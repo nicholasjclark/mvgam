@@ -2178,28 +2178,61 @@ extract_hierarchical_info <- function(data_info, trend_specs) {
   # Input validation following project standards
   checkmate::assert_list(data_info, names = "named")
   checkmate::assert_list(trend_specs, names = "named")
-  
+
   has_groups <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
 
   if (!has_groups) {
     return(NULL)
   }
-  
-  # Compute n_groups from actual data using established pattern from validations.R
-  unique_groups <- sort(unique(data_info$data[[trend_specs$gr]]))
+
+  gr_var <- trend_specs$gr
+
+  if (is.null(data_info$data[[gr_var]])) {
+    stop(insight::format_error(c(
+      paste0("Grouping variable '", gr_var, "' not found in data."),
+      i = "Check that 'gr' refers to an existing column."
+    )))
+  }
+
+  unique_groups <- sort(unique(data_info$data[[gr_var]]))
   n_groups <- length(unique_groups)
-  
+
   if (n_groups < 1) {
     stop(insight::format_error(
-      "Grouping variable {.field {trend_specs$gr}} has no unique values"
+      paste0("Grouping variable '", gr_var, "' has no unique values.")
     ))
+  }
+
+  # n_subgroups = number of series within each group. If user supplied
+  # subgr= or n_lv (factor models), prefer that. Otherwise derive from
+  # the series-to-group mapping. The Stan template declares matrices
+  # of size N_subgroups_trend; a constant series-per-group count is
+  # assumed downstream and unbalanced designs require explicit subgr=.
+  if (!is.null(data_info$n_subgroups)) {
+    n_subgroups <- data_info$n_subgroups
+  } else {
+    series_var <- data_info$series_var %||% "series"
+    if (is.null(data_info$data[[series_var]])) {
+      stop(insight::format_error(c(
+        paste0("Series variable '", series_var, "' not found in data."),
+        i = "Cannot derive n_subgroups for hierarchical trend."
+      )))
+    }
+    unique_series_data <- data_info$data[
+      !duplicated(data_info$data[[series_var]]),
+      ,
+      drop = FALSE
+    ]
+    series_groups <- unique_series_data[[gr_var]]
+    group_counts <- as.integer(table(series_groups))
+    n_subgroups <- max(group_counts)
   }
 
   list(
     has_groups = TRUE,
     n_groups = n_groups,
-    n_subgroups = data_info$n_subgroups %||% data_info$n_lv %||% data_info$n_series,
-    gr_var = trend_specs$gr,
+    n_subgroups = n_subgroups,
+    gr_var = gr_var,
     subgr_var = trend_specs$subgr %||% 'NA'
   )
 }

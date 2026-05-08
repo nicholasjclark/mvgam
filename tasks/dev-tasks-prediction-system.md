@@ -617,11 +617,30 @@ User-friendly interfaces with automatic summarization.
       - DRY design: single dispatcher, pattern-specific transforms
       - Code reviewer approved
 
-    - [ ] **4.1.1.4 Handle hierarchical covariance structures**
-      - Implement `sample_hierarchical_cholesky_innovations()` for grouped models
-      - Extract: `L_Omega_global_trend`, `L_deviation_group_trend`, `alpha_cor_trend`
-      - Combine global + group-specific correlations per the Stan model
-      - Handle group indices mapping from `object$trend_model`
+    - [x] **4.1.1.4 Handle hierarchical covariance structures**
+      - Implemented `transform_hierarchical_cholesky_innovations()` in
+        `R/sample_innovations.R` mirroring Stan's `combine_cholesky()`:
+        per-group Cholesky from convex combination of global + per-group
+        deviations, then row-scaled by per-group sigmas.
+      - Added `extract_hierarchical_cholesky_params()` to pull posterior
+        columns by exact name into structured arrays
+        `[ndraws, n_groups, n_sub, n_sub]`. Avoids the brittle
+        sort-by-first-index path in `extract_named_params()`.
+      - `get_trend_covariance_structure()` detects hierarchical via
+        `standata$N_groups_trend` (top-level metadata gr_var is stale,
+        tracked separately).
+      - `sample_innovations()` dispatches hierarchical+cholesky_scaled
+        to the new transform.
+      - Surfaced and filed five blocking codegen / metadata bugs while
+        fitting the validation fixture: N_subgroups computed as N_series
+        (FIXED in this branch), X_trend dim mismatch with covariate+gr,
+        RW(gr=) silently ignored, dangling scaled_innovations_trend in
+        non-hier RW Stan, simple-Cholesky transforms assume lower-tri-only
+        but posterior is full N×N, top-level trend_metadata gr_var stale.
+      - Added `tests/testthat/test-sample-innovations.R` (22 tests):
+        shape, value preservation, identity round-trip, sigma scaling,
+        within-group correlation, group independence, dim validation.
+      - Code reviewer approved without changes.
 
     - [ ] **4.1.1.5 Create main `sample_process_errors()` function**
       - Signature: `sample_process_errors(object, ndraws, newdata, draw_ids = NULL)`
@@ -740,6 +759,59 @@ Final validation and documentation.
 - [ ] **6.5 Final code review**
   - Use **code-reviewer agent** on complete prediction system
   - Review: consistency, documentation completeness, test coverage
+
+---
+
+### 7.0 Known Limitations Surfaced During Prediction-System Work
+
+Codegen / validation gaps unrelated to the prediction functions per se,
+but discovered while building the hierarchical-trend prediction fixture
+in 4.1.1.4. Tracked here so prediction tests don't quietly assume them
+to be solved.
+
+- [ ] **7.1 Support unbalanced hierarchical groups in Stan codegen**
+  - Current Stan template assumes constant series-per-group via a
+    single scalar `N_subgroups_trend`. Per-group matrices are declared
+    `array[N_groups_trend] cholesky_factor_corr[N_subgroups_trend]`,
+    inner loops fill only `k` entries of fixed-size `group_innov`,
+    leaving tail entries uninitialised → NaN at init for unbalanced
+    groups (e.g. 3 forest + 2 grassland series).
+  - Verified by Explore agent: structural constraint, not cosmetic.
+    Constraint pinned at `R/stan_assembly.R` lines 2788, 2807, 2816,
+    2823 (parameter declarations) and 2857–2877 (innovation loop).
+  - Fix scope: ragged Stan arrays (Stan ≥2.31), new
+    `array[N_groups_trend] int group_sizes_trend` data block, rewrite
+    loop bounds `1:N_subgroups_trend` → `1:group_sizes[g]` in ~8
+    blocks, R-side data prep to compute `group_sizes`.
+  - Estimated effort: 2–3 days. Until shipped, hierarchical prediction
+    only covers balanced designs; unbalanced inputs fail at Stan init
+    with `normal_lpdf: Location parameter[1] is nan`.
+  - Recommended UX in the meantime: emit a soft warning at fit time
+    when groups are unbalanced, naming the offending counts.
+
+- [ ] **7.2 Fix X_trend dim mismatch with covariates + gr= in trend**
+  - `trend_formula = ~ x + (x|g) + ZMVN(gr=g)` declares `X_trend`
+    with `N_trend` rows but standata supplies `N` (n_obs) rows. The
+    trend-level fixed-effects design matrix isn't being aggregated
+    when `gr=` is set.
+
+- [x] **7.3 Validate gr= covariate is constant within each series**
+  - Implemented as `validate_gr_constant_per_series()` in
+    `R/validations.R`, called from `validate_trend_grouping()`. Errors
+    fast naming the offending series when `gr` varies across rows of
+    one series.
+
+- [ ] **7.4 Fix `RW(gr=...)` and `AR(gr=...)` silently ignoring `gr`**
+  - Constructors parse the arg but the codegen path emits
+    non-hierarchical Stan. Either implement hierarchical RW/AR codegen
+    or fail-fast at constructor time pointing users to ZMVN/VAR.
+
+- [ ] **7.5 Fix dangling `scaled_innovations_trend` in plain RW Stan**
+  - Plain `RW()` (gaussian, simple) declares
+    `matrix[N_trend, N_lv_trend] scaled_innovations_trend` but never
+    assigns to it before reading. `lv_trend` becomes NaN at init.
+    Affects basic RW fits on certain code paths; the cor=TRUE path
+    appears to assign correctly so the bug is path-dependent.
 
 ---
 

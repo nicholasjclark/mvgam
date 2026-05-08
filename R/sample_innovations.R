@@ -323,8 +323,9 @@ covariance_param_specs <- list(
 #'     \item \code{params}: List of extracted parameter matrices
 #'     \item \code{group_info}: Group structure (if hierarchical)
 #'   }
-#'   Cholesky factors kept as vectors for memory efficiency; use
-#'   cholesky_to_matrix() to reconstruct.
+#'   Cholesky factors are kept as flat per-draw vectors (in row-major
+#'   order from posterior sort); reshape via
+#'   matrix(vec, dim, dim, byrow = TRUE) to get L.
 #'
 #' @noRd
 get_trend_covariance_structure <- function(object, ndraws = NULL,
@@ -364,9 +365,10 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
   }
 
   n_series <- object$series_info$n_series %||% object$trend_components$n_trends
-  hierarchical <- !is.null(metadata$variables$gr_var) &&
-                  !is.na(metadata$variables$gr_var) &&
-                  metadata$variables$gr_var != "NA"
+  # standata is the ground truth: hierarchical Stan code declares
+  # N_groups_trend / N_subgroups_trend; absence means non-hierarchical.
+  hierarchical <- !is.null(object$standata) &&
+                  !is.null(object$standata$N_groups_trend)
 
   draws_mat <- posterior::as_draws_matrix(object$fit)
   draw_indices <- resolve_draw_indices(nrow(draws_mat), ndraws, draw_ids)
@@ -377,10 +379,26 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
     effective_pattern <- "diagonal"
   }
 
-  param_names <- covariance_param_specs[[effective_pattern]][[
-    if (hierarchical) "hierarchical" else "simple"
-  ]]
-  params <- extract_named_params(draws_mat, param_names)
+  group_info <- if (hierarchical) get_group_info(object$standata) else NULL
+  n_series_int <- as.integer(n_series)
+
+  # Multi-index params (Cholesky factors, full covariance) are extracted
+  # via explicit named-column lookup so indexing is unambiguous; the
+  # generic extract_named_params() sorts only by first index, which is
+  # brittle for 2D+ arrays where the secondary order then depends on
+  # the source storage convention.
+  if (hierarchical && effective_pattern == "cholesky_scaled") {
+    params <- extract_hierarchical_cholesky_params(draws_mat, group_info)
+  } else if (!hierarchical && effective_pattern == "cholesky_scaled") {
+    params <- extract_simple_cholesky_params(draws_mat, n_series_int)
+  } else if (!hierarchical && effective_pattern == "full_covariance") {
+    params <- extract_simple_full_cov_params(draws_mat, n_series_int)
+  } else {
+    param_names <- covariance_param_specs[[effective_pattern]][[
+      if (hierarchical) "hierarchical" else "simple"
+    ]]
+    params <- extract_named_params(draws_mat, param_names)
+  }
 
   list(
     pattern = pattern,
@@ -389,7 +407,7 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
     has_correlations = has_correlations,
     ndraws = length(draw_indices),
     params = params,
-    group_info = if (hierarchical) get_group_info(object$standata) else NULL
+    group_info = group_info
   )
 }
 
@@ -481,6 +499,161 @@ extract_posterior_param <- function(draws_mat, all_cols, param_name) {
 }
 
 
+#' Extract Simple Cholesky Parameters as Structured Arrays
+#'
+#' Builds a per-draw `[ndraws, n, n]` array for `L_Omega_trend` and
+#' `[ndraws, n]` matrix for `sigma_trend` via direct column-name
+#' lookup. Mirrors `extract_hierarchical_cholesky_params()` for the
+#' non-hierarchical case so reconstruction is independent of any
+#' sort-order assumption in `extract_named_params()`.
+#'
+#' @noRd
+extract_simple_cholesky_params <- function(draws_mat, n_series) {
+  checkmate::assert_matrix(draws_mat, min.rows = 1, min.cols = 1)
+  checkmate::assert_int(n_series, lower = 1)
+  ndraws <- nrow(draws_mat)
+  all_cols <- colnames(draws_mat)
+
+  pull_col <- function(name) {
+    if (!name %in% all_cols) {
+      stop(insight::format_error(c(
+        paste0("Posterior parameter '", name, "' not found."),
+        i = "Required for simple Cholesky covariance."
+      )))
+    }
+    as.numeric(draws_mat[, name])
+  }
+
+  sigma <- matrix(0, ndraws, n_series)
+  for (s in seq_len(n_series)) {
+    sigma[, s] <- pull_col(sprintf("sigma_trend[%d]", s))
+  }
+
+  L_omega <- array(0, c(ndraws, n_series, n_series))
+  for (j in seq_len(n_series)) {
+    for (i in seq_len(n_series)) {
+      L_omega[, i, j] <- pull_col(sprintf("L_Omega_trend[%d,%d]", i, j))
+    }
+  }
+
+  list(sigma_trend = sigma, L_Omega_trend = L_omega)
+}
+
+
+#' Extract Simple Full Covariance Parameters as Structured Arrays
+#'
+#' Builds a `[ndraws, n, n]` array for `Sigma_trend` via direct
+#' column-name lookup so reconstruction is order-safe.
+#'
+#' @noRd
+extract_simple_full_cov_params <- function(draws_mat, n_series) {
+  checkmate::assert_matrix(draws_mat, min.rows = 1, min.cols = 1)
+  checkmate::assert_int(n_series, lower = 1)
+  ndraws <- nrow(draws_mat)
+  all_cols <- colnames(draws_mat)
+
+  pull_col <- function(name) {
+    if (!name %in% all_cols) {
+      stop(insight::format_error(c(
+        paste0("Posterior parameter '", name, "' not found."),
+        i = "Required for full-covariance trend."
+      )))
+    }
+    as.numeric(draws_mat[, name])
+  }
+
+  Sigma <- array(0, c(ndraws, n_series, n_series))
+  for (j in seq_len(n_series)) {
+    for (i in seq_len(n_series)) {
+      Sigma[, i, j] <- pull_col(sprintf("Sigma_trend[%d,%d]", i, j))
+    }
+  }
+
+  list(Sigma_trend = Sigma)
+}
+
+
+#' Extract Hierarchical Cholesky Parameters as Structured Arrays
+#'
+#' Builds named arrays for hierarchical Cholesky covariance from posterior
+#' draws via direct column-name lookup. Unlike `extract_named_params()`
+#' (which sorts only by first index), this preserves multi-index ordering
+#' so downstream code can use `arr[d, g, i, j]` directly.
+#'
+#' @return List with components:
+#'   - `alpha_cor_trend`: numeric vector length ndraws
+#'   - `L_Omega_global_trend`: array `[ndraws, n_sub, n_sub]`
+#'   - `L_deviation_group_trend`: array `[ndraws, n_groups, n_sub, n_sub]`
+#'   - `sigma_group_trend`: array `[ndraws, n_groups, n_sub]`
+#'
+#' @noRd
+extract_hierarchical_cholesky_params <- function(draws_mat, group_info) {
+  checkmate::assert_matrix(draws_mat, min.rows = 1, min.cols = 1)
+  checkmate::assert_list(group_info)
+  checkmate::assert_names(
+    names(group_info),
+    must.include = c("n_groups", "n_subgroups")
+  )
+
+  ndraws <- nrow(draws_mat)
+  n_groups <- as.integer(group_info$n_groups)
+  n_sub <- as.integer(group_info$n_subgroups)
+  all_cols <- colnames(draws_mat)
+
+  pull_col <- function(name) {
+    if (!name %in% all_cols) {
+      stop(insight::format_error(c(
+        paste0("Posterior parameter '", name, "' not found."),
+        i = "Required for hierarchical Cholesky covariance."
+      )))
+    }
+    as.numeric(draws_mat[, name])
+  }
+
+  # alpha_cor_trend: scalar per draw
+  alpha <- pull_col("alpha_cor_trend")
+
+  # L_Omega_global_trend: 2D matrix per draw, shape [n_sub, n_sub]
+  L_global <- array(0, c(ndraws, n_sub, n_sub))
+  for (j in seq_len(n_sub)) {
+    for (i in seq_len(n_sub)) {
+      L_global[, i, j] <- pull_col(
+        sprintf("L_Omega_global_trend[%d,%d]", i, j)
+      )
+    }
+  }
+
+  # L_deviation_group_trend: per-group matrix, shape [n_groups, n_sub, n_sub]
+  L_dev <- array(0, c(ndraws, n_groups, n_sub, n_sub))
+  for (g in seq_len(n_groups)) {
+    for (j in seq_len(n_sub)) {
+      for (i in seq_len(n_sub)) {
+        L_dev[, g, i, j] <- pull_col(
+          sprintf("L_deviation_group_trend[%d,%d,%d]", g, i, j)
+        )
+      }
+    }
+  }
+
+  # sigma_group_trend: per-group SDs, shape [n_groups, n_sub]
+  sigma_grp <- array(0, c(ndraws, n_groups, n_sub))
+  for (g in seq_len(n_groups)) {
+    for (s in seq_len(n_sub)) {
+      sigma_grp[, g, s] <- pull_col(
+        sprintf("sigma_group_trend[%d,%d]", g, s)
+      )
+    }
+  }
+
+  list(
+    alpha_cor_trend = alpha,
+    L_Omega_global_trend = L_global,
+    L_deviation_group_trend = L_dev,
+    sigma_group_trend = sigma_grp
+  )
+}
+
+
 #' @noRd
 get_group_info <- function(standata) {
   list(
@@ -491,21 +664,6 @@ get_group_info <- function(standata) {
 }
 
 
-#' Convert Cholesky Vector to Matrix
-#'
-#' Reconstructs a lower-triangular Cholesky factor matrix from
-#' Stan's column-major vector storage.
-#'
-#' @param chol_vec Numeric vector of Cholesky elements
-#' @param dim Dimension of the square matrix
-#' @return Lower-triangular matrix
-#'
-#' @noRd
-cholesky_to_matrix <- function(chol_vec, dim) {
-  L <- matrix(0, nrow = dim, ncol = dim)
-  L[lower.tri(L, diag = TRUE)] <- chol_vec
-  L
-}
 
 
 # ============================================================================
@@ -585,22 +743,34 @@ sample_innovations <- function(cov_structure, obs_structure) {
     n_times * n_series
   )
 
-  # Transform by covariance pattern
-  innovations_flat <- switch(
-    effective_pattern,
-    diagonal = transform_diagonal_innovations(
-      z, cov_structure$params, n_times, n_series, ndraws
-    ),
-    cholesky_scaled = transform_cholesky_innovations(
-      z, cov_structure$params, n_times, n_series, ndraws
-    ),
-    full_covariance = transform_full_cov_innovations(
-      z, cov_structure$params, n_times, n_series, ndraws
-    ),
-    stop(insight::format_error(
-      paste0("Unknown covariance pattern: '", effective_pattern, "'.")
-    ))
-  )
+  # Transform by covariance pattern. Hierarchical Cholesky uses a
+  # different structure (per-group convex combination of correlations),
+  # so route it to its dedicated transform.
+  is_hier_chol <- isTRUE(cov_structure$hierarchical) &&
+                  effective_pattern == "cholesky_scaled"
+
+  if (is_hier_chol) {
+    innovations_flat <- transform_hierarchical_cholesky_innovations(
+      z, cov_structure$params, n_times, n_series, ndraws,
+      cov_structure$group_info
+    )
+  } else {
+    innovations_flat <- switch(
+      effective_pattern,
+      diagonal = transform_diagonal_innovations(
+        z, cov_structure$params, n_times, n_series, ndraws
+      ),
+      cholesky_scaled = transform_cholesky_innovations(
+        z, cov_structure$params, n_times, n_series, ndraws
+      ),
+      full_covariance = transform_full_cov_innovations(
+        z, cov_structure$params, n_times, n_series, ndraws
+      ),
+      stop(insight::format_error(
+        paste0("Unknown covariance pattern: '", effective_pattern, "'.")
+      ))
+    )
+  }
 
   # Map (time, series) grid to observations
   map_innovations_to_obs(innovations_flat, n_times, n_series, obs_structure)
@@ -653,10 +823,9 @@ transform_diagonal_innovations <- function(z, params, n_times, n_series,
 #' Requires per-draw loop because covariance matrices vary across draws.
 #'
 #' @param z Matrix `[ndraws x (n_times * n_series)]` of standard normals
-#' @param params List with:
+#' @param params List from `extract_simple_cholesky_params()`:
 #'   - `sigma_trend`: matrix `[ndraws x n_series]` of innovation SDs
-#'   - `L_Omega_trend`: matrix `[ndraws x n_chol_elements]` of Cholesky
-#'     factors (lower tri, column-major)
+#'   - `L_Omega_trend`: array `[ndraws x n_series x n_series]`
 #' @param n_times Number of unique time points
 #' @param n_series Number of series
 #' @param ndraws Number of posterior draws
@@ -665,7 +834,7 @@ transform_diagonal_innovations <- function(z, params, n_times, n_series,
 #'
 #' @details
 #' For each draw d:
-#' 1. Reconstruct L_Omega from vector storage
+#' 1. Slice L_Omega from the per-draw 3D array
 #' 2. Compute L_Sigma = diag(sigma) %*% L_Omega via row scaling
 #' 3. Transform: innovations = z %*% t(L_Sigma)
 #'
@@ -678,27 +847,26 @@ transform_cholesky_innovations <- function(z, params, n_times, n_series,
   checkmate::assert_int(ndraws, lower = 1)
 
   sigma <- params$sigma_trend
-  L_omega_vec <- params$L_Omega_trend
+  L_omega_arr <- params$L_Omega_trend
 
   checkmate::assert_matrix(sigma, nrows = ndraws, ncols = n_series)
-  n_chol_elements <- n_series * (n_series + 1) / 2
-  checkmate::assert_matrix(
-    L_omega_vec,
-    nrows = ndraws,
-    ncols = n_chol_elements
-  )
+  if (!identical(dim(L_omega_arr),
+                 as.integer(c(ndraws, n_series, n_series)))) {
+    stop(insight::format_error(c(
+      "Unexpected dimensions for 'L_Omega_trend'.",
+      x = paste0("Got: ", paste(dim(L_omega_arr), collapse = "x"),
+                 ", expected: ", ndraws, "x", n_series, "x", n_series, ".")
+    )))
+  }
 
   # Pre-allocate result matrix
   result <- matrix(0, ndraws, n_times * n_series)
 
   for (d in seq_len(ndraws)) {
-    # Reconstruct L_Omega (correlation Cholesky)
-    L_omega <- cholesky_to_matrix(L_omega_vec[d, ], n_series)
+    L_omega <- L_omega_arr[d, , ]
 
-    # L_Sigma = diag(sigma) %*% L_Omega
-    # Multiply each row i of L_omega by sigma[i] to avoid
-    # constructing the diagonal matrix explicitly
-    L_sigma <- L_omega * sigma[d, ]
+    # L_Sigma = diag(sigma) %*% L_Omega via row scaling
+    L_sigma <- L_omega * as.numeric(sigma[d, ])
 
     # Reshape z for this draw: [n_times x n_series]
     z_d <- matrix(z[d, ], n_times, n_series, byrow = FALSE)
@@ -717,8 +885,8 @@ transform_cholesky_innovations <- function(z, params, n_times, n_series,
 #' per draw, which is O(n^3) where n = n_series.
 #'
 #' @param z Matrix `[ndraws x (n_times * n_series)]` of standard normals
-#' @param params List with `Sigma_trend`: matrix `[ndraws x n_series^2]`
-#'   containing flattened covariance matrices (column-major)
+#' @param params List from `extract_simple_full_cov_params()`:
+#'   - `Sigma_trend`: array `[ndraws x n_series x n_series]`
 #' @param n_times Number of unique time points
 #' @param n_series Number of series
 #' @param ndraws Number of posterior draws
@@ -727,7 +895,7 @@ transform_cholesky_innovations <- function(z, params, n_times, n_series,
 #'
 #' @details
 #' For each draw d:
-#' 1. Reconstruct Sigma from vector storage
+#' 1. Slice Sigma from the per-draw 3D array
 #' 2. Compute L = chol(Sigma) using R's LAPACK-based implementation
 #' 3. Transform: innovations = z %*% t(L)
 #'
@@ -739,18 +907,23 @@ transform_full_cov_innovations <- function(z, params, n_times, n_series,
   checkmate::assert_int(n_series, lower = 1)
   checkmate::assert_int(ndraws, lower = 1)
 
-  Sigma_vec <- params$Sigma_trend
-  checkmate::assert_matrix(Sigma_vec, nrows = ndraws, ncols = n_series^2)
+  Sigma_arr <- params$Sigma_trend
+  if (!identical(dim(Sigma_arr),
+                 as.integer(c(ndraws, n_series, n_series)))) {
+    stop(insight::format_error(c(
+      "Unexpected dimensions for 'Sigma_trend'.",
+      x = paste0("Got: ", paste(dim(Sigma_arr), collapse = "x"),
+                 ", expected: ", ndraws, "x", n_series, "x", n_series, ".")
+    )))
+  }
 
   # Pre-allocate result matrix
   result <- matrix(0, ndraws, n_times * n_series)
 
   for (d in seq_len(ndraws)) {
-    # Reconstruct Sigma matrix (column-major storage)
-    Sigma_d <- matrix(Sigma_vec[d, ], n_series, n_series)
+    Sigma_d <- Sigma_arr[d, , ]
 
-    # Compute Cholesky decomposition
-    # R's chol() returns upper triangular, transpose for lower
+    # R's chol() returns upper triangular; transpose for lower.
     L_d <- t(chol(Sigma_d))
 
     # Reshape z for this draw
@@ -819,4 +992,152 @@ map_innovations_to_obs <- function(innovations_flat, n_times, n_series,
 
   # Column selection
   innovations_flat[, grid_idx, drop = FALSE]
+}
+
+
+#' Transform Innovations: Hierarchical Cholesky Pattern
+#'
+#' For models declared with `gr=` grouping. The per-group covariance is
+#' assembled via Stan's `combine_cholesky()` (see R/stan_assembly.R) as a
+#' convex combination of the global correlation and per-group deviations,
+#' then re-Choleskied and scaled by per-group SDs:
+#' \itemize{
+#'   \item C_global = L_g L_g^T
+#'   \item C_local[g] = L_d[g] L_d[g]^T
+#'   \item L_grp[g] = chol(alpha * C_global + (1 - alpha) * C_local[g])
+#'   \item L_full[g] = diag(sigma_grp[g]) %*% L_grp[g]
+#' }
+#' Different groups are independent (block-diagonal full covariance).
+#'
+#' @param z Matrix `[ndraws x (n_times * n_series)]` of standard normals.
+#' @param params List of structured arrays from
+#'   `extract_hierarchical_cholesky_params()`:
+#'   `alpha_cor_trend`, `L_Omega_global_trend`,
+#'   `L_deviation_group_trend`, `sigma_group_trend`.
+#' @param n_times Number of unique time points.
+#' @param n_series Total number of series across all groups.
+#' @param ndraws Number of posterior draws.
+#' @param group_info List with `n_groups`, `n_subgroups`, `group_inds`.
+#'
+#' @return Matrix `[ndraws x (n_times * n_series)]` of transformed
+#'   innovations laid out in the same column order as the diagonal /
+#'   simple-Cholesky transforms.
+#'
+#' @noRd
+transform_hierarchical_cholesky_innovations <- function(z, params, n_times,
+                                                        n_series, ndraws,
+                                                        group_info) {
+  checkmate::assert_matrix(z, nrows = ndraws, ncols = n_times * n_series)
+  checkmate::assert_int(n_times, lower = 1)
+  checkmate::assert_int(n_series, lower = 1)
+  checkmate::assert_int(ndraws, lower = 1)
+  checkmate::assert_list(group_info)
+  checkmate::assert_names(
+    names(group_info),
+    must.include = c("n_groups", "n_subgroups", "group_inds")
+  )
+
+  n_groups <- as.integer(group_info$n_groups)
+  n_sub <- as.integer(group_info$n_subgroups)
+  group_inds <- as.integer(group_info$group_inds)
+
+  checkmate::assert_int(n_groups, lower = 1)
+  checkmate::assert_int(n_sub, lower = 1)
+  checkmate::assert_integerish(
+    group_inds,
+    lower = 1, upper = n_groups,
+    len = n_series, any.missing = FALSE
+  )
+
+  alpha <- params$alpha_cor_trend
+  L_glob_arr <- params$L_Omega_global_trend
+  L_dev_arr <- params$L_deviation_group_trend
+  sigma_arr <- params$sigma_group_trend
+
+  checkmate::assert_numeric(alpha, len = ndraws, any.missing = FALSE)
+  # Local helper: dim() returns integer; build expected as integer too
+  # so identical() doesn't trip on a numeric/integer mismatch.
+  check_dims <- function(arr, name, expected) {
+    expected <- as.integer(expected)
+    if (!identical(dim(arr), expected)) {
+      stop(insight::format_error(c(
+        paste0("Unexpected dimensions for '", name, "'."),
+        x = paste0("Got: ", paste(dim(arr), collapse = "x"),
+                   ", expected: ", paste(expected, collapse = "x"), ".")
+      )))
+    }
+  }
+
+  # L_Omega_global: [ndraws, n_sub, n_sub]
+  checkmate::assert_array(
+    L_glob_arr, d = 3,
+    any.missing = FALSE
+  )
+  check_dims(L_glob_arr, "L_Omega_global_trend",
+             c(ndraws, n_sub, n_sub))
+  # L_deviation_group: [ndraws, n_groups, n_sub, n_sub]
+  check_dims(L_dev_arr, "L_deviation_group_trend",
+             c(ndraws, n_groups, n_sub, n_sub))
+  # sigma_group: [ndraws, n_groups, n_sub]
+  check_dims(sigma_arr, "sigma_group_trend",
+             c(ndraws, n_groups, n_sub))
+
+  # Each series's rank within its group (1-based). Vectorized via ave().
+  within_pos <- as.integer(
+    ave(seq_along(group_inds), group_inds, FUN = seq_along)
+  )
+
+  # Pre-compute series indices grouped by group_id
+  series_by_group <- split(seq_len(n_series), group_inds)
+
+  # Pre-compute (start, end) column ranges per series in z / result
+  series_col_start <- (seq_len(n_series) - 1L) * n_times + 1L
+
+  result <- matrix(0, ndraws, n_times * n_series)
+
+  for (d in seq_len(ndraws)) {
+    # drop = FALSE not needed for 3D->2D slice; R returns a matrix.
+    L_glob_d <- L_glob_arr[d, , ]
+    glob_cor <- tcrossprod(L_glob_d)
+    alpha_d <- alpha[d]
+    one_minus_alpha_d <- 1 - alpha_d
+
+    for (g in seq_len(n_groups)) {
+      L_dev_dg <- L_dev_arr[d, g, , ]
+      local_cor <- tcrossprod(L_dev_dg)
+
+      combined_cor <- alpha_d * glob_cor + one_minus_alpha_d * local_cor
+
+      # R's chol() is upper-tri; transpose to match Stan's lower-tri
+      # cholesky_decompose() convention.
+      L_grp <- t(chol(combined_cor))
+
+      # Row-scale by per-group sigmas (equivalent to diag(sigma) %*% L)
+      sigma_dg <- sigma_arr[d, g, ]
+      L_full <- L_grp * sigma_dg
+
+      series_g <- series_by_group[[g]]
+
+      # Stack z columns for these series into [n_times, n_sub] in
+      # within-group order. z layout: cols (s-1)*n_times + 1:n_times.
+      z_g <- matrix(0, n_times, n_sub)
+      for (k in seq_along(series_g)) {
+        s <- series_g[k]
+        col_range <- series_col_start[s] + (0:(n_times - 1L))
+        z_g[, within_pos[s]] <- z[d, col_range]
+      }
+
+      # Transform: x = z %*% t(L) gives MVN with cov L %*% t(L)
+      innov_g <- z_g %*% t(L_full)
+
+      # Place innovations back into result
+      for (k in seq_along(series_g)) {
+        s <- series_g[k]
+        col_range <- series_col_start[s] + (0:(n_times - 1L))
+        result[d, col_range] <- innov_g[, within_pos[s]]
+      }
+    }
+  }
+
+  result
 }

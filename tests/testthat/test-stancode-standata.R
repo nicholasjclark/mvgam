@@ -63,15 +63,41 @@ setup_stan_test_data <- function() {
     site = factor(rep(c("A", "B", "C"), length.out = n_time))
   )
 
-  # Multivariate dataset with balanced design
+  # Multivariate dataset with balanced design. habitat is assigned
+  # deterministically per series so it can be used as a hierarchical
+  # grouping variable (constant within each series). Trend-level
+  # covariates (x, presence) are generated per (time, habitat) so they
+  # satisfy the trend invariance check used by hierarchical trends.
+  series_levels <- paste0("series", 1:n_series)
+  series_to_habitat <- setNames(
+    rep(c("forest", "grassland"), length.out = n_series),
+    series_levels
+  )
+  series_col <- factor(rep(series_levels, each = n_time),
+                        levels = series_levels)
+  habitat_col <- factor(series_to_habitat[as.character(series_col)],
+                         levels = c("forest", "grassland"))
+  th_grid <- expand.grid(
+    time = seq_len(n_time),
+    habitat = factor(c("forest", "grassland"))
+  )
+  th_grid$x <- rnorm(nrow(th_grid))
+  th_grid$presence <- rbinom(nrow(th_grid), 1, 0.7)
+  th_lookup <- setNames(
+    seq_len(nrow(th_grid)),
+    paste(th_grid$time, th_grid$habitat, sep = "_")
+  )
+  obs_keys <- paste(rep(seq_len(n_time), n_series),
+                     as.character(habitat_col), sep = "_")
+  obs_idx <- th_lookup[obs_keys]
   multivariate <- data.frame(
-    time = rep(1:n_time, n_series),
-    series = factor(rep(paste0("series", 1:n_series), each = n_time)),
+    time = rep(seq_len(n_time), n_series),
+    series = series_col,
     count = rpois(n_time * n_series, lambda = 4),
     biomass = rlnorm(n_time * n_series, meanlog = 1, sdlog = 0.5),
-    presence = rbinom(n_time * n_series, size = 1, prob = 0.7),
-    x = rnorm(n_time * n_series),
-    habitat = factor(sample(c("forest", "grassland"), n_time * n_series, replace = TRUE))
+    presence = th_grid$presence[obs_idx],
+    x = th_grid$x[obs_idx],
+    habitat = habitat_col
   )
 
   # Dataset with missing values
@@ -1102,8 +1128,10 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
   # Universal trend computation pattern should still be present
   expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\]", code_with_trend))
 
-  # Observation model priors (brms pattern)
-  expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept \\| 3, 0\\.9, 2\\.5\\);", code_with_trend))
+  # Observation model priors (brms pattern). The intercept prior
+  # location is data-driven (median of the response, computed by brms),
+  # so we don't pin it.
+  expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept \\| 3, [^,]+, 2\\.5\\);", code_with_trend))
   expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(sigma \\| 3, 0, 2\\.5\\)", code_with_trend))
   expect_true(stan_pattern("- 1 \\* student_t_lccdf\\(0 \\| 3, 0, 2\\.5\\);", code_with_trend))
 
@@ -1247,7 +1275,8 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   expect_false(grepl("b_trend ~", code_with_trend))
 
   # Observation model priors (brms pattern)
-  expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept \\| 3, 0\\.9, 2\\.5\\);", code_with_trend))
+  # Intercept prior location is data-driven; don't pin the value.
+  expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept \\| 3, [^,]+, 2\\.5\\);", code_with_trend))
   expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(sigma \\| 3, 0, 2\\.5\\)", code_with_trend))
   expect_true(stan_pattern("- 1 \\* student_t_lccdf\\(0 \\| 3, 0, 2\\.5\\);", code_with_trend))
 
@@ -2212,15 +2241,8 @@ test_that("stan functions provide informative error messages", {
   mf <- mvgam_formula(y ~ x, trend_formula = ~ RW())
 
   # Should provide informative errors
-  expect_error(
-    stancode(mf, data = bad_data, family = poisson()),
-    class = c("rlang_error", "error")
-  )
-
-  expect_error(
-    standata(mf, data = bad_data, family = poisson()),
-    class = c("rlang_error", "error")
-  )
+  expect_error(stancode(mf, data = bad_data, family = poisson()))
+  expect_error(standata(mf, data = bad_data, family = poisson()))
 })
 
 test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend structure", {

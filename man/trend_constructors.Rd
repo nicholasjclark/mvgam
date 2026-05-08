@@ -83,7 +83,19 @@ degree of partial pooling).
 When used within a \code{VAR()} model, this essentially sets up a hierarchical
 panel vector autoregression where both the autoregressive and correlation
 matrices are learned hierarchically. If \code{gr} is supplied then \code{subgr}
-\emph{must} also be supplied.}
+\emph{must} also be supplied.
+
+Two constraints currently apply to hierarchical trend models:
+\itemize{
+\item \code{gr} must be constant within each series (each series belongs to
+a single group). Models with \code{gr} varying within a series are
+rejected at validation time.
+\item Groups must be balanced (the same number of series in each
+group). Unbalanced designs are not yet supported by the underlying
+Stan template; if you supply unbalanced data without an explicit
+\code{subgr} argument, the model will fail at Stan initialisation. See
+the package issue tracker for the planned ragged-array support.
+}}
 
 \item{subgr}{A subgrouping \code{factor} variable specifying which element in
 \code{data} represents the different time series. Defaults to \code{series}, but

@@ -2018,6 +2018,18 @@ print.mvgam_trend <- function(x, ...) {
 #'   matrices are learned hierarchically. If `gr` is supplied then `subgr`
 #'   *must* also be supplied.
 #'
+#'   Two constraints currently apply to hierarchical trend models:
+#'   \itemize{
+#'     \item `gr` must be constant within each series (each series belongs to
+#'       a single group). Models with `gr` varying within a series are
+#'       rejected at validation time.
+#'     \item Groups must be balanced (the same number of series in each
+#'       group). Unbalanced designs are not yet supported by the underlying
+#'       Stan template; if you supply unbalanced data without an explicit
+#'       `subgr` argument, the model will fail at Stan initialisation. See
+#'       the package issue tracker for the planned ragged-array support.
+#'   }
+#'
 #' @param subgr A subgrouping `factor` variable specifying which element in
 #'   `data` represents the different time series. Defaults to `series`, but
 #'   note that models that use the hierarchical correlations, where the

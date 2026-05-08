@@ -463,9 +463,64 @@ validate_trend_grouping <- function(trend_spec, data, cached_formulas = NULL) {
     formula_to_use <- if (!is.null(cached_formulas)) cached_formulas$formula else NULL
     filtered_vars <- filter_required_variables(required_vars, formula_to_use)
     validate_required_variables(data, filtered_vars, "grouping data")
+
+    # Each series must belong to a single group. If gr varies within a
+    # series, mvgam silently picks the first row's value and Stan fails
+    # at init with non-finite gradients; better to flag it here.
+    validate_gr_constant_per_series(trend_spec, data)
   }
 
   return(trend_spec)
+}
+
+
+#' Validate Grouping Variable is Constant Within Each Series
+#'
+#' Series-level hierarchical models map each series to a single group.
+#' If `gr` varies across rows of the same series, the model is incoherent.
+#'
+#' @param trend_spec Trend specification with `gr` and (optionally)
+#'   `series` fields.
+#' @param data Data frame containing `gr` and series columns.
+#' @return Invisibly NULL; called for its side-effect (errors on
+#'   inconsistent series).
+#' @noRd
+validate_gr_constant_per_series <- function(trend_spec, data) {
+  gr_var <- trend_spec$gr
+  series_var <- trend_spec$series %||% "series"
+
+  if (!series_var %in% colnames(data)) {
+    return(invisible(NULL))
+  }
+  if (!gr_var %in% colnames(data)) {
+    return(invisible(NULL))
+  }
+
+  series_vec <- data[[series_var]]
+  gr_vec <- data[[gr_var]]
+  counts <- vapply(
+    split(gr_vec, series_vec),
+    function(x) length(unique(x[!is.na(x)])),
+    integer(1)
+  )
+  bad_series <- names(counts)[counts > 1]
+  if (length(bad_series) > 0) {
+    shown <- utils::head(bad_series, 5)
+    tail_msg <- if (length(bad_series) > 5) {
+      paste0(" (and ", length(bad_series) - 5, " more)")
+    } else {
+      ""
+    }
+    stop(insight::format_error(c(
+      paste0("Grouping variable '", gr_var,
+             "' is not constant within each series."),
+      x = paste0("Inconsistent series: ",
+                 paste(shown, collapse = ", "), tail_msg, "."),
+      i = "Each series must belong to a single group."
+    )))
+  }
+
+  invisible(NULL)
 }
 
 #' Validate Trend Time Intervals
@@ -3471,7 +3526,20 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
 
     # Extract everything from precomputed dimensions - skip parse_trend_formula entirely
     trend_variables <- .precomputed_dimensions$metadata$covariates %||% character(0)
-    parsed_trend <- list(trend_model = NULL)  # Minimal structure for compatibility
+    # Pull the trend model out of trend_specs so downstream metadata
+    # builders see gr/subgr/trend (otherwise the top-level
+    # trend_metadata$variables$gr_var falls through to NA).
+    # Safety note: ensure_mvgam_variables() only constructs the
+    # interaction-based hierarchical series when BOTH gr and subgr are
+    # present (see line ~3138). With only gr set, the hierarchical
+    # series-creation path is not triggered, so populating trend_model
+    # with a real spec here is non-invasive for non-hierarchical models.
+    single_spec <- if (!is.null(trend_specs)) {
+      if (is_multivariate_trend_specs(trend_specs)) trend_specs[[1]] else trend_specs
+    } else {
+      NULL
+    }
+    parsed_trend <- list(trend_model = single_spec)
 
     # Create attribute-based time and series variables for fitting context
     data <- ensure_mvgam_variables(data, parsed_trend, time_var, series_var, response_vars,
@@ -3561,20 +3629,30 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
           ), call. = FALSE)
         }
 
-        # Dynamic invariance validation with proper line breaks
-        varying_covariates <- validation_data %>%
-          dplyr::group_by(
-            dplyr::across(dplyr::all_of(validation_grouping_vars))
-          ) %>%
-          dplyr::summarise(
-            dplyr::across(dplyr::all_of(trend_variables),
-                         ~ length(unique(.x)) > 1),
-            .groups = "drop"
-          ) %>%
-          dplyr::select(-dplyr::all_of(validation_grouping_vars)) %>%
-          dplyr::summarise(dplyr::across(dplyr::everything(), any)) %>%
-          dplyr::select(dplyr::where(isTRUE)) %>%
-          names()
+        # A grouping variable is trivially constant within its own
+        # groups, so exclude it from the across() to avoid a tidyselect
+        # error when gr_var also appears in trend_variables (e.g.
+        # ~ x + (x | habitat) + ZMVN(gr = habitat)).
+        trend_vars_to_check <- setdiff(trend_variables,
+                                        validation_grouping_vars)
+
+        varying_covariates <- if (length(trend_vars_to_check) > 0) {
+          validation_data %>%
+            dplyr::group_by(
+              dplyr::across(dplyr::all_of(validation_grouping_vars))
+            ) %>%
+            dplyr::summarise(
+              dplyr::across(dplyr::all_of(trend_vars_to_check),
+                           ~ length(unique(.x)) > 1),
+              .groups = "drop"
+            ) %>%
+            dplyr::select(-dplyr::all_of(validation_grouping_vars)) %>%
+            dplyr::summarise(dplyr::across(dplyr::everything(), any)) %>%
+            dplyr::select(dplyr::where(isTRUE)) %>%
+            names()
+        } else {
+          character(0)
+        }
 
         if (length(varying_covariates) > 0) {
           stop(insight::format_error(
