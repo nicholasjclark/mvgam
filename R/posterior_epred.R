@@ -218,9 +218,15 @@ compute_family_epred <- function(linpred, family,
 #' @param object A fitted mvgam object from [mvgam()].
 #' @param newdata Optional data frame with covariates for prediction. If
 #'   NULL, uses original training data stored in the model object.
-#' @param process_error Logical; if TRUE (default), includes full
-#'   draw-by-draw uncertainty from trend parameters. If FALSE, fixes
-#'   trend at posterior mean for faster computation.
+#' @param process_error Logical; if TRUE (default), uses the full
+#'   posterior draws of the trend parameters (per-draw variation). If
+#'   FALSE, fixes the trend at its posterior mean for faster
+#'   computation. Like `posterior_linpred()`, this method does **not**
+#'   add sampled stochastic innovations — it remains a deterministic
+#'   function of the parameter draws so the invariant
+#'   \code{posterior_epred(x) == linkinv(posterior_linpred(x))} holds.
+#'   Use [posterior_predict.mvgam()] for samples that include latent
+#'   process noise.
 #' @param ndraws Positive integer specifying number of posterior draws to
 #'   use. NULL (default) uses all available draws.
 #' @param re_formula Formula for random effects. NULL (default) includes

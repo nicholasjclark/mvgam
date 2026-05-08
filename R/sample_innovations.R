@@ -140,14 +140,16 @@ get_observation_structure <- function(object, newdata = NULL) {
     if (is.null(series_var)) series_var <- "series"
   }
 
-  # Prepare data with standardized time/series attributes
-  # Handles all series creation strategies
+  # Prepare data with standardized time/series attributes. For
+  # multivariate fits the data may not carry an explicit `series`
+  # column (mvbind builds it implicitly); pass response_names so
+  # ensure_mvgam_variables can recreate the multivariate series.
   data_prepared <- ensure_mvgam_variables(
     data = newdata,
     parsed_trend = NULL,
     time_var = time_var,
     series_var = series_var,
-    response_vars = NULL,
+    response_vars = object$response_names,
     metadata = metadata
   )
 
@@ -275,6 +277,63 @@ has_stochastic_trend <- function(object) {
   trend_type <- get_trend_type(object)
   pattern <- get_covariance_pattern(trend_type)
   pattern != "none"
+}
+
+
+#' Sample Process Errors for a Fitted mvgam Object
+#'
+#' Top-level entry point for innovation sampling. Composes the
+#' observation structure, the trend covariance structure, and the
+#' pattern-specific transform into a single matrix of process-error
+#' draws aligned with the observation grid.
+#'
+#' @param object A fitted `mvgam` object.
+#' @param ndraws Optional number of posterior draws to use. Mutually
+#'   exclusive with `draw_ids`. Defaults to all available draws.
+#' @param newdata Optional data frame of prediction covariates. If
+#'   `NULL`, the observation grid is taken from the training data.
+#' @param draw_ids Optional integer vector of specific draw indices.
+#'   Mutually exclusive with `ndraws`.
+#'
+#' @return Numeric matrix `[ndraws x n_obs]` of sampled innovations,
+#'   in the same column order as `newdata` (or training data) rows.
+#'   Returns a matrix of zeros for deterministic-trend models (PW,
+#'   None) so callers can add it unconditionally.
+#'
+#' @details
+#' For deterministic trends the routine short-circuits and returns a
+#' single-row zero matrix unless `ndraws` or `draw_ids` is supplied,
+#' in which case the requested row count is returned.
+#'
+#' @noRd
+sample_process_errors <- function(object, ndraws = NULL, newdata = NULL,
+                                   draw_ids = NULL) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
+  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
+  if (!is.null(ndraws) && !is.null(draw_ids)) {
+    stop(insight::format_error(
+      "Cannot specify both 'ndraws' and 'draw_ids'."
+    ))
+  }
+
+  obs_structure <- get_observation_structure(object, newdata)
+
+  if (!has_stochastic_trend(object)) {
+    n_rows <- if (!is.null(draw_ids)) {
+      length(draw_ids)
+    } else if (!is.null(ndraws)) {
+      ndraws
+    } else {
+      1L
+    }
+    return(matrix(0, n_rows, obs_structure$n_obs))
+  }
+
+  cov_structure <- get_trend_covariance_structure(
+    object, ndraws = ndraws, draw_ids = draw_ids
+  )
+  sample_innovations(cov_structure, obs_structure)
 }
 
 

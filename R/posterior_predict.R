@@ -1289,8 +1289,16 @@ extract_dpars_from_stanfit <- function(stanfit,
 #' @param newdata Optional data frame with covariates for prediction. If
 #'   NULL, uses original training data stored in the model object.
 #' @param process_error Logical; if TRUE (default), includes full
-#'   draw-by-draw uncertainty from trend parameters. If FALSE, fixes
-#'   trend at posterior mean for faster computation.
+#'   draw-by-draw uncertainty from trend parameters AND adds sampled
+#'   stochastic innovations from the trend covariance structure
+#'   (state-space process noise). If FALSE, fixes the trend at its
+#'   posterior mean and skips innovation sampling.
+#'
+#'   The innovation step is unique to `posterior_predict`: it represents
+#'   the unobserved stochastic component of the latent trend process,
+#'   which matters for predictive uncertainty. `posterior_linpred` and
+#'   `posterior_epred` do **not** add innovations, so they remain
+#'   deterministic functions of the parameter draws.
 #' @param ndraws Positive integer specifying number of posterior draws to
 #'   use. NULL (default) uses all available draws.
 #' @param re_formula Formula for random effects. NULL (default) includes
@@ -1399,6 +1407,18 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
     resp = resp
   )
 
+  # Add stochastic process innovations from the trend covariance to
+  # each linpred matrix BEFORE sampling observation noise. This is the
+  # only entry point that adds innovations: posterior_linpred and
+  # posterior_epred stay deterministic, preserving the
+  # epred == linkinv(linpred) invariant.
+  if (isTRUE(process_error) && has_stochastic_trend(object)) {
+    innovations <- sample_process_errors(
+      object, ndraws = NULL, newdata = newdata
+    )
+    linpred_all <- add_innovations_to_linpred(linpred_all, innovations)
+  }
+
   # Sample draw_ids ONCE for consistent subsampling across all responses
   if (is.list(linpred_all) && !is.matrix(linpred_all)) {
     total_draws <- nrow(linpred_all[[1]])
@@ -1453,6 +1473,41 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
     newdata = newdata,
     is_multivariate = is_mv
   )
+}
+
+
+#' Add Process Innovations to a Linpred Matrix or List
+#'
+#' Adds a `[ndraws x nobs]` innovations matrix to either a single linpred
+#' matrix (univariate / single-response) or each element of a list of
+#' linpred matrices (multivariate). Both inputs share the same posterior
+#' draw order because each is fetched with `ndraws = NULL`.
+#'
+#' @noRd
+add_innovations_to_linpred <- function(linpred_all, innovations) {
+  checkmate::assert_matrix(innovations, any.missing = FALSE)
+  if (is.list(linpred_all) && !is.matrix(linpred_all)) {
+    return(lapply(linpred_all, function(m) {
+      check_linpred_innov_dims(m, innovations)
+      m + innovations
+    }))
+  }
+  check_linpred_innov_dims(linpred_all, innovations)
+  linpred_all + innovations
+}
+
+
+#' @noRd
+check_linpred_innov_dims <- function(linpred, innovations) {
+  if (!identical(dim(linpred), dim(innovations))) {
+    stop(insight::format_error(c(
+      "Process-error innovations dim mismatch with linpred.",
+      x = paste0("linpred=[", paste(dim(linpred), collapse = "x"),
+                 "], innovations=[",
+                 paste(dim(innovations), collapse = "x"), "].")
+    )))
+  }
+  invisible(NULL)
 }
 
 

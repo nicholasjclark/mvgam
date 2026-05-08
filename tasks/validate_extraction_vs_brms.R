@@ -2297,6 +2297,58 @@ results$predict_process_error <- list(
 )
 
 
+# Test 6: posterior_predict adds stochastic trend innovations on top of
+# observation noise when process_error = TRUE, but the predictive
+# distribution should still be centred on the same mean as brms (which
+# uses comparable AR(1) dynamics). Larger predictive variance, similar
+# central tendency.
+cat("\n--- posterior_predict: innovations widen vs brms baseline ---\n")
+ndraws_pe <- 500
+
+# brms reference: AR(1) Poisson on the same data
+set.seed(91)
+brms_pp <- brms::posterior_predict(brms_2, newdata = test_data,
+                                    ndraws = ndraws_pe)
+
+set.seed(92)
+mvgam_pp_true <- posterior_predict(mvgam_2, newdata = test_data,
+                                    process_error = TRUE,
+                                    ndraws = ndraws_pe)
+set.seed(92)
+mvgam_pp_false <- posterior_predict(mvgam_2, newdata = test_data,
+                                     process_error = FALSE,
+                                     ndraws = ndraws_pe)
+
+# Variance: TRUE > FALSE (innovations add a real component)
+var_true <- mean(apply(mvgam_pp_true, 2, var))
+var_false <- mean(apply(mvgam_pp_false, 2, var))
+var_brms <- mean(apply(brms_pp, 2, var))
+var_widens <- var_true > var_false * 1.05
+
+# Central tendency: per-observation means should track brms within
+# Poisson-scale noise (relaxed because exp() amplifies linpred diffs).
+brms_means <- colMeans(brms_pp)
+mvgam_means <- colMeans(mvgam_pp_true)
+mean_corr <- cor(brms_means, mvgam_means)
+mean_corr_ok <- mean_corr > 0.85
+
+cat(sprintf("  var(predict|PE=TRUE):  %.3f\n", var_true))
+cat(sprintf("  var(predict|PE=FALSE): %.3f\n", var_false))
+cat(sprintf("  var(brms predict):     %.3f\n", var_brms))
+cat(sprintf("  per-obs mean cor (mvgam vs brms): %.3f\n", mean_corr))
+cat("  innovations widen variance:", var_widens, "\n")
+cat("  central tendency tracks brms:", mean_corr_ok, "\n")
+
+results$predict_innovations_vs_brms <- list(
+  name = "predict_innovations_widen_vs_brms",
+  passed = var_widens && mean_corr_ok,
+  var_true = var_true,
+  var_false = var_false,
+  var_brms = var_brms,
+  mean_corr = mean_corr
+)
+
+
 # =============================================================================
 # SUMMARY
 # =============================================================================

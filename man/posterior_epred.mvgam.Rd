@@ -22,9 +22,15 @@
 \item{newdata}{Optional data frame with covariates for prediction. If
 NULL, uses original training data stored in the model object.}
 
-\item{process_error}{Logical; if TRUE (default), includes full
-draw-by-draw uncertainty from trend parameters. If FALSE, fixes
-trend at posterior mean for faster computation.}
+\item{process_error}{Logical; if TRUE (default), uses the full
+posterior draws of the trend parameters (per-draw variation). If
+FALSE, fixes the trend at its posterior mean for faster
+computation. Like \code{posterior_linpred()}, this method does \strong{not}
+add sampled stochastic innovations — it remains a deterministic
+function of the parameter draws so the invariant
+\code{posterior_epred(x) == linkinv(posterior_linpred(x))} holds.
+Use \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} for samples that include latent
+process noise.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws.}

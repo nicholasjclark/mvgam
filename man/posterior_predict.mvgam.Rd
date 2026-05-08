@@ -23,8 +23,16 @@
 NULL, uses original training data stored in the model object.}
 
 \item{process_error}{Logical; if TRUE (default), includes full
-draw-by-draw uncertainty from trend parameters. If FALSE, fixes
-trend at posterior mean for faster computation.}
+draw-by-draw uncertainty from trend parameters AND adds sampled
+stochastic innovations from the trend covariance structure
+(state-space process noise). If FALSE, fixes the trend at its
+posterior mean and skips innovation sampling.
+
+The innovation step is unique to \code{posterior_predict}: it represents
+the unobserved stochastic component of the latent trend process,
+which matters for predictive uncertainty. \code{posterior_linpred} and
+\code{posterior_epred} do \strong{not} add innovations, so they remain
+deterministic functions of the parameter draws.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws.}

@@ -157,9 +157,19 @@ get_combined_linpred <- function(mvgam_fit, newdata,
 #' @param object A fitted mvgam object from [mvgam()].
 #' @param newdata Optional data frame with covariates for prediction. If
 #'   NULL, uses original training data stored in the model object.
-#' @param process_error Logical; if TRUE (default), includes full
-#'   draw-by-draw uncertainty from trend parameters. If FALSE, fixes
-#'   trend at posterior mean for faster computation.
+#' @param process_error Logical; if TRUE (default), uses the full
+#'   posterior draws of the trend parameters (per-draw variation). If
+#'   FALSE, fixes the trend at its posterior mean for faster
+#'   computation.
+#'
+#'   `posterior_linpred()` (and `posterior_epred()`) deliberately do
+#'   **not** add sampled stochastic innovations from the trend
+#'   covariance structure. They remain deterministic functions of the
+#'   parameter draws so the invariant
+#'   \code{posterior_epred(x) == linkinv(posterior_linpred(x))} holds
+#'   across separate calls. State-space process noise is added only by
+#'   `posterior_predict()`, where it contributes to predictive
+#'   uncertainty alongside observation-level noise.
 #' @param ndraws Positive integer specifying number of posterior draws to
 #'   use. NULL (default) uses all available draws.
 #' @param re_formula Formula for random effects. NULL (default) includes
@@ -195,10 +205,17 @@ get_combined_linpred <- function(mvgam_fit, newdata,
 #' The \code{process_error} argument controls uncertainty propagation:
 #' \itemize{
 #'   \item TRUE: Full posterior uncertainty from both observation and
-#'     trend parameters (draw-by-draw variation)
+#'     trend parameters (per-draw variation). Does NOT add sampled
+#'     stochastic innovations — the linpred remains a deterministic
+#'     function of the parameters at each draw.
 #'   \item FALSE: Trend fixed at posterior mean; only observation
-#'     uncertainty propagated (faster but understates total uncertainty)
+#'     uncertainty propagated (faster but understates total uncertainty).
 #' }
+#'
+#' If you want predictive samples that include the unobserved
+#' stochastic component of the latent trend (state-space process
+#' noise), use [posterior_predict.mvgam()] — that is the only entry
+#' point that adds sampled innovations on top of the linear predictor.
 #'
 #' @seealso [brms::posterior_linpred()] for the brms generic,
 #'   [posterior_epred.mvgam()] for expected values on response scale,
