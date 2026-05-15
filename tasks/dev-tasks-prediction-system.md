@@ -863,17 +863,81 @@ to be solved.
   - Recommended UX in the meantime: emit a soft warning at fit time
     when groups are unbalanced, naming the offending counts.
 
-- [ ] **7.2 Fix X_trend dim mismatch with covariates + gr= in trend**
-  - `trend_formula = ~ x + (x|g) + ZMVN(gr=g)` declares `X_trend`
-    with `N_trend` rows but standata supplies `N` (n_obs) rows. The
-    trend-level fixed-effects design matrix isn't being aggregated
-    when `gr=` is set.
+- [x] **7.2 Fix X_trend dim mismatch with covariates in trend**
+  - **Resolved.** The original symptom — `X_trend` declared with
+    `N_trend` rows but standata supplying `N = n_time * n_series`
+    rows — was caused by an override in
+    `extract_univariate_standata()` forcing `N_trend = n_time` even
+    though brms emitted the trend-level design matrix at
+    `nrow(trend_data)`. Investigation showed the same dim mismatch
+    fires for *any* multi-series univariate or hierarchical fit with
+    a trend covariate, not just the `gr=` case in the original
+    description.
+  - **Layout split** (commit `50a2885b`). The trend Stan template
+    now carries two dimensions:
+    + `N_trend = nrow(trend_data) = n_time * n_unique_trend_series`
+      sizes `mu_trend` and `X_trend`, so trend-formula fixed and
+      random effects can carry per-(time, series) values.
+    + `N_time_trend = n_time` (new dim emitted by
+      `generate_common_trend_data()`) sizes the time axis used by
+      `lv_trend` dynamics, innovation matrices, AR/RW/VAR/ZMVN/CAR/PW
+      loops, the trend output matrix and the times_trend lookup.
+    + `create_times_trend_matrix()` fills
+      `times_trend[i, s] = (i - 1) * n_unique_trend_series + s` for
+      per-series cases and `times_trend[i, s] = i` for shared-trend
+      (multivariate-shared) cases.
+    + Override at the old `R/stan_assembly.R:6648` removed; the
+      `n_time` argument is also gone from
+      `extract_and_rename_standata_objects` and
+      `extract_univariate_standata`.
+  - **gr/subgr validation wire-up** (same commit). The dispatch
+    table that previously gated `validate_trend_grouping` is dead on
+    the standata path, so `validate_grouping_arguments` and
+    `validate_gr_constant_per_series` are now invoked directly from
+    `extract_and_validate_trend_components`.
+    `validate_grouping_arguments` auto-fills `subgr = "series"` when
+    `gr` is supplied without `subgr` (matches the hierarchical
+    codegen's implicit treatment); the old ban on `subgr = "series"`
+    is removed. `ensure_mvgam_variables` Strategy 2 now skips the
+    `interaction(gr, subgr)` rebuild when `subgr_var == series_var`
+    so the original series column is preserved.
+  - **Related fixes** (commit `d028c0dd`).
+    + `predict.mvgam` now mirrors `fitted.mvgam`'s multivariate
+      handling: when `posterior_predict` returns a named list,
+      summarise each response separately.
+    + Test refresh and new regression coverage in
+      `tests/testthat/test-stancode-standata.R`,
+      `tests/testthat/test-trend-dispatcher.R` and
+      `tests/local/test-models-single.R`. Stale
+      `tests/testthat/test-sim_mvgam.R` deleted.
+    + `create_empty_brmsprior()` delegates to `brms::empty_prior()`
+      so the canonical schema (incl. `tag` and any future brms
+      additions) is inherited. `create_trend_parameter_prior()`
+      builds rows via `brms::set_prior()` normalising NA bounds to
+      "". Both rbind sites in `R/priors.R` route through a new
+      `bind_brmsprior_rows()` helper using `dplyr::bind_rows()` for
+      defensive column-schema union.
+  - **Architecture doc** (same commit). New "Trend Stan Template
+    Dimension Split" section in
+    `architecture/architecture-decisions.md` plus updated mu_trend
+    construction notes describing the per-(time, series) layout.
+  - **Verified**: testthat 2318/2319 pass (1 intentional empty-test
+    skip); brms validation 95/96 pass (1 stochastic SBC failure
+    pre-dates this work); local fits succeed for multi-series
+    univariate + trend covariate and for multivariate-shared trend
+    (mvbind + RW cor=TRUE). Full fresh refit of all 26 mvgam
+    validation fixtures runs cleanly under the new layout.
 
 - [x] **7.3 Validate gr= covariate is constant within each series**
   - Implemented as `validate_gr_constant_per_series()` in
-    `R/validations.R`, called from `validate_trend_grouping()`. Errors
-    fast naming the offending series when `gr` varies across rows of
-    one series.
+    `R/validations.R`. Was originally wired only into the
+    rule-based dispatcher (`validate_trend_grouping`), which the
+    standata path does not invoke, so the check was dead until §7.2
+    activated it. Now called directly from
+    `extract_and_validate_trend_components` alongside
+    `validate_grouping_arguments`, so it fires on every fit. Errors
+    fast naming the offending series when `gr` varies across rows
+    of one series.
 
 - [ ] **7.4 Fix `RW(gr=...)` and `AR(gr=...)` silently ignoring `gr`**
   - Constructors parse the arg but the codegen path emits
