@@ -221,15 +221,26 @@ test_that("grouping validation helper works correctly", {
   expect_null(result1$gr)
   expect_null(result1$subgr)
 
-  # Test valid hierarchical case would work (but we test error cases)
-  expect_error(
-    mvgam:::validate_grouping_arguments("region", "NA"),
-    "Hierarchical grouping requires subgrouping"
-  )
+  # gr without subgr auto-fills subgr to "series" because the
+  # hierarchical codegen derives subgroups from the existing series
+  # column when no explicit subgr variable is given.
+  result_gr_only <- mvgam:::validate_grouping_arguments("region", "NA")
+  expect_equal(result_gr_only$gr, "region")
+  expect_equal(result_gr_only$subgr, "series")
 
+  # gr with explicit subgr = "series" is now allowed and matches the
+  # auto-fill default.
+  result_series_subgr <- mvgam:::validate_grouping_arguments(
+    "region", "series"
+  )
+  expect_equal(result_series_subgr$gr, "region")
+  expect_equal(result_series_subgr$subgr, "series")
+
+  # subgr without gr is still rejected since there is no main
+  # grouping variable to nest within.
   expect_error(
-    mvgam:::validate_grouping_arguments("region", "series"),
-    "Invalid subgrouping for hierarchical models"
+    mvgam:::validate_grouping_arguments("NA", "site"),
+    "Subgrouping requires main grouping variable"
   )
 })
 
@@ -798,16 +809,26 @@ test_that("grouping variables are properly validated and passed to dispatchers",
 # Test grouping validation error conditions
 test_that("grouping variable validation catches invalid combinations", {
 
-  # Test error when gr specified without subgr
-  expect_error(
-    mvgam:::validate_grouping_arguments("region", "NA"),
-    "Hierarchical grouping requires subgrouping"
-  )
+  # gr without subgr is allowed: subgr auto-fills to "series" so the
+  # hierarchical codegen path derives subgroups from the existing
+  # series column.
+  result_gr_only <- mvgam:::validate_grouping_arguments("region", "NA")
+  expect_equal(result_gr_only$gr, "region")
+  expect_equal(result_gr_only$subgr, "series")
 
-  # Test error when subgr is 'series' (reserved)
+  # Explicit subgr = "series" is also allowed and equivalent to the
+  # auto-fill above.
+  result_series_subgr <- mvgam:::validate_grouping_arguments(
+    "region", "series"
+  )
+  expect_equal(result_series_subgr$gr, "region")
+  expect_equal(result_series_subgr$subgr, "series")
+
+  # subgr without gr is rejected: no main grouping variable to nest
+  # within.
   expect_error(
-    mvgam:::validate_grouping_arguments("region", "series"),
-    "Invalid subgrouping for hierarchical models"
+    mvgam:::validate_grouping_arguments("NA", "site"),
+    "Subgrouping requires main grouping variable"
   )
 
   # Test hierarchical grouping works without warnings
@@ -1246,11 +1267,14 @@ test_that("validation rule dispatch table contains all expected rules", {
 })
 
 test_that("validation functions handle edge cases correctly", {
-  # Test trend grouping validation
+  # Test trend grouping validation. validate_gr_constant_per_series
+  # (active since the 7.2 layout work) requires gr to be constant
+  # within each series, so build the fixture with two distinct series
+  # each fully in one group.
   trend_spec <- list(trend = "AR", gr = "group_var", subgr = "subgroup_var")
   test_data <- data.frame(
-    time = 1:10,
-    series = 1,
+    time = rep(1:5, 2),
+    series = factor(rep(c("s1", "s2"), each = 5)),
     group_var = factor(rep(c("A", "B"), each = 5)),
     subgroup_var = factor(rep(c("X", "Y"), times = 5))
   )
@@ -1260,10 +1284,12 @@ test_that("validation functions handle edge cases correctly", {
   expect_equal(result$gr, "group_var")
   expect_equal(result$subgr, "subgroup_var")
 
-  # Test missing grouping variable - gr without subgr triggers different error
-  trend_spec_bad <- list(trend = "AR", gr = "missing_var")
+  # Grouping variable not found in data fails the data presence
+  # check inside validate_trend_grouping.
+  trend_spec_missing <- list(trend = "AR", gr = "missing_var",
+                              subgr = "missing_sub")
   expect_error(
-    validate_trend_grouping(trend_spec_bad, test_data),
-    "requires subgrouping|not found"
+    validate_trend_grouping(trend_spec_missing, test_data),
+    "not found"
   )
 })

@@ -124,21 +124,8 @@ extract_trend_priors <- function(trend_formula, data, response_names = NULL, .pr
   }
 
   if (is.null(trend_formula)) {
-    # No trend model - return empty brmsprior
-    empty_prior <- data.frame(
-      prior = character(0),
-      class = character(0),
-      coef = character(0),
-      group = character(0),
-      resp = character(0),
-      dpar = character(0),
-      nlpar = character(0),
-      lb = character(0),
-      ub = character(0),
-      source = character(0),
-      stringsAsFactors = FALSE
-    )
-    class(empty_prior) <- c("brmsprior", "data.frame")
+    # No trend model - return empty brmsprior with canonical schema
+    empty_prior <- create_empty_brmsprior()
     return(empty_prior)
   }
 
@@ -273,10 +260,25 @@ generate_trend_priors <- function(trend_spec, data, response_names = NULL) {
   if (length(prior_list) == 0) {
     return(create_empty_brmsprior())
   }
+  return(bind_brmsprior_rows(prior_list))
+}
 
-  combined <- do.call(rbind, prior_list)
+#' Row-bind brmsprior data frames with column-schema union
+#'
+#' brms's prior data frames carry slightly different columns depending
+#' on which generator built them (the obs side picks up newer columns
+#' like `tag` from brms; the trend side and mvgam-internal generators
+#' may not). dplyr::bind_rows fills missing columns with NA, which
+#' keeps this helper robust to future brms schema additions.
+#'
+#' @param prior_list List of brmsprior / data.frame objects.
+#' @return brmsprior object with all rows row-bound and columns unioned.
+#' @noRd
+bind_brmsprior_rows <- function(prior_list) {
+  checkmate::assert_list(prior_list, min.len = 1)
+  combined <- dplyr::bind_rows(prior_list)
   class(combined) <- c("brmsprior", "data.frame")
-  return(combined)
+  combined
 }
 
 #' Generate Trend Priors from Monitor Parameters
@@ -334,20 +336,23 @@ create_trend_parameter_prior <- function(param_name, trend_obj) {
   # Get default prior and bounds for this parameter type
   prior_info <- get_default_trend_parameter_prior(param_name, trend_obj)
 
-  # Create single row of brmsprior structure
-  data.frame(
-    prior = prior_info$prior,
-    class = param_name,  # Parameter name becomes the class
-    coef = "",
-    group = "",
-    resp = "",
-    dpar = "",
-    nlpar = "",
-    lb = prior_info$lb,
-    ub = prior_info$ub,
-    source = "default",
-    stringsAsFactors = FALSE
+  # Delegate to brms::set_prior so the returned row always carries the
+  # full canonical brmsprior schema (including columns like `tag` that
+  # newer brms versions add). Avoids drift between mvgam-internal and
+  # brms-generated prior rows.
+  row <- brms::set_prior(
+    prior = prior_info$prior %||% "",
+    class = param_name,
+    lb = if (nzchar(prior_info$lb %||% "")) prior_info$lb else NA,
+    ub = if (nzchar(prior_info$ub %||% "")) prior_info$ub else NA
   )
+  # brms::set_prior returns NA for unbounded; brms::get_prior returns
+  # "". Normalise to "" so prior rows mvgam emits compare equal to
+  # rows that came in via get_prior on the obs side.
+  if (is.na(row$lb)) row$lb <- ""
+  if (is.na(row$ub)) row$ub <- ""
+  row$source <- "default"
+  row
 }
 
 #' Get Default Prior Information for Trend Parameter
@@ -425,21 +430,11 @@ get_parameter_type_default_prior <- function(param_name) {
 #' @return Empty brmsprior data frame
 #' @noRd
 create_empty_brmsprior <- function() {
-  empty_prior <- data.frame(
-    prior = character(0),
-    class = character(0),
-    coef = character(0),
-    group = character(0),
-    resp = character(0),
-    dpar = character(0),
-    nlpar = character(0),
-    lb = character(0),
-    ub = character(0),
-    source = character(0),
-    stringsAsFactors = FALSE
-  )
-  class(empty_prior) <- c("brmsprior", "data.frame")
-  return(empty_prior)
+  # Delegate to brms so the empty schema always tracks the current
+  # brmsprior columns (e.g. `tag` added in recent brms versions). Any
+  # mvgam-internal prior rows that get appended downstream will inherit
+  # the canonical column set instead of drifting away from brms.
+  brms::empty_prior()
 }
 
 # =============================================================================
@@ -516,7 +511,18 @@ combine_obs_trend_priors <- function(obs_priors, trend_priors) {
     return(obs_priors)
   }
 
-  # Simple row binding without custom attributes
+  # brms's prior data frames carry slightly different columns depending
+  # on which generator built them (the obs side picks up newer columns
+  # like `tag` from brms; the trend side does not). Align the schemas
+  # before rbind so we are robust to brms schema additions.
+  all_cols <- union(colnames(obs_priors), colnames(trend_priors))
+  missing_obs <- setdiff(all_cols, colnames(obs_priors))
+  missing_trend <- setdiff(all_cols, colnames(trend_priors))
+  for (col in missing_obs) obs_priors[[col]] <- NA_character_
+  for (col in missing_trend) trend_priors[[col]] <- NA_character_
+  obs_priors <- obs_priors[, all_cols, drop = FALSE]
+  trend_priors <- trend_priors[, all_cols, drop = FALSE]
+
   combined <- rbind(obs_priors, trend_priors)
 
   # Return standard brms prior object

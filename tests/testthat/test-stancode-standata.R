@@ -2624,3 +2624,108 @@ test_that("hurdle_poisson stancode has correct structure", {
     )
   )
 })
+
+test_that("trend formula with covariate on multi-series univariate produces X_trend matching N_trend", {
+  # Regression test for the N_trend / N_time_trend split (closes the
+  # silent X_trend dim mismatch where trend_data had n_time * n_series
+  # rows but N_trend was forced to n_time).
+  set.seed(7)
+  n_time <- 6
+  n_series <- 4
+  d <- data.frame(
+    time = rep(seq_len(n_time), n_series),
+    series = factor(rep(paste0("s", seq_len(n_series)), each = n_time)),
+    x = stats::rnorm(n_time * n_series),
+    y = stats::rpois(n_time * n_series, lambda = 5)
+  )
+
+  sd <- standata(
+    mvgam_formula(y ~ 1, trend_formula = ~ x + AR(p = 1)),
+    data = d, family = poisson()
+  )
+
+  # N_trend keeps brms's natural nrow(trend_data) so the trend-level
+  # design matrix has one row per (time, series). N_time_trend is the
+  # independent time axis used by the latent dynamics.
+  expect_equal(sd$N_trend, n_time * n_series)
+  expect_equal(sd$N_time_trend, n_time)
+  expect_equal(sd$N_series_trend, n_series)
+
+  # X_trend dims must match N_trend. Before the layout split this was
+  # 20 vs 5, causing "dims declared=(5,1); dims found=(20,1)" at Stan
+  # init.
+  expect_true(is.matrix(sd$X_trend))
+  expect_equal(nrow(sd$X_trend), sd$N_trend)
+  expect_equal(ncol(sd$X_trend), 1L)
+
+  # times_trend maps each (time index i, series index s) to a unique
+  # row of mu_trend; per-series case fills (i - 1) * n_series + s.
+  expect_equal(dim(sd$times_trend), c(n_time, n_series))
+  expect_equal(min(sd$times_trend), 1L)
+  expect_equal(max(sd$times_trend), sd$N_trend)
+  expect_equal(length(unique(as.integer(sd$times_trend))), sd$N_trend)
+  expect_equal(sd$times_trend[1, ], seq_len(n_series))
+  expect_equal(sd$times_trend[2, ], n_series + seq_len(n_series))
+
+  # Stancode must declare both dims and the trend-formula design matrix
+  # at the trend-data row count.
+  sc <- stancode(
+    mvgam_formula(y ~ 1, trend_formula = ~ x + AR(p = 1)),
+    data = d, family = poisson(), validate = FALSE
+  )
+  expect_true(stan_pattern("int<lower=1> N_trend;", sc, fixed = TRUE))
+  expect_true(stan_pattern("int<lower=1> N_time_trend;", sc, fixed = TRUE))
+  expect_true(stan_pattern("matrix\\[N_trend, K_trend\\] X_trend;", sc))
+  expect_true(stan_pattern(
+    "vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", sc
+  ))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] lv_trend;", sc))
+  expect_true(stan_pattern("for \\(i in 2 : N_time_trend\\)", sc))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_series_trend\\] trend;", sc))
+  expect_true(stan_pattern(
+    "array\\[N_time_trend, N_series_trend\\] int times_trend;", sc
+  ))
+
+  # Final validation: stanc should accept the assembled program.
+  expect_no_error(
+    stancode(
+      mvgam_formula(y ~ 1, trend_formula = ~ x + AR(p = 1)),
+      data = d, family = poisson(), validate = TRUE
+    )
+  )
+})
+
+test_that("ZMVN(gr = X) without explicit subgr auto-fills subgr to series", {
+  # The codegen path always treated `series` as the implicit subgr
+  # when only `gr` was supplied; validate_grouping_arguments now
+  # mirrors that by auto-filling subgr = "series". Smoke-checks the
+  # resulting Stan code carries the hierarchical structure.
+  data <- setup_stan_test_data()$multivariate
+  mf <- mvgam_formula(
+    biomass ~ 1,
+    trend_formula = ~ x + (x | habitat) + ZMVN(gr = habitat)
+  )
+  sd <- standata(mf, data = data, family = lognormal())
+  expect_true(!is.null(sd$N_groups_trend))
+  expect_true(!is.null(sd$N_subgroups_trend))
+  expect_gt(sd$N_groups_trend, 0)
+  expect_gt(sd$N_subgroups_trend, 0)
+
+  sc <- stancode(mf, data = data, family = lognormal(), validate = FALSE)
+  expect_true(stan_pattern("int<lower=1> N_groups_trend;", sc, fixed = TRUE))
+  expect_true(stan_pattern("int<lower=1> N_subgroups_trend;", sc, fixed = TRUE))
+})
+
+test_that("subgr without gr is rejected with clear error", {
+  # The auto-fill is one-directional: subgr cannot be supplied
+  # without gr because we have no inferred main grouping variable.
+  data <- setup_stan_test_data()$multivariate
+  expect_error(
+    standata(
+      mvgam_formula(biomass ~ 1,
+                    trend_formula = ~ ZMVN(subgr = habitat)),
+      data = data, family = lognormal()
+    ),
+    regexp = "Subgrouping requires main grouping variable"
+  )
+})

@@ -985,14 +985,28 @@ test_that("posterior_epred returns matrix for univariate Poisson models", {
   expect_true(all(epred >= 0))
 })
 
-test_that("posterior_epred equals exp(linpred) for Poisson models", {
-  # For Poisson with log link: E[Y] = exp(eta)
-  linpred <- posterior_linpred(fit1, newdata = test_data$univariate)
-  epred <- posterior_epred(fit1, newdata = test_data$univariate)
+test_that("posterior_epred equals exp(linpred) for Poisson without process_error", {
+  # posterior_epred adds sampled state-space innovations on the link
+  # scale before linkinv, so epred = exp(linpred + innov) in general
+  # and is NOT equal to exp(linpred) per draw. Strict equality only
+  # holds with process_error = FALSE, where the trend is fixed at its
+  # posterior mean and no innovations are added.
+  set.seed(123)
+  linpred <- posterior_linpred(fit1, newdata = test_data$univariate,
+                                process_error = FALSE)
+  set.seed(123)
+  epred <- posterior_epred(fit1, newdata = test_data$univariate,
+                            process_error = FALSE)
+  expect_equal(as.matrix(epred), as.matrix(exp(linpred)),
+               tolerance = 1e-10, ignore_attr = TRUE)
 
-  # Should be exact transformation
-
-  expect_equal(epred, exp(linpred), tolerance = 1e-10)
+  # With process_error = TRUE, epred is still non-negative (exp of any
+  # real input) and finite, but exceeds exp(linpred) on average by the
+  # Jensen correction E[exp(innov)] - 1.
+  epred_full <- posterior_epred(fit1, newdata = test_data$univariate,
+                                 process_error = TRUE)
+  expect_true(all(epred_full >= 0))
+  expect_true(all(is.finite(epred_full)))
 })
 
 test_that("posterior_epred returns named list for multivariate models", {
@@ -1014,8 +1028,11 @@ test_that("posterior_epred returns named list for multivariate models", {
   expect_equal(nrow(epred$count), n_draws)
   expect_equal(nrow(epred$biomass), n_draws)
 
-  # Response-scale constraints: count (Poisson) must be non-negative
-  expect_true(all(epred$count >= 0))
+  # fit2 uses default gaussian for both responses (identity link), so
+  # epred values are not constrained to be non-negative; assert
+  # finiteness instead.
+  expect_true(all(is.finite(epred$count)))
+  expect_true(all(is.finite(epred$biomass)))
 })
 
 test_that("posterior_epred ndraws subsetting works", {
@@ -1057,8 +1074,9 @@ test_that("posterior_epred resp argument filters multivariate response", {
   n_draws <- nrow(posterior::as_draws_matrix(fit2$fit))
   expect_equal(nrow(epred_count), n_draws)
 
-  # Poisson constraint
-  expect_true(all(epred_count >= 0))
+  # fit2 is default gaussian for both responses; assert finiteness
+  # rather than a family-specific bound.
+  expect_true(all(is.finite(epred_count)))
 })
 
 test_that("posterior_epred uses training data when newdata is NULL", {
@@ -1070,25 +1088,85 @@ test_that("posterior_epred uses training data when newdata is NULL", {
   expect_equal(ncol(epred_default), n_obs)
 })
 
-test_that("posterior_epred handles multivariate with different families", {
-  # fit2 has count (Poisson) and biomass (Gaussian implied by continuous data)
+test_that("posterior_epred handles multivariate finite values", {
+  # fit2 uses default gaussian for both count and biomass; assert
+  # finiteness only. A separate fit (fit4 below) exercises mixed
+  # per-response families (Poisson, Bernoulli, Gamma).
   epred <- posterior_epred(fit2, newdata = test_data$multivariate)
 
-  # Both should be finite
   expect_true(all(is.finite(epred$count)))
   expect_true(all(is.finite(epred$biomass)))
-
-  # Count (Poisson) non-negative
-  expect_true(all(epred$count >= 0))
 })
 
-test_that("posterior_epred matches linpred transformation for Gaussian", {
-  # For Gaussian with identity link: E[Y] = eta (no transformation)
+test_that("posterior_epred matches linpred for Gaussian without process_error", {
+  # With identity link, exact equality of epred and linpred only holds
+  # when process_error = FALSE (no sampled innovations added).
+  set.seed(456)
   linpred <- posterior_linpred(fit2, newdata = test_data$multivariate,
-                               resp = "biomass")
+                               resp = "biomass", process_error = FALSE)
+  set.seed(456)
   epred <- posterior_epred(fit2, newdata = test_data$multivariate,
-                           resp = "biomass")
+                           resp = "biomass", process_error = FALSE)
+  expect_equal(as.matrix(epred), as.matrix(linpred),
+               tolerance = 1e-10, ignore_attr = TRUE)
 
-  # Should be identical for identity link
-  expect_equal(epred, linpred, tolerance = 1e-10)
+  # With process_error = TRUE, epred concentrates around linpred since
+  # innovations are mean-zero. Column-wise means agree within a loose
+  # tolerance.
+  lp_full <- posterior_linpred(fit2, newdata = test_data$multivariate,
+                                resp = "biomass", process_error = TRUE)
+  ep_full <- posterior_epred(fit2, newdata = test_data$multivariate,
+                              resp = "biomass", process_error = TRUE)
+  expect_equal(colMeans(ep_full), colMeans(lp_full), tolerance = 0.10)
+})
+
+# ==============================================================================
+# REGRESSION: 7.2 multi-series univariate + trend covariate
+# ==============================================================================
+test_that("multi-series univariate with trend covariate fits and predicts", {
+  # Before the N_trend / N_time_trend split, brms generated the trend
+  # design matrix at nrow(trend_data) = n_time * n_series rows while
+  # Stan declared it as matrix[N_trend = n_time, K_trend]. The fit
+  # failed at Stan init with a dim mismatch. This case exercises the
+  # path end-to-end (compile + sample + predict).
+  set.seed(7)
+  n_time <- 12
+  n_series <- 3
+  d <- data.frame(
+    time = rep(seq_len(n_time), n_series),
+    series = factor(rep(paste0("s", seq_len(n_series)),
+                         each = n_time))
+  )
+  d$x <- stats::rnorm(nrow(d))
+  d$y <- stats::rpois(nrow(d), lambda = 5)
+
+  fit <- SW(SM(mvgam(
+    y ~ 1,
+    trend_formula = ~ x + AR(p = 1),
+    data = d,
+    family = poisson(),
+    chains = 1,
+    iter = 300,
+    silent = 2
+  )))
+
+  # Sampled successfully and carries trend coefficients
+  expect_s3_class(fit, "mvgam")
+  vars <- variables(fit)
+  expect_true(any(grepl("^b_trend", vars)))
+  expect_true(any(grepl("^ar1_trend", vars)))
+
+  # Trend covariate is per (time, series), so the trend-level design
+  # matrix has one row per data row
+  expect_equal(nrow(as.matrix(fit$standata$X_trend)),
+               n_time * n_series)
+  expect_equal(fit$standata$N_trend, n_time * n_series)
+  expect_equal(fit$standata$N_time_trend, n_time)
+
+  # Predictions are well-defined on the training data
+  ep <- posterior_epred(fit, ndraws = 50)
+  expect_true(is.matrix(ep))
+  expect_equal(ncol(ep), nrow(d))
+  expect_true(all(ep >= 0))
+  expect_true(all(is.finite(ep)))
 })
