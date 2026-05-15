@@ -887,6 +887,39 @@ to be solved.
     Affects basic RW fits on certain code paths; the cor=TRUE path
     appears to assign correctly so the bug is path-dependent.
 
+- [ ] **7.8 Investigate distributional parameters in `trend_formula`**
+  - Open question from `tasks/prediction-system-implementation-strategy.md`
+    ("Distributional parameters in trends: Can trend_formula have
+    `sigma ~ ...`?"). Currently unaddressed in code or docs.
+  - **Scope of investigation** (research before implementation):
+    1. Confirm whether brms's `bf(y ~ x, sigma ~ z)` syntax is
+       parseable when handed to mvgam's trend formula path; check
+       `R/validations.R` and `R/priors.R` for any explicit rejection.
+    2. Trace the dpars extraction in `R/posterior_epred.R` and
+       `R/posterior_predict.R` to determine whether trend-side
+       distributional parameters would be picked up. Current dpars
+       extraction (e.g. `extract_obs_parameters`) is observation-side
+       only — trend-side dpars would need a parallel extractor.
+    3. Identify which families this matters for. Useful for Gaussian
+       trend (heteroscedastic state-space variance), Beta trend
+       (varying phi), etc. Not meaningful for Poisson trend (no free
+       dispersion parameter).
+    4. Check Stan codegen in `R/stan_assembly.R`: does the
+       `trend_model` brmsfit currently propagate non-mu dpar
+       formulas into the combined Stan code, or are they silently
+       dropped at the assembly stage?
+  - **Expected outcomes**:
+    - If silently dropped: file as a separate codegen bug under §7,
+      or fail-fast at fit time with a clear error directing users to
+      put dpar formulas in the observation formula.
+    - If wired but untested: add an integration test fitting
+      `mvgam(bf(y ~ x), trend_formula = bf(~ AR(p=1), sigma ~ z),
+      ...)` against a brms equivalent; extend dpars extractors to
+      cover the trend side; document the supported subset.
+  - Use Explore + package-analyzer agents to trace before deciding
+    scope. Defer implementation decision until investigation
+    complete.
+
 - [x] **7.7 Validation strategy for state-space comparators**
   - **Resolved.** brms residual-AR vs mvgam state-space-AR is
     structurally non-equivalent and prior alignment cannot bridge
