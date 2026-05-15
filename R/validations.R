@@ -640,27 +640,20 @@ validate_grouping_arguments <- function(gr, subgr) {
     checkmate::assert_string(subgr, min.chars = 1)
   }
 
-  # Validation logic
+  # Auto-fill subgr to the default 'series' when only gr is supplied:
+  # the hierarchical codegen path derives subgroups from the existing
+  # series column (see generate_hierarchical_correlation_data() in
+  # stan_assembly.R), so a bare ZMVN(gr = X) is well-defined as long as
+  # the data carries a series variable. Users who want a different
+  # within-group identifier still pass subgr explicitly.
   if (!is.null(gr) && is.null(subgr)) {
-    stop(insight::format_error(
-      "Hierarchical grouping requires subgrouping variable.",
-      "If you specify {.field gr = '{gr}'}, you must also specify {.field subgr}.",
-      "For simple grouping, use {.field series} parameter instead."
-    ))
+    subgr <- "series"
   }
 
   if (!is.null(subgr) && is.null(gr)) {
     stop(insight::format_error(
       "Subgrouping requires main grouping variable.",
       "Cannot specify {.field subgr = '{subgr}'} without {.field gr}."
-    ))
-  }
-
-  if (!is.null(gr) && !is.null(subgr) && subgr == "series") {
-    stop(insight::format_error(
-      "Invalid subgrouping for hierarchical models.",
-      "Cannot use 'series' as {.field subgr} when {.field gr = '{gr}'}.",
-      "Use a different subgrouping variable that nests within '{gr}'."
     ))
   }
 
@@ -3135,7 +3128,12 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
     gr_var <- if (!is.null(parsed_trend$trend_model$gr) && parsed_trend$trend_model$gr != "NA") parsed_trend$trend_model$gr else NULL
     subgr_var <- if (!is.null(parsed_trend$trend_model$subgr) && parsed_trend$trend_model$subgr != "NA") parsed_trend$trend_model$subgr else NULL
 
-    if (!is.null(gr_var) && !is.null(subgr_var)) {
+    if (!is.null(gr_var) && !is.null(subgr_var) && subgr_var != series_var) {
+      # When subgr is a separate variable, build series from
+      # interaction(gr, subgr). When subgr defaults to the existing
+      # series column, fall through to Strategy 3 so the original
+      # series values are preserved (the codegen path reads the series
+      # column directly).
       checkmate::assert_names(names(data), must.include = c(gr_var, subgr_var))
       series_values <- interaction(data[[gr_var]], data[[subgr_var]], drop = TRUE, sep = '_', lex.order = TRUE)
       series_source <- "hierarchical"
@@ -3293,6 +3291,20 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   } else {
     mv_spec$trend_specs
   }
+
+  # Enforce gr/subgr coherence on every trend spec that carries them.
+  # validate_trend_grouping is only dispatched via a validation rule that
+  # is currently dead, so the gr-requires-subgr check and the
+  # gr-constant-per-series check at validate_gr_constant_per_series never
+  # fire from the standata path. Call them directly here so both rules
+  # apply uniformly.
+  groupings <- validate_grouping_arguments(parsed_trend$gr, parsed_trend$subgr)
+  parsed_trend$gr <- groupings$gr %||% "NA"
+  parsed_trend$subgr <- groupings$subgr %||% "NA"
+  if (!is.null(groupings$gr)) {
+    validate_gr_constant_per_series(parsed_trend, data)
+  }
+
   data <- ensure_mvgam_variables(data, parsed_trend, time_var, series_var,
                                 response_vars)
 

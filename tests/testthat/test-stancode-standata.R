@@ -158,13 +158,13 @@ test_that("stancode.mvgam_formula returns correct class structure", {
   expect_true(stan_pattern("int<lower=1> N_lv_trend;", code_with_trend, fixed = TRUE))
 
   # Critical times_trend array structure
-  expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_time_trend, N_series_trend\\] int times_trend;", code_with_trend))
 
   # Factor loading matrix for non-factor models
   expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = diag_matrix", code_with_trend))
 
   # RW-specific innovation structure
-  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
   expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend))
   expect_true(stan_pattern("scaled_innovations_trend = innovations_trend \\* diag_matrix\\(sigma_trend\\)", code_with_trend))
 
@@ -253,7 +253,7 @@ test_that("stancode generates correct AR(p = c(1, 12)) seasonal model with negat
   expect_true(stan_pattern("lv_trend\\[i, :\\] = scaled_innovations_trend\\[i, :\\];", code_with_trend))
 
   # AR dynamics: Should start from time point 13
-  expect_true(stan_pattern("for \\(i in 13:N_trend\\)", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 13:N_time_trend\\)", code_with_trend))
 
   # AR dynamics equation: Should use both ar1_trend and ar12_trend
   expect_true(stan_pattern("ar1_trend\\[j\\] \\* lv_trend\\[i-1,j\\]", code_with_trend))
@@ -275,9 +275,9 @@ test_that("stancode generates correct AR(p = c(1, 12)) seasonal model with negat
   expect_false(grepl("poisson_log_glm_lpmf", code_with_trend))
 
   # Should still have standard trend components
-  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
   expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend))
-  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] lv_trend;", code_with_trend))
 
   # mu construction and trend addition in transformed parameters
   expect_true(stan_pattern("mu\\[n\\] \\+= trend\\[obs_trend_time\\[n\\], obs_trend_series\\[n\\]\\];", code_with_trend))
@@ -331,10 +331,10 @@ test_that("stancode generates correct AR(p = c(2, 4), ma = TRUE) ARMA model stru
   expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] theta1_trend;", code_with_trend))
 
   # MA innovations matrix should be created from scaled innovations
-  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] ma_innovations_trend = scaled_innovations_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] ma_innovations_trend = scaled_innovations_trend;", code_with_trend))
 
   # MA transformation should be applied to the entire matrix first
-  expect_true(stan_pattern("for \\(i in 2:N_trend\\)", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 2:N_time_trend\\)", code_with_trend))
   expect_true(stan_pattern("ma_innovations_trend\\[i, j\\] \\+= theta1_trend\\[j\\] \\* ma_innovations_trend\\[i-1, j\\];", code_with_trend))
 
   # Initialization: First 4 time points should use MA innovations
@@ -342,7 +342,7 @@ test_that("stancode generates correct AR(p = c(2, 4), ma = TRUE) ARMA model stru
   expect_true(stan_pattern("lv_trend\\[i, :\\] = ma_innovations_trend\\[i, :\\];", code_with_trend))
 
   # AR dynamics: Should start from time point 5 and use ma_innovations_trend
-  expect_true(stan_pattern("for \\(i in 5:N_trend\\)", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 5:N_time_trend\\)", code_with_trend))
 
   # AR dynamics equation: Should use both ar2_trend and ar4_trend with MA innovations
   expect_true(stan_pattern("ar2_trend\\[j\\] \\* lv_trend\\[i-2, j\\]", code_with_trend))
@@ -358,9 +358,9 @@ test_that("stancode generates correct AR(p = c(2, 4), ma = TRUE) ARMA model stru
   expect_true(stan_pattern("theta1_trend ~ normal", code_with_trend))
 
   # Should still have standard trend components
-  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
   expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend))
-  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] lv_trend;", code_with_trend))
 
   # Universal trend computation pattern should still be present
   expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\]", code_with_trend))
@@ -434,7 +434,7 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with ten
   expect_true(stan_pattern("array\\[N_biomass\\] int obs_trend_series_biomass;", code_with_trend))
 
   # Times trend matrix (2D integer array)
-  expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_time_trend, N_series_trend\\] int times_trend;", code_with_trend))
 
   # Trend formula design matrix variables (presence covariate, no intercept)
   expect_true(stan_pattern("int<lower=1> K_trend;", code_with_trend))
@@ -474,7 +474,7 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with ten
   expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;", code_with_trend))
 
   # Standard latent variables
-  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] lv_trend;", code_with_trend))
 
   # Spline coefficient computations in transformed parameters
   expect_true(stan_pattern("s_count_1_1 = sds_count_1\\[1\\] \\* zs_count_1_1;", code_with_trend))
@@ -721,7 +721,7 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
                       code_with_trend))
 
     # Times trend matrix
-    expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;",
+    expect_true(stan_pattern("array\\[N_time_trend, N_series_trend\\] int times_trend;",
                       code_with_trend))
 
     # GLM compatibility vectors for discrete families only
@@ -766,7 +766,7 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
     expect_true(stan_pattern("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw;", code_with_trend))
 
     # Innovation matrix
-    expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;",
+    expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] innovations_trend;",
                       code_with_trend))
 
     # lprior initialization with family-specific priors
@@ -786,10 +786,10 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
     expect_true(stan_pattern("scaled_innovations_trend = innovations_trend \\* L_Sigma_trend';", code_with_trend))
 
     # AR(1) latent variable dynamics
-    expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
+    expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] lv_trend;", code_with_trend))
     expect_true(stan_pattern("lv_trend\\[i,:\\] = scaled_innovations_trend\\[i,:\\];",
                       code_with_trend))
-    expect_true(stan_pattern("for \\(i in 2:N_trend\\)", code_with_trend))
+    expect_true(stan_pattern("for \\(i in 2:N_time_trend\\)", code_with_trend))
     expect_true(stan_pattern("for \\(j in 1:N_lv_trend\\)", code_with_trend))
     expect_true(stan_pattern("lv_trend\\[i,j\\] = ar1_trend\\[j\\] \\* lv_trend\\[i-1,j\\] \\+ scaled_innovations_trend\\[i,j\\];", code_with_trend))
 
@@ -798,7 +798,7 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
                       code_with_trend))
 
     # Universal trend computation pattern
-    expect_true(stan_pattern("matrix\\[N_trend, N_series_trend\\] trend;", code_with_trend))
+    expect_true(stan_pattern("matrix\\[N_time_trend, N_series_trend\\] trend;", code_with_trend))
     expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i,
   :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\];", code_with_trend))
 
@@ -937,7 +937,7 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   expect_true(stan_pattern("array\\[N_biomass\\] int obs_trend_series_biomass;", code_with_trend))
 
   # Times trend matrix
-  expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_time_trend, N_series_trend\\] int times_trend;", code_with_trend))
 
   # GLM compatibility vectors for discrete families only
   expect_true(stan_pattern("vector\\[1\\] mu_ones_count;", code_with_trend))
@@ -972,7 +972,7 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   expect_true(stan_pattern("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw;", code_with_trend))
 
   # Innovation matrix
-  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
 
   # lprior initialization with family-specific priors
   expect_true(stan_pattern("real lprior = 0;", code_with_trend))
@@ -989,9 +989,9 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   expect_true(stan_pattern("scaled_innovations_trend = innovations_trend \\* L_Sigma_trend';", code_with_trend))
 
   # AR(1) latent variable dynamics
-  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] lv_trend;", code_with_trend))
   expect_true(stan_pattern("lv_trend\\[i,:\\] = scaled_innovations_trend\\[i,:\\];", code_with_trend))
-  expect_true(stan_pattern("for \\(i in 2:N_trend\\)", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 2:N_time_trend\\)", code_with_trend))
   expect_true(stan_pattern("for \\(j in 1:N_lv_trend\\)", code_with_trend))
   expect_true(stan_pattern("lv_trend\\[i,j\\] = ar1_trend\\[j\\] \\* lv_trend\\[i-1,j\\] \\+ scaled_innovations_trend\\[i,j\\];", code_with_trend))
 
@@ -999,7 +999,7 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_with_trend))
 
   # Universal trend computation pattern
-  expect_true(stan_pattern("matrix\\[N_trend, N_series_trend\\] trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_series_trend\\] trend;", code_with_trend))
   expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\];", code_with_trend))
 
   # Family-specific linear predictors
@@ -1453,10 +1453,10 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
     expect_true(stan_pattern("int<lower=1> N_lv_trend;", code_with_trend))
 
     # CAR-specific time distance array for irregular intervals
-    expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] real<lower=0> time_dis", code_with_trend))
+    expect_true(stan_pattern("array\\[N_time_trend, N_series_trend\\] real<lower=0> time_dis", code_with_trend))
 
     # Standard trend mapping arrays
-    expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;", code_with_trend))
+    expect_true(stan_pattern("array\\[N_time_trend, N_series_trend\\] int times_trend;", code_with_trend))
     expect_true(stan_pattern("array\\[N\\] int obs_trend_time;", code_with_trend))
     expect_true(stan_pattern("array\\[N\\] int obs_trend_series;", code_with_trend))
 
@@ -1483,7 +1483,7 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
     expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;", code_with_trend))
     expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;",
                       code_with_trend))
-    expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;",
+    expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] innovations_trend;",
                       code_with_trend))
 
     # 5. Transformed Parameters Block - Complex computations
@@ -1501,13 +1501,13 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
     expect_true(stan_pattern("lprior \\+= student_t_lpdf\\(sd_2 \\|", code_with_trend))  # Plot SD priors
 
     # CAR-specific trend computation
-    expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] scaled_innovations_trend;",
+    expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] scaled_innovations_trend;",
                       code_with_trend))
     expect_true(stan_pattern("scaled_innovations_trend = innovations_trend \\*
   diag_matrix\\(sigma_trend\\);", code_with_trend))
 
     # CAR latent variable evolution
-    expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
+    expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] lv_trend;", code_with_trend))
 
     # CAR initialization (first time point)
     expect_true(stan_pattern("for \\(j in 1:N_lv_trend\\)", code_with_trend))
@@ -1516,16 +1516,16 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
 
     # CAR continuous-time evolution (key differentiator)
     expect_true(stan_pattern("for \\(j in 1:N_lv_trend\\)", code_with_trend))
-    expect_true(stan_pattern("for \\(i in 2:N_trend\\)", code_with_trend))
+    expect_true(stan_pattern("for \\(i in 2:N_time_trend\\)", code_with_trend))
     expect_true(stan_pattern("lv_trend\\[i, j\\] = pow\\(ar1_trend\\[j\\], time_dis\\[i, j\\]\\) \\*
   lv_trend\\[i - 1, j\\]", code_with_trend))
     expect_true(stan_pattern("\\+ scaled_innovations_trend\\[i, j\\];", code_with_trend))
 
     # Universal trend computation pattern
-    expect_true(stan_pattern("matrix\\[N_trend, N_series_trend\\] trend;", code_with_trend))
+    expect_true(stan_pattern("matrix\\[N_time_trend, N_series_trend\\] trend;", code_with_trend))
     expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0.0,
   N_trend\\);", code_with_trend))
-    expect_true(stan_pattern("for \\(i in 1:N_trend\\)", code_with_trend))
+    expect_true(stan_pattern("for \\(i in 1:N_time_trend\\)", code_with_trend))
     expect_true(stan_pattern("for \\(s in 1:N_series_trend\\)", code_with_trend))
     expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+
   mu_trend\\[times_trend\\[i, s\\]\\];", code_with_trend))
@@ -1702,7 +1702,7 @@ test_that("stancode generates correct Stan blocks", {
   expect_false(grepl("obs_ind", code))
 
   # Universal trend computation pattern should be present
-  expect_true(stan_pattern("for\\(iin1:N_trend\\)", code))
+  expect_true(stan_pattern("for\\(iin1:N_time_trend\\)", code))
   expect_match2(code, "trend\\[i,\\s*s\\]\\s*=.*dot_product")
 
   # Should contain sigma_trend prior but not duplicate sigma prior
@@ -1883,7 +1883,7 @@ test_that("stancode handles multivariate specifications with shared RW trend and
   expect_match2(code_shared, "array\\[N_biomass\\] int obs_trend_series_biomass;")
 
   # Times trend matrix - Should declare times_trend 2D array
-  expect_match2(code_shared, "array\\[N_trend, N_series_trend\\] int times_trend;")
+  expect_match2(code_shared, "array\\[N_time_trend, N_series_trend\\] int times_trend;")
 
   # Offset data structures for each response (brms consolidates them)
   expect_match2(code_shared, "vector\\[N_count\\] offsets_count;")  # Count offsets
@@ -1912,7 +1912,7 @@ test_that("stancode handles multivariate specifications with shared RW trend and
   # Should declare L_Omega_trend for correlation
   expect_match2(code_shared, "cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;")
   # Should declare innovations_trend matrix
-  expect_match2(code_shared, "matrix\\[N_trend, N_lv_trend\\] innovations_trend;")
+  expect_match2(code_shared, "matrix\\[N_time_trend, N_lv_trend\\] innovations_trend;")
 
   # Should initialize lprior
   expect_match2(code_shared, "real lprior = 0;")
@@ -1925,11 +1925,11 @@ test_that("stancode handles multivariate specifications with shared RW trend and
 
   # RW latent variables
   # Should declare lv_trend matrix for latent variables (with _trend suffix)
-  expect_match2(code_shared, "matrix\\[N_trend, N_lv_trend\\] lv_trend;")
+  expect_match2(code_shared, "matrix\\[N_time_trend, N_lv_trend\\] lv_trend;")
   # Should declare L_Sigma_trend for scaling
   expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] L_Sigma_trend =", code_shared))
   # Should declare scaled_innovations_trend
-  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] scaled_innovations_trend", code_shared))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] scaled_innovations_trend", code_shared))
   # Should initialize first lv_trend from scaled innovations
   expect_true(stan_pattern("lv_trend\\[1,\\s*:\\s*\\] = scaled_innovations_trend\\[1,\\s*:\\s*\\]", code_shared))
   # Should implement RW cumulative sum
@@ -1937,7 +1937,7 @@ test_that("stancode handles multivariate specifications with shared RW trend and
 
   # Trend matrix computation (shared, not response-specific)
   # Should declare shared trend matrix (not trend_count/trend_biomass)
-  expect_match2(code_shared, "matrix\\[N_trend, N_series_trend\\] trend;")
+  expect_match2(code_shared, "matrix\\[N_time_trend, N_series_trend\\] trend;")
 
   # Linear predictor construction with trend injection
   # Should initialize mu vectors
@@ -2299,18 +2299,18 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
   expect_true(stan_pattern("array\\[N\\] int obs_trend_series;", code_with_trend))
 
   # Times trend matrix
-  expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;", code_with_trend))
+  expect_true(stan_pattern("array\\[N_time_trend, N_series_trend\\] int times_trend;", code_with_trend))
 
   # 3. Transformed Data Block - Time vector and changepoint matrix
   # Factor loading matrix (diagonal for PW - no factor model support)
   expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = diag_matrix\\(rep_vector\\(1\\.0, N_lv_trend\\)\\);", code_with_trend))
 
   # Time vector creation (integer sequence)
-  expect_true(stan_pattern("vector\\[N_trend\\] time_trend;", code_with_trend))
-  expect_true(stan_pattern("for \\(i in 1:N_trend\\) time_trend\\[i\\] = i;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_time_trend\\] time_trend;", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 1:N_time_trend\\) time_trend\\[i\\] = i;", code_with_trend))
 
   # Changepoint matrix computation
-  expect_true(stan_pattern("matrix\\[N_trend, n_change_trend\\] Kappa_trend = get_changepoint_matrix\\(time_trend, t_change_trend, N_trend, n_change_trend\\);", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_time_trend, n_change_trend\\] Kappa_trend = get_changepoint_matrix\\(time_trend, t_change_trend, N_time_trend, n_change_trend\\);", code_with_trend))
 
   # 4. Parameters Block - PW-specific parameters
   # Base trend parameters
@@ -2334,19 +2334,19 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
   expect_false(stan_pattern("lprior \\+= student_t_lpdf\\(Intercept_trend \\|", code_with_trend))
 
   # Latent trend matrix declaration
-  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] lv_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] lv_trend;", code_with_trend))
 
   # Linear trend computation
   expect_true(stan_pattern("for \\(s in 1 : N_lv_trend\\)", code_with_trend))
-  expect_true(stan_pattern("lv_trend\\[1 : N_trend, s\\] = linear_trend\\(k_trend\\[s\\], m_trend\\[s\\],", code_with_trend))
+  expect_true(stan_pattern("lv_trend\\[1 : N_time_trend, s\\] = linear_trend\\(k_trend\\[s\\], m_trend\\[s\\],", code_with_trend))
   expect_true(stan_pattern("to_vector\\(delta_trend\\[ : , s\\]\\), time_trend,", code_with_trend))
   expect_true(stan_pattern("Kappa_trend,", code_with_trend))
   expect_true(stan_pattern("t_change_trend\\);", code_with_trend))
 
   # Universal trend computation pattern
-  expect_true(stan_pattern("matrix\\[N_trend, N_series_trend\\] trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_series_trend\\] trend;", code_with_trend))
   expect_false(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(Intercept_trend, N_trend\\);", code_with_trend))
-  expect_true(stan_pattern("for \\(i in 1:N_trend\\)", code_with_trend))
+  expect_true(stan_pattern("for \\(i in 1:N_time_trend\\)", code_with_trend))
   expect_true(stan_pattern("for \\(s in 1:N_series_trend\\)", code_with_trend))
   expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\];", code_with_trend))
 
@@ -2432,7 +2432,7 @@ test_that("stancode handles distributional regression models correctly", {
   # 2. Data Block - univariate trend structure (not response-specific)
   expect_true(stan_pattern("int<lower=1> N_series_trend;", code_distributional))
   expect_true(stan_pattern("int<lower=1> N_lv_trend;", code_distributional))
-  expect_true(stan_pattern("array\\[N_trend, N_series_trend\\] int times_trend;", code_distributional))
+  expect_true(stan_pattern("array\\[N_time_trend, N_series_trend\\] int times_trend;", code_distributional))
   expect_true(stan_pattern("array\\[N\\] int obs_trend_time;", code_distributional))
   expect_true(stan_pattern("array\\[N\\] int obs_trend_series;", code_distributional))
 
@@ -2450,11 +2450,11 @@ test_that("stancode handles distributional regression models correctly", {
 
   # 5. Parameters Block - RW trend parameters
   expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_distributional))
-  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] innovations_trend;", code_distributional))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] innovations_trend;", code_distributional))
 
   # 6. Transformed Parameters - RW dynamics
   expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0\\.0, N_trend\\);", code_distributional))
-  expect_true(stan_pattern("matrix\\[N_trend, N_lv_trend\\] scaled_innovations_trend;", code_distributional))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] scaled_innovations_trend;", code_distributional))
   expect_true(stan_pattern("scaled_innovations_trend = innovations_trend \\* diag_matrix\\(sigma_trend\\);", code_distributional))
 
   # RW state evolution
@@ -2462,7 +2462,7 @@ test_that("stancode handles distributional regression models correctly", {
   expect_true(stan_pattern("lv_trend\\[i, :\\] = lv_trend\\[i - 1, :\\] \\+ scaled_innovations_trend\\[i, :\\];", code_distributional))
 
   # Final trend computation
-  expect_true(stan_pattern("matrix\\[N_trend, N_series_trend\\] trend;", code_distributional))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_series_trend\\] trend;", code_distributional))
   expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\];", code_distributional))
 
   # 7. Model Block - trend injection into mu only

@@ -264,7 +264,7 @@ add_targeted_comments <- function(lines) {
   }
 
   # Comment 2: lv_trend matrix - latent variable trajectories
-  lv_pattern <- "matrix\\[N_trend,\\s*N_lv_trend\\]\\s*lv_trend\\s*;"
+  lv_pattern <- "matrix\\[N_time_trend,\\s*N_lv_trend\\]\\s*lv_trend\\s*;"
   lv_lines <- grep(lv_pattern, lines)
   if (length(lv_lines) > 0) {
     lines <- insert_comment_before_line(lines, lv_lines[1],
@@ -272,7 +272,7 @@ add_targeted_comments <- function(lines) {
   }
 
   # Comment 3: trend matrix - final trend values
-  trend_pattern <- "matrix\\[N_trend,\\s*N_series_trend\\]\\s*trend\\s*;"
+  trend_pattern <- "matrix\\[N_time_trend,\\s*N_series_trend\\]\\s*trend\\s*;"
   trend_lines <- grep(trend_pattern, lines)
   if (length(trend_lines) > 0) {
     lines <- insert_comment_before_line(lines, trend_lines[1],
@@ -280,7 +280,7 @@ add_targeted_comments <- function(lines) {
   }
 
   # Comment 4: Trend mapping computation
-  trend_loop_pattern <- "for\\s*\\(\\s*i\\s*in\\s*1\\s*:\\s*N_trend\\)\\s*\\{"
+  trend_loop_pattern <- "for\\s*\\(\\s*i\\s*in\\s*1\\s*:\\s*N_time_trend\\)\\s*\\{"
   trend_loop_lines <- grep(trend_loop_pattern, lines)
   if (length(trend_loop_lines) > 0) {
     # Check if this is the trend mapping loop (contains dot_product and trend assignment)

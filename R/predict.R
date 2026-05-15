@@ -127,7 +127,13 @@ predict.mvgam <- function(object,
     return(pp_draws)
   }
 
-  # Compute summary statistics
+  # Compute summary statistics. Multivariate posterior_predict returns
+  # a named list of matrices (one per response); summarise each
+  # element separately to match brms's output convention.
+  if (is.list(pp_draws) && !is.matrix(pp_draws)) {
+    return(lapply(pp_draws, summarize_predictions,
+                  probs = probs, robust = robust))
+  }
   summarize_predictions(pp_draws, probs = probs, robust = robust)
 }
 

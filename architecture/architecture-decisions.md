@@ -178,6 +178,49 @@ mu_biomass += mu_biomass_trend;
    - `N_subgroups_trend`: Series within EACH group (within-group, e.g., 2 series per group)
 6. **Matrix Dimensioning**: Group-specific matrices use `N_subgroups_trend`, system-wide matrices use `N_lv_trend`
 
+### 5. Trend Stan Template Dimension Split
+
+**Design Principle**: Separate the time axis (`N_time_trend`) from the trend-level design-matrix row axis (`N_trend`) so trend-formula fixed and random effects can vary per (time, series).
+
+**Two dimensions**:
+- `N_time_trend` = number of unique time points. Sizes the lv_trend dynamics loop, the innovation / scaled-innovation matrices, the trend output matrix, and the times_trend lookup array.
+- `N_trend` = `nrow(trend_data)` = `N_time_trend * N_series_trend` for the canonical layout. Sizes `mu_trend` (`vector[N_trend]`) and `X_trend` (`matrix[N_trend, K_trend]`) so the brms-generated trend design matrix carries one row per (time, series).
+
+**Indexing contract** (`R/stan_assembly.R:create_times_trend_matrix`):
+- `times_trend[i, s] = (i - 1) * N_series_trend + s` returns the row of `trend_data` (and hence the slot of `mu_trend`) for time `i` and series `s`.
+- Relies on `extract_trend_data()` arranging trend_data by `dplyr::arrange(time, series)`. Do not break that ordering.
+
+**Stan emit pattern** (current, after the split):
+```stan
+data {
+  int<lower=1> N_trend;            // nrow(trend_data)
+  int<lower=1> N_time_trend;       // unique time points
+  int<lower=1> N_series_trend;
+  int<lower=1> N_lv_trend;
+  matrix[N_trend, K_trend] X_trend;
+  array[N_time_trend, N_series_trend] int times_trend;
+}
+transformed parameters {
+  vector[N_trend] mu_trend = rep_vector(0.0, N_trend);
+  mu_trend += X_trend * b_trend;           // per (time, series)
+  matrix[N_time_trend, N_lv_trend] lv_trend;
+  for (i in 2:N_time_trend) {              // time-axis loop
+    for (j in 1:N_lv_trend) {
+      lv_trend[i, j] = ar1_trend[j] * lv_trend[i - 1, j] + ...;
+    }
+  }
+  matrix[N_time_trend, N_series_trend] trend;
+  for (i in 1:N_time_trend) {
+    for (s in 1:N_series_trend) {
+      trend[i, s] = dot_product(Z[s, :], lv_trend[i, :])
+                  + mu_trend[times_trend[i, s]];
+    }
+  }
+}
+```
+
+**Why this split**: The latent dynamics (`lv_trend`, AR/VAR/RW recurrences, innovations) only make sense indexed by time — the `i-1` step in the recurrence is the previous time point, not the previous (time, series). The trend formula's effects (fixed via `X_trend * b_trend`, random via brms's `r_*_trend[J_*_trend[n]] * Z_*_trend[n]` patterns) naturally apply per row of `trend_data`. Keeping `N_trend` at `nrow(trend_data)` lets brms emit those design matrices unchanged; `times_trend` then glues the per-(time, series) `mu_trend` slots back onto the per-time `lv_trend` in the trend assembly.
+
 ## Validation Framework Principles
 
 ### 1. Context-Aware Validation
@@ -541,6 +584,8 @@ mu_trend += Intercept_trend + Xs_trend * bs_trend + Zs_1_1_trend * s_1_1_trend; 
 mu_trend += Intercept_trend + gp_pred_1_trend[Jgp_1_trend];  // GP predictions
 mu_trend += Intercept_trend + r_1_1_trend[J_1_trend[n]] * Z_1_1_trend[n];  // Random effects
 ```
+
+**`mu_trend` is sized `vector[N_trend]` where `N_trend = nrow(trend_data) = N_time_trend * N_series_trend`** under the canonical layout. The trend assembly resolves the per-(time, series) slot with `mu_trend[times_trend[i, s]]`. See the "Trend Stan Template Dimension Split" section below for the full indexing contract; in short, trend-formula fixed and random effects can vary per (time, series), while the latent dynamics still iterate over `N_time_trend` only.
 
 **Implementation**: `extract_and_rename_stan_blocks()` uses variable-tracing to extract mu construction patterns from brms model blocks, then renames variables with `_trend` suffix for proper integration.
 
