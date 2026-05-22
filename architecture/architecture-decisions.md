@@ -178,6 +178,8 @@ mu_biomass += mu_biomass_trend;
    - `N_subgroups_trend`: Series within EACH group (within-group, e.g., 2 series per group)
 6. **Matrix Dimensioning**: Group-specific matrices use `N_subgroups_trend`, system-wide matrices use `N_lv_trend`
 
+**Current limitation — balanced groups only**: `N_subgroups_trend` is a scalar, so per-group cholesky and sigma blocks share one fixed size. Unbalanced designs (e.g. 3 forest + 2 grassland series) are refused at `validate_gr_balanced_groups()`. Moving to ragged arrays (Stan ≥2.31) with per-group sized blocks and `array[N_groups_trend] int group_sizes_trend` would lift this and let users fit hierarchical trends on observational datasets with any series-per-group split.
+
 ### 5. Trend Stan Template Dimension Split
 
 **Design Principle**: Separate the time axis (`N_time_trend`) from the trend-level design-matrix row axis (`N_trend`) so trend-formula fixed and random effects can vary per (time, series).
