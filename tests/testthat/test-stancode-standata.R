@@ -51,7 +51,7 @@ stan_pattern <- function(pattern, x, ignore.case = FALSE, ...) {
 setup_stan_test_data <- function() {
   set.seed(42)
   n_time <- 24
-  n_series <- 3
+  n_series <- 4
 
   # Simple univariate dataset
   univariate <- data.frame(

@@ -848,6 +848,77 @@ test_that("grouping variable validation catches invalid combinations", {
   expect_equal(grouped_var$subgr, "location")
 })
 
+test_that("validate_gr_balanced_groups errors on unbalanced groups", {
+  # 3 forest + 2 grassland series: tail entries of fixed-size
+  # group_innov would be NaN at Stan init.
+  unbalanced <- data.frame(
+    time = rep(1:6, 5),
+    series = factor(rep(paste0("s", 1:5), each = 6)),
+    habitat = factor(rep(
+      c("forest", "forest", "forest", "grassland", "grassland"),
+      each = 6
+    ))
+  )
+  expect_error(
+    mvgam:::validate_gr_balanced_groups(
+      list(gr = "habitat", subgr = "NA", series = "series"),
+      unbalanced
+    ),
+    "unbalanced groups"
+  )
+
+  # Error message names the offending group counts so the user can
+  # see exactly which groups are off.
+  err <- tryCatch(
+    mvgam:::validate_gr_balanced_groups(
+      list(gr = "habitat", subgr = "NA", series = "series"),
+      unbalanced
+    ),
+    error = function(e) conditionMessage(e)
+  )
+  expect_match(err, "forest=3")
+  expect_match(err, "grassland=2")
+})
+
+test_that("validate_gr_balanced_groups passes balanced groups silently", {
+  balanced <- data.frame(
+    time = rep(1:6, 4),
+    series = factor(rep(paste0("s", 1:4), each = 6)),
+    habitat = factor(rep(
+      c("forest", "forest", "grassland", "grassland"),
+      each = 6
+    ))
+  )
+  expect_silent(
+    result <- mvgam:::validate_gr_balanced_groups(
+      list(gr = "habitat", subgr = "NA", series = "series"),
+      balanced
+    )
+  )
+  expect_null(result)
+})
+
+test_that("validate_gr_balanced_groups respects explicit subgr= bypass", {
+  # User-supplied subgr drives the factor-model path; balance is
+  # not derived from series-per-group counts in that path.
+  unbalanced <- data.frame(
+    time = rep(1:6, 5),
+    series = factor(rep(paste0("s", 1:5), each = 6)),
+    habitat = factor(rep(
+      c("forest", "forest", "forest", "grassland", "grassland"),
+      each = 6
+    )),
+    site = factor(rep(paste0("site", 1:5), each = 6))
+  )
+  expect_silent(
+    result <- mvgam:::validate_gr_balanced_groups(
+      list(gr = "habitat", subgr = "site", series = "series"),
+      unbalanced
+    )
+  )
+  expect_null(result)
+})
+
 # Test PW cap argument validation for logistic growth
 test_that("PW cap argument is properly validated for logistic growth", {
 

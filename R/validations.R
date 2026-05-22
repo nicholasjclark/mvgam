@@ -474,6 +474,64 @@ validate_trend_grouping <- function(trend_spec, data, cached_formulas = NULL) {
 }
 
 
+#' Validate Hierarchical Groups Are Balanced
+#'
+#' Hierarchical trend codegen currently sizes per-group cholesky and
+#' sigma blocks by `max(series-per-group)` and fills only the first
+#' `k` entries of a fixed-size innovation vector per group. Tail
+#' entries stay uninitialised and produce NaN at Stan init for
+#' unbalanced designs. Fail-fast with a clear message until ragged
+#' array support is implemented.
+#'
+#' @param trend_spec Trend specification with `gr`, `subgr` and
+#'   (optionally) `series` fields.
+#' @param data Data frame containing `gr` and series columns.
+#' @return Invisibly NULL; called for its side-effect.
+#' @noRd
+validate_gr_balanced_groups <- function(trend_spec, data) {
+  # User-supplied subgr= drives a factor-model path where N_subgroups
+  # is set explicitly; series-per-group balance is not derived.
+  subgr <- trend_spec$subgr
+  if (!is.null(subgr) && !identical(subgr, "NA")) {
+    return(invisible(NULL))
+  }
+
+  gr_var <- trend_spec$gr
+  series_var <- trend_spec$series %||% "series"
+
+  if (!series_var %in% colnames(data) || !gr_var %in% colnames(data)) {
+    return(invisible(NULL))
+  }
+
+  unique_series_rows <- data[!duplicated(data[[series_var]]), , drop = FALSE]
+  series_group_table <- table(unique_series_rows[[gr_var]])
+  group_counts <- as.integer(series_group_table)
+
+  if (length(unique(group_counts)) <= 1L) {
+    return(invisible(NULL))
+  }
+
+  counts_str <- paste(
+    paste0(names(series_group_table), "=", group_counts),
+    collapse = ", "
+  )
+  stop(insight::format_error(c(
+    paste0(
+      "Hierarchical trend models currently require equal ",
+      "series-per-group counts."
+    ),
+    x = paste0(
+      "Grouping variable '", gr_var,
+      "' has unbalanced groups: ", counts_str, "."
+    ),
+    i = paste0(
+      "Subset the data to a balanced design, or combine small ",
+      "groups. Support for unbalanced groups is planned."
+    )
+  )))
+}
+
+
 #' Validate Grouping Variable is Constant Within Each Series
 #'
 #' Series-level hierarchical models map each series to a single group.
@@ -3303,6 +3361,11 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   parsed_trend$subgr <- groupings$subgr %||% "NA"
   if (!is.null(groupings$gr)) {
     validate_gr_constant_per_series(parsed_trend, data)
+    # Reason: current Stan template sizes per-group cholesky/sigma
+    # blocks by max(series-per-group) and produces NaN at init for
+    # unbalanced designs; fail-fast here until ragged-array support
+    # lands. Mirrors the gr-constant-per-series check above.
+    validate_gr_balanced_groups(parsed_trend, data)
   }
 
   data <- ensure_mvgam_variables(data, parsed_trend, time_var, series_var,

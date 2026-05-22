@@ -843,25 +843,28 @@ but discovered while building the hierarchical-trend prediction fixture
 in 4.1.1.4. Tracked here so prediction tests don't quietly assume them
 to be solved.
 
-- [ ] **7.1 Support unbalanced hierarchical groups in Stan codegen**
-  - Current Stan template assumes constant series-per-group via a
-    single scalar `N_subgroups_trend`. Per-group matrices are declared
-    `array[N_groups_trend] cholesky_factor_corr[N_subgroups_trend]`,
-    inner loops fill only `k` entries of fixed-size `group_innov`,
-    leaving tail entries uninitialised → NaN at init for unbalanced
-    groups (e.g. 3 forest + 2 grassland series).
-  - Verified by Explore agent: structural constraint, not cosmetic.
-    Constraint pinned at `R/stan_assembly.R` lines 2788, 2807, 2816,
-    2823 (parameter declarations) and 2857–2877 (innovation loop).
-  - Fix scope: ragged Stan arrays (Stan ≥2.31), new
-    `array[N_groups_trend] int group_sizes_trend` data block, rewrite
-    loop bounds `1:N_subgroups_trend` → `1:group_sizes[g]` in ~8
-    blocks, R-side data prep to compute `group_sizes`.
-  - Estimated effort: 2–3 days. Until shipped, hierarchical prediction
-    only covers balanced designs; unbalanced inputs fail at Stan init
-    with `normal_lpdf: Location parameter[1] is nan`.
-  - Recommended UX in the meantime: emit a soft warning at fit time
-    when groups are unbalanced, naming the offending counts.
+- [x] **7.1 Support unbalanced hierarchical groups in Stan codegen**
+  - **Resolved (interim).** Added `validate_gr_balanced_groups()` in
+    `R/validations.R` and wired it into the live standata path in
+    `validate_time_series_for_trends()`, mirroring how
+    `validate_gr_constant_per_series()` is dispatched. The check fires
+    whenever a `gr=` trend spec lands without an explicit `subgr=`
+    (factor models are exempt) and errors with the offending group
+    counts before any Stan compile, e.g.
+    "habitat has unbalanced groups: forest=3, grassland=2".
+  - Also fixed the shared `setup_stan_test_data()` fixture (both
+    `tests/testthat/test-stancode-standata.R` and
+    `tests/local/test-models-single.R`) which had `n_series = 3` and
+    therefore produced an unbalanced forest/grassland split, contrary
+    to its own "balanced design" comment. Bumped to `n_series = 4` so
+    the fixture matches its documented intent.
+  - **Still open (long-term):** the underlying Stan template still
+    assumes constant series-per-group. Full ragged-array support
+    (Stan ≥2.31) with `array[N_groups_trend] int group_sizes_trend`
+    plus rewritten loop bounds `1:N_subgroups_trend` →
+    `1:group_sizes[g]` across ~8 blocks (see
+    `R/stan_assembly.R` lines 2788, 2807, 2816, 2823 and 2857–2877)
+    is the proper fix; estimated 2–3 days when prioritised.
 
 - [x] **7.2 Fix X_trend dim mismatch with covariates in trend**
   - **Resolved.** The original symptom — `X_trend` declared with
