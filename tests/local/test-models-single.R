@@ -1215,8 +1215,12 @@ test_that("RW(gr = habitat) fits balanced hierarchical and predicts cleanly", {
   expect_s3_class(fit, "mvgam")
   expect_equal(fit$standata$N_groups_trend, 2L)
   expect_equal(fit$standata$N_subgroups_trend, 2L)
+  # Interleaved series-to-group mapping: rep(c("forest","grassland"),
+  # length.out = 4) yields s1=forest, s2=grassland, s3=forest, s4=grassland.
+  # Exercises the non-contiguous group_inds path that
+  # extract_hierarchical_diagonal_params() must handle correctly.
   expect_equal(as.integer(fit$standata$group_inds_trend),
-               c(1L, 1L, 2L, 2L))
+               c(1L, 2L, 1L, 2L))
 
   # Latent trend states and scaled innovations must be finite for every
   # draw - the original bug produced NaN at init for these matrices.
