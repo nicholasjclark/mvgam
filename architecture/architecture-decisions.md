@@ -42,6 +42,8 @@ mvgam(y ~ x1 + x2, trend_formula = ~ 1, data = data)
 mvgam(y ~ x1 + x2, trend_formula = ~ AR(), data = data)
 ```
 
+**Distributional parameters in `trend_formula`**: `bf(..., sigma ~ z)`-style dpar formulas inside `trend_formula` are rejected with a targeted error at `mvgam_formula()`; place dpar formulas in the observation `formula` instead. Trend-side dpar support (e.g. heteroscedastic Gaussian state-space variance) is a deferred feature, gated on a concrete user request.
+
 ### 3. Stan Integration Strategy: Two-Stage Assembly
 **Decision**: Leverage brms stanvars system with enhanced processing layer
 **Stage 1**: Generate trend stanvars and trend Stan data in `generate_trend_stanvars()`

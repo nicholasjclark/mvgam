@@ -1,0 +1,275 @@
+# brms vs mvgam numerical concordance tests.
+#
+# These tests live under tests/local/ because they require pre-built
+# brms + mvgam fixture pairs and are too heavy for CI. Run via:
+#   testthat::test_file("tests/local/test-predictions-brms-concordance.R")
+# after building the fixtures with
+#   Rscript tests/local/build_fixtures.R
+#
+# Each test_that block asserts numerical agreement with a fitted brms
+# equivalent on the same data, plus family-specific scale constraints.
+# This is correctness coverage, not just shape: posterior_linpred,
+# posterior_epred and posterior_predict are expected to agree with
+# brms within MC noise.
+
+source("setup_tests_local.R")
+source("concordance_helpers.R")
+
+
+# -- Univariate Poisson AR(1) grid --------------------------------------
+
+# Concordance defaults to linpred only because brms residual-AR
+# integrates differently from mvgam state-space-AR through inverse
+# links (see 7.6 / 7.7); on the link scale the structural difference
+# washes out and Pearson cor is the right summary. Family tests below
+# add epred / predict checks where the relationship is direct
+# (Beta epred = mu, Binomial epred = p * trials, ordinal sums to 1).
+
+test_that("Poisson AR(1): intercept-only", {
+  require_fixtures("val_brms_ar1_int.rds", "val_mvgam_ar1_int.rds")
+  brms_fit <- load_brms("ar1_int")
+  mvgam_fit <- load_mvgam("ar1_int")
+  newdata <- mvgam_fit$data
+  # Intercept-only collapses linpred to near-constant; assert_linpred
+  # uses rmse fallback when sd of one side is near zero.
+  assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.85)
+  pp <- posterior_predict(mvgam_fit, ndraws = 100)
+  assert_predict_scale_constraints(pp, poisson())
+})
+
+test_that("Poisson AR(1) + fixed effect", {
+  require_fixtures("val_brms_ar1_fx.rds", "val_mvgam_ar1_fx.rds")
+  brms_fit <- load_brms("ar1_fx")
+  mvgam_fit <- load_mvgam("ar1_fx")
+  newdata <- mvgam_fit$data
+  assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.88)
+  pp <- posterior_predict(mvgam_fit, ndraws = 100)
+  assert_predict_scale_constraints(pp, poisson())
+})
+
+test_that("Poisson AR(1) + random intercept", {
+  require_fixtures("val_brms_ar1_re.rds", "val_mvgam_ar1_re.rds")
+  brms_fit <- load_brms("ar1_re")
+  mvgam_fit <- load_mvgam("ar1_re")
+  newdata <- mvgam_fit$data
+  assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.88)
+})
+
+test_that("Poisson AR(1) + fixed + random + smooth", {
+  require_fixtures("val_brms_ar1_re_smooth.rds",
+                   "val_mvgam_ar1_re_smooth.rds")
+  brms_fit <- load_brms("ar1_re_smooth")
+  mvgam_fit <- load_mvgam("ar1_re_smooth")
+  newdata <- mvgam_fit$data
+  assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.88)
+})
+
+test_that("Poisson AR(1) + correlated random effects", {
+  require_fixtures("val_brms_ar1_cor_re.rds", "val_mvgam_ar1_cor_re.rds")
+  brms_fit <- load_brms("ar1_cor_re")
+  mvgam_fit <- load_mvgam("ar1_cor_re")
+  newdata <- mvgam_fit$data
+  assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.88)
+})
+
+test_that("Poisson AR(1) + monotonic mo()", {
+  require_fixtures("val_brms_ar1_mo.rds", "val_mvgam_ar1_mo.rds")
+  brms_fit <- load_brms("ar1_mo")
+  mvgam_fit <- load_mvgam("ar1_mo")
+  newdata <- mvgam_fit$data
+  assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.88)
+})
+
+test_that("Poisson AR(1) + GP(z)", {
+  require_fixtures("val_brms_ar1_gp.rds", "val_mvgam_ar1_gp.rds")
+  brms_fit <- load_brms("ar1_gp")
+  mvgam_fit <- load_mvgam("ar1_gp")
+  newdata <- mvgam_fit$data
+  assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.88)
+})
+
+
+# -- Trend-formula variants (mvgam moves the covariate into the trend
+#    block; brms cannot do this so we compare against the obs-formula
+#    counterpart fitted in the brms grid) -------------------------------
+
+test_that("AR(1) + fixed effect in trend formula", {
+  # mvgam_2t uses trend_formula = ~ x + AR(p = 1); brms_2 has the same
+  # x in the observation formula. Linpred should still concord because
+  # mvgam combines obs + trend additively on the link scale.
+  require_fixtures("val_brms_ar1_fx.rds", "val_mvgam_ar1_fx_trend.rds")
+  brms_fit <- load_brms("ar1_fx")
+  mvgam_fit <- load_mvgam("ar1_fx_trend")
+  newdata <- mvgam_fit$data
+  # Compare combined obs + trend linpred against brms linpred.
+  brms_pred <- brms::posterior_linpred(brms_fit, newdata = newdata,
+                                        incl_autocor = FALSE)
+  mvgam_pred <- posterior_linpred(mvgam_fit, newdata = newdata)
+  testthat::expect_equal(dim(brms_pred), dim(mvgam_pred))
+  comp <- compare_vectors(colMeans(brms_pred), colMeans(mvgam_pred))
+  expect_gte(comp$cor, 0.85)
+})
+
+test_that("AR(1) + fixed + random + smooth in trend formula", {
+  require_fixtures("val_brms_ar1_re_smooth.rds",
+                   "val_mvgam_ar1_re_smooth_trend.rds")
+  brms_fit <- load_brms("ar1_re_smooth")
+  mvgam_fit <- load_mvgam("ar1_re_smooth_trend")
+  newdata <- mvgam_fit$data
+  brms_pred <- brms::posterior_linpred(brms_fit, newdata = newdata,
+                                        incl_autocor = FALSE)
+  mvgam_pred <- posterior_linpred(mvgam_fit, newdata = newdata)
+  testthat::expect_equal(dim(brms_pred), dim(mvgam_pred))
+  comp <- compare_vectors(colMeans(brms_pred), colMeans(mvgam_pred))
+  expect_gte(comp$cor, 0.85)
+})
+
+
+# -- Multivariate ------------------------------------------------------
+
+test_that("Multivariate mvbind shared AR(1)", {
+  require_fixtures("val_brms_mv_gauss.rds", "val_mvgam_mv_gauss.rds")
+  brms_fit <- load_brms("mv_gauss")
+  mvgam_fit <- load_mvgam("mv_gauss")
+  newdata <- mvgam_fit$data
+
+  brms_pred <- brms::posterior_linpred(brms_fit, newdata = newdata,
+                                        incl_autocor = FALSE)
+  mvgam_pred <- posterior_linpred(mvgam_fit, newdata = newdata)
+  # mvgam returns a named list for multi-response; brms returns 3D
+  # [ndraws x nobs x nresp].
+  expect_type(mvgam_pred, "list")
+  expect_named(mvgam_pred, c("y1", "y2"))
+  expect_equal(dim(mvgam_pred$y1), c(dim(brms_pred)[1], dim(brms_pred)[2]))
+
+  for (resp in c("y1", "y2")) {
+    brms_resp <- brms_pred[, , resp]
+    comp <- compare_vectors(colMeans(brms_resp),
+                            colMeans(mvgam_pred[[resp]]))
+    expect_gte(comp$cor, 0.92)
+  }
+
+  # resp = filter returns a single matrix
+  resp_filtered <- posterior_linpred(mvgam_fit, newdata = newdata,
+                                      resp = "y1")
+  expect_true(is.matrix(resp_filtered))
+})
+
+
+# -- Family coverage ----------------------------------------------------
+
+test_that("Beta AR(1) — epred bounded (0, 1) and concords with brms", {
+  require_fixtures("val_brms_beta_ar1.rds", "val_mvgam_beta_ar1.rds")
+  brms_fit <- load_brms("beta_ar1")
+  mvgam_fit <- load_mvgam("beta_ar1")
+  newdata <- mvgam_fit$data
+  assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.925)
+  brms_ep <- brms::posterior_epred(brms_fit, newdata = newdata)
+  mvgam_ep <- posterior_epred(mvgam_fit, newdata = newdata)
+  expect_true(all(mvgam_ep > 0 & mvgam_ep < 1))
+  comp <- compare_vectors(colMeans(brms_ep), colMeans(mvgam_ep))
+  expect_gte(comp$cor, 0.925)
+})
+
+test_that("Binomial AR(1) — epred = p * trials, bounded by trials", {
+  require_fixtures("val_brms_binom_ar1.rds", "val_mvgam_binom_ar1.rds")
+  brms_fit <- load_brms("binom_ar1")
+  mvgam_fit <- load_mvgam("binom_ar1")
+  newdata <- mvgam_fit$data
+  assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.925)
+  brms_ep <- brms::posterior_epred(brms_fit, newdata = newdata)
+  mvgam_ep <- posterior_epred(mvgam_fit, newdata = newdata)
+  expect_true(all(mvgam_ep >= 0 & mvgam_ep <= max(newdata$trials)))
+  comp <- compare_vectors(colMeans(brms_ep), colMeans(mvgam_ep))
+  expect_gte(comp$cor, 0.925)
+})
+
+test_that("Ordinal (Cumulative) — 2D linpred, 3D epred summing to 1", {
+  require_fixtures("val_brms_cumulative_fx.rds",
+                   "val_mvgam_cumulative_fx.rds")
+  brms_fit <- load_brms("cumulative_fx")
+  mvgam_fit <- load_mvgam("cumulative_fx")
+  newdata <- mvgam_fit$data
+
+  brms_lp <- brms::posterior_linpred(brms_fit, newdata = newdata)
+  mvgam_lp <- posterior_linpred(mvgam_fit, newdata = newdata)
+  expect_equal(length(dim(brms_lp)), 2L)
+  expect_equal(length(dim(mvgam_lp)), 2L)
+  expect_gte(stats::cor(colMeans(brms_lp), colMeans(mvgam_lp)), 0.925)
+
+  brms_ep <- brms::posterior_epred(brms_fit, newdata = newdata)
+  mvgam_ep <- posterior_epred(mvgam_fit, newdata = newdata)
+  expect_equal(length(dim(brms_ep)), 3L)
+  expect_equal(length(dim(mvgam_ep)), 3L)
+  # Category probabilities sum to 1.
+  expect_true(max(abs(apply(mvgam_ep, 1:2, sum) - 1)) < 1e-10)
+  comp <- compare_vectors(as.vector(apply(brms_ep, 2:3, mean)),
+                          as.vector(apply(mvgam_ep, 2:3, mean)))
+  expect_gte(comp$cor, 0.925)
+})
+
+test_that("Hurdle Poisson AR(1) — hu extracted and epred non-negative", {
+  require_fixtures("val_brms_hurdle_poisson_ar1.rds",
+                   "val_mvgam_hurdle_poisson_ar1.rds")
+  brms_fit <- load_brms("hurdle_poisson_ar1")
+  mvgam_fit <- load_mvgam("hurdle_poisson_ar1")
+  newdata <- mvgam_fit$data
+  assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.925)
+
+  mvgam_ep <- posterior_epred(mvgam_fit, newdata = newdata)
+  expect_true(all(mvgam_ep >= 0))
+  brms_ep <- brms::posterior_epred(brms_fit, newdata = newdata)
+  # Count families are noisier; relax threshold but still cor-bound.
+  comp <- compare_vectors(colMeans(brms_ep), colMeans(mvgam_ep))
+  expect_gte(comp$cor, 0.75)
+
+  pp <- posterior_predict(mvgam_fit, ndraws = 100)
+  assert_predict_scale_constraints(pp, hurdle_poisson())
+})
+
+test_that("Hurdle NegBin AR(1) — IQR2 dispersion stable PE=TRUE vs FALSE", {
+  require_fixtures("val_brms_hurdle_negbinomial_ar1.rds",
+                   "val_mvgam_hurdle_negbinomial_ar1.rds")
+  brms_fit <- load_brms("hurdle_negbinomial_ar1")
+  mvgam_fit <- load_mvgam("hurdle_negbinomial_ar1")
+  newdata <- mvgam_fit$data
+  assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.925)
+
+  # NB-shape tails make raw variance unstable across seeds. Use IQR^2.
+  set.seed(1)
+  pp_pe <- posterior_predict(mvgam_fit, ndraws = 500)
+  set.seed(2)
+  pp_no <- posterior_predict(mvgam_fit, ndraws = 500, process_error = FALSE)
+  iqr2_ratio <- stats::IQR(as.vector(pp_pe))^2 /
+                  max(stats::IQR(as.vector(pp_no))^2, 1e-12)
+  expect_gte(iqr2_ratio, 0.95)
+})
+
+test_that("Zero-inflated Poisson AR(1) — zi extracted, epred valid", {
+  require_fixtures("val_brms_zero_inflated_poisson_ar1.rds",
+                   "val_mvgam_zero_inflated_poisson_ar1.rds")
+  brms_fit <- load_brms("zero_inflated_poisson_ar1")
+  mvgam_fit <- load_mvgam("zero_inflated_poisson_ar1")
+  newdata <- mvgam_fit$data
+  assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.925)
+
+  mvgam_ep <- posterior_epred(mvgam_fit, newdata = newdata)
+  expect_true(all(mvgam_ep >= 0))
+  pp <- posterior_predict(mvgam_fit, ndraws = 100)
+  assert_predict_scale_constraints(pp, zero_inflated_poisson())
+})
+
+
+# -- Process error toggle ----------------------------------------------
+
+test_that("process_error toggle on Poisson AR(1) widens predict variance", {
+  require_fixtures("val_mvgam_ar1_hs.rds")
+  mvgam_fit <- load_mvgam("ar1_hs")
+  set.seed(1)
+  pp_pe <- posterior_predict(mvgam_fit, ndraws = 500)
+  set.seed(2)
+  pp_no <- posterior_predict(mvgam_fit, ndraws = 500, process_error = FALSE)
+  v_pe <- mean(apply(pp_pe, 2, stats::var))
+  v_no <- mean(apply(pp_no, 2, stats::var))
+  expect_gt(v_pe, v_no)
+})

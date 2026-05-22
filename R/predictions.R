@@ -811,34 +811,37 @@ extract_linpred_nonlinear <- function(prep, resp = NULL) {
 #'
 #' @noRd
 validate_monotonic_indices <- function(xmo_data, xmo_name, k_levels, n_obs) {
-  # Note: Check if indices are 0-based or 1-based
+  # `k_levels` is `ncol(simo_draws)` = D, the simplex dimension. The
+  # brms convention is X_mo taking values 0..D inclusive (so D+1
+  # distinct values) for 0-based indexing, or 1..D+1 for 1-based. The
+  # check below mirrors that contract.
   checkmate::assert_integerish(xmo_data, any.missing = FALSE)
 
   Xmo <- as.integer(xmo_data)
 
   if (length(Xmo) != n_obs) {
-    stop(insight::format_error(
-      "Monotonic design matrix {.field {xmo_name}} has ",
-      "{length(Xmo)} elements but expected {n_obs} observations."
-    ))
+    stop(insight::format_error(paste0(
+      "Monotonic design matrix '", xmo_name, "' has ",
+      length(Xmo), " elements but expected ", n_obs, " observations."
+    )))
   }
 
-  # Detect if data is 0-based or 1-based and convert to 0-based for .mo function
   min_val <- min(Xmo)
   max_val <- max(Xmo)
-  
-  if (min_val == 0 && max_val <= k_levels - 1) {
-    # Already 0-based indexing (0 to k_levels-1)
+
+  if (min_val == 0 && max_val <= k_levels) {
+    # 0-based indexing in 0..D
     return(Xmo)
-  } else if (min_val == 1 && max_val <= k_levels) {
-    # 1-based indexing (1 to k_levels), convert to 0-based
-    return(Xmo - 1)
+  } else if (min_val == 1 && max_val <= k_levels + 1) {
+    # 1-based indexing in 1..D+1; convert to 0-based for .mo()
+    return(Xmo - 1L)
   } else {
-    stop(insight::format_error(
-      "Monotonic design matrix {.field {xmo_name}} contains ",
-      "invalid index range. Expected 0-based [0, {k_levels - 1}] ",
-      "or 1-based [1, {k_levels}]. Found range: [{min_val}, {max_val}]."
-    ))
+    stop(insight::format_error(paste0(
+      "Monotonic design matrix '", xmo_name, "' contains ",
+      "invalid index range. Expected 0-based [0, ", k_levels,
+      "] or 1-based [1, ", k_levels + 1L,
+      "]. Found range: [", min_val, ", ", max_val, "]."
+    )))
   }
 }
 
@@ -1422,13 +1425,17 @@ monotonic_pred <- function(eta, draws_mat, prep, suffix, n_obs) {
   # D is the number of simplex dimensions
   D <- k_levels
   
-  # Validate Xmo indices are within bounds before indexing
+  # Validate Xmo indices are within bounds before indexing.
+  # Xmo is 0-based in 0..D after validate_monotonic_indices(); the
+  # downstream lookup is simplex_cumsum[, Xmo + 1], which indexes a
+  # matrix of width D + 1, so max(Xmo) <= D = k_levels.
   max_index <- max(Xmo)
   if (max_index > k_levels) {
-    stop(insight::format_error(
-      "Monotonic indices exceed bounds: max index {max_index} ",
-      "but only {k_levels} levels available."
-    ))
+    stop(insight::format_error(paste0(
+      "Monotonic indices exceed bounds: max index ", max_index,
+      " but only ", k_levels + 1L,
+      " simplex entries available (0..", k_levels, ")."
+    )))
   }
   
   # Prepend zeros and compute cumulative sum vectorized

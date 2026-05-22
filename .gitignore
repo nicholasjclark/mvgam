@@ -12,5 +12,6 @@ desktop.ini
 .claude/logs/
 .claude/backups/
 claude.exe
-tasks/fixtures/*.rds
 tasks/prep_structure_output.txt
+tests/local/fixtures/*.rds
+tests/local/fixtures/brms_gp/
