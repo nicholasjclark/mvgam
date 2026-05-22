@@ -1054,38 +1054,45 @@ to be solved.
   - No behaviour change beyond improved error rendering; downstream
     consumers should not be affected.
 
-- [ ] **7.8 Investigate distributional parameters in `trend_formula`**
-  - Open question from `tasks/prediction-system-implementation-strategy.md`
-    ("Distributional parameters in trends: Can trend_formula have
-    `sigma ~ ...`?"). Currently unaddressed in code or docs.
-  - **Scope of investigation** (research before implementation):
-    1. Confirm whether brms's `bf(y ~ x, sigma ~ z)` syntax is
-       parseable when handed to mvgam's trend formula path; check
-       `R/validations.R` and `R/priors.R` for any explicit rejection.
-    2. Trace the dpars extraction in `R/posterior_epred.R` and
-       `R/posterior_predict.R` to determine whether trend-side
-       distributional parameters would be picked up. Current dpars
-       extraction (e.g. `extract_obs_parameters`) is observation-side
-       only — trend-side dpars would need a parallel extractor.
-    3. Identify which families this matters for. Useful for Gaussian
-       trend (heteroscedastic state-space variance), Beta trend
-       (varying phi), etc. Not meaningful for Poisson trend (no free
-       dispersion parameter).
-    4. Check Stan codegen in `R/stan_assembly.R`: does the
-       `trend_model` brmsfit currently propagate non-mu dpar
-       formulas into the combined Stan code, or are they silently
-       dropped at the assembly stage?
-  - **Expected outcomes**:
-    - If silently dropped: file as a separate codegen bug under §7,
-      or fail-fast at fit time with a clear error directing users to
-      put dpar formulas in the observation formula.
-    - If wired but untested: add an integration test fitting
-      `mvgam(bf(y ~ x), trend_formula = bf(~ AR(p=1), sigma ~ z),
-      ...)` against a brms equivalent; extend dpars extractors to
-      cover the trend side; document the supported subset.
-  - Use Explore + package-analyzer agents to trace before deciding
-    scope. Defer implementation decision until investigation
-    complete.
+- [x] **7.8 Investigate distributional parameters in `trend_formula`**
+  - **Resolved (Option A: fail-fast with hint).** Investigation
+    findings:
+    1. Six `checkmate::assert_formula(trend_formula)` or
+       `assert_class(trend_formula, "formula")` guards across
+       `R/validations.R` (1368, 2936, 3593), `R/trend_system.R:1695`
+       and `R/priors.R` (116, 1416) reject any `brmsformula`/`bform`
+       trend_formula outright, including bf with pforms.
+    2. One bf-aware validator (`validate_bf_trend_formula` at
+       `R/validations.R:1089`) is intended for multivariate trend
+       specs like `bf(y1 ~ AR(), y2 ~ RW())` and does iterate over
+       pforms, but it is unreachable from the live `mvgam()` path
+       because the checkmate guards fire first.
+    3. `extract_trend_parameters()` already exists in
+       `R/index-mvgam.R:355` and returns trend dynamics, betas,
+       smoothpars and re_params via `categorize_mvgam_parameters`.
+       No separate trend-side dpar slot, because no upstream
+       mechanism produces one.
+    4. `brms::brm(formula = trend_formula, ..., backend = "mock")`
+       in `R/brms_integration.R:183` would propagate pforms into
+       the trend `brmsfit` if it ever received one, but never does
+       under the current guards.
+  - **Fix applied.** Added an explicit detector in `mvgam_formula()`
+    (`R/priors.R:1416`) that fires BEFORE the generic checkmate
+    assertion when `trend_formula` is a `brmsformula`/`bform` with
+    non-empty `pforms`. The error names the offending dpar(s) and
+    directs users to place dpar formulas in the observation
+    formula. Regression coverage: four new test_that blocks in
+    `tests/testthat/test-mvgam-formula.R` (single dpar, multiple
+    dpars, dpar names in message, bf without pforms still hits the
+    generic assertion not the new one).
+  - **Full support deferred.** Lifting the six guards to accept bf
+    with pforms, propagating trend-side dpars into the combined
+    Stan codegen, extending dpar extractors and posterior_epred /
+    posterior_predict to honour heteroscedastic state-space
+    variance, and adding brms-equivalent integration tests is a
+    1-3 day feature. Useful primarily for Gaussian trend with
+    `sigma ~ z`; not meaningful for Poisson / NB trends. Revisit
+    only on a concrete user request.
 
 - [x] **7.7 Validation strategy for state-space comparators**
   - **Resolved.** brms residual-AR vs mvgam state-space-AR is

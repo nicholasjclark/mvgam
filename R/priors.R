@@ -1413,6 +1413,33 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
 
   # Validate trend_formula if provided
   if (!is.null(trend_formula)) {
+    # Detect bf() / brmsformula with distributional-parameter formulas
+    # (pforms) before the assert_formula guard fires. The downstream
+    # validator returns a generic "Must be a formula, not brmsformula"
+    # message; trap the dpar case here so users get a targeted hint.
+    if (inherits(trend_formula, c("brmsformula", "bform")) &&
+        !is.null(trend_formula$pforms) &&
+        length(trend_formula$pforms) > 0L) {
+      dpar_names <- paste(
+        paste0("'", names(trend_formula$pforms), "'"),
+        collapse = ", "
+      )
+      stop(insight::format_error(c(
+        paste0(
+          "Distributional-parameter formulas (e.g. 'sigma ~ z') ",
+          "inside 'trend_formula' are not currently supported."
+        ),
+        x = paste0(
+          "Found dpar formula(s): ", dpar_names, "."
+        ),
+        i = paste0(
+          "Use bf(...) in 'formula' (the observation model) for ",
+          "distributional parameters, or open an issue if you need ",
+          "trend-side dpar support."
+        )
+      )))
+    }
+
     checkmate::assert_formula(trend_formula, .var.name = "trend_formula")
 
     # Use comprehensive trend formula validation from validations.R
