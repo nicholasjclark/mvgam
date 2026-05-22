@@ -939,17 +939,41 @@ to be solved.
     fast naming the offending series when `gr` varies across rows
     of one series.
 
-- [ ] **7.4 Fix `RW(gr=...)` and `AR(gr=...)` silently ignoring `gr`**
-  - Constructors parse the arg but the codegen path emits
-    non-hierarchical Stan. Either implement hierarchical RW/AR codegen
-    or fail-fast at constructor time pointing users to ZMVN/VAR.
+- [x] **7.4 Fix `RW(gr=...)` and `AR(gr=...)` silently ignoring `gr`**
+  - **Resolved (RW path).** Root cause was the same as §7.5: the RW
+    constructor did parse `gr` and `data_info$has_hierarchical` was
+    set, but `generate_rw_trend_stanvars()` never called
+    `add_hierarchical_support()`, so the hierarchical data block,
+    parameters and the `scaled_innovations_trend[t, s] = scaled[k]`
+    assignment loop were never emitted. AR(p>=1)/ZMVN already wired
+    `add_hierarchical_support()`. RW now emits hierarchical Stan and
+    fits cleanly (`/tmp/fit_rw_gr.R` balanced fixture, 0 divergences).
+  - Downstream `posterior_epred` failure for the
+    diagonal-hierarchical pattern was patched in `sample_innovations.R`:
+    new `extract_hierarchical_diagonal_params()` broadcasts
+    `sigma_group_trend[g, sub]` to per-series sigma using
+    `group_inds_trend` + sub-index within group (Stan loop order).
+  - Dispatch chain in `sample_innovations.R` refactored from
+    if/else cascade to `switch()` keyed on
+    `<hier|flat>.<effective_pattern>`.
 
-- [ ] **7.5 Fix dangling `scaled_innovations_trend` in plain RW Stan**
-  - Plain `RW()` (gaussian, simple) declares
-    `matrix[N_trend, N_lv_trend] scaled_innovations_trend` but never
-    assigns to it before reading. `lv_trend` becomes NaN at init.
-    Affects basic RW fits on certain code paths; the cor=TRUE path
-    appears to assign correctly so the bug is path-dependent.
+- [x] **7.5 Fix dangling `scaled_innovations_trend` in plain RW Stan**
+  - **Resolved.** Description was mis-scoped: plain `RW()` already
+    emitted decl + assignment; the offending path was `RW(gr=...)`,
+    where the hierarchical branch of
+    `generate_shared_innovation_stanvars()` emits a declaration-only
+    block and the matching assignment is meant to come from
+    `add_hierarchical_support()`. `generate_rw_trend_stanvars()` was
+    not calling it. Fix: added one `add_hierarchical_support()` call
+    after the Z matrix step in `R/stan_assembly.R` (mirrors AR/ZMVN).
+  - Regression coverage: new RW(gr=) stancode test in
+    `tests/testthat/test-stancode-standata.R` asserts hierarchical
+    data dims, parameter decls, the assignment loop, and that no
+    direct flat assignment is emitted. Four new test_that blocks in
+    `tests/testthat/test-sample-innovations.R` cover
+    `extract_hierarchical_diagonal_params` (contiguous and
+    non-contiguous group_inds, missing-param error, integration with
+    `transform_diagonal_innovations`).
 
 - [ ] **7.8 Investigate distributional parameters in `trend_formula`**
   - Open question from `tasks/prediction-system-implementation-strategy.md`

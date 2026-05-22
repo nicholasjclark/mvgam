@@ -3184,6 +3184,14 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   matrix_z <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
   components <- append_if_not_null(components, matrix_z)
 
+  # STEP 3: Add hierarchical correlation support if applicable (BEFORE RW dynamics)
+  # Reason: when gr is supplied, the shared innovation system emits a
+  # declaration-only branch for scaled_innovations_trend; the matching
+  # assignment loop is provided by generate_hierarchical_correlation_parameters
+  # (via add_hierarchical_support) and must be in place before the RW
+  # recurrence reads scaled_innovations_trend.
+  components <- add_hierarchical_support(components, trend_specs, data_info, prior)
+
   # 1. PARAMETERS block - RW trend-specific parameters
   if (has_ma) {
     rw_parameters_stanvar <- brms::stanvar(

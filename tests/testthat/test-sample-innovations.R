@@ -118,6 +118,115 @@ test_that("extract_hierarchical_cholesky_params errors on missing param", {
 })
 
 
+test_that("extract_hierarchical_diagonal_params broadcasts sigma_group_trend per series", {
+  # Diagonal-hierarchical path: each series s reads from
+  # sigma_group_trend[group_inds[s], sub_idx_of_s_within_group], where
+  # sub_idx follows the Stan loop order in
+  # generate_hierarchical_correlation_parameters().
+  n_draws <- 6
+  n_groups <- 2
+  n_sub <- 2
+  draws_mat <- make_hier_draws_mat(n_draws, n_groups, n_sub)
+  group_info <- list(
+    n_groups = n_groups, n_subgroups = n_sub,
+    group_inds = c(1L, 1L, 2L, 2L)
+  )
+
+  params <- extract_hierarchical_diagonal_params(draws_mat, group_info)
+
+  expect_equal(dim(params$sigma_trend), c(n_draws, 4L))
+  # Series-to-(group, sub_idx) mapping:
+  #   s1 → (g=1, k=1), s2 → (g=1, k=2), s3 → (g=2, k=1), s4 → (g=2, k=2)
+  expect_equal(params$sigma_trend[, 1],
+               as.numeric(draws_mat[, "sigma_group_trend[1,1]"]))
+  expect_equal(params$sigma_trend[, 2],
+               as.numeric(draws_mat[, "sigma_group_trend[1,2]"]))
+  expect_equal(params$sigma_trend[, 3],
+               as.numeric(draws_mat[, "sigma_group_trend[2,1]"]))
+  expect_equal(params$sigma_trend[, 4],
+               as.numeric(draws_mat[, "sigma_group_trend[2,2]"]))
+})
+
+
+test_that("extract_hierarchical_diagonal_params respects non-contiguous group_inds", {
+  # If series are interleaved across groups (e.g. group_inds c(1, 2, 1, 2)),
+  # sub_idx must still follow the Stan loop order (cumulative count within
+  # each group as series indices are scanned 1..N_lv_trend).
+  n_draws <- 4
+  draws_mat <- make_hier_draws_mat(n_draws, n_groups = 2, n_sub = 2)
+  group_info <- list(
+    n_groups = 2L, n_subgroups = 2L,
+    group_inds = c(1L, 2L, 1L, 2L)
+  )
+
+  params <- extract_hierarchical_diagonal_params(draws_mat, group_info)
+
+  # s1 (g=1, first encounter) → [1, 1]; s2 (g=2, first) → [2, 1];
+  # s3 (g=1, second) → [1, 2]; s4 (g=2, second) → [2, 2]
+  expect_equal(params$sigma_trend[, 1],
+               as.numeric(draws_mat[, "sigma_group_trend[1,1]"]))
+  expect_equal(params$sigma_trend[, 2],
+               as.numeric(draws_mat[, "sigma_group_trend[2,1]"]))
+  expect_equal(params$sigma_trend[, 3],
+               as.numeric(draws_mat[, "sigma_group_trend[1,2]"]))
+  expect_equal(params$sigma_trend[, 4],
+               as.numeric(draws_mat[, "sigma_group_trend[2,2]"]))
+})
+
+
+test_that("extract_hierarchical_diagonal_params errors on missing param", {
+  draws_mat <- matrix(0, 5, 3,
+                      dimnames = list(NULL, c("a", "b", "c")))
+  group_info <- list(n_groups = 1L, n_subgroups = 1L, group_inds = 1L)
+  expect_error(
+    extract_hierarchical_diagonal_params(draws_mat, group_info),
+    "sigma_group_trend"
+  )
+})
+
+
+test_that("extract_hierarchical_diagonal_params output feeds transform_diagonal_innovations", {
+  # Integration check: the broadcast sigma_trend matrix is the exact
+  # shape transform_diagonal_innovations expects, and the per-series
+  # variance of the transformed innovations recovers (sigma_group^2).
+  n_draws <- 30
+  n_times <- 80
+  n_groups <- 2
+  n_sub <- 2
+  n_series <- n_groups * n_sub
+  draws_mat <- make_hier_draws_mat(n_draws, n_groups, n_sub)
+  group_info <- list(
+    n_groups = n_groups, n_subgroups = n_sub,
+    group_inds = c(1L, 1L, 2L, 2L)
+  )
+  params <- extract_hierarchical_diagonal_params(draws_mat, group_info)
+
+  set.seed(33)
+  z <- matrix(rnorm(n_draws * n_times * n_series),
+              n_draws, n_times * n_series)
+  innov <- transform_diagonal_innovations(
+    z, params, n_times, n_series, n_draws
+  )
+
+  # Per-series sample variance should track sigma_group_trend^2 averaged
+  # over draws (since sigma varies per draw via make_hier_draws_mat).
+  per_series_var <- function(s) {
+    cols <- (s - 1L) * n_times + seq_len(n_times)
+    var(as.vector(innov[, cols]))
+  }
+  expected_var <- function(g, k) {
+    mean(as.numeric(
+      draws_mat[, sprintf("sigma_group_trend[%d,%d]", g, k)]
+    )^2)
+  }
+  # Loose tolerance: small n_draws + per-draw sigma variation.
+  expect_equal(per_series_var(1), expected_var(1, 1), tolerance = 0.25)
+  expect_equal(per_series_var(2), expected_var(1, 2), tolerance = 0.25)
+  expect_equal(per_series_var(3), expected_var(2, 1), tolerance = 0.25)
+  expect_equal(per_series_var(4), expected_var(2, 2), tolerance = 0.25)
+})
+
+
 test_that("hierarchical transform: identity Chol + unit sigma is identity", {
   n_draws <- 4
   n_times <- 6

@@ -1309,6 +1309,55 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   expect_no_error(stancode(mf_with_trend, data = data, family = lognormal(), prior = custom_prior, validate = TRUE))
 })
 
+test_that("RW(gr = habitat) emits hierarchical Stan and wires scaled_innovations_trend assignment", {
+  # Regression for the dangling-scaled_innovations_trend bug. Before the
+  # fix, generate_rw_trend_stanvars() did not call
+  # add_hierarchical_support(), so when a user supplied gr= the shared
+  # innovation system emitted a declaration-only branch and the RW
+  # recurrence then read scaled_innovations_trend with no upstream
+  # assignment, producing NaN at Stan init. The fix adds the same
+  # add_hierarchical_support() call that AR/ZMVN use, so the hierarchical
+  # correlation system fills scaled_innovations_trend[t, s] in the
+  # tparameters block before the recurrence consumes it.
+  data <- setup_stan_test_data()$multivariate
+  mf <- mvgam_formula(count ~ 1, trend_formula = ~ RW(gr = habitat))
+
+  code <- stancode(mf, data = data, family = poisson(), validate = FALSE)
+
+  # Hierarchical data structures wired in
+  expect_true(stan_pattern("int<lower=1> N_groups_trend;", code, fixed = TRUE))
+  expect_true(stan_pattern("int<lower=1> N_subgroups_trend;", code, fixed = TRUE))
+  expect_true(stan_pattern(
+    "array\\[N_series_trend\\] int<lower=1> group_inds_trend;", code))
+
+  # Hierarchical parameters present (the same ones AR/ZMVN gr= emit)
+  expect_true(stan_pattern(
+    "cholesky_factor_corr\\[N_subgroups_trend\\] L_Omega_global_trend;", code))
+  expect_true(stan_pattern(
+    "array\\[N_groups_trend\\] vector<lower=0>\\[N_subgroups_trend\\] sigma_group_trend;",
+    code))
+  expect_true(stan_pattern("real<lower=0, upper=1> alpha_cor_trend;", code))
+
+  # Critical bug-fix assertion: hierarchical assignment loop must populate
+  # scaled_innovations_trend before the RW recurrence reads it.
+  expect_true(stan_pattern(
+    "scaled_innovations_trend\\[t, s\\] = scaled\\[k\\];", code))
+
+  # The flat direct-assignment branch must NOT fire for the hierarchical
+  # path (mutually exclusive with the hierarchical assignment).
+  expect_false(grepl(
+    "scaled_innovations_trend = innovations_trend \\* diag_matrix\\(sigma_trend\\)",
+    code))
+
+  # RW recurrence reads scaled_innovations_trend (unchanged by the fix)
+  expect_true(stan_pattern(
+    "lv_trend\\[1,\\s*:\\s*\\] = scaled_innovations_trend\\[1,\\s*:\\s*\\]",
+    code))
+  expect_true(stan_pattern(
+    "lv_trend\\[i,\\s*:\\s*\\] = lv_trend\\[i - 1,\\s*:\\s*\\]\\s*\\+ scaled_innovations_trend\\[i,\\s*:\\s*\\]",
+    code))
+})
+
 test_that("stancode generates correct hierarchical VAR(gr = habitat) model with proper coefficient matrices", {
   data <- setup_stan_test_data()$multivariate
   mf_with_trend <- mvgam_formula(
