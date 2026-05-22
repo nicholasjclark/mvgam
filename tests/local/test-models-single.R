@@ -1170,3 +1170,148 @@ test_that("multi-series univariate with trend covariate fits and predicts", {
   expect_true(all(ep >= 0))
   expect_true(all(is.finite(ep)))
 })
+
+# ==============================================================================
+# REGRESSION: 7.4 / 7.5 hierarchical RW(gr=) and AR(gr=) end-to-end
+# ==============================================================================
+
+# Balanced 2-2 forest/grassland fixture: matches the dim contract of
+# the current Stan template (N_subgroups_trend = max(group_counts)).
+make_hierarchical_balanced <- function(n_time = 24, n_series = 4) {
+  series_levels <- paste0("s", seq_len(n_series))
+  habitat <- rep(c("forest", "grassland"),
+                  length.out = n_series)
+  data.frame(
+    time    = rep(seq_len(n_time), n_series),
+    series  = factor(rep(series_levels, each = n_time),
+                      levels = series_levels),
+    habitat = factor(rep(habitat, each = n_time),
+                      levels = c("forest", "grassland")),
+    count   = stats::rpois(n_time * n_series, lambda = 5),
+    x       = stats::rnorm(n_time * n_series)
+  )
+}
+
+test_that("RW(gr = habitat) fits balanced hierarchical and predicts cleanly", {
+  # Before the 7.5 fix, generate_rw_trend_stanvars() did not call
+  # add_hierarchical_support(), so the shared-innovation stanvars
+  # emitted a declaration-only branch for scaled_innovations_trend
+  # under gr=. lv_trend resolved to NaN at Stan init. The fix adds the
+  # same add_hierarchical_support() call the AR/ZMVN paths use; this
+  # test exercises the full fit + predict path end-to-end.
+  set.seed(1)
+  d <- make_hierarchical_balanced(n_time = 24, n_series = 4)
+
+  fit <- SW(SM(mvgam(
+    bf(count ~ x),
+    trend_formula = ~ RW(gr = habitat),
+    data    = d,
+    family  = poisson(),
+    chains  = 2,
+    iter    = 500,
+    silent  = 2
+  )))
+
+  expect_s3_class(fit, "mvgam")
+  expect_equal(fit$standata$N_groups_trend, 2L)
+  expect_equal(fit$standata$N_subgroups_trend, 2L)
+  expect_equal(as.integer(fit$standata$group_inds_trend),
+               c(1L, 1L, 2L, 2L))
+
+  # Latent trend states and scaled innovations must be finite for every
+  # draw - the original bug produced NaN at init for these matrices.
+  lv <- posterior::as_draws_matrix(fit$fit,
+                                    variable = "lv_trend",
+                                    regex = TRUE)
+  expect_true(all(is.finite(lv)))
+
+  sit <- posterior::as_draws_matrix(fit$fit,
+                                     variable = "scaled_innovations_trend",
+                                     regex = TRUE)
+  expect_true(all(is.finite(sit)))
+
+  # Downstream prediction surface
+  ep <- posterior_epred(fit, ndraws = 50)
+  expect_true(is.matrix(ep))
+  expect_equal(ncol(ep), nrow(d))
+  expect_true(all(is.finite(ep)))
+  expect_true(all(ep >= 0))
+
+  pp <- posterior_predict(fit, ndraws = 50)
+  expect_true(is.matrix(pp))
+  expect_equal(ncol(pp), nrow(d))
+  expect_true(all(is.finite(pp)))
+  expect_true(all(pp == floor(pp)))  # Poisson integer-valued
+})
+
+test_that("AR(p=1, gr = habitat, cor = FALSE) fits and predicts cleanly", {
+  # Companion to the RW(gr=) test. Exercises the diagonal-hierarchical
+  # arm shared by AR(gr=, cor=FALSE) and RW(gr=); the same downstream
+  # extract_hierarchical_diagonal_params() patch covers both. Before
+  # the fix the posterior_epred matrix-of-sigma assertion failed because
+  # the hierarchical extractor returned sigma_group_trend instead of
+  # broadcasting to per-series sigma_trend.
+  set.seed(2)
+  d <- make_hierarchical_balanced(n_time = 24, n_series = 4)
+
+  fit <- SW(SM(mvgam(
+    bf(count ~ x),
+    trend_formula = ~ AR(p = 1, gr = habitat, cor = FALSE),
+    data    = d,
+    family  = poisson(),
+    chains  = 2,
+    iter    = 500,
+    silent  = 2
+  )))
+
+  expect_s3_class(fit, "mvgam")
+  expect_equal(fit$standata$N_groups_trend, 2L)
+  expect_equal(fit$standata$N_subgroups_trend, 2L)
+
+  ep <- posterior_epred(fit, ndraws = 50)
+  expect_true(all(is.finite(ep)))
+  expect_true(all(ep >= 0))
+
+  pp <- posterior_predict(fit, ndraws = 50)
+  expect_true(all(is.finite(pp)))
+  expect_true(all(pp == floor(pp)))
+})
+
+test_that("mvgam() fails fast on unbalanced hierarchical groups", {
+  # The current Stan template sizes per-group cholesky and sigma blocks
+  # by max(series-per-group) and fills only k entries of a fixed-size
+  # group_innov vector per group; unbalanced designs leave tail entries
+  # uninitialised and yield NaN at init. validate_gr_balanced_groups()
+  # refuses such inputs before stancode generation with the offending
+  # counts in the message.
+  set.seed(3)
+  n_time <- 12
+  series_levels <- paste0("s", 1:5)
+  unbalanced <- data.frame(
+    time    = rep(seq_len(n_time), 5),
+    series  = factor(rep(series_levels, each = n_time),
+                      levels = series_levels),
+    habitat = factor(rep(
+      c("forest", "forest", "forest", "grassland", "grassland"),
+      each = n_time
+    )),
+    count   = stats::rpois(n_time * 5, lambda = 5),
+    x       = stats::rnorm(n_time * 5)
+  )
+
+  err <- tryCatch(
+    mvgam(
+      bf(count ~ x),
+      trend_formula = ~ RW(gr = habitat),
+      data    = unbalanced,
+      family  = poisson(),
+      chains  = 1,
+      iter    = 200,
+      silent  = 2
+    ),
+    error = function(e) conditionMessage(e)
+  )
+  expect_match(err, "unbalanced groups")
+  expect_match(err, "forest=3")
+  expect_match(err, "grassland=2")
+})

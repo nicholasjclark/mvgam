@@ -489,15 +489,21 @@ validate_trend_grouping <- function(trend_spec, data, cached_formulas = NULL) {
 #' @return Invisibly NULL; called for its side-effect.
 #' @noRd
 validate_gr_balanced_groups <- function(trend_spec, data) {
-  # User-supplied subgr= drives a factor-model path where N_subgroups
-  # is set explicitly; series-per-group balance is not derived.
-  subgr <- trend_spec$subgr
-  if (!is.null(subgr) && !identical(subgr, "NA")) {
-    return(invisible(NULL))
-  }
-
   gr_var <- trend_spec$gr
   series_var <- trend_spec$series %||% "series"
+
+  # Factor-model subgr (e.g. subgr = "site") drives a path where
+  # N_subgroups is set explicitly and series-per-group balance is not
+  # derived. The auto-filled subgr = "series" (matching the default
+  # series variable) is the canonical series-level path and must still
+  # be checked.
+  subgr <- trend_spec$subgr
+  user_supplied_subgr <- !is.null(subgr) &&
+    !identical(subgr, "NA") &&
+    !identical(subgr, series_var)
+  if (user_supplied_subgr) {
+    return(invisible(NULL))
+  }
 
   if (!series_var %in% colnames(data) || !gr_var %in% colnames(data)) {
     return(invisible(NULL))
