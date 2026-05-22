@@ -367,10 +367,31 @@ Credit Paul Bürkner and the brms development team in roxygen documentation.
   - `mean_discrete_weibull()`: series approximation for E[Y] (lines 606-625)
   - `mean_com_poisson()`: series + closed-form approximation (lines 640-710)
 
-- [ ] **2.6.9 Update `compute_family_epred()` to use new infrastructure**
-  - Current switch statement works correctly
-  - Could refactor to use `get(paste0("posterior_epred_", family_name))`
-  - Low priority since existing tests pass
+- [x] **2.6.9 Update `compute_family_epred()` to use new infrastructure**
+  - **Closed as won't-fix.** The proposed refactor (replace the
+    switch in `compute_family_epred()` with `get(paste0(
+    "posterior_epred_", family_name))(prep)` dispatch) is
+    code-shape only. Inputs and outputs unchanged; the centralised
+    validation for `sigma`/`trials`/unsupported-family branches
+    would have to either move into each of the 50+ per-family
+    helpers or stay in a thin wrapper that calls them — neither
+    is a clear win.
+  - Verified neither downstream consumer needs it:
+    - `marginaleffects`: integrates via the public S3 methods
+      (`posterior_epred.mvgam`, etc.) routed through the option
+      `marginaleffects_model_classes = "mvgam"` set in `zzz.R`.
+      Internal dispatch shape is invisible to it.
+    - `pp_check`: `pp_check.mvgam()` in `R/ppc.mvgam.R` picks
+      either `posterior_epred` or `posterior_predict` based on
+      bayesplot plot type and feeds the resulting matrix to
+      `bayesplot::ppc_*()`. Same public S3 surface.
+  - The 50+ per-family helpers (`posterior_epred_<family>`)
+    coexist alongside the switch. They are reachable by external
+    code that wants a brms-style entry point but are not on the
+    live prediction hot path. No removal needed.
+  - Revisit only if a concrete new feature (e.g. exposing
+    family-specific dpars via a `dpar =` argument à la brms) makes
+    the dual structure costly.
 
 - [x] **2.6.10 Add tests for family functions**
   - Unit tests added to `tests/testthat/test-predict.R`
