@@ -940,7 +940,7 @@ to be solved.
     of one series.
 
 - [x] **7.4 Fix `RW(gr=...)` and `AR(gr=...)` silently ignoring `gr`**
-  - **Resolved (RW path).** Root cause was the same as §7.5: the RW
+  - **Resolved.** Root cause was the same as §7.5: the RW
     constructor did parse `gr` and `data_info$has_hierarchical` was
     set, but `generate_rw_trend_stanvars()` never called
     `add_hierarchical_support()`, so the hierarchical data block,
@@ -953,9 +953,16 @@ to be solved.
     new `extract_hierarchical_diagonal_params()` broadcasts
     `sigma_group_trend[g, sub]` to per-series sigma using
     `group_inds_trend` + sub-index within group (Stan loop order).
+    The same fix covers `AR(gr=, cor=FALSE)`, which had a
+    pre-existing downstream sampler bug on the diagonal-hier arm.
   - Dispatch chain in `sample_innovations.R` refactored from
     if/else cascade to `switch()` keyed on
     `<hier|flat>.<effective_pattern>`.
+  - End-to-end verified: `RW(gr = habitat)` and
+    `AR(p = 1, gr = habitat, cor = FALSE)` both fit on the balanced
+    2-2 forest/grassland fixture with 0 divergences; lv_trend,
+    scaled_innovations_trend, posterior_epred and posterior_predict
+    all finite (`/tmp/fit_rw_gr.R`, `/tmp/fit_ar_gr.R`).
 
 - [x] **7.5 Fix dangling `scaled_innovations_trend` in plain RW Stan**
   - **Resolved.** Description was mis-scoped: plain `RW()` already
