@@ -796,8 +796,21 @@ Ensure all prediction functions work correctly with multivariate responses.
   - Local tests cover the dimension and `resp = NULL` contracts
     (5.1 above).
 
-- [ ] **5.4 Code review for Task 5.0**
-  - Defer until 5.2 is closed (response-specific trends).
+- [x] **5.4 Code review for Task 5.0**
+  - **Resolved.** code-reviewer agent reviewed the multivariate
+    prediction path (get_combined_linpred, extract_component_linpred,
+    extract_linpred_from_prep, posterior_linpred / posterior_epred /
+    posterior_predict multivariate dispatch). Architecturally sound,
+    test coverage in place. One drive-by applied: a comment on the
+    per-response trend-list branch in get_combined_linpred() makes
+    explicit that it is defensive plumbing tested only via mocks
+    (no current codegen path emits a multi-response trend model;
+    mixed trend types per response remain a documented non-goal).
+  - Convention drift flagged for separate handling: ~280 of the 304
+    insight::format_error() call sites in R/ pass positional string
+    args instead of the c(main, x =, i =) idiom the project CLAUDE.md
+    prescribes. Multivariate code matches the codebase-wide pattern,
+    not the standard. Filed below under §7.9.
 
 ---
 
@@ -822,15 +835,15 @@ Final validation and documentation.
     (see 7.6 / 7.7). Linpred and epred concordance with brms remain
     the load-bearing checks across all families.
 
-- [ ] **6.3 Update NAMESPACE exports**
-  - Run `devtools::document()` to update NAMESPACE
-  - Verify all S3 methods properly exported:
-    - `posterior_linpred.mvgam`
-    - `posterior_epred.mvgam`
-    - `posterior_predict.mvgam`
-    - `predict.mvgam`
-    - `fitted.mvgam`
-  - Check for any namespace conflicts
+- [x] **6.3 Update NAMESPACE exports**
+  - **Resolved.** `devtools::document()` produced no NAMESPACE diff
+    (already current). All five S3 methods are exported:
+    `S3method(posterior_linpred, mvgam)`,
+    `S3method(posterior_epred, mvgam)`,
+    `S3method(posterior_predict, mvgam)`,
+    `S3method(predict, mvgam)` and `S3method(fitted, mvgam)`. Plus
+    `importFrom(brms, posterior_*)` for the three brms generics. No
+    namespace conflicts.
 
 - [x] **6.4 Run full package test suite**
   - **Resolved.** `devtools::test()` reports
@@ -839,9 +852,20 @@ Final validation and documentation.
     skip from `skip()` in test logic. No regressions from any of the
     7.1 / 7.4 / 7.5 / 6.2 work shipped on this branch.
 
-- [ ] **6.5 Final code review**
-  - Use **code-reviewer agent** on complete prediction system
-  - Review: consistency, documentation completeness, test coverage
+- [x] **6.5 Final code review**
+  - **Resolved.** code-reviewer agent reviewed the prediction system
+    end-to-end (posterior_linpred / posterior_epred /
+    posterior_predict, predictions.R, sample_innovations.R, the
+    7.5 / 7.4 / 7.1 fixes, the 6.2 validation stabilisation).
+    Verdict: APPROVE FOR MERGE. Argument validation complete, no
+    duplication, recent hierarchical fixes correct and within bounds,
+    roxygen aligned with behaviour, 2677 PASS / 0 FAIL across the
+    package. Two design boundaries called out (not bugs): the
+    truncation-bounds path only supports pure-finite or pure-infinite
+    per-vector bounds (variable per-observation bounds warn and
+    clamp); the family-to-distribution abbreviation map covers common
+    families and falls back to clamping with a warning for
+    nmix / tweedie / discrete_weibull / com_poisson.
 
 ---
 
@@ -993,6 +1017,21 @@ to be solved.
     `extract_hierarchical_diagonal_params` (contiguous and
     non-contiguous group_inds, missing-param error, integration with
     `transform_diagonal_innovations`).
+
+- [ ] **7.9 Bring `insight::format_error()` call sites into c() compliance**
+  - Project CLAUDE.md mandates `c(main, x =, i =)` form for multi-line
+    messages, but ~280 of the 304 `stop(insight::format_error(...))`
+    sites in `R/` pass positional string args that concatenate into a
+    single paragraph and lose the `cli` bullet rendering.
+  - CLAUDE.md was strengthened in this branch to make the standard
+    non-negotiable and to include an anti-pattern example so the
+    drift stops accreting.
+  - Bulk refactor: mechanical, large diff. Prioritise files touched
+    by user-facing error paths first (validations.R, mvgam-main.R,
+    prediction modules) and let the rest convert opportunistically
+    when each file is next edited.
+  - No behaviour change beyond improved error rendering; downstream
+    consumers should not be affected.
 
 - [ ] **7.8 Investigate distributional parameters in `trend_formula`**
   - Open question from `tasks/prediction-system-implementation-strategy.md`

@@ -79,7 +79,16 @@ get_combined_linpred <- function(mvgam_fit, newdata,
       obs_mat <- obs_linpred[[resp_name]]
 
       # Trend may be shared (matrix) or response-specific (list)
-      # Shared trend means same latent process affects all responses
+      # Shared trend means same latent process affects all responses.
+      #
+      # The list (per-response) branch is defensive plumbing: no
+      # current mvgam codegen path emits a multi-response trend model
+      # because mixed trend types per response are an explicit
+      # non-goal (see architecture/architecture-decisions.md). The
+      # branch is covered only by mock-based tests in
+      # tests/testthat/test-posterior-linpred.R and exists so the
+      # combination math is ready if per-response trends are ever
+      # added.
       if (is.list(trend_linpred) && !is.matrix(trend_linpred)) {
         trend_mat <- trend_linpred[[resp_name]]
       } else {

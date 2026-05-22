@@ -86,20 +86,46 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 4. **Session Warnings**: Use `if (!identical(Sys.getenv("TESTTHAT"), "true")) rlang::warn(..., .frequency = "once")` for one-time warnings
 
 #### Message Formatting Standards
-- Use single quotes around parameter names: `'parameter_name'`
-- Use `c()` with named elements for multi-line messages:
-  - `i = "..."` for informational hints (indented)
-  - `x = "..."` for error details (indented)
-- Include suggested solutions in error messages
-- Provide context about why constraints exist
 
-Example:
+These rules are non-negotiable. New error and warning messages must follow
+them; existing non-conforming sites should be updated when touched.
+
+- Use single quotes around parameter names: `'parameter_name'`
+- Multi-line messages MUST use `c()` with named elements. Bare positional
+  string arguments to `insight::format_error()` are NOT accepted — they
+  concatenate into one paragraph and lose the bullet structure
+  `cli`/`insight` render for named elements:
+  - first element: the main error line (no name)
+  - `x = "..."` for error details (indented red cross)
+  - `i = "..."` for informational hints (indented blue info)
+- Include a suggested solution and the context that explains why the
+  constraint exists
+- Single-line messages may stay as a bare string argument; no need to
+  wrap them in `c()` just to satisfy the convention
+
+Correct (multi-line):
 ```r
 stop(insight::format_error(c(
   "Parameter 'ndraws' exceeds available draws.",
   x = paste0("Requested: ", ndraws, ", available: ", total, "."),
   i = "Use a smaller value or set ndraws = NULL to use all draws."
 )))
+```
+
+Wrong (multi-line, positional args — DO NOT USE):
+```r
+stop(insight::format_error(
+  "Parameter 'ndraws' exceeds available draws.",
+  paste0("Requested: ", ndraws, ", available: ", total, "."),
+  "Use a smaller value or set ndraws = NULL to use all draws."
+))
+```
+
+Correct (single-line, bare string):
+```r
+stop(insight::format_error(
+  paste0("Series variable '", series_var, "' not found in data.")
+))
 ```
 
 ### Export Guidelines
