@@ -116,10 +116,20 @@ mvgam_attach <- function() {
     if (exists("sanity_dots", envir = me_ns, inherits = FALSE)) {
       original_sanity_dots <- get("sanity_dots", envir = me_ns)
       if (!isTRUE(attr(original_sanity_dots, "mvgam_patched"))) {
+        # mvgam-specific args plus marginaleffects's own white_list
+        # (modeldata, draw, conf.int, ... are inserted into `...` by
+        # the predictions / slopes / comparisons pipeline and need to
+        # pass through quietly). Inlined from
+        # marginaleffects::sanity_dots so we don't risk it drifting
+        # silently — the wrap intentionally over-accepts.
         mvgam_allowed_dots <- c(
           "process_error", "draw_ids", "ndraws", "re_formula",
           "allow_new_levels", "sample_new_levels", "resp",
-          "incl_latent_state", "incl_autocor", "summary"
+          "incl_latent_state", "incl_autocor", "summary",
+          "conf.int", "modeldata", "internal_call", "df",
+          "transform", "comparison", "side", "delta", "null",
+          "equivalence", "draw", "flag", "variables_grid", "at",
+          "conf.level"
         )
         patched_sanity_dots <- function(model,
                                         calling_function = NULL, ...) {

@@ -254,3 +254,10 @@ marginaleffects::datagrid
 #' @importFrom marginaleffects hypotheses
 #' @export
 marginaleffects::hypotheses
+
+
+# Re-export the generic from brms so `library(mvgam)` is enough for
+# users to call `conditional_effects(mvgam_fit)` directly.
+#' @importFrom brms conditional_effects
+#' @export
+brms::conditional_effects

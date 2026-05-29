@@ -25,6 +25,7 @@
 \alias{plot_comparisons}
 \alias{datagrid}
 \alias{hypotheses}
+\alias{conditional_effects}
 \alias{mcmc_plot}
 \alias{tidy}
 \alias{augment}
@@ -36,7 +37,7 @@ These objects are imported from other packages. Follow the links
 below to see their documentation.
 
 \describe{
-  \item{brms}{\code{\link[brms:mcmc_plot.brmsfit]{mcmc_plot}}}
+  \item{brms}{\code{\link[brms:conditional_effects.brmsfit]{conditional_effects}}, \code{\link[brms:mcmc_plot.brmsfit]{mcmc_plot}}}
 
   \item{generics}{\code{\link[generics]{augment}}, \code{\link[generics]{tidy}}}
 

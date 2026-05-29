@@ -86,6 +86,33 @@ test_that("find_predictors.mvgam pulls obs + trend + meta vars", {
   expect_true(all(c("x1", "x2", "time", "series") %in% preds))
 })
 
+test_that("conditional_effects.mvgam is registered and re-exports the generic", {
+  expect_true(
+    !is.null(getS3method("conditional_effects", "mvgam", optional = TRUE))
+  )
+  exports <- getNamespaceExports("mvgam")
+  expect_true("conditional_effects" %in% exports)
+})
+
+test_that("plot/print methods on mvgam_conditional_effects are registered", {
+  expect_true(
+    !is.null(getS3method("plot", "mvgam_conditional_effects",
+                         optional = TRUE))
+  )
+  expect_true(
+    !is.null(getS3method("print", "mvgam_conditional_effects",
+                         optional = TRUE))
+  )
+})
+
+test_that("conditional_effects.mvgam signature has expected args", {
+  fmls <- names(formals(getS3method("conditional_effects", "mvgam")))
+  expect_true("x" %in% fmls)
+  expect_true("effects" %in% fmls)
+  expect_true("type" %in% fmls)
+  expect_true("process_error" %in% fmls)
+})
+
 test_that("re-exports of marginaleffects entry points are wired", {
   exports <- getNamespaceExports("mvgam")
   for (nm in c("predictions", "avg_predictions", "slopes", "avg_slopes",

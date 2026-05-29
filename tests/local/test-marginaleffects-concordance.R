@@ -265,6 +265,55 @@ test_that("predictions at unseen times use marginal mean (no error)", {
 })
 
 
+# -- conditional_effects.mvgam ----------------------------------------
+
+test_that("conditional_effects(mv) detects formula terms automatically", {
+  require_fixtures("val_mvgam_ar1_gp.rds")
+  mv <- load_mvgam("ar1_gp")
+  mv$data$group <- NULL
+  ce <- suppressWarnings(conditional_effects(mv))
+  testthat::expect_s3_class(ce, "mvgam_conditional_effects")
+  testthat::expect_true("z" %in% names(ce))
+  testthat::expect_s3_class(ce[[1L]], "ggplot")
+})
+
+test_that("conditional_effects(mv, type = link) routes through plot_predictions", {
+  require_fixtures("val_mvgam_ar1_gp.rds")
+  mv <- load_mvgam("ar1_gp")
+  mv$data$group <- NULL
+  ce <- suppressWarnings(conditional_effects(mv, type = "link"))
+  testthat::expect_s3_class(ce, "mvgam_conditional_effects")
+  testthat::expect_true(length(ce) >= 1L)
+})
+
+test_that("conditional_effects detects tensor-product interactions", {
+  require_fixtures("val_mvgam_ar1_t2_noint.rds")
+  mv <- load_mvgam("ar1_t2_noint")
+  mv$data$group <- NULL
+  ce <- suppressWarnings(conditional_effects(mv))
+  testthat::expect_s3_class(ce, "mvgam_conditional_effects")
+  testthat::expect_true(any(grepl(":", names(ce))))
+})
+
+test_that("conditional_effects honours user-supplied `effects`", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  mv$data$group <- NULL
+  ce <- suppressWarnings(conditional_effects(mv, effects = "x"))
+  testthat::expect_equal(length(ce), 1L)
+  testthat::expect_equal(names(ce), "x")
+})
+
+test_that("plot.mvgam_conditional_effects returns the list invisibly", {
+  require_fixtures("val_mvgam_ar1_gp.rds")
+  mv <- load_mvgam("ar1_gp")
+  mv$data$group <- NULL
+  ce <- suppressWarnings(conditional_effects(mv))
+  out <- plot(ce, plot = FALSE)
+  testthat::expect_identical(out, ce)
+})
+
+
 # -- Binomial trials propagate through datagrid -----------------------
 
 test_that("binomial trials carry through datagrid + predictions", {
