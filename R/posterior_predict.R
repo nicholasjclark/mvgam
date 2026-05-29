@@ -78,20 +78,20 @@ extract_truncation_bounds <- function(object, nobs) {
     has_finite <- any(is.finite(lb))
     has_infinite <- any(!is.finite(lb))
     if (has_finite && has_infinite) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "Mixed finite and infinite lower bounds not supported.",
-        "i" = "All lb values must be either finite or all infinite (-Inf)."
-      ))
+        i = "All lb values must be either finite or all infinite (-Inf)."
+      )))
     }
   }
   if (!is.null(ub)) {
     has_finite <- any(is.finite(ub))
     has_infinite <- any(!is.finite(ub))
     if (has_finite && has_infinite) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "Mixed finite and infinite upper bounds not supported.",
-        "i" = "All ub values must be either finite or all infinite (Inf)."
-      ))
+        i = "All ub values must be either finite or all infinite (Inf)."
+      )))
     }
   }
 
@@ -103,13 +103,15 @@ extract_truncation_bounds <- function(object, nobs) {
       lb_vals <- unique(finite_lb)
       ub_vals <- unique(finite_ub)
       if (length(lb_vals) == 1 && length(ub_vals) == 1 && lb_vals >= ub_vals) {
-        stop(insight::format_error(
-          paste0(
-            "Invalid truncation bounds: {.field lb} (", lb_vals,
-            ") must be less than {.field ub} (", ub_vals, ")."
+        stop(insight::format_error(c(
+          cli::format_inline(
+            paste0(
+              "Invalid truncation bounds: {.field lb} (", lb_vals,
+              ") must be less than {.field ub} (", ub_vals, ")."
+            )
           ),
-          "i" = "Truncation requires lb < ub to define a valid bounded region."
-        ))
+          i = "Truncation requires lb < ub to define a valid bounded region."
+        )))
       }
     }
   }
@@ -188,13 +190,15 @@ sample_continuous_truncated <- function(n, dist, lb = -Inf, ub = Inf,
   checkmate::assert_int(ntrys, lower = 1)
 
   if (is.finite(lb) && is.finite(ub) && lb >= ub) {
-    stop(insight::format_error(
-      paste0(
-        "Invalid truncation bounds: {.field lb} (", lb,
-        ") must be less than {.field ub} (", ub, ")."
+    stop(insight::format_error(c(
+      cli::format_inline(
+        paste0(
+          "Invalid truncation bounds: {.field lb} (", lb,
+          ") must be less than {.field ub} (", ub, ")."
+        )
       ),
-      "i" = "Truncation requires lb < ub to define a valid bounded region."
-    ))
+      i = "Truncation requires lb < ub to define a valid bounded region."
+    )))
   }
 
   args <- list(...)
@@ -245,13 +249,15 @@ sample_truncated_rejection <- function(n, dist, lb = -Inf, ub = Inf,
   checkmate::assert_int(ntrys, lower = 1)
 
   if (is.finite(lb) && is.finite(ub) && lb >= ub) {
-    stop(insight::format_error(
-      paste0(
-        "Invalid truncation bounds: {.field lb} (", lb,
-        ") must be less than {.field ub} (", ub, ")."
+    stop(insight::format_error(c(
+      cli::format_inline(
+        paste0(
+          "Invalid truncation bounds: {.field lb} (", lb,
+          ") must be less than {.field ub} (", ub, ")."
+        )
       ),
-      "i" = "Truncation requires lb < ub to define a valid bounded region."
-    ))
+      i = "Truncation requires lb < ub to define a valid bounded region."
+    )))
   }
 
   args <- list(...)
@@ -718,8 +724,9 @@ sample_from_family <- function(family_name, ndraws, epred,
       # Validate epred > ndt (shift must be less than expected value)
       if (any(epred <= ndt)) {
         stop(insight::format_error(
-          "For shifted_lognormal, expected values must exceed shift (ndt). ",
-          "Found {sum(epred <= ndt)} values where epred <= ndt."
+          cli::format_inline(
+            "For shifted_lognormal, expected values must exceed shift (ndt). Found {sum(epred <= ndt)} values where epred <= ndt."
+          )
         ))
       }
       # epred = exp(meanlog + sigma^2/2) + ndt
@@ -993,8 +1000,9 @@ sample_from_family <- function(family_name, ndraws, epred,
     # ============ Unsupported families ============
 
     stop(insight::format_error(
-      "Posterior predictive sampling for family {.val {family_name}} ",
-      "is not yet implemented."
+      cli::format_inline(
+        "Posterior predictive sampling for family {.val {family_name}} is not yet implemented."
+      )
     ))
   )
 
@@ -1177,17 +1185,22 @@ extract_dpars_from_stanfit <- function(stanfit,
   # Determine which draw indices to use
   if (!is.null(draw_ids)) {
     if (max(draw_ids) > total_draws) {
-      stop(insight::format_error(
-        "Requested {.field draw_ids} exceed available draws.",
-        "Max requested: {max(draw_ids)}, available: {total_draws}."
-      ))
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "Requested {.field draw_ids} exceed available draws."
+        ),
+        x = cli::format_inline(
+          "Max requested: {max(draw_ids)}, available: {total_draws}."
+        )
+      )))
     }
     draw_indices <- draw_ids
     ndraws <- length(draw_ids)
   } else if (ndraws > total_draws) {
     stop(insight::format_error(
-      "Requested {.field ndraws} ({ndraws}) exceeds available draws ",
-      "({total_draws})."
+      cli::format_inline(
+        "Requested {.field ndraws} ({ndraws}) exceeds available draws ({total_draws})."
+      )
     ))
   } else {
     draw_indices <- seq_len(ndraws)
@@ -1222,8 +1235,9 @@ extract_dpars_from_stanfit <- function(stanfit,
       # Validate index extraction succeeded
       if (any(is.na(indices))) {
         stop(insight::format_error(
-          "Failed to extract numeric indices from parameter names: ",
-          "{.val {indexed_cols[is.na(indices)]}}."
+          cli::format_inline(
+            "Failed to extract numeric indices from parameter names: {.val {indexed_cols[is.na(indices)]}}."
+          )
         ))
       }
 
@@ -1385,8 +1399,9 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
   if (is.null(newdata)) {
     if (is.null(object$data)) {
       stop(insight::format_error(
-        "No training data found in model object. ",
-        "Please provide {.field newdata} explicitly."
+        cli::format_inline(
+          "No training data found in model object. Please provide {.field newdata} explicitly."
+        )
       ))
     }
     newdata <- object$data
@@ -1429,8 +1444,9 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
   if (!is.null(ndraws)) {
     if (ndraws > total_draws) {
       stop(insight::format_error(
-        "Requested {.field ndraws} ({ndraws}) exceeds available ",
-        "draws ({total_draws})."
+        cli::format_inline(
+          "Requested {.field ndraws} ({ndraws}) exceeds available draws ({total_draws})."
+        )
       ))
     }
     draw_ids <- sample(total_draws, ndraws)

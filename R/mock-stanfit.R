@@ -155,13 +155,15 @@ create_mock_stanfit <- function(draws_matrix) {
   # Verify required structure for brms compatibility
   if (!"draws" %in% class(draws_matrix)) {
     stop(insight::format_error(
-      "{.field draws_matrix} must inherit from 'draws' class."
+      cli::format_inline(
+        "{.field draws_matrix} must inherit from 'draws' class."
+      )
     ))
   }
 
   if (!is.matrix(draws_matrix)) {
     stop(insight::format_error(
-      "{.field draws_matrix} must be a matrix."
+      cli::format_inline("{.field draws_matrix} must be a matrix.")
     ))
   }
 
@@ -257,26 +259,36 @@ prepare_predictions.mock_stanfit <- function(object,
   # Validate newdata if provided
   if (!is.null(newdata)) {
     if (!is.data.frame(newdata)) {
-      stop(insight::format_error(
-        "{.field newdata} must be a data frame.",
-        "Received object of class: {class(newdata)}"
-      ))
+      stop(insight::format_error(c(
+        cli::format_inline("{.field newdata} must be a data frame."),
+        x = cli::format_inline(
+          "Received object of class: {class(newdata)}"
+        )
+      )))
     }
     if (nrow(newdata) < 1) {
-      stop(insight::format_error(
-        "{.field newdata} must contain at least one row.",
-        "Received data frame with {nrow(newdata)} rows."
-      ))
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "{.field newdata} must contain at least one row."
+        ),
+        x = cli::format_inline(
+          "Received data frame with {nrow(newdata)} rows."
+        )
+      )))
     }
   }
 
   # Validate re_formula parameter
   if (!is.null(re_formula) && !identical(re_formula, NA)) {
     if (!inherits(re_formula, "formula")) {
-      stop(insight::format_error(
-        "{.field re_formula} must be NULL, NA, or a valid formula object.",
-        "Current value has class: {class(re_formula)}"
-      ))
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "{.field re_formula} must be NULL, NA, or a valid formula object."
+        ),
+        x = cli::format_inline(
+          "Current value has class: {class(re_formula)}"
+        )
+      )))
     }
   }
 
@@ -289,11 +301,14 @@ prepare_predictions.mock_stanfit <- function(object,
 
   # Validate logical relationship between parameters
   if (sample_new_levels != "uncertainty" && !allow_new_levels) {
-    stop(insight::format_error(
-      "{.field sample_new_levels} can only be modified when ",
-      "{.field allow_new_levels} is TRUE.",
-      "Set {.field allow_new_levels = TRUE} or use default sampling."
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "{.field sample_new_levels} can only be modified when {.field allow_new_levels} is TRUE."
+      ),
+      i = cli::format_inline(
+        "Set {.field allow_new_levels = TRUE} or use default sampling."
+      )
+    )))
   }
 
   # Use newdata if provided, otherwise use original data from brmsfit
@@ -379,7 +394,9 @@ prepare_predictions.mock_stanfit <- function(object,
 
     if (is.null(resp_names) || length(resp_names) == 0) {
       stop(insight::format_error(
-        "Multivariate formula missing response names in {.field forms}."
+        cli::format_inline(
+          "Multivariate formula missing response names in {.field forms}."
+        )
       ))
     }
 
@@ -396,8 +413,9 @@ prepare_predictions.mock_stanfit <- function(object,
         nobs_name <- paste0("N_", resp_name)
         if (!nobs_name %in% names(sdata)) {
           stop(insight::format_error(
-            "Missing {.field {nobs_name}} in standata for response ",
-            "{.val {resp_name}}."
+            cli::format_inline(
+              "Missing {.field {nobs_name}} in standata for response {.val {resp_name}}."
+            )
           ))
         }
         nobs_resp <- sdata[[nobs_name]]
@@ -482,7 +500,9 @@ compute_nonlinear_dpars <- function(prep, formula) {
 
   if (is.null(formula$pforms) || length(formula$pforms) == 0) {
     stop(insight::format_error(
-      "Nonlinear formula must have {.field pforms} component."
+      cli::format_inline(
+        "Nonlinear formula must have {.field pforms} component."
+      )
     ))
   }
 
@@ -498,8 +518,9 @@ compute_nonlinear_dpars <- function(prep, formula) {
     x_name <- paste0("X_", nlp)
     if (!x_name %in% names(prep$sdata)) {
       stop(insight::format_error(
-        "Missing design matrix {.field {x_name}} for nlpar ",
-        "{.val {nlp}}."
+        cli::format_inline(
+          "Missing design matrix {.field {x_name}} for nlpar {.val {nlp}}."
+        )
       ))
     }
 
@@ -526,9 +547,9 @@ compute_nonlinear_dpars <- function(prep, formula) {
 
     if (length(matching_params) == 0) {
       stop(insight::format_error(
-        "No coefficients found for nlpar {.val {nlp}}. ",
-        "Expected parameters matching {.val {array_pattern}} or ",
-        "{.val {underscore_pattern}}."
+        cli::format_inline(
+          "No coefficients found for nlpar {.val {nlp}}. Expected parameters matching {.val {array_pattern}} or {.val {underscore_pattern}}."
+        )
       ))
     }
 
@@ -537,9 +558,9 @@ compute_nonlinear_dpars <- function(prep, formula) {
     # Validate dimensions
     if (ncol(b_nlpar) != ncol(X_nlpar)) {
       stop(insight::format_error(
-        "Dimension mismatch for nlpar {.val {nlp}}: ",
-        "design matrix has {ncol(X_nlpar)} columns but ",
-        "found {ncol(b_nlpar)} coefficient parameters."
+        cli::format_inline(
+          "Dimension mismatch for nlpar {.val {nlp}}: design matrix has {ncol(X_nlpar)} columns but found {ncol(b_nlpar)} coefficient parameters."
+        )
       ))
     }
 
@@ -559,9 +580,9 @@ compute_nonlinear_dpars <- function(prep, formula) {
 
     if (length(covariate_names) != length(c_vars)) {
       stop(insight::format_error(
-        "Covariate mismatch: formula has ",
-        "{length(covariate_names)} covariate(s) but standata has ",
-        "{length(c_vars)} C_* entries."
+        cli::format_inline(
+          "Covariate mismatch: formula has {length(covariate_names)} covariate(s) but standata has {length(c_vars)} C_* entries."
+        )
       ))
     }
 
@@ -575,8 +596,9 @@ compute_nonlinear_dpars <- function(prep, formula) {
         # Already a matrix - validate dimensions
         if (nrow(cov_data) != prep$nobs) {
           stop(insight::format_error(
-            "Covariate {.field {cov_name}} has {nrow(cov_data)} ",
-            "rows but expected {prep$nobs} observations."
+            cli::format_inline(
+              "Covariate {.field {cov_name}} has {nrow(cov_data)} rows but expected {prep$nobs} observations."
+            )
           ))
         }
         covariates[[cov_name]] <- cov_data
@@ -609,15 +631,17 @@ compute_nonlinear_dpars <- function(prep, formula) {
 
   if (nrow(mu) != nrow(prep$draws)) {
     stop(insight::format_error(
-      "Formula evaluation produced {nrow(mu)} rows but expected ",
-      "{nrow(prep$draws)} draws."
+      cli::format_inline(
+        "Formula evaluation produced {nrow(mu)} rows but expected {nrow(prep$draws)} draws."
+      )
     ))
   }
 
   if (ncol(mu) != prep$nobs) {
     stop(insight::format_error(
-      "Formula evaluation produced {ncol(mu)} columns but ",
-      "expected {prep$nobs} observations."
+      cli::format_inline(
+        "Formula evaluation produced {ncol(mu)} columns but expected {prep$nobs} observations."
+      )
     ))
   }
 

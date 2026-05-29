@@ -167,10 +167,10 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   # Validate brms formula compatibility
   formula_validation <- validate_brms_formula(formula)
   if (!formula_validation$valid) {
-    stop(insight::format_error(
-      "Invalid brms formula structure:",
-      paste(formula_validation$issues, collapse = "\n")
-    ))
+    stop(insight::format_error(c(
+      "Invalid brms formula structure.",
+      x = paste(formula_validation$issues, collapse = "\n")
+    )))
   }
 
   # Parse and validate trend formula if provided
@@ -316,19 +316,26 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
   } else if (is.list(trend_formula) && !is.null(names(trend_formula))) {
     # Handle response-specific trends as validated lists
     if (!is_mv_main) {
-      stop(insight::format_error(
-        "List {.field trend_formula} requires multivariate main formula.",
-        "Use mvbind() or bf() for multiple responses."
-      ))
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "List {.field trend_formula} requires multivariate main formula."
+        ),
+        i = "Use mvbind() or bf() for multiple responses."
+      )))
     }
 
     # Validate response names match
     missing_responses <- setdiff(names(trend_formula), response_names)
     if (length(missing_responses) > 0) {
-      stop(insight::format_error(
-        paste("Unknown responses in {.field trend_formula}:", paste(missing_responses, collapse = ", ")),
-        paste("Available responses:", paste(response_names, collapse = ", "))
-      ))
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "Unknown responses in {.field trend_formula}: {paste(missing_responses, collapse = ', ')}"
+        ),
+        i = paste(
+          "Available responses:",
+          paste(response_names, collapse = ", ")
+        )
+      )))
     }
 
     # Parse each trend formula
@@ -510,11 +517,11 @@ has_mvbind_response <- function(formula) {
 
   # Validate mvbind has arguments (at least 2 responses for multivariate)
   if (length(response_expr) < 3) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Invalid mvbind() specification in formula.",
-      "mvbind() requires at least 2 response variables for multivariate models.",
-      "Ensure syntax: mvbind(y1, y2, ...) ~ predictors"
-    ), call. = FALSE)
+      x = "mvbind() requires at least 2 response variables for multivariate models.",
+      i = "Ensure syntax: mvbind(y1, y2, ...) ~ predictors"
+    )), call. = FALSE)
   }
 
   return(TRUE)
@@ -578,19 +585,19 @@ extract_response_names <- function(formula) {
       # For nonlinear formulas, pforms contain parameter definitions, not responses
       # Return only the main response variable
       if (is.null(formula$resp)) {
-        stop(insight::format_error(
+        stop(insight::format_error(c(
           "Nonlinear formula missing response variable.",
-          "Ensure the formula has a valid response on the left-hand side."
-        ), call. = FALSE)
+          i = "Ensure the formula has a valid response on the left-hand side."
+        )), call. = FALSE)
       }
       return(formula$resp)
     }
     # Regular brmsformula - return response
     if (is.null(formula$resp)) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "brmsformula missing response variable.",
-        "Ensure the formula has a valid response specification."
-      ), call. = FALSE)
+        i = "Ensure the formula has a valid response specification."
+      )), call. = FALSE)
     }
     return(formula$resp)
   }
@@ -605,18 +612,20 @@ extract_response_names <- function(formula) {
 
     # Handle univariate formula case - extract single response with fail-fast
     if (length(formula) < 3) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "Formula has no response variable (left-hand side).",
-        "Provide a formula with the form {.code response ~ predictors}."
-      ), call. = FALSE)
+        i = cli::format_inline(
+          "Provide a formula with the form {.code response ~ predictors}."
+        )
+      )), call. = FALSE)
     }
 
     response_terms <- all.vars(formula[[2]])
     if (length(response_terms) == 0) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "Could not extract response variable from formula left-hand side.",
-        "Ensure the response variable is a valid R variable name."
-      ), call. = FALSE)
+        i = "Ensure the response variable is a valid R variable name."
+      )), call. = FALSE)
     }
 
     return(response_terms)
@@ -635,11 +644,13 @@ extract_response_names <- function(formula) {
   }
 
   # Should not reach here with proper validation, but fail fast if we do
-  stop(insight::format_error(
+  stop(insight::format_error(c(
     "Could not extract response variable names from formula.",
-    "Formula type {.cls {class(formula)}} may not be supported.",
-    "Supported types: formula, brmsformula, mvbrmsformula, bform."
-  ), call. = FALSE)
+    x = cli::format_inline(
+      "Formula type {.cls {class(formula)}} may not be supported."
+    ),
+    i = "Supported types: formula, brmsformula, mvbrmsformula, bform."
+  )), call. = FALSE)
 }
 
 #' Extract Response Names from mvbind Expression
@@ -693,10 +704,12 @@ extract_mvbind_responses <- function(formula) {
 
   # Validate we have arguments
   if (length(response_args) == 0) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "mvbind() call contains no arguments.",
-      "Provide at least one response variable: {.code mvbind(response1, response2, ...)}"
-    ), call. = FALSE)
+      i = cli::format_inline(
+        "Provide at least one response variable: {.code mvbind(response1, response2, ...)}"
+      )
+    )), call. = FALSE)
   }
 
   # Extract variable names from each argument
@@ -710,11 +723,11 @@ extract_mvbind_responses <- function(formula) {
 
     if (is.null(var_name) || nchar(var_name) == 0) {
       arg_text <- deparse(arg)
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         paste0("Could not extract response variable name from mvbind() argument ", i, "."),
-        paste0("Argument: ", arg_text),
-        "Ensure all mvbind() arguments reference valid variable names."
-      ), call. = FALSE)
+        x = paste0("Argument: ", arg_text),
+        i = "Ensure all mvbind() arguments reference valid variable names."
+      )), call. = FALSE)
     }
 
     response_names[i] <- var_name
@@ -724,11 +737,11 @@ extract_mvbind_responses <- function(formula) {
   invalid_names <- !grepl("^[a-zA-Z][a-zA-Z0-9_.]*$", response_names)
   if (any(invalid_names)) {
     invalid_list <- response_names[invalid_names]
-    stop(insight::format_error(
-      "Invalid variable names extracted from mvbind():",
-      paste0("Invalid names: ", paste(invalid_list, collapse = ", ")),
-      "Use valid R variable names in mvbind() arguments."
-    ), call. = FALSE)
+    stop(insight::format_error(c(
+      "Invalid variable names extracted from mvbind().",
+      x = paste0("Invalid names: ", paste(invalid_list, collapse = ", ")),
+      i = "Use valid R variable names in mvbind() arguments."
+    )), call. = FALSE)
   }
 
   return(response_names)
@@ -790,10 +803,10 @@ extract_response_trends <- function(trend_formula, response_names, validate_sepa
     trend_terms <- try(brms::brmsterms(trend_formula), silent = TRUE)
 
     if (inherits(trend_terms, "try-error")) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "Could not parse trend_formula structure.",
-        "Ensure proper bf() syntax for response-specific trends."
-      ))
+        i = "Ensure proper bf() syntax for response-specific trends."
+      )))
     }
   }
 
@@ -985,10 +998,14 @@ determine_trend_injection_point <- function(nl_components, trend_specs) {
       if (trend_specs$target_parameter %in% nl_components$nonlinear_params) {
         return(trend_specs$target_parameter)
       } else {
-        insight::format_warning(
-          "Specified trend target parameter '{trend_specs$target_parameter}' not found.",
-          "Using main parameter '{main_param}' instead."
-        )
+        insight::format_warning(c(
+          cli::format_inline(
+            "Specified trend target parameter {.val {trend_specs$target_parameter}} not found."
+          ),
+          i = cli::format_inline(
+            "Using main parameter {.val {main_param}} instead."
+          )
+        ))
       }
     }
 

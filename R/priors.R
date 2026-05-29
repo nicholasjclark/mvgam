@@ -162,17 +162,21 @@ generate_trend_priors <- function(trend_spec, data, response_names = NULL) {
 
   # Validate trend_spec structure before accessing components
   if (!"trend_model" %in% names(trend_spec)) {
-    stop(insight::format_error(
-      "Invalid {.field trend_spec} structure.",
-      "Expected component {.field trend_model} not found."
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline("Invalid {.field trend_spec} structure."),
+      x = cli::format_inline(
+        "Expected component {.field trend_model} not found."
+      )
+    )))
   }
 
   if (!"base_formula" %in% names(trend_spec)) {
-    stop(insight::format_error(
-      "Invalid {.field trend_spec} structure.",
-      "Expected component {.field base_formula} not found."
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline("Invalid {.field trend_spec} structure."),
+      x = cli::format_inline(
+        "Expected component {.field base_formula} not found."
+      )
+    )))
   }
 
   # Validate component types
@@ -211,36 +215,40 @@ generate_trend_priors <- function(trend_spec, data, response_names = NULL) {
 
       # Validate that setup returned expected structure
       if (!is.list(trend_setup)) {
-        stop(insight::format_error(
+        stop(insight::format_error(c(
           "setup_brms_lightweight returned unexpected structure.",
-          "Expected list object with prior component."
-        ))
+          x = "Expected list object with prior component."
+        )))
       }
 
       if (!"prior" %in% names(trend_setup)) {
-        stop(insight::format_error(
-          "setup_brms_lightweight missing expected {.field prior} component.",
-          "Cannot extract base formula priors."
-        ))
+        stop(insight::format_error(c(
+          cli::format_inline(
+            "setup_brms_lightweight missing expected {.field prior} component."
+          ),
+          x = "Cannot extract base formula priors."
+        )))
       }
 
       # Extract and validate prior structure
       base_priors <- trend_setup$prior
       if (!inherits(base_priors, c("brmsprior", "data.frame"))) {
-        stop(insight::format_error(
+        stop(insight::format_error(c(
           "Invalid prior structure from setup_brms_lightweight.",
-          "Expected brmsprior data frame."
-        ))
+          x = "Expected brmsprior data frame."
+        )))
       }
 
       # Add _trend suffix to distinguish from observation priors
       if (nrow(base_priors) > 0) {
         # Validate expected columns exist
         if (!"class" %in% names(base_priors)) {
-          stop(insight::format_error(
+          stop(insight::format_error(c(
             "Invalid base_priors structure.",
-            "Missing required {.field class} column."
-          ))
+            x = cli::format_inline(
+              "Missing required {.field class} column."
+            )
+          )))
         }
 
         # Add _trend suffix to all classes except sigma (which conflicts with trend constructor)
@@ -786,10 +794,10 @@ build_ar_prior_spec <- function(lags, ar_prior_base = NULL,
 
   # Validate lags are positive integers
   if (any(lags <= 0) || any(lags != as.integer(lags))) {
-    stop(insight::format_error(
-      "Invalid lag specification",
-      "All lags must be positive integers"
-    ))
+    stop(insight::format_error(c(
+      "Invalid lag specification.",
+      x = "All lags must be positive integers."
+    )))
   }
 
   # Use default AR prior if not specified
@@ -801,11 +809,12 @@ build_ar_prior_spec <- function(lags, ar_prior_base = NULL,
   required_fields <- c("default", "bounds", "description")
   missing_fields <- setdiff(required_fields, names(ar_prior_base))
   if (length(missing_fields) > 0) {
-    stop(insight::format_error(
-      "Invalid ar_prior_base specification",
-      paste0("Missing required fields: {.val ",
-             paste(missing_fields, collapse = ", "), "}")
-    ))
+    stop(insight::format_error(c(
+      "Invalid ar_prior_base specification.",
+      x = cli::format_inline(
+        "Missing required fields: {.val {missing_fields}}"
+      )
+    )))
   }
 
   result <- list()
@@ -864,7 +873,9 @@ map_prior_to_stan_string <- function(prior_row) {
   # Validate required column exists
   if (!"prior" %in% names(prior_row)) {
     stop(insight::format_error(
-      "Input {.field prior_row} must contain a 'prior' column"
+      cli::format_inline(
+        "Input {.field prior_row} must contain a 'prior' column"
+      )
     ))
   }
 
@@ -950,7 +961,9 @@ extract_prior_string <- function(prior_frame, class_name, coef_name = NULL,
   missing_cols <- setdiff(required_cols, names(prior_frame))
   if (length(missing_cols) > 0) {
     stop(insight::format_error(
-      "brmsprior object missing required columns: {.field {missing_cols}}"
+      cli::format_inline(
+        "brmsprior object missing required columns: {.field {missing_cols}}"
+      )
     ))
   }
 
@@ -1122,10 +1135,12 @@ map_trend_priors <- function(prior, trend_type) {
   if (is.null(trend_prior_spec)) {
     if (!identical(Sys.getenv("TESTTHAT"), "true")) {
       rlang::warn(
-        insight::format_warning(
-          "Trend type {.field {trend_type}} not found in registry. ",
-          "No priors will be mapped."
-        ),
+        insight::format_warning(c(
+          cli::format_inline(
+            "Trend type {.field {trend_type}} not found in registry."
+          ),
+          i = "No priors will be mapped."
+        )),
         .frequency = "once",
         .frequency_id = "mvgam_trend_registry"
       )
@@ -1216,7 +1231,9 @@ get_trend_parameter_prior <- function(prior = NULL, param_name) {
       # Defensive check for helper function return
       if (!is.character(user_prior)) {
         stop(insight::format_error(
-          "extract_prior_string returned non-character value for parameter {.field {param_name}}"
+          cli::format_inline(
+            "extract_prior_string returned non-character value for parameter {.field {param_name}}"
+          )
         ))
       }
 
@@ -1227,7 +1244,9 @@ get_trend_parameter_prior <- function(prior = NULL, param_name) {
       # Validate the result
       if (!is.character(stan_string) || length(stan_string) != 1) {
         stop(insight::format_error(
-          "map_prior_to_stan_string returned invalid result for parameter {.field {param_name}}"
+          cli::format_inline(
+            "map_prior_to_stan_string returned invalid result for parameter {.field {param_name}}"
+          )
         ))
       }
 
@@ -1246,7 +1265,9 @@ get_trend_parameter_prior <- function(prior = NULL, param_name) {
     default_spec <- common_trend_priors[[param_name]]
     if (!is.list(default_spec) || !"default" %in% names(default_spec)) {
       stop(insight::format_error(
-        "Invalid structure for common_trend_priors parameter {.field {param_name}}"
+        cli::format_inline(
+          "Invalid structure for common_trend_priors parameter {.field {param_name}}"
+        )
       ))
     }
     return(default_spec$default)
@@ -1646,10 +1667,10 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
 
   # Validate formula structure before proceeding
   if (length(formula) < 3) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Formula missing response variable.",
-      "Ensure formula has form: y ~ predictors"
-    ))
+      i = "Ensure formula has form: y ~ predictors"
+    )))
   }
 
   # Extract observation priors with embedded family support
