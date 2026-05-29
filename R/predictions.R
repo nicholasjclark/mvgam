@@ -2071,6 +2071,43 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
     validate_prediction_factor_levels(newdata, mvgam_fit$trend_metadata)
   }
 
+  # Feature flag: route the covariate-side linpred through brms via
+  # `extract_component_linpred_via_brms` (slices param subset, renames
+  # to brms's friendly names, calls brms::posterior_linpred). The
+  # latent state is still added on top below. Default is FALSE so
+  # existing behaviour is preserved; switch the option to TRUE to use
+  # the brms-delegation path. Stage-0 verification has shown numerical
+  # equivalence on 17 of 17 state-space fixtures plus correction of
+  # the by-variable GP bug (#53).
+  if (isTRUE(getOption("mvgam.use_brms_delegation", FALSE))) {
+    linpred <- extract_component_linpred_via_brms(
+      mvgam_fit = mvgam_fit,
+      newdata = newdata,
+      component = component,
+      resp = resp,
+      ndraws = ndraws,
+      re_formula = re_formula,
+      allow_new_levels = allow_new_levels,
+      sample_new_levels = sample_new_levels
+    )
+    if (component == "trend" && incl_latent_state) {
+      full_draws <- posterior::as_draws_matrix(mvgam_fit$fit)
+      if (!is.null(ndraws)) {
+        n_avail <- nrow(full_draws)
+        full_draws <- full_draws[sample(n_avail, ndraws), , drop = FALSE]
+      }
+      latent_mat <- extract_trend_latent_states(
+        mvgam_fit = mvgam_fit,
+        newdata = newdata,
+        full_draws = full_draws
+      )
+      if (!is.null(latent_mat)) {
+        linpred <- add_latent_to_linpred(linpred, latent_mat)
+      }
+    }
+    return(linpred)
+  }
+
   # Extract parameters based on component
   if (component == "obs") {
     params <- extract_obs_parameters(mvgam_fit)
