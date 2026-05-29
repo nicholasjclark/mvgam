@@ -55,10 +55,10 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   # Check for fitted model
   if (is.null(object$fit)) {
     stop(
-      insight::format_error(
+      insight::format_error(c(
         "No fitted model found in mvgam object.",
-        "The model may not have been fitted successfully."
-      )
+        i = "The model may not have been fitted successfully."
+      ))
     )
   }
 
@@ -920,15 +920,15 @@ check_mvgam_convergence <- function(all_summaries, nchains) {
 
     if (min_bulk < ess_threshold) {
       rlang::warn(
-        insight::format_warning(
+        insight::format_warning(c(
           sprintf(
             "Bulk ESS too low (min = %.0f, should be > %.0f).",
             min_bulk,
             ess_threshold
           ),
-          "Parameter estimates may be unreliable.",
-          "Consider increasing 'iter' to improve effective sample size."
-        ),
+          x = "Parameter estimates may be unreliable.",
+          i = "Consider increasing 'iter' to improve effective sample size."
+        )),
         .frequency = "once",
         .frequency_id = "mvgam_bulk_ess"
       )
@@ -942,15 +942,15 @@ check_mvgam_convergence <- function(all_summaries, nchains) {
 
     if (min_tail < ess_threshold) {
       rlang::warn(
-        insight::format_warning(
+        insight::format_warning(c(
           sprintf(
             "Tail ESS too low (min = %.0f, should be > %.0f).",
             min_tail,
             ess_threshold
           ),
-          "Tail quantile estimates may be unreliable.",
-          "Consider increasing 'iter' to improve tail ESS."
-        ),
+          x = "Tail quantile estimates may be unreliable.",
+          i = "Consider increasing 'iter' to improve tail ESS."
+        )),
         .frequency = "once",
         .frequency_id = "mvgam_tail_ess"
       )
@@ -1037,10 +1037,10 @@ summary.mvgam_pooled <- function(object, probs = c(0.025, 0.975),
   combination_method <- attr(object, "combination_method")
 
   if (is.null(individual_fits) || is.null(n_imputations)) {
-    insight::format_warning(
+    insight::format_warning(c(
       "Missing multiple imputation metadata in pooled object.",
-      "Summary will proceed without MI diagnostics."
-    )
+      i = "Summary will proceed without MI diagnostics."
+    ))
 
     # Return standard summary if metadata missing
     return(base_summary)
@@ -1048,13 +1048,15 @@ summary.mvgam_pooled <- function(object, probs = c(0.025, 0.975),
 
   # Validate consistency between metadata and actual fits
   if (length(individual_fits) != n_imputations) {
-    insight::format_warning(
-      sprintf(
-        "Mismatch: {.field n_imputations} = %d but %d fits stored.",
-        n_imputations, length(individual_fits)
+    insight::format_warning(c(
+      cli::format_inline(
+        sprintf(
+          "Mismatch: {.field n_imputations} = %d but %d fits stored.",
+          n_imputations, length(individual_fits)
+        )
       ),
-      "Using actual number of stored fits."
-    )
+      i = "Using actual number of stored fits."
+    ))
     n_imputations <- length(individual_fits)
   }
 

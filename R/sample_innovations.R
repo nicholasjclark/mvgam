@@ -185,20 +185,20 @@ get_observation_structure <- function(object, newdata = NULL) {
   # Validate that data preparation succeeded
   checkmate::assert_data_frame(data_prepared, min.rows = 1)
   if (is.null(attr(data_prepared, "mvgam_time"))) {
-    stop(insight::format_error(
-      c(
-        "Failed to prepare data with mvgam time attributes.",
-        i = paste0("Check that {.field ", time_var, "} exists in data.")
+    stop(insight::format_error(c(
+      "Failed to prepare data with mvgam time attributes.",
+      i = cli::format_inline(
+        "Check that {.field {time_var}} exists in data."
       )
-    ))
+    )))
   }
   if (is.null(attr(data_prepared, "mvgam_series"))) {
-    stop(insight::format_error(
-      c(
-        "Failed to prepare data with mvgam series attributes.",
-        i = paste0("Check that {.field ", series_var, "} exists in data.")
+    stop(insight::format_error(c(
+      "Failed to prepare data with mvgam series attributes.",
+      i = cli::format_inline(
+        "Check that {.field {series_var}} exists in data."
       )
-    ))
+    )))
   }
 
   # Extract indices using existing accessor functions

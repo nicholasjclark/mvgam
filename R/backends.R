@@ -198,13 +198,17 @@ compile_model <- function(model, backend, ...) {
       rstan::rstan_options(threads_per_chain = threads$threads)
     } else {
       stop(insight::format_error(
-        "Threading is not supported by backend 'rstan' version {utils::packageVersion('rstan')}."
+        cli::format_inline(
+          "Threading is not supported by backend 'rstan' version {utils::packageVersion('rstan')}."
+        )
       ), call. = FALSE)
     }
   }
   if (use_opencl(opencl)) {
     stop(insight::format_error(
-      "OpenCL is not supported by backend 'rstan' version {utils::packageVersion('rstan')}."
+      cli::format_inline(
+        "OpenCL is not supported by backend 'rstan' version {utils::packageVersion('rstan')}."
+      )
     ), call. = FALSE)
   }
   eval_silent(
@@ -329,13 +333,17 @@ fit_model <- function(model, backend, ...) {
       rstan::rstan_options(threads_per_chain = threads$threads)
     } else {
       stop(insight::format_error(
-        "Threading is not supported by backend 'rstan' version {utils::packageVersion('rstan')}."
+        cli::format_inline(
+          "Threading is not supported by backend 'rstan' version {utils::packageVersion('rstan')}."
+        )
       ), call. = FALSE)
     }
   }
   if (use_opencl(opencl)) {
     stop(insight::format_error(
-      "OpenCL is not supported by backend 'rstan' version {utils::packageVersion('rstan')}."
+      cli::format_inline(
+        "OpenCL is not supported by backend 'rstan' version {utils::packageVersion('rstan')}."
+      )
     ), call. = FALSE)
   }
   if (is.null(init)) {
@@ -406,7 +414,9 @@ fit_model <- function(model, backend, ...) {
     c(args) <- nlist(algorithm)
     out <- brms::do_call(rstan::vb, args)
   } else {
-    stop(insight::format_error("Algorithm '{algorithm}' is not supported."), call. = FALSE)
+    stop(insight::format_error(
+      cli::format_inline("Algorithm '{algorithm}' is not supported.")
+    ), call. = FALSE)
   }
   # TODO: add support for pathfinder and laplace
   out <- repair_stanfit(out)
@@ -548,7 +558,9 @@ fit_model <- function(model, backend, ...) {
     }
     out <- brms::do_call(model$laplace, args)
   } else {
-    stop(insight::format_error("Algorithm '{algorithm}' is not supported."), call. = FALSE)
+    stop(insight::format_error(
+      cli::format_inline("Algorithm '{algorithm}' is not supported.")
+    ), call. = FALSE)
   }
 
   if (future) {
@@ -711,7 +723,11 @@ require_backend <- function(backend, x) {
   stopifnot(is.mvgam(x))
   backend <- match.arg(backend, backend_choices())
   if (isTRUE(x$backend != backend)) {
-    stop(insight::format_error("Backend '{backend}' is required for this method."), call. = FALSE)
+    stop(insight::format_error(
+      cli::format_inline(
+        "Backend '{backend}' is required for this method."
+      )
+    ), call. = FALSE)
   }
   invisible(TRUE)
 }
@@ -895,13 +911,17 @@ ulapply <- function(X, FUN, ..., recursive = TRUE, use.names = TRUE) {
 #' @noRd
 require_package <- function(package, version = NULL) {
   if (!requireNamespace(package, quietly = TRUE)) {
-    stop(insight::format_error("Please install the '{package}' package."), call. = FALSE)
+    stop(insight::format_error(
+      cli::format_inline("Please install the '{package}' package.")
+    ), call. = FALSE)
   }
   if (!is.null(version)) {
     version <- as.package_version(version)
     if (utils::packageVersion(package) < version) {
       stop(insight::format_error(
-        "Please install package '{package}' version {version} or higher."
+        cli::format_inline(
+          "Please install package '{package}' version {version} or higher."
+        )
       ), call. = FALSE)
     }
   }

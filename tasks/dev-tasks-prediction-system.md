@@ -1047,7 +1047,7 @@ to be solved.
     non-contiguous group_inds, missing-param error, integration with
     `transform_diagonal_innovations`).
 
-- [ ] **7.9 Bring `insight::format_error()` call sites into c() compliance**
+- [x] **7.9 Bring `insight::format_error()` call sites into c() compliance**
   - Project CLAUDE.md mandates `c(main, x =, i =)` form for multi-line
     messages, but multi-arg positional calls concatenate into a single
     paragraph and lose the `cli` bullet rendering. Same standard
@@ -1082,23 +1082,28 @@ to be solved.
     - [x] 7.9.7 `R/priors.R` (was 15, now 0)
     - [x] 7.9.8 `R/brms_integration.R` (was 14, now 0)
     - [x] 7.9.9 `R/posterior_predict.R` (was 12, now 0)
-    - [ ] 7.9.10 `R/mvgam_core.R` (10)
-    - [ ] 7.9.11 `R/make_stan.R` (10)
-    - [ ] 7.9.12 `R/backends.R` (9)
-    - [ ] 7.9.13 `R/print.mvgam.R` (6)
-    - [ ] 7.9.14 `R/summary.mvgam.R` (5)
-    - [ ] 7.9.15 `R/glm_analysis.R` (5)
-    - [ ] 7.9.16 `R/posterior_linpred.R` (3)
-    - [ ] 7.9.17 `R/sample_innovations.R` (2)
-  - Per-file workflow: convert arg #1 → unnamed main, arg #2 → `x =`,
-    arg #3 → `i =`, extras → additional `x =`. Conditional bullet
-    construction goes via a local `c()` vector built stepwise. Wrap
-    any string containing `{...}` markup in `cli::format_inline(...)`.
-    Preserve all `{.field ...}` / `{.pkg ...}` cli markup. After each
-    file: detector → 0 for that file; `devtools::test()` clean;
-    code-reviewer agent on the diff; commit.
-  - No behaviour change beyond improved error rendering; downstream
-    consumers should not be affected.
+    - [x] 7.9.10 `R/mvgam_core.R` (was 10, now 0)
+    - [x] 7.9.11 `R/make_stan.R` (was 10, now 0)
+    - [x] 7.9.12 `R/backends.R` (was 9, now 0)
+    - [x] 7.9.13 `R/print.mvgam.R` (was 6, now 0)
+    - [x] 7.9.14 `R/summary.mvgam.R` (was 5, now 0)
+    - [x] 7.9.15 `R/glm_analysis.R` (was 5, now 0)
+    - [x] 7.9.16 `R/posterior_linpred.R` (was 3, now 0)
+    - [x] 7.9.17 `R/sample_innovations.R` (was 2, now 0)
+  - **Resolved.** All 17 R/ files clean per the expanded detector
+    (structural rule + inline-rendering rule). Final
+    `devtools::test()`: 2683 PASS / 0 FAIL / 1 pre-existing SKIP.
+  - Per-file workflow used: convert arg #1 → unnamed main, arg #2 →
+    `x =`, arg #3 → `i =`, extras → additional `x =`. Conditional
+    bullet construction via a local `c()` vector built stepwise.
+    Any string containing `{...}` markup wrapped in
+    `cli::format_inline(...)`. cli was added to `DESCRIPTION` Imports.
+  - **Follow-up filed (out of §7.9 scope)**: ~12+ pre-existing sites
+    in stan_assembly.R and a handful elsewhere call
+    `insight::format_error(...)` without `stop()`, so the formatted
+    string is silently discarded and execution continues. Tracked
+    separately.
+  - No behaviour change beyond improved error rendering.
 
 - [x] **7.8 Investigate distributional parameters in `trend_formula`**
   - **Resolved (Option A: fail-fast with hint).** Investigation

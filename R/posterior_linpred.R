@@ -101,9 +101,9 @@ get_combined_linpred <- function(mvgam_fit, newdata,
       if (nrow(trend_mat) != nrow(obs_mat) ||
           ncol(trend_mat) != ncol(obs_mat)) {
         stop(insight::format_error(
-          "Dimension mismatch for response {.val {resp_name}}: ",
-          "obs_linpred is [{nrow(obs_mat)} x {ncol(obs_mat)}] but ",
-          "trend_linpred is [{nrow(trend_mat)} x {ncol(trend_mat)}]."
+          cli::format_inline(
+            "Dimension mismatch for response {.val {resp_name}}: obs_linpred is [{nrow(obs_mat)} x {ncol(obs_mat)}] but trend_linpred is [{nrow(trend_mat)} x {ncol(trend_mat)}]."
+          )
         ))
       }
 
@@ -133,9 +133,9 @@ get_combined_linpred <- function(mvgam_fit, newdata,
   if (nrow(trend_linpred) != nrow(obs_linpred) ||
       ncol(trend_linpred) != ncol(obs_linpred)) {
     stop(insight::format_error(
-      "Dimension mismatch: obs_linpred is ",
-      "[{nrow(obs_linpred)} x {ncol(obs_linpred)}] but ",
-      "trend_linpred is [{nrow(trend_linpred)} x {ncol(trend_linpred)}]."
+      cli::format_inline(
+        "Dimension mismatch: obs_linpred is [{nrow(obs_linpred)} x {ncol(obs_linpred)}] but trend_linpred is [{nrow(trend_linpred)} x {ncol(trend_linpred)}]."
+      )
     ))
   }
 
@@ -272,8 +272,9 @@ posterior_linpred.mvgam <- function(object, newdata = NULL,
   if (is.null(newdata)) {
     if (is.null(object$data)) {
       stop(insight::format_error(
-        "No training data found in model object. ",
-        "Please provide {.field newdata} explicitly."
+        cli::format_inline(
+          "No training data found in model object. Please provide {.field newdata} explicitly."
+        )
       ))
     }
     newdata <- object$data

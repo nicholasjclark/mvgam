@@ -271,19 +271,23 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
 
   # Validate brmsfit field existence for prediction system
   if (!"brmsfit" %in% names(obs_setup)) {
-    insight::format_error(
-      "{.field obs_setup} missing required {.field brmsfit} component.",
-      "The observation model setup must include a brmsfit object for predictions.",
-      "Check setup_brms_lightweight() implementation."
-    )
+    insight::format_error(c(
+      cli::format_inline(
+        "{.field obs_setup} missing required {.field brmsfit} component."
+      ),
+      x = "The observation model setup must include a brmsfit object for predictions.",
+      i = "Check setup_brms_lightweight() implementation."
+    ))
   }
 
   if (!is.null(trend_setup) && !"brmsfit" %in% names(trend_setup)) {
-    insight::format_error(
-      "{.field trend_setup} missing required {.field brmsfit} component.",
-      "The trend model setup must include a brmsfit object for predictions.",
-      "Check setup_brms_lightweight() implementation."
-    )
+    insight::format_error(c(
+      cli::format_inline(
+        "{.field trend_setup} missing required {.field brmsfit} component."
+      ),
+      x = "The trend model setup must include a brmsfit object for predictions.",
+      i = "Check setup_brms_lightweight() implementation."
+    ))
   }
 
   mvgam_components <- extract_mvgam_components(combined_fit, obs_setup,
@@ -588,10 +592,12 @@ mvgam_multiple <- function(formula,
 
   # Validate all elements are data frames
   if (!all(sapply(data_list, is.data.frame))) {
-    stop(insight::format_error(
-      "All elements in {.field data_list} must be data.frames.",
-      "Found non-data.frame elements in imputation list."
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "All elements in {.field data_list} must be data.frames."
+      ),
+      x = "Found non-data.frame elements in imputation list."
+    )))
   }
 
   # Validate multiple imputation datasets
@@ -633,10 +639,10 @@ validate_multiple_imputation_datasets <- function(data_list) {
 
   # Check all elements are data frames
   if (!all(sapply(data_list, is.data.frame))) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "All elements in data_list must be data.frames.",
-      "Found non-data.frame elements in imputation list."
-    ))
+      x = "Found non-data.frame elements in imputation list."
+    )))
   }
 
   # Get reference structure from first dataset
@@ -650,29 +656,29 @@ validate_multiple_imputation_datasets <- function(data_list) {
 
     # Check column names match
     if (!identical(names(current_data), ref_names)) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         paste("Dataset", i, "has different column names than dataset 1."),
-        "All imputed datasets must have identical structure."
-      ))
+        x = "All imputed datasets must have identical structure."
+      )))
     }
 
     # Check number of rows match
     if (nrow(current_data) != ref_nrow) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         paste("Dataset", i, "has", nrow(current_data), "rows, expected",
              ref_nrow),
-        "All imputed datasets must have same number of observations."
-      ))
+        x = "All imputed datasets must have same number of observations."
+      )))
     }
 
     # Check essential columns (time, series) are identical
     essential_cols <- intersect(c("time", "series"), ref_names)
     for (col in essential_cols) {
       if (!identical(ref_data[[col]], current_data[[col]])) {
-        stop(insight::format_error(
+        stop(insight::format_error(c(
           paste("Column", col, "differs between datasets."),
-          "Time and series identifiers must be identical across imputations."
-        ))
+          x = "Time and series identifiers must be identical across imputations."
+        )))
       }
     }
   }
@@ -702,11 +708,10 @@ validate_missing_patterns <- function(data_list) {
     reference_values <- values_list[[1]]
     for (i in 2:n_datasets) {
       if (!identical(reference_values, values_list[[i]])) {
-        insight::format_warning(
+        insight::format_warning(c(
           paste("Column", col, "varies between imputed datasets."),
-          "This may indicate improper imputation of structural variables.",
-          .frequency = "once"
-        )
+          x = "This may indicate improper imputation of structural variables."
+        ))
       }
     }
   }
@@ -779,10 +784,10 @@ pool_mvgam_fits <- function(fits) {
   checkmate::assert_list(fits, min.len = 2)
 
   if (!all(sapply(fits, function(x) inherits(x, "mvgam")))) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "All fits must be mvgam objects.",
-      "Cannot combine fits of different types."
-    ))
+      x = "Cannot combine fits of different types."
+    )))
   }
 
   # Validate parameter consistency across fits
@@ -790,10 +795,10 @@ pool_mvgam_fits <- function(fits) {
   for (i in seq_along(fits)[-1]) {
     current_vars <- sort(variables(fits[[i]]))
     if (!identical(ref_vars, current_vars)) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         sprintf("Model 1 and %d have different parameters.", i),
-        "This may indicate fitting failures or model changes."
-      ))
+        x = "This may indicate fitting failures or model changes."
+      )))
     }
   }
 

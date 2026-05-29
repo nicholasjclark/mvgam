@@ -428,7 +428,9 @@ transform_glm_call_to_mu_format <- function(glm_line, glm_type, glm_params) {
   # Get configuration for GLM type
   config <- glm_family_config[[glm_type]]
   if (is.null(config)) {
-    insight::format_error("Unsupported GLM type: {.field {glm_type}}")
+    insight::format_error(
+      cli::format_inline("Unsupported GLM type: {.field {glm_type}}")
+    )
   }
   
   # Build function name
@@ -786,10 +788,12 @@ apply_glm_transformations <- function(code_lines, block_info, analysis) {
   for (glm_type in glm_types_to_convert) {
     # Use cached parameters from analysis
     if (is.null(analysis$glm_parameters[[glm_type]])) {
-      stop(insight::format_error(
-        "GLM parameters not found in analysis for type: {.field {glm_type}}",
-        "Analysis object must contain pre-parsed GLM parameters."
-      ), call. = FALSE)
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "GLM parameters not found in analysis for type: {.field {glm_type}}"
+        ),
+        i = "Analysis object must contain pre-parsed GLM parameters."
+      )), call. = FALSE)
     }
     params <- analysis$glm_parameters[[glm_type]]
 
@@ -886,7 +890,9 @@ transform_single_glm_call <- function(glm_line, glm_type, params) {
     replacement <- paste0(glm_type, "_lpmf(", params$y_var, " | to_matrix(mu), 0.0, mu_ones", other_params_str, ")")
   } else {
     stop(insight::format_error(
-      "Unsupported GLM type for transformation: {.field {glm_type}}"
+      cli::format_inline(
+        "Unsupported GLM type for transformation: {.field {glm_type}}"
+      )
     ), call. = FALSE)
   }
 
@@ -1027,7 +1033,11 @@ transition_with_tracking <- function(state, new_stage, operation,
                       "mu_analysis")
   missing_fields <- required_fields[!required_fields %in% names(state)]
   if (length(missing_fields) > 0) {
-    insight::format_error("State object missing required {.field {missing_fields}}")
+    insight::format_error(
+      cli::format_inline(
+        "State object missing required {.field {missing_fields}}"
+      )
+    )
   }
 
   # Apply modifications or use existing values
@@ -1199,7 +1209,11 @@ transform_glm_code <- function(stan_code, trend_injection_code, response_names =
   checkmate::assert_list(trend_info, null.ok = TRUE)
 
   if (nchar(stan_code) == 0) {
-    insight::format_error("Stan code cannot be empty for parameter {.field stan_code}")
+    insight::format_error(
+      cli::format_inline(
+        "Stan code cannot be empty for parameter {.field stan_code}"
+      )
+    )
   }
 
   # Chain state transitions

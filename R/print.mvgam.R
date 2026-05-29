@@ -170,10 +170,10 @@ family.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
 
   if (is.null(object$family)) {
-    insight::format_error(
+    insight::format_error(c(
       "Family not found in mvgam object.",
-      "The object may be corrupted or from an incompatible version."
-    )
+      i = "The object may be corrupted or from an incompatible version."
+    ))
   }
 
   return(object$family)
@@ -189,10 +189,10 @@ formula.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
 
   if (is.null(x$formula)) {
-    insight::format_error(
+    insight::format_error(c(
       "Formula not found in mvgam object.",
-      "The object may be corrupted or from an incompatible version."
-    )
+      i = "The object may be corrupted or from an incompatible version."
+    ))
   }
 
   return(x$formula)
@@ -213,11 +213,12 @@ nobs.mvgam <- function(object, ...) {
              !is.null(object$standata$N)) {
     return(object$standata$N)
   } else {
-    insight::format_error(
+    insight::format_error(c(
       "Cannot determine number of observations.",
-      paste("Neither {.field data} nor {.field standata$N}",
-            "found in mvgam object.")
-    )
+      x = cli::format_inline(
+        "Neither {.field data} nor {.field standata$N} found in mvgam object."
+      )
+    ))
   }
 }
 
@@ -235,10 +236,10 @@ extract_mcmc_info <- function(mvgam_obj) {
   checkmate::assert_class(mvgam_obj, "mvgam")
 
   if (is.null(mvgam_obj$fit)) {
-    insight::format_error(
+    insight::format_error(c(
       "Stan fit not found in mvgam object.",
-      "The object may be corrupted or incomplete."
-    )
+      i = "The object may be corrupted or incomplete."
+    ))
   }
 
   # Use posterior package (backend-independent)
@@ -289,10 +290,10 @@ stancode.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
 
   if (is.null(object$stancode)) {
-    insight::format_error(
+    insight::format_error(c(
       "Stan code not found in mvgam object.",
-      "The model may have been fitted with an older version that didn't store Stan code."
-    )
+      i = "The model may have been fitted with an older version that didn't store Stan code."
+    ))
   }
 
   # Add mvgam-specific stancode class with brms compatibility
@@ -307,10 +308,10 @@ stancode.mvgam_prefit <- function(object, ...) {
   checkmate::assert_class(object, "mvgam_prefit")
 
   if (is.null(object$stancode)) {
-    insight::format_error(
+    insight::format_error(c(
       "Stan code not found in mvgam_prefit object.",
-      "The prefit object may not have been properly generated."
-    )
+      i = "The prefit object may not have been properly generated."
+    ))
   }
 
   # Add mvgam-specific stancode class with brms compatibility
