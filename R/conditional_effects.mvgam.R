@@ -201,29 +201,25 @@ split_term_labels <- function(lab) {
 
 
 # Tidy ggplot legend labels: keep integers untouched, round numeric
-# values to a small fixed number of decimal places so legends don't
-# carry 8+ digit floating-point noise.
+# values to the minimum precision needed across the label set so
+# legends don't carry 8+ digit floating-point noise.
 round_legend_labels <- function(x) {
   numeric_x <- suppressWarnings(as.numeric(x))
   if (all(is.na(numeric_x))) {
     return(x)
   }
   decimals <- vapply(numeric_x, function(v) {
-    if (is.na(v)) {
-      return(0L)
-    }
-    if (abs(v - round(v)) <= .Machine$double.eps^0.5) {
+    if (is.na(v) ||
+        abs(v - round(v)) <= .Machine$double.eps^0.5) {
       return(0L)
     }
     parts <- strsplit(sub("0+$", "", format(v, scientific = FALSE)),
                       ".", fixed = TRUE)[[1L]]
     if (length(parts) < 2L) 0L else nchar(parts[2L])
   }, integer(1L))
-  if (all(decimals == 0L)) {
+  n_dec <- min(max(decimals, na.rm = TRUE), 4L)
+  if (n_dec == 0L) {
     return(format(numeric_x, scientific = FALSE))
   }
-  if (all(decimals <= 1L)) {
-    return(sprintf("%.1f", numeric_x))
-  }
-  sprintf("%.4f", numeric_x)
+  sprintf(paste0("%.", n_dec, "f"), numeric_x)
 }
