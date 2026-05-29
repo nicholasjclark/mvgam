@@ -88,7 +88,11 @@ srcref_line <- function(sr) {
   as.integer(sr[1L])
 }
 
-walk <- function(x, outer_line, sites) {
+is_stop_call <- function(x) {
+  is.call(x) && is.symbol(x[[1L]]) && as.character(x[[1L]]) == "stop"
+}
+
+walk <- function(x, outer_line, inside_stop, sites) {
   if (is_target_call(x)) {
     line <- srcref_line(attr(x, "srcref"))
     if (is.na(line)) line <- outer_line
@@ -109,17 +113,24 @@ walk <- function(x, outer_line, sites) {
         }
       }
     }
-    compliant <- structural_ok && inline_ok
+    # Missing-stop check: only applies to format_error. format_warning is
+    # typically passed to rlang::warn() or used bare, so it's exempt.
+    fn_str <- fn_label(x)
+    is_format_error <- endsWith(fn_str, "format_error")
+    stop_ok <- !is_format_error || inside_stop
+    compliant <- structural_ok && inline_ok && stop_ok
     reason <- if (!structural_ok) {
       "positional"
     } else if (!inline_ok) {
       "unwrapped-braces"
+    } else if (!stop_ok) {
+      "missing-stop"
     } else {
       "ok"
     }
     sites[[length(sites) + 1L]] <- data.frame(
       line = line,
-      fn = fn_label(x),
+      fn = fn_str,
       n_args = n_args,
       compliant = compliant,
       reason = reason,
@@ -129,8 +140,10 @@ walk <- function(x, outer_line, sites) {
   if (is.call(x)) {
     own_sr_line <- srcref_line(attr(x, "srcref"))
     own_line <- if (is.na(own_sr_line)) outer_line else own_sr_line
+    # If this call IS stop(), every descendant counts as inside_stop.
+    descend_inside_stop <- inside_stop || is_stop_call(x)
     for (i in seq_along(x)) {
-      sites <- walk(x[[i]], own_line, sites)
+      sites <- walk(x[[i]], own_line, descend_inside_stop, sites)
     }
   }
   sites
@@ -146,7 +159,7 @@ scan_file <- function(path) {
     } else {
       as.integer(srcrefs[[i]][1L])
     }
-    sites <- walk(parsed[[i]], top_line, list())
+    sites <- walk(parsed[[i]], top_line, FALSE, list())
     for (s in sites) {
       s$file <- path
       rows[[length(rows) + 1L]] <- s
