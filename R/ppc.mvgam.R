@@ -10,7 +10,6 @@
 #' @inheritParams brms::prepare_predictions.brmsfit
 #'
 #' @importFrom stats terms formula weights
-#' @importFrom insight get_predictors
 #' @importFrom brms do_call
 #' @importFrom bayesplot pp_check color_scheme_set color_scheme_get
 #'
@@ -127,6 +126,8 @@ pp_check.mvgam <- function(
   group = NULL,
   x = NULL,
   newdata = NULL,
+  resp = NULL,
+  draw_ids = NULL,
   ...
 ) {
   # Set red colour scheme
@@ -142,7 +143,9 @@ pp_check.mvgam <- function(
   ndraws_given <- "ndraws" %in% names(match.call())
 
   if (is.null(newdata)) {
-    newdata <- object$obs_data
+    # Fitting data lives on $data; some objects also expose $obs_data
+    # as an alias and may have it empty.
+    newdata <- object$data %||% object$obs_data
   }
 
   if (prefix == "ppc") {
@@ -187,11 +190,13 @@ pp_check.mvgam <- function(
 
   ppc_fun <- get(paste0(prefix, "_", bptype), asNamespace("bayesplot"))
 
-  family <- object$family
-  if (family == "nmix") {
+  if (object$family$family == "nmix") {
     stop("'pp_check' is not implemented for this family.", call. = FALSE)
   }
-  valid_vars <- names(get_predictors(object))
+  # Validate group / x against the column names of newdata. insight's
+  # get_predictors does not dispatch on mvgam fits, and the variable-name
+  # check is all we need here.
+  valid_vars <- names(newdata)
   if ("group" %in% names(formals(ppc_fun))) {
     if (is.null(group)) {
       stop(
@@ -255,34 +260,45 @@ pp_check.mvgam <- function(
 
   y <- NULL
   if (prefix == "ppc") {
-    # y is ignored in prefix 'ppd' plots; get the response variable,
-    # but take care that binomial models use the cbind() lhs
-    resp_terms <- as.character(terms(formula(object$call))[[2]])
-    if (length(resp_terms) == 1) {
-      out_name <- as.character(terms(object$call)[[2]])
+    # y is ignored in prefix 'ppd' plots. Pull the response variable
+    # from the (brms)formula; binomial models with cbind(success, failure)
+    # take success as the response.
+    resp_form <- brms::brmsterms(object$formula)$respform
+    resp_terms <- as.character(resp_form[[2L]])
+    if (length(resp_terms) == 1L) {
+      out_name <- resp_terms
+    } else if (any(grepl("cbind", resp_terms))) {
+      out_name <- resp_terms[-which(grepl("cbind", resp_terms))][1L]
     } else {
-      if (any(grepl("cbind", resp_terms))) {
-        resp_terms <- resp_terms[-grepl("cbind", resp_terms)]
-        out_name <- resp_terms[1]
-      }
+      out_name <- resp_terms[1L]
     }
     y <- newdata[[out_name]]
   }
 
   # For plotting DS residuals, set y to zero and take
   # -1 * residual so that errors are in the correct direction
+  # If a subsample of draws is requested, pin it once here so yrep and
+  # the PSIS log-weights below refer to the same posterior draws.
+  if (!is.null(ndraws) && is.null(draw_ids)) {
+    total_draws <- posterior::ndraws(posterior::as_draws_array(object$fit))
+    draw_ids <- sort(sample.int(total_draws, min(ndraws, total_draws)))
+    ndraws <- NULL
+  }
+
   if (grepl("resid", type)) {
     y[!is.na(y)] <- 0
     yrep <- t(-1 * residuals(object, summary = FALSE))
 
-    if (!is.null(ndraws)) {
-      yrep <- yrep[1:ndraws, ]
+    if (!is.null(draw_ids)) {
+      yrep <- yrep[draw_ids, ]
     }
   } else {
     pred_args <- list(
       object,
       newdata = newdata,
       ndraws = ndraws,
+      draw_ids = draw_ids,
+      resp = resp,
       ...
     )
     yrep <- do_call(method, pred_args)
@@ -334,7 +350,8 @@ pp_check.mvgam <- function(
   needs_psis <- any(c("psis_object", "lw") %in%
                     setdiff(names(formals(ppc_fun)), names(ppc_args)))
   if (needs_psis) {
-    ll <- log_lik(object, newdata = newdata, process_error = TRUE)
+    ll <- log_lik(object, newdata = newdata, process_error = TRUE,
+                  resp = resp, draw_ids = draw_ids)
     chains <- posterior::nchains(posterior::as_draws_array(object$fit))
     n_per_chain <- NROW(ll) / chains
     r_eff <- loo::relative_eff(

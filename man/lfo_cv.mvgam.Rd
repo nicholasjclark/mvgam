@@ -9,12 +9,13 @@ lfo_cv(object, ...)
 
 \method{lfo_cv}{mvgam}(
   object,
-  data,
+  newdata,
   min_t,
   fc_horizon = 1,
   pareto_k_threshold = 0.7,
   silent = 1,
-  ...
+  ...,
+  data
 )
 }
 \arguments{
@@ -22,7 +23,7 @@ lfo_cv(object, ...)
 
 \item{...}{Ignored}
 
-\item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
+\item{newdata}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:
 'series' (character or factor index of the series IDs)
 'time' (numeric index of the time point for each observation).
@@ -46,6 +47,8 @@ messages of compiler and sampler are suppressed. If \code{2}, even more messages
 actual sampling progress is still printed. Set \code{refresh = 0} to turn this off as well. If using
 \code{backend = "rstan"} you can also set open_progress = FALSE to prevent opening additional
 progress bars.}
+
+\item{data}{Deprecated. Use \code{newdata} instead.}
 }
 \value{
 A \code{list} of class \code{mvgam_lfo} containing the approximate ELPD scores,

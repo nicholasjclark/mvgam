@@ -2,11 +2,12 @@
 #'@name lfo_cv.mvgam
 #'@importFrom stats update
 #'@param object \code{list} object of class \code{mvgam}. See [mvgam()]
-#'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
+#'@param newdata A \code{dataframe} or \code{list} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
 #''series' (character or factor index of the series IDs)
 #''time' (numeric index of the time point for each observation).
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
+#'@param data Deprecated. Use \code{newdata} instead.
 #'@param min_t Integer specifying the minimum training time required before making predictions
 #'from the data. Default is either the `30`th timepoint in the observational data,
 #'or whatever training time allows for at least
@@ -124,22 +125,39 @@ lfo_cv <- function(object, ...) {
 #'@export
 lfo_cv.mvgam = function(
   object,
-  data,
+  newdata,
   min_t,
   fc_horizon = 1,
   pareto_k_threshold = 0.7,
   silent = 1,
-  ...
+  ...,
+  data
 ) {
   validate_proportional(pareto_k_threshold)
   validate_pos_integer(fc_horizon)
 
-  if (missing(data)) {
+  # Backward-compat: accept the master-era `data` arg with a deprecation
+  # warning. Once both are supplied, `newdata` wins.
+  if (!missing(data)) {
+    if (missing(newdata)) {
+      warning(insight::format_warning(c(
+        "Argument {.field data} is deprecated; use {.field newdata}.",
+        i = "Forwarding the supplied value to {.field newdata}."
+      )), call. = FALSE)
+      newdata <- data
+    } else {
+      warning(insight::format_warning(
+        "Both {.field data} and {.field newdata} supplied; using {.field newdata}."
+      ), call. = FALSE)
+    }
+  }
+
+  if (missing(newdata)) {
     all_data <- object$obs_data
   } else {
     all_data <- validate_series_time(
-      data,
-      name = 'data',
+      newdata,
+      name = 'newdata',
       trend_model = object$trend_model
     )
   }

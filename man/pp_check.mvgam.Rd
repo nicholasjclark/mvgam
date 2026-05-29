@@ -13,6 +13,8 @@
   group = NULL,
   x = NULL,
   newdata = NULL,
+  resp = NULL,
+  draw_ids = NULL,
   ...
 )
 }
@@ -49,6 +51,12 @@ containing the variables included in the linear predictor of
 \code{formula}. If not supplied, predictions are generated for the
 original observations used for the model fit. Ignored if using one
 of the residual plots (i.e. 'resid_hist')}
+
+\item{resp}{Optional names of response variables. If specified, predictions
+are performed only for the specified response variables.}
+
+\item{draw_ids}{An integer vector specifying the posterior draws to be used.
+If \code{NULL} (the default), all draws are used.}
 
 \item{...}{Further arguments passed to \code{\link{predict.mvgam}}
 as well as to the PPC function specified in \code{type}}

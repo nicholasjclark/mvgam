@@ -6,13 +6,24 @@
 #'
 #' @param x Object of class `mvgam` or `jsdgam`
 #'
-#' @param incl_dynamics Logical. Equivalent to `process_error` on
-#'   [log_lik.mvgam()]; when `TRUE` (default) latent trend uncertainty is
-#'   propagated into the per-observation log-likelihood, matching the
-#'   brms convention for state-space models. Set `FALSE` to fix the trend
-#'   at its posterior mean (master's `incl_dynamics = FALSE` path).
+#' @param compare,resp,pointwise,moment_match,reloo,k_threshold,save_psis,moment_match_args,reloo_args,model_names
+#'   Accepted for [brms::loo.brmsfit] parity. `resp` is passed through to
+#'   [log_lik.mvgam()] for multivariate response selection; `pointwise`,
+#'   `moment_match`, `reloo` and their `*_args` companions require
+#'   refit / streaming machinery that mvgam does not yet support — v1
+#'   raises a clear error when any of them is requested. `compare`,
+#'   `k_threshold`, `save_psis` and `model_names` pass through to
+#'   [loo::loo()] or are no-ops for single-model evaluation.
 #'
-#' @param ... Additional arguments for [loo::loo()]
+#' @param incl_dynamics Logical, default `FALSE`. Maps to the
+#'   `process_error` argument on [log_lik.mvgam()]. When `FALSE` (default)
+#'   the trend is fixed at its posterior mean, giving PSIS weights that
+#'   reflect parameter uncertainty alone. Set `TRUE` to fold sampled
+#'   trend realisations into the per-observation log-likelihood — useful
+#'   for continuous-family fits where the observation noise is small
+#'   relative to the trend.
+#'
+#' @param ... Further arguments passed to [loo::loo()]
 #'
 #' @rdname loo.mvgam
 #'
@@ -120,24 +131,50 @@
 #'
 #' @export
 
-loo.mvgam <- function(x, incl_dynamics = TRUE, ...) {
+loo.mvgam <- function(x, ...,
+                      compare = TRUE,
+                      resp = NULL,
+                      pointwise = FALSE,
+                      moment_match = FALSE,
+                      reloo = FALSE,
+                      k_threshold = 0.7,
+                      save_psis = FALSE,
+                      moment_match_args = list(),
+                      reloo_args = list(),
+                      model_names = NULL,
+                      incl_dynamics = FALSE) {
+  # brms-parity arguments that need machinery we do not yet have. Fail
+  # fast rather than silently ignoring; users picking these flags expect
+  # them to do something.
+  if (isTRUE(pointwise)) {
+    stop(insight::format_error(c(
+      "{.field pointwise = TRUE} streaming log-likelihood is not yet supported on mvgam.",
+      i = "Compute LOO in-memory by leaving {.field pointwise = FALSE}."
+    )))
+  }
+  if (isTRUE(moment_match) || isTRUE(reloo)) {
+    stop(insight::format_error(c(
+      "{.field moment_match} and {.field reloo} are not yet supported on mvgam.",
+      i = "These require model refits; revisit once the C++ trend extrapolator lands."
+    )))
+  }
+
   # Brms-parity log-likelihood path. `incl_dynamics` maps to the
-  # `process_error` argument on log_lik.mvgam: TRUE samples a trend
-  # realisation per draw (the default and the only path that produces
-  # PSIS weights consistent with brms's expectation for state-space
-  # models); FALSE fixes the trend at its posterior mean.
-  logliks <- log_lik(x, process_error = incl_dynamics)
+  # `process_error` argument on log_lik.mvgam: FALSE (default) fixes the
+  # trend at its posterior mean so PSIS weights are not dominated by
+  # latent-state variance; TRUE folds sampled trend realisations into
+  # the per-observation log-density.
+  logliks <- log_lik(x, process_error = incl_dynamics, resp = resp)
   logliks <- clean_ll(x, logliks)
 
-  # Compute relative effective sample size for PSIS. The new branch uses
-  # the posterior package's chain accounting on the underlying stanfit.
+  # Compute relative effective sample size for PSIS.
   chains <- posterior::nchains(posterior::as_draws_array(x$fit))
   n_per_chain <- NROW(logliks) / chains
   releffs <- loo::relative_eff(
     exp(logliks),
     chain_id = sort(rep(seq_len(chains), n_per_chain))
   )
-  loo::loo(logliks, r_eff = releffs, ...)
+  loo::loo(logliks, r_eff = releffs, save_psis = save_psis, ...)
 }
 
 #' @importFrom loo loo_compare
@@ -149,7 +186,11 @@ loo.mvgam <- function(x, incl_dynamics = TRUE, ...) {
 #' @param model_names If `NULL` (the default) will use model names derived
 #' from deparsing the call. Otherwise will use the passed values as model names
 #'
-#' @param incl_dynamics Logical, passed through to [loo.mvgam()].
+#' @param criterion Information criterion used for comparison. One of
+#'   `"loo"` (default) or `"waic"`.
+#'
+#' @param incl_dynamics Logical, passed through to [loo.mvgam()] /
+#'   [waic.mvgam()]. Default `FALSE` to match [loo.mvgam()].
 #'
 #' @rdname loo.mvgam
 #'
@@ -157,15 +198,21 @@ loo.mvgam <- function(x, incl_dynamics = TRUE, ...) {
 loo_compare.mvgam <- function(
   x,
   ...,
+  criterion = c("loo", "waic"),
   model_names = NULL,
-  incl_dynamics = TRUE
+  incl_dynamics = FALSE
 ) {
+  criterion <- match.arg(criterion)
   models <- split_mod_dots(x, ..., model_names = model_names)
-  loos <- named_list(names(models))
+  estimates <- named_list(names(models))
   for (i in seq_along(models)) {
-    loos[[i]] <- loo(models[[i]], incl_dynamics = incl_dynamics)
+    estimates[[i]] <- if (criterion == "loo") {
+      loo(models[[i]], incl_dynamics = incl_dynamics)
+    } else {
+      waic(models[[i]], incl_dynamics = incl_dynamics)
+    }
   }
-  loo_compare(loos)
+  loo_compare(estimates)
 }
 
 #' @export

@@ -5,19 +5,51 @@
 \alias{loo_compare.mvgam}
 \title{LOO information criteria for \pkg{mvgam} models}
 \usage{
-\method{loo}{mvgam}(x, incl_dynamics = TRUE, ...)
+\method{loo}{mvgam}(
+  x,
+  ...,
+  compare = TRUE,
+  resp = NULL,
+  pointwise = FALSE,
+  moment_match = FALSE,
+  reloo = FALSE,
+  k_threshold = 0.7,
+  save_psis = FALSE,
+  moment_match_args = list(),
+  reloo_args = list(),
+  model_names = NULL,
+  incl_dynamics = FALSE
+)
 
-\method{loo_compare}{mvgam}(x, ..., model_names = NULL, incl_dynamics = TRUE)
+\method{loo_compare}{mvgam}(
+  x,
+  ...,
+  criterion = c("loo", "waic"),
+  model_names = NULL,
+  incl_dynamics = FALSE
+)
 }
 \arguments{
 \item{x}{Object of class \code{mvgam}}
 
-\item{incl_dynamics}{Logical, passed through to \code{\link[=loo.mvgam]{loo.mvgam()}}.}
-
 \item{...}{More \code{mvgam} objects}
+
+\item{compare, resp, pointwise, moment_match, reloo, k_threshold, save_psis, moment_match_args, reloo_args, model_names}{Accepted for \link[brms:loo.brmsfit]{brms::loo.brmsfit} parity. \code{resp} is passed through to
+\code{\link[=log_lik.mvgam]{log_lik.mvgam()}} for multivariate response selection; \code{pointwise},
+\code{moment_match}, \code{reloo} and their \verb{*_args} companions require
+refit / streaming machinery that mvgam does not yet support — v1
+raises a clear error when any of them is requested. \code{compare},
+\code{k_threshold}, \code{save_psis} and \code{model_names} pass through to
+\code{\link[loo:loo]{loo::loo()}} or are no-ops for single-model evaluation.}
 
 \item{model_names}{If \code{NULL} (the default) will use model names derived
 from deparsing the call. Otherwise will use the passed values as model names}
+
+\item{incl_dynamics}{Logical, passed through to \code{\link[=loo.mvgam]{loo.mvgam()}} /
+\code{\link[=waic.mvgam]{waic.mvgam()}}. Default \code{FALSE} to match \code{\link[=loo.mvgam]{loo.mvgam()}}.}
+
+\item{criterion}{Information criterion used for comparison. One of
+\code{"loo"} (default) or \code{"waic"}.}
 }
 \value{
 For \code{loo.mvgam}, an object of class \code{psis_loo} (see \code{\link[loo:loo]{loo::loo()}}

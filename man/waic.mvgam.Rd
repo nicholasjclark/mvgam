@@ -10,19 +10,24 @@
   compare = TRUE,
   resp = NULL,
   pointwise = FALSE,
-  model_names = NULL
+  model_names = NULL,
+  incl_dynamics = FALSE
 )
 }
 \arguments{
 \item{x}{An mvgam fit.}
 
 \item{...}{Additional arguments passed to \code{\link[=log_lik.mvgam]{log_lik.mvgam()}} (e.g.
-\code{newdata}, \code{process_error}, \code{ndraws}, \code{draw_ids}).}
+\code{newdata}, \code{ndraws}, \code{draw_ids}).}
 
-\item{compare, resp, pointwise, model_names}{Accepted for brms-parity but
-currently ignored or passed through; multi-response WAIC and model
-comparison are routed through \code{\link[=loo_compare.mvgam]{loo_compare.mvgam()}} / \code{loo::waic} as
-appropriate.}
+\item{compare, resp, pointwise, model_names}{Accepted for
+\link[brms:waic.brmsfit]{brms::waic.brmsfit} parity. \code{resp} is passed through to
+\code{\link[=log_lik.mvgam]{log_lik.mvgam()}} for multivariate response selection;
+\code{pointwise} is not yet supported and raises a clear error;
+\code{compare} and \code{model_names} are no-ops for single-model WAIC.}
+
+\item{incl_dynamics}{Logical, default \code{FALSE}. Maps to the
+\code{process_error} argument on \code{\link[=log_lik.mvgam]{log_lik.mvgam()}}.}
 }
 \value{
 A \code{loo::waic} object.
