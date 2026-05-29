@@ -44,10 +44,11 @@ ppc \code{*_grouped} types and ignored otherwise.}
 Only used for ppc types having an \code{x} argument
 and ignored otherwise.}
 
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the
-variables included in the linear predictor of \code{formula}. If not supplied,
-predictions are generated for the original observations used for the model fit.
-Ignored if using one of the residual plots (i.e. 'resid_hist')}
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data
+containing the variables included in the linear predictor of
+\code{formula}. If not supplied, predictions are generated for the
+original observations used for the model fit. Ignored if using one
+of the residual plots (i.e. 'resid_hist')}
 
 \item{...}{Further arguments passed to \code{\link{predict.mvgam}}
 as well as to the PPC function specified in \code{type}}
@@ -58,16 +59,16 @@ customized using the \pkg{ggplot2} package.
 }
 \description{
 Perform unconditional posterior predictive checks with the help
-of the \pkg{bayesplot} package.
+of the \pkg{bayesplot} package. Returns a \pkg{ggplot2} object that
+can be further customised.
 }
 \details{
-Unlike the conditional posterior checks provided by \code{\link{ppc}},
-This function computes \emph{unconditional} posterior predictive checks (i.e. it generates
-predictions for fake data without considering the true observations associated with those
-fake data). For a detailed explanation of each of the ppc functions,
-see the \code{\link[bayesplot:PPC-overview]{PPC}}
-documentation of the \pkg{\link[bayesplot:bayesplot-package]{bayesplot}}
-package.
+For a detailed explanation of each of the ppc functions,
+see the \code{\link[bayesplot:PPC-overview]{PPC}} documentation of the
+\pkg{\link[bayesplot:bayesplot-package]{bayesplot}} package. LOO-PIT
+bayesplot variants (\code{loo_pit}, \code{loo_pit_overlay},
+\code{loo_pit_qq}, \code{loo_intervals}, \code{loo_ribbon}) compute
+PSIS weights internally via \code{\link[=log_lik.mvgam]{log_lik.mvgam()}}.
 }
 \examples{
 \donttest{
@@ -122,6 +123,9 @@ pp_check(mod,
   group = "series"
 )
 
+# PSIS-LOO bayesplot variants
+pp_check(mod, type = "loo_pit_overlay")
+
 # Custom functions accepted
 pp_check(mod, type = "stat", stat = function(x) mean(x == 0))
 pp_check(mod,
@@ -145,7 +149,7 @@ pp_check(mod, prefix = "ppd")
 
 }
 \seealso{
-\code{\link{ppc}}, \code{\link{predict.mvgam}}
+\code{\link{predict.mvgam}}, \code{\link[=log_lik.mvgam]{log_lik.mvgam()}}
 }
 \author{
 Nicholas J Clark

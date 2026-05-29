@@ -5,14 +5,14 @@
 \alias{loo_compare.mvgam}
 \title{LOO information criteria for \pkg{mvgam} models}
 \usage{
-\method{loo}{mvgam}(x, incl_dynamics = FALSE, ...)
+\method{loo}{mvgam}(x, incl_dynamics = TRUE, ...)
 
-\method{loo_compare}{mvgam}(x, ..., model_names = NULL, incl_dynamics = FALSE)
+\method{loo_compare}{mvgam}(x, ..., model_names = NULL, incl_dynamics = TRUE)
 }
 \arguments{
 \item{x}{Object of class \code{mvgam}}
 
-\item{incl_dynamics}{Deprecated and currently ignored}
+\item{incl_dynamics}{Logical, passed through to \code{\link[=loo.mvgam]{loo.mvgam()}}.}
 
 \item{...}{More \code{mvgam} objects}
 

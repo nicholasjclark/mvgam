@@ -6,7 +6,11 @@
 #'
 #' @param x Object of class `mvgam` or `jsdgam`
 #'
-#' @param incl_dynamics Deprecated and currently ignored
+#' @param incl_dynamics Logical. Equivalent to `process_error` on
+#'   [log_lik.mvgam()]; when `TRUE` (default) latent trend uncertainty is
+#'   propagated into the per-observation log-likelihood, matching the
+#'   brms convention for state-space models. Set `FALSE` to fix the trend
+#'   at its posterior mean (master's `incl_dynamics = FALSE` path).
 #'
 #' @param ... Additional arguments for [loo::loo()]
 #'
@@ -116,51 +120,22 @@
 #'
 #' @export
 
-loo.mvgam <- function(x, incl_dynamics = FALSE, ...) {
-  # Families with observation error components can give strange log-likelihood estimates
-  # if process error components were also included in the model (this is because the
-  # observation error estimates may be very small); use incl_dynamics = TRUE for these
-  # families to ensure all errors are propagated appropriately when calculating the
-  # log-likelihood
-  incl_dynamics <- FALSE
-  if (
-    x$family %in%
-      c(
-        "gaussian",
-        "lognormal",
-        "student"
-      )
-  ) {
-    incl_dynamics <- TRUE
-  }
-
-  if (x$family == 'nmix' | incl_dynamics) {
-    logliks <- logLik(x, include_forecast = FALSE)
-  } else {
-    x$series_names <- levels(x$obs_data$series)
-    logliks <- logLik(
-      x,
-      linpreds = predict(
-        x,
-        newdata = x$obs_data,
-        type = 'link',
-        summary = FALSE,
-        process_error = FALSE
-      ),
-      newdata = x$obs_data,
-      family_pars = extract_family_pars(x),
-      include_forecast = FALSE
-    )
-  }
-
+loo.mvgam <- function(x, incl_dynamics = TRUE, ...) {
+  # Brms-parity log-likelihood path. `incl_dynamics` maps to the
+  # `process_error` argument on log_lik.mvgam: TRUE samples a trend
+  # realisation per draw (the default and the only path that produces
+  # PSIS weights consistent with brms's expectation for state-space
+  # models); FALSE fixes the trend at its posterior mean.
+  logliks <- log_lik(x, process_error = incl_dynamics)
   logliks <- clean_ll(x, logliks)
+
+  # Compute relative effective sample size for PSIS. The new branch uses
+  # the posterior package's chain accounting on the underlying stanfit.
+  chains <- posterior::nchains(posterior::as_draws_array(x$fit))
+  n_per_chain <- NROW(logliks) / chains
   releffs <- loo::relative_eff(
     exp(logliks),
-    chain_id = sort(rep(
-      1:x$model_output@sim$chains,
-      (NROW(logliks) /
-        x$model_output@sim$chains)
-    ))
+    chain_id = sort(rep(seq_len(chains), n_per_chain))
   )
   loo::loo(logliks, r_eff = releffs, ...)
 }
@@ -174,7 +149,7 @@ loo.mvgam <- function(x, incl_dynamics = FALSE, ...) {
 #' @param model_names If `NULL` (the default) will use model names derived
 #' from deparsing the call. Otherwise will use the passed values as model names
 #'
-#' @param incl_dynamics Deprecated and currently ignored
+#' @param incl_dynamics Logical, passed through to [loo.mvgam()].
 #'
 #' @rdname loo.mvgam
 #'
@@ -183,7 +158,7 @@ loo_compare.mvgam <- function(
   x,
   ...,
   model_names = NULL,
-  incl_dynamics = FALSE
+  incl_dynamics = TRUE
 ) {
   models <- split_mod_dots(x, ..., model_names = model_names)
   loos <- named_list(names(models))

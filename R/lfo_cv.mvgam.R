@@ -1,6 +1,6 @@
 #'@title Approximate leave-future-out cross-validation of fitted \pkg{mvgam} objects
 #'@name lfo_cv.mvgam
-#'@importFrom stats update logLik
+#'@importFrom stats update
 #'@param object \code{list} object of class \code{mvgam}. See [mvgam()]
 #'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
@@ -201,7 +201,7 @@ lfo_cv.mvgam = function(
     c(data_splits$data_train$time, data_splits$data_test$time) %in%
       (min_t + 1):(min_t + fc_horizon)
   )
-  loglik_past <- logLik(fit_past)
+  loglik_past <- log_lik(fit_past)
 
   # Store the EPLD estimate
   approx_elpds[min_t + 1] <- log_mean_exp(sum_rows(loglik_past[, fc_indices]))
@@ -259,7 +259,7 @@ lfo_cv.mvgam = function(
         c(data_splits$data_train$time, data_splits$data_test$time) %in%
           (i + 1):(i + fc_horizon)
       )
-      loglik_past <- logLik(fit_past)
+      loglik_past <- log_lik(fit_past)
       approx_elpds[i + 1] <- log_mean_exp(sum_rows(loglik_past[, fc_indices]))
     } else {
       # If k below threshold, calculate log likelihoods for the
