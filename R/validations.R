@@ -243,15 +243,17 @@ validate_supported_family <- function(family) {
   family_name <- family$family
 
   if (family_name %in% unsupported_families) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       paste0("Family '", family_name, "' is not supported by mvgam."),
-      paste0(
+      x = paste0(
         "Multi-category families (categorical, multinomial, dirichlet) ",
         "require multiple linear predictors (one per category) that ",
         "cannot be combined with State-Space trends."
       ),
-      "For these response types, please use {.pkg brms} directly."
-    ))
+      i = cli::format_inline(
+        "For these response types, please use {.pkg brms} directly."
+      )
+    )))
   }
 
   invisible(TRUE)
@@ -279,10 +281,12 @@ validate_nonlinear_trend_compatibility <- function(nl_components, trend_specs) {
   incompatible_trends <- c()  # Currently all trends should work
 
   if (trend_specs$type %in% incompatible_trends) {
-    stop(insight::format_error(
-      "Trend type '{trend_specs$type}' is not compatible with nonlinear models.",
-      "Consider using different trend specification."
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Trend type {.val {trend_specs$type}} is not compatible with nonlinear models."
+      ),
+      i = "Consider using different trend specification."
+    )))
   }
 
   invisible(TRUE)
@@ -628,11 +632,13 @@ validate_trend_factor_compatibility <- function(trend_spec, data) {
       n_series <- length(unique(data[[series_var]]))
 
       if (trend_spec$n_lv >= n_series) {
-        stop(insight::format_error(
-          "Factor model requires {.field n_lv < n_series}.",
-          "You specified {.field n_lv = {trend_spec$n_lv}} but data has {n_series} series.",
-          "Reduce n_lv or increase number of series."
-        ))
+        stop(insight::format_error(c(
+          cli::format_inline("Factor model requires {.field n_lv < n_series}."),
+          x = cli::format_inline(
+            "You specified {.field n_lv = {trend_spec$n_lv}} but data has {n_series} series."
+          ),
+          i = "Reduce n_lv or increase number of series."
+        )))
       }
     }
   }
@@ -660,10 +666,12 @@ validate_factor_compatibility <- function(trend_spec) {
 
   # Check if trend type is registered
   if (!exists(trend_name, envir = trend_registry)) {
-    stop(insight::format_error(
-      "Unknown trend type: '{trend_name}'",
-      "Available types: {paste(ls(trend_registry), collapse = ', ')}"
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline("Unknown trend type: {.val {trend_name}}"),
+      i = cli::format_inline(
+        "Available types: {paste(ls(trend_registry), collapse = ', ')}"
+      )
+    )))
   }
 
   # Get trend info from registry
@@ -671,10 +679,12 @@ validate_factor_compatibility <- function(trend_spec) {
 
   # Check factor support
   if (!trend_info$supports_factors) {
-    stop(insight::format_error(
-      "Factor models (n_lv > 0) not supported for {trend_name} trends.",
-      trend_info$incompatibility_reason
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Factor models (n_lv > 0) not supported for {trend_name} trends."
+      ),
+      x = trend_info$incompatibility_reason
+    )))
   }
 
   invisible(TRUE)
@@ -715,10 +725,12 @@ validate_grouping_arguments <- function(gr, subgr) {
   }
 
   if (!is.null(subgr) && is.null(gr)) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Subgrouping requires main grouping variable.",
-      "Cannot specify {.field subgr = '{subgr}'} without {.field gr}."
-    ))
+      x = cli::format_inline(
+        "Cannot specify {.field subgr = {subgr}} without {.field gr}."
+      )
+    )))
   }
 
   return(list(gr = gr, subgr = subgr))
@@ -746,12 +758,16 @@ validate_regular_time_intervals <- function(time_values, time_var = "time") {
   is_regular <- abs(interval_range[2] - interval_range[1]) < tolerance
 
   if (!is_regular) {
-    stop(insight::format_error(
-      "Irregular time intervals detected in '{time_var}'.",
-      "Some trends require regular time spacing.",
-      "Interval range: {min(intervals)} to {max(intervals)}",
-      "Consider using CAR() for irregular intervals or interpolate data."
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Irregular time intervals detected in {.field {time_var}}."
+      ),
+      x = "Some trends require regular time spacing.",
+      x = cli::format_inline(
+        "Interval range: {min(intervals)} to {max(intervals)}"
+      ),
+      i = "Consider using CAR() for irregular intervals or interpolate data."
+    )))
   }
 
 
@@ -983,20 +999,23 @@ validate_exact_gp_usage <- function(formula) {
     }, silent = TRUE)
     
     if (inherits(gp_obj, "try-error")) {
-      stop(insight::format_error(
-        "Invalid GP term syntax: {.field {gp_term}}",
-        "GP terms must be valid function calls"
-      ))
+      stop(insight::format_error(c(
+        cli::format_inline("Invalid GP term syntax: {.field {gp_term}}"),
+        i = "GP terms must be valid function calls"
+      )))
     }
-    
+
     if (is.na(gp_obj$k)) {
-      stop(insight::format_error(
-        paste("Exact GP terms (without {.field k} parameter)",
-              "are not supported"),
-        paste("Found:", gp_term),
-        "Solution: Add {.field k} to specify number of basis functions",
-        paste("Example:", gsub("\\)$", ", k=20)", gp_term))
-      ))
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "Exact GP terms (without {.field k} parameter) are not supported."
+        ),
+        x = paste("Found:", gp_term),
+        i = cli::format_inline(
+          "Add {.field k} to specify number of basis functions."
+        ),
+        i = paste("Example:", gsub("\\)$", ", k=20)", gp_term))
+      )))
     }
   }
   
@@ -1034,12 +1053,18 @@ validate_obs_formula_brms <- function(formula) {
   }
 
   if (length(detected_trends) > 0) {
-    stop(insight::format_error(
-      "mvgam trend constructors found in observation {.field formula}:",
-      paste("Found:", paste(unique(detected_trends), collapse = ", ")),
-      "Trend constructors belong in {.field trend_formula}, not {.field formula}.",
-      "Use: {.code mvgam(y ~ x, trend_formula = ~ RW())}"
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "mvgam trend constructors found in observation {.field formula}:"
+      ),
+      x = paste("Found:", paste(unique(detected_trends), collapse = ", ")),
+      i = cli::format_inline(
+        "Trend constructors belong in {.field trend_formula}, not {.field formula}."
+      ),
+      i = cli::format_inline(
+        "Use: {.code mvgam(y ~ x, trend_formula = ~ RW())}"
+      )
+    )))
   }
 
   # Check for exact GP usage (gp() without k parameter)
@@ -1076,10 +1101,12 @@ validate_trend_formula_brms <- function(trend_formula) {
   }
 
   # Invalid type
-  stop(insight::format_error(
-    "Invalid {.field trend_formula} type: {class(trend_formula)}",
-    "Must be formula, bf() object, or named list."
-  ))
+  stop(insight::format_error(c(
+    cli::format_inline(
+      "Invalid {.field trend_formula} type: {class(trend_formula)}"
+    ),
+    i = "Must be formula, bf() object, or named list."
+  )))
 }
 
 #' Validate bf() trend formula objects
@@ -1175,10 +1202,14 @@ extract_all_bf_formulas <- function(bf_obj) {
 #' @noRd
 validate_list_trend_formula <- function(formula_list) {
   if (is.null(names(formula_list))) {
-    stop(insight::format_error(
-      "Multivariate {.field trend_formula} must be a named list.",
-      "Use: {.code trend_formula = list(resp1 = ~ AR(), resp2 = ~ RW())}"
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Multivariate {.field trend_formula} must be a named list."
+      ),
+      i = cli::format_inline(
+        "Use: {.code trend_formula = list(resp1 = ~ AR(), resp2 = ~ RW())}"
+      )
+    )))
   }
 
   # Validate each component formula
@@ -1208,11 +1239,17 @@ validate_single_trend_formula <- function(formula, context = NULL, allow_respons
   if (length(formula) == 3) {
     if (!allow_response) {
       context_msg <- if (!is.null(context)) paste("in", context) else ""
-      stop(insight::format_error(
-        "Trend formula {context_msg} should not have a response variable.",
-        "Use: {.code trend_formula = ~ RW()}, not {.code trend_formula = y ~ RW()}",
-        "For multivariate models, use: {.code trend_formula = bf(y1 ~ AR(), y2 ~ RW())}"
-      ))
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "Trend formula {context_msg} should not have a response variable."
+        ),
+        i = cli::format_inline(
+          "Use: {.code trend_formula = ~ RW()}, not {.code trend_formula = y ~ RW()}"
+        ),
+        i = cli::format_inline(
+          "For multivariate models, use: {.code trend_formula = bf(y1 ~ AR(), y2 ~ RW())}"
+        )
+      )))
     }
     # If response variables are allowed, continue with validation but note it's for multivariate
   }
@@ -1345,12 +1382,12 @@ validate_trend_formula_restrictions <- function(formula_str,
         found_text <- paste("Found:", paste(unique(detected), collapse = ", "))
       }
 
-      stop(insight::format_error(
-        config$error_header,
-        found_text,
-        config$error_reason,
-        config$error_suggestion
-      ))
+      stop(insight::format_error(c(
+        cli::format_inline(config$error_header),
+        x = found_text,
+        x = config$error_reason,
+        i = cli::format_inline(config$error_suggestion)
+      )))
     }
   }
 
@@ -1378,37 +1415,45 @@ validate_multivariate_trend_constraints <- function(trend_formula, response_name
   for (trend_component in parsed$trend_components) {
     # Check for factor models (n_lv parameter)
     if (!is.null(trend_component$n_lv) && trend_component$n_lv > 0) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "Factor models not allowed in multivariate response trends.",
-        "Response '{response_name}' has n_lv = {trend_component$n_lv}.",
-        "Remove n_lv parameter for basic temporal dynamics only."
-      ))
+        x = cli::format_inline(
+          "Response {.val {response_name}} has n_lv = {trend_component$n_lv}."
+        ),
+        i = "Remove n_lv parameter for basic temporal dynamics only."
+      )))
     }
 
     # Check for correlations (cor parameter)
     if (!is.null(trend_component$cor) && trend_component$cor) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "Correlation structures not allowed in multivariate response trends.",
-        "Response '{response_name}' has cor = TRUE.",
-        "Remove cor parameter for basic temporal dynamics only."
-      ))
+        x = cli::format_inline(
+          "Response {.val {response_name}} has cor = TRUE."
+        ),
+        i = "Remove cor parameter for basic temporal dynamics only."
+      )))
     }
 
     # Check for hierarchical grouping (gr, subgr parameters)
     if (!is.null(trend_component$gr)) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "Hierarchical grouping not allowed in multivariate response trends.",
-        "Response '{response_name}' has gr = '{trend_component$gr}'.",
-        "Remove gr parameter for basic temporal dynamics only."
-      ))
+        x = cli::format_inline(
+          "Response {.val {response_name}} has gr = {.val {trend_component$gr}}."
+        ),
+        i = "Remove gr parameter for basic temporal dynamics only."
+      )))
     }
 
     if (!is.null(trend_component$subgr)) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "Hierarchical grouping not allowed in multivariate response trends.",
-        "Response '{response_name}' has subgr = '{trend_component$subgr}'.",
-        "Remove subgr parameter for basic temporal dynamics only."
-      ))
+        x = cli::format_inline(
+          "Response {.val {response_name}} has subgr = {.val {trend_component$subgr}}."
+        ),
+        i = "Remove subgr parameter for basic temporal dynamics only."
+      )))
     }
   }
 
@@ -1448,27 +1493,27 @@ validate_setup_components <- function(components) {
   missing_components <- setdiff(required_components, names(components))
 
   if (length(missing_components) > 0) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Missing required setup components:",
-      paste(missing_components, collapse = ", ")
-    ))
+      x = paste(missing_components, collapse = ", ")
+    )))
   }
 
   # Validate Stan code is not empty
   if (is.null(components$stancode) ||
       (is.character(components$stancode) && nchar(components$stancode) == 0)) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Stan code extraction failed.",
-      "Could not obtain valid Stan model code from brms setup."
-    ))
+      x = "Could not obtain valid Stan model code from brms setup."
+    )))
   }
 
   # Validate Stan data is not empty
   if (is.null(components$standata) || length(components$standata) == 0) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Stan data extraction failed.",
-      "Could not obtain valid Stan data from brms setup."
-    ))
+      x = "Could not obtain valid Stan data from brms setup."
+    )))
   }
 
   invisible(TRUE)
@@ -1524,11 +1569,11 @@ validate_time_series_for_trends <- function(data, trend_specs, silent = 1, respo
 
   # Use precomputed dimensions - no fallback in ultra-DRY architecture
   if (is.null(.precomputed_dimensions)) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Missing precomputed dimensions in ultra-DRY architecture.",
-      "This function should only be called with precomputed dimensions.",
-      "Check that extract_and_validate_trend_components() is passing dimensions correctly."
-    ), call. = FALSE)
+      x = "This function should only be called with precomputed dimensions.",
+      i = "Check that extract_and_validate_trend_components() is passing dimensions correctly."
+    )), call. = FALSE)
   }
 
   dimensions <- .precomputed_dimensions
@@ -1538,10 +1583,10 @@ validate_time_series_for_trends <- function(data, trend_specs, silent = 1, respo
 
   # Phase 2: Verify attribute creation succeeded
   if (!has_mvgam_variables(data)) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Attribute creation failed during time series validation.",
-      "mvgam time and series attributes are missing from data."
-    ), call. = FALSE)
+      x = "mvgam time and series attributes are missing from data."
+    )), call. = FALSE)
   }
 
   # Phase 3: Context-specific validations (only what's essential)
@@ -1585,31 +1630,33 @@ validate_trend_components <- function(trend_components) {
   # Check for multiple trend types - only one trend type allowed per formula
   if (length(trend_components) > 1) {
     trend_types <- sapply(trend_components, function(x) x$trend_type)
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Multiple trend types detected in single formula.",
-      paste("Found:", paste(trend_types, collapse = ", ")),
-      "Only one trend constructor is allowed per trend_formula.",
-      "Use separate models or combine into a single trend type."
-    ))
+      x = paste("Found:", paste(trend_types, collapse = ", ")),
+      x = "Only one trend constructor is allowed per trend_formula.",
+      i = "Use separate models or combine into a single trend type."
+    )))
   }
 
   # Check for multiple dynamic factor models
   n_lv_models <- sum(sapply(trend_components, function(x) !is.null(x$n_lv) && x$n_lv > 0))
   if (n_lv_models > 1) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Multiple dynamic factor models specified.",
-      "Only one trend component can have {.field n_lv > 0}.",
-      "Consider combining factor structures or removing one factor model."
-    ))
+      x = cli::format_inline(
+        "Only one trend component can have {.field n_lv > 0}."
+      ),
+      i = "Consider combining factor structures or removing one factor model."
+    )))
   }
 
   # Check for conflicting correlation structures
   cor_settings <- sapply(trend_components, function(x) x$cor %||% FALSE)
   if (any(cor_settings) && !all(cor_settings)) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Mixed correlation settings detected.",
-      "Some trend components have correlation enabled while others don't."
-    ))
+      x = "Some trend components have correlation enabled while others don't."
+    )))
   }
 
   invisible(NULL)
@@ -1888,7 +1935,9 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
     missing_fields <- setdiff(required_fields, names(dimensions))
     if (length(missing_fields) > 0) {
       stop(insight::format_error(
-        "Dimensions list missing required fields: {paste(missing_fields, collapse = ', ')}"
+        cli::format_inline(
+          "Dimensions list missing required fields: {paste(missing_fields, collapse = ', ')}"
+        )
       ), call. = FALSE)
     }
   }
@@ -1908,10 +1957,12 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
 
   # Handle edge case where all observations are missing
   if (length(non_missing_idx) == 0) {
-    stop(insight::format_error(
-      "All observations are missing for response variable {.field {response_var}}.",
-      "Cannot create observation mappings without any valid data."
-    ), call. = FALSE)
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "All observations are missing for response variable {.field {response_var}}."
+      ),
+      x = "Cannot create observation mappings without any valid data."
+    )), call. = FALSE)
   }
 
   # Extract time and series indices for non-missing observations
@@ -1950,32 +2001,40 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
 
   # Validate the mappings
   if (any(is.na(obs_trend_time))) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Failed to map some observations to time indices.",
-      "This indicates a data structure problem."
-    ), call. = FALSE)
+      x = "This indicates a data structure problem."
+    )), call. = FALSE)
   }
 
   if (any(is.na(obs_trend_series))) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Failed to map some observations to series indices.",
-      "This indicates a data structure problem."
-    ), call. = FALSE)
+      x = "This indicates a data structure problem."
+    )), call. = FALSE)
   }
 
   # Validate bounds
   if (any(obs_trend_time < 1 | obs_trend_time > dimensions$n_time)) {
-    stop(insight::format_error(
-      "Time indices out of bounds: must be in [1, {dimensions$n_time}].",
-      "Found indices: [{min(obs_trend_time)}, {max(obs_trend_time)}]"
-    ), call. = FALSE)
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Time indices out of bounds: must be in [1, {dimensions$n_time}]."
+      ),
+      x = cli::format_inline(
+        "Found indices: [{min(obs_trend_time)}, {max(obs_trend_time)}]"
+      )
+    )), call. = FALSE)
   }
 
   if (any(obs_trend_series < 1 | obs_trend_series > dimensions$n_series)) {
-    stop(insight::format_error(
-      "Series indices out of bounds: must be in [1, {dimensions$n_series}].",
-      "Found indices: [{min(obs_trend_series)}, {max(obs_trend_series)}]"
-    ), call. = FALSE)
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Series indices out of bounds: must be in [1, {dimensions$n_series}]."
+      ),
+      x = cli::format_inline(
+        "Found indices: [{min(obs_trend_series)}, {max(obs_trend_series)}]"
+      )
+    )), call. = FALSE)
   }
 
   return(list(
@@ -2001,7 +2060,9 @@ validate_mvgam_trend <- function(trend_obj) {
   missing_fields <- setdiff(required_fields, names(trend_obj))
   if (length(missing_fields) > 0) {
     stop(insight::format_error(
-      "Missing required fields in mvgam_trend object: {.field {missing_fields}}"
+      cli::format_inline(
+        "Missing required fields in mvgam_trend object: {.field {missing_fields}}"
+      )
     ), call. = FALSE)
   }
 
@@ -2136,11 +2197,13 @@ validate_factor_levels <- function(data, var_name, data_name = "data", auto_drop
     } else {
       # Warn about unused levels
       rlang::warn(
-        message = insight::format_warning(
-          "Factor variable '{var_name}' in {data_name} has unused levels: {paste(unused_levels, collapse = ', ')}.",
-          "Consider using droplevels() to remove unused factor levels.",
-          "This may cause indexing issues in Stan model compilation."
-        ),
+        message = insight::format_warning(c(
+          cli::format_inline(
+            "Factor variable {.field {var_name}} in {data_name} has unused levels: {paste(unused_levels, collapse = ', ')}."
+          ),
+          i = "Consider using droplevels() to remove unused factor levels.",
+          x = "This may cause indexing issues in Stan model compilation."
+        )),
         .frequency = "once"
       )
     }
@@ -2249,11 +2312,13 @@ validate_prediction_factor_levels <- function(data, metadata) {
       if (!is.null(newdata_levels)) {
         invalid <- setdiff(newdata_levels, metadata$levels$series)
         if (length(invalid) > 0) {
-          stop(insight::format_error(
-            "Series levels in newdata not found in training data: ",
-            "{.val {invalid}}.",
-            "Training data has levels: {.val {metadata$levels$series}}."
-          ), call. = FALSE)
+          stop(insight::format_error(c(
+            "Series levels in newdata not found in training data.",
+            x = cli::format_inline("Invalid: {.val {invalid}}."),
+            i = cli::format_inline(
+              "Training data has levels: {.val {metadata$levels$series}}."
+            )
+          )), call. = FALSE)
         }
       }
     }
@@ -2267,11 +2332,15 @@ validate_prediction_factor_levels <- function(data, metadata) {
       if (!is.null(newdata_levels)) {
         invalid <- setdiff(newdata_levels, metadata$levels$gr)
         if (length(invalid) > 0) {
-          stop(insight::format_error(
-            "Grouping variable {.field {gr_var}} has levels not in ",
-            "training data: {.val {invalid}}.",
-            "Training data has levels: {.val {metadata$levels$gr}}."
-          ), call. = FALSE)
+          stop(insight::format_error(c(
+            cli::format_inline(
+              "Grouping variable {.field {gr_var}} has levels not in training data."
+            ),
+            x = cli::format_inline("Invalid: {.val {invalid}}."),
+            i = cli::format_inline(
+              "Training data has levels: {.val {metadata$levels$gr}}."
+            )
+          )), call. = FALSE)
         }
       }
     }
@@ -2285,11 +2354,15 @@ validate_prediction_factor_levels <- function(data, metadata) {
       if (!is.null(newdata_levels)) {
         invalid <- setdiff(newdata_levels, metadata$levels$subgr)
         if (length(invalid) > 0) {
-          stop(insight::format_error(
-            "Sub-grouping variable {.field {subgr_var}} has levels ",
-            "not in training data: {.val {invalid}}.",
-            "Training data has levels: {.val {metadata$levels$subgr}}."
-          ), call. = FALSE)
+          stop(insight::format_error(c(
+            cli::format_inline(
+              "Sub-grouping variable {.field {subgr_var}} has levels not in training data."
+            ),
+            x = cli::format_inline("Invalid: {.val {invalid}}."),
+            i = cli::format_inline(
+              "Training data has levels: {.val {metadata$levels$subgr}}."
+            )
+          )), call. = FALSE)
         }
       }
     }
@@ -2326,10 +2399,12 @@ validate_stan_code_structure <- function(stan_code) {
   }
 
   if (length(missing_blocks) > 0) {
-    stop(insight::format_error(
-      "Missing required Stan block{?s}: {.field {missing_blocks}}",
-      "Stan models must contain data, parameters, and model blocks."
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Missing required Stan block{?s}: {.field {missing_blocks}}"
+      ),
+      i = "Stan models must contain data, parameters, and model blocks."
+    )))
   }
 
   invisible(TRUE)
@@ -2438,19 +2513,21 @@ validate_stan_code <- function(stan_code, backend = "rstan", silent = TRUE, ...)
 
   # Handle empty string case - always error for empty code
   if (nchar(stan_code) == 0) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Empty Stan code provided.",
-      "Stan code must contain at least one character."
-    ))
+      i = "Stan code must contain at least one character."
+    )))
   }
 
   # Primary validation using rstan::stanc() (most comprehensive and up-to-date)
   if (backend == "rstan") {
     if (!requireNamespace("rstan", quietly = TRUE)) {
-      stop(insight::format_error(
-        "Package {.pkg rstan} is required for Stan code validation.",
-        "Install rstan or use cmdstanr backend."
-      ))
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "Package {.pkg rstan} is required for Stan code validation."
+        ),
+        i = "Install rstan or use cmdstanr backend."
+      )))
     }
 
     # rstan::stanc() doesn't accept silent parameter, so filter it out
@@ -2479,10 +2556,12 @@ parse_model_cmdstanr <- function(model, silent = 1, ...) {
 
   # Check if cmdstanr is available
   if (!requireNamespace("cmdstanr", quietly = TRUE)) {
-    stop(insight::format_error(
-      "Package {.pkg cmdstanr} is required for Stan code validation.",
-      "Install cmdstanr or use rstan backend."
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Package {.pkg cmdstanr} is required for Stan code validation."
+      ),
+      i = "Install cmdstanr or use rstan backend."
+    )))
   }
 
   # Write Stan model to temporary file - let errors bubble up
@@ -2497,11 +2576,13 @@ parse_model_cmdstanr <- function(model, silent = 1, ...) {
   )
 
   if (inherits(out, "try-error")) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Stan code validation failed with cmdstanr backend.",
-      "Check Stan syntax and model structure.",
-      "Error details: {attr(out, 'condition')$message}"
-    ))
+      x = "Check Stan syntax and model structure.",
+      i = cli::format_inline(
+        "Error details: {attr(out, 'condition')$message}"
+      )
+    )))
   }
 
   # Check syntax and return code - let errors bubble up
@@ -2546,7 +2627,9 @@ validate_series_time = function(
   # Common validation: time variable must exist
   if (!time_var %in% colnames(data)) {
     stop(insight::format_error(
-      "{.field {name}} does not contain a '{time_var}' variable."
+      cli::format_inline(
+        "{.field {name}} does not contain a {.val {time_var}} variable."
+      )
     ), call. = FALSE)
   }
 
@@ -2590,10 +2673,12 @@ validate_multivariate_series_time <- function(data, name, time_var, check_times)
     expected_times <- seq.int(from = min_time, to = max_time)
 
     if (!identical(as.numeric(unique_times_in_data), as.numeric(expected_times))) {
-      stop(insight::format_error(
-        "Time series in {.field {name}} is missing observations for one or more timepoints.",
-        "Multivariate models require complete time sampling for all responses."
-      ), call. = FALSE)
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "Time series in {.field {name}} is missing observations for one or more timepoints."
+        ),
+        i = "Multivariate models require complete time sampling for all responses."
+      )), call. = FALSE)
     }
   }
 
@@ -2621,15 +2706,19 @@ validate_univariate_series_time <- function(data, name, time_var, series_var, ch
   # Check that series variable exists and is a factor
   if (!series_var %in% colnames(data)) {
     stop(insight::format_error(
-      "{.field {name}} does not contain a '{series_var}' variable."
+      cli::format_inline(
+        "{.field {name}} does not contain a {.val {series_var}} variable."
+      )
     ), call. = FALSE)
   }
 
   if (!is.factor(data[[series_var]])) {
-    stop(insight::format_error(
-      "Variable {.field {series_var}} must be a factor.",
-      "Convert to factor using: data${series_var} <- factor(data${series_var})"
-    ), call. = FALSE)
+    stop(insight::format_error(c(
+      cli::format_inline("Variable {.field {series_var}} must be a factor."),
+      i = cli::format_inline(
+        "Convert to factor using: data${series_var} <- factor(data${series_var})"
+      )
+    )), call. = FALSE)
   }
 
   # Check for unused factor levels in series variable
@@ -2638,10 +2727,14 @@ validate_univariate_series_time <- function(data, name, time_var, series_var, ch
   # Series factor must have all unique levels present if this is a forecast check
   if (check_levels) {
     if (!all(levels(data[[series_var]]) %in% unique(data[[series_var]]))) {
-      stop(insight::format_error(
-        "Mismatch between factor levels of {.field {series_var}} and unique values.",
-        "Use setdiff(levels(data${series_var}), unique(data${series_var})) for guidance."
-      ), call. = FALSE)
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "Mismatch between factor levels of {.field {series_var}} and unique values."
+        ),
+        i = cli::format_inline(
+          "Use setdiff(levels(data${series_var}), unique(data${series_var})) for guidance."
+        )
+      )), call. = FALSE)
     }
   }
 
@@ -2670,7 +2763,9 @@ validate_univariate_series_time <- function(data, name, time_var, series_var, ch
 
     if (any(checked_times$all_there == FALSE)) {
       stop(insight::format_error(
-        "One or more series in {.field {name}} is missing observations for one or more timepoints."
+        cli::format_inline(
+          "One or more series in {.field {name}} is missing observations for one or more timepoints."
+        )
       ), call. = FALSE)
     }
   }
@@ -2716,17 +2811,25 @@ validate_grouping_structure = function(data, trend_model, name = 'data') {
   if (!is.null(gr_var)) {
     # Check gr variable exists and is factor
     if (!gr_var %in% names(data)) {
-      stop(insight::format_error(
-        "{name} does not contain grouping variable '{gr_var}'.",
-        "The grouping variable '{gr_var}' was specified in the trend constructor but is missing from the data."
-      ), call. = FALSE)
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "{name} does not contain grouping variable {.val {gr_var}}."
+        ),
+        x = cli::format_inline(
+          "The grouping variable {.val {gr_var}} was specified in the trend constructor but is missing from the data."
+        )
+      )), call. = FALSE)
     }
 
     if (!is.factor(data[[gr_var]])) {
-      stop(insight::format_error(
-        "Grouping variable '{gr_var}' must be a factor.",
-        "Convert to factor using: data${gr_var} <- factor(data${gr_var})"
-      ), call. = FALSE)
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "Grouping variable {.val {gr_var}} must be a factor."
+        ),
+        i = cli::format_inline(
+          "Convert to factor using: data${gr_var} <- factor(data${gr_var})"
+        )
+      )), call. = FALSE)
     }
 
     # Check for unused factor levels in gr variable
@@ -2736,17 +2839,25 @@ validate_grouping_structure = function(data, trend_model, name = 'data') {
   if (!is.null(subgr_var)) {
     # Check subgr variable exists and is factor
     if (!subgr_var %in% names(data)) {
-      stop(insight::format_error(
-        "{name} does not contain subgrouping variable '{subgr_var}'.",
-        "The subgrouping variable '{subgr_var}' was specified in the trend constructor but is missing from the data."
-      ), call. = FALSE)
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "{name} does not contain subgrouping variable {.val {subgr_var}}."
+        ),
+        x = cli::format_inline(
+          "The subgrouping variable {.val {subgr_var}} was specified in the trend constructor but is missing from the data."
+        )
+      )), call. = FALSE)
     }
 
     if (!is.factor(data[[subgr_var]])) {
-      stop(insight::format_error(
-        "Subgrouping variable '{subgr_var}' must be a factor.",
-        "Convert to factor using: data${subgr_var} <- factor(data${subgr_var})"
-      ), call. = FALSE)
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "Subgrouping variable {.val {subgr_var}} must be a factor."
+        ),
+        i = cli::format_inline(
+          "Convert to factor using: data${subgr_var} <- factor(data${subgr_var})"
+        )
+      )), call. = FALSE)
     }
 
     # Check for unused factor levels in subgr variable
@@ -2792,10 +2903,12 @@ validate_and_process_trend_parameters <- function(trend_spec, data) {
   if (!is.null(trend_spec$dimensions)) {
     # Dimensions already extracted, validate consistency with parameters
     if (!is.null(trend_spec$n_lv) && trend_spec$n_lv >= trend_spec$dimensions$n_series) {
-      stop(insight::format_error(
-        "Factor model requires {.field n_lv < n_series}.",
-        "You specified {.field n_lv = {trend_spec$n_lv}} with {trend_spec$dimensions$n_series} series."
-      ))
+      stop(insight::format_error(c(
+        cli::format_inline("Factor model requires {.field n_lv < n_series}."),
+        x = cli::format_inline(
+          "You specified {.field n_lv = {trend_spec$n_lv}} with {trend_spec$dimensions$n_series} series."
+        )
+      )))
     }
   }
 
@@ -2827,10 +2940,12 @@ process_lag_parameters <- function(p, trend_type) {
 
   # Additional validation for edge cases
   if (any(p <= 0) || any(!is.finite(p))) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Lag parameters must be positive integers.",
-      "You specified {.field p = {paste(p, collapse = ', ')}} for {.field {trend_type}} model."
-    ))
+      x = cli::format_inline(
+        "You specified {.field p = {paste(p, collapse = ', ')}} for {.field {trend_type}} model."
+      )
+    )))
   }
 
   # Sort and remove duplicates for consistent processing
@@ -2867,18 +2982,20 @@ process_capacity_parameter <- function(cap, data) {
   if (is.numeric(cap)) {
     checkmate::assert_number(cap, lower = 0, finite = TRUE)
     if (cap <= 0) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "Capacity must be a positive finite number.",
-        "You specified {.field cap = {cap}}."
-      ))
+        x = cli::format_inline("You specified {.field cap = {cap}}.")
+      )))
     }
     return(cap)
   }
 
-  stop(insight::format_error(
+  stop(insight::format_error(c(
     "Capacity parameter must be either a positive number or a column name.",
-    "You specified {.field cap = {cap}} of type {.field {class(cap)}}."
-  ))
+    x = cli::format_inline(
+      "You specified {.field cap = {cap}} of type {.field {class(cap)}}."
+    )
+  )))
 }
 
 #' Validate Factor + Hierarchical Restriction
@@ -2906,10 +3023,14 @@ validate_no_factor_hierarchical <- function(trend_specs, n_series, trend_name) {
 
   # Factor models are incompatible with hierarchical grouping
   if (use_grouping && is_factor_model) {
-    stop(insight::format_error(
-      glue::glue("Hierarchical {trend_name} models cannot use factor models"),
-      "Use {.field n_lv = n_series} or remove {.field gr}/{.field subgr} parameters"
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Hierarchical {trend_name} models cannot use factor models."
+      ),
+      i = cli::format_inline(
+        "Use {.field n_lv = n_series} or remove {.field gr}/{.field subgr} parameters."
+      )
+    )))
   }
 
   return(invisible(TRUE))
@@ -2971,10 +3092,10 @@ remove_trend_expressions <- function(expr, trend_patterns, depth = 0) {
 
   # Recursion depth protection
   if (depth > 50) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Formula nesting too deep (>50 levels).",
-      "Simplify the trend formula structure."
-    ))
+      i = "Simplify the trend formula structure."
+    )))
   }
 
   # Handle minus operations first to check for unary case
@@ -2996,10 +3117,10 @@ remove_trend_expressions <- function(expr, trend_patterns, depth = 0) {
     
     # Validate binary operation structure
     if (length(args) != 2) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         paste0("Invalid ", op, " operation in formula."),
-        "Expected binary operation with two arguments."
-      ))
+        x = "Expected binary operation with two arguments."
+      )))
     }
     
     # Process both operands recursively
@@ -3122,11 +3243,13 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
 
     # Check if observations can be evenly divided across responses
     if (n_obs %% length(response_vars) != 0) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "Cannot create series from multivariate structure.",
-        "Data has {n_obs} observations but {length(response_vars)} responses.",
-        "Expected equal observations per response for series creation."
-      ), call. = FALSE)
+        x = cli::format_inline(
+          "Data has {n_obs} observations but {length(response_vars)} responses."
+        ),
+        i = "Expected equal observations per response for series creation."
+      )), call. = FALSE)
     }
 
     n_obs_per_response <- n_obs / length(response_vars)
@@ -3219,10 +3342,12 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
       series_values <- result$series_values
       series_source <- result$series_source
     } else {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "No series variable found in data.",
-        "Either provide {.field {series_var}} column, hierarchical grouping variables (gr and subgr), or specify response_vars for multivariate series creation."
-      ), call. = FALSE)
+        i = cli::format_inline(
+          "Either provide {.field {series_var}} column, hierarchical grouping variables (gr and subgr), or specify response_vars for multivariate series creation."
+        )
+      )), call. = FALSE)
     }
   }
 
@@ -3246,10 +3371,10 @@ get_time_for_grouping <- function(data) {
 
   time_values <- attr(data, "mvgam_time")
   if (is.null(time_values)) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "No time variable attribute found.",
-      "Call ensure_mvgam_variables() first to create time attributes."
-    ), call. = FALSE)
+      i = "Call ensure_mvgam_variables() first to create time attributes."
+    )), call. = FALSE)
   }
 
   return(time_values)
@@ -3267,10 +3392,10 @@ get_series_for_grouping <- function(data) {
 
   series_values <- attr(data, "mvgam_series")
   if (is.null(series_values)) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "No series variable attribute found.",
-      "Call ensure_mvgam_variables() first to create series attributes."
-    ), call. = FALSE)
+      i = "Call ensure_mvgam_variables() first to create series attributes."
+    )), call. = FALSE)
   }
 
   return(series_values)
@@ -3333,20 +3458,24 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   checkmate::assert_list(mv_spec)
   required_fields <- c("base_formula", "trend_specs", "has_trends")
   if (!all(required_fields %in% names(mv_spec))) {
-    stop(insight::format_error(
-      "Invalid {.field mv_spec} structure.",
-      "Must contain {.field base_formula}, {.field trend_specs}, and {.field has_trends} fields."
-    ), call. = FALSE)
+    stop(insight::format_error(c(
+      cli::format_inline("Invalid {.field mv_spec} structure."),
+      i = cli::format_inline(
+        "Must contain {.field base_formula}, {.field trend_specs}, and {.field has_trends} fields."
+      )
+    )), call. = FALSE)
   }
   checkmate::assert_character(response_vars, min.len = 1, null.ok = TRUE)
   checkmate::assert_string(time_var)
   checkmate::assert_string(series_var)
 
   if (!mv_spec$has_trends) {
-    stop(insight::format_error(
-      "Cannot process trend components when {.field mv_spec$has_trends} is FALSE.",
-      "This function should only be called for models with trend specifications."
-    ), call. = FALSE)
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Cannot process trend components when {.field mv_spec$has_trends} is FALSE."
+      ),
+      i = "This function should only be called for models with trend specifications."
+    )), call. = FALSE)
   }
 
   # Create attributes early to fix root cause
@@ -3479,10 +3608,12 @@ extract_and_validate_trend_components <- function(data, mv_spec,
     )
 
     if (!is.list(result) || !all(c("trend_data", "metadata") %in% names(result))) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "Invalid result from trend data extraction.",
-        "Expected list with {.field trend_data} and {.field metadata} fields."
-      ), call. = FALSE)
+        i = cli::format_inline(
+          "Expected list with {.field trend_data} and {.field metadata} fields."
+        )
+      )), call. = FALSE)
     }
 
     trend_data <- result$trend_data
@@ -3499,10 +3630,12 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   )
 
   if (is.null(validation_result) || is.null(validation_result$dimensions)) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Validation returned invalid results.",
-      "Expected {.field validation_result} with {.field dimensions} field."
-    ), call. = FALSE)
+      i = cli::format_inline(
+        "Expected {.field validation_result} with {.field dimensions} field."
+      )
+    )), call. = FALSE)
   }
 
   # Inject dimensions into mv_spec
@@ -3544,11 +3677,13 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
 
     # Get stored metadata from fitted object
     if (is.null(mvgam_object$trend_metadata)) {
-      stop(insight::format_error(
-        "No trend metadata found in fitted {.cls mvgam} object.",
-        "This model may have been fitted without trend components.",
-        "Or it was fitted with an older version that didn't store metadata."
-      ), call. = FALSE)
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "No trend metadata found in fitted {.cls mvgam} object."
+        ),
+        x = "This model may have been fitted without trend components.",
+        x = "Or it was fitted with an older version that didn't store metadata."
+      )), call. = FALSE)
     }
 
     metadata <- mvgam_object$trend_metadata
@@ -3567,12 +3702,16 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
     missing_vars <- setdiff(required_vars, names(newdata))
 
     if (length(missing_vars) > 0) {
-      stop(insight::format_error(
-        "Missing required variables in {.arg newdata}.",
-        "Required variables: {.field {required_vars}}",
-        "Missing: {.field {missing_vars}}",
-        "Ensure newdata contains all variables used during model fitting."
-      ), call. = FALSE)
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "Missing required variables in {.arg newdata}."
+        ),
+        x = cli::format_inline(
+          "Required variables: {.field {required_vars}}"
+        ),
+        x = cli::format_inline("Missing: {.field {missing_vars}}"),
+        i = "Ensure newdata contains all variables used during model fitting."
+      )), call. = FALSE)
     }
 
     # Get grouping variables from metadata
@@ -3598,11 +3737,11 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
 
     # Use precomputed dimensions - no fallback in ultra-DRY architecture
     if (is.null(.precomputed_dimensions)) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "Missing precomputed dimensions in ultra-DRY architecture.",
-        "This function should only be called with precomputed dimensions.",
-        "Check that extract_and_validate_trend_components() is passing dimensions correctly."
-      ), call. = FALSE)
+        x = "This function should only be called with precomputed dimensions.",
+        i = "Check that extract_and_validate_trend_components() is passing dimensions correctly."
+      )), call. = FALSE)
     }
 
     # Extract everything from precomputed dimensions - skip parse_trend_formula entirely
@@ -3630,16 +3769,15 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
     if (!is.null(response_vars) && length(trend_variables) > 0) {
       offending_vars <- intersect(trend_variables, response_vars)
       if (length(offending_vars) > 0) {
-        stop(insight::format_error(
-          c(
-            "Response variables cannot be used as trend predictors:",
-            "x" = paste("Offending variables: {.field",
-                       paste(offending_vars, collapse = "}, {.field"), "}"),
-            "i" = "Trend models require exogenous covariates only.",
-            "i" = "Consider using these variables in the observation formula instead.",
-            ">" = "See ?mvgam_formulas for guidance on proper covariate specification."
-          )
-        ), call. = FALSE)
+        stop(insight::format_error(c(
+          "Response variables cannot be used as trend predictors:",
+          x = cli::format_inline(
+            "Offending variables: {.field {offending_vars}}"
+          ),
+          i = "Trend models require exogenous covariates only.",
+          i = "Consider using these variables in the observation formula instead.",
+          i = "See ?mvgam_formulas for guidance on proper covariate specification."
+        )), call. = FALSE)
       }
     }
 
@@ -3698,16 +3836,11 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
         # Validate trend variables exist (grouping vars are temporary)
         missing_trend_vars <- setdiff(trend_variables, names(validation_data))
         if (length(missing_trend_vars) > 0) {
-          stop(insight::format_error(
-            c(
-              "Required trend variables not found in data:",
-              "x" = paste("Missing: {.field",
-                         paste(missing_trend_vars, collapse = "}, {.field"),
-                         "}"),
-              "i" = paste("Available:",
-                         paste(names(data), collapse = ", "))
-            )
-          ), call. = FALSE)
+          stop(insight::format_error(c(
+            "Required trend variables not found in data:",
+            x = cli::format_inline("Missing: {.field {missing_trend_vars}}"),
+            i = paste("Available:", paste(names(data), collapse = ", "))
+          )), call. = FALSE)
         }
 
         # A grouping variable is trivially constant within its own
@@ -3736,19 +3869,17 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
         }
 
         if (length(varying_covariates) > 0) {
-          stop(insight::format_error(
-            c(
-              paste0("Trend covariates must be constant within ",
-                    grouping_desc, " groups:"),
-              "x" = paste("Varying covariates: {.field",
-                         paste(varying_covariates, collapse = "}, {.field"),
-                         "}"),
-              "i" = paste0("Each ", grouping_desc,
-                          " combination must have identical covariate values."),
-              "i" = "Consider aggregating data or using observation-level effects instead.",
-              ">" = "See ?mvgam_data_structure for data preparation guidance."
-            )
-          ), call. = FALSE)
+          stop(insight::format_error(c(
+            paste0("Trend covariates must be constant within ",
+                   grouping_desc, " groups:"),
+            x = cli::format_inline(
+              "Varying covariates: {.field {varying_covariates}}"
+            ),
+            i = paste0("Each ", grouping_desc,
+                       " combination must have identical covariate values."),
+            i = "Consider aggregating data or using observation-level effects instead.",
+            i = "See ?mvgam_data_structure for data preparation guidance."
+          )), call. = FALSE)
         }
       }
     }

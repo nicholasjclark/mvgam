@@ -839,10 +839,18 @@ Ensure all prediction functions work correctly with multivariate responses.
 
 Final validation and documentation.
 
-- [ ] **6.1 Create comprehensive integration test file**
-  - Create `tests/testthat/test-predictions-core.R`
-  - Move validation tests from tasks/ to testthat
-  - Cover: all prediction functions, all model types, edge cases
+- [x] **6.1 Create comprehensive integration test file**
+  - **Resolved (superseded).** The original "build a new
+    `tests/testthat/test-predictions-core.R`" task is superseded by the
+    local concordance suite at
+    `tests/local/test-predictions-brms-concordance.R` (17 fixture
+    families, 62 PASS / 0 FAIL, brms-numerical-concordance thresholds)
+    and the integration coverage in
+    `tests/testthat/test-stancode-standata.R`,
+    `tests/testthat/test-sample-innovations.R` and
+    `tests/local/test-models-single.R`. CI runs the testthat/ suite at
+    2683 PASS / 0 FAIL / 1 SKIP; the heavy brms-concordance fits are
+    run manually under `tests/local/` so they don't bloat CI time.
 
 - [x] **6.2 Run full validation suite**
   - **Resolved.** `tasks/validate_extraction_vs_brms.R` (the active
@@ -1041,16 +1049,54 @@ to be solved.
 
 - [ ] **7.9 Bring `insight::format_error()` call sites into c() compliance**
   - Project CLAUDE.md mandates `c(main, x =, i =)` form for multi-line
-    messages, but ~280 of the 304 `stop(insight::format_error(...))`
-    sites in `R/` pass positional string args that concatenate into a
-    single paragraph and lose the `cli` bullet rendering.
+    messages, but multi-arg positional calls concatenate into a single
+    paragraph and lose the `cli` bullet rendering. Same standard
+    applies to `insight::format_warning()`.
   - CLAUDE.md was strengthened in this branch to make the standard
     non-negotiable and to include an anti-pattern example so the
     drift stops accreting.
-  - Bulk refactor: mechanical, large diff. Prioritise files touched
-    by user-facing error paths first (validations.R, mvgam-main.R,
-    prediction modules) and let the rest convert opportunistically
-    when each file is next edited.
+  - **Detector**: `detect_format_error_violations.R` at the project
+    root parses each `R/*.R` via `getParseData(parse(...))` and emits
+    a TSV with `(file, line, fn, n_args, compliant, reason)`.
+    Compliant if (a) `n_args <= 1` or first arg is a `c(...)` call,
+    AND (b) no string element with `{...}` markup is left without a
+    `cli::format_inline(...)` wrapper. The second rule catches
+    single-arg calls whose markup never reached cli. Run:
+    `Rscript detect_format_error_violations.R`.
+  - **Combined refactor pattern**: every site touched in §7.9 also
+    routes its `{...}` markup through `cli::format_inline(...)` (the
+    user expanded the scope so we fix both structure and inline
+    rendering in one pass; `insight::format_error` does not auto-
+    interpolate cli/glue tokens in this version). Bare strings with
+    no `{...}` stay un-wrapped. cli was added to `DESCRIPTION`
+    Imports.
+  - **Current state (run 2026-05-29, after validations.R)**: 229
+    violations across 16 remaining R/ files. Closed and remaining:
+
+    - [x] 7.9.1 `R/validations.R` (was 65, now 0)
+    - [ ] 7.9.2 `R/predictions.R` (44 violations)
+    - [ ] 7.9.3 `R/stan_assembly.R` (34)
+    - [ ] 7.9.4 `R/trend_system.R` (23)
+    - [ ] 7.9.5 `R/posterior_epred.R` (21)
+    - [ ] 7.9.6 `R/mock-stanfit.R` (16)
+    - [ ] 7.9.7 `R/priors.R` (15)
+    - [ ] 7.9.8 `R/brms_integration.R` (14)
+    - [ ] 7.9.9 `R/posterior_predict.R` (12)
+    - [ ] 7.9.10 `R/mvgam_core.R` (10)
+    - [ ] 7.9.11 `R/make_stan.R` (10)
+    - [ ] 7.9.12 `R/backends.R` (9)
+    - [ ] 7.9.13 `R/print.mvgam.R` (6)
+    - [ ] 7.9.14 `R/summary.mvgam.R` (5)
+    - [ ] 7.9.15 `R/glm_analysis.R` (5)
+    - [ ] 7.9.16 `R/posterior_linpred.R` (3)
+    - [ ] 7.9.17 `R/sample_innovations.R` (2)
+  - Per-file workflow: convert arg #1 → unnamed main, arg #2 → `x =`,
+    arg #3 → `i =`, extras → additional `x =`. Conditional bullet
+    construction goes via a local `c()` vector built stepwise. Wrap
+    any string containing `{...}` markup in `cli::format_inline(...)`.
+    Preserve all `{.field ...}` / `{.pkg ...}` cli markup. After each
+    file: detector → 0 for that file; `devtools::test()` clean;
+    code-reviewer agent on the diff; commit.
   - No behaviour change beyond improved error rendering; downstream
     consumers should not be affected.
 

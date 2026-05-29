@@ -22,6 +22,7 @@ Depends:
 Imports:
     methods,
     mgcv (>= 1.8-13),
+    cli (>= 3.6.0),
     insight (>= 0.19.1),
     marginaleffects (>= 0.16.0),
     Rcpp (>= 0.12.0),
