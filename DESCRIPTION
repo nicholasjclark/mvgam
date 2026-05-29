@@ -60,7 +60,7 @@ Suggests:
     lubridate,
     knitr, 
     collapse,
-    rmarkdown, 
+    rmarkdown,
     usethis,
     testthat,
     colorspace,

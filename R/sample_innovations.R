@@ -404,7 +404,16 @@ sample_process_errors <- function(object, ndraws = NULL, newdata = NULL,
   cov_structure <- get_trend_covariance_structure(
     object, ndraws = ndraws, draw_ids = draw_ids
   )
-  sample_innovations(cov_structure, obs_structure)
+  innov <- sample_innovations(cov_structure, obs_structure)
+  # Strip posterior::draws_matrix class so downstream callers (notably
+  # marginaleffects, which type-checks @draws against matrixOrNULL)
+  # see a plain numeric matrix matching brms's posterior_* return.
+  if (!is.null(innov)) {
+    dn <- dim(innov)
+    innov <- as.numeric(innov)
+    dim(innov) <- dn
+  }
+  innov
 }
 
 
