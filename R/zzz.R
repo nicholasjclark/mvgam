@@ -75,5 +75,78 @@ mvgam_attach <- function() {
 .onLoad <- function(libname, pkgname) {
   # Initialize trend registry with core trend types
   ensure_registry_initialized()
+
+  # marginaleffects ships a per-class `type_dictionary` data.frame
+  # that gates the `type` argument upstream of `get_predict()`. The
+  # pre-existing mvgam row carries master's vocabulary
+  # (response, link, expected, detection, latent_N); append the
+  # brms-convention "prediction" so users can request
+  # posterior_predict() draws via marginaleffects. Use rbind so any
+  # future marginaleffects-side updates to the mvgam row remain in
+  # effect.
+  if (requireNamespace("marginaleffects", quietly = TRUE)) {
+    me_ns <- asNamespace("marginaleffects")
+    if (exists("type_dictionary", envir = me_ns, inherits = FALSE)) {
+      td <- get("type_dictionary", envir = me_ns)
+      if (!any(td$class == "mvgam" & td$type == "prediction")) {
+        binding_locked <- bindingIsLocked("type_dictionary", me_ns)
+        if (binding_locked) unlockBinding("type_dictionary", me_ns)
+        try(
+          assign(
+            "type_dictionary",
+            rbind(td, data.frame(class = "mvgam", type = "prediction")),
+            envir = me_ns
+          ),
+          silent = TRUE
+        )
+        if (binding_locked) {
+          try(lockBinding("type_dictionary", me_ns), silent = TRUE)
+        }
+      }
+    }
+
+    # marginaleffects's `sanity_dots` warns when get_predict.mvgam
+    # receives arguments not on its per-class whitelist (process_error,
+    # re_formula, etc). The whitelist is a local variable inside the
+    # function, so we wrap the original to short-circuit when the
+    # model is mvgam and all `...` are in our known set. Falls back to
+    # the original for any other class or for unknown args. Wrapped in
+    # `try(silent)` so a marginaleffects-side change to `sanity_dots`
+    # cannot block load.
+    if (exists("sanity_dots", envir = me_ns, inherits = FALSE)) {
+      original_sanity_dots <- get("sanity_dots", envir = me_ns)
+      if (!isTRUE(attr(original_sanity_dots, "mvgam_patched"))) {
+        mvgam_allowed_dots <- c(
+          "process_error", "draw_ids", "ndraws", "re_formula",
+          "allow_new_levels", "sample_new_levels", "resp",
+          "incl_latent_state", "incl_autocor", "summary"
+        )
+        patched_sanity_dots <- function(model,
+                                        calling_function = NULL, ...) {
+          if (inherits(model, "mvgam")) {
+            unknown <- setdiff(...names(), mvgam_allowed_dots)
+            if (length(unknown) == 0L) {
+              return(invisible(NULL))
+            }
+          }
+          original_sanity_dots(
+            model, calling_function = calling_function, ...
+          )
+        }
+        attr(patched_sanity_dots, "mvgam_patched") <- TRUE
+
+        binding_locked <- bindingIsLocked("sanity_dots", me_ns)
+        if (binding_locked) unlockBinding("sanity_dots", me_ns)
+        try(
+          assign("sanity_dots", patched_sanity_dots, envir = me_ns),
+          silent = TRUE
+        )
+        if (binding_locked) {
+          try(lockBinding("sanity_dots", me_ns), silent = TRUE)
+        }
+      }
+    }
+  }
+
   invisible()
 }

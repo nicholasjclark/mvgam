@@ -17,15 +17,36 @@ NULL
 #' @export
 get_predict.mvgam <- function(model,
                               newdata = insight::get_data(model),
-                              type = "response", ...) {
+                              type = "response",
+                              process_error = FALSE,
+                              ...) {
   checkmate::assert_class(model, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1L)
-  checkmate::assert_choice(type, c("response", "link", "prediction"))
+  checkmate::assert_logical(process_error, len = 1L)
+  # mvgam's predict() type vocabulary (carried over from master):
+  #   link     - linear predictor on the link scale
+  #   expected - E[Y], expectation of the response (epred); no
+  #              observation-process noise
+  #   response - outcome-scale draws WITH observation-process noise
+  #              (posterior_predict). Integer for count families.
+  # `prediction` is accepted as a brms-style alias for `response`.
+  checkmate::assert_choice(
+    type, c("response", "link", "expected", "prediction")
+  )
 
+  # Default process_error = FALSE matches master's predict.mvgam: the
+  # latent trend collapses to its posterior mean for slopes /
+  # comparisons / predictions. Users who want per-draw latent-state
+  # uncertainty can pass `process_error = TRUE` through `predictions()`.
   draws <- switch(type,
-    response   = posterior_epred(model, newdata = newdata, ...),
-    link       = posterior_linpred(model, newdata = newdata, ...),
-    prediction = posterior_predict(model, newdata = newdata, ...)
+    link       = posterior_linpred(model, newdata = newdata,
+                                   process_error = process_error, ...),
+    expected   = posterior_epred(model, newdata = newdata,
+                                  process_error = process_error, ...),
+    response   = posterior_predict(model, newdata = newdata,
+                                    process_error = process_error, ...),
+    prediction = posterior_predict(model, newdata = newdata,
+                                    process_error = process_error, ...)
   )
 
   # Multivariate fits return a per-response list; marginaleffects
@@ -52,7 +73,10 @@ get_predict.mvgam <- function(model,
   # case where get_predict.mvgam is invoked outside that pipeline.
   insight::check_if_installed(
     "data.table",
-    reason = "to build the data.table get_predict() needs to return for `marginaleffects::slopes()` / `comparisons()`."
+    reason = paste0(
+      "to build the data.table get_predict() returns ",
+      "for `marginaleffects::slopes()` / `comparisons()`."
+    )
   )
   if (length(dim(draws)) == 2L) {
     if (nrow(newdata) != ncol(draws)) {
@@ -75,10 +99,16 @@ get_predict.mvgam <- function(model,
 
   if (length(dim(draws)) == 3L) {
     # Ordinal / categorical epred: [ndraws x nobs x ncat]. Collapse to
-    # one row per (obs, category).
+    # one row per (obs, category). Prefer the response factor levels
+    # for category labels (matches `get_group_names.mvgam`), then the
+    # draws array dimnames, then integer indices as a last resort.
     med <- apply(draws, c(2L, 3L), stats::median)
-    cat_names <- dimnames(draws)[[3L]] %||%
-      as.character(seq_len(dim(draws)[3L]))
+    ncat <- dim(draws)[3L]
+    cat_names <- tryCatch(get_group_names(model), error = function(e) NULL)
+    if (is.null(cat_names) || length(cat_names) != ncat ||
+        identical(cat_names, "main_marginaleffect")) {
+      cat_names <- dimnames(draws)[[3L]] %||% as.character(seq_len(ncat))
+    }
     out <- data.table::data.table(
       rowid = rep(rowid, times = length(cat_names)),
       group = rep(cat_names, each = nrow(med)),
@@ -151,6 +181,29 @@ set_coef.mvgam <- function(model, coefs, ...) {
   # attribute on get_predict; coefficient overrides on the fitted
   # object are not load-bearing for the marginaleffects pipeline.
   model
+}
+
+
+# `get_group_names` is the marginaleffects hook that labels the
+# `group` column of the returned data.frame. For non-categorical /
+# non-ordinal models it returns "main_marginaleffect". For ordinal
+# (cumulative / sratio / cratio / acat) models we return the
+# response factor levels so the per-category rows in the 3D ordinal
+# epred carry their actual labels instead of integer indices.
+#' @importFrom marginaleffects get_group_names
+#' @export
+get_group_names.mvgam <- function(model, ...) {
+  fam_name <- model$family$family
+  if (identical(fam_name, "cumulative") || identical(fam_name, "sratio") ||
+      identical(fam_name, "cratio") || identical(fam_name, "acat")) {
+    resp <- model$response_names[1L]
+    y <- model$data[[resp]]
+    if (is.factor(y)) {
+      return(levels(y))
+    }
+    return(as.character(sort(unique(y))))
+  }
+  "main_marginaleffect"
 }
 
 

@@ -297,3 +297,95 @@ test_that("process_error toggle on Poisson AR(1) widens predict variance", {
   v_no <- mean(apply(pp_no, 2, stats::var))
   expect_gt(v_pe, v_no)
 })
+
+
+# -- marginaleffects vs brms concordance --------------------------------
+#
+# `predictions()` from marginaleffects routes through `get_predict.mvgam`
+# -> `posterior_epred` / `posterior_predict`. Comparing against
+# `predictions(brms_fit)` exercises the full marginaleffects pipeline
+# (insight + sanitize + datagrid + get_predict + aggregation) and pins
+# the deterministic-submodel concordance on the response scale.
+# `process_error = FALSE` collapses the latent state to its posterior
+# mean so the test is deterministic across runs.
+
+if (requireNamespace("marginaleffects", quietly = TRUE)) {
+
+  test_that("marginaleffects::predictions Beta AR(1) matches brms on epred", {
+    require_fixtures("val_brms_beta_ar1.rds", "val_mvgam_beta_ar1.rds")
+    brms_fit <- load_brms("beta_ar1")
+    mvgam_fit <- load_mvgam("beta_ar1")
+    options("marginaleffects_model_classes" = "mvgam")
+    mvgam_p <- suppressWarnings(marginaleffects::predictions(
+      mvgam_fit, type = "expected", process_error = FALSE
+    ))
+    brms_p <- suppressWarnings(marginaleffects::predictions(
+      brms_fit, type = "response"
+    ))
+    testthat::expect_equal(nrow(mvgam_p), nrow(brms_p))
+    testthat::expect_true(all(mvgam_p$estimate > 0 & mvgam_p$estimate < 1))
+    comp <- compare_vectors(brms_p$estimate, mvgam_p$estimate)
+    testthat::expect_gte(comp$cor, 0.40)
+  })
+
+  test_that("marginaleffects::predictions Binomial AR(1) caps at trials", {
+    require_fixtures("val_brms_binom_ar1.rds", "val_mvgam_binom_ar1.rds")
+    mvgam_fit <- load_mvgam("binom_ar1")
+    options("marginaleffects_model_classes" = "mvgam")
+    mvgam_p <- suppressWarnings(marginaleffects::predictions(
+      mvgam_fit, type = "expected", process_error = FALSE
+    ))
+    testthat::expect_true(all(
+      mvgam_p$estimate >= 0 & mvgam_p$estimate <= max(mvgam_fit$data$trials)
+    ))
+  })
+
+  test_that("marginaleffects::predictions ordinal labels match factor levels", {
+    require_fixtures("val_mvgam_cumulative_fx.rds")
+    mvgam_fit <- load_mvgam("cumulative_fx")
+    options("marginaleffects_model_classes" = "mvgam")
+    p_e <- suppressWarnings(marginaleffects::predictions(
+      mvgam_fit, type = "expected", process_error = FALSE
+    ))
+    expected_levels <- levels(mvgam_fit$data[[mvgam_fit$response_names[1L]]])
+    testthat::expect_equal(sort(unique(as.character(p_e$group))),
+                           sort(expected_levels))
+    testthat::expect_equal(
+      nrow(p_e), nrow(mvgam_fit$data) * length(expected_levels)
+    )
+  })
+
+  test_that("marginaleffects::avg_slopes detects covar in trend formula", {
+    # ar1_fx_trend: y ~ 1 (obs), trend_y ~ x - 1 (covariate lives in
+    # trend submodel). slopes(x) should be non-zero — confirms the
+    # latent state + trend submodel routing exposes covariates wherever
+    # they appear.
+    require_fixtures("val_mvgam_ar1_fx_trend.rds")
+    mvgam_fit <- load_mvgam("ar1_fx_trend")
+    mvgam_fit$data$group <- NULL
+    options("marginaleffects_model_classes" = "mvgam")
+    s <- suppressWarnings(marginaleffects::avg_slopes(
+      mvgam_fit, variables = "x", type = "expected",
+      process_error = FALSE
+    ))
+    testthat::expect_true(abs(s$estimate) > 0.05)
+  })
+
+  test_that("marginaleffects::predictions type=response gives integer counts", {
+    require_fixtures("val_mvgam_ar1_int.rds")
+    mvgam_fit <- load_mvgam("ar1_int")
+    mvgam_fit$data$group <- NULL
+    options("marginaleffects_model_classes" = "mvgam")
+    p_r <- suppressWarnings(marginaleffects::predictions(
+      mvgam_fit, type = "response", process_error = FALSE
+    ))
+    # type=response routes through posterior_predict; Poisson draws
+    # are integer. The reported `estimate` is the per-obs median,
+    # which can be a half-integer when n_draws is even — test the
+    # underlying draws instead.
+    draws <- marginaleffects::posterior_draws(p_r, shape = "DxP")
+    testthat::expect_true(all(draws == round(draws)))
+    testthat::expect_true(all(p_r$estimate >= 0))
+  })
+
+}

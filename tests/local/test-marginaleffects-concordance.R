@@ -95,8 +95,10 @@ test_that("get_predict.mvgam: link type matches posterior_linpred", {
 test_that("get_predict.mvgam: 3D ordinal epred flattens to tall frame", {
   require_fixtures("val_mvgam_cumulative_fx.rds")
   mv <- load_mvgam("cumulative_fx")
-  out <- get_predict(mv, newdata = mv$data, type = "response")
-  # nobs * ncat rows
+  # type = "expected" routes through posterior_epred, which returns
+  # [ndraws x nobs x ncat] for ordinal families. The 3D branch in
+  # get_predict.mvgam flattens this to one row per (obs, category).
+  out <- get_predict(mv, newdata = mv$data, type = "expected")
   testthat::expect_equal(nrow(out), nrow(mv$data) * length(unique(out$group)))
   testthat::expect_true(length(unique(out$group)) > 1L)
 })
@@ -175,5 +177,111 @@ test_that("get_predict rejects an invalid type", {
   mv <- load_mvgam("beta_ar1")
   testthat::expect_error(
     get_predict(mv, newdata = mv$data, type = "bogus")
+  )
+})
+
+
+# -- type vocabulary & process_error toggle ----------------------------
+
+test_that("type='expected' matches median(posterior_epred) exactly", {
+  require_fixtures("val_mvgam_beta_ar1.rds")
+  mv <- load_mvgam("beta_ar1")
+  p <- suppressWarnings(predictions(mv, type = "expected", process_error = FALSE))
+  ep <- posterior_epred(mv, newdata = mv$data, process_error = FALSE)
+  manual <- unname(apply(ep, 2L, stats::median))
+  testthat::expect_equal(unname(p$estimate), manual, tolerance = 1e-10)
+})
+
+test_that("type='response' on Poisson returns non-negative count samples", {
+  require_fixtures("val_mvgam_ar1_int.rds")
+  mv <- load_mvgam("ar1_int")
+  mv$data$group <- NULL
+  p <- suppressWarnings(predictions(mv, type = "response", process_error = FALSE))
+  # posterior_predict draws are integer; the per-obs MEDIAN of an
+  # even number of draws can fall on a half-integer (e.g. 7.5), so
+  # test the underlying draws rather than the reported point estimate.
+  # marginaleffects strips the `posterior_draws` attribute from the
+  # data.frame and stores it on an internal slot — use
+  # marginaleffects::posterior_draws() to retrieve it.
+  draws <- marginaleffects::posterior_draws(p, shape = "DxP")
+  testthat::expect_true(all(draws == round(draws)))
+  testthat::expect_true(all(p$estimate >= 0))
+})
+
+test_that("type='link' returns unbounded linpred-scale draws", {
+  require_fixtures("val_mvgam_beta_ar1.rds")
+  mv <- load_mvgam("beta_ar1")
+  p_link <- suppressWarnings(predictions(mv, type = "link", process_error = FALSE))
+  p_resp <- suppressWarnings(predictions(mv, type = "expected", process_error = FALSE))
+  testthat::expect_true(any(p_link$estimate < 0))
+  testthat::expect_equal(plogis(p_link$estimate), p_resp$estimate,
+                         tolerance = 1e-6)
+})
+
+test_that("process_error TRUE vs FALSE produces a measurable shift", {
+  require_fixtures("val_mvgam_beta_ar1.rds")
+  mv <- load_mvgam("beta_ar1")
+  set.seed(1)
+  p_F <- suppressWarnings(predictions(mv, type = "expected", process_error = FALSE))
+  set.seed(1)
+  p_T <- suppressWarnings(predictions(mv, type = "expected", process_error = TRUE))
+  testthat::expect_gt(max(abs(p_F$estimate - p_T$estimate)), 1e-6)
+})
+
+
+# -- get_group_names for ordinal ---------------------------------------
+
+test_that("get_group_names.mvgam returns factor levels for ordinal", {
+  require_fixtures("val_mvgam_cumulative_fx.rds")
+  mv <- load_mvgam("cumulative_fx")
+  expected <- levels(mv$data[[mv$response_names[1L]]])
+  testthat::expect_equal(get_group_names(mv), expected)
+})
+
+test_that("get_group_names.mvgam returns default for non-ordinal", {
+  require_fixtures("val_mvgam_beta_ar1.rds")
+  mv <- load_mvgam("beta_ar1")
+  testthat::expect_equal(get_group_names(mv), "main_marginaleffect")
+})
+
+
+# -- Edge: unseen times silently fall back to per-series marginal mean -
+
+test_that("predictions at unseen times use marginal mean (no error)", {
+  require_fixtures("val_mvgam_ar1_int.rds")
+  mv <- load_mvgam("ar1_int")
+  mv$data$group <- NULL
+  fit_max_time <- max(mv$data$time)
+  nd_oos <- data.frame(
+    time = (fit_max_time + 1L):(fit_max_time + 3L),
+    series = mv$data$series[1L],
+    y = NA_integer_
+  )
+  # The primitive emits an info on first call; tests/local always
+  # passes through, so just verify it returns finite values.
+  ep <- posterior_epred(mv, newdata = nd_oos, process_error = FALSE)
+  testthat::expect_equal(ncol(ep), 3L)
+  testthat::expect_true(all(is.finite(ep)))
+})
+
+
+# -- Binomial trials propagate through datagrid -----------------------
+
+test_that("binomial trials carry through datagrid + predictions", {
+  require_fixtures("val_mvgam_binom_ar1.rds")
+  mv <- load_mvgam("binom_ar1")
+  grid <- datagrid(x = 0, trials = c(10, 50, 100), model = mv)
+  testthat::expect_true("trials" %in% names(grid))
+  p <- suppressWarnings(predictions(mv, newdata = grid, type = "expected",
+                                     process_error = FALSE))
+  # epred for binomial = p * trials. At fixed x, estimates should
+  # be approximately proportional to trials.
+  testthat::expect_lt(
+    abs(p$estimate[2L] / p$estimate[1L] - 5),
+    0.05
+  )
+  testthat::expect_lt(
+    abs(p$estimate[3L] / p$estimate[1L] - 10),
+    0.05
   )
 })

@@ -329,24 +329,25 @@ prepare_predictions.mock_stanfit <- function(object,
     resp_vars <- as.character(brmsfit$formula$formula[[2]])
   }
 
-  # Add dummy values for any missing response variables
-  # Use family-appropriate values based on bounds (never used in computation)
+  # Add dummy values for missing OR NA response entries. Missing
+  # column: brms's data_response requires the response to evaluate
+  # the formula. NA cells: brms rejects them with an unhelpful
+  # "missing value where TRUE/FALSE needed" before reaching the
+  # linpred machinery. Dummy values are never read by the
+  # linpred / epred / predict paths — they exist only to satisfy
+  # brms's standata validation.
   for (rv in resp_vars) {
+    family_obj <- if (brms::is.mvbrmsformula(brmsfit$formula)) {
+      brmsfit$family[[rv]]
+    } else {
+      brmsfit$family
+    }
+    dummy_value <- get_safe_dummy_value(family_obj)
     if (!rv %in% names(newdata_with_resp)) {
-      # Get family for this response
-      if (brms::is.mvbrmsformula(brmsfit$formula)) {
-        family_obj <- brmsfit$family[[rv]]
-      } else {
-        family_obj <- brmsfit$family
-      }
-
-      # Generate safe dummy based on family type and bounds
-      dummy_value <- get_safe_dummy_value(family_obj)
-
-      newdata_with_resp[[rv]] <- rep(
-        dummy_value,
-        nrow(newdata_with_resp)
-      )
+      newdata_with_resp[[rv]] <- rep(dummy_value, nrow(newdata_with_resp))
+    } else if (anyNA(newdata_with_resp[[rv]])) {
+      na_idx <- is.na(newdata_with_resp[[rv]])
+      newdata_with_resp[[rv]][na_idx] <- dummy_value
     }
   }
 

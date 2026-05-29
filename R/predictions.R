@@ -2240,38 +2240,62 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws) {
   t_idx <- match(obs_struct$time, fit_unique_times)
   s_idx <- obs_struct$series_int
 
-  if (any(is.na(t_idx))) {
-    bad <- unique(obs_struct$time[is.na(t_idx)])
-    stop(insight::format_error(c(
-      "Cannot retrieve latent trend state for unseen time points.",
-      x = cli::format_inline(
-        "newdata contains times {.val {bad}} that were not in the fit."
-      ),
-      i = "Latent-state extrapolation is not yet implemented; predict at observed time points or marginalise over time."
-    )))
-  }
   if (any(s_idx < 1L | s_idx > N_series_trend)) {
     stop(insight::format_error(
       "newdata contains series indices outside the fitted model's range."
     ))
   }
 
+  # Unseen times: fall back to the per-series marginal posterior mean
+  # of the latent state (averaged across the training time grid). The
+  # prediction primitives are not a forecaster — `forecast()` will
+  # extrapolate properly once the C++ extrapolator lands. Treating
+  # unseen times as marginalized matches the user expectation that
+  # marginaleffects evaluates at covariate combinations without
+  # forecasting structural time indices.
+  has_unseen <- any(is.na(t_idx))
+  if (has_unseen && !identical(Sys.getenv("TESTTHAT"), "true")) {
+    rlang::inform(
+      paste0(
+        "Some newdata times are outside the fitted range; using the ",
+        "per-series posterior mean of the latent trend for those rows."
+      ),
+      .frequency = "once",
+      .frequency_id = "mvgam_oos_trend_marginal"
+    )
+  }
+
+  series_marginal <- if (has_unseen) {
+    out <- matrix(NA_real_, nrow = nrow(full_draws), ncol = N_series_trend)
+    for (s in seq_len(N_series_trend)) {
+      cols_s <- paste0("trend[", seq_len(N_time_trend), ",", s, "]")
+      cols_s <- intersect(cols_s, par_names)
+      if (length(cols_s) > 0L) {
+        out[, s] <- rowMeans(full_draws[, cols_s, drop = FALSE])
+      }
+    }
+    out
+  } else {
+    NULL
+  }
+
   ndraws <- nrow(full_draws)
   nobs <- length(t_idx)
-  required_cols <- paste0("trend[", t_idx, ",", s_idx, "]")
-  missing_cols <- setdiff(required_cols, par_names)
-  if (length(missing_cols) > 0L) {
-    stop(insight::format_error(c(
-      "Latent trend state columns missing from posterior draws.",
-      x = cli::format_inline(
-        "Missing: {.val {unique(missing_cols)}}."
-      ),
-      i = "Stan output should contain trend[t, s] for every (t, s) pair covered by the fit."
-    )))
-  }
   latent_mat <- matrix(NA_real_, nrow = ndraws, ncol = nobs)
   for (j in seq_len(nobs)) {
-    latent_mat[, j] <- full_draws[, required_cols[j]]
+    if (is.na(t_idx[j])) {
+      latent_mat[, j] <- series_marginal[, s_idx[j]]
+    } else {
+      nm <- paste0("trend[", t_idx[j], ",", s_idx[j], "]")
+      if (!nm %in% par_names) {
+        stop(insight::format_error(c(
+          "Latent trend state column missing from posterior draws.",
+          x = cli::format_inline("Missing: {.val {nm}}."),
+          i = "Stan output should contain trend[t, s] for every (t, s) pair covered by the fit."
+        )))
+      }
+      latent_mat[, j] <- full_draws[, nm]
+    }
   }
   latent_mat
 }
