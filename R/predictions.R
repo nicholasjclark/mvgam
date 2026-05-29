@@ -2048,7 +2048,8 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
 extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
                                      resp = NULL, ndraws = NULL,
                                      re_formula = NULL, allow_new_levels = FALSE,
-                                     sample_new_levels = "uncertainty") {
+                                     sample_new_levels = "uncertainty",
+                                     incl_latent_state = TRUE) {
   # Validate inputs
   checkmate::assert_class(mvgam_fit, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1)
@@ -2056,6 +2057,7 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   checkmate::assert_string(resp, null.ok = TRUE)
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
   checkmate::assert_logical(allow_new_levels, len = 1)
+  checkmate::assert_logical(incl_latent_state, len = 1)
   checkmate::assert_choice(sample_new_levels, c("uncertainty", "gaussian"))
   checkmate::assert(
     checkmate::check_null(re_formula),
@@ -2149,5 +2151,127 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   )
 
   # Extract linear predictor (use_resp handles shared vs multivariate trends)
-  extract_linpred_from_prep(prep, resp = use_resp)
+  linpred <- extract_linpred_from_prep(prep, resp = use_resp)
+
+  # State-space trends carry their per-(t, s) latent values in
+  # `trend[t, s]` of the stanfit. The trend submodel's brms-mocked
+  # linpred above captures only the trend covariates' contribution
+  # (X %*% beta_trend); without the latent state, every draw shares
+  # the same per-time value and the process_error toggle has nothing
+  # to vary. Add the latent state here, aligned to the same draw
+  # subset used by the submodel linpred. incl_latent_state = FALSE is
+  # the deterministic-submodel-only mode used by brms-concordance
+  # tests to match brms::posterior_linpred(incl_autocor = FALSE).
+  if (component == "trend" && incl_latent_state) {
+    latent_mat <- extract_trend_latent_states(
+      mvgam_fit = mvgam_fit,
+      newdata = newdata,
+      full_draws = full_draws
+    )
+    if (!is.null(latent_mat)) {
+      linpred <- add_latent_to_linpred(linpred, latent_mat)
+    }
+  }
+
+  linpred
+}
+
+
+#' Add latent state matrix to linpred (matrix or per-resp list)
+#' @noRd
+add_latent_to_linpred <- function(linpred, latent_mat) {
+  if (is.list(linpred) && !is.matrix(linpred)) {
+    return(lapply(linpred, function(m) {
+      checkmate::assert_matrix(m,
+        nrows = nrow(latent_mat),
+        ncols = ncol(latent_mat)
+      )
+      m + latent_mat
+    }))
+  }
+  checkmate::assert_matrix(linpred,
+    nrows = nrow(latent_mat),
+    ncols = ncol(latent_mat)
+  )
+  linpred + latent_mat
+}
+
+
+#' Extract per-observation latent trend state draws
+#'
+#' Pulls the `trend[t, s]` posterior draws from the stanfit and
+#' aligns them to `newdata` rows via `(time, series)` mapping. Returns
+#' a `[ndraws x nobs]` matrix or NULL if the fit has no latent trend
+#' state.
+#'
+#' @noRd
+extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws) {
+  checkmate::assert_class(mvgam_fit, "mvgam")
+  checkmate::assert_data_frame(newdata, min.rows = 1)
+  checkmate::assert_matrix(full_draws, min.rows = 1)
+
+  par_names <- colnames(full_draws)
+  trend_cols <- grep("^trend\\[", par_names, value = TRUE)
+  if (length(trend_cols) == 0L) {
+    return(NULL)
+  }
+
+  N_time_trend <- mvgam_fit$standata$N_time_trend
+  N_series_trend <- mvgam_fit$standata$N_series_trend
+  if (is.null(N_time_trend) || is.null(N_series_trend)) {
+    stop(insight::format_error(c(
+      "Cannot align latent trend state without N_time_trend / N_series_trend.",
+      i = "This indicates a malformed mvgam fit."
+    )))
+  }
+
+  # The latent state grid uses the fit-time sorted-unique times.
+  # standata$times_trend is an N_time_trend x N_series_trend matrix
+  # of fit-time time values; for shared grids all columns are equal,
+  # so the first column is the canonical map index -> raw time.
+  times_trend <- mvgam_fit$standata$times_trend
+  fit_unique_times <- if (is.matrix(times_trend)) {
+    times_trend[, 1L]
+  } else {
+    times_trend
+  }
+
+  obs_struct <- get_observation_structure(mvgam_fit, newdata = newdata)
+  t_idx <- match(obs_struct$time, fit_unique_times)
+  s_idx <- obs_struct$series_int
+
+  if (any(is.na(t_idx))) {
+    bad <- unique(obs_struct$time[is.na(t_idx)])
+    stop(insight::format_error(c(
+      "Cannot retrieve latent trend state for unseen time points.",
+      x = cli::format_inline(
+        "newdata contains times {.val {bad}} that were not in the fit."
+      ),
+      i = "Latent-state extrapolation is not yet implemented; predict at observed time points or marginalise over time."
+    )))
+  }
+  if (any(s_idx < 1L | s_idx > N_series_trend)) {
+    stop(insight::format_error(
+      "newdata contains series indices outside the fitted model's range."
+    ))
+  }
+
+  ndraws <- nrow(full_draws)
+  nobs <- length(t_idx)
+  required_cols <- paste0("trend[", t_idx, ",", s_idx, "]")
+  missing_cols <- setdiff(required_cols, par_names)
+  if (length(missing_cols) > 0L) {
+    stop(insight::format_error(c(
+      "Latent trend state columns missing from posterior draws.",
+      x = cli::format_inline(
+        "Missing: {.val {unique(missing_cols)}}."
+      ),
+      i = "Stan output should contain trend[t, s] for every (t, s) pair covered by the fit."
+    )))
+  }
+  latent_mat <- matrix(NA_real_, nrow = ndraws, ncol = nobs)
+  for (j in seq_len(nobs)) {
+    latent_mat[, j] <- full_draws[, required_cols[j]]
+  }
+  latent_mat
 }

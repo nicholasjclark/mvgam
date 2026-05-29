@@ -74,9 +74,11 @@ log_lik.mvgam <- function(object,
   )
 
   # Multivariate fits return a named list of [ndraws x nobs] matrices,
-  # one per response. brms's log_lik returns a single [ndraws x sum(nobs)]
-  # matrix concatenating per-response columns; mirror that when `resp`
-  # is NULL, and subset when a single response is named.
+  # one per response. brms's log_lik returns the JOINT per-observation
+  # log density when resp is NULL: a [ndraws x nobs] matrix where each
+  # column sums the per-response log densities for that observation
+  # row (verified against brms::log_lik on mvbind Gaussian fixtures).
+  # Subset to a single response when resp is named.
   if (is.list(linpred) && !is.matrix(linpred)) {
     if (!is.null(resp)) {
       linpred <- linpred[[resp]]
@@ -91,7 +93,10 @@ log_lik.mvgam <- function(object,
           draw_ids = draw_ids
         )
       })
-      return(do.call(cbind, per_resp))
+      if (length(per_resp) == 1L) {
+        return(per_resp[[1L]])
+      }
+      return(Reduce(`+`, per_resp))
     }
   }
 

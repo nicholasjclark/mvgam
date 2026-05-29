@@ -239,10 +239,11 @@ cat("  resp=y1 dim : ",
     if (!inherits(ll_y1, "smoke_err"))
       paste(dim(ll_y1), collapse = "x")
     else fmt_err(ll_y1), "\n", sep = "")
-# Joint should be ncols(y1) + ncols(y2); per-resp should be ncols(y1).
+# brms parity: joint log_lik for mv fits is the per-obs sum across
+# responses, so it has the same column count as a single response.
 if (!inherits(ll_joint, "smoke_err") && !inherits(ll_y1, "smoke_err")) {
-  cat("  joint width == 2 * per-resp width ? : ",
-      ncol(ll_joint) == 2L * ncol(ll_y1), "\n", sep = "")
+  cat("  joint width == per-resp width ? : ",
+      ncol(ll_joint) == ncol(ll_y1), "\n", sep = "")
 }
 loo_mv <- run_call(loo(mv_mv))
 cat("  loo(joint) elpd_loo : ",

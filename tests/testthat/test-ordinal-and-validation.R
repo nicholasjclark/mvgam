@@ -191,3 +191,52 @@ test_that("pp_check.mvgam: resp + draw_ids are accepted (brms parity)", {
   expect_true("resp" %in% fmls)
   expect_true("draw_ids" %in% fmls)
 })
+
+
+# -------------------------------------------------------------------------
+# extract_component_linpred / extract_trend_latent_states signature gates
+# -------------------------------------------------------------------------
+
+test_that("extract_component_linpred: incl_latent_state arg exists", {
+  fmls <- names(formals(extract_component_linpred))
+  expect_true("incl_latent_state" %in% fmls)
+})
+
+test_that("extract_trend_latent_states: missing trend[t,s] column errors", {
+  # Hand-build a [3 x 4] draws matrix containing only trend[1,1] and
+  # trend[2,1]; index a (t,s) that does not exist in the columns to
+  # confirm the pre-loop validation fires with a clear message rather
+  # than the cryptic 'subscript out of bounds'.
+  full_draws <- matrix(
+    rnorm(12),
+    nrow = 3,
+    dimnames = list(NULL, c("trend[1,1]", "trend[2,1]",
+                            "sigma_trend[1]", "ar1_trend[1]"))
+  )
+  # Build a minimal mock mvgam object with the structure the helper
+  # depends on: standata + trend_metadata + obs_data with a `time`
+  # column. Mock get_observation_structure by passing newdata that
+  # maps to t = 3 (which is missing from full_draws above).
+  mock_fit <- structure(
+    list(
+      standata = list(
+        N_time_trend = 3L,
+        N_series_trend = 1L,
+        times_trend = matrix(c(1L, 2L, 3L), ncol = 1L)
+      ),
+      trend_metadata = list(
+        variables = list(time_var = "time", series_var = "series")
+      ),
+      obs_data = data.frame(time = 1:3),
+      data = data.frame(time = 1:3)
+    ),
+    class = "mvgam"
+  )
+  attr(mock_fit$obs_data, "mvgam_series") <- factor("s1", levels = "s1")
+  newdata <- data.frame(time = 3L)
+  expect_error(
+    extract_trend_latent_states(mock_fit, newdata,
+                                full_draws = full_draws),
+    regexp = "Latent trend state columns missing from posterior draws"
+  )
+})
