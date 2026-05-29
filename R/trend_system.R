@@ -1741,24 +1741,24 @@ parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL
   # Safe formula parsing with try() like brms
   tf_safe <- try(terms(trend_formula, keep.order = TRUE), silent = TRUE)
   if (inherits(tf_safe, "try-error")) {
-    insight::format_error(c(
+    stop(insight::format_error(c(
       "Invalid formula syntax.",
       x = cli::format_inline(
         "The {.field trend_formula} could not be parsed."
       ),
       i = "Check for balanced parentheses and valid R syntax."
-    ))
+    )))
   }
 
   # Check for response variable (brms pattern)
   if (attr(tf_safe, "response") > 0) {
-    insight::format_error(c(
+    stop(insight::format_error(c(
       "Response variable not allowed in trend formula.",
       x = "Trend formulas should only contain predictors.",
       i = cli::format_inline(
         "Remove the response variable from {.field trend_formula}."
       )
-    ))
+    )))
   }
 
   # Handle dot expansion if data provided (brms pattern)
@@ -1949,13 +1949,13 @@ eval_trend_constructor <- function(trend_call) {
 
   # Validate result
   if (!is.mvgam_trend(trend_obj)) {
-    insight::format_error(c(
+    stop(insight::format_error(c(
       "Invalid trend constructor result.",
       x = cli::format_inline(
         "Expression {.code {trend_call}} did not produce a valid trend object."
       ),
       i = "Check that you're using a supported trend constructor."
-    ))
+    )))
   }
 
   return(trend_obj)

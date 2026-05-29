@@ -870,11 +870,11 @@ transform_glm_call <- function(stan_code, glm_type, params) {
     replacement <- paste0(glm_type, "_lpmf(", params$y_var, " | to_matrix(mu), 0.0, mu_ones", other_params_str, ")")
 
   } else {
-    insight::format_error(
+    stop(insight::format_error(
       cli::format_inline(
         "Unsupported GLM type for transformation: {glm_type}"
       )
-    )
+    ))
   }
 
   gsub(original_pattern, replacement, stan_code)
@@ -1325,7 +1325,7 @@ insert_after_mu_lines_in_model_block <- function(code_lines, trend_injection_cod
   # Use existing infrastructure to find model block
   block_info <- find_stan_block(code_lines, "model")
   if (is.null(block_info)) {
-    insight::format_error("Model block not found in Stan code")
+    stop(insight::format_error("Model block not found in Stan code"))
   }
 
   # Find last mu += line within the model block
@@ -1535,9 +1535,9 @@ handle_nonlinear_trend_injection <- function(code_lines, block_info,
   # Validate block indices
   if (block_info$start_idx > block_info$end_idx ||
       block_info$end_idx > length(code_lines)) {
-    insight::format_error(
+    stop(insight::format_error(
       cli::format_inline("Invalid block indices in {.field block_info}")
-    )
+    ))
   }
 
   model_lines <- code_lines[block_info$start_idx:block_info$end_idx]
@@ -1546,10 +1546,10 @@ handle_nonlinear_trend_injection <- function(code_lines, block_info,
   mu_assignment_indices <- which(grepl("\\s*mu\\[n\\]\\s*=", model_lines))
 
   if (length(mu_assignment_indices) == 0) {
-    insight::format_error(c(
+    stop(insight::format_error(c(
       "No mu[n] assignment patterns found in nonlinear model block.",
       i = "Expected pattern: mu[n] = <expression>;"
-    ))
+    )))
   }
 
   # Use the last mu assignment for trend injection
@@ -1561,11 +1561,11 @@ handle_nonlinear_trend_injection <- function(code_lines, block_info,
 
   # Validate we can extract the right-hand side
   if (!grepl("mu\\[n\\]\\s*=\\s*(.+);", current_line)) {
-    insight::format_error(
+    stop(insight::format_error(
       cli::format_inline(
         "Could not parse mu assignment in line: {.field current_line}"
       )
-    )
+    ))
   }
 
   # Extract the right-hand side expression
@@ -3611,30 +3611,30 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # VAR/VARMA constraint validation
   if (lags < 1) {
-    insight::format_error(
+    stop(insight::format_error(
       cli::format_inline("VAR model requires {.field lags} >= 1")
-    )
+    ))
   }
   if (ma_lags < 0) {
-    insight::format_error(
+    stop(insight::format_error(
       cli::format_inline("VARMA model requires {.field ma_lags} >= 0")
-    )
+    ))
   }
   # VARMA constraint: only q=1 is supported for mvgam
   # Reason: Simplifies initialization and computation while covering most practical use cases
   if (ma_lags > 1) {
-    insight::format_error(
+    stop(insight::format_error(
       cli::format_inline(
         "mvgam VARMA models support only {.field ma_lags} = 1. Higher order MA components are not currently implemented."
       )
-    )
+    ))
   }
   if (n_lv > n_series && ma_lags == 0) {
-    insight::format_error(
+    stop(insight::format_error(
       cli::format_inline(
         "VAR factor model requires {.field n_lv} <= {.field n_series}"
       )
-    )
+    ))
   }
 
   # Check for hierarchical grouping requirements
@@ -3684,18 +3684,18 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Additional validation for logical consistency
   checkmate::assert_logical(is_varma, len = 1)
   if (is_varma && ma_lags <= 0) {
-    insight::format_error(
+    stop(insight::format_error(
       cli::format_inline(
         "Internal error: VARMA flag set but {.field ma_lags} <= 0"
       )
-    )
+    ))
   }
   if (!is_varma && ma_lags > 0) {
-    insight::format_error(
+    stop(insight::format_error(
       cli::format_inline(
         "Internal error: VARMA flag not set but {.field ma_lags} > 0"
       )
-    )
+    ))
   }
 
   # VAR/VARMA mathematical functions block with modern Stan syntax and numerical stability
@@ -5380,11 +5380,11 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
                   grepl("matrix\\[.*\\]\\s+X[^_]", stancode)
 
         if (!has_xc) {
-          insight::format_error(
+          stop(insight::format_error(
             cli::format_inline(
               "Expected design matrix {.field Xc{suffix}} not found in Stan code."
             )
-          )
+          ))
         }
 
         # Validate inputs following project standards
@@ -5734,11 +5734,11 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
 
   # Validate consistent input - if mu_construction exists, we should have mapping
   if (length(variable_mapping) == 0) {
-    insight::format_error(
+    stop(insight::format_error(
       cli::format_inline(
         "mu construction expressions found but no {.field variable_mapping} provided. Variable mapping is required for renaming."
       )
-    )
+    ))
   }
 
   # Sort variable names by length (descending) to prevent partial replacements
@@ -7179,11 +7179,11 @@ remove_duplicate_functions <- function(functions_list) {
         unique_functions[[length(unique_functions) + 1]] <- first_func
       } else {
         # Different implementations - error
-        insight::format_error(c(
+        stop(insight::format_error(c(
           "Functions with identical signatures but different implementations detected.",
           x = cli::format_inline("Name: {.field {first_func$name}}"),
           i = "This suggests a serious error in code generation."
-        ))
+        )))
       }
     }
   }

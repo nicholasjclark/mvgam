@@ -37,7 +37,7 @@ analyze_stan <- function(stan_code, response_names = NULL, trend_info = NULL) {
   checkmate::assert_character(response_names, null.ok = TRUE)
 
   if (nchar(stan_code) == 0) {
-    insight::format_error("Stan code cannot be empty")
+    stop(insight::format_error("Stan code cannot be empty"))
   }
 
   glm_patterns <- detect_glm_patterns(stan_code)
@@ -301,7 +301,7 @@ parse_glm_parameters_from_line <- function(glm_line, glm_type) {
   # Extract function call content between parentheses
   call_match <- regexpr("\\([^)]+\\)", glm_line)
   if (call_match < 0) {
-    insight::format_error("Invalid GLM function call format")
+    stop(insight::format_error("Invalid GLM function call format"))
   }
   
   call_content <- regmatches(glm_line, call_match)
@@ -310,7 +310,7 @@ parse_glm_parameters_from_line <- function(glm_line, glm_type) {
   # Split by | to get Y and parameters
   parts <- strsplit(call_content, "\\|")[[1]]
   if (length(parts) < 2) {
-    insight::format_error("GLM call missing required parameters")
+    stop(insight::format_error("GLM call missing required parameters"))
   }
   
   y_var <- trimws(parts[1])
@@ -428,9 +428,9 @@ transform_glm_call_to_mu_format <- function(glm_line, glm_type, glm_params) {
   # Get configuration for GLM type
   config <- glm_family_config[[glm_type]]
   if (is.null(config)) {
-    insight::format_error(
+    stop(insight::format_error(
       cli::format_inline("Unsupported GLM type: {.field {glm_type}}")
-    )
+    ))
   }
   
   # Build function name
@@ -1033,11 +1033,11 @@ transition_with_tracking <- function(state, new_stage, operation,
                       "mu_analysis")
   missing_fields <- required_fields[!required_fields %in% names(state)]
   if (length(missing_fields) > 0) {
-    insight::format_error(
+    stop(insight::format_error(
       cli::format_inline(
         "State object missing required {.field {missing_fields}}"
       )
-    )
+    ))
   }
 
   # Apply modifications or use existing values
@@ -1097,7 +1097,7 @@ track_operations <- function(state, operation, details = list()) {
                       "transformations_applied", "stage", "analysis",
                       "mu_analysis")
   if (!all(required_fields %in% names(state))) {
-    insight::format_error("State object missing required fields")
+    stop(insight::format_error("State object missing required fields"))
   }
 
   operation_entry <- list(
@@ -1209,11 +1209,11 @@ transform_glm_code <- function(stan_code, trend_injection_code, response_names =
   checkmate::assert_list(trend_info, null.ok = TRUE)
 
   if (nchar(stan_code) == 0) {
-    insight::format_error(
+    stop(insight::format_error(
       cli::format_inline(
         "Stan code cannot be empty for parameter {.field stan_code}"
       )
-    )
+    ))
   }
 
   # Chain state transitions

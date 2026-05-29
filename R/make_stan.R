@@ -81,11 +81,11 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
       family <- get(family, mode = "function")()
     }
     if (!inherits(family, "family")) {
-      insight::format_error(
+      stop(insight::format_error(
         cli::format_inline(
           "The {.field family} parameter must be a family object or function name."
         )
-      )
+      ))
     }
     # Block multi-category families that require 3D linear predictors
     validate_supported_family(family)
@@ -93,12 +93,12 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
 
   # Parse multivariate trends and validate
   if (is.null(mv_spec <- parse_multivariate_trends(obs_formula, trend_formula))) {
-    insight::format_error(c(
+    stop(insight::format_error(c(
       "Failed to parse trend formula specification.",
       i = cli::format_inline(
         "Check your {.arg trend_formula} syntax and constructor arguments."
       )
-    ))
+    )))
   }
 
   # Setup observation model using lightweight brms
@@ -124,12 +124,12 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
     silent = silent,
     ...
   ))) {
-    insight::format_error(c(
+    stop(insight::format_error(c(
       "Failed to setup observation model with brms.",
       i = cli::format_inline(
         "Check your {.arg formula} and {.arg data} compatibility."
       )
-    ))
+    )))
   }
 
   # Initialize trend_priors outside conditional block
@@ -186,12 +186,12 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
       silent = silent,
       ...
     ))) {
-      insight::format_error(c(
+      stop(insight::format_error(c(
         "Failed to setup trend model with brms.",
         i = cli::format_inline(
           "Check your {.arg trend_formula} and {.arg data} compatibility."
         )
-      ))
+      )))
     }
     trend_result
   } else {
@@ -209,23 +209,23 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
 
   # Validate result structure with specific error locations
   if (is.null(combined_components)) {
-    insight::format_error(c(
+    stop(insight::format_error(c(
       "Stan component generation returned NULL result.",
       i = cli::format_inline(
         "This indicates a failure in {.fn generate_combined_stancode_and_data}."
       )
-    ))
+    )))
   }
 
   if (!is.list(combined_components)) {
-    insight::format_error(c(
+    stop(insight::format_error(c(
       cli::format_inline(
         "Stan component generation returned invalid type: {.cls {class(combined_components)}}."
       ),
       i = cli::format_inline(
         "Expected list from {.fn generate_combined_stancode_and_data}."
       )
-    ))
+    )))
   }
 
   # Polish Stan code for consistent formatting and spacing
@@ -331,14 +331,14 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
 
   # Validate and return stancode component
   if (is.null(combined_components$combined_components$stancode)) {
-    insight::format_error(c(
+    stop(insight::format_error(c(
       cli::format_inline(
         "Stan code generation missing {.field stancode} component."
       ),
       i = cli::format_inline(
         "The {.fn generate_combined_stancode_and_data} result is incomplete."
       )
-    ))
+    )))
   }
 
   # Add mvgam-specific stancode class with brms compatibility
@@ -423,32 +423,32 @@ standata.mvgam_formula <- function(object, data, family = gaussian(),
 
   # Validate and return standata component
   if (is.null(combined_components$combined_components$standata)) {
-    insight::format_error(c(
+    stop(insight::format_error(c(
       cli::format_inline(
         "Stan data generation missing {.field standata} component."
       ),
       i = cli::format_inline(
         "The {.fn generate_combined_stancode_and_data} result is incomplete."
       )
-    ))
+    )))
   }
 
   # Validate Stan data structure follows brms conventions
   standata <- combined_components$combined_components$standata
   if (!is.list(standata)) {
-    insight::format_error(c(
+    stop(insight::format_error(c(
       cli::format_inline(
         "Generated Stan data is not a list: {.cls {class(standata)}}."
       ),
       i = "Stan requires named list structure for data."
-    ))
+    )))
   }
 
   if (length(standata) == 0) {
-    insight::format_error(c(
+    stop(insight::format_error(c(
       "Generated Stan data list is empty.",
       i = "No data components were successfully generated."
-    ))
+    )))
   }
 
   return(standata)

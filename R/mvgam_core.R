@@ -271,23 +271,23 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
 
   # Validate brmsfit field existence for prediction system
   if (!"brmsfit" %in% names(obs_setup)) {
-    insight::format_error(c(
+    stop(insight::format_error(c(
       cli::format_inline(
         "{.field obs_setup} missing required {.field brmsfit} component."
       ),
       x = "The observation model setup must include a brmsfit object for predictions.",
       i = "Check setup_brms_lightweight() implementation."
-    ))
+    )))
   }
 
   if (!is.null(trend_setup) && !"brmsfit" %in% names(trend_setup)) {
-    insight::format_error(c(
+    stop(insight::format_error(c(
       cli::format_inline(
         "{.field trend_setup} missing required {.field brmsfit} component."
       ),
       x = "The trend model setup must include a brmsfit object for predictions.",
       i = "Check setup_brms_lightweight() implementation."
-    ))
+    )))
   }
 
   mvgam_components <- extract_mvgam_components(combined_fit, obs_setup,
