@@ -29,8 +29,7 @@ formula are detected automatically.}
 
 \item{type}{Scale of predictions. One of \code{"response"} (outcome
 scale with observation-process noise), \code{"link"} (link-scale
-linear predictor) or \code{"expected"} (E\link{Y}; default — matches
-master).}
+linear predictor) or \code{"expected"} (E\link{Y}; default).}
 
 \item{points}{Logical or numeric. If \code{TRUE} (or a non-zero alpha
 between 0 and 1) and \code{type = "response"}, raw observations are
@@ -41,8 +40,8 @@ marks are drawn along the axes.}
 
 \item{process_error}{Logical. Passed to \code{plot_predictions()} /
 \code{get_predict.mvgam}. Defaults to \code{FALSE} so the latent trend
-collapses to its posterior mean (matches master); set \code{TRUE} to
-include per-draw latent-state uncertainty.}
+collapses to its posterior mean; set \code{TRUE} to include per-draw
+latent-state uncertainty.}
 
 \item{...}{Ignored.}
 

@@ -22,6 +22,7 @@
 #' Preservation: "Let brms handle observation model complexity
 #' entirely.")
 #'
+#' @importFrom cli format_inline
 #' @name mvgam_brms_delegation
 #' @keywords internal
 NULL
@@ -75,8 +76,11 @@ build_component_brmsfit <- function(mvgam_fit, component = c("obs", "trend")) {
 #' @noRd
 collect_component_params <- function(mvgam_fit, component) {
   if (component == "obs") {
+    # Anchor `(L?)rescor` to a `[` index or a string end so
+    # user-named columns containing `rescor` cannot accidentally
+    # match (e.g. a covariate called `rescore`).
     extra <- grep(
-      "^(L)?rescor",
+      "^(L)?rescor($|\\[)",
       colnames(posterior::as_draws_matrix(mvgam_fit$fit)),
       value = TRUE
     )
@@ -99,6 +103,9 @@ collect_component_params <- function(mvgam_fit, component) {
 #'
 #' @noRd
 slice_stanfit <- function(stanfit, keep, strip_suffix = NULL) {
+  checkmate::assert_class(stanfit, "stanfit")
+  checkmate::assert_character(keep, min.len = 1L, any.missing = FALSE)
+  checkmate::assert_string(strip_suffix, null.ok = TRUE)
   sim <- stanfit@sim
   all_flat <- names(sim$samples[[1L]])
   keep_flat <- intersect(all_flat, keep)
@@ -111,10 +118,23 @@ slice_stanfit <- function(stanfit, keep, strip_suffix = NULL) {
     )))
   }
 
+  # Anchor `strip_suffix` to the END of each name so internal
+  # occurrences (e.g. a user-named parameter whose root happens to
+  # contain the suffix) survive untouched. Bracket indices like
+  # [t, s] sit after the parameter root, so split into (root, idx)
+  # and strip only from the root.
   renamed_flat <- if (is.null(strip_suffix)) {
     keep_flat
   } else {
-    gsub(strip_suffix, "", keep_flat, fixed = TRUE)
+    roots <- sub("(\\[.*\\])?$", "", keep_flat)
+    idxs <- regmatches(keep_flat, regexpr("\\[.*\\]$", keep_flat))
+    # regmatches returns character(0) for entries without a match;
+    # pad to a per-name vector of "" so paste stays aligned
+    idx_vec <- character(length(keep_flat))
+    has_idx <- grepl("\\[.*\\]$", keep_flat)
+    idx_vec[has_idx] <- idxs
+    roots <- sub(paste0(strip_suffix, "$"), "", roots)
+    paste0(roots, idx_vec)
   }
 
   fit <- stanfit
@@ -173,6 +193,12 @@ extract_component_linpred_via_brms <- function(mvgam_fit, newdata,
                                                re_formula = NULL,
                                                allow_new_levels = TRUE,
                                                sample_new_levels = "uncertainty") {
+  checkmate::assert_class(mvgam_fit, "mvgam")
+  checkmate::assert_data_frame(newdata, min.rows = 1L)
+  checkmate::assert_choice(component, c("obs", "trend"))
+  checkmate::assert_string(resp, null.ok = TRUE)
+  checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
+  checkmate::assert_logical(allow_new_levels, len = 1L)
   rebuilt <- build_component_brmsfit(mvgam_fit, component)
   brms::posterior_linpred(
     rebuilt,
