@@ -50,18 +50,22 @@ register_trend_type <- function(name, supports_factors = FALSE, generator_func,
     for (param_name in names(prior_spec)) {
       param_spec <- prior_spec[[param_name]]
       if (!is.list(param_spec)) {
-        stop(insight::format_error(
-          paste0("Invalid prior specification for parameter {.field ", param_name, "}"),
-          "Each prior specification must be a named list with 'default', 'bounds', and 'description' elements."
-        ))
+        stop(insight::format_error(c(
+          cli::format_inline(
+            "Invalid prior specification for parameter {.field {param_name}}."
+          ),
+          i = "Each prior specification must be a named list with 'default', 'bounds', and 'description' elements."
+        )))
       }
       required_fields <- c("default", "bounds", "description")
       missing_fields <- setdiff(required_fields, names(param_spec))
       if (length(missing_fields) > 0) {
-        stop(insight::format_error(
-          paste0("Missing required fields in prior specification for {.field ", param_name, "}"),
-          paste0("Missing: {.val ", paste(missing_fields, collapse = ", "), "}")
-        ))
+        stop(insight::format_error(c(
+          cli::format_inline(
+            "Missing required fields in prior specification for {.field {param_name}}."
+          ),
+          x = cli::format_inline("Missing: {.val {missing_fields}}")
+        )))
       }
     }
   }
@@ -93,10 +97,10 @@ get_trend_info <- function(name) {
 
   if (!exists(name, envir = trend_registry)) {
     available_trends <- ls(trend_registry)
-    stop(insight::format_error(
-      paste0("Unknown trend type: {.field ", name, "}"),
-      paste0("Available types: {.val ", paste(available_trends, collapse = ", "), "}")
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline("Unknown trend type: {.field {name}}"),
+      i = cli::format_inline("Available types: {.val {available_trends}}")
+    )))
   }
 
   trend_registry[[name]]
@@ -193,11 +197,13 @@ auto_register_trend_types <- function() {
   generator_functions <- grep(generator_pattern, all_functions, value = TRUE)
 
   if (length(generator_functions) == 0) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "No trend generator functions found.",
-      "Expected functions like {.field generate_ar_trend_stanvars}, {.field generate_rw_trend_stanvars}, etc.",
-      "Check that Stan assembly functions follow naming convention."
-    ))
+      x = cli::format_inline(
+        "Expected functions like {.field generate_ar_trend_stanvars}, {.field generate_rw_trend_stanvars}, etc."
+      ),
+      i = "Check that Stan assembly functions follow naming convention."
+    )))
   }
 
   # Extract trend type names from function names
@@ -216,11 +222,15 @@ auto_register_trend_types <- function() {
     properties_func_name <- paste0(tolower(trend_type), "_trend_properties")
 
     if (!exists(properties_func_name, envir = getNamespace("mvgam"))) {
-      stop(insight::format_error(
-        "Missing required properties function for trend type {.field {trend_type}}.",
-        "You must define {.field {properties_func_name}()} that returns list(supports_factors = TRUE/FALSE, incompatibility_reason = '...').",
-        "This ensures explicit declaration of trend capabilities."
-      ))
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "Missing required properties function for trend type {.field {trend_type}}."
+        ),
+        x = cli::format_inline(
+          "You must define {.field {properties_func_name}()} that returns list(supports_factors = TRUE/FALSE, incompatibility_reason = '...')."
+        ),
+        i = "This ensures explicit declaration of trend capabilities."
+      )))
     }
 
     # Get properties function and call it
@@ -271,39 +281,59 @@ validate_trend_properties <- function(trend_info, trend_type, func_name) {
   checkmate::assert_string(func_name, min.chars = 1)
 
   if (!is.list(trend_info)) {
-    stop(insight::format_error(
-      "Function {.field {func_name}()} must return a list.",
-      "Got {.field {class(trend_info)}} instead.",
-      "Fix: return list(supports_factors = TRUE/FALSE, incompatibility_reason = '...')"
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Function {.field {func_name}()} must return a list."
+      ),
+      x = cli::format_inline(
+        "Got {.field {class(trend_info)}} instead."
+      ),
+      i = "Fix: return list(supports_factors = TRUE/FALSE, incompatibility_reason = '...')"
+    )))
   }
 
   required_fields <- c("supports_factors")
   missing_fields <- setdiff(required_fields, names(trend_info))
 
   if (length(missing_fields) > 0) {
-    stop(insight::format_error(
-      "Function {.field {func_name}()} missing required fields: {.field {paste(missing_fields, collapse = ', ')}}.",
-      "Required structure: list(supports_factors = TRUE/FALSE, incompatibility_reason = '...')",
-      "The supports_factors field is mandatory for trend type {.field {trend_type}}."
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Function {.field {func_name}()} missing required fields: {.field {missing_fields}}."
+      ),
+      x = "Required structure: list(supports_factors = TRUE/FALSE, incompatibility_reason = '...')",
+      i = cli::format_inline(
+        "The supports_factors field is mandatory for trend type {.field {trend_type}}."
+      )
+    )))
   }
 
   if (!is.logical(trend_info$supports_factors) || length(trend_info$supports_factors) != 1) {
-    stop(insight::format_error(
-      "Field {.field supports_factors} must be a single logical value (TRUE or FALSE).",
-      "Got {.field {trend_info$supports_factors}} of type {.field {class(trend_info$supports_factors)}}.",
-      "Fix {.field {func_name}()} to return supports_factors = TRUE or FALSE."
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Field {.field supports_factors} must be a single logical value (TRUE or FALSE)."
+      ),
+      x = cli::format_inline(
+        "Got {.field {trend_info$supports_factors}} of type {.field {class(trend_info$supports_factors)}}."
+      ),
+      i = cli::format_inline(
+        "Fix {.field {func_name}()} to return supports_factors = TRUE or FALSE."
+      )
+    )))
   }
 
   if (!trend_info$supports_factors &&
       (is.null(trend_info$incompatibility_reason) || !is.character(trend_info$incompatibility_reason))) {
-    stop(insight::format_error(
-      "Trends with {.field supports_factors = FALSE} must provide {.field incompatibility_reason}.",
-      "Fix {.field {func_name}()} to include incompatibility_reason = 'explanation why factors not supported'.",
-      "This helps users understand why factor models don't work with {.field {trend_type}} trends."
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Trends with {.field supports_factors = FALSE} must provide {.field incompatibility_reason}."
+      ),
+      x = cli::format_inline(
+        "Fix {.field {func_name}()} to include incompatibility_reason = 'explanation why factors not supported'."
+      ),
+      i = cli::format_inline(
+        "This helps users understand why factor models don't work with {.field {trend_type}} trends."
+      )
+    )))
   }
 
   invisible(TRUE)
@@ -531,7 +561,11 @@ trend_param <- function(name, bounds = NULL, monitor = TRUE,
 `+.trend_param` <- function(e1, e2) {
   if (is.null(e2)) return(e1)
   if (!is.trend_param(e2)) {
-    stop(insight::format_error("Cannot add '{class(e2)[1]}' objects to trend parameters."))
+    stop(insight::format_error(
+      cli::format_inline(
+        "Cannot add {.val {class(e2)[1]}} objects to trend parameters."
+      )
+    ))
   }
   c(e1, e2)
 }
@@ -645,10 +679,12 @@ generate_monitor_params <- function(trend_spec) {
     "CAR" = generate_car_monitor_params(trend_spec),
     "ZMVN" = character(0),
     "PW" = generate_pw_monitor_params(trend_spec),
-    stop(insight::format_error(
-      "Unknown trend type: {.field {trend_type}}",
-      "Supported types: RW, AR, VAR, CAR, ZMVN, PW"
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Unknown trend type: {.field {trend_type}}"
+      ),
+      i = "Supported types: RW, AR, VAR, CAR, ZMVN, PW"
+    )))
   )
 
   # Add correlation parameters if enabled
@@ -820,10 +856,12 @@ generate_forecast_required_params <- function(trend_spec, trend_type) {
     "CAR" = filter_car_forecast_params(all_monitor_params, trend_spec),
     "ZMVN" = filter_zmvn_forecast_params(all_monitor_params, trend_spec),
     "PW" = filter_pw_forecast_params(all_monitor_params, trend_spec),
-    stop(insight::format_error(
-      "Unknown trend type for forecasting: {.field {trend_type}}",
-      "Supported types: RW, AR, VAR, CAR, ZMVN, PW"
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Unknown trend type for forecasting: {.field {trend_type}}"
+      ),
+      i = "Supported types: RW, AR, VAR, CAR, ZMVN, PW"
+    )))
   )
 }
 
@@ -1703,20 +1741,24 @@ parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL
   # Safe formula parsing with try() like brms
   tf_safe <- try(terms(trend_formula, keep.order = TRUE), silent = TRUE)
   if (inherits(tf_safe, "try-error")) {
-    insight::format_error(
+    insight::format_error(c(
       "Invalid formula syntax.",
-      "The {.field trend_formula} could not be parsed.",
-      "Check for balanced parentheses and valid R syntax."
-    )
+      x = cli::format_inline(
+        "The {.field trend_formula} could not be parsed."
+      ),
+      i = "Check for balanced parentheses and valid R syntax."
+    ))
   }
 
   # Check for response variable (brms pattern)
   if (attr(tf_safe, "response") > 0) {
-    insight::format_error(
+    insight::format_error(c(
       "Response variable not allowed in trend formula.",
-      "Trend formulas should only contain predictors.",
-      "Remove the response variable from {.field trend_formula}."
-    )
+      x = "Trend formulas should only contain predictors.",
+      i = cli::format_inline(
+        "Remove the response variable from {.field trend_formula}."
+      )
+    ))
   }
 
   # Handle dot expansion if data provided (brms pattern)
@@ -1740,11 +1782,15 @@ parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL
   # Validate that we have some meaningful formula structure
   # Allow ~ 1, ~ -1, and formulas with actual terms
   if (length(tf) == 0 && !is_simple_formula) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Invalid trend formula structure.",
-      "The {.field trend_formula} has no terms and no intercept specification.",
-      "Use {.code ~ 1}, {.code ~ -1}, or include predictors/trend constructors."
-    ))
+      x = cli::format_inline(
+        "The {.field trend_formula} has no terms and no intercept specification."
+      ),
+      i = cli::format_inline(
+        "Use {.code ~ 1}, {.code ~ -1}, or include predictors/trend constructors."
+      )
+    )))
   }
 
   # Find trend terms using mvgam-style detection with brms-inspired robustness
@@ -1774,12 +1820,12 @@ parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL
 
   # Validate we have exactly one trend type per response - only one allowed per formula
   if (length(trend_terms) > 1) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Multiple trend constructors detected in single response formula.",
-      paste("Found:", paste(trend_terms, collapse = ", ")),
-      "Only one trend constructor is allowed per response variable.",
-      "For multivariate models, use separate trend formulas per response."
-    ))
+      x = paste("Found:", paste(trend_terms, collapse = ", ")),
+      x = "Only one trend constructor is allowed per response variable.",
+      i = "For multivariate models, use separate trend formulas per response."
+    )))
   }
 
   # Handle formulas without explicit trend constructors (default to ZMVN)
@@ -1804,10 +1850,12 @@ parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL
   offset_attr <- attr(tf_safe, 'offset')
 
   if (!is.null(offset_attr)) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Offsets not allowed in trend_formula.",
-      "Check for invalid syntax in {.field trend_formula}."
-    ))
+      i = cli::format_inline(
+        "Check for invalid syntax in {.field trend_formula}."
+      )
+    )))
   }
 
   # Use rlang-based approach to preserve complex formula structures like (1|series)
@@ -1833,12 +1881,14 @@ parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL
     
     # Only restrict CAR models with covariates if multivariate (n_series > 1)
     if (n_series > 1) {
-      stop(insight::format_error(
-        "Multivariate CAR models cannot include trend covariates in {.field trend_formula}.",
-        "CAR models use irregular time intervals that vary by series in multivariate settings.",
-        "Remove covariates from the trend formula or use a different trend type.",
-        "Note: Univariate CAR models (single series) can include trend covariates."
-      ), call. = FALSE)
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "Multivariate CAR models cannot include trend covariates in {.field trend_formula}."
+        ),
+        x = "CAR models use irregular time intervals that vary by series in multivariate settings.",
+        i = "Remove covariates from the trend formula or use a different trend type.",
+        i = "Note: Univariate CAR models (single series) can include trend covariates."
+      )), call. = FALSE)
     }
   }
 
@@ -1851,11 +1901,11 @@ parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL
     if (!is.null(.precomputed_dimensions)) {
       dimensions <- .precomputed_dimensions
     } else if (!is.null(data)) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "Missing precomputed dimensions in ultra-DRY architecture.",
-        "When data is provided, precomputed dimensions must be supplied.",
-        "Check that calling function is passing dimensions correctly."
-      ), call. = FALSE)
+        x = "When data is provided, precomputed dimensions must be supplied.",
+        i = "Check that calling function is passing dimensions correctly."
+      )), call. = FALSE)
     } else {
       # No data provided - dimensions not needed for formula parsing only
       dimensions <- NULL
@@ -1899,11 +1949,13 @@ eval_trend_constructor <- function(trend_call) {
 
   # Validate result
   if (!is.mvgam_trend(trend_obj)) {
-    insight::format_error(
+    insight::format_error(c(
       "Invalid trend constructor result.",
-      "Expression {.code {trend_call}} did not produce a valid trend object.",
-      "Check that you're using a supported trend constructor."
-    )
+      x = cli::format_inline(
+        "Expression {.code {trend_call}} did not produce a valid trend object."
+      ),
+      i = "Check that you're using a supported trend constructor."
+    ))
   }
 
   return(trend_obj)
@@ -2731,21 +2783,29 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 
   # PW doesn't support factor models - validate n_lv
   if (!is.null(n_lv)) {
-    stop(insight::format_error(
-      "Factor models ({.field n_lv}) not supported for PW trends.",
-      "Piecewise trends require series-specific changepoint modeling.",
-      "Remove {.field n_lv} parameter or use factor-compatible trends: AR, RW, VAR, ZMVN"
-    ), call. = FALSE)
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Factor models ({.field n_lv}) not supported for PW trends."
+      ),
+      x = "Piecewise trends require series-specific changepoint modeling.",
+      i = cli::format_inline(
+        "Remove {.field n_lv} parameter or use factor-compatible trends: AR, RW, VAR, ZMVN"
+      )
+    )), call. = FALSE)
   }
 
   # Check for required cap variable in logistic models
   cap_expr <- substitute(cap)
   if (growth == 'logistic' && identical(cap_expr, quote(NA))) {
-    stop(insight::format_error(
-      "Logistic growth models require a {.field cap} variable.",
-      "Either provide {.field cap} argument or ensure 'cap' column exists in data.",
-      "Example: PW(cap = carrying_capacity, growth = 'logistic')"
-    ), call. = FALSE)
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Logistic growth models require a {.field cap} variable."
+      ),
+      x = cli::format_inline(
+        "Either provide {.field cap} argument or ensure 'cap' column exists in data."
+      ),
+      i = "Example: PW(cap = carrying_capacity, growth = 'logistic')"
+    )), call. = FALSE)
   }
 
   trend_obj <- create_mvgam_trend(
@@ -3172,12 +3232,12 @@ validate_trend_dispatch_consistency <- function(trend_obj) {
     actual_forecast <- trend_obj$forecast_metadata$function_name
 
     if (!is.null(actual_forecast) && actual_forecast != expected_forecast) {
-      stop(insight::format_error(
-        "Inconsistent forecast function naming",
-        "Expected: {.field {expected_forecast}}",
-        "Got: {.field {actual_forecast}}",
-        "All dispatch functions must follow pattern: trend_type + function_suffix"
-      ))
+      stop(insight::format_error(c(
+        "Inconsistent forecast function naming.",
+        x = cli::format_inline("Expected: {.field {expected_forecast}}"),
+        x = cli::format_inline("Got: {.field {actual_forecast}}"),
+        i = "All dispatch functions must follow pattern: trend_type + function_suffix"
+      )))
     }
   }
 

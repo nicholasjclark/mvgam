@@ -31,8 +31,9 @@ get_family_for_resp <- function(object, resp_name) {
     object$family
   } else {
     stop(insight::format_error(
-      "No family found for response {.val {resp_name}}. ",
-      "Family must be specified either in {.fn bf} or at top-level."
+      cli::format_inline(
+        "No family found for response {.val {resp_name}}. Family must be specified either in {.fn bf} or at top-level."
+      )
     ))
   }
 }
@@ -82,8 +83,9 @@ compute_family_epred <- function(linpred, family,
   # Validate family structure
   if (is.null(family$family) || is.null(family$linkinv)) {
     stop(insight::format_error(
-      "{.field family} object missing required components: ",
-      "{.field $family} and {.field $linkinv}."
+      cli::format_inline(
+        "{.field family} object missing required components: {.field $family} and {.field $linkinv}."
+      )
     ))
   }
 
@@ -95,9 +97,9 @@ compute_family_epred <- function(linpred, family,
     checkmate::assert_matrix(sigma)
     if (nrow(sigma) != nrow(linpred) || ncol(sigma) != ncol(linpred)) {
       stop(insight::format_error(
-        "Dimension mismatch: {.field sigma} is ",
-        "[{nrow(sigma)} x {ncol(sigma)}] but ",
-        "{.field linpred} is [{nrow(linpred)} x {ncol(linpred)}]."
+        cli::format_inline(
+          "Dimension mismatch: {.field sigma} is [{nrow(sigma)} x {ncol(sigma)}] but {.field linpred} is [{nrow(linpred)} x {ncol(linpred)}]."
+        )
       ))
     }
   }
@@ -107,8 +109,9 @@ compute_family_epred <- function(linpred, family,
     checkmate::assert_numeric(trials, min.len = 1)
     if (length(trials) != 1 && length(trials) != ncol(linpred)) {
       stop(insight::format_error(
-        "{.field trials} must be length 1 or match number of ",
-        "observations ({ncol(linpred)})."
+        cli::format_inline(
+          "{.field trials} must be length 1 or match number of observations ({ncol(linpred)})."
+        )
       ))
     }
   }
@@ -143,8 +146,9 @@ compute_family_epred <- function(linpred, family,
     "beta_binomial" = {
       if (is.null(trials)) {
         stop(insight::format_error(
-          "Family {.val {family_name}} requires {.field trials} argument ",
-          "for computing expected values."
+          cli::format_inline(
+            "Family {.val {family_name}} requires {.field trials} argument for computing expected values."
+          )
         ))
       }
       prob <- family$linkinv(linpred)
@@ -160,8 +164,9 @@ compute_family_epred <- function(linpred, family,
     "lognormal" = {
       if (is.null(sigma)) {
         stop(insight::format_error(
-          "Family {.val {family_name}} requires {.field sigma} argument ",
-          "for computing expected values. E[Y] = exp(mu + sigma^2/2)."
+          cli::format_inline(
+            "Family {.val {family_name}} requires {.field sigma} argument for computing expected values. E[Y] = exp(mu + sigma^2/2)."
+          )
         ))
       }
       exp(linpred + sigma^2 / 2)
@@ -169,12 +174,15 @@ compute_family_epred <- function(linpred, family,
 
     # Unsupported families
     "nmix" = stop(insight::format_error(
-      "Family {.val nmix} is not yet supported for {.fn posterior_epred}. ",
-      "N-mixture models require specialized expected value computation."
+      cli::format_inline(
+        "Family {.val nmix} is not yet supported for {.fn posterior_epred}. N-mixture models require specialized expected value computation."
+      )
     )),
 
     "tweedie" = stop(insight::format_error(
-      "Family {.val tweedie} is not yet supported for {.fn posterior_epred}."
+      cli::format_inline(
+        "Family {.val tweedie} is not yet supported for {.fn posterior_epred}."
+      )
     )),
 
     # Ordinal families require threshold parameters for category probability
@@ -184,8 +192,9 @@ compute_family_epred <- function(linpred, family,
     "sratio" = ,
     "cratio" = ,
     "acat" = stop(insight::format_error(
-      "Family {.val {family_name}} is not yet supported for ",
-      "{.fn posterior_epred}. Ordinal models require threshold parameters."
+      cli::format_inline(
+        "Family {.val {family_name}} is not yet supported for {.fn posterior_epred}. Ordinal models require threshold parameters."
+      )
     )),
 
     # Default: try inverse link with warning for unknown families
@@ -315,8 +324,9 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
   if (is.null(newdata)) {
     if (is.null(object$data)) {
       stop(insight::format_error(
-        "No training data found in model object. ",
-        "Please provide {.field newdata} explicitly."
+        cli::format_inline(
+          "No training data found in model object. Please provide {.field newdata} explicitly."
+        )
       ))
     }
     newdata <- object$data
@@ -379,8 +389,9 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
     # Multivariate case without resp specified
     if (any(vapply(family, is_ordinal_family, logical(1)))) {
       stop(insight::format_error(
-        "Ordinal families in multivariate models require ",
-        "{.field resp} parameter to specify which response variable."
+        cli::format_inline(
+          "Ordinal families in multivariate models require {.field resp} parameter to specify which response variable."
+        )
       ))
     }
   } else if (is_ordinal_family(family)) {
@@ -395,14 +406,16 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
     # Validate extracted dimensions match linear predictor
     if (nrow(thres) != ndraws_actual) {
       stop(insight::format_error(
-        "Threshold extraction returned {nrow(thres)} draws but ",
-        "expected {ndraws_actual} to match linear predictor."
+        cli::format_inline(
+          "Threshold extraction returned {nrow(thres)} draws but expected {ndraws_actual} to match linear predictor."
+        )
       ))
     }
     if (nrow(disc) != ndraws_actual || ncol(disc) != nobs_actual) {
       stop(insight::format_error(
-        "Discrimination parameter dimensions [{nrow(disc)} x {ncol(disc)}] ",
-        "do not match expected [{ndraws_actual} x {nobs_actual}]."
+        cli::format_inline(
+          "Discrimination parameter dimensions [{nrow(disc)} x {ncol(disc)}] do not match expected [{ndraws_actual} x {nobs_actual}]."
+        )
       ))
     }
 
@@ -496,11 +509,14 @@ extract_trials_for_family <- function(object, family, newdata) {
   }
 
   if (is.null(trials)) {
-    stop(insight::format_error(
-      "Family {.val {family_name}} requires {.field trials} data.",
-      "Ensure {.code trials} is present in your data or use ",
-      "{.code y | trials(n) ~ ...} formula syntax."
-    ))
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Family {.val {family_name}} requires {.field trials} data."
+      ),
+      i = cli::format_inline(
+        "Ensure {.code trials} is present in your data or use {.code y | trials(n) ~ ...} formula syntax."
+      )
+    )))
   }
 
   # Validate trials values
@@ -558,7 +574,9 @@ data2draws <- function(x, dim) {
     # dim[1] = ndraws, dim[2] = nobs
     if (!length(x) %in% c(1, dim[2])) {
       stop(insight::format_error(
-        "Length of {.field x} must be 1 or {dim[2]}, not {length(x)}."
+        cli::format_inline(
+          "Length of {.field x} must be 1 or {dim[2]}, not {length(x)}."
+        )
       ))
     }
     matrix(x, nrow = dim[1], ncol = dim[2], byrow = TRUE)
@@ -567,7 +585,9 @@ data2draws <- function(x, dim) {
     # dim[1] = ndraws, dim[2:3] = observation dimensions
     if (!(length(x) == 1 || identical(dim(x), as.integer(dim[2:3])))) {
       stop(insight::format_error(
-        "Dimension of {.field x} must match dim[2:3]."
+        cli::format_inline(
+          "Dimension of {.field x} must match dim[2:3]."
+        )
       ))
     }
     aperm(array(x, dim = c(dim[2:3], dim[1])), perm = c(3, 1, 2))
@@ -996,11 +1016,13 @@ extract_ordinal_thresholds <- function(object, ndraws = NULL) {
   thres_cols <- grep(thres_pattern, all_cols, value = TRUE)
 
   if (length(thres_cols) == 0) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "No threshold parameters found in model.",
-      "Expected parameters matching pattern {.code b_Intercept[k]}.",
-      "Is this an ordinal family model?"
-    ))
+      x = cli::format_inline(
+        "Expected parameters matching pattern {.code b_Intercept[k]}."
+      ),
+      i = "Is this an ordinal family model?"
+    )))
   }
 
   # Sort columns by index to ensure correct ordering
@@ -1059,7 +1081,9 @@ extract_ordinal_disc <- function(object, ndraws, nobs) {
     # Validate ndraws doesn't exceed available draws
     if (ndraws > nrow(disc_draws)) {
       stop(insight::format_error(
-        "Requested {ndraws} draws but only {nrow(disc_draws)} available."
+        cli::format_inline(
+          "Requested {ndraws} draws but only {nrow(disc_draws)} available."
+        )
       ))
     }
 
@@ -1201,7 +1225,9 @@ insert_refcat <- function(eta, refcat = 1) {
     }
   } else {
     stop(insight::format_error(
-      "eta must be a matrix or 3D array, not {class(eta)[1]}."
+      cli::format_inline(
+        "eta must be a matrix or 3D array, not {class(eta)[1]}."
+      )
     ))
   }
 
@@ -1266,7 +1292,9 @@ inv_link <- function(x, link) {
     log = exp(x),
     inverse = 1 / x,
     sqrt = x^2,
-    stop(insight::format_error("Unknown link function: {.val {link}}."))
+    stop(insight::format_error(
+      cli::format_inline("Unknown link function: {.val {link}}.")
+    ))
   )
 }
 
@@ -1784,7 +1812,8 @@ posterior_epred_logistic_normal <- function(prep) {
   checkmate::assert_list(prep)
 
   stop(insight::format_error(
-    "Cannot compute expected values of the posterior predictive ",
-    "distribution for family {.val logistic_normal}."
+    cli::format_inline(
+      "Cannot compute expected values of the posterior predictive distribution for family {.val logistic_normal}."
+    )
   ))
 }

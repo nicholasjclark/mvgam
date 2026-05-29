@@ -1075,9 +1075,9 @@ to be solved.
 
     - [x] 7.9.1 `R/validations.R` (was 65, now 0)
     - [x] 7.9.2 `R/predictions.R` (was 44, now 0)
-    - [ ] 7.9.3 `R/stan_assembly.R` (34)
-    - [ ] 7.9.4 `R/trend_system.R` (23)
-    - [ ] 7.9.5 `R/posterior_epred.R` (21)
+    - [x] 7.9.3 `R/stan_assembly.R` (was 34, now 0)
+    - [x] 7.9.4 `R/trend_system.R` (was 23, now 0)
+    - [x] 7.9.5 `R/posterior_epred.R` (was 21, now 0)
     - [ ] 7.9.6 `R/mock-stanfit.R` (16)
     - [ ] 7.9.7 `R/priors.R` (15)
     - [ ] 7.9.8 `R/brms_integration.R` (14)

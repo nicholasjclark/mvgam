@@ -294,10 +294,10 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
     # Extract actual response name from observation formula
     response_names <- extract_response_names(obs_setup$formula)
     if (length(response_names) == 0) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "Could not extract response variable from observation formula.",
-        "The formula must have a valid response variable on the left-hand side."
-      ), call. = FALSE)
+        i = "The formula must have a valid response variable on the left-hand side."
+      )), call. = FALSE)
     }
     response_name <- response_names[1]  # Use first response for univariate
 
@@ -396,11 +396,11 @@ generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
   # trend_stanvars can be NULL, a stanvar, or stanvars collection
   if (!is.null(trend_stanvars)) {
     if (!inherits(trend_stanvars, c("stanvar", "stanvars"))) {
-      stop(insight::format_error(
-        "Invalid trend_stanvars class:",
-        paste("Got class:", paste(class(trend_stanvars), collapse = ", ")),
-        "Expected stanvar or stanvars object."
-      ))
+      stop(insight::format_error(c(
+        "Invalid trend_stanvars class.",
+        x = paste("Got class:", paste(class(trend_stanvars), collapse = ", ")),
+        i = "Expected stanvar or stanvars object."
+      )))
     }
   }
 
@@ -490,11 +490,11 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
     dimensions <- trend_specs$dimensions
 
     if (is.null(dimensions)) {
-      stop(insight::format_error(
+      stop(insight::format_error(c(
         "Missing dimension information in trend specification.",
-        "trend_specs must contain a 'dimensions' field with time series dimensions.",
-        "This should be calculated using extract_time_series_dimensions() during data validation."
-      ), call. = FALSE)
+        x = "trend_specs must contain a 'dimensions' field with time series dimensions.",
+        i = "This should be calculated using extract_time_series_dimensions() during data validation."
+      )), call. = FALSE)
     }
 
     # Extract timing information from pre-calculated dimensions
@@ -546,10 +546,14 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
 
           # Validate this response's mapping structure
           if (!all(c("obs_trend_time", "obs_trend_series") %in% names(mapping))) {
-            stop(insight::format_error(
-              "Mapping for response {.field {resp_name}} missing required fields.",
-              "Expected fields: {.field obs_trend_time}, {.field obs_trend_series}."
-            ), call. = FALSE)
+            stop(insight::format_error(c(
+              cli::format_inline(
+                "Mapping for response {.field {resp_name}} missing required fields."
+              ),
+              i = cli::format_inline(
+                "Expected fields: {.field obs_trend_time}, {.field obs_trend_series}."
+              )
+            )), call. = FALSE)
           }
 
           # Create stanvars for this response's mapping arrays
@@ -866,7 +870,11 @@ transform_glm_call <- function(stan_code, glm_type, params) {
     replacement <- paste0(glm_type, "_lpmf(", params$y_var, " | to_matrix(mu), 0.0, mu_ones", other_params_str, ")")
 
   } else {
-    insight::format_error("Unsupported GLM type for transformation: {glm_type}")
+    insight::format_error(
+      cli::format_inline(
+        "Unsupported GLM type for transformation: {glm_type}"
+      )
+    )
   }
 
   gsub(original_pattern, replacement, stan_code)
@@ -965,20 +973,22 @@ validate_mapping_arrays <- function(mapping_arrays) {
 
   # Validate arrays exist
   if (length(mapping_arrays$time_arrays) == 0 || length(mapping_arrays$series_arrays) == 0) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Missing observation-to-trend mapping arrays in trend_stanvars.",
-      "Expected obs_trend_time and obs_trend_series arrays from generate_obs_trend_mapping().",
-      "This indicates a problem in the stanvar generation pipeline."
-    ), call. = FALSE)
+      x = "Expected obs_trend_time and obs_trend_series arrays from generate_obs_trend_mapping().",
+      i = "This indicates a problem in the stanvar generation pipeline."
+    )), call. = FALSE)
   }
 
   # Validate arrays are paired
   if (length(mapping_arrays$time_arrays) != length(mapping_arrays$series_arrays)) {
-    stop(insight::format_error(
-      "Mismatched mapping arrays: {length(mapping_arrays$time_arrays)} time arrays but {length(mapping_arrays$series_arrays)} series arrays.",
-      "Each obs_trend_time array must have a corresponding obs_trend_series array.",
-      "Check the stanvar generation process for consistency."
-    ), call. = FALSE)
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Mismatched mapping arrays: {length(mapping_arrays$time_arrays)} time arrays but {length(mapping_arrays$series_arrays)} series arrays."
+      ),
+      x = "Each obs_trend_time array must have a corresponding obs_trend_series array.",
+      i = "Check the stanvar generation process for consistency."
+    )), call. = FALSE)
   }
 
   return(invisible(TRUE))
@@ -1033,10 +1043,10 @@ find_stan_block <- function(code_lines, block_name) {
   }
 
   if (is.null(end_idx)) {
-    stop(insight::format_error(
-      "Cannot find end of {block_name} block.",
-      "Stan code structure is invalid or malformed."
-    ), call. = FALSE)
+    stop(insight::format_error(c(
+      cli::format_inline("Cannot find end of {block_name} block."),
+      x = "Stan code structure is invalid or malformed."
+    )), call. = FALSE)
   }
 
   return(list(start_idx = start_idx, end_idx = end_idx))
@@ -1139,10 +1149,14 @@ transform_glm_calls_post_processing <- function(stan_code, detected_glm_types) {
                           "bernoulli_logit_glm", "ordered_logistic_glm", "categorical_logit_glm")
   invalid_types <- setdiff(detected_glm_types, supported_glm_types)
   if (length(invalid_types) > 0) {
-    stop(insight::format_error(
-      "Unsupported GLM types detected: {.field {invalid_types}}",
-      "Supported types: {.field {supported_glm_types}}"
-    ), call. = FALSE)
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Unsupported GLM types detected: {.field {invalid_types}}"
+      ),
+      i = cli::format_inline(
+        "Supported types: {.field {supported_glm_types}}"
+      )
+    )), call. = FALSE)
   }
   
   modified_code <- stan_code
@@ -1151,10 +1165,12 @@ transform_glm_calls_post_processing <- function(stan_code, detected_glm_types) {
   for (glm_type in detected_glm_types) {
     # Use cached parameters from analysis (required)
     if (is.null(analysis$glm_parameters[[glm_type]])) {
-      stop(insight::format_error(
-        "GLM parameters not found in analysis for type: {.field {glm_type}}",
-        "Analysis object must contain pre-parsed GLM parameters."
-      ), call. = FALSE)
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "GLM parameters not found in analysis for type: {.field {glm_type}}"
+        ),
+        i = "Analysis object must contain pre-parsed GLM parameters."
+      )), call. = FALSE)
     }
     params <- analysis$glm_parameters[[glm_type]]
     
@@ -1164,10 +1180,12 @@ transform_glm_calls_post_processing <- function(stan_code, detected_glm_types) {
     
     # Verify transformation occurred
     if (identical(previous_code, modified_code)) {
-      stop(insight::format_error(
-        "GLM transformation failed for type: {.field {glm_type}}",
-        "No changes were made to the Stan code during transformation."
-      ), call. = FALSE)
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "GLM transformation failed for type: {.field {glm_type}}"
+        ),
+        x = "No changes were made to the Stan code during transformation."
+      )), call. = FALSE)
     }
   }
   
@@ -1201,10 +1219,12 @@ convert_glm_to_standard_form <- function(code_lines, block_info, detected_glm_ty
   
   # Validate block indices
   if (block_info$start_idx > block_info$end_idx || block_info$end_idx > length(code_lines)) {
-    stop(insight::format_error(
-      "Invalid block indices in {.field block_info}",
-      "start_idx: {block_info$start_idx}, end_idx: {block_info$end_idx}, code length: {length(code_lines)}"
-    ), call. = FALSE)
+    stop(insight::format_error(c(
+      cli::format_inline("Invalid block indices in {.field block_info}."),
+      x = cli::format_inline(
+        "start_idx: {block_info$start_idx}, end_idx: {block_info$end_idx}, code length: {length(code_lines)}"
+      )
+    )), call. = FALSE)
   }
   
   # Work with a copy to avoid modifying the original
@@ -1215,10 +1235,12 @@ convert_glm_to_standard_form <- function(code_lines, block_info, detected_glm_ty
   
   # Use cached parameters from analysis
   if (is.null(analysis$glm_parameters[[glm_type]])) {
-    stop(insight::format_error(
-      "GLM parameters not found in analysis for type: {.field {glm_type}}",
-      "Analysis object must contain pre-parsed GLM parameters."
-    ), call. = FALSE)
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "GLM parameters not found in analysis for type: {.field {glm_type}}"
+      ),
+      i = "Analysis object must contain pre-parsed GLM parameters."
+    )), call. = FALSE)
   }
   params <- analysis$glm_parameters[[glm_type]]
   
@@ -1384,8 +1406,11 @@ handle_response_trend_injection <- function(code_lines, resp_name) {
   mu_assign_lines <- which(grepl(mu_assign_pattern, code_lines, perl = TRUE))
   
   if (length(mu_assign_lines) == 0) {
-    insight::format_warning("No mu assignment found for response {.field ", 
-                           resp_name, "}")
+    insight::format_warning(
+      cli::format_inline(
+        "No mu assignment found for response {.field {resp_name}}"
+      )
+    )
     return(code_lines)
   }
   
@@ -1510,7 +1535,9 @@ handle_nonlinear_trend_injection <- function(code_lines, block_info,
   # Validate block indices
   if (block_info$start_idx > block_info$end_idx ||
       block_info$end_idx > length(code_lines)) {
-    insight::format_error("Invalid block indices in {.field block_info}")
+    insight::format_error(
+      cli::format_inline("Invalid block indices in {.field block_info}")
+    )
   }
 
   model_lines <- code_lines[block_info$start_idx:block_info$end_idx]
@@ -1519,10 +1546,10 @@ handle_nonlinear_trend_injection <- function(code_lines, block_info,
   mu_assignment_indices <- which(grepl("\\s*mu\\[n\\]\\s*=", model_lines))
 
   if (length(mu_assignment_indices) == 0) {
-    insight::format_error(
-      "No mu[n] assignment patterns found in nonlinear model block. ",
-      "Expected pattern: mu[n] = <expression>;"
-    )
+    insight::format_error(c(
+      "No mu[n] assignment patterns found in nonlinear model block.",
+      i = "Expected pattern: mu[n] = <expression>;"
+    ))
   }
 
   # Use the last mu assignment for trend injection
@@ -1535,7 +1562,9 @@ handle_nonlinear_trend_injection <- function(code_lines, block_info,
   # Validate we can extract the right-hand side
   if (!grepl("mu\\[n\\]\\s*=\\s*(.+);", current_line)) {
     insight::format_error(
-      "Could not parse mu assignment in line: {.field current_line}"
+      cli::format_inline(
+        "Could not parse mu assignment in line: {.field current_line}"
+      )
     )
   }
 
@@ -1947,20 +1976,20 @@ combine_stanvars <- function(...) {
             } else if (inherits(item, "stanvar")) {
               valid_components <- append(valid_components, list(item))
             } else {
-              stop(insight::format_error(
-                "Invalid item in list component:",
-                paste("Class:", paste(class(item), collapse = ", ")),
-                "Expected stanvar or stanvars object."
-              ))
+              stop(insight::format_error(c(
+                "Invalid item in list component.",
+                x = paste("Class:", paste(class(item), collapse = ", ")),
+                i = "Expected stanvar or stanvars object."
+              )))
             }
           }
         }
       } else {
-        stop(insight::format_error(
-          "Invalid component type:",
-          paste("Class:", paste(class(component), collapse = ", ")),
-          "Expected stanvar, stanvars, list, or NULL."
-        ))
+        stop(insight::format_error(c(
+          "Invalid component type.",
+          x = paste("Class:", paste(class(component), collapse = ", ")),
+          i = "Expected stanvar, stanvars, list, or NULL."
+        )))
       }
     }
   }
@@ -1983,11 +2012,11 @@ combine_stanvars <- function(...) {
 
   # Validate result has proper class
   if (!inherits(result, c("stanvar", "stanvars"))) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "combine_stanvars produced invalid result.",
-      paste("Result class:", paste(class(result), collapse = ", ")),
-      "Expected stanvar or stanvars object."
-    ))
+      x = paste("Result class:", paste(class(result), collapse = ", ")),
+      i = "Expected stanvar or stanvars object."
+    )))
   }
 
   return(result)
@@ -2282,11 +2311,13 @@ add_hierarchical_support <- function(components, trend_specs, data_info, prior =
     valid_trends <- trend_info$trend_type
     
     if (!trend_type %in% valid_trends) {
-      stop(insight::format_error(
-        paste0("Unknown trend type {.field ", trend_type, "}."),
-        paste0("Valid trend types are: {.field ", paste(valid_trends, collapse = ", "), "}"),
-        "Check spelling or register custom trend type first."
-      ))
+      stop(insight::format_error(c(
+        cli::format_inline("Unknown trend type {.field {trend_type}}."),
+        x = cli::format_inline(
+          "Valid trend types are: {.field {valid_trends}}"
+        ),
+        i = "Check spelling or register custom trend type first."
+      )))
     }
   }
   
@@ -2979,7 +3010,7 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
   trend_type <- trend_specs$trend
   if (is.null(trend_type)) {
     stop(insight::format_error(
-      "trend_specs must contain {.field trend} field"
+      cli::format_inline("trend_specs must contain {.field trend} field")
     ))
   }
 
@@ -2990,15 +3021,21 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
   if (!exists(generator_function_name, mode = "function")) {
     # Provide helpful guidance using registry information
     available_trends <- ls(trend_registry)
-    stop(insight::format_error(
-      "No Stan generator found for trend type: {.field {trend_type}}",
-      "Expected function: {.field {generator_function_name}}",
-      if (length(available_trends) > 0) {
-        paste0("Available trend types: {.field {paste(available_trends, collapse = ', ')}}")
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "No Stan generator found for trend type: {.field {trend_type}}"
+      ),
+      x = cli::format_inline(
+        "Expected function: {.field {generator_function_name}}"
+      ),
+      i = if (length(available_trends) > 0) {
+        cli::format_inline(
+          "Available trend types: {.field {available_trends}}"
+        )
       } else {
         "Registry appears empty. Check that register_core_trends() was called."
       }
-    ))
+    )))
   }
 
   generator_function <- get(generator_function_name, mode = "function")
@@ -3574,18 +3611,30 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # VAR/VARMA constraint validation
   if (lags < 1) {
-    insight::format_error("VAR model requires {.field lags} >= 1")
+    insight::format_error(
+      cli::format_inline("VAR model requires {.field lags} >= 1")
+    )
   }
   if (ma_lags < 0) {
-    insight::format_error("VARMA model requires {.field ma_lags} >= 0")
+    insight::format_error(
+      cli::format_inline("VARMA model requires {.field ma_lags} >= 0")
+    )
   }
   # VARMA constraint: only q=1 is supported for mvgam
   # Reason: Simplifies initialization and computation while covering most practical use cases
   if (ma_lags > 1) {
-    insight::format_error("mvgam VARMA models support only {.field ma_lags} = 1. Higher order MA components are not currently implemented.")
+    insight::format_error(
+      cli::format_inline(
+        "mvgam VARMA models support only {.field ma_lags} = 1. Higher order MA components are not currently implemented."
+      )
+    )
   }
   if (n_lv > n_series && ma_lags == 0) {
-    insight::format_error("VAR factor model requires {.field n_lv} <= {.field n_series}")
+    insight::format_error(
+      cli::format_inline(
+        "VAR factor model requires {.field n_lv} <= {.field n_series}"
+      )
+    )
   }
 
   # Check for hierarchical grouping requirements
@@ -3598,7 +3647,9 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     # Get hierarchical parameters using existing extraction function
     hierarchical_info <- extract_hierarchical_info(data_info, trend_specs)
     if (is.null(hierarchical_info)) {
-      stop(insight::format_error("Hierarchical VAR requires grouping specification"))
+      stop(insight::format_error(
+        "Hierarchical VAR requires grouping specification"
+      ))
     }
     n_groups <- hierarchical_info$n_groups
     n_subgroups <- hierarchical_info$n_subgroups
@@ -3633,10 +3684,18 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Additional validation for logical consistency
   checkmate::assert_logical(is_varma, len = 1)
   if (is_varma && ma_lags <= 0) {
-    insight::format_error("Internal error: VARMA flag set but {.field ma_lags} <= 0")
+    insight::format_error(
+      cli::format_inline(
+        "Internal error: VARMA flag set but {.field ma_lags} <= 0"
+      )
+    )
   }
   if (!is_varma && ma_lags > 0) {
-    insight::format_error("Internal error: VARMA flag not set but {.field ma_lags} > 0")
+    insight::format_error(
+      cli::format_inline(
+        "Internal error: VARMA flag not set but {.field ma_lags} > 0"
+      )
+    )
   }
 
   # VAR/VARMA mathematical functions block with modern Stan syntax and numerical stability
@@ -4403,10 +4462,10 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # CAR does not support factor models (continuous-time AR requires
   # series-specific temporal evolution)
   if (!is.null(trend_specs$n_lv) && trend_specs$n_lv < n_series) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "CAR trends do not support factor models (n_lv < n_series).",
-      "Continuous-time AR requires series-specific temporal evolution modeling."
-    ))
+      i = "Continuous-time AR requires series-specific temporal evolution modeling."
+    )))
   }
 
   # CAR does not support hierarchical correlations
@@ -4730,11 +4789,11 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   checkmate::assert_int(n_lv, lower = 1)
 
   if (!trend_type %in% c("linear", "logistic")) {
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       "Piecewise trend type must be 'linear' or 'logistic'.",
-      paste0("Got type = '", trend_type, "'."),
-      "Use type = 'linear' or type = 'logistic'."
-    ))
+      x = paste0("Got type = '", trend_type, "'."),
+      i = "Use type = 'linear' or type = 'logistic'."
+    )))
   }
 
   # PW trends do not support factor models (series-specific changepoints required)
@@ -5322,7 +5381,9 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
 
         if (!has_xc) {
           insight::format_error(
-            "Expected design matrix {.field Xc{suffix}} not found in Stan code."
+            cli::format_inline(
+              "Expected design matrix {.field Xc{suffix}} not found in Stan code."
+            )
           )
         }
 
@@ -5674,7 +5735,9 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
   # Validate consistent input - if mu_construction exists, we should have mapping
   if (length(variable_mapping) == 0) {
     insight::format_error(
-      "mu construction expressions found but no {.field variable_mapping} provided. Variable mapping is required for renaming."
+      cli::format_inline(
+        "mu construction expressions found but no {.field variable_mapping} provided. Variable mapping is required for renaming."
+      )
     )
   }
 
@@ -7116,10 +7179,10 @@ remove_duplicate_functions <- function(functions_list) {
         unique_functions[[length(unique_functions) + 1]] <- first_func
       } else {
         # Different implementations - error
-        insight::format_error(paste(
-          "Functions with identical signatures but different implementations detected:",
-          "{.field", first_func$name, "}",
-          "This suggests a serious error in code generation."
+        insight::format_error(c(
+          "Functions with identical signatures but different implementations detected.",
+          x = cli::format_inline("Name: {.field {first_func$name}}"),
+          i = "This suggests a serious error in code generation."
         ))
       }
     }
