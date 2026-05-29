@@ -73,19 +73,43 @@ log_lik.mvgam <- function(object,
     resp = resp
   )
 
-  # Multivariate fits return a named list of matrices per response; flatten
-  # if a single resp was requested, otherwise stop until multivariate
-  # log_lik is wired in §3.1 of trd-downstream-consumers
+  # Multivariate fits return a named list of [ndraws x nobs] matrices,
+  # one per response. brms's log_lik returns a single [ndraws x sum(nobs)]
+  # matrix concatenating per-response columns; mirror that when `resp`
+  # is NULL, and subset when a single response is named.
   if (is.list(linpred) && !is.matrix(linpred)) {
-    if (is.null(resp)) {
-      stop(insight::format_error(c(
-        "Multivariate log_lik requires {.field resp}.",
-        i = "Specify a response name to compute per-response log densities."
-      )))
+    if (!is.null(resp)) {
+      linpred <- linpred[[resp]]
+    } else {
+      resp_names <- names(linpred)
+      per_resp <- lapply(resp_names, function(r) {
+        log_lik_single_response(
+          object = object,
+          newdata = newdata,
+          linpred = linpred[[r]],
+          resp = r,
+          draw_ids = draw_ids
+        )
+      })
+      return(do.call(cbind, per_resp))
     }
-    linpred <- linpred[[resp]]
   }
 
+  log_lik_single_response(
+    object = object,
+    newdata = newdata,
+    linpred = linpred,
+    resp = resp,
+    draw_ids = draw_ids
+  )
+}
+
+
+# Univariate log-lik path. Pulled out so the multivariate branch can
+# loop over responses and stitch the [ndraws x sum(nobs)] matrix back
+# together.
+log_lik_single_response <- function(object, newdata, linpred, resp,
+                                    draw_ids) {
   family_obj <- if (!is.null(resp)) {
     get_family_for_resp(object, resp)
   } else {
@@ -97,18 +121,42 @@ log_lik.mvgam <- function(object,
   # Observed response on the data scale
   y <- extract_response_for_log_lik(object, newdata, resp)
 
-  # Distributional parameters (sigma, shape, hu, zi, ...) as [ndraws x nobs]
+  # Distributional parameters (sigma, shape, hu, zi, ...) as [ndraws x nobs].
+  # Multivariate fits store dpars as `<dpar>_<resp>` in the posterior;
+  # extract under that name then rename back to the bare key so the
+  # per-family helpers see a uniform structure.
   dpar_names <- get_family_dpars(family_name)
   family_pars <- if (length(dpar_names) > 0) {
-    extract_dpars_from_stanfit(
+    extract_names <- if (!is.null(resp)) {
+      paste0(dpar_names, "_", resp)
+    } else {
+      dpar_names
+    }
+    out <- extract_dpars_from_stanfit(
       stanfit = object$fit,
-      dpar_names = dpar_names,
+      dpar_names = extract_names,
       ndraws = nrow(linpred),
       nobs = ncol(linpred),
       draw_ids = draw_ids
     )
+    names(out) <- dpar_names
+    out
   } else {
     list()
+  }
+
+  # Ordinal families need threshold and disc draws from the posterior
+  # in addition to the standard dpars.
+  if (family_name %in% c("cumulative", "sratio", "cratio", "acat")) {
+    family_pars$thres <- extract_ordinal_thresholds(
+      object,
+      ndraws = nrow(linpred)
+    )
+    family_pars$disc <- extract_ordinal_disc(
+      object,
+      ndraws = nrow(linpred),
+      nobs = ncol(linpred)
+    )
   }
 
   # Trials for binomial-family responses

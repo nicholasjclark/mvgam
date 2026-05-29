@@ -148,6 +148,27 @@ pp_check.mvgam <- function(
     newdata <- object$data %||% object$obs_data
   }
 
+  # brms parity: for multivariate fits require a single resp argument.
+  is_mv <- brms::is.mvbrmsformula(object$formula)
+  resp_names <- if (is_mv) object$formula$responses else character(0)
+  if (is_mv) {
+    if (is.null(resp) || length(resp) != 1L) {
+      stop(insight::format_error(c(
+        "{.field resp} must be a single response name for a multivariate model.",
+        i = cli::format_inline(
+          "Available responses: {.val {resp_names}}."
+        )
+      )))
+    }
+    if (!resp %in% resp_names) {
+      stop(insight::format_error(
+        cli::format_inline(
+          "Invalid {.field resp}: {.val {resp}}. Valid choices: {.val {resp_names}}."
+        )
+      ))
+    }
+  }
+
   if (prefix == "ppc") {
     # No type checking for prefix 'ppd' yet
     valid_types <- sort(
@@ -260,19 +281,26 @@ pp_check.mvgam <- function(
 
   y <- NULL
   if (prefix == "ppc") {
-    # y is ignored in prefix 'ppd' plots. Pull the response variable
-    # from the (brms)formula; binomial models with cbind(success, failure)
-    # take success as the response.
-    resp_form <- brms::brmsterms(object$formula)$respform
-    resp_terms <- as.character(resp_form[[2L]])
-    if (length(resp_terms) == 1L) {
-      out_name <- resp_terms
-    } else if (any(grepl("cbind", resp_terms))) {
-      out_name <- resp_terms[-which(grepl("cbind", resp_terms))][1L]
+    # y is ignored in prefix 'ppd' plots. Pull the response name from
+    # the formula's lhs; for multivariate fits use the per-resp form.
+    # Handles the cbind(success, failure) binomial and the
+    # `y | trials(trials)` aterms convention by taking the leftmost
+    # variable in the lhs expression.
+    lhs <- if (is_mv) {
+      object$formula$forms[[resp]]$formula[[2L]]
+    } else if (inherits(object$formula, "brmsformula")) {
+      object$formula$formula[[2L]]
     } else {
-      out_name <- resp_terms[1L]
+      object$formula[[2L]]
     }
+    out_name <- all.vars(lhs)[1L]
     y <- newdata[[out_name]]
+    # Ordinal responses arrive as ordered factors; bayesplot's ppc_*
+    # functions assert numeric y, so coerce factors to their integer
+    # codes (1..nlevels).
+    if (is.factor(y)) {
+      y <- as.integer(y)
+    }
   }
 
   # For plotting DS residuals, set y to zero and take

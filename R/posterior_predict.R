@@ -623,6 +623,55 @@ apply_truncation <- function(samples, family_name, lb, ub, ntrys,
 #'   by posterior_predict.mvgam() which reshapes to [ndraws x nobs] matrix.
 #'
 #' @noRd
+
+
+# Apply the link's inverse CDF to the threshold offset arg = disc *
+# (thres - eta). Vectorised over both draws (rows) and thresholds
+# (columns) of thres.
+ordinal_linkinv <- function(arg, link) {
+  switch(link,
+    logit = stats::plogis(arg),
+    probit = stats::pnorm(arg),
+    probit_approx = stats::pnorm(arg),
+    cloglog = 1 - exp(-exp(arg)),
+    cauchit = stats::pcauchy(arg),
+    identity = arg,
+    stop(insight::format_error(
+      cli::format_inline("Unsupported ordinal link: {.val {link}}.")
+    ))
+  )
+}
+
+# Sample a category for each (draw, obs) under the cumulative family.
+# Returns a length(eta) vector of integers in 1..ncat. eta is a
+# [ndraws x nobs] matrix of link-scale linear predictors; thres is
+# [ndraws x nthres]; disc is a [ndraws x nobs] matrix or scalar.
+ordinal_sample <- function(eta, thres, disc = 1, link = "logit") {
+  ndraws <- nrow(eta)
+  nobs <- ncol(eta)
+  ncat <- ncol(thres) + 1L
+  out <- integer(length(eta))
+  for (j in seq_len(nobs)) {
+    disc_j <- if (is.matrix(disc)) disc[, j] else disc
+    cdf <- matrix(NA_real_, nrow = ndraws, ncol = ncat)
+    for (k in seq_len(ncat - 1L)) {
+      cdf[, k] <- ordinal_linkinv(disc_j * (thres[, k] - eta[, j]), link)
+    }
+    cdf[, ncat] <- 1
+    u <- stats::runif(ndraws)
+    cats <- rep.int(ncat, ndraws)
+    unmatched <- rep.int(TRUE, ndraws)
+    for (k in seq_len(ncat - 1L)) {
+      hit <- unmatched & u <= cdf[, k]
+      cats[hit] <- k
+      unmatched[hit] <- FALSE
+    }
+    out[((j - 1L) * ndraws + 1L):(j * ndraws)] <- cats
+  }
+  out
+}
+
+
 sample_from_family <- function(family_name, ndraws, epred,
                                sigma = NULL, phi = NULL,
                                shape = NULL, nu = NULL,
@@ -972,30 +1021,27 @@ sample_from_family <- function(family_name, ndraws, epred,
       checkmate::assert_matrix(hu, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(thres)
       if (is.null(disc)) disc <- 1
-      nthres <- ncol(thres)
-      ncat <- nthres + 1L
-
-      # Compute cumulative probabilities for each category
-      # Using brms pordinal helper
-      pordinal <- getFromNamespace("pordinal", "brms")
-      first_greater <- getFromNamespace("first_greater", "brms")
-
-      # Get category probabilities [ndraws x ncat]
-      p <- pordinal(
-        q = seq_len(ncat),
-        eta = epred,
-        disc = disc,
-        thres = thres,
-        family = "cumulative",
-        link = link
-      )
-
-      # Sample: 0 if hurdle, else sample from categories 1:ncat
+      ordinal_samples <- ordinal_sample(eta = epred, thres = thres,
+                                        disc = disc, link = link)
       tmp <- stats::runif(length(epred))
-      u <- stats::runif(ndraws)
-      ordinal_samples <- first_greater(p, target = u)
       ifelse(tmp < hu, 0L, ordinal_samples)
     },
+
+    "cumulative" = {
+      checkmate::assert_matrix(thres)
+      if (is.null(disc)) disc <- 1
+      ordinal_sample(eta = epred, thres = thres, disc = disc,
+                     link = link)
+    },
+
+    "sratio" = ,
+    "cratio" = ,
+    "acat" = stop(insight::format_error(c(
+      cli::format_inline(
+        "Posterior predictive sampling for family {.val {family_name}} is not yet implemented."
+      ),
+      i = "Currently supported ordinal family: {.val cumulative}."
+    ))),
 
     # ============ Unsupported families ============
 
@@ -1604,11 +1650,23 @@ predict_single_response <- function(object, linpred_resp, resp, draw_ids,
   # Extract constant truncation bounds if model has truncation
   trunc_bounds <- extract_truncation_bounds(object, nobs)
 
+  # Ordinal families need thres + disc draws and operate on the
+  # link-scale linear predictor rather than the response-scale mu.
+  ordinal_families <- c("cumulative", "sratio", "cratio", "acat")
+  if (family_name %in% ordinal_families) {
+    dpars$thres <- extract_ordinal_thresholds(object, ndraws = ndraws)
+    dpars$disc <- extract_ordinal_disc(object, ndraws = ndraws,
+                                       nobs = nobs)
+    epred_for_family <- linpred
+  } else {
+    epred_for_family <- mu
+  }
+
   # Sample from family distribution
   samples <- sample_from_family(
     family_name = family_name,
     ndraws = ndraws,
-    epred = mu,
+    epred = epred_for_family,
     sigma = dpars$sigma,
     phi = dpars$phi,
     shape = dpars$shape,
