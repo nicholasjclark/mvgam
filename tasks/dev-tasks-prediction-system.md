@@ -1074,7 +1074,7 @@ to be solved.
     violations across 16 remaining R/ files. Closed and remaining:
 
     - [x] 7.9.1 `R/validations.R` (was 65, now 0)
-    - [ ] 7.9.2 `R/predictions.R` (44 violations)
+    - [x] 7.9.2 `R/predictions.R` (was 44, now 0)
     - [ ] 7.9.3 `R/stan_assembly.R` (34)
     - [ ] 7.9.4 `R/trend_system.R` (23)
     - [ ] 7.9.5 `R/posterior_epred.R` (21)

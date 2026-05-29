@@ -167,15 +167,17 @@ approx_gp_pred <- function(Xgp, slambda, zgp, sdgp, lscale, kernel) {
   # Validate dimension consistency
   if (ncol(zgp) != n_basis) {
     stop(insight::format_error(
-      "Basis function mismatch: {.field Xgp} has {n_basis} basis functions ",
-      "but {.field zgp} has {ncol(zgp)} coefficients."
+      cli::format_inline(
+        "Basis function mismatch: {.field Xgp} has {n_basis} basis functions but {.field zgp} has {ncol(zgp)} coefficients."
+      )
     ))
   }
-  
+
   if (length(sdgp) != n_draws) {
     stop(insight::format_error(
-      "Draw count mismatch: {.field zgp} has {n_draws} draws ",
-      "but {.field sdgp} has {length(sdgp)} elements."
+      cli::format_inline(
+        "Draw count mismatch: {.field zgp} has {n_draws} draws but {.field sdgp} has {length(sdgp)} elements."
+      )
     ))
   }
   
@@ -238,8 +240,9 @@ prepare_spd_inputs <- function(slambda, sdgp, lscale) {
   # Validate row count matches draws
   if (nrow(lscale) != n_draws) {
     stop(insight::format_error(
-      "Dimension mismatch: {.field lscale} has {nrow(lscale)} rows ",
-      "but {.field sdgp} has {n_draws} elements."
+      cli::format_inline(
+        "Dimension mismatch: {.field lscale} has {nrow(lscale)} rows but {.field sdgp} has {n_draws} elements."
+      )
     ))
   }
 
@@ -255,8 +258,9 @@ prepare_spd_inputs <- function(slambda, sdgp, lscale) {
     lscale2 <- lscale^2
   } else {
     stop(insight::format_error(
-      "Dimension mismatch: {.field lscale} has {n_lscale_dims} ",
-      "columns but expected 1 (isotropic) or {n_dims} (anisotropic)."
+      cli::format_inline(
+        "Dimension mismatch: {.field lscale} has {n_lscale_dims} columns but expected 1 (isotropic) or {n_dims} (anisotropic)."
+      )
     ))
   }
 
@@ -462,8 +466,9 @@ compute_spd_vectorized <- function(slambda, sdgp, lscale, kernel) {
     "matern32" = spd_gp_matern32(slambda, sdgp, lscale), 
     "matern52" = spd_gp_matern52(slambda, sdgp, lscale),
     stop(insight::format_error(
-      "Unsupported kernel type: {.field {kernel}}. ",
-      "Supported types: exp_quad, matern32, matern52."
+      cli::format_inline(
+        "Unsupported kernel type: {.field {kernel}}. Supported types: exp_quad, matern32, matern52."
+      )
     ))
   )
   
@@ -523,8 +528,9 @@ detect_gp_kernel <- function(prep, brmsfit) {
       "matern_52" = "matern52",
       "matern5/2" = "matern52",
       stop(insight::format_error(
-        "Unsupported GP kernel: {.field {kernel}}. ",
-        "Supported kernels: exp_quad, matern32, matern52."
+        cli::format_inline(
+          "Unsupported GP kernel: {.field {kernel}}. Supported kernels: exp_quad, matern32, matern52."
+        )
       ))
     )
   } else {
@@ -586,7 +592,9 @@ has_nlpars <- function(object) {
   formula_obj <- if (inherits(object, c("mvgam", "brmsfit"))) {
     if (is.null(object$formula)) {
       stop(insight::format_error(
-        "Object missing {.field formula} component."
+        cli::format_inline(
+          "Object missing {.field formula} component."
+        )
       ))
     }
     object$formula
@@ -664,13 +672,17 @@ extract_linpred_nonlinear <- function(prep, resp = NULL) {
 
   if (!"dpars" %in% names(prep)) {
     stop(insight::format_error(
-      "Nonlinear formula models require {.field dpars} component."
+      cli::format_inline(
+        "Nonlinear formula models require {.field dpars} component."
+      )
     ))
   }
 
   if (!"mu" %in% names(prep$dpars)) {
     stop(insight::format_error(
-      "Nonlinear formula prep missing {.field mu} in dpars."
+      cli::format_inline(
+        "Nonlinear formula prep missing {.field mu} in dpars."
+      )
     ))
   }
 
@@ -679,14 +691,15 @@ extract_linpred_nonlinear <- function(prep, resp = NULL) {
   # Validate mu is matrix with correct structure
   if (!is.matrix(mu)) {
     stop(insight::format_error(
-      "{.field mu} must be a matrix [ndraws × nobs]."
+      cli::format_inline("{.field mu} must be a matrix [ndraws × nobs].")
     ))
   }
 
   if (ncol(mu) != prep$nobs) {
     stop(insight::format_error(
-      "{.field mu} has {ncol(mu)} columns but expected ",
-      "{prep$nobs} observations."
+      cli::format_inline(
+        "{.field mu} has {ncol(mu)} columns but expected {prep$nobs} observations."
+      )
     ))
   }
 
@@ -697,7 +710,7 @@ extract_linpred_nonlinear <- function(prep, resp = NULL) {
     # Univariate model
     if (!is.null(resp)) {
       stop(insight::format_error(
-        "{.field resp} only for multivariate models."
+        cli::format_inline("{.field resp} only for multivariate models.")
       ))
     }
     return(mu)
@@ -706,7 +719,9 @@ extract_linpred_nonlinear <- function(prep, resp = NULL) {
   # Multivariate model - split mu by response
   if (!"responses" %in% names(prep$formula)) {
     stop(insight::format_error(
-      "Multivariate formula must contain {.field responses}."
+      cli::format_inline(
+        "Multivariate formula must contain {.field responses}."
+      )
     ))
   }
 
@@ -723,7 +738,7 @@ extract_linpred_nonlinear <- function(prep, resp = NULL) {
     nobs_name <- paste0("N_", r)
     if (!nobs_name %in% names(prep$sdata)) {
       stop(insight::format_error(
-        "Missing {.field {nobs_name}} in prep$sdata."
+        cli::format_inline("Missing {.field {nobs_name}} in prep$sdata.")
       ))
     }
     prep$sdata[[nobs_name]]
@@ -744,8 +759,9 @@ extract_linpred_nonlinear <- function(prep, resp = NULL) {
   # Validate column count matches
   if (col_start - 1 != ncol(mu)) {
     stop(insight::format_error(
-      "Column count mismatch: split {col_start - 1} columns but ",
-      "{.field mu} has {ncol(mu)} columns."
+      cli::format_inline(
+        "Column count mismatch: split {col_start - 1} columns but {.field mu} has {ncol(mu)} columns."
+      )
     ))
   }
 
@@ -754,7 +770,9 @@ extract_linpred_nonlinear <- function(prep, resp = NULL) {
     if (!resp %in% response_names) {
       available <- paste(response_names, collapse = ", ")
       stop(insight::format_error(
-        "Response {.field {resp}} not found. Available: {available}."
+        cli::format_inline(
+          "Response {.field {resp}} not found. Available: {available}."
+        )
       ))
     }
     return(mu_list[[resp]])
@@ -974,11 +992,12 @@ add_all_gp_contributions <- function(eta, prep, brmsfit = NULL, resp = NULL) {
         zgp_g_pattern <- paste0("^zgp_", suffix, "\\[", g, ",")
         zgp_g_names <- grep(zgp_g_pattern, draws_names, value = TRUE)
         if (length(zgp_g_names) == 0) {
-          stop(insight::format_error(
-            "No {.field zgp} parameters found for level {g} ",
-            "in GP suffix {.field {suffix}}. ",
-            "Check that model parameters match prediction data."
-          ))
+          stop(insight::format_error(c(
+            cli::format_inline(
+              "No {.field zgp} parameters found for level {g} in GP suffix {.field {suffix}}."
+            ),
+            i = "Check that model parameters match prediction data."
+          )))
         }
         zgp_g <- draws_mat[, zgp_g_names, drop = FALSE]
         checkmate::assert_matrix(zgp_g, any.missing = FALSE, nrows = n_draws)
@@ -987,11 +1006,12 @@ add_all_gp_contributions <- function(eta, prep, brmsfit = NULL, resp = NULL) {
         lscale_g_pattern <- paste0("^lscale_", suffix, "\\[", g, ",")
         lscale_g_names <- grep(lscale_g_pattern, draws_names, value = TRUE)
         if (length(lscale_g_names) == 0) {
-          stop(insight::format_error(
-            "No {.field lscale} parameters found for level {g} ",
-            "in GP suffix {.field {suffix}}. ",
-            "Check that model parameters match prediction data."
-          ))
+          stop(insight::format_error(c(
+            cli::format_inline(
+              "No {.field lscale} parameters found for level {g} in GP suffix {.field {suffix}}."
+            ),
+            i = "Check that model parameters match prediction data."
+          )))
         }
         lscale_g <- draws_mat[, lscale_g_names, drop = FALSE]
         checkmate::assert_matrix(lscale_g, any.missing = FALSE, nrows = n_draws)
@@ -1017,20 +1037,21 @@ add_all_gp_contributions <- function(eta, prep, brmsfit = NULL, resp = NULL) {
           if (length(level_obs) > 0) {
             if (length(level_obs) != ncol(gp_g)) {
               stop(insight::format_error(
-                "Dimension mismatch for GP level {g}: expected ",
-                "{length(level_obs)} observations but GP contribution ",
-                "has {ncol(gp_g)} columns."
+                cli::format_inline(
+                  "Dimension mismatch for GP level {g}: expected {length(level_obs)} observations but GP contribution has {ncol(gp_g)} columns."
+                )
               ))
             }
             gp_contrib[, level_obs] <- gp_g
           }
         } else {
           # No Jgp mapping available - cannot determine level membership
-          stop(insight::format_error(
-            "GP with by-variable requires {.field Jgp} mapping but none ",
-            "found for suffix {.field {suffix}}. ",
-            "Check that standata includes level membership indicators."
-          ))
+          stop(insight::format_error(c(
+            cli::format_inline(
+              "GP with by-variable requires {.field Jgp} mapping but none found for suffix {.field {suffix}}."
+            ),
+            i = "Check that standata includes level membership indicators."
+          )))
         }
       }
 
@@ -1055,7 +1076,9 @@ add_all_gp_contributions <- function(eta, prep, brmsfit = NULL, resp = NULL) {
       )
       if (length(zgp_names) == 0) {
         stop(insight::format_error(
-          "No {.field zgp} parameters found for suffix {.field {suffix}}."
+          cli::format_inline(
+            "No {.field zgp} parameters found for suffix {.field {suffix}}."
+          )
         ))
       }
       zgp <- draws_mat[, zgp_names, drop = FALSE]
@@ -1079,10 +1102,12 @@ add_all_gp_contributions <- function(eta, prep, brmsfit = NULL, resp = NULL) {
         }
       }
       if (length(lscale_names) == 0) {
-        stop(insight::format_error(
-          "No {.field lscale} parameters found for suffix {.field {suffix}}. ",
-          "Tried patterns: lscale_, lsd_, lengthscale_, ls_."
-        ))
+        stop(insight::format_error(c(
+          cli::format_inline(
+            "No {.field lscale} parameters found for suffix {.field {suffix}}."
+          ),
+          i = "Tried patterns: lscale_, lsd_, lengthscale_, ls_."
+        )))
       }
       lscale <- draws_mat[, lscale_names, drop = FALSE]
 
@@ -1171,25 +1196,33 @@ extract_linpred_from_prep <- function(prep, resp = NULL) {
 
   if (!"draws" %in% names(prep)) {
     stop(insight::format_error(
-      "{.field prep} must contain a {.field draws} component."
+      cli::format_inline(
+        "{.field prep} must contain a {.field draws} component."
+      )
     ))
   }
 
   if (!"sdata" %in% names(prep)) {
     stop(insight::format_error(
-      "{.field prep} must contain an {.field sdata} component."
+      cli::format_inline(
+        "{.field prep} must contain an {.field sdata} component."
+      )
     ))
   }
 
   if (!"nobs" %in% names(prep)) {
     stop(insight::format_error(
-      "{.field prep} must contain an {.field nobs} component."
+      cli::format_inline(
+        "{.field prep} must contain an {.field nobs} component."
+      )
     ))
   }
 
   if (!"formula" %in% names(prep)) {
     stop(insight::format_error(
-      "{.field prep} must contain a {.field formula} component."
+      cli::format_inline(
+        "{.field prep} must contain a {.field formula} component."
+      )
     ))
   }
 
@@ -1204,7 +1237,9 @@ extract_linpred_from_prep <- function(prep, resp = NULL) {
   } else {
     if (!is.null(resp)) {
       stop(insight::format_error(
-        "{.field resp} should only be specified for multivariate models."
+        cli::format_inline(
+          "{.field resp} should only be specified for multivariate models."
+        )
       ))
     }
     return(extract_linpred_univariate(prep))
@@ -1253,7 +1288,9 @@ population_random_pred <- function(prep, draws_mat, n_draws, n_obs) {
 
     if (!J_name %in% names(prep$sdata)) {
       stop(insight::format_error(
-        "Missing grouping index {.field {J_name}} for {.field {z_name}}."
+        cli::format_inline(
+          "Missing grouping index {.field {J_name}} for {.field {z_name}}."
+        )
       ))
     }
 
@@ -1262,8 +1299,9 @@ population_random_pred <- function(prep, draws_mat, n_draws, n_obs) {
     # Validate dimensions
     if (length(Z) != n_obs || length(J) != n_obs) {
       stop(insight::format_error(
-        "Dimension mismatch: Z length={length(Z)}, J length={length(J)}, ",
-        "expected n_obs={n_obs}."
+        cli::format_inline(
+          "Dimension mismatch: Z length={length(Z)}, J length={length(J)}, expected n_obs={n_obs}."
+        )
       ))
     }
 
@@ -1274,7 +1312,9 @@ population_random_pred <- function(prep, draws_mat, n_draws, n_obs) {
     missing_params <- setdiff(param_names, colnames(draws_mat))
     if (length(missing_params) > 0) {
       stop(insight::format_error(
-        "Missing random effects parameters: {paste(missing_params, collapse=', ')}"
+        cli::format_inline(
+          "Missing random effects parameters: {paste(missing_params, collapse=', ')}"
+        )
       ))
     }
 
@@ -1326,8 +1366,9 @@ smooth_fixed_pred <- function(eta, draws_mat, prep) {
 
   if (length(bs_names) != ncol(Xs)) {
     stop(insight::format_error(
-      "Smooth parameter count mismatch: {length(bs_names)} ",
-      "bs coefficient(s) but {ncol(Xs)} smooth predictor(s)."
+      cli::format_inline(
+        "Smooth parameter count mismatch: {length(bs_names)} bs coefficient(s) but {ncol(Xs)} smooth predictor(s)."
+      )
     ))
   }
 
@@ -1513,14 +1554,17 @@ smooth_random_pred <- function(eta, draws_mat, prep, resp_prefix) {
         # Validate matrix structure
         if (!is.matrix(Zs)) {
           stop(insight::format_error(
-            "Smooth basis {.field {zs_name}} must be a matrix."
+            cli::format_inline(
+              "Smooth basis {.field {zs_name}} must be a matrix."
+            )
           ))
         }
 
         if (nrow(Zs) != n_obs) {
           stop(insight::format_error(
-            "Smooth basis {.field {zs_name}} has {nrow(Zs)} rows ",
-            "but expected {n_obs} observations."
+            cli::format_inline(
+              "Smooth basis {.field {zs_name}} has {nrow(Zs)} rows but expected {n_obs} observations."
+            )
           ))
         }
 
@@ -1543,9 +1587,8 @@ smooth_random_pred <- function(eta, draws_mat, prep, resp_prefix) {
       } else {
         # Component matrix missing - log warning but continue
         rlang::warn(
-          paste0(
-            "Expected smooth component matrix {.field ", zs_name, "} ",
-            "not found in prep$sdata. Skipping this component."
+          cli::format_inline(
+            "Expected smooth component matrix {.field {zs_name}} not found in prep$sdata. Skipping this component."
           ),
           .frequency = "once"
         )
@@ -1607,8 +1650,9 @@ extract_linpred_univariate <- function(prep) {
       if (length(b_names) > 0) {
         if (length(b_names) != ncol(X)) {
           stop(insight::format_error(
-            "Parameter count mismatch: {length(b_names)} ",
-            "coefficient(s) but {ncol(X)} predictor(s)."
+            cli::format_inline(
+              "Parameter count mismatch: {length(b_names)} coefficient(s) but {ncol(X)} predictor(s)."
+            )
           ))
         }
 
@@ -1688,7 +1732,9 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
   # Extract response names
   if (!"responses" %in% names(prep$formula)) {
     stop(insight::format_error(
-      "Multivariate formula must contain {.field responses} component."
+      cli::format_inline(
+        "Multivariate formula must contain {.field responses} component."
+      )
     ))
   }
 
@@ -1705,8 +1751,9 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
   if (!is.null(resp)) {
     if (!resp %in% response_names) {
       stop(insight::format_error(
-        "Response {.val {resp}} not found in model. ",
-        "Available: {.val {response_names}}."
+        cli::format_inline(
+          "Response {.val {resp}} not found in model. Available: {.val {response_names}}."
+        )
       ))
     }
     response_names <- resp
@@ -1724,14 +1771,14 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
     n_obs_name <- paste0("N_", resp_name)
     if (!n_obs_name %in% names(prep$sdata)) {
       available_n <- grep("^N_", names(prep$sdata), value = TRUE)
-      stop(insight::format_error(
-        "Cannot find {.field {n_obs_name}} in prep$sdata.",
-        if (length(available_n) > 0) {
+      stop(insight::format_error(c(
+        cli::format_inline("Cannot find {.field {n_obs_name}} in prep$sdata."),
+        i = if (length(available_n) > 0) {
           paste("Available:", paste(available_n, collapse = ", "))
         } else {
           "No N_ fields found."
         }
-      ))
+      )))
     }
     n_obs <- prep$sdata[[n_obs_name]]
 
@@ -1769,9 +1816,9 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
         if (length(b_names) > 0) {
           if (length(b_names) != ncol(X)) {
             stop(insight::format_error(
-              "Parameter mismatch for {.val {resp_name}}: ",
-              "{length(b_names)} coefficient(s) but {ncol(X)} ",
-              "predictor(s)."
+              cli::format_inline(
+                "Parameter mismatch for {.val {resp_name}}: {length(b_names)} coefficient(s) but {ncol(X)} predictor(s)."
+              )
             ))
           }
 
@@ -1814,9 +1861,9 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
 
       if (length(Z) != n_obs) {
         stop(insight::format_error(
-          "Random effects design vector {.field {z_name}} has {length(Z)} ",
-          "elements but expected {n_obs} observations for ",
-          "response {.val {resp_name}}."
+          cli::format_inline(
+            "Random effects design vector {.field {z_name}} has {length(Z)} elements but expected {n_obs} observations for response {.val {resp_name}}."
+          )
         ))
       }
 
@@ -1830,9 +1877,9 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
       J <- as.integer(prep$sdata[[J_name]])
       if (length(J) != n_obs) {
         stop(insight::format_error(
-          "Grouping indices {.field {J_name}} length {length(J)} ",
-          "does not match {n_obs} observations for ",
-          "response {.val {resp_name}}."
+          cli::format_inline(
+            "Grouping indices {.field {J_name}} length {length(J)} does not match {n_obs} observations for response {.val {resp_name}}."
+          )
         ))
       }
 
@@ -1933,8 +1980,9 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
 
       if (length(all_offsets) != total_obs) {
         stop(insight::format_error(
-          "Offset length {length(all_offsets)} does not match total ",
-          "observations {total_obs} across all responses."
+          cli::format_inline(
+            "Offset length {length(all_offsets)} does not match total observations {total_obs} across all responses."
+          )
         ))
       }
 
@@ -2042,7 +2090,9 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
 
     if (length(params) == 0) {
       stop(insight::format_error(
-        "No parameters found for component {.field {component}}."
+        cli::format_inline(
+          "No parameters found for component {.field {component}}."
+        )
       ))
     }
 
@@ -2054,7 +2104,9 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   # Validate brms_model exists
   if (is.null(brms_model)) {
     stop(insight::format_error(
-      "No brmsfit model found for component {.field {component}}."
+      cli::format_inline(
+        "No brmsfit model found for component {.field {component}}."
+      )
     ))
   }
 
@@ -2066,7 +2118,9 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
     n_available <- nrow(full_draws)
     if (ndraws > n_available) {
       stop(insight::format_error(
-        "Requested {ndraws} draws but only {n_available} available."
+        cli::format_inline(
+          "Requested {ndraws} draws but only {n_available} available."
+        )
       ))
     }
     draw_indices <- sample(n_available, ndraws)
