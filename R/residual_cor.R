@@ -162,7 +162,7 @@ residual_cor.jsdgam <- function(
   # Initiate objects to store all posterior correlation and covariance matrices
   p <- NCOL(object$ytimes)
   sp_names <- levels(object$obs_data$series)
-  ndraws <- brms::ndraws(as_draws_array(object, variable = 'betas'))
+  ndraws <- posterior::ndraws(posterior::as_draws_array(object$fit))
   all_cormat <- all_covmat <- all_precmat <- array(
     0,
     dim = c(ndraws, p, p)

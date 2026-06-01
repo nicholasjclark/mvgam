@@ -35,10 +35,8 @@ default, a hopefully not too large selection of variables is plotted.}
 \item{regex}{Logical; Indicates whether \code{variable} should
 be treated as regular expressions. Defaults to \code{FALSE}.}
 
-\item{use_alias}{Logical. If more informative names for parameters are
-available (i.e. for beta coefficients \code{b} or for smoothing parameters \code{rho}),
-replace the uninformative names with the more informative alias. Defaults to
-\code{TRUE}.}
+\item{use_alias}{Retained for backwards-compatibility; parameter
+names are now brms-native so no aliasing is performed.}
 
 \item{...}{Additional arguments passed to the plotting functions.
 See \code{\link[bayesplot:MCMC-overview]{MCMC-overview}} for
@@ -63,8 +61,8 @@ mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
              silent = 2)
 mcmc_plot(mod)
 mcmc_plot(mod, type = 'neff_hist')
-mcmc_plot(mod, variable = 'betas', type = 'areas')
-mcmc_plot(mod, variable = 'trend_params', type = 'combo')
+mcmc_plot(mod, variable = "betas", type = "areas")
+mcmc_plot(mod, variable = "trend_params", type = "combo")
 }
 }
 \seealso{

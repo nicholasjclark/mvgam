@@ -81,7 +81,7 @@ test_data <- data.frame(
   z = z,
   time = 1:n_time,
   series = factor("s1"),
-  group = factor(rep(letters[1:6], each = 5))
+  grp = factor(rep(letters[1:6], each = 5))
 )
 
 # High-signal Poisson AR(1) data (used by process_error toggle test)
@@ -122,26 +122,26 @@ fit_mvgam_cached("ar1_fx",
 
 cat("\n[3] AR(1) + random intercept\n")
 fit_brms_cached("ar1_re",
-  y ~ 1 + x + (1 | group) + ar(time = time, p = 1, cov = TRUE),
+  y ~ 1 + x + (1 | grp) + ar(time = time, p = 1, cov = TRUE),
   test_data, poisson())
 fit_mvgam_cached("ar1_re",
-  y ~ 1 + x + (1 | group), ~ AR(p = 1),
+  y ~ 1 + x + (1 | grp), ~ AR(p = 1),
   test_data, poisson())
 
 cat("\n[4] AR(1) + fixed + random + smooth\n")
 fit_brms_cached("ar1_re_smooth",
-  y ~ 1 + x + (1 | group) + s(z) + ar(time = time, p = 1, cov = TRUE),
+  y ~ 1 + x + (1 | grp) + s(z) + ar(time = time, p = 1, cov = TRUE),
   test_data, poisson())
 fit_mvgam_cached("ar1_re_smooth",
-  y ~ 1 + x + (1 | group) + s(z), ~ AR(p = 1),
+  y ~ 1 + x + (1 | grp) + s(z), ~ AR(p = 1),
   test_data, poisson())
 
 cat("\n[5] AR(1) + correlated REs\n")
 fit_brms_cached("ar1_cor_re",
-  y ~ 1 + x + (x | group) + ar(time = time, p = 1, cov = TRUE),
+  y ~ 1 + x + (x | grp) + ar(time = time, p = 1, cov = TRUE),
   test_data, poisson())
 fit_mvgam_cached("ar1_cor_re",
-  y ~ 1 + x + (x | group), ~ AR(p = 1),
+  y ~ 1 + x + (x | grp), ~ AR(p = 1),
   test_data, poisson())
 
 cat("\n[6] AR(1) + monotonic mo()\n")
@@ -211,7 +211,7 @@ fit_mvgam_cached("ar1_fx_trend",
 
 cat("\n[9] AR(1) + fixed + random + smooth (in trend)\n")
 fit_mvgam_cached("ar1_re_smooth_trend",
-  y ~ 1, ~ x + (1 | group) + s(z) + AR(p = 1),
+  y ~ 1, ~ x + (1 | grp) + s(z) + AR(p = 1),
   test_data, poisson())
 
 # ----------------------------------------------------------------------

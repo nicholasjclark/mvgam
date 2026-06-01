@@ -3,10 +3,14 @@
 # Lives in tests/local because the round-trip through
 # marginaleffects -> insight -> get_predict -> posterior_epred is
 # fixture-driven and too heavy for CI. Covers the full user surface:
-# predictions / avg_predictions / avg_slopes / avg_comparisons on a
-# slice of families that pass the marginaleffects data validation
-# (no `group` column in fixture data; fixtures that include `group`
-# trip marginaleffects's forbidden-name check before reaching mvgam).
+# predictions / avg_predictions / avg_slopes / avg_comparisons.
+#
+# marginaleffects forbids any column literally named 'group' in the
+# fit's training data (it reserves that name for its own output).
+# Fixtures built by build_fixtures.R use 'grp' for the random-effects
+# grouping variable to avoid that collision. The orphan ar1_t2_noint
+# fixture (built outside build_fixtures.R) still carries 'group' and
+# the affected test below strips it before dispatching.
 #
 # Concordance bar: predictions(mvgam_fit) and predictions(brms_fit)
 # at observed time points should agree on the deterministic submodel
@@ -20,9 +24,8 @@ library(marginaleffects)
 options("marginaleffects_model_classes" = "mvgam")
 
 
-# Fixtures whose synthetic data does NOT carry a `group` column
-# (marginaleffects reserves that name for its own output and refuses
-# to evaluate models whose data includes it).
+# Coverage scope for the marginaleffects entry-point smoke loop.
+# Each fixture exercises a distinct observation family.
 me_safe_fixtures <- c(
   "beta_ar1",
   "binom_ar1",
@@ -195,7 +198,6 @@ test_that("type='expected' matches median(posterior_epred) exactly", {
 test_that("type='response' on Poisson returns non-negative count samples", {
   require_fixtures("val_mvgam_ar1_int.rds")
   mv <- load_mvgam("ar1_int")
-  mv$data$group <- NULL
   p <- suppressWarnings(predictions(mv, type = "response", process_error = FALSE))
   # posterior_predict draws are integer; the per-obs MEDIAN of an
   # even number of draws can fall on a half-integer (e.g. 7.5), so
@@ -250,7 +252,6 @@ test_that("get_group_names.mvgam returns default for non-ordinal", {
 test_that("predictions at unseen times use marginal mean (no error)", {
   require_fixtures("val_mvgam_ar1_int.rds")
   mv <- load_mvgam("ar1_int")
-  mv$data$group <- NULL
   fit_max_time <- max(mv$data$time)
   nd_oos <- data.frame(
     time = (fit_max_time + 1L):(fit_max_time + 3L),
@@ -270,7 +271,6 @@ test_that("predictions at unseen times use marginal mean (no error)", {
 test_that("conditional_effects(mv) detects formula terms automatically", {
   require_fixtures("val_mvgam_ar1_gp.rds")
   mv <- load_mvgam("ar1_gp")
-  mv$data$group <- NULL
   ce <- suppressWarnings(conditional_effects(mv))
   testthat::expect_s3_class(ce, "mvgam_conditional_effects")
   testthat::expect_true("z" %in% names(ce))
@@ -280,7 +280,6 @@ test_that("conditional_effects(mv) detects formula terms automatically", {
 test_that("conditional_effects(mv, type = link) routes through plot_predictions", {
   require_fixtures("val_mvgam_ar1_gp.rds")
   mv <- load_mvgam("ar1_gp")
-  mv$data$group <- NULL
   ce <- suppressWarnings(conditional_effects(mv, type = "link"))
   testthat::expect_s3_class(ce, "mvgam_conditional_effects")
   testthat::expect_true(length(ce) >= 1L)
@@ -289,6 +288,8 @@ test_that("conditional_effects(mv, type = link) routes through plot_predictions"
 test_that("conditional_effects detects tensor-product interactions", {
   require_fixtures("val_mvgam_ar1_t2_noint.rds")
   mv <- load_mvgam("ar1_t2_noint")
+  # ar1_t2_noint is an orphan fixture built outside build_fixtures.R
+  # and still carries a `group` column that marginaleffects forbids.
   mv$data$group <- NULL
   ce <- suppressWarnings(conditional_effects(mv))
   testthat::expect_s3_class(ce, "mvgam_conditional_effects")
@@ -298,7 +299,6 @@ test_that("conditional_effects detects tensor-product interactions", {
 test_that("conditional_effects honours user-supplied `effects`", {
   require_fixtures("val_mvgam_ar1_fx.rds")
   mv <- load_mvgam("ar1_fx")
-  mv$data$group <- NULL
   ce <- suppressWarnings(conditional_effects(mv, effects = "x"))
   testthat::expect_equal(length(ce), 1L)
   testthat::expect_equal(names(ce), "x")
@@ -307,10 +307,68 @@ test_that("conditional_effects honours user-supplied `effects`", {
 test_that("plot.mvgam_conditional_effects returns the list invisibly", {
   require_fixtures("val_mvgam_ar1_gp.rds")
   mv <- load_mvgam("ar1_gp")
-  mv$data$group <- NULL
   ce <- suppressWarnings(conditional_effects(mv))
   out <- plot(ce, plot = FALSE)
   testthat::expect_identical(out, ce)
+})
+
+
+# -- series argument (state-space deviation from brms) ----------------
+# `series = NULL` brms-parity behaviour is already covered by the
+# default-call tests above.
+
+test_that("conditional_effects(series = 'all') appends series to condition", {
+  require_fixtures("val_mvgam_ar1_gp.rds")
+  mv <- load_mvgam("ar1_gp")
+  ce <- suppressWarnings(conditional_effects(mv, series = "all"))
+  testthat::expect_s3_class(ce, "mvgam_conditional_effects")
+  testthat::expect_s3_class(ce[[1L]], "ggplot")
+})
+
+test_that("conditional_effects(series = <chr>) filters to one series", {
+  require_fixtures("val_mvgam_ar1_gp.rds")
+  mv <- load_mvgam("ar1_gp")
+  one_level <- levels(mv$data$series)[1L]
+  ce <- suppressWarnings(
+    conditional_effects(mv, series = one_level)
+  )
+  testthat::expect_s3_class(ce, "mvgam_conditional_effects")
+  testthat::expect_s3_class(ce[[1L]], "ggplot")
+})
+
+test_that("conditional_effects(series = <int>) resolves to factor level", {
+  require_fixtures("val_mvgam_ar1_gp.rds")
+  mv <- load_mvgam("ar1_gp")
+  ce <- suppressWarnings(conditional_effects(mv, series = 1L))
+  testthat::expect_s3_class(ce, "mvgam_conditional_effects")
+})
+
+test_that("conditional_effects rejects an unknown series level", {
+  require_fixtures("val_mvgam_ar1_gp.rds")
+  mv <- load_mvgam("ar1_gp")
+  testthat::expect_error(
+    conditional_effects(mv, series = "not_a_series"),
+    regexp = "not one of the model's series levels"
+  )
+})
+
+test_that("conditional_effects rejects an out-of-range series index", {
+  require_fixtures("val_mvgam_ar1_gp.rds")
+  mv <- load_mvgam("ar1_gp")
+  n_levels <- length(levels(mv$data$series))
+  testthat::expect_error(
+    conditional_effects(mv, series = n_levels + 1L),
+    regexp = "upper"
+  )
+})
+
+test_that("conditional_effects rejects malformed series arg", {
+  require_fixtures("val_mvgam_ar1_gp.rds")
+  mv <- load_mvgam("ar1_gp")
+  testthat::expect_error(
+    conditional_effects(mv, series = c("a", "b")),
+    regexp = "NULL, 'all', a series name"
+  )
 })
 
 

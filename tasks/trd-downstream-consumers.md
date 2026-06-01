@@ -278,3 +278,40 @@ CI runs the testthat suite; the brms-concordance suite is manual.
   abundance scale — expensive marginalisation, defer.
 - Full multivariate per-response `resp` handling on `waic` — pass-through
   to `log_lik` in v1; expand if a user asks.
+
+
+## 9. Bayesplot-ecosystem methods — deferred
+
+The diagnostic batch (task #74) shipped: `coef`, `fixef`, `rhat`,
+`neff_ratio`, `nuts_params`, `log_posterior`, `bayes_R2`,
+`prior_summary`, `ndraws`, `nchains`, `niterations`, `nvariables`,
+`posterior_summary`, `getCall`. Two brms methods were considered
+in-tier but deferred:
+
+- **`ranef.mvgam`** and **`VarCorr.mvgam`**: brms shapes are per-group
+  named lists of 3D arrays / variance matrices. The mvgam Stan
+  parameterisation exposes random-effect coefficients as positional
+  `r_<id>_<coef>[<level>]`, `sd_<id>[<coef>]`, `cor_<id>[<i>,<j>]`
+  without the group / coefficient name mapping brms's `rename_pars`
+  cascade applies. Producing brms-shape output therefore requires
+  either re-deriving names from the formula or extending mvgam's
+  variable-aliasing layer. Users can still access the raw draws via
+  `as.matrix(fit, variable = "^(sd|cor|r)_", regex = TRUE)`. Land
+  alongside the next aliasing work.
+
+The following brms `.brmsfit` methods are out of scope. Each is its
+own decision thread, not a gap from the rebuild:
+
+| Method | Why deferred |
+|---|---|
+| `autocor.mvgam` | mvgam autocorrelation lives in the trend submodel, not residual — semantic shift, not a method gap |
+| `bridge_sampler.mvgam` / `bayes_factor.mvgam` / `post_prob.mvgam` | Requires `bridgesampling` integration and Stan code surgery |
+| `hypothesis.mvgam` | Reachable via `marginaleffects::hypotheses()` |
+| `kfold.mvgam` | Heavy refit machinery; revisit with the forecast extrapolator |
+| `vcov.mvgam` | Bayesian users go through draws; point vcov is rarely the right answer |
+| `add_criterion.mvgam` / `loo_*.mvgam` extras (`loo_R2`, `loo_predict`, `loo_subsample`, `loo_moment_match`, `loo_model_weights`, etc.) | Cache / advanced LOO machinery; each warrants its own decision |
+| `expose_functions.mvgam` / `launch_shinystan.mvgam` / `getRefmodel.mvgam` | Niche tooling integrations |
+| `LOO.mvgam` / `WAIC.mvgam` | Uppercase aliases; pure cosmetic parity |
+| `posterior_smooths.mvgam` / `conditional_smooths.mvgam` | Smooth-term-specific predictions; reachable via marginaleffects with effect labels |
+| `update.mvgam` / `update.jsdgam` | Refit-with-new-data convenience; substantial scope (~80–120 LOC), separate task |
+| Diagnostic-flag methods (`control_params`, `inits`, `default_prior`) | Internal-facing in brms; defer until a user need surfaces |

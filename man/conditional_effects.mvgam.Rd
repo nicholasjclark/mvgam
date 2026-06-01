@@ -13,6 +13,7 @@
   points = FALSE,
   rug = FALSE,
   process_error = FALSE,
+  series = NULL,
   ...
 )
 
@@ -43,6 +44,13 @@ marks are drawn along the axes.}
 collapses to its posterior mean; set \code{TRUE} to include per-draw
 latent-state uncertainty.}
 
+\item{series}{Optional control over the \code{series} factor in
+multi-series fits. \code{NULL} (the default) marginalises over series,
+matching brms's behaviour for a grouping factor. \code{"all"} adds
+\code{series} to each condition tuple so the plot facets by series.
+A single integer or character value picks one series and filters
+the prediction grid to that series's observations.}
+
 \item{...}{Ignored.}
 
 \item{plot}{Logical. If \code{TRUE} (default), draws each plot;
@@ -66,8 +74,18 @@ model's term labels (across both observation and trend submodels)
 and produces one ggplot per term.
 }
 \seealso{
-\code{\link[marginaleffects:plot_predictions]{marginaleffects::plot_predictions()}},
-\code{\link[marginaleffects:plot_slopes]{marginaleffects::plot_slopes()}}
+\code{\link[marginaleffects:plot_predictions]{marginaleffects::plot_predictions()}} for the underlying
+conditional-effect engine,
+\code{\link[marginaleffects:predictions]{marginaleffects::predictions()}} for the same content as a
+\code{data.frame},
+\code{\link[marginaleffects:slopes]{marginaleffects::avg_slopes()}},
+\code{\link[marginaleffects:comparisons]{marginaleffects::avg_comparisons()}} for marginal-effect tables,
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} for the prediction primitive that
+\code{plot_predictions} calls under the hood,
+\code{\link[=pp_check.mvgam]{pp_check.mvgam()}} for posterior predictive checks,
+\link{mvgam_diagnostics} for parameter-level diagnostics
+(\code{fixef}, \code{rhat}, \code{bayes_R2}, ...),
+\link{mvgam_draws} for raw draws extraction
 }
 \author{
 Nicholas J Clark

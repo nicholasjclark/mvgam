@@ -111,6 +111,94 @@ test_that("conditional_effects.mvgam signature has expected args", {
   expect_true("effects" %in% fmls)
   expect_true("type" %in% fmls)
   expect_true("process_error" %in% fmls)
+  expect_true("series" %in% fmls)
+})
+
+# Build a minimal mvgam-class stub carrying just the slots
+# `resolve_series_arg` reads. Keeps these tests fast (~1 ms each).
+series_stub <- function(levels = c("s1", "s2", "s3"),
+                        with_series_col = TRUE) {
+  dat <- data.frame(y = seq_along(levels))
+  if (with_series_col) {
+    dat$series <- factor(levels, levels = levels)
+  }
+  structure(list(data = dat), class = "mvgam")
+}
+
+test_that("resolve_series_arg(NULL) returns kind = 'none'", {
+  out <- mvgam:::resolve_series_arg(NULL, series_stub())
+  expect_equal(out$kind, "none")
+  expect_true(is.na(out$level))
+})
+
+test_that("resolve_series_arg('all') returns kind = 'all'", {
+  out <- mvgam:::resolve_series_arg("all", series_stub())
+  expect_equal(out$kind, "all")
+  expect_true(is.na(out$level))
+})
+
+test_that("resolve_series_arg(<chr>) resolves to a single level", {
+  out <- mvgam:::resolve_series_arg("s2", series_stub())
+  expect_equal(out$kind, "one")
+  expect_equal(out$level, "s2")
+})
+
+test_that("resolve_series_arg(<int>) indexes into levels()", {
+  out <- mvgam:::resolve_series_arg(3L, series_stub())
+  expect_equal(out$kind, "one")
+  expect_equal(out$level, "s3")
+})
+
+test_that("resolve_series_arg errors on unknown level", {
+  expect_error(
+    mvgam:::resolve_series_arg("not_a_series", series_stub()),
+    regexp = "not one of the model's series levels"
+  )
+})
+
+test_that("resolve_series_arg errors on out-of-range index", {
+  # checkmate emits "is not <= 3" for an out-of-range index given the
+  # 3-level stub.
+  expect_error(
+    mvgam:::resolve_series_arg(99L, series_stub()),
+    regexp = "not <="
+  )
+})
+
+test_that("resolve_series_arg errors on length-N vector", {
+  expect_error(
+    mvgam:::resolve_series_arg(c("s1", "s2"), series_stub()),
+    regexp = "NULL, 'all', a series name"
+  )
+})
+
+test_that("resolve_series_arg errors when data has no series column", {
+  expect_error(
+    mvgam:::resolve_series_arg(
+      "s1",
+      series_stub(with_series_col = FALSE)
+    ),
+    regexp = "no 'series' column"
+  )
+})
+
+test_that("conditional_effects rejects clashes between `...` and reserved args", {
+  # A stub is enough — the collision guard fires before any
+  # plot_predictions / posterior_epred machinery runs.
+  stub <- structure(
+    list(
+      formula = y ~ x,
+      data = data.frame(y = 1, x = 1, series = factor("s1"))
+    ),
+    class = "mvgam"
+  )
+  for (kw in c("condition", "draw", "newdata")) {
+    expect_error(
+      do.call(conditional_effects, c(list(stub, effects = "x"),
+                                      setNames(list("hijack"), kw))),
+      regexp = "Cannot pass"
+    )
+  }
 })
 
 test_that("re-exports of marginaleffects entry points are wired", {

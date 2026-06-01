@@ -23,6 +23,12 @@
 #'   `get_predict.mvgam`. Defaults to `FALSE` so the latent trend
 #'   collapses to its posterior mean; set `TRUE` to include per-draw
 #'   latent-state uncertainty.
+#' @param series Optional control over the `series` factor in
+#'   multi-series fits. `NULL` (the default) marginalises over series,
+#'   matching brms's behaviour for a grouping factor. `"all"` adds
+#'   `series` to each condition tuple so the plot facets by series.
+#'   A single integer or character value picks one series and filters
+#'   the prediction grid to that series's observations.
 #' @param ... Additional arguments forwarded to
 #'   [marginaleffects::plot_predictions()].
 #'
@@ -30,8 +36,19 @@
 #'   list with one `ggplot` per effect, drawn by the `plot` and
 #'   `print` methods.
 #'
-#' @seealso [marginaleffects::plot_predictions()],
-#'   [marginaleffects::plot_slopes()]
+#' @seealso
+#'   [marginaleffects::plot_predictions()] for the underlying
+#'     conditional-effect engine,
+#'   [marginaleffects::predictions()] for the same content as a
+#'     `data.frame`,
+#'   [marginaleffects::avg_slopes()],
+#'   [marginaleffects::avg_comparisons()] for marginal-effect tables,
+#'   [posterior_epred.mvgam()] for the prediction primitive that
+#'     `plot_predictions` calls under the hood,
+#'   [pp_check.mvgam()] for posterior predictive checks,
+#'   [mvgam_diagnostics] for parameter-level diagnostics
+#'   (`fixef`, `rhat`, `bayes_R2`, ...),
+#'   [mvgam_draws] for raw draws extraction
 #'
 #' @author Nicholas J Clark
 #' @method conditional_effects mvgam
@@ -43,11 +60,16 @@ conditional_effects.mvgam <- function(x,
                                       points = FALSE,
                                       rug = FALSE,
                                       process_error = FALSE,
+                                      series = NULL,
                                       ...) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_character(effects, null.ok = TRUE)
   checkmate::assert_logical(process_error, len = 1L)
   type <- match.arg(type, c("response", "link", "expected"))
+  # `series` is polymorphic (NULL / "all" / character / integer) so a
+  # single checkmate::assert_* call cannot validate it; the resolver
+  # owns the per-branch validation and surfaces typed errors.
+  series_mode <- resolve_series_arg(series, x)
 
   # Observation rugs and overlaid points only make sense on response
   # scale, and only for univariate fits (multivariate `mvbind`
@@ -84,17 +106,59 @@ conditional_effects.mvgam <- function(x,
     return(out)
   }
 
+  # Pre-check the four-way facet case before the dispatch loop:
+  # marginaleffects caps `condition` at three variables, and `series`
+  # facetting would push a 3-var effect to 4.
+  if (identical(series_mode$kind, "all") &&
+        any(lengths(cond_labs) >= 3L)) {
+    stop(insight::format_error(c(
+      "Cannot facet by series when an effect already has three variables.",
+      i = "Drop one effect or omit 'series'."
+    )))
+  }
+
+  # Reject collisions between named arguments mvgam controls and any
+  # the user passes through `...`. Without this, R's positional-merge
+  # in do.call() silently drops the user's override. Only args that
+  # mvgam injects into pp_args but does NOT take as formal parameters
+  # are vulnerable here — `type`, `points`, `rug`, `process_error` are
+  # already consumed by the signature and cannot reach `...`.
+  reserved <- c("condition", "draw", "newdata")
+  dot_names <- names(list(...))
+  clash <- intersect(dot_names, reserved)
+  if (length(clash) > 0L) {
+    stop(insight::format_error(c(
+      paste0(
+        "Cannot pass ",
+        paste(shQuote(clash), collapse = ", "),
+        " through `...`."
+      ),
+      i = paste0(
+        "These are set by conditional_effects.mvgam; pass via the ",
+        "named arguments instead."
+      )
+    )))
+  }
+
   out <- lapply(cond_labs, function(cond) {
-    marginaleffects::plot_predictions(
-      x,
+    pp_args <- list(
       condition = cond,
       draw = TRUE,
       type = type,
       points = points_alpha,
       rug = rug,
-      process_error = process_error,
-      ...
-    ) +
+      process_error = process_error
+    )
+    if (identical(series_mode$kind, "all")) {
+      pp_args$condition <- c(cond, "series")
+    } else if (identical(series_mode$kind, "one")) {
+      # Restrict the prediction grid to one series's observations.
+      pp_args$newdata <- x$data[
+        x$data$series == series_mode$level, , drop = FALSE
+      ]
+    }
+    do.call(marginaleffects::plot_predictions,
+            c(list(x), pp_args, list(...))) +
       ggplot2::scale_fill_discrete(label = round_legend_labels) +
       ggplot2::scale_colour_discrete(label = round_legend_labels) +
       ggplot2::theme_classic()
@@ -197,6 +261,62 @@ split_term_labels <- function(lab) {
   } else {
     list(all.vars(rlang::parse_expr(lab)))
   }
+}
+
+
+# Resolve the user-facing `series` argument into a structured mode
+# the dispatch loop can branch on. Returns a list with
+#   kind   = "none" | "all" | "one"
+#   level  = NA_character_ | <resolved series factor level>
+# Validates against the model's series factor levels and surfaces a
+# targeted error when a non-existent level is requested.
+resolve_series_arg <- function(series, x) {
+  if (is.null(series)) {
+    return(list(kind = "none", level = NA_character_))
+  }
+  if (!"series" %in% names(x$data)) {
+    stop(insight::format_error(c(
+      paste0(
+        "'series' was supplied but the model's data has no ",
+        "'series' column."
+      ),
+      i = paste0(
+        "Drop the 'series' argument for fits without multiple ",
+        "time series."
+      )
+    )))
+  }
+  series_levels <- levels(x$data$series)
+  if (length(series) != 1L) {
+    stop(insight::format_error(
+      "'series' must be NULL, 'all', a series name, or a 1-based index."
+    ))
+  }
+  if (identical(series, "all")) {
+    return(list(kind = "all", level = NA_character_))
+  }
+  if (is.numeric(series)) {
+    checkmate::assert_integerish(
+      series, lower = 1L, upper = length(series_levels), len = 1L
+    )
+    return(list(kind = "one", level = series_levels[as.integer(series)]))
+  }
+  if (is.character(series)) {
+    if (!series %in% series_levels) {
+      stop(insight::format_error(c(
+        "'series' is not one of the model's series levels.",
+        x = paste0("Got: '", series, "'."),
+        i = paste0(
+          "Available: ",
+          paste(shQuote(series_levels), collapse = ", "), "."
+        )
+      )))
+    }
+    return(list(kind = "one", level = series))
+  }
+  stop(insight::format_error(
+    "'series' must be NULL, 'all', a series name, or a 1-based index."
+  ))
 }
 
 

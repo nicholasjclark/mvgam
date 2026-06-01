@@ -17,15 +17,15 @@
   x,
   row.names = NULL,
   optional = TRUE,
-  variable = "betas",
-  use_alias = TRUE,
+  variable = NULL,
   regex = FALSE,
+  use_alias = TRUE,
   ...
 )
 
-\method{as.matrix}{mvgam}(x, variable = "betas", regex = FALSE, use_alias = TRUE, ...)
+\method{as.matrix}{mvgam}(x, variable = NULL, regex = FALSE, use_alias = TRUE, ...)
 
-\method{as.array}{mvgam}(x, variable = "betas", regex = FALSE, use_alias = TRUE, ...)
+\method{as.array}{mvgam}(x, variable = NULL, regex = FALSE, use_alias = TRUE, ...)
 
 \method{as_draws}{mvgam}(
   x,
@@ -75,63 +75,57 @@
 \method{as_draws_rvars}{mvgam}(x, variable = NULL, regex = FALSE, inc_warmup = FALSE, ...)
 }
 \arguments{
-\item{x}{\code{list} object of class \code{mvgam}}
+\item{x}{A fitted \code{mvgam} object.}
 
-\item{row.names}{Ignored}
+\item{row.names, optional}{Ignored.}
 
-\item{optional}{Ignored}
-
-\item{variable}{A character specifying which parameters to extract. Can
-either be one of the following options:
+\item{variable}{Either a keyword shortcut, a character vector of
+parameter names, or (when \code{regex = TRUE}) a vector of regular
+expressions. Recognised keywords:
 \itemize{
-\item \code{obs_params} (other parameters specific to the observation model,
-such as overdispersions for negative binomial models or observation error
-SD for gaussian / student-t models)
-\item \code{betas} (beta coefficients from the GAM observation model linear
-predictor; default)
-\item \code{smooth_params} (smoothing parameters from the GAM observation model)
-\item \code{linpreds} (estimated linear predictors on whatever link scale was
-used in the model)
-\item \code{trend_params} (parameters governing the trend dynamics, such as AR
-parameters, trend SD parameters or Gaussian Process parameters)
-\item \code{trend_betas} (beta coefficients from the GAM latent process model
-linear predictor; only available if a \code{trend_formula} was supplied in the
-original model)
-\item \code{trend_smooth_params} (process model GAM smoothing parameters; only
-available if a \code{trend_formula} was supplied in the original model)
-\item \code{trend_linpreds} (process model linear predictors on the identity
-scale; only available if a \code{trend_formula} was supplied in the original
-model)
+\item \code{"betas"}: population-level fixed effects (brms \verb{b_*}).
+\item \code{"obs_params"}: observation-family distributional
+parameters (\code{sigma}, \code{phi}, \code{shape}, ...).
+\item \code{"smooth_params"}: smooth-term standard deviations
+(\verb{sds_*}).
+\item \code{"trend_betas"}: trend-side fixed effects (\verb{b_trend[*]}).
+\item \code{"trend_params"}: trend-dynamics parameters (AR, GP,
+innovation SD, ...). With a \code{trend_formula} this resolves to
+the \verb{_trend}-suffixed parameter block; without it, the
+top-level trend dynamics.
+\item \code{"trend_smooth_params"}: trend-side smooth SDs.
 }
-OR can be a character vector providing the variables to extract.}
+\code{NULL} (the default) returns every parameter.}
 
-\item{use_alias}{Logical. If more informative names for parameters are
-available (i.e. for beta coefficients \code{b} or for smoothing parameters \code{rho}),
-replace the uninformative names with the more informative alias. Defaults to
-\code{TRUE}.}
+\item{regex}{Logical. When \code{TRUE}, each entry of \code{variable} is
+treated as a regular expression and any parameter matching at
+least one pattern is selected. Keyword shortcuts are still
+honoured. Defaults to \code{FALSE}.}
 
-\item{regex}{Logical. If not using one of the prespecified options for
-extractions, should \code{variable} be treated as a (vector of) regular
-expressions? Any variable in \code{x} matching at least one of the regular
-expressions will be selected. Defaults to \code{FALSE}.}
+\item{use_alias}{Retained for backwards-compatibility; parameter
+names are now brms-native so no aliasing is performed.}
 
-\item{...}{Ignored}
+\item{...}{Ignored.}
 
-\item{inc_warmup}{Should warmup draws be included? Defaults to \code{FALSE}.}
+\item{inc_warmup}{Logical. Include warmup draws? Defaults to
+\code{FALSE}.}
 }
 \value{
-A \code{data.frame}, \code{matrix}, or \code{array} containing the posterior draws.
+A \code{data.frame}, \code{matrix}, \code{array}, or one of the
+\verb{posterior::draws_*} classes (\code{draws_matrix}, \code{draws_array},
+\code{draws_df}, \code{draws_list}, \code{draws_rvars}) depending on the method
+dispatched.
 }
 \description{
-Extract posterior draws in conventional formats as data.frames, matrices,
-or arrays.
+Extract posterior draws in conventional formats as data.frames,
+matrices, arrays, or \verb{posterior::draws_*} objects.
 }
 \examples{
 \donttest{
 sim <- sim_mvgam(family = Gamma())
 
 mod1 <- mvgam(
-  y ~ s(season, bs = 'cc'),
+  y ~ s(season, bs = "cc"),
   trend_model = AR(),
   data = sim$data_train,
   family = Gamma(),
@@ -139,17 +133,22 @@ mod1 <- mvgam(
   silent = 2
 )
 
-beta_draws_df <- as.data.frame(mod1, variable = 'betas')
-head(beta_draws_df)
-str(beta_draws_df)
-
-beta_draws_mat <- as.matrix(mod1, variable = 'betas')
-head(beta_draws_mat)
-str(beta_draws_mat)
-
-shape_pars <- as.matrix(mod1, variable = 'shape', regex = TRUE)
-head(shape_pars)
+head(as.matrix(mod1, variable = "betas"))
+head(as.matrix(mod1, variable = "trend_params"))
+head(as.matrix(mod1, variable = "^sd_", regex = TRUE))
 }
+}
+\seealso{
+\link{mvgam_diagnostics} for higher-level summaries derived from
+these draws (\code{rhat}, \code{neff_ratio}, \code{fixef}, \code{bayes_R2},
+\code{posterior_summary}, ...),
+\code{\link[=variables.mvgam]{variables.mvgam()}} to list every parameter name in the fit,
+\code{\link[=mcmc_plot.mvgam]{mcmc_plot.mvgam()}} for diagnostic visualisations,
+\code{\link[=summary.mvgam]{summary.mvgam()}} for a printed model summary,
+\code{\link[=tidy.mvgam]{tidy.mvgam()}} for a tibble of parameter summaries,
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}, \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}},
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} for prediction-scale outputs,
+\link[posterior:draws]{posterior::draws} for the underlying draws classes.
 }
 \author{
 Nicholas J Clark

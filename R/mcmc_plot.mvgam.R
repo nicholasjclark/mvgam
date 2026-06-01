@@ -31,8 +31,8 @@
 #'              silent = 2)
 #' mcmc_plot(mod)
 #' mcmc_plot(mod, type = 'neff_hist')
-#' mcmc_plot(mod, variable = 'betas', type = 'areas')
-#' mcmc_plot(mod, variable = 'trend_params', type = 'combo')
+#' mcmc_plot(mod, variable = "betas", type = "areas")
+#' mcmc_plot(mod, variable = "trend_params", type = "combo")
 #' }
 #' @export
 mcmc_plot.mvgam = function(
@@ -43,6 +43,10 @@ mcmc_plot.mvgam = function(
   use_alias = TRUE,
   ...
 ) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_character(variable, null.ok = TRUE)
+  checkmate::assert_logical(regex, len = 1L)
+  checkmate::assert_logical(use_alias, len = 1L)
   # Set red colour scheme
   col_scheme <- attr(color_scheme_get(), 'scheme_name')
   color_scheme_set('red')
@@ -51,26 +55,30 @@ mcmc_plot.mvgam = function(
   valid_types <- as.character(bayesplot::available_mcmc(""))
   valid_types <- sub("^mcmc_", "", valid_types)
   if (!type %in% valid_types) {
-    stop(
-      "Invalid plot type. Valid plot types are: \n",
-      paste0("'", valid_types, "'", collapse = ", "),
-      call. = FALSE
-    )
+    stop(insight::format_error(c(
+      "'type' is not a recognised bayesplot MCMC plot.",
+      x = paste0("Got: '", type, "'."),
+      i = paste0(
+        "Available: ",
+        paste0("'", valid_types, "'", collapse = ", "), "."
+      )
+    )))
   }
 
-  # Set default params to plot
-  # By default, don't plot the Betas as there can be hundreds
-  # of them in spline models
+  # Default variable set: every brms-named parameter except the bulk
+  # per-observation / per-state arrays (latent trend, innovations,
+  # posterior predictive draws) and the Stan housekeeping entries
+  # (`lp__`, `lprior`). Spline-heavy models otherwise render hundreds
+  # of panels.
   if (is.null(variable)) {
-    all_pars <- variables(object)
-    variable <- c(
-      all_pars$observation_pars[, 1],
-      all_pars$observation_smoothpars[, 1],
-      all_pars$observation_re_params[, 1],
-      all_pars$trend_pars[, 1],
-      all_pars$trend_smoothpars[, 1],
-      all_pars$trend_re_params[, 1]
+    all_vars <- posterior::variables(
+      posterior::as_draws_array(object$fit)
     )
+    drop_pattern <- paste0(
+      "^(trend\\[|innovations_trend\\[|Y_pred\\[|",
+      "lp__$|lprior$)"
+    )
+    variable <- all_vars[!grepl(drop_pattern, all_vars)]
     regex <- FALSE
   }
 
@@ -78,12 +86,15 @@ mcmc_plot.mvgam = function(
   mcmc_fun <- get(paste0("mcmc_", type), asNamespace("bayesplot"))
   mcmc_arg_names <- names(formals(mcmc_fun))
   mcmc_args <- list(...)
+  # NUTS sampler params are needed for both `x` (nuts_* plot types)
+  # and `np` (any plot type that overlays divergences). Compute once.
+  need_np <- ("x" %in% mcmc_arg_names && grepl("^nuts_", type)) ||
+    "np" %in% mcmc_arg_names
+  np <- if (need_np) nuts_params(object) else NULL
   if ("x" %in% mcmc_arg_names) {
     if (grepl("^nuts_", type)) {
-      # x refers to a molten data.frame of NUTS parameters
-      mcmc_args$x <- brms::nuts_params(object$model_output)
+      mcmc_args$x <- np
     } else {
-      # x refers to a data.frame of draws
       draws <- as.array(
         object,
         variable = variable,
@@ -92,29 +103,33 @@ mcmc_plot.mvgam = function(
       )
       sel_variables <- dimnames(draws)$variable
       if (type %in% c("scatter", "hex") && length(sel_variables) != 2L) {
-        stop(
-          "Exactly 2 parameters must be selected for this type.",
-          "\nParameters selected: ",
-          paste0("'", sel_variables, "'", collapse = ", "),
-          call. = FALSE
-        )
+        stop(insight::format_error(c(
+          paste0(
+            "'type = ", type,
+            "' requires exactly two parameters."
+          ),
+          x = paste0(
+            "Selected: ",
+            paste0("'", sel_variables, "'", collapse = ", "), "."
+          ),
+          i = "Restrict via 'variable' or 'regex'."
+        )))
       }
-
       if (type == 'pairs' && length(sel_variables) == 1L) {
-        stop(
-          "2 or more parameters must be selected for this type.",
-          "\nParameters selected: ",
-          paste0("'", sel_variables, "'", collapse = ", "),
-          call. = FALSE
-        )
+        stop(insight::format_error(c(
+          "'type = pairs' requires two or more parameters.",
+          x = paste0(
+            "Selected: ",
+            paste0("'", sel_variables, "'", collapse = ", "), "."
+          ),
+          i = "Widen 'variable' or drop 'regex'."
+        )))
       }
-
       mcmc_args$x <- draws
     }
   }
-
   if ("np" %in% mcmc_arg_names) {
-    mcmc_args$np <- brms::nuts_params(object$model_output)
+    mcmc_args$np <- np
   }
   interval_type <- type %in% c("intervals", "areas")
   if ("rhat" %in% mcmc_arg_names && !interval_type) {
