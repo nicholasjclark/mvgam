@@ -1,121 +1,147 @@
 #' Detect Gaussian Process Terms in Prep Object
 #'
 #' Searches a brmsprep object for Gaussian Process (GP) terms and
-#'   validates that complete GP data structures exist. Only supports
-#'   approximate GP using Hilbert space approximation (gp(x, k=5)
-#'   syntax in brms).
+#'   groups level-specific basis matrices under a single term id when
+#'   the GP carries a `by` variable. Only approximate (Hilbert-space)
+#'   GPs are supported.
 #'
 #' @param prep A brmsprep object from prepare_predictions()
 #'
 #' @return NULL if no GP terms found, otherwise a list with:
-#'   - suffixes: character vector of GP term identifiers (e.g., "1",
-#'     "trend_1")
-#'   - type: always "approximate" (mvgam only supports approximate GP)
-#'   - n_terms: integer count of valid GP terms
+#'   - terms: named list keyed by term id (e.g. `"1"`, `"trend_2"`).
+#'     Each entry is `list(id, n_levels)`. `n_levels == 1` indicates a
+#'     standard GP (single basis matrix `Xgp_<id>`); `n_levels > 1`
+#'     indicates a by-factor GP with per-level basis matrices
+#'     `Xgp_<id>_<g>` for g in 1..n_levels.
+#'   - type: always "approximate"
+#'   - n_terms: integer count of detected GP terms
 #'
 #' @details
-#' GP terms are identified by Xgp_* matrices in prep$sdata. Each valid
-#'   GP term must have complete data structures:
-#' - Xgp_<suffix>: basis function evaluations (N × k matrix)
-#' - slambda_<suffix>: eigenvalues for spectral basis functions (k × dims array)
-#' - NBgp_<suffix>: number of basis functions (scalar)
+#' Term ids are enumerated from `sdgp_<id>[...]` parameters in
+#'   `prep$draws` rather than from `Xgp_*` names in `prep$sdata`, because
+#'   `sdgp` is emitted consistently per term whereas `Xgp` carries a
+#'   level suffix in the by-factor case (`Xgp_<id>_<g>`) and is
+#'   indistinguishable by name from a non-by term whose id happens to
+#'   contain an underscore.
 #'
-#' And corresponding parameters in prep$draws:
-#' - zgp_<suffix>: standard normal draws (ndraws × k matrix)
-#' - sdgp_<suffix>: marginal standard deviations (ndraws × k matrix)  
-#' - lscale_<suffix>: length-scale parameters (ndraws × k matrix)
+#' For each detected term, the function validates that the appropriate
+#'   `Xgp_*` and `slambda_*` data structures exist:
+#' - no-by GP: `Xgp_<id>`, `slambda_<id>`
+#' - by-factor GP: `Xgp_<id>_<g>` and `slambda_<id>_<g>` for each level
 #'
-#' Full GP (gp(x) without k) is not supported and will not be detected.
+#' If a candidate term is missing required structures, the function
+#'   errors with the unrecognised pattern (no silent skip — silent skip
+#'   was the cause of bug #53 where by-factor GP contributions were
+#'   never added to the linear predictor).
 #'
-#' Terms with incomplete data structures are silently skipped. If all
-#'   candidate GP terms are incomplete, returns NULL. This allows
-#'   graceful handling of partially specified models.
+#' Full GP (`gp(x)` without `k`) emits no `slambda_*` and is not
+#'   detected.
 #'
 #' @noRd
 detect_gp_terms <- function(prep) {
   checkmate::assert_class(prep, "brmsprep")
   checkmate::assert_list(prep$sdata, names = "named")
-
-  # Validate dpars if present
   if ("dpars" %in% names(prep)) {
     checkmate::assert_list(prep$dpars, names = "named")
   }
-
-  # Search for Xgp_* matrices indicating GP terms
-  gp_candidates <- grep("^Xgp_", names(prep$sdata), value = TRUE)
-
-  if (length(gp_candidates) == 0) {
+  if (!"draws" %in% names(prep)) {
     return(NULL)
   }
 
-  # Extract suffixes (e.g., "1" from "Xgp_1", "trend_1" from "Xgp_trend_1")
-  suffixes <- sub("^Xgp_", "", gp_candidates)
+  draws_names <- colnames(prep$draws)
+  sdata_names <- names(prep$sdata)
 
-  # Validate each candidate has complete GP structure
-  valid_suffixes <- character()
+  # Enumerate term ids via sdgp_<id>[...]. The id is the substring
+  # between "sdgp_" and the opening bracket.
+  sdgp_flat <- grep("^sdgp_.+\\[[0-9]+\\]$", draws_names, value = TRUE)
+  if (length(sdgp_flat) == 0L) {
+    return(NULL)
+  }
+  ids <- unique(sub("^sdgp_(.+?)\\[[0-9]+\\]$", "\\1", sdgp_flat))
 
-  for (suffix in suffixes) {
-    # Check required sdata components
-    required_sdata <- c(
-      paste0("Xgp_", suffix),
-      paste0("slambda_", suffix),
-      paste0("NBgp_", suffix)
-    )
+  terms <- list()
+  for (id in ids) {
+    sdgp_id <- grep(paste0("^sdgp_", id, "\\["), sdgp_flat, value = TRUE)
+    n_levels <- length(sdgp_id)
+    checkmate::assert_int(n_levels, lower = 1L)
 
-    if (!all(required_sdata %in% names(prep$sdata))) {
-      missing_sdata <- setdiff(required_sdata, names(prep$sdata))
-      next
-    }
-
-    # Check required parameter components in draws matrix
-    if (!"draws" %in% names(prep)) {
-      next
-    }
-
-    draws_names <- colnames(prep$draws)
-    
-    # Check for bracket notation GP parameters
-    has_zgp <- any(grepl(paste0("^zgp_", suffix, "\\["), draws_names))
-    has_sdgp <- any(grepl(paste0("^sdgp_", suffix, "\\["), draws_names))
-    
-    # Check for lscale with multiple possible patterns
-    has_lscale <- any(grepl(paste0("^lscale_", suffix, "\\["), draws_names))
-    if (!has_lscale) {
-      # Try alternative patterns for lscale
-      alt_patterns <- c(
-        paste0("^lsd_", suffix, "\\["),
-        paste0("^lengthscale_", suffix, "\\["),
-        paste0("^ls_", suffix, "\\[")
+    # Required Xgp / slambda entries differ by by-status. Surface the
+    # missing names directly rather than skipping silently.
+    if (n_levels == 1L) {
+      required <- c(paste0("Xgp_", id), paste0("slambda_", id))
+    } else {
+      required <- c(
+        paste0("Xgp_", id, "_", seq_len(n_levels)),
+        paste0("slambda_", id, "_", seq_len(n_levels))
       )
-      has_lscale <- any(sapply(alt_patterns, function(p) any(grepl(p, draws_names))))
     }
-    
-    if (!has_zgp || !has_sdgp || !has_lscale) {
-      missing <- character()
-      if (!has_zgp) missing <- c(missing, paste0("zgp_", suffix, "[*]"))
-      if (!has_sdgp) missing <- c(missing, paste0("sdgp_", suffix, "[*]"))
-      if (!has_lscale) missing <- c(missing, paste0("lscale_", suffix, "[*]"))
-      
-      # Add debug output to investigate missing lscale
-      if (!has_lscale) {
-        all_scale_params <- grep("scale|lscale|lsd|ls", draws_names, value = TRUE, ignore.case = TRUE)
-      }
-      
-      next
+    missing_required <- setdiff(required, sdata_names)
+    if (length(missing_required) > 0L) {
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "GP term {.field {id}} is missing expected standata entries."
+        ),
+        x = cli::format_inline(
+          "Missing: {paste(missing_required, collapse = ', ')}"
+        ),
+        i = cli::format_inline(
+          "n_levels detected from {.field sdgp_{id}[*]} = {n_levels}."
+        )
+      )))
     }
 
-    # Valid complete GP term found
-    valid_suffixes <- c(valid_suffixes, suffix)
+    # zgp parameter naming differs: bracket-indexed for no-by
+    # (zgp_<id>[k]) and underscore-suffixed for by-factor
+    # (zgp_<id>_<g>[k]).
+    if (n_levels == 1L) {
+      zgp_pat <- paste0("^zgp_", id, "\\[")
+    } else {
+      zgp_pat <- paste0("^zgp_", id, "_[0-9]+\\[")
+    }
+    if (!any(grepl(zgp_pat, draws_names))) {
+      stop(insight::format_error(
+        cli::format_inline(
+          "No {.field zgp} parameters found for GP term {.field {id}}."
+        )
+      ))
+    }
+
+    # lscale is emitted by brms as a 2D matrix lscale_<id>[level, dim].
+    # Some user-overrides rename to lsd_/lengthscale_/ls_; keep that
+    # fallback intact.
+    lscale_present <- any(grepl(
+      paste0("^lscale_", id, "\\["), draws_names
+    ))
+    if (!lscale_present) {
+      alt_pats <- paste0(
+        "^", c("lsd_", "lengthscale_", "ls_"), id, "\\["
+      )
+      lscale_present <- any(vapply(
+        alt_pats,
+        function(p) any(grepl(p, draws_names)),
+        logical(1L)
+      ))
+    }
+    if (!lscale_present) {
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "No {.field lscale} parameters found for GP term {.field {id}}."
+        ),
+        i = "Tried prefixes: lscale_, lsd_, lengthscale_, ls_."
+      )))
+    }
+
+    terms[[id]] <- list(id = id, n_levels = n_levels)
   }
 
-  if (length(valid_suffixes) == 0) {
+  if (length(terms) == 0L) {
     return(NULL)
   }
 
   list(
-    suffixes = valid_suffixes,
+    terms = terms,
     type = "approximate",
-    n_terms = length(valid_suffixes)
+    n_terms = length(terms)
   )
 }
 
@@ -894,261 +920,216 @@ validate_monotonic_indices <- function(xmo_data, xmo_name, k_levels, n_obs) {
 #'
 #' @noRd
 add_all_gp_contributions <- function(eta, prep, brmsfit = NULL, resp = NULL) {
-  # Validate inputs
   checkmate::assert_matrix(eta, any.missing = FALSE)
-  checkmate::assert_class(prep, "brmsprep") 
+  checkmate::assert_class(prep, "brmsprep")
   checkmate::assert_string(resp, null.ok = TRUE)
-  
-  # Detect GP terms
+
   gp_info <- detect_gp_terms(prep)
   if (is.null(gp_info)) {
-    return(eta)  # No GP terms found
+    return(eta)
   }
-  
-  # Detect kernel type (use cached if available, detect if brmsfit provided)
+
   kernel <- prep$gp_kernel
   if (is.null(kernel) && !is.null(brmsfit)) {
     kernel <- detect_gp_kernel(prep, brmsfit)
   }
   if (is.null(kernel)) {
-    kernel <- "exp_quad"  # Default fallback
+    kernel <- "exp_quad"
   }
-  
-  # Filter GP terms by response context (multivariate only)
-  suffixes <- gp_info$suffixes
-  if (!is.null(resp)) {
-    # Multivariate: include response-specific + shared terms
-    valid_suffixes <- character()
-    for (suffix in suffixes) {
-      is_resp_specific <- grepl(paste0("^", resp, "_"), suffix)
-      is_shared <- !grepl("^[a-zA-Z]", suffix)
-      
-      if (is_resp_specific || is_shared) {
-        valid_suffixes <- c(valid_suffixes, suffix)
-      }
-    }
-    suffixes <- valid_suffixes
-  }
-  
-  # Return early if no valid suffixes remain
-  if (length(suffixes) == 0) {
-    return(eta)
-  }
-  
-  # Validate kernel before processing
   checkmate::assert_string(kernel, min.chars = 1)
 
-  # Process each valid GP term
-  for (suffix in suffixes) {
-    # Extract GP components from sdata and draws
-    Xgp <- prep$sdata[[paste0("Xgp_", suffix)]]
-    slambda <- prep$sdata[[paste0("slambda_", suffix)]]
+  term_ids <- names(gp_info$terms)
+  if (!is.null(resp)) {
+    # Multivariate filter: keep response-specific or shared term ids.
+    # Response-specific term ids begin with the response name; shared
+    # terms begin with a digit (purely numeric brms term id).
+    keep <- vapply(term_ids, function(id) {
+      grepl(paste0("^", resp, "_"), id) || !grepl("^[a-zA-Z]", id)
+    }, logical(1L))
+    term_ids <- term_ids[keep]
+  }
+  if (length(term_ids) == 0L) {
+    return(eta)
+  }
 
-    # Skip if missing required data components
-    if (is.null(Xgp) || is.null(slambda)) {
-      next
-    }
+  draws_mat <- prep$draws
+  draws_names <- colnames(draws_mat)
+  n_draws <- nrow(draws_mat)
 
-    # Extract GP parameters from draws matrix using bracket patterns
-    draws_mat <- prep$draws
-    draws_names <- colnames(draws_mat)
-    n_draws <- nrow(draws_mat)
+  for (id in term_ids) {
+    info <- gp_info$terms[[id]]
+    n_levels <- info$n_levels
 
-    # Count sdgp parameters to detect by-variable GP
-    sdgp_names <- grep(
-      paste0("^sdgp_", suffix, "\\["),
-      draws_names,
-      value = TRUE
-    )
-    n_levels <- length(sdgp_names)
-
-    if (n_levels == 0) {
-      next
-    }
-
-    # Check for Jgp (observation-to-covariate mapping)
-    Jgp <- prep$sdata[[paste0("Jgp_", suffix)]]
-
-    # Check for Cgp (continuous by-variable scaling)
-    Cgp <- prep$sdata[[paste0("Cgp_", suffix)]]
-
-    if (n_levels > 1) {
-      # GP with categorical by-variable requires level-indexed parameters
-      checkmate::assert_int(n_levels, lower = 2)
-
-      # Initialize GP contribution matrix (rows=draws, cols=observations)
+    if (n_levels > 1L) {
+      # By-factor GP. Each level has its own basis matrix
+      # Xgp_<id>_<g>, eigenvalues slambda_<id>_<g>, observation
+      # indices Igp_<id>_<g> (into the full eta column space) and
+      # within-level covariate mapping Jgp_<id>_<g>. Parameters are
+      # split across naming styles: sdgp_<id>[g] (bracket-indexed)
+      # and zgp_<id>_<g>[k] (suffix-indexed). lscale_<id>[g, d] is
+      # 2D bracket-indexed for level and covariate dimension.
       gp_contrib <- matrix(0, nrow = n_draws, ncol = ncol(eta))
 
       for (g in seq_len(n_levels)) {
-        # Extract level-specific sdgp
-        sdgp_g <- draws_mat[, sdgp_names[g]]
-        checkmate::assert_numeric(
-          sdgp_g,
-          any.missing = FALSE,
-          len = n_draws
-        )
+        Xgp_g <- prep$sdata[[paste0("Xgp_", id, "_", g)]]
+        slambda_g <- prep$sdata[[paste0("slambda_", id, "_", g)]]
+        Igp_g <- prep$sdata[[paste0("Igp_", id, "_", g)]]
+        Jgp_g <- prep$sdata[[paste0("Jgp_", id, "_", g)]]
+        Cgp_g <- prep$sdata[[paste0("Cgp_", id, "_", g)]]
 
-        # Extract level-specific zgp: zgp_suffix[g,k] for k in 1:n_basis
-        zgp_g_pattern <- paste0("^zgp_", suffix, "\\[", g, ",")
-        zgp_g_names <- grep(zgp_g_pattern, draws_names, value = TRUE)
-        if (length(zgp_g_names) == 0) {
+        # Igp_g + Jgp_g are required for by-factor placement.
+        # detect_gp_terms already validated Xgp_g + slambda_g.
+        if (is.null(Igp_g) || is.null(Jgp_g)) {
           stop(insight::format_error(c(
             cli::format_inline(
-              "No {.field zgp} parameters found for level {g} in GP suffix {.field {suffix}}."
+              "By-factor GP term {.field {id}} level {g} is missing observation-to-basis mappings."
             ),
-            i = "Check that model parameters match prediction data."
+            x = cli::format_inline(
+              "Required: Igp_{id}_{g} and Jgp_{id}_{g} in standata."
+            )
           )))
+        }
+        # newdata may not contain observations for every level of the
+        # by-factor (e.g. a prediction grid filtered to a single
+        # category). brms emits zero-row Xgp / empty Igp for absent
+        # levels; nothing to scatter into eta for that level.
+        if (length(Igp_g) == 0L) {
+          next
+        }
+        checkmate::assert_integerish(Igp_g, any.missing = FALSE, lower = 1L)
+        checkmate::assert_integerish(Jgp_g, any.missing = FALSE, lower = 1L)
+
+        sdgp_g <- draws_mat[, paste0("sdgp_", id, "[", g, "]")]
+        checkmate::assert_numeric(sdgp_g, any.missing = FALSE, len = n_draws)
+
+        zgp_g_names <- grep(
+          paste0("^zgp_", id, "_", g, "\\["),
+          draws_names,
+          value = TRUE
+        )
+        if (length(zgp_g_names) == 0L) {
+          stop(insight::format_error(
+            cli::format_inline(
+              "No {.field zgp_{id}_{g}[*]} parameters in draws."
+            )
+          ))
         }
         zgp_g <- draws_mat[, zgp_g_names, drop = FALSE]
-        checkmate::assert_matrix(zgp_g, any.missing = FALSE, nrows = n_draws)
 
-        # Extract level-specific lscale: lscale_suffix[g,d] for d dimensions
-        lscale_g_pattern <- paste0("^lscale_", suffix, "\\[", g, ",")
-        lscale_g_names <- grep(lscale_g_pattern, draws_names, value = TRUE)
-        if (length(lscale_g_names) == 0) {
-          stop(insight::format_error(c(
+        lscale_g_names <- grep(
+          paste0("^lscale_", id, "\\[", g, ","),
+          draws_names,
+          value = TRUE
+        )
+        if (length(lscale_g_names) == 0L) {
+          stop(insight::format_error(
             cli::format_inline(
-              "No {.field lscale} parameters found for level {g} in GP suffix {.field {suffix}}."
-            ),
-            i = "Check that model parameters match prediction data."
-          )))
+              "No {.field lscale_{id}[{g},*]} parameters in draws."
+            )
+          ))
         }
         lscale_g <- draws_mat[, lscale_g_names, drop = FALSE]
-        checkmate::assert_matrix(lscale_g, any.missing = FALSE, nrows = n_draws)
 
-        # Compute GP contribution for this level
-        gp_g <- approx_gp_pred(Xgp, slambda, zgp_g, sdgp_g, lscale_g, kernel)
+        gp_g <- approx_gp_pred(
+          Xgp_g, slambda_g, zgp_g, sdgp_g, lscale_g, kernel
+        )
 
-        # Find observations belonging to this level
-        # Check for level-specific Jgp (e.g., Jgp_2_1, Jgp_2_2)
-        Jgp_g_name <- paste0("Jgp_", suffix, "_", g)
-        Jgp_g <- prep$sdata[[Jgp_g_name]]
+        # Reorder level's basis-row predictions to observation order
+        # using Jgp_g, then scatter into the full predictor at Igp_g.
+        obs_contrib <- gp_g[, Jgp_g, drop = FALSE]
 
-        if (!is.null(Jgp_g)) {
-          # Level-specific Jgp: maps level's obs to GP covariate indices
-          checkmate::assert_integerish(Jgp_g, any.missing = FALSE, lower = 1)
-          level_obs <- which(!is.na(Jgp_g) & Jgp_g > 0)
-          if (length(level_obs) > 0) {
-            gp_contrib[, level_obs] <- gp_g[, Jgp_g[level_obs], drop = FALSE]
-          }
-        } else if (!is.null(Jgp)) {
-          # Single Jgp with level indicator: values indicate level membership
-          level_obs <- which(Jgp == g)
-          if (length(level_obs) > 0) {
-            if (length(level_obs) != ncol(gp_g)) {
-              stop(insight::format_error(
-                cli::format_inline(
-                  "Dimension mismatch for GP level {g}: expected {length(level_obs)} observations but GP contribution has {ncol(gp_g)} columns."
-                )
-              ))
-            }
-            gp_contrib[, level_obs] <- gp_g
-          }
-        } else {
-          # No Jgp mapping available - cannot determine level membership
-          stop(insight::format_error(c(
-            cli::format_inline(
-              "GP with by-variable requires {.field Jgp} mapping but none found for suffix {.field {suffix}}."
-            ),
-            i = "Check that standata includes level membership indicators."
-          )))
+        # Cgp_g carries continuous by-variable scaling (1 for factor
+        # by; covariate value for continuous by). Apply per-obs.
+        if (!is.null(Cgp_g)) {
+          checkmate::assert_numeric(
+            Cgp_g, any.missing = FALSE, len = length(Igp_g)
+          )
+          Cgp_mat <- matrix(
+            Cgp_g, nrow = n_draws, ncol = length(Igp_g), byrow = TRUE
+          )
+          obs_contrib <- obs_contrib * Cgp_mat
         }
-      }
 
-      # Apply continuous by-variable scaling if present
-      if (!is.null(Cgp)) {
-        checkmate::assert_numeric(Cgp, any.missing = FALSE, len = ncol(eta))
-        Cgp_mat <- matrix(Cgp, nrow = n_draws, ncol = ncol(eta), byrow = TRUE)
-        gp_contrib <- gp_contrib * Cgp_mat
+        gp_contrib[, Igp_g] <- gp_contrib[, Igp_g] + obs_contrib
       }
 
       eta <- eta + gp_contrib
-
     } else {
-      # Single level GP (no categorical by-variable)
-      sdgp <- draws_mat[, sdgp_names[1]]
+      # No-by GP: a single basis matrix covers all observations.
+      Xgp <- prep$sdata[[paste0("Xgp_", id)]]
+      slambda <- prep$sdata[[paste0("slambda_", id)]]
+      Jgp <- prep$sdata[[paste0("Jgp_", id)]]
+      Cgp <- prep$sdata[[paste0("Cgp_", id)]]
 
-      # Extract zgp parameters (multiple basis functions)
+      sdgp <- draws_mat[, paste0("sdgp_", id, "[1]")]
+
       zgp_names <- grep(
-        paste0("^zgp_", suffix, "\\["),
-        draws_names,
-        value = TRUE
+        paste0("^zgp_", id, "\\["), draws_names, value = TRUE
       )
-      if (length(zgp_names) == 0) {
+      if (length(zgp_names) == 0L) {
         stop(insight::format_error(
           cli::format_inline(
-            "No {.field zgp} parameters found for suffix {.field {suffix}}."
+            "No {.field zgp_{id}[*]} parameters in draws."
           )
         ))
       }
       zgp <- draws_mat[, zgp_names, drop = FALSE]
 
-      # Extract lscale parameters
       lscale_names <- grep(
-        paste0("^lscale_", suffix, "\\["),
-        draws_names,
-        value = TRUE
+        paste0("^lscale_", id, "\\["), draws_names, value = TRUE
       )
-      if (length(lscale_names) == 0) {
-        # Try alternative patterns
-        alt_patterns <- c(
-          paste0("^lsd_", suffix, "\\["),
-          paste0("^lengthscale_", suffix, "\\["),
-          paste0("^ls_", suffix, "\\[")
+      if (length(lscale_names) == 0L) {
+        alt_patterns <- paste0(
+          "^", c("lsd_", "lengthscale_", "ls_"), id, "\\["
         )
         for (pattern in alt_patterns) {
           lscale_names <- grep(pattern, draws_names, value = TRUE)
-          if (length(lscale_names) > 0) break
+          if (length(lscale_names) > 0L) break
         }
       }
-      if (length(lscale_names) == 0) {
+      if (length(lscale_names) == 0L) {
         stop(insight::format_error(c(
           cli::format_inline(
-            "No {.field lscale} parameters found for suffix {.field {suffix}}."
+            "No {.field lscale} parameters in draws for term {.field {id}}."
           ),
-          i = "Tried patterns: lscale_, lsd_, lengthscale_, ls_."
+          i = "Tried prefixes: lscale_, lsd_, lengthscale_, ls_."
         )))
       }
       lscale <- draws_mat[, lscale_names, drop = FALSE]
 
-      # Validate matrix dimensions and structure
       checkmate::assert_matrix(Xgp, any.missing = FALSE, all.missing = FALSE)
       checkmate::assert_array(
-        slambda,
-        min.d = 2,
-        max.d = 3,
-        any.missing = FALSE
+        slambda, min.d = 2L, max.d = 3L, any.missing = FALSE
       )
       checkmate::assert_matrix(zgp, any.missing = FALSE, all.missing = FALSE)
-      checkmate::assert_numeric(sdgp, any.missing = FALSE, min.len = 1)
-      checkmate::assert_matrix(lscale, any.missing = FALSE, all.missing = FALSE)
+      checkmate::assert_numeric(sdgp, any.missing = FALSE, min.len = 1L)
+      checkmate::assert_matrix(
+        lscale, any.missing = FALSE, all.missing = FALSE
+      )
 
-      # Compute GP contribution
-      gp_contrib <- approx_gp_pred(Xgp, slambda, zgp, sdgp, lscale, kernel)
+      gp_contrib <- approx_gp_pred(
+        Xgp, slambda, zgp, sdgp, lscale, kernel
+      )
 
-      # Apply Jgp expansion if present (maps obs to unique covariate positions)
-      # Following brms pattern: eta <- eta[, Jgp, drop = FALSE]
       if (!is.null(Jgp)) {
         checkmate::assert_integerish(
-          Jgp,
-          any.missing = FALSE,
-          lower = 1,
-          upper = ncol(gp_contrib)
+          Jgp, any.missing = FALSE, lower = 1L, upper = ncol(gp_contrib)
         )
         gp_contrib <- gp_contrib[, Jgp, drop = FALSE]
       }
 
-      # Apply continuous by-variable scaling if present
       if (!is.null(Cgp)) {
         checkmate::assert_numeric(Cgp, any.missing = FALSE, len = ncol(eta))
-        Cgp_mat <- matrix(Cgp, nrow = n_draws, ncol = ncol(eta), byrow = TRUE)
+        Cgp_mat <- matrix(
+          Cgp, nrow = n_draws, ncol = ncol(eta), byrow = TRUE
+        )
         gp_contrib <- gp_contrib * Cgp_mat
       }
 
       eta <- eta + gp_contrib
     }
   }
-  
+
   eta
 }
 

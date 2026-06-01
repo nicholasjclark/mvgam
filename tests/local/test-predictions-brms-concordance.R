@@ -88,6 +88,62 @@ test_that("Poisson AR(1) + GP(z)", {
   assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.88)
 })
 
+test_that("Poisson AR(1) + GP(z) + GP(w, by = cat)", {
+  # By-factor GP regression test (#53): brms generates per-level basis
+  # matrices (Xgp_<id>_<g>, slambda_<id>_<g>) and per-level coefficients
+  # (zgp_<id>_<g>[k]) while sdgp_<id>[g] and lscale_<id>[g, d] are
+  # bracket-indexed. Prior to the fix, detect_gp_terms split term 2's
+  # basis matrices into separate "terms" 2_1 and 2_2 and silently
+  # dropped them, returning identical predictions for every level of
+  # cat. The two assertions below catch both the structural bug
+  # (predictions varying across levels) and the numerical correctness
+  # (concordance with brms's own per-level prediction).
+  require_fixtures("val_brms_ar1_gp2_by.rds", "val_mvgam_ar1_gp2_by.rds")
+  brms_fit <- load_brms("ar1_gp2_by")
+  mvgam_fit <- load_mvgam("ar1_gp2_by")
+  newdata <- mvgam_fit$data
+  assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.88)
+
+  # Regression sentinel: predictions on a fixed (w, z) grid must differ
+  # across cat levels. A passing concordance test catches drift but
+  # not a future regression to the silent-skip path; this assertion
+  # locks the by-factor contribution in.
+  wgrid <- seq(min(mvgam_fit$data$w),
+               max(mvgam_fit$data$w),
+               length.out = 6L)
+  grid_A <- data.frame(
+    w = wgrid, z = 0,
+    cat = factor("A", levels = levels(mvgam_fit$data$cat)),
+    series = factor(levels(mvgam_fit$data$series)[1L],
+                    levels = levels(mvgam_fit$data$series)),
+    time = seq_along(wgrid), group = "a"
+  )
+  grid_B <- grid_A
+  grid_B$cat <- factor("B", levels = levels(mvgam_fit$data$cat))
+  pred_A <- posterior_linpred(mvgam_fit, newdata = grid_A, ndraws = 50L)
+  pred_B <- posterior_linpred(mvgam_fit, newdata = grid_B, ndraws = 50L)
+  testthat::expect_true(
+    max(abs(colMeans(pred_A) - colMeans(pred_B))) > 1e-3,
+    label = paste0(
+      "by-factor GP must produce different predictions per level; ",
+      "max|A - B| = ",
+      signif(max(abs(colMeans(pred_A) - colMeans(pred_B))), 3),
+      ". brms ", as.character(utils::packageVersion("brms")), "."
+    )
+  )
+})
+
+test_that("Poisson AR(1) + 2D GP(z, w)", {
+  # Multi-dim GP regression test: lscale is 2D (lscale_<id>[lvl, d])
+  # and the basis matrix has multiple covariate dimensions. Without
+  # by-factor, n_levels == 1 but lscale still uses 2D indexing.
+  require_fixtures("val_brms_ar1_gp2d.rds", "val_mvgam_ar1_gp2d.rds")
+  brms_fit <- load_brms("ar1_gp2d")
+  mvgam_fit <- load_mvgam("ar1_gp2d")
+  newdata <- mvgam_fit$data
+  assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.88)
+})
+
 
 # -- Trend-formula variants (mvgam moves the covariate into the trend
 #    block; brms cannot do this so we compare against the obs-formula
