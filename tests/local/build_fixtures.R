@@ -162,6 +162,43 @@ fit_mvgam_cached("ar1_gp",
   y ~ 1 + gp(z, k = 10), ~ AR(p = 1),
   test_data, poisson())
 
+# GP fixtures with extra covariates `w` and `cat` (the original
+# build state used to carry these inline; reconstruct them here so
+# future fixture rebuilds reproduce the gp2_by / gp2d / gp2d_by
+# pairs deterministically).
+test_data_gp2 <- test_data
+test_data_gp2$w <- seq(-1, 1, length.out = nrow(test_data_gp2))
+test_data_gp2$cat <- factor(
+  rep(c("A", "B"), length.out = nrow(test_data_gp2)),
+  levels = c("A", "B")
+)
+
+cat("\n[7a] AR(1) + GP(z) + GP(w, by = cat)\n")
+fit_brms_cached("ar1_gp2_by",
+  y ~ 1 + gp(z, k = 5) + gp(w, by = cat, k = 5) +
+    ar(time = time, p = 1, cov = TRUE),
+  test_data_gp2, poisson())
+fit_mvgam_cached("ar1_gp2_by",
+  y ~ 1 + gp(z, k = 5) + gp(w, by = cat, k = 5), ~ AR(p = 1),
+  test_data_gp2, poisson())
+
+cat("\n[7b] AR(1) + 2D GP(z, w)\n")
+fit_brms_cached("ar1_gp2d",
+  y ~ 1 + gp(z, w, k = 5) + ar(time = time, p = 1, cov = TRUE),
+  test_data_gp2, poisson())
+fit_mvgam_cached("ar1_gp2d",
+  y ~ 1 + gp(z, w, k = 5), ~ AR(p = 1),
+  test_data_gp2, poisson())
+
+cat("\n[7c] AR(1) + 2D GP(z, w, by = cat) — multi-dim by-factor\n")
+fit_brms_cached("ar1_gp2d_by",
+  y ~ 1 + gp(z, w, by = cat, k = 5) +
+    ar(time = time, p = 1, cov = TRUE),
+  test_data_gp2, poisson())
+fit_mvgam_cached("ar1_gp2d_by",
+  y ~ 1 + gp(z, w, by = cat, k = 5), ~ AR(p = 1),
+  test_data_gp2, poisson())
+
 # ----------------------------------------------------------------------
 # TREND-FORMULA VARIANTS (mvgam-only; brms cannot move covariates into
 # the autocor block, so these test trend-side prediction logic)

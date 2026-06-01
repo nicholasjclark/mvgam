@@ -144,6 +144,47 @@ test_that("Poisson AR(1) + 2D GP(z, w)", {
   assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.88)
 })
 
+test_that("Poisson AR(1) + 2D GP(z, w, by = cat)", {
+  # Combines the two extensions that triggered bug #53:
+  # multi-dimensional basis (lscale_<id>[lvl, d] with d > 1) AND a
+  # by-factor (per-level Xgp_<id>_<g>). Either alone is covered
+  # above; this block locks the combination in.
+  require_fixtures("val_brms_ar1_gp2d_by.rds", "val_mvgam_ar1_gp2d_by.rds")
+  brms_fit <- load_brms("ar1_gp2d_by")
+  mvgam_fit <- load_mvgam("ar1_gp2d_by")
+  newdata <- mvgam_fit$data
+  assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.88)
+
+  # Regression sentinel: 2D by-factor must produce different
+  # predictions per cat level on a fixed (z, w) grid.
+  zg <- seq(min(mvgam_fit$data$z),
+            max(mvgam_fit$data$z),
+            length.out = 6L)
+  wg <- seq(min(mvgam_fit$data$w),
+            max(mvgam_fit$data$w),
+            length.out = 6L)
+  grid_A <- data.frame(
+    z = zg, w = wg,
+    cat = factor("A", levels = levels(mvgam_fit$data$cat)),
+    series = factor(levels(mvgam_fit$data$series)[1L],
+                    levels = levels(mvgam_fit$data$series)),
+    time = seq_along(zg), group = "a"
+  )
+  grid_B <- grid_A
+  grid_B$cat <- factor("B", levels = levels(mvgam_fit$data$cat))
+  pred_A <- posterior_linpred(mvgam_fit, newdata = grid_A, ndraws = 50L)
+  pred_B <- posterior_linpred(mvgam_fit, newdata = grid_B, ndraws = 50L)
+  testthat::expect_true(
+    max(abs(colMeans(pred_A) - colMeans(pred_B))) > 1e-3,
+    label = paste0(
+      "2D by-factor GP must produce different predictions per level; ",
+      "max|A - B| = ",
+      signif(max(abs(colMeans(pred_A) - colMeans(pred_B))), 3),
+      ". brms ", as.character(utils::packageVersion("brms")), "."
+    )
+  )
+})
+
 
 # -- Trend-formula variants (mvgam moves the covariate into the trend
 #    block; brms cannot do this so we compare against the obs-formula
