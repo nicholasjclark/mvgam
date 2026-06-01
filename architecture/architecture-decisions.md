@@ -296,10 +296,6 @@ as_draws.mvgam <- function(x, variable = NULL, ...) {
 **Principle**: Preserve all brms Stan optimizations (GLM primitives, threading, etc.)
 **Implementation**: Let brms handle observation model complexity entirely. GLM injection uses recursive preprocessing to maintain efficiency.
 
-### 3a. Prediction via brms Delegation
-**Principle**: Covariate-side prediction (X·β, smooths, GPs incl. by-variable, REs, monotonic, ordinal-3D, multivariate) is brms's responsibility, not mvgam's.
-**Implementation**: `R/brms_delegation.R` slices obs/trend params out of `mvgam_fit$fit`, strips the `_trend` suffix for the trend submodel, renames via brms's `rename_pars` so positional Stan names map to formula-derived friendly names, and calls `brms::posterior_linpred(..., incl_autocor = FALSE)`. mvgam's only addition is the latent state `trend[t, s]` injected by `extract_trend_latent_states()`. Gated behind `options(mvgam.use_brms_delegation = ...)` while the in-tree re-implementation is retained for cross-validation; deletion only after sustained verified operation.
-
 ### 3. Simplified Constructor Architecture
 -  Trend constructors become minimal object creators using `create_mvgam_trend()`
 
