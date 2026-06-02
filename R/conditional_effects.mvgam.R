@@ -296,9 +296,21 @@ resolve_series_arg <- function(series, x) {
     return(list(kind = "all", level = NA_character_))
   }
   if (is.numeric(series)) {
-    checkmate::assert_integerish(
-      series, lower = 1L, upper = length(series_levels), len = 1L
-    )
+    n_levels <- length(series_levels)
+    checkmate::assert_integerish(series, len = 1L)
+    if (series < 1L || series > n_levels) {
+      stop(insight::format_error(c(
+        "'series' index is out of range.",
+        x = paste0(
+          "Got: ", series, "; valid range is 1 to upper bound ",
+          n_levels, "."
+        ),
+        i = paste0(
+          "Available levels: ",
+          paste(shQuote(series_levels), collapse = ", "), "."
+        )
+      )))
+    }
     return(list(kind = "one", level = series_levels[as.integer(series)]))
   }
   if (is.character(series)) {

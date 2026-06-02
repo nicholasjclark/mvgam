@@ -59,7 +59,11 @@ variables.mvgam <- function(x, ...) {
     all_vars <- setdiff(all_vars, x$exclude)
   }
 
-  all_vars
+  # Surface brms-style `b_<term>` / `b_<term>_trend` names in place
+  # of the positional Stan slots (`b[k]`, `b_trend[k]`). Mirrors the
+  # rename applied in `extract_mvgam_draws` so character-vector and
+  # draws-array consumers see identical names.
+  apply_mvgam_beta_aliases(all_vars, mvgam_beta_aliases(x))
 }
 
 
@@ -108,8 +112,16 @@ categorize_mvgam_parameters <- function(x) {
   # Validate input
   checkmate::assert_class(x, "mvgam")
 
-  # Extract all parameter names as character vector from combined fit
-  all_pars <- variables(x)
+  # Pull raw positional names directly from the stanfit. The
+  # mvgam-side beta-aliasing (`b[k]` -> `b_<term>`) is a user-facing
+  # projection applied inside `extract_mvgam_draws` and
+  # `variables.mvgam`; the internal prediction pipeline subsets the
+  # raw stanfit draws by positional name and must see them
+  # unaliased here.
+  all_pars <- variables(posterior::as_draws(x$fit))
+  if (!is.null(x$exclude) && length(x$exclude) > 0L) {
+    all_pars <- setdiff(all_pars, x$exclude)
+  }
 
   # Helper to create data.frame component or NULL
   create_component <- function(pars) {

@@ -9,7 +9,7 @@
 #' @aliases coef.mvgam rhat.mvgam neff_ratio.mvgam nuts_params.mvgam
 #'   log_posterior.mvgam fixef.mvgam bayes_R2.mvgam prior_summary.mvgam
 #'   ndraws.mvgam nchains.mvgam niterations.mvgam nvariables.mvgam
-#'   posterior_summary.mvgam getCall.mvgam
+#'   posterior_summary.mvgam getCall.mvgam vcov.mvgam
 #'
 #' @param object,x A fitted `mvgam` object.
 #' @param pars Optional character vector of parameter names. For
@@ -323,4 +323,29 @@ posterior_summary.mvgam <- function(object, pars = NULL,
 getCall.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
   x$call
+}
+
+
+#' @rdname mvgam_diagnostics
+#' @param correlation Logical. If `TRUE`, return the correlation
+#'   matrix of fixed-effect coefficients; otherwise the covariance
+#'   matrix. Defaults to `FALSE`.
+#' @method vcov mvgam
+#' @export
+vcov.mvgam <- function(object, correlation = FALSE, pars = NULL, ...) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_logical(correlation, len = 1L)
+  checkmate::assert_character(pars, null.ok = TRUE)
+  # Reuse the `betas` keyword so the `b_trend[*]` filter matches
+  # `coef.mvgam` / `fixef.mvgam` exactly.
+  mat <- as_draws_matrix(object, variable = "betas")
+  if (!is.null(pars)) {
+    keep <- paste0("b_", pars)
+    mat <- mat[, intersect(colnames(mat), keep), drop = FALSE]
+  }
+  if (ncol(mat) == 0L) {
+    return(matrix(0, 0, 0))
+  }
+  colnames(mat) <- sub("^b_", "", colnames(mat))
+  if (isTRUE(correlation)) stats::cor(mat) else stats::cov(mat)
 }

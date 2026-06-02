@@ -16,6 +16,7 @@
 \alias{nvariables.mvgam}
 \alias{posterior_summary.mvgam}
 \alias{getCall.mvgam}
+\alias{vcov.mvgam}
 \title{Diagnostic quantities for mvgam models}
 \usage{
 \method{coef}{mvgam}(object, summarise = TRUE, ...)
@@ -65,6 +66,8 @@
 )
 
 \method{getCall}{mvgam}(x, ...)
+
+\method{vcov}{mvgam}(object, correlation = FALSE, pars = NULL, ...)
 }
 \arguments{
 \item{object, x}{A fitted \code{mvgam} object.}
@@ -91,6 +94,10 @@ quantile probabilities for credible intervals. Defaults to
 
 \item{resp}{Character. Response name for multivariate models.
 Ignored for univariate fits.}
+
+\item{correlation}{Logical. If \code{TRUE}, return the correlation
+matrix of fixed-effect coefficients; otherwise the covariance
+matrix. Defaults to \code{FALSE}.}
 }
 \value{
 Shape depends on the method (see method details).

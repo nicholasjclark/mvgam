@@ -392,3 +392,138 @@ test_that("binomial trials carry through datagrid + predictions", {
     0.05
   )
 })
+
+
+# ====================================================================
+# Tier-3 brms-parity batch: vcov, loo_R2, loo_predict, loo_model_weights
+# ====================================================================
+# Numerical sanity vs brms on a shared fixed-effects fixture. These
+# tests live in `local/` because they instantiate full MCMC fits via
+# the fixture pair and run on the full posterior — too heavy for CI.
+
+
+test_that("vcov(mvgam) shares fixed effects with vcov(brms)", {
+  require_fixtures("val_mvgam_ar1_fx.rds", "val_brms_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  bm <- load_brms("ar1_fx")
+  vm <- vcov(mv)
+  vb <- vcov(bm)
+  # mvgam now aliases b[k] to b_<term>; both should carry x + Intercept.
+  expect_setequal(colnames(vm), c("Intercept", "x"))
+  expect_setequal(colnames(vb), c("Intercept", "x"))
+  # Symmetric and PSD (variances on diag > 0).
+  expect_equal(vm, t(vm), tolerance = 1e-12)
+  expect_true(all(diag(vm) > 0))
+  # correlation = TRUE produces unit diagonal.
+  cm <- vcov(mv, correlation = TRUE)
+  expect_equal(unname(diag(cm)), c(1, 1), tolerance = 1e-12)
+})
+
+
+test_that("loo_R2(mvgam) returns finite R^2 with overlapping CI vs brms", {
+  require_fixtures("val_mvgam_ar1_fx.rds", "val_brms_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  bm <- load_brms("ar1_fx")
+  set.seed(1L)
+  r2_mv <- suppressWarnings(loo_R2(mv))
+  set.seed(1L)
+  r2_bm <- suppressWarnings(loo_R2(bm))
+  # brms-shape summary: Estimate, Est.Error, Q2.5, Q97.5.
+  expect_setequal(colnames(r2_mv),
+                   c("Estimate", "Est.Error", "Q2.5", "Q97.5"))
+  # Estimate finite + in (-1, 1] (clamped per Gelman 2019).
+  expect_true(is.finite(r2_mv[, "Estimate"]))
+  expect_lte(r2_mv[, "Estimate"], 1)
+  # Credible intervals overlap (different latent structures give
+  # different point estimates but the intervals should agree).
+  expect_true(
+    r2_mv[, "Q2.5"] <= r2_bm[, "Q97.5"] &&
+      r2_bm[, "Q2.5"] <= r2_mv[, "Q97.5"]
+  )
+})
+
+
+test_that("loo_R2(mvgam, summary = FALSE) returns per-draw vector", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  set.seed(1L)
+  r2 <- suppressWarnings(loo_R2(mv, summary = FALSE))
+  expect_true(is.matrix(r2))
+  expect_identical(ncol(r2), 1L)
+  # Clamped to [-1, 1].
+  expect_true(all(r2 >= -1 & r2 <= 1))
+})
+
+
+test_that("loo_predict(mvgam, type = 'mean') returns finite length-N vector", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  lp <- suppressMessages(suppressWarnings(
+    loo_predict(mv, type = "mean")
+  ))
+  expect_true(is.numeric(lp))
+  expect_identical(length(lp), nrow(mv$data))
+  expect_true(all(is.finite(lp)))
+})
+
+
+test_that("loo_model_weights(mvgam, mvgam) returns named stacking weights", {
+  require_fixtures("val_mvgam_ar1_fx.rds", "val_mvgam_ar1_re.rds")
+  m1 <- load_mvgam("ar1_fx")
+  m2 <- load_mvgam("ar1_re")
+  w <- suppressWarnings(
+    loo_model_weights(m1, m2, model_names = c("fx", "re"))
+  )
+  # loo_model_weights returns a named "stacking_weights" object;
+  # treat it as a numeric vector for these assertions.
+  expect_identical(length(as.numeric(w)), 2L)
+  labels <- rownames(w)
+  if (is.null(labels)) labels <- names(w)
+  expect_setequal(labels, c("fx", "re"))
+  # Weights are non-negative and sum to 1.
+  expect_true(all(as.numeric(w) >= 0))
+  expect_equal(sum(as.numeric(w)), 1, tolerance = 1e-6)
+})
+
+
+test_that("add_criterion(mvgam) populates $criteria with loo + bayes_R2", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  set.seed(1L)
+  mv2 <- suppressWarnings(add_criterion(mv, c("loo", "bayes_R2")))
+  expect_setequal(names(mv2$criteria), c("loo", "bayes_R2"))
+  expect_s3_class(mv2$criteria$loo, "psis_loo")
+  expect_true(is.matrix(mv2$criteria$bayes_R2))
+})
+
+
+test_that("LOO and WAIC alias the lowercase functions", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  set.seed(1L)
+  l_lo <- suppressWarnings(loo(mv))
+  set.seed(1L)
+  l_hi <- suppressWarnings(LOO(mv))
+  expect_equal(l_lo$estimates, l_hi$estimates)
+  set.seed(1L)
+  w_lo <- suppressWarnings(waic(mv))
+  set.seed(1L)
+  w_hi <- suppressWarnings(WAIC(mv))
+  expect_equal(w_lo$estimates, w_hi$estimates)
+})
+
+
+test_that("loo_moment_match.mvgam errors informatively", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  expect_error(loo_moment_match(mv),
+                "not currently supported")
+})
+
+
+test_that("loo_subsample.mvgam errors informatively", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  expect_error(loo_subsample(mv),
+                "not currently supported")
+})

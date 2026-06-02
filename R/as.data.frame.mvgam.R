@@ -136,6 +136,89 @@ resolve_mvgam_keyword <- function(keyword, x, all_vars) {
 }
 
 
+# Internal: build the positional -> brms-style alias map for the
+# fixed-effects block. brms's `rename_pars` translates `b[k]` to
+# `b_<term>` post-fit, where `<term>` is the k-th non-Intercept
+# column of the design matrix (the Intercept is centred out into
+# its own scalar). For trend-formula fits the analogous map is
+# `b_trend[k]` -> `b_<term>_trend` over `standata$X_trend`. We
+# rebuild the map at draw-extraction time so every method routed
+# through `extract_mvgam_draws` sees the brms-native names.
+#
+# Univariate only in v1; multivariate fits store per-response
+# standata blocks (`X_<resp>`) and need per-response prefixes —
+# the helper returns an empty map for MV so positional names are
+# preserved unchanged.
+#'@noRd
+mvgam_beta_aliases <- function(x) {
+  # brms's stancode centres the design matrix whenever an Intercept
+  # column is present: `b[k]` then enumerates the K - 1 non-Intercept
+  # columns. Without an Intercept the mapping is direct. Every
+  # linear predictor gets its own design-matrix block in standata:
+  #   `X`             obs main formula  -> b[k]            -> b_<term>
+  #   `X_<resp>`      MV response       -> b_<resp>[k]     -> b_<resp>_<term>
+  #   `X_<dpar>`      dpar formula      -> b_<dpar>[k]     -> b_<dpar>_<term>
+  #   `X_trend`       mvgam-only        -> b_trend[k]      -> b_<term>_trend
+  # The trend block is the only one with a name suffix (rather than
+  # prefix); all others reduce to the same template, so we drive the
+  # whole map from a single sweep over `names(x$standata)`.
+  build <- function(X, pos_prefix, alias_prefix, alias_suffix) {
+    if (is.null(X) || !is.matrix(X) || ncol(X) == 0L) {
+      return(character(0L))
+    }
+    cn <- colnames(X)
+    if (length(cn) == 0L) {
+      return(character(0L))
+    }
+    if (identical(cn[1L], "Intercept")) {
+      cn <- cn[-1L]
+    }
+    if (length(cn) == 0L) {
+      return(character(0L))
+    }
+    new <- paste0(alias_prefix, cn, alias_suffix)
+    old <- paste0(pos_prefix, "[", seq_along(cn), "]")
+    stats::setNames(old, new)
+  }
+  X_blocks <- grep("^X(_.+)?$", names(x$standata), value = TRUE)
+  parts <- lapply(X_blocks, function(blk) {
+    X <- x$standata[[blk]]
+    if (identical(blk, "X")) {
+      build(X, "b", "b_", "")
+    } else if (identical(blk, "X_trend")) {
+      build(X, "b_trend", "b_", "_trend")
+    } else {
+      suffix <- sub("^X_", "", blk)
+      build(
+        X,
+        pos_prefix = paste0("b_", suffix),
+        alias_prefix = paste0("b_", suffix, "_"),
+        alias_suffix = ""
+      )
+    }
+  })
+  unlist(parts)
+}
+
+
+# Internal: replace `b[k]` / `b_trend[k]` entries in `vars` with
+# their brms-native aliases. Names that are not in the map pass
+# through unchanged. Used by `variables.mvgam` to expose the alias
+# at the character-vector layer.
+#'@noRd
+apply_mvgam_beta_aliases <- function(vars, alias_map) {
+  if (length(alias_map) == 0L) {
+    return(vars)
+  }
+  idx <- match(alias_map, vars)
+  has <- !is.na(idx)
+  if (any(has)) {
+    vars[idx[has]] <- names(alias_map)[has]
+  }
+  vars
+}
+
+
 # Internal: pull a `draws_array` from the stanfit slot, optionally
 # filtered by keyword / explicit names / regex. Public methods just
 # need to coerce the result to their target shape.
@@ -146,6 +229,19 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
   checkmate::assert_logical(regex, len = 1L)
   checkmate::assert_logical(inc_warmup, len = 1L)
   drws <- posterior::as_draws_array(x$fit, inc_warmup = inc_warmup)
+  alias_map <- mvgam_beta_aliases(x)
+  if (length(alias_map) > 0L) {
+    # Only rename entries whose positional name is actually present
+    # in the draws. brms's rename_pars is similarly tolerant: a fit
+    # that pre-aliased itself (e.g. test stubs) becomes a no-op.
+    have <- alias_map %in% posterior::variables(drws)
+    if (any(have)) {
+      drws <- do.call(
+        posterior::rename_variables,
+        c(list(drws), as.list(alias_map[have]))
+      )
+    }
+  }
   if (is.null(variable)) {
     return(drws)
   }
