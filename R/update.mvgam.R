@@ -1,0 +1,287 @@
+#' Update a fitted \pkg{mvgam} model
+#'
+#' Refit a fitted `mvgam` object with new data, an updated formula,
+#' new priors, different sampler settings, or any other argument
+#' accepted by [`mvgam()`]. The signature mirrors
+#' [brms::update.brmsfit()] so users familiar with brms can drop
+#' into the same workflow.
+#'
+#' @param object A fitted `mvgam` object.
+#' @param formula. A new observation-side formula, or a formula
+#'   update specification such as `~ . + new_term`. `NULL` (the
+#'   default) reuses `object$formula`. Routed through
+#'   [stats::update.formula()] so all of `~ . + z`, `~ . - z`,
+#'   `y2 ~ x`, and `. ~ .` work via R's standard mechanics.
+#' @param newdata An optional new training data frame. `NULL`
+#'   (the default) reuses `object$data`. Passing `data = ...` in
+#'   `...` is an error; use `newdata`.
+#' @param recompile Optional logical. Controls Stan recompilation
+#'   behaviour. Both supported backends (`cmdstanr`, `rstan`) cache
+#'   compiled models by stancode hash, so an unchanged stancode
+#'   skips the compile step transparently. `NULL` (the default)
+#'   and `TRUE` both delegate to `mvgam()` and let the cache
+#'   decide. `FALSE` regenerates the prospective stancode, compares
+#'   it byte-for-byte against the cached `object$stancode`, and
+#'   errors if they diverge (so the caller is alerted to a needed
+#'   recompile rather than silently paying compile cost). When
+#'   `FALSE` and the stancodes match, the cache is guaranteed to
+#'   hit.
+#' @param ... Any other argument accepted by [`mvgam()`] (e.g.
+#'   `trend_formula`, `family`, `prior`, `chains`, `iter`,
+#'   `warmup`, `cores`, `threads`, `algorithm`, `backend`,
+#'   `silent`, `seed`, `init`, `control`). Each value overrides
+#'   the matching slot inherited from `object`.
+#'
+#' @return A refit `mvgam` object.
+#'
+#' @details
+#' Argument inheritance: every `mvgam()` argument is taken from
+#' the corresponding slot on `object` unless the caller overrides
+#' via `...`. This means
+#' `update(fit, iter = 4000)` reuses the original formula, data,
+#' family, trend, prior, and backend, and only bumps the iteration
+#' count.
+#'
+#' Multivariate fits: formula updates are allowed and route
+#' through brms's own formula-update machinery via
+#' `stats::update.formula`.
+#'
+#' Multiple-imputation fits (produced by `mvgam_multiple(combine =
+#' TRUE)`): not currently supported on `update()`; re-fit each
+#' imputation separately by calling [`mvgam()`] and re-pool.
+#'
+#' @author Nicholas J Clark
+#'
+#' @seealso [`mvgam()`], [stats::update.formula()],
+#'   [brms::update.brmsfit()],
+#'   [stancode.mvgam()] for inspecting the cached Stan model,
+#'   [mvgam_diagnostics] / [mvgam_loo_extras] for diagnostics and
+#'   model comparison on the refit object.
+#'
+#' @examples
+#' \donttest{
+#' sim <- sim_mvgam(family = Gamma())
+#' mod <- mvgam(
+#'   y ~ s(season, bs = "cc"),
+#'   trend_model = AR(),
+#'   data = sim$data_train,
+#'   family = Gamma(),
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
+#' # Refit with a different sampler configuration.
+#' mod2 <- update(mod, iter = 500, chains = 1)
+#'
+#' # Refit on a subset of the training data.
+#' mod3 <- update(mod, newdata = sim$data_train[1:30, ])
+#'
+#' # Add a covariate to the formula.
+#' mod4 <- update(mod, formula. = ~ . + s(x))
+#' }
+#'
+#' @method update mvgam
+#' @export
+update.mvgam <- function(object, formula. = NULL, newdata = NULL,
+                          recompile = NULL, ...) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_data_frame(newdata, null.ok = TRUE)
+  if (!is.null(recompile)) {
+    checkmate::assert_logical(recompile, len = 1L)
+  }
+  dots <- list(...)
+  if ("data" %in% names(dots)) {
+    stop(insight::format_error(c(
+      "Use 'newdata' rather than 'data' to update the training data on a fitted mvgam.",
+      i = "'data' is reserved for the original 'mvgam()' call; 'newdata' is the supported argument name on 'update()'."
+    )))
+  }
+  if (isTRUE(attr(object, "is_pooled")) ||
+      inherits(object, "mvgam_pooled")) {
+    stop(insight::format_error(c(
+      "Cannot 'update()' a pooled multiple-imputation mvgam fit.",
+      i = paste0(
+        "Refit each imputation by calling 'mvgam()' on its slice, ",
+        "then re-pool with 'mvgam_multiple(combine = TRUE)'."
+      )
+    )))
+  }
+  if (is.null(object$trend_call) &&
+      !is.null(object$trend_components) &&
+      length(object$trend_components) > 0L &&
+      !"trend_formula" %in% names(dots)) {
+    stop(insight::format_error(c(
+      paste0(
+        "Cannot infer the original 'trend_formula' from this fit."
+      ),
+      x = paste0(
+        "This 'mvgam' object lacks the 'trend_call' slot (likely ",
+        "built with an older mvgam version) but has trend dynamics, ",
+        "so the trend constructor cannot be reconstructed."
+      ),
+      i = paste0(
+        "Pass 'trend_formula = ...' explicitly to 'update()', or ",
+        "refit the model with the current mvgam version so the ",
+        "original trend_formula is preserved."
+      )
+    )))
+  }
+  call_args <- mvgam_update_call(object, formula., newdata, dots)
+  # Stancode comparison drives the recompile decision. Both
+  # supported backends (rstan, cmdstanr) cache compiled models by
+  # stancode hash, so an unchanged stancode collapses the compile
+  # cost to near zero even when delegating to the full mvgam()
+  # pipeline. `recompile = FALSE` makes a diverging stancode a
+  # hard error rather than a silent slow path.
+  if (isFALSE(recompile)) {
+    new_stancode <- mvgam_dry_stancode(call_args)
+    same <- identical(
+      mvgam_normalise_stancode(new_stancode),
+      mvgam_normalise_stancode(object$stancode)
+    )
+    if (!same) {
+      stop(insight::format_error(c(
+        paste0(
+          "'recompile = FALSE' is incompatible with the requested ",
+          "update because the new model would emit different Stan ",
+          "code."
+        ),
+        i = paste0(
+          "Pass 'recompile = TRUE' (or omit 'recompile') to refit ",
+          "with the new Stan model. Use 'stancode(object)' to ",
+          "inspect the current model."
+        )
+      )))
+    }
+  }
+  do.call(mvgam, call_args)
+}
+
+
+# Internal: regenerate prospective stancode for the merged args
+# without compiling or sampling. Routes through the same helper
+# `mvgam_single()` uses (`generate_stan_components_mvgam_formula()`),
+# so the comparison is byte-for-byte against what the next
+# `mvgam()` call would produce.
+#'@noRd
+mvgam_dry_stancode <- function(call_args) {
+  mvgam_formula_obj <- mvgam_formula(
+    call_args$formula,
+    call_args$trend_formula
+  )
+  pass_args <- call_args[
+    !names(call_args) %in% c("formula", "trend_formula")
+  ]
+  components <- do.call(
+    generate_stan_components_mvgam_formula,
+    c(list(formula = mvgam_formula_obj), pass_args)
+  )
+  components$combined_components$stancode
+}
+
+
+# Internal: normalise a stancode string for byte-for-byte
+# comparison against `object$stancode`. Mirrors the strip brms
+# uses in `stancode(version = FALSE)` and inside
+# `update.brmsfit`: the head of an mvgam-generated stancode is a
+# single `// Generated with mvgam X.Y.Z using brms X.Y.Z` comment.
+# The version values can drift across sessions but the Stan body
+# is what drives compilation, so stripping a leading `//` comment
+# line lets a version-only difference fall through. The strip is
+# conditional on the line actually being a comment, so if the
+# header convention is ever removed or replaced the normaliser
+# degrades gracefully (no Stan code is ever lost).
+#'@noRd
+mvgam_normalise_stancode <- function(stancode) {
+  if (is.null(stancode)) {
+    return(character(0L))
+  }
+  txt <- as.character(stancode)
+  txt <- sub("^//[^\n]*\n", "", txt)
+  trimws(txt)
+}
+
+
+# Internal: argument table for update.mvgam slot inheritance.
+# Each row pairs an `mvgam()` argument name with the slot on the
+# fitted `mvgam` object that supplies its default when the user
+# does not override via `...`. Optional `normaliser` entries route
+# the inherited value through a converter so the user-facing form
+# matches what mvgam() accepts on a fresh call.
+#
+# Extending the inheritance to a new `mvgam()` argument is one new
+# entry here, no method changes.
+#'@noRd
+mvgam_update_inheritance <- list(
+  trend_formula = list(slot = "trend_call"),
+  family = list(slot = "family"),
+  prior = list(slot = "prior"),
+  backend = list(slot = "backend"),
+  algorithm = list(slot = "algorithm")
+)
+
+
+# Internal: extract chain / iter / warmup / thin from `object$fit`
+# in a backend-agnostic way. mvgam stores cmdstanr and rstan fits
+# as `stanfit`-class objects with a `@stan_args` slot; this helper
+# returns the original sampler dimensions so `update.mvgam` can
+# reuse them when the user does not override.
+#'@noRd
+mvgam_sampler_inheritance <- function(object) {
+  out <- list()
+  fit_obj <- object$fit
+  if (!isS4(fit_obj) ||
+      !"stan_args" %in% methods::slotNames(fit_obj)) {
+    return(out)
+  }
+  args <- fit_obj@stan_args
+  if (length(args) == 0L) {
+    return(out)
+  }
+  first <- args[[1L]]
+  out$chains <- length(args)
+  if (!is.null(first$iter)) out$iter <- first$iter
+  if (!is.null(first$warmup)) out$warmup <- first$warmup
+  if (!is.null(first$thin)) out$thin <- first$thin
+  out
+}
+
+
+# Internal: assemble the merged argument list for the refit. The
+# resolution order is (1) user-supplied via `...`, (2) the named
+# `object` slot, (3) the `mvgam()` default. Returns a list ready
+# to feed `do.call(mvgam, ...)`.
+#'@noRd
+mvgam_update_call <- function(object, formula., newdata, dots) {
+  resolved <- list()
+  resolved$formula <- if (is.null(formula.)) {
+    object$formula
+  } else {
+    stats::update.formula(object$formula, formula.)
+  }
+  resolved$data <- if (is.null(newdata)) object$data else newdata
+  for (arg_name in names(mvgam_update_inheritance)) {
+    if (arg_name %in% names(dots)) {
+      resolved[[arg_name]] <- dots[[arg_name]]
+      next
+    }
+    entry <- mvgam_update_inheritance[[arg_name]]
+    value <- object[[entry$slot]]
+    if (!is.null(entry$normaliser)) {
+      value <- entry$normaliser(value)
+    }
+    resolved[[arg_name]] <- value
+  }
+  # Inherit sampler dimensions from the original stanfit unless
+  # the user explicitly overrides.
+  sampler <- mvgam_sampler_inheritance(object)
+  for (arg_name in names(sampler)) {
+    if (!arg_name %in% names(dots) && !arg_name %in% names(resolved)) {
+      resolved[[arg_name]] <- sampler[[arg_name]]
+    }
+  }
+  # Pass through any remaining user dots (cores, threads, seed,
+  # control, init, silent, ...) that are not already resolved.
+  extra <- dots[!names(dots) %in% names(resolved)]
+  c(resolved, extra)
+}

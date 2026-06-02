@@ -29,6 +29,32 @@
 #'   these response types, use brms directly.
 #' @param ... Additional arguments passed to Stan fitting
 #' @return mvgam object with dual brmsfit-like structure
+#'
+#' @examples
+#' \donttest{
+#' simdat <- sim_mvgam(family = poisson())
+#'
+#' # Fit an AR(1) state-space model with one fixed effect.
+#' mod <- mvgam(
+#'   y ~ s(season, bs = "cc"),
+#'   trend_formula = ~ AR(p = 1),
+#'   data = simdat$data_train,
+#'   family = poisson(),
+#'   chains = 2,
+#'   silent = 2
+#' )
+#'
+#' # Refit with a different sampler configuration. update.mvgam()
+#' # inherits formula, family, prior, and the trend constructor
+#' # from the fitted object, so only the sampler arg has to be
+#' # named on the call.
+#' mod2 <- update(mod, iter = 500, chains = 1)
+#'
+#' # Extend the formula. Routed through stats::update.formula() so
+#' # `~ . + new_term` semantics work.
+#' mod3 <- update(mod, formula. = ~ . + s(time))
+#' }
+#'
 #' @export
 mvgam <- function(formula, trend_formula = NULL, data = NULL,
                            backend = getOption("brms.backend", "cmdstanr"),
@@ -182,7 +208,8 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     trend_metadata = stan_components$trend_metadata,
     data_name = data_name,
     combined_stancode = stan_components$combined_components$stancode,
-    combined_standata = stan_components$combined_components$standata
+    combined_standata = stan_components$combined_components$standata,
+    user_trend_formula = trend_formula
   )
 
   return(mvgam_object)
@@ -262,7 +289,8 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
                                           trend_metadata = NULL,
                                           data_name = NULL,
                                           combined_stancode = NULL,
-                                          combined_standata = NULL) {
+                                          combined_standata = NULL,
+                                          user_trend_formula = NULL) {
   checkmate::assert_class(combined_fit, "stanfit")
   checkmate::assert_list(obs_setup, names = "named")
   checkmate::assert_list(trend_setup, names = "named", null.ok = TRUE)
@@ -300,6 +328,11 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       fit = combined_fit,
       formula = obs_setup$formula,
       trend_formula = if (!is.null(trend_setup)) trend_setup$formula else NULL,
+      # Original user-supplied trend_formula (with trend constructors
+      # like AR(p = 1) intact); preserved verbatim so update.mvgam
+      # can round-trip the fit without trying to reconstruct the
+      # constructor call from parsed `mv_spec$trend_specs`.
+      trend_call = user_trend_formula,
       family = obs_setup$family,
       prior = obs_setup$prior,
       data = obs_setup$data,

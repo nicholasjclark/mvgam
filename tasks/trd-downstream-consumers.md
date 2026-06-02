@@ -305,6 +305,15 @@ parameter names (`b[k]`, `b_trend[k]`, `b_<resp>[k]`,
 (`extract_mvgam_draws`, `variables.mvgam`). The internal prediction
 pipeline still subsets the raw stanfit by positional name.
 
+The Tier-4 batch (this branch) shipped `update.mvgam`: brms-parity
+refit method with `formula.`, `newdata`, and `recompile` args.
+Recompilation is auto-detected by byte-for-byte stancode
+comparison; `recompile = FALSE` errors informatively if the new
+model would emit different Stan code. Trend-formula round-trip is
+backed by a new `$trend_call` slot populated in
+`create_mvgam_from_combined_fit()` so the user-supplied trend
+constructor (e.g. `~ AR(p = 1)`) is preserved verbatim.
+
 One brms-parity gap remains:
 
 - **`ranef.mvgam`** and **`VarCorr.mvgam`**: brms shapes are per-group
@@ -328,5 +337,5 @@ its own decision thread, not a gap from the rebuild:
 | `kfold.mvgam` | Heavy refit machinery; revisit with the forecast extrapolator |
 | `expose_functions.mvgam` / `launch_shinystan.mvgam` / `getRefmodel.mvgam` | Niche tooling integrations |
 | `posterior_smooths.mvgam` / `conditional_smooths.mvgam` | Smooth-term-specific predictions; reachable via marginaleffects with effect labels |
-| `update.mvgam` / `update.jsdgam` | Refit-with-new-data convenience; substantial scope (~80 to 120 LOC), separate task |
+| `update.jsdgam` | `jsdgam()` does not exist on this branch; ship alongside the constructor when added |
 | Diagnostic-flag methods (`control_params`, `inits`, `default_prior`) | Internal-facing in brms; defer until a user need surfaces |

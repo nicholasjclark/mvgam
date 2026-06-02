@@ -527,3 +527,93 @@ test_that("loo_subsample.mvgam errors informatively", {
   expect_error(loo_subsample(mv),
                 "not currently supported")
 })
+
+
+# ====================================================================
+# Tier-4 brms-parity batch: update.mvgam
+# ====================================================================
+# Numerical refit checks vs the cached fit. These live in `local/`
+# because they instantiate full MCMC fits via cmdstanr. The backend
+# stancode cache means most calls skip the actual Stan compile.
+
+
+test_that("update(mvgam) reuses inherited slots and refits cleanly", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  refit <- suppressWarnings(suppressMessages(
+    update(mv, iter = 200, warmup = 100, chains = 1,
+            silent = 2, refresh = 0)
+  ))
+  expect_s3_class(refit, "mvgam")
+  # New sampler dimensions land on the fit.
+  expect_identical(
+    posterior::nchains(posterior::as_draws_array(refit$fit)), 1L
+  )
+  # Inherited slots are preserved.
+  expect_identical(refit$family$family, mv$family$family)
+  expect_identical(refit$backend, mv$backend)
+  # Formula round-trips.
+  expect_identical(deparse(refit$formula), deparse(mv$formula))
+})
+
+
+test_that("update(mvgam, newdata = subset) refits on the new data", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  nd <- mv$data[1:20, ]
+  refit <- suppressWarnings(suppressMessages(
+    update(mv, newdata = nd, iter = 200, warmup = 100, chains = 1,
+            silent = 2, refresh = 0)
+  ))
+  expect_s3_class(refit, "mvgam")
+  expect_identical(nrow(refit$data), 20L)
+})
+
+
+test_that("update(mvgam, formula. = ~ . + 1) is a no-op formula change", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  refit <- suppressWarnings(suppressMessages(
+    update(mv, formula. = ~ . + 1, iter = 200, warmup = 100,
+            chains = 1, silent = 2, refresh = 0)
+  ))
+  expect_s3_class(refit, "mvgam")
+  # Same fixed-effect set after the no-op update.
+  expect_setequal(rownames(fixef(refit)), rownames(fixef(mv)))
+})
+
+
+test_that("update(recompile = FALSE) succeeds when stancode is unchanged", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  refit <- suppressWarnings(suppressMessages(
+    update(mv, recompile = FALSE, iter = 200, warmup = 100,
+            chains = 1, silent = 2, refresh = 0)
+  ))
+  expect_s3_class(refit, "mvgam")
+})
+
+
+test_that("update(recompile = FALSE) accepts data-only refits", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  # brms parametrises b[Kc] with Kc as a data variable, so adding
+  # a new fixed-effect term grows the X design matrix without
+  # mutating the stancode body. recompile = FALSE should pass.
+  refit <- suppressWarnings(suppressMessages(
+    update(mv, formula. = ~ . + I(x^2), recompile = FALSE,
+            iter = 200, warmup = 100, chains = 1,
+            silent = 2, refresh = 0)
+  ))
+  expect_s3_class(refit, "mvgam")
+})
+
+
+test_that("update(recompile = FALSE, family = new_family) errors", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  expect_error(
+    update(mv, recompile = FALSE, family = gaussian()),
+    "incompatible with the requested"
+  )
+})
