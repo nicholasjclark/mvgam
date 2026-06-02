@@ -151,6 +151,7 @@ resolve_mvgam_keyword <- function(keyword, x, all_vars) {
 # preserved unchanged.
 #'@noRd
 mvgam_beta_aliases <- function(x) {
+  checkmate::assert_class(x, "mvgam")
   # brms's stancode centres the design matrix whenever an Intercept
   # column is present: `b[k]` then enumerates the K - 1 non-Intercept
   # columns. Without an Intercept the mapping is direct. Every
@@ -201,10 +202,13 @@ mvgam_beta_aliases <- function(x) {
 }
 
 
-# Internal: replace `b[k]` / `b_trend[k]` entries in `vars` with
-# their brms-native aliases. Names that are not in the map pass
-# through unchanged. Used by `variables.mvgam` to expose the alias
-# at the character-vector layer.
+# Internal: replace positional Stan parameter names in `vars` with
+# their brms-native aliases. The map is named character vector
+# where each element's name is the alias and the value is the
+# positional Stan name (the same shape produced by
+# `mvgam_beta_aliases` and `mvgam_ranef_aliases`). Names not in
+# the map pass through unchanged. Used by `variables.mvgam` to
+# expose aliases at the character-vector layer.
 #'@noRd
 apply_mvgam_beta_aliases <- function(vars, alias_map) {
   if (length(alias_map) == 0L) {
@@ -219,6 +223,153 @@ apply_mvgam_beta_aliases <- function(vars, alias_map) {
 }
 
 
+# Internal: reconstruct brms group-level metadata for a fitted
+# mvgam object. Returns a list with `reframe` (the brmsfit
+# `$ranef` data.frame: one row per (group, coef) pair) and
+# `group_levels` (the named list of levels per grouping factor),
+# or NULL when the fit has no group-level effects.
+#
+# The cheap gate `^M_<id>$` on `x$standata` short-circuits no-RE
+# fits without paying the brms-setup cost. Trend-side blocks have
+# the suffixed key `M_<id>_trend` and are deliberately excluded.
+#
+# Both `mvgam_ranef_aliases` and the user-facing `ranef.mvgam` /
+# `VarCorr.mvgam` methods consume this metadata so the
+# `brm(empty = TRUE)` setup happens via one entry point.
+#'@noRd
+mvgam_ranef_metadata <- function(x) {
+  checkmate::assert_class(x, "mvgam")
+  # brms's standata convention: obs-side group blocks are exactly
+  # `M_<id>` (integer suffix only). Trend-side blocks carry the
+  # `_trend` suffix (`M_<id>_trend`) and are intentionally
+  # excluded from this gate. If brms ever changes the obs-side
+  # key naming, the gate falls closed (no aliasing) rather than
+  # producing an incorrect map — safe failure mode.
+  std_names <- names(x$standata)
+  has_obs_re <- any(grepl("^M_\\d+$", std_names))
+  if (!has_obs_re) {
+    return(NULL)
+  }
+  empty <- brms::brm(
+    formula = x$formula, data = x$data, family = x$family,
+    empty = TRUE, silent = 2
+  )
+  reframe <- empty$ranef
+  if (is.null(reframe) || nrow(reframe) == 0L) {
+    return(NULL)
+  }
+  list(reframe = reframe, group_levels = attr(reframe, "levels"))
+}
+
+
+# Internal: build alias map for random-effect parameters.
+# brms's stancode emits group-level parameters in positional form
+# (`r_<id>[<level_idx>,<coef_idx>]`, `sd_<id>[<coef_idx>]`,
+# `cor_<id>[<flat_off_diag>]`). brms's `rename_pars` then promotes
+# these to user-facing aliases keyed on the grouping factor name
+# and the coefficient name (`r_<group>[<level>,<coef>]`,
+# `sd_<group>__<coef>`, `cor_<group>__<coef1>__<coef2>`). mvgam
+# delegates Stan-code generation to brms but does not run
+# `rename_pars`, so this helper rebuilds the same map.
+#
+# Returns a named character vector in the same shape as
+# `mvgam_beta_aliases`: names are the brms-native aliases, values
+# are the positional Stan names. An empty character vector is
+# returned when the fit has no group-level effects.
+#
+# Multi-coef correlated groups: brms stores the correlation matrix
+# off-diagonals in a vector `cor_<id>[1:NC]` where
+# `NC = M*(M-1)/2`. brms's stancode packs them via
+# `cor_<id>[choose(k - 1, 2) + j] = Cor_<id>[j, k]` for j < k, i.e.
+# column-major upper-triangle order: for M = 4 the pairs are
+# (1,2), (1,3), (2,3), (1,4), (2,4), (3,4). The helper below
+# walks pairs in the same order so the alias index matches brms
+# byte-for-byte at any M.
+#
+# Trend-side random effects (REs in `trend_formula`) are deferred.
+# v1 aliases only the observation-side group structure; trend REs
+# remain accessible via their positional names. Extending here:
+# iterate over the trend brmsterms via
+# `brms::brm(formula = x$trend_formula, ..., empty = TRUE)`,
+# build the same r_/sd_/cor_ maps, and append a `_trend` suffix
+# to each alias name (mirrors the `_trend` suffix the beta
+# aliaser already applies for the `b_trend[k]` block).
+#
+# Other brms RE patterns the helper inherits from `brm(empty=TRUE)`:
+# multivariate response (`bf(mvbind(y1, y2) ~ (1 | g))`),
+# distributional-parameter REs (`bf(y ~ ..., sigma ~ (1 | g))`),
+# nested REs (`(1 | g1/g2)` expanded to `(1|g1) + (1|g1:g2)`),
+# by-factor REs (`gr(g, by = f)`). brms's metadata for these
+# scenarios is exposed via the same `empty$ranef` table, so the
+# aliaser produces correct maps without special-casing. No test
+# fixtures exist for them yet; add concordance coverage when
+# user demand surfaces.
+#'@noRd
+mvgam_ranef_aliases <- function(x) {
+  meta <- mvgam_ranef_metadata(x)
+  if (is.null(meta)) {
+    return(character(0L))
+  }
+  reframe <- meta$reframe
+  group_levels <- meta$group_levels
+  ids <- unique(reframe$id)
+  parts <- lapply(ids, function(id) {
+    rows <- reframe[reframe$id == id, , drop = FALSE]
+    group <- rows$group[1L]
+    coefs <- rows$coef
+    levels <- group_levels[[group]]
+    if (is.null(levels) || length(coefs) == 0L) {
+      return(character(0L))
+    }
+    n_lvl <- length(levels)
+    n_coef <- length(coefs)
+    has_cor <- isTRUE(rows$cor[1L]) && n_coef > 1L
+    # Stan parameter form depends on whether brms estimates a
+    # correlation matrix for this group:
+    #   - correlated (M >= 2, cor = TRUE): a single matrix
+    #     `r_<id>[<level_idx>, <coef_idx>]` is emitted.
+    #   - uncorrelated or single-coef: per-coef vectors
+    #     `r_<id>_<coef_idx>[<level_idx>]` are emitted.
+    # Both forms alias to the same user-facing
+    # `r_<group>[<level>, <coef>]` name.
+    grid <- expand.grid(
+      level_idx = seq_len(n_lvl),
+      coef_idx = seq_len(n_coef),
+      KEEP.OUT.ATTRS = FALSE
+    )
+    r_old <- if (has_cor) {
+      sprintf("r_%d[%d,%d]", id, grid$level_idx, grid$coef_idx)
+    } else {
+      sprintf("r_%d_%d[%d]", id, grid$coef_idx, grid$level_idx)
+    }
+    r_new <- sprintf(
+      "r_%s[%s,%s]", group,
+      levels[grid$level_idx], coefs[grid$coef_idx]
+    )
+    r_map <- stats::setNames(r_old, r_new)
+    # sd_<id>[<coef_idx>] -> sd_<group>__<coef>
+    sd_old <- sprintf("sd_%d[%d]", id, seq_len(n_coef))
+    sd_new <- sprintf("sd_%s__%s", group, coefs)
+    sd_map <- stats::setNames(sd_old, sd_new)
+    # cor_<id>[<k>] -> cor_<group>__<coef_j>__<coef_k>
+    # Pair order follows brms's column-major upper-triangle packing
+    # (`choose(k - 1, 2) + j` for j < k); see comment block above.
+    cor_map <- character(0L)
+    if (has_cor) {
+      ks <- rep(2:n_coef, times = seq_len(n_coef - 1L))
+      js <- unlist(lapply(2:n_coef, function(k) seq_len(k - 1L)))
+      cor_old <- sprintf("cor_%d[%d]", id, seq_along(js))
+      cor_new <- sprintf(
+        "cor_%s__%s__%s", group, coefs[js], coefs[ks]
+      )
+      cor_map <- stats::setNames(cor_old, cor_new)
+    }
+    c(r_map, sd_map, cor_map)
+  })
+  unlist(parts)
+}
+
+
 # Internal: pull a `draws_array` from the stanfit slot, optionally
 # filtered by keyword / explicit names / regex. Public methods just
 # need to coerce the result to their target shape.
@@ -229,7 +380,7 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
   checkmate::assert_logical(regex, len = 1L)
   checkmate::assert_logical(inc_warmup, len = 1L)
   drws <- posterior::as_draws_array(x$fit, inc_warmup = inc_warmup)
-  alias_map <- mvgam_beta_aliases(x)
+  alias_map <- c(mvgam_beta_aliases(x), mvgam_ranef_aliases(x))
   if (length(alias_map) > 0L) {
     # Only rename entries whose positional name is actually present
     # in the draws. brms's rename_pars is similarly tolerant: a fit

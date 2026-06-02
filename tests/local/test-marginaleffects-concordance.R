@@ -617,3 +617,167 @@ test_that("update(recompile = FALSE, family = new_family) errors", {
     "incompatible with the requested"
   )
 })
+
+
+# ---------------------------------------------------------------------
+# Tier-5 brms-parity batch: ranef + VarCorr
+# ---------------------------------------------------------------------
+#
+# Concordance against brms's own random-effect accessors on the three
+# RE fixtures (intercept-only, intercept+smooth, correlated slope).
+# Numerical tolerance reflects mvgam's state-space architecture: the
+# AR(1) trend lives in the linear predictor rather than as residual
+# autocorrelation, so per-level posterior medians shift relative to
+# brms. Shape parity is exact; per-level Estimate / SD comparisons are
+# loose enough to absorb the architectural difference but tight
+# enough to catch a structural bug.
+
+
+re_concordance_threshold_sd <- 0.5
+re_concordance_threshold_estimate <- 1.0
+
+
+test_that("ranef(mvgam) matches brms shape on val_mvgam_ar1_re", {
+  require_fixtures("val_mvgam_ar1_re.rds", "val_brms_ar1_re.rds")
+  mv <- load_mvgam("ar1_re")
+  br <- load_brms("ar1_re")
+  mv_re <- ranef(mv)
+  br_re <- brms::ranef(br)
+  expect_named(mv_re, names(br_re))
+  expect_identical(dim(mv_re$grp), dim(br_re$grp))
+  expect_identical(dimnames(mv_re$grp), dimnames(br_re$grp))
+  expect_lt(
+    max(abs(mv_re$grp[, "Estimate", "Intercept"] -
+              br_re$grp[, "Estimate", "Intercept"])),
+    re_concordance_threshold_estimate
+  )
+})
+
+
+test_that("ranef(mvgam) matches brms shape on val_mvgam_ar1_re_smooth", {
+  require_fixtures(
+    "val_mvgam_ar1_re_smooth.rds", "val_brms_ar1_re_smooth.rds"
+  )
+  mv <- load_mvgam("ar1_re_smooth")
+  br <- load_brms("ar1_re_smooth")
+  mv_re <- ranef(mv)
+  br_re <- brms::ranef(br)
+  expect_named(mv_re, names(br_re))
+  expect_identical(dim(mv_re$grp), dim(br_re$grp))
+  expect_identical(dimnames(mv_re$grp), dimnames(br_re$grp))
+})
+
+
+test_that("ranef(mvgam) matches brms shape on val_mvgam_ar1_cor_re", {
+  require_fixtures(
+    "val_mvgam_ar1_cor_re.rds", "val_brms_ar1_cor_re.rds"
+  )
+  mv <- load_mvgam("ar1_cor_re")
+  br <- load_brms("ar1_cor_re")
+  mv_re <- ranef(mv)
+  br_re <- brms::ranef(br)
+  expect_named(mv_re, names(br_re))
+  expect_identical(dim(mv_re$grp), dim(br_re$grp))
+  expect_identical(dimnames(mv_re$grp), dimnames(br_re$grp))
+  # Correlated slope: both Intercept and x dimensions should be
+  # populated with sensible numerical agreement.
+  expect_lt(
+    max(abs(mv_re$grp[, "Estimate", "Intercept"] -
+              br_re$grp[, "Estimate", "Intercept"])),
+    re_concordance_threshold_estimate
+  )
+  expect_lt(
+    max(abs(mv_re$grp[, "Estimate", "x"] -
+              br_re$grp[, "Estimate", "x"])),
+    re_concordance_threshold_estimate
+  )
+})
+
+
+test_that("ranef(summary = FALSE) returns a draws-shaped 3D array", {
+  require_fixtures("val_mvgam_ar1_cor_re.rds")
+  mv <- load_mvgam("ar1_cor_re")
+  raw <- ranef(mv, summary = FALSE)
+  # [n_draws, n_levels, n_coefs]
+  expect_identical(length(dim(raw$grp)), 3L)
+  expect_identical(dim(raw$grp)[2L], length(levels(mv$data$grp)))
+  expect_identical(dim(raw$grp)[3L], 2L)
+  expect_true(!is.null(attr(raw$grp, "nchains")))
+})
+
+
+test_that("VarCorr(mvgam) returns sd-only structure for M = 1", {
+  require_fixtures("val_mvgam_ar1_re.rds")
+  mv <- load_mvgam("ar1_re")
+  vc <- VarCorr(mv)
+  expect_named(vc, "grp")
+  expect_named(vc$grp, "sd")
+  expect_identical(dim(vc$grp$sd), c(1L, 4L))
+  expect_identical(dimnames(vc$grp$sd)[[1L]], "Intercept")
+  expect_identical(
+    dimnames(vc$grp$sd)[[2L]],
+    c("Estimate", "Est.Error", "Q2.5", "Q97.5")
+  )
+})
+
+
+test_that("VarCorr(mvgam) matches brms shape on val_mvgam_ar1_cor_re", {
+  require_fixtures(
+    "val_mvgam_ar1_cor_re.rds", "val_brms_ar1_cor_re.rds"
+  )
+  mv <- load_mvgam("ar1_cor_re")
+  br <- load_brms("ar1_cor_re")
+  mv_vc <- VarCorr(mv)
+  br_vc <- brms::VarCorr(br)
+  expect_named(mv_vc, names(br_vc))
+  expect_named(mv_vc$grp, names(br_vc$grp))
+  for (slot in c("sd", "cor", "cov")) {
+    expect_identical(dim(mv_vc$grp[[slot]]), dim(br_vc$grp[[slot]]))
+    expect_identical(
+      dimnames(mv_vc$grp[[slot]]), dimnames(br_vc$grp[[slot]])
+    )
+  }
+  # SD estimates per coef should agree within a state-space
+  # tolerance — the AR(1) absorbs some shrinkage, but the
+  # group-level SD is largely structural and should not diverge
+  # dramatically.
+  expect_lt(
+    max(abs(mv_vc$grp$sd[, "Estimate"] - br_vc$grp$sd[, "Estimate"])),
+    re_concordance_threshold_sd
+  )
+})
+
+
+test_that("VarCorr(summary = FALSE) returns per-draw arrays", {
+  require_fixtures("val_mvgam_ar1_cor_re.rds")
+  mv <- load_mvgam("ar1_cor_re")
+  raw <- VarCorr(mv, summary = FALSE)
+  expect_identical(length(dim(raw$grp$sd)), 2L)
+  expect_identical(length(dim(raw$grp$cor)), 3L)
+  expect_identical(length(dim(raw$grp$cov)), 3L)
+  # cor must be exactly 1 on the diagonal across every draw.
+  expect_true(all(raw$grp$cor[, 1L, 1L] == 1))
+  expect_true(all(raw$grp$cor[, 2L, 2L] == 1))
+})
+
+
+# ---------------------------------------------------------------------
+# Tier-5 supporting checks: variable aliasing through update()
+# ---------------------------------------------------------------------
+
+test_that("update(mvgam) round-trips RE structure cleanly", {
+  require_fixtures("val_mvgam_ar1_cor_re.rds")
+  mv <- load_mvgam("ar1_cor_re")
+  # Update with tighter sampler dimensions to confirm the refit
+  # path preserves the brms-native RE parameter names without
+  # special-casing.
+  refit <- suppressWarnings(suppressMessages(
+    update(mv, iter = 200, warmup = 100, chains = 1,
+            silent = 2, refresh = 0)
+  ))
+  expect_s3_class(refit, "mvgam")
+  vars <- variables(refit)
+  expect_true(any(grepl("^r_grp\\[", vars)))
+  expect_true(any(grepl("^sd_grp__", vars)))
+  expect_true(any(grepl("^cor_grp__", vars)))
+})

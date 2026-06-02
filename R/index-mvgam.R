@@ -59,11 +59,14 @@ variables.mvgam <- function(x, ...) {
     all_vars <- setdiff(all_vars, x$exclude)
   }
 
-  # Surface brms-style `b_<term>` / `b_<term>_trend` names in place
-  # of the positional Stan slots (`b[k]`, `b_trend[k]`). Mirrors the
-  # rename applied in `extract_mvgam_draws` so character-vector and
-  # draws-array consumers see identical names.
-  apply_mvgam_beta_aliases(all_vars, mvgam_beta_aliases(x))
+  # Surface brms-style `b_<term>` / `b_<term>_trend` and
+  # `r_<group>[<level>,<coef>]` / `sd_<group>__<coef>` /
+  # `cor_<group>__<coef1>__<coef2>` names in place of the positional
+  # Stan slots. Mirrors the rename applied in `extract_mvgam_draws`
+  # so character-vector and draws-array consumers see identical
+  # names.
+  alias_map <- c(mvgam_beta_aliases(x), mvgam_ranef_aliases(x))
+  apply_mvgam_beta_aliases(all_vars, alias_map)
 }
 
 

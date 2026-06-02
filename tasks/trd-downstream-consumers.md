@@ -314,17 +314,31 @@ backed by a new `$trend_call` slot populated in
 `create_mvgam_from_combined_fit()` so the user-supplied trend
 constructor (e.g. `~ AR(p = 1)`) is preserved verbatim.
 
-One brms-parity gap remains:
+The Tier-5 batch (this branch) shipped `ranef.mvgam` and
+`VarCorr.mvgam` (brms-parity). The user-facing surface mirrors
+`brms::ranef.brmsfit` / `brms::VarCorr.brmsfit` exactly:
+per-group 3D arrays (`[n_levels, n_stats, n_coefs]` summary or
+`[n_draws, n_levels, n_coefs]` raw) and per-group
+`list(sd, cor, cov)` respectively. The mapping from positional
+Stan names (`r_<id>[<level>,<coef>]` / `r_<id>_<coef>[<level>]`,
+`sd_<id>[<coef>]`, `cor_<id>[<k>]`) to brms-native aliases
+(`r_<group>[<level>,<coef>]`, `sd_<group>__<coef>`,
+`cor_<group>__<coef_j>__<coef_k>`) is rebuilt by
+`mvgam_ranef_aliases()`, which queries an empty brmsfit skeleton
+(`brms::brm(empty = TRUE)`) for the canonical metadata table. The
+helper composes with `mvgam_beta_aliases()` under a single
+`posterior::rename_variables` call in `extract_mvgam_draws()` so
+every downstream consumer (`as.matrix`, `as.data.frame`,
+`as_draws_*`, `variables.mvgam`, `mcmc_plot`) sees the brms-native
+names without per-method aliasing.
 
-- **`ranef.mvgam`** and **`VarCorr.mvgam`**: brms shapes are per-group
-  named lists of 3D arrays / variance matrices. mvgam exposes
-  random-effect coefficients as positional `r_<id>_<coef>[<level>]`,
-  `sd_<id>[<coef>]`, `cor_<id>[<i>,<j>]` and the
-  group / coefficient mapping brms applies via its
-  `rename_pars` cascade has not been re-implemented for these
-  blocks. Users can still access raw draws via
-  `as.matrix(fit, variable = "^(sd|cor|r)_", regex = TRUE)`. Land
-  alongside future random-effect aliasing work.
+Correlation packing matches brms's stancode byte-for-byte:
+`cor_<id>[choose(k - 1, 2) + j] = Cor[j, k]` column-major
+upper-triangle order, verified against the brms source for
+M = 2..5. Trend-side group-level effects (`(1 | g)` inside
+`trend_formula`) remain accessible via their positional Stan
+names; the trend-side extension is documented inline in
+`mvgam_ranef_aliases()` for a future batch.
 
 The following brms `.brmsfit` methods remain out of scope. Each is
 its own decision thread, not a gap from the rebuild:

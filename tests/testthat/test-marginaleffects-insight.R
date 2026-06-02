@@ -157,11 +157,12 @@ test_that("resolve_series_arg errors on unknown level", {
 })
 
 test_that("resolve_series_arg errors on out-of-range index", {
-  # checkmate emits "is not <= 3" for an out-of-range index given the
-  # 3-level stub.
+  # The handler wraps the bound check in `insight::format_error` so
+  # the user sees the requested index, the valid range, and the
+  # available level names. Match the stable leading line.
   expect_error(
     mvgam:::resolve_series_arg(99L, series_stub()),
-    regexp = "not <="
+    regexp = "'series' index is out of range"
   )
 })
 
