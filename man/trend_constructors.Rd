@@ -127,9 +127,8 @@ arguments to be interpreted by the parsing functions in \pkg{mvgam}.
 Specify trend models for multivariate State-Space models in \pkg{mvgam}.
 These constructor functions create trend specifications for various temporal
 dynamics including random walks (RW), autoregressive models (AR, VAR, CAR),
-Gaussian processes (GP), and piecewise trends (PW). These functions do not
-evaluate their arguments – they exist purely to help set up models with
-particular trend structures.
+and piecewise trends (PW). These functions do not evaluate their arguments
+– they exist purely to help set up models with particular trend structures.
 }
 \details{
 \strong{Important}: Only ONE trend constructor is allowed per \code{trend_formula}.

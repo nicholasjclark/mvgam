@@ -49,8 +49,6 @@ generics::augment
 #'
 #'   * `gp()` in `trend_formula`: "type" of "trend_formula_param".
 #'
-#'   * `GP()` in `trend_model`: "type" of "trend_model_param".
-#'
 #' @param x An object of class `mvgam`.
 #'
 #' @param probs The desired probability levels of the parameters' posteriors.

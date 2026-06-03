@@ -159,11 +159,11 @@ how_to_cite.mvgam <- function(object, ...) {
     )
   }
 
-  # Check for approximate GPs
+  # Check for approximate GPs (obs-side or trend-side gp() covariate
+  # smooths)
   if (
     !is.null(attr(object$mgcv_model, 'gp_att_table')) |
-      !is.null(attr(object$trend_mgcv_model, 'gp_att_table')) |
-      trend_model == 'GP'
+      !is.null(attr(object$trend_mgcv_model, 'gp_att_table'))
   ) {
     specials_text <- c(
       specials_text,

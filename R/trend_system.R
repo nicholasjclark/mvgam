@@ -2007,9 +2007,8 @@ print.mvgam_trend <- function(x, ...) {
 #' Specify trend models for multivariate State-Space models in \pkg{mvgam}.
 #' These constructor functions create trend specifications for various temporal
 #' dynamics including random walks (RW), autoregressive models (AR, VAR, CAR),
-#' Gaussian processes (GP), and piecewise trends (PW). These functions do not
-#' evaluate their arguments – they exist purely to help set up models with
-#' particular trend structures.
+#' and piecewise trends (PW). These functions do not evaluate their arguments
+#' – they exist purely to help set up models with particular trend structures.
 #'
 #' @param ma \code{Logical}. Include moving average terms of order \code{1}?
 #'   Default is \code{FALSE}.
@@ -2514,79 +2513,6 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, gr = NA, subgr = NA, n
   )
 
   return(trend_obj)
-}
-
-#' Specify dynamic Gaussian process trends in \pkg{mvgam} models
-#'
-#' Set up low-rank approximate Gaussian Process trend models using Hilbert
-#' basis expansions in \pkg{mvgam}. This function does not evaluate its
-#' arguments – it exists purely to help set up a model with particular GP
-#' trend models.
-#'
-#' @param ... unused
-#'
-#' @return An object of class \code{mvgam_trend}, which contains a list of
-#'   arguments to be interpreted by the parsing functions in \pkg{mvgam}.
-#'
-#' @details A GP trend is estimated for each series using Hilbert space
-#'   approximate Gaussian Processes. In `mvgam`, latent squared exponential GP
-#'   trends are approximated using by default \code{20} basis functions and
-#'   using a multiplicative factor of `c = 5/4`, which saves computational
-#'   costs compared to fitting full GPs while adequately estimating GP
-#'   \code{alpha} and \code{rho} parameters.
-#'
-#' @rdname GP
-#'
-#' @author Nicholas J Clark
-#'
-#' @references Riutort-Mayol G, Burkner PC, Andersen MR, Solin A and Vehtari A
-#'   (2023). Practical Hilbert space approximate Bayesian Gaussian processes for
-#'   probabilistic programming. Statistics and Computing 33, 1.
-#'   https://doi.org/10.1007/s11222-022-10167-2
-#'
-#' @seealso \code{\link[brms]{gp}}
-#'
-#' @export
-GP = function(time = NA, series = NA, ...) {
-  # Issue deprecation warning
-  rlang::warn(
-    paste0(
-      "GP() trend models are deprecated and will be removed in a future version.\n",
-      "Use Gaussian Process terms in trend_formula instead: ~ gp(time, k = 10)\n",
-      "Combined with other trend models: trend_model = AR() or RW()"
-    ),
-    class = "mvgam_deprecation_warning",
-    .frequency = "once",
-    .frequency_id = "gp_deprecation"
-  )
-
-  # Process time argument
-  time <- deparse0(substitute(time))
-  if (time == "NA") time <- "time"  # Default to 'time' when NA
-
-  # Process series argument
-  series <- deparse0(substitute(series))
-  if (series == "NA") series <- "series"  # Default to 'series' when NA
-
-
-  out <- structure(
-    list(
-      trend = 'GP',
-      ma = FALSE,
-      cor = FALSE,
-      time = time,
-      series = series,
-      unit = 'time',
-      gr = 'NA',
-      subgr = 'series',
-      label = match.call()
-    ),
-    class = 'mvgam_trend',
-    param_info = list(
-      param_names = c('trend', 'alpha_gp', 'rho_gp', 'b_gp'),
-      labels = c('trend_estimates', 'marginal_deviation', 'length_scale', 'basis_coefficients')
-    )
-  )
 }
 
 #' Specify piecewise linear or logistic trends in \pkg{mvgam} models

@@ -58,7 +58,6 @@ different "type"s (or absence!):
 \item \code{s(bs = "gp")}: No parameters returned.
 \item \code{gp()} in \code{formula}: "type" of "observation_param".
 \item \code{gp()} in \code{trend_formula}: "type" of "trend_formula_param".
-\item \code{GP()} in \code{trend_model}: "type" of "trend_model_param".
 }
 }
 \examples{

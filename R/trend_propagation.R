@@ -448,4 +448,90 @@ rmvn <- function(n, mu, Sigma) {
 }
 
 
+# ----------------------------------------------------------------
+# F0 fit-time enrichment helpers
+# ----------------------------------------------------------------
+# These derive the kernel-relevant fields the forecasting surface
+# (extract_last_state, propagate_trend) needs at every per-draw
+# call. Computing them once at fit time and storing them on
+# `mvgam_fit$trend_metadata` avoids re-parsing the trend
+# constructor on every forecast call.
+
+
+# Internal: enrich trend_metadata with kernel-relevant extras
+# derived from the parsed trend constructor.
+#
+# Adds these fields to `trend_metadata` when a trend spec is
+# present:
+#   * `trend_type`  - character; one of "RW", "AR", "VAR", "CAR",
+#                     "ZMVN", "PW".
+#   * `ar_lags`     - integer vector of active AR lag indices.
+#                     `1` for RW / CAR, `seq_len(p)` for
+#                     `AR(p = k)` / `VAR(p = k)`, `as.integer(p)`
+#                     for sparse-lag `AR(p = c(...))`, empty for
+#                     ZMVN / PW.
+#   * `ma_lags`     - integer vector of active MA lag indices.
+#                     `1L` when `spec$ma == TRUE` (only q = 1 is
+#                     supported on this branch), empty otherwise.
+#   * `max_lag`     - cached max of ar_lags and ma_lags.
+#   * `has_cor`     - logical; `spec$cor`.
+#   * `n_lv`        - integer factor-model dimension (or NULL).
+#
+# Returns the (possibly enriched) `trend_metadata` list. Returns
+# NULL if `trend_metadata` is NULL on entry (no trend present in
+# the fit).
+#'@noRd
+enrich_trend_metadata <- function(trend_metadata, trend_specs) {
+  if (is.null(trend_metadata)) return(NULL)
+  if (is.null(trend_specs)) return(trend_metadata)
+
+  spec <- if (is_multivariate_trend_specs(trend_specs)) {
+    trend_specs[[1L]]
+  } else {
+    trend_specs
+  }
+  if (is.null(spec) || is.null(spec$trend)) return(trend_metadata)
+
+  trend_metadata$trend_type <- spec$trend
+  trend_metadata$ar_lags <- derive_ar_lags(spec)
+  trend_metadata$ma_lags <- derive_ma_lags(spec)
+  trend_metadata$max_lag <- max(
+    c(0L, trend_metadata$ar_lags, trend_metadata$ma_lags)
+  )
+  trend_metadata$has_cor <- isTRUE(spec$cor)
+  trend_metadata$n_lv <- spec$n_lv
+  trend_metadata
+}
+
+
+# Internal: derive the active AR lag set from a parsed trend
+# constructor. See `enrich_trend_metadata` for the contract.
+#'@noRd
+derive_ar_lags <- function(spec) {
+  switch(
+    spec$trend,
+    "RW" = 1L,
+    "AR" = ,
+    "VAR" = {
+      p <- spec$p
+      if (is.null(p)) return(integer(0))
+      if (length(p) == 1L) seq_len(as.integer(p)) else as.integer(p)
+    },
+    "CAR" = 1L,
+    "ZMVN" = integer(0),
+    "PW" = integer(0),
+    integer(0)
+  )
+}
+
+
+# Internal: derive the active MA lag set. On this branch only
+# q = 1 is supported across all trend types that allow MA, so the
+# result is either `c(1L)` or empty.
+#'@noRd
+derive_ma_lags <- function(spec) {
+  if (isTRUE(spec$ma)) 1L else integer(0)
+}
+
+
 # Note: `%||%` is defined package-wide at R/priors.R:1298.
