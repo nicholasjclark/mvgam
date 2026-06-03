@@ -261,19 +261,40 @@ rstantools::predictive_error
 #' Deprecated brms aliases on a fitted \pkg{mvgam} model
 #'
 #' Thin wrappers that dispatch a deprecated brms generic name to
-#' its current mvgam method. The brms generic itself emits the
-#' one-time deprecation warning; the method body just forwards
-#' the call so brms-trained users do not see
+#' its current mvgam method, so brms-trained users do not see
 #' "no applicable method" errors when they reach for legacy
-#' names.
+#' names. For the four generics that brms itself has deprecated
+#' (`marginal_smooths`, `marginal_effects`, `parnames`,
+#' `nsamples`), the brms generic emits the one-time deprecation
+#' warning and the mvgam method just forwards the call.
+#' `as.mcmc.mvgam` mirrors `brms::as.mcmc.brmsfit` — both are
+#' deprecated and emit their own one-time warning recommending
+#' `posterior::as_draws_array()` or `as.array(x)` for newer
+#' tooling. It converts the posterior draws (with the standard
+#' brms-style alias map applied to column names) to a
+#' [coda::mcmc.list()] (default) or single [coda::mcmc()] for
+#' downstream coda-based diagnostics. Requires the \pkg{coda}
+#' package (suggested dependency).
 #'
 #' * `marginal_smooths.mvgam` -> [conditional_smooths.mvgam()]
 #' * `marginal_effects.mvgam` -> [conditional_effects.mvgam()]
 #' * `parnames.mvgam` -> [variables.mvgam()]
 #' * `nsamples.mvgam` -> [posterior::ndraws()]
+#' * `as.mcmc.mvgam` -> [coda::mcmc.list()]
 #'
 #' @param x,object A fitted `mvgam` object.
 #' @param ... Forwarded to the current method.
+#'
+#' @return Shape depends on the method (see the brms equivalent
+#'   for `marginal_smooths` / `marginal_effects` / `parnames` /
+#'   `nsamples`). `as.mcmc.mvgam` returns a [coda::mcmc.list()]
+#'   when `combine_chains = FALSE` (default) and a single
+#'   [coda::mcmc()] when `combine_chains = TRUE`.
+#'
+#' @author Nicholas J Clark
+#'
+#' @seealso [posterior::as_draws_array()], [as.array.mvgam()],
+#'   [variables.mvgam()].
 #'
 #' @name mvgam_brms_deprecated
 NULL
@@ -329,6 +350,99 @@ nsamples.mvgam <- function(object, ...) {
 #' @importFrom brms nsamples
 #' @export
 brms::nsamples
+
+
+#' @rdname mvgam_brms_deprecated
+#' @param pars Optional character vector of parameter names to
+#'   include. `NA` (the default) keeps all parameters. With
+#'   `fixed = FALSE` each entry is treated as a regular expression
+#'   and any matching parameter is kept; with `fixed = TRUE` only
+#'   exact matches are kept.
+#' @param fixed Logical. If `TRUE`, treat `pars` as exact names
+#'   rather than regular expressions.
+#' @param combine_chains Logical. If `TRUE`, return a single
+#'   [coda::mcmc()] object stacking all chains; otherwise return
+#'   a [coda::mcmc.list()] with one element per chain (the
+#'   default).
+#' @param inc_warmup Logical. If `TRUE`, include warmup draws.
+#'   Defaults to `FALSE`.
+#' @method as.mcmc mvgam
+#' @export
+as.mcmc.mvgam <- function(x, pars = NA, fixed = FALSE,
+                           combine_chains = FALSE,
+                           inc_warmup = FALSE, ...) {
+  checkmate::assert_class(x, "mvgam")
+  checkmate::assert_logical(fixed, len = 1L)
+  checkmate::assert_logical(combine_chains, len = 1L)
+  checkmate::assert_logical(inc_warmup, len = 1L)
+  if (!requireNamespace("coda", quietly = TRUE)) {
+    stop(insight::format_error(c(
+      "Package 'coda' is required for 'as.mcmc.mvgam'.",
+      i = "Install it with 'install.packages(\"coda\")'."
+    )))
+  }
+  warning(
+    "'as.mcmc.mvgam' is deprecated; prefer ",
+    "'posterior::as_draws_array(x)' or 'as.array(x)' for ",
+    "downstream tooling that accepts the 'posterior' draws ",
+    "format.",
+    call. = FALSE
+  )
+  # Route through `as_draws_array.mvgam` so the brms-style alias
+  # map (e.g. `b[1] -> b_Intercept`, `bs[k] -> bs_<colname>`,
+  # `r_<id>[lvl, coef] -> r_<group>[<level>, <coef>]`) is applied
+  # before any `pars` filtering or downstream consumers see the
+  # column names.
+  drws <- as_draws_array(x, inc_warmup = inc_warmup)
+  all_vars <- posterior::variables(drws)
+  if (!identical(pars, NA) && !is.null(pars)) {
+    checkmate::assert_character(pars, min.len = 1L)
+    if (isTRUE(fixed)) {
+      kept <- intersect(pars, all_vars)
+    } else {
+      kept <- unique(unlist(lapply(pars, function(p) {
+        grep(p, all_vars, value = TRUE)
+      })))
+    }
+    if (length(kept) == 0L) {
+      stop(insight::format_error(c(
+        "No parameters matched 'pars'.",
+        x = paste0(
+          "Requested: ",
+          paste0("'", pars, "'", collapse = ", "), "."
+        ),
+        i = "Use 'variables(x)' to see available names."
+      )))
+    }
+    drws <- posterior::subset_draws(drws, variable = kept)
+  }
+  if (isTRUE(combine_chains)) {
+    mat <- as.matrix(posterior::as_draws_matrix(drws))
+    attr(mat, "mcpar") <- c(1L, nrow(mat), 1L)
+    class(mat) <- "mcmc"
+    return(mat)
+  }
+  n_chains <- posterior::nchains(drws)
+  n_iter <- posterior::niterations(drws)
+  vars <- posterior::variables(drws)
+  per_chain <- lapply(seq_len(n_chains), function(ch) {
+    chain_slice <- drws[, ch, , drop = FALSE]
+    mat <- matrix(
+      as.numeric(chain_slice),
+      nrow = n_iter, ncol = length(vars),
+      dimnames = list(NULL, vars)
+    )
+    attr(mat, "mcpar") <- c(1L, n_iter, 1L)
+    class(mat) <- "mcmc"
+    mat
+  })
+  coda::as.mcmc.list(per_chain)
+}
+
+
+#' @importFrom coda as.mcmc
+#' @export
+coda::as.mcmc
 
 
 # Internal: return the response variable's name from the fit's

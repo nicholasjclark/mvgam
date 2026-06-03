@@ -45,7 +45,8 @@ make_wrapper_stub <- function(with_re = FALSE) {
 test_that("Tier-7 methods have S3 entries on mvgam", {
   for (m in c("posterior_interval", "predictive_interval", "ngrps",
               "predictive_error", "marginal_smooths",
-              "marginal_effects", "parnames", "nsamples")) {
+              "marginal_effects", "parnames", "nsamples",
+              "as.mcmc")) {
     expect_true(
       !is.null(getS3method(m, "mvgam", optional = TRUE)),
       info = NULL
@@ -163,4 +164,70 @@ test_that("predictive_error.mvgam errors when newdata lacks the response", {
 test_that("mvgam_response_name returns the LHS variable", {
   stub <- make_wrapper_stub()
   expect_identical(mvgam_response_name(stub), "y")
+})
+
+
+# ---- as.mcmc.mvgam -------------------------------------------------
+
+test_that("as.mcmc.mvgam matches brms signature", {
+  expected <- names(formals(getS3method("as.mcmc", "brmsfit")))
+  actual <- names(formals(getS3method("as.mcmc", "mvgam")))
+  expect_true(all(expected %in% actual))
+})
+
+
+test_that("as.mcmc.mvgam returns an mcmc.list by default", {
+  stub <- make_wrapper_stub()
+  expect_warning(out <- as.mcmc(stub), "deprecated")
+  expect_s3_class(out, "mcmc.list")
+  # Stub has 2 chains x 50 iter.
+  expect_length(out, 2L)
+  expect_s3_class(out[[1L]], "mcmc")
+  expect_identical(nrow(out[[1L]]), 50L)
+  expect_equal(attr(out[[1L]], "mcpar"), c(1, 50, 1))
+})
+
+
+test_that("as.mcmc.mvgam combine_chains stacks into a single mcmc", {
+  stub <- make_wrapper_stub()
+  expect_warning(
+    out <- as.mcmc(stub, combine_chains = TRUE),
+    "deprecated"
+  )
+  expect_s3_class(out, "mcmc")
+  expect_identical(nrow(out), 100L)
+  expect_equal(attr(out, "mcpar"), c(1, 100, 1))
+})
+
+
+test_that("as.mcmc.mvgam pars filter (regex) keeps matching columns", {
+  stub <- make_wrapper_stub()
+  expect_warning(
+    out <- as.mcmc(stub, pars = "^b_"),
+    "deprecated"
+  )
+  expect_true(all(grepl("^b_", colnames(out[[1L]]))))
+})
+
+
+test_that("as.mcmc.mvgam pars filter (fixed) is exact", {
+  stub <- make_wrapper_stub()
+  expect_warning(
+    out <- as.mcmc(stub, pars = "b_x", fixed = TRUE),
+    "deprecated"
+  )
+  expect_identical(colnames(out[[1L]]), "b_x")
+})
+
+
+test_that("as.mcmc.mvgam errors when no parameter matches 'pars'", {
+  stub <- make_wrapper_stub()
+  # The deprecation warning fires before the error; suppress the
+  # warning so the expect_error matches the error condition only.
+  expect_error(
+    suppressWarnings(
+      as.mcmc(stub, pars = "no_such_par", fixed = TRUE)
+    ),
+    "No parameters matched"
+  )
 })

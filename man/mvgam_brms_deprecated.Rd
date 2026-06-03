@@ -6,6 +6,7 @@
 \alias{marginal_effects.mvgam}
 \alias{parnames.mvgam}
 \alias{nsamples.mvgam}
+\alias{as.mcmc.mvgam}
 \title{Deprecated brms aliases on a fitted \pkg{mvgam} model}
 \usage{
 \method{marginal_smooths}{mvgam}(x, ...)
@@ -15,19 +16,61 @@
 \method{parnames}{mvgam}(x, ...)
 
 \method{nsamples}{mvgam}(object, ...)
+
+\method{as.mcmc}{mvgam}(
+  x,
+  pars = NA,
+  fixed = FALSE,
+  combine_chains = FALSE,
+  inc_warmup = FALSE,
+  ...
+)
 }
 \arguments{
 \item{x, object}{A fitted \code{mvgam} object.}
 
 \item{...}{Forwarded to the current method.}
+
+\item{pars}{Optional character vector of parameter names to
+include. \code{NA} (the default) keeps all parameters. With
+\code{fixed = FALSE} each entry is treated as a regular expression
+and any matching parameter is kept; with \code{fixed = TRUE} only
+exact matches are kept.}
+
+\item{fixed}{Logical. If \code{TRUE}, treat \code{pars} as exact names
+rather than regular expressions.}
+
+\item{combine_chains}{Logical. If \code{TRUE}, return a single
+\code{\link[coda:mcmc]{coda::mcmc()}} object stacking all chains; otherwise return
+a \code{\link[coda:mcmc.list]{coda::mcmc.list()}} with one element per chain (the
+default).}
+
+\item{inc_warmup}{Logical. If \code{TRUE}, include warmup draws.
+Defaults to \code{FALSE}.}
+}
+\value{
+Shape depends on the method (see the brms equivalent
+for \code{marginal_smooths} / \code{marginal_effects} / \code{parnames} /
+\code{nsamples}). \code{as.mcmc.mvgam} returns a \code{\link[coda:mcmc.list]{coda::mcmc.list()}}
+when \code{combine_chains = FALSE} (default) and a single
+\code{\link[coda:mcmc]{coda::mcmc()}} when \code{combine_chains = TRUE}.
 }
 \description{
 Thin wrappers that dispatch a deprecated brms generic name to
-its current mvgam method. The brms generic itself emits the
-one-time deprecation warning; the method body just forwards
-the call so brms-trained users do not see
+its current mvgam method, so brms-trained users do not see
 "no applicable method" errors when they reach for legacy
-names.
+names. For the four generics that brms itself has deprecated
+(\code{marginal_smooths}, \code{marginal_effects}, \code{parnames},
+\code{nsamples}), the brms generic emits the one-time deprecation
+warning and the mvgam method just forwards the call.
+\code{as.mcmc.mvgam} mirrors \code{brms::as.mcmc.brmsfit} — both are
+deprecated and emit their own one-time warning recommending
+\code{posterior::as_draws_array()} or \code{as.array(x)} for newer
+tooling. It converts the posterior draws (with the standard
+brms-style alias map applied to column names) to a
+\code{\link[coda:mcmc.list]{coda::mcmc.list()}} (default) or single \code{\link[coda:mcmc]{coda::mcmc()}} for
+downstream coda-based diagnostics. Requires the \pkg{coda}
+package (suggested dependency).
 }
 \details{
 \itemize{
@@ -35,5 +78,27 @@ names.
 \item \code{marginal_effects.mvgam} -> \code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}}
 \item \code{parnames.mvgam} -> \code{\link[=variables.mvgam]{variables.mvgam()}}
 \item \code{nsamples.mvgam} -> \code{\link[posterior:draws-index]{posterior::ndraws()}}
+\item \code{as.mcmc.mvgam} -> \code{\link[coda:mcmc.list]{coda::mcmc.list()}}
 }
+}
+\examples{
+\donttest{
+sim <- sim_mvgam(family = gaussian())
+mod <- mvgam(y ~ s(season, bs = "cc"), trend_model = AR(),
+             data = sim$data_train, family = gaussian(),
+             chains = 2, silent = 2)
+# Coda mcmc.list for diagnostic tools that don't yet accept
+# 'posterior' draws_* classes.
+mc <- suppressWarnings(as.mcmc(mod))
+# Single combined-chains mcmc.
+mc_all <- suppressWarnings(as.mcmc(mod, combine_chains = TRUE))
+}
+
+}
+\seealso{
+\code{\link[posterior:draws_array]{posterior::as_draws_array()}}, \code{\link[=as.array.mvgam]{as.array.mvgam()}},
+\code{\link[=variables.mvgam]{variables.mvgam()}}.
+}
+\author{
+Nicholas J Clark
 }

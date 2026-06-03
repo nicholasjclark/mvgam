@@ -20,6 +20,7 @@
 \alias{marginal_effects}
 \alias{parnames}
 \alias{nsamples}
+\alias{as.mcmc}
 \alias{log_lik}
 \alias{loo}
 \alias{loo_compare}
@@ -53,6 +54,8 @@ below to see their documentation.
 
 \describe{
   \item{brms}{\code{\link[brms:conditional_effects.brmsfit]{conditional_effects}}, \code{\link[brms:conditional_smooths.brmsfit]{conditional_smooths}}, \code{\link[brms:conditional_effects.brmsfit]{marginal_effects}}, \code{\link[brms:conditional_smooths.brmsfit]{marginal_smooths}}, \code{\link[brms:mcmc_plot.brmsfit]{mcmc_plot}}, \code{\link[brms:ngrps.brmsfit]{ngrps}}, \code{\link[brms:nsamples.brmsfit]{nsamples}}, \code{\link[brms]{parnames}}, \code{\link[brms:posterior_average.brmsfit]{posterior_average}}, \code{\link[brms:posterior_smooths.brmsfit]{posterior_smooths}}, \code{\link[brms:pp_average.brmsfit]{pp_average}}, \code{\link[brms:ranef.brmsfit]{ranef}}, \code{\link[brms:VarCorr.brmsfit]{VarCorr}}}
+
+  \item{coda}{\code{\link[coda:mcmc]{as.mcmc}}}
 
   \item{generics}{\code{\link[generics]{augment}}, \code{\link[generics]{tidy}}}
 

@@ -64,7 +64,8 @@ Suggests:
     usethis,
     testthat,
     colorspace,
-    future
+    future,
+    coda
 Enhances:
     gratia (>= 0.9.0),
     tidyr
