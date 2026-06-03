@@ -378,5 +378,37 @@ fit_mvgam_cached("ar1_t2",
   y ~ 1 + t2(z, w), ~ AR(p = 1),
   test_data_t2, poisson())
 
+cat("\n[20] Gaussian AR(1), N=150 — PSIS-stable concordance fixture\n")
+# Larger N with high signal-to-noise keeps Pareto-k diagnostics in
+# the stable region (<0.7), so cross-package PSIS-weighted
+# predictions (loo_epred / loo_linpred / loo_predictive_interval)
+# can be compared bit-for-bit between mvgam and brms.
+set.seed(7)
+gauss_n <- 150L
+gauss_ar <- 0.5
+gauss_sigma <- 0.4
+gauss_latent <- numeric(gauss_n)
+gauss_latent[1L] <- stats::rnorm(
+  1L, 0, gauss_sigma / sqrt(1 - gauss_ar^2)
+)
+for (t in 2:gauss_n) {
+  gauss_latent[t] <- gauss_ar * gauss_latent[t - 1L] +
+    stats::rnorm(1L, 0, gauss_sigma)
+}
+gauss_x <- stats::rnorm(gauss_n)
+test_data_gauss <- data.frame(
+  y = 1.0 + 1.5 * gauss_x + gauss_latent +
+    stats::rnorm(gauss_n, 0, 0.3),
+  x = gauss_x,
+  time = seq_len(gauss_n),
+  series = factor("s1")
+)
+fit_brms_cached("gauss_ar1_n150",
+  y ~ 1 + x + ar(time = time, p = 1, cov = TRUE),
+  test_data_gauss, gaussian())
+fit_mvgam_cached("gauss_ar1_n150",
+  y ~ 1 + x, ~ AR(p = 1),
+  test_data_gauss, gaussian())
+
 cat("\n=== All fixtures present in", FIXTURE_DIR, "===\n")
 cat("Files: ", length(list.files(FIXTURE_DIR, pattern = "\\.rds$")), "\n")

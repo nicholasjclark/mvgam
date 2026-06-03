@@ -48,6 +48,7 @@ make_loo_extras_stub <- function(n_iter = 80L, n_chains = 2L) {
 test_that("every Tier-3 method has an S3 method on `mvgam`", {
   for (m in c(
     "vcov", "LOO", "WAIC", "loo_R2", "loo_predict",
+    "loo_epred", "loo_linpred", "loo_predictive_interval",
     "loo_subsample", "loo_moment_match",
     "loo_model_weights", "add_criterion"
   )) {
@@ -78,6 +79,15 @@ test_that("Tier-3 method signatures match brms / loo reference", {
     ),
     loo_predict = c(
       "object", "type", "probs", "psis_object", "resp", "..."
+    ),
+    loo_epred = c(
+      "object", "type", "probs", "psis_object", "resp", "..."
+    ),
+    loo_linpred = c(
+      "object", "type", "probs", "psis_object", "resp", "..."
+    ),
+    loo_predictive_interval = c(
+      "object", "prob", "psis_object", "..."
     ),
     loo_subsample = c("x", "...", "compare", "resp", "model_names"),
     loo_moment_match = c(
@@ -208,5 +218,44 @@ test_that("loo_model_weights.mvgam rejects unnamed non-model args", {
   expect_error(
     loo_model_weights(stub, 42),
     "must be named"
+  )
+})
+
+
+# ---- LOO trio: shared helper + pure-delegation forms ---------------
+
+test_that("loo_predict / loo_epred / loo_linpred delegate to shared helper", {
+  for (m in c("loo_predict", "loo_epred", "loo_linpred")) {
+    body_chr <- paste(deparse(body(getS3method(m, "mvgam"))),
+                       collapse = "\n")
+    expect_match(body_chr, "mvgam_loo_E_loo")
+  }
+})
+
+
+test_that("loo_predictive_interval delegates to loo_predict with quantile", {
+  body_chr <- paste(
+    deparse(body(getS3method("loo_predictive_interval", "mvgam"))),
+    collapse = "\n"
+  )
+  expect_match(body_chr, "loo_predict")
+  expect_match(body_chr, "quantile")
+})
+
+
+test_that("loo_predictive_interval validates 'prob' in (0, 1)", {
+  stub <- make_loo_extras_stub()
+  expect_error(loo_predictive_interval(stub, prob = -0.1),
+               "Element 1 is not >= 0")
+  expect_error(loo_predictive_interval(stub, prob = 1.5),
+               "Element 1 is not <= 1")
+})
+
+
+test_that("mvgam_loo_E_loo asserts its 'posterior_fn' is a function", {
+  stub <- make_loo_extras_stub()
+  expect_error(
+    mvgam_loo_E_loo(stub, posterior_fn = "not_a_function"),
+    "function"
   )
 })

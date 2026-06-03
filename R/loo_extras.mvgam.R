@@ -3,11 +3,12 @@
 #' brms-parity S3 methods that compose mvgam's existing prediction
 #' and log-likelihood primitives ([`log_lik.mvgam`], [`loo.mvgam`],
 #' [`waic.mvgam`], [`posterior_epred.mvgam`],
-#' [`posterior_predict.mvgam`]) with helpers from the
-#' \pkg{loo} package.
+#' [`posterior_linpred.mvgam`], [`posterior_predict.mvgam`]) with
+#' helpers from the \pkg{loo} package.
 #'
 #' @name mvgam_loo_extras
 #' @aliases LOO.mvgam WAIC.mvgam loo_R2.mvgam loo_predict.mvgam
+#'   loo_epred.mvgam loo_linpred.mvgam loo_predictive_interval.mvgam
 #'   loo_subsample.mvgam loo_moment_match.mvgam
 #'   loo_model_weights.mvgam add_criterion.mvgam
 #'
@@ -25,8 +26,12 @@
 #' @param args_epred,args_loglik Lists of additional arguments
 #'   forwarded to [`posterior_epred`] / [`log_lik`] when computing
 #'   the LOO R^2.
-#' @param type For `loo_predict.mvgam`, one of `"mean"`, `"var"`,
-#'   or `"quantile"`.
+#' @param type For `loo_predict.mvgam`, `loo_epred.mvgam`, and
+#'   `loo_linpred.mvgam`, one of `"mean"`, `"var"`, or
+#'   `"quantile"`.
+#' @param prob For `loo_predictive_interval.mvgam`, a single
+#'   numeric in `(0, 1)` giving the credible-interval mass.
+#'   Defaults to `0.9` (matching brms).
 #' @param psis_object Optional precomputed `loo::psis` object.
 #' @param compare Logical. If `TRUE`, compare multiple models.
 #' @param pointwise Logical. Pointwise streaming mode (not
@@ -66,6 +71,8 @@
 #'   [log_lik.mvgam()] for pointwise log densities,
 #'   [bayes_R2.mvgam()] for the non-LOO Bayesian R^2,
 #'   [brms::loo_R2.brmsfit()], [brms::loo_predict.brmsfit()],
+#'   [brms::loo_epred.brmsfit()], [brms::loo_linpred.brmsfit()],
+#'   [brms::loo_predictive_interval.brmsfit()],
 #'   [brms::add_criterion()], [loo::loo_subsample()],
 #'   [loo::loo_model_weights()], [loo::E_loo()],
 #'   [loo::psis()].
@@ -115,6 +122,78 @@ mvgam_loo_R2 <- function(y, epred, ll, r_eff) {
   r2[r2 < -1] <- -1
   r2[r2 > 1] <- 1
   as.matrix(r2)
+}
+
+
+# Internal: shared PSIS-weighting skeleton for `loo_predict`,
+# `loo_epred`, and `loo_linpred`. Builds a PSIS object (via
+# `loo(save_psis = TRUE)` if none supplied), computes posterior
+# predictions through `posterior_fn`, and returns the PSIS-
+# weighted expectation/quantile via `loo::E_loo`, with the
+# brms-parity output normalisation (column-labelled matrix; for
+# 3D multivariate prediction arrays, returns a 3D array with the
+# per-response slabs stacked along the last dimension).
+#
+# mvgam's posterior_* and `log_lik` methods stochastically
+# resample latent-state contributions on each call. To keep the
+# PSIS weights (derived from log_lik inside `loo()`) aligned
+# row-by-row with the prediction draws (from `posterior_fn`),
+# both calls run under a shared RNG seed; the user's RNG state
+# is snapshotted on entry and restored on exit. Without this
+# tie, predictions and weights reference different latent-state
+# samples and the PSIS expectation drifts substantially from the
+# brms equivalent.
+#'@noRd
+mvgam_loo_E_loo <- function(object, posterior_fn,
+                             type = c("mean", "var", "quantile"),
+                             probs = 0.5, psis_object = NULL,
+                             resp = NULL, ...) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_function(posterior_fn)
+  type <- match.arg(type)
+  if (exists(".Random.seed", envir = .GlobalEnv)) {
+    rng_old <- get(".Random.seed", envir = .GlobalEnv)
+    on.exit(assign(".Random.seed", rng_old, envir = .GlobalEnv))
+  }
+  aligned_seed <- 1L
+  if (is.null(psis_object)) {
+    message("Running PSIS to compute weights")
+    set.seed(aligned_seed)
+    loo_object <- loo(object, resp = resp, save_psis = TRUE, ...)
+    psis_object <- loo_object$psis_object
+  }
+  set.seed(aligned_seed)
+  preds <- posterior_fn(object, resp = resp, ...)
+  if (length(dim(preds)) == 3L) {
+    out <- apply(preds, 3L, mvgam_E_loo_normalise,
+                  psis_object = psis_object, type = type,
+                  probs = probs, simplify = FALSE)
+    return(abind::abind(out, rev.along = 0L))
+  }
+  mvgam_E_loo_normalise(preds, psis_object, type, probs)
+}
+
+
+# Internal: per-slab normalisation that mirrors the brms helper
+# `E_loo_value` — wraps a vector into a 1-col matrix, transposes
+# the quantile matrix into observation-row layout, and assigns
+# column labels (`"mean"`, `"var"`, or `"q{prob*100}"`).
+#'@noRd
+mvgam_E_loo_normalise <- function(preds, psis_object,
+                                    type = "mean", probs = 0.5) {
+  y <- loo::E_loo(preds, psis_object, type = type,
+                   probs = probs)$value
+  if (is.matrix(y) && ncol(preds) == ncol(y)) {
+    y <- t(y)
+  } else if (is.vector(y)) {
+    y <- matrix(y)
+  }
+  labs <- type
+  if (identical(type, "quantile")) {
+    labs <- paste0("q", probs * 100)
+  }
+  colnames(y) <- labs
+  y
 }
 
 
@@ -219,15 +298,59 @@ loo_predict.mvgam <- function(object,
                                 type = c("mean", "var", "quantile"),
                                 probs = 0.5, psis_object = NULL,
                                 resp = NULL, ...) {
+  mvgam_loo_E_loo(
+    object, posterior_predict, type = type, probs = probs,
+    psis_object = psis_object, resp = resp, ...
+  )
+}
+
+
+#' @rdname mvgam_loo_extras
+#' @importFrom brms loo_epred
+#' @method loo_epred mvgam
+#' @export loo_epred
+#' @export
+loo_epred.mvgam <- function(object,
+                              type = c("mean", "var", "quantile"),
+                              probs = 0.5, psis_object = NULL,
+                              resp = NULL, ...) {
+  mvgam_loo_E_loo(
+    object, posterior_epred, type = type, probs = probs,
+    psis_object = psis_object, resp = resp, ...
+  )
+}
+
+
+#' @rdname mvgam_loo_extras
+#' @importFrom brms loo_linpred
+#' @method loo_linpred mvgam
+#' @export loo_linpred
+#' @export
+loo_linpred.mvgam <- function(object,
+                                type = c("mean", "var", "quantile"),
+                                probs = 0.5, psis_object = NULL,
+                                resp = NULL, ...) {
+  mvgam_loo_E_loo(
+    object, posterior_linpred, type = type, probs = probs,
+    psis_object = psis_object, resp = resp, ...
+  )
+}
+
+
+#' @rdname mvgam_loo_extras
+#' @importFrom brms loo_predictive_interval
+#' @method loo_predictive_interval mvgam
+#' @export loo_predictive_interval
+#' @export
+loo_predictive_interval.mvgam <- function(object, prob = 0.9,
+                                            psis_object = NULL, ...) {
   checkmate::assert_class(object, "mvgam")
-  type <- match.arg(type)
-  if (is.null(psis_object)) {
-    message("Running PSIS to compute weights")
-    loo_object <- loo(object, resp = resp, save_psis = TRUE, ...)
-    psis_object <- loo_object$psis_object
-  }
-  preds <- posterior_predict(object, resp = resp, ...)
-  loo::E_loo(preds, psis_object, type = type, probs = probs)$value
+  checkmate::assert_number(prob, lower = 0, upper = 1)
+  alpha <- (1 - prob) / 2
+  loo_predict(
+    object, type = "quantile", probs = c(alpha, 1 - alpha),
+    psis_object = psis_object, ...
+  )
 }
 
 

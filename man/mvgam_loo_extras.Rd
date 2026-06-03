@@ -6,6 +6,9 @@
 \alias{WAIC.mvgam}
 \alias{loo_R2.mvgam}
 \alias{loo_predict.mvgam}
+\alias{loo_epred.mvgam}
+\alias{loo_linpred.mvgam}
+\alias{loo_predictive_interval.mvgam}
 \alias{loo_subsample.mvgam}
 \alias{loo_moment_match.mvgam}
 \alias{loo_model_weights.mvgam}
@@ -56,6 +59,26 @@
   resp = NULL,
   ...
 )
+
+\method{loo_epred}{mvgam}(
+  object,
+  type = c("mean", "var", "quantile"),
+  probs = 0.5,
+  psis_object = NULL,
+  resp = NULL,
+  ...
+)
+
+\method{loo_linpred}{mvgam}(
+  object,
+  type = c("mean", "var", "quantile"),
+  probs = 0.5,
+  psis_object = NULL,
+  resp = NULL,
+  ...
+)
+
+\method{loo_predictive_interval}{mvgam}(object, prob = 0.9, psis_object = NULL, ...)
 
 \method{loo_subsample}{mvgam}(x, ..., compare = TRUE, resp = NULL, model_names = NULL)
 
@@ -121,10 +144,15 @@ probabilities for credible intervals. Defaults to
 forwarded to \code{\link{posterior_epred}} / \code{\link{log_lik}} when computing
 the LOO R^2.}
 
-\item{type}{For \code{loo_predict.mvgam}, one of \code{"mean"}, \code{"var"},
-or \code{"quantile"}.}
+\item{type}{For \code{loo_predict.mvgam}, \code{loo_epred.mvgam}, and
+\code{loo_linpred.mvgam}, one of \code{"mean"}, \code{"var"}, or
+\code{"quantile"}.}
 
 \item{psis_object}{Optional precomputed \code{loo::psis} object.}
+
+\item{prob}{For \code{loo_predictive_interval.mvgam}, a single
+numeric in \verb{(0, 1)} giving the credible-interval mass.
+Defaults to \code{0.9} (matching brms).}
 
 \item{loo, newdata, check, recompile}{Retained for brms-parity on
 \code{loo_moment_match.mvgam} (the method errors before they are
@@ -154,8 +182,8 @@ brms / loo equivalents).
 brms-parity S3 methods that compose mvgam's existing prediction
 and log-likelihood primitives (\code{\link{log_lik.mvgam}}, \code{\link{loo.mvgam}},
 \code{\link{waic.mvgam}}, \code{\link{posterior_epred.mvgam}},
-\code{\link{posterior_predict.mvgam}}) with helpers from the
-\pkg{loo} package.
+\code{\link{posterior_linpred.mvgam}}, \code{\link{posterior_predict.mvgam}}) with
+helpers from the \pkg{loo} package.
 }
 \seealso{
 \link{mvgam_diagnostics} for posterior summaries and convergence
@@ -166,6 +194,8 @@ criteria,
 \code{\link[=log_lik.mvgam]{log_lik.mvgam()}} for pointwise log densities,
 \code{\link[=bayes_R2.mvgam]{bayes_R2.mvgam()}} for the non-LOO Bayesian R^2,
 \code{\link[brms:loo_R2.brmsfit]{brms::loo_R2.brmsfit()}}, \code{\link[brms:loo_predict.brmsfit]{brms::loo_predict.brmsfit()}},
+\code{\link[brms:loo_predict.brmsfit]{brms::loo_epred.brmsfit()}}, \code{\link[brms:loo_predict.brmsfit]{brms::loo_linpred.brmsfit()}},
+\code{\link[brms:loo_predict.brmsfit]{brms::loo_predictive_interval.brmsfit()}},
 \code{\link[brms:add_criterion]{brms::add_criterion()}}, \code{\link[loo:loo_subsample]{loo::loo_subsample()}},
 \code{\link[loo:loo_model_weights]{loo::loo_model_weights()}}, \code{\link[loo:E_loo]{loo::E_loo()}},
 \code{\link[loo:psis]{loo::psis()}}.

@@ -1077,3 +1077,161 @@ test_that("deprecated brms aliases dispatch to current methods", {
     posterior::ndraws(posterior::as_draws(mv$fit))
   )
 })
+
+
+# ------------------------------------------------------------------
+# Tier-8 brms-parity batch: PSIS-weighted predictions + model
+# averaging (loo_epred / loo_linpred / loo_predictive_interval /
+# posterior_average / pp_average)
+# ------------------------------------------------------------------
+
+
+# Tier-8 strict numerical concordance is exercised on two
+# fixture pairs designed for PSIS stability:
+#   * binom_ar1       — Binomial AR(1), N=30, max Pareto-k 0.68
+#   * gauss_ar1_n150  — Gaussian AR(1), N=150, smooth posterior
+# Both produce loo_epred / loo_linpred / loo_predictive_interval
+# values that correlate >=0.95 with the brms equivalents.
+
+test_that("loo_epred.mvgam matches brms on PSIS-stable fixtures", {
+  for (name in c("binom_ar1", "gauss_ar1_n150")) {
+    require_fixtures(paste0("val_mvgam_", name, ".rds"),
+                      paste0("val_brms_", name, ".rds"))
+    mv <- load_mvgam(name)
+    br <- load_brms(name)
+    mv_e <- suppressMessages(suppressWarnings(
+      loo_epred(mv, type = "mean")
+    ))
+    br_e <- suppressMessages(suppressWarnings(
+      loo_epred(br, type = "mean")
+    ))
+    # Shape, dimnames, and per-observation numerical agreement.
+    expect_identical(dim(mv_e), dim(br_e))
+    expect_identical(colnames(mv_e), colnames(br_e))
+    expect_gt(
+      stats::cor(as.numeric(mv_e), as.numeric(br_e)), 0.95
+    )
+  }
+})
+
+
+test_that("loo_linpred.mvgam matches brms on PSIS-stable fixtures", {
+  for (name in c("binom_ar1", "gauss_ar1_n150")) {
+    require_fixtures(paste0("val_mvgam_", name, ".rds"),
+                      paste0("val_brms_", name, ".rds"))
+    mv <- load_mvgam(name)
+    br <- load_brms(name)
+    mv_l <- suppressMessages(suppressWarnings(
+      loo_linpred(mv, type = "mean")
+    ))
+    br_l <- suppressMessages(suppressWarnings(
+      loo_linpred(br, type = "mean")
+    ))
+    expect_identical(dim(mv_l), dim(br_l))
+    expect_identical(colnames(mv_l), colnames(br_l))
+    expect_gt(
+      stats::cor(as.numeric(mv_l), as.numeric(br_l)), 0.95
+    )
+  }
+})
+
+
+test_that("loo_predictive_interval.mvgam matches brms on Gaussian fixture", {
+  # Gaussian: continuous response, no PI quantisation noise.
+  require_fixtures("val_mvgam_gauss_ar1_n150.rds",
+                    "val_brms_gauss_ar1_n150.rds")
+  mv <- load_mvgam("gauss_ar1_n150")
+  br <- load_brms("gauss_ar1_n150")
+  mv_pi <- suppressMessages(suppressWarnings(
+    loo_predictive_interval(mv, prob = 0.9)
+  ))
+  br_pi <- suppressMessages(suppressWarnings(
+    loo_predictive_interval(br, prob = 0.9)
+  ))
+  expect_identical(dim(mv_pi), dim(br_pi))
+  expect_identical(colnames(mv_pi), colnames(br_pi))
+  expect_true(all(mv_pi[, 2L] >= mv_pi[, 1L]))
+  # Per-quantile column-wise correlation must be high.
+  expect_gt(stats::cor(mv_pi[, 1L], br_pi[, 1L]), 0.95)
+  expect_gt(stats::cor(mv_pi[, 2L], br_pi[, 2L]), 0.95)
+})
+
+
+test_that("loo_predictive_interval.mvgam shape parity on binom fixture", {
+  require_fixtures("val_mvgam_binom_ar1.rds",
+                    "val_brms_binom_ar1.rds")
+  mv <- load_mvgam("binom_ar1")
+  br <- load_brms("binom_ar1")
+  mv_pi <- suppressMessages(suppressWarnings(
+    loo_predictive_interval(mv, prob = 0.9)
+  ))
+  br_pi <- suppressMessages(suppressWarnings(
+    loo_predictive_interval(br, prob = 0.9)
+  ))
+  # Binomial response is integer-valued, so quantile-rounding
+  # softens cross-package agreement; lock in shape + ordering.
+  expect_identical(dim(mv_pi), dim(br_pi))
+  expect_identical(colnames(mv_pi), colnames(br_pi))
+  expect_true(all(mv_pi[, 2L] >= mv_pi[, 1L]))
+})
+
+
+test_that("posterior_average.mvgam returns shape + attrs (brms-parity)", {
+  require_fixtures("val_mvgam_ar1_fx.rds", "val_mvgam_ar1_int.rds")
+  mv_a <- load_mvgam("ar1_fx")
+  mv_b <- load_mvgam("ar1_int")
+  # Equal weights bypass the stacking solver to keep this test
+  # cheap and deterministic.
+  out <- posterior_average(
+    mv_a, mv_b, weights = c(0.5, 0.5),
+    ndraws = 200L, seed = 1L
+  )
+  expect_s3_class(out, "data.frame")
+  expect_identical(nrow(out), 200L)
+  expect_true("b_Intercept" %in% colnames(out))
+  w <- attr(out, "weights")
+  expect_equal(unname(w), c(0.5, 0.5))
+  nd <- attr(out, "ndraws")
+  expect_equal(sum(nd), 200)
+})
+
+
+test_that("pp_average.mvgam summary shape matches posterior_summary", {
+  require_fixtures("val_mvgam_ar1_fx.rds", "val_mvgam_ar1_int.rds")
+  mv_a <- load_mvgam("ar1_fx")
+  mv_b <- load_mvgam("ar1_int")
+  out <- pp_average(
+    mv_a, mv_b, weights = c(0.5, 0.5),
+    method = "posterior_epred",
+    ndraws = 200L, summary = TRUE, seed = 1L
+  )
+  expect_true(is.matrix(out))
+  expect_identical(nrow(out), NROW(mv_a$data))
+  expect_identical(ncol(out), 4L)
+  expect_equal(unname(attr(out, "weights")), c(0.5, 0.5))
+})
+
+
+test_that("pp_average.mvgam draws=FALSE returns the averaged draw matrix", {
+  require_fixtures("val_mvgam_ar1_fx.rds", "val_mvgam_ar1_int.rds")
+  mv_a <- load_mvgam("ar1_fx")
+  mv_b <- load_mvgam("ar1_int")
+  out <- pp_average(
+    mv_a, mv_b, weights = c(0.5, 0.5),
+    ndraws = 200L, summary = FALSE, seed = 1L
+  )
+  expect_true(is.matrix(out))
+  expect_identical(nrow(out), 200L)
+  expect_identical(ncol(out), NROW(mv_a$data))
+})
+
+
+test_that("pp_average.mvgam errors on mismatched response variables", {
+  require_fixtures("val_mvgam_ar1_fx.rds", "val_mvgam_beta_ar1.rds")
+  mv_g <- load_mvgam("ar1_fx")
+  mv_b <- load_mvgam("beta_ar1")
+  expect_error(
+    pp_average(mv_g, mv_b, weights = c(0.5, 0.5)),
+    "same response"
+  )
+})

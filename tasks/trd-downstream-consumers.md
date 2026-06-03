@@ -347,6 +347,38 @@ forwarders (`marginal_smooths`, `marginal_effects`, `parnames`,
 `nsamples`) that dispatch to their current method so brms-trained
 users hit a working path instead of a missing-method error.
 
+The Tier-8 batch shipped PSIS-weighted prediction and Bayesian
+model-averaging surfaces: `loo_epred.mvgam`, `loo_linpred.mvgam`,
+`loo_predictive_interval.mvgam`, `posterior_average.mvgam`, and
+`pp_average.mvgam`. The LOO trio reuses the existing
+`loo.mvgam(save_psis = TRUE)` PSIS object alongside the existing
+`posterior_epred` / `posterior_linpred` / `posterior_predict`
+primitives, with a shared `mvgam_loo_E_loo` helper that
+absorbs the duplicated `loo() -> posterior_fn() -> loo::E_loo`
+skeleton (refactoring `loo_predict.mvgam` to use the same
+helper) and applies the brms-parity output normalisation —
+column-labelled `[N x 1]` for `"mean"`/`"var"` and `[N x n_probs]`
+for `"quantile"`. The helper snapshots and restores the user's
+RNG state, then ties the `loo()` and `posterior_fn` calls to a
+shared seed so successive calls are deterministic and the
+PSIS-weighted expectation aligns with the prediction draws even
+when mvgam's `posterior_epred` / `posterior_predict` would
+otherwise stochastically resample latent-state innovations.
+Strict cross-package concordance against brms holds on
+PSIS-stable fixture pairs (`binom_ar1`, `gauss_ar1_n150`) at
+`cor > 0.95`. The averaging pair composes a new shared helpers
+file `R/mvgam_model_helpers.R` (`mvgam_split_models`,
+`mvgam_validate_weights`, `mvgam_match_response`,
+`mvgam_round_largest_remainder`, `mvgam_validate_pp_method`,
+`mvgam_use_alias`) designed so a future `forecast_average`
+surface (once the C++ trend extrapolator lands) can consume the
+same plumbing without rework. `posterior_average.mvgam`
+implements brms's full `missing` argument semantics (NULL
+intersects across fits, list keys per-parameter defaults,
+scalar broadcasts a single default). `as.data.frame.mvgam`
+gained a brms-parity `draw` argument to support per-model draw
+subsetting from `posterior_average`.
+
 The Tier-6 batch shipped `posterior_smooths.mvgam` and
 `conditional_smooths.mvgam` plus a `smooths.mvgam()` enumerator.
 Signatures mirror `brms::posterior_smooths.brmsfit` and

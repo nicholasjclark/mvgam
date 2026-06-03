@@ -23,9 +23,11 @@
 }
 \description{
 Thin wrappers that dispatch a deprecated brms generic name to
-its current mvgam method, with a one-time warning. Provided
-so brms-trained users do not see "no applicable method"
-errors when they call legacy names.
+its current mvgam method. The brms generic itself emits the
+one-time deprecation warning; the method body just forwards
+the call so brms-trained users do not see
+"no applicable method" errors when they reach for legacy
+names.
 }
 \details{
 \itemize{

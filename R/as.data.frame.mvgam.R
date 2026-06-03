@@ -28,6 +28,9 @@
 #'   treated as a regular expression and any parameter matching at
 #'   least one pattern is selected. Keyword shortcuts are still
 #'   honoured. Defaults to `FALSE`.
+#' @param draw For `as.data.frame.mvgam`, an optional integer
+#'   vector of draw indices (1-based) to subset after extraction.
+#'   `NULL` (the default) returns all draws.
 #' @param inc_warmup Logical. Include warmup draws? Defaults to
 #'   `FALSE`.
 #' @param use_alias Retained for backwards-compatibility; parameter
@@ -468,11 +471,16 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
 #' @rdname mvgam_draws
 #' @export
 as.data.frame.mvgam <- function(x, row.names = NULL, optional = TRUE,
-                                 variable = NULL, regex = FALSE,
-                                 use_alias = TRUE, ...) {
-  as.data.frame(posterior::as_draws_df(
+                                 variable = NULL, draw = NULL,
+                                 regex = FALSE, use_alias = TRUE,
+                                 ...) {
+  drws <- posterior::as_draws_df(
     extract_mvgam_draws(x, variable, regex)
-  ))
+  )
+  if (!is.null(draw)) {
+    drws <- posterior::subset_draws(drws, draw = draw)
+  }
+  as.data.frame(drws)
 }
 
 

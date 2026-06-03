@@ -18,6 +18,7 @@
   row.names = NULL,
   optional = TRUE,
   variable = NULL,
+  draw = NULL,
   regex = FALSE,
   use_alias = TRUE,
   ...
@@ -96,6 +97,10 @@ top-level trend dynamics.
 \item \code{"trend_smooth_params"}: trend-side smooth SDs.
 }
 \code{NULL} (the default) returns every parameter.}
+
+\item{draw}{For \code{as.data.frame.mvgam}, an optional integer
+vector of draw indices (1-based) to subset after extraction.
+\code{NULL} (the default) returns all draws.}
 
 \item{regex}{Logical. When \code{TRUE}, each entry of \code{variable} is
 treated as a regular expression and any parameter matching at
