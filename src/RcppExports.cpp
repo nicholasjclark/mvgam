@@ -11,64 +11,45 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
-// ar3_recursC
-Rcpp::NumericVector ar3_recursC(double drift, double ar1, double ar2, double ar3, Rcpp::NumericVector linpreds, Rcpp::NumericVector errors, Rcpp::NumericVector last_trends, int h);
-RcppExport SEXP _mvgam_ar3_recursC(SEXP driftSEXP, SEXP ar1SEXP, SEXP ar2SEXP, SEXP ar3SEXP, SEXP linpredsSEXP, SEXP errorsSEXP, SEXP last_trendsSEXP, SEXP hSEXP) {
+// trend_arma_recursC
+arma::mat trend_arma_recursC(const arma::ivec& ar_lags, const arma::ivec& ma_lags, const arma::vec& drift, const arma::cube& A, const arma::cube& B, const arma::mat& innovations, const arma::mat& linpreds, const arma::mat& last_trends, int h);
+RcppExport SEXP _mvgam_trend_arma_recursC(SEXP ar_lagsSEXP, SEXP ma_lagsSEXP, SEXP driftSEXP, SEXP ASEXP, SEXP BSEXP, SEXP innovationsSEXP, SEXP linpredsSEXP, SEXP last_trendsSEXP, SEXP hSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< double >::type drift(driftSEXP);
-    Rcpp::traits::input_parameter< double >::type ar1(ar1SEXP);
-    Rcpp::traits::input_parameter< double >::type ar2(ar2SEXP);
-    Rcpp::traits::input_parameter< double >::type ar3(ar3SEXP);
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type linpreds(linpredsSEXP);
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type errors(errorsSEXP);
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type last_trends(last_trendsSEXP);
+    Rcpp::traits::input_parameter< const arma::ivec& >::type ar_lags(ar_lagsSEXP);
+    Rcpp::traits::input_parameter< const arma::ivec& >::type ma_lags(ma_lagsSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type drift(driftSEXP);
+    Rcpp::traits::input_parameter< const arma::cube& >::type A(ASEXP);
+    Rcpp::traits::input_parameter< const arma::cube& >::type B(BSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type innovations(innovationsSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type linpreds(linpredsSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type last_trends(last_trendsSEXP);
     Rcpp::traits::input_parameter< int >::type h(hSEXP);
-    rcpp_result_gen = Rcpp::wrap(ar3_recursC(drift, ar1, ar2, ar3, linpreds, errors, last_trends, h));
+    rcpp_result_gen = Rcpp::wrap(trend_arma_recursC(ar_lags, ma_lags, drift, A, B, innovations, linpreds, last_trends, h));
     return rcpp_result_gen;
 END_RCPP
 }
-// var1_recursC
-arma::mat var1_recursC(arma::mat A, arma::mat linpreds, arma::mat errors, arma::rowvec drift, arma::rowvec last_trends, int h);
-RcppExport SEXP _mvgam_var1_recursC(SEXP ASEXP, SEXP linpredsSEXP, SEXP errorsSEXP, SEXP driftSEXP, SEXP last_trendsSEXP, SEXP hSEXP) {
+// car1_recursC
+arma::mat car1_recursC(const arma::vec& phi, const arma::vec& sigma, const arma::vec& time_dis, const arma::mat& innovations, const arma::vec& last_trend, int h);
+RcppExport SEXP _mvgam_car1_recursC(SEXP phiSEXP, SEXP sigmaSEXP, SEXP time_disSEXP, SEXP innovationsSEXP, SEXP last_trendSEXP, SEXP hSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type A(ASEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type linpreds(linpredsSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type errors(errorsSEXP);
-    Rcpp::traits::input_parameter< arma::rowvec >::type drift(driftSEXP);
-    Rcpp::traits::input_parameter< arma::rowvec >::type last_trends(last_trendsSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type phi(phiSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type sigma(sigmaSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type time_dis(time_disSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type innovations(innovationsSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type last_trend(last_trendSEXP);
     Rcpp::traits::input_parameter< int >::type h(hSEXP);
-    rcpp_result_gen = Rcpp::wrap(var1_recursC(A, linpreds, errors, drift, last_trends, h));
-    return rcpp_result_gen;
-END_RCPP
-}
-// varma_recursC
-arma::mat varma_recursC(arma::mat A, arma::mat A2, arma::mat A3, arma::mat theta, arma::mat linpreds, arma::mat errors, arma::rowvec drift, arma::mat last_trends, int h);
-RcppExport SEXP _mvgam_varma_recursC(SEXP ASEXP, SEXP A2SEXP, SEXP A3SEXP, SEXP thetaSEXP, SEXP linpredsSEXP, SEXP errorsSEXP, SEXP driftSEXP, SEXP last_trendsSEXP, SEXP hSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat >::type A(ASEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type A2(A2SEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type A3(A3SEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type theta(thetaSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type linpreds(linpredsSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type errors(errorsSEXP);
-    Rcpp::traits::input_parameter< arma::rowvec >::type drift(driftSEXP);
-    Rcpp::traits::input_parameter< arma::mat >::type last_trends(last_trendsSEXP);
-    Rcpp::traits::input_parameter< int >::type h(hSEXP);
-    rcpp_result_gen = Rcpp::wrap(varma_recursC(A, A2, A3, theta, linpreds, errors, drift, last_trends, h));
+    rcpp_result_gen = Rcpp::wrap(car1_recursC(phi, sigma, time_dis, innovations, last_trend, h));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_mvgam_ar3_recursC", (DL_FUNC) &_mvgam_ar3_recursC, 8},
-    {"_mvgam_var1_recursC", (DL_FUNC) &_mvgam_var1_recursC, 6},
-    {"_mvgam_varma_recursC", (DL_FUNC) &_mvgam_varma_recursC, 9},
+    {"_mvgam_trend_arma_recursC", (DL_FUNC) &_mvgam_trend_arma_recursC, 9},
+    {"_mvgam_car1_recursC", (DL_FUNC) &_mvgam_car1_recursC, 6},
     {NULL, NULL, 0}
 };
 

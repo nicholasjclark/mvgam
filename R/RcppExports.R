@@ -2,17 +2,12 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 #' @noRd
-ar3_recursC <- function(drift, ar1, ar2, ar3, linpreds, errors, last_trends, h) {
-    .Call(`_mvgam_ar3_recursC`, drift, ar1, ar2, ar3, linpreds, errors, last_trends, h)
+trend_arma_recursC <- function(ar_lags, ma_lags, drift, A, B, innovations, linpreds, last_trends, h) {
+    .Call(`_mvgam_trend_arma_recursC`, ar_lags, ma_lags, drift, A, B, innovations, linpreds, last_trends, h)
 }
 
 #' @noRd
-var1_recursC <- function(A, linpreds, errors, drift, last_trends, h) {
-    .Call(`_mvgam_var1_recursC`, A, linpreds, errors, drift, last_trends, h)
-}
-
-#' @noRd
-varma_recursC <- function(A, A2, A3, theta, linpreds, errors, drift, last_trends, h) {
-    .Call(`_mvgam_varma_recursC`, A, A2, A3, theta, linpreds, errors, drift, last_trends, h)
+car1_recursC <- function(phi, sigma, time_dis, innovations, last_trend, h) {
+    .Call(`_mvgam_car1_recursC`, phi, sigma, time_dis, innovations, last_trend, h)
 }
 
