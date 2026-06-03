@@ -340,6 +340,22 @@ M = 2..5. Trend-side group-level effects (`(1 | g)` inside
 names; the trend-side extension is documented inline in
 `mvgam_ranef_aliases()` for a future batch.
 
+The Tier-6 batch shipped `posterior_smooths.mvgam` and
+`conditional_smooths.mvgam` plus a `smooths.mvgam()` enumerator.
+Signatures mirror `brms::posterior_smooths.brmsfit` and
+`brms::conditional_smooths.brmsfit` exactly, including by-factor
+expansion for `s(z, by = grp)`. The mvgam-only `facets` knob on
+`conditional_smooths` controls the number of facet levels when
+`surface = FALSE` for 2-D smooths (default `3` for brms parity,
+higher values give marginaleffects-style multi-panel displays).
+Basis matrices come from `brms::standata(side_form, newdata)` so
+the focal-smooth `Xs` columns and `Zs` blocks are computed by
+brms itself; the smooth-term contribution is then
+`Xs_focal %*% bs_focal + sum_j(Zs_j %*% s_j)` per draw using the
+already-aliased `bs_<colname>` / `s_<row>_<j>[k]` parameters.
+Obs and trend sides share the same code path via the
+`mvgam_side_formula()` / `mvgam_side_suffix()` helpers.
+
 The following brms `.brmsfit` methods remain out of scope. Each is
 its own decision thread, not a gap from the rebuild:
 
@@ -350,6 +366,5 @@ its own decision thread, not a gap from the rebuild:
 | `hypothesis.mvgam` | Reachable via `marginaleffects::hypotheses()` |
 | `kfold.mvgam` | Heavy refit machinery; revisit with the forecast extrapolator |
 | `expose_functions.mvgam` / `launch_shinystan.mvgam` / `getRefmodel.mvgam` | Niche tooling integrations |
-| `posterior_smooths.mvgam` / `conditional_smooths.mvgam` | Smooth-term-specific predictions; reachable via marginaleffects with effect labels |
 | `update.jsdgam` | `jsdgam()` does not exist on this branch; ship alongside the constructor when added |
 | Diagnostic-flag methods (`control_params`, `inits`, `default_prior`) | Internal-facing in brms; defer until a user need surfaces |

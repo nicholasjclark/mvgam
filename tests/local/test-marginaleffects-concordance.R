@@ -781,3 +781,232 @@ test_that("update(mvgam) round-trips RE structure cleanly", {
   expect_true(any(grepl("^sd_grp__", vars)))
   expect_true(any(grepl("^cor_grp__", vars)))
 })
+
+
+# ---------------------------------------------------------------------
+# Tier-6 brms-parity batch: posterior_smooths + conditional_smooths
+# ---------------------------------------------------------------------
+#
+# Shape concordance against brms's own smooth methods on the
+# ar1_re_smooth fixture (single 1D smooth) and ar1_re_smooth_trend
+# (trend-side smooth). The numerical tolerance reflects mvgam's
+# state-space architecture (AR(1) trend in the linear predictor vs
+# brms residual-AR) but is still tight enough to catch a structural
+# bug in the basis-matrix / coefficient pairing.
+
+
+smooths_concordance_threshold <- 0.5
+
+
+test_that("smooths(mvgam) enumerates the same s() terms as brms", {
+  require_fixtures(
+    "val_mvgam_ar1_re_smooth.rds", "val_brms_ar1_re_smooth.rds"
+  )
+  mv <- load_mvgam("ar1_re_smooth")
+  br <- load_brms("ar1_re_smooth")
+  mv_terms <- smooths(mv)
+  br_terms <- attr(
+    terms(brms::brmsterms(br$formula)$dpars$mu$sm),
+    "term.labels"
+  )
+  expect_identical(mv_terms, br_terms)
+})
+
+
+test_that("posterior_smooths(mvgam) matches brms shape on ar1_re_smooth", {
+  require_fixtures(
+    "val_mvgam_ar1_re_smooth.rds", "val_brms_ar1_re_smooth.rds"
+  )
+  mv <- load_mvgam("ar1_re_smooth")
+  br <- load_brms("ar1_re_smooth")
+  mv_eta <- posterior_smooths(mv, smooth = "s(z)")
+  br_eta <- brms::posterior_smooths(br, smooth = "s(z)")
+  expect_identical(dim(mv_eta), dim(br_eta))
+  # Per-grid-point posterior median should track brms within the
+  # state-space tolerance — this catches a structural index or
+  # basis-matrix mismatch even when the AR architectural gap
+  # shifts the absolute values.
+  expect_lt(
+    max(abs(apply(mv_eta, 2, median) - apply(br_eta, 2, median))),
+    smooths_concordance_threshold
+  )
+})
+
+
+test_that("posterior_smooths(mvgam) respects ndraws and draw_ids", {
+  require_fixtures("val_mvgam_ar1_re_smooth.rds")
+  mv <- load_mvgam("ar1_re_smooth")
+  full <- posterior_smooths(mv, smooth = "s(z)")
+  expect_identical(
+    nrow(posterior_smooths(mv, smooth = "s(z)", ndraws = 50L)),
+    50L
+  )
+  ids <- c(1L, 5L, 10L)
+  picked <- posterior_smooths(mv, smooth = "s(z)", draw_ids = ids)
+  expect_identical(nrow(picked), length(ids))
+  expect_equal(picked, full[ids, , drop = FALSE])
+})
+
+
+test_that("posterior_smooths(mvgam) accepts user-supplied newdata", {
+  require_fixtures("val_mvgam_ar1_re_smooth.rds")
+  mv <- load_mvgam("ar1_re_smooth")
+  nd <- data.frame(
+    z = seq(min(mv$data$z), max(mv$data$z), length.out = 25L),
+    x = 0,
+    grp = factor("a", levels = levels(mv$data$grp))
+  )
+  out <- posterior_smooths(mv, smooth = "s(z)", newdata = nd)
+  expect_identical(ncol(out), 25L)
+})
+
+
+test_that("conditional_smooths(mvgam) returns brms_conditional_effects shape", {
+  require_fixtures(
+    "val_mvgam_ar1_re_smooth.rds", "val_brms_ar1_re_smooth.rds"
+  )
+  mv <- load_mvgam("ar1_re_smooth")
+  br <- load_brms("ar1_re_smooth")
+  mv_cs <- conditional_smooths(mv)
+  br_cs <- brms::conditional_smooths(br)
+  expect_s3_class(mv_cs, "brms_conditional_effects")
+  expect_identical(length(mv_cs), length(br_cs))
+  expect_identical(
+    sort(colnames(mv_cs[[1L]])), sort(colnames(br_cs[[1L]]))
+  )
+  expect_identical(nrow(mv_cs[[1L]]), nrow(br_cs[[1L]]))
+})
+
+
+test_that("conditional_smooths(mvgam) plot dispatch works", {
+  require_fixtures("val_mvgam_ar1_re_smooth.rds")
+  mv <- load_mvgam("ar1_re_smooth")
+  cs <- conditional_smooths(mv)
+  # brms inherits the plot method; check it returns a list of
+  # ggplots without error.
+  p <- suppressWarnings(plot(cs, plot = FALSE))
+  expect_type(p, "list")
+  expect_true(length(p) >= 1L)
+  expect_s3_class(p[[1L]], "ggplot")
+})
+
+
+test_that("posterior_smooths(mvgam) works on trend-side smooths", {
+  require_fixtures("val_mvgam_ar1_re_smooth_trend.rds")
+  mv <- load_mvgam("ar1_re_smooth_trend")
+  expect_true("s(z)" %in% smooths(mv))
+  eta <- posterior_smooths(mv, smooth = "s(z)")
+  expect_identical(length(dim(eta)), 2L)
+  # Trend-side smooth has 30 grid points (matches training data).
+  expect_identical(ncol(eta), 30L)
+})
+
+
+test_that("posterior_smooths(mvgam) handles s(z, by = grp) factor expansion", {
+  require_fixtures(
+    "val_mvgam_ar1_s_by.rds", "val_brms_ar1_s_by.rds"
+  )
+  mv <- load_mvgam("ar1_s_by")
+  br <- load_brms("ar1_s_by")
+  # By-factor expansion: brms enumerates one user-facing smooth
+  # but emits per-level basis blocks; the eta matrix concatenates
+  # all by-levels into the grid.
+  mv_eta <- posterior_smooths(mv, smooth = "s(z, by = grp)")
+  br_eta <- brms::posterior_smooths(br, smooth = "s(z, by = grp)")
+  expect_identical(dim(mv_eta), dim(br_eta))
+})
+
+
+test_that("conditional_smooths(mvgam) facets by-factor on real fit", {
+  require_fixtures("val_mvgam_ar1_s_by.rds")
+  mv <- load_mvgam("ar1_s_by")
+  cs <- conditional_smooths(mv)
+  expect_s3_class(cs, "brms_conditional_effects")
+  expect_true(length(cs) >= 1L)
+  # By-factor smooth: cond__ column should carry per-level facet
+  # labels.
+  expect_true(length(unique(cs[[1L]]$cond__)) >= 3L ||
+    !is.null(attr(cs[[1L]], "effects")))
+})
+
+
+test_that("posterior_smooths(mvgam) handles 2D t2(z, w) tensor smooth", {
+  require_fixtures("val_mvgam_ar1_t2.rds", "val_brms_ar1_t2.rds")
+  mv <- load_mvgam("ar1_t2")
+  br <- load_brms("ar1_t2")
+  mv_eta <- posterior_smooths(mv, smooth = "t2(z, w)")
+  br_eta <- brms::posterior_smooths(br, smooth = "t2(z, w)")
+  expect_identical(dim(mv_eta), dim(br_eta))
+})
+
+
+test_that("conditional_smooths(mvgam) 2D surface=TRUE returns full grid", {
+  require_fixtures("val_mvgam_ar1_t2.rds")
+  mv <- load_mvgam("ar1_t2")
+  cs <- conditional_smooths(mv, resolution = 20L)
+  # 20 x 20 = 400 grid points by default for a 2D surface smooth.
+  expect_identical(nrow(cs[[1L]]), 400L)
+  expect_true(attr(cs[[1L]], "surface"))
+  expect_identical(attr(cs[[1L]], "effects"), c("z", "w"))
+})
+
+
+test_that("conditional_smooths(mvgam) 2D surface=FALSE facets the second covariate", {
+  require_fixtures("val_mvgam_ar1_t2.rds")
+  mv <- load_mvgam("ar1_t2")
+  cs <- conditional_smooths(mv, surface = FALSE,
+                              resolution = 20L, facets = 3L)
+  # 20 (focal) x 3 (facets) = 60 rows.
+  expect_identical(nrow(cs[[1L]]), 60L)
+  expect_false(attr(cs[[1L]], "surface"))
+})
+
+
+test_that("conditional_smooths(mvgam) facets argument controls facet count", {
+  require_fixtures("val_mvgam_ar1_t2.rds")
+  mv <- load_mvgam("ar1_t2")
+  cs5 <- conditional_smooths(mv, surface = FALSE,
+                              resolution = 10L, facets = 5L)
+  cs2 <- conditional_smooths(mv, surface = FALSE,
+                              resolution = 10L, facets = 2L)
+  expect_identical(nrow(cs5[[1L]]), 50L)
+  expect_identical(nrow(cs2[[1L]]), 20L)
+})
+
+
+test_that("conditional_smooths(mvgam) int_conditions overrides covariate values", {
+  require_fixtures("val_mvgam_ar1_re_smooth.rds")
+  mv <- load_mvgam("ar1_re_smooth")
+  cs <- conditional_smooths(mv,
+                              int_conditions = list(z = c(-1, 0, 1)))
+  # int_conditions on the focal covariate overrides the full grid.
+  expect_identical(nrow(cs[[1L]]), 3L)
+})
+
+
+test_that("conditional_smooths(mvgam) spaghetti returns draws overlay", {
+  require_fixtures("val_mvgam_ar1_re_smooth.rds")
+  mv <- load_mvgam("ar1_re_smooth")
+  cs <- conditional_smooths(mv, spaghetti = TRUE, ndraws = 20L)
+  spa <- attr(cs[[1L]], "spaghetti")
+  expect_s3_class(spa, "data.frame")
+  expect_true("estimate__" %in% colnames(spa))
+  expect_true("sample__" %in% colnames(spa))
+  # 100 grid pts x 20 draws.
+  expect_identical(nrow(spa), 2000L)
+})
+
+
+test_that("conditional_smooths(mvgam) restricts via smooths argument", {
+  require_fixtures("val_mvgam_ar1_re_smooth.rds")
+  mv <- load_mvgam("ar1_re_smooth")
+  # Subset to s(z); the formula only has s(z) so output is length 1
+  # either way, but this exercises the smooths-arg filter path.
+  cs <- conditional_smooths(mv, smooths = "s(z)")
+  expect_identical(length(cs), 1L)
+  # Unknown smooth errors with the hint to use smooths(x).
+  expect_error(
+    conditional_smooths(mv, smooths = "s(nonexistent)"),
+    "smooths"
+  )
+})

@@ -355,5 +355,28 @@ fit_mvgam_cached("ar1_hs",
   y ~ 1 + x, ~ AR(p = 1),
   test_data_hs, poisson())
 
+cat("\n[18] s(z, by = grp) factor-by-factor smooth\n")
+test_data_sby <- test_data
+test_data_sby$grp <- factor(
+  rep(letters[1:3], length.out = nrow(test_data_sby)),
+  levels = letters[1:3]
+)
+fit_brms_cached("ar1_s_by",
+  y ~ 1 + s(z, by = grp) + ar(time = time, p = 1, cov = TRUE),
+  test_data_sby, poisson())
+fit_mvgam_cached("ar1_s_by",
+  y ~ 1 + s(z, by = grp), ~ AR(p = 1),
+  test_data_sby, poisson())
+
+cat("\n[19] t2(z, w) tensor-product smooth\n")
+test_data_t2 <- test_data
+test_data_t2$w <- seq(-1, 1, length.out = nrow(test_data_t2))
+fit_brms_cached("ar1_t2",
+  y ~ 1 + t2(z, w) + ar(time = time, p = 1, cov = TRUE),
+  test_data_t2, poisson())
+fit_mvgam_cached("ar1_t2",
+  y ~ 1 + t2(z, w), ~ AR(p = 1),
+  test_data_t2, poisson())
+
 cat("\n=== All fixtures present in", FIXTURE_DIR, "===\n")
 cat("Files: ", length(list.files(FIXTURE_DIR, pattern = "\\.rds$")), "\n")

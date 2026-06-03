@@ -198,7 +198,28 @@ mvgam_beta_aliases <- function(x) {
       )
     }
   })
-  unlist(parts)
+  # Smooth-term fixed-effect basis: `bs[k]` / `bs_trend[k]` map to
+  # `bs_<colname>` / `bs_<colname>_trend` where colname comes from
+  # the corresponding standata block (`Xs` / `Xs_trend`). The
+  # `bs` vector is NOT intercept-centred (no leading "Intercept"
+  # column to strip), so the index is direct.
+  build_bs <- function(Xs, pos_name, alias_suffix) {
+    if (is.null(Xs) || !is.matrix(Xs) || ncol(Xs) == 0L) {
+      return(character(0L))
+    }
+    cn <- colnames(Xs)
+    if (length(cn) == 0L) {
+      return(character(0L))
+    }
+    new <- paste0("bs_", cn, alias_suffix)
+    old <- paste0(pos_name, "[", seq_along(cn), "]")
+    stats::setNames(old, new)
+  }
+  bs_parts <- c(
+    build_bs(x$standata$Xs, "bs", ""),
+    build_bs(x$standata$Xs_trend, "bs_trend", "_trend")
+  )
+  c(unlist(parts), bs_parts)
 }
 
 
