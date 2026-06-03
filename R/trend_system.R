@@ -1639,7 +1639,7 @@ find_trend_terms <- function(x) {
   trend_matches <- character(0)
 
   for (trend_type in trend_types) {
-    # Look for trend_type followed by opening parenthesis (like mvgam's dynamic() detection)
+    # Look for trend_type followed by opening parenthesis
     pattern <- paste0(trend_type, '\\s*\\(')
     which_trends <- grep(pattern, terms_char, fixed = FALSE)
 
@@ -1798,7 +1798,7 @@ parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL
   trend_indices <- integer(0)
 
   for (trend_type in trend_types) {
-    # Use mvgam's approach: grep with fixed=TRUE (like dynamic() detection)
+    # Detect trend constructor invocations via fixed grep
     which_trends <- grep(paste0(trend_type, '('), tf, fixed = TRUE)
     if (length(which_trends) > 0) {
       trend_indices <- c(trend_indices, which_trends)
