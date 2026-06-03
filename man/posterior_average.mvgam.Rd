@@ -76,11 +76,11 @@ computed) model weights. Mirrors
 sim <- sim_mvgam(family = gaussian())
 mod_a <- mvgam(y ~ s(season, bs = "cc"), trend_model = AR(),
                data = sim$data_train, family = gaussian(),
-               chains = 2, silent = 2)
+               chains = 1, silent = 2)
 mod_b <- mvgam(y ~ s(season, bs = "cc", k = 6),
                trend_model = AR(),
                data = sim$data_train, family = gaussian(),
-               chains = 2, silent = 2)
+               chains = 1, silent = 2)
 avg <- posterior_average(mod_a, mod_b, weights = "stacking")
 head(avg)
 attr(avg, "weights")

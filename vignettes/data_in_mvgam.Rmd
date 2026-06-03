@@ -311,104 +311,68 @@ plot_mvgam_series(
 )
 ```
 
-## Example with NEON tick data
-To give one example of how data can be reformatted for `mvgam` modelling, we will use observations from the National Ecological Observatory Network (NEON) tick drag cloth samples. *Ixodes scapularis* is a widespread tick species capable of transmitting a diversity of parasites to animals and humans, many of which are zoonotic. Due to the medical and ecological importance of this tick species, a common goal is to understand factors that influence their abundances. The NEON field team carries out standardised [long-term monitoring of tick abundances as well as other important indicators of ecological change](https://www.neonscience.org/data-collection/ticks){target="_blank"}. Nymphal abundance of *I. scapularis* is routinely recorded across NEON plots using a field sampling method called drag cloth sampling, which is a common method for sampling ticks in the landscape. Field researchers sample ticks by dragging a large cloth behind themselves through terrain that is suspected of harboring ticks, usually working in a grid-like pattern. The sites have been sampled since 2014, resulting in a rich dataset of nymph abundance time series. These tick time series show strong seasonality and incorporate many of the challenging features associated with ecological data including overdispersion, high proportions of missingness and irregular sampling in time, making them useful for exploring the utility of dynamic GAMs. 
-  
-We begin by loading NEON tick data for the years 2014 - 2021, which were downloaded from NEON and prepared as described in [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.13974){target="_blank"}. You can read a bit about the data using the call `?all_neon_tick_data`
+## Example with simulated bird-song counts
+
+To give one example of how a multi-series count dataset is laid out for
+`mvgam` modelling, we use the stock `birdsong` data. This is a
+simulated weekly count series for four bird species observed over 80
+weeks. The truth combines a shared cyclic seasonal cycle on
+week-within-year, species-specific random intercepts on the log scale,
+and a four-series autoregressive process with cross-species
+innovation correlation (two species rise together, two move opposite).
+Datasets of this shape (overdispersed counts, strong seasonality, and
+correlated trajectories across series) are common in ecological
+monitoring and exercise most of `mvgam`'s observation and trend
+machinery in a single fit.
+
+Load the data and inspect the structure:
 ```{r}
-data("all_neon_tick_data")
-str(dplyr::ungroup(all_neon_tick_data))
+data("birdsong")
+str(birdsong)
 ```
 
-For this exercise, we will use the `epiWeek` variable as an index of seasonality, and we will only work with observations from a few sampling plots (labelled in the `plotID` column):
-```{r}
-plotIDs <- c(
-  "SCBI_013", "SCBI_002",
-  "SERC_001", "SERC_005",
-  "SERC_006", "SERC_012",
-  "BLAN_012", "BLAN_005"
-)
-```
+The dataset already includes the columns that `mvgam` expects:
+`series` (factor identifying each panel) and `time` (integer week
+index), alongside the response `y` (weekly count) and the
+covariate `week_in_year` for the seasonal smooth. The other columns
+(`species`, `week`, `count`) are aliases kept for readability.
 
-Now we can select the target species we want (*I. scapularis*), filter to the correct plot IDs and convert the `epiWeek` variable from `character` to `numeric`:
-```{r}
-model_dat <- all_neon_tick_data %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(target = ixodes_scapularis) %>%
-  dplyr::filter(plotID %in% plotIDs) %>%
-  dplyr::select(Year, epiWeek, plotID, target) %>%
-  dplyr::mutate(epiWeek = as.numeric(epiWeek))
-```
-
-Now is the tricky part: we need to fill in missing observations with `NA`s. The tick data are sparse in that field observers do not go out and sample in each possible `epiWeek`. So there are many particular weeks in which observations are not included in the data. But we can use `expand.grid()` again to take care of this:
-```{r}
-model_dat %>%
-  # Create all possible combos of plotID, Year and epiWeek;
-  # missing outcomes will be filled in as NA
-  dplyr::full_join(expand.grid(
-    plotID = unique(model_dat$plotID),
-    Year = unique(model_dat$Year),
-    epiWeek = seq(1, 52)
-  )) %>%
-  # left_join back to original data so plotID and siteID will
-  # match up, in case you need the siteID for anything else later on
-  dplyr::left_join(all_neon_tick_data %>%
-    dplyr::select(siteID, plotID) %>%
-    dplyr::distinct()) -> model_dat
-```
-
-Create the `series` variable needed for `mvgam` modelling:
-```{r}
-model_dat %>%
-  dplyr::mutate(
-    series = plotID,
-    y = target
-  ) %>%
-  dplyr::mutate(
-    siteID = factor(siteID),
-    series = factor(series)
-  ) %>%
-  dplyr::select(-target, -plotID) %>%
-  dplyr::arrange(Year, epiWeek, series) -> model_dat
-```
-
-Now create the `time` variable, which needs to track `Year` and `epiWeek` for each unique series. The `n` function from `dplyr` is often useful if generating a `time` index for grouped dataframes:
-```{r}
-model_dat %>%
-  dplyr::ungroup() %>%
-  dplyr::group_by(series) %>%
-  dplyr::arrange(Year, epiWeek) %>%
-  dplyr::mutate(time = seq(1, dplyr::n())) %>%
-  dplyr::ungroup() -> model_dat
-```
-
-Check factor levels for the `series`:
-```{r}
-levels(model_dat$series)
-```
-
-This looks good, as does a more rigorous check using `get_mvgam_priors()`:
+A quick sanity check via `get_mvgam_priors()`:
 ```{r error=TRUE}
 get_mvgam_priors(
-  y ~ 1,
-  data = model_dat,
+  y ~ s(week_in_year, bs = "cc", k = 8) +
+    s(species, bs = "re"),
+  trend_formula = ~ AR(p = 1, cor = TRUE),
+  data = birdsong,
   family = poisson()
 )
 ```
 
-We can also set up a model in `mvgam()` but use `run_model = FALSE` to further ensure all of the necessary steps for creating the modelling code and objects will run. It is recommended that you use the `cmdstanr` backend if possible, as the auto-formatting options available in this package are very useful for checking the package-generated `Stan` code for any inefficiencies that can be fixed to lead to sampling performance improvements:
+This confirms the observation formula, trend formula and family are
+all compatible with the data. The trend model is specified as an
+expression inside `trend_formula`; `AR(p = 1, cor = TRUE)` adds a
+multivariate AR(1) latent process with a correlated innovation
+covariance across the four species.
+
+We can also construct (without fitting) the full Stan model with
+`mvgam(..., run_model = FALSE)`. Using the `cmdstanr` backend gives
+auto-formatted Stan code that is easier to inspect for any
+inefficiencies before launching long sampling runs:
+
 ```{r}
 testmod <- mvgam(
-  y ~ s(epiWeek, by = series, bs = "cc") +
-    s(series, bs = "re"),
-  trend_model = AR(),
-  data = model_dat,
+  y ~ s(week_in_year, bs = "cc", k = 8) +
+    s(species, bs = "re"),
+  trend_formula = ~ AR(p = 1, cor = TRUE),
+  data = birdsong,
+  family = poisson(),
   backend = "cmdstanr",
   run_model = FALSE
 )
 ```
 
-This call runs without issue, and the resulting object now contains the model code and data objects that are needed to initiate sampling:
+The resulting object contains the model code and data ready for
+sampling:
 ```{r}
 str(testmod$model_data)
 ```

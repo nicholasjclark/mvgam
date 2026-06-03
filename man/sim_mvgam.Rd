@@ -2,147 +2,133 @@
 % Please edit documentation in R/sim_mvgam.R
 \name{sim_mvgam}
 \alias{sim_mvgam}
-\title{Simulate a set of time series for modelling in \pkg{mvgam}}
+\title{Simulate \code{mvgam}-shaped time-series data with known truth}
 \usage{
 sim_mvgam(
-  T = 100,
-  n_series = 3,
-  seasonality = "shared",
-  use_lv = FALSE,
-  n_lv = 0,
-  trend_model = RW(),
-  drift = FALSE,
-  prop_trend = 0.2,
-  trend_rel,
-  freq = 12,
-  family = poisson(),
-  phi,
-  shape,
-  sigma,
-  nu,
-  mu,
+  type = 1L,
+  family = gaussian(),
+  n_series = 1L,
+  n_timepoints = 80L,
+  trend_model = NULL,
+  prop_trend = NULL,
+  proportional_train = 0.75,
   prop_missing = 0,
-  prop_train = 0.85
+  family_pars = list(),
+  seed = NULL
 )
 }
 \arguments{
-\item{T}{\code{integer}. Number of observations (timepoints)}
+\item{type}{Integer in \code{1:6} selecting the observation-side
+recipe. See \emph{Details} for the catalog.}
 
-\item{n_series}{\code{integer}. Number of discrete time series}
+\item{family}{A \code{family} or \code{brmsfamily} object specifying the
+observation likelihood. Supported in v1: \code{gaussian()},
+\code{student()}, \code{poisson()}, \code{negbinomial()},
+\code{binomial()}, \code{Beta()}, \code{Gamma()} (and their \code{brms::brmsfamily}
+equivalents). Defaults to \code{gaussian()}.}
 
-\item{seasonality}{\code{character}. Either \code{shared}, meaning that
-all series share the exact same seasonal pattern, or
-\code{hierarchical}, meaning that there is a global seasonality but
-each series' pattern can deviate slightly}
+\item{n_series}{Integer; number of time series to simulate.
+Defaults to \code{1L}.}
 
-\item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to
-estimate series' latent trends in a reduced dimension format. If
-\code{FALSE}, estimate independent latent trends for each series}
+\item{n_timepoints}{Integer; number of timepoints per series.
+Defaults to \code{80L}.}
 
-\item{n_lv}{\code{integer}. Number of latent dynamic factors for
-generating the series' trends. Defaults to \code{0}, meaning that dynamics
-are estimated independently for each series}
+\item{trend_model}{An optional \code{mvgam_trend} constructor (e.g.
+\code{AR(p = 1)}, \code{VAR(p = 2, cor = TRUE)}, \code{CAR()}, \code{ZMVN()}).
+\code{NULL} (the default) selects the type's preferred trend (see
+\emph{Details}). Sparse-lag specs like \code{AR(p = c(1, 3, 12))} are
+supported natively.}
 
-\item{trend_model}{\code{character} specifying the time series dynamics
-for the latent trend. Options are:
-\itemize{
-\item \code{None} (no latent trend component; i.e. the GAM component is
-all that contributes to the linear predictor, and the observation
-process is the only source of error; similarly to what is estimated
-by \code{\link[mgcv]{gam}})
-\item \code{RW} (random walk with possible drift)
-\item \code{AR1} (with possible drift)
-\item \code{AR2} (with possible drift)
-\item \code{AR3} (with possible drift)
-\item \code{VAR1} (contemporaneously uncorrelated VAR1)
-\item \code{VAR1cor} (contemporaneously correlated VAR1)
-\item \code{GP} (Gaussian Process with squared exponential kernel)
-}
-See \link{mvgam_trends} for more details}
+\item{prop_trend}{Numeric in \verb{[0, 1]} controlling the fraction
+of total link-scale variance contributed by the latent
+trend. \code{NULL} uses a type-specific default
+(0.2 for type 5 / state-space, 0.5 elsewhere).}
 
-\item{drift}{\code{logical}, simulate a drift term for each trend}
+\item{proportional_train}{Numeric in \verb{(0, 1]}; the fraction of
+timepoints retained in \code{data_train}. Remainder goes to
+\code{data_test}. Defaults to \code{0.75}.}
 
-\item{prop_trend}{\code{numeric}. Relative importance of the trend for
-each series. Should be between \code{0} and \code{1}}
+\item{prop_missing}{Numeric in \verb{[0, 1)}; fraction of training
+observations to mark as \code{NA}. Defaults to \code{0}.}
 
-\item{trend_rel}{Deprecated. Use \code{prop_trend} instead}
+\item{family_pars}{Optional named list of additional family
+parameters (\code{sigma}, \code{nu}, \code{size}, \code{trials}, \code{phi},
+\code{shape}). Type-specific defaults are used when an entry is
+absent.}
 
-\item{freq}{\code{integer}. The seasonal frequency of the series}
-
-\item{family}{\code{family} specifying the exponential observation
-family for the series. Currently supported families are: \code{nb()},
-\code{poisson()}, \code{bernoulli()}, \code{tweedie()}, \code{gaussian()}, \code{betar()},
-\code{lognormal()}, \code{student()} and \code{Gamma()}}
-
-\item{phi}{\code{vector} of dispersion parameters for the series
-(i.e. \code{size} for \code{nb()} or \code{phi} for \code{betar()}). If
-\code{length(phi) < n_series}, the first element of \code{phi} will be
-replicated \code{n_series} times. Defaults to \code{5} for \code{nb()} and
-\code{tweedie()}; \code{10} for \code{betar()}}
-
-\item{shape}{\code{vector} of shape parameters for the series
-(i.e. \code{shape} for \code{gamma()}). If \code{length(shape) < n_series},
-the first element of \code{shape} will be replicated \code{n_series} times.
-Defaults to \code{10}}
-
-\item{sigma}{\code{vector} of scale parameters for the series
-(i.e. \code{sd} for \code{gaussian()} or \code{student()}, \code{log(sd)} for
-\code{lognormal()}). If \code{length(sigma) < n_series}, the first element
-of \code{sigma} will be replicated \code{n_series} times. Defaults to
-\code{0.5} for \code{gaussian()} and \code{student()}; \code{0.2} for
-\code{lognormal()}}
-
-\item{nu}{\code{vector} of degrees of freedom parameters for the series
-(i.e. \code{nu} for \code{student()}). If \code{length(nu) < n_series}, the
-first element of \code{nu} will be replicated \code{n_series} times. Defaults
-to \code{3}}
-
-\item{mu}{\code{vector} of location parameters for the series. If
-\code{length(mu) < n_series}, the first element of \code{mu} will be
-replicated \code{n_series} times. Defaults to small random values between
-\code{-0.5} and \code{0.5} on the link scale}
-
-\item{prop_missing}{\code{numeric} stating proportion of observations
-that are missing. Should be between \code{0} and \code{0.8}, inclusive}
-
-\item{prop_train}{\code{numeric} stating the proportion of data to use
-for training. Should be between \code{0.2} and \code{1}}
+\item{seed}{Optional integer seed for reproducibility.}
 }
 \value{
-A \code{list} object containing outputs needed for
-\code{\link{mvgam}}, including 'data_train' and 'data_test', as well
-as some additional information about the simulated seasonality and
-trend dependencies
+A list of class \code{"mvgam_sim"} with elements:
+\describe{
+\item{\code{data_train}}{\code{data.frame} in long format: columns
+include \code{y}, \code{series}, \code{time}, and the type-specific
+covariates (\code{x}, \code{z}, \code{grp}, or \code{season}).}
+\item{\code{data_test}}{\code{data.frame} of held-out timepoints, or
+\code{NULL} when \code{proportional_train = 1}.}
+\item{\code{family}}{The \code{brmsfamily} used.}
+\item{\code{trend_model}}{The \code{mvgam_trend} used.}
+\item{\code{type}}{The catalog entry.}
+\item{\code{true_betas}}{Named numeric vector of population-
+level coefficients.}
+\item{\code{true_smooths}}{Named list of \code{data.frame(grid, f_true)} ground-truth smooth functions.}
+\item{\code{true_trend}}{Matrix \verb{[n_timepoints, n_series]} of
+latent trend realisations.}
+\item{\code{true_sigma_obs}}{Observation noise SD (or
+family-specific dispersion).}
+}
 }
 \description{
-This function simulates sets of time series data for fitting a
-multivariate GAM that includes shared seasonality and dependence on
-State-Space latent dynamic factors. Random dependencies among series,
-i.e. correlations in their long-term trends, are included in the form of
-correlated loadings on the latent dynamic factors
+Generates training (and optional testing) data under a fixed
+catalog of observation-side covariate recipes (the \code{type}
+argument) crossed with any of the supported trend dynamics
+(the \code{trend_model} argument). Inspired by \code{\link[mgcv:gamSim]{mgcv::gamSim()}}'s
+fixed-recipe pattern but extended to cover mvgam's state-space
+grammar (smooths + GPs + random effects + AR/RW/CAR/VAR
+dynamics).
+}
+\details{
+The six recipes:
+
+\describe{
+\item{\code{type = 1}}{\code{y ~ s(x)} with \code{RW()} trend.
+Single smooth covariate + random-walk trend; the simplest
+mvgam recipe.}
+\item{\code{type = 2}}{\code{y ~ s(x) + s(z)} with \code{AR(p = 1, phi = 0.7)}
+trend. Two additive smooths.}
+\item{\code{type = 3}}{\code{y ~ s(x) + (1 | grp)} with
+\code{AR(p = 1, phi = 0.7)}. Hierarchical: random intercept per
+group level (5 groups by default).}
+\item{\code{type = 4}}{\code{y ~ gp(x)} with \code{AR(p = 1, phi = 0.7)}.
+Gaussian-process covariate (mvgam-specific).}
+\item{\code{type = 5}}{State-space: obs \code{y ~ x}, trend formula
+\code{~ s(z)}, \code{AR(p = 1, phi = 0.6)}. The smooth lives on the
+trend, not on \code{y}'s linear predictor. \code{prop_trend} defaults
+to \code{0.2} for this type to keep the AR component small
+relative to the smooth so the two are identifiable.}
+\item{\code{type = 6}}{\code{y ~ s(season, bs = "cc")} with \code{CAR(time, series)}. Cyclic seasonal + continuous-time AR(1) on
+irregular time gaps (\code{Δt ~ Uniform(1, 6)}).}
+}
+
+For multi-series simulations (\code{n_series > 1}), the observation
+covariates \code{x}, \code{z}, etc. are independently drawn per
+series-time cell; the trend dynamics follow \code{trend_model}
+(independent per series unless the constructor specifies
+\code{cor = TRUE} or \code{VAR()}).
 }
 \examples{
-# Simulate series with observations bounded at 0 and 1 (Beta responses)
-sim_data <- sim_mvgam(
-  family = betar(),
-  trend_model = RW(),
-  prop_trend = 0.6
-)
-plot_mvgam_series(data = sim_data$data_train, series = 'all')
-
-# Now simulate series with overdispersed discrete observations
-sim_data <- sim_mvgam(
-  family = nb(),
-  trend_model = RW(),
-  prop_trend = 0.6,
-  phi = 10
-)
-plot_mvgam_series(data = sim_data$data_train, series = 'all')
+\donttest{
+sim <- sim_mvgam(type = 1, family = gaussian(),
+                 n_timepoints = 60, seed = 1)
+head(sim$data_train)
+str(sim$true_smooths)
+}
 
 }
-\references{
-Clark, N. J. and Wells, K. (2022). Dynamic generalised
-additive models (DGAMs) for forecasting discrete ecological time
-series. \emph{Methods in Ecology and Evolution}, 13(11), 2388-2404.
-\doi{10.1111/2041-210X.13974}
+\seealso{
+\code{\link[mgcv:gamSim]{mgcv::gamSim()}} for the conceptual inspiration;
+\code{\link[=mvgam]{mvgam()}} for the fitter the simulated data can be fed to.
+}
+\author{
+Nicholas J Clark
 }

@@ -70,14 +70,12 @@ fake_mod <- mvgam(
     # different intercept per series
     series - 1,
 
-  # process model formula, which has a shared seasonal smooth
-  # (each latent process model shares the SAME smooth)
-  trend_formula = ~ s(season, bs = "cc", k = 6),
-
-  # AR1 dynamics (each latent process model has DIFFERENT)
-  # dynamics; processes are estimated using the noncentred
-  # parameterisation for improved efficiency
-  trend_model = AR(),
+  # process model formula: shared seasonal smooth plus AR1
+  # dynamics. Each latent process model shares the SAME smooth
+  # but has DIFFERENT autoregressive dynamics; processes are
+  # estimated using the noncentred parameterisation for improved
+  # efficiency.
+  trend_formula = ~ s(season, bs = "cc", k = 6) + AR(),
   noncentred = TRUE,
 
   # supplied trend_map
@@ -105,8 +103,7 @@ Though this model doesn't perfectly match the data-generating process (which all
 ```{r full_mod, include = FALSE, results='hide'}
 full_mod <- mvgam(
   y ~ series - 1,
-  trend_formula = ~ s(season, bs = "cc", k = 6),
-  trend_model = AR(),
+  trend_formula = ~ s(season, bs = "cc", k = 6) + AR(),
   noncentred = TRUE,
   trend_map = trend_map,
   family = poisson(),
@@ -118,8 +115,7 @@ full_mod <- mvgam(
 ```{r eval=FALSE}
 full_mod <- mvgam(
   y ~ series - 1,
-  trend_formula = ~ s(season, bs = "cc", k = 6),
-  trend_model = AR(),
+  trend_formula = ~ s(season, bs = "cc", k = 6) + AR(),
   noncentred = TRUE,
   trend_map = trend_map,
   family = poisson(),
@@ -133,14 +129,7 @@ The summary of this model is informative as it shows that only two latent proces
 summary(full_mod)
 ```
 
-Both series 1 and 2 share the exact same latent process estimates, while the estimates for series 3 are different:
-```{r}
-plot(full_mod, type = "trend", series = 1)
-plot(full_mod, type = "trend", series = 2)
-plot(full_mod, type = "trend", series = 3)
-```
-
-However, forecasts for series' 1 and 2 will differ because they have different intercepts in the observation model
+Both series 1 and 2 share the exact same latent process estimates, while the estimates for series 3 are different (this is encoded in `trend_map`; see `summary(full_mod)` for the underlying `ar1_trend` and `sigma_trend` posteriors). Forecasts for series 1 and 2 will still differ because they have different intercepts in the observation model.
 
 ## Example: signal detection
 Now we will explore a more complicated example. Here we simulate a true hidden signal that we are trying to track. This signal depends nonlinearly on some covariate (called `productivity`, which represents a measure of how productive the landscape is). The signal also demonstrates a fairly large amount of temporal autocorrelation:
@@ -255,13 +244,9 @@ mod <- mvgam(
       s(temperature, k = 10) +
       s(series, temperature, bs = "sz", k = 8),
   trend_formula =
-  # formula for the latent signal, which can depend
-  # nonlinearly on productivity
-    ~ s(productivity, k = 8) - 1,
-  trend_model =
-  # in addition to productivity effects, the signal is
-  # assumed to exhibit temporal autocorrelation
-    AR(),
+  # formula for the latent signal: depends nonlinearly on
+  # productivity, with AR(1) temporal autocorrelation on top
+    ~ s(productivity, k = 8) - 1 + AR(),
   noncentred = TRUE,
   trend_map =
   # trend_map forces all sensors to track the same
@@ -296,13 +281,9 @@ mod <- mvgam(
       s(temperature, k = 10) +
       s(series, temperature, bs = "sz", k = 8),
   trend_formula =
-  # formula for the latent signal, which can depend
-  # nonlinearly on productivity
-    ~ s(productivity, k = 8) - 1,
-  trend_model =
-  # in addition to productivity effects, the signal is
-  # assumed to exhibit temporal autocorrelation
-    AR(),
+  # formula for the latent signal: depends nonlinearly on
+  # productivity, with AR(1) temporal autocorrelation on top
+    ~ s(productivity, k = 8) - 1 + AR(),
   noncentred = TRUE,
   trend_map =
   # trend_map forces all sensors to track the same
@@ -350,14 +331,26 @@ plot_predictions(
 We have successfully estimated effects, some of them nonlinear, that impact the hidden process AND the observations. All in a single joint model. But there can always be challenges with these models, particularly when estimating both process and observation error at the same time.
 
 ### Recovering the hidden signal
-A final but very key question is whether we can successfully recover the true hidden signal. The `trend` slot in the returned model parameters has the estimates for this signal, which we can easily plot using the `mvgam` S3 method for `plot`. We can also overlay the true values for the hidden signal, which shows that our model has done a good job of recovering it:
+A final but very key question is whether we can successfully recover the true hidden signal. The fit object exposes the latent process as the `trend[t, series]` parameter matrix; series 1 (any one of the three sensors works, since all three share the same latent state under the `trend_map`) gives the posterior mean signal at each time point. We can overlay the simulated truth to confirm recovery:
 ```{r}
-plot(mod, 
-     type = "trend") +
-  ggplot2::geom_point(data = data.frame(time = 1:100,
-                                        y = true_signal),
-                      mapping = ggplot2::aes(x = time,
-                                             y = y))
+trend_draws <- as.matrix(
+  as_draws_df(mod, variable = "^trend\\[", regex = TRUE)
+)
+n_time <- length(true_signal)
+trend_mean_series1 <- colMeans(trend_draws)[seq_len(n_time)]
+ggplot2::ggplot() +
+  ggplot2::geom_line(
+    data = data.frame(time = seq_len(n_time),
+                       y = trend_mean_series1),
+    mapping = ggplot2::aes(x = time, y = y),
+    colour = "#B23A48"
+  ) +
+  ggplot2::geom_point(
+    data = data.frame(time = seq_len(n_time), y = true_signal),
+    mapping = ggplot2::aes(x = time, y = y)
+  ) +
+  ggplot2::labs(x = "Time", y = "Signal") +
+  ggplot2::theme_classic()
 ```
 
 ## Further reading

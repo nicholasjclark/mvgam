@@ -81,20 +81,6 @@ package (suggested dependency).
 \item \code{as.mcmc.mvgam} -> \code{\link[coda:mcmc.list]{coda::mcmc.list()}}
 }
 }
-\examples{
-\donttest{
-sim <- sim_mvgam(family = gaussian())
-mod <- mvgam(y ~ s(season, bs = "cc"), trend_model = AR(),
-             data = sim$data_train, family = gaussian(),
-             chains = 2, silent = 2)
-# Coda mcmc.list for diagnostic tools that don't yet accept
-# 'posterior' draws_* classes.
-mc <- suppressWarnings(as.mcmc(mod))
-# Single combined-chains mcmc.
-mc_all <- suppressWarnings(as.mcmc(mod, combine_chains = TRUE))
-}
-
-}
 \seealso{
 \code{\link[posterior:draws_array]{posterior::as_draws_array()}}, \code{\link[=as.array.mvgam]{as.array.mvgam()}},
 \code{\link[=variables.mvgam]{variables.mvgam()}}.

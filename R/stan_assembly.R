@@ -6924,9 +6924,22 @@ create_times_trend_matrix <- function(n_time,
   n_unique_trend_series <- as.integer(n_trend_rows / n_time)
   if (n_unique_trend_series * n_time != n_trend_rows) {
     stop(insight::format_error(c(
-      "n_trend_rows must be a multiple of n_time.",
-      x = paste0("Got n_trend_rows = ", n_trend_rows,
-                 ", n_time = ", n_time, ".")
+      paste0(
+        "Series in 'data' do not share the same time grid."
+      ),
+      x = paste0(
+        "Got ", n_trend_rows,
+        " observations across ", n_time,
+        " unique time points; mvgam expects ", n_time, " x ",
+        n_series, " = ", n_time * n_series,
+        " rows (one per series-time cell)."
+      ),
+      i = paste0(
+        "Pad 'data' so every series has a row at each unique time ",
+        "(set 'y' to NA at unobserved cells). CAR() trends handle ",
+        "irregular gaps within a series natively, but each series ",
+        "must still align on the shared union of time points."
+      )
     )), call. = FALSE)
   }
 
