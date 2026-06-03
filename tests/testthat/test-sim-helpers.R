@@ -146,10 +146,12 @@ test_that("sim_family_rng Gamma returns positive values", {
 
 
 test_that("sim_family_rng errors on unsupported family", {
+  bad <- structure(
+    list(family = "lognormal", link = "identity"),
+    class = "family"
+  )
   expect_error(
-    sim_family_rng(rep(0, 5L),
-                    family = brms::brmsfamily("bernoulli"),
-                    pars = list()),
+    sim_family_rng(rep(0, 5L), family = bad, pars = list()),
     "Unsupported family"
   )
 })

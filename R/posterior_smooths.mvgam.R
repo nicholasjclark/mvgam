@@ -356,7 +356,17 @@ mvgam_side_suffix <- function(side) {
 # `mgcv::interpret.gam()` can parse into a `smooth.spec` list.
 # Returns NULL when the formula has no smooths.
 #'@noRd
-mvgam_smooth_label_spec <- function(formula) {
+mvgam_smooth_label_spec <- function(formula, family = NULL) {
+  # When the caller's formula carries family-specific aterms (e.g.
+  # `y | trials(trials) ~ s(x)` on a binomial fit) but is a plain
+  # R formula rather than a `brmsformula`, brms's `brmsterms.default`
+  # falls through to a `validate_formula(family = gaussian())` call
+  # and rejects the aterm. Wrap the formula in `brms::bf()` with
+  # the supplied family so brms's parser knows trials() is valid.
+  if (!is.null(family) && !inherits(formula, "brmsformula") &&
+      !inherits(formula, "mvbrmsformula")) {
+    formula <- brms::bf(formula, family = family)
+  }
   bt <- brms::brmsterms(formula)
   sm <- bt$dpars$mu$sm
   if (is.null(sm)) return(NULL)
@@ -413,7 +423,9 @@ resolve_mvgam_smooth <- function(x, smooth) {
 mvgam_smooth_terms <- function(x) {
   checkmate::assert_class(x, "mvgam")
   out <- list()
-  obs_idx <- mvgam_smooth_index(x$formula, x$data)
+  obs_idx <- mvgam_smooth_index(
+    x$formula, x$data, family = x$family
+  )
   if (!is.null(obs_idx)) {
     for (term in unique(obs_idx$term)) {
       sub <- obs_idx[obs_idx$term == term, , drop = FALSE]
@@ -426,7 +438,10 @@ mvgam_smooth_terms <- function(x) {
   }
   trend_bf <- mvgam_side_formula(x, "trend")
   if (!is.null(trend_bf)) {
-    trend_idx <- mvgam_smooth_index(trend_bf, x$data)
+    # Trend latent process is gaussian regardless of obs family.
+    trend_idx <- mvgam_smooth_index(
+      trend_bf, x$data, family = stats::gaussian()
+    )
     if (!is.null(trend_idx)) {
       for (term in unique(trend_idx$term)) {
         sub <- trend_idx[trend_idx$term == term, , drop = FALSE]
@@ -447,8 +462,8 @@ mvgam_smooth_terms <- function(x) {
 # expansion and `brms::brmsterms()` for the canonical term labels.
 # Returns NULL if the formula has no smooths.
 #'@noRd
-mvgam_smooth_index <- function(formula, data) {
-  ls <- mvgam_smooth_label_spec(formula)
+mvgam_smooth_index <- function(formula, data, family = NULL) {
+  ls <- mvgam_smooth_label_spec(formula, family = family)
   if (is.null(ls)) return(NULL)
   brms_labels <- ls$labels
   spec <- ls$spec
@@ -518,12 +533,22 @@ mvgam_smooth_eta <- function(object, hit, newdata,
   # stored basis (computed at fit time), so PredictMat handles
   # any newdata grid — sparse or dense — without re-running
   # smoothCon. This is exactly what brms's posterior_smooths does.
+  #
+  # Pass `check_response = FALSE` and `internal = TRUE` so brms
+  # skips response + aterm validation on `newdata` — this matches
+  # what `brms:::posterior_smooths.btl` does and prevents
+  # family-specific aterm columns (e.g. `| trials(N)` for
+  # binomial fits) from raising errors when the caller's grid
+  # doesn't carry those columns.
   side_model <- if (identical(side, "trend")) {
     object$trend_model
   } else {
     object$obs_model
   }
-  sd_new <- brms::standata(side_model, newdata = newdata)
+  sd_new <- brms::standata(
+    side_model, newdata = newdata,
+    check_response = FALSE, internal = TRUE
+  )
   # Focal smooth's Xs columns + the canonical bs_ aliases for
   # those columns (stored at fit time on `object$standata$Xs`).
   Xs_key <- paste0("Xs", suffix)

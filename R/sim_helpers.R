@@ -132,7 +132,10 @@ beta_shapes <- function(mu, phi) {
 #'@noRd
 sim_family_rng <- function(eta, family, pars = list()) {
   checkmate::assert_numeric(eta, finite = TRUE)
-  fam_name <- family$family
+  # brms / validate_family normalises "Gamma" to lowercase "gamma";
+  # accept either casing so callers can pass base R Gamma() or
+  # brms::brmsfamily("Gamma") interchangeably.
+  fam_name <- tolower(family$family)
   link <- family$link
   inv_link <- switch(
     link,
@@ -163,7 +166,7 @@ sim_family_rng <- function(eta, family, pars = list()) {
       shp <- beta_shapes(mu, pars$phi %||% 5)
       stats::rbeta(length(eta), shp$shape1, shp$shape2)
     },
-    "Gamma" = stats::rgamma(
+    "gamma" = stats::rgamma(
       length(eta), shape = pars$shape %||% 2,
       rate = (pars$shape %||% 2) / mu
     ),
@@ -172,7 +175,7 @@ sim_family_rng <- function(eta, family, pars = list()) {
       x = paste0("Got: '", fam_name, "'."),
       i = paste0(
         "Supported: gaussian, student, poisson, negbinomial, ",
-        "binomial, beta, Gamma."
+        "binomial, beta, gamma."
       )
     )))
   )
