@@ -340,6 +340,13 @@ M = 2..5. Trend-side group-level effects (`(1 | g)` inside
 names; the trend-side extension is documented inline in
 `mvgam_ranef_aliases()` for a future batch.
 
+The Tier-7 batch shipped thin brms-parity wrappers:
+`posterior_interval.mvgam`, `predictive_interval.mvgam`,
+`ngrps.mvgam`, `predictive_error.mvgam`, plus deprecated-name
+forwarders (`marginal_smooths`, `marginal_effects`, `parnames`,
+`nsamples`) that dispatch to their current method so brms-trained
+users hit a working path instead of a missing-method error.
+
 The Tier-6 batch shipped `posterior_smooths.mvgam` and
 `conditional_smooths.mvgam` plus a `smooths.mvgam()` enumerator.
 Signatures mirror `brms::posterior_smooths.brmsfit` and

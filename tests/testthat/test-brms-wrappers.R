@@ -1,0 +1,166 @@
+# CI-safe tests for the thin brms-parity wrappers landed in
+# `R/brms_wrappers.mvgam.R`. Locks in S3 dispatch, signature
+# parity, return shapes, and a few semantic edge cases. Numerical
+# concordance against brms lives in tests/local/.
+
+
+make_wrapper_stub <- function(with_re = FALSE) {
+  varnames <- c(
+    "b_Intercept", "b_x", "Intercept", "sigma",
+    if (with_re) c("sd_grp__Intercept", "r_grp[a,Intercept]") else NULL,
+    "lp__"
+  )
+  set.seed(2L)
+  arr <- array(
+    rnorm(50L * 2L * length(varnames)),
+    dim = c(50L, 2L, length(varnames)),
+    dimnames = list(NULL, NULL, varnames)
+  )
+  drws <- posterior::as_draws_array(arr)
+  std <- list(N = 8L, X = matrix(rnorm(16L), 8L, 2L,
+                                  dimnames = list(NULL,
+                                                  c("Intercept", "x"))))
+  if (with_re) {
+    std$M_1 <- 1L
+    std$N_1 <- 1L
+  }
+  form <- if (with_re) brms::bf(y ~ x + (1 | grp)) else brms::bf(y ~ x)
+  structure(
+    list(
+      fit = drws,
+      formula = form,
+      data = data.frame(y = rnorm(8L), x = rnorm(8L),
+                         grp = factor("a")),
+      family = brms::brmsfamily("gaussian"),
+      standata = std,
+      response_names = "y"
+    ),
+    class = "mvgam"
+  )
+}
+
+
+# ---- Dispatch + signature parity -----------------------------------
+
+test_that("Tier-7 methods have S3 entries on mvgam", {
+  for (m in c("posterior_interval", "predictive_interval", "ngrps",
+              "predictive_error", "marginal_smooths",
+              "marginal_effects", "parnames", "nsamples")) {
+    expect_true(
+      !is.null(getS3method(m, "mvgam", optional = TRUE)),
+      info = NULL
+    )
+  }
+})
+
+
+test_that("posterior_interval.mvgam matches brms signature", {
+  expected <- names(formals(getS3method("posterior_interval", "brmsfit")))
+  actual <- names(formals(getS3method("posterior_interval", "mvgam")))
+  expect_true(all(expected %in% actual))
+})
+
+
+test_that("predictive_interval.mvgam matches brms signature", {
+  expected <- names(formals(getS3method("predictive_interval", "brmsfit")))
+  actual <- names(formals(getS3method("predictive_interval", "mvgam")))
+  expect_true(all(expected %in% actual))
+})
+
+
+test_that("ngrps.mvgam matches brms signature", {
+  expected <- names(formals(getS3method("ngrps", "brmsfit")))
+  actual <- names(formals(getS3method("ngrps", "mvgam")))
+  expect_true(all(expected %in% actual))
+})
+
+
+test_that("predictive_error.mvgam matches brms signature", {
+  expected <- names(formals(getS3method("predictive_error", "brmsfit")))
+  actual <- names(formals(getS3method("predictive_error", "mvgam")))
+  expect_true(all(expected %in% actual))
+})
+
+
+# ---- ngrps gate ----------------------------------------------------
+
+test_that("ngrps.mvgam returns NULL on a no-RE fit", {
+  set.seed(3L); n <- 12L
+  df <- data.frame(y = rnorm(n), x = rnorm(n))
+  sd_ <- brms::standata(
+    brms::bf(y ~ x), data = df,
+    family = brms::brmsfamily("gaussian")
+  )
+  stub <- structure(
+    list(formula = brms::bf(y ~ x), data = df,
+         family = brms::brmsfamily("gaussian"),
+         standata = as.list(sd_)),
+    class = "mvgam"
+  )
+  expect_null(ngrps(stub))
+})
+
+
+# ---- Aliasing semantics on wrappers --------------------------------
+
+test_that("posterior_interval.mvgam respects pars / variable / prob", {
+  stub <- make_wrapper_stub()
+  pi_default <- posterior_interval(stub)
+  expect_true(is.matrix(pi_default))
+  expect_identical(ncol(pi_default), 2L)
+  # Default brms prob = 0.95 -> columns are 2.5% / 97.5%.
+  expect_identical(colnames(pi_default), c("2.5%", "97.5%"))
+  pi_50 <- posterior_interval(stub, prob = 0.5)
+  expect_identical(colnames(pi_50), c("25%", "75%"))
+  pi_one <- posterior_interval(stub, variable = "b_x")
+  expect_identical(nrow(pi_one), 1L)
+  expect_identical(rownames(pi_one), "b_x")
+})
+
+
+test_that("posterior_interval pars alias falls back to variable", {
+  stub <- make_wrapper_stub()
+  pi_pars <- posterior_interval(stub, pars = "b_x")
+  expect_identical(rownames(pi_pars), "b_x")
+})
+
+
+# ---- Deprecated alias dispatch -------------------------------------
+
+test_that("parnames.mvgam dispatches to variables.mvgam", {
+  stub <- make_wrapper_stub()
+  # brms's parnames generic emits its own deprecation warning,
+  # which is the documented behaviour. Suppress it here.
+  expect_identical(
+    suppressWarnings(parnames(stub)),
+    variables(stub)
+  )
+})
+
+
+test_that("nsamples.mvgam returns the posterior draw count", {
+  stub <- make_wrapper_stub()
+  # Stub uses 50 iter x 2 chains = 100 total draws.
+  expect_identical(nsamples(stub), 100L)
+})
+
+
+# ---- predictive_error response-column check ------------------------
+
+test_that("predictive_error.mvgam errors when newdata lacks the response", {
+  set.seed(5L); n <- 10L
+  stub <- make_wrapper_stub()
+  nd <- data.frame(x = rnorm(n))  # no `y` column
+  expect_error(
+    predictive_error(stub, newdata = nd),
+    "response"
+  )
+})
+
+
+# ---- mvgam_response_name -------------------------------------------
+
+test_that("mvgam_response_name returns the LHS variable", {
+  stub <- make_wrapper_stub()
+  expect_identical(mvgam_response_name(stub), "y")
+})

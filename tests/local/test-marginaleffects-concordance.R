@@ -1010,3 +1010,70 @@ test_that("conditional_smooths(mvgam) restricts via smooths argument", {
     "smooths"
   )
 })
+
+
+# ---------------------------------------------------------------------
+# Tier-7 brms-parity batch: posterior_interval + predictive_interval
+# + ngrps + predictive_error + deprecated aliases
+# ---------------------------------------------------------------------
+
+
+test_that("posterior_interval(mvgam) matches brms shape on a real fit", {
+  require_fixtures(
+    "val_mvgam_ar1_re_smooth.rds", "val_brms_ar1_re_smooth.rds"
+  )
+  mv <- load_mvgam("ar1_re_smooth")
+  br <- load_brms("ar1_re_smooth")
+  mv_pi <- posterior_interval(mv)
+  br_pi <- posterior_interval(br)
+  expect_identical(ncol(mv_pi), ncol(br_pi))
+  expect_identical(colnames(mv_pi), colnames(br_pi))
+})
+
+
+test_that("predictive_interval(mvgam) returns [nobs x 2] with brms cols", {
+  require_fixtures("val_mvgam_ar1_re_smooth.rds")
+  mv <- load_mvgam("ar1_re_smooth")
+  pi <- predictive_interval(mv)
+  expect_identical(ncol(pi), 2L)
+  expect_identical(nrow(pi), nrow(mv$data))
+  expect_identical(colnames(pi), c("5%", "95%"))
+})
+
+
+test_that("ngrps(mvgam) matches brms on a real RE fit", {
+  require_fixtures(
+    "val_mvgam_ar1_re_smooth.rds", "val_brms_ar1_re_smooth.rds"
+  )
+  mv <- load_mvgam("ar1_re_smooth")
+  br <- load_brms("ar1_re_smooth")
+  expect_identical(ngrps(mv), ngrps(br))
+})
+
+
+test_that("predictive_error(mvgam) returns [ndraws x nobs] error matrix", {
+  require_fixtures("val_mvgam_ar1_re_smooth.rds")
+  mv <- load_mvgam("ar1_re_smooth")
+  err <- predictive_error(mv, ndraws = 50L)
+  expect_identical(nrow(err), 50L)
+  expect_identical(ncol(err), nrow(mv$data))
+  # epred branch returns a different matrix; sanity-check the
+  # branch toggle works without erroring.
+  err_e <- predictive_error(
+    mv, method = "posterior_epred", ndraws = 20L
+  )
+  expect_identical(dim(err_e), c(20L, nrow(mv$data)))
+})
+
+
+test_that("deprecated brms aliases dispatch to current methods", {
+  require_fixtures("val_mvgam_ar1_re_smooth.rds")
+  mv <- load_mvgam("ar1_re_smooth")
+  # parnames -> variables; nsamples -> ndraws; both warn via the
+  # brms generic.
+  expect_identical(suppressWarnings(parnames(mv)), variables(mv))
+  expect_identical(
+    suppressWarnings(nsamples(mv)),
+    posterior::ndraws(posterior::as_draws(mv$fit))
+  )
+})
