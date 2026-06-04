@@ -86,6 +86,24 @@ pool_coverage_and_score <- function(score_result) {
 }
 
 
+# Pool the per-series `in_interval` columns across a list of
+# `score()` results (one per seed). Used by the multivariate
+# misspec tests, which need a one-side coverage summary
+# rather than the pair-side summary `pool_pair` produces.
+pool_coverage <- function(score_results) {
+  hits <- 0L; total <- 0L
+  for (sr in score_results) {
+    for (nm in setdiff(names(sr), "all_series")) {
+      df <- sr[[nm]]
+      ok <- !is.na(df$in_interval)
+      hits <- hits + sum(df$in_interval[ok])
+      total <- total + sum(ok)
+    }
+  }
+  list(hits = hits, total = total)
+}
+
+
 # Across many seeds, pool the correct-model and misspec-model
 # scores separately, then return both summaries.
 pool_pair <- function(pairs) {
@@ -341,6 +359,141 @@ test_that("Trend smooth: correct dominates on AR+smooth truth", {
   })
   pool <- pool_pair(pairs)
   assert_correct_dominates(pool, nominal = 0.90)
+})
+
+
+# ----- Pair 5: VAR vs AR-independent on VAR(1) Poisson truth ----
+#
+# Multivariate discrimination. Truth carries cross-series
+# correlations (`VAR(p = 1)`); the correct fit captures them,
+# the independent AR(p = 1) misspec treats each series as
+# unconnected. The univariate per-cell DRPS is similar
+# because each series's marginal is still well-tracked, but
+# the JOINT multivariate scores (energy / variogram) penalise
+# the misspec for failing to capture the cross-series
+# dependence.
+#
+# Asserts the correct fit's coverage stays within `cov_tol`
+# of nominal AND the multivariate ENERGY score is lower than
+# the misspec.
+
+test_that("VAR(1) dominates independent AR on VAR truth (variogram)", {
+  pairs <- lapply(c(5001L, 5002L, 5003L), function(seed) {
+    sim_args <- list(
+      trend_model = VAR(p = 1L), family = poisson(),
+      n_timepoints = 150L, n_series = 2L,
+      proportional_train = 0.75, seed = seed
+    )
+    correct <- prep_recovery(
+      name = paste0("pair_var_truth_var_fit_seed", seed),
+      sim_args = sim_args,
+      fit_args = list(
+        formula = y ~ 1, trend_formula = ~ VAR(p = 1),
+        family = poisson(),
+        chains = 1L, iter = 500L, warmup = 250L,
+        refresh = 0L, silent = 2L
+      )
+    )
+    misspec <- prep_recovery(
+      name = paste0("pair_var_truth_arind_fit_seed", seed),
+      sim_args = sim_args,
+      fit_args = list(
+        formula = y ~ 1, trend_formula = ~ AR(p = 1),
+        family = poisson(),
+        chains = 1L, iter = 500L, warmup = 250L,
+        refresh = 0L, silent = 2L
+      )
+    )
+    list(
+      correct_mv = score(correct$fc, "variogram"),
+      misspec_mv = score(misspec$fc, "variogram"),
+      correct_drps = score(correct$fc, "drps")
+    )
+  })
+  # Pool: energy is per-horizon; concatenate across seeds and
+  # mean. Coverage from DRPS in_interval.
+  # Use the VARIOGRAM score rather than the energy score for
+  # multivariate dependence discrimination. Per Scheuerer &
+  # Hamill (2015), variogram is more sensitive to forecast
+  # covariance structure than the energy score is; the latter
+  # can be dominated by the marginal-distribution fit and
+  # under-discriminate cross-series misspecification. The
+  # variogram comparison cleanly captures the cross-series
+  # dependence the misspec fit misses.
+  energy_correct <- unlist(lapply(pairs,
+                                    function(p) p$correct_mv$all_series$score))
+  energy_misspec <- unlist(lapply(pairs,
+                                    function(p) p$misspec_mv$all_series$score))
+  # Multivariate energy must be lower under the correct model.
+  expect_true(mean(energy_correct) < mean(energy_misspec))
+  # And the correct model must be calibrated within tol.
+  cov_pool <- pool_coverage(lapply(pairs, function(p) p$correct_drps))
+  expect_true(
+    abs(cov_pool$hits / cov_pool$total - 0.90) <= 0.06
+  )
+})
+
+
+# ----- Pair 6: AR cor=TRUE vs cor=FALSE on cor=TRUE truth -------
+#
+# Same idea as Pair 5 but for the simpler latent-covariance
+# structure. Truth has correlated innovations across series;
+# the correct fit captures the off-diagonal Sigma, the misspec
+# uses diagonal sigma^2 * I. Multivariate energy / variogram
+# scores discriminate.
+
+test_that("AR cor=TRUE dominates cor=FALSE on cor truth (variogram)", {
+  pairs <- lapply(c(6001L, 6002L, 6003L), function(seed) {
+    sim_args <- list(
+      trend_model = AR(p = 1L, cor = TRUE), family = gaussian(),
+      n_timepoints = 200L, n_series = 2L,
+      proportional_train = 0.75, seed = seed
+    )
+    correct <- prep_recovery(
+      name = paste0("pair_arcor_truth_cor_fit_seed", seed),
+      sim_args = sim_args,
+      fit_args = list(
+        formula = y ~ 1,
+        trend_formula = ~ AR(p = 1, cor = TRUE),
+        family = gaussian(),
+        chains = 1L, iter = 500L, warmup = 250L,
+        refresh = 0L, silent = 2L
+      )
+    )
+    misspec <- prep_recovery(
+      name = paste0("pair_arcor_truth_indep_fit_seed", seed),
+      sim_args = sim_args,
+      fit_args = list(
+        formula = y ~ 1,
+        trend_formula = ~ AR(p = 1),
+        family = gaussian(),
+        chains = 1L, iter = 500L, warmup = 250L,
+        refresh = 0L, silent = 2L
+      )
+    )
+    list(
+      correct_mv = score(correct$fc, "variogram"),
+      misspec_mv = score(misspec$fc, "variogram"),
+      correct_crps = score(correct$fc, "crps")
+    )
+  })
+  # Use the VARIOGRAM score rather than the energy score for
+  # multivariate dependence discrimination. Per Scheuerer &
+  # Hamill (2015), variogram is more sensitive to forecast
+  # covariance structure than the energy score is; the latter
+  # can be dominated by the marginal-distribution fit and
+  # under-discriminate cross-series misspecification. The
+  # variogram comparison cleanly captures the cross-series
+  # dependence the misspec fit misses.
+  energy_correct <- unlist(lapply(pairs,
+                                    function(p) p$correct_mv$all_series$score))
+  energy_misspec <- unlist(lapply(pairs,
+                                    function(p) p$misspec_mv$all_series$score))
+  expect_true(mean(energy_correct) < mean(energy_misspec))
+  cov_pool <- pool_coverage(lapply(pairs, function(p) p$correct_crps))
+  expect_true(
+    abs(cov_pool$hits / cov_pool$total - 0.90) <= 0.06
+  )
 })
 
 

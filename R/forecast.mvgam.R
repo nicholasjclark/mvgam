@@ -123,15 +123,15 @@ forecast.mvgam <- function(object,
   }
   meta <- get_enriched_trend_metadata(object)
   trend_type <- meta$trend_type
-  if (trend_type %in% c("VAR", "CAR", "PW")) {
+  if (identical(trend_type, "PW")) {
     stop(insight::format_error(c(
       paste0(
         "Forecasting for '", trend_type,
         "' trends is not yet implemented in 'forecast.mvgam'."
       ),
       i = paste0(
-        "Univariate RW / AR / ARMA / ZMVN are supported; ",
-        "VAR / CAR / PW are pending."
+        "RW / AR / ARMA / ZMVN / VAR / CAR are supported; ",
+        "PW propagation requires a piecewise C++ kernel."
       )
     )))
   }
@@ -525,6 +525,18 @@ build_forecast_arms <- function(object, trend_model, meta,
     )
   }
 
+  # CAR forecasts need a per-step time-gap vector for the
+  # kernel's `time_dis` parameter. Computed once here because
+  # both inputs (per-series last training time + the forecast
+  # time grid) are deterministic across draws -- moving this
+  # inside the per-draw loop would re-derive the same gaps
+  # `ndraws_use` times. NULL for non-CAR trends.
+  fc_time <- if (identical(meta$trend_type, "CAR")) {
+    compute_car_forecast_time(object, fc_grid, series_levels)
+  } else {
+    NULL
+  }
+
   # Per-draw kernel loop. `trend_flat[i, j]` holds the trend
   # value at draw `draw_idx[i]`, observation row j of the
   # forecast grid (obs_struct_fc ordering).
@@ -556,7 +568,8 @@ build_forecast_arms <- function(object, trend_model, meta,
       trend_lp_tail = trend_lp_tail,
       trend_lp_fc = trend_lp_fc,
       obs_struct_tail = obs_struct_tail,
-      obs_struct_fc = obs_struct_fc
+      obs_struct_fc = obs_struct_fc,
+      fc_time = fc_time
     )
     trend_flat[i, ] <- flatten_grid_to_obs_order(fc_link_d,
                                                     obs_struct_fc)
@@ -591,7 +604,8 @@ propagate_one_draw <- function(object, trend_model, meta, training,
                                  fc_grid, draws_mat, d_state, d_lin,
                                  h_max, n_series, tail_data,
                                  trend_lp_tail, trend_lp_fc,
-                                 obs_struct_tail, obs_struct_fc) {
+                                 obs_struct_tail, obs_struct_fc,
+                                 fc_time = NULL) {
   ls_d <- extract_last_state(object, d_state,
                                 draws_mat = draws_mat)
   max_lag <- as.integer(meta$max_lag %||% 0L)
@@ -622,8 +636,56 @@ propagate_one_draw <- function(object, trend_model, meta, training,
     h = h_max,
     n_series = n_series,
     last_state = ls_d$last_state,
-    linpreds = linpreds_combined
+    linpreds = linpreds_combined,
+    time = fc_time
   )
+}
+
+
+# Internal: per-step time gap vector for a CAR forecast. CAR(1)
+# is continuous-time, so the kernel needs the gap from the last
+# observed time to each forecast time. The kernel accepts a
+# single length-`h` vector (no per-series matrix), so all
+# series must share the same forecast time grid -- this is the
+# common case for mvgam CAR fits where `time` is a global
+# continuous coordinate and the test split is also shared.
+# Heterogeneous per-series forecast times error with a
+# message; the kernel-side extension to accept a `[h,
+# n_series]` matrix is pending.
+#'@noRd
+compute_car_forecast_time <- function(object, fc_grid,
+                                        series_levels) {
+  n_series <- length(series_levels)
+  last_times <- extract_last_observed_times(object, n_series)
+  gap_per_series <- vector("list", n_series)
+  for (s in seq_len(n_series)) {
+    lv <- series_levels[s]
+    fut_t <- sort(fc_grid$times[[lv]])
+    if (length(fut_t) == 0L) {
+      gap_per_series[[s]] <- numeric(0L)
+      next
+    }
+    gap_per_series[[s]] <- diff(c(last_times[s], fut_t))
+  }
+  # Drop empty (no-forecast) series from the consistency check.
+  nonempty <- vapply(gap_per_series, length, integer(1L)) > 0L
+  if (!any(nonempty)) return(numeric(0L))
+  ref <- gap_per_series[[which(nonempty)[1L]]]
+  for (s in which(nonempty)) {
+    if (!isTRUE(all.equal(gap_per_series[[s]], ref))) {
+      stop(insight::format_error(c(
+        paste0(
+          "CAR forecasts currently require all series to share ",
+          "the same forecast time grid."
+        ),
+        i = paste0(
+          "Heterogeneous per-series time gaps will be supported ",
+          "after the CAR kernel accepts a per-series time matrix."
+        )
+      )))
+    }
+  }
+  ref
 }
 
 

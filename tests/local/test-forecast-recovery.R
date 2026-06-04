@@ -340,7 +340,9 @@ test_that("AR(1) + mo(x_ord) on trend: monotonic effect flows through", {
 # ----- Scoring API parity vs direct kernel call ------------------
 
 test_that("score(fc, 'crps') matches direct crps_mcmc_object", {
-  bundle <- readRDS(file.path(CACHE_DIR, "rw_gauss_seed201.rds"))
+  bundle <- readRDS(
+    file.path(CACHE_DIR, "rw_gauss_T400_seed201.rds")
+  )
   via_dispatch <- score(bundle$fc, "crps")
   series_name <- as.character(bundle$fc$series_names[1L])
   truth <- bundle$fc$test_observations[[series_name]]
@@ -350,6 +352,109 @@ test_that("score(fc, 'crps') matches direct crps_mcmc_object", {
     via_dispatch[[series_name]]$score,
     as.numeric(direct[, "score"])
   )
+})
+
+
+# ----- VAR(1) 2-series Poisson recovery --------------------------
+
+test_that("VAR(1) 2-series 90% PI covers near nominal across seeds", {
+  results <- lapply(c(401L, 402L, 403L), function(seed) {
+    bundle <- prep_recovery(
+      # T = 250 (up from 150) so the VAR posterior tightens
+      # enough for the forecast PI to not over-cover -- at the
+      # shorter length the joint posterior of A + Sigma is
+      # still diffuse and the predictive PI is wider than the
+      # true conditional distribution.
+      name = paste0("var1_2_pois_T250_seed", seed),
+      sim_args = list(
+        trend_model = VAR(p = 1L), family = poisson(),
+        n_timepoints = 250L, n_series = 2L,
+        proportional_train = 0.75, seed = seed
+      ),
+      fit_args = list(
+        formula = y ~ 1,
+        trend_formula = ~ VAR(p = 1),
+        family = poisson(),
+        chains = 1L, iter = 500L, warmup = 250L,
+        refresh = 0L, silent = 2L
+      )
+    )
+    score(bundle$fc, "drps")
+  })
+  pooled <- pool_coverage(results)
+  ci <- wilson_ci(pooled$hits, pooled$total)
+  expect_true(0.90 >= ci["lower"] && 0.90 <= ci["upper"])
+})
+
+
+test_that("VAR(1) 2-series: multivariate energy + variogram finite", {
+  bundle <- readRDS(
+    file.path(CACHE_DIR, "var1_2_pois_T250_seed401.rds")
+  )
+  e <- score(bundle$fc, "energy")
+  v <- score(bundle$fc, "variogram")
+  expect_true(all(is.finite(e$all_series$score)))
+  expect_true(all(is.finite(v$all_series$score)))
+})
+
+
+# ----- CAR(1) single-series recovery -----------------------------
+#
+# CAR generates irregular per-series time grids (sim_mvgam
+# type 6 draws cumulative Unif(1, 6) gaps independently per
+# series). Multi-series CAR with different grids hits the
+# kernel's shared-time-vector limit; the single-series case
+# is the well-tested path.
+
+test_that("CAR(1) single-series 90% PI covers near nominal across seeds", {
+  results <- lapply(c(501L, 502L, 503L), function(seed) {
+    bundle <- prep_recovery(
+      name = paste0("car1_pois_seed", seed),
+      sim_args = list(
+        type = 6L, family = poisson(),
+        n_timepoints = 120L, n_series = 1L,
+        proportional_train = 0.75, seed = seed
+      ),
+      fit_args = list(
+        formula = y ~ s(season, bs = "cc", k = 6L),
+        trend_formula = ~ CAR(time = time),
+        family = poisson(),
+        chains = 1L, iter = 500L, warmup = 250L,
+        refresh = 0L, silent = 2L
+      )
+    )
+    score(bundle$fc, "drps")
+  })
+  pooled <- pool_coverage(results)
+  ci <- wilson_ci(pooled$hits, pooled$total)
+  expect_true(0.90 >= ci["lower"] && 0.90 <= ci["upper"])
+})
+
+
+# ----- AR(1) cor=TRUE 2-series Gaussian recovery -----------------
+
+test_that("AR(1) cor=TRUE 2-series 90% PI covers near nominal", {
+  results <- lapply(c(601L, 602L, 603L), function(seed) {
+    bundle <- prep_recovery(
+      name = paste0("ar1_cor_gauss_seed", seed),
+      sim_args = list(
+        trend_model = AR(p = 1L, cor = TRUE), family = gaussian(),
+        n_timepoints = 200L, n_series = 2L,
+        proportional_train = 0.75, seed = seed
+      ),
+      fit_args = list(
+        formula = y ~ 1,
+        trend_formula = ~ AR(p = 1, cor = TRUE),
+        family = gaussian(),
+        chains = 1L, iter = 500L, warmup = 250L,
+        refresh = 0L, silent = 2L
+      )
+    )
+    score(bundle$fc, "crps")
+  })
+  pooled <- pool_coverage(results)
+  ci <- wilson_ci(pooled$hits, pooled$total)
+  expect_true(0.90 >= ci["lower"] && 0.90 <= ci["upper"])
 })
 
 

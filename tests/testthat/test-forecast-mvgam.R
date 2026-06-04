@@ -249,20 +249,86 @@ test_that("ndraws beyond available draws errors informatively", {
 })
 
 
-test_that("Unsupported trend types (VAR / CAR / PW) error", {
-  for (tt in c("VAR", "CAR", "PW")) {
-    fit <- make_mock_mvgam(trend_type = tt)
-    fit$mv_spec$trend_specs$trend <- tt
-    draws <- make_draws_mat(ndraws = 2L)
-    testthat::local_mocked_bindings(
-      `as_draws_matrix` = function(...) draws,
-      .package = "posterior"
-    )
-    expect_error(
-      forecast(fit, newdata = NULL, type = "response", ndraws = 2L),
-      tt
+test_that("Only PW remains gated; VAR / CAR flow through", {
+  # PW: still gated until the pw_trendC kernel lands.
+  fit_pw <- make_mock_mvgam(trend_type = "PW")
+  fit_pw$mv_spec$trend_specs$trend <- "PW"
+  draws <- make_draws_mat(ndraws = 2L)
+  testthat::local_mocked_bindings(
+    `as_draws_matrix` = function(...) draws,
+    .package = "posterior"
+  )
+  expect_error(
+    forecast(fit_pw, newdata = NULL, type = "response", ndraws = 2L),
+    "PW"
+  )
+
+  # VAR and CAR no longer error at the dispatcher level.
+  # (They route into build_hindcast_arms via posterior_predict,
+  # which is stubbed in the test below.)
+  testthat::local_mocked_bindings(
+    posterior_predict = function(...) matrix(1L, 2L, 10L),
+    posterior_epred = function(...) matrix(1, 2L, 10L)
+  )
+  for (tt in c("VAR", "CAR")) {
+    fit_tt <- make_mock_mvgam(trend_type = tt)
+    fit_tt$mv_spec$trend_specs$trend <- tt
+    expect_no_error(
+      forecast(fit_tt, newdata = NULL, type = "response",
+                ndraws = 2L)
     )
   }
+})
+
+
+# ----- compute_car_forecast_time ----------------------------------
+
+test_that("compute_car_forecast_time builds the right gap vector", {
+  # Fake fit with two series, last training times = c(10, 10).
+  fit <- make_mock_mvgam(series_levels = c("a", "b"))
+  testthat::local_mocked_bindings(
+    extract_last_observed_times = function(fit, n_series) {
+      c(10, 10)
+    }
+  )
+  fc_grid <- list(times = list(a = c(11, 14, 16),
+                                  b = c(11, 14, 16)))
+  out <- compute_car_forecast_time(fit, fc_grid,
+                                     series_levels = c("a", "b"))
+  expect_equal(out, c(1, 3, 2))
+})
+
+
+test_that("compute_car_forecast_time errors on per-series time mismatch", {
+  fit <- make_mock_mvgam(series_levels = c("a", "b"))
+  testthat::local_mocked_bindings(
+    extract_last_observed_times = function(fit, n_series) {
+      c(10, 10)
+    }
+  )
+  # Series 'a' has gaps c(1, 1); series 'b' has gaps c(1, 2).
+  fc_grid <- list(times = list(a = c(11, 12),
+                                  b = c(11, 13)))
+  expect_error(
+    compute_car_forecast_time(fit, fc_grid,
+                                series_levels = c("a", "b")),
+    "share the same forecast"
+  )
+})
+
+
+test_that("compute_car_forecast_time ignores series with no forecast rows", {
+  fit <- make_mock_mvgam(series_levels = c("a", "b"))
+  testthat::local_mocked_bindings(
+    extract_last_observed_times = function(fit, n_series) {
+      c(10, 10)
+    }
+  )
+  fc_grid <- list(times = list(a = c(11, 14, 16),
+                                  b = integer(0L)))
+  out <- compute_car_forecast_time(fit, fc_grid,
+                                     series_levels = c("a", "b"))
+  expect_equal(out, c(1, 3, 2))
 })
 
 
