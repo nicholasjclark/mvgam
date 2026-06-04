@@ -609,12 +609,6 @@ test_that("time parameter works correctly in trend constructors", {
   car_default <- CAR()
   expect_true(is.na(car_default$time) || car_default$time == "time")
 
-  # GP is deprecated, wrap in suppressWarnings
-  suppressWarnings({
-    gp_default <- GP()
-  })
-  expect_true(is.na(gp_default$time) || gp_default$time == "time")
-
   # Test explicit time parameter with unquoted variable names
   rw_custom <- RW(time = week)
   expect_equal(rw_custom$time, "week")
@@ -627,11 +621,6 @@ test_that("time parameter works correctly in trend constructors", {
 
   car_custom <- CAR(time = day)
   expect_equal(car_custom$time, "day")
-
-  suppressWarnings({
-    gp_custom <- GP(time = timestep)
-  })
-  expect_equal(gp_custom$time, "timestep")
 
   # Test that other parameters still work correctly with time parameter
   ar_complex <- AR(time = period, p = c(1, 12), ma = TRUE, cor = TRUE)
@@ -698,11 +687,6 @@ test_that("series parameter works correctly in trend constructors", {
   car_default <- CAR()
   expect_true(is.na(car_default$series) || car_default$series == "series")
 
-  suppressWarnings({
-    gp_default <- GP()
-  })
-  expect_true(is.na(gp_default$series) || gp_default$series == "series")
-
   # Test explicit series parameter with unquoted variable names
   rw_custom <- RW(series = species)
   expect_equal(rw_custom$series, "species")
@@ -715,11 +699,6 @@ test_that("series parameter works correctly in trend constructors", {
 
   car_custom <- CAR(series = location)
   expect_equal(car_custom$series, "location")
-
-  suppressWarnings({
-    gp_custom <- GP(series = site)
-  })
-  expect_equal(gp_custom$series, "site")
 
   # Test both time and series parameters specified
   ar_no_warn <- AR(time = week, series = species, p = c(1, 12), ma = TRUE, cor = TRUE)
