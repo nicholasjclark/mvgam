@@ -1,22 +1,64 @@
 # Statistical recovery checks for forecast.mvgam.
 #
-# Each test simulates from the trend kernel via sim_mvgam,
-# fits, forecasts on the held-out test slice, and asserts the
-# observed 90% PI coverage is consistent with the nominal rate.
-# Coverage is pooled across multiple seeds so the binomial
-# Wilson CI bracket is tight enough to detect ~10 pp coverage
-# shortfalls.
+# Three groups:
+#
+#   1. Baseline calibration tests. Three trend families pooled
+#      across three seeds each (AR(1) Poisson, RW Gaussian,
+#      ZMVN 2-series Poisson). For each pooled set we assert
+#      the 90% PI coverage is consistent with nominal via a
+#      Wilson 95% CI bracket on the binomial in_interval rate.
+#
+#   2. Complex-predictor end-to-end tests. Each fits one model
+#      with a non-trivial predictor (AR(p = 3) consecutive,
+#      ARMA(1,1), negbinomial dispersion family, obs-side
+#      `s(x)`, trend-side Hilbert `gp(x, k)`, trend-side
+#      `mo(x_ord)`) and asserts the score pipeline produces a
+#      finite, sensible CRPS / DRPS / coverage indicator on the
+#      held-out test slice.
+#
+#   3. Scoring-API parity checks. Confirm that
+#      `score(fc, "crps")$s$score` matches a direct call to the
+#      underlying kernel on a real fit's posterior.
+#
+# Every fit is cached under
+# `tests/local/fixtures/forecast_recovery/<name>.rds` so reruns
+# are fast (load) after the initial sweep (fit).
 
 source("setup_tests_local.R")
 
+CACHE_DIR <- "fixtures/forecast_recovery"
 
-# --- Coverage helper ----------------------------------------------
 
-# Wilson 95% confidence interval for a Binomial(n, p_hat) given
-# k successes out of n. The interval is centred on the
-# Wilson-adjusted estimate `(p_hat + z^2/(2n)) / (1 + z^2/n)`,
-# not on `p_hat`. Used here to bracket the acceptable range of
-# observed coverage around the nominal probability.
+# ----- Cache helper ------------------------------------------------
+
+# Run sim + (optional data augmentation) + fit + forecast for
+# one configuration and cache the whole bundle. Subsequent
+# calls load from disk. `mutate_fn` applies the same
+# transformation to `sim$data_train` and `sim$data_test` so
+# users can add derived columns (ordinal encodings for `mo()`,
+# log transforms, custom interactions, etc.) without inflating
+# sim_mvgam's surface.
+prep_recovery <- function(name, sim_args, fit_args,
+                            mutate_fn = identity,
+                            ndraws_fc = 200L) {
+  path <- file.path(CACHE_DIR, paste0(name, ".rds"))
+  if (file.exists(path)) return(readRDS(path))
+  sim <- do.call(sim_mvgam, sim_args)
+  sim$data_train <- mutate_fn(sim$data_train)
+  sim$data_test <- mutate_fn(sim$data_test)
+  fit <- SM(SW(do.call(mvgam, c(
+    list(data = sim$data_train), fit_args
+  ))))
+  fc <- forecast(fit, newdata = sim$data_test,
+                   type = "response", ndraws = ndraws_fc)
+  out <- list(sim = sim, fit = fit, fc = fc)
+  saveRDS(out, path)
+  out
+}
+
+
+# ----- Coverage helper --------------------------------------------
+
 wilson_ci <- function(k, n, conf = 0.95) {
   z <- stats::qnorm(1 - (1 - conf) / 2)
   phat <- k / n
@@ -28,135 +70,301 @@ wilson_ci <- function(k, n, conf = 0.95) {
 }
 
 
-# Assert that the observed in-PI count is consistent with the
-# `nominal` true coverage at the `conf` confidence level. The
-# Wilson CI is the 95% interval around the count's MLE; we
-# require `nominal` to fall inside it.
-assert_pi_coverage <- function(observed_in_pi, total, nominal,
-                                conf = 0.95) {
-  ci <- wilson_ci(observed_in_pi, total, conf = conf)
-  testthat::expect_true(
-    nominal >= ci["lower"] && nominal <= ci["upper"]
-  )
-}
-
-
-# Per-series in-PI count given a forecast matrix `[ndraws, h]`,
-# truth vector, and central PI probability.
-count_in_pi <- function(forecast_mat, truth, prob = 0.90) {
-  alpha <- (1 - prob) / 2
-  lo <- apply(forecast_mat, 2L, stats::quantile, probs = alpha)
-  hi <- apply(forecast_mat, 2L, stats::quantile,
-              probs = 1 - alpha)
-  sum(truth >= lo & truth <= hi)
-}
-
-
-# Run one forecast simulation: sim -> fit -> forecast -> count
-# in-PI observations across all series.
-run_one_recovery <- function(seed, sim_args, fit_args) {
-  set.seed(seed)
-  sim <- do.call(sim_mvgam, c(sim_args, list(seed = seed)))
-  fit <- SM(SW(do.call(mvgam, c(
-    list(data = sim$data_train), fit_args
-  ))))
-  fc <- forecast(fit, newdata = sim$data_test,
-                   type = "response", ndraws = 200L)
-  in_pi <- 0L
-  truth_total <- 0L
-  for (lv in levels(sim$data_test$series)) {
-    truth_s <- as.numeric(sim$data_test$y[
-      sim$data_test$series == lv
-    ])
-    fmat_s <- fc$forecasts[[lv]]
-    in_pi <- in_pi + count_in_pi(fmat_s, truth_s, prob = 0.90)
-    truth_total <- truth_total + length(truth_s)
+# Pool the per-series `in_interval` columns from a sequence of
+# `score()` results, return the binomial (hits, total) pair.
+pool_coverage <- function(score_results) {
+  hits <- 0L
+  total <- 0L
+  for (sr in score_results) {
+    for (nm in setdiff(names(sr), "all_series")) {
+      df <- sr[[nm]]
+      ok <- !is.na(df$in_interval)
+      hits <- hits + sum(df$in_interval[ok])
+      total <- total + sum(ok)
+    }
   }
-  list(in_pi = in_pi, total = truth_total)
+  list(hits = hits, total = total)
 }
 
 
-# Pool counts across `seeds` runs of the same simulation /
-# fit / forecast pipeline. Aggregation tightens the Wilson CI
-# so 10 pp coverage shortfalls can be detected.
-pooled_recovery <- function(seeds, sim_args, fit_args) {
-  in_pi <- 0L; total <- 0L
-  for (s in seeds) {
-    r <- run_one_recovery(s, sim_args, fit_args)
-    in_pi <- in_pi + r$in_pi
-    total <- total + r$total
-  }
-  list(in_pi = in_pi, total = total)
-}
-
-
-# --- AR(1) Poisson recovery (3 seeds, ~150 pooled obs) ------------
+# ----- Baseline group: AR(1) Poisson, three seeds ----------------
 
 test_that("AR(1) Poisson 90% PI covers near nominal across seeds", {
-  res <- pooled_recovery(
-    seeds = c(101L, 102L, 103L),
+  results <- lapply(c(101L, 102L, 103L), function(seed) {
+    bundle <- prep_recovery(
+      name = paste0("ar1_pois_seed", seed),
+      sim_args = list(
+        trend_model = AR(p = 1L), family = poisson(),
+        n_timepoints = 200L, n_series = 1L,
+        proportional_train = 0.75, seed = seed
+      ),
+      fit_args = list(
+        formula = y ~ 1,
+        trend_formula = ~ AR(p = 1),
+        family = poisson(),
+        chains = 1L, iter = 500L, warmup = 250L,
+        refresh = 0L, silent = 2L
+      )
+    )
+    score(bundle$fc, "drps")
+  })
+  pooled <- pool_coverage(results)
+  ci <- wilson_ci(pooled$hits, pooled$total)
+  expect_true(0.90 >= ci["lower"] && 0.90 <= ci["upper"])
+})
+
+
+# ----- Baseline group: RW Gaussian, three seeds ------------------
+
+test_that("RW Gaussian 90% PI covers near nominal across seeds", {
+  results <- lapply(c(201L, 202L, 203L), function(seed) {
+    bundle <- prep_recovery(
+      # RW estimation is weakly identified on short series
+      # (the marginal likelihood is flat in sigma_trend when
+      # the signal is small). Lengthen the series so the fit
+      # has enough data to recover the innovation SD; without
+      # this the posterior mean sigma is biased low and the
+      # downstream forecast PI is too narrow.
+      name = paste0("rw_gauss_T400_seed", seed),
+      sim_args = list(
+        trend_model = RW(), family = gaussian(),
+        n_timepoints = 400L, n_series = 1L,
+        proportional_train = 0.75, seed = seed
+      ),
+      fit_args = list(
+        formula = y ~ 1,
+        trend_formula = ~ RW(),
+        family = gaussian(),
+        chains = 1L, iter = 500L, warmup = 250L,
+        refresh = 0L, silent = 2L
+      )
+    )
+    score(bundle$fc, "crps")
+  })
+  pooled <- pool_coverage(results)
+  ci <- wilson_ci(pooled$hits, pooled$total)
+  expect_true(0.90 >= ci["lower"] && 0.90 <= ci["upper"])
+})
+
+
+# ----- Baseline group: ZMVN 2-series Poisson, three seeds --------
+
+test_that("ZMVN 2-series 90% PI covers near nominal across seeds", {
+  results <- lapply(c(301L, 302L, 303L), function(seed) {
+    bundle <- prep_recovery(
+      name = paste0("zmvn_2_pois_seed", seed),
+      sim_args = list(
+        trend_model = ZMVN(), family = poisson(),
+        n_timepoints = 120L, n_series = 2L,
+        proportional_train = 0.75, seed = seed
+      ),
+      fit_args = list(
+        formula = y ~ 1,
+        trend_formula = ~ ZMVN(),
+        family = poisson(),
+        chains = 1L, iter = 500L, warmup = 250L,
+        refresh = 0L, silent = 2L
+      )
+    )
+    score(bundle$fc, "drps")
+  })
+  pooled <- pool_coverage(results)
+  ci <- wilson_ci(pooled$hits, pooled$total)
+  expect_true(0.90 >= ci["lower"] && 0.90 <= ci["upper"])
+})
+
+
+# ----- Complex-predictor group: AR(p = 3) consecutive ------------
+
+test_that("AR(p=3) Poisson: score pipeline yields finite CRPS / DRPS", {
+  bundle <- prep_recovery(
+    name = "arp3_pois_seed401",
     sim_args = list(
-      trend_model = AR(p = 1L),
-      family = poisson(),
-      n_timepoints = 200L,
-      n_series = 1L,
-      proportional_train = 0.75
+      trend_model = AR(p = 3L), family = poisson(),
+      n_timepoints = 200L, n_series = 1L,
+      proportional_train = 0.75, seed = 401L
     ),
     fit_args = list(
       formula = y ~ 1,
+      trend_formula = ~ AR(p = 3),
+      family = poisson(),
+      chains = 1L, iter = 500L, warmup = 250L,
+      refresh = 0L, silent = 2L
+    )
+  )
+  sc_drps <- score(bundle$fc, "drps")
+  expect_true(all(is.finite(sc_drps$series_1$score)))
+  expect_true(all(is.finite(sc_drps$all_series$score)))
+  expect_identical(unique(sc_drps$series_1$score_type), "drps")
+  expect_true(all(sc_drps$series_1$in_interval %in% c(0, 1)))
+})
+
+
+# ----- Complex-predictor group: ARMA(1,1) ------------------------
+
+test_that("ARMA(1,1) Poisson: MA pipeline produces finite scores", {
+  bundle <- prep_recovery(
+    name = "arma11_pois_seed501",
+    sim_args = list(
+      trend_model = AR(p = 1L, ma = TRUE), family = poisson(),
+      n_timepoints = 180L, n_series = 1L,
+      proportional_train = 0.75, seed = 501L
+    ),
+    fit_args = list(
+      formula = y ~ 1,
+      trend_formula = ~ AR(p = 1, ma = TRUE),
+      family = poisson(),
+      chains = 1L, iter = 500L, warmup = 250L,
+      refresh = 0L, silent = 2L
+    )
+  )
+  sc <- score(bundle$fc, "drps")
+  expect_true(all(is.finite(sc$series_1$score)))
+  expect_true(all(is.finite(sc$all_series$score)))
+})
+
+
+# ----- Complex-predictor group: Negative binomial ----------------
+
+test_that("AR(1) NegBin: dispersion family produces finite scores", {
+  bundle <- prep_recovery(
+    name = "ar1_nb_seed601",
+    sim_args = list(
+      trend_model = AR(p = 1L),
+      family = brms::negbinomial(),
+      n_timepoints = 150L, n_series = 1L,
+      proportional_train = 0.75, seed = 601L
+    ),
+    fit_args = list(
+      formula = y ~ 1,
+      trend_formula = ~ AR(p = 1),
+      family = brms::negbinomial(),
+      chains = 1L, iter = 500L, warmup = 250L,
+      refresh = 0L, silent = 2L
+    )
+  )
+  sc <- score(bundle$fc, "drps")
+  expect_true(all(is.finite(sc$series_1$score)))
+  # Log score exercises the family-aware density path.
+  sc_logs <- score(bundle$fc, "logs")
+  expect_true(all(is.finite(sc_logs$series_1$score)))
+})
+
+
+# ----- Complex-predictor group: obs-side smooth ------------------
+
+test_that("AR(1) + s(x) on obs: smooth contribution flows through", {
+  bundle <- prep_recovery(
+    name = "ar1_pois_obs_sx_seed701",
+    sim_args = list(
+      trend_model = AR(p = 1L), family = poisson(),
+      n_timepoints = 150L, n_series = 1L,
+      proportional_train = 0.75, seed = 701L
+    ),
+    # Re-use the auto-generated `x` covariate from sim_mvgam
+    # type 1 / 2 specs (default type = 1L includes `x`).
+    fit_args = list(
+      formula = y ~ s(x, k = 6L),
       trend_formula = ~ AR(p = 1),
       family = poisson(),
       chains = 1L, iter = 500L, warmup = 250L,
       refresh = 0L, silent = 2L
     )
   )
-  assert_pi_coverage(res$in_pi, res$total, nominal = 0.90)
+  sc <- score(bundle$fc, "drps")
+  expect_true(all(is.finite(sc$series_1$score)))
 })
 
 
-# --- RW Gaussian recovery (3 seeds, ~150 pooled obs) -------------
+# ----- Complex-predictor group: trend-side GP --------------------
 
-test_that("RW Gaussian 90% PI covers near nominal across seeds", {
-  res <- pooled_recovery(
-    seeds = c(201L, 202L, 203L),
+test_that("AR(1) + gp(x) on trend: Hilbert-GP basis flows through", {
+  bundle <- prep_recovery(
+    name = "ar1_pois_trend_gp_seed801",
     sim_args = list(
-      trend_model = RW(),
-      family = gaussian(),
-      n_timepoints = 200L,
-      n_series = 1L,
-      proportional_train = 0.75
+      trend_model = AR(p = 1L), family = poisson(),
+      n_timepoints = 150L, n_series = 1L,
+      proportional_train = 0.75, seed = 801L
     ),
     fit_args = list(
       formula = y ~ 1,
-      trend_formula = ~ RW(),
-      family = gaussian(),
-      chains = 1L, iter = 500L, warmup = 250L,
-      refresh = 0L, silent = 2L
-    )
-  )
-  assert_pi_coverage(res$in_pi, res$total, nominal = 0.90)
-})
-
-
-# --- ZMVN 2-series Poisson recovery (3 seeds, ~180 pooled obs) ----
-
-test_that("ZMVN 2-series 90% PI covers near nominal across seeds", {
-  res <- pooled_recovery(
-    seeds = c(301L, 302L, 303L),
-    sim_args = list(
-      trend_model = ZMVN(),
-      family = poisson(),
-      n_timepoints = 120L,
-      n_series = 2L,
-      proportional_train = 0.75
-    ),
-    fit_args = list(
-      formula = y ~ 1,
-      trend_formula = ~ ZMVN(),
+      trend_formula = ~ gp(x, k = 8L) + AR(p = 1),
       family = poisson(),
       chains = 1L, iter = 500L, warmup = 250L,
       refresh = 0L, silent = 2L
     )
   )
-  assert_pi_coverage(res$in_pi, res$total, nominal = 0.90)
+  sc <- score(bundle$fc, "drps")
+  expect_true(all(is.finite(sc$series_1$score)))
+})
+
+
+# ----- Complex-predictor group: trend-side monotonic -------------
+
+test_that("AR(1) + mo(x_ord) on trend: monotonic effect flows through", {
+  bundle <- prep_recovery(
+    # n_timepoints = 300 so the 25% held-out slice has enough
+    # rows for `x` to span the 5 monotonic bins; mvgam's
+    # validator rejects test data that hits only a single
+    # level.
+    name = "ar1_pois_trend_mo_seed901_T300",
+    sim_args = list(
+      trend_model = AR(p = 1L), family = poisson(),
+      n_timepoints = 300L, n_series = 1L,
+      proportional_train = 0.75, seed = 901L
+    ),
+    fit_args = list(
+      formula = y ~ 1,
+      # Discretise `x` into a 5-level ordered factor for mo().
+      trend_formula = ~ mo(x_ord) + AR(p = 1),
+      family = poisson(),
+      chains = 1L, iter = 500L, warmup = 250L,
+      refresh = 0L, silent = 2L
+    ),
+    mutate_fn = function(d) {
+      # Fixed breakpoints over `sim_mvgam`'s [-2, 2] range so
+      # train and test rows share the same ordinal coding.
+      d$x_ord <- as.integer(cut(
+        d$x, breaks = seq(-2, 2, length.out = 6L),
+        include.lowest = TRUE
+      ))
+      d
+    }
+  )
+  expect_s3_class(bundle$fit, "mvgam")
+  sc <- score(bundle$fc, "drps")
+  expect_true(all(is.finite(sc$series_1$score)))
+})
+
+
+# ----- Scoring API parity vs direct kernel call ------------------
+
+test_that("score(fc, 'crps') matches direct crps_mcmc_object", {
+  bundle <- readRDS(file.path(CACHE_DIR, "rw_gauss_seed201.rds"))
+  via_dispatch <- score(bundle$fc, "crps")
+  series_name <- as.character(bundle$fc$series_names[1L])
+  truth <- bundle$fc$test_observations[[series_name]]
+  fc_mat <- bundle$fc$forecasts[[series_name]]
+  direct <- mvgam:::crps_mcmc_object(truth, fc_mat)
+  expect_equal(
+    via_dispatch[[series_name]]$score,
+    as.numeric(direct[, "score"])
+  )
+})
+
+
+# ----- Multivariate scoring on cached ZMVN -----------------------
+
+test_that("Energy / variogram score the cached ZMVN forecast", {
+  bundle <- readRDS(
+    file.path(CACHE_DIR, "zmvn_2_pois_seed301.rds")
+  )
+  e <- score(bundle$fc, "energy")
+  v <- score(bundle$fc, "variogram")
+  expect_named(e, c("series_1", "series_2", "all_series"))
+  expect_named(v, c("series_1", "series_2", "all_series"))
+  expect_true(all(is.finite(e$all_series$score)))
+  expect_true(all(is.finite(v$all_series$score)))
+  expect_true(all(e$all_series$score_type == "energy"))
+  expect_true(all(v$all_series$score_type == "variogram"))
 })

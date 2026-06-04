@@ -15,6 +15,7 @@ claude.exe
 tasks/prep_structure_output.txt
 tests/local/fixtures/*.rds
 tests/local/fixtures/brms_gp/
+tests/local/fixtures/forecast_recovery/
 Rplots.pdf
 src/*.so
 src/*.o
