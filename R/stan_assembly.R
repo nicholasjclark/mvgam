@@ -4510,7 +4510,7 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # 1. PARAMETERS block - CAR trend-specific parameters
   car_parameters_stanvar <- brms::stanvar(
     name = "car_parameters",
-    scode = "// CAR AR1 parameters\nvector<lower=-1,upper=1>[N_lv_trend] ar1_trend;",
+    scode = "// CAR AR1 damping.\nvector<lower=0.001,upper=0.999>[N_lv_trend] ar1_trend;",
     block = "parameters"
   )
   components <- append(components, list(car_parameters_stanvar))

@@ -1529,7 +1529,7 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
 
     # CAR trend parameters
     expect_false(stan_pattern("real Intercept_trend;", code_with_trend))
-    expect_true(stan_pattern("vector<lower=-1,upper=1>\\[N_lv_trend\\] ar1_trend;", code_with_trend))
+    expect_true(stan_pattern("vector<lower=0.001,upper=0.999>\\[N_lv_trend\\] ar1_trend;", code_with_trend))
     expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;",
                       code_with_trend))
     expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] innovations_trend;",
