@@ -358,42 +358,31 @@ arma::mat pw_trendC(
       // changepoint. The sum-of-prior-gammas term is
       // accumulated as we go.
       //
-      // Two guards are non-negotiable for the logistic form
-      // to stay well-defined:
-      //   1. k_cum[i+1] must be non-zero (we divide by it).
-      //      Exact equality would miss near-zero draws that
-      //      blow gamma up; use an absolute tolerance.
-      //   2. k_cum[i] and k_cum[i+1] must share sign. When
-      //      cumulative growth crosses zero, the ratio
-      //      k_cum[i] / k_cum[i+1] becomes negative and the
-      //      continuity correction `1 - ratio` exceeds 1 with
-      //      the wrong sign, producing a gamma that breaks
-      //      continuity instead of preserving it. Posterior
-      //      draws of (k, delta) can hit this regime; abort
-      //      so the caller can filter or down-weight the
-      //      degenerate draw rather than silently use it.
+      // The continuity correction degenerates when:
+      //   * k_cum[i+1] is near zero (we divide by it), or
+      //   * k_cum[i] and k_cum[i+1] differ in sign (the
+      //     ratio is negative and the "1 - ratio" term over-
+      //     corrects).
+      //
+      // Prophet does not guard against either case; it just
+      // accepts the resulting discontinuity. We skip the
+      // correction (gamma_i = 0) in both degenerate regimes
+      // so the trend stays finite, matching the practical
+      // behavior in Taylor & Letham (2018).
       const double k_eps = 1e-10;
       arma::vec gamma_s(n_change, arma::fill::zeros);
       double sum_gamma = 0.0;
       for (int i = 0; i < n_change; ++i) {
         const double k_curr = k_cum.at(i);
         const double k_next = k_cum.at(i + 1);
-        if (std::abs(k_next) < k_eps) {
-          Rcpp::stop(
-            "pw_trendC: cumulative growth near zero at a "
-            "changepoint; logistic gamma is ill-defined."
-          );
+        if (std::abs(k_next) < k_eps ||
+            k_curr * k_next < 0.0) {
+          gamma_s.at(i) = 0.0;
+        } else {
+          gamma_s.at(i) =
+            (t_change.at(i) - m.at(s) - sum_gamma) *
+            (1.0 - k_curr / k_next);
         }
-        if (k_curr * k_next < 0.0) {
-          Rcpp::stop(
-            "pw_trendC: cumulative growth changes sign at a "
-            "changepoint; logistic continuity correction is "
-            "undefined."
-          );
-        }
-        gamma_s.at(i) =
-          (t_change.at(i) - m.at(s) - sum_gamma) *
-          (1.0 - k_curr / k_next);
         sum_gamma += gamma_s.at(i);
       }
 
