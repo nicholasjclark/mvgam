@@ -172,6 +172,15 @@ sim_mvgam <- function(type = 1L,
     n_series = n_series, n_timepoints = n_timepoints,
     prop_trend = prop_trend
   )
+  # Fill in trend-model-specific param defaults that the
+  # generic per-type spec functions don't know about (VAR's
+  # transition matrix A and innovation covariance Sigma;
+  # cor = TRUE's off-diagonal Sigma). Keeps the per-type
+  # spec functions trend-agnostic while letting users pass
+  # arbitrary trend constructors via `trend_model = ...`.
+  trend_args$params <- fill_multivariate_trend_defaults(
+    trend_model, trend_args$params, n_series
+  )
   nonstat <- is_nonstationary_trend(trend_model)
   if (nonstat) {
     # Pick sigma_innov so the empirical SD of the centred RW
@@ -493,14 +502,15 @@ spec_type_6 <- function() {
     build_data = function(n_timepoints, n_series, series_fac,
                            time_int) {
       total_n <- n_timepoints * n_series
-      # Build irregular continuous time per series: cumulative
-      # uniform-(1, 6) gaps from t = 0.
-      time_long <- numeric(total_n)
-      for (s in seq_len(n_series)) {
-        idx <- ((s - 1L) * n_timepoints + 1L):(s * n_timepoints)
-        gaps <- c(0, stats::runif(n_timepoints - 1L, 1, 6))
-        time_long[idx] <- cumsum(gaps)
-      }
+      # Build irregular continuous time grid: cumulative
+      # uniform-(1, 6) gaps from t = 0. All series share the
+      # SAME gap sequence so forecast.mvgam's CAR helper
+      # (which requires a single length-h time vector across
+      # series) can consume the simulated test data without
+      # tripping the per-series gap-mismatch guard.
+      shared_gaps <- c(0, stats::runif(n_timepoints - 1L, 1, 6))
+      shared_times <- cumsum(shared_gaps)
+      time_long <- rep(shared_times, n_series)
       season <- ((time_long %% 12) + 1)
       sm_season <- sim_smooth(season, k = 6L, bs = "cc",
                                 scale = 0.5)
@@ -596,6 +606,91 @@ is_nonstationary_trend <- function(trend_model) {
   }
   if (is.null(t)) return(FALSE)
   identical(t, "RW") || identical(t, "PW")
+}
+
+
+# Internal: trend-model-specific param defaults. Each per-type
+# spec returns AR-style defaults (`sigma`, optionally `ar`),
+# which suffice for univariate RW / AR / CAR / ZMVN. VAR
+# needs an `A` cube of cross-series transition coefficients,
+# and any cor = TRUE trend needs an off-diagonal `Sigma` to
+# generate truly correlated draws. Fill those in here when
+# the supplied `trend_model` requires them and the per-type
+# spec didn't set them. Lets users sim with arbitrary trend
+# constructors via `trend_model = VAR(p = 1)` etc.
+#
+# Defaults:
+#   * VAR A: diagonal `phi_diag = 0.5`, off-diagonal
+#     `phi_off = 0.30`. Stable (spectral radius 0.5 + 0.30 *
+#     (n_series - 1) < 1 for n_series <= 2; larger n_series
+#     reduces phi_off proportionally below). Off-diagonal is
+#     large enough that the multivariate energy / variogram
+#     scores can reliably discriminate VAR vs independent-AR
+#     in misspecification tests.
+#   * cor=TRUE Sigma: correlation `rho = 0.5` across all
+#     series pairs (so the test discrimination has signal
+#     without driving the predictive too far off the marginal)
+#'@noRd
+fill_multivariate_trend_defaults <- function(trend_model,
+                                                params, n_series) {
+  if (is.null(trend_model) || is.character(trend_model)) {
+    return(params)
+  }
+  trend_type <- trend_model$trend
+  if (is.null(trend_type)) return(params)
+  cor_trend <- isTRUE(trend_model$cor)
+
+  # VAR transition matrix.
+  if (identical(trend_type, "VAR") && is.null(params$A)) {
+    n_lags <- 1L
+    if (!is.null(trend_model$p)) {
+      n_lags <- length(seq_len(trend_model$p))
+    }
+    # Default A populates lag-1 only; higher lags stay zero.
+    # Warn when the user requested p > 1 but didn't supply A,
+    # since the simulated data will reflect VAR(1) dynamics
+    # with a higher-lag label and any VAR(p > 1) fit will
+    # estimate near-zero coefficients at lags >= 2.
+    if (n_lags > 1L &&
+        !identical(Sys.getenv("TESTTHAT"), "true")) {
+      rlang::warn(
+        paste0(
+          "VAR(p > 1) default A populates lag 1 only; ",
+          "higher lags are zero. Supply 'params$A' to ",
+          "sim_mvgam() for genuine VAR(p > 1) dynamics."
+        ),
+        .frequency = "once",
+        .frequency_id = "mvgam_sim_var_default_p_gt_1"
+      )
+    }
+    # Scale off-diagonal by n_series - 1 so the row sums stay
+    # below 1 (a sufficient condition for stability) regardless
+    # of n_series.
+    off_diag <- 0.30 / max(1L, n_series - 1L)
+    A_cube <- array(0, dim = c(n_series, n_series, n_lags))
+    A_cube[, , 1L] <- 0.5 * diag(n_series) +
+      off_diag * (1 - diag(n_series))
+    params$A <- A_cube
+  }
+
+  # cor = TRUE (or VAR which is always correlated):
+  # cross-correlated Sigma.
+  needs_sigma <- (identical(trend_type, "VAR") ||
+                    cor_trend ||
+                    identical(trend_type, "ZMVN")) &&
+    is.null(params$Sigma)
+  if (needs_sigma && !is.null(params$sigma)) {
+    sigma_vec <- as.numeric(params$sigma)
+    if (length(sigma_vec) == 1L) {
+      sigma_vec <- rep(sigma_vec, n_series)
+    }
+    rho <- 0.5
+    cor_mat <- rho * matrix(1, n_series, n_series) +
+      (1 - rho) * diag(n_series)
+    params$Sigma <- diag(sigma_vec) %*% cor_mat %*%
+      diag(sigma_vec)
+  }
+  params
 }
 
 
