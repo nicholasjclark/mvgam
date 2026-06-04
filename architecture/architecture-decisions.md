@@ -348,6 +348,27 @@ ZMVN()            # trend = 'ZMVN'
 # Base type used for ALL dispatch throughout system
 ```
 
+**Lag semantics for AR and VAR**:
+- **AR scalar `p = k`** expands to consecutive lags `1:k`
+  (textbook AR(k)). The Stan generator declares
+  `ar1_trend, ar2_trend, ..., ark_trend` and the recurrence
+  sums all of them. Resolved by the shared helper
+  `resolve_active_lags()` in `R/trend_propagation.R`.
+- **AR vector `p = c(...)`** selects a sparse lag set. For
+  `p = c(1, 12)` only `ar1_trend` and `ar12_trend` are
+  declared (seasonal AR with no intermediate lags). For
+  `p = c(2, 4)` only `ar2_trend` and `ar4_trend` are declared.
+- **VAR scalar `p = k`** expands to consecutive lags `1:k`
+  (textbook VAR(k)). Coefficient matrices `A_trend[1..k]`
+  follow the Heaps-2022 stationary parameterisation.
+- **VAR vector `p = c(...)`** is currently rejected at the
+  constructor with an informative error. The Heaps-2022
+  stationary joint-distribution initialisation assumes a
+  consecutive companion-form structure; the sparse-companion
+  stationary covariance is a separate piece of work. Users
+  needing sparse-lag autoregression on a single series should
+  reach for `AR(p = c(...))`.
+
 ### 4. Attribute-Based Variable System Architecture
 
 **Design Decision**: Use attribute-based time and series variable storage for universal (time, series) grouping without data contamination.

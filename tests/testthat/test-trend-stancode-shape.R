@@ -108,15 +108,18 @@ test_that("VAR(p = 2) declares array[2] A_raw_trend", {
 })
 
 
-# ----- VAR sparse-lag p (intended: ONLY listed lags) -------------
+# ----- VAR sparse-lag p (currently rejected) --------------------
 
-test_that("VAR(p = c(2, 4)) accepts vector p and uses sparse lags", {
-  code <- get_trend_stancode(~ VAR(p = c(2, 4)))
-  # Two A matrices: one for lag 2, one for lag 4.
-  expect_true(stan_has(
-    code, "array[2] matrix[N_lv_trend, N_lv_trend] A_raw_trend"
-  ))
-  # Active lag values reach Stan as a data array so the
-  # dynamics can index `lv_trend[i - active_lags_trend[k], :]`.
-  expect_true(stan_has(code, "active_lags_trend"))
+test_that("VAR(p = c(2, 4)) errors with an informative message", {
+  # Sparse-lag VAR is not yet supported: the Heaps-2022
+  # stationary joint-distribution initialisation assumes a
+  # consecutive companion-form structure, and deriving the
+  # sparse-companion stationary covariance is a separate piece
+  # of work. The constructor rejects vector 'p' with a clear
+  # message that points users at AR(p = c(...)) for the
+  # univariate sparse-lag case.
+  expect_error(
+    VAR(p = c(2, 4)),
+    "Sparse-lag VAR"
+  )
 })

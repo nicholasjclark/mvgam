@@ -113,11 +113,31 @@ for the data using:
 
 \code{series = interaction(group, subgroup, drop = TRUE)}}
 
-\item{p}{For \code{AR()} models: A positive integer or vector of positive integers
-specifying the autoregressive lag(s). Can be a single value like \code{p = 1}
-for AR(1), or a vector like \code{p = c(1, 12, 24)} for seasonal models with
-multiple lags. For \code{VAR()} models: A positive integer specifying the VAR order.
-For \code{CAR()} models: Must be \code{1} (continuous time AR(1) process).}
+\item{p}{Specification of the autoregressive lag set. The
+semantics differ slightly across trend types:
+\itemize{
+\item For \code{AR()} models: a positive integer or a positive
+integer vector. A scalar \code{p = k} is the textbook
+AR(k) interpretation and is expanded to consecutive
+lags \code{1:k}, so the fit estimates \code{ar1_trend},
+\code{ar2_trend}, ..., \code{ark_trend}. A vector
+\code{p = c(...)} selects a sparse lag set:
+\code{p = c(1, 12)} declares only \code{ar1_trend} and
+\code{ar12_trend} (seasonal AR with no intermediate
+lags), and \code{p = c(2, 4)} declares only
+\code{ar2_trend} and \code{ar4_trend} (no \code{ar1}
+or \code{ar3}).
+\item For \code{VAR()} models: a positive integer. A scalar
+\code{p = k} is the VAR(k) interpretation with
+consecutive coefficient matrices for lags \code{1:k}.
+Sparse-lag vector \code{p} is rejected because the
+Heaps-2022 stationary joint-distribution initialisation
+assumes consecutive companion-form structure. Use
+\code{AR(p = c(...))} for sparse-lag autoregression on
+a single series.
+\item For \code{CAR()} models: must be \code{1} (continuous-time
+AR(1) process).
+}}
 }
 \value{
 An object of class \code{mvgam_trend}, which contains a list of

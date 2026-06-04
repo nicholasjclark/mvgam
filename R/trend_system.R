@@ -2020,11 +2020,29 @@ print.mvgam_trend <- function(x, ...) {
 #'   Note: For \code{VAR()} models, correlation is always enabled (\code{cor = TRUE})
 #'   as this is essential for optimal performance.
 #'
-#' @param p For `AR()` models: A positive integer or vector of positive integers
-#'   specifying the autoregressive lag(s). Can be a single value like \code{p = 1}
-#'   for AR(1), or a vector like \code{p = c(1, 12, 24)} for seasonal models with
-#'   multiple lags. For `VAR()` models: A positive integer specifying the VAR order.
-#'   For `CAR()` models: Must be \code{1} (continuous time AR(1) process).
+#' @param p Specification of the autoregressive lag set. The
+#'   semantics differ slightly across trend types:
+#'   * For `AR()` models: a positive integer or a positive
+#'     integer vector. A scalar \code{p = k} is the textbook
+#'     AR(k) interpretation and is expanded to consecutive
+#'     lags \code{1:k}, so the fit estimates \code{ar1_trend},
+#'     \code{ar2_trend}, ..., \code{ark_trend}. A vector
+#'     \code{p = c(...)} selects a sparse lag set:
+#'     \code{p = c(1, 12)} declares only \code{ar1_trend} and
+#'     \code{ar12_trend} (seasonal AR with no intermediate
+#'     lags), and \code{p = c(2, 4)} declares only
+#'     \code{ar2_trend} and \code{ar4_trend} (no \code{ar1}
+#'     or \code{ar3}).
+#'   * For `VAR()` models: a positive integer. A scalar
+#'     \code{p = k} is the VAR(k) interpretation with
+#'     consecutive coefficient matrices for lags \code{1:k}.
+#'     Sparse-lag vector \code{p} is rejected because the
+#'     Heaps-2022 stationary joint-distribution initialisation
+#'     assumes consecutive companion-form structure. Use
+#'     \code{AR(p = c(...))} for sparse-lag autoregression on
+#'     a single series.
+#'   * For `CAR()` models: must be \code{1} (continuous-time
+#'     AR(1) process).
 #'
 #' @param time The unquoted name of the variable that represents time in the
 #'   supplied `data`. This variable should be either a `numeric` or `integer`
@@ -2492,15 +2510,31 @@ CAR = function(time = NA, series = NA) {
 #' @export
 VAR = function(time = NA, series = NA, p = 1, ma = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
   # Validate VAR order parameter. Scalar p (e.g. p = 2) is the
-  # standard interpretation: include AR coefficient matrices for
-  # consecutive lags 1..p. Vector p (e.g. p = c(2, 4)) selects a
-  # sparse lag set: only those lag indices get a coefficient
-  # matrix. Mirrors the AR() constructor contract.
-  if (length(p) == 1) {
-    checkmate::assert_int(p, lower = 1)
-  } else {
-    checkmate::assert_integerish(p, lower = 1, unique = TRUE, sorted = TRUE)
+  # standard interpretation: include AR coefficient matrices
+  # for consecutive lags 1..p. Sparse-lag vector p (e.g.
+  # p = c(2, 4)) is not yet supported because the Heaps-2022
+  # stationary joint-distribution initialisation that VAR uses
+  # assumes consecutive companion-form structure; deriving the
+  # sparse companion stationary covariance is a separate piece
+  # of work. Use AR(p = c(...)) for sparse-lag autoregression
+  # on a single series in the meantime.
+  if (length(p) != 1L) {
+    stop(insight::format_error(c(
+      paste0(
+        "Sparse-lag VAR (vector 'p') is not yet supported."
+      ),
+      x = paste0(
+        "Got 'p' of length ", length(p), ": ",
+        paste(p, collapse = ", "), "."
+      ),
+      i = paste0(
+        "Pass a scalar 'p' (e.g. p = 2) for consecutive lags ",
+        "1..p, or use AR(p = c(...)) for sparse-lag ",
+        "autoregression on a single series."
+      )
+    )))
   }
+  checkmate::assert_int(p, lower = 1)
 
   # Basic input validation
   checkmate::assert_logical(ma, len = 1)
