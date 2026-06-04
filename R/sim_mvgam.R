@@ -150,15 +150,33 @@ sim_mvgam <- function(type = 1L,
     series_fac = series_fac, time_int = time_int
   )
 
-  # Trend propagation. Raw trend uses sigma = 1; we rescale it
-  # below so the EMPIRICAL trend SD is the requested prop_trend
-  # share of total link-scale variance, regardless of whether
-  # the trend is stationary (AR/VAR/CAR) or non-stationary (RW
-  # with growing variance over time).
+  # Bound total link-scale variance per family to keep response-
+  # scale values in a recoverable range (e.g. exp(eta) shouldn't
+  # span 10 orders of magnitude for Poisson; logit(eta) shouldn't
+  # saturate to 0/1 for Binomial).
+  total_link_sd <- link_scale_budget(fam_name)
+  target_trend_sd <- total_link_sd * sqrt(prop_trend)
+  target_obs_sd <- total_link_sd * sqrt(1 - prop_trend)
+
+  # Trend propagation. Stationary processes (AR / VAR / CAR /
+  # ZMVN) use `sigma = trend_sigma(prop_trend)` and are
+  # rescaled post-propagation so the empirical SD matches the
+  # target. Non-stationary processes (RW) have variance that
+  # grows linearly with time; rescaling to a fixed empirical SD
+  # would destroy that growth and produce a stationary-looking
+  # trajectory. Instead we choose `sigma_innov` upfront so the
+  # accumulated variance at the final timepoint lands near
+  # `target_trend_sd^2`, then skip the post-hoc rescale and let
+  # the natural RW shape through.
   trend_args <- spec$trend_params(
     n_series = n_series, n_timepoints = n_timepoints,
     prop_trend = prop_trend
   )
+  nonstat <- is_nonstationary_trend(trend_model)
+  if (nonstat) {
+    trend_args$params$sigma <-
+      target_trend_sd / sqrt(n_timepoints)
+  }
   trend_mat <- propagate_trend(
     trend_model = trend_model,
     params = trend_args$params,
@@ -167,31 +185,26 @@ sim_mvgam <- function(type = 1L,
     time = trend_args$time
   )
 
-  # Bound total link-scale variance per family to keep response-
-  # scale values in a recoverable range (e.g. exp(eta) shouldn't
-  # span 10 orders of magnitude for Poisson; logit(eta) shouldn't
-  # saturate to 0/1 for Binomial). Apply matched rescales to the
-  # trend matrix AND the obs-side contribution so the recorded
-  # `true_smooths` track the post-rescale generative scale.
-  total_link_sd <- link_scale_budget(fam_name)
-  target_trend_sd <- total_link_sd * sqrt(prop_trend)
-  target_obs_sd <- total_link_sd * sqrt(1 - prop_trend)
-
-  # Center the trend and obs contributions on zero before scaling
-  # so the mean of eta is the intercept (not intercept + drift of
-  # whatever the smooth / trend realisation happened to deposit).
-  # Without this, log-link families anchor at exp(intercept +
-  # drift) and logit families saturate.
+  # Centre the trend and obs contributions on zero before
+  # combining so the mean of eta is the intercept (not
+  # intercept + drift of whatever the smooth / trend realisation
+  # happened to deposit). Without this, log-link families
+  # anchor at exp(intercept + drift) and logit families
+  # saturate.
   trend_vec <- as.numeric(trend_mat) - mean(as.numeric(trend_mat))
   trend_mat <- matrix(
     trend_vec, nrow = nrow(trend_mat), ncol = ncol(trend_mat)
   )
   obs_centered <- built$obs_contrib - mean(built$obs_contrib)
 
-  trend_scale <- sd_rescale_factor(trend_vec, target_trend_sd)
+  # Rescale stationary trends to the target empirical SD. Skip
+  # for non-stationary trends -- sigma_innov was chosen upfront
+  # to match the target.
+  if (!nonstat) {
+    trend_scale <- sd_rescale_factor(trend_vec, target_trend_sd)
+    trend_mat <- trend_mat * trend_scale
+  }
   obs_scale <- sd_rescale_factor(obs_centered, target_obs_sd)
-
-  trend_mat <- trend_mat * trend_scale
   obs_contrib <- obs_centered * obs_scale
   # Apply the obs scale to every recorded ground-truth smooth so
   # the stored truth tracks the same amplitude the data was
@@ -544,11 +557,37 @@ intercept_for_family <- function(fam_name) {
 # `prop_trend` of the link-scale variance becomes the trend's
 # variance share. Kept as a thin wrapper so type specs can pass a
 # sensible scalar to propagate_trend's params; the empirical
-# trend SD is rescaled post hoc inside `sim_mvgam`.
+# trend SD is rescaled post hoc inside `sim_mvgam` for
+# stationary trends. Non-stationary trends (RW) override
+# `sigma` upfront in the main flow rather than going through
+# this helper.
 #'@noRd
 trend_sigma <- function(prop_trend) {
   prop_trend <- max(min(prop_trend, 0.99), 0.01)
   sqrt(prop_trend / (1 - prop_trend))
+}
+
+
+# Internal: TRUE when the trend kernel produces an integrated
+# (non-stationary) trajectory whose variance grows with time.
+# Post-propagation SD-rescaling is skipped for these trends to
+# preserve the linearly-growing variance that defines the
+# process; sim_mvgam picks `sigma_innov` upfront instead.
+#
+# RW is the only non-stationary kernel on this branch. PW joins
+# the list once the piecewise-linear / -logistic kernel lands.
+#'@noRd
+is_nonstationary_trend <- function(trend_model) {
+  if (is.null(trend_model)) return(FALSE)
+  # `trend_model` may be a character ("None", "RW", "PW") or an
+  # `mvgam_trend` constructor output with a `trend` slot.
+  t <- if (is.character(trend_model)) {
+    trend_model
+  } else {
+    trend_model$trend
+  }
+  if (is.null(t)) return(FALSE)
+  identical(t, "RW") || identical(t, "PW")
 }
 
 
