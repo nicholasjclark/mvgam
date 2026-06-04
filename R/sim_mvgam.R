@@ -174,8 +174,16 @@ sim_mvgam <- function(type = 1L,
   )
   nonstat <- is_nonstationary_trend(trend_model)
   if (nonstat) {
+    # Pick sigma_innov so the empirical SD of the centred RW
+    # over t = 1..T matches `target_trend_sd`. The variance of
+    # the centred RW at t averages sigma^2 * T/6 across t, so
+    # solving sigma^2 * T/6 = target_trend_sd^2 gives the
+    # scaling factor sqrt(6/T). This preserves the linearly
+    # growing variance of the unscaled RW while keeping the
+    # documented `prop_trend` meaning ("the share of total
+    # link-scale variance contributed by the latent trend").
     trend_args$params$sigma <-
-      target_trend_sd / sqrt(n_timepoints)
+      target_trend_sd * sqrt(6 / n_timepoints)
   }
   trend_mat <- propagate_trend(
     trend_model = trend_model,
