@@ -2491,8 +2491,16 @@ CAR = function(time = NA, series = NA) {
 #' @rdname trend_constructors
 #' @export
 VAR = function(time = NA, series = NA, p = 1, ma = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
-  # Validate VAR order parameter
-  checkmate::assert_int(p, lower = 1)
+  # Validate VAR order parameter. Scalar p (e.g. p = 2) is the
+  # standard interpretation: include AR coefficient matrices for
+  # consecutive lags 1..p. Vector p (e.g. p = c(2, 4)) selects a
+  # sparse lag set: only those lag indices get a coefficient
+  # matrix. Mirrors the AR() constructor contract.
+  if (length(p) == 1) {
+    checkmate::assert_int(p, lower = 1)
+  } else {
+    checkmate::assert_integerish(p, lower = 1, unique = TRUE, sorted = TRUE)
+  }
 
   # Basic input validation
   checkmate::assert_logical(ma, len = 1)

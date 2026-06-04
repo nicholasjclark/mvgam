@@ -1,4 +1,4 @@
-# Unit tests for the F0 fit-time enrichment helper
+# Unit tests for the fit-time enrichment helper
 # `enrich_trend_metadata()` in `R/trend_propagation.R`. The
 # helper derives the kernel-relevant `ar_lags`, `ma_lags`,
 # `max_lag`, `has_cor`, `n_lv`, and `trend_type` fields from the

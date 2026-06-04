@@ -201,8 +201,7 @@ mvgam_single <- function(formula, trend_formula, data, backend,
 
   # Enrich trend_metadata with kernel-relevant extras (ar_lags,
   # ma_lags, max_lag, has_cor, n_lv, trend_type). Persisting these
-  # at fit time means the forecasting surface
-  # (extract_last_state, propagate_trend) doesn't have to
+  # at fit time means the forecasting surface doesn't have to
   # re-derive them on every per-draw call.
   enriched_trend_metadata <- enrich_trend_metadata(
     stan_components$trend_metadata,

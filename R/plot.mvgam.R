@@ -1,10 +1,10 @@
 #' Default plot method for `mvgam` objects (placeholder)
 #'
 #' Scaffold for the eventual `plot.mvgam` S3 method. The full
-#' implementation is pending the plot-overhaul batch that will
-#' ship native ggplot helpers for latent trends and forecasts,
-#' alongside the canonical wrappers around `pp_check.mvgam()`,
-#' `conditional_effects.mvgam()`, and `mcmc_plot.mvgam()`.
+#' implementation will ship native ggplot helpers for latent
+#' trends and forecasts, alongside canonical wrappers around
+#' `pp_check.mvgam()`, `conditional_effects.mvgam()`, and
+#' `mcmc_plot.mvgam()`.
 #'
 #' Until that lands, use the brms-style alternatives directly:
 #'
@@ -47,8 +47,7 @@ plot.mvgam <- function(x, ...) {
       "regex = TRUE)' in the meantime."
     ),
     i = paste0(
-      "A ggplot-native 'plot.mvgam' is on the plot-overhaul ",
-      "roadmap; see 'tasks/forecasting_roadmap.md'."
+      "A ggplot-native 'plot.mvgam' is pending."
     )
   )))
 }

@@ -3409,8 +3409,7 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   checkmate::assert_int(n_series, lower = 1)
   checkmate::assert_int(n_obs, lower = 1)
 
-  # Convert p parameter to ar_lags vector
-  ar_lags <- if (!is.null(trend_specs$ar_lags)) trend_specs$ar_lags else p
+  ar_lags <- resolve_active_lags(p, trend_specs$ar_lags)
   checkmate::assert_integerish(ar_lags, lower = 1, any.missing = FALSE)
 
   is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series

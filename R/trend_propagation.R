@@ -449,7 +449,7 @@ rmvn <- function(n, mu, Sigma) {
 
 
 # ----------------------------------------------------------------
-# F0 fit-time enrichment helpers
+# Fit-time trend metadata enrichment helpers
 # ----------------------------------------------------------------
 # These derive the kernel-relevant fields the forecasting surface
 # (extract_last_state, propagate_trend) needs at every per-draw
@@ -512,16 +512,34 @@ derive_ar_lags <- function(spec) {
     spec$trend,
     "RW" = 1L,
     "AR" = ,
-    "VAR" = {
-      p <- spec$p
-      if (is.null(p)) return(integer(0))
-      if (length(p) == 1L) seq_len(as.integer(p)) else as.integer(p)
-    },
+    "VAR" = resolve_active_lags(spec$p),
     "CAR" = 1L,
     "ZMVN" = integer(0),
     "PW" = integer(0),
     integer(0)
   )
+}
+
+
+# Internal: turn an AR or VAR `p` argument into the integer
+# vector of active lag indices. Used by both the trend metadata
+# enrichment (above) and the Stan generators (R/stan_assembly.R).
+#
+# Scalar `p` (e.g. `2`) expands to consecutive lags 1..p:
+# `c(1L, 2L)`. Vector `p` (e.g. `c(2, 4)`) is treated as the
+# sparse lag set: `c(2L, 4L)`. NULL or zero-length `p` returns
+# `integer(0)` (trend has no AR dynamics).
+#
+# An optional `override` argument lets the Stan generators pass
+# in a pre-parsed `trend_specs$ar_lags` when it has already been
+# resolved upstream; this keeps both callers using the same
+# resolution rule even when one of them caches the result.
+#'@noRd
+resolve_active_lags <- function(p, override = NULL) {
+  if (!is.null(override)) return(as.integer(override))
+  if (is.null(p) || length(p) == 0L) return(integer(0))
+  if (length(p) == 1L) return(seq_len(as.integer(p)))
+  as.integer(p)
 }
 
 

@@ -17,10 +17,10 @@ the alternatives above.
 }
 \description{
 Scaffold for the eventual \code{plot.mvgam} S3 method. The full
-implementation is pending the plot-overhaul batch that will
-ship native ggplot helpers for latent trends and forecasts,
-alongside the canonical wrappers around \code{pp_check.mvgam()},
-\code{conditional_effects.mvgam()}, and \code{mcmc_plot.mvgam()}.
+implementation will ship native ggplot helpers for latent
+trends and forecasts, alongside canonical wrappers around
+\code{pp_check.mvgam()}, \code{conditional_effects.mvgam()}, and
+\code{mcmc_plot.mvgam()}.
 }
 \details{
 Until that lands, use the brms-style alternatives directly:
