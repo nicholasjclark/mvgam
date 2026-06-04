@@ -873,20 +873,36 @@ validate_monotonic_indices <- function(xmo_data, xmo_name, k_levels, n_obs) {
   min_val <- min(Xmo)
   max_val <- max(Xmo)
 
-  if (min_val == 0 && max_val <= k_levels) {
-    # 0-based indexing in 0..D
+  # Disambiguate 0-based vs 1-based by the presence of a zero:
+  # data containing 0 must be 0-based; otherwise treat as
+  # 1-based and shift to 0-based for `.mo()`. The original
+  # validator additionally required `min_val == 0` or `1`
+  # exactly, which broke partial-data calls -- e.g.
+  # `forecast.mvgam`'s training-tail subset for `max_lag = 1`
+  # passes a single row whose `Xmo` is a single value in the
+  # interior of the valid range. Loosening to `min_val >= 0`
+  # / `min_val >= 1` keeps the original semantics for full
+  # data while accepting any in-range subset.
+  if (min_val == 0L) {
+    if (max_val > k_levels) {
+      stop(insight::format_error(paste0(
+        "Monotonic design matrix '", xmo_name, "' contains ",
+        "invalid index range. Expected 0-based [0, ",
+        k_levels, "] or 1-based [1, ", k_levels + 1L,
+        "]. Found range: [", min_val, ", ", max_val, "]."
+      )))
+    }
     return(Xmo)
-  } else if (min_val == 1 && max_val <= k_levels + 1) {
-    # 1-based indexing in 1..D+1; convert to 0-based for .mo()
-    return(Xmo - 1L)
-  } else {
-    stop(insight::format_error(paste0(
-      "Monotonic design matrix '", xmo_name, "' contains ",
-      "invalid index range. Expected 0-based [0, ", k_levels,
-      "] or 1-based [1, ", k_levels + 1L,
-      "]. Found range: [", min_val, ", ", max_val, "]."
-    )))
   }
+  if (min_val >= 1L && max_val <= k_levels + 1L) {
+    return(Xmo - 1L)
+  }
+  stop(insight::format_error(paste0(
+    "Monotonic design matrix '", xmo_name, "' contains ",
+    "invalid index range. Expected 0-based [0, ", k_levels,
+    "] or 1-based [1, ", k_levels + 1L,
+    "]. Found range: [", min_val, ", ", max_val, "]."
+  )))
 }
 
 
