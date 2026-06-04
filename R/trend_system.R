@@ -2065,6 +2065,15 @@ print.mvgam_trend <- function(x, ...) {
 #'   \item For multivariate dynamics: `VAR(p = 2)` captures cross-series relationships
 #' }
 #'
+#' @note **VAR fits and `init = 0`**: VAR uses the Heaps-2022
+#'   stationary joint-distribution initialisation. Setting
+#'   `init = 0` in the call to [mvgam()] starts all parameters
+#'   at zero on the unconstrained scale, which collapses the
+#'   stationary covariance matrix and prevents the chain from
+#'   making any valid first step. Leave the sampler's `init`
+#'   argument at its default (random) for VAR fits. AR / RW /
+#'   CAR / ZMVN are unaffected.
+#'
 #' @param gr An optional grouping variable, which must be a `factor` in the
 #'   supplied `data`, for setting up hierarchical residual correlation
 #'   structures. If specified, this will automatically set `cor = TRUE` and set

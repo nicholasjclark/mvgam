@@ -90,6 +90,21 @@ test_that("AR(p = c(2, 4)) declares ar2_trend and ar4_trend only", {
 })
 
 
+# ----- initial_joint_var() out-of-bounds guard ------------------
+
+test_that("initial_joint_var guards the q=0 (pure VAR) case", {
+  # Pure VAR (no MA) has q = 0. The companion_var matrix is then
+  # sized (p + q) * m = p * m, so the MA-block writes at indices
+  # (p * m + 1):((p + 1) * m) are out of bounds. The Stan
+  # function must wrap those writes in `if (q > 0)`. Without this
+  # guard every pure VAR fit crashed at runtime with an
+  # 'accessing element out of range' exception.
+  code <- get_trend_stancode(~ VAR(p = 1))
+  expect_true(stan_has(code, "if (q > 0)"))
+  expect_true(stan_has(code, "companion_var[1:m, 1:m] = Sigma;"))
+})
+
+
 # ----- VAR scalar p (intended: CONSECUTIVE lags 1..p) ------------
 
 test_that("VAR(p = 1) declares array[1] A_raw_trend", {

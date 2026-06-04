@@ -3879,12 +3879,21 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
           }
         }
 
-        // Construct innovation covariance matrix (Sigma_tilde)
-        // Innovations affect y_t and eps_t simultaneously
-        companion_var[1:m, 1:m] = Sigma;  // For y_t innovations
-        companion_var[(p * m + 1):((p + 1) * m), (p * m + 1):((p + 1) * m)] = Sigma;  // For eps_t innovations
-        companion_var[1:m, (p * m + 1):((p + 1) * m)] = Sigma;  // Cross-covariance
-        companion_var[(p * m + 1):((p + 1) * m), 1:m] = Sigma;  // Symmetric cross-covariance
+        // Construct innovation covariance matrix (Sigma_tilde).
+        // y_t innovations always sit in the top-left block.
+        companion_var[1:m, 1:m] = Sigma;
+        // The eps_t innovation blocks and cross-covariance terms
+        // only exist when an MA component is present (q > 0).
+        // Without this guard, pure VAR(p) fits (q = 0) would
+        // index out of bounds: companion_var is sized
+        // (p + q) * m x (p + q) * m, which collapses to p * m
+        // when q = 0, while the MA blocks below address rows /
+        // columns (p * m + 1):((p + 1) * m) that don't exist.
+        if (q > 0) {
+          companion_var[(p * m + 1):((p + 1) * m), (p * m + 1):((p + 1) * m)] = Sigma;  // For eps_t innovations
+          companion_var[1:m, (p * m + 1):((p + 1) * m)] = Sigma;  // Cross-covariance
+          companion_var[(p * m + 1):((p + 1) * m), 1:m] = Sigma;  // Symmetric cross-covariance
+        }
 
         // Solve Lyapunov equation: Omega = Sigma_tilde + Phi_tilde * Omega * Phi_tilde'
         // Vectorized form: vec(Omega) = (I - Phi_tilde ⊗ Phi_tilde)^{-1} vec(Sigma_tilde)

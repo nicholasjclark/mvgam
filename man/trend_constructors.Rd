@@ -164,6 +164,16 @@ available stochastic trend types in \pkg{mvgam}, or view the rendered
 version on the package website at:
 https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html
 }
+\note{
+\strong{VAR fits and \code{init = 0}}: VAR uses the Heaps-2022
+stationary joint-distribution initialisation. Setting
+\code{init = 0} in the call to \code{\link[=mvgam]{mvgam()}} starts all parameters
+at zero on the unconstrained scale, which collapses the
+stationary covariance matrix and prevents the chain from
+making any valid first step. Leave the sampler's \code{init}
+argument at its default (random) for VAR fits. AR / RW /
+CAR / ZMVN are unaffected.
+}
 \section{Parameter Naming Convention}{
 
 All trend model parameters automatically receive a "_trend" suffix to prevent
