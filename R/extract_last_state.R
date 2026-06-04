@@ -92,12 +92,15 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
     "VAR" = extract_var_state(one_draw, meta, n_series, n_lv, fit),
     "CAR" = extract_car_state(one_draw, meta, n_series, fit),
     "ZMVN" = extract_zmvn_state(one_draw, meta, n_series, n_lv),
+    "PW" = extract_pw_state(one_draw, meta, n_series, n_lv, fit),
     stop(insight::format_error(c(
       paste0(
         "Trend type '", meta$trend_type,
         "' is not supported by 'extract_last_state'."
       ),
-      i = "Supported: 'RW', 'AR', 'VAR', 'CAR', 'ZMVN'."
+      i = paste0(
+        "Supported: 'RW', 'AR', 'VAR', 'CAR', 'ZMVN', 'PW'."
+      )
     )))
   )
 }
@@ -443,6 +446,71 @@ extract_zmvn_state <- function(one_draw, meta, n_series, n_lv) {
       trends = matrix(0, nrow = 0L, ncol = n_series),
       errors = empty_errors(),
       linpreds = matrix(0, nrow = 0L, ncol = n_series)
+    )
+  )
+}
+
+
+# PW (piecewise linear / logistic): pulls the per-series
+# growth (`k_trend[s]`), intercept (`m_trend[s]`), and
+# changepoint-effect matrix (`delta_trend[i, s]`) from the
+# posterior, plus the fit-time changepoint times
+# `t_change_trend` from `standata`. The latter is not a
+# sampled parameter -- it is fixed at fit time on a regular
+# grid over the training history. The `cap_trend` data array
+# (logistic only) is also pulled here so the forecast caller
+# can read it without re-touching standata.
+#'@noRd
+extract_pw_state <- function(one_draw, meta, n_series, n_lv,
+                                fit) {
+  k_nms <- paste0("k_trend[", seq_len(n_lv), "]")
+  m_nms <- paste0("m_trend[", seq_len(n_lv), "]")
+  k_vec <- broadcast_to_series(
+    as.numeric(one_draw[k_nms]), n_series
+  )
+  m_vec <- broadcast_to_series(
+    as.numeric(one_draw[m_nms]), n_series
+  )
+
+  # `delta_trend` is declared `matrix[n_change_trend, N_lv_trend]`
+  # in Stan, so the posterior names are `delta_trend[i, j]` with
+  # `i` the changepoint index and `j` the latent series.
+  n_change <- as.integer(fit$standata$n_change_trend %||% 0L)
+  delta <- matrix(0, nrow = n_change, ncol = n_series)
+  if (n_change > 0L) {
+    for (i in seq_len(n_change)) {
+      for (j in seq_len(n_lv)) {
+        nm <- paste0("delta_trend[", i, ",", j, "]")
+        val <- one_draw[[nm]]
+        if (is.null(val)) next
+        # Broadcast n_lv = 1 to all series.
+        if (n_lv == 1L) {
+          delta[i, ] <- as.numeric(val)
+        } else if (j <= n_series) {
+          delta[i, j] <- as.numeric(val)
+        }
+      }
+    }
+  }
+  t_change <- as.numeric(fit$standata$t_change_trend %||%
+                           numeric(0L))
+  # `cap_trend` is a fit-time `[N_time_trend, N_series_trend]`
+  # data matrix (logistic only); store it on `last_state` so
+  # the forecast caller can read it without re-traversing
+  # standata. Linear fits store it as NULL.
+  cap <- fit$standata$cap_trend
+  list(
+    params = list(
+      k = k_vec,
+      m = m_vec,
+      delta = delta,
+      t_change = t_change
+    ),
+    last_state = list(
+      trends = matrix(0, nrow = 0L, ncol = n_series),
+      errors = empty_errors(),
+      linpreds = matrix(0, nrow = 0L, ncol = n_series),
+      cap_train = cap
     )
   )
 }

@@ -322,11 +322,74 @@ test_that("draw_id beyond available draws errors informatively", {
 
 test_that("Unsupported trend type errors with the right message", {
   draws <- make_draws(list(sigma_trend = c(1, 1)))
-  meta <- list(trend_type = "PW", ar_lags = integer(0),
+  # `BOGUS` is not in the dispatcher's switch -- the fall-
+  # through stop() fires with the supported-types message.
+  meta <- list(trend_type = "BOGUS", ar_lags = integer(0),
                ma_lags = integer(0), max_lag = 0L,
                has_cor = FALSE)
   fit <- make_mock_fit(draws, n_series = 2L, n_lv = 2L,
                         n_time = 5L, meta)
   expect_error(extract_last_state(fit, 1L),
-                "PW")
+                "BOGUS")
+})
+
+
+# ----- PW (piecewise) posterior pulling --------------------------
+
+test_that("PW pulls k / m / delta from posterior and t_change from standata", {
+  n_series <- 2L; n_lv <- 2L; n_time <- 20L
+  n_change <- 3L
+  # Delta matrix [n_change, n_lv] with distinct values so we
+  # can verify each cell is pulled correctly.
+  delta_post <- matrix(
+    c(0.10, 0.20, 0.30, -0.10, -0.20, -0.30),
+    nrow = n_change, ncol = n_lv, byrow = FALSE
+  )
+  draws <- make_draws(list(
+    k_trend = c(0.05, 0.15),
+    m_trend = c(0.4, 0.6),
+    delta_trend = delta_post
+  ))
+  # Standata carries t_change_trend (fixed at fit time) and
+  # cap_trend (logistic only); both are pulled by the helper.
+  t_change_data <- c(5, 10, 15)
+  cap_data <- matrix(10, nrow = n_time, ncol = n_series)
+  meta <- list(trend_type = "PW", ar_lags = integer(0),
+               ma_lags = integer(0), max_lag = 0L,
+               has_cor = FALSE)
+  fit <- make_mock_fit(draws, n_series, n_lv, n_time, meta)
+  fit$standata$n_change_trend <- n_change
+  fit$standata$t_change_trend <- t_change_data
+  fit$standata$cap_trend <- cap_data
+  res <- extract_last_state(fit, 1L)
+  expect_named(res$params,
+                c("k", "m", "delta", "t_change"))
+  expect_equal(res$params$k, c(0.05, 0.15))
+  expect_equal(res$params$m, c(0.4, 0.6))
+  expect_identical(dim(res$params$delta),
+                    c(n_change, n_series))
+  expect_equal(res$params$delta, delta_post,
+                tolerance = 1e-12)
+  expect_equal(res$params$t_change, c(5, 10, 15))
+  # cap is carried on last_state for the forecast caller.
+  expect_identical(dim(res$last_state$cap_train),
+                    c(n_time, n_series))
+})
+
+
+test_that("PW handles no-changepoint case gracefully", {
+  draws <- make_draws(list(
+    k_trend = c(0.05, 0.15),
+    m_trend = c(0.4, 0.6)
+  ))
+  meta <- list(trend_type = "PW", ar_lags = integer(0),
+               ma_lags = integer(0), max_lag = 0L,
+               has_cor = FALSE)
+  fit <- make_mock_fit(draws, n_series = 2L, n_lv = 2L,
+                        n_time = 10L, meta)
+  fit$standata$n_change_trend <- 0L
+  fit$standata$t_change_trend <- numeric(0L)
+  res <- extract_last_state(fit, 1L)
+  expect_identical(dim(res$params$delta), c(0L, 2L))
+  expect_length(res$params$t_change, 0L)
 })

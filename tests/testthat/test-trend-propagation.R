@@ -185,10 +185,83 @@ test_that("propagate_trend accepts a caller-supplied last_state", {
 
 test_that("propagate_trend errors on unsupported trend types", {
   fake_trend <- structure(
-    list(trend = "PWlinear"), class = "mvgam_trend"
+    list(trend = "UNKNOWN"), class = "mvgam_trend"
   )
   expect_error(
     propagate_trend(fake_trend, list(), h = 10L, n_series = 1L),
     "not supported"
+  )
+})
+
+
+# ----- PW: horizon-changepoint sampling reproducibility -----------
+
+test_that("propagate_pw is deterministic under set.seed", {
+  # Same params + same fc_times + same seed must produce the
+  # same forecast trajectory (horizon changepoints sampled in
+  # R-level RNG; once the seed is fixed, the result should be
+  # bit-identical across calls).
+  params <- list(
+    k = 0.05, m = 0.5,
+    delta = matrix(c(-0.1, 0.05, -0.08), ncol = 1L),
+    t_change = c(20, 40, 60)
+  )
+  fc_times <- 81:100
+  training_times <- 1:80
+  spec <- structure(
+    list(trend = "PW", growth = "linear"),
+    class = "mvgam_trend"
+  )
+  set.seed(42L)
+  a <- propagate_trend(
+    spec, params, h = length(fc_times), n_series = 1L,
+    fc_times = fc_times, training_times = training_times
+  )
+  set.seed(42L)
+  b <- propagate_trend(
+    spec, params, h = length(fc_times), n_series = 1L,
+    fc_times = fc_times, training_times = training_times
+  )
+  expect_equal(a, b)
+})
+
+
+test_that("propagate_pw errors on mismatched k / m lengths", {
+  spec <- structure(
+    list(trend = "PW", growth = "linear"),
+    class = "mvgam_trend"
+  )
+  params <- list(
+    k = c(0.05, 0.1),  # length 2, but n_series = 1 below
+    m = 0.5,
+    delta = matrix(0.1, ncol = 1L),
+    t_change = 10
+  )
+  expect_error(
+    propagate_trend(
+      spec, params, h = 5L, n_series = 1L,
+      fc_times = 11:15, training_times = 1:10
+    ),
+    "params"
+  )
+})
+
+
+test_that("propagate_pw rejects logistic growth without cap", {
+  spec <- structure(
+    list(trend = "PW", growth = "logistic"),
+    class = "mvgam_trend"
+  )
+  params <- list(
+    k = 0.05, m = 0.5,
+    delta = matrix(0.1, ncol = 1L),
+    t_change = 10
+  )
+  expect_error(
+    propagate_trend(
+      spec, params, h = 5L, n_series = 1L,
+      fc_times = 11:15, training_times = 1:10
+    ),
+    "cap"
   )
 })

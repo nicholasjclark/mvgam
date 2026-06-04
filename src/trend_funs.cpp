@@ -241,3 +241,170 @@ arma::mat car1_recursC(
 
   return states;
 }
+
+
+// Piecewise trend extrapolation (Prophet-style linear or logistic).
+//
+// Closed-form evaluation of a piecewise-linear or piecewise-
+// logistic trend at user-supplied times. Unlike the AR / CAR
+// kernels, the result is deterministic given parameters --
+// posterior uncertainty in the forecast comes from sampling
+// (k, m, delta) across draws, not from stochastic innovations.
+//
+// The kernel evaluates whatever changepoint schedule is
+// passed in `t_change` / `delta`. Per-draw horizon-changepoint
+// sampling (Prophet-style Poisson(change_freq) for the count,
+// Laplace(0, median(|delta|)) for each new rate-change, and
+// uniform-in-horizon for the new times) happens in the R
+// caller before invoking this kernel. That separation keeps
+// the C++ deterministic and testable while leaving the
+// sampling step inspectable / replaceable in R.
+//
+// Inputs:
+//   t           length-h vector of forecast times.
+//   k           length-n_series vector of base growth rates.
+//   m           length-n_series vector of intercepts.
+//   delta       [n_change, n_series] rate-change magnitudes
+//               at each changepoint.
+//   t_change    length-n_change vector of changepoint times
+//               (fixed at fit time; same for every draw).
+//   cap         [h, n_series] carrying capacities on the link
+//               scale; required for `growth_type = "logistic"`
+//               and ignored for `"linear"`.
+//   growth_type "linear" or "logistic".
+//
+// Returns: [h, n_series] matrix of trend values on the link
+// scale.
+//
+// Math (linear):
+//   y(t, s) = (k[s] + A %*% delta[, s]) * t
+//           + (m[s] + A %*% (-t_change * delta[, s]))
+//   where A[i, c] = 1 iff t[i] >= t_change[c].
+//
+// Math (logistic, with piecewise-continuity gamma):
+//   k_cum[1]   = k[s]
+//   k_cum[c+1] = k_cum[c] + delta[c, s]
+//   gamma[i]   = (t_change[i] - m[s] - sum(gamma[1:i-1]))
+//                * (1 - k_cum[i] / k_cum[i+1])
+//   y(t, s)    = cap[t, s] /
+//                (1 + exp(-(k[s] + A %*% delta[, s])
+//                         * (t - (m[s] + A %*% gamma))))
+// [[Rcpp::export]]
+arma::mat pw_trendC(
+    const arma::vec& t,
+    const arma::vec& k,
+    const arma::vec& m,
+    const arma::mat& delta,
+    const arma::vec& t_change,
+    const arma::mat& cap,
+    const std::string& growth_type) {
+
+  const int h = t.n_elem;
+  const int n_series = k.n_elem;
+  const int n_change = t_change.n_elem;
+
+  if (static_cast<int>(m.n_elem) != n_series) {
+    Rcpp::stop("pw_trendC: 'm' must have length n_series.");
+  }
+  if (static_cast<int>(delta.n_rows) != n_change ||
+      static_cast<int>(delta.n_cols) != n_series) {
+    Rcpp::stop(
+      "pw_trendC: 'delta' must be [n_changepoints, n_series]."
+    );
+  }
+
+  // Changepoint indicator matrix A[t_idx, c] = 1 iff
+  // t[t_idx] >= t_change[c]. Built once and reused per series.
+  arma::mat A(h, n_change, arma::fill::zeros);
+  for (int ti = 0; ti < h; ++ti) {
+    for (int c = 0; c < n_change; ++c) {
+      if (t.at(ti) >= t_change.at(c)) {
+        A.at(ti, c) = 1.0;
+      }
+    }
+  }
+
+  arma::mat out(h, n_series, arma::fill::zeros);
+
+  if (growth_type == "linear") {
+    for (int s = 0; s < n_series; ++s) {
+      const arma::vec delta_s = delta.col(s);
+      const arma::vec gamma_lin = -t_change % delta_s;
+      const arma::vec k_t = k.at(s) + A * delta_s;
+      const arma::vec m_t = m.at(s) + A * gamma_lin;
+      out.col(s) = k_t % t + m_t;
+    }
+    return out;
+  }
+
+  if (growth_type == "logistic") {
+    if (static_cast<int>(cap.n_rows) != h ||
+        static_cast<int>(cap.n_cols) != n_series) {
+      Rcpp::stop(
+        "pw_trendC: 'cap' must be [h, n_series] for logistic."
+      );
+    }
+    for (int s = 0; s < n_series; ++s) {
+      const arma::vec delta_s = delta.col(s);
+
+      // Cumulative growth rate at each changepoint boundary.
+      arma::vec k_cum(n_change + 1);
+      k_cum.at(0) = k.at(s);
+      for (int c = 0; c < n_change; ++c) {
+        k_cum.at(c + 1) = k_cum.at(c) + delta_s.at(c);
+      }
+
+      // Gamma updates enforce piecewise continuity at each
+      // changepoint. The sum-of-prior-gammas term is
+      // accumulated as we go.
+      //
+      // Two guards are non-negotiable for the logistic form
+      // to stay well-defined:
+      //   1. k_cum[i+1] must be non-zero (we divide by it).
+      //      Exact equality would miss near-zero draws that
+      //      blow gamma up; use an absolute tolerance.
+      //   2. k_cum[i] and k_cum[i+1] must share sign. When
+      //      cumulative growth crosses zero, the ratio
+      //      k_cum[i] / k_cum[i+1] becomes negative and the
+      //      continuity correction `1 - ratio` exceeds 1 with
+      //      the wrong sign, producing a gamma that breaks
+      //      continuity instead of preserving it. Posterior
+      //      draws of (k, delta) can hit this regime; abort
+      //      so the caller can filter or down-weight the
+      //      degenerate draw rather than silently use it.
+      const double k_eps = 1e-10;
+      arma::vec gamma_s(n_change, arma::fill::zeros);
+      double sum_gamma = 0.0;
+      for (int i = 0; i < n_change; ++i) {
+        const double k_curr = k_cum.at(i);
+        const double k_next = k_cum.at(i + 1);
+        if (std::abs(k_next) < k_eps) {
+          Rcpp::stop(
+            "pw_trendC: cumulative growth near zero at a "
+            "changepoint; logistic gamma is ill-defined."
+          );
+        }
+        if (k_curr * k_next < 0.0) {
+          Rcpp::stop(
+            "pw_trendC: cumulative growth changes sign at a "
+            "changepoint; logistic continuity correction is "
+            "undefined."
+          );
+        }
+        gamma_s.at(i) =
+          (t_change.at(i) - m.at(s) - sum_gamma) *
+          (1.0 - k_curr / k_next);
+        sum_gamma += gamma_s.at(i);
+      }
+
+      const arma::vec k_t = k.at(s) + A * delta_s;
+      const arma::vec m_t = m.at(s) + A * gamma_s;
+      out.col(s) = cap.col(s) / (1.0 + arma::exp(-k_t % (t - m_t)));
+    }
+    return out;
+  }
+
+  Rcpp::stop(
+    "pw_trendC: 'growth_type' must be 'linear' or 'logistic'."
+  );
+}

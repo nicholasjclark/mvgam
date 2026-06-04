@@ -82,7 +82,11 @@ propagate_trend <- function(trend_model,
                              n_series = 1L,
                              last_state = NULL,
                              linpreds = NULL,
-                             time = NULL) {
+                             time = NULL,
+                             fc_times = NULL,
+                             training_times = NULL,
+                             cap = NULL,
+                             changepoint_range = NULL) {
   if (is.character(trend_model) && identical(trend_model, "None")) {
     return(matrix(0, nrow = h, ncol = n_series))
   }
@@ -104,11 +108,15 @@ propagate_trend <- function(trend_model,
                             last_state, linpreds),
     "VAR" = propagate_arma(trend_model, params, h, n_series,
                               last_state, linpreds),
+    "PW" = propagate_pw(trend_model, params, h, n_series,
+                          fc_times, training_times, cap,
+                          changepoint_range),
     stop(insight::format_error(c(
       "Trend type not supported by 'propagate_trend'.",
       x = paste0("Got: '", trend_type, "'."),
       i = paste0(
-        "Supported: 'None', 'RW', 'AR', 'VAR', 'CAR', 'ZMVN'."
+        "Supported: 'None', 'RW', 'AR', 'VAR', 'CAR', 'ZMVN', ",
+        "'PW'."
       )
     )))
   )
@@ -163,6 +171,178 @@ propagate_car <- function(params, h, n_series, last_state, time) {
   car1_recursC(
     phi = phi, sigma = sigma, time_dis = as.numeric(time),
     innovations = innovations, last_trend = last_trend, h = h
+  )
+}
+
+
+# ------------------------------------------------------------------
+# PW: Prophet-style piecewise linear or logistic. Deterministic
+# evaluation given (k, m, delta, t_change); per-draw posterior
+# uncertainty comes from sampling those parameters. Horizon-
+# changepoint sampling (Poisson(change_freq) count, Laplace(0,
+# median(|delta|)) magnitudes, uniform-in-horizon times) happens
+# here in R before invoking the C++ kernel so the kernel stays
+# deterministic and testable.
+# ------------------------------------------------------------------
+#'@noRd
+propagate_pw <- function(trend_model, params, h, n_series,
+                           fc_times, training_times, cap = NULL,
+                           changepoint_range = NULL) {
+  growth <- trend_model$growth %||% "linear"
+  if (!(growth %in% c("linear", "logistic"))) {
+    stop(insight::format_error(c(
+      paste0(
+        "'growth' must be 'linear' or 'logistic'."
+      ),
+      x = paste0("Got: '", growth, "'.")
+    )))
+  }
+  if (is.null(fc_times) || length(fc_times) != h) {
+    stop(insight::format_error(c(
+      "PW propagation requires 'fc_times' of length h.",
+      x = paste0(
+        "Got length = ",
+        if (is.null(fc_times)) 0L else length(fc_times),
+        ", expected ", h, "."
+      )
+    )))
+  }
+  if (is.null(training_times) || length(training_times) == 0L) {
+    stop(insight::format_error(
+      "PW propagation requires non-empty 'training_times'."
+    ))
+  }
+  if (identical(growth, "logistic")) {
+    if (is.null(cap) || !is.matrix(cap)) {
+      stop(insight::format_error(c(
+        "PW logistic requires 'cap' as a [h, n_series] matrix.",
+        i = paste0(
+          "Supply 'cap' via newdata for forecast.mvgam()."
+        )
+      )))
+    }
+    if (any(!is.finite(cap)) || any(cap <= 0)) {
+      stop(insight::format_error(c(
+        "PW logistic 'cap' must be strictly positive and finite.",
+        x = paste0(
+          "Non-positive / non-finite entries detected."
+        )
+      )))
+    }
+  }
+  # `params$delta` is the training-time per-series rate-change
+  # matrix [n_train_change, n_series]. `params$t_change` is the
+  # shared training-time changepoint vector. `params$k` and
+  # `params$m` are length-n_series vectors of base growth /
+  # intercept.
+  t_change_train <- as.numeric(params$t_change %||% numeric(0L))
+  delta_train <- params$delta
+  if (is.null(delta_train)) {
+    delta_train <- matrix(0, nrow = 0L, ncol = n_series)
+  }
+  k_vec <- as.numeric(params$k)
+  m_vec <- as.numeric(params$m)
+  checkmate::assert_numeric(k_vec, len = n_series,
+                              any.missing = FALSE,
+                              .var.name = "params$k")
+  checkmate::assert_numeric(m_vec, len = n_series,
+                              any.missing = FALSE,
+                              .var.name = "params$m")
+
+  # `hist_size` must match the value Stan saw at fit time. The
+  # PW Stan generator uses `floor(n_time * changepoint_range)`
+  # (Prophet's convention from Taylor & Letham 2018), so re-use
+  # that here when `changepoint_range` is supplied. Falls back
+  # to the full training span only for callers that don't pass
+  # it (e.g. unit tests that build a synthetic spec by hand).
+  full_span <- max(training_times) - min(training_times) + 1
+  hist_size <- if (!is.null(changepoint_range)) {
+    floor(full_span * as.numeric(changepoint_range))
+  } else {
+    full_span
+  }
+  if (hist_size < 1) hist_size <- 1
+  change_freq <- length(t_change_train) / hist_size
+  fc_min <- min(fc_times)
+  fc_max <- max(fc_times)
+  fc_horizon <- fc_max - fc_min + 1
+
+  out <- matrix(NA_real_, nrow = h, ncol = n_series)
+  for (s in seq_len(n_series)) {
+    sampled <- sample_horizon_changepoints(
+      delta_train_s = as.numeric(delta_train[, s]),
+      t_change_train = t_change_train,
+      change_freq = change_freq,
+      fc_min = fc_min,
+      fc_max = fc_max,
+      fc_horizon = fc_horizon
+    )
+    # Pack one column for pw_trendC, plus cap slice for logistic.
+    delta_mat <- matrix(sampled$delta, ncol = 1L)
+    cap_s <- if (identical(growth, "logistic")) {
+      cap[, s, drop = FALSE]
+    } else {
+      matrix(0, 0L, 0L)
+    }
+    fc <- pw_trendC(
+      t = as.numeric(fc_times),
+      k = k_vec[s],
+      m = m_vec[s],
+      delta = delta_mat,
+      t_change = sampled$t_change,
+      cap = cap_s,
+      growth_type = growth
+    )
+    out[, s] <- as.numeric(fc)
+  }
+  out
+}
+
+
+# Inverse-CDF Laplace sampler. Avoids a Suggests dep on
+# `extraDistr`; the inverse CDF of Laplace(mu, sigma) is
+# mu - sigma * sign(u) * log(1 - 2 * abs(u)) for u ~ U(-1/2,
+# 1/2). Matches extraDistr::rlaplace exactly up to RNG-stream
+# differences in the underlying uniform draws.
+#'@noRd
+rlaplace_inverse_cdf <- function(n, mu = 0, sigma = 1) {
+  u <- stats::runif(n, -0.5, 0.5)
+  mu - sigma * sign(u) * log1p(-2 * abs(u))
+}
+
+
+# Sample horizon changepoints under the Prophet-style scheme:
+#   count ~ Poisson(change_freq * fc_horizon)
+#   magnitudes ~ Laplace(0, median(|train deltas|) + eps)
+#   times ~ uniform on [fc_min, fc_max]
+# Combines with the training-time changepoints + deltas and
+# sorts by time so the resulting (delta, t_change) pair fits
+# the pw_trendC kernel's contract.
+#'@noRd
+sample_horizon_changepoints <- function(delta_train_s,
+                                          t_change_train,
+                                          change_freq,
+                                          fc_min, fc_max,
+                                          fc_horizon) {
+  n_new <- stats::rpois(1L, change_freq * fc_horizon)
+  if (n_new == 0L || length(delta_train_s) == 0L) {
+    delta_new <- numeric(0L)
+    t_change_new <- numeric(0L)
+  } else {
+    lambda <- stats::median(abs(delta_train_s)) + 1e-8
+    t_change_new <- sort(unique(
+      stats::runif(n_new, fc_min, fc_max)
+    ))
+    delta_new <- rlaplace_inverse_cdf(
+      length(t_change_new), mu = 0, sigma = lambda
+    )
+  }
+  t_change_combined <- c(t_change_train, t_change_new)
+  delta_combined <- c(delta_train_s, delta_new)
+  ord <- order(t_change_combined)
+  list(
+    t_change = as.numeric(t_change_combined[ord]),
+    delta = as.numeric(delta_combined[ord])
   )
 }
 
@@ -500,6 +680,11 @@ enrich_trend_metadata <- function(trend_metadata, trend_specs) {
   )
   trend_metadata$has_cor <- isTRUE(spec$cor)
   trend_metadata$n_lv <- spec$n_lv
+  if (identical(spec$trend, "PW")) {
+    trend_metadata$pw_changepoint_range <-
+      spec$changepoint_range %||% 0.8
+    trend_metadata$pw_growth <- spec$growth %||% "linear"
+  }
   trend_metadata
 }
 

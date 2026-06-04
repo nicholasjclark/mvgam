@@ -458,6 +458,57 @@ test_that("AR(1) cor=TRUE 2-series 90% PI covers near nominal", {
 })
 
 
+# ----- PW (piecewise linear) recovery -----------------------------
+#
+# Uses sim_mvgam's PW sim path: `fill_pw_trend_defaults`
+# supplies (k, m, delta, t_change) and `pw_trendC` evaluates
+# the trend deterministically across the training time grid.
+# Gaussian response so the in-PI coverage check measures the
+# actual posterior-predictive width rather than the integer-
+# rounding artefact a Poisson PI exhibits at small lambda.
+#
+# Reason: the observation formula uses `y ~ -1` because the PW
+# trend's `m_trend` (intercept) and an obs-side intercept are
+# not jointly identified -- they compete for the same constant
+# offset (Prophet convention from Taylor & Letham 2018).
+
+test_that("PW linear 90% PI covers near nominal across seeds", {
+  results <- lapply(c(701L, 702L, 703L), function(seed) {
+    bundle <- prep_recovery(
+      name = paste0("pw_linear_gauss_seed", seed),
+      sim_args = list(
+        trend_model = PW(n_changepoints = 5),
+        family = gaussian(),
+        n_timepoints = 200L, n_series = 1L,
+        proportional_train = 0.75, seed = seed
+      ),
+      fit_args = list(
+        formula = y ~ -1,
+        trend_formula = ~ PW(n_changepoints = 5),
+        family = gaussian(),
+        chains = 1L, iter = 500L, warmup = 250L,
+        refresh = 0L, silent = 2L
+      )
+    )
+    score(bundle$fc, "crps")
+  })
+  pooled <- pool_coverage(results)
+  ci <- wilson_ci(pooled$hits, pooled$total)
+  expect_true(0.90 >= ci["lower"] && 0.90 <= ci["upper"])
+})
+
+
+test_that("PW linear: score pipeline yields finite CRPS", {
+  bundle <- readRDS(
+    file.path(CACHE_DIR, "pw_linear_gauss_seed701.rds")
+  )
+  sc <- score(bundle$fc, "crps")
+  expect_true(all(is.finite(sc$series_1$score)))
+  expect_true(all(is.finite(sc$all_series$score)))
+  expect_identical(unique(sc$series_1$score_type), "crps")
+})
+
+
 # ----- Multivariate scoring on cached ZMVN -----------------------
 
 test_that("Energy / variogram score the cached ZMVN forecast", {

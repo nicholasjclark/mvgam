@@ -181,8 +181,20 @@ sim_mvgam <- function(type = 1L,
   trend_args$params <- fill_multivariate_trend_defaults(
     trend_model, trend_args$params, n_series
   )
+  is_pw <- is_pw_trend(trend_model)
+  if (is_pw) {
+    # PW (piecewise linear or logistic) needs its own param
+    # defaults (k, m, delta, t_change) and a direct kernel
+    # call -- the propagate_trend dispatcher's PW arm is
+    # designed for forecast-horizon changepoint sampling,
+    # which is wrong for simulation (we want a fully
+    # deterministic trend at the training time grid).
+    trend_args$params <- fill_pw_trend_defaults(
+      trend_model, trend_args$params, n_series, n_timepoints
+    )
+  }
   nonstat <- is_nonstationary_trend(trend_model)
-  if (nonstat) {
+  if (nonstat && !is_pw) {
     # Pick sigma_innov so the empirical SD of the centred RW
     # over t = 1..T matches `target_trend_sd`. The variance of
     # the centred RW at t averages sigma^2 * T/6 across t, so
@@ -194,13 +206,34 @@ sim_mvgam <- function(type = 1L,
     trend_args$params$sigma <-
       target_trend_sd * sqrt(6 / n_timepoints)
   }
-  trend_mat <- propagate_trend(
-    trend_model = trend_model,
-    params = trend_args$params,
-    h = n_timepoints,
-    n_series = n_series,
-    time = trend_args$time
-  )
+  trend_mat <- if (is_pw) {
+    # PW is fully deterministic given (k, m, delta, t_change);
+    # bypass the propagate_trend dispatcher (whose PW arm is
+    # tuned for forecast-horizon changepoint sampling) and
+    # evaluate the kernel directly at the training time grid.
+    growth <- trend_model$growth %||% "linear"
+    pw_trendC(
+      t = as.numeric(seq_len(n_timepoints)),
+      k = as.numeric(trend_args$params$k),
+      m = as.numeric(trend_args$params$m),
+      delta = trend_args$params$delta,
+      t_change = as.numeric(trend_args$params$t_change),
+      cap = if (identical(growth, "logistic")) {
+        trend_args$params$cap
+      } else {
+        matrix(0, 0L, 0L)
+      },
+      growth_type = growth
+    )
+  } else {
+    propagate_trend(
+      trend_model = trend_model,
+      params = trend_args$params,
+      h = n_timepoints,
+      n_series = n_series,
+      time = trend_args$time
+    )
+  }
 
   # Centre the trend and obs contributions on zero before
   # combining so the mean of eta is the intercept (not
@@ -595,6 +628,83 @@ trend_sigma <- function(prop_trend) {
 # RW is the only non-stationary kernel on this branch. PW joins
 # the list once the piecewise-linear / -logistic kernel lands.
 #'@noRd
+# Internal: TRUE when the trend constructor is `PW()`. PW
+# trends need their own simulation path (deterministic kernel
+# evaluation, not stochastic propagation) and their own
+# parameter set (k, m, delta, t_change), so they bypass the
+# multivariate-default + propagate_trend pipeline used for the
+# stationary / non-stationary stochastic trends.
+#'@noRd
+is_pw_trend <- function(trend_model) {
+  if (is.null(trend_model)) return(FALSE)
+  t <- if (is.character(trend_model)) {
+    trend_model
+  } else {
+    trend_model$trend
+  }
+  identical(t, "PW")
+}
+
+
+# Internal: PW-specific param defaults. The `PW()` constructor
+# carries `n_changepoints`, `growth`, and `changepoint_scale`;
+# this helper turns those into (k, m, delta, t_change) plus an
+# optional cap matrix for logistic growth.
+#
+# Defaults:
+#   * k       : 0.02 per unit time -- gentle linear growth.
+#   * m       : 0.5 -- mild positive intercept.
+#   * delta   : alternating +/- 0.05 magnitudes across
+#     changepoints, independently per series so multi-series
+#     PW sims have visibly distinct trajectories.
+#   * t_change: evenly spaced across the training horizon,
+#     respecting `changepoint_range` (defaults 0.8) so the
+#     last 20% of the training period stays changepoint-free
+#     and the trend has room to settle before forecasting.
+#   * cap     : logistic only; defaults to a constant ceiling
+#     of `exp(intercept) * 3` per series so the inverse-logit
+#     output stays well clear of the saturation regime.
+#'@noRd
+fill_pw_trend_defaults <- function(trend_model, params,
+                                      n_series, n_timepoints) {
+  n_change <- as.integer(trend_model$n_changepoints %||% 5L)
+  range_prop <- as.numeric(
+    trend_model$changepoint_range %||% 0.8
+  )
+  last_cp <- max(1.0, range_prop * n_timepoints)
+  if (is.null(params$t_change)) {
+    params$t_change <- seq.int(
+      from = max(2L, floor(0.05 * n_timepoints)),
+      to = floor(last_cp),
+      length.out = n_change
+    )
+  }
+  if (is.null(params$k)) {
+    params$k <- rep(0.02, n_series)
+  }
+  if (is.null(params$m)) {
+    params$m <- rep(0.5, n_series)
+  }
+  if (is.null(params$delta)) {
+    signs <- (-1)^seq_len(n_change)
+    delta_mat <- matrix(0, nrow = n_change, ncol = n_series)
+    for (s in seq_len(n_series)) {
+      delta_mat[, s] <- 0.05 * signs *
+        (1 + 0.1 * (s - 1L))
+    }
+    params$delta <- delta_mat
+  }
+  if (identical(trend_model$growth %||% "linear", "logistic")
+      && is.null(params$cap)) {
+    params$cap <- matrix(
+      exp(params$m[1L]) * 3,
+      nrow = n_timepoints, ncol = n_series
+    )
+  }
+  params
+}
+
+
 is_nonstationary_trend <- function(trend_model) {
   if (is.null(trend_model)) return(FALSE)
   # `trend_model` may be a character ("None", "RW", "PW") or an

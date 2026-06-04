@@ -249,28 +249,21 @@ test_that("ndraws beyond available draws errors informatively", {
 })
 
 
-test_that("Only PW remains gated; VAR / CAR flow through", {
-  # PW: still gated until the pw_trendC kernel lands.
-  fit_pw <- make_mock_mvgam(trend_type = "PW")
-  fit_pw$mv_spec$trend_specs$trend <- "PW"
+test_that("All multivariate / PW trend types flow through dispatch", {
+  # Every supported trend type should now reach
+  # build_hindcast_arms (stubbed via posterior_predict /
+  # posterior_epred below). Only an invented "BOGUS" type
+  # should still fail before dispatch.
   draws <- make_draws_mat(ndraws = 2L)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
     .package = "posterior"
   )
-  expect_error(
-    forecast(fit_pw, newdata = NULL, type = "response", ndraws = 2L),
-    "PW"
-  )
-
-  # VAR and CAR no longer error at the dispatcher level.
-  # (They route into build_hindcast_arms via posterior_predict,
-  # which is stubbed in the test below.)
   testthat::local_mocked_bindings(
     posterior_predict = function(...) matrix(1L, 2L, 10L),
     posterior_epred = function(...) matrix(1, 2L, 10L)
   )
-  for (tt in c("VAR", "CAR")) {
+  for (tt in c("VAR", "CAR", "PW")) {
     fit_tt <- make_mock_mvgam(trend_type = tt)
     fit_tt$mv_spec$trend_specs$trend <- tt
     expect_no_error(

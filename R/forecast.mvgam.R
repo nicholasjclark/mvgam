@@ -123,18 +123,6 @@ forecast.mvgam <- function(object,
   }
   meta <- get_enriched_trend_metadata(object)
   trend_type <- meta$trend_type
-  if (identical(trend_type, "PW")) {
-    stop(insight::format_error(c(
-      paste0(
-        "Forecasting for '", trend_type,
-        "' trends is not yet implemented in 'forecast.mvgam'."
-      ),
-      i = paste0(
-        "RW / AR / ARMA / ZMVN / VAR / CAR are supported; ",
-        "PW propagation requires a piecewise C++ kernel."
-      )
-    )))
-  }
 
   series_info <- resolve_series_info(object)
   series_levels <- series_info$series_levels
@@ -537,6 +525,18 @@ build_forecast_arms <- function(object, trend_model, meta,
     NULL
   }
 
+  # PW forecasts evaluate a piecewise function at user-
+  # supplied forecast times. Pre-compute the shared
+  # absolute-time vector for the horizon and the training
+  # time range that drives the changepoint frequency; these
+  # are deterministic across draws, like CAR's gap vector.
+  pw_extras <- if (identical(meta$trend_type, "PW")) {
+    compute_pw_forecast_extras(object, training, fc_grid,
+                                 series_levels)
+  } else {
+    NULL
+  }
+
   # Per-draw kernel loop. `trend_flat[i, j]` holds the trend
   # value at draw `draw_idx[i]`, observation row j of the
   # forecast grid (obs_struct_fc ordering).
@@ -569,7 +569,8 @@ build_forecast_arms <- function(object, trend_model, meta,
       trend_lp_fc = trend_lp_fc,
       obs_struct_tail = obs_struct_tail,
       obs_struct_fc = obs_struct_fc,
-      fc_time = fc_time
+      fc_time = fc_time,
+      pw_extras = pw_extras
     )
     trend_flat[i, ] <- flatten_grid_to_obs_order(fc_link_d,
                                                     obs_struct_fc)
@@ -605,9 +606,28 @@ propagate_one_draw <- function(object, trend_model, meta, training,
                                  h_max, n_series, tail_data,
                                  trend_lp_tail, trend_lp_fc,
                                  obs_struct_tail, obs_struct_fc,
-                                 fc_time = NULL) {
+                                 fc_time = NULL, pw_extras = NULL) {
   ls_d <- extract_last_state(object, d_state,
                                 draws_mat = draws_mat)
+
+  # PW bypasses the centred-convention linpred machinery: the
+  # trend is a closed-form Prophet-style evaluation at user-
+  # supplied times. Dispatch to propagate_trend with the
+  # PW-specific extras (fc_times, training_times, cap) and
+  # return early.
+  if (identical(meta$trend_type, "PW")) {
+    return(propagate_trend(
+      trend_model = trend_model,
+      params = ls_d$params,
+      h = h_max,
+      n_series = n_series,
+      fc_times = pw_extras$fc_times,
+      training_times = pw_extras$training_times,
+      cap = pw_extras$cap,
+      changepoint_range = meta$pw_changepoint_range
+    ))
+  }
+
   max_lag <- as.integer(meta$max_lag %||% 0L)
 
   lp_history <- if (max_lag == 0L) {
@@ -686,6 +706,156 @@ compute_car_forecast_time <- function(object, fc_grid,
     }
   }
   ref
+}
+
+
+# Internal: extras the PW kernel needs for its closed-form
+# evaluation:
+#   * `fc_times`: shared horizon time vector (one per step).
+#   * `training_times`: training time vector (drives the
+#     Prophet-style horizon-changepoint frequency).
+#   * `cap`: forecast-horizon carrying capacities [h, n_series]
+#     for the logistic growth path; NULL for linear.
+#
+# All series are assumed to share the same forecast time grid
+# (mirrors the CAR shared-time constraint); heterogeneous
+# per-series grids would need a per-series PW evaluation loop
+# in `propagate_pw`.
+#'@noRd
+compute_pw_forecast_extras <- function(object, training,
+                                          fc_grid, series_levels) {
+  n_series <- length(series_levels)
+  # Take the first non-empty series' forecast times as the
+  # shared grid; validate the others match.
+  fc_times <- NULL
+  for (lv in series_levels) {
+    ts <- as.numeric(fc_grid$times[[lv]])
+    if (length(ts) == 0L) next
+    if (is.null(fc_times)) {
+      fc_times <- sort(unique(ts))
+    } else if (!isTRUE(all.equal(sort(unique(ts)), fc_times))) {
+      stop(insight::format_error(c(
+        paste0(
+          "PW forecasts currently require all series to share ",
+          "the same forecast time grid."
+        ),
+        i = paste0(
+          "Heterogeneous per-series PW horizons are pending."
+        )
+      )))
+    }
+  }
+  if (is.null(fc_times)) fc_times <- numeric(0L)
+
+  # Training time range drives change_freq inside propagate_pw.
+  training_times <- sort(unique(unlist(training$times)))
+
+  # Logistic PW needs a cap matrix [h, n_series] from newdata.
+  # Detect from the trend_model spec. Linear PW leaves cap NULL.
+  trend_specs <- object$mv_spec$trend_specs
+  spec <- if (is_multivariate_trend_specs(trend_specs)) {
+    trend_specs[[1L]]
+  } else {
+    trend_specs
+  }
+  growth <- spec$growth %||% "linear"
+  cap <- if (identical(growth, "logistic")) {
+    extract_pw_cap_matrix(fc_grid, spec, fc_times,
+                            series_levels,
+                            family = object$family)
+  } else {
+    NULL
+  }
+
+  list(fc_times = fc_times,
+       training_times = training_times,
+       cap = cap)
+}
+
+
+# Internal: build the `[h, n_series]` cap matrix for PW
+# logistic from the forecast newdata. The cap column name is
+# stored on the trend spec via `spec$cap` (defaults to "cap").
+#
+# User-supplied cap is on the RESPONSE scale (e.g. "carrying
+# capacity of 100 individuals"); the C++ kernel expects cap on
+# the LINK scale because the logistic formula evaluates
+# `cap * inv_logit(...)` as the trend's contribution to eta.
+# Apply the family's link function to bring cap to the link
+# scale. Together with the PW convention of fitting on a
+# zero-intercept observation formula (`y ~ -1`), this gives
+# `E[Y]` saturating at exactly the user-stated cap.
+#
+# Cells without an observed cap row error rather than silently
+# substituting -- propagating an unknown cap into the
+# inverse-logit would produce a meaningless forecast.
+#'@noRd
+extract_pw_cap_matrix <- function(fc_grid, spec, fc_times,
+                                    series_levels, family) {
+  cap_var <- spec$cap %||% "cap"
+  d <- fc_grid$data
+  if (!(cap_var %in% names(d))) {
+    stop(insight::format_error(c(
+      paste0(
+        "PW logistic requires a '", cap_var,
+        "' column in 'newdata' for the forecast cells."
+      ),
+      i = paste0(
+        "Each (time, series) forecast cell needs a cap value."
+      )
+    )))
+  }
+  series_var <- attr(d, "series_var") %||% "series"
+  time_var <- attr(d, "time_var") %||% "time"
+  cap_mat <- matrix(NA_real_, nrow = length(fc_times),
+                      ncol = length(series_levels))
+  for (s in seq_along(series_levels)) {
+    lv <- series_levels[s]
+    for (k in seq_along(fc_times)) {
+      ix <- which(d[[series_var]] == lv &
+                    as.numeric(d[[time_var]]) == fc_times[k])
+      if (length(ix) == 0L) next
+      cap_mat[k, s] <- as.numeric(d[[cap_var]][ix[1L]])
+    }
+  }
+  if (any(is.na(cap_mat))) {
+    stop(insight::format_error(c(
+      paste0(
+        "PW logistic: missing 'cap' values for some forecast ",
+        "cells in 'newdata'."
+      ),
+      i = paste0("Supply 'cap' for every (time, series) cell.")
+    )))
+  }
+  cap_mat <- transform_pw_cap_to_link(cap_mat, family)
+  cap_mat
+}
+
+
+# Internal: apply the observation family's link function to a
+# response-scale cap matrix. Brms / mvgam families with an
+# identity link pass through unchanged; log / logit / probit
+# transform as expected. Errors if the result has any
+# non-finite cells (e.g. user supplied `cap = 0` to a log-link
+# family).
+#'@noRd
+transform_pw_cap_to_link <- function(cap_mat, family) {
+  if (is.null(family) || is.null(family$linkfun)) return(cap_mat)
+  out <- family$linkfun(cap_mat)
+  if (any(!is.finite(out))) {
+    stop(insight::format_error(c(
+      paste0(
+        "PW logistic: cap values are not finite after applying ",
+        "the '", family$link %||% "<unknown>",
+        "' link transform."
+      ),
+      x = paste0(
+        "Check that all 'cap' values are valid on the response ",
+        "scale (e.g. strictly positive for a log link)."
+      )
+    )))
+  }
+  out
 }
 
 

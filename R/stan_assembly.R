@@ -510,7 +510,10 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
       series_var = dimensions$series_var,
       unique_times = dimensions$unique_times,
       unique_series = dimensions$unique_series,
-      data = obs_setup$data %||% trend_setup$data  # Use original data for hierarchical grouping and CAR calculations
+      # Reason: PW logistic needs `data` and `family` to build
+      # cap_trend (cap column read from data, link-transformed).
+      data = obs_setup$data %||% trend_setup$data,
+      family = obs_setup$family
     )
 
     # Compute hierarchical parameters if grouping specified
@@ -1546,10 +1549,34 @@ handle_nonlinear_trend_injection <- function(code_lines, block_info,
   mu_assignment_indices <- which(grepl("\\s*mu\\[n\\]\\s*=", model_lines))
 
   if (length(mu_assignment_indices) == 0) {
-    stop(insight::format_error(c(
-      "No mu[n] assignment patterns found in nonlinear model block.",
-      i = "Expected pattern: mu[n] = <expression>;"
-    )))
+    # brms emits `vector[N] mu = rep_vector(0.0, N);` (no per-
+    # element assignment) when the observation formula has no
+    # fixed terms (e.g. `y ~ -1` or `y ~ 0`). The trend still
+    # needs to enter `mu`, so append an explicit per-element
+    # trend addition right after the declaration.
+    decl_indices <- which(grepl(
+      "\\s*vector\\[N\\]\\s*mu\\s*=\\s*rep_vector",
+      model_lines
+    ))
+    if (length(decl_indices) == 0L) {
+      stop(insight::format_error(c(
+        "No mu[n] assignment patterns found in nonlinear model block.",
+        i = "Expected pattern: mu[n] = <expression>;"
+      )))
+    }
+    abs_idx <- block_info$start_idx + max(decl_indices) - 1L
+    decl_line <- code_lines[abs_idx]
+    indent <- sub("^(\\s*).*", "\\1", decl_line)
+    insertion <- c(
+      paste0(indent, "for (n in 1:N) {"),
+      paste0(
+        indent, "  mu[n] = trend[obs_trend_time[n], ",
+        "obs_trend_series[n]];"
+      ),
+      paste0(indent, "}")
+    )
+    code_lines <- append(code_lines, insertion, after = abs_idx)
+    return(code_lines)
   }
 
   # Use the last mu assignment for trend injection
@@ -4773,6 +4800,114 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 #' # Override growth pattern
 #' stanvars <- generate_pw_trend_stanvars(trend_specs, data_info, growth = "linear")
 #'
+# Internal: read the user-supplied `cap` column from training
+# data and reshape to the `[n_time, n_series]` matrix Stan
+# expects for `cap_trend`. Applies the observation family's link
+# function so the kernel can evaluate `cap * inv_logit(...)`
+# directly on the linear-predictor scale. Errors when cap is
+# missing, non-finite, non-positive on the response scale, or
+# non-finite after the link transform.
+#'@noRd
+build_pw_cap_matrix <- function(data, cap_var, time_var, series_var,
+                                  n_time, n_series, family) {
+  checkmate::assert_data_frame(data, min.rows = 1L)
+  checkmate::assert_string(cap_var, min.chars = 1L)
+  checkmate::assert_string(time_var)
+  checkmate::assert_string(series_var)
+  checkmate::assert_int(n_time, lower = 1L)
+  checkmate::assert_int(n_series, lower = 1L)
+
+  if (!(cap_var %in% names(data))) {
+    stop(insight::format_error(c(
+      paste0(
+        "PW logistic growth requires a '", cap_var,
+        "' column in the training data."
+      ),
+      i = paste0(
+        "Either supply '", cap_var, "' or use growth = 'linear'."
+      )
+    )))
+  }
+
+  cap_vals <- data[[cap_var]]
+  if (any(is.na(cap_vals))) {
+    stop(insight::format_error(paste0(
+      "PW logistic: missing values in '", cap_var, "' column."
+    )))
+  }
+  if (any(!is.finite(cap_vals)) || any(cap_vals <= 0)) {
+    stop(insight::format_error(c(
+      paste0(
+        "PW logistic: '", cap_var,
+        "' must be strictly positive and finite on the ",
+        "response scale."
+      )
+    )))
+  }
+
+  times <- as.numeric(data[[time_var]])
+  series_fac <- as.factor(data[[series_var]])
+  series_levels <- levels(series_fac)
+  if (length(series_levels) < n_series) {
+    stop(insight::format_error(c(
+      paste0(
+        "PW: '", series_var, "' has fewer levels than n_series."
+      ),
+      x = paste0(
+        "Got ", length(series_levels), " levels, expected at least ",
+        n_series, "."
+      )
+    )))
+  }
+  time_levels <- sort(unique(times))
+  if (length(time_levels) < n_time) {
+    stop(insight::format_error(c(
+      paste0(
+        "PW: '", time_var, "' has fewer unique values than n_time."
+      ),
+      x = paste0(
+        "Got ", length(time_levels), " unique times, expected ",
+        n_time, "."
+      )
+    )))
+  }
+  time_idx <- match(times, time_levels)
+
+  out <- matrix(NA_real_, nrow = n_time, ncol = n_series)
+  for (s in seq_len(n_series)) {
+    rows <- which(series_fac == series_levels[s])
+    if (length(rows) == 0L) next
+    out[time_idx[rows], s] <- as.numeric(cap_vals[rows])
+  }
+  if (any(is.na(out))) {
+    stop(insight::format_error(c(
+      paste0(
+        "PW logistic: '", cap_var, "' missing for some (time, ",
+        series_var, ") cells in training data."
+      ),
+      i = "Each training (time, series) cell needs a cap value."
+    )))
+  }
+
+  if (!is.null(family) && !is.null(family$linkfun)) {
+    out <- family$linkfun(out)
+    if (any(!is.finite(out))) {
+      stop(insight::format_error(c(
+        paste0(
+          "PW logistic: cap values are non-finite after applying ",
+          "the '", family$link %||% "<unknown>", "' link."
+        ),
+        x = paste0(
+          "Check that all '", cap_var, "' values are valid on ",
+          "the response scale."
+        )
+      )))
+    }
+  }
+  out
+}
+
+
 #' @noRd
 generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
                                        prior = NULL) {
@@ -4880,7 +5015,29 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   # Validate PW-specific parameters
   checkmate::assert_number(n_changepoints, lower = 0)
   checkmate::assert_number(changepoint_scale, lower = 0)
-  t_change_values <- seq(0.1, 0.9, length.out = n_changepoints)
+  changepoint_range <- trend_specs$changepoint_range %||% 0.8
+  checkmate::assert_number(changepoint_range, lower = 0, upper = 1)
+
+  # Distribute changepoints across the first
+  # `changepoint_range * n_time` time points of the training
+  # history, following Prophet's convention (Taylor & Letham
+  # 2018). `n_time` here is the number of unique training
+  # timepoints, so changepoints land on the actual time grid
+  # rather than on arbitrary fractions.
+  n_time_trend <- data_info$n_time
+  if (is.null(n_time_trend) || n_time_trend < 2L) {
+    stop(insight::format_error(c(
+      "PW trend requires at least two unique training time points.",
+      x = paste0("Got n_time = ", n_time_trend %||% "NULL", ".")
+    )))
+  }
+  hist_size <- floor(n_time_trend * changepoint_range)
+  if (hist_size < 1L) hist_size <- 1L
+  t_change_values <- unique(round(
+    seq.int(1, hist_size, length.out = n_changepoints + 1L)[-1L]
+  ))
+  n_changepoints <- length(t_change_values)
+  change_freq <- n_changepoints / hist_size
 
   # Create individual stanvars for each PW data component
   n_change_stanvar <- brms::stanvar(
@@ -4891,7 +5048,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   )
 
   t_change_stanvar <- brms::stanvar(
-    x = t_change_values,
+    x = as.numeric(t_change_values),
     name = "t_change_trend",
     scode = "vector[n_change_trend] t_change_trend;",
     block = "data"
@@ -4909,10 +5066,19 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
 
   # Logistic-specific data (carrying capacity)
   if (trend_type == "logistic") {
+    cap_matrix <- build_pw_cap_matrix(
+      data = data_info$data,
+      cap_var = trend_specs$cap %||% "cap",
+      time_var = data_info$time_var %||% "time",
+      series_var = data_info$series_var %||% "series",
+      n_time = n_time_trend,
+      n_series = n_series,
+      family = data_info$family
+    )
     pw_logistic_data_stanvar <- brms::stanvar(
-      x = matrix(10, nrow = n_obs, ncol = n_series),  # Default carrying capacity
-      name = "pw_logistic_data",
-      scode = glue::glue("matrix[N_time_trend, N_lv_trend] cap_trend; // carrying capacities"),
+      x = cap_matrix,
+      name = "cap_trend",
+      scode = "matrix[N_time_trend, N_lv_trend] cap_trend;",
       block = "data"
     )
   }

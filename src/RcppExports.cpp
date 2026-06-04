@@ -46,10 +46,28 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// pw_trendC
+arma::mat pw_trendC(const arma::vec& t, const arma::vec& k, const arma::vec& m, const arma::mat& delta, const arma::vec& t_change, const arma::mat& cap, const std::string& growth_type);
+RcppExport SEXP _mvgam_pw_trendC(SEXP tSEXP, SEXP kSEXP, SEXP mSEXP, SEXP deltaSEXP, SEXP t_changeSEXP, SEXP capSEXP, SEXP growth_typeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type t(tSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type k(kSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type m(mSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type delta(deltaSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type t_change(t_changeSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type cap(capSEXP);
+    Rcpp::traits::input_parameter< const std::string& >::type growth_type(growth_typeSEXP);
+    rcpp_result_gen = Rcpp::wrap(pw_trendC(t, k, m, delta, t_change, cap, growth_type));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_mvgam_trend_arma_recursC", (DL_FUNC) &_mvgam_trend_arma_recursC, 9},
     {"_mvgam_car1_recursC", (DL_FUNC) &_mvgam_car1_recursC, 6},
+    {"_mvgam_pw_trendC", (DL_FUNC) &_mvgam_pw_trendC, 7},
     {NULL, NULL, 0}
 };
 
