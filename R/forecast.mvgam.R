@@ -135,7 +135,8 @@ forecast.mvgam <- function(object,
     stop(insight::format_error(c(
       "'ndraws' exceeds the number of posterior draws.",
       x = paste0("Got ndraws = ", ndraws,
-                 ", total draws = ", total_draws, ".")
+                 ", total draws = ", total_draws, "."),
+      i = "Use a smaller value or set ndraws = NULL to use all draws."
     )))
   }
   draw_idx <- if (ndraws == total_draws) {
@@ -148,8 +149,14 @@ forecast.mvgam <- function(object,
   fc_grid <- resolve_forecast_grid(object, newdata, training,
                                      series_levels)
 
-  hindcasts <- build_hindcast_arms(object, training, type,
-                                     draw_idx, obs_uncertainty)
+  # The hindcast slot inside a forecast() result uses the same
+  # deterministic-state convention as hindcast()
+  # (resample_innovations = FALSE) so the two surfaces agree at
+  # the training grid.
+  hindcasts <- build_hindcast_arms(
+    object, training, type, draw_idx, obs_uncertainty,
+    resample_innovations = FALSE
+  )
 
   forecasts <- if (is.null(fc_grid)) {
     NULL
@@ -230,8 +237,11 @@ build_training_arms <- function(object, series_levels) {
     list(time_var = "time", series_var = "series")
   time_var <- meta_vars$time_var
   series_var <- meta_vars$series_var
-  resp <- object$mv_spec$response_names %||%
-    as.character(object$formula[[2L]])[1L]
+  # `response_names` may be a length>1 vector for response-side
+  # addition terms (`y | trials(n)`, `y | cens(c)` etc). The
+  # actual response column is always the first element.
+  resp <- (object$mv_spec$response_names %||%
+    as.character(object$formula[[2L]]))[1L]
 
   series_fac <- as.factor(d[[series_var]])
   observations <- lapply(series_levels, function(lv) {
@@ -365,9 +375,20 @@ build_training_tail_data <- function(training, max_lag) {
 # existing posterior_predict / posterior_epred / component-
 # linpred infrastructure so dpar / trials / family handling stays
 # centralised. Slices to the chosen draws.
+#
+# `resample_innovations` controls the latent-state pathway:
+# FALSE uses the Stan-fitted `trend[t, s]` and `mu_trend[t, s]`
+# directly (master's deterministic-state hindcast convention),
+# TRUE draws fresh innovations from the trend's covariance and
+# adds them on top via posterior_epred / posterior_predict's
+# marginal MC pathway. Hindcasts default to FALSE so a
+# perfectly-fit trend (e.g. RW with sigma -> 0) returns response
+# draws that hug the training values, surfacing
+# overfit-versus-predict gaps directly.
 #'@noRd
 build_hindcast_arms <- function(object, training, type, draw_idx,
-                                  obs_uncertainty) {
+                                  obs_uncertainty,
+                                  resample_innovations = FALSE) {
   series_levels <- names(training$observations)
   out <- vector("list", length(series_levels))
   names(out) <- series_levels
@@ -383,20 +404,27 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
       training$data[[training$series_var]] == lv, , drop = FALSE
     ]
     sub <- sub[order(sub[[training$time_var]]), , drop = FALSE]
-    out[[s]] <- hindcast_one_series(object, sub, type,
-                                      draw_idx, obs_uncertainty)
+    out[[s]] <- hindcast_one_series(
+      object, sub, type, draw_idx, obs_uncertainty,
+      resample_innovations
+    )
   }
   out
 }
 
 
 # Internal: dispatch on `type` for a single series's hindcast.
-# `trend` / `link` reuse extract_component_linpred; `expected`
-# and `response` route through posterior_epred / posterior_predict
-# so the family / dpar / trials wiring stays single-sourced.
+# `trend` / `link` reuse extract_component_linpred (always
+# deterministic at the Stan-fitted state). `expected` /
+# `response` route through posterior_epred / posterior_predict
+# with `resample_innovations` toggling whether the latent state
+# gets fresh innovation draws on top (TRUE) or is read directly
+# from the Stan posterior (FALSE, the default for hindcasts).
+# Maps to the underlying helpers' `process_error` flag.
 #'@noRd
 hindcast_one_series <- function(object, sub_data, type, draw_idx,
-                                  obs_uncertainty) {
+                                  obs_uncertainty,
+                                  resample_innovations = FALSE) {
   full <- switch(
     type,
     "trend" = extract_component_linpred(
@@ -410,14 +438,20 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
       mvgam_fit = object, newdata = sub_data,
       component = "trend", incl_latent_state = TRUE
     ),
-    "expected" = posterior_epred(object, newdata = sub_data,
-                                  ndraws = NULL),
+    "expected" = posterior_epred(
+      object, newdata = sub_data, ndraws = NULL,
+      process_error = resample_innovations
+    ),
     "response" = if (isTRUE(obs_uncertainty)) {
-      posterior_predict(object, newdata = sub_data,
-                          ndraws = NULL)
+      posterior_predict(
+        object, newdata = sub_data, ndraws = NULL,
+        process_error = resample_innovations
+      )
     } else {
-      posterior_epred(object, newdata = sub_data,
-                        ndraws = NULL)
+      posterior_epred(
+        object, newdata = sub_data, ndraws = NULL,
+        process_error = resample_innovations
+      )
     }
   )
   if (is.list(full) && !is.matrix(full)) {
