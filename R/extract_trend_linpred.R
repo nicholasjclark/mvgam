@@ -25,7 +25,8 @@
 #              contribution -- the centred convention reduces to
 #              `trend - 0 = trend`)
 #'@noRd
-extract_trend_linpred <- function(fit, draw_id, newdata) {
+extract_trend_linpred <- function(fit, draw_id, newdata,
+                                    trend_lp_mat = NULL) {
   checkmate::assert_class(fit, "mvgam")
   checkmate::assert_int(draw_id, lower = 1L)
   checkmate::assert_data_frame(newdata, min.rows = 1L)
@@ -35,12 +36,20 @@ extract_trend_linpred <- function(fit, draw_id, newdata) {
   # treats a NULL `linpreds` slot as a zero matrix.
   if (is.null(fit$trend_model)) return(NULL)
 
-  full_mat <- extract_component_linpred(
-    mvgam_fit = fit,
-    newdata = newdata,
-    component = "trend",
-    incl_latent_state = FALSE
-  )
+  # Callers running a per-draw loop (forecast.mvgam) compute
+  # the [ndraws, nobs] linpred matrix once for the chosen
+  # newdata and pass it via `trend_lp_mat` to skip the
+  # `extract_component_linpred` cost on every iteration.
+  full_mat <- if (is.null(trend_lp_mat)) {
+    extract_component_linpred(
+      mvgam_fit = fit,
+      newdata = newdata,
+      component = "trend",
+      incl_latent_state = FALSE
+    )
+  } else {
+    trend_lp_mat
+  }
 
   # Multivariate trend formulas return a per-response named list
   # of matrices. Forecasting for multivariate response models is
@@ -121,6 +130,26 @@ reshape_linpred_to_grid <- function(lp_vec, obs_struct) {
 
   for (j in seq_along(lp_vec)) {
     out[t_idx[j], s_idx[j]] <- lp_vec[j]
+  }
+  out
+}
+
+
+# Internal: inverse of `reshape_linpred_to_grid`. Flatten a
+# `[n_unique_times, n_series]` matrix back into the
+# observation-ordered vector that matches `obs_struct$time` /
+# `obs_struct$series_int` row-for-row. Used by `forecast.mvgam`
+# to align per-draw kernel output with the obs-side linpred
+# vector before combining and applying the observation family.
+#'@noRd
+flatten_grid_to_obs_order <- function(grid, obs_struct) {
+  unique_times <- obs_struct$unique_times
+  n_obs <- length(obs_struct$time)
+  out <- numeric(n_obs)
+  t_idx <- match(obs_struct$time, unique_times)
+  s_idx <- as.integer(obs_struct$series_int)
+  for (j in seq_len(n_obs)) {
+    out[j] <- grid[t_idx[j], s_idx[j]]
   }
   out
 }

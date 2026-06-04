@@ -25,7 +25,7 @@
 # enrichments: re-runs `enrich_trend_metadata` on the fly when
 # the cached fields are absent so loaded older fits still work.
 #'@noRd
-extract_last_state <- function(fit, draw_id) {
+extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
   checkmate::assert_class(fit, "mvgam")
   checkmate::assert_int(draw_id, lower = 1L)
 
@@ -41,7 +41,13 @@ extract_last_state <- function(fit, draw_id) {
   # `setNames(as.numeric(...), colnames(...))` also sidesteps
   # the "Dropping 'draws_df' class" warnings raised by
   # `[.draws_df`.
-  draws_mat <- posterior::as_draws_matrix(fit$fit)
+  #
+  # Callers running a per-draw loop (forecast.mvgam) build the
+  # matrix once and pass it via `draws_mat` to skip the
+  # `as_draws_matrix` cost on every iteration.
+  if (is.null(draws_mat)) {
+    draws_mat <- posterior::as_draws_matrix(fit$fit)
+  }
   total_draws <- nrow(draws_mat)
   if (draw_id > total_draws) {
     stop(insight::format_error(c(
@@ -234,9 +240,23 @@ extract_ma_innovations <- function(one_draw, n_series, n_lv,
       nm <- paste0("ma_innovations_trend[", abs_t, ",", s, "]")
       val <- one_draw[[nm]]
       if (is.null(val)) {
-        # Some configurations may not expose ma_innovations_trend
-        # in the posterior (e.g. when the user has excluded it
-        # via `exclude`). Fall back to zero — the kernel default.
+        # `ma_innovations_trend` is not in the posterior (e.g.
+        # excluded via `exclude`). Returning NULL seeds the
+        # kernel's MA history with zeros, which biases the
+        # first forecast step by `theta * e[T]` for an ARMA
+        # model. Emit a one-time warning so the caller knows
+        # the fallback was taken.
+        if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+          rlang::warn(
+            paste0(
+              "ARMA MA innovation 'ma_innovations_trend' is ",
+              "not in the posterior; first forecast step uses ",
+              "zero past innovations and may be biased."
+            ),
+            .frequency = "once",
+            .frequency_id = "mvgam_ma_innov_missing"
+          )
+        }
         return(NULL)
       }
       out[t, s] <- as.numeric(val)
