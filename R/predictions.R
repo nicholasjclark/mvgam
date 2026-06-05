@@ -2044,6 +2044,7 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
 #' @noRd
 extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
                                      resp = NULL, ndraws = NULL,
+                                     draw_ids = NULL,
                                      re_formula = NULL, allow_new_levels = FALSE,
                                      sample_new_levels = "uncertainty",
                                      incl_latent_state = TRUE) {
@@ -2051,6 +2052,14 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   checkmate::assert_class(mvgam_fit, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1)
   checkmate::assert_string(component)
+  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,
+                                any.missing = FALSE)
+  if (!is.null(ndraws) && !is.null(draw_ids)) {
+    stop(insight::format_error(c(
+      "Cannot supply both 'ndraws' and 'draw_ids'.",
+      i = "Pass one or the other; 'draw_ids' takes precedence when both look set."
+    )))
+  }
   checkmate::assert_string(resp, null.ok = TRUE)
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
   checkmate::assert_logical(allow_new_levels, len = 1)
@@ -2111,10 +2120,21 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
 
   # Extract parameter draws
   full_draws <- posterior::as_draws_matrix(mvgam_fit$fit)
-  
-  # Subset to requested draws if specified
-  if (!is.null(ndraws)) {
-    n_available <- nrow(full_draws)
+  n_available <- nrow(full_draws)
+
+  # Subset to requested draws. draw_ids takes precedence (already
+  # validated against ndraws conflict above) so callers can pin the
+  # exact rows shared with paired extractions (e.g. dpar pulls).
+  if (!is.null(draw_ids)) {
+    if (max(draw_ids) > n_available) {
+      stop(insight::format_error(c(
+        "'draw_ids' exceeds the number of posterior draws.",
+        x = paste0("Got max(draw_ids) = ", max(draw_ids),
+                   ", total draws = ", n_available, ".")
+      )))
+    }
+    full_draws <- full_draws[draw_ids, , drop = FALSE]
+  } else if (!is.null(ndraws)) {
     if (ndraws > n_available) {
       stop(insight::format_error(
         cli::format_inline(

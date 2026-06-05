@@ -179,3 +179,93 @@ test_that("get_combined_linpred returns obs only when no trend model", {
                               newdata = NULL, process_error = TRUE)
   expect_equal(out, matrix(7, 3, 2))
 })
+
+
+# transform = TRUE: posterior_linpred.mvgam must forward to
+# posterior_epred so the inverse link / family-specific E[Y]
+# transformation is applied (brms convention).
+test_that("posterior_linpred(transform = TRUE) forwards to posterior_epred", {
+  sentinel <- matrix(rnorm(12), nrow = 4, ncol = 3)
+  call_log <- list()
+  testthat::local_mocked_bindings(
+    posterior_epred.mvgam = function(object, ...) {
+      call_log[["called"]] <<- TRUE
+      call_log[["dots"]] <<- list(...)
+      sentinel
+    },
+    .package = "mvgam"
+  )
+  out <- posterior_linpred.mvgam(
+    stub_obj(),
+    newdata = NULL,
+    transform = TRUE,
+    process_error = FALSE,
+    ndraws = 4
+  )
+  expect_true(isTRUE(call_log$called))
+  expect_identical(out, sentinel)
+  expect_identical(call_log$dots$process_error, FALSE)
+  expect_identical(call_log$dots$ndraws, 4)
+})
+
+
+test_that("posterior_linpred(transform = FALSE) keeps link-scale path", {
+  testthat::local_mocked_bindings(
+    extract_component_linpred = function(mvgam_fit, newdata, component, ...) {
+      if (component == "obs") matrix(1, 4, 3) else matrix(0.5, 4, 3)
+    },
+    has_stochastic_trend = function(object) FALSE,
+    .package = "mvgam"
+  )
+  obj <- stub_obj()
+  obj$data <- data.frame(x = 1:3)
+  out <- posterior_linpred.mvgam(obj, transform = FALSE,
+                                 process_error = TRUE)
+  expect_equal(out, matrix(1.5, 4, 3))
+})
+
+
+test_that("posterior_linpred(transform = ...) validated as flag", {
+  expect_error(
+    posterior_linpred.mvgam(stub_obj(), transform = "yes"),
+    "transform"
+  )
+  expect_error(
+    posterior_linpred.mvgam(stub_obj(), transform = NA),
+    "transform"
+  )
+})
+
+
+# draw_ids plumbing: posterior_linpred -> get_combined_linpred ->
+# extract_component_linpred(twice) must thread the same draw_ids so mu
+# / sigma extractions stay aligned to a single posterior subset.
+
+test_that("posterior_linpred(draw_ids = ...) forwards through stack", {
+  captured <- list()
+  testthat::local_mocked_bindings(
+    extract_component_linpred = function(mvgam_fit, newdata, component,
+                                         ...) {
+      args <- list(...)
+      captured[[component]] <<- args$draw_ids
+      matrix(1, nrow = if (is.null(args$draw_ids)) 4L else
+        length(args$draw_ids), ncol = 3L)
+    },
+    has_stochastic_trend = function(object) FALSE,
+    .package = "mvgam"
+  )
+  obj <- stub_obj()
+  obj$data <- data.frame(x = 1:3)
+  posterior_linpred.mvgam(obj, transform = FALSE,
+                          draw_ids = c(2L, 5L, 11L))
+  expect_identical(captured$obs, c(2L, 5L, 11L))
+  expect_identical(captured$trend, c(2L, 5L, 11L))
+})
+
+
+test_that("posterior_linpred(draw_ids = TRUE) rejects non-integer", {
+  expect_error(
+    posterior_linpred.mvgam(stub_obj(), draw_ids = c(1.5, 2.5)),
+    "draw_ids"
+  )
+})

@@ -123,3 +123,40 @@ test_that("pp_check loo_pit_overlay renders with PSIS weights", {
   )
   testthat::expect_s3_class(plt, "ggplot")
 })
+
+
+# logLik.mvgam: stats::logLik S3 method. AIC()/BIC() dispatch on it.
+# The scalar return is mean(rowSums(log_lik)); df = posterior
+# variables minus NUTS sampler diagnostics; nobs = nobs.mvgam(fit).
+# For state-space models df overcounts because every latent state
+# is a sampled variable, so AIC/BIC are coarse — LOO/WAIC are
+# preferred for proper Bayesian model selection.
+
+test_that("logLik.mvgam scalar is finite and AIC/BIC work end-to-end", {
+  require_fixtures("val_mvgam_gauss_ar1_n150.rds")
+  mvgam_fit <- load_mvgam("gauss_ar1_n150")
+  ll <- logLik(mvgam_fit)
+  testthat::expect_s3_class(ll, "logLik")
+  testthat::expect_equal(length(ll), 1L)
+  testthat::expect_true(is.finite(as.numeric(ll)))
+  testthat::expect_true(attr(ll, "df") > 0L)
+  testthat::expect_equal(attr(ll, "nobs"), nobs(mvgam_fit))
+  # AIC = -2 * ll + 2 * df ; BIC = -2 * ll + log(n) * df.
+  expected_aic <- -2 * as.numeric(ll) + 2 * attr(ll, "df")
+  expected_bic <- -2 * as.numeric(ll) +
+                  log(attr(ll, "nobs")) * attr(ll, "df")
+  testthat::expect_equal(AIC(mvgam_fit), expected_aic, tolerance = 1e-8)
+  testthat::expect_equal(BIC(mvgam_fit), expected_bic, tolerance = 1e-8)
+})
+
+test_that("logLik.mvgam(pointwise = TRUE) returns the log_lik matrix", {
+  require_fixtures("val_mvgam_gauss_ar1_n150.rds")
+  mvgam_fit <- load_mvgam("gauss_ar1_n150")
+  ll_mat <- logLik(mvgam_fit, pointwise = TRUE)
+  testthat::expect_true(is.matrix(ll_mat))
+  testthat::expect_equal(ncol(ll_mat), nobs(mvgam_fit))
+  testthat::expect_true(all(is.finite(ll_mat)))
+  # The pointwise=TRUE path must agree with log_lik() row-for-row.
+  expected <- log_lik(mvgam_fit)
+  testthat::expect_identical(dim(ll_mat), dim(expected))
+})

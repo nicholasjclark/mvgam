@@ -410,5 +410,67 @@ fit_mvgam_cached("gauss_ar1_n150",
   y ~ 1 + x, ~ AR(p = 1),
   test_data_gauss, gaussian())
 
+# ----------------------------------------------------------------------
+# [21] VAR(p = 1) cor=TRUE on 3 series - residual_cor fixture
+# ----------------------------------------------------------------------
+cat("\n[21] VAR(1) 3-series correlated trend\n")
+set.seed(11)
+n_t <- 40L
+n_sv <- 3L
+A_true <- matrix(c(0.5, 0.1, 0.0,
+                   0.1, 0.4, 0.1,
+                   0.0, 0.1, 0.3), n_sv, n_sv, byrow = TRUE)
+L_true <- t(chol(matrix(c(0.4, 0.15, 0.05,
+                          0.15, 0.4, 0.1,
+                          0.05, 0.1, 0.3), n_sv, n_sv, byrow = TRUE)))
+lat <- matrix(0, n_t, n_sv)
+for (t in 2:n_t) {
+  lat[t, ] <- A_true %*% lat[t - 1L, ] + L_true %*% stats::rnorm(n_sv)
+}
+test_data_var <- data.frame(
+  y = as.vector(rpois(n_t * n_sv, exp(1 + as.vector(lat)))),
+  series = factor(rep(paste0("s", 1:n_sv), each = n_t),
+                  levels = paste0("s", 1:n_sv)),
+  time = rep(seq_len(n_t), times = n_sv)
+)
+fit_mvgam_cached("var_cor",
+  y ~ 1, ~ VAR(p = 1),
+  test_data_var, poisson())
+
+# ----------------------------------------------------------------------
+# [22] AR(1) cor=TRUE hierarchical (gr=region, subgr=species)
+# ----------------------------------------------------------------------
+cat("\n[22] AR(1) hierarchical correlated trend (2 groups x 3 subgroups)\n")
+set.seed(13)
+n_t_h <- 30L
+n_groups <- 2L
+n_sub <- 3L
+n_series_h <- n_groups * n_sub
+ar_h <- 0.5
+# Independent latent per series for simplicity; the fit learns the
+# hierarchical structure regardless of the true generating mechanism.
+lat_h <- matrix(0, n_t_h, n_series_h)
+for (s in seq_len(n_series_h)) {
+  for (t in 2:n_t_h) {
+    lat_h[t, s] <- ar_h * lat_h[t - 1L, s] + stats::rnorm(1L, 0, 0.3)
+  }
+}
+test_data_hier <- data.frame(
+  y = as.vector(rpois(n_t_h * n_series_h,
+                      exp(1 + as.vector(lat_h)))),
+  region = factor(rep(rep(paste0("r", 1:n_groups), each = n_sub),
+                      times = n_t_h)),
+  species = factor(rep(rep(paste0("sp", 1:n_sub), times = n_groups),
+                       times = n_t_h)),
+  time = rep(seq_len(n_t_h), each = n_series_h)
+)
+test_data_hier$series <- interaction(test_data_hier$region,
+                                      test_data_hier$species,
+                                      drop = TRUE)
+fit_mvgam_cached("hier_ar_cor",
+  y ~ 1,
+  ~ AR(gr = region, subgr = species, cor = TRUE),
+  test_data_hier, poisson())
+
 cat("\n=== All fixtures present in", FIXTURE_DIR, "===\n")
 cat("Files: ", length(list.files(FIXTURE_DIR, pattern = "\\.rds$")), "\n")

@@ -78,11 +78,11 @@ mvgam_attach <- function() {
 
   # marginaleffects ships a per-class `type_dictionary` data.frame
   # that gates the `type` argument upstream of `get_predict()`. The
-  # pre-existing mvgam row carries master's vocabulary
-  # (response, link, expected, detection, latent_N); append the
-  # brms-convention "prediction" so users can request
-  # posterior_predict() draws via marginaleffects. Use rbind so any
-  # future marginaleffects-side updates to the mvgam row remain in
+  # mvgam row carries the predict.mvgam vocabulary (response, link,
+  # expected, detection, latent_N); append the brms-convention
+  # "prediction" so users can request posterior_predict() draws via
+  # marginaleffects. Use rbind so any future marginaleffects-side
+  # updates to the mvgam row remain in
   # effect.
   if (requireNamespace("marginaleffects", quietly = TRUE)) {
     me_ns <- asNamespace("marginaleffects")

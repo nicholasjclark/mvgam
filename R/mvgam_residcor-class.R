@@ -81,7 +81,7 @@ NULL
 #' only those correlations whose credible interval does not contain zero. All other
 #' correlations are set to zero in the returned plot
 #' @return A `ggplot` object
-#' @seealso [jsdgam()], [lv_correlations()], [residual_cor()]
+#' @seealso [residual_cor()], [summary.mvgam_residcor()]
 #'
 #' @author Nicholas J Clark
 #'

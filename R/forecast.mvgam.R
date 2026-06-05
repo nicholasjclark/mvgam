@@ -382,10 +382,10 @@ build_training_tail_data <- function(training, max_lag) {
 #
 # `resample_innovations` controls the latent-state pathway:
 # FALSE uses the Stan-fitted `trend[t, s]` and `mu_trend[t, s]`
-# directly (master's deterministic-state hindcast convention),
-# TRUE draws fresh innovations from the trend's covariance and
-# adds them on top via posterior_epred / posterior_predict's
-# marginal MC pathway. Hindcasts default to FALSE so a
+# directly (deterministic-state hindcast); TRUE draws fresh
+# innovations from the trend's covariance and adds them on top via
+# posterior_epred / posterior_predict's marginal MC pathway.
+# Hindcasts default to FALSE so a
 # perfectly-fit trend (e.g. RW with sigma -> 0) returns response
 # draws that hug the training values, surfacing
 # overfit-versus-predict gaps directly.

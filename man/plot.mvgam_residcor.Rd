@@ -31,7 +31,7 @@ only those correlations whose credible interval does not contain zero. All other
 correlations are set to zero in the returned plot
 }
 \seealso{
-\code{\link[=jsdgam]{jsdgam()}}, \code{\link[=lv_correlations]{lv_correlations()}}, \code{\link[=residual_cor]{residual_cor()}}
+\code{\link[=residual_cor]{residual_cor()}}, \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}}
 }
 \author{
 Nicholas J Clark

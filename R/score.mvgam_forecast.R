@@ -134,7 +134,7 @@ score.mvgam_forecast <- function(object,
 # ----- Validation -------------------------------------------------
 
 # Internal: shared validation for both score branches. Routes
-# the family / type guards (master's `brier`/`elpd`/`type` rules
+# the family / type guards (the `brier` / `elpd` / `type` rules
 # live here) and the empty-forecast guard.
 #'@noRd
 validate_scoreable_forecast <- function(object, score) {

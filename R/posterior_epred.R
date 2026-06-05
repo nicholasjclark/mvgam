@@ -217,6 +217,176 @@ compute_family_epred <- function(linpred, family,
 }
 
 
+#' Compute Var[Y | theta] per draw for a family
+#'
+#' Companion to [compute_family_epred()] that returns per-draw conditional
+#' variances of the response given the parameter draws. Used by
+#' `predict.mvgam(type = "variance")` to expose the mean-variance
+#' relationship of the observation family.
+#'
+#' @param mu Numeric matrix of E[Y|theta] per draw (`[ndraws x nobs]`),
+#'   already on the response scale (typically the return value of
+#'   [compute_family_epred()] or [posterior_epred.mvgam()]).
+#' @param family A family or brmsfamily object; `family$family` selects
+#'   the variance formula.
+#' @param sigma Optional `[ndraws x nobs]` matrix of `sigma` draws. Required
+#'   for `gaussian` (Var = sigma^2). Other families ignore it.
+#' @param shape Optional `[ndraws x nobs]` matrix of `shape` draws. Required
+#'   for `negbinomial` (Var = mu + mu^2/shape) and `gamma`
+#'   (Var = mu^2/shape).
+#' @param phi Optional `[ndraws x nobs]` matrix of `phi` draws. Required for
+#'   `beta` (Var = mu(1-mu)/(1+phi)). `phi` here is the brms precision
+#'   parameter (shape1 + shape2 of the underlying Beta), not an
+#'   overdispersion.
+#' @param nu Optional `[ndraws x nobs]` matrix of `nu` (degrees of
+#'   freedom) draws. Required for `student`
+#'   (Var = sigma^2 * nu / (nu - 2) when nu > 2; `Inf` otherwise).
+#' @param trials Optional numeric vector (length `ncol(mu)` or 1) of trial
+#'   counts for `binomial` (Var = trials * p * (1-p) where p = mu/trials).
+#'
+#' @return Numeric matrix `[ndraws x nobs]` of conditional variances on the
+#'   response scale.
+#'
+#' @noRd
+compute_family_variance <- function(mu, family, sigma = NULL,
+                                    shape = NULL, phi = NULL,
+                                    nu = NULL, trials = NULL) {
+  # Multivariate dispatch: recurse per response.
+  if (is.list(mu) && !is.matrix(mu)) {
+    checkmate::assert_list(family, names = "named")
+    result <- lapply(names(mu), function(resp_name) {
+      compute_family_variance(
+        mu = mu[[resp_name]],
+        family = family[[resp_name]],
+        sigma = if (is.list(sigma)) sigma[[resp_name]] else sigma,
+        shape = if (is.list(shape)) shape[[resp_name]] else shape,
+        phi = if (is.list(phi)) phi[[resp_name]] else phi,
+        nu = if (is.list(nu)) nu[[resp_name]] else nu,
+        trials = trials
+      )
+    })
+    names(result) <- names(mu)
+    return(result)
+  }
+
+  checkmate::assert_matrix(mu)
+  if (is.null(family$family)) {
+    stop(insight::format_error(
+      "'family' object is missing the 'family' component."
+    ))
+  }
+  family_name <- family$family
+
+  require_dpar <- function(value, dpar_name) {
+    if (is.null(value)) {
+      stop(insight::format_error(c(
+        paste0(
+          "Family '", family_name, "' requires '", dpar_name,
+          "' for variance computation."
+        ),
+        i = "Internal: check predict_variance() extraction path."
+      )))
+    }
+    checkmate::assert_matrix(value)
+    if (nrow(value) != nrow(mu) || ncol(value) != ncol(mu)) {
+      stop(insight::format_error(c(
+        paste0(
+          "Dimension mismatch for '", dpar_name, "' in variance computation."
+        ),
+        x = paste0(
+          "Got [", nrow(value), " x ", ncol(value), "]; expected [",
+          nrow(mu), " x ", ncol(mu), "]."
+        )
+      )))
+    }
+    value
+  }
+
+  switch(
+    family_name,
+    "gaussian" = {
+      s <- require_dpar(sigma, "sigma")
+      s^2
+    },
+    "poisson" = mu,
+    "bernoulli" = mu * (1 - mu),
+    "binomial" = {
+      if (is.null(trials)) {
+        stop(insight::format_error(
+          "Family 'binomial' requires 'trials' for variance computation."
+        ))
+      }
+      checkmate::assert_numeric(trials, lower = 0)
+      if (any(trials == 0) &&
+          !identical(Sys.getenv("TESTTHAT"), "true")) {
+        rlang::warn(
+          c(
+            "'trials' contains zeros.",
+            i = "Variance is NaN for binomial observations with 0 trials."
+          ),
+          .frequency = "once",
+          .frequency_id = "binomial_variance_zero_trials"
+        )
+      }
+      if (length(trials) == 1L) {
+        p <- mu / trials
+        p * (1 - p) * trials
+      } else {
+        trials_mat <- matrix(trials, nrow = nrow(mu), ncol = ncol(mu),
+                             byrow = TRUE)
+        p <- mu / trials_mat
+        p * (1 - p) * trials_mat
+      }
+    },
+    "negbinomial" = ,
+    "negative binomial" = {
+      k <- require_dpar(shape, "shape")
+      mu + mu^2 / k
+    },
+    "gamma" = ,
+    "Gamma" = {
+      k <- require_dpar(shape, "shape")
+      mu^2 / k
+    },
+    "beta" = {
+      p <- require_dpar(phi, "phi")
+      mu * (1 - mu) / (1 + p)
+    },
+    "student" = {
+      s <- require_dpar(sigma, "sigma")
+      df <- require_dpar(nu, "nu")
+      # Var[Y] = sigma^2 * nu/(nu-2) for nu > 2; undefined otherwise.
+      # Return Inf for the undefined region so downstream summaries
+      # propagate non-finiteness rather than silently NA.
+      v <- s^2 * df / (df - 2)
+      v[df <= 2] <- Inf
+      v
+    },
+    "lognormal" = {
+      # brms parameterisation: mu is meanlog, sigma is sdlog. mu_full
+      # arriving here is the response-scale mean exp(meanlog + sdlog^2/2)
+      # (compute_family_epred handles the Jensen correction). So
+      # Var[Y] = E[Y]^2 * (exp(sdlog^2) - 1).
+      s <- require_dpar(sigma, "sigma")
+      mu^2 * (exp(s^2) - 1)
+    },
+    stop(insight::format_error(c(
+      paste0(
+        "type = \"variance\" is not implemented for family '", family_name, "'."
+      ),
+      x = paste0(
+        "Supported families: gaussian, student, lognormal, poisson, ",
+        "bernoulli, binomial, negbinomial, gamma, beta."
+      ),
+      i = paste0(
+        "For unsupported families, draw with type = \"response\" and ",
+        "compute the variance empirically."
+      )
+    )))
+  )
+}
+
+
 #' Extract Posterior Expected Values from mvgam Models
 #'
 #' @description
@@ -315,6 +485,7 @@ compute_family_epred <- function(linpred, family,
 posterior_epred.mvgam <- function(object, newdata = NULL,
                                   process_error = TRUE,
                                   ndraws = NULL,
+                                  draw_ids = NULL,
                                   re_formula = NULL,
                                   allow_new_levels = FALSE,
                                   sample_new_levels = "uncertainty",
@@ -323,6 +494,8 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
   # Validate mvgam-specific parameters
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_logical(process_error, len = 1)
+  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,
+                                any.missing = FALSE)
 
   # Handle newdata = NULL (use training data)
   if (is.null(newdata)) {
@@ -342,6 +515,7 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
     newdata = newdata,
     process_error = process_error,
     ndraws = ndraws,
+    draw_ids = draw_ids,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels,

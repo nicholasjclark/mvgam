@@ -442,3 +442,77 @@ test_that("min_t too late errors with the largest valid value", {
     "leaves no room for evaluation"
   )
 })
+
+
+# ---- loo_compare.mvgam_lfo ---------------------------------------
+
+mk_mvgam_lfo <- function(elpds, eval_timepoints = NULL,
+                          fc_horizon = 1L, pareto_ks = NULL,
+                          refit_triggered = NULL) {
+  n <- length(elpds)
+  if (is.null(eval_timepoints)) eval_timepoints <- seq_len(n) + 30L
+  if (is.null(pareto_ks)) pareto_ks <- rep(0.3, n)
+  if (is.null(refit_triggered)) refit_triggered <- rep(FALSE, n)
+  structure(
+    list(
+      elpds = elpds,
+      eval_timepoints = eval_timepoints,
+      fc_horizon = fc_horizon,
+      pareto_ks = pareto_ks,
+      refit_triggered = refit_triggered,
+      refits_at = integer(0),
+      pareto_k_threshold = 0.7
+    ),
+    class = "mvgam_lfo"
+  )
+}
+
+
+test_that("loo_compare.mvgam_lfo orders by elpd_diff descending", {
+  m1 <- mk_mvgam_lfo(c(-2, -2.5, -3, -2.2, -2.7))
+  # Non-uniform offset so sd(diff) > 0 and se_diff is meaningful.
+  m2 <- mk_mvgam_lfo(c(-3, -3.7, -3.5, -3.4, -3.1))
+  cmp <- loo_compare(m1, m2)
+  expect_s3_class(cmp, "compare.loo")
+  expect_equal(nrow(cmp), 2L)
+  expect_equal(cmp$elpd_diff[1L], 0)
+  expect_lt(cmp$elpd_diff[2L], 0)
+  # se_diff[best] is 0 by construction; se_diff[worst] > 0 because
+  # the per-fold differences vary across folds.
+  expect_equal(cmp$se_diff[1L], 0)
+  expect_gt(cmp$se_diff[2L], 0)
+})
+
+
+test_that("loo_compare.mvgam_lfo errors when eval_timepoints differ", {
+  m1 <- mk_mvgam_lfo(c(-1, -2, -3), eval_timepoints = c(10, 11, 12))
+  m2 <- mk_mvgam_lfo(c(-1, -2, -3), eval_timepoints = c(20, 21, 22))
+  expect_error(loo_compare(m1, m2), "eval_timepoints")
+})
+
+
+test_that("loo_compare.mvgam_lfo errors when fc_horizon differs", {
+  m1 <- mk_mvgam_lfo(c(-1, -2, -3), fc_horizon = 1L)
+  m2 <- mk_mvgam_lfo(c(-1, -2, -3), fc_horizon = 3L)
+  expect_error(loo_compare(m1, m2), "fc_horizon")
+})
+
+
+test_that("loo_compare.mvgam_lfo errors when ELPDs are missing", {
+  m1 <- mk_mvgam_lfo(c(-1, -2, -3))
+  m2 <- mk_mvgam_lfo(c(-1, -2, -3))
+  m2$elpds <- NULL
+  expect_error(loo_compare(m1, m2), "no ELPDs")
+})
+
+
+test_that("loo_compare.mvgam_lfo SE matches paired-diff convention", {
+  # Construct two models where per-fold diff is known exactly:
+  # m2$elpds = m1$elpds - c(1, 1, 1) so diff = (1,1,1), sd = 0
+  # se_diff = sqrt(3) * 0 = 0; elpd_diff = -3
+  m1 <- mk_mvgam_lfo(c(-1, -2, -3))
+  m2 <- mk_mvgam_lfo(c(-2, -3, -4))
+  cmp <- loo_compare(m1, m2)
+  expect_equal(cmp$elpd_diff[2L], -3, tolerance = 1e-10)
+  expect_equal(cmp$se_diff[2L], 0, tolerance = 1e-10)
+})

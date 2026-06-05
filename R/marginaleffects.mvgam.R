@@ -34,10 +34,10 @@ get_predict.mvgam <- function(model,
     type, c("response", "link", "expected", "prediction")
   )
 
-  # Default process_error = FALSE matches master's predict.mvgam: the
-  # latent trend collapses to its posterior mean for slopes /
-  # comparisons / predictions. Users who want per-draw latent-state
-  # uncertainty can pass `process_error = TRUE` through `predictions()`.
+  # Default process_error = FALSE collapses the latent trend to its
+  # posterior mean for slopes / comparisons / predictions. Users who
+  # want per-draw latent-state uncertainty can pass
+  # `process_error = TRUE` through `predictions()`.
   draws <- switch(type,
     link       = posterior_linpred(model, newdata = newdata,
                                    process_error = process_error, ...),

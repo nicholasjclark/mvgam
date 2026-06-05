@@ -51,7 +51,6 @@ Suggests:
     tweedie,
     splines2,
     extraDistr,
-    corpcor,
     wrswoR,
     ggrepel,
     ggpp,

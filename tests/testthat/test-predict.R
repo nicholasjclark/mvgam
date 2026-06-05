@@ -1169,3 +1169,243 @@ test_that("summarize_predictions handles single and multiple quantiles", {
   )
   expect_equal(ncol(result2), 7)
 })
+
+
+# predict.mvgam type= dispatch. Each type routes to a different
+# posterior_* method (or, for type = "variance", to predict_variance()).
+# Tests use mocked S3 methods so the dispatcher can be exercised
+# without a real Stan fit.
+
+predict_stub_obj <- function() structure(list(), class = "mvgam")
+
+test_that("predict.mvgam(type = 'response') routes to posterior_predict", {
+  called <- list()
+  sentinel <- matrix(rnorm(4 * 3), 4, 3)
+  testthat::local_mocked_bindings(
+    posterior_predict.mvgam = function(object, ...) {
+      called$response <<- TRUE
+      sentinel
+    },
+    .package = "mvgam"
+  )
+  out <- predict.mvgam(predict_stub_obj(), summary = FALSE)
+  expect_true(isTRUE(called$response))
+  expect_identical(out, sentinel)
+})
+
+
+test_that("predict.mvgam(type = 'link') routes to posterior_linpred", {
+  called <- list()
+  sentinel <- matrix(rnorm(4 * 3), 4, 3)
+  testthat::local_mocked_bindings(
+    posterior_linpred.mvgam = function(object, ...) {
+      called$link <<- TRUE
+      called$dots <<- list(...)
+      sentinel
+    },
+    .package = "mvgam"
+  )
+  out <- predict.mvgam(predict_stub_obj(), type = "link", summary = FALSE)
+  expect_true(isTRUE(called$link))
+  expect_identical(out, sentinel)
+  # transform should be hard-coded FALSE for the link route
+  expect_identical(called$dots$transform, FALSE)
+})
+
+
+test_that("predict.mvgam(type = 'expected') routes to posterior_epred", {
+  called <- list()
+  sentinel <- matrix(rnorm(4 * 3), 4, 3)
+  testthat::local_mocked_bindings(
+    posterior_epred.mvgam = function(object, ...) {
+      called$expected <<- TRUE
+      sentinel
+    },
+    .package = "mvgam"
+  )
+  out <- predict.mvgam(predict_stub_obj(), type = "expected", summary = FALSE)
+  expect_true(isTRUE(called$expected))
+  expect_identical(out, sentinel)
+})
+
+
+test_that("predict.mvgam(type = 'terms') errors with migration pointer", {
+  expect_error(
+    predict.mvgam(predict_stub_obj(), type = "terms"),
+    "not implemented"
+  )
+  expect_error(
+    predict.mvgam(predict_stub_obj(), type = "terms"),
+    "posterior_smooths"
+  )
+})
+
+
+test_that("predict.mvgam(type = 'latent_N'/'detection') errors clearly", {
+  expect_error(
+    predict.mvgam(predict_stub_obj(), type = "latent_N"),
+    "N-mixture"
+  )
+  expect_error(
+    predict.mvgam(predict_stub_obj(), type = "detection"),
+    "N-mixture"
+  )
+})
+
+
+# compute_family_variance: family-by-family variance formulas.
+
+test_that("compute_family_variance: gaussian returns sigma^2", {
+  mu <- matrix(rnorm(6), 2, 3)
+  sigma <- matrix(c(1, 2, 3, 4, 5, 6), 2, 3)
+  v <- compute_family_variance(
+    mu = mu, family = gaussian(), sigma = sigma
+  )
+  expect_equal(v, sigma^2)
+})
+
+
+test_that("compute_family_variance: poisson returns mu", {
+  mu <- matrix(c(1, 2, 3, 4, 5, 6), 2, 3)
+  v <- compute_family_variance(mu = mu, family = poisson())
+  expect_equal(v, mu)
+})
+
+
+test_that("compute_family_variance: bernoulli returns mu*(1-mu)", {
+  mu <- matrix(c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6), 2, 3)
+  v <- compute_family_variance(
+    mu = mu,
+    family = list(family = "bernoulli", linkinv = plogis)
+  )
+  expect_equal(v, mu * (1 - mu))
+})
+
+
+test_that("compute_family_variance: binomial uses trials per obs", {
+  mu <- matrix(c(2, 4, 6), 1, 3)
+  trials <- c(10, 10, 10)
+  v <- compute_family_variance(
+    mu = mu,
+    family = list(family = "binomial", linkinv = plogis),
+    trials = trials
+  )
+  # p = mu/trials; Var = trials*p*(1-p)
+  p <- mu / 10
+  expect_equal(v, p * (1 - p) * 10)
+})
+
+
+test_that("compute_family_variance: negbinomial uses mu + mu^2/shape", {
+  mu <- matrix(c(1, 2, 3, 4), 2, 2)
+  shape <- matrix(c(2, 4, 6, 8), 2, 2)
+  v <- compute_family_variance(
+    mu = mu,
+    family = list(family = "negbinomial", linkinv = exp),
+    shape = shape
+  )
+  expect_equal(v, mu + mu^2 / shape)
+})
+
+
+test_that("compute_family_variance: gamma uses mu^2/shape", {
+  mu <- matrix(c(2, 3, 4, 5), 2, 2)
+  shape <- matrix(c(1, 2, 3, 4), 2, 2)
+  v <- compute_family_variance(
+    mu = mu,
+    family = list(family = "gamma", linkinv = exp),
+    shape = shape
+  )
+  expect_equal(v, mu^2 / shape)
+})
+
+
+test_that("compute_family_variance: beta uses mu(1-mu)/(1+phi)", {
+  mu <- matrix(c(0.1, 0.2, 0.3, 0.4), 2, 2)
+  phi <- matrix(c(2, 4, 6, 8), 2, 2)
+  v <- compute_family_variance(
+    mu = mu,
+    family = list(family = "beta", linkinv = plogis),
+    phi = phi
+  )
+  expect_equal(v, mu * (1 - mu) / (1 + phi))
+})
+
+
+test_that("compute_family_variance: student uses sigma^2 * nu/(nu-2)", {
+  mu <- matrix(c(1, 2, 3, 4), 2, 2)
+  sigma <- matrix(c(1, 2, 1, 2), 2, 2)
+  nu <- matrix(c(5, 10, 5, 10), 2, 2)
+  v <- compute_family_variance(
+    mu = mu,
+    family = list(family = "student", linkinv = identity),
+    sigma = sigma, nu = nu
+  )
+  expect_equal(v, sigma^2 * nu / (nu - 2))
+})
+
+
+test_that("compute_family_variance: student returns Inf when nu <= 2", {
+  mu <- matrix(1, 2, 2)
+  sigma <- matrix(1, 2, 2)
+  # Column-major fill: nu[1,1]=1.5, nu[2,1]=2.0, nu[1,2]=5.0, nu[2,2]=10.
+  nu <- matrix(c(1.5, 2.0, 5.0, 10.0), 2, 2)
+  v <- compute_family_variance(
+    mu = mu,
+    family = list(family = "student", linkinv = identity),
+    sigma = sigma, nu = nu
+  )
+  expect_true(is.infinite(v[1, 1]))  # nu = 1.5
+  expect_true(is.infinite(v[2, 1]))  # nu = 2.0 (boundary)
+  expect_true(is.finite(v[1, 2]))    # nu = 5.0
+  expect_true(is.finite(v[2, 2]))    # nu = 10.0
+})
+
+
+test_that("compute_family_variance: lognormal uses mu^2 * (exp(sigma^2) - 1)", {
+  # mu here is the response-scale mean E[Y] = exp(meanlog + sdlog^2/2).
+  mu <- matrix(c(2, 4, 6, 8), 2, 2)
+  sigma <- matrix(c(0.5, 1, 0.5, 1), 2, 2)
+  v <- compute_family_variance(
+    mu = mu,
+    family = list(family = "lognormal", linkinv = identity),
+    sigma = sigma
+  )
+  expect_equal(v, mu^2 * (exp(sigma^2) - 1))
+})
+
+
+test_that("compute_family_variance: errors for unsupported family", {
+  mu <- matrix(1, 2, 2)
+  expect_error(
+    compute_family_variance(
+      mu = mu,
+      family = list(family = "tweedie", linkinv = exp)
+    ),
+    "not implemented"
+  )
+})
+
+
+test_that("compute_family_variance: errors with dim mismatch on dpar", {
+  mu <- matrix(1, 2, 3)
+  bad_sigma <- matrix(1, 2, 2)
+  expect_error(
+    compute_family_variance(
+      mu = mu, family = gaussian(), sigma = bad_sigma
+    ),
+    "Dimension mismatch"
+  )
+})
+
+
+test_that("compute_family_variance: errors when required dpar missing", {
+  mu <- matrix(1, 2, 2)
+  expect_error(
+    compute_family_variance(
+      mu = mu,
+      family = list(family = "negbinomial", linkinv = exp)
+    ),
+    "shape"
+  )
+})

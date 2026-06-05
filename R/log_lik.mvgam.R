@@ -19,9 +19,10 @@
 #'   exclusive with `ndraws`).
 #' @param process_error Logical. When `TRUE` (default) each posterior draw
 #'   carries a sampled latent-trend realisation through the linear
-#'   predictor, matching brms's behaviour for a model with stochastic
-#'   dynamics. When `FALSE` the trend is fixed at its posterior mean (the
-#'   `loo.mvgam(incl_dynamics = FALSE)` path on master).
+#'   predictor, integrating the trend's stochastic dynamics into the
+#'   log-likelihood. When `FALSE` the trend is fixed at its posterior
+#'   mean, returning a goodness-of-fit log-likelihood that ignores
+#'   process noise.
 #' @param ... Ignored.
 #'
 #' @return Numeric matrix `[ndraws x nobs]` of pointwise log densities.
@@ -579,4 +580,65 @@ log_lik_cumulative <- function(linpred, link, y, family_pars, trials) {
     }
   }
   out
+}
+
+
+#' Log-likelihood of a fitted mvgam model
+#'
+#' Method for the `stats::logLik` generic so that `AIC()` and `BIC()`
+#' dispatch on `mvgam` objects. Returns the posterior mean of the
+#' summed pointwise log-likelihood (across observations) as a numeric
+#' scalar with the `df` and `nobs` attributes the [stats::AIC()] /
+#' [stats::BIC()] machinery expects.
+#'
+#' @param object A fitted [mvgam][mvgam] object.
+#' @param pointwise Logical. When `FALSE` (default) a single scalar
+#'   `logLik` value is returned for compatibility with `AIC` and `BIC`.
+#'   When `TRUE` the underlying `[ndraws x nobs]` pointwise matrix from
+#'   [log_lik.mvgam()] is returned (matches the historical mvgam
+#'   return shape).
+#' @param ... Additional arguments forwarded to [log_lik.mvgam()]
+#'   (e.g. `newdata`, `ndraws`, `process_error`).
+#'
+#' @return When `pointwise = FALSE`, a length-1 `logLik` object with
+#'   `df` (number of sampled parameters, excluding sampler
+#'   diagnostics) and `nobs` attributes. When `pointwise = TRUE`, a
+#'   `[ndraws x nobs]` numeric matrix of pointwise log densities.
+#'
+#' @details
+#' The scalar returned is the posterior mean of `rowSums(log_lik(object))`
+#' across draws. For Bayesian state-space models AIC and BIC are coarse
+#' instruments because every latent state inflates the parameter count;
+#' [loo()] / [waic()] are usually the better model-selection tools and
+#' are recommended in preference.
+#'
+#' @seealso [log_lik.mvgam()], [loo.mvgam()], [waic.mvgam()].
+#'
+#' @method logLik mvgam
+#' @export
+logLik.mvgam <- function(object, pointwise = FALSE, ...) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_flag(pointwise)
+
+  ll_mat <- log_lik(object, ...)
+
+  if (pointwise) {
+    return(ll_mat)
+  }
+
+  per_draw_sum <- rowSums(ll_mat)
+  ll_scalar <- mean(per_draw_sum)
+
+  diag_pars <- c(
+    "lp__", "lprior", "accept_stat__", "stepsize__", "treedepth__",
+    "n_leapfrog__", "divergent__", "energy__"
+  )
+  df <- length(setdiff(variables(object), diag_pars))
+
+  structure(
+    ll_scalar,
+    df = df,
+    nobs = nobs(object),
+    class = "logLik"
+  )
 }

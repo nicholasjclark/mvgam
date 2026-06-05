@@ -228,8 +228,7 @@ detect_conditional_effects <- function(x) {
 # groupings suitable for plot_predictions(condition = ...). Handles
 # `:` / `*` interactions, smooth wrappers (`s`, `te`, `t2`, `ti`,
 # `gp`, `mo`) and bare terms. For three-variable smooths returns the
-# three pairwise marginal groupings (matches master's split_termlabs
-# semantics).
+# three pairwise marginal groupings.
 split_term_labels <- function(lab) {
   if (grepl(":", lab, fixed = TRUE)) {
     return(list(strsplit(lab, ":", fixed = TRUE)[[1L]]))

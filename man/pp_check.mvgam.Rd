@@ -77,6 +77,14 @@ see the \code{\link[bayesplot:PPC-overview]{PPC}} documentation of the
 bayesplot variants (\code{loo_pit}, \code{loo_pit_overlay},
 \code{loo_pit_qq}, \code{loo_intervals}, \code{loo_ribbon}) compute
 PSIS weights internally via \code{\link[=log_lik.mvgam]{log_lik.mvgam()}}.
+
+To produce conditional posterior predictive checks restricted to a
+particular series or covariate slice, filter \code{newdata} to the rows
+of interest and pass it to \code{pp_check()}. For series-grouped variants
+use the \code{group = "series"} argument of the underlying bayesplot
+functions (e.g. \code{type = "ecdf_overlay_grouped"}, \code{type = "bars_grouped"}). For per-observation summaries against a covariate,
+\code{marginaleffects::plot_predictions()} provides a complementary
+conditional surface.
 }
 \examples{
 \donttest{

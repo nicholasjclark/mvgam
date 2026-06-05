@@ -33,6 +33,7 @@ NULL
 get_combined_linpred <- function(mvgam_fit, newdata,
                                  process_error = TRUE,
                                  ndraws = NULL,
+                                 draw_ids = NULL,
                                  re_formula = NULL,
                                  allow_new_levels = FALSE,
                                  sample_new_levels = "uncertainty",
@@ -48,6 +49,7 @@ get_combined_linpred <- function(mvgam_fit, newdata,
     component = "obs",
     resp = resp,
     ndraws = ndraws,
+    draw_ids = draw_ids,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels
@@ -65,6 +67,7 @@ get_combined_linpred <- function(mvgam_fit, newdata,
     component = "trend",
     resp = resp,
     ndraws = ndraws,
+    draw_ids = draw_ids,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels
@@ -166,6 +169,11 @@ get_combined_linpred <- function(mvgam_fit, newdata,
 #' @param object A fitted mvgam object from [mvgam()].
 #' @param newdata Optional data frame with covariates for prediction. If
 #'   NULL, uses original training data stored in the model object.
+#' @param transform Logical; if `FALSE` (default), values are returned
+#'   on the link scale. If `TRUE`, the inverse link is applied and
+#'   the call is forwarded to [posterior_epred.mvgam()] so the
+#'   returned matrix is on the response scale. Mirrors the
+#'   `transform` argument of [brms::posterior_linpred()].
 #' @param process_error Logical; if TRUE (default), uses the full
 #'   posterior draws of the trend parameters (per-draw variation). If
 #'   FALSE, fixes the trend at its posterior mean for faster
@@ -180,7 +188,12 @@ get_combined_linpred <- function(mvgam_fit, newdata,
 #'   deterministic-state-at-fitted-values semantics use [forecast()] /
 #'   [hindcast()].
 #' @param ndraws Positive integer specifying number of posterior draws to
-#'   use. NULL (default) uses all available draws.
+#'   use. NULL (default) uses all available draws. Mutually exclusive
+#'   with `draw_ids`; supply one or the other.
+#' @param draw_ids Optional integer vector of specific draw indices to
+#'   use. `NULL` (default) selects draws via `ndraws` (or all draws when
+#'   both are NULL). Useful for keeping multiple downstream extractions
+#'   aligned to the same posterior subset.
 #' @param re_formula Formula for random effects. NULL (default) includes
 #'   all random effects, NA excludes all random effects.
 #' @param allow_new_levels Logical; if TRUE, allows new factor levels in
@@ -259,8 +272,10 @@ get_combined_linpred <- function(mvgam_fit, newdata,
 #' @method posterior_linpred mvgam
 #' @export
 posterior_linpred.mvgam <- function(object, newdata = NULL,
+                                    transform = FALSE,
                                     process_error = TRUE,
                                     ndraws = NULL,
+                                    draw_ids = NULL,
                                     re_formula = NULL,
                                     allow_new_levels = FALSE,
                                     sample_new_levels = "uncertainty",
@@ -268,7 +283,27 @@ posterior_linpred.mvgam <- function(object, newdata = NULL,
                                     ...) {
   # Validate mvgam-specific parameters only (other validation delegated)
   checkmate::assert_class(object, "mvgam")
+  checkmate::assert_flag(transform)
   checkmate::assert_logical(process_error, len = 1)
+  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,
+                                any.missing = FALSE)
+
+  # transform = TRUE forwards to posterior_epred so the inverse link
+  # and any family-specific E[Y] transformation are applied.
+  if (transform) {
+    return(posterior_epred(
+      object = object,
+      newdata = newdata,
+      process_error = process_error,
+      ndraws = ndraws,
+      draw_ids = draw_ids,
+      re_formula = re_formula,
+      allow_new_levels = allow_new_levels,
+      sample_new_levels = sample_new_levels,
+      resp = resp,
+      ...
+    ))
+  }
 
   # Handle newdata = NULL (use training data)
   if (is.null(newdata)) {
@@ -288,6 +323,7 @@ posterior_linpred.mvgam <- function(object, newdata = NULL,
     newdata = newdata,
     process_error = process_error,
     ndraws = ndraws,
+    draw_ids = draw_ids,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels,

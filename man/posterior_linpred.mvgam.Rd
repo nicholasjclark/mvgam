@@ -7,8 +7,10 @@
 \method{posterior_linpred}{mvgam}(
   object,
   newdata = NULL,
+  transform = FALSE,
   process_error = TRUE,
   ndraws = NULL,
+  draw_ids = NULL,
   re_formula = NULL,
   allow_new_levels = FALSE,
   sample_new_levels = "uncertainty",
@@ -21,6 +23,12 @@
 
 \item{newdata}{Optional data frame with covariates for prediction. If
 NULL, uses original training data stored in the model object.}
+
+\item{transform}{Logical; if \code{FALSE} (default), values are returned
+on the link scale. If \code{TRUE}, the inverse link is applied and
+the call is forwarded to \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} so the
+returned matrix is on the response scale. Mirrors the
+\code{transform} argument of \code{\link[brms:posterior_linpred.brmsfit]{brms::posterior_linpred()}}.}
 
 \item{process_error}{Logical; if TRUE (default), uses the full
 posterior draws of the trend parameters (per-draw variation). If
@@ -37,7 +45,13 @@ deterministic-state-at-fitted-values semantics use \code{\link[generics:forecast
 \code{\link[=hindcast]{hindcast()}}.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
-use. NULL (default) uses all available draws.}
+use. NULL (default) uses all available draws. Mutually exclusive
+with \code{draw_ids}; supply one or the other.}
+
+\item{draw_ids}{Optional integer vector of specific draw indices to
+use. \code{NULL} (default) selects draws via \code{ndraws} (or all draws when
+both are NULL). Useful for keeping multiple downstream extractions
+aligned to the same posterior subset.}
 
 \item{re_formula}{Formula for random effects. NULL (default) includes
 all random effects, NA excludes all random effects.}

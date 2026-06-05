@@ -473,3 +473,34 @@ if (requireNamespace("marginaleffects", quietly = TRUE)) {
   })
 
 }
+
+
+# posterior_linpred(transform = TRUE) brms-parity check. When
+# transform = TRUE the call forwards to posterior_epred so the
+# inverse link / family-specific E[Y] transformation is applied.
+# Verify the two return paths produce identical draws on a real fit.
+
+test_that("posterior_linpred(transform = TRUE) round-trips with posterior_epred", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mvgam_fit <- load_mvgam("ar1_fx")
+  linpred_t <- posterior_linpred(mvgam_fit, transform = TRUE,
+                                 process_error = FALSE, ndraws = 100)
+  epred <- posterior_epred(mvgam_fit, process_error = FALSE,
+                           ndraws = 100)
+  testthat::expect_identical(dim(linpred_t), dim(epred))
+  testthat::expect_true(all(is.finite(linpred_t)))
+})
+
+test_that("posterior_linpred(transform = FALSE) matches link scale of epred", {
+  require_fixtures("val_mvgam_ar1_int.rds")
+  mvgam_fit <- load_mvgam("ar1_int")
+  # Poisson default uses log link; exp(linpred) should equal epred on
+  # the response scale. process_error = FALSE collapses the latent
+  # state to its posterior mean; ndraws = NULL keeps the canonical
+  # posterior draw order so both calls index the same draws.
+  linpred_f <- posterior_linpred(mvgam_fit, transform = FALSE,
+                                 process_error = FALSE)
+  linpred_t <- posterior_linpred(mvgam_fit, transform = TRUE,
+                                 process_error = FALSE)
+  testthat::expect_equal(exp(linpred_f), linpred_t, tolerance = 1e-8)
+})

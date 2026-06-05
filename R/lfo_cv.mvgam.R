@@ -7,7 +7,7 @@
 # approximate a fresh fit; a refit only happens when the Pareto k
 # diagnostic crosses a stability threshold.
 #
-# ELPD uses master's PSIS algorithm directly. Non-ELPD scores
+# ELPD uses the standard PSIS algorithm directly. Non-ELPD scores
 # (crps, drps, sis, brier, energy, variogram) are computed by
 # resampling forecast draws according to the PSIS weights before
 # routing through `score.mvgam_forecast`, which is the canonical
@@ -120,7 +120,7 @@ lfo_cv.mvgam <- function(object,
   checkmate::assert_subset(score, allowed_scores, empty.ok = FALSE)
   score <- unique(score)
 
-  # Backward-compat: accept the master-era `data` arg.
+  # Backward-compat: accept the deprecated `data` arg.
   if (!is.null(data)) {
     if (is.null(newdata)) {
       warning(insight::format_warning(c(
@@ -196,9 +196,10 @@ lfo_cv.mvgam <- function(object,
     )))
   }
 
-  # Resolve min_t to a time VALUE. Default matches master's ladder
-  # but indexes into the observed times so it works for any
-  # integer start (1..T, 2010..2044, julian days, etc.).
+  # Resolve min_t to a time VALUE. Default picks a sensible training
+  # window from a ladder (30 / 20 / 10 / 1) and indexes into the
+  # observed times so it works for any integer start (1..T,
+  # 2010..2044, julian days, etc.).
   if (is.null(min_t)) {
     base_idx <- if (n_times > 30L) 30L else
       if (n_times > 20L) 20L else
@@ -562,8 +563,8 @@ lfo_sum_rows <- function(x) {
 #' @description Renders a faceted ggplot of the per-fold Pareto-k
 #'   diagnostic and every populated score (ELPD plus any non-ELPD
 #'   scores requested at fit time). Outlier points are highlighted
-#'   per the same thresholds master's plot used: Pareto-k above
-#'   `pareto_k_threshold` and ELPD below its 15% quantile.
+#'   per these thresholds: Pareto-k above `pareto_k_threshold` and
+#'   ELPD below its 15% quantile.
 #'
 #' @importFrom graphics layout axis lines abline polygon points
 #' @param x An object of class `mvgam_lfo`.
@@ -675,6 +676,121 @@ summary.mvgam_lfo <- function(object, ...) {
   }
   rownames(out) <- NULL
   class(out) <- c("tbl_df", "tbl", "data.frame")
+  out
+}
+
+
+#' Compare leave-future-out evaluations across models
+#'
+#' Pairwise ELPD comparison for two or more `mvgam_lfo` objects,
+#' modelled after `loo::loo_compare()` but operating on the per-fold
+#' ELPDs accumulated by [lfo_cv()]. Returns a comparison table sorted
+#' from best to worst by sum ELPD, with the standard error of the
+#' difference computed pair-wise against the best model using the
+#' aligned per-fold differences.
+#'
+#' @param x A `mvgam_lfo` object.
+#' @param ... Additional `mvgam_lfo` objects to compare against `x`.
+#' @param model_names Optional character vector of model labels;
+#'   defaults to the deparsed call names.
+#'
+#' @return A `data.frame` (subclass `compare.loo`) with one row per
+#'   model, sorted by `elpd_diff` descending. Columns:
+#'   \describe{
+#'     \item{`elpd_diff`}{Sum-ELPD difference vs. the best model
+#'       (zero for the best).}
+#'     \item{`se_diff`}{Standard error of `elpd_diff` using the
+#'       per-fold paired-difference SE, scaled by `sqrt(N)`. Zero
+#'       for the best model.}
+#'     \item{`elpd_lfo`}{Sum of per-fold ELPDs.}
+#'     \item{`se_elpd_lfo`}{Standard error of `elpd_lfo`.}
+#'   }
+#'
+#' @details All compared `mvgam_lfo` objects must have been built
+#'   over the same evaluation grid (same `eval_timepoints` and same
+#'   `fc_horizon`). Models with non-aligned grids raise an error
+#'   because paired differences would mix observations.
+#'
+#' @importFrom loo loo_compare
+#' @method loo_compare mvgam_lfo
+#' @export
+loo_compare.mvgam_lfo <- function(x, ..., model_names = NULL) {
+  checkmate::assert_class(x, "mvgam_lfo")
+  extras <- list(...)
+  for (m in extras) {
+    checkmate::assert_class(m, "mvgam_lfo")
+  }
+  models <- c(list(x), extras)
+
+  if (is.null(model_names)) {
+    nms <- c(deparse(substitute(x)),
+             vapply(substitute(...()), deparse, character(1L)))
+    model_names <- nms
+  }
+  checkmate::assert_character(model_names, len = length(models),
+                              any.missing = FALSE)
+
+  # Align grids: every model must have the same eval_timepoints and
+  # fc_horizon so per-fold differences are meaningful.
+  ref_times <- models[[1L]]$eval_timepoints
+  ref_h <- models[[1L]]$fc_horizon
+  for (i in seq_along(models)) {
+    if (!identical(models[[i]]$eval_timepoints, ref_times)) {
+      stop(insight::format_error(c(
+        "Cannot compare: eval_timepoints differ across models.",
+        x = paste0("Model ", i, " has a different evaluation grid ",
+                   "than model 1."),
+        i = paste0("Refit lfo_cv() on each model with the same ",
+                   "min_t and fc_horizon, against the same data.")
+      )))
+    }
+    if (!identical(models[[i]]$fc_horizon, ref_h)) {
+      stop(insight::format_error(c(
+        "Cannot compare: fc_horizon differs across models.",
+        x = paste0("Model ", i, " uses fc_horizon = ",
+                   models[[i]]$fc_horizon,
+                   "; model 1 uses ", ref_h, ".")
+      )))
+    }
+  }
+
+  for (i in seq_along(models)) {
+    if (is.null(models[[i]]$elpds)) {
+      stop(insight::format_error(c(
+        paste0("Model ", i, " has no ELPDs; nothing to compare."),
+        i = paste0("Call lfo_cv(..., score = 'elpd') (or include 'elpd' ",
+                   "in the score vector) to populate ELPDs.")
+      )))
+    }
+  }
+
+  # Build per-model sum ELPD + standard error of the sum, then
+  # paired-difference SE against the best model.
+  elpd_mat <- vapply(models, function(m) m$elpds, numeric(length(ref_times)))
+  if (!is.matrix(elpd_mat)) {
+    elpd_mat <- matrix(elpd_mat, nrow = length(ref_times),
+                       ncol = length(models))
+  }
+  n_folds <- nrow(elpd_mat)
+  sum_elpd <- colSums(elpd_mat, na.rm = TRUE)
+  se_sum <- sqrt(n_folds) * apply(elpd_mat, 2L, stats::sd, na.rm = TRUE)
+
+  best <- which.max(sum_elpd)
+  diff_mat <- elpd_mat - elpd_mat[, best]
+  elpd_diff <- colSums(diff_mat, na.rm = TRUE)
+  se_diff <- sqrt(n_folds) * apply(diff_mat, 2L, stats::sd, na.rm = TRUE)
+  se_diff[best] <- 0
+  elpd_diff[best] <- 0
+
+  ord <- order(elpd_diff, decreasing = TRUE)
+  out <- data.frame(
+    elpd_diff = elpd_diff[ord],
+    se_diff = se_diff[ord],
+    elpd_lfo = sum_elpd[ord],
+    se_elpd_lfo = se_sum[ord],
+    row.names = model_names[ord]
+  )
+  class(out) <- c("compare.loo", "matrix", "data.frame")
   out
 }
 

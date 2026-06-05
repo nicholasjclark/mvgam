@@ -656,6 +656,37 @@ extract_posterior_param <- function(draws_mat, all_cols, param_name) {
 #' sort-order assumption in `extract_named_params()`.
 #'
 #' @noRd
+#' Pull a 2D-indexed Stan parameter `name[i, j]` into a per-draw
+#' `[ndraws, nrow, ncol]` array, validating all required columns are
+#' present. Shared by Cholesky / full-covariance / factor-loadings
+#' extractors that build `[d, i, j]` arrays from posterior draws.
+#'
+#' @noRd
+extract_indexed_array_2d <- function(draws_mat, name, nrow, ncol,
+                                      required_for = name) {
+  checkmate::assert_matrix(draws_mat, min.rows = 1, min.cols = 1)
+  checkmate::assert_string(name, min.chars = 1)
+  checkmate::assert_int(nrow, lower = 1)
+  checkmate::assert_int(ncol, lower = 1)
+  ndraws <- base::nrow(draws_mat)
+  all_cols <- colnames(draws_mat)
+  out <- array(0, c(ndraws, nrow, ncol))
+  for (j in seq_len(ncol)) {
+    for (i in seq_len(nrow)) {
+      col_name <- sprintf("%s[%d,%d]", name, i, j)
+      if (!col_name %in% all_cols) {
+        stop(insight::format_error(c(
+          paste0("Posterior parameter '", col_name, "' not found."),
+          i = paste0("Required for ", required_for, ".")
+        )))
+      }
+      out[, i, j] <- as.numeric(draws_mat[, col_name])
+    }
+  }
+  out
+}
+
+
 extract_simple_cholesky_params <- function(draws_mat, n_series) {
   checkmate::assert_matrix(draws_mat, min.rows = 1, min.cols = 1)
   checkmate::assert_int(n_series, lower = 1)

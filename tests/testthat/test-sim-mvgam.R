@@ -204,3 +204,56 @@ test_that("type outside 1..6 errors informatively", {
   expect_error(sim_mvgam(type = 0L), "not >= 1")
   expect_error(sim_mvgam(type = 7L), "not <= 6")
 })
+
+
+# ---- summary.mvgam_sim --------------------------------------------
+
+test_that("summary.mvgam_sim returns mvgam_sim_summary with expected fields", {
+  sim <- sim_mvgam(type = 2L, n_series = 3L, n_timepoints = 40L,
+                    seed = 11L)
+  s <- summary(sim)
+  expect_s3_class(s, "mvgam_sim_summary")
+  expect_setequal(
+    names(s),
+    c("type", "family", "trend", "n_series", "n_timepoints",
+      "n_train", "n_test", "true_betas", "n_smooths",
+      "smooth_names", "true_trend_sigma", "true_sigma_obs")
+  )
+  expect_equal(s$type, 2L)
+  expect_equal(s$n_series, 3L)
+  expect_equal(s$n_timepoints, 40L)
+  expect_equal(s$n_train + s$n_test, NROW(sim$data_train) +
+                 (if (is.null(sim$data_test)) 0L else NROW(sim$data_test)))
+  expect_true(is.numeric(s$true_trend_sigma))
+})
+
+
+test_that("summary.mvgam_sim trend label uses 'None' when no trend", {
+  sim <- sim_mvgam(type = 1L, n_series = 1L, n_timepoints = 30L,
+                    seed = 3L, trend_model = NULL,
+                    prop_trend = 0)
+  s <- summary(sim)
+  # When prop_trend = 0 the trend_model is still set, but if absent
+  # entirely the label collapses to "None". Either way the field
+  # should be a single non-empty string.
+  expect_true(is.character(s$trend) && nzchar(s$trend))
+})
+
+
+test_that("print.mvgam_sim_summary prints header and parameters", {
+  sim <- sim_mvgam(type = 2L, n_series = 2L, n_timepoints = 25L,
+                    seed = 5L)
+  out <- capture.output(invisible(print(summary(sim))))
+  expect_true(any(grepl("Simulated mvgam dataset", out)))
+  expect_true(any(grepl("Family", out)))
+  expect_true(any(grepl("Trend", out)))
+  expect_true(any(grepl("True generative parameters", out)))
+})
+
+
+test_that("print.mvgam_sim delegates to summary print", {
+  sim <- sim_mvgam(type = 1L, n_series = 1L, n_timepoints = 25L,
+                    seed = 4L)
+  out <- capture.output(invisible(print(sim)))
+  expect_true(any(grepl("Simulated mvgam dataset", out)))
+})

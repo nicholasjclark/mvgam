@@ -324,6 +324,127 @@ sim_mvgam <- function(type = 1L,
 }
 
 
+#' Summary for `sim_mvgam()` output
+#'
+#' Returns a structured snapshot of a simulated dataset's design and
+#' true generative parameters so that ground-truth recovery checks
+#' downstream can be programmed against it without re-extracting
+#' fields manually.
+#'
+#' @param object An `mvgam_sim` object returned by [sim_mvgam()].
+#' @param ... Currently ignored.
+#'
+#' @return A list with class `mvgam_sim_summary` containing:
+#'   \describe{
+#'     \item{`type`}{The catalog type used.}
+#'     \item{`family`}{Family name (string).}
+#'     \item{`trend`}{Trend type label (string or `"None"`).}
+#'     \item{`n_series`}{Number of series.}
+#'     \item{`n_timepoints`}{Total number of timepoints.}
+#'     \item{`n_train`}{Number of training rows.}
+#'     \item{`n_test`}{Number of test rows.}
+#'     \item{`true_betas`}{Named numeric vector of population
+#'       coefficients.}
+#'     \item{`n_smooths`}{Number of true smooth functions.}
+#'     \item{`smooth_names`}{Character vector of true smooth names.}
+#'     \item{`true_trend_sigma`}{Empirical SD of the latent trend
+#'       across all series x time cells.}
+#'     \item{`true_sigma_obs`}{Observation-family scale / dispersion
+#'       parameter (NA if family is fully discrete).}
+#'   }
+#'
+#' @method summary mvgam_sim
+#' @export
+summary.mvgam_sim <- function(object, ...) {
+  checkmate::assert_class(object, "mvgam_sim")
+  trend_label <- if (is.null(object$trend_model)) {
+    "None"
+  } else if (!is.null(object$trend_model$label) &&
+             nzchar(object$trend_model$label)) {
+    object$trend_model$label
+  } else {
+    object$trend_model$type %||% "Unknown"
+  }
+  smooths <- object$true_smooths %||% list()
+  structure(
+    list(
+      type = object$type,
+      family = object$family$family %||% "unknown",
+      trend = trend_label,
+      n_series = NCOL(object$true_trend),
+      n_timepoints = NROW(object$true_trend),
+      n_train = NROW(object$data_train),
+      n_test = if (is.null(object$data_test)) 0L else NROW(object$data_test),
+      true_betas = object$true_betas,
+      n_smooths = length(smooths),
+      smooth_names = names(smooths),
+      true_trend_sigma = object$true_trend_sigma,
+      true_sigma_obs = object$true_sigma_obs
+    ),
+    class = "mvgam_sim_summary"
+  )
+}
+
+
+#' Print method for `mvgam_sim_summary`
+#'
+#' @param x A `mvgam_sim_summary` object.
+#' @param digits Integer; significant digits for printed numbers.
+#'   Default `3`.
+#' @param ... Currently ignored.
+#'
+#' @method print mvgam_sim_summary
+#' @export
+print.mvgam_sim_summary <- function(x, digits = 3L, ...) {
+  checkmate::assert_class(x, "mvgam_sim_summary")
+  checkmate::assert_int(digits, lower = 0L)
+  cat("Simulated mvgam dataset (sim_mvgam type ", x$type, ")\n",
+      sep = "")
+  cat("  Family       : ", x$family, "\n", sep = "")
+  cat("  Trend        : ", x$trend, "\n", sep = "")
+  cat("  Series       : ", x$n_series, "\n", sep = "")
+  cat("  Timepoints   : ", x$n_timepoints, "  (train = ",
+      x$n_train, ", test = ", x$n_test, ")\n", sep = "")
+  cat("\nTrue generative parameters\n")
+  if (length(x$true_betas) > 0L) {
+    cat("  Population coefficients:\n")
+    for (nm in names(x$true_betas)) {
+      cat("    ", nm, " = ",
+          format(round(x$true_betas[[nm]], digits), nsmall = digits),
+          "\n", sep = "")
+    }
+  } else {
+    cat("  Population coefficients: (none)\n")
+  }
+  if (x$n_smooths > 0L) {
+    cat("  Smooth functions (", x$n_smooths, "): ",
+        paste(x$smooth_names, collapse = ", "), "\n", sep = "")
+  }
+  cat("  Latent trend SD: ",
+      format(round(x$true_trend_sigma, digits), nsmall = digits),
+      "\n", sep = "")
+  cat("  Obs noise / dispersion: ",
+      if (is.na(x$true_sigma_obs)) "NA" else
+        format(round(x$true_sigma_obs, digits), nsmall = digits),
+      "\n", sep = "")
+  invisible(x)
+}
+
+
+#' Print method for `mvgam_sim`
+#'
+#' Delegates to `summary(x)` so the default print is informative.
+#'
+#' @param x A `mvgam_sim` object.
+#' @param ... Passed to `print.mvgam_sim_summary()`.
+#'
+#' @method print mvgam_sim
+#' @export
+print.mvgam_sim <- function(x, ...) {
+  print(summary(x), ...)
+}
+
+
 # ------------------------------------------------------------------
 # Type catalog: per-type spec returns (build_data, trend_params,
 # default_trend, default_prop_trend, intercept).

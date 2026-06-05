@@ -617,8 +617,7 @@ assemble_innovations <- function(last_errors, h, n_series, Sigma,
 }
 
 
-# Internal: mgcv-based multivariate-normal sampler. Same recipe as
-# the master-branch helper (R/mvgam_setup.R:182): factor the
+# Internal: mgcv-based multivariate-normal sampler. Factor the
 # covariance via mgcv::mroot and apply to IID normals.
 #'@noRd
 rmvn <- function(n, mu, Sigma) {

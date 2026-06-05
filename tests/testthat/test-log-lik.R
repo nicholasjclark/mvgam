@@ -162,3 +162,69 @@ test_that("loo.mvgam no longer calls removed logLik / extract_family_pars", {
   expect_false(grepl("extract_family_pars", src))
   expect_true(grepl("log_lik\\(", src))
 })
+
+
+# logLik.mvgam: stats::logLik S3 method enabling AIC()/BIC().
+test_that("logLik.mvgam method is registered as S3", {
+  expect_true(
+    inherits(
+      getS3method("logLik", "mvgam", optional = TRUE),
+      "function"
+    )
+  )
+})
+
+
+test_that("logLik.mvgam(pointwise = FALSE) returns scalar with df + nobs", {
+  ll_mat <- matrix(c(-1, -2, -3, -4, -5, -6), nrow = 2, byrow = TRUE)
+  testthat::local_mocked_bindings(
+    log_lik.mvgam = function(object, ...) ll_mat,
+    variables.mvgam = function(x, ...) c("b_Intercept", "sigma", "lp__"),
+    nobs.mvgam = function(object, ...) 3L,
+    .package = "mvgam"
+  )
+  obj <- structure(list(), class = "mvgam")
+  out <- logLik.mvgam(obj)
+  expect_s3_class(out, "logLik")
+  expect_equal(length(out), 1L)
+  # row sums: -6, -15; mean = -10.5
+  expect_equal(as.numeric(out), -10.5)
+  # df excludes lp__: counts b_Intercept + sigma = 2
+  expect_equal(attr(out, "df"), 2L)
+  expect_equal(attr(out, "nobs"), 3L)
+})
+
+
+test_that("logLik.mvgam(pointwise = TRUE) returns the [ndraws x nobs] matrix", {
+  ll_mat <- matrix(c(-1, -2, -3, -4, -5, -6), nrow = 2, byrow = TRUE)
+  testthat::local_mocked_bindings(
+    log_lik.mvgam = function(object, ...) ll_mat,
+    .package = "mvgam"
+  )
+  obj <- structure(list(), class = "mvgam")
+  out <- logLik.mvgam(obj, pointwise = TRUE)
+  expect_identical(out, ll_mat)
+})
+
+
+test_that("logLik.mvgam validates pointwise as a flag", {
+  obj <- structure(list(), class = "mvgam")
+  expect_error(logLik.mvgam(obj, pointwise = "yes"), "pointwise")
+  expect_error(logLik.mvgam(obj, pointwise = NA), "pointwise")
+})
+
+
+test_that("logLik.mvgam strips all known NUTS diagnostic vars from df", {
+  diag_pars <- c("lp__", "lprior", "accept_stat__", "stepsize__",
+                 "treedepth__", "n_leapfrog__", "divergent__", "energy__")
+  ll_mat <- matrix(-1, nrow = 4, ncol = 5)
+  testthat::local_mocked_bindings(
+    log_lik.mvgam = function(object, ...) ll_mat,
+    variables.mvgam = function(x, ...) c("b_a", "b_b", "sigma", diag_pars),
+    nobs.mvgam = function(object, ...) 5L,
+    .package = "mvgam"
+  )
+  out <- logLik.mvgam(structure(list(), class = "mvgam"))
+  # 3 real pars (b_a, b_b, sigma); the 8 diagnostics are stripped
+  expect_equal(attr(out, "df"), 3L)
+})

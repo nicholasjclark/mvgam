@@ -35,9 +35,10 @@ exclusive with \code{ndraws}).}
 
 \item{process_error}{Logical. When \code{TRUE} (default) each posterior draw
 carries a sampled latent-trend realisation through the linear
-predictor, matching brms's behaviour for a model with stochastic
-dynamics. When \code{FALSE} the trend is fixed at its posterior mean (the
-\code{loo.mvgam(incl_dynamics = FALSE)} path on master).}
+predictor, integrating the trend's stochastic dynamics into the
+log-likelihood. When \code{FALSE} the trend is fixed at its posterior
+mean, returning a goodness-of-fit log-likelihood that ignores
+process noise.}
 
 \item{...}{Ignored.}
 }

@@ -34,6 +34,15 @@
 #'   \code{loo_pit_qq}, \code{loo_intervals}, \code{loo_ribbon}) compute
 #'   PSIS weights internally via [log_lik.mvgam()].
 #'
+#'   To produce conditional posterior predictive checks restricted to a
+#'   particular series or covariate slice, filter `newdata` to the rows
+#'   of interest and pass it to `pp_check()`. For series-grouped variants
+#'   use the `group = "series"` argument of the underlying bayesplot
+#'   functions (e.g. `type = "ecdf_overlay_grouped"`, `type =
+#'   "bars_grouped"`). For per-observation summaries against a covariate,
+#'   `marginaleffects::plot_predictions()` provides a complementary
+#'   conditional surface.
+#'
 #' @seealso \code{\link{predict.mvgam}}, [log_lik.mvgam()]
 #'
 #' @examples

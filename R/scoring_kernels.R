@@ -11,8 +11,7 @@
 # ...)` -> scalar kernel via apply_multivariate_score(), which
 # stacks the per-series forecasts at each horizon and dispatches.
 #
-# CRPS uses scoringRules::crps_sample under the EDF method (the
-# same target master's hand-rolled `crps_edf` was computing);
+# CRPS uses scoringRules::crps_sample under the EDF method;
 # energy uses scoringRules::es_sample. Variogram is kept in-tree
 # because scoringRules::vs_sample uses a mean pairwise sqrt-
 # difference, whereas the established mvgam choice is the median
@@ -89,8 +88,8 @@ apply_multivariate_score <- function(truths, fcs, score_fn, ...) {
 
 # ----- Per-cell univariate kernels --------------------------------
 
-# CRPS via the empirical-CDF method (matches master's hand-rolled
-# `crps_edf`; scoringRules computes the same target).
+# CRPS via the empirical-CDF method (equivalent to scoringRules'
+# `crps_sample` target).
 #'@noRd
 crps_cell <- function(truth, fc, interval_width = 0.9,
                         log = FALSE) {

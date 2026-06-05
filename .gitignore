@@ -26,3 +26,4 @@ data-raw/verify_outputs/
 **/cache/*.rdb
 **/cache/*.rdx
 **/cache/*.RData
+tests/local/fixtures/lfo_cv/

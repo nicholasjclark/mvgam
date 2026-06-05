@@ -2,12 +2,13 @@
 % Please edit documentation in R/predict.R
 \name{predict.mvgam}
 \alias{predict.mvgam}
-\title{Draws from the Posterior Predictive Distribution}
+\title{Draws from the Posterior Distribution of an mvgam Model}
 \usage{
 \method{predict}{mvgam}(
   object,
   newdata = NULL,
-  process_error = TRUE,
+  type = c("response", "link", "expected", "variance", "terms", "latent_N", "detection"),
+  process_error = FALSE,
   ndraws = NULL,
   draw_ids = NULL,
   re_formula = NULL,
@@ -26,9 +27,18 @@
 \item{newdata}{An optional data.frame containing new predictor values.
 If \code{NULL} (the default), the original training data is used.}
 
-\item{process_error}{Logical. If \code{TRUE} (the default), trend uncertainty
-is included in predictions. If \code{FALSE}, predictions use the
-posterior mean of trend parameters, reducing uncertainty.}
+\item{type}{Character; one of \code{"response"} (default), \code{"link"},
+\code{"expected"}, \code{"variance"}, \code{"terms"}, \code{"latent_N"}, \code{"detection"}.
+See Details.}
+
+\item{process_error}{Logical. If \code{FALSE} (the default) the trend is
+fixed at its posterior mean and only parameter uncertainty
+propagates, treating the latent trend as a nuisance random
+effect for scenario-based prediction from the GAM components
+alone. If \code{TRUE}, the trend's stochastic dynamics are integrated
+by Monte Carlo. Use \code{\link[=forecast.mvgam]{forecast.mvgam()}} / \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} for
+predictions that respect the temporal dynamics of the latent
+trend at specific time points.}
 
 \item{ndraws}{Positive integer specifying the number of posterior draws
 to use. If \code{NULL} (the default), all draws are used.}
@@ -61,45 +71,84 @@ deviation (MAD).}
 Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
 single value or multiple values.}
 
-\item{...}{Additional arguments passed to \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}.}
+\item{...}{Additional arguments forwarded to the underlying
+\code{posterior_predict} / \code{posterior_epred} / \code{posterior_linpred} method.}
 }
 \value{
-If \code{summary = FALSE}, returns a matrix of posterior draws with
-dimensions \verb{[ndraws x nobs]}.
+If \code{summary = FALSE}, returns a numeric matrix of posterior
+draws with dimensions \verb{[ndraws x nobs]}. For multivariate fits with
+\code{resp = NULL}, returns a named list of such matrices.
 
 If \code{summary = TRUE}, returns a matrix with columns:
 \itemize{
-\item \code{Estimate}: Point estimate (mean or median depending on
+\item \code{Estimate}: point estimate (mean or median depending on
 \code{robust})
-\item \code{Est.Error}: Uncertainty estimate (sd or mad depending on
+\item \code{Est.Error}: uncertainty estimate (sd or mad depending on
 \code{robust})
-\item \verb{Q*}: Quantile columns corresponding to values in \code{probs}
+\item \verb{Q*}: quantile columns corresponding to values in \code{probs}
 }
 }
 \description{
-Compute posterior predictions for mvgam models. This method is a
-convenience wrapper around \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} that
-optionally returns summary statistics instead of raw draws.
+Compute posterior predictions for mvgam models. Dispatches by \code{type}
+to the appropriate prediction surface:
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} for \code{"response"} (default),
+\code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} for \code{"link"},
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} for \code{"expected"}, and an internal
+family-aware helper for \code{"variance"}.
+}
+\details{
+The \code{type} argument selects which posterior summary to return:
+\itemize{
+\item \code{"response"} (default): draws from the posterior predictive
+distribution on the outcome scale. Routes through
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}.
+\item \code{"link"}: linear predictor draws on the link scale (no
+inverse-link applied). Routes through
+\code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}}.
+\item \code{"expected"}: posterior expectation E[Y | X] on the response
+scale. Routes through \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}.
+\item \code{"variance"}: conditional variance Var[Y | theta] per draw,
+using family-specific mean-variance formulas. Supported
+families: gaussian, student, lognormal, poisson, bernoulli,
+binomial, negbinomial, gamma, beta. Other families raise an
+informative error. When \code{process_error = TRUE}, the returned
+variance is conditional on both the parameter draw and that
+draw's sampled trend innovation, so it reflects observation
+noise at the trend-integrated mean rather than pure
+observation noise at the posterior-mean trend. Set
+\code{process_error = FALSE} for the latter.
+\item \code{"terms"}: per-term decomposition of the linear predictor.
+Not yet ported on this branch; use \code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}}
+for per-smooth draws and \code{\link[=fixef.mvgam]{fixef.mvgam()}} / \code{\link[=ranef.mvgam]{ranef.mvgam()}} for
+parametric and random-effect components.
+\item \code{"latent_N"}, \code{"detection"}: N-mixture-only. Not yet
+supported (n-mixture port pending).
+}
 }
 \examples{
 \dontrun{
 # Fit a model
 fit <- mvgam(count ~ s(time), data = data, family = poisson())
 
-# Get summary predictions (default)
+# Posterior predictive summary on the response scale (default)
 pred <- predict(fit)
-head(pred)
 
-# Get raw posterior draws
+# Raw posterior predictive draws
 draws <- predict(fit, summary = FALSE)
-dim(draws)
 
-# Predictions without trend uncertainty
-pred_fixed <- predict(fit, process_error = FALSE)
+# Linear predictor (link scale)
+lp <- predict(fit, type = "link")
+
+# Expected values (response scale)
+mu <- predict(fit, type = "expected")
+
+# Conditional variance Var[Y|theta] per draw
+v <- predict(fit, type = "variance")
 }
 
 }
 \seealso{
 \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}, \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}},
-\code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}}, \code{\link[=fitted.mvgam]{fitted.mvgam()}}
+\code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}}, \code{\link[=fitted.mvgam]{fitted.mvgam()}},
+\code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}}.
 }
