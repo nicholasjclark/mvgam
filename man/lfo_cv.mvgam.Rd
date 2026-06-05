@@ -3,154 +3,91 @@
 \name{lfo_cv.mvgam}
 \alias{lfo_cv.mvgam}
 \alias{lfo_cv}
-\title{Approximate leave-future-out cross-validation of fitted \pkg{mvgam} objects}
+\title{Approximate leave-future-out cross-validation of fitted mvgam
+objects}
 \usage{
 lfo_cv(object, ...)
 
 \method{lfo_cv}{mvgam}(
   object,
-  newdata,
-  min_t,
-  fc_horizon = 1,
+  newdata = NULL,
+  min_t = NULL,
+  fc_horizon = 1L,
   pareto_k_threshold = 0.7,
-  silent = 1,
+  score = "elpd",
+  silent = 1L,
   ...,
-  data
+  data = NULL
 )
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+\item{object}{A fitted \link[=mvgam]{mvgam} object.}
 
-\item{...}{Ignored}
+\item{...}{Currently unused.}
 
-\item{newdata}{A \code{dataframe} or \code{list} containing the model response variable and covariates
-required by the GAM \code{formula}. Should include columns:
-'series' (character or factor index of the series IDs)
-'time' (numeric index of the time point for each observation).
-Any other variables to be included in the linear predictor of \code{formula} must also be present}
+\item{newdata}{Optional \code{data.frame} containing the response,
+\code{time}, \code{series} and any covariates required by the model
+formula. When \code{NULL}, the original training data
+(\code{object$obs_data} or \code{object$data}) is used.}
 
-\item{min_t}{Integer specifying the minimum training time required before making predictions
-from the data. Default is either the \code{30}th timepoint in the observational data,
-or whatever training time allows for at least
-\code{10} lfo-cv calculations, if possible.
-This value is essentially arbitrary so it is highly recommended to change it
-to something that is more suitable to the
-data and models being evaluated.}
+\item{min_t}{Integer; minimum training time before the first
+evaluation. Defaults to the smaller of \code{30} and \code{N - 10 - fc_horizon}, where \code{N} is the number of unique time points.}
 
-\item{fc_horizon}{Integer specifying the number of time steps ahead for evaluating forecasts}
+\item{fc_horizon}{Integer; the number of time steps ahead
+evaluated at each fold. Default \code{1}.}
 
-\item{pareto_k_threshold}{Proportion specifying the threshold over which the Pareto shape parameter
-is considered unstable, triggering a model refit. Default is \code{0.7}}
+\item{pareto_k_threshold}{Proportion; the Pareto shape value
+above which the PSIS approximation is considered unstable
+and a refit is triggered. Default \code{0.7}.}
 
-\item{silent}{Verbosity level between \code{0} and \code{2}. If \code{1} (the default), most of the informational
-messages of compiler and sampler are suppressed. If \code{2}, even more messages are suppressed. The
-actual sampling progress is still printed. Set \code{refresh = 0} to turn this off as well. If using
-\code{backend = "rstan"} you can also set open_progress = FALSE to prevent opening additional
-progress bars.}
+\item{score}{Character vector of scoring rules to compute at
+each fold. Must be a subset of \code{c("elpd", "crps", "drps", "sis", "brier", "energy", "variogram")}. ELPD uses the
+PSIS log-likelihood approximation directly; the other
+scores are computed by sampling forecast draws from the
+PSIS-weighted posterior and routing through
+\link{score.mvgam_forecast}. Defaults to \code{"elpd"}.}
+
+\item{silent}{Verbosity level between \code{0} and \code{2}. See
+\link{mvgam} for the contract.}
 
 \item{data}{Deprecated. Use \code{newdata} instead.}
 }
 \value{
-A \code{list} of class \code{mvgam_lfo} containing the approximate ELPD scores,
-the Pareto-k shape values and 'the specified \code{pareto_k_threshold}
+A \code{list} of class \code{mvgam_lfo} containing:
+\itemize{
+\item \code{elpds} — vector of approximate ELPDs at each evaluation
+time point (if \code{"elpd"} is in \code{score}).
+\item \code{scores} — named list of vectors, one per requested non-ELPD
+score (\code{NULL} if no non-ELPD score requested).
+\item \code{pareto_ks} — Pareto-k diagnostic at each evaluation step.
+\item \code{eval_timepoints} — integer vector of the times evaluated.
+\item \code{refits_at} — integer vector of time points where the model
+was refit.
+\item \code{pareto_k_threshold} — the threshold passed in.
+\item \code{fc_horizon} — the horizon used at each fold.
+}
 }
 \description{
-Approximate leave-future-out cross-validation of fitted \pkg{mvgam} objects
-}
-\details{
-Approximate leave-future-out cross-validation uses an expanding training window scheme
-to evaluate a model on its forecasting ability. The steps used in this function mirror those laid out
-in the \href{https://mc-stan.org/loo/articles/loo2-lfo.html}{lfo vignette from the \code{loo} package},
-written by Paul Bürkner, Jonah Gabry, Aki Vehtari. First, we refit the model using the first \code{min_t}
-observations to perform a single exact \code{fc_horizon}-ahead forecast step. This forecast is evaluated against
-the \code{min_t + fc_horizon} out of sample observations using the Expected Log Predictive Density (ELPD).
-Next, we approximate each successive round of
-expanding window forecasts by moving forward one step at a time \verb{for i in 1:N_evaluations} and re-weighting
-draws from the model's posterior predictive distribution using Pareto Smoothed
-Importance Sampling (PSIS). In each iteration \code{i}, PSIS weights are obtained for the next observation
-that would have been included in the model if we had re-fit (i.e. the last observation that would have
-been in the training data, or \code{min_t + i}). If these importance ratios are stable, we consider the
-approximation adequate and use the re-weighted posterior's forecast for evaluating the next holdout
-set of testing observations (\code{(min_t + i + 1):(min_t + i + fc_horizon)}). At some point the
-importance ratio variability will become too large and importance sampling will fail. This is
-indicated by the estimated shape parameter \code{k} of the generalized Pareto distribution
-crossing a certain threshold \code{pareto_k_threshold}. Only then do we refit the model using
-all of the observations up to the time of the failure. We then restart the process and iterate forward
-until the next refit is triggered (Bürkner et al. 2020).
-}
-\examples{
-\donttest{
-# Simulate from a Poisson-AR2 model with a seasonal smooth
-set.seed(100)
-dat <- sim_mvgam(T = 75,
-                n_series = 1,
-                prop_trend = 0.75,
-                trend_model = 'AR2',
-                family = poisson())
-
-# Plot the time series
-plot_mvgam_series(data = dat$data_train,
-                 newdata = dat$data_test,
-                 series = 1)
-
-# Fit an appropriate model
-mod_ar2 <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-               trend_model = AR(p = 2),
-               family = poisson(),
-               data = dat$data_train,
-               newdata = dat$data_test,
-               chains = 2,
-               silent = 2)
-
-# Fit a less appropriate model
-mod_rw <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-              trend_model = RW(),
-              family = poisson(),
-              data = dat$data_train,
-              newdata = dat$data_test,
-              chains = 2,
-              silent = 2)
-
-# Compare Discrete Ranked Probability Scores for the testing period
-fc_ar2 <- forecast(mod_ar2)
-fc_rw <- forecast(mod_rw)
-score_ar2 <- score(fc_ar2, score = 'drps')
-score_rw <- score(fc_rw, score = 'drps')
-sum(score_ar2$series_1$score)
-sum(score_rw$series_1$score)
-
-# Now use approximate leave-future-out CV to compare
-# rolling forecasts; start at time point 40 to reduce
-# computational time and to ensure enough data is available
-# for estimating model parameters
-lfo_ar2 <- lfo_cv(mod_ar2,
-                 min_t = 40,
-                 fc_horizon = 3,
-                 silent = 2)
-lfo_rw <- lfo_cv(mod_rw,
-                min_t = 40,
-                fc_horizon = 3,
-                silent = 2)
-
-# Plot Pareto-K values and ELPD estimates
-plot(lfo_ar2)
-plot(lfo_rw)
-
-# Proportion of timepoints in which AR2 model gives better forecasts
-length(which((lfo_ar2$elpds - lfo_rw$elpds) > 0)) /
-      length(lfo_ar2$elpds)
-
-# A higher total ELPD is preferred
-lfo_ar2$sum_ELPD
-lfo_rw$sum_ELPD
-}
+Approximate leave-future-out (LFO) cross-validation
+uses an expanding training window to evaluate a model on its
+forecasting ability. The algorithm mirrors the
+\href{https://mc-stan.org/loo/articles/loo2-lfo.html}{loo PSIS-LFO vignette}
+of Burkner, Gabry and Vehtari (2020): refit the model on the
+first \code{min_t} observations and compute an exact \code{fc_horizon}
+-ahead score; for each subsequent time point, reweight the
+posterior with Pareto Smoothed Importance Sampling (PSIS) and
+only refit when the Pareto-k diagnostic exceeds
+\code{pareto_k_threshold}.
 }
 \references{
-Paul-Christian Bürkner, Jonah Gabry & Aki Vehtari (2020). Approximate leave-future-out cross-validation for Bayesian time series models
-Journal of Statistical Computation and Simulation. 90:14, 2499-2523.
+Paul-Christian Burkner, Jonah Gabry and Aki Vehtari (2020).
+Approximate leave-future-out cross-validation for Bayesian time
+series models. \emph{Journal of Statistical Computation and
+Simulation}. 90:14, 2499-2523.
 }
 \seealso{
-\code{\link{forecast}}, \code{\link{score}}, \code{\link{compare_mvgams}}
+\link{forecast.mvgam}, \link{hindcast.mvgam},
+\link{score.mvgam_forecast}, \link{log_lik.mvgam}, \link{update.mvgam}
 }
 \author{
 Nicholas J Clark

@@ -929,4 +929,84 @@ mvgam_object$trend_metadata <- list(
 - `validate_trend_setup()`: Future master validation function
 - `extract_trend_metadata()`: Future unified metadata extraction
 
-**Future Applications**: This pattern should be applied to all validation and data processing functions that will need to work during prediction, including hierarchical validation, CAR special handling, and metadata-driven processing.
+**Future Applications**: This pattern should be applied to all validation and data processing functions that will need to work during prediction, including hierarchical validation, CAR special handling and metadata-driven processing.
+
+### 21. S3 Result-Object Surface: print + summary Conventions
+
+**Design Principle**: Every user-facing S3 result class returned by
+mvgam must expose a `summary()` method that returns a structured,
+inspectable object. Heavyweight fit objects use a two-layer pattern
+(custom summary class with its own print method); lightweight result
+objects use a single-layer pattern (summary returns a tibble that the
+default print method renders directly).
+
+**Two-Layer Pattern (heavyweight fit objects)**:
+
+```r
+# summary returns a class with its own print method
+summary.mvgam <- function(object, probs = c(0.025, 0.975), ...) {
+  out <- list(... structured fit summary ...)
+  class(out) <- "mvgam_summary"
+  out
+}
+
+print.mvgam_summary <- function(x, digits = 2, ...) {
+  # rich formatting via cat()
+}
+
+# print.<X> is independent, usually a compact header dump
+print.mvgam <- function(x, digits = 2, ...) {
+  # one-screen overview
+}
+```
+
+Used for: `mvgam`, `mvgam_pooled`.
+
+**Single-Layer Pattern (lightweight result objects)**:
+
+```r
+# summary returns a tibble; default tibble print renders it
+summary.mvgam_forecast <- function(object,
+                                     probs = c(0.025, 0.975), ...) {
+  # one row per (series, time); columns include predQ50,
+  # predQ<lower>, predQ<upper>, truth (if applicable), type
+  out <- data.frame(...)
+  class(out) <- c("tbl_df", "tbl", "data.frame")
+  out
+}
+
+# Optional print.<X> for headline numbers; if omitted, default
+# list-dump applies.
+print.mvgam_lfo <- function(x, ...) {
+  cat("Approximate LFO ...\n")
+  ...
+}
+```
+
+Used for: `mvgam_forecast`, `mvgam_irf`, `mvgam_fevd`, `mvgam_lfo`.
+
+**Key Rules**:
+
+1. **Every user-facing result class MUST have a `summary()` method.**
+   Falling back to the default `summary.default` list dump is not
+   acceptable for results users will inspect.
+2. **Summary tibbles use one row per logical observation** (per-time,
+   per-series, per-fold). Columns named with the `predQ<p>` /
+   `eval_time` / `pareto_k` conventions established by master.
+3. **`probs = c(0.025, 0.975)`** is the standard quantile-band argument
+   for summary tibbles (matching the existing methods on
+   `mvgam_forecast` / `mvgam_irf` / `mvgam_fevd`).
+4. **`print.<class>` is optional for lightweight classes**: only add
+   one when there is a useful headline view that differs from the
+   summary tibble (e.g. scalar totals across the tibble rows).
+5. **`print.<class>` for lightweight classes uses `cat()` for plain
+   text** and `print()` only for nested objects with their own print
+   methods (formulas, data frames). Matches `print.mvgam` etc.
+
+**Implementation Examples**:
+
+- Two-layer: `R/summary.mvgam.R` (the `mvgam` / `mvgam_summary`
+  pairing).
+- Single-layer: `R/mvgam_forecast-class.R` (`summary.mvgam_forecast`),
+  `R/mvgam_irf-class.R`, `R/mvgam_fevd-class.R`, `R/lfo_cv.mvgam.R`
+  (the `summary.mvgam_lfo` + `print.mvgam_lfo` pairing).

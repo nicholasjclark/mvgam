@@ -2926,10 +2926,25 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #' }
 #'
 #' @export
-ZMVN = function(time = NA, series = NA, gr = NA, subgr = NA, n_lv = NULL) {
+ZMVN = function(time = NA, series = NA, gr = NA, subgr = NA,
+                 n_lv = NULL, cor = TRUE) {
   # Basic parameter validation for n_lv if provided
   if (!is.null(n_lv)) {
     checkmate::assert_int(n_lv, lower = 1, null.ok = TRUE)
+  }
+  # `cor` is accepted for API symmetry with AR / VAR but must be
+  # TRUE: ZMVN is the zero-mean multivariate normal latent prior
+  # and correlated factors are its definitional purpose. Use a
+  # different trend type for uncorrelated series-level noise.
+  checkmate::assert_flag(cor)
+  if (!isTRUE(cor)) {
+    stop(insight::format_error(c(
+      "'cor = FALSE' is not supported for 'ZMVN()'.",
+      x = paste0("ZMVN always has correlation structure (it is the ",
+                 "zero-mean multivariate normal latent prior)."),
+      i = paste0("For uncorrelated series-level noise, use ",
+                 "'RW()' or 'AR()' with 'cor = FALSE' instead.")
+    )))
   }
 
   # Use helper function for clean object creation

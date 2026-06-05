@@ -2,23 +2,22 @@
 % Please edit documentation in R/lfo_cv.mvgam.R
 \name{plot.mvgam_lfo}
 \alias{plot.mvgam_lfo}
-\title{Plot Pareto-k and ELPD values from a \code{mvgam_lfo} object}
+\title{Plot Pareto-k and per-fold scores from an \code{mvgam_lfo} object}
 \usage{
 \method{plot}{mvgam_lfo}(x, ...)
 }
 \arguments{
-\item{x}{An object of class \code{mvgam_lfo}}
+\item{x}{An object of class \code{mvgam_lfo}.}
 
-\item{...}{Ignored}
+\item{...}{Currently unused.}
 }
 \value{
-A \code{ggplot} object presenting Pareto-k and ELPD values over the
-evaluation timepoints. For the Pareto-k plot, a dashed red line indicates the
-specified threshold chosen for triggering model refits. For the ELPD plot,
-a dashed red line indicates the bottom 10\% quantile of ELPD values. Points below
-this threshold may represent outliers that were more difficult to forecast
+A \code{ggplot} object.
 }
 \description{
-This function takes an object of class \code{mvgam_lfo} and creates several
-informative diagnostic plots
+Renders a faceted ggplot of the per-fold Pareto-k
+diagnostic and every populated score (ELPD plus any non-ELPD
+scores requested at fit time). Outlier points are highlighted
+per the same thresholds master's plot used: Pareto-k above
+\code{pareto_k_threshold} and ELPD below its 15\% quantile.
 }

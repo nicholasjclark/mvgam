@@ -244,6 +244,11 @@ sum_univariate_horizon <- function(series_score, score) {
   padded <- vapply(cols, function(v) {
     c(v, rep(NA_real_, h_max - length(v)))
   }, numeric(h_max))
+  # vapply collapses to a vector when h_max == 1; force matrix
+  # shape so rowSums sees the column dimension.
+  if (!is.matrix(padded)) {
+    padded <- matrix(padded, nrow = h_max)
+  }
   data.frame(
     score = rowSums(padded, na.rm = TRUE),
     eval_horizon = seq_len(h_max),

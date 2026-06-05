@@ -3185,10 +3185,16 @@ is_trend_term <- function(expr, trend_patterns) {
   # Input validation
   checkmate::assert_character(trend_patterns)
 
-  expr_text <- rlang::expr_text(expr)
-  any(vapply(trend_patterns, function(pattern) {
-    grepl(pattern, expr_text, fixed = TRUE)
-  }, logical(1)))
+  # Match by the function being CALLED, not by full deparsed text.
+  # Reason: full-text fixed-string match fails on argument-literal
+  # variants (e.g. pattern "AR(p = 1)" vs expr "AR(p = 1L)" do not
+  # match even though both refer to the same AR constructor). The
+  # function name is the only stable identifier across literal forms.
+  if (!rlang::is_call(expr)) return(FALSE)
+  fn_name <- rlang::call_name(expr)
+  if (is.null(fn_name)) return(FALSE)
+  trend_fn_names <- sub("\\(.*$", "", trend_patterns)
+  fn_name %in% trend_fn_names
 }
 
 #' Create universal time and series attributes for mvgam grouping

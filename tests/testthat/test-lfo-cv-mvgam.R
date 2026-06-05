@@ -1,0 +1,444 @@
+# Unit tests for `lfo_cv.mvgam()` in `R/lfo_cv.mvgam.R`. The
+# method orchestrates a sequence of `update.mvgam` refits and
+# `log_lik.mvgam` / `forecast.mvgam` / `score.mvgam_forecast`
+# calls; the algorithmic primitives are exercised by their own
+# test files. These tests stub the primitives via
+# `local_mocked_bindings()` and assert:
+#
+#   * Argument validation (score subset, min_t guard, fc_horizon).
+#   * Return-shape contract (mvgam_lfo class with the documented
+#     slot names; per-score arrays sized to n_evals).
+#   * The deprecated `data` arg forwards to `newdata` with a
+#     warning.
+#   * `summary.mvgam_lfo()` returns a tibble with one row per
+#     evaluation timepoint and the expected columns.
+#   * `print.mvgam_lfo()` runs without error.
+
+
+# Minimal mock mvgam fit; enough surface for lfo_cv to traverse
+# (data frame access, trend_metadata, family).
+make_lfo_mock <- function(n_time = 40L, n_series = 1L) {
+  d <- data.frame(
+    time = rep(seq_len(n_time), n_series),
+    series = factor(rep(paste0("s", seq_len(n_series)),
+                         each = n_time),
+                     levels = paste0("s", seq_len(n_series))),
+    y = stats::rpois(n_time * n_series, lambda = 3)
+  )
+  fit <- list(
+    fit = structure(list(), class = "fake_stanfit"),
+    data = d,
+    obs_data = d,
+    formula = stats::as.formula("y ~ 1"),
+    family = poisson(),
+    trend_metadata = list(
+      trend_type = "AR",
+      variables = list(time_var = "time", series_var = "series"),
+      dimensions = list(n_series = n_series)
+    ),
+    backend = "rstan"
+  )
+  class(fit) <- "mvgam"
+  fit
+}
+
+
+# ----- Validation arms --------------------------------------------
+
+test_that("score arg validation rejects unknown rules", {
+  fit <- make_lfo_mock()
+  expect_error(
+    lfo_cv(fit, min_t = 30L, score = "nonsense"),
+    "Must be a subset"
+  )
+})
+
+
+test_that("fc_horizon must be a positive integer", {
+  fit <- make_lfo_mock()
+  expect_error(
+    lfo_cv(fit, min_t = 30L, fc_horizon = 0L),
+    "fc_horizon"
+  )
+})
+
+
+test_that("pareto_k_threshold must be in [0, 1]", {
+  fit <- make_lfo_mock()
+  expect_error(
+    lfo_cv(fit, min_t = 30L, pareto_k_threshold = 1.5),
+    "pareto_k_threshold"
+  )
+})
+
+
+test_that("min_t leaving no eval room errors informatively", {
+  fit <- make_lfo_mock(n_time = 40L)
+  expect_error(
+    lfo_cv(fit, min_t = 40L, fc_horizon = 1L),
+    "no room for evaluation"
+  )
+})
+
+
+test_that("deprecated data arg forwards to newdata with warning", {
+  fit <- make_lfo_mock(n_time = 40L)
+  newdat <- fit$data
+  # Stub the heavy machinery so we can reach the deprecation
+  # branch without actually fitting.
+  testthat::local_mocked_bindings(
+    update.mvgam = function(object, ...) object,
+    log_lik = function(object, ...) {
+      matrix(stats::rnorm(5L * nrow(newdat)),
+             nrow = 5L, ncol = nrow(newdat))
+    },
+    forecast = function(object, ...) {
+      list(forecasts = setNames(
+        list(matrix(0, nrow = 5L, ncol = 1L)),
+        levels(newdat$series)
+      ))
+    },
+    score = function(object, score, ...) {
+      list(all_series = data.frame(score = 0))
+    }
+  )
+  expect_warning(
+    lfo_cv(fit, min_t = 30L, fc_horizon = 1L, data = newdat,
+            silent = 2L),
+    "data.*deprecated"
+  )
+})
+
+
+# ----- Return-shape contract --------------------------------------
+
+# Helper: stub the primitives so a small mock fit can roll through
+# lfo_cv end-to-end without any real Stan calls.
+stub_lfo_primitives <- function(fit, ndraws = 5L,
+                                 pareto_k = 0.2,
+                                 loglik_fill = -1.0) {
+  newdat <- fit$data
+  n_obs <- nrow(newdat)
+  testthat::local_mocked_bindings(
+    update.mvgam = function(object, ...) object,
+    log_lik = function(object, ...) {
+      matrix(loglik_fill, nrow = ndraws, ncol = n_obs)
+    },
+    forecast = function(object, ..., newdata = NULL) {
+      n_h <- if (is.null(newdata)) 1L else
+        length(unique(newdata[[
+          object$trend_metadata$variables$time_var
+        ]]))
+      n_series <- length(levels(object$data[[
+        object$trend_metadata$variables$series_var
+      ]]))
+      fmats <- replicate(n_series,
+                          matrix(0, nrow = ndraws, ncol = n_h),
+                          simplify = FALSE)
+      names(fmats) <- levels(object$data[[
+        object$trend_metadata$variables$series_var
+      ]])
+      list(forecasts = fmats)
+    },
+    score = function(object, score, ...) {
+      list(all_series = data.frame(score = 1.0))
+    },
+    .package = c("mvgam", "mvgam", "mvgam", "mvgam"),
+    .env = parent.frame()
+  )
+  invisible(NULL)
+}
+
+
+test_that("Return object has all documented mvgam_lfo slots", {
+  fit <- make_lfo_mock(n_time = 35L)
+  ndraws <- 5L
+  newdat <- fit$data
+  testthat::local_mocked_bindings(
+    update.mvgam = function(object, ...) object,
+    log_lik = function(object, ...) {
+      matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
+    }
+  )
+  out <- lfo_cv(fit, min_t = 30L, fc_horizon = 1L,
+                 score = "elpd", silent = 2L)
+  expect_s3_class(out, "mvgam_lfo")
+  required <- c("elpds", "sum_ELPD", "scores", "pareto_ks",
+                "eval_timepoints", "refits_at",
+                "pareto_k_threshold", "fc_horizon")
+  expect_true(all(required %in% names(out)))
+  expect_identical(out$fc_horizon, 1L)
+  expect_identical(out$pareto_k_threshold, 0.7)
+  expect_true(min_t_in_refits <- 30L %in% out$refits_at)
+  # eval window is (min_t + 1):(N - fc_horizon + 1) = 31:35,
+  # so 5 evaluations on a 35-step series with fc_horizon = 1.
+  expect_identical(length(out$eval_timepoints), 5L)
+  expect_identical(length(out$elpds), 5L)
+  expect_null(out$scores)
+})
+
+
+test_that("Non-ELPD score adds named entries to scores list", {
+  fit <- make_lfo_mock(n_time = 35L)
+  ndraws <- 5L
+  newdat <- fit$data
+  testthat::local_mocked_bindings(
+    update.mvgam = function(object, ...) object,
+    log_lik = function(object, ...) {
+      matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
+    },
+    forecast = function(object, ..., newdata = NULL) {
+      n_h <- if (is.null(newdata)) 1L else
+        length(unique(newdata$time))
+      list(forecasts = list(s1 = matrix(0, ndraws, n_h)))
+    },
+    score = function(object, score, ...) {
+      list(all_series = data.frame(score = 0.5))
+    }
+  )
+  out <- lfo_cv(fit, min_t = 30L, fc_horizon = 1L,
+                 score = c("elpd", "crps"), silent = 2L)
+  expect_true(is.list(out$scores))
+  expect_true("crps" %in% names(out$scores))
+  expect_identical(length(out$scores$crps), 5L)
+  # All forecast() calls stubbed to score = 0.5 per window.
+  expect_true(all(out$scores$crps == 0.5))
+})
+
+
+# ----- summary / print methods -----------------------------------
+
+test_that("summary.mvgam_lfo returns a tibble with one row per fold", {
+  fit <- make_lfo_mock(n_time = 35L)
+  ndraws <- 5L
+  newdat <- fit$data
+  testthat::local_mocked_bindings(
+    update.mvgam = function(object, ...) object,
+    log_lik = function(object, ...) {
+      matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
+    },
+    forecast = function(object, ..., newdata = NULL) {
+      n_h <- if (is.null(newdata)) 1L else
+        length(unique(newdata$time))
+      list(forecasts = list(s1 = matrix(0, ndraws, n_h)))
+    },
+    score = function(object, score, ...) {
+      list(all_series = data.frame(score = 0.5))
+    }
+  )
+  out <- lfo_cv(fit, min_t = 30L, fc_horizon = 1L,
+                 score = c("elpd", "crps"), silent = 2L)
+  tib <- summary(out)
+  expect_s3_class(tib, "tbl_df")
+  expect_identical(nrow(tib), length(out$eval_timepoints))
+  expect_true(all(c("eval_time", "refit_here", "pareto_k",
+                     "elpd", "crps") %in% names(tib)))
+  expect_true(is.logical(tib$refit_here))
+  expect_true(tib$refit_here[1L])  # min_t triggered the initial refit
+})
+
+
+test_that("print.mvgam_lfo runs without error and returns invisibly", {
+  fit <- make_lfo_mock(n_time = 35L)
+  ndraws <- 5L
+  newdat <- fit$data
+  testthat::local_mocked_bindings(
+    update.mvgam = function(object, ...) object,
+    log_lik = function(object, ...) {
+      matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
+    }
+  )
+  out <- lfo_cv(fit, min_t = 30L, fc_horizon = 1L,
+                 score = "elpd", silent = 2L)
+  expect_invisible(print(out))
+  expect_output(print(out), "Approximate leave-future-out")
+  expect_output(print(out), "ELPD")
+})
+
+
+# ----- Multi-series ----------------------------------------------
+
+test_that("lfo_cv runs on a 2-series fit", {
+  fit <- make_lfo_mock(n_time = 35L, n_series = 2L)
+  ndraws <- 5L
+  newdat <- fit$data
+  testthat::local_mocked_bindings(
+    update.mvgam = function(object, ...) object,
+    log_lik = function(object, ...) {
+      matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
+    }
+  )
+  out <- lfo_cv(fit, min_t = 30L, fc_horizon = 1L,
+                 score = "elpd", silent = 2L)
+  expect_s3_class(out, "mvgam_lfo")
+  expect_identical(length(out$eval_timepoints), 5L)
+  expect_identical(length(out$elpds), 5L)
+})
+
+
+# ----- Index-based design: arbitrary time starts ------------------
+
+# Build a mock fit whose time column is shifted by `offset`, so
+# times run (offset + 1):(offset + n_time). Exercises that lfo_cv
+# arithmetic is position-based, not value-based.
+make_lfo_mock_shifted <- function(n_time = 35L, offset = 2009L) {
+  d <- data.frame(
+    time = seq.int(offset + 1L, offset + n_time),
+    series = factor("s1", levels = "s1"),
+    y = stats::rpois(n_time, lambda = 3)
+  )
+  fit <- list(
+    fit = structure(list(), class = "fake_stanfit"),
+    data = d, obs_data = d,
+    formula = stats::as.formula("y ~ 1"),
+    family = poisson(),
+    trend_metadata = list(
+      trend_type = "AR",
+      variables = list(time_var = "time", series_var = "series"),
+      dimensions = list(n_series = 1L)
+    ),
+    backend = "rstan"
+  )
+  class(fit) <- "mvgam"
+  fit
+}
+
+
+test_that("min_t works as a time VALUE for non-1-indexed times", {
+  # Times run 2010..2044. With min_t = 2039, expect evals at
+  # 2040..2044 (5 points), refits_at = 2039.
+  fit <- make_lfo_mock_shifted(n_time = 35L, offset = 2009L)
+  ndraws <- 5L
+  newdat <- fit$data
+  testthat::local_mocked_bindings(
+    update.mvgam = function(object, ...) object,
+    log_lik = function(object, ...) {
+      matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
+    }
+  )
+  out <- lfo_cv(fit, min_t = 2039L, fc_horizon = 1L,
+                 score = "elpd", silent = 2L)
+  expect_identical(length(out$eval_timepoints), 5L)
+  expect_identical(out$eval_timepoints, 2040:2044)
+  expect_true(2039L %in% out$refits_at)
+})
+
+
+test_that("default min_t picks the 30th observed time for n=35", {
+  fit <- make_lfo_mock_shifted(n_time = 35L, offset = 2009L)
+  ndraws <- 5L
+  newdat <- fit$data
+  testthat::local_mocked_bindings(
+    update.mvgam = function(object, ...) object,
+    log_lik = function(object, ...) {
+      matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
+    }
+  )
+  out <- lfo_cv(fit, fc_horizon = 1L,
+                 score = "elpd", silent = 2L)
+  # Default base_idx = 30, capped by n_times - 10 - fc_horizon =
+  # 35 - 11 = 24. So base_idx = 24, min_t = all_unique_times[24]
+  # = 2009 + 24 = 2033.
+  expect_true(2033L %in% out$refits_at)
+  expect_identical(out$eval_timepoints[1L], 2034L)
+})
+
+
+# ----- Irregular (CAR-style) grid --------------------------------
+
+test_that("lfo_cv handles irregular CAR-style time grids", {
+  # Observed times have gaps (e.g., monthly samples missing some
+  # months). 12 observed times in a 20-month span.
+  obs_times <- c(1L, 2L, 4L, 5L, 7L, 9L, 10L, 13L, 15L,
+                  17L, 19L, 20L)
+  d <- data.frame(
+    time = obs_times,
+    series = factor("s1", levels = "s1"),
+    y = stats::rpois(length(obs_times), lambda = 3)
+  )
+  fit <- list(
+    fit = structure(list(), class = "fake_stanfit"),
+    data = d, obs_data = d,
+    formula = stats::as.formula("y ~ 1"),
+    family = poisson(),
+    trend_metadata = list(
+      trend_type = "CAR",
+      variables = list(time_var = "time", series_var = "series"),
+      dimensions = list(n_series = 1L)
+    ),
+    backend = "rstan"
+  )
+  class(fit) <- "mvgam"
+  ndraws <- 5L
+  testthat::local_mocked_bindings(
+    update.mvgam = function(object, ...) object,
+    log_lik = function(object, ...) {
+      matrix(-1.0, nrow = ndraws, ncol = nrow(d))
+    }
+  )
+  # min_t = 9 is the 6th observed time. Expect 6 evaluations at
+  # the next 6 observed times: 10, 13, 15, 17, 19, 20.
+  out <- lfo_cv(fit, min_t = 9L, fc_horizon = 1L,
+                 score = "elpd", silent = 2L)
+  expect_identical(out$eval_timepoints,
+                    c(10L, 13L, 15L, 17L, 19L, 20L))
+  expect_identical(length(out$elpds), 6L)
+})
+
+
+# ----- New error conditions --------------------------------------
+
+test_that("Mismatched per-series time grids error", {
+  d <- data.frame(
+    time = c(1:30, 5:34),  # series s1: 1..30, s2: 5..34
+    series = factor(rep(c("s1", "s2"), each = 30L)),
+    y = stats::rpois(60L, lambda = 3)
+  )
+  fit <- list(
+    fit = structure(list(), class = "fake_stanfit"),
+    data = d, obs_data = d,
+    formula = stats::as.formula("y ~ 1"),
+    family = poisson(),
+    trend_metadata = list(
+      trend_type = "AR",
+      variables = list(time_var = "time", series_var = "series"),
+      dimensions = list(n_series = 2L)
+    ),
+    backend = "rstan"
+  )
+  class(fit) <- "mvgam"
+  expect_error(
+    lfo_cv(fit, min_t = 20L, score = "elpd", silent = 2L),
+    "share the same time grid"
+  )
+})
+
+
+test_that("fc_horizon >= n_times errors with focused message", {
+  fit <- make_lfo_mock(n_time = 10L)
+  expect_error(
+    lfo_cv(fit, min_t = 5L, fc_horizon = 12L,
+            score = "elpd", silent = 2L),
+    "exceeds the available time span"
+  )
+})
+
+
+test_that("min_t not in observed times errors informatively", {
+  fit <- make_lfo_mock_shifted(n_time = 35L, offset = 2009L)
+  expect_error(
+    lfo_cv(fit, min_t = 25L, fc_horizon = 1L,
+            score = "elpd", silent = 2L),
+    "is not an observed time"
+  )
+})
+
+
+test_that("min_t too late errors with the largest valid value", {
+  fit <- make_lfo_mock(n_time = 35L)
+  expect_error(
+    lfo_cv(fit, min_t = 35L, fc_horizon = 1L,
+            score = "elpd", silent = 2L),
+    "leaves no room for evaluation"
+  )
+})
