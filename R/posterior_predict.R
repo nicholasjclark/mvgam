@@ -1348,17 +1348,25 @@ extract_dpars_from_stanfit <- function(stanfit,
 #' @param object A fitted mvgam object from [mvgam()].
 #' @param newdata Optional data frame with covariates for prediction. If
 #'   NULL, uses original training data stored in the model object.
-#' @param process_error Logical; if TRUE (default), includes full
-#'   draw-by-draw uncertainty from trend parameters AND adds sampled
-#'   stochastic innovations from the trend covariance structure
-#'   (state-space process noise). If FALSE, fixes the trend at its
-#'   posterior mean and skips innovation sampling.
+#' @param process_error Logical; if TRUE (default), the posterior
+#'   predictive distribution is the **marginal** `[Y | X]` integrated
+#'   over the trend's stochastic dynamics. mvgam achieves this by
+#'   Monte Carlo: sampled innovations are added to the link-scale
+#'   linear predictor before applying the inverse link and drawing
+#'   observation-family noise, matching brms's analytical convention
+#'   for autocorrelated residual models. If FALSE, the trend is fixed
+#'   at its Stan-fitted posterior draws (no innovation resampling)
+#'   and only observation-family noise contributes to the predictive
+#'   distribution.
 #'
-#'   The innovation step is unique to `posterior_predict`: it represents
-#'   the unobserved stochastic component of the latent trend process,
-#'   which matters for predictive uncertainty. `posterior_linpred` and
-#'   `posterior_epred` do **not** add innovations, so they remain
-#'   deterministic functions of the parameter draws.
+#'   Note: with `process_error = TRUE` the invariant
+#'   \code{posterior_epred(x) == linkinv(posterior_linpred(x))} no
+#'   longer holds (innovations are added in `epred` and `predict` but
+#'   not in `linpred`). For deterministic-state-at-fitted-values
+#'   semantics (matching the trained latent state without resampling)
+#'   use [forecast.mvgam] / [hindcast.mvgam], which read the
+#'   `lv_trend` posterior draws directly and extrapolate the latent
+#'   state forward for newdata times beyond the training grid.
 #' @param ndraws Positive integer specifying number of posterior draws to
 #'   use. NULL (default) uses all available draws.
 #' @param re_formula Formula for random effects. NULL (default) includes
@@ -1391,8 +1399,26 @@ extract_dpars_from_stanfit <- function(stanfit,
 #' Posterior predictive samples have higher variance and are suitable for
 #' checking if the model can generate data like the observed data.
 #'
-#' @seealso [posterior_epred.mvgam()] for expected values without noise,
-#'   [posterior_linpred.mvgam()] for link-scale predictions.
+#' Semantic split (see also the architecture-decisions document):
+#' \itemize{
+#'   \item `posterior_predict()` / `posterior_epred()` /
+#'     `posterior_linpred()` integrate over the trend's stochastic
+#'     dynamics. At newdata times beyond the training grid the
+#'     latent state is treated as stationary at its per-series
+#'     posterior mean (a `marginaleffects`-style convention; an
+#'     informational message fires once per session).
+#'   \item [forecast.mvgam] / [hindcast.mvgam] read the fitted
+#'     `lv_trend` posterior draws directly. `hindcast()` returns
+#'     them at the training grid; `forecast()` extrapolates them
+#'     forward via the kernel for newdata times beyond training.
+#'     Use these surfaces when you want state-aware out-of-sample
+#'     prediction.
+#' }
+#'
+#' @seealso [posterior_epred.mvgam()] for expected values without
+#'   noise, [posterior_linpred.mvgam()] for link-scale predictions,
+#'   [forecast.mvgam] and [hindcast.mvgam] for the deterministic
+#'   state-extrapolating prediction surface.
 #'
 #' @examples
 #' \dontrun{

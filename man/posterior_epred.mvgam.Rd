@@ -112,5 +112,9 @@ all.equal(epred, exp(linpred))
 }
 \seealso{
 \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} for link scale predictions,
-\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} for posterior predictive samples.
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} for posterior predictive samples,
+\link{forecast.mvgam} and \link{hindcast.mvgam} for the deterministic
+state-extrapolating prediction surface (state read from the
+fitted \code{lv_trend} posterior draws instead of integrated over
+via Monte Carlo).
 }

@@ -1010,3 +1010,29 @@ Used for: `mvgam_forecast`, `mvgam_irf`, `mvgam_fevd`, `mvgam_lfo`.
 - Single-layer: `R/mvgam_forecast-class.R` (`summary.mvgam_forecast`),
   `R/mvgam_irf-class.R`, `R/mvgam_fevd-class.R`, `R/lfo_cv.mvgam.R`
   (the `summary.mvgam_lfo` + `print.mvgam_lfo` pairing).
+
+### 22. Prediction Surface Semantics: Marginal MC vs Deterministic State
+
+**Design Principle**: mvgam ships two prediction surfaces with
+distinct semantics around the latent state. The split is
+intentional. User-facing docs must point at both and explain
+which to pick; the wrong choice will silently mislead.
+
+**Surface A, Marginal Monte Carlo** (`posterior_predict()`,
+`posterior_epred()`, `posterior_linpred()`): integrates over the
+trend's stochastic dynamics. Treats the latent state as
+stationary at the per-series posterior mean for any prediction
+time. Re-samples innovations per call under `process_error =
+TRUE`. This is the `marginaleffects` / brms convention for
+models with correlated residuals.
+
+**Surface B, Deterministic state** (`forecast.mvgam()`,
+`hindcast.mvgam()`): reads the fitted latent state from the Stan
+posterior. `hindcast()` returns it at the training grid;
+`forecast()` extrapolates it forward via the trend kernel for
+newdata beyond training. Exact and reproducible across calls.
+
+**Rule**: counterfactuals and covariate-level reasoning go
+through Surface A. Forecasting, hindcasting, model comparison
+via ELPD / scoring rules go through Surface B. Surface A
+`@seealso` blocks must cross-link to Surface B and vice versa.

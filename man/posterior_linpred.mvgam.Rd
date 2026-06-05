@@ -122,5 +122,7 @@ linpred_sub <- posterior_linpred(fit, ndraws = 100)
 \seealso{
 \code{\link[brms:posterior_linpred.brmsfit]{brms::posterior_linpred()}} for the brms generic,
 \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} for expected values on response scale,
-\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} for posterior predictive samples.
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} for posterior predictive samples,
+\link{forecast.mvgam} and \link{hindcast.mvgam} for the deterministic
+state-extrapolating prediction surface.
 }

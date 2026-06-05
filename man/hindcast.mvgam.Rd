@@ -57,5 +57,9 @@ the response scale. For predictions at unseen times use
 \link{forecast.mvgam}.
 }
 \seealso{
-\link[=mvgam]{mvgam_forecast-class}, \link{forecast.mvgam}
+\link[=mvgam]{mvgam_forecast-class}, \link{forecast.mvgam},
+\link{posterior_predict.mvgam} and \link{posterior_epred.mvgam} for the
+alternative marginal-MC prediction surface that integrates
+over the trend's stochastic dynamics instead of reading the
+fitted latent state.
 }

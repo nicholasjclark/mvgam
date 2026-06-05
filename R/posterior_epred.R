@@ -285,7 +285,11 @@ compute_family_epred <- function(linpred, family,
 #' }
 #'
 #' @seealso [posterior_linpred.mvgam()] for link scale predictions,
-#'   [posterior_predict.mvgam()] for posterior predictive samples.
+#'   [posterior_predict.mvgam()] for posterior predictive samples,
+#'   [forecast.mvgam] and [hindcast.mvgam] for the deterministic
+#'   state-extrapolating prediction surface (state read from the
+#'   fitted `lv_trend` posterior draws instead of integrated over
+#'   via Monte Carlo).
 #'
 #' @examples
 #' \dontrun{

@@ -22,17 +22,25 @@
 \item{newdata}{Optional data frame with covariates for prediction. If
 NULL, uses original training data stored in the model object.}
 
-\item{process_error}{Logical; if TRUE (default), includes full
-draw-by-draw uncertainty from trend parameters AND adds sampled
-stochastic innovations from the trend covariance structure
-(state-space process noise). If FALSE, fixes the trend at its
-posterior mean and skips innovation sampling.
+\item{process_error}{Logical; if TRUE (default), the posterior
+predictive distribution is the \strong{marginal} \verb{[Y | X]} integrated
+over the trend's stochastic dynamics. mvgam achieves this by
+Monte Carlo: sampled innovations are added to the link-scale
+linear predictor before applying the inverse link and drawing
+observation-family noise, matching brms's analytical convention
+for autocorrelated residual models. If FALSE, the trend is fixed
+at its Stan-fitted posterior draws (no innovation resampling)
+and only observation-family noise contributes to the predictive
+distribution.
 
-The innovation step is unique to \code{posterior_predict}: it represents
-the unobserved stochastic component of the latent trend process,
-which matters for predictive uncertainty. \code{posterior_linpred} and
-\code{posterior_epred} do \strong{not} add innovations, so they remain
-deterministic functions of the parameter draws.}
+Note: with \code{process_error = TRUE} the invariant
+\code{posterior_epred(x) == linkinv(posterior_linpred(x))} no
+longer holds (innovations are added in \code{epred} and \code{predict} but
+not in \code{linpred}). For deterministic-state-at-fitted-values
+semantics (matching the trained latent state without resampling)
+use \link{forecast.mvgam} / \link{hindcast.mvgam}, which read the
+\code{lv_trend} posterior draws directly and extrapolate the latent
+state forward for newdata times beyond the training grid.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws.}
@@ -76,6 +84,22 @@ The posterior predictive distribution combines:
 This differs from \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} which returns only E\link{Y|X}.
 Posterior predictive samples have higher variance and are suitable for
 checking if the model can generate data like the observed data.
+
+Semantic split (see also the architecture-decisions document):
+\itemize{
+\item \code{posterior_predict()} / \code{posterior_epred()} /
+\code{posterior_linpred()} integrate over the trend's stochastic
+dynamics. At newdata times beyond the training grid the
+latent state is treated as stationary at its per-series
+posterior mean (a \code{marginaleffects}-style convention; an
+informational message fires once per session).
+\item \link{forecast.mvgam} / \link{hindcast.mvgam} read the fitted
+\code{lv_trend} posterior draws directly. \code{hindcast()} returns
+them at the training grid; \code{forecast()} extrapolates them
+forward via the kernel for newdata times beyond training.
+Use these surfaces when you want state-aware out-of-sample
+prediction.
+}
 }
 \examples{
 \dontrun{
@@ -98,6 +122,8 @@ var(pp) > var(epred)  # Should be TRUE
 
 }
 \seealso{
-\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} for expected values without noise,
-\code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} for link-scale predictions.
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} for expected values without
+noise, \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} for link-scale predictions,
+\link{forecast.mvgam} and \link{hindcast.mvgam} for the deterministic
+state-extrapolating prediction surface.
 }

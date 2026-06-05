@@ -2243,19 +2243,27 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws) {
     ))
   }
 
-  # Unseen times: fall back to the per-series marginal posterior mean
-  # of the latent state (averaged across the training time grid). The
-  # prediction primitives are not a forecaster — `forecast()` will
-  # extrapolate properly once the C++ extrapolator lands. Treating
-  # unseen times as marginalized matches the user expectation that
-  # marginaleffects evaluates at covariate combinations without
-  # forecasting structural time indices.
+  # Unseen times: substitute the per-series posterior mean of the
+  # latent state (averaged across the training time grid) for any
+  # newdata row whose time is outside the fitted grid. This is the
+  # documented marginal-MC semantic of the posterior_*.mvgam
+  # surfaces (see architecture-decisions.md): the prediction
+  # primitives integrate over the trend dynamics and treat the
+  # latent state as stationary at any prediction time, matching
+  # the marginaleffects / brms::predict convention for models with
+  # correlated residuals. For state-aware out-of-sample prediction
+  # (latent state extrapolated forward via the trend kernel) use
+  # `forecast.mvgam()` instead.
   has_unseen <- any(is.na(t_idx))
   if (has_unseen && !identical(Sys.getenv("TESTTHAT"), "true")) {
     rlang::inform(
       paste0(
-        "Some newdata times are outside the fitted range; using the ",
-        "per-series posterior mean of the latent trend for those rows."
+        "Some newdata times are outside the fitted range. ",
+        "Using the per-series posterior mean of the latent trend ",
+        "for those rows (the marginal convention of ",
+        "posterior_predict / posterior_epred / posterior_linpred). ",
+        "Call forecast.mvgam() for state-aware out-of-sample ",
+        "extrapolation."
       ),
       .frequency = "once",
       .frequency_id = "mvgam_oos_trend_marginal"

@@ -28,13 +28,22 @@ lfo_cv(object, ...)
 \item{newdata}{Optional \code{data.frame} containing the response,
 \code{time}, \code{series} and any covariates required by the model
 formula. When \code{NULL}, the original training data
-(\code{object$obs_data} or \code{object$data}) is used.}
+(\code{object$obs_data} or \code{object$data}) is used. All series must
+share the same set of observed time values.}
 
-\item{min_t}{Integer; minimum training time before the first
-evaluation. Defaults to the smaller of \code{30} and \code{N - 10 - fc_horizon}, where \code{N} is the number of unique time points.}
+\item{min_t}{Integer; the time \emph{value} at which the initial
+training window ends. Must be a time value present in the
+data. The first forecast window covers the next \code{fc_horizon}
+observed times. When \code{NULL}, defaults to the time value at
+the 30th observed time point (ratcheted down for shorter
+series) and adjusted to leave at least 10 evaluation folds
+when possible.}
 
-\item{fc_horizon}{Integer; the number of time steps ahead
-evaluated at each fold. Default \code{1}.}
+\item{fc_horizon}{Integer; the number of \emph{observed time steps}
+ahead evaluated at each fold. For regular grids this is the
+familiar forecast horizon; for irregular CAR grids it is the
+next \code{fc_horizon} observed times (the CAR kernel absorbs the
+gaps via \code{time_dis}). Default \code{1}.}
 
 \item{pareto_k_threshold}{Proportion; the Pareto shape value
 above which the PSIS approximation is considered unstable

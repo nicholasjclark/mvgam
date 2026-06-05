@@ -82,7 +82,11 @@
 #'   Hindcasts and forecasts are returned as named lists of
 #'   `[ndraws, n_times]` matrices, one per series.
 #'
-#' @seealso [mvgam_forecast-class][mvgam], [hindcast.mvgam]
+#' @seealso [mvgam_forecast-class][mvgam], [hindcast.mvgam],
+#'   [posterior_predict.mvgam] and [posterior_epred.mvgam] for the
+#'   alternative marginal-MC prediction surface that integrates
+#'   over the trend's stochastic dynamics instead of extrapolating
+#'   the fitted latent state.
 #' @importFrom generics forecast
 #' @method forecast mvgam
 #' @export

@@ -68,7 +68,11 @@ hindcast <- function(object, ...) {
 #'   matrices, one per series; `forecasts` / `test_*` slots are
 #'   `NULL`.
 #'
-#' @seealso [mvgam_forecast-class][mvgam], [forecast.mvgam]
+#' @seealso [mvgam_forecast-class][mvgam], [forecast.mvgam],
+#'   [posterior_predict.mvgam] and [posterior_epred.mvgam] for the
+#'   alternative marginal-MC prediction surface that integrates
+#'   over the trend's stochastic dynamics instead of reading the
+#'   fitted latent state.
 #' @method hindcast mvgam
 #' @export
 hindcast.mvgam <- function(object,

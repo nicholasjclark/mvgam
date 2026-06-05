@@ -71,5 +71,9 @@ fitted state-space dynamics; the observation family then
 maps the trajectory back to the response scale.
 }
 \seealso{
-\link[=mvgam]{mvgam_forecast-class}, \link{hindcast.mvgam}
+\link[=mvgam]{mvgam_forecast-class}, \link{hindcast.mvgam},
+\link{posterior_predict.mvgam} and \link{posterior_epred.mvgam} for the
+alternative marginal-MC prediction surface that integrates
+over the trend's stochastic dynamics instead of extrapolating
+the fitted latent state.
 }

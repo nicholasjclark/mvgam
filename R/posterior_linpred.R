@@ -228,7 +228,9 @@ get_combined_linpred <- function(mvgam_fit, newdata,
 #'
 #' @seealso [brms::posterior_linpred()] for the brms generic,
 #'   [posterior_epred.mvgam()] for expected values on response scale,
-#'   [posterior_predict.mvgam()] for posterior predictive samples.
+#'   [posterior_predict.mvgam()] for posterior predictive samples,
+#'   [forecast.mvgam] and [hindcast.mvgam] for the deterministic
+#'   state-extrapolating prediction surface.
 #'
 #' @examples
 #' \dontrun{
