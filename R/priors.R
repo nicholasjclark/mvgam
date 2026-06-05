@@ -1500,8 +1500,8 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
 #' @description
 #' S3 generic function for extracting prior specifications from various model
 #' objects. This function provides a unified interface for prior inspection
-#' across different model types, with full brms compatibility and extensions
-#' for mvgam State-Space models.
+#' across different model types, with extensions for mvgam
+#' State-Space models.
 #'
 #' @param object Model specification object (formula, brmsformula, mvgam_formula, etc.)
 #' @param ... Additional arguments passed to methods
@@ -1591,10 +1591,9 @@ has_embedded_families <- function(formula) {
 #' @description
 #' Extracts and combines prior specifications for both observation and trend
 #' components of an mvgam model. This method provides a unified interface
-#' for prior inspection before model fitting with full brms compatibility.
-#' When \code{trend_formula = NULL}, this function behaves identically to
-#' \code{brms::get_prior}, ensuring perfect brms compatibility for observation-only
-#' models.
+#' for prior inspection before model fitting. When
+#' \code{trend_formula = NULL}, this function behaves identically to
+#' \code{brms::get_prior} for observation-only models.
 #'
 #' @param object An object of class \code{mvgam_formula} created by
 #'   \code{\link{mvgam_formula}}

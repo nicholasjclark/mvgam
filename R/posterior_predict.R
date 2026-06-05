@@ -1445,6 +1445,7 @@ extract_dpars_from_stanfit <- function(stanfit,
 posterior_predict.mvgam <- function(object, newdata = NULL,
                                     process_error = TRUE,
                                     ndraws = NULL,
+                                    draw_ids = NULL,
                                     re_formula = NULL,
                                     allow_new_levels = FALSE,
                                     sample_new_levels = "uncertainty",
@@ -1455,6 +1456,12 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
   checkmate::assert_logical(process_error, len = 1)
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
+  checkmate::assert_integerish(draw_ids, lower = 1L, null.ok = TRUE)
+  if (!is.null(ndraws) && !is.null(draw_ids)) {
+    stop(insight::format_error(
+      "Specify only one of 'ndraws' or 'draw_ids'."
+    ))
+  }
   checkmate::assert(
     checkmate::check_class(re_formula, "formula"),
     checkmate::check_true(is.na(re_formula)),
@@ -1513,7 +1520,18 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
     total_draws <- nrow(linpred_all)
   }
 
-  if (!is.null(ndraws)) {
+  if (!is.null(draw_ids)) {
+    if (max(draw_ids) > total_draws) {
+      stop(insight::format_error(c(
+        "Requested 'draw_ids' exceed available draws.",
+        x = paste0(
+          "Max requested: ", max(draw_ids),
+          ", available: ", total_draws, "."
+        )
+      )))
+    }
+    ndraws <- length(draw_ids)
+  } else if (!is.null(ndraws)) {
     if (ndraws > total_draws) {
       stop(insight::format_error(
         cli::format_inline(

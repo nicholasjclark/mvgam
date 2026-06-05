@@ -103,8 +103,7 @@ sim_re <- function(grp, sigma = 1) {
 
 # Internal: Convert beta-distribution mean / precision (`mu`,
 # `phi`) to (`shape1`, `shape2`) for `stats::rbeta`. Matches
-# brms's parametrisation. Verbatim port from
-# master:R/families.R:355.
+# brms's parametrisation.
 #'@noRd
 beta_shapes <- function(mu, phi) {
   list(shape1 = mu * phi, shape2 = (1 - mu) * phi)
@@ -238,9 +237,8 @@ sim_grp <- function(n, n_levels = 5L,
 
 
 # Internal: Stationary VAR(p) coefficient matrix via Ansley-Kohn
-# (1986). Verbatim port from master:R/trends.R:677-735, kept here
-# so sim_mvgam can draw random stable VAR coefficients without
-# user input. Returns a `[n_series, n_series, p]` cube.
+# (1986). Lets sim_mvgam draw random stable VAR coefficients
+# without user input. Returns a `[n_series, n_series, p]` cube.
 #'@noRd
 stationary_VAR_phi <- function(p = 1L, n_series = 3L, ar_scale = 1) {
   stopifnot(ar_scale > 0)

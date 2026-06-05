@@ -149,8 +149,9 @@ get_observation_structure <- function(object, newdata = NULL) {
   # invoking ensure_mvgam_variables.
   n_series_trained <- object$standata$N_series_trend %||%
     object$trend_metadata$dimensions$n_series %||%
-    length(levels(as.factor(attr(object$obs_data %||% object$data,
-                                  "mvgam_series"))))
+    length(levels(as.factor(
+      attr(mvgam_training_data(object), "mvgam_series")
+    )))
 
   is_single_series <- !is.null(n_series_trained) && n_series_trained == 1L
   has_explicit_series <- series_var %in% names(newdata)
@@ -158,7 +159,7 @@ get_observation_structure <- function(object, newdata = NULL) {
   if (is_single_series && !has_explicit_series) {
     # Pull the trained level so series indices line up with the
     # fitted model's encoding.
-    train_series <- attr(object$obs_data %||% object$data, "mvgam_series")
+    train_series <- attr(mvgam_training_data(object), "mvgam_series")
     level_label <- if (!is.null(train_series)) {
       as.character(train_series[1L])
     } else {
@@ -503,11 +504,18 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
     ))
   }
 
-  n_series <- object$series_info$n_series %||% object$trend_components$n_trends
-  # standata is the ground truth: hierarchical Stan code declares
-  # N_groups_trend / N_subgroups_trend; absence means non-hierarchical.
-  hierarchical <- !is.null(object$standata) &&
-                  !is.null(object$standata$N_groups_trend)
+  # Trend topology comes from the user's trend constructor spec.
+  # `detect_factor_n_lv` returns n_lv (or NULL); a non-NA `$gr`
+  # marks a hierarchical (grouped) trend. Same checks the
+  # stan-assembly / validation layers use.
+  spec <- trend_spec_for_residcor(object)
+  n_lv <- detect_factor_n_lv(object)
+  is_lv <- !is.null(n_lv)
+  hierarchical <- !is.null(spec$gr) && spec$gr != "NA"
+  n_obs_series <- object$series_info$n_series %||%
+    object$trend_components$n_trends
+  n_series <- if (is_lv) as.integer(n_lv) else
+    as.integer(n_obs_series)
 
   draws_mat <- posterior::as_draws_matrix(object$fit)
   draw_indices <- resolve_draw_indices(nrow(draws_mat), ndraws, draw_ids)
@@ -555,7 +563,10 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
     has_correlations = has_correlations,
     ndraws = length(draw_indices),
     params = params,
-    group_info = group_info
+    group_info = group_info,
+    is_lv = is_lv,
+    n_obs_series = as.integer(n_obs_series),
+    draws_mat = if (is_lv) draws_mat else NULL
   )
 }
 
@@ -1010,8 +1021,88 @@ sample_innovations <- function(cov_structure, obs_structure) {
     )
   }
 
+  # Latent-factor map: innovations were sampled at the LV level
+  # (`n_series == n_lv` here). Convert to per-series innovations
+  # via the loadings `Z[s, lv]` before mapping to obs.
+  if (isTRUE(cov_structure$is_lv)) {
+    Z <- extract_Z_loadings(
+      cov_structure$draws_mat,
+      n_obs_series = cov_structure$n_obs_series,
+      n_lv = n_series
+    )
+    innovations_flat <- map_lv_to_series_innovations(
+      innovations_flat, Z, n_times, n_lv = n_series,
+      n_obs_series = cov_structure$n_obs_series
+    )
+    n_series <- cov_structure$n_obs_series
+  }
+
   # Map (time, series) grid to observations
   map_innovations_to_obs(innovations_flat, n_times, n_series, obs_structure)
+}
+
+
+# Internal: extract Z[s, lv] loadings from the posterior draws.
+# Returns array [ndraws, n_obs_series, n_lv] sorted by series
+# index (outer) then by lv index (inner), matching Stan's
+# column-major storage convention.
+#'@noRd
+extract_Z_loadings <- function(draws_mat, n_obs_series, n_lv) {
+  checkmate::assert_matrix(draws_mat)
+  checkmate::assert_int(n_obs_series, lower = 1L)
+  checkmate::assert_int(n_lv, lower = 1L)
+  ndraws <- nrow(draws_mat)
+  cols <- grep("^Z\\[", colnames(draws_mat), value = TRUE)
+  expected_cols <- n_obs_series * n_lv
+  if (length(cols) != expected_cols) {
+    stop(insight::format_error(c(
+      paste0(
+        "Expected ", expected_cols,
+        " Z loading columns, found ", length(cols), "."
+      ),
+      i = paste0(
+        "Latent-factor model needs Z[s,lv] for s in 1..",
+        n_obs_series, ", lv in 1..", n_lv, "."
+      )
+    )))
+  }
+  # Stan stores matrix[N_series, N_lv] Z column-major:
+  # Z[1,1], Z[2,1], ..., Z[N_series,1], Z[1,2], ...
+  array(
+    as.numeric(draws_mat[, cols, drop = FALSE]),
+    dim = c(ndraws, n_obs_series, n_lv)
+  )
+}
+
+
+# Internal: vectorised LV->series mapping for innovations.
+# `lv_innov` is `[ndraws, n_times * n_lv]` laid out
+# time-fastest-within-lv (matching `transform_diagonal_innovations`).
+# `Z` is `[ndraws, n_obs_series, n_lv]`. Output is
+# `[ndraws, n_times * n_obs_series]` laid out
+# time-fastest-within-series, matching what
+# `map_innovations_to_obs` expects. Per draw d, for each time t
+# and series s: out[d, t + (s-1)*n_times] =
+#   sum_lv Z[d, s, lv] * lv_innov[d, t + (lv-1)*n_times].
+#'@noRd
+map_lv_to_series_innovations <- function(lv_innov, Z, n_times,
+                                          n_lv, n_obs_series) {
+  ndraws <- nrow(lv_innov)
+  checkmate::assert_matrix(lv_innov,
+                            ncols = n_times * n_lv)
+  checkmate::assert_array(Z, d = 3L)
+  out <- matrix(0, ndraws, n_times * n_obs_series)
+  for (d in seq_len(ndraws)) {
+    # [n_times x n_lv] for this draw, time varies fastest
+    lv_d <- matrix(lv_innov[d, ], nrow = n_times, ncol = n_lv,
+                    byrow = FALSE)
+    # [n_obs_series x n_lv] for this draw
+    Z_d <- Z[d, , , drop = TRUE]
+    # [n_times x n_obs_series] per-series innovations
+    series_d <- lv_d %*% t(Z_d)
+    out[d, ] <- as.numeric(series_d)
+  }
+  out
 }
 
 

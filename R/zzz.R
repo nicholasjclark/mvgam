@@ -59,8 +59,7 @@ mvgam_attach <- function() {
       "Loading 'mvgam' (version ",
       version,
       "). Useful instructions can be found by typing help('mvgam'). ",
-      "A more detailed introduction to the package is available through vignette('mvgam_overview'). ",
-      "Full brms compatibility is now enabled."
+      "A more detailed introduction to the package is available through vignette('mvgam_overview')."
     )
   )
   

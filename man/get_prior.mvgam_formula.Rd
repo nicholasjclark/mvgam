@@ -31,10 +31,9 @@ The returned object is fully compatible with \code{brms::set_prior()} and
 \description{
 Extracts and combines prior specifications for both observation and trend
 components of an mvgam model. This method provides a unified interface
-for prior inspection before model fitting with full brms compatibility.
-When \code{trend_formula = NULL}, this function behaves identically to
-\code{brms::get_prior}, ensuring perfect brms compatibility for observation-only
-models.
+for prior inspection before model fitting. When
+\code{trend_formula = NULL}, this function behaves identically to
+\code{brms::get_prior} for observation-only models.
 }
 \details{
 When a trend formula is specified, the function:

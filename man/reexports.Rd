@@ -45,6 +45,7 @@
 \alias{VarCorr}
 \alias{tidy}
 \alias{augment}
+\alias{glance}
 \alias{waic}
 \title{Objects exported from other packages}
 \keyword{internal}
@@ -57,7 +58,7 @@ below to see their documentation.
 
   \item{coda}{\code{\link[coda:mcmc]{as.mcmc}}}
 
-  \item{generics}{\code{\link[generics]{augment}}, \code{\link[generics]{tidy}}}
+  \item{generics}{\code{\link[generics]{augment}}, \code{\link[generics]{glance}}, \code{\link[generics]{tidy}}}
 
   \item{loo}{\code{\link[loo]{loo}}, \code{\link[loo]{loo_compare}}, \code{\link[loo]{waic}}}
 

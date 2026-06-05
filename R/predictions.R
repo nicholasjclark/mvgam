@@ -2275,20 +2275,6 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws) {
   # (latent state extrapolated forward via the trend kernel) use
   # `forecast.mvgam()` instead.
   has_unseen <- any(is.na(t_idx))
-  if (has_unseen && !identical(Sys.getenv("TESTTHAT"), "true")) {
-    rlang::inform(
-      paste0(
-        "Some newdata times are outside the fitted range. ",
-        "Using the per-series posterior mean of the latent trend ",
-        "for those rows (the marginal convention of ",
-        "posterior_predict / posterior_epred / posterior_linpred). ",
-        "Call forecast.mvgam() for state-aware out-of-sample ",
-        "extrapolation."
-      ),
-      .frequency = "once",
-      .frequency_id = "mvgam_oos_trend_marginal"
-    )
-  }
 
   series_marginal <- if (has_unseen) {
     out <- matrix(NA_real_, nrow = nrow(full_draws), ncol = N_series_trend)

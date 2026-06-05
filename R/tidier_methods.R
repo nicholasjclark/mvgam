@@ -6,509 +6,580 @@ generics::tidy
 #' @export
 generics::augment
 
+#' @importFrom generics glance
+#' @export
+generics::glance
+
 
 #' Tidy an `mvgam` object's parameter posteriors
 #'
-#' Get parameters' posterior statistics, implementing the generic `tidy` from
-#' the package \pkg{broom}.
+#' Posterior summaries for the fixed and random parameters of a
+#' fitted `mvgam` model, returned as a tibble in the column
+#' layout established by the \pkg{broom} / \pkg{broom.mixed}
+#' package: `term`, `estimate`, `std.error`, `conf.low`,
+#' `conf.high`. An additional `type` column carries an
+#' `mvgam`-specific categorisation that distinguishes
+#' observation-model and trend-model parameters.
 #'
-#' The parameters are categorized by the column "type". For instance, the
-#' intercept of the observation model (i.e. the "formula" arg to `mvgam()`) has
-#' the "type" "observation_beta". The possible "type"s are:
+#' The `type` column places every parameter into one of the
+#' following categories:
 #'
-#'   * observation_family_extra_param: any extra parameters for your observation
-#'     model, e.g. sigma for a gaussian observation model. These parameters are
-#'     not directly derived from the latent trend components (contrast to mu).
+#'   * `"observation_family_extra_param"` -- auxiliary
+#'     observation-family parameters such as `sigma`, `shape`,
+#'     `nu`, `phi`, `zi`, `hu`.
+#'   * `"observation_beta"` -- non-smoother coefficients of the
+#'     observation linear predictor (intercepts + non-smooth
+#'     fixed effects).
+#'   * `"random_effect_group_level"` -- group-level random-effect
+#'     parameters (`sd_`, `cor_`, etc.) attached to the
+#'     observation formula.
+#'   * `"random_effect_beta"` -- the individual random-effect
+#'     coefficients attached to the observation formula.
+#'   * `"trend_model_param"` -- parameters of the trend dynamics
+#'     (`ar1_trend`, `theta_trend`, `Sigma_trend`, `k_trend`,
+#'     `m_trend`, `delta_trend`, etc.) including any GP
+#'     hyperparameters used inside `trend_model`.
+#'   * `"trend_beta"` -- non-smoother coefficients of the trend
+#'     linear predictor (`trend_formula`).
+#'   * `"trend_random_effect_group_level"` -- group-level
+#'     random-effect parameters attached to the trend formula.
+#'   * `"trend_random_effect_beta"` -- the individual
+#'     random-effect coefficients attached to the trend formula.
 #'
-#'   * observation_beta: betas from your observation model, excluding any
-#'     smooths. If your formula was `y ~ x1 + s(x2, bs='cr')`, then your
-#'     intercept and `x1`'s beta would be categorized as this.
+#' @param x A fitted `mvgam` object.
+#' @param effects Character. One of `"all"` (the default;
+#'   returns every parameter), `"fixed"` (only
+#'   `observation_beta` + `trend_beta`), `"ran_pars"` (only the
+#'   group-level random-effect parameters, observation-family
+#'   extras and trend-dynamics parameters) or `"ran_vals"`
+#'   (only the individual random-effect coefficients). The
+#'   vocabulary matches `broom.mixed::tidy.brmsfit()`.
+#' @param robust Logical. If `FALSE` (the default) the posterior
+#'   mean and standard deviation are used as the point estimate
+#'   and dispersion. If `TRUE` the median and the median
+#'   absolute deviation (MAD) are used instead.
+#' @param conf.int Logical. If `TRUE` (the default), include
+#'   `conf.low` and `conf.high` posterior quantile columns.
+#' @param conf.level Numeric. Probability covered by the
+#'   credible interval reported in `conf.low` / `conf.high`.
+#'   Defaults to `0.95`.
+#' @param rhat Logical. If `TRUE`, add a `rhat` column with
+#'   posterior::rhat() values.
+#' @param ess Logical. If `TRUE`, add an `ess_bulk` column with
+#'   posterior::ess_bulk() values.
+#' @param ... Unused, included for generic consistency.
 #'
-#'   * random_effect_group_level: Group-level random effects parameters, i.e.
-#'     the mean and sd of the distribution from which the specific random
-#'     intercepts/slopes are considered to be drawn from.
-#'
-#'   * random_effect_beta: betas for the individual random intercepts/slopes.
-#'
-#'   * trend_model_param: parameters from your `trend_model`.
-#'
-#'   * trend_beta: analog of "observation_beta", but for any `trend_formula`.
-#'
-#'   * trend_random_effect_group_level: analog of
-#'     "random_effect_group_level", but for any `trend_formula`.
-#'
-#'   * trend_random_effect_beta: analog of "random_effect_beta", but for any
-#'     `trend_formula`.
-#'
-#' Additionally, GP terms can be incorporated in several ways, leading to
-#' different "type"s (or absence!):
-#'
-#'   * `s(bs = "gp")`: No parameters returned.
-#'
-#'   * `gp()` in `formula`: "type" of "observation_param".
-#'
-#'   * `gp()` in `trend_formula`: "type" of "trend_formula_param".
-#'
-#' @param x An object of class `mvgam`.
-#'
-#' @param probs The desired probability levels of the parameters' posteriors.
-#'   Defaults to `c(0.025, 0.5, 0.975)`, i.e. 2.5%, 50%, and 97.5%.
-#'
-#' @param ... Unused, included for generic consistency only.
-#'
-#' @returns A `tibble` containing:
-#'
-#'   * "parameter": The parameter in question.
-#'
-#'   * "type": The component of the model that the parameter belongs to (see
-#'     details).
-#'
-#'   * "mean": The posterior mean.
-#'
-#'   * "sd": The posterior standard deviation.
-#'
-#'   * percentile(s): Any percentiles of interest from these posteriors.
-#'
-#' @family tidiers
-#'
-#' @examples
-#' \dontrun{
-#' set.seed(0)
-#' simdat <- sim_mvgam(
-#'   T = 100,
-#'   n_series = 3,
-#'   trend_model = AR(),
-#'   prop_trend = 0.75,
-#'   family = gaussian()
-#' )
-#'
-#' simdat$data_train$x <- rnorm(nrow(simdat$data_train))
-#' simdat$data_train$year_fac <- factor(simdat$data_train$year)
-#'
-#' mod <- mvgam(
-#'   y ~ -1 + s(time, by = series, bs = 'cr', k = 20) + x,
-#'   trend_formula = ~ s(year_fac, bs = 're') - 1,
-#'   trend_model = AR(cor = TRUE),
-#'   family = gaussian(),
-#'   data = simdat$data_train,
-#'   silent = 2
-#' )
-#'
-#' tidy(mod, probs = c(0.2, 0.5, 0.8))
-#' }
-#'
-#' @export
-tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
-  object <- x
-  obj_vars <- variables(object)
-  digits <- 2 # TODO: Let user change?
-  partialized_mcmc_summary <- purrr::partial(
-    mcmc_summary,
-    object$model_output,
-    ... = ,
-    ISB = FALSE, # Matches `x[i]`'s rather than `x`.
-    probs = probs,
-    digits = digits,
-    Rhat = FALSE,
-    n.eff = FALSE
-  )
-  out <- tibble::tibble()
-
-  # Observation family extra parameters --------
-  xp_names_all <- obj_vars$observation_pars$orig_name
-  # no matches -> length(xp_names) == 0, even if xp_names_all is NULL
-  xp_names <- grep("vec", xp_names_all, value = TRUE, invert = TRUE)
-  if (length(xp_names) > 0) {
-    extra_params_out <- partialized_mcmc_summary(params = xp_names)
-    extra_params_out <- tibble::add_column(
-      extra_params_out,
-      type = "observation_family_extra_param",
-      .before = 1
-    )
-    out <- dplyr::bind_rows(out, extra_params_out)
-  }
-  # END Observation family extra parameters
-
-  # obs non-smoother betas --------
-  if (object$mgcv_model$nsdf > 0) {
-    obs_beta_name_map <- dplyr::slice_head(
-      obj_vars$observation_betas,
-      n = object$mgcv_model$nsdf
-    ) # df("orig_name", "alias")
-    obs_betas_out <- partialized_mcmc_summary(
-      params = obs_beta_name_map$orig_name
-    )
-    row.names(obs_betas_out) <- obs_beta_name_map$alias
-    obs_betas_out <- tibble::add_column(
-      obs_betas_out,
-      type = "observation_beta",
-      .before = 1
-    )
-    out <- dplyr::bind_rows(out, obs_betas_out)
-  }
-  # END obs non-smoother betas
-
-  # random effects --------
-  # TODO: names for random slopes
-  re_param_name_map <- obj_vars$observation_re_params
-  if (!is.null(re_param_name_map)) {
-    re_params_out <- partialized_mcmc_summary(
-      params = re_param_name_map$orig_name
-    )
-    row.names(re_params_out) <- re_param_name_map$alias
-    re_params_out <- tibble::add_column(
-      re_params_out,
-      type = "random_effect_group_level",
-      .before = 1
-    )
-    out <- dplyr::bind_rows(out, re_params_out)
-
-    # specific betas
-    for (sp in object$mgcv_model$smooth) {
-      if (inherits(sp, "random.effect")) {
-        re_label <- sp$label
-        betas_all <- obj_vars$observation_betas
-        re_beta_idxs <- grep(re_label, betas_all$alias, fixed = TRUE)
-        re_beta_name_map <- dplyr::slice(betas_all, re_beta_idxs)
-        re_betas_out <- partialized_mcmc_summary(
-          params = re_beta_name_map$orig_name
-        )
-        row.names(re_betas_out) <- re_beta_name_map$alias
-        re_betas_out <- tibble::add_column(
-          re_betas_out,
-          type = "random_effect_beta",
-          .before = 1
-        )
-        out <- dplyr::bind_rows(out, re_betas_out)
-      }
-    }
-  }
-  # END random effects
-
-  # GPs --------
-  if (!is.null(obj_vars$trend_pars)) {
-    tm_param_names_all <- obj_vars$trend_pars$orig_name
-    gp_param_names <- grep(
-      "^alpha_gp|^rho_gp",
-      tm_param_names_all,
-      value = TRUE
-    )
-    if (length(gp_param_names) > 0) {
-      gp_params_out <- partialized_mcmc_summary(params = gp_param_names)
-      # where is GP? can be in formula, trend_formula, or trend_model
-      if (grepl("^(alpha|rho)_gp_trend", gp_param_names[[1]])) {
-        param_type <- "trend_formula_param"
-      } else if (grepl("^(alpha|rho)_gp_", gp_param_names[[1]])) {
-        # hmph.
-        param_type <- "observation_param"
-      } else {
-        param_type <- "trend_model_param"
-      }
-      gp_params_out <- tibble::add_column(
-        gp_params_out,
-        type = param_type,
-        .before = 1
-      )
-      out <- dplyr::bind_rows(out, gp_params_out)
-    }
-  }
-  # END GPs
-
-  # RW, AR, CAR, VAR, ZMVN --------
-  # TODO: split out Sigma for heircor?
-  trend_model_name <- ifelse(
-    inherits(object$trend_model, "mvgam_trend"),
-    object$trend_model$trend_model,
-    object$trend_model
-  ) # str vs called obj as arg to mvgam
-  if (grepl("^VAR|^CAR|^AR|^RW|^ZMVN", trend_model_name)) {
-    # theta = MA terms
-    # alpha_cor = heirarchical corr term
-    # A = VAR auto-regressive matrix
-    # Sigma = correlated errors matrix
-    # sigma = errors
-
-    # setting up the params to extract
-    if (trend_model_name == "VAR") {
-      trend_model_params <- c("^A\\[", "^alpha_cor", "^theta", "^Sigma")
-    } else if (grepl("^CAR|^AR|^RW", trend_model_name)) {
-      cor <- inherits(object$trend_model, "mvgam_trend") &&
-        object$trend_model$cor
-      sigma_name <- ifelse(cor, "^Sigma", "^sigma")
-      trend_model_params <- c("^ar", "^alpha_cor", "^theta", sigma_name)
-    } else if (grepl("^ZMVN", trend_model_name)) {
-      trend_model_params <- c("^alpha_cor", "^Sigma")
-    }
-
-    # extracting the params
-    trend_model_params <- paste(trend_model_params, collapse = "|")
-    tm_param_names_all <- obj_vars$trend_pars$orig_name
-    tm_param_names <- grep(trend_model_params, tm_param_names_all, value = TRUE)
-    tm_params_out <- partialized_mcmc_summary(params = tm_param_names)
-    tm_params_out <- tibble::add_column(
-      tm_params_out,
-      type = "trend_model_param",
-      .before = 1
-    )
-    out <- dplyr::bind_rows(out, tm_params_out)
-  }
-  # END RW, AR, CAR, VAR
-
-  # 'None' trend_model with a trend_formula --------
-  if (trend_model_name == "None" && !is.null(object$trend_call)) {
-    trend_pars_names_all <- obj_vars$trend_pars$orig_name
-    trend_pars_names <- grep("sigma", trend_pars_names_all, value = TRUE)
-    if (length(trend_pars_names) > 0) {
-      trend_params_out <- partialized_mcmc_summary(params = trend_pars_names)
-      trend_params_out <- tibble::add_column(
-        trend_params_out,
-        type = "trend_model_param",
-        .before = 1
-      )
-      out <- dplyr::bind_rows(out, trend_params_out)
-    }
-  }
-  # END 'None' trend_model with a trend_formula
-
-  # Piecewise --------
-  # TODO: potentially lump into AR section, above; how to handle change points?
-  # to lump in, just add an
-  # `else if (grepl("^PW", trend_model_name)`, then
-  # `trend_model_params <- c("^k_trend", "^m_trend", "^delta_trend")`
-  # and change initial grep(ar car var) call
-  if (grepl("^PW", trend_model_name)) {
-    trend_model_params <- "^k_trend|^m_trend|^delta_trend"
-    tm_param_names_all <- obj_vars$trend_pars$orig_name
-    tm_param_names <- grep(trend_model_params, tm_param_names_all, value = TRUE)
-    tm_params_out <- partialized_mcmc_summary(params = tm_param_names)
-    tm_params_out <- tibble::add_column(
-      tm_params_out,
-      type = "trend_model_param",
-      .before = 1
-    )
-    out <- dplyr::bind_rows(out, tm_params_out)
-  }
-  # END Piecewise
-
-  # Trend formula betas --------
-  if (!is.null(object$trend_call) && object$trend_mgcv_model$nsdf > 0) {
-    trend_beta_name_map <- dplyr::slice_head(
-      obj_vars$trend_betas,
-      n = object$trend_mgcv_model$nsdf
-    ) # df("orig_name", "alias")
-    trend_betas_out <- partialized_mcmc_summary(
-      params = trend_beta_name_map$orig_name
-    )
-    row.names(trend_betas_out) <- trend_beta_name_map$alias
-    trend_betas_out <- tibble::add_column(
-      trend_betas_out,
-      type = "trend_beta",
-      .before = 1
-    )
-    out <- dplyr::bind_rows(out, trend_betas_out)
-  }
-  # END Trend formula betas
-
-  # trend random effects --------
-  trend_re_param_name_map <- obj_vars$trend_re_params
-  if (!is.null(trend_re_param_name_map)) {
-    trend_re_params_out <- partialized_mcmc_summary(
-      params = trend_re_param_name_map$orig_name
-    )
-    row.names(trend_re_params_out) <- trend_re_param_name_map$alias
-    trend_re_params_out <- tibble::add_column(
-      trend_re_params_out,
-      type = "trend_random_effect_group_level",
-      .before = 1
-    )
-    out <- dplyr::bind_rows(out, trend_re_params_out)
-
-    # specific betas
-    for (sp in object$trend_mgcv_model$smooth) {
-      if (inherits(sp, "random.effect")) {
-        trend_re_label <- sp$label
-        trend_betas_all <- obj_vars$trend_betas
-        trend_re_beta_idxs <- grep(
-          trend_re_label,
-          trend_betas_all$alias,
-          fixed = TRUE
-        )
-        trend_re_beta_name_map <- dplyr::slice(
-          trend_betas_all,
-          trend_re_beta_idxs
-        )
-        trend_re_betas_out <- partialized_mcmc_summary(
-          params = trend_re_beta_name_map$orig_name
-        )
-        row.names(trend_re_betas_out) <- trend_re_beta_name_map$alias
-        trend_re_betas_out <- tibble::add_column(
-          trend_re_betas_out,
-          type = "trend_random_effect_beta",
-          .before = 1
-        )
-        out <- dplyr::bind_rows(out, trend_re_betas_out)
-      }
-    }
-  }
-  # END trend random effects
-
-  # Cleanup output --------
-  # TODO: might need to put this prior to every bind_rows to avoid rowname dups.
-  out <- tibble::rownames_to_column(out, "parameter")
-
-  # Split Sigma in case of hierarchical residual correlations
-  alpha_cor_matches <- grep("alpha_cor", out$parameter, fixed = TRUE)
-  if (length(alpha_cor_matches) > 0) {
-    out <- split_hier_Sigma(object, out)
-  }
-  # END Cleanup output
-
-  out
-}
-
-
-#' Helper function to split apart Sigma into its constituent sub-matrixes in
-#' the case of a hierarchical latent process.
-#'
-#' The default MCMC output has dummy parameters filling out Sigma to make it
-#' an nxn matrix. This removes those, and renames the remaining sub-matrixes
-#' to align with the `gr` and `subgr` sizes from `mvgam()`'s `trend_model` argument.
-#'
-#' @param object An object of class `mvgam`.
-#'
-#' @param params `tibble` The parameters that are going to be returned by
-#'   `tidy.mvgam()`. Assumed that the columns match what `tidy.mvgam()` will return.
-#'   Specifically, that there is a "parameter" column.
-#'
-#' @returns `tibble` The `params`, but with the Sigma parameters split up by `gr`.
-#'
-#' @noRd
-split_hier_Sigma <- function(object, params) {
-  params_nonSigma <- dplyr::filter(params, !grepl("^Sigma", parameter))
-  params_Sigma <- dplyr::filter(params, grepl("^Sigma", parameter))
-
-  gr <- object$trend_model$gr
-  subgr <- object$trend_model$subgr
-  gr_levels <- levels(object$obs_data[[gr]])
-  subgr_levels <- levels(object$obs_data[[subgr]])
-  n_gr <- length(gr_levels)
-  n_subgr <- length(subgr_levels)
-
-  # anything besides the dummy params should have non-zero sd
-  params_Sigma <- dplyr::filter(params_Sigma, mean != 0, sd != 0)
-  index_strs <- sub("Sigma", "", params_Sigma$parameter)[1:(n_subgr**2)]
-
-  # new names
-  new_names <- paste0(
-    "Sigma_",
-    rep(seq_len(n_gr), each = n_subgr**2),
-    index_strs
-  )
-  params_Sigma["parameter"] <- new_names
-
-  dplyr::bind_rows(params_nonSigma, params_Sigma)
-}
-
-
-#' Augment an `mvgam` object's data
-#'
-#' Add fits and residuals to the data, implementing the generic `augment` from
-#' the package \pkg{broom}.
-#'
-#' A `list` is returned if `class(x$obs_data) == 'list'`, otherwise a `tibble`
-#' is returned, but the contents of either object is the same.
-#'
-#' The arguments `robust` and `probs` are applied to both the fit and residuals
-#' calls (see [fitted.mvgam()] and [residuals.mvgam()] for details).
-#'
-#' @importFrom stats residuals
-#'
-#' @param x An object of class `mvgam`.
-#'
-#' @param robust If `FALSE` (the default) the mean is used as the measure of
-#'   central tendency and the standard deviation as the measure of variability.
-#'   If `TRUE`, the median and the median absolute deviation (MAD) are applied
-#'   instead.
-#'
-#' @param probs The percentiles to be computed by the quantile function.
-#'
-#' @param ... Unused, included for generic consistency only.
-#'
-#' @returns A `list` or `tibble` (see details) combining:
-#'
-#'   * The data supplied to `mvgam()`.
-#'
-#'   * The outcome variable, named as `.observed`.
-#'
-#'   * The fitted backcasts, along with their variability and credible bounds.
-#'
-#'   * The residuals, along with their variability and credible bounds.
-#'
-#' @seealso
-#'   \code{\link{residuals.mvgam}},
-#'   \code{\link{fitted.mvgam}}
+#' @return A tibble with one row per parameter and columns
+#'   `term`, `type`, `estimate`, `std.error`, optionally
+#'   `conf.low` / `conf.high`, and optionally `rhat` /
+#'   `ess_bulk`.
 #'
 #' @family tidiers
 #'
 #' @examples
 #' \donttest{
-#' set.seed(0)
-#' dat <- sim_mvgam(
-#'   T = 80,
-#'   n_series = 3,
-#'   mu = 2,
-#'   trend_model = AR(p = 1),
-#'   prop_missing = 0.1,
-#'   prop_trend = 0.6
-#' )
-#'
-#' mod1 <- mvgam(
-#'   formula = y ~ s(season, bs = 'cc', k = 6),
-#'   data = dat$data_train,
-#'   trend_model = AR(),
-#'   family = poisson(),
-#'   noncentred = TRUE,
-#'   chains = 2,
-#'   silent = 2
-#' )
-#'
-#' augment(mod1, robust = TRUE, probs = c(0.25, 0.75))
+#' sim <- sim_mvgam(family = gaussian(), n_series = 2L,
+#'                   n_timepoints = 50L, seed = 1L)
+#' mod <- mvgam(y ~ s(season, bs = "cc", k = 6),
+#'              trend_formula = ~ AR(p = 1),
+#'              data = sim$data_train,
+#'              family = gaussian(),
+#'              chains = 1L, silent = 2L)
+#' tidy(mod)
+#' tidy(mod, effects = "fixed", conf.level = 0.9)
+#' tidy(mod, robust = TRUE, rhat = TRUE, ess = TRUE)
 #' }
 #'
-#'
 #' @export
-augment.mvgam <- function(x, robust = FALSE, probs = c(0.025, 0.975), ...) {
-  obs_data <- x$obs_data
-  obs_data$.observed <- obs_data$y
+tidy.mvgam <- function(x, effects = "all", robust = FALSE,
+                        conf.int = TRUE, conf.level = 0.95,
+                        rhat = FALSE, ess = FALSE, ...) {
+  checkmate::assert_class(x, "mvgam")
+  effects <- match.arg(
+    effects, c("all", "fixed", "ran_pars", "ran_vals")
+  )
+  checkmate::assert_flag(robust)
+  checkmate::assert_flag(conf.int)
+  checkmate::assert_number(conf.level, lower = 0, upper = 1)
+  checkmate::assert_flag(rhat)
+  checkmate::assert_flag(ess)
+
+  obj_vars <- categorize_mvgam_parameters(x)
+  draws <- posterior::as_draws_array(x$fit)
+  obs_var_names <- variables(x)
+  alias_map <- c(mvgam_beta_aliases(x), mvgam_ranef_aliases(x))
+
+  # Resolve mvgam beta aliases for a vector of raw Stan names.
+  # Falls back to the raw name when no alias exists.
+  apply_alias <- function(raw) {
+    out <- alias_map[raw]
+    out[is.na(out)] <- raw[is.na(out)]
+    unname(out)
+  }
+
+  spec <- tidy_spec(x, obj_vars)
+  spec <- dplyr::filter(spec, .effects_filter(effect, effects))
+
+  out <- purrr::map_dfr(
+    seq_len(nrow(spec)),
+    function(i) {
+      params <- spec$params[[i]]
+      if (length(params) == 0L) return(tibble::tibble())
+      summarise_param_block(
+        draws = draws,
+        param_names = params,
+        type = spec$type[i],
+        alias = apply_alias(params),
+        robust = robust,
+        conf.int = conf.int,
+        conf.level = conf.level,
+        rhat = rhat,
+        ess = ess
+      )
+    }
+  )
+
+  if (length(grep("alpha_cor", out$term, fixed = TRUE)) > 0L &&
+        !is.null(x$trend_model$gr)) {
+    out <- split_hier_Sigma(x, out)
+  }
+  out
+}
+
+
+# Internal: the per-block plan that tidy.mvgam walks. Each row
+# is one taxonomy bucket the parameter vector falls into,
+# together with the broom effects-class it belongs to. Keeping
+# this as a single tibble removes the 8+ near-identical blocks
+# the original implementation carried around.
+#'@noRd
+tidy_spec <- function(x, obj_vars) {
+  # Canonical source of truth for the trend type: `enrich_trend_metadata`
+  # populates `trend_type` as a single string ("AR", "VAR", "PW", ...).
+  # Falls back to whatever's on `$trend_model` for legacy fits.
+  meta <- get_enriched_trend_metadata(x)
+  trend_model_name <- meta$trend_type %||%
+    (if (inherits(x$trend_model, "mvgam_trend"))
+       x$trend_model$trend_model else
+       as.character(x$trend_model %||% "None"))
+  trend_dynamic_pattern <- trend_dynamic_pattern_for(
+    x, trend_model_name
+  )
+
+  obs_family <- obj_vars$observation_pars$orig_name %||% character(0L)
+  obs_family <- grep("vec", obs_family, value = TRUE, invert = TRUE)
+
+  trend_pars_all <- obj_vars$trend_pars$orig_name %||% character(0L)
+  trend_dynamic <- if (nzchar(trend_dynamic_pattern)) {
+    grep(trend_dynamic_pattern, trend_pars_all, value = TRUE)
+  } else if (identical(trend_model_name, "None") &&
+              !is.null(x$trend_call)) {
+    # 'None' trend with a trend_formula -> only sigma_trend
+    grep("sigma", trend_pars_all, value = TRUE)
+  } else {
+    character(0L)
+  }
+
+  obs_beta <- head_betas(x$mgcv_model, obj_vars$observation_betas)
+  trend_beta <- if (!is.null(x$trend_call)) {
+    head_betas(x$trend_mgcv_model, obj_vars$trend_betas)
+  } else character(0L)
+
+  re_pars <- obj_vars$observation_re_params$orig_name %||%
+    character(0L)
+  re_beta <- random_effect_beta_names(x, obj_vars)
+  trend_re_pars <- obj_vars$trend_re_params$orig_name %||%
+    character(0L)
+  trend_re_beta <- random_effect_beta_names(x, obj_vars,
+                                              which = "trend")
+
+  tibble::tibble(
+    type = c(
+      "observation_family_extra_param",
+      "observation_beta",
+      "random_effect_group_level",
+      "random_effect_beta",
+      "trend_model_param",
+      "trend_beta",
+      "trend_random_effect_group_level",
+      "trend_random_effect_beta"
+    ),
+    effect = c(
+      "ran_pars",  # family extras are not "fixed" in broom sense
+      "fixed",
+      "ran_pars",
+      "ran_vals",
+      "ran_pars",
+      "fixed",
+      "ran_pars",
+      "ran_vals"
+    ),
+    params = list(
+      obs_family,
+      obs_beta,
+      re_pars,
+      re_beta,
+      trend_dynamic,
+      trend_beta,
+      trend_re_pars,
+      trend_re_beta
+    )
+  )
+}
+
+
+# Internal: regex of parameter prefixes for the trend dynamics
+# parameters of `trend_model_name`. Returns a single regex
+# string (alternation-separated) suitable for grep().
+#'@noRd
+trend_dynamic_pattern_for <- function(x, trend_model_name) {
+  has_cor <- inherits(x$trend_model, "mvgam_trend") &&
+    isTRUE(x$trend_model$cor)
+  if (grepl("^VAR", trend_model_name)) {
+    return("^A\\[|^alpha_cor|^theta|^Sigma")
+  }
+  if (grepl("^CAR|^AR|^RW", trend_model_name)) {
+    sigma_name <- if (has_cor) "^Sigma" else "^sigma"
+    return(paste(
+      c("^ar", "^alpha_cor", "^theta", sigma_name),
+      collapse = "|"
+    ))
+  }
+  if (grepl("^ZMVN", trend_model_name)) {
+    return("^alpha_cor|^Sigma")
+  }
+  if (grepl("^PW", trend_model_name)) {
+    return("^k_trend|^m_trend|^delta_trend")
+  }
+  # GP-only / unknown -> nothing here; sigma fallback applies.
+  ""
+}
+
+
+# Internal: pull the first `nsdf` non-smoother betas from an
+# obj_vars block. Returns character(0) when the model has no
+# parametric coefficients on that side.
+#'@noRd
+head_betas <- function(mgcv_model, betas_df) {
+  if (is.null(mgcv_model) || is.null(betas_df) ||
+        mgcv_model$nsdf <= 0L) {
+    return(character(0L))
+  }
+  utils::head(betas_df$orig_name, mgcv_model$nsdf)
+}
+
+
+# Internal: extract the raw Stan names for individual random-effect
+# coefficients from a fitted mgcv model. `which` chooses between
+# the observation- and trend-side smooth lists.
+#'@noRd
+random_effect_beta_names <- function(x, obj_vars,
+                                       which = c("obs", "trend")) {
+  which <- match.arg(which)
+  mgcv_model <- if (which == "obs") x$mgcv_model else
+    x$trend_mgcv_model
+  betas_all <- if (which == "obs") obj_vars$observation_betas else
+    obj_vars$trend_betas
+  if (is.null(mgcv_model) || is.null(betas_all)) {
+    return(character(0L))
+  }
+  unlist(lapply(mgcv_model$smooth, function(sp) {
+    if (!inherits(sp, "random.effect")) return(character(0L))
+    re_label <- sp$label
+    idx <- grep(re_label, betas_all$alias, fixed = TRUE)
+    betas_all$orig_name[idx]
+  }), use.names = FALSE) %||% character(0L)
+}
+
+
+# Internal: vectorised effects-class filter. Returns a logical
+# vector of the same length as `effect_col` indicating which
+# rows survive the user's `effects` choice.
+#'@noRd
+.effects_filter <- function(effect_col, effects) {
+  if (effects == "all") {
+    return(rep(TRUE, length(effect_col)))
+  }
+  effect_col == effects
+}
+
+
+# Internal: summarise a named subset of parameters using broom
+# column conventions. Returns a tibble with columns
+#   term, type, estimate, std.error[, conf.low, conf.high]
+#   [, rhat, ess_bulk]
+#
+# All summaries are computed in a single `posterior::summarise_draws()`
+# pass over the subset, so the function walks the draws exactly
+# once regardless of which optional columns are requested.
+#'@noRd
+summarise_param_block <- function(draws, param_names, type,
+                                    alias = NULL,
+                                    robust = FALSE,
+                                    conf.int = TRUE,
+                                    conf.level = 0.95,
+                                    rhat = FALSE, ess = FALSE) {
+  sub <- posterior::subset_draws(draws, variable = param_names)
+  summary_fns <- broom_summary_fns(
+    robust = robust, conf.int = conf.int,
+    conf.level = conf.level, rhat = rhat, ess = ess
+  )
+  summ <- do.call(
+    posterior::summarise_draws, c(list(sub), summary_fns)
+  )
+  out <- tibble::tibble(
+    term = if (!is.null(alias)) alias else summ$variable,
+    type = type
+  )
+  for (nm in setdiff(names(summ), "variable")) {
+    out[[nm]] <- summ[[nm]]
+  }
+  out
+}
+
+
+# Internal: build the list of named summary functions
+# `posterior::summarise_draws()` will apply. Centralises the
+# robust / quantile / convergence choices so tidy.mvgam,
+# augment.mvgam and any future tidiers stay aligned on column
+# naming.
+#'@noRd
+broom_summary_fns <- function(robust = FALSE,
+                                conf.int = TRUE,
+                                conf.level = 0.95,
+                                rhat = FALSE, ess = FALSE) {
+  fns <- list(
+    estimate  = if (robust) stats::median else mean,
+    std.error = if (robust) stats::mad else stats::sd
+  )
+  if (conf.int) {
+    a <- (1 - conf.level) / 2
+    fns$conf.low  <- function(.x)
+      stats::quantile(.x, a, names = FALSE)
+    fns$conf.high <- function(.x)
+      stats::quantile(.x, 1 - a, names = FALSE)
+  }
+  if (rhat) fns$rhat <- posterior::rhat
+  if (ess) fns$ess_bulk <- posterior::ess_bulk
+  fns
+}
+
+
+# Internal: in hierarchical residual-correlation models the
+# Stan `Sigma` block contains dummy entries that pad it to an
+# (n_subgr * n_gr)^2 block-diagonal. This drops the zero
+# entries and renames the remaining sub-matrix entries with a
+# leading group index `Sigma_<g><i><j>`.
+#'@noRd
+split_hier_Sigma <- function(x, params) {
+  is_sigma <- grepl("^Sigma", params$term)
+  if (!any(is_sigma)) return(params)
+  non_sigma <- params[!is_sigma, ]
+  sigma <- params[is_sigma, ]
+
+  gr <- x$trend_model$gr
+  subgr <- x$trend_model$subgr
+  n_gr <- length(levels(x$obs_data[[gr]]))
+  n_subgr <- length(levels(x$obs_data[[subgr]]))
+
+  # Drop dummy entries (mean and std.error both exactly zero)
+  sigma <- sigma[sigma$estimate != 0 | sigma$std.error != 0, ]
+  if (nrow(sigma) == 0L) return(non_sigma)
+  index_strs <- sub("Sigma", "", sigma$term)[seq_len(n_subgr^2)]
+  sigma$term <- paste0(
+    "Sigma_",
+    rep(seq_len(n_gr), each = n_subgr^2),
+    index_strs
+  )
+  dplyr::bind_rows(non_sigma, sigma)
+}
+
+
+#' Augment an `mvgam` object's training data with fitted values
+#' and residuals
+#'
+#' Adds posterior summaries of the in-sample fits and
+#' residuals to the training data, using broom column names.
+#' Each row of the input data is preserved and three (or
+#' five, when `conf.int = TRUE`) new columns are appended for
+#' each of the fitted and residual posteriors.
+#'
+#' @param x A fitted `mvgam` object.
+#' @param robust Logical. `FALSE` (the default) uses the
+#'   posterior mean and standard deviation; `TRUE` uses the
+#'   median and the median absolute deviation (MAD).
+#' @param conf.int Logical. If `TRUE` (the default), include
+#'   `.lower` / `.upper` (for `.fitted`) and `.resid.lower` /
+#'   `.resid.upper` (for `.resid`) credible interval columns.
+#' @param conf.level Numeric. Probability covered by the
+#'   credible intervals. Defaults to `0.95`.
+#' @param ... Unused, included for generic consistency.
+#'
+#' @return A tibble (or `list`, when `class(x$obs_data) == "list"`)
+#'   with the original training data plus:
+#'
+#'   * `.observed` -- the response value.
+#'   * `.fitted` -- the posterior mean (or median) fitted value.
+#'   * `.se.fit` -- the posterior standard deviation (or MAD) of
+#'     the fitted value.
+#'   * `.lower`, `.upper` -- the lower / upper bound of the
+#'     `conf.level` credible interval for `.fitted`. Present only
+#'     when `conf.int = TRUE`.
+#'   * `.resid` -- the posterior mean (or median) residual.
+#'   * `.resid.se` -- the posterior standard deviation (or MAD)
+#'     of the residual.
+#'   * `.resid.lower`, `.resid.upper` -- the residual credible
+#'     interval bounds. Present only when `conf.int = TRUE`.
+#'
+#' @family tidiers
+#' @seealso [fitted.mvgam()], [residuals.mvgam()]
+#'
+#' @examples
+#' \donttest{
+#' sim <- sim_mvgam(family = gaussian(), n_series = 1L,
+#'                   n_timepoints = 50L, seed = 1L)
+#' mod <- mvgam(y ~ s(season, bs = "cc"),
+#'              trend_formula = ~ AR(p = 1),
+#'              data = sim$data_train,
+#'              family = gaussian(),
+#'              chains = 1L, silent = 2L)
+#' augment(mod)
+#' }
+#'
+#' @importFrom stats residuals
+#' @export
+augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
+                            conf.level = 0.95, ...) {
+  checkmate::assert_class(x, "mvgam")
+  checkmate::assert_flag(robust)
+  checkmate::assert_flag(conf.int)
+  checkmate::assert_number(conf.level, lower = 0, upper = 1)
+
+  obs_data <- mvgam_training_data(x)
+  resp <- mvgam_response_name(x)
+  obs_data$.observed <- obs_data[[resp]]
   obs_data <- purrr::discard_at(
     obs_data,
     c("index..orig..order", "index..time..index")
   )
 
-  resids <- residuals(x, robust = robust, probs = probs) %>%
-    tibble::as_tibble()
-  fits <- fitted(x, robust = robust, probs = probs) %>%
-    tibble::as_tibble()
-  hc_fits <- fits %>%
-    dplyr::slice_head(n = NROW(resids)) # fits can include fcs
-  colnames(resids) <- c(
-    ".resid",
-    ".resid.variability",
-    ".resid.cred.low",
-    ".resid.cred.high"
-  )
-  colnames(hc_fits) <- c(
-    ".fitted",
-    ".fit.variability",
-    ".fit.cred.low",
-    ".fit.cred.high"
-  )
+  a <- (1 - conf.level) / 2
+  probs <- c(a, 1 - a)
 
-  augmented <- c(obs_data, hc_fits, resids) # coerces to list
-  if (!identical(class(x$obs_data), "list")) {
-    # data.frame
-    augmented <- tibble::as_tibble(augmented)
+  fit_summ <- stats::fitted(
+    x, robust = robust, probs = probs
+  ) |>
+    tibble::as_tibble()
+  resid_summ <- residuals(
+    x, robust = robust, probs = probs
+  ) |>
+    tibble::as_tibble()
+  # `fitted.mvgam` may include forecast rows; align with residual
+  # length (which is training-only) by slicing.
+  fit_summ <- dplyr::slice_head(fit_summ, n = NROW(resid_summ))
+  colnames(fit_summ) <- c(".fitted", ".se.fit", ".lower", ".upper")
+  colnames(resid_summ) <- c(".resid", ".resid.se",
+                              ".resid.lower", ".resid.upper")
+  if (!conf.int) {
+    fit_summ <- dplyr::select(fit_summ, .fitted, .se.fit)
+    resid_summ <- dplyr::select(resid_summ, .resid, .resid.se)
   }
 
+  augmented <- c(obs_data, fit_summ, resid_summ)
+  if (!identical(class(x$obs_data), "list")) {
+    augmented <- tibble::as_tibble(augmented)
+  }
   augmented
 }
+
+
+#' One-row model summary for an `mvgam` fit
+#'
+#' broom-style one-row summary of an `mvgam` fit. Reports the
+#' Stan algorithm, post-warmup sample size, training-observation
+#' count, response family, link function and (optionally) `loo`
+#' criteria. Mirrors `broom.mixed::glance.brmsfit()`.
+#'
+#' @param x A fitted `mvgam` object.
+#' @param looic Logical. If `TRUE`, compute leave-one-out
+#'   information criteria via [loo.mvgam()] and add `elpd_loo`,
+#'   `se_elpd_loo`, `p_loo` and `looic` columns. Defaults to
+#'   `FALSE` because computing `loo` can be slow on large fits.
+#' @param ... Forwarded to [loo.mvgam()] when `looic = TRUE`.
+#'
+#' @return A one-row tibble with columns:
+#'
+#'   * `algorithm` -- the Stan algorithm used.
+#'   * `pss` -- post-warmup sample size summed across chains.
+#'   * `nobs` -- number of (non-missing) training observations.
+#'   * `nseries` -- number of unique series in the training data.
+#'   * `family` -- observation-family name.
+#'   * `link` -- observation-family link.
+#'   * Optional: `elpd_loo`, `se_elpd_loo`, `p_loo`, `looic`
+#'     (only when `looic = TRUE`).
+#'
+#' @family tidiers
+#' @seealso [tidy.mvgam()], [augment.mvgam()], [loo.mvgam()]
+#'
+#' @examples
+#' \donttest{
+#' sim <- sim_mvgam(family = gaussian(), n_series = 1L,
+#'                   n_timepoints = 50L, seed = 1L)
+#' mod <- mvgam(y ~ s(season, bs = "cc"),
+#'              trend_formula = ~ AR(p = 1),
+#'              data = sim$data_train,
+#'              family = gaussian(),
+#'              chains = 1L, silent = 2L)
+#' glance(mod)
+#' glance(mod, looic = TRUE)
+#' }
+#'
+#' @export
+glance.mvgam <- function(x, looic = FALSE, ...) {
+  checkmate::assert_class(x, "mvgam")
+  checkmate::assert_flag(looic)
+
+  fam <- x$family
+  fam_name <- if (inherits(fam, "family")) fam$family else
+    as.character(fam)
+  link_name <- if (inherits(fam, "family")) fam$link else
+    NA_character_
+
+  resp <- mvgam_response_name(x)
+  d <- mvgam_training_data(x)
+  out <- tibble::tibble(
+    algorithm = glance_algorithm(x),
+    pss = posterior::ndraws(posterior::as_draws(x$fit)),
+    nobs = sum(!is.na(d[[resp]])),
+    nseries = length(resolve_series_info(x)$series_levels),
+    family = fam_name,
+    link = link_name
+  )
+
+  if (looic) {
+    l <- loo(x, ...)
+    est <- l$estimates
+    out$elpd_loo <- est["elpd_loo", "Estimate"]
+    out$se_elpd_loo <- est["elpd_loo", "SE"]
+    out$p_loo <- est["p_loo", "Estimate"]
+    out$looic <- est["looic", "Estimate"]
+  }
+  out
+}
+
+
+# Internal: Stan algorithm string ('sampling' / 'variational' /
+# 'optimizing' / 'fixed_param'), pulled from the underlying
+# stanfit when available, otherwise NA.
+#'@noRd
+glance_algorithm <- function(x) {
+  fit <- x$fit
+  if (inherits(fit, "stanfit") &&
+        length(fit@stan_args) > 0L) {
+    algo <- fit@stan_args[[1L]][["method"]]
+    return(if (is.null(algo)) NA_character_ else algo)
+  }
+  NA_character_
+}
+
+

@@ -413,7 +413,7 @@ extract_last_observed_times <- function(fit, n_series) {
   meta <- fit$trend_metadata
   time_var <- meta$variables$time_var %||% "time"
   series_var <- meta$variables$series_var %||% "series"
-  d <- fit$obs_data %||% fit$data
+  d <- mvgam_training_data(fit)
   if (is.null(d) || is.null(d[[time_var]])) {
     return(rep(NA_real_, n_series))
   }

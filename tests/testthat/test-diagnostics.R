@@ -5,9 +5,9 @@
 # posterior_summary, getCall).
 #
 # Each test builds a draws_array-backed mvgam stub so the runtime
-# paths execute without invoking Stan. Catches regressions like the
-# master-era `x$model_output` references that silently broke the
-# whole family in earlier branches.
+# paths execute without invoking Stan. Catches regressions like
+# stale `x$model_output` references that previously broke the
+# diagnostic family silently.
 
 
 # Minimal mvgam-class stub. Carries the slots every diagnostic /

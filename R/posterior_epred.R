@@ -532,7 +532,8 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
   # uniformly across families/links and trend types.
   if (isTRUE(process_error) && has_stochastic_trend(object)) {
     innovations <- sample_process_errors(
-      object, ndraws = ndraws, newdata = newdata
+      object, ndraws = ndraws, newdata = newdata,
+      draw_ids = draw_ids
     )
     linpred <- add_innovations_to_linpred(linpred, innovations)
   }

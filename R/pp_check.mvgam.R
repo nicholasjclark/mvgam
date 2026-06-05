@@ -204,17 +204,13 @@ pp_check.mvgam <- function(
 
   bptype <- type
 
+  # Residual ppc types: residuals() is computed on-the-fly below
+  # (line ~323). Just rename the bptype to the corresponding
+  # `error_*` bayesplot function.
   if (bptype %in% c("resid_hist", "resid_hist_grouped")) {
-    if (is.null(object$resids)) {
-      object <- add_residuals(object)
-    }
     bptype <- sub("resid", "error", bptype)
   }
-
   if (bptype %in% c("resid_ribbon", "resid_ribbon_grouped")) {
-    if (is.null(object$resids)) {
-      object <- add_residuals(object)
-    }
     bptype <- sub("resid_", "", bptype)
   }
 
@@ -255,6 +251,20 @@ pp_check.mvgam <- function(
   } else {
     method <- "posterior_predict"
   }
+  # Type-specific draw count defaults + warnings.
+  #
+  # Non-grouped resid plots use empirical PIT residuals: ndraws
+  # below ~50 makes the PIT support underflow for observations in
+  # the predictive tail, producing apparent ±8 extreme values
+  # that are floating-point clamp artefacts rather than model
+  # misfit. Default to 500 and warn if the user passes < 50.
+  #
+  # Grouped resid plots route through bayesplot facets that put
+  # one panel per draw × group. With ndraws much above ~12 the
+  # panels collapse to invisible at typical canvas sizes. Default
+  # to 8 and warn if the user passes > 12.
+  resid_nongrouped <- c("resid_hist", "resid_ribbon")
+  resid_grouped <- c("resid_hist_grouped", "resid_ribbon_grouped")
   if (!ndraws_given) {
     aps_types <- c(
       "error_scatter_avg",
@@ -282,9 +292,42 @@ pp_check.mvgam <- function(
     if (type %in% aps_types) {
       ndraws <- NULL
       message("Using all posterior draws for ppc type '", type, "' by default.")
+    } else if (type %in% resid_nongrouped) {
+      ndraws <- 500L
+      message("Using 500 posterior draws for ppc type '", type, "' by default.")
+    } else if (type %in% resid_grouped) {
+      ndraws <- 8L
+      message("Using 8 posterior draws for ppc type '", type, "' by default.")
     } else {
       ndraws <- 10
       message("Using 10 posterior draws for ppc type '", type, "' by default.")
+    }
+  } else {
+    if (type %in% resid_nongrouped && !is.null(ndraws) &&
+          ndraws < 50L) {
+      rlang::warn(
+        paste0(
+          "ndraws < 50 for '", type, "' may produce apparent ",
+          "extreme residuals from PIT support underflow on ",
+          "observations in the predictive tail. Consider ",
+          "ndraws >= 500 for a stable empirical PIT."
+        ),
+        .frequency = "once",
+        .frequency_id = "mvgam_pp_check_resid_low_ndraws"
+      )
+    }
+    if (type %in% resid_grouped && !is.null(ndraws) &&
+          ndraws > 12L) {
+      rlang::warn(
+        paste0(
+          "ndraws > 12 for '", type, "' may collapse the ",
+          "bayesplot facet panels (one panel per draw x group) ",
+          "to invisible at typical canvas sizes. Consider ",
+          "ndraws <= 8."
+        ),
+        .frequency = "once",
+        .frequency_id = "mvgam_pp_check_resid_grouped_high_ndraws"
+      )
     }
   }
 
@@ -324,11 +367,13 @@ pp_check.mvgam <- function(
 
   if (grepl("resid", type)) {
     y[!is.na(y)] <- 0
-    yrep <- t(-1 * residuals(object, summary = FALSE))
-
-    if (!is.null(draw_ids)) {
-      yrep <- yrep[draw_ids, ]
-    }
+    # residuals(summary = FALSE) returns [ndraws x nobs] (brms
+    # convention; matches posterior_predict output below).
+    yrep <- -1 * residuals(
+      object, summary = FALSE,
+      ndraws = if (!is.null(draw_ids)) NULL else ndraws,
+      draw_ids = draw_ids
+    )
   } else {
     pred_args <- list(
       object,

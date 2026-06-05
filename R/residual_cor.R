@@ -241,15 +241,8 @@ compute_residual_cor <- function(object, groups, partial, summary,
 #'
 #' @noRd
 detect_factor_n_lv <- function(object) {
-  trend_specs <- object$mv_spec$trend_specs
-  if (is.null(trend_specs)) return(NULL)
-  spec <- if (inherits(trend_specs, "mvgam_trend")) {
-    trend_specs
-  } else if (is.list(trend_specs)) {
-    trend_specs[[1L]]
-  } else {
-    return(NULL)
-  }
+  spec <- trend_spec_for_residcor(object)
+  if (is.null(spec)) return(NULL)
   n_lv <- spec$n_lv
   if (is.null(n_lv) || !is.numeric(n_lv) || n_lv < 1L) {
     return(NULL)

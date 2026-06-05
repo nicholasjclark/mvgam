@@ -4,76 +4,181 @@
 \alias{residuals.mvgam}
 \title{Posterior draws of residuals from \pkg{mvgam} models}
 \usage{
-\method{residuals}{mvgam}(object, summary = TRUE, robust = FALSE, probs = c(0.025, 0.975), ...)
+\method{residuals}{mvgam}(
+  object,
+  newdata = NULL,
+  type = c("quantile", "ordinary"),
+  ndraws = NULL,
+  draw_ids = NULL,
+  summary = TRUE,
+  robust = FALSE,
+  probs = c(0.025, 0.975),
+  ...
+)
 }
 \arguments{
-\item{object}{An object of class \code{mvgam}}
+\item{object}{An object of class \code{mvgam}.}
 
-\item{summary}{Should summary statistics be returned
-instead of the raw values? Default is \code{TRUE}..}
+\item{newdata}{Optional \code{data.frame} to compute residuals on
+(defaults to the training data).}
 
-\item{robust}{If \code{FALSE} (the default) the mean is used as
-the measure of central tendency and the standard deviation as
-the measure of variability. If \code{TRUE}, the median and the
-median absolute deviation (MAD) are applied instead.
-Only used if \code{summary} is \code{TRUE}.}
+\item{type}{Character. Either \code{"quantile"} (default) or
+\code{"ordinary"}.}
 
-\item{probs}{The percentiles to be computed by the \code{quantile}
-function. Only used if \code{summary} is \code{TRUE}.}
+\item{ndraws}{Positive integer; subsample this many posterior
+draws. \code{NULL} (the default) uses every draw.}
 
-\item{...}{Ignored}
+\item{draw_ids}{Integer vector selecting specific posterior
+draws. Mutually exclusive with \code{ndraws}.}
+
+\item{summary}{Logical. If \code{TRUE} (the default), return a
+per-observation summary matrix; if \code{FALSE}, return the full
+\verb{ndraws x nobs} matrix of per-draw residuals (which can be
+handed to \code{DHARMa::createDHARMa()} for further diagnostics).}
+
+\item{robust}{Logical. If \code{TRUE}, the per-observation summary
+uses the median and MAD instead of the mean and SD.}
+
+\item{probs}{Length-2 numeric. Quantile probabilities for the
+per-observation summary intervals.}
+
+\item{...}{Additional arguments forwarded to
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}.}
 }
 \value{
-An \code{array} of randomized quantile residual values.
-
-If \code{summary = FALSE} the output resembles those of
-\code{\link{posterior_epred.mvgam}} and \code{\link{predict.mvgam}}.
-
-If \code{summary = TRUE} the output is an \code{n_observations} x \code{E}
-matrix. The number of summary statistics \code{E} is equal to \code{2 +
-  length(probs)}. The \code{Estimate} column contains point estimates (either
-mean or median depending on argument \code{robust}), while the
-\code{Est.Error} column contains uncertainty estimates (either standard
-deviation or median absolute deviation depending on argument
-\code{robust}). The remaining columns starting with \code{Q} contain
-quantile estimates as specified via argument \code{probs}.
+An array of residuals.
+\itemize{
+\item \code{summary = FALSE}: an \verb{ndraws x nobs} numeric matrix of
+per-draw residuals (the same shape as
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} output). For continuous
+responses (where the empirical PIT does not need
+randomization) every row is identical and the matrix
+reduces to a single deterministic residual per
+observation.
+\item \code{summary = TRUE}: an \verb{nobs x E} numeric matrix where
+\code{E = 2 + length(probs)}. Column \code{Estimate} is the mean
+(or median when \code{robust = TRUE}); column \code{Est.Error} is
+the standard deviation (or MAD); the remaining columns
+are quantile estimates labelled \verb{Q<min*100>} and
+\verb{Q<max*100>}.
+}
 }
 \description{
-This method extracts posterior draws of Dunn-Smyth (randomized quantile)
-residuals in the order in which the data were supplied to the model. It
-includes additional arguments for obtaining summaries of the computed
-residuals.
+Extracts posterior draws of residuals for a fitted \code{mvgam}
+model, with two options for residual type:
 }
 \details{
-This method gives residuals as Dunn-Smyth (randomized quantile)
-residuals. Any observations that were missing (i.e. \code{NA}) in the original
-data will have missing values in the residuals.
+\itemize{
+\item \code{"quantile"} (default) -- randomized quantile residuals
+(Dunn & Smyth 1996), often also called Dunn-Smyth or PIT
+residuals. Each observation is transformed through the
+cumulative distribution function of its predictive
+distribution and then through the standard-normal quantile,
+so under a correctly-specified model the residuals are
+independent N(0, 1) draws regardless of the response
+family. For the standard continuous families
+(\code{gaussian}, \code{student}, \code{lognormal}, \code{Gamma}, \code{beta})
+the per-draw analytic CDF is used so each posterior
+parameter draw produces its own residual realisation,
+which preserves the parameter uncertainty in the per-draw
+matrix. For every other family -- including discrete,
+zero-inflated, hurdle, ordinal, beta-binomial and custom
+families -- the residuals are computed via the empirical
+PIT over \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} draws (the DHARMa /
+Hartig 2024 approach), which inherits family coverage
+from \code{posterior_predict}.
+\item \code{"ordinary"} -- the predictive error \code{y - posterior_predict(y)}
+per draw. Matches \code{type = "ordinary"} in
+\code{\link[brms:residuals.brmsfit]{brms::residuals.brmsfit()}}.
+}
+
+Residuals are computed conditionally on each posterior draw
+of the model parameters so the returned object carries the
+full posterior uncertainty in the residual distribution.
+
+Pearson residuals are not provided. In a state-space model
+with a stochastic trend the posterior absorbs most of the
+low-frequency residual structure, so the per-observation
+variance denominator standardises against the wrong
+quantity and Pearson residuals end up systematically too
+tight. Use \code{"quantile"} instead -- it is the correct
+diagnostic for this model class and is N(0, 1) under a
+correctly-specified model regardless of family.
+
+The empirical-PIT path follows the DHARMa approach
+(Hartig 2024) of computing residuals directly from the
+posterior predictive draws:
+\itemize{
+\item \code{lower = mean(yrep < y_i)}, \code{upper = mean(yrep <= y_i)}.
+\item If \code{lower == upper} (continuous response, no ties) the
+residual is \code{qnorm(lower)}; otherwise it is
+\code{qnorm(Uniform(lower, upper))}.
+}
+
+This formulation needs no analytic family CDF, so it
+inherits the family coverage of
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} -- mixture families
+(zero-inflated, hurdle), beta-binomial, tweedie, ordinal
+families and custom families are all supported.
+
+The PIT u is clamped to \verb{[.Machine$double.eps, 1 - .Machine$double.eps]} before \code{qnorm} so the residual
+stays finite even when an observation lies in the extreme
+floating-point tail of the predictive distribution. This
+bound corresponds to \verb{|qnorm(u)| ≈ 8.13}.
+
+\emph{ndraws sensitivity.} The two paths react differently to
+the posterior draw count:
+\itemize{
+\item The analytic-CDF path can produce isolated clamp events
+on individual posterior draws whose \verb{(mu_d, dpar_d)}
+happen to place the observed \code{y_i} more than ~38 SDs
+from the predictive mean -- \code{pnorm} underflows to exactly
+0 or 1 and the clamp triggers. These look like extreme
+\verb{±8.13} residuals in the per-draw matrix but are a
+property of the posterior, not a misfit signal. They get
+proportionally rarer with more draws but never vanish.
+\item The empirical-PIT path needs enough simulations for the
+empirical predictive CDF to cover the data. With small
+\code{ndraws} many observations land outside the simulated
+range entirely, so \code{u} is exactly 0 or 1 deterministically
+and the clamp turns every draw for that observation into
+\verb{±8.13}. Setting \code{ndraws >= 500} resolves the empirical
+PIT well enough that this artefact disappears in
+typical cases.
+}
+
+For diagnostic plotting via \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} with
+\code{type = "resid_*"}, use \code{ndraws >= 500} (the default for
+those types).
 }
 \examples{
 \donttest{
-# Simulate some data and fit a model
-simdat <- sim_mvgam(n_series = 1, trend_model = AR())
-
+simdat <- sim_mvgam(n_series = 1L, trend_model = AR())
 mod <- mvgam(
-  y ~ s(season, bs = 'cc'),
-  trend_model = AR(),
+  y ~ s(season, bs = "cc"),
+  trend_formula = ~ AR(),
   noncentred = TRUE,
   data = simdat$data_train,
-  chains = 2,
-  silent = 2
+  chains = 2L,
+  silent = 2L
 )
-
-# Extract posterior residuals
 resids <- residuals(mod)
 str(resids)
-
-# Or add them directly to the observed data, along with fitted values
-augment(mod, robust = FALSE, probs = c(0.25, 0.75))
 }
 
+}
+\references{
+Dunn, P. K. and Smyth, G. K. (1996). Randomized quantile
+residuals. \emph{Journal of Computational and Graphical
+Statistics}, 5(3), 236-244.
+
+Hartig, F. (2024). DHARMa: Residual diagnostics for
+hierarchical (multi-level / mixed) regression models.
+R package.
 }
 \seealso{
-\code{\link{augment.mvgam}}
+\code{\link[=augment.mvgam]{augment.mvgam()}}, \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}},
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}
 }
 \author{
 Nicholas J Clark

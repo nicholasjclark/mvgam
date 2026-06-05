@@ -2,74 +2,70 @@
 % Please edit documentation in R/tidier_methods.R
 \name{augment.mvgam}
 \alias{augment.mvgam}
-\title{Augment an \code{mvgam} object's data}
+\title{Augment an \code{mvgam} object's training data with fitted values
+and residuals}
 \usage{
-\method{augment}{mvgam}(x, robust = FALSE, probs = c(0.025, 0.975), ...)
+\method{augment}{mvgam}(x, robust = FALSE, conf.int = TRUE, conf.level = 0.95, ...)
 }
 \arguments{
-\item{x}{An object of class \code{mvgam}.}
+\item{x}{A fitted \code{mvgam} object.}
 
-\item{robust}{If \code{FALSE} (the default) the mean is used as the measure of
-central tendency and the standard deviation as the measure of variability.
-If \code{TRUE}, the median and the median absolute deviation (MAD) are applied
-instead.}
+\item{robust}{Logical. \code{FALSE} (the default) uses the
+posterior mean and standard deviation; \code{TRUE} uses the
+median and the median absolute deviation (MAD).}
 
-\item{probs}{The percentiles to be computed by the quantile function.}
+\item{conf.int}{Logical. If \code{TRUE} (the default), include
+\code{.lower} / \code{.upper} (for \code{.fitted}) and \code{.resid.lower} /
+\code{.resid.upper} (for \code{.resid}) credible interval columns.}
 
-\item{...}{Unused, included for generic consistency only.}
+\item{conf.level}{Numeric. Probability covered by the
+credible intervals. Defaults to \code{0.95}.}
+
+\item{...}{Unused, included for generic consistency.}
 }
 \value{
-A \code{list} or \code{tibble} (see details) combining:
+A tibble (or \code{list}, when \code{class(x$obs_data) == "list"})
+with the original training data plus:
 \itemize{
-\item The data supplied to \code{mvgam()}.
-\item The outcome variable, named as \code{.observed}.
-\item The fitted backcasts, along with their variability and credible bounds.
-\item The residuals, along with their variability and credible bounds.
+\item \code{.observed} -- the response value.
+\item \code{.fitted} -- the posterior mean (or median) fitted value.
+\item \code{.se.fit} -- the posterior standard deviation (or MAD) of
+the fitted value.
+\item \code{.lower}, \code{.upper} -- the lower / upper bound of the
+\code{conf.level} credible interval for \code{.fitted}. Present only
+when \code{conf.int = TRUE}.
+\item \code{.resid} -- the posterior mean (or median) residual.
+\item \code{.resid.se} -- the posterior standard deviation (or MAD)
+of the residual.
+\item \code{.resid.lower}, \code{.resid.upper} -- the residual credible
+interval bounds. Present only when \code{conf.int = TRUE}.
 }
 }
 \description{
-Add fits and residuals to the data, implementing the generic \code{augment} from
-the package \pkg{broom}.
-}
-\details{
-A \code{list} is returned if \code{class(x$obs_data) == 'list'}, otherwise a \code{tibble}
-is returned, but the contents of either object is the same.
-
-The arguments \code{robust} and \code{probs} are applied to both the fit and residuals
-calls (see \code{\link[=fitted.mvgam]{fitted.mvgam()}} and \code{\link[=residuals.mvgam]{residuals.mvgam()}} for details).
+Adds posterior summaries of the in-sample fits and
+residuals to the training data, using broom column names.
+Each row of the input data is preserved and three (or
+five, when \code{conf.int = TRUE}) new columns are appended for
+each of the fitted and residual posteriors.
 }
 \examples{
 \donttest{
-set.seed(0)
-dat <- sim_mvgam(
-  T = 80,
-  n_series = 3,
-  mu = 2,
-  trend_model = AR(p = 1),
-  prop_missing = 0.1,
-  prop_trend = 0.6
-)
-
-mod1 <- mvgam(
-  formula = y ~ s(season, bs = 'cc', k = 6),
-  data = dat$data_train,
-  trend_model = AR(),
-  family = poisson(),
-  noncentred = TRUE,
-  chains = 2,
-  silent = 2
-)
-
-augment(mod1, robust = TRUE, probs = c(0.25, 0.75))
+sim <- sim_mvgam(family = gaussian(), n_series = 1L,
+                  n_timepoints = 50L, seed = 1L)
+mod <- mvgam(y ~ s(season, bs = "cc"),
+             trend_formula = ~ AR(p = 1),
+             data = sim$data_train,
+             family = gaussian(),
+             chains = 1L, silent = 2L)
+augment(mod)
 }
-
 
 }
 \seealso{
-\code{\link{residuals.mvgam}},
-\code{\link{fitted.mvgam}}
+\code{\link[=fitted.mvgam]{fitted.mvgam()}}, \code{\link[=residuals.mvgam]{residuals.mvgam()}}
 
 Other tidiers: 
+\code{\link{glance.mvgam}()},
 \code{\link{tidy.mvgam}()}
 }
 \concept{tidiers}

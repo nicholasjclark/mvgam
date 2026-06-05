@@ -222,7 +222,7 @@ forecast.mvgam <- function(object,
 resolve_series_info <- function(object) {
   lv <- object$series_info$series_levels
   if (is.null(lv)) {
-    d <- object$obs_data %||% object$data
+    d <- mvgam_training_data(object)
     series_var <- object$trend_metadata$variables$series_var %||%
       "series"
     lv <- levels(as.factor(d[[series_var]]))
@@ -236,7 +236,7 @@ resolve_series_info <- function(object) {
 # frame the downstream linpred calls subset.
 #'@noRd
 build_training_arms <- function(object, series_levels) {
-  d <- object$obs_data %||% object$data
+  d <- mvgam_training_data(object)
   meta_vars <- object$trend_metadata$variables %||%
     list(time_var = "time", series_var = "series")
   time_var <- meta_vars$time_var

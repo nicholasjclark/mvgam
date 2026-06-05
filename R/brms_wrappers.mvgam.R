@@ -455,3 +455,16 @@ mvgam_response_name <- function(object) {
   if (inherits(f, "brmsformula")) f <- f$formula
   all.vars(f[[2L]])[1L]
 }
+
+
+# Internal: training data for a fitted `mvgam`. Prefers
+# `obs_data` (the post-fit canonical slot) and falls back to
+# `data` (raw input). Returns NULL when neither slot is set.
+# Single source of truth so every downstream consumer reads the
+# training data the same way. Assertion is intentionally
+# omitted: called in low-overhead inner loops where the caller
+# has already validated.
+#'@noRd
+mvgam_training_data <- function(object) {
+  object$obs_data %||% object$data
+}

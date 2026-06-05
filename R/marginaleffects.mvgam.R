@@ -23,7 +23,7 @@ get_predict.mvgam <- function(model,
   checkmate::assert_class(model, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1L)
   checkmate::assert_logical(process_error, len = 1L)
-  # mvgam's predict() type vocabulary (carried over from master):
+  # mvgam's predict() type vocabulary:
   #   link     - linear predictor on the link scale
   #   expected - E[Y], expectation of the response (epred); no
   #              observation-process noise

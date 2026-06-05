@@ -29,7 +29,8 @@
 #'
 #' @details Per-model weights are split into integer draw counts
 #'   that sum to `ndraws` using the largest-remainder rule
-#'   ([brms::round_largest_remainder()] convention), then that
+#'   (largest-remainder rule, after [brms::round_largest_remainder()]),
+#'   then that
 #'   many rows are sampled (with replacement when a model has
 #'   fewer draws than its assigned share) from each input's
 #'   hindcasts and forecasts. The returned object inherits its

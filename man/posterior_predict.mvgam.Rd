@@ -9,6 +9,7 @@
   newdata = NULL,
   process_error = TRUE,
   ndraws = NULL,
+  draw_ids = NULL,
   re_formula = NULL,
   allow_new_levels = FALSE,
   sample_new_levels = "uncertainty",

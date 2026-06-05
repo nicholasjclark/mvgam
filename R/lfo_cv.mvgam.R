@@ -135,7 +135,7 @@ lfo_cv.mvgam <- function(object,
     }
   }
 
-  all_data <- newdata %||% object$obs_data %||% object$data
+  all_data <- newdata %||% mvgam_training_data(object)
   if (is.null(all_data)) {
     stop(insight::format_error(c(
       "No data available to roll the LFO window over.",
