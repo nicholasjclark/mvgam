@@ -1,24 +1,27 @@
 # Shared internal helpers for methods that operate on multiple
-# fitted `mvgam` objects (model averaging, posterior averaging,
-# eventually combined forecasting). Mirrors the helper surface
-# brms uses to back `posterior_average.brmsfit` and
-# `pp_average.brmsfit`, with brms-internal calls replaced by
+# fitted `mvgam` objects or `mvgam_forecast` objects (model
+# averaging, posterior averaging, forecast ensembling). Mirrors
+# the helper surface brms uses to back `posterior_average.brmsfit`
+# and `pp_average.brmsfit`, with brms-internal calls replaced by
 # exported equivalents per CRAN policy.
 
 
-# Internal: variadic capture of mvgam fits passed as `x, ...`.
-# Returns a `list(models = <named list of mvgam fits>,
-# other = <named list of remaining args>)`. Non-model `...`
-# entries must be named or the call errors.
+# Internal: variadic capture of mvgam fits (or, with `class =
+# "mvgam_forecast"`, of forecast objects) passed as `x, ...`.
+# Returns `list(models = <named list>, other = <named list of
+# remaining args>)`. Non-model `...` entries must be named or
+# the call errors.
 #'@noRd
-mvgam_split_models <- function(x, ..., model_names = NULL) {
-  checkmate::assert_class(x, "mvgam")
+mvgam_split_models <- function(x, ..., model_names = NULL,
+                                class = "mvgam") {
+  checkmate::assert_string(class)
+  checkmate::assert_class(x, class)
   dots <- list(...)
   user_names <- names(dots)
   if (is.null(user_names)) {
     user_names <- rep("", length(dots))
   }
-  is_model_dot <- vapply(dots, inherits, logical(1L), "mvgam")
+  is_model_dot <- vapply(dots, inherits, logical(1L), class)
   other <- dots[!is_model_dot]
   other_names <- user_names[!is_model_dot]
   if (length(other) > 0L &&
@@ -91,6 +94,38 @@ mvgam_match_response <- function(models) {
 }
 
 
+# Internal: numeric-weight validation + normalisation. Shared
+# between `mvgam_validate_weights` (model averaging) and
+# `ensemble.mvgam_forecast` (forecast ensembling). Errors with
+# `insight::format_error` if `weights` is not finite,
+# non-negative, length `n_models`, with positive total.
+#'@noRd
+mvgam_normalize_weights <- function(weights, n_models) {
+  checkmate::assert_numeric(weights)
+  checkmate::assert_integerish(n_models, lower = 1L, len = 1L)
+  if (length(weights) != n_models) {
+    stop(insight::format_error(c(
+      "Numeric 'weights' must have one entry per model.",
+      x = paste0(
+        "Got ", length(weights), " weights for ",
+        n_models, " models."
+      )
+    )))
+  }
+  if (any(weights < 0) || any(!is.finite(weights))) {
+    stop(insight::format_error(
+      "Numeric 'weights' must be finite and non-negative."
+    ))
+  }
+  if (sum(weights) == 0) {
+    stop(insight::format_error(
+      "Numeric 'weights' must have a positive total."
+    ))
+  }
+  weights / sum(weights)
+}
+
+
 # Internal: validate / compute model-averaging weights. Accepts
 # either a numeric vector (length == length(models), non-negative,
 # auto-normalised to sum to 1) or one of the named strategies
@@ -105,28 +140,7 @@ mvgam_validate_weights <- function(weights, models,
   checkmate::assert_list(models, min.len = 1L, types = "mvgam")
   checkmate::assert_list(control)
   if (is.numeric(weights)) {
-    if (length(weights) != length(models)) {
-      stop(insight::format_error(c(
-        paste0(
-          "Numeric 'weights' must have one entry per model."
-        ),
-        x = paste0(
-          "Got ", length(weights), " weights for ",
-          length(models), " models."
-        )
-      )))
-    }
-    if (any(weights < 0) || any(!is.finite(weights))) {
-      stop(insight::format_error(
-        "Numeric 'weights' must be finite and non-negative."
-      ))
-    }
-    if (sum(weights) == 0) {
-      stop(insight::format_error(
-        "Numeric 'weights' must have a positive total."
-      ))
-    }
-    return(weights / sum(weights))
+    return(mvgam_normalize_weights(weights, length(models)))
   }
   checkmate::assert_string(weights)
   if (identical(weights, "kfold")) {
