@@ -531,5 +531,102 @@ fit_trend_map_cached <- function(name, Z_user) {
 }
 fit_trend_map_cached("trend_map_fx", Z_true)
 
+# ----------------------------------------------------------------------
+# STRUCTURED-PRIOR FACTOR MODEL: loadings_prior end-to-end fixture
+# Eight series live on two trait clusters with a 1D continuous trait
+# and a 2-level cluster indicator. Series within a cluster share factor
+# loadings; the structured prior should learn this from a feature
+# matrix plus a pairwise distance matrix built from the cluster split.
+# ----------------------------------------------------------------------
+cat("\n[24] AR(1) factor model with loadings_prior\n")
+set.seed(8024L)
+n_t_lp <- 60L
+n_series_lp <- 8L
+n_lv_lp <- 3L
+ar_lp <- c(0.75, 0.55, 0.45)
+sigma_lp <- rep(0.45, n_lv_lp)
+series_lp <- paste0("s", seq_len(n_series_lp))
+cluster_lp <- factor(rep(c("A", "B"), each = n_series_lp / 2L),
+                     levels = c("A", "B"))
+trait_lp <- c(seq(-1, 1, length.out = n_series_lp / 2L),
+              seq(-1, 1, length.out = n_series_lp / 2L))
+# Cluster A loads on factors 1 + 3; cluster B loads on factors 2 + 3;
+# the shared factor 3 mixes positively for everyone. The third factor
+# carries a smooth modulation by `trait_lp`.
+Z_lp <- matrix(0, nrow = n_series_lp, ncol = n_lv_lp)
+Z_lp[cluster_lp == "A", 1L] <- 0.9 +
+  0.1 * trait_lp[cluster_lp == "A"]
+Z_lp[cluster_lp == "B", 2L] <- 0.9 -
+  0.1 * trait_lp[cluster_lp == "B"]
+Z_lp[, 3L] <- 0.5 + 0.3 * trait_lp
+rownames(Z_lp) <- series_lp
+# Latent AR(1) factors.
+lv_lp <- matrix(0, n_t_lp, n_lv_lp)
+for (k in seq_len(n_lv_lp)) {
+  lv_lp[1L, k] <- stats::rnorm(
+    1L, 0, sigma_lp[k] / sqrt(1 - ar_lp[k]^2)
+  )
+  for (t in 2:n_t_lp) {
+    lv_lp[t, k] <- ar_lp[k] * lv_lp[t - 1L, k] +
+      stats::rnorm(1L, 0, sigma_lp[k])
+  }
+}
+mu_lp <- lv_lp %*% t(Z_lp)
+obs_sigma_lp <- 0.25
+y_lp <- as.vector(mu_lp) +
+  stats::rnorm(n_t_lp * n_series_lp, 0, obs_sigma_lp)
+test_data_lp <- data.frame(
+  series = factor(rep(series_lp, each = n_t_lp), levels = series_lp),
+  time = rep(seq_len(n_t_lp), times = n_series_lp),
+  y = y_lp
+)
+features_lp <- data.frame(
+  series = series_lp,
+  trait = trait_lp,
+  cluster = cluster_lp
+)
+# Hierarchical distance: 0 within cluster, 1 across cluster.
+d_cluster_lp <- as.matrix(
+  stats::dist(as.numeric(cluster_lp), method = "manhattan")
+)
+rownames(d_cluster_lp) <- colnames(d_cluster_lp) <- series_lp
+# Persist the simulation truth alongside the fit so the test can
+# check loadings recovery without reproducing the simulation.
+loadings_prior_truth <- list(
+  Z_true = Z_lp,
+  cluster = cluster_lp,
+  trait = trait_lp
+)
+saveRDS(
+  loadings_prior_truth,
+  file.path(FIXTURE_DIR, "val_mvgam_loadings_prior_truth.rds")
+)
+fit_loadings_prior_cached <- function(name) {
+  path <- file.path(
+    FIXTURE_DIR, paste0("val_mvgam_", name, ".rds")
+  )
+  if (file.exists(path)) {
+    cat("  cached mvgam:", name, "\n")
+    return(readRDS(path))
+  }
+  cat("  fitting mvgam:", name, "\n")
+  fit <- mvgam(
+    formula = y ~ 1,
+    trend_formula = ~ AR(p = 1, n_lv = n_lv_lp),
+    data = test_data_lp,
+    family = gaussian(),
+    data2 = list(features = features_lp, cluster = d_cluster_lp),
+    loadings_prior = list(
+      features = "features",
+      distances = "cluster"
+    ),
+    chains = CHAINS, iter = ITER, warmup = WARMUP,
+    refresh = REFRESH, silent = 2, backend = "cmdstanr"
+  )
+  saveRDS(fit, path)
+  fit
+}
+fit_loadings_prior_cached("loadings_prior")
+
 cat("\n=== All fixtures present in", FIXTURE_DIR, "===\n")
 cat("Files: ", length(list.files(FIXTURE_DIR, pattern = "\\.rds$")), "\n")

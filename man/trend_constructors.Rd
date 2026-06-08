@@ -227,6 +227,31 @@ custom_trend <- function(...) {
 }
 }
 
+\section{Identification}{
+
+Factor-model fits (\code{n_lv < n_series}) sample the loadings
+matrix \code{Z} unconstrained and identify it post-hoc via thin QR
+decomposition in generated quantities, following Heaps & Jermyn
+(2024). The identified loadings \code{Z_tilde} and rotated factor
+paths \code{lv_trend_tilde} (for AR / RW / VAR) are saved alongside
+the unrotated \code{Z} and \code{lv_trend}; downstream resolvers prefer
+the identified versions when present. \code{qr_thin_R()}
+guarantees a non-negative diagonal on \code{Z_tilde}, removing the
+\eqn{2^k} sign-mode equivalence by construction. Per-factor
+scalar parameters (\code{ar1_trend}, \code{sigma_trend}, \code{theta1_trend},
+\code{L_Omega_trend}) remain in the unrotated latent basis; for
+VAR-trend factor models the lag-coefficient array also rotates
+(\verb{A_trend_tilde[lag] = Q_tilde * A_trend[lag] * Q_tilde'}).
+
+Supplying \code{trend_map} bypasses the QR identification step
+entirely so the user-encoded fixed entries are preserved exactly
+on \code{Z}. Combine a free factor model with the optional
+\code{loadings_prior} argument on \code{mvgam()} to swap the
+default iid Student-t prior on \code{Z} for a structured matrix-normal
+prior built from per-series features and / or pairwise distance
+matrices; see \code{\link{mvgam}} for the full surface.
+}
+
 \examples{
 \donttest{
 # Basic trend model usage with defaults (will issue warnings)
@@ -475,6 +500,12 @@ conditional_effects(mod, type = "link")
 # Inspect posterior estimates for the correlation weighting parameter
 mcmc_plot(mod, variable = "alpha_cor_trend", type = "hist")
 }
+}
+\references{
+Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
+distributions for the covariance matrix in latent factor
+models. \emph{Statistics and Computing}, 34:143.
+\doi{10.1007/s11222-024-10454-0}
 }
 \author{
 Nicholas J Clark

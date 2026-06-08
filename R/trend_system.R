@@ -2202,6 +2202,35 @@ print.mvgam_trend <- function(x, ...) {
 #' }
 #' }
 #'
+#' @section Identification:
+#' Factor-model fits (\code{n_lv < n_series}) sample the loadings
+#' matrix `Z` unconstrained and identify it post-hoc via thin QR
+#' decomposition in generated quantities, following Heaps & Jermyn
+#' (2024). The identified loadings `Z_tilde` and rotated factor
+#' paths `lv_trend_tilde` (for AR / RW / VAR) are saved alongside
+#' the unrotated `Z` and `lv_trend`; downstream resolvers prefer
+#' the identified versions when present. \code{qr_thin_R()}
+#' guarantees a non-negative diagonal on `Z_tilde`, removing the
+#' \eqn{2^k} sign-mode equivalence by construction. Per-factor
+#' scalar parameters (`ar1_trend`, `sigma_trend`, `theta1_trend`,
+#' `L_Omega_trend`) remain in the unrotated latent basis; for
+#' VAR-trend factor models the lag-coefficient array also rotates
+#' (`A_trend_tilde[lag] = Q_tilde * A_trend[lag] * Q_tilde'`).
+#'
+#' Supplying \code{trend_map} bypasses the QR identification step
+#' entirely so the user-encoded fixed entries are preserved exactly
+#' on `Z`. Combine a free factor model with the optional
+#' \code{loadings_prior} argument on \code{mvgam()} to swap the
+#' default iid Student-t prior on `Z` for a structured matrix-normal
+#' prior built from per-series features and / or pairwise distance
+#' matrices; see \code{\link{mvgam}} for the full surface.
+#'
+#' @references
+#' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
+#' distributions for the covariance matrix in latent factor
+#' models. \emph{Statistics and Computing}, 34:143.
+#' \doi{10.1007/s11222-024-10454-0}
+#'
 #' @author Nicholas J Clark
 #'
 #' @examples
@@ -2898,6 +2927,32 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #'
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #'   arguments to be interpreted by the parsing functions in \pkg{mvgam}
+#'
+#' @section Identification:
+#' Factor-model fits (\code{n_lv < n_series}) sample the loadings
+#' matrix `Z` unconstrained and identify it post-hoc via thin QR
+#' decomposition in generated quantities, following Heaps & Jermyn
+#' (2024). The identified loadings `Z_tilde` and rotated factor
+#' paths `lv_trend_tilde` are saved alongside `Z` and `lv_trend`;
+#' downstream resolvers prefer the identified versions when
+#' present. \code{qr_thin_R()} guarantees a non-negative diagonal
+#' on `Z_tilde`, removing the \eqn{2^k} sign-mode equivalence by
+#' construction. The per-block scale matrices `L_Omega_trend` /
+#' `Sigma_trend` remain in the unrotated latent basis.
+#'
+#' Supplying \code{trend_map} bypasses the QR identification step
+#' entirely so the user-encoded fixed entries are preserved exactly
+#' on `Z`. Combine a free factor model with the optional
+#' \code{loadings_prior} argument on \code{mvgam()} to swap the
+#' default iid Student-t prior on `Z` for a structured matrix-normal
+#' prior built from per-series features and / or pairwise distance
+#' matrices; see \code{\link{mvgam}} for the full surface.
+#'
+#' @references
+#' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
+#' distributions for the covariance matrix in latent factor
+#' models. \emph{Statistics and Computing}, 34:143.
+#' \doi{10.1007/s11222-024-10454-0}
 #'
 #' @examples
 #' \donttest{

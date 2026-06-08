@@ -69,6 +69,28 @@ Set up latent correlated multivariate Gaussian residual processes in
 \pkg{mvgam}. This function does not evaluate its arguments – it exists
 purely to help set up a model with particular error processes
 }
+\section{Identification}{
+
+Factor-model fits (\code{n_lv < n_series}) sample the loadings
+matrix \code{Z} unconstrained and identify it post-hoc via thin QR
+decomposition in generated quantities, following Heaps & Jermyn
+(2024). The identified loadings \code{Z_tilde} and rotated factor
+paths \code{lv_trend_tilde} are saved alongside \code{Z} and \code{lv_trend};
+downstream resolvers prefer the identified versions when
+present. \code{qr_thin_R()} guarantees a non-negative diagonal
+on \code{Z_tilde}, removing the \eqn{2^k} sign-mode equivalence by
+construction. The per-block scale matrices \code{L_Omega_trend} /
+\code{Sigma_trend} remain in the unrotated latent basis.
+
+Supplying \code{trend_map} bypasses the QR identification step
+entirely so the user-encoded fixed entries are preserved exactly
+on \code{Z}. Combine a free factor model with the optional
+\code{loadings_prior} argument on \code{mvgam()} to swap the
+default iid Student-t prior on \code{Z} for a structured matrix-normal
+prior built from per-series features and / or pairwise distance
+matrices; see \code{\link{mvgam}} for the full surface.
+}
+
 \examples{
 \donttest{
 # Simulate counts of four species over ten sampling locations
@@ -141,4 +163,10 @@ mod <- mvgam(
 mcmc_plot(mod, variable = "Sigma", regex = TRUE, type = "hist")
 }
 
+}
+\references{
+Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
+distributions for the covariance matrix in latent factor
+models. \emph{Statistics and Computing}, 34:143.
+\doi{10.1007/s11222-024-10454-0}
 }

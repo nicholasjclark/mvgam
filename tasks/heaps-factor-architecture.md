@@ -8,10 +8,10 @@
 | 1 — Stan refactor for default factor model | DONE | `d80eab98` |
 | 2 — R-side rewires for the new variable names | DONE | `290d29b1` |
 | 3 — `trend_map` semantics under free Λ | DONE | `5d70d90c` |
-| 4 — `loadings_prior` plumbing | PENDING | — |
-| 5 — Encoding + validation helpers | PENDING | — |
-| 6 — Local end-to-end fit fixture | PENDING | — |
-| 7 — Documentation sweep | PENDING | — |
+| 4 — `loadings_prior` plumbing | DONE | `3b00803f` |
+| 5 — Encoding + validation helpers | DONE | shipped in `3b00803f` |
+| 6 — Local end-to-end fit fixture | DONE | next commit |
+| 7 — Documentation sweep | DONE | next commit |
 
 Per-phase implementation notes appear inside each Phase section
 below. Decisions that diverged from the original plan are
