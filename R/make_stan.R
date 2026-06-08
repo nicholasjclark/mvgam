@@ -43,11 +43,12 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
                                                    prior = NULL, data2 = NULL,
                                                    sample_prior = "no", sparse = NULL,
                                                    knots = NULL, drop_unused_levels = TRUE,
-                                                   backend = "rstan", 
+                                                   backend = "rstan",
                                                    threads = getOption("mc.cores", 1),
                                                    normalize = TRUE, save_model = NULL,
-                                                   stan_funs = NULL, silent = 1L, 
-                                                   stanvars = NULL, validate = TRUE, ...) {
+                                                   stan_funs = NULL, silent = 1L,
+                                                   stanvars = NULL, validate = TRUE,
+                                                   trend_map = NULL, ...) {
   
   # Input validation
   checkmate::assert_class(formula, "mvgam_formula")
@@ -100,6 +101,23 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
       )
     )))
   }
+
+  # Apply the top-level `trend_map` alias to the parsed trend
+  # specs. Collision detection: error if the user supplied
+  # `trend_map` both at `mvgam(..., trend_map = ...)` AND on the
+  # trend constructor (e.g. `AR(trend_map = ...)`).
+  mv_spec$trend_specs <- apply_trend_map_alias(
+    mv_spec$trend_specs, trend_map
+  )
+
+  # Normalise each spec's raw `trend_map` (matrix / data.frame /
+  # character code) to a canonical numeric Z. Stashed on
+  # `spec$fixed_Z`; `spec$n_lv` is reconciled to `ncol(Z)`. Stan
+  # emission downstream reads `fixed_Z` and skips the sampled-Z
+  # path when it is non-NULL.
+  mv_spec$trend_specs <- normalise_trend_map_on_specs(
+    mv_spec$trend_specs, data
+  )
 
   # PW trends define their own intercept via `m_trend`. An
   # observation-side intercept competes with it for the same

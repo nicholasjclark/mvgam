@@ -472,5 +472,64 @@ fit_mvgam_cached("hier_ar_cor",
   ~ AR(gr = region, subgr = species, cor = TRUE),
   test_data_hier, poisson())
 
+
+# ----------------------------------------------------------------------
+# [23] AR(1) factor model with fixed Z via trend_map (dense matrix).
+# Four series load on two latent factors with known dense weights.
+# Exercises the fixed-Z Stan path end-to-end: standata carries Z,
+# Stan compiles, posterior recovers the latent trends.
+# ----------------------------------------------------------------------
+cat("\n[23] AR(1) factor model with fixed Z via trend_map\n")
+set.seed(17)
+n_t_tm <- 50L
+n_series_tm <- 4L
+n_lv_tm <- 2L
+ar_tm <- c(0.7, 0.3)
+sigma_tm <- c(0.4, 0.4)
+Z_true <- matrix(
+  c(1.0, 0.0,
+    0.8, 0.2,
+    0.0, 1.0,
+    0.3, 0.7),
+  nrow = n_series_tm, ncol = n_lv_tm, byrow = TRUE
+)
+lv_tm <- matrix(0, n_t_tm, n_lv_tm)
+for (k in seq_len(n_lv_tm)) {
+  for (t in 2:n_t_tm) {
+    lv_tm[t, k] <- ar_tm[k] * lv_tm[t - 1L, k] +
+      stats::rnorm(1L, 0, sigma_tm[k])
+  }
+}
+mu_tm <- 1 + lv_tm %*% t(Z_true)
+test_data_tm <- data.frame(
+  y = as.vector(rpois(n_t_tm * n_series_tm,
+                      exp(as.vector(mu_tm)))),
+  series = factor(
+    rep(paste0("s", seq_len(n_series_tm)), each = n_t_tm),
+    levels = paste0("s", seq_len(n_series_tm))
+  ),
+  time = rep(seq_len(n_t_tm), times = n_series_tm)
+)
+attr(test_data_tm, "Z_true") <- Z_true
+fit_trend_map_cached <- function(name, Z_user) {
+  path <- file.path(FIXTURE_DIR, paste0("val_mvgam_", name, ".rds"))
+  if (file.exists(path)) {
+    cat("  cached mvgam:", name, "\n")
+    return(readRDS(path))
+  }
+  cat("  fitting mvgam:", name, "\n")
+  fit <- mvgam(
+    formula = y ~ 1,
+    trend_formula = ~ -1 + AR(p = 1, trend_map = Z_user, cor = TRUE),
+    data = test_data_tm,
+    family = poisson(),
+    chains = CHAINS, iter = ITER, warmup = WARMUP,
+    refresh = REFRESH, silent = 2, backend = "cmdstanr"
+  )
+  saveRDS(fit, path)
+  fit
+}
+fit_trend_map_cached("trend_map_fx", Z_true)
+
 cat("\n=== All fixtures present in", FIXTURE_DIR, "===\n")
 cat("Files: ", length(list.files(FIXTURE_DIR, pattern = "\\.rds$")), "\n")

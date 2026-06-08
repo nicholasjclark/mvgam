@@ -11,6 +11,7 @@ mvgam_multiple(
   backend = getOption("brms.backend", "cmdstanr"),
   combine = TRUE,
   check_data = TRUE,
+  newdata = NULL,
   ...
 )
 }

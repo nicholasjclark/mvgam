@@ -2,46 +2,89 @@
 % Please edit documentation in R/plot.mvgam.R
 \name{plot.mvgam}
 \alias{plot.mvgam}
-\title{Default plot method for \code{mvgam} objects (placeholder)}
+\title{Default plots for \pkg{mvgam} models}
 \usage{
-\method{plot}{mvgam}(x, ...)
+\method{plot}{mvgam}(
+  x,
+  type = c("residuals", "smooths", "trend", "factors", "series"),
+  series = NULL,
+  ndraws = NULL,
+  ...
+)
 }
 \arguments{
-\item{x}{An object of class \code{mvgam}.}
+\item{x}{A fitted \code{mvgam} object.}
 
-\item{...}{Currently ignored.}
+\item{type}{Character. The kind of plot to produce. One of:
+\describe{
+\item{\code{"residuals"} (default)}{Four-panel Dunn-Smyth
+residual diagnostic: residuals vs fitted, Q-Q, ACF,
+pACF. See \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} for the underlying types
+(\code{resid_vs_fitted}, \code{resid_qq}, \code{resid_acf},
+\code{resid_pacf}).}
+\item{\code{"smooths"}}{Conditional smooth posteriors via
+\code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}, combined into a single
+\code{patchwork} when more than one smooth is present.}
+\item{\code{"trend"}}{Latent trend over the training grid via
+\code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}} on
+\code{hindcast(x, type = "trend")}.}
+\item{\code{"factors"}}{Latent dynamic factors. Errors clearly
+when the fit does not include latent factors. The
+returned ggplot carries a \code{"contribution"} attribute
+(data.frame with \code{Factor}, \code{PathVarShare}, \code{Lower},
+\code{Upper}) giving the loading-weighted variance partition
+across factors. Access via
+\code{attr(plot(fit, type = "factors"), "contribution")} if
+you want the numeric summary without the figure.
+Per-draw factor paths themselves live on \code{object$fit} as
+\code{lv_trend[t, k]}; pull them with
+\code{\link[posterior:draws_array]{posterior::as_draws_array()}} when you need the raw
+draws (e.g. for custom summaries).}
+\item{\code{"series"}}{Input-data exploratory plot (works
+without a fit — wraps the observation data carried on
+the object).}
+}
+
+For posterior forecasts, parametric effects, random
+effects, and arbitrary conditional surfaces use the
+dedicated surfaces directly:
+\itemize{
+\item Forecasts: \code{forecast(x, newdata = ...) |> plot()}.
+\item Parametric / random effects: \code{\link[=conditional_effects]{conditional_effects()}}
+(plus its \code{plot} method).
+\item Arbitrary conditional plots:
+\code{\link[marginaleffects:plot_predictions]{marginaleffects::plot_predictions()}}.
+}}
+
+\item{series}{Optional series subset. Passed through to the
+series-aware branches (\code{"residuals"}, \code{"trend"},
+\code{"series"}). Accepts \code{NULL} (all series, default), \code{"all"},
+an integer index, or a character series name. Ignored by
+branches that summarise across series (\code{"smooths"},
+\code{"factors"}).}
+
+\item{ndraws}{Optional cap on posterior draws used by branches
+that subsample. Passed through to the relevant surface.}
+
+\item{...}{Additional arguments forwarded to the dispatched
+function (e.g. \code{smooths = ...} for \code{smooths}).}
 }
 \value{
-Stops with an informative error directing users to
-the alternatives above.
+A \code{ggplot} object (or \code{patchwork}, which inherits
+from \code{ggplot}).
 }
 \description{
-Scaffold for the eventual \code{plot.mvgam} S3 method. The full
-implementation will ship native ggplot helpers for latent
-trends and forecasts, alongside canonical wrappers around
-\code{pp_check.mvgam()}, \code{conditional_effects.mvgam()}, and
-\code{mcmc_plot.mvgam()}.
+Plot method for fitted \code{mvgam} objects. A thin S3 dispatcher
+that routes by \code{type} to the canonical plotting surface for
+each kind of summary. No bespoke plotting code lives here —
+every branch forwards to a single dedicated function.
 }
-\details{
-Until that lands, use the brms-style alternatives directly:
-
-\itemize{
-\item Posterior predictive checks:
-\code{pp_check(object, type = "dens_overlay")}.
-\item Marginal smooths / predictor effects:
-\code{conditional_effects(object)} or
-\code{marginaleffects::plot_predictions(object,
-    condition = ...)}.
-\item Smooth posteriors directly:
-\code{conditional_smooths(object)} or
-\code{posterior_smooths(object, smooth = ...)}.
-\item MCMC traces / densities:
-\code{bayesplot::mcmc_trace(as_draws_df(object))} (the
-native \code{mcmc_plot.mvgam} wrapper is also pending
-the plot overhaul).
-\item Latent trend draws:
-\code{as_draws_df(object, variable = "^trend\\\\[",
-    regex = TRUE)}.
-\item Input time-series EDA: \code{plot_mvgam_series(...)}.
+\seealso{
+\code{\link[=pp_check.mvgam]{pp_check.mvgam()}}, \code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}},
+\code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}, \code{\link[=forecast.mvgam]{forecast.mvgam()}},
+\code{\link[=hindcast.mvgam]{hindcast.mvgam()}}, \code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}},
+\code{\link[marginaleffects:plot_predictions]{marginaleffects::plot_predictions()}}
 }
+\author{
+Nicholas J Clark
 }

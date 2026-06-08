@@ -12,7 +12,8 @@ PW(
   changepoint_range = 0.8,
   changepoint_scale = 0.05,
   growth = "linear",
-  n_lv = NULL
+  n_lv = NULL,
+  trend_map = NULL
 )
 }
 \arguments{
@@ -165,8 +166,6 @@ mod_data <- data.frame(
   cap = 35,
   series = as.factor("series_1")
 )
-plot_mvgam_series(data = mod_data)
-
 mod3 <- mvgam(
   y ~ 0,
   trend_model = PW(growth = "logistic"),  # Uses default 'cap' variable

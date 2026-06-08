@@ -1738,6 +1738,11 @@ parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL
     checkmate::assert_list(.precomputed_dimensions, names = "named")
   }
 
+  # Capture the formula's environment so trend constructor args
+  # that reference user-defined variables (e.g. an inline matrix
+  # passed to `trend_map`) can be resolved at evaluation time.
+  formula_env <- environment(trend_formula) %||% parent.frame()
+
   # Safe formula parsing with try() like brms
   tf_safe <- try(terms(trend_formula, keep.order = TRUE), silent = TRUE)
   if (inherits(tf_safe, "try-error")) {
@@ -1839,7 +1844,9 @@ parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL
     names(trend_components) <- paste0("trend", seq_along(trend_terms))
 
     for (i in seq_along(trend_terms)) {
-      trend_components[[i]] <- eval_trend_constructor(trend_terms[i])
+      trend_components[[i]] <- eval_trend_constructor(
+        trend_terms[i], formula_env = formula_env
+      )
     }
   }
 
@@ -1934,18 +1941,33 @@ parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL
 #' Safely evaluates a trend constructor call string.
 #'
 #' @param trend_call Character string containing the trend constructor call
+#' @param formula_env Optional environment from the originating
+#'   trend formula. Used so constructor arguments that reference
+#'   user-scope variables (e.g. an inline matrix passed to
+#'   `trend_map`) resolve correctly. Falls back to the mvgam
+#'   namespace if NULL (legacy / direct callers).
 #'
 #' @return A validated mvgam_trend object
 #' @noRd
-eval_trend_constructor <- function(trend_call) {
+eval_trend_constructor <- function(trend_call, formula_env = NULL) {
   checkmate::assert_string(trend_call)
 
   # Parse the expression
   expr <- str2expression(trend_call)[[1]]
 
-  # Use package namespace where trend constructors are defined
+  # Build a child environment of the user's formula scope so any
+  # symbols inside the constructor call (variables, matrices,
+  # data.frames) are visible. Trend constructors themselves are
+  # always resolvable because the mvgam namespace sits on the
+  # search path. Fall back to the package namespace when no
+  # formula env is supplied.
   pkg_env <- asNamespace("mvgam")
-  trend_obj <- eval(expr, envir = pkg_env)
+  eval_env <- if (is.null(formula_env)) {
+    pkg_env
+  } else {
+    new.env(parent = formula_env)
+  }
+  trend_obj <- eval(expr, envir = eval_env)
 
   # Validate result
   if (!is.mvgam_trend(trend_obj)) {
@@ -2438,15 +2460,20 @@ RW = function(
     cor = FALSE,
     gr = NA,
     subgr = NA,
-    n_lv = NULL) {
+    n_lv = NULL,
+    trend_map = NULL) {
 
   # Basic input validation for trend-specific parameters
   checkmate::assert_logical(ma, len = 1)
   checkmate::assert_logical(cor, len = 1)
+  assert_trend_map_input(trend_map)
 
   # Use helper function for clean object creation
   # Complex logic (grouping, correlation requirements, parameter processing)
-  # moved to validation and Stan assembly layers
+  # moved to validation and Stan assembly layers. Raw `trend_map`
+  # input is stashed on the spec; normalisation via
+  # `normalise_trend_map()` happens at fit time when data is in
+  # scope.
   trend_obj <- create_mvgam_trend(
     "RW",  # Base trend type used for ALL dispatch
     .time = substitute(time),
@@ -2456,7 +2483,8 @@ RW = function(
     # Store parameters as-is (processing moved to Stan assembly)
     ma = ma,
     cor = cor,
-    n_lv = n_lv
+    n_lv = n_lv,
+    trend_map = trend_map
   )
 
   # Legacy validation (will be replaced by enhanced validation layer)
@@ -2467,7 +2495,8 @@ RW = function(
 
 #' @rdname trend_constructors
 #' @export
-AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
+AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE,
+              gr = NA, subgr = NA, n_lv = NULL, trend_map = NULL) {
   # Validate AR order parameter
   if (length(p) == 1) {
     checkmate::assert_int(p, lower = 1)
@@ -2478,9 +2507,11 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, s
   # Basic input validation
   checkmate::assert_logical(ma, len = 1)
   checkmate::assert_logical(cor, len = 1)
+  assert_trend_map_input(trend_map)
 
-  # Use helper function for clean object creation
-  # Complex logic moved to validation and Stan assembly layers
+  # Use helper function for clean object creation. Raw
+  # `trend_map` is stashed on the spec; normalisation happens at
+  # fit time via `normalise_trend_map()`.
   trend_obj <- create_mvgam_trend(
     "AR",  # Base trend type used for ALL dispatch
     .time = substitute(time),
@@ -2491,7 +2522,8 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE, gr = NA, s
     p = p,
     ma = ma,
     cor = cor,
-    n_lv = n_lv
+    n_lv = n_lv,
+    trend_map = trend_map
   )
 
   return(trend_obj)
@@ -2517,7 +2549,8 @@ CAR = function(time = NA, series = NA) {
 
 #' @rdname trend_constructors
 #' @export
-VAR = function(time = NA, series = NA, p = 1, ma = FALSE, gr = NA, subgr = NA, n_lv = NULL) {
+VAR = function(time = NA, series = NA, p = 1, ma = FALSE, gr = NA,
+               subgr = NA, n_lv = NULL, trend_map = NULL) {
   # Validate VAR order parameter. Scalar p (e.g. p = 2) is the
   # standard interpretation: include AR coefficient matrices
   # for consecutive lags 1..p. Sparse-lag vector p (e.g.
@@ -2547,6 +2580,7 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, gr = NA, subgr = NA, n
 
   # Basic input validation
   checkmate::assert_logical(ma, len = 1)
+  assert_trend_map_input(trend_map)
 
   # Use helper function for clean object creation
   # Complex logic moved to validation and Stan assembly layers
@@ -2560,7 +2594,8 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, gr = NA, subgr = NA, n
     p = p,
     ma = ma,
     cor = TRUE,  # VAR models always use correlation for optimal performance
-    n_lv = n_lv
+    n_lv = n_lv,
+    trend_map = trend_map
   )
 
   return(trend_obj)
@@ -2722,8 +2757,6 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, gr = NA, subgr = NA, n
 #'   cap = 35,
 #'   series = as.factor("series_1")
 #' )
-#' plot_mvgam_series(data = mod_data)
-#'
 #' mod3 <- mvgam(
 #'   y ~ 0,
 #'   trend_model = PW(growth = "logistic"),  # Uses default 'cap' variable
@@ -2751,14 +2784,16 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, gr = NA, subgr = NA, n
 #' @export
 PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
               changepoint_range = 0.8, changepoint_scale = 0.05,
-              growth = 'linear', n_lv = NULL) {
+              growth = 'linear', n_lv = NULL, trend_map = NULL) {
   # Validate arguments
   growth <- match.arg(growth, choices = c('linear', 'logistic'))
   checkmate::assert_number(changepoint_range, lower = 0, upper = 1)
   checkmate::assert_int(n_changepoints, lower = 1)
   checkmate::assert_number(changepoint_scale, lower = 0)
 
-  # PW doesn't support factor models - validate n_lv
+  # PW doesn't support factor models. Reject n_lv and the
+  # user-facing fixed-loadings surface (trend_map) separately so
+  # the error names exactly what the user supplied.
   if (!is.null(n_lv)) {
     stop(insight::format_error(c(
       cli::format_inline(
@@ -2767,6 +2802,17 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
       x = "Piecewise trends require series-specific changepoint modeling.",
       i = cli::format_inline(
         "Remove {.field n_lv} parameter or use factor-compatible trends: AR, RW, VAR, ZMVN"
+      )
+    )), call. = FALSE)
+  }
+  if (!is.null(trend_map)) {
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Factor-loading specification {.field trend_map} not supported for PW trends."
+      ),
+      x = "Piecewise trends define series-specific changepoint dynamics.",
+      i = cli::format_inline(
+        "Drop {.field trend_map} or use a factor-compatible trend: AR, RW, VAR, ZMVN."
       )
     )), call. = FALSE)
   }
@@ -2927,7 +2973,7 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #'
 #' @export
 ZMVN = function(time = NA, series = NA, gr = NA, subgr = NA,
-                 n_lv = NULL, cor = TRUE) {
+                 n_lv = NULL, cor = TRUE, trend_map = NULL) {
   # Basic parameter validation for n_lv if provided
   if (!is.null(n_lv)) {
     checkmate::assert_int(n_lv, lower = 1, null.ok = TRUE)
@@ -2937,6 +2983,7 @@ ZMVN = function(time = NA, series = NA, gr = NA, subgr = NA,
   # and correlated factors are its definitional purpose. Use a
   # different trend type for uncorrelated series-level noise.
   checkmate::assert_flag(cor)
+  assert_trend_map_input(trend_map)
   if (!isTRUE(cor)) {
     stop(insight::format_error(c(
       "'cor = FALSE' is not supported for 'ZMVN()'.",
@@ -2958,7 +3005,8 @@ ZMVN = function(time = NA, series = NA, gr = NA, subgr = NA,
     # Store parameters as-is
     n_lv = n_lv,
     ma = FALSE,   # ZMVN doesn't support MA
-    cor = TRUE    # ZMVN always has correlation structure
+    cor = TRUE,   # ZMVN always has correlation structure
+    trend_map = trend_map
   )
 }
 

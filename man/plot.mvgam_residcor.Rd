@@ -2,33 +2,44 @@
 % Please edit documentation in R/mvgam_residcor-class.R
 \name{plot.mvgam_residcor}
 \alias{plot.mvgam_residcor}
-\title{Plot residual correlations based on latent factors}
+\title{Plot residual correlations or precisions from a \code{mvgam_residcor} object}
 \usage{
-\method{plot}{mvgam_residcor}(x, cluster = FALSE, ...)
+\method{plot}{mvgam_residcor}(x, type = c("correlation", "precision"), cluster = FALSE, ...)
 }
 \arguments{
-\item{x}{\code{list} object of class \code{mvgam_residcor} resulting from a
-call to \code{residual_cor(..., summary = TRUE)}}
+\item{x}{A \code{mvgam_residcor} object returned by
+\code{residual_cor(..., summary = TRUE)}.}
 
-\item{cluster}{Logical. Should the variables be re-arranged within the plot
-to group the correlation matrix into clusters of positive and negative correlations?
-Defaults to \code{FALSE}}
+\item{type}{Character. Which matrix to plot. \code{"correlation"}
+(the default) reads \code{x$sig_cor}; \code{"precision"} reads
+\code{x$sig_prec} (the partial correlations, Ovaskainen et al.
+2016). Precision panels widen the colour-scale limits from
+the correlation default \verb{[-1, 1]} to the entry-magnitude
+range of \code{sig_prec}.}
 
-\item{...}{ignored}
+\item{cluster}{Logical. When \code{TRUE}, the matrix is reordered
+by an approximate Robinson ordering (Gruvaeus & Wainer
+1972; average linkage on the \code{1 - cormat} distance) so
+visually coherent positive and negative clusters sit
+adjacent. Defaults to \code{FALSE}.}
+
+\item{...}{Ignored.}
 }
 \value{
-A \code{ggplot} object
+A \code{ggplot} object.
 }
 \description{
-Plot residual correlation estimates from Joint Species Distribution
-(\code{jsdgam}) or dynamic factor (\code{mvgam}) models
+Heatmap of the significant residual correlations or precisions
+from a Joint Species Distribution (\code{jsdgam}) or dynamic
+factor (\code{mvgam}) model.
 }
 \details{
-This function plots the significant residual correlations from a
-\code{mvgam_residcor} object, whereby the posterior mean (if \code{robust = FALSE})
-or posterior median (if \code{robust = TRUE}) correlations are shown
-only those correlations whose credible interval does not contain zero. All other
-correlations are set to zero in the returned plot
+Only the lower triangle of off-diagonal entries is
+shown; the diagonal is dropped (it is \code{1} for any
+correlation and undefined for a precision matrix). Cells
+whose credible interval contained zero have been set to
+zero by \code{residual_cor()} and read as grey on the diverging
+palette.
 }
 \seealso{
 \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}}

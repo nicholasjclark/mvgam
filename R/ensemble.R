@@ -38,11 +38,6 @@
 #'   mu = 1
 #' )
 #'
-#' plot_mvgam_series(
-#'   data = simdat$data_train,
-#'   newdata = simdat$data_test
-#' )
-#'
 #' m1 <- mvgam(
 #'   y ~ 1,
 #'   trend_formula = ~ time +

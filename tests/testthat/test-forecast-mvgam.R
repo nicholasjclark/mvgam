@@ -5,7 +5,7 @@
 # posterior_predict / posterior_epred, get_observation_structure)
 # are exercised by their own test files, so these tests stub
 # them via `local_mocked_bindings()` and assert on:
-#   * mvgam_forecast class shape (16 fields, list-of-matrices
+#   * mvgam_forecast class shape (10 fields, list-of-matrices
 #     for hindcasts / forecasts).
 #   * uncertainty-toggle semantics (b_uncertainty,
 #     trend_uncertainty, obs_uncertainty).
@@ -102,7 +102,7 @@ make_obs_struct_for_grid <- function(times, series_int,
 
 # ----- Class shape + type dispatch --------------------------------
 
-test_that("Returns mvgam_forecast with 16 contractual fields", {
+test_that("Returns mvgam_forecast with 10 contractual fields", {
   fit <- make_mock_mvgam()
   draws <- make_draws_mat(ndraws = 3L)
   newdata <- data.frame(time = 11:12,
@@ -151,12 +151,14 @@ test_that("Returns mvgam_forecast with 16 contractual fields", {
   # class-shape contract is the same for every type.
   fc <- forecast(fit, newdata = newdata, type = "expected")
   expect_s3_class(fc, "mvgam_forecast")
-  required <- c("call", "trend_call", "family", "family_pars",
-                "trend_model", "drift", "use_lv", "fit_engine",
-                "type", "series_names", "train_observations",
-                "train_times", "test_observations", "test_times",
+  required <- c("family", "family_pars", "type", "series_names",
+                "train_observations", "train_times",
+                "test_observations", "test_times",
                 "hindcasts", "forecasts")
-  expect_true(all(required %in% names(fc)))
+  expect_equal(sort(names(fc)), sort(required))
+  dead <- c("call", "trend_call", "trend_model", "drift",
+            "use_lv", "fit_engine")
+  expect_false(any(dead %in% names(fc)))
   expect_identical(fc$type, "expected")
   expect_true(is.list(fc$forecasts))
   expect_true(is.list(fc$hindcasts))

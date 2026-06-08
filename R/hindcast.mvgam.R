@@ -114,17 +114,6 @@ hindcast.mvgam <- function(object,
     resample_innovations = resample_innovations
   )
 
-  trend_specs <- object$mv_spec$trend_specs
-  trend_model <- if (is.null(trend_specs)) {
-    NULL
-  } else if (is_multivariate_trend_specs(trend_specs)) {
-    trend_specs[[1L]]
-  } else {
-    trend_specs
-  }
-  meta <- get_enriched_trend_metadata(object)
-  trend_type <- meta$trend_type
-
   family_pars <- if (type == "link") {
     extract_family_pars_for_draws(object, draws_mat, draw_idx)
   } else {
@@ -133,14 +122,8 @@ hindcast.mvgam <- function(object,
 
   structure(
     list(
-      call = object$call,
-      trend_call = object$trend_call,
       family = object$family$family,
       family_pars = family_pars,
-      trend_model = trend_type,
-      drift = isTRUE(trend_model$drift),
-      use_lv = FALSE,
-      fit_engine = object$backend %||% "stan",
       type = type,
       series_names = factor(series_levels,
                             levels = series_levels),

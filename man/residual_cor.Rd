@@ -61,13 +61,23 @@ population-level matrix under the name \code{"_global"}). When
 }
 \description{
 Compute residual (cross-series) correlation, covariance and partial
-correlation summaries from a fitted \link[=mvgam]{mvgam} model whose
-trend includes a correlated process error structure
-(\code{cor = TRUE} on \code{RW()} / \code{AR()} / \code{ZMVN()}, or any \code{VAR()} /
-\code{VARMA()} trend) or a hierarchical correlation structure via a
-grouping variable on the trend.
+correlation summaries from a fitted \link[=mvgam]{mvgam} model. The
+three supported sources for the per-series covariance are:
 }
 \details{
+\itemize{
+\item Latent-factor trends (\code{n_lv} on the trend constructor). The
+implied per-series covariance is \verb{Sigma = Z Z^T} per draw,
+using the posterior loadings \code{Z} for the default sampled-Z
+factor model, or the user-supplied loadings broadcast across
+draws when \code{trend_map = ...} fixes Z (see \code{\link[=mvgam]{mvgam()}} /
+\code{\link[=AR]{AR()}} / \code{\link[=VAR]{VAR()}} / \code{\link[=RW]{RW()}} / \code{\link[=ZMVN]{ZMVN()}}).
+\item Correlated process-error trends (\code{cor = TRUE} on \code{RW()} /
+\code{AR()} / \code{ZMVN()}, or any \code{VAR()} / \code{VARMA()} trend).
+\item Hierarchical correlation structures (grouping variable on
+the trend via \code{gr = ...}).
+}
+
 For non-hierarchical correlated trends the per-draw correlation
 matrix is reconstructed from the trend's posterior covariance:
 \itemize{

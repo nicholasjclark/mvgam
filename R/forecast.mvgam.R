@@ -126,7 +126,6 @@ forecast.mvgam <- function(object,
     trend_specs
   }
   meta <- get_enriched_trend_metadata(object)
-  trend_type <- meta$trend_type
 
   series_info <- resolve_series_info(object)
   series_levels <- series_info$series_levels
@@ -189,14 +188,8 @@ forecast.mvgam <- function(object,
 
   structure(
     list(
-      call = object$call,
-      trend_call = object$trend_call,
       family = object$family$family,
       family_pars = family_pars,
-      trend_model = trend_type,
-      drift = isTRUE(trend_model$drift),
-      use_lv = FALSE,
-      fit_engine = object$backend %||% "stan",
       type = type,
       series_names = factor(series_levels,
                               levels = series_levels),

@@ -19,6 +19,19 @@
 #' @param formula Main observation model formula (supports brms syntax)
 #' @param trend_formula Trend formula specification (may be response-specific)
 #' @param data Data frame or list of multiply imputed datasets
+#' @param newdata Optional test-set `data.frame` persisted on the
+#'   fit as `object$test_data`. Used by `plot(fit, type = "series")`
+#'   to overlay the test arm without re-passing the data. Not fed
+#'   to Stan at fit time — supply it to `posterior_predict()` /
+#'   `forecast()` for out-of-sample evaluation.
+#' @param trend_map Optional fixed factor-loading specification.
+#'   Accepts one of three shapes — a numeric `n_series x n_lv`
+#'   matrix for general (possibly non-binary) loadings, a
+#'   `data.frame(series, trend)` for sparse series-to-trend
+#'   sharing, or a character code `"identity"` / `"shared"` for
+#'   the two most common cases. Top-level alias for the
+#'   `trend_map` argument on the trend constructor; passing both
+#'   is an error.
 #' @param backend Stan backend (defaults to "cmdstanr")
 #' @param combine Logical, pool multiple imputation results (default TRUE)
 #' @param family Family specification. Supports most brms families including
@@ -57,6 +70,8 @@
 #'
 #' @export
 mvgam <- function(formula, trend_formula = NULL, data = NULL,
+                           newdata = NULL,
+                           trend_map = NULL,
                            backend = getOption("brms.backend", "cmdstanr"),
                            combine = TRUE, family = gaussian(), ...) {
 
@@ -65,6 +80,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
     checkmate::check_list(data, types = "data.frame"),
     .var.name = "data"
   )
+  newdata <- validate_newdata(newdata, data)
   checkmate::assert_character(backend, len = 1)
   checkmate::assert_logical(combine, len = 1)
 
@@ -75,10 +91,12 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   if (is.list(data) && !is.data.frame(data)) {
     if (combine) {
       return(mvgam_multiple(formula, trend_formula, data, backend,
-                           combine = TRUE, data_name = data_name, ...))
+                           combine = TRUE, data_name = data_name,
+                           newdata = newdata, ...))
     } else {
       return(mvgam_multiple(formula, trend_formula, data, backend,
-                           combine = FALSE, data_name = data_name, ...))
+                           combine = FALSE, data_name = data_name,
+                           newdata = newdata, ...))
     }
   }
 
@@ -87,6 +105,8 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
     formula = formula,
     trend_formula = trend_formula,
     data = data,
+    newdata = newdata,
+    trend_map = trend_map,
     backend = backend,
     family = family,
     data_name = data_name,
@@ -94,6 +114,42 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   )
 
   return(mvgam_object)
+}
+
+
+# Lightweight newdata validator. Defers column-presence checks to
+# the canonical `validate_required_variables` helper and only adds
+# a series-level subset check + factor coercion on top. Returns
+# NULL fast when no newdata was supplied. Predictor / response
+# columns are NOT enforced here; downstream predict / forecast
+# surfaces handle formula resolution when they consume the data.
+# Factor coercion locks newdata$series to the training-grid levels
+# so any downstream consumer that pulls $test_data sees the
+# canonical factor shape.
+#' @noRd
+validate_newdata <- function(newdata, data) {
+  if (is.null(newdata)) return(NULL)
+  required <- intersect(c("time", "series"), names(data))
+  validate_required_variables(newdata, required, "newdata")
+  train_levels <- levels(data$series)
+  if (is.null(train_levels)) return(newdata)
+  new_chr <- as.character(newdata$series)
+  if (!all(new_chr %in% train_levels)) {
+    bad <- unique(new_chr[!new_chr %in% train_levels])
+    stop(insight::format_error(c(
+      "'newdata' contains series not present in the training data.",
+      x = paste0(
+        "Unknown levels: ",
+        paste0("'", bad, "'", collapse = ", "), "."
+      ),
+      i = paste0(
+        "newdata$series must be a subset of levels(data$series); ",
+        "additional series at fit time are not supported."
+      )
+    )))
+  }
+  newdata$series <- factor(new_chr, levels = train_levels)
+  newdata
 }
 
 # ------------------------------------------------------------------------------
@@ -112,7 +168,8 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
 #' @return mvgam object
 #' @noRd
 mvgam_single <- function(formula, trend_formula, data, backend,
-                        family, data_name = NULL, ...) {
+                        family, data_name = NULL, newdata = NULL,
+                        trend_map = NULL, ...) {
 
   # Create mvgam_formula object for shared processing
   mvgam_formula_obj <- mvgam_formula(formula, trend_formula)
@@ -120,9 +177,10 @@ mvgam_single <- function(formula, trend_formula, data, backend,
   # Use existing shared infrastructure (same as stancode())
   stan_components <- generate_stan_components_mvgam_formula(
     formula = mvgam_formula_obj,
-    data = data, 
+    data = data,
     family = family,
     backend = backend,
+    trend_map = trend_map,
     ...
   )
 
@@ -217,7 +275,8 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     data_name = data_name,
     combined_stancode = stan_components$combined_components$stancode,
     combined_standata = stan_components$combined_components$standata,
-    user_trend_formula = trend_formula
+    user_trend_formula = trend_formula,
+    newdata = newdata
   )
 
   return(mvgam_object)
@@ -298,7 +357,8 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
                                           data_name = NULL,
                                           combined_stancode = NULL,
                                           combined_standata = NULL,
-                                          user_trend_formula = NULL) {
+                                          user_trend_formula = NULL,
+                                          newdata = NULL) {
   checkmate::assert_class(combined_fit, "stanfit")
   checkmate::assert_list(obs_setup, names = "named")
   checkmate::assert_list(trend_setup, names = "named", null.ok = TRUE)
@@ -344,6 +404,7 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       family = obs_setup$family,
       prior = obs_setup$prior,
       data = obs_setup$data,
+      test_data = newdata,
       data.name = data_name,
       stancode = combined_stancode %||% obs_setup$stancode,
       standata = combined_standata %||% obs_setup$standata,
@@ -613,6 +674,7 @@ mvgam_multiple <- function(formula,
                            backend = getOption("brms.backend", "cmdstanr"),
                            combine = TRUE,
                            check_data = TRUE,
+                           newdata = NULL,
                            ...) {
   # Input validation
   checkmate::assert_list(data_list, min.len = 2)
@@ -646,12 +708,16 @@ mvgam_multiple <- function(formula,
     validate_multiple_imputation_datasets(data_list)
   }
 
-  # Fit individual models to each imputed dataset
+  # Fit individual models to each imputed dataset. The same
+  # `newdata` is persisted on every imputation fit so downstream
+  # plot / forecast surfaces can reach it through any one of
+  # them.
   individual_fits <- fit_multiple_imputation_models(
     formula = formula,
     trend_formula = trend_formula,
     data_list = data_list,
     backend = backend,
+    newdata = newdata,
     ...
   )
 

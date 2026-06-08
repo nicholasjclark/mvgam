@@ -1,11 +1,21 @@
 #' Extract residual correlations from a fitted mvgam model
 #'
 #' Compute residual (cross-series) correlation, covariance and partial
-#' correlation summaries from a fitted [mvgam][mvgam::mvgam] model whose
-#' trend includes a correlated process error structure
-#' (`cor = TRUE` on `RW()` / `AR()` / `ZMVN()`, or any `VAR()` /
-#' `VARMA()` trend) or a hierarchical correlation structure via a
-#' grouping variable on the trend.
+#' correlation summaries from a fitted [mvgam][mvgam::mvgam] model. The
+#' three supported sources for the per-series covariance are:
+#'
+#' \itemize{
+#'   \item Latent-factor trends (`n_lv` on the trend constructor). The
+#'     implied per-series covariance is `Sigma = Z Z^T` per draw,
+#'     using the posterior loadings `Z` for the default sampled-Z
+#'     factor model, or the user-supplied loadings broadcast across
+#'     draws when `trend_map = ...` fixes Z (see [mvgam()] /
+#'     [AR()] / [VAR()] / [RW()] / [ZMVN()]).
+#'   \item Correlated process-error trends (`cor = TRUE` on `RW()` /
+#'     `AR()` / `ZMVN()`, or any `VAR()` / `VARMA()` trend).
+#'   \item Hierarchical correlation structures (grouping variable on
+#'     the trend via `gr = ...`).
+#' }
 #'
 #' @param object A fitted [mvgam][mvgam::mvgam] object.
 #' @param groups Logical. Only relevant for hierarchical trends
@@ -253,17 +263,14 @@ detect_factor_n_lv <- function(object) {
 
 #' Per-draw factor-implied covariance `Sigma = Z Z^T`.
 #'
-#' Extracts the `Z[i, j]` loadings matrix from the posterior (Stan
-#' stores it as `matrix[N_series_trend, N_lv_trend] Z`) and returns
-#' the implied `[ndraws, n_series, n_series]` covariance array.
+#' Delegates to `resolve_factor_loadings()` so the sampled-vs-
+#' fixed Z decision lives in one place. Returns the implied
+#' `[ndraws, n_series, n_series]` covariance array.
 #'
 #' @noRd
 extract_cov_draws_factor <- function(object, n_lv, n_series) {
-  draws_mat <- posterior::as_draws_matrix(object$fit)
-  Z_arr <- extract_indexed_array_2d(
-    draws_mat = draws_mat, name = "Z",
-    nrow = n_series, ncol = n_lv,
-    required_for = "factor-model residual_cor"
+  Z_arr <- resolve_factor_loadings(
+    object = object, n_lv = n_lv, n_series = n_series
   )
   ndraws <- dim(Z_arr)[1L]
   cov_draws <- array(0, dim = c(ndraws, n_series, n_series))

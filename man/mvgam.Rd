@@ -8,6 +8,8 @@ mvgam(
   formula,
   trend_formula = NULL,
   data = NULL,
+  newdata = NULL,
+  trend_map = NULL,
   backend = getOption("brms.backend", "cmdstanr"),
   combine = TRUE,
   family = gaussian(),
@@ -20,6 +22,21 @@ mvgam(
 \item{trend_formula}{Trend formula specification (may be response-specific)}
 
 \item{data}{Data frame or list of multiply imputed datasets}
+
+\item{newdata}{Optional test-set \code{data.frame} persisted on the
+fit as \code{object$test_data}. Used by \code{plot(fit, type = "series")}
+to overlay the test arm without re-passing the data. Not fed
+to Stan at fit time — supply it to \code{posterior_predict()} /
+\code{forecast()} for out-of-sample evaluation.}
+
+\item{trend_map}{Optional fixed factor-loading specification.
+Accepts one of three shapes — a numeric \verb{n_series x n_lv}
+matrix for general (possibly non-binary) loadings, a
+\code{data.frame(series, trend)} for sparse series-to-trend
+sharing, or a character code \code{"identity"} / \code{"shared"} for
+the two most common cases. Top-level alias for the
+\code{trend_map} argument on the trend constructor; passing both
+is an error.}
 
 \item{backend}{Stan backend (defaults to "cmdstanr")}
 

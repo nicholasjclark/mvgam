@@ -4,7 +4,15 @@
 \alias{ZMVN}
 \title{Specify correlated residual processes in \pkg{mvgam}}
 \usage{
-ZMVN(time = NA, series = NA, gr = NA, subgr = NA, n_lv = NULL, cor = TRUE)
+ZMVN(
+  time = NA,
+  series = NA,
+  gr = NA,
+  subgr = NA,
+  n_lv = NULL,
+  cor = TRUE,
+  trend_map = NULL
+)
 }
 \arguments{
 \item{gr}{An optional grouping variable, which must be a \code{factor} in the

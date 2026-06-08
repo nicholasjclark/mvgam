@@ -2778,3 +2778,124 @@ test_that("subgr without gr is rejected with clear error", {
     regexp = "Subgrouping requires main grouping variable"
   )
 })
+
+
+# ---- Fixed-Z (trend_map) Stan emission contract -------------------
+
+test_that("trend_map matrix moves Z into the data block; no Z_raw", {
+  # Dense user-supplied Z (4 series, 2 factors, custom weights).
+  # Constructor-level path: the trend formula's environment is
+  # captured so `Z_user` resolves at evaluation time.
+  data <- setup_stan_test_data()$multivariate
+  Z_user <- matrix(
+    c(1.0, 0.0,
+      0.7, 0.3,
+      0.0, 1.0,
+      0.5, 0.5),
+    nrow = 4L, ncol = 2L, byrow = TRUE
+  )
+  mf <- mvgam_formula(
+    count ~ x,
+    trend_formula = ~ -1 + AR(p = 1, trend_map = Z_user, cor = TRUE)
+  )
+  code <- stancode(mf, data = data, family = poisson(),
+                   validate = FALSE)
+  sd <- standata(mf, data = data, family = poisson())
+
+  # Z declared in the data block (no Z_raw / construction / prior).
+  expect_true(stan_pattern(
+    "matrix\\[N_series_trend, N_lv_trend\\] Z;", code
+  ))
+  expect_false(grepl("Z_raw", code, fixed = TRUE))
+  expect_false(grepl("Z_raw ~", code))
+
+  # Standata carries the matrix verbatim.
+  expect_equal(dim(sd$Z), c(4L, 2L))
+  expect_equal(unname(sd$Z), unname(Z_user))
+
+  # Innovations are still factor-sized (n_lv = 2 < n_series = 4).
+  expect_true(stan_pattern(
+    "matrix\\[N_time_trend, N_lv_trend\\] innovations_trend;",
+    code
+  ))
+  expect_equal(sd$N_lv_trend, 2L)
+})
+
+test_that("trend_map 'shared' yields single-column Z in data", {
+  data <- setup_stan_test_data()$multivariate
+  mf <- mvgam_formula(
+    count ~ 1,
+    trend_formula = ~ -1 + RW(trend_map = "shared")
+  )
+  code <- stancode(mf, data = data, family = poisson(), validate = FALSE)
+  sd <- standata(mf, data = data, family = poisson())
+
+  expect_true(stan_pattern(
+    "matrix\\[N_series_trend, N_lv_trend\\] Z;", code
+  ))
+  expect_false(grepl("Z_raw", code, fixed = TRUE))
+  expect_equal(sd$N_lv_trend, 1L)
+  expect_equal(dim(sd$Z), c(4L, 1L))
+  expect_true(all(sd$Z == 1))
+})
+
+test_that("trend_map data.frame builds binary Z aligned to series", {
+  data <- setup_stan_test_data()$multivariate
+  tm <- data.frame(
+    series = paste0("series", 1:4),
+    trend = c(1, 1, 2, 2)
+  )
+  mf <- mvgam_formula(
+    count ~ 1,
+    trend_formula = ~ -1 + AR(p = 1, trend_map = tm)
+  )
+  code <- stancode(mf, data = data, family = poisson(), validate = FALSE)
+  sd <- standata(mf, data = data, family = poisson())
+
+  expected_Z <- matrix(c(1, 0,
+                         1, 0,
+                         0, 1,
+                         0, 1),
+                       nrow = 4L, ncol = 2L, byrow = TRUE)
+  expect_equal(unname(sd$Z), expected_Z)
+  expect_false(grepl("Z_raw", code, fixed = TRUE))
+})
+
+test_that("trend_map 'identity' emits Z as data (not tdata default)", {
+  # Even when n_lv == n_series, an explicit trend_map keeps Z in
+  # the data block so the user's choice is preserved through
+  # downstream consumers.
+  data <- setup_stan_test_data()$multivariate
+  mf <- mvgam_formula(
+    count ~ 1,
+    trend_formula = ~ -1 + RW(trend_map = "identity")
+  )
+  code <- stancode(mf, data = data, family = poisson(), validate = FALSE)
+  sd <- standata(mf, data = data, family = poisson())
+
+  expect_true(stan_pattern(
+    "matrix\\[N_series_trend, N_lv_trend\\] Z;", code
+  ))
+  # No default diagonal Z assignment in tdata.
+  expect_false(grepl(
+    "Z = diag_matrix\\(rep_vector\\(1.0, N_lv_trend\\)\\)", code
+  ))
+  expect_equal(unname(sd$Z), diag(1, 4L))
+})
+
+test_that("trend_map conflict with explicit n_lv errors at fit time", {
+  data <- setup_stan_test_data()$multivariate
+  Z_user <- matrix(c(1, 0,
+                     1, 1,
+                     0, 1,
+                     1, 0),
+                   nrow = 4L, ncol = 2L, byrow = TRUE)
+  mf <- mvgam_formula(
+    count ~ 1,
+    trend_formula = ~ -1 + AR(p = 1, n_lv = 3, trend_map = Z_user)
+  )
+  expect_error(
+    stancode(mf, data = data, family = poisson(), validate = FALSE),
+    "shape conflicts"
+  )
+})

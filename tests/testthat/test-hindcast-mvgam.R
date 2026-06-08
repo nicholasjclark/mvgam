@@ -2,7 +2,7 @@
 # method is a thin wrapper over `build_hindcast_arms()` (already
 # covered by tests in `test-forecast-mvgam.R`), so these tests
 # focus on:
-#   * mvgam_forecast class shape (16 fields; test_* / forecasts
+#   * mvgam_forecast class shape (10 fields; test_* / forecasts
 #     slots NULL).
 #   * type dispatch (response / link / expected / trend).
 #   * obs_uncertainty toggle for `type = "response"`.
@@ -83,12 +83,14 @@ test_that("hindcast.mvgam returns mvgam_forecast with NULL forecast slots", {
   )
   hc <- hindcast(fit, type = "response")
   expect_s3_class(hc, "mvgam_forecast")
-  required <- c("call", "trend_call", "family", "family_pars",
-                "trend_model", "drift", "use_lv", "fit_engine",
-                "type", "series_names", "train_observations",
-                "train_times", "test_observations", "test_times",
+  required <- c("family", "family_pars", "type", "series_names",
+                "train_observations", "train_times",
+                "test_observations", "test_times",
                 "hindcasts", "forecasts")
-  expect_true(all(required %in% names(hc)))
+  expect_equal(sort(names(hc)), sort(required))
+  dead <- c("call", "trend_call", "trend_model", "drift",
+            "use_lv", "fit_engine")
+  expect_false(any(dead %in% names(hc)))
   expect_null(hc$forecasts)
   expect_null(hc$test_times)
   expect_null(hc$test_observations)

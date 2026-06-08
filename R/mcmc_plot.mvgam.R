@@ -47,9 +47,6 @@ mcmc_plot.mvgam = function(
   checkmate::assert_character(variable, null.ok = TRUE)
   checkmate::assert_logical(regex, len = 1L)
   checkmate::assert_logical(use_alias, len = 1L)
-  # Set red colour scheme
-  col_scheme <- attr(color_scheme_get(), 'scheme_name')
-  color_scheme_set('red')
 
   # Check type validity
   valid_types <- as.character(bayesplot::available_mcmc(""))
@@ -139,12 +136,7 @@ mcmc_plot.mvgam = function(
     mcmc_args$ratio <- neff_ratio(object)
   }
 
-  # Generate plot and reset colour scheme
-  out_plot <- do.call(mcmc_fun, args = mcmc_args)
-  color_scheme_set(col_scheme)
-
-  # Return the plot
-  return(out_plot)
+  with_color_scheme("red", do.call(mcmc_fun, args = mcmc_args))
 }
 
 #' @export

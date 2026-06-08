@@ -566,7 +566,11 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
     group_info = group_info,
     is_lv = is_lv,
     n_obs_series = as.integer(n_obs_series),
-    draws_mat = if (is_lv) draws_mat else NULL
+    draws_mat = if (is_lv) draws_mat else NULL,
+    # Threaded to `resolve_factor_loadings()` so fixed-Z fits
+    # skip the Z[i, j] posterior lookup that does not exist when
+    # Z is supplied as Stan data.
+    fixed_Z = object$trend_metadata$fixed_Z
   )
 }
 
@@ -1023,11 +1027,14 @@ sample_innovations <- function(cov_structure, obs_structure) {
 
   # Latent-factor map: innovations were sampled at the LV level
   # (`n_series == n_lv` here). Convert to per-series innovations
-  # via the loadings `Z[s, lv]` before mapping to obs.
+  # via the loadings `Z[s, lv]` before mapping to obs. The
+  # resolver returns sampled Z draws or the broadcast fixed Z
+  # transparently.
   if (isTRUE(cov_structure$is_lv)) {
-    Z <- extract_Z_loadings(
-      cov_structure$draws_mat,
-      n_obs_series = cov_structure$n_obs_series,
+    Z <- resolve_factor_loadings(
+      draws_mat = cov_structure$draws_mat,
+      fixed_Z = cov_structure$fixed_Z,
+      n_series = cov_structure$n_obs_series,
       n_lv = n_series
     )
     innovations_flat <- map_lv_to_series_innovations(

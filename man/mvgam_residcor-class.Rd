@@ -6,19 +6,32 @@
 \value{
 Objects of this class are structured as a \code{list} with the following components:
 
-\item{cor, cor_lower, cor_upper}{A set of \eqn{p \times p} correlation matrices,
-containing either the posterior median or mean estimate, plus lower and upper limits
-of the corresponding credible intervals supplied to \code{probs}}
-\item{sig_cor}{A \eqn{p \times p} correlation matrix containing only those correlations whose credible
-interval does not contain zero. All other correlations are set to zero}
-\item{prec, prec_lower, prec_upper}{A set of \eqn{p \times p} precision matrices,
-containing either the posterior median or mean estimate, plus lower and upper limits
-of the corresponding credible intervals supplied to \code{probs}}
-\item{sig_prec}{A \eqn{p \times p} precision matrix containing only those precisions whose credible
-interval does not contain zero. All other precisions are set to zero}
-\item{cov}{A \eqn{p \times p} posterior median or mean covariance matrix}
-\item{trace}{The median/mean point estimator of the trace (sum of the diagonal elements)
-of the residual covariance matrix \code{cov}}
+\item{cor, cor_se, cor_lower, cor_upper}{Posterior summaries of
+the \eqn{p \times p} correlation matrix: median (or mean), standard
+error, and lower / upper limits of the credible intervals at the
+\code{probs} levels.}
+\item{prob_positive, prob_negative, prob_nonzero}{\eqn{p \times p}
+matrices of \code{Pr(r > 0)}, \code{Pr(r < 0)} and the larger of the two for
+every off-diagonal entry. Use these for a sign-determinability
+filter rather than the binary "CI does not contain zero" rule.}
+\item{sig_cor}{A \eqn{p \times p} correlation matrix containing
+only those correlations whose credible interval excludes zero. All
+other entries are set to zero.}
+\item{cov, cov_se, cov_lower, cov_upper}{Posterior summaries of the
+residual covariance matrix.}
+\item{mean_abs_offdiag}{Mean of the absolute off-diagonal entries
+of the posterior median correlation — a scalar summary of overall
+correlation strength.}
+\item{n_series, series_names}{Dimensions of the matrix and the
+series labels.}
+\item{pattern, hierarchical, group_label}{Bookkeeping fields
+recording the residual structure that was summarised.}
+\item{probs, prob_threshold}{The credible interval and threshold
+used by \code{residual_cor()} to populate \code{sig_cor}.}
+
+Precision-matrix slots (\verb{prec*} / \code{sig_prec}) are reserved for a
+future extension of \code{residual_cor()}; current builds populate the
+correlation surface only.
 }
 \description{
 A \code{mvgam_residcor} object returned by function \code{\link[=residual_cor]{residual_cor()}}.

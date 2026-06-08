@@ -343,6 +343,254 @@ validate_required_variables <- function(data, required_vars, context = "data", f
   invisible(TRUE)
 }
 
+
+#' Normalise the user-facing `trend_map` argument
+#'
+#' Single entry point that converts any of the accepted
+#' `trend_map` input shapes to a canonical numeric loading
+#' matrix `Z` of dimension `n_series × n_lv`. Every consumer of
+#' fixed loadings (the `mvgam()` arg, the trend constructors,
+#' the future `nmix`/`jsdgam` ports) calls this function — there
+#' is no parallel parsing anywhere else.
+#'
+#' Accepted shapes:
+#' \itemize{
+#'   \item Numeric `matrix` of dimension `n_series × n_lv`. The
+#'     general case; loadings can be any finite values
+#'     including fractional or negative. `n_lv` is inferred from
+#'     `ncol(Z)`.
+#'   \item `data.frame(series, trend)` — one row per series
+#'     assigning each to a single trend integer. The resulting
+#'     Z is binary `0/1` with `Z[s, k] = 1` iff
+#'     `trend_map$trend[trend_map$series == s] == k`.
+#'   \item Character scalar `"identity"` (each series its own
+#'     trend; `Z = diag(n_series)`) or `"shared"` (single shared
+#'     latent factor; `Z = matrix(1, n_series, 1)`).
+#' }
+#'
+#' Rejects:
+#' \itemize{
+#'   \item Integer vector form (silent ordering bug when series
+#'     factor levels change).
+#'   \item Z matrices with non-finite entries.
+#'   \item Rows that sum to zero (series silently unmodelled).
+#'   \item data.frame mappings with missing series, gaps in the
+#'     trend integer sequence, or `max(trend) > n_series`.
+#' }
+#'
+#' @param input The user-supplied `trend_map` value.
+#' @param data Training `data.frame` carrying a `series` factor
+#'   so the normaliser can resolve dimensions and validate
+#'   labels.
+#'
+#' @return `list(Z = <num matrix>, n_lv = <int>)`.
+#'
+#' Shape-only assertion for `trend_map` (constructor fail-fast).
+#'
+#' Called from every trend constructor that accepts `trend_map`
+#' so malformed input errors immediately, not at fit time. Defers
+#' all data-dependent validation (dimension match, series-label
+#' coverage, contiguity etc.) to `normalise_trend_map()`.
+#'
+#' @noRd
+assert_trend_map_input <- function(input) {
+  if (is.null(input)) return(invisible(NULL))
+  checkmate::assert(
+    checkmate::check_character(input, len = 1L),
+    checkmate::check_matrix(input, mode = "numeric"),
+    checkmate::check_data_frame(input),
+    .var.name = "trend_map"
+  )
+  invisible(NULL)
+}
+
+
+#' @noRd
+normalise_trend_map <- function(input, data) {
+  if (is.null(input)) return(NULL)
+  checkmate::assert_data_frame(data)
+  series_levels <- if (is.factor(data$series)) {
+    levels(data$series)
+  } else if (!is.null(data$series)) {
+    sort(unique(as.character(data$series)))
+  } else {
+    stop(insight::format_error(c(
+      "trend_map requires a 'series' column on 'data'.",
+      i = "Add a 'series' factor / character column to 'data'."
+    )))
+  }
+  n_series <- length(series_levels)
+  Z <- if (is.character(input)) {
+    trend_map_from_character(input, n_series)
+  } else if (is.data.frame(input)) {
+    trend_map_from_dataframe(input, series_levels)
+  } else if (is.matrix(input) && is.numeric(input)) {
+    trend_map_from_matrix(input, n_series)
+  } else {
+    stop(insight::format_error(c(
+      "'trend_map' must be a matrix, data.frame, or character code.",
+      x = paste0("Got: ", class(input)[1L], "."),
+      i = "See ?mvgam for accepted shapes."
+    )))
+  }
+  rownames(Z) <- series_levels
+  colnames(Z) <- paste0("trend_", seq_len(ncol(Z)))
+  list(Z = Z, n_lv = ncol(Z))
+}
+
+
+# Character-code branch. Two recognised codes.
+#'@noRd
+trend_map_from_character <- function(input, n_series) {
+  if (length(input) != 1L) {
+    stop(insight::format_error(c(
+      "Character 'trend_map' must be a single string.",
+      x = paste0("Got length-", length(input), " vector.")
+    )))
+  }
+  switch(
+    input,
+    identity = diag(1, nrow = n_series, ncol = n_series),
+    shared = matrix(1, nrow = n_series, ncol = 1L),
+    stop(insight::format_error(c(
+      paste0("Unknown 'trend_map' code: '", input, "'."),
+      i = "Accepted codes: 'identity', 'shared'."
+    )))
+  )
+}
+
+
+# Numeric-matrix branch. Validates shape + finite + no all-zero
+# rows.
+#'@noRd
+trend_map_from_matrix <- function(input, n_series) {
+  if (nrow(input) != n_series) {
+    stop(insight::format_error(c(
+      "'trend_map' matrix has the wrong number of rows.",
+      x = paste0(
+        "Expected ", n_series, " (one per series), got ",
+        nrow(input), "."
+      ),
+      i = "Rows correspond to series; columns to latent factors."
+    )))
+  }
+  if (anyNA(input) || any(!is.finite(input))) {
+    stop(insight::format_error(c(
+      "'trend_map' matrix must be finite (no NA / Inf entries).",
+      i = paste0(
+        "Partial fixing (some entries sampled) is not yet ",
+        "supported."
+      )
+    )))
+  }
+  # Strict equality is intentional. If the user typed a finite
+  # non-zero loading (even something like 1e-30), we trust the
+  # number — they made a deliberate choice. The check only
+  # fires for entries that are EXACTLY 0, which is the only
+  # value that genuinely leaves a series unmodelled.
+  zero_rows <- which(rowSums(abs(input)) == 0)
+  if (length(zero_rows) > 0L) {
+    stop(insight::format_error(c(
+      "'trend_map' has zero-loading rows; those series are unmodelled.",
+      x = paste0(
+        "Rows with zero loadings: ",
+        paste(zero_rows, collapse = ", "), "."
+      ),
+      i = "Every series must load on at least one latent factor."
+    )))
+  }
+  input
+}
+
+
+# data.frame branch. Validates cols + factor-level coverage +
+# contiguous trend integers; lifts to a binary 0/1 Z matrix.
+#'@noRd
+trend_map_from_dataframe <- function(input, series_levels) {
+  validate_required_variables(
+    input, c("series", "trend"), "trend_map"
+  )
+  s <- as.character(input$series)
+  if (!all(series_levels %in% s)) {
+    missing_series <- setdiff(series_levels, s)
+    stop(insight::format_error(c(
+      "'trend_map' must list every training series exactly once.",
+      x = paste0(
+        "Missing from trend_map: ",
+        paste0("'", missing_series, "'", collapse = ", "), "."
+      )
+    )))
+  }
+  if (anyDuplicated(s)) {
+    stop(insight::format_error(c(
+      "'trend_map' contains duplicate series labels.",
+      x = paste0(
+        "Duplicated: ",
+        paste0("'", unique(s[duplicated(s)]), "'", collapse = ", "),
+        "."
+      ),
+      i = "Each series must map to exactly one trend."
+    )))
+  }
+  unknown <- setdiff(s, series_levels)
+  if (length(unknown) > 0L) {
+    stop(insight::format_error(c(
+      "'trend_map' references series not present in the training data.",
+      x = paste0(
+        "Unknown: ",
+        paste0("'", unknown, "'", collapse = ", "), "."
+      )
+    )))
+  }
+  if (!is.numeric(input$trend) && !is.integer(input$trend)) {
+    stop(insight::format_error(c(
+      "'trend_map$trend' must be a numeric or integer column.",
+      x = paste0("Got column of class ", class(input$trend)[1L], "."),
+      i = "Use integer factor indices 1..K to assign series."
+    )))
+  }
+  t <- as.integer(input$trend)
+  if (anyNA(t) || any(t < 1L)) {
+    stop(insight::format_error(c(
+      "'trend_map$trend' must be positive integers.",
+      x = paste0(
+        "Got: ",
+        paste0(input$trend, collapse = ", "), "."
+      )
+    )))
+  }
+  max_t <- max(t)
+  if (!setequal(unique(t), seq_len(max_t))) {
+    stop(insight::format_error(c(
+      "'trend_map$trend' must be a contiguous integer sequence 1..K.",
+      x = paste0(
+        "Got: ",
+        paste0(sort(unique(t)), collapse = ", "), "."
+      ),
+      i = paste0(
+        "Latent factors are indexed 1..K with no gaps; ",
+        "renumber the mapping if needed."
+      )
+    )))
+  }
+  if (max_t > length(series_levels)) {
+    stop(insight::format_error(c(
+      paste0(
+        "'trend_map$trend' has more factors than series (",
+        max_t, " > ", length(series_levels), ")."
+      ),
+      i = "max(trend) must not exceed the number of series."
+    )))
+  }
+  # Reorder rows to match series_levels so Z[s, ] aligns with
+  # the canonical series order.
+  ord <- match(series_levels, s)
+  Z <- matrix(0, nrow = length(series_levels), ncol = max_t)
+  Z[cbind(seq_along(series_levels), t[ord])] <- 1
+  Z
+}
+
+
 #' Apply Rule-Based Validation Dispatch
 #'
 #' @description
@@ -2159,6 +2407,138 @@ is_multivariate_trend_specs <- function(trend_specs) {
   # Univariate case: direct trend specification object
   return(FALSE)
 }
+
+#' Apply the top-level `trend_map` alias to parsed trend specs
+#'
+#' Single point that lets users supply `trend_map` either at the
+#' trend constructor (`AR(trend_map = ...)`) or at `mvgam()`.
+#' Errors if both are populated (collision); otherwise sets the
+#' top-level alias on each spec when the constructor-level value
+#' is absent.
+#'
+#' @param trend_specs Parsed trend specs (single spec or named
+#'   list of specs for multi-response models).
+#' @param mvgam_trend_map The top-level `trend_map` value (may
+#'   be NULL).
+#'
+#' @return `trend_specs` with `$trend_map` populated when the
+#'   top-level alias was supplied; unchanged otherwise.
+#'
+#' @noRd
+apply_trend_map_alias <- function(trend_specs, mvgam_trend_map) {
+  if (is.null(trend_specs) || is.null(mvgam_trend_map)) {
+    return(trend_specs)
+  }
+  is_multivar <- is_multivariate_trend_specs(trend_specs)
+  specs <- if (is_multivar) trend_specs else list(trend_specs)
+  for (i in seq_along(specs)) {
+    if (!is.null(specs[[i]]$trend_map)) {
+      stop(insight::format_error(c(
+        paste0(
+          "'trend_map' supplied at both trend constructor and ",
+          "'mvgam()' (collision)."
+        ),
+        x = paste0(
+          "Trend spec '", names(specs)[i] %||% i,
+          "' has 'trend_map' on the constructor; mvgam() ",
+          "also supplies it at the top level."
+        ),
+        i = paste0(
+          "Drop the mvgam()-level 'trend_map' argument ",
+          "(constructor-level takes precedence)."
+        )
+      )))
+    }
+    specs[[i]]$trend_map <- mvgam_trend_map
+  }
+  if (is_multivar) specs else specs[[1L]]
+}
+
+
+#' Normalise raw `trend_map` input on every spec to a fixed-Z
+#' matrix and reconcile with `n_lv`.
+#'
+#' Called once in the Stan-code pipeline right after
+#' `apply_trend_map_alias()`. Walks each trend spec, calls
+#' `normalise_trend_map()` for any non-NULL `trend_map`, stashes
+#' the canonical numeric Z on `spec$fixed_Z`, and updates
+#' `spec$n_lv` to match `ncol(Z)`. If the user also set `n_lv`
+#' explicitly on the constructor, the two values must agree.
+#'
+#' @param trend_specs Parsed trend specs (single spec or named
+#'   list).
+#' @param data Training `data.frame` (used to resolve series
+#'   levels for the normaliser).
+#'
+#' @return `trend_specs` with `$fixed_Z` and reconciled `$n_lv`
+#'   set on any spec whose `$trend_map` was supplied.
+#'
+#' @noRd
+normalise_trend_map_on_specs <- function(trend_specs, data) {
+  if (is.null(trend_specs)) return(trend_specs)
+  is_multivar <- is_multivariate_trend_specs(trend_specs)
+  specs <- if (is_multivar) trend_specs else list(trend_specs)
+  for (i in seq_along(specs)) {
+    spec <- specs[[i]]
+    if (is.null(spec$trend_map)) next
+    normalised <- normalise_trend_map(spec$trend_map, data)
+    if (is.null(normalised)) next
+    if (!is.null(spec$n_lv) && spec$n_lv != normalised$n_lv) {
+      stop(insight::format_error(c(
+        paste0(
+          "'trend_map' shape conflicts with constructor ",
+          "'n_lv' on spec '", names(specs)[i] %||% i, "'."
+        ),
+        x = paste0(
+          "trend_map implies n_lv = ", normalised$n_lv,
+          " but n_lv was set to ", spec$n_lv, "."
+        ),
+        i = "Drop the redundant 'n_lv' or update trend_map shape."
+      )))
+    }
+    spec$fixed_Z <- normalised$Z
+    spec$n_lv <- normalised$n_lv
+    specs[[i]] <- spec
+  }
+  # Multivariate fits use ONE shared trend component across all
+  # responses (see `enrich_trend_metadata()` which already keeps
+  # only the first spec's trend metadata). A fixed Z must
+  # therefore agree across responses; otherwise the downstream
+  # resolver would silently apply the first response's Z to
+  # every series.
+  if (is_multivar) {
+    fixed_Zs <- lapply(specs, function(s) s$fixed_Z)
+    populated <- which(!vapply(fixed_Zs, is.null, logical(1L)))
+    if (length(populated) >= 2L) {
+      ref <- fixed_Zs[[populated[1L]]]
+      mismatch <- populated[-1L][
+        !vapply(populated[-1L], function(j) {
+          identical(unname(fixed_Zs[[j]]), unname(ref))
+        }, logical(1L))
+      ]
+      if (length(mismatch) > 0L) {
+        offending <- names(specs)[mismatch] %||% as.character(mismatch)
+        stop(insight::format_error(c(
+          paste0(
+            "'trend_map' differs across multivariate trend specs."
+          ),
+          x = paste0(
+            "Mismatched spec(s): ",
+            paste(offending, collapse = ", "), "."
+          ),
+          i = paste0(
+            "mvgam uses one shared trend component across ",
+            "responses; supply the same 'trend_map' for every ",
+            "spec (or set it once at the top level via ",
+            "'mvgam(trend_map = ...)')."
+          )
+        )))
+      }
+    }
+  }
+  if (is_multivar) specs else specs[[1L]]
+}
+
 
 #' Validate Factor Levels
 #'

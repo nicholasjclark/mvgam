@@ -2583,9 +2583,16 @@ sort_stanvars <- function(stanvars) {
 #' @param is_factor_model Logical indicating if this is a factor model
 #' @param n_lv Number of latent variables
 #' @param n_series Number of observed series
+#' @param fixed_Z Optional user-supplied numeric Z matrix. When
+#'   non-NULL, Z is emitted as data via `make_fixed_z_stanvars()`
+#'   and this function returns NULL.
 #' @return List of parameter block stanvars
 #' @noRd
-generate_matrix_z_parameters <- function(is_factor_model, n_lv, n_series) {
+generate_matrix_z_parameters <- function(is_factor_model, n_lv, n_series,
+                                         fixed_Z = NULL) {
+  # When the user fixed Z (via trend_map) it lives in the data
+  # block, not parameters. Suppress this declaration.
+  if (!is.null(fixed_Z)) return(NULL)
   if (is_factor_model) {
     # Factor model: estimate Z in parameters for dimensionality reduction
     z_matrix_stanvar <- brms::stanvar(
@@ -2600,15 +2607,41 @@ generate_matrix_z_parameters <- function(is_factor_model, n_lv, n_series) {
   }
 }
 
+#' Emit a user-supplied fixed Z matrix as Stan `data`.
+#'
+#' Single point of truth for the fixed-loadings code path. Reused
+#' by every trend type (RW / AR / VAR / ZMVN / etc.) and reserved
+#' for future `nmix` / `jsdgam` integration. The matrix value is
+#' attached to the stanvar so brms threads it into standata.
+#'
+#' @param fixed_Z A numeric `n_series x n_lv` matrix produced by
+#'   `normalise_trend_map()`.
+#' @return A `brms::stanvar` declaring `Z` in the data block.
+#' @noRd
+make_fixed_z_stanvars <- function(fixed_Z) {
+  checkmate::assert_matrix(fixed_Z, mode = "numeric", any.missing = FALSE)
+  brms::stanvar(
+    x = fixed_Z,
+    name = "Z",
+    scode = "matrix[N_series_trend, N_lv_trend] Z;",
+    block = "data"
+  )
+}
+
 #' Generate Transformed Data Block Injections for Matrix Z
 #'
 #'
 #' @param is_factor_model Logical indicating if this is a factor model
 #' @param n_lv Number of latent variables
 #' @param n_series Number of observed series
+#' @param fixed_Z Optional user-supplied numeric Z. When non-NULL
+#'   Z is supplied via the data block, so the identity-Z default
+#'   is suppressed.
 #' @return List of transformed data block stanvars
 #' @noRd
-generate_matrix_z_tdata <- function(is_factor_model, n_lv, n_series) {
+generate_matrix_z_tdata <- function(is_factor_model, n_lv, n_series,
+                                    fixed_Z = NULL) {
+  if (!is.null(fixed_Z)) return(NULL)
   if (!is_factor_model) {
     # Non-factor model: diagonal Z in transformed data
     z_matrix_stanvar <- brms::stanvar(
@@ -2628,22 +2661,43 @@ generate_matrix_z_tdata <- function(is_factor_model, n_lv, n_series) {
 #' Combines all matrix Z injection functions for factor/non-factor models.
 #' This provides a single interface for matrix Z generation across all Stan blocks.
 #'
+#' Three exclusive branches:
+#' - `fixed_Z` non-NULL: emit Z in the data block (no Z_raw,
+#'   no construction, no priors). Identification comes from the
+#'   fixed loadings.
+#' - `is_factor_model = TRUE`, `fixed_Z` NULL: defer to
+#'   `generate_factor_model()` for parameters / tparameters /
+#'   priors (Z_raw + PLT construction).
+#' - `is_factor_model = FALSE`, `fixed_Z` NULL: emit diagonal Z
+#'   in tdata (default identity factor structure).
 #'
 #' @param is_factor_model Logical indicating if this is a factor model
 #' @param n_lv Number of latent variables
 #' @param n_series Number of observed series
+#' @param fixed_Z Optional user-supplied numeric Z. See branches above.
 #' @return List of stanvars for matrix Z across all required blocks
 #' @noRd
-generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv, n_series) {
+generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
+                                                  n_series,
+                                                  fixed_Z = NULL) {
   # Validate inputs following CLAUDE.md standards
   checkmate::assert_logical(is_factor_model, len = 1)
   checkmate::assert_integerish(n_lv, len = 1, lower = 1)
   checkmate::assert_integerish(n_series, len = 1, lower = 1)
 
+  # Fixed-Z branch: skip everything else and emit Z as data.
+  if (!is.null(fixed_Z)) {
+    return(make_fixed_z_stanvars(fixed_Z))
+  }
+
   # Get Z matrix components (dimensions handled by generate_common_trend_data)
   # For factor models, skip parameters (handled by generate_factor_model)
   stanvars_list <- list(
-    if (!is_factor_model) generate_matrix_z_parameters(is_factor_model, n_lv, n_series) else NULL,
+    if (!is_factor_model) {
+      generate_matrix_z_parameters(is_factor_model, n_lv, n_series)
+    } else {
+      NULL
+    },
     generate_matrix_z_tdata(is_factor_model, n_lv, n_series)
   )
 
@@ -2662,17 +2716,25 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv, n_serie
 #' Generate Factor Model Block Code
 #'
 #' Provides standardized priors for factor models with fixed variance=1 constraint.
-#' Only generates priors when is_factor_model=TRUE.
+#' Only generates priors when `is_factor_model=TRUE` AND `fixed_Z`
+#' is NULL. When the user has fixed Z via `trend_map`, Z is data,
+#' not a parameter, so Z_raw + PLT + prior are all suppressed.
 #'
 #'
 #' @param is_factor_model Logical indicating if this is a factor model
 #' @param n_lv Number of latent variables
+#' @param fixed_Z Optional user-supplied numeric Z. When non-NULL
+#'   this function returns NULL — the identification comes from
+#'   the fixed loadings, no Z_raw or priors are needed.
 #' @return List of stanvars for factor model priors
 #' @noRd
-generate_factor_model <- function(is_factor_model, n_lv) {
+generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL) {
   # Input validation
   checkmate::assert_logical(is_factor_model, len = 1)
   checkmate::assert_integerish(n_lv, lower = 1, any.missing = FALSE)
+
+  # Suppress sampled-Z scaffolding when Z is user-supplied.
+  if (!is.null(fixed_Z)) return(NULL)
 
   if (!is_factor_model) {
     return(NULL)
@@ -3245,7 +3307,10 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # STEP 1: Dimensions handled by calling context (no duplication)
 
   # STEP 2: Always add matrix Z (factor=parameters, non-factor=diagonal in tdata)
-  matrix_z <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
+  matrix_z <- generate_matrix_z_multiblock_stanvars(
+    is_factor_model, n_lv, n_series,
+    fixed_Z = trend_specs$fixed_Z
+  )
   components <- append_if_not_null(components, matrix_z)
 
   # STEP 3: Add hierarchical correlation support if applicable (BEFORE RW dynamics)
@@ -3314,7 +3379,10 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # 5. Factor model priors if applicable
   if (is_factor_model) {
-    factor_priors <- generate_factor_model(is_factor_model, n_lv)
+    factor_priors <- generate_factor_model(
+      is_factor_model, n_lv,
+      fixed_Z = trend_specs$fixed_Z
+    )
     components <- append_if_not_null(components, factor_priors)
   }
 
@@ -3451,7 +3519,10 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # STEP 1: Dimensions handled by calling context (no duplication)
 
   # STEP 2: Always add matrix Z (factor=parameters, non-factor=diagonal in tdata)
-  matrix_z <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
+  matrix_z <- generate_matrix_z_multiblock_stanvars(
+    is_factor_model, n_lv, n_series,
+    fixed_Z = trend_specs$fixed_Z
+  )
   components <- append_if_not_null(components, matrix_z)
 
   # STEP 3: Add hierarchical correlation support if applicable (BEFORE AR dynamics)
@@ -3542,7 +3613,10 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # 5. Factor model priors if applicable
   if (is_factor_model) {
-    factor_priors <- generate_factor_model(is_factor_model, n_lv)
+    factor_priors <- generate_factor_model(
+      is_factor_model, n_lv,
+      fixed_Z = trend_specs$fixed_Z
+    )
     components <- append_if_not_null(components, factor_priors)
   }
 
@@ -4319,7 +4393,10 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # STEP 1: Dimensions handled by calling context (no duplication)
 
   # STEP 2: Add Z matrix using standard generation (VAR supports factor models unless hierarchical)
-  matrix_z <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
+  matrix_z <- generate_matrix_z_multiblock_stanvars(
+    is_factor_model, n_lv, n_series,
+    fixed_Z = trend_specs$fixed_Z
+  )
 
   # Add trend computation stanvars (maps lv_trend through Z matrix)
   trend_computation <- generate_trend_computation_tparameters(n_lv, n_series)
@@ -4369,7 +4446,10 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # Add factor model support if applicable
   if (is_factor_model) {
-    factor_priors <- generate_factor_model(is_factor_model, n_lv)
+    factor_priors <- generate_factor_model(
+      is_factor_model, n_lv,
+      fixed_Z = trend_specs$fixed_Z
+    )
     components <- append_if_not_null(components, factor_priors)
   }
 
@@ -4519,7 +4599,10 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   is_factor_model <- FALSE  # CAR never uses factor models
 
   # STEP 2: Always add matrix Z (CAR uses diagonal Z in transformed data)
-  matrix_z <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
+  matrix_z <- generate_matrix_z_multiblock_stanvars(
+    is_factor_model, n_lv, n_series,
+    fixed_Z = trend_specs$fixed_Z
+  )
   components <- append_if_not_null(components, matrix_z)
 
   # Calculate time distances for continuous-time AR evolution
@@ -4694,7 +4777,10 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # STEP 1: Dimensions handled by calling context (no duplication)
 
   # STEP 2: Always add matrix Z (factor=parameters, non-factor=diagonal in tdata)
-  matrix_z <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
+  matrix_z <- generate_matrix_z_multiblock_stanvars(
+    is_factor_model, n_lv, n_series,
+    fixed_Z = trend_specs$fixed_Z
+  )
   components <- append_if_not_null(components, matrix_z)
 
   # STEP 3: Add hierarchical correlation support if applicable (BEFORE ZMVN stanvars)
@@ -4733,7 +4819,10 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # Add factor model priors if applicable
   if (is_factor_model) {
-    factor_priors <- generate_factor_model(is_factor_model, n_lv)
+    factor_priors <- generate_factor_model(
+      is_factor_model, n_lv,
+      fixed_Z = trend_specs$fixed_Z
+    )
     components <- append_if_not_null(components, factor_priors)
   }
 
@@ -4948,7 +5037,10 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   # STEP 1: Dimensions handled by calling context (no duplication)
 
   # STEP 2: Always add matrix Z (PW uses diagonal Z in transformed data)
-  matrix_z <- generate_matrix_z_multiblock_stanvars(is_factor_model, n_lv, n_series)
+  matrix_z <- generate_matrix_z_multiblock_stanvars(
+    is_factor_model, n_lv, n_series,
+    fixed_Z = trend_specs$fixed_Z
+  )
   components <- append_if_not_null(components, matrix_z)
 
   # Functions block - Prophet-style piecewise functions

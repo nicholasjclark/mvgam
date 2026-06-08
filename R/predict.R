@@ -265,7 +265,7 @@ predict.mvgam <- function(object,
 #' subsamples randomly when `ndraws < total_draws`, we compute `mu`
 #' over the full posterior and then subsample `mu` and the dpar
 #' matrices with the same `draw_idx`. The fix is independent of
-#' draw_ids plumbing through posterior_epred (tracked as task #145).
+#' draw_ids plumbing through `posterior_epred()`.
 #'
 #' @noRd
 predict_variance <- function(object, newdata, process_error, ndraws,

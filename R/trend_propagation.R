@@ -679,6 +679,11 @@ enrich_trend_metadata <- function(trend_metadata, trend_specs) {
   )
   trend_metadata$has_cor <- isTRUE(spec$cor)
   trend_metadata$n_lv <- spec$n_lv
+  # When the user supplied `trend_map`, the normaliser stashed
+  # the canonical numeric Z on `spec$fixed_Z` upstream. Persist
+  # it on the fit's trend_metadata so `resolve_factor_loadings()`
+  # can broadcast it across draws in downstream consumers.
+  trend_metadata$fixed_Z <- spec$fixed_Z
   if (identical(spec$trend, "PW")) {
     trend_metadata$pw_changepoint_range <-
       spec$changepoint_range %||% 0.8

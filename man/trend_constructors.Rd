@@ -14,7 +14,8 @@ RW(
   cor = FALSE,
   gr = NA,
   subgr = NA,
-  n_lv = NULL
+  n_lv = NULL,
+  trend_map = NULL
 )
 
 AR(
@@ -25,7 +26,8 @@ AR(
   cor = FALSE,
   gr = NA,
   subgr = NA,
-  n_lv = NULL
+  n_lv = NULL,
+  trend_map = NULL
 )
 
 CAR(time = NA, series = NA)
@@ -37,7 +39,8 @@ VAR(
   ma = FALSE,
   gr = NA,
   subgr = NA,
-  n_lv = NULL
+  n_lv = NULL,
+  trend_map = NULL
 )
 }
 \arguments{

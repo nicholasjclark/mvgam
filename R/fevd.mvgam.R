@@ -33,8 +33,6 @@
 #'   trend_model = VAR(cor = TRUE),
 #'   prop_trend = 1
 #' )
-#' plot_mvgam_series(data = simdat$data_train, series = "all")
-#'
 #' # Fit a model that uses a latent VAR(1)
 #' mod <- mvgam(
 #'   formula = y ~ -1,

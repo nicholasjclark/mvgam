@@ -139,9 +139,7 @@ pp_check.mvgam <- function(
   draw_ids = NULL,
   ...
 ) {
-  # Set red colour scheme
-  col_scheme <- attr(color_scheme_get(), "scheme_name")
-  color_scheme_set("red")
+  set_color_scheme_local("red")
 
   dots <- list(...)
   if (missing(type)) {
@@ -186,7 +184,11 @@ pp_check.mvgam <- function(
         "ppc_resid_hist",
         "ppc_resid_hist_grouped",
         "ppc_resid_ribbon",
-        "ppc_resid_ribbon_grouped"
+        "ppc_resid_ribbon_grouped",
+        "ppc_resid_acf",
+        "ppc_resid_pacf",
+        "ppc_resid_qq",
+        "ppc_resid_vs_fitted"
       )
     )
     valid_types <- sub("^ppc_", "", valid_types)
@@ -214,16 +216,31 @@ pp_check.mvgam <- function(
     bptype <- sub("resid_", "", bptype)
   }
 
-  ppc_fun <- get(paste0(prefix, "_", bptype), asNamespace("bayesplot"))
+  # The four diagnostic resid types skip bayesplot entirely (see
+  # the dispatch later in this function); short-circuit so the
+  # bayesplot lookup doesn't fail on `ppc_resid_acf` etc.
+  ppc_fun <- if (type %in% c(
+    "resid_acf", "resid_pacf", "resid_qq", "resid_vs_fitted"
+  )) {
+    NULL
+  } else {
+    get(paste0(prefix, "_", bptype), asNamespace("bayesplot"))
+  }
 
   if (object$family$family == "nmix") {
     stop("'pp_check' is not implemented for this family.", call. = FALSE)
   }
   # Validate group / x against the column names of newdata. insight's
   # get_predictors does not dispatch on mvgam fits, and the variable-name
-  # check is all we need here.
+  # check is all we need here. The diagnostic resid types skip this
+  # block; they have no bayesplot formals to query.
   valid_vars <- names(newdata)
-  if ("group" %in% names(formals(ppc_fun))) {
+  ppc_formals <- if (is.null(ppc_fun)) {
+    character(0L)
+  } else {
+    names(formals(ppc_fun))
+  }
+  if ("group" %in% ppc_formals) {
     if (is.null(group)) {
       stop(
         "Argument 'group' is required for ppc type '",
@@ -241,7 +258,7 @@ pp_check.mvgam <- function(
       )
     }
   }
-  if ("x" %in% names(formals(ppc_fun))) {
+  if ("x" %in% ppc_formals) {
     if (!is.null(x) && !x %in% valid_vars) {
       stop("Variable '", x, "' could not be found in the data.", call. = FALSE)
     }
@@ -265,6 +282,9 @@ pp_check.mvgam <- function(
   # to 8 and warn if the user passes > 12.
   resid_nongrouped <- c("resid_hist", "resid_ribbon")
   resid_grouped <- c("resid_hist_grouped", "resid_ribbon_grouped")
+  resid_diagnostic <- c(
+    "resid_acf", "resid_pacf", "resid_qq", "resid_vs_fitted"
+  )
   if (!ndraws_given) {
     aps_types <- c(
       "error_scatter_avg",
@@ -298,6 +318,12 @@ pp_check.mvgam <- function(
     } else if (type %in% resid_grouped) {
       ndraws <- 8L
       message("Using 8 posterior draws for ppc type '", type, "' by default.")
+    } else if (type %in% resid_diagnostic) {
+      ndraws <- 100L
+      message(
+        "Using 100 posterior draws for ppc type '", type,
+        "' by default."
+      )
     } else {
       ndraws <- 10
       message("Using 10 posterior draws for ppc type '", type, "' by default.")
@@ -395,6 +421,43 @@ pp_check.mvgam <- function(
     take <- NULL
   }
 
+  # Diagnostic resid types build their plot directly from the
+  # residual draws (and, for resid_vs_fitted, posterior_epred
+  # values at the same draw_ids). They never route through
+  # bayesplot's ppc_* dispatcher.
+  if (type %in% resid_diagnostic) {
+    # yrep currently holds -1 * residuals (bayesplot error
+    # convention); restore the natural-sign DS residual draws.
+    resid_draws <- -1 * yrep
+    if (type %in% c("resid_acf", "resid_pacf")) {
+      return(build_resid_lag_panel(
+        resid_draws, lag_type = sub("resid_", "", type)
+      ))
+    }
+    if (type == "resid_qq") {
+      return(build_resid_qq_panel(resid_draws))
+    }
+    if (type == "resid_vs_fitted") {
+      fitted_draws <- posterior_epred(
+        object, newdata = newdata,
+        ndraws = NULL, draw_ids = draw_ids,
+        resp = resp
+      )
+      if (!is.null(take)) {
+        fitted_draws <- fitted_draws[, take, drop = FALSE]
+      }
+      # `per_obs` (default TRUE) collapses each observation to
+      # its posterior median for both fitted and residual,
+      # matching the one-dot-per-observation `plot.lm` style.
+      # Pass `per_obs = FALSE` to retain the pooled draw x obs
+      # scatter that exposes posterior uncertainty.
+      per_obs <- isTRUE(dots$per_obs %||% TRUE)
+      return(build_resid_vs_fitted_panel(
+        resid_draws, fitted_draws, per_obs = per_obs
+      ))
+    }
+  }
+
   # Prepare plotting arguments
   ppc_args <- list()
   if (prefix == "ppc") {
@@ -430,7 +493,7 @@ pp_check.mvgam <- function(
   }
 
   needs_psis <- any(c("psis_object", "lw") %in%
-                    setdiff(names(formals(ppc_fun)), names(ppc_args)))
+                    setdiff(ppc_formals, names(ppc_args)))
   if (needs_psis) {
     ll <- log_lik(object, newdata = newdata, process_error = TRUE,
                   resp = resp, draw_ids = draw_ids)
@@ -443,10 +506,10 @@ pp_check.mvgam <- function(
     psis_obj <- suppressWarnings(
       loo::psis(-ll, r_eff = r_eff)
     )
-    if ("psis_object" %in% names(formals(ppc_fun))) {
+    if ("psis_object" %in% ppc_formals) {
       ppc_args$psis_object <- psis_obj
     }
-    if ("lw" %in% names(formals(ppc_fun))) {
+    if ("lw" %in% ppc_formals) {
       ppc_args$lw <- stats::weights(psis_obj)
     }
   }
@@ -458,7 +521,7 @@ pp_check.mvgam <- function(
   # Generate plot
   out_plot <- do_call(ppc_fun, ppc_args)
 
-  if ("x" %in% names(formals(ppc_fun)) && !is.null(x)) {
+  if ("x" %in% ppc_formals && !is.null(x)) {
     out_plot <- out_plot +
       ggplot2::labs(x = x)
   }
@@ -474,8 +537,183 @@ pp_check.mvgam <- function(
       ggplot2::theme(legend.position = "none") +
       ggplot2::labs(y = "DS residuals")
   }
+  out_plot
+}
 
-  # Reset color scheme and return the plot
-  color_scheme_set(col_scheme)
-  return(out_plot)
+
+# Internal: ACF / pACF panel for DS residual draws.
+# `resid_draws` is `[ndraws x nobs]`; computes per-draw ACF (or
+# pACF) via stats::acf / stats::pacf, then summarises across
+# draws with nested quantile segments at each integer lag.
+# Bands are drawn as `geom_segment` instead of the time-axis
+# ribbons in P0 because the x-axis is discrete lag positions,
+# not continuous time. The dashed band shows the asymptotic
+# 95% white-noise interval `+/- 1.96 / sqrt(n)`.
+#'@noRd
+build_resid_lag_panel <- function(
+  resid_draws, lag_type = c("acf", "pacf")
+) {
+  lag_type <- match.arg(lag_type)
+  acf_fn <- if (lag_type == "acf") stats::acf else stats::pacf
+  ndraws <- nrow(resid_draws)
+  per_draw <- lapply(seq_len(ndraws), function(d) {
+    out <- acf_fn(
+      resid_draws[d, ], plot = FALSE, na.action = stats::na.pass
+    )
+    data.frame(
+      value = out$acf[, , 1L],
+      lag = out$lag[, 1L, 1L],
+      n_used = out$n.used
+    )
+  })
+  lag_df <- do.call(rbind, per_draw)
+  lag_df <- lag_df[lag_df$lag > 0, , drop = FALSE]
+
+  by_lag <- split(lag_df$value, lag_df$lag)
+  qfun <- function(p) {
+    vapply(by_lag, stats::quantile, numeric(1L),
+      probs = p, na.rm = TRUE, names = FALSE
+    )
+  }
+  bands <- data.frame(
+    lag = as.numeric(names(by_lag)),
+    q025 = qfun(0.025), q975 = qfun(0.975),
+    q100 = qfun(0.10),  q900 = qfun(0.90),
+    q250 = qfun(0.25),  q750 = qfun(0.75)
+  )
+
+  n_used <- per_draw[[1L]]$n_used[1L]
+  ci_bound <- stats::qnorm(0.975) / sqrt(n_used)
+  palette <- mvgam_palette()
+  ylab <- if (lag_type == "acf") "Autocorrelation" else
+    "Partial autocorrelation"
+  title <- if (lag_type == "acf") "ACF" else "pACF"
+
+  ggplot2::ggplot(bands, ggplot2::aes(x = lag)) +
+    ggplot2::geom_hline(
+      yintercept = c(-1, 1) * ci_bound,
+      linetype = "dashed", colour = "black"
+    ) +
+    ggplot2::geom_hline(
+      yintercept = 0, colour = palette[6L], linewidth = 0.25
+    ) +
+    ggplot2::geom_segment(
+      colour = palette[1L], linewidth = 1.5,
+      ggplot2::aes(y = q025, yend = q975)
+    ) +
+    ggplot2::geom_segment(
+      colour = palette[3L], linewidth = 1.5,
+      ggplot2::aes(y = q100, yend = q900)
+    ) +
+    ggplot2::geom_segment(
+      colour = palette[6L], linewidth = 1.5,
+      ggplot2::aes(y = q250, yend = q750)
+    ) +
+    ggplot2::labs(title = title, x = "Lag", y = ylab) +
+    mvgam_theme()
+}
+
+
+# Internal: Q-Q panel for DS residual draws. Pools all draws,
+# overlays a single reference line and double-plots points
+# (white outline + dark fill) for the mvgam point overlay style.
+#'@noRd
+build_resid_qq_panel <- function(resid_draws) {
+  palette <- mvgam_palette()
+  df <- data.frame(resids = as.numeric(resid_draws))
+  ggplot2::ggplot(df, ggplot2::aes(sample = resids)) +
+    ggplot2::stat_qq_line(colour = palette[5L], linewidth = 1) +
+    ggplot2::stat_qq(
+      shape = 16, colour = "white", size = 1.25, alpha = 0.4
+    ) +
+    ggplot2::stat_qq(
+      shape = 16, colour = "black", size = 1, alpha = 0.4
+    ) +
+    ggplot2::labs(
+      title = "Normal Q-Q Plot",
+      x = "Theoretical Quantiles",
+      y = "Sample Quantiles"
+    ) +
+    mvgam_theme()
+}
+
+
+# Internal: Resids-vs-fitted panel. `per_obs = TRUE` (the default
+# at the call site in `pp_check.mvgam`) collapses each
+# observation to its posterior median for both fitted and
+# residual — one point per observation, matching the
+# `plot.lm` convention. `per_obs = FALSE` retains the pooled
+# (draw x obs) scatter that exposes the per-draw spread of
+# discrete-PIT residuals at low fitted values. The thin-plate
+# gam smoother ribbon highlights any systematic mean trend in
+# either view.
+#'@noRd
+build_resid_vs_fitted_panel <- function(
+  resid_draws, fitted_draws, per_obs = TRUE
+) {
+  palette <- mvgam_palette()
+  if (per_obs) {
+    df <- data.frame(
+      preds = apply(fitted_draws, 2L, stats::median, na.rm = TRUE),
+      resids = apply(resid_draws, 2L, stats::median, na.rm = TRUE)
+    )
+    point_size <- 1.5
+    point_alpha <- 1
+  } else {
+    df <- data.frame(
+      preds = as.numeric(fitted_draws),
+      resids = as.numeric(resid_draws)
+    )
+    point_size <- 1
+    point_alpha <- 0.4
+  }
+  df <- df[stats::complete.cases(df), , drop = FALSE]
+  ggplot2::ggplot(df, ggplot2::aes(x = preds, y = resids)) +
+    ggplot2::geom_point(
+      shape = 16, colour = "white",
+      size = point_size + 0.25, alpha = point_alpha
+    ) +
+    ggplot2::geom_point(
+      shape = 16, colour = "black",
+      size = point_size, alpha = point_alpha
+    ) +
+    ggplot2::geom_smooth(
+      method = "gam", formula = y ~ s(x, bs = "cs"),
+      colour = paste0(palette[6L], "60"),
+      fill = paste0(palette[6L], "40")
+    ) +
+    ggplot2::labs(
+      title = "Resids vs Fitted",
+      x = "Fitted values",
+      y = "DS residuals"
+    ) +
+    mvgam_theme()
+}
+
+
+# Internal: 4-panel residual diagnostic patchwork. Called by
+# `plot.mvgam(x, type = "residuals")` in the dispatcher. Bundles
+# the four diagnostic pp_check types into a single ggplot via
+# `patchwork::wrap_plots`.
+#'@noRd
+mvgam_resid_panel <- function(
+  object, newdata = NULL, ndraws = 100L, ...
+) {
+  p1 <- pp_check(
+    object, type = "resid_vs_fitted", newdata = newdata,
+    ndraws = ndraws, ...
+  )
+  p2 <- pp_check(
+    object, type = "resid_qq", newdata = newdata,
+    ndraws = ndraws, ...
+  )
+  p3 <- pp_check(
+    object, type = "resid_acf", newdata = newdata,
+    ndraws = ndraws, ...
+  )
+  p4 <- pp_check(
+    object, type = "resid_pacf", newdata = newdata,
+    ndraws = ndraws, ...
+  )
+  patchwork::wrap_plots(p1, p2, p3, p4, ncol = 2L, nrow = 2L)
 }

@@ -89,12 +89,11 @@ mvgam_keyword_shortcuts <- c(
 
 
 # Resolve a single keyword to a character vector of parameter names
-# present in `all_vars`. The patterns below are brms-native: master
-# called into `x$mgcv_model`, `x$sp_names`, `trend_par_names()` and
-# `family_param_info()`, none of which apply on the brms-integrated
-# branch. The trend-dynamics block (`trend_params`) is the one place
-# context matters — with a `trend_formula` those parameters carry the
-# `_trend` suffix, otherwise they sit at the top level.
+# present in `all_vars`. Patterns are brms-native: keywords map
+# directly to the parameter names brms emits. The trend-dynamics
+# block (`trend_params`) is the one place context matters — with
+# a `trend_formula` those parameters carry the `_trend` suffix,
+# otherwise they sit at the top level.
 #'@noRd
 resolve_mvgam_keyword <- function(keyword, x, all_vars) {
   has_trend_f <- !is.null(x$trend_formula)
