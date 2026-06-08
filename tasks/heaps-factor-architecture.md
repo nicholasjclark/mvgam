@@ -1,5 +1,22 @@
 # Heaps 2024 factor-model architecture (task #166)
 
+## Status
+
+| Phase | State | Commit |
+|---|---|---|
+| 0 — Stage Heaps reference materials | DONE | `61a2c143` |
+| 1 — Stan refactor for default factor model | DONE | `d80eab98` |
+| 2 — R-side rewires for the new variable names | DONE | `290d29b1` |
+| 3 — `trend_map` semantics under free Λ | DONE | `5d70d90c` |
+| 4 — `loadings_prior` plumbing | PENDING | — |
+| 5 — Encoding + validation helpers | PENDING | — |
+| 6 — Local end-to-end fit fixture | PENDING | — |
+| 7 — Documentation sweep | PENDING | — |
+
+Per-phase implementation notes appear inside each Phase section
+below. Decisions that diverged from the original plan are
+flagged explicitly.
+
 ## Context
 
 mvgam's current factor-model architecture is PLT-at-sampling
@@ -191,73 +208,181 @@ A one-page shim. No new Stan-side code.
 Phase 0 is a prep commit. Phases 1 to 3 are prerequisite to
 anything informed-prior, so the landing order matters.
 
-### Phase 0 (~0.1 day): Stage Heaps reference materials
+### Phase 0 (~0.1 day): Stage Heaps reference materials — DONE
 
-Copy the paper PDF, supps PDF, and supps `code/` directory into
-`tasks/heaps-2024/` (paths listed in the "Reference materials"
-section above). Commit alone before any Stan or R change so the
-references are stable and reviewable. Also delete the leftover
-draft at `architecture/heaps-factor-architecture-plan.md` (this
-plan moves to `tasks/heaps-factor-architecture.md` at Phase 0
-commit time).
+Commit `61a2c143`. Paper PDF, supplementary PDF, and supps
+`code/` directory staged under `tasks/heaps-2024/`. The plan
+moved into `tasks/heaps-factor-architecture.md` at this point;
+the architecture-side draft was deleted.
 
-### Phase 1 (~1 day): Stan refactor for the default factor model
+### Phase 1 (~1 day): Stan refactor for the default factor model — DONE
 
-Touch `R/stan_assembly.R::generate_factor_model` and matrix-Z
-helpers (`generate_matrix_z_parameters`, `generate_matrix_z_tdata`,
-`generate_matrix_z_multiblock_stanvars`).
+Commit `d80eab98`. `R/stan_assembly.R::generate_factor_model`
+and matrix-Z helpers rewritten so factor models sample
+`matrix[N_series_trend, N_lv_trend] Z` directly in `parameters`
+under `to_vector(Z) ~ student_t(3, 0, 1)`, then identify
+`Z_tilde = qr_thin_R(Z')'`, `Q_tilde = qr_thin_Q(Z')'`,
+`lv_trend_tilde = lv_trend * Q_tilde'` in generated quantities.
 
-- Drop the lower-triangular fill from `Z_raw`. Sample
-  `matrix[N_series_trend, N_lv_trend] Z` directly in `parameters`.
-- Default prior: `to_vector(Z) ~ student_t(3, 0, 1)` matches the
-  Φ = I_p, Ψ = ψI_k case in Heaps' framework. Marginal density on
-  Z̃ is identical to the current per-entry prior.
-- Add a `generated quantities` emission of
-  `Z_tilde = qr_thin_R(Z')'`, `Q = qr_thin_Q(Z')'`, rotated
-  `lv_trend_tilde = lv_trend * Q'`. For VAR trends also rotate
-  the AR coefficient matrices as `A_trend_tilde = Q * A_trend * Q'`.
+Implementation notes that diverged from / refined the original
+plan, after stringent code review + stats review + Opus
+deep-verify:
 
-Test regen: factor-model contract tests in
-`tests/testthat/test-stancode-standata.R` currently match
-`Z_raw`, lower-triangular fill, and the `Z_raw ~ student_t`
-prior. None of those patterns survive. Replace with contracts on
-the new shape: full Z sampled, `qr_thin_R` in generated
-quantities, `Z_tilde` and `lv_trend_tilde` saved.
+- **`qr_thin_R` confirmed on wide matrices.** The Stan
+  Functions Reference documents `qr_thin_R` as requiring
+  `rows >= cols`, but the underlying Eigen `HouseholderQR`
+  handles wide input correctly and Stan applies the positive-
+  diagonal normalisation to the first `min(rows, cols)`
+  diagonal entries. Verified empirically against Stan 2.38 on
+  a 3×5 input (reconstruction error 1e-16, positive diagonal
+  by construction).
+- **Sign-fix loop dropped.** Because `qr_thin_R` guarantees
+  diag(R) ≥ 0 and `qr_thin_Q` applies the matching column-
+  sign flips so `Z = Z_tilde * Q_tilde` is preserved, the
+  inline sign-fix loop that an earlier draft of this phase
+  included is dead code under the thin variants. Heaps' own
+  reference code does not include one either.
+- **VAR rotation wired in.** `generate_factor_model` accepts
+  an optional `trend_type` argument; when set to `"VAR"` the
+  generated-quantities block also emits
+  `array[size(A_trend)] matrix[N_lv, N_lv] A_trend_tilde` with
+  `A_trend_tilde[lag] = Q_tilde * A_trend[lag] * Q_tilde'`
+  (the analogue of Heaps' `Gammatilde = Q Gamma Q'` in
+  `hourlygasdemand.stan`).
+- **Identification scope documented in roxygen.** Per-factor
+  scalar nuisance parameters (`ar1_trend`, `ar{p}_trend`,
+  `theta1_trend`, `sigma_trend`, `L_Omega_trend`,
+  `Sigma_trend`) remain in the unrotated `Z` basis. They are
+  meaningful per-factor only on the sampled `Z`, not on the
+  identified `Z_tilde`. Rotating them into `K × K` matrices
+  destroys the per-factor interpretation, so they are NOT
+  emitted in rotated form. The function roxygen calls this
+  out explicitly.
+- **Student-t prior kept for the MVP.** The plan flagged a
+  Gaussian (`multi_normal_prec`) prior as the canonical
+  Heaps form, which preserves the gamma-on-diagonal / normal-
+  off-diagonal closed-form marginal on `Z_tilde` (Corollary
+  S1). The Phase 1 commit retains `to_vector(Z) ~
+  student_t(3, 0, 1)` for compatibility with the existing
+  prior baseline. The induced marginal on `Z_tilde` is
+  heavier-tailed than the Gaussian case and not the closed-
+  form Corollary S1 density; this is documented in the
+  function comment. Phase 4 introduces the structured Gaussian
+  prior via `loadings_prior`.
 
-Risk: free-Λ has more parameters than PLT (`p·k` vs
-`p·k − k(k−1)/2`). MCMC speed could differ. Verify on the
-existing 4-series × 2-factor local fixture before committing.
+Test contracts in `tests/testthat/test-stancode-standata.R`
+updated to assert: `matrix[N_series_trend, N_lv_trend] Z` in
+parameters, `to_vector(Z) ~ student_t(3, 0, 1)`, and the QR
+block (`qr_thin_R(Z')'`, `qr_thin_Q(Z')'`, `lv_trend_tilde =
+lv_trend * Q_tilde'`) in generated quantities. Full testthat
+green (4076 PASS, 0 FAIL, 0 WARN) before merge.
 
-### Phase 2 (~0.5 day): R-side rewires for the new variable names
+### Phase 2 (~0.5 day): R-side rewires for the new variable names — DONE
 
-- `resolve_factor_loadings` reads `Z_tilde[i, j]` instead of
-  `Z[i, j]`.
-- `extract_lv_trend_matrices` reads `lv_trend_tilde[t, k]`.
-- `sign_canonicalise_factors` becomes a no-op for sampled-Z fits
-  (the `qr_thin_R` positive-diagonal guarantee covers it). Keep
-  the function as a defensive belt.
-- Fully-fixed-Z fits (`trend_map` with no NAs) are unchanged: Z
-  is in the data block, no QR rotation.
-- Backward-compat path: resolver falls back to `Z[i, j]` for
-  pre-Heaps cached fits and warns about the deprecated names.
+Commit `290d29b1`. Resolvers, summary classifier, and tidy
+classifier now read the QR-identified parameter names with a
+prefer-`Z_tilde`-then-fall-back-to-`Z` rule. Implementation
+notes:
 
-### Phase 3 (~0.5 day): Partial Z under free-Λ
+- **Shared helpers in `R/sample_innovations.R`.** Three small
+  pattern selectors centralise the routing so the resolver,
+  the summary classifier, and the tidy classifier stay in
+  lockstep:
+  - `factor_loading_param_pattern(pars)`: returns
+    `"^Z_tilde\\["` if any `Z_tilde[...]` column is in the
+    posterior, else `"^Z\\["`.
+  - `factor_state_param_pattern(pars)`: same shape, picking
+    `lv_trend_tilde` over `lv_trend`.
+  - `hidden_unrotated_factor_pars(pars)`: returns
+    `"^A_trend\\["` when `A_trend_tilde` is in the posterior,
+    so VAR factor summaries do not display both bases.
+- **Resolvers.** `extract_Z_loadings`,
+  `extract_lv_trend_matrices`, and
+  `extract_factor_loadings_array` delegate to the helpers.
+  Free-Z factor fits surface identified loadings / paths;
+  partial-Z fits surface the user-encoded `Z` / `lv_trend`
+  unchanged.
+- **`sign_canonicalise_factors`.** Short-circuits to a no-op
+  whenever `Z_tilde` is in the posterior (positive diagonal
+  guaranteed by `qr_thin_R`). Also short-circuits for ANY
+  user-supplied loadings (fully fixed OR partial) because
+  flipping a column would corrupt the user's encoded pattern.
+- **Classifiers.** `match_z_loadings`, `match_trend_pars`,
+  `is_latent_state_param`, `match_trend_specific_pars`
+  (`R/summary.mvgam.R`) and `categorize_mvgam_parameters`
+  (`R/index-mvgam.R`) use the helpers. Default summary print,
+  tidy, `mcmc_plot`, `as.data.frame` all see identified
+  loadings as canonical and hide the unrotated `A_trend`
+  draws when `A_trend_tilde` is present.
+- **Identification footnote.** `compute_all_summaries` stores
+  a `loadings_identified` flag (TRUE when extracted from
+  `Z_tilde` draws). `print.summary.mvgam` emits a scope
+  paragraph on identified fits stating that per-factor trend
+  dynamics parameters remain in the unrotated factor basis.
+- **Roxygen sweep.** User-facing roxygen on
+  `resolve_factor_loadings` (`R/plot_helpers.R`),
+  `ordinate.jsdgam`, and `plot_factors` describes the new
+  routing. The `sign_canonicalise_factors` heading and the
+  call-site comment in `R/mvgam_core.R` reflect the no-op
+  semantic on Phase 1+ fits.
 
-`trend_map` with NAs (partial Z) semantics shift. The user
-currently thinks of `trend_map` as fixing entries of identified
-Z̃. Under Heaps, the saved Z̃ is a QR rotation of unconstrained
-Λ; hard-fixing entries of Λ does not preserve those entries in
-Z̃.
+Pre-Heaps cached fits would surface as a draws-array without
+`Z_tilde` columns; the helpers fall through to `Z` cleanly so
+no deprecation warning was needed.
 
-Decision: `trend_map` applies to Λ in the new architecture. The
-user encodes structural hypotheses on unconstrained loadings;
-the QR rotation produces a canonical Z̃ that may differ. Store
-`Q` on the fit as `attr(fit, "loadings_rotation")` so users who
-care can map back via `Z̃ Q'`.
+### Phase 3 (~0.5 day): `trend_map` semantics under free Λ — DONE
 
-Update `test-trend-map.R` partial-Z tests to reflect the new
-semantics. The user-supplied pattern is preserved on Λ
-parameter draws.
+Commit `5d70d90c`. Doc-only phase; the routing already
+implemented in Phase 1 separated user-supplied loadings from
+the QR identification path so no code change was required.
+
+**Semantic chosen (diverges from the original plan).** The
+original plan proposed that `trend_map` should apply to the
+unconstrained Λ in the new architecture, with the QR rotation
+producing a canonical Z̃ that may differ from the user's
+encoded pattern; the rotation Q was to be stashed on the fit
+so users could map back. The implementation instead chose a
+cleaner semantic: **any non-NULL `trend_map` bypasses the QR
+identification entirely**. The user's encoded entries are
+preserved exactly on `Z` in the posterior, no `Z_tilde` is
+emitted for those fits, and no rotation map needs to be
+stored. The routing in
+`generate_matrix_z_multiblock_stanvars` dispatches user-
+supplied loadings to `make_partial_z_stanvars` /
+`make_fixed_z_stanvars`, neither of which calls
+`generate_factor_model`.
+
+Why this is the right call:
+
+- A user who fixes `Z[2, 1] = 0.5` expects 0.5 in the saved
+  draws of `Z[2, 1]`. Rotating Λ into a canonical Z̃ would
+  destroy that.
+- For partial Z, any fixed non-zero entry in column k
+  anchors the sign of that column, so the sign-mode
+  equivalence the QR removes does not exist for those
+  columns. Rotation would solve a non-problem.
+- Users who want the structured-prior surface should reach
+  for Phase 4's `loadings_prior`, which encodes belief
+  through Φ on the unrotated Λ rather than hard constraints
+  on Z.
+
+Phase 3 work shipped:
+
+- `@param trend_map` (`R/mvgam_core.R`) restated to make the
+  partial-Z surface (NA = sampled, finite = preserved) and
+  the QR bypass explicit.
+- `normalise_trend_map()` accepted-shapes roxygen extended
+  with the partial-Z entry plus a paragraph stating that
+  any non-NULL `trend_map` bypasses the QR identification.
+- Two invariant tests added to
+  `tests/testthat/test-stancode-standata.R`: the partial-Z
+  and the fully-fixed-Z stancode test bodies now assert that
+  `Z_tilde`, `Q_tilde`, and `qr_thin_R` do NOT appear.
+
+Existing `test-trend-map.R` partial-Z assertions were left in
+place — they continue to describe the user-preserved-on-`Z`
+semantic accurately because nothing changed about how partial
+Z is sampled.
 
 ### Phase 4 (~1.5 days): `loadings_prior` plumbing
 
@@ -391,11 +516,19 @@ built hierarchy. Verify:
 
 - `resolve_factor_loadings()` in `R/plot_helpers.R`: keep the
   branching pattern (fixed-Z broadcast vs posterior parse).
-  Only the parameter name changes (`Z[i, j]` to
-  `Z_tilde[i, j]`).
+  Reads identified loadings via `extract_Z_loadings`, which
+  in turn uses `factor_loading_param_pattern()`.
 - `make_fixed_z_stanvars()`, `make_partial_z_stanvars()` in
-  `R/stan_assembly.R`: stay as-is. They emit Z in the data
-  block, no QR involved.
+  `R/stan_assembly.R`: stay as-is. They emit Z in the data /
+  transformed-parameters block, no QR involved.
+- `factor_loading_param_pattern()`,
+  `factor_state_param_pattern()`,
+  `hidden_unrotated_factor_pars()` in
+  `R/sample_innovations.R`: the shared selectors added in
+  Phase 2. Any new accessor that needs to read identified
+  loadings, factor paths, or hide unrotated VAR coefficients
+  should delegate to these helpers rather than rolling its
+  own regex.
 - `normalise_trend_map()`, `normalise_trend_map_on_specs()` in
   `R/validations.R`: pattern to follow for
   `normalise_loadings_prior()`.
@@ -505,8 +638,45 @@ verification time.
    Recommend: do not expose for the MVP; document the
    multiplicative form clearly; file a follow-up if a real user
    case for sum-of-kernels surfaces.
-3. **`ordinate()` behaviour under the new architecture.** The
-   saved Z̃ is already QR-canonical, so the SVD rotation inside
-   `ordinate.mvgam` operates on top of that. Document in the
-   `ordinate.mvgam` roxygen that the function performs a second
-   rotation for biplot orientation purposes.
+3. **`ordinate()` behaviour under the new architecture** —
+   RESOLVED in Phase 2. The saved Z̃ is QR-canonical via
+   `qr_thin_R`, so `ordinate.mvgam` operates on identified
+   loadings; `extract_factor_loadings_array` reads `Z_tilde`
+   when present and `Z` otherwise. The `ordinate` roxygen
+   describes this routing.
+
+## Deferred follow-ups
+
+Items considered for the Heaps architecture work but scoped
+out of Phases 1–3 (and not yet implemented). Each is small
+enough to land as an isolated follow-up.
+
+- **Shared variation matrix accessor.** Heaps emphasises
+  `Δ = Z Z'` (equivalently `Z̃ Z̃'`) as the
+  rotation-invariant interpretable quantity. A dedicated
+  `shared_variation(object)` accessor returning a per-pair
+  posterior summary of the off-diagonal entries would surface
+  this without cluttering default `summary()` print. Out of
+  Phase 2 scope because the per-pair output design needs its
+  own pass (full `p × p` table vs top-K-by-magnitude).
+- **Per-factor variance contribution table in `summary()`.**
+  `plot_factors()` already computes per-factor variance shares
+  via `lv_contribution_table(per_lv, Z_arr)`. Mirroring the
+  table inside `summary.mvgam` would give a non-graphical
+  caller the same information. Deferred for the same scoping
+  reason as Δ.
+- **`Sigma_trend_tilde` in generated quantities.** The
+  innovation covariance for VAR factor dynamics rotates as
+  `Q_tilde Sigma_trend Q_tilde'`. Phase 1 rotates the VAR
+  coefficient array but not the innovation covariance, so the
+  saved `Sigma_trend` is in the unrotated basis. Adding the
+  rotated form is a 4-line genquant addition; deferred
+  because it duplicates information already implicit in
+  `A_trend_tilde` and the unrotated `Sigma_trend`, and most
+  users will not consult it directly.
+- **Rotated per-factor scalars.** `ar1_trend`, `sigma_trend`,
+  etc. cannot meaningfully be rotated into per-factor
+  scalars on `Z_tilde`; rotating gives `K × K` matrices that
+  break the per-factor interpretation. Phase 1 documents
+  this scope; users who need the rotated dynamics can
+  multiply the saved draws manually via `Q_tilde`.
