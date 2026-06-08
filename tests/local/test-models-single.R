@@ -1,5 +1,5 @@
 # Local tests for single dataset mvgam models
-# Tests all major trend types and model patterns from target_generation.R
+# Covers all major trend types and model patterns.
 
 source("setup_tests_local.R")
 
