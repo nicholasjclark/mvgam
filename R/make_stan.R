@@ -48,8 +48,9 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
                                                    normalize = TRUE, save_model = NULL,
                                                    stan_funs = NULL, silent = 1L,
                                                    stanvars = NULL, validate = TRUE,
-                                                   trend_map = NULL, ...) {
-  
+                                                   trend_map = NULL,
+                                                   loadings_prior = NULL, ...) {
+
   # Input validation
   checkmate::assert_class(formula, "mvgam_formula")
   checkmate::assert_data_frame(data, min.rows = 1)
@@ -57,7 +58,7 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
   if (!is.null(data2)) {
     checkmate::assert(
       checkmate::check_data_frame(data2),
-      checkmate::check_list(data2, types = "data.frame", min.len = 1),
+      checkmate::check_list(data2, min.len = 1, names = "named"),
       .var.name = "data2"
     )
   }
@@ -118,6 +119,19 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
   mv_spec$trend_specs <- normalise_trend_map_on_specs(
     mv_spec$trend_specs, data
   )
+
+  # Normalise the structured-loadings prior once at the top
+  # level and attach to each trend spec. The same spec is shared
+  # across multivariate trends because mvgam fits one shared
+  # trend component across responses.
+  loadings_prior_spec <- normalise_loadings_prior(
+    loadings_prior, data2 = data2, data = data
+  )
+  if (!is.null(loadings_prior_spec)) {
+    mv_spec$trend_specs <- attach_loadings_prior_spec(
+      mv_spec$trend_specs, loadings_prior_spec
+    )
+  }
 
   # PW trends define their own intercept via `m_trend`. An
   # observation-side intercept competes with it for the same

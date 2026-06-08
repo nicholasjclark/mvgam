@@ -2879,27 +2879,38 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
 #' \doi{10.1007/s11222-024-10454-0}
 #' @noRd
 generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
-                                  trend_type = NULL) {
+                                  trend_type = NULL,
+                                  loadings_prior_spec = NULL) {
   checkmate::assert_logical(is_factor_model, len = 1)
   checkmate::assert_integerish(n_lv, lower = 1, any.missing = FALSE)
   checkmate::assert_character(trend_type, len = 1, null.ok = TRUE)
+  checkmate::assert_list(loadings_prior_spec, null.ok = TRUE)
 
   if (!is.null(fixed_Z)) return(NULL)
   if (!is_factor_model) return(NULL)
 
-  # Heaps' framework corresponds to Phi = I_p, Psi = psi I_k under
-  # a Gaussian prior on the unconstrained matrix. A student_t(3)
-  # prior on entries of Z gives heavier tails than the Gaussian
-  # case; the induced marginal on Z_tilde is therefore not the
-  # closed-form gamma-on-diagonal / normal-off-diagonal density
-  # of Heaps Corollary S1. The model remains valid: any iid
-  # entry-prior on unconstrained Z induces a well-defined prior
-  # on the QR-identified Z_tilde via the LQ change of variables.
-  z_prior <- brms::stanvar(
-    name = "factor_z_priors",
-    scode = "to_vector(Z) ~ student_t(3, 0, 1);",
-    block = "model"
-  )
+  # Structured prior path: replace the default iid prior with
+  # per-column matrix-normal priors built from features and / or
+  # pairwise distances. Otherwise fall back to a heavier-tailed
+  # default (see comment below) on each entry of Z.
+  z_prior <- if (!is.null(loadings_prior_spec)) {
+    make_loadings_prior_stanvars(loadings_prior_spec)
+  } else {
+    # Heaps' framework corresponds to Phi = I_p, Psi = psi I_k
+    # under a Gaussian prior on the unconstrained matrix. A
+    # student_t(3) prior on entries of Z gives heavier tails
+    # than the Gaussian case; the induced marginal on Z_tilde is
+    # therefore not the closed-form gamma-on-diagonal /
+    # normal-off-diagonal density of Heaps Corollary S1. The
+    # model remains valid: any iid entry-prior on unconstrained
+    # Z induces a well-defined prior on the QR-identified Z_tilde
+    # via the LQ change of variables.
+    brms::stanvar(
+      name = "factor_z_priors",
+      scode = "to_vector(Z) ~ student_t(3, 0, 1);",
+      block = "model"
+    )
+  }
 
   # Post-hoc identification via thin QR. `qr_thin_R` guarantees a
   # positive diagonal on the upper-triangular factor (Stan
@@ -2939,6 +2950,291 @@ generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
 
   combine_stanvars(z_prior, z_qr)
 }
+
+
+#' Emit the structured Heaps prior for the free loadings matrix.
+#'
+#' Returns a combined `brms::stanvar` covering the data /
+#' transformed-data / parameters / transformed-parameters / model
+#' block fragments needed to swap the default
+#' `to_vector(Z) ~ student_t(3, 0, 1)` for the per-column
+#' matrix-normal prior
+#'
+#'   `Z[, i] ~ multi_normal_cholesky(zero_vec, L_Phi * sqrt(Psi_diag[i]))`
+#'
+#' where `Phi = exp(-d_1 / theta_dist_1) * ... *
+#' exp(-d_K / theta_dist_K) * gp_exponential_cov(features, 1.0,
+#' theta_features)`, i.e. a multiplicative kernel combination
+#' across each supplied pairwise-distance source and the
+#' feature-derived ARD exponential kernel (Heaps & Jermyn 2024
+#' Sect. 3.4.2 and Supps S4.2.1).
+#'
+#' `Psi_diag` is `rep_vector(1.0, N_lv_trend)` under
+#' `column_shrinkage = "iid"` or the multiplicative-gamma-process
+#' (MGP) increasing-shrinkage scale under
+#' `column_shrinkage = "mgp"` (Bhattacharya & Dunson 2011, used
+#' in Heaps Eq. (9)).
+#'
+#' Length-scales receive a `log(theta) ~ normal(0, 1)` default
+#' prior, matching Heaps' practice across the simulation,
+#' Finnish-birds and gas-demand applications (paper Sects.
+#' 6.1.2, 6.2.2, 6.3.1). Pairwise distance matrices are
+#' rescaled in `validate_pairwise_distance()` so that
+#' `max(d) == 1`, mirroring Heaps Supps S4.2.1 ("the branch
+#' lengths are standardised by scaling to make the common root
+#' to tip distance one") and giving the unit-scale
+#' length-scale prior a meaningful default.
+#'
+#' @param spec A normalised loadings-prior list returned by
+#'   `normalise_loadings_prior()`. Must contain
+#'   `features_mat` (numeric p x c matrix or NULL),
+#'   `distance_mats` (named list of p x p matrices, possibly
+#'   empty), `column_shrinkage` ("iid" or "mgp"), `mgp_a1`,
+#'   `mgp_a2`, `n_series`, `n_features`, `n_distances`.
+#' @return Combined `brms::stanvar` injecting all required
+#'   declarations and prior statements.
+#' @references
+#' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
+#' distributions for the covariance matrix in latent factor
+#' models. \emph{Statistics and Computing}, 34:143.
+#' \doi{10.1007/s11222-024-10454-0}
+#'
+#' Bhattacharya, A. and Dunson, D. B. (2011). Sparse Bayesian
+#' infinite factor models. \emph{Biometrika}, 98:291-306.
+#' @noRd
+make_loadings_prior_stanvars <- function(spec) {
+  assert_loadings_prior_spec_consistent(spec)
+  has_features <- spec$n_features > 0L
+  has_distances <- spec$n_distances > 0L
+  uses_mgp <- identical(spec$column_shrinkage, "mgp")
+  dist_names <- names(spec$distance_mats) %||% character(0)
+  data_vars <- list()
+  tdata_vars <- list()
+  param_vars <- list()
+  tparam_vars <- list()
+  model_vars <- list()
+  if (has_features) {
+    data_vars <- c(data_vars, list(
+      brms::stanvar(
+        x = as.integer(spec$n_features),
+        name = "n_features",
+        scode = "int<lower=1> n_features;",
+        block = "data"
+      ),
+      brms::stanvar(
+        x = spec$features_mat,
+        name = "row_features",
+        scode = "matrix[N_series_trend, n_features] row_features;",
+        block = "data"
+      )
+    ))
+    # `gp_exponential_cov` in Stan takes an array of vectors, so
+    # convert the data-block matrix once in transformed data and
+    # re-use the array form when assembling Phi each iteration.
+    tdata_vars <- c(tdata_vars, list(
+      brms::stanvar(
+        name = "row_features_arr",
+        scode = paste(
+          "array[N_series_trend] vector[n_features] row_features_arr;",
+          "for (i_rf in 1:N_series_trend) {",
+          "  row_features_arr[i_rf] = row_features[i_rf, ]';",
+          "}",
+          sep = "\n"
+        ),
+        block = "tdata"
+      )
+    ))
+    # `gp_exponential_cov` requires `array[] real` length-scales
+    # in its ARD signature, not `vector`. Declare accordingly so
+    # the call typechecks.
+    param_vars <- c(param_vars, list(
+      brms::stanvar(
+        name = "theta_features",
+        scode = "array[n_features] real<lower=0> theta_features;",
+        block = "parameters"
+      )
+    ))
+    model_vars <- c(model_vars, list(
+      brms::stanvar(
+        name = "loadings_prior_theta_features",
+        scode = "target += lognormal_lpdf(theta_features | 0, 1);",
+        block = "model"
+      )
+    ))
+  }
+  if (has_distances) {
+    for (nm in dist_names) {
+      data_vars <- c(data_vars, list(
+        brms::stanvar(
+          x = spec$distance_mats[[nm]],
+          name = paste0("dist_", nm),
+          scode = paste0(
+            "matrix<lower=0>[N_series_trend, N_series_trend] dist_",
+            nm, ";"
+          ),
+          block = "data"
+        )
+      ))
+      param_vars <- c(param_vars, list(
+        brms::stanvar(
+          name = paste0("theta_dist_", nm),
+          scode = paste0("real<lower=0> theta_dist_", nm, ";"),
+          block = "parameters"
+        )
+      ))
+      model_vars <- c(model_vars, list(
+        brms::stanvar(
+          name = paste0("loadings_prior_theta_dist_", nm),
+          scode = paste0(
+            "target += lognormal_lpdf(theta_dist_", nm,
+            " | 0, 1);"
+          ),
+          block = "model"
+        )
+      ))
+    }
+  }
+  # Phi assembly. Build the matrix multiplicatively across the
+  # supplied sources (Heaps' `projExpCov_variance_matrix`,
+  # multiprobitregr.stan lines 16-29). Start from a p x p matrix
+  # of ones (Phi = 1 elementwise when neither features nor
+  # distances are supplied is degenerate, but the normaliser
+  # already errors on that case). Each distance contributes a
+  # factor exp(-d / theta_dist) and the feature block contributes
+  # one ARD `gp_exponential_cov`.
+  phi_terms <- character(0)
+  if (has_distances) {
+    for (nm in dist_names) {
+      phi_terms <- c(
+        phi_terms,
+        paste0("exp(-dist_", nm, " / theta_dist_", nm, ")")
+      )
+    }
+  }
+  if (has_features) {
+    phi_terms <- c(
+      phi_terms,
+      paste0(
+        "gp_exponential_cov(row_features_arr, 1.0, theta_features)"
+      )
+    )
+  }
+  phi_lines <- if (length(phi_terms) == 1L) {
+    c(
+      paste0(
+        "matrix[N_series_trend, N_series_trend] Phi_loadings = ",
+        phi_terms, ";"
+      )
+    )
+  } else {
+    c(
+      "matrix[N_series_trend, N_series_trend] Phi_loadings;",
+      "{",
+      paste0(
+        "  Phi_loadings = ",
+        paste(phi_terms, collapse = " .* "), ";"
+      ),
+      "}"
+    )
+  }
+  # Add a tiny diagonal jitter before factorising to keep the
+  # Cholesky stable when supplied kernels are near-singular.
+  chol_lines <- c(
+    phi_lines,
+    paste0(
+      "matrix[N_series_trend, N_series_trend] L_Phi_loadings = ",
+      "cholesky_decompose(",
+      "add_diag(Phi_loadings, 1e-8));"
+    )
+  )
+  tparam_vars <- c(tparam_vars, list(
+    brms::stanvar(
+      name = "loadings_prior_chol",
+      scode = paste(chol_lines, collapse = "\n"),
+      block = "tparameters"
+    )
+  ))
+  if (uses_mgp) {
+    data_vars <- c(data_vars, list(
+      brms::stanvar(
+        x = spec$mgp_a1,
+        name = "mgp_a1",
+        scode = "real<lower=0> mgp_a1;",
+        block = "data"
+      ),
+      brms::stanvar(
+        x = spec$mgp_a2,
+        name = "mgp_a2",
+        scode = "real<lower=0> mgp_a2;",
+        block = "data"
+      )
+    ))
+    param_vars <- c(param_vars, list(
+      brms::stanvar(
+        name = "varrho_inv",
+        scode = "vector<lower=0>[N_lv_trend] varrho_inv;",
+        block = "parameters"
+      )
+    ))
+    tparam_vars <- c(tparam_vars, list(
+      brms::stanvar(
+        name = "Psi_diag",
+        scode = paste(
+          "vector<lower=0>[N_lv_trend] Psi_diag",
+          " = exp(cumulative_sum(log(varrho_inv)));",
+          sep = ""
+        ),
+        block = "tparameters"
+      )
+    ))
+    model_vars <- c(model_vars, list(
+      brms::stanvar(
+        name = "mgp_priors",
+        scode = paste(
+          "varrho_inv[1] ~ inv_gamma(mgp_a1, 1);",
+          "if (N_lv_trend > 1) {",
+          "  varrho_inv[2:N_lv_trend] ~ inv_gamma(mgp_a2, 1);",
+          "}",
+          sep = "\n"
+        ),
+        block = "model"
+      )
+    ))
+  }
+  # Per-column Z prior. Under iid shrinkage Psi_diag is implicit
+  # 1, so the column scale collapses to L_Phi unchanged.
+  z_lines <- if (uses_mgp) {
+    c(
+      "for (i_z in 1:N_lv_trend) {",
+      "  Z[, i_z] ~ multi_normal_cholesky(",
+      "    rep_vector(0.0, N_series_trend),",
+      "    L_Phi_loadings * sqrt(Psi_diag[i_z])",
+      "  );",
+      "}"
+    )
+  } else {
+    c(
+      "for (i_z in 1:N_lv_trend) {",
+      "  Z[, i_z] ~ multi_normal_cholesky(",
+      "    rep_vector(0.0, N_series_trend),",
+      "    L_Phi_loadings",
+      "  );",
+      "}"
+    )
+  }
+  model_vars <- c(model_vars, list(
+    brms::stanvar(
+      name = "factor_z_priors",
+      scode = paste(z_lines, collapse = "\n"),
+      block = "model"
+    )
+  ))
+  do.call(
+    combine_stanvars,
+    c(data_vars, tdata_vars, param_vars, tparam_vars, model_vars)
+  )
+}
+
 
 #' Generate Transformed Parameters Block Injections for Trend Computation
 #'
@@ -3550,7 +3846,8 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   if (is_factor_model) {
     factor_priors <- generate_factor_model(
       is_factor_model, n_lv,
-      fixed_Z = trend_specs$fixed_Z
+      fixed_Z = trend_specs$fixed_Z,
+      loadings_prior_spec = trend_specs$loadings_prior_spec
     )
     components <- append_if_not_null(components, factor_priors)
   }
@@ -3784,7 +4081,8 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   if (is_factor_model) {
     factor_priors <- generate_factor_model(
       is_factor_model, n_lv,
-      fixed_Z = trend_specs$fixed_Z
+      fixed_Z = trend_specs$fixed_Z,
+      loadings_prior_spec = trend_specs$loadings_prior_spec
     )
     components <- append_if_not_null(components, factor_priors)
   }
@@ -4621,7 +4919,8 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     factor_priors <- generate_factor_model(
       is_factor_model, n_lv,
       fixed_Z = trend_specs$fixed_Z,
-      trend_type = "VAR"
+      trend_type = "VAR",
+      loadings_prior_spec = trend_specs$loadings_prior_spec
     )
     components <- append_if_not_null(components, factor_priors)
   }
@@ -4994,7 +5293,8 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   if (is_factor_model) {
     factor_priors <- generate_factor_model(
       is_factor_model, n_lv,
-      fixed_Z = trend_specs$fixed_Z
+      fixed_Z = trend_specs$fixed_Z,
+      loadings_prior_spec = trend_specs$loadings_prior_spec
     )
     components <- append_if_not_null(components, factor_priors)
   }

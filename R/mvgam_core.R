@@ -38,6 +38,66 @@
 #'   bypasses that rotation so the encoded structure is not
 #'   altered. Top-level alias for the `trend_map` argument on
 #'   the trend constructor; passing both is an error.
+#' @param loadings_prior Optional named list specifying a
+#'   structured prior on the unconstrained factor loadings
+#'   matrix following Heaps & Jermyn (2024). When supplied, the
+#'   default iid `to_vector(Z) ~ student_t(3, 0, 1)` prior is
+#'   replaced with a per-column matrix-normal prior of the form
+#'   `Z[, i] ~ multi_normal_cholesky(0, L_Phi * sqrt(Psi_diag[i]))`,
+#'   where the among-row scale matrix `Phi` is assembled
+#'   multiplicatively from any combination of:
+#'   \itemize{
+#'     \item a per-series feature matrix (`features`), expanded
+#'       into an ARD exponential kernel via `gp_exponential_cov()`
+#'     \item one or more pairwise distance matrices
+#'       (`distances`), each contributing an `exp(-d / theta)`
+#'       factor
+#'   }
+#'
+#'   Accepted fields:
+#'   \itemize{
+#'     \item `features`: string lookup into `data2`, a numeric
+#'       matrix, or a data.frame. Columns are encoded by type
+#'       (numeric/integer/logical: z-score; ordered factor:
+#'       z-score after `as.numeric()`; unordered factor /
+#'       character: one-hot with all levels retained, following
+#'       Heaps Sect. 6.2). Each encoded column receives its own
+#'       ARD length-scale.
+#'     \item `distances`: string name (or character vector of
+#'       names) of pairwise distance matrices in `data2`, or a
+#'       single matrix / named list of matrices passed inline.
+#'       Each matrix is rescaled to maximum entry one so the
+#'       default length-scale prior is interpretable on a unit
+#'       scale (matching Heaps Supps S4.2.1).
+#'     \item `column_shrinkage`: `"iid"` (default; no shrinkage)
+#'       or `"mgp"` (multiplicative-gamma-process increasing
+#'       shrinkage of Bhattacharya & Dunson 2011, used in
+#'       Heaps Eq. (9)).
+#'     \item `mgp_a1`, `mgp_a2`: numeric MGP hyperparameters,
+#'       only used when `column_shrinkage = "mgp"`. Default
+#'       `(2, 3)` follows Heaps Sect. 6.3.1 (gas-demand
+#'       application). The bird-case JSDM application (Sect.
+#'       6.2.2) used `(2, 6)`.
+#'   }
+#'
+#'   Length-scales receive a `lognormal(0, 1)` prior in the
+#'   model block. This prior lives on the standardised distance
+#'   scale: pairwise distance matrices are rescaled to
+#'   `max(d) = 1` inside the normaliser, so a length-scale of 1
+#'   corresponds to correlation `exp(-1)` between the two most
+#'   distant series. Heaps' Finnish-birds application (Sect.
+#'   6.2.2) used the wider `lognormal(0, sqrt(10))` instead;
+#'   override the default by passing a `prior()` for
+#'   `theta_features` / `theta_dist_<name>` if your data weakly
+#'   identify length-scales and you want less regularisation.
+#'   Note: the `max(d) = 1` rule is the natural generic
+#'   standardisation. Heaps Supps S4.2.1 used "root-to-tip
+#'   distance = 1" for ultrametric phylogenies, which corresponds
+#'   to `max(d) = 2` (twice the per-leaf depth); pre-standardise
+#'   your distance matrix to match if exact parity matters.
+#'   Cannot combine with `trend_map`: a partial or fully-fixed
+#'   loadings matrix has no free parameters left for a
+#'   structured prior.
 #' @param backend Stan backend (defaults to "cmdstanr")
 #' @param combine Logical, pool multiple imputation results (default TRUE)
 #' @param family Family specification. Supports most brms families including
@@ -78,6 +138,7 @@
 mvgam <- function(formula, trend_formula = NULL, data = NULL,
                            newdata = NULL,
                            trend_map = NULL,
+                           loadings_prior = NULL,
                            backend = getOption("brms.backend", "cmdstanr"),
                            combine = TRUE, family = gaussian(), ...) {
 
@@ -113,6 +174,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
     data = data,
     newdata = newdata,
     trend_map = trend_map,
+    loadings_prior = loadings_prior,
     backend = backend,
     family = family,
     data_name = data_name,
@@ -175,11 +237,11 @@ validate_newdata <- function(newdata, data) {
 #' @noRd
 mvgam_single <- function(formula, trend_formula, data, backend,
                         family, data_name = NULL, newdata = NULL,
-                        trend_map = NULL, ...) {
+                        trend_map = NULL, loadings_prior = NULL, ...) {
 
   # Create mvgam_formula object for shared processing
   mvgam_formula_obj <- mvgam_formula(formula, trend_formula)
-  
+
   # Use existing shared infrastructure (same as stancode())
   stan_components <- generate_stan_components_mvgam_formula(
     formula = mvgam_formula_obj,
@@ -187,6 +249,7 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     family = family,
     backend = backend,
     trend_map = trend_map,
+    loadings_prior = loadings_prior,
     ...
   )
 

@@ -2981,3 +2981,176 @@ test_that("fully-fixed Z is preserved (no partial-Z stanvars emitted)", {
   expect_false(grepl("Q_tilde", code, fixed = TRUE))
   expect_false(grepl("qr_thin_R", code, fixed = TRUE))
 })
+
+
+# Helper: 4-series factor-model fixture used by the
+# loadings_prior contract tests below. Returns a list with the
+# fixed pieces (data, mvgam_formula, features, distance matrix)
+# every contract test re-uses.
+loadings_prior_fixture <- function() {
+  set.seed(1L)
+  n_series <- 4L
+  series_levels <- paste0("s", seq_len(n_series))
+  data <- data.frame(
+    series = factor(rep(series_levels, each = 10L)),
+    time = rep(1:10, n_series),
+    y = rpois(40L, 2)
+  )
+  features <- data.frame(
+    series = series_levels,
+    trait = rnorm(n_series)
+  )
+  d_phylo <- as.matrix(stats::dist(rnorm(n_series)))
+  mf <- mvgam_formula(
+    y ~ 1, trend_formula = ~ AR(p = 1, n_lv = 2)
+  )
+  list(
+    data = data, features = features, d_phylo = d_phylo, mf = mf,
+    series_levels = series_levels
+  )
+}
+
+
+test_that("loadings_prior with features only emits ARD prior on Z", {
+  fx <- loadings_prior_fixture()
+  code <- suppressWarnings(stancode(
+    fx$mf, data = fx$data, family = poisson(),
+    data2 = list(features = fx$features),
+    loadings_prior = list(features = "features")
+  ))
+  sc <- as.character(code)
+  expect_match(sc, "int<lower=1>\\s+n_features\\s*;")
+  expect_match(
+    sc,
+    "array\\[n_features\\]\\s+real<lower=0>\\s+theta_features\\s*;"
+  )
+  expect_match(sc, "gp_exponential_cov", fixed = TRUE)
+  expect_match(sc, "cholesky_decompose", fixed = TRUE)
+  expect_match(sc, "multi_normal_cholesky", fixed = TRUE)
+  expect_match(sc, "lognormal_lpdf\\(theta_features")
+  expect_false(grepl("to_vector\\(Z\\)\\s*~\\s*student_t", sc))
+  expect_match(sc, "qr_thin_R", fixed = TRUE)
+})
+
+
+test_that("loadings_prior with distances only emits exponential decay prior", {
+  fx <- loadings_prior_fixture()
+  code <- suppressWarnings(stancode(
+    fx$mf, data = fx$data, family = poisson(),
+    data2 = list(phylo = fx$d_phylo),
+    loadings_prior = list(distances = "phylo")
+  ))
+  sc <- as.character(code)
+  expect_match(
+    sc,
+    "matrix<lower=0>\\[N_series_trend,\\s*N_series_trend\\]\\s+dist_phylo\\s*;"
+  )
+  expect_match(sc, "real<lower=0>\\s+theta_dist_phylo\\s*;")
+  expect_match(sc, "exp\\(-dist_phylo")
+  expect_false(grepl("gp_exponential_cov", sc, fixed = TRUE))
+  expect_false(grepl("row_features", sc, fixed = TRUE))
+})
+
+
+test_that("loadings_prior combines features and distances multiplicatively", {
+  fx <- loadings_prior_fixture()
+  code <- suppressWarnings(stancode(
+    fx$mf, data = fx$data, family = poisson(),
+    data2 = list(features = fx$features, phylo = fx$d_phylo),
+    loadings_prior = list(
+      features = "features", distances = "phylo"
+    )
+  ))
+  sc <- as.character(code)
+  expect_match(sc, "gp_exponential_cov", fixed = TRUE)
+  expect_match(sc, "dist_phylo", fixed = TRUE)
+  # Multiplicative combination uses Stan's elementwise `.*`.
+  expect_match(sc, ".*", fixed = TRUE)
+})
+
+
+test_that("loadings_prior with column_shrinkage = 'mgp' emits MGP machinery", {
+  fx <- loadings_prior_fixture()
+  code <- suppressWarnings(stancode(
+    fx$mf, data = fx$data, family = poisson(),
+    data2 = list(phylo = fx$d_phylo),
+    loadings_prior = list(
+      distances = "phylo",
+      column_shrinkage = "mgp",
+      mgp_a1 = 2, mgp_a2 = 6
+    )
+  ))
+  sc <- as.character(code)
+  expect_match(sc, "varrho_inv", fixed = TRUE)
+  expect_match(sc, "Psi_diag", fixed = TRUE)
+  expect_match(sc, "inv_gamma\\(mgp_a1")
+  expect_match(sc, "sqrt\\(Psi_diag")
+})
+
+
+test_that("loadings_prior standata threads features and distances correctly", {
+  fx <- loadings_prior_fixture()
+  sd <- suppressWarnings(standata(
+    fx$mf, data = fx$data, family = poisson(),
+    data2 = list(features = fx$features, phylo = fx$d_phylo),
+    loadings_prior = list(
+      features = "features", distances = "phylo"
+    )
+  ))
+  expect_equal(sd$n_features, 1L)
+  expect_equal(dim(sd$row_features), c(4L, 1L))
+  expect_equal(dim(sd$dist_phylo), c(4L, 4L))
+  expect_equal(max(sd$dist_phylo), 1)
+})
+
+
+test_that("default factor model still emits the iid student_t default", {
+  fx <- loadings_prior_fixture()
+  code <- stancode(fx$mf, data = fx$data, family = poisson())
+  sc <- as.character(code)
+  expect_match(sc, "to_vector\\(Z\\)\\s*~\\s*student_t")
+  expect_false(grepl("Phi_loadings", sc, fixed = TRUE))
+  expect_false(grepl("gp_exponential_cov", sc, fixed = TRUE))
+  expect_match(sc, "qr_thin_R", fixed = TRUE)
+})
+
+
+test_that("loadings_prior errors when combined with a partial trend_map", {
+  fx <- loadings_prior_fixture()
+  # Each row carries at least one finite entry and at least one
+  # NA so the partial-Z validator accepts the matrix and the
+  # loadings-prior compatibility check is what fires.
+  Z_partial <- matrix(c(1, NA, NA, 1, 1, NA, NA, 1),
+                       nrow = 4L, ncol = 2L, byrow = TRUE)
+  mf <- mvgam_formula(
+    y ~ 1,
+    trend_formula = ~ AR(p = 1, trend_map = Z_partial)
+  )
+  expect_error(
+    suppressWarnings(stancode(
+      mf, data = fx$data, family = poisson(),
+      data2 = list(phylo = fx$d_phylo),
+      loadings_prior = list(distances = "phylo")
+    )),
+    "cannot combine with a partial 'trend_map'"
+  )
+})
+
+
+test_that("loadings_prior errors when combined with a fully-fixed trend_map", {
+  fx <- loadings_prior_fixture()
+  Z_fixed <- matrix(c(1, 0, 0.5, 0.5, 0, 1, 0.3, 0.7),
+                     nrow = 4L, ncol = 2L, byrow = TRUE)
+  mf <- mvgam_formula(
+    y ~ 1,
+    trend_formula = ~ AR(p = 1, trend_map = Z_fixed)
+  )
+  expect_error(
+    suppressWarnings(stancode(
+      mf, data = fx$data, family = poisson(),
+      data2 = list(phylo = fx$d_phylo),
+      loadings_prior = list(distances = "phylo")
+    )),
+    "cannot combine with a fully-fixed 'trend_map'"
+  )
+})

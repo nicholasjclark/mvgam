@@ -2531,6 +2531,26 @@ apply_trend_map_alias <- function(trend_specs, mvgam_trend_map) {
 #'   set on any spec whose `$trend_map` was supplied.
 #'
 #' @noRd
+# Attach a normalised loadings-prior spec onto each trend spec.
+# Mirrors `normalise_trend_map_on_specs` for the multivariate
+# unwrap/rewrap so all call sites see one consistent shape. Also
+# asserts compatibility with any fixed_Z already attached: a
+# structured prior cannot coexist with either a partial-Z or
+# fully-fixed Z (see `assert_loadings_prior_compatible()` for
+# the rationale and error messages).
+#'@noRd
+attach_loadings_prior_spec <- function(trend_specs, spec) {
+  if (is.null(trend_specs) || is.null(spec)) return(trend_specs)
+  is_multivar <- is_multivariate_trend_specs(trend_specs)
+  specs <- if (is_multivar) trend_specs else list(trend_specs)
+  for (i in seq_along(specs)) {
+    assert_loadings_prior_compatible(spec, specs[[i]]$fixed_Z)
+    specs[[i]]$loadings_prior_spec <- spec
+  }
+  if (is_multivar) specs else specs[[1L]]
+}
+
+
 normalise_trend_map_on_specs <- function(trend_specs, data) {
   if (is.null(trend_specs)) return(trend_specs)
   is_multivar <- is_multivariate_trend_specs(trend_specs)
@@ -4482,4 +4502,367 @@ format_pipeline_error <- function(message, context = NULL) {
   # Format and stop with error
   full_message <- paste(error_components, collapse = ". ")
   stop(insight::format_error(full_message), call. = FALSE)
+}
+
+
+# Normalise the user-supplied `loadings_prior` specification into
+# a structured list consumed by `make_loadings_prior_stanvars()`.
+# Resolves names against `data2`, validates dimensions against
+# `n_series`, encodes feature columns via
+# `encode_loadings_features()` and validates each pairwise
+# distance via `validate_pairwise_distance()`.
+#
+# Accepted shapes for the user-facing list:
+#   loadings_prior = list(
+#     features         = "<name>" or a matrix / data.frame,
+#     distances        = "<name>", character vector of names,
+#                        a single matrix, named list of matrices,
+#                        or unnamed list (auto-named "dist_1",
+#                        "dist_2", ...),
+#     column_shrinkage = "iid" (default) or "mgp",
+#     mgp_a1, mgp_a2   = numeric MGP hyperparameters (only used
+#                        when column_shrinkage == "mgp"; defaults
+#                        2 and 3 following Heaps & Jermyn 2024
+#                        Sect. 6.3.1).
+#   )
+#
+# Returns NULL when input is NULL. Otherwise returns a list with
+# elements:
+#   features_mat       p x c numeric matrix or NULL
+#   distance_mats      named list of p x p numeric matrices
+#                      (possibly empty)
+#   column_shrinkage   "iid" or "mgp"
+#   mgp_a1, mgp_a2     numeric (NA when shrinkage = "iid")
+#   n_series           int p
+#   n_features         int c (0 when features is NULL)
+#   n_distances        int K (length of distance_mats)
+#'@noRd
+normalise_loadings_prior <- function(input, data2, data,
+                                     n_series = NULL) {
+  if (is.null(input)) return(NULL)
+  checkmate::assert_list(input, names = "named")
+  allowed <- c(
+    "features", "distances", "column_shrinkage",
+    "mgp_a1", "mgp_a2"
+  )
+  unknown <- setdiff(names(input), allowed)
+  if (length(unknown) > 0L) {
+    stop(insight::format_error(c(
+      "Unknown 'loadings_prior' fields.",
+      x = paste0(
+        "Unrecognised: ",
+        paste0("'", unknown, "'", collapse = ", "), "."
+      ),
+      i = paste0(
+        "Accepted fields: ",
+        paste0("'", allowed, "'", collapse = ", "), "."
+      )
+    )))
+  }
+  if (is.null(input$features) && is.null(input$distances)) {
+    stop(insight::format_error(c(
+      paste0(
+        "'loadings_prior' must supply at least one of ",
+        "'features' or 'distances'."
+      ),
+      i = paste0(
+        "An empty spec collapses to the default iid prior; ",
+        "drop the argument instead."
+      )
+    )))
+  }
+  series_levels <- if (is.factor(data$series)) {
+    levels(data$series)
+  } else if (!is.null(data$series)) {
+    sort(unique(as.character(data$series)))
+  } else {
+    stop(insight::format_error(c(
+      "'loadings_prior' requires a 'series' column on 'data'.",
+      i = "Add a 'series' factor / character column to 'data'."
+    )))
+  }
+  n_series_actual <- length(series_levels)
+  if (!is.null(n_series) && n_series != n_series_actual) {
+    stop(insight::format_error(c(
+      "Mismatch between supplied n_series and series levels.",
+      x = paste0(
+        "Got n_series = ", n_series, ", levels(data$series) = ",
+        n_series_actual, "."
+      )
+    )))
+  }
+  features_mat <- resolve_features_input(input$features, data2)
+  distance_mats <- resolve_distances_input(input$distances, data2)
+  if (!is.null(features_mat)) {
+    features_mat <- encode_loadings_features(
+      features_mat, series_levels
+    )
+  }
+  if (length(distance_mats) > 0L) {
+    distance_mats <- mapply(
+      function(mat, nm) {
+        validate_pairwise_distance(
+          mat, n_series_actual, nm,
+          series_levels = series_levels
+        )
+      },
+      distance_mats, names(distance_mats),
+      SIMPLIFY = FALSE
+    )
+  }
+  shrinkage <- input$column_shrinkage %||% "iid"
+  checkmate::assert_choice(shrinkage, c("iid", "mgp"))
+  mgp_a1 <- if (shrinkage == "mgp") input$mgp_a1 %||% 2 else NA_real_
+  mgp_a2 <- if (shrinkage == "mgp") input$mgp_a2 %||% 3 else NA_real_
+  if (shrinkage == "mgp") {
+    checkmate::assert_number(mgp_a1, lower = .Machine$double.eps)
+    checkmate::assert_number(mgp_a2, lower = .Machine$double.eps)
+  } else if (!is.null(input$mgp_a1) || !is.null(input$mgp_a2)) {
+    stop(insight::format_error(c(
+      paste0(
+        "'mgp_a1' / 'mgp_a2' supplied but ",
+        "'column_shrinkage' is not 'mgp'."
+      ),
+      i = "Set column_shrinkage = 'mgp' to use these hyperparameters."
+    )))
+  }
+  length_scale_collinearity_warning(features_mat, distance_mats)
+  imbalance_warning(features_mat)
+  list(
+    features_mat = features_mat,
+    distance_mats = distance_mats,
+    column_shrinkage = shrinkage,
+    mgp_a1 = mgp_a1,
+    mgp_a2 = mgp_a2,
+    n_series = n_series_actual,
+    n_features = if (is.null(features_mat)) 0L else ncol(features_mat),
+    n_distances = length(distance_mats)
+  )
+}
+
+
+# Resolve the `features` field of `loadings_prior` against
+# `data2`. Accepts a single string lookup, a matrix, or a
+# data.frame. Returns the unencoded object (encoding happens in
+# the normaliser via `encode_loadings_features()`).
+#'@noRd
+resolve_features_input <- function(features, data2) {
+  if (is.null(features)) return(NULL)
+  if (is.character(features) && length(features) == 1L) {
+    if (is.null(data2) || !features %in% names(data2)) {
+      stop(insight::format_error(c(
+        paste0(
+          "'loadings_prior$features' = '", features,
+          "' not found in 'data2'."
+        ),
+        i = paste0(
+          "Supply 'data2 = list(", features,
+          " = <matrix or data.frame>)' or pass the object inline."
+        )
+      )))
+    }
+    return(data2[[features]])
+  }
+  if (is.matrix(features) || is.data.frame(features)) {
+    return(features)
+  }
+  stop(insight::format_error(c(
+    "'loadings_prior$features' has an unsupported type.",
+    x = paste0("Got: ", class(features)[1L], "."),
+    i = paste0(
+      "Supply a single 'data2' lookup string, a numeric matrix, ",
+      "or a data.frame."
+    )
+  )))
+}
+
+
+# Resolve the `distances` field of `loadings_prior` against
+# `data2`. Returns a named list of pairwise distance matrices
+# (possibly empty). Auto-names unnamed list entries
+# "dist_1", "dist_2", ... and inline matrices "dist_1".
+#'@noRd
+resolve_distances_input <- function(distances, data2) {
+  if (is.null(distances)) return(list())
+  if (is.character(distances)) {
+    if (length(distances) == 0L) return(list())
+    missing_names <- setdiff(
+      distances, if (is.null(data2)) character(0) else names(data2)
+    )
+    if (length(missing_names) > 0L) {
+      stop(insight::format_error(c(
+        "'loadings_prior$distances' references missing names.",
+        x = paste0(
+          "Not in 'data2': ",
+          paste0("'", missing_names, "'", collapse = ", "), "."
+        ),
+        i = paste0(
+          "Add the missing matrix / matrices to 'data2' or pass ",
+          "them inline as a named list."
+        )
+      )))
+    }
+    assert_distance_names_unreserved(distances)
+    return(stats::setNames(
+      lapply(distances, function(nm) data2[[nm]]),
+      distances
+    ))
+  }
+  if (is.matrix(distances)) {
+    return(list(dist_1 = distances))
+  }
+  if (is.list(distances)) {
+    if (length(distances) == 0L) return(list())
+    nms <- names(distances)
+    if (is.null(nms) || any(nms == "")) {
+      nms <- paste0("dist_", seq_along(distances))
+      names(distances) <- nms
+    }
+    assert_distance_names_unreserved(names(distances))
+    bad <- vapply(distances, function(d) {
+      !(is.matrix(d) || is.data.frame(d))
+    }, logical(1))
+    if (any(bad)) {
+      stop(insight::format_error(c(
+        paste0(
+          "'loadings_prior$distances' list entries must be ",
+          "matrices."
+        ),
+        x = paste0(
+          "Bad entries: ",
+          paste(nms[bad], collapse = ", "), "."
+        )
+      )))
+    }
+    return(distances)
+  }
+  stop(insight::format_error(c(
+    "'loadings_prior$distances' has an unsupported type.",
+    x = paste0("Got: ", class(distances)[1L], "."),
+    i = paste0(
+      "Supply a single name string, a character vector of ",
+      "'data2' names, a single matrix, or a named list of ",
+      "matrices."
+    )
+  )))
+}
+
+
+# Check that `loadings_prior` is coherent with `trend_map`:
+# - cannot combine with fully-fixed Z (no parameters left to put
+#   a prior on)
+# - cannot combine with partial Z (NAs in trend_map mark free
+#   entries, but Heaps' framework treats all entries jointly)
+# Both error. Called from make_stan after both arguments have
+# been normalised.
+#'@noRd
+# Defensive consistency check on a normalised loadings-prior
+# spec, called from `make_loadings_prior_stanvars()` before
+# stanvar emission. Validates that the required fields are
+# present and that the count fields agree with the actual
+# matrix dimensions, catching silent corruption between the
+# normaliser and the emitter.
+#'@noRd
+assert_loadings_prior_spec_consistent <- function(spec) {
+  checkmate::assert_list(spec)
+  required <- c(
+    "features_mat", "distance_mats", "column_shrinkage",
+    "mgp_a1", "mgp_a2", "n_series", "n_features", "n_distances"
+  )
+  missing <- setdiff(required, names(spec))
+  if (length(missing) > 0L) {
+    stop(insight::format_error(c(
+      "Loadings-prior spec is missing required fields.",
+      x = paste0(
+        "Missing: ",
+        paste0("'", missing, "'", collapse = ", "), "."
+      ),
+      i = "Build the spec via `normalise_loadings_prior()`."
+    )))
+  }
+  if (!is.null(spec$features_mat) &&
+      spec$n_features != ncol(spec$features_mat)) {
+    stop(insight::format_error(c(
+      "Loadings-prior spec has inconsistent feature dimensions.",
+      x = paste0(
+        "spec$n_features = ", spec$n_features,
+        " but ncol(features_mat) = ",
+        ncol(spec$features_mat), "."
+      ),
+      i = "Rebuild the spec via `normalise_loadings_prior()`."
+    )))
+  }
+  if (spec$n_distances != length(spec$distance_mats)) {
+    stop(insight::format_error(c(
+      "Loadings-prior spec has inconsistent distance counts.",
+      x = paste0(
+        "spec$n_distances = ", spec$n_distances,
+        " but length(distance_mats) = ",
+        length(spec$distance_mats), "."
+      ),
+      i = "Rebuild the spec via `normalise_loadings_prior()`."
+    )))
+  }
+  invisible(NULL)
+}
+
+
+# Guard against user-supplied distance names that would collide
+# with the auto-naming scheme (`dist_1`, `dist_2`, ...) used for
+# unnamed inline list entries. Also reserves any name starting
+# with `dist_` to avoid silent Stan-variable shadowing further
+# down the emission. Reserved names error early with a clear
+# fix message rather than later as a Stan compile failure.
+#'@noRd
+assert_distance_names_unreserved <- function(nms) {
+  bad <- nms[grepl("^dist_", nms)]
+  if (length(bad) > 0L) {
+    stop(insight::format_error(c(
+      paste0(
+        "'loadings_prior$distances' names cannot start with ",
+        "'dist_'."
+      ),
+      x = paste0(
+        "Reserved: ",
+        paste0("'", bad, "'", collapse = ", "), "."
+      ),
+      i = paste0(
+        "Stan emission uses 'dist_<name>' / 'theta_dist_<name>' ",
+        "internally; rename to avoid collisions."
+      )
+    )))
+  }
+  invisible(NULL)
+}
+
+
+assert_loadings_prior_compatible <- function(loadings_prior_spec,
+                                             trend_map_Z) {
+  if (is.null(loadings_prior_spec) || is.null(trend_map_Z)) {
+    return(invisible(NULL))
+  }
+  any_free <- anyNA(trend_map_Z)
+  if (any_free) {
+    stop(insight::format_error(c(
+      paste0(
+        "'loadings_prior' cannot combine with a partial 'trend_map' ",
+        "(NA entries)."
+      ),
+      i = paste0(
+        "Drop 'trend_map' to apply the structured prior to a free ",
+        "loadings matrix, or drop 'loadings_prior' to keep the ",
+        "user-supplied partial pattern."
+      )
+    )))
+  }
+  stop(insight::format_error(c(
+    paste0(
+      "'loadings_prior' cannot combine with a fully-fixed ",
+      "'trend_map'."
+    ),
+    i = paste0(
+      "Fixed loadings have no free parameters to put a prior on; ",
+      "drop one of the two arguments."
+    )
+  )))
 }
