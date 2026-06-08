@@ -10,6 +10,12 @@ Objects of this class are structured as a \code{list} with the following compone
 the \eqn{p \times p} correlation matrix: median (or mean), standard
 error, and lower / upper limits of the credible intervals at the
 \code{probs} levels.}
+\item{cor_ess}{\eqn{p \times p} matrix of per-entry effective
+sample sizes for the correlation draws (computed on the Fisher-z
+scale via \code{\link[posterior:ess_basic]{posterior::ess_basic()}}). Diagonal entries are \code{NA}
+because the diagonal is fixed at 1. Use this to flag
+correlations that are nominally precise but poorly resolved by
+the MCMC chains.}
 \item{prob_positive, prob_negative, prob_nonzero}{\eqn{p \times p}
 matrices of \code{Pr(r > 0)}, \code{Pr(r < 0)} and the larger of the two for
 every off-diagonal entry. Use these for a sign-determinability
@@ -17,8 +23,9 @@ filter rather than the binary "CI does not contain zero" rule.}
 \item{sig_cor}{A \eqn{p \times p} correlation matrix containing
 only those correlations whose credible interval excludes zero. All
 other entries are set to zero.}
-\item{cov, cov_se, cov_lower, cov_upper}{Posterior summaries of the
-residual covariance matrix.}
+\item{cov, cov_se, cov_lower, cov_upper, cov_ess}{Posterior
+summaries of the residual covariance matrix, with per-entry ESS
+matching the correlation surface.}
 \item{mean_abs_offdiag}{Mean of the absolute off-diagonal entries
 of the posterior median correlation — a scalar summary of overall
 correlation strength.}
@@ -29,9 +36,12 @@ recording the residual structure that was summarised.}
 \item{probs, prob_threshold}{The credible interval and threshold
 used by \code{residual_cor()} to populate \code{sig_cor}.}
 
-Precision-matrix slots (\verb{prec*} / \code{sig_prec}) are reserved for a
-future extension of \code{residual_cor()}; current builds populate the
-correlation surface only.
+Precision-matrix slots (\code{prec}, \code{prec_se}, \code{prec_lower},
+\code{prec_upper}, \code{prec_ess}) are populated when \code{partial = TRUE} is
+passed to \code{residual_cor()}. The \code{sig_prec} thresholded matrix is
+reserved for a future extension; until then,
+\code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}} with \code{type = "precision"} errors clearly
+when called on an object built without \code{partial = TRUE}.
 }
 \description{
 A \code{mvgam_residcor} object returned by function \code{\link[=residual_cor]{residual_cor()}}.

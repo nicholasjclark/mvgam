@@ -14,9 +14,12 @@
 }
 \value{
 A \code{tibble::tibble} with columns \code{series_1}, \code{series_2},
-\code{Estimate}, \code{Est.Error}, \code{Q_lower}, \code{Q_upper}, \code{prob_positive},
-\code{prob_negative}, \code{prob_nonzero}, \code{sig} (whether
-\code{prob_nonzero > prob_threshold}).
+\code{Estimate}, \code{Est.Error}, \code{Q_lower}, \code{Q_upper}, \code{ESS},
+\code{prob_positive}, \code{prob_negative}, \code{prob_nonzero}, \code{sig} (whether
+\code{prob_nonzero > prob_threshold}). \code{ESS} is the per-entry
+effective sample size of the correlation draws on the Fisher-z
+scale; low values flag pairs whose CI / point estimate look
+tight but were poorly sampled by the chains.
 }
 \description{
 Returns a tibble with one row per unique upper-triangle pair of

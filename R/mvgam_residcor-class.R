@@ -8,6 +8,12 @@
 #'  the \eqn{p \times p} correlation matrix: median (or mean), standard
 #'  error, and lower / upper limits of the credible intervals at the
 #'  `probs` levels.}
+#'  \item{cor_ess}{\eqn{p \times p} matrix of per-entry effective
+#'  sample sizes for the correlation draws (computed on the Fisher-z
+#'  scale via [posterior::ess_basic()]). Diagonal entries are `NA`
+#'  because the diagonal is fixed at 1. Use this to flag
+#'  correlations that are nominally precise but poorly resolved by
+#'  the MCMC chains.}
 #'  \item{prob_positive, prob_negative, prob_nonzero}{\eqn{p \times p}
 #'  matrices of `Pr(r > 0)`, `Pr(r < 0)` and the larger of the two for
 #'  every off-diagonal entry. Use these for a sign-determinability
@@ -15,8 +21,9 @@
 #'  \item{sig_cor}{A \eqn{p \times p} correlation matrix containing
 #'  only those correlations whose credible interval excludes zero. All
 #'  other entries are set to zero.}
-#'  \item{cov, cov_se, cov_lower, cov_upper}{Posterior summaries of the
-#'  residual covariance matrix.}
+#'  \item{cov, cov_se, cov_lower, cov_upper, cov_ess}{Posterior
+#'  summaries of the residual covariance matrix, with per-entry ESS
+#'  matching the correlation surface.}
 #'  \item{mean_abs_offdiag}{Mean of the absolute off-diagonal entries
 #'  of the posterior median correlation — a scalar summary of overall
 #'  correlation strength.}
@@ -27,9 +34,12 @@
 #'  \item{probs, prob_threshold}{The credible interval and threshold
 #'  used by `residual_cor()` to populate `sig_cor`.}
 #'
-#' Precision-matrix slots (`prec*` / `sig_prec`) are reserved for a
-#' future extension of `residual_cor()`; current builds populate the
-#' correlation surface only.
+#' Precision-matrix slots (`prec`, `prec_se`, `prec_lower`,
+#' `prec_upper`, `prec_ess`) are populated when `partial = TRUE` is
+#' passed to `residual_cor()`. The `sig_prec` thresholded matrix is
+#' reserved for a future extension; until then,
+#' [plot.mvgam_residcor()] with `type = "precision"` errors clearly
+#' when called on an object built without `partial = TRUE`.
 #'
 #' @details
 #' Hui (2016) provides an excellent description of the quantities that this function calculates, so this passage

@@ -460,6 +460,7 @@ finalise_residcor <- function(cov_draws, series_names, partial,
     cor_se = cor_stats$se,
     cor_lower = cor_stats$lower,
     cor_upper = cor_stats$upper,
+    cor_ess = cor_stats$ess,
     prob_positive = cor_stats$prob_positive,
     prob_negative = cor_stats$prob_negative,
     prob_nonzero = cor_stats$prob_nonzero,
@@ -468,6 +469,7 @@ finalise_residcor <- function(cov_draws, series_names, partial,
     cov_se = cov_stats$se,
     cov_lower = cov_stats$lower,
     cov_upper = cov_stats$upper,
+    cov_ess = cov_stats$ess,
     mean_abs_offdiag = mean_abs_offdiag_summary(cor_draws, robust, probs),
     n_series = p,
     series_names = series_names,
@@ -485,6 +487,7 @@ finalise_residcor <- function(cov_draws, series_names, partial,
     out$prec_se <- prec_stats$se
     out$prec_lower <- prec_stats$lower
     out$prec_upper <- prec_stats$upper
+    out$prec_ess <- prec_stats$ess
   }
 
   structure(out, class = "mvgam_residcor")
@@ -524,6 +527,7 @@ summarise_correlation_array <- function(arr, robust, probs, series_names) {
   upper <- matrix(0, p, p)
   prob_pos <- matrix(0, p, p)
   prob_neg <- matrix(0, p, p)
+  ess <- matrix(NA_real_, p, p)
 
   clip <- function(r) {
     # eps = 1e-7 keeps atanh finite (atanh(±1) = ±Inf) while staying
@@ -546,6 +550,10 @@ summarise_correlation_array <- function(arr, robust, probs, series_names) {
       upper[i, j] <- tanh(z_q[2L])
       prob_pos[i, j] <- mean(r > 0)
       prob_neg[i, j] <- mean(r < 0)
+      # ESS computed on the Fisher-z scale to match the location/
+      # scale summaries; equivalent to native ESS for r away from
+      # the boundary and well-defined when r touches +/- 1.
+      ess[i, j] <- if (stats::sd(z) > 0) posterior::ess_basic(z) else NA_real_
     }
   }
 
@@ -558,6 +566,7 @@ summarise_correlation_array <- function(arr, robust, probs, series_names) {
   se[diag_idx]    <- 0
   lower[diag_idx] <- 1
   upper[diag_idx] <- 1
+  ess[diag_idx]   <- NA_real_
 
   rownames(point) <- colnames(point) <- series_names
   rownames(se) <- colnames(se) <- series_names
@@ -565,6 +574,7 @@ summarise_correlation_array <- function(arr, robust, probs, series_names) {
   rownames(upper) <- colnames(upper) <- series_names
   rownames(prob_pos) <- colnames(prob_pos) <- series_names
   rownames(prob_neg) <- colnames(prob_neg) <- series_names
+  rownames(ess) <- colnames(ess) <- series_names
 
   diag(prob_pos) <- 1
   diag(prob_neg) <- 0
@@ -578,7 +588,7 @@ summarise_correlation_array <- function(arr, robust, probs, series_names) {
   list(
     point = point, se = se, lower = lower, upper = upper,
     prob_positive = prob_pos, prob_negative = prob_neg,
-    prob_nonzero = prob_nz, sig = sig
+    prob_nonzero = prob_nz, sig = sig, ess = ess
   )
 }
 
@@ -594,6 +604,7 @@ summarise_unconstrained_array <- function(arr, robust, probs,
   se    <- matrix(0, p, p)
   lower <- matrix(0, p, p)
   upper <- matrix(0, p, p)
+  ess   <- matrix(NA_real_, p, p)
 
   for (i in seq_len(p)) {
     for (j in seq_len(p)) {
@@ -603,6 +614,7 @@ summarise_unconstrained_array <- function(arr, robust, probs,
       qs <- stats::quantile(x, probs = probs, na.rm = TRUE)
       lower[i, j] <- qs[1L]
       upper[i, j] <- qs[2L]
+      ess[i, j] <- if (stats::sd(x) > 0) posterior::ess_basic(x) else NA_real_
     }
   }
 
@@ -610,8 +622,9 @@ summarise_unconstrained_array <- function(arr, robust, probs,
   rownames(se) <- colnames(se) <- series_names
   rownames(lower) <- colnames(lower) <- series_names
   rownames(upper) <- colnames(upper) <- series_names
+  rownames(ess) <- colnames(ess) <- series_names
 
-  list(point = point, se = se, lower = lower, upper = upper)
+  list(point = point, se = se, lower = lower, upper = upper, ess = ess)
 }
 
 
@@ -718,9 +731,12 @@ lookup_factor_levels <- function(data, var_name, expected_n, prefix) {
 #' @param ... Currently ignored.
 #'
 #' @return A `tibble::tibble` with columns `series_1`, `series_2`,
-#'   `Estimate`, `Est.Error`, `Q_lower`, `Q_upper`, `prob_positive`,
-#'   `prob_negative`, `prob_nonzero`, `sig` (whether
-#'   `prob_nonzero > prob_threshold`).
+#'   `Estimate`, `Est.Error`, `Q_lower`, `Q_upper`, `ESS`,
+#'   `prob_positive`, `prob_negative`, `prob_nonzero`, `sig` (whether
+#'   `prob_nonzero > prob_threshold`). `ESS` is the per-entry
+#'   effective sample size of the correlation draws on the Fisher-z
+#'   scale; low values flag pairs whose CI / point estimate look
+#'   tight but were poorly sampled by the chains.
 #'
 #' @method summary mvgam_residcor
 #' @export
@@ -748,6 +764,7 @@ summary.mvgam_residcor <- function(object, ...) {
       series_1 = character(0), series_2 = character(0),
       Estimate = numeric(0), Est.Error = numeric(0),
       Q_lower = numeric(0), Q_upper = numeric(0),
+      ESS = numeric(0),
       prob_positive = numeric(0), prob_negative = numeric(0),
       prob_nonzero = numeric(0), sig = logical(0)
     ))
@@ -757,6 +774,12 @@ summary.mvgam_residcor <- function(object, ...) {
   rows <- pairs[, 1L]
   cols <- pairs[, 2L]
   threshold <- object[["prob_threshold"]] %||% 0.95
+  cor_ess_mat <- object[["cor_ess"]]
+  ess_col <- if (is.null(cor_ess_mat)) {
+    rep(NA_real_, nrow(pairs))
+  } else {
+    cor_ess_mat[pairs]
+  }
 
   out <- tibble::tibble(
     series_1 = series_names[rows],
@@ -765,6 +788,7 @@ summary.mvgam_residcor <- function(object, ...) {
     Est.Error = object[["cor_se"]][pairs],
     Q_lower = object[["cor_lower"]][pairs],
     Q_upper = object[["cor_upper"]][pairs],
+    ESS = ess_col,
     prob_positive = object[["prob_positive"]][pairs],
     prob_negative = object[["prob_negative"]][pairs],
     prob_nonzero = object[["prob_nonzero"]][pairs],

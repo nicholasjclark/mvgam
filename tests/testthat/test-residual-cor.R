@@ -233,6 +233,63 @@ test_that("residual_cor(partial = TRUE) populates prec fields", {
   expect_equal(dim(res$prec), c(3L, 3L))
   expect_true(!is.null(res$prec_lower))
   expect_true(!is.null(res$prec_upper))
+  expect_true(!is.null(res$prec_ess))
+  expect_equal(dim(res$prec_ess), c(3L, 3L))
+})
+
+
+# ---- per-entry ESS ----------------------------------------------------
+
+# Local fixture: full-covariance draws with realistic posterior
+# variation, so ESS is well-defined. The shared mk_full_cov_struct
+# replicates one Sigma exactly across draws (zero variance per
+# entry), which makes ESS NA by design.
+mk_full_cov_struct_jittered <- function(Sigma, ndraws = 200L, sd = 0.05) {
+  p <- nrow(Sigma)
+  set.seed(11L)
+  Sigma_arr <- array(0, dim = c(ndraws, p, p))
+  for (d in seq_len(ndraws)) {
+    jitter_mat <- matrix(stats::rnorm(p * p, sd = sd), p, p)
+    jitter_mat <- (jitter_mat + t(jitter_mat)) / 2
+    diag(jitter_mat) <- 0
+    Sigma_arr[d, , ] <- Sigma + jitter_mat
+  }
+  list(
+    pattern = "full_covariance",
+    n_series = p,
+    hierarchical = FALSE,
+    has_correlations = TRUE,
+    ndraws = ndraws,
+    params = list(Sigma_trend = Sigma_arr),
+    group_info = NULL, is_lv = FALSE, n_obs_series = p,
+    draws_mat = NULL
+  )
+}
+
+test_that("residual_cor populates cor_ess / cov_ess per off-diagonal entry", {
+  Sigma <- matrix(c(1.0, 0.6, 0.2,
+                    0.6, 1.0, 0.4,
+                    0.2, 0.4, 1.0), 3, 3)
+  cov_struct <- mk_full_cov_struct_jittered(Sigma)
+  testthat::local_mocked_bindings(
+    get_trend_covariance_structure = function(object) cov_struct,
+    .package = "mvgam"
+  )
+  res <- residual_cor(build_fake_mvgam())
+
+  expect_true(!is.null(res$cor_ess))
+  expect_equal(dim(res$cor_ess), c(3L, 3L))
+  # Diagonal entries are NA (correlation diagonal is fixed at 1).
+  expect_true(all(is.na(diag(res$cor_ess))))
+  # Off-diagonal entries are finite, positive, and bounded above by
+  # the number of draws.
+  off_diag <- res$cor_ess[upper.tri(res$cor_ess)]
+  expect_true(all(is.finite(off_diag)))
+  expect_true(all(off_diag > 0))
+  expect_true(all(off_diag <= cov_struct$ndraws))
+
+  expect_true(!is.null(res$cov_ess))
+  expect_equal(dim(res$cov_ess), c(3L, 3L))
 })
 
 
@@ -416,7 +473,7 @@ test_that("summary.mvgam_residcor returns tidy tibble sorted by prob_nonzero", {
   Sigma <- matrix(c(1.0, 0.8, 0.1,
                     0.8, 1.0, 0.5,
                     0.1, 0.5, 1.0), 3, 3)
-  cov_struct <- mk_full_cov_struct(Sigma)
+  cov_struct <- mk_full_cov_struct_jittered(Sigma)
   testthat::local_mocked_bindings(
     get_trend_covariance_structure = function(object) cov_struct,
     .package = "mvgam"
@@ -428,14 +485,17 @@ test_that("summary.mvgam_residcor returns tidy tibble sorted by prob_nonzero", {
   expect_setequal(
     colnames(s),
     c("series_1", "series_2", "Estimate", "Est.Error",
-      "Q_lower", "Q_upper", "prob_positive", "prob_negative",
-      "prob_nonzero", "sig")
+      "Q_lower", "Q_upper", "ESS",
+      "prob_positive", "prob_negative", "prob_nonzero", "sig")
   )
-  # All three constant-Sigma off-diagonals have prob_nonzero = 1, so
-  # the tiebreaker (abs(Estimate) desc) puts 0.8 / 0.5 / 0.1 in order.
-  expect_equal(s$Estimate[1L], cov2cor(Sigma)[1, 2], tolerance = 1e-8)
+  expect_true(all(is.finite(s$ESS)))
+  expect_true(all(s$ESS > 0))
+  # The strongest off-diagonal (0.8) is recovered as the largest
+  # absolute estimate; tiebreaker order (0.8 / 0.5 / 0.1) holds
+  # despite small posterior jitter.
+  expect_equal(s$Estimate[1L], cov2cor(Sigma)[1, 2], tolerance = 0.05)
   expect_equal(abs(s$Estimate), sort(abs(s$Estimate), decreasing = TRUE),
-               tolerance = 1e-8)
+               tolerance = 0.05)
 })
 
 
