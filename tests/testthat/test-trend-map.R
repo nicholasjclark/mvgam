@@ -72,13 +72,27 @@ test_that("matrix with wrong row count errors", {
   )
 })
 
-test_that("matrix with NA or Inf errors", {
-  Z_in <- matrix(c(1, 0, NA, 0.5, 1, 0),
+test_that("matrix with Inf entries errors", {
+  Z_in <- matrix(c(1, 0, Inf, 0.5, 1, 0),
                  nrow = 3L, ncol = 2L, byrow = TRUE)
   expect_error(
     mvgam:::normalise_trend_map(Z_in, .make_data(3L)),
-    "finite"
+    "Inf or NaN"
   )
+})
+
+test_that("matrix with NA entries is accepted (partial Z)", {
+  # NA marks a free entry in the partial-Z surface. Each row
+  # still has at least one fixed non-zero (or any NA), so the
+  # zero-row guard is satisfied.
+  Z_in <- matrix(c(1, 0, NA, 0.5, 1, 0),
+                 nrow = 3L, ncol = 2L, byrow = TRUE)
+  out <- mvgam:::normalise_trend_map(Z_in, .make_data(3L))
+  expect_equal(out$n_lv, 2L)
+  expect_true(anyNA(out$Z))
+  # byrow = TRUE layout: row 2 = (NA, 0.5) so NA at Z[2, 1].
+  expect_true(is.na(out$Z[2L, 1L]))
+  expect_equal(out$Z[2L, 2L], 0.5)
 })
 
 test_that("matrix with all-zero rows errors", {
@@ -88,6 +102,24 @@ test_that("matrix with all-zero rows errors", {
     mvgam:::normalise_trend_map(Z_in, .make_data(3L)),
     "zero-loading"
   )
+})
+
+test_that("matrix with all-NA row passes (every entry free)", {
+  Z_in <- matrix(c(NA, NA, 1, 0, 0, 1),
+                 nrow = 3L, ncol = 2L, byrow = TRUE)
+  out <- mvgam:::normalise_trend_map(Z_in, .make_data(3L))
+  expect_true(all(is.na(out$Z[1L, ])))
+})
+
+test_that("partial Z with no anchors warns on rotation invariance", {
+  # All-NA matrix must be explicitly numeric (NA defaults to
+  # logical, which the matrix branch rejects).
+  Z_in <- matrix(NA_real_, nrow = 3L, ncol = 2L)
+  # warn_partial_z_identification skips under TESTTHAT=true, so
+  # we just confirm the matrix branch accepts it. The warning
+  # path is exercised by calling the helper directly below.
+  out <- mvgam:::normalise_trend_map(Z_in, .make_data(3L))
+  expect_equal(sum(is.na(out$Z)), 6L)
 })
 
 

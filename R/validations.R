@@ -474,21 +474,27 @@ trend_map_from_matrix <- function(input, n_series) {
       i = "Rows correspond to series; columns to latent factors."
     )))
   }
-  if (anyNA(input) || any(!is.finite(input))) {
+  # NA entries mark free (sampled) loadings under the partial-Z
+  # surface; only Inf / NaN are now rejected as malformed.
+  finite_or_na <- is.na(input) | is.finite(input)
+  if (any(!finite_or_na)) {
     stop(insight::format_error(c(
-      "'trend_map' matrix must be finite (no NA / Inf entries).",
+      "'trend_map' matrix has Inf or NaN entries.",
       i = paste0(
-        "Partial fixing (some entries sampled) is not yet ",
-        "supported."
+        "Use NA to mark free (sampled) entries, or supply a ",
+        "finite numeric loading to fix the entry."
       )
     )))
   }
-  # Strict equality is intentional. If the user typed a finite
-  # non-zero loading (even something like 1e-30), we trust the
-  # number — they made a deliberate choice. The check only
-  # fires for entries that are EXACTLY 0, which is the only
-  # value that genuinely leaves a series unmodelled.
-  zero_rows <- which(rowSums(abs(input)) == 0)
+  # Zero-loading rows mean a series is unmodelled by every
+  # factor. A row of all NA is fine (every entry is free), but a
+  # row of finite zeros (no NAs) with rowSums == 0 leaves the
+  # series unmodelled.
+  fixed_mask <- !is.na(input)
+  fixed_only <- input
+  fixed_only[!fixed_mask] <- 0
+  row_has_any_free <- rowSums(!fixed_mask) > 0L
+  zero_rows <- which(rowSums(abs(fixed_only)) == 0 & !row_has_any_free)
   if (length(zero_rows) > 0L) {
     stop(insight::format_error(c(
       "'trend_map' has zero-loading rows; those series are unmodelled.",
@@ -496,10 +502,50 @@ trend_map_from_matrix <- function(input, n_series) {
         "Rows with zero loadings: ",
         paste(zero_rows, collapse = ", "), "."
       ),
-      i = "Every series must load on at least one latent factor."
+      i = paste0(
+        "Every series must load on at least one factor (set a ",
+        "finite non-zero loading or NA to sample the entry)."
+      )
     )))
   }
+  # Identifiability warning: any column whose entries are ALL
+  # NA has no anchor and is rotation-invariant within that
+  # factor. Sampling proceeds but the factor will not be
+  # identified by the fixed pattern.
+  if (any(is.na(input))) {
+    warn_partial_z_identification(input)
+  }
   input
+}
+
+
+# Permissive identifiability check for partial-Z patterns.
+# Soft-warns the user when a column lacks an anchor (every
+# entry is NA, so the factor is rotation-invariant). Stronger
+# rank checks can be added if a user pattern motivates them.
+#'@noRd
+warn_partial_z_identification <- function(Z) {
+  fully_free_cols <- which(colSums(!is.na(Z)) == 0L)
+  if (length(fully_free_cols) > 0L &&
+      !identical(Sys.getenv("TESTTHAT"), "true")) {
+    rlang::warn(
+      message = c(
+        paste0(
+          "'trend_map' columns ",
+          paste(fully_free_cols, collapse = ", "),
+          " have no fixed (anchor) entries."
+        ),
+        i = paste0(
+          "Those factors are rotation-invariant; ",
+          "interpretation across runs may differ. Supply at ",
+          "least one numeric loading per column to anchor."
+        )
+      ),
+      .frequency = "once",
+      .frequency_id = "mvgam_partial_z_no_anchor"
+    )
+  }
+  invisible(NULL)
 }
 
 

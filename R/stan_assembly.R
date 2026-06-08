@@ -2609,13 +2609,15 @@ generate_matrix_z_parameters <- function(is_factor_model, n_lv, n_series,
 
 #' Emit a user-supplied fixed Z matrix as Stan `data`.
 #'
-#' Single point of truth for the fixed-loadings code path. Reused
-#' by every trend type (RW / AR / VAR / ZMVN / etc.) and reserved
-#' for future `nmix` / `jsdgam` integration. The matrix value is
-#' attached to the stanvar so brms threads it into standata.
+#' Single point of truth for the fully-fixed-loadings code path
+#' (no NAs in fixed_Z). Reused by every trend type
+#' (RW / AR / VAR / ZMVN / etc.) and reserved for future `nmix` /
+#' `jsdgam` integration. The matrix value is attached to the
+#' stanvar so brms threads it into standata.
 #'
 #' @param fixed_Z A numeric `n_series x n_lv` matrix produced by
-#'   `normalise_trend_map()`.
+#'   `normalise_trend_map()`. Must NOT contain NAs (partial Z
+#'   routes through `make_partial_z_stanvars()` instead).
 #' @return A `brms::stanvar` declaring `Z` in the data block.
 #' @noRd
 make_fixed_z_stanvars <- function(fixed_Z) {
@@ -2625,6 +2627,98 @@ make_fixed_z_stanvars <- function(fixed_Z) {
     name = "Z",
     scode = "matrix[N_series_trend, N_lv_trend] Z;",
     block = "data"
+  )
+}
+
+
+#' Emit a partial-Z (mixed fixed / sampled) loadings matrix.
+#'
+#' Used when the user supplies `trend_map` as a numeric matrix
+#' with `NA` entries marking free (sampled) loadings. The Stan
+#' code receives:
+#' - `Z_template`: data matrix with NAs replaced by 0
+#' - `Z_is_free`: data integer matrix (1 where free, 0 where
+#'   fixed) used by the assembly loop to decide each cell
+#' - `N_free`: data integer giving the count of free entries
+#' - `Z_free_vec`: parameter vector of length `N_free` holding
+#'   the sampled loadings
+#'
+#' In transformed parameters Z is assembled by walking the
+#' matrix in row-major order and picking either the template
+#' value or the next `Z_free_vec` element. The prior
+#' `Z_free_vec ~ student_t(3, 0, 1)` mirrors the standard
+#' sampled-Z prior on the free entries only.
+#'
+#' @param fixed_Z A numeric `n_series x n_lv` matrix produced by
+#'   `normalise_trend_map()` with at least one NA (otherwise
+#'   `make_fixed_z_stanvars()` should be used).
+#' @return Combined `brms::stanvar` covering data / parameters /
+#'   tparameters / model blocks for the partial-Z code path.
+#' @noRd
+make_partial_z_stanvars <- function(fixed_Z) {
+  checkmate::assert_matrix(fixed_Z, mode = "numeric")
+  if (!anyNA(fixed_Z)) {
+    stop(insight::format_error(
+      "make_partial_z_stanvars() requires NA entries in fixed_Z."
+    ))
+  }
+  free_mask <- is.na(fixed_Z)
+  template <- fixed_Z
+  template[free_mask] <- 0
+  is_free_int <- matrix(as.integer(free_mask), nrow = nrow(fixed_Z))
+  n_free <- as.integer(sum(free_mask))
+
+  data_template <- brms::stanvar(
+    x = template, name = "Z_template",
+    scode = "matrix[N_series_trend, N_lv_trend] Z_template;",
+    block = "data"
+  )
+  data_mask <- brms::stanvar(
+    x = is_free_int, name = "Z_is_free",
+    scode = paste0(
+      "array[N_series_trend, N_lv_trend] ",
+      "int<lower=0, upper=1> Z_is_free;"
+    ),
+    block = "data"
+  )
+  data_n_free <- brms::stanvar(
+    x = n_free, name = "N_free_Z",
+    scode = "int<lower=1> N_free_Z;",
+    block = "data"
+  )
+  param_free <- brms::stanvar(
+    name = "Z_free_vec",
+    scode = "vector[N_free_Z] Z_free_vec;",
+    block = "parameters"
+  )
+  z_assembly <- brms::stanvar(
+    name = "Z",
+    scode = paste0(
+      "matrix[N_series_trend, N_lv_trend] Z;\n",
+      "  {\n",
+      "    int idx = 1;\n",
+      "    for (j in 1:N_lv_trend) {\n",
+      "      for (i in 1:N_series_trend) {\n",
+      "        if (Z_is_free[i, j] == 1) {\n",
+      "          Z[i, j] = Z_free_vec[idx];\n",
+      "          idx += 1;\n",
+      "        } else {\n",
+      "          Z[i, j] = Z_template[i, j];\n",
+      "        }\n",
+      "      }\n",
+      "    }\n",
+      "  }"
+    ),
+    block = "tparameters"
+  )
+  z_prior <- brms::stanvar(
+    name = "Z_free_prior",
+    scode = "Z_free_vec ~ student_t(3, 0, 1);",
+    block = "model"
+  )
+  combine_stanvars(
+    data_template, data_mask, data_n_free,
+    param_free, z_assembly, z_prior
   )
 }
 
@@ -2685,8 +2779,16 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
   checkmate::assert_integerish(n_lv, len = 1, lower = 1)
   checkmate::assert_integerish(n_series, len = 1, lower = 1)
 
-  # Fixed-Z branch: skip everything else and emit Z as data.
+  # User-supplied Z branch. Two flavours:
+  # - fully fixed (no NAs): Z lives entirely in the data block
+  # - partial (one or more NAs): free entries become a parameter
+  #   vector with a student_t prior; assembly happens in
+  #   transformed parameters using a Z_is_free mask passed via
+  #   the data block.
   if (!is.null(fixed_Z)) {
+    if (anyNA(fixed_Z)) {
+      return(make_partial_z_stanvars(fixed_Z))
+    }
     return(make_fixed_z_stanvars(fixed_Z))
   }
 

@@ -2899,3 +2899,75 @@ test_that("trend_map conflict with explicit n_lv errors at fit time", {
     "shape conflicts"
   )
 })
+
+
+# ---- Partial Z (NA = sampled) Stan emission contract ----------
+
+test_that("trend_map with NA emits Z_template + Z_is_free + Z_free_vec", {
+  # Partial Z: some entries fixed, some sampled (NA in matrix).
+  data <- setup_stan_test_data()$multivariate
+  Z_user <- matrix(
+    c(1.0, 0.0,
+      NA_real_, NA_real_,
+      0.0, 1.0,
+      NA_real_, NA_real_),
+    nrow = 4L, ncol = 2L, byrow = TRUE
+  )
+  mf <- mvgam_formula(
+    count ~ x,
+    trend_formula = ~ -1 + AR(p = 1, trend_map = Z_user, cor = TRUE)
+  )
+  code <- stancode(mf, data = data, family = poisson(),
+                   validate = FALSE)
+  sd <- standata(mf, data = data, family = poisson())
+
+  # Z_template in data with NAs replaced by 0.
+  expect_true(stan_pattern(
+    "matrix\\[N_series_trend, N_lv_trend\\] Z_template;", code
+  ))
+  # Z_is_free integer mask in data.
+  expect_true(stan_pattern(
+    paste0(
+      "array\\[N_series_trend, N_lv_trend\\] ",
+      "int<lower=0, upper=1> Z_is_free;"
+    ),
+    code
+  ))
+  # Free-entry vector parameter.
+  expect_true(stan_pattern(
+    "vector\\[N_free_Z\\] Z_free_vec;", code
+  ))
+  # Assembly loop in transformed parameters.
+  expect_true(stan_pattern(
+    "Z\\[i, j\\] = Z_free_vec\\[idx\\];", code
+  ))
+  expect_true(stan_pattern(
+    "Z\\[i, j\\] = Z_template\\[i, j\\];", code
+  ))
+  # Prior on the free vector only.
+  expect_true(stan_pattern(
+    "Z_free_vec ~ student_t\\(3, 0, 1\\);", code
+  ))
+  # Standata carries the template (NAs -> 0), mask, and count.
+  expect_equal(dim(sd$Z_template), c(4L, 2L))
+  expect_equal(sum(sd$Z_template == 0), 6L)  # 4 NAs + 2 fixed-0
+  expect_equal(dim(sd$Z_is_free), c(4L, 2L))
+  expect_equal(sd$N_free_Z, 4L)
+})
+
+test_that("fully-fixed Z is preserved (no partial-Z stanvars emitted)", {
+  # Regression: when trend_map has no NAs, the old fully-fixed
+  # code path stays in effect — no Z_template / Z_free_vec.
+  data <- setup_stan_test_data()$multivariate
+  Z_user <- matrix(c(1, 0, 0.5, 0.5, 0, 1, 0.3, 0.7),
+                    nrow = 4L, ncol = 2L, byrow = TRUE)
+  mf <- mvgam_formula(
+    count ~ 1,
+    trend_formula = ~ -1 + AR(p = 1, trend_map = Z_user)
+  )
+  code <- stancode(mf, data = data, family = poisson(),
+                   validate = FALSE)
+  expect_false(grepl("Z_template", code, fixed = TRUE))
+  expect_false(grepl("Z_is_free", code, fixed = TRUE))
+  expect_false(grepl("Z_free_vec", code, fixed = TRUE))
+})

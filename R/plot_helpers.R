@@ -518,7 +518,11 @@ resolve_factor_loadings <- function(object = NULL,
   checkmate::assert_int(n_lv, lower = 1L)
   checkmate::assert_int(n_series, lower = 1L)
 
-  if (!is.null(fixed_Z)) {
+  # Partial Z (some entries NA = sampled): the free entries are
+  # saved as Z[i, j] in the posterior alongside the fixed
+  # entries, so fall through to the column-major draws parser.
+  fully_fixed <- !is.null(fixed_Z) && !anyNA(fixed_Z)
+  if (fully_fixed) {
     # Reason: fixed-Z fits store Z in standata, so there are no
     # Z[i, j] posterior columns to read. Broadcast the matrix
     # across ndraws to match the sampled-Z return shape.
