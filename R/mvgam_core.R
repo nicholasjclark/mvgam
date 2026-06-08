@@ -26,12 +26,18 @@
 #'   `forecast()` for out-of-sample evaluation.
 #' @param trend_map Optional fixed factor-loading specification.
 #'   Accepts one of three shapes — a numeric `n_series x n_lv`
-#'   matrix for general (possibly non-binary) loadings, a
-#'   `data.frame(series, trend)` for sparse series-to-trend
-#'   sharing, or a character code `"identity"` / `"shared"` for
-#'   the two most common cases. Top-level alias for the
-#'   `trend_map` argument on the trend constructor; passing both
-#'   is an error.
+#'   matrix for general loadings, a `data.frame(series, trend)`
+#'   for sparse series-to-trend sharing, or a character code
+#'   `"identity"` / `"shared"` for the two most common cases.
+#'   The numeric matrix may carry `NA` entries to mark loadings
+#'   that should be sampled (partial Z); finite entries are
+#'   treated as fixed and preserved exactly on `Z` in the
+#'   posterior. Default factor models (no `trend_map`) sample
+#'   `Z` unconstrained and identify it post-hoc via thin QR
+#'   (see Heaps & Jermyn 2024); any user-supplied `trend_map`
+#'   bypasses that rotation so the encoded structure is not
+#'   altered. Top-level alias for the `trend_map` argument on
+#'   the trend constructor; passing both is an error.
 #' @param backend Stan backend (defaults to "cmdstanr")
 #' @param combine Logical, pool multiple imputation results (default TRUE)
 #' @param family Family specification. Supports most brms families including

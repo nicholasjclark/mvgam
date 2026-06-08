@@ -2950,6 +2950,10 @@ test_that("trend_map with NA emits Z_template + Z_is_free + Z_free_vec", {
   expect_true(stan_pattern(
     "Z_free_vec ~ student_t\\(3, 0, 1\\);", code
   ))
+  # User-supplied loadings bypass the QR identification path.
+  expect_false(grepl("Z_tilde", code, fixed = TRUE))
+  expect_false(grepl("Q_tilde", code, fixed = TRUE))
+  expect_false(grepl("qr_thin_R", code, fixed = TRUE))
   # Standata carries the template (NAs -> 0), mask, and count.
   expect_equal(dim(sd$Z_template), c(4L, 2L))
   expect_equal(sum(sd$Z_template == 0), 6L)  # 4 NAs + 2 fixed-0
@@ -2958,8 +2962,8 @@ test_that("trend_map with NA emits Z_template + Z_is_free + Z_free_vec", {
 })
 
 test_that("fully-fixed Z is preserved (no partial-Z stanvars emitted)", {
-  # Regression: when trend_map has no NAs, the old fully-fixed
-  # code path stays in effect — no Z_template / Z_free_vec.
+  # Regression: when trend_map has no NAs, the fully-fixed code
+  # path stays in effect — no Z_template / Z_free_vec.
   data <- setup_stan_test_data()$multivariate
   Z_user <- matrix(c(1, 0, 0.5, 0.5, 0, 1, 0.3, 0.7),
                     nrow = 4L, ncol = 2L, byrow = TRUE)
@@ -2972,4 +2976,8 @@ test_that("fully-fixed Z is preserved (no partial-Z stanvars emitted)", {
   expect_false(grepl("Z_template", code, fixed = TRUE))
   expect_false(grepl("Z_is_free", code, fixed = TRUE))
   expect_false(grepl("Z_free_vec", code, fixed = TRUE))
+  # User-supplied loadings bypass the QR identification path.
+  expect_false(grepl("Z_tilde", code, fixed = TRUE))
+  expect_false(grepl("Q_tilde", code, fixed = TRUE))
+  expect_false(grepl("qr_thin_R", code, fixed = TRUE))
 })

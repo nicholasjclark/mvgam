@@ -31,12 +31,18 @@ to Stan at fit time — supply it to \code{posterior_predict()} /
 
 \item{trend_map}{Optional fixed factor-loading specification.
 Accepts one of three shapes — a numeric \verb{n_series x n_lv}
-matrix for general (possibly non-binary) loadings, a
-\code{data.frame(series, trend)} for sparse series-to-trend
-sharing, or a character code \code{"identity"} / \code{"shared"} for
-the two most common cases. Top-level alias for the
-\code{trend_map} argument on the trend constructor; passing both
-is an error.}
+matrix for general loadings, a \code{data.frame(series, trend)}
+for sparse series-to-trend sharing, or a character code
+\code{"identity"} / \code{"shared"} for the two most common cases.
+The numeric matrix may carry \code{NA} entries to mark loadings
+that should be sampled (partial Z); finite entries are
+treated as fixed and preserved exactly on \code{Z} in the
+posterior. Default factor models (no \code{trend_map}) sample
+\code{Z} unconstrained and identify it post-hoc via thin QR
+(see Heaps & Jermyn 2024); any user-supplied \code{trend_map}
+bypasses that rotation so the encoded structure is not
+altered. Top-level alias for the \code{trend_map} argument on
+the trend constructor; passing both is an error.}
 
 \item{backend}{Stan backend (defaults to "cmdstanr")}
 

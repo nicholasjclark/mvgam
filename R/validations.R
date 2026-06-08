@@ -355,9 +355,12 @@ validate_required_variables <- function(data, required_vars, context = "data", f
 #'
 #' Accepted shapes:
 #' \itemize{
-#'   \item Numeric `matrix` of dimension `n_series × n_lv`. The
-#'     general case; loadings can be any finite values
-#'     including fractional or negative. `n_lv` is inferred from
+#'   \item Numeric `matrix` of dimension `n_series × n_lv`.
+#'     Finite entries are treated as fixed and preserved exactly
+#'     on `Z` in the posterior (including fractional or
+#'     negative values). `NA` entries mark loadings to sample
+#'     (partial Z); the free entries are sampled jointly while
+#'     the fixed entries stay pinned. `n_lv` is inferred from
 #'     `ncol(Z)`.
 #'   \item `data.frame(series, trend)` — one row per series
 #'     assigning each to a single trend integer. The resulting
@@ -368,12 +371,20 @@ validate_required_variables <- function(data, required_vars, context = "data", f
 #'     latent factor; `Z = matrix(1, n_series, 1)`).
 #' }
 #'
+#' Any non-NULL `trend_map` bypasses the post-hoc QR
+#' identification used by default factor models (Heaps & Jermyn
+#' 2024). The user-supplied loadings are saved as `Z[i, j]`
+#' directly; no `Z_tilde` is emitted because the encoded
+#' structure already anchors the basis.
+#'
 #' Rejects:
 #' \itemize{
 #'   \item Integer vector form (silent ordering bug when series
 #'     factor levels change).
-#'   \item Z matrices with non-finite entries.
-#'   \item Rows that sum to zero (series silently unmodelled).
+#'   \item Z matrices with `Inf` or `NaN` entries (use `NA` to
+#'     mark sampled entries).
+#'   \item Rows of fixed zeros with no free entries (series
+#'     silently unmodelled).
 #'   \item data.frame mappings with missing series, gaps in the
 #'     trend integer sequence, or `max(trend) > n_series`.
 #' }
