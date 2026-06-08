@@ -69,18 +69,12 @@ ordinate <- function(object, ...) {
   UseMethod("ordinate", object)
 }
 
-#' Internal: SVD-rotated factor scores and loadings shared by every
-#' `ordinate.*` method. Returns posterior-median site scores and
-#' species loadings in a common 2-D space, plus the model's
-#' `n_lv`. Errors if the fit has no latent factors or no Z
-#' (sampled or fixed) reachable from the posterior.
-#'
-#' The math is the BORAL (Hui 2016) re-rotation: SVD of the
-#' `LV %*% t(Z)` cross-product, then split the singular values
-#' across factor paths (alpha) and loadings (1 - alpha).
+#' Internal: posterior-median LV trends and Z loadings from a
+#' fitted LV-factor `mvgam` / `jsdgam`. Errors if the fit has no
+#' latent factors or no Z reachable from the posterior.
 #'
 #' @noRd
-ordinate_svd_components <- function(object, alpha) {
+ordinate_extract_medians <- function(object) {
   n_lv <- detect_factor_n_lv(object)
   if (is.null(n_lv)) {
     stop(insight::format_error(c(
@@ -104,7 +98,69 @@ ordinate_svd_components <- function(object, alpha) {
     )))
   }
   lv_coefs <- apply(Z_arr, c(2L, 3L), stats::median, na.rm = TRUE)
+  list(lv_estimates = lv_estimates, lv_coefs = lv_coefs,
+        n_lv = n_lv)
+}
 
+
+#' Internal: rotation dispatcher for ordinate methods.
+#'
+#' Returns `list(scores, loadings, n_lv, rotation, rotmat)` where:
+#' - `scores` is `[n_time, n_lv]` site scores in the rotated basis
+#' - `loadings` is `[n_series, n_lv]` series loadings in the same
+#'   rotated basis
+#' - `rotmat` is the rotation matrix used (NULL for `"svd"` and
+#'   `"none"` since those don't apply a single rotation matrix to
+#'   the input arrays). For varimax / promax `rotmat` is the
+#'   `stats::varimax()`/`stats::promax()` rotation.
+#'
+#' Branches:
+#' - `"svd"`: BORAL (Hui 2016) re-rotation. SVD of the
+#'   `LV %*% t(Z)` cross-product, then split the singular values
+#'   across factor paths (`alpha`) and loadings (`1 - alpha`).
+#'   Axes are variance-ordered; `which_lvs = c(1, 2)` picks the
+#'   most informative pair.
+#' - `"varimax"`: orthogonal rotation maximising loading sparsity.
+#'   `alpha` is ignored. Rotation invariance of `LV %*% t(Z)` is
+#'   preserved (apply R to Z and R to LV; for orthogonal R,
+#'   `R^{-T} = R`).
+#' - `"promax"`: oblique extension of varimax. `alpha` ignored.
+#' - `"none"`: pass through unrotated medians. `alpha` ignored.
+#'
+#' @noRd
+ordinate_factor_components <- function(object, alpha, rotation) {
+  medians <- ordinate_extract_medians(object)
+  lv_estimates <- medians$lv_estimates
+  lv_coefs <- medians$lv_coefs
+  n_lv <- medians$n_lv
+  out <- switch(
+    rotation,
+    "svd" = ordinate_svd_rotate(lv_estimates, lv_coefs, alpha,
+                                  n_lv),
+    "varimax" = ordinate_orth_rotate(
+      lv_estimates, lv_coefs, n_lv, method = "varimax"
+    ),
+    "promax" = ordinate_orth_rotate(
+      lv_estimates, lv_coefs, n_lv, method = "promax"
+    ),
+    "none" = list(
+      scores = scale(lv_estimates, center = TRUE, scale = FALSE),
+      loadings = scale(lv_coefs, center = TRUE, scale = FALSE),
+      rotmat = NULL
+    )
+  )
+  out$n_lv <- n_lv
+  out$rotation <- rotation
+  out
+}
+
+
+#' Internal: BORAL SVD rotation branch. See
+#' `ordinate_factor_components()` for the broader contract.
+#'
+#' @noRd
+ordinate_svd_rotate <- function(lv_estimates, lv_coefs, alpha,
+                                  n_lv) {
   testcov <- tcrossprod(lv_estimates, lv_coefs)
   do_svd <- svd(testcov, n_lv, n_lv)
   scores <- scale(
@@ -127,7 +183,49 @@ ordinate_svd_components <- function(object, alpha) {
       ),
     center = TRUE, scale = FALSE
   )
-  list(scores = scores, loadings = loadings, n_lv = n_lv)
+  list(scores = scores, loadings = loadings, rotmat = NULL)
+}
+
+
+#' Internal: varimax / promax rotation branch. Applies the
+#' rotation matrix returned by `stats::varimax()` / `stats::promax()`
+#' to both the loadings AND the latent paths, preserving the
+#' fitted `LV %*% t(Z)` product. For orthogonal varimax,
+#' `R^{-T} = R`. For oblique promax, the inverse-transpose is
+#' computed explicitly so the product invariance holds.
+#'
+#' @noRd
+ordinate_orth_rotate <- function(lv_estimates, lv_coefs, n_lv,
+                                   method) {
+  if (n_lv < 2L) {
+    stop(insight::format_error(c(
+      paste0("Rotation '", method, "' requires at least 2 factors."),
+      x = paste0("Got n_lv = ", n_lv, "."),
+      i = paste0(
+        "Refit with n_lv >= 2, or use rotation = 'none' / 'svd'."
+      )
+    )))
+  }
+  rot <- switch(
+    method,
+    "varimax" = stats::varimax(lv_coefs, normalize = TRUE),
+    "promax" = stats::promax(lv_coefs)
+  )
+  rotmat <- rot$rotmat
+  loadings_rot <- lv_coefs %*% rotmat
+  # Preserve LV %*% t(Z): for orthogonal R, t(solve(t(R))) = R;
+  # promax's rotmat is oblique so we solve directly.
+  lv_transform <- if (method == "varimax") {
+    rotmat
+  } else {
+    t(solve(t(rotmat)))
+  }
+  scores_rot <- lv_estimates %*% lv_transform
+  list(
+    scores = scale(scores_rot, center = TRUE, scale = FALSE),
+    loadings = scale(loadings_rot, center = TRUE, scale = FALSE),
+    rotmat = rotmat
+  )
 }
 
 
@@ -207,11 +305,42 @@ ordinate_build_plot <- function(svd_comp, which_lvs, biplot,
   if (biplot) {
     p <- p + ordinate_biplot_layers(sp_dat, species_names)
   }
-  p + mvgam_theme()
+  p <- p + mvgam_theme()
+  # Attach rotated arrays as a structured attribute so power users
+  # can extract Z / LV in the rotated basis without re-running.
+  attr(p, "rotation") <- list(
+    method = svd_comp$rotation,
+    n_lv = svd_comp$n_lv,
+    scores = svd_comp$scores,
+    loadings = svd_comp$loadings,
+    rotmat = svd_comp$rotmat
+  )
+  p
 }
 
 
 #' @rdname ordinate.jsdgam
+#' @param rotation Character. Post-hoc rotation of the
+#'   posterior-median LV trends and Z loadings before plotting.
+#'   One of:
+#'   \describe{
+#'     \item{`"svd"` (default)}{BORAL convention: SVD of
+#'       `LV %*% t(Z)` re-orders axes by singular-value variance.
+#'       Use `alpha` to split the variance between site scores and
+#'       loadings.}
+#'     \item{`"varimax"`}{Orthogonal rotation maximising loading
+#'       sparsity. Each series tends to load strongly on one
+#'       factor and near-zero on others. `alpha` is ignored.
+#'       Requires `n_lv >= 2`.}
+#'     \item{`"promax"`}{Oblique extension of varimax (allows
+#'       correlated factors). `alpha` ignored.}
+#'     \item{`"none"`}{No rotation. Plot raw posterior-median LV
+#'       and Z, centred. `alpha` ignored.}
+#'   }
+#'   For varimax / promax the axes are NOT variance-ordered, so
+#'   the choice of `which_lvs` matters in a different way than
+#'   under SVD: any pair of rotated factors is a valid pair to
+#'   plot.
 #' @method ordinate jsdgam
 #' @importFrom grid arrow unit
 #' @export
@@ -220,6 +349,7 @@ ordinate.jsdgam <- function(
   which_lvs = c(1L, 2L),
   biplot = TRUE,
   alpha = 0.5,
+  rotation = c("svd", "varimax", "promax", "none"),
   label_sites = TRUE,
   ...
 ) {
@@ -229,17 +359,18 @@ ordinate.jsdgam <- function(
   validate_proportional(alpha)
   checkmate::assert_flag(biplot)
   checkmate::assert_flag(label_sites)
+  rotation <- match.arg(rotation)
   insight::check_if_installed(
     "ggrepel",
     reason = "to adequately plot ordination scores"
   )
 
-  svd_comp <- ordinate_svd_components(object, alpha)
+  comp <- ordinate_factor_components(object, alpha, rotation)
   sp_names <- resolve_series_info(object)$series_levels
   unit_name <- attr(object$model_data, "prepped_trend_model")$unit
   site_names <- unique(object$obs_data[[unit_name]])
   ordinate_build_plot(
-    svd_comp, which_lvs, biplot, label_sites,
+    comp, which_lvs, biplot, label_sites,
     site_names = site_names, species_names = sp_names
   )
 }
@@ -269,39 +400,66 @@ ordinate.jsdgam <- function(
 #'   between series are approximately comparably scaled. Use
 #'   `alpha` close to `1` to emphasise separation between time
 #'   points, or close to `0` to emphasise separation between
-#'   series. Matches the BORAL convention.
+#'   series. Matches the BORAL convention. Ignored for
+#'   `rotation` values other than `"svd"`.
+#' @param rotation Character. Post-hoc rotation of the
+#'   posterior-median LV trends and Z loadings before plotting.
+#'   One of:
+#'   \describe{
+#'     \item{`"svd"` (default)}{BORAL convention: SVD of
+#'       `LV %*% t(Z)` re-orders axes by singular-value variance.
+#'       Most informative when `n_lv > 2` and you want the two
+#'       leading gradients.}
+#'     \item{`"varimax"`}{Orthogonal rotation maximising loading
+#'       sparsity (each series loads strongly on one factor and
+#'       near-zero on others). Use this when you want
+#'       interpretable factor "names" rather than variance-
+#'       ordered axes. Requires `n_lv >= 2`. `alpha` ignored.}
+#'     \item{`"promax"`}{Oblique extension of varimax that allows
+#'       correlated rotated factors. `alpha` ignored.}
+#'     \item{`"none"`}{Skip rotation entirely; plot raw
+#'       posterior-median LV / Z, centred. The axes correspond
+#'       directly to the Stan parameters `lv_trend[t, k]` and
+#'       `Z[i, k]` (subject to the lower-triangular Stan
+#'       constraint discussed in Details). `alpha` ignored.}
+#'   }
 #' @param label_sites Logical. When `TRUE`, site scores are
 #'   drawn as text labels (the training time values); when
 #'   `FALSE`, as points only.
 #' @param ... Ignored.
 #'
-#' @return A `ggplot` object.
+#' @return A `ggplot` object. The returned object carries a
+#'   `"rotation"` attribute (a list with `method`, `n_lv`,
+#'   `scores`, `loadings`, `rotmat`) so users can extract the
+#'   rotated factor scores and loadings without re-running
+#'   `ordinate()`. Access via `attr(p, "rotation")`.
 #'
 #' @details
-#' For sampled-Z fits the PLT (positive lower-triangular)
-#' identification used during MCMC is dissolved by the SVD
-#' re-rotation: the axes labelled "Latent variable 1" and
-#' "Latent variable 2" are SVD-rotated ordination gradients,
-#' NOT the original Stan factors. Use [plot_factors()] to view
-#' the un-rotated sampled factors directly.
+#' For sampled-Z fits the Stan model imposes a lower-triangular
+#' pattern on `Z` during MCMC to keep the factor model
+#' identified. Under `rotation = "svd"` (default) the axes are
+#' SVD-rotated ordination gradients, NOT the original Stan
+#' factors. Under `rotation = "varimax"` / `"promax"` the axes
+#' are rotated for sparsity rather than variance; the Stan
+#' lower-triangular pattern is preserved in the underlying fit
+#' but not visible in the plot. Use `rotation = "none"` (or
+#' [plot_factors()]) to view the un-rotated Stan factors
+#' directly.
 #'
-#' For fixed-Z fits supplied via `trend_map`, the SVD step
-#' rotates loadings out of the structural pattern the user
-#' encoded. The biplot is still useful as an exploratory
-#' gradient-finding tool, but should NOT be read as a
-#' visualisation of the user's specified factor structure. A
-#' one-time warning is emitted when called on a fixed-Z fit;
+#' For fixed-Z fits supplied via `trend_map`, ANY non-`"none"`
+#' rotation discards the structural loadings the user encoded.
+#' A one-time warning is emitted when called on a fixed-Z fit;
 #' `plot_factors(fit)` shows the raw user-supplied loadings.
 #'
 #' @section Known limitations:
 #' \itemize{
-#'   \item Posterior-median plug-in: the SVD operates on per-
-#'     element medians of `lv_trend` and `Z`. Uncertainty in
+#'   \item Posterior-median plug-in: the rotation operates on
+#'     per-element medians of `lv_trend` and `Z`. Uncertainty in
 #'     site scores and loading positions is not propagated to
 #'     the biplot.
-#'   \item Sign indeterminacy: SVD columns are sign-arbitrary,
-#'     so comparing ordinations from independently-fit models
-#'     may require a manual sign-flip alignment.
+#'   \item Sign indeterminacy: SVD and varimax columns are sign-
+#'     arbitrary, so comparing ordinations from independently-
+#'     fit models may require a manual sign-flip alignment.
 #' }
 #'
 #' @author Nicholas J Clark
@@ -316,6 +474,7 @@ ordinate.mvgam <- function(
   which_lvs = c(1L, 2L),
   biplot = TRUE,
   alpha = 0.5,
+  rotation = c("svd", "varimax", "promax", "none"),
   label_sites = TRUE,
   ...
 ) {

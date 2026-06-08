@@ -431,6 +431,15 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
   mvgam_object$call <- match.call(sys.function(sys.parent()),
                                  sys.call(sys.parent()))
 
+  # Force sign-canonical factor orientation so saved Z and
+  # lv_trend draws have Z[k, k] >= 0 per draw. No-op when the
+  # fit has no latent factors or when Z is fixed via trend_map.
+  # Removes the 2^n_lv sign-mode equivalence the lower-triangular
+  # Z constraint leaves identifiable up to, so Rhat / ESS /
+  # mcmc_trace / posterior medians all behave correctly on the
+  # saved draws.
+  mvgam_object <- sign_canonicalise_factors(mvgam_object)
+
   return(mvgam_object)
 }
 
