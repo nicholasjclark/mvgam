@@ -151,10 +151,19 @@ mu_biomass += mu_biomass_trend;
 1. **Detection**: Factor models triggered by `n_lv < n_series` on compatible trend types
 2. **Validation**: Registry-based compatibility checking prevents invalid factor models
 3. **Variance Constraint**: Dynamic factor variances must be fixed to 1 for identifiability
-4. **Matrix Z Location**: Estimated in `parameters` block (factor model) vs `transformed data` (non-factor), or supplied in `data` block when trend mapping
+4. **Matrix Z Location**: Three branches handled by `generate_matrix_z_multiblock_stanvars()`:
+   - Sampled Z (default factor model): `parameters` block, lower-triangular construction in `transformed parameters` from `Z_raw` vector, prior `Z_raw ~ student_t(3, 0, 1)` in `model` block
+   - Fixed Z (user supplied via `trend_map`): `data` block matrix, no Z_raw declaration, no prior; identification comes from the user's structural choices
+   - Non-factor (`n_lv >= n_series`): identity Z in `transformed data` block (no sampling cost)
 5. **Universal Computation**: All trend models use `trend[i, s] = dot_product(Z[s, :], LV[i, :]) + mu_trend[times_trend[i, s]]`
 6. **Code Deduplication**: Shared utility functions ensure consistent patterns across trend types
 7. **Registration**: New trend types must explicitly declare factor compatibility in registry
+
+**Fixed loadings via `trend_map`**: User-facing surface for supplying Z directly. Three input shapes (numeric matrix, `data.frame(series, trend)`, character codes `"identity"` / `"shared"`) all normalise to a numeric `n_series x n_lv` matrix that persists on `object$trend_metadata$fixed_Z`. Accepted at the trend constructor or as a top-level `mvgam(trend_map = ...)` alias.
+
+**Single Z resolver**: `resolve_factor_loadings()` in `R/plot_helpers.R` is the one place that returns per-draw Z for any consumer (residual_cor, plot_factors, ordinate, sample_innovations). It branches on `trend_metadata$fixed_Z` and either broadcasts the fixed matrix or parses `Z[i, j]` posterior columns.
+
+**Sign-canonical saved draws**: `sign_canonicalise_factors()` in `R/sign_canonical.R` runs once at fit time, flipping Z columns and matching `lv_trend` columns so every saved draw has `Z[k, k] >= 0`. The `Z * lv_trend` product is invariant, so likelihood and saved `trend` draws are unchanged; the fix removes the `2^n_lv` sign-mode equivalence that the lower-triangular Z constraint alone leaves identifiable up to. Without it, MCMC chains drift between sign modes and downstream diagnostics (Rhat, ESS, mcmc_trace, posterior medians) misreport. Skipped for non-factor and fixed-Z fits.
 
 ### 3. Code Deduplication for User Extensibility
 
