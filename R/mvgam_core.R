@@ -134,6 +134,38 @@
 #' mod3 <- update(mod, formula. = ~ . + s(time))
 #' }
 #'
+#' @references
+#' Clark, N. J. and Wells, K. (2023). Dynamic Generalized
+#' Additive Models for forecasting discrete ecological time
+#' series. \emph{Methods in Ecology and Evolution}, 14:771-784.
+#' \doi{10.1111/2041-210X.13974}
+#'
+#' Burkner, P.-C. (2017). brms: An R package for Bayesian
+#' multilevel models using Stan. \emph{Journal of Statistical
+#' Software}, 80(1):1-28. \doi{10.18637/jss.v080.i01}
+#'
+#' Wood, S. N. (2017). \emph{Generalized Additive Models: An
+#' Introduction with R} (2nd edition). Chapman and Hall/CRC.
+#'
+#' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
+#' distributions for the covariance matrix in latent factor
+#' models. \emph{Statistics and Computing}, 34:143.
+#' \doi{10.1007/s11222-024-10454-0} (post-hoc QR identification
+#' of latent factor loadings; structured \code{loadings_prior}
+#' construction.)
+#'
+#' Riutort-Mayol, G., Burkner, P.-C., Andersen, M. R., Solin, A.
+#' and Vehtari, A. (2023). Practical Hilbert space approximate
+#' Bayesian Gaussian processes for probabilistic programming.
+#' \emph{Statistics and Computing}, 33:1.
+#' \doi{10.1007/s11222-022-10167-2} (used when \code{formula}
+#' or \code{trend_formula} contains \code{gp()} terms.)
+#'
+#' Use \code{how_to_cite(fit)} for a citation-ready methods
+#' description that adapts to the model's actual structure
+#' (trend type, factor identification, sampling algorithm,
+#' backend).
+#'
 #' @export
 mvgam <- function(formula, trend_formula = NULL, data = NULL,
                            newdata = NULL,

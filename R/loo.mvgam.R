@@ -49,6 +49,12 @@
 #' \code{\link{forecast.mvgam}}, \code{\link{score.mvgam_forecast}},
 #' \code{\link{lfo_cv}}).
 #'
+#' @references
+#' Vehtari, A., Gelman, A. and Gabry, J. (2017). Practical
+#' Bayesian model evaluation using leave-one-out cross-validation
+#' and WAIC. \emph{Statistics and Computing}, 27:1413-1432.
+#' \doi{10.1007/s11222-016-9696-4}
+#'
 #' @author Nicholas J Clark
 #'
 #' @examples

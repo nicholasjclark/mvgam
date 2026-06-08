@@ -10,73 +10,49 @@ how_to_cite(object, ...)
 \method{how_to_cite}{mvgam}(object, ...)
 }
 \arguments{
-\item{object}{\code{list} object of class \code{mvgam} resulting from a call
-to \code{\link[=mvgam]{mvgam()}} or \code{\link[=jsdgam]{jsdgam()}}}
+\item{object}{A fitted \code{mvgam} or \code{jsdgam} object.}
 
-\item{...}{ignored}
+\item{...}{Currently ignored.}
 }
 \value{
-An object of class \code{how_to_cite} containing a text description
-of the methods as well as lists of both primary and additional references.
+An object of class \code{how_to_cite} carrying a
+\code{methods_text} skeleton, the matched \code{citations}, a
+curated \code{other_citations} block, and a \code{bibtex} list
+keyed by reference handle. Use \code{bibtex(x)} to extract the
+BibTeX entries; the default \code{print()} method renders all
+sections together.
 }
 \description{
-Create a brief but fully referenced methods description, along with a useful
-list of references, for fitted \code{mvgam} and \code{jsdgam} models.
-}
-\details{
-This function uses the model's structure to come up with a very
-basic but hopefully useful methods description that can help users to
-appropriately acknowledge the hard work of developers and champion open
-science. Please do not consider the text returned by this function to be a
-completely adequate methods section; it is only meant to get you started.
+Construct a methods skeleton plus a deduplicated reference
+list and BibTeX block for a fitted \code{mvgam} object. The
+assembled text and citation set are driven by the model's
+actual structure: the family / link, trend type, factor
+identification, structured loadings prior, GP smooths,
+piecewise trends, Stan backend, and sampling algorithm.
 }
 \examples{
 \donttest{
-#--------------------------------------------------
-# Simulate 4 time series with hierarchical seasonality
-# and a VAR(1) dynamic process
-#--------------------------------------------------
 set.seed(0)
-
 simdat <- sim_mvgam(
   seasonality = 'hierarchical',
   trend_model = VAR(cor = TRUE),
   family = gaussian()
 )
-
-# Fit an appropriate model
-mod1 <- mvgam(
+mod <- mvgam(
   y ~ s(season, bs = 'cc', k = 6),
+  trend_formula = ~ VAR(cor = TRUE),
   data = simdat$data_train,
   family = gaussian(),
-  trend_model = VAR(cor = TRUE),
   chains = 2,
   silent = 2
 )
-
-how_to_cite(mod1)
-
-#--------------------------------------------------
-# For a GP example, simulate data using the mgcv package
-#--------------------------------------------------
-dat <- mgcv::gamSim(1, n = 30, scale = 2)
-
-# Fit a model that uses an approximate GP from brms
-mod2 <- mvgam(
-  y ~ gp(x2, k = 12),
-  data = dat,
-  family = gaussian(),
-  chains = 2,
-  silent = 2
-)
-
-how_to_cite(mod2)
+how_to_cite(mod)
+cat(bibtex(how_to_cite(mod)))
 }
 
 }
 \seealso{
-\code{\link[utils]{citation}}, \code{\link{mvgam}},
-\code{\link{jsdgam}}
+\code{\link[utils]{citation}}, \code{\link{mvgam}}
 }
 \author{
 Nicholas J Clark

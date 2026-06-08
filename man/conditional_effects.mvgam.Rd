@@ -73,6 +73,12 @@ interactions. A thin wrapper around
 model's term labels (across both observation and trend submodels)
 and produces one ggplot per term.
 }
+\references{
+Arel-Bundock, V., Greifer, N. and Heiss, A. (2024). How to
+interpret statistical models using marginaleffects for R and
+Python. \emph{Journal of Statistical Software}, 111(9):1-32.
+\doi{10.18637/jss.v111.i09}
+}
 \seealso{
 \code{\link[marginaleffects:plot_predictions]{marginaleffects::plot_predictions()}} for the underlying
 conditional-effect engine,

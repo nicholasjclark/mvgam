@@ -50,6 +50,12 @@
 #'   (`fixef`, `rhat`, `bayes_R2`, ...),
 #'   [mvgam_draws] for raw draws extraction
 #'
+#' @references
+#' Arel-Bundock, V., Greifer, N. and Heiss, A. (2024). How to
+#' interpret statistical models using marginaleffects for R and
+#' Python. \emph{Journal of Statistical Software}, 111(9):1-32.
+#' \doi{10.18637/jss.v111.i09}
+#'
 #' @author Nicholas J Clark
 #' @method conditional_effects mvgam
 #' @export

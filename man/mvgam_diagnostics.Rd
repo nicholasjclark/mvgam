@@ -108,6 +108,13 @@ S3 methods that surface Stan / NUTS diagnostics for fitted
 on the underlying stanfit (\code{nuts_params}, \code{log_posterior}) or to
 \verb{posterior::} summaries on the draws array.
 }
+\references{
+Vehtari, A., Gelman, A., Simpson, D., Carpenter, B. and
+Burkner, P.-C. (2021). Rank-normalization, folding, and
+localization: An improved Rhat for assessing convergence of
+MCMC. \emph{Bayesian Analysis}, 16(2):667-718.
+\doi{10.1214/20-BA1221}
+}
 \seealso{
 \link{mvgam_draws} for raw posterior-draw extraction,
 \code{\link[=summary.mvgam]{summary.mvgam()}} for a printed model summary,

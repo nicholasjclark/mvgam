@@ -164,6 +164,12 @@ pp_check(mod, prefix = "ppd")
 }
 
 }
+\references{
+Gabry, J., Simpson, D., Vehtari, A., Betancourt, M. and
+Gelman, A. (2019). Visualization in Bayesian workflow.
+\emph{Journal of the Royal Statistical Society A}, 182:389-402.
+\doi{10.1111/rssa.12378}
+}
 \seealso{
 \code{\link{predict.mvgam}}, \code{\link[=log_lik.mvgam]{log_lik.mvgam()}}
 }

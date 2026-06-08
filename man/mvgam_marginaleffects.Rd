@@ -12,4 +12,10 @@ by \code{get_predict}, so \code{get_coef} / \code{get_vcov} / \code{set_coef} ex
 mostly to satisfy the S3 surface — they are not load-bearing for
 predictions or slopes.
 }
+\references{
+Arel-Bundock, V., Greifer, N. and Heiss, A. (2024). How to
+interpret statistical models using marginaleffects for R and
+Python. \emph{Journal of Statistical Software}, 111(9):1-32.
+\doi{10.18637/jss.v111.i09}
+}
 \keyword{internal}

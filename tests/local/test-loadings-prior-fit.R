@@ -110,6 +110,48 @@ test_that("loadings_prior fit recovers within-cluster residual correlation", {
 })
 
 
+test_that("shared_variation() recovers block structure of true Delta", {
+  require_fixtures("val_mvgam_loadings_prior.rds")
+  fit <- load_mvgam("loadings_prior")
+  truth <- load_loadings_prior_truth()
+  sv <- shared_variation(fit)
+  expect_s3_class(sv, "mvgam_shared_variation")
+  expect_equal(sv$n_series, 8L)
+  expect_equal(sv$n_lv, 3L)
+  expect_equal(dim(sv$delta), c(8L, 8L))
+  expect_equal(rownames(sv$delta), truth$Z_true |> rownames())
+  # Within-cluster Delta should dominate between-cluster Delta
+  # because cluster A and cluster B load on disjoint primary
+  # factors plus a shared factor 3.
+  cl <- truth$cluster
+  within_idx <- outer(cl, cl, "==") & upper.tri(sv$delta)
+  between_idx <- outer(cl, cl, "!=") & upper.tri(sv$delta)
+  expect_gt(mean(sv$delta[within_idx]),
+            mean(sv$delta[between_idx]))
+  # Diagonal entries are positive variances by construction.
+  expect_true(all(diag(sv$delta) > 0))
+})
+
+
+test_that("summary() shows the loadings_prior block when present", {
+  require_fixtures("val_mvgam_loadings_prior.rds")
+  fit <- load_mvgam("loadings_prior")
+  s <- summary(fit)
+  expect_false(is.null(s$loadings_prior))
+  block_vars <- rownames(s$loadings_prior)
+  # One theta_features per encoded column (1 continuous + 2
+  # one-hot cluster indicators = 3 columns) plus one
+  # theta_dist_<name> per supplied distance matrix.
+  expect_true(all(c(
+    "theta_features[1]", "theta_features[2]", "theta_features[3]",
+    "theta_dist_cluster"
+  ) %in% block_vars))
+  # varrho_inv is intentionally hidden: uninterpretable on its
+  # own (cumulative-product parameter for Psi_diag).
+  expect_false(any(grepl("^varrho_inv", block_vars)))
+})
+
+
 test_that("loadings_prior fit recovers the dominant cluster contrast", {
   require_fixtures("val_mvgam_loadings_prior.rds")
   fit <- load_mvgam("loadings_prior")

@@ -124,6 +124,12 @@
 #'
 #' @export pp_check
 #'
+#' @references
+#' Gabry, J., Simpson, D., Vehtari, A., Betancourt, M. and
+#' Gelman, A. (2019). Visualization in Bayesian workflow.
+#' \emph{Journal of the Royal Statistical Society A}, 182:389-402.
+#' \doi{10.1111/rssa.12378}
+#'
 #' @author Nicholas J Clark
 #'
 #' @export

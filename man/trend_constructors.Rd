@@ -506,6 +506,16 @@ Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
 distributions for the covariance matrix in latent factor
 models. \emph{Statistics and Computing}, 34:143.
 \doi{10.1007/s11222-024-10454-0}
+
+Heaps, S. E. (2023). Enforcing stationarity through the prior
+in vector autoregressions. \emph{Journal of Computational and
+Graphical Statistics}, 32:74-83. (VAR stationarity prior used
+for \code{VAR()} trends.)
+
+Clark, N. J., Ernest, S. K. M., Senyondo, H., Simonis, J.,
+White, E. P., Yenni, G. M. and Karunarathna, K. A. N. K.
+(2025). Beyond single-species models: multispecies forecasts
+for ecological predictability. \emph{PeerJ}, 13:e18929.
 }
 \author{
 Nicholas J Clark

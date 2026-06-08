@@ -9,6 +9,13 @@
 #' predictions or slopes.
 #'
 #' @name mvgam_marginaleffects
+#'
+#' @references
+#' Arel-Bundock, V., Greifer, N. and Heiss, A. (2024). How to
+#' interpret statistical models using marginaleffects for R and
+#' Python. \emph{Journal of Statistical Software}, 111(9):1-32.
+#' \doi{10.18637/jss.v111.i09}
+#'
 #' @keywords internal
 NULL
 

@@ -297,15 +297,18 @@ mvgam_diverging_scale <- function(
 
 #' Melt a symmetric matrix into a long data.frame keyed by
 #' `Var1` / `Var2` with the numeric entries in a single `value`
-#' column. The upper triangle and the diagonal are set to `NA`
-#' before melting so the heatmap shows only the lower triangle
-#' of off-diagonal entries — `scale_fill_gradient2`'s `na.value`
-#' renders the omitted cells in the panel background.
+#' column. By default the upper triangle and the diagonal are
+#' set to `NA` before melting so the heatmap shows only the
+#' lower triangle of off-diagonal entries (suits a correlation
+#' matrix where the diagonal is uninformative). Toggle
+#' `drop_diag` / `drop_upper` to keep both for use cases like
+#' a covariance matrix where the diagonal carries inferential
+#' signal or the symmetric upper triangle helps readability.
 #'
 #' @noRd
-gather_matrix <- function(mat) {
-  mat[upper.tri(mat)] <- NA
-  diag(mat) <- NA
+gather_matrix <- function(mat, drop_diag = TRUE, drop_upper = TRUE) {
+  if (drop_upper) mat[upper.tri(mat)] <- NA
+  if (drop_diag) diag(mat) <- NA
   if (is.null(dimnames(mat))) {
     grid <- expand.grid(seq.int(NROW(mat)), seq.int(NCOL(mat)))
   } else {

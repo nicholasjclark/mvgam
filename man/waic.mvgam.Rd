@@ -38,6 +38,12 @@ Compute the WAIC by passing pointwise log-likelihoods from
 \code{\link[=loo.mvgam]{loo.mvgam()}} method (LOO-PSIS) is usually preferred for posterior
 model comparison.
 }
+\references{
+Vehtari, A., Gelman, A. and Gabry, J. (2017). Practical
+Bayesian model evaluation using leave-one-out cross-validation
+and WAIC. \emph{Statistics and Computing}, 27:1413-1432.
+\doi{10.1007/s11222-016-9696-4}
+}
 \seealso{
 \code{\link[=loo.mvgam]{loo.mvgam()}}, \code{\link[=log_lik.mvgam]{log_lik.mvgam()}}.
 }

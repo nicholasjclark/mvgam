@@ -1,357 +1,608 @@
 #' Generate a methods description for \pkg{mvgam} models
 #'
-#' Create a brief but fully referenced methods description, along with a useful
-#' list of references, for fitted \code{mvgam} and \code{jsdgam} models.
+#' Construct a methods skeleton plus a deduplicated reference
+#' list and BibTeX block for a fitted `mvgam` object. The
+#' assembled text and citation set are driven by the model's
+#' actual structure: the family / link, trend type, factor
+#' identification, structured loadings prior, GP smooths,
+#' piecewise trends, Stan backend, and sampling algorithm.
 #'
 #' @name how_to_cite.mvgam
 #'
-#' @param object \code{list} object of class \code{mvgam} resulting from a call
-#' to [mvgam()] or [jsdgam()]
+#' @param object A fitted `mvgam` or `jsdgam` object.
+#' @param ... Currently ignored.
 #'
-#' @param ... ignored
-#'
-#' @details This function uses the model's structure to come up with a very
-#' basic but hopefully useful methods description that can help users to
-#' appropriately acknowledge the hard work of developers and champion open
-#' science. Please do not consider the text returned by this function to be a
-#' completely adequate methods section; it is only meant to get you started.
-#'
-#' @return An object of class \code{how_to_cite} containing a text description
-#' of the methods as well as lists of both primary and additional references.
+#' @return An object of class `how_to_cite` carrying a
+#'   `methods_text` skeleton, the matched `citations`, a
+#'   curated `other_citations` block, and a `bibtex` list
+#'   keyed by reference handle. Use `bibtex(x)` to extract the
+#'   BibTeX entries; the default `print()` method renders all
+#'   sections together.
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso \code{\link[utils]{citation}}, \code{\link{mvgam}},
-#' \code{\link{jsdgam}}
+#' @seealso \code{\link[utils]{citation}}, \code{\link{mvgam}}
 #'
 #' @examples
 #' \donttest{
-#' #--------------------------------------------------
-#' # Simulate 4 time series with hierarchical seasonality
-#' # and a VAR(1) dynamic process
-#' #--------------------------------------------------
 #' set.seed(0)
-#'
 #' simdat <- sim_mvgam(
 #'   seasonality = 'hierarchical',
 #'   trend_model = VAR(cor = TRUE),
 #'   family = gaussian()
 #' )
-#'
-#' # Fit an appropriate model
-#' mod1 <- mvgam(
+#' mod <- mvgam(
 #'   y ~ s(season, bs = 'cc', k = 6),
+#'   trend_formula = ~ VAR(cor = TRUE),
 #'   data = simdat$data_train,
 #'   family = gaussian(),
-#'   trend_model = VAR(cor = TRUE),
 #'   chains = 2,
 #'   silent = 2
 #' )
-#'
-#' how_to_cite(mod1)
-#'
-#' #--------------------------------------------------
-#' # For a GP example, simulate data using the mgcv package
-#' #--------------------------------------------------
-#' dat <- mgcv::gamSim(1, n = 30, scale = 2)
-#'
-#' # Fit a model that uses an approximate GP from brms
-#' mod2 <- mvgam(
-#'   y ~ gp(x2, k = 12),
-#'   data = dat,
-#'   family = gaussian(),
-#'   chains = 2,
-#'   silent = 2
-#' )
-#'
-#' how_to_cite(mod2)
+#' how_to_cite(mod)
+#' cat(bibtex(how_to_cite(mod)))
 #' }
 #'
-#'@export
+#' @export
 how_to_cite <- function(object, ...) {
   UseMethod("how_to_cite", object)
 }
 
-#'@export
-print.how_to_cite <- function(x, ...) {
-  cat("Methods text skeleton\n")
-  cat(insight::format_message(x$methods_text))	
-  cat('\n')
 
-  cat("\nPrimary references\n")
-  for (i in seq_along(x$citations)) {
-    cat(insight::format_message(x$citations[[i]]))
-    cat('\n')
-  }
-
-  cat("\nOther useful references\n")
-  for (i in seq_along(x$other_citations)) {
-    cat(insight::format_message(x$other_citations[[i]]))
-    cat('\n')
-  }
-
-  invisible(x)
+# Reference database: each entry carries the rendered text
+# citation (matching the in-text "(Author Year)" pointers) and
+# a BibTeX entry. New citations should be added here and
+# referenced by key from the detection table below.
+#'@noRd
+reference_db <- function() {
+  list(
+    clark_dgam = list(
+      text = "Clark NJ and Wells K (2023). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. Methods in Ecology and Evolution, 14, 771-784. https://doi.org/10.1111/2041-210X.13974",
+      bibtex = paste(
+        "@article{clark2023dgam,",
+        "  title = {Dynamic Generalized Additive Models {(DGAMs)} for forecasting discrete ecological time series},",
+        "  author = {Clark, Nicholas J. and Wells, Konstans},",
+        "  journal = {Methods in Ecology and Evolution},",
+        "  volume = {14},",
+        "  pages = {771--784},",
+        "  year = {2023},",
+        "  doi = {10.1111/2041-210X.13974}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    burkner_brms = list(
+      text = "Burkner PC (2017). brms: An R Package for Bayesian Multilevel Models Using Stan. Journal of Statistical Software, 80(1), 1-28. https://doi.org/10.18637/jss.v080.i01",
+      bibtex = paste(
+        "@article{burkner2017brms,",
+        "  title = {{brms}: An {R} Package for {B}ayesian Multilevel Models Using {S}tan},",
+        "  author = {B{\\\"u}rkner, Paul-Christian},",
+        "  journal = {Journal of Statistical Software},",
+        "  volume = {80},",
+        "  number = {1},",
+        "  pages = {1--28},",
+        "  year = {2017},",
+        "  doi = {10.18637/jss.v080.i01}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    wood_gam = list(
+      text = "Wood SN (2017). Generalized Additive Models: An Introduction with R (2nd edition). Chapman and Hall/CRC.",
+      bibtex = paste(
+        "@book{wood2017gam,",
+        "  title = {Generalized Additive Models: An Introduction with {R}},",
+        "  author = {Wood, Simon N.},",
+        "  publisher = {Chapman and Hall/CRC},",
+        "  edition = {2},",
+        "  year = {2017}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    stan = list(
+      text = "Carpenter B, Gelman A, Hoffman MD, Lee D, Goodrich B, Betancourt M, Brubaker M, Guo J, Li P and Riddell A (2017). Stan: A probabilistic programming language. Journal of Statistical Software 76.",
+      bibtex = paste(
+        "@article{carpenter2017stan,",
+        "  title = {{Stan}: A Probabilistic Programming Language},",
+        "  author = {Carpenter, Bob and Gelman, Andrew and Hoffman, Matthew D. and Lee, Daniel and Goodrich, Ben and Betancourt, Michael and Brubaker, Marcus and Guo, Jiqiang and Li, Peter and Riddell, Allen},",
+        "  journal = {Journal of Statistical Software},",
+        "  volume = {76},",
+        "  year = {2017},",
+        "  doi = {10.18637/jss.v076.i01}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    cmdstanr = list(
+      text = "Gabry J, Cesnovar R, Johnson A and Bronder S (2024). cmdstanr: R Interface to 'CmdStan'. https://mc-stan.org/cmdstanr/",
+      bibtex = paste(
+        "@misc{gabry2024cmdstanr,",
+        "  title = {{cmdstanr}: {R} Interface to {'CmdStan'}},",
+        "  author = {Gabry, Jonah and {\\v C}e{\\v s}novar, Rok and Johnson, Andrew and Bronder, Steve},",
+        "  year = {2024},",
+        "  url = {https://mc-stan.org/cmdstanr/}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    rstan = list(
+      text = "Stan Development Team (2024). RStan: the R interface to Stan. https://mc-stan.org/",
+      bibtex = paste(
+        "@misc{standevteam2024rstan,",
+        "  title = {{RStan}: the {R} interface to {Stan}},",
+        "  author = {{Stan Development Team}},",
+        "  year = {2024},",
+        "  url = {https://mc-stan.org/}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    vehtari_rhat = list(
+      text = "Vehtari A, Gelman A, Simpson D, Carpenter B and Burkner P (2021). Rank-normalization, folding, and localization: An improved Rhat for assessing convergence of MCMC. Bayesian Analysis 16(2), 667-718. https://doi.org/10.1214/20-BA1221",
+      bibtex = paste(
+        "@article{vehtari2021rhat,",
+        "  title = {Rank-Normalization, Folding, and Localization: {A}n Improved {R-hat} for Assessing Convergence of {MCMC}},",
+        "  author = {Vehtari, Aki and Gelman, Andrew and Simpson, Daniel and Carpenter, Bob and B{\\\"u}rkner, Paul-Christian},",
+        "  journal = {Bayesian Analysis},",
+        "  volume = {16},",
+        "  number = {2},",
+        "  pages = {667--718},",
+        "  year = {2021},",
+        "  doi = {10.1214/20-BA1221}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    kucukelbir_advi = list(
+      text = "Kucukelbir A, Tran D, Ranganath R, Gelman A and Blei DM (2017). Automatic Differentiation Variational Inference. Journal of Machine Learning Research 18, 1-45.",
+      bibtex = paste(
+        "@article{kucukelbir2017advi,",
+        "  title = {Automatic Differentiation Variational Inference},",
+        "  author = {Kucukelbir, Alp and Tran, Dustin and Ranganath, Rajesh and Gelman, Andrew and Blei, David M.},",
+        "  journal = {Journal of Machine Learning Research},",
+        "  volume = {18},",
+        "  pages = {1--45},",
+        "  year = {2017}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    zhang_pathfinder = list(
+      text = "Zhang L, Carpenter B, Gelman A and Vehtari A (2022). Pathfinder: parallel Quasi-Newton variational inference. Journal of Machine Learning Research 23(306), 1-49.",
+      bibtex = paste(
+        "@article{zhang2022pathfinder,",
+        "  title = {Pathfinder: parallel Quasi-{N}ewton variational inference},",
+        "  author = {Zhang, Lu and Carpenter, Bob and Gelman, Andrew and Vehtari, Aki},",
+        "  journal = {Journal of Machine Learning Research},",
+        "  volume = {23},",
+        "  number = {306},",
+        "  pages = {1--49},",
+        "  year = {2022}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    heaps_var = list(
+      text = "Heaps SE (2023). Enforcing stationarity through the prior in vector autoregressions. Journal of Computational and Graphical Statistics 32, 74-83.",
+      bibtex = paste(
+        "@article{heaps2023var,",
+        "  title = {Enforcing stationarity through the prior in vector autoregressions},",
+        "  author = {Heaps, Sarah E.},",
+        "  journal = {Journal of Computational and Graphical Statistics},",
+        "  volume = {32},",
+        "  pages = {74--83},",
+        "  year = {2023}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    clark_multispecies = list(
+      text = "Clark NJ, Ernest SKM, Senyondo H, Simonis J, White EP, Yenni GM and Karunarathna KANK (2025). Beyond single-species models: leveraging multispecies forecasts to navigate the dynamics of ecological predictability. PeerJ 13, e18929.",
+      bibtex = paste(
+        "@article{clark2025multispecies,",
+        "  title = {Beyond single-species models: leveraging multispecies forecasts to navigate the dynamics of ecological predictability},",
+        "  author = {Clark, Nicholas J. and Ernest, S. K. Morgan and Senyondo, Henry and Simonis, Juniper and White, Ethan P. and Yenni, Glenda M. and Karunarathna, K. A. N. K.},",
+        "  journal = {PeerJ},",
+        "  volume = {13},",
+        "  pages = {e18929},",
+        "  year = {2025}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    riutort_gp = list(
+      text = "Riutort-Mayol G, Burkner PC, Andersen MR, Solin A and Vehtari A (2023). Practical Hilbert space approximate Bayesian Gaussian processes for probabilistic programming. Statistics and Computing 33, 1. https://doi.org/10.1007/s11222-022-10167-2",
+      bibtex = paste(
+        "@article{riutort2023gp,",
+        "  title = {Practical {H}ilbert space approximate {B}ayesian {G}aussian processes for probabilistic programming},",
+        "  author = {Riutort-Mayol, Gabriel and B{\\\"u}rkner, Paul-Christian and Andersen, Michael R. and Solin, Arno and Vehtari, Aki},",
+        "  journal = {Statistics and Computing},",
+        "  volume = {33},",
+        "  pages = {1},",
+        "  year = {2023},",
+        "  doi = {10.1007/s11222-022-10167-2}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    taylor_pw = list(
+      text = "Taylor S and Letham B (2018). Forecasting at scale. The American Statistician 72(1), 37-45. https://doi.org/10.1080/00031305.2017.1380080",
+      bibtex = paste(
+        "@article{taylor2018prophet,",
+        "  title = {Forecasting at scale},",
+        "  author = {Taylor, Sean J. and Letham, Benjamin},",
+        "  journal = {The American Statistician},",
+        "  volume = {72},",
+        "  number = {1},",
+        "  pages = {37--45},",
+        "  year = {2018},",
+        "  doi = {10.1080/00031305.2017.1380080}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    heaps_jermyn = list(
+      text = "Heaps SE and Jermyn IH (2024). Structured prior distributions for the covariance matrix in latent factor models. Statistics and Computing 34, 143. https://doi.org/10.1007/s11222-024-10454-0",
+      bibtex = paste(
+        "@article{heaps2024structured,",
+        "  title = {Structured prior distributions for the covariance matrix in latent factor models},",
+        "  author = {Heaps, Sarah E. and Jermyn, Ian H.},",
+        "  journal = {Statistics and Computing},",
+        "  volume = {34},",
+        "  pages = {143},",
+        "  year = {2024},",
+        "  doi = {10.1007/s11222-024-10454-0}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    bhattacharya_mgp = list(
+      text = "Bhattacharya A and Dunson DB (2011). Sparse Bayesian infinite factor models. Biometrika 98, 291-306. https://doi.org/10.1093/biomet/asr013",
+      bibtex = paste(
+        "@article{bhattacharya2011mgp,",
+        "  title = {Sparse {B}ayesian infinite factor models},",
+        "  author = {Bhattacharya, Anirban and Dunson, David B.},",
+        "  journal = {Biometrika},",
+        "  volume = {98},",
+        "  pages = {291--306},",
+        "  year = {2011},",
+        "  doi = {10.1093/biomet/asr013}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    arel_bundock_marginaleffects = list(
+      text = "Arel-Bundock V, Greifer N and Heiss A (2024). How to interpret statistical models using marginaleffects for R and Python. Journal of Statistical Software, 111(9), 1-32. https://doi.org/10.18637/jss.v111.i09",
+      bibtex = paste(
+        "@article{arelbundock2024marginal,",
+        "  title = {How to interpret statistical models using {marginaleffects} for {R} and {Python}},",
+        "  author = {Arel-Bundock, Vincent and Greifer, Noah and Heiss, Andrew},",
+        "  journal = {Journal of Statistical Software},",
+        "  volume = {111},",
+        "  number = {9},",
+        "  pages = {1--32},",
+        "  year = {2024},",
+        "  doi = {10.18637/jss.v111.i09}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    gabry_workflow = list(
+      text = "Gabry J, Simpson D, Vehtari A, Betancourt M and Gelman A (2019). Visualization in Bayesian workflow. Journal of the Royal Statistical Society A, 182, 389-402. https://doi.org/10.1111/rssa.12378",
+      bibtex = paste(
+        "@article{gabry2019workflow,",
+        "  title = {Visualization in {B}ayesian workflow},",
+        "  author = {Gabry, Jonah and Simpson, Daniel and Vehtari, Aki and Betancourt, Michael and Gelman, Andrew},",
+        "  journal = {Journal of the Royal Statistical Society A},",
+        "  volume = {182},",
+        "  pages = {389--402},",
+        "  year = {2019},",
+        "  doi = {10.1111/rssa.12378}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    vehtari_loo = list(
+      text = "Vehtari A, Gelman A and Gabry J (2017). Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC. Statistics and Computing, 27, 1413-1432. https://doi.org/10.1007/s11222-016-9696-4",
+      bibtex = paste(
+        "@article{vehtari2017loo,",
+        "  title = {Practical {B}ayesian model evaluation using leave-one-out cross-validation and {WAIC}},",
+        "  author = {Vehtari, Aki and Gelman, Andrew and Gabry, Jonah},",
+        "  journal = {Statistics and Computing},",
+        "  volume = {27},",
+        "  pages = {1413--1432},",
+        "  year = {2017},",
+        "  doi = {10.1007/s11222-016-9696-4}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    burkner_lfo = list(
+      text = "Burkner PC, Gabry J and Vehtari A (2020). Approximate leave-future-out cross-validation for Bayesian time series models. Journal of Statistical Computation and Simulation, 90(14), 2499-2523. https://doi.org/10.1080/00949655.2020.1783262",
+      bibtex = paste(
+        "@article{burkner2020lfo,",
+        "  title = {Approximate leave-future-out cross-validation for {B}ayesian time series models},",
+        "  author = {B{\\\"u}rkner, Paul-Christian and Gabry, Jonah and Vehtari, Aki},",
+        "  journal = {Journal of Statistical Computation and Simulation},",
+        "  volume = {90},",
+        "  number = {14},",
+        "  pages = {2499--2523},",
+        "  year = {2020},",
+        "  doi = {10.1080/00949655.2020.1783262}",
+        "}",
+        sep = "\n"
+      )
+    )
+  )
 }
 
-#'@rdname how_to_cite.mvgam
-#'@method how_to_cite mvgam
-#'@export
-how_to_cite.mvgam <- function(object, ...) {
-  current_year <- format(Sys.Date(), "%Y")
-  citations <- vector(mode = 'list')
 
-  # mvgam-specific methods
-  mvgam_text <- paste0(
+# Predicate: does the fit use any approximate-GP smooth on the
+# observation or trend side? Scans the formulas for `gp(`. The
+# brms-integration architecture parses gp() smooths in the
+# brms formula machinery rather than carrying a separate
+# `gp_att_table` attribute, so the formula scan is the single
+# detection point that stays accurate as the architecture
+# evolves.
+#'@noRd
+uses_gp_smooth <- function(object) {
+  has_gp <- function(f) {
+    if (is.null(f)) return(FALSE)
+    txt <- if (inherits(f, "brmsformula")) {
+      paste(format(f$formula), collapse = " ")
+    } else {
+      paste(format(f), collapse = " ")
+    }
+    grepl("\\bgp\\(", txt)
+  }
+  has_gp(object$formula) || has_gp(object$trend_formula)
+}
+
+
+# Read sampling info from the stanfit S4 on `object$fit`.
+# mvgam normalises both rstan and cmdstanr output into a
+# stanfit, so the `stan_args` slot is the only access path
+# needed. Returns NULL when stan_args is empty (variational /
+# Laplace / Pathfinder fits).
+#'@noRd
+extract_sampling_info <- function(object) {
+  sa <- methods::slot(object$fit, "stan_args")
+  if (length(sa) == 0L) return(NULL)
+  list(
+    chains = length(sa),
+    warmup = sa[[1L]]$warmup %||% NA_integer_,
+    iter = sa[[1L]]$iter %||% NA_integer_
+  )
+}
+
+
+#' @rdname how_to_cite.mvgam
+#' @method how_to_cite mvgam
+#' @export
+how_to_cite.mvgam <- function(object, ...) {
+  db <- reference_db()
+
+  # Always-cited references: mvgam itself plus its essential
+  # upstream stack.
+  refs <- c("clark_dgam", "burkner_brms", "wood_gam")
+  methods_text <- paste0(
     "We used the R package mvgam (version ",
     utils::packageVersion("mvgam"),
     "; Clark & Wells, 2023) to construct, fit and interrogate the model.",
-    " mvgam fits Bayesian State-Space models that can include flexible",
-    " predictor effects in both the process and observation components",
-    " by incorporating functionalities from the brms (Burkner 2017),",
-    " mgcv (Wood 2017) and splines2 (Wang & Yan, 2023) packages."
+    " mvgam fits Bayesian state-space models that combine flexible",
+    " predictor effects in both the process and observation components,",
+    " building on functionality from the brms (Burkner 2017) and",
+    " mgcv (Wood 2017) packages."
   )
 
-  citations[[
-    1
-  ]] <- "Clark, NJ and Wells K (2023). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. Methods in Ecology and Evolution, 14, 771-784. doi.org/10.1111/2041-210X.13974"
-  citations[[
-    2
-  ]] <- "Burkner, PC (2017). brms: An R Package for Bayesian Multilevel Models Using Stan. Journal of Statistical Software, 80(1), 1-28. doi:10.18637/jss.v080.i01"
-  citations[[
-    3
-  ]] <- "Wood, SN (2017). Generalized Additive Models: An Introduction with R (2nd edition). Chapman and Hall/CRC."
-  citations[[
-    4
-  ]] <- "Wang W and Yan J (2021). Shape-Restricted Regression Splines with R Package splines2. Journal of Data Science, 19(3), 498-517. doi:10.6339/21-JDS1020 https://doi.org/10.6339/21-JDS1020."
+  trend_model <- object$trend_components$types[1L] %||% ""
 
-  # Any specials; first check whether this model used a VAR / VARMA process
-  specials_text <- NULL
-  trend_model <- attr(object$model_data, 'trend_model')
-  if (
-    trend_model %in%
-      c(
-        'VAR',
-        'VARcor',
-        'VARhiercor',
-        'VAR1',
-        'VAR1cor',
-        'VAR1hiercor',
-        'VARMA',
-        'VARMAcor',
-        'VARMA1,1cor'
-      )
-  ) {
-    specials_text <- c(
-      specials_text,
-      " To encourage stability and prevent forecast variance from increasing indefinitely, we enforced stationarity of the Vector Autoregressive process following methods described by Heaps (2023) and Clark et al. (2025)."
-    )
-    citations <- append(
-      citations,
-      list(
-        "Heaps, SE (2023). Enforcing stationarity through the prior in vector autoregressions. Journal of Computational and Graphical Statistics 32, 74-83."
-      )
-    )
-    citations <- append(
-      citations,
-      list(
-        "Clark NJ, Ernest SKM, Senyondo H, Simonis J, White EP, Yenni GM, Karunarathna KANK (2025). Beyond single-species models: leveraging multispecies forecasts to navigate the dynamics of ecological predictability. PeerJ 13:e18929."
-      )
-    )
-  }
-
-  # Check for approximate GPs (obs-side or trend-side gp() covariate
-  # smooths)
-  if (
-    !is.null(attr(object$mgcv_model, 'gp_att_table')) |
-      !is.null(attr(object$trend_mgcv_model, 'gp_att_table'))
-  ) {
-    specials_text <- c(
-      specials_text,
-      " Gaussian Process functional effects were estimated using a low-rank Hilbert space approximation following methods described by Riutort-Mayol et al. (2023)."
-    )
-    citations <- append(
-      citations,
-      list(
-        "Riutort-Mayol G, Burkner PC, Andersen MR, Solin A and Vehtari A (2023). Practical Hilbert space approximate Bayesian Gaussian processes for probabilistic programming. Statistics and Computing 33, 1. https://doi.org/10.1007/s11222-022-10167-2"
-      )
-    )
-  }
-
-  # Check for piecewise trends
-  if (
-    trend_model %in%
-      c('PWlogistic', 'PWlinear')
-  ) {
-    specials_text <- c(
-      specials_text,
-      " Piecewise dynamic trends were parameterized and estimated following methods described by Taylor and Letham (2018)."
-    )
-    citations <- append(
-      citations,
-      list(
-        "Taylor S and Letham B (2018). Forecasting at scale. The American Statistician 72(1) 37-45. https://doi.org/10.1080/00031305.2017.1380080"
-      )
-    )
-  }
-
-  # Was this a jsdgam?
-  if (inherits(object, 'jsdgam')) {
-    specials_text <- c(
-      specials_text,
-      " To ensure identifiability of factors, factor loadings were constrained following Lopes & West (2004)."
-    )
-    citations <- append(
-      citations,
-      list(
-        "Lopes HF and West M (2014). Bayesian model assessment in factor analysis. Statistica Sinica 14(1) 41-67. https://www.jstor.org/stable/24307179"
-      )
-    )
-  }
-
-  # Stan-specific methods
-  citations <- append(
-    citations,
+  # Detection table: each rule pairs a TRUE/FALSE predicate
+  # with the methods text it appends and the reference keys it
+  # adds. Keeping all conditional citations in one structure
+  # avoids scattering append() calls across the function and
+  # makes new citations a one-line addition.
+  rules <- list(
     list(
-      "Carpenter B, Gelman A, Hoffman MD, Lee D, Goodrich B, Betancourt M, Brubaker M, Guo J, Li P and Riddell A (2017). Stan: A probabilistic programming language. Journal of Statistical Software 76."
+      detect = grepl("^VAR", trend_model),
+      text = " To encourage stability and prevent forecast variance from increasing indefinitely, we enforced stationarity of the Vector Autoregressive process following Heaps (2023) and Clark et al. (2025).",
+      refs = c("heaps_var", "clark_multispecies")
+    ),
+    list(
+      detect = uses_gp_smooth(object),
+      text = " Gaussian Process functional effects were estimated using the low-rank Hilbert-space approximation of Riutort-Mayol et al. (2023).",
+      refs = "riutort_gp"
+    ),
+    list(
+      detect = trend_model %in% c("PWlogistic", "PWlinear"),
+      text = " Piecewise dynamic trends were parameterised following Taylor and Letham (2018).",
+      refs = "taylor_pw"
+    ),
+    list(
+      detect = !is.null(detect_factor_n_lv(object)),
+      text = " Latent-factor loadings were sampled unconstrained and identified post-hoc via thin QR decomposition following Heaps and Jermyn (2024).",
+      refs = "heaps_jermyn"
+    ),
+    list(
+      detect = !is.null(detect_factor_n_lv(object)) &&
+               uses_loadings_prior(object),
+      text = " Domain knowledge was encoded into the loadings prior via a structured matrix-normal distribution whose among-row scale was assembled from per-series features and pairwise distance matrices (Heaps and Jermyn, 2024).",
+      refs = "heaps_jermyn"
+    ),
+    list(
+      detect = !is.null(detect_factor_n_lv(object)) &&
+               !is.null(object$standata$mgp_a1),
+      text = " Column shrinkage on the factor variances used the multiplicative gamma process of Bhattacharya and Dunson (2011).",
+      refs = "bhattacharya_mgp"
     )
   )
 
-  stan_text <-
-    paste0(
-      " The mvgam-constructed model and observed data",
-      " were passed to the probabilistic programming environment Stan"
-    )
+  for (rule in rules) {
+    if (isTRUE(rule$detect)) {
+      methods_text <- paste0(methods_text, rule$text)
+      refs <- c(refs, rule$refs)
+    }
+  }
 
-  if (object$backend == 'cmdstanr') {
+  # Stan backend + algorithm.
+  refs <- c(refs, "stan")
+  backend <- object$backend %||% "rstan"
+  stan_text <- " The mvgam-constructed model and data were passed to Stan"
+  if (backend == "cmdstanr") {
     stan_text <- paste0(
       stan_text,
-      " (version ",
-      cmdstanr::cmdstan_version(),
-      "; Carpenter et al. 2017, Stan Development Team ",
-      current_year,
-      "), specifically through the cmdstanr interface (Gabry & Cesnovar, 2021)."
+      " (Carpenter et al. 2017) via the cmdstanr interface",
+      " (Gabry et al. 2024)."
     )
-    citations <- append(
-      citations,
-      list(paste0(
-        "Gabry J, Cesnovar R, Johnson A, and Bronder S (",
-        current_year,
-        "). cmdstanr: R Interface to 'CmdStan'. https://mc-stan.org/cmdstanr/, https://discourse.mc-stan.org."
-      ))
-    )
+    refs <- c(refs, "cmdstanr")
   } else {
     stan_text <- paste0(
       stan_text,
-      " (version ",
-      rstan::stan_version(),
-      "; Carpenter et al. 2017)",
-      ", specifically through the rstan interface (Stan Development Team ",
-      current_year,
-      ")"
+      " (Carpenter et al. 2017) via the rstan interface",
+      " (Stan Development Team 2024)."
     )
-    citations <- append(
-      citations,
-      list(paste0(
-        "Stan Development Team (",
-        current_year,
-        "). RStan: the R interface to Stan. R package version ",
-        utils::packageVersion("rstan"),
-        ". https://mc-stan.org/."
-      ))
-    )
+    refs <- c(refs, "rstan")
   }
 
-  if (object$algorithm == 'sampling') {
-    stan_text <- paste0(
-      stan_text,
-      " We ran ",
-      object$model_output@sim$chains,
-      " Hamiltonian Monte Carlo chains for ",
-      object$model_output@sim$warmup,
-      " warmup iterations and ",
-      object$model_output@sim$iter - object$model_output@sim$warmup,
-      " sampling iterations for joint posterior estimation.",
-      " Rank normalized split Rhat (Vehtari et al. 2021) and effective",
-      " sample sizes were used to monitor convergence."
-    )
-    citations <- append(
-      citations,
-      list(
-        "Vehtari A, Gelman A, Simpson D, Carpenter B, and Burkner P (2021). Rank-normalization, folding, and localization: An improved Rhat for assessing convergence of MCMC (with discussion). Bayesian Analysis 16(2) 667-718. https://doi.org/10.1214/20-BA1221."
+  algorithm <- object$algorithm %||% "sampling"
+  info <- extract_sampling_info(object)
+  if (algorithm == "sampling") {
+    if (!is.null(info)) {
+      stan_text <- paste0(
+        stan_text,
+        " We ran ", info$chains,
+        " Hamiltonian Monte Carlo chains for ", info$warmup,
+        " warmup iterations and ", info$iter - info$warmup,
+        " sampling iterations."
       )
-    )
-  }
-
-  if (object$algorithm %in% c('meanfield', 'fullrank')) {
+    } else {
+      stan_text <- paste0(
+        stan_text,
+        " We ran Hamiltonian Monte Carlo for joint posterior estimation."
+      )
+    }
     stan_text <- paste0(
       stan_text,
-      " We used Stan's Automatic Differentiation Variational Inference algorithm",
-      " (Kucukelbir et al. 2017) for posterior approximation, specifically using ",
-      object$algorithm,
-      " algorithm to draw ",
-      object$model_output@sim$iter,
+      " Rank-normalised split Rhat and effective sample sizes",
+      " (Vehtari et al. 2021) were used to monitor convergence."
+    )
+    refs <- c(refs, "vehtari_rhat")
+  } else if (algorithm %in% c("meanfield", "fullrank")) {
+    stan_text <- paste0(
+      stan_text,
+      " We used Stan's Automatic Differentiation Variational Inference",
+      " (Kucukelbir et al. 2017), specifically the ", algorithm,
+      " algorithm, to draw samples from the approximate joint posterior."
+    )
+    refs <- c(refs, "kucukelbir_advi")
+  } else if (algorithm == "laplace") {
+    stan_text <- paste0(
+      stan_text,
+      " We used Stan's Laplace approximation algorithm to draw",
       " samples from the approximate joint posterior."
     )
-    citations <- append(
-      citations,
-      list(
-        "Kucukelbir A, Tran D, Ranganath R, Gelman A, and Blei DM (2017). Automatic Differentiation Variational Inference. Journal of Machine Learning Research 18 1-45."
-      )
-    )
-  }
-
-  if (object$algorithm == c('laplace')) {
+  } else if (algorithm == "pathfinder") {
     stan_text <- paste0(
       stan_text,
-      " We used Stan's Laplace approximation algorithm",
-      " to draw ",
-      object$model_output@sim$iter,
-      " samples from the approximate joint posterior."
+      " We used Stan's Pathfinder variational approximation",
+      " (Zhang et al. 2022) to draw samples from the approximate posterior."
     )
+    refs <- c(refs, "zhang_pathfinder")
   }
 
-  if (object$algorithm == c('pathfinder')) {
-    stan_text <- paste0(
-      stan_text,
-      " We used Stan's Pathfinder variational approximation algorithm (Zhang et al. 2022)",
-      " to draw ",
-      object$model_output@sim$iter,
-      " samples from the approximate joint posterior."
-    )
+  methods_text <- paste0(methods_text, stan_text)
 
-    citations <- append(
-      citations,
-      list(
-        "Zhang L, Carpenter B, Gelman A, and Vehtari A (2022). Pathfinder: parallel Quasi-Newton variational inference. Journal of Machine Learning Research 23(306), 1-49. http://jmlr.org/papers/v23/21-0889.html."
-      )
-    )
-  }
-  # Append texts
-  all_text <- paste0(mvgam_text, specials_text, stan_text)
-
-  # List of additional, possibly very useful references
-  other_citations <- vector(mode = 'list')
-  other_citations[[
-    1
-  ]] <- "Arel-Bundock V, Greifer N, and Heiss A (2024). How to interpret statistical models using marginaleffects for R and Python. Journal of Statistical Software, 111(9), 1-32. https://doi.org/10.18637/jss.v111.i09"
-  other_citations[[
-    2
-  ]] <- "Gabry J, Simpson D, Vehtari A, Betancourt M, and Gelman A (2019). Visualization in Bayesian workflow. Journal of the Royal Statatistical Society A, 182, 389-402. doi:10.1111/rssa.12378."
-  other_citations[[
-    3
-  ]] <- "Vehtari A, Gelman A, and Gabry J (2017). Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC. Statistics and Computing, 27, 1413-1432. doi:10.1007/s11222-016-9696-4."
-  other_citations[[
-    4
-  ]] <- "Burkner PC, Gabry J, and Vehtari A. (2020). Approximate leave-future-out cross-validation for Bayesian time series models. Journal of Statistical Computation and Simulation, 90(14), 2499-2523. https://doi.org/10.1080/00949655.2020.1783262"
-
-  out <- structure(
-    list(
-      methods_text = all_text,
-      citations = citations,
-      other_citations = other_citations
-    ),
-    class = 'how_to_cite'
+  refs <- unique(refs)
+  citations <- lapply(refs, function(k) db[[k]]$text)
+  bibtex <- stats::setNames(
+    lapply(refs, function(k) db[[k]]$bibtex),
+    refs
   )
 
-  return(out)
+  other_keys <- c(
+    "arel_bundock_marginaleffects", "gabry_workflow",
+    "vehtari_loo", "burkner_lfo"
+  )
+  other_citations <- lapply(other_keys, function(k) db[[k]]$text)
+  other_bibtex <- stats::setNames(
+    lapply(other_keys, function(k) db[[k]]$bibtex),
+    other_keys
+  )
+
+  structure(
+    list(
+      methods_text = methods_text,
+      citations = citations,
+      other_citations = other_citations,
+      bibtex = c(bibtex, other_bibtex)
+    ),
+    class = "how_to_cite"
+  )
+}
+
+
+#' Extract the BibTeX block from a `how_to_cite` object
+#'
+#' Concatenates the matched BibTeX entries into one string.
+#' Pass `file = "refs.bib"` to write the block to disk; the
+#' default returns the string invisibly and prints to stdout.
+#'
+#' @param x A `how_to_cite` object.
+#' @param file Optional output path. When non-NULL the BibTeX
+#'   is written to disk and the string is returned invisibly.
+#' @param other Logical. When `TRUE` (default), include the
+#'   curated "other useful references" block; set to `FALSE`
+#'   to emit only the matched primary references.
+#' @param ... Ignored.
+#'
+#' @return A single character string containing the BibTeX
+#'   entries separated by blank lines.
+#' @export
+bibtex <- function(x, ...) {
+  UseMethod("bibtex", x)
+}
+
+
+#' @rdname bibtex
+#' @export
+bibtex.how_to_cite <- function(x, file = NULL, other = TRUE, ...) {
+  entries <- if (isTRUE(other)) x$bibtex else {
+    primary_keys <- setdiff(names(x$bibtex), c(
+      "arel_bundock_marginaleffects", "gabry_workflow",
+      "vehtari_loo", "burkner_lfo"
+    ))
+    x$bibtex[primary_keys]
+  }
+  out <- paste(unlist(entries), collapse = "\n\n")
+  if (!is.null(file)) {
+    writeLines(out, file)
+    return(invisible(out))
+  }
+  cat(out, "\n", sep = "")
+  invisible(out)
+}
+
+
+#' @export
+print.how_to_cite <- function(x, ...) {
+  cat("Methods text skeleton\n")
+  cat(insight::format_message(x$methods_text))
+  cat("\n\n")
+
+  print_sorted <- function(citations, header) {
+    if (length(citations) == 0L) return(invisible(NULL))
+    cat(header, "\n", sep = "")
+    refs <- vapply(citations, identity, character(1L))
+    for (ref in refs[order(refs)]) {
+      cat(insight::format_message(ref))
+      cat("\n")
+    }
+  }
+  print_sorted(x$citations, "Primary references")
+  cat("\n")
+  print_sorted(x$other_citations, "Other useful references")
+
+  cat("\nUse `bibtex(x)` for a BibTeX block ready for your .bib file.\n")
+  invisible(x)
 }

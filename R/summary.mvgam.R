@@ -184,6 +184,13 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     out$loadings_identified <- any(grepl("^Z_tilde\\[", pars))
   }
 
+  loadings_prior_idx <- match_loadings_prior_pars(pars)
+  if (any(loadings_prior_idx)) {
+    out$loadings_prior <- all_summaries[
+      loadings_prior_idx, , drop = FALSE
+    ]
+  }
+
   # Store mvgam-specific metadata for print.summary.mvgam() to display
   # model structure information (formula, trend type, dimensions)
   out$trend_formula <- object$trend_formula
@@ -534,6 +541,30 @@ match_z_loadings <- function(pars) {
   grepl(factor_loading_param_pattern(pars), pars)
 }
 
+#' Match interpretable loadings-prior parameters
+#'
+#' @description
+#' Identifies the structured-prior parameters worth showing in
+#' `summary.mvgam()`: length-scales for the feature ARD kernel
+#' (`theta_features[k]`), length-scales for each supplied pairwise
+#' distance matrix (`theta_dist_<name>`), and the per-factor
+#' multiplicative-gamma-process column scale `Psi_diag[k]` when
+#' MGP shrinkage is enabled. The underlying `varrho_inv[k]`
+#' draws are intentionally hidden: they parameterise `Psi_diag`
+#' via a cumulative product and carry no direct interpretation
+#' on their own.
+#'
+#' @param pars Character vector of all parameter names
+#' @return Logical vector indicating which parameters belong to
+#'   the loadings-prior summary block
+#'
+#' @noRd
+match_loadings_prior_pars <- function(pars) {
+  checkmate::assert_character(pars)
+  if (length(pars) == 0) return(logical(0))
+  grepl("^theta_features\\[|^theta_dist_|^Psi_diag\\[", pars)
+}
+
 #' Get distributional parameter names
 #'
 #' @description
@@ -835,7 +866,7 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   # Section 9: Trend Model Parameters
   has_trend_params <- !is.null(x$trend_fixed) || !is.null(x$trend_smooth) ||
                       !is.null(x$trend_random) || !is.null(x$trend_spec) ||
-                      !is.null(x$loadings)
+                      !is.null(x$loadings) || !is.null(x$loadings_prior)
 
   if (has_trend_params) {
     cat("== Trend Model ==\n")
@@ -843,25 +874,81 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
     print_param_section(x$trend_smooth, "Smooth Terms", digits)
     print_param_section(x$trend_random, "Group-Level Effects", digits)
     print_param_section(x$trend_spec, "Trend Specific Parameters", digits)
-    print_param_section(x$loadings, "Factor Loadings", digits)
-  }
-
-  # Section 10: Footer (brms style)
-  if (isTRUE(x$loadings_identified)) {
-    cat("Factor Loadings reflect the QR-identified `Z_tilde` ",
-        "(lower-triangular, positive diagonal). Trend dynamics\n",
-        "parameters (ar*_trend, sigma_trend, L_Omega_trend, ",
-        "theta*_trend) remain in the unrotated factor basis;\n",
-        "their per-factor entries describe the sampled `Z`, ",
-        "not the identified `Z_tilde`. See Heaps & Jermyn\n",
-        "(2024) for the post-hoc QR identification scheme.\n",
-        sep = "")
+    if (!is.null(x$loadings)) {
+      cat(
+        "Factor Loadings: ", nrow(x$loadings),
+        " entries. Use `shared_variation(fit)` for the",
+        " series-level shared-variation summary.\n\n",
+        sep = ""
+      )
+    }
+    if (!is.null(x$loadings_prior)) {
+      cat(
+        "Loadings Prior (length-scales: smaller ",
+        "=> stronger influence on Delta = Z * Z'; larger ",
+        "=> weaker):\n",
+        sep = ""
+      )
+      print(round_numeric(x$loadings_prior, digits), quote = FALSE)
+      cat("\n")
+    }
   }
   cat("Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS\n")
   cat("and Tail_ESS are effective sample size measures, and Rhat is the potential\n")
   cat("scale reduction factor on split chains (at convergence, Rhat = 1).\n")
 
+  steps <- build_next_steps(x)
+  cat("\nNext steps:\n")
+  for (s in steps) cat("  - ", s, "\n", sep = "")
+  cat("Use `how_to_cite(fit)` for a citation-ready model description.\n")
+
   invisible(x)
+}
+
+
+# Adaptive "Next steps" list for `print.summary.mvgam`. Builds a
+# candidate set, gated on what the fit can actually offer, then
+# caps the list at five entries by priority so the suggestion
+# block stays scannable. Universal entries (pp_check, loo) always
+# appear; model-specific entries (shared_variation, residual_cor,
+# conditional_effects) only appear when relevant.
+#'@noRd
+build_next_steps <- function(x) {
+  has_factors <- !is.null(x$loadings) || !is.null(x$loadings_prior)
+  trend_model <- x$trend_model %||% ""
+  has_cor_trend <- has_factors ||
+    grepl("cor$|cor[a-z]|ZMVN", trend_model)
+  has_covariates <- !is.null(x$fixed) &&
+    nrow(x$fixed) > 1L
+  forecastable <- !grepl("^ZMVN", trend_model)
+  # Candidates in priority order; first five matching entries
+  # populate the printed list.
+  candidates <- list(
+    list(when = TRUE,
+         text = "`pp_check(fit)`: posterior predictive checks"),
+    list(when = has_factors,
+         text = paste0(
+           "`shared_variation(fit)`: factor-implied ",
+           "Delta = Z * Z' (rotation-invariant; pass to ",
+           "`plot()` for a heatmap)"
+         )),
+    list(when = has_cor_trend,
+         text = "`residual_cor(fit)`: implied cross-series correlations"),
+    list(when = forecastable,
+         text = "`forecast(fit, newdata = ...)`: out-of-sample forecasts"),
+    list(when = TRUE,
+         text = "`loo(fit)` / `loo_compare(...)`: model fit + comparison"),
+    list(when = has_covariates,
+         text = paste0(
+           "`conditional_effects(fit)`: marginal posterior ",
+           "predictions across covariates"
+         ))
+  )
+  texts <- vapply(
+    Filter(function(c) isTRUE(c$when), candidates),
+    function(c) c$text, character(1L)
+  )
+  utils::head(texts, 5L)
 }
 
 # ==============================================================================
