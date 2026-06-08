@@ -184,14 +184,12 @@ categorize_mvgam_parameters <- function(x) {
 
   # Trend dynamics parameters (AR coefficients, innovation SDs, correlations)
   # Excludes computed arrays, intercepts, fixed effects, and b_Intercept_trend
-  # (uncentered generated quantity already filtered via variables.mvgam)
-  # Note: Z and Z_raw are bridge parameters mapping observations to latent
-  # trends - they lack _trend suffix as they connect both components
-  # FIXED: Exclude smooth and random effect parameters to prevent duplicates
+  # (uncentered generated quantity already filtered via variables.mvgam).
+  # Z is the latent factor-loading matrix; it lacks the `_trend` suffix
+  # because it bridges observations and latent trends.
   trend_dynamic_pars <- all_pars[
     (grepl("_trend", all_pars) |
-       grepl("^Z\\[", all_pars) |
-       grepl("^Z_raw\\[", all_pars)) &
+       grepl("^Z\\[", all_pars)) &
       !grepl("^(trend|lv_trend|innovations_trend|scaled_innovations_trend|mu_trend)\\[", all_pars) &
       all_pars != "b_Intercept_trend" &
       all_pars != "Intercept_trend" &

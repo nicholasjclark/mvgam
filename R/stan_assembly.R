@@ -2756,12 +2756,18 @@ generate_matrix_z_tdata <- function(is_factor_model, n_lv, n_series,
 #' This provides a single interface for matrix Z generation across all Stan blocks.
 #'
 #' Three exclusive branches:
-#' - `fixed_Z` non-NULL: emit Z in the data block (no Z_raw,
-#'   no construction, no priors). Identification comes from the
-#'   fixed loadings.
-#' - `is_factor_model = TRUE`, `fixed_Z` NULL: defer to
-#'   `generate_factor_model()` for parameters / tparameters /
-#'   priors (Z_raw + PLT construction).
+#' - `fixed_Z` non-NULL with NAs: partial Z. Free entries become
+#'   parameters; fixed entries are assembled into Z in
+#'   transformed parameters. No QR identification (the user's
+#'   fixed pattern is preserved on Z directly).
+#' - `fixed_Z` non-NULL with no NAs: fully fixed Z in the data
+#'   block. No priors, no identification step.
+#' - `is_factor_model = TRUE`, `fixed_Z` NULL: emit
+#'   `matrix[N_series_trend, N_lv_trend] Z` in parameters.
+#'   `generate_factor_model()` applies the prior and emits
+#'   post-hoc QR identification (`Z_tilde`, `Q_tilde`,
+#'   `lv_trend_tilde`) with an inline sign-fix in generated
+#'   quantities.
 #' - `is_factor_model = FALSE`, `fixed_Z` NULL: emit diagonal Z
 #'   in tdata (default identity factor structure).
 #'
@@ -2792,14 +2798,13 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
     return(make_fixed_z_stanvars(fixed_Z))
   }
 
-  # Get Z matrix components (dimensions handled by generate_common_trend_data)
-  # For factor models, skip parameters (handled by generate_factor_model)
+  # Under the Heaps (2024) architecture both factor and non-factor
+  # models declare Z explicitly. Factor models declare Z as a free
+  # `matrix[N_series_trend, N_lv_trend]` parameter (no PLT
+  # construction at sampling time); non-factor models emit the
+  # identity Z in transformed data.
   stanvars_list <- list(
-    if (!is_factor_model) {
-      generate_matrix_z_parameters(is_factor_model, n_lv, n_series)
-    } else {
-      NULL
-    },
+    generate_matrix_z_parameters(is_factor_model, n_lv, n_series),
     generate_matrix_z_tdata(is_factor_model, n_lv, n_series)
   )
 
@@ -2815,62 +2820,124 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
   }
 }
 
-#' Generate Factor Model Block Code
+#' Factor-model prior + post-hoc QR identification
 #'
-#' Provides standardized priors for factor models with fixed variance=1 constraint.
-#' Only generates priors when `is_factor_model=TRUE` AND `fixed_Z`
-#' is NULL. When the user has fixed Z via `trend_map`, Z is data,
-#' not a parameter, so Z_raw + PLT + prior are all suppressed.
+#' Implements the Heaps and Jermyn (2024) factor-model
+#' parameterisation: sample `Z` as an unconstrained
+#' `matrix[N_series_trend, N_lv_trend]` parameter (declaration
+#' lives in `generate_matrix_z_parameters()`), apply the prior
+#' on the unconstrained matrix, and recover the identified
+#' lower-triangular `Z_tilde` via thin-QR decomposition in
+#' generated quantities. The factor paths `lv_trend` are
+#' rotated by the same `Q` so the `trend = Z lv_trend^T`
+#' product is invariant.
 #'
+#' `qr_thin_R` guarantees a positive diagonal on the upper
+#' triangular factor by Stan's normalisation. The LQ factor
+#' `Z_tilde = qr_thin_R(Z')'` therefore has a non-negative
+#' diagonal by construction, removing the 2^n_lv sign-mode
+#' equivalence without an inline sign-fix.
+#'
+#' For VAR factor models the coefficient array `A_trend` lives
+#' in the same latent basis as `lv_trend`. The rotation
+#' `A_trend_tilde[lag] = Q_tilde A_trend[lag] Q_tilde'` brings
+#' the saved coefficients into the identified `Z_tilde` /
+#' `lv_trend_tilde` basis so downstream summaries (impulse
+#' responses, stationarity checks) are coherent.
+#'
+#' Scope of identification. The QR rotation is applied to
+#' parameters that index over the latent factor dimension `K`
+#' and whose interpretation only makes sense in the identified
+#' basis: `Z_tilde`, `lv_trend_tilde`, and (VAR only)
+#' `A_trend_tilde`. Per-factor scalar parameters
+#' (`ar1_trend`, `ar{p}_trend`, `theta1_trend`,
+#' `sigma_trend`, `L_Omega_trend`, `Sigma_trend`) are NOT
+#' rotated. They remain in the unrotated `Z` basis, where
+#' element `k` describes factor `k` of the sampled `Z`. After
+#' rotation, factor `k` of `lv_trend_tilde` is a linear
+#' combination of the unrotated factors under `Q_tilde`, so
+#' interpretations like "the AR(1) coefficient of factor `k`"
+#' apply to the unrotated factors, not the identified ones.
+#'
+#' Returns NULL when the fit is not a factor model OR when Z is
+#' user-supplied via `trend_map` (the data-block code path in
+#' `make_fixed_z_stanvars()` / `make_partial_z_stanvars()`
+#' handles identification differently).
 #'
 #' @param is_factor_model Logical indicating if this is a factor model
 #' @param n_lv Number of latent variables
 #' @param fixed_Z Optional user-supplied numeric Z. When non-NULL
-#'   this function returns NULL — the identification comes from
-#'   the fixed loadings, no Z_raw or priors are needed.
-#' @return List of stanvars for factor model priors
+#'   this function returns NULL.
+#' @param trend_type Optional trend-type string. When
+#'   `trend_type == "VAR"` the generated quantities block also
+#'   emits the rotated VAR coefficient array.
+#' @return Combined stanvar for prior + post-hoc QR identification.
+#' @references
+#' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
+#' distributions for the covariance matrix in latent factor
+#' models. \emph{Statistics and Computing}, 34:143.
+#' \doi{10.1007/s11222-024-10454-0}
 #' @noRd
-generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL) {
-  # Input validation
+generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
+                                  trend_type = NULL) {
   checkmate::assert_logical(is_factor_model, len = 1)
   checkmate::assert_integerish(n_lv, lower = 1, any.missing = FALSE)
+  checkmate::assert_character(trend_type, len = 1, null.ok = TRUE)
 
-  # Suppress sampled-Z scaffolding when Z is user-supplied.
   if (!is.null(fixed_Z)) return(NULL)
+  if (!is_factor_model) return(NULL)
 
-  if (!is_factor_model) {
-    return(NULL)
-  }
-
-  components <- list()
-
-  # 1. PARAMETERS block - Z_raw factor loadings parameter
-  z_raw_parameters <- brms::stanvar(
-    name = "z_raw_parameters",
-    scode = "// Factor loading matrix (estimated for factor model)\nvector[N_series_trend * N_lv_trend] Z_raw;  // raw factor loadings",
-    block = "parameters"
-  )
-  components <- append(components, list(z_raw_parameters))
-
-  # 2. TPARAMETERS block - Z matrix construction with identifiability constraints
-  z_construction <- brms::stanvar(
-    name = "z_construction",
-    scode = "// Factor loading matrix with identifiability constraints\n  matrix[N_series_trend, N_lv_trend] Z = rep_matrix(0, N_series_trend, N_lv_trend);\n  // constraints allow identifiability of loadings\n  {\n    int index = 1;\n    for (j in 1 : N_lv_trend) {\n      for (i in j : N_series_trend) {\n        Z[i, j] = Z_raw[index];\n        index += 1;\n      }\n    }\n  }",
-    block = "tparameters"
-  )
-  components <- append(components, list(z_construction))
-
-  # 3. MODEL block - Z_raw factor loading priors
-  # Note: innovations_trend priors are handled by shared innovation system
-  # Note: LV_raw no longer exists - was outdated parameter name
-  factor_z_priors <- brms::stanvar(
+  # Heaps' framework corresponds to Phi = I_p, Psi = psi I_k under
+  # a Gaussian prior on the unconstrained matrix. A student_t(3)
+  # prior on entries of Z gives heavier tails than the Gaussian
+  # case; the induced marginal on Z_tilde is therefore not the
+  # closed-form gamma-on-diagonal / normal-off-diagonal density
+  # of Heaps Corollary S1. The model remains valid: any iid
+  # entry-prior on unconstrained Z induces a well-defined prior
+  # on the QR-identified Z_tilde via the LQ change of variables.
+  z_prior <- brms::stanvar(
     name = "factor_z_priors",
-    scode = "Z_raw ~ student_t(3, 0, 1);",
+    scode = "to_vector(Z) ~ student_t(3, 0, 1);",
     block = "model"
   )
-  components <- append(components, list(factor_z_priors))
 
-  return(combine_stanvars(z_raw_parameters, z_construction, factor_z_priors))
+  # Post-hoc identification via thin QR. `qr_thin_R` guarantees a
+  # positive diagonal on the upper-triangular factor (Stan
+  # normalisation), so the LQ factor Z_tilde has a non-negative
+  # diagonal by construction. `qr_thin_Q` applies the matching
+  # column flips so Z_tilde Q_tilde == Z is preserved.
+  qr_lines <- c(
+    "matrix[N_series_trend, N_lv_trend] Z_tilde = qr_thin_R(Z')';",
+    "matrix[N_lv_trend, N_lv_trend] Q_tilde = qr_thin_Q(Z')';",
+    paste0(
+      "matrix[N_time_trend, N_lv_trend] lv_trend_tilde",
+      " = lv_trend * Q_tilde';"
+    )
+  )
+
+  if (!is.null(trend_type) && trend_type == "VAR") {
+    qr_lines <- c(
+      qr_lines,
+      paste0(
+        "array[size(A_trend)] matrix[N_lv_trend, N_lv_trend]",
+        " A_trend_tilde;"
+      ),
+      "for (lag in 1:size(A_trend)) {",
+      paste0(
+        "  A_trend_tilde[lag]",
+        " = Q_tilde * A_trend[lag] * Q_tilde';"
+      ),
+      "}"
+    )
+  }
+
+  z_qr <- brms::stanvar(
+    name = "factor_z_identification",
+    scode = paste(qr_lines, collapse = "\n"),
+    block = "genquant"
+  )
+
+  combine_stanvars(z_prior, z_qr)
 }
 
 #' Generate Transformed Parameters Block Injections for Trend Computation
@@ -4546,11 +4613,15 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     components <- append_if_not_null(components, hierarchical_functions)
   }
 
-  # Add factor model support if applicable
+  # Add factor model support if applicable. Pass trend_type = "VAR"
+  # so generate_factor_model() emits the rotated A_trend_tilde in
+  # generated quantities (the VAR coefficient array lives in the
+  # latent basis and must be rotated to match Z_tilde/lv_trend_tilde).
   if (is_factor_model) {
     factor_priors <- generate_factor_model(
       is_factor_model, n_lv,
-      fixed_Z = trend_specs$fixed_Z
+      fixed_Z = trend_specs$fixed_Z,
+      trend_type = "VAR"
     )
     components <- append_if_not_null(components, factor_priors)
   }

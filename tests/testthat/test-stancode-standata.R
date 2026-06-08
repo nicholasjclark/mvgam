@@ -762,8 +762,10 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
                       code_with_trend))
     expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;", code_with_trend))
 
-    # Factor loading parameters (estimated for n_lv = 2)
-    expect_true(stan_pattern("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw;", code_with_trend))
+    # Factor loading parameter: unconstrained Z matrix sampled
+    # directly; QR identification handled in generated quantities.
+    expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z;",
+                      code_with_trend))
 
     # Innovation matrix
     expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] innovations_trend;",
@@ -771,14 +773,6 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
 
     # lprior initialization with family-specific priors
     expect_true(stan_pattern("real lprior = 0;", code_with_trend))
-
-    # Factor loading matrix construction with identifiability constraints
-    expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = rep_matrix\\(0,
-  N_series_trend, N_lv_trend\\);", code_with_trend))
-    expect_true(stan_pattern("int index = 1;", code_with_trend))
-    expect_true(stan_pattern("for \\(j in 1 : N_lv_trend\\)", code_with_trend))
-    expect_true(stan_pattern("for \\(i in j : N_series_trend\\)", code_with_trend))
-    expect_true(stan_pattern("Z\\[i, j\\] = Z_raw\\[index\\];", code_with_trend))
 
     # Innovation covariance construction
     expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] L_Sigma_trend =
@@ -842,8 +836,17 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
     expect_true(stan_pattern("ar1_trend ~", code_with_trend))
     expect_true(stan_pattern("sigma_trend ~", code_with_trend))
     expect_true(stan_pattern("L_Omega_trend ~", code_with_trend))
-    expect_true(stan_pattern("Z_raw ~", code_with_trend))
+    expect_true(stan_pattern("to_vector\\(Z\\) ~ student_t\\(3, 0, 1\\);",
+                      code_with_trend))
     expect_true(stan_pattern("to_vector\\(innovations_trend\\) ~", code_with_trend))
+
+    # Post-hoc QR identification in generated quantities
+    expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z_tilde = qr_thin_R\\(Z'\\)';",
+                      code_with_trend))
+    expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] Q_tilde = qr_thin_Q\\(Z'\\)';",
+                      code_with_trend))
+    expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] lv_trend_tilde = lv_trend \\* Q_tilde';",
+                      code_with_trend))
 
     # Generated quantities for all three families
     expect_true(stan_pattern("real b_count_Intercept = Intercept_count -
@@ -968,21 +971,15 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend))
   expect_true(stan_pattern("cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;", code_with_trend))
 
-  # Factor loading parameters (estimated for n_lv = 2)
-  expect_true(stan_pattern("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw;", code_with_trend))
+  # Factor loading parameter: unconstrained Z matrix sampled
+  # directly; QR identification handled in generated quantities.
+  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z;", code_with_trend))
 
   # Innovation matrix
   expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] innovations_trend;", code_with_trend))
 
   # lprior initialization with family-specific priors
   expect_true(stan_pattern("real lprior = 0;", code_with_trend))
-
-  # Factor loading matrix construction with identifiability constraints
-  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = rep_matrix\\(0, N_series_trend, N_lv_trend\\);", code_with_trend))
-  expect_true(stan_pattern("int index = 1;", code_with_trend))
-  expect_true(stan_pattern("for \\(j in 1 : N_lv_trend\\)", code_with_trend))
-  expect_true(stan_pattern("for \\(i in j : N_series_trend\\)", code_with_trend))
-  expect_true(stan_pattern("Z\\[i, j\\] = Z_raw\\[index\\];", code_with_trend))
 
   # Innovation covariance construction
   expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] L_Sigma_trend = diag_pre_multiply\\(sigma_trend, L_Omega_trend\\);", code_with_trend))
@@ -1031,8 +1028,13 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   expect_true(stan_pattern("ar1_trend ~", code_with_trend))
   expect_true(stan_pattern("sigma_trend ~", code_with_trend))
   expect_true(stan_pattern("L_Omega_trend ~", code_with_trend))
-  expect_true(stan_pattern("Z_raw ~", code_with_trend))
+  expect_true(stan_pattern("to_vector\\(Z\\) ~ student_t\\(3, 0, 1\\);", code_with_trend))
   expect_true(stan_pattern("to_vector\\(innovations_trend\\) ~", code_with_trend))
+
+  # Post-hoc QR identification in generated quantities
+  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z_tilde = qr_thin_R\\(Z'\\)';", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] Q_tilde = qr_thin_Q\\(Z'\\)';", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] lv_trend_tilde = lv_trend \\* Q_tilde';", code_with_trend))
 
   # Generated quantities for all three families
   expect_true(stan_pattern("real b_count_Intercept = Intercept_count - dot_product\\(means_X_count, b_count\\);", code_with_trend))
@@ -1111,13 +1113,13 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
 
   # Factor model parameters
   expect_true(stan_pattern("vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_with_trend))
-  expect_true(stan_pattern("vector\\[N_series_trend \\* N_lv_trend\\] Z_raw;", code_with_trend))
+  # Unconstrained Z matrix; QR identification in generated quantities.
+  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z;", code_with_trend))
 
-  # Factor loading constraints in transformed parameters
-  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = rep_matrix\\(0, N_series_trend, N_lv_trend\\);", code_with_trend))
-  expect_true(stan_pattern("for \\(j in 1 : N_lv_trend\\)", code_with_trend))
-  expect_true(stan_pattern("for \\(i in j : N_series_trend\\)", code_with_trend))
-  expect_true(stan_pattern("Z\\[i, j\\] = Z_raw\\[index\\];", code_with_trend))
+  # Post-hoc QR identification in generated quantities
+  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z_tilde = qr_thin_R\\(Z'\\)';", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] Q_tilde = qr_thin_Q\\(Z'\\)';", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_lv_trend\\] lv_trend_tilde = lv_trend \\* Q_tilde';", code_with_trend))
 
   # ZMVN dynamics (just scaled innovations, no complex dynamics)
   expect_true(stan_pattern("lv_trend = scaled_innovations_trend;", code_with_trend))
@@ -1137,7 +1139,7 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
 
   # Trend parameter priors
   expect_true(stan_pattern("sigma_trend ~ exponential\\(2\\);", code_with_trend))
-  expect_true(stan_pattern("Z_raw ~ student_t\\(3, 0, 1\\);", code_with_trend))
+  expect_true(stan_pattern("to_vector\\(Z\\) ~ student_t\\(3, 0, 1\\);", code_with_trend))
 
   # No prior for b_trend (brms default flat prior)
   expect_false(grepl("b_trend ~", code_with_trend))
