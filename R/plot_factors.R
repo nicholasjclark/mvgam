@@ -45,11 +45,13 @@
 #'   pushed `sigma_trend[k]` itself to zero, inspect the raw
 #'   posterior of `sigma_trend[k]` via [as_draws_df.mvgam()].
 #'
-#' @details Factor paths are read from the Stan posterior under
-#'   the name `lv_trend[t, k]`, which is populated in the
-#'   generated-quantities block for any LV trend. Time runs
-#'   along the training grid only; out-of-sample factor draws
-#'   are not displayed.
+#' @details Factor paths are read from the Stan posterior,
+#'   preferring `lv_trend_tilde[t, k]` (the rotated factor
+#'   paths from free-Z factor models, in the identified
+#'   `Z_tilde` basis) and falling back to `lv_trend[t, k]` for
+#'   partial-Z fits where the user-supplied loading pattern is
+#'   preserved without rotation. Time runs along the training
+#'   grid only; out-of-sample factor draws are not displayed.
 #'
 #' @seealso [as_draws_df.mvgam()], [residual_cor()],
 #'   [ordinate.jsdgam()]
@@ -122,20 +124,25 @@ plot_factors <- function(
 
 
 # Internal: extract per-factor (ndraws x n_time) matrices of
-# `lv_trend[t, k]` from the Stan posterior. Returns a list of
-# length `n_lv`, names "Factor 1" ... "Factor n_lv".
+# factor paths from the Stan posterior. Returns a list of length
+# `n_lv`, names "Factor 1" ... "Factor n_lv". Pattern selection
+# delegates to `factor_state_param_pattern()`.
 #'@noRd
 extract_lv_trend_matrices <- function(object, n_lv) {
   draws_mat <- posterior::as_draws_matrix(object$fit)
-  lv_cols <- grep(
-    "^lv_trend\\[", colnames(draws_mat), value = TRUE
-  )
+  pattern <- factor_state_param_pattern(colnames(draws_mat))
+  param_name <- if (pattern == "^lv_trend_tilde\\[") {
+    "lv_trend_tilde"
+  } else {
+    "lv_trend"
+  }
+  lv_cols <- grep(pattern, colnames(draws_mat), value = TRUE)
   if (length(lv_cols) == 0L) {
     stop(insight::format_error(c(
-      "Could not locate 'lv_trend' draws in object$fit.",
+      "Could not locate factor-path draws in object$fit.",
       i = paste0(
-        "Expected an LV-factor model with `lv_trend[t, k]` ",
-        "stored in the generated-quantities block."
+        "Expected an LV-factor model with `", param_name,
+        "[t, k]` stored in the posterior."
       )
     )))
   }
@@ -209,17 +216,20 @@ lv_contribution_table <- function(per_lv, Z_arr = NULL) {
 
 # Internal: extract per-draw factor loadings array
 # `[ndraws, n_series, n_lv]` for plotting. Returns NULL when the
-# fit has neither sampled Z[i, j] columns nor a fixed Z stashed
-# on `trend_metadata$fixed_Z` (e.g. non-factor trend types).
-# Delegates to `resolve_factor_loadings()` so the fixed-vs-
-# sampled decision lives in exactly one place.
+# fit has neither sampled loading columns (`Z_tilde[i, j]` or
+# `Z[i, j]`) nor a fixed Z stashed on `trend_metadata$fixed_Z`
+# (e.g. non-factor trend types). Delegates to
+# `resolve_factor_loadings()` so the fixed-vs-sampled decision
+# lives in exactly one place.
 #'@noRd
 extract_factor_loadings_array <- function(object, n_lv) {
-  if (!is.null(object$trend_metadata$fixed_Z)) {
+  if (!is.null(object$trend_metadata$fixed_Z) &&
+      !anyNA(object$trend_metadata$fixed_Z)) {
     return(resolve_factor_loadings(object = object, n_lv = n_lv))
   }
   draws_mat <- posterior::as_draws_matrix(object$fit)
-  z_cols <- grep("^Z\\[", colnames(draws_mat), value = TRUE)
+  pattern <- factor_loading_param_pattern(colnames(draws_mat))
+  z_cols <- grep(pattern, colnames(draws_mat), value = TRUE)
   if (length(z_cols) == 0L) {
     return(NULL)
   }

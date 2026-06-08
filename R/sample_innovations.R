@@ -1049,32 +1049,74 @@ sample_innovations <- function(cov_structure, obs_structure) {
 }
 
 
-# Internal: extract Z[s, lv] loadings from the posterior draws.
+# Shared regex selectors for factor-model parameter names.
+# Free-Z factor fits emit identified `Z_tilde[i, j]` and rotated
+# `lv_trend_tilde[t, k]` in generated quantities (Heaps and Jermyn
+# 2024). Partial-Z fits skip the QR rotation and keep the user-
+# supplied pattern on `Z[i, j]` / `lv_trend[t, k]` directly. These
+# helpers centralise the prefer-identified-then-fall-back rule so
+# `extract_Z_loadings`, `extract_lv_trend_matrices`,
+# `match_z_loadings` (summary.mvgam.R), and
+# `categorize_mvgam_parameters` (index-mvgam.R) stay in lockstep.
+#'@noRd
+factor_loading_param_pattern <- function(pars) {
+  if (any(grepl("^Z_tilde\\[", pars))) "^Z_tilde\\[" else "^Z\\["
+}
+
+#'@noRd
+factor_state_param_pattern <- function(pars) {
+  if (any(grepl("^lv_trend_tilde\\[", pars))) {
+    "^lv_trend_tilde\\["
+  } else {
+    "^lv_trend\\["
+  }
+}
+
+# Returns the regex matching unrotated factor-basis dynamics
+# draws (currently `A_trend[lag][i, j]` for VAR factor models)
+# when the rotated `A_trend_tilde[lag][i, j]` counterpart is
+# also in the posterior; returns NULL otherwise. Used by
+# summary and tidy classifiers to deduplicate display when both
+# bases are saved.
+#'@noRd
+hidden_unrotated_factor_pars <- function(pars) {
+  if (any(grepl("^A_trend_tilde\\[", pars))) {
+    "^A_trend\\["
+  } else {
+    NULL
+  }
+}
+
+# Internal: extract factor-loading draws from the posterior.
 # Returns array [ndraws, n_obs_series, n_lv] sorted by series
 # index (outer) then by lv index (inner), matching Stan's
-# column-major storage convention.
+# column-major storage convention. Selects `Z_tilde` or `Z` via
+# `factor_loading_param_pattern()`.
 #'@noRd
 extract_Z_loadings <- function(draws_mat, n_obs_series, n_lv) {
   checkmate::assert_matrix(draws_mat)
   checkmate::assert_int(n_obs_series, lower = 1L)
   checkmate::assert_int(n_lv, lower = 1L)
   ndraws <- nrow(draws_mat)
-  cols <- grep("^Z\\[", colnames(draws_mat), value = TRUE)
+  pattern <- factor_loading_param_pattern(colnames(draws_mat))
+  param_name <- if (pattern == "^Z_tilde\\[") "Z_tilde" else "Z"
+  cols <- grep(pattern, colnames(draws_mat), value = TRUE)
   expected_cols <- n_obs_series * n_lv
   if (length(cols) != expected_cols) {
     stop(insight::format_error(c(
       paste0(
-        "Expected ", expected_cols,
-        " Z loading columns, found ", length(cols), "."
+        "Expected ", expected_cols, " ", param_name,
+        " loading columns, found ", length(cols), "."
       ),
       i = paste0(
-        "Latent-factor model needs Z[s,lv] for s in 1..",
-        n_obs_series, ", lv in 1..", n_lv, "."
+        "Latent-factor model needs ", param_name,
+        "[s, lv] for s in 1..", n_obs_series,
+        ", lv in 1..", n_lv, "."
       )
     )))
   }
-  # Stan stores matrix[N_series, N_lv] Z column-major:
-  # Z[1,1], Z[2,1], ..., Z[N_series,1], Z[1,2], ...
+  # Stan stores the loading matrix column-major:
+  # [1,1], [2,1], ..., [N_series,1], [1,2], ...
   array(
     as.numeric(draws_mat[, cols, drop = FALSE]),
     dim = c(ndraws, n_obs_series, n_lv)

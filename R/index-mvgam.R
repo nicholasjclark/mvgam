@@ -182,15 +182,29 @@ categorize_mvgam_parameters <- function(x) {
   ]
   observation_re_params <- create_component(obs_re_pars)
 
-  # Trend dynamics parameters (AR coefficients, innovation SDs, correlations)
+  # Trend dynamics parameters (AR coefficients, innovation SDs, correlations).
   # Excludes computed arrays, intercepts, fixed effects, and b_Intercept_trend
   # (uncentered generated quantity already filtered via variables.mvgam).
-  # Z is the latent factor-loading matrix; it lacks the `_trend` suffix
-  # because it bridges observations and latent trends.
+  # The factor-loading matrix bridges observations and latent trends and
+  # lacks the `_trend` suffix; the loading regex (`Z_tilde` or `Z`) and the
+  # state regex (`lv_trend` plus `lv_trend_tilde`) delegate pattern choice
+  # to the shared selectors so other accessors stay in lockstep.
+  loading_pattern <- factor_loading_param_pattern(all_pars)
+  hide_pattern <- hidden_unrotated_factor_pars(all_pars)
+  state_pattern <- paste0(
+    "^(trend|lv_trend|lv_trend_tilde|innovations_trend|",
+    "scaled_innovations_trend|mu_trend)\\["
+  )
+  hide_match <- if (is.null(hide_pattern)) {
+    rep(FALSE, length(all_pars))
+  } else {
+    grepl(hide_pattern, all_pars)
+  }
   trend_dynamic_pars <- all_pars[
     (grepl("_trend", all_pars) |
-       grepl("^Z\\[", all_pars)) &
-      !grepl("^(trend|lv_trend|innovations_trend|scaled_innovations_trend|mu_trend)\\[", all_pars) &
+       grepl(loading_pattern, all_pars)) &
+      !grepl(state_pattern, all_pars) &
+      !hide_match &
       all_pars != "b_Intercept_trend" &
       all_pars != "Intercept_trend" &
       !grepl("^b_.*_trend", all_pars) &

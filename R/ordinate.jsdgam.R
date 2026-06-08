@@ -10,13 +10,14 @@
 #' are installed the species arrows are rendered as tapered
 #' loadings.
 #'
-#' @note `jsdgam()` itself is not yet on the
-#'   `feature/brms-integration` branch; this function exists for
-#'   forward-compatibility with the eventual jsdgam port. It
-#'   relies on the same Stan parameters that an LV `mvgam` fit
-#'   carries (`lv_trend[t, k]` and `Z[i, k]`) plus a few
-#'   `jsdgam`-specific bookkeeping slots — calling it on an
-#'   ordinary `mvgam` object will error at those slot accesses.
+#' @note `jsdgam()` itself is not yet ported on this branch;
+#'   this function exists for forward-compatibility with the
+#'   eventual jsdgam port. It relies on the same Stan parameters
+#'   that an LV `mvgam` fit carries — `lv_trend_tilde[t, k]` and
+#'   `Z_tilde[i, k]` for free-Z factor models, or `lv_trend` and
+#'   `Z` for partial-Z fits — plus a few `jsdgam`-specific
+#'   bookkeeping slots. Calling it on an ordinary `mvgam` object
+#'   will error at those slot accesses.
 #'
 #' @name ordinate.jsdgam
 #'
@@ -91,9 +92,9 @@ ordinate_extract_medians <- function(object) {
     stop(insight::format_error(c(
       "Could not extract Z loadings from the posterior.",
       i = paste0(
-        "Ordination requires either sampled Z[i, k] in the ",
-        "Stan posterior, or a fixed-loadings matrix attached ",
-        "to the fitted object."
+        "Ordination requires either sampled `Z_tilde[i, k]` ",
+        "or `Z[i, k]` in the Stan posterior, or a fixed-",
+        "loadings matrix attached to the fitted object."
       )
     )))
   }
@@ -419,9 +420,10 @@ ordinate.jsdgam <- function(
 #'       correlated rotated factors. `alpha` ignored.}
 #'     \item{`"none"`}{Skip rotation entirely; plot raw
 #'       posterior-median LV / Z, centred. The axes correspond
-#'       directly to the Stan parameters `lv_trend[t, k]` and
-#'       `Z[i, k]` (subject to the lower-triangular Stan
-#'       constraint discussed in Details). `alpha` ignored.}
+#'       directly to the Stan parameters
+#'       `lv_trend_tilde[t, k]` and `Z_tilde[i, k]` (free-Z
+#'       factor models) or `lv_trend` / `Z` (partial-Z fits),
+#'       as discussed in Details. `alpha` ignored.}
 #'   }
 #' @param label_sites Logical. When `TRUE`, site scores are
 #'   drawn as text labels (the training time values); when
@@ -435,21 +437,32 @@ ordinate.jsdgam <- function(
 #'   `ordinate()`. Access via `attr(p, "rotation")`.
 #'
 #' @details
-#' For sampled-Z fits the Stan model imposes a lower-triangular
-#' pattern on `Z` during MCMC to keep the factor model
-#' identified. Under `rotation = "svd"` (default) the axes are
-#' SVD-rotated ordination gradients, NOT the original Stan
-#' factors. Under `rotation = "varimax"` / `"promax"` the axes
-#' are rotated for sparsity rather than variance; the Stan
-#' lower-triangular pattern is preserved in the underlying fit
-#' but not visible in the plot. Use `rotation = "none"` (or
-#' [plot_factors()]) to view the un-rotated Stan factors
-#' directly.
+#' For sampled-Z factor models the Stan model samples an
+#' unconstrained loading matrix `Z` under a structured prior and
+#' then applies a thin-QR decomposition in generated quantities
+#' to produce a lower-triangular, positive-diagonal `Z_tilde`
+#' together with the rotated factor paths `lv_trend_tilde`. The
+#' identified `Z_tilde` and `lv_trend_tilde` are what
+#' `ordinate()` reads. Under `rotation = "svd"` (default) the
+#' axes are SVD-rotated ordination gradients, NOT the original
+#' Stan factors. Under `rotation = "varimax"` / `"promax"` the
+#' axes are rotated for sparsity rather than variance; the
+#' identified lower-triangular pattern is preserved in the
+#' underlying fit but not visible in the plot. Use
+#' `rotation = "none"` (or [plot_factors()]) to view the
+#' un-rotated identified factors directly. See Heaps and Jermyn
+#' (2024) for the structured-prior + post-hoc QR framework.
 #'
-#' For fixed-Z fits supplied via `trend_map`, ANY non-`"none"`
-#' rotation discards the structural loadings the user encoded.
-#' A one-time warning is emitted when called on a fixed-Z fit;
-#' `plot_factors(fit)` shows the raw user-supplied loadings.
+#' For partial-Z fits (free entries marked `NA` in `trend_map`)
+#' no QR rotation is applied, since rotating would overwrite
+#' the user-supplied entries on `Z`. Ordination reads `Z` and
+#' `lv_trend` directly in those fits.
+#'
+#' For fully fixed-Z fits supplied via `trend_map`, ANY
+#' non-`"none"` rotation discards the structural loadings the
+#' user encoded. A one-time warning is emitted when called on
+#' a fixed-Z fit; `plot_factors(fit)` shows the raw user-
+#' supplied loadings.
 #'
 #' @section Known limitations:
 #' \itemize{

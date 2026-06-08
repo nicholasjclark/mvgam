@@ -12,6 +12,7 @@ ordinate(object, ...)
   which_lvs = c(1L, 2L),
   biplot = TRUE,
   alpha = 0.5,
+  rotation = c("svd", "varimax", "promax", "none"),
   label_sites = TRUE,
   ...
 )
@@ -33,6 +34,28 @@ site scores only.}
 controlling the relative scaling of latent variables vs
 loading coefficients.}
 
+\item{rotation}{Character. Post-hoc rotation of the
+posterior-median LV trends and Z loadings before plotting.
+One of:
+\describe{
+\item{\code{"svd"} (default)}{BORAL convention: SVD of
+\code{LV \%*\% t(Z)} re-orders axes by singular-value variance.
+Use \code{alpha} to split the variance between site scores and
+loadings.}
+\item{\code{"varimax"}}{Orthogonal rotation maximising loading
+sparsity. Each series tends to load strongly on one
+factor and near-zero on others. \code{alpha} is ignored.
+Requires \code{n_lv >= 2}.}
+\item{\code{"promax"}}{Oblique extension of varimax (allows
+correlated factors). \code{alpha} ignored.}
+\item{\code{"none"}}{No rotation. Plot raw posterior-median LV
+and Z, centred. \code{alpha} ignored.}
+}
+For varimax / promax the axes are NOT variance-ordered, so
+the choice of \code{which_lvs} matters in a different way than
+under SVD: any pair of rotated factors is a valid pair to
+plot.}
+
 \item{label_sites}{Logical. When \code{TRUE}, site scores are
 drawn as labels (from the \code{unit} argument of the original
 \code{jsdgam()} call); when \code{FALSE}, as points only.}
@@ -52,13 +75,14 @@ are installed the species arrows are rendered as tapered
 loadings.
 }
 \note{
-\code{jsdgam()} itself is not yet on the
-\code{feature/brms-integration} branch; this function exists for
-forward-compatibility with the eventual jsdgam port. It
-relies on the same Stan parameters that an LV \code{mvgam} fit
-carries (\code{lv_trend[t, k]} and \code{Z[i, k]}) plus a few
-\code{jsdgam}-specific bookkeeping slots — calling it on an
-ordinary \code{mvgam} object will error at those slot accesses.
+\code{jsdgam()} itself is not yet ported on this branch;
+this function exists for forward-compatibility with the
+eventual jsdgam port. It relies on the same Stan parameters
+that an LV \code{mvgam} fit carries — \code{lv_trend_tilde[t, k]} and
+\code{Z_tilde[i, k]} for free-Z factor models, or \code{lv_trend} and
+\code{Z} for partial-Z fits — plus a few \code{jsdgam}-specific
+bookkeeping slots. Calling it on an ordinary \code{mvgam} object
+will error at those slot accesses.
 }
 \examples{
 \donttest{

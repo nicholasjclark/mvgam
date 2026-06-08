@@ -178,6 +178,10 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   z_idx <- match_z_loadings(pars)
   if (any(z_idx)) {
     out$loadings <- all_summaries[z_idx, , drop = FALSE]
+    # Flag set when loadings were extracted from QR-identified
+    # `Z_tilde` draws rather than raw `Z`, so print.summary.mvgam
+    # can surface a scope footnote when relevant.
+    out$loadings_identified <- any(grepl("^Z_tilde\\[", pars))
   }
 
   # Store mvgam-specific metadata for print.summary.mvgam() to display
@@ -408,8 +412,10 @@ match_family_pars <- function(pars, has_dpar_formulas = character()) {
 match_trend_pars <- function(pars) {
   # Get all parameters with _trend suffix
   is_trend <- grepl("_trend", pars)
-  # Exclude latent states (handled separately with include_states argument)
-  is_state <- grepl("^(trend|lv_trend)\\[", pars)
+  # Exclude latent states (handled separately with include_states
+  # argument). Both `lv_trend[t, k]` (partial-Z fits) and
+  # `lv_trend_tilde[t, k]` (QR-identified factor paths) qualify.
+  is_state <- grepl("^(trend|lv_trend|lv_trend_tilde)\\[", pars)
 
   is_trend & !is_state
 }
@@ -496,20 +502,36 @@ match_trend_specific_pars <- function(pars) {
   # Not latent states
   is_not_state <- !is_latent_state_param(pars)
 
-  is_trend & is_not_fixed & is_not_smooth & is_not_random & is_not_state
+  # Hide unrotated dynamics draws (e.g. `A_trend[lag][i, j]`)
+  # when the QR-rotated counterpart is also in the posterior.
+  hide_pat <- hidden_unrotated_factor_pars(pars)
+  is_not_hidden <- if (is.null(hide_pat)) {
+    rep(TRUE, length(pars))
+  } else {
+    !grepl(hide_pat, pars)
+  }
+
+  is_trend & is_not_fixed & is_not_smooth & is_not_random &
+    is_not_state & is_not_hidden
 }
 
 #' Match factor loading parameter names
 #'
 #' @description
-#' Identifies factor loading matrix parameters (Z[i,j]).
+#' Identifies factor loading matrix parameters. Prefers
+#' `Z_tilde[i, j]` (QR-identified loadings emitted by free-Z
+#' factor models) when present and falls back to `Z[i, j]`
+#' for partial-Z fits where the user-supplied pattern is
+#' preserved without rotation. Pattern selection delegates to
+#' `factor_loading_param_pattern()`.
 #'
 #' @param pars Character vector of all parameter names
-#' @return Logical vector indicating which parameters are factor loadings
+#' @return Logical vector indicating which parameters are factor
+#'   loadings
 #'
 #' @noRd
 match_z_loadings <- function(pars) {
-  grepl("^Z\\[", pars)
+  grepl(factor_loading_param_pattern(pars), pars)
 }
 
 #' Get distributional parameter names
@@ -609,8 +631,14 @@ match_dpar_smooth_pars <- function(pars, dpar) {
 is_latent_state_param <- function(pars) {
   checkmate::assert_character(pars)
 
+  # `lv_trend_tilde[t, k]` is the rotated factor path saved by
+  # QR-identified factor fits; include it alongside `lv_trend`
+  # so default summary print stays clean.
   grepl(
-    "^(trend|lv_trend|innovations_trend|mu_trend|scaled_innovations_trend)\\[",
+    paste0(
+      "^(trend|lv_trend|lv_trend_tilde|innovations_trend|",
+      "mu_trend|scaled_innovations_trend)\\["
+    ),
     pars
   )
 }
@@ -819,6 +847,16 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   }
 
   # Section 10: Footer (brms style)
+  if (isTRUE(x$loadings_identified)) {
+    cat("Factor Loadings reflect the QR-identified `Z_tilde` ",
+        "(lower-triangular, positive diagonal). Trend dynamics\n",
+        "parameters (ar*_trend, sigma_trend, L_Omega_trend, ",
+        "theta*_trend) remain in the unrotated factor basis;\n",
+        "their per-factor entries describe the sampled `Z`, ",
+        "not the identified `Z_tilde`. See Heaps & Jermyn\n",
+        "(2024) for the post-hoc QR identification scheme.\n",
+        sep = "")
+  }
   cat("Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS\n")
   cat("and Tail_ESS are effective sample size measures, and Rhat is the potential\n")
   cat("scale reduction factor on split chains (at convergence, Rhat = 1).\n")

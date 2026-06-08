@@ -7,19 +7,21 @@
 # / prior / saved `trend` draws are unchanged; only Z and
 # lv_trend draws on disk become canonical.
 #
-# This removes the `2^n_lv` sign-mode equivalence class that the
-# lower-triangular Z constraint alone leaves identifiable up to.
-# Without the fix, chains can drift between sign-flipped modes
-# within a single run, inflating Rhat / ESS, polluting trace
-# plots, and pulling posterior medians of Z artificially toward
-# zero (the median of a bimodal symmetric posterior). With the
-# fix, all of those diagnostics behave correctly.
+# Factor models that sample Z freely save identified `Z_tilde`
+# and `lv_trend_tilde` with a positive diagonal by construction
+# via Stan's `qr_thin_R`. The sign-mode equivalence class is
+# removed at the QR step, so this function is a no-op whenever
+# `Z_tilde` columns are present in the posterior; it is kept
+# active for partial-Z fits where the saved `Z` includes free
+# entries that can still drift between sign modes.
 #
 # Skipped automatically when:
 #   - the fit has no latent factors (detect_factor_n_lv returns
-#     NULL), or
+#     NULL),
 #   - the loadings are fixed via `trend_map` (no sign-mode
-#     exists when Z is data, not a parameter).
+#     exists when Z is data, not a parameter), or
+#   - the posterior already carries `Z_tilde` columns (QR
+#     identification handled at Stan level).
 #
 # Called exactly once inside `create_mvgam_from_combined_fit()`
 # right before the final `mvgam_object` is returned to the user.
@@ -32,11 +34,20 @@
 #' @return The same `object` with `@sim$samples` mutated in place
 #'   and a `$trend_metadata$sign_canonicalised = TRUE` flag.
 #'
+#' @references
+#' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
+#' distributions for the covariance matrix in latent factor
+#' models. \emph{Statistics and Computing}, 34:143.
+#' \doi{10.1007/s11222-024-10454-0}
+#'
 #' @noRd
 sign_canonicalise_factors <- function(object) {
   checkmate::assert_class(object, "mvgam")
   n_lv <- detect_factor_n_lv(object)
   if (is.null(n_lv) || n_lv < 1L) return(object)
+  # Any user-supplied loadings (fully fixed OR partial) pin the
+  # sign of every column touched by the constraint, so flipping
+  # would corrupt the user's encoded structure.
   if (!is.null(object$trend_metadata$fixed_Z)) return(object)
 
   stanfit <- object$fit
@@ -45,6 +56,17 @@ sign_canonicalise_factors <- function(object) {
   }
   samples_list <- stanfit@sim$samples
   if (is.null(samples_list) || length(samples_list) == 0L) {
+    return(object)
+  }
+
+  # Sampled-Z factor fits save a positive-diagonal Z_tilde via
+  # Stan's qr_thin_R; the sign-mode equivalence is already
+  # resolved at the QR step, so the chain-level mutation below is
+  # unnecessary. Detect Z_tilde columns once and skip if present.
+  first_chain <- samples_list[[1L]]
+  if (!is.null(first_chain) &&
+      any(grepl("^Z_tilde\\[", names(first_chain)))) {
+    object$trend_metadata$sign_canonicalised <- TRUE
     return(object)
   }
 

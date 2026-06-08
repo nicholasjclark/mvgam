@@ -431,13 +431,14 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
   mvgam_object$call <- match.call(sys.function(sys.parent()),
                                  sys.call(sys.parent()))
 
-  # Force sign-canonical factor orientation so saved Z and
-  # lv_trend draws have Z[k, k] >= 0 per draw. No-op when the
-  # fit has no latent factors or when Z is fixed via trend_map.
-  # Removes the 2^n_lv sign-mode equivalence the lower-triangular
-  # Z constraint leaves identifiable up to, so Rhat / ESS /
-  # mcmc_trace / posterior medians all behave correctly on the
-  # saved draws.
+  # Defensive sign-canonical pass on saved Z / lv_trend draws.
+  # Free-Z factor models save `Z_tilde` and `lv_trend_tilde`
+  # with positive diagonal via Stan's `qr_thin_R` so the
+  # sign-mode equivalence is already removed at sampling time;
+  # this call short-circuits to a no-op whenever `Z_tilde` is
+  # in the posterior. Active only for fits that lack the
+  # post-hoc QR (none in current architecture, but the function
+  # is kept as a defensive belt).
   mvgam_object <- sign_canonicalise_factors(mvgam_object)
 
   return(mvgam_object)

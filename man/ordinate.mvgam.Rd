@@ -9,6 +9,7 @@
   which_lvs = c(1L, 2L),
   biplot = TRUE,
   alpha = 0.5,
+  rotation = c("svd", "varimax", "promax", "none"),
   label_sites = TRUE,
   ...
 )
@@ -33,7 +34,31 @@ between site scores and series loadings. \code{alpha = 0.5}
 between series are approximately comparably scaled. Use
 \code{alpha} close to \code{1} to emphasise separation between time
 points, or close to \code{0} to emphasise separation between
-series. Matches the BORAL convention.}
+series. Matches the BORAL convention. Ignored for
+\code{rotation} values other than \code{"svd"}.}
+
+\item{rotation}{Character. Post-hoc rotation of the
+posterior-median LV trends and Z loadings before plotting.
+One of:
+\describe{
+\item{\code{"svd"} (default)}{BORAL convention: SVD of
+\code{LV \%*\% t(Z)} re-orders axes by singular-value variance.
+Most informative when \code{n_lv > 2} and you want the two
+leading gradients.}
+\item{\code{"varimax"}}{Orthogonal rotation maximising loading
+sparsity (each series loads strongly on one factor and
+near-zero on others). Use this when you want
+interpretable factor "names" rather than variance-
+ordered axes. Requires \code{n_lv >= 2}. \code{alpha} ignored.}
+\item{\code{"promax"}}{Oblique extension of varimax that allows
+correlated rotated factors. \code{alpha} ignored.}
+\item{\code{"none"}}{Skip rotation entirely; plot raw
+posterior-median LV / Z, centred. The axes correspond
+directly to the Stan parameters
+\code{lv_trend_tilde[t, k]} and \code{Z_tilde[i, k]} (free-Z
+factor models) or \code{lv_trend} / \code{Z} (partial-Z fits),
+as discussed in Details. \code{alpha} ignored.}
+}}
 
 \item{label_sites}{Logical. When \code{TRUE}, site scores are
 drawn as text labels (the training time values); when
@@ -42,7 +67,11 @@ drawn as text labels (the training time values); when
 \item{...}{Ignored.}
 }
 \value{
-A \code{ggplot} object.
+A \code{ggplot} object. The returned object carries a
+\code{"rotation"} attribute (a list with \code{method}, \code{n_lv},
+\code{scores}, \code{loadings}, \code{rotmat}) so users can extract the
+rotated factor scores and loadings without re-running
+\code{ordinate()}. Access via \code{attr(p, "rotation")}.
 }
 \description{
 Generalises \code{\link[=ordinate.jsdgam]{ordinate.jsdgam()}} to any LV-factor \code{mvgam} fit
@@ -52,31 +81,43 @@ series. The SVD re-rotation and the biplot layout are
 identical to the \code{jsdgam} method.
 }
 \details{
-For sampled-Z fits the PLT (positive lower-triangular)
-identification used during MCMC is dissolved by the SVD
-re-rotation: the axes labelled "Latent variable 1" and
-"Latent variable 2" are SVD-rotated ordination gradients,
-NOT the original Stan factors. Use \code{\link[=plot_factors]{plot_factors()}} to view
-the un-rotated sampled factors directly.
+For sampled-Z factor models the Stan model samples an
+unconstrained loading matrix \code{Z} under a structured prior and
+then applies a thin-QR decomposition in generated quantities
+to produce a lower-triangular, positive-diagonal \code{Z_tilde}
+together with the rotated factor paths \code{lv_trend_tilde}. The
+identified \code{Z_tilde} and \code{lv_trend_tilde} are what
+\code{ordinate()} reads. Under \code{rotation = "svd"} (default) the
+axes are SVD-rotated ordination gradients, NOT the original
+Stan factors. Under \code{rotation = "varimax"} / \code{"promax"} the
+axes are rotated for sparsity rather than variance; the
+identified lower-triangular pattern is preserved in the
+underlying fit but not visible in the plot. Use
+\code{rotation = "none"} (or \code{\link[=plot_factors]{plot_factors()}}) to view the
+un-rotated identified factors directly. See Heaps and Jermyn
+(2024) for the structured-prior + post-hoc QR framework.
 
-For fixed-Z fits supplied via \code{trend_map}, the SVD step
-rotates loadings out of the structural pattern the user
-encoded. The biplot is still useful as an exploratory
-gradient-finding tool, but should NOT be read as a
-visualisation of the user's specified factor structure. A
-one-time warning is emitted when called on a fixed-Z fit;
-\code{plot_factors(fit)} shows the raw user-supplied loadings.
+For partial-Z fits (free entries marked \code{NA} in \code{trend_map})
+no QR rotation is applied, since rotating would overwrite
+the user-supplied entries on \code{Z}. Ordination reads \code{Z} and
+\code{lv_trend} directly in those fits.
+
+For fully fixed-Z fits supplied via \code{trend_map}, ANY
+non-\code{"none"} rotation discards the structural loadings the
+user encoded. A one-time warning is emitted when called on
+a fixed-Z fit; \code{plot_factors(fit)} shows the raw user-
+supplied loadings.
 }
 \section{Known limitations}{
 
 \itemize{
-\item Posterior-median plug-in: the SVD operates on per-
-element medians of \code{lv_trend} and \code{Z}. Uncertainty in
+\item Posterior-median plug-in: the rotation operates on
+per-element medians of \code{lv_trend} and \code{Z}. Uncertainty in
 site scores and loading positions is not propagated to
 the biplot.
-\item Sign indeterminacy: SVD columns are sign-arbitrary,
-so comparing ordinations from independently-fit models
-may require a manual sign-flip alignment.
+\item Sign indeterminacy: SVD and varimax columns are sign-
+arbitrary, so comparing ordinations from independently-
+fit models may require a manual sign-flip alignment.
 }
 }
 

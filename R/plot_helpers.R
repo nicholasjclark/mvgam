@@ -478,10 +478,12 @@ reorder_clusters <- function(x, dis, ...) {
 #'   `sample_innovations()`) that already hold pre-extracted
 #'   draws and bookkeeping scalars.
 #'
-#' When `fixed_Z` is non-NULL the matrix is broadcast across
-#' `ndraws`. Otherwise the resolver delegates to
-#' `extract_Z_loadings()` which parses the column-major
-#' `Z[i, j]` posterior draws.
+#' When `fixed_Z` is fully populated (no NAs) the matrix is
+#' broadcast across `ndraws`. Otherwise the resolver delegates
+#' to `extract_Z_loadings()`, which prefers the QR-identified
+#' `Z_tilde[i, j]` draws (free-Z factor models) and falls back
+#' to `Z[i, j]` for partial-Z fits where the user-supplied
+#' pattern is preserved without rotation.
 #'
 #' @param object Fitted mvgam object (object-style entry).
 #'   Required when callers omit `n_series`/`n_lv`.
@@ -519,12 +521,12 @@ resolve_factor_loadings <- function(object = NULL,
   checkmate::assert_int(n_series, lower = 1L)
 
   # Partial Z (some entries NA = sampled): the free entries are
-  # saved as Z[i, j] in the posterior alongside the fixed
+  # saved as `Z[i, j]` in the posterior alongside the fixed
   # entries, so fall through to the column-major draws parser.
   fully_fixed <- !is.null(fixed_Z) && !anyNA(fixed_Z)
   if (fully_fixed) {
     # Reason: fixed-Z fits store Z in standata, so there are no
-    # Z[i, j] posterior columns to read. Broadcast the matrix
+    # `Z[i, j]` posterior columns to read. Broadcast the matrix
     # across ndraws to match the sampled-Z return shape.
     ndraws <- if (!is.null(draws_mat)) {
       nrow(draws_mat)
