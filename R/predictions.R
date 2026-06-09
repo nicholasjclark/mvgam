@@ -2042,6 +2042,85 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
 #' trend_model brmsfit expects "b\[1\]".
 #'
 #' @noRd
+NULL
+
+#' Detect dpar-suffixed parameter names
+#'
+#' Returns a logical vector indicating which names look like
+#' brms's `<head>_<dpar>_<rest>` / `<head>_<dpar>[<idx>]` /
+#' `<head>_<dpar>$` emission for a distributional parameter
+#' (`p`, `mphi`, `mtheta`, etc.). Used by the dpar branch of
+#' `extract_component_linpred()` to filter draws.
+#' @noRd
+is_dpar_param <- function(x, dpar) {
+  pat <- paste0("(^|_)", dpar, "(_|\\[|$)")
+  grepl(pat, x)
+}
+
+#' Filter and rename `prep$sdata` for a dpar linpred extraction
+#'
+#' For dpar components (e.g. `p` for nmix(), future `mphi` /
+#' `mtheta` for tweedie distributional regression), the
+#' obs_model's standata carries BOTH mu's design matrices (`X`,
+#' `Xc`, `Xs`, `Zs_<j>_<m>`, `Z_<g>_<m>`, `Xgp_<id>`, etc.) and
+#' the dpar's (suffixed with `_<dpar>`). If we feed this to
+#' `extract_linpred_univariate()` unchanged, it reads mu's
+#' entries and silently composes mu's linpred against the
+#' dpar's draws.
+#'
+#' Two-pass rewrite:
+#'  1. Keep ONLY dpar-suffixed design / basis entries plus the
+#'     shared structural scalars (N, J_<g>, M_<g>, NC_<g>,
+#'     nlevels, prior_only). Mu's bare-name design matrices
+#'     are dropped because they would shadow the dpar's
+#'     entries after rename.
+#'  2. Strip the `_<dpar>` infix from the remaining names so
+#'     the dpar's design matrices land under the bare names
+#'     `extract_linpred_univariate()` consults.
+#'
+#' @noRd
+strip_dpar_sdata <- function(sdata, dpar) {
+  checkmate::assert_list(sdata, names = "named")
+  checkmate::assert_string(dpar)
+  # Shared structural entries that index into both mu and
+  # dpars; keep regardless of `_<dpar>` membership.
+  shared_pat <- paste0(
+    "^N$|^N_[0-9]|^J_|^M_[0-9]|^NC_[0-9]|^nlevels|",
+    "^prior_only$|^offsets$|^Y$"
+  )
+  has_dpar <- is_dpar_param(names(sdata), dpar)
+  is_shared <- grepl(shared_pat, names(sdata))
+  keep <- has_dpar | is_shared
+  out <- sdata[keep]
+  names(out) <- strip_dpar_infix(names(out), dpar)
+  out
+}
+
+#' Strip the `_<dpar>` infix from brms-emitted parameter or
+#' standata names
+#'
+#' Handles all three positions brms uses: end-of-name
+#' (`Intercept_p` -> `Intercept`, `X_p` -> `X`), before an index
+#' bracket (`b_p[1]` -> `b[1]`, `bs_p[1]` -> `bs[1]`), and as a
+#' middle infix between segments (`b_p_Intercept` -> `b_Intercept`,
+#' `r_1_p_1[5]` -> `r_1_1[5]`, `Zs_p_1_1` -> `Zs_1_1`).
+#'
+#' `_trend` follows the same convention: trend is always a
+#' suffix, so passing `dpar = "trend"` gives the trend-side
+#' rename used by `extract_component_linpred()`. The single
+#' regex unifies the previously bespoke `gsub("_trend", "", ...)`
+#' with the dpar path.
+#'
+#' @param x Character vector of brms parameter or standata names.
+#' @param dpar Character scalar; the infix to strip (e.g.,
+#'   `"p"`, `"trend"`, `"mphi"`).
+#' @return Character vector with the infix removed.
+#' @noRd
+strip_dpar_infix <- function(x, dpar) {
+  pat <- paste0("_", dpar, "(_|\\[|$)")
+  sub(pat, "\\1", x)
+}
+
 extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
                                      resp = NULL, ndraws = NULL,
                                      draw_ids = NULL,
@@ -2092,9 +2171,18 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
     is_mv_trend <- brms::is.mvbrmsformula(brms_model$formula)
     use_resp <- if (is_mv_trend) resp else NULL
   } else {
-    # Distributional parameter (sigma, zi, hu, etc.)
+    # Distributional parameter (e.g. `p` for nmix(), future
+    # `mphi` / `mtheta` for tweedie() distributional regression).
+    # The dpar shares a brmsfit with the mu component, so
+    # standata carries BOTH mu's design matrices and the dpar's
+    # (suffixed by `_<dpar>`). The dpar branch below
+    # strip-renames the `_<dpar>` infix on both the parameter
+    # draws AND the sdata entries, then drops mu's shadowing
+    # entries, so `extract_linpred_from_prep()` composes the
+    # dpar linpred via the same parametric + smooth + RE + GP
+    # machinery it uses for mu.
     params <- extract_obs_parameters(mvgam_fit)
-    params <- grep(paste0("_", component), params, value = TRUE)
+    params <- params[is_dpar_param(params, component)]
 
     if (length(params) == 0) {
       stop(insight::format_error(
@@ -2105,7 +2193,7 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
     }
 
     brms_model <- mvgam_fit$obs_model
-    strip_suffix <- FALSE
+    strip_suffix <- TRUE
     use_resp <- resp
   }
 
@@ -2148,10 +2236,19 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   
   # Extract component-specific draws
   component_draws <- full_draws[, params, drop = FALSE]
-  
-  # Strip suffix for trend parameters
+
+  # Strip the component infix from parameter names so the shared
+  # composer (`extract_linpred_univariate()`) reads them as
+  # top-level mu parameters. For the trend the infix is always
+  # at the end (`_trend`); for dpars it can sit at the end
+  # (`Intercept_p`), before a bracket (`b_p[1]`), or as a middle
+  # segment (`b_p_Intercept`, `r_1_p_1[5]`). `strip_dpar_infix()`
+  # handles all three.
   if (strip_suffix) {
-    colnames(component_draws) <- gsub("_trend", "", colnames(component_draws))
+    colnames(component_draws) <- strip_dpar_infix(
+      colnames(component_draws),
+      dpar = component
+    )
   }
 
   # Create mock stanfit object
@@ -2166,6 +2263,17 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
     allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels
   )
+
+  # For dpar components the obs_model's standata carries both
+  # mu's design matrices and the dpar's (suffixed with `_<dpar>`).
+  # Drop mu's shadowing entries and rename the dpar-suffixed ones
+  # to bare names so the shared linpred composer reads the
+  # dpar's basis. Trend components don't need this because the
+  # trend has a separate brmsfit whose standata already uses
+  # bare names.
+  if (strip_suffix && !identical(component, "trend")) {
+    prep$sdata <- strip_dpar_sdata(prep$sdata, dpar = component)
+  }
 
   # Extract linear predictor (use_resp handles shared vs multivariate trends)
   linpred <- extract_linpred_from_prep(prep, resp = use_resp)

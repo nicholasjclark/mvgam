@@ -201,6 +201,26 @@ as_draws_matrix.mock_stanfit <- function(x, ...) {
 }
 
 
+#' Dimnames for a mock stanfit
+#'
+#' Defers to the cached draws-matrix so callers that consult
+#' `colnames(prep$draws)` / `dim(prep$draws)` (for example
+#' `detect_gp_terms()` and other GP / smooth / RE detection
+#' helpers in `R/predictions.R`) work against a mock_stanfit
+#' without falling through to the default `dimnames.stanfit`
+#' method, which reads `@mode` and has no implementation here.
+#'
+#' @param x A mock_stanfit object created by `create_mock_stanfit()`.
+#' @return The dimnames of the underlying `draws_matrix` (a list
+#'   with `NULL` rows and the parameter names as columns).
+#'
+#' @method dimnames mock_stanfit
+#' @export
+dimnames.mock_stanfit <- function(x) {
+  dimnames(x$draws_cache)
+}
+
+
 #' Prepare Predictions for Mock stanfit
 #'
 #' S3 method for prepare_predictions that works with mock_stanfit objects

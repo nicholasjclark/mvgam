@@ -1124,38 +1124,19 @@ extract_p_for_nmix <- function(object, newdata, draw_ids,
                                 n_visit, ndraws) {
   draws_mat <- posterior::as_draws_matrix(object$fit)
   all_cols  <- colnames(draws_mat)
-  # Smooth / RE / GP terms on the detection dpar are gated for
-  # now; the parametric path covers `p ~ x1 + x2 + factor(z)`
-  # cleanly and the more elaborate brms reparameterisations are
-  # a follow-up.
-  unsupported_p_terms <- grep("^sds_p_|^s_p_|^sd_p_|^gp_p_",
-                              all_cols, value = TRUE)
-  if (length(unsupported_p_terms) > 0L) {
-    stop(insight::format_error(c(
-      paste0(
-        "R-side prediction for `bf(p ~ ...)` with smooths, ",
-        "random effects, or GP terms is not yet wired."
-      ),
-      x = paste0(
-        "Detected posterior parameter(s): ",
-        paste(head(unsupported_p_terms, 3), collapse = ", "),
-        if (length(unsupported_p_terms) > 3L) ", ..." else "",
-        "."
-      ),
-      i = paste0(
-        "Parametric detection sub-formulas (e.g. `p ~ tod + ",
-        "factor(site)`) are supported; the smooth / RE / GP ",
-        "extraction will land in a follow-up commit."
-      )
-    )))
-  }
-  has_b_p_intercept <- "b_p_Intercept" %in% all_cols
-  b_p_slope_cols    <- grep("^b_p\\[", all_cols, value = TRUE)
-  if (has_b_p_intercept || length(b_p_slope_cols) > 0L) {
-    return(extract_p_vector(
-      object, newdata, draw_ids,
-      b_p_slope_cols = b_p_slope_cols
-    ))
+  # Any column emitted by a detection sub-formula triggers the
+  # vector-p path; the rebuild reuses mvgam's existing dpar-
+  # linpred composer via name-stripping so parametric, smooth,
+  # random-effect and GP terms in `p ~ ...` all flow through.
+  has_any_p_subformula <- any(grepl(
+    paste0(
+      "^Intercept_p$|^b_p_|^bs_p($|\\[)|^s_p_|^sds_p_|",
+      "^zs_p_|^r_.+_p_|^gp_p_|^sdgp_p_|^lscale_p_"
+    ),
+    all_cols
+  ))
+  if (has_any_p_subformula) {
+    return(extract_p_via_dpar_linpred(object, newdata, draw_ids))
   }
   # Scalar `p` parameter in the posterior; broadcast to per-visit
   # length for downstream indexing.
@@ -1173,74 +1154,28 @@ extract_p_for_nmix <- function(object, newdata, draw_ids,
   matrix(p_scalar, nrow = ndraws, ncol = n_visit, byrow = FALSE)
 }
 
-#' Vector-p draws: rebuild from posterior b_p_* + design matrix
+#' Vector-p draws via mvgam's shared dpar-linpred composer
 #'
-#' Recomputes the per-visit detection probability matrix when
-#' the user supplied a parametric detection sub-formula via
-#' `bf(y ~ ..., p ~ ...)`. brms generates the original-scale
-#' intercept `b_p_Intercept` in the generated quantities block
-#' (already adjusted for the standardisation of `X_p`); the
-#' slopes `b_p[k]` apply to the raw design matrix without any
-#' further centering.
+#' Delegates to `extract_component_linpred()` with
+#' `component = "p"`, the same machinery used for the obs and
+#' trend components. The dpar branch strip-renames the `_p`
+#' infix on draws and standata, then funnels the result through
+#' `extract_linpred_univariate()` which already composes
+#' parametric + smooth + RE + GP contributions across draws.
+#' Reusing the shared composer means a `bf(y ~ ..., p ~ ...)`
+#' detection sub-formula inherits every predictor type brms
+#' supports without bespoke code.
 #'
-#' Standata for `newdata` is rebuilt via `mvgam_formula` +
-#' `standata()` so the detection design matrix `X_p` reflects
-#' the user's possibly-edited `newdata` (factors levels, raw
-#' covariate values).
+#' @return `[ndraws x n_visit]` matrix of probabilities (link
+#'   inverse already applied).
 #' @noRd
-extract_p_vector <- function(object, newdata, draw_ids,
-                              b_p_slope_cols) {
-  draws_mat <- posterior::as_draws_matrix(object$fit)
-  if (!is.null(draw_ids)) {
-    draws_mat <- draws_mat[draw_ids, , drop = FALSE]
-  }
-  ndraws <- nrow(draws_mat)
-  # Rebuild standata for newdata via mvgam_formula. brms keeps
-  # the raw design matrix in `X_p` (Intercept column + slopes).
-  mf <- mvgam_formula(object$formula)
-  sdata_new <- standata(
-    mf, data = newdata, family = object$family
+extract_p_via_dpar_linpred <- function(object, newdata, draw_ids) {
+  linpred_p <- extract_component_linpred(
+    mvgam_fit = object,
+    newdata   = newdata,
+    component = "p",
+    draw_ids  = draw_ids
   )
-  if (is.null(sdata_new$X_p)) {
-    stop(insight::format_error(
-      "Detection design matrix 'X_p' missing from regenerated standata."
-    ))
-  }
-  X_p_raw <- sdata_new$X_p
-  # b_p_Intercept already lives on the unstandardised scale via
-  # brms's `b_p_Intercept = Intercept_p - dot_product(means_X_p,
-  # b_p)` reparameterisation in generated quantities. Pair it
-  # with the raw X_p (intercept column dropped because b_p_*
-  # holds the intercept directly).
-  if (!"b_p_Intercept" %in% colnames(draws_mat)) {
-    stop(insight::format_error(
-      "'b_p_Intercept' missing from posterior draws."
-    ))
-  }
-  intercept_p <- as.numeric(draws_mat[, "b_p_Intercept"])
-  if (length(b_p_slope_cols) == 0L) {
-    # Intercept-only detection sub-formula; broadcast across
-    # visits.
-    return(stats::plogis(matrix(
-      intercept_p, nrow = ndraws,
-      ncol = nrow(X_p_raw), byrow = FALSE
-    )))
-  }
-  b_p_slopes <- as.matrix(draws_mat[, b_p_slope_cols, drop = FALSE])
-  # X_p columns: first is Intercept (all 1s), then slopes.
-  X_slopes <- X_p_raw[, -1L, drop = FALSE]
-  if (ncol(X_slopes) != ncol(b_p_slopes)) {
-    stop(insight::format_error(c(
-      "Mismatch between b_p slope count and X_p design matrix.",
-      x = paste0(
-        "b_p slopes: ", ncol(b_p_slopes),
-        ", X_p slopes: ", ncol(X_slopes), "."
-      )
-    )))
-  }
-  linpred_p <- matrix(intercept_p, nrow = ndraws,
-                      ncol = nrow(X_slopes), byrow = FALSE) +
-               b_p_slopes %*% t(X_slopes)
   stats::plogis(linpred_p)
 }
 
@@ -1255,10 +1190,12 @@ extract_p_vector <- function(object, newdata, draw_ids,
 #' `newdata` so that user edits to the `cap` column take effect
 #' at prediction time.
 #'
-#' Step 5a restricts `p` to the scalar (no sub-formula) case.
-#' Vector-p extraction with `bf(y ~ ..., p ~ tod)` requires
-#' rebuilding the detection design matrix from posterior `b_p`
-#' draws and ships separately.
+#' Detection sub-formulas (`bf(y ~ ..., p ~ tod)`) are
+#' supported via `extract_p_via_dpar_linpred()`, which rebuilds
+#' the per-visit probability matrix from the posterior
+#' coefficients + the standata design matrices on `newdata`.
+#' Parametric, smooth and random-effect terms in `p ~ ...` all
+#' flow through; GP terms in `p ~ ...` are gated.
 #'
 #' Predict-time guard: re-runs `validate_closure_unit_data()` to
 #' catch the case where `newdata` carries `cap < max(y)` per
