@@ -277,7 +277,8 @@ generate_trend_priors <- function(trend_spec, data, response_names = NULL) {
 #' on which generator built them (the obs side picks up newer columns
 #' like `tag` from brms; the trend side and mvgam-internal generators
 #' may not). dplyr::bind_rows fills missing columns with NA, which
-#' keeps this helper robust to future brms schema additions.
+#' lets this helper accept future brms schema additions without
+#' tracking each column individually.
 #'
 #' @param prior_list List of brmsprior / data.frame objects.
 #' @return brmsprior object with all rows row-bound and columns unioned.
@@ -400,6 +401,12 @@ get_parameter_type_default_prior <- function(param_name) {
   if (grepl("^ar[0-9]+_trend$", param_name)) {
     # AR coefficients: typically bounded [-1, 1] for stationarity
     return(list(prior = "normal(0, 0.5)", lb = "-1", ub = "1"))
+  } else if (grepl("^mu_ar[0-9]+_trend$", param_name)) {
+    # Population mean for hierarchical AR coefficient (lag-specific)
+    return(list(prior = "normal(0, 0.5)", lb = "-1", ub = "1"))
+  } else if (grepl("^sigma_ar[0-9]+_trend$", param_name)) {
+    # Population scale for hierarchical AR coefficient
+    return(list(prior = "exponential(2)", lb = "0", ub = ""))
   } else if (grepl("sigma.*_trend$", param_name)) {
     # Variance parameters: positive with lower bound
     return(list(prior = "", lb = "0", ub = ""))
@@ -522,7 +529,7 @@ combine_obs_trend_priors <- function(obs_priors, trend_priors) {
   # brms's prior data frames carry slightly different columns depending
   # on which generator built them (the obs side picks up newer columns
   # like `tag` from brms; the trend side does not). Align the schemas
-  # before rbind so we are robust to brms schema additions.
+  # before rbind so future brms schema additions don't error here.
   all_cols <- union(colnames(obs_priors), colnames(trend_priors))
   missing_obs <- setdiff(all_cols, colnames(obs_priors))
   missing_trend <- setdiff(all_cols, colnames(trend_priors))
@@ -1359,7 +1366,7 @@ get_trend_parameter_prior <- function(prior = NULL, param_name) {
 #' terms conflict with mvgam's State-Space dynamics. All forbidden terms remain
 #' fully supported in the main observation formula.
 #'
-#' @section Multivariate models — single shared trend type:
+#' @section Multivariate models, single shared trend type:
 #' For multivariate observation models (\code{mvbind()} or
 #' \code{bf() + bf()}), \strong{a single trend constructor applies to
 #' all responses}. Different trend types per response (e.g.
@@ -1719,3 +1726,4 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
 
   return(combined_priors)
 }
+

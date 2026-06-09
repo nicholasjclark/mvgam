@@ -27,7 +27,8 @@ AR(
   gr = NA,
   subgr = NA,
   n_lv = NULL,
-  trend_map = NULL
+  trend_map = NULL,
+  coef_sharing = c("none", "shared", "hierarchical")
 )
 
 CAR(time = NA, series = NA)
@@ -133,14 +134,28 @@ or \code{ar3}).
 \item For \code{VAR()} models: a positive integer. A scalar
 \code{p = k} is the VAR(k) interpretation with
 consecutive coefficient matrices for lags \code{1:k}.
-Sparse-lag vector \code{p} is rejected because the
-Heaps-2022 stationary joint-distribution initialisation
-assumes consecutive companion-form structure. Use
-\code{AR(p = c(...))} for sparse-lag autoregression on
-a single series.
+Sparse-lag vector \code{p} is not supported and will
+not be added: the Heaps-2022 stationary joint-
+distribution initialisation assumes consecutive
+companion-form structure, so the sparse case has no
+companion-form analogue with the same identified
+stationary covariance. Use \code{AR(p = c(...))} for
+sparse-lag autoregression on a single series.
 \item For \code{CAR()} models: must be \code{1} (continuous-time
 AR(1) process).
 }}
+
+\item{coef_sharing}{Character string, one of \code{"none"},
+\code{"shared"}, or \code{"hierarchical"}, controlling how AR
+coefficients vary across latent series in \code{AR()}. The
+default \code{"none"} estimates an independent coefficient
+vector per series (one \verb{ar\{lag\}_trend} entry per latent
+process per lag). \code{"shared"} collapses to a single
+\verb{ar\{lag\}_shared} scalar per lag, broadcast across all
+series in \verb{transformed parameters}. \code{"hierarchical"} adds
+per-lag population-mean (\verb{mu_ar\{lag\}_trend}) and scale
+(\verb{sigma_ar\{lag\}_trend}) hyperparameters with a pooled
+\verb{ar\{lag\}_trend[j] ~ normal(mu_ar\{lag\}_trend, sigma_ar\{lag\}_trend)}.}
 }
 \value{
 An object of class \code{mvgam_trend}, which contains a list of
@@ -177,6 +192,26 @@ making any valid first step. Leave the sampler's \code{init}
 argument at its default (random) for VAR fits. AR / RW /
 CAR / ZMVN are unaffected.
 }
+\section{AR coefficient-sharing surface}{
+
+The \code{coef_sharing} argument selects how AR coefficients
+vary across the latent series. The three settings and the
+Stan parameters each declares are:
+\tabular{ll}{
+\strong{coef_sharing}    \tab \strong{Stan parameters with priors} \cr
+\code{"none"}                 \tab \verb{ar\{lag\}_trend} per series \cr
+\code{"shared"}               \tab \verb{ar\{lag\}_shared} (one per lag) \cr
+\code{"hierarchical"}         \tab \verb{mu_ar\{lag\}_trend}, \verb{sigma_ar\{lag\}_trend}, \verb{ar\{lag\}_trend} per series \cr
+}
+All variants synthesise the same \verb{ar\{lag\}_trend[j]} symbol
+in \verb{transformed parameters}, so downstream code
+(forecasting, IRF, FEVD, summary printing) is unchanged.
+Custom priors can be set on any sampled parameter via the
+standard \code{brms::set_prior(class = "<name>")} route; call
+\code{get_prior(mvgam_formula(...))} to see the exact parameter
+set surfaced by the current \code{coef_sharing} value.
+}
+
 \section{Parameter Naming Convention}{
 
 All trend model parameters automatically receive a "_trend" suffix to prevent

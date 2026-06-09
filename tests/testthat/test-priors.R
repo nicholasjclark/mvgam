@@ -537,7 +537,11 @@ test_that("validate_single_trend_formula rejects invalid terms", {
   expect_error(mvgam:::validate_single_trend_formula(~ weights(w) + AR()))
   expect_error(mvgam:::validate_single_trend_formula(~ trials(n) + AR()))
   expect_error(mvgam:::validate_single_trend_formula(~ cens(c) + AR()))
-  expect_error(mvgam:::validate_single_trend_formula(~ mi(x) + AR()))
+  # mi() is the one brms addition-term special that IS allowed on
+  # the trend side (the gatekeeper in validate_single_trend_formula
+  # whitelists it so users can impute missing latent-scale
+  # predictors).
+  expect_no_error(mvgam:::validate_single_trend_formula(~ mi(x) + AR()))
 })
 
 test_that("validate_trend_formula_brms handles all formula types", {

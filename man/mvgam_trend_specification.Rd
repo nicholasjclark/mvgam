@@ -222,11 +222,11 @@ ar_trend <- structure(list(
 \section{Design Principles}{
 
 \itemize{
-\item{Self-contained}: Each object contains all needed metadata}
-\item{Convention-based}: Minimal configuration, maximum automation}
-\item{Extensible}: New fields can be added without breaking existing trends}
-\item{Validated}: Structure enforced through validate_mvgam_trend()}
-\item{Consistent}: All trends follow identical patterns}
+\item Self-contained: each object contains all needed metadata
+\item Convention-based: minimal configuration, maximum automation
+\item Extensible: new fields can be added without breaking existing trends
+\item Validated: structure enforced through \code{validate_mvgam_trend()}
+\item Consistent: all trends follow identical patterns
 }
 }
 

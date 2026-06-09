@@ -1,0 +1,1746 @@
+Statistics and Computing (2024) 34:143
+https://doi.org/10.1007/s11222-024-10454-0
+
+    ORIGINAL PAPER
+
+
+
+Structured prior distributions for the covariance matrix in latent factor
+models
+Sarah Elizabeth Heaps1 · Ian Hyla Jermyn1
+
+Received: 18 October 2023 / Accepted: 11 June 2024 / Published online: 26 June 2024
+© The Author(s) 2024
+
+
+Abstract
+Factor models are widely used for dimension reduction in the analysis of multivariate data. This is achieved through decom-
+position of a p × p covariance matrix into the sum of two components. Through a latent factor representation, they can be
+interpreted as a diagonal matrix of idiosyncratic variances and a shared variation matrix, that is, the product of a p × k factor
+loadings matrix and its transpose. If k  p, this defines a parsimonious factorisation of the covariance matrix. Historically,
+little attention has been paid to incorporating prior information in Bayesian analyses using factor models where, at best, the
+prior for the factor loadings is order invariant. In this work, a class of structured priors is developed that can encode ideas of
+dependence structure about the shared variation matrix. The construction allows data-informed shrinkage towards sensible
+parametric structures while also facilitating inference over the number of factors. Using an unconstrained reparameterisation
+of stationary vector autoregressions, the methodology is extended to stationary dynamic factor models. For computational
+inference, parameter-expanded Markov chain Monte Carlo samplers are proposed, including an efficient adaptive Gibbs
+sampler. Two substantive applications showcase the scope of the methodology and its inferential benefits.
+
+Keywords Covariance matrix · Dimension reduction · Intraday gas demand · Latent factor models · Stationary dynamic
+factor models · Structured prior distributions
+
+Mathematics Subject Classification 62F15 · 62J99 · 62M10
+
+
+1 Introduction                                                               yi = μ + ηi +  i ,                                        (1)
+
+Factor models are widely used as a tool for dimension reduc-                in which the p × k matrix  is called the factor loadings
+tion in explaining the covariance structure of multivariate                 matrix. The components of the error term  i are often called
+data. Let yi = (yi1 , . . . , yi p )T be a p-dimensional random             the specific factors (or “uniquenesses”) and their variances
+vector with mean μ and covariance matrix  for observa-                     are often termed the idiosyncratic variances. In (1), we take
+tion unit i = 1, . . . , n. The classic factor model posits that            the specific and common factors,  i and ηi , to be uncorre-
+the covariances between the p components of yi can be                       lated, zero-mean multivariate normal random variables, with
+explained by their mutual dependence on a smaller number
+k of unknown common factors ηi = (ηi1 , . . . , ηik )T . Specifi-            i ∼ N p (0, ) and ηi ∼ Nk (0, I k ).                      (2)
+cally, the model expresses yi as a noisy affine transformation
+                                                                            In general, the common factors are assumed to explain all
+of ηi ,
+                                                                            the shared variation between the components of yi and so 
+                                                                            is constrained to be a diagonal matrix with positive diagonal
+                                                                            elements,  = diag(σ12 , . . . , σ p2 ). It then follows from (1)
+B Sarah Elizabeth Heaps                                                     that the marginal covariance matrix  can be expressed as
+     sarah.e.heaps@durham.ac.uk
+     Ian Hyla Jermyn                                                         = T +                                                   (3)
+     i.h.jermyn@durham.ac.uk
+1    Department of Mathematical Sciences, Durham University,                in which the product  = (δi j ) = T will henceforth be
+     Upper Mountjoy, Stockton Road, Durham DH1 3LE, UK                      termed the shared variation matrix. If k  p, the right-hand-
+
+
+                                                                                                                                  123
+143    Page 2 of 18                                                                                  Statistics and Computing (2024) 34:143
+
+
+side of (3) constitutes a parsimonious factorisation of the full          Beyond analyses of functional data, most of the work in
+covariance matrix.                                                     the Bayesian literature on prior specification for factor mod-
+    Factor models originally found widespread use in psychol-          els has focused on the problem of developing priors that are
+ogy and other social sciences (e.g. Goldberg 1990), where              exchangeable with respect to the order of the variables in
+a primary motivation was the prospect of domain insight                the observation vector (e.g. Leung and Drton 2016; Chan
+through interpretation of the latent factors. Since their intro-       et al. 2018) with more recent work focusing additionally on
+duction, factor models have been extended in a variety of              allowing sparsity in the factor loadings matrix (Frühwirth-
+directions, for example, by allowing sparsity in the matrix of         Schnatter et al. 2023). There has been very little work on
+factor loadings for high-dimensional problems (Conti et al.            constructing non-exchangeable prior specifications in a gen-
+2014) or by modelling the temporal evolution of variances              eral setting. A notable exception is the structured increasing
+in stochastic volatility models (Lopes and Carvalho 2007)              shrinkage process prior of Schiavon et al. (2022) under
+or the latent factors in dynamic factor models (Sáfadi and             which each factor loading in an infinite factorisation model is
+Peña 2008). Accordingly, the use of factor models and their            assigned a spike-and-slab prior where variable-specific meta-
+extensions has spread into a diverse array of other fields, such       covariates are incorporated in the spike probabilities. Other
+as finance (Aguilar and West 2000) and genetics (Carvalho              related work appears in the context of vector error correc-
+et al. 2008).                                                          tion models, which are another class of reduced rank models,
+    In many of these application areas, the modeller is likely         where Koop et al. (2009) develop an informative prior for the
+to hold prior beliefs about the nature of the dependence               matrix of cointegration vectors based on economic theory
+between variables. For example, when the observation vector            about the likely cointegration relationships between vari-
+represents repeated measures data, or observations at a col-           ables.
+lection of spatial locations, it would be reasonable to expect            In this paper, we treat the factor model as a tool for pro-
+stronger associations between measurements that are closer             viding a dimension-reduced parameterisation of a covariance
+together in time or space. Indeed, such ideas underpin the             matrix. Based on the insight that the shared variation matrix
+class of functional factor models which are tailored to vari-           = T in (3) is more amenable to the specification of
+ables that might be better represented as functions over a             prior beliefs than the factor loadings matrix , our main
+continuous domain, rather than vector-valued random quan-              contribution is a framework for incorporating initial beliefs
+tities. Some functional factor models, and their dynamic               about  in the prior for  by exploiting the algebraic relation-
+extensions, have functional factors (e.g. Castellanos et al.           ship between the two quantities. By switching the focus from
+2004; Taylor-Rodriguez et al. 2019) while others have func-            properties of the prior for  to properties of the prior for  we
+tional factor loadings. In the latter case, if we regard the p         obtain a methodology that is more flexible than alternatives
+observations on unit i as measurements on a function over a            described in the literature. The prior for the shared variation
+continuous domain, say τ ∈ R, then we replace (1) with                 matrix  is induced through a structured prior distribution for
+                                                                       the factor loadings matrix  which can encode ideas of order-
+yi (τ j ) = μ(τ j ) + f i (τ j ) + i (τ j )                           invariance as well as non-exchangeable structure, modelled
+                                                                       through dependence on covariance kernels, meta-covariates,
+                        
+                        k
+        = μ(τ j ) +          λm (τ j )ηim + i (τ j )                  pairwise distance metrics and more, within a single prin-
+                       m=1                                             cipled framework. In particular, the mean of the prior for
+                                                                        can be any positive definite matrix of relevance. For
+for j = 1, . . . , p. The key idea is then to treat the factor load-   example, it could be a phylogenetic distance matrix whose
+ing curves λm (τ ) as smooth unknownfunctions of τ . This can         entries encode distances between nodes on a tree, or even
+be achieved by regarding f i (τ j ) = λm (τ j )ηim as a linear         the Gram matrix arising from a Gaussian process covariance
+combination of (orthogonal) basis functions, often modelled            function. The interpretability of this prior expectation facil-
+using splines, which then implies a particular covariance              itates straightforward incorporation of meaningful domain
+function for f i (τ ). Although some of the research in this           expertise. Moreover, the flexible class of priors allows data-
+direction uses a Bayesian approach to inference (Kowal et al.          informed shrinkage towards a region around the mean within
+2017; Kowal and Canale 2022), the frequentist treatment                a framework that facilitates inference on the number of fac-
+of the problem is more common, particularly in financial               tors and hence the extent to which dimension-reduction can
+applications to forecasting yield curves (Hays et al. 2012;            be achieved. New theoretical results outline the nature of this
+Jungbacker et al. 2014). An alternative approach in models             shrinkage in the rank-reduced space over which  has sup-
+with functional factor loadings is to assume each λm (τ ) to be        port while shedding light on some of the identifiability issues
+a realisation of a stochastic process, for instance, a Gaussian        that can hamper computational inference for factor models.
+process with a chosen covariance function; see, for example,              Based on ideas from the literature on infinite factorisation
+the dynamic spatial model of Lopes et al. (2008).                      models and parameter-expansion algorithms, we propose an
+
+
+123
+Statistics and Computing (2024) 34:143                                                                                      Page 3 of 18   143
+
+
+efficient scheme for computational inference where a single         Given identification of , solving the rotation problem would
+Markov chain Monte Carlo (MCMC) run yields informa-                 then guarantee unique identification of the factor loadings
+tion about both the continuous model parameters and the             matrix .
+number of factors. Using an unconstrained reparameterisa-               In the Bayesian literature, the most common solution to the
+tion of stationary vector autoregressions, the methodology is       rotation problem uses the positive diagonal, lower triangular
+also extended to a class of stationary dynamic factor models        (PLT) constraint; denoting the constrained matrix by                 ˜ and
+for which the shared variation matrix remains meaningfully          corresponding factors by η̃1 , . . . , η̃n , this demands λ̃i j = 0
+defined. To the best of our knowledge, this is the first prior,     for j > i and λ̃ii > 0 for i = 1, . . . , k. Although histor-
+with associated inferential scheme, for a general class of          ically this approach has been widely used in the Bayesian
+dynamic factor models that constrains inference to the sta-         literature (e.g. Geweke and Zhou 1996; Lopes and West
+tionary region without imposing further restrictions. This          2004), we choose not to address the rotational invariance
+constitutes an important contribution to the Bayesian time-         and instead parameterise the model using the unidentified
+series literature.                                                  and unconstrained factor loadings matrix . There are two
+    The remainder of this paper is organised as follows. After      main motivations.
+introducing our parameterisation of Bayesian factor models              First, recent work provides theoretical and empirical evi-
+in Sect. 2, Sect. 3 presents the general class of structured pri-   dence that imposition of the PLT constraint can adversely
+ors and its components. In Sect. 4, we extend these ideas           affect computational inference. Writing              ˜ (k) to denote the
+to a class of stationary dynamic factor models. Posterior           lower triangular matrix comprising the first k rows and
+computation is discussed in Sect. 5, then Sect. 6 presents a
+                                                                    columns of ,  ˜ problems arise when             ˜ (k) is near singular,
+simulation experiment and two substantive applications that
+                                                                    which can occur when variables in yi are highly correlated.
+illustrate the scope of the methodology and its inferential
+                                                                    When the jth diagonal element of             ˜ (k) is close to zero, the
+benefits.
+                                                                    signs of (λ̃ j+1, j , . . . , λ̃ pj ) are only very weakly identified,
+                                                                    producing multiple modes in the posterior corresponding to
+                                                                    the different sign flips (e.g. Aßmann et al. 2016; Man and
+2 Parameterisation of the Bayesian factor
+                                                                    Culpepper 2022). This can cause poor mixing in MCMC
+  model
+                                                                    samplers and poor approximation of the posterior for the
+                                                                    number of factors (Chan et al. 2018). These problems have
+It is well known that the parameters  and  in the marginal
+                                                                    been addressed successfully by parameter-expansion tech-
+covariance matrix  = T +  of a factor model are not
+                                                                    niques, which target a posterior over an expanded space with
+identifiable from the likelihood without imposition of con-
+                                                                    fewer pathological features (e.g. Ghosh and Dunson 2009;
+straints. Indeed, even with the scale of the factors fixed at
+                                                                    Chan et al. 2018). Parameterising the model and framing the
+Var(ηi ) = I k in (2), there remains a rotational invariance.
+                                                                    problem of computational inference in terms of the unidenti-
+Consider any k×k orthogonal matrix Q. We can pre-multiply
+                                                                    fied factor loadings matrix  falls into this class of methods.
+the factors in (1) by Q and post-multiply the factor loadings
+                                                                        Second, parameterisation in terms of the unconstrained
+matrix by Q T and this gives the transformed factors in (2) the
+                                                                    and unidentified factor loadings matrix  delivers an addi-
+same distribution as the original factors and so the marginal
+                                                                    tional benefit in terms of prior specification. Direct elicitation
+variance in (3) remains unchanged. The factor loadings                                                                         ˜ is difficult as
+                                                                    of a prior for the identified factor loadings in 
+matrix can therefore only be identified up to an orthogonal
+                                                                    they quantify relationships with latent factors whose inter-
+transformation. This means there are pk − k(k − 1)/2 + p
+                                                                    pretation is generally unclear a priori. In contrast, beliefs
+degrees of freedom determining the marginal variance .
+                                                                    about the shared variation  in linear Gaussian models can
+In an unconstrained model for yi , the number of degrees of
+                                                                    be related directly to beliefs about observable quantities. As
+freedom would be p( p + 1)/2 and so the reduction in the
+                                                                    a result,  is generally a more intuitive parameter for the
+number of parameters is p( p + 1)/2 − { pk − k(k − 1)/2 + p}
+                                                                    quantification of covariation. For example, in a spatial prob-
+which is positive if k < ϕ( p) where
+                                                                    lem where the elements of yi correspond to observations
+                   √                                                at different locations, a modeller might reasonably structure
+          2p + 1 − 8p + 1
+ϕ( p) =                                                      (4)    their beliefs through a covariance matrix for which covari-
+                  2                                                 ance decays as a function of distance. Fortunately, subject to
+is called the Ledermann bound. Notwithstanding rotational           k < ϕ( p), identifiability of  is not necessary for identifica-
+invariance, the first identification issue is therefore whether     tion of . Further, under various standard distributions for an
+ can be identified uniquely from . Fortunately, Bekker            unconstrained random matrix , the first and second order
+                                                                    moments of the shared variation matrix  =                  ˜˜ T = T
+and ten Berge (1997) proved that if k < ϕ( p) then , and
+therefore  = T , is almost surely globally identifiable.         can be calculated in closed form. Through careful specifi-
+
+
+                                                                                                                                   123
+143   Page 4 of 18                                                                                       Statistics and Computing (2024) 34:143
+
+
+cation of the prior for , a modeller can therefore capture         T = D1/2 U (k) U (k) T D1/2 where U (k) is the sub-matrix
+their beliefs about the moments in the prior for the shared         comprising the first k columns of U. Moreover, the minimum
+variation matrix.                                                   squared Frobenius distance is equal to the sum of the squares
+                                                                    of the last p − k eigenvalues of D.
+                                                                       The proof of Proposition 1 is provided in the Supplemen-
+3 Structured prior distributions
+                                                                    tary Materials.
+3.1 Significance of prior expectation                               Theorem 1 If U MU T denotes the spectral decomposition of
+                                                                    E() ∈ S + p and m k  = m k+1 , then the constrained expec-
+The prior expectation of the shared variation matrix  =            tation of , E F () ∈ S +
+                                                                                             p,k , is equal to the matrix product
+T is defined by E() = {E(δi j )} = E(T ). As we                which minimises the Frobenius distance to E(). That is,
+detail in Sect. 3.4, E() will be chosen to reflect beliefs about   E F () = E()1/2 U (k) U (k) T E()1/2 .
+the covariation amongst the p elements of yi . In general, it
+will be a rank p matrix.                                               The proof of Theorem 1 is given in the Supplementary
+   For k < p, denote by S +  p,k the set of rank k, p × p sym-
+                                                                    Materials. Its significance lies in the suggestion that the prior
+metric, positive semi-definite matrices and write S +               for  encourages shrinkage towards the closest matrix in
+                                                        p for the
+space of p × p symmetric, positive definite matrices. The           S+p,k to the rank p prior expectation E(), hence for a given
+factor loadings matrix  is rank k < ϕ( p) < p and so the           structure for E(), approximating it as closely as possi-
+prior distribution for the shared variation matrix  = T          ble in rank-reduced form. The Supplementary Materials also
+only offers non-zero support to S +                  +              consider the case m k = m k+1 and the implications for com-
+                                     p,k . Because S p,k is not a
+convex set, it need not contain the prior expectation of .         putational inference.
+Indeed, as stated previously, E() will generally be rank
+p. Therefore, although E() represents the centre of prior          3.2 A matrix normal prior
+mass, in general there will be zero density at this point. The
+significance of E() is thus not completely clear. We will          A random matrix  has a matrix normal distribution with
+elucidate its meaning via an alternative, constrained expec-        location matrix M ∈ R p×k , among-row scale matrix  ∈
+tation, as follows.                                                 S+p and among-column scale matrix       ∈ Sk+ , written
+   The Frobenius norm of a matrix is simply the Euclidean            ∼ N p,k (M, , ), if vec()  is multivariate normal
+norm of its vectorised form. Define the (squared) Frobenius         and such that vec() ∼ N pk vec(M),                       ⊗  . Since
+distance between two matrices A and B as the squared Frobe-         (α   ) ⊗ (α −1 ) =     ⊗  for any scalar α > 0, the overall
+nius norm of their difference:                                      scale of either  or can be fixed without loss of generality.
+                                                                      Suppose that we take  ∼ N p,k (0, , ) as a prior for
+d( A, B)2 =  A − B2F = tr ( A − B)T ( A − B) .                    the unconstrained factor loadings matrix and fix the scale
+                                                                    of the among-row scale matrix by taking tr() = p or
+By analogy with the classic Euclidean expectation, we               tr(−1 ) = p. As remarked in Sect. 2, the shared variation
+now define the constrained expectation of  as E F () =            matrix  = (δi j ) = T is a quantity which is amenable to
+L 0 L T0 ∈ S +
+             p,k where                                              the specification of prior beliefs, and so our goal is to derive
+                                                                  its moments. Using standard theory for the matrix normal
+L 0 = min E              d(T , L L T )2 .                         distribution (e.g. Gupta and Nagar 2000, Chapter 2), it can
+      L∈R p×k
+                                                                    be shown that the expectation of  is given by
+Theorem 1 below asserts that if the kth and (k + 1)th eigen-
+values of E() are distinct, the constrained expectation of        E() = tr( ),                                                         (5)
+is the point in S +
+                  p,k that minimises the Frobenius distance to
+E(). However, before proving Theorem 1, we need Propo-             while the covariance between δi j and δk is Cov(δi j , δk ) =
+sition 1.                                                           tr( 2 )(φik φ j + φi φ jk ). In the special case where i = k
+                                                                    and j = , the variance of δi j is then
+Proposition 1 Let the spectral decomposition of a matrix
+D ∈ S+   p be U MU , where M = diag(m 1 , . . . , m p ) is
+                     T
+                                                                    Var(δi j ) = tr(   2
+                                                                                           )(φii φ j j + φi2j ).                           (6)
+a diagonal matrix of ordered eigenvalues, m 1 ≥ m 2 ≥
+· · · ≥ m p > 0, and U is an orthogonal matrix whose                The derivations of the moments above are provided in the
+columns comprise the corresponding eigenvectors. Assume             Supplementary Materials.
+that m k = m k+1 . Then, for  ∈ R p×k , the matrix prod-             The result in (5) is significant because of the interpre-
+uct T which minimises the Frobenius distance to D is              tation it bestows on the among-row scale matrix  as a
+
+
+123
+Statistics and Computing (2024) 34:143                                                                                               Page 5 of 18   143
+
+
+standardised version of our prior expectation for the shared                         unknown and assigning it a prior, we can allow the data
+variation matrix . Parametric forms are convenient models                           to influence the degree of shrinkage of the shared varia-
+for covariance matrices because they provide a parsimonious                          tion matrix towards the closest rank k matrix to its mean.
+representation of dependence and a way to model the rela-                            Writing ς̌ = 1/(ς − 4) ∈ R+ , a matrix normal distribu-
+tionships with as-yet unobserved variables. We can therefore                         tion for  is recovered as ς̌ → 0. We can therefore allow
+model the among-row scale matrix  using a parametric                                controlled relaxation of the fixed shrinkage of the matrix
+form. This encourages shrinkage of the shared variation                              normal prior by specifying a prior for ς̌ with its mode at
+matrix  towards an area around that parametric form but                             zero. To this end, we recommend an exponential distribu-
+without enforcing the structure as a model constraint.                               tion ς̌ ∼ Exp(a0 ). In the special case when  = I p
+   Suppose that  = R(ϑ) in which ϑ is a low-dimensional                             and      = ψ I k , we have Var(δij ) = sk (ς̌ )E(δi j ) where
+vector of hyperparameters on which the parametric form R(·)                          sk (ς̌) = (1 + 2ς̌ ) 1 + (2 + k)ς̌ /(1 + 3ς̌ ) is an increas-
+depends. We complete our prior for the factor loadings matrix                        ing function in ς̌ which takes its minimum value of 1 when
+by taking = diag(ψ1 , . . . , ψk ) and assigning a prior to ϑ                        ς̌ = 0. By trial and improvement, we can therefore use the
+and the ψi . Parametric forms R(·) and the prior for the ψi                          quantiles of the Exp(a0 ) distribution to choose a value for
+are discussed in Sects. 3.4 and 3.5, respectively.                                   a0 which is consistent with our prior beliefs about a cho-
+                                                                                     sen quantile in the distribution for the scale factor sk (ς̌) for
+3.3 A matrix-t prior                                                                 various k. This is illustrated in the application in Sect. 6.2.
+
+The expressions for the means and variances in (5) and (6)                           3.4 Model and prior for 8
+under the matrix normal prior reveal a lack of flexibility;
+recalling that the scale of  is fixed, once the mean E()                           3.4.1 General form
+has been chosen, it is clearly not possible to scale up or
+down all the variances by scaling . As such, we cannot                               Under either a matrix normal or matrix-t prior for ,
+assess independently the overall scale of the mean and uncer-                        E(|, ) = tr( ). As explained in Sect. 3.2, since we
+tainty around that mean. A matrix-t prior for  remedies this                        choose to fix tr() = p or tr(−1 ) = p, we can therefore
+problem through the introduction of a degree of freedom                              interpret  as a standardised version of the prior expecta-
+parameter.                                                                           tion of . For most of the parametric forms described in this
+   Let S ∼ W p (ς + p − 1, −1 ) and X ∼ N p,k (0, I p , )                           section, it will be possible to factorise  or     = −1 as
+be independent random matrices, where Wn (q, U) denotes                               = R(ϑ) or = R(ϑ), respectively, where R(·) yields a
+the n-dimensional Wishart distribution with q > 0 degrees                            positive definite matrix with 1 s on the diagonal. The vector
+of freedom and scale matrix U ∈ Sn+ . If we define                                   ϑ typically contains a small number of unknown hyperpa-
+                                                                                     rameters to which we assign a prior.
+ = (S−1/2 )T X + M                                                           (7)
+                                                                                     3.4.2 Specific examples
+where S1/2 (S1/2 )T = S and M ∈ R p×k , then the ran-
+dom matrix  has a matrix-t distribution, written  ∼                                The simplest structure for  would take  = I p giving
+t p,k (ς, M, , ). Again, one can fix the scale of either the                        E(|, ) = tr( )I p . In the matrix normal case when,
+among-row scale matrix  ∈ S +  p or the among-column scale                          additionally, = ψ I k , we obtain the order-invariant prior
+               +
+matrix ∈ Sk without loss of generality.                                              presented in Leung and Drton (2016) for the identified factor
+    Suppose that we adopt  ∼ t p,k (ς, 0, ,˘   ) as a prior                        loadings matrix in which λ̃i j ∼ N(0, ψ) for i = j and λ̃ii2 ∼
+for the factor loadings matrix. Expressions for the means,                           Gam{(k − i + 1)/2, 1/(2ψ)} for i = 1, . . . , k. Although
+variances and covariances of  = T are derived in                                  taking  = I p will give an order-invariant prior for , a
+the Supplementary Materials. In particular, we show that                             more general distribution that is exchangeable with respect
+E() = tr( ) for ς > 2 where  = /(ς     ˘    − 2), which                          to the order of the variables in yi arises by taking  to be
+is identical to the expression derived under the matrix nor-                         a two-parameter exchangeable matrix. Since we constrain
+mal prior. We also show that for a fixed value of E(), the                          tr() = p this yields  = (1−ϑ)I p +ϑ J p , where −1/( p−
+variance,                                                                            1) < ϑ < 1, J p = 1 p 1Tp and 1 p is a p-vector of 1 s. This
+                                                                                     is the most general form for a p × p symmetric, positive
+                                                                  
+                   tr( )2 + (ς − 2)tr( 2 ) ς φi2j + (ς − 2)φii φ j j                 definite matrix with tr() = p which is invariant under a
+Var(δi j ) =                                                             forς > 4,   common permutation of the rows and columns. If a modeller
+                                    (ς − 1)(ς − 4)
+                                                                                     has nothing in their prior beliefs to distinguish among the
+can be increased or decreased by decreasing or increas-                              p elements of yi , the advantage of this specification over
+ing ς , respectively. Therefore, by treating ς > 4 as an                             the order-invariant prior of Leung and Drton (2016) is that it
+
+
+                                                                                                                                           123
+143   Page 6 of 18                                                                              Statistics and Computing (2024) 34:143
+
+
+allows shrinkage of the p( p − 1)/2 off-diagonal elements of       correlation matrix could be used for  which has huge scope
+the shared variation matrix  towards non-zero values. This        for the incorporation of meaningful domain expertise.
+can be particularly helpful when the number of observations           More generally, if the distances between variables can be
+is small relative to the dimension of yi .                         measured by some metric, say d jk , this could be used to struc-
+    In confirmatory factor analysis, structural zeros are often    ture the prior through the specification φ jk = exp(−d jk /ϑ).
+introduced in the factor loadings matrix based on prior beliefs    An ecological example is provided in Sect. 6.2 which uses
+about the relationships between the k factors and the variables    phylogenetic distances between species in a joint model for
+in yi . For example, in the prototypical two-factor model, the     species occurrence.
+first p1 variables load only on factor 1 whilst the remaining
+p− p1 variables load only on factor 2. This would correspond       3.5 Model and prior for
+to a block diagonal shared variation matrix . Rather than
+imposing these beliefs about independent group structure as        Except in confirmatory factor analysis, an appropriate num-
+a model constraint, one could instead encourage shrinkage          ber of factors is not usually known a priori. Various methods
+towards the corresponding structure through the prior. With        have been proposed in the literature to address this source
+appropriate ordering of the variables, this could be achieved      of uncertainty. This includes techniques to approximate the
+by taking  = blockdiag(1 , . . . , k ) in which each i         marginal likelihood of models with different numbers of fac-
+block is a two-parameter exchangeable matrix, as described         tors, including path sampling (Dutta and Ghosh 2013) and
+above.                                                             Chib’s method (Chib et al. 2006). However, these meth-
+    Beyond these simple examples, there are many fields of         ods are very computationally expensive, requiring separate
+statistics in which parametric forms are adopted for correla-      Monte Carlo simulations for models with k = 1, . . . , H
+tion matrices or their inverses. Typically, they are intended      factors, where H is the maximum number of factors that
+to capture the idea that observations from variables that are      a modeller is prepared to entertain. Lopes and West (2004)
+closer together, often in time or space, tend to be more           propose a reversible jump MCMC algorithm but the pro-
+strongly (positively) correlated. For instance, the precision      posals for transdimensional moves require pilot MCMC
+matrix for a vector of longitudinal measurements might be          runs for models with k = 1, . . . , H factors which rapidly
+assumed to be that of a stationary autoregressive process of       becomes untenable for high-dimensional problems. Other
+order one. We could centre the prior for  on a matrix of          methods that attempt to allow simultaneous inference of the
+this form by taking = (ξi j ) to be a tridiagonal matrix with      number of factors and the model parameters rely on iden-
+ξi,i+1 = ξi+1,i = −ϑ for i = 1, . . . , p − 1, ξii = 1 + ϑ 2 for   tification of individual zeros in the factor loadings matrix
+i = 2, . . . , p − 1 and ξ11 = ξ pp = 1 where ϑ ∈ (−1, 1).         (Frühwirth-Schnatter and Lopes 2010; Conti et al. 2014;
+    In spatial statistics, it is very common to use a spatial      Frühwirth-Schnatter et al. 2023). The approach taken here
+correlation function, such as one from the Matérn class. A         in similar in spirit, relying on the removal of columns whose
+conventional spatial correlation function will depend only         contribution to  is negligible.
+on the distance, and possibly direction, between sites. How-           Due to the challenges in approximating the posterior for
+ever, Schmidt et al. (2011) introduced the idea of recording       k, a recent approach that has become popular relies con-
+distances in a space of dimension greater than two, by intro-      ceptually on an overfitted factor model (Bhattacharya and
+ducing covariates into the correlation function. A special         Dunson 2011; Legramanti et al. 2020; Schiavon et al. 2022).
+case, termed the projection model, measures the distance           In theory, infinitely many factors are permitted but cumula-
+between sites j and k in this augmented space using the            tive shrinkage priors are used to increasingly shrink columns
+Mahalanobis metric with respect to an (unknown) c × c sym-         of the factor loadings matrix towards zero as the column index
+metric, positive definite matrix , that is,                        increases. This allows the infinite factor loadings matrix to
+                                                                   be approximated with a finite matrix by omitting columns
+           √
+dC, jk =       {(x j − x k )T (x j − x k )}.                (8)    that have been shrunk close enough to zero. The posterior
+                                                                   for the number of non-discarded columns k ∗ is then used as
+Here x j is a vector of coordinates for site j, comprising         a proxy for the posterior for k. As such, a single MCMC
+its two spatial coordinates and the values of c − 2 meta-          sample yields information about both the model parameters
+covariates. This is then combined with an exponential spatial      and the number of latent factors.
+correlation function to give φ jk = exp(−dC, jk ). Omitting            A popular increasing shrinkage prior is the multiplicative
+the spatial coordinates, these ideas can be extended to non-       gamma process (MGP) (Bhattacharya and Dunson 2011).
+spatial settings if there are meta-covariates associated with      Conditional on a set of hyperparameters, the factor loadings
+the p variables that are thought to influence the relationships    within each column are assumed to be independent nor-
+between deviations from the mean (yi j − μ j ) and (yik − μk )     mal random variables with zero mean and a column-specific
+in any vector measurement. Indeed, any Gaussian process            precision parameter. The precisions are a cumulative prod-
+
+
+123
+Statistics and Computing (2024) 34:143                                                                                 Page 7 of 18   143
+
+
+uct of gamma random variables and their prior expectation              of the idiosyncratic innovations to evolve independently as
+increases with the column index. A factor is deemed inac-              univariate stationary autoregressions.
+tive a posteriori if the contribution of its loadings to  is
+negligible under a chosen truncation criterion. In order to            4.2 A stationary dynamic factor model
+apply these ideas to our structured prior for the shared vari-
+ation matrix, we take the among-column scale matrix to                 The methodology described in this paper relies on the use of
+be diagonal and assign the reciprocals of its elements a MGP           a structured prior distribution for the shared variation com-
+prior                                                                  ponent of the marginal variance. The marginal variance of
+                                                                       a dynamic factor model is only meaningfully defined when
+           h                                                           the factors evolve according to a stationary process; here-
+ψh−1 =          ,                                                     after we focus only on situations where this is a reasonable
+          =1                                                           assumption. The manner by which stationarity is enforced is
+1 ∼ Gam(a1 , 1),  ∼ Gam(a2 , 1),                 ≥2            (9)   discussed in Sect. 4.3.
+                                                                           In order to identify the scale of the loadings matrix in a
+in which the  are independent. To ensure identifiability of           dynamic factor model, the scale of the factors is normally
+the shared variation matrix  = T and the idiosyncratic              constrained by fixing  = Var(ζ t ) = I k . However, to retain
+variances  in the likelihood, we choose to truncate the prior         the interpretation of  = T as a shared variation matrix,
+at H ≤ ϕ( p)−1 where ϕ( p) was defined in (4). Guidelines             we instead constrain the stationary covariance matrix so that
+on the choice of a1 and a2 to ensure the 1/ψh are stochas-             G 0 = Var(ηt ) = I k and hence the marginal variance of yt
+tically increasing in a reasonable neighbourhood of zero are           remains as  = T + . We can therefore assign a prior to
+provided in Durante (2017).                                            the unconstrained factor loadings matrix  using precisely
+                                                                       the ideas discussed in Sect. 3 for the static model.
+                                                                           To complete specification of the stationary dynamic factor
+4 Stationary dynamic factor models                                     model, the state equation (11) must be initialised at its sta-
+                                                                       tionary distribution. To this end, we augment the parameter
+4.1 Bayesian dynamic factor models                                     space with m auxiliary factors at times t = 1 − m, . . . , 0.
+                                                                       Generalising the definition of the stationary variance G 0
+In the classic vector autoregressive (VAR) model, the num-             above, we define G i = Cov(ηt , ηt+i ) as the ith autocovari-
+ber of parameters grows quadratically with the dimension of            ance of ηt . The initial distribution can then be expressed as
+the observation vector. In contrast, the number of parame-             (ηT1−m , . . . , ηT0 )T ∼ Nkm (0, G) where G is a positive defi-
+ters in a dynamic factor model only grows quadratically with           nite block Toeplitz matrix with G j−i as the block in rows
+the dimension of the latent factors. This makes them a valu-           {k(i − 1) + 1} to ki and columns {k( j − 1) + 1} to k j
+able tool for dimension-reduction in multivariate time series          (i, j = 1, . . . , m) and G − = G T ( = 1, . . . , m − 1).
+analysis. A dynamic factor model has the same observation
+equation as a static model,                                            4.3 Enforcing the stationarity constraint
+
+yt = μ + ηt +  t ,           t ∼ N p (0, ).                (10)    Denote by B the backshift operator, Bηt = ηt−1 . The VAR
+                                                                       model governing evolution of the factors can then be written
+However, the factors in a dynamic model evolve over time               as ζ t = (I k − 1 B − · · · − m B m )ηt = (B)ηt where i ∈
+according to an order m vector autoregression (VAR(m)).                Rk×k for i = 1, . . . , m and (u) = I k − 1 u − · · · − m u m ,
+This yields the state equation as                                      u ∈ C, is termed the characteristic polynomial. The process is
+                                                                       stable if and only if all the roots of det{ (u)} = 0 lie outside
+ηt =     1 η t−1 + · · · +   m η t−m + ζ t ,   ζ t ∼ Nk (0, ), (11)   the unit circle. Because all stable processes are stationary and
+                                                                       unstable stationary processes are not generally of interest,
+for t = 1, 2, . . . in which the observation and factor inno-          this subset of the Cartesian product space in which the i lie
+vations  t and ζ t are serially and mutually uncorrelated.            is often referred to as the stationary region, Cm,k . Even for the
+As in the static case, it is generally assumed that the com-           simplest vector case of an order-1 bivariate autoregression,
+mon factors explain all of the shared variation and so                it has a highly complex geometry.
+is taken to be diagonal. Various extensions of this model                  Various authors have considered Bayesian inference for
+have been presented, for example, Peña and Poncela (2006)              stationary dynamic factor models (e.g. Sáfadi and Peña
+incorporate a moving average component in state equation,              2008; Lopes et al. 2008). However, due to the difficulties
+Aßmann et al. (2016) introduce lagged factors in (10) and              of designing efficient MCMC samplers with state space
+Kaufmann and Schumacher (2019) allow the components                    constrained to Cm,k , the autoregressive coefficient matrices
+
+
+                                                                                                                             123
+143   Page 8 of 18                                                                                        Statistics and Computing (2024) 34:143
+
+
+are often assumed to be diagonal, which simplifies the sta-              we assign a prior which is rotatable, that is Ai and Q Ai Q T
+tionarity condition to that of a univariate autoregression.              have the same distribution for any orthogonal matrix Q.
+Fortunately, recent work by Heaps (2023) presents a prior                To this end, we take the Ai to be independent with Ai ∼
+for the autoregressive coefficient matrices that is constrained          Nk,k (0, I k , I k ), i = 1, . . . , m.
+to Cm,k and facilitates routine computational inference. This
+is based on an unconstrained reparameterisation of the
+model through two bijective transformations. First, the model            5 Posterior computation
+parameters {( 1 , . . . , m ), } undergo a recursive mapping
+which yields a new parameter set {( P 1 , . . . , P m ), }. Here        5.1 Samplers with fixed truncation level
+P i+1 is the (i + 1)th partial autocorrelation matrix, that is,
+a standardised version of the conditional cross-covariance               Consider first the static factor model. For computational
+between ηt+1 and ηt−i given the i intervening variables                  inference, we use MCMC to sample from the posterior asso-
+(ηt , . . . , ηt−i+1 ). Each partial autocorrelation matrix lies in      ciated with our unconstrained parameterisation of the model.
+the space of k × k square matrices with singular values                  When the truncation level in the factor loadings matrix is
+less than one. By mapping the singular values of P i from                fixed at H , we propose a straightforward Gibbs sampler. The
+[0, 1) to the positive real line, a second mapping then con-             full conditional distributions for most unknowns have stan-
+structs an unconstrained k × k square matrix Ai through                  dard forms and can be sampled directly. However, depending
+Ai = (I k − P i P iT )−1/2 P i , i = 1, . . . , m, in which X −1/2       on the structure chosen for the among-row scale matrix
+denotes the inverse of the symmetric matrix square root of                = R(ϑ), a semi-conjugate prior for the correlation param-
+X. Specification of a prior for the Ai , discussed in Sect. 4.4,         eter(s) in ϑ is not generally available and so we update ϑ
+and computational inference is now routine owing to the                  in a Metropolis-Hastings step. Computational inference is
+Euclidean geometry of the parameter space.                               slightly complicated if a matrix-t, rather than matrix normal,
+    The inverse mapping from the intermediate reparam-                   prior is adopted for  because it is not conjugate to the like-
+eterisation {( P 1 , . . . , P m ), } to the original parameters        lihood. However, sampling becomes straightforward if we
+{( 1 , . . . , m ), } involves two recursions. The first outputs        make use of the representation of a matrix-t random vari-
+the stationary covariance matrix G 0 from {( P 1 , . . . , P m ), }     able in (7) and augment the state space of the sampler with
+and the second outputs ( 1 , . . . , m ) (and recovers )                the matrix S. The full conditional distribution for  is then
+from ( P 1 , . . . , P m ) and G 0 . It is therefore trivial to mod-     matrix-normal while the full conditional distribution for S is
+ify the reparameterisation to accommodate the constraint that            Wishart. The only other additional unknown is the degree of
+G 0 = I k ; one simply omits the first recursion, and calculates         freedom parameter ς . If ς is assigned the prior from Sect. 3.3,
+{( 1 , . . . , m ), } from ( P 1 , . . . , P m ) and G 0 = I k in the   its full conditional distribution is non-standard. Rather than
+second recursion. We note that the autocovariance matrices               updating the transformed degree of freedom parameter ς̌
+G 1 , . . . , G m−1 needed to characterise the initial distribution      through its own Metropolis-Hastings step, mixing can be
+of η(1−m):0 are also by-products of this second recursion.               greatly improved by performing a joint update of S and ς̌ .
+    When ηt follows a VAR(1) process, there is a closed form             The proposal density takes the form q(S∗ , ς̌ ∗ |S, ς̌ , . . .) =
+expression for the original model parameters in terms of P 1             q1 (ς̌ ∗ |ς̌)q2 (S∗ |ς̌ ∗ , . . .) in which q1 (·) is a random walk pro-
+or, equivalently, A1 . Dropping the 1-subscript for brevity, we          posal on the log-scale and q2 (·) is the full conditional density
+can write = P = (I k + A AT )−1/2 A and  = I k − P P T =                for S.
+(I k + A AT )−1 .                                                            Extension of the Gibbs sampler to handle the dynamic fac-
+                                                                         tor model is straightforward. The latent factors η1−m , . . . , ηn
+4.4 Prior for the transformed partial autocorrelation                    can be sampled efficiently from their full conditional distribu-
+    matrices                                                             tion in a single block using a variety of sampling approaches
+                                                                         (Wilkinson and Yeung 2002, 2004). In the example in
+The stationary dynamic factor model described in the                     Sect. 6.3 we used the forward-filtering backward-sampling
+previous sections is invariant under rotations of the fac-               algorithm (e.g. Frühwirth-Schnatter 1994) but other methods
+tors when compensatory transformations are applied to                    that rely on banded or sparse matrix algorithms will be more
+the factor loadings and parameters of the state equa-                    efficient in higher-dimensional applications; see, for exam-
+tion. In particular, marginalising over the common fac-                  ple, Chan and Jeliazkov (2009). The full conditional distri-
+tors, it can readily be shown that the likelihood evaluated              butions for the transformed partial autocorrelation matrices
+at (μ, , , A1 , . . . , Am ) is the same as the likelihood             A1 , . . . , Am are non-standard. Given a truncation level of
+evaluated at (μ,  Q T , , Q A1 Q T , . . . , Q Am Q T ) for any        H , each Ai contains H 2 parameters and so it is not generally
+orthogonal matrix Q ∈ O(k). In the absence of any mean-                  feasible to update the whole matrix in a single Metropolis-
+ingful information to distinguish Ai from Q Ai Q T a priori,             Hastings step. We therefore propose dividing the elements of
+
+
+123
+Statistics and Computing (2024) 34:143                                                                              Page 9 of 18   143
+
+
+each Ai into blocks of length b and updating the blocks one-           During an adaptation step, k ∗ [i] is compared to the current
+at-a-time. In the application in Sect. 6.3, we found mixing to     value of H . The basic idea is to delete any inactive factors or
+be greatly improved by using Metropolis-adjusted Langevin          to add an extra factor if all H factors are active. In the static
+(MALA) steps rather than Gaussian random walks.                    model, implementation is straightforward. If k ∗ [i] < H , H
+   Given a large enough fixed truncation level H ≤ ϕ( p)−         is reduced to k ∗ [i] and any inactive factors are deleted along
+1, the MGP prior increasingly shrinks the factor loadings          with the corresponding columns of  and components of 
+in columns with higher indices if the data suggest their           and . If k ∗ [i] = H and H < ϕ( p) − 1, H is increased by
+likelihood contribution is negligible. At least conceptually,      1 then an extra factor, column of factor loadings, and com-
+these columns can be discarded. If there are m [i] discardable     ponent of  are sampled from their priors. In the dynamic
+columns on iteration i of the MCMC sampler, the effec-             model, the adaptation step is slightly more involved because
+tive number of factors is defined as k ∗ [i] = H − m [i] .         of the additional complexity in the distribution of the latent
+The posterior for the effective number of factors can then         factors. Full details of the adaptive Gibbs samplers for both
+be used as a proxy for the posterior for k. There are vari-        static and dynamic models are given in the Supplementary
+ous truncation criteria for deciding which columns can be          Materials, along with R code for the applications in Sect. 6.
+omitted. Bhattacharya and Dunson (2011) consider as inac-          We also provide details on how the posterior output can be
+tive any factor whose loadings are all within  of zero for        post-processed to obtain samples under a parameterisation
+some chosen threshold, say  = 10−4 . Schiavon and Canale          in which the factor loadings matrix is identified by the PLT
+(2020) suggest a more interpretable criterion which, unlike        constraint. This is incredibly valuable for parameter interpre-
+the choice of threshold , is unaffected by the scale of the       tation and the assessment of MCMC diagnostics.
+data and its dimension. Denote by k ∗ the factor loadings
+matrix obtained by discarding the columns of  from k ∗ + 1
+onwards. The basic idea is that if k ∗ = k ∗ Tk ∗ +  can       6 Applications
+explain 100T % of the total variability of the data for some
+T ∈ (0, 1), then one decides there are k ∗ active factors. The     6.1 Simulation experiment
+choice of proportion T then replaces the choice of threshold
+. This is the truncation criterion we adopt in the applications   6.1.1 Simulation settings
+in Sect. 6.
+   When the truncation level H is fixed, an alternative to         In order to investigate posterior sensitivity to the prior specifi-
+Gibbs sampling is to implement off-the-shelf computational         cation in the idealised setting in which we know the data were
+inference using standard probabilistic programming soft-           generated from a factor model with known shared variation
+ware. Code for the applications in Sect. 6, written in Stan        matrix , we carried out a series of simulation experiments.
+(Carpenter et al. 2017), is given in the Supplementary Mate-       In the simplified setting in which  = σ 2 I p , denote by β
+rials. Stan uses Hamiltonian Monte Carlo to perform joint          the proportion of the total variation in  =  +  that is
+updates of all unknowns and so tends to converge faster and        explained by the common factors, that is, β = tr()/tr().
+mix better than a Gibbs sampler. The caveat is the necessity to    Then for given β and , the corresponding value of σ 2 can
+fix H ; although this can be addressed in a bespoke implemen-      be computed as σ 2 = (1 − β)tr()/(kβ). Three different
+tation of Gibbs sampling (see Sect. 5.2 below), Stan cannot        combinations of p and k, representing different degrees of
+be customised in this way.                                         dimension reduction, were considered: ( p = 24, k = 6),
+                                                                   ( p = 48, k = 9) and ( p = 72, k = 9) so that k/ p was
+5.2 Adaptive Gibbs sampler                                         equal to 25, 18.75 and 12.5%, respectively. For each combi-
+                                                                   nation of p and k, we also considered three values for β, β ∈
+Especially in applications where p is large, the number of         {0.9, 0.95, 0.99}, giving nine sets of values for {( p, k), β} in
+effective factors is often considerably less than the Leder-       total. We refer to these as simulation settings. Note that we
+mann bound ϕ( p). Therefore fixing a truncation level H            only set  = σ 2 I p for the purposes of simulating the data;
+which is less than, but in the vicinity of, ϕ( p) can be com-      for inference, we still allow  = diag(σ12 , . . . , σ p2 ).
+putationally inefficient. In the literature on infinite factor        Under each simulation setting, we simulated 24 data sets
+models, a common pragmatic solution is to use an adap-             of size n = 50 based on an exponential correlation matrix
+tive Gibbs sampler which tunes the truncation level H as it        for , taking  to be the closest rank-k matrix to  (see
+proceeds. Adaptation occurs at iteration i with probability        Proposition 1). In the simulation of each data set, in order
+p(i) = exp(α0 + α1 i) where α0 ≤ 0 and α1 < 0 such that            to fix the value of , we simulated p pairs of coordinates
+the probability of adaptation decreases over the course of         x j = (x j1 , x j2 )T , j = 1, . . . , p, by sampling uniformly
+the simulation. This is necessary to satisfy the diminishing       at random from the unit square, and then set the expected
+adaptation condition of Roberts and Rosenthal (2007).              shared variation matrix equal to  with ( j, k) element φ jk =
+
+
+                                                                                                                          123
+143   Page 10 of 18                                                                             Statistics and Computing (2024) 34:143
+
+
+exp(−x j − x k 2 /ϑ) where the length-scale parameter was                         tion for the slab, θ∞ = 0.05 for the position
+equal to                                                                            of the spike and α = 5 in the cumulative
+   ⎧                                                                                stick-breaking construction controlling the
+   ⎪
+   ⎪ −1/ log(0.05),         for data sets 1, . . . , 6;                             probability assigned to the spike.
+   ⎪
+   ⎪
+   ⎨−1/ log(0.10),          for data sets 7, . . . , 12;
+ϑ=                                                                 For the three structured matrix normal priors, we chose
+   ⎪
+   ⎪ −1/ log(0.15),         for data sets 13, . . . , 18;
+   ⎪
+   ⎪                                                               a1 = 1 and a2 = 2 in the multiplicative gamma process
+   ⎩−1/ log(0.20),          for data sets 19, . . . , 24.          for the diagonal elements of . In all cases, the idiosyn-
+                                                                   cratic variances were assigned the prior 1/σ j2 ∼ γ (1, 0.3)
+For a distance of 1 in the unit square, the correlations there-    independently for j = 1, . . . , p.
+fore ranged from 0.05 to 0.20.
+                                                                   6.1.3 Analysis and results
+6.1.2 Prior distributions
+                                                                   All analyses were run using an adaptive Gibbs sampler,
+Each data set generated under each simulation setting was          allowing adaptation after 500 iterations and setting the
+used to update five prior distributions for . Three are struc-    parameters in the diminishing adaptation condition at α0 =
+tured matrix normal priors, with different assumptions about       −1 and α1 = −5 × 10−4 . The chains were run for 10K itera-
+, and two are widely used priors in factor analysis which         tions, following a burn-in of 10K, and thinned to retain every
+allow inference on the number of factors:                          fifth sample to reduce computational overheads. For the three
+                                                                   structured matrix normal priors and the original MGP prior,
+SN (expcov.)      A structured matrix normal prior in which       we applied the truncation criterion of Schiavon and Canale
+                  was taken to have the same form as that used     (2020), retaining as active enough factors to explain at least
+                  to simulate the data, that is, an exponential    T = 0.95 of the total variation in the data.
+                  correlation matrix. The length-scale param-          The (squared) geodesic distance between two symmetric
+                  eter was taken to be unknown and assigned        positive definite matrices A ∈ S +            +
+                                                                                                    p and B ∈ S p is defined as
+                  the distribution log(ϑ) ∼ N(0, 1).
+SN (fixed)        A structured matrix normal prior in which                        p                       
+                                                                                                    2
+                  was taken to have the same form as that used     dG ( A, B)2 =          log λi A−1 B
+                  to simulate the data, that is, an exponential                     i=1
+                  correlation matrix. The length-scale param-
+                  eter was fixed at the value used to simulate     in which λi (X) denotes the ith eigenvalue of X (Lim and
+                  the data.                                        Sepulchre 2019). For simulation experiments in which β =
+SN (exch.)        A structured matrix normal prior in which        0.99, Table 1 reports the median and interquartile range
+                   was taken to have a different form to that     across the 24 data sets of the posterior mean of dG (, 0 )
+                  used to simulate the data, specifically we       where 0 denotes the value used to simulate the data. Cor-
+                  took  = (1 − ϑ)I p + ϑ J p , −1/( p −           responding Tables for the simulations where β = 0.95 and
+                  1) < ϑ < 1, representing a two-parameter         β = 0.9 are presented in the Supplementary Materials. We
+                  exchangeable matrix with trace fixed at          chose the distance metric dG (·, ·) because, by construction,
+                  p. The correlation parameter was taken to         is close to singular and so the geodesic distance will be
+                  be unknown and assigned the distribution         better suited than a metric, such as the Frobenius distance,
+                  logit(ϑ̌) ∼ N(0, 1) where ϑ̌ = {1 + ( p −        which ignores the geometry of the space. In particular, it will
+                  1)ϑ}/ p.                                         give large values whenever  and 0 do not approximately
+MGP               The original (exchangeable) multiplicative       span the same subspace of R p , that is when their null spaces
+                  gamma process prior described in Bhat-           are not approximately the same. We also report the median
+                  tacharya and Dunson (2011), which is a           and interquartile range for the posterior mean of the effective
+                  global–local prior. We took a1 = 1 and           number of factors k ∗ .
+                  a2 = 2 in the multiplicative gamma pro-             Focusing first on the posterior mean of the geodesic dis-
+                  cess for the global precision parameters and     tance dG (, 0 ), it is immediately clear from Table 1 and
+                  ν = 3 in the distribution for the local preci-   the corresponding tables in the Supplementary Materials that
+                  sion parameters.                                 both the medians and interquartile ranges across data sets are
+CUSP              A cumulative shrinkage process prior (Legra-     typically smallest when we use a prior in which  is based
+                  manti et al. 2020), which is a slab-and-spike    on an exponential correlation matrix. As we would expect,
+                  prior. We took aθ = bθ = 2 in the distribu-      this is especially true when the length-scale parameter in the
+
+
+123
+Statistics and Computing (2024) 34:143                                                                                  Page 11 of 18   143
+
+
+Table 1 Summaries of the simulation experiment when β = 0.99          6.2 Co-occurrence of Finnish birds
+Prior            ( p, k)    E{dG (, 0 )| y}    E(k ∗ | y)
+                            Median       IQR     Median        IQR
+                                                                      6.2.1 Model and prior
+
+SN (expcov.)     (24, 6)    15.88        0.38    6.34          0.56   As discussed in Sect. 1, most of the literature on prior
+SN (fixed)       (24, 6)    15.78        0.39    6.30          0.89   specification for factor models focuses on constructing a dis-
+SN (exch.)       (24, 6)    15.93        0.39    6.63          0.69   tribution for the factor loadings matrix that is exchangeable
+MGP              (24, 6)    16.02        0.45    6.27          0.86   with respect to the order of the components in the observation
+CUSP             (24, 6)    16.25        0.36    3.13          0.57   vector. An exception is the structured increasing shrinkage
+SN (expcov.)     (48, 9)    21.25        0.58    7.54          1.95   (SIS) process (Schiavon et al. 2022). This prior allows meta-
+SN (fixed)       (48, 9)    21.18        0.65    7.32          1.47   covariates to inform the within-column sparsity structure of
+SN (exch.)       (48, 9)    22.20        1.04    5.96          2.02   the factor loadings matrix in an infinite factorisation model.
+MGP              (48, 9)    22.15        0.64    6.41          2.32   In this section, we re-examine the Finnish birds data set anal-
+CUSP             (48, 9)    22.86        0.84    3.00          0.23   ysed in Schiavon et al. (2022) to illustrate the extra flexibility
+SN (expcov.)     (72, 9)    23.89        1.03    7.76          1.38   afforded by our approach.
+SN (fixed)       (72, 9)    23.69        1.37    7.85          1.55       The Finnish bird data comprise information on the co-
+SN (exch.)       (72, 9)    25.81        1.87    6.15          0.92
+                                                                      occurrence of the 50 most common bird species in Finland
+                                                                      from 137 sampling areas in 2014 (Lindström et al. 2015).
+MGP              (72, 9)    24.99        0.94    7.21          1.81
+                                                                      The occurrences are arranged into a n × p binary matrix
+CUSP             (72, 9)    27.89        1.07    3.00          0.00
+                                                                      Y = (yi j ) where yi j = 1 if bird species j was observed
+                                                                      in area i and yi j = 0 otherwise. Information available to
+                                                                      explain the variation in the mean μi at each sampling area
+                                                                      include a n × c matrix of environmental covariates W con-
+                                                                      taining measurements on spring temperature and its square
+                                                                      and a five-level habitat type (broadleaved forests, conifer-
+                                                                      ous forests, open habitats, urban habitats, wetlands) so that
+prior is fixed at the value used in simulating the data. Never-       c = 7. Information available to structure the prior for the
+theless, the modest differences between posterior inferences          marginal variance  include a phylogenetic tree, indicat-
+under SN (expcov.) and SN (fixed) are reassuring; in the              ing the evolutionary relationships amongst the 50 species,
+analysis of a real data set, though we may have strong prior          and a p × q matrix of meta-covariates X consisting of two
+beliefs about a suitable structure for E(), we are likely to         species traits: logarithm of typical body mass and a three-
+be more uncertain about the values of the hyperparameters             level migratory strategy (short-distance migrant, resident
+in that structure. We also observe that the gains from assum-         species, long-distance migrant). Following Schiavon et al.
+ing the correct form for  in this simulation experiment are          (2022), we model species presence or absence using a multi-
+greatest when the total variation in  makes up a larger pro-         variate probit regression model where yi j = I(z i j > 0) and
+portion of the total variation in  (that is, when β = 0.99           we assume the latent variables z i = (z i1 , . . . , z i p )T are such
+and β = 0.95) and when the degree of dimension reduction              that z i = B T wi + ηi +  i for i = 1, . . . , n. Here wiT is
+is larger. This is as expected because in both cases, the prior       the ith row of W , B = (βi j ) is a c × p matrix of regression
+for , and therefore , is likely to impart more influence            coefficients, and the idiosyncratic variances on the diagonal
+on the posterior for . It is interesting to observe that when        of Var( i ) =  are set equal to 1 to prevent compensatory
+we adopt a structured matrix normal prior but assume an               rescaling of B and  = T + . Our prior for the coeffi-
+incorrect structure for , the posterior mean for dG (, 0 )         cients in B is identical to that of Schiavon et al. (2022) and
+still tends to be smaller than under the MGP or CUSP pri-             described in the Supplementary Materials.
+ors. This is likely to be because we simulated all data sets              The SIS process prior for  is built on a series of assump-
+based on exponential correlation matrices for  which have            tions of conditional independence. As a consequence, the
+strictly positive diagonal elements. Under SN (exch.), we are         expectation of the shared variation matrix  is diagonal,
+shrinking  towards a rank-reduced approximation to a two-            irrespective of the priors assigned to its hyperparameters.
+parameter exchangeable matrix with a common (potentially              Moreover, every factor loading λi j has a spike-and-slab dis-
+positive) off-diagonal element whereas the prior expectation          tribution in which the meta-covariates only enter through the
+for  under the MGP and CUSP priors is diagonal.                      logit of the spike probability. As such, there is no mecha-
+    A discussion of the results concerning the posterior mean         nism for incorporating the rich information on evolutionary
+of the effective number of factors k ∗ can be found in the            relationships that is expressed through the phylogenetic tree.
+Supplementary Materials.
+
+
+                                                                                                                                123
+143   Page 12 of 18                                                                                Statistics and Computing (2024) 34:143
+
+
+   In contrast, using the approach outlined in Sect. 3.4 we           6.2.2 Analysis and results
+can structure the prior for the shared variation so that it
+incorporates the information from the phylogenetic tree in            We ran two chains, initialised at different starting points,
+addition to the two meta-covariates. The former can be                using the adaptive Gibbs sampler discussed in Sect. 5.2 and
+encoded as a matrix of phylogenetic distances between the             another two chains using Stan’s implementation of the (non-
+50 species, whose (i, j)th entry, say d P,i j , is the sum of         adaptive) Hamiltonian Monte Carlo sampler with a fixed
+the branch lengths along the path between the leaves for              truncation level of H = 10. In the Gibbs sampler, adapta-
+species i and j. This distance function is a metric over              tion was allowed after 500 iterations and, following Schiavon
+the set of leaves (Steel 2016, Chapter 6). Another mea-               et al. (2022), the parameters in the diminishing adaptation
+sure of the dissimilarity between species can be obtained             condition were set at α0 = −1 and α1 = −5 × 10−4 . After
+using the generalised distance function from the projection           a burn-in of 20K iterations, each chain was run for a further
+model in (8). As we only have binary response data, which             20K iterations, thinning to store every fifth draw in order to
+is unlikely to be as informative as continuous data, we sim-          reduce computational overheads. Using the truncation cri-
+plify (8) by taking the matrix to be diagonal. This yields            terion of Schiavon and Canale (2020), we retain as active
+                                    1/2
+dC,i j =      4                                                       enough factors to explain at least T = 0.999 of the total
+              k=1 (x ik − x jk ) /ϑk
+                                2   2      as a metric for the dis-
+                                                                      variation in the data. The posterior mode (and median) for
+tance between the meta-covariates for species i and j, where
+                                                                      the number of effective factors in each case was 5 with 95%
+xi1 , xi2 and xi3 are indicators for whether species i is a
+                                                                      credible interval (3, 6). Comparing the output of identified
+short-distance migrant, resident or long-distance migrant,
+                                                                      parameters across the chains from both samplers using the
+respectively, while xi4 is the logarithm of typical body mass
+                                                                      usual graphical diagnostic checks gave no evidence of any
+for species i. Since d P,i j and dC,i j are metrics over a set
+                                                                      lack of convergence.
+comprising the species and their associated traits, the sum is
+                                                                         To gauge performance against another non-exchangeable
+also a metric. We can therefore take as a generalised measure
+                                                                      prior, the model was also fitted under the SIS process prior
+of distance between species i and j, di j = dC,i j + d P,i j /ϑ5 ,
+                                                                      using an adaptive Gibbs sampler, with the hyperparameters in
+in which ϑi > 0 for i = 1, . . . , 5. So that all the length-
+                                                                      the prior and tuning parameters in the sampler set in line with
+scale parameters ϑi operate on a comparable scale, the
+                                                                      the specification from Section 5 of Schiavon et al. (2022). In
+meta-covariates and branch lengths are standardised prior
+                                                                      this case, more or less all the posterior mass for the number
+to calculating dC,i j and d P,i j . Finally, we relate the gener-
+                                                                      of effective factors was stacked at 4.
+alised distance di j to the among-row scale matrix  by using
+                                                                         The marginal prior and posterior densities for the log-
+the exponential correlation function, φi j = exp(−di j ). We
+                                                                      arithms of the length-scale parameters ϑ1 , . . . , ϑ5 and the
+assume the length-scale parameters to be independent in the
+                                                                      transformed degree of freedom parameter ς̌ = 1/(ς − 4)
+prior and assign distributions log ϑi ∼ N(0, 10).
+                                                                      under the structured matrix-t prior are displayed in Fig. 1.
+   Based on available phylogenetic and ecological informa-
+                                                                      Absence of a relationship between a component of the gen-
+tion, this prior encourages shrinkage towards a rank-reduced
+                                                                      eralised distance metric and the expected shared variation
+approximation of an expected shared variation matrix E()
+                                                                      between species would be indicated by an infinite value for
+with higher correlations between types of bird that are more
+                                                                      the corresponding length-scale parameter. Therefore the con-
+closely related in terms of their evolutionary history and
+                                                                      centration of all posterior densities in Fig. 1a over a finite
+species traits. Since we allow the length-scale parameters
+                                                                      interval near the origin highlights the role played by the gen-
+ϑi to be unknown we are also able to learn which vari-
+                                                                      eralised distance metric in explaining the structure of the
+ables are more important in explaining relationships between
+                                                                      shared variation matrix. It is also clear that the phyloge-
+species. However, the structure for the expected shared vari-
+                                                                      netic distances, whose length-scale parameter is ϑ5 , have the
+ation matrix represented through  is conjectural and so we
+                                                                      greatest influence. For the transformed degree of freedom
+elect to use the matrix-t prior whose extra degree of free-
+                                                                      parameter ς̌ in Fig. 1b, the similarity between the prior and
+dom parameter ς allows the data to influence the degree of
+                                                                      posterior indicate that the information learned from the data
+shrinkage. As discussed in Sect. 3.3, we induce a prior for
+                                                                      is modest. Nevertheless, the shift in the position of the mode
+ς > 4 by specifying a distribution for ς̌ = 1/(ς − 4) ∈ R+ .
+                                                                      from 0 in the prior to around 0.1 in the posterior suggests that
+Specifically, we take ς̌ ∼ Exp(1) which implies that when
+                                                                      the data support less shrinkage towards the expected shared
+the number of factors k is 5, 10 and 15, the probability of
+                                                                      variation matrix than would be implied by a matrix normal
+the scale factor sk (ς̌ ) lying between 1 and x is 0.75 for
+                                                                      prior for which ς̌ = 0.
+x = 7.8, x = 12.9 and x = 18.0, respectively. For the
+                                                                         Further qualitative evidence of the importance of the
+diagonal elements in , we assign a MGP prior (9) with
+                                                                      phylogenetic information on the structure of the marginal
+a1 = 2, a2 = 6 and a maximum truncation point H that
+                                                                      covariance matrix  = (ωi j ) is demonstrated in Fig. 2 which
+satisfies H ≤ ϕ(50) − 1 = 40.
+                                                                      shows the mean of the posterior for the marginal correlation
+
+
+123
+Statistics and Computing (2024) 34:143                                                                                                 Page 13 of 18   143
+
+Fig. 1 Marginal posterior
+                                                   0.8
+density for a the logarithms of
+                                                                                                         0.9
+the length scale parameters ϑ1
+( ), ϑ2 ( ), ϑ3 ( ), ϑ4 ( ),                       0.6
+ϑ5 ( ) and b the transformed
+
+
+
+
+                                         density
+
+
+
+
+                                                                                               density
+                                                                                                         0.6
+degree of freedom parameter ς̌.                    0.4
+Also shown are the priors ( ).
+(color figure online)                                                                                    0.3
+                                                   0.2
+
+
+                                                   0.0                                                   0.0
+                                                         −5   0            5        10                         0.0   2.5         5.0        7.5        10.0
+                                                                   value                                                    value
+
+                                                                  (a)                                                      (b)
+
+
+                                            √           √
+matrix S−1        −1
+            S , where S = diag( ω11 , . . . , ω pp ).                      6.3 Hourly demand for natural gas
+The order of the 50 bird species is based on their phylo-
+genetic tree, which is shown in the margins of the plot. There                 6.3.1 Model and prior
+is clear structure in the matrix with several groups of species
+that share a recent common ancestor displaying strong pos-                     To illustrate the use of our methodology in the context
+itive correlations. This includes the species in the first ten                 of a dynamic model, we consider an application to mod-
+rows, which correspond to birds from the Corvoidea super-                      elling the hourly demand for natural gas. In the UK, gas in
+family and the Sylviidae family; the species in rows 19 to                     the national transmission system is transported to individ-
+30, which correspond largely to birds from the Musicapoidea                    ual customers through eight regional distribution networks
+superfamily; and the species in rows 42 to 47, which corre-                    which are responsible for maintaining a reliable gas supply
+spond mostly to birds from the Scolopacidae superfamily.                       to customers at all times. This requires accurate short-term
+It is also clear that most of the rows and columns predomi-                    forecasts of the hourly demand for gas at individual points
+nated by near-zero correlations correspond to basal species,                   in the network called offtakes, where gas is taken off to sup-
+like Columba palumbus and Grus grus. Nevertheless, the                         ply locally. We consider data from a single offtake site in a
+structure of the matrix is clearly not dictated by evolutionary                regional distribution network in the North of England. Hourly
+proximity alone. Interestingly, the corresponding plot from                    gas demand data are available for the period from May 2012
+the analysis under the SIS process prior appears to be very                    to June 2015 along with the average daily temperature at
+sparse; see the Supplementary Materials. At least in part, this                the offtake site. In addition to the weather, the other main
+can be attributed to shrinkage of  towards its prior mean,                    factors that are known to influence the mean level of residen-
+which is a diagonal matrix.                                                    tial demand for gas are seasonal and calendar effects (Soldo
+    In order to provide a more formal comparison between                       2012). We therefore additionally incorporate covariates that
+the two model-prior combinations, we consider measures of                      represent the day of the year, day of the week and whether
+goodness-of-fit and predictive performance. In the former                      or not a day is a public holiday.
+case, we follow Schiavon et al. (2022) by computing the                            The measurement of the demand for gas at an hourly res-
+pseudo marginal likelihood (PML), defined as the product                       olution makes construction of a model challenging because
+of conditional predictive ordinates (Gelfand and Dey 1994).                    the underlying dynamics of the process are likely to vary over
+In terms of predictive performance, we consider the Brier                      a much longer time scale. For example, consider a dynamic
+score, which is a widely used proper scoring rule for cate-                    linear model for hourly gas demand that allows for calendar
+gorical variables, calculated using a 4-fold cross-validation                  and weather effects and incorporates a time-varying local
+approach (e.g. Gneiting and Raftery 2007). In our case, the                    level. Suppose that this local level is modelled as evolving
+score is positively oriented so that large values indicate better              according to a random walk or autoregression. Deviations
+performance. The results are shown in Table 2 from which                       from behaviour that would be considered typical given the
+we can conclude that the combination of the factor model                       calendar and weather effects would likely persist over days,
+and structured matrix-t prior gives the best-fit to the data                   rather than hours, and so hourly evolution of the local level
+and, more markedly, the best predictive performance. Fur-                      would demand a near-zero innovation variance. Similarly, if
+ther details on the calculation of the PML and Brier score                     calendar effects such as the day of the week, were regarded as
+can be found in the Supplementary Materials.                                   dynamic, hourly evolution would demand vanishingly small
+                                                                               innovation variances.
+
+
+
+
+                                                                                                                                              123
+143   Page 14 of 18                                                                                       Statistics and Computing (2024) 34:143
+
+
+
+
+        −0.2   0.4 0.8
+
+
+                                                                                                                                        pica          e
+                                                                                                                              Pica s coron
+                                                                                                                                     vu            x
+                                                                                                                              Cor s cora dula
+                                                                                                                                     vu            e
+                                                                                                                              Cor s mon darius
+                                                                                                                                     vu            n
+                                                                                                                              Cor ulus gla is
+                                                                                                                                     r                s
+                                                                                                                              Gar a arven
+                                                                                                                                   u   d
+                                                                                                                              Ala borin illa
+                                                                                                                                      ia           p
+                                                                                                                              Sylv atrica nis
+                                                                                                                                      ia             u
+                                                                                                                              Sylv comm
+                                                                                                                                      ia          c  a          s
+                                                                                                                              Sylv curru trochilu
+                                                                                                                                      ia          s             a
+                                                                                                                              Sylv scopu collybit
+                                                                                                                                     llo          s            ix
+                                                                                                                              Phy scopu sibilatr
+                                                                                                                                     llo          s
+                                                                                                                              Phy scopu
+                                                                                                                                  y  ll o         t ic a
+                                                                                                                              Ph            r us s
+                                                                                                                                      ndo         tu
+                                                                                                                              Hiru crista us
+                                                                                                                                    us               n
+                                                                                                                              P a r
+                                                                                                                                          m onta
+                                                                                                                                    u  s         r
+                                                                                                                              Par s majo us
+                                                                                                                                  r u           u  le
+                                                                                                                              Pa           aer ris
+                                                                                                                                    us c             ia
+                                                                                                                              Par ia famil rus
+                                                                                                                                     th              o
+                                                                                                                              Cer s visciv elos
+                                                                                                                                   d  u            m
+                                                                                                                              Tur s philo
+                                                                                                                                 r d  u        r u  la
+                                                                                                                              Tu             e
+                                                                                                                                      us m s
+                                                                                                                              Turd s iliacu
+                                                                                                                                      u          is
+                                                                                                                              Turd s pilar tra
+                                                                                                                                      u             e           u r us
+                                                                                                                              Turd la rub hoenic
+                                                                                                                                a x  ico rus p ca
+                                                                                                                              S            u
+                                                                                                                                     enic            oleu
+                                                                                                                              Pho ula hyp cula
+                                                                                                                                      d               e
+                                                                                                                              Fice cus rub iata
+                                                                                                                                    ha           str
+                                                                                                                              Erit icapa lus
+                                                                                                                                      c            u
+                                                                                                                              Mus lus reg ris
+                                                                                                                                      u             lo
+                                                                                                                              Reg elis ch ra
+                                                                                                                                    d   u        o   st
+                                                                                                                              Car curvir us                      s
+                                                                                                                                 x  ia         s p  in      rinu
+                                                                                                                              Lo uelis                 ryth
+                                                                                                                                    d                e
+                                                                                                                              Car dacus ula
+                                                                                                                                    p   o         r  h
+                                                                                                                              Car ula pyr bs
+                                                                                                                                    rh             le
+                                                                                                                              Pyr illa coe ella
+                                                                                                                                     g              rin
+                                                                                                                              Frin riza cit
+                                                                                                                                    b  e            lis
+                                                                                                                              Em s trivia
+                                                                                                                                    h  u            a
+                                                                                                                              Ant illa alb laris
+                                                                                                                                     ac            du
+                                                                                                                              Mot lla mo major
+                                                                                                                                    ne             s
+                                                                                                                              Pru rocopo ar tius
+                                                                                                                                      d
+                                                                                                                              Den opus m u s
+                                                                                                                                 y  o  c        n   or
+                                                                                                                              Dr            ca
+                                                                                                                                      ulus
+                                                                                                                              Cuc gr us                   ta
+                                                                                                                                     s            rqua
+                                                                                                                              Gru nius a inago
+                                                                                                                                       e            ll
+                                                                                                                              Num a g o g a us
+                                                                                                                                     in            p
+                                                                                                                              Gall ochro
+                                                                                                                                    ga
+                                                                                                                              Trin canus mbus
+                                                                                                                                       s           lu
+                                                                                                                              L a r u mba pa
+                                                                                                                              Colu tetrix
+                                                                                                                                     ao
+                                                                                                                              Tetr
+                                       cop collyb s
+                                                             ita
+                                            nd ilatrix
+
+
+
+
+                                                               s
+
+
+
+
+                                  Mus cus rub uca
+
+
+
+                                    Lox elis ch s
+                                                               a
+
+
+
+                                            da a rius
+
+
+
+
+                                                              is
+
+
+
+
+                                Em gilla co hula
+                                                               s
+
+
+
+
+                                   Cuc us ma jor
+
+
+
+
+                                    Trin o gallin ta
+                                                  ch r o g o
+                                       mba s can s
+                                   Sylv atrica rin
+                                                         pilla
+
+                                                               a
+
+
+
+
+                                   Cer s caeru jor
+
+
+
+
+                             enic Saxico s pilaris
+
+
+                               Erit la hypo urus
+
+
+
+                                   Car lus reg ta
+
+
+
+                                   Pyr s eryth us
+                                                    yrr s
+
+
+
+
+                                                 can s
+
+
+
+
+                                                 ao t us
+                               Gall enius a grus
+                                    Sylv ylvia b sis
+
+
+
+
+                                           Par ntanus
+                                  Cor orvus one
+
+
+
+
+                                    Par s crist a
+
+
+
+
+                                                              la
+                                                               s
+                              Gar vus m corax
+                                    Alau landa la
+
+
+
+
+                                                        atus
+
+
+
+                                   Turd ia fam us
+
+                                                            us
+
+
+
+
+                                    Reg apa st ula
+                                 Turd us visc iliaris
+
+
+
+
+                               Fice s phoe ubetra
+
+
+
+
+                                                        loris
+
+                                     acu lis spin ra
+
+
+
+
+                                                             lla
+                                                               s
+                              Den ella m la alba
+                               Dry ocopos ularis
+
+
+
+
+                                              palu us
+
+                                                        etrix
+                                              Gru orus
+                            Phy scopu trochilu
+
+
+
+
+                                       Turd ilomelo
+
+
+
+
+                                                        ulu
+
+
+
+
+                                                      eleb
+
+
+
+
+                                                         pu
+                                                       rinu
+
+
+
+
+                                                        r tiu
+                                         Turd s iliacu
+
+
+
+
+                                        Mot s triviali
+                                       Cor ica pic
+
+
+
+
+                            Phy scopu curruc
+
+
+
+
+                                                           ic
+                                        Sylv mmun
+
+
+
+
+                                        Turd meru
+                                           s g nedu
+
+
+
+
+                                                        ria
+
+
+
+
+                                                     rqua
+                                                            t
+
+
+
+
+                                       Ant citrine
+
+
+
+
+                                                         b
+                                                        le
+
+                                        us p ivor
+                                                         a
+
+
+
+
+                                                      ma
+
+
+
+
+                                                         a
+                                                         o
+
+
+
+
+                           Car Cardu urviros
+                                           S rven
+
+
+
+
+                                      Par o rust
+
+
+
+
+                                                      ec
+
+
+
+
+                                                      m
+                                                      le
+                                                   sm
+                                                   cor
+
+
+
+
+                                                   nic
+
+
+
+
+                                                     s
+                                                   ib
+
+
+
+
+                                                  od
+                                               la r
+
+
+
+
+                                                  il
+                                                  o
+
+
+
+
+                                                  p
+                                                 o
+
+
+
+
+                                            us s
+
+
+
+
+                                                 u
+                                            vus
+
+
+
+
+                                              us
+                                                P
+
+
+
+
+                                                u
+
+
+
+
+                                                c
+
+
+
+
+                               Colu Laru
+                                                o
+
+
+
+
+                                          ga o
+                                         us m
+
+
+
+
+                                                u
+
+
+
+
+                                           Tetr
+                                              ia
+
+
+
+
+                                               h
+
+
+
+
+                                        rhula
+                                              s
+
+
+
+
+                                            hu
+
+
+
+
+                                         ulus
+                                              a
+                                              s
+
+
+
+
+                                             a
+                                          ia c
+
+
+
+
+                                             e
+                                         ia c
+                                           ia
+
+
+
+
+                                            u
+
+
+
+
+                                      beriz
+
+
+
+
+                                           p
+                                         cic
+
+                                         du
+                                           u
+
+
+
+
+                                      inag
+                                      Hiru
+
+
+
+
+                                         th
+                                         u
+
+
+
+
+                                     oco
+                                         C
+
+                                    rulu
+
+
+
+
+                                    Frin
+                                      du
+                                     ha
+                                    Par
+
+
+
+
+                                     dr
+
+
+
+                                Num
+                                      n
+                                   ur u
+                                llos
+
+
+
+
+                               Pr u
+                               po d
+                                 llo
+                                llo
+                           Phy
+
+
+
+
+                         Pho
+
+
+
+
+Fig. 2 Mean of the posterior for the marginal correlation matrix under the structured matrix-t prior. The species are ordered according to their
+phylogenetic tree which is visualised in the margins
+
+Table 2 Goodness-of-fit and predictive performance of the two model-           Motivated by these concerns, we define a gas-day-
+prior combinations                                                         vector as a longitudinal series of measurements of the
+                          Structured matrix-t              SIS process     log-transformed demand for gas over 24 h, starting at 07:00,
+                                                                           which is the beginning of a gas-day. Denote by yt =
+Log PML                   − 2831.6                         − 2936.5
+                                                                           (yt1 , . . . , yt,24 )T the gas-day-vector on day t so that yt,h
+Brier score               − 0.29120                        − 0.85396
+                                                                           denotes the log-transformed demand for gas at hour h of gas-
+Bold indicates the score of the model-prior combination that performs      day t. We elect to model the gas-day-vectors using a dynamic
+better against that metric. Both metrics are positively oriented so that   factor model with observation equation yt = μt + ηt +  t ,
+the larger values indicate better performance
+                                                                           where  t ∼ N p (0, ), t = 1, . . . , n. For simplicity in this
+                                                                           illustrative application, we model evolution of the factors
+
+
+123
+Statistics and Computing (2024) 34:143                                                                                   Page 15 of 18   143
+
+
+using a first order vector autoregression, ηt = ηt−1 + ζ t ,           the parameters in the diminishing adaptation condition were
+where ζ t ∼ Nk (0, ). Due to the stability of the demand for          set at α0 = −1 and α1 = −5×10−5 . The Hamiltonian Monte
+gas over the time period in question, it is reasonable to assume       Carlo sampler was run for 20K iterations after a burn-in of the
+that the departures from the time-varying mean yt −μt follow           same length, thinning the output to retain every 10th draw.
+a stationary process. We therefore constrain the stationary            As in the Finnish birds example, we retain as active enough
+variance of the ηt to be I k and take the initial distribution to be   factors to explain at least T = 0.999 of the total variation in
+η0 ∼ Nk (0, I k ). Reparameterising the model for the factors          the data. The posterior mode (and median) for the number
+in terms of the transformed partial autocorrelation matrices           of effective factors in each case was 10 with 95% credible
+yields a single unconstrained square matrix A = (αi j ) with           interval (9, 12). Comparing the output of identified param-
+   = (I k + A AT )−1/2 A and  = (I k + A AT )−1 . As dis-             eters across the chains for the two samplers using the usual
+cussed in Sect. 4.4, we assign a rotatable prior to A = (αi j ),       graphical diagnostic checks gave no evidence of any lack of
+and therefore , by taking αi j ∼ N(0, 1).                              convergence.
+    The variances of the specific factors  t are assigned the             Let ϒ = −1 = (υi j ) denote the marginal precision
+                                                                                                                     √            √
+prior 1/σ j2 ∼ γ (3.1, 2.1) independently for j = 1, . . . , p         matrix of the process and let Sϒ = diag( υ11 , . . . , υ pp ).
+which ensures that the distributions have finite variance.             Figure 3 shows the posterior mean for the standardised pre-
+The time-varying mean μt is modelled as μt = B T wt in                 cision matrix S−1         −1
+                                                                                          ϒ ϒ Sϒ . It is clear that its structure is
+which wTt = (wt1 , . . . , wtc ) is row t of an n × c matrix of        reasonably consistent with the tridiagonal Toeplitz matrix
+daily covariates W . The columns of W allow for an inter-              with corners on which the prior for −1 is centered. How-
+cept, a non-linear effect of deviations from seasonal average          ever, there are some deviations, most notably another one or
+temperature and fixed effects for the day-of-the-week, the             two bands of non-zero elements below the subdiagonal and
+occurrence of a public holiday, and the day-of-the-year,               above the supradiagonal. There is also some evidence of at
+which is represented as a truncated Fourier series with six            least a partial band in the vicinity of υi,i+12 for i = 1, . . . , 12.
+harmonics. Full details of the model for μt are given in               This may be due to people switching their heating on twice
+the Supplementary Materials along with a description of the            per day, at around 7:00 in the morning and around 19:00
+associated priors.                                                     in the evening. This picture is reinforced by the posterior
+    In order to reflect both the persistence of above or below         for the identified factor loadings matrix ,     ˜ shown in the
+average demand for gas and the longitudinal but circular               Supplementary Materials, many of whose columns display a
+nature of a gas-day-vector, a sensible model for the inverse           double-hump shape with smaller loadings towards the middle
+of the expected shared variation matrix             = −1 would        of the gas-day. As remarked in Sect. 4.3, in order to simplify
+be the precision matrix of a stationary circular autoregres-           the geometry of the stationary region for stationary dynamic
+sive process of order one (Held and Rue 2010). We therefore            factor models, the autoregressive coefficient matrices in the
+take = (ξi j ) to be a tridiagonal Toeplitz matrix with cor-           state equation are often assumed to be diagonal. However,
+ners; that is, ξi,i+1 = ξi+1,i = −ϑ/2 for i = 1, . . . , p − 1,        this example provides considerable evidence in favour of
+ξ1 p = ξ p1 = −ϑ/2 and ξii = 1 for i = 1, . . . , p where we           our fully flexible approach, with the posterior probabilities
+assume ϑ ∈ [0, 1) and take logit(ϑ) ∼ N(0, 2). Exploratory             Pr(γ̃i, jk > 0| y1:n ) for many off-diagonal elements being
+analysis using data from another offtake site suggest that this        close to zero or one.
+structure is sensible based on the inverse of the sample covari-           In order to assess the forecasting performance of the
+ance matrix. Given that the existing model is already rather           model, the number of factors was fixed at k = 10 and the
+complex, we chose to adopt a matrix normal prior for  in this         model was refitted, holding back the last 25% of observations
+example. The diagonal elements in the among-column scale               as test data. In keeping with the short-term horizon of interest,
+matrix are given a MGP prior (9), with a1 = 2, a2 = 3                  we considered forecasting h = 24 h ahead and, for compara-
+and a maximum truncation point of H = ϕ(24) − 1 = 17.                 tive purposes, h = 1 hour ahead. Application of the standard
+                                                                       forward filtering and forecasting recursions for (multivari-
+6.3.2 Analysis and results                                             ate) dynamic linear models are not appropriate here as they
+                                                                       do not allow within-day updates or forecasts. We therefore
+We ran two chains, initialised at different starting points,           modify the standard forward filter so that the time-step is
+using the adaptive Gibbs sampler discussed in Sect. 5.2 and            hours, rather than days, and at hours 2, . . . , 24 within each
+another two chains using the (non-adaptive) Hamiltonian                gas-day, we perform a partial update, comprising an observa-
+Monte Carlo sampler with a fixed truncation level of H =               tion step but no prediction step. The forecasting algorithm is
+ ϕ(24) − 1 = 17. After a burn-in of 50K iterations, each              similarly modified to allow forecasts to be issued hourly. The
+Gibbs chain was run for a further 200K iterations, thinning            full algorithms are given in the Supplementary Materials. By
+to retain every 100th draw in order to reduce computational            using the draws from the posterior obtained from the fit to
+overheads. Adaptation was allowed after 5K iterations and              the training data and sampling one-for-one from the h-step
+
+
+                                                                                                                                 123
+143   Page 16 of 18                                                                                              Statistics and Computing (2024) 34:143
+
+
+
+
+              −0.2                    0                       0.2                   0.4                0.6                      0.8                  1
+
+
+
+
+                                                                                                                                      7
+
+                                                                                                                                      8
+
+                                                                                                                                      9
+
+                                                                                                                                      10
+
+                                                                                                                                      11
+
+                                                                                                                                      12
+
+                                                                                                                                      13
+
+                                                                                                                                      14
+
+                                                                                                                                      15
+
+                                                                                                                                      16
+
+                                                                                                                                      17
+
+                                                                                                                                      18
+
+                                                                                                                                      19
+
+                                                                                                                                      20
+
+                                                                                                                                      21
+
+                                                                                                                                      22
+
+                                                                                                                                      23
+
+                                                                                                                                      0
+
+                                                                                                                                      1
+
+                                                                                                                                      2
+
+                                                                                                                                      3
+
+                                                                                                                                      4
+
+                                                                                                                                      5
+
+                                                                                                                                      6
+
+      7   8     9     10   11   12   13   14   15   16   17     18   19   20   21   22    23   0   1   2     3    4    5    6
+
+
+Fig. 3 Mean of the posterior for the marginal standardised precision matrix. The labels indicate hour of the day in a 24-h clock
+
+
+ahead predictive distributions, we obtain samples from the h-                   7 Discussion
+step ahead posterior predictive distributions. For h = 1 and
+h = 24, these are visualised in Fig. 4 for the first 5% of times                We have proposed a class of structured priors for the load-
+in the hold-out period, along with the test data. An analogous                  ings matrix of a Bayesian factor model with accompanying
+figure in the Supplementary Materials shows the last 5% of                      inferential algorithms. The novelty lies in the insight that the
+times. From these plots it is clear that the posterior predictive               shared variation matrix  = T is much more amenable
+distributions are both accurate and precise over the forecast                   to the specification of prior beliefs than the factor loadings
+horizons of interest.                                                           matrix . The prior is based on a matrix normal or matrix-
+                                                                                t distribution for . Two important features are the choice
+                                                                                of parametric structure for the among-row scale matrix 
+                                                                                and the increasing shrinkage prior for the diagonal among-
+
+
+123
+Statistics and Computing (2024) 34:143                                                                                           Page 17 of 18    143
+
+                                   1 hour ahead
+                                                                            Funding SEH was supported by the EPSRC grant EP/N510129/1 via
+                 −5.0
+                                                                            the Alan Turing Institute project “Streaming data modelling for real-
+                 −5.5
+
+                 −6.0
+                                                                            time monitoring and forecasting”.
+log gas demand
+
+
+
+
+                 −6.5
+
+                                  24 hours ahead                            Data availability The Finnish bird data are available publicly from
+                 −5.0                                                       https://www.helsinki.fi/en/researchgroups/statistical-ecology/software/
+                 −5.5                                                       hmsc.
+                 −6.0
+
+                 −6.5
+                        Sep 15                     Sep 22                   Declarations
+                                      date
+
+
+
+Fig. 4 For the first 5% of times in the hold-out period, means ( ) and
+95% equi-tailed credible intervals (     ) for the one-step ahead and 24-   Conflict of interest The authors have no relevant financial or non-
+step ahead posterior predictive distributions. The observed data are also   financial interests to disclose.
+shown ( ). (color figure online)
+                                                                            Open Access This article is licensed under a Creative Commons
+                                                                            Attribution 4.0 International License, which permits use, sharing, adap-
+                                                                            tation, distribution and reproduction in any medium or format, as
+                                                                            long as you give appropriate credit to the original author(s) and the
+column scale matrix . The matrix  characterises the
+                                                                            source, provide a link to the Creative Commons licence, and indi-
+conditional prior expectation of . Parametric forms are                    cate if changes were made. The images or other third party material
+widely adopted as models for covariance matrices in lon-                    in this article are included in the article’s Creative Commons licence,
+gitudinal studies, spatial statistics, Gaussian processes, and a            unless indicated otherwise in a credit line to the material. If material
+                                                                            is not included in the article’s Creative Commons licence and your
+host of other areas. By adopting a parametric form, informed
+                                                                            intended use is not permitted by statutory regulation or exceeds the
+by domain expertise, as a model for the expectation of , we                permitted use, you will need to obtain permission directly from the copy-
+benefit from shrinkage towards a rank-reduced matrix that is                right holder. To view a copy of this licence, visit http://creativecomm
+close to that structure. In general, the number of factors in a             ons.org/licenses/by/4.0/.
+factor model is not known a priori. This is addressed through
+the increasing shrinkage process prior for ψ1 , . . . , ψk which
+allows columns of loadings whose likelihood contribution is                 References
+negligible to be shrunk towards zero and discarded. A prior
+that encourages no more factors than are needed is helpful,                 Aguilar, O., West, M.: Bayesian dynamic factor models and portfolio
+particularly for prediction, because of the reduction in epis-                   allocation. J. Bus. Econ. Stat. 18(3), 338–357 (2000)
+                                                                            Aßmann, C., Boysen-Hogrefe, J., Pape, M.: Bayesian analysis of static
+temic uncertainty that is afforded. At the cost of slightly more
+                                                                                 and dynamic factor models: an ex-post approach towards the rota-
+involved computational inference, the matrix-t version of the                    tion problem. J. Economet. 192, 190–206 (2016)
+structured prior also offers a degree of freedom parameter ς                Bekker, P.A., ten Berge, J.M.F.: Generic global identification in factor
+which allows the data to influence the degree of shrinkage of                    analysis. Linear Algebra Appl. 264, 255–263 (1997)
+                                                                            Bhattacharya, A., Dunson, D.B.: Sparse Bayesian infinite factor models.
+ towards a rank-reduced matrix that is close to its mean.
+                                                                                 Biometrika 98(2), 291–306 (2011)
+                                                                            Carpenter, B., Gelman, A., Hoffman, M.D., Lee, D., Goodrich, B.,
+                                                                                 Betancourt, M., Brubaker, M.A., Guo, J., Li, P., Riddell, A.: Stan:
+                                                                                 a probabilistic programming language. J. Stat. Softw. 76(1), 1–32
+                                                                                 (2017)
+Supplementary information                                                   Carvalho, C.M., Chang, J., Lucas, J.E., Nevins, J.R., Wang, Q., West,
+                                                                                 M.: High-dimensional sparse factor modeling: applications in gene
+Supplementary information includes: (i) a document contain-                      expression genomics. J. Am. Stat. Assoc. 103(484), 1438–1456
+                                                                                 (2008)
+ing proofs and derivations of the results used in the paper,                Castellanos, L., Vu, V.Q., Perel, S., Schwartz, A.B., Kass, R.E.: A
+complete descriptions of the adaptive Gibbs samplers, fur-                       multivariate Gaussian process factor model for hand shape dur-
+ther background and results on the simulation experiment                         ing reach-to-grasp movements. Stat. Sinica 25(1), 5–24 (2004)
+and two applications; (ii) Stan programmes for non-adaptive                 Chan, J.C.C., Jeliazkov, I.: Efficient simulation and integrated likeli-
+                                                                                 hood estimation in state space models. Int. J. Math. Model. Numer.
+Hamiltonian Monte Carlo sampling and R code implement-                           Optim. 1, 101–120 (2009)
+ing adaptive Gibbs sampling for the two applications.                       Chan, J., Leon-Gonzalez, R., Strachan, R.W.: Invariant inference and
+                                                                                 efficient computation in the static factor model. J. Am. Stat. Assoc.
+Supplementary Information The online version contains supplemen-                 113(522), 819–828 (2018)
+tary material available at https://doi.org/10.1007/s11222-024-10454-        Chib, S., Nardari, F., Shephard, N.: Analysis of high dimensional multi-
+0.                                                                               variate stochastic volatility models. J. Economet. 134(2), 341–371
+                                                                                 (2006)
+Acknowledgements We are grateful to Michael Betancourt and Mal-             Conti, G., Frühwirth-Schnatter, S., Heckman, J.J., Piatek, R.: Bayesian
+colm Farrow for conversations which have improved the manuscript. We             exploratory factor analysis. J. Economet. 183, 31–57 (2014)
+are also grateful to two anonymous referees for their helpful comments      Durante, D.: A note on the multiplicative gamma process. Stat. Probab.
+and suggestions.                                                                 Lett. 122, 198–204 (2017)
+
+
+                                                                                                                                         123
+143    Page 18 of 18                                                                                            Statistics and Computing (2024) 34:143
+
+
+Dutta, R., Ghosh, J.K.: Bayes model selection with path sampling: factor      Lindström, Å., Green, M., Husby, M., Kålås, J.A., Lehikoinen, A.:
+     models and other examples. Stat. Sci. 28(1), 95–115 (2013)                    Large-scale monitoring of waders on their Boreal and Arctic breed-
+Frühwirth-Schnatter, S.: Data augmentation and dynamic linear models.              ing grounds in Northern Europe. Ardea 103(1), 3–15 (2015)
+     J. Time Ser. Anal. 15, 183–202 (1994)                                    Lopes, H.F., Carvalho, C.M.: Factor stochastic volatility with time vary-
+Frühwirth-Schnatter, S., Lopes, H.F.: Parsimonious Bayesian factor                 ing loadings and Markov switching regimes. J. Stat. Plan. Inf. 137,
+     analysis when the number of factors is unknown. Technical Report,             3082–3091 (2007)
+     Chicago Booth (2010)                                                     Lopes, H.F., West, M.: Bayesian model assessment in factor analysis.
+Frühwirth-Schnatter, S., Hosszejni, D., Lopes, H.F.: Sparse Bayesian               Stat. Sinica 14, 41–67 (2004)
+     factor analysis when the number of factors is unknown.                   Lopes, H.F., Salazar, E., Gamerman, D.: Spatial dynamic factor analy-
+     arXiv:2301.06459 (2023)                                                       sis. Bayesian Anal. 3(4), 759–792 (2008)
+Gelfand, A.E., Dey, D.K.: Bayesian model choice: asymptotics and              Man, A.X., Culpepper, S.A.: A mode-jumping algorithm for Bayesian
+     exact calculations. J. R. Stat. Soc. B 56(3), 501–514 (1994)                  factor analysis. J. Am. Stat. Assoc. 117(537), 277–290 (2022)
+Geweke, J., Zhou, G.: Measuring the pricing error of the arbitrage pric-      Peña, D., Poncela, P.: Nonstationary dynamic factor analysis. J. Stat.
+     ing theory. Rev. Financial Stud. 9(2), 557–587 (1996)                         Plan. Inf. 136, 1237–1257 (2006)
+Ghosh, J., Dunson, D.B.: Default prior distributions and efficient pos-       Roberts, G.O., Rosenthal, J.S.: Coupling and ergodicity of adaptive
+     terior computation in Bayesian factor analysis. J. Comput. Graph.             Markov chain Monte Carlo algorithms. J. Appl. Probab. 44(2),
+     Stat. 18(2), 306–320 (2009)                                                   458–475 (2007)
+Gneiting, T., Raftery, A.E.: Strictly proper scoring rules, prediction, and   Sáfadi, T., Peña, D.: Bayesian analysis of dynamic factor models: an
+     estimation. J. Am. Stat. Assoc. 102(477), 359–378 (2007)                      application to air pollution and mortality in São Paulo, Brazil.
+Goldberg, L.R.: An alternative ‘description of personality’: the big-five          Environmetrics 19(1), 95–117 (2008)
+     factor structure. J. Pers. Soc. Psychol. 59(6), 1216–1229 (1990)         Schiavon, L., Canale, A.: On the truncation criteria in infinite factor
+Gupta, A.K., Nagar, D.K.: Matrix variate distributions. Chapman &                  models. Stat 9(1), 298 (2020)
+     Hall/CRC, Boca Raton (2000)                                              Schiavon, L., Canale, A., Dunson, D.B.: Generalized infinite factoriza-
+Hays, S., Shen, H., Huang, J.X.: Functional dynamic factor models                  tion models. Biometrika 109(3), 817–835 (2022)
+     with application to yield curve forecasting. Ann. Appl. Stat. 6(3),      Schmidt, A.M., Guttorp, P., O’Hagan, A.: Considering covariates in
+     870–894 (2012)                                                                the covariance structure of spatial processes. Environmetrics 22,
+Heaps, S.E.: Enforcing stationarity through the prior in vector autore-            487–500 (2011)
+     gressions. J. Comput. Graph. Stat. 32(1), 74–83 (2023)                   Soldo, B.: Forecasting natural gas consumption. Appl. Energy 92, 26–
+Held, L., Rue, H.: Conditional and intrinsic autoregressions. In:                  37 (2012)
+     Gelfand, A.E., Diggle, P.J., Fuentes, M., Guttorp, P. (eds.) Hand-       Steel, M.: Phylogeny: Discrete and Random Processes in Evolution.
+     book of Spatial Statistics, 1st edn. Handbooks of Modern Statistical          Society for Industrial and Applied Mathematics, Philadelphia
+     Methods, pp. 201–216. CRC Press, Boca Raton (2010). Chap. 13                  (2016)
+Jungbacker, B., Koopman, S.J., Van der Wel, M.: Smooth dynamic fac-           Taylor-Rodriguez, D., Finley, A.O., Dhatta, A., Babcock, C., Andersen,
+     tor analysis with application to the US term structure of interest            H., Cook, B.D., Mortin, D.C., Banerjee, S.: Spatial factor models
+     rates. J. Appl. Economet. 29(3), 65–90 (2014)                                 for high-dimensional and large spatial data. Stat. Sinica 29(3),
+Kaufmann, S., Schumacher, C.: Bayesian estimation of sparse dynamic                1155–1180 (2019)
+     factor models with order-independent and ex-post identification.         Wilkinson, D.J., Yeung, S.K.H.: Conditional simulation from highly
+     J. Economet. 210, 116–134 (2019)                                              structured Gaussian systems, with application to blocking-MCMC
+Koop, G., Leon-Gonzalez, R., Strachan, R.W.: Efficient posterior sim-              for the Bayesian analysis of very large linear models. Stat. Comput.
+     ulation for cointegrated models with priors on the cointegration              12, 287–300 (2002)
+     space. Economet. Rev. 29(2), 224–242 (2009)                              Wilkinson, D.J., Yeung, S.K.H.: A sparse matrix approach to Bayesian
+Kowal, D.R., Canale, A.: Semiparametric functional factor models with              computation in large linear models. Comput. Stat. Data Anal. 44,
+     Bayesian rank selection. arXiv:2108.02151v3 (2022)                            493–516 (2004)
+Kowal, D.R., Matteson, D.S., Ruppert, D.: A Bayesian multivariate
+     functional dynamic linear model. J. Am. Stat. Assoc. 112(518),
+     733–744 (2017)                                                           Publisher’s Note Springer Nature remains neutral with regard to juris-
+Legramanti, S., Durante, D., Dunson, D.B.: Bayesian cumulative                dictional claims in published maps and institutional affiliations.
+     shrinkage for infinite factorizations. Biometrika 107(3), 745–752
+     (2020)
+Leung, D., Drton, M.: Order-invariant prior specification in Bayesian
+     factor analysis. Stat. Probab. Lett. 111, 60–66 (2016)
+Lim, L.-H., Sepulchre, R.: Geometric distance between positive definite
+     matrices of different dimensions. IEEE Trans. Inf. Theory 65(9),
+     5401–5405 (2019)
+
+
+
+
+123
+

@@ -745,12 +745,25 @@ generate_ar_monitor_params <- function(trend_spec) {
   # p=c(1,3) means specific lags 1,3 (sparse AR model)
   if (length(lags) == 1 && is.numeric(lags)) {
     # Single integer: create standard AR(p) with all lags 1:p
-    ar_params <- paste0("ar", 1:lags, "_trend")
+    lag_vec <- 1:lags
   } else {
     # Vector or multiple values: use specific lags only
-    ar_params <- paste0("ar", lags, "_trend")
+    lag_vec <- lags
   }
+  ar_params <- paste0("ar", lag_vec, "_trend")
 
+  # Under hierarchical sharing the per-series ar{lag}_trend
+  # vectors still exist (one normal draw per series, per lag)
+  # AND there is a population mean + scale per lag. Add those
+  # so `get_prior()` surfaces an editable row for each.
+  sharing <- trend_spec$coef_sharing %||% "none"
+  if (sharing == "hierarchical") {
+    ar_params <- c(
+      ar_params,
+      paste0("mu_ar", lag_vec, "_trend"),
+      paste0("sigma_ar", lag_vec, "_trend")
+    )
+  }
   return(ar_params)
 }
 
@@ -1215,11 +1228,11 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
 #'
 #' @section Design Principles:
 #' \itemize{
-#'   \item{Self-contained}: Each object contains all needed metadata}
-#'   \item{Convention-based}: Minimal configuration, maximum automation}
-#'   \item{Extensible}: New fields can be added without breaking existing trends}
-#'   \item{Validated}: Structure enforced through validate_mvgam_trend()}
-#'   \item{Consistent}: All trends follow identical patterns}
+#'   \item Self-contained: each object contains all needed metadata
+#'   \item Convention-based: minimal configuration, maximum automation
+#'   \item Extensible: new fields can be added without breaking existing trends
+#'   \item Validated: structure enforced through `validate_mvgam_trend()`
+#'   \item Consistent: all trends follow identical patterns
 #' }
 #'
 #' @name mvgam_trend_specification
@@ -2058,11 +2071,13 @@ print.mvgam_trend <- function(x, ...) {
 #'   * For `VAR()` models: a positive integer. A scalar
 #'     \code{p = k} is the VAR(k) interpretation with
 #'     consecutive coefficient matrices for lags \code{1:k}.
-#'     Sparse-lag vector \code{p} is rejected because the
-#'     Heaps-2022 stationary joint-distribution initialisation
-#'     assumes consecutive companion-form structure. Use
-#'     \code{AR(p = c(...))} for sparse-lag autoregression on
-#'     a single series.
+#'     Sparse-lag vector \code{p} is not supported and will
+#'     not be added: the Heaps-2022 stationary joint-
+#'     distribution initialisation assumes consecutive
+#'     companion-form structure, so the sparse case has no
+#'     companion-form analogue with the same identified
+#'     stationary covariance. Use \code{AR(p = c(...))} for
+#'     sparse-lag autoregression on a single series.
 #'   * For `CAR()` models: must be \code{1} (continuous-time
 #'     AR(1) process).
 #'
@@ -2130,6 +2145,19 @@ print.mvgam_trend <- function(x, ...) {
 #'       the package issue tracker for the planned ragged-array support.
 #'   }
 #'
+#' @param coef_sharing Character string, one of `"none"`,
+#'   `"shared"`, or `"hierarchical"`, controlling how AR
+#'   coefficients vary across latent series in `AR()`. The
+#'   default `"none"` estimates an independent coefficient
+#'   vector per series (one `ar{lag}_trend` entry per latent
+#'   process per lag). `"shared"` collapses to a single
+#'   `ar{lag}_shared` scalar per lag, broadcast across all
+#'   series in `transformed parameters`. `"hierarchical"` adds
+#'   per-lag population-mean (`mu_ar{lag}_trend`) and scale
+#'   (`sigma_ar{lag}_trend`) hyperparameters with a pooled
+#'   `ar{lag}_trend[j] ~ normal(mu_ar{lag}_trend,
+#'   sigma_ar{lag}_trend)`.
+#'
 #' @param subgr A subgrouping `factor` variable specifying which element in
 #'   `data` represents the different time series. Defaults to `series`, but
 #'   note that models that use the hierarchical correlations, where the
@@ -2148,6 +2176,24 @@ print.mvgam_trend <- function(x, ...) {
 #'
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #'   arguments to be interpreted by the parsing functions in \pkg{mvgam}.
+#'
+#' @section AR coefficient-sharing surface:
+#' The `coef_sharing` argument selects how AR coefficients
+#' vary across the latent series. The three settings and the
+#' Stan parameters each declares are:
+#' \tabular{ll}{
+#'   \strong{coef_sharing}    \tab \strong{Stan parameters with priors} \cr
+#'   `"none"`                 \tab `ar{lag}_trend` per series \cr
+#'   `"shared"`               \tab `ar{lag}_shared` (one per lag) \cr
+#'   `"hierarchical"`         \tab `mu_ar{lag}_trend`, `sigma_ar{lag}_trend`, `ar{lag}_trend` per series \cr
+#' }
+#' All variants synthesise the same `ar{lag}_trend[j]` symbol
+#' in `transformed parameters`, so downstream code
+#' (forecasting, IRF, FEVD, summary printing) is unchanged.
+#' Custom priors can be set on any sampled parameter via the
+#' standard `brms::set_prior(class = "<name>")` route; call
+#' `get_prior(mvgam_formula(...))` to see the exact parameter
+#' set surfaced by the current `coef_sharing` value.
 #'
 #' @rdname trend_constructors
 #'
@@ -2535,7 +2581,8 @@ RW = function(
 #' @rdname trend_constructors
 #' @export
 AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE,
-              gr = NA, subgr = NA, n_lv = NULL, trend_map = NULL) {
+              gr = NA, subgr = NA, n_lv = NULL, trend_map = NULL,
+              coef_sharing = c("none", "shared", "hierarchical")) {
   # Validate AR order parameter
   if (length(p) == 1) {
     checkmate::assert_int(p, lower = 1)
@@ -2547,6 +2594,7 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE,
   checkmate::assert_logical(ma, len = 1)
   checkmate::assert_logical(cor, len = 1)
   assert_trend_map_input(trend_map)
+  coef_sharing <- match.arg(coef_sharing)
 
   # Use helper function for clean object creation. Raw
   # `trend_map` is stashed on the spec; normalisation happens at
@@ -2562,7 +2610,8 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE,
     ma = ma,
     cor = cor,
     n_lv = n_lv,
-    trend_map = trend_map
+    trend_map = trend_map,
+    coef_sharing = coef_sharing
   )
 
   return(trend_obj)
@@ -2593,16 +2642,16 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, gr = NA,
   # Validate VAR order parameter. Scalar p (e.g. p = 2) is the
   # standard interpretation: include AR coefficient matrices
   # for consecutive lags 1..p. Sparse-lag vector p (e.g.
-  # p = c(2, 4)) is not yet supported because the Heaps-2022
+  # p = c(2, 4)) is not supported. Reason: the Heaps-2022
   # stationary joint-distribution initialisation that VAR uses
-  # assumes consecutive companion-form structure; deriving the
-  # sparse companion stationary covariance is a separate piece
-  # of work. Use AR(p = c(...)) for sparse-lag autoregression
-  # on a single series in the meantime.
+  # assumes consecutive companion-form structure, so the sparse
+  # case has no companion-form analogue with the same identified
+  # stationary covariance. Use AR(p = c(...)) for sparse-lag
+  # autoregression on a single series.
   if (length(p) != 1L) {
     stop(insight::format_error(c(
       paste0(
-        "Sparse-lag VAR (vector 'p') is not yet supported."
+        "Sparse-lag VAR (vector 'p') is not supported."
       ),
       x = paste0(
         "Got 'p' of length ", length(p), ": ",
@@ -2610,8 +2659,8 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, gr = NA,
       ),
       i = paste0(
         "Pass a scalar 'p' (e.g. p = 2) for consecutive lags ",
-        "1..p, or use AR(p = c(...)) for sparse-lag ",
-        "autoregression on a single series."
+        "1..p. Use AR(p = c(...)) for sparse-lag autoregression ",
+        "on a single series."
       )
     )))
   }

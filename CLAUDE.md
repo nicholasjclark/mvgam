@@ -12,6 +12,7 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 ### Building and Documentation
 - `Rscript -e "devtools::document()"` - Generate roxygen2 documentation
 - `R CMD INSTALL --preclean --no-multiarch` - Install package locally
+- No `devtools::document()` warnings or errors are allowed. This is NON-NEGOTIABLE. Every roxygen change must leave the documentation rebuild clean.
 
 ### Documentation Memory
 - Use `context7` MCP server to find relevant, up-to-date documentation when working with 3rd party libraries, as needed

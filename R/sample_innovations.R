@@ -244,7 +244,7 @@ get_observation_structure <- function(object, newdata = NULL) {
 #' @param time_var Character; name of the time column.
 #' @param level_label Character; the single trained series level used
 #'   for the integer/factor mapping. Pulled from
-#'   `attr(object$obs_data, "mvgam_series")[1]`.
+#'   `attr(object$obs_data, "mvgam_series")\[1\]`.
 #'
 #' @noRd
 build_single_series_observation_structure <- function(newdata, time_var,
@@ -284,7 +284,7 @@ build_single_series_observation_structure <- function(newdata, time_var,
 #'
 #' @details
 #' Lookup order:
-#' 1. `trend_components$types[1]` - primary source used by summary/print
+#' 1. `trend_components$types\[1\]` - primary source used by summary/print
 #' 2. `trend_metadata$trend$trend_type` - fallback metadata source
 #' 3. `trend_formula` existence check - issues warning if type unclear
 #' 4. Returns "None" if no trend model detected
@@ -367,7 +367,7 @@ has_stochastic_trend <- function(object) {
 #' @param draw_ids Optional integer vector of specific draw indices.
 #'   Mutually exclusive with `ndraws`.
 #'
-#' @return Numeric matrix `[ndraws x n_obs]` of sampled innovations,
+#' @return Numeric matrix \[ndraws x n_obs\] of sampled innovations,
 #'   in the same column order as `newdata` (or training data) rows.
 #'   Returns a matrix of zeros for deterministic-trend models (PW,
 #'   None) so callers can add it unconditionally.
@@ -664,17 +664,19 @@ extract_posterior_param <- function(draws_mat, all_cols, param_name) {
 
 #' Extract Simple Cholesky Parameters as Structured Arrays
 #'
-#' Builds a per-draw `[ndraws, n, n]` array for `L_Omega_trend` and
-#' `[ndraws, n]` matrix for `sigma_trend` via direct column-name
+#' Builds a per-draw \[ndraws, n, n\] array for `L_Omega_trend` and
+#' \[ndraws, n\] matrix for `sigma_trend` via direct column-name
 #' lookup. Mirrors `extract_hierarchical_cholesky_params()` for the
 #' non-hierarchical case so reconstruction is independent of any
 #' sort-order assumption in `extract_named_params()`.
 #'
 #' @noRd
-#' Pull a 2D-indexed Stan parameter `name[i, j]` into a per-draw
-#' `[ndraws, nrow, ncol]` array, validating all required columns are
+NULL
+
+#' Pull a 2D-indexed Stan parameter `name\[i, j\]` into a per-draw
+#' \[ndraws, nrow, ncol\] array, validating all required columns are
 #' present. Shared by Cholesky / full-covariance / factor-loadings
-#' extractors that build `[d, i, j]` arrays from posterior draws.
+#' extractors that build \[d, i, j\] arrays from posterior draws.
 #'
 #' @noRd
 extract_indexed_array_2d <- function(draws_mat, name, nrow, ncol,
@@ -736,7 +738,7 @@ extract_simple_cholesky_params <- function(draws_mat, n_series) {
 
 #' Extract Simple Full Covariance Parameters as Structured Arrays
 #'
-#' Builds a `[ndraws, n, n]` array for `Sigma_trend` via direct
+#' Builds a \[ndraws, n, n\] array for `Sigma_trend` via direct
 #' column-name lookup so reconstruction is order-safe.
 #'
 #' @noRd
@@ -772,13 +774,13 @@ extract_simple_full_cov_params <- function(draws_mat, n_series) {
 #' Builds named arrays for hierarchical Cholesky covariance from posterior
 #' draws via direct column-name lookup. Unlike `extract_named_params()`
 #' (which sorts only by first index), this preserves multi-index ordering
-#' so downstream code can use `arr[d, g, i, j]` directly.
+#' so downstream code can use `arr\[d, g, i, j\]` directly.
 #'
 #' @return List with components:
 #'   - `alpha_cor_trend`: numeric vector length ndraws
-#'   - `L_Omega_global_trend`: array `[ndraws, n_sub, n_sub]`
-#'   - `L_deviation_group_trend`: array `[ndraws, n_groups, n_sub, n_sub]`
-#'   - `sigma_group_trend`: array `[ndraws, n_groups, n_sub]`
+#'   - `L_Omega_global_trend`: array \[ndraws, n_sub, n_sub\]
+#'   - `L_deviation_group_trend`: array \[ndraws, n_groups, n_sub, n_sub\]
+#'   - `sigma_group_trend`: array \[ndraws, n_groups, n_sub\]
 #'
 #' @noRd
 extract_hierarchical_cholesky_params <- function(draws_mat, group_info) {
@@ -852,14 +854,14 @@ extract_hierarchical_cholesky_params <- function(draws_mat, group_info) {
 #'
 #' For hierarchical models with `cor = FALSE` (RW(gr=), AR(gr=), ZMVN(gr=)
 #' with diagonal innovation covariance), the posterior holds per-group SDs
-#' as `sigma_group_trend[g, k]`. The innovation sampler operates on a flat
-#' per-series `sigma_trend[d, s]` matrix, so we broadcast each series to
+#' as `sigma_group_trend\[g, k\]`. The innovation sampler operates on a flat
+#' per-series `sigma_trend\[d, s\]` matrix, so we broadcast each series to
 #' its group's `k`-th entry, where `k` is the series' index within its
 #' group as ordered in the Stan codegen (matches the `if
-#' (group_inds_trend[s] == g_idx) { k += 1; ... }` loop in
+#' (group_inds_trend\[s\] == g_idx) { k += 1; ... }` loop in
 #' `generate_hierarchical_correlation_parameters()`).
 #'
-#' @return List with `sigma_trend`: matrix `[ndraws x n_series]`
+#' @return List with `sigma_trend`: matrix \[ndraws x n_series\]
 #'
 #' @noRd
 extract_hierarchical_diagonal_params <- function(draws_mat, group_info) {
@@ -941,7 +943,7 @@ get_group_info <- function(standata) {
 #' @param obs_structure List from `get_observation_structure()` containing:
 #'   time, series_int, n_obs, n_times, n_series, unique_times.
 #'
-#' @return Matrix `[ndraws x n_obs]` of sampled innovations, where each
+#' @return Matrix \[ndraws x n_obs\] of sampled innovations, where each
 #'   observation gets the innovation for its (time, series) combination.
 #'
 #' @details
@@ -1072,19 +1074,18 @@ factor_state_param_pattern <- function(pars) {
   }
 }
 
-# Returns the regex matching unrotated factor-basis dynamics
-# draws (currently `A_trend[lag][i, j]` for VAR factor models)
-# when the rotated `A_trend_tilde[lag][i, j]` counterpart is
-# also in the posterior; returns NULL otherwise. Used by
-# summary and tidy classifiers to deduplicate display when both
-# bases are saved.
+# Returns the regex matching parameter-draws that the summary
+# / tidy classifiers should hide. Currently covers unrotated
+# VAR factor dynamics (`A_trend[lag][i, j]`) when the
+# QR-rotated `A_trend_tilde[lag][i, j]` counterpart is also in
+# the posterior, to avoid double display. Returns NULL when
+# nothing needs hiding.
 #'@noRd
 hidden_unrotated_factor_pars <- function(pars) {
   if (any(grepl("^A_trend_tilde\\[", pars))) {
-    "^A_trend\\["
-  } else {
-    NULL
+    return("^A_trend\\[")
   }
+  NULL
 }
 
 # Internal: extract factor-loading draws from the posterior.
@@ -1161,7 +1162,7 @@ map_lv_to_series_innovations <- function(lv_innov, Z, n_times,
 #' with cor=FALSE). Vectorized implementation without per-draw loops.
 #'
 #' @param z Matrix `[ndraws x (n_times * n_series)]` of standard normals
-#' @param params List with `sigma_trend` matrix `[ndraws x n_series]`
+#' @param params List with `sigma_trend` matrix \[ndraws x n_series\]
 #' @param n_times Number of unique time points
 #' @param n_series Number of series
 #' @param ndraws Number of posterior draws
@@ -1202,8 +1203,8 @@ transform_diagonal_innovations <- function(z, params, n_times, n_series,
 #'
 #' @param z Matrix `[ndraws x (n_times * n_series)]` of standard normals
 #' @param params List from `extract_simple_cholesky_params()`:
-#'   - `sigma_trend`: matrix `[ndraws x n_series]` of innovation SDs
-#'   - `L_Omega_trend`: array `[ndraws x n_series x n_series]`
+#'   - `sigma_trend`: matrix \[ndraws x n_series\] of innovation SDs
+#'   - `L_Omega_trend`: array \[ndraws x n_series x n_series\]
 #' @param n_times Number of unique time points
 #' @param n_series Number of series
 #' @param ndraws Number of posterior draws
@@ -1264,7 +1265,7 @@ transform_cholesky_innovations <- function(z, params, n_times, n_series,
 #'
 #' @param z Matrix `[ndraws x (n_times * n_series)]` of standard normals
 #' @param params List from `extract_simple_full_cov_params()`:
-#'   - `Sigma_trend`: array `[ndraws x n_series x n_series]`
+#'   - `Sigma_trend`: array \[ndraws x n_series x n_series\]
 #' @param n_times Number of unique time points
 #' @param n_series Number of series
 #' @param ndraws Number of posterior draws
@@ -1327,7 +1328,7 @@ transform_full_cov_innovations <- function(z, params, n_times, n_series,
 #' @param n_series Number of series
 #' @param obs_structure List from `get_observation_structure()`
 #'
-#' @return Matrix `[ndraws x n_obs]` of innovations for each observation
+#' @return Matrix \[ndraws x n_obs\] of innovations for each observation
 #'
 #' @details
 #' Linear indexing converts (time, series) to grid position. For example,
@@ -1381,9 +1382,9 @@ map_innovations_to_obs <- function(innovations_flat, n_times, n_series,
 #' then re-Choleskied and scaled by per-group SDs:
 #' \itemize{
 #'   \item C_global = L_g L_g^T
-#'   \item C_local[g] = L_d[g] L_d[g]^T
-#'   \item L_grp[g] = chol(alpha * C_global + (1 - alpha) * C_local[g])
-#'   \item L_full[g] = diag(sigma_grp[g]) %*% L_grp[g]
+#'   \item C_local\[g\] = L_d\[g\] L_d\[g\]^T
+#'   \item L_grp\[g\] = chol(alpha * C_global + (1 - alpha) * C_local\[g\])
+#'   \item L_full\[g\] = diag(sigma_grp\[g\]) %*% L_grp\[g\]
 #' }
 #' Different groups are independent (block-diagonal full covariance).
 #'

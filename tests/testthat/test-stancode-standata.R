@@ -3154,3 +3154,91 @@ test_that("loadings_prior errors when combined with a fully-fixed trend_map", {
     "cannot combine with a fully-fixed 'trend_map'"
   )
 })
+
+
+# ---- AR() prior + coef_sharing surface (Step 3) -------------------
+
+# Shared fixture for the four valid combinations + the
+# constructor-side rejections. Small panel because we only
+# inspect the emitted stancode, not the posterior.
+ar_step3_fixture <- function() {
+  set.seed(1L)
+  data.frame(
+    y = rnorm(80L),
+    time = rep(1:20L, 4L),
+    series = factor(rep(paste0("s", 1:4), each = 20L))
+  )
+}
+
+ar_step3_stancode <- function(tf) {
+  dat <- ar_step3_fixture()
+  mf <- mvgam_formula(y ~ 1, trend_formula = tf)
+  paste(unlist(stancode(mf, data = dat)), collapse = "\n")
+}
+
+# brms reformats `<lower=a,upper=b>` to `<lower=a, upper=b>`
+# in its emitted Stan source. The regex patterns below use
+# `\\s*` between comma-separated arguments so they survive
+# either spacing.
+
+test_that("AR(default + none) keeps the historical ar{lag}_trend declaration", {
+  sc <- ar_step3_stancode(~ AR(p = 2))
+  expect_true(grepl(
+    "vector<lower=-1,\\s*upper=1>\\[N_lv_trend\\] ar1_trend;", sc
+  ))
+  expect_true(grepl(
+    "vector<lower=-1,\\s*upper=1>\\[N_lv_trend\\] ar2_trend;", sc
+  ))
+  expect_false(grepl("ar1_shared\\b", sc))
+  expect_false(grepl("mu_ar1_trend\\b", sc))
+})
+
+test_that("AR(default + shared) emits ar{lag}_shared and broadcasts to ar{lag}_trend", {
+  sc <- ar_step3_stancode(~ AR(p = 2, coef_sharing = "shared"))
+  expect_true(grepl(
+    "vector<lower=-1,\\s*upper=1>\\[1\\] ar1_shared;", sc
+  ))
+  expect_true(grepl(
+    "vector<lower=-1,\\s*upper=1>\\[1\\] ar2_shared;", sc
+  ))
+  expect_true(grepl(
+    "ar1_trend = rep_vector\\(ar1_shared\\[1\\], N_lv_trend\\);", sc
+  ))
+  expect_true(grepl("ar1_shared ~ normal\\(0, 0\\.5\\);", sc))
+  expect_false(grepl(
+    "vector<lower=-1,\\s*upper=1>\\[N_lv_trend\\] ar1_trend;", sc
+  ))
+})
+
+test_that("AR(default + hierarchical) emits mu/sigma hyperparams and pooled prior", {
+  sc <- ar_step3_stancode(~ AR(p = 2, coef_sharing = "hierarchical"))
+  expect_true(grepl(
+    "real<lower=-1,\\s*upper=1> mu_ar1_trend;", sc
+  ))
+  expect_true(grepl("real<lower=0> sigma_ar1_trend;", sc))
+  expect_true(grepl(
+    "vector<lower=-1,\\s*upper=1>\\[N_lv_trend\\] ar1_trend;", sc
+  ))
+  expect_true(grepl("mu_ar1_trend ~ normal\\(0, 0\\.5\\);", sc))
+  expect_true(grepl("sigma_ar1_trend ~ exponential\\(2\\);", sc))
+  expect_true(grepl(
+    "ar1_trend ~ normal\\(mu_ar1_trend, sigma_ar1_trend\\);", sc
+  ))
+})
+
+
+test_that("get_prior() surfaces mu_/sigma_ rows under coef_sharing = \"hierarchical\"", {
+  dat <- ar_step3_fixture()
+  gp <- get_prior(
+    mvgam_formula(
+      y ~ 1, trend_formula = ~ AR(p = 2, coef_sharing = "hierarchical")
+    ),
+    data = dat
+  )
+  classes <- gp$class
+  expect_true("mu_ar1_trend" %in% classes)
+  expect_true("mu_ar2_trend" %in% classes)
+  expect_true("sigma_ar1_trend" %in% classes)
+  expect_true("sigma_ar2_trend" %in% classes)
+  expect_true("ar1_trend" %in% classes)
+})

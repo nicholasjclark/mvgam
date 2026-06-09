@@ -343,12 +343,15 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
   # Deduplicate functions (GP models may have identical functions in both models)
   combined_stancode <- deduplicate_stan_functions(combined_stancode)
 
-  # Generate complete standata using brms with trend stanvars included
+  # Generate complete standata using brms with trend stanvars included.
+  # `data2` (cached on obs_setup) carries `car()` adjacency matrices
+  # and other special-lookup objects.
   combined_standata <- generate_base_brms_standata(
     formula = obs_setup$formula,
     data = obs_setup$data,
     family = obs_setup$family,
-    stanvars = trend_stanvars
+    stanvars = trend_stanvars,
+    data2 = obs_setup$data2
   )
 
   # Validate final Stan code if requested
@@ -429,14 +432,18 @@ generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
 
   # Return NULL for empty stanvars (brms expectation)
 
-  # Generate Stan code using brms with combined stanvars
+  # Generate Stan code using brms with combined stanvars. `data2`
+  # rides along so specials that look up auxiliary objects
+  # (`car()` adjacency matrices, `cov_ranef()` covariance matrices)
+  # can resolve their references.
   base_code <- brms::make_stancode(
-      formula = obs_setup$formula,
-      data = obs_setup$data,
-      family = obs_setup$family,
-      stanvars = all_stanvars,
-      prior = obs_setup$prior
-    )
+    formula = obs_setup$formula,
+    data = obs_setup$data,
+    family = obs_setup$family,
+    data2 = obs_setup$data2,
+    stanvars = all_stanvars,
+    prior = obs_setup$prior
+  )
 
   return(base_code)
 }
@@ -1512,11 +1519,11 @@ apply_correct_transformation_order <- function(code_lines, insert_pos,
   return(result_lines)
 }
 
-#' Handle Nonlinear Trend Injection for Models Using mu[n] = ... Patterns
+#' Handle Nonlinear Trend Injection for Models Using mu\[n\] = ... Patterns
 #'
 #' @description
 #' Injects trend effects into nonlinear brms models that compute mu using
-#' assignment patterns like mu[n] = (expression) within for loops. Modifies
+#' assignment patterns like mu\[n\] = (expression) within for loops. Modifies
 #' the Stan code to add trend effects to the nonlinear predictor.
 #'
 #' @param code_lines Character vector of all model code lines
@@ -1628,7 +1635,7 @@ handle_nonlinear_trend_injection <- function(code_lines, block_info,
 #'   Generated code follows the pattern:
 #'   \preformatted{
 #'   for (n in 1:N) {
-#'     mu[n] += trend[obs_trend_time[n], obs_trend_series[n]];
+#'     mu\[n\] += trend[obs_trend_time\[n\], obs_trend_series\[n\]];
 #'   }
 #'   }
 #'   For multivariate responses, generates response-specific variable names
@@ -1927,7 +1934,7 @@ inject_multivariate_trends_into_linear_predictors <- function(
 #' @return List of Stan data
 #' @noRd
 generate_base_brms_standata <- function(formula, data, family = gaussian(),
-                                       stanvars = NULL) {
+                                       stanvars = NULL, data2 = NULL) {
   # Accept both regular formulas and brms formula objects
   checkmate::assert(
     checkmate::check_class(formula, "formula"),
@@ -1938,15 +1945,15 @@ generate_base_brms_standata <- function(formula, data, family = gaussian(),
   )
   checkmate::assert_data_frame(data)
 
-  # Use brms to generate Stan data
-  standata <-
-    brms::make_standata(
-      formula = formula,
-      data = data,
-      family = family,
-      stanvars = stanvars
-    )
-
+  # `data2` resolves auxiliary objects referenced by brms specials
+  # (`car()`, `cov_ranef()`) whose values live outside `data`.
+  standata <- brms::make_standata(
+    formula = formula,
+    data = data,
+    family = family,
+    stanvars = stanvars,
+    data2 = data2
+  )
 
   return(standata)
 }
@@ -2763,7 +2770,7 @@ generate_matrix_z_tdata <- function(is_factor_model, n_lv, n_series,
 #' - `fixed_Z` non-NULL with no NAs: fully fixed Z in the data
 #'   block. No priors, no identification step.
 #' - `is_factor_model = TRUE`, `fixed_Z` NULL: emit
-#'   `matrix[N_series_trend, N_lv_trend] Z` in parameters.
+#'   `matrix\[N_series_trend, N_lv_trend\] Z` in parameters.
 #'   `generate_factor_model()` applies the prior and emits
 #'   post-hoc QR identification (`Z_tilde`, `Q_tilde`,
 #'   `lv_trend_tilde`) with an inline sign-fix in generated
@@ -2824,7 +2831,7 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
 #'
 #' Implements the Heaps and Jermyn (2024) factor-model
 #' parameterisation: sample `Z` as an unconstrained
-#' `matrix[N_series_trend, N_lv_trend]` parameter (declaration
+#' `matrix\[N_series_trend, N_lv_trend\]` parameter (declaration
 #' lives in `generate_matrix_z_parameters()`), apply the prior
 #' on the unconstrained matrix, and recover the identified
 #' lower-triangular `Z_tilde` via thin-QR decomposition in
@@ -2840,7 +2847,7 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
 #'
 #' For VAR factor models the coefficient array `A_trend` lives
 #' in the same latent basis as `lv_trend`. The rotation
-#' `A_trend_tilde[lag] = Q_tilde A_trend[lag] Q_tilde'` brings
+#' `A_trend_tilde\[lag\] = Q_tilde A_trend\[lag\] Q_tilde'` brings
 #' the saved coefficients into the identified `Z_tilde` /
 #' `lv_trend_tilde` basis so downstream summaries (impulse
 #' responses, stationarity checks) are coherent.
@@ -2960,7 +2967,7 @@ generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
 #' `to_vector(Z) ~ student_t(3, 0, 1)` for the per-column
 #' matrix-normal prior
 #'
-#'   `Z[, i] ~ multi_normal_cholesky(zero_vec, L_Phi * sqrt(Psi_diag[i]))`
+#'   `Z\[, i\] ~ multi_normal_cholesky(zero_vec, L_Phi * sqrt(Psi_diag\[i\]))`
 #'
 #' where `Phi = exp(-d_1 / theta_dist_1) * ... *
 #' exp(-d_K / theta_dist_K) * gp_exponential_cov(features, 1.0,
@@ -3239,7 +3246,7 @@ make_loadings_prior_stanvars <- function(spec) {
 #' Generate Transformed Parameters Block Injections for Trend Computation
 #'
 #' All trends must use the same computation pattern:
-#' trend[i,s] = dot_product(Z[s,:], LV[i,:]) + mu_trend[ytimes[i,s]]
+#' trend\[i,s\] = dot_product(Z\[s,:\], LV\[i,:\]) + mu_trend[ytimes\[i,s\]]
 #'
 #'
 #' @param n_lv Number of latent variables
@@ -3900,13 +3907,154 @@ generate_trend_priors_stanvar <- function(param_names, prior = NULL, stanvar_nam
 }
 
 
+#' Build the AR coefficient Stan blocks (parameters,
+#' transformed parameters, model) for the three valid
+#' `coef_sharing` modes.
+#'
+#' Combinations and what each emits:
+#'
+#' * none: one `vector<lower=-1,upper=1>\[N_lv_trend\]
+#'   ar{lag}_trend` per lag, sampled directly with the standard
+#'   trend prior.
+#' * shared: one `vector<lower=-1,upper=1>\[1\] ar{lag}_shared`
+#'   per lag in `parameters`; per-series `ar{lag}_trend`
+#'   synthesised in `transformed parameters` via `rep_vector`
+#'   so downstream code is unchanged.
+#' * hierarchical: per-lag `real mu_ar{lag}_trend` plus
+#'   `real<lower=0> sigma_ar{lag}_trend` hyperparameters in
+#'   `parameters` alongside the per-series `ar{lag}_trend`;
+#'   prior on `ar{lag}_trend` becomes
+#'   `normal(mu_ar{lag}_trend, sigma_ar{lag}_trend)`.
+#'
+#' @param ar_lags Integer vector of active lags (e.g. `1:p` or
+#'   `c(1, 12)` for sparse-lag AR).
+#' @param coef_sharing One of `"none"`, `"shared"`, or
+#'   `"hierarchical"`.
+#' @param prior `brmsprior` for user-supplied prior overrides.
+#'
+#' @return A list of `brmsstanvar` objects, suitable for
+#'   appending to the AR generator's components list.
+#' @noRd
+build_ar_coef_stanvars <- function(ar_lags, coef_sharing, prior = NULL) {
+  checkmate::assert_integerish(ar_lags, lower = 1L, any.missing = FALSE)
+  checkmate::assert_choice(coef_sharing,
+                           c("none", "shared", "hierarchical"))
+  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
+  build_plain_ar_stanvars(
+    ar_lags = ar_lags, coef_sharing = coef_sharing, prior = prior
+  )
+}
+
+#' AR Stan emission with optional coefficient sharing.
+#'
+#' Default prior path. Branches on `coef_sharing`. The
+#' parameter that carries the user-tunable prior is named
+#' `ar{lag}_shared` under shared mode and `ar{lag}_trend`
+#' otherwise; the model-block prior emission targets the
+#' sampled parameter name.
+#'
+#' @noRd
+build_plain_ar_stanvars <- function(ar_lags, coef_sharing, prior = NULL) {
+  checkmate::assert_integerish(ar_lags, lower = 1L, any.missing = FALSE)
+  checkmate::assert_choice(coef_sharing,
+                           c("none", "shared", "hierarchical"))
+  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
+  par_lines <- character(0)
+  tpar_decl_lines <- character(0)
+  tpar_assign_lines <- character(0)
+  prior_lines <- character(0)
+  for (lag in ar_lags) {
+    sampled <- switch(coef_sharing,
+      none = paste0("ar", lag, "_trend"),
+      shared = paste0("ar", lag, "_shared"),
+      hierarchical = paste0("ar", lag, "_trend")
+    )
+    if (coef_sharing == "shared") {
+      par_lines <- c(par_lines, paste0(
+        "vector<lower=-1,upper=1>[1] ", sampled, ";"
+      ))
+      tpar_decl_lines <- c(tpar_decl_lines, paste0(
+        "vector[N_lv_trend] ar", lag, "_trend;"
+      ))
+      tpar_assign_lines <- c(tpar_assign_lines, paste0(
+        "ar", lag, "_trend = rep_vector(",
+        sampled, "[1], N_lv_trend);"
+      ))
+      prior_str <- get_trend_parameter_prior(prior, sampled)
+      if (!nzchar(prior_str)) {
+        prior_str <- get_trend_parameter_prior(
+          prior, paste0("ar", lag, "_trend")
+        )
+      }
+      if (!nzchar(prior_str)) prior_str <- "normal(0, 0.5)"
+      prior_lines <- c(prior_lines, paste0(sampled, " ~ ", prior_str, ";"))
+    } else if (coef_sharing == "hierarchical") {
+      mu_name <- paste0("mu_ar", lag, "_trend")
+      sigma_name <- paste0("sigma_ar", lag, "_trend")
+      par_lines <- c(par_lines,
+        paste0("real<lower=-1,upper=1> ", mu_name, ";"),
+        paste0("real<lower=0> ", sigma_name, ";"),
+        paste0("vector<lower=-1,upper=1>[N_lv_trend] ar", lag, "_trend;")
+      )
+      mu_prior <- get_trend_parameter_prior(prior, mu_name)
+      if (!nzchar(mu_prior)) mu_prior <- "normal(0, 0.5)"
+      sigma_prior <- get_trend_parameter_prior(prior, sigma_name)
+      if (!nzchar(sigma_prior)) sigma_prior <- "exponential(2)"
+      prior_lines <- c(prior_lines,
+        paste0(mu_name, " ~ ", mu_prior, ";"),
+        paste0(sigma_name, " ~ ", sigma_prior, ";"),
+        paste0(
+          "ar", lag, "_trend ~ normal(", mu_name, ", ", sigma_name, ");"
+        )
+      )
+    } else {
+      par_lines <- c(par_lines, paste0(
+        "vector<lower=-1,upper=1>[N_lv_trend] ar", lag, "_trend;"
+      ))
+      prior_str <- get_trend_parameter_prior(prior, sampled)
+      if (!nzchar(prior_str)) prior_str <- "normal(0, 0.5)"
+      prior_lines <- c(prior_lines, paste0(sampled, " ~ ", prior_str, ";"))
+    }
+  }
+  parameters_sv <- brms::stanvar(
+    name = "ar_parameters",
+    scode = paste0(
+      "// AR coefficient parameters\n",
+      paste(par_lines, collapse = "\n")
+    ),
+    block = "parameters"
+  )
+  out <- list(parameters_sv)
+  if (length(tpar_decl_lines)) {
+    tpar_sv <- brms::stanvar(
+      name = "ar_sharing_tparameters",
+      scode = paste0(
+        "// Broadcast shared AR coefficients across series\n",
+        paste(tpar_decl_lines, collapse = "\n"), "\n",
+        paste(tpar_assign_lines, collapse = "\n")
+      ),
+      block = "tparameters"
+    )
+    out <- c(out, list(tpar_sv))
+  }
+  model_sv <- brms::stanvar(
+    name = "ar_model",
+    scode = paste0(
+      "// AR coefficient priors\n",
+      paste(prior_lines, collapse = "\n")
+    ),
+    block = "model"
+  )
+  c(out, list(model_sv))
+}
+
 #' AR Trend Generator
 #'
 #' @description
 #' Generates Stan code components for autoregressive trends with support for
 #' factor models, hierarchical correlations, and custom lag structures.
-#' Uses consistent non-centered parameterization and proper ar{lag}_trend
-#' parameter naming convention for seamless prior integration.
+#' Uses non-centred parameterisation and the `ar{lag}_trend` parameter
+#' naming convention for prior integration.
 #'
 #' @param trend_specs Trend specification for AR model containing parameters
 #'   like lags (AR order), n_lv (latent variables), gr (grouping), ma (moving average)
@@ -3994,20 +4142,18 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # STEP 3: Add hierarchical correlation support if applicable (BEFORE AR dynamics)
   components <- add_hierarchical_support(components, trend_specs, data_info, prior)
 
-  # 1. PARAMETERS block - AR trend-specific parameters
-  ar_param_declarations <- sapply(ar_lags, function(lag) {
-    glue::glue("vector<lower=-1,upper=1>[N_lv_trend] ar{lag}_trend;")
-  })
-
-  ar_parameters_stanvar <- brms::stanvar(
-    name = "ar_parameters",
-    scode = paste0(
-      "// AR coefficient parameters\n",
-      paste(ar_param_declarations, collapse = "\n")
-    ),
-    block = "parameters"
+  # 1/3. PARAMETERS, TPARAMETERS (decls), MODEL (priors) for AR
+  # coefficients. Branch on `coef_sharing`. The `"none"` path
+  # emits `ar{lag}_trend` directly in `parameters`; `"shared"`
+  # and `"hierarchical"` introduce derived `ar{lag}_trend`
+  # definitions in transformed parameters.
+  coef_sharing <- trend_specs$coef_sharing %||% "none"
+  ar_blocks <- build_ar_coef_stanvars(
+    ar_lags = ar_lags,
+    coef_sharing = coef_sharing,
+    prior = prior
   )
-  components <- append(components, list(ar_parameters_stanvar))
+  components <- append(components, ar_blocks)
 
   # Add MA parameters if needed
   if (has_ma) {
@@ -4055,22 +4201,17 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   )
   components <- append(components, list(ar_tparameters_stanvar))
 
-  # 3. MODEL block - AR priors (AR coefficients and possibly MA, but not sigma_trend)
-  # Build list of parameters that need priors
-  ar_params_to_prior <- paste0("ar", ar_lags, "_trend")
+  # 3. MODEL block - AR coefficient priors are now emitted by
+  # `build_ar_coef_stanvars()` above. Only the MA prior needs
+  # to be added here (sigma_trend priors are handled by the
+  # shared innovation system).
   if (has_ma) {
-    ar_params_to_prior <- c(ar_params_to_prior, "theta1_trend")
-  }
-  # Note: sigma_trend priors are handled by the shared innovation system
-  # The trend generator shouldn't duplicate them
-
-  if (length(ar_params_to_prior) > 0) {
-    ar_model_stanvar <- generate_trend_priors_stanvar(
-      param_names = ar_params_to_prior,
+    ma_model_stanvar <- generate_trend_priors_stanvar(
+      param_names = "theta1_trend",
       prior = prior,
-      stanvar_name = "ar_model"
+      stanvar_name = "ar_ma_model"
     )
-    components <- append_if_not_null(components, ar_model_stanvar)
+    components <- append_if_not_null(components, ma_model_stanvar)
   }
 
   # 4. Add trend computation (maps lv_trend through Z if needed)
@@ -4940,7 +5081,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 #' Uses pmax(1e-3, dis_time) to prevent zero distances.
 #'
 #' @param data_info Data information containing data, time variable, and series
-#' @return Matrix of time distances [n, n_series]
+#' @return Matrix of time distances \[n, n_series\]
 #' @noRd
 calculate_car_time_distances <- function(data_info) {
   data <- data_info$data
@@ -6296,7 +6437,7 @@ should_include_in_transformed_parameters <- function(declaration) {
 #' @return Character vector of variable names this declaration depends on
 #' @examples
 #' \dontrun{
-#' # Example declaration: "vector[Nsubgp_1] gp_pred_1 = Xgp_1 * rgp_1;"
+#' # Example declaration: "vector\[Nsubgp_1\] gp_pred_1 = Xgp_1 * rgp_1;"
 #' # Returns: c("Nsubgp_1", "Xgp_1", "rgp_1")
 #' extract_dependencies_from_declaration(declaration)
 #' }
@@ -6454,8 +6595,8 @@ find_variable_declarations <- function(stancode, referenced_vars,
 #' @return Character vector of Stan code lines for mu_trend construction
 #' @examples
 #' \dontrun{
-#' mu_exprs <- c("mu += Intercept + gp_pred_1[Jgp_1];")
-#' support_decls <- c("vector[Nsubgp_1] gp_pred_1 = gp_exp_quad(Xgp_1, sdgp_1, lscale_1, zgp_1);")
+#' mu_exprs <- c("mu += Intercept + gp_pred_1\[Jgp_1\];")
+#' support_decls <- c("vector\[Nsubgp_1\] gp_pred_1 = gp_exp_quad(Xgp_1, sdgp_1, lscale_1, zgp_1);")
 #' var_map <- list("Intercept" = "Intercept_trend", "gp_pred_1" = "gp_pred_1_trend", "Jgp_1" = "Jgp_1_trend")
 #' reconstruct_mu_trend_with_renamed_vars(mu_exprs, support_decls, var_map)
 #' }
@@ -7268,7 +7409,7 @@ extract_stan_identifiers <- function(stan_code) {
 #' Extract computed variables from Stan assignment patterns
 #'
 #' Detects variables created through assignments in Stan code, such as:
-#' - Type declarations with assignments: vector[N] gp_pred_1 = gp_exp_quad(...)
+#' - Type declarations with assignments: vector\[N\] gp_pred_1 = gp_exp_quad(...)
 #' - Direct assignments: variable_name = expression
 #'
 #' @param stan_code Character string containing Stan code
