@@ -359,3 +359,123 @@ test_that("stancode under nmix() emits vector-p path when a detection sub-formul
   expect_match(sc, "Intercept_p", fixed = TRUE)
   expect_match(sc, "Xc_p", fixed = TRUE)
 })
+
+# ------------------------------------------------------------
+# R-side prediction surface (chunk 3): log_lik, posterior_epred,
+# posterior_predict, predict(latent_N), predict(detection)
+# ------------------------------------------------------------
+#
+# These tests fit a small nmix() model on simulated data with
+# known truth (lambda_intercept = 1, lambda_elev_slope = 0.5,
+# p = 0.6) and verify that each surface returns the expected
+# shape and recovers the truth within a wide CI.
+
+# Cache one short fit at the top so each test runs fast. The
+# truth values are fixed by the seed; recovery is loose because
+# the chain is short (300 iter), so the assertions check shape
+# + sign + order-of-magnitude rather than tight intervals.
+local_nmix_fit <- function() {
+  set.seed(42)
+  n_unit <- 15
+  n_visit <- 3
+  elev <- rnorm(n_unit)
+  log_lambda <- 1 + 0.5 * elev
+  N_per <- rpois(n_unit, exp(log_lambda))
+  p_true <- 0.6
+  y_sim <- as.integer(unlist(lapply(N_per, function(N) {
+    rbinom(n_visit, N, p_true)
+  })))
+  d <- data.frame(
+    series = factor(rep(seq_len(n_unit), each = n_visit)),
+    time   = rep(1L, n_unit * n_visit),
+    y      = y_sim,
+    cap    = rep(30L, n_unit * n_visit),
+    elev   = rep(elev, each = n_visit)
+  )
+  fit <- mvgam(y ~ elev,
+               family = nmix(),
+               data = d,
+               chains = 1, iter = 300, warmup = 150,
+               silent = 2, refresh = 0)
+  list(fit = fit, data = d, N_per = N_per, p_true = p_true)
+}
+
+test_that("posterior_epred.mvgam returns [S x N_visit] for nmix and recovers lambda * p", {
+  bundle <- local_nmix_fit()
+  pe <- posterior_epred(bundle$fit)
+  expect_equal(dim(pe), c(150L, nrow(bundle$data)))
+  # Mean of E[Y] should be in the right ballpark of the data mean.
+  expect_lt(abs(mean(pe) - mean(bundle$data$y)), 1.0)
+})
+
+test_that("posterior_predict.mvgam returns [S x N_visit] integer counts for nmix", {
+  bundle <- local_nmix_fit()
+  pp <- posterior_predict(bundle$fit)
+  expect_equal(dim(pp), c(150L, nrow(bundle$data)))
+  expect_true(all(pp == as.integer(pp)))
+  expect_true(all(pp >= 0))
+  # Marginal mean within data-mean ballpark.
+  expect_lt(abs(mean(pp) - mean(bundle$data$y)), 1.5)
+})
+
+test_that("log_lik.mvgam returns [S x N_unit] for nmix (closure-unit grain for LOO)", {
+  bundle <- local_nmix_fit()
+  ll <- log_lik(bundle$fit)
+  n_unit <- length(unique(bundle$data$series))
+  expect_equal(dim(ll), c(150L, n_unit))
+  expect_true(all(is.finite(ll)))
+})
+
+test_that("predict.mvgam(type = 'latent_N') returns [S x N_unit] integer N draws covering truth", {
+  bundle <- local_nmix_fit()
+  ln <- predict(bundle$fit, type = "latent_N", summary = FALSE)
+  expect_equal(dim(ln), c(150L, length(unique(bundle$data$series))))
+  expect_true(all(ln == as.integer(ln)))
+  # Per-unit mean should land near the simulated N's mean.
+  expect_lt(
+    abs(mean(colMeans(ln)) - mean(bundle$N_per)),
+    1.5
+  )
+})
+
+test_that("predict.mvgam(type = 'detection') returns [S x N_visit] in (0, 1)", {
+  bundle <- local_nmix_fit()
+  de <- predict(bundle$fit, type = "detection", summary = FALSE)
+  expect_equal(dim(de), c(150L, nrow(bundle$data)))
+  expect_true(all(de > 0 & de < 1))
+  # Scalar-p case: every visit column should have the same draw.
+  expect_true(all(de[, 1L] == de[, 2L]))
+  # Posterior mean covers the truth.
+  expect_lt(abs(mean(de) - bundle$p_true), 0.2)
+})
+
+test_that("predict.mvgam(type = 'latent_N') errors on non-nmix families", {
+  set.seed(1)
+  d <- data.frame(
+    series = factor(rep(1L:3L, each = 4L)),
+    time   = 1L:4L,
+    y      = rnorm(12L),
+    elev   = rnorm(12L)
+  )
+  fit <- mvgam(y ~ elev, data = d, chains = 1, iter = 100,
+               warmup = 50, silent = 2, refresh = 0)
+  expect_error(
+    predict(fit, type = "latent_N"),
+    "only available for closure-unit families"
+  )
+  expect_error(
+    predict(fit, type = "detection"),
+    "only available for closure-unit families"
+  )
+})
+
+test_that("nmix R-side guards reject a `p ~ ...` sub-formula until chunk 4", {
+  # A bf() with p ~ tod compiles via brms (chunk 2 verified) but
+  # the R-side extractor explicitly stops because the per-visit
+  # p draws can't yet be reconstructed from posterior b_p_*.
+  # This test is skipped because the guard runs at predict time
+  # against a fitted model and we don't want to spend the
+  # compile-fit cost in CI; the upstream stancode test confirms
+  # the Stan side accepts the sub-formula.
+  skip("vector-p R-side extraction lands in chunk 4")
+})

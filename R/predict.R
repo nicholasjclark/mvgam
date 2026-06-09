@@ -159,15 +159,40 @@ predict.mvgam <- function(object,
     any.missing = FALSE
   )
 
-  # N-mixture-only types: error clearly because n-mixture isn't yet
-  # ported on this branch.
+  # N-mixture-only types: dispatch via the closure-unit
+  # extractors in families.R. Both types require an nmix()-family
+  # fit; reject early for any other family.
   if (type %in% c("latent_N", "detection")) {
-    stop(insight::format_error(c(
-      paste0("type = '", type,
-             "' is only available for N-mixture models."),
-      x = "N-mixture observation models are not yet ported on this branch.",
-      i = "Use type = 'response' / 'expected' / 'link' for supported families."
-    )))
+    if (!is_closure_unit_family(object$family)) {
+      stop(insight::format_error(c(
+        paste0("type = '", type,
+               "' is only available for closure-unit families."),
+        x = paste0(
+          "Family '", resolve_family_name(object$family),
+          "' has no latent abundance or detection layer."
+        ),
+        i = paste0(
+          "Refit with family = nmix() to enable type = '",
+          type, "'."
+        )
+      )))
+    }
+    if (identical(type, "latent_N")) {
+      pred <- posterior_latent_N(
+        object,
+        newdata     = newdata,
+        draw_ids    = draw_ids,
+        conditional = TRUE
+      )
+    } else {
+      pred <- posterior_detection(
+        object,
+        newdata  = newdata,
+        draw_ids = draw_ids
+      )
+    }
+    if (!summary) return(pred)
+    return(summarize_predictions(pred, probs = probs, robust = robust))
   }
 
   # Per-term decomposition: defer with a clear migration pointer.

@@ -1171,7 +1171,8 @@ get_family_dpars <- function(family_name) {
     hurdle_cumulative = c("hu", "disc"),
 
     # Custom mvgam families
-    tweedie = c("mphi", "mtheta")
+    tweedie = c("mphi", "mtheta"),
+    nmix    = c("p")
   )
 
   dpar_map[[family_name]] %||% character(0)
@@ -1504,6 +1505,17 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
     newdata <- object$data
   }
 
+  # Closure-unit families (nmix) intercept upstream because the
+  # per-visit sampling step needs joint-over-unit latent N draws
+  # plus the rebuilt closure-unit arrays from the current
+  # newdata; the generic linpred + sample_from_family path
+  # cannot produce that without the unit-level structure.
+  if (is_closure_unit_family(object$family)) {
+    return(posterior_predict_nmix(
+      object, newdata = newdata, draw_ids = draw_ids
+    ))
+  }
+
   # Get ALL draws from linpred (returns list for multivariate without resp).
   # Using linpred + inverse link (not posterior_epred) because for ZI/hurdle
   # families, posterior_epred returns E[Y]=(1-zi)*mu, but sampling requires
@@ -1677,6 +1689,16 @@ predict_single_response <- function(object, linpred_resp, resp, draw_ids,
     family <- object$family
   } else {
     family <- get_family_for_resp(object, resp)
+  }
+
+  # Closure-unit families need joint-over-unit sampling: draw
+  # latent N per closure unit, then draw each visit's count
+  # binomial(N, p). Intercept upstream so the generic per-row
+  # sample_from_family dispatch never sees nmix.
+  if (is_closure_unit_family(family)) {
+    return(posterior_predict_nmix(
+      object, newdata = newdata, draw_ids = draw_ids
+    ))
   }
 
   mu <- family$linkinv(linpred)

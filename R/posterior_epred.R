@@ -172,12 +172,18 @@ compute_family_epred <- function(linpred, family,
       exp(linpred + sigma^2 / 2)
     },
 
-    # Unsupported families
-    "nmix" = stop(insight::format_error(
-      cli::format_inline(
-        "Family {.val nmix} is not yet supported for {.fn posterior_epred}. N-mixture models require specialized expected value computation."
+    # nmix() is intercepted upstream in posterior_epred.mvgam();
+    # this branch is defensive (e.g. callers that reach
+    # compute_family_epred directly).
+    "nmix" = stop(insight::format_error(c(
+      "Family 'nmix' must be routed through posterior_epred.mvgam().",
+      i = paste0(
+        "compute_family_epred() is the generic dispatch; nmix's ",
+        "lambda * p computation needs the per-fit `p` draws and ",
+        "closure-unit arrays, which posterior_epred.mvgam ",
+        "supplies via posterior_epred_nmix()."
       )
-    )),
+    ))),
 
     # Tweedie (compound Poisson-gamma): E[Y | mu, phi, theta] = mu
     # for all theta in [1, 2], including the boundary cases (scaled
@@ -509,6 +515,17 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
     newdata <- object$data
   }
 
+  # Closure-unit families (nmix) intercept BEFORE
+  # get_combined_linpred + has_stochastic_trend, because the
+  # nmix extractor manages its own linpred / dpar extraction and
+  # because the no-trend nmix path otherwise triggers a generic
+  # trend-metadata fallback that is irrelevant here.
+  if (is_closure_unit_family(object$family)) {
+    return(posterior_epred_nmix(
+      object, newdata = newdata, draw_ids = draw_ids
+    ))
+  }
+
   # Get linear predictor (handles obs+trend combination)
   linpred <- get_combined_linpred(
     mvgam_fit = object,
@@ -573,6 +590,14 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
         )
       ))
     }
+  } else if (is_closure_unit_family(family)) {
+    # nmix() and future closure-unit families use a dedicated
+    # extractor that pulls lambda + p draws and applies the
+    # response-scale combination (E[Y] = lambda * p for nmix).
+    # The unit / visit grain is handled inside.
+    return(posterior_epred_nmix(
+      object, newdata = newdata, draw_ids = draw_ids
+    ))
   } else if (is_ordinal_family(family)) {
     # Univariate ordinal or multivariate with resp specified
     ndraws_actual <- nrow(linpred)

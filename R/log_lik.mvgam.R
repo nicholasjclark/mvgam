@@ -127,6 +127,34 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
   # Observed response on the data scale
   y <- extract_response_for_log_lik(object, newdata, resp)
 
+  # Closure-unit families (nmix and successors) return at the
+  # closure-unit grain rather than the visit grain. The Stan
+  # lpdf marginalises latent N analytically across all visits
+  # within a unit, so the unit is the conditionally iid block
+  # that loo/waic must score (Vehtari, Gelman, Gabry 2017).
+  # Closure-unit data prep is re-run from the (possibly new)
+  # data here so cap edits at predict time take effect.
+  if (is_closure_unit_family(family_obj)) {
+    arrays <- build_closure_unit_arrays(
+      newdata, response_var = nmix_response_var(object$formula)
+    )
+    p_mat <- extract_dpars_from_stanfit(
+      stanfit    = object$fit,
+      dpar_names = "p",
+      ndraws     = nrow(linpred),
+      nobs       = ncol(linpred),
+      draw_ids   = draw_ids
+    )$p
+    family_pars_nmix <- list(closure_arrays = arrays, p = p_mat)
+    return(log_lik_nmix(
+      linpred     = linpred,
+      link        = family_link,
+      y           = y,
+      family_pars = family_pars_nmix,
+      trials      = NULL
+    ))
+  }
+
   # Distributional parameters (sigma, shape, hu, zi, ...) as [ndraws x nobs].
   # Multivariate fits store dpars as `<dpar>_<resp>` in the posterior;
   # extract under that name then rename back to the bare key so the

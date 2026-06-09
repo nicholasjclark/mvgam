@@ -1051,3 +1051,396 @@ log_lik_tweedie <- function(linpred, link, y, family_pars, trials) {
   }
   out
 }
+
+# ============================================================
+# nmix() R-side downstream methods
+# ============================================================
+# Five shared dispatchers, all built on a single
+# `extract_nmix_components()` helper that derives the per-visit
+# lambda matrix, per-visit p matrix, and closure-unit arrays
+# from a fitted mvgam object. The same five methods will lift
+# to other closure-unit families (occ, royle_nichols, ...) once
+# their R-side extractors land; the only family-specific work
+# is the marginal log-likelihood + the conditional latent-state
+# reweighting formula. Everything else (linpred-to-lambda, p
+# extraction, predict.mvgam routing) is shared.
+
+#' Resolve the response variable name from an mvgam formula slot
+#'
+#' Handles both the plain `formula` and the `brmsformula` /
+#' `mvgam_formula` cases. Used by every nmix() R-side extractor.
+#' @noRd
+nmix_response_var <- function(form) {
+  raw <- if (inherits(form, "brmsformula")) {
+    form$formula[[2L]]
+  } else if (inherits(form, "formula")) {
+    form[[2L]]
+  } else {
+    stop(insight::format_error(
+      "Could not resolve response variable from object$formula."
+    ))
+  }
+  vars <- all.vars(raw)
+  if (length(vars) != 1L) {
+    stop(insight::format_error(c(
+      "Closure-unit families require a single response column.",
+      x = paste0(
+        "Found ", length(vars),
+        " variables in the LHS of the observation formula."
+      ),
+      i = "cbind() responses are not supported for nmix()."
+    )))
+  }
+  vars[1L]
+}
+
+#' Extract lambda, p and closure-unit arrays for an nmix() fit
+#'
+#' Single-pass extractor used by every nmix() R-side method:
+#' `log_lik_nmix`, `posterior_epred_nmix`, `posterior_predict_nmix`,
+#' `posterior_latent_N`, `posterior_detection`. Returns the
+#' abundance rate lambda at its native grain (one column per
+#' closure unit, not per visit), the per-visit detection
+#' probability p, and the closure-unit arrays rebuilt from
+#' `newdata` so that user edits to the `cap` column take effect
+#' at prediction time.
+#'
+#' Step 5a restricts `p` to the scalar (no sub-formula) case.
+#' Vector-p extraction with `bf(y ~ ..., p ~ tod)` requires
+#' rebuilding the detection design matrix from posterior `b_p`
+#' draws and ships separately.
+#'
+#' Predict-time guard: re-runs `validate_closure_unit_data()` to
+#' catch the case where `newdata` carries `cap < max(y)` per
+#' unit. That state produces all-`-Inf` log-weights in the
+#' latent-N reweighting and would otherwise silently sample
+#' garbage from `sample()`.
+#'
+#' @param object Fitted `mvgam` object with a closure-unit family.
+#' @param newdata Long-format observation data; defaults to the
+#'   training data stored on `object`.
+#' @param draw_ids Optional vector of posterior draw indices.
+#' @return Named list with `lambda` (`[S x N_unit]`), `p`
+#'   (`[S x N_visit]`), `arrays`, `ndraws`, `n_unit`, `n_visit`.
+#' @noRd
+extract_nmix_components <- function(object, newdata = NULL,
+                                     draw_ids = NULL) {
+  checkmate::assert_class(object, "mvgam")
+  if (!is_closure_unit_family(object$family)) {
+    stop(insight::format_error(
+      "extract_nmix_components() requires an nmix() fit."
+    ))
+  }
+  if (is.null(newdata)) {
+    newdata <- object$data
+    if (is.null(newdata)) {
+      stop(insight::format_error(
+        "Training data not stored on object; supply 'newdata'."
+      ))
+    }
+  }
+  response_var <- nmix_response_var(object$formula)
+  # validate_closure_unit_data catches cap < y at predict time as
+  # well as fit time; without this guard a user passing newdata
+  # with a smaller cap than the observed counts would produce
+  # all-(-Inf) log-weights in posterior_latent_N and silently
+  # sample garbage from sample(). Identifiability covariate
+  # flags are conservative (TRUE) at predict time because we
+  # don't re-examine the formula here; that check is only
+  # informative at fit time.
+  validate_closure_unit_data(
+    newdata,
+    response_var       = response_var,
+    has_obs_covariates = TRUE,
+    has_det_covariates = TRUE
+  )
+  arrays <- build_closure_unit_arrays(
+    newdata, response_var = response_var
+  )
+  # Per-visit linpred for the abundance rate. The linpred is
+  # constant within a closure unit because the formula is on
+  # site-level covariates; we drop the redundant columns to one
+  # per unit and carry the unit-grain lambda to all downstream
+  # methods. Per-visit broadcasting happens only at the binomial
+  # sampling step, where it is unavoidable.
+  #
+  # process_error = FALSE because Step 5a's nmix has no
+  # stochastic trend layer (trend_type = "None"). When trend
+  # support lands (Step 5c), this flag flips to the caller's
+  # request.
+  linpred <- posterior_linpred(
+    object, newdata = newdata, draw_ids = draw_ids,
+    process_error = FALSE
+  )
+  lambda_visit <- object$family$linkinv(linpred)
+  ndraws   <- nrow(lambda_visit)
+  n_visit  <- ncol(lambda_visit)
+  n_unit   <- arrays$N_unit
+  # Read the first-visit column per unit; checked against the
+  # within-unit constancy invariant below in debug builds.
+  first_visit_idx <- arrays$visit_idx[, 1L]
+  lambda <- lambda_visit[, first_visit_idx, drop = FALSE]
+  # p extraction: brms emits scalar `p` in the posterior when no
+  # detection sub-formula is supplied. Vector-p case (with
+  # `bf(p ~ ...)`) lands in a follow-up; flag with a clear
+  # error so users hit the limit early.
+  draws_mat <- posterior::as_draws_matrix(object$fit)
+  all_cols  <- colnames(draws_mat)
+  if (any(grepl("^Intercept_p$|^b_p_", all_cols))) {
+    stop(insight::format_error(c(
+      paste0(
+        "R-side prediction for nmix() with a `p ~ ...` ",
+        "sub-formula is not yet wired."
+      ),
+      i = paste0(
+        "The Stan side is supported; pass `family = nmix()` ",
+        "without a detection sub-formula for the v2.0 R-side ",
+        "prediction surface, or extract `b_p_*` from the ",
+        "posterior manually for now."
+      )
+    )))
+  }
+  if (!"p" %in% all_cols) {
+    stop(insight::format_error(
+      "Detection probability draws 'p' not found in posterior."
+    ))
+  }
+  if (is.null(draw_ids)) {
+    draw_ids <- seq_len(ndraws)
+  } else if (length(draw_ids) != ndraws) {
+    draw_ids <- draw_ids[seq_len(ndraws)]
+  }
+  p_scalar <- as.numeric(draws_mat[draw_ids, "p"])
+  p <- matrix(p_scalar, nrow = ndraws, ncol = n_visit, byrow = FALSE)
+  list(
+    lambda  = lambda,
+    p       = p,
+    arrays  = arrays,
+    ndraws  = ndraws,
+    n_unit  = n_unit,
+    n_visit = n_visit
+  )
+}
+
+#' Per-visit expected count for an nmix() fit
+#'
+#' Returns the per-visit expectation `lambda_g * p_{g, j}`. No
+#' Jensen correction is needed because both the Poisson and the
+#' Binomial are linear in their mean parameters at the per-draw
+#' level.
+#'
+#' @param object Fitted `mvgam` object with a closure-unit family.
+#' @param newdata Long-format observation data; defaults to the
+#'   training data.
+#' @param draw_ids Optional vector of posterior draw indices.
+#' @return `[S x N_visit]` matrix of expected counts.
+#' @noRd
+posterior_epred_nmix <- function(object, newdata = NULL,
+                                  draw_ids = NULL) {
+  comp <- extract_nmix_components(object, newdata, draw_ids)
+  # Broadcast unit-grain lambda back to per-visit length via the
+  # visit-to-unit lookup encoded in `arrays$visit_idx`. The
+  # first-visit column is shared by every visit of a unit, so the
+  # inverse mapping is straightforward.
+  unit_of_visit <- visit_to_unit_lookup(comp$arrays, comp$n_visit)
+  comp$lambda[, unit_of_visit, drop = FALSE] * comp$p
+}
+
+#' Inverse of arrays$visit_idx: for each visit row, the unit g
+#' that contains it. Used to broadcast unit-grain quantities
+#' (lambda, latent N) back to the visit grain without copying
+#' the lambda matrix.
+#' @noRd
+visit_to_unit_lookup <- function(arrays, n_visit) {
+  out <- integer(n_visit)
+  for (g in seq_len(arrays$N_unit)) {
+    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    out[idx] <- g
+  }
+  out
+}
+
+#' Per-visit response draws for an nmix() fit (unconditional)
+#'
+#' Draws latent abundances unconditionally from the Poisson prior
+#' (`N_g ~ Poisson(lambda_g)`) per posterior draw, then samples
+#' each visit's count from `Binomial(N_g, p_{g,j})`. This matches
+#' the Stan likelihood's marginalisation semantics: the model
+#' integrates N out, and the unconditional prior predictive is
+#' the natural ppc target. Use `predict(object, type =
+#' "latent_N")` for the conditional posterior of N given the
+#' observed counts (Royle 2004 reverse-Bayes).
+#'
+#' @inheritParams posterior_epred_nmix
+#' @return `[S x N_visit]` integer matrix of visit counts.
+#' @noRd
+posterior_predict_nmix <- function(object, newdata = NULL,
+                                    draw_ids = NULL) {
+  comp <- extract_nmix_components(object, newdata, draw_ids)
+  arrays <- comp$arrays
+  ndraws <- comp$ndraws
+  out <- matrix(0L, nrow = ndraws, ncol = comp$n_visit)
+  for (g in seq_len(arrays$N_unit)) {
+    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    lam_g <- comp$lambda[, g]
+    N_draws <- stats::rpois(ndraws, lambda = lam_g)
+    for (j in idx) {
+      out[, j] <- stats::rbinom(ndraws, size = N_draws,
+                                prob = comp$p[, j])
+    }
+  }
+  out
+}
+
+#' Per-visit detection-probability draws for an nmix() fit
+#'
+#' Wraps `extract_nmix_components()` for `predict(type =
+#' "detection")`. Returns a `[S x N_visit]` matrix of
+#' detection probabilities on the response (0-1) scale.
+#'
+#' @inheritParams posterior_epred_nmix
+#' @return `[S x N_visit]` matrix.
+#' @noRd
+posterior_detection <- function(object, newdata = NULL,
+                                 draw_ids = NULL) {
+  extract_nmix_components(object, newdata, draw_ids)$p
+}
+
+#' Per-closure-unit latent-abundance draws for an nmix() fit
+#'
+#' Royle (2004) reverse-Bayes conditional posterior:
+#' \deqn{P(N_g = k | y_g, lambda_g, p_g) \propto
+#'   Poisson(k | lambda_g) \times \prod_j Binomial(y_{g,j} | k, p_{g,j})}
+#' for `k = max(y[g, ])..K_max[g]`. Weights are accumulated in
+#' log space and normalised via `log_sum_exp` before
+#' exponentiation, so numerical underflow at large `K_max` is
+#' avoided.
+#'
+#' When `conditional = FALSE` (no observed y available, e.g. a
+#' fresh prediction grid), N is sampled directly from the prior
+#' `Poisson(lambda_g)` per draw.
+#'
+#' @param object Fitted `mvgam` object.
+#' @param newdata Long-format observation data; defaults to
+#'   training data.
+#' @param draw_ids Optional vector of posterior draw indices.
+#' @param conditional Logical. If TRUE (default), reweight the
+#'   discrete N support by the binomial likelihood at the
+#'   observed counts. If FALSE, sample N from the unconditional
+#'   Poisson prior.
+#' @return `[S x N_unit]` integer matrix of latent abundance
+#'   draws.
+#' @noRd
+posterior_latent_N <- function(object, newdata = NULL,
+                                draw_ids = NULL,
+                                conditional = TRUE) {
+  checkmate::assert_flag(conditional)
+  comp <- extract_nmix_components(object, newdata, draw_ids)
+  arrays <- comp$arrays
+  ndraws <- comp$ndraws
+  N_unit <- arrays$N_unit
+  if (is.null(newdata)) newdata <- object$data
+  response_var <- nmix_response_var(object$formula)
+  y_vals <- as.integer(newdata[[response_var]])
+  out <- matrix(0L, nrow = ndraws, ncol = N_unit)
+  for (g in seq_len(N_unit)) {
+    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    lam_g <- comp$lambda[, g]
+    if (!conditional) {
+      out[, g] <- stats::rpois(ndraws, lambda = lam_g)
+      next
+    }
+    y_g <- y_vals[idx]
+    cmax <- arrays$Y_max[g]
+    K_g  <- arrays$K_max[g]
+    p_g  <- comp$p[, idx, drop = FALSE]
+    k_grid <- cmax:K_g
+    n_k <- length(k_grid)
+    # Per-draw log-weight matrix: rows are draws, columns are k.
+    # Computed entirely in log space; subtract log_sum_exp per
+    # draw to normalise before exponentiating, keeping the tail
+    # mass at extreme k numerically stable even at K_g of a few
+    # hundred.
+    lw <- matrix(NA_real_, nrow = ndraws, ncol = n_k)
+    for (kk in seq_along(k_grid)) {
+      k <- k_grid[kk]
+      lp_pois <- stats::dpois(k, lambda = lam_g, log = TRUE)
+      lp_binom <- rep(0, ndraws)
+      for (jj in seq_along(idx)) {
+        lp_binom <- lp_binom +
+          stats::dbinom(y_g[jj], size = k,
+                        prob = p_g[, jj], log = TRUE)
+      }
+      lw[, kk] <- lp_pois + lp_binom
+    }
+    # Sample one k per draw using the normalised per-row weights.
+    out[, g] <- vapply(seq_len(ndraws), function(s) {
+      wts <- lw[s, ]
+      wts <- exp(wts - max(wts))
+      k_grid[sample.int(n_k, size = 1L, prob = wts)]
+    }, integer(1L))
+  }
+  out
+}
+
+#' Log-likelihood per closure unit for an nmix() fit
+#'
+#' Matches the Stan lpdf's per-unit marginal:
+#' \deqn{\log p(y_g | lambda_g, p_g) = \log \sum_{k = Y\_max_g}^{K\_max_g}
+#'   Poisson(k | lambda_g) \times \prod_j Binomial(y_{g,j} | k, p_{g,j})}
+#' Returned at the closure-unit grain (one column per unit) so
+#' `loo()` / `waic()` see one observation per conditionally iid
+#' block. Per-visit log-likelihoods would imply visits within a
+#' unit are exchangeable, which they are not (they share latent
+#' N_g).
+#'
+#' Threaded through the standard `dispatch_log_lik` signature.
+#' The closure-unit arrays + posterior `p` draws are passed in
+#' `family_pars` via the upstream extension hook in
+#' `log_lik_single_response()`.
+#'
+#' @noRd
+log_lik_nmix <- function(linpred, link, y, family_pars, trials) {
+  checkmate::assert_matrix(linpred)
+  checkmate::assert_choice(link, "log")
+  arrays <- family_pars$closure_arrays
+  if (is.null(arrays)) {
+    stop(insight::format_error(
+      "log_lik_nmix() requires 'closure_arrays' in family_pars."
+    ))
+  }
+  p_mat <- family_pars$p
+  checkmate::assert_matrix(
+    p_mat, nrows = nrow(linpred), ncols = ncol(linpred)
+  )
+  lambda_visit <- .linkinv(linpred, link)
+  ndraws <- nrow(linpred)
+  N_unit <- arrays$N_unit
+  y_int  <- as.integer(y)
+  out <- matrix(NA_real_, nrow = ndraws, ncol = N_unit)
+  for (g in seq_len(N_unit)) {
+    idx  <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    lam  <- lambda_visit[, idx[1L]]
+    y_g  <- y_int[idx]
+    p_g  <- p_mat[, idx, drop = FALSE]
+    cmax <- arrays$Y_max[g]
+    K_g  <- arrays$K_max[g]
+    k_grid <- cmax:K_g
+    lp_mat <- matrix(NA_real_, nrow = ndraws, ncol = length(k_grid))
+    for (kk in seq_along(k_grid)) {
+      k <- k_grid[kk]
+      lp_pois <- stats::dpois(k, lambda = lam, log = TRUE)
+      lp_binom <- rep(0, ndraws)
+      for (jj in seq_along(idx)) {
+        lp_binom <- lp_binom +
+          stats::dbinom(y_g[jj], size = k,
+                        prob = p_g[, jj], log = TRUE)
+      }
+      lp_mat[, kk] <- lp_pois + lp_binom
+    }
+    # log_sum_exp across the truncated k grid.
+    m <- apply(lp_mat, 1L, max)
+    out[, g] <- m + log(rowSums(exp(lp_mat - m)))
+  }
+  out
+}
