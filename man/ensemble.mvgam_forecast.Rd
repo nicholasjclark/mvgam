@@ -70,7 +70,7 @@ predictions.
 
 Per-model weights are split into integer draw counts
 that sum to \code{ndraws} using the largest-remainder rule
-(largest-remainder rule, after \code{\link[brms:round_largest_remainder]{brms::round_largest_remainder()}}),
+(largest-remainder rule, after \code{brms::round_largest_remainder()}),
 then that
 many rows are sampled (with replacement when a model has
 fewer draws than its assigned share) from each input's

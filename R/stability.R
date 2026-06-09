@@ -188,41 +188,17 @@ stability <- function(object, ...) {
 #'@method stability mvgam
 #'@export
 stability.mvgam = function(object, ...) {
-  # Check trend_model
-  trend_model <- attr(object$model_data, 'trend_model')
-  if (!trend_model %in% c('VAR', 'VARcor', 'VAR1', 'VAR1cor')) {
-    stop(
-      'Only VAR(1) models currently supported for calculating stability metrics',
-      call. = FALSE
-    )
-  }
-
-  # Take posterior draws of the interaction matrix
-  B_post <- mcmc_chains(object$model_output, 'A')
-
-  # Take posterior draws of Sigma
-  Sigma_post <- mcmc_chains(object$model_output, 'Sigma')
-
-  # Number of series in the VAR process
-  n_series <- object$n_lv
-
-  if (is.null(n_series)) {
-    n_series <- nlevels(object$obs_data$series)
-  }
+  assert_var_trend(object, surface = "stability()")
+  var_post <- extract_var_posterior(object)
 
   metrics <- do.call(
     rbind,
-    lapply(seq_len(NROW(B_post)), function(i) {
-      B <- matrix(B_post[i, ], nrow = n_series, ncol = n_series, byrow = TRUE)
-      p <- dim(B)[1]
+    lapply(seq_len(var_post$ndraws), function(i) {
+      B <- var_post$A[i, , , drop = TRUE]
+      p <- var_post$K
+      Sigma <- var_post$Sigma[i, , , drop = TRUE]
 
-      # If we want to get the variance of the stationary distribution (Sigma_inf)
-      Sigma <- matrix(
-        Sigma_post[i, ],
-        nrow = n_series,
-        ncol = n_series,
-        byrow = TRUE
-      )
+      # Variance of the stationary distribution (Sigma_inf)
       vecS_inf <- solve(diag(p * p) - kronecker(B, B)) %*% as.vector(Sigma)
       Sigma_inf <- matrix(vecS_inf, nrow = p)
 

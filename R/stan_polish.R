@@ -513,7 +513,7 @@ reorganize_lprior_statements <- function(lines) {
 #' them to the end of the if (!prior_only) block. It follows the same pattern
 #' as reorganize_lprior_statements() but operates on the model block.
 #'
-#' Target statements containing loop-dependent indexing (e.g., Y[n], mu[i]) are
+#' Target statements containing loop-dependent indexing (e.g., Y\[n\], mu\[i\]) are
 #' preserved in their original location to maintain loop variable scope. Only
 #' vectorized statements without element-wise indexing are reorganized.
 #'

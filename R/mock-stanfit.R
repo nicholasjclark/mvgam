@@ -11,7 +11,7 @@
 #' @details
 #' Implements brms dummy_y_values() logic using public family properties:
 #' 1. Integer families (type == "int"): Returns 1L
-#' 2. Positive continuous (ybounds[1] > 0): Returns 1
+#' 2. Positive continuous (ybounds\[1\] > 0): Returns 1
 #' 3. Unconstrained families: Returns 0
 #'
 #' This matches brms internal behavior without relying on unexported functions.
@@ -53,7 +53,7 @@ get_safe_dummy_value <- function(family_obj) {
 #' Extract Random Effects Parameter Mapping from brms Object
 #'
 #' Creates a mapping from design matrix names to parameter names using
-#'   brms ranef structure. Maps Z_1_1 style names to r_1[level,term]
+#'   brms ranef structure. Maps Z_1_1 style names to r_1\[level,term\]
 #'   style parameter patterns.
 #'
 #' @param brmsfit_object A fitted brms model
@@ -137,7 +137,7 @@ get_brms_re_mapping <- function(brmsfit_object) {
 #' # Extract observation parameters from combined fit
 #' full_draws <- posterior::as_draws_matrix(mvgam_fit$fit)
 #' obs_params <- c("b_Intercept", "b_temperature", "sigma")
-#' obs_draws <- full_draws[, obs_params]
+#' obs_draws <- full_draws\[, obs_params\]
 #'
 #' # Create mock stanfit
 #' mock_fit <- create_mock_stanfit(obs_draws)
@@ -471,7 +471,7 @@ prepare_predictions.mock_stanfit <- function(object,
 #' @param formula A brmsformula object with nonlinear specification
 #'   (nl = TRUE)
 #'
-#' @return List with $mu component (matrix [ndraws × nobs])
+#' @return List with $mu component (matrix \[ndraws × nobs\])
 #'
 #' @details
 #' Nonlinear formulas specify R expressions combining nonlinear

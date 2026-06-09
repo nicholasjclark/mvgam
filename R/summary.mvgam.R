@@ -17,7 +17,7 @@
 #' @param robust Logical; if \code{TRUE}, use median and MAD instead of mean
 #'   and SD as measures of central tendency and spread. Default is \code{FALSE}.
 #' @param include_states Logical; if \code{TRUE}, include latent state parameters
-#'   (\code{trend[i,s]}, \code{lv_trend[i,k]}) in summary. Default is \code{FALSE} as these
+#'   (\code{trend\[i,s\]}, \code{lv_trend\[i,k\]}) in summary. Default is \code{FALSE} as these
 #'   are typically too numerous for display.
 #' @param ... Additional arguments (currently unused).
 #'
@@ -378,7 +378,7 @@ match_random_pars <- function(pars) {
 #' @description
 #' Identifies family-specific parameters (sigma, shape, nu, phi, zi, hu)
 #' excluding trend model parameters and distributional parameters that have
-#' formulas (e.g., if sigma ~ x exists, exclude sigma[1]).
+#' formulas (e.g., if sigma ~ x exists, exclude sigma\[1\]).
 #'
 #' @param pars Character vector of all parameter names
 #' @param has_dpar_formulas Character vector of distributional parameter names
@@ -526,8 +526,8 @@ match_trend_specific_pars <- function(pars) {
 #'
 #' @description
 #' Identifies factor loading matrix parameters. Prefers
-#' `Z_tilde[i, j]` (QR-identified loadings emitted by free-Z
-#' factor models) when present and falls back to `Z[i, j]`
+#' `Z_tilde\[i, j\]` (QR-identified loadings emitted by free-Z
+#' factor models) when present and falls back to `Z\[i, j\]`
 #' for partial-Z fits where the user-supplied pattern is
 #' preserved without rotation. Pattern selection delegates to
 #' `factor_loading_param_pattern()`.
@@ -546,10 +546,10 @@ match_z_loadings <- function(pars) {
 #' @description
 #' Identifies the structured-prior parameters worth showing in
 #' `summary.mvgam()`: length-scales for the feature ARD kernel
-#' (`theta_features[k]`), length-scales for each supplied pairwise
+#' (`theta_features\[k\]`), length-scales for each supplied pairwise
 #' distance matrix (`theta_dist_<name>`), and the per-factor
-#' multiplicative-gamma-process column scale `Psi_diag[k]` when
-#' MGP shrinkage is enabled. The underlying `varrho_inv[k]`
+#' multiplicative-gamma-process column scale `Psi_diag\[k\]` when
+#' MGP shrinkage is enabled. The underlying `varrho_inv\[k\]`
 #' draws are intentionally hidden: they parameterise `Psi_diag`
 #' via a cumulative product and carry no direct interpretation
 #' on their own.
@@ -619,7 +619,7 @@ match_dpar_fixed_pars <- function(pars, dpar) {
 #'
 #' @description
 #' Identifies smooth terms for distributional parameters
-#' (e.g., s_sigma_x_1[1] for sigma ~ s(x)).
+#' (e.g., s_sigma_x_1\[1\] for sigma ~ s(x)).
 #'
 #' @param pars Character vector of parameter names
 #' @param dpar Distributional parameter name (e.g., "sigma", "phi")
@@ -651,11 +651,11 @@ match_dpar_smooth_pars <- function(pars, dpar) {
 #' @details
 #' Matches the following array-indexed parameters:
 #' \itemize{
-#'   \item{\code{trend[i,s]}}{Main state matrix for each series}
-#'   \item{\code{lv_trend[i,k]}}{Latent variable states}
-#'   \item{\code{innovations_trend[i,s]}}{Raw innovations}
-#'   \item{\code{mu_trend[i]}}{Trend formula linear predictor}
-#'   \item{\code{scaled_innovations_trend[i,s]}}{Scaled innovations}
+#'   \item{\code{trend\[i,s\]}}{Main state matrix for each series}
+#'   \item{\code{lv_trend\[i,k\]}}{Latent variable states}
+#'   \item{\code{innovations_trend\[i,s\]}}{Raw innovations}
+#'   \item{\code{mu_trend\[i\]}}{Trend formula linear predictor}
+#'   \item{\code{scaled_innovations_trend\[i,s\]}}{Scaled innovations}
 #' }
 #'
 #' @noRd

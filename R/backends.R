@@ -838,7 +838,7 @@ validate_silent <- function(silent) {
 
 #' Repair Variable Names for Stan Compatibility
 #' @description
-#' Converts variable names to proper Stan array syntax (e.g., b.1.1 to b[1,1]).
+#' Converts variable names to proper Stan array syntax (e.g., b.1.1 to b\[1,1\]).
 #' Adapted from brms backend system by Paul-Christian Bürkner.
 #' @param x Character vector of variable names to repair
 #' @return Character vector with corrected Stan array syntax

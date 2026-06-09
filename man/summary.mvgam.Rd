@@ -22,7 +22,7 @@ for credible intervals. Default is \code{c(0.025, 0.975)} for 95\% intervals.}
 and SD as measures of central tendency and spread. Default is \code{FALSE}.}
 
 \item{include_states}{Logical; if \code{TRUE}, include latent state parameters
-(\code{trend[i,s]}, \code{lv_trend[i,k]}) in summary. Default is \code{FALSE} as these
+(\code{trend\[i,s\]}, \code{lv_trend\[i,k\]}) in summary. Default is \code{FALSE} as these
 are typically too numerous for display.}
 
 \item{...}{Additional arguments (currently unused).}

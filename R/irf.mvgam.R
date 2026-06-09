@@ -78,41 +78,18 @@ irf.mvgam <- function(
   ...
 ) {
   validate_pos_integer(h)
-  trend_model <- attr(object$model_data, "trend_model")
-  if (!trend_model %in% c("VAR", "VARcor", "VAR1", "VAR1cor")) {
-    stop(
-      "Only VAR(1) models currently supported for calculating IRFs",
-      call. = FALSE
-    )
-  }
-  beta_vars <- mcmc_chains(object$model_output, "A")
-  sigmas <- mcmc_chains(object$model_output, "Sigma")
-  n_series <- object$n_lv
+  checkmate::assert_logical(cumulative, len = 1L)
+  checkmate::assert_logical(orthogonal, len = 1L)
+  assert_var_trend(object, surface = "irf()")
+  var_post <- extract_var_posterior(object)
 
-  if (is.null(n_series)) {
-    n_series <- nlevels(object$obs_data$series)
-  }
-
-  all_irfs <- lapply(seq_len(NROW(beta_vars)), function(draw) {
-    # Get necessary VAR parameters into a simple list format
+  all_irfs <- lapply(seq_len(var_post$ndraws), function(draw) {
     x <- list(
-      K = n_series,
-      A = matrix(
-        beta_vars[draw, ],
-        nrow = n_series,
-        ncol = n_series,
-        byrow = TRUE
-      ),
-      Sigma = matrix(
-        sigmas[draw, ],
-        nrow = n_series,
-        ncol = n_series,
-        byrow = TRUE
-      ),
-      p = 1
+      K = var_post$K,
+      A = var_post$A[draw, , , drop = TRUE],
+      Sigma = var_post$Sigma[draw, , , drop = TRUE],
+      p = 1L
     )
-
-    # Calculate the IRF
     gen_irf(x, h = h, cumulative = cumulative, orthogonal = orthogonal)
   })
   class(all_irfs) <- "mvgam_irf"
@@ -121,7 +98,7 @@ irf.mvgam <- function(
     "Orthogonalized",
     "Generalized"
   )
-  return(all_irfs)
+  all_irfs
 }
 
 #### Functions to compute Generalized Impulse Response functions
@@ -129,57 +106,53 @@ irf.mvgam <- function(
 # https://www.clintonwatkins.com/posts/2021-generalised-impulse-response-function-R/ ####
 
 #' Calculate impulse response functions
+#'
+#' Orthogonalised (Sims 1980 / Lutkepohl 2007 §2.3.2) and
+#' generalised (Pesaran-Shin 1998) impulse responses. Both share the
+#' MA representation of A but project it differently:
+#'
+#' * Orthogonalised: `Psi_k e_j = (Phi_k P) e_j` where `P` is the
+#'   lower Cholesky factor of `Sigma_u`. `var_psi(x, h)` returns
+#'   `Phi_k P` pre-multiplied, so applying `e_j` (a unit vector) is
+#'   a single column lookup; no further Cholesky-side multiplication.
+#' * Generalised: `sigma_jj^{-1/2} Phi_k Sigma_u e_j`. Uses the raw
+#'   MA reps (`var_phi`) and projects via the j-th column of
+#'   `Sigma_u` scaled by the inverse-root of `Sigma_u[j, j]`.
+#'
 #' @noRd
 gen_irf <- function(x, h = 6, cumulative = TRUE, orthogonal = FALSE) {
   impulse <- paste0("process_", 1:x$K)
-
-  # Create arrays to hold calculations
-  IRF_o <- array(
+  irf_array <- array(
     data = 0,
     dim = c(h, x$K, x$K),
     dimnames = list(NULL, impulse, impulse)
   )
-  IRF_g <- array(
-    data = 0,
-    dim = c(h, x$K, x$K),
-    dimnames = list(NULL, impulse, impulse)
-  )
-  IRF_g1 <- array(data = 0, dim = c(h, x$K, x$K))
 
-  # Estimation of orthogonalised or generalised IRFs
   if (orthogonal) {
-    var_ma <- var_psi(x, h)
-  } else {
-    var_ma <- var_phi(x, h)
-  }
-
-  sigma_u <- x$Sigma
-  P <- t(chol(sigma_u))
-  sig_jj <- diag(sigma_u)
-
-  for (jj in 1:x$K) {
-    indx_ <- matrix(0, x$K, 1)
-    indx_[jj, 1] <- 1
-
-    for (kk in 1:h) {
-      IRF_o[kk, , jj] <- var_ma[,, kk] %*% P %*% indx_ # Peseran-Shin eqn 7 (OIRF)
-      IRF_g1[kk, , jj] <- var_ma[,, kk] %*% sigma_u %*% indx_
-      IRF_g[kk, , jj] <- sig_jj[jj]^(-0.5) * IRF_g1[kk, , jj] # Peseran-Shin eqn 10 (GIRF)
+    # Psi_k = Phi_k * P; `var_psi` already absorbs P, so the OIRF
+    # for shock j is just the j-th column of Psi_k.
+    Psi <- var_psi(x, h)
+    for (jj in 1:x$K) {
+      for (kk in 1:h) {
+        irf_array[kk, , jj] <- Psi[, jj, kk]
+      }
     }
-  }
-
-  if (orthogonal == TRUE) {
-    irf <- IRF_o
-  } else if (orthogonal == FALSE) {
-    irf <- IRF_g
   } else {
-    stop("\nError! Orthogonalised or generalised IRF?\n")
+    Phi <- var_phi(x, h)
+    sigma_u <- x$Sigma
+    sig_jj <- diag(sigma_u)
+    for (jj in 1:x$K) {
+      scale_jj <- sig_jj[jj]^(-0.5)
+      for (kk in 1:h) {
+        irf_array[kk, , jj] <- scale_jj * (Phi[,, kk] %*% sigma_u[, jj])
+      }
+    }
   }
 
   idx <- length(impulse)
   irs <- list()
   for (ii in 1:idx) {
-    irs[[ii]] <- matrix(irf[1:(h), impulse, impulse[ii]], nrow = h)
+    irs[[ii]] <- matrix(irf_array[1:(h), impulse, impulse[ii]], nrow = h)
     colnames(irs[[ii]]) <- impulse
     if (cumulative) {
       if (length(impulse) > 1) {
@@ -193,7 +166,7 @@ gen_irf <- function(x, h = 6, cumulative = TRUE, orthogonal = FALSE) {
     }
   }
   names(irs) <- impulse
-  return(irs)
+  irs
 }
 
 #' Convert a VAR A matrix to its moving average representation

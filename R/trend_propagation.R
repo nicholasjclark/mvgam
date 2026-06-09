@@ -12,8 +12,8 @@
 #' Propagate an `mvgam` trend forward in time
 #'
 #' Dispatches on the supplied `mvgam_trend` constructor to the
-#' appropriate C++ kernel ([`trend_arma_recursC()`] for
-#' AR/RW/ARMA/VAR/VARMA, [`car1_recursC()`] for CAR(1)) or pure-R
+#' appropriate C++ kernel (`trend_arma_recursC()` for
+#' AR/RW/ARMA/VAR/VARMA, `car1_recursC()` for CAR(1)) or pure-R
 #' path (ZMVN, None). Draws innovations with the appropriate
 #' covariance structure, applies any burn-in needed when no
 #' explicit `last_state` is supplied, and returns the forward

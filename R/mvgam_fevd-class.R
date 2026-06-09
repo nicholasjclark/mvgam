@@ -60,9 +60,9 @@ NULL
 #'
 #' @export
 summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
-  if (length(probs) != 2L) {
-    stop("argument 'probs' must be a vector of length 2", call. = FALSE)
-  }
+  checkmate::assert_class(object, "mvgam_fevd")
+  checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1,
+                            any.missing = FALSE, sorted = TRUE)
   validate_proportional(min(probs))
   validate_proportional(max(probs))
 
@@ -75,10 +75,6 @@ summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
         dplyr::mutate(draw = draw)
     })
   ) %>%
-    dplyr::group_by(horizon, target, draw) %>%
-    dplyr::mutate(total_evd = sum(evd)) %>%
-    dplyr::ungroup() %>%
-    dplyr::mutate(evd = evd / total_evd) %>%
     dplyr::group_by(horizon, target, Series) %>%
     dplyr::mutate(
       fevdQ50 = median(evd),
@@ -121,6 +117,7 @@ summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
 #'
 #'@export
 plot.mvgam_fevd = function(x, ...) {
+  checkmate::assert_class(x, "mvgam_fevd")
   # Calculate posterior median error variance contributions
   ynames <- names(x[[1]])
   do.call(
@@ -132,28 +129,31 @@ plot.mvgam_fevd = function(x, ...) {
     dplyr::group_by(horizon, target, Series) %>%
     dplyr::summarise(mean_evd = median(evd)) %>%
     dplyr::ungroup() %>%
-    dplyr::group_by(horizon, target) %>%
-    dplyr::mutate(
-      total_evd = sum(mean_evd),
-      mean_evd = mean_evd / total_evd
-    ) %>%
-    dplyr::ungroup() %>%
     dplyr::mutate(
       Series = gsub('process', 'Process', Series),
       target = gsub('process', 'Process', target)
     ) -> mean_evds
 
-  # Plot as a ggplot object
+  # Use package-wide palette so FEVD bars share the visual identity
+  # of forecast / pp_check / factor plots. The palette returns 6
+  # colour stops; recycle if the VAR has more than 6 processes.
+  palette_cols <- mvgam_palette()
+  series_levels <- sort(unique(mean_evds$Series))
+  fill_values <- palette_cols[((seq_along(series_levels) - 1L) %%
+                               length(palette_cols)) + 1L]
+  names(fill_values) <- series_levels
+
   ggplot2::ggplot(
     mean_evds,
     ggplot2::aes(fill = Series, y = mean_evd, x = horizon)
   ) +
     ggplot2::geom_bar(position = "stack", stat = "identity") +
+    ggplot2::scale_fill_manual(values = fill_values) +
     ggplot2::facet_wrap(~target) +
-    ggplot2::theme_bw() +
+    mvgam_theme() +
     ggplot2::labs(
-      x = 'Forecast horizon',
-      y = 'Median contribution to forecast variance'
+      x = "Forecast horizon",
+      y = "Median contribution to forecast variance"
     )
 }
 

@@ -74,45 +74,20 @@ fevd <- function(object, ...) {
 #' @export
 fevd.mvgam <- function(object, h = 10, ...) {
   validate_pos_integer(h)
-  trend_model <- attr(object$model_data, "trend_model")
-  if (!trend_model %in% c("VAR", "VARcor", "VAR1", "VAR1cor")) {
-    stop(
-      "Only VAR(1) models currently supported for calculating FEVDs",
-      call. = FALSE
-    )
-  }
-  beta_vars <- mcmc_chains(object$model_output, "A")
-  sigmas <- mcmc_chains(object$model_output, "Sigma")
-  n_series <- object$n_lv
+  assert_var_trend(object, surface = "fevd()")
+  var_post <- extract_var_posterior(object)
 
-  if (is.null(n_series)) {
-    n_series <- nlevels(object$obs_data$series)
-  }
-
-  all_fevds <- lapply(seq_len(NROW(beta_vars)), function(draw) {
-    # Get necessary VAR parameters into a simple list format
+  all_fevds <- lapply(seq_len(var_post$ndraws), function(draw) {
     x <- list(
-      K = n_series,
-      A = matrix(
-        beta_vars[draw, ],
-        nrow = n_series,
-        ncol = n_series,
-        byrow = TRUE
-      ),
-      Sigma = matrix(
-        sigmas[draw, ],
-        nrow = n_series,
-        ncol = n_series,
-        byrow = TRUE
-      ),
-      p = 1
+      K = var_post$K,
+      A = var_post$A[draw, , , drop = TRUE],
+      Sigma = var_post$Sigma[draw, , , drop = TRUE],
+      p = 1L
     )
-
-    # Calculate the FEVD for this draw
     gen_fevd(x, h = h)
   })
   class(all_fevds) <- "mvgam_fevd"
-  return(all_fevds)
+  all_fevds
 }
 
 #### Functions to compute forecast error variance decompositions
@@ -153,16 +128,29 @@ gen_fevd <- function(x, h = 6, ...) {
 
 
 #' Forecast error covariance matrix
+#'
+#' Computes the cumulative h-step forecast error covariance for a
+#' VAR(1) as
+#' \deqn{\Sigma_y(h) = \sum_{k=0}^{h-1} \Phi_k \, \Sigma_u \, \Phi_k'}
+#' where \eqn{\Phi_0 = I} and \eqn{\Phi_k = A^k} are the MA
+#' coefficients returned by `var_phi` and \eqn{\Sigma_u} is the
+#' innovation covariance (`x$Sigma`). The diagonal of
+#' \eqn{\Sigma_y(h)} is the FEVD denominator used in `gen_fevd`;
+#' the matching numerator is built from `var_psi`, which absorbs
+#' the Cholesky factor of \eqn{\Sigma_u} into the MA representation
+#' so the two halves partition each response's variance.
+#'
 #' @noRd
 var_fecov <- function(x, h) {
   sigma_yh <- array(NA, dim = c(x$K, x$K, h))
   Phi <- var_phi(x, h = h)
-  sigma_yh[,, 1] <- Phi[,, 1] %*% t(Phi[,, 1])
+  Sigma_u <- x$Sigma
+  sigma_yh[,, 1] <- Phi[,, 1] %*% Sigma_u %*% t(Phi[,, 1])
   if (h > 1) {
     for (i in 2:h) {
       temp <- matrix(0, nrow = x$K, ncol = x$K)
       for (j in 2:i) {
-        temp <- temp + Phi[,, j] %*% t(Phi[,, j])
+        temp <- temp + Phi[,, j] %*% Sigma_u %*% t(Phi[,, j])
       }
       sigma_yh[,, i] <- temp + sigma_yh[,, 1]
     }
