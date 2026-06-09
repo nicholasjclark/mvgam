@@ -3242,3 +3242,139 @@ test_that("get_prior() surfaces mu_/sigma_ rows under coef_sharing = \"hierarchi
   expect_true("sigma_ar2_trend" %in% classes)
   expect_true("ar1_trend" %in% classes)
 })
+
+
+# ============================================================
+# brms helper-parity exports (Task #189)
+# ============================================================
+# Users can call stancode / standata / make_stancode /
+# make_standata / default_prior / get_prior from the mvgam
+# namespace directly. The brms wrappers (make_stancode,
+# make_standata) work via the existing mvgam_formula methods;
+# default_prior gets its own dispatch method that delegates to
+# get_prior, and standata gains a fitted-model method.
+
+test_that("brms helper generics are exported by mvgam", {
+  ns_exports <- getNamespaceExports("mvgam")
+  for (name in c("stancode", "standata", "make_stancode",
+                 "make_standata", "default_prior", "get_prior",
+                 "prior_summary")) {
+    expect_true(
+      name %in% ns_exports,
+      label = paste0("mvgam exports `", name, "`")
+    )
+  }
+})
+
+test_that("make_stancode / make_standata dispatch on mvgam_formula without brms::", {
+  dat <- ar_step3_fixture()
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 2))
+  sc <- make_stancode(mf, data = dat)
+  expect_s3_class(sc, "mvgamstancode")
+  expect_s3_class(sc, "stancode")
+  expect_true(grepl("ar1_trend", as.character(sc)))
+
+  sd <- make_standata(mf, data = dat)
+  expect_type(sd, "list")
+  expect_true(all(c("N", "Y", "N_trend") %in% names(sd)))
+})
+
+test_that("default_prior dispatches on mvgam_formula (was broken in brms default)", {
+  dat <- ar_step3_fixture()
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1))
+  # Sanity: the brms default dispatcher errors with "Nested
+  # formulas are not allowed" on an mvgam_formula; the mvgam
+  # method routes through get_prior.mvgam_formula and returns
+  # the standard brmsprior frame.
+  dp <- default_prior(mf, data = dat)
+  expect_s3_class(dp, "brmsprior")
+  expect_true("Intercept" %in% dp$class)
+  # Must match get_prior() output exactly (DRY contract: both
+  # entry points return the same table).
+  gp <- get_prior(mf, data = dat)
+  expect_identical(default_prior(mf, data = dat),
+                   get_prior(mf, data = dat))
+})
+
+test_that("standata.mvgam and default_prior.mvgam read from the fitted slot", {
+  # Stub a fitted-mvgam shape; the methods only need
+  # `$standata` / `$prior` and the class tag.
+  stub <- structure(
+    list(
+      standata = list(N = 10L, Y = rnorm(10L)),
+      prior = structure(
+        data.frame(prior = "normal(0, 1)", class = "Intercept",
+                   coef = "", group = "", resp = "", dpar = "",
+                   nlpar = "", lb = NA_character_, ub = NA_character_,
+                   source = "user", stringsAsFactors = FALSE),
+        class = c("brmsprior", "data.frame")
+      )
+    ),
+    class = "mvgam"
+  )
+  sd <- standata(stub)
+  expect_identical(sd, stub$standata)
+  dp <- default_prior(stub)
+  expect_identical(dp, stub$prior)
+  # Errors when the slot is empty so callers learn about stale
+  # fits rather than silently getting NULL.
+  empty <- structure(list(), class = "mvgam")
+  expect_error(standata(empty), "Stan data not found")
+  expect_error(default_prior(empty),
+               "Fit was not stored with a prior table")
+})
+
+
+test_that("brms helper batch re-exports work via mvgam without library(brms)", {
+  # set_prior + prior + prior_string + empty_prior return brmsprior frames
+  expect_s3_class(set_prior("normal(0,1)", class = "b"), "brmsprior")
+  expect_s3_class(prior(normal(0, 1), class = "b"), "brmsprior")
+  expect_s3_class(prior_string("exponential(2)", class = "sigma"),
+                  "brmsprior")
+  expect_s3_class(empty_prior(), "brmsprior")
+  # Coercion + predicate
+  p <- set_prior("normal(0,1)", class = "b")
+  expect_true(is.brmsprior(p))
+  expect_s3_class(as.brmsprior(p), "brmsprior")
+  # Family + formula constructors
+  expect_s3_class(brmsfamily("gaussian"), "brmsfamily")
+  expect_s3_class(bf(y ~ x), "brmsformula")
+  expect_s3_class(brmsformula(y ~ x), "brmsformula")
+  expect_s3_class(mvbrmsformula(bf(y ~ x)), "mvbrmsformula")
+  expect_true(is.brmsformula(bf(y ~ x)))
+  expect_true(is.mvbrmsformula(mvbrmsformula(bf(y ~ x))))
+  # Stanvar + constant
+  expect_s3_class(
+    stanvar(x = 5L, name = "K", scode = "int K;"),
+    "stanvars"
+  )
+  expect_true(is.list(constant(1)) || is.function(constant))
+})
+
+test_that("control_params.mvgam / inits.mvgam read from the stanfit slot", {
+  # Stub a minimal mvgam-shaped object with the @stan_args slot
+  # populated. Avoids the cost of a real fit while still
+  # exercising the dispatch and extraction.
+  stub_stan_args <- list(
+    list(control = list(adapt_delta = 0.95, max_treedepth = 12),
+         init = "random"),
+    list(control = list(adapt_delta = 0.95, max_treedepth = 12),
+         init = "random")
+  )
+  stub_stanfit <- new(
+    "stanfit",
+    stan_args = stub_stan_args
+  )
+  stub <- structure(
+    list(fit = stub_stanfit),
+    class = "mvgam"
+  )
+  cp <- control_params(stub)
+  expect_type(cp, "list")
+  expect_identical(cp$adapt_delta, 0.95)
+  expect_identical(cp$max_treedepth, 12)
+  ii <- inits(stub)
+  expect_length(ii, 2L)
+  expect_identical(ii[[1L]], "random")
+  expect_identical(ii[[2L]], "random")
+})

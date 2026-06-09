@@ -468,3 +468,255 @@ mvgam_response_name <- function(object) {
 mvgam_training_data <- function(object) {
   object$obs_data %||% object$data
 }
+
+
+# ============================================================
+# brms helper-parity re-exports + dispatch (Task #189)
+# ============================================================
+#
+# Re-export the brms generics so users can call them without
+# the `brms::` namespace prefix, and add the few mvgam-side
+# dispatch methods that brms's default dispatchers do not know
+# about. Each method here forwards to an existing mvgam helper:
+#
+#   default_prior.mvgam_formula -> get_prior.mvgam_formula
+#   default_prior.mvgam         -> get_prior.mvgam
+#   standata.mvgam              -> object$standata
+#
+# stancode.mvgam / stancode.mvgam_formula / standata.mvgam_formula
+# already exist; brms::make_stancode and brms::make_standata are
+# thin wrappers around stancode() / standata() so they dispatch
+# correctly via the existing methods with no extra code.
+
+#' @importFrom brms stancode
+#' @export stancode
+NULL
+
+#' @importFrom brms standata
+#' @export standata
+NULL
+
+#' @importFrom brms make_stancode
+#' @export make_stancode
+NULL
+
+#' @importFrom brms make_standata
+#' @export make_standata
+NULL
+
+#' @importFrom brms default_prior
+#' @export default_prior
+NULL
+
+#' Stan data for a fitted mvgam model
+#'
+#' Returns the Stan data list that was generated at fit time
+#' and stored on `object$standata`. Mirrors [stancode.mvgam()];
+#' useful for re-running the same model with `rstan` or
+#' `cmdstanr` directly, or for inspecting which design matrices
+#' brms produced from the formula and data.
+#'
+#' @param object A fitted `mvgam` model.
+#' @param ... Currently unused; present for S3 generic dispatch.
+#' @return A named list of Stan data.
+#' @method standata mvgam
+#' @export
+standata.mvgam <- function(object, ...) {
+  checkmate::assert_class(object, "mvgam")
+  if (is.null(object$standata)) {
+    stop(insight::format_error(c(
+      "Stan data not found in mvgam object.",
+      i = paste0(
+        "The model may have been fitted with an older version ",
+        "that did not store the Stan data list."
+      )
+    )))
+  }
+  object$standata
+}
+
+#' Default priors for an mvgam_formula
+#'
+#' Alias for [get_prior.mvgam_formula()] under the brms
+#' `default_prior()` generic. mvgam routes both names to the
+#' same prior-construction code, so this method exists purely
+#' so users coming from newer brms releases can call
+#' `default_prior(mf, data = ...)` interchangeably with
+#' `get_prior(mf, data = ...)`.
+#'
+#' @inheritParams get_prior.mvgam_formula
+#' @return A `brmsprior` data frame.
+#' @method default_prior mvgam_formula
+#' @export
+default_prior.mvgam_formula <- function(object, data,
+                                        family = gaussian(), ...) {
+  get_prior.mvgam_formula(
+    object, data = data, family = family, ...
+  )
+}
+
+#' Default priors for a fitted mvgam model
+#'
+#' Alias for [get_prior.mvgam()] under the brms
+#' `default_prior()` generic. Returns the literal prior table
+#' the model was fit with (`object$prior`).
+#'
+#' @param object A fitted `mvgam` model.
+#' @param ... Currently unused; present for S3 generic dispatch.
+#' @return A `brmsprior` data frame.
+#' @method default_prior mvgam
+#' @export
+default_prior.mvgam <- function(object, ...) {
+  get_prior.mvgam(object, ...)
+}
+
+
+# ============================================================
+# brms prior / family / formula / stanvar re-exports
+# ============================================================
+# Re-export the user-facing brms helpers that mvgam workflows
+# routinely reach for, so users do not need to type `brms::`
+# for the prior-writing, family-constructing, formula-wrapping
+# and stanvar-building APIs. All zero-code re-exports; the
+# generics live in brms and dispatch unchanged.
+
+#' @importFrom brms set_prior
+#' @export set_prior
+NULL
+
+#' @importFrom brms prior
+#' @export prior
+NULL
+
+#' @importFrom brms prior_
+#' @export prior_
+NULL
+
+#' @importFrom brms prior_string
+#' @export prior_string
+NULL
+
+#' @importFrom brms empty_prior
+#' @export empty_prior
+NULL
+
+#' @importFrom brms as.brmsprior
+#' @export as.brmsprior
+NULL
+
+#' @importFrom brms is.brmsprior
+#' @export is.brmsprior
+NULL
+
+#' @importFrom brms validate_prior
+#' @export validate_prior
+NULL
+
+#' @importFrom brms prior_draws
+#' @export prior_draws
+NULL
+
+#' @importFrom brms prior_samples
+#' @export prior_samples
+NULL
+
+#' @importFrom brms brmsfamily
+#' @export brmsfamily
+NULL
+
+#' @importFrom brms custom_family
+#' @export custom_family
+NULL
+
+#' @importFrom brms brmsformula
+#' @export brmsformula
+NULL
+
+#' @importFrom brms bf
+#' @export bf
+NULL
+
+#' @importFrom brms mvbrmsformula
+#' @export mvbrmsformula
+NULL
+
+#' @importFrom brms is.brmsformula
+#' @export is.brmsformula
+NULL
+
+#' @importFrom brms is.mvbrmsformula
+#' @export is.mvbrmsformula
+NULL
+
+#' @importFrom brms stanvar
+#' @export stanvar
+NULL
+
+#' @importFrom brms validate_newdata
+#' @export validate_newdata
+NULL
+
+#' @importFrom brms constant
+#' @export constant
+NULL
+
+#' @importFrom brms inits
+#' @export inits
+NULL
+
+#' @importFrom brms control_params
+#' @export control_params
+NULL
+
+#' Extract sampler control parameters from a fitted mvgam model
+#'
+#' Method on `brms::control_params()` for mvgam fits. Reads the
+#' NUTS control settings (adapt_delta, max_treedepth, stepsize,
+#' etc.) from the underlying stanfit's `@stan_args` slot. The
+#' brms default method only dispatches on `brmsfit`, so without
+#' this method `control_params(fit)` fails on an mvgam object.
+#'
+#' @param x A fitted `mvgam` model.
+#' @param ... Currently unused.
+#' @return Named list of NUTS control settings (same shape as
+#'   `brms::control_params()` on a `brmsfit`); empty list when
+#'   no NUTS args are stored (e.g. variational fits).
+#' @method control_params mvgam
+#' @export
+control_params.mvgam <- function(x, ...) {
+  checkmate::assert_class(x, "mvgam")
+  fit_obj <- x$fit
+  if (!isS4(fit_obj) ||
+        !"stan_args" %in% methods::slotNames(fit_obj)) {
+    return(list())
+  }
+  args <- fit_obj@stan_args
+  if (length(args) == 0L) return(list())
+  ctrl <- args[[1L]]$control
+  ctrl %||% list()
+}
+
+#' Extract initial values used in a fitted mvgam model
+#'
+#' Method on `brms::inits()` for mvgam fits. Reads the per-chain
+#' `init` argument from the underlying stanfit's `@stan_args`
+#' slot. The brms default method only dispatches on `brmsfit`,
+#' so without this method `inits(fit)` fails on an mvgam object.
+#'
+#' @param x A fitted `mvgam` model.
+#' @param ... Currently unused.
+#' @return List with one element per chain, mirroring the `init`
+#'   argument passed to the sampler.
+#' @method inits mvgam
+#' @export
+inits.mvgam <- function(x, ...) {
+  checkmate::assert_class(x, "mvgam")
+  fit_obj <- x$fit
+  if (!isS4(fit_obj) ||
+        !"stan_args" %in% methods::slotNames(fit_obj)) {
+    return(list())
+  }
+  args <- fit_obj@stan_args
+  if (length(args) == 0L) return(list())
+  lapply(args, function(a) a$init)
+}
