@@ -92,6 +92,40 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
     # Block multi-category families that require 3D linear predictors
     validate_supported_family(family)
   }
+  # Closure-unit families (nmix, future occ / royle_nichols /
+  # poisson_poisson) carry per-data Stan stanvars that are built
+  # at fit time from the user's observation data: unit indexing
+  # arrays, per-unit upper truncation (K_max), per-unit max obs
+  # (Y_max), and the family-specific lpdf function block. The
+  # arrays change with the data, so the resolution is deferred
+  # to here rather than baked into the family() constructor.
+  if (is_closure_unit_family(family)) {
+    # obs_formula may be either a plain `formula` or a brms
+    # `brmsformula` carrying dpar sub-formulas in `$pforms`.
+    if (inherits(obs_formula, "brmsformula")) {
+      main_formula <- obs_formula$formula
+      dpar_forms   <- obs_formula$pforms %||% list()
+    } else {
+      main_formula <- obs_formula
+      dpar_forms   <- list()
+    }
+    response_var <- as.character(main_formula[[2L]])
+    main_terms <- tryCatch(
+      stats::terms(main_formula), error = function(e) NULL
+    )
+    has_obs_covs <- if (is.null(main_terms)) FALSE else
+      length(attr(main_terms, "term.labels")) > 0L
+    has_det_covs <- "p" %in% names(dpar_forms) &&
+      length(attr(stats::terms(dpar_forms$p), "term.labels")) > 0L
+    family <- prepare_closure_unit_family(
+      family,
+      data               = data,
+      response_var       = response_var,
+      has_obs_covariates = has_obs_covs,
+      has_det_covariates = has_det_covs
+    )
+  }
+
   # Custom families (e.g. tweedie()) carry their own Stan function
   # block + data stanvars in attr(family, "mvgam_stanvars"). They
   # belong on the observation submodel only; the trend submodel

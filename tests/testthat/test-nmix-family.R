@@ -23,8 +23,11 @@ test_that("nmix() returns a customfamily with mu/p dpars and logit/log links", {
   expect_false(fam$loop)
   # brms wraps lb/ub into a named list of character vectors per
   # dpar (the strings become Stan-side bounds at codegen time).
-  expect_identical(fam$lb, list(mu = "0", p = NA_character_))
-  expect_identical(fam$ub, list(mu = NA_character_, p = NA_character_))
+  # Bounds on p keep the scalar-dpar case sampled in (0, 1) so
+  # the lpdf's logit(p) call stays valid even when there's no
+  # sub-formula for detection.
+  expect_identical(fam$lb, list(mu = "0", p = "0"))
+  expect_identical(fam$ub, list(mu = NA_character_, p = "1"))
   # linkinv / linkfun helpers are attached so downstream
   # dispatchers (compute_family_epred etc.) don't have to
   # branch on customfamily.
@@ -272,4 +275,87 @@ test_that("validate_closure_unit_data() accepts single-visit data when a covaria
 test_that("validate_supported_family() admits nmix() and tweedie() customfamily objects", {
   expect_invisible(validate_supported_family(nmix()))
   expect_invisible(validate_supported_family(tweedie()))
+})
+
+# ------------------------------------------------------------
+# Stan emission contract tests via brms make_stancode round-trip
+# ------------------------------------------------------------
+#
+# These tests exercise the data-prep hook in
+# `generate_stan_components_mvgam_formula()` to confirm that
+# closure-unit arrays land in standata and the nmix lpdf
+# function block lands in stancode with the expected signature.
+
+test_that("stancode under nmix() includes the lpdf signature and data declarations", {
+  d <- make_nmix_data(n_unit = 4, n_visit = 3)
+  mf <- mvgam_formula(y ~ elev)
+  sc <- as.character(stancode(mf, data = d, family = nmix()))
+  # Function block: both overloaded signatures emitted.
+  expect_match(sc, "real nmix_lpmf\\(\\s*array\\[\\] int y,", fixed = FALSE)
+  expect_match(sc, "vector mu,", fixed = TRUE)
+  expect_match(sc, "vector p,", fixed = TRUE)
+  expect_match(sc, "real p,", fixed = TRUE)  # scalar broadcast entry point
+  # Stable lpmf forms used inside the loop.
+  expect_match(sc, "poisson_log_lpmf(k | log_lam)", fixed = TRUE)
+  expect_match(sc, "binomial_logit_lpmf(counts | k, lp_visits)", fixed = TRUE)
+  expect_match(sc, "log_sum_exp(component_lps)", fixed = TRUE)
+  # Data block: closure-unit arrays at unit length, not visit length.
+  expect_match(sc, "int<lower=1> N_unit;", fixed = TRUE)
+  expect_match(sc, "array[N_unit] int<lower=1> n_rep;", fixed = TRUE)
+  expect_match(sc, "array[N_unit] int<lower=1> K_max;", fixed = TRUE)
+  expect_match(sc, "array[N_unit] int<lower=0> Y_max;", fixed = TRUE)
+  expect_match(sc, "array[N_unit, 3] int<lower=1> visit_idx;", fixed = TRUE)
+  # Likelihood call wires the dpars + vint args correctly.
+  expect_match(
+    sc,
+    "nmix_lpmf(Y | mu, p, N_unit, n_rep, K_max, Y_max, visit_idx)",
+    fixed = TRUE
+  )
+  # Scalar-p case: p declared as a bounded probability so the
+  # lpdf's logit(p) call is well-defined even without a
+  # `p ~ ...` sub-formula.
+  expect_match(sc, "real<lower=0, upper=1> p;", fixed = TRUE)
+})
+
+test_that("standata under nmix() carries the closure-unit arrays with correct values", {
+  d <- make_nmix_data(n_unit = 5, n_visit = 2, seed = 7)
+  mf <- mvgam_formula(y ~ elev)
+  sd <- standata(mf, data = d, family = nmix())
+  arrs <- build_closure_unit_arrays(d, response_var = "y")
+  expect_identical(as.integer(sd$N_unit), arrs$N_unit)
+  expect_identical(as.integer(sd$n_rep),  arrs$n_rep)
+  expect_identical(as.integer(sd$K_max),  arrs$K_max)
+  expect_identical(as.integer(sd$Y_max),  arrs$Y_max)
+  expect_equal(dim(sd$visit_idx), c(arrs$N_unit, arrs$max_rep))
+  expect_equal(as.integer(sd$visit_idx), as.integer(arrs$visit_idx))
+})
+
+test_that("standata K_max updates when newdata carries a different cap column", {
+  d_fit  <- make_nmix_data(n_unit = 4, n_visit = 3)
+  d_pred <- d_fit
+  d_pred$cap <- 99L
+  mf <- mvgam_formula(y ~ elev)
+  sd_fit  <- standata(mf, data = d_fit,  family = nmix())
+  sd_pred <- standata(mf, data = d_pred, family = nmix())
+  expect_identical(as.integer(sd_fit$K_max),  rep(20L, 4))
+  expect_identical(as.integer(sd_pred$K_max), rep(99L, 4))
+  # Visit structure is identical; only K_max responds to the
+  # edited cap column.
+  expect_identical(sd_fit$N_unit, sd_pred$N_unit)
+  expect_identical(sd_fit$n_rep,  sd_pred$n_rep)
+  expect_identical(sd_fit$visit_idx, sd_pred$visit_idx)
+})
+
+test_that("stancode under nmix() emits vector-p path when a detection sub-formula is supplied", {
+  d <- make_nmix_data(n_unit = 4, n_visit = 3)
+  d$tod <- stats::runif(nrow(d))
+  mf <- mvgam_formula(brms::bf(y ~ elev, p ~ tod))
+  sc <- as.character(stancode(mf, data = d, family = nmix()))
+  # brms emits a vector p with inv_logit applied when the
+  # sub-formula supplies a design matrix for the detection dpar.
+  expect_match(sc, "vector[N] p", fixed = TRUE)
+  expect_match(sc, "p = inv_logit(p)", fixed = TRUE)
+  # b_p coefficients become available to the user.
+  expect_match(sc, "Intercept_p", fixed = TRUE)
+  expect_match(sc, "Xc_p", fixed = TRUE)
 })

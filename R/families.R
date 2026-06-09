@@ -737,8 +737,13 @@ nmix <- function() {
     name  = "nmix",
     dpars = c("mu", "p"),
     links = c("log", "logit"),
-    lb    = c(0, NA),
-    ub    = c(NA, NA),
+    # mu (lambda) is a positive rate; p is a probability. Setting
+    # both bounds at the family level makes brms declare the
+    # scalar-dpar case with the right constraints, which keeps
+    # the lpdf's logit(p) call valid even when no sub-formula
+    # is supplied for p.
+    lb    = c(0, 0),
+    ub    = c(NA, 1),
     type  = "int",
     loop  = FALSE
   )
@@ -751,6 +756,233 @@ nmix <- function() {
   # the closure-unit arrays from the user's data are known.
   attr(fam, "mvgam_stanvars") <- NULL
   fam
+}
+
+#' Stan function block for the closure-unit N-mixture lpmf
+#'
+#' Implements the Royle (2004) Poisson-binomial marginalisation
+#' over the latent abundance N as a `log_sum_exp` across the
+#' truncated range `max(y[g, ]) <= k <= K_max[g]`. Each k value
+#' scores the joint Poisson-Binomial log-probability of
+#' (latent = k, observed visit counts); the sum gives the
+#' closure-unit marginal log-likelihood. Below `max(y[g, ])`
+#' the closure constraint forces zero probability, encoded as
+#' `negative_infinity()` in the lp vector.
+#'
+#' Numerical-stability notes:
+#'   - `mu` arrives from brms as the exponentiated linear
+#'     predictor (positive rate); converting back to
+#'     `log_mu = log(mu)` keeps the inner `poisson_log_lpmf`
+#'     form stable for large abundance values.
+#'   - `p` arrives from brms as the inv-logit linear predictor
+#'     (probability); converting back to
+#'     `logit_p = logit(p)` keeps `binomial_logit_lpmf` stable
+#'     at probabilities close to 0 or 1.
+#'   - `log_sum_exp` handles the `-Inf` entries below
+#'     `max(y[g, ])` without underflow.
+#'
+#' @param max_rep Positive integer maximum visit count across
+#'   closure units. Sets the column count of `visit_idx`. The
+#'   Stan loop reads only the first `n_rep[g]` columns per unit.
+#' @return Character scalar of Stan function code.
+#' @noRd
+nmix_stan_funs <- function(max_rep) {
+  checkmate::assert_integerish(max_rep, lower = 1L, len = 1L)
+  paste(
+    "  // Per-visit implementation. brms passes `mu` and `p` as",
+    "  // vectors when either dpar carries a sub-formula (e.g.",
+    "  // bf(y ~ s(elev), p ~ s(tod))). The overloaded scalar",
+    "  // signature below broadcasts the static-dpar case via",
+    "  // rep_vector and delegates to this entry point.",
+    "  real nmix_lpmf(",
+    "    array[] int y,",
+    "    vector mu,",
+    "    vector p,",
+    "    int N_unit,",
+    "    array[] int n_rep,",
+    "    array[] int K_max,",
+    "    array[] int Y_max,",
+    "    array[,] int visit_idx) {",
+    "    real lp = 0;",
+    "    // Convert dpars back to link scale for numerically",
+    "    // stable lpmf forms.",
+    "    vector[num_elements(mu)] log_mu    = log(mu);",
+    "    vector[num_elements(p)]  logit_p   = logit(p);",
+    "    for (g in 1 : N_unit) {",
+    "      int Kg = K_max[g];",
+    "      int cmax = Y_max[g];",
+    "      array[n_rep[g]] int idx = visit_idx[g, 1:n_rep[g]];",
+    "      // lambda is constant within a closure unit; pull it",
+    "      // from the first visit's linear predictor.",
+    "      real log_lam = log_mu[idx[1]];",
+    "      array[n_rep[g]] int counts = y[idx];",
+    "      vector[n_rep[g]] lp_visits = logit_p[idx];",
+    "      vector[Kg + 1] component_lps;",
+    "      // Closure: k < cmax is impossible because every visit",
+    "      // observed cmax or fewer, never more.",
+    "      for (k in 0 : (cmax - 1)) {",
+    "        component_lps[k + 1] = negative_infinity();",
+    "      }",
+    "      for (k in cmax : Kg) {",
+    "        component_lps[k + 1] = poisson_log_lpmf(k | log_lam)",
+    "          + binomial_logit_lpmf(counts | k, lp_visits);",
+    "      }",
+    "      lp += log_sum_exp(component_lps);",
+    "    }",
+    "    return lp;",
+    "  }",
+    "",
+    "  // Scalar-p entry point: broadcasts to the per-visit",
+    "  // vector and dispatches to the vector implementation.",
+    "  real nmix_lpmf(",
+    "    array[] int y,",
+    "    vector mu,",
+    "    real p,",
+    "    int N_unit,",
+    "    array[] int n_rep,",
+    "    array[] int K_max,",
+    "    array[] int Y_max,",
+    "    array[,] int visit_idx) {",
+    "    int N = num_elements(mu);",
+    "    return nmix_lpmf(y | mu, rep_vector(p, N), N_unit,",
+    "                     n_rep, K_max, Y_max, visit_idx);",
+    "  }",
+    sep = "\n"
+  )
+}
+
+#' Build the closure-unit Stan stanvars for an nmix() fit
+#'
+#' Given the integer arrays returned by
+#' `build_closure_unit_arrays()`, assemble the
+#' `brms::stanvar()` bundle that declares the closure-unit data
+#' in the Stan data block and registers the `nmix_lpmf`
+#' function block.
+#'
+#' Each closure-unit family rolls its own `make_*_stanvars()`
+#' helper using the same data arrays, sharing the integer
+#' declarations and changing only the function block. Future
+#' families (`occ()`, `royle_nichols()`, `poisson_poisson()`)
+#' reuse this shape.
+#'
+#' @param arrays Named list returned by
+#'   `build_closure_unit_arrays()`.
+#' @return A `brmsstanvars` object.
+#' @noRd
+make_nmix_stanvars <- function(arrays) {
+  checkmate::assert_list(arrays, names = "named")
+  required <- c(
+    "N_unit", "n_rep", "K_max", "Y_max",
+    "visit_idx", "max_rep"
+  )
+  missing_fields <- setdiff(required, names(arrays))
+  if (length(missing_fields) > 0L) {
+    stop(insight::format_error(
+      paste0(
+        "Closure-unit arrays are missing fields: ",
+        paste(missing_fields, collapse = ", "), "."
+      )
+    ))
+  }
+  brms::stanvar(
+    name  = "nmix_funs",
+    scode = nmix_stan_funs(arrays$max_rep),
+    block = "functions"
+  ) +
+    brms::stanvar(
+      x     = as.integer(arrays$N_unit),
+      name  = "N_unit",
+      scode = "int<lower=1> N_unit;",
+      block = "data"
+    ) +
+    brms::stanvar(
+      x     = as.integer(arrays$n_rep),
+      name  = "n_rep",
+      scode = "array[N_unit] int<lower=1> n_rep;",
+      block = "data"
+    ) +
+    brms::stanvar(
+      x     = as.integer(arrays$K_max),
+      name  = "K_max",
+      scode = "array[N_unit] int<lower=1> K_max;",
+      block = "data"
+    ) +
+    brms::stanvar(
+      x     = as.integer(arrays$Y_max),
+      name  = "Y_max",
+      scode = "array[N_unit] int<lower=0> Y_max;",
+      block = "data"
+    ) +
+    brms::stanvar(
+      x     = arrays$visit_idx,
+      name  = "visit_idx",
+      scode = paste0(
+        "array[N_unit, ", arrays$max_rep,
+        "] int<lower=1> visit_idx;"
+      ),
+      block = "data"
+    )
+}
+
+#' Prepare a closure-unit family for fitting
+#'
+#' Resolves the data-dependent parts of a closure-unit family
+#' at fit time: validates the observation data, builds the
+#' closure-unit arrays, assembles the family-specific Stan
+#' stanvars, and sets `family$vars` so brms threads the right
+#' data variables through to the lpdf call.
+#'
+#' Called from `R/make_stan.R` immediately before
+#' `attach_family_stanvars()`. The returned family carries the
+#' filled-in stanvars in `attr(family, "mvgam_stanvars")` and
+#' is ready to flow through the existing brms pipeline.
+#'
+#' @param family A closure-unit family (e.g. [nmix()]).
+#' @param data User observation data.
+#' @param response_var Name of the response (count) column.
+#' @param has_obs_covariates Logical; TRUE if the abundance /
+#'   state formula contains at least one covariate.
+#' @param has_det_covariates Logical; TRUE if a detection
+#'   sub-formula was supplied.
+#' @return The family with `mvgam_stanvars` attribute populated
+#'   and `vars` set.
+#' @noRd
+prepare_closure_unit_family <- function(family, data, response_var,
+                                         has_obs_covariates = FALSE,
+                                         has_det_covariates = FALSE) {
+  validate_closure_unit_data(
+    data,
+    response_var       = response_var,
+    has_obs_covariates = has_obs_covariates,
+    has_det_covariates = has_det_covariates
+  )
+  arrays <- build_closure_unit_arrays(
+    data, response_var = response_var
+  )
+  family_name <- family$name
+  family_stanvars <- switch(
+    family_name,
+    nmix = make_nmix_stanvars(arrays),
+    stop(insight::format_error(c(
+      paste0(
+        "Closure-unit dispatch missing for family '",
+        family_name, "'."
+      ),
+      i = paste0(
+        "Add a '", family_name, " = make_",
+        family_name,
+        "_stanvars(arrays)' branch to the switch() in ",
+        "prepare_closure_unit_family()."
+      )
+    )))
+  )
+  attr(family, "mvgam_stanvars") <- family_stanvars
+  family$vars <- c("N_unit", "n_rep", "K_max", "Y_max", "visit_idx")
+  # Stash the arrays on the family so downstream code (predict /
+  # posterior_predict / log_lik) can reuse the same closure-unit
+  # grouping without re-deriving it from data.
+  attr(family, "mvgam_closure_unit_arrays") <- arrays
+  family
 }
 
 #' Merge a custom family's mvgam_stanvars into the user's stanvars
