@@ -84,7 +84,31 @@ log_lik.mvgam <- function(object,
     if (!is.null(resp)) {
       linpred <- linpred[[resp]]
     } else {
+      # Closure-unit families return at the unit grain
+      # (`[S x N_unit]`), which has fewer columns than the
+      # per-visit grain produced by every other family. Stitching
+      # the per-response matrices via `Reduce("+", ...)` would
+      # silently truncate or recycle. Multi-response closure-unit
+      # support lands when jsdgam wires together multiple
+      # detection-error responses; flag the gap clearly until
+      # then.
       resp_names <- names(linpred)
+      mv_families <- lapply(resp_names, function(r) {
+        get_family_for_resp(object, r)
+      })
+      if (any(vapply(mv_families, is_closure_unit_family, logical(1)))) {
+        stop(insight::format_error(c(
+          "Multivariate models with a closure-unit family are not yet supported by log_lik().",
+          x = paste0(
+            "Responses with closure-unit families: ",
+            paste(resp_names[vapply(mv_families,
+                                    is_closure_unit_family,
+                                    logical(1))], collapse = ", "),
+            "."
+          ),
+          i = "Call log_lik() per response with `resp = '<name>'`."
+        )))
+      }
       per_resp <- lapply(resp_names, function(r) {
         log_lik_single_response(
           object = object,

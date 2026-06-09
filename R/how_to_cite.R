@@ -378,8 +378,82 @@ reference_db <- function() {
         "}",
         sep = "\n"
       )
+    ),
+    royle_nmix_2004 = list(
+      text = "Royle JA (2004). N-mixture models for estimating population size from spatially replicated counts. Biometrics, 60(1), 108-115. https://doi.org/10.1111/j.0006-341X.2004.00142.x",
+      bibtex = paste(
+        "@article{royle2004nmixture,",
+        "  title = {{N}-mixture models for estimating population size from spatially replicated counts},",
+        "  author = {Royle, J. Andrew},",
+        "  journal = {Biometrics},",
+        "  volume = {60},",
+        "  number = {1},",
+        "  pages = {108--115},",
+        "  year = {2004},",
+        "  doi = {10.1111/j.0006-341X.2004.00142.x}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    dennis_nmix_2015 = list(
+      text = "Dennis EB, Morgan BJT and Ridout MS (2015). Computational aspects of N-mixture models. Biometrics, 71(1), 237-246. https://doi.org/10.1111/biom.12246",
+      bibtex = paste(
+        "@article{dennis2015nmixture,",
+        "  title = {Computational aspects of {N}-mixture models},",
+        "  author = {Dennis, Emily B. and Morgan, Byron J. T. and Ridout, Martin S.},",
+        "  journal = {Biometrics},",
+        "  volume = {71},",
+        "  number = {1},",
+        "  pages = {237--246},",
+        "  year = {2015},",
+        "  doi = {10.1111/biom.12246}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    kery_nmix_2018 = list(
+      text = "Kery M (2018). Identifiability in N-mixture models: a large-scale screening test with bird data. Ecology, 99(2), 281-288. https://doi.org/10.1002/ecy.2093",
+      bibtex = paste(
+        "@article{kery2018identifiability,",
+        "  title = {Identifiability in {N}-mixture models: a large-scale screening test with bird data},",
+        "  author = {K{\\'e}ry, Marc},",
+        "  journal = {Ecology},",
+        "  volume = {99},",
+        "  number = {2},",
+        "  pages = {281--288},",
+        "  year = {2018},",
+        "  doi = {10.1002/ecy.2093}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    knape_overdispersion_2018 = list(
+      text = "Knape J, Arlt D, Barraquand F, Berg A, Chevalier M, Part T, Ruete A and Zmihorski M (2018). Sensitivity of binomial N-mixture models to overdispersion: the importance of assessing model fit. Methods in Ecology and Evolution, 9(10), 2102-2114. https://doi.org/10.1111/2041-210X.13062",
+      bibtex = paste(
+        "@article{knape2018overdispersion,",
+        "  title = {Sensitivity of binomial {N}-mixture models to overdispersion: the importance of assessing model fit},",
+        "  author = {Knape, Jonas and Arlt, Debora and Barraquand, Fr{\\'e}d{\\'e}ric and Berg, {\\AA}ke and Chevalier, Mathieu and P{\\\"a}rt, Tomas and Ruete, Alejandro and {\\.Z}mihorski, Micha{\\l}},",
+        "  journal = {Methods in Ecology and Evolution},",
+        "  volume = {9},",
+        "  number = {10},",
+        "  pages = {2102--2114},",
+        "  year = {2018},",
+        "  doi = {10.1111/2041-210X.13062}",
+        "}",
+        sep = "\n"
+      )
     )
   )
+}
+
+# Predicate: did the fit use the nmix() closure-unit family?
+# Routes through `resolve_family_name()` so the customfamily
+# storage convention (name = "nmix", family = "custom") is
+# recognised correctly.
+#' @noRd
+uses_nmix_family <- function(object) {
+  if (is.null(object$family)) return(FALSE)
+  identical(resolve_family_name(object$family), "nmix")
 }
 
 
@@ -505,6 +579,26 @@ how_to_cite.mvgam <- function(object, ...) {
       ),
       refs = c("jorgensen_tweedie", "dunn_smyth_tweedie",
                "aims_tweedie_brms")
+    ),
+    list(
+      detect = uses_nmix_family(object),
+      text = paste0(
+        " Counts were modelled with the Poisson-binomial",
+        " N-mixture family (Royle 2004), with the latent",
+        " abundance marginalised analytically over a truncated",
+        " support per closure unit using the log-sum-exp form",
+        " of Dennis et al. (2015). Identifiability of detection",
+        " and abundance under the visit structure was assessed",
+        " following Kery (2018), and sensitivity to abundance",
+        " over-dispersion was considered after Knape et al.",
+        " (2018)."
+      ),
+      refs = c(
+        "royle_nmix_2004",
+        "dennis_nmix_2015",
+        "kery_nmix_2018",
+        "knape_overdispersion_2018"
+      )
     )
   )
 

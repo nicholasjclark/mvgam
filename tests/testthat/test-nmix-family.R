@@ -479,3 +479,29 @@ test_that("nmix R-side guards reject a `p ~ ...` sub-formula until chunk 4", {
   # the Stan side accepts the sub-formula.
   skip("vector-p R-side extraction lands in chunk 4")
 })
+
+# ------------------------------------------------------------
+# how_to_cite() coverage for nmix
+# ------------------------------------------------------------
+
+test_that("how_to_cite reference_db includes the four nmix entries", {
+  db <- reference_db()
+  expected <- c(
+    "royle_nmix_2004",
+    "dennis_nmix_2015",
+    "kery_nmix_2018",
+    "knape_overdispersion_2018"
+  )
+  expect_true(all(expected %in% names(db)))
+  for (key in expected) {
+    expect_true(nzchar(db[[key]]$text))
+    expect_true(nzchar(db[[key]]$bibtex))
+  }
+})
+
+test_that("uses_nmix_family() predicate distinguishes the family", {
+  expect_false(uses_nmix_family(NULL))
+  expect_false(uses_nmix_family(list(family = gaussian())))
+  expect_true(uses_nmix_family(list(family = nmix())))
+  expect_false(uses_nmix_family(list(family = tweedie())))
+})
