@@ -25,7 +25,7 @@
 #'   process noise.
 #' @param ... Ignored.
 #'
-#' @return Numeric matrix `[ndraws x nobs]` of pointwise log densities.
+#' @return Numeric matrix \[ndraws x nobs\] of pointwise log densities.
 #'
 #' @details
 #' The implementation dispatches by `object$family$family` to per-family log
@@ -34,7 +34,7 @@
 #' `beta` uses `(mu, phi)`; `hurdle_*` and `zero_inflated_*` mix a point mass
 #' at zero with the corresponding base family). Trials for `binomial` /
 #' `beta_binomial` are extracted from `newdata` or from the model object via
-#' the existing [extract_trials_for_family()] helper.
+#' the existing `extract_trials_for_family()` helper.
 #'
 #' For state-space-dominated fits, `process_error = TRUE` is the default and
 #' matches the behaviour LOO / PSIS / WAIC expect. Set `process_error = FALSE`
@@ -591,10 +591,10 @@ log_lik_cumulative <- function(linpred, link, y, family_pars, trials) {
 #' scalar with the `df` and `nobs` attributes the [stats::AIC()] /
 #' [stats::BIC()] machinery expects.
 #'
-#' @param object A fitted [mvgam][mvgam] object.
+#' @param object A fitted \[mvgam\]\[mvgam\] object.
 #' @param pointwise Logical. When `FALSE` (default) a single scalar
 #'   `logLik` value is returned for compatibility with `AIC` and `BIC`.
-#'   When `TRUE` the underlying `[ndraws x nobs]` pointwise matrix from
+#'   When `TRUE` the underlying \[ndraws x nobs\] pointwise matrix from
 #'   [log_lik.mvgam()] is returned (matches the historical mvgam
 #'   return shape).
 #' @param ... Additional arguments forwarded to [log_lik.mvgam()]
@@ -603,7 +603,7 @@ log_lik_cumulative <- function(linpred, link, y, family_pars, trials) {
 #' @return When `pointwise = FALSE`, a length-1 `logLik` object with
 #'   `df` (number of sampled parameters, excluding sampler
 #'   diagnostics) and `nobs` attributes. When `pointwise = TRUE`, a
-#'   `[ndraws x nobs]` numeric matrix of pointwise log densities.
+#'   \[ndraws x nobs\] numeric matrix of pointwise log densities.
 #'
 #' @details
 #' The scalar returned is the posterior mean of `rowSums(log_lik(object))`

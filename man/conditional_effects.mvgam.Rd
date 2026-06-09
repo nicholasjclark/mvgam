@@ -30,7 +30,7 @@ formula are detected automatically.}
 
 \item{type}{Scale of predictions. One of \code{"response"} (outcome
 scale with observation-process noise), \code{"link"} (link-scale
-linear predictor) or \code{"expected"} (E\link{Y}; default).}
+linear predictor) or \code{"expected"} (E[Y]; default).}
 
 \item{points}{Logical or numeric. If \code{TRUE} (or a non-zero alpha
 between 0 and 1) and \code{type = "response"}, raw observations are
@@ -89,9 +89,9 @@ conditional-effect engine,
 \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} for the prediction primitive that
 \code{plot_predictions} calls under the hood,
 \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} for posterior predictive checks,
-\link{mvgam_diagnostics} for parameter-level diagnostics
+[mvgam_diagnostics] for parameter-level diagnostics
 (\code{fixef}, \code{rhat}, \code{bayes_R2}, ...),
-\link{mvgam_draws} for raw draws extraction
+[mvgam_draws] for raw draws extraction
 }
 \author{
 Nicholas J Clark

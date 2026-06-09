@@ -76,7 +76,7 @@ single value or multiple values.}
 }
 \value{
 If \code{summary = FALSE}, returns a numeric matrix of posterior
-draws with dimensions \verb{[ndraws x nobs]}. For multivariate fits with
+draws with dimensions \verb{\\\[ndraws x nobs\\\]}. For multivariate fits with
 \code{resp = NULL}, returns a named list of such matrices.
 
 If \code{summary = TRUE}, returns a matrix with columns:
@@ -142,7 +142,7 @@ lp <- predict(fit, type = "link")
 # Expected values (response scale)
 mu <- predict(fit, type = "expected")
 
-# Conditional variance Var[Y|theta] per draw
+# Conditional variance Var\[Y|theta\] per draw
 v <- predict(fit, type = "variance")
 }
 

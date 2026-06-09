@@ -87,9 +87,10 @@ should_trend_formula_have_intercept <- function(formula) {
 setup_brms_lightweight <- function(formula, data, family = gaussian(),
                                    trend_formula = NULL, stanvars = NULL,
                                    prior = NULL,
+                                   data2 = NULL,
                                    is_trend_setup = FALSE,
                                    response_vars = NULL,
-                                   time_var = "time", 
+                                   time_var = "time",
                                    series_var = "series",
                                    ...) {
   # Accept both regular formulas and brms formula objects
@@ -180,12 +181,16 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   }
 
   # Use mock backend for rapid setup (creates brmsfit object needed for prediction)
+  # `data2` is forwarded explicitly so brms specials that reference
+  # objects living outside `data` (e.g. `car()` adjacency matrices,
+  # `cov_ranef()` covariance matrices) can resolve their lookups.
   mock_setup <- brms::brm(
     formula = formula,
     data = data,
     family = family,
     stanvars = stanvars,
     prior = prior,
+    data2 = data2,
     backend = "mock",
     mock_fit = 1,
     rename = FALSE
@@ -197,11 +202,16 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   # update() throws an error. Adding current brms version prevents this.
   mock_setup$version <- list(brms = utils::packageVersion("brms"))
 
-  # Extract key components for mvgam integration
+  # Extract key components for mvgam integration. `data2` is retained
+  # on the setup so downstream Stan-code regenerators
+  # (`generate_base_stancode_with_stanvars`) can forward it to brms
+  # for specials whose lookups live outside `data` (e.g. `car()`,
+  # `cov_ranef()`).
   setup_components <- list(
     formula = formula,
     trend_formula = trend_formula,
     data = data,
+    data2 = data2,
     family = family,
     stanvars = stanvars,
     stancode = brms::stancode(mock_setup),

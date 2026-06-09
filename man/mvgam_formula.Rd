@@ -68,7 +68,7 @@ terms conflict with mvgam's State-Space dynamics. All forbidden terms remain
 fully supported in the main observation formula.
 }
 
-\section{Multivariate models — single shared trend type}{
+\section{Multivariate models, single shared trend type}{
 
 For multivariate observation models (\code{mvbind()} or
 \code{bf() + bf()}), \strong{a single trend constructor applies to

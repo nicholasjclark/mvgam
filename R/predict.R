@@ -47,7 +47,7 @@
 #'   `posterior_predict` / `posterior_epred` / `posterior_linpred` method.
 #'
 #' @return If `summary = FALSE`, returns a numeric matrix of posterior
-#'   draws with dimensions `[ndraws x nobs]`. For multivariate fits with
+#'   draws with dimensions ``\\[ndraws x nobs\\]``. For multivariate fits with
 #'   `resp = NULL`, returns a named list of such matrices.
 #'
 #'   If `summary = TRUE`, returns a matrix with columns:
@@ -109,7 +109,7 @@
 #' # Expected values (response scale)
 #' mu <- predict(fit, type = "expected")
 #'
-#' # Conditional variance Var[Y|theta] per draw
+#' # Conditional variance Var\[Y|theta\] per draw
 #' v <- predict(fit, type = "variance")
 #' }
 #'
@@ -252,7 +252,7 @@ predict.mvgam <- function(object,
 }
 
 
-#' Posterior conditional variance Var[Y | theta] for predict.mvgam
+#' Posterior conditional variance Var\[Y | theta\] for predict.mvgam
 #'
 #' Internal helper that computes per-draw conditional variances using
 #' family-specific mean-variance formulas. Called only from
@@ -379,7 +379,7 @@ predict_variance <- function(object, newdata, process_error, ndraws,
 #' Computes summary statistics from a matrix of posterior draws following
 #'   the brms output format.
 #'
-#' @param draws Matrix of posterior draws with dimensions `[ndraws x nobs]`.
+#' @param draws Matrix of posterior draws with dimensions ``\\[ndraws x nobs\\]``.
 #' @param probs Numeric vector of probabilities for quantile computation.
 #' @param robust Logical. If `FALSE`, uses mean and sd. If `TRUE`, uses
 #'   median and mad.

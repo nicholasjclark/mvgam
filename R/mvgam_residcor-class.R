@@ -82,7 +82,7 @@
 #' Otso Ovaskainen et al. (2016). Using latent variable models to identify large networks of
 #' species-to-species associations at different spatial scales. Methods in Ecology and Evolution,
 #' 7, 549-555.
-#' @seealso [jsdgam()], [residual_cor()]
+#' @seealso `jsdgam()`, [residual_cor()]
 #' @author Nicholas J Clark
 #' @name mvgam_residcor-class
 NULL

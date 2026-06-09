@@ -289,7 +289,7 @@ sample_truncated_rejection <- function(n, dist, lb = -Inf, ub = Inf,
 #' Checks predicted values against truncation bounds and warns if many samples
 #' are invalid. Rounds values for discrete distributions.
 #'
-#' @param x Matrix of samples [ndraws x nobs]
+#' @param x Matrix of samples `\\[ndraws x nobs\\]`
 #' @param lb Lower bounds (vector of length nobs, scalar, or NULL)
 #' @param ub Upper bounds (vector of length nobs, scalar, or NULL)
 #' @param threshold Numeric in (0,1); fraction of invalid samples triggering
@@ -413,7 +413,7 @@ family_to_dist <- function(family_name) {
 #' Applies truncation bounds to samples by resampling out-of-bounds values
 #' or clamping to bounds when resampling fails.
 #'
-#' @param samples Matrix [ndraws x nobs] or vector of samples
+#' @param samples Matrix `\\[ndraws x nobs\\]` or vector of samples
 #' @param family_name Character; distribution family name
 #' @param lb Numeric; lower bound(s) - scalar or vector of length nobs
 #' @param ub Numeric; upper bound(s) - scalar or vector of length nobs
@@ -421,7 +421,7 @@ family_to_dist <- function(family_name) {
 #' @param ndraws Integer; number of draws (needed if samples is vector)
 #' @param nobs Integer; number of observations (needed if samples is vector)
 #'
-#' @return Matrix [ndraws x nobs] of truncated samples
+#' @return Matrix `\\[ndraws x nobs\\]` of truncated samples
 #'
 #' @details
 #' The function works column-by-column to handle observation-specific bounds.
@@ -569,58 +569,58 @@ apply_truncation <- function(samples, family_name, lb, ub, ntrys,
 #'
 #' @param family_name Character name of the distribution (e.g., "poisson")
 #' @param ndraws Integer; number of draws per observation
-#' @param epred Matrix [ndraws x nobs] of expected values
-#' @param sigma Optional matrix [ndraws x nobs] of scale/dispersion.
+#' @param epred Matrix `\\[ndraws x nobs\\]` of expected values
+#' @param sigma Optional matrix `\\[ndraws x nobs\\]` of scale/dispersion.
 #'   Required for: gaussian, student, lognormal, hurdle_lognormal,
 #'   skew_normal, exgaussian, gen_extreme_value, asym_laplace.
-#' @param phi Optional matrix [ndraws x nobs] of precision parameter.
+#' @param phi Optional matrix `\\[ndraws x nobs\\]` of precision parameter.
 #'   Required for: beta, beta_binomial, zero_inflated_beta,
 #'   zero_inflated_beta_binomial, zero_one_inflated_beta.
-#' @param shape Optional matrix [ndraws x nobs] of shape parameters.
+#' @param shape Optional matrix `\\[ndraws x nobs\\]` of shape parameters.
 #'   Required for: gamma, negbinomial, weibull, frechet, inverse.gaussian,
 #'   hurdle_negbinomial, hurdle_gamma, discrete_weibull, com_poisson
-#' @param nu Optional matrix [ndraws x nobs] of degrees of freedom.
+#' @param nu Optional matrix `\\[ndraws x nobs\\]` of degrees of freedom.
 #'   Required for: student
 #' @param trials Optional vector of trial counts (length 1 or nobs).
 #'   Required for: binomial, beta_binomial, zero_inflated_binomial,
 #'   zero_inflated_beta_binomial
-#' @param hu Optional matrix [ndraws x nobs] of hurdle probability.
+#' @param hu Optional matrix `\\[ndraws x nobs\\]` of hurdle probability.
 #'   Required for: hurdle_poisson, hurdle_negbinomial, hurdle_gamma,
 #'   hurdle_lognormal
-#' @param zi Optional matrix [ndraws x nobs] of zero-inflation probability.
+#' @param zi Optional matrix `\\[ndraws x nobs\\]` of zero-inflation probability.
 #'   Required for: zero_inflated_poisson, zero_inflated_negbinomial,
 #'   zero_inflated_binomial, zero_inflated_beta_binomial, zero_inflated_beta,
 #'   zero_inflated_asym_laplace
-#' @param zoi Optional matrix [ndraws x nobs] of zero-one inflation.
+#' @param zoi Optional matrix `\\[ndraws x nobs\\]` of zero-one inflation.
 #'   Required for: zero_one_inflated_beta (probability of boundary value)
-#' @param coi Optional matrix [ndraws x nobs] of conditional one-inflation.
+#' @param coi Optional matrix `\\[ndraws x nobs\\]` of conditional one-inflation.
 #'   Required for: zero_one_inflated_beta (P(Y=1 | Y in {0,1}))
-#' @param alpha Optional matrix [ndraws x nobs] of skewness parameters.
+#' @param alpha Optional matrix `\\[ndraws x nobs\\]` of skewness parameters.
 #'   Required for: skew_normal
-#' @param ndt Optional matrix [ndraws x nobs] of non-decision time (>=0).
+#' @param ndt Optional matrix `\\[ndraws x nobs\\]` of non-decision time (>=0).
 #'   Required for: shifted_lognormal, exgaussian
-#' @param xi Optional matrix [ndraws x nobs] of shape/tail parameters.
+#' @param xi Optional matrix `\\[ndraws x nobs\\]` of shape/tail parameters.
 #'   Required for: gen_extreme_value
-#' @param quantile Optional matrix [ndraws x nobs] of quantile values (0,1).
+#' @param quantile Optional matrix `\\[ndraws x nobs\\]` of quantile values (0,1).
 #'   Required for: asym_laplace, zero_inflated_asym_laplace
-#' @param kappa Optional matrix [ndraws x nobs] of concentration (>0).
+#' @param kappa Optional matrix `\\[ndraws x nobs\\]` of concentration (>0).
 #'   Required for: von_mises
-#' @param beta Optional matrix [ndraws x nobs] of rate parameters (>0).
+#' @param beta Optional matrix `\\[ndraws x nobs\\]` of rate parameters (>0).
 #'   Required for: exgaussian
-#' @param bs Optional matrix [ndraws x nobs] of boundary separation (>0).
+#' @param bs Optional matrix `\\[ndraws x nobs\\]` of boundary separation (>0).
 #'   Required for: wiener
-#' @param bias Optional matrix [ndraws x nobs] of starting point bias (0-1).
+#' @param bias Optional matrix `\\[ndraws x nobs\\]` of starting point bias (0-1).
 #'   Required for: wiener
-#' @param disc Optional matrix [ndraws x nobs] of discrimination (>0).
+#' @param disc Optional matrix `\\[ndraws x nobs\\]` of discrimination (>0).
 #'   Required for: hurdle_cumulative. Defaults to 1 if NULL.
-#' @param thres Optional matrix [ndraws x nthres] of ordinal thresholds.
+#' @param thres Optional matrix \\[ndraws x nthres\\] of ordinal thresholds.
 #'   Required for: hurdle_cumulative
 #' @param link Character; link function for ordinal models.
 #'   Required for: hurdle_cumulative. Default "logit".
 #'
 #' @return Vector of sampled values with length = length(epred). Values are
 #'   integers for count families, doubles for continuous. Used internally
-#'   by posterior_predict.mvgam() which reshapes to [ndraws x nobs] matrix.
+#'   by posterior_predict.mvgam() which reshapes to `\\[ndraws x nobs\\]` matrix.
 #'
 #' @noRd
 
@@ -1174,22 +1174,22 @@ get_family_dpars <- function(family_name) {
 #' @param draw_ids Optional integer vector of specific draw indices to use.
 #'   If provided, overrides ndraws.
 #'
-#' @return Named list of matrices, each with dimensions [ndraws x nobs].
-#'   Scalar parameters are broadcast to full [ndraws x nobs] matrices.
+#' @return Named list of matrices, each with dimensions `\\[ndraws x nobs\\]`.
+#'   Scalar parameters are broadcast to full `\\[ndraws x nobs\\]` matrices.
 #'   Parameters not found in the posterior return NULL.
 #'
 #' @details
 #' This function handles both scalar and observation-indexed parameters:
 #' \itemize{
-#'   \item Scalar parameters (e.g., "sigma"): broadcast to [ndraws x nobs]
-#'   \item Indexed parameters (e.g., "sigma[1]", "sigma[2]", ...): extracted
+#'   \item Scalar parameters (e.g., "sigma"): broadcast to `\\[ndraws x nobs\\]`
+#'   \item Indexed parameters (e.g., "sigma\[1\]", "sigma\[2\]", ...): extracted
 #'     as matrix with nobs columns
 #' }
 #'
 #' Example of scalar broadcasting:
 #' If posterior contains "sigma" (scalar), and ndraws=100, nobs=50:
 #'   - Extracts 100 draws of scalar sigma
-#'   - Returns matrix [100 x 50] with each row containing the same sigma value
+#'   - Returns matrix \[100 x 50\] with each row containing the same sigma value
 #'
 #' Parameter naming follows brms conventions. Some families use different
 #' internal names:
@@ -1199,8 +1199,8 @@ get_family_dpars <- function(family_name) {
 #'     parameterizations)
 #' }
 #'
-#' @seealso [get_family_dpars()] for family-to-dpar mapping,
-#'   [sample_from_family()] which consumes these matrices.
+#' @seealso `get_family_dpars()` for family-to-dpar mapping,
+#'   `sample_from_family()` which consumes these matrices.
 #'
 #' @noRd
 extract_dpars_from_stanfit <- function(stanfit,
@@ -1349,7 +1349,7 @@ extract_dpars_from_stanfit <- function(stanfit,
 #' @param newdata Optional data frame with covariates for prediction. If
 #'   NULL, uses original training data stored in the model object.
 #' @param process_error Logical; if TRUE (default), the posterior
-#'   predictive distribution is the **marginal** `[Y | X]` integrated
+#'   predictive distribution is the **marginal** `\[Y | X\]` integrated
 #'   over the trend's stochastic dynamics. mvgam achieves this by
 #'   Monte Carlo: sampled innovations are added to the link-scale
 #'   linear predictor before applying the inverse link and drawing
@@ -1364,7 +1364,7 @@ extract_dpars_from_stanfit <- function(stanfit,
 #'   longer holds (innovations are added in `epred` and `predict` but
 #'   not in `linpred`). For deterministic-state-at-fitted-values
 #'   semantics (matching the trained latent state without resampling)
-#'   use [forecast.mvgam] / [hindcast.mvgam], which read the
+#'   use \[forecast.mvgam\] / \[hindcast.mvgam\], which read the
 #'   `lv_trend` posterior draws directly and extrapolate the latent
 #'   state forward for newdata times beyond the training grid.
 #' @param ndraws Positive integer specifying number of posterior draws to
@@ -1380,7 +1380,7 @@ extract_dpars_from_stanfit <- function(stanfit,
 #'   responses.
 #' @param ... Additional arguments passed to internal methods.
 #'
-#' @return Matrix with dimensions [ndraws x nobs] containing posterior
+#' @return Matrix with dimensions `\\[ndraws x nobs\\]` containing posterior
 #'   predictive samples. Each row is one posterior draw, each column is
 #'   one observation. Values are on the response scale (include observation
 #'   noise).
@@ -1391,11 +1391,11 @@ extract_dpars_from_stanfit <- function(stanfit,
 #' @details
 #' The posterior predictive distribution combines:
 #' \itemize{
-#'   \item Expected values E[Y|X]: from observation + trend models
+#'   \item Expected values E\[Y|X\]: from observation + trend models
 #'   \item Observation noise: family-specific random draws
 #' }
 #'
-#' This differs from [posterior_epred.mvgam()] which returns only E[Y|X].
+#' This differs from `posterior_epred.mvgam()` which returns only E\[Y|X\].
 #' Posterior predictive samples have higher variance and are suitable for
 #' checking if the model can generate data like the observed data.
 #'
@@ -1407,7 +1407,7 @@ extract_dpars_from_stanfit <- function(stanfit,
 #'     latent state is treated as stationary at its per-series
 #'     posterior mean (a `marginaleffects`-style convention; an
 #'     informational message fires once per session).
-#'   \item [forecast.mvgam] / [hindcast.mvgam] read the fitted
+#'   \item \[forecast.mvgam\] / \[hindcast.mvgam\] read the fitted
 #'     `lv_trend` posterior draws directly. `hindcast()` returns
 #'     them at the training grid; `forecast()` extrapolates them
 #'     forward via the kernel for newdata times beyond training.
@@ -1415,9 +1415,9 @@ extract_dpars_from_stanfit <- function(stanfit,
 #'     prediction.
 #' }
 #'
-#' @seealso [posterior_epred.mvgam()] for expected values without
+#' @seealso `posterior_epred.mvgam()` for expected values without
 #'   noise, [posterior_linpred.mvgam()] for link-scale predictions,
-#'   [forecast.mvgam] and [hindcast.mvgam] for the deterministic
+#'   \[forecast.mvgam\] and \[hindcast.mvgam\] for the deterministic
 #'   state-extrapolating prediction surface.
 #'
 #' @examples
@@ -1432,7 +1432,7 @@ extract_dpars_from_stanfit <- function(stanfit,
 #'
 #' # Generate posterior predictive samples
 #' pp <- posterior_predict(fit)
-#' dim(pp)  # [ndraws x nobs]
+#' dim(pp)  # `\\[ndraws x nobs\\]`
 #'
 #' # Posterior predictive check: samples should vary more than epred
 #' epred <- posterior_epred(fit)
@@ -1584,7 +1584,7 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
 
 #' Add Process Innovations to a Linpred Matrix or List
 #'
-#' Adds a `[ndraws x nobs]` innovations matrix to either a single linpred
+#' Adds a ``\\[ndraws x nobs\\]`` innovations matrix to either a single linpred
 #' matrix (univariate / single-response) or each element of a list of
 #' linpred matrices (multivariate). Both inputs share the same posterior
 #' draw order because each is fetched with `ndraws = NULL`.
@@ -1624,14 +1624,14 @@ check_linpred_innov_dims <- function(linpred, innovations) {
 #' zi/hu can be applied during the sampling process itself.
 #'
 #' @param object mvgam model object
-#' @param linpred_resp Matrix [total_draws x nobs] of linear predictor
+#' @param linpred_resp Matrix \[total_draws x nobs\] of linear predictor
 #' @param resp Response name (NULL for univariate)
 #' @param draw_ids Integer vector of draw indices to use
 #' @param ndraws Number of draws (length of draw_ids)
 #' @param newdata Data frame for predictions
 #' @param is_multivariate Logical; TRUE if multivariate model
 #'
-#' @return Matrix [ndraws x nobs] of posterior predictive samples
+#' @return Matrix `\\[ndraws x nobs\\]` of posterior predictive samples
 #'
 #' @noRd
 predict_single_response <- function(object, linpred_resp, resp, draw_ids,

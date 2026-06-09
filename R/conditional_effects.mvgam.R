@@ -13,7 +13,7 @@
 #'   formula are detected automatically.
 #' @param type Scale of predictions. One of `"response"` (outcome
 #'   scale with observation-process noise), `"link"` (link-scale
-#'   linear predictor) or `"expected"` (E[Y]; default).
+#'   linear predictor) or `"expected"` (E\[Y\]; default).
 #' @param points Logical or numeric. If `TRUE` (or a non-zero alpha
 #'   between 0 and 1) and `type = "response"`, raw observations are
 #'   overlaid on the plot.
@@ -46,9 +46,9 @@
 #'   [posterior_epred.mvgam()] for the prediction primitive that
 #'     `plot_predictions` calls under the hood,
 #'   [pp_check.mvgam()] for posterior predictive checks,
-#'   [mvgam_diagnostics] for parameter-level diagnostics
+#'   \[mvgam_diagnostics\] for parameter-level diagnostics
 #'   (`fixef`, `rhat`, `bayes_R2`, ...),
-#'   [mvgam_draws] for raw draws extraction
+#'   \[mvgam_draws\] for raw draws extraction
 #'
 #' @references
 #' Arel-Bundock, V., Greifer, N. and Heiss, A. (2024). How to

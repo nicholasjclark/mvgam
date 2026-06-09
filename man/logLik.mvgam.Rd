@@ -7,11 +7,11 @@
 \method{logLik}{mvgam}(object, pointwise = FALSE, ...)
 }
 \arguments{
-\item{object}{A fitted \link{mvgam} object.}
+\item{object}{A fitted [mvgam][mvgam] object.}
 
 \item{pointwise}{Logical. When \code{FALSE} (default) a single scalar
 \code{logLik} value is returned for compatibility with \code{AIC} and \code{BIC}.
-When \code{TRUE} the underlying \verb{[ndraws x nobs]} pointwise matrix from
+When \code{TRUE} the underlying [ndraws x nobs] pointwise matrix from
 \code{\link[=log_lik.mvgam]{log_lik.mvgam()}} is returned (matches the historical mvgam
 return shape).}
 
@@ -22,7 +22,7 @@ return shape).}
 When \code{pointwise = FALSE}, a length-1 \code{logLik} object with
 \code{df} (number of sampled parameters, excluding sampler
 diagnostics) and \code{nobs} attributes. When \code{pointwise = TRUE}, a
-\verb{[ndraws x nobs]} numeric matrix of pointwise log densities.
+[ndraws x nobs] numeric matrix of pointwise log densities.
 }
 \description{
 Method for the \code{stats::logLik} generic so that \code{AIC()} and \code{BIC()}

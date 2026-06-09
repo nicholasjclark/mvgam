@@ -60,7 +60,7 @@ responses.}
 \item{...}{Additional arguments passed to internal methods.}
 }
 \value{
-Matrix with dimensions \link{ndraws x nobs} containing expected
+Matrix with dimensions \verb{\\\[ndraws x nobs\\\]} containing expected
 values on response scale. Each row is one posterior draw, each column
 is one observation from newdata.
 
@@ -73,18 +73,18 @@ Combines observation and trend components, then applies the inverse link
 function to transform from link scale to response scale.
 }
 \details{
-Expected values are computed as E\link{Y|X} by applying the inverse link
+Expected values are computed as E[Y|X] by applying the inverse link
 function to the linear predictor. For most families this is simply
 \code{linkinv(eta)}:
 \itemize{
 \item Gaussian, Poisson, Bernoulli, Beta, Gamma, NegBinomial, Student:
-E\link{Y} = linkinv(eta)
+E[Y] = linkinv(eta)
 }
 
 Some families require additional parameters:
 \itemize{
-\item Binomial, Beta-binomial: E\link{Y} = p * trials (requires trials)
-\item Lognormal: E\link{Y} = exp(mu + sigma^2/2) (requires sigma)
+\item Binomial, Beta-binomial: E[Y] = p * trials (requires trials)
+\item Lognormal: E[Y] = exp(mu + sigma^2/2) (requires sigma)
 }
 
 Unsupported families:
@@ -114,7 +114,7 @@ all.equal(epred, exp(linpred))
 \seealso{
 \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} for link scale predictions,
 \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} for posterior predictive samples,
-\link{forecast.mvgam} and \link{hindcast.mvgam} for the deterministic
+[forecast.mvgam] and [hindcast.mvgam] for the deterministic
 state-extrapolating prediction surface (state read from the
 fitted \code{lv_trend} posterior draws instead of integrated over
 via Monte Carlo).

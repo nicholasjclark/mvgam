@@ -25,7 +25,7 @@ NULL
 #' @param sample_new_levels Character; method for sampling new levels
 #' @param resp Character; response name for multivariate models (NULL = all)
 #'
-#' @return Matrix [ndraws x nobs] of combined linear predictor values on
+#' @return Matrix `\\[ndraws x nobs\\]` of combined linear predictor values on
 #'   link scale. For multivariate models with resp = NULL, returns named
 #'   list of matrices.
 #'
@@ -205,7 +205,7 @@ get_combined_linpred <- function(mvgam_fit, newdata,
 #'   responses.
 #' @param ... Additional arguments passed to internal methods.
 #'
-#' @return Matrix with dimensions [ndraws x nobs] containing linear
+#' @return Matrix with dimensions `\\[ndraws x nobs\\]` containing linear
 #'   predictor values. Each row is one posterior draw, each column is
 #'   one observation from newdata. Values are on link scale.
 #'
@@ -242,7 +242,7 @@ get_combined_linpred <- function(mvgam_fit, newdata,
 #' @seealso [brms::posterior_linpred()] for the brms generic,
 #'   [posterior_epred.mvgam()] for expected values on response scale,
 #'   [posterior_predict.mvgam()] for posterior predictive samples,
-#'   [forecast.mvgam] and [hindcast.mvgam] for the deterministic
+#'   \[forecast.mvgam\] and \[hindcast.mvgam\] for the deterministic
 #'   state-extrapolating prediction surface.
 #'
 #' @examples

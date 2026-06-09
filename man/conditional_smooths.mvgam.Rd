@@ -54,7 +54,7 @@ for marginaleffects-style multidimensional displays.}
 \item{resolution}{Positive integer. Grid resolution per
 covariate dimension. Defaults to \code{100}.}
 
-\item{too_far}{Numeric in \verb{[0, 1]}. For surface smooths, grid
+\item{too_far}{Numeric in [0, 1]. For surface smooths, grid
 points further than this from the training data (measured in
 the unit square) are dropped via
 \code{\link[mgcv:exclude.too.far]{mgcv::exclude.too.far()}}. \code{0} (default) keeps all points.}
@@ -67,7 +67,7 @@ the unit square) are dropped via
 A named list with one element per smooth term. Each
 element is a \code{data.frame} with the brms-style summary columns
 (\code{estimate__}, \code{se__}, \code{lower__}, \code{upper__},
-\code{effect1__} , \code{cond__}) plus the focal
+\code{effect1__} (optionally \code{effect2__}), \code{cond__}) plus the focal
 covariate(s). Attributes \code{response}, \code{effects},
 \code{surface}, \code{spaghetti}, and \code{points} are populated for the
 existing brms plot dispatch. The returned object carries the
@@ -76,11 +76,11 @@ existing brms plot dispatch. The returned object carries the
 \description{
 Compute and display posterior conditional effects for every
 smooth term in a fitted \code{mvgam} object, matching the shape of
-\code{\link[brms:conditional_smooths.brmsfit]{brms::conditional_smooths()}}. Returns a named list of
+\code{\link[brms]{conditional_smooths.brmsfit}}. Returns a named list of
 \code{data.frame}s with the brms-style \code{estimate__} / \code{lower__} /
 \code{upper__} / \code{effect1__} / \code{effect2__} / \code{cond__} columns and
-inherits the \code{brms_conditional_effects} class so the existing
-\code{\link[brms:::plot.brms_conditional_effects]{brms::::plot.brms_conditional_effects()}} method works
+inherits the \code{brms_conditional_effects} class so brms's
+\code{plot.brms_conditional_effects()} method works
 out-of-the-box.
 }
 \examples{
@@ -101,7 +101,7 @@ plot(cs)
 
 }
 \seealso{
-\code{\link[brms:conditional_smooths.brmsfit]{brms::conditional_smooths()}},
+\code{\link[brms]{conditional_smooths.brmsfit}},
 \code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}},
 \code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}}.
 }

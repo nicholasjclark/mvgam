@@ -45,17 +45,17 @@ get_family_for_resp <- function(object, resp_name) {
 #' family-appropriate transformations. Most families use simple inverse link,
 #' but some require distributional parameters.
 #'
-#' @param linpred Matrix [ndraws x nobs] of linear predictor values, or named
+#' @param linpred Matrix `\\[ndraws x nobs\\]` of linear predictor values, or named
 #'   list of matrices for multivariate models.
 #' @param family Family object with `$family` (name) and `$linkinv` (function).
 #'   For multivariate, a named list of family objects keyed by response name.
-#' @param sigma Optional matrix [ndraws x nobs] of sigma values. Required for
-#'   lognormal family where E[Y] = exp(mu + sigma^2/2). For multivariate, a
+#' @param sigma Optional matrix `\\[ndraws x nobs\\]` of sigma values. Required for
+#'   lognormal family where E\[Y\] = exp(mu + sigma^2/2). For multivariate, a
 #'   named list of matrices keyed by response name.
 #' @param trials Optional vector of trial counts for binomial family where
-#'   E[Y] = p * trials. Length 1 or ncol(linpred).
+#'   E\[Y\] = p * trials. Length 1 or ncol(linpred).
 #'
-#' @return Matrix [ndraws x nobs] of expected values on response scale, or
+#' @return Matrix `\\[ndraws x nobs\\]` of expected values on response scale, or
 #'   named list of matrices for multivariate models.
 #'
 #' @noRd
@@ -217,34 +217,34 @@ compute_family_epred <- function(linpred, family,
 }
 
 
-#' Compute Var[Y | theta] per draw for a family
+#' Compute Var\[Y | theta\] per draw for a family
 #'
-#' Companion to [compute_family_epred()] that returns per-draw conditional
+#' Companion to `compute_family_epred()` that returns per-draw conditional
 #' variances of the response given the parameter draws. Used by
 #' `predict.mvgam(type = "variance")` to expose the mean-variance
 #' relationship of the observation family.
 #'
-#' @param mu Numeric matrix of E[Y|theta] per draw (`[ndraws x nobs]`),
+#' @param mu Numeric matrix of E\[Y|theta\] per draw (``\\[ndraws x nobs\\]``),
 #'   already on the response scale (typically the return value of
-#'   [compute_family_epred()] or [posterior_epred.mvgam()]).
+#'   `compute_family_epred()` or `posterior_epred.mvgam()`).
 #' @param family A family or brmsfamily object; `family$family` selects
 #'   the variance formula.
-#' @param sigma Optional `[ndraws x nobs]` matrix of `sigma` draws. Required
+#' @param sigma Optional ``\\[ndraws x nobs\\]`` matrix of `sigma` draws. Required
 #'   for `gaussian` (Var = sigma^2). Other families ignore it.
-#' @param shape Optional `[ndraws x nobs]` matrix of `shape` draws. Required
+#' @param shape Optional ``\\[ndraws x nobs\\]`` matrix of `shape` draws. Required
 #'   for `negbinomial` (Var = mu + mu^2/shape) and `gamma`
 #'   (Var = mu^2/shape).
-#' @param phi Optional `[ndraws x nobs]` matrix of `phi` draws. Required for
+#' @param phi Optional ``\\[ndraws x nobs\\]`` matrix of `phi` draws. Required for
 #'   `beta` (Var = mu(1-mu)/(1+phi)). `phi` here is the brms precision
 #'   parameter (shape1 + shape2 of the underlying Beta), not an
 #'   overdispersion.
-#' @param nu Optional `[ndraws x nobs]` matrix of `nu` (degrees of
+#' @param nu Optional ``\\[ndraws x nobs\\]`` matrix of `nu` (degrees of
 #'   freedom) draws. Required for `student`
 #'   (Var = sigma^2 * nu / (nu - 2) when nu > 2; `Inf` otherwise).
 #' @param trials Optional numeric vector (length `ncol(mu)` or 1) of trial
 #'   counts for `binomial` (Var = trials * p * (1-p) where p = mu/trials).
 #'
-#' @return Numeric matrix `[ndraws x nobs]` of conditional variances on the
+#' @return Numeric matrix ``\\[ndraws x nobs\\]`` of conditional variances on the
 #'   response scale.
 #'
 #' @noRd
@@ -427,7 +427,7 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #'   responses.
 #' @param ... Additional arguments passed to internal methods.
 #'
-#' @return Matrix with dimensions [ndraws x nobs] containing expected
+#' @return Matrix with dimensions `\\[ndraws x nobs\\]` containing expected
 #'   values on response scale. Each row is one posterior draw, each column
 #'   is one observation from newdata.
 #'
@@ -435,18 +435,18 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #'   matrices (one per response variable).
 #'
 #' @details
-#' Expected values are computed as E[Y|X] by applying the inverse link
+#' Expected values are computed as E\[Y|X\] by applying the inverse link
 #' function to the linear predictor. For most families this is simply
 #' `linkinv(eta)`:
 #' \itemize{
 #'   \item Gaussian, Poisson, Bernoulli, Beta, Gamma, NegBinomial, Student:
-#'     E[Y] = linkinv(eta)
+#'     E\[Y\] = linkinv(eta)
 #' }
 #'
 #' Some families require additional parameters:
 #' \itemize{
-#'   \item Binomial, Beta-binomial: E[Y] = p * trials (requires trials)
-#'   \item Lognormal: E[Y] = exp(mu + sigma^2/2) (requires sigma)
+#'   \item Binomial, Beta-binomial: E\[Y\] = p * trials (requires trials)
+#'   \item Lognormal: E\[Y\] = exp(mu + sigma^2/2) (requires sigma)
 #' }
 #'
 #' Unsupported families:
@@ -456,7 +456,7 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #'
 #' @seealso [posterior_linpred.mvgam()] for link scale predictions,
 #'   [posterior_predict.mvgam()] for posterior predictive samples,
-#'   [forecast.mvgam] and [hindcast.mvgam] for the deterministic
+#'   \[forecast.mvgam\] and \[hindcast.mvgam\] for the deterministic
 #'   state-extrapolating prediction surface (state read from the
 #'   fitted `lv_trend` posterior draws instead of integrated over
 #'   via Monte Carlo).
@@ -997,7 +997,7 @@ posterior_epred_hurdle_lognormal <- function(prep) {
 
 #' Mean of discrete Weibull distribution
 #'
-#' Computes E[Y] for discrete Weibull via truncated series summation.
+#' Computes E\[Y\] for discrete Weibull via truncated series summation.
 #' Based on brms implementation by Paul-Christian Buerkner.
 #'
 #' @param mu Location parameter in unit interval
@@ -1029,7 +1029,7 @@ mean_discrete_weibull <- function(mu, shape, M = 1000, thres = 0.001) {
 
 #' Mean of COM-Poisson distribution
 #'
-#' Computes E[Y] for Conway-Maxwell-Poisson via series approximation.
+#' Computes E\[Y\] for Conway-Maxwell-Poisson via series approximation.
 #' Based on brms implementation by Paul-Christian Buerkner.
 #' Uses closed-form approximation when mu^shape >= 1.5 and mu >= 1.5.
 #'
@@ -1168,12 +1168,12 @@ is_ordinal_family <- function(family) {
 #'
 #' Extracts threshold parameters (intercepts) from an mvgam model's
 #' posterior draws. For ordinal models, thresholds are stored as
-#' `b_Intercept[1]`, `b_Intercept[2]`, etc. in the Stan output.
+#' `b_Intercept\[1\]`, `b_Intercept\[2\]`, etc. in the Stan output.
 #'
 #' @param object An mvgam model object
 #' @param ndraws Optional number of draws to return. If NULL, all draws.
 #'
-#' @return Matrix [ndraws x nthres] of threshold values
+#' @return Matrix \\[ndraws x nthres\\] of threshold values
 #'
 #' @details
 #' For an ordinal model with K categories, there are K-1 thresholds.
@@ -1232,7 +1232,7 @@ extract_ordinal_thresholds <- function(object, ndraws = NULL) {
 #' @param ndraws Number of draws (must match threshold extraction)
 #' @param nobs Number of observations for matrix dimensions
 #'
-#' @return Matrix [ndraws x nobs] of discrimination values
+#' @return Matrix `\\[ndraws x nobs\\]` of discrimination values
 #'
 #' @details
 #' The discrimination parameter scales the linear predictor in ordinal
@@ -1349,9 +1349,9 @@ seq_cols <- function(x) {
 #' per non-reference category). This function inserts zeros for the reference
 #' category to create a full ncat-column matrix for softmax transformation.
 #'
-#' @param eta Matrix [ndraws x (ncat-1)] or array [ndraws x nobs x (ncat-1)]
+#' @param eta Matrix \[ndraws x (ncat-1)\] or array \[ndraws x nobs x (ncat-1)\]
 #' @param refcat Integer index of reference category (typically 1)
-#' @return Matrix [ndraws x ncat] or array [ndraws x nobs x ncat] with zeros
+#' @return Matrix \\[ndraws x ncat\\] or array \\[ndraws x nobs x ncat\\] with zeros
 #'   inserted at reference category position
 #' @noRd
 insert_refcat <- function(eta, refcat = 1) {
@@ -1418,7 +1418,7 @@ insert_refcat <- function(eta, refcat = 1) {
 #' Computes log(softmax(x)) in a numerically stable way by subtracting
 #' the log-sum-exp from each element.
 #'
-#' @param x Matrix [ndraws x ncat] or array [ndraws x nobs x ncat]
+#' @param x Matrix \\[ndraws x ncat\\] or array \\[ndraws x nobs x ncat\\]
 #' @return Matrix or array of same dimensions with log-softmax applied
 #' @noRd
 log_softmax <- function(x) {
@@ -1484,7 +1484,7 @@ inv_link <- function(x, link) {
 #'
 #' @param prep Prediction preparation object
 #' @param i Observation index
-#' @return Matrix [ndraws x nthres] of threshold values
+#' @return Matrix \\[ndraws x nthres\\] of threshold values
 #' @noRd
 subset_thres <- function(prep, i) {
   checkmate::assert_list(prep)
@@ -1513,11 +1513,11 @@ subset_thres <- function(prep, i) {
 #' P(Y = k) = F(theta_k - eta) - F(theta_{k-1} - eta)
 #'
 #' @param x Integer vector of category indices
-#' @param eta Vector [ndraws] of linear predictor values
-#' @param thres Matrix [ndraws x nthres] of threshold values
-#' @param disc Vector [ndraws] of discrimination parameter (default 1)
+#' @param eta Vector \\[ndraws\\] of linear predictor values
+#' @param thres Matrix \\[ndraws x nthres\\] of threshold values
+#' @param disc Vector \\[ndraws\\] of discrimination parameter (default 1)
 #' @param link Character link function name
-#' @return Matrix [ndraws x length(x)] of category probabilities
+#' @return Matrix \[ndraws x length(x)\] of category probabilities
 #' @noRd
 dcumulative <- function(x, eta, thres, disc = 1, link = "logit") {
   checkmate::assert_integerish(x, lower = 1)
@@ -1543,9 +1543,9 @@ dcumulative <- function(x, eta, thres, disc = 1, link = "logit") {
 #'
 #' Transforms cumulative probabilities to category probabilities.
 #'
-#' @param x Matrix [ndraws x nthres] of disc * (thres - eta)
+#' @param x Matrix \\[ndraws x nthres\\] of disc * (thres - eta)
 #' @param link Character link function name
-#' @return Matrix [ndraws x ncat] of category probabilities
+#' @return Matrix \\[ndraws x ncat\\] of category probabilities
 #' @noRd
 inv_link_cumulative <- function(x, link) {
   checkmate::assert_numeric(x)
@@ -1565,7 +1565,7 @@ inv_link_cumulative <- function(x, link) {
 #' P(Y = k | Y >= k) = F(theta_k - eta)
 #'
 #' @inheritParams dcumulative
-#' @return Matrix [ndraws x length(x)] of category probabilities
+#' @return Matrix \[ndraws x length(x)\] of category probabilities
 #' @noRd
 dsratio <- function(x, eta, thres, disc = 1, link = "logit") {
   checkmate::assert_integerish(x, lower = 1)
@@ -1586,7 +1586,7 @@ dsratio <- function(x, eta, thres, disc = 1, link = "logit") {
 #' Inverse Link for Sequential Ratio Models
 #'
 #' @inheritParams inv_link_cumulative
-#' @return Matrix [ndraws x ncat] of category probabilities
+#' @return Matrix \\[ndraws x ncat\\] of category probabilities
 #' @noRd
 inv_link_sratio <- function(x, link) {
   checkmate::assert_numeric(x)
@@ -1612,7 +1612,7 @@ inv_link_sratio <- function(x, link) {
 #' P(Y = k | Y <= k) = 1 - F(theta_k - eta)
 #'
 #' @inheritParams dcumulative
-#' @return Matrix [ndraws x length(x)] of category probabilities
+#' @return Matrix \[ndraws x length(x)\] of category probabilities
 #' @noRd
 dcratio <- function(x, eta, thres, disc = 1, link = "logit") {
   checkmate::assert_integerish(x, lower = 1)
@@ -1633,7 +1633,7 @@ dcratio <- function(x, eta, thres, disc = 1, link = "logit") {
 #' Inverse Link for Continuation Ratio Models
 #'
 #' @inheritParams inv_link_cumulative
-#' @return Matrix [ndraws x ncat] of category probabilities
+#' @return Matrix \\[ndraws x ncat\\] of category probabilities
 #' @noRd
 inv_link_cratio <- function(x, link) {
   checkmate::assert_numeric(x)
@@ -1659,7 +1659,7 @@ inv_link_cratio <- function(x, link) {
 #' log(P(Y=k) / P(Y=k+1)) = theta_k - eta
 #'
 #' @inheritParams dcumulative
-#' @return Matrix [ndraws x length(x)] of category probabilities
+#' @return Matrix \[ndraws x length(x)\] of category probabilities
 #' @noRd
 dacat <- function(x, eta, thres, disc = 1, link = "logit") {
   checkmate::assert_integerish(x, lower = 1)
@@ -1680,7 +1680,7 @@ dacat <- function(x, eta, thres, disc = 1, link = "logit") {
 #' Inverse Link for Adjacent Category Models
 #'
 #' @inheritParams inv_link_cumulative
-#' @return Matrix [ndraws x ncat] of category probabilities
+#' @return Matrix \\[ndraws x ncat\\] of category probabilities
 #' @noRd
 inv_link_acat <- function(x, link) {
   checkmate::assert_numeric(x)
@@ -1729,9 +1729,9 @@ inv_link_acat <- function(x, link) {
 #' Computes category probabilities from linear predictor using softmax.
 #'
 #' @param x Integer vector of category indices
-#' @param eta Matrix [ndraws x ncat] of linear predictor values
+#' @param eta Matrix \\[ndraws x ncat\\] of linear predictor values
 #' @param log Logical; return log probabilities?
-#' @return Matrix [ndraws x length(x)] of category probabilities
+#' @return Matrix \[ndraws x length(x)\] of category probabilities
 #' @noRd
 dcategorical <- function(x, eta, log = FALSE) {
   checkmate::assert_integerish(x, lower = 1)
@@ -1754,7 +1754,7 @@ dcategorical <- function(x, eta, log = FALSE) {
 #' Applies softmax transformation to convert linear predictors to
 #'   probabilities.
 #'
-#' @param x Matrix [ndraws x ncat] or array [ndraws x nobs x ncat]
+#' @param x Matrix \\[ndraws x ncat\\] or array \\[ndraws x nobs x ncat\\]
 #' @param refcat Integer reference category index (NULL if already complete)
 #' @param log Logical; return log probabilities?
 #' @return Matrix or array of category probabilities
@@ -1783,7 +1783,7 @@ inv_link_categorical <- function(x, refcat = 1, log = FALSE) {
 #' Extracts the Mu parameter which may be a 3D array for categorical models.
 #'
 #' @param prep Prediction preparation object
-#' @return Array [ndraws x nobs x (ncat-1)] or matrix
+#' @return Array \[ndraws x nobs x (ncat-1)\] or matrix
 #' @noRd
 get_Mu <- function(prep) {
   checkmate::assert_list(prep)
@@ -1795,16 +1795,16 @@ get_Mu <- function(prep) {
 #' Posterior Expected Values for Ordinal Models
 #'
 #' Main helper function for computing category probabilities in ordinal models.
-#' Returns a 3D array [ndraws x nobs x ncat] of category probabilities.
+#' Returns a 3D array \\[ndraws x nobs x ncat\\] of category probabilities.
 #'
 #' @param prep Prediction preparation object containing:
-#'   - dpars$mu: linear predictor matrix [ndraws x nobs]
+#'   - dpars$mu: linear predictor matrix `\\[ndraws x nobs\\]`
 #'   - dpars$disc: discrimination parameter (optional)
-#'   - dpars$thres: threshold matrix [ndraws x nthres]
+#'   - dpars$thres: threshold matrix \\[ndraws x nthres\\]
 #'   - data$nthres: number of thresholds (may vary by observation)
 #'   - family$family: family name (cumulative, sratio, cratio, acat)
 #'   - family$link: link function name
-#' @return Array [ndraws x nobs x ncat] of category probabilities
+#' @return Array \\[ndraws x nobs x ncat\\] of category probabilities
 #' @noRd
 posterior_epred_ordinal <- function(prep) {
   checkmate::assert_list(prep)
@@ -1883,14 +1883,14 @@ posterior_epred_acat <- function(prep) {
 #' Posterior Expected Values for Categorical Models
 #'
 #' Computes category probabilities for categorical response models.
-#' Returns a 3D array [ndraws x nobs x ncat] of category probabilities.
+#' Returns a 3D array \\[ndraws x nobs x ncat\\] of category probabilities.
 #'
 #' @param prep Prediction preparation object containing:
-#'   - dpars$mu: array [ndraws x nobs x (ncat-1)] of linear predictors
+#'   - dpars$mu: array \[ndraws x nobs x (ncat-1)\] of linear predictors
 #'   - data$ncat: number of response categories
 #'   - refcat: reference category index
 #'   - cats: category labels
-#' @return Array [ndraws x nobs x ncat] of category probabilities
+#' @return Array \\[ndraws x nobs x ncat\\] of category probabilities
 #' @noRd
 posterior_epred_categorical <- function(prep) {
   checkmate::assert_list(prep)
@@ -1911,10 +1911,10 @@ posterior_epred_categorical <- function(prep) {
 #' Posterior Expected Values for Multinomial Models
 #'
 #' Computes expected counts for multinomial response models.
-#' Returns a 3D array [ndraws x nobs x ncat] of expected counts.
+#' Returns a 3D array \\[ndraws x nobs x ncat\\] of expected counts.
 #'
 #' @param prep Prediction preparation object
-#' @return Array [ndraws x nobs x ncat] of expected counts
+#' @return Array \\[ndraws x nobs x ncat\\] of expected counts
 #' @noRd
 posterior_epred_multinomial <- function(prep) {
   checkmate::assert_list(prep)
@@ -1939,7 +1939,7 @@ posterior_epred_multinomial <- function(prep) {
 #' The phi parameter affects variance only.
 #'
 #' @param prep Prediction preparation object
-#' @return Array [ndraws x nobs x ncat] of expected counts
+#' @return Array \\[ndraws x nobs x ncat\\] of expected counts
 #' @noRd
 posterior_epred_dirichlet_multinomial <- function(prep) {
   posterior_epred_multinomial(prep)
@@ -1953,7 +1953,7 @@ posterior_epred_dirichlet_multinomial <- function(prep) {
 #' Implementation identical to categorical (see brms source lines 562-606).
 #'
 #' @param prep Prediction preparation object
-#' @return Array [ndraws x nobs x ncat] of expected proportions
+#' @return Array \\[ndraws x nobs x ncat\\] of expected proportions
 #' @noRd
 posterior_epred_dirichlet <- function(prep) {
   # Dirichlet expected values use same softmax transformation as categorical
@@ -1963,10 +1963,10 @@ posterior_epred_dirichlet <- function(prep) {
 #' Posterior Expected Values for Dirichlet2 Models
 #'
 #' Dirichlet2 uses direct concentration parameters rather than softmax.
-#' E[Y_k] = alpha_k / sum(alpha)
+#' E\[Y_k\] = alpha_k / sum(alpha)
 #'
 #' @param prep Prediction preparation object
-#' @return Array [ndraws x nobs x ncat] of expected proportions
+#' @return Array \\[ndraws x nobs x ncat\\] of expected proportions
 #' @noRd
 posterior_epred_dirichlet2 <- function(prep) {
   checkmate::assert_list(prep)

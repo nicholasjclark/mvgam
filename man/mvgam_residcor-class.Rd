@@ -90,7 +90,7 @@ species-to-species associations at different spatial scales. Methods in Ecology 
 7, 549-555.
 }
 \seealso{
-\code{\link[=jsdgam]{jsdgam()}}, \code{\link[=residual_cor]{residual_cor()}}
+\code{jsdgam()}, \code{\link[=residual_cor]{residual_cor()}}
 }
 \author{
 Nicholas J Clark

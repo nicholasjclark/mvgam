@@ -21,7 +21,7 @@ residual_cor(object, ...)
 \method{residual_cor}{jsdgam}(object, ...)
 }
 \arguments{
-\item{object}{A fitted \link[=mvgam]{mvgam} object.}
+\item{object}{A fitted [mvgam][mvgam::mvgam] object.}
 
 \item{...}{Currently ignored.}
 
@@ -31,7 +31,7 @@ residual_cor(object, ...)
 (\code{tcrossprod(L_Omega_global)}) is returned. When \code{TRUE}, a named
 list of \code{mvgam_residcor} objects is returned, one per group; each
 group's correlation is reconstructed as
-\code{alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev[g])}.}
+\verb{alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev\[g\])}.}
 
 \item{partial}{Logical. When \code{TRUE}, also compute the residual
 partial correlation matrix per draw via the inverse-correlation
@@ -53,7 +53,7 @@ probabilities for the quantile-based credible interval. Default
 \code{c(0.025, 0.975)}.}
 }
 \value{
-An \linkS4class{mvgam_residcor} object when \code{summary = TRUE} and
+An [mvgam_residcor-class] object when \code{summary = TRUE} and
 \code{groups = FALSE}. When \code{groups = TRUE} on a hierarchical trend, a
 named list of \code{mvgam_residcor} objects (one per group plus the
 population-level matrix under the name \code{"_global"}). When
@@ -61,7 +61,7 @@ population-level matrix under the name \code{"_global"}). When
 }
 \description{
 Compute residual (cross-series) correlation, covariance and partial
-correlation summaries from a fitted \link[=mvgam]{mvgam} model. The
+correlation summaries from a fitted [mvgam][mvgam::mvgam] model. The
 three supported sources for the per-series covariance are:
 }
 \details{
@@ -90,7 +90,7 @@ directly.
 }
 For hierarchical trends, per-group correlations combine the global
 Cholesky factor and per-group deviations via
-\code{alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev[g])}.
+\verb{alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev\[g\])}.
 
 Credible intervals and posterior SDs for correlations are computed
 on the Fisher z-transformed scale (\code{atanh(r)}) and back-transformed
@@ -114,6 +114,6 @@ Regression Analysis of Multivariate Abundance Data in R.
 \doi{10.1111/2041-210X.12514}
 }
 \seealso{
-\linkS4class{mvgam_residcor}, \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}},
+[mvgam_residcor-class], \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}},
 \code{\link[=print.mvgam_residcor]{print.mvgam_residcor()}}.
 }

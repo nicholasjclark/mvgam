@@ -47,7 +47,7 @@
 #' @param ... Unused; present for S3 / brms-parity.
 #'
 #' @return A numeric matrix of dimension
-#'   `[n_draws x n_grid_points]` containing the posterior draws
+#'   \[n_draws x n_grid_points\] containing the posterior draws
 #'   of the smooth term's contribution to the linear predictor.
 #'
 #' @details
@@ -125,11 +125,11 @@ brms::posterior_smooths
 #'
 #' Compute and display posterior conditional effects for every
 #' smooth term in a fitted `mvgam` object, matching the shape of
-#' [brms::conditional_smooths()]. Returns a named list of
+#' \code{\link[brms]{conditional_smooths.brmsfit}}. Returns a named list of
 #' `data.frame`s with the brms-style `estimate__` / `lower__` /
 #' `upper__` / `effect1__` / `effect2__` / `cond__` columns and
-#' inherits the `brms_conditional_effects` class so the existing
-#' [brms:::plot.brms_conditional_effects()] method works
+#' inherits the `brms_conditional_effects` class so brms's
+#' `plot.brms_conditional_effects()` method works
 #' out-of-the-box.
 #'
 #' @param x A fitted `mvgam` object.
@@ -158,7 +158,7 @@ brms::posterior_smooths
 #'   for marginaleffects-style multidimensional displays.
 #' @param resolution Positive integer. Grid resolution per
 #'   covariate dimension. Defaults to `100`.
-#' @param too_far Numeric in `[0, 1]`. For surface smooths, grid
+#' @param too_far Numeric in \[0, 1\]. For surface smooths, grid
 #'   points further than this from the training data (measured in
 #'   the unit square) are dropped via
 #'   [mgcv::exclude.too.far()]. `0` (default) keeps all points.
@@ -168,13 +168,13 @@ brms::posterior_smooths
 #' @return A named list with one element per smooth term. Each
 #'   element is a `data.frame` with the brms-style summary columns
 #'   (`estimate__`, `se__`, `lower__`, `upper__`,
-#'   `effect1__` [, `effect2__`], `cond__`) plus the focal
+#'   `effect1__` (optionally `effect2__`), `cond__`) plus the focal
 #'   covariate(s). Attributes `response`, `effects`,
 #'   `surface`, `spaghetti`, and `points` are populated for the
 #'   existing brms plot dispatch. The returned object carries the
 #'   `brms_conditional_effects` class.
 #'
-#' @seealso [brms::conditional_smooths()],
+#' @seealso \code{\link[brms]{conditional_smooths.brmsfit}},
 #'   [posterior_smooths.mvgam()],
 #'   [conditional_effects.mvgam()].
 #'

@@ -1,7 +1,7 @@
 #' Extract residual correlations from a fitted mvgam model
 #'
 #' Compute residual (cross-series) correlation, covariance and partial
-#' correlation summaries from a fitted [mvgam][mvgam::mvgam] model. The
+#' correlation summaries from a fitted \[mvgam\]\[mvgam::mvgam\] model. The
 #' three supported sources for the per-series covariance are:
 #'
 #' \itemize{
@@ -17,14 +17,14 @@
 #'     the trend via `gr = ...`).
 #' }
 #'
-#' @param object A fitted [mvgam][mvgam::mvgam] object.
+#' @param object A fitted \[mvgam\]\[mvgam::mvgam\] object.
 #' @param groups Logical. Only relevant for hierarchical trends
 #'   (`gr = ...` supplied to the trend constructor). When `FALSE`
 #'   (default) the population-level correlation
 #'   (`tcrossprod(L_Omega_global)`) is returned. When `TRUE`, a named
 #'   list of `mvgam_residcor` objects is returned, one per group; each
 #'   group's correlation is reconstructed as
-#'   `alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev[g])`.
+#'   `alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev\[g\])`.
 #' @param partial Logical. When `TRUE`, also compute the residual
 #'   partial correlation matrix per draw via the inverse-correlation
 #'   identity `P_ij = -inv(R)_ij / sqrt(inv(R)_ii * inv(R)_jj)`. This
@@ -42,7 +42,7 @@
 #'   `c(0.025, 0.975)`.
 #' @param ... Currently ignored.
 #'
-#' @return An [mvgam_residcor-class] object when `summary = TRUE` and
+#' @return An \[mvgam_residcor-class\] object when `summary = TRUE` and
 #'   `groups = FALSE`. When `groups = TRUE` on a hierarchical trend, a
 #'   named list of `mvgam_residcor` objects (one per group plus the
 #'   population-level matrix under the name `"_global"`). When
@@ -61,7 +61,7 @@
 #' }
 #' For hierarchical trends, per-group correlations combine the global
 #' Cholesky factor and per-group deviations via
-#' `alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev[g])`.
+#' `alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev\[g\])`.
 #'
 #' Credible intervals and posterior SDs for correlations are computed
 #' on the Fisher z-transformed scale (`atanh(r)`) and back-transformed
@@ -78,7 +78,7 @@
 #' latent-factor parameterisation; this function will be wired up to
 #' that case when the jsdgam port lands.
 #'
-#' @seealso [mvgam_residcor-class], [summary.mvgam_residcor()],
+#' @seealso \[mvgam_residcor-class\], [summary.mvgam_residcor()],
 #'   [print.mvgam_residcor()].
 #'
 #' @references Hui, F. K. C. (2016). boral - Bayesian Ordination and
@@ -147,7 +147,7 @@ residual_cor.jsdgam <- function(object, ...) {
 #'   1. Factor model (`n_lv > 0` on the trend spec): `Sigma = Z Z^T`
 #'      per draw from the posterior loadings matrix `Z`.
 #'   2. `get_trend_covariance_structure()$pattern`:
-#'      - `"full_covariance"` (VAR, VARMA): `Sigma_trend[d, , ]` direct.
+#'      - `"full_covariance"` (VAR, VARMA): `Sigma_trend\[d, , \]` direct.
 #'      - `"cholesky_scaled"` with correlations: reconstruct as
 #'        `diag(sigma) %*% L_Omega %*% t(L_Omega) %*% diag(sigma)`.
 #'      - `"hierarchical_cholesky"`: population-level `tcrossprod(L_global)`
@@ -282,7 +282,7 @@ uses_loadings_prior <- function(object) {
 #'
 #' Delegates to `resolve_factor_loadings()` so the sampled-vs-
 #' fixed Z decision lives in one place. Returns the implied
-#' `[ndraws, n_series, n_series]` covariance array.
+#' \[ndraws, n_series, n_series\] covariance array.
 #'
 #' @noRd
 extract_cov_draws_factor <- function(object, n_lv, n_series) {
@@ -302,7 +302,7 @@ extract_cov_draws_factor <- function(object, n_lv, n_series) {
 
 #' Per-draw covariance array from a non-hierarchical trend.
 #'
-#' Returns a `[ndraws, p, p]` numeric array of posterior covariance
+#' Returns a \[ndraws, p, p\] numeric array of posterior covariance
 #' matrices reconstructed from either the cholesky-scaled or
 #' full-covariance pattern.
 #'
@@ -529,11 +529,11 @@ partial_cor_from_cor <- function(R) {
 
 #' Per-element summary of a correlation array via Fisher z.
 #'
-#' For each `(i, j)` element of the `[ndraws, p, p]` correlation
-#' array, compute point estimate, posterior SD, and quantile CIs on
-#' the Fisher-z scale and back-transform to the correlation scale.
-#' Off-scale draws (`r == 1`) are clipped before `atanh` to avoid
-#' infinities.
+#' For each off-diagonal element of the input draws-by-p-by-p
+#' correlation array, compute point estimate, posterior SD, and
+#' quantile CIs on the Fisher-z scale and back-transform to the
+#' correlation scale. Off-scale draws (r == 1) are clipped before
+#' atanh to avoid infinities.
 #'
 #' @noRd
 summarise_correlation_array <- function(arr, robust, probs, series_names) {
@@ -715,7 +715,7 @@ trend_spec_for_residcor <- function(object) {
 }
 
 
-#' Look up `levels(data[[var_name]])` with a fallback if the column
+#' Look up `levels(data[\[var_name\]])` with a fallback if the column
 #' is missing or the level count differs from the expected size.
 #' Variable name comes from `as.character()` of the trend spec slot.
 #'

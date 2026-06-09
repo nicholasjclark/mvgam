@@ -43,7 +43,7 @@ process noise.}
 \item{...}{Ignored.}
 }
 \value{
-Numeric matrix \verb{[ndraws x nobs]} of pointwise log densities.
+Numeric matrix [ndraws x nobs] of pointwise log densities.
 }
 \description{
 Compute the per-observation log-likelihood for each posterior draw,
@@ -59,7 +59,7 @@ density helpers. brms's parameterisations are reproduced verbatim
 \code{beta} uses \verb{(mu, phi)}; \verb{hurdle_*} and \verb{zero_inflated_*} mix a point mass
 at zero with the corresponding base family). Trials for \code{binomial} /
 \code{beta_binomial} are extracted from \code{newdata} or from the model object via
-the existing \code{\link[=extract_trials_for_family]{extract_trials_for_family()}} helper.
+the existing \code{extract_trials_for_family()} helper.
 
 For state-space-dominated fits, \code{process_error = TRUE} is the default and
 matches the behaviour LOO / PSIS / WAIC expect. Set \code{process_error = FALSE}

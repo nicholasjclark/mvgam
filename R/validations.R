@@ -1224,6 +1224,91 @@ formula2str_mvgam <- function(formula, space = "trim") {
   return(x)
 }
 
+#' Collect function-call symbol names from an unevaluated R expression
+#'
+#' Recursively walks a `call`/`language` tree and returns the function
+#' names at each call site. Used by formula validators that need to
+#' detect specific function calls without false-positives from
+#' substring matches in deparsed text (e.g. distinguishing the brms
+#' `se()` addition term from a user variable named `se_x` or
+#' `defense`).
+#'
+#' Handles namespace-qualified calls (`pkg::fun(x)` returns `fun`).
+#' Returns `character(0)` for symbols, literals, and `NULL`.
+#'
+#' @param expr An unevaluated R expression (the kind you get from
+#'   indexing a formula, e.g. `formula[[length(formula)]]`).
+#' @return A character vector of call-site function names, in
+#'   left-to-right depth-first order. May contain duplicates.
+#' @noRd
+collect_call_names <- function(expr) {
+  if (!is.call(expr)) {
+    return(character(0L))
+  }
+  head <- expr[[1L]]
+  head_name <- if (is.symbol(head)) {
+    as.character(head)
+  } else if (is.call(head) && identical(head[[1L]], as.name("::"))) {
+    as.character(head[[3L]])
+  } else {
+    character(0L)
+  }
+  arg_names <- unlist(
+    lapply(as.list(expr)[-1L], collect_call_names),
+    use.names = FALSE
+  )
+  c(head_name, arg_names)
+}
+
+#' Function-call names in the right-hand side of a formula
+#'
+#' Dispatches on the formula class so plain `formula`, `brmsformula`,
+#' `bform`, and `mvbrmsformula` inputs all return the function calls
+#' appearing in their predictor expressions. For `brmsformula` /
+#' `bform` we walk the main RHS plus every distributional-parameter
+#' (`pforms`) and non-linear-parameter (`nlpars`) sub-formula. For
+#' `mvbrmsformula` we recurse over each response sub-formula.
+#'
+#' The LHS of a formula (response, brms addition-terms like
+#' `y | cens(c)`) is deliberately not walked: validators that care
+#' about LHS specials handle them separately via the parsed
+#' `brmsterms()` `$adforms` slot.
+#'
+#' @param x A formula, brmsformula, bform, or mvbrmsformula.
+#' @return Unique character vector of function-call names appearing on
+#'   the RHS. Empty character vector if `x` is `NULL` or no calls.
+#' @noRd
+formula_rhs_function_names <- function(x) {
+  if (is.null(x)) {
+    return(character(0L))
+  }
+  if (inherits(x, "mvbrmsformula")) {
+    return(unique(unlist(
+      lapply(x$forms, formula_rhs_function_names),
+      use.names = FALSE
+    )))
+  }
+  if (inherits(x, c("brmsformula", "bform"))) {
+    parts <- list(
+      if (!is.null(x$formula)) formula_rhs_function_names(x$formula),
+      if (!is.null(x$pforms)) {
+        unlist(lapply(x$pforms, formula_rhs_function_names),
+               use.names = FALSE)
+      },
+      if (!is.null(x$nlpars)) {
+        unlist(lapply(x$nlpars, formula_rhs_function_names),
+               use.names = FALSE)
+      }
+    )
+    return(unique(unlist(parts, use.names = FALSE)))
+  }
+  if (inherits(x, "formula")) {
+    rhs <- x[[length(x)]]
+    return(unique(collect_call_names(rhs)))
+  }
+  character(0L)
+}
+
 #' Get Dynamic Trend Validation Patterns
 #'
 #' @description
@@ -1606,15 +1691,27 @@ validate_trend_formula_restrictions <- function(formula_str,
     ),
 
     "addition_terms" = list(
-      patterns = function(formula_str) {
-        addition_terms <- c("weights", "cens", "trunc", "mi", "trials",
-                           "rate", "vreal", "vint", "subset", "index", "cov_ranef")
-        pattern <- paste0("\\b(", paste(addition_terms, collapse = "|"), ")\\s*\\(")
-        matches <- regmatches(formula_str, gregexpr(pattern, formula_str, perl = TRUE))[[1]]
-        if (length(matches) > 0) {
-          detected_terms <- gsub("\\s*\\(.*", "", matches)
-          structure(paste0(unique(detected_terms), "()"), names = rep("detected", length(detected_terms)))
-        } else character(0)
+      # brms `formula_ad` specials that modify the *observation model*
+      # and therefore have no defined meaning on a latent State-Space
+      # trend. `mi` is deliberately absent: per the design intent of
+      # GH issue #109 item 12, missing-predictor imputation is allowed
+      # on the latent scale; the obs-side rejection of `mi()` as a
+      # predictor lives in `validate_obs_formula_brms`. Detection walks
+      # the formula AST (see `formula_rhs_function_names`) rather than
+      # grepping the deparsed string so variable names like `defense`
+      # or `se_x` cannot false-positive.
+      patterns = function(formula_str, formula = NULL) {
+        if (is.null(formula)) return(character(0L))
+        addition_terms <- c(
+          "weights", "se", "cens", "trunc", "trials", "rate",
+          "vreal", "vint", "subset", "index", "dec", "cat",
+          "thres", "cov_ranef"
+        )
+        rhs_calls <- formula_rhs_function_names(formula)
+        hit <- intersect(rhs_calls, addition_terms)
+        if (length(hit) > 0L) {
+          structure(paste0(hit, "()"), names = rep("detected", length(hit)))
+        } else character(0L)
       },
       error_header = "brms addition-terms not allowed in {.field trend_formula}:",
       error_reason = "These terms modify observation model behavior, not State-Space dynamics.",
@@ -1663,9 +1760,13 @@ validate_trend_formula_restrictions <- function(formula_str,
   for (restriction in restrictions) {
     config <- restriction_configs[[restriction]]
 
-    # Detect violations
+    # Detect violations. `offsets` and `addition_terms` both need the
+    # original formula object: `offsets` uses `terms(formula)` to find
+    # the offset attribute, `addition_terms` walks the AST via
+    # `formula_rhs_function_names()` to avoid false-positives from
+    # variable names that share a substring with an addition-term name.
     if (is.function(config$patterns)) {
-      if (restriction == "offsets") {
+      if (restriction %in% c("offsets", "addition_terms")) {
         detected <- config$patterns(formula_str, formula)
       } else {
         detected <- config$patterns(formula_str)

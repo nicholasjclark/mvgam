@@ -24,7 +24,7 @@
 NULL, uses original training data stored in the model object.}
 
 \item{process_error}{Logical; if TRUE (default), the posterior
-predictive distribution is the \strong{marginal} \verb{[Y | X]} integrated
+predictive distribution is the \strong{marginal} \verb{\[Y | X\]} integrated
 over the trend's stochastic dynamics. mvgam achieves this by
 Monte Carlo: sampled innovations are added to the link-scale
 linear predictor before applying the inverse link and drawing
@@ -39,7 +39,7 @@ Note: with \code{process_error = TRUE} the invariant
 longer holds (innovations are added in \code{epred} and \code{predict} but
 not in \code{linpred}). For deterministic-state-at-fitted-values
 semantics (matching the trained latent state without resampling)
-use \link{forecast.mvgam} / \link{hindcast.mvgam}, which read the
+use [forecast.mvgam] / [hindcast.mvgam], which read the
 \code{lv_trend} posterior draws directly and extrapolate the latent
 state forward for newdata times beyond the training grid.}
 
@@ -62,7 +62,7 @@ responses.}
 \item{...}{Additional arguments passed to internal methods.}
 }
 \value{
-Matrix with dimensions \link{ndraws x nobs} containing posterior
+Matrix with dimensions \verb{\\\[ndraws x nobs\\\]} containing posterior
 predictive samples. Each row is one posterior draw, each column is
 one observation. Values are on the response scale (include observation
 noise).
@@ -78,11 +78,11 @@ checks and predictions on new data.
 \details{
 The posterior predictive distribution combines:
 \itemize{
-\item Expected values E\link{Y|X}: from observation + trend models
+\item Expected values E[Y|X]: from observation + trend models
 \item Observation noise: family-specific random draws
 }
 
-This differs from \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} which returns only E\link{Y|X}.
+This differs from \code{posterior_epred.mvgam()} which returns only E[Y|X].
 Posterior predictive samples have higher variance and are suitable for
 checking if the model can generate data like the observed data.
 
@@ -94,7 +94,7 @@ dynamics. At newdata times beyond the training grid the
 latent state is treated as stationary at its per-series
 posterior mean (a \code{marginaleffects}-style convention; an
 informational message fires once per session).
-\item \link{forecast.mvgam} / \link{hindcast.mvgam} read the fitted
+\item [forecast.mvgam] / [hindcast.mvgam] read the fitted
 \code{lv_trend} posterior draws directly. \code{hindcast()} returns
 them at the training grid; \code{forecast()} extrapolates them
 forward via the kernel for newdata times beyond training.
@@ -114,7 +114,7 @@ fit <- mvgam(
 
 # Generate posterior predictive samples
 pp <- posterior_predict(fit)
-dim(pp)  # [ndraws x nobs]
+dim(pp)  # `\\[ndraws x nobs\\]`
 
 # Posterior predictive check: samples should vary more than epred
 epred <- posterior_epred(fit)
@@ -123,8 +123,8 @@ var(pp) > var(epred)  # Should be TRUE
 
 }
 \seealso{
-\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} for expected values without
+\code{posterior_epred.mvgam()} for expected values without
 noise, \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} for link-scale predictions,
-\link{forecast.mvgam} and \link{hindcast.mvgam} for the deterministic
+[forecast.mvgam] and [hindcast.mvgam] for the deterministic
 state-extrapolating prediction surface.
 }

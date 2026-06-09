@@ -17,7 +17,7 @@
 #'   - n_terms: integer count of detected GP terms
 #'
 #' @details
-#' Term ids are enumerated from `sdgp_<id>[...]` parameters in
+#' Term ids are enumerated from `sdgp_<id>\[...\]` parameters in
 #'   `prep$draws` rather than from `Xgp_*` names in `prep$sdata`, because
 #'   `sdgp` is emitted consistently per term whereas `Xgp` carries a
 #'   level suffix in the by-factor case (`Xgp_<id>_<g>`) and is
@@ -229,17 +229,17 @@ approx_gp_pred <- function(Xgp, slambda, zgp, sdgp, lscale, kernel) {
 #' if GP is isotropic or anisotropic. Follows brms pattern of checking
 #' lscale column count (structure) rather than comparing values.
 #'
-#' @param slambda Array of eigenvalues; matrix [n_basis, n_dims] or
-#'   3D array [n_basis, n_dims, 1]
-#' @param sdgp Vector of marginal standard deviations [n_draws]
-#' @param lscale Matrix of length scale parameters; [n_draws, 1] for
-#'   isotropic GPs (brms default) or [n_draws, n_dims] for anisotropic
+#' @param slambda Array of eigenvalues; matrix \[n_basis, n_dims\] or
+#'   3D array \[n_basis, n_dims, 1\]
+#' @param sdgp Vector of marginal standard deviations \\[n_draws\\]
+#' @param lscale Matrix of length scale parameters; \\[n_draws, 1\\] for
+#'   isotropic GPs (brms default) or \\[n_draws, n_dims\\] for anisotropic
 #'
 #' @return List with validated/prepared components:
-#'   - slambda: 2D matrix [n_basis, n_dims]
+#'   - slambda: 2D matrix \[n_basis, n_dims\]
 #'   - n_basis, n_dims, n_draws: dimension integers
 #'   - is_isotropic: logical indicating single shared length scale
-#'   - lscale_iso: vector [n_draws] if isotropic, NULL otherwise
+#'   - lscale_iso: vector \\[n_draws\\] if isotropic, NULL otherwise
 #'   - lscale2: lscale^2 matrix for anisotropic computation
 #'
 #' @noRd
@@ -309,13 +309,13 @@ prepare_spd_inputs <- function(slambda, sdgp, lscale) {
 #' using the squared exponential (exp_quad) kernel. Follows brms
 #' implementation exactly for consistency with Stan code generation.
 #'
-#' @param slambda Array of eigenvalues; matrix [n_basis, n_dims] or
-#'   3D array [n_basis, n_dims, 1]
-#' @param sdgp Vector of marginal standard deviations [n_draws]
-#' @param lscale Matrix of length scale parameters; [n_draws, 1] for
-#'   isotropic GPs (brms default) or [n_draws, n_dims] for anisotropic
+#' @param slambda Array of eigenvalues; matrix \[n_basis, n_dims\] or
+#'   3D array \[n_basis, n_dims, 1\]
+#' @param sdgp Vector of marginal standard deviations \\[n_draws\\]
+#' @param lscale Matrix of length scale parameters; \\[n_draws, 1\\] for
+#'   isotropic GPs (brms default) or \\[n_draws, n_dims\\] for anisotropic
 #'
-#' @return Matrix [n_draws, n_basis] of spectral power density values
+#' @return Matrix \\[n_draws, n_basis\\] of spectral power density values
 #'
 #' @details
 #' Mathematical formula where D = n_dims:
@@ -367,7 +367,7 @@ spd_gp_exp_quad <- function(slambda, sdgp, lscale) {
 #' using the Matern 3/2 kernel. Follows brms implementation exactly.
 #'
 #' @inheritParams spd_gp_exp_quad
-#' @return Matrix [n_draws, n_basis] of spectral power density values
+#' @return Matrix \\[n_draws, n_basis\\] of spectral power density values
 #'
 #' @details
 #' Mathematical formula where D = n_dims:
@@ -420,7 +420,7 @@ spd_gp_matern32 <- function(slambda, sdgp, lscale) {
 #' using the Matern 5/2 kernel. Follows brms implementation exactly.
 #'
 #' @inheritParams spd_gp_exp_quad
-#' @return Matrix [n_draws, n_basis] of spectral power density values
+#' @return Matrix \\[n_draws, n_basis\\] of spectral power density values
 #'
 #' @details
 #' Mathematical formula where D = n_dims:
@@ -475,11 +475,11 @@ spd_gp_matern52 <- function(slambda, sdgp, lscale) {
 #'
 #' @param slambda Array of eigenvalues for spectral basis functions
 #' @param sdgp Vector of marginal standard deviations across draws  
-#' @param lscale Matrix of length scale parameters [draws, dimensions]
+#' @param lscale Matrix of length scale parameters \[draws, dimensions\]
 #' @param kernel Character string specifying kernel type: "exp_quad", 
 #'   "matern32", or "matern52"
 #'
-#' @return Matrix [n_draws, n_basis] of sqrt(spectral_power_density)
+#' @return Matrix \\[n_draws, n_basis\\] of sqrt(spectral_power_density)
 #'
 #' @noRd
 compute_spd_vectorized <- function(slambda, sdgp, lscale, kernel) {
@@ -670,7 +670,7 @@ has_nlpars <- function(object) {
 #'   multivariate models. If NULL, returns all responses (univariate
 #'   returns single matrix, multivariate returns named list).
 #'
-#' @return Matrix [ndraws × nobs] for univariate or single response.
+#' @return Matrix \\[ndraws × nobs\\] for univariate or single response.
 #'   Named list of matrices for multivariate models when resp = NULL.
 #'
 #' @details
@@ -814,13 +814,13 @@ extract_linpred_nonlinear <- function(prep, resp = NULL) {
 #' standardized (zs_* with sds_*) and unstandardized (s_*) forms
 #' following brms conventions.
 #'
-#' @param draws_mat Matrix of posterior draws [n_draws × n_params]
+#' @param draws_mat Matrix of posterior draws \\[n_draws × n_params\\]
 #' @param smooth_label Base name for smooth term
 #'   (e.g., "1_1" from Zs_count_1_1)
 #' @param resp Response name for multivariate models (NULL for univariate)
 #' @param n_basis Expected number of basis functions
 #'
-#' @return Matrix [n_draws × n_basis] of smooth coefficients, or NULL if
+#' @return Matrix \\[n_draws × n_basis\\] of smooth coefficients, or NULL if
 #'   no matching coefficients found (allows silent skip for optional smooths)
 #'
 #' @details
@@ -912,14 +912,14 @@ validate_monotonic_indices <- function(xmo_data, xmo_name, k_levels, n_obs) {
 #' Gaussian Process terms in a model. Handles both univariate and
 #' multivariate contexts with response-specific filtering.
 #'
-#' @param eta Matrix [n_draws × n_obs] of current linear predictor values
+#' @param eta Matrix \\[n_draws × n_obs\\] of current linear predictor values
 #' @param prep A brmsprep object containing GP data structures
 #' @param brmsfit A brmsfit object for kernel detection (optional)
 #' @param resp Character string for response name in multivariate models.
 #'   NULL for univariate models. When specified, only includes GPs that
 #'   are response-specific ("resp_1") or shared (no prefix).
 #'
-#' @return Matrix [n_draws × n_obs] with GP contributions added
+#' @return Matrix \\[n_draws × n_obs\\] with GP contributions added
 #'
 #' @details
 #' Processing steps:
@@ -1164,9 +1164,9 @@ add_all_gp_contributions <- function(eta, prep, brmsfit = NULL, resp = NULL) {
 #'   and model is multivariate, returns named list of matrices (one per
 #'   response). If specified, returns matrix for that response only.
 #'
-#' @return For univariate models: Matrix [ndraws × nobs]
+#' @return For univariate models: Matrix \\[ndraws × nobs\\]
 #'   For multivariate models with resp=NULL: Named list of matrices
-#'   For multivariate models with resp specified: Matrix [ndraws × nobs]
+#'   For multivariate models with resp specified: Matrix \\[ndraws × nobs\\]
 #'
 #' @details
 #' The linear predictor (eta) is computed as:
@@ -1254,7 +1254,7 @@ extract_linpred_from_prep <- function(prep, resp = NULL) {
 #' @param n_draws Number of draws
 #' @param n_obs Number of observations
 #'
-#' @return Matrix [n_draws × n_obs] of random effects contributions
+#' @return Matrix \\[n_draws × n_obs\\] of random effects contributions
 #'
 #' @noRd
 population_random_pred <- function(prep, draws_mat, n_draws, n_obs) {
@@ -1334,8 +1334,8 @@ population_random_pred <- function(prep, draws_mat, n_draws, n_obs) {
 #' basis matrix multiplication. Validates parameter dimensions and
 #' provides informative error messages for mismatches.
 #'
-#' @param eta Current linear predictor matrix [n_draws × n_obs]
-#' @param draws_mat Parameter draws matrix with bs[*] coefficients
+#' @param eta Current linear predictor matrix \\[n_draws × n_obs\\]
+#' @param draws_mat Parameter draws matrix with bs\[*\] coefficients
 #' @param prep Prepared prediction data containing sdata$Xs
 #'
 #' @return Updated eta matrix with smooth fixed effects added
@@ -1376,10 +1376,10 @@ smooth_fixed_pred <- function(eta, draws_mat, prep) {
 #' Add Monotonic Effects (bsp * mo(simo, Xmo))
 #'
 #' Adds monotonic effects contribution to linear predictor following
-#' Stan formula: mu[n] += (bsp[1]) * mo(simo_1, Xmo_1[n])
+#' Stan formula: mu\[n\] += (bsp\[1\]) * mo(simo_1, Xmo_1\[n\])
 #'
-#' @param eta Current linear predictor matrix [n_draws × n_obs]
-#' @param draws_mat Parameter draws matrix with bsp[*] and simo_*[*] coefficients
+#' @param eta Current linear predictor matrix \\[n_draws × n_obs\\]
+#' @param draws_mat Parameter draws matrix with bsp\[*\] and simo_*\[*\] coefficients
 #' @param prep Prepared prediction data containing sdata components
 #' @param suffix Monotonic term suffix (e.g., "1" for univariate, "count_1" for multivariate)
 #' @param n_obs Number of observations for current response
@@ -1387,7 +1387,7 @@ smooth_fixed_pred <- function(eta, draws_mat, prep) {
 #' @return Updated eta matrix with monotonic effects added
 #'
 #' @details
-#' Implements Stan formula: (bsp[id]) * mo(simo_id, Xmo_id[n])
+#' Implements Stan formula: (bsp\[id\]) * mo(simo_id, Xmo_id\[n\])
 #' where bsp are monotonic coefficients, simo are simplex parameters,
 #' and Xmo are ordinal level indices.
 #' 
@@ -1497,7 +1497,7 @@ monotonic_pred <- function(eta, draws_mat, prep, suffix, n_obs) {
 #' Each nb_<id> field indicates the number of components for smooth term <id>.
 #' This metadata-driven approach handles both regular smooths and tensor products.
 #'
-#' @param eta Current linear predictor matrix [n_draws × n_obs] to add to
+#' @param eta Current linear predictor matrix \\[n_draws × n_obs\\] to add to
 #' @param draws_mat Parameter draws matrix with columns for coefficients
 #' @param prep Prepared prediction data from brms
 #' @param resp_prefix Response prefix for multivariate (e.g., "y1_") or "" for univariate
@@ -1603,7 +1603,7 @@ smooth_random_pred <- function(eta, draws_mat, prep, resp_prefix) {
 #'
 #' @param prep A brmsprep object from prepare_predictions()
 #'
-#' @return Matrix [ndraws × nobs]
+#' @return Matrix \\[ndraws × nobs\\]
 #'
 #' @noRd
 extract_linpred_univariate <- function(prep) {
@@ -1716,8 +1716,8 @@ extract_linpred_univariate <- function(prep) {
 #' @param prep A brmsprep object from prepare_predictions()
 #' @param resp Optional response name. If NULL, returns list of matrices.
 #'
-#' @return If resp is NULL: Named list of matrices [ndraws × nobs]
-#'   If resp specified: Single matrix [ndraws × nobs]
+#' @return If resp is NULL: Named list of matrices \\[ndraws × nobs\\]
+#'   If resp specified: Single matrix \\[ndraws × nobs\\]
 #'
 #' @noRd
 extract_linpred_multivariate <- function(prep, resp = NULL) {
@@ -2027,7 +2027,7 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
 #' @param sample_new_levels Character; how to sample new levels
 #'   ("uncertainty" or "gaussian")
 #'
-#' @return Matrix [ndraws × nobs] of linear predictor values on link scale
+#' @return Matrix \\[ndraws × nobs\\] of linear predictor values on link scale
 #'
 #' @details
 #' **Component Routing**:
@@ -2038,8 +2038,8 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
 #'   model component
 #'
 #' **Parameter Renaming**: Trend parameters have "_trend" suffix stripped
-#' because the combined fit stores parameters as "b_trend[1]" but the
-#' trend_model brmsfit expects "b[1]".
+#' because the combined fit stores parameters as "b_trend\[1\]" but the
+#' trend_model brmsfit expects "b\[1\]".
 #'
 #' @noRd
 extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
@@ -2216,9 +2216,9 @@ add_latent_to_linpred <- function(linpred, latent_mat) {
 
 #' Extract per-observation latent trend state draws
 #'
-#' Pulls the `trend[t, s]` posterior draws from the stanfit and
+#' Pulls the `trend\[t, s\]` posterior draws from the stanfit and
 #' aligns them to `newdata` rows via `(time, series)` mapping. Returns
-#' a `[ndraws x nobs]` matrix or NULL if the fit has no latent trend
+#' a ``\\[ndraws x nobs\\]`` matrix or NULL if the fit has no latent trend
 #' state.
 #'
 #' @noRd

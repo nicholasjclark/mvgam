@@ -39,7 +39,7 @@ matching the \code{\link[brms:posterior_smooths.brmsfit]{brms::posterior_smooths
 }
 \value{
 A numeric matrix of dimension
-\verb{[n_draws x n_grid_points]} containing the posterior draws
+[n_draws x n_grid_points] containing the posterior draws
 of the smooth term's contribution to the linear predictor.
 }
 \description{

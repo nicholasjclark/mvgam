@@ -90,7 +90,7 @@ variables.mvgam <- function(x, ...) {
 #'     \item trend_betas: Trend formula fixed effects
 #'     \item trend_smoothpars: Trend formula smooth parameters
 #'     \item trend_re_params: Trend formula random effects
-#'     \item trends: Computed trend state arrays (trend[i,j])
+#'     \item trends: Computed trend state arrays (trend\[i,j\])
 #'   }
 #'
 #' @details
@@ -99,7 +99,7 @@ variables.mvgam <- function(x, ...) {
 #' suffix to avoid naming conflicts with observation model parameters.
 #'
 #' The alias column is reserved for mapping Stan parameter names to mgcv-style
-#' coefficient names (e.g., "s_x_1[3]" might alias to "s(x).3"). Currently
+#' coefficient names (e.g., "s_x_1\[3\]" might alias to "s(x).3"). Currently
 #' set to NA as this mapping is not yet implemented.
 #'
 #' @examples
@@ -366,8 +366,8 @@ extract_obs_parameters <- function(mvgam_fit) {
 #'     (sd_, r_, cor_)
 #' }
 #'
-#' Note: Computed trend state arrays (trend[i,j], lv_trend[i,j],
-#'   innovations_trend[i,j]) are excluded as they are derived
+#' Note: Computed trend state arrays (trend\[i,j\], lv_trend\[i,j\],
+#'   innovations_trend\[i,j\]) are excluded as they are derived
 #'   quantities, not model parameters.
 #'
 #' @examples

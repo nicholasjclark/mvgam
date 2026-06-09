@@ -6,7 +6,7 @@
 #' decomposition, then posterior medians of the variables and
 #' the species' loadings are scattered in the resulting 2-D
 #' space. Site labels and species loading arrows are drawn via
-#' the package-wide [ggrepel] helpers; when [ggarrow] and [ggpp]
+#' the package-wide [ggrepel] helpers; when \pkg{ggarrow} and \pkg{ggpp}
 #' are installed the species arrows are rendered as tapered
 #' loadings.
 #'
@@ -40,7 +40,7 @@
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso [jsdgam()], [residual_cor()]
+#' @seealso `jsdgam()`, [residual_cor()]
 #'
 #' @examples
 #' \donttest{
@@ -379,7 +379,7 @@ ordinate.jsdgam <- function(
 
 #' Latent variable ordination plot from a fitted `mvgam`
 #'
-#' Generalises [ordinate.jsdgam()] to any LV-factor `mvgam` fit
+#' Generalises `ordinate.jsdgam()` to any LV-factor `mvgam` fit
 #' (default sampled-Z factor models OR fixed Z via `trend_map`).
 #' "Sites" are training time points, "species" are the model's
 #' series. The SVD re-rotation and the biplot layout are
@@ -449,7 +449,7 @@ ordinate.jsdgam <- function(
 #' axes are rotated for sparsity rather than variance; the
 #' identified lower-triangular pattern is preserved in the
 #' underlying fit but not visible in the plot. Use
-#' `rotation = "none"` (or [plot_factors()]) to view the
+#' `rotation = "none"` (or `plot_factors()`) to view the
 #' un-rotated identified factors directly. See Heaps and Jermyn
 #' (2024) for the structured-prior + post-hoc QR framework.
 #'
@@ -477,7 +477,7 @@ ordinate.jsdgam <- function(
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso [ordinate.jsdgam()], [plot_factors()],
+#' @seealso `ordinate.jsdgam()`, `plot_factors()`,
 #'   [residual_cor()]
 #'
 #' @method ordinate mvgam

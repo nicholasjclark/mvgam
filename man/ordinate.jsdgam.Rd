@@ -70,7 +70,7 @@ variables are first re-rotated via singular value
 decomposition, then posterior medians of the variables and
 the species' loadings are scattered in the resulting 2-D
 space. Site labels and species loading arrows are drawn via
-the package-wide \link[ggrepel:ggrepel]{ggrepel::ggrepel} helpers; when \link{ggarrow} and \link{ggpp}
+the package-wide \link[ggrepel:ggrepel]{ggrepel::ggrepel} helpers; when \pkg{ggarrow} and \pkg{ggpp}
 are installed the species arrows are rendered as tapered
 loadings.
 }
@@ -109,7 +109,7 @@ plot(residual_cor(mod))
 
 }
 \seealso{
-\code{\link[=jsdgam]{jsdgam()}}, \code{\link[=residual_cor]{residual_cor()}}
+\code{jsdgam()}, \code{\link[=residual_cor]{residual_cor()}}
 }
 \author{
 Nicholas J Clark

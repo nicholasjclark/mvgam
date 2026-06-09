@@ -74,7 +74,7 @@ rotated factor scores and loadings without re-running
 \code{ordinate()}. Access via \code{attr(p, "rotation")}.
 }
 \description{
-Generalises \code{\link[=ordinate.jsdgam]{ordinate.jsdgam()}} to any LV-factor \code{mvgam} fit
+Generalises \code{ordinate.jsdgam()} to any LV-factor \code{mvgam} fit
 (default sampled-Z factor models OR fixed Z via \code{trend_map}).
 "Sites" are training time points, "species" are the model's
 series. The SVD re-rotation and the biplot layout are
@@ -93,7 +93,7 @@ Stan factors. Under \code{rotation = "varimax"} / \code{"promax"} the
 axes are rotated for sparsity rather than variance; the
 identified lower-triangular pattern is preserved in the
 underlying fit but not visible in the plot. Use
-\code{rotation = "none"} (or \code{\link[=plot_factors]{plot_factors()}}) to view the
+\code{rotation = "none"} (or \code{plot_factors()}) to view the
 un-rotated identified factors directly. See Heaps and Jermyn
 (2024) for the structured-prior + post-hoc QR framework.
 
@@ -122,7 +122,7 @@ fit models may require a manual sign-flip alignment.
 }
 
 \seealso{
-\code{\link[=ordinate.jsdgam]{ordinate.jsdgam()}}, \code{\link[=plot_factors]{plot_factors()}},
+\code{ordinate.jsdgam()}, \code{plot_factors()},
 \code{\link[=residual_cor]{residual_cor()}}
 }
 \author{
