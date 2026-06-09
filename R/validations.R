@@ -228,6 +228,7 @@ validate_supported_family <- function(family) {
   checkmate::assert(
     checkmate::check_class(family, "family"),
     checkmate::check_class(family, "brmsfamily"),
+    checkmate::check_class(family, "customfamily"),
     combine = "or"
   )
 
@@ -254,6 +255,212 @@ validate_supported_family <- function(family) {
         "For these response types, please use {.pkg brms} directly."
       )
     )))
+  }
+
+  invisible(TRUE)
+}
+
+
+#' Validate observation data shape for a closure-unit family
+#'
+#' Closure-unit families (`nmix()`, future `occ()`, etc.) accept
+#' long-format data with one row per visit. Multiple rows per
+#' `(series, time)` pair encode replicate visits to one closure
+#' unit. This validator checks the data conforms to that shape,
+#' validates the `cap` (upper-truncation) column, and warns when
+#' the visit structure is at risk of leaving `lambda` and `p`
+#' separately unidentified.
+#'
+#' Identifiability rules implemented:
+#'   - error if every closure unit has only one visit AND
+#'     neither the response nor the detection formula carries a
+#'     covariate (a fully intercept-only single-visit model is
+#'     provably non-identified, Kery 2018).
+#'   - warn (once per session) if more than 30% of closure
+#'     units have a single visit.
+#'   - warn if any closure unit has `cap < max(y)` (impossible
+#'     latent abundance support; the likelihood evaluates to
+#'     `-Inf`).
+#'
+#' @param data Long-format observation data frame.
+#' @param response_var Name of the response (count) column.
+#' @param series_var Series factor column name (default
+#'   `"series"`).
+#' @param time_var Time column name (default `"time"`).
+#' @param cap_var Per-row upper-truncation column name (default
+#'   `"cap"`).
+#' @param has_obs_covariates Logical; TRUE when the
+#'   abundance/state formula contains at least one covariate.
+#' @param has_det_covariates Logical; TRUE when a detection
+#'   sub-formula (e.g. `p ~ tod`) is supplied.
+#' @return Invisible `TRUE` on success; stops on hard
+#'   identifiability failure.
+#' @noRd
+validate_closure_unit_data <- function(data,
+                                        response_var,
+                                        series_var          = "series",
+                                        time_var            = "time",
+                                        cap_var             = "cap",
+                                        has_obs_covariates  = FALSE,
+                                        has_det_covariates  = FALSE) {
+  checkmate::assert_data_frame(data, min.rows = 1L)
+  checkmate::assert_string(response_var)
+  checkmate::assert_string(series_var)
+  checkmate::assert_string(time_var)
+  checkmate::assert_string(cap_var)
+  checkmate::assert_flag(has_obs_covariates)
+  checkmate::assert_flag(has_det_covariates)
+
+  for (col in c(response_var, series_var, time_var, cap_var)) {
+    if (!col %in% colnames(data)) {
+      stop(insight::format_error(c(
+        paste0(
+          "Closure-unit families require column '", col,
+          "' to be present in 'data'."
+        ),
+        i = paste0(
+          "Each row of 'data' is one visit; the (",
+          series_var, ", ", time_var, ") pair identifies a ",
+          "closure unit and '", cap_var, "' bounds the latent ",
+          "abundance per unit."
+        )
+      )))
+    }
+  }
+
+  y_vals   <- data[[response_var]]
+  cap_vals <- data[[cap_var]]
+
+  if (any(!is.finite(suppressWarnings(as.numeric(y_vals))))) {
+    stop(insight::format_error(
+      paste0(
+        "Non-finite or non-numeric values found in '",
+        response_var, "'."
+      )
+    ))
+  }
+  y_int <- as.integer(y_vals)
+  if (any(y_int < 0L)) {
+    stop(insight::format_error(
+      paste0("Negative counts found in '", response_var, "'.")
+    ))
+  }
+  if (any(abs(as.numeric(y_vals) - y_int) > 1e-8)) {
+    stop(insight::format_error(c(
+      paste0(
+        "Non-integer values found in response '",
+        response_var, "'."
+      ),
+      i = paste0(
+        "Closure-unit families model integer counts; round or ",
+        "cast '", response_var, "' to integer before fitting."
+      )
+    )))
+  }
+
+  if (any(!is.finite(suppressWarnings(as.numeric(cap_vals))))) {
+    stop(insight::format_error(
+      paste0(
+        "Non-finite or non-numeric values found in '",
+        cap_var, "'."
+      )
+    ))
+  }
+  cap_int <- as.integer(cap_vals)
+  if (any(cap_int < 1L)) {
+    stop(insight::format_error(
+      paste0("'", cap_var, "' must be a positive integer.")
+    ))
+  }
+  if (any(cap_int < y_int)) {
+    bad <- which(cap_int < y_int)[1L]
+    stop(insight::format_error(c(
+      paste0(
+        "Some '", cap_var, "' values are below the observed counts."
+      ),
+      x = paste0(
+        "Row ", bad, ": ", cap_var, " = ", cap_int[bad],
+        ", ", response_var, " = ", y_int[bad], "."
+      ),
+      i = paste0(
+        "Each closure unit's '", cap_var, "' must be at least ",
+        "the largest observed count in that unit; raise '",
+        cap_var, "' or drop the offending row."
+      )
+    )))
+  }
+
+  # Closure-unit grouping. Run once and reuse for both the
+  # cap-constant-within-unit check and the identifiability
+  # heuristics so users see the friendly error at validation
+  # time rather than mid-array-build.
+  series_vals <- as.factor(data[[series_var]])
+  time_vals   <- data[[time_var]]
+  unit_label  <- paste(as.integer(series_vals), as.integer(time_vals),
+                       sep = "_")
+  unit_int    <- match(unit_label, unique(unit_label))
+  rep_counts  <- tabulate(unit_int)
+
+  n_unit <- length(rep_counts)
+  for (g in seq_len(n_unit)) {
+    rows_g <- which(unit_int == g)
+    cap_g  <- cap_int[rows_g]
+    if (length(unique(cap_g)) > 1L) {
+      bad_row <- rows_g[1L]
+      stop(insight::format_error(c(
+        paste0(
+          "'", cap_var, "' must be constant within a closure unit."
+        ),
+        x = paste0(
+          "Closure unit (", series_var, "=",
+          as.character(series_vals[bad_row]), ", ",
+          time_var, "=", time_vals[bad_row],
+          ") has differing '", cap_var, "' values: ",
+          paste(unique(cap_g), collapse = ", "), "."
+        ),
+        i = paste0(
+          "Each closure unit has one latent abundance, so its ",
+          "upper truncation '", cap_var, "' must be a single value."
+        )
+      )))
+    }
+  }
+
+  any_covariates <- has_obs_covariates || has_det_covariates
+  if (all(rep_counts == 1L) && !any_covariates) {
+    stop(insight::format_error(c(
+      "Closure-unit family is non-identified.",
+      x = paste0(
+        "Every closure unit has a single visit and neither the ",
+        "abundance nor the detection formula carries a covariate."
+      ),
+      i = paste0(
+        "Add at least one covariate to a formula or supply ",
+        "additional visits per closure unit."
+      )
+    )))
+  }
+  single_visit_share <- mean(rep_counts == 1L)
+  if (single_visit_share > 0.3) {
+    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+      rlang::warn(
+        insight::format_warning(c(
+          paste0(
+            "More than 30% of closure units have a single visit ",
+            "(", round(100 * single_visit_share),
+            "% single-visit units)."
+          ),
+          i = paste0(
+            "Detection probability and abundance share information ",
+            "only via the formulae; with this proportion of ",
+            "single-visit units, posterior identifiability ",
+            "depends entirely on the covariate structure."
+          )
+        )),
+        .frequency = "once",
+        .frequency_id = "closure_unit_single_visit"
+      )
+    }
   }
 
   invisible(TRUE)

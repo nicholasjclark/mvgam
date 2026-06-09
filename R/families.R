@@ -452,6 +452,307 @@ check_tweedie_truncation <- function(object) {
   invisible(NULL)
 }
 
+# ============================================================
+# Closure-unit family helpers (nmix, occ, royle_nichols, ...)
+# ============================================================
+# Every family in this group shares the same wire format: one
+# row per visit in the user's data; the (series, time) pair
+# identifies a closure unit; replicate rows are visits. The Stan
+# lpdf operates per closure unit, marginalising the discrete
+# latent state (abundance N for nmix, occupancy Z for occ). All
+# closure-unit families flow through four primitives:
+#
+#   1. `is_closure_unit_family()`: predicate gating downstream
+#      bypasses (duplicate-time validation skip, prediction-type
+#      routing, etc).
+#   2. `build_closure_unit_arrays()`: long-format data to unit
+#      arrays (N_unit, n_rep, K_max, Y_max, visit_idx). Called
+#      both at fit time and at predict time with newdata so the
+#      cap column can vary per-call.
+#   3. `validate_closure_unit_data()`: cap column, integer
+#      counts, per-unit `cap >= max(y)`, identifiability
+#      warnings.
+#   4. Family-specific `make_*_stanvars(arrays, ...)`: Stan
+#      function block + per-family data block; emitted at fit
+#      time once the unit arrays are known.
+#
+# Future families (`occ()`, `royle_nichols()`, `poisson_poisson()`)
+# reuse all four primitives; only step 4 changes per family.
+#
+# Cap tracking. The per-unit upper truncation `K_max[g]` is
+# always read from the `cap` column of the input data. At fit
+# time it lands in standata as `K_max` and shapes the Stan
+# marginalisation loop. At prediction time, `newdata` must also
+# carry a `cap` column; predict.mvgam re-runs
+# `build_closure_unit_arrays()` on the new data, so users can
+# request predictions under different upper truncations simply
+# by passing newdata with different cap values. Predictions at
+# the fit-time data reuse the stored K_max without re-deriving
+# it.
+
+#' Detect whether a family uses the closure-unit wire format
+#'
+#' Returns TRUE if the family is one of the closure-unit
+#' detection-error families (currently `nmix()`; future
+#' `occ()`, `royle_nichols()`, `poisson_poisson()`). Detected
+#' via the `mvgam_closure_unit` attribute attached by each
+#' family constructor.
+#'
+#' @param family A family / brmsfamily / customfamily object.
+#' @return TRUE or FALSE.
+#' @noRd
+is_closure_unit_family <- function(family) {
+  if (is.null(family)) return(FALSE)
+  isTRUE(attr(family, "mvgam_closure_unit", exact = TRUE))
+}
+
+#' Build per-closure-unit indexing arrays from long-format data
+#'
+#' Walks the user's long-format observation data and groups rows
+#' by (series, time) into closure units. Returns the integer
+#' arrays needed to populate the Stan data block: number of
+#' visits per unit, per-unit upper truncation (`K_max`), per-unit
+#' maximum observed count (`Y_max`), and a `[N_unit, max_rep]`
+#' matrix of visit-row indices (padded with `1L` on the right
+#' for units with fewer than `max_rep` visits, harmless because
+#' the Stan loop reads only the first `n_rep[g]` entries).
+#'
+#' Called from two sites with identical signature:
+#' (a) at fit time, against the user's training data; and
+#' (b) at predict time, against `newdata`. The fit-time call
+#' fixes the Stan `K_max` in standata. The predict-time call
+#' lets users request latent-state predictions under a
+#' different upper truncation by supplying a different `cap`
+#' column in newdata.
+#'
+#' @param data Long-format observation data frame.
+#' @param response_var Name of the response (count) column.
+#' @param series_var Name of the series factor (default
+#'   `"series"`).
+#' @param time_var Name of the time column (default `"time"`).
+#' @param cap_var Name of the per-row upper-truncation column
+#'   (default `"cap"`). Must be present and constant within
+#'   each closure unit; the constant value becomes `K_max[g]`.
+#' @return Named list with elements `N_unit`, `n_rep`, `K_max`,
+#'   `Y_max`, `visit_idx`, `max_rep`, `unit_labels`.
+#' @noRd
+build_closure_unit_arrays <- function(data,
+                                       response_var,
+                                       series_var = "series",
+                                       time_var   = "time",
+                                       cap_var    = "cap") {
+  checkmate::assert_data_frame(data, min.rows = 1L)
+  checkmate::assert_string(response_var)
+  checkmate::assert_string(series_var)
+  checkmate::assert_string(time_var)
+  checkmate::assert_string(cap_var)
+  for (col in c(response_var, series_var, time_var, cap_var)) {
+    if (!col %in% colnames(data)) {
+      stop(insight::format_error(c(
+        paste0(
+          "Closure-unit families require column '", col,
+          "' to be present in 'data'."
+        ),
+        i = paste0(
+          "Add '", col, "' to the data frame, or rename the ",
+          "existing variable via the relevant `*_var` argument."
+        )
+      )))
+    }
+  }
+  series_vals <- as.integer(as.factor(data[[series_var]]))
+  time_vals   <- as.integer(data[[time_var]])
+  unit_label  <- paste(series_vals, time_vals, sep = "_")
+  unit_levels <- unique(unit_label)
+  unit_int    <- match(unit_label, unit_levels)
+  n_unit      <- length(unit_levels)
+  # Per-unit visit counts indexed in `unit_levels` order. `table`
+  # would re-order alphabetically; an explicit tabulate keeps
+  # the unit ordering deterministic.
+  rep_counts  <- tabulate(unit_int, nbins = n_unit)
+  if (any(rep_counts < 1L)) {
+    stop(insight::format_error(
+      "Every closure unit must have at least one visit row."
+    ))
+  }
+  max_rep <- max(rep_counts)
+  visit_idx <- matrix(1L, nrow = n_unit, ncol = max_rep)
+  for (g in seq_len(n_unit)) {
+    rows_g <- which(unit_int == g)
+    visit_idx[g, seq_along(rows_g)] <- as.integer(rows_g)
+  }
+  y_vals <- as.integer(data[[response_var]])
+  if (anyNA(y_vals)) {
+    stop(insight::format_error(c(
+      paste0(
+        "Closure-unit families do not yet support missing values ",
+        "in the response '", response_var, "'."
+      ),
+      i = "Filter or impute before passing the data to mvgam()."
+    )))
+  }
+  cap_vals <- as.integer(data[[cap_var]])
+  if (anyNA(cap_vals)) {
+    stop(insight::format_error(
+      paste0(
+        "Missing values in '", cap_var,
+        "' are not allowed for closure-unit families."
+      )
+    ))
+  }
+  # Pre-flight invariant: cap must be constant within a closure
+  # unit. `validate_closure_unit_data()` catches this earlier in
+  # the mvgam pipeline with a richer error message; this defence
+  # protects standalone callers (tests, downstream tools).
+  Y_max <- integer(n_unit)
+  K_max <- integer(n_unit)
+  for (g in seq_len(n_unit)) {
+    rows_g <- visit_idx[g, seq_len(rep_counts[g])]
+    Y_max[g] <- max(y_vals[rows_g])
+    cap_g <- cap_vals[rows_g]
+    if (length(unique(cap_g)) > 1L) {
+      stop(insight::format_error(
+        paste0(
+          "'", cap_var,
+          "' must be constant within a closure unit."
+        )
+      ))
+    }
+    K_max[g] <- cap_g[1L]
+  }
+  list(
+    N_unit      = n_unit,
+    n_rep       = rep_counts,
+    K_max       = K_max,
+    Y_max       = Y_max,
+    visit_idx   = visit_idx,
+    max_rep     = as.integer(max_rep),
+    unit_labels = unit_levels
+  )
+}
+
+#' Closure-unit Poisson-binomial N-mixture family
+#'
+#' N-mixture model (Royle 2004, *Biometrics*) with a Poisson
+#' latent abundance and binomial detection. Each observation
+#' row is one visit; closure is enforced over (series, time)
+#' pairs so multiple rows sharing the same (series, time)
+#' represent replicate visits to the same underlying abundance.
+#' The latent count `N_g` for closure unit `g` is marginalised
+#' analytically over the truncated range
+#' `K_max[g] >= k >= max(y[g, ])` using a `log_sum_exp` over
+#' `poisson_log_lpmf(k | log_lambda_g) + binomial_logit_lpmf(y[g,] | k, logit_p_{g,j})`
+#' (Royle 2004 equation; ito4303 Stan implementation
+#' \url{https://gist.github.com/ito4303/33bf2d192d121e257e25f97e6d48df73}).
+#'
+#' Parameterised with two distributional parameters:
+#' \describe{
+#'   \item{`mu`}{positive abundance rate \eqn{\lambda} (log link, fixed)}
+#'   \item{`p`}{per-visit detection probability (logit link, fixed)}
+#' }
+#'
+#' Distributional regression. brms `bf()` syntax handles
+#' covariate-dependent detection automatically:
+#'
+#' ```r
+#' mvgam(bf(y ~ s(elev), p ~ s(tod)), family = nmix(), data = ...)
+#' ```
+#'
+#' Identifiability. With a single visit per closure unit the
+#' likelihood reduces to a thinned Poisson with only
+#' `lambda * p` identified; the individual parameters are not.
+#' Information about the decomposition flows entirely from
+#' shared structure across units (covariates in either formula
+#' and the across-unit hierarchical pooling). Practical
+#' guidance from Kery (2018, *Ecology*): with 3 or more visits
+#' per unit the model is reliably identified for detection
+#' probabilities above 0.1; with 2 visits identification is
+#' marginal below `p = 0.3`. `validate_closure_unit_data()`
+#' warns when the average visit count is below 2 and errors when
+#' every unit has only one visit alongside no covariates.
+#'
+#' Under overdispersed counts (negative-binomial truth instead
+#' of Poisson), the detection probability is biased downward
+#' and the abundance is biased upward; the product `lambda * p`
+#' remains approximately consistent (Knape et al. 2018,
+#' *Methods in Ecology and Evolution*). Use posterior
+#' predictive checks to detect this; refit with a richer
+#' abundance distribution if overdispersion is present.
+#'
+#' Data shape. A long-format data frame, one row per visit, with
+#' columns: a response (count) column, `series` (factor),
+#' `time` (integer), `cap` (per-row upper truncation; constant
+#' within a closure unit), plus any covariates referenced in the
+#' formulae. Multiple rows sharing the same (series, time) pair
+#' encode replicate visits to one closure unit.
+#'
+#' Prediction at different caps. `cap` is carried as a data
+#' column, not stored only as a Stan scalar. Predicting via
+#' `predict(fit, newdata = X)` re-extracts the closure-unit
+#' arrays from `newdata`, so users can request latent-abundance
+#' draws under arbitrary upper truncations by supplying
+#' `newdata` with different `cap` values. Set `cap` higher than
+#' the fit-time cap to expand the latent-state support;
+#' fit-time caps are reused when `newdata` is `NULL`.
+#'
+#' @return A `brms::customfamily` object with the
+#'   `mvgam_closure_unit` attribute set; closure-unit data prep
+#'   builds the unit arrays and attaches the Stan lpdf at fit
+#'   time.
+#'
+#' @references
+#' Royle, J. A. (2004). N-mixture models for estimating
+#'   population size from spatially replicated counts.
+#'   *Biometrics*, 60, 108-115.
+#'   \doi{10.1111/j.0006-341X.2004.00142.x}.
+#'
+#' Dennis, E. B., Morgan, B. J. T., & Ridout, M. S. (2015).
+#'   Computational aspects of N-mixture models. *Biometrics*,
+#'   71, 237-246. \doi{10.1111/biom.12246}.
+#'
+#' Kery, M. (2018). Identifiability in N-mixture models: a
+#'   large-scale screening test with bird data. *Ecology*, 99,
+#'   281-288. \doi{10.1002/ecy.2093}.
+#'
+#' Knape, J., Arlt, D., Barraquand, F., Berg, A., Chevalier, M.,
+#'   Part, T., Ruete, A., & Zmihorski, M. (2018). Sensitivity of
+#'   binomial N-mixture models to overdispersion. *Methods in
+#'   Ecology and Evolution*, 9, 2102-2114.
+#'   \doi{10.1111/2041-210X.13062}.
+#'
+#' @examples
+#' \dontrun{
+#' # Constant detection probability, abundance varies with elevation
+#' mvgam(y ~ s(elev), family = nmix(), data = closure_unit_data)
+#'
+#' # Distributional regression on detection
+#' mvgam(bf(y ~ s(elev), p ~ s(tod)),
+#'       family = nmix(),
+#'       data = closure_unit_data)
+#' }
+#'
+#' @export
+nmix <- function() {
+  fam <- brms::custom_family(
+    name  = "nmix",
+    dpars = c("mu", "p"),
+    links = c("log", "logit"),
+    lb    = c(0, NA),
+    ub    = c(NA, NA),
+    type  = "int",
+    loop  = FALSE
+  )
+  link_info <- stats::make.link(fam$link)
+  fam$linkinv <- link_info$linkinv
+  fam$linkfun <- link_info$linkfun
+  attr(fam, "mvgam_closure_unit")  <- TRUE
+  attr(fam, "mvgam_predict_types") <- c("latent_N", "detection")
+  # mvgam_stanvars is populated at data preparation time, once
+  # the closure-unit arrays from the user's data are known.
+  attr(fam, "mvgam_stanvars") <- NULL
+  fam
+}
+
 #' Merge a custom family's mvgam_stanvars into the user's stanvars
 #'
 #' Custom families built via [tweedie()] attach their function-
