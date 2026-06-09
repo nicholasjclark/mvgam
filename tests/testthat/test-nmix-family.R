@@ -469,15 +469,72 @@ test_that("predict.mvgam(type = 'latent_N') errors on non-nmix families", {
   )
 })
 
-test_that("nmix R-side guards reject a `p ~ ...` sub-formula until chunk 4", {
-  # A bf() with p ~ tod compiles via brms (chunk 2 verified) but
-  # the R-side extractor explicitly stops because the per-visit
-  # p draws can't yet be reconstructed from posterior b_p_*.
-  # This test is skipped because the guard runs at predict time
-  # against a fitted model and we don't want to spend the
-  # compile-fit cost in CI; the upstream stancode test confirms
-  # the Stan side accepts the sub-formula.
-  skip("vector-p R-side extraction lands in chunk 4")
+test_that("nmix vector-p R-side prediction recovers the detection-covariate effect", {
+  set.seed(31)
+  n_unit <- 18; n_visit <- 4
+  elev <- rnorm(n_unit)
+  tod  <- stats::runif(n_unit * n_visit)
+  N_per <- rpois(n_unit, exp(1.2 + 0.6 * elev))
+  y_sim <- integer(n_unit * n_visit)
+  for (g in seq_len(n_unit)) {
+    visit_rows <- ((g - 1) * n_visit + 1):(g * n_visit)
+    for (j in visit_rows) {
+      y_sim[j] <- rbinom(1, N_per[g], plogis(-0.2 + 1.3 * tod[j]))
+    }
+  }
+  d <- data.frame(
+    series = factor(rep(seq_len(n_unit), each = n_visit)),
+    time   = rep(1L, n_unit * n_visit),
+    y      = y_sim, cap = rep(30L, n_unit * n_visit),
+    elev   = rep(elev, each = n_visit), tod = tod
+  )
+  fit <- mvgam(brms::bf(y ~ elev, p ~ tod), family = nmix(),
+               data = d, chains = 1, iter = 400, warmup = 200,
+               silent = 2, refresh = 0)
+  de <- predict(fit, type = "detection", summary = FALSE)
+  expect_equal(dim(de), c(200L, nrow(d)))
+  # Vector-p must vary across visits (unlike the scalar case).
+  expect_gt(stats::sd(apply(de, 2L, median)), 1e-3)
+  # Detection covaries strongly with tod by construction.
+  expect_gt(stats::cor(apply(de, 2L, median), d$tod), 0.8)
+  # All five surfaces should run without error.
+  expect_no_error(posterior_epred(fit))
+  expect_no_error(posterior_predict(fit))
+  expect_no_error(log_lik(fit))
+  expect_no_error(predict(fit, type = "latent_N", summary = FALSE))
+})
+
+test_that("nmix R-side smooth/RE/GP-in-p guard fires with a clear message", {
+  # Synthesise a draws matrix with sds_p_<term> column to trip the
+  # guard without paying for an actual fit. The check happens in
+  # extract_p_for_nmix() before any heavy lifting.
+  expect_error(
+    extract_p_for_nmix(
+      object   = list(fit = local({
+        fake_draws <- matrix(0, nrow = 4L, ncol = 2L)
+        colnames(fake_draws) <- c("b_p_Intercept", "sds_p_s(tod)")
+        structure(
+          posterior::as_draws_matrix(fake_draws),
+          class = c("draws_matrix", "draws")
+        )
+      })),
+      newdata  = data.frame(),
+      draw_ids = NULL,
+      n_visit  = 1L,
+      ndraws   = 4L
+    ),
+    "smooths, random effects"
+  )
+})
+
+test_that("nmix predict(type = 'variance') equals predict(type = 'expected')", {
+  bundle <- local_nmix_fit()
+  v <- predict(bundle$fit, type = "variance", summary = FALSE)
+  e <- predict(bundle$fit, type = "expected", summary = FALSE)
+  expect_equal(dim(v), dim(e))
+  # Var[Y] = lambda * p = E[Y] under the thinned-Poisson property
+  # of the Poisson-Binomial mixture.
+  expect_equal(v, e)
 })
 
 # ------------------------------------------------------------

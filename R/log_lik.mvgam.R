@@ -162,13 +162,17 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
     arrays <- build_closure_unit_arrays(
       newdata, response_var = nmix_response_var(object$formula)
     )
-    p_mat <- extract_dpars_from_stanfit(
-      stanfit    = object$fit,
-      dpar_names = "p",
-      ndraws     = nrow(linpred),
-      nobs       = ncol(linpred),
-      draw_ids   = draw_ids
-    )$p
+    # extract_p_for_nmix() handles both scalar (no detection
+    # sub-formula) and vector (with `bf(p ~ ...)`) cases by
+    # routing the vector case through brms's dpar linpred via
+    # the mock-stanfit path. Single call covers both shapes.
+    p_mat <- extract_p_for_nmix(
+      object   = object,
+      newdata  = newdata,
+      draw_ids = draw_ids,
+      n_visit  = ncol(linpred),
+      ndraws   = nrow(linpred)
+    )
     family_pars_nmix <- list(closure_arrays = arrays, p = p_mat)
     return(log_lik_nmix(
       linpred     = linpred,

@@ -296,6 +296,23 @@ predict.mvgam <- function(object,
 predict_variance <- function(object, newdata, process_error, ndraws,
                              re_formula, allow_new_levels,
                              sample_new_levels, resp) {
+  # Closure-unit families: marginally Y_{g,j} | lambda_g, p_{g,j}
+  # ~ Poisson(lambda_g * p_{g,j}) (the thinned-Poisson property
+  # of the Poisson-Binomial mixture), so Var[Y] = lambda * p =
+  # E[Y]. Route to posterior_epred and return that matrix
+  # directly; no dpar broadcasting needed.
+  if (is_closure_unit_family(object$family)) {
+    return(posterior_epred(
+      object,
+      newdata           = newdata,
+      process_error     = process_error,
+      ndraws            = ndraws,
+      re_formula        = re_formula,
+      allow_new_levels  = allow_new_levels,
+      sample_new_levels = sample_new_levels,
+      resp              = resp
+    ))
+  }
   # Compute mu over the full posterior so row i of mu_full corresponds
   # to draws_mat row i. Without this, posterior_epred(ndraws=K) would
   # randomly subsample, and dpars (which we extract sequentially)

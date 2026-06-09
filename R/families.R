@@ -1094,6 +1094,156 @@ nmix_response_var <- function(form) {
   vars[1L]
 }
 
+#' Extract detection-probability draws for an nmix() fit
+#'
+#' Handles both the scalar-`p` case (no detection sub-formula,
+#' brms declares `real<lower=0,upper=1> p;` in the parameters
+#' block and the posterior carries `p` directly) and the
+#' vector-`p` case (sub-formula such as `bf(y ~ x, p ~ s(tod))`,
+#' brms emits `b_p_Intercept` + `b_p_*` and computes `p` as a
+#' transient `vector[N]` in the model block).
+#'
+#' For the vector case the per-row p is rebuilt from the fitted
+#' coefficients + the design matrix on `newdata` via the shared
+#' `extract_component_linpred(component = "p")` path, which
+#' funnels through `prepare_predictions.mock_stanfit()` and so
+#' picks up parametric terms, smooths, random effects, GP
+#' terms etc. transparently.
+#'
+#' @param object Fitted mvgam object with a closure-unit family.
+#' @param newdata Long-format observation data on which to
+#'   predict.
+#' @param draw_ids Optional posterior draw indices.
+#' @param n_visit Integer; number of visit rows in `newdata`.
+#' @param ndraws Integer; number of posterior draws after any
+#'   `draw_ids` subsetting.
+#' @return `[ndraws x n_visit]` matrix of detection probabilities
+#'   in (0, 1).
+#' @noRd
+extract_p_for_nmix <- function(object, newdata, draw_ids,
+                                n_visit, ndraws) {
+  draws_mat <- posterior::as_draws_matrix(object$fit)
+  all_cols  <- colnames(draws_mat)
+  # Smooth / RE / GP terms on the detection dpar are gated for
+  # now; the parametric path covers `p ~ x1 + x2 + factor(z)`
+  # cleanly and the more elaborate brms reparameterisations are
+  # a follow-up.
+  unsupported_p_terms <- grep("^sds_p_|^s_p_|^sd_p_|^gp_p_",
+                              all_cols, value = TRUE)
+  if (length(unsupported_p_terms) > 0L) {
+    stop(insight::format_error(c(
+      paste0(
+        "R-side prediction for `bf(p ~ ...)` with smooths, ",
+        "random effects, or GP terms is not yet wired."
+      ),
+      x = paste0(
+        "Detected posterior parameter(s): ",
+        paste(head(unsupported_p_terms, 3), collapse = ", "),
+        if (length(unsupported_p_terms) > 3L) ", ..." else "",
+        "."
+      ),
+      i = paste0(
+        "Parametric detection sub-formulas (e.g. `p ~ tod + ",
+        "factor(site)`) are supported; the smooth / RE / GP ",
+        "extraction will land in a follow-up commit."
+      )
+    )))
+  }
+  has_b_p_intercept <- "b_p_Intercept" %in% all_cols
+  b_p_slope_cols    <- grep("^b_p\\[", all_cols, value = TRUE)
+  if (has_b_p_intercept || length(b_p_slope_cols) > 0L) {
+    return(extract_p_vector(
+      object, newdata, draw_ids,
+      b_p_slope_cols = b_p_slope_cols
+    ))
+  }
+  # Scalar `p` parameter in the posterior; broadcast to per-visit
+  # length for downstream indexing.
+  if (!"p" %in% all_cols) {
+    stop(insight::format_error(
+      "Detection probability draws 'p' not found in posterior."
+    ))
+  }
+  if (is.null(draw_ids)) {
+    draw_ids <- seq_len(ndraws)
+  } else if (length(draw_ids) != ndraws) {
+    draw_ids <- draw_ids[seq_len(ndraws)]
+  }
+  p_scalar <- as.numeric(draws_mat[draw_ids, "p"])
+  matrix(p_scalar, nrow = ndraws, ncol = n_visit, byrow = FALSE)
+}
+
+#' Vector-p draws: rebuild from posterior b_p_* + design matrix
+#'
+#' Recomputes the per-visit detection probability matrix when
+#' the user supplied a parametric detection sub-formula via
+#' `bf(y ~ ..., p ~ ...)`. brms generates the original-scale
+#' intercept `b_p_Intercept` in the generated quantities block
+#' (already adjusted for the standardisation of `X_p`); the
+#' slopes `b_p[k]` apply to the raw design matrix without any
+#' further centering.
+#'
+#' Standata for `newdata` is rebuilt via `mvgam_formula` +
+#' `standata()` so the detection design matrix `X_p` reflects
+#' the user's possibly-edited `newdata` (factors levels, raw
+#' covariate values).
+#' @noRd
+extract_p_vector <- function(object, newdata, draw_ids,
+                              b_p_slope_cols) {
+  draws_mat <- posterior::as_draws_matrix(object$fit)
+  if (!is.null(draw_ids)) {
+    draws_mat <- draws_mat[draw_ids, , drop = FALSE]
+  }
+  ndraws <- nrow(draws_mat)
+  # Rebuild standata for newdata via mvgam_formula. brms keeps
+  # the raw design matrix in `X_p` (Intercept column + slopes).
+  mf <- mvgam_formula(object$formula)
+  sdata_new <- standata(
+    mf, data = newdata, family = object$family
+  )
+  if (is.null(sdata_new$X_p)) {
+    stop(insight::format_error(
+      "Detection design matrix 'X_p' missing from regenerated standata."
+    ))
+  }
+  X_p_raw <- sdata_new$X_p
+  # b_p_Intercept already lives on the unstandardised scale via
+  # brms's `b_p_Intercept = Intercept_p - dot_product(means_X_p,
+  # b_p)` reparameterisation in generated quantities. Pair it
+  # with the raw X_p (intercept column dropped because b_p_*
+  # holds the intercept directly).
+  if (!"b_p_Intercept" %in% colnames(draws_mat)) {
+    stop(insight::format_error(
+      "'b_p_Intercept' missing from posterior draws."
+    ))
+  }
+  intercept_p <- as.numeric(draws_mat[, "b_p_Intercept"])
+  if (length(b_p_slope_cols) == 0L) {
+    # Intercept-only detection sub-formula; broadcast across
+    # visits.
+    return(stats::plogis(matrix(
+      intercept_p, nrow = ndraws,
+      ncol = nrow(X_p_raw), byrow = FALSE
+    )))
+  }
+  b_p_slopes <- as.matrix(draws_mat[, b_p_slope_cols, drop = FALSE])
+  # X_p columns: first is Intercept (all 1s), then slopes.
+  X_slopes <- X_p_raw[, -1L, drop = FALSE]
+  if (ncol(X_slopes) != ncol(b_p_slopes)) {
+    stop(insight::format_error(c(
+      "Mismatch between b_p slope count and X_p design matrix.",
+      x = paste0(
+        "b_p slopes: ", ncol(b_p_slopes),
+        ", X_p slopes: ", ncol(X_slopes), "."
+      )
+    )))
+  }
+  linpred_p <- matrix(intercept_p, nrow = ndraws,
+                      ncol = nrow(X_slopes), byrow = FALSE) +
+               b_p_slopes %*% t(X_slopes)
+  stats::plogis(linpred_p)
+}
+
 #' Extract lambda, p and closure-unit arrays for an nmix() fit
 #'
 #' Single-pass extractor used by every nmix() R-side method:
@@ -1180,38 +1330,14 @@ extract_nmix_components <- function(object, newdata = NULL,
   # within-unit constancy invariant below in debug builds.
   first_visit_idx <- arrays$visit_idx[, 1L]
   lambda <- lambda_visit[, first_visit_idx, drop = FALSE]
-  # p extraction: brms emits scalar `p` in the posterior when no
-  # detection sub-formula is supplied. Vector-p case (with
-  # `bf(p ~ ...)`) lands in a follow-up; flag with a clear
-  # error so users hit the limit early.
-  draws_mat <- posterior::as_draws_matrix(object$fit)
-  all_cols  <- colnames(draws_mat)
-  if (any(grepl("^Intercept_p$|^b_p_", all_cols))) {
-    stop(insight::format_error(c(
-      paste0(
-        "R-side prediction for nmix() with a `p ~ ...` ",
-        "sub-formula is not yet wired."
-      ),
-      i = paste0(
-        "The Stan side is supported; pass `family = nmix()` ",
-        "without a detection sub-formula for the v2.0 R-side ",
-        "prediction surface, or extract `b_p_*` from the ",
-        "posterior manually for now."
-      )
-    )))
-  }
-  if (!"p" %in% all_cols) {
-    stop(insight::format_error(
-      "Detection probability draws 'p' not found in posterior."
-    ))
-  }
-  if (is.null(draw_ids)) {
-    draw_ids <- seq_len(ndraws)
-  } else if (length(draw_ids) != ndraws) {
-    draw_ids <- draw_ids[seq_len(ndraws)]
-  }
-  p_scalar <- as.numeric(draws_mat[draw_ids, "p"])
-  p <- matrix(p_scalar, nrow = ndraws, ncol = n_visit, byrow = FALSE)
+  # p extraction. brms emits the scalar `p` in the posterior when
+  # there is no detection sub-formula; with a sub-formula
+  # (`bf(y ~ x, p ~ tod)`) `p` is transient in the model block
+  # and the posterior carries `b_p_Intercept` + `b_p_*` instead.
+  # Both cases route through `extract_p_for_nmix()` which
+  # reuses mvgam's existing dpar-prediction machinery so smooths,
+  # group-level effects, GP terms etc. all flow through brms.
+  p <- extract_p_for_nmix(object, newdata, draw_ids, n_visit, ndraws)
   list(
     lambda  = lambda,
     p       = p,
@@ -1373,12 +1499,32 @@ posterior_latent_N <- function(object, newdata = NULL,
       }
       lw[, kk] <- lp_pois + lp_binom
     }
-    # Sample one k per draw using the normalised per-row weights.
-    out[, g] <- vapply(seq_len(ndraws), function(s) {
-      wts <- lw[s, ]
-      wts <- exp(wts - max(wts))
-      k_grid[sample.int(n_k, size = 1L, prob = wts)]
-    }, integer(1L))
+    # Vectorised inverse-CDF sample: subtract per-row maxima to
+    # avoid overflow, exponentiate, accumulate the running CDF
+    # column-by-column (one vectorised pass over draws per k),
+    # normalise by the row sum, and pick the first column where
+    # the running CDF exceeds a single uniform draw. Collapses
+    # the per-draw sample.int loop into n_k column updates;
+    # identical in distribution to the prob = exp(...) call to
+    # sample.int.
+    row_max <- do.call(pmax, lapply(seq_len(n_k), function(k) lw[, k]))
+    w <- exp(lw - row_max)
+    # Column-wise running CDF: each column adds the previous
+    # column's running total. n_k iterations, each touching
+    # ndraws values; far cheaper than apply(w, 1L, cumsum) when
+    # ndraws is large.
+    cdf <- w
+    if (n_k > 1L) {
+      for (k in 2:n_k) {
+        cdf[, k] <- cdf[, k - 1L] + cdf[, k]
+      }
+    }
+    cdf <- cdf / cdf[, n_k]
+    u <- stats::runif(ndraws)
+    # Number of CDF entries strictly less than u is the 0-based
+    # bin index; +1 gives the 1-based k_grid index.
+    bin_idx <- rowSums(cdf < u) + 1L
+    out[, g] <- k_grid[bin_idx]
   }
   out
 }
