@@ -137,6 +137,30 @@ test_that("mvgam_update_call inherits family / prior / backend / algorithm", {
   expect_identical(out$algorithm, stub$algorithm)
 })
 
+test_that("mvgam_update_call lets the caller override the inherited prior", {
+  # The lfo_cv refit story relies on update.mvgam reusing the
+  # original fit's literal prior table by default (so brms doesn't
+  # regenerate adaptive Intercept / sigma priors and bust the
+  # compiled-model cache). Conversely, users must still be able to
+  # supply `prior = ...` to override that table for a single refit.
+  stub <- make_update_stub()
+  new_prior <- structure(
+    data.frame(
+      prior = "normal(0, 0.5)", class = "b",
+      coef = "", group = "", resp = "", dpar = "",
+      nlpar = "", lb = NA_character_, ub = NA_character_,
+      source = "user", stringsAsFactors = FALSE
+    ),
+    class = c("brmsprior", "data.frame")
+  )
+  out <- mvgam_update_call(
+    stub, formula. = NULL, newdata = NULL,
+    dots = list(prior = new_prior)
+  )
+  expect_identical(out$prior, new_prior)
+  expect_false(identical(out$prior, stub$prior))
+})
+
 
 test_that("mvgam_update_call lets `dots` override inherited slots", {
   stub <- make_update_stub()

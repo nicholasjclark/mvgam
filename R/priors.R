@@ -1570,6 +1570,33 @@ get_prior.brmsformula <- function(object, ...) {
   brms::get_prior(object, ...)
 }
 
+#' Method for fitted mvgam objects - returns the stored prior table
+#'
+#' Convenience shortcut for the post-fit prior table. In brms the
+#' canonical post-fit accessor is `prior_summary()`; mvgam keeps
+#' that path (it forwards to `object$prior` too) but exports
+#' `get_prior.mvgam()` as well because users frequently type
+#' `get_prior(fit)` by analogy with the formula method. The
+#' returned `brmsprior` is the literal prior table mvgam handed
+#' to brms at fit time (with all adaptive constants baked in by
+#' brms), so it can be edited and fed back through
+#' `update(fit, prior = ..., recompile = FALSE)` for refits that
+#' reuse the compiled Stan model.
+#'
+#' @param object A fitted \code{mvgam} model.
+#' @param ... Currently unused; present for S3 generic dispatch.
+#' @return A \code{brmsprior} data frame.
+#' @export
+get_prior.mvgam <- function(object, ...) {
+  checkmate::assert_class(object, "mvgam")
+  if (is.null(object$prior)) {
+    stop(insight::format_error(
+      "Fit was not stored with a prior table (object$prior is NULL)."
+    ))
+  }
+  object$prior
+}
+
 #' Detect Embedded Families in Formula Objects
 #'
 #' Checks if a formula object contains embedded family specifications

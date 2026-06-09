@@ -35,7 +35,10 @@ hit.}
 \code{trend_formula}, \code{family}, \code{prior}, \code{chains}, \code{iter},
 \code{warmup}, \code{cores}, \code{threads}, \code{algorithm}, \code{backend},
 \code{silent}, \code{seed}, \code{init}, \code{control}). Each value overrides
-the matching slot inherited from \code{object}.}
+the matching slot inherited from \code{object}. Passing
+\code{prior = ...} replaces the original fit's prior table for
+this refit only; see "Prior inheritance and Stan model
+reuse" in Details.}
 }
 \value{
 A refit \code{mvgam} object.
@@ -54,6 +57,33 @@ via \code{...}. This means
 \code{update(fit, iter = 4000)} reuses the original formula, data,
 family, trend, prior, and backend, and only bumps the iteration
 count.
+
+Prior inheritance and Stan model reuse. The fitted object's
+\code{prior} table is reused on every \code{update()} call by default.
+The \code{brms} adaptive priors (e.g. the response-centred Intercept
+prior, response-scaled \code{sigma} prior) carry their literal
+constants from the original fit rather than being regenerated
+from new training data, so a refit with a different
+\code{newdata} window does not change the stancode and the compiled
+Stan model is reused. This is what makes \code{\link[=lfo_cv]{lfo_cv()}} and other
+refit-heavy workflows fast: subsequent refits skip the (slow)
+compile step and only repeat sampling. To override the inherited
+priors for a single refit (e.g. swap a coefficient's prior or
+loosen a constraint) pass \code{prior = ...} directly to
+\code{\link[=update]{update()}}; the change overrides the inherited prior table
+for that call only:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{new_priors <- c(
+  brms::prior(normal(0, 1), class = "b"),
+  brms::prior(exponential(1), class = "sigma")
+)
+refit <- update(mod, prior = new_priors)
+}\if{html}{\out{</div>}}
+
+A change in priors that alters the Stan model will cause a
+recompile (and a \code{recompile = FALSE} call would error). Use
+\code{stancode(refit)} after the call to confirm the model surface
+you intended.
 
 Multivariate fits: formula updates are allowed and route
 through brms's own formula-update machinery via
@@ -82,6 +112,15 @@ mod3 <- update(mod, newdata = sim$data_train[1:30, ])
 
 # Add a covariate to the formula.
 mod4 <- update(mod, formula. = ~ . + s(x))
+
+# Override priors for the refit (replaces the inherited table).
+mod5 <- update(
+  mod,
+  prior = c(
+    brms::prior(normal(0, 1), class = "b"),
+    brms::prior(exponential(1), class = "sigma")
+  )
+)
 }
 
 }

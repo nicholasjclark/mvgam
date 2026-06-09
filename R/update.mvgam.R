@@ -30,7 +30,10 @@
 #'   `trend_formula`, `family`, `prior`, `chains`, `iter`,
 #'   `warmup`, `cores`, `threads`, `algorithm`, `backend`,
 #'   `silent`, `seed`, `init`, `control`). Each value overrides
-#'   the matching slot inherited from `object`.
+#'   the matching slot inherited from `object`. Passing
+#'   `prior = ...` replaces the original fit's prior table for
+#'   this refit only; see "Prior inheritance and Stan model
+#'   reuse" in Details.
 #'
 #' @return A refit `mvgam` object.
 #'
@@ -41,6 +44,34 @@
 #' `update(fit, iter = 4000)` reuses the original formula, data,
 #' family, trend, prior, and backend, and only bumps the iteration
 #' count.
+#'
+#' Prior inheritance and Stan model reuse. The fitted object's
+#' `prior` table is reused on every `update()` call by default.
+#' The `brms` adaptive priors (e.g. the response-centred Intercept
+#' prior, response-scaled `sigma` prior) carry their literal
+#' constants from the original fit rather than being regenerated
+#' from new training data, so a refit with a different
+#' `newdata` window does not change the stancode and the compiled
+#' Stan model is reused. This is what makes [`lfo_cv()`] and other
+#' refit-heavy workflows fast: subsequent refits skip the (slow)
+#' compile step and only repeat sampling. To override the inherited
+#' priors for a single refit (e.g. swap a coefficient's prior or
+#' loosen a constraint) pass `prior = ...` directly to
+#' [`update()`]; the change overrides the inherited prior table
+#' for that call only:
+#'
+#' ```r
+#' new_priors <- c(
+#'   brms::prior(normal(0, 1), class = "b"),
+#'   brms::prior(exponential(1), class = "sigma")
+#' )
+#' refit <- update(mod, prior = new_priors)
+#' ```
+#'
+#' A change in priors that alters the Stan model will cause a
+#' recompile (and a `recompile = FALSE` call would error). Use
+#' `stancode(refit)` after the call to confirm the model surface
+#' you intended.
 #'
 #' Multivariate fits: formula updates are allowed and route
 #' through brms's own formula-update machinery via
@@ -78,6 +109,15 @@
 #'
 #' # Add a covariate to the formula.
 #' mod4 <- update(mod, formula. = ~ . + s(x))
+#'
+#' # Override priors for the refit (replaces the inherited table).
+#' mod5 <- update(
+#'   mod,
+#'   prior = c(
+#'     brms::prior(normal(0, 1), class = "b"),
+#'     brms::prior(exponential(1), class = "sigma")
+#'   )
+#' )
 #' }
 #'
 #' @method update mvgam
