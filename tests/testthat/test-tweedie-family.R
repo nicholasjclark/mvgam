@@ -59,9 +59,14 @@ test_that("mvgam(family = tweedie()) auto-injects the Stan function block + M da
   expect_true(grepl("log_sum_exp", sc))
   # Strict positivity guards (the AIMS reference accepted mu/mphi
   # >= 0; mvgam tightens to strict > 0).
-  expect_true(grepl("if \\(mphi <= 0\\)", sc))
+  # check_tweedie now operates per-element (vector dpars) so the
+  # guard reads `mphi[n] <= 0`, `mu[n] <= 0`,
+  # `mtheta[n] <= 1 || mtheta[n] >= 2`.
+  expect_true(grepl("if \\(mphi\\[n\\] <= 0\\)", sc))
   expect_true(grepl("if \\(mu\\[n\\] <= 0\\)", sc))
-  expect_true(grepl("mtheta <= 1 \\|\\| mtheta >= 2", sc))
+  expect_true(grepl(
+    "mtheta\\[n\\] <= 1 \\|\\| mtheta\\[n\\] >= 2", sc
+  ))
   # M data stanvar.
   expect_true(grepl("int<lower=1> M;", sc))
   # mphi parameter with strict lb and no ub.
@@ -216,4 +221,55 @@ test_that("uses_tweedie_family predicate distinguishes the family", {
   # NULL-family safety: a malformed object should return FALSE,
   # not error.
   expect_false(mvgam:::uses_tweedie_family(list()))
+})
+
+
+test_that("tweedie_lpdf has overloaded scalar / vector dpar signatures", {
+  # The Stan function block must declare both the all-scalar
+  # and all-vector entry points (plus mixed) so brms's
+  # distributional regression on mphi / mtheta flows through
+  # without a typecheck error. Was discovered via smoke test
+  # 2026-06-09 (mvgam(bf(y ~ x, mphi ~ site), family = tweedie())
+  # used to fail at Stan compile).
+  scode <- mvgam:::tweedie_stan_funs()
+  expect_true(grepl(
+    "real tweedie_lpdf\\(vector y, vector mu, vector mphi,\\s*vector mtheta, int M\\)",
+    scode
+  ))
+  expect_true(grepl(
+    "real tweedie_lpdf\\(vector y, vector mu, real mphi,\\s*real mtheta, int M\\)",
+    scode
+  ))
+  expect_true(grepl(
+    "real tweedie_lpdf\\(vector y, vector mu, vector mphi,\\s*real mtheta, int M\\)",
+    scode
+  ))
+  expect_true(grepl(
+    "real tweedie_lpdf\\(vector y, vector mu, real mphi,\\s*vector mtheta, int M\\)",
+    scode
+  ))
+})
+
+test_that("tweedie() supports brms distributional regression on mphi", {
+  # Confirms that the user can write `mphi ~ covs` and brms
+  # routes a vector mphi into the lpdf via the per-element
+  # path. Does NOT fit -- just checks stancode + standata.
+  set.seed(1)
+  dat <- data.frame(
+    y    = c(rep(0, 10), rgamma(40, 2, 0.5)),
+    site = factor(rep(c("s1", "s2"), each = 25)),
+    time = 1:50,
+    series = factor(rep("s1", 50))
+  )
+  mf <- mvgam_formula(brms::bf(y ~ 1, mphi ~ site))
+  sc <- paste(unlist(stancode(mf, data = dat, family = tweedie())),
+              collapse = "\n")
+  expect_true(grepl("\\bb_mphi\\b", sc))
+  expect_true(grepl("X_mphi", sc))
+  expect_true(grepl(
+    "mphi\\s*\\+=\\s*Intercept_mphi\\s*\\+\\s*Xc_mphi\\s*\\*\\s*b_mphi", sc
+  ))
+  expect_true(grepl("tweedie_lpdf", sc))
+  sd <- standata(mf, data = dat, family = tweedie())
+  expect_true(all(c("K_mphi", "X_mphi") %in% names(sd)))
 })

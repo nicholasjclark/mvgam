@@ -53,16 +53,28 @@
 #' demands a non-log link with a constrained linear predictor,
 #' open an issue.
 #'
-#' Only `mu` is connected to the linear predictor (and therefore
-#' to the latent state-space trend in mvgam). The dispersion
-#' `mphi` and power `mtheta` are estimated as global scalars
-#' shared across all observations. This is a deliberate
-#' assumption of constant dispersion across time and series; if
-#' the data display obvious heteroscedasticity (e.g. seasonal
-#' claim severity), perform posterior predictive checks
-#' stratified by time and consider letting `mphi` vary via a
-#' distributional sub-formula (Bürkner 2018, brms distributional
-#' regression vignette).
+#' By default `mu` is the only dpar tied to the linear predictor
+#' (and therefore to the latent state-space trend in mvgam); the
+#' dispersion `mphi` and power `mtheta` are estimated as global
+#' scalars shared across all observations. brms distributional
+#' regression is fully supported: write a `brms::bf()` formula
+#' with `mphi ~ covs` and / or `mtheta ~ covs` to give either
+#' parameter its own per-observation linear predictor. For
+#' example,
+#'
+#' ```r
+#' mvgam(bf(y ~ x, mphi ~ site), family = tweedie(), ...)
+#' ```
+#'
+#' fits a Tweedie with site-varying dispersion. brms generates
+#' the `b_mphi_Intercept` / `b_mphi_*` parameters and the
+#' associated design matrix automatically; the Tweedie Stan
+#' lpdf has overloaded scalar and vector signatures so both
+#' the static-dpar and distributional cases work without any
+#' extra wiring. If the data display obvious heteroscedasticity
+#' (e.g. seasonal claim severity), prefer letting `mphi` vary
+#' via a sub-formula over the global default (Bürkner 2018, brms
+#' distributional regression vignette).
 #'
 #' The Stan likelihood is the compound Poisson-gamma
 #' decomposition of Spinkney (Stan Forums,
@@ -289,16 +301,25 @@ tweedie_stan_funs <- function() {
     "    return zero_index;",
     "  }",
     "",
-    "  void check_tweedie(vector mu, real mphi, real mtheta) {",
+    "  // Element-wise check on vector-valued mphi / mtheta. Both",
+    "  // scalar and vector dpar shapes are supported: brms passes",
+    "  // scalars when no sub-formula is given (e.g. family =",
+    "  // tweedie()) and vectors when distributional regression is",
+    "  // active (e.g. bf(y ~ x, mphi ~ site)). The overloaded",
+    "  // tweedie_lpdf signatures below broadcast scalars to",
+    "  // vectors via rep_vector and delegate to the per-element",
+    "  // implementation.",
+    "  void check_tweedie(vector mu, vector mphi, vector mtheta) {",
     "    int N = num_elements(mu);",
-    "    if (mphi <= 0) {",
-    "      reject(\"mphi must be > 0; found mphi =\", mphi);",
-    "    }",
-    "    if (mtheta <= 1 || mtheta >= 2) {",
-    "      reject(\"mtheta must be in (1, 2); found mtheta =\",",
-    "             mtheta);",
-    "    }",
     "    for (n in 1 : N) {",
+    "      if (mphi[n] <= 0) {",
+    "        reject(\"mphi must be > 0; found mphi =\", mphi[n],",
+    "               \"on element\", n);",
+    "      }",
+    "      if (mtheta[n] <= 1 || mtheta[n] >= 2) {",
+    "        reject(\"mtheta must be in (1, 2); found mtheta =\",",
+    "               mtheta[n], \"on element\", n);",
+    "      }",
     "      if (mu[n] <= 0) {",
     "        reject(\"mu must be > 0; found mu =\", mu[n],",
     "               \"on element\", n);",
@@ -306,8 +327,11 @@ tweedie_stan_funs <- function() {
     "    }",
     "  }",
     "",
-    "  real tweedie_lpdf(vector y, vector mu, real mphi,",
-    "                    real mtheta, int M) {",
+    "  // Per-element implementation; lambda, alpha, beta are all",
+    "  // per-observation under distributional regression on phi or",
+    "  // theta.",
+    "  real tweedie_lpdf(vector y, vector mu, vector mphi,",
+    "                    vector mtheta, int M) {",
     "    check_tweedie(mu, mphi, mtheta);",
     "    int N = num_elements(y);",
     "    int N_non_zero = num_non_zero_fun(y);",
@@ -315,20 +339,44 @@ tweedie_stan_funs <- function() {
     "    array[N_zero] int zero_index = zero_index_fun(y, N_zero);",
     "    array[N_non_zero] int non_zero_index =",
     "        non_zero_index_fun(y, N_non_zero);",
-    "    vector[N] lambda = 1 / mphi * mu .^ (2 - mtheta) / (2 - mtheta);",
-    "    real alpha = (2 - mtheta) / (mtheta - 1);",
-    "    vector[N] beta = 1 / mphi * mu .^ (1 - mtheta) / (mtheta - 1);",
+    "    vector[N] lambda = (mu .^ (2 - mtheta))",
+    "                       ./ ((2 - mtheta) .* mphi);",
+    "    vector[N] alpha = (2 - mtheta) ./ (mtheta - 1);",
+    "    vector[N] beta = (mu .^ (1 - mtheta))",
+    "                     ./ ((mtheta - 1) .* mphi);",
     "    real lp = -sum(lambda[zero_index]);",
     "    for (n in 1 : N_non_zero) {",
     "      int idx = non_zero_index[n];",
     "      vector[M] ps;",
     "      for (m in 1 : M) {",
     "        ps[m] = poisson_lpmf(m | lambda[idx])",
-    "              + gamma_lpdf(y[idx] | m * alpha, beta[idx]);",
+    "              + gamma_lpdf(y[idx] | m * alpha[idx], beta[idx]);",
     "      }",
     "      lp += log_sum_exp(ps);",
     "    }",
     "    return lp;",
+    "  }",
+    "",
+    "  // Overloaded scalar entry points broadcast and dispatch.",
+    "  real tweedie_lpdf(vector y, vector mu, real mphi,",
+    "                    real mtheta, int M) {",
+    "    int N = num_elements(y);",
+    "    return tweedie_lpdf(y | mu, rep_vector(mphi, N),",
+    "                        rep_vector(mtheta, N), M);",
+    "  }",
+    "",
+    "  real tweedie_lpdf(vector y, vector mu, vector mphi,",
+    "                    real mtheta, int M) {",
+    "    int N = num_elements(y);",
+    "    return tweedie_lpdf(y | mu, mphi,",
+    "                        rep_vector(mtheta, N), M);",
+    "  }",
+    "",
+    "  real tweedie_lpdf(vector y, vector mu, real mphi,",
+    "                    vector mtheta, int M) {",
+    "    int N = num_elements(y);",
+    "    return tweedie_lpdf(y | mu, rep_vector(mphi, N),",
+    "                        mtheta, M);",
     "  }",
     sep = "\n"
   )

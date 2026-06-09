@@ -49,16 +49,27 @@ is driven by a latent stochastic trend. If a future use case
 demands a non-log link with a constrained linear predictor,
 open an issue.
 
-Only \code{mu} is connected to the linear predictor (and therefore
-to the latent state-space trend in mvgam). The dispersion
-\code{mphi} and power \code{mtheta} are estimated as global scalars
-shared across all observations. This is a deliberate
-assumption of constant dispersion across time and series; if
-the data display obvious heteroscedasticity (e.g. seasonal
-claim severity), perform posterior predictive checks
-stratified by time and consider letting \code{mphi} vary via a
-distributional sub-formula (Bürkner 2018, brms distributional
-regression vignette).
+By default \code{mu} is the only dpar tied to the linear predictor
+(and therefore to the latent state-space trend in mvgam); the
+dispersion \code{mphi} and power \code{mtheta} are estimated as global
+scalars shared across all observations. brms distributional
+regression is fully supported: write a \code{brms::bf()} formula
+with \code{mphi ~ covs} and / or \code{mtheta ~ covs} to give either
+parameter its own per-observation linear predictor. For
+example,
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{mvgam(bf(y ~ x, mphi ~ site), family = tweedie(), ...)
+}\if{html}{\out{</div>}}
+
+fits a Tweedie with site-varying dispersion. brms generates
+the \code{b_mphi_Intercept} / \verb{b_mphi_*} parameters and the
+associated design matrix automatically; the Tweedie Stan
+lpdf has overloaded scalar and vector signatures so both
+the static-dpar and distributional cases work without any
+extra wiring. If the data display obvious heteroscedasticity
+(e.g. seasonal claim severity), prefer letting \code{mphi} vary
+via a sub-formula over the global default (Bürkner 2018, brms
+distributional regression vignette).
 
 The Stan likelihood is the compound Poisson-gamma
 decomposition of Spinkney (Stan Forums,
