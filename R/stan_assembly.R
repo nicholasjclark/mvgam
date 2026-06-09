@@ -343,14 +343,25 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
   # Deduplicate functions (GP models may have identical functions in both models)
   combined_stancode <- deduplicate_stan_functions(combined_stancode)
 
-  # Generate complete standata using brms with trend stanvars included.
-  # `data2` (cached on obs_setup) carries `car()` adjacency matrices
-  # and other special-lookup objects.
+  # Generate complete standata using brms with both the trend
+  # stanvars and any obs-side stanvars (e.g. custom families like
+  # tweedie() that attach a data int like M). `data2` (cached on
+  # obs_setup) carries `car()` adjacency matrices and other
+  # special-lookup objects.
+  standata_stanvars <- if (!is.null(obs_setup$stanvars)) {
+    if (!is.null(trend_stanvars)) {
+      combine_stanvars(obs_setup$stanvars, trend_stanvars)
+    } else {
+      obs_setup$stanvars
+    }
+  } else {
+    trend_stanvars
+  }
   combined_standata <- generate_base_brms_standata(
     formula = obs_setup$formula,
     data = obs_setup$data,
     family = obs_setup$family,
-    stanvars = trend_stanvars,
+    stanvars = standata_stanvars,
     data2 = obs_setup$data2
   )
 

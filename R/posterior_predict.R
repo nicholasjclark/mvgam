@@ -681,6 +681,7 @@ sample_from_family <- function(family_name, ndraws, epred,
                                quantile = NULL, kappa = NULL,
                                beta = NULL, bs = NULL, bias = NULL,
                                disc = NULL, thres = NULL,
+                               mphi = NULL, mtheta = NULL,
                                link = "logit",
                                lb = NULL, ub = NULL, ntrys = 5) {
   checkmate::assert_string(family_name)
@@ -752,6 +753,20 @@ sample_from_family <- function(family_name, ndraws, epred,
     "inverse.gaussian" = {
       checkmate::assert_matrix(shape, nrows = ndraws, ncols = ncol(epred))
       statmod::rinvgauss(length(epred), mean = epred, shape = shape)
+    },
+
+    "tweedie" = {
+      # Compound Poisson-gamma; uses mgcv::rTweedie (already an
+      # mvgam hard dependency) so no Suggests check is needed.
+      # mphi and mtheta arrive as [ndraws x nobs] matrices from
+      # the custom-family dpars.
+      checkmate::assert_matrix(mphi, nrows = ndraws, ncols = ncol(epred))
+      checkmate::assert_matrix(mtheta, nrows = ndraws, ncols = ncol(epred))
+      mgcv::rTweedie(
+        mu = as.numeric(epred),
+        p = as.numeric(mtheta),
+        phi = as.numeric(mphi)
+      )
     },
 
     "exgaussian" = {
@@ -1153,7 +1168,10 @@ get_family_dpars <- function(family_name) {
     hurdle_negbinomial = c("hu", "shape"),
     hurdle_gamma = c("hu", "shape"),
     hurdle_lognormal = c("hu", "sigma"),
-    hurdle_cumulative = c("hu", "disc")
+    hurdle_cumulative = c("hu", "disc"),
+
+    # Custom mvgam families
+    tweedie = c("mphi", "mtheta")
   )
 
   dpar_map[[family_name]] %||% character(0)
@@ -1662,7 +1680,7 @@ predict_single_response <- function(object, linpred_resp, resp, draw_ids,
   }
 
   mu <- family$linkinv(linpred)
-  family_name <- family$family
+  family_name <- resolve_family_name(family)
 
   # Get dpar names for this family
   dpar_names <- get_family_dpars(family_name)
@@ -1730,6 +1748,8 @@ predict_single_response <- function(object, linpred_resp, resp, draw_ids,
     bias = dpars$bias,
     disc = dpars$disc,
     thres = dpars$thres,
+    mphi = dpars$mphi,
+    mtheta = dpars$mtheta,
     lb = trunc_bounds$lb,
     ub = trunc_bounds$ub
   )

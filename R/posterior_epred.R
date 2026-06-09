@@ -89,7 +89,7 @@ compute_family_epred <- function(linpred, family,
     ))
   }
 
-  family_name <- family$family
+  family_name <- resolve_family_name(family)
   checkmate::assert_string(family_name)
 
   # Validate sigma when provided
@@ -179,11 +179,11 @@ compute_family_epred <- function(linpred, family,
       )
     )),
 
-    "tweedie" = stop(insight::format_error(
-      cli::format_inline(
-        "Family {.val tweedie} is not yet supported for {.fn posterior_epred}."
-      )
-    )),
+    # Tweedie (compound Poisson-gamma): E[Y | mu, phi, theta] = mu
+    # for all theta in [1, 2], including the boundary cases (scaled
+    # Poisson at theta = 1, Gamma at theta = 2). The point mass at
+    # zero is absorbed into mu without any Jensen correction.
+    "tweedie" = family$linkinv(linpred),
 
     # Ordinal families require threshold parameters for category probability
     # computation. Routing in posterior_epred.mvgam() handles these families
@@ -275,7 +275,7 @@ compute_family_variance <- function(mu, family, sigma = NULL,
       "'family' object is missing the 'family' component."
     ))
   }
-  family_name <- family$family
+  family_name <- resolve_family_name(family)
 
   require_dpar <- function(value, dpar_name) {
     if (is.null(value)) {

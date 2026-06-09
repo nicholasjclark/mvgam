@@ -139,8 +139,12 @@ categorize_mvgam_parameters <- function(x) {
     }
   }
 
-  # Observation family parameters (not from linear predictor)
-  obs_family_pattern <- "^(sigma|shape|nu|phi|zi|hu)(_|\\[|$)"
+  # Observation family parameters (not from linear predictor).
+  # `mphi` / `mtheta` are the Tweedie custom-family dispersion
+  # and power parameters; they belong here so `tidy()`,
+  # `coef()` and the family-extras section of `summary.mvgam()`
+  # surface them alongside standard dpars.
+  obs_family_pattern <- "^(sigma|shape|nu|phi|zi|hu|mphi|mtheta)(_|\\[|$)"
   obs_family_pars <- all_pars[
     grepl(obs_family_pattern, all_pars) &
       !grepl("_trend", all_pars)

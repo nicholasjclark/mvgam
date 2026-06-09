@@ -121,7 +121,7 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
   } else {
     object$family
   }
-  family_name <- family_obj$family
+  family_name <- resolve_family_name(family_obj)
   family_link <- family_obj$link
 
   # Observed response on the data scale

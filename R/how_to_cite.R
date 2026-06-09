@@ -333,8 +333,64 @@ reference_db <- function() {
         "}",
         sep = "\n"
       )
+    ),
+    jorgensen_tweedie = list(
+      text = "Jorgensen B (1987). Exponential dispersion models. Journal of the Royal Statistical Society: Series B (Methodological), 49(2), 127-162. https://doi.org/10.1111/j.2517-6161.1987.tb01685.x",
+      bibtex = paste(
+        "@article{jorgensen1987edm,",
+        "  title = {Exponential dispersion models},",
+        "  author = {J{\\o}rgensen, Bent},",
+        "  journal = {Journal of the Royal Statistical Society: Series B (Methodological)},",
+        "  volume = {49},",
+        "  number = {2},",
+        "  pages = {127--162},",
+        "  year = {1987},",
+        "  doi = {10.1111/j.2517-6161.1987.tb01685.x}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    dunn_smyth_tweedie = list(
+      text = "Dunn PK and Smyth GK (2005). Series evaluation of Tweedie exponential dispersion model densities. Statistics and Computing, 15(4), 267-280. https://doi.org/10.1007/s11222-005-4070-y",
+      bibtex = paste(
+        "@article{dunn2005tweedie,",
+        "  title = {Series evaluation of {T}weedie exponential dispersion model densities},",
+        "  author = {Dunn, Peter K. and Smyth, Gordon K.},",
+        "  journal = {Statistics and Computing},",
+        "  volume = {15},",
+        "  number = {4},",
+        "  pages = {267--280},",
+        "  year = {2005},",
+        "  doi = {10.1007/s11222-005-4070-y}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    aims_tweedie_brms = list(
+      text = "Australian Institute of Marine Science (2023). open-AIMS/tweedie: brms custom_family implementation of the Tweedie compound Poisson-gamma distribution. https://github.com/open-AIMS/tweedie",
+      bibtex = paste(
+        "@misc{aims2023tweedie,",
+        "  title = {{open-AIMS/tweedie}: a {brms} {custom\\_family} implementation of the {T}weedie compound {P}oisson-gamma distribution},",
+        "  author = {{Australian Institute of Marine Science}},",
+        "  year = {2023},",
+        "  url = {https://github.com/open-AIMS/tweedie},",
+        "  note = {MIT licensed}",
+        "}",
+        sep = "\n"
+      )
     )
   )
+}
+
+
+# Predicate: did the fit use the Tweedie custom family? Reads
+# the user-facing family name via `resolve_family_name()` so
+# the customfamily class (which stores name = "tweedie" while
+# family = "custom") is recognised correctly.
+#'@noRd
+uses_tweedie_family <- function(object) {
+  if (is.null(object$family)) return(FALSE)
+  identical(resolve_family_name(object$family), "tweedie")
 }
 
 
@@ -435,6 +491,20 @@ how_to_cite.mvgam <- function(object, ...) {
                !is.null(object$standata$mgp_a1),
       text = " Column shrinkage on the factor variances used the multiplicative gamma process of Bhattacharya and Dunson (2011).",
       refs = "bhattacharya_mgp"
+    ),
+    list(
+      detect = uses_tweedie_family(object),
+      text = paste0(
+        " Observations were modelled with the Tweedie compound",
+        " Poisson-gamma family (Jorgensen 1987), with the Stan",
+        " log-density evaluated via the truncated Poisson-gamma",
+        " series of Dunn and Smyth (2005). The brms",
+        " custom_family wiring is adapted from the AIMS",
+        " open-AIMS/tweedie implementation",
+        " (Australian Institute of Marine Science 2023)."
+      ),
+      refs = c("jorgensen_tweedie", "dunn_smyth_tweedie",
+               "aims_tweedie_brms")
     )
   )
 

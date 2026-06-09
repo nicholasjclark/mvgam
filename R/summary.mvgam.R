@@ -390,8 +390,13 @@ match_family_pars <- function(pars, has_dpar_formulas = character()) {
   checkmate::assert_character(pars)
   checkmate::assert_character(has_dpar_formulas)
 
-  # Match family parameter patterns
-  is_family <- grepl("^(sigma|shape|nu|phi|zi|hu)(_|\\[|$)", pars)
+  # Match family parameter patterns. `mphi` / `mtheta` are the
+  # Tweedie custom-family dispersion and power parameters; they
+  # follow the same name convention as other observation-side
+  # dpars and should appear in the Observation Model block.
+  is_family <- grepl(
+    "^(sigma|shape|nu|phi|zi|hu|mphi|mtheta)(_|\\[|$)", pars
+  )
   # Exclude trend parameters
   is_trend <- grepl("_trend", pars)
 
@@ -745,10 +750,12 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
     length(x$formula$forms) > 1
 
   if (is_multivariate) {
-    # Multivariate model with response-specific families and links
-    # Extract response names and family info from formula$forms
+    # Multivariate model with response-specific families and links.
+    # `resolve_family_name()` returns "tweedie" instead of "custom"
+    # for customfamily objects, matching the user-facing name.
     resp_names <- x$formula$responses
-    families <- sapply(x$formula$forms, function(f) f$family$family)
+    families <- sapply(x$formula$forms,
+                       function(f) resolve_family_name(f$family))
     links <- sapply(x$formula$forms, function(f) f$family$link)
 
     # Format families following brms convention
@@ -766,7 +773,7 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
     cat("  Links: ", link_str, " \n", sep = "")
   } else {
     # Univariate model
-    cat(" Family: ", x$family$family, " \n", sep = "")
+    cat(" Family: ", resolve_family_name(x$family), " \n", sep = "")
     cat("  Links: mu = ", x$family$link, " \n", sep = "")
   }
 

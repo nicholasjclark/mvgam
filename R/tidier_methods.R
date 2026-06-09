@@ -540,7 +540,10 @@ glance.mvgam <- function(x, looic = FALSE, ...) {
   checkmate::assert_flag(looic)
 
   fam <- x$family
-  fam_name <- if (inherits(fam, "family")) fam$family else
+  # `resolve_family_name()` returns the user-visible family
+  # name even for customfamily objects (e.g. "tweedie" instead
+  # of the brms-internal "custom").
+  fam_name <- if (inherits(fam, "family")) resolve_family_name(fam) else
     as.character(fam)
   link_name <- if (inherits(fam, "family")) fam$link else
     NA_character_

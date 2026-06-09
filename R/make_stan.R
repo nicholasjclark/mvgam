@@ -92,6 +92,14 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
     # Block multi-category families that require 3D linear predictors
     validate_supported_family(family)
   }
+  # Custom families (e.g. tweedie()) carry their own Stan function
+  # block + data stanvars in attr(family, "mvgam_stanvars"). They
+  # belong on the observation submodel only; the trend submodel
+  # uses gaussian() and reusing them there would duplicate the
+  # function block + the M data int and explode the final
+  # c.stanvars merge.
+  obs_stanvars <- attach_family_stanvars(stanvars, family)
+  trend_stanvars_in <- stanvars
 
   # Parse multivariate trends and validate
   if (is.null(mv_spec <- parse_multivariate_trends(obs_formula, trend_formula))) {
@@ -157,7 +165,7 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
     normalize = normalize,
     save_model = save_model,
     stan_funs = stan_funs,
-    stanvars = stanvars,
+    stanvars = obs_stanvars,
     silent = silent,
     ...
   ))) {
@@ -219,7 +227,7 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
       normalize = normalize,
       save_model = save_model,
       stan_funs = stan_funs,
-      stanvars = stanvars,
+      stanvars = trend_stanvars_in,
       silent = silent,
       ...
     ))) {
