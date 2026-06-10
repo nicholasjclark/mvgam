@@ -4392,6 +4392,31 @@ extract_and_validate_trend_components <- function(data, mv_spec,
       if (by_lv_res$deprecated_trend_seen) {
         warn_legacy_trend_by()
       }
+
+      # When the loadings matrix Z is user-pinned (fully or partially),
+      # the rotation concern that `by = lv_axis()` was designed to
+      # address is moot: the env constraint and the data-side constraint
+      # both pin factor identification, so the QR-skip auto-resolve
+      # is a no-op (the standard factor-model emission path is not
+      # entered anyway). Surface this as a one-time warning so users
+      # know their rotation setting will not influence the fit.
+      has_fixed_Z <- !is.null(parsed_trend$fixed_Z) ||
+        !is.null(parsed_trend$Z)
+      if (has_fixed_Z &&
+          !identical(Sys.getenv("TESTTHAT"), "true")) {
+        rlang::warn(
+          paste0(
+            "'by = lv_axis()' was supplied with a user-pinned ",
+            "'trend_map' (numeric entries on Z). The per-factor ",
+            "smooths still fit, but factor identification is ",
+            "already pinned by the user-supplied loadings; the ",
+            "rotation auto-skip behaviour does not apply."
+          ),
+          class = "mvgam_by_lv_with_pinned_Z",
+          .frequency = "once",
+          .frequency_id = "mvgam_by_lv_with_pinned_Z"
+        )
+      }
     }
   }
 

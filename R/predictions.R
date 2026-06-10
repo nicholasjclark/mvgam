@@ -2206,6 +2206,33 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
     ))
   }
 
+  # by = lv_axis() trend predictions: the fitted trend brmsfit holds
+  # data at (time, .trend) grain, so the user-supplied (time, series)
+  # newdata cannot be passed to its prepare_predictions kernel
+  # directly. Instead, build a (time, .trend) prediction grid, run the
+  # brms kernel on that grid to recover the per-factor mu_factor, then
+  # compose with the posterior Z draws to produce per-(time, series)
+  # linpred. The has_by_lv trend computation in Stan emits
+  # `trend[t, s] = dot(Z[s, :], lv_trend[t, :] + mu_factor[t, :])`,
+  # so when `incl_latent_state = TRUE` the full per-(t, s) result is
+  # already in the trend[t, s] draws; we delegate to the latent-state
+  # path. When FALSE (the forecast.mvgam deterministic-submodel path),
+  # we keep only the dot(Z, mu_factor) contribution here.
+  has_by_lv_trend <- identical(component, "trend") &&
+    isTRUE(mvgam_fit$trend_metadata$has_by_lv)
+  if (has_by_lv_trend) {
+    return(compose_by_lv_trend_linpred(
+      mvgam_fit = mvgam_fit,
+      newdata = newdata,
+      ndraws = ndraws,
+      draw_ids = draw_ids,
+      re_formula = re_formula,
+      allow_new_levels = allow_new_levels,
+      sample_new_levels = sample_new_levels,
+      incl_latent_state = incl_latent_state
+    ))
+  }
+
   # Extract parameter draws
   full_draws <- posterior::as_draws_matrix(mvgam_fit$fit)
   n_available <- nrow(full_draws)
@@ -2299,6 +2326,166 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   }
 
   linpred
+}
+
+
+#' Compose a per-(time, series) trend linpred for a by = lv_axis() fit.
+#'
+#' Reuses the same mock-stanfit + prepare_predictions + extract_linpred
+#' machinery the standard trend branch uses, but on a (time, .trend)
+#' prediction grid instead of the user-supplied (time, series) newdata,
+#' then folds the per-factor `mu_factor` through the posterior Z draws
+#' via one matrix multiply per draw. For `incl_latent_state = TRUE`,
+#' the Stan-side `trend[t, s] = dot(Z[s, :], lv_trend[t, :] + mu_factor)`
+#' already contains the full result, so we just lift the latent state
+#' via the existing `extract_trend_latent_states()` helper, mirroring
+#' the same per-(t, s) cell mapping that the non-by-lv path uses.
+#'
+#' Composes existing primitives rather than introducing new ones:
+#'   * `get_observation_structure()`: newdata to (time, series_int).
+#'   * `extract_Z_loadings()`: posterior Z draws as [d, s, k] array.
+#'   * `extract_trend_latent_states()`: latent state for the
+#'     `incl_latent_state = TRUE` path.
+#'   * `extract_trend_parameters()`, `create_mock_stanfit()`,
+#'     `prepare_predictions.mock_stanfit()`,
+#'     `extract_linpred_from_prep()`: brms-mocked deterministic
+#'     submodel kernel, called with the lv-grain prediction grid.
+#'   * `strip_dpar_infix()`: strip the `_trend` infix on parameter
+#'     draw column names before the mock-stanfit step.
+#' @noRd
+compose_by_lv_trend_linpred <- function(mvgam_fit, newdata, ndraws,
+                                         draw_ids, re_formula,
+                                         allow_new_levels,
+                                         sample_new_levels,
+                                         incl_latent_state) {
+  checkmate::assert_class(mvgam_fit, "mvgam")
+  checkmate::assert_data_frame(newdata, min.rows = 1L)
+  checkmate::assert_logical(incl_latent_state, len = 1L)
+
+  full_draws <- posterior::as_draws_matrix(mvgam_fit$fit)
+  n_available <- nrow(full_draws)
+  if (!is.null(draw_ids)) {
+    if (max(draw_ids) > n_available) {
+      stop(insight::format_error(c(
+        "'draw_ids' exceeds the number of posterior draws.",
+        x = paste0("Got max(draw_ids) = ", max(draw_ids),
+                   ", total draws = ", n_available, ".")
+      )))
+    }
+    full_draws <- full_draws[draw_ids, , drop = FALSE]
+  } else if (!is.null(ndraws)) {
+    if (ndraws > n_available) {
+      stop(insight::format_error(
+        cli::format_inline(
+          "Requested {ndraws} draws but only {n_available} available."
+        )
+      ))
+    }
+    full_draws <- full_draws[sample(n_available, ndraws), , drop = FALSE]
+  }
+
+  if (incl_latent_state) {
+    return(extract_trend_latent_states(mvgam_fit, newdata, full_draws))
+  }
+
+  n_lv <- as.integer(mvgam_fit$trend_metadata$n_lv_for_grain)
+  n_series <- as.integer(mvgam_fit$series_info$n_series %||%
+                            mvgam_fit$trend_components$n_trends)
+  if (is.null(n_lv) || is.null(n_series)) {
+    stop(insight::format_error(c(
+      "Cannot compose by = lv_axis() prediction without n_lv / n_series.",
+      i = "This indicates a malformed mvgam fit."
+    )))
+  }
+  brms_model <- mvgam_fit$trend_model
+  if (is.null(brms_model)) {
+    stop(insight::format_error(
+      "No trend brmsfit found on the mvgam object for by = lv_axis() composition."
+    ))
+  }
+
+  obs_struct <- get_observation_structure(mvgam_fit, newdata = newdata)
+  unique_newdata_times <- obs_struct$unique_times
+  n_unique_t <- length(unique_newdata_times)
+
+  trend_vars <- mvgam_fit$trend_metadata$covariates %||% character(0)
+  # Time-level covariates: collapse newdata to one row per time so the
+  # (time, .trend) prediction grid can left-join time-fastest-by-design
+  # covariate values. This mirrors the by_lv grain build in
+  # extract_trend_data() but without re-running the validator.
+  time_data <- if (length(trend_vars) > 0L) {
+    nd <- dplyr::mutate(newdata,
+                        .t_for_grouping = obs_struct$time)
+    nd <- dplyr::group_by(nd, .data$.t_for_grouping)
+    nd <- dplyr::summarise(
+      nd,
+      dplyr::across(dplyr::all_of(trend_vars), dplyr::first),
+      .groups = "drop"
+    )
+    nd <- dplyr::rename(nd, time = ".t_for_grouping")
+    dplyr::arrange(nd, .data$time)
+  } else {
+    data.frame(time = unique_newdata_times)
+  }
+  lv_newdata <- tidyr::expand_grid(
+    time = unique_newdata_times,
+    .trend = factor(seq_len(n_lv))
+  )
+  if (length(trend_vars) > 0L) {
+    lv_newdata <- dplyr::left_join(lv_newdata, time_data, by = "time")
+  }
+
+  params <- extract_trend_parameters(mvgam_fit)
+  component_draws <- full_draws[, params, drop = FALSE]
+  colnames(component_draws) <- strip_dpar_infix(
+    colnames(component_draws), dpar = "trend"
+  )
+  mock_fit <- create_mock_stanfit(component_draws)
+  prep <- prepare_predictions.mock_stanfit(
+    object = mock_fit, brmsfit = brms_model, newdata = lv_newdata,
+    re_formula = re_formula, allow_new_levels = allow_new_levels,
+    sample_new_levels = sample_new_levels
+  )
+  mu_factor_long <- extract_linpred_from_prep(prep, resp = NULL)
+  if (is.list(mu_factor_long) && !is.matrix(mu_factor_long)) {
+    stop(insight::format_error(
+      "Multivariate trend formulas are not supported by 'by = lv_axis()' yet."
+    ))
+  }
+  checkmate::assert_matrix(mu_factor_long, ncols = n_unique_t * n_lv)
+
+  Z_arr <- extract_Z_loadings(full_draws,
+                              n_obs_series = n_series, n_lv = n_lv)
+
+  ndraws_used <- nrow(full_draws)
+  deterministic_grid <- array(NA_real_,
+                               dim = c(ndraws_used, n_unique_t, n_series))
+  for (d in seq_len(ndraws_used)) {
+    mu_d <- matrix(mu_factor_long[d, ],
+                   nrow = n_unique_t, ncol = n_lv, byrow = TRUE)
+    Z_d <- matrix(Z_arr[d, , ], nrow = n_series, ncol = n_lv)
+    deterministic_grid[d, , ] <- mu_d %*% t(Z_d)
+  }
+
+  t_idx <- match(obs_struct$time, unique_newdata_times)
+  s_idx <- as.integer(obs_struct$series_int)
+  if (any(is.na(t_idx))) {
+    stop(insight::format_error(c(
+      "newdata times outside the unique prediction grid.",
+      i = "Drop or rename the offending rows."
+    )))
+  }
+  if (any(s_idx < 1L | s_idx > n_series)) {
+    stop(insight::format_error(
+      "newdata contains series indices outside the fitted model's range."
+    ))
+  }
+  nobs <- length(t_idx)
+  linpred_mat <- matrix(NA_real_, nrow = ndraws_used, ncol = nobs)
+  for (j in seq_len(nobs)) {
+    linpred_mat[, j] <- deterministic_grid[, t_idx[j], s_idx[j]]
+  }
+  linpred_mat
 }
 
 
