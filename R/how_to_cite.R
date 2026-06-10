@@ -442,6 +442,48 @@ reference_db <- function() {
         "}",
         sep = "\n"
       )
+    ),
+    mackenzie_occu_2002 = list(
+      text = "MacKenzie DI, Nichols JD, Lachman GB, Droege S, Royle JA and Langtimm CA (2002). Estimating site occupancy rates when detection probabilities are less than one. Ecology, 83(8), 2248-2255. https://doi.org/10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2",
+      bibtex = paste(
+        "@article{mackenzie2002occupancy,",
+        "  title = {Estimating site occupancy rates when detection probabilities are less than one},",
+        "  author = {MacKenzie, Darryl I. and Nichols, James D. and Lachman, Gideon B. and Droege, Sam and Royle, J. Andrew and Langtimm, Catherine A.},",
+        "  journal = {Ecology},",
+        "  volume = {83},",
+        "  number = {8},",
+        "  pages = {2248--2255},",
+        "  year = {2002},",
+        "  doi = {10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    royle_dorazio_2008 = list(
+      text = "Royle JA and Dorazio RM (2008). Hierarchical Modeling and Inference in Ecology: The Analysis of Data from Populations, Metapopulations and Communities. Academic Press.",
+      bibtex = paste(
+        "@book{royle2008hierarchical,",
+        "  title = {Hierarchical Modeling and Inference in Ecology: The Analysis of Data from Populations, Metapopulations and Communities},",
+        "  author = {Royle, J. Andrew and Dorazio, Robert M.},",
+        "  year = {2008},",
+        "  publisher = {Academic Press}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    socolar_flocker_2023 = list(
+      text = "Socolar JB and Mills SC (2023). flocker: flexible occupancy estimation with Stan. bioRxiv. https://doi.org/10.1101/2023.10.26.564080 (GitHub: https://github.com/jsocolar/flocker)",
+      bibtex = paste(
+        "@article{socolar2023flocker,",
+        "  title = {flocker: flexible occupancy estimation with Stan},",
+        "  author = {Socolar, Jacob B. and Mills, Simon C.},",
+        "  journal = {bioRxiv},",
+        "  year = {2023},",
+        "  doi = {10.1101/2023.10.26.564080},",
+        "  url = {https://github.com/jsocolar/flocker}",
+        "}",
+        sep = "\n"
+      )
     )
   )
 }
@@ -454,6 +496,13 @@ reference_db <- function() {
 uses_nmix_family <- function(object) {
   if (is.null(object$family)) return(FALSE)
   identical(resolve_family_name(object$family), "nmix")
+}
+
+# Predicate: did the fit use the occ() closure-unit family?
+#' @noRd
+uses_occ_family <- function(object) {
+  if (is.null(object$family)) return(FALSE)
+  identical(resolve_family_name(object$family), "occ")
 }
 
 
@@ -598,6 +647,23 @@ how_to_cite.mvgam <- function(object, ...) {
         "dennis_nmix_2015",
         "kery_nmix_2018",
         "knape_overdispersion_2018"
+      )
+    ),
+    list(
+      detect = uses_occ_family(object),
+      text = paste0(
+        " Detection / non-detection histories were modelled with",
+        " the single-season Bernoulli-binomial occupancy family",
+        " (MacKenzie et al. 2002), with the latent occupancy state",
+        " marginalised analytically per closure unit via",
+        " log-sum-exp; the custom-family scaffold follows the",
+        " flocker pattern (Socolar and Mills 2023) and the",
+        " hierarchical framing of Royle and Dorazio (2008)."
+      ),
+      refs = c(
+        "mackenzie_occu_2002",
+        "royle_dorazio_2008",
+        "socolar_flocker_2023"
       )
     )
   )

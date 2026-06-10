@@ -11,8 +11,8 @@
 #' @param newdata An optional data.frame containing new predictor values.
 #'   If `NULL` (the default), the original training data is used.
 #' @param type Character; one of `"response"` (default), `"link"`,
-#'   `"expected"`, `"variance"`, `"terms"`, `"latent_N"`, `"detection"`.
-#'   See Details.
+#'   `"expected"`, `"variance"`, `"terms"`, `"latent_N"`,
+#'   `"occupancy"`, `"detection"`. See Details.
 #' @param process_error Logical. If `FALSE` (the default) the trend is
 #'   fixed at its posterior mean and only parameter uncertainty
 #'   propagates, treating the latent trend as a nuisance random
@@ -84,8 +84,17 @@
 #'     Not yet ported on this branch; use [posterior_smooths.mvgam()]
 #'     for per-smooth draws and [fixef.mvgam()] / [ranef.mvgam()] for
 #'     parametric and random-effect components.
-#'   \item `"latent_N"`, `"detection"`: N-mixture-only. Not yet
-#'     supported (n-mixture port pending).
+#'   \item `"latent_N"`: closure-unit nmix() only. Posterior
+#'     latent abundance N per closure unit, conditioned on the
+#'     observed counts (Royle 2004 reverse-Bayes).
+#'   \item `"occupancy"`: closure-unit occ() only. Posterior
+#'     occupancy probability P(z = 1 | y_g) per site,
+#'     conditioned on the observed detection history. Returns
+#'     the probability matrix by default; use `posterior_occupancy(draw = TRUE)`
+#'     directly for 0/1 z draws.
+#'   \item `"detection"`: closure-unit families (nmix(), occ()).
+#'     Per-visit detection probability p_{g,j} on the response
+#'     scale.
 #' }
 #'
 #' @seealso [posterior_predict.mvgam()], [posterior_epred.mvgam()],
@@ -118,7 +127,7 @@ predict.mvgam <- function(object,
                           newdata = NULL,
                           type = c("response", "link", "expected",
                                    "variance", "terms", "latent_N",
-                                   "detection"),
+                                   "occupancy", "detection"),
                           process_error = FALSE,
                           ndraws = NULL,
                           draw_ids = NULL,
@@ -159,38 +168,48 @@ predict.mvgam <- function(object,
     any.missing = FALSE
   )
 
-  # N-mixture-only types: dispatch via the closure-unit
-  # extractors in families.R. Both types require an nmix()-family
-  # fit; reject early for any other family.
-  if (type %in% c("latent_N", "detection")) {
-    if (!is_closure_unit_family(object$family)) {
+  # Closure-unit family types: dispatch via the per-family
+  # extractors in families.R. Each family registers its valid
+  # `type` strings on `attr(family, "mvgam_predict_types")` (e.g.
+  # nmix => c("latent_N", "detection"); occ => c("occupancy",
+  # "detection")). `detection` is shared across all closure-unit
+  # families; the latent-state type is family-specific.
+  if (type %in% c("latent_N", "detection", "occupancy")) {
+    family_types <- attr(object$family, "mvgam_predict_types",
+                          exact = TRUE) %||% character(0)
+    if (!is_closure_unit_family(object$family) ||
+        !(type %in% family_types)) {
       stop(insight::format_error(c(
         paste0("type = '", type,
-               "' is only available for closure-unit families."),
+               "' is not available for this family."),
         x = paste0(
           "Family '", resolve_family_name(object$family),
-          "' has no latent abundance or detection layer."
+          "' exposes types: ",
+          if (length(family_types) > 0L) {
+            paste(paste0("'", family_types, "'"), collapse = ", ")
+          } else {
+            "none (not a closure-unit family)"
+          },
+          "."
         ),
-        i = paste0(
-          "Refit with family = nmix() to enable type = '",
-          type, "'."
-        )
+        i = "Refit with family = nmix() or family = occ() to enable closure-unit predict types."
       )))
     }
-    if (identical(type, "latent_N")) {
-      pred <- posterior_latent_N(
-        object,
-        newdata     = newdata,
-        draw_ids    = draw_ids,
-        conditional = TRUE
+    pred <- switch(
+      type,
+      latent_N  = posterior_latent_N(
+        object, newdata = newdata,
+        draw_ids = draw_ids, conditional = TRUE
+      ),
+      occupancy = posterior_occupancy(
+        object, newdata = newdata,
+        draw_ids = draw_ids,
+        conditional = TRUE, draw = FALSE
+      ),
+      detection = posterior_detection(
+        object, newdata = newdata, draw_ids = draw_ids
       )
-    } else {
-      pred <- posterior_detection(
-        object,
-        newdata  = newdata,
-        draw_ids = draw_ids
-      )
-    }
+    )
     if (!summary) return(pred)
     return(summarize_predictions(pred, probs = probs, robust = robust))
   }
@@ -296,13 +315,16 @@ predict.mvgam <- function(object,
 predict_variance <- function(object, newdata, process_error, ndraws,
                              re_formula, allow_new_levels,
                              sample_new_levels, resp) {
-  # Closure-unit families: marginally Y_{g,j} | lambda_g, p_{g,j}
-  # ~ Poisson(lambda_g * p_{g,j}) (the thinned-Poisson property
-  # of the Poisson-Binomial mixture), so Var[Y] = lambda * p =
-  # E[Y]. Route to posterior_epred and return that matrix
-  # directly; no dpar broadcasting needed.
+  # Closure-unit families have closed-form per-visit marginal
+  # variances:
+  #   nmix Y_{g,j} | lambda_g, p_{g,j} ~ Poisson(lambda_g *
+  #     p_{g,j}) (thinned-Poisson property), so Var[Y] = E[Y].
+  #   occ  Y_{g,j} | psi_g, p_{g,j} ~ Bernoulli(psi_g * p_{g,j}),
+  #     so Var[Y] = E[Y] * (1 - E[Y]).
+  # Both route through posterior_epred and apply the
+  # family-specific variance formula; no dpar broadcasting needed.
   if (is_closure_unit_family(object$family)) {
-    return(posterior_epred(
+    epred <- posterior_epred(
       object,
       newdata           = newdata,
       process_error     = process_error,
@@ -311,6 +333,19 @@ predict_variance <- function(object, newdata, process_error, ndraws,
       allow_new_levels  = allow_new_levels,
       sample_new_levels = sample_new_levels,
       resp              = resp
+    )
+    family_name <- resolve_family_name(object$family)
+    return(switch(
+      family_name,
+      nmix = epred,                  # Poisson thinned variance
+      occ  = epred * (1 - epred),    # Bernoulli variance
+      stop(insight::format_error(c(
+        paste0(
+          "predict(type = 'variance') closure-unit dispatch ",
+          "missing for family '", family_name, "'."
+        ),
+        i = "Add a branch with the family's mean-variance formula."
+      )))
     ))
   }
   # Compute mu over the full posterior so row i of mu_full corresponds

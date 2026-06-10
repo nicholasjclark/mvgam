@@ -245,6 +245,11 @@ test_that("validate_closure_unit_data() errors on negative counts", {
 
 test_that("validate_closure_unit_data() errors when all units single-visit with no covariates", {
   d <- make_nmix_data(n_unit = 5, n_visit = 1)
+  # Count families (binary_response = FALSE) hard-error on this
+  # configuration because lambda has unbounded support and the
+  # lambda*p product is the only identified quantity (Solymos
+  # et al. 2012, Dennis et al. 2015). Binary-response families
+  # (occ) demote this to a warning per Royle and Dorazio 2008.
   expect_error(
     validate_closure_unit_data(
       d,
@@ -252,7 +257,7 @@ test_that("validate_closure_unit_data() errors when all units single-visit with 
       has_obs_covariates = FALSE,
       has_det_covariates = FALSE
     ),
-    "Closure-unit family is non-identified"
+    "Closure-unit count family is non-identified"
   )
 })
 
@@ -461,11 +466,11 @@ test_that("predict.mvgam(type = 'latent_N') errors on non-nmix families", {
                warmup = 50, silent = 2, refresh = 0)
   expect_error(
     predict(fit, type = "latent_N"),
-    "only available for closure-unit families"
+    "not available for this family"
   )
   expect_error(
     predict(fit, type = "detection"),
-    "only available for closure-unit families"
+    "not available for this family"
   )
 })
 

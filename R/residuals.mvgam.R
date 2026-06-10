@@ -173,6 +173,26 @@ residuals.mvgam <- function(object,
                               any.missing = FALSE,
                               unique = TRUE)
 
+  # Closure-unit families (nmix, occ) violate the per-visit
+  # exchangeability assumption: visits within a closure unit
+  # share the latent state and are only marginally independent.
+  # Falling through to the standard quantile / ordinary path
+  # would emit residuals whose ACF / QQ diagnostics are biased
+  # toward apparent positive correlation.
+  if (is_closure_unit_family(object$family)) {
+    stop(insight::format_error(c(
+      paste0(
+        "residuals() is not supported for closure-unit family '",
+        resolve_family_name(object$family), "'."
+      ),
+      x = "Visits within a closure unit share the latent state and are marginally correlated.",
+      i = paste0(
+        "Use `predict(fit, type = 'occupancy' | 'latent_N' | ",
+        "'detection')` or `posterior_predict(fit)` directly."
+      )
+    )))
+  }
+
   d <- newdata %||% mvgam_training_data(object)
   resp <- mvgam_response_name(object)
   y <- as.numeric(d[[resp]])

@@ -4212,10 +4212,10 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   )
   components <- append(components, list(ar_tparameters_stanvar))
 
-  # 3. MODEL block - AR coefficient priors are now emitted by
-  # `build_ar_coef_stanvars()` above. Only the MA prior needs
-  # to be added here (sigma_trend priors are handled by the
-  # shared innovation system).
+  # 3. MODEL block - AR coefficient priors are emitted by
+  # `build_ar_coef_stanvars()` above. The MA prior is emitted
+  # here; sigma_trend priors are handled by the shared
+  # innovation system.
   if (has_ma) {
     ma_model_stanvar <- generate_trend_priors_stanvar(
       param_names = "theta1_trend",

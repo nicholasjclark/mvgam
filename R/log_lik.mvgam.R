@@ -160,25 +160,41 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
   # data here so cap edits at predict time take effect.
   if (is_closure_unit_family(family_obj)) {
     arrays <- build_closure_unit_arrays(
-      newdata, response_var = nmix_response_var(object$formula)
+      newdata, response_var = closure_unit_response_var(object$formula)
     )
-    # extract_p_for_nmix() handles both scalar (no detection
-    # sub-formula) and vector (with `bf(p ~ ...)`) cases by
-    # routing the vector case through brms's dpar linpred via
+    # extract_p_for_closure_unit() handles both scalar (no
+    # detection sub-formula) and vector (with `bf(p ~ ...)`) cases
+    # by routing the vector case through brms's dpar linpred via
     # the mock-stanfit path. Single call covers both shapes.
-    p_mat <- extract_p_for_nmix(
+    p_mat <- extract_p_for_closure_unit(
       object   = object,
       newdata  = newdata,
       draw_ids = draw_ids,
       n_visit  = ncol(linpred),
       ndraws   = nrow(linpred)
     )
-    family_pars_nmix <- list(closure_arrays = arrays, p = p_mat)
-    return(log_lik_nmix(
+    family_pars_cu <- list(closure_arrays = arrays, p = p_mat)
+    log_lik_fn <- switch(
+      family_name,
+      nmix = log_lik_nmix,
+      occ  = log_lik_occ,
+      stop(insight::format_error(c(
+        paste0(
+          "Closure-unit log_lik dispatch missing for family '",
+          family_name, "'."
+        ),
+        i = paste0(
+          "Add a '", family_name, " = log_lik_",
+          family_name, "' branch to the switch() in ",
+          "log_lik_single_response()."
+        )
+      )))
+    )
+    return(log_lik_fn(
       linpred     = linpred,
       link        = family_link,
       y           = y,
-      family_pars = family_pars_nmix,
+      family_pars = family_pars_cu,
       trials      = NULL
     ))
   }

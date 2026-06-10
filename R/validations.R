@@ -263,36 +263,46 @@ validate_supported_family <- function(family) {
 
 #' Validate observation data shape for a closure-unit family
 #'
-#' Closure-unit families (`nmix()`, future `occ()`, etc.) accept
-#' long-format data with one row per visit. Multiple rows per
-#' `(series, time)` pair encode replicate visits to one closure
-#' unit. This validator checks the data conforms to that shape,
-#' validates the `cap` (upper-truncation) column, and warns when
-#' the visit structure is at risk of leaving `lambda` and `p`
-#' separately unidentified.
+#' Closure-unit families (`nmix()`, `occ()`, future
+#' `royle_nichols()`, etc.) accept long-format data with one row
+#' per visit. Multiple rows per `(series, time)` pair encode
+#' replicate visits to one closure unit. This validator checks
+#' the data conforms to that shape, validates the `cap`
+#' (upper-truncation) column when required, and warns when the
+#' visit structure is at risk of leaving the state and detection
+#' parameters separately unidentified.
 #'
 #' Identifiability rules implemented:
-#'   - error if every closure unit has only one visit AND
-#'     neither the response nor the detection formula carries a
-#'     covariate (a fully intercept-only single-visit model is
-#'     provably non-identified, Kery 2018).
-#'   - warn (once per session) if more than 30% of closure
-#'     units have a single visit.
-#'   - warn if any closure unit has `cap < max(y)` (impossible
+#'   - error if `N_unit == 1` (single closure unit gives no
+#'     information about the state parameter).
+#'   - warn (once per session) if every closure unit has a single
+#'     visit AND neither the state nor the detection formula
+#'     carries a covariate (a fully intercept-only single-visit
+#'     model identifies only the product of state and detection;
+#'     the individual parameters are prior-dominated, MacKenzie
+#'     et al. 2002, Royle and Dorazio 2008 ch. 3.5).
+#'   - warn (once per session) if more than 30% of closure units
+#'     have a single visit.
+#'   - error if any closure unit has `cap < max(y)` (impossible
 #'     latent abundance support; the likelihood evaluates to
 #'     `-Inf`).
 #'
 #' @param data Long-format observation data frame.
-#' @param response_var Name of the response (count) column.
+#' @param response_var Name of the response column.
 #' @param series_var Series factor column name (default
 #'   `"series"`).
 #' @param time_var Time column name (default `"time"`).
 #' @param cap_var Per-row upper-truncation column name (default
-#'   `"cap"`).
-#' @param has_obs_covariates Logical; TRUE when the
-#'   abundance/state formula contains at least one covariate.
+#'   `"cap"`). For binary-response families this column is
+#'   optional; when missing a constant of 1 is used.
+#' @param has_obs_covariates Logical; TRUE when the state formula
+#'   contains at least one covariate.
 #' @param has_det_covariates Logical; TRUE when a detection
 #'   sub-formula (e.g. `p ~ tod`) is supplied.
+#' @param binary_response Logical; TRUE for families whose
+#'   response is restricted to {0, 1} (e.g. `occ()`). Triggers
+#'   the y-range check and makes `cap` optional with a default
+#'   of 1.
 #' @return Invisible `TRUE` on success; stops on hard
 #'   identifiability failure.
 #' @noRd
@@ -302,7 +312,8 @@ validate_closure_unit_data <- function(data,
                                         time_var            = "time",
                                         cap_var             = "cap",
                                         has_obs_covariates  = FALSE,
-                                        has_det_covariates  = FALSE) {
+                                        has_det_covariates  = FALSE,
+                                        binary_response     = FALSE) {
   checkmate::assert_data_frame(data, min.rows = 1L)
   checkmate::assert_string(response_var)
   checkmate::assert_string(series_var)
@@ -310,8 +321,15 @@ validate_closure_unit_data <- function(data,
   checkmate::assert_string(cap_var)
   checkmate::assert_flag(has_obs_covariates)
   checkmate::assert_flag(has_det_covariates)
+  checkmate::assert_flag(binary_response)
 
-  for (col in c(response_var, series_var, time_var, cap_var)) {
+  # Required columns: response + grouping. cap is required only
+  # for non-binary families; binary families default to 1 below.
+  required_cols <- c(response_var, series_var, time_var)
+  if (!binary_response) {
+    required_cols <- c(required_cols, cap_var)
+  }
+  for (col in required_cols) {
     if (!col %in% colnames(data)) {
       stop(insight::format_error(c(
         paste0(
@@ -322,14 +340,22 @@ validate_closure_unit_data <- function(data,
           "Each row of 'data' is one visit; the (",
           series_var, ", ", time_var, ") pair identifies a ",
           "closure unit and '", cap_var, "' bounds the latent ",
-          "abundance per unit."
+          "state per unit."
         )
       )))
     }
   }
 
   y_vals   <- data[[response_var]]
-  cap_vals <- data[[cap_var]]
+  # Binary families default `cap` to 1 when the column is absent;
+  # users may still supply `cap` explicitly (any positive integer
+  # >= y), in which case it flows through the same checks as
+  # count families.
+  cap_vals <- if (cap_var %in% colnames(data)) {
+    data[[cap_var]]
+  } else {
+    rep(1L, nrow(data))
+  }
 
   if (any(!is.finite(suppressWarnings(as.numeric(y_vals))))) {
     stop(insight::format_error(
@@ -354,6 +380,22 @@ validate_closure_unit_data <- function(data,
       i = paste0(
         "Closure-unit families model integer counts; round or ",
         "cast '", response_var, "' to integer before fitting."
+      )
+    )))
+  }
+  if (binary_response && any(y_int > 1L)) {
+    bad <- which(y_int > 1L)[1L]
+    stop(insight::format_error(c(
+      paste0(
+        "Binary-response closure-unit family requires '",
+        response_var, "' in {0, 1}."
+      ),
+      x = paste0(
+        "Row ", bad, ": ", response_var, " = ", y_int[bad], "."
+      ),
+      i = paste0(
+        "For count detections use family = nmix() instead; ",
+        "occ() models detection / non-detection only."
       )
     )))
   }
@@ -426,22 +468,69 @@ validate_closure_unit_data <- function(data,
     }
   }
 
-  any_covariates <- has_obs_covariates || has_det_covariates
-  if (all(rep_counts == 1L) && !any_covariates) {
+  # Structurally degenerate input: a single closure unit is one
+  # draw from the state distribution; its parameters (mean,
+  # variance) are not identified by a single realisation even
+  # with arbitrarily many visits to that one unit.
+  if (n_unit < 2L) {
     stop(insight::format_error(c(
-      "Closure-unit family is non-identified.",
+      "Closure-unit family requires at least two closure units.",
       x = paste0(
-        "Every closure unit has a single visit and neither the ",
-        "abundance nor the detection formula carries a covariate."
+        "Only ", n_unit, " unique (", series_var, ", ", time_var,
+        ") combination found."
       ),
       i = paste0(
-        "Add at least one covariate to a formula or supply ",
-        "additional visits per closure unit."
+        "Each closure unit is one draw from the state ",
+        "distribution; a single draw cannot identify the ",
+        "distribution parameters regardless of the visit count."
       )
     )))
   }
+
+  any_covariates <- has_obs_covariates || has_det_covariates
+  # All-single-visit + no-covariates handling diverges by family
+  # support. For occ (bounded psi in [0, 1]) the inference is
+  # prior-dominated but proper (Royle and Dorazio 2008 ch. 3.5);
+  # warn and allow the fit. For nmix (unbounded lambda > 0) the
+  # literature treats the same configuration as an identifiability
+  # failure: lambda and p sit on the lambda * p = y / n_visits
+  # isocurve with no data signal to break the symmetry (Solymos
+  # et al. 2012, Dennis et al. 2015, Kery 2018). Refuse the fit.
+  if (all(rep_counts == 1L) && !any_covariates) {
+    if (binary_response) {
+      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+        rlang::warn(
+          insight::format_warning(c(
+            "Every closure unit has a single visit and no covariates.",
+            i = paste0(
+              "Only the product of state and detection probability ",
+              "is identified by data; the individual parameters ",
+              "are prior-dominated (Royle and Dorazio 2008, ch. 3.5)."
+            )
+          )),
+          .frequency = "once",
+          .frequency_id = "closure_unit_all_single_visit"
+        )
+      }
+    } else {
+      stop(insight::format_error(c(
+        "Closure-unit count family is non-identified.",
+        x = paste0(
+          "Every unit has a single visit and neither the state ",
+          "nor the detection formula carries a covariate."
+        ),
+        i = paste0(
+          "With unbounded state support, lambda and detection p ",
+          "lie on the lambda * p = observed isocurve with no data ",
+          "signal to separate them (Solymos et al. 2012). Add a ",
+          "covariate to a formula or supply additional visits per ",
+          "closure unit."
+        )
+      )))
+    }
+  }
   single_visit_share <- mean(rep_counts == 1L)
-  if (single_visit_share > 0.3) {
+  if (single_visit_share > 0.3 && !all(rep_counts == 1L)) {
     if (!identical(Sys.getenv("TESTTHAT"), "true")) {
       rlang::warn(
         insight::format_warning(c(
@@ -451,10 +540,10 @@ validate_closure_unit_data <- function(data,
             "% single-visit units)."
           ),
           i = paste0(
-            "Detection probability and abundance share information ",
+            "State and detection probability share information ",
             "only via the formulae; with this proportion of ",
             "single-visit units, posterior identifiability ",
-            "depends entirely on the covariate structure."
+            "depends largely on the covariate structure."
           )
         )),
         .frequency = "once",

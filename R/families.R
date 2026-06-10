@@ -526,27 +526,41 @@ is_closure_unit_family <- function(family) {
 #' column in newdata.
 #'
 #' @param data Long-format observation data frame.
-#' @param response_var Name of the response (count) column.
+#' @param response_var Name of the response column.
 #' @param series_var Name of the series factor (default
 #'   `"series"`).
 #' @param time_var Name of the time column (default `"time"`).
 #' @param cap_var Name of the per-row upper-truncation column
-#'   (default `"cap"`). Must be present and constant within
-#'   each closure unit; the constant value becomes `K_max[g]`.
+#'   (default `"cap"`). Must be constant within each closure
+#'   unit; the constant value becomes `K_max[g]`. Optional when
+#'   `default_cap` is supplied (used by binary-response families
+#'   such as `occ()` where the upper truncation is always 1).
+#' @param default_cap Optional integer; when set, fills in `cap`
+#'   with this constant if the column is absent from `data`.
 #' @return Named list with elements `N_unit`, `n_rep`, `K_max`,
 #'   `Y_max`, `visit_idx`, `max_rep`, `unit_labels`.
 #' @noRd
 build_closure_unit_arrays <- function(data,
                                        response_var,
-                                       series_var = "series",
-                                       time_var   = "time",
-                                       cap_var    = "cap") {
+                                       series_var  = "series",
+                                       time_var    = "time",
+                                       cap_var     = "cap",
+                                       default_cap = NULL) {
   checkmate::assert_data_frame(data, min.rows = 1L)
   checkmate::assert_string(response_var)
   checkmate::assert_string(series_var)
   checkmate::assert_string(time_var)
   checkmate::assert_string(cap_var)
-  for (col in c(response_var, series_var, time_var, cap_var)) {
+  checkmate::assert_integerish(default_cap, lower = 1L, len = 1L,
+                               null.ok = TRUE)
+  # Required columns: response + grouping always; cap only when no
+  # default has been supplied. Binary-response families pass
+  # `default_cap = 1L` to make `cap` optional.
+  required_cols <- c(response_var, series_var, time_var)
+  if (is.null(default_cap)) {
+    required_cols <- c(required_cols, cap_var)
+  }
+  for (col in required_cols) {
     if (!col %in% colnames(data)) {
       stop(insight::format_error(c(
         paste0(
@@ -591,7 +605,11 @@ build_closure_unit_arrays <- function(data,
       i = "Filter or impute before passing the data to mvgam()."
     )))
   }
-  cap_vals <- as.integer(data[[cap_var]])
+  cap_vals <- if (cap_var %in% colnames(data)) {
+    as.integer(data[[cap_var]])
+  } else {
+    rep(as.integer(default_cap), nrow(data))
+  }
   if (anyNA(cap_vals)) {
     stop(insight::format_error(
       paste0(
@@ -752,10 +770,309 @@ nmix <- function() {
   fam$linkfun <- link_info$linkfun
   attr(fam, "mvgam_closure_unit")  <- TRUE
   attr(fam, "mvgam_predict_types") <- c("latent_N", "detection")
+  # The lpmf signature determines which data fields brms must
+  # thread through; declared once on the family so that
+  # prepare_closure_unit_family() does not have to know per-family
+  # signatures.
+  attr(fam, "mvgam_vars") <- c(
+    "N_unit", "n_rep", "K_max", "Y_max", "visit_idx"
+  )
   # mvgam_stanvars is populated at data preparation time, once
   # the closure-unit arrays from the user's data are known.
   attr(fam, "mvgam_stanvars") <- NULL
   fam
+}
+
+#' Closure-unit single-season occupancy family
+#'
+#' Bernoulli-binomial occupancy model (MacKenzie et al. 2002,
+#' *Ecology*) with a Bernoulli latent occupancy state and a
+#' Bernoulli detection process. Each observation row is one
+#' visit; closure is enforced over (series, time) pairs so
+#' multiple rows sharing the same (series, time) represent
+#' replicate detection / non-detection visits to the same
+#' underlying occupancy state. The latent state `z_g` for
+#' closure unit `g` is marginalised analytically: at sites with
+#' at least one detection, `z_g = 1` is certain and no
+#' marginalisation is needed; at sites with all-zero detection
+#' histories, `log_sum_exp` combines the all-zero-given-occupied
+#' and unoccupied branches (Royle and Dorazio 2008, ch. 3;
+#' Kery and Royle 2016, ch. 10).
+#'
+#' Parameterised with two distributional parameters:
+#' \describe{
+#'   \item{`mu`}{per-site occupancy probability \eqn{\psi}
+#'     (logit link, fixed)}
+#'   \item{`p`}{per-visit detection probability (logit link,
+#'     fixed)}
+#' }
+#'
+#' Distributional regression. brms `bf()` syntax handles
+#' covariate-dependent detection automatically:
+#'
+#' ```r
+#' mvgam(bf(y ~ s(elev), p ~ s(tod)), family = occ(), data = ...)
+#' ```
+#'
+#' Identifiability. With a single visit per closure unit and no
+#' covariates the likelihood reduces to a Bernoulli with mean
+#' `psi * p` and only that product is identified; the individual
+#' parameters are prior-dominated (Royle and Dorazio 2008,
+#' ch. 3.5). The validator warns in this configuration but
+#' allows the fit. With 3 or more visits per unit and detection
+#' probability above 0.1, identification is reliable (the same
+#' Kery 2018 result that holds for nmix carries to the
+#' Bernoulli-binomial form).
+#'
+#' Data shape. A long-format data frame, one row per visit, with
+#' columns: a binary response (0 = non-detection, 1 = detection),
+#' `series` (factor), `time` (integer), plus any covariates
+#' referenced in the formulae. Multiple rows sharing the same
+#' (series, time) pair encode replicate visits to one closure
+#' unit. The `cap` column required by `nmix()` is implicit at
+#' `1` for `occ()` and need not be supplied.
+#'
+#' @return A `brms::customfamily` object with the
+#'   `mvgam_closure_unit` and `mvgam_binary_response` attributes
+#'   set; closure-unit data prep builds the unit arrays and
+#'   attaches the Stan lpdf at fit time.
+#'
+#' @references
+#' MacKenzie, D. I., Nichols, J. D., Lachman, G. B., Droege, S.,
+#'   Royle, J. A., & Langtimm, C. A. (2002). Estimating site
+#'   occupancy rates when detection probabilities are less than
+#'   one. *Ecology*, 83, 2248-2255.
+#'   \doi{10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2}.
+#'
+#' Royle, J. A., & Dorazio, R. M. (2008). *Hierarchical Modeling
+#'   and Inference in Ecology*. Academic Press.
+#'
+#' Kery, M., & Royle, J. A. (2016). *Applied Hierarchical
+#'   Modeling in Ecology, Vol. 1*. Academic Press.
+#'
+#' Socolar, J. B., & Mills, S. C. (2023). flocker: flexible
+#'   occupancy estimation in R. *bioRxiv*.
+#'   \doi{10.1101/2023.10.26.564080}.
+#'
+#' @section Cross-reference with ubms / spOccupancy / flocker:
+#' mvgam's `occ()` uses the long-form ecology vocabulary
+#' (`occupancy`, `detection`) in `predict(type = ...)`. The
+#' equivalents in adjacent packages:
+#' \itemize{
+#'   \item ubms
+#'     (\url{https://github.com/biodiverse/ubms}):
+#'     `predict(submodel = "state")` returns marginal psi;
+#'     `predict(submodel = "det")` returns p;
+#'     `posterior_predict(param = "z")` returns 0/1 latent
+#'     occupancy draws conditioned on the observed history.
+#'   \item spOccupancy
+#'     (\url{https://github.com/biodiverse/spOccupancy}):
+#'     `psi.0.samples` (marginal psi), `z.0.samples` (latent z
+#'     draws).
+#'   \item flocker
+#'     (\url{https://github.com/jsocolar/flocker}):
+#'     `fitted_flocker(components = "occ" | "det")` for linpred
+#'     extraction; `get_Z(history_condition = TRUE)` for
+#'     conditional z draws.
+#' }
+#'
+#' mvgam: `predict(fit, type = "occupancy")` returns the
+#' conditional probability `P(z = 1 | y)` per site;
+#' `posterior_occupancy(fit, conditional = TRUE, draw = TRUE)`
+#' returns 0/1 z draws; `posterior_occupancy(conditional = FALSE)`
+#' returns marginal psi. `predict(fit, type = "detection")`
+#' returns the per-visit detection probability p_{g,j} on the
+#' response scale.
+#'
+#' @examples
+#' \dontrun{
+#' # Constant detection, occupancy varies with elevation
+#' mvgam(y ~ s(elev), family = occ(), data = closure_unit_data)
+#'
+#' # Distributional regression on detection
+#' mvgam(bf(y ~ s(elev), p ~ s(tod)),
+#'       family = occ(),
+#'       data = closure_unit_data)
+#' }
+#'
+#' @export
+occ <- function() {
+  fam <- brms::custom_family(
+    name  = "occ",
+    dpars = c("mu", "p"),
+    links = c("logit", "logit"),
+    # mu (psi) and p are both probabilities. Setting both bounds
+    # at the family level lets brms declare the scalar-dpar case
+    # with the right constraints; the lpmf converts back to
+    # logit scale internally for `log_inv_logit` /
+    # `bernoulli_logit_lpmf` stability.
+    lb    = c(0, 0),
+    ub    = c(1, 1),
+    type  = "int",
+    loop  = FALSE
+  )
+  link_info <- stats::make.link(fam$link)
+  fam$linkinv <- link_info$linkinv
+  fam$linkfun <- link_info$linkfun
+  attr(fam, "mvgam_closure_unit")    <- TRUE
+  attr(fam, "mvgam_binary_response") <- TRUE
+  attr(fam, "mvgam_predict_types")   <- c("occupancy", "detection")
+  # occ_lpmf drops K_max from the nmix signature because the
+  # latent z is binary; the lpmf reads Y_max directly as the
+  # per-unit `any detection?` indicator.
+  attr(fam, "mvgam_vars") <- c(
+    "N_unit", "n_rep", "Y_max", "visit_idx"
+  )
+  # mvgam_stanvars is populated at data preparation time, once
+  # the closure-unit arrays from the user's data are known.
+  attr(fam, "mvgam_stanvars") <- NULL
+  fam
+}
+
+#' Stan function block for the closure-unit single-season
+#' occupancy lpmf
+#'
+#' Implements the MacKenzie et al. (2002) Bernoulli-binomial
+#' marginalisation over the binary latent state `z` as a
+#' `log_sum_exp` of the occupied (`z = 1`) and unoccupied
+#' (`z = 0`) branches. For closure units with at least one
+#' detection (`Y_max[g] >= 1`), `z = 1` is certain and the
+#' marginalisation collapses to the occupied branch directly
+#' (flocker / ubms fast path).
+#'
+#' Numerical-stability notes:
+#'   - `mu` arrives from brms as the inv-logit linear predictor
+#'     (probability); converting back to
+#'     `logit_psi = logit(mu)` lets us use `log_inv_logit`
+#'     and `log1m_inv_logit` for the two branches without
+#'     boundary underflow.
+#'   - `p` arrives from brms as the inv-logit linear predictor
+#'     (probability); converting back to
+#'     `logit_p = logit(p)` keeps `bernoulli_logit_lpmf` /
+#'     `log1m_inv_logit` stable at probabilities close to 0 or
+#'     1.
+#'   - `log_sum_exp` factors out the larger of the two log
+#'     contributions before exponentiating, so the
+#'     small-probability branch can decay to a very large
+#'     negative value without affecting the result.
+#'
+#' @param max_rep Positive integer maximum visit count across
+#'   closure units. Sets the column count of `visit_idx`. The
+#'   Stan loop reads only the first `n_rep[g]` columns per unit.
+#' @return Character scalar of Stan function code.
+#' @noRd
+occ_stan_funs <- function(max_rep) {
+  checkmate::assert_integerish(max_rep, lower = 1L, len = 1L)
+  paste(
+    "  // Per-visit implementation. brms passes `mu` and `p` as",
+    "  // vectors when either dpar carries a sub-formula (e.g.",
+    "  // bf(y ~ s(elev), p ~ s(tod))). The overloaded scalar",
+    "  // signatures below broadcast the static-dpar cases via",
+    "  // rep_vector and delegate to this entry point.",
+    "  real occ_lpmf(",
+    "    array[] int y,",
+    "    vector mu,",
+    "    vector p,",
+    "    int N_unit,",
+    "    array[] int n_rep,",
+    "    array[] int Y_max,",
+    "    array[,] int visit_idx) {",
+    "    real lp = 0;",
+    "    // Convert dpars back to logit scale for the stable",
+    "    // inverse-link forms.",
+    "    vector[num_elements(mu)] logit_psi = logit(mu);",
+    "    vector[num_elements(p)]  logit_p   = logit(p);",
+    "    for (g in 1 : N_unit) {",
+    "      int n_g = n_rep[g];",
+    "      array[n_g] int idx = visit_idx[g, 1:n_g];",
+    "      // psi is constant within a closure unit; pull it",
+    "      // from the first visit's linear predictor.",
+    "      real lpsi_g = logit_psi[idx[1]];",
+    "      array[n_g] int y_g = y[idx];",
+    "      vector[n_g] lp_g  = logit_p[idx];",
+    "      if (Y_max[g] >= 1) {",
+    "        // Detected at least once: z = 1 is certain.",
+    "        lp += log_inv_logit(lpsi_g)",
+    "            + bernoulli_logit_lpmf(y_g | lp_g);",
+    "      } else {",
+    "        // All-zero history: marginalise z in {0, 1}.",
+    "        // log_sum_exp factors out the larger contribution",
+    "        // so the small branch can decay without underflow.",
+    "        real loglik_z1 = log_inv_logit(lpsi_g)",
+    "                       + sum(log1m_inv_logit(lp_g));",
+    "        real loglik_z0 = log1m_inv_logit(lpsi_g);",
+    "        lp += log_sum_exp(loglik_z1, loglik_z0);",
+    "      }",
+    "    }",
+    "    return lp;",
+    "  }",
+    "",
+    "  // Scalar-p entry point: broadcasts to per-visit length",
+    "  // and dispatches to the vector implementation.",
+    "  real occ_lpmf(",
+    "    array[] int y,",
+    "    vector mu,",
+    "    real p,",
+    "    int N_unit,",
+    "    array[] int n_rep,",
+    "    array[] int Y_max,",
+    "    array[,] int visit_idx) {",
+    "    int N = num_elements(mu);",
+    "    return occ_lpmf(y | mu, rep_vector(p, N), N_unit,",
+    "                    n_rep, Y_max, visit_idx);",
+    "  }",
+    "",
+    "  // Scalar-mu entry point: same broadcast for the static",
+    "  // occupancy case.",
+    "  real occ_lpmf(",
+    "    array[] int y,",
+    "    real mu,",
+    "    vector p,",
+    "    int N_unit,",
+    "    array[] int n_rep,",
+    "    array[] int Y_max,",
+    "    array[,] int visit_idx) {",
+    "    int N = num_elements(p);",
+    "    return occ_lpmf(y | rep_vector(mu, N), p, N_unit,",
+    "                    n_rep, Y_max, visit_idx);",
+    "  }",
+    "",
+    "  // Both-scalar entry point: broadcasts both dpars.",
+    "  real occ_lpmf(",
+    "    array[] int y,",
+    "    real mu,",
+    "    real p,",
+    "    int N_unit,",
+    "    array[] int n_rep,",
+    "    array[] int Y_max,",
+    "    array[,] int visit_idx) {",
+    "    int N = num_elements(y);",
+    "    return occ_lpmf(y | rep_vector(mu, N), rep_vector(p, N),",
+    "                    N_unit, n_rep, Y_max, visit_idx);",
+    "  }",
+    sep = "\n"
+  )
+}
+
+#' Build the closure-unit Stan stanvars for an `occ()` fit
+#'
+#' Wraps the shared `make_closure_unit_arrays_stanvars()` with
+#' the occ-specific function block. `K_max` is omitted (latent z
+#' is binary) and `Y_max` is bounded at 1 to mirror the response
+#' support; the lpmf reads `Y_max[g] >= 1` as the per-unit
+#' "any detection?" indicator that drives the fast-path branch.
+#'
+#' @inheritParams make_closure_unit_arrays_stanvars
+#' @return A `brmsstanvars` object.
+#' @noRd
+make_occ_stanvars <- function(arrays) {
+  make_closure_unit_arrays_stanvars(
+    arrays,
+    family_funs_name = "occ_funs",
+    family_funs      = occ_stan_funs(arrays$max_rep),
+    y_max_upper      = 1L,
+    include_K_max    = FALSE
+  )
 }
 
 #' Stan function block for the closure-unit N-mixture lpmf
@@ -851,30 +1168,46 @@ nmix_stan_funs <- function(max_rep) {
   )
 }
 
-#' Build the closure-unit Stan stanvars for an nmix() fit
+#' Assemble the shared closure-unit Stan stanvar bundle
 #'
-#' Given the integer arrays returned by
-#' `build_closure_unit_arrays()`, assemble the
-#' `brms::stanvar()` bundle that declares the closure-unit data
-#' in the Stan data block and registers the `nmix_lpmf`
-#' function block.
+#' Every closure-unit family emits the same `N_unit`, `n_rep`,
+#' `Y_max`, `visit_idx` integer arrays in the Stan data block,
+#' plus a family-specific function block. nmix() additionally
+#' carries `K_max` (per-unit latent abundance upper truncation);
+#' binary-response families (`occ()`) omit it because the latent
+#' state is binary.
 #'
-#' Each closure-unit family rolls its own `make_*_stanvars()`
-#' helper using the same data arrays, sharing the integer
-#' declarations and changing only the function block. Future
-#' families (`occ()`, `royle_nichols()`, `poisson_poisson()`)
-#' reuse this shape.
+#' This helper centralises the shared declarations so per-family
+#' wrappers only differ in (i) the function block, (ii) the
+#' Y_max upper bound (1 for binary y, unbounded for counts), and
+#' (iii) whether K_max is declared.
 #'
 #' @param arrays Named list returned by
 #'   `build_closure_unit_arrays()`.
+#' @param family_funs_name Stanvar name for the function block
+#'   (e.g. `"nmix_funs"`, `"occ_funs"`).
+#' @param family_funs Character scalar of Stan function-block
+#'   code (typically the output of `*_stan_funs(arrays$max_rep)`).
+#' @param y_max_upper Upper bound on the per-unit `Y_max`
+#'   declaration. Defaults to `NA` (unbounded). Set to `1L` for
+#'   binary-response families to mirror the response support.
+#' @param include_K_max Logical; emit the `K_max` data array
+#'   when `TRUE`. Defaults to `TRUE` for count families.
 #' @return A `brmsstanvars` object.
 #' @noRd
-make_nmix_stanvars <- function(arrays) {
+make_closure_unit_arrays_stanvars <- function(arrays,
+                                               family_funs_name,
+                                               family_funs,
+                                               y_max_upper   = NA_integer_,
+                                               include_K_max = TRUE) {
   checkmate::assert_list(arrays, names = "named")
-  required <- c(
-    "N_unit", "n_rep", "K_max", "Y_max",
-    "visit_idx", "max_rep"
-  )
+  checkmate::assert_string(family_funs_name)
+  checkmate::assert_string(family_funs)
+  checkmate::assert_integerish(y_max_upper, len = 1L, lower = 0L,
+                               null.ok = FALSE)
+  checkmate::assert_flag(include_K_max)
+  required <- c("N_unit", "n_rep", "Y_max", "visit_idx", "max_rep")
+  if (include_K_max) required <- c(required, "K_max")
   missing_fields <- setdiff(required, names(arrays))
   if (length(missing_fields) > 0L) {
     stop(insight::format_error(
@@ -884,9 +1217,17 @@ make_nmix_stanvars <- function(arrays) {
       )
     ))
   }
-  brms::stanvar(
-    name  = "nmix_funs",
-    scode = nmix_stan_funs(arrays$max_rep),
+  y_max_scode <- if (is.na(y_max_upper)) {
+    "array[N_unit] int<lower=0> Y_max;"
+  } else {
+    paste0(
+      "array[N_unit] int<lower=0, upper=", y_max_upper,
+      "> Y_max;"
+    )
+  }
+  stanvars <- brms::stanvar(
+    name  = family_funs_name,
+    scode = family_funs,
     block = "functions"
   ) +
     brms::stanvar(
@@ -902,15 +1243,9 @@ make_nmix_stanvars <- function(arrays) {
       block = "data"
     ) +
     brms::stanvar(
-      x     = as.integer(arrays$K_max),
-      name  = "K_max",
-      scode = "array[N_unit] int<lower=1> K_max;",
-      block = "data"
-    ) +
-    brms::stanvar(
       x     = as.integer(arrays$Y_max),
       name  = "Y_max",
-      scode = "array[N_unit] int<lower=0> Y_max;",
+      scode = y_max_scode,
       block = "data"
     ) +
     brms::stanvar(
@@ -922,6 +1257,34 @@ make_nmix_stanvars <- function(arrays) {
       ),
       block = "data"
     )
+  if (include_K_max) {
+    stanvars <- stanvars +
+      brms::stanvar(
+        x     = as.integer(arrays$K_max),
+        name  = "K_max",
+        scode = "array[N_unit] int<lower=1> K_max;",
+        block = "data"
+      )
+  }
+  stanvars
+}
+
+#' Build the closure-unit Stan stanvars for an nmix() fit
+#'
+#' Wraps the shared `make_closure_unit_arrays_stanvars()` with
+#' the nmix-specific function block and the `K_max` data array.
+#'
+#' @inheritParams make_closure_unit_arrays_stanvars
+#' @return A `brmsstanvars` object.
+#' @noRd
+make_nmix_stanvars <- function(arrays) {
+  make_closure_unit_arrays_stanvars(
+    arrays,
+    family_funs_name = "nmix_funs",
+    family_funs      = nmix_stan_funs(arrays$max_rep),
+    y_max_upper      = NA_integer_,
+    include_K_max    = TRUE
+  )
 }
 
 #' Prepare a closure-unit family for fitting
@@ -950,19 +1313,29 @@ make_nmix_stanvars <- function(arrays) {
 prepare_closure_unit_family <- function(family, data, response_var,
                                          has_obs_covariates = FALSE,
                                          has_det_covariates = FALSE) {
+  family_name <- family$name
+  # Binary-response families (`occ()`) make `cap` optional and
+  # check that the response is in {0, 1}. nmix() and future
+  # count-based closure-unit families keep the strict `cap`
+  # requirement.
+  binary_response <- isTRUE(attr(family, "mvgam_binary_response",
+                                  exact = TRUE))
+  default_cap <- if (binary_response) 1L else NULL
   validate_closure_unit_data(
     data,
     response_var       = response_var,
     has_obs_covariates = has_obs_covariates,
-    has_det_covariates = has_det_covariates
+    has_det_covariates = has_det_covariates,
+    binary_response    = binary_response
   )
   arrays <- build_closure_unit_arrays(
-    data, response_var = response_var
+    data, response_var = response_var,
+    default_cap = default_cap
   )
-  family_name <- family$name
   family_stanvars <- switch(
     family_name,
     nmix = make_nmix_stanvars(arrays),
+    occ  = make_occ_stanvars(arrays),
     stop(insight::format_error(c(
       paste0(
         "Closure-unit dispatch missing for family '",
@@ -977,7 +1350,20 @@ prepare_closure_unit_family <- function(family, data, response_var,
     )))
   )
   attr(family, "mvgam_stanvars") <- family_stanvars
-  family$vars <- c("N_unit", "n_rep", "K_max", "Y_max", "visit_idx")
+  family_vars <- attr(family, "mvgam_vars", exact = TRUE)
+  if (is.null(family_vars)) {
+    stop(insight::format_error(c(
+      paste0(
+        "Closure-unit family '", family_name,
+        "' is missing the 'mvgam_vars' attribute."
+      ),
+      i = paste0(
+        "Set `attr(fam, \"mvgam_vars\")` in the constructor to ",
+        "the integer arrays brms must thread through to the lpmf."
+      )
+    )))
+  }
+  family$vars <- family_vars
   # Stash the arrays on the family so downstream code (predict /
   # posterior_predict / log_lik) can reuse the same closure-unit
   # grouping without re-deriving it from data.
@@ -1053,24 +1439,82 @@ log_lik_tweedie <- function(linpred, link, y, family_pars, trials) {
 }
 
 # ============================================================
-# nmix() R-side downstream methods
+# Closure-unit family R-side downstream methods
 # ============================================================
-# Five shared dispatchers, all built on a single
-# `extract_nmix_components()` helper that derives the per-visit
-# lambda matrix, per-visit p matrix, and closure-unit arrays
-# from a fitted mvgam object. The same five methods will lift
-# to other closure-unit families (occ, royle_nichols, ...) once
-# their R-side extractors land; the only family-specific work
-# is the marginal log-likelihood + the conditional latent-state
-# reweighting formula. Everything else (linpred-to-lambda, p
-# extraction, predict.mvgam routing) is shared.
+# All closure-unit families (nmix, occ, ...) share the
+# `extract_closure_unit_components()` extractor which yields
+# `$state` (per-unit, link-inverted), `$p` (per-visit), and the
+# closure-unit arrays. Per-family methods then apply the
+# family-specific likelihood / sampling formula. `predict.mvgam`,
+# `posterior_epred.mvgam`, `posterior_predict.mvgam` and
+# `log_lik.mvgam` route to per-family methods via the central
+# `dispatch_closure_unit_method()` switch defined below; adding
+# a new family means adding one branch per `method_kind` arm.
+
+#' Dispatch a closure-unit R-side method by family name
+#'
+#' Central routing table for the closure-unit families. All
+#' downstream surfaces (predict, posterior_epred,
+#' posterior_predict, posterior_detection, posterior_latent_N /
+#' posterior_occupancy) call this helper rather than hard-wiring
+#' a family name. Adding a new closure-unit family means adding
+#' one branch per `method_kind` arm.
+#'
+#' @param family A fitted mvgam family (must be a closure-unit
+#'   family per `is_closure_unit_family()`).
+#' @param method_kind One of `"epred"`, `"predict"`, `"log_lik"`,
+#'   `"latent_state"`. The `"latent_state"` arm is family-specific
+#'   (latent_N for nmix, occupancy for occ).
+#' @return A function with the per-family signature for that
+#'   method. Calls `stop()` for unknown families or methods so
+#'   the missing branch is reported with the family name in the
+#'   error message.
+#' @noRd
+dispatch_closure_unit_method <- function(family, method_kind) {
+  checkmate::assert_choice(
+    method_kind, c("epred", "predict", "log_lik", "latent_state")
+  )
+  if (!is_closure_unit_family(family)) {
+    stop(insight::format_error(
+      "dispatch_closure_unit_method() requires a closure-unit family."
+    ))
+  }
+  family_name <- resolve_family_name(family)
+  fn <- switch(
+    family_name,
+    nmix = switch(method_kind,
+                  epred        = posterior_epred_nmix,
+                  predict      = posterior_predict_nmix,
+                  log_lik      = log_lik_nmix,
+                  latent_state = posterior_latent_N),
+    occ  = switch(method_kind,
+                  epred        = posterior_epred_occ,
+                  predict      = posterior_predict_occ,
+                  log_lik      = log_lik_occ,
+                  latent_state = posterior_occupancy)
+  )
+  if (is.null(fn)) {
+    stop(insight::format_error(c(
+      paste0(
+        "Closure-unit dispatch missing for family '",
+        family_name, "' method '", method_kind, "'."
+      ),
+      i = paste0(
+        "Add a '", family_name, " = switch(method_kind, ...)' ",
+        "branch to dispatch_closure_unit_method() in R/families.R."
+      )
+    )))
+  }
+  fn
+}
 
 #' Resolve the response variable name from an mvgam formula slot
 #'
 #' Handles both the plain `formula` and the `brmsformula` /
-#' `mvgam_formula` cases. Used by every nmix() R-side extractor.
+#' `mvgam_formula` cases. Used by every closure-unit family's
+#' R-side extractor.
 #' @noRd
-nmix_response_var <- function(form) {
+closure_unit_response_var <- function(form) {
   raw <- if (inherits(form, "brmsformula")) {
     form$formula[[2L]]
   } else if (inherits(form, "formula")) {
@@ -1088,7 +1532,7 @@ nmix_response_var <- function(form) {
         "Found ", length(vars),
         " variables in the LHS of the observation formula."
       ),
-      i = "cbind() responses are not supported for nmix()."
+      i = "cbind() responses are not supported for closure-unit families."
     )))
   }
   vars[1L]
@@ -1120,8 +1564,8 @@ nmix_response_var <- function(form) {
 #' @return `[ndraws x n_visit]` matrix of detection probabilities
 #'   in (0, 1).
 #' @noRd
-extract_p_for_nmix <- function(object, newdata, draw_ids,
-                                n_visit, ndraws) {
+extract_p_for_closure_unit <- function(object, newdata, draw_ids,
+                                       n_visit, ndraws) {
   draws_mat <- posterior::as_draws_matrix(object$fit)
   all_cols  <- colnames(draws_mat)
   # Any column emitted by a detection sub-formula triggers the
@@ -1179,44 +1623,51 @@ extract_p_via_dpar_linpred <- function(object, newdata, draw_ids) {
   stats::plogis(linpred_p)
 }
 
-#' Extract lambda, p and closure-unit arrays for an nmix() fit
+#' Extract state, detection-probability and closure-unit arrays
 #'
-#' Single-pass extractor used by every nmix() R-side method:
-#' `log_lik_nmix`, `posterior_epred_nmix`, `posterior_predict_nmix`,
-#' `posterior_latent_N`, `posterior_detection`. Returns the
-#' abundance rate lambda at its native grain (one column per
-#' closure unit, not per visit), the per-visit detection
-#' probability p, and the closure-unit arrays rebuilt from
-#' `newdata` so that user edits to the `cap` column take effect
-#' at prediction time.
+#' Single-pass extractor used by every closure-unit family's
+#' R-side method (`log_lik_*`, `posterior_epred_*`,
+#' `posterior_predict_*`, `posterior_latent_N` for nmix,
+#' `posterior_occupancy` for occ, `posterior_detection`).
+#' Returns the per-unit state quantity at its native grain
+#' (one column per closure unit, not per visit), the per-visit
+#' detection probability p, and the closure-unit arrays rebuilt
+#' from `newdata` so that user edits take effect at prediction
+#' time.
+#'
+#' The state quantity is family-specific: lambda (abundance
+#' rate, log link) for nmix, psi (occupancy probability, logit
+#' link) for occ, both inverted from the same linpred path via
+#' the family's `linkinv`. Downstream methods access
+#' `comp$state` and apply the family-specific likelihood.
 #'
 #' Detection sub-formulas (`bf(y ~ ..., p ~ tod)`) are
 #' supported via `extract_p_via_dpar_linpred()`, which rebuilds
 #' the per-visit probability matrix from the posterior
 #' coefficients + the standata design matrices on `newdata`.
-#' Parametric, smooth and random-effect terms in `p ~ ...` all
-#' flow through; GP terms in `p ~ ...` are gated.
+#' Parametric, smooth, random-effect, and GP terms in
+#' `p ~ ...` all flow through.
 #'
 #' Predict-time guard: re-runs `validate_closure_unit_data()` to
 #' catch the case where `newdata` carries `cap < max(y)` per
-#' unit. That state produces all-`-Inf` log-weights in the
-#' latent-N reweighting and would otherwise silently sample
-#' garbage from `sample()`.
+#' unit (nmix) or non-binary y (occ). The cap guard prevents
+#' silent garbage from `sample()` in `posterior_latent_N`.
 #'
 #' @param object Fitted `mvgam` object with a closure-unit family.
 #' @param newdata Long-format observation data; defaults to the
 #'   training data stored on `object`.
 #' @param draw_ids Optional vector of posterior draw indices.
-#' @return Named list with `lambda` (`[S x N_unit]`), `p`
+#' @return Named list with `state` (`[S x N_unit]`), `p`
 #'   (`[S x N_visit]`), `arrays`, `ndraws`, `n_unit`, `n_visit`.
 #' @noRd
-extract_nmix_components <- function(object, newdata = NULL,
-                                     draw_ids = NULL) {
+extract_closure_unit_components <- function(object, newdata = NULL,
+                                             draw_ids = NULL) {
   checkmate::assert_class(object, "mvgam")
   if (!is_closure_unit_family(object$family)) {
-    stop(insight::format_error(
-      "extract_nmix_components() requires an nmix() fit."
-    ))
+    stop(insight::format_error(c(
+      "extract_closure_unit_components() requires a closure-unit fit.",
+      i = "Use family = nmix() or family = occ()."
+    )))
   }
   if (is.null(newdata)) {
     newdata <- object$data
@@ -1226,57 +1677,58 @@ extract_nmix_components <- function(object, newdata = NULL,
       ))
     }
   }
-  response_var <- nmix_response_var(object$formula)
-  # validate_closure_unit_data catches cap < y at predict time as
-  # well as fit time; without this guard a user passing newdata
-  # with a smaller cap than the observed counts would produce
-  # all-(-Inf) log-weights in posterior_latent_N and silently
-  # sample garbage from sample(). Identifiability covariate
-  # flags are conservative (TRUE) at predict time because we
-  # don't re-examine the formula here; that check is only
-  # informative at fit time.
+  response_var <- closure_unit_response_var(object$formula)
+  binary_response <- isTRUE(attr(object$family, "mvgam_binary_response",
+                                  exact = TRUE))
+  default_cap <- if (binary_response) 1L else NULL
+  # Re-run validation on newdata so cap edits (nmix) or non-binary
+  # y (occ) raise the friendly error rather than producing silent
+  # garbage in downstream sampling. Identifiability flags are TRUE
+  # at predict time because we do not re-examine the formula here;
+  # those warnings are only informative at fit time.
   validate_closure_unit_data(
     newdata,
     response_var       = response_var,
     has_obs_covariates = TRUE,
-    has_det_covariates = TRUE
+    has_det_covariates = TRUE,
+    binary_response    = binary_response
   )
   arrays <- build_closure_unit_arrays(
-    newdata, response_var = response_var
+    newdata, response_var = response_var,
+    default_cap = default_cap
   )
-  # Per-visit linpred for the abundance rate. The linpred is
+  # Per-visit linpred for the state quantity. The linpred is
   # constant within a closure unit because the formula is on
-  # site-level covariates; we drop the redundant columns to one
-  # per unit and carry the unit-grain lambda to all downstream
-  # methods. Per-visit broadcasting happens only at the binomial
-  # sampling step, where it is unavoidable.
+  # site-level covariates; drop the redundant columns to one per
+  # unit and carry the unit-grain state to all downstream methods.
+  # Per-visit broadcasting happens only at the response sampling
+  # step, where it is unavoidable.
   #
-  # process_error = FALSE because Step 5a's nmix has no
-  # stochastic trend layer (trend_type = "None"). When trend
-  # support lands (Step 5c), this flag flips to the caller's
+  # process_error = FALSE because the current closure-unit
+  # families have no stochastic trend layer (trend_type = "None").
+  # When trend support lands this flag flips to the caller's
   # request.
   linpred <- posterior_linpred(
     object, newdata = newdata, draw_ids = draw_ids,
     process_error = FALSE
   )
-  lambda_visit <- object$family$linkinv(linpred)
-  ndraws   <- nrow(lambda_visit)
-  n_visit  <- ncol(lambda_visit)
+  state_visit <- object$family$linkinv(linpred)
+  ndraws   <- nrow(state_visit)
+  n_visit  <- ncol(state_visit)
   n_unit   <- arrays$N_unit
-  # Read the first-visit column per unit; checked against the
-  # within-unit constancy invariant below in debug builds.
   first_visit_idx <- arrays$visit_idx[, 1L]
-  lambda <- lambda_visit[, first_visit_idx, drop = FALSE]
+  state <- state_visit[, first_visit_idx, drop = FALSE]
   # p extraction. brms emits the scalar `p` in the posterior when
   # there is no detection sub-formula; with a sub-formula
   # (`bf(y ~ x, p ~ tod)`) `p` is transient in the model block
   # and the posterior carries `b_p_Intercept` + `b_p_*` instead.
-  # Both cases route through `extract_p_for_nmix()` which
+  # Both cases route through `extract_p_for_closure_unit()` which
   # reuses mvgam's existing dpar-prediction machinery so smooths,
   # group-level effects, GP terms etc. all flow through brms.
-  p <- extract_p_for_nmix(object, newdata, draw_ids, n_visit, ndraws)
+  p <- extract_p_for_closure_unit(object, newdata, draw_ids,
+                                  n_visit, ndraws)
   list(
-    lambda  = lambda,
+    state   = state,
     p       = p,
     arrays  = arrays,
     ndraws  = ndraws,
@@ -1300,13 +1752,13 @@ extract_nmix_components <- function(object, newdata = NULL,
 #' @noRd
 posterior_epred_nmix <- function(object, newdata = NULL,
                                   draw_ids = NULL) {
-  comp <- extract_nmix_components(object, newdata, draw_ids)
+  comp <- extract_closure_unit_components(object, newdata, draw_ids)
   # Broadcast unit-grain lambda back to per-visit length via the
   # visit-to-unit lookup encoded in `arrays$visit_idx`. The
   # first-visit column is shared by every visit of a unit, so the
   # inverse mapping is straightforward.
   unit_of_visit <- visit_to_unit_lookup(comp$arrays, comp$n_visit)
-  comp$lambda[, unit_of_visit, drop = FALSE] * comp$p
+  comp$state[, unit_of_visit, drop = FALSE] * comp$p
 }
 
 #' Inverse of arrays$visit_idx: for each visit row, the unit g
@@ -1339,13 +1791,13 @@ visit_to_unit_lookup <- function(arrays, n_visit) {
 #' @noRd
 posterior_predict_nmix <- function(object, newdata = NULL,
                                     draw_ids = NULL) {
-  comp <- extract_nmix_components(object, newdata, draw_ids)
+  comp <- extract_closure_unit_components(object, newdata, draw_ids)
   arrays <- comp$arrays
   ndraws <- comp$ndraws
   out <- matrix(0L, nrow = ndraws, ncol = comp$n_visit)
   for (g in seq_len(arrays$N_unit)) {
     idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
-    lam_g <- comp$lambda[, g]
+    lam_g <- comp$state[, g]
     N_draws <- stats::rpois(ndraws, lambda = lam_g)
     for (j in idx) {
       out[, j] <- stats::rbinom(ndraws, size = N_draws,
@@ -1355,18 +1807,20 @@ posterior_predict_nmix <- function(object, newdata = NULL,
   out
 }
 
-#' Per-visit detection-probability draws for an nmix() fit
+#' Per-visit detection-probability draws for a closure-unit fit
 #'
-#' Wraps `extract_nmix_components()` for `predict(type =
-#' "detection")`. Returns a `[S x N_visit]` matrix of
-#' detection probabilities on the response (0-1) scale.
+#' Wraps `extract_closure_unit_components()` for
+#' `predict(type = "detection")`. Returns a `[S x N_visit]`
+#' matrix of detection probabilities on the response (0-1)
+#' scale. Family-agnostic; works for any closure-unit family
+#' (nmix, occ, future royle_nichols / poisson_poisson).
 #'
 #' @inheritParams posterior_epred_nmix
 #' @return `[S x N_visit]` matrix.
 #' @noRd
 posterior_detection <- function(object, newdata = NULL,
                                  draw_ids = NULL) {
-  extract_nmix_components(object, newdata, draw_ids)$p
+  extract_closure_unit_components(object, newdata, draw_ids)$p
 }
 
 #' Per-closure-unit latent-abundance draws for an nmix() fit
@@ -1398,17 +1852,17 @@ posterior_latent_N <- function(object, newdata = NULL,
                                 draw_ids = NULL,
                                 conditional = TRUE) {
   checkmate::assert_flag(conditional)
-  comp <- extract_nmix_components(object, newdata, draw_ids)
+  comp <- extract_closure_unit_components(object, newdata, draw_ids)
   arrays <- comp$arrays
   ndraws <- comp$ndraws
   N_unit <- arrays$N_unit
   if (is.null(newdata)) newdata <- object$data
-  response_var <- nmix_response_var(object$formula)
+  response_var <- closure_unit_response_var(object$formula)
   y_vals <- as.integer(newdata[[response_var]])
   out <- matrix(0L, nrow = ndraws, ncol = N_unit)
   for (g in seq_len(N_unit)) {
     idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
-    lam_g <- comp$lambda[, g]
+    lam_g <- comp$state[, g]
     if (!conditional) {
       out[, g] <- stats::rpois(ndraws, lambda = lam_g)
       next
@@ -1524,6 +1978,222 @@ log_lik_nmix <- function(linpred, link, y, family_pars, trials) {
     # log_sum_exp across the truncated k grid.
     m <- apply(lp_mat, 1L, max)
     out[, g] <- m + log(rowSums(exp(lp_mat - m)))
+  }
+  out
+}
+
+# ============================================================
+# occ() R-side downstream methods
+# ============================================================
+# Mirror the nmix() pattern: every method delegates to
+# `extract_closure_unit_components()` for psi (state), p (per
+# visit) and the closure-unit arrays, then applies the
+# occupancy-specific likelihood / sampling formula.
+
+#' Per-visit expected detection probability for an occ() fit
+#'
+#' Returns the per-visit response-scale expectation
+#' `E[Y_{g, j} | psi_g, p_{g, j}] = psi_g * p_{g, j}`, which is
+#' the marginal Bernoulli rate over the latent occupancy state.
+#' No Jensen correction is needed: both factors are linear in
+#' their parameters at the per-draw level.
+#'
+#' @param object Fitted `mvgam` object with `family = occ()`.
+#' @param newdata Long-format observation data; defaults to
+#'   training data.
+#' @param draw_ids Optional vector of posterior draw indices.
+#' @return `[S x N_visit]` matrix of expected detection rates
+#'   in (0, 1).
+#' @noRd
+posterior_epred_occ <- function(object, newdata = NULL,
+                                 draw_ids = NULL) {
+  comp <- extract_closure_unit_components(object, newdata, draw_ids)
+  # Broadcast unit-grain psi back to per-visit length via the
+  # visit-to-unit lookup encoded in `arrays$visit_idx`. The
+  # first-visit column is shared by every visit of a unit, so
+  # the inverse mapping is straightforward.
+  unit_of_visit <- visit_to_unit_lookup(comp$arrays, comp$n_visit)
+  comp$state[, unit_of_visit, drop = FALSE] * comp$p
+}
+
+#' Per-visit response draws for an occ() fit (unconditional)
+#'
+#' Two-step generative simulation: per posterior draw, sample
+#' `z_g ~ Bernoulli(psi_g)` then `y_{g, j} ~ Bernoulli(z_g *
+#' p_{g, j})`. This preserves the within-unit correlation
+#' structure (every visit to a site shares the same z draw),
+#' which a flat `Bernoulli(psi * p)` would discard. The
+#' marginal distribution of y is identical to Bernoulli(psi*p),
+#' but PPCs of within-unit detection patterns rely on the
+#' shared z (Kery and Royle 2016, ch. 10.3).
+#'
+#' @inheritParams posterior_epred_occ
+#' @return `[S x N_visit]` integer matrix of 0/1 detections.
+#' @noRd
+posterior_predict_occ <- function(object, newdata = NULL,
+                                   draw_ids = NULL) {
+  comp <- extract_closure_unit_components(object, newdata, draw_ids)
+  arrays <- comp$arrays
+  ndraws <- comp$ndraws
+  out <- matrix(0L, nrow = ndraws, ncol = comp$n_visit)
+  for (g in seq_len(arrays$N_unit)) {
+    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    psi_g <- comp$state[, g]
+    z_draws <- stats::rbinom(ndraws, size = 1L, prob = psi_g)
+    for (j in idx) {
+      out[, j] <- stats::rbinom(ndraws, size = 1L,
+                                prob = z_draws * comp$p[, j])
+    }
+  }
+  out
+}
+
+#' Per-site posterior occupancy for an occ() fit
+#'
+#' Returns the posterior of the latent occupancy state z at the
+#' per-closure-unit grain. Two regimes:
+#'
+#' * `conditional = TRUE` (default): Bayes-rule posterior given
+#'   the observed detection history. Sites with at least one
+#'   detection have `P(z = 1 | y) = 1`; sites with all-zero
+#'   histories use
+#'   \deqn{P(z_g = 1 | y_g) =
+#'     \frac{\psi_g \prod_j (1 - p_{g,j})}
+#'          {\psi_g \prod_j (1 - p_{g,j}) + (1 - \psi_g)}}
+#'   (Royle and Dorazio 2008, ch. 3).
+#' * `conditional = FALSE`: the marginal occupancy probability
+#'   psi_g returned directly (the prior occupancy at new
+#'   prediction sites without observed y).
+#'
+#' Output is a probability matrix by default. Set `draw = TRUE`
+#' to return 0/1 integer Bernoulli draws (matches ubms's
+#' `posterior_predict(param = "z")` semantics; required for
+#' downstream uses such as richness estimation or
+#' colonisation-extinction simulations where ignoring
+#' stochasticity in z would introduce bias).
+#'
+#' @param object Fitted `mvgam` object with `family = occ()`.
+#' @param newdata Long-format observation data; defaults to
+#'   training data.
+#' @param draw_ids Optional vector of posterior draw indices.
+#' @param conditional Logical. If TRUE (default), reweight
+#'   `psi` by the Bernoulli likelihood of the observed history.
+#'   If FALSE, return the marginal `psi`.
+#' @param draw Logical. If FALSE (default), return the
+#'   probability `P(z = 1)` per site per draw. If TRUE, return
+#'   0/1 Bernoulli draws from that probability.
+#' @return `[S x N_unit]` matrix; probability in (0, 1) when
+#'   `draw = FALSE`, integer 0/1 when `draw = TRUE`.
+#' @noRd
+posterior_occupancy <- function(object, newdata = NULL,
+                                 draw_ids = NULL,
+                                 conditional = TRUE,
+                                 draw = FALSE) {
+  checkmate::assert_flag(conditional)
+  checkmate::assert_flag(draw)
+  comp <- extract_closure_unit_components(object, newdata, draw_ids)
+  arrays <- comp$arrays
+  ndraws <- comp$ndraws
+  N_unit <- arrays$N_unit
+  if (!conditional) {
+    # Marginal psi at the unit grain. No use of observed y.
+    probs <- comp$state
+  } else {
+    if (is.null(newdata)) newdata <- object$data
+    response_var <- closure_unit_response_var(object$formula)
+    y_vals <- as.integer(newdata[[response_var]])
+    probs <- matrix(NA_real_, nrow = ndraws, ncol = N_unit)
+    for (g in seq_len(N_unit)) {
+      idx   <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+      psi_g <- comp$state[, g]
+      y_g   <- y_vals[idx]
+      if (arrays$Y_max[g] >= 1L) {
+        # Detected at least once: z = 1 with probability 1.
+        probs[, g] <- 1
+        next
+      }
+      # All-zero history: Bayes rule on the binary latent state.
+      # Computed in log space and exponentiated last so per-draw
+      # underflow at psi ~ 1 with many zero visits is safe.
+      p_g <- comp$p[, idx, drop = FALSE]
+      log_psi   <- log(psi_g)
+      log1m_psi <- log1p(-psi_g)
+      sum_log1m_p <- rowSums(log1p(-p_g))
+      ll_z1 <- log_psi + sum_log1m_p
+      ll_z0 <- log1m_psi
+      m <- pmax(ll_z1, ll_z0)
+      probs[, g] <- exp(ll_z1 - m) /
+        (exp(ll_z1 - m) + exp(ll_z0 - m))
+    }
+  }
+  if (!draw) return(probs)
+  # Integer 0/1 draws via Bernoulli; preserved as integer matrix
+  # for downstream interop with richness / colonisation code.
+  out <- matrix(stats::rbinom(length(probs), size = 1L, prob = probs),
+                nrow = nrow(probs), ncol = ncol(probs))
+  storage.mode(out) <- "integer"
+  out
+}
+
+#' Log-likelihood per closure unit for an occ() fit
+#'
+#' Matches the Stan lpdf's per-unit marginal:
+#' \deqn{\log p(y_g | \psi_g, p_g) =
+#'   \log[\psi_g \prod_j p_{g,j}^{y_{g,j}} (1 - p_{g,j})^{1 - y_{g,j}}
+#'        + (1 - \psi_g) \mathbb{1}(\sum_j y_{g,j} = 0)]}
+#' Returned at the closure-unit grain (one column per unit) so
+#' `loo()` / `waic()` see one observation per conditionally iid
+#' block (visits within a unit share latent z; they are not
+#' exchangeable across units).
+#'
+#' Threaded through the standard `dispatch_log_lik` signature.
+#' The closure-unit arrays + posterior `p` draws are passed in
+#' `family_pars` via the upstream extension hook in
+#' `log_lik_single_response()`.
+#'
+#' @noRd
+log_lik_occ <- function(linpred, link, y, family_pars, trials) {
+  checkmate::assert_matrix(linpred)
+  checkmate::assert_choice(link, "logit")
+  arrays <- family_pars$closure_arrays
+  if (is.null(arrays)) {
+    stop(insight::format_error(
+      "log_lik_occ() requires 'closure_arrays' in family_pars."
+    ))
+  }
+  p_mat <- family_pars$p
+  checkmate::assert_matrix(
+    p_mat, nrows = nrow(linpred), ncols = ncol(linpred)
+  )
+  psi_visit <- .linkinv(linpred, link)
+  ndraws <- nrow(linpred)
+  N_unit <- arrays$N_unit
+  y_int  <- as.integer(y)
+  out <- matrix(NA_real_, nrow = ndraws, ncol = N_unit)
+  for (g in seq_len(N_unit)) {
+    idx   <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    psi   <- psi_visit[, idx[1L]]
+    y_g   <- y_int[idx]
+    p_g   <- p_mat[, idx, drop = FALSE]
+    log_psi   <- log(psi)
+    log1m_psi <- log1p(-psi)
+    # Bernoulli per-visit log-prob given z = 1.
+    log_p_y <- matrix(0, nrow = ndraws, ncol = length(idx))
+    for (jj in seq_along(idx)) {
+      log_p_y[, jj] <- ifelse(
+        y_g[jj] == 1L,
+        log(p_g[, jj]),
+        log1p(-p_g[, jj])
+      )
+    }
+    ll_z1 <- log_psi + rowSums(log_p_y)
+    if (arrays$Y_max[g] >= 1L) {
+      out[, g] <- ll_z1
+    } else {
+      ll_z0 <- log1m_psi
+      m <- pmax(ll_z1, ll_z0)
+      out[, g] <- m + log(exp(ll_z1 - m) + exp(ll_z0 - m))
+    }
   }
   out
 }

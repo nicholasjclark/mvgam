@@ -233,8 +233,24 @@ pp_check.mvgam <- function(
     get(paste0(prefix, "_", bptype), asNamespace("bayesplot"))
   }
 
-  if (object$family$family == "nmix") {
-    stop("'pp_check' is not implemented for this family.", call. = FALSE)
+  # Closure-unit families (nmix, occ) carry `family$family ==
+  # "custom"` under brms's customfamily convention, so the
+  # predicate routes through `resolve_family_name()`. Per-visit
+  # pp_check would treat visits within a closure unit as
+  # exchangeable, which they are not (they share the latent
+  # state).
+  if (is_closure_unit_family(object$family)) {
+    stop(insight::format_error(c(
+      paste0(
+        "pp_check() is not supported for closure-unit family '",
+        resolve_family_name(object$family), "'."
+      ),
+      i = paste0(
+        "Use `posterior_predict(fit)` (per visit) and ",
+        "`predict(fit, type = 'occupancy' | 'latent_N' | ",
+        "'detection')` (per unit)."
+      )
+    )))
   }
   # Validate group / x against the column names of newdata. insight's
   # get_predictors does not dispatch on mvgam fits, and the variable-name

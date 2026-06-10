@@ -7,7 +7,8 @@
 \method{predict}{mvgam}(
   object,
   newdata = NULL,
-  type = c("response", "link", "expected", "variance", "terms", "latent_N", "detection"),
+  type = c("response", "link", "expected", "variance", "terms", "latent_N", "occupancy",
+    "detection"),
   process_error = FALSE,
   ndraws = NULL,
   draw_ids = NULL,
@@ -28,8 +29,8 @@
 If \code{NULL} (the default), the original training data is used.}
 
 \item{type}{Character; one of \code{"response"} (default), \code{"link"},
-\code{"expected"}, \code{"variance"}, \code{"terms"}, \code{"latent_N"}, \code{"detection"}.
-See Details.}
+\code{"expected"}, \code{"variance"}, \code{"terms"}, \code{"latent_N"},
+\code{"occupancy"}, \code{"detection"}. See Details.}
 
 \item{process_error}{Logical. If \code{FALSE} (the default) the trend is
 fixed at its posterior mean and only parameter uncertainty
@@ -121,8 +122,17 @@ observation noise at the posterior-mean trend. Set
 Not yet ported on this branch; use \code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}}
 for per-smooth draws and \code{\link[=fixef.mvgam]{fixef.mvgam()}} / \code{\link[=ranef.mvgam]{ranef.mvgam()}} for
 parametric and random-effect components.
-\item \code{"latent_N"}, \code{"detection"}: N-mixture-only. Not yet
-supported (n-mixture port pending).
+\item \code{"latent_N"}: closure-unit nmix() only. Posterior
+latent abundance N per closure unit, conditioned on the
+observed counts (Royle 2004 reverse-Bayes).
+\item \code{"occupancy"}: closure-unit occ() only. Posterior
+occupancy probability P(z = 1 | y_g) per site,
+conditioned on the observed detection history. Returns
+the probability matrix by default; use \code{posterior_occupancy(draw = TRUE)}
+directly for 0/1 z draws.
+\item \code{"detection"}: closure-unit families (nmix(), occ()).
+Per-visit detection probability p_{g,j} on the response
+scale.
 }
 }
 \examples{
