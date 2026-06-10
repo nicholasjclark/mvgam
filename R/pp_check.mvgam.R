@@ -43,6 +43,31 @@
 #'   `marginaleffects::plot_predictions()` provides a complementary
 #'   conditional surface.
 #'
+#' @section Closure-unit families (`nmix()`, `occ()`):
+#'   Closure-unit observation families compute predictions at
+#'   the closure-unit grain (one per site x season) because
+#'   visits within a unit share the latent state. `pp_check()`
+#'   aggregates the per-visit response and per-visit posterior
+#'   predictive draws to the unit grain (sum across visits) via
+#'   the shared `aggregate_closure_unit_visits()` helper, then
+#'   hands the resulting `(y_unit, yrep_unit)` to the relevant
+#'   `bayesplot::ppc_*` function. Discrete-friendly types are
+#'   the natural fit (`bars`, `bars_grouped`, `rootogram`,
+#'   `hist`, `freqpoly`, `freqpoly_grouped`); density / ECDF
+#'   variants (`dens_overlay`, `ecdf_overlay`,
+#'   `ecdf_overlay_grouped`), per-unit stats (`stat`, `stat_2d`,
+#'   `stat_grouped`), intervals / ribbons over a unit-constant
+#'   covariate (`intervals`, `ribbon`), and the residual
+#'   histograms (`resid_hist`, `resid_qq`) all work as
+#'   expected. Per-row scatter / fitted-vs-residual / per-row
+#'   time-axis types (`scatter_avg`, `error_binned`,
+#'   `resid_acf`, `resid_pacf`, `resid_vs_fitted`,
+#'   `resid_ribbon`) are blocked because they do not match the
+#'   closure-unit grain. `group =` and `x =` covariates must be
+#'   constant within every closure unit; per-visit covariates
+#'   (`tod`, observer, weather) are rejected with a clear
+#'   error.
+#'
 #' @seealso \code{\link{predict.mvgam}}, [log_lik.mvgam()]
 #'
 #' @examples
@@ -120,6 +145,22 @@
 #'
 #' # Many plots can be made without the observed data
 #' pp_check(mod, prefix = "ppd")
+#' }
+#'
+#' \dontrun{
+#' # Closure-unit families: pp_check aggregates per-visit y and
+#' # yrep to the per-unit grain (sum of detections per site) and
+#' # then dispatches to bayesplot. Default `type = "bars"` gives
+#' # the per-site detection-count distribution; pair with a
+#' # unit-constant grouping covariate (e.g. site elevation) for
+#' # faceted variants.
+#' occ_fit <- mvgam(bf(y ~ elev, p ~ tod), family = occ(),
+#'                  data = closure_unit_data)
+#' pp_check(occ_fit, type = "bars", ndraws = 200)
+#' pp_check(occ_fit, type = "rootogram")
+#' pp_check(occ_fit, type = "stat",
+#'          stat = function(x) mean(x == 0))
+#' pp_check(occ_fit, type = "resid_hist", ndraws = 8)
 #' }
 #'
 #' @export pp_check
@@ -233,25 +274,38 @@ pp_check.mvgam <- function(
     get(paste0(prefix, "_", bptype), asNamespace("bayesplot"))
   }
 
-  # Closure-unit families (nmix, occ) carry `family$family ==
-  # "custom"` under brms's customfamily convention, so the
-  # predicate routes through `resolve_family_name()`. Per-visit
-  # pp_check would treat visits within a closure unit as
-  # exchangeable, which they are not (they share the latent
-  # state).
+  # Closure-unit families (nmix, occ) operate at the closure-unit
+  # grain (one per site x season). Per-row PPC types that assume
+  # exchangeable observations or a per-row time axis do not match
+  # that grain and are blocked up front; the rest of the ppc_*
+  # surface routes through a per-unit aggregation injected below
+  # (see closure_unit_pp_check_setup()).
   if (is_closure_unit_family(object$family)) {
-    stop(insight::format_error(c(
-      paste0(
-        "pp_check() is not supported for closure-unit family '",
-        resolve_family_name(object$family), "'."
-      ),
-      i = paste0(
-        "Use `residuals(fit)` for per-unit randomised quantile ",
-        "residuals, `posterior_predict(fit)` for per-visit ",
-        "draws, or `predict(fit, type = 'occupancy' | ",
-        "'latent_N' | 'detection')` for latent-state extraction."
-      )
-    )))
+    closure_unit_blocked <- c(
+      "scatter_avg", "scatter_avg_grouped",
+      "error_scatter_avg", "error_scatter_avg_vs_x",
+      "error_binned",
+      "resid_acf", "resid_pacf", "resid_vs_fitted",
+      "resid_ribbon", "resid_ribbon_grouped"
+    )
+    if (type %in% closure_unit_blocked) {
+      stop(insight::format_error(c(
+        paste0(
+          "pp_check(type = '", type, "') is not available for ",
+          "closure-unit family '",
+          resolve_family_name(object$family), "'."
+        ),
+        x = paste0(
+          "Per-row scatter, fitted-vs-residual, and per-row ",
+          "time-axis types do not match the closure-unit grain."
+        ),
+        i = paste0(
+          "Use type = 'bars', 'rootogram', 'dens_overlay', ",
+          "'ecdf_overlay', 'intervals', 'stat', 'resid_hist', ",
+          "or 'resid_qq' for closure-unit fits."
+        )
+      )))
+    }
   }
   # Validate group / x against the column names of newdata. insight's
   # get_predictors does not dispatch on mvgam fits, and the variable-name
@@ -444,6 +498,36 @@ pp_check.mvgam <- function(
     take <- NULL
   }
 
+  # Closure-unit families: collapse y and yrep to the per-unit
+  # grain via the shared aggregator. For resid_* types yrep is
+  # already per-unit (residuals.mvgam aggregates internally) so
+  # only y needs the length swap. group / x covariates are
+  # validated as unit-constant and remapped to the first-visit
+  # row per unit so bayesplot sees one value per closure unit.
+  closure_unit_lookup <- NULL
+  if (is_closure_unit_family(object$family)) {
+    cu <- closure_unit_pp_check_setup(
+      object  = object,
+      newdata = newdata,
+      y       = y,
+      yrep    = yrep,
+      type    = type
+    )
+    y <- cu$y
+    yrep <- cu$yrep
+    closure_unit_lookup <- cu$first_visits
+    if (!is.null(group)) {
+      check_closure_unit_var_unit_constant(
+        newdata[[group]], cu$arrays, var_name = group
+      )
+    }
+    if (!is.null(x)) {
+      check_closure_unit_var_unit_constant(
+        newdata[[x]], cu$arrays, var_name = x
+      )
+    }
+  }
+
   # Diagnostic resid types build their plot directly from the
   # residual draws (and, for resid_vs_fitted, posterior_epred
   # values at the same draw_ids). They never route through
@@ -498,6 +582,10 @@ pp_check.mvgam <- function(
     if (!is.null(take)) {
       ppc_args$group <- ppc_args$group[take]
     }
+    # Closure-unit: select one value per unit (first-visit row).
+    if (!is.null(closure_unit_lookup)) {
+      ppc_args$group <- ppc_args$group[closure_unit_lookup]
+    }
   }
 
   is_like_factor <- function(x) {
@@ -512,6 +600,9 @@ pp_check.mvgam <- function(
 
     if (!is.null(take)) {
       ppc_args$x <- ppc_args$x[take]
+    }
+    if (!is.null(closure_unit_lookup)) {
+      ppc_args$x <- ppc_args$x[closure_unit_lookup]
     }
   }
 
@@ -561,6 +652,85 @@ pp_check.mvgam <- function(
       ggplot2::labs(y = "DS residuals")
   }
   out_plot
+}
+
+
+# Internal: closure-unit pp_check setup.
+#
+# Collapses the per-visit response and per-visit posterior
+# predictive draws to the closure-unit grain via the shared
+# `aggregate_closure_unit_visits()` helper, so bayesplot's ppc_*
+# functions operate on `(y_unit, yrep_unit)`. Per-visit
+# residuals would treat visits within a closure unit as
+# exchangeable, which they are not (visits share the latent
+# state). For `resid_*` types, `yrep` arrives already at the
+# unit grain because `residuals.mvgam` aggregates internally; we
+# only synthesise a length-matched `y_unit` vector (set to zeros
+# by the caller for the residual histograms).
+#
+# Returns a list `(y, yrep, arrays, first_visits)`. The
+# `first_visits` lookup is used by the caller to dedup any
+# `group` / `x` covariate the user supplied so bayesplot sees
+# one covariate value per closure unit.
+#'@noRd
+closure_unit_pp_check_setup <- function(object, newdata, y, yrep,
+                                          type) {
+  resp_var <- closure_unit_response_var(object$formula)
+  binary_response <- isTRUE(attr(object$family, "mvgam_binary_response",
+                                  exact = TRUE))
+  default_cap <- if (binary_response) 1L else NULL
+  arrays <- build_closure_unit_arrays(
+    newdata, response_var = resp_var, default_cap = default_cap
+  )
+  if (grepl("resid", type)) {
+    # `yrep` is already `[ndraws x N_unit]` (per-unit residuals);
+    # `y` is set to zeros downstream for resid_* types so only
+    # the length matters here.
+    y_unit <- rep(0, arrays$N_unit)
+    yrep_unit <- yrep
+  } else {
+    agg <- aggregate_closure_unit_visits(
+      object, newdata = newdata, yrep_visit = yrep
+    )
+    y_unit <- agg$y_unit
+    yrep_unit <- agg$yrep_unit
+  }
+  list(
+    y = y_unit, yrep = yrep_unit, arrays = arrays,
+    first_visits = arrays$visit_idx[, 1L]
+  )
+}
+
+
+# Internal: assert that a per-visit covariate is constant within
+# every closure unit. Used by the closure-unit pp_check setup to
+# guard the `group` and `x` ppc_* arguments before they get
+# remapped to the per-unit grain.
+#'@noRd
+check_closure_unit_var_unit_constant <- function(values, arrays,
+                                                   var_name) {
+  for (g in seq_len(arrays$N_unit)) {
+    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    if (length(unique(values[idx])) > 1L) {
+      stop(insight::format_error(c(
+        paste0(
+          "Covariate '", var_name,
+          "' is not constant within every closure unit."
+        ),
+        x = paste0(
+          "Closure-unit pp_check operates at the unit grain ",
+          "(one value per site x season); '", var_name,
+          "' varies within at least one closure unit."
+        ),
+        i = paste0(
+          "Drop '", var_name,
+          "' from `group =` / `x =`, or use a unit-constant ",
+          "covariate (e.g. a site-level trait)."
+        )
+      )))
+    }
+  }
+  invisible(NULL)
 }
 
 

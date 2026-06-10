@@ -86,6 +86,33 @@ functions (e.g. \code{type = "ecdf_overlay_grouped"}, \code{type = "bars_grouped
 \code{marginaleffects::plot_predictions()} provides a complementary
 conditional surface.
 }
+\section{Closure-unit families (\code{nmix()}, \code{occ()})}{
+
+Closure-unit observation families compute predictions at
+the closure-unit grain (one per site x season) because
+visits within a unit share the latent state. \code{pp_check()}
+aggregates the per-visit response and per-visit posterior
+predictive draws to the unit grain (sum across visits) via
+the shared \code{aggregate_closure_unit_visits()} helper, then
+hands the resulting \verb{(y_unit, yrep_unit)} to the relevant
+\verb{bayesplot::ppc_*} function. Discrete-friendly types are
+the natural fit (\code{bars}, \code{bars_grouped}, \code{rootogram},
+\code{hist}, \code{freqpoly}, \code{freqpoly_grouped}); density / ECDF
+variants (\code{dens_overlay}, \code{ecdf_overlay},
+\code{ecdf_overlay_grouped}), per-unit stats (\code{stat}, \code{stat_2d},
+\code{stat_grouped}), intervals / ribbons over a unit-constant
+covariate (\code{intervals}, \code{ribbon}), and the residual
+histograms (\code{resid_hist}, \code{resid_qq}) all work as
+expected. Per-row scatter / fitted-vs-residual / per-row
+time-axis types (\code{scatter_avg}, \code{error_binned},
+\code{resid_acf}, \code{resid_pacf}, \code{resid_vs_fitted},
+\code{resid_ribbon}) are blocked because they do not match the
+closure-unit grain. \verb{group =} and \verb{x =} covariates must be
+constant within every closure unit; per-visit covariates
+(\code{tod}, observer, weather) are rejected with a clear
+error.
+}
+
 \examples{
 \donttest{
 simdat <- sim_mvgam(seasonality = "hierarchical")
@@ -161,6 +188,22 @@ pp_check(mod,
 
 # Many plots can be made without the observed data
 pp_check(mod, prefix = "ppd")
+}
+
+\dontrun{
+# Closure-unit families: pp_check aggregates per-visit y and
+# yrep to the per-unit grain (sum of detections per site) and
+# then dispatches to bayesplot. Default `type = "bars"` gives
+# the per-site detection-count distribution; pair with a
+# unit-constant grouping covariate (e.g. site elevation) for
+# faceted variants.
+occ_fit <- mvgam(bf(y ~ elev, p ~ tod), family = occ(),
+                 data = closure_unit_data)
+pp_check(occ_fit, type = "bars", ndraws = 200)
+pp_check(occ_fit, type = "rootogram")
+pp_check(occ_fit, type = "stat",
+         stat = function(x) mean(x == 0))
+pp_check(occ_fit, type = "resid_hist", ndraws = 8)
 }
 
 }

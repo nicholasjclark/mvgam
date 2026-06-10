@@ -78,6 +78,17 @@ mod <- mvgam(y ~ s(season, bs = "cc"),
 augment(mod)
 }
 
+\dontrun{
+# Closure-unit families: per-unit .resid* rows are recycled
+# back to the per-visit observation frame and tagged with a
+# `.unit` column. Use it to recover the unit-grain residuals
+# or to facet diagnostics by site.
+occ_fit <- mvgam(bf(y ~ elev, p ~ tod), family = occ(),
+                 data = closure_unit_data)
+out <- augment(occ_fit)
+head(out[, c(".unit", ".observed", ".fitted", ".resid")])
+}
+
 }
 \seealso{
 \code{\link[=fitted.mvgam]{fitted.mvgam()}}, \code{\link[=residuals.mvgam]{residuals.mvgam()}}

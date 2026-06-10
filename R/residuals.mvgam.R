@@ -195,6 +195,20 @@
 #' str(resids)
 #' }
 #'
+#' \dontrun{
+#' # Closure-unit families: residuals collapse to the per-unit
+#' # grain (one row per site x season), using the per-unit sum
+#' # as the summary statistic for the empirical PIT.
+#' occ_fit <- mvgam(bf(y ~ elev, p ~ tod), family = occ(),
+#'                  data = closure_unit_data)
+#' rs <- residuals(occ_fit)
+#' nrow(rs) # one row per closure unit
+#' # Pair with the per-visit posterior_predict draws when
+#' # within-unit prediction detail is needed.
+#' yrep_visit <- posterior_predict(occ_fit)
+#' dim(yrep_visit) # [ndraws x n_visit]
+#' }
+#'
 #' @export
 residuals.mvgam <- function(object,
                               newdata = NULL,
