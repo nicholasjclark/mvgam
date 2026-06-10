@@ -921,3 +921,220 @@ budget on the cached cmdstanr install.
 Six chunks, each commit-sized, each independently reviewable.
 Total LOC budget: ~600 lines in `R/jsdgam.R` plus ~400 lines of
 tests, plus the vignette. No new Stan code. No parallel pipeline.
+
+---
+
+## §5b — Factor-side environmental structure (latent-factor-varying effects)
+
+**Headline.** Constrained / concurrent ordination — where each latent
+factor `k` is itself a smooth function of a *different* environmental
+gradient (factor 1 ~ s(elevation), factor 2 ~ s(precip)) — is the
+JSDM pattern an HMSC user reaches for when they want a-priori
+interpretable axes rather than a free rotation. The existing §4 sketch
+of `factor_formula = ~ env` papers over a genuine ambiguity: does the
+env smooth load on all factors equally, or does each factor get its
+own smooth? Auditing the source shows mvgam currently supports
+neither cleanly. `mu_trend` is sized per `(time, series)`, not per
+factor, so `s(x, by = trend)` has nothing to bind to on the
+trend-side data and silently fails. The trend linpred can shape a
+shared response curve that all factors load on (option a below), but
+the per-factor (`by = trend`) machinery is absent and the roxygen
+example at `R/trend_system.R:2451` is aspirational rather than wired
+up.
+
+### Current mvgam state
+
+- **`trend_data` carries `(time, series, covariates...)`, no `trend`
+  column.** `R/validations.R:4776–4805` builds the trend-side data by
+  `group_by(time, series) %>% summarise(across(trend_variables,
+  first))`. There is no `mutate(trend = ...)` step, no aliasing of
+  `series` to `trend`, anywhere along the path from `mvgam()` →
+  `extract_trend_data()` → `parse_multivariate_trends()` →
+  `brms::brm(formula = trend_formula, data = trend_data)`.
+
+- **`mu_trend` is sized per observation, not per factor.**
+  `R/stan_assembly.R:2516` declares
+  `vector[N_trend] mu_trend = ...`, and the assembly comment at
+  L2447–2448 spells it out: "`mu_trend` can carry per-(time, series)
+  values." `N_lv_trend` (L2439) sizes only `lv_trend` and `Z`. The
+  trend linpred and the factor axis live in different dimensions and
+  the Stan code has no path to pipe a smooth basis through the
+  `N_lv_trend` axis.
+
+- **`extract_trend_linpred()` returns `[n_time, n_series]`.**
+  `R/extract_trend_linpred.R:23` documents the shape; the reshape at
+  L98–135 (`reshape_linpred_to_grid`) is explicit:
+  `out <- matrix(0, nrow = n_time, ncol = n_series)`. There is no
+  factor axis anywhere in the post-processing path either, which
+  matches the Stan side.
+
+- **`s(x, by = trend)` in `trend_formula` is silently broken.**
+  The roxygen example at `R/trend_system.R:2451` writes
+  `trend_formula = ~ s(season, bs = 'cc', k = 5, by = trend)`. The
+  trend-side data has no `trend` column, so brms's smooth machinery
+  either errors with `object 'trend' not found` at design-matrix
+  construction time or, worse, picks up an unrelated symbol from the
+  formula environment. No test exercises this path (`grep "by = trend"
+  tests/` returns nothing), so the breakage is invisible. `by =
+  series` is not tried either.
+
+- **What the trend formula `can` do today.** Plain smooths and
+  parametric terms (`~ s(season) + temp`) work: they emit a shared
+  `mu_trend[t, s]` that is added to *every* series's
+  `dot_product(Z[s, :], lv_trend[t, :])`. Read as a factor model, this
+  is "one shared env response across all series, plus a free
+  rotation of `n_lv` residual factors". It does NOT give different
+  factors different env structure.
+
+### HMSC / gllvm / boral comparison
+
+| Package | What `factor ~ env` actually does | User-facing syntax |
+|---------|-----------------------------------|---------------------|
+| HMSC    | XRRR is *not* on the factor axis. `X_RRR (S × p_RRR) %*% t(wRRR) (ncRRR × p_RRR)` produces `ncRRR` synthetic columns that are *cbind*-ed onto X and then enter the species-specific `Beta` matrix. `Eta * Lambda` (the latent factors) remain a separate residual block. Verified from `R/updatewRRR.R`: `XB = XRRR %*% t(wRRR); X = cbind(X, XB)`. The "rank reduction" is on the species-coefficient matrix, not on the latent ordination. | `Hmsc(..., XRRRData = df, XRRRFormula = ~ env1 + env2, ncRRR = 2)` |
+| gllvm   | True constrained / concurrent ordination. Each latent variable is `z_i = B' x_lv,i + eps_i`; `num.RR` zeros the residual (pure constrained), `num.lv.c` keeps it (concurrent). Verified from `gllvm::gllvm` docs: `num.lv.c`, `num.RR`, `lv.formula`. This is the per-factor-env-gradient pattern. | `gllvm(y, X, lv.formula = ~ env1 + env2, num.RR = 2)` |
+| boral   | `boral(..., lv.control = ...)` exposes constrained latent variables analogous to gllvm's `num.RR` (older RJAGS implementation; documented as constrained ordination). Effectively the same semantics as gllvm but slower and JAGS-bound. | `boral(y, X.lv = env, lv.control = list(num.lv = 2, type = "independent"))` |
+
+The user's mental model of XRRR ("HMSC's constrained-ordination
+pattern") is closer to gllvm's `num.RR` than to what HMSC's XRRR
+actually does. An ecologist coming from HMSC asking for
+"factor-varying env effects" almost certainly wants gllvm's
+constrained-ordination semantics: factor 1 loads on elev, factor 2
+loads on precip, species then load on those interpretable axes.
+
+### Identifiability tradeoffs
+
+- **(a) Shared env smooth, free factors (today's `factor_formula = ~
+  s(env)`).** The smooth adds a single `mu_trend[t, s]` that all
+  series see; the `n_lv` factors remain rotation-free residual
+  structure. The env response is identified at the species mean
+  level, but the factors themselves carry no env interpretation; any
+  post-hoc `ordinate()` / varimax rotation can reassign which factor
+  "looks like" the env axis. An ecologist who wants a JSDM with an
+  env covariate adjustment plus residual co-occurrence picks this.
+
+- **(b) Per-factor env smooths (`s(env, by = trend)`).** Each
+  factor `k` gets its own env response `f_k(env)`; the env
+  constraints break rotation invariance and the factor axes become
+  a-priori interpretable. This is gllvm's `num.lv.c`. An ecologist who
+  wants "factor 1 = elevation axis, factor 2 = precip axis, species
+  load on those axes" picks this. The price is that the factors are
+  no longer pure residual; the env block competes with `Beta` on X
+  for the same variance.
+
+- **(c) HMSC XRRR.** Reduced-rank species-coefficient matrix on env
+  covariates; nothing to do with the latent factors. An HMSC user who
+  has hundreds of env covariates and wants regularisation on `Beta`
+  picks this. mvgam users would get the same effect from
+  penalised smooths (`s(env, bs = "ts")`) in `formula =`. Not the
+  thing the user is asking for under "factor-varying effects".
+
+The clean recommendation: jsdgam should expose (b) under
+`factor_formula = ~ s(env, by = trend)`, document (a) as the default
+(`factor_formula = ~ env` — no `by` — adds env to all factors
+uniformly), and ignore (c) since penalised smooths already cover
+that ground.
+
+### Proposed jsdgam API
+
+Default: `factor_formula = ~ 1` → iid factors (current behaviour,
+matches the §4 sketch). Constrained-ordination opt-in via
+`factor_formula = ~ s(env, by = trend)`:
+
+```r
+# Factor 1 tracks elevation, factor 2 tracks precipitation;
+# species load on those constrained axes.
+jsdgam(
+  formula        = abundance ~ 1,
+  factor_formula = ~ s(elev, by = trend, k = 5) +
+                    s(precip, by = trend, k = 5) +
+                    AR(n_lv = 2),
+  data           = comm_df,
+  species        = "species",
+  unit           = "site",
+  family         = poisson()
+)
+```
+
+The wrapper passes `factor_formula` through as `trend_formula` and
+relies on per-factor smooth machinery (does not yet exist — see
+implementation cost below). Each `s(env, by = trend)` term expands
+to `n_lv` smooths, one per factor; the smooth basis is evaluated at
+each unit's env value and added to `lv_trend[t, k]` *before* `Z`
+maps it onto species. With `n_lv = 2` and two `by = trend` smooths,
+factor 1's env response is `s(elev) + s(precip)` evaluated at
+`trend == 1`, factor 2's at `trend == 2`.
+
+### Implementation cost if `by = trend` is missing
+
+The audit confirms it IS missing. To wire it up:
+
+- **`R/validations.R:4776` (`extract_trend_data`):** when any term in
+  the parsed trend formula references `trend` as a `by` variable,
+  the helper must replicate `trend_data` `n_lv` times and add a
+  `trend = factor(1:n_lv)` column (analogous to brms long-format
+  expansion for `by = ` smooths). Cost: ~30 lines plus a branch in
+  the `summarise` path.
+
+- **`R/stan_assembly.R` `mu_trend` block (L2515–2517):** today
+  `mu_trend` is `vector[N_trend]` indexed by `(time, series)`. To
+  carry per-factor smooths we either (i) introduce a parallel
+  `matrix[N_time_trend, N_lv_trend] mu_lv_trend` populated from the
+  expanded design matrix and folded into `lv_trend` before `Z`, or
+  (ii) refactor `mu_trend` itself to `[N_time_trend, N_lv_trend]`
+  whenever the formula contains `by = trend`. Option (i) is
+  additive and leaves the existing per-`(t,s)` path untouched for
+  PB / RN / PPM / occ; option (ii) is cleaner but rewrites the
+  injection points at L2528 (`mu_<resp>[n] += trend[…]`). Cost: ~80
+  lines + Stan-template changes; risk: medium because the
+  `lv_trend` / `Z` decomposition is shared with all factor-based
+  trends.
+
+- **`R/extract_trend_linpred.R` and `reshape_linpred_to_grid`:**
+  reshape must learn to return a per-factor matrix when the formula
+  carries `by = trend`. Cost: ~40 lines plus a metadata flag on the
+  fit object.
+
+- **`extract_component_linpred(component = "trend")`:** must apply
+  the brms newdata expansion across the `trend = factor(1:n_lv)`
+  axis. Cost: ~20 lines.
+
+- **Risk to PB / RN / PPM / occ:** all four use `mu_trend[N_trend]`
+  with no `by = trend` term. If option (i) above is chosen, the
+  existing path is untouched and these families keep working with
+  no behaviour change. Option (ii) would force a regression sweep
+  across `tests/testthat/test-nmix.R`, `test-occ.R`, and the
+  shared-trend tests.
+
+Total cost: ~170 LOC plus tests, gated on choosing option (i) for
+backwards compatibility. The cleanest delivery is a separate
+follow-up after jsdgam v2.0 ships with shared env smooths only;
+factor-varying env can land in v2.1 once the `by = trend` machinery
+is in place.
+
+### Open questions
+
+- **Q1.** Should `by = trend` expansion happen inside `mvgam()` /
+  `extract_trend_data()` (so plain mvgam users also get it) or
+  inside the `jsdgam()` wrapper alone? The mvgam-wide path is
+  cleaner but exposes a new failure mode for trend-only users who
+  wrote `by = trend` not knowing it would now do something. Pin the
+  scope before implementing.
+
+- **Q2.** With per-factor env smooths the factors gain a-priori
+  identifiability and the post-hoc `ordinate()` / QR + sign-fix step
+  in `generate_factor_model()` (`R/stan_assembly.R:2939`) may become
+  redundant or actively harmful (rotating away the env constraint).
+  Confirm the identification block can be skipped when any `by =
+  trend` term is present.
+
+- **Q3.** Does the env-constrained factor compete with a Heaps
+  trait-loaded `Z` prior on the same variance? If `loadings_prior$
+  features = trait_df` is also specified, do we double-shrink
+  toward both env-driven `lv_trend` and trait-driven `Z`? Needs a
+  stats-reviewer look before exposing both knobs in the same call.
+
+- **Q4.** Roxygen example at `R/trend_system.R:2451` references `by
+  = trend` but the path does not work. Cheapest fix is a doc patch
+  (drop the example or rewrite to `by = series`); long-term fix is
+  to actually wire `by = trend`. Confirm which we pin for the next
+  CRAN cut.
