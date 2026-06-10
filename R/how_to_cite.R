@@ -379,6 +379,22 @@ reference_db <- function() {
         sep = "\n"
       )
     ),
+    royle_nichols_2003 = list(
+      text = "Royle JA and Nichols JD (2003). Estimating abundance from repeated presence-absence data or point counts. Ecology, 84(3), 777-790. https://doi.org/10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2",
+      bibtex = paste(
+        "@article{royle2003abundance,",
+        "  title = {Estimating abundance from repeated presence-absence data or point counts},",
+        "  author = {Royle, J. Andrew and Nichols, James D.},",
+        "  journal = {Ecology},",
+        "  volume = {84},",
+        "  number = {3},",
+        "  pages = {777--790},",
+        "  year = {2003},",
+        "  doi = {10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2}",
+        "}",
+        sep = "\n"
+      )
+    ),
     royle_nmix_2004 = list(
       text = "Royle JA (2004). N-mixture models for estimating population size from spatially replicated counts. Biometrics, 60(1), 108-115. https://doi.org/10.1111/j.0006-341X.2004.00142.x",
       bibtex = paste(
@@ -488,14 +504,26 @@ reference_db <- function() {
   )
 }
 
-# Predicate: did the fit use the nmix() closure-unit family?
-# Routes through `resolve_family_name()` so the customfamily
-# storage convention (name = "nmix", family = "custom") is
-# recognised correctly.
+# Predicate: did the fit use the nmix() Poisson-binomial closure-
+# unit family? Matches the original Royle (2004) variant, not the
+# Royle-Nichols binary-detection variant (which has its own
+# predicate). Routes through `resolve_family_name()` so the
+# customfamily storage convention (name = "nmix", family =
+# "custom") is recognised correctly.
 #' @noRd
 uses_nmix_family <- function(object) {
   if (is.null(object$family)) return(FALSE)
   identical(resolve_family_name(object$family), "nmix")
+}
+
+# Predicate: did the fit use the nmix("royle_nichols") variant?
+# Distinct from `uses_nmix_family()` because the citation rule
+# pulls a different reference set (Royle and Nichols 2003 rather
+# than Royle 2004 / Dennis et al. 2015).
+#' @noRd
+uses_nmix_royle_nichols_family <- function(object) {
+  if (is.null(object$family)) return(FALSE)
+  identical(resolve_family_name(object$family), "nmix_royle_nichols")
 }
 
 # Predicate: did the fit use the occ() closure-unit family?
@@ -647,6 +675,25 @@ how_to_cite.mvgam <- function(object, ...) {
         "dennis_nmix_2015",
         "kery_nmix_2018",
         "knape_overdispersion_2018"
+      )
+    ),
+    list(
+      detect = uses_nmix_royle_nichols_family(object),
+      text = paste0(
+        " Binary detection / non-detection histories were modelled",
+        " with the Royle-Nichols N-mixture family",
+        " (Royle and Nichols 2003), where the per-visit detection",
+        " probability `1 - (1 - r)^N` marginalises a per-",
+        " individual detection `r` over latent abundance",
+        " `N ~ Poisson(lambda)`. The marginalisation uses the",
+        " log-sum-exp form of Dennis et al. (2015) over a",
+        " truncated per-unit support, and identifiability under",
+        " the visit structure was assessed following Kery (2018)."
+      ),
+      refs = c(
+        "royle_nichols_2003",
+        "dennis_nmix_2015",
+        "kery_nmix_2018"
       )
     ),
     list(

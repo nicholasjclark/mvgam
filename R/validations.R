@@ -299,10 +299,15 @@ validate_supported_family <- function(family) {
 #'   contains at least one covariate.
 #' @param has_det_covariates Logical; TRUE when a detection
 #'   sub-formula (e.g. `p ~ tod`) is supplied.
-#' @param binary_response Logical; TRUE for families whose
-#'   response is restricted to {0, 1} (e.g. `occ()`). Triggers
-#'   the y-range check and makes `cap` optional with a default
-#'   of 1.
+#' @param binary_y_check Logical; TRUE when the family restricts
+#'   the response to {0, 1} (e.g. `occ()`,
+#'   `nmix("royle_nichols")`). Triggers the y-range check.
+#' @param cap_required Logical; TRUE when the family requires the
+#'   `cap` data column to be present. FALSE for families that
+#'   default the per-unit upper truncation (e.g. `occ()` defaults
+#'   to `cap = 1`). Royle-Nichols carries binary response but
+#'   keeps `cap_required = TRUE` because its latent abundance can
+#'   exceed one.
 #' @return Invisible `TRUE` on success; stops on hard
 #'   identifiability failure.
 #' @noRd
@@ -313,7 +318,8 @@ validate_closure_unit_data <- function(data,
                                         cap_var             = "cap",
                                         has_obs_covariates  = FALSE,
                                         has_det_covariates  = FALSE,
-                                        binary_response     = FALSE) {
+                                        binary_y_check      = FALSE,
+                                        cap_required        = TRUE) {
   checkmate::assert_data_frame(data, min.rows = 1L)
   checkmate::assert_string(response_var)
   checkmate::assert_string(series_var)
@@ -321,12 +327,15 @@ validate_closure_unit_data <- function(data,
   checkmate::assert_string(cap_var)
   checkmate::assert_flag(has_obs_covariates)
   checkmate::assert_flag(has_det_covariates)
-  checkmate::assert_flag(binary_response)
+  checkmate::assert_flag(binary_y_check)
+  checkmate::assert_flag(cap_required)
 
-  # Required columns: response + grouping. cap is required only
-  # for non-binary families; binary families default to 1 below.
+  # Required columns: response + grouping. The cap column is
+  # optional only for families that default the per-unit upper
+  # truncation (e.g. occ() defaults to 1); count-latent families
+  # such as nmix() and nmix("royle_nichols") always require it.
   required_cols <- c(response_var, series_var, time_var)
-  if (!binary_response) {
+  if (cap_required) {
     required_cols <- c(required_cols, cap_var)
   }
   for (col in required_cols) {
@@ -383,7 +392,7 @@ validate_closure_unit_data <- function(data,
       )
     )))
   }
-  if (binary_response && any(y_int > 1L)) {
+  if (binary_y_check && any(y_int > 1L)) {
     bad <- which(y_int > 1L)[1L]
     stop(insight::format_error(c(
       paste0(
@@ -395,7 +404,8 @@ validate_closure_unit_data <- function(data,
       ),
       i = paste0(
         "For count detections use family = nmix() instead; ",
-        "occ() models detection / non-detection only."
+        "occ() and nmix(\"royle_nichols\") model detection / ",
+        "non-detection only."
       )
     )))
   }
@@ -497,7 +507,7 @@ validate_closure_unit_data <- function(data,
   # isocurve with no data signal to break the symmetry (Solymos
   # et al. 2012, Dennis et al. 2015, Kery 2018). Refuse the fit.
   if (all(rep_counts == 1L) && !any_covariates) {
-    if (binary_response) {
+    if (binary_y_check) {
       if (!identical(Sys.getenv("TESTTHAT"), "true")) {
         rlang::warn(
           insight::format_warning(c(

@@ -4,7 +4,18 @@
 \alias{nmix}
 \title{Closure-unit Poisson-binomial N-mixture family}
 \usage{
-nmix()
+nmix(type = c("poisson_binomial", "royle_nichols", "poisson_poisson"))
+}
+\arguments{
+\item{type}{Character scalar selecting the N-mixture variant.
+\code{"poisson_binomial"} (default) is the canonical Royle (2004)
+model: latent abundance \code{N ~ Poisson(lambda)}, per-visit
+counts \code{y ~ Binomial(N, p)} with logit-link per-visit
+detection \code{p}. \code{"royle_nichols"} is the Royle and Nichols
+(2003) binary-detection variant: latent \code{N ~ Poisson(lambda)},
+per-visit binary outcomes \code{y ~ Bernoulli(1 - (1-r)^N)} with
+logit-link per-individual detection \code{r}. \code{"poisson_poisson"}
+reserved; will be wired in a follow-up commit.}
 }
 \value{
 A \code{brms::customfamily} object with the
@@ -75,6 +86,43 @@ draws under arbitrary upper truncations by supplying
 the fit-time cap to expand the latent-state support;
 fit-time caps are reused when \code{newdata} is \code{NULL}.
 }
+\section{Choosing between Poisson-binomial and Royle-Nichols}{
+
+The two parameterisations are NOT statistically distinguishable
+from data alone, because their visit-level variance structures
+coincide at fixed \code{N} and \code{r}. Family choice is a scientific
+judgement about the detection mechanism: per-visit \code{p} for
+sampling-effort or observation-condition heterogeneity that
+applies uniformly to all individuals in a unit; per-individual
+\code{r} for territorial / song-post / camera-placement heterogeneity
+driven by individual behaviour. Royle-Nichols requires binary
+detection (0/1) per visit; Poisson-binomial accepts arbitrary
+count data.
+}
+
+\section{Identification (Royle-Nichols)}{
+
+The Stan code uses the logit link on per-individual detection
+\code{r}. A flat Uniform(0, 1) prior on \code{r} propagates to a near-
+saturated prior on the visit-level detection probability
+\code{p_visit = 1 - (1-r)^N} for any moderate \code{lambda} (e.g.
+\code{E[p_visit | r ~ U(0,1), lambda = 5] ~ 0.83}), creating a ridge
+where small \code{r} flattens the likelihood in \code{lambda}. The logit
+link with a \code{Normal(0, 1.5)} prior on the logit-r intercept
+places most prior mass on \code{r} between 0.05 and 0.95, while
+remaining workable on the logit scale even when the likelihood
+is nearly flat. The per-unit upper truncation \code{K_max[g]} must
+satisfy
+both (a) \code{ppois(K_max, lambda_hat, lower.tail=FALSE) < 1e-4}
+(Poisson tail negligible) and (b) \code{(1 - r_hat)^K_max < 1e-4}
+(Royle-Nichols detection function saturated). Condition (b) is
+specific to Royle-Nichols: under Poisson-binomial, too-small
+\code{K_max} only costs computation; under Royle-Nichols with low
+\code{r}, too-small \code{K_max} leaves non-negligible Poisson mass in
+cells where the detection function still varies, biasing the
+posterior on \code{lambda} upward.
+}
+
 \examples{
 \dontrun{
 # Constant detection probability, abundance varies with elevation
@@ -84,6 +132,10 @@ mvgam(y ~ s(elev), family = nmix(), data = closure_unit_data)
 mvgam(bf(y ~ s(elev), p ~ s(tod)),
       family = nmix(),
       data = closure_unit_data)
+
+# Royle-Nichols variant on binary detection / non-detection data
+mvgam(y ~ s(elev), family = nmix("royle_nichols"),
+      data = closure_unit_binary_data)
 }
 
 }
@@ -106,4 +158,9 @@ Part, T., Ruete, A., & Zmihorski, M. (2018). Sensitivity of
 binomial N-mixture models to overdispersion. \emph{Methods in
 Ecology and Evolution}, 9, 2102-2114.
 \doi{10.1111/2041-210X.13062}.
+
+Royle, J. A., and Nichols, J. D. (2003). Estimating abundance
+from repeated presence-absence data or point counts.
+\emph{Ecology}, 84, 777-790.
+\doi{10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2}.
 }

@@ -676,9 +676,7 @@ pp_check.mvgam <- function(
 closure_unit_pp_check_setup <- function(object, newdata, y, yrep,
                                           type) {
   resp_var <- closure_unit_response_var(object$formula)
-  binary_response <- isTRUE(attr(object$family, "mvgam_binary_response",
-                                  exact = TRUE))
-  default_cap <- if (binary_response) 1L else NULL
+  default_cap <- closure_unit_default_cap(object$family)
   arrays <- build_closure_unit_arrays(
     newdata, response_var = resp_var, default_cap = default_cap
   )

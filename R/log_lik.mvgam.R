@@ -176,8 +176,9 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
     family_pars_cu <- list(closure_arrays = arrays, p = p_mat)
     log_lik_fn <- switch(
       family_name,
-      nmix = log_lik_nmix,
-      occ  = log_lik_occ,
+      nmix               = log_lik_nmix,
+      nmix_royle_nichols = log_lik_nmix_royle_nichols,
+      occ                = log_lik_occ,
       stop(insight::format_error(c(
         paste0(
           "Closure-unit log_lik dispatch missing for family '",

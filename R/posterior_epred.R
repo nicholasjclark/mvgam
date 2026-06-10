@@ -172,16 +172,20 @@ compute_family_epred <- function(linpred, family,
       exp(linpred + sigma^2 / 2)
     },
 
-    # nmix() is intercepted upstream in posterior_epred.mvgam();
-    # this branch is defensive (e.g. callers that reach
-    # compute_family_epred directly).
-    "nmix" = stop(insight::format_error(c(
-      "Family 'nmix' must be routed through posterior_epred.mvgam().",
+    # nmix() and its variants are intercepted upstream in
+    # posterior_epred.mvgam(); these branches are defensive (e.g.
+    # callers that reach compute_family_epred directly).
+    "nmix" = ,
+    "nmix_royle_nichols" = stop(insight::format_error(c(
+      paste0(
+        "Family '", family$name,
+        "' must be routed through posterior_epred.mvgam()."
+      ),
       i = paste0(
-        "compute_family_epred() is the generic dispatch; nmix's ",
-        "lambda * p computation needs the per-fit `p` draws and ",
-        "closure-unit arrays, which posterior_epred.mvgam ",
-        "supplies via posterior_epred_nmix()."
+        "compute_family_epred() is the generic dispatch; closure-",
+        "unit families need the per-fit `p` draws and arrays, which ",
+        "posterior_epred.mvgam supplies via the per-family kernels ",
+        "registered in dispatch_closure_unit_method()."
       )
     ))),
 

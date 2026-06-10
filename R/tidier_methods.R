@@ -511,9 +511,7 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
   # unit grain via `dplyr::distinct(out, .unit, .keep_all = TRUE)`.
   unit_id <- NULL
   if (is_closure_unit_family(x$family)) {
-    binary_response <- isTRUE(attr(x$family, "mvgam_binary_response",
-                                    exact = TRUE))
-    default_cap <- if (binary_response) 1L else NULL
+    default_cap <- closure_unit_default_cap(x$family)
     arrays <- build_closure_unit_arrays(
       obs_data, response_var = resp,
       default_cap = default_cap

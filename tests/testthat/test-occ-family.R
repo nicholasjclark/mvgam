@@ -67,7 +67,8 @@ test_that("validate_closure_unit_data() accepts occ data without a cap column", 
   expect_invisible(validate_closure_unit_data(
     d, response_var = "y",
     has_obs_covariates = TRUE, has_det_covariates = TRUE,
-    binary_response = TRUE
+    binary_y_check = TRUE,
+    cap_required   = FALSE
   ))
 })
 
@@ -78,7 +79,8 @@ test_that("validate_closure_unit_data() rejects non-binary y under occ", {
     validate_closure_unit_data(
       d, response_var = "y",
       has_obs_covariates = TRUE, has_det_covariates = TRUE,
-      binary_response = TRUE
+      binary_y_check = TRUE,
+      cap_required   = FALSE
     ),
     "Binary-response closure-unit family requires"
   )
@@ -94,7 +96,8 @@ test_that("validate_closure_unit_data() warns (not errors) for occ with all-sing
       validate_closure_unit_data(
         d, response_var = "y",
         has_obs_covariates = FALSE, has_det_covariates = FALSE,
-        binary_response = TRUE
+        binary_y_check = TRUE,
+        cap_required   = FALSE
       ),
       "Every closure unit has a single visit"
     )
@@ -113,7 +116,8 @@ test_that("validate_closure_unit_data() hard-errors on N_unit < 2 for both branc
   expect_error(
     validate_closure_unit_data(
       d, response_var = "y",
-      binary_response = TRUE
+      binary_y_check = TRUE,
+      cap_required   = FALSE
     ),
     "requires at least two closure units"
   )

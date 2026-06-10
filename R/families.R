@@ -506,6 +506,32 @@ is_closure_unit_family <- function(family) {
   isTRUE(attr(family, "mvgam_closure_unit", exact = TRUE))
 }
 
+#' Default per-unit upper truncation for a closure-unit family
+#'
+#' Reads the `mvgam_default_cap` family attribute. Returns the
+#' integer default (e.g. `1L` for `occ()`, whose latent state is
+#' binary) or `NULL` when the family requires the user to supply
+#' a `cap` column (`nmix("poisson_binomial")`,
+#' `nmix("royle_nichols")`, future `nmix("poisson_poisson")`, all
+#' of which carry latent abundance possibly greater than one).
+#'
+#' The `mvgam_default_cap` attribute is distinct from
+#' `mvgam_binary_response`: the latter only controls the `y in
+#' {0, 1}` validation check. `nmix("royle_nichols")` sets the
+#' response flag (binary detection input) but leaves the default
+#' cap unset because its latent `N` is bounded by the user-supplied
+#' `cap`, not by `1`.
+#'
+#' @param family A family / brmsfamily / customfamily object.
+#' @return Integer scalar default cap, or `NULL`.
+#' @noRd
+closure_unit_default_cap <- function(family) {
+  if (is.null(family)) return(NULL)
+  default_cap <- attr(family, "mvgam_default_cap", exact = TRUE)
+  if (is.null(default_cap)) return(NULL)
+  as.integer(default_cap)
+}
+
 #' Build per-closure-unit indexing arrays from long-format data
 #'
 #' Walks the user's long-format observation data and groups rows
@@ -738,6 +764,16 @@ build_closure_unit_arrays <- function(data,
 #'   Ecology and Evolution*, 9, 2102-2114.
 #'   \doi{10.1111/2041-210X.13062}.
 #'
+#' @param type Character scalar selecting the N-mixture variant.
+#'   `"poisson_binomial"` (default) is the canonical Royle (2004)
+#'   model: latent abundance `N ~ Poisson(lambda)`, per-visit
+#'   counts `y ~ Binomial(N, p)` with logit-link per-visit
+#'   detection `p`. `"royle_nichols"` is the Royle and Nichols
+#'   (2003) binary-detection variant: latent `N ~ Poisson(lambda)`,
+#'   per-visit binary outcomes `y ~ Bernoulli(1 - (1-r)^N)` with
+#'   logit-link per-individual detection `r`. `"poisson_poisson"`
+#'   reserved; will be wired in a follow-up commit.
+#'
 #' @examples
 #' \dontrun{
 #' # Constant detection probability, abundance varies with elevation
@@ -747,19 +783,79 @@ build_closure_unit_arrays <- function(data,
 #' mvgam(bf(y ~ s(elev), p ~ s(tod)),
 #'       family = nmix(),
 #'       data = closure_unit_data)
+#'
+#' # Royle-Nichols variant on binary detection / non-detection data
+#' mvgam(y ~ s(elev), family = nmix("royle_nichols"),
+#'       data = closure_unit_binary_data)
 #' }
 #'
+#' @section Choosing between Poisson-binomial and Royle-Nichols:
+#' The two parameterisations are NOT statistically distinguishable
+#' from data alone, because their visit-level variance structures
+#' coincide at fixed `N` and `r`. Family choice is a scientific
+#' judgement about the detection mechanism: per-visit `p` for
+#' sampling-effort or observation-condition heterogeneity that
+#' applies uniformly to all individuals in a unit; per-individual
+#' `r` for territorial / song-post / camera-placement heterogeneity
+#' driven by individual behaviour. Royle-Nichols requires binary
+#' detection (0/1) per visit; Poisson-binomial accepts arbitrary
+#' count data.
+#'
+#' @section Identification (Royle-Nichols):
+#' The Stan code uses the logit link on per-individual detection
+#' `r`. A flat Uniform(0, 1) prior on `r` propagates to a near-
+#' saturated prior on the visit-level detection probability
+#' `p_visit = 1 - (1-r)^N` for any moderate `lambda` (e.g.
+#' `E[p_visit | r ~ U(0,1), lambda = 5] ~ 0.83`), creating a ridge
+#' where small `r` flattens the likelihood in `lambda`. The logit
+#' link with a `Normal(0, 1.5)` prior on the logit-r intercept
+#' places most prior mass on `r` between 0.05 and 0.95, while
+#' remaining workable on the logit scale even when the likelihood
+#' is nearly flat. The per-unit upper truncation `K_max[g]` must
+#' satisfy
+#' both (a) `ppois(K_max, lambda_hat, lower.tail=FALSE) < 1e-4`
+#' (Poisson tail negligible) and (b) `(1 - r_hat)^K_max < 1e-4`
+#' (Royle-Nichols detection function saturated). Condition (b) is
+#' specific to Royle-Nichols: under Poisson-binomial, too-small
+#' `K_max` only costs computation; under Royle-Nichols with low
+#' `r`, too-small `K_max` leaves non-negligible Poisson mass in
+#' cells where the detection function still varies, biasing the
+#' posterior on `lambda` upward.
+#'
+#' @references
+#' Royle, J. A., and Nichols, J. D. (2003). Estimating abundance
+#'   from repeated presence-absence data or point counts.
+#'   *Ecology*, 84, 777-790.
+#'   \doi{10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2}.
+#'
 #' @export
-nmix <- function() {
+nmix <- function(type = c("poisson_binomial", "royle_nichols",
+                          "poisson_poisson")) {
+  type <- match.arg(type)
+  if (type == "poisson_poisson") {
+    stop(insight::format_error(c(
+      "The 'poisson_poisson' nmix variant is not yet wired in.",
+      i = paste0(
+        "Use nmix() for the Poisson-binomial model or ",
+        "nmix(\"royle_nichols\") for the Royle-Nichols binary ",
+        "variant; the Poisson-Poisson port lands in a follow-up."
+      )
+    )))
+  }
+  family_name <- switch(
+    type,
+    poisson_binomial = "nmix",
+    royle_nichols    = "nmix_royle_nichols"
+  )
   fam <- brms::custom_family(
-    name  = "nmix",
+    name  = family_name,
     dpars = c("mu", "p"),
     links = c("log", "logit"),
     # mu (lambda) is a positive rate; p is a probability. Setting
     # both bounds at the family level makes brms declare the
     # scalar-dpar case with the right constraints, which keeps
-    # the lpdf's logit(p) call valid even when no sub-formula
-    # is supplied for p.
+    # the lpdf's logit(p) / log1m(p) calls valid even when no
+    # sub-formula is supplied for p.
     lb    = c(0, 0),
     ub    = c(NA, 1),
     type  = "int",
@@ -769,6 +865,15 @@ nmix <- function() {
   fam$linkinv <- link_info$linkinv
   fam$linkfun <- link_info$linkfun
   attr(fam, "mvgam_closure_unit")  <- TRUE
+  attr(fam, "mvgam_nmix_type")     <- type
+  # Royle-Nichols takes binary detection input; trigger the
+  # y in {0, 1} validation. The Poisson-binomial variant accepts
+  # arbitrary counts so leaves the response check unset. Neither
+  # variant sets mvgam_default_cap: latent N can exceed 1 and
+  # the user must supply the `cap` column.
+  if (type == "royle_nichols") {
+    attr(fam, "mvgam_binary_response") <- TRUE
+  }
   attr(fam, "mvgam_predict_types") <- c("latent_N", "detection")
   # The lpmf signature determines which data fields brms must
   # thread through; declared once on the family so that
@@ -916,6 +1021,10 @@ occ <- function() {
   fam$linkfun <- link_info$linkfun
   attr(fam, "mvgam_closure_unit")    <- TRUE
   attr(fam, "mvgam_binary_response") <- TRUE
+  # Latent z is binary, so the per-unit upper truncation is always
+  # 1; closure_unit_default_cap() reads this attribute to make the
+  # `cap` data column optional for occ() fits.
+  attr(fam, "mvgam_default_cap")     <- 1L
   attr(fam, "mvgam_predict_types")   <- c("occupancy", "detection")
   # occ_lpmf drops K_max from the nmix signature because the
   # latent z is binary; the lpmf reads Y_max directly as the
@@ -1168,6 +1277,106 @@ nmix_stan_funs <- function(max_rep) {
   )
 }
 
+#' Stan function block for the Royle-Nichols nmix variant
+#'
+#' Marginalises latent abundance `N ~ Poisson(lambda)` over a
+#' per-unit upper truncation `K_max[g]`; per-visit binary outcomes
+#' have probability `1 - (1 - r)^N` where `r` is per-individual
+#' detection (logit link). Per-visit varying `r` is supported via
+#' the dpar sub-formula on `p` (matching how the Poisson-binomial
+#' lpmf handles per-visit `p`).
+#'
+#' Avoids two artifacts present in the Bollen reference Stan code:
+#' the stray `+ 1` literal on a log-probability in the
+#' all-zero-history branch, and any `1e-9` regularisation around
+#' `log(0)` (with the logit link on `r` and the loop range
+#' `Y_max[g] : K_max[g]`, the `k = 0` cell is unreachable whenever
+#' the unit has any detection).
+#'
+#' @param max_rep Positive integer maximum visit count across
+#'   closure units; only used by the scalar-p overload's broadcast.
+#' @return Character scalar of Stan function code.
+#' @noRd
+nmix_royle_nichols_stan_funs <- function(max_rep) {
+  checkmate::assert_integerish(max_rep, lower = 1L, len = 1L)
+  paste(
+    "  // Per-visit implementation. Per-individual detection r is",
+    "  // logit-linked; brms passes p (= r) as a probability vector.",
+    "  // log(1 - r) is the per-individual non-detection log-prob",
+    "  // used in the marginalisation; log1m(p) computes it stably.",
+    "  real nmix_royle_nichols_lpmf(",
+    "    array[] int y,",
+    "    vector mu,",
+    "    vector p,",
+    "    int N_unit,",
+    "    array[] int n_rep,",
+    "    array[] int K_max,",
+    "    array[] int Y_max,",
+    "    array[,] int visit_idx) {",
+    "    real lp = 0;",
+    "    vector[num_elements(mu)] log_mu   = log(mu);",
+    "    vector[num_elements(p)]  log_1m_r = log1m(p);",
+    "    for (g in 1 : N_unit) {",
+    "      int Kg = K_max[g];",
+    "      int cmax = Y_max[g];",
+    "      array[n_rep[g]] int idx = visit_idx[g, 1:n_rep[g]];",
+    "      // lambda is constant within a closure unit; pull it",
+    "      // from the first visit's linear predictor.",
+    "      real log_lam = log_mu[idx[1]];",
+    "      array[n_rep[g]] int counts = y[idx];",
+    "      vector[n_rep[g]] log_1m_r_v = log_1m_r[idx];",
+    "      vector[n_rep[g]] counts_v   = to_vector(counts);",
+    "      // Pre-aggregate the constant-in-k non-detection sum so",
+    "      // the inner loop is O(1) in n_rep.",
+    "      real sum_non_det_log_1m_r = dot_product(",
+    "        1.0 - counts_v, log_1m_r_v",
+    "      );",
+    "      vector[Kg + 1] component_lps;",
+    "      // Closure: k < cmax is impossible because the unit",
+    "      // observed at least cmax detection events.",
+    "      for (k in 0 : (cmax - 1)) {",
+    "        component_lps[k + 1] = negative_infinity();",
+    "      }",
+    "      for (k in cmax : Kg) {",
+    "        real lp_k = poisson_log_lpmf(k | log_lam)",
+    "          + k * sum_non_det_log_1m_r;",
+    "        if (k > 0) {",
+    "          // sum_t counts[t] * log(1 - (1 - r_t)^k)",
+    "          // log1m_exp(k * log_1m_r_v) computes log(1 - (1-r)^k)",
+    "          // elementwise; at k = 0 it returns -inf, which is",
+    "          // why this branch is guarded.",
+    "          lp_k += dot_product(",
+    "            counts_v, log1m_exp(k * log_1m_r_v)",
+    "          );",
+    "        }",
+    "        component_lps[k + 1] = lp_k;",
+    "      }",
+    "      lp += log_sum_exp(component_lps);",
+    "    }",
+    "    return lp;",
+    "  }",
+    "",
+    "  // Scalar-p entry point: broadcasts to the per-visit",
+    "  // vector and dispatches to the vector implementation.",
+    "  real nmix_royle_nichols_lpmf(",
+    "    array[] int y,",
+    "    vector mu,",
+    "    real p,",
+    "    int N_unit,",
+    "    array[] int n_rep,",
+    "    array[] int K_max,",
+    "    array[] int Y_max,",
+    "    array[,] int visit_idx) {",
+    "    int N = num_elements(mu);",
+    "    return nmix_royle_nichols_lpmf(",
+    "      y | mu, rep_vector(p, N), N_unit,",
+    "      n_rep, K_max, Y_max, visit_idx",
+    "    );",
+    "  }",
+    sep = "\n"
+  )
+}
+
 #' Assemble the shared closure-unit Stan stanvar bundle
 #'
 #' Every closure-unit family emits the same `N_unit`, `n_rep`,
@@ -1287,6 +1496,27 @@ make_nmix_stanvars <- function(arrays) {
   )
 }
 
+#' Build the closure-unit Stan stanvars for an nmix("royle_nichols")
+#' fit
+#'
+#' Wraps the shared `make_closure_unit_arrays_stanvars()` with the
+#' Royle-Nichols function block, the per-unit `K_max` data array,
+#' and the binary `Y_max` upper bound (Royle-Nichols requires
+#' binary detection input, so `Y_max[g] in {0, 1}`).
+#'
+#' @inheritParams make_closure_unit_arrays_stanvars
+#' @return A `brmsstanvars` object.
+#' @noRd
+make_nmix_royle_nichols_stanvars <- function(arrays) {
+  make_closure_unit_arrays_stanvars(
+    arrays,
+    family_funs_name = "nmix_royle_nichols_funs",
+    family_funs      = nmix_royle_nichols_stan_funs(arrays$max_rep),
+    y_max_upper      = 1L,
+    include_K_max    = TRUE
+  )
+}
+
 #' Prepare a closure-unit family for fitting
 #'
 #' Resolves the data-dependent parts of a closure-unit family
@@ -1314,19 +1544,16 @@ prepare_closure_unit_family <- function(family, data, response_var,
                                          has_obs_covariates = FALSE,
                                          has_det_covariates = FALSE) {
   family_name <- family$name
-  # Binary-response families (`occ()`) make `cap` optional and
-  # check that the response is in {0, 1}. nmix() and future
-  # count-based closure-unit families keep the strict `cap`
-  # requirement.
-  binary_response <- isTRUE(attr(family, "mvgam_binary_response",
-                                  exact = TRUE))
-  default_cap <- if (binary_response) 1L else NULL
+  binary_y_check <- isTRUE(attr(family, "mvgam_binary_response",
+                                 exact = TRUE))
+  default_cap <- closure_unit_default_cap(family)
   validate_closure_unit_data(
     data,
     response_var       = response_var,
     has_obs_covariates = has_obs_covariates,
     has_det_covariates = has_det_covariates,
-    binary_response    = binary_response
+    binary_y_check     = binary_y_check,
+    cap_required       = is.null(default_cap)
   )
   arrays <- build_closure_unit_arrays(
     data, response_var = response_var,
@@ -1334,8 +1561,9 @@ prepare_closure_unit_family <- function(family, data, response_var,
   )
   family_stanvars <- switch(
     family_name,
-    nmix = make_nmix_stanvars(arrays),
-    occ  = make_occ_stanvars(arrays),
+    nmix                 = make_nmix_stanvars(arrays),
+    nmix_royle_nichols   = make_nmix_royle_nichols_stanvars(arrays),
+    occ                  = make_occ_stanvars(arrays),
     stop(insight::format_error(c(
       paste0(
         "Closure-unit dispatch missing for family '",
@@ -1486,7 +1714,14 @@ dispatch_closure_unit_method <- function(family, method_kind) {
                   epred        = posterior_epred_nmix,
                   predict      = posterior_predict_nmix,
                   log_lik      = log_lik_nmix,
-                  latent_state = posterior_latent_N),
+                  latent_state = posterior_latent_N_pb),
+    nmix_royle_nichols = switch(
+      method_kind,
+      epred        = posterior_epred_nmix_royle_nichols,
+      predict      = posterior_predict_nmix_royle_nichols,
+      log_lik      = log_lik_nmix_royle_nichols,
+      latent_state = posterior_latent_N_royle_nichols
+    ),
     occ  = switch(method_kind,
                   epred        = posterior_epred_occ,
                   predict      = posterior_predict_occ,
@@ -1678,20 +1913,21 @@ extract_closure_unit_components <- function(object, newdata = NULL,
     }
   }
   response_var <- closure_unit_response_var(object$formula)
-  binary_response <- isTRUE(attr(object$family, "mvgam_binary_response",
+  binary_y_check <- isTRUE(attr(object$family, "mvgam_binary_response",
                                   exact = TRUE))
-  default_cap <- if (binary_response) 1L else NULL
+  default_cap <- closure_unit_default_cap(object$family)
   # Re-run validation on newdata so cap edits (nmix) or non-binary
-  # y (occ) raise the friendly error rather than producing silent
-  # garbage in downstream sampling. Identifiability flags are TRUE
-  # at predict time because we do not re-examine the formula here;
-  # those warnings are only informative at fit time.
+  # y (occ, royle_nichols) raise the friendly error rather than
+  # producing silent garbage in downstream sampling. Identifiability
+  # flags are TRUE at predict time because we do not re-examine the
+  # formula here; those warnings are only informative at fit time.
   validate_closure_unit_data(
     newdata,
     response_var       = response_var,
     has_obs_covariates = TRUE,
     has_det_covariates = TRUE,
-    binary_response    = binary_response
+    binary_y_check     = binary_y_check,
+    cap_required       = is.null(default_cap)
   )
   arrays <- build_closure_unit_arrays(
     newdata, response_var = response_var,
@@ -1880,13 +2116,11 @@ aggregate_closure_unit_visits <- function(object,
   checkmate::assert_matrix(yrep_visit)
   if (is.null(newdata)) newdata <- object$data
   response_var <- closure_unit_response_var(object$formula)
-  # Binary-response families (`occ()`) make `cap` optional on the
-  # input frame; mirror `prepare_closure_unit_family()` so the
-  # array builder injects `default_cap = 1L` instead of erroring
-  # when the user did not carry a `cap` column through to newdata.
-  binary_response <- isTRUE(attr(object$family, "mvgam_binary_response",
-                                  exact = TRUE))
-  default_cap <- if (binary_response) 1L else NULL
+  # closure_unit_default_cap() returns 1L for occ() (binary latent
+  # state), NULL otherwise. Threading it through to the array
+  # builder mirrors prepare_closure_unit_family() so users do not
+  # need to carry a `cap` column through to newdata for occ() fits.
+  default_cap <- closure_unit_default_cap(object$family)
   arrays <- build_closure_unit_arrays(
     newdata, response_var = response_var,
     default_cap = default_cap
@@ -1925,6 +2159,41 @@ aggregate_closure_unit_visits <- function(object,
 
 #' Per-closure-unit latent-abundance draws for an nmix() fit
 #'
+#' Thin dispatcher: routes to the per-variant kernel
+#' (`posterior_latent_N_pb` for `nmix("poisson_binomial")`,
+#' `posterior_latent_N_royle_nichols` for `nmix("royle_nichols")`)
+#' via the central `dispatch_closure_unit_method()` table.
+#' Public-facing call site (used by `predict(type = "latent_N")`).
+#'
+#' @param object Fitted `mvgam` object with an nmix() family.
+#' @param newdata Long-format observation data; defaults to
+#'   training data.
+#' @param draw_ids Optional vector of posterior draw indices.
+#' @param conditional Logical. If TRUE (default), reweight the
+#'   discrete N support by the per-visit likelihood at the
+#'   observed counts. If FALSE, sample N from the unconditional
+#'   Poisson prior.
+#' @return `[S x N_unit]` integer matrix of latent abundance
+#'   draws.
+#' @noRd
+posterior_latent_N <- function(object, newdata = NULL,
+                                draw_ids = NULL,
+                                conditional = TRUE) {
+  if (!is_closure_unit_family(object$family)) {
+    stop(insight::format_error(
+      "posterior_latent_N() requires a closure-unit family."
+    ))
+  }
+  kernel <- dispatch_closure_unit_method(object$family, "latent_state")
+  kernel(
+    object, newdata = newdata,
+    draw_ids = draw_ids, conditional = conditional
+  )
+}
+
+#' Per-closure-unit latent-abundance draws for an
+#' `nmix("poisson_binomial")` fit
+#'
 #' Royle (2004) reverse-Bayes conditional posterior:
 #' \deqn{P(N_g = k | y_g, lambda_g, p_g) \propto
 #'   Poisson(k | lambda_g) \times \prod_j Binomial(y_{g,j} | k, p_{g,j})}
@@ -1937,20 +2206,13 @@ aggregate_closure_unit_visits <- function(object,
 #' fresh prediction grid), N is sampled directly from the prior
 #' `Poisson(lambda_g)` per draw.
 #'
-#' @param object Fitted `mvgam` object.
-#' @param newdata Long-format observation data; defaults to
-#'   training data.
-#' @param draw_ids Optional vector of posterior draw indices.
-#' @param conditional Logical. If TRUE (default), reweight the
-#'   discrete N support by the binomial likelihood at the
-#'   observed counts. If FALSE, sample N from the unconditional
-#'   Poisson prior.
+#' @inheritParams posterior_latent_N
 #' @return `[S x N_unit]` integer matrix of latent abundance
 #'   draws.
 #' @noRd
-posterior_latent_N <- function(object, newdata = NULL,
-                                draw_ids = NULL,
-                                conditional = TRUE) {
+posterior_latent_N_pb <- function(object, newdata = NULL,
+                                   draw_ids = NULL,
+                                   conditional = TRUE) {
   checkmate::assert_flag(conditional)
   comp <- extract_closure_unit_components(object, newdata, draw_ids)
   arrays <- comp$arrays
@@ -2076,6 +2338,249 @@ log_lik_nmix <- function(linpred, link, y, family_pars, trials) {
       lp_mat[, kk] <- lp_pois + lp_binom
     }
     # log_sum_exp across the truncated k grid.
+    m <- apply(lp_mat, 1L, max)
+    out[, g] <- m + log(rowSums(exp(lp_mat - m)))
+  }
+  out
+}
+
+# ============================================================
+# nmix("royle_nichols") R-side downstream methods
+# ============================================================
+# Per-individual detection r enters as `p` on the family constructor
+# (logit link). The per-visit detection probability marginalised
+# over latent abundance N ~ Poisson(lambda) is
+# `1 - exp(-r_j * lambda_g)` (Royle and Nichols 2003), giving a
+# closed-form posterior_epred. Sampling and reverse-Bayes need the
+# truncated `1 - (1 - r_j)^k` form because they condition on
+# specific draws of N. Numerically safer via log1mexp() than via
+# direct (1 - r)^k subtraction.
+
+#' Numerically stable log(1 - exp(-a)) for a > 0
+#'
+#' Maechler 2012 algorithm. Used by the Royle-Nichols log-lik /
+#' latent_N kernels where the per-(unit, k) term carries
+#' `log(1 - (1 - r_j)^k) = log1mexp(-k * log(1 - r_j))`. The
+#' branch at `log(2)` switches between `log(-expm1(-a))` (stable
+#' near `a = 0`) and `log1p(-exp(-a))` (stable for large `a`).
+#'
+#' @param a Non-negative numeric vector / matrix.
+#' @return `log(1 - exp(-a))`.
+#' @noRd
+log1mexp <- function(a) {
+  out <- a
+  small <- a <= log(2)
+  out[ small] <- log(-expm1(-a[ small]))
+  out[!small] <- log1p(-exp(-a[!small]))
+  out
+}
+
+#' Per-visit expected detection probability for an
+#' `nmix("royle_nichols")` fit
+#'
+#' Closed-form marginal over the Poisson abundance prior:
+#' \deqn{E[Y_{g, j} | lambda_g, r_j] = 1 - exp(-r_j * lambda_g)}.
+#' (`E[(1-r)^N]` for `N ~ Poisson(lambda)` is the MGF of N at
+#' `log(1-r)`, which simplifies to `exp(-r * lambda)`.) No Jensen
+#' correction or truncation needed.
+#'
+#' @inheritParams posterior_epred_nmix
+#' @return `[S x N_visit]` matrix of expected detection
+#'   probabilities in (0, 1).
+#' @noRd
+posterior_epred_nmix_royle_nichols <- function(object,
+                                                newdata = NULL,
+                                                draw_ids = NULL) {
+  comp <- extract_closure_unit_components(object, newdata, draw_ids)
+  unit_of_visit <- visit_to_unit_lookup(comp$arrays, comp$n_visit)
+  lambda_visit <- comp$state[, unit_of_visit, drop = FALSE]
+  r_visit <- comp$p
+  1 - exp(-r_visit * lambda_visit)
+}
+
+#' Per-visit binary response draws for an
+#' `nmix("royle_nichols")` fit (unconditional)
+#'
+#' Two-step generative simulation: per posterior draw, sample
+#' `N_g ~ Poisson(lambda_g)`, then for each visit `j` sample
+#' `y_{g, j} ~ Bernoulli(1 - (1 - r_j)^N_g)`. This preserves the
+#' within-unit correlation structure (every visit to a unit
+#' shares the same N draw), which a flat per-visit Bernoulli
+#' would discard.
+#'
+#' @inheritParams posterior_epred_nmix
+#' @return `[S x N_visit]` integer matrix of 0/1 detections.
+#' @noRd
+posterior_predict_nmix_royle_nichols <- function(object,
+                                                  newdata = NULL,
+                                                  draw_ids = NULL) {
+  comp <- extract_closure_unit_components(object, newdata, draw_ids)
+  arrays <- comp$arrays
+  ndraws <- comp$ndraws
+  out <- matrix(0L, nrow = ndraws, ncol = comp$n_visit)
+  for (g in seq_len(arrays$N_unit)) {
+    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    lam_g <- comp$state[, g]
+    N_draws <- stats::rpois(ndraws, lambda = lam_g)
+    for (j in idx) {
+      r_j <- comp$p[, j]
+      # 1 - (1 - r_j)^N_draws via log space avoids the catastrophic
+      # cancellation that hits for small r and small N_draws.
+      log_1m_r <- log1p(-r_j)
+      p_visit <- 1 - exp(N_draws * log_1m_r)
+      out[, j] <- stats::rbinom(ndraws, size = 1L, prob = p_visit)
+    }
+  }
+  out
+}
+
+#' Per-closure-unit latent-abundance draws for an
+#' `nmix("royle_nichols")` fit
+#'
+#' Reverse-Bayes conditional posterior:
+#' \deqn{P(N_g = k | y_g, lambda_g, r_g) \propto
+#'   Poisson(k | lambda_g) \times
+#'   \prod_j (1 - (1 - r_{g, j})^k)^{y_{g, j}}
+#'         ((1 - r_{g, j})^k)^{1 - y_{g, j}}}
+#' for `k = Y_max[g]..K_max[g]`. Weights are accumulated in log
+#' space using `log1mexp()` for the detection term so the
+#' per-draw sample stays stable across realistic `K_max` and the
+#' small-`r` regime where `(1 - r)^k` is close to 1. The
+#' unconditional branch (`conditional = FALSE`) draws directly
+#' from the Poisson prior.
+#'
+#' @inheritParams posterior_latent_N
+#' @return `[S x N_unit]` integer matrix of latent abundance
+#'   draws.
+#' @noRd
+posterior_latent_N_royle_nichols <- function(object,
+                                              newdata = NULL,
+                                              draw_ids = NULL,
+                                              conditional = TRUE) {
+  checkmate::assert_flag(conditional)
+  comp <- extract_closure_unit_components(object, newdata, draw_ids)
+  arrays <- comp$arrays
+  ndraws <- comp$ndraws
+  N_unit <- arrays$N_unit
+  if (is.null(newdata)) newdata <- object$data
+  response_var <- closure_unit_response_var(object$formula)
+  y_vals <- as.integer(newdata[[response_var]])
+  out <- matrix(0L, nrow = ndraws, ncol = N_unit)
+  for (g in seq_len(N_unit)) {
+    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    lam_g <- comp$state[, g]
+    if (!conditional) {
+      out[, g] <- stats::rpois(ndraws, lambda = lam_g)
+      next
+    }
+    y_g <- y_vals[idx]
+    cmax <- arrays$Y_max[g]
+    K_g  <- arrays$K_max[g]
+    log_1m_r_g <- log1p(-comp$p[, idx, drop = FALSE])
+    detected_idx <- which(y_g == 1L)
+    nondet_idx   <- which(y_g == 0L)
+    sum_nondet_log_1m_r <- if (length(nondet_idx) > 0L) {
+      rowSums(log_1m_r_g[, nondet_idx, drop = FALSE])
+    } else {
+      rep(0, ndraws)
+    }
+    k_grid <- cmax:K_g
+    n_k <- length(k_grid)
+    lw <- matrix(NA_real_, nrow = ndraws, ncol = n_k)
+    for (kk in seq_along(k_grid)) {
+      k <- k_grid[kk]
+      lp_pois <- stats::dpois(k, lambda = lam_g, log = TRUE)
+      lp_nondet <- k * sum_nondet_log_1m_r
+      lp_det <- if (k > 0L && length(detected_idx) > 0L) {
+        rowSums(log1mexp(-k * log_1m_r_g[, detected_idx, drop = FALSE]))
+      } else if (k == 0L && length(detected_idx) > 0L) {
+        rep(-Inf, ndraws)
+      } else {
+        rep(0, ndraws)
+      }
+      lw[, kk] <- lp_pois + lp_nondet + lp_det
+    }
+    # Vectorised inverse-CDF sample identical to the Poisson-binomial
+    # path: subtract per-row maxima for numerical stability, build a
+    # running CDF column-by-column, and pick the first column whose
+    # running CDF exceeds a single uniform draw per row.
+    row_max <- do.call(pmax, lapply(seq_len(n_k), function(k) lw[, k]))
+    w <- exp(lw - row_max)
+    cdf <- w
+    if (n_k > 1L) {
+      for (k in 2:n_k) {
+        cdf[, k] <- cdf[, k - 1L] + cdf[, k]
+      }
+    }
+    cdf <- cdf / cdf[, n_k]
+    u <- stats::runif(ndraws)
+    bin_idx <- rowSums(cdf < u) + 1L
+    out[, g] <- k_grid[bin_idx]
+  }
+  out
+}
+
+#' Log-likelihood per closure unit for an
+#' `nmix("royle_nichols")` fit
+#'
+#' Per-unit marginal mirroring the Stan emission:
+#' \deqn{\log p(y_g | lambda_g, r_g) = \log \sum_{k = Y\_max_g}^{K\_max_g}
+#'   Poisson(k | lambda_g) \times
+#'   \prod_j (1 - (1 - r_{g, j})^k)^{y_{g, j}}
+#'         ((1 - r_{g, j})^k)^{1 - y_{g, j}}}.
+#' Returned at the closure-unit grain (one column per unit) so
+#' `loo()` / `waic()` see one observation per conditionally iid
+#' block.
+#'
+#' @noRd
+log_lik_nmix_royle_nichols <- function(linpred, link, y,
+                                         family_pars, trials) {
+  checkmate::assert_matrix(linpred)
+  checkmate::assert_choice(link, "log")
+  arrays <- family_pars$closure_arrays
+  if (is.null(arrays)) {
+    stop(insight::format_error(
+      "log_lik_nmix_royle_nichols() requires 'closure_arrays' in family_pars."
+    ))
+  }
+  p_mat <- family_pars$p
+  checkmate::assert_matrix(
+    p_mat, nrows = nrow(linpred), ncols = ncol(linpred)
+  )
+  lambda_visit <- .linkinv(linpred, link)
+  ndraws <- nrow(linpred)
+  N_unit <- arrays$N_unit
+  y_int  <- as.integer(y)
+  out <- matrix(NA_real_, nrow = ndraws, ncol = N_unit)
+  for (g in seq_len(N_unit)) {
+    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    lam <- lambda_visit[, idx[1L]]
+    y_g <- y_int[idx]
+    log_1m_r_g <- log1p(-p_mat[, idx, drop = FALSE])
+    detected_idx <- which(y_g == 1L)
+    nondet_idx   <- which(y_g == 0L)
+    sum_nondet_log_1m_r <- if (length(nondet_idx) > 0L) {
+      rowSums(log_1m_r_g[, nondet_idx, drop = FALSE])
+    } else {
+      rep(0, ndraws)
+    }
+    cmax <- arrays$Y_max[g]
+    K_g  <- arrays$K_max[g]
+    k_grid <- cmax:K_g
+    lp_mat <- matrix(NA_real_, nrow = ndraws, ncol = length(k_grid))
+    for (kk in seq_along(k_grid)) {
+      k <- k_grid[kk]
+      lp_pois <- stats::dpois(k, lambda = lam, log = TRUE)
+      lp_nondet <- k * sum_nondet_log_1m_r
+      lp_det <- if (k > 0L && length(detected_idx) > 0L) {
+        rowSums(log1mexp(-k * log_1m_r_g[, detected_idx, drop = FALSE]))
+      } else if (k == 0L && length(detected_idx) > 0L) {
+        rep(-Inf, ndraws)
+      } else {
+        rep(0, ndraws)
+      }
+      lp_mat[, kk] <- lp_pois + lp_nondet + lp_det
+    }
     m <- apply(lp_mat, 1L, max)
     out[, g] <- m + log(rowSums(exp(lp_mat - m)))
   }

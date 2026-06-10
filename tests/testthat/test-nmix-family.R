@@ -637,4 +637,226 @@ test_that("uses_nmix_family() predicate distinguishes the family", {
   expect_false(uses_nmix_family(list(family = gaussian())))
   expect_true(uses_nmix_family(list(family = nmix())))
   expect_false(uses_nmix_family(list(family = tweedie())))
+  # Royle-Nichols is its own predicate; the PB predicate excludes it
+  # so the citation rule picks the variant-specific reference set.
+  expect_false(
+    uses_nmix_family(list(family = nmix("royle_nichols")))
+  )
+})
+
+test_that("uses_nmix_royle_nichols_family() predicate distinguishes the RN variant", {
+  expect_false(uses_nmix_royle_nichols_family(NULL))
+  expect_false(uses_nmix_royle_nichols_family(list(family = gaussian())))
+  expect_false(uses_nmix_royle_nichols_family(list(family = nmix())))
+  expect_true(
+    uses_nmix_royle_nichols_family(list(family = nmix("royle_nichols")))
+  )
+})
+
+test_that("how_to_cite reference_db carries the Royle-Nichols 2003 entry", {
+  db <- mvgam:::reference_db()
+  expect_true("royle_nichols_2003" %in% names(db))
+  rn <- db[["royle_nichols_2003"]]
+  expect_true(grepl("Royle JA and Nichols JD", rn$text))
+  expect_true(grepl("royle2003abundance", rn$bibtex))
+})
+
+# ------------------------------------------------------------
+# nmix("royle_nichols") — Stan emission, dispatcher, recovery
+# ------------------------------------------------------------
+
+test_that("nmix('royle_nichols') constructor exposes the RN family name and binary-response flag", {
+  fam <- nmix("royle_nichols")
+  expect_identical(fam$name, "nmix_royle_nichols")
+  expect_true(isTRUE(attr(fam, "mvgam_closure_unit", exact = TRUE)))
+  expect_identical(attr(fam, "mvgam_nmix_type", exact = TRUE),
+                   "royle_nichols")
+  expect_true(isTRUE(attr(fam, "mvgam_binary_response",
+                          exact = TRUE)))
+  # RN keeps default_cap unset because latent N can exceed 1; the
+  # user must supply the cap column.
+  expect_null(attr(fam, "mvgam_default_cap", exact = TRUE))
+  expect_identical(attr(fam, "mvgam_predict_types", exact = TRUE),
+                   c("latent_N", "detection"))
+})
+
+test_that("nmix('poisson_poisson') is reserved with a friendly error pointing at the follow-up", {
+  expect_error(
+    nmix("poisson_poisson"),
+    "not yet wired in"
+  )
+})
+
+test_that("nmix('royle_nichols') Stan emission carries the RN lpmf and the binary Y_max upper bound", {
+  set.seed(7)
+  n_unit <- 25L; n_visit <- 3L
+  d <- data.frame(
+    series = factor(rep(seq_len(n_unit), each = n_visit)),
+    time   = rep(seq_len(n_visit), n_unit),
+    y      = rbinom(n_unit * n_visit, 1, 0.4),
+    cap    = rep(8L, n_unit * n_visit),
+    elev   = rep(rnorm(n_unit), each = n_visit)
+  )
+  prefit <- mvgam(y ~ elev, family = nmix("royle_nichols"),
+                  data = d, algorithm = "sampling", chains = 0)
+  sc <- stancode(prefit)
+  expect_true(grepl("nmix_royle_nichols_lpmf", sc))
+  expect_true(grepl("array\\[N_unit\\] int<lower=0, upper=1> Y_max",
+                    sc))
+  expect_true(grepl("array\\[N_unit\\] int<lower=1> K_max", sc))
+  expect_true(grepl("log1m_exp", sc))
+  # The Bollen `+ 1` literal on the occ==0 log-prob must not leak
+  # into the emitted lpmf.
+  expect_false(grepl("\\+ 1;\\s*//\\s*occ", sc))
+})
+
+test_that("nmix('royle_nichols') end-to-end fit returns correct grain for every dispatcher arm", {
+  set.seed(101)
+  n_unit <- 30L; n_visit <- 4L
+  elev <- rnorm(n_unit)
+  lambda_true <- exp(1.2 + 0.6 * elev)
+  r_true <- 0.3
+  N_per <- rpois(n_unit, lambda_true)
+  y_sim <- integer(n_unit * n_visit)
+  for (g in seq_len(n_unit)) {
+    rows <- ((g - 1L) * n_visit + 1L):(g * n_visit)
+    p_visit <- 1 - (1 - r_true)^N_per[g]
+    y_sim[rows] <- rbinom(n_visit, 1, p_visit)
+  }
+  d <- data.frame(
+    series = factor(rep(seq_len(n_unit), each = n_visit)),
+    time   = rep(1L, n_unit * n_visit),
+    y      = y_sim,
+    cap    = rep(15L, n_unit * n_visit),
+    elev   = rep(elev, each = n_visit)
+  )
+  fit <- mvgam(y ~ elev,
+               family    = nmix("royle_nichols"),
+               data      = d,
+               chains    = 1, iter = 300, warmup = 150,
+               silent    = 2, refresh = 0)
+  n_total <- n_unit * n_visit
+  yhat <- posterior_predict(fit)
+  expect_equal(dim(yhat), c(150L, n_total))
+  expect_true(all(yhat %in% c(0L, 1L)))
+  ehat <- posterior_epred(fit)
+  expect_equal(dim(ehat), c(150L, n_total))
+  expect_true(all(ehat > 0 & ehat < 1))
+  ll <- log_lik(fit)
+  expect_equal(dim(ll), c(150L, n_unit))
+  expect_true(all(is.finite(ll)))
+  latent <- predict(fit, type = "latent_N", summary = FALSE)
+  expect_equal(dim(latent), c(150L, n_unit))
+  expect_true(all(latent >= 0L & latent <= 15L))
+  expect_true(all(latent == as.integer(latent)))
+  det <- predict(fit, type = "detection", summary = FALSE)
+  expect_equal(dim(det), c(150L, n_total))
+  expect_true(all(det > 0 & det < 1))
+})
+
+test_that("nmix('royle_nichols') smooth-r recovers a known non-linear detection effect", {
+  set.seed(202)
+  n_unit <- 40L; n_visit <- 5L
+  elev <- rnorm(n_unit)
+  tod  <- stats::runif(n_unit * n_visit)
+  N_per <- rpois(n_unit, exp(1.4 + 0.5 * elev))
+  y_sim <- integer(n_unit * n_visit)
+  for (g in seq_len(n_unit)) {
+    rows <- ((g - 1L) * n_visit + 1L):(g * n_visit)
+    for (j in rows) {
+      r_j <- plogis(-0.5 + 2 * sin(2 * pi * tod[j]))
+      p_visit <- 1 - (1 - r_j)^N_per[g]
+      y_sim[j] <- rbinom(1, 1, p_visit)
+    }
+  }
+  d <- data.frame(
+    series = factor(rep(seq_len(n_unit), each = n_visit)),
+    time   = rep(1L, n_unit * n_visit),
+    y      = y_sim,
+    cap    = rep(40L, n_unit * n_visit),
+    elev   = rep(elev, each = n_visit),
+    tod    = tod
+  )
+  fit <- mvgam(brms::bf(y ~ elev, p ~ s(tod, k = 8)),
+               family    = nmix("royle_nichols"),
+               data      = d,
+               chains    = 1, iter = 400, warmup = 200,
+               silent    = 2, refresh = 0)
+  de <- predict(fit, type = "detection", summary = FALSE)
+  expect_equal(dim(de), c(200L, nrow(d)))
+  de_med <- apply(de, 2L, median)
+  truth <- plogis(-0.5 + 2 * sin(2 * pi * d$tod))
+  # RN binary data is less informative than PB counts per visit,
+  # so the recovery threshold is looser than the PB equivalent
+  # (which targets > 0.9).
+  expect_gt(stats::cor(de_med, truth), 0.7)
+})
+
+test_that("nmix('royle_nichols') random-effects-r recovers per-observer detection", {
+  set.seed(303)
+  n_unit <- 40L; n_visit <- 5L
+  n_obs_total <- n_unit * n_visit
+  elev <- rnorm(n_unit)
+  N_per <- rpois(n_unit, exp(1.4 + 0.5 * elev))
+  observer <- factor(sample(letters[1:5], n_obs_total, replace = TRUE))
+  obs_effects <- c(a = -0.5, b = 0.3, c = 1.0, d = -0.2, e = 0.8)
+  y_sim <- integer(n_obs_total)
+  for (g in seq_len(n_unit)) {
+    rows <- ((g - 1L) * n_visit + 1L):(g * n_visit)
+    for (j in rows) {
+      r_j <- plogis(0 + obs_effects[observer[j]])
+      p_visit <- 1 - (1 - r_j)^N_per[g]
+      y_sim[j] <- rbinom(1, 1, p_visit)
+    }
+  }
+  d <- data.frame(
+    series   = factor(rep(seq_len(n_unit), each = n_visit)),
+    time     = rep(1L, n_obs_total),
+    y        = y_sim,
+    cap      = rep(40L, n_obs_total),
+    elev     = rep(elev, each = n_visit),
+    observer = observer
+  )
+  fit <- mvgam(brms::bf(y ~ elev, p ~ (1 | observer)),
+               family    = nmix("royle_nichols"),
+               data      = d,
+               chains    = 1, iter = 400, warmup = 200,
+               silent    = 2, refresh = 0)
+  de <- predict(fit, type = "detection", summary = FALSE)
+  de_med <- apply(de, 2L, median)
+  truth <- plogis(0 + obs_effects[d$observer])
+  expect_gt(stats::cor(de_med, truth), 0.6)
+})
+
+test_that("nmix('royle_nichols') smooth-on-state recovers a non-linear lambda effect", {
+  set.seed(404)
+  n_unit <- 50L; n_visit <- 5L
+  elev <- stats::runif(n_unit, -2, 2)
+  # Non-linear lambda(elev): peaks in the middle of the range
+  lambda_true <- exp(1.0 + 1.5 * exp(-elev^2 / 2) - 0.5)
+  r_true <- 0.4
+  N_per <- rpois(n_unit, lambda_true)
+  y_sim <- integer(n_unit * n_visit)
+  for (g in seq_len(n_unit)) {
+    rows <- ((g - 1L) * n_visit + 1L):(g * n_visit)
+    p_visit <- 1 - (1 - r_true)^N_per[g]
+    y_sim[rows] <- rbinom(n_visit, 1, p_visit)
+  }
+  d <- data.frame(
+    series = factor(rep(seq_len(n_unit), each = n_visit)),
+    time   = rep(1L, n_unit * n_visit),
+    y      = y_sim,
+    cap    = rep(30L, n_unit * n_visit),
+    elev   = rep(elev, each = n_visit)
+  )
+  fit <- mvgam(y ~ s(elev, k = 8),
+               family    = nmix("royle_nichols"),
+               data      = d,
+               chains    = 1, iter = 400, warmup = 200,
+               silent    = 2, refresh = 0)
+  ehat <- posterior_epred(fit)
+  ehat_med <- apply(ehat, 2L, median)
+  # Truth at each visit: 1 - exp(-r * lambda(elev))
+  truth <- 1 - exp(-r_true * exp(1.0 + 1.5 * exp(-d$elev^2 / 2) - 0.5))
+  expect_gt(stats::cor(ehat_med, truth), 0.7)
 })
