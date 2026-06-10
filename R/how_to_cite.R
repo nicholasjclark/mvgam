@@ -379,6 +379,22 @@ reference_db <- function() {
         sep = "\n"
       )
     ),
+    neyman_type_a_1939 = list(
+      text = "Neyman J (1939). On a new class of contagious distributions, applicable in entomology and bacteriology. Annals of Mathematical Statistics, 10(1), 35-57. https://doi.org/10.1214/aoms/1177732245",
+      bibtex = paste(
+        "@article{neyman1939contagious,",
+        "  title = {On a new class of contagious distributions, applicable in entomology and bacteriology},",
+        "  author = {Neyman, Jerzy},",
+        "  journal = {Annals of Mathematical Statistics},",
+        "  volume = {10},",
+        "  number = {1},",
+        "  pages = {35--57},",
+        "  year = {1939},",
+        "  doi = {10.1214/aoms/1177732245}",
+        "}",
+        sep = "\n"
+      )
+    ),
     royle_nichols_2003 = list(
       text = "Royle JA and Nichols JD (2003). Estimating abundance from repeated presence-absence data or point counts. Ecology, 84(3), 777-790. https://doi.org/10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2",
       bibtex = paste(
@@ -504,44 +520,45 @@ reference_db <- function() {
   )
 }
 
-# Predicate: did the fit use the nmix() Poisson-binomial closure-
-# unit family? Matches the original Royle (2004) variant, not the
-# Royle-Nichols binary-detection variant (which has its own
-# predicate). Routes through `resolve_family_name()` so the
-# customfamily storage convention (name = "nmix", family =
-# "custom") is recognised correctly.
+# Shared predicate: does the fit's family resolve to a given
+# user-facing name? Routes through `resolve_family_name()` so the
+# customfamily storage convention (e.g. name = "nmix" / "tweedie"
+# while family = "custom") is recognised correctly. All per-name
+# predicates below are one-line wrappers; new closure-unit /
+# custom families add a wrapper rather than re-coding the
+# null-check + identical() boilerplate.
+#' @noRd
+family_name_is <- function(object, name) {
+  if (is.null(object$family)) return(FALSE)
+  identical(resolve_family_name(object$family), name)
+}
+
+# Per-family predicates. `uses_nmix_family()` matches the original
+# Royle (2004) Poisson-binomial variant only (not the RN or PPM
+# variants, which have their own citation rules).
 #' @noRd
 uses_nmix_family <- function(object) {
-  if (is.null(object$family)) return(FALSE)
-  identical(resolve_family_name(object$family), "nmix")
+  family_name_is(object, "nmix")
 }
 
-# Predicate: did the fit use the nmix("royle_nichols") variant?
-# Distinct from `uses_nmix_family()` because the citation rule
-# pulls a different reference set (Royle and Nichols 2003 rather
-# than Royle 2004 / Dennis et al. 2015).
 #' @noRd
 uses_nmix_royle_nichols_family <- function(object) {
-  if (is.null(object$family)) return(FALSE)
-  identical(resolve_family_name(object$family), "nmix_royle_nichols")
+  family_name_is(object, "nmix_royle_nichols")
 }
 
-# Predicate: did the fit use the occ() closure-unit family?
+#' @noRd
+uses_nmix_poisson_poisson_family <- function(object) {
+  family_name_is(object, "nmix_poisson_poisson")
+}
+
 #' @noRd
 uses_occ_family <- function(object) {
-  if (is.null(object$family)) return(FALSE)
-  identical(resolve_family_name(object$family), "occ")
+  family_name_is(object, "occ")
 }
 
-
-# Predicate: did the fit use the Tweedie custom family? Reads
-# the user-facing family name via `resolve_family_name()` so
-# the customfamily class (which stores name = "tweedie" while
-# family = "custom") is recognised correctly.
-#'@noRd
+#' @noRd
 uses_tweedie_family <- function(object) {
-  if (is.null(object$family)) return(FALSE)
-  identical(resolve_family_name(object$family), "tweedie")
+  family_name_is(object, "tweedie")
 }
 
 
@@ -692,6 +709,27 @@ how_to_cite.mvgam <- function(object, ...) {
       ),
       refs = c(
         "royle_nichols_2003",
+        "dennis_nmix_2015",
+        "kery_nmix_2018"
+      )
+    ),
+    list(
+      detect = uses_nmix_poisson_poisson_family(object),
+      text = paste0(
+        " Encounter counts were modelled with the Poisson-Poisson",
+        " N-mixture family, where per-visit counts `y ~ Poisson(N * p)`",
+        " marginalise the per-individual encounter rate `p` over a",
+        " latent abundance `N ~ Poisson(lambda)`. The compound",
+        " marginal is the Neyman Type A distribution (Neyman 1939),",
+        " over-dispersed relative to Poisson; the marginalisation",
+        " uses the log-sum-exp form of Dennis et al. (2015) over a",
+        " truncated per-unit support, and identifiability of",
+        " `lambda` and `p` separately requires either a covariate",
+        " on one of the formulae or an informative prior on at",
+        " least one intercept (Kery 2018)."
+      ),
+      refs = c(
+        "neyman_type_a_1939",
         "dennis_nmix_2015",
         "kery_nmix_2018"
       )

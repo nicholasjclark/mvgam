@@ -680,13 +680,6 @@ test_that("nmix('royle_nichols') constructor exposes the RN family name and bina
                    c("latent_N", "detection"))
 })
 
-test_that("nmix('poisson_poisson') is reserved with a friendly error pointing at the follow-up", {
-  expect_error(
-    nmix("poisson_poisson"),
-    "not yet wired in"
-  )
-})
-
 test_that("nmix('royle_nichols') Stan emission carries the RN lpmf and the binary Y_max upper bound", {
   set.seed(7)
   n_unit <- 25L; n_visit <- 3L
@@ -859,4 +852,196 @@ test_that("nmix('royle_nichols') smooth-on-state recovers a non-linear lambda ef
   # Truth at each visit: 1 - exp(-r * lambda(elev))
   truth <- 1 - exp(-r_true * exp(1.0 + 1.5 * exp(-d$elev^2 / 2) - 0.5))
   expect_gt(stats::cor(ehat_med, truth), 0.7)
+})
+
+# ------------------------------------------------------------
+# nmix("poisson_poisson") — Stan emission, dispatcher, recovery
+# ------------------------------------------------------------
+
+test_that("nmix('poisson_poisson') constructor exposes the PPM family name and count-response config", {
+  fam <- nmix("poisson_poisson")
+  expect_identical(fam$name, "nmix_poisson_poisson")
+  expect_true(isTRUE(attr(fam, "mvgam_closure_unit", exact = TRUE)))
+  expect_identical(attr(fam, "mvgam_nmix_type", exact = TRUE),
+                   "poisson_poisson")
+  # PPM accepts arbitrary counts so the binary-response check is OFF.
+  expect_false(isTRUE(attr(fam, "mvgam_binary_response",
+                           exact = TRUE)))
+  expect_null(attr(fam, "mvgam_default_cap", exact = TRUE))
+  expect_identical(attr(fam, "mvgam_predict_types", exact = TRUE),
+                   c("latent_N", "detection"))
+  # Log link on p (not logit) so the rate stays on positive reals.
+  expect_identical(fam$link_p, "log")
+  expect_true(is.na(fam$ub[2L]))
+})
+
+test_that("nmix('poisson_poisson') Stan emission carries the factored Poisson lpmf", {
+  set.seed(7)
+  n_unit <- 25L; n_visit <- 3L
+  d <- data.frame(
+    series = factor(rep(seq_len(n_unit), each = n_visit)),
+    time   = rep(seq_len(n_visit), n_unit),
+    y      = rpois(n_unit * n_visit, 2),
+    cap    = rep(20L, n_unit * n_visit),
+    elev   = rep(rnorm(n_unit), each = n_visit)
+  )
+  prefit <- mvgam(y ~ elev, family = nmix("poisson_poisson"),
+                  data = d, algorithm = "sampling", chains = 0)
+  sc <- stancode(prefit)
+  expect_true(grepl("nmix_poisson_poisson_lpmf", sc))
+  expect_true(grepl("array\\[N_unit\\] int<lower=1> K_max", sc))
+  # Y_max stays unbounded for PPM (y_t can exceed N).
+  expect_true(grepl("array\\[N_unit\\] int<lower=0> Y_max", sc))
+  expect_false(grepl("upper=1>\\s+Y_max", sc))
+  # Factored constants in the loop body.
+  expect_true(grepl("sum_counts", sc))
+  expect_true(grepl("sum_y_log_p", sc))
+  expect_true(grepl("sum_p_v", sc))
+  expect_true(grepl("lgamma_const", sc))
+  # No O(n_rep) per-k poisson_log_lpmf(counts | ...) call.
+  expect_false(grepl("poisson_log_lpmf\\(counts\\s*\\|\\s*log\\(k\\)",
+                     sc))
+  # Log link on p (not logit).
+  expect_true(grepl("log\\(p\\)", sc))
+  expect_false(grepl("logit\\(p\\)", sc))
+})
+
+test_that("nmix('poisson_poisson') intercept-only spec emits the identifiability warn from prepare_closure_unit_family()", {
+  set.seed(99)
+  n_unit <- 15L; n_visit <- 3L
+  # 3 visits per closure unit (same series, same time across the
+  # n_visit rows) so the validator's "every unit single visit + no
+  # covariates" hard-error does not fire and only the PPM
+  # identifiability warn raises.
+  d <- data.frame(
+    series = factor(rep(seq_len(n_unit), each = n_visit)),
+    time   = rep(1L, n_unit * n_visit),
+    y      = rpois(n_unit * n_visit, 2),
+    cap    = rep(20L, n_unit * n_visit)
+  )
+  fam <- nmix("poisson_poisson")
+  # Call prepare_closure_unit_family() directly: the warn fires
+  # there, and routing through mvgam() would conflate this with
+  # unrelated Stan-compile warnings (e.g. E-BFMI from chains = 0).
+  # rlang::warn(..., .frequency = "once") is gated by TESTTHAT in
+  # the production code; flip it off so the warn raises.
+  withr::with_envvar(c(TESTTHAT = ""), {
+    expect_warning(
+      prepare_closure_unit_family(
+        fam,
+        data = d,
+        response_var = "y",
+        has_obs_covariates = FALSE,
+        has_det_covariates = FALSE
+      ),
+      "weakly identified"
+    )
+  })
+})
+
+test_that("nmix('poisson_poisson') end-to-end fit returns correct grain for every dispatcher arm", {
+  set.seed(202)
+  n_unit <- 30L; n_visit <- 4L
+  elev <- rnorm(n_unit)
+  lambda_true <- exp(1.0 + 0.5 * elev)
+  p_true <- 0.4
+  N_per <- rpois(n_unit, lambda_true)
+  y_sim <- integer(n_unit * n_visit)
+  for (g in seq_len(n_unit)) {
+    rows <- ((g - 1L) * n_visit + 1L):(g * n_visit)
+    y_sim[rows] <- rpois(n_visit, lambda = N_per[g] * p_true)
+  }
+  d <- data.frame(
+    series = factor(rep(seq_len(n_unit), each = n_visit)),
+    time   = rep(1L, n_unit * n_visit),
+    y      = y_sim,
+    cap    = rep(30L, n_unit * n_visit),
+    elev   = rep(elev, each = n_visit)
+  )
+  fit <- mvgam(y ~ elev,
+               family    = nmix("poisson_poisson"),
+               data      = d,
+               chains    = 1, iter = 300, warmup = 150,
+               silent    = 2, refresh = 0)
+  n_total <- n_unit * n_visit
+  yhat <- posterior_predict(fit)
+  expect_equal(dim(yhat), c(150L, n_total))
+  expect_true(all(yhat == as.integer(yhat)))
+  expect_true(all(yhat >= 0L))
+  ehat <- posterior_epred(fit)
+  expect_equal(dim(ehat), c(150L, n_total))
+  expect_true(all(ehat > 0))
+  ll <- log_lik(fit)
+  expect_equal(dim(ll), c(150L, n_unit))
+  expect_true(all(is.finite(ll)))
+  latent <- predict(fit, type = "latent_N", summary = FALSE)
+  expect_equal(dim(latent), c(150L, n_unit))
+  expect_true(all(latent >= 0L & latent <= 30L))
+  expect_true(all(latent == as.integer(latent)))
+  det <- predict(fit, type = "detection", summary = FALSE)
+  expect_equal(dim(det), c(150L, n_total))
+  expect_true(all(det > 0))
+})
+
+test_that("nmix('poisson_poisson') smooth-p recovers a known non-linear encounter-rate effect", {
+  set.seed(303)
+  n_unit <- 40L; n_visit <- 5L
+  elev <- rnorm(n_unit)
+  tod  <- stats::runif(n_unit * n_visit)
+  N_per <- rpois(n_unit, exp(1.2 + 0.5 * elev))
+  y_sim <- integer(n_unit * n_visit)
+  for (g in seq_len(n_unit)) {
+    rows <- ((g - 1L) * n_visit + 1L):(g * n_visit)
+    for (j in rows) {
+      p_j <- exp(-1 + 1.2 * sin(2 * pi * tod[j]))
+      y_sim[j] <- rpois(1, lambda = N_per[g] * p_j)
+    }
+  }
+  d <- data.frame(
+    series = factor(rep(seq_len(n_unit), each = n_visit)),
+    time   = rep(1L, n_unit * n_visit),
+    y      = y_sim,
+    cap    = rep(40L, n_unit * n_visit),
+    elev   = rep(elev, each = n_visit),
+    tod    = tod
+  )
+  fit <- mvgam(brms::bf(y ~ elev, p ~ s(tod, k = 8)),
+               family    = nmix("poisson_poisson"),
+               data      = d,
+               chains    = 1, iter = 400, warmup = 200,
+               silent    = 2, refresh = 0)
+  de <- predict(fit, type = "detection", summary = FALSE)
+  expect_equal(dim(de), c(200L, nrow(d)))
+  de_med <- apply(de, 2L, median)
+  truth <- exp(-1 + 1.2 * sin(2 * pi * d$tod))
+  # PPM encounter rates are unidentified up to a scale (banana
+  # ridge on the `lambda * p` product), so absolute recovery may
+  # be off; the shape correlation with the truth is what the
+  # smooth identifies once the elev covariate partially constrains
+  # `lambda`. Threshold tightened from 0.7 to 0.80 per stats
+  # review: a correct factored Poisson precompute on this
+  # simulation should recover the shape well above 0.7, so a
+  # weaker threshold has no power to catch an implementation
+  # error in the precompute terms.
+  expect_gt(stats::cor(de_med, truth), 0.80)
+})
+
+test_that("uses_nmix_poisson_poisson_family() predicate distinguishes the PPM variant", {
+  expect_false(uses_nmix_poisson_poisson_family(NULL))
+  expect_false(uses_nmix_poisson_poisson_family(list(family = gaussian())))
+  expect_false(uses_nmix_poisson_poisson_family(list(family = nmix())))
+  expect_false(
+    uses_nmix_poisson_poisson_family(list(family = nmix("royle_nichols")))
+  )
+  expect_true(
+    uses_nmix_poisson_poisson_family(list(family = nmix("poisson_poisson")))
+  )
+})
+
+test_that("how_to_cite reference_db carries the Neyman 1939 entry", {
+  db <- mvgam:::reference_db()
+  expect_true("neyman_type_a_1939" %in% names(db))
+  ny <- db[["neyman_type_a_1939"]]
+  expect_true(grepl("Neyman J", ny$text))
+  expect_true(grepl("neyman1939contagious", ny$bibtex))
 })

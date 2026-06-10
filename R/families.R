@@ -772,7 +772,10 @@ build_closure_unit_arrays <- function(data,
 #'   (2003) binary-detection variant: latent `N ~ Poisson(lambda)`,
 #'   per-visit binary outcomes `y ~ Bernoulli(1 - (1-r)^N)` with
 #'   logit-link per-individual detection `r`. `"poisson_poisson"`
-#'   reserved; will be wired in a follow-up commit.
+#'   is the Neyman Type A model used for encounter counts (e.g.
+#'   camera-trap captures): latent `N ~ Poisson(lambda)`, per-visit
+#'   counts `y ~ Poisson(N * p)` with log-link per-individual
+#'   encounter rate `p`.
 #'
 #' @examples
 #' \dontrun{
@@ -787,6 +790,11 @@ build_closure_unit_arrays <- function(data,
 #' # Royle-Nichols variant on binary detection / non-detection data
 #' mvgam(y ~ s(elev), family = nmix("royle_nichols"),
 #'       data = closure_unit_binary_data)
+#'
+#' # Poisson-Poisson variant on encounter counts
+#' mvgam(bf(y ~ s(elev), p ~ tod),
+#'       family = nmix("poisson_poisson"),
+#'       data = closure_unit_count_data)
 #' }
 #'
 #' @section Choosing between Poisson-binomial and Royle-Nichols:
@@ -822,6 +830,69 @@ build_closure_unit_arrays <- function(data,
 #' cells where the detection function still varies, biasing the
 #' posterior on `lambda` upward.
 #'
+#' @section Identification (Poisson-Poisson):
+#' The Stan code uses the log link on per-individual encounter
+#' rate `p`. Bollen's `logit(p)` reparameterisation is rejected
+#' because under a flat Uniform(0, 1) prior on `p` the implied
+#' prior on the rate `mu / (1 - mu)` is Cauchy(0, 1) tailed,
+#' which is ecologically unmotivated and computationally unstable.
+#' Under intercept-only specifications on both `mu` and `p` only
+#' the product `lambda * p` is identified by the data; the
+#' marginal variance (Neyman Type A is over-dispersed Poisson)
+#' provides weak cross-identification only when at least one
+#' covariate separates the two parameters (Kery 2018; "Wild
+#' posteriors in the wild" arXiv 2503.00239). The fit-time
+#' validator emits a `rlang::warn(...)` when both formulae reduce
+#' to intercept-only, recommending an informative prior on at
+#' least one intercept. The default prior on the log-scale `p`
+#' intercept is tighter than the Poisson-binomial default
+#' (`Normal(0, 1)`, implying encounter rate mostly in
+#' `(0.1, 10)` encounters per individual per visit) for the same
+#' reason. The truncated-N marginalisation is required: the
+#' closed-form Poisson(`lambda * p`) marginal is mean-equivalent
+#' but distribution-wrong (it drops the Neyman Type A over-
+#' dispersion, which is the only handle on separating `lambda`
+#' from `p`; under the closed form the likelihood depends only
+#' on the product `lambda * p`, so individual posteriors on
+#' `lambda` and `p` are prior-dominated and the reverse-Bayes
+#' `predict(type = "latent_N")` returns the prior on `N` rather
+#' than a data-informed posterior).
+#'
+#' @section Priors (Poisson-Poisson):
+#' For Poisson-Poisson fits the recommended starting prior on
+#' the log-scale `p` intercept is `Normal(0, 1)`, which puts
+#' most prior mass on encounter rates between `exp(-2) ~ 0.14`
+#' and `exp(2) ~ 7.4` per individual per visit. Pass this prior
+#' via the `prior` argument of [mvgam()]:
+#' ```r
+#' mvgam(y ~ elev,
+#'       family = nmix("poisson_poisson"),
+#'       data   = closure_unit_count_data,
+#'       prior  = c(brms::prior(normal(0, 1),
+#'                              class = "Intercept",
+#'                              dpar  = "p")))
+#' ```
+#' For rare species with very low encounter rates the centre
+#' should shift down (e.g. `Normal(-2, 0.5)`); for passive
+#' acoustic monitors logging many detections per individual the
+#' centre should shift up (e.g. `Normal(2, 0.5)`). The
+#' identifiability validator emits a `rlang::warn(...)` only at
+#' the fully intercept-only configuration; with one-sided
+#' covariates the intercept of the formula without a covariate
+#' is still weakly identified, so an informative prior on that
+#' intercept remains advisable.
+#'
+#' @section K_max for Poisson-Poisson:
+#' Unlike Royle-Nichols (which has a two-sided saturation rule),
+#' Poisson-Poisson `K_max[g]` only needs to satisfy
+#' `ppois(K_max[g], lambda_hat, lower.tail = FALSE) < 1e-4`
+#' (the Poisson tail negligible). A safe rough default is
+#' `K_max[g] = max(Y_max[g], ceiling(lambda_hat + 4 * sqrt(lambda_hat)))`
+#' where `lambda_hat` is an initial estimate of the per-unit
+#' abundance (e.g. `mean(y_g) / mean(p_hat)` with `p_hat` from a
+#' prior-mean encounter rate). Users supply this as the `cap`
+#' column on the input data.
+#'
 #' @references
 #' Royle, J. A., and Nichols, J. D. (2003). Estimating abundance
 #'   from repeated presence-absence data or point counts.
@@ -832,32 +903,43 @@ build_closure_unit_arrays <- function(data,
 nmix <- function(type = c("poisson_binomial", "royle_nichols",
                           "poisson_poisson")) {
   type <- match.arg(type)
-  if (type == "poisson_poisson") {
-    stop(insight::format_error(c(
-      "The 'poisson_poisson' nmix variant is not yet wired in.",
-      i = paste0(
-        "Use nmix() for the Poisson-binomial model or ",
-        "nmix(\"royle_nichols\") for the Royle-Nichols binary ",
-        "variant; the Poisson-Poisson port lands in a follow-up."
-      )
-    )))
-  }
-  family_name <- switch(
+  variant_config <- switch(
     type,
-    poisson_binomial = "nmix",
-    royle_nichols    = "nmix_royle_nichols"
+    poisson_binomial = list(
+      name  = "nmix",
+      links = c("log", "logit"),
+      lb    = c(0, 0),
+      ub    = c(NA, 1)
+    ),
+    royle_nichols = list(
+      name  = "nmix_royle_nichols",
+      links = c("log", "logit"),
+      lb    = c(0, 0),
+      ub    = c(NA, 1)
+    ),
+    # Poisson-Poisson: p is an encounter rate per individual per
+    # visit, NOT a probability. Log link on both dpars keeps the
+    # rate on the positive real line. Bollen's logit(p) reparam
+    # is rejected because it imposes a Cauchy(0, 1)-tailed prior
+    # on the rate (stats review 2026-06-10).
+    poisson_poisson = list(
+      name  = "nmix_poisson_poisson",
+      links = c("log", "log"),
+      lb    = c(0, 0),
+      ub    = c(NA, NA)
+    )
   )
   fam <- brms::custom_family(
-    name  = family_name,
+    name  = variant_config$name,
     dpars = c("mu", "p"),
-    links = c("log", "logit"),
-    # mu (lambda) is a positive rate; p is a probability. Setting
-    # both bounds at the family level makes brms declare the
-    # scalar-dpar case with the right constraints, which keeps
-    # the lpdf's logit(p) / log1m(p) calls valid even when no
-    # sub-formula is supplied for p.
-    lb    = c(0, 0),
-    ub    = c(NA, 1),
+    links = variant_config$links,
+    # Bounds at the family level let brms declare the scalar-dpar
+    # case with the right constraints. The lpmf operates on the
+    # response-scale dpars (post-inv-link), with each per-variant
+    # function block converting back to the link scale internally
+    # for numerically stable likelihood evaluation.
+    lb    = variant_config$lb,
+    ub    = variant_config$ub,
     type  = "int",
     loop  = FALSE
   )
@@ -867,10 +949,10 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
   attr(fam, "mvgam_closure_unit")  <- TRUE
   attr(fam, "mvgam_nmix_type")     <- type
   # Royle-Nichols takes binary detection input; trigger the
-  # y in {0, 1} validation. The Poisson-binomial variant accepts
-  # arbitrary counts so leaves the response check unset. Neither
-  # variant sets mvgam_default_cap: latent N can exceed 1 and
-  # the user must supply the `cap` column.
+  # y in {0, 1} validation. Poisson-binomial and Poisson-Poisson
+  # accept count input. None of the variants set
+  # mvgam_default_cap: latent N exceeds 1 for all three and the
+  # user must supply the `cap` column.
   if (type == "royle_nichols") {
     attr(fam, "mvgam_binary_response") <- TRUE
   }
@@ -1377,6 +1459,111 @@ nmix_royle_nichols_stan_funs <- function(max_rep) {
   )
 }
 
+#' Stan function block for the Poisson-Poisson nmix variant
+#'
+#' Per-unit log-likelihood marginalises latent abundance
+#' `N ~ Poisson(lambda)` over `0 : K_max[g]`; conditional on
+#' `N = k`, per-visit encounter counts are
+#' `y_t ~ Poisson(k * p_t)` with per-individual encounter rate
+#' `p` (log link). `Y_max[g]` does NOT bound `N` from below for
+#' Poisson-Poisson (`y_t` can exceed `N` because each individual
+#' contributes its own Poisson process per visit). The `k = 0`
+#' cell is only consistent with all-zero detection histories;
+#' the guard handles this without resorting to Bollen's `1e-9`
+#' regularisation, which is unnecessary under the log link.
+#'
+#' Efficient factored form. Stan's `poisson_log_lpmf` decomposes
+#' `sum_t poisson_log_lpmf(y_t | log(k) + log(p_t))` as
+#' `log(k) * sum(y) + sum(y * log(p)) - k * sum(p) - sum(lgamma(y + 1))`.
+#' The three terms `sum(y)`, `sum(y * log(p))`, `sum(p)`, and
+#' `sum(lgamma(y + 1))` are constant in `k`, so the inner
+#' marginalisation loop runs in `O(K_max[g])` total per unit
+#' instead of `O(K_max[g] * n_rep[g])`. At realistic
+#' `K_max ~ 50, n_rep ~ 5` this is a 5x speed-up; at
+#' `K_max ~ 200, n_rep ~ 10` it is a 10x speed-up.
+#'
+#' @param max_rep Positive integer maximum visit count across
+#'   closure units; only used by the scalar-p overload's broadcast.
+#' @return Character scalar of Stan function code.
+#' @noRd
+nmix_poisson_poisson_stan_funs <- function(max_rep) {
+  checkmate::assert_integerish(max_rep, lower = 1L, len = 1L)
+  paste(
+    "  // Per-visit implementation. p is a positive encounter rate",
+    "  // per individual per visit (log link). log_p is the linear-",
+    "  // predictor scale; log_mu is the abundance log-rate.",
+    "  real nmix_poisson_poisson_lpmf(",
+    "    array[] int y,",
+    "    vector mu,",
+    "    vector p,",
+    "    int N_unit,",
+    "    array[] int n_rep,",
+    "    array[] int K_max,",
+    "    array[] int Y_max,",
+    "    array[,] int visit_idx) {",
+    "    real lp = 0;",
+    "    vector[num_elements(mu)] log_mu = log(mu);",
+    "    vector[num_elements(p)]  log_p  = log(p);",
+    "    for (g in 1 : N_unit) {",
+    "      int Kg = K_max[g];",
+    "      array[n_rep[g]] int idx = visit_idx[g, 1:n_rep[g]];",
+    "      // lambda is constant within a closure unit; pull from",
+    "      // the first visit's linear predictor.",
+    "      real log_lam = log_mu[idx[1]];",
+    "      array[n_rep[g]] int counts = y[idx];",
+    "      vector[n_rep[g]] log_p_v   = log_p[idx];",
+    "      vector[n_rep[g]] p_v       = p[idx];",
+    "      vector[n_rep[g]] counts_v  = to_vector(counts);",
+    "      int any_detection = Y_max[g] > 0;",
+    "      // O(n_rep) precomputes; reused for every k in 1..Kg.",
+    "      real sum_counts   = sum(counts_v);",
+    "      real sum_y_log_p  = dot_product(counts_v, log_p_v);",
+    "      real sum_p_v      = sum(p_v);",
+    "      real lgamma_const = sum(lgamma(counts_v + 1));",
+    "      vector[Kg + 1] component_lps;",
+    "      // k = 0 only consistent with all-zero counts. If any",
+    "      // visit detected anything, the k = 0 cell is impossible;",
+    "      // otherwise it contributes poisson_log_lpmf(0|log_lam)",
+    "      // plus 0 (Poisson(y=0|rate=0) = 1).",
+    "      if (any_detection) {",
+    "        component_lps[1] = negative_infinity();",
+    "      } else {",
+    "        component_lps[1] = poisson_log_lpmf(0 | log_lam);",
+    "      }",
+    "      for (k in 1 : Kg) {",
+    "        // Factored sum_t poisson_log_lpmf(y_t|log(k)+log_p_v[t])",
+    "        // = log(k) * sum_y + sum_y_log_p",
+    "        //   - k * sum_p_v - lgamma_const.",
+    "        component_lps[k + 1] = poisson_log_lpmf(k | log_lam)",
+    "          + log(k) * sum_counts + sum_y_log_p",
+    "          - k * sum_p_v - lgamma_const;",
+    "      }",
+    "      lp += log_sum_exp(component_lps);",
+    "    }",
+    "    return lp;",
+    "  }",
+    "",
+    "  // Scalar-p entry point: broadcasts to the per-visit",
+    "  // vector and dispatches to the vector implementation.",
+    "  real nmix_poisson_poisson_lpmf(",
+    "    array[] int y,",
+    "    vector mu,",
+    "    real p,",
+    "    int N_unit,",
+    "    array[] int n_rep,",
+    "    array[] int K_max,",
+    "    array[] int Y_max,",
+    "    array[,] int visit_idx) {",
+    "    int N = num_elements(mu);",
+    "    return nmix_poisson_poisson_lpmf(",
+    "      y | mu, rep_vector(p, N), N_unit,",
+    "      n_rep, K_max, Y_max, visit_idx",
+    "    );",
+    "  }",
+    sep = "\n"
+  )
+}
+
 #' Assemble the shared closure-unit Stan stanvar bundle
 #'
 #' Every closure-unit family emits the same `N_unit`, `n_rep`,
@@ -1517,6 +1704,29 @@ make_nmix_royle_nichols_stanvars <- function(arrays) {
   )
 }
 
+#' Build the closure-unit Stan stanvars for an
+#' `nmix("poisson_poisson")` fit
+#'
+#' Wraps the shared `make_closure_unit_arrays_stanvars()` with
+#' the Neyman Type A function block and the per-unit `K_max`
+#' data array. Y_max keeps the unbounded count declaration
+#' because Poisson-Poisson allows `y_t > N` (each individual
+#' contributes its own Poisson process per visit; the closure
+#' constraint does NOT bound `N` from below by `Y_max`).
+#'
+#' @inheritParams make_closure_unit_arrays_stanvars
+#' @return A `brmsstanvars` object.
+#' @noRd
+make_nmix_poisson_poisson_stanvars <- function(arrays) {
+  make_closure_unit_arrays_stanvars(
+    arrays,
+    family_funs_name = "nmix_poisson_poisson_funs",
+    family_funs      = nmix_poisson_poisson_stan_funs(arrays$max_rep),
+    y_max_upper      = NA_integer_,
+    include_K_max    = TRUE
+  )
+}
+
 #' Prepare a closure-unit family for fitting
 #'
 #' Resolves the data-dependent parts of a closure-unit family
@@ -1563,6 +1773,7 @@ prepare_closure_unit_family <- function(family, data, response_var,
     family_name,
     nmix                 = make_nmix_stanvars(arrays),
     nmix_royle_nichols   = make_nmix_royle_nichols_stanvars(arrays),
+    nmix_poisson_poisson = make_nmix_poisson_poisson_stanvars(arrays),
     occ                  = make_occ_stanvars(arrays),
     stop(insight::format_error(c(
       paste0(
@@ -1592,6 +1803,36 @@ prepare_closure_unit_family <- function(family, data, response_var,
     )))
   }
   family$vars <- family_vars
+  # Poisson-Poisson identifiability guard. With intercept-only mu
+  # AND intercept-only p, the closed-form marginal would be a
+  # Poisson(lambda * p) ridge; the Neyman Type A over-dispersion
+  # in the truncated form gives only weak cross-identification, and
+  # the lambda * p = constant ridge remains pronounced (Kery 2018;
+  # "Wild posteriors in the wild" arXiv 2503.00239). Warn once per
+  # session so the user has the option to constrain at least one
+  # intercept with an informative prior.
+  if (identical(family_name, "nmix_poisson_poisson") &&
+      !has_obs_covariates && !has_det_covariates) {
+    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+      rlang::warn(
+        insight::format_warning(c(
+          "nmix(\"poisson_poisson\") with intercept-only mu and p is weakly identified.",
+          x = paste0(
+            "Only the product `lambda * p` is identified by the ",
+            "Neyman Type A marginal; individual posteriors on ",
+            "`lambda` and `p` are dominated by their priors."
+          ),
+          i = paste0(
+            "Add a covariate to either formula (`y ~ x` or ",
+            "`bf(y ~ ..., p ~ x)`), or supply an informative prior ",
+            "on at least one intercept via the `prior` argument."
+          )
+        )),
+        .frequency    = "once",
+        .frequency_id = "nmix_poisson_poisson_intercept_only"
+      )
+    }
+  }
   # Stash the arrays on the family so downstream code (predict /
   # posterior_predict / log_lik) can reuse the same closure-unit
   # grouping without re-deriving it from data.
@@ -1721,6 +1962,13 @@ dispatch_closure_unit_method <- function(family, method_kind) {
       predict      = posterior_predict_nmix_royle_nichols,
       log_lik      = log_lik_nmix_royle_nichols,
       latent_state = posterior_latent_N_royle_nichols
+    ),
+    nmix_poisson_poisson = switch(
+      method_kind,
+      epred        = posterior_epred_nmix_poisson_poisson,
+      predict      = posterior_predict_nmix_poisson_poisson,
+      log_lik      = log_lik_nmix_poisson_poisson,
+      latent_state = posterior_latent_N_poisson_poisson
     ),
     occ  = switch(method_kind,
                   epred        = posterior_epred_occ,
@@ -2580,6 +2828,222 @@ log_lik_nmix_royle_nichols <- function(linpred, link, y,
         rep(0, ndraws)
       }
       lp_mat[, kk] <- lp_pois + lp_nondet + lp_det
+    }
+    m <- apply(lp_mat, 1L, max)
+    out[, g] <- m + log(rowSums(exp(lp_mat - m)))
+  }
+  out
+}
+
+# ============================================================
+# nmix("poisson_poisson") R-side downstream methods
+# ============================================================
+# Encounter-count model. Per-individual encounter rate p is log-
+# linked; the marginal of `y_visit ~ Poisson(N * p), N ~
+# Poisson(lambda)` is Neyman Type A (over-dispersed Poisson).
+# The truncated-N likelihood and reverse-Bayes both use the
+# factored Poisson form
+#   sum_t poisson_log_pmf(y_t | log(k) + log(p_t))
+#   = log(k) * sum(y) + sum(y * log(p))
+#     - k * sum(p) - sum(lgamma(y + 1))
+# so the inner marginalisation loop is O(K_max[g]) per unit
+# with constant per-k work (an O(n_rep) precompute amortises
+# across all k values).
+
+#' Per-visit expected count for an `nmix("poisson_poisson")` fit
+#'
+#' Closed-form marginal mean: `E[y_t] = lambda * p_t`. No Jensen
+#' correction needed; the Poisson abundance prior contributes
+#' only its mean to the per-visit count expectation.
+#'
+#' @inheritParams posterior_epred_nmix
+#' @return `[S x N_visit]` matrix of expected counts.
+#' @noRd
+posterior_epred_nmix_poisson_poisson <- function(object,
+                                                  newdata = NULL,
+                                                  draw_ids = NULL) {
+  comp <- extract_closure_unit_components(object, newdata, draw_ids)
+  unit_of_visit <- visit_to_unit_lookup(comp$arrays, comp$n_visit)
+  lambda_visit <- comp$state[, unit_of_visit, drop = FALSE]
+  lambda_visit * comp$p
+}
+
+#' Per-visit response draws for an `nmix("poisson_poisson")` fit
+#'
+#' Two-step generative simulation: sample `N_g ~ Poisson(lambda_g)`
+#' once per posterior draw, then sample each visit's count from
+#' `Poisson(N_g * p_t)`. Sharing one `N_g` across visits within a
+#' unit preserves the Neyman Type A within-unit dependence.
+#'
+#' @inheritParams posterior_epred_nmix
+#' @return `[S x N_visit]` integer matrix of visit counts.
+#' @noRd
+posterior_predict_nmix_poisson_poisson <- function(object,
+                                                    newdata = NULL,
+                                                    draw_ids = NULL) {
+  comp <- extract_closure_unit_components(object, newdata, draw_ids)
+  arrays <- comp$arrays
+  ndraws <- comp$ndraws
+  out <- matrix(0L, nrow = ndraws, ncol = comp$n_visit)
+  for (g in seq_len(arrays$N_unit)) {
+    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    lam_g <- comp$state[, g]
+    N_draws <- stats::rpois(ndraws, lambda = lam_g)
+    for (j in idx) {
+      p_j <- comp$p[, j]
+      out[, j] <- stats::rpois(ndraws, lambda = N_draws * p_j)
+    }
+  }
+  out
+}
+
+#' Per-closure-unit latent-abundance draws for an
+#' `nmix("poisson_poisson")` fit
+#'
+#' Reverse-Bayes conditional posterior:
+#' \deqn{P(N_g = k | y_g, lambda_g, p_g) \propto
+#'   Poisson(k | lambda_g) \times \prod_j Poisson(y_{g,j} | k * p_{g,j})}
+#' for `k = 0..K_max[g]`. The `k = 0` cell is consistent only with
+#' all-zero detection histories. The factored log-weight
+#' (`log(k) * sum_y + sum_y_log_p - k * sum_p - lgamma_const`)
+#' makes the per-k cost `O(1)` after one `O(n_rep)` precompute.
+#'
+#' @inheritParams posterior_latent_N
+#' @return `[S x N_unit]` integer matrix of latent abundance
+#'   draws.
+#' @noRd
+posterior_latent_N_poisson_poisson <- function(object,
+                                                newdata = NULL,
+                                                draw_ids = NULL,
+                                                conditional = TRUE) {
+  checkmate::assert_flag(conditional)
+  comp <- extract_closure_unit_components(object, newdata, draw_ids)
+  arrays <- comp$arrays
+  ndraws <- comp$ndraws
+  N_unit <- arrays$N_unit
+  if (is.null(newdata)) newdata <- object$data
+  response_var <- closure_unit_response_var(object$formula)
+  y_vals <- as.integer(newdata[[response_var]])
+  out <- matrix(0L, nrow = ndraws, ncol = N_unit)
+  for (g in seq_len(N_unit)) {
+    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    lam_g <- comp$state[, g]
+    if (!conditional) {
+      out[, g] <- stats::rpois(ndraws, lambda = lam_g)
+      next
+    }
+    y_g <- y_vals[idx]
+    K_g <- arrays$K_max[g]
+    # comp$p arrives on the response (rate) scale already, post-
+    # inv-link from brms; log(p_g) recovers the linear predictor
+    # log_p for use in the factored Poisson form. Mirrors the Stan
+    # block which computes log_p = log(p) at the top of the lpmf.
+    p_g <- comp$p[, idx, drop = FALSE]
+    log_p_g <- log(p_g)
+    sum_counts <- sum(y_g)
+    sum_y_log_p <- as.numeric(log_p_g %*% y_g)
+    sum_p_g <- rowSums(p_g)
+    lgamma_const <- sum(lgamma(y_g + 1))
+    any_detection <- sum_counts > 0L
+    k_grid <- 0:K_g
+    n_k <- length(k_grid)
+    lw <- matrix(NA_real_, nrow = ndraws, ncol = n_k)
+    # k = 0 cell.
+    if (any_detection) {
+      lw[, 1L] <- -Inf
+    } else {
+      lw[, 1L] <- stats::dpois(0L, lambda = lam_g, log = TRUE)
+    }
+    if (K_g >= 1L) {
+      log_k_grid <- log(seq_len(K_g))
+      for (kk in seq_len(K_g)) {
+        k <- kk
+        log_k <- log_k_grid[kk]
+        lw[, kk + 1L] <- stats::dpois(k, lambda = lam_g, log = TRUE) +
+          log_k * sum_counts + sum_y_log_p -
+          k * sum_p_g - lgamma_const
+      }
+    }
+    # Vectorised inverse-CDF sample identical to the PB and RN
+    # paths: subtract per-row maxima for numerical stability,
+    # build a running CDF column-by-column, pick the first
+    # column whose running CDF exceeds a single uniform draw.
+    row_max <- do.call(pmax, lapply(seq_len(n_k), function(k) lw[, k]))
+    w <- exp(lw - row_max)
+    cdf <- w
+    if (n_k > 1L) {
+      for (k in 2:n_k) {
+        cdf[, k] <- cdf[, k - 1L] + cdf[, k]
+      }
+    }
+    cdf <- cdf / cdf[, n_k]
+    u <- stats::runif(ndraws)
+    bin_idx <- rowSums(cdf < u) + 1L
+    out[, g] <- k_grid[bin_idx]
+  }
+  out
+}
+
+#' Log-likelihood per closure unit for an
+#' `nmix("poisson_poisson")` fit
+#'
+#' Per-unit marginal mirroring the Stan emission:
+#' \deqn{\log p(y_g | lambda_g, p_g) = \log \sum_{k = 0}^{K\_max_g}
+#'   Poisson(k | lambda_g) \times \prod_j Poisson(y_{g,j} | k * p_{g,j})}.
+#' Uses the same factored Poisson form as the Stan code (constant
+#' per-k cost after one `O(n_rep)` precompute). Returned at the
+#' closure-unit grain (one column per unit) so `loo()` / `waic()`
+#' see one observation per conditionally iid block.
+#'
+#' @noRd
+log_lik_nmix_poisson_poisson <- function(linpred, link, y,
+                                          family_pars, trials) {
+  checkmate::assert_matrix(linpred)
+  checkmate::assert_choice(link, "log")
+  arrays <- family_pars$closure_arrays
+  if (is.null(arrays)) {
+    stop(insight::format_error(
+      "log_lik_nmix_poisson_poisson() requires 'closure_arrays' in family_pars."
+    ))
+  }
+  p_mat <- family_pars$p
+  checkmate::assert_matrix(
+    p_mat, nrows = nrow(linpred), ncols = ncol(linpred)
+  )
+  lambda_visit <- .linkinv(linpred, link)
+  ndraws <- nrow(linpred)
+  N_unit <- arrays$N_unit
+  y_int  <- as.integer(y)
+  out <- matrix(NA_real_, nrow = ndraws, ncol = N_unit)
+  for (g in seq_len(N_unit)) {
+    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    lam <- lambda_visit[, idx[1L]]
+    y_g <- y_int[idx]
+    p_g <- p_mat[, idx, drop = FALSE]
+    log_p_g <- log(p_g)
+    sum_counts   <- sum(y_g)
+    sum_y_log_p  <- as.numeric(log_p_g %*% y_g)
+    sum_p_g      <- rowSums(p_g)
+    lgamma_const <- sum(lgamma(y_g + 1))
+    any_detection <- sum_counts > 0L
+    K_g <- arrays$K_max[g]
+    k_grid <- 0:K_g
+    lp_mat <- matrix(NA_real_, nrow = ndraws, ncol = length(k_grid))
+    # k = 0 cell.
+    if (any_detection) {
+      lp_mat[, 1L] <- -Inf
+    } else {
+      lp_mat[, 1L] <- stats::dpois(0L, lambda = lam, log = TRUE)
+    }
+    if (K_g >= 1L) {
+      log_k_grid <- log(seq_len(K_g))
+      for (kk in seq_len(K_g)) {
+        k <- kk
+        log_k <- log_k_grid[kk]
+        lp_mat[, kk + 1L] <- stats::dpois(k, lambda = lam, log = TRUE) +
+          log_k * sum_counts + sum_y_log_p -
+          k * sum_p_g - lgamma_const
+      }
     }
     m <- apply(lp_mat, 1L, max)
     out[, g] <- m + log(rowSums(exp(lp_mat - m)))

@@ -176,7 +176,8 @@ compute_family_epred <- function(linpred, family,
     # posterior_epred.mvgam(); these branches are defensive (e.g.
     # callers that reach compute_family_epred directly).
     "nmix" = ,
-    "nmix_royle_nichols" = stop(insight::format_error(c(
+    "nmix_royle_nichols" = ,
+    "nmix_poisson_poisson" = stop(insight::format_error(c(
       paste0(
         "Family '", family$name,
         "' must be routed through posterior_epred.mvgam()."

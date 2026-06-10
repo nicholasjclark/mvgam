@@ -499,11 +499,15 @@ and load-bearing for tasks #223-#232:
    The marginal of `y_visit ~ Poisson(N * p), N ~ Poisson(lambda)`
    is the Neyman Type A distribution, which is over-dispersed
    relative to Poisson. The closed-form Poisson is **mean-equivalent
-   but distribution-wrong**: it drops the over-dispersion (under-
-   estimates variance, produces anti-conservative intervals) and
-   blocks `posterior_latent_N()` (no path from a Poisson marginal
-   to draws on `N_g`). Task #226 description is being rewritten to
-   strike the marginal-Poisson option.
+   but distribution-wrong**: it drops the Neyman Type A over-
+   dispersion (the only handle on separating `lambda` from `p`,
+   since the closed-form likelihood depends only on the product),
+   so individual posteriors on `lambda` and `p` are prior-
+   dominated, and the reverse-Bayes `posterior_latent_N()`
+   returns the prior on `N` (`Poisson(lambda)` with `lambda`
+   barely updated by data) rather than a data-informed posterior.
+   Task #226 description is being rewritten to strike the
+   marginal-Poisson option.
 
 6. **Log link on `p`** (encounter rate on positive real line).
    Reject Bollen's `logit(p)` reparameterisation: under Uniform(0,1)

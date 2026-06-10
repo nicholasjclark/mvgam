@@ -15,7 +15,10 @@ detection \code{p}. \code{"royle_nichols"} is the Royle and Nichols
 (2003) binary-detection variant: latent \code{N ~ Poisson(lambda)},
 per-visit binary outcomes \code{y ~ Bernoulli(1 - (1-r)^N)} with
 logit-link per-individual detection \code{r}. \code{"poisson_poisson"}
-reserved; will be wired in a follow-up commit.}
+is the Neyman Type A model used for encounter counts (e.g.
+camera-trap captures): latent \code{N ~ Poisson(lambda)}, per-visit
+counts \code{y ~ Poisson(N * p)} with log-link per-individual
+encounter rate \code{p}.}
 }
 \value{
 A \code{brms::customfamily} object with the
@@ -123,6 +126,76 @@ cells where the detection function still varies, biasing the
 posterior on \code{lambda} upward.
 }
 
+\section{Identification (Poisson-Poisson)}{
+
+The Stan code uses the log link on per-individual encounter
+rate \code{p}. Bollen's \code{logit(p)} reparameterisation is rejected
+because under a flat Uniform(0, 1) prior on \code{p} the implied
+prior on the rate \code{mu / (1 - mu)} is Cauchy(0, 1) tailed,
+which is ecologically unmotivated and computationally unstable.
+Under intercept-only specifications on both \code{mu} and \code{p} only
+the product \code{lambda * p} is identified by the data; the
+marginal variance (Neyman Type A is over-dispersed Poisson)
+provides weak cross-identification only when at least one
+covariate separates the two parameters (Kery 2018; "Wild
+posteriors in the wild" arXiv 2503.00239). The fit-time
+validator emits a \code{rlang::warn(...)} when both formulae reduce
+to intercept-only, recommending an informative prior on at
+least one intercept. The default prior on the log-scale \code{p}
+intercept is tighter than the Poisson-binomial default
+(\code{Normal(0, 1)}, implying encounter rate mostly in
+\verb{(0.1, 10)} encounters per individual per visit) for the same
+reason. The truncated-N marginalisation is required: the
+closed-form Poisson(\code{lambda * p}) marginal is mean-equivalent
+but distribution-wrong (it drops the Neyman Type A over-
+dispersion, which is the only handle on separating \code{lambda}
+from \code{p}; under the closed form the likelihood depends only
+on the product \code{lambda * p}, so individual posteriors on
+\code{lambda} and \code{p} are prior-dominated and the reverse-Bayes
+\code{predict(type = "latent_N")} returns the prior on \code{N} rather
+than a data-informed posterior).
+}
+
+\section{Priors (Poisson-Poisson)}{
+
+For Poisson-Poisson fits the recommended starting prior on
+the log-scale \code{p} intercept is \code{Normal(0, 1)}, which puts
+most prior mass on encounter rates between \code{exp(-2) ~ 0.14}
+and \code{exp(2) ~ 7.4} per individual per visit. Pass this prior
+via the \code{prior} argument of \code{\link[=mvgam]{mvgam()}}:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{mvgam(y ~ elev,
+      family = nmix("poisson_poisson"),
+      data   = closure_unit_count_data,
+      prior  = c(brms::prior(normal(0, 1),
+                             class = "Intercept",
+                             dpar  = "p")))
+}\if{html}{\out{</div>}}
+
+For rare species with very low encounter rates the centre
+should shift down (e.g. \code{Normal(-2, 0.5)}); for passive
+acoustic monitors logging many detections per individual the
+centre should shift up (e.g. \code{Normal(2, 0.5)}). The
+identifiability validator emits a \code{rlang::warn(...)} only at
+the fully intercept-only configuration; with one-sided
+covariates the intercept of the formula without a covariate
+is still weakly identified, so an informative prior on that
+intercept remains advisable.
+}
+
+\section{K_max for Poisson-Poisson}{
+
+Unlike Royle-Nichols (which has a two-sided saturation rule),
+Poisson-Poisson \code{K_max[g]} only needs to satisfy
+\code{ppois(K_max[g], lambda_hat, lower.tail = FALSE) < 1e-4}
+(the Poisson tail negligible). A safe rough default is
+\code{K_max[g] = max(Y_max[g], ceiling(lambda_hat + 4 * sqrt(lambda_hat)))}
+where \code{lambda_hat} is an initial estimate of the per-unit
+abundance (e.g. \code{mean(y_g) / mean(p_hat)} with \code{p_hat} from a
+prior-mean encounter rate). Users supply this as the \code{cap}
+column on the input data.
+}
+
 \examples{
 \dontrun{
 # Constant detection probability, abundance varies with elevation
@@ -136,6 +209,11 @@ mvgam(bf(y ~ s(elev), p ~ s(tod)),
 # Royle-Nichols variant on binary detection / non-detection data
 mvgam(y ~ s(elev), family = nmix("royle_nichols"),
       data = closure_unit_binary_data)
+
+# Poisson-Poisson variant on encounter counts
+mvgam(bf(y ~ s(elev), p ~ tod),
+      family = nmix("poisson_poisson"),
+      data = closure_unit_count_data)
 }
 
 }
