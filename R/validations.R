@@ -4355,6 +4355,46 @@ extract_and_validate_trend_components <- function(data, mv_spec,
     mv_spec$trend_specs
   }
 
+  # by = lv_axis() machinery: detect per-factor smooth markers in
+  # mv_spec$base_formula, rewrite each to `by = .trend`, and inject a
+  # `.trend` factor column into trend_data so the existing single brms
+  # compile sees a regular factor by-variable. The grain switches from
+  # (time, series) to (time, .trend) only when has_by_lv is TRUE; the
+  # standard path is unchanged. has_by_lv + n_lv are threaded through
+  # to extract_trend_data and downstream stanvar emission.
+  has_by_lv <- FALSE
+  n_lv_for_grain <- NULL
+  if (!is.null(mv_spec$base_formula) &&
+      inherits(mv_spec$base_formula, "formula")) {
+    by_lv_res <- detect_and_rewrite_by_lv(mv_spec$base_formula)
+    if (by_lv_res$has_by_lv) {
+      n_lv_for_grain <- parsed_trend$n_lv
+      if (is.null(n_lv_for_grain) || n_lv_for_grain < 1L) {
+        stop(insight::format_error(c(
+          paste0(
+            "'by = lv_axis()' requires a factor model ",
+            "(n_lv < n_series)."
+          ),
+          x = paste0(
+            "No 'n_lv' is set on the trend spec; the formula uses ",
+            by_lv_res$n_by_lv, " per-factor smooth term(s) but no ",
+            "factor model is configured."
+          ),
+          i = paste0(
+            "Set 'trend_map = matrix(NA, n_species, n_lv)' (or supply ",
+            "a partial-Z matrix) so a factor model is triggered, or ",
+            "remove 'by = lv_axis()' from the trend formula."
+          )
+        )), call. = FALSE)
+      }
+      has_by_lv <- TRUE
+      mv_spec$base_formula <- by_lv_res$formula
+      if (by_lv_res$deprecated_trend_seen) {
+        warn_legacy_trend_by()
+      }
+    }
+  }
+
   # Enforce gr/subgr coherence on every trend spec that carries them.
   # validate_trend_grouping is only dispatched via a validation rule that
   # is currently dead, so the gr-requires-subgr check and the
@@ -4385,6 +4425,38 @@ extract_and_validate_trend_components <- function(data, mv_spec,
     response_vars = response_vars,
     cached_formulas = mv_spec$cached_formulas
   )
+
+  # Persist the by_lv grain flags on dimensions so downstream stanvar
+  # emission (extract_and_rename_trend_parameters → times_trend) sees
+  # the matching axis. The standard (time, series) path stays unchanged
+  # when has_by_lv is FALSE.
+  dimensions$has_by_lv <- has_by_lv
+  dimensions$n_lv_for_grain <- n_lv_for_grain
+
+  # Cross-grain check now that n_series is known. has_by_lv requires
+  # n_lv < n_series so a factor model is actually triggered downstream
+  # (the existing gate is is_factor_model <- n_lv < n_series).
+  if (has_by_lv) {
+    n_series_for_check <- dimensions$n_series %||%
+      length(dimensions$unique_series %||% character(0))
+    if (n_series_for_check < 1L ||
+        n_lv_for_grain >= n_series_for_check) {
+      stop(insight::format_error(c(
+        paste0(
+          "'by = lv_axis()' requires a factor model ",
+          "(n_lv < n_series)."
+        ),
+        x = paste0(
+          "Configured n_lv = ", n_lv_for_grain,
+          " but the data has n_series = ", n_series_for_check, "."
+        ),
+        i = paste0(
+          "Reduce 'n_lv' below the number of series, or remove ",
+          "'by = lv_axis()' from the trend formula."
+        )
+      )), call. = FALSE)
+    }
+  }
 
   # Extract trend variables using existing safe functionality
   trend_variables <- character(0)
@@ -4474,7 +4546,8 @@ extract_and_validate_trend_components <- function(data, mv_spec,
     result <- extract_trend_data(
       data, trend_formula, time_var, series_var,
       response_vars = response_vars, .return_metadata = TRUE,
-      .precomputed_dimensions = dimensions, trend_specs = mv_spec$trend_specs
+      .precomputed_dimensions = dimensions, trend_specs = mv_spec$trend_specs,
+      has_by_lv = has_by_lv, n_lv_for_grain = n_lv_for_grain
     )
 
     if (!is.list(result) || !all(c("trend_data", "metadata") %in% names(result))) {
@@ -4528,7 +4601,8 @@ extract_and_validate_trend_components <- function(data, mv_spec,
 
 extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", series_var = "series",
                               mvgam_object = NULL, newdata = NULL, response_vars = NULL,
-                              .return_metadata = FALSE, .precomputed_dimensions = NULL, trend_specs = NULL) {
+                              .return_metadata = FALSE, .precomputed_dimensions = NULL, trend_specs = NULL,
+                              has_by_lv = FALSE, n_lv_for_grain = NULL) {
 
   # Input validation for new parameters - non-negotiable per CLAUDE.md
   if (!is.null(response_vars)) {
@@ -4537,6 +4611,27 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
   checkmate::assert_logical(.return_metadata, len = 1)
   if (!is.null(.precomputed_dimensions)) {
     checkmate::assert_list(.precomputed_dimensions, names = "named")
+  }
+  checkmate::assert_flag(has_by_lv)
+  checkmate::assert_integerish(n_lv_for_grain, lower = 1L, len = 1L,
+                                null.ok = TRUE)
+  if (has_by_lv && is.null(n_lv_for_grain)) {
+    stop(insight::format_error(c(
+      "'has_by_lv = TRUE' requires 'n_lv_for_grain' to be set."
+    )))
+  }
+
+  # In prediction context the grain mode follows the fitted object's
+  # trend_metadata, which is restored downstream from
+  # mvgam_object$trend_metadata; the caller does not pass these flags.
+  # Pull them out of metadata when present so newdata reshaping uses
+  # the same grain that was used during fitting.
+  if (!is.null(mvgam_object)) {
+    md_has_by_lv <- mvgam_object$trend_metadata$has_by_lv %||% FALSE
+    if (isTRUE(md_has_by_lv)) {
+      has_by_lv <- TRUE
+      n_lv_for_grain <- mvgam_object$trend_metadata$n_lv_for_grain
+    }
   }
 
   # Dual-context dispatch: fitting vs prediction
@@ -4773,7 +4868,49 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
   time_vals <- get_time_for_grouping(data)
   series_vals <- get_series_for_grouping(data)
 
-  if (length(trend_variables) > 0) {
+  # When `by = lv_axis()` is present, switch trend_data from the
+  # default (time, series) grain to a (time, .trend) grain: one row
+  # per (unique_time, latent_factor) combination, with the injected
+  # .trend factor column carrying levels 1:n_lv. The trend covariates
+  # are first reduced to one value per (time, series) cell (taking
+  # `dplyr::first()` to mirror the standard path) and then promoted to
+  # one value per time (assumed time-level: the existing covariate
+  # invariance check above enforces constant-within-(time, series),
+  # which together with the n_lv < n_series gate means time-level
+  # values are unambiguous).
+  if (has_by_lv) {
+    if (length(trend_variables) > 0) {
+      time_level <- data %>%
+        dplyr::mutate(
+          time = time_vals,
+          series = series_vals
+        ) %>%
+        dplyr::group_by(.data$time, .data$series) %>%
+        dplyr::summarise(
+          dplyr::across(dplyr::all_of(trend_variables), dplyr::first),
+          .groups = "drop"
+        ) %>%
+        dplyr::group_by(.data$time) %>%
+        dplyr::summarise(
+          dplyr::across(dplyr::all_of(trend_variables), dplyr::first),
+          .groups = "drop"
+        ) %>%
+        dplyr::arrange(.data$time)
+      lv_grid <- tidyr::expand_grid(
+        time = time_level$time,
+        .trend = factor(seq_len(n_lv_for_grain))
+      )
+      trend_data <- dplyr::left_join(lv_grid, time_level, by = "time") %>%
+        dplyr::arrange(.data$time, .data$.trend)
+    } else {
+      unique_times <- sort(unique(time_vals))
+      trend_data <- tidyr::expand_grid(
+        time = unique_times,
+        .trend = factor(seq_len(n_lv_for_grain))
+      )
+    }
+    trend_data <- remove_mvgam_variables(trend_data)
+  } else if (length(trend_variables) > 0) {
     trend_data <- data %>%
       dplyr::mutate(
         time = time_vals,
@@ -4839,6 +4976,11 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
         NULL
       },
       response_vars = if (is.null(mvgam_object)) response_vars else NULL,
+      # by = lv_axis() grain switch: persist so prediction rebuilds
+      # newdata at the matching (time, .trend) grid via the same
+      # extract_trend_data code path under the prediction context.
+      has_by_lv = has_by_lv,
+      n_lv_for_grain = n_lv_for_grain,
       # Store factor levels for prediction validation
       levels = list(
         series = if (is.factor(series_vals)) {

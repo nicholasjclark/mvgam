@@ -2445,10 +2445,10 @@ print.mvgam_trend <- function(x, ...) {
 #' ) %>%
 #'   dplyr::mutate(series = as.factor(series))
 #'
-#' # mvgam with CAR(1) trends and series-level seasonal smooths
+#' # mvgam with CAR(1) trends and a shared cyclic seasonal smooth
 #' mod <- mvgam(
 #'   formula = y ~ -1,
-#'   trend_formula = ~ s(season, bs = 'cc', k = 5, by = trend),
+#'   trend_formula = ~ s(season, bs = 'cc', k = 5),
 #'   trend_model = CAR(),
 #'   priors = c(
 #'     prior(exponential(3), class = sigma),
