@@ -351,3 +351,69 @@ the path of least resistance.
   `partial_log_lik{resp}` per response (`brms/R/stancode.R:135`);
   closure-unit families are single-response today, so not an immediate
   concern.
+
+---
+
+## Review-locked design decisions (2026-06-10)
+
+Code review (agent run `a8e4db8054aedc00f`) on this note and stats
+review (agent run `ace4091850806463d`) on the companion Bollen note.
+The following are locked for tasks #229-#232:
+
+1. **Option (ii) wins for resolving the base-lpmf double-emit knot.**
+   Post-process the brms-emitted stancode to strip the
+   `target += <family>_lpmf(...)` line and substitute our own
+   `target += reduce_sum(partial_sum_<family>_lpmf, units, grainsize,
+   ...)`. mvgam already does this pattern at
+   `R/stan_assembly.R:1750-1830` for GLM lpdf replacement, so the
+   institutional knowledge exists. Document the brms version pin
+   alongside the regex.
+
+2. **`force = TRUE` is load-bearing**, not a stylistic choice. With
+   it: brms sets `stan_threads = TRUE` at compile/runtime but skips
+   emitting its own `partial_log_lik` scaffold and does NOT auto-slice
+   `y`, `mu`, `p` to `[start:end]`. Our `partial_sum_<family>_lpmf`
+   needs those arrays whole so it can index by global row via
+   `visit_idx[g, 1:n_rep[g]]`. Without `force = TRUE`, brms's
+   observation-grain auto-slice corrupts the indexing.
+
+3. **Smoke-test acceptance criterion** (task #230 canary): generated
+   Stan must satisfy BOTH
+   - No `partial_log_lik` scaffold from brms (confirms `force = TRUE`
+     suppressed the auto-thread branch).
+   - A `reduce_sum(partial_sum_<family>_lpmf, units, grainsize, ...)`
+     call inside the model block (confirms our injection landed).
+   Test against `make_stancode()` output without compiling.
+
+4. **No statistical risk at the closure-unit grain.** Per stats
+   review, `log_sum_exp` stays inside one thread per unit (it is a
+   per-unit reduction, not cross-chunk), and the outer per-unit sum
+   accumulates across threads via exact floating-point addition.
+   Numerical equivalence with `threads = 1` should sit comfortably
+   inside MCMC recovery test tolerances.
+
+5. **Performance caveat — warn when `N_unit ≪ threads_per_chain`.**
+   With `grainsize = 1`, TBB schedules `N_unit` atomic work units;
+   if `N_unit` is small (camera-trap study with 20-50 units), there
+   is no parallelism benefit and modest scheduler overhead. Emit a
+   `rlang::warn(...)` at fit time when `N_unit < 4 * threads`.
+
+6. **Existing closure-unit families retroactively threaded.** Per
+   code review, this is LOW risk for nmix("poisson_binomial") and
+   occ() — the likelihood is mathematically identical, only the
+   reduction order changes, parallel-accumulation precision drift
+   should sit inside existing test tolerances in
+   `tests/testthat/test-nmix-family.R`,
+   `tests/testthat/test-closure-unit-residuals.R`, and
+   `tests/local/test-closure-unit-pp-check.R`.
+
+7. **Uniform partial_sum idiom across all four closure-unit
+   families** (nmix PB / RN / PP, occ). Same signature, same slicing
+   strategy, same stanvar injection block layout. Code review flags
+   that three different threading idioms would be a long-term
+   maintenance burden.
+
+8. **Validation pattern**: any new threading errors follow the
+   `checkmate::assert_*` + multi-line `insight::format_error(c(...,
+   x = "...", i = "..."))` convention already in
+   `R/families.R:565-619` and `R/backends.R:753-783`.

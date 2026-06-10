@@ -446,6 +446,133 @@ brms-side investigation confirms the suppression hook is supported.
 
 ---
 
+## Review-locked design decisions (2026-06-10)
+
+Stats review (agent run `ace4091850806463d`) and code review (agent run
+`a8e4db8054aedc00f`) on this note plus
+`brms-threading-composition.md`. The following decisions are locked
+and load-bearing for tasks #223-#232:
+
+### Royle-Nichols (RN)
+
+1. **Logit link on `r`** (per-individual detection). Default prior
+   `Normal(0, 1.5)` on the intercept. Rationale beyond "matches PB
+   nmix and ubms": Uniform(0,1) on `r` propagates to a near-saturated
+   prior on `p_visit = 1 - (1-r)^N` for any moderate `lambda`
+   (e.g. `E[p_visit | r ~ U(0,1), lambda = 5] ≈ 0.83`). Identity link
+   silently pushes the sampler into a ridge where `r → 0` flattens
+   the likelihood in `lambda`. Document this rationale in the family
+   `@section Identification` block so future contributors do not
+   revert to identity for "simplicity".
+
+2. **Two-sided `K_max` saturation rule.** RN needs `K_max[g]` to
+   satisfy BOTH (a) `ppois(K_max, lambda_hat, lower.tail=FALSE) <
+   1e-4` (Poisson tail negligible) AND (b) `(1 - r_hat)^K_max <
+   1e-4` (RN detection function saturated). Condition (b) is
+   specific to RN: under PB nmix, large `K_max` only costs compute;
+   under RN with low `r`, too-small `K_max` leaves non-negligible
+   Poisson mass in cells where the detection function still varies,
+   biasing the posterior on `lambda` upward.
+
+3. **Auto-default for RN `K_max[g]`**:
+   ```
+   K_max[g] = max(
+     Y_max[g] + ceiling(-4 / log(1 - 0.3)),   # ≈ Y_max[g] + 11
+     3 * max(y_g)
+   )
+   ```
+   Hardcodes `r ≈ 0.3` as the conservative worst-case for the
+   saturation condition; the `3 * max(y_g)` floor handles the
+   Poisson tail. User-supplied `cap` overrides.
+
+4. **Post-fit saturation diagnostic.** In `summary.mvgam` (or a
+   dedicated `check_closure_unit_saturation()` helper invoked from
+   `summary`), evaluate `(1 - mean(p_draws))^K_max[g]` per unit and
+   `rlang::warn(..., .frequency = "once")` if any unit exceeds
+   `0.01`. This is the minimum acceptable guard against the silent
+   bias risk in #2.
+
+### Poisson-Poisson (PPM)
+
+5. **Truncated-N likelihood is the ONLY supported form.** Do NOT
+   ship a closed-form marginal Poisson(`lambda * p`) alternative.
+   The marginal of `y_visit ~ Poisson(N * p), N ~ Poisson(lambda)`
+   is the Neyman Type A distribution, which is over-dispersed
+   relative to Poisson. The closed-form Poisson is **mean-equivalent
+   but distribution-wrong**: it drops the over-dispersion (under-
+   estimates variance, produces anti-conservative intervals) and
+   blocks `posterior_latent_N()` (no path from a Poisson marginal
+   to draws on `N_g`). Task #226 description is being rewritten to
+   strike the marginal-Poisson option.
+
+6. **Log link on `p`** (encounter rate on positive real line).
+   Reject Bollen's `logit(p)` reparameterisation: under Uniform(0,1)
+   on `p`, `logit(p)` implies a Cauchy(0,1)-tailed prior on the
+   rate — improper at the upper tail, ecologically unmotivated,
+   numerically unsafe.
+
+7. **PPM identifiability guard.** `lambda * p` is the only
+   identified product under intercept-only PPM. With covariate
+   structure that separates `lambda` from `p`, the Neyman Type A
+   variance gives weak cross-identification but the posterior
+   ridge along `lambda * p = constant` remains pronounced (Kéry
+   2018; "Wild posteriors in the wild" arxiv 2503.00239).
+   **At fit time**: if BOTH `mu` and `p` formulae reduce to
+   intercept-only, emit a `rlang::warn(...)` stating the ridge
+   problem and recommending informative priors on at least one
+   intercept.
+
+8. **Tighter PPM default priors.** Default `Normal(0, 1)` on the
+   log-scale `p` intercept (implying encounter rate mostly in
+   `(0.1, 10)` encounters per individual per visit), tighter than
+   the PB nmix default. Document the rationale in the `?nmix`
+   family help under a PPM-specific subsection.
+
+### Family-choice diagnostics (PB vs RN)
+
+9. **Do NOT ship a diagnostic that claims to distinguish PB-vs-RN
+   misspecification from data alone.** The two are not nested and
+   their visit-level variance structures coincide at fixed `N` and
+   `r`. Family choice is a **scientific judgement about the
+   detection mechanism** (per-individual behaviour vs per-visit
+   sampling), not a data-driven question. Document this in the
+   `?nmix` help under "Choosing between Poisson-binomial and
+   Royle-Nichols".
+
+10. **Optional all-zero PPC.** A `pp_check` on the site-level
+    all-zero-history frequency IS defensible — under fixed
+    `lambda`, RN and PB nmix predict different all-zero rates as
+    a function of abundance. Ship as one of the existing
+    `pp_check(..., type = "stat", stat = ...)` examples rather
+    than a bespoke method.
+
+### Bollen artifacts confirmed for exclusion
+
+11. The `+ 1` literal on a log-probability in RN's `occ == 0`
+    branch (note §3) is a genuine error, not a notation quirk.
+    The mvgam port must use clean `bernoulli_lpmf(0 | p_visit)` or
+    `log1m(p_visit)` equivalents.
+
+12. The `1e-9` regularisation kludge in PPM (note §4) is a code
+    smell driven by Bollen's `logit(p)` reparameterisation. With
+    the log link on `p` (decision #6), the `k = 0` branch is a
+    clean point mass: `poisson_log_lpmf(0 | log(0))` is
+    `-Inf · 1 = -Inf` only when `lambda * p = 0`, which under the
+    log link requires `log_p = -Inf` — outside any valid
+    parameter draw. No regularisation needed.
+
+### Threading (cross-reference)
+
+13. Per the stats review, the closure-unit grain in `reduce_sum`
+    has **no statistical risk** — `log_sum_exp` stays inside a
+    single thread per unit, only the outer per-unit sum
+    accumulates across threads (floating-point exact addition).
+    Performance caveat: warn when `N_unit ≪ threads_per_chain`
+    (threading overhead with no benefit). See
+    `brms-threading-composition.md` §"Review-locked".
+
+---
+
 ## Files referenced
 
 - `/home/nicholas-clark/Desktop/mvgam/R/families.R` — closure-unit
