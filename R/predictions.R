@@ -2343,7 +2343,7 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
 #'
 #' Composes existing primitives rather than introducing new ones:
 #'   * `get_observation_structure()`: newdata to (time, series_int).
-#'   * `extract_Z_loadings()`: posterior Z draws as [d, s, k] array.
+#'   * `extract_Z_loadings()`: posterior Z draws as `(d, s, k)` array.
 #'   * `extract_trend_latent_states()`: latent state for the
 #'     `incl_latent_state = TRUE` path.
 #'   * `extract_trend_parameters()`, `create_mock_stanfit()`,
