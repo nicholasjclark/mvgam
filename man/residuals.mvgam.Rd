@@ -151,6 +151,54 @@ For diagnostic plotting via \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} with
 \code{type = "resid_*"}, use \code{ndraws >= 500} (the default for
 those types).
 }
+\section{Closure-unit families (\code{nmix()}, \code{occ()})}{
+
+Closure-unit observation families treat the closure unit
+(site x season) as the conditionally iid block: visits
+within a unit share the latent state (\code{N_g} for nmix,
+\code{z_g} for occ) and are only marginally independent.
+Per-visit residuals would carry an apparent within-unit
+correlation and bias every standard diagnostic (ACF, QQ,
+residual-vs-fitted), so \code{residuals()} returns one residual
+per closure unit:
+\itemize{
+\item The observed response is aggregated per unit by \code{sum()}.
+For nmix this is the unit's total observed count (the
+marginal sufficient statistic under fixed \code{N_g}); for
+occ this is the per-unit detection count (the sufficient
+statistic for the per-unit Bernoulli marginal under
+fixed \code{z_g}).
+\item The per-visit posterior predictive draws are aggregated
+the same way before the empirical PIT (\code{type = "quantile"})
+or the predictive error (\code{type = "ordinary"}) is computed.
+}
+
+The returned matrix is shaped \verb{[ndraws x N_unit]}
+(\code{summary = FALSE}) or \verb{[N_unit x E]} (\code{summary = TRUE}),
+with rows / columns labelled by the unit IDs from
+\code{build_closure_unit_arrays()}.
+
+The PIT comparison is against the \strong{marginal} posterior
+predictive: each draw re-simulates the latent state
+(\code{z_g} for occ, \code{N_g} for nmix) from \code{psi_g} / \code{lambda_g}
+per draw, not conditional on the observed detection
+history for that unit. This is the DHARMa / flocker / ubms
+convention and tests model adequacy at the population
+level rather than site-level prediction accuracy; see
+\code{posterior_occupancy(conditional = TRUE)} and
+\code{posterior_latent_N(conditional = TRUE)} when the
+conditional state posterior is the quantity of interest.
+
+The empirical PIT randomises uniformly across the discrete
+support, so per-unit residuals on fits with small \code{n_rep}
+(~ 2-4 visits) have heavier QQ-tails than analytic
+\code{qnorm(N(0, 1))} lines under a correctly-specified model
+(Dunn & Smyth 1996 §3; Hartig 2024 DHARMa vignette). A
+one-time warning fires when any closure unit has 4 or
+fewer visits; interpret QQ-plots against simulated N(0, 1)
+envelopes rather than the analytic line in that regime.
+}
+
 \examples{
 \donttest{
 simdat <- sim_mvgam(n_series = 1L, trend_model = AR())

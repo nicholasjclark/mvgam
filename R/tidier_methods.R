@@ -430,6 +430,22 @@ split_hier_Sigma <- function(x, params) {
 #'     of the residual.
 #'   * `.resid.lower`, `.resid.upper` -- the residual credible
 #'     interval bounds. Present only when `conf.int = TRUE`.
+#'   * `.unit` -- only for closure-unit families (`nmix()`,
+#'     `occ()`): the closure-unit ID this row belongs to. Rows
+#'     sharing the same `.unit` share the same `.resid*` columns
+#'     (see below).
+#'
+#' @section Closure-unit families (`nmix()`, `occ()`):
+#'   `.fitted` is per-visit (`psi * p` for occ, `lambda * p` for
+#'   nmix from the per-visit `posterior_epred`). `.resid` is
+#'   computed at the closure-unit grain by [residuals.mvgam()]
+#'   (one residual per site x season, using a sum-summary PIT
+#'   on the per-visit posterior predictive draws) and **recycled**
+#'   back to each visit row of the same unit so the augment
+#'   output stays aligned with the per-visit training frame. The
+#'   `.unit` column makes the recycling explicit: rows sharing
+#'   the same `.unit` share the same `.resid*` values. See
+#'   `?residuals.mvgam` for the per-unit residual semantics.
 #'
 #' @family tidiers
 #' @seealso [fitted.mvgam()], [residuals.mvgam()]
@@ -474,6 +490,33 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
     x, robust = robust, probs = probs
   ) |>
     tibble::as_tibble()
+  # Closure-unit families return one residual per closure unit
+  # (see ?residuals.mvgam). `.fitted` stays per-visit (psi*p or
+  # lambda*p from the per-visit posterior_epred), and we recycle
+  # the per-unit residual rows back to the per-visit obs frame so
+  # every visit row carries its unit's residual. A `.unit` column
+  # makes the grain explicit: rows sharing the same `.unit` share
+  # the same `.resid*` columns and a user can deduplicate to the
+  # unit grain via `dplyr::distinct(out, .unit, .keep_all = TRUE)`.
+  unit_id <- NULL
+  if (is_closure_unit_family(x$family)) {
+    binary_response <- isTRUE(attr(x$family, "mvgam_binary_response",
+                                    exact = TRUE))
+    default_cap <- if (binary_response) 1L else NULL
+    arrays <- build_closure_unit_arrays(
+      obs_data, response_var = resp,
+      default_cap = default_cap
+    )
+    # `visit_idx[g, 1:n_rep[g]]` gives the obs_data row indices
+    # for unit g; invert to a row -> unit map.
+    unit_of_visit <- integer(NROW(obs_data))
+    for (g in seq_len(arrays$N_unit)) {
+      idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+      unit_of_visit[idx] <- g
+    }
+    resid_summ <- resid_summ[unit_of_visit, , drop = FALSE]
+    unit_id <- arrays$unit_labels[unit_of_visit]
+  }
   # `fitted.mvgam` may include forecast rows; align with residual
   # length (which is training-only) by slicing.
   fit_summ <- dplyr::slice_head(fit_summ, n = NROW(resid_summ))
@@ -485,7 +528,11 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
     resid_summ <- dplyr::select(resid_summ, .resid, .resid.se)
   }
 
-  augmented <- c(obs_data, fit_summ, resid_summ)
+  augmented <- if (is.null(unit_id)) {
+    c(obs_data, fit_summ, resid_summ)
+  } else {
+    c(obs_data, fit_summ, resid_summ, list(.unit = unit_id))
+  }
   if (!identical(class(x$obs_data), "list")) {
     augmented <- tibble::as_tibble(augmented)
   }

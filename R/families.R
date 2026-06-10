@@ -1823,6 +1823,106 @@ posterior_detection <- function(object, newdata = NULL,
   extract_closure_unit_components(object, newdata, draw_ids)$p
 }
 
+#' Aggregate per-visit observations and posterior predictive draws
+#' to the closure-unit grain
+#'
+#' Closure-unit families (nmix, occ) treat the unit (site x season)
+#' as the conditionally iid block. Per-visit observations within a
+#' unit share the latent state (latent N for nmix, latent z for
+#' occ), so per-visit residuals or PIT statistics inherit a
+#' within-unit correlation that distorts standard diagnostics.
+#' Aggregating the response and the per-visit posterior predictive
+#' draws to the unit grain using a sufficient summary restores
+#' exchangeability across units, which is the correct grain for
+#' empirical-PIT residuals and pp_check density / interval plots.
+#'
+#' The aggregating function is `sum`: for nmix the per-visit
+#' counts add to a per-unit total (the marginal sufficient
+#' statistic for the Poisson-binomial likelihood when the
+#' detection probability is constant across visits within a
+#' unit); for occ the per-visit 0/1 detections add to the
+#' detection count, which carries the full within-unit
+#' detection-frequency information. `sum` is the sufficient
+#' statistic for the per-unit Bernoulli-binomial marginal under
+#' fixed `z_g` only when `p_{g, j}` is constant across visits;
+#' with visit-level detection covariates the detection
+#' probabilities differ across visits and the per-unit sum is
+#' a Poisson-binomial summary that loses some discriminating
+#' power relative to a full detection-history score (Kery and
+#' Royle 2016, ch. 10.2). It still gives a valid PIT comparison
+#' because the per-visit posterior predictive uses the same
+#' per-visit `p`, so the marginal distribution of the aggregated
+#' replicate matches the data-generating process. `sum` is
+#' chosen over `max` because it preserves detection frequency
+#' rather than collapsing to presence / absence.
+#'
+#' @param object Fitted `mvgam` object with a closure-unit family.
+#' @param newdata Long-format observation data; defaults to the
+#'   training data on `object`.
+#' @param yrep_visit `[ndraws x N_visit]` integer matrix of
+#'   per-visit posterior predictive draws (as returned by
+#'   `posterior_predict(object, newdata)` on a closure-unit
+#'   family). The column order must match `newdata` row order.
+#' @return Named list with elements:
+#'   * `y_unit` -- length-`N_unit` numeric vector of aggregated
+#'     observed values, indexed in `arrays$unit_labels` order.
+#'   * `yrep_unit` -- `[ndraws x N_unit]` numeric matrix of
+#'     aggregated posterior predictive draws (one column per
+#'     closure unit, columns named by `arrays$unit_labels`).
+#'   * `arrays` -- the closure-unit array list produced by
+#'     `build_closure_unit_arrays()` (carries `N_unit`, `n_rep`,
+#'     `visit_idx`, `Y_max`, `unit_labels`).
+#' @noRd
+aggregate_closure_unit_visits <- function(object,
+                                           newdata,
+                                           yrep_visit) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_matrix(yrep_visit)
+  if (is.null(newdata)) newdata <- object$data
+  response_var <- closure_unit_response_var(object$formula)
+  # Binary-response families (`occ()`) make `cap` optional on the
+  # input frame; mirror `prepare_closure_unit_family()` so the
+  # array builder injects `default_cap = 1L` instead of erroring
+  # when the user did not carry a `cap` column through to newdata.
+  binary_response <- isTRUE(attr(object$family, "mvgam_binary_response",
+                                  exact = TRUE))
+  default_cap <- if (binary_response) 1L else NULL
+  arrays <- build_closure_unit_arrays(
+    newdata, response_var = response_var,
+    default_cap = default_cap
+  )
+  if (ncol(yrep_visit) != nrow(newdata)) {
+    stop(insight::format_error(c(
+      "Posterior predictive matrix column count does not match 'newdata'.",
+      x = paste0(
+        "ncol(yrep_visit) = ", ncol(yrep_visit),
+        ", nrow(newdata) = ", nrow(newdata), "."
+      )
+    )))
+  }
+  y_visit <- as.numeric(newdata[[response_var]])
+  N_unit <- arrays$N_unit
+  ndraws <- nrow(yrep_visit)
+  y_unit <- numeric(N_unit)
+  yrep_unit <- matrix(0, nrow = ndraws, ncol = N_unit)
+  for (g in seq_len(N_unit)) {
+    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    y_unit[g] <- sum(y_visit[idx])
+    # Single-visit units short-circuit the apply call. Multi-visit
+    # units sum across the chosen visit columns; rowSums is the
+    # vectorised form and is materially faster than apply on the
+    # wide N_visit grain.
+    yrep_unit[, g] <- if (length(idx) == 1L) {
+      yrep_visit[, idx]
+    } else {
+      rowSums(yrep_visit[, idx, drop = FALSE])
+    }
+  }
+  colnames(yrep_unit) <- arrays$unit_labels
+  names(y_unit) <- arrays$unit_labels
+  list(y_unit = y_unit, yrep_unit = yrep_unit, arrays = arrays)
+}
+
 #' Per-closure-unit latent-abundance draws for an nmix() fit
 #'
 #' Royle (2004) reverse-Bayes conditional posterior:

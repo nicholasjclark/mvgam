@@ -39,6 +39,10 @@ when \code{conf.int = TRUE}.
 of the residual.
 \item \code{.resid.lower}, \code{.resid.upper} -- the residual credible
 interval bounds. Present only when \code{conf.int = TRUE}.
+\item \code{.unit} -- only for closure-unit families (\code{nmix()},
+\code{occ()}): the closure-unit ID this row belongs to. Rows
+sharing the same \code{.unit} share the same \verb{.resid*} columns
+(see below).
 }
 }
 \description{
@@ -48,6 +52,20 @@ Each row of the input data is preserved and three (or
 five, when \code{conf.int = TRUE}) new columns are appended for
 each of the fitted and residual posteriors.
 }
+\section{Closure-unit families (\code{nmix()}, \code{occ()})}{
+
+\code{.fitted} is per-visit (\code{psi * p} for occ, \code{lambda * p} for
+nmix from the per-visit \code{posterior_epred}). \code{.resid} is
+computed at the closure-unit grain by \code{\link[=residuals.mvgam]{residuals.mvgam()}}
+(one residual per site x season, using a sum-summary PIT
+on the per-visit posterior predictive draws) and \strong{recycled}
+back to each visit row of the same unit so the augment
+output stays aligned with the per-visit training frame. The
+\code{.unit} column makes the recycling explicit: rows sharing
+the same \code{.unit} share the same \verb{.resid*} values. See
+\code{?residuals.mvgam} for the per-unit residual semantics.
+}
+
 \examples{
 \donttest{
 sim <- sim_mvgam(family = gaussian(), n_series = 1L,

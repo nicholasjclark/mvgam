@@ -382,17 +382,13 @@ test_that("compute_family_epred rejects unsupported families", {
   )
   expect_error(
     compute_family_epred(linpred, nmix_family),
-    "not yet supported"
+    "must be routed through posterior_epred.mvgam"
   )
 
-  tweedie_family <- list(
-    family = "tweedie",
-    linkinv = exp
-  )
-  expect_error(
-    compute_family_epred(linpred, tweedie_family),
-    "not yet supported"
-  )
+  # `tweedie` has an analytic epred branch (linkinv(linpred)), so
+  # it routes through compute_family_epred without erroring; only
+  # families with state-space identification gaps (nmix, occ)
+  # raise here.
 })
 
 test_that("compute_family_epred validates inputs", {
@@ -1244,11 +1240,11 @@ test_that("predict.mvgam(type = 'terms') errors with migration pointer", {
 test_that("predict.mvgam(type = 'latent_N'/'detection') errors clearly", {
   expect_error(
     predict.mvgam(predict_stub_obj(), type = "latent_N"),
-    "N-mixture"
+    "not available for this family"
   )
   expect_error(
     predict.mvgam(predict_stub_obj(), type = "detection"),
-    "N-mixture"
+    "not available for this family"
   )
 })
 

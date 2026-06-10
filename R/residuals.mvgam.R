@@ -39,6 +39,51 @@
 #' diagnostic for this model class and is N(0, 1) under a
 #' correctly-specified model regardless of family.
 #'
+#' @section Closure-unit families (`nmix()`, `occ()`):
+#'   Closure-unit observation families treat the closure unit
+#'   (site x season) as the conditionally iid block: visits
+#'   within a unit share the latent state (`N_g` for nmix,
+#'   `z_g` for occ) and are only marginally independent.
+#'   Per-visit residuals would carry an apparent within-unit
+#'   correlation and bias every standard diagnostic (ACF, QQ,
+#'   residual-vs-fitted), so `residuals()` returns one residual
+#'   per closure unit:
+#'
+#'   * The observed response is aggregated per unit by `sum()`.
+#'     For nmix this is the unit's total observed count (the
+#'     marginal sufficient statistic under fixed `N_g`); for
+#'     occ this is the per-unit detection count (the sufficient
+#'     statistic for the per-unit Bernoulli marginal under
+#'     fixed `z_g`).
+#'   * The per-visit posterior predictive draws are aggregated
+#'     the same way before the empirical PIT (`type = "quantile"`)
+#'     or the predictive error (`type = "ordinary"`) is computed.
+#'
+#'   The returned matrix is shaped `[ndraws x N_unit]`
+#'   (`summary = FALSE`) or `[N_unit x E]` (`summary = TRUE`),
+#'   with rows / columns labelled by the unit IDs from
+#'   `build_closure_unit_arrays()`.
+#'
+#'   The PIT comparison is against the **marginal** posterior
+#'   predictive: each draw re-simulates the latent state
+#'   (`z_g` for occ, `N_g` for nmix) from `psi_g` / `lambda_g`
+#'   per draw, not conditional on the observed detection
+#'   history for that unit. This is the DHARMa / flocker / ubms
+#'   convention and tests model adequacy at the population
+#'   level rather than site-level prediction accuracy; see
+#'   `posterior_occupancy(conditional = TRUE)` and
+#'   `posterior_latent_N(conditional = TRUE)` when the
+#'   conditional state posterior is the quantity of interest.
+#'
+#'   The empirical PIT randomises uniformly across the discrete
+#'   support, so per-unit residuals on fits with small `n_rep`
+#'   (~ 2-4 visits) have heavier QQ-tails than analytic
+#'   `qnorm(N(0, 1))` lines under a correctly-specified model
+#'   (Dunn & Smyth 1996 §3; Hartig 2024 DHARMa vignette). A
+#'   one-time warning fires when any closure unit has 4 or
+#'   fewer visits; interpret QQ-plots against simulated N(0, 1)
+#'   envelopes rather than the analytic line in that regime.
+#'
 #' @param object An object of class `mvgam`.
 #' @param newdata Optional `data.frame` to compute residuals on
 #'   (defaults to the training data).
@@ -173,35 +218,14 @@ residuals.mvgam <- function(object,
                               any.missing = FALSE,
                               unique = TRUE)
 
-  # Closure-unit families (nmix, occ) violate the per-visit
-  # exchangeability assumption: visits within a closure unit
-  # share the latent state and are only marginally independent.
-  # Falling through to the standard quantile / ordinary path
-  # would emit residuals whose ACF / QQ diagnostics are biased
-  # toward apparent positive correlation.
-  if (is_closure_unit_family(object$family)) {
-    stop(insight::format_error(c(
-      paste0(
-        "residuals() is not supported for closure-unit family '",
-        resolve_family_name(object$family), "'."
-      ),
-      x = "Visits within a closure unit share the latent state and are marginally correlated.",
-      i = paste0(
-        "Use `predict(fit, type = 'occupancy' | 'latent_N' | ",
-        "'detection')` or `posterior_predict(fit)` directly."
-      )
-    )))
-  }
-
-  d <- newdata %||% mvgam_training_data(object)
-  resp <- mvgam_response_name(object)
-  y <- as.numeric(d[[resp]])
-
-  # Pin draw_ids once so posterior_epred / posterior_predict /
-  # the dpar extractor all see the same posterior subsample. This
-  # is essential for `type = "pearson"` (mu_d and sigma_d must
-  # come from the same draw d) and for `type = "quantile"` on
-  # continuous families (analytic PIT needs aligned mu_d, sigma_d).
+  # Pin draw_ids once so the analytic / empirical / closure-unit
+  # paths all see the same posterior subsample. Pinning is
+  # essential for `type = "quantile"` on continuous families
+  # (analytic PIT needs aligned mu_d, sigma_d) and matters on
+  # the closure-unit path too: `posterior_predict.mvgam`'s
+  # closure-unit intercept threads `draw_ids` through but
+  # silently ignores `ndraws`, so the conversion has to happen
+  # here for the requested subsample to take effect.
   if (is.null(draw_ids) && !is.null(ndraws)) {
     total_draws <- posterior::ndraws(
       posterior::as_draws(object$fit)
@@ -211,6 +235,32 @@ residuals.mvgam <- function(object,
       ndraws <- NULL
     }
   }
+
+  # Closure-unit families (nmix, occ) violate the per-visit
+  # exchangeability assumption: visits within a closure unit
+  # share the latent state and are only marginally independent.
+  # Residuals collapse to the unit grain (one residual per
+  # closure unit) using a sufficient summary statistic
+  # (per-unit detection / count totals); the empirical-PIT path
+  # then operates on the aggregated draws so DHARMa-style
+  # diagnostics on the returned matrix carry the correct
+  # exchangeability (Hartig 2024 §3; Vehtari et al. 2017 §4.2).
+  if (is_closure_unit_family(object$family)) {
+    resids <- compute_closure_unit_residuals(
+      object   = object,
+      newdata  = newdata,
+      type     = type,
+      draw_ids = draw_ids,
+      ndraws   = ndraws,
+      ...
+    )
+    return(residuals_finalise(resids, summary = summary,
+                                robust = robust, probs = probs))
+  }
+
+  d <- newdata %||% mvgam_training_data(object)
+  resp <- mvgam_response_name(object)
+  y <- as.numeric(d[[resp]])
   pp_args <- c(list(object = object, newdata = newdata,
                      ndraws = ndraws, draw_ids = draw_ids,
                      summary = FALSE), list(...))
@@ -228,6 +278,65 @@ residuals.mvgam <- function(object,
   )
   residuals_finalise(resids, summary = summary,
                        robust = robust, probs = probs)
+}
+
+
+# Internal: per-closure-unit residuals for closure-unit families
+# (nmix, occ). Aggregates the per-visit posterior predictive
+# matrix to the unit grain via `aggregate_closure_unit_visits()`
+# (the unit total of detections / counts is the sufficient
+# summary for the per-unit Bernoulli-binomial / Poisson-binomial
+# marginal), then routes the resulting `[ndraws x N_unit]`
+# matrix through the same empirical-PIT or ordinary path used
+# for any other family. Per-visit residuals are not produced
+# because visits within a unit share the latent state and are
+# only marginally independent (Royle 2004; MacKenzie et al.
+# 2002; flocker_format vignette).
+#'@noRd
+compute_closure_unit_residuals <- function(object, newdata, type,
+                                             draw_ids, ndraws, ...) {
+  newdata <- newdata %||% mvgam_training_data(object)
+  pp_args <- c(
+    list(object = object, newdata = newdata,
+         draw_ids = draw_ids, ndraws = ndraws),
+    list(...)
+  )
+  yrep_visit <- do.call(posterior_predict, pp_args)
+  agg <- aggregate_closure_unit_visits(
+    object, newdata = newdata, yrep_visit = yrep_visit
+  )
+  # The empirical-PIT randomisation widens the per-residual
+  # variance above 1 whenever the discrete support is coarse
+  # (Dunn & Smyth 1996 §3; DHARMa vignette "Residuals for
+  # discrete distributions"). For closure-unit families that
+  # surfaces when n_rep is small: the per-unit sum lives on
+  # {0, ..., n_rep}, so QQ-tails can read as heavier than N(0, 1)
+  # under a correctly-specified model.
+  if (type == "quantile" &&
+        !identical(Sys.getenv("TESTTHAT"), "true") &&
+        any(agg$arrays$n_rep <= 4L)) {
+    rlang::warn(
+      paste0(
+        "Per-unit quantile residuals on closure-unit fits ",
+        "have coarse PIT support when 'n_rep' is small. ",
+        "Interpret QQ-plots against simulated N(0, 1) ",
+        "envelopes rather than analytic quantile lines ",
+        "when any closure unit has <= 4 visits."
+      ),
+      .frequency = "once",
+      .frequency_id = "mvgam_closure_unit_residuals_low_n_rep"
+    )
+  }
+  switch(
+    type,
+    "quantile" = compute_quantile_residuals_empirical(
+      agg$y_unit, agg$yrep_unit, nrow(agg$yrep_unit)
+    ),
+    "ordinary" = sweep(
+      agg$yrep_unit, 2L, agg$y_unit,
+      FUN = function(yh, yi) yi - yh
+    )
+  )
 }
 
 

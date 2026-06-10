@@ -246,9 +246,10 @@ pp_check.mvgam <- function(
         resolve_family_name(object$family), "'."
       ),
       i = paste0(
-        "Use `posterior_predict(fit)` (per visit) and ",
-        "`predict(fit, type = 'occupancy' | 'latent_N' | ",
-        "'detection')` (per unit)."
+        "Use `residuals(fit)` for per-unit randomised quantile ",
+        "residuals, `posterior_predict(fit)` for per-visit ",
+        "draws, or `predict(fit, type = 'occupancy' | ",
+        "'latent_N' | 'detection')` for latent-state extraction."
       )
     )))
   }
