@@ -4624,6 +4624,53 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   ))
 }
 
+#' Collapse a (time, series)-grained data.frame to one row per unique
+#' time for the listed time-level covariates.
+#'
+#' The validator (`extract_trend_data()`) enforces that every entry in
+#' `trend_variables` is constant within each (time, series) cell, so
+#' "promoting" the values from (time, series) grain to time grain is
+#' lossless: we take `dplyr::first()` within each (time, series) and
+#' then again within each time. The result is sorted by time and
+#' carries one row per unique time value with the listed covariates
+#' attached. Used by `extract_trend_data()` when building the
+#' (time, .trend) grain for `has_by_lv = TRUE` fits, and by
+#' `compose_by_lv_trend_linpred()` when building the matching
+#' prediction grid on newdata.
+#'
+#' @param data Data frame containing the covariates.
+#' @param time_vals Time accessor values (parallel to `nrow(data)`).
+#' @param series_vals Series accessor values (parallel to `nrow(data)`).
+#' @param trend_variables Character vector of column names to collapse.
+#'   When empty the function returns a one-row-per-time frame with no
+#'   covariates attached.
+#' @return Data frame with columns `time, <trend_variables>`, sorted by
+#'   time.
+#' @noRd
+collapse_to_time_level <- function(data, time_vals, series_vals,
+                                    trend_variables) {
+  checkmate::assert_data_frame(data, min.rows = 1L)
+  checkmate::assert_character(trend_variables)
+
+  if (length(trend_variables) == 0L) {
+    return(data.frame(time = sort(unique(time_vals))))
+  }
+
+  data %>%
+    dplyr::mutate(time = time_vals, series = series_vals) %>%
+    dplyr::group_by(.data$time, .data$series) %>%
+    dplyr::summarise(
+      dplyr::across(dplyr::all_of(trend_variables), dplyr::first),
+      .groups = "drop"
+    ) %>%
+    dplyr::group_by(.data$time) %>%
+    dplyr::summarise(
+      dplyr::across(dplyr::all_of(trend_variables), dplyr::first),
+      .groups = "drop"
+    ) %>%
+    dplyr::arrange(.data$time)
+}
+
 extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", series_var = "series",
                               mvgam_object = NULL, newdata = NULL, response_vars = NULL,
                               .return_metadata = FALSE, .precomputed_dimensions = NULL, trend_specs = NULL,
@@ -4904,35 +4951,20 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
   # which together with the n_lv < n_series gate means time-level
   # values are unambiguous).
   if (has_by_lv) {
-    if (length(trend_variables) > 0) {
-      time_level <- data %>%
-        dplyr::mutate(
-          time = time_vals,
-          series = series_vals
-        ) %>%
-        dplyr::group_by(.data$time, .data$series) %>%
-        dplyr::summarise(
-          dplyr::across(dplyr::all_of(trend_variables), dplyr::first),
-          .groups = "drop"
-        ) %>%
-        dplyr::group_by(.data$time) %>%
-        dplyr::summarise(
-          dplyr::across(dplyr::all_of(trend_variables), dplyr::first),
-          .groups = "drop"
-        ) %>%
-        dplyr::arrange(.data$time)
-      lv_grid <- tidyr::expand_grid(
-        time = time_level$time,
-        .trend = factor(seq_len(n_lv_for_grain))
+    time_level <- collapse_to_time_level(
+      data, time_vals, series_vals, trend_variables
+    )
+    lv_grid <- tidyr::expand_grid(
+      time = time_level$time,
+      .trend = factor(seq_len(n_lv_for_grain))
+    )
+    trend_data <- if (length(trend_variables) > 0L) {
+      dplyr::arrange(
+        dplyr::left_join(lv_grid, time_level, by = "time"),
+        .data$time, .data$.trend
       )
-      trend_data <- dplyr::left_join(lv_grid, time_level, by = "time") %>%
-        dplyr::arrange(.data$time, .data$.trend)
     } else {
-      unique_times <- sort(unique(time_vals))
-      trend_data <- tidyr::expand_grid(
-        time = unique_times,
-        .trend = factor(seq_len(n_lv_for_grain))
-      )
+      lv_grid
     }
     trend_data <- remove_mvgam_variables(trend_data)
   } else if (length(trend_variables) > 0) {

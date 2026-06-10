@@ -2409,30 +2409,24 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata, ndraws,
   n_unique_t <- length(unique_newdata_times)
 
   trend_vars <- mvgam_fit$trend_metadata$covariates %||% character(0)
-  # Time-level covariates: collapse newdata to one row per time so the
-  # (time, .trend) prediction grid can left-join time-fastest-by-design
-  # covariate values. This mirrors the by_lv grain build in
-  # extract_trend_data() but without re-running the validator.
-  time_data <- if (length(trend_vars) > 0L) {
-    nd <- dplyr::mutate(newdata,
-                        .t_for_grouping = obs_struct$time)
-    nd <- dplyr::group_by(nd, .data$.t_for_grouping)
-    nd <- dplyr::summarise(
-      nd,
-      dplyr::across(dplyr::all_of(trend_vars), dplyr::first),
-      .groups = "drop"
-    )
-    nd <- dplyr::rename(nd, time = ".t_for_grouping")
-    dplyr::arrange(nd, .data$time)
-  } else {
-    data.frame(time = unique_newdata_times)
-  }
+  # Same time-level collapse the fitting path uses; both feed an
+  # (time, .trend) grid downstream. `collapse_to_time_level()` lives
+  # in R/validations.R alongside extract_trend_data().
+  series_vals_pred <- as.integer(obs_struct$series_int)
+  time_data <- collapse_to_time_level(
+    newdata, time_vals = obs_struct$time,
+    series_vals = series_vals_pred, trend_variables = trend_vars
+  )
   lv_newdata <- tidyr::expand_grid(
     time = unique_newdata_times,
     .trend = factor(seq_len(n_lv))
   )
   if (length(trend_vars) > 0L) {
     lv_newdata <- dplyr::left_join(lv_newdata, time_data, by = "time")
+  }
+  if (!is.null(mvgam_fit$trend_metadata$levels)) {
+    validate_prediction_factor_levels(lv_newdata,
+                                       mvgam_fit$trend_metadata)
   }
 
   params <- extract_trend_parameters(mvgam_fit)
