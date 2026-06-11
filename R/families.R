@@ -1687,6 +1687,165 @@ make_multi_stanvars <- function(arrays) {
     make_simplex_z_constraint_stanvar()
 }
 
+#' Closure-unit Categorical single-trial family
+#'
+#' Composes Stan's native `categorical_logit_lpmf` with the mvgam
+#' factor-model trend. Each closure unit (site) carries K rows
+#' (one per category) whose binary responses encode the observed
+#' category in one-hot form: exactly one row per site has `y = 1`
+#' (the observed category) and the remaining K - 1 rows have
+#' `y = 0`. The custom lpmf finds the observed category code from
+#' the one-hot K-vector and calls Stan's
+#' `categorical_logit_lpmf(cat_code | mu_unit)` once per unit.
+#'
+#' Categorical is one-trial multinomial: per-site information
+#' content is at most `log2(K)` bits, so recovery of `Z Z'` from
+#' single-trial categorical data is intrinsically weaker than
+#' multinomial or dirichlet at comparable site counts. Stats
+#' review recommends fixtures with at least 100 sites for K = 4
+#' categories.
+#'
+#' Distributional parameters:
+#' \describe{
+#'   \item{`mu`}{per-row latent score on the unconstrained scale.
+#'     Softmax inside the lpmf maps the K scores per unit to a
+#'     simplex of cell probabilities. Default link is identity.}
+#' }
+#'
+#' Identification: identical to [diri()] and [multi()]. The
+#' shared simplex column-sum soft constraint on `Z` (bundled via
+#' `make_simplex_z_constraint_stanvar()`) removes the softmax
+#' shift indeterminacy in the columns of `Z`.
+#'
+#' Data layout: long format, one row per (site, category), exactly
+#' K rows per site. The response `y` is binary: `y = 1` on the row
+#' corresponding to the observed category for that site and
+#' `y = 0` on the K - 1 other rows.
+#'
+#' @return A `brms::custom_family` object tagged with the
+#'   `mvgam_closure_unit`, `mvgam_multi_response`, and
+#'   `mvgam_simplex_response` attributes.
+#'
+#' @references
+#' Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,
+#'   Taskinen, S., Walker, S. C. and Hui, F. K. C. (2015). So many
+#'   variables: joint modeling in community ecology. *Trends in
+#'   Ecology and Evolution*, 30(12):766-779.
+#'   \doi{10.1016/j.tree.2015.09.007}
+#'
+#' @examples
+#' \dontrun{
+#' # JSDM on single-trial habitat-type observations per site
+#' mod <- jsdgam(
+#'   formula = y ~ elev,
+#'   factor_formula = ~ -1,
+#'   data = habitat_long,
+#'   unit = site,
+#'   species = habitat_class,
+#'   family = categ(),
+#'   n_lv = 2
+#' )
+#' }
+#'
+#' @export
+categ <- function() {
+  fam <- brms::custom_family(
+    name  = "categ",
+    dpars = "mu",
+    links = "identity",
+    lb    = NA,
+    ub    = NA,
+    type  = "int",
+    loop  = FALSE
+  )
+  link_info <- stats::make.link("identity")
+  fam$linkinv <- link_info$linkinv
+  fam$linkfun <- link_info$linkfun
+  attr(fam, "mvgam_closure_unit")      <- TRUE
+  attr(fam, "mvgam_multi_response")    <- TRUE
+  attr(fam, "mvgam_simplex_response")  <- TRUE
+  # Binary one-hot response; the per-row y value is 0 or 1. The
+  # shared closure-unit data prep treats it as integer counts and
+  # leaves a downstream attr-driven data validator to enforce the
+  # one-hot invariant.
+  attr(fam, "mvgam_binary_response")   <- TRUE
+  attr(fam, "mvgam_predict_types")     <- character(0L)
+  attr(fam, "mvgam_vars") <- c(
+    "N_unit", "n_rep", "visit_idx"
+  )
+  attr(fam, "mvgam_stanvars") <- NULL
+  fam
+}
+
+#' Stan function block for the closure-unit Categorical lpmf
+#'
+#' Finds the observed category code in the one-hot K-vector by
+#' scanning `y_unit` for the position of the 1, then calls Stan's
+#' native `categorical_logit_lpmf(cat_code | mu_unit)` once per
+#' closure unit. The scan is `O(K)` per unit per draw, which is
+#' negligible compared with the brms linear-predictor evaluation.
+#'
+#' Validates the one-hot invariant inside Stan by setting
+#' `cat_code = 0` when no `1` is found; Stan's
+#' `categorical_logit_lpmf` rejects `cat_code = 0` with a domain
+#' error, so a malformed (all-zero) site surfaces as a sampler
+#' rejection rather than a silent fit. The R-side data validator
+#' (run before Stan compile) catches the malformed case with a
+#' clearer error message.
+#'
+#' @return A character scalar suitable for
+#'   `brms::stanvar(scode = ..., block = "functions")`.
+#' @noRd
+categ_stan_funs <- function() {
+  paste(
+    "  real categ_lpmf(",
+    "    array[] int y,",
+    "    vector mu,",
+    "    int N_unit,",
+    "    array[] int n_rep,",
+    "    array[,] int visit_idx) {",
+    "    real lp = 0;",
+    "    for (g in 1:N_unit) {",
+    "      int Kg = n_rep[g];",
+    "      array[Kg] int idx = visit_idx[g, 1:Kg];",
+    "      array[Kg] int y_unit  = y[idx];",
+    "      vector[Kg] mu_unit = mu[idx];",
+    "      int cat_code = 0;",
+    "      for (k in 1:Kg) {",
+    "        if (y_unit[k] == 1) {",
+    "          cat_code = k;",
+    "          break;",
+    "        }",
+    "      }",
+    "      lp += categorical_logit_lpmf(cat_code | mu_unit);",
+    "    }",
+    "    return lp;",
+    "  }",
+    sep = "\n"
+  )
+}
+
+#' Build the closure-unit Stan stanvars for a categ() fit
+#'
+#' Wraps `make_closure_unit_arrays_stanvars()` with the Categorical
+#' function block and the shared simplex column-sum soft constraint
+#' that removes the softmax shift indeterminacy in the columns of
+#' `Z`.
+#'
+#' @inheritParams make_closure_unit_arrays_stanvars
+#' @return A `brmsstanvars` object.
+#' @noRd
+make_categ_stanvars <- function(arrays) {
+  make_closure_unit_arrays_stanvars(
+    arrays,
+    family_funs_name = "categ_funs",
+    family_funs      = categ_stan_funs(),
+    include_K_max    = FALSE,
+    include_Y_max    = FALSE
+  ) +
+    make_simplex_z_constraint_stanvar()
+}
+
 #' Soft column-sum constraint on `Z` for simplex multi-response
 #' families
 #'
@@ -2260,6 +2419,7 @@ prepare_closure_unit_family <- function(family, data, response_var,
     occ                  = make_occ_stanvars(arrays),
     diri                 = make_diri_stanvars(arrays),
     multi                = make_multi_stanvars(arrays),
+    categ                = make_categ_stanvars(arrays),
     stop(insight::format_error(c(
       paste0(
         "Closure-unit dispatch missing for family '",
