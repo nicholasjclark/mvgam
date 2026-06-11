@@ -127,11 +127,69 @@
 #' variables: joint modeling in community ecology. *Trends in
 #' Ecology and Evolution*, 30(12):766-779. \doi{10.1016/j.tree.2015.09.007}
 #'
+#' Ovaskainen, O., Tikhonov, G., Norberg, A., Blanchet, F. G., Duan,
+#' L., Dunson, D., Roslin, T. and Abrego, N. (2017). How to make
+#' more out of community data? *Ecology Letters*, 20(5):561-576.
+#' \doi{10.1111/ele.12757}
+#'
+#' Tikhonov, G., Opedal, O. H., Abrego, N., Lehikoinen, A., de Jonge,
+#' M. M. J., Oksanen, J. and Ovaskainen, O. (2020). Joint species
+#' distribution modelling with the R-package Hmsc. *Methods in
+#' Ecology and Evolution*, 11(3):442-447.
+#' \doi{10.1111/2041-210X.13345}
+#'
+#' Hui, F. K. C. (2016). boral - Bayesian Ordination and Regression
+#' Analysis of Multivariate Abundance Data in R. *Methods in Ecology
+#' and Evolution*, 7(6):744-750. \doi{10.1111/2041-210X.12514}
+#'
 #' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
 #' distributions for the covariance matrix in latent factor
 #' models. *Statistics and Computing*, 34:143.
 #' \doi{10.1007/s11222-024-10454-0}
 #'
+#' @examples
+#' \donttest{
+#' # Basic JSDM on the Portal Data captures, two latent factors,
+#' # Poisson observation family. Use `residual_cor()` to summarise
+#' # the implied species covariance and `ordinate()` to build the
+#' # biplot.
+#' mod <- jsdgam(
+#'   formula = captures ~ ndvi_ma12:series + mintemp:series +
+#'                        gp(time, k = 15),
+#'   factor_formula = ~ -1,
+#'   data = portal_data, unit = time, species = series,
+#'   family = poisson(), n_lv = 2,
+#'   chains = 2, silent = 2
+#' )
+#' plot(residual_cor(mod))
+#' ordinate(mod, alpha = 0.7)
+#'
+#' # Constrained ordination: one spatial Gaussian process per latent
+#' # factor via `by = lv_axis()`. Each factor expresses a different
+#' # spatial gradient, and the species loadings on each factor show
+#' # which species respond similarly to that gradient.
+#' mod_constrained <- jsdgam(
+#'   formula = count ~ s(species, bs = "re", by = temperature),
+#'   factor_formula = ~ gp(lon, lat, k = 6, by = lv_axis()) - 1,
+#'   data = portal_data, unit = site, species = species,
+#'   family = poisson(), n_lv = 3,
+#'   chains = 2, silent = 2
+#' )
+#'
+#' # Trait- and phylogeny-informed loadings prior. Pass a per-species
+#' # trait data.frame to `traits` and an `ape::phylo` (or pre-computed
+#' # distance matrix) to `phylo`; the wrapper threads both into the
+#' # structured Heaps & Jermyn (2024) `loadings_prior` spec.
+#' mod_traits <- jsdgam(
+#'   formula = y ~ env,
+#'   factor_formula = ~ -1,
+#'   data = my_data, unit = site, species = species,
+#'   family = bernoulli(), n_lv = 2,
+#'   traits = trait_df,
+#'   phylo = species_tree,
+#'   chains = 2, silent = 2
+#' )
+#' }
 #' @export
 jsdgam <- function(formula,
                    factor_formula = ~ -1,

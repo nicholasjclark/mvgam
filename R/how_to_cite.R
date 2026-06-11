@@ -257,6 +257,70 @@ reference_db <- function() {
         sep = "\n"
       )
     ),
+    warton_jsdm = list(
+      text = "Warton DI, Blanchet FG, O'Hara RB, Ovaskainen O, Taskinen S, Walker SC and Hui FKC (2015). So many variables: joint modeling in community ecology. Trends in Ecology and Evolution 30(12), 766-779. https://doi.org/10.1016/j.tree.2015.09.007",
+      bibtex = paste(
+        "@article{warton2015jsdm,",
+        "  title = {So many variables: joint modeling in community ecology},",
+        "  author = {Warton, David I. and Blanchet, F. Guillaume and O'Hara, Robert B. and Ovaskainen, Otso and Taskinen, Sara and Walker, Steven C. and Hui, Francis K. C.},",
+        "  journal = {Trends in Ecology and Evolution},",
+        "  volume = {30},",
+        "  number = {12},",
+        "  pages = {766--779},",
+        "  year = {2015},",
+        "  doi = {10.1016/j.tree.2015.09.007}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    hui_boral = list(
+      text = "Hui FKC (2016). boral - Bayesian Ordination and Regression Analysis of Multivariate Abundance Data in R. Methods in Ecology and Evolution 7(6), 744-750. https://doi.org/10.1111/2041-210X.12514",
+      bibtex = paste(
+        "@article{hui2016boral,",
+        "  title = {{boral} - {B}ayesian Ordination and Regression Analysis of Multivariate Abundance Data in {R}},",
+        "  author = {Hui, Francis K. C.},",
+        "  journal = {Methods in Ecology and Evolution},",
+        "  volume = {7},",
+        "  number = {6},",
+        "  pages = {744--750},",
+        "  year = {2016},",
+        "  doi = {10.1111/2041-210X.12514}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    ovaskainen_hmsc_2017 = list(
+      text = "Ovaskainen O, Tikhonov G, Norberg A, Blanchet FG, Duan L, Dunson D, Roslin T and Abrego N (2017). How to make more out of community data? A conceptual framework and its implementation as models and software. Ecology Letters 20(5), 561-576. https://doi.org/10.1111/ele.12757",
+      bibtex = paste(
+        "@article{ovaskainen2017hmsc,",
+        "  title = {How to make more out of community data? {A} conceptual framework and its implementation as models and software},",
+        "  author = {Ovaskainen, Otso and Tikhonov, Gleb and Norberg, Anna and Blanchet, F. Guillaume and Duan, Leo and Dunson, David and Roslin, Tomas and Abrego, Nerea},",
+        "  journal = {Ecology Letters},",
+        "  volume = {20},",
+        "  number = {5},",
+        "  pages = {561--576},",
+        "  year = {2017},",
+        "  doi = {10.1111/ele.12757}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    tikhonov_hmsc_2020 = list(
+      text = "Tikhonov G, Opedal OH, Abrego N, Lehikoinen A, de Jonge MMJ, Oksanen J and Ovaskainen O (2020). Joint species distribution modelling with the R-package Hmsc. Methods in Ecology and Evolution 11(3), 442-447. https://doi.org/10.1111/2041-210X.13345",
+      bibtex = paste(
+        "@article{tikhonov2020hmsc,",
+        "  title = {Joint species distribution modelling with the {R-package Hmsc}},",
+        "  author = {Tikhonov, Gleb and Opedal, {\\O}ystein H. and Abrego, Nerea and Lehikoinen, Aleksi and de Jonge, Melinda M. J. and Oksanen, Jari and Ovaskainen, Otso},",
+        "  journal = {Methods in Ecology and Evolution},",
+        "  volume = {11},",
+        "  number = {3},",
+        "  pages = {442--447},",
+        "  year = {2020},",
+        "  doi = {10.1111/2041-210X.13345}",
+        "}",
+        sep = "\n"
+      )
+    ),
     bhattacharya_mgp = list(
       text = "Bhattacharya A and Dunson DB (2011). Sparse Bayesian infinite factor models. Biometrika 98, 291-306. https://doi.org/10.1093/biomet/asr013",
       bibtex = paste(
@@ -562,6 +626,17 @@ uses_tweedie_family <- function(object) {
 }
 
 
+# Predicate: was the fit produced by the jsdgam() wrapper? Keys
+# off the class hierarchy set in jsdgam() (c("mvgam", "jsdgam"))
+# rather than family or trend type, because jsdgam composes onto
+# the standard mvgam factor-model path and shares the family /
+# trend surface with plain mvgam fits.
+#' @noRd
+uses_jsdgam <- function(object) {
+  inherits(object, "jsdgam")
+}
+
+
 # Predicate: does the fit use any approximate-GP smooth on the
 # observation or trend side? Scans the formulas for `gp(`. The
 # brms-integration architecture parses gp() smooths in the
@@ -647,6 +722,24 @@ how_to_cite.mvgam <- function(object, ...) {
       detect = !is.null(detect_factor_n_lv(object)),
       text = " Latent-factor loadings were sampled unconstrained and identified post-hoc via thin QR decomposition following Heaps and Jermyn (2024).",
       refs = "heaps_jermyn"
+    ),
+    list(
+      detect = uses_jsdgam(object),
+      text = paste0(
+        " The joint species distribution model layered the",
+        " latent-factor covariance directly on the species axis,",
+        " following the general framework of Warton et al.",
+        " (2015) and the structured implementations of",
+        " Ovaskainen et al. (2017) and Tikhonov et al. (2020).",
+        " The ordination and residual-correlation post-fit",
+        " summaries follow the conventions of Hui (2016)."
+      ),
+      refs = c(
+        "warton_jsdm",
+        "ovaskainen_hmsc_2017",
+        "tikhonov_hmsc_2020",
+        "hui_boral"
+      )
     ),
     list(
       detect = !is.null(detect_factor_n_lv(object)) &&
