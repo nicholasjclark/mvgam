@@ -372,3 +372,4 @@ test_that("default (no aliases) yields no row_features / dist_* slots", {
   expect_false("dist_phylo" %in% names(sd))
   expect_false("row_features" %in% names(sd))
 })
+

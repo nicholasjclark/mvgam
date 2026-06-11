@@ -525,7 +525,8 @@ ordinate.mvgam <- function(
     )
   }
 
-  svd_comp <- ordinate_svd_components(object, alpha)
+  rotation <- match.arg(rotation)
+  svd_comp <- ordinate_factor_components(object, alpha, rotation)
   series_info <- resolve_series_info(object)
   species_names <- series_info$series_levels
   data <- object$obs_data %||% object$data

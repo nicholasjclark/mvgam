@@ -3,7 +3,6 @@
 \name{residual_cor}
 \alias{residual_cor}
 \alias{residual_cor.mvgam}
-\alias{residual_cor.jsdgam}
 \title{Extract residual correlations from a fitted mvgam model}
 \usage{
 residual_cor(object, ...)
@@ -17,8 +16,6 @@ residual_cor(object, ...)
   probs = c(0.025, 0.975),
   ...
 )
-
-\method{residual_cor}{jsdgam}(object, ...)
 }
 \arguments{
 \item{object}{A fitted [mvgam][mvgam::mvgam] object.}
@@ -103,9 +100,12 @@ with elements set to zero where \code{prob_nonzero <= 0.95} (the
 threshold is exposed via the returned object's
 \code{prob_threshold} metadata field).
 
-Joint species distribution models (\code{jsdgam} fits) use a different
-latent-factor parameterisation; this function will be wired up to
-that case when the jsdgam port lands.
+Joint species distribution models (\code{jsdgam} fits) inherit this
+method directly. The \code{jsdgam()} wrapper triggers the same free-Z
+factor model the standalone \code{mvgam()} factor path uses, so the
+factor-loadings branch (\code{compute_residual_cor()} -> \code{n_lv > 0})
+fires identically on the inherited class and reconstructs
+\verb{Sigma = Z Z'} per draw on the species axis.
 }
 \references{
 Hui, F. K. C. (2016). boral - Bayesian Ordination and
