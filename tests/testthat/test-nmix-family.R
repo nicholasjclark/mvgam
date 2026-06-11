@@ -107,21 +107,102 @@ test_that("validate_supported_family() admits multi-response customfamily object
   )
 })
 
-test_that("validate_supported_family() rejects naked brms multi-category families with a constructor pointer", {
-  err_dirichlet <- expect_error(validate_supported_family(brms::dirichlet()))
-  expect_match(conditionMessage(err_dirichlet), "mvgam_dirichlet")
-  err_categorical <- expect_error(
-    validate_supported_family(brms::categorical())
+test_that("validate_supported_family() points naked brms multi-category families at the mvgam wrapper", {
+  expect_error(validate_supported_family(brms::dirichlet()), "diri\\(\\)")
+  expect_error(validate_supported_family(brms::multinomial()),
+               "multi\\(\\)")
+  expect_error(validate_supported_family(brms::categorical()),
+               "categ\\(\\)")
+  expect_error(validate_supported_family(brms::logistic_normal()),
+               "mvn\\(\\)")
+})
+
+
+# ------------------------------------------------------------
+# diri(): family registration, attribute tagging,
+# closure-unit grouping, and Stan emission round-trip
+# ------------------------------------------------------------
+
+make_dirichlet_long_data <- function(n_sites = 6L, n_species = 4L,
+                                     seed = 11L) {
+  set.seed(seed)
+  species_levels <- paste0("y", seq_len(n_species))
+  alpha <- exp(matrix(rnorm(n_sites * n_species, sd = 0.3),
+                      n_sites, n_species))
+  Y <- t(apply(alpha, 1L, function(a) {
+    d <- rgamma(n_species, shape = a, rate = 1)
+    d / sum(d)
+  }))
+  Y <- pmax(Y, 1e-4); Y <- Y / rowSums(Y)
+  data.frame(
+    series = factor(rep(species_levels, times = n_sites),
+                    levels = species_levels),
+    time   = rep(seq_len(n_sites), each = n_species),
+    y      = as.vector(t(Y)),
+    env    = rep(rnorm(n_sites), each = n_species)
   )
-  expect_match(conditionMessage(err_categorical), "mvgam_categorical")
-  err_multinomial <- expect_error(
-    validate_supported_family(brms::multinomial())
+}
+
+test_that("diri() returns a custom family with the right tags", {
+  fam <- diri()
+  expect_s3_class(fam, "customfamily")
+  expect_identical(fam$name, "diri")
+  expect_identical(fam$dpars, c("mu", "phi"))
+  expect_identical(fam$link, "identity")
+  expect_identical(fam$link_phi, "log")
+  expect_true(is_closure_unit_family(fam))
+  expect_true(is_multi_response_family(fam))
+  expect_true(is_simplex_response_family(fam))
+  expect_identical(
+    attr(fam, "mvgam_vars", exact = TRUE),
+    c("N_unit", "n_rep", "visit_idx")
   )
-  expect_match(conditionMessage(err_multinomial), "mvgam_multinomial")
-  err_logistic <- expect_error(
-    validate_supported_family(brms::logistic_normal())
+})
+
+test_that("diri() composes with validate_supported_family", {
+  expect_invisible(validate_supported_family(diri()))
+})
+
+test_that("prepare_closure_unit_family() groups dirichlet rows by site, not by (species, site)", {
+  fam <- diri()
+  dat <- make_dirichlet_long_data(n_sites = 5L, n_species = 4L)
+  fam_prep <- mvgam:::prepare_closure_unit_family(
+    fam, dat, response_var = "y",
+    has_obs_covariates = FALSE, has_det_covariates = FALSE
   )
-  expect_match(conditionMessage(err_logistic), "mvgam_mvnormal")
+  sv <- attr(fam_prep, "mvgam_stanvars", exact = TRUE)
+  expect_false(is.null(sv))
+  expect_identical(fam_prep$vars, c("N_unit", "n_rep", "visit_idx"))
+  # Verify the unit grouping by inspecting the standata round-trip.
+  mf <- bf(y ~ env, family = fam_prep)
+  sd <- brms::make_standata(mf, data = dat, stanvars = sv)
+  expect_identical(sd$N_unit, 5L)
+  expect_identical(sd$n_rep, rep(4L, 5L))
+  expect_identical(dim(sd$visit_idx), c(5L, 4L))
+})
+
+test_that("stancode under diri() emits the lpdf, dirichlet_logit_lpdf, and closure-unit arrays", {
+  fam <- diri()
+  dat <- make_dirichlet_long_data()
+  fam_prep <- mvgam:::prepare_closure_unit_family(
+    fam, dat, response_var = "y",
+    has_obs_covariates = FALSE, has_det_covariates = FALSE
+  )
+  sv <- attr(fam_prep, "mvgam_stanvars", exact = TRUE)
+  sc <- as.character(brms::make_stancode(
+    bf(y ~ env, family = fam_prep),
+    data = dat, stanvars = sv
+  ))
+  expect_match(sc, "real diri_lpdf\\(", fixed = FALSE)
+  expect_match(sc, "dirichlet_logit_lpdf", fixed = TRUE)
+  expect_match(sc, "int<lower=1> N_unit;", fixed = TRUE)
+  expect_match(sc, "array[N_unit] int<lower=1> n_rep;", fixed = TRUE)
+  expect_match(sc, "array[N_unit, ", fixed = TRUE)
+  # Confirm Y_max / K_max are NOT emitted -- dirichlet skips them.
+  expect_false(grepl("array[N_unit] int<lower=0> Y_max", sc,
+                     fixed = TRUE))
+  expect_false(grepl("array[N_unit] int<lower=1> K_max", sc,
+                     fixed = TRUE))
 })
 
 # ------------------------------------------------------------

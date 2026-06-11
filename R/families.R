@@ -517,7 +517,7 @@ is_closure_unit_family <- function(family) {
 #'
 #' Returns TRUE if the family is one of the multivariate-response
 #' families that aggregate K species rows per closure unit
-#' (`mvgam_dirichlet`, `mvgam_multinomial`, `mvgam_categorical`,
+#' (`diri`, `mvgam_multinomial`, `mvgam_categorical`,
 #' `mvgam_mvnormal`, `mvgam_mvt`). Detected via the
 #' `mvgam_multi_response` attribute attached by each family
 #' constructor. These families piggyback on the closure-unit data
@@ -540,7 +540,7 @@ is_multi_response_family <- function(family) {
 #' constraint on each column of Z to remove the shift indeterminacy
 #' that softmax leaves unidentified.
 #'
-#' Returns TRUE for `mvgam_dirichlet`, `mvgam_multinomial`,
+#' Returns TRUE for `diri`, `mvgam_multinomial`,
 #' `mvgam_categorical`. Returns FALSE for `mvgam_mvnormal`,
 #' `mvgam_mvt` (multivariate normal lpdfs are sensitive to absolute
 #' mu levels, so the column-sum constraint is unnecessary and
@@ -617,15 +617,37 @@ closure_unit_default_cap <- function(family) {
 #'   such as `occ()` where the upper truncation is always 1).
 #' @param default_cap Optional integer; when set, fills in `cap`
 #'   with this constant if the column is absent from `data`.
+#' @param compute_y_max Logical. When TRUE (default) coerce the
+#'   response to integer and compute per-unit `Y_max` + `K_max`
+#'   arrays used by the count-based closure-unit families
+#'   (`nmix()`, `occ()`). Multi-response families that aggregate
+#'   K species rows per unit (`diri()`,
+#'   `mvgam_multinomial()`, `mvgam_categorical()`,
+#'   `mvgam_mvnormal()`, `mvgam_mvt()`) set this FALSE because
+#'   their per-unit likelihood reads the response vector directly
+#'   without a per-unit truncation bound. When FALSE the
+#'   `Y_max`, `K_max`, and `cap_vals` slots are returned as `NA`.
+#' @param unit_grouping_vars Character vector of column names that
+#'   jointly identify a closure unit. Defaults to
+#'   `c(series_var, time_var)` for the count-based detection-error
+#'   families (each (species, site) pair is its own closure unit
+#'   with repeated visits). Multi-response families set this to
+#'   `time_var` only: one closure unit per site, with the K species
+#'   rows treated as the "visits" within that unit. The
+#'   `visit_idx` matrix then maps each (unit, k) pair to the row
+#'   index of the k-th species row at that site.
 #' @return Named list with elements `N_unit`, `n_rep`, `K_max`,
-#'   `Y_max`, `visit_idx`, `max_rep`, `unit_labels`.
+#'   `Y_max`, `visit_idx`, `max_rep`, `unit_labels`. `K_max` and
+#'   `Y_max` are `NA` when `compute_y_max = FALSE`.
 #' @noRd
 build_closure_unit_arrays <- function(data,
                                        response_var,
                                        series_var  = "series",
                                        time_var    = "time",
                                        cap_var     = "cap",
-                                       default_cap = NULL) {
+                                       default_cap = NULL,
+                                       compute_y_max = TRUE,
+                                       unit_grouping_vars = NULL) {
   checkmate::assert_data_frame(data, min.rows = 1L)
   checkmate::assert_string(response_var)
   checkmate::assert_string(series_var)
@@ -633,11 +655,19 @@ build_closure_unit_arrays <- function(data,
   checkmate::assert_string(cap_var)
   checkmate::assert_integerish(default_cap, lower = 1L, len = 1L,
                                null.ok = TRUE)
+  checkmate::assert_flag(compute_y_max)
+  if (is.null(unit_grouping_vars)) {
+    unit_grouping_vars <- c(series_var, time_var)
+  }
+  checkmate::assert_character(unit_grouping_vars, min.len = 1L,
+                              any.missing = FALSE)
   # Required columns: response + grouping always; cap only when no
-  # default has been supplied. Binary-response families pass
-  # `default_cap = 1L` to make `cap` optional.
-  required_cols <- c(response_var, series_var, time_var)
-  if (is.null(default_cap)) {
+  # default has been supplied AND we need it (count-family path).
+  # Binary-response families pass `default_cap = 1L` to make `cap`
+  # optional. Multi-response families pass `compute_y_max = FALSE`,
+  # which drops the cap requirement entirely.
+  required_cols <- c(response_var, unit_grouping_vars)
+  if (compute_y_max && is.null(default_cap)) {
     required_cols <- c(required_cols, cap_var)
   }
   for (col in required_cols) {
@@ -654,9 +684,18 @@ build_closure_unit_arrays <- function(data,
       )))
     }
   }
-  series_vals <- as.integer(as.factor(data[[series_var]]))
-  time_vals   <- as.integer(data[[time_var]])
-  unit_label  <- paste(series_vals, time_vals, sep = "_")
+  # Assemble the closure-unit key from the requested grouping
+  # columns. For count-based families this is "(series, time)" so
+  # each (species, site) pair is its own closure unit; for
+  # multi-response families it is "time" alone so each site is one
+  # closure unit and the K species rows are the per-unit
+  # contributions.
+  grouping_vals <- lapply(unit_grouping_vars, function(col) {
+    as.integer(as.factor(data[[col]]))
+  })
+  unit_label  <- do.call(
+    paste, c(grouping_vals, list(sep = "_"))
+  )
   unit_levels <- unique(unit_label)
   unit_int    <- match(unit_label, unit_levels)
   n_unit      <- length(unit_levels)
@@ -674,6 +713,23 @@ build_closure_unit_arrays <- function(data,
   for (g in seq_len(n_unit)) {
     rows_g <- which(unit_int == g)
     visit_idx[g, seq_along(rows_g)] <- as.integer(rows_g)
+  }
+  if (!compute_y_max) {
+    # Multi-response path: count families need Y_max + cap-driven
+    # K_max for their per-unit truncation, but dirichlet /
+    # multinomial / categorical / mv-normal / mv-t read the K
+    # response components directly and do not truncate, so the
+    # cap column requirement is dropped and Y_max + K_max return
+    # as NA placeholders.
+    return(list(
+      N_unit      = n_unit,
+      n_rep       = rep_counts,
+      K_max       = NA_integer_,
+      Y_max       = NA_integer_,
+      visit_idx   = visit_idx,
+      max_rep     = as.integer(max_rep),
+      unit_labels = unit_levels
+    ))
   }
   y_vals <- as.integer(data[[response_var]])
   if (anyNA(y_vals)) {
@@ -1320,6 +1376,173 @@ make_occ_stanvars <- function(arrays) {
   )
 }
 
+#' Closure-unit Dirichlet-on-the-simplex family
+#'
+#' Composes Stan's native `dirichlet_logit_lpdf` with the mvgam
+#' factor-model trend. Each closure unit (site) carries K rows
+#' (one per species / response component) whose response values
+#' sum to 1 within the unit. The custom lpdf assembles the per-unit
+#' K-vectors of response and linear predictor inside Stan, then
+#' calls Stan's native `dirichlet_logit_lpdf(y_unit | mu_unit, phi)`
+#' which maps `mu_unit` through `softmax` and parameterises the
+#' Dirichlet by `softmax(mu_unit) * phi`.
+#'
+#' Distributional parameters:
+#' \describe{
+#'   \item{`mu`}{per-row latent score on the unconstrained scale.
+#'     Softmax inside the lpdf maps the K scores per unit to a
+#'     simplex. Default link is identity.}
+#'   \item{`phi`}{Dirichlet concentration (positive). Larger `phi`
+#'     concentrates draws near `softmax(mu_unit)`. Default link is
+#'     log.}
+#' }
+#'
+#' Identification under the K-row free `Z` factor model: softmax
+#' is shift-invariant in `mu_unit` (adding `c * 1_K` leaves the
+#' likelihood unchanged), so under the default iid `Z` prior the
+#' columns of `Z` carry a residual level indeterminacy that the
+#' Heaps post-hoc QR rotation does not absorb. The downstream
+#' factor-model emission adds a soft column-sum constraint on
+#' `Z` (`sum(Z[, l]) ~ normal(0, 0.01)`) whenever
+#' `is_simplex_response_family(family)` is TRUE, which removes the
+#' shift mode at trivial cost. The `loadings_prior` matrix-normal
+#' prior, when supplied, already encodes a zero column mean and
+#' so doubles as a stronger version of the constraint.
+#'
+#' Data layout: long format, one row per (site, species), exactly
+#' K rows per site. The user passes the species axis via the
+#' `species` argument on `jsdgam()` (or labels it `series` in the
+#' data when using `mvgam()` directly); the closure-unit data prep
+#' groups by (series, time) so each site forms one closure unit.
+#'
+#' @return A `brms::custom_family` object tagged with the
+#'   `mvgam_closure_unit`, `mvgam_multi_response`, and
+#'   `mvgam_simplex_response` attributes that route the
+#'   downstream data prep, validation, and Stan emission.
+#'
+#' @references
+#' Aitchison, J. (1982). The statistical analysis of compositional
+#'   data. *Journal of the Royal Statistical Society Series B*,
+#'   44(2):139-177.
+#'
+#' Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,
+#'   Taskinen, S., Walker, S. C. and Hui, F. K. C. (2015). So many
+#'   variables: joint modeling in community ecology. *Trends in
+#'   Ecology and Evolution*, 30(12):766-779.
+#'   \doi{10.1016/j.tree.2015.09.007}
+#'
+#' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
+#'   distributions for the covariance matrix in latent factor
+#'   models. *Statistics and Computing*, 34:143.
+#'   \doi{10.1007/s11222-024-10454-0}
+#'
+#' @examples
+#' \dontrun{
+#' # Compositional JSDM on long-format proportions data
+#' mod <- jsdgam(
+#'   formula = y ~ env,
+#'   factor_formula = ~ -1,
+#'   data = my_long_format_data,
+#'   unit = site,
+#'   species = species,
+#'   family = diri(),
+#'   n_lv = 2
+#' )
+#' plot(residual_cor(mod))
+#' }
+#'
+#' @export
+diri <- function() {
+  fam <- brms::custom_family(
+    name  = "diri",
+    dpars = c("mu", "phi"),
+    links = c("identity", "log"),
+    lb    = c(NA, 0),
+    ub    = c(NA, NA),
+    type  = "real",
+    loop  = FALSE
+  )
+  link_info_mu <- stats::make.link("identity")
+  fam$linkinv <- link_info_mu$linkinv
+  fam$linkfun <- link_info_mu$linkfun
+  attr(fam, "mvgam_closure_unit")      <- TRUE
+  attr(fam, "mvgam_multi_response")    <- TRUE
+  attr(fam, "mvgam_simplex_response")  <- TRUE
+  # Dirichlet has no latent-state predict surface; downstream
+  # `predict()` and `posterior_predict()` use the standard
+  # response-scale dispatch.
+  attr(fam, "mvgam_predict_types")     <- character(0L)
+  # brms threads these data arrays into the lpdf call site so the
+  # Stan function block can assemble the K-vector per unit.
+  attr(fam, "mvgam_vars") <- c(
+    "N_unit", "n_rep", "visit_idx"
+  )
+  attr(fam, "mvgam_stanvars") <- NULL
+  fam
+}
+
+#' Stan function block for the closure-unit Dirichlet lpdf
+#'
+#' Assembles the per-unit K-vector of response values and linear
+#' predictor scores from the long-format `Y` and `mu` arrays via
+#' `visit_idx`, then calls Stan's native
+#' `dirichlet_logit_lpdf(y_unit | mu_unit, phi)` once per closure
+#' unit. The softmax over `mu_unit` parameterises the Dirichlet,
+#' so the K mu rows are interpretable on a common scale. The
+#' post-hoc QR identification of `Z` + the column-sum soft
+#' constraint together fix the shift indeterminacy that softmax
+#' otherwise leaves in `mu_unit`.
+#'
+#' brms calls this function ONCE per likelihood evaluation with
+#' the full `Y` and `mu` vectors plus the closure-unit indexing
+#' arrays threaded through via `family$vars`.
+#'
+#' @return A character scalar suitable for
+#'   `brms::stanvar(scode = ..., block = "functions")`.
+#' @noRd
+diri_stan_funs <- function() {
+  paste(
+    "  real diri_lpdf(",
+    "    vector y,",
+    "    vector mu,",
+    "    real phi,",
+    "    int N_unit,",
+    "    array[] int n_rep,",
+    "    array[,] int visit_idx) {",
+    "    real lp = 0;",
+    "    for (g in 1:N_unit) {",
+    "      int Kg = n_rep[g];",
+    "      array[Kg] int idx = visit_idx[g, 1:Kg];",
+    "      vector[Kg] y_unit  = y[idx];",
+    "      vector[Kg] mu_unit = mu[idx];",
+    "      lp += dirichlet_logit_lpdf(y_unit | mu_unit, phi);",
+    "    }",
+    "    return lp;",
+    "  }",
+    sep = "\n"
+  )
+}
+
+#' Build the closure-unit Stan stanvars for an diri() fit
+#'
+#' Wraps the shared `make_closure_unit_arrays_stanvars()` with the
+#' Dirichlet function block. Skips `K_max` and `Y_max` because the
+#' per-unit Dirichlet likelihood reads the K-vector of responses
+#' directly without truncation.
+#'
+#' @inheritParams make_closure_unit_arrays_stanvars
+#' @return A `brmsstanvars` object.
+#' @noRd
+make_diri_stanvars <- function(arrays) {
+  make_closure_unit_arrays_stanvars(
+    arrays,
+    family_funs_name = "diri_funs",
+    family_funs      = diri_stan_funs(),
+    include_K_max    = FALSE,
+    include_Y_max    = FALSE
+  )
+}
+
 #' Stan function block for the closure-unit N-mixture lpmf
 #'
 #' Implements the Royle (2004) Poisson-binomial marginalisation
@@ -1649,14 +1872,17 @@ make_closure_unit_arrays_stanvars <- function(arrays,
                                                family_funs_name,
                                                family_funs,
                                                y_max_upper   = NA_integer_,
-                                               include_K_max = TRUE) {
+                                               include_K_max = TRUE,
+                                               include_Y_max = TRUE) {
   checkmate::assert_list(arrays, names = "named")
   checkmate::assert_string(family_funs_name)
   checkmate::assert_string(family_funs)
   checkmate::assert_integerish(y_max_upper, len = 1L, lower = 0L,
                                null.ok = FALSE)
   checkmate::assert_flag(include_K_max)
-  required <- c("N_unit", "n_rep", "Y_max", "visit_idx", "max_rep")
+  checkmate::assert_flag(include_Y_max)
+  required <- c("N_unit", "n_rep", "visit_idx", "max_rep")
+  if (include_Y_max) required <- c(required, "Y_max")
   if (include_K_max) required <- c(required, "K_max")
   missing_fields <- setdiff(required, names(arrays))
   if (length(missing_fields) > 0L) {
@@ -1666,14 +1892,6 @@ make_closure_unit_arrays_stanvars <- function(arrays,
         paste(missing_fields, collapse = ", "), "."
       )
     ))
-  }
-  y_max_scode <- if (is.na(y_max_upper)) {
-    "array[N_unit] int<lower=0> Y_max;"
-  } else {
-    paste0(
-      "array[N_unit] int<lower=0, upper=", y_max_upper,
-      "> Y_max;"
-    )
   }
   stanvars <- brms::stanvar(
     name  = family_funs_name,
@@ -1693,12 +1911,6 @@ make_closure_unit_arrays_stanvars <- function(arrays,
       block = "data"
     ) +
     brms::stanvar(
-      x     = as.integer(arrays$Y_max),
-      name  = "Y_max",
-      scode = y_max_scode,
-      block = "data"
-    ) +
-    brms::stanvar(
       x     = arrays$visit_idx,
       name  = "visit_idx",
       scode = paste0(
@@ -1707,6 +1919,23 @@ make_closure_unit_arrays_stanvars <- function(arrays,
       ),
       block = "data"
     )
+  if (include_Y_max) {
+    y_max_scode <- if (is.na(y_max_upper)) {
+      "array[N_unit] int<lower=0> Y_max;"
+    } else {
+      paste0(
+        "array[N_unit] int<lower=0, upper=", y_max_upper,
+        "> Y_max;"
+      )
+    }
+    stanvars <- stanvars +
+      brms::stanvar(
+        x     = as.integer(arrays$Y_max),
+        name  = "Y_max",
+        scode = y_max_scode,
+        block = "data"
+      )
+  }
   if (include_K_max) {
     stanvars <- stanvars +
       brms::stanvar(
@@ -1811,24 +2040,42 @@ prepare_closure_unit_family <- function(family, data, response_var,
   binary_y_check <- isTRUE(attr(family, "mvgam_binary_response",
                                  exact = TRUE))
   default_cap <- closure_unit_default_cap(family)
-  validate_closure_unit_data(
-    data,
-    response_var       = response_var,
-    has_obs_covariates = has_obs_covariates,
-    has_det_covariates = has_det_covariates,
-    binary_y_check     = binary_y_check,
-    cap_required       = is.null(default_cap)
-  )
-  arrays <- build_closure_unit_arrays(
-    data, response_var = response_var,
-    default_cap = default_cap
-  )
+  multi_response <- is_multi_response_family(family)
+  if (multi_response) {
+    # Multi-response families (diri / multinomial /
+    # categorical / mvnormal / mvt) skip the integer-y / cap
+    # validation: their per-unit likelihoods read the K response
+    # components directly, without per-unit truncation. The closure
+    # unit groups by `time` (site) only -- the K species rows at
+    # each site form the per-unit contributions, in contrast to the
+    # count-based families where each (species, site) pair is its
+    # own closure unit with replicate visits.
+    arrays <- build_closure_unit_arrays(
+      data, response_var = response_var,
+      compute_y_max = FALSE,
+      unit_grouping_vars = "time"
+    )
+  } else {
+    validate_closure_unit_data(
+      data,
+      response_var       = response_var,
+      has_obs_covariates = has_obs_covariates,
+      has_det_covariates = has_det_covariates,
+      binary_y_check     = binary_y_check,
+      cap_required       = is.null(default_cap)
+    )
+    arrays <- build_closure_unit_arrays(
+      data, response_var = response_var,
+      default_cap = default_cap
+    )
+  }
   family_stanvars <- switch(
     family_name,
     nmix                 = make_nmix_stanvars(arrays),
     nmix_royle_nichols   = make_nmix_royle_nichols_stanvars(arrays),
     nmix_poisson_poisson = make_nmix_poisson_poisson_stanvars(arrays),
     occ                  = make_occ_stanvars(arrays),
+    diri      = make_diri_stanvars(arrays),
     stop(insight::format_error(c(
       paste0(
         "Closure-unit dispatch missing for family '",
