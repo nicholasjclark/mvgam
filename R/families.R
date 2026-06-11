@@ -218,7 +218,14 @@ resolve_family_name <- function(family) {
         !is.null(family$name) && nzchar(family$name)) {
     return(family$name)
   }
-  family$family
+  # stats::Gamma() reports family$family = "Gamma" with the capital
+  # initial, but brms normalises to lowercase internally and every
+  # mvgam dispatcher (log_lik_*, posterior_predict family switch)
+  # is keyed on the lowercase "gamma". Align here so the dispatchers
+  # find the right branch regardless of how the user spells the call.
+  fam <- family$family
+  if (identical(fam, "Gamma")) fam <- "gamma"
+  fam
 }
 
 #' Build the Stan stanvars bundle for the Tweedie family
