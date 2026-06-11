@@ -205,6 +205,93 @@ test_that("stancode under diri() emits the lpdf, dirichlet_logit_lpdf, and closu
                      fixed = TRUE))
 })
 
+test_that("diri() emits the simplex column-sum soft constraint on Z", {
+  fam <- diri()
+  dat <- make_dirichlet_long_data()
+  fam_prep <- mvgam:::prepare_closure_unit_family(
+    fam, dat, response_var = "y",
+    has_obs_covariates = FALSE, has_det_covariates = FALSE
+  )
+  sv <- attr(fam_prep, "mvgam_stanvars", exact = TRUE)
+  sc <- as.character(brms::make_stancode(
+    bf(y ~ env, family = fam_prep),
+    data = dat, stanvars = sv
+  ))
+  expect_match(sc, "Simplex shift-mode soft constraint", fixed = TRUE)
+  expect_match(sc, "for (l in 1:N_lv_trend) sum(Z[, l])",
+               fixed = TRUE)
+})
+
+# ------------------------------------------------------------
+# multi(): family registration + Stan emission for multinomial
+# ------------------------------------------------------------
+
+make_multi_long_data <- function(n_sites = 6L, n_species = 4L,
+                                  seed = 21L) {
+  set.seed(seed)
+  species_levels <- paste0("y", seq_len(n_species))
+  rows <- list()
+  for (s in seq_len(n_sites)) {
+    p <- exp(rnorm(n_species, sd = 0.4))
+    p <- p / sum(p)
+    N_s <- sample(30:80, 1L)
+    y_s <- as.vector(rmultinom(1L, N_s, p))
+    env_s <- rnorm(1L)
+    for (k in seq_len(n_species)) {
+      rows[[length(rows) + 1L]] <- data.frame(
+        series = factor(species_levels[k], levels = species_levels),
+        time   = s,
+        y      = y_s[k],
+        env    = env_s
+      )
+    }
+  }
+  do.call(rbind, rows)
+}
+
+test_that("multi() returns a custom family with the right tags", {
+  fam <- multi()
+  expect_s3_class(fam, "customfamily")
+  expect_identical(fam$name, "multi")
+  expect_identical(fam$dpars, "mu")
+  expect_identical(fam$link, "identity")
+  expect_identical(fam$type, "int")
+  expect_false(fam$loop)
+  expect_true(is_closure_unit_family(fam))
+  expect_true(is_multi_response_family(fam))
+  expect_true(is_simplex_response_family(fam))
+  expect_identical(
+    attr(fam, "mvgam_vars", exact = TRUE),
+    c("N_unit", "n_rep", "visit_idx")
+  )
+})
+
+test_that("multi() composes with validate_supported_family", {
+  expect_invisible(validate_supported_family(multi()))
+})
+
+test_that("stancode under multi() emits multi_lpmf, multinomial_logit_lpmf, and the simplex constraint", {
+  fam <- multi()
+  dat <- make_multi_long_data()
+  fam_prep <- mvgam:::prepare_closure_unit_family(
+    fam, dat, response_var = "y",
+    has_obs_covariates = FALSE, has_det_covariates = FALSE
+  )
+  sv <- attr(fam_prep, "mvgam_stanvars", exact = TRUE)
+  sc <- as.character(brms::make_stancode(
+    bf(y ~ env, family = fam_prep),
+    data = dat, stanvars = sv
+  ))
+  expect_match(sc, "real multi_lpmf\\(", fixed = FALSE)
+  expect_match(sc, "multinomial_logit_lpmf", fixed = TRUE)
+  expect_match(sc, "int<lower=1> N_unit;", fixed = TRUE)
+  expect_match(sc, "Simplex shift-mode soft constraint", fixed = TRUE)
+  expect_match(sc, "for (l in 1:N_lv_trend) sum(Z[, l])",
+               fixed = TRUE)
+  # multi() takes integer counts; Y declaration should NOT be vector.
+  expect_match(sc, "array[N] int Y;", fixed = TRUE)
+})
+
 # ------------------------------------------------------------
 # build_closure_unit_arrays()
 # ------------------------------------------------------------

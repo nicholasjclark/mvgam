@@ -1540,6 +1540,189 @@ make_diri_stanvars <- function(arrays) {
     family_funs      = diri_stan_funs(),
     include_K_max    = FALSE,
     include_Y_max    = FALSE
+  ) +
+    make_simplex_z_constraint_stanvar()
+}
+
+#' Closure-unit Multinomial-on-the-simplex family
+#'
+#' Composes Stan's native `multinomial_logit_lpmf` with the mvgam
+#' factor-model trend. Each closure unit (site) carries K rows
+#' (one per species / response component) whose integer counts sum
+#' to a per-site total `N_site = sum(Y_unit)`. The custom lpmf
+#' assembles the per-unit K-vectors of counts and linear predictor
+#' scores inside Stan, then calls Stan's native
+#' `multinomial_logit_lpmf(y_unit_int | mu_unit)` which applies
+#' `softmax` over `mu_unit` to obtain the K cell probabilities.
+#'
+#' The multinomial total `N_site` varies freely across sites
+#' (each site has its own `sum(Y_unit)` as the implicit total
+#' trials), which is desirable for ecological count data and
+#' microbiome read-depth differences. No additional `N_site` data
+#' field is required because `sum(Y_unit)` is the sufficient
+#' statistic for the trial count.
+#'
+#' Distributional parameters:
+#' \describe{
+#'   \item{`mu`}{per-row latent score on the unconstrained scale.
+#'     Softmax inside the lpmf maps the K scores per unit to a
+#'     simplex of cell probabilities. Default link is identity.}
+#' }
+#'
+#' Identification: identical to [diri()]. Softmax is shift-invariant
+#' in `mu_unit`, so the K rows of `Z` carry a residual level
+#' indeterminacy under the default iid `Z` prior. The
+#' `make_simplex_z_constraint_stanvar()` helper bundles a soft
+#' column-sum constraint (`sum(Z[, l]) ~ normal(0, 0.01)`) into
+#' the family stanvars that removes the shift mode at trivial
+#' cost.
+#'
+#' Data layout: long format, one row per (site, species), exactly
+#' K rows per site. The integer count for that (site, species)
+#' cell is the response.
+#'
+#' @return A `brms::custom_family` object tagged with the
+#'   `mvgam_closure_unit`, `mvgam_multi_response`, and
+#'   `mvgam_simplex_response` attributes.
+#'
+#' @references
+#' Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,
+#'   Taskinen, S., Walker, S. C. and Hui, F. K. C. (2015). So many
+#'   variables: joint modeling in community ecology. *Trends in
+#'   Ecology and Evolution*, 30(12):766-779.
+#'   \doi{10.1016/j.tree.2015.09.007}
+#'
+#' @examples
+#' \dontrun{
+#' # Microbiome-style read-count JSDM
+#' mod <- jsdgam(
+#'   formula = y ~ env,
+#'   factor_formula = ~ -1,
+#'   data = read_counts_long,
+#'   unit = site,
+#'   species = taxon,
+#'   family = multi(),
+#'   n_lv = 2
+#' )
+#' }
+#'
+#' @export
+multi <- function() {
+  fam <- brms::custom_family(
+    name  = "multi",
+    dpars = "mu",
+    links = "identity",
+    lb    = NA,
+    ub    = NA,
+    type  = "int",
+    loop  = FALSE
+  )
+  link_info <- stats::make.link("identity")
+  fam$linkinv <- link_info$linkinv
+  fam$linkfun <- link_info$linkfun
+  attr(fam, "mvgam_closure_unit")      <- TRUE
+  attr(fam, "mvgam_multi_response")    <- TRUE
+  attr(fam, "mvgam_simplex_response")  <- TRUE
+  attr(fam, "mvgam_predict_types")     <- character(0L)
+  attr(fam, "mvgam_vars") <- c(
+    "N_unit", "n_rep", "visit_idx"
+  )
+  attr(fam, "mvgam_stanvars") <- NULL
+  fam
+}
+
+#' Stan function block for the closure-unit Multinomial lpmf
+#'
+#' Assembles the per-unit K-vector of integer counts and linear
+#' predictor scores from the long-format `Y` and `mu` arrays via
+#' `visit_idx`, then calls Stan's native
+#' `multinomial_logit_lpmf(y_unit | mu_unit)` once per closure
+#' unit. Softmax over `mu_unit` parameterises the K cell
+#' probabilities; the multinomial total `sum(y_unit)` enters the
+#' lpmf via the response itself (sufficient statistic).
+#'
+#' @return A character scalar suitable for
+#'   `brms::stanvar(scode = ..., block = "functions")`.
+#' @noRd
+multi_stan_funs <- function() {
+  paste(
+    "  real multi_lpmf(",
+    "    array[] int y,",
+    "    vector mu,",
+    "    int N_unit,",
+    "    array[] int n_rep,",
+    "    array[,] int visit_idx) {",
+    "    real lp = 0;",
+    "    for (g in 1:N_unit) {",
+    "      int Kg = n_rep[g];",
+    "      array[Kg] int idx = visit_idx[g, 1:Kg];",
+    "      array[Kg] int y_unit  = y[idx];",
+    "      vector[Kg] mu_unit = mu[idx];",
+    "      lp += multinomial_logit_lpmf(y_unit | mu_unit);",
+    "    }",
+    "    return lp;",
+    "  }",
+    sep = "\n"
+  )
+}
+
+#' Build the closure-unit Stan stanvars for a multi() fit
+#'
+#' Wraps `make_closure_unit_arrays_stanvars()` with the multinomial
+#' function block and the shared simplex column-sum soft constraint
+#' that removes the softmax shift indeterminacy in the columns of
+#' `Z`.
+#'
+#' @inheritParams make_closure_unit_arrays_stanvars
+#' @return A `brmsstanvars` object.
+#' @noRd
+make_multi_stanvars <- function(arrays) {
+  make_closure_unit_arrays_stanvars(
+    arrays,
+    family_funs_name = "multi_funs",
+    family_funs      = multi_stan_funs(),
+    include_K_max    = FALSE,
+    include_Y_max    = FALSE
+  ) +
+    make_simplex_z_constraint_stanvar()
+}
+
+#' Soft column-sum constraint on `Z` for simplex multi-response
+#' families
+#'
+#' Stan's softmax is shift-invariant in the K-vector mu, so the
+#' columns of the K x n_lv loadings matrix `Z` carry a residual
+#' level indeterminacy under the default iid `Z` prior that the
+#' Heaps post-hoc QR rotation does not absorb. The constraint
+#' `sum(Z[, l]) ~ normal(0, 0.01)` for each latent factor `l`
+#' removes the shift mode at trivial cost. Bundled into the
+#' simplex-family stanvars (`diri`, `multi`, `categ`) so the
+#' constraint is automatically active whenever a simplex family
+#' fits over a factor model.
+#'
+#' The constraint references `Z` and `N_lv_trend` by name; both
+#' symbols are declared by the factor-model code emitted from
+#' `generate_factor_model()`. If a simplex family is fit without
+#' a factor model the Stan compile will error with a clear
+#' "Z not declared" message, which is correct: multi-response
+#' families require a factor model to express inter-species
+#' structure.
+#'
+#' @return A `brms::stanvar` for the model block.
+#' @noRd
+make_simplex_z_constraint_stanvar <- function() {
+  brms::stanvar(
+    scode = paste(
+      "  // Simplex shift-mode soft constraint: softmax is",
+      "  // shift-invariant in the K-vector mu, so the columns of Z",
+      "  // carry a residual level indeterminacy under the default",
+      "  // iid Z prior. The cheap column-sum prior removes the",
+      "  // shift mode at trivial cost.",
+      "  for (l in 1:N_lv_trend) sum(Z[, l]) ~ normal(0, 0.01);",
+      sep = "\n"
+    ),
+    block = "model",
+    position = "start"
   )
 }
 
@@ -2075,7 +2258,8 @@ prepare_closure_unit_family <- function(family, data, response_var,
     nmix_royle_nichols   = make_nmix_royle_nichols_stanvars(arrays),
     nmix_poisson_poisson = make_nmix_poisson_poisson_stanvars(arrays),
     occ                  = make_occ_stanvars(arrays),
-    diri      = make_diri_stanvars(arrays),
+    diri                 = make_diri_stanvars(arrays),
+    multi                = make_multi_stanvars(arrays),
     stop(insight::format_error(c(
       paste0(
         "Closure-unit dispatch missing for family '",
