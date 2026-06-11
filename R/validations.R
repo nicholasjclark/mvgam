@@ -232,27 +232,44 @@ validate_supported_family <- function(family) {
     combine = "or"
   )
 
-  # Multi-category families require K-1 linear predictors per observation,
-  # which cannot be combined with single-process State-Space trends
-  unsupported_families <- c(
-    "categorical",
-    "multinomial",
-    "dirichlet",
-    "logistic_normal"
+  # mvgam-side multi-response families (mvgam_dirichlet, mvgam_multinomial,
+  # mvgam_categorical, mvgam_mvnormal, mvgam_mvt) carry the
+  # `mvgam_multi_response` attribute and wire the K-row response into a
+  # per-closure-unit lpdf that aggregates K species rows per site. Allow
+  # them through unconditionally; the closure-unit pipeline (same one
+  # nmix/occ use) handles the rest.
+  if (is_multi_response_family(family)) {
+    return(invisible(TRUE))
+  }
+
+  # Naked brms multi-category families (dirichlet, multinomial, etc.)
+  # emit K-1 linear predictors with a reference category and do not
+  # compose with the mvgam factor-model trend without the closure-unit
+  # multi-response wrapper. Route users to the mvgam_* constructors.
+  brms_to_mvgam <- list(
+    categorical = "mvgam_categorical()",
+    multinomial = "mvgam_multinomial()",
+    dirichlet   = "mvgam_dirichlet()",
+    logistic_normal = "mvgam_mvnormal()"
   )
 
   family_name <- family$family
 
-  if (family_name %in% unsupported_families) {
+  if (family_name %in% names(brms_to_mvgam)) {
     stop(insight::format_error(c(
-      paste0("Family '", family_name, "' is not supported by mvgam."),
-      x = paste0(
-        "Multi-category families (categorical, multinomial, dirichlet) ",
-        "require multiple linear predictors (one per category) that ",
-        "cannot be combined with State-Space trends."
+      paste0(
+        "Family '", family_name, "' must be wired through the mvgam-side ",
+        "multi-response wrapper."
       ),
-      i = cli::format_inline(
-        "For these response types, please use {.pkg brms} directly."
+      x = paste0(
+        "brms' native ", family_name, "() emits K-1 per-category linear ",
+        "predictors with a reference category, which does not compose ",
+        "with the mvgam factor-model trend."
+      ),
+      i = paste0(
+        "Use ", brms_to_mvgam[[family_name]], " instead. It aggregates ",
+        "K species rows per closure unit (site) and calls Stan's native ",
+        "multivariate likelihood once per unit."
       )
     )))
   }

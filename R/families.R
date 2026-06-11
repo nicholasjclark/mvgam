@@ -513,6 +513,53 @@ is_closure_unit_family <- function(family) {
   isTRUE(attr(family, "mvgam_closure_unit", exact = TRUE))
 }
 
+#' Detect whether a family wires a multi-response per-unit lpdf
+#'
+#' Returns TRUE if the family is one of the multivariate-response
+#' families that aggregate K species rows per closure unit
+#' (`mvgam_dirichlet`, `mvgam_multinomial`, `mvgam_categorical`,
+#' `mvgam_mvnormal`, `mvgam_mvt`). Detected via the
+#' `mvgam_multi_response` attribute attached by each family
+#' constructor. These families piggyback on the closure-unit data
+#' prep pipeline (site = closure unit, K species rows per unit) and
+#' replace the per-row likelihood call with a per-unit K-vector
+#' multivariate likelihood (Stan's native `dirichlet_logit_lpdf`,
+#' `multinomial_logit_lpmf`, `categorical_logit_lpmf`,
+#' `multi_normal_cholesky_lpdf`, `multi_student_t_lpdf`).
+#'
+#' @param family A family / brmsfamily / customfamily object.
+#' @return TRUE or FALSE.
+#' @noRd
+is_multi_response_family <- function(family) {
+  if (is.null(family)) return(FALSE)
+  isTRUE(attr(family, "mvgam_multi_response", exact = TRUE))
+}
+
+#' Detect whether a multi-response family uses the softmax-based
+#' simplex likelihood and therefore needs the sum-to-zero soft
+#' constraint on each column of Z to remove the shift indeterminacy
+#' that softmax leaves unidentified.
+#'
+#' Returns TRUE for `mvgam_dirichlet`, `mvgam_multinomial`,
+#' `mvgam_categorical`. Returns FALSE for `mvgam_mvnormal`,
+#' `mvgam_mvt` (multivariate normal lpdfs are sensitive to absolute
+#' mu levels, so the column-sum constraint is unnecessary and
+#' over-restrictive there).
+#'
+#' Detected via the `mvgam_simplex_response` attribute attached
+#' by the three simplex family constructors. The attribute is
+#' separate from `mvgam_multi_response` so MV-normal/MV-T can opt
+#' into the multi-response wire format without inheriting the
+#' identification constraint.
+#'
+#' @param family A family / brmsfamily / customfamily object.
+#' @return TRUE or FALSE.
+#' @noRd
+is_simplex_response_family <- function(family) {
+  if (is.null(family)) return(FALSE)
+  isTRUE(attr(family, "mvgam_simplex_response", exact = TRUE))
+}
+
 #' Default per-unit upper truncation for a closure-unit family
 #'
 #' Reads the `mvgam_default_cap` family attribute. Returns the

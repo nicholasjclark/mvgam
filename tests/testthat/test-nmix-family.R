@@ -56,6 +56,75 @@ test_that("is_closure_unit_family() returns FALSE for non-closure families", {
 })
 
 # ------------------------------------------------------------
+# Multi-response family predicates + gate
+# ------------------------------------------------------------
+#
+# The mvgam_multi_response and mvgam_simplex_response attributes
+# tag families that aggregate K species rows per closure unit and
+# call Stan's native multivariate likelihood (dirichlet,
+# multinomial, categorical, multivariate normal, multivariate T).
+# Tests below use mock customfamily objects with the attributes
+# set directly, so the predicates can be verified independently
+# of the family constructors that eventually consume them.
+
+mock_multi_response_family <- function(simplex = FALSE) {
+  fam <- brms::custom_family(
+    name = "mock_multi", dpars = c("mu"), links = "identity",
+    type = "real", loop = FALSE
+  )
+  attr(fam, "mvgam_multi_response") <- TRUE
+  if (simplex) attr(fam, "mvgam_simplex_response") <- TRUE
+  fam
+}
+
+test_that("is_multi_response_family() detects the mvgam_multi_response attr", {
+  expect_true(is_multi_response_family(mock_multi_response_family()))
+  expect_true(is_multi_response_family(
+    mock_multi_response_family(simplex = TRUE)
+  ))
+})
+
+test_that("is_multi_response_family() returns FALSE for non-MV families", {
+  expect_false(is_multi_response_family(NULL))
+  expect_false(is_multi_response_family(gaussian()))
+  expect_false(is_multi_response_family(nmix()))
+  expect_false(is_multi_response_family(tweedie()))
+})
+
+test_that("is_simplex_response_family() detects only simplex MV families", {
+  expect_true(is_simplex_response_family(
+    mock_multi_response_family(simplex = TRUE)
+  ))
+  expect_false(is_simplex_response_family(mock_multi_response_family()))
+  expect_false(is_simplex_response_family(NULL))
+  expect_false(is_simplex_response_family(gaussian()))
+})
+
+test_that("validate_supported_family() admits multi-response customfamily objects", {
+  expect_invisible(validate_supported_family(mock_multi_response_family()))
+  expect_invisible(
+    validate_supported_family(mock_multi_response_family(simplex = TRUE))
+  )
+})
+
+test_that("validate_supported_family() rejects naked brms multi-category families with a constructor pointer", {
+  err_dirichlet <- expect_error(validate_supported_family(brms::dirichlet()))
+  expect_match(conditionMessage(err_dirichlet), "mvgam_dirichlet")
+  err_categorical <- expect_error(
+    validate_supported_family(brms::categorical())
+  )
+  expect_match(conditionMessage(err_categorical), "mvgam_categorical")
+  err_multinomial <- expect_error(
+    validate_supported_family(brms::multinomial())
+  )
+  expect_match(conditionMessage(err_multinomial), "mvgam_multinomial")
+  err_logistic <- expect_error(
+    validate_supported_family(brms::logistic_normal())
+  )
+  expect_match(conditionMessage(err_logistic), "mvgam_mvnormal")
+})
+
+# ------------------------------------------------------------
 # build_closure_unit_arrays()
 # ------------------------------------------------------------
 
