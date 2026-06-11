@@ -181,7 +181,7 @@ test_that("prepare_closure_unit_family() groups dirichlet rows by site, not by (
   expect_identical(dim(sd$visit_idx), c(5L, 4L))
 })
 
-test_that("stancode under diri() emits the lpdf, dirichlet_logit_lpdf, and closure-unit arrays", {
+test_that("stancode under diri() emits the lpdf, native dirichlet_lpdf, and closure-unit arrays", {
   fam <- diri()
   dat <- make_dirichlet_long_data()
   fam_prep <- mvgam:::prepare_closure_unit_family(
@@ -194,7 +194,12 @@ test_that("stancode under diri() emits the lpdf, dirichlet_logit_lpdf, and closu
     data = dat, stanvars = sv
   ))
   expect_match(sc, "real diri_lpdf\\(", fixed = FALSE)
-  expect_match(sc, "dirichlet_logit_lpdf", fixed = TRUE)
+  # Native Stan helpers: dirichlet_lpdf + softmax. The brms-emitted
+  # `dirichlet_logit_lpdf` helper is NOT a Stan built-in, so we
+  # apply softmax(mu_unit) * phi inline before calling
+  # `dirichlet_lpdf`.
+  expect_match(sc, "dirichlet_lpdf(y_unit | softmax(mu_unit) * phi)",
+
   expect_match(sc, "int<lower=1> N_unit;", fixed = TRUE)
   expect_match(sc, "array[N_unit] int<lower=1> n_rep;", fixed = TRUE)
   expect_match(sc, "array[N_unit, ", fixed = TRUE)
@@ -205,22 +210,6 @@ test_that("stancode under diri() emits the lpdf, dirichlet_logit_lpdf, and closu
                      fixed = TRUE))
 })
 
-test_that("diri() emits the simplex column-sum soft constraint on Z", {
-  fam <- diri()
-  dat <- make_dirichlet_long_data()
-  fam_prep <- mvgam:::prepare_closure_unit_family(
-    fam, dat, response_var = "y",
-    has_obs_covariates = FALSE, has_det_covariates = FALSE
-  )
-  sv <- attr(fam_prep, "mvgam_stanvars", exact = TRUE)
-  sc <- as.character(brms::make_stancode(
-    bf(y ~ env, family = fam_prep),
-    data = dat, stanvars = sv
-  ))
-  expect_match(sc, "Simplex shift-mode soft constraint", fixed = TRUE)
-  expect_match(sc, "for (l in 1:N_lv_trend) sum(Z[, l])",
-               fixed = TRUE)
-})
 
 # ------------------------------------------------------------
 # multi(): family registration + Stan emission for multinomial
@@ -270,7 +259,7 @@ test_that("multi() composes with validate_supported_family", {
   expect_invisible(validate_supported_family(multi()))
 })
 
-test_that("stancode under multi() emits multi_lpmf, multinomial_logit_lpmf, and the simplex constraint", {
+test_that("stancode under multi() emits multi_lpmf, multinomial_logit_lpmf", {
   fam <- multi()
   dat <- make_multi_long_data()
   fam_prep <- mvgam:::prepare_closure_unit_family(
@@ -285,9 +274,9 @@ test_that("stancode under multi() emits multi_lpmf, multinomial_logit_lpmf, and 
   expect_match(sc, "real multi_lpmf\\(", fixed = FALSE)
   expect_match(sc, "multinomial_logit_lpmf", fixed = TRUE)
   expect_match(sc, "int<lower=1> N_unit;", fixed = TRUE)
-  expect_match(sc, "Simplex shift-mode soft constraint", fixed = TRUE)
-  expect_match(sc, "for (l in 1:N_lv_trend) sum(Z[, l])",
-               fixed = TRUE)
+
+
+
   # multi() takes integer counts; Y declaration should NOT be vector.
   expect_match(sc, "array[N] int Y;", fixed = TRUE)
 })
@@ -336,7 +325,7 @@ test_that("categ() composes with validate_supported_family", {
   expect_invisible(validate_supported_family(categ()))
 })
 
-test_that("stancode under categ() emits categ_lpmf, native categorical_logit_lpmf, and the simplex constraint", {
+test_that("stancode under categ() emits categ_lpmf, native categorical_logit_lpmf", {
   fam <- categ()
   dat <- make_categ_long_data()
   fam_prep <- mvgam:::prepare_closure_unit_family(
@@ -350,7 +339,7 @@ test_that("stancode under categ() emits categ_lpmf, native categorical_logit_lpm
   ))
   expect_match(sc, "real categ_lpmf\\(", fixed = FALSE)
   expect_match(sc, "categorical_logit_lpmf", fixed = TRUE)
-  expect_match(sc, "Simplex shift-mode soft constraint", fixed = TRUE)
+
   expect_match(sc, "for (k in 1:Kg) {", fixed = TRUE)
 })
 

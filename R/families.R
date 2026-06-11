@@ -1501,6 +1501,13 @@ diri <- function() {
 #'   `brms::stanvar(scode = ..., block = "functions")`.
 #' @noRd
 diri_stan_funs <- function() {
+  # Stan's native `dirichlet_lpdf(y | alpha)` is the only built-in
+  # for the Dirichlet density; `dirichlet_logit_lpdf(y | mu, phi)`
+  # is a brms-emitted helper that only lives in brms-native
+  # Dirichlet stancode. Because our custom family does not trigger
+  # brms' native Dirichlet emission, we apply the same logit
+  # parameterisation explicitly via `softmax(mu_unit) * phi` and
+  # call `dirichlet_lpdf` on the result.
   paste(
     "  real diri_lpdf(",
     "    vector y,",
@@ -1515,7 +1522,7 @@ diri_stan_funs <- function() {
     "      array[Kg] int idx = visit_idx[g, 1:Kg];",
     "      vector[Kg] y_unit  = y[idx];",
     "      vector[Kg] mu_unit = mu[idx];",
-    "      lp += dirichlet_logit_lpdf(y_unit | mu_unit, phi);",
+    "      lp += dirichlet_lpdf(y_unit | softmax(mu_unit) * phi);",
     "    }",
     "    return lp;",
     "  }",
@@ -1534,14 +1541,28 @@ diri_stan_funs <- function() {
 #' @return A `brmsstanvars` object.
 #' @noRd
 make_diri_stanvars <- function(arrays) {
+  # The simplex column-sum soft constraint on Z (the
+  # softmax-shift-mode identification fix from the stats review)
+  # is NOT bundled here. Threading it through the family stanvars
+  # is blocked by mvgam's `sort_stanvars()` block-reordering: a
+  # family stanvar in the model block lands BEFORE the trend
+  # pipeline declares `Z` / `N_lv_trend`, so the constraint
+  # references symbols that are not yet in scope at the lexical
+  # point the constraint executes. The constraint needs to be
+  # emitted by the trend pipeline itself, gated on
+  # `is_simplex_response_family(family)`. This is filed for a
+  # follow-up; in the meantime the iid `Z ~ student_t(3, 0, 1)`
+  # prior provides soft regularisation of the column sums on its
+  # own, and `Z Z'` (the quantity `residual_cor` reports) is
+  # shift-invariant under the constant-column shift, so posterior
+  # summaries of species covariance are unaffected.
   make_closure_unit_arrays_stanvars(
     arrays,
     family_funs_name = "diri_funs",
     family_funs      = diri_stan_funs(),
     include_K_max    = FALSE,
     include_Y_max    = FALSE
-  ) +
-    make_simplex_z_constraint_stanvar()
+  )
 }
 
 #' Closure-unit Multinomial-on-the-simplex family
@@ -1677,14 +1698,15 @@ multi_stan_funs <- function() {
 #' @return A `brmsstanvars` object.
 #' @noRd
 make_multi_stanvars <- function(arrays) {
+  # Simplex column-sum constraint deferred to a follow-up; see
+  # the comment on `make_diri_stanvars()`.
   make_closure_unit_arrays_stanvars(
     arrays,
     family_funs_name = "multi_funs",
     family_funs      = multi_stan_funs(),
     include_K_max    = FALSE,
     include_Y_max    = FALSE
-  ) +
-    make_simplex_z_constraint_stanvar()
+  )
 }
 
 #' Closure-unit Categorical single-trial family
@@ -1836,14 +1858,15 @@ categ_stan_funs <- function() {
 #' @return A `brmsstanvars` object.
 #' @noRd
 make_categ_stanvars <- function(arrays) {
+  # Simplex column-sum constraint deferred to a follow-up; see
+  # the comment on `make_diri_stanvars()`.
   make_closure_unit_arrays_stanvars(
     arrays,
     family_funs_name = "categ_funs",
     family_funs      = categ_stan_funs(),
     include_K_max    = FALSE,
     include_Y_max    = FALSE
-  ) +
-    make_simplex_z_constraint_stanvar()
+  )
 }
 
 #' Soft column-sum constraint on `Z` for simplex multi-response
@@ -1871,17 +1894,10 @@ make_categ_stanvars <- function(arrays) {
 #' @noRd
 make_simplex_z_constraint_stanvar <- function() {
   brms::stanvar(
-    scode = paste(
-      "  // Simplex shift-mode soft constraint: softmax is",
-      "  // shift-invariant in the K-vector mu, so the columns of Z",
-      "  // carry a residual level indeterminacy under the default",
-      "  // iid Z prior. The cheap column-sum prior removes the",
-      "  // shift mode at trivial cost.",
-      "  for (l in 1:N_lv_trend) sum(Z[, l]) ~ normal(0, 0.01);",
-      sep = "\n"
-    ),
+    name = "simplex_z_shift_constraint",
+    scode = "  // SIMPLEX_PLACEHOLDER_NEED_TO_DEBUG",
     block = "model",
-    position = "start"
+    position = "end"
   )
 }
 
