@@ -199,3 +199,176 @@ test_that("jsdgam default family is binomial", {
     "binomial"
   )
 })
+
+# 4. traits + phylo aliases -----------------------------------------------
+#
+# Unit-test the alias compiler directly and exercise the downstream
+# Stan emission via standata.mvgam_formula() (no jsdgam()/mvgam() fit
+# pipeline). Goes straight to the brms-style helper so every test is
+# bounded by a single make_standata() call rather than full wrapper
+# validation + slot plumbing.
+
+species_4 <- function() paste0("sp", 1:4)
+
+# 4a. build_jsdgam_loadings_prior helper
+
+test_that("build_jsdgam_loadings_prior returns NULL when all aliases are NULL", {
+  spec <- mvgam:::build_jsdgam_loadings_prior(
+    traits = NULL, phylo = NULL, loadings_prior = NULL,
+    species_levels = species_4()
+  )
+  expect_null(spec)
+})
+
+test_that("build_jsdgam_loadings_prior errors on alias + explicit conflict", {
+  expect_error(
+    mvgam:::build_jsdgam_loadings_prior(
+      traits = data.frame(series = species_4(), x = 1:4),
+      phylo = NULL,
+      loadings_prior = list(features = data.frame(x = 1:4)),
+      species_levels = species_4()
+    ),
+    "EITHER an explicit"
+  )
+})
+
+test_that("build_jsdgam_loadings_prior threads traits into features", {
+  traits <- data.frame(series = species_4(), body_mass = c(0.2, 0.6, 1.1, 1.5))
+  spec <- mvgam:::build_jsdgam_loadings_prior(
+    traits = traits, phylo = NULL, loadings_prior = NULL,
+    species_levels = species_4()
+  )
+  expect_identical(spec$features, traits)
+  expect_null(spec$distances)
+})
+
+test_that("build_jsdgam_loadings_prior threads phylo into distances$phylo", {
+  d <- matrix(c(0, 1, 2, 3, 1, 0, 1, 2, 2, 1, 0, 1, 3, 2, 1, 0), 4, 4)
+  rownames(d) <- colnames(d) <- species_4()
+  spec <- mvgam:::build_jsdgam_loadings_prior(
+    traits = NULL, phylo = d, loadings_prior = NULL,
+    species_levels = species_4()
+  )
+  expect_true("phylo" %in% names(spec$distances))
+  expect_equal(dim(spec$distances$phylo), c(4L, 4L))
+})
+
+test_that("build_jsdgam_loadings_prior forwards explicit loadings_prior", {
+  lp <- list(features = data.frame(series = species_4(), x = 1:4))
+  spec <- mvgam:::build_jsdgam_loadings_prior(
+    traits = NULL, phylo = NULL, loadings_prior = lp,
+    species_levels = species_4()
+  )
+  expect_identical(spec, lp)
+})
+
+# 4b. jsdgam_phylo_to_dist helper
+
+test_that("jsdgam_phylo_to_dist passes through a numeric distance matrix", {
+  d <- matrix(c(0, 1, 2, 3, 1, 0, 1, 2, 2, 1, 0, 1, 3, 2, 1, 0), 4, 4)
+  rownames(d) <- colnames(d) <- species_4()
+  out <- mvgam:::jsdgam_phylo_to_dist(d, species_4())
+  expect_equal(out, d[species_4(), species_4()])
+})
+
+test_that("jsdgam_phylo_to_dist reorders rows / cols to species_levels", {
+  d <- matrix(c(0, 1, 2, 3, 1, 0, 1, 2, 2, 1, 0, 1, 3, 2, 1, 0), 4, 4)
+  reordered <- rev(species_4())
+  rownames(d) <- colnames(d) <- reordered
+  out <- mvgam:::jsdgam_phylo_to_dist(d, species_4())
+  expect_equal(rownames(out), species_4())
+})
+
+test_that("jsdgam_phylo_to_dist errors when distance matrix lacks names", {
+  d <- matrix(0, 4L, 4L)
+  expect_error(
+    mvgam:::jsdgam_phylo_to_dist(d, species_4()),
+    "row and column names"
+  )
+})
+
+test_that("jsdgam_phylo_to_dist errors when species missing from matrix", {
+  d <- matrix(0, 3L, 3L)
+  rownames(d) <- colnames(d) <- species_4()[1:3]
+  expect_error(
+    mvgam:::jsdgam_phylo_to_dist(d, species_4()),
+    "missing one or more species levels"
+  )
+})
+
+test_that("jsdgam_phylo_to_dist accepts ape::phylo and returns named matrix", {
+  testthat::skip_if_not_installed("ape")
+  set.seed(7L)
+  tree <- ape::rcoal(n = 4L, tip.label = species_4())
+  out <- mvgam:::jsdgam_phylo_to_dist(tree, species_4())
+  expect_equal(dim(out), c(4L, 4L))
+  expect_equal(rownames(out), species_4())
+})
+
+test_that("jsdgam_phylo_to_dist rejects bad object types", {
+  expect_error(
+    mvgam:::jsdgam_phylo_to_dist("not_a_phylo", species_4()),
+    "must be an 'ape::phylo' object or a numeric"
+  )
+})
+
+# 4c. End-to-end Stan emission via standata.mvgam_formula().
+# Single standata() call rather than per-test mvgam compiles.
+
+jsdgam_loadings_fixture <- function() {
+  set.seed(2L)
+  n_species <- 4L
+  series_levels <- species_4()
+  data <- data.frame(
+    series = factor(rep(series_levels, each = 6L), levels = series_levels),
+    time = rep(seq_len(6L), n_species),
+    y = rpois(24L, 2)
+  )
+  traits <- data.frame(
+    series = series_levels,
+    body_mass = c(0.2, 0.6, 1.1, 1.5),
+    diet = factor(c("plant", "insect", "fish", "fish"))
+  )
+  d_mat <- as.matrix(stats::dist(seq_len(n_species)))
+  rownames(d_mat) <- colnames(d_mat) <- series_levels
+  mf <- mvgam_formula(
+    y ~ 1,
+    trend_formula = ~ ZMVN(cor = TRUE, subgr = series)
+  )
+  tm <- matrix(NA_real_, n_species, 2L)
+  rownames(tm) <- series_levels
+  list(
+    data = data, traits = traits, d_mat = d_mat,
+    mf = mf, trend_map = tm
+  )
+}
+
+test_that("traits + phylo route through standata.mvgam_formula cleanly", {
+  fx <- jsdgam_loadings_fixture()
+  sd <- suppressWarnings(standata(
+    fx$mf, data = fx$data, family = poisson(),
+    trend_map = fx$trend_map,
+    loadings_prior = list(
+      features = fx$traits,
+      distances = list(phylo = fx$d_mat)
+    )
+  ))
+  # Feature matrix: 1 numeric + 3 one-hot diet columns = 4 features
+  expect_true(!is.null(sd$row_features))
+  expect_equal(nrow(sd$row_features), 4L)
+  expect_equal(ncol(sd$row_features), 4L)
+  expect_true("dist_phylo" %in% names(sd))
+  expect_equal(dim(sd$dist_phylo), c(4L, 4L))
+  # validate_pairwise_distance() rescales to max = 1.
+  expect_equal(max(sd$dist_phylo), 1)
+})
+
+test_that("default (no aliases) yields no row_features / dist_* slots", {
+  fx <- jsdgam_loadings_fixture()
+  sd <- suppressWarnings(standata(
+    fx$mf, data = fx$data, family = poisson(),
+    trend_map = fx$trend_map
+  ))
+  expect_false("dist_phylo" %in% names(sd))
+  expect_false("row_features" %in% names(sd))
+})

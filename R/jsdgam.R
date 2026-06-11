@@ -85,9 +85,33 @@
 #'   prior overrides. See `[get_mvgam_priors]` and `[brms::prior()]`
 #'   for the conventions.
 #'
+#' @param traits Optional per-species feature `data.frame`, matrix,
+#'   or single string referencing a slot in `data2`. Rows correspond
+#'   to species and are matched against `levels(data[[species]])` by
+#'   the `series` column (if present), rownames, or row order.
+#'   Forwarded as `loadings_prior$features`; categorical columns are
+#'   one-hot encoded and numerics z-scored downstream by
+#'   `encode_loadings_features()`. Mutually exclusive with an
+#'   explicit `loadings_prior` argument.
+#'
+#' @param phylo Optional phylogeny. Either an `ape::phylo` object
+#'   (in which case `ape::cophenetic.phylo()` produces a pairwise
+#'   distance matrix and a non-ultrametric tree triggers a one-time
+#'   warning) or a pre-computed numeric distance matrix whose
+#'   row/column names match `levels(data[[species]])`. The matrix
+#'   is forwarded as `loadings_prior$distances$phylo` and rescaled
+#'   to `max(d) = 1` by `validate_pairwise_distance()`. Requires the
+#'   \pkg{ape} package when an `ape::phylo` object is supplied.
+#'   Mutually exclusive with an explicit `loadings_prior` argument.
+#'
+#' @param loadings_prior Optional explicit specification of the
+#'   structured loadings prior, mirroring the `mvgam()` argument.
+#'   When supplied the `traits` and `phylo` aliases must be `NULL`;
+#'   see `[mvgam()]` for the accepted field list.
+#'
 #' @param ... Other arguments forwarded to `mvgam()`. Notable ones
-#'   include `loadings_prior` (for trait- and phylogeny-informed
-#'   priors on Z), `algorithm`, `chains`, `silent`, `run_model`.
+#'   include `data2` (lookup list for string-named `traits` / `phylo`
+#'   slots), `algorithm`, `chains`, `silent`, `run_model`.
 #'
 #' @return A `list` of class `c("mvgam", "jsdgam")`. The full mvgam
 #'   method surface (`summary`, `predict`, `forecast`, `loo`,
@@ -121,6 +145,9 @@ jsdgam <- function(formula,
                    share_obs_params = FALSE,
                    priors,
                    n_lv = 2L,
+                   traits = NULL,
+                   phylo = NULL,
+                   loadings_prior = NULL,
                    backend = getOption("brms.backend", "cmdstanr"),
                    ...) {
   call <- match.call(expand.dots = FALSE)
@@ -228,6 +255,19 @@ jsdgam <- function(formula,
   trend_map_mat <- matrix(NA_real_, nrow = n_species, ncol = as.integer(n_lv))
   rownames(trend_map_mat) <- levels(data_train$series)
 
+  # Resolve the trait + phylogeny aliases into a loadings_prior list
+  # before forwarding. The downstream pipeline (normalise_loadings_prior
+  # -> make_loadings_prior_stanvars -> generate_factor_model) does the
+  # encoding, validation and Stan emission; the helper here only
+  # translates user-facing names into that spec.
+  dots <- list(...)
+  loadings_prior_resolved <- build_jsdgam_loadings_prior(
+    traits = traits,
+    phylo = phylo,
+    loadings_prior = loadings_prior,
+    species_levels = levels(data_train$series)
+  )
+
   # Forward to mvgam(). Optional args (knots, factor_knots, newdata,
   # priors) only enter the call if the user supplied them so mvgam's
   # own argument defaults handle the missing case.
@@ -245,7 +285,14 @@ jsdgam <- function(formula,
   if (!missing(knots)) forward_args$knots <- knots
   if (!missing(factor_knots)) forward_args$trend_knots <- factor_knots
   if (!missing(priors)) forward_args$priors <- priors
-  forward_args <- c(forward_args, list(...))
+  if (!is.null(loadings_prior_resolved)) {
+    forward_args$loadings_prior <- loadings_prior_resolved
+  }
+  # Drop any duplicate loadings_prior coming through ..., since the
+  # explicit argument and the alias resolver have already been
+  # reconciled by build_jsdgam_loadings_prior().
+  dots$loadings_prior <- NULL
+  forward_args <- c(forward_args, dots)
 
   fit <- do.call(mvgam, forward_args)
 
@@ -263,4 +310,128 @@ jsdgam <- function(formula,
 
   class(fit) <- c("mvgam", "jsdgam")
   fit
+}
+
+
+# Resolve the trait + phylogeny aliases supplied to `jsdgam()` into a
+# `loadings_prior` list spec consumed by `normalise_loadings_prior()`.
+# - `traits` -> `loadings_prior$features`
+# - `phylo`  -> `loadings_prior$distances$phylo`
+# `loadings_prior` cannot be combined with the aliases; if both are
+# present the function errors. When all three are NULL it returns
+# NULL so the default iid prior fires downstream.
+#
+# @noRd
+build_jsdgam_loadings_prior <- function(traits,
+                                        phylo,
+                                        loadings_prior,
+                                        species_levels) {
+  has_alias <- !is.null(traits) || !is.null(phylo)
+  if (!is.null(loadings_prior) && has_alias) {
+    stop(insight::format_error(c(
+      paste0(
+        "Supply EITHER an explicit 'loadings_prior' OR the ",
+        "'traits' / 'phylo' aliases."
+      ),
+      i = paste0(
+        "The aliases are compiled into a 'loadings_prior' spec ",
+        "internally; pick one entry point per fit."
+      )
+    )))
+  }
+  if (!is.null(loadings_prior)) return(loadings_prior)
+  if (!has_alias) return(NULL)
+  spec <- list()
+  if (!is.null(traits)) {
+    spec$features <- traits
+  }
+  if (!is.null(phylo)) {
+    spec$distances <- list(
+      phylo = jsdgam_phylo_to_dist(phylo, species_levels)
+    )
+  }
+  spec
+}
+
+
+# Convert a phylogeny supplied via `phylo =` into a pairwise distance
+# matrix on the species axis. Accepts:
+#   - `ape::phylo` objects: requires the `ape` package; computes
+#     `ape::cophenetic.phylo()` and warns once when the tree is not
+#     ultrametric (the path-length distances still propagate but the
+#     downstream `validate_pairwise_distance()` rescales to max = 1).
+#   - Numeric distance matrices: passed through after a names check.
+# Downstream `validate_pairwise_distance()` does the symmetry,
+# zero-diagonal, non-negativity and rescale checks. This helper only
+# bridges between the phylogeny object types and the matrix shape
+# downstream expects.
+#
+# @noRd
+jsdgam_phylo_to_dist <- function(phylo, species_levels) {
+  checkmate::assert_character(species_levels, min.len = 2L,
+                              any.missing = FALSE)
+  if (inherits(phylo, "phylo")) {
+    insight::check_if_installed("ape")
+    if (!ape::is.ultrametric(phylo)) {
+      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+        rlang::warn(
+          insight::format_warning(c(
+            paste0(
+              "Phylogeny passed to 'phylo' is not ultrametric."
+            ),
+            i = paste0(
+              "Cophenetic distances use raw path lengths; the ",
+              "loadings-prior pipeline rescales the matrix to ",
+              "max(d) = 1 before constructing the kernel."
+            )
+          )),
+          .frequency = "once",
+          .frequency_id = "jsdgam_non_ultrametric_phylo"
+        )
+      }
+    }
+    d <- ape::cophenetic.phylo(phylo)
+  } else if (is.matrix(phylo) || is.data.frame(phylo)) {
+    d <- as.matrix(phylo)
+    if (!is.numeric(d)) {
+      stop(insight::format_error(
+        "'phylo' matrix must be numeric."
+      ))
+    }
+  } else {
+    stop(insight::format_error(c(
+      paste0(
+        "'phylo' must be an 'ape::phylo' object or a ",
+        "numeric distance matrix."
+      ),
+      x = paste0("Got: '", class(phylo)[1L], "'.")
+    )))
+  }
+  if (is.null(rownames(d)) || is.null(colnames(d))) {
+    stop(insight::format_error(c(
+      paste0(
+        "Phylogenetic distance matrix needs row and column names ",
+        "matching the species levels."
+      ),
+      i = paste0(
+        "Set rownames(d) and colnames(d) before passing, or supply ",
+        "an 'ape::phylo' object whose tip labels match the ",
+        "species levels."
+      )
+    )))
+  }
+  missing_sp <- setdiff(species_levels, rownames(d))
+  if (length(missing_sp) > 0L) {
+    stop(insight::format_error(c(
+      "Phylogeny is missing one or more species levels.",
+      x = paste0(
+        "Missing: ",
+        paste0("'", missing_sp, "'", collapse = ", "), "."
+      ),
+      i = paste0(
+        "Every species level must appear as a tip label / row name."
+      )
+    )))
+  }
+  d[species_levels, species_levels, drop = FALSE]
 }

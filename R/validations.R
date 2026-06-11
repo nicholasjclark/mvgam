@@ -2980,7 +2980,12 @@ normalise_trend_map_on_specs <- function(trend_specs, data) {
         i = "Drop the redundant 'n_lv' or update trend_map shape."
       )))
     }
-    spec$fixed_Z <- normalised$Z
+    # An all-NA mask is just the canonical factor-model trigger
+    # (every loading free). Treat it as NULL so the downstream
+    # 'matrix-Z' code path emits a free parameter Z that
+    # loadings_prior can wire onto column-wise; keep n_lv so the
+    # factor-model gate (n_lv < n_series) still fires.
+    spec$fixed_Z <- if (all(is.na(normalised$Z))) NULL else normalised$Z
     spec$n_lv <- normalised$n_lv
     specs[[i]] <- spec
   }
@@ -5444,6 +5449,18 @@ assert_distance_names_unreserved <- function(nms) {
 
 assert_loadings_prior_compatible <- function(loadings_prior_spec,
                                              trend_map_Z) {
+  # Compatibility contract (matching the user-facing roxygen on
+  # `mvgam()` / `jsdgam()` `trend_map` + `loadings_prior` args):
+  # - trend_map_Z = NULL (no fixed entries; canonical free-Z trigger
+  #   via `n_lv`, or the all-NA jsdgam mask which
+  #   `normalise_trend_map_on_specs()` collapses to NULL): COMPATIBLE.
+  # - trend_map_Z mixed (some fixed values, some NAs): INCOMPATIBLE.
+  #   Partial-Z parameterises Z element-wise via a vector parameter
+  #   under an iid student_t prior; the matrix-normal loadings_prior
+  #   wires onto the assembled Z matrix in tparameters and would
+  #   silently overlap with the per-element prior.
+  # - trend_map_Z fully fixed (no NAs): INCOMPATIBLE. No free
+  #   parameters for the structured prior to act on.
   if (is.null(loadings_prior_spec) || is.null(trend_map_Z)) {
     return(invisible(NULL))
   }
@@ -5452,12 +5469,15 @@ assert_loadings_prior_compatible <- function(loadings_prior_spec,
     stop(insight::format_error(c(
       paste0(
         "'loadings_prior' cannot combine with a partial 'trend_map' ",
-        "(NA entries)."
+        "(mixed fixed entries and NAs)."
       ),
       i = paste0(
         "Drop 'trend_map' to apply the structured prior to a free ",
-        "loadings matrix, or drop 'loadings_prior' to keep the ",
-        "user-supplied partial pattern."
+        "loadings matrix (the n_lv argument alone triggers the ",
+        "factor model), or drop 'loadings_prior' to keep the ",
+        "user-supplied partial pattern. An all-NA mask is treated ",
+        "as 'no fixed entries' upstream and does combine cleanly ",
+        "with 'loadings_prior'."
       )
     )))
   }

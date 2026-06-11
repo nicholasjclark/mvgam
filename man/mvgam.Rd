@@ -31,19 +31,25 @@ to Stan at fit time — supply it to \code{posterior_predict()} /
 \code{forecast()} for out-of-sample evaluation.}
 
 \item{trend_map}{Optional fixed factor-loading specification.
-Accepts one of three shapes — a numeric \verb{n_series x n_lv}
+Accepts one of three shapes, a numeric \verb{n_series x n_lv}
 matrix for general loadings, a \code{data.frame(series, trend)}
 for sparse series-to-trend sharing, or a character code
 \code{"identity"} / \code{"shared"} for the two most common cases.
 The numeric matrix may carry \code{NA} entries to mark loadings
 that should be sampled (partial Z); finite entries are
 treated as fixed and preserved exactly on \code{Z} in the
-posterior. Default factor models (no \code{trend_map}) sample
-\code{Z} unconstrained and identify it post-hoc via thin QR
-(see Heaps & Jermyn 2024); any user-supplied \code{trend_map}
-bypasses that rotation so the encoded structure is not
-altered. Top-level alias for the \code{trend_map} argument on
-the trend constructor; passing both is an error.}
+posterior. An all-NA mask is treated as equivalent to
+\code{trend_map = NULL} (no fixed entries, factor model
+triggered by \code{n_lv} alone) so it composes with
+\code{loadings_prior}. Default factor models (no \code{trend_map})
+sample \code{Z} unconstrained and identify it post-hoc via thin
+QR (see Heaps & Jermyn 2024); any user-supplied \code{trend_map}
+with at least one fixed entry bypasses that rotation so the
+encoded structure is not altered. Top-level alias for the
+\code{trend_map} argument on the trend constructor; passing both
+is an error. See \code{loadings_prior} for the compatibility
+matrix between \code{trend_map} patterns and structured
+loadings priors.}
 
 \item{loadings_prior}{Optional named list specifying a
 structured prior on the unconstrained factor loadings
@@ -102,9 +108,36 @@ standardisation. Heaps Supps S4.2.1 used "root-to-tip
 distance = 1" for ultrametric phylogenies, which corresponds
 to \code{max(d) = 2} (twice the per-leaf depth); pre-standardise
 your distance matrix to match if exact parity matters.
-Cannot combine with \code{trend_map}: a partial or fully-fixed
-loadings matrix has no free parameters left for a
-structured prior.}
+Identification caveat. The structured prior is placed on the
+unrotated \code{Z} columns, before the post-hoc QR rotation
+identifies \code{Z_tilde}. Each column of the identified
+\code{Z_tilde} is a linear mixture of the unrotated columns
+under the rotation \code{Q_tilde}. Trait or phylogeny effects
+inferred via \code{shared_variation()} or \code{residual_cor()} are
+well-defined on the rotation-invariant outer product
+\verb{Z Z'}, but column-by-column interpretation of \code{Z_tilde}
+does not directly inherit the structured prior. The same
+caveat applies to all per-factor scalars (see the trend
+constructors' Identification sections).
+
+Compatibility with \code{trend_map}:
+\itemize{
+\item \code{trend_map = NULL} (default): COMPATIBLE. \code{n_lv} alone
+triggers the free-Z factor model; \code{loadings_prior} wires
+onto the sampled \code{Z} column-wise.
+\item \code{trend_map = matrix(NA_real_, n_series, n_lv)}
+(all-NA mask, used internally by \code{jsdgam()}): COMPATIBLE.
+Treated as a free-Z trigger upstream; \code{loadings_prior}
+applies as if \code{trend_map} were \code{NULL}.
+\item \code{trend_map} with a mix of fixed entries and \code{NA}s:
+INCOMPATIBLE. Partial-Z parameterises the free entries
+as a vector under an iid \code{student_t(3, 0, 1)} prior,
+which would overlap with the matrix-normal structure
+and double-count regularisation.
+\item Fully-fixed \code{trend_map} (no \code{NA}s): INCOMPATIBLE.
+No free parameters left for the structured prior to act
+on.
+}}
 
 \item{backend}{Stan backend (defaults to "cmdstanr")}
 

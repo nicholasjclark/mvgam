@@ -17,6 +17,9 @@ jsdgam(
   share_obs_params = FALSE,
   priors,
   n_lv = 2L,
+  traits = NULL,
+  phylo = NULL,
+  loadings_prior = NULL,
   backend = getOption("brms.backend", "cmdstanr"),
   ...
 )
@@ -78,11 +81,35 @@ for the conventions.}
 modelling residual associations. Must be \verb{>= 1} and strictly
 less than the number of species. Defaults to \code{2}.}
 
+\item{traits}{Optional per-species feature \code{data.frame}, matrix,
+or single string referencing a slot in \code{data2}. Rows correspond
+to species and are matched against \code{levels(data[[species]])} by
+the \code{series} column (if present), rownames, or row order.
+Forwarded as \code{loadings_prior$features}; categorical columns are
+one-hot encoded and numerics z-scored downstream by
+\code{encode_loadings_features()}. Mutually exclusive with an
+explicit \code{loadings_prior} argument.}
+
+\item{phylo}{Optional phylogeny. Either an \code{ape::phylo} object
+(in which case \code{ape::cophenetic.phylo()} produces a pairwise
+distance matrix and a non-ultrametric tree triggers a one-time
+warning) or a pre-computed numeric distance matrix whose
+row/column names match \code{levels(data[[species]])}. The matrix
+is forwarded as \code{loadings_prior$distances$phylo} and rescaled
+to \code{max(d) = 1} by \code{validate_pairwise_distance()}. Requires the
+\pkg{ape} package when an \code{ape::phylo} object is supplied.
+Mutually exclusive with an explicit \code{loadings_prior} argument.}
+
+\item{loadings_prior}{Optional explicit specification of the
+structured loadings prior, mirroring the \code{mvgam()} argument.
+When supplied the \code{traits} and \code{phylo} aliases must be \code{NULL};
+see \verb{[mvgam()]} for the accepted field list.}
+
 \item{backend}{Stan backend (defaults to "cmdstanr")}
 
 \item{...}{Other arguments forwarded to \code{mvgam()}. Notable ones
-include \code{loadings_prior} (for trait- and phylogeny-informed
-priors on Z), \code{algorithm}, \code{chains}, \code{silent}, \code{run_model}.}
+include \code{data2} (lookup list for string-named \code{traits} / \code{phylo}
+slots), \code{algorithm}, \code{chains}, \code{silent}, \code{run_model}.}
 }
 \value{
 A \code{list} of class \code{c("mvgam", "jsdgam")}. The full mvgam

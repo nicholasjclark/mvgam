@@ -25,19 +25,25 @@
 #'   to Stan at fit time — supply it to `posterior_predict()` /
 #'   `forecast()` for out-of-sample evaluation.
 #' @param trend_map Optional fixed factor-loading specification.
-#'   Accepts one of three shapes — a numeric `n_series x n_lv`
+#'   Accepts one of three shapes, a numeric `n_series x n_lv`
 #'   matrix for general loadings, a `data.frame(series, trend)`
 #'   for sparse series-to-trend sharing, or a character code
 #'   `"identity"` / `"shared"` for the two most common cases.
 #'   The numeric matrix may carry `NA` entries to mark loadings
 #'   that should be sampled (partial Z); finite entries are
 #'   treated as fixed and preserved exactly on `Z` in the
-#'   posterior. Default factor models (no `trend_map`) sample
-#'   `Z` unconstrained and identify it post-hoc via thin QR
-#'   (see Heaps & Jermyn 2024); any user-supplied `trend_map`
-#'   bypasses that rotation so the encoded structure is not
-#'   altered. Top-level alias for the `trend_map` argument on
-#'   the trend constructor; passing both is an error.
+#'   posterior. An all-NA mask is treated as equivalent to
+#'   `trend_map = NULL` (no fixed entries, factor model
+#'   triggered by `n_lv` alone) so it composes with
+#'   `loadings_prior`. Default factor models (no `trend_map`)
+#'   sample `Z` unconstrained and identify it post-hoc via thin
+#'   QR (see Heaps & Jermyn 2024); any user-supplied `trend_map`
+#'   with at least one fixed entry bypasses that rotation so the
+#'   encoded structure is not altered. Top-level alias for the
+#'   `trend_map` argument on the trend constructor; passing both
+#'   is an error. See `loadings_prior` for the compatibility
+#'   matrix between `trend_map` patterns and structured
+#'   loadings priors.
 #' @param loadings_prior Optional named list specifying a
 #'   structured prior on the unconstrained factor loadings
 #'   matrix following Heaps & Jermyn (2024). When supplied, the
@@ -95,9 +101,36 @@
 #'   distance = 1" for ultrametric phylogenies, which corresponds
 #'   to `max(d) = 2` (twice the per-leaf depth); pre-standardise
 #'   your distance matrix to match if exact parity matters.
-#'   Cannot combine with `trend_map`: a partial or fully-fixed
-#'   loadings matrix has no free parameters left for a
-#'   structured prior.
+#'   Identification caveat. The structured prior is placed on the
+#'   unrotated `Z` columns, before the post-hoc QR rotation
+#'   identifies `Z_tilde`. Each column of the identified
+#'   `Z_tilde` is a linear mixture of the unrotated columns
+#'   under the rotation `Q_tilde`. Trait or phylogeny effects
+#'   inferred via `shared_variation()` or `residual_cor()` are
+#'   well-defined on the rotation-invariant outer product
+#'   `Z Z'`, but column-by-column interpretation of `Z_tilde`
+#'   does not directly inherit the structured prior. The same
+#'   caveat applies to all per-factor scalars (see the trend
+#'   constructors' Identification sections).
+#'
+#'   Compatibility with `trend_map`:
+#'   \itemize{
+#'     \item `trend_map = NULL` (default): COMPATIBLE. `n_lv` alone
+#'       triggers the free-Z factor model; `loadings_prior` wires
+#'       onto the sampled `Z` column-wise.
+#'     \item `trend_map = matrix(NA_real_, n_series, n_lv)`
+#'       (all-NA mask, used internally by `jsdgam()`): COMPATIBLE.
+#'       Treated as a free-Z trigger upstream; `loadings_prior`
+#'       applies as if `trend_map` were `NULL`.
+#'     \item `trend_map` with a mix of fixed entries and `NA`s:
+#'       INCOMPATIBLE. Partial-Z parameterises the free entries
+#'       as a vector under an iid `student_t(3, 0, 1)` prior,
+#'       which would overlap with the matrix-normal structure
+#'       and double-count regularisation.
+#'     \item Fully-fixed `trend_map` (no `NA`s): INCOMPATIBLE.
+#'       No free parameters left for the structured prior to act
+#'       on.
+#'   }
 #' @param backend Stan backend (defaults to "cmdstanr")
 #' @param combine Logical, pool multiple imputation results (default TRUE)
 #' @param family Family specification. Supports most brms families including
