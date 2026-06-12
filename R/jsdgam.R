@@ -64,7 +64,17 @@
 #'   distribution. Supported families are documented in
 #'   `mvgam_families`. Defaults to `binomial()`, which is the standard
 #'   choice for presence/absence JSDM responses; switch to a count
-#'   family (`poisson()`, `nb()`) when modelling counts.
+#'   family (`poisson()`, `nb()`) when modelling counts. For simplex
+#'   multi-response families (`diri()`, `multi()`, `categ()`), write
+#'   the formula with a per-`species` interaction (e.g.
+#'   `y ~ env * species` or the brms-native-style
+#'   `y ~ 0 + species + env:species`). All fixed effects shared
+#'   across species drop out of the softmax likelihood, so a
+#'   formula like `y ~ env` will fit but its `b_Intercept` and
+#'   `b_env` coefficients carry no posterior information; a
+#'   once-per-session warning fires in that case to point at the
+#'   interpretable form. See `?diri` for the identification
+#'   constraints that make this work.
 #'
 #' @param unit The unquoted name of the `numeric/integer` variable
 #'   that indexes the sampling unit (typical names: `time` or
@@ -326,6 +336,17 @@ jsdgam <- function(formula,
     species_levels = levels(data_train$series)
   )
 
+  # Soft warn (once per session) for simplex multi-response families
+  # whose `formula` carries no term referencing the species factor.
+  # Under the mode-1 + mode-2 constraints any such K-shared coefficient
+  # is pulled to near zero by the prior and contributes nothing to the
+  # likelihood; the user almost certainly wants per-species fixed
+  # effects via `* series` (or the user's species column name) or the
+  # brms-native-style `0 + series + env:series`.
+  if (is_simplex_response_family(family)) {
+    warn_simplex_obs_formula_lacks_species(formula, species_chr)
+  }
+
   # Forward to mvgam(). Optional args (knots, factor_knots, newdata,
   # priors) only enter the call if the user supplied them so mvgam's
   # own argument defaults handle the missing case.
@@ -368,6 +389,52 @@ jsdgam <- function(formula,
 
   class(fit) <- c("mvgam", "jsdgam")
   fit
+}
+
+
+# Soft-warn (once per session) when a simplex `jsdgam()` call has no
+# term in `formula` that interacts with or references the species
+# factor. Such formulas put all per-category differentiation onto the
+# latent factor `Z`, while the K-shared fixed-effect coefficients
+# (e.g. `b_Intercept`, `b_env`) drop out of the softmax likelihood
+# and sample from their default `student_t(3, 0, 2.5)` prior with no
+# data contribution.
+#
+# Detects the species factor by looking for the user-supplied
+# `species_chr` column name in the formula's term labels via
+# `all.vars()`. Returns the formula invariant; only side effect is
+# the warning.
+#
+# @noRd
+warn_simplex_obs_formula_lacks_species <- function(formula, species_chr) {
+  if (identical(Sys.getenv("TESTTHAT"), "true")) return(invisible(NULL))
+  if (!inherits(formula, "formula") && !inherits(formula, "brmsformula")) {
+    return(invisible(NULL))
+  }
+  rhs_formula <- if (inherits(formula, "brmsformula")) {
+    formula$formula
+  } else {
+    formula
+  }
+  rhs_vars <- tryCatch(
+    all.vars(rhs_formula[[length(rhs_formula)]]),
+    error = function(e) character(0)
+  )
+  if (species_chr %in% rhs_vars || "series" %in% rhs_vars) {
+    return(invisible(NULL))
+  }
+  rlang::warn(
+    paste0(
+      "All fixed effects in 'formula' are shared across categories. ",
+      "The factor model 'Z' will carry the per-category differentiation. ",
+      "For interpretable per-category fixed effects, consider ",
+      "'y ~ env * ", species_chr, "' or ",
+      "'y ~ 0 + ", species_chr, " + env:", species_chr, "'."
+    ),
+    .frequency = "once",
+    .frequency_id = "jsdgam_simplex_no_species_interaction"
+  )
+  invisible(NULL)
 }
 
 

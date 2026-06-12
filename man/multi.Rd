@@ -36,13 +36,13 @@ Softmax inside the lpmf maps the K scores per unit to a
 simplex of cell probabilities. Default link is identity.}
 }
 
-Identification: identical to \code{\link[=diri]{diri()}}. Softmax is shift-invariant
-in \code{mu_unit}, so the K rows of \code{Z} carry a residual level
-indeterminacy under the default iid \code{Z} prior. The
-\code{make_simplex_z_constraint_stanvar()} helper bundles a soft
-column-sum constraint (\code{sum(Z[, l]) ~ normal(0, 0.01)}) into
-the family stanvars that removes the shift mode at trivial
-cost.
+Identification: identical to \code{\link[=diri]{diri()}}. Each \code{Z} column is
+declared as \code{sum_to_zero_vector[K]} so column sums are exactly
+zero by construction (Stan >= 2.36), and the lpdf body subtracts
+\code{mu_unit[1]} from all entries before softmax to remove the
+K-shared fixed-effect shift. Both constraints are hard (no soft
+priors); the K species are kept symmetric in the loadings via
+the column-sum-zero manifold.
 
 Data layout: long format, one row per (site, species), exactly
 K rows per site. The integer count for that (site, species)
@@ -50,9 +50,12 @@ cell is the response.
 }
 \examples{
 \dontrun{
-# Microbiome-style read-count JSDM
+# Microbiome-style read-count JSDM. The `env * taxon` interaction
+# gives each taxon its own intercept and environmental response;
+# see `?diri` for the rationale on why a per-`species` interaction
+# is the interpretable form for a simplex multi-response family.
 mod <- jsdgam(
-  formula = y ~ env,
+  formula = y ~ env * taxon,
   factor_formula = ~ -1,
   data = read_counts_long,
   unit = site,

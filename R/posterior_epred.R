@@ -527,6 +527,13 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
   # fallback that is irrelevant here.
   if (is_closure_unit_family(object$family)) {
     epred_fn <- dispatch_closure_unit_method(object$family, "epred")
+    # Materialise `ndraws` as `draw_ids` so the kernel's
+    # posterior_linpred call subsamples consistently with the rest
+    # of the pipeline; the closure-unit kernels accept `draw_ids`
+    # only.
+    draw_ids <- closure_unit_resolve_draw_ids(
+      object, ndraws, draw_ids
+    )
     return(epred_fn(
       object, newdata = newdata, draw_ids = draw_ids
     ))

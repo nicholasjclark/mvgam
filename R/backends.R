@@ -697,6 +697,63 @@ backend_choices <- function() {
   c("rstan", "cmdstanr", "mock")
 }
 
+#' Assert the active Stan backend ships at least a given Stan version
+#'
+#' Returns the underlying engine version reported by the live backend
+#' (`rstan::stan_version()` for `"rstan"`,
+#' `cmdstanr::cmdstan_version()` for `"cmdstanr"`) and errors with an
+#' upgrade hint when it falls below `min_version`. Used to gate
+#' features that need recent Stan compiler additions (initially
+#' `sum_to_zero_vector[K]` for the simplex families, but reusable for
+#' any future Stan-version dependency).
+#'
+#' @param backend One of `"rstan"` or `"cmdstanr"`. The `"mock"`
+#'   backend is rejected because it does not run a real Stan compiler.
+#' @param min_version Minimum Stan engine version required (e.g.
+#'   `"2.36.0"`). Compared via `numeric_version()`.
+#' @param feature Optional short description of the feature being
+#'   gated; surfaces in the error message so the user knows what they
+#'   need the newer Stan for.
+#' @return Invisible NULL; errors if the engine version is too old.
+#' @noRd
+assert_stan_version <- function(backend, min_version, feature = NULL) {
+  checkmate::assert_choice(backend, c("rstan", "cmdstanr"))
+  checkmate::assert_string(min_version, min.chars = 1L)
+  checkmate::assert_string(feature, null.ok = TRUE)
+  required <- numeric_version(min_version)
+  if (identical(backend, "cmdstanr")) {
+    require_package("cmdstanr")
+    stan_v <- numeric_version(as.character(cmdstanr::cmdstan_version()))
+  } else {
+    stan_v <- numeric_version(as.character(rstan::stan_version()))
+  }
+  if (stan_v >= required) return(invisible(NULL))
+  upgrade <- if (identical(backend, "cmdstanr")) {
+    paste0(
+      "Upgrade with `cmdstanr::install_cmdstan(version = '",
+      required, "')` or newer."
+    )
+  } else {
+    paste0(
+      "Upgrade with `install.packages('rstan', ",
+      "repos = c('https://stan-dev.r-universe.dev', getOption('repos')))` ",
+      "to a build that ships Stan >= ", required, "."
+    )
+  }
+  feature_clause <- if (is.null(feature)) {
+    ""
+  } else {
+    paste0(" (", feature, " requires this version)")
+  }
+  stop(insight::format_error(c(
+    paste0(
+      "Stan >= ", required, " is required", feature_clause, "."
+    ),
+    x = paste0("Detected Stan ", stan_v, " via backend '", backend, "'."),
+    i = upgrade
+  )))
+}
+
 #' Supported Stan Algorithms
 #'
 #' @description

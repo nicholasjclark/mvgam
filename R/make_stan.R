@@ -180,7 +180,23 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
   # constant offset, so soft-warn the user once per session.
   warn_pw_obs_intercept(mv_spec, obs_formula)
 
-  # Setup observation model using lightweight brms
+  # Setup observation model using lightweight brms.
+  # Simplex multi-response families (`diri`, `multi`, `categ`)
+  # impose a hard sum-to-zero constraint on the loadings matrix `Z`
+  # via Stan's `sum_to_zero_vector[K]` (Stan >= 2.36) and remove
+  # the K-shared softmax shift inside each lpdf by subtracting
+  # `mu_unit[1]`. Both constraints are exact (no soft priors), so
+  # the K-shared population effects (`b_Intercept`, `b_env`, etc.)
+  # carry no likelihood information. A weakly-informative
+  # `student_t(3, 0, 2.5)` default prior keeps them sampling from
+  # a proper distribution; users may override via `prior`.
+  if (is_simplex_response_family(family)) {
+    assert_stan_version(
+      backend, "2.36.0",
+      feature = "'sum_to_zero_vector[K]' for simplex families"
+    )
+    prior <- c(default_simplex_population_priors(), prior)
+  }
   # Filter priors: only pass observation-related priors to observation setup
   obs_priors <- filter_obs_priors(prior)
   
@@ -283,7 +299,8 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
     trend_setup = trend_setup,
     mv_spec = mv_spec,
     validate = validate,
-    prior = trend_priors  # Pass unfiltered trend priors to mvgam functions
+    prior = trend_priors,  # Pass unfiltered trend priors to mvgam functions
+    backend = backend
   )
 
   # Validate result structure with specific error locations

@@ -34,16 +34,25 @@ log.}
 }
 
 Identification under the K-row free \code{Z} factor model: softmax
-is shift-invariant in \code{mu_unit} (adding \verb{c * 1_K} leaves the
-likelihood unchanged), so under the default iid \code{Z} prior the
-columns of \code{Z} carry a residual level indeterminacy that the
-Heaps post-hoc QR rotation does not absorb. The downstream
-factor-model emission adds a soft column-sum constraint on
-\code{Z} (\code{sum(Z[, l]) ~ normal(0, 0.01)}) whenever
-\code{is_simplex_response_family(family)} is TRUE, which removes the
-shift mode at trivial cost. The \code{loadings_prior} matrix-normal
-prior, when supplied, already encodes a zero column mean and
-so doubles as a stronger version of the constraint.
+is shift-invariant in \code{mu_unit} along two independent directions,
+both removed by HARD constraints (Stan >= 2.36). Each column of
+\code{Z} is declared as Stan's native \code{sum_to_zero_vector[K]} so
+column sums are exactly zero by construction (no soft prior,
+no scale to tune; see Mitzi Morris "The Sum-to-Zero Constraint
+in Stan" for the Helmert-style transform Stan uses internally).
+The per-site K-shared fixed-effect shift is eliminated inside
+the lpdf by subtracting \code{mu_unit[1]} from all entries before
+softmax, matching the brms-native dirichlet reference-category
+parameterisation. A weakly-informative \code{student_t(3, 0, 2.5)}
+population-effect default prior is also injected because brms
+\code{custom_family()} would otherwise emit flat improper priors;
+under the hard mode-2 reference subtraction, any K-shared
+coefficient (\code{b_Intercept}, \code{b_env}, etc.) has no likelihood
+contribution and samples from that prior, so a once-per-session
+warning fires from \code{jsdgam()} when the user's formula contains
+no per-\code{species} interaction term. The \code{loadings_prior} matrix-normal prior, when
+supplied, composes with the sum-to-zero constraint and is the
+recommended path when traits or phylogeny are available.
 
 Data layout: long format, one row per (site, species), exactly
 K rows per site. The user passes the species axis via the
@@ -53,9 +62,13 @@ groups by (series, time) so each site forms one closure unit.
 }
 \examples{
 \dontrun{
-# Compositional JSDM on long-format proportions data
+# Compositional JSDM on long-format proportions data. The formula
+# interacts the environmental covariate with `species` so each
+# species gets its own intercept and `env` slope; this is the
+# interpretable form for a simplex multi-response family. The
+# brms-native-style `y ~ 0 + species + env:species` is equivalent.
 mod <- jsdgam(
-  formula = y ~ env,
+  formula = y ~ env * species,
   factor_formula = ~ -1,
   data = my_long_format_data,
   unit = site,

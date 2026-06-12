@@ -836,7 +836,7 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
     expect_true(stan_pattern("ar1_trend ~", code_with_trend))
     expect_true(stan_pattern("sigma_trend ~", code_with_trend))
     expect_true(stan_pattern("L_Omega_trend ~", code_with_trend))
-    expect_true(stan_pattern("to_vector\\(Z\\) ~ student_t\\(3, 0, 1\\);",
+    expect_true(stan_pattern("to_vector\\(Z\\) ~ student_t\\(3, 0, 0.5\\);",
                       code_with_trend))
     expect_true(stan_pattern("to_vector\\(innovations_trend\\) ~", code_with_trend))
 
@@ -1028,7 +1028,7 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   expect_true(stan_pattern("ar1_trend ~", code_with_trend))
   expect_true(stan_pattern("sigma_trend ~", code_with_trend))
   expect_true(stan_pattern("L_Omega_trend ~", code_with_trend))
-  expect_true(stan_pattern("to_vector\\(Z\\) ~ student_t\\(3, 0, 1\\);", code_with_trend))
+  expect_true(stan_pattern("to_vector\\(Z\\) ~ student_t\\(3, 0, 0.5\\);", code_with_trend))
   expect_true(stan_pattern("to_vector\\(innovations_trend\\) ~", code_with_trend))
 
   # Post-hoc QR identification in generated quantities
@@ -1139,7 +1139,7 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
 
   # Trend parameter priors
   expect_true(stan_pattern("sigma_trend ~ exponential\\(2\\);", code_with_trend))
-  expect_true(stan_pattern("to_vector\\(Z\\) ~ student_t\\(3, 0, 1\\);", code_with_trend))
+  expect_true(stan_pattern("to_vector\\(Z\\) ~ student_t\\(3, 0, 0.5\\);", code_with_trend))
 
   # No prior for b_trend (brms default flat prior)
   expect_false(grepl("b_trend ~", code_with_trend))
@@ -2601,14 +2601,17 @@ mf <- mvgam_formula(y ~ x)
   )
 })
 
-test_that("error message directs users to brms for multi-category families", {
+test_that("error message directs users to the mvgam multi-response wrapper", {
   data <- setup_stan_test_data()$univariate
   mf <- mvgam_formula(y ~ x)
 
-  # Verify error message mentions brms as alternative
+  # Naked `categorical()` now redirects users to the mvgam wrapper
+  # `categ()` rather than pointing back at brms; the multi-response
+  # families ship via the long-format closure-unit pattern, not the
+  # brms-native cbind() LHS.
   expect_error(
     stancode(mf, data = data, family = categorical()),
-    regexp = "brms",
+    regexp = "categ\\(\\)",
     ignore.case = TRUE
   )
 })

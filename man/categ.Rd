@@ -36,10 +36,10 @@ Softmax inside the lpmf maps the K scores per unit to a
 simplex of cell probabilities. Default link is identity.}
 }
 
-Identification: identical to \code{\link[=diri]{diri()}} and \code{\link[=multi]{multi()}}. The
-shared simplex column-sum soft constraint on \code{Z} (bundled via
-\code{make_simplex_z_constraint_stanvar()}) removes the softmax
-shift indeterminacy in the columns of \code{Z}.
+Identification: identical to \code{\link[=diri]{diri()}} and \code{\link[=multi]{multi()}}. Each \code{Z}
+column is declared as \code{sum_to_zero_vector[K]} (Stan >= 2.36) and
+the lpdf subtracts \code{mu_unit[1]} from all entries before softmax.
+Both constraints are hard.
 
 Data layout: long format, one row per (site, category), exactly
 K rows per site. The response \code{y} is binary: \code{y = 1} on the row
@@ -48,9 +48,11 @@ corresponding to the observed category for that site and
 }
 \examples{
 \dontrun{
-# JSDM on single-trial habitat-type observations per site
+# JSDM on single-trial habitat-type observations per site. The
+# `elev * habitat_class` interaction gives each habitat class its
+# own elevation response; see `?diri` for the rationale.
 mod <- jsdgam(
-  formula = y ~ elev,
+  formula = y ~ elev * habitat_class,
   factor_formula = ~ -1,
   data = habitat_long,
   unit = site,

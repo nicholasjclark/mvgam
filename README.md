@@ -60,6 +60,13 @@ and/or `cmdstanr`). Please refer to installation links for `Stan` with
 target="_blank">here</a>, or for `Stan` with `cmdstandr`
 <a href="https://mc-stan.org/cmdstanr/" target="_blank">here</a>.
 
+The simplex multi-response families (`diri()`, `multi()`, `categ()`)
+need Stan `>= 2.36` because their loadings matrix uses Stan's native
+`sum_to_zero_vector[K]` for hard column-sum identification. Install
+or upgrade with `cmdstanr::install_cmdstan(version = "2.36.0")` (or
+newer) when fitting these families. All other families work on any
+`Stan` version supported by `brms`.
+
 ## Cheatsheet
 
 [![`mvgam` usage

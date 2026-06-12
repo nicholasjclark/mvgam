@@ -1514,6 +1514,9 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
   # unit-level structure.
   if (is_closure_unit_family(object$family)) {
     predict_fn <- dispatch_closure_unit_method(object$family, "predict")
+    draw_ids <- closure_unit_resolve_draw_ids(
+      object, ndraws, draw_ids
+    )
     return(predict_fn(
       object, newdata = newdata, draw_ids = draw_ids
     ))

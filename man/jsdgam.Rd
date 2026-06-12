@@ -60,7 +60,17 @@ to Stan at fit time — supply it to \code{posterior_predict()} /
 distribution. Supported families are documented in
 \code{mvgam_families}. Defaults to \code{binomial()}, which is the standard
 choice for presence/absence JSDM responses; switch to a count
-family (\code{poisson()}, \code{nb()}) when modelling counts.}
+family (\code{poisson()}, \code{nb()}) when modelling counts. For simplex
+multi-response families (\code{diri()}, \code{multi()}, \code{categ()}), write
+the formula with a per-\code{species} interaction (e.g.
+\code{y ~ env * species} or the brms-native-style
+\code{y ~ 0 + species + env:species}). All fixed effects shared
+across species drop out of the softmax likelihood, so a
+formula like \code{y ~ env} will fit but its \code{b_Intercept} and
+\code{b_env} coefficients carry no posterior information; a
+once-per-session warning fires in that case to point at the
+interpretable form. See \code{?diri} for the identification
+constraints that make this work.}
 
 \item{unit}{The unquoted name of the \code{numeric/integer} variable
 that indexes the sampling unit (typical names: \code{time} or

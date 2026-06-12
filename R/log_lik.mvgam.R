@@ -159,6 +159,86 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
   # Closure-unit data prep is re-run from the (possibly new)
   # data here so cap edits at predict time take effect.
   if (is_closure_unit_family(family_obj)) {
+    # mv-response families (mvn / mvt) take a different path:
+    # the per-row residual is independent (normal or Student-t)
+    # conditional on the latent factor contribution in mu, so the
+    # closure-unit log_lik scores at the (site, species) row grain
+    # rather than the marginal-over-N grain. Psi (and nu for mvt)
+    # are pulled from the posterior and broadcast to per-row level
+    # via `extract_mv_response_components()`.
+    if (is_multi_response_family(family_obj)) {
+      # mv-response continuous (mvn, mvt) and simplex (diri,
+      # multi, categ) families share the multi-response gate but
+      # need different dpar extraction. mvn/mvt pull Psi/nu; the
+      # simplex families pull the per-row softmax probability +
+      # closure-unit arrays (and phi for diri).
+      if (is_simplex_response_family(family_obj)) {
+        needs_phi <- identical(family_name, "diri")
+        comp <- extract_simplex_response_components(
+          object, newdata, draw_ids, needs_phi = needs_phi,
+          linpred = linpred
+        )
+        family_pars_simplex <- list(
+          prob_row = comp$prob_row,
+          phi      = comp$phi,
+          arrays   = comp$arrays
+        )
+        log_lik_fn <- switch(
+          family_name,
+          diri  = log_lik_diri,
+          multi = log_lik_multi,
+          categ = log_lik_categ,
+          stop(insight::format_error(c(
+            paste0(
+              "Simplex log_lik dispatch missing for family '",
+              family_name, "'."
+            ),
+            i = paste0(
+              "Add a '", family_name, " = log_lik_",
+              family_name, "' branch."
+            )
+          )))
+        )
+        return(log_lik_fn(
+          linpred     = linpred,
+          link        = family_link,
+          y           = y,
+          family_pars = family_pars_simplex,
+          trials      = NULL
+        ))
+      }
+      needs_nu <- identical(family_name, "mvt")
+      comp <- extract_mv_response_components(
+        object, newdata, draw_ids, needs_nu = needs_nu,
+        linpred = linpred
+      )
+      family_pars_mv <- list(
+        Psi_row = comp$Psi_row,
+        nu      = comp$nu
+      )
+      log_lik_fn <- switch(
+        family_name,
+        mvn = log_lik_mvn,
+        mvt = log_lik_mvt,
+        stop(insight::format_error(c(
+          paste0(
+            "Mv-response log_lik dispatch missing for family '",
+            family_name, "'."
+          ),
+          i = paste0(
+            "Add a '", family_name, " = log_lik_",
+            family_name, "' branch."
+          )
+        )))
+      )
+      return(log_lik_fn(
+        linpred     = linpred,
+        link        = family_link,
+        y           = y,
+        family_pars = family_pars_mv,
+        trials      = NULL
+      ))
+    }
     arrays <- build_closure_unit_arrays(
       newdata, response_var = closure_unit_response_var(object$formula)
     )

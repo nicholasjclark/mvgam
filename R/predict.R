@@ -335,6 +335,63 @@ predict_variance <- function(object, newdata, process_error, ndraws,
       resp              = resp
     )
     family_name <- resolve_family_name(object$family)
+    # mv-response families (mvn, mvt) carry per-row residual scale
+    # in Psi (and df in nu for mvt). The marginal per-row variance
+    # under the conditional gllvm parameterisation is the residual
+    # variance plus the row's contribution from the factor model;
+    # the latter is row-constant given the design, so the residual
+    # term carries the per-row variability.
+    if (is_multi_response_family(object$family)) {
+      # Simplex families: per-cell variance follows from the
+      # softmax probability and the family's dispersion. Dirichlet:
+      # Var[X_k] = p_k (1 - p_k) / (phi + 1). Multinomial:
+      # Var[Y_k] = N * p_k (1 - p_k). Categorical: Bernoulli per
+      # cell, Var = p_k (1 - p_k).
+      if (is_simplex_response_family(object$family)) {
+        needs_phi <- identical(family_name, "diri")
+        comp <- extract_simplex_response_components(
+          object, newdata = newdata, draw_ids = NULL,
+          needs_phi = needs_phi
+        )
+        prob <- comp$prob_row
+        base_var <- prob * (1 - prob)
+        if (identical(family_name, "diri")) {
+          phi_mat <- matrix(comp$phi, nrow = comp$ndraws,
+                             ncol = comp$N_obs)
+          return(base_var / (phi_mat + 1))
+        }
+        if (identical(family_name, "multi")) {
+          if (is.null(newdata)) {
+            newdata <- object$obs_data %||% object$data
+          }
+          response_var <- closure_unit_response_var(object$formula)
+          y_vec <- newdata[[response_var]]
+          total_row <- numeric(comp$N_obs)
+          for (g in seq_len(comp$N_unit)) {
+            Kg <- comp$arrays$n_rep[g]
+            idx <- comp$arrays$visit_idx[g, seq_len(Kg)]
+            total_row[idx] <- sum(y_vec[idx])
+          }
+          total_mat <- matrix(total_row, nrow = comp$ndraws,
+                               ncol = comp$N_obs, byrow = TRUE)
+          return(base_var * total_mat)
+        }
+        # categ
+        return(base_var)
+      }
+      needs_nu <- identical(family_name, "mvt")
+      comp <- extract_mv_response_components(
+        object, newdata = newdata, draw_ids = NULL,
+        needs_nu = needs_nu
+      )
+      base_var <- comp$Psi_row^2
+      if (needs_nu) {
+        nu_mat <- matrix(comp$nu, nrow = comp$ndraws,
+                          ncol = comp$N_obs)
+        return(base_var * nu_mat / (nu_mat - 2))
+      }
+      return(base_var)
+    }
     return(switch(
       family_name,
       nmix = epred,                  # Poisson thinned variance

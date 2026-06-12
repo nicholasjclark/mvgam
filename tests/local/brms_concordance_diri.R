@@ -88,22 +88,29 @@ if (file.exists(cache_brms)) {
 }
 
 # Our diri() fit on the long-format panel ---------------------------------
+# Interaction `env * series` makes the env effect category-specific,
+# matching brms native's separate `b_muy{2..K}_env` per-category
+# slopes. Without the interaction, the long-format wrapper broadcasts
+# a single env slope across all K categories and the per-category
+# fixed effects collapse (cor against brms native ~ 0.4 instead of
+# the > 0.9 you'd expect; see git history).
 cache_diri <- "/tmp/brms_diri_concordance_diri.rds"
 if (file.exists(cache_diri)) {
   cat("[cache] diri() fit\n")
   fit_diri <- readRDS(cache_diri)
 } else {
-  cat("[fit ] diri() (jsdgam wrapper, n_lv = 1)\n")
+  cat("[fit ] diri() (jsdgam wrapper, env * series, n_lv = 2)\n")
   fit_diri <- jsdgam(
-    formula = y ~ env,
+    formula = y ~ env * series,
     factor_formula = ~ -1,
     data = as.data.frame(long_dat),
     unit = time, species = series,
     family = diri(),
-    n_lv = 1L,
+    n_lv = 2L,
     chains = 2L, parallel = TRUE,
     burnin = 500L, samples = 500L,
-    silent = 2
+    silent = 2,
+    backend = "cmdstanr"
   )
   saveRDS(fit_diri, cache_diri)
 }
@@ -209,14 +216,16 @@ cat("\n=== diri() Z identification diagnostics ===\n")
 diri_draws <- as_draws_matrix(fit_diri$fit)
 z_cols <- grep("^Z\\[", colnames(diri_draws), value = TRUE)
 if (length(z_cols)) {
+  n_lv_for_z <- length(z_cols) / n_cats
   Z_post_mean <- matrix(
     colMeans(diri_draws[, z_cols, drop = FALSE]),
-    nrow = n_cats, ncol = 1L, byrow = FALSE
+    nrow = n_cats, ncol = n_lv_for_z, byrow = FALSE
   )
   cat("Z posterior mean per latent factor (one column per l):\n")
   print(round(Z_post_mean, 3))
   cat("Column sums (should hover near zero under soft constraint):",
-      round(colSums(Z_post_mean), 3), "\n")
+      round(colSums(Z_post_mean), 3),
+      " (exact zero by sum_to_zero_vector)\n")
   z_ess <- apply(diri_draws[, z_cols, drop = FALSE], 2L,
                  posterior::ess_bulk)
   cat("min ESS for Z entries:", round(min(z_ess), 0),

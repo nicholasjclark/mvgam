@@ -505,7 +505,13 @@ pp_check.mvgam <- function(
   # validated as unit-constant and remapped to the first-visit
   # row per unit so bayesplot sees one value per closure unit.
   closure_unit_lookup <- NULL
-  if (is_closure_unit_family(object$family)) {
+  # Mv-response closure-unit families (mvn, mvt) carry one
+  # observation per (site, species) row, so pp_check operates at
+  # the row grain that bayesplot expects by default. The per-unit
+  # aggregation in `closure_unit_pp_check_setup()` is for
+  # nmix / occ where multiple visits within a site need a
+  # sufficient-statistic collapse before scoring.
+  if (needs_closure_unit_aggregation(object$family)) {
     cu <- closure_unit_pp_check_setup(
       object  = object,
       newdata = newdata,

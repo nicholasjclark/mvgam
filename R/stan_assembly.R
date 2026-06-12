@@ -2610,22 +2610,51 @@ sort_stanvars <- function(stanvars) {
 #' @return List of parameter block stanvars
 #' @noRd
 generate_matrix_z_parameters <- function(is_factor_model, n_lv, n_series,
-                                         fixed_Z = NULL) {
+                                         fixed_Z = NULL,
+                                         simplex = FALSE) {
   # When the user fixed Z (via trend_map) it lives in the data
   # block, not parameters. Suppress this declaration.
   if (!is.null(fixed_Z)) return(NULL)
-  if (is_factor_model) {
-    # Factor model: estimate Z in parameters for dimensionality reduction
-    z_matrix_stanvar <- brms::stanvar(
-      name = "Z",
-      scode = glue::glue("matrix[N_series_trend, N_lv_trend] Z;"),
+  if (!is_factor_model) return(NULL)
+  if (simplex) {
+    # Simplex multi-response families (`diri`, `multi`, `categ`) need
+    # the columns of `Z` to be exactly sum-to-zero so the softmax
+    # shift mode in each column is eliminated by construction. Use
+    # Stan's `sum_to_zero_vector[K]` (Stan >= 2.36, see Mitzi Morris
+    # "The Sum-to-Zero Constraint in Stan") which internally uses
+    # K-1 unconstrained parameters with a Helmert-style transform
+    # designed to give them a unit-normal marginal under a flat
+    # prior, eliminating the ridge geometry that a soft
+    # `sum(Z[, l]) ~ normal(0, sigma)` would create. `Z` is built
+    # from `Z_cols` in transformed parameters so the rest of the
+    # trend pipeline (QR identification, trend computation,
+    # `residual_cor` extraction) keeps reading `Z` as before.
+    z_param <- brms::stanvar(
+      name = "Z_cols",
+      scode = paste(
+        "  array[N_lv_trend] sum_to_zero_vector[N_series_trend] Z_cols;",
+        sep = "\n"
+      ),
       block = "parameters"
     )
-    return(z_matrix_stanvar)
-  } else {
-    # Return NULL for empty case
-    return(NULL)
+    z_tparam <- brms::stanvar(
+      name = "Z_from_Z_cols",
+      scode = paste(
+        "  matrix[N_series_trend, N_lv_trend] Z;",
+        "  for (l in 1:N_lv_trend) {",
+        "    Z[, l] = Z_cols[l];",
+        "  }",
+        sep = "\n"
+      ),
+      block = "tparameters"
+    )
+    return(combine_stanvars(z_param, z_tparam))
   }
+  brms::stanvar(
+    name = "Z",
+    scode = glue::glue("matrix[N_series_trend, N_lv_trend] Z;"),
+    block = "parameters"
+  )
 }
 
 #' Emit a user-supplied fixed Z matrix as Stan `data`.
@@ -2800,7 +2829,8 @@ generate_matrix_z_tdata <- function(is_factor_model, n_lv, n_series,
 #' @noRd
 generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
                                                   n_series,
-                                                  fixed_Z = NULL) {
+                                                  fixed_Z = NULL,
+                                                  family = NULL) {
   # Validate inputs following CLAUDE.md standards
   checkmate::assert_logical(is_factor_model, len = 1)
   checkmate::assert_integerish(n_lv, len = 1, lower = 1)
@@ -2821,11 +2851,17 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
 
   # Under the Heaps (2024) architecture both factor and non-factor
   # models declare Z explicitly. Factor models declare Z as a free
-  # `matrix[N_series_trend, N_lv_trend]` parameter (no PLT
-  # construction at sampling time); non-factor models emit the
-  # identity Z in transformed data.
+  # `matrix[N_series_trend, N_lv_trend]` parameter for non-simplex
+  # families, or as a derived `tparameters` matrix built from
+  # `array[N_lv_trend] sum_to_zero_vector[N_series_trend] Z_cols`
+  # for simplex multi-response families (Stan >= 2.36). Non-factor
+  # models emit the identity Z in transformed data.
+  simplex_z <- is_simplex_response_family(family)
   stanvars_list <- list(
-    generate_matrix_z_parameters(is_factor_model, n_lv, n_series),
+    generate_matrix_z_parameters(
+      is_factor_model, n_lv, n_series,
+      simplex = simplex_z
+    ),
     generate_matrix_z_tdata(is_factor_model, n_lv, n_series)
   )
 
@@ -2892,6 +2928,21 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
 #' @param trend_type Optional trend-type string. When
 #'   `trend_type == "VAR"` the generated quantities block also
 #'   emits the rotated VAR coefficient array.
+#' @param loadings_prior_spec Optional normalised structured-loadings
+#'   prior spec. When non-NULL replaces the default iid `Z` prior with
+#'   the per-column matrix-normal kernel built by
+#'   `make_loadings_prior_stanvars()`.
+#' @param rotate Logical. Apply post-hoc thin-QR identification of
+#'   `Z` in generated quantities. Set FALSE when factor identification
+#'   comes from `by = lv_axis()` covariate structure rather than QR.
+#' @param family Optional family / brmsfamily / customfamily object,
+#'   typically `data_info$family` at the trend-generator call sites.
+#'   When `is_simplex_response_family(family)` is TRUE, the Z column
+#'   sums are constrained HARD via Stan's
+#'   `array[N_lv] sum_to_zero_vector[K]` declaration in
+#'   `generate_matrix_z_parameters()` (no model-block prior is
+#'   emitted here); this removes the softmax Z-column shift mode
+#'   that would otherwise contaminate `Z Z'`. Requires Stan >= 2.36.
 #' @return Combined stanvar for prior + post-hoc QR identification.
 #' @references
 #' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
@@ -2902,12 +2953,18 @@ generate_matrix_z_multiblock_stanvars <- function(is_factor_model, n_lv,
 generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
                                   trend_type = NULL,
                                   loadings_prior_spec = NULL,
-                                  rotate = TRUE) {
+                                  rotate = TRUE,
+                                  family = NULL) {
   checkmate::assert_logical(is_factor_model, len = 1)
   checkmate::assert_integerish(n_lv, lower = 1, any.missing = FALSE)
   checkmate::assert_character(trend_type, len = 1, null.ok = TRUE)
   checkmate::assert_list(loadings_prior_spec, null.ok = TRUE)
   checkmate::assert_flag(rotate)
+  if (!is.null(family) && !inherits(family, c("family", "brmsfamily", "customfamily"))) {
+    stop(insight::format_error(
+      "Argument 'family' must be NULL or a family/brmsfamily/customfamily object."
+    ))
+  }
 
   if (!is.null(fixed_Z)) return(NULL)
   if (!is_factor_model) return(NULL)
@@ -2930,10 +2987,16 @@ generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
     # via the LQ change of variables.
     brms::stanvar(
       name = "factor_z_priors",
-      scode = "to_vector(Z) ~ student_t(3, 0, 1);",
+      scode = "to_vector(Z) ~ student_t(3, 0, 0.5);",
       block = "model"
     )
   }
+
+  # Mode-1 column-sum identification for simplex multi-response
+  # families is enforced HARD by declaring each Z column as
+  # `sum_to_zero_vector[K]` in `generate_matrix_z_parameters()`
+  # (Stan >= 2.36; gated by `assert_stan_version()` in
+  # `make_stan.R`). No additional prior is needed here.
 
   # Post-hoc identification via thin QR. `qr_thin_R` guarantees a
   # positive diagonal on the upper-triangular factor (Stan
@@ -3841,7 +3904,8 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # STEP 2: Always add matrix Z (factor=parameters, non-factor=diagonal in tdata)
   matrix_z <- generate_matrix_z_multiblock_stanvars(
     is_factor_model, n_lv, n_series,
-    fixed_Z = trend_specs$fixed_Z
+    fixed_Z = trend_specs$fixed_Z,
+    family = data_info$family
   )
   components <- append_if_not_null(components, matrix_z)
 
@@ -3917,12 +3981,12 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       is_factor_model, n_lv,
       fixed_Z = trend_specs$fixed_Z,
       loadings_prior_spec = trend_specs$loadings_prior_spec,
-      rotate = !isTRUE(data_info$has_by_lv)
+      rotate = !isTRUE(data_info$has_by_lv),
+      family = data_info$family
     )
     components <- append_if_not_null(components, factor_priors)
   }
 
-  # Use the robust combine_stanvars function
   return(do.call(combine_stanvars, components))
 }
 
@@ -4198,7 +4262,8 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # STEP 2: Always add matrix Z (factor=parameters, non-factor=diagonal in tdata)
   matrix_z <- generate_matrix_z_multiblock_stanvars(
     is_factor_model, n_lv, n_series,
-    fixed_Z = trend_specs$fixed_Z
+    fixed_Z = trend_specs$fixed_Z,
+    family = data_info$family
   )
   components <- append_if_not_null(components, matrix_z)
 
@@ -4289,12 +4354,12 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       is_factor_model, n_lv,
       fixed_Z = trend_specs$fixed_Z,
       loadings_prior_spec = trend_specs$loadings_prior_spec,
-      rotate = !isTRUE(data_info$has_by_lv)
+      rotate = !isTRUE(data_info$has_by_lv),
+      family = data_info$family
     )
     components <- append_if_not_null(components, factor_priors)
   }
 
-  # Use the robust combine_stanvars function
   return(do.call(combine_stanvars, components))
 }
 
@@ -5069,7 +5134,8 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # STEP 2: Add Z matrix using standard generation (VAR supports factor models unless hierarchical)
   matrix_z <- generate_matrix_z_multiblock_stanvars(
     is_factor_model, n_lv, n_series,
-    fixed_Z = trend_specs$fixed_Z
+    fixed_Z = trend_specs$fixed_Z,
+    family = data_info$family
   )
 
   # Add trend computation stanvars (maps lv_trend through Z matrix)
@@ -5130,7 +5196,8 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       fixed_Z = trend_specs$fixed_Z,
       trend_type = "VAR",
       loadings_prior_spec = trend_specs$loadings_prior_spec,
-      rotate = !isTRUE(data_info$has_by_lv)
+      rotate = !isTRUE(data_info$has_by_lv),
+      family = data_info$family
     )
     components <- append_if_not_null(components, factor_priors)
   }
@@ -5283,7 +5350,8 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # STEP 2: Always add matrix Z (CAR uses diagonal Z in transformed data)
   matrix_z <- generate_matrix_z_multiblock_stanvars(
     is_factor_model, n_lv, n_series,
-    fixed_Z = trend_specs$fixed_Z
+    fixed_Z = trend_specs$fixed_Z,
+    family = data_info$family
   )
   components <- append_if_not_null(components, matrix_z)
 
@@ -5463,7 +5531,8 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # STEP 2: Always add matrix Z (factor=parameters, non-factor=diagonal in tdata)
   matrix_z <- generate_matrix_z_multiblock_stanvars(
     is_factor_model, n_lv, n_series,
-    fixed_Z = trend_specs$fixed_Z
+    fixed_Z = trend_specs$fixed_Z,
+    family = data_info$family
   )
   components <- append_if_not_null(components, matrix_z)
 
@@ -5509,7 +5578,8 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       is_factor_model, n_lv,
       fixed_Z = trend_specs$fixed_Z,
       loadings_prior_spec = trend_specs$loadings_prior_spec,
-      rotate = !isTRUE(data_info$has_by_lv)
+      rotate = !isTRUE(data_info$has_by_lv),
+      family = data_info$family
     )
     components <- append_if_not_null(components, factor_priors)
   }
@@ -5727,7 +5797,8 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   # STEP 2: Always add matrix Z (PW uses diagonal Z in transformed data)
   matrix_z <- generate_matrix_z_multiblock_stanvars(
     is_factor_model, n_lv, n_series,
-    fixed_Z = trend_specs$fixed_Z
+    fixed_Z = trend_specs$fixed_Z,
+    family = data_info$family
   )
   components <- append_if_not_null(components, matrix_z)
 

@@ -47,9 +47,8 @@ RoxygenNote: 7.3.3
 Suggests: 
     scoringRules,
     matrixStats,
-    cmdstanr (>= 0.5.0),
+    cmdstanr (>= 0.8.0),
     tweedie,
-    splines2,
     extraDistr,
     wrswoR,
     ggrepel,
@@ -69,6 +68,10 @@ Suggests:
 Enhances:
     gratia (>= 0.9.0),
     tidyr
+SystemRequirements: Stan (>= 2.36.0 for simplex multi-response
+  families `diri()`, `multi()`, `categ()`; >= 2.26.0 otherwise).
+  Install via `cmdstanr::install_cmdstan()` or rstan from
+  `https://mc-stan.org/r-packages/`.
 Additional_repositories: https://mc-stan.org/r-packages/
 LinkingTo: Rcpp, RcppArmadillo
 VignetteBuilder: knitr

@@ -535,6 +535,33 @@ is_multi_response_family <- function(family) {
   isTRUE(attr(family, "mvgam_multi_response", exact = TRUE))
 }
 
+#' Detect whether a closure-unit family routes its post-fit
+#' surface (pp_check, residuals, log_lik, posterior_predict /
+#' epred) through the per-unit aggregation pipeline.
+#'
+#' TRUE for `nmix()` and `occ()`: their Stan likelihood
+#' marginalises a latent state (N for nmix, z for occ) and
+#' downstream R-side methods aggregate per-visit responses to the
+#' closure-unit grain via `closure_unit_pp_check_setup()` /
+#' `compute_closure_unit_residuals()`. FALSE for the mv-response
+#' families (`mvn()`, `mvt()`): their per-row residual is
+#' conditionally independent given the latent factor scores
+#' baked into mu by the trend pipeline, so post-fit methods
+#' operate at the (site, species) row grain directly.
+#'
+#' Used by `pp_check.mvgam()`, `residuals.mvgam()`, and the
+#' predict-time guard in `extract_closure_unit_components()` to
+#' route mv-response fits around the aggregation / cap-validation
+#' machinery that does not apply to them.
+#'
+#' @param family A family / brmsfamily / customfamily object.
+#' @return TRUE or FALSE.
+#' @noRd
+needs_closure_unit_aggregation <- function(family) {
+  is_closure_unit_family(family) &&
+    !is_multi_response_family(family)
+}
+
 #' Detect whether a multi-response family uses the softmax-based
 #' simplex likelihood and therefore needs the sum-to-zero soft
 #' constraint on each column of Z to remove the shift indeterminacy
@@ -558,6 +585,34 @@ is_multi_response_family <- function(family) {
 is_simplex_response_family <- function(family) {
   if (is.null(family)) return(FALSE)
   isTRUE(attr(family, "mvgam_simplex_response", exact = TRUE))
+}
+
+#' Default `brms::prior()` set for simplex multi-response families
+#'
+#' brms `custom_family()` does not trigger the family-specific prior
+#' dispatch and emits flat improper priors on population-level effects
+#' by default. Under the mode-2 reference subtraction
+#' `mu[idx] - mu[idx[1]]` inside the lpdf (see `diri_stan_funs()`
+#' etc.), any K-shared population effect (`b_Intercept`, `b_env`,
+#' etc.) has no likelihood contribution at all and would walk
+#' unboundedly under a flat prior.
+#'
+#' Returns a `brmsprior` with `student_t(3, 0, 2.5)` on both
+#' `class = "b"` and `class = "Intercept"`. Matches Gelman et al.
+#' (2008) for logistic regression with standardised predictors and
+#' the brms built-in default for families that trigger the dispatch.
+#'
+#' Merged with the user's `priors` argument such that user-supplied
+#' priors take precedence (brms `validate_prior()` resolves duplicates
+#' in favour of explicit user input).
+#'
+#' @return A `brmsprior` object.
+#' @noRd
+default_simplex_population_priors <- function() {
+  c(
+    brms::prior("student_t(3, 0, 2.5)", class = "b"),
+    brms::prior("student_t(3, 0, 2.5)", class = "Intercept")
+  )
 }
 
 #' Default per-unit upper truncation for a closure-unit family
@@ -1398,16 +1453,25 @@ make_occ_stanvars <- function(arrays) {
 #' }
 #'
 #' Identification under the K-row free `Z` factor model: softmax
-#' is shift-invariant in `mu_unit` (adding `c * 1_K` leaves the
-#' likelihood unchanged), so under the default iid `Z` prior the
-#' columns of `Z` carry a residual level indeterminacy that the
-#' Heaps post-hoc QR rotation does not absorb. The downstream
-#' factor-model emission adds a soft column-sum constraint on
-#' `Z` (`sum(Z[, l]) ~ normal(0, 0.01)`) whenever
-#' `is_simplex_response_family(family)` is TRUE, which removes the
-#' shift mode at trivial cost. The `loadings_prior` matrix-normal
-#' prior, when supplied, already encodes a zero column mean and
-#' so doubles as a stronger version of the constraint.
+#' is shift-invariant in `mu_unit` along two independent directions,
+#' both removed by HARD constraints (Stan >= 2.36). Each column of
+#' `Z` is declared as Stan's native `sum_to_zero_vector[K]` so
+#' column sums are exactly zero by construction (no soft prior,
+#' no scale to tune; see Mitzi Morris "The Sum-to-Zero Constraint
+#' in Stan" for the Helmert-style transform Stan uses internally).
+#' The per-site K-shared fixed-effect shift is eliminated inside
+#' the lpdf by subtracting `mu_unit[1]` from all entries before
+#' softmax, matching the brms-native dirichlet reference-category
+#' parameterisation. A weakly-informative `student_t(3, 0, 2.5)`
+#' population-effect default prior is also injected because brms
+#' `custom_family()` would otherwise emit flat improper priors;
+#' under the hard mode-2 reference subtraction, any K-shared
+#' coefficient (`b_Intercept`, `b_env`, etc.) has no likelihood
+#' contribution and samples from that prior, so a once-per-session
+#' warning fires from `jsdgam()` when the user's formula contains
+#' no per-`species` interaction term. The `loadings_prior` matrix-normal prior, when
+#' supplied, composes with the sum-to-zero constraint and is the
+#' recommended path when traits or phylogeny are available.
 #'
 #' Data layout: long format, one row per (site, species), exactly
 #' K rows per site. The user passes the species axis via the
@@ -1438,9 +1502,13 @@ make_occ_stanvars <- function(arrays) {
 #'
 #' @examples
 #' \dontrun{
-#' # Compositional JSDM on long-format proportions data
+#' # Compositional JSDM on long-format proportions data. The formula
+#' # interacts the environmental covariate with `species` so each
+#' # species gets its own intercept and `env` slope; this is the
+#' # interpretable form for a simplex multi-response family. The
+#' # brms-native-style `y ~ 0 + species + env:species` is equivalent.
 #' mod <- jsdgam(
-#'   formula = y ~ env,
+#'   formula = y ~ env * species,
 #'   factor_formula = ~ -1,
 #'   data = my_long_format_data,
 #'   unit = site,
@@ -1489,9 +1557,11 @@ diri <- function() {
 #' `dirichlet_logit_lpdf(y_unit | mu_unit, phi)` once per closure
 #' unit. The softmax over `mu_unit` parameterises the Dirichlet,
 #' so the K mu rows are interpretable on a common scale. The
-#' post-hoc QR identification of `Z` + the column-sum soft
-#' constraint together fix the shift indeterminacy that softmax
-#' otherwise leaves in `mu_unit`.
+#' post-hoc Heaps QR identification of `Z` + the hard
+#' `sum_to_zero_vector[K]` constraint on Z columns + the per-unit
+#' `mu_unit = mu[idx] - mu[idx[1]]` reference subtraction together
+#' fix the three shift modes that softmax otherwise leaves in
+#' `mu_unit`.
 #'
 #' brms calls this function ONCE per likelihood evaluation with
 #' the full `Y` and `mu` vectors plus the closure-unit indexing
@@ -1508,6 +1578,17 @@ diri_stan_funs <- function() {
   # brms' native Dirichlet emission, we apply the same logit
   # parameterisation explicitly via `softmax(mu_unit) * phi` and
   # call `dirichlet_lpdf` on the result.
+  # Mode-2 identification: subtract `mu_unit[1]` from all entries
+  # before softmax. softmax is shift-invariant, so this is identical
+  # in likelihood to the unshifted form, but it removes the per-site
+  # K-shared shift mode by construction. Paired with the hard
+  # `sum_to_zero_vector` constraint on Z columns (mode-1), this
+  # leaves the K-shared population effects (`b_Intercept`, `b_env`,
+  # etc.) sampling from their `student_t(3, 0, 2.5)` default prior
+  # with no likelihood contribution, matching brms-native dirichlet's
+  # K-1 reference-category parameterisation while keeping `Z` fully
+  # K-row symmetric in the column space (Z[1, :] is determined by
+  # Z[2..K, :] through the sum-to-zero constraint).
   paste(
     "  real diri_lpdf(",
     "    vector y,",
@@ -1521,7 +1602,7 @@ diri_stan_funs <- function() {
     "      int Kg = n_rep[g];",
     "      array[Kg] int idx = visit_idx[g, 1:Kg];",
     "      vector[Kg] y_unit  = y[idx];",
-    "      vector[Kg] mu_unit = mu[idx];",
+    "      vector[Kg] mu_unit = mu[idx] - mu[idx[1]];",
     "      lp += dirichlet_lpdf(y_unit | softmax(mu_unit) * phi);",
     "    }",
     "    return lp;",
@@ -1541,21 +1622,13 @@ diri_stan_funs <- function() {
 #' @return A `brmsstanvars` object.
 #' @noRd
 make_diri_stanvars <- function(arrays) {
-  # The simplex column-sum soft constraint on Z (the
-  # softmax-shift-mode identification fix from the stats review)
-  # is NOT bundled here. Threading it through the family stanvars
-  # is blocked by mvgam's `sort_stanvars()` block-reordering: a
-  # family stanvar in the model block lands BEFORE the trend
-  # pipeline declares `Z` / `N_lv_trend`, so the constraint
-  # references symbols that are not yet in scope at the lexical
-  # point the constraint executes. The constraint needs to be
-  # emitted by the trend pipeline itself, gated on
-  # `is_simplex_response_family(family)`. This is filed for a
-  # follow-up; in the meantime the iid `Z ~ student_t(3, 0, 1)`
-  # prior provides soft regularisation of the column sums on its
-  # own, and `Z Z'` (the quantity `residual_cor` reports) is
-  # shift-invariant under the constant-column shift, so posterior
-  # summaries of species covariance are unaffected.
+  # Mode-1 Z-column sum-to-zero constraint and mode-2 per-site
+  # mu_unit sum-to-zero constraint live in the trend pipeline
+  # (generate_factor_model() in R/stan_assembly.R) and the lpdf
+  # function block (diri_stan_funs() above), respectively. They are
+  # NOT bundled here because mvgam's sort_stanvars() block-reordering
+  # would land a family-bundle constraint before Z / N_lv_trend are
+  # declared by the trend pipeline.
   make_closure_unit_arrays_stanvars(
     arrays,
     family_funs_name = "diri_funs",
@@ -1590,13 +1663,13 @@ make_diri_stanvars <- function(arrays) {
 #'     simplex of cell probabilities. Default link is identity.}
 #' }
 #'
-#' Identification: identical to [diri()]. Softmax is shift-invariant
-#' in `mu_unit`, so the K rows of `Z` carry a residual level
-#' indeterminacy under the default iid `Z` prior. The
-#' `make_simplex_z_constraint_stanvar()` helper bundles a soft
-#' column-sum constraint (`sum(Z[, l]) ~ normal(0, 0.01)`) into
-#' the family stanvars that removes the shift mode at trivial
-#' cost.
+#' Identification: identical to [diri()]. Each `Z` column is
+#' declared as `sum_to_zero_vector[K]` so column sums are exactly
+#' zero by construction (Stan >= 2.36), and the lpdf body subtracts
+#' `mu_unit[1]` from all entries before softmax to remove the
+#' K-shared fixed-effect shift. Both constraints are hard (no soft
+#' priors); the K species are kept symmetric in the loadings via
+#' the column-sum-zero manifold.
 #'
 #' Data layout: long format, one row per (site, species), exactly
 #' K rows per site. The integer count for that (site, species)
@@ -1615,9 +1688,12 @@ make_diri_stanvars <- function(arrays) {
 #'
 #' @examples
 #' \dontrun{
-#' # Microbiome-style read-count JSDM
+#' # Microbiome-style read-count JSDM. The `env * taxon` interaction
+#' # gives each taxon its own intercept and environmental response;
+#' # see `?diri` for the rationale on why a per-`species` interaction
+#' # is the interpretable form for a simplex multi-response family.
 #' mod <- jsdgam(
-#'   formula = y ~ env,
+#'   formula = y ~ env * taxon,
 #'   factor_formula = ~ -1,
 #'   data = read_counts_long,
 #'   unit = site,
@@ -1666,6 +1742,8 @@ multi <- function() {
 #'   `brms::stanvar(scode = ..., block = "functions")`.
 #' @noRd
 multi_stan_funs <- function() {
+  # See `diri_stan_funs()` for the rationale on the mode-2
+  # identification via subtraction of `mu_unit[1]`.
   paste(
     "  real multi_lpmf(",
     "    array[] int y,",
@@ -1678,7 +1756,7 @@ multi_stan_funs <- function() {
     "      int Kg = n_rep[g];",
     "      array[Kg] int idx = visit_idx[g, 1:Kg];",
     "      array[Kg] int y_unit  = y[idx];",
-    "      vector[Kg] mu_unit = mu[idx];",
+    "      vector[Kg] mu_unit = mu[idx] - mu[idx[1]];",
     "      lp += multinomial_logit_lpmf(y_unit | mu_unit);",
     "    }",
     "    return lp;",
@@ -1690,16 +1768,17 @@ multi_stan_funs <- function() {
 #' Build the closure-unit Stan stanvars for a multi() fit
 #'
 #' Wraps `make_closure_unit_arrays_stanvars()` with the multinomial
-#' function block and the shared simplex column-sum soft constraint
-#' that removes the softmax shift indeterminacy in the columns of
-#' `Z`.
+#' function block. The hard `sum_to_zero_vector[K]` constraint on
+#' the columns of `Z` is emitted from the trend pipeline; the
+#' per-site K-shared shift is removed inside the lpdf by subtracting
+#' `mu_unit[1]`.
 #'
 #' @inheritParams make_closure_unit_arrays_stanvars
 #' @return A `brmsstanvars` object.
 #' @noRd
 make_multi_stanvars <- function(arrays) {
-  # Simplex column-sum constraint deferred to a follow-up; see
-  # the comment on `make_diri_stanvars()`.
+  # Mode-1 + mode-2 simplex shift constraints live in the trend
+  # pipeline and lpdf source helper. See `make_diri_stanvars()`.
   make_closure_unit_arrays_stanvars(
     arrays,
     family_funs_name = "multi_funs",
@@ -1734,10 +1813,10 @@ make_multi_stanvars <- function(arrays) {
 #'     simplex of cell probabilities. Default link is identity.}
 #' }
 #'
-#' Identification: identical to [diri()] and [multi()]. The
-#' shared simplex column-sum soft constraint on `Z` (bundled via
-#' `make_simplex_z_constraint_stanvar()`) removes the softmax
-#' shift indeterminacy in the columns of `Z`.
+#' Identification: identical to [diri()] and [multi()]. Each `Z`
+#' column is declared as `sum_to_zero_vector[K]` (Stan >= 2.36) and
+#' the lpdf subtracts `mu_unit[1]` from all entries before softmax.
+#' Both constraints are hard.
 #'
 #' Data layout: long format, one row per (site, category), exactly
 #' K rows per site. The response `y` is binary: `y = 1` on the row
@@ -1757,9 +1836,11 @@ make_multi_stanvars <- function(arrays) {
 #'
 #' @examples
 #' \dontrun{
-#' # JSDM on single-trial habitat-type observations per site
+#' # JSDM on single-trial habitat-type observations per site. The
+#' # `elev * habitat_class` interaction gives each habitat class its
+#' # own elevation response; see `?diri` for the rationale.
 #' mod <- jsdgam(
-#'   formula = y ~ elev,
+#'   formula = y ~ elev * habitat_class,
 #'   factor_formula = ~ -1,
 #'   data = habitat_long,
 #'   unit = site,
@@ -1819,6 +1900,8 @@ categ <- function() {
 #'   `brms::stanvar(scode = ..., block = "functions")`.
 #' @noRd
 categ_stan_funs <- function() {
+  # See `diri_stan_funs()` for the rationale on the mode-2
+  # identification via subtraction of `mu_unit[1]`.
   paste(
     "  real categ_lpmf(",
     "    array[] int y,",
@@ -1831,7 +1914,7 @@ categ_stan_funs <- function() {
     "      int Kg = n_rep[g];",
     "      array[Kg] int idx = visit_idx[g, 1:Kg];",
     "      array[Kg] int y_unit  = y[idx];",
-    "      vector[Kg] mu_unit = mu[idx];",
+    "      vector[Kg] mu_unit = mu[idx] - mu[idx[1]];",
     "      int cat_code = 0;",
     "      for (k in 1:Kg) {",
     "        if (y_unit[k] == 1) {",
@@ -1850,16 +1933,17 @@ categ_stan_funs <- function() {
 #' Build the closure-unit Stan stanvars for a categ() fit
 #'
 #' Wraps `make_closure_unit_arrays_stanvars()` with the Categorical
-#' function block and the shared simplex column-sum soft constraint
-#' that removes the softmax shift indeterminacy in the columns of
-#' `Z`.
+#' function block. The hard `sum_to_zero_vector[K]` constraint on
+#' the columns of `Z` is emitted from the trend pipeline; the
+#' per-site K-shared shift is removed inside the lpdf by subtracting
+#' `mu_unit[1]`.
 #'
 #' @inheritParams make_closure_unit_arrays_stanvars
 #' @return A `brmsstanvars` object.
 #' @noRd
 make_categ_stanvars <- function(arrays) {
-  # Simplex column-sum constraint deferred to a follow-up; see
-  # the comment on `make_diri_stanvars()`.
+  # Mode-1 + mode-2 simplex shift constraints live in the trend
+  # pipeline and lpdf source helper. See `make_diri_stanvars()`.
   make_closure_unit_arrays_stanvars(
     arrays,
     family_funs_name = "categ_funs",
@@ -1869,35 +1953,421 @@ make_categ_stanvars <- function(arrays) {
   )
 }
 
-#' Soft column-sum constraint on `Z` for simplex multi-response
-#' families
+#' Closure-unit Multivariate normal family
 #'
-#' Stan's softmax is shift-invariant in the K-vector mu, so the
-#' columns of the K x n_lv loadings matrix `Z` carry a residual
-#' level indeterminacy under the default iid `Z` prior that the
-#' Heaps post-hoc QR rotation does not absorb. The constraint
-#' `sum(Z[, l]) ~ normal(0, 0.01)` for each latent factor `l`
-#' removes the shift mode at trivial cost. Bundled into the
-#' simplex-family stanvars (`diri`, `multi`, `categ`) so the
-#' constraint is automatically active whenever a simplex family
-#' fits over a factor model.
+#' Continuous-response JSDM with low-rank residual covariance
+#' `Sigma = Z Z' + diag(Psi^2)`, parameterised conditionally
+#' (gllvm / boral style): each row of the linear predictor receives
+#' the latent-factor contribution `Z[k, :] * lv[i, :]` from the
+#' trend pipeline (with `lv ~ N(0, I_n_lv)` sampled jointly with
+#' the model), and the lpdf is then independent normal per row with
+#' SD `Psi[k]` for species `k`. Integrating out `lv` recovers the
+#' gllvm marginal covariance `Sigma`.
 #'
-#' The constraint references `Z` and `N_lv_trend` by name; both
-#' symbols are declared by the factor-model code emitted from
-#' `generate_factor_model()`. If a simplex family is fit without
-#' a factor model the Stan compile will error with a clear
-#' "Z not declared" message, which is correct: multi-response
-#' families require a factor model to express inter-species
-#' structure.
+#' Distributional parameters:
+#' \describe{
+#'   \item{`mu`}{per-row response mean on the identity scale.
+#'     Already includes the latent factor contribution from the
+#'     trend pipeline. Default link is identity.}
+#' }
 #'
-#' @return A `brms::stanvar` for the model block.
+#' Identification: the marginal `Sigma = Z Z' + diag(Psi^2)` is
+#' invariant to `Z -> Z * Q` for orthogonal `Q` (the gllvm / boral
+#' rotation invariance); the existing Heaps post-hoc QR rotation
+#' fixes `Q` and `Z Z'` is identified. Unlike the simplex families,
+#' the multi-normal likelihood is NOT shift-invariant in `mu_unit`,
+#' so neither a `sum_to_zero_vector` constraint on `Z` columns nor
+#' a `mu_unit[1]` reference subtraction is needed. `Z` is declared
+#' as a plain `matrix[K, n_lv]` free parameter by the trend
+#' pipeline.
+#'
+#' Data layout: long format, one row per `(site, species)`, exactly
+#' K rows per site. Responses are continuous reals; the `Y` vector
+#' is assembled into the per-unit K-vector `y_unit` by the lpdf.
+#'
+#' @return A `brms::custom_family` object tagged with the
+#'   `mvgam_closure_unit` and `mvgam_multi_response` attributes
+#'   that route the closure-unit data prep, validation, and Stan
+#'   emission. The `mvgam_simplex_response` attribute is NOT set
+#'   so the simplex-only identification machinery is skipped.
+#'
+#' @references
+#' Hui, F. K. C., Taskinen, S., Pledger, S., Foster, S. D. and
+#'   Warton, D. I. (2015). Model-based approaches to unconstrained
+#'   ordination. *Methods in Ecology and Evolution*, 6(4):399-411.
+#'   \doi{10.1111/2041-210X.12236}
+#'
+#' Niku, J., Brooks, W., Herliansyah, R., Hui, F. K. C., Taskinen,
+#'   S. and Warton, D. I. (2019). Efficient estimation of
+#'   generalized linear latent variable models. *PLOS ONE*,
+#'   14(5):e0216129. \doi{10.1371/journal.pone.0216129}
+#'
+#' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
+#'   distributions for the covariance matrix in latent factor
+#'   models. *Statistics and Computing*, 34:143.
+#'   \doi{10.1007/s11222-024-10454-0}
+#'
+#' @examples
+#' \dontrun{
+#' # gllvm-style continuous JSDM. The `env * species` interaction
+#' # gives each species its own intercept and environmental
+#' # response; the latent factor model handles residual
+#' # species-by-species correlation.
+#' mod <- jsdgam(
+#'   formula = y ~ env * species,
+#'   factor_formula = ~ -1,
+#'   data = wide_to_long_data,
+#'   unit = site,
+#'   species = species,
+#'   family = mvn(),
+#'   n_lv = 2
+#' )
+#' plot(residual_cor(mod))
+#' }
+#'
+#' @export
+mvn <- function() {
+  fam <- brms::custom_family(
+    name  = "mvn",
+    dpars = "mu",
+    links = "identity",
+    lb    = NA,
+    ub    = NA,
+    type  = "real",
+    loop  = FALSE
+  )
+  link_info <- stats::make.link("identity")
+  fam$linkinv <- link_info$linkinv
+  fam$linkfun <- link_info$linkfun
+  attr(fam, "mvgam_closure_unit")   <- TRUE
+  attr(fam, "mvgam_multi_response") <- TRUE
+  # No `mvgam_simplex_response` attribute: multi_normal_cholesky_lpdf
+  # is sensitive to absolute mu levels so the simplex-only
+  # identification machinery (sum_to_zero_vector on Z columns,
+  # mu_unit[1] reference subtraction) is skipped.
+  attr(fam, "mvgam_predict_types") <- character(0L)
+  # brms threads N_unit / n_rep / visit_idx into the lpdf via vint,
+  # plus the parameter `Psi` (per-species residual SD vector
+  # emitted by `make_mvn_stanvars()`). The loadings matrix `Z`
+  # enters via `mu` through the trend-pipeline contribution
+  # `Z[k, :] * lv[i, :]`, so the lpdf does not need `Z` as a
+  # separate argument.
+  attr(fam, "mvgam_vars") <- c(
+    "N_unit", "n_rep", "visit_idx", "Psi"
+  )
+  attr(fam, "mvgam_stanvars") <- NULL
+  fam
+}
+
+#' Stan function block for the closure-unit mv-normal lpdf
+#'
+#' Uses the conditional gllvm / boral parameterisation: the trend
+#' pipeline already adds `Z[k, :] * lv[i, :]` to `mu[i, k]` via the
+#' per-row trend computation, with the latent factor scores
+#' `lv ~ N(0, I_n_lv)` sampled as part of the model. Integrating out
+#' `lv` gives the marginal covariance
+#' `Sigma = Z Z' + diag(Psi .* Psi)` on the K-vector of responses at
+#' each site, which is the gllvm / boral target. So the per-row
+#' conditional density `y_n | mu_n, Psi_{k(n)}` is independent
+#' normal, and the lpdf reduces to one `normal_lpdf` call per
+#' closure unit (vectorised across the K rows of the unit). No
+#' Cholesky is needed at the lpdf level.
+#'
+#' `Psi` is declared on the SD scale by `make_mvn_stanvars()` so
+#' that the residual variance enters as `Psi[k]^2` and the marginal
+#' covariance entry `Sigma[k, k]` is `Z[k, :] * Z[k, :]' + Psi[k]^2`.
+#' The loadings prior on `Z` and the post-hoc Heaps QR
+#' identification stay unchanged from the rest of the factor-model
+#' pipeline.
+#'
+#' @return Character scalar suitable for
+#'   `brms::stanvar(scode = ..., block = "functions")`.
 #' @noRd
-make_simplex_z_constraint_stanvar <- function() {
-  brms::stanvar(
-    name = "simplex_z_shift_constraint",
-    scode = "  // SIMPLEX_PLACEHOLDER_NEED_TO_DEBUG",
-    block = "model",
-    position = "end"
+mvn_stan_funs <- function() {
+  paste(
+    "  real mvn_lpdf(",
+    "    vector y,",
+    "    vector mu,",
+    "    int N_unit,",
+    "    array[] int n_rep,",
+    "    array[,] int visit_idx,",
+    "    vector Psi) {",
+    "    real lp = 0;",
+    "    for (g in 1:N_unit) {",
+    "      int Kg = n_rep[g];",
+    "      array[Kg] int idx = visit_idx[g, 1:Kg];",
+    "      vector[Kg] y_unit  = y[idx];",
+    "      vector[Kg] mu_unit = mu[idx];",
+    "      vector[Kg] psi_unit = Psi[1:Kg];",
+    "      lp += normal_lpdf(y_unit | mu_unit, psi_unit);",
+    "    }",
+    "    return lp;",
+    "  }",
+    sep = "\n"
+  )
+}
+
+#' Build the closure-unit Stan stanvars for an mvn() fit
+#'
+#' Wraps `make_closure_unit_arrays_stanvars()` with the mv-normal
+#' function block and adds a per-species residual SD parameter
+#' `vector<lower=0>[K] Psi` with an `exponential(1)` prior on the
+#' SD scale. `K` is the number of response components per closure
+#' unit (constant across sites for multi-response families) and is
+#' baked in as a literal at fit time so the declaration is
+#' self-contained and does not race with the trend pipeline's
+#' emission of `N_series_trend`.
+#'
+#' Prior choice: SD-scale priors are weakly informative across
+#' unstandardised response scales, whereas a variance-scale
+#' exponential prior would over-suppress residual variance and bias
+#' the inferred `Z Z'` covariance upward.
+#'
+#' `K_max` and `Y_max` are omitted because the mv-normal
+#' likelihood does not truncate the per-unit response support.
+#'
+#' @inheritParams make_closure_unit_arrays_stanvars
+#' @return A `brmsstanvars` object.
+#' @noRd
+make_mvn_stanvars <- function(arrays) {
+  # K (number of response components per closure unit) is constant
+  # across sites for multi-response families. Bake the literal K
+  # into the `Psi` declaration so the parameter declaration is
+  # self-contained and does not race with the trend pipeline's
+  # emission of `N_series_trend` (which is declared in the data
+  # block but lands after the family-bundle stanvars in
+  # `sort_stanvars()` ordering, leaving `N_series_trend` out of
+  # scope when Stan parses the parameters block).
+  K <- as.integer(arrays$max_rep)
+  psi_param <- brms::stanvar(
+    name  = "mvn_Psi_param",
+    scode = paste0("  vector<lower=0>[", K, "] Psi;"),
+    block = "parameters"
+  )
+  psi_prior <- brms::stanvar(
+    name  = "mvn_Psi_prior",
+    scode = "  Psi ~ exponential(1);",
+    block = "model"
+  )
+  combine_stanvars(
+    make_closure_unit_arrays_stanvars(
+      arrays,
+      family_funs_name = "mvn_funs",
+      family_funs      = mvn_stan_funs(),
+      include_K_max    = FALSE,
+      include_Y_max    = FALSE
+    ),
+    psi_param,
+    psi_prior
+  )
+}
+
+#' Closure-unit Multivariate Student-t family
+#'
+#' Heavy-tailed continuous-response JSDM. Extends `mvn()` with a
+#' degrees-of-freedom parameter `nu` so the per-observation residual
+#' follows a Student-t distribution rather than a Gaussian. Each row
+#' of the linear predictor still receives the latent-factor
+#' contribution `Z[k, :] * lv[i, :]` from the trend pipeline
+#' (conditional gllvm / boral parameterisation), and the lpdf is
+#' independent Student-t per row with scale `Psi[k]` for species
+#' `k` and shared `nu`.
+#'
+#' Under this parameterisation the marginal residual covariance is
+#' approximately `Z Z' + diag(Psi^2 * nu / (nu - 2))` (Student-t
+#' variance scaling), which converges to the mv-normal target
+#' `Z Z' + diag(Psi^2)` as `nu -> Inf`. The strict multivariate
+#' Student-t marginal would require a per-site scale-mixture
+#' latent, which would not compose cleanly with the existing trend
+#' pipeline; the conditional Student-t parameterisation is what
+#' gllvm uses for its `family = "tweedie"` / `"normal"` heavy-tail
+#' option and is the right operational fit for outlier robustness
+#' in JSDM use cases.
+#'
+#' Distributional parameters:
+#' \describe{
+#'   \item{`mu`}{per-row response mean on the identity scale.
+#'     Already includes the latent factor contribution from the
+#'     trend pipeline. Default link is identity.}
+#' }
+#'
+#' Identification: identical to `mvn()`. Marginal covariance is
+#' invariant to `Z -> Z * Q` for orthogonal `Q`; the Heaps post-hoc
+#' QR fixes `Q`. The Student-t observation is NOT shift-invariant in
+#' `mu_unit`, so no simplex-style constraints apply. The
+#' `nu` parameter is declared with a hard lower bound of 2 so the
+#' marginal residual variance stays finite; the prior is
+#' `(nu - 2) ~ gamma(2, 0.1)`, giving a weakly informative pull
+#' toward moderate heavy tails (prior median around `nu = 14`,
+#' prior `Pr(nu < 5) ~ 0.18`).
+#'
+#' Data layout: long format, one row per `(site, species)`, exactly
+#' K rows per site. Responses are continuous reals.
+#'
+#' @return A `brms::custom_family` object tagged with the
+#'   `mvgam_closure_unit` and `mvgam_multi_response` attributes
+#'   that route the closure-unit data prep, validation, and Stan
+#'   emission. The `mvgam_simplex_response` attribute is NOT set.
+#'
+#' @references
+#' Hui, F. K. C., Taskinen, S., Pledger, S., Foster, S. D. and
+#'   Warton, D. I. (2015). Model-based approaches to unconstrained
+#'   ordination. *Methods in Ecology and Evolution*, 6(4):399-411.
+#'   \doi{10.1111/2041-210X.12236}
+#'
+#' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
+#'   distributions for the covariance matrix in latent factor
+#'   models. *Statistics and Computing*, 34:143.
+#'   \doi{10.1007/s11222-024-10454-0}
+#'
+#' @examples
+#' \dontrun{
+#' # Heavy-tailed gllvm-style JSDM. Use mvt() over mvn() when
+#' # responses contain occasional outliers (rare extreme abundances,
+#' # sensor glitches) that under mvn() would be absorbed by widening
+#' # `Psi` and the inferred `Z Z'` off-diagonals.
+#' mod <- jsdgam(
+#'   formula = y ~ env * species,
+#'   factor_formula = ~ -1,
+#'   data = wide_to_long_data,
+#'   unit = site,
+#'   species = species,
+#'   family = mvt(),
+#'   n_lv = 2
+#' )
+#' plot(residual_cor(mod))
+#' }
+#'
+#' @export
+mvt <- function() {
+  fam <- brms::custom_family(
+    name  = "mvt",
+    dpars = "mu",
+    links = "identity",
+    lb    = NA,
+    ub    = NA,
+    type  = "real",
+    loop  = FALSE
+  )
+  link_info <- stats::make.link("identity")
+  fam$linkinv <- link_info$linkinv
+  fam$linkfun <- link_info$linkfun
+  attr(fam, "mvgam_closure_unit")   <- TRUE
+  attr(fam, "mvgam_multi_response") <- TRUE
+  # No `mvgam_simplex_response`: the Student-t observation is not
+  # shift-invariant in mu so the sum_to_zero / reference subtraction
+  # machinery does not apply.
+  attr(fam, "mvgam_predict_types") <- character(0L)
+  # brms threads N_unit / n_rep / visit_idx into the lpdf via vint,
+  # plus the parameters `Psi` (per-species residual scale) and `nu`
+  # (shared degrees of freedom), both emitted by
+  # `make_mvt_stanvars()`. `Z` enters via `mu` through the
+  # trend-pipeline contribution `Z[k, :] * lv[i, :]`.
+  attr(fam, "mvgam_vars") <- c(
+    "N_unit", "n_rep", "visit_idx", "Psi", "nu"
+  )
+  attr(fam, "mvgam_stanvars") <- NULL
+  fam
+}
+
+#' Stan function block for the closure-unit mv-Student-t lpdf
+#'
+#' Same conditional gllvm parameterisation as `mvn_stan_funs()`:
+#' the per-row latent-factor contribution `Z[k, :] * lv[i, :]` is
+#' added to `mu` by the trend pipeline, the lpdf only sees the
+#' per-row residual. With `lv ~ N(0, I_n_lv)` and independent
+#' per-row Student-t residuals at degrees of freedom `nu` and scale
+#' `Psi[k]`, the marginal residual covariance is approximately
+#' `Z Z' + diag(Psi^2 * nu / (nu - 2))` (Student-t variance scaling).
+#'
+#' `nu` is shared across species within a site; the per-species
+#' residual scale is carried by `Psi`. Both are declared by
+#' `make_mvt_stanvars()`.
+#'
+#' @return Character scalar suitable for
+#'   `brms::stanvar(scode = ..., block = "functions")`.
+#' @noRd
+mvt_stan_funs <- function() {
+  paste(
+    "  real mvt_lpdf(",
+    "    vector y,",
+    "    vector mu,",
+    "    int N_unit,",
+    "    array[] int n_rep,",
+    "    array[,] int visit_idx,",
+    "    vector Psi,",
+    "    real nu) {",
+    "    real lp = 0;",
+    "    for (g in 1:N_unit) {",
+    "      int Kg = n_rep[g];",
+    "      array[Kg] int idx = visit_idx[g, 1:Kg];",
+    "      vector[Kg] y_unit  = y[idx];",
+    "      vector[Kg] mu_unit = mu[idx];",
+    "      vector[Kg] psi_unit = Psi[1:Kg];",
+    "      lp += student_t_lpdf(y_unit | nu, mu_unit, psi_unit);",
+    "    }",
+    "    return lp;",
+    "  }",
+    sep = "\n"
+  )
+}
+
+#' Build the closure-unit Stan stanvars for an mvt() fit
+#'
+#' Wraps `make_closure_unit_arrays_stanvars()` with the mv-Student-t
+#' function block and adds two free parameters: a per-species
+#' residual scale `vector<lower=0>[K] Psi` (SD-scale exponential(1)
+#' prior, identical to `make_mvn_stanvars()`) and a shared degrees
+#' of freedom `real<lower=2> nu`. `nu` is hard-floored at 2 so the
+#' marginal residual variance stays finite; without that bound,
+#' posterior draws of nu in (0, 2) would produce infinite variance
+#' and contaminate downstream LOO PSIS weights and predictive
+#' summaries. The prior `(nu - 2) ~ gamma(2, 0.1)` is weakly
+#' informative (prior median around 14, prior 95% interval roughly
+#' \[2.3, 50\]) and matches the recommendation in Juarez & Steel
+#' (2010) for Bayesian Student-t regression.
+#'
+#' `K` is the number of response components per closure unit
+#' (constant across sites) and is baked in as a literal at fit time
+#' so the `Psi` declaration is self-contained.
+#'
+#' @inheritParams make_closure_unit_arrays_stanvars
+#' @return A `brmsstanvars` object.
+#' @noRd
+make_mvt_stanvars <- function(arrays) {
+  K <- as.integer(arrays$max_rep)
+  psi_param <- brms::stanvar(
+    name  = "mvt_Psi_param",
+    scode = paste0("  vector<lower=0>[", K, "] Psi;"),
+    block = "parameters"
+  )
+  psi_prior <- brms::stanvar(
+    name  = "mvt_Psi_prior",
+    scode = "  Psi ~ exponential(1);",
+    block = "model"
+  )
+  nu_param <- brms::stanvar(
+    name  = "mvt_nu_param",
+    scode = "  real<lower=2> nu;",
+    block = "parameters"
+  )
+  nu_prior <- brms::stanvar(
+    name  = "mvt_nu_prior",
+    scode = "  target += gamma_lpdf(nu - 2 | 2, 0.1);",
+    block = "model"
+  )
+  combine_stanvars(
+    make_closure_unit_arrays_stanvars(
+      arrays,
+      family_funs_name = "mvt_funs",
+      family_funs      = mvt_stan_funs(),
+      include_K_max    = FALSE,
+      include_Y_max    = FALSE
+    ),
+    psi_param,
+    psi_prior,
+    nu_param,
+    nu_prior
   )
 }
 
@@ -2436,6 +2906,8 @@ prepare_closure_unit_family <- function(family, data, response_var,
     diri                 = make_diri_stanvars(arrays),
     multi                = make_multi_stanvars(arrays),
     categ                = make_categ_stanvars(arrays),
+    mvn                  = make_mvn_stanvars(arrays),
+    mvt                  = make_mvt_stanvars(arrays),
     stop(insight::format_error(c(
       paste0(
         "Closure-unit dispatch missing for family '",
@@ -2635,7 +3107,32 @@ dispatch_closure_unit_method <- function(family, method_kind) {
                   epred        = posterior_epred_occ,
                   predict      = posterior_predict_occ,
                   log_lik      = log_lik_occ,
-                  latent_state = posterior_occupancy)
+                  latent_state = posterior_occupancy),
+    mvn  = switch(method_kind,
+                  epred        = posterior_epred_mvn,
+                  predict      = posterior_predict_mvn,
+                  log_lik      = log_lik_mvn,
+                  latent_state = NULL),
+    mvt  = switch(method_kind,
+                  epred        = posterior_epred_mvt,
+                  predict      = posterior_predict_mvt,
+                  log_lik      = log_lik_mvt,
+                  latent_state = NULL),
+    diri  = switch(method_kind,
+                   epred        = posterior_epred_diri,
+                   predict      = posterior_predict_diri,
+                   log_lik      = log_lik_diri,
+                   latent_state = NULL),
+    multi = switch(method_kind,
+                   epred        = posterior_epred_multi,
+                   predict      = posterior_predict_multi,
+                   log_lik      = log_lik_multi,
+                   latent_state = NULL),
+    categ = switch(method_kind,
+                   epred        = posterior_epred_categ,
+                   predict      = posterior_predict_categ,
+                   log_lik      = log_lik_categ,
+                   latent_state = NULL)
   )
   if (is.null(fn)) {
     stop(insight::format_error(c(
@@ -2650,6 +3147,34 @@ dispatch_closure_unit_method <- function(family, method_kind) {
     )))
   }
   fn
+}
+
+#' Materialise `ndraws` to a concrete `draw_ids` vector for the
+#' closure-unit kernels.
+#'
+#' `posterior_epred.mvgam()` and `posterior_predict.mvgam()` accept
+#' both `ndraws` and `draw_ids`, but the closure-unit kernels
+#' (`posterior_epred_nmix`, `posterior_predict_mvn`, ...) accept
+#' only `draw_ids`. Materialising `ndraws` here means a single
+#' random subsample is shared by `mu`, dpars (`Psi`, `nu`), and
+#' any downstream extraction the kernel performs, instead of each
+#' call drawing a different subset.
+#'
+#' Convention matches `posterior::resample_draws()`: when both
+#' `ndraws` and `draw_ids` are supplied the explicit `draw_ids`
+#' wins. When neither is supplied the kernel sees `draw_ids =
+#' NULL` and uses the full posterior.
+#'
+#' @param object Fitted `mvgam` object.
+#' @param ndraws Integer or NULL.
+#' @param draw_ids Integer vector or NULL.
+#' @return `draw_ids` vector or NULL.
+#' @noRd
+closure_unit_resolve_draw_ids <- function(object, ndraws, draw_ids) {
+  if (!is.null(draw_ids) || is.null(ndraws)) return(draw_ids)
+  total <- posterior::ndraws(posterior::as_draws_matrix(object$fit))
+  if (ndraws >= total) return(NULL)
+  sort(sample.int(total, ndraws))
 }
 
 #' Resolve the response variable name from an mvgam formula slot
@@ -2830,13 +3355,18 @@ extract_closure_unit_components <- function(object, newdata = NULL,
   # producing silent garbage in downstream sampling. Identifiability
   # flags are TRUE at predict time because we do not re-examine the
   # formula here; those warnings are only informative at fit time.
+  # Mv-response families (mvn / mvt) read continuous responses
+  # without a per-unit truncation; they share the closure-unit
+  # data layout (long format, K rows per site) but neither
+  # require a cap column nor run the binary-y check.
+  aggregates <- needs_closure_unit_aggregation(object$family)
   validate_closure_unit_data(
     newdata,
     response_var       = response_var,
     has_obs_covariates = TRUE,
     has_det_covariates = TRUE,
-    binary_y_check     = binary_y_check,
-    cap_required       = is.null(default_cap)
+    binary_y_check     = binary_y_check && aggregates,
+    cap_required       = is.null(default_cap) && aggregates
   )
   arrays <- build_closure_unit_arrays(
     newdata, response_var = response_var,
@@ -3281,6 +3811,714 @@ log1mexp <- function(a) {
   small <- a <= log(2)
   out[ small] <- log(-expm1(-a[ small]))
   out[!small] <- log1p(-exp(-a[!small]))
+  out
+}
+
+#' Extract per-row mu and per-species Psi (and nu) draws for an
+#' mv-response fit
+#'
+#' Helper for the `mvn()` and `mvt()` post-fit kernels. Returns
+#' `mu` on the response scale (identity link; the trend pipeline
+#' has already added the latent factor contribution
+#' `Z[k, :] * lv[i, :]`), the per-species residual scale `Psi`
+#' broadcast to the per-row level, and (for mvt) `nu`.
+#'
+#' The mv-response closure-unit pattern groups by site only with
+#' K rows per site. `as.integer(as.factor(data$series))` yields
+#' the species index per row, which is used to broadcast Psi.
+#'
+#' @param object Fitted `mvgam` object with an mv-response family.
+#' @param newdata Long-format observation data; defaults to the
+#'   training data on `object`.
+#' @param draw_ids Optional posterior draw indices.
+#' @param needs_nu Logical; pull `nu` from the posterior. TRUE for
+#'   `mvt()`, FALSE for `mvn()`.
+#' @return Named list with `mu` `[ndraws x N_obs]`, `Psi_row`
+#'   `[ndraws x N_obs]` (per-row Psi after species lookup), `nu`
+#'   numeric vector of length `ndraws` (or `NULL`), `species_idx`
+#'   integer vector of length N_obs, `K`, `ndraws`.
+#' @noRd
+extract_mv_response_components <- function(object, newdata = NULL,
+                                            draw_ids = NULL,
+                                            ndraws = NULL,
+                                            needs_nu = FALSE,
+                                            linpred = NULL) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
+  if (!is_multi_response_family(object$family)) {
+    stop(insight::format_error(
+      "extract_mv_response_components() requires an mv-response fit."
+    ))
+  }
+  if (is.null(newdata)) {
+    newdata <- object$obs_data %||% object$data
+    if (is.null(newdata)) {
+      stop(insight::format_error(
+        "Training data not stored on object; supply 'newdata'."
+      ))
+    }
+  }
+  if (!"series" %in% colnames(newdata)) {
+    stop(insight::format_error(c(
+      "mv-response families require a 'series' factor column in 'data'.",
+      i = "Each row of 'data' is one (site, species) observation."
+    )))
+  }
+  series_fac <- as.factor(newdata$series)
+  species_idx <- as.integer(series_fac)
+  K <- length(levels(series_fac))
+
+  # mu enters with the latent factor contribution Z[k, :] * lv[i, :]
+  # already added via the trend pipeline. process_error = FALSE
+  # because closure-unit families do not run a stochastic trend
+  # layer. When `linpred` is supplied (log_lik path) skip the
+  # recomputation so the caller's already-subsampled linpred is
+  # used; this keeps Psi aligned to the same draw indices as mu.
+  if (is.null(linpred)) {
+    linpred <- posterior_linpred(
+      object, newdata = newdata, draw_ids = draw_ids,
+      ndraws = ndraws, process_error = FALSE
+    )
+  }
+  mu <- object$family$linkinv(linpred)
+  ndraws_actual <- nrow(mu)
+  N_obs <- ncol(mu)
+
+  # Resolve which posterior draw indices the linpred is on so Psi
+  # (and nu) line up element-wise. nmix uses the same convention:
+  # draw_ids when supplied, else seq_len(ndraws_actual).
+  draws_mat <- posterior::as_draws_matrix(object$fit)
+  if (is.null(draw_ids)) {
+    draw_ids_local <- seq_len(ndraws_actual)
+  } else if (length(draw_ids) != ndraws_actual) {
+    draw_ids_local <- draw_ids[seq_len(ndraws_actual)]
+  } else {
+    draw_ids_local <- draw_ids
+  }
+
+  # Psi declared in Stan as `vector<lower=0>[K] Psi`.
+  psi_cols <- paste0("Psi[", seq_len(K), "]")
+  missing_cols <- setdiff(psi_cols, colnames(draws_mat))
+  if (length(missing_cols) > 0L) {
+    stop(insight::format_error(c(
+      "Posterior is missing Psi columns for mv-response family.",
+      x = paste0(
+        "Expected: ", paste(psi_cols, collapse = ", "),
+        "; missing: ", paste(missing_cols, collapse = ", "), "."
+      )
+    )))
+  }
+  Psi_full <- draws_mat[draw_ids_local, psi_cols, drop = FALSE]
+  # Broadcast Psi[, species_idx] to a [ndraws x N_obs] matrix so
+  # downstream kernels can use it element-wise alongside mu.
+  Psi_row <- Psi_full[, species_idx, drop = FALSE]
+  dim(Psi_row) <- c(ndraws_actual, N_obs)
+
+  nu_draws <- NULL
+  if (needs_nu) {
+    if (!"nu" %in% colnames(draws_mat)) {
+      stop(insight::format_error(
+        "Posterior is missing the 'nu' column for mvt() family."
+      ))
+    }
+    nu_draws <- as.numeric(draws_mat[draw_ids_local, "nu"])
+  }
+
+  list(
+    mu          = mu,
+    Psi_row     = Psi_row,
+    Psi         = unname(as.matrix(Psi_full)),
+    nu          = nu_draws,
+    species_idx = species_idx,
+    K           = K,
+    ndraws      = ndraws_actual,
+    N_obs       = N_obs
+  )
+}
+
+#' Per-row expected value for an `mvn()` fit
+#'
+#' Identity link. The trend pipeline already adds the latent factor
+#' contribution `Z[k, :] * lv[i, :]` to `mu`, so the conditional
+#' expectation `E[y | lv]` is just `mu`. Marginalising over
+#' `lv ~ N(0, I)` leaves the marginal mean unchanged because the
+#' factor contribution is mean-zero.
+#'
+#' @inheritParams extract_mv_response_components
+#' @return `[ndraws x N_obs]` matrix of expected values.
+#' @noRd
+posterior_epred_mvn <- function(object, newdata = NULL,
+                                 draw_ids = NULL, ndraws = NULL) {
+  extract_mv_response_components(
+    object, newdata, draw_ids, ndraws = ndraws, needs_nu = FALSE
+  )$mu
+}
+
+#' Per-row response RNG for an `mvn()` fit
+#'
+#' Draws `y[s, n] ~ N(mu[s, n], Psi[s, species(n)])`. The latent
+#' factor contribution to `mu` is sampled jointly with the model,
+#' so the per-row residual is conditionally independent normal.
+#' Marginalising over `lv ~ N(0, I)` recovers the gllvm/boral
+#' marginal `y_unit ~ MVN(mu_unit, Z Z' + diag(Psi^2))`.
+#'
+#' @inheritParams posterior_epred_mvn
+#' @return `[ndraws x N_obs]` numeric matrix of response draws.
+#' @noRd
+posterior_predict_mvn <- function(object, newdata = NULL,
+                                   draw_ids = NULL, ndraws = NULL) {
+  comp <- extract_mv_response_components(
+    object, newdata, draw_ids, ndraws = ndraws, needs_nu = FALSE
+  )
+  matrix(
+    stats::rnorm(
+      comp$ndraws * comp$N_obs,
+      mean = as.numeric(comp$mu),
+      sd   = as.numeric(comp$Psi_row)
+    ),
+    nrow = comp$ndraws, ncol = comp$N_obs
+  )
+}
+
+#' Per-observation log-likelihood for `mvn()`
+#'
+#' Independent normal per row at the conditional gllvm
+#' parameterisation: `lp_n = dnorm(y_n | mu_n, Psi[species(n)],
+#' log = TRUE)` where `mu_n` already includes the per-draw latent
+#' factor contribution.
+#'
+#' loo / waic score at the (site, species) row grain rather than
+#' the per-site joint grain because the K rows of a site are
+#' conditionally independent given `lv_i`. Aggregating to the
+#' site grain (`loo` with `r_eff = relative_eff()` over sites)
+#' is appropriate when the user wants leave-one-site-out scoring;
+#' the default leave-one-row-out scoring is the natural
+#' conditional-on-lv quantity.
+#'
+#' @param linpred Per-row linpred `[ndraws x N_obs]` already on the
+#'   identity scale (mu).
+#' @param link Family link ("identity" for mvn / mvt).
+#' @param y Numeric response vector of length N_obs.
+#' @param family_pars List with `Psi_row` `[ndraws x N_obs]` (and
+#'   `nu` numeric vector of length ndraws for mvt).
+#' @param trials Unused.
+#' @return `[ndraws x N_obs]` log-density matrix.
+#' @noRd
+log_lik_mvn <- function(linpred, link, y, family_pars, trials) {
+  Psi_row <- family_pars$Psi_row
+  ndraws <- nrow(linpred)
+  N_obs <- ncol(linpred)
+  if (length(y) != N_obs) {
+    stop(insight::format_error(c(
+      "log_lik_mvn: y length does not match linpred columns.",
+      x = paste0("length(y) = ", length(y),
+                 ", ncol(linpred) = ", N_obs, ".")
+    )))
+  }
+  if (!identical(dim(Psi_row), c(ndraws, N_obs))) {
+    stop(insight::format_error(c(
+      "log_lik_mvn: Psi_row dimensions do not match linpred.",
+      x = paste0(
+        "Psi_row: ", paste(dim(Psi_row), collapse = "x"),
+        "; expected ", ndraws, "x", N_obs, "."
+      )
+    )))
+  }
+  y_mat <- matrix(y, nrow = ndraws, ncol = N_obs, byrow = TRUE)
+  matrix(
+    stats::dnorm(
+      as.numeric(y_mat),
+      mean = as.numeric(linpred),
+      sd   = as.numeric(Psi_row),
+      log  = TRUE
+    ),
+    nrow = ndraws, ncol = N_obs
+  )
+}
+
+#' Per-row expected value for an `mvt()` fit
+#'
+#' Same as `posterior_epred_mvn()`. The Student-t residual has
+#' mean `mu` for `nu > 1` (always satisfied here because `nu` has
+#' a hard lower bound of 2 by Stan declaration).
+#'
+#' @inheritParams posterior_epred_mvn
+#' @return `[ndraws x N_obs]` matrix.
+#' @noRd
+posterior_epred_mvt <- function(object, newdata = NULL,
+                                 draw_ids = NULL, ndraws = NULL) {
+  extract_mv_response_components(
+    object, newdata, draw_ids, ndraws = ndraws, needs_nu = TRUE
+  )$mu
+}
+
+#' Per-row response RNG for an `mvt()` fit
+#'
+#' Draws `y[s, n] = mu[s, n] + Psi[s, species(n)] * t_nu` where
+#' `t_nu ~ Student-t(0, 1, nu[s])`. The conditional gllvm
+#' parameterisation puts the latent factor contribution in `mu`,
+#' so the per-row residual is conditionally Student-t with
+#' per-species scale.
+#'
+#' @inheritParams posterior_epred_mvn
+#' @return `[ndraws x N_obs]` numeric matrix.
+#' @noRd
+posterior_predict_mvt <- function(object, newdata = NULL,
+                                   draw_ids = NULL, ndraws = NULL) {
+  comp <- extract_mv_response_components(
+    object, newdata, draw_ids, ndraws = ndraws, needs_nu = TRUE
+  )
+  # nu is per-draw; broadcast to per-cell with matrix() recycling.
+  nu_row <- matrix(comp$nu, nrow = comp$ndraws, ncol = comp$N_obs)
+  t_draws <- matrix(
+    stats::rt(comp$ndraws * comp$N_obs, df = as.numeric(nu_row)),
+    nrow = comp$ndraws, ncol = comp$N_obs
+  )
+  comp$mu + comp$Psi_row * t_draws
+}
+
+#' Per-observation log-likelihood for `mvt()`
+#'
+#' Independent scaled Student-t per row at the conditional gllvm
+#' parameterisation: `lp_n = dt((y_n - mu_n) / Psi[species(n)],
+#' df = nu, log = TRUE) - log(Psi[species(n)])` (location-scale
+#' transform Jacobian).
+#'
+#' @param linpred Per-row linpred `[ndraws x N_obs]`.
+#' @param link Family link ("identity").
+#' @param y Numeric response vector of length N_obs.
+#' @param family_pars List with `Psi_row` `[ndraws x N_obs]` and
+#'   `nu` numeric vector of length `ndraws`.
+#' @param trials Unused.
+#' @return `[ndraws x N_obs]` log-density matrix.
+#' @noRd
+log_lik_mvt <- function(linpred, link, y, family_pars, trials) {
+  Psi_row <- family_pars$Psi_row
+  nu      <- family_pars$nu
+  ndraws <- nrow(linpred)
+  N_obs <- ncol(linpred)
+  if (length(y) != N_obs) {
+    stop(insight::format_error(
+      "log_lik_mvt: y length does not match linpred columns."
+    ))
+  }
+  if (!identical(dim(Psi_row), c(ndraws, N_obs))) {
+    stop(insight::format_error(
+      "log_lik_mvt: Psi_row dimensions do not match linpred."
+    ))
+  }
+  if (length(nu) != ndraws) {
+    stop(insight::format_error(
+      "log_lik_mvt: nu length does not match ndraws."
+    ))
+  }
+  y_mat <- matrix(y, nrow = ndraws, ncol = N_obs, byrow = TRUE)
+  nu_mat <- matrix(nu, nrow = ndraws, ncol = N_obs)
+  z <- (y_mat - linpred) / Psi_row
+  # dt is log density at z; Jacobian for the scale Psi is
+  # -log(Psi) so the unscaled-y log density is dt(z, log) - log(Psi).
+  dt_z <- matrix(
+    stats::dt(as.numeric(z), df = as.numeric(nu_mat), log = TRUE),
+    nrow = ndraws, ncol = N_obs
+  )
+  dt_z - log(Psi_row)
+}
+
+#' Extract per-row softmax probabilities + dpars for a simplex fit
+#'
+#' Shared helper for the `diri()`, `multi()`, and `categ()` post-fit
+#' kernels. Builds the closure-unit arrays from `newdata`, assembles
+#' per-unit mu blocks (`mu[idx] - mu[idx[1]]` reference subtraction,
+#' matching the Stan lpdf body), applies `softmax` per draw per unit,
+#' and broadcasts the result back to a `[ndraws x N_obs]` per-row
+#' probability matrix.
+#'
+#' The species-axis Z column constraint (`sum_to_zero_vector[K]`)
+#' and the per-unit reference subtraction together identify the
+#' simplex up to the K-shared shift the softmax cannot resolve;
+#' both already live in the Stan emission, so the R-side helper
+#' just mirrors the reference subtraction so that R-side predictions
+#' agree with the Stan-side likelihood.
+#'
+#' @param object Fitted `mvgam` object with a simplex-response family.
+#' @param newdata Long-format observation data.
+#' @param draw_ids Optional posterior draw indices.
+#' @param ndraws Optional integer; passed to posterior_linpred when
+#'   `linpred` is not supplied.
+#' @param needs_phi Logical; pull `phi` from the posterior (TRUE for
+#'   `diri()`, FALSE for `multi()` / `categ()`).
+#' @param linpred Optional precomputed linpred. When supplied the
+#'   internal `posterior_linpred()` call is skipped.
+#' @return Named list with `prob_row` `[ndraws x N_obs]` per-row
+#'   softmax probabilities, `phi` numeric vector of length ndraws
+#'   (or `NULL`), `arrays`, `ndraws`, `N_obs`, `N_unit`.
+#' @noRd
+extract_simplex_response_components <- function(object,
+                                                  newdata = NULL,
+                                                  draw_ids = NULL,
+                                                  ndraws = NULL,
+                                                  needs_phi = FALSE,
+                                                  linpred = NULL) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
+  if (!is_simplex_response_family(object$family)) {
+    stop(insight::format_error(
+      "extract_simplex_response_components() requires a simplex-response fit."
+    ))
+  }
+  if (is.null(newdata)) {
+    newdata <- object$obs_data %||% object$data
+    if (is.null(newdata)) {
+      stop(insight::format_error(
+        "Training data not stored on object; supply 'newdata'."
+      ))
+    }
+  }
+  response_var <- closure_unit_response_var(object$formula)
+  arrays <- build_closure_unit_arrays(
+    newdata, response_var = response_var,
+    compute_y_max      = FALSE,
+    unit_grouping_vars = "time"
+  )
+
+  if (is.null(linpred)) {
+    linpred <- posterior_linpred(
+      object, newdata = newdata, draw_ids = draw_ids,
+      ndraws = ndraws, process_error = FALSE
+    )
+  }
+  mu <- linpred
+  ndraws_actual <- nrow(mu)
+  N_obs <- ncol(mu)
+  N_unit <- arrays$N_unit
+  visit_idx <- arrays$visit_idx
+  n_rep <- arrays$n_rep
+
+  # Build per-row softmax probabilities by walking units. Each unit
+  # contributes Kg rows whose probabilities sum to 1 along the draw
+  # axis.
+  prob_row <- matrix(0, nrow = ndraws_actual, ncol = N_obs)
+  for (g in seq_len(N_unit)) {
+    Kg <- n_rep[g]
+    idx <- visit_idx[g, seq_len(Kg)]
+    mu_unit <- mu[, idx, drop = FALSE]
+    # Mirror Stan's `mu_unit = mu[idx] - mu[idx[1]]` reference shift.
+    # softmax is shift-invariant so the resulting probabilities are
+    # the same as without the subtraction, but staying explicit
+    # documents the parameterisation match.
+    mu_unit_centred <- mu_unit - mu_unit[, 1L]
+    exp_mu <- exp(mu_unit_centred)
+    prob_row[, idx] <- exp_mu / rowSums(exp_mu)
+  }
+
+  draws_mat <- posterior::as_draws_matrix(object$fit)
+  if (is.null(draw_ids)) {
+    draw_ids_local <- seq_len(ndraws_actual)
+  } else if (length(draw_ids) != ndraws_actual) {
+    draw_ids_local <- draw_ids[seq_len(ndraws_actual)]
+  } else {
+    draw_ids_local <- draw_ids
+  }
+
+  phi_draws <- NULL
+  if (needs_phi) {
+    if (!"phi" %in% colnames(draws_mat)) {
+      has_phi_subformula <- any(grepl(
+        "^b_phi_|^Intercept_phi$|^bs_phi($|\\[)|^s_phi_",
+        colnames(draws_mat)
+      ))
+      if (has_phi_subformula) {
+        stop(insight::format_error(c(
+          "diri() post-fit kernels do not yet support distributional regression on 'phi'.",
+          x = paste0(
+            "The posterior carries 'b_phi_*' / 's_phi_*' columns ",
+            "(emitted by a `phi ~ ...` sub-formula)."
+          ),
+          i = paste0(
+            "Drop the phi sub-formula and refit with a scalar 'phi', ",
+            "or file a feature request for per-site phi extraction."
+          )
+        )))
+      }
+      stop(insight::format_error(
+        "Posterior is missing 'phi' column for diri() family."
+      ))
+    }
+    phi_draws <- as.numeric(draws_mat[draw_ids_local, "phi"])
+  }
+
+  list(
+    prob_row = prob_row,
+    phi      = phi_draws,
+    arrays   = arrays,
+    ndraws   = ndraws_actual,
+    N_obs    = N_obs,
+    N_unit   = N_unit
+  )
+}
+
+#' Per-row expected value for a `diri()` fit
+#'
+#' Each (site, species) row receives its softmax probability,
+#' broadcast from the per-site K-vector via `arrays$visit_idx`.
+#' Compositional responses sum to 1 across the K rows of a site,
+#' so `E[y_{i,k}] = softmax(mu_unit_i)[k]`.
+#'
+#' @inheritParams extract_simplex_response_components
+#' @return `[ndraws x N_obs]` matrix of expected proportions.
+#' @noRd
+posterior_epred_diri <- function(object, newdata = NULL,
+                                  draw_ids = NULL, ndraws = NULL) {
+  extract_simplex_response_components(
+    object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE
+  )$prob_row
+}
+
+#' Per-row response RNG for a `diri()` fit
+#'
+#' Draws `Y_unit ~ Dirichlet(softmax(mu_unit) * phi)` per closure
+#' unit via the gamma-normalisation construction. The draws are
+#' simplex K-vectors, broadcast back to per-row layout.
+#'
+#' @inheritParams posterior_epred_diri
+#' @return `[ndraws x N_obs]` matrix of simplex draws.
+#' @noRd
+posterior_predict_diri <- function(object, newdata = NULL,
+                                    draw_ids = NULL, ndraws = NULL) {
+  comp <- extract_simplex_response_components(
+    object, newdata, draw_ids, ndraws = ndraws, needs_phi = TRUE
+  )
+  out <- matrix(0, nrow = comp$ndraws, ncol = comp$N_obs)
+  for (g in seq_len(comp$N_unit)) {
+    Kg <- comp$arrays$n_rep[g]
+    idx <- comp$arrays$visit_idx[g, seq_len(Kg)]
+    prob_g <- comp$prob_row[, idx, drop = FALSE]
+    # alpha[s, k] = prob_g[s, k] * phi[s]. Generate Kg gamma draws
+    # per row, renormalise to a simplex.
+    alpha <- prob_g * comp$phi
+    gam <- matrix(
+      stats::rgamma(comp$ndraws * Kg, shape = as.numeric(alpha),
+                     rate = 1),
+      nrow = comp$ndraws, ncol = Kg
+    )
+    out[, idx] <- gam / rowSums(gam)
+  }
+  out
+}
+
+#' Per-observation log-likelihood for `diri()`
+#'
+#' Per-unit Dirichlet density `dirichlet_lpdf(y_unit |
+#' softmax(mu_unit) * phi)`. The per-unit log-density is assigned to
+#' the first row of each unit (`visit_idx[g, 1]`) and zero for the
+#' remaining K-1 rows, so the sum across rows recovers the joint
+#' log-likelihood and loo / waic naturally score at the site grain.
+#'
+#' @param linpred `[ndraws x N_obs]` linpred on identity scale.
+#' @param link Family link ("identity").
+#' @param y Numeric vector of observed proportions, length N_obs.
+#' @param family_pars List with `prob_row`, `phi`, `arrays`.
+#' @param trials Unused.
+#' @return `[ndraws x N_obs]` log-density matrix.
+#' @noRd
+log_lik_diri <- function(linpred, link, y, family_pars, trials) {
+  prob_row <- family_pars$prob_row
+  phi      <- family_pars$phi
+  arrays   <- family_pars$arrays
+  ndraws <- nrow(linpred)
+  N_obs <- ncol(linpred)
+  out <- matrix(0, nrow = ndraws, ncol = N_obs)
+  for (g in seq_len(arrays$N_unit)) {
+    Kg <- arrays$n_rep[g]
+    idx <- arrays$visit_idx[g, seq_len(Kg)]
+    y_unit <- y[idx]
+    prob_g <- prob_row[, idx, drop = FALSE]
+    alpha <- prob_g * phi
+    # dirichlet_lpdf(y | alpha) = lgamma(sum(alpha)) -
+    #   sum(lgamma(alpha)) + sum((alpha - 1) * log(y))
+    log_y <- matrix(log(y_unit), nrow = ndraws, ncol = Kg, byrow = TRUE)
+    lp <- lgamma(rowSums(alpha)) - rowSums(lgamma(alpha)) +
+            rowSums((alpha - 1) * log_y)
+    out[, idx[1L]] <- lp
+  }
+  out
+}
+
+#' Per-row expected count for a `multi()` fit
+#'
+#' Each row's expected count is `softmax(mu_unit)[k] * N_site` where
+#' `N_site = sum(Y_unit)` is the per-site trial total. The per-site
+#' total is read from `object$obs_data` (or `newdata`) so the
+#' epred matches the data-generating multinomial sample size.
+#'
+#' @inheritParams posterior_epred_diri
+#' @return `[ndraws x N_obs]` matrix of expected counts.
+#' @noRd
+posterior_epred_multi <- function(object, newdata = NULL,
+                                   draw_ids = NULL, ndraws = NULL) {
+  comp <- extract_simplex_response_components(
+    object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE
+  )
+  if (is.null(newdata)) {
+    newdata <- object$obs_data %||% object$data
+  }
+  response_var <- closure_unit_response_var(object$formula)
+  y_vec <- newdata[[response_var]]
+  total_row <- numeric(comp$N_obs)
+  for (g in seq_len(comp$N_unit)) {
+    Kg <- comp$arrays$n_rep[g]
+    idx <- comp$arrays$visit_idx[g, seq_len(Kg)]
+    total_row[idx] <- sum(y_vec[idx])
+  }
+  total_mat <- matrix(total_row, nrow = comp$ndraws,
+                       ncol = comp$N_obs, byrow = TRUE)
+  comp$prob_row * total_mat
+}
+
+#' Per-row response RNG for a `multi()` fit
+#'
+#' Draws `Y_unit ~ Multinomial(N_site, softmax(mu_unit))` per unit.
+#' Returns the K cell counts broadcast to per-row layout. The
+#' per-site total `N_site` is the sufficient statistic of the
+#' multinomial and is held fixed at the observed value (matching
+#' the closure constraint baked into the Stan likelihood).
+#'
+#' @inheritParams posterior_epred_diri
+#' @return `[ndraws x N_obs]` integer matrix of counts.
+#' @noRd
+posterior_predict_multi <- function(object, newdata = NULL,
+                                     draw_ids = NULL, ndraws = NULL) {
+  comp <- extract_simplex_response_components(
+    object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE
+  )
+  if (is.null(newdata)) {
+    newdata <- object$obs_data %||% object$data
+  }
+  response_var <- closure_unit_response_var(object$formula)
+  y_vec <- newdata[[response_var]]
+  out <- matrix(0L, nrow = comp$ndraws, ncol = comp$N_obs)
+  for (g in seq_len(comp$N_unit)) {
+    Kg <- comp$arrays$n_rep[g]
+    idx <- comp$arrays$visit_idx[g, seq_len(Kg)]
+    n_g <- sum(y_vec[idx])
+    prob_g <- comp$prob_row[, idx, drop = FALSE]
+    for (s in seq_len(comp$ndraws)) {
+      out[s, idx] <- as.integer(
+        stats::rmultinom(1L, size = n_g, prob = prob_g[s, ])
+      )
+    }
+  }
+  out
+}
+
+#' Per-observation log-likelihood for `multi()`
+#'
+#' Per-unit multinomial log-mass attributed to the first row of
+#' each unit. `loo` / `waic` score at the site grain naturally.
+#'
+#' @inheritParams log_lik_diri
+#' @return `[ndraws x N_obs]` log-density matrix.
+#' @noRd
+log_lik_multi <- function(linpred, link, y, family_pars, trials) {
+  prob_row <- family_pars$prob_row
+  arrays   <- family_pars$arrays
+  ndraws <- nrow(linpred)
+  N_obs <- ncol(linpred)
+  out <- matrix(0, nrow = ndraws, ncol = N_obs)
+  for (g in seq_len(arrays$N_unit)) {
+    Kg <- arrays$n_rep[g]
+    idx <- arrays$visit_idx[g, seq_len(Kg)]
+    y_unit <- as.integer(y[idx])
+    n_g <- sum(y_unit)
+    prob_g <- prob_row[, idx, drop = FALSE]
+    # multinomial log-mass: lgamma(n + 1) - sum(lgamma(y + 1)) +
+    #   sum(y * log(p))
+    log_p <- log(prob_g)
+    y_mat <- matrix(y_unit, nrow = ndraws, ncol = Kg, byrow = TRUE)
+    lp <- lgamma(n_g + 1) - sum(lgamma(y_unit + 1)) +
+            rowSums(y_mat * log_p)
+    out[, idx[1L]] <- lp
+  }
+  out
+}
+
+#' Per-row probability for a `categ()` fit
+#'
+#' Each row's expected value is the probability that this category
+#' is the observed one, i.e. `softmax(mu_unit)[k]`. Returns a
+#' probability matrix on the response scale.
+#'
+#' @inheritParams posterior_epred_diri
+#' @return `[ndraws x N_obs]` matrix of probabilities.
+#' @noRd
+posterior_epred_categ <- function(object, newdata = NULL,
+                                   draw_ids = NULL, ndraws = NULL) {
+  extract_simplex_response_components(
+    object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE
+  )$prob_row
+}
+
+#' Per-row response RNG for a `categ()` fit
+#'
+#' Draws one category per site from `Categorical(softmax(mu_unit))`
+#' and broadcasts to a per-row one-hot encoding so the result
+#' matches the long-format data layout (one 1 and (K-1) 0s per
+#' site).
+#'
+#' @inheritParams posterior_epred_diri
+#' @return `[ndraws x N_obs]` integer matrix of 0 / 1 values.
+#' @noRd
+posterior_predict_categ <- function(object, newdata = NULL,
+                                     draw_ids = NULL, ndraws = NULL) {
+  comp <- extract_simplex_response_components(
+    object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE
+  )
+  out <- matrix(0L, nrow = comp$ndraws, ncol = comp$N_obs)
+  for (g in seq_len(comp$N_unit)) {
+    Kg <- comp$arrays$n_rep[g]
+    idx <- comp$arrays$visit_idx[g, seq_len(Kg)]
+    prob_g <- comp$prob_row[, idx, drop = FALSE]
+    for (s in seq_len(comp$ndraws)) {
+      cat_code <- sample.int(Kg, size = 1L, prob = prob_g[s, ])
+      out[s, idx[cat_code]] <- 1L
+    }
+  }
+  out
+}
+
+#' Per-observation log-likelihood for `categ()`
+#'
+#' Per-unit categorical log-mass at the observed one-hot category
+#' code, attributed to the first row of each unit.
+#'
+#' @inheritParams log_lik_diri
+#' @return `[ndraws x N_obs]` log-density matrix.
+#' @noRd
+log_lik_categ <- function(linpred, link, y, family_pars, trials) {
+  prob_row <- family_pars$prob_row
+  arrays   <- family_pars$arrays
+  ndraws <- nrow(linpred)
+  N_obs <- ncol(linpred)
+  out <- matrix(0, nrow = ndraws, ncol = N_obs)
+  for (g in seq_len(arrays$N_unit)) {
+    Kg <- arrays$n_rep[g]
+    idx <- arrays$visit_idx[g, seq_len(Kg)]
+    y_unit <- as.integer(y[idx])
+    # Observed category code: the index where y_unit == 1.
+    cat_code <- which(y_unit == 1L)
+    if (length(cat_code) != 1L) {
+      stop(insight::format_error(c(
+        "categ() observation is not a single one-hot per site.",
+        x = paste0(
+          "Site ", g, " has ", sum(y_unit),
+          " ones across K = ", Kg, " species rows."
+        ),
+        i = "Each site must have exactly one species selected."
+      )))
+    }
+    lp <- log(prob_row[, idx[cat_code]])
+    out[, idx[1L]] <- lp
+  }
   out
 }
 

@@ -419,10 +419,13 @@ test_that("residual_cor errors when correlations not requested", {
 })
 
 
-test_that("residual_cor.jsdgam errors with pending-port message", {
+test_that("residual_cor.jsdgam errors when called on an unfitted object", {
+  # jsdgam now routes through the shared factor-loadings branch in
+  # `compute_residual_cor()`, so an empty / unfitted jsdgam object
+  # errors at the posterior-draws extraction step rather than
+  # raising the old "not yet implemented" message.
   obj <- structure(list(), class = c("jsdgam", "mvgam"))
-  expect_error(residual_cor(obj), "not yet implemented")
-  expect_error(residual_cor(obj), "jsdgam")
+  expect_error(residual_cor(obj), "no fitted posterior draws")
 })
 
 
