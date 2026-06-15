@@ -191,7 +191,7 @@ test_that("diri_stan_funs() emits the lpdf body with mu_unit[1] anchor", {
   # Native Stan helpers: dirichlet_lpdf + softmax. The brms-emitted
   # `dirichlet_logit_lpdf` helper is NOT a Stan built-in.
   expect_match(
-    sc, "dirichlet_lpdf(y_unit | softmax(mu_unit) * phi)",
+    sc, "dirichlet_lpdf(y_unit | softmax(mu_unit) * phi_g)",
     fixed = TRUE
   )
   # Mode-2 hard identification: subtract `mu_unit[1]` from all
@@ -202,6 +202,16 @@ test_that("diri_stan_funs() emits the lpdf body with mu_unit[1] anchor", {
                fixed = TRUE)
   expect_false(grepl("mu_unit_sums", sc, fixed = TRUE))
   expect_false(grepl("normal_lupdf(mu_unit_sums", sc, fixed = TRUE))
+  # Two-signature dispatch: vector-phi primary (emits the
+  # `phi_g = phi[idx[1]]` per-unit collapse) and scalar-phi
+  # broadcast that forwards via `rep_vector(phi, N)`.
+  expect_match(sc, "vector phi,", fixed = TRUE)
+  expect_match(sc, "real phi,", fixed = TRUE)
+  expect_match(sc, "real phi_g = phi[idx[1]];", fixed = TRUE)
+  expect_match(
+    sc, "diri_lpdf(y | mu, rep_vector(phi, N), N_unit",
+    fixed = TRUE
+  )
 })
 
 

@@ -1479,6 +1479,58 @@ make_occ_stanvars <- function(arrays) {
 #' data when using `mvgam()` directly); the closure-unit data prep
 #' groups by (series, time) so each site forms one closure unit.
 #'
+#' @section Distributional regression on `phi`:
+#' A `phi ~ env` sub-formula in `bf()` (e.g.
+#' `bf(y ~ env * species, phi ~ env, family = diri())` through
+#' `mvgam()` rather than `jsdgam()`, which currently exposes only
+#' the response formula) IS supported at fit time: the lpdf
+#' dispatches `vector phi` vs `real phi` so brms can pass either.
+#' Per-row `phi[i, k]` is collapsed to one scalar per closure unit
+#' by taking `phi[idx[1]]`, which assumes the `phi` covariate is
+#' constant across the K rows of any site (site-level only). A
+#' species-level `phi` covariate is statistically ill-defined for
+#' a Dirichlet observation; if you pass one, the lpdf silently uses
+#' row 1's value and the user-facing pre-fit validator for this
+#' contract is on the v2.0.1 roadmap.
+#'
+#' Post-fit response-scale dispatchers
+#' (`posterior_predict()` / `posterior_epred()` / `log_lik()`)
+#' currently expect a scalar `phi` and will error directionally on
+#' a phi sub-formula fit. Interrogate the `b_phi_*` posterior
+#' directly via `posterior::as_draws_matrix(fit$fit)` until the
+#' v2.0.1 plumbing for per-row `phi` extraction lands.
+#'
+#' The default brms prior on `b_phi` regression coefficients is
+#' flat. Consider supplying `prior(student_t(3, 0, 2.5), class = b,
+#' dpar = phi)` via the `priors` argument to regularise the
+#' log-concentration slopes (matches the simplex population-effect
+#' default; flat priors leave room for implausible orders-of-magnitude
+#' phi shifts under modest sample sizes).
+#'
+#' @section Post-fit conventions:
+#' `log_lik()`, `loo()`, and `waic()` score at the **site grain**,
+#' not the (site, species) row grain. The Stan lpdf evaluates the
+#' joint K-vector Dirichlet density once per closure unit, so the
+#' per-unit log-density is attributed to the first row of the unit
+#' and the remaining K - 1 rows return `0` for `log_lik()`. This is
+#' the only correct grain for joint multi-row outcomes and matches
+#' the flocker / ubms convention for closure-unit families;
+#' Vehtari, Gelman and Gabry (2017) recommend the joint-unit grain
+#' for PSIS-LOO whenever the per-row likelihoods are not
+#' conditionally independent given the parameters. To compare
+#' simplex fits via `loo_compare()` against models scored at the
+#' row grain, refit the row-grain model on the unit-aggregated
+#' response or use `waic()` on both fits at consistent grain.
+#'
+#' `posterior_linpred()` returns the **uncentred** linear predictor
+#' `mu[i, k]` per row (the value brms emits before the lpdf body
+#' applies `mu_unit = mu[idx] - mu[idx[1]]` to remove the per-site
+#' K-shared shift). This is the natural scale for `marginaleffects`
+#' contrasts on the species axis. For probabilities on the simplex,
+#' use `posterior_epred()`, which applies the reference subtraction
+#' and softmax internally and returns one probability per (site,
+#' species) row summing to 1 within each site.
+#'
 #' @return A `brms::custom_family` object tagged with the
 #'   `mvgam_closure_unit`, `mvgam_multi_response`, and
 #'   `mvgam_simplex_response` attributes that route the
@@ -1488,6 +1540,11 @@ make_occ_stanvars <- function(arrays) {
 #' Aitchison, J. (1982). The statistical analysis of compositional
 #'   data. *Journal of the Royal Statistical Society Series B*,
 #'   44(2):139-177.
+#'
+#' Vehtari, A., Gelman, A. and Gabry, J. (2017). Practical Bayesian
+#'   model evaluation using leave-one-out cross-validation and WAIC.
+#'   *Statistics and Computing*, 27:1413-1432.
+#'   \doi{10.1007/s11222-016-9696-4}
 #'
 #' Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,
 #'   Taskinen, S., Walker, S. C. and Hui, F. K. C. (2015). So many
@@ -1589,11 +1646,19 @@ diri_stan_funs <- function() {
   # K-1 reference-category parameterisation while keeping `Z` fully
   # K-row symmetric in the column space (Z[1, :] is determined by
   # Z[2..K, :] through the sum-to-zero constraint).
+  #
+  # Per-unit phi: the Dirichlet concentration applies to the
+  # K-vector as a whole, so `phi` must be constant across the K
+  # rows of a closure unit. The vector-phi entry takes
+  # `phi[idx[1]]` for unit g; the scalar-phi entry broadcasts
+  # to the same value. brms emits the vector-phi entry when the
+  # user supplies a `phi ~ ...` sub-formula and the scalar-phi
+  # entry otherwise.
   paste(
     "  real diri_lpdf(",
     "    vector y,",
     "    vector mu,",
-    "    real phi,",
+    "    vector phi,",
     "    int N_unit,",
     "    array[] int n_rep,",
     "    array[,] int visit_idx) {",
@@ -1603,9 +1668,24 @@ diri_stan_funs <- function() {
     "      array[Kg] int idx = visit_idx[g, 1:Kg];",
     "      vector[Kg] y_unit  = y[idx];",
     "      vector[Kg] mu_unit = mu[idx] - mu[idx[1]];",
-    "      lp += dirichlet_lpdf(y_unit | softmax(mu_unit) * phi);",
+    "      real phi_g = phi[idx[1]];",
+    "      lp += dirichlet_lpdf(y_unit | softmax(mu_unit) * phi_g);",
     "    }",
     "    return lp;",
+    "  }",
+    "",
+    "  // Scalar-phi entry point: broadcasts to vector phi for the",
+    "  // no-sub-formula case where brms emits a scalar phi dpar.",
+    "  real diri_lpdf(",
+    "    vector y,",
+    "    vector mu,",
+    "    real phi,",
+    "    int N_unit,",
+    "    array[] int n_rep,",
+    "    array[,] int visit_idx) {",
+    "    int N = num_elements(y);",
+    "    return diri_lpdf(y | mu, rep_vector(phi, N), N_unit,",
+    "                    n_rep, visit_idx);",
     "  }",
     sep = "\n"
   )
@@ -1674,6 +1754,8 @@ make_diri_stanvars <- function(arrays) {
 #' Data layout: long format, one row per (site, species), exactly
 #' K rows per site. The integer count for that (site, species)
 #' cell is the response.
+#'
+#' @inheritSection diri Post-fit conventions
 #'
 #' @return A `brms::custom_family` object tagged with the
 #'   `mvgam_closure_unit`, `mvgam_multi_response`, and
@@ -1822,6 +1904,8 @@ make_multi_stanvars <- function(arrays) {
 #' K rows per site. The response `y` is binary: `y = 1` on the row
 #' corresponding to the observed category for that site and
 #' `y = 0` on the K - 1 other rows.
+#'
+#' @inheritSection diri Post-fit conventions
 #'
 #' @return A `brms::custom_family` object tagged with the
 #'   `mvgam_closure_unit`, `mvgam_multi_response`, and
@@ -4229,14 +4313,18 @@ extract_simplex_response_components <- function(object,
       ))
       if (has_phi_subformula) {
         stop(insight::format_error(c(
-          "diri() post-fit kernels do not yet support distributional regression on 'phi'.",
+          "diri() post-fit response-scale kernels do not yet wire per-row 'phi'.",
           x = paste0(
             "The posterior carries 'b_phi_*' / 's_phi_*' columns ",
-            "(emitted by a `phi ~ ...` sub-formula)."
+            "(emitted by a `phi ~ ...` sub-formula), but the response-",
+            "scale dispatchers still expect a scalar 'phi'."
           ),
           i = paste0(
-            "Drop the phi sub-formula and refit with a scalar 'phi', ",
-            "or file a feature request for per-site phi extraction."
+            "Fit-time `phi ~ ...` IS supported (Stan signature dispatches ",
+            "vector vs scalar 'phi'); interrogate the 'b_phi_*' posterior ",
+            "directly via `posterior::as_draws_matrix(fit$fit)`. Per-row ",
+            "extraction in `posterior_predict()` / `log_lik()` is planned ",
+            "for v2.0.1; refit with scalar 'phi' for those surfaces today."
           )
         )))
       }

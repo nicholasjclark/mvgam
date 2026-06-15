@@ -60,6 +60,61 @@ K rows per site. The user passes the species axis via the
 data when using \code{mvgam()} directly); the closure-unit data prep
 groups by (series, time) so each site forms one closure unit.
 }
+\section{Distributional regression on \code{phi}}{
+
+A \code{phi ~ env} sub-formula in \code{bf()} (e.g.
+\code{bf(y ~ env * species, phi ~ env, family = diri())} through
+\code{mvgam()} rather than \code{jsdgam()}, which currently exposes only
+the response formula) IS supported at fit time: the lpdf
+dispatches \verb{vector phi} vs \verb{real phi} so brms can pass either.
+Per-row \code{phi[i, k]} is collapsed to one scalar per closure unit
+by taking \code{phi[idx[1]]}, which assumes the \code{phi} covariate is
+constant across the K rows of any site (site-level only). A
+species-level \code{phi} covariate is statistically ill-defined for
+a Dirichlet observation; if you pass one, the lpdf silently uses
+row 1's value and the user-facing pre-fit validator for this
+contract is on the v2.0.1 roadmap.
+
+Post-fit response-scale dispatchers
+(\code{posterior_predict()} / \code{posterior_epred()} / \code{log_lik()})
+currently expect a scalar \code{phi} and will error directionally on
+a phi sub-formula fit. Interrogate the \verb{b_phi_*} posterior
+directly via \code{posterior::as_draws_matrix(fit$fit)} until the
+v2.0.1 plumbing for per-row \code{phi} extraction lands.
+
+The default brms prior on \code{b_phi} regression coefficients is
+flat. Consider supplying \code{prior(student_t(3, 0, 2.5), class = b, dpar = phi)} via the \code{priors} argument to regularise the
+log-concentration slopes (matches the simplex population-effect
+default; flat priors leave room for implausible orders-of-magnitude
+phi shifts under modest sample sizes).
+}
+
+\section{Post-fit conventions}{
+
+\code{log_lik()}, \code{loo()}, and \code{waic()} score at the \strong{site grain},
+not the (site, species) row grain. The Stan lpdf evaluates the
+joint K-vector Dirichlet density once per closure unit, so the
+per-unit log-density is attributed to the first row of the unit
+and the remaining K - 1 rows return \code{0} for \code{log_lik()}. This is
+the only correct grain for joint multi-row outcomes and matches
+the flocker / ubms convention for closure-unit families;
+Vehtari, Gelman and Gabry (2017) recommend the joint-unit grain
+for PSIS-LOO whenever the per-row likelihoods are not
+conditionally independent given the parameters. To compare
+simplex fits via \code{loo_compare()} against models scored at the
+row grain, refit the row-grain model on the unit-aggregated
+response or use \code{waic()} on both fits at consistent grain.
+
+\code{posterior_linpred()} returns the \strong{uncentred} linear predictor
+\code{mu[i, k]} per row (the value brms emits before the lpdf body
+applies \code{mu_unit = mu[idx] - mu[idx[1]]} to remove the per-site
+K-shared shift). This is the natural scale for \code{marginaleffects}
+contrasts on the species axis. For probabilities on the simplex,
+use \code{posterior_epred()}, which applies the reference subtraction
+and softmax internally and returns one probability per (site,
+species) row summing to 1 within each site.
+}
+
 \examples{
 \dontrun{
 # Compositional JSDM on long-format proportions data. The formula
@@ -84,6 +139,11 @@ plot(residual_cor(mod))
 Aitchison, J. (1982). The statistical analysis of compositional
 data. \emph{Journal of the Royal Statistical Society Series B},
 44(2):139-177.
+
+Vehtari, A., Gelman, A. and Gabry, J. (2017). Practical Bayesian
+model evaluation using leave-one-out cross-validation and WAIC.
+\emph{Statistics and Computing}, 27:1413-1432.
+\doi{10.1007/s11222-016-9696-4}
 
 Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,
 Taskinen, S., Walker, S. C. and Hui, F. K. C. (2015). So many

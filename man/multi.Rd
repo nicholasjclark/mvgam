@@ -48,6 +48,32 @@ Data layout: long format, one row per (site, species), exactly
 K rows per site. The integer count for that (site, species)
 cell is the response.
 }
+\section{Post-fit conventions}{
+
+\code{log_lik()}, \code{loo()}, and \code{waic()} score at the \strong{site grain},
+not the (site, species) row grain. The Stan lpdf evaluates the
+joint K-vector Dirichlet density once per closure unit, so the
+per-unit log-density is attributed to the first row of the unit
+and the remaining K - 1 rows return \code{0} for \code{log_lik()}. This is
+the only correct grain for joint multi-row outcomes and matches
+the flocker / ubms convention for closure-unit families;
+Vehtari, Gelman and Gabry (2017) recommend the joint-unit grain
+for PSIS-LOO whenever the per-row likelihoods are not
+conditionally independent given the parameters. To compare
+simplex fits via \code{loo_compare()} against models scored at the
+row grain, refit the row-grain model on the unit-aggregated
+response or use \code{waic()} on both fits at consistent grain.
+
+\code{posterior_linpred()} returns the \strong{uncentred} linear predictor
+\code{mu[i, k]} per row (the value brms emits before the lpdf body
+applies \code{mu_unit = mu[idx] - mu[idx[1]]} to remove the per-site
+K-shared shift). This is the natural scale for \code{marginaleffects}
+contrasts on the species axis. For probabilities on the simplex,
+use \code{posterior_epred()}, which applies the reference subtraction
+and softmax internally and returns one probability per (site,
+species) row summing to 1 within each site.
+}
+
 \examples{
 \dontrun{
 # Microbiome-style read-count JSDM. The `env * taxon` interaction
