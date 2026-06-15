@@ -54,13 +54,19 @@ lv_true <- cbind(sin(env), env^2 - mean(env^2))
 lv_true <- scale(lv_true, center = TRUE, scale = apply(lv_true, 2L, sd))
 
 # True species loadings on each factor. Column-centring gives the
-# QR-identified form the model targets.
-Z_true <- matrix(rnorm(K * N_lv, sd = 0.7), nrow = K, ncol = N_lv)
+# QR-identified form the model targets. Z magnitude (sd = 0.4) keeps
+# log_lambda excursions modest so the per-closure-unit truncation
+# window stays small (and the lpmf marginalisation cheap).
+Z_true <- matrix(rnorm(K * N_lv, sd = 0.4), nrow = K, ncol = N_lv)
 Z_true <- scale(Z_true, center = TRUE, scale = FALSE)
 attr(Z_true, "scaled:center") <- NULL
 
-# True per-species log-abundance intercept.
-b_int <- rnorm(K, mean = 1.5, sd = 0.4)
+# True per-species log-abundance intercept. Mean 0.5 puts baseline
+# lambda around exp(0.5) ~ 1.6, with peaks around exp(2) ~ 7 once
+# the env-driven factor contribution is added in. The empirical
+# max N_latent then sits in the low 20s, keeping possible_N
+# (= K_max - max(y_visits)) small enough to fit in 5-10 min.
+b_int <- rnorm(K, mean = 0.5, sd = 0.3)
 
 # Truth on the latent state: log_lambda[s, i] = b_int[s] + Z[s, :]
 # %*% lv[i, :]. Draw N[s, i] from Poisson.

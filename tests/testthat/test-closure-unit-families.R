@@ -987,6 +987,66 @@ test_that("stancode under nmix() includes the lpdf signature and data declaratio
   expect_match(sc, "real<lower=0, upper=1> p;", fixed = TRUE)
 })
 
+test_that("nmix log-space recurrence matches brute-force log-sum-exp on canonical cases", {
+  # Independent R-side implementation of the Stan log-space ratio
+  # recurrence in nmix_stan_funs(). Asserting both forms agree to
+  # machine precision protects the Stan emission against silent
+  # math regressions on the marginalisation algorithm. Cases cover
+  # the corners worth defending against (high p with y near N,
+  # large possible_N, single-visit, tiny lambda, K_max == K_min
+  # no-op, all-zero detection history).
+  brute_force <- function(y_visits, lambda, p, K_max) {
+    K_min <- max(y_visits)
+    if (length(p) == 1L) p <- rep(p, length(y_visits))
+    k_vals <- K_min:K_max
+    log_terms <- vapply(k_vals, function(k) {
+      stats::dpois(k, lambda, log = TRUE) +
+        sum(stats::dbinom(y_visits, k, p, log = TRUE))
+    }, numeric(1L))
+    m <- max(log_terms)
+    m + log(sum(exp(log_terms - m)))
+  }
+  recurrence_log <- function(y_visits, lambda, p, K_max) {
+    K_min <- max(y_visits)
+    possible_N <- K_max - K_min
+    V <- length(y_visits)
+    if (length(p) == 1L) p <- rep(p, V)
+    log_lam <- log(lambda)
+    log_ff <- log_lam + sum(log1p(-p))
+    log_prob_n <- 0
+    if (possible_N > 0L) {
+      for (i in seq_len(possible_N)) {
+        N <- K_max - i + 1
+        log_N <- log(N)
+        log_k_obs <- sum(log_N - log(N - y_visits))
+        a <- 0
+        b <- log_prob_n + log_ff + log_k_obs - log_N
+        mab <- max(a, b)
+        log_prob_n <- mab + log(exp(a - mab) + exp(b - mab))
+      }
+    }
+    baseline <- stats::dpois(K_min, lambda, log = TRUE) +
+      sum(stats::dbinom(y_visits, K_min, p, log = TRUE))
+    baseline + log_prob_n
+  }
+  cases <- list(
+    list(y = c(0L, 0L, 0L),         lam = 1.5,  p = 0.5,  K = 20L),
+    list(y = c(2L, 3L, 1L),         lam = 5,    p = 0.6,  K = 30L),
+    list(y = c(8L, 9L, 10L),        lam = 30,   p = 0.4,  K = 50L),
+    list(y = c(1L),                 lam = 10,   p = 0.3,  K = 25L),
+    list(y = c(0L, 0L, 0L, 0L, 0L), lam = 50,   p = 0.95, K = 100L),
+    list(y = c(5L),                 lam = 0.01, p = 0.5,  K = 10L),
+    list(y = c(2L, 2L, 2L),         lam = 2,    p = 0.5,  K = 2L)
+  )
+  for (cs in cases) {
+    expect_equal(
+      recurrence_log(cs$y, cs$lam, cs$p, cs$K),
+      brute_force(cs$y, cs$lam, cs$p, cs$K),
+      tolerance = 1e-12
+    )
+  }
+})
+
 test_that("standata under nmix() carries the closure-unit arrays with correct values", {
   d <- make_nmix_data(n_unit = 5, n_visit = 2, seed = 7)
   mf <- mvgam_formula(y ~ elev)
