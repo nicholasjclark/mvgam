@@ -14,6 +14,7 @@ mvgam(
   backend = getOption("brms.backend", "cmdstanr"),
   combine = TRUE,
   family = gaussian(),
+  run_model = TRUE,
   ...
 )
 }
@@ -149,6 +150,23 @@ ordinal families (see \code{\link[brms:brmsfamily]{brms::cumulative()}}, \code{\
 separate linear predictors for each response category are not supported:
 \code{\link[brms:brmsfamily]{brms::categorical()}}, \code{\link[brms:brmsfamily]{brms::multinomial()}}, \code{\link[brms:brmsfamily]{brms::dirichlet()}}. For
 these response types, use brms directly.}
+
+\item{run_model}{\strong{(deprecated; do not use in new code)} Logical.
+Setting \code{run_model = FALSE} short-circuits before Stan parse /
+compile / sampling and returns a stub \code{mvgam} object whose
+\verb{$stancode} and \verb{$standata} slots are populated but \verb{$fit} is
+\code{NULL}. Methods that need a fitted model (\code{summary()},
+\code{predict()}, \code{forecast()}, \code{loo()}, etc.) reject the stub with
+a pointer back to the modern helpers. Use \code{\link[brms:stancode]{brms::stancode()}} and
+\code{\link[brms:standata]{brms::standata()}} on an \code{\link[=mvgam_formula]{mvgam_formula()}} object instead. Both
+dispatch on \code{mvgam_formula} and share the exact same trend /
+\code{loadings_prior} pipeline used internally by \code{mvgam()} /
+\code{jsdgam()}, so they surface the same Stan code and data without
+any of the stub object's downstream limitations. A one-time
+\code{rlang::warn()} per session fires when this argument is \code{FALSE};
+repeated calls within the same R session do not re-warn (the
+warning is rate-limited via \code{.frequency = "regularly"}).
+Defaults to \code{TRUE}.}
 
 \item{...}{Additional arguments passed to Stan fitting}
 }

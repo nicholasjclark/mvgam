@@ -121,12 +121,12 @@ test_that("jsdgam refuses to overwrite existing 'series' column", {
 
 test_that("jsdgam returns c('mvgam', 'jsdgam') and the metadata slots", {
   dat <- build_jsdgam_toy()
-  mod <- jsdgam(
+  mod <- suppressWarnings(jsdgam(
     formula = y ~ 1, factor_formula = ~ -1,
     data = dat, unit = time, species = species,
     family = poisson(), n_lv = 2L,
     run_model = FALSE, silent = 2
-  )
+  ))
   expect_s3_class(mod, "jsdgam")
   expect_s3_class(mod, "mvgam")
   expect_identical(class(mod)[1L:2L], c("mvgam", "jsdgam"))
@@ -145,12 +145,12 @@ test_that("jsdgam preserves the unit column name on prepped_trend_model", {
   dat <- build_jsdgam_toy()
   dat$site <- dat$time
   dat$time <- NULL
-  mod <- jsdgam(
+  mod <- suppressWarnings(jsdgam(
     formula = y ~ 1, factor_formula = ~ -1,
     data = dat, unit = site, species = species,
     family = poisson(), n_lv = 2L,
     run_model = FALSE, silent = 2
-  )
+  ))
   expect_identical(
     attr(mod$model_data, "prepped_trend_model")$unit,
     "site"
@@ -162,13 +162,16 @@ test_that("jsdgam preserves the unit column name on prepped_trend_model", {
 
 test_that("jsdgam composes with the standard mvgam pipeline", {
   dat <- build_jsdgam_toy()
-  mod <- jsdgam(
+  mod <- suppressWarnings(jsdgam(
     formula = y ~ 1, factor_formula = ~ -1,
     data = dat, unit = time, species = species,
     family = poisson(), n_lv = 2L,
     run_model = FALSE, silent = 2
-  )
-  expect_true(!is.null(mod$fit))
+  ))
+  # `run_model = FALSE` returns the stub mvgam shape with stancode +
+  # standata populated and a NULL $fit; the end-to-end smoke fit
+  # lives in tests/local/.
+  expect_null(mod$fit)
   expect_true(!is.null(mod$standata))
   expect_true(!is.null(mod$stancode))
   expect_equal(mod$standata$N_lv_trend, 2L)
@@ -177,13 +180,13 @@ test_that("jsdgam composes with the standard mvgam pipeline", {
 
 test_that("jsdgam with by = lv_axis() composes the per-factor smooth path", {
   dat <- build_jsdgam_toy(n_time = 60L)
-  mod <- jsdgam(
+  mod <- suppressWarnings(jsdgam(
     formula = y ~ 1,
     factor_formula = ~ s(elev, k = 5L, by = lv_axis()) - 1,
     data = dat, unit = time, species = species,
     family = poisson(), n_lv = 2L,
     run_model = FALSE, silent = 2
-  )
+  ))
   expect_true(isTRUE(mod$trend_metadata$has_by_lv))
   expect_equal(mod$trend_metadata$n_lv_for_grain, 2L)
   expect_equal(mod$standata$N_lv_trend, 2L)

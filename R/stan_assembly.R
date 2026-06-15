@@ -186,8 +186,18 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
   checkmate::assert_flag(validate)
   checkmate::assert_number(silent)
 
-  # If no trend specification, return observation model as-is
+  # If no trend specification, return observation model as-is.
+  # Still parse-validate when `validate = TRUE` so obs-only fits get
+  # the same syntax check trend-formula fits do; the assembly stage
+  # is skipped but the parser is not.
   if (is.null(trend_setup) || is.null(trend_specs)) {
+    if (isTRUE(validate)) {
+      validate_stan_code(
+        obs_setup$stancode,
+        backend = backend,
+        silent = silent
+      )
+    }
     return(list(
       stancode = obs_setup$stancode,
       standata = obs_setup$standata,

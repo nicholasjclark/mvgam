@@ -129,9 +129,16 @@
 #'   When supplied the `traits` and `phylo` aliases must be `NULL`;
 #'   see `[mvgam()]` for the accepted field list.
 #'
+#' @param run_model **(deprecated)** Logical. Forwarded to `mvgam()`;
+#'   when `FALSE`, skips Stan parse / compile / sampling and returns a
+#'   stub `mvgam` / `jsdgam` object with `$stancode` and `$standata`
+#'   populated but `$fit = NULL`. New code should use [`stancode()`] /
+#'   [`standata()`] on an [`mvgam_formula()`] object instead. Emits a
+#'   one-time `rlang::warn()` when `FALSE`. Defaults to `TRUE`.
+#'
 #' @param ... Other arguments forwarded to `mvgam()`. Notable ones
 #'   include `data2` (lookup list for string-named `traits` / `phylo`
-#'   slots), `algorithm`, `chains`, `silent`, `run_model`.
+#'   slots), `algorithm`, `chains`, and `silent`.
 #'
 #' @return A `list` of class `c("mvgam", "jsdgam")`. The full mvgam
 #'   method surface (`summary`, `predict`, `forecast`, `loo`,
@@ -227,6 +234,7 @@ jsdgam <- function(formula,
                    phylo = NULL,
                    loadings_prior = NULL,
                    backend = getOption("brms.backend", "cmdstanr"),
+                   run_model = TRUE,
                    ...) {
   call <- match.call(expand.dots = FALSE)
 
@@ -368,7 +376,8 @@ jsdgam <- function(formula,
     data = data_train,
     family = family,
     share_obs_params = share_obs_params,
-    backend = backend
+    backend = backend,
+    run_model = run_model
   )
   if (!missing(newdata)) forward_args$newdata <- newdata
   if (!missing(knots)) forward_args$knots <- knots
@@ -397,7 +406,14 @@ jsdgam <- function(formula,
   fit$model_spec <- c(fit$model_spec %||% list(), list(is_jsdgam = TRUE))
   fit$jsdgam_call <- call
 
-  class(fit) <- c("mvgam", "jsdgam")
+  # Preserve `mvgam_prefit` if mvgam returned a stub via
+  # `run_model = FALSE`, otherwise plain c("mvgam", "jsdgam").
+  fit_classes <- if (inherits(fit, "mvgam_prefit")) {
+    c("mvgam", "jsdgam", "mvgam_prefit")
+  } else {
+    c("mvgam", "jsdgam")
+  }
+  class(fit) <- fit_classes
   fit
 }
 

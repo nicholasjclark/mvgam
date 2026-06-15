@@ -320,6 +320,19 @@ stancode.mvgam_prefit <- function(object, ...) {
   return(code)
 }
 
+#' @rdname standata.mvgam
+#' @export
+standata.mvgam_prefit <- function(object, ...) {
+  checkmate::assert_class(object, "mvgam_prefit")
+  if (is.null(object$standata)) {
+    stop(insight::format_error(c(
+      "Stan data not found in mvgam_prefit object.",
+      i = "The prefit object may not have been properly generated."
+    )))
+  }
+  object$standata
+}
+
 #' Print mvgam Stan Code Objects
 #'
 #' Print method for mvgamstancode objects that displays Stan model code in a

@@ -21,6 +21,7 @@ jsdgam(
   phylo = NULL,
   loadings_prior = NULL,
   backend = getOption("brms.backend", "cmdstanr"),
+  run_model = TRUE,
   ...
 )
 }
@@ -127,9 +128,16 @@ see \verb{[mvgam()]} for the accepted field list.}
 
 \item{backend}{Stan backend (defaults to "cmdstanr")}
 
+\item{run_model}{\strong{(deprecated)} Logical. Forwarded to \code{mvgam()};
+when \code{FALSE}, skips Stan parse / compile / sampling and returns a
+stub \code{mvgam} / \code{jsdgam} object with \verb{$stancode} and \verb{$standata}
+populated but \verb{$fit = NULL}. New code should use \code{\link[brms:stancode]{brms::stancode()}} /
+\code{\link[brms:standata]{brms::standata()}} on an \code{\link[=mvgam_formula]{mvgam_formula()}} object instead. Emits a
+one-time \code{rlang::warn()} when \code{FALSE}. Defaults to \code{TRUE}.}
+
 \item{...}{Other arguments forwarded to \code{mvgam()}. Notable ones
 include \code{data2} (lookup list for string-named \code{traits} / \code{phylo}
-slots), \code{algorithm}, \code{chains}, \code{silent}, \code{run_model}.}
+slots), \code{algorithm}, \code{chains}, and \code{silent}.}
 }
 \value{
 A \code{list} of class \code{c("mvgam", "jsdgam")}. The full mvgam

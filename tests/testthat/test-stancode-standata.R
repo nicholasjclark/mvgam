@@ -3353,3 +3353,117 @@ test_that("control_params.mvgam / inits.mvgam read from the stanfit slot", {
   expect_identical(ii[[1L]], "random")
   expect_identical(ii[[2L]], "random")
 })
+
+# ---------------------------------------------------------------------------
+# Deprecated `run_model = FALSE` short-circuit. Skips Stan parse /
+# compile / sampling and returns a stub mvgam object whose stancode +
+# standata slots are populated but $fit is NULL. The deprecation
+# pointer goes to stancode() / standata() on an mvgam_formula(),
+# which is what these tests exercise alongside.
+# ---------------------------------------------------------------------------
+
+run_model_test_data <- function(n = 24L) {
+  set.seed(42L)
+  data.frame(
+    time = seq_len(n),
+    series = factor(rep("series1", n)),
+    y = rpois(n, lambda = 5),
+    x = rnorm(n)
+  )
+}
+
+test_that("run_model = FALSE warns once and returns NULL $fit", {
+  data <- run_model_test_data()
+  rlang::reset_warning_verbosity("mvgam_run_model_false_deprecated")
+  expect_warning(
+    mod <- mvgam(y ~ x, data = data, family = poisson(),
+                 run_model = FALSE),
+    "run_model = FALSE.*deprecated"
+  )
+  expect_s3_class(mod, "mvgam")
+  expect_null(mod$fit)
+})
+
+test_that("run_model = FALSE populates stancode + standata slots", {
+  data <- run_model_test_data()
+  mod <- suppressWarnings(mvgam(
+    y ~ x, data = data, family = poisson(), run_model = FALSE
+  ))
+  expect_true(!is.null(mod$stancode))
+  expect_true(!is.null(mod$standata))
+  # standata should carry the brms-flavoured slots from codegen.
+  expect_true(is.list(mod$standata))
+  expect_true("N" %in% names(mod$standata))
+  expect_equal(mod$standata$N, nrow(data))
+})
+
+test_that("run_model = FALSE stub matches stancode() on the same formula", {
+  data <- run_model_test_data()
+  mf <- mvgam_formula(y ~ x)
+  code_direct <- stancode(mf, data = data, family = poisson(),
+                          validate = FALSE)
+  mod <- suppressWarnings(mvgam(
+    y ~ x, data = data, family = poisson(), run_model = FALSE
+  ))
+  # The deprecated path should produce IDENTICAL code to the helper
+  # it points users toward; otherwise the deprecation message is
+  # misleading. Strip whitespace + trailing newlines for the compare.
+  norm <- function(x) gsub("\\s+", "", as.character(x))
+  expect_equal(norm(mod$stancode), norm(code_direct))
+})
+
+test_that("run_model = FALSE threads through jsdgam() too", {
+  set.seed(11L)
+  dat <- expand.grid(
+    time = seq_len(12L),
+    species = factor(paste0("sp", 1:3))
+  )
+  dat$y <- rpois(nrow(dat), 2)
+  # Reset rlang's per-session rate limit so we observe the warning
+  # even when an earlier test already triggered it.
+  rlang::reset_warning_verbosity("mvgam_run_model_false_deprecated")
+  expect_warning(
+    mod <- jsdgam(
+      formula = y ~ 1, factor_formula = ~ -1,
+      data = dat, unit = time, species = species,
+      family = poisson(), n_lv = 2L,
+      run_model = FALSE, silent = 2
+    ),
+    "run_model = FALSE.*deprecated"
+  )
+  expect_s3_class(mod, "jsdgam")
+  expect_s3_class(mod, "mvgam")
+  expect_null(mod$fit)
+  expect_true(!is.null(mod$standata))
+  expect_equal(mod$standata$N_lv_trend, 2L)
+})
+
+test_that("run_model = FALSE leaves trend_metadata populated for forecast / predict context", {
+  data <- run_model_test_data()
+  mod <- suppressWarnings(mvgam(
+    y ~ x, trend_formula = ~ AR(p = 1L),
+    data = data, family = poisson(), run_model = FALSE
+  ))
+  expect_true(!is.null(mod$trend_metadata))
+  # Enrichment fields the forecast / predict surfaces read.
+  expect_true("trend_type" %in% names(mod$trend_metadata) ||
+              "max_lag" %in% names(mod$trend_metadata))
+})
+
+test_that("run_model = FALSE deprecation fires only once per session via rlang", {
+  data <- run_model_test_data()
+  # Frequency-controlled rlang warnings re-fire after a reset; reset
+  # so we observe the same warning in both calls below.
+  rlang::reset_warning_verbosity("mvgam_run_model_false_deprecated")
+  expect_warning(
+    suppressMessages(mvgam(y ~ x, data = data, family = poisson(),
+                           run_model = FALSE)),
+    "run_model = FALSE"
+  )
+  # Second call within the same session should NOT re-warn (frequency
+  # = "regularly" suppresses repeat fires within the rate limit).
+  expect_no_warning(
+    suppressMessages(mvgam(y ~ x, data = data, family = poisson(),
+                           run_model = FALSE))
+  )
+})

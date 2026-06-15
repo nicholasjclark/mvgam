@@ -57,7 +57,16 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     stop(
       insight::format_error(c(
         "No fitted model found in mvgam object.",
-        i = "The model may not have been fitted successfully."
+        x = paste0(
+          "summary() requires a fitted Stan model and an unfitted ",
+          "stub was supplied (`run_model = FALSE`)."
+        ),
+        i = paste0(
+          "Use `stancode()` and `standata()` on `mvgam_formula()` ",
+          "to inspect the generated Stan code and data without ",
+          "fitting; refit with `run_model = TRUE` (the default) to ",
+          "summarise."
+        )
       ))
     )
   }

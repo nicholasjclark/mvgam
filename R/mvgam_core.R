@@ -139,6 +139,22 @@
 #'   separate linear predictors for each response category are not supported:
 #'   [brms::categorical()], [brms::multinomial()], [brms::dirichlet()]. For
 #'   these response types, use brms directly.
+#' @param run_model **(deprecated; do not use in new code)** Logical.
+#'   Setting `run_model = FALSE` short-circuits before Stan parse /
+#'   compile / sampling and returns a stub `mvgam` object whose
+#'   `$stancode` and `$standata` slots are populated but `$fit` is
+#'   `NULL`. Methods that need a fitted model (`summary()`,
+#'   `predict()`, `forecast()`, `loo()`, etc.) reject the stub with
+#'   a pointer back to the modern helpers. Use [`stancode()`] and
+#'   [`standata()`] on an [`mvgam_formula()`] object instead. Both
+#'   dispatch on `mvgam_formula` and share the exact same trend /
+#'   `loadings_prior` pipeline used internally by `mvgam()` /
+#'   `jsdgam()`, so they surface the same Stan code and data without
+#'   any of the stub object's downstream limitations. A one-time
+#'   `rlang::warn()` per session fires when this argument is `FALSE`;
+#'   repeated calls within the same R session do not re-warn (the
+#'   warning is rate-limited via `.frequency = "regularly"`).
+#'   Defaults to `TRUE`.
 #' @param ... Additional arguments passed to Stan fitting
 #' @return mvgam object with dual brmsfit-like structure
 #'
@@ -205,7 +221,8 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
                            trend_map = NULL,
                            loadings_prior = NULL,
                            backend = getOption("brms.backend", "cmdstanr"),
-                           combine = TRUE, family = gaussian(), ...) {
+                           combine = TRUE, family = gaussian(),
+                           run_model = TRUE, ...) {
 
   checkmate::assert(
     checkmate::check_data_frame(data),
@@ -215,6 +232,20 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   newdata <- validate_newdata(newdata, data)
   checkmate::assert_character(backend, len = 1)
   checkmate::assert_logical(combine, len = 1)
+  checkmate::assert_flag(run_model)
+  if (isFALSE(run_model)) {
+    rlang::warn(
+      paste0(
+        "`run_model = FALSE` is deprecated. Use `stancode()` and ",
+        "`standata()` on an `mvgam_formula()` object to retrieve the ",
+        "generated Stan code and data without fitting; both dispatch ",
+        "on `mvgam_formula` and share the same trend / loadings_prior ",
+        "pipeline used internally by `mvgam()` and `jsdgam()`."
+      ),
+      .frequency = "regularly",
+      .frequency_id = "mvgam_run_model_false_deprecated"
+    )
+  }
 
   # Capture data name from user's call (before passing to internal
   # functions). `deparse()` of a literal data frame expression (e.g.
@@ -252,6 +283,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
     backend = backend,
     family = family,
     data_name = data_name,
+    run_model = run_model,
     ...
   )
 
@@ -311,7 +343,8 @@ validate_newdata <- function(newdata, data) {
 #' @noRd
 mvgam_single <- function(formula, trend_formula, data, backend,
                         family, data_name = NULL, newdata = NULL,
-                        trend_map = NULL, loadings_prior = NULL, ...) {
+                        trend_map = NULL, loadings_prior = NULL,
+                        run_model = TRUE, ...) {
 
   # Create mvgam_formula object for shared processing
   mvgam_formula_obj <- mvgam_formula(formula, trend_formula)
@@ -326,6 +359,24 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     loadings_prior = loadings_prior,
     ...
   )
+
+  # Deprecated run_model = FALSE: short-circuit before parse / compile
+  # / fit so callers can inspect the generated stancode + standata
+  # without paying for Stan codegen + sampling. The deprecation
+  # warning is emitted in mvgam() (so it fires at the user-facing API
+  # surface, not the internal single / multi dispatcher).
+  if (isFALSE(run_model)) {
+    return(create_mvgam_stub_from_stan_components(
+      stan_components = stan_components,
+      formula = formula,
+      trend_formula = trend_formula,
+      family = family,
+      data = data,
+      data_name = data_name,
+      newdata = newdata,
+      backend = backend
+    ))
+  }
 
   # Fit the combined model using backend functions directly
   dots <- list(...)
@@ -591,6 +642,63 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
   mvgam_object <- sign_canonicalise_factors(mvgam_object)
 
   return(mvgam_object)
+}
+
+# Build a no-fit mvgam stub from generated stan_components. Used by
+# the deprecated `run_model = FALSE` path: callers get an mvgam-shaped
+# list with `stancode`, `standata`, `obs_data`, `trend_metadata` and
+# friends populated, but `fit` is left NULL because no sampling
+# happened. The stub carries `c("mvgam", "mvgam_prefit")` so the
+# existing `print.mvgam_prefit()` and `stancode.mvgam_prefit()`
+# methods dispatch on it, reusing the unfitted-object convention
+# already exposed elsewhere in the package. Downstream surfaces that
+# need a real fit (`summary`, `predict`, `loo`, etc.) refuse the stub
+# with a pointer back to `stancode()` / `standata()` on an
+# `mvgam_formula()`.
+create_mvgam_stub_from_stan_components <- function(stan_components,
+                                                   formula,
+                                                   trend_formula,
+                                                   family,
+                                                   data,
+                                                   data_name,
+                                                   newdata,
+                                                   backend) {
+  obs_setup <- stan_components$obs_setup
+  trend_setup <- stan_components$trend_setup
+  mv_spec <- stan_components$mv_spec
+  enriched_trend_metadata <- enrich_trend_metadata(
+    stan_components$trend_metadata,
+    mv_spec$trend_specs
+  )
+  mvgam_object <- structure(
+    list(
+      fit = NULL,
+      formula = obs_setup$formula,
+      trend_formula = if (!is.null(trend_setup)) trend_setup$formula else NULL,
+      trend_call = trend_formula,
+      family = obs_setup$family %||% family,
+      prior = obs_setup$prior,
+      data = obs_setup$data %||% data,
+      test_data = newdata,
+      data.name = data_name,
+      stancode = stan_components$combined_components$stancode,
+      standata = stan_components$combined_components$standata,
+      exclude = c("lprior", "lp__"),
+      mv_spec = mv_spec,
+      response_names = mv_spec$response_names %||% NULL,
+      trend_metadata = enriched_trend_metadata,
+      obs_model = obs_setup$brmsfit,
+      trend_model = if (!is.null(trend_setup)) trend_setup$brmsfit else NULL,
+      backend = backend,
+      algorithm = "none",
+      brms_version = utils::packageVersion("brms"),
+      mvgam_version = utils::packageVersion("mvgam"),
+      creation_time = Sys.time(),
+      criteria = list()
+    ),
+    class = c("mvgam", "mvgam_prefit")
+  )
+  mvgam_object
 }
 
 
