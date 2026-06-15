@@ -4324,12 +4324,20 @@ log_lik_mvt <- function(linpred, link, y, family_pars, trials) {
 #' @param ndraws Optional integer; passed to posterior_linpred when
 #'   `linpred` is not supplied.
 #' @param needs_phi Logical; pull `phi` from the posterior (TRUE for
-#'   `diri()`, FALSE for `multi()` / `categ()`).
+#'   `diri()`, FALSE for `multi()` / `categ()`). When a `phi ~ ...`
+#'   sub-formula was supplied at fit time, the per-row linpred is
+#'   recomputed on `newdata` via `extract_component_linpred()` and
+#'   the inverse log link is applied. When no sub-formula was
+#'   supplied, the scalar `phi` posterior column is broadcast across
+#'   rows. Either way the K rows of a closure unit share the value
+#'   at the unit's first row, mirroring Stan's `phi[idx[1]]` per-unit
+#'   collapse.
 #' @param linpred Optional precomputed linpred. When supplied the
 #'   internal `posterior_linpred()` call is skipped.
 #' @return Named list with `prob_row` `[ndraws x N_obs]` per-row
-#'   softmax probabilities, `phi` numeric vector of length ndraws
-#'   (or `NULL`), `arrays`, `ndraws`, `N_obs`, `N_unit`.
+#'   softmax probabilities, `phi` `[ndraws x N_obs]` per-row
+#'   Dirichlet concentration (constant within each closure unit)
+#'   or `NULL`, `arrays`, `ndraws`, `N_obs`, `N_unit`.
 #' @noRd
 extract_simplex_response_components <- function(object,
                                                   newdata = NULL,
@@ -4358,6 +4366,12 @@ extract_simplex_response_components <- function(object,
     compute_y_max      = FALSE,
     unit_grouping_vars = "time"
   )
+
+  # Resolve draw_ids up front so the mu linpred and the per-row phi
+  # (when sourced from a sub-formula) use the same posterior rows.
+  # Without this, an ndraws-only call would randomly subsample once
+  # for mu and again for phi, mis-aligning the two by draw index.
+  draw_ids <- closure_unit_resolve_draw_ids(object, ndraws, draw_ids)
 
   if (is.null(linpred)) {
     linpred <- posterior_linpred(
@@ -4389,54 +4403,105 @@ extract_simplex_response_components <- function(object,
     prob_row[, idx] <- exp_mu / rowSums(exp_mu)
   }
 
-  draws_mat <- posterior::as_draws_matrix(object$fit)
-  if (is.null(draw_ids)) {
-    draw_ids_local <- seq_len(ndraws_actual)
-  } else if (length(draw_ids) != ndraws_actual) {
-    draw_ids_local <- draw_ids[seq_len(ndraws_actual)]
-  } else {
-    draw_ids_local <- draw_ids
-  }
-
-  phi_draws <- NULL
+  phi_mat <- NULL
   if (needs_phi) {
-    if (!"phi" %in% colnames(draws_mat)) {
-      has_phi_subformula <- any(grepl(
-        "^b_phi_|^Intercept_phi$|^bs_phi($|\\[)|^s_phi_",
-        colnames(draws_mat)
-      ))
-      if (has_phi_subformula) {
-        stop(insight::format_error(c(
-          "diri() post-fit response-scale kernels do not yet wire per-row 'phi'.",
-          x = paste0(
-            "The posterior carries 'b_phi_*' / 's_phi_*' columns ",
-            "(emitted by a `phi ~ ...` sub-formula), but the response-",
-            "scale dispatchers still expect a scalar 'phi'."
-          ),
-          i = paste0(
-            "Fit-time `phi ~ ...` IS supported (Stan signature dispatches ",
-            "vector vs scalar 'phi'); interrogate the 'b_phi_*' posterior ",
-            "directly via `posterior::as_draws_matrix(fit$fit)`. Per-row ",
-            "extraction in `posterior_predict()` / `log_lik()` is planned ",
-            "for v2.0.1; refit with scalar 'phi' for those surfaces today."
-          )
-        )))
-      }
-      stop(insight::format_error(
-        "Posterior is missing 'phi' column for diri() family."
-      ))
-    }
-    phi_draws <- as.numeric(draws_mat[draw_ids_local, "phi"])
+    phi_mat <- extract_phi_per_row(
+      object        = object,
+      newdata       = newdata,
+      draw_ids      = draw_ids,
+      ndraws_actual = ndraws_actual,
+      N_obs         = N_obs,
+      arrays        = arrays
+    )
   }
 
   list(
     prob_row = prob_row,
-    phi      = phi_draws,
+    phi      = phi_mat,
     arrays   = arrays,
     ndraws   = ndraws_actual,
     N_obs    = N_obs,
     N_unit   = N_unit
   )
+}
+
+#' Per-row Dirichlet concentration on `newdata`
+#'
+#' Returns the per-row `phi` value for each (draw, observation) in a
+#' `[ndraws x N_obs]` matrix. Two paths:
+#'
+#' - **Scalar phi**: brms emits a `phi` column when no `phi ~ ...`
+#'   sub-formula is supplied. We pull the posterior column and
+#'   broadcast it across the `N_obs` axis.
+#' - **Per-row phi**: when the posterior carries `b_phi_*` /
+#'   `Intercept_phi` / `s_phi_*` columns, we call
+#'   `extract_component_linpred()` with `component = "phi"` on
+#'   `newdata` to recompose the per-row linpred (matching whatever
+#'   parametric / smooth / RE / GP structure the user supplied for
+#'   `phi`) and apply the log link inverse `exp()` to get phi on the
+#'   response scale.
+#'
+#' After extraction the per-unit collapse is applied: each closure
+#' unit's K rows are set to the value at the unit's first row
+#' (`visit_idx[g, 1]`), mirroring Stan's `phi[idx[1]]` semantics in
+#' `diri_lpdf()`. Per-row phi only enters the joint Dirichlet
+#' density once per unit, so any cross-row variation in the unit
+#' would be ignored by the likelihood and is removed here to keep
+#' the R-side and Stan-side scoring identical.
+#'
+#' @noRd
+extract_phi_per_row <- function(object, newdata, draw_ids,
+                                  ndraws_actual, N_obs, arrays) {
+  draws_mat <- posterior::as_draws_matrix(object$fit)
+  has_scalar_phi <- "phi" %in% colnames(draws_mat)
+  has_phi_subformula <- any(grepl(
+    "^b_phi_|^Intercept_phi$|^bs_phi($|\\[)|^s_phi_",
+    colnames(draws_mat)
+  ))
+
+  if (has_phi_subformula) {
+    # Per-row phi via the dpar linpred pipeline. The `phi` component
+    # branch in extract_component_linpred() strips the `_phi` infix
+    # from both the parameter draws and the standata, then composes
+    # the linpred via the same kernel mu uses; we then apply log^-1.
+    phi_linpred <- extract_component_linpred(
+      mvgam_fit = object,
+      newdata   = newdata,
+      component = "phi",
+      draw_ids  = draw_ids
+    )
+    if (nrow(phi_linpred) != ndraws_actual ||
+        ncol(phi_linpred) != N_obs) {
+      stop(insight::format_error(c(
+        "Per-row 'phi' linpred dimension mismatch.",
+        x = paste0(
+          "Expected [", ndraws_actual, " x ", N_obs,
+          "], got [", nrow(phi_linpred), " x ", ncol(phi_linpred), "]."
+        )
+      )))
+    }
+    phi_mat <- exp(phi_linpred)
+  } else if (has_scalar_phi) {
+    rows <- if (is.null(draw_ids)) seq_len(ndraws_actual) else draw_ids
+    phi_draws <- as.numeric(draws_mat[rows, "phi"])
+    phi_mat <- matrix(phi_draws, nrow = ndraws_actual, ncol = N_obs,
+                       byrow = FALSE)
+  } else {
+    stop(insight::format_error(
+      "Posterior is missing 'phi' column for diri() family."
+    ))
+  }
+
+  # Per-unit collapse: each closure unit's Kg rows share `phi[idx[1]]`
+  # (Stan parameterisation). Without this collapse a covariate that
+  # varies WITHIN a unit would introduce per-row variation that the
+  # Stan likelihood never sees.
+  for (g in seq_len(arrays$N_unit)) {
+    Kg <- arrays$n_rep[g]
+    idx <- arrays$visit_idx[g, seq_len(Kg)]
+    phi_mat[, idx] <- phi_mat[, idx[1L]]
+  }
+  phi_mat
 }
 
 #' Per-row expected value for a `diri()` fit
@@ -4475,9 +4540,12 @@ posterior_predict_diri <- function(object, newdata = NULL,
     Kg <- comp$arrays$n_rep[g]
     idx <- comp$arrays$visit_idx[g, seq_len(Kg)]
     prob_g <- comp$prob_row[, idx, drop = FALSE]
-    # alpha[s, k] = prob_g[s, k] * phi[s]. Generate Kg gamma draws
-    # per row, renormalise to a simplex.
-    alpha <- prob_g * comp$phi
+    # alpha[s, k] = prob_g[s, k] * phi[s, idx[1]]. `comp$phi` is a
+    # `[ndraws x N_obs]` matrix whose Kg-row block is constant within
+    # a unit (per Stan's `phi[idx[1]]` collapse), so the slice
+    # `comp$phi[, idx]` gives the same per-draw alpha shape via
+    # elementwise multiplication.
+    alpha <- prob_g * comp$phi[, idx, drop = FALSE]
     gam <- matrix(
       stats::rgamma(comp$ndraws * Kg, shape = as.numeric(alpha),
                      rate = 1),
@@ -4515,7 +4583,7 @@ log_lik_diri <- function(linpred, link, y, family_pars, trials) {
     idx <- arrays$visit_idx[g, seq_len(Kg)]
     y_unit <- y[idx]
     prob_g <- prob_row[, idx, drop = FALSE]
-    alpha <- prob_g * phi
+    alpha <- prob_g * phi[, idx, drop = FALSE]
     # dirichlet_lpdf(y | alpha) = lgamma(sum(alpha)) -
     #   sum(lgamma(alpha)) + sum((alpha - 1) * log(y))
     log_y <- matrix(log(y_unit), nrow = ndraws, ncol = Kg, byrow = TRUE)

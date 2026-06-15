@@ -356,9 +356,9 @@ predict_variance <- function(object, newdata, process_error, ndraws,
         prob <- comp$prob_row
         base_var <- prob * (1 - prob)
         if (identical(family_name, "diri")) {
-          phi_mat <- matrix(comp$phi, nrow = comp$ndraws,
-                             ncol = comp$N_obs)
-          return(base_var / (phi_mat + 1))
+          # comp$phi is already `[ndraws x N_obs]` with per-unit-shared
+          # values (Stan's `phi[idx[1]]` collapse), so no broadcast.
+          return(base_var / (comp$phi + 1))
         }
         if (identical(family_name, "multi")) {
           if (is.null(newdata)) {
