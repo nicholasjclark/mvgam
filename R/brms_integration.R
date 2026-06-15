@@ -458,13 +458,16 @@ is_multivariate_formula <- function(formula) {
     
     # Check pforms content
     if (!is.null(formula$pforms) && length(formula$pforms) > 0) {
-      # brms distributional parameters (from brms source analysis)
+      # brms-native distributional parameters plus mvgam custom-family
+      # dpars (`p` for nmix() / occ() detection; `Psi` for mvn() /
+      # mvt() residual SDs; `mphi` / `mtheta` for tweedie()).
       distributional_params <- c(
-        "sigma", "sigma2", "shape", "nu", "phi", "kappa", "theta", 
-        "zi", "hu", "disc", "bs", "ndt", "bias", "xi", "coi", "zoi", 
-        "beta", "hurdle", "alpha", "sigma_error"
+        "sigma", "sigma2", "shape", "nu", "phi", "kappa", "theta",
+        "zi", "hu", "disc", "bs", "ndt", "bias", "xi", "coi", "zoi",
+        "beta", "hurdle", "alpha", "sigma_error",
+        "p", "Psi", "mphi", "mtheta"
       )
-      
+
       pform_names <- names(formula$pforms)
       # Distributional parameters = univariate, non-distributional = multivariate
       if (all(pform_names %in% distributional_params)) {

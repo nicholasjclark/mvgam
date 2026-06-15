@@ -223,6 +223,22 @@ test_that("collect_call_names walks nested calls and resolves namespace heads", 
   expect_identical(collect_call_names(1L), character(0L))
 })
 
+test_that("is_multivariate_formula treats custom-family dpars as univariate", {
+  # `bf(y ~ x, <dpar> ~ z)` with a mvgam custom-family dpar must not
+  # be treated as multivariate, otherwise the trend pipeline kicks
+  # into the per-response branch and emits `obs_trend_time_<resp>`
+  # with a missing `N_<resp>` data declaration.
+  expect_false(is_multivariate_formula(brms::bf(y ~ x, p ~ z)))      # nmix / occ
+  expect_false(is_multivariate_formula(brms::bf(y ~ x, Psi ~ z)))    # mvn / mvt
+  expect_false(is_multivariate_formula(brms::bf(y ~ x, mphi ~ z)))   # tweedie
+  expect_false(is_multivariate_formula(brms::bf(y ~ x, mtheta ~ z))) # tweedie
+  # brms-native dpar still recognised as univariate.
+  expect_false(is_multivariate_formula(brms::bf(y ~ x, sigma ~ z)))
+  expect_false(is_multivariate_formula(brms::bf(y ~ x, phi ~ z)))
+  # Genuine multivariate via mvbind is unchanged.
+  expect_true(is_multivariate_formula(brms::bf(mvbind(y1, y2) ~ x)))
+})
+
 test_that("formula_rhs_function_names walks only the RHS", {
   expect_setequal(
     formula_rhs_function_names(y ~ s(x) + AR(p = 1)),

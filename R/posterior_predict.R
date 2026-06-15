@@ -1173,7 +1173,12 @@ get_family_dpars <- function(family_name) {
     # Custom mvgam families
     tweedie = c("mphi", "mtheta"),
     nmix    = c("p"),
-    occ     = c("p")
+    occ     = c("p"),
+    diri    = c("phi"),
+    multi   = character(0),
+    categ   = character(0),
+    mvn     = c("Psi"),
+    mvt     = c("Psi", "nu")
   )
 
   dpar_map[[family_name]] %||% character(0)
