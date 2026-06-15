@@ -147,7 +147,11 @@ test_that("by = lv_axis() without a factor model raises a clear error", {
   dat$series <- factor(dat$series)
   dat$elev <- rep(rnorm(30), times = 3)
   dat$y <- rnorm(nrow(dat))
-  expect_error(
+  # The validator should error before mvgam even reaches its
+  # `run_model = FALSE` deprecation path; suppress that warning so
+  # it doesn't leak into the testthat summary if the order of
+  # checks ever changes.
+  suppressWarnings(expect_error(
     mvgam(
       formula = y ~ -1,
       trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
@@ -158,7 +162,7 @@ test_that("by = lv_axis() without a factor model raises a clear error", {
       silent = 2
     ),
     "requires a factor model"
-  )
+  ))
 })
 
 test_that("by = lv_axis() with n_lv >= n_series raises a clear error", {
@@ -167,7 +171,7 @@ test_that("by = lv_axis() with n_lv >= n_series raises a clear error", {
   dat$series <- factor(dat$series)
   dat$elev <- rep(rnorm(30), times = 3)
   dat$y <- rnorm(nrow(dat))
-  expect_error(
+  suppressWarnings(expect_error(
     mvgam(
       formula = y ~ -1,
       trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
@@ -179,7 +183,7 @@ test_that("by = lv_axis() with n_lv >= n_series raises a clear error", {
       silent = 2
     ),
     "requires a factor model"
-  )
+  ))
 })
 
 # 4. Recovery on cached fit ---------------------------------------------
