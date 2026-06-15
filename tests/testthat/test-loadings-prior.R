@@ -111,7 +111,7 @@ test_that("normalise_loadings_prior accepts pure MGP (no features / distances)",
   expect_identical(spec$n_features, 0L)
   expect_identical(spec$n_distances, 0L)
   expect_equal(spec$mgp_a1, 2)
-  expect_equal(spec$mgp_a2, 3)
+  expect_equal(spec$mgp_a2, 4)
 })
 
 test_that("normalise_loadings_prior accepts string shorthand 'mgp'", {
@@ -122,7 +122,7 @@ test_that("normalise_loadings_prior accepts string shorthand 'mgp'", {
   expect_identical(spec$column_shrinkage, "mgp")
   expect_null(spec$features_mat)
   expect_equal(spec$mgp_a1, 2)
-  expect_equal(spec$mgp_a2, 3)
+  expect_equal(spec$mgp_a2, 4)
 })
 
 test_that("make_loadings_prior_stanvars for pure MGP emits elementwise normal Z prior", {
@@ -154,7 +154,7 @@ test_that("normalise_loadings_prior accepts column_shrinkage = 'mgp' with defaul
   )
   expect_equal(spec$column_shrinkage, "mgp")
   expect_equal(spec$mgp_a1, 2)
-  expect_equal(spec$mgp_a2, 3)
+  expect_equal(spec$mgp_a2, 4)
 })
 
 test_that("normalise_loadings_prior respects user-supplied mgp_a1/a2", {

@@ -81,9 +81,14 @@
 #'       Heaps Eq. (9)).
 #'     \item `mgp_a1`, `mgp_a2`: numeric MGP hyperparameters,
 #'       only used when `column_shrinkage = "mgp"`. Default
-#'       `(2, 3)` follows Heaps Sect. 6.3.1 (gas-demand
-#'       application). The bird-case JSDM application (Sect.
-#'       6.2.2) used `(2, 6)`.
+#'       `(2, 4)` sits within the `a2 in [3, 5]` range
+#'       recommended for moderate-n ecology / community panels
+#'       by Legramanti, Durante and Dunson (2020, JRSS-B) and
+#'       Schiavon, Canale and Dunson (2022, Biometrics 78:995).
+#'       Heaps Sect. 6.3.1 used `(2, 3)` for the gas-demand
+#'       application; Sect. 6.2.2 used `(2, 6)` for the
+#'       Finnish-bird JSDM. Lower `a2` for less shrinkage when
+#'       the data weakly identify the active rank.
 #'   }
 #'
 #'   Length-scales receive a `lognormal(0, 1)` prior in the

@@ -5120,7 +5120,7 @@ normalise_loadings_prior <- function(input, data2, data,
   if (is.null(input)) return(NULL)
   # String shorthand: `loadings_prior = "mgp"` is sugar for
   # `loadings_prior = list(column_shrinkage = "mgp")` with default
-  # MGP hyperparameters (a1 = 2, a2 = 3). Pure MGP (no features /
+  # MGP hyperparameters (a1 = 2, a2 = 4). Pure MGP (no features /
   # distances) is the Bhattacharya & Dunson (2011) parameterisation
   # and is mathematically defined for any positive integer n_lv.
   if (is.character(input) && length(input) == 1L) {
@@ -5202,7 +5202,15 @@ normalise_loadings_prior <- function(input, data2, data,
   shrinkage <- input$column_shrinkage %||% "iid"
   checkmate::assert_choice(shrinkage, c("iid", "mgp"))
   mgp_a1 <- if (shrinkage == "mgp") input$mgp_a1 %||% 2 else NA_real_
-  mgp_a2 <- if (shrinkage == "mgp") input$mgp_a2 %||% 3 else NA_real_
+  # `mgp_a2 = 4` sits in the [3, 5] range Schiavon, Canale and
+  # Dunson (2022, Biometrics 78:995) and Legramanti, Durante and
+  # Dunson (2020, JRSS-B) recommend for the moderate-n ecology /
+  # community regime (n in the tens to low hundreds). The original
+  # Bhattacharya-Dunson (2011) `a2 = 2.1` was calibrated for
+  # `p >> n` and is too weak to produce visible truncation in the
+  # mvgam target setting; the package surfaces `a2` via
+  # `loadings_prior = list(mgp_a2 = ...)` for sensitivity work.
+  mgp_a2 <- if (shrinkage == "mgp") input$mgp_a2 %||% 4 else NA_real_
   if (shrinkage == "mgp") {
     checkmate::assert_number(mgp_a1, lower = .Machine$double.eps)
     checkmate::assert_number(mgp_a2, lower = .Machine$double.eps)

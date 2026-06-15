@@ -92,7 +92,7 @@ cat("Max-treedepth saturation:", n_treedepth, "/", n_total_trans,
 
 cat("\n=== Posterior recovery ===\n")
 res_cor <- residual_cor(fit_mvn)
-post_sigma <- res_cor$sigma$mean
+post_sigma <- res_cor$cov
 true_off  <- sigma_true[upper.tri(sigma_true)]
 post_off  <- post_sigma[upper.tri(post_sigma)]
 cor_off <- stats::cor(true_off, post_off)
