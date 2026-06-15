@@ -33,11 +33,13 @@ suppressMessages({
 
 set.seed(909L)
 
-# K = 5 with n_lv = 4 = K - 1 satisfies the jsdgam validator
-# (n_lv < n_species). True rank stays at 2, so MGP has two extra
-# columns to shrink toward zero.
+# K = 5 with n_lv = K = 5 exercises the full truncation-ceiling
+# regime that MGP is designed for: three extra columns above the
+# true rank (2) for the prior to shrink toward zero. Allowed
+# because `loadings_prior = "mgp"` lifts the iid-prior ceiling of
+# `n_lv < n_species` up to `n_lv <= n_species`.
 K       <- 5L
-N_lv    <- 4L
+N_lv    <- 5L
 true_r  <- 2L
 n_sites <- 30L
 species_levels <- paste0("y", seq_len(K))

@@ -89,18 +89,32 @@ prior overrides. See \verb{[get_mvgam_priors]} and \verb{[brms::prior()]}
 for the conventions.}
 
 \item{n_lv}{\code{integer}. Number of latent factors to use for
-modelling residual associations. Must be \verb{>= 1} and strictly
-less than the number of species. Defaults to \code{2}.
-
-Under the default \code{loadings_prior} (iid \code{student_t(3, 0, 1)}
-or kernel-driven shrinkage) \code{n_lv} is the exact factor count
-that enters the likelihood. Under the multiplicative gamma
-process prior (\code{loadings_prior = "mgp"}) the prior shrinks
-later columns of \code{Z} toward zero so \code{n_lv} becomes a
-truncation ceiling: pick a value at or above the rank you
-want to admit and let the data prune unused columns. See
-\code{\link[=active_factors]{active_factors()}} for a posterior summary of how many
-columns the data actually used.}
+modelling residual associations. Must be \verb{>= 1}. Defaults to
+\code{2}. The upper bound depends on the \code{loadings_prior}:
+\itemize{
+\item Default iid Z prior (\code{student_t(3, 0, 1)}) or any
+kernel-driven structured prior built from \code{traits} /
+\code{phylo} / \code{loadings_prior$distances}: \code{n_lv} is the
+\strong{exact factor count} that enters the likelihood, and
+must be \strong{strictly less than} the number of species. The
+constraint exists because at \code{n_lv = n_species}, \verb{Z Z'}
+saturates the residual covariance and the per-species
+residual variance loses identifiability under HMC,
+producing a heavy funnel.
+\item Multiplicative gamma process prior
+(\code{loadings_prior = "mgp"} or
+\code{loadings_prior = list(column_shrinkage = "mgp", ...)}):
+\code{n_lv} is a \strong{truncation ceiling}. Set it at or above
+the rank you want to admit; the MGP shrinks later columns
+of \code{Z} toward zero by construction so unused columns are
+pruned by the prior. Allowed up to \code{n_lv = n_species}.
+Passing \code{n_lv > n_species} is rejected because the
+marginal \verb{Z Z' + diag(Psi^2)} has rank at most \code{n_species}
+and additional columns add no expressive capacity --
+tighten \code{mgp_a2} for stronger shrinkage instead.
+}
+See \code{\link[=active_factors]{active_factors()}} for a posterior summary of how many
+columns the data actually used under MGP.}
 
 \item{traits}{Optional per-species feature \code{data.frame}, matrix,
 or single string referencing a slot in \code{data2}. Rows correspond

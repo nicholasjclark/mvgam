@@ -86,18 +86,32 @@
 #'   mvgam models.
 #'
 #' @param n_lv `integer`. Number of latent factors to use for
-#'   modelling residual associations. Must be `>= 1` and strictly
-#'   less than the number of species. Defaults to `2`.
-#'
-#'   Under the default `loadings_prior` (iid `student_t(3, 0, 1)`
-#'   or kernel-driven shrinkage) `n_lv` is the exact factor count
-#'   that enters the likelihood. Under the multiplicative gamma
-#'   process prior (`loadings_prior = "mgp"`) the prior shrinks
-#'   later columns of `Z` toward zero so `n_lv` becomes a
-#'   truncation ceiling: pick a value at or above the rank you
-#'   want to admit and let the data prune unused columns. See
-#'   [active_factors()] for a posterior summary of how many
-#'   columns the data actually used.
+#'   modelling residual associations. Must be `>= 1`. Defaults to
+#'   `2`. The upper bound depends on the `loadings_prior`:
+#'   \itemize{
+#'     \item Default iid Z prior (`student_t(3, 0, 1)`) or any
+#'       kernel-driven structured prior built from `traits` /
+#'       `phylo` / `loadings_prior$distances`: `n_lv` is the
+#'       **exact factor count** that enters the likelihood, and
+#'       must be **strictly less than** the number of species. The
+#'       constraint exists because at `n_lv = n_species`, `Z Z'`
+#'       saturates the residual covariance and the per-species
+#'       residual variance loses identifiability under HMC,
+#'       producing a heavy funnel.
+#'     \item Multiplicative gamma process prior
+#'       (`loadings_prior = "mgp"` or
+#'       `loadings_prior = list(column_shrinkage = "mgp", ...)`):
+#'       `n_lv` is a **truncation ceiling**. Set it at or above
+#'       the rank you want to admit; the MGP shrinks later columns
+#'       of `Z` toward zero by construction so unused columns are
+#'       pruned by the prior. Allowed up to `n_lv = n_species`.
+#'       Passing `n_lv > n_species` is rejected because the
+#'       marginal `Z Z' + diag(Psi^2)` has rank at most `n_species`
+#'       and additional columns add no expressive capacity --
+#'       tighten `mgp_a2` for stronger shrinkage instead.
+#'   }
+#'   See [active_factors()] for a posterior summary of how many
+#'   columns the data actually used under MGP.
 #'
 #' @param share_obs_params Logical. Forwarded to `mvgam`.
 #'
@@ -254,7 +268,13 @@ jsdgam <- function(formula,
   }
 
   checkmate::assert_data_frame(data, min.rows = 1L)
-  checkmate::assert_class(formula, "formula")
+  # Accept either plain `formula` or `brms::bf(...)` (`brmsformula`)
+  # so detection / dpar sub-formulas (`p ~ visit_cov` for occ() /
+  # nmix(); `phi ~ env` for diri()) can be threaded through
+  # `mvgam()` downstream.
+  checkmate::assert_multi_class(
+    formula, c("formula", "brmsformula")
+  )
   checkmate::assert_class(factor_formula, "formula")
   checkmate::assert_names(
     names(data),
@@ -276,16 +296,17 @@ jsdgam <- function(formula,
       )
     )))
   }
-  if (as.integer(n_lv) >= n_species) {
-    stop(insight::format_error(c(
-      paste0(
-        "'n_lv' must be strictly less than the number of species."
-      ),
-      i = paste0(
-        "Got n_lv = ", n_lv, " and n_species = ", n_species, "."
-      )
-    )))
-  }
+  # Early `n_lv` ceiling gate so jsdgam-side errors mention
+  # "species" rather than the canonical mvgam "series". The
+  # downstream wrapper-layer call in `make_stan.R` covers the
+  # `mvgam()` direct path; the two share `validate_n_lv_ceiling()`
+  # so the iid vs MGP rule lives in one place.
+  validate_n_lv_ceiling(
+    n_lv           = n_lv,
+    n_species      = n_species,
+    loadings_prior = loadings_prior,
+    fit_function   = "jsdgam"
+  )
 
   # Unit must be numeric / integer because mvgam's time axis is.
   if (!is.numeric(data[[unit_chr]]) && !is.integer(data[[unit_chr]])) {

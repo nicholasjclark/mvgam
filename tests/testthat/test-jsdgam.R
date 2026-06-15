@@ -35,7 +35,38 @@ test_that("jsdgam errors when 'species' column is missing", {
   )
 })
 
-test_that("jsdgam rejects n_lv >= number of species", {
+test_that("jsdgam accepts brmsformula (bf) in addition to plain formula", {
+  dat <- build_jsdgam_toy()
+  # Relaxed assertion allows `brms::bf()` so downstream dpar
+  # sub-formulas (`phi ~ env` for diri(), `p ~ visit_cov` for
+  # occ() / nmix()) compose with `jsdgam()`. Plain `bf(y ~ x)`
+  # round-trips identically to a plain `formula`.
+  suppressWarnings(expect_no_error(
+    jsdgam(
+      formula = brms::bf(y ~ elev),
+      factor_formula = ~ -1,
+      data = dat, species = species,
+      family = poisson(), n_lv = 2L,
+      run_model = FALSE, silent = 2
+    )
+  ))
+})
+
+test_that("jsdgam rejects non-formula non-brmsformula 'formula' arg", {
+  dat <- build_jsdgam_toy()
+  suppressWarnings(expect_error(
+    jsdgam(
+      formula = "y ~ elev",  # bare string, not parsed
+      factor_formula = ~ -1,
+      data = dat, species = species,
+      family = poisson(), n_lv = 2L,
+      run_model = FALSE, silent = 2
+    ),
+    "Must inherit from class"
+  ))
+})
+
+test_that("jsdgam rejects n_lv >= number of species under iid prior", {
   dat <- build_jsdgam_toy()
   expect_error(
     jsdgam(
@@ -46,6 +77,36 @@ test_that("jsdgam rejects n_lv >= number of species", {
     ),
     "strictly less than the number of species"
   )
+})
+
+test_that("jsdgam allows n_lv = n_species under MGP loadings_prior", {
+  dat <- build_jsdgam_toy()
+  # 4 species, n_lv = 4, admissible only under MGP shrinkage. The
+  # `run_model = FALSE` deprecation warning fires here; suppress so
+  # it doesn't leak into the testthat summary.
+  suppressWarnings(expect_no_error(
+    jsdgam(
+      formula = y ~ 1, factor_formula = ~ -1,
+      data = dat, species = species,
+      family = poisson(), n_lv = 4L,
+      loadings_prior = "mgp",
+      run_model = FALSE, silent = 2
+    )
+  ))
+})
+
+test_that("jsdgam rejects n_lv > n_species even under MGP", {
+  dat <- build_jsdgam_toy()
+  suppressWarnings(expect_error(
+    jsdgam(
+      formula = y ~ 1, factor_formula = ~ -1,
+      data = dat, species = species,
+      family = poisson(), n_lv = 5L,
+      loadings_prior = "mgp",
+      run_model = FALSE, silent = 2
+    ),
+    "cannot exceed the number of species"
+  ))
 })
 
 test_that("jsdgam rejects n_lv = 0", {

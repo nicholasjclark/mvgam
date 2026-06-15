@@ -2422,7 +2422,12 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL,
   checkmate::assert_logical(is_factor_model, len = 1, null.ok = TRUE)
   checkmate::assert_number(n_time, lower = 1, null.ok = TRUE)
 
-  # Infer factor model behavior if not specified
+  # Infer factor model behavior if not specified. This site is
+  # called with an already-defaulted `n_lv` where
+  # `n_lv = n_series` is the "no factor model" sentinel, so we
+  # keep the strict `<` rule rather than going through
+  # [is_factor_model_spec()] (which is for raw `trend_specs$n_lv`
+  # values where the sentinel is NULL).
   if (is.null(is_factor_model)) {
     is_factor_model <- !is.null(n_lv) && n_lv < n_series
   }
@@ -3799,7 +3804,7 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
   n_obs <- data_info$n_obs
   n_series <- data_info$n_series %||% 1
   n_lv <- trend_specs$n_lv %||% n_series
-  is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series
+  is_factor_model <- is_factor_model_spec(trend_specs$n_lv, n_series)
   use_grouping <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
 
   # Cross-cutting system validation (integration between factor models and hierarchical correlations)
@@ -3916,7 +3921,7 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   checkmate::assert_int(n_series, lower = 1)
   checkmate::assert_int(n_obs, lower = 1)
 
-  is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series
+  is_factor_model <- is_factor_model_spec(trend_specs$n_lv, n_series)
   has_ma <- trend_specs$ma %||% FALSE
 
   # Cross-cutting validation handled by injection function
@@ -4273,7 +4278,7 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   ar_lags <- resolve_active_lags(p, trend_specs$ar_lags)
   checkmate::assert_integerish(ar_lags, lower = 1, any.missing = FALSE)
 
-  is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series
+  is_factor_model <- is_factor_model_spec(trend_specs$n_lv, n_series)
   has_ma <- trend_specs$ma %||% FALSE
   max_lag <- max(ar_lags)
 
@@ -4540,9 +4545,12 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     # and block-structured matrices for proper within-group interactions only
   }
 
-  # Determine model type with validation
+  # Determine model type with validation. Pass the unset
+  # `trend_specs$n_lv` (not the locally-defaulted `n_lv`, which is
+  # `%||% n_series` upstream as a non-factor sentinel) so a VAR
+  # without an explicit `n_lv` is not promoted to a factor model.
   is_varma <- ma_lags > 0
-  is_factor_model <- n_lv < n_series
+  is_factor_model <- is_factor_model_spec(trend_specs$n_lv, n_series)
   use_grouping <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
 
   # Additional validation for logical consistency
@@ -5544,7 +5552,7 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   checkmate::assert_int(n_lv, lower = 1)
 
   # Determine if this is a factor model (n_lv < n_series)
-  is_factor_model <- !is.null(trend_specs$n_lv) && n_lv < n_series
+  is_factor_model <- is_factor_model_spec(trend_specs$n_lv, n_series)
 
   # Cross-cutting validation handled by injection function
 

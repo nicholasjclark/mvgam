@@ -1198,7 +1198,10 @@ validate_trend_time_intervals <- function(trend_spec, data) {
 #'
 #' @param trend_spec Trend specification
 #' @param data Data frame with time series data
-#' @return Enhanced trend specification
+#' @return The trend specification, after validating that
+#'   `n_lv <= n_series`. The wrapper-layer
+#'   [validate_n_lv_ceiling()] handles the prior-aware iid vs MGP
+#'   distinction; this gate is the downstream invariant guard.
 #' @noRd
 validate_trend_factor_compatibility <- function(trend_spec, data) {
 
@@ -1208,20 +1211,180 @@ validate_trend_factor_compatibility <- function(trend_spec, data) {
     series_var <- trend_spec$series %||% "series"
     if (series_var %in% colnames(data)) {
       n_series <- length(unique(data[[series_var]]))
-
-      if (trend_spec$n_lv >= n_series) {
+      # `n_lv > n_series` is rejected regardless of prior: the
+      # marginal covariance has rank at most n_series, so extra
+      # columns of Z add no expressive capacity. The
+      # `n_lv = n_series` MGP case is handled at the wrapper
+      # entry (`validate_n_lv_ceiling()` in `mvgam()` / `jsdgam()`)
+      # where the loadings prior is in scope.
+      if (trend_spec$n_lv > n_series) {
         stop(insight::format_error(c(
-          cli::format_inline("Factor model requires {.field n_lv < n_series}."),
+          cli::format_inline("Factor model requires {.field n_lv <= n_series}."),
           x = cli::format_inline(
             "You specified {.field n_lv = {trend_spec$n_lv}} but data has {n_series} series."
           ),
-          i = "Reduce n_lv or increase number of series."
+          i = paste0(
+            "Reduce n_lv. With `loadings_prior = \"mgp\"`, ",
+            "increase 'mgp_a2' (e.g. to 5) for stronger column ",
+            "shrinkage instead of raising the truncation ceiling."
+          )
         )))
       }
     }
   }
 
   return(trend_spec)
+}
+
+#' Detect whether a trend spec describes a factor model
+#'
+#' Single helper for the `is_factor_model` gate. Returns TRUE iff
+#' `n_lv` is set and `n_lv <= n_series`. The `<=` admits the MGP
+#' truncation-ceiling case `n_lv = n_series`; the wrapper-layer
+#' [validate_n_lv_ceiling()] rejects the iid analogue upstream so
+#' this predicate never spuriously promotes a default-prior fit to
+#' a degenerate full-rank factor model.
+#'
+#' @param n_lv Integer or NULL (the `n_lv` slot from a trend spec).
+#' @param n_series Positive integer.
+#' @return Logical scalar.
+#' @noRd
+is_factor_model_spec <- function(n_lv, n_series) {
+  if (is.null(n_lv)) return(FALSE)
+  n_lv <= n_series
+}
+
+#' Detect MGP column shrinkage in a `loadings_prior` argument
+#'
+#' Accepts the string shorthand `"mgp"` and the list form
+#' `list(column_shrinkage = "mgp", ...)`. Returns FALSE for any
+#' other input (including NULL). Used by [validate_n_lv_ceiling()]
+#' so the iid vs MGP `n_lv` ceiling check stays in one place.
+#'
+#' `traits` / `phylo` aliases do NOT enable MGP by themselves; they
+#' layer a kernel prior on top of iid Z. Users can compose them
+#' with MGP via the explicit list form
+#' `list(features = ..., column_shrinkage = "mgp")`.
+#'
+#' @noRd
+is_mgp_loadings_prior <- function(loadings_prior) {
+  if (is.null(loadings_prior)) return(FALSE)
+  if (is.character(loadings_prior) && length(loadings_prior) == 1L) {
+    return(identical(loadings_prior, "mgp"))
+  }
+  if (is.list(loadings_prior)) {
+    return(identical(loadings_prior$column_shrinkage, "mgp"))
+  }
+  FALSE
+}
+
+#' Validate the `n_lv` ceiling against the prior
+#'
+#' Shared entry-point gate for `jsdgam()` and `mvgam()`. The ceiling
+#' depends on the loadings prior:
+#' \itemize{
+#'   \item iid Z (default `student_t(3, 0, 1)`) or kernel-driven
+#'     structured priors: `n_lv < n_species`. At the boundary, `Z Z'`
+#'     saturates the residual covariance and Psi is unidentified
+#'     from observed residuals, producing an HMC funnel.
+#'   \item MGP (`loadings_prior = "mgp"` or
+#'     `list(column_shrinkage = "mgp")`): `n_lv <= n_species`. The
+#'     prior shrinks excess columns toward zero by construction so
+#'     the truncation ceiling at K is admissible.
+#'   \item Either prior: `n_lv > n_species` always errors because
+#'     the marginal `Z Z'` has rank at most n_species.
+#' }
+#' See Bhattacharya & Dunson (2011), Schiavon, Canale, Dunson
+#' (2022, Biometrics 78:995) for MGP-side identification.
+#'
+#' @noRd
+validate_n_lv_ceiling <- function(n_lv, n_species, loadings_prior,
+                                    fit_function = "mvgam") {
+  checkmate::assert_int(n_lv, lower = 1)
+  checkmate::assert_int(n_species, lower = 2)
+  checkmate::assert_choice(fit_function, c("mvgam", "jsdgam"))
+  # `jsdgam()` users think in species; mvgam-direct users think in
+  # series. The check is the same; only the noun changes.
+  noun <- if (identical(fit_function, "jsdgam")) "species" else "series"
+  mgp_on <- is_mgp_loadings_prior(loadings_prior)
+  n_lv_int <- as.integer(n_lv)
+  if (n_lv_int > n_species) {
+    stop(insight::format_error(c(
+      paste0(
+        "'n_lv' cannot exceed the number of ", noun, "."
+      ),
+      x = paste0(
+        "Got n_lv = ", n_lv_int, ", n_", noun, " = ", n_species, "."
+      ),
+      i = paste0(
+        "The marginal residual covariance has rank at most n_",
+        noun, ", so additional columns of 'Z' add no expressive ",
+        "capacity. With `loadings_prior = \"mgp\"`, increase ",
+        "'mgp_a2' (e.g. to 5) for stronger column shrinkage instead."
+      )
+    )))
+  }
+  if (!mgp_on && n_lv_int >= n_species) {
+    stop(insight::format_error(c(
+      paste0(
+        "'n_lv' must be strictly less than the number of ", noun,
+        " under the default loadings prior."
+      ),
+      x = paste0(
+        "Got n_lv = ", n_lv_int, ", n_", noun, " = ", n_species, "."
+      ),
+      i = paste0(
+        "Pass `loadings_prior = \"mgp\"` to allow n_lv up to n_",
+        noun, "; the multiplicative-gamma-process prior is ",
+        "designed for the truncation-ceiling regime."
+      )
+    )))
+  }
+  invisible(TRUE)
+}
+
+#' Walk trend specs to find `n_lv` and apply the ceiling gate
+#'
+#' Wrapper-layer hook called once from
+#' `generate_stan_components()` after the loadings prior is
+#' attached. Reads `n_lv` from the first factor-model trend spec
+#' it finds (multivariate trend lists may be a single spec or a
+#' per-response list, but mvgam currently fits one shared trend
+#' so the first hit is the authoritative one), counts unique
+#' series from `data`, and dispatches to
+#' [validate_n_lv_ceiling()]. No-ops when no spec carries `n_lv`.
+#'
+#' @noRd
+enforce_n_lv_ceiling_against_data <- function(trend_specs, data,
+                                                loadings_prior,
+                                                fit_function = "mvgam") {
+  if (is.null(trend_specs)) return(invisible(TRUE))
+  specs <- if (is_multivariate_trend_specs(trend_specs)) {
+    trend_specs
+  } else {
+    list(trend_specs)
+  }
+  for (spec in specs) {
+    n_lv <- spec$n_lv
+    if (is.null(n_lv) || !is.numeric(n_lv) || n_lv < 1L) next
+    # `fixed_Z` (set by `trend_map = matrix(...)` or `"identity"`)
+    # supplies Z directly; no Z prior is sampled, so the iid funnel
+    # at `n_lv = n_series` does not apply. The downstream
+    # invariant gates still reject `n_lv > n_series`.
+    if (!is.null(spec$fixed_Z)) next
+    series_var <- spec$series_var %||% spec$series %||% "series"
+    if (!series_var %in% colnames(data)) next
+    n_series <- length(unique(data[[series_var]]))
+    if (n_series < 2L) next
+    validate_n_lv_ceiling(
+      n_lv           = as.integer(n_lv),
+      n_species      = as.integer(n_series),
+      loadings_prior = loadings_prior,
+      fit_function   = fit_function
+    )
+    break
+  }
+  invisible(TRUE)
 }
 
 #' Validate Factor Compatibility
@@ -2557,7 +2720,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
       trend = if (!is.null(trend_specs)) list(
         trend_type = trend_specs$trend %||% trend_specs$trend_model %||% NULL,
         has_trend = TRUE,
-        is_factor_model = !is.null(trend_specs$n_lv) && trend_specs$n_lv < length(unique_series),
+        is_factor_model = is_factor_model_spec(trend_specs$n_lv, length(unique_series)),
         correlation_structure = list(
           cor = trend_specs$cor %||% FALSE,
           ma = trend_specs$ma %||% FALSE,
@@ -3737,12 +3900,21 @@ validate_and_process_trend_parameters <- function(trend_spec, data) {
 
   # Add dimension information for downstream processing
   if (!is.null(trend_spec$dimensions)) {
-    # Dimensions already extracted, validate consistency with parameters
-    if (!is.null(trend_spec$n_lv) && trend_spec$n_lv >= trend_spec$dimensions$n_series) {
+    # Downstream invariant guard. `n_lv = n_series` is admissible
+    # under MGP shrinkage (the wrapper-layer
+    # [validate_n_lv_ceiling()] makes the prior-aware decision);
+    # `n_lv > n_series` is always rejected because the marginal
+    # `Z Z'` cannot exceed rank n_series.
+    if (!is.null(trend_spec$n_lv) && trend_spec$n_lv > trend_spec$dimensions$n_series) {
       stop(insight::format_error(c(
-        cli::format_inline("Factor model requires {.field n_lv < n_series}."),
+        cli::format_inline("Factor model requires {.field n_lv <= n_series}."),
         x = cli::format_inline(
           "You specified {.field n_lv = {trend_spec$n_lv}} with {trend_spec$dimensions$n_series} series."
+        ),
+        i = paste0(
+          "Reduce n_lv. With `loadings_prior = \"mgp\"`, ",
+          "increase 'mgp_a2' (e.g. to 5) for stronger column ",
+          "shrinkage instead of raising the truncation ceiling."
         )
       )))
     }
@@ -3850,9 +4022,8 @@ validate_no_factor_hierarchical <- function(trend_specs, n_series, trend_name) {
   checkmate::assert_int(n_series, lower = 1)
   checkmate::assert_string(trend_name)
 
-  # Check if this is a factor model
   n_lv <- trend_specs$n_lv
-  is_factor_model <- !is.null(n_lv) && n_lv < n_series
+  is_factor_model <- is_factor_model_spec(n_lv, n_series)
 
   # Check if hierarchical grouping is requested
   use_grouping <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
@@ -3864,7 +4035,7 @@ validate_no_factor_hierarchical <- function(trend_specs, n_series, trend_name) {
         "Hierarchical {trend_name} models cannot use factor models."
       ),
       i = cli::format_inline(
-        "Use {.field n_lv = n_series} or remove {.field gr}/{.field subgr} parameters."
+        "Drop {.field n_lv} (one trend per series) or remove {.field gr}/{.field subgr} to keep the factor model."
       )
     )))
   }
