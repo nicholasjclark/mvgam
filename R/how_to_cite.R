@@ -580,6 +580,54 @@ reference_db <- function() {
         "}",
         sep = "\n"
       )
+    ),
+    niku_gllvm_2019 = list(
+      text = "Niku J, Brooks W, Herliansyah R, Hui FKC, Taskinen S and Warton DI (2019). Efficient estimation of generalized linear latent variable models. PLoS ONE, 14(5), e0216129. https://doi.org/10.1371/journal.pone.0216129",
+      bibtex = paste(
+        "@article{niku2019gllvm,",
+        "  title = {Efficient estimation of generalized linear latent variable models},",
+        "  author = {Niku, Jenni and Brooks, Wesley and Herliansyah, Riki and Hui, Francis K. C. and Taskinen, Sara and Warton, David I.},",
+        "  journal = {PLoS ONE},",
+        "  volume = {14},",
+        "  number = {5},",
+        "  pages = {e0216129},",
+        "  year = {2019},",
+        "  doi = {10.1371/journal.pone.0216129}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    tikhonov_hmsc_2020 = list(
+      text = "Tikhonov G, Opedal OH, Abrego N, Lehikoinen A, de Jonge MMJ, Oksanen J and Ovaskainen O (2020). Joint species distribution modelling with the r-package Hmsc. Methods in Ecology and Evolution, 11(3), 442-447. https://doi.org/10.1111/2041-210X.13345",
+      bibtex = paste(
+        "@article{tikhonov2020hmsc,",
+        "  title = {Joint species distribution modelling with the {R}-package {H}msc},",
+        "  author = {Tikhonov, Gleb and Opedal, {\\O}ystein H. and Abrego, Nerea and Lehikoinen, Aleksi and de Jonge, Melinda M. J. and Oksanen, Jari and Ovaskainen, Otso},",
+        "  journal = {Methods in Ecology and Evolution},",
+        "  volume = {11},",
+        "  number = {3},",
+        "  pages = {442--447},",
+        "  year = {2020},",
+        "  doi = {10.1111/2041-210X.13345}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    harrison_dmm_2020 = list(
+      text = "Harrison JG, Calder WJ, Shastry V and Buerkle CA (2020). Dirichlet-multinomial modelling outperforms alternatives for analysis of microbiome and other ecological count data. Molecular Ecology Resources, 20(2), 481-497. https://doi.org/10.1111/1755-0998.13128",
+      bibtex = paste(
+        "@article{harrison2020dmm,",
+        "  title = {{D}irichlet-multinomial modelling outperforms alternatives for analysis of microbiome and other ecological count data},",
+        "  author = {Harrison, Joshua G. and Calder, W. John and Shastry, Vivaswat and Buerkle, C. Alex},",
+        "  journal = {Molecular Ecology Resources},",
+        "  volume = {20},",
+        "  number = {2},",
+        "  pages = {481--497},",
+        "  year = {2020},",
+        "  doi = {10.1111/1755-0998.13128}",
+        "}",
+        sep = "\n"
+      )
     )
   )
 }
@@ -623,6 +671,21 @@ uses_occ_family <- function(object) {
 #' @noRd
 uses_tweedie_family <- function(object) {
   family_name_is(object, "tweedie")
+}
+
+# Simplex multi-response: diri(), multi(), categ(). Detect via the
+# mvgam_simplex_response attribute set by the constructor.
+#' @noRd
+uses_simplex_response <- function(object) {
+  is_simplex_response_family(object$family)
+}
+
+# Multivariate continuous response: mvn(), mvt(). Detect via the
+# mvgam_multi_response attribute while excluding the simplex trio.
+#' @noRd
+uses_mv_continuous_response <- function(object) {
+  is_multi_response_family(object$family) &&
+    !is_simplex_response_family(object$family)
 }
 
 
@@ -842,6 +905,48 @@ how_to_cite.mvgam <- function(object, ...) {
         "mackenzie_occu_2002",
         "royle_dorazio_2008",
         "socolar_flocker_2023"
+      )
+    ),
+    list(
+      detect = uses_simplex_response(object),
+      text = paste0(
+        " The multi-category response (proportions, counts or",
+        " single-category outcomes across K mutually exclusive",
+        " categories) was modelled with a softmax-link",
+        " observation likelihood following the Dirichlet-multinomial",
+        " framing of Harrison et al. (2020); the per-category",
+        " linear predictors share the factor-loading structure of",
+        " the generalised linear latent variable model (Niku et al.",
+        " 2019) extended to joint species distribution modelling",
+        " by Tikhonov et al. (2020). Mode-1 unidentified column",
+        " shifts on the loadings matrix are removed with Stan's",
+        " sum_to_zero_vector parameterisation, and the per-site",
+        " mode-2 shift is removed by subtracting the reference",
+        " category from the per-site linear predictor inside the",
+        " custom log-density."
+      ),
+      refs = c(
+        "harrison_dmm_2020",
+        "niku_gllvm_2019",
+        "tikhonov_hmsc_2020"
+      )
+    ),
+    list(
+      detect = uses_mv_continuous_response(object),
+      text = paste0(
+        " The multivariate continuous response was modelled with",
+        " a conditional generalised linear latent variable",
+        " parameterisation (Niku et al. 2019) in which",
+        " per-category linear predictors share a low-rank factor",
+        " loading; the resulting marginal residual covariance",
+        " `Z Z' + diag(Psi^2)` (Gaussian) or",
+        " `Z Z' + diag(Psi^2 * nu / (nu - 2))` (Student-t with",
+        " hard floor at nu > 2) follows the joint species",
+        " distribution framing of Tikhonov et al. (2020)."
+      ),
+      refs = c(
+        "niku_gllvm_2019",
+        "tikhonov_hmsc_2020"
       )
     )
   )

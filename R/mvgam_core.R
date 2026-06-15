@@ -216,8 +216,17 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   checkmate::assert_character(backend, len = 1)
   checkmate::assert_logical(combine, len = 1)
 
-  # Capture data name from user's call (before passing to internal functions)
-  data_name <- deparse(match.call()$data)
+  # Capture data name from user's call (before passing to internal
+  # functions). `deparse()` of a literal data frame expression (e.g.
+  # `mvgam(data = as.data.frame(long_dat))` or a `do.call(mvgam, ...)`
+  # call that resolved `data` to an inline structure) returns the
+  # full expansion, which then bleeds into summary() output. Collapse
+  # any multi-line deparse and fall back to a short placeholder when
+  # the captured name is longer than a typical symbol identifier.
+  data_name <- paste(deparse(match.call()$data), collapse = " ")
+  if (nchar(data_name) > 80L) {
+    data_name <- "<inline data>"
+  }
 
   # Handle multiple imputation input
   if (is.list(data) && !is.data.frame(data)) {
