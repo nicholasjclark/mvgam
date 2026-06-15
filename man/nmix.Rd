@@ -233,6 +233,20 @@ wrapper-level API and \code{\link[=lv_axis]{lv_axis()}} for the \code{by = lv_ax
 sentinel that turns smooths into per-factor regressors.
 }
 
+\section{Importing array data}{
+
+Detection-history data from \code{unmarked::unmarkedFramePCount},
+\code{spOccupancy}, \code{ubms}, and \code{flocker} arrives as a 2D \verb{[J, K]}
+matrix (single-species), 3D \verb{[N, J, K]} array (multi-species),
+4D \verb{[N, J, T, K]} array (multi-season multi-species), or named
+list of \verb{[J, K]} matrices (\code{unmarkedFrameOccuMulti}). Use
+\code{\link[=pivot_detection_array]{pivot_detection_array()}} to convert any of these into the
+long-format \code{data} that \code{mvgam(family = nmix())} /
+\code{jsdgam(family = nmix())} expects, with \code{site_covs},
+\code{season_covs}, \code{site_season_covs}, and \code{obs_covs} broadcast
+across the right grid axes.
+}
+
 \examples{
 \dontrun{
 # Constant detection probability, abundance varies with elevation

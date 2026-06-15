@@ -7,87 +7,111 @@
 pivot_detection_array(
   y,
   site_covs = NULL,
+  season_covs = NULL,
+  site_season_covs = NULL,
   obs_covs = NULL,
   species = NULL,
-  site_id_name = "time",
-  visit_id_name = "visit",
-  series_name = "series",
-  values_to = "y"
+  site_col = "site",
+  season_col = "season",
+  visit_col = "visit",
+  time_col = "time",
+  series_col = "series",
+  y_col = "y"
 )
 }
 \arguments{
-\item{y}{One of three layouts:
+\item{y}{One of four layouts:
 \itemize{
-\item \strong{Single-species}: a \verb{[J_sites, K_max_visits]} matrix
-of detections (0 / 1 for \code{occ()}, non-negative counts for
-\code{nmix()}). This is the \code{unmarked::unmarkedFrameOccu} /
-\code{unmarkedFramePCount} \code{y} slot and the \code{flocker::flock}
-\code{obs} argument with \code{type = "single"}.
-\item \strong{Multi-species (array)}: a
-\verb{[N_species, J_sites, K_max_visits]} array. This is the
+\item \strong{Single-species, single-season}: a \verb{[J_sites, K_max_visits]} matrix of detections (0 / 1 for \code{occ()},
+non-negative counts for \code{nmix()}). The
+\code{unmarked::unmarkedFrameOccu} / \code{unmarkedFramePCount} \code{y}
+slot and the \code{flocker::flock} \code{obs} argument with
+\code{type = "single"}.
+\item \strong{Multi-species, single-season (array)}: a
+\verb{[N_species, J_sites, K_max_visits]} array. The
 \code{spOccupancy::lfMsPGOcc} / \code{msPGOcc} \code{y} slot.
-\item \strong{Multi-species (list)}: a named list of
-\verb{[J_sites, K_max_visits]} matrices, one per species. This
-is the \code{unmarked::unmarkedFrameOccuMulti} \code{y} slot.
-List names become species labels; matrices must share \code{J}
-and \code{K}.
+\item \strong{Multi-species, single-season (list)}: a named list
+of \verb{[J_sites, K_max_visits]} matrices, one per species.
+The \code{unmarked::unmarkedFrameOccuMulti} \code{y} slot; list
+names become species labels.
+\item \strong{Multi-species, multi-season}: a \verb{[N_species, J_sites, T_seasons, K_max_visits]} 4D array. The
+\code{spOccupancy::tMsPGOcc} / \code{svcTMsPGOcc} \code{y} slot. For
+single-species multi-season data, wrap in a length-1 list
+(\code{list(only_species = matrix_or_3d_array)}) or pass as a
+\verb{[1, J, T, K]} array.
 }
-\code{NA} entries mark missing visits and are dropped from the
-output, matching the \code{unmarked} / \code{flocker} ragged-visit
-convention.}
+\code{NA} entries mark missing visits / seasons and are dropped
+from the output.}
 
 \item{site_covs}{Optional \code{data.frame} of site-level covariates
-with \code{nrow == J_sites}. Broadcast across visits and species.
-The \code{unmarked::unmarkedFrameOccu} \code{siteCovs} slot, the
-spOccupancy \code{occ.covs}, and the \code{flocker} \code{unit_covs} map
-here. Column names appear unchanged in the output.}
+with \code{nrow == J_sites}. Broadcast across visits, seasons, and
+species. The \code{unmarked::unmarkedFrameOccu} \code{siteCovs} slot,
+the spOccupancy \code{occ.covs}, and the \code{flocker} \code{unit_covs} map
+here.}
 
-\item{obs_covs}{Optional visit-level covariates. Two layouts
-are accepted:
+\item{season_covs}{Optional \code{data.frame} of season-level
+covariates with \code{nrow == T_seasons}. Broadcast across sites,
+visits, and species. Use for year-of-study effects,
+season-of-year covariates, or any covariate that varies across
+primary periods but is constant within a season.}
+
+\item{site_season_covs}{Optional named list of
+\verb{[J_sites, T_seasons]} matrices for covariates that vary
+across the \verb{(site, season)} interaction (e.g., site-level
+habitat that changes between seasons).}
+
+\item{obs_covs}{Optional visit-level covariates:
 \itemize{
-\item A \strong{named list} of \verb{[J_sites, K_max_visits]} matrices
-(the spOccupancy \code{det.covs}, \code{flocker} \code{event_covs}, and
-the list-form of \code{unmarked::unmarkedFrameOccu} \code{obsCovs}).
-List entries must be named.
-\item A \strong{long-format data.frame} with \code{J_sites * K_max_visits}
-rows, site-major and visit-fastest (matching the
-\code{unmarked} \code{obsCovs} data.frame convention,
-\code{as.vector(t(matrix))}).
-}
-Broadcast across species in the multi-species cases.}
+\item Single-season: named list of \verb{[J_sites, K_max_visits]}
+matrices, OR a long-format \code{data.frame} with
+\code{J_sites * K_max_visits} rows in site-major / visit-fastest
+order (the \code{unmarked} \code{obsCovs} convention).
+\item Multi-season: named list of
+\verb{[J_sites, T_seasons, K_max_visits]} arrays.
+}}
 
 \item{species}{Optional character vector of species names with
 \code{length == N_species}. Only meaningful for multi-species \code{y}.
-Defaults to \verb{sp1, sp2, ...}.}
+When \code{y} is a named list, list names take precedence. Defaults
+to \verb{sp1, sp2, ...}.}
 
-\item{site_id_name}{Name of the site identifier in the output.
-Defaults to \code{"time"} so the result drops directly into mvgam
-(which expects \code{time}); set to \code{"site"} if you intend to pass
-the result through \code{jsdgam(unit = site)}.}
+\item{site_col}{Name of the site identifier in the output.
+Defaults to \code{"site"}.}
 
-\item{visit_id_name}{Name of the visit identifier in the output.
-Defaults to \code{"visit"}.}
+\item{season_col}{Name of the season identifier in the output.
+Defaults to \code{"season"}.}
 
-\item{series_name}{Name of the species column. Defaults to
-\code{"series"}. Set to \code{"species"} if you intend to pass the
-result through \code{jsdgam(species = species)}.}
+\item{visit_col}{Name of the visit identifier. Defaults to
+\code{"visit"}.}
 
-\item{values_to}{Name of the detection / count column. Defaults
-to \code{"y"}.}
+\item{time_col}{Name of the fused closure-unit identifier.
+Defaults to \code{"time"}. Single-season: \code{time = site}.
+Multi-season: \code{time = (site - 1) * T + season} so each
+\verb{(site, season)} pair is a unique closure unit.}
+
+\item{series_col}{Name of the species column. Defaults to
+\code{"series"}.}
+
+\item{y_col}{Name of the detection / count column. Defaults to
+\code{"y"}.}
 }
 \value{
 A long-format \code{data.frame} with columns
-\verb{(series, time, visit, y, site_covs..., obs_covs...)} ready to
-feed \code{mvgam(family = occ() / nmix())} or \code{jsdgam(family = occ() / nmix())}. Rows where \code{y} is \code{NA} are dropped so closure
-units can vary in the number of visits.
+\verb{(series, time, site, season, visit, y, <site_covs>, <season_covs>, <site_season_covs>, <obs_covs>)}. Rows where
+\code{y} is \code{NA} are dropped so closure units can vary in the
+number of observed visits / seasons.
 }
 \description{
 Convert the multi-dimensional detection histories used by
 \code{unmarked}, \code{ubms}, \code{flocker}, and \code{spOccupancy} into the
 long-format closure-unit layout \code{mvgam(family = occ() / nmix())}
 and \code{jsdgam(family = occ() / nmix())} expect. One row per
-\verb{(species, site, visit)} triple (or \verb{(site, visit)} when \code{y} is
-single-species).
+\verb{(species, site, season, visit)} tuple. Single-species data
+drops the \code{series} axis; single-season data sets \code{season = 1}
+for every row and \code{time = site}. Multi-season data emits a
+fused \code{time = (site - 1) * T + season} (the canonical
+closure-unit identifier) alongside the raw \code{site} and \code{season}
+columns for downstream joins.
 }
 \author{
 Nicholas J Clark

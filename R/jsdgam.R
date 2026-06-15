@@ -60,6 +60,15 @@
 #'   sampling-unit index, often `time` or `site`) and the factor
 #'   column named by `species` (the response-unit index).
 #'
+#'   Users arriving from `unmarked`, `ubms`, `flocker`, `Hmsc`, or
+#'   `spOccupancy` typically carry their data in multi-dimensional
+#'   arrays. Use [pivot_detection_array()] to convert occupancy /
+#'   N-mixture detection-history arrays (2D `[J, K]`, 3D `[N, J, K]`,
+#'   4D `[N, J, T, K]` multi-season, or named list of `[J, K]`
+#'   matrices per species) into the long-format `data` that
+#'   `jsdgam()` expects, and [pivot_species_matrix()] for the
+#'   Hmsc-style wide `[J, N]` species-composition matrix.
+#'
 #' @param family A `family` object specifying the observation
 #'   distribution. Supported families are documented in
 #'   `mvgam_families`. Defaults to `binomial()`, which is the standard

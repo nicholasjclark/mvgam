@@ -60,6 +60,19 @@ referenced in the formulae. Multiple rows sharing the same
 unit. The \code{cap} column required by \code{nmix()} is implicit at
 \code{1} for \code{occ()} and need not be supplied.
 }
+\section{Importing array data}{
+
+Detection-history data from \code{unmarked::unmarkedFrameOccu},
+\code{unmarkedFrameOccuMulti}, \code{spOccupancy}, \code{ubms}, and \code{flocker}
+arrives as a 2D \verb{[J, K]} matrix, 3D \verb{[N, J, K]} array, 4D
+\verb{[N, J, T, K]} array (multi-season), or named list of \verb{[J, K]}
+matrices per species. Use \code{\link[=pivot_detection_array]{pivot_detection_array()}} to convert
+any of these into the long-format \code{data} that
+\code{mvgam(family = occ())} / \code{jsdgam(family = occ())} expect, with
+\code{site_covs}, \code{season_covs}, \code{site_season_covs}, and \code{obs_covs}
+broadcast across the right grid axes.
+}
+
 \section{JSDM with imperfect detection}{
 
 Passing \code{occ()} to \code{\link[=jsdgam]{jsdgam()}} with \code{n_lv > 0} composes the

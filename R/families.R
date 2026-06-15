@@ -1093,6 +1093,18 @@ build_closure_unit_arrays <- function(data,
 #' wrapper-level API and [lv_axis()] for the `by = lv_axis()`
 #' sentinel that turns smooths into per-factor regressors.
 #'
+#' @section Importing array data:
+#' Detection-history data from `unmarked::unmarkedFramePCount`,
+#' `spOccupancy`, `ubms`, and `flocker` arrives as a 2D `[J, K]`
+#' matrix (single-species), 3D `[N, J, K]` array (multi-species),
+#' 4D `[N, J, T, K]` array (multi-season multi-species), or named
+#' list of `[J, K]` matrices (`unmarkedFrameOccuMulti`). Use
+#' [pivot_detection_array()] to convert any of these into the
+#' long-format `data` that `mvgam(family = nmix())` /
+#' `jsdgam(family = nmix())` expects, with `site_covs`,
+#' `season_covs`, `site_season_covs`, and `obs_covs` broadcast
+#' across the right grid axes.
+#'
 #' @references
 #' Royle, J. A., and Nichols, J. D. (2003). Estimating abundance
 #'   from repeated presence-absence data or point counts.
@@ -1223,6 +1235,17 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #'   `mvgam_closure_unit` and `mvgam_binary_response` attributes
 #'   set; closure-unit data prep builds the unit arrays and
 #'   attaches the Stan lpdf at fit time.
+#'
+#' @section Importing array data:
+#' Detection-history data from `unmarked::unmarkedFrameOccu`,
+#' `unmarkedFrameOccuMulti`, `spOccupancy`, `ubms`, and `flocker`
+#' arrives as a 2D `[J, K]` matrix, 3D `[N, J, K]` array, 4D
+#' `[N, J, T, K]` array (multi-season), or named list of `[J, K]`
+#' matrices per species. Use [pivot_detection_array()] to convert
+#' any of these into the long-format `data` that
+#' `mvgam(family = occ())` / `jsdgam(family = occ())` expect, with
+#' `site_covs`, `season_covs`, `site_season_covs`, and `obs_covs`
+#' broadcast across the right grid axes.
 #'
 #' @references
 #' MacKenzie, D. I., Nichols, J. D., Lachman, G. B., Droege, S.,

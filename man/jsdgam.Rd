@@ -49,7 +49,16 @@ smooth terms in \code{factor_formula}, mirroring the role of
 variable and the covariates referenced by \code{formula} and
 \code{factor_formula}. Must contain the column named by \code{unit} (the
 sampling-unit index, often \code{time} or \code{site}) and the factor
-column named by \code{species} (the response-unit index).}
+column named by \code{species} (the response-unit index).
+
+Users arriving from \code{unmarked}, \code{ubms}, \code{flocker}, \code{Hmsc}, or
+\code{spOccupancy} typically carry their data in multi-dimensional
+arrays. Use \code{\link[=pivot_detection_array]{pivot_detection_array()}} to convert occupancy /
+N-mixture detection-history arrays (2D \verb{[J, K]}, 3D \verb{[N, J, K]},
+4D \verb{[N, J, T, K]} multi-season, or named list of \verb{[J, K]}
+matrices per species) into the long-format \code{data} that
+\code{jsdgam()} expects, and \code{\link[=pivot_species_matrix]{pivot_species_matrix()}} for the
+Hmsc-style wide \verb{[J, N]} species-composition matrix.}
 
 \item{newdata}{Optional test-set \code{data.frame} persisted on the
 fit as \code{object$test_data}. Used by \code{plot(fit, type = "series")}
