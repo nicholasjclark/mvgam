@@ -118,7 +118,7 @@ test_that("stancode.mvgam_formula returns correct class structure", {
 
   # Simple observation-only model
   mf_obs_only <- mvgam_formula(y ~ x)
-  code_obs_only <- stancode(mf_obs_only, data = data, family = poisson(), validate = FALSE)
+  code_obs_only <- stancode(mf_obs_only, data = data, family = poisson(), validate = TRUE)
 
   # Check class structure follows mvgam convention with brms compatibility
   expect_s3_class(code_obs_only, "mvgamstancode")
@@ -128,7 +128,7 @@ test_that("stancode.mvgam_formula returns correct class structure", {
 
   # Model with trends - generate without validation first
   mf_with_trend <- mvgam_formula(y ~ x, trend_formula = ~ RW())
-  code_with_trend <- stancode(mf_with_trend, data = data, family = poisson(), validate = FALSE)
+  code_with_trend <- stancode(mf_with_trend, data = data, family = poisson(), validate = TRUE)
 
   # Should have same class structure
   expect_s3_class(code_with_trend, "mvgamstancode")
@@ -192,9 +192,6 @@ test_that("stancode.mvgam_formula returns correct class structure", {
   expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
   expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
 
-  # Final validation: ensure both models compile correctly
-  expect_no_error(stancode(mf_obs_only, data = data, family = poisson(), validate = TRUE))
-  expect_no_error(stancode(mf_with_trend, data = data, family = poisson(), validate = TRUE))
 })
 
 test_that("stancode uses GLM optimization with fixed effects + random effects", {
@@ -227,7 +224,7 @@ test_that("stancode generates correct AR(p = c(1, 12)) seasonal model with negat
   code_with_trend <- stancode(
     mf_with_trend, data = data,
     family = negbinomial(),
-    validate = FALSE
+    validate = TRUE
   )
 
   # Basic structure checks
@@ -297,8 +294,6 @@ test_that("stancode generates correct AR(p = c(1, 12)) seasonal model with negat
   expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
   expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
 
-  # Final validation: ensure model compiles correctly
-  expect_no_error(stancode(mf_with_trend, data = data, family = negbinomial(), validate = TRUE))
 })
 
 test_that("stancode generates correct AR(p = c(2, 4), ma = TRUE) ARMA model structure", {
@@ -310,7 +305,7 @@ test_that("stancode generates correct AR(p = c(2, 4), ma = TRUE) ARMA model stru
   code_with_trend <- stancode(
     mf_with_trend, data = data,
     family = poisson(),
-    validate = FALSE
+    validate = TRUE
   )
 
   # Basic structure checks
@@ -381,8 +376,6 @@ test_that("stancode generates correct AR(p = c(2, 4), ma = TRUE) ARMA model stru
   expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
   expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
 
-  # Final validation: ensure model compiles correctly
-  expect_no_error(stancode(mf_with_trend, data = data, family = poisson(), validate = TRUE))
 })
 
 test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with tensor product smooths and presence covariate", {
@@ -393,7 +386,7 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with ten
   )
   code_with_trend <- stancode(
     mf_with_trend, data = data,
-    validate = FALSE
+    validate = TRUE
   )
 
   # Basic structure checks
@@ -657,8 +650,6 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with ten
   expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
   expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
 
-  # Final validation: ensure model compiles correctly
-  expect_no_error(stancode(mf_with_trend, data = data, validate = TRUE))
 })
 
 test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, cor =
@@ -672,7 +663,7 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
     )
     code_with_trend <- stancode(
       mf_with_trend, data = data,
-      validate = FALSE
+      validate = TRUE
     )
 
     # Basic structure checks
@@ -889,8 +880,6 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
     expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{",
                                  code_with_trend)[[1]]), 1)
 
-    # Final validation: ensure model compiles correctly
-    expect_no_error(stancode(mf_with_trend, data = data, validate = TRUE))
   })
 
 test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, cor = TRUE) model with three families", {
@@ -903,7 +892,7 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   )
   code_with_trend <- stancode(
     mf_with_trend, data = data,
-    validate = FALSE
+    validate = TRUE
   )
 
   # Basic structure checks
@@ -1070,8 +1059,6 @@ test_that("stancode generates correct multivariate factor AR(p = 1, n_lv = 2, co
   expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
   expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
 
-  # Final validation: ensure model compiles correctly
-  expect_no_error(stancode(mf_with_trend, data = data, validate = TRUE))
 })
 
 test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend covariate", {
@@ -1084,7 +1071,7 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
     mf_with_trend,
     data = data,
     family = lognormal(),
-    validate = FALSE
+    validate = TRUE
   )
 
   # Basic structure checks
@@ -1169,8 +1156,6 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
   expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
   expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
 
-  # Final validation: ensure model compiles correctly
-  expect_no_error(stancode(mf_with_trend, data = data, family = lognormal(), validate = TRUE))
 })
 
 test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with correlated RE and custom prior", {
@@ -1188,7 +1173,7 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
     data = data,
     family = lognormal(),
     prior = custom_prior,
-    validate = FALSE
+    validate = TRUE
   )
 
   # Basic structure checks
@@ -1307,8 +1292,6 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
   expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
 
-  # Final validation: ensure model compiles correctly
-  expect_no_error(stancode(mf_with_trend, data = data, family = lognormal(), prior = custom_prior, validate = TRUE))
 })
 
 test_that("RW(gr = habitat) emits hierarchical Stan and wires scaled_innovations_trend assignment", {
@@ -1371,7 +1354,7 @@ test_that("stancode generates correct hierarchical VAR(gr = habitat) model with 
     mf_with_trend,
     data = data,
     family = poisson(),
-    validate = FALSE
+    validate = TRUE
   )
 
   # Basic structure checks
@@ -1444,8 +1427,6 @@ test_that("stancode generates correct hierarchical VAR(gr = habitat) model with 
   expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
   expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
 
-  # Final validation: ensure model compiles correctly
-  expect_no_error(stancode(mf_with_trend, data = data, family = poisson(), validate = TRUE))
 })
 
 test_that("stancode generates correct CAR() continuous autoregressive trend with nested RE and monotonic effects", {
@@ -1470,7 +1451,7 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
     code_with_trend <- stancode(
       mf_with_trend, data = data,
       family = poisson(),
-      validate = FALSE
+      validate = TRUE
     )
 
     # Basic structure checks
@@ -1661,8 +1642,6 @@ test_that("stancode generates correct CAR() continuous autoregressive trend with
     expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
     expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
 
-    # Final validation: ensure model compiles correctly
-    expect_no_error(stancode(mf_with_trend, data = data, family = poisson(), validate = TRUE))
   })
 
 test_that("stancode handles different observation families", {
@@ -1710,7 +1689,7 @@ test_that("stancode generates correct Stan blocks", {
   mf <- mvgam_formula(y ~ s(x), trend_formula = ~ AR(p = 1))
 
   # Generate Stan code without validation for structure inspection
-  code <- stancode(mf, data = data, family = poisson(), validate = FALSE)
+  code <- stancode(mf, data = data, family = poisson(), validate = TRUE)
 
   # Each Stan block should appear exactly once
   expect_equal(length(gregexpr("^\\s*data\\s*\\{", code)[[1]]), 1)
@@ -1832,7 +1811,6 @@ test_that("stancode generates correct Stan blocks", {
   expect_true(any(grepl("mu\\[n\\]\\s*\\+=\\s*trend\\[obs_trend_time\\[n\\],\\s*obs_trend_series\\[n\\]\\]", model_lines)))
 
   # Generated Stan code should compile without errors
-  expect_no_error(stancode(mf, data = data, family = poisson(), validate = TRUE))
 })
 
 test_that("stancode handles smooth terms in trend_formula with correct declaration order", {
@@ -1872,7 +1850,7 @@ test_that("stancode handles multivariate specifications with shared RW trend and
   )
 
   # Generate without validation first for structure inspection
-  code_shared <- stancode(mf_shared, data = data, validate = FALSE)
+  code_shared <- stancode(mf_shared, data = data, validate = TRUE)
 
   expect_s3_class(code_shared, "stancode")
   expect_gt(nchar(code_shared), 500)
@@ -2040,8 +2018,6 @@ test_that("stancode handles multivariate specifications with shared RW trend and
   params_block <- sub(".*parameters\\s*\\{([^}]*)\\}.*", "\\1", code_shared)
   expect_gt(length(gregexpr(";", params_block)[[1]]), 5)
 
-  # Final validation: ensure multivariate model compiles correctly
-  expect_no_error(stancode(mf_shared, data = data, validate = TRUE))
 })
 
 test_that("stancode integrates custom priors correctly", {
@@ -2308,7 +2284,7 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
   code_with_trend <- stancode(
     mf_with_trend, data = data,
     family = poisson(),
-    validate = FALSE
+    validate = TRUE
   )
 
   # Basic structure checks
@@ -2452,8 +2428,6 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
   expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_with_trend)[[1]]), 1)
   expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
 
-  # Final validation: ensure model compiles correctly
-  expect_no_error(stancode(mf_with_trend, data = data, family = poisson(), validate = TRUE))
 })
 
 test_that("stancode handles distributional regression models correctly", {
@@ -2468,7 +2442,7 @@ test_that("stancode handles distributional regression models correctly", {
   code_distributional <- stancode(
     mf_distributional, data = data,
     family = gaussian(),
-    validate = FALSE
+    validate = TRUE
   )
 
   # Basic structure checks
@@ -2560,8 +2534,6 @@ test_that("stancode handles distributional regression models correctly", {
   expect_equal(length(gregexpr("^\\s*model\\s*\\{", code_distributional)[[1]]), 1)
   expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_distributional)[[1]]), 1)
 
-  # Final validation: ensure model compiles correctly
-  expect_no_error(stancode(mf_distributional, data = data, family = gaussian(), validate = TRUE))
 })
 
 # Unsupported Family Validation Tests ----
