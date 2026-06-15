@@ -823,44 +823,13 @@ trend_map_from_matrix <- function(input, n_series) {
       )
     )))
   }
-  # Identifiability warning: any column whose entries are ALL
-  # NA has no anchor and is rotation-invariant within that
-  # factor. Sampling proceeds but the factor will not be
-  # identified by the fixed pattern.
-  if (any(is.na(input))) {
-    warn_partial_z_identification(input)
-  }
+  # Fully-free columns (every entry NA) are identified up to
+  # sign by the Heaps post-hoc QR rotation emitted in
+  # `generate_factor_model()`, which decomposes Z = Q_tilde'
+  # Z_tilde and saves Z_tilde with a non-negative diagonal.
+  # Post-fit accessors prefer Z_tilde over the raw Z, so no
+  # warning about unfixed columns is needed here.
   input
-}
-
-
-# Permissive identifiability check for partial-Z patterns.
-# Soft-warns the user when a column lacks an anchor (every
-# entry is NA, so the factor is rotation-invariant). Stronger
-# rank checks can be added if a user pattern motivates them.
-#'@noRd
-warn_partial_z_identification <- function(Z) {
-  fully_free_cols <- which(colSums(!is.na(Z)) == 0L)
-  if (length(fully_free_cols) > 0L &&
-      !identical(Sys.getenv("TESTTHAT"), "true")) {
-    rlang::warn(
-      message = c(
-        paste0(
-          "'trend_map' columns ",
-          paste(fully_free_cols, collapse = ", "),
-          " have no fixed (anchor) entries."
-        ),
-        i = paste0(
-          "Those factors are rotation-invariant; ",
-          "interpretation across runs may differ. Supply at ",
-          "least one numeric loading per column to anchor."
-        )
-      ),
-      .frequency = "once",
-      .frequency_id = "mvgam_partial_z_no_anchor"
-    )
-  }
-  invisible(NULL)
 }
 
 

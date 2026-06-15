@@ -111,14 +111,16 @@ test_that("matrix with all-NA row passes (every entry free)", {
   expect_true(all(is.na(out$Z[1L, ])))
 })
 
-test_that("partial Z with no anchors warns on rotation invariance", {
+test_that("fully-free Z passes validation (Heaps QR identifies it)", {
   # All-NA matrix must be explicitly numeric (NA defaults to
-  # logical, which the matrix branch rejects).
+  # logical, which the matrix branch rejects). Fully-free
+  # columns are identified up to sign by the post-hoc QR
+  # rotation emitted in generate_factor_model(); no warning
+  # about unfixed columns is raised at validation time.
   Z_in <- matrix(NA_real_, nrow = 3L, ncol = 2L)
-  # warn_partial_z_identification skips under TESTTHAT=true, so
-  # we just confirm the matrix branch accepts it. The warning
-  # path is exercised by calling the helper directly below.
-  out <- mvgam:::normalise_trend_map(Z_in, .make_data(3L))
+  expect_no_warning(
+    out <- mvgam:::normalise_trend_map(Z_in, .make_data(3L))
+  )
   expect_equal(sum(is.na(out$Z)), 6L)
 })
 

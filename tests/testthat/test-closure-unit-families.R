@@ -265,6 +265,23 @@ test_that("multi_stan_funs() emits the lpmf body with mu_unit[1] anchor", {
   expect_false(grepl("mu_unit_sums", sc, fixed = TRUE))
 })
 
+test_that("prepare_closure_unit_family() groups multinomial rows by site", {
+  fam <- multi()
+  dat <- make_multi_long_data(n_sites = 5L, n_species = 4L)
+  fam_prep <- mvgam:::prepare_closure_unit_family(
+    fam, dat, response_var = "y",
+    has_obs_covariates = FALSE, has_det_covariates = FALSE
+  )
+  sv <- attr(fam_prep, "mvgam_stanvars", exact = TRUE)
+  expect_false(is.null(sv))
+  expect_identical(fam_prep$vars, c("N_unit", "n_rep", "visit_idx"))
+  mf <- bf(y ~ env, family = fam_prep)
+  sd <- brms::make_standata(mf, data = dat, stanvars = sv)
+  expect_identical(sd$N_unit, 5L)
+  expect_identical(sd$n_rep, rep(4L, 5L))
+  expect_identical(dim(sd$visit_idx), c(5L, 4L))
+})
+
 # ------------------------------------------------------------
 # categ(): family registration + Stan emission for categorical
 # ------------------------------------------------------------
@@ -319,6 +336,23 @@ test_that("categ_stan_funs() emits the lpmf body with mu_unit[1] anchor", {
   expect_match(sc, "vector[Kg] mu_unit = mu[idx] - mu[idx[1]];",
                fixed = TRUE)
   expect_false(grepl("mu_unit_sums", sc, fixed = TRUE))
+})
+
+test_that("prepare_closure_unit_family() groups categorical rows by site", {
+  fam <- categ()
+  dat <- make_categ_long_data(n_sites = 5L, n_categories = 4L)
+  fam_prep <- mvgam:::prepare_closure_unit_family(
+    fam, dat, response_var = "y",
+    has_obs_covariates = FALSE, has_det_covariates = FALSE
+  )
+  sv <- attr(fam_prep, "mvgam_stanvars", exact = TRUE)
+  expect_false(is.null(sv))
+  expect_identical(fam_prep$vars, c("N_unit", "n_rep", "visit_idx"))
+  mf <- bf(y ~ env, family = fam_prep)
+  sd <- brms::make_standata(mf, data = dat, stanvars = sv)
+  expect_identical(sd$N_unit, 5L)
+  expect_identical(sd$n_rep, rep(4L, 5L))
+  expect_identical(dim(sd$visit_idx), c(5L, 4L))
 })
 
 # Shared helper used by mvn() and generate_factor_model() tests.
