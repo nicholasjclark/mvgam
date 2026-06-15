@@ -194,15 +194,10 @@ test_that("check_tweedie_truncation requires a tweedie fit", {
   )
 })
 
-test_that("how_to_cite reference_db includes Tweedie + AIMS entries", {
+test_that("how_to_cite reference_db includes Tweedie entries", {
   db <- mvgam:::reference_db()
   expect_true("jorgensen_tweedie" %in% names(db))
   expect_true("dunn_smyth_tweedie" %in% names(db))
-  expect_true("aims_tweedie_brms" %in% names(db))
-  # AIMS entry must surface the github URL so users can find the
-  # upstream implementation.
-  expect_true(grepl("github.com/open-AIMS/tweedie",
-                    db$aims_tweedie_brms$text))
   # Canonical Tweedie reference (Jorgensen 1987) DOI present.
   expect_true(grepl("10\\.1111/j\\.2517-6161",
                     db$jorgensen_tweedie$text))

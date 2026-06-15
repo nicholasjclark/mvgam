@@ -196,6 +196,43 @@ prior-mean encounter rate). Users supply this as the \code{cap}
 column on the input data.
 }
 
+\section{JSDM with imperfect detection}{
+
+Passing \code{nmix()} to \code{\link[=jsdgam]{jsdgam()}} with \code{n_lv > 0} composes the
+closure-unit marginalisation with the Heaps factor model so the
+user gets a hierarchical JSDM whose three levels each live in
+a distinct dpar:
+
+\describe{
+\item{\strong{lowest level}: env-driven latent factors.}{
+\code{factor_formula = ~ s(env, by = lv_axis())} makes each
+latent factor a smooth of an environmental covariate. The
+factors are identified by their environmental signature
+rather than by being free draws, which removes the
+intercept-vs-Z*lv competition that otherwise hampers
+identification when site-level intercepts are also fit on
+\code{mu}.}
+\item{\strong{middle level}: species loadings.}{Each species \code{s}
+loads on the \code{K} factors via the row \verb{Z[s, :]}, so
+\verb{log_lambda[s, i] = b_X(species) + Z[s, :] \%*\% lv[i, :]}
+for site \code{i}. \code{Z} is identified up to sign via Heaps and
+Jermyn (2024) post-hoc QR.}
+\item{\strong{top level}: imperfect detection.}{The \code{p} dpar
+carries its own brms sub-formula (e.g.,
+\code{bf(y ~ species, p ~ visit_effort)}) so the detection
+process is modelled independently of the latent abundance.
+The lpmf marginalises latent \code{N} per closure unit; nothing
+about the factor model has to be aware of the
+marginalisation, and nothing about the marginalisation has
+to be aware of the factor model.}
+}
+
+Recovery on this composition is documented in
+\code{tests/local/jsdgam_mv_nmix.R}. See \code{\link[=jsdgam]{jsdgam()}} for the
+wrapper-level API and \code{\link[=lv_axis]{lv_axis()}} for the \code{by = lv_axis()}
+sentinel that turns smooths into per-factor regressors.
+}
+
 \examples{
 \dontrun{
 # Constant detection probability, abundance varies with elevation

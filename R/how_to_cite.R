@@ -430,19 +430,6 @@ reference_db <- function() {
         sep = "\n"
       )
     ),
-    aims_tweedie_brms = list(
-      text = "Australian Institute of Marine Science (2023). open-AIMS/tweedie: brms custom_family implementation of the Tweedie compound Poisson-gamma distribution. https://github.com/open-AIMS/tweedie",
-      bibtex = paste(
-        "@misc{aims2023tweedie,",
-        "  title = {{open-AIMS/tweedie}: a {brms} {custom\\_family} implementation of the {T}weedie compound {P}oisson-gamma distribution},",
-        "  author = {{Australian Institute of Marine Science}},",
-        "  year = {2023},",
-        "  url = {https://github.com/open-AIMS/tweedie},",
-        "  note = {MIT licensed}",
-        "}",
-        sep = "\n"
-      )
-    ),
     neyman_type_a_1939 = list(
       text = "Neyman J (1939). On a new class of contagious distributions, applicable in entomology and bacteriology. Annals of Mathematical Statistics, 10(1), 35-57. https://doi.org/10.1214/aoms/1177732245",
       bibtex = paste(
@@ -567,20 +554,6 @@ reference_db <- function() {
         sep = "\n"
       )
     ),
-    socolar_flocker_2023 = list(
-      text = "Socolar JB and Mills SC (2023). flocker: flexible occupancy estimation with Stan. bioRxiv. https://doi.org/10.1101/2023.10.26.564080 (GitHub: https://github.com/jsocolar/flocker)",
-      bibtex = paste(
-        "@article{socolar2023flocker,",
-        "  title = {flocker: flexible occupancy estimation with Stan},",
-        "  author = {Socolar, Jacob B. and Mills, Simon C.},",
-        "  journal = {bioRxiv},",
-        "  year = {2023},",
-        "  doi = {10.1101/2023.10.26.564080},",
-        "  url = {https://github.com/jsocolar/flocker}",
-        "}",
-        sep = "\n"
-      )
-    ),
     niku_gllvm_2019 = list(
       text = "Niku J, Brooks W, Herliansyah R, Hui FKC, Taskinen S and Warton DI (2019). Efficient estimation of generalized linear latent variable models. PLoS ONE, 14(5), e0216129. https://doi.org/10.1371/journal.pone.0216129",
       bibtex = paste(
@@ -687,6 +660,7 @@ uses_mv_continuous_response <- function(object) {
   is_multi_response_family(object$family) &&
     !is_simplex_response_family(object$family)
 }
+
 
 
 # Predicate: was the fit produced by the jsdgam() wrapper? Keys
@@ -820,15 +794,11 @@ how_to_cite.mvgam <- function(object, ...) {
       detect = uses_tweedie_family(object),
       text = paste0(
         " Observations were modelled with the Tweedie compound",
-        " Poisson-gamma family (Jorgensen 1987), with the Stan",
+        " Poisson-gamma family (Jorgensen 1987), with the",
         " log-density evaluated via the truncated Poisson-gamma",
-        " series of Dunn and Smyth (2005). The brms",
-        " custom_family wiring is adapted from the AIMS",
-        " open-AIMS/tweedie implementation",
-        " (Australian Institute of Marine Science 2023)."
+        " series of Dunn and Smyth (2005)."
       ),
-      refs = c("jorgensen_tweedie", "dunn_smyth_tweedie",
-               "aims_tweedie_brms")
+      refs = c("jorgensen_tweedie", "dunn_smyth_tweedie")
     ),
     list(
       detect = uses_nmix_family(object),
@@ -897,14 +867,12 @@ how_to_cite.mvgam <- function(object, ...) {
         " the single-season Bernoulli-binomial occupancy family",
         " (MacKenzie et al. 2002), with the latent occupancy state",
         " marginalised analytically per closure unit via",
-        " log-sum-exp; the custom-family scaffold follows the",
-        " flocker pattern (Socolar and Mills 2023) and the",
-        " hierarchical framing of Royle and Dorazio (2008)."
+        " log-sum-exp under the hierarchical framing of Royle and",
+        " Dorazio (2008)."
       ),
       refs = c(
         "mackenzie_occu_2002",
-        "royle_dorazio_2008",
-        "socolar_flocker_2023"
+        "royle_dorazio_2008"
       )
     ),
     list(

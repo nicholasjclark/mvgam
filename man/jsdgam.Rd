@@ -89,7 +89,17 @@ for the conventions.}
 
 \item{n_lv}{\code{integer}. Number of latent factors to use for
 modelling residual associations. Must be \verb{>= 1} and strictly
-less than the number of species. Defaults to \code{2}.}
+less than the number of species. Defaults to \code{2}.
+
+Under the default \code{loadings_prior} (iid \code{student_t(3, 0, 1)}
+or kernel-driven shrinkage) \code{n_lv} is the exact factor count
+that enters the likelihood. Under the multiplicative gamma
+process prior (\code{loadings_prior = "mgp"}) the prior shrinks
+later columns of \code{Z} toward zero so \code{n_lv} becomes a
+truncation ceiling: pick a value at or above the rank you
+want to admit and let the data prune unused columns. See
+\code{\link[=active_factors]{active_factors()}} for a posterior summary of how many
+columns the data actually used.}
 
 \item{traits}{Optional per-species feature \code{data.frame}, matrix,
 or single string referencing a slot in \code{data2}. Rows correspond

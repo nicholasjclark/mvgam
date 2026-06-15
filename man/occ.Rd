@@ -60,6 +60,41 @@ referenced in the formulae. Multiple rows sharing the same
 unit. The \code{cap} column required by \code{nmix()} is implicit at
 \code{1} for \code{occ()} and need not be supplied.
 }
+\section{JSDM with imperfect detection}{
+
+Passing \code{occ()} to \code{\link[=jsdgam]{jsdgam()}} with \code{n_lv > 0} composes the
+single-season Bernoulli marginalisation with the Heaps factor
+model so the user gets a hierarchical JSDM whose three levels
+each live in a distinct dpar:
+
+\describe{
+\item{\strong{lowest level}: env-driven latent factors.}{
+\code{factor_formula = ~ s(env, by = lv_axis())} makes each
+latent factor a smooth of an environmental covariate, so
+the factors track env gradients rather than being free
+draws.}
+\item{\strong{middle level}: species loadings on occupancy.}{Each
+species \code{s} loads on the \code{K} factors via the row
+\verb{Z[s, :]}, so
+\verb{logit_psi[s, i] = b_X(species) + Z[s, :] \%*\% lv[i, :]}
+for site \code{i}. \code{Z} is identified up to sign via Heaps and
+Jermyn (2024) post-hoc QR.}
+\item{\strong{top level}: imperfect detection.}{The \code{p} dpar
+carries its own brms sub-formula (e.g.,
+\code{bf(y ~ species, p ~ s(tod))}) so the per-visit detection
+process is modelled independently of the latent occupancy
+state. The lpmf marginalises latent \code{z} per closure unit;
+nothing about the factor model has to be aware of the
+marginalisation, and nothing about the marginalisation has
+to be aware of the factor model.}
+}
+
+Recovery on this composition is documented in
+\code{tests/local/jsdgam_mv_occ.R}. See \code{\link[=jsdgam]{jsdgam()}} for the
+wrapper-level API and \code{\link[=lv_axis]{lv_axis()}} for the \code{by = lv_axis()}
+sentinel that turns smooths into per-factor regressors.
+}
+
 \section{Cross-reference with ubms / spOccupancy / flocker}{
 
 mvgam's \code{occ()} uses the long-form ecology vocabulary

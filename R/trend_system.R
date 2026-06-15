@@ -2271,6 +2271,15 @@ print.mvgam_trend <- function(x, ...) {
 #' prior built from per-series features and / or pairwise distance
 #' matrices; see \code{\link{mvgam}} for the full surface.
 #'
+#' Setting \code{loadings_prior = "mgp"} (or
+#' \code{loadings_prior = list(column_shrinkage = "mgp")}) switches
+#' the column scaling to the multiplicative gamma process prior of
+#' Bhattacharya & Dunson (2011), which shrinks later columns of `Z`
+#' toward zero with increasing strength. Under this prior `n_lv`
+#' acts as a truncation ceiling rather than the exact factor count;
+#' \code{\link{active_factors}} reports the posterior distribution of
+#' the active column count.
+#'
 #' @references
 #' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
 #' distributions for the covariance matrix in latent factor
@@ -3006,6 +3015,15 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #' default iid Student-t prior on `Z` for a structured matrix-normal
 #' prior built from per-series features and / or pairwise distance
 #' matrices; see \code{\link{mvgam}} for the full surface.
+#'
+#' Setting \code{loadings_prior = "mgp"} (or
+#' \code{loadings_prior = list(column_shrinkage = "mgp")}) switches
+#' the column scaling to the multiplicative gamma process prior of
+#' Bhattacharya & Dunson (2011), which shrinks later columns of `Z`
+#' toward zero with increasing strength. Under this prior `n_lv`
+#' acts as a truncation ceiling rather than the exact factor count;
+#' \code{\link{active_factors}} reports the posterior distribution of
+#' the active column count.
 #'
 #' @references
 #' Heaps, S. E. and Jermyn, I. H. (2024). Structured prior

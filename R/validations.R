@@ -5118,6 +5118,15 @@ format_pipeline_error <- function(message, context = NULL) {
 normalise_loadings_prior <- function(input, data2, data,
                                      n_series = NULL) {
   if (is.null(input)) return(NULL)
+  # String shorthand: `loadings_prior = "mgp"` is sugar for
+  # `loadings_prior = list(column_shrinkage = "mgp")` with default
+  # MGP hyperparameters (a1 = 2, a2 = 3). Pure MGP (no features /
+  # distances) is the Bhattacharya & Dunson (2011) parameterisation
+  # and is mathematically defined for any positive integer n_lv.
+  if (is.character(input) && length(input) == 1L) {
+    checkmate::assert_choice(input, "mgp")
+    input <- list(column_shrinkage = input)
+  }
   checkmate::assert_list(input, names = "named")
   allowed <- c(
     "features", "distances", "column_shrinkage",
@@ -5137,11 +5146,13 @@ normalise_loadings_prior <- function(input, data2, data,
       )
     )))
   }
-  if (is.null(input$features) && is.null(input$distances)) {
+  uses_mgp_shorthand <- identical(input$column_shrinkage, "mgp")
+  if (is.null(input$features) && is.null(input$distances) &&
+      !uses_mgp_shorthand) {
     stop(insight::format_error(c(
       paste0(
         "'loadings_prior' must supply at least one of ",
-        "'features' or 'distances'."
+        "'features', 'distances', or 'column_shrinkage = \"mgp\"'."
       ),
       i = paste0(
         "An empty spec collapses to the default iid prior; ",

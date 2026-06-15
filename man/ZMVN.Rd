@@ -89,6 +89,15 @@ on \code{Z}. Combine a free factor model with the optional
 default iid Student-t prior on \code{Z} for a structured matrix-normal
 prior built from per-series features and / or pairwise distance
 matrices; see \code{\link{mvgam}} for the full surface.
+
+Setting \code{loadings_prior = "mgp"} (or
+\code{loadings_prior = list(column_shrinkage = "mgp")}) switches
+the column scaling to the multiplicative gamma process prior of
+Bhattacharya & Dunson (2011), which shrinks later columns of \code{Z}
+toward zero with increasing strength. Under this prior \code{n_lv}
+acts as a truncation ceiling rather than the exact factor count;
+\code{\link{active_factors}} reports the posterior distribution of
+the active column count.
 }
 
 \examples{

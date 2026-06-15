@@ -1058,8 +1058,7 @@ build_closure_unit_arrays <- function(data,
 #' prior-mean encounter rate). Users supply this as the `cap`
 #' column on the input data.
 #'
-#' @section Joint species distribution modelling with imperfect
-#'   detection:
+#' @section JSDM with imperfect detection:
 #' Passing `nmix()` to [jsdgam()] with `n_lv > 0` composes the
 #' closure-unit marginalisation with the Heaps factor model so the
 #' user gets a hierarchical JSDM whose three levels each live in
@@ -1242,8 +1241,7 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #'   occupancy estimation in R. *bioRxiv*.
 #'   \doi{10.1101/2023.10.26.564080}.
 #'
-#' @section Joint species distribution modelling with imperfect
-#'   detection:
+#' @section JSDM with imperfect detection:
 #' Passing `occ()` to [jsdgam()] with `n_lv > 0` composes the
 #' single-season Bernoulli marginalisation with the Heaps factor
 #' model so the user gets a hierarchical JSDM whose three levels

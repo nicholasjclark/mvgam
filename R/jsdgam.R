@@ -89,6 +89,16 @@
 #'   modelling residual associations. Must be `>= 1` and strictly
 #'   less than the number of species. Defaults to `2`.
 #'
+#'   Under the default `loadings_prior` (iid `student_t(3, 0, 1)`
+#'   or kernel-driven shrinkage) `n_lv` is the exact factor count
+#'   that enters the likelihood. Under the multiplicative gamma
+#'   process prior (`loadings_prior = "mgp"`) the prior shrinks
+#'   later columns of `Z` toward zero so `n_lv` becomes a
+#'   truncation ceiling: pick a value at or above the rank you
+#'   want to admit and let the data prune unused columns. See
+#'   [active_factors()] for a posterior summary of how many
+#'   columns the data actually used.
+#'
 #' @param share_obs_params Logical. Forwarded to `mvgam`.
 #'
 #' @param priors Optional `data.frame` or `brmsprior` vector with

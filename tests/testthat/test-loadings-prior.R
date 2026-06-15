@@ -91,14 +91,58 @@ test_that("normalise_loadings_prior errors on unknown spec fields", {
   )
 })
 
-test_that("normalise_loadings_prior errors when both features and distances are NULL", {
+test_that("normalise_loadings_prior errors when features, distances, and mgp are all absent", {
   data <- make_test_data(3L)
   expect_error(
     normalise_loadings_prior(
-      list(column_shrinkage = "mgp"), data2 = NULL, data = data
+      list(), data2 = NULL, data = data
     ),
-    "at least one of 'features' or 'distances'"
+    "at least one of"
   )
+})
+
+test_that("normalise_loadings_prior accepts pure MGP (no features / distances)", {
+  data <- make_test_data(4L)
+  spec <- normalise_loadings_prior(
+    list(column_shrinkage = "mgp"), data2 = NULL, data = data
+  )
+  expect_identical(spec$column_shrinkage, "mgp")
+  expect_null(spec$features_mat)
+  expect_identical(spec$n_features, 0L)
+  expect_identical(spec$n_distances, 0L)
+  expect_equal(spec$mgp_a1, 2)
+  expect_equal(spec$mgp_a2, 3)
+})
+
+test_that("normalise_loadings_prior accepts string shorthand 'mgp'", {
+  data <- make_test_data(4L)
+  spec <- normalise_loadings_prior(
+    "mgp", data2 = NULL, data = data
+  )
+  expect_identical(spec$column_shrinkage, "mgp")
+  expect_null(spec$features_mat)
+  expect_equal(spec$mgp_a1, 2)
+  expect_equal(spec$mgp_a2, 3)
+})
+
+test_that("make_loadings_prior_stanvars for pure MGP emits elementwise normal Z prior", {
+  data <- make_test_data(4L)
+  spec <- normalise_loadings_prior(
+    list(column_shrinkage = "mgp"), data2 = NULL, data = data
+  )
+  sv <- make_loadings_prior_stanvars(spec)
+  sc <- paste(vapply(sv, function(s) s$scode, character(1L)),
+              collapse = "\n")
+  # No Phi / Cholesky construction in the pure-MGP path.
+  expect_false(grepl("Phi_loadings", sc, fixed = TRUE))
+  expect_false(grepl("L_Phi_loadings", sc, fixed = TRUE))
+  # Elementwise normal per column with Psi_diag scale.
+  expect_match(sc, "Z[, i_z] ~ normal(0, sqrt(Psi_diag[i_z]));",
+               fixed = TRUE)
+  # MGP plumbing still emitted.
+  expect_match(sc, "varrho_inv", fixed = TRUE)
+  expect_match(sc, "Psi_diag = exp(cumulative_sum(log(varrho_inv)));",
+               fixed = TRUE)
 })
 
 test_that("normalise_loadings_prior accepts column_shrinkage = 'mgp' with defaults", {

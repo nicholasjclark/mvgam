@@ -3194,64 +3194,66 @@ make_loadings_prior_stanvars <- function(spec) {
   }
   # Phi assembly. Build the matrix multiplicatively across the
   # supplied sources (Heaps' `projExpCov_variance_matrix`,
-  # multiprobitregr.stan lines 16-29). Start from a p x p matrix
-  # of ones (Phi = 1 elementwise when neither features nor
-  # distances are supplied is degenerate, but the normaliser
-  # already errors on that case). Each distance contributes a
+  # multiprobitregr.stan lines 16-29). Each distance contributes a
   # factor exp(-d / theta_dist) and the feature block contributes
-  # one ARD `gp_exponential_cov`.
-  phi_terms <- character(0)
-  if (has_distances) {
-    for (nm in dist_names) {
+  # one ARD `gp_exponential_cov`. Pure-MGP (no kernel) skips the
+  # Phi block entirely and emits an elementwise normal prior on Z
+  # below (Bhattacharya & Dunson 2011 parameterisation).
+  has_kernel <- has_features || has_distances
+  if (has_kernel) {
+    phi_terms <- character(0)
+    if (has_distances) {
+      for (nm in dist_names) {
+        phi_terms <- c(
+          phi_terms,
+          paste0("exp(-dist_", nm, " / theta_dist_", nm, ")")
+        )
+      }
+    }
+    if (has_features) {
       phi_terms <- c(
         phi_terms,
-        paste0("exp(-dist_", nm, " / theta_dist_", nm, ")")
+        paste0(
+          "gp_exponential_cov(row_features_arr, 1.0, theta_features)"
+        )
       )
     }
-  }
-  if (has_features) {
-    phi_terms <- c(
-      phi_terms,
+    phi_lines <- if (length(phi_terms) == 1L) {
+      c(
+        paste0(
+          "matrix[N_series_trend, N_series_trend] Phi_loadings = ",
+          phi_terms, ";"
+        )
+      )
+    } else {
+      c(
+        "matrix[N_series_trend, N_series_trend] Phi_loadings;",
+        "{",
+        paste0(
+          "  Phi_loadings = ",
+          paste(phi_terms, collapse = " .* "), ";"
+        ),
+        "}"
+      )
+    }
+    # Add a tiny diagonal jitter before factorising to keep the
+    # Cholesky stable when supplied kernels are near-singular.
+    chol_lines <- c(
+      phi_lines,
       paste0(
-        "gp_exponential_cov(row_features_arr, 1.0, theta_features)"
+        "matrix[N_series_trend, N_series_trend] L_Phi_loadings = ",
+        "cholesky_decompose(",
+        "add_diag(Phi_loadings, 1e-8));"
       )
     )
-  }
-  phi_lines <- if (length(phi_terms) == 1L) {
-    c(
-      paste0(
-        "matrix[N_series_trend, N_series_trend] Phi_loadings = ",
-        phi_terms, ";"
+    tparam_vars <- c(tparam_vars, list(
+      brms::stanvar(
+        name = "loadings_prior_chol",
+        scode = paste(chol_lines, collapse = "\n"),
+        block = "tparameters"
       )
-    )
-  } else {
-    c(
-      "matrix[N_series_trend, N_series_trend] Phi_loadings;",
-      "{",
-      paste0(
-        "  Phi_loadings = ",
-        paste(phi_terms, collapse = " .* "), ";"
-      ),
-      "}"
-    )
+    ))
   }
-  # Add a tiny diagonal jitter before factorising to keep the
-  # Cholesky stable when supplied kernels are near-singular.
-  chol_lines <- c(
-    phi_lines,
-    paste0(
-      "matrix[N_series_trend, N_series_trend] L_Phi_loadings = ",
-      "cholesky_decompose(",
-      "add_diag(Phi_loadings, 1e-8));"
-    )
-  )
-  tparam_vars <- c(tparam_vars, list(
-    brms::stanvar(
-      name = "loadings_prior_chol",
-      scode = paste(chol_lines, collapse = "\n"),
-      block = "tparameters"
-    )
-  ))
   if (uses_mgp) {
     data_vars <- c(data_vars, list(
       brms::stanvar(
@@ -3299,9 +3301,22 @@ make_loadings_prior_stanvars <- function(spec) {
       )
     ))
   }
-  # Per-column Z prior. Under iid shrinkage Psi_diag is implicit
-  # 1, so the column scale collapses to L_Phi unchanged.
-  z_lines <- if (uses_mgp) {
+  # Per-column Z prior. Three branches:
+  #   - kernel + MGP: multi_normal_cholesky with L_Phi * sqrt(Psi)
+  #   - kernel only:  multi_normal_cholesky with L_Phi (Psi implicit = 1)
+  #   - pure MGP (no kernel): elementwise normal(0, sqrt(Psi_diag[h]))
+  #     per column. Bhattacharya & Dunson (2011) parameterisation;
+  #     equivalent to multi_normal_cholesky on an identity Phi but
+  #     avoids the p x p Cholesky and works cleanly with simplex
+  #     families' `sum_to_zero_vector[K]` Z columns where rank-
+  #     deficient covariances would be awkward.
+  z_lines <- if (uses_mgp && !has_kernel) {
+    c(
+      "for (i_z in 1:N_lv_trend) {",
+      "  Z[, i_z] ~ normal(0, sqrt(Psi_diag[i_z]));",
+      "}"
+    )
+  } else if (uses_mgp) {
     c(
       "for (i_z in 1:N_lv_trend) {",
       "  Z[, i_z] ~ multi_normal_cholesky(",
