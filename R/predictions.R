@@ -2281,14 +2281,24 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   # Create mock stanfit object
   mock_fit <- create_mock_stanfit(component_draws)
 
-  # Generate prep object
+  # Generate prep object. Trend submodels are linpred-only (the
+  # latent state arrives via incl_latent_state below); their
+  # gaussian family slot is a brms-side bookkeeping artefact and
+  # the `sigma_trend[]` parameters are per-LV process noise, not
+  # observation residual SDs. Pass `linpred_only = TRUE` so
+  # prepare_predictions.mock_stanfit() skips the observation-dpar
+  # extraction that would otherwise misinterpret `sigma_trend[1..n_lv]`
+  # (renamed to `sigma[]` by the _trend infix stripper) as a per-
+  # observation sigma dpar.
+  linpred_only <- identical(component, "trend")
   prep <- prepare_predictions.mock_stanfit(
     object = mock_fit,
     brmsfit = brms_model,
     newdata = newdata,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
-    sample_new_levels = sample_new_levels
+    sample_new_levels = sample_new_levels,
+    linpred_only = linpred_only
   )
 
   # For dpar components the obs_model's standata carries both

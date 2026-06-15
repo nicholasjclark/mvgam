@@ -271,6 +271,7 @@ prepare_predictions.mock_stanfit <- function(object,
                                               re_formula = NULL,
                                               allow_new_levels = FALSE,
                                               sample_new_levels = "uncertainty",
+                                              linpred_only = FALSE,
                                               ...) {
   # Validate core object types
   checkmate::assert_class(object, "mock_stanfit")
@@ -403,6 +404,17 @@ prepare_predictions.mock_stanfit <- function(object,
     ),
     class = c("brmsprep", "mvgam_prep")
   )
+
+  # Linpred-only callers (trend submodel; see
+  # extract_component_linpred() in R/predictions.R) skip the dpar
+  # extraction entirely. Trend submodels carry per-LV process noise
+  # in `sigma_trend[]` (renamed by the `_trend` infix stripper to
+  # `sigma[]`); those are not observation-level residual SDs and
+  # the brms-style dpar lookup would misinterpret them as a
+  # `gaussian()$dpars = c("sigma")` per-row sigma matrix.
+  if (linpred_only) {
+    return(prep)
+  }
 
   # Populate dpars based on model type. Three cases:
   # - Nonlinear: mu computed from formula evaluation
