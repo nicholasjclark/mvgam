@@ -1058,6 +1058,42 @@ build_closure_unit_arrays <- function(data,
 #' prior-mean encounter rate). Users supply this as the `cap`
 #' column on the input data.
 #'
+#' @section Joint species distribution modelling with imperfect
+#'   detection:
+#' Passing `nmix()` to [jsdgam()] with `n_lv > 0` composes the
+#' closure-unit marginalisation with the Heaps factor model so the
+#' user gets a hierarchical JSDM whose three levels each live in
+#' a distinct dpar:
+#'
+#' \describe{
+#'   \item{**lowest level**: env-driven latent factors.}{
+#'     `factor_formula = ~ s(env, by = lv_axis())` makes each
+#'     latent factor a smooth of an environmental covariate. The
+#'     factors are identified by their environmental signature
+#'     rather than by being free draws, which removes the
+#'     intercept-vs-Z*lv competition that otherwise hampers
+#'     identification when site-level intercepts are also fit on
+#'     `mu`.}
+#'   \item{**middle level**: species loadings.}{Each species `s`
+#'     loads on the `K` factors via the row `Z[s, :]`, so
+#'     `log_lambda[s, i] = b_X(species) + Z[s, :] %*% lv[i, :]`
+#'     for site `i`. `Z` is identified up to sign via Heaps and
+#'     Jermyn (2024) post-hoc QR.}
+#'   \item{**top level**: imperfect detection.}{The `p` dpar
+#'     carries its own brms sub-formula (e.g.,
+#'     `bf(y ~ species, p ~ visit_effort)`) so the detection
+#'     process is modelled independently of the latent abundance.
+#'     The lpmf marginalises latent `N` per closure unit; nothing
+#'     about the factor model has to be aware of the
+#'     marginalisation, and nothing about the marginalisation has
+#'     to be aware of the factor model.}
+#' }
+#'
+#' Recovery on this composition is documented in
+#' `tests/local/jsdgam_mv_nmix.R`. See [jsdgam()] for the
+#' wrapper-level API and [lv_axis()] for the `by = lv_axis()`
+#' sentinel that turns smooths into per-factor regressors.
+#'
 #' @references
 #' Royle, J. A., and Nichols, J. D. (2003). Estimating abundance
 #'   from repeated presence-absence data or point counts.
@@ -1205,6 +1241,40 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #' Socolar, J. B., & Mills, S. C. (2023). flocker: flexible
 #'   occupancy estimation in R. *bioRxiv*.
 #'   \doi{10.1101/2023.10.26.564080}.
+#'
+#' @section Joint species distribution modelling with imperfect
+#'   detection:
+#' Passing `occ()` to [jsdgam()] with `n_lv > 0` composes the
+#' single-season Bernoulli marginalisation with the Heaps factor
+#' model so the user gets a hierarchical JSDM whose three levels
+#' each live in a distinct dpar:
+#'
+#' \describe{
+#'   \item{**lowest level**: env-driven latent factors.}{
+#'     `factor_formula = ~ s(env, by = lv_axis())` makes each
+#'     latent factor a smooth of an environmental covariate, so
+#'     the factors track env gradients rather than being free
+#'     draws.}
+#'   \item{**middle level**: species loadings on occupancy.}{Each
+#'     species `s` loads on the `K` factors via the row
+#'     `Z[s, :]`, so
+#'     `logit_psi[s, i] = b_X(species) + Z[s, :] %*% lv[i, :]`
+#'     for site `i`. `Z` is identified up to sign via Heaps and
+#'     Jermyn (2024) post-hoc QR.}
+#'   \item{**top level**: imperfect detection.}{The `p` dpar
+#'     carries its own brms sub-formula (e.g.,
+#'     `bf(y ~ species, p ~ s(tod))`) so the per-visit detection
+#'     process is modelled independently of the latent occupancy
+#'     state. The lpmf marginalises latent `z` per closure unit;
+#'     nothing about the factor model has to be aware of the
+#'     marginalisation, and nothing about the marginalisation has
+#'     to be aware of the factor model.}
+#' }
+#'
+#' Recovery on this composition is documented in
+#' `tests/local/jsdgam_mv_occ.R`. See [jsdgam()] for the
+#' wrapper-level API and [lv_axis()] for the `by = lv_axis()`
+#' sentinel that turns smooths into per-factor regressors.
 #'
 #' @section Cross-reference with ubms / spOccupancy / flocker:
 #' mvgam's `occ()` uses the long-form ecology vocabulary
@@ -2458,25 +2528,37 @@ make_mvt_stanvars <- function(arrays) {
 #' Stan function block for the closure-unit N-mixture lpmf
 #'
 #' Implements the Royle (2004) Poisson-binomial marginalisation
-#' over the latent abundance N as a `log_sum_exp` across the
-#' truncated range `max(y[g, ]) <= k <= K_max[g]`. Each k value
-#' scores the joint Poisson-Binomial log-probability of
-#' (latent = k, observed visit counts); the sum gives the
-#' closure-unit marginal log-likelihood. Below `max(y[g, ])`
-#' the closure constraint forces zero probability, encoded as
-#' `negative_infinity()` in the lp vector.
+#' over the latent abundance N via an analytic ratio recurrence in
+#' log space. The marginal sum
+#' \deqn{S = \sum_{N=K_{\min}}^{K_{\max}} \text{Poisson}(N\mid\lambda)
+#'           \prod_v \text{Binomial}(y_v\mid N, p_v)}
+#' factors as \eqn{T_{K_{\min}} \cdot (1 + r_1 + r_1 r_2 + \ldots)}
+#' with consecutive-term ratio
+#' \deqn{T_N / T_{N-1} = (\lambda / N) \prod_v ((1 - p_v) \cdot N/(N - y_v)).}
+#' Pulling \eqn{ff = \lambda \prod_v (1 - p_v)} out front, the
+#' nested Horner form evaluates the sum from
+#' \eqn{N = K_{\max}} down to \eqn{N = K_{\min} + 1} in
+#' \eqn{O(\text{possible\_N} \cdot \text{n\_visits})} cheap operations
+#' rather than the naive log-sum-exp's \eqn{O(K_{\max} \cdot \text{n\_visits})}
+#' `lgamma` evaluations.
 #'
-#' Numerical-stability notes:
-#'   - `mu` arrives from brms as the exponentiated linear
-#'     predictor (positive rate); converting back to
-#'     `log_mu = log(mu)` keeps the inner `poisson_log_lpmf`
-#'     form stable for large abundance values.
-#'   - `p` arrives from brms as the inv-logit linear predictor
-#'     (probability); converting back to
-#'     `logit_p = logit(p)` keeps `binomial_logit_lpmf` stable
-#'     at probabilities close to 0 or 1.
-#'   - `log_sum_exp` handles the `-Inf` entries below
-#'     `max(y[g, ])` without underflow.
+#' Numerical-stability strategy. The accumulation runs in log
+#' space (`log_sum_exp(0, log_prob_n + log_ff + log_k_obs - log(N))`)
+#' so the recurrence remains finite for any
+#' \eqn{(\lambda, p, \text{possible\_N})} within Stan's representable
+#' range. The linear-space form used in earlier mvgam releases
+#' overflows in the high-detection / large-window corner (e.g.,
+#' \eqn{\lambda=50, p=0.95, V=5, \text{possible\_N}=50}); the log-space
+#' form is unconditionally stable at the cost of one `log_sum_exp`
+#' per iteration. The loop bounds guarantee
+#' \eqn{N \geq K_{\min} + 1 > \max(y_v)} so the per-visit
+#' denominator \eqn{N - y_v \geq 1} throughout the recurrence,
+#' ruling out the only other numerical hazard.
+#'
+#' The baseline term `poisson_log_lpmf(K_min | log_lam) +
+#' binomial_logit_lpmf(counts | K_min, lp_visits)` accounts for
+#' \eqn{T_{K_{\min}}} and is added once per closure unit; the
+#' recurrence supplies the additional `log_prob_n` contribution.
 #'
 #' @param max_rep Positive integer maximum visit count across
 #'   closure units. Sets the column count of `visit_idx`. The
@@ -2501,30 +2583,44 @@ nmix_stan_funs <- function(max_rep) {
     "    array[] int Y_max,",
     "    array[,] int visit_idx) {",
     "    real lp = 0;",
-    "    // Convert dpars back to link scale for numerically",
-    "    // stable lpmf forms.",
-    "    vector[num_elements(mu)] log_mu    = log(mu);",
-    "    vector[num_elements(p)]  logit_p   = logit(p);",
+    "    // Convert dpars back to link scale for the baseline",
+    "    // poisson_log_lpmf / binomial_logit_lpmf forms.",
+    "    vector[num_elements(mu)] log_mu  = log(mu);",
+    "    vector[num_elements(p)]  logit_p = logit(p);",
     "    for (g in 1 : N_unit) {",
-    "      int Kg = K_max[g];",
-    "      int cmax = Y_max[g];",
+    "      int K_max_g    = K_max[g];",
+    "      int K_min_g    = Y_max[g];",
+    "      int possible_N = K_max_g - K_min_g;",
     "      array[n_rep[g]] int idx = visit_idx[g, 1:n_rep[g]];",
-    "      // lambda is constant within a closure unit; pull it",
-    "      // from the first visit's linear predictor.",
-    "      real log_lam = log_mu[idx[1]];",
+    "      real log_lam              = log_mu[idx[1]];",
     "      array[n_rep[g]] int counts = y[idx];",
     "      vector[n_rep[g]] lp_visits = logit_p[idx];",
-    "      vector[Kg + 1] component_lps;",
-    "      // Closure: k < cmax is impossible because every visit",
-    "      // observed cmax or fewer, never more.",
-    "      for (k in 0 : (cmax - 1)) {",
-    "        component_lps[k + 1] = negative_infinity();",
+    "      // Analytic marginalisation via the ratio recurrence",
+    "      //   T_N / T_{N-1} = (ff / N) * prod_v (N / (N - y_v))",
+    "      // with ff = lambda * prod_v (1 - p_v). The log-space",
+    "      // Horner form below evaluates",
+    "      //   log(1 + r_1 + r_1*r_2 + ... + r_1*...*r_M)",
+    "      // backward from N = K_max down to N = K_min + 1. See",
+    "      // ?nmix_stan_funs (R/families.R) for the stability",
+    "      // rationale; log_sum_exp inside the loop keeps prob_n",
+    "      // finite for any realistic (lambda, p, possible_N).",
+    "      real log_ff     = log_lam + sum(log1m(p[idx]));",
+    "      real log_prob_n = 0; // log(1)",
+    "      for (i in 1 : possible_N) {",
+    "        real N         = K_max_g - i + 1;",
+    "        real log_N     = log(N);",
+    "        real log_k_obs = 0;",
+    "        // Loop bounds guarantee N >= K_min_g + 1 > max(counts)",
+    "        // so N - counts[j] >= 1; no division-by-zero possible.",
+    "        for (j in 1 : n_rep[g]) {",
+    "          log_k_obs += log_N - log(N - counts[j]);",
+    "        }",
+    "        log_prob_n = log_sum_exp(0,",
+    "          log_prob_n + log_ff + log_k_obs - log_N);",
     "      }",
-    "      for (k in cmax : Kg) {",
-    "        component_lps[k + 1] = poisson_log_lpmf(k | log_lam)",
-    "          + binomial_logit_lpmf(counts | k, lp_visits);",
-    "      }",
-    "      lp += log_sum_exp(component_lps);",
+    "      lp += poisson_log_lpmf(K_min_g | log_lam)",
+    "          + binomial_logit_lpmf(counts | K_min_g, lp_visits)",
+    "          + log_prob_n;",
     "    }",
     "    return lp;",
     "  }",

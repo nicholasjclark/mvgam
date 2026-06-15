@@ -949,10 +949,26 @@ test_that("stancode under nmix() includes the lpdf signature and data declaratio
   expect_match(sc, "vector mu,", fixed = TRUE)
   expect_match(sc, "vector p,", fixed = TRUE)
   expect_match(sc, "real p,", fixed = TRUE)  # scalar broadcast entry point
-  # Stable lpmf forms used inside the loop.
-  expect_match(sc, "poisson_log_lpmf(k | log_lam)", fixed = TRUE)
-  expect_match(sc, "binomial_logit_lpmf(counts | k, lp_visits)", fixed = TRUE)
-  expect_match(sc, "log_sum_exp(component_lps)", fixed = TRUE)
+  # Log-space ratio recurrence: per-unit baseline at K_min_g plus
+  # the Horner accumulation inside the marginalisation loop. The
+  # recurrence avoids the per-k binomial_logit_lpmf re-evaluation
+  # that the naive log_sum_exp form pays.
+  expect_match(sc, "poisson_log_lpmf(K_min_g | log_lam)", fixed = TRUE)
+  expect_match(
+    sc, "binomial_logit_lpmf(counts | K_min_g, lp_visits)",
+    fixed = TRUE
+  )
+  expect_match(sc, "real log_ff = log_lam + sum(log1m(p[idx]));",
+               fixed = TRUE)
+  expect_match(sc, "for (i in 1 : possible_N)", fixed = TRUE)
+  expect_match(
+    sc,
+    "log_prob_n = log_sum_exp(0, log_prob_n + log_ff + log_k_obs - log_N);",
+    fixed = TRUE
+  )
+  # No remnants of the old vectorised log-sum-exp loop.
+  expect_false(grepl("component_lps", sc, fixed = TRUE))
+  expect_false(grepl("poisson_log_lpmf(k | log_lam)", sc, fixed = TRUE))
   # Data block: closure-unit arrays at unit length, not visit length.
   expect_match(sc, "int<lower=1> N_unit;", fixed = TRUE)
   expect_match(sc, "array[N_unit] int<lower=1> n_rep;", fixed = TRUE)
