@@ -239,8 +239,15 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
         trials      = NULL
       ))
     }
+    # `closure_unit_grouping()` returns the multi-season opt-in
+    # `c("series", "site", "time")` when set; NULL keeps the
+    # default 2-axis path inside `build_closure_unit_arrays()`.
+    # `default_cap` makes the `cap` data column optional for
+    # binary-response families (`occ()` defaults to 1).
     arrays <- build_closure_unit_arrays(
-      newdata, response_var = closure_unit_response_var(object$formula)
+      newdata, response_var = closure_unit_response_var(object$formula),
+      default_cap = closure_unit_default_cap(object$family),
+      unit_grouping_vars = closure_unit_grouping(object$family)
     )
     # extract_p_for_closure_unit() handles both scalar (no
     # detection sub-formula) and vector (with `bf(p ~ ...)`) cases

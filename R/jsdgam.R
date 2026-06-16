@@ -152,6 +152,18 @@
 #'   When supplied the `traits` and `phylo` aliases must be `NULL`;
 #'   see `[mvgam()]` for the accepted field list.
 #'
+#' @param threads Positive integer or `NULL`. Forwarded to
+#'   [`mvgam()`] / `cmdstanr`. With closure-unit families
+#'   (`nmix()`, `occ()`), enables `reduce_sum` threading of the
+#'   per-closure-unit lpmf. See [`mvgam()`] for the threading
+#'   notes and bench guidance.
+#' @param cpp_options Optional named list forwarded to
+#'   `cmdstanr::cmdstan_model()` (e.g. `CXXFLAGS = "-march=native"`).
+#'   `stan_threads = TRUE` is auto-set when `threads` is non-NULL.
+#' @param stanc_options Optional list forwarded to
+#'   `cmdstanr::cmdstan_model(stanc_options = ...)` (e.g.
+#'   `list("O1")` to enable the stanc3 optimiser). Bench
+#'   per-model before enabling.
 #' @param run_model **(deprecated)** Logical. Forwarded to `mvgam()`;
 #'   when `FALSE`, skips Stan parse / compile / sampling and returns a
 #'   stub `mvgam` / `jsdgam` object with `$stancode` and `$standata`

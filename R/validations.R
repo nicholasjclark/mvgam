@@ -306,6 +306,15 @@ validate_supported_family <- function(family) {
 #'   to `cap = 1`). Royle-Nichols carries binary response but
 #'   keeps `cap_required = TRUE` because its latent abundance can
 #'   exceed one.
+#' @param unit_grouping_vars Optional character vector of column
+#'   names identifying one closure unit. Defaults to
+#'   `c(series_var, time_var)` so existing 2-axis grouping is
+#'   unchanged. Multi-season families (`occ(multi_season = TRUE)`,
+#'   `nmix(multi_season = TRUE)`) pass a 3-axis grouping such as
+#'   `c("series", "site", "time")` so each (species, site, season)
+#'   forms one closure unit with replicate visits inside. The cap-
+#'   constancy and single-visit identifiability checks all generalise
+#'   over the supplied grouping cardinality.
 #' @return Invisible `TRUE` on success; stops on hard
 #'   identifiability failure.
 #' @noRd
@@ -317,7 +326,8 @@ validate_closure_unit_data <- function(data,
                                         has_obs_covariates  = FALSE,
                                         has_det_covariates  = FALSE,
                                         binary_y_check      = FALSE,
-                                        cap_required        = TRUE) {
+                                        cap_required        = TRUE,
+                                        unit_grouping_vars  = NULL) {
   checkmate::assert_data_frame(data, min.rows = 1L)
   checkmate::assert_string(response_var)
   checkmate::assert_string(series_var)
@@ -327,12 +337,21 @@ validate_closure_unit_data <- function(data,
   checkmate::assert_flag(has_det_covariates)
   checkmate::assert_flag(binary_y_check)
   checkmate::assert_flag(cap_required)
+  if (is.null(unit_grouping_vars)) {
+    unit_grouping_vars <- c(series_var, time_var)
+  }
+  checkmate::assert_character(unit_grouping_vars, min.len = 1L,
+                               any.missing = FALSE, unique = TRUE)
+  # Pretty-print of the grouping tuple for messages, e.g.
+  # "(species, site, season)".
+  grouping_label <- paste0("(", paste(unit_grouping_vars, collapse = ", "),
+                            ")")
 
   # Required columns: response + grouping. The cap column is
   # optional only for families that default the per-unit upper
   # truncation (e.g. occ() defaults to 1); count-latent families
   # such as nmix() and nmix("royle_nichols") always require it.
-  required_cols <- c(response_var, series_var, time_var)
+  required_cols <- c(response_var, unit_grouping_vars)
   if (cap_required) {
     required_cols <- c(required_cols, cap_var)
   }
@@ -344,10 +363,9 @@ validate_closure_unit_data <- function(data,
           "' to be present in 'data'."
         ),
         i = paste0(
-          "Each row of 'data' is one visit; the (",
-          series_var, ", ", time_var, ") pair identifies a ",
-          "closure unit and '", cap_var, "' bounds the latent ",
-          "state per unit."
+          "Each row of 'data' is one visit; the ", grouping_label,
+          " tuple identifies a closure unit and '", cap_var,
+          "' bounds the latent state per unit."
         )
       )))
     }
@@ -443,13 +461,15 @@ validate_closure_unit_data <- function(data,
   # Closure-unit grouping. Run once and reuse for both the
   # cap-constant-within-unit check and the identifiability
   # heuristics so users see the friendly error at validation
-  # time rather than mid-array-build.
-  series_vals <- as.factor(data[[series_var]])
-  time_vals   <- data[[time_var]]
-  unit_label  <- paste(as.integer(series_vals), as.integer(time_vals),
-                       sep = "_")
-  unit_int    <- match(unit_label, unique(unit_label))
-  rep_counts  <- tabulate(unit_int)
+  # time rather than mid-array-build. The grouping is polymorphic
+  # over the cardinality of `unit_grouping_vars`: each column is
+  # coerced to a factor-integer code and concatenated.
+  grouping_vals <- lapply(unit_grouping_vars, function(col) {
+    as.integer(as.factor(data[[col]]))
+  })
+  unit_label <- do.call(paste, c(grouping_vals, list(sep = "_")))
+  unit_int   <- match(unit_label, unique(unit_label))
+  rep_counts <- tabulate(unit_int)
 
   n_unit <- length(rep_counts)
   for (g in seq_len(n_unit)) {
@@ -457,14 +477,20 @@ validate_closure_unit_data <- function(data,
     cap_g  <- cap_int[rows_g]
     if (length(unique(cap_g)) > 1L) {
       bad_row <- rows_g[1L]
+      # Build a (col=value, ...) tuple description of the bad unit
+      # for the diagnostic.
+      bad_tuple <- paste(
+        vapply(unit_grouping_vars, function(col) {
+          paste0(col, "=", as.character(data[[col]][bad_row]))
+        }, character(1L)),
+        collapse = ", "
+      )
       stop(insight::format_error(c(
         paste0(
           "'", cap_var, "' must be constant within a closure unit."
         ),
         x = paste0(
-          "Closure unit (", series_var, "=",
-          as.character(series_vals[bad_row]), ", ",
-          time_var, "=", time_vals[bad_row],
+          "Closure unit (", bad_tuple,
           ") has differing '", cap_var, "' values: ",
           paste(unique(cap_g), collapse = ", "), "."
         ),
@@ -484,8 +510,8 @@ validate_closure_unit_data <- function(data,
     stop(insight::format_error(c(
       "Closure-unit family requires at least two closure units.",
       x = paste0(
-        "Only ", n_unit, " unique (", series_var, ", ", time_var,
-        ") combination found."
+        "Only ", n_unit, " unique ", grouping_label,
+        " combination found."
       ),
       i = paste0(
         "Each closure unit is one draw from the state ",
@@ -1200,7 +1226,7 @@ validate_trend_time_intervals <- function(trend_spec, data) {
 #' @param data Data frame with time series data
 #' @return The trend specification, after validating that
 #'   `n_lv <= n_series`. The wrapper-layer
-#'   [validate_n_lv_ceiling()] handles the prior-aware iid vs MGP
+#'   `validate_n_lv_ceiling()` handles the prior-aware iid vs MGP
 #'   distinction; this gate is the downstream invariant guard.
 #' @noRd
 validate_trend_factor_compatibility <- function(trend_spec, data) {
@@ -1241,7 +1267,7 @@ validate_trend_factor_compatibility <- function(trend_spec, data) {
 #' Single helper for the `is_factor_model` gate. Returns TRUE iff
 #' `n_lv` is set and `n_lv <= n_series`. The `<=` admits the MGP
 #' truncation-ceiling case `n_lv = n_series`; the wrapper-layer
-#' [validate_n_lv_ceiling()] rejects the iid analogue upstream so
+#' `validate_n_lv_ceiling()` rejects the iid analogue upstream so
 #' this predicate never spuriously promotes a default-prior fit to
 #' a degenerate full-rank factor model.
 #'
@@ -1258,7 +1284,7 @@ is_factor_model_spec <- function(n_lv, n_series) {
 #'
 #' Accepts the string shorthand `"mgp"` and the list form
 #' `list(column_shrinkage = "mgp", ...)`. Returns FALSE for any
-#' other input (including NULL). Used by [validate_n_lv_ceiling()]
+#' other input (including NULL). Used by `validate_n_lv_ceiling()`
 #' so the iid vs MGP `n_lv` ceiling check stays in one place.
 #'
 #' `traits` / `phylo` aliases do NOT enable MGP by themselves; they
@@ -1352,7 +1378,7 @@ validate_n_lv_ceiling <- function(n_lv, n_species, loadings_prior,
 #' per-response list, but mvgam currently fits one shared trend
 #' so the first hit is the authoritative one), counts unique
 #' series from `data`, and dispatches to
-#' [validate_n_lv_ceiling()]. No-ops when no spec carries `n_lv`.
+#' `validate_n_lv_ceiling()`. No-ops when no spec carries `n_lv`.
 #'
 #' @noRd
 enforce_n_lv_ceiling_against_data <- function(trend_specs, data,
@@ -2409,11 +2435,12 @@ validate_time_series_for_trends <- function(data, trend_specs, silent = 1, respo
   data <- ensure_mvgam_variables(data, parsed_trend, time_var, series_var, response_vars)
 
 
-  # Use precomputed dimensions - no fallback in ultra-DRY architecture
+  # Pre-computed dimensions are mandatory; the validator does not
+  # recompute them locally.
   if (is.null(.precomputed_dimensions)) {
     stop(insight::format_error(c(
-      "Missing precomputed dimensions in ultra-DRY architecture.",
-      x = "This function should only be called with precomputed dimensions.",
+      "Missing precomputed dimensions.",
+      x = "This function must be called with precomputed dimensions.",
       i = "Check that extract_and_validate_trend_components() is passing dimensions correctly."
     )), call. = FALSE)
   }
@@ -3902,7 +3929,7 @@ validate_and_process_trend_parameters <- function(trend_spec, data) {
   if (!is.null(trend_spec$dimensions)) {
     # Downstream invariant guard. `n_lv = n_series` is admissible
     # under MGP shrinkage (the wrapper-layer
-    # [validate_n_lv_ceiling()] makes the prior-aware decision);
+    # `validate_n_lv_ceiling()` makes the prior-aware decision);
     # `n_lv > n_series` is always rejected because the marginal
     # `Z Z'` cannot exceed rank n_series.
     if (!is.null(trend_spec$n_lv) && trend_spec$n_lv > trend_spec$dimensions$n_series) {
@@ -4915,11 +4942,12 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
     # Only require time_var - series_var can be created via attributes if missing
     checkmate::assert_names(names(data), must.include = time_var)
 
-    # Use precomputed dimensions - no fallback in ultra-DRY architecture
+    # Pre-computed dimensions are mandatory; the validator does not
+    # recompute them locally.
     if (is.null(.precomputed_dimensions)) {
       stop(insight::format_error(c(
-        "Missing precomputed dimensions in ultra-DRY architecture.",
-        x = "This function should only be called with precomputed dimensions.",
+        "Missing precomputed dimensions.",
+        x = "This function must be called with precomputed dimensions.",
         i = "Check that extract_and_validate_trend_components() is passing dimensions correctly."
       )), call. = FALSE)
     }

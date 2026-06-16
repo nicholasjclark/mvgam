@@ -36,7 +36,7 @@ test_that("occ() tags closure-unit, binary-response and predict-type attributes"
   expect_true(isTRUE(attr(fam, "mvgam_binary_response", exact = TRUE)))
   expect_identical(
     attr(fam, "mvgam_predict_types", exact = TRUE),
-    c("occupancy", "detection")
+    c("latent_state", "detection")
   )
   expect_identical(
     attr(fam, "mvgam_vars", exact = TRUE),
@@ -194,7 +194,7 @@ test_that("dispatch_closure_unit_method() errors on a non-closure family", {
 # predict.mvgam type-dispatch gate via mvgam_predict_types
 # ------------------------------------------------------------
 
-test_that("predict.mvgam(type = 'occupancy') errors on a non-occ family", {
+test_that("predict.mvgam(type = 'latent_state') errors on a non-closure-unit family", {
   d <- make_occ_data()
   # Use an mvgam fit with gaussian() to drive the gate without
   # requiring a long MCMC run for occ itself.
@@ -202,7 +202,7 @@ test_that("predict.mvgam(type = 'occupancy') errors on a non-occ family", {
   fit <- mvgam(y_real ~ elev, data = d, chains = 1, iter = 100,
                warmup = 50, silent = 2, refresh = 0)
   expect_error(
-    predict(fit, type = "occupancy"),
+    predict(fit, type = "latent_state"),
     "not available for this family"
   )
 })

@@ -70,6 +70,56 @@ test_that("4D array y emits fused time and side-car season", {
   expect_equal(length(unique(uniq$time)), J * T_)
 })
 
+test_that("4D array with multi_season = 'hierarchical' emits time = season", {
+  set.seed(4L)
+  N <- 3L; J <- 5L; T_ <- 4L; K <- 3L
+  y <- array(rbinom(N * J * T_ * K, 1L, 0.4),
+             dim = c(N, J, T_, K))
+  out <- pivot_detection_array(
+    y, species = c("sp1", "sp2", "sp3"),
+    multi_season = "hierarchical"
+  )
+  expect_equal(nrow(out), N * J * T_ * K)
+  # `time = season` rather than the fused encoding. `site` is
+  # retained as a side-car covariate for use in obs_formula.
+  expect_equal(out$time, out$season)
+  expect_true("site" %in% colnames(out))
+  # Distinct `time` values match the number of seasons, not
+  # (site, season) pairs.
+  expect_equal(length(unique(out$time)), T_)
+  # Closure-unit grouping (series, site, time): one unit per
+  # (species, site, season).
+  arrays <- mvgam:::build_closure_unit_arrays(
+    out, response_var = "y", compute_y_max = FALSE,
+    unit_grouping_vars = c("series", "site", "time")
+  )
+  expect_equal(arrays$N_unit, N * J * T_)
+  expect_true(all(arrays$n_rep == K))
+})
+
+test_that("multi_season is ignored for single-season inputs", {
+  # 2D and 3D inputs have only one season; both modes should give
+  # identical output.
+  set.seed(4L)
+  y3 <- array(rbinom(60L, 1L, 0.4), dim = c(3L, 5L, 4L))
+  out_default <- pivot_detection_array(
+    y3, species = c("sp1", "sp2", "sp3")
+  )
+  out_hier <- pivot_detection_array(
+    y3, species = c("sp1", "sp2", "sp3"),
+    multi_season = "hierarchical"
+  )
+  expect_identical(out_default, out_hier)
+})
+
+test_that("invalid multi_season choice errors via match.arg", {
+  y <- matrix(rbinom(20L, 1L, 0.4), 5L, 4L)
+  expect_error(
+    pivot_detection_array(y, multi_season = "bogus"),
+    "should be one of"
+  )
+})
+
 test_that("named list of matrices is OccuMulti-style multi-species", {
   set.seed(5L)
   y <- list(

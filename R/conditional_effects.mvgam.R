@@ -13,7 +13,15 @@
 #'   formula are detected automatically.
 #' @param type Scale of predictions. One of `"response"` (outcome
 #'   scale with observation-process noise), `"link"` (link-scale
-#'   linear predictor) or `"expected"` (E\[Y\]; default).
+#'   linear predictor), `"expected"` (E\[Y\]; default), or one of
+#'   the family-specific scales handled by [predict.mvgam()]:
+#'   `"variance"`, `"latent_state"`, `"detection"`. For closure-unit
+#'   families (`occ()`, `nmix()` and variants), `"latent_state"`
+#'   returns the family-aware latent state on the response scale
+#'   (latent occupancy `psi` for `occ()`, latent abundance `N` for
+#'   `nmix()`), which is the natural marginal-effects display for
+#'   the ecological quantity of interest separate from detection
+#'   probability.
 #' @param points Logical or numeric. If `TRUE` (or a non-zero alpha
 #'   between 0 and 1) and `type = "response"`, raw observations are
 #'   overlaid on the plot.
@@ -71,7 +79,38 @@ conditional_effects.mvgam <- function(x,
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_character(effects, null.ok = TRUE)
   checkmate::assert_logical(process_error, len = 1L)
-  type <- match.arg(type, c("response", "link", "expected"))
+  type <- match.arg(
+    type,
+    c("response", "link", "expected",
+      "variance", "latent_state", "detection")
+  )
+  # Family-specific types are valid only for the families that
+  # register them on `attr(family, "mvgam_predict_types")`. Defer
+  # the deeper check to predict.mvgam (which surfaces a typed error
+  # listing the family's exposed types), but reject the
+  # non-closure-unit case here so the user gets the error early
+  # rather than via a generic marginaleffects failure.
+  if (type %in% c("latent_state", "detection") &&
+        !is_closure_unit_family(x$family)) {
+    family_types <- attr(x$family, "mvgam_predict_types",
+                          exact = TRUE) %||% character(0)
+    stop(insight::format_error(c(
+      paste0(
+        "type = '", type, "' is not available for this family."
+      ),
+      x = paste0(
+        "Family '", resolve_family_name(x$family),
+        "' exposes types: ",
+        if (length(family_types) > 0L) {
+          paste(paste0("'", family_types, "'"), collapse = ", ")
+        } else {
+          "none (not a closure-unit family)"
+        },
+        "."
+      ),
+      i = "Refit with family = nmix() or family = occ() to enable closure-unit predict types."
+    )))
+  }
   # `series` is polymorphic (NULL / "all" / character / integer) so a
   # single checkmate::assert_* call cannot validate it; the resolver
   # owns the per-branch validation and surfaces typed errors.

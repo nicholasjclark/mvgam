@@ -41,7 +41,7 @@ test_that("nmix() tags closure-unit and predict-type attributes", {
   expect_true(is_closure_unit_family(fam))
   expect_identical(
     attr(fam, "mvgam_predict_types", exact = TRUE),
-    c("latent_N", "detection")
+    c("latent_state", "detection")
   )
   # The Stan stanvars slot is filled in at data-prep time; chunk 1
   # leaves it NULL so attach_family_stanvars() passes through.
@@ -958,7 +958,14 @@ test_that("stancode under nmix() includes the lpdf signature and data declaratio
     sc, "binomial_logit_lpmf(counts | K_min_g, lp_visits)",
     fixed = TRUE
   )
-  expect_match(sc, "real log_ff = log_lam + sum(log1m(p[idx]));",
+  # log1m_p is hoisted to the wrapper (task #230) so the partial
+  # sum body reads `log1m_p[idx]` instead of recomputing log1m(p)
+  # per chunk. The wrapper precomputes all three link-scale
+  # vectors (log_mu, logit_p, log1m_p) before dispatching to
+  # reduce_sum.
+  expect_match(sc, "real log_ff = log_lam + sum(log1m_p[idx]);",
+               fixed = TRUE)
+  expect_match(sc, "vector[num_elements(p)] log1m_p = log1m(p);",
                fixed = TRUE)
   expect_match(sc, "for (i in 1 : possible_N)", fixed = TRUE)
   expect_match(
@@ -966,6 +973,21 @@ test_that("stancode under nmix() includes the lpdf signature and data declaratio
     "log_prob_n = log_sum_exp(0, log_prob_n + log_ff + log_k_obs - log_N);",
     fixed = TRUE
   )
+  # Threading: per-unit body lives in partial_sum_nmix_lpmf;
+  # nmix_lpmf wrapper calls reduce_sum over closure units. When
+  # stan_threads is compiled in (via `threads = N` on mvgam()),
+  # TBB splits chunks across threads.
+  expect_match(sc, "real partial_sum_nmix_lpmf(", fixed = TRUE)
+  expect_match(sc, "reduce_sum(", fixed = TRUE)
+  # stanc line-wraps the single-statement for-body onto two
+  # lines, so assert on the two pieces independently.
+  expect_match(sc, "array[N_unit] int g_seq;", fixed = TRUE)
+  expect_match(sc, "g_seq[g] = g;", fixed = TRUE)
+  # grainsize heuristic targets ~8 chunks (N_unit / 8 with a 1
+  # floor) so single-threaded fits pay minimal dispatch overhead
+  # AND multi-threaded fits see ~8 chunks across cores.
+  expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit / 8 : 1;",
+               fixed = TRUE)
   # No remnants of the old vectorised log-sum-exp loop.
   expect_false(grepl("component_lps", sc, fixed = TRUE))
   expect_false(grepl("poisson_log_lpmf(k | log_lam)", sc, fixed = TRUE))
@@ -975,16 +997,161 @@ test_that("stancode under nmix() includes the lpdf signature and data declaratio
   expect_match(sc, "array[N_unit] int<lower=1> K_max;", fixed = TRUE)
   expect_match(sc, "array[N_unit] int<lower=0> Y_max;", fixed = TRUE)
   expect_match(sc, "array[N_unit, 3] int<lower=1> visit_idx;", fixed = TRUE)
-  # Likelihood call wires the dpars + vint args correctly.
+  # Likelihood call wires the dpars + vint args correctly; the
+  # trailing `log_n_lookup` argument is the cached log(N) vector
+  # emitted in transformed data (task #316) so the inner ratio
+  # loop indexes a vector instead of calling scalar log() per
+  # iteration.
   expect_match(
     sc,
-    "nmix_lpmf(Y | mu, p, N_unit, n_rep, K_max, Y_max, visit_idx)",
+    "nmix_lpmf(Y | mu, p, N_unit, n_rep, K_max, Y_max, visit_idx, log_n_lookup)",
     fixed = TRUE
   )
+  expect_match(sc, "int K_max_global = max(K_max);", fixed = TRUE)
+  expect_match(sc, "vector[K_max_global] log_n_lookup;", fixed = TRUE)
+  expect_match(sc, "log_n_lookup[n_lk] = log(n_lk);", fixed = TRUE)
   # Scalar-p case: p declared as a bounded probability so the
   # lpdf's logit(p) call is well-defined even without a
   # `p ~ ...` sub-formula.
   expect_match(sc, "real<lower=0, upper=1> p;", fixed = TRUE)
+})
+
+test_that("stancode under occ() emits partial_sum + reduce_sum scaffold", {
+  d <- make_nmix_data(n_unit = 4, n_visit = 3)
+  d$y <- as.integer(d$y > 0L)
+  mf <- mvgam_formula(y ~ elev)
+  sc <- as.character(stancode(mf, data = d, family = occ()))
+  # Per-unit body factored into partial_sum_occ_lpmf; wrapper hoists
+  # logit(mu) -> logit_psi and logit(p) -> logit_p once before
+  # dispatching to reduce_sum so per-thread chunks reuse the cached
+  # link-scale vectors.
+  expect_match(sc, "real partial_sum_occ_lpmf(", fixed = TRUE)
+  expect_match(sc, "vector[num_elements(mu)] logit_psi = logit(mu);",
+               fixed = TRUE)
+  expect_match(sc, "vector[num_elements(p)] logit_p = logit(p);",
+               fixed = TRUE)
+  # Per-unit marginalisation branches on whether anything was
+  # detected: z = 1 certain when Y_max[g] >= 1, otherwise
+  # log_sum_exp over {z = 0, z = 1}.
+  expect_match(sc, "if (Y_max[g] >= 1)", fixed = TRUE)
+  expect_match(sc, "log_sum_exp(loglik_z1, loglik_z0)", fixed = TRUE)
+  # Threading: reduce_sum + grainsize heuristic shared with the
+  # other closure-unit families.
+  expect_match(sc, "reduce_sum(partial_sum_occ_lpmf,", fixed = TRUE)
+  expect_match(sc, "array[N_unit] int g_seq;", fixed = TRUE)
+  expect_match(sc, "g_seq[g] = g;", fixed = TRUE)
+  expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit / 8 : 1;",
+               fixed = TRUE)
+  # All four signature overloads (vec/vec, vec/scalar, scalar/vec,
+  # scalar/scalar) must land so the brms emission resolves regardless
+  # of whether mu / p are dpars or constants.
+  expect_match(sc, "real occ_lpmf(array[] int y, vector mu, vector p, int N_unit,",
+               fixed = TRUE)
+  expect_match(sc, "real occ_lpmf(array[] int y, vector mu, real p, int N_unit,",
+               fixed = TRUE)
+  expect_match(sc, "real occ_lpmf(array[] int y, real mu, vector p, int N_unit,",
+               fixed = TRUE)
+  expect_match(sc, "real occ_lpmf(array[] int y, real mu, real p, int N_unit,",
+               fixed = TRUE)
+  # Likelihood call wires the standata args correctly.
+  expect_match(
+    sc,
+    "occ_lpmf(Y | mu, p, N_unit, n_rep, Y_max, visit_idx)",
+    fixed = TRUE
+  )
+  # Y_max is the per-unit detection indicator; bounded {0, 1}.
+  expect_match(sc, "array[N_unit] int<lower=0, upper=1> Y_max;",
+               fixed = TRUE)
+  # occ() must NOT carry log_n_lookup (no log(int) in the body).
+  expect_false(grepl("log_n_lookup", sc, fixed = TRUE))
+})
+
+test_that("stancode under nmix('royle_nichols') emits partial_sum + reduce_sum scaffold", {
+  d <- make_nmix_data(n_unit = 4, n_visit = 3)
+  d$y <- as.integer(d$y > 0L)
+  mf <- mvgam_formula(y ~ elev)
+  sc <- as.character(stancode(mf, data = d, family = nmix("royle_nichols")))
+  # Per-unit body factored into partial_sum_nmix_royle_nichols_lpmf;
+  # wrapper hoists log(mu) -> log_mu and log1m(p) -> log_1m_r once
+  # before dispatching to reduce_sum.
+  expect_match(sc, "real partial_sum_nmix_royle_nichols_lpmf(",
+               fixed = TRUE)
+  expect_match(sc, "vector[num_elements(mu)] log_mu = log(mu);",
+               fixed = TRUE)
+  expect_match(sc, "vector[num_elements(p)] log_1m_r = log1m(p);",
+               fixed = TRUE)
+  # Closure constraint: k < cmax pre-filled with -Inf so log_sum_exp
+  # over the K_max marginalisation cells skips infeasible states.
+  expect_match(sc, "for (k in 0 : (cmax - 1))", fixed = TRUE)
+  expect_match(sc, "component_lps[k + 1] = negative_infinity();",
+               fixed = TRUE)
+  # Inner k loop: k * sum_non_det_log_1m_r is the closed-form
+  # non-detection contribution; dot_product(counts_v, log1m_exp(k * log_1m_r_v))
+  # is the per-visit at-least-one-detection contribution.
+  expect_match(sc, "k * sum_non_det_log_1m_r", fixed = TRUE)
+  expect_match(sc, "log1m_exp(k * log_1m_r_v)", fixed = TRUE)
+  # Threading: reduce_sum + grainsize heuristic.
+  expect_match(sc, "reduce_sum(partial_sum_nmix_royle_nichols_lpmf,",
+               fixed = TRUE)
+  expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit / 8 : 1;",
+               fixed = TRUE)
+  # Likelihood call.
+  expect_match(
+    sc,
+    "nmix_royle_nichols_lpmf(Y | mu, p, N_unit, n_rep, K_max, Y_max, visit_idx)",
+    fixed = TRUE
+  )
+  # Data: K_max alongside the binary Y_max indicator.
+  expect_match(sc, "array[N_unit] int<lower=1> K_max;", fixed = TRUE)
+  expect_match(sc, "array[N_unit] int<lower=0, upper=1> Y_max;",
+               fixed = TRUE)
+  # RN has no log(int) in the inner loop, so log_n_lookup must NOT
+  # be emitted for this family.
+  expect_false(grepl("log_n_lookup", sc, fixed = TRUE))
+})
+
+test_that("stancode under nmix('poisson_poisson') emits partial_sum + log_n_lookup + reduce_sum", {
+  d <- make_nmix_data(n_unit = 4, n_visit = 3)
+  mf <- mvgam_formula(y ~ elev)
+  sc <- as.character(stancode(mf, data = d, family = nmix("poisson_poisson")))
+  # Per-unit body factored into partial_sum_nmix_poisson_poisson_lpmf;
+  # wrapper hoists log(mu) -> log_mu and log(p) -> log_p once. The
+  # raw p vector is also threaded through because the inner cell
+  # uses k * sum(p_v) as the Poisson rate aggregate.
+  expect_match(sc, "real partial_sum_nmix_poisson_poisson_lpmf(",
+               fixed = TRUE)
+  expect_match(sc, "vector[num_elements(mu)] log_mu = log(mu);",
+               fixed = TRUE)
+  expect_match(sc, "vector[num_elements(p)] log_p = log(p);",
+               fixed = TRUE)
+  # Inner k loop uses log_n_lookup[k] instead of scalar log(k) so
+  # the AD tape skips the per-iter math op (task #316 pattern).
+  expect_match(sc, "log_n_lookup[k] * sum_counts", fixed = TRUE)
+  # k = 0 only feasible when no detections; flip to -Inf otherwise
+  # so log_sum_exp over the full K range marginalises cleanly.
+  expect_match(sc, "if (any_detection)", fixed = TRUE)
+  expect_match(sc, "component_lps[1] = negative_infinity();",
+               fixed = TRUE)
+  # Threading: reduce_sum, grainsize heuristic, log_n_lookup as a
+  # tail-position argument matching the partial_sum signature.
+  expect_match(sc, "reduce_sum(partial_sum_nmix_poisson_poisson_lpmf,",
+               fixed = TRUE)
+  expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit / 8 : 1;",
+               fixed = TRUE)
+  # Transformed data: log_n_lookup built once over K_max_global so
+  # the lpmf indexes a cached vector instead of recomputing log(k).
+  expect_match(sc, "int K_max_global = max(K_max);", fixed = TRUE)
+  expect_match(sc, "vector[K_max_global] log_n_lookup;", fixed = TRUE)
+  expect_match(sc, "log_n_lookup[n_lk] = log(n_lk);", fixed = TRUE)
+  # Likelihood call: log_n_lookup tail arg present.
+  expect_match(
+    sc,
+    "nmix_poisson_poisson_lpmf(Y | mu, p, N_unit, n_rep, K_max, Y_max, visit_idx, log_n_lookup)",
+    fixed = TRUE
+  )
+  # Data: K_max and unbounded Y_max (counts).
+  expect_match(sc, "array[N_unit] int<lower=1> K_max;", fixed = TRUE)
+  expect_match(sc, "array[N_unit] int<lower=0> Y_max;", fixed = TRUE)
 })
 
 test_that("nmix log-space recurrence matches brute-force log-sum-exp on canonical cases", {
@@ -1161,7 +1328,7 @@ test_that("nmix('royle_nichols') constructor exposes the RN family name and bina
   # user must supply the cap column.
   expect_null(attr(fam, "mvgam_default_cap", exact = TRUE))
   expect_identical(attr(fam, "mvgam_predict_types", exact = TRUE),
-                   c("latent_N", "detection"))
+                   c("latent_state", "detection"))
 })
 
 # Stan emission + end-to-end + smooth-r + RE + smooth-on-state
@@ -1184,7 +1351,7 @@ test_that("nmix('poisson_poisson') constructor exposes the PPM family name and c
                            exact = TRUE)))
   expect_null(attr(fam, "mvgam_default_cap", exact = TRUE))
   expect_identical(attr(fam, "mvgam_predict_types", exact = TRUE),
-                   c("latent_N", "detection"))
+                   c("latent_state", "detection"))
   # Log link on p (not logit) so the rate stays on positive reals.
   expect_identical(fam$link_p, "log")
   expect_true(is.na(fam$ub[2L]))

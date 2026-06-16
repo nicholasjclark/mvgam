@@ -144,6 +144,28 @@
 #'   separate linear predictors for each response category are not supported:
 #'   [brms::categorical()], [brms::multinomial()], [brms::dirichlet()]. For
 #'   these response types, use brms directly.
+#' @param threads Positive integer or `NULL`. When non-NULL the
+#'   model is compiled with `cpp_options$stan_threads = TRUE` and
+#'   cmdstanr passes `threads_per_chain = N` at sample time.
+#'   Closure-unit families (`nmix()`, `occ()`) thread their
+#'   per-closure-unit lpmf via `reduce_sum`; brms-native families
+#'   thread their lpmf loops via brms's `partial_log_lik`. For
+#'   closure-unit families, expect ~30-40% sampling throughput
+#'   improvement at `threads = 4` on a fixture with N_unit >= 50;
+#'   smaller fixtures may see thread-overhead-dominated
+#'   regressions. The internal grainsize is auto-tuned to ~8
+#'   chunks regardless of `threads`.
+#' @param cpp_options Optional named list forwarded to
+#'   `cmdstanr::cmdstan_model()`. Common entries:
+#'   `stan_threads = TRUE` (auto-set when `threads` is non-NULL),
+#'   `stan_opencl = TRUE`, `CXXFLAGS = "-march=native"` for native
+#'   CPU tuning. Use only on the `backend = "cmdstanr"` path.
+#' @param stanc_options Optional list forwarded to
+#'   `cmdstanr::cmdstan_model(stanc_options = ...)`. Most commonly
+#'   `list("O1")` to enable the stanc3 optimiser. Test per-model
+#'   since some custom-family lpmfs (including some configurations
+#'   of `nmix()`) can regress under `O1`; benchmark before
+#'   enabling.
 #' @param run_model **(deprecated; do not use in new code)** Logical.
 #'   Setting `run_model = FALSE` short-circuits before Stan parse /
 #'   compile / sampling and returns a stub `mvgam` object whose
@@ -401,6 +423,15 @@ mvgam_single <- function(formula, trend_formula, data, backend,
   control <- dots$control %||% NULL
   silent <- dots$silent %||% 1
   future <- dots$future %||% FALSE
+  # cmdstanr compile-time passthroughs. cpp_options accepts
+  # entries like `stan_threads = TRUE` (auto-set when `threads`
+  # is non-NULL), `CXXFLAGS = "-march=native"` for native-CPU
+  # tuning, or any other cmdstan-supported C++ flag.
+  # stanc_options accepts the stanc3 optimisation level
+  # (e.g. `"O1"`) and other stanc-level flags. Both forward
+  # directly to `cmdstanr::cmdstan_model()`.
+  cpp_options   <- dots$cpp_options   %||% NULL
+  stanc_options <- dots$stanc_options %||% NULL
   
   # Validate and normalize parameters
   silent <- validate_silent(silent)
@@ -418,13 +449,16 @@ mvgam_single <- function(formula, trend_formula, data, backend,
   if (silent < 2) {
     message("Compiling Stan model...")
   }
-  compiled_model <- compile_model(
-    model = validated_code,
-    backend = backend,
-    threads = threads,
-    opencl = opencl,
-    silent = silent
+  compile_args <- list(
+    model         = validated_code,
+    backend       = backend,
+    threads       = threads,
+    opencl        = opencl,
+    silent        = silent
   )
+  if (!is.null(cpp_options))   compile_args$cpp_options   <- cpp_options
+  if (!is.null(stanc_options)) compile_args$stanc_options <- stanc_options
+  compiled_model <- do.call(compile_model, compile_args)
   
   # Fit Stan model
   if (silent < 2) {

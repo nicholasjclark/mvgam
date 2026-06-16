@@ -401,8 +401,23 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
       training$data[[training$series_var]] == lv, , drop = FALSE
     ]
     sub <- sub[order(sub[[training$time_var]]), , drop = FALSE]
+    # Closure-unit families ship multiple rows per (series, time)
+    # for the per-visit detection grain. The `"trend"` and `"link"`
+    # surfaces live at the (time, series) grain of the trend matrix,
+    # so collapse `sub` to one row per unique time before the
+    # linpred call. The detection-marginalised `"expected"` and
+    # `"response"` surfaces keep the per-row sub-data because the
+    # latent state varies per closure unit.
+    if (type %in% c("trend", "link") &&
+          is_closure_unit_family(object$family)) {
+      sub_for_linpred <- sub[
+        !duplicated(sub[[training$time_var]]), , drop = FALSE
+      ]
+    } else {
+      sub_for_linpred <- sub
+    }
     out[[s]] <- hindcast_one_series(
-      object, sub, type, draw_idx, obs_uncertainty,
+      object, sub_for_linpred, type, draw_idx, obs_uncertainty,
       resample_innovations
     )
   }

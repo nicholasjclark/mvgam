@@ -16,7 +16,8 @@ pivot_detection_array(
   visit_col = "visit",
   time_col = "time",
   series_col = "series",
-  y_col = "y"
+  y_col = "y",
+  multi_season = c("fused", "hierarchical")
 )
 }
 \arguments{
@@ -84,16 +85,32 @@ Defaults to \code{"season"}.}
 \item{visit_col}{Name of the visit identifier. Defaults to
 \code{"visit"}.}
 
-\item{time_col}{Name of the fused closure-unit identifier.
+\item{time_col}{Name of the closure-unit time identifier.
 Defaults to \code{"time"}. Single-season: \code{time = site}.
-Multi-season: \code{time = (site - 1) * T + season} so each
-\verb{(site, season)} pair is a unique closure unit.}
+Multi-season + \code{multi_season = "fused"}:
+\code{time = (site - 1) * T + season} (one closure unit per
+(site, season)). Multi-season + \code{multi_season = "hierarchical"}: \code{time = season} (one closure unit per
+(species, site, season), with site referenced separately in
+\code{obs_formula}).}
 
 \item{series_col}{Name of the species column. Defaults to
 \code{"series"}.}
 
 \item{y_col}{Name of the detection / count column. Defaults to
 \code{"y"}.}
+
+\item{multi_season}{Character scalar controlling the
+multi-season \code{time} encoding. \code{"fused"} (default) fuses
+\verb{(site, season)} into a single \code{time} axis so each
+\verb{(site, season)} pair is a unique closure unit. This matches
+the existing single-season closure-unit grouping
+\verb{(series, time)} and works with \code{occ()} / \code{nmix()} unchanged.
+\code{"hierarchical"} keeps \code{time = season} and exposes \code{site} as
+a side-car covariate for use in \code{obs_formula}; pair with
+\code{occ(multi_season = TRUE)} or \code{nmix(multi_season = TRUE)} so
+the 3-axis closure-unit grouping \verb{(series, site, time)} is
+activated. Ignored for single-season inputs (2D matrix, 3D
+\verb{[N, J, K]} array, or 4D array with \code{T = 1}).}
 }
 \value{
 A long-format \code{data.frame} with columns
@@ -108,10 +125,26 @@ long-format closure-unit layout \code{mvgam(family = occ() / nmix())}
 and \code{jsdgam(family = occ() / nmix())} expect. One row per
 \verb{(species, site, season, visit)} tuple. Single-species data
 drops the \code{series} axis; single-season data sets \code{season = 1}
-for every row and \code{time = site}. Multi-season data emits a
-fused \code{time = (site - 1) * T + season} (the canonical
-closure-unit identifier) alongside the raw \code{site} and \code{season}
-columns for downstream joins.
+for every row and \code{time = site}. Multi-season data has two
+modes selected via \code{multi_season}:
+}
+\details{
+\itemize{
+\item \code{"fused"} (default): \code{time = (site - 1) * T + season},
+so each (site, season) pair is a unique closure-unit
+identifier. Use when seasons are independent given covariates
+(single-season analysis applied per season, no cross-season
+dynamics modelled).
+\item \code{"hierarchical"}: \code{time = season}. Pair with
+\code{occ(multi_season = TRUE)} / \code{nmix(multi_season = TRUE)} and
+reference the \code{site} column in \code{obs_formula} (e.g.,
+\code{s(site, bs = "re")}) so per-site variation enters the
+observation model while the trend pipeline operates on the
+season axis. See \code{?occ} for the multi-season scope and
+identification caveats (the model parameterizes joint
+cross-species occupancy dynamics, NOT explicit colonization
+and extinction rates).
+}
 }
 \author{
 Nicholas J Clark

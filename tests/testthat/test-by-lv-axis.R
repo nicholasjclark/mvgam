@@ -171,6 +171,10 @@ test_that("by = lv_axis() with n_lv >= n_series raises a clear error", {
   dat$series <- factor(dat$series)
   dat$elev <- rep(rnorm(30), times = 3)
   dat$y <- rnorm(nrow(dat))
+  # `validate_n_lv_ceiling()` intercepts this earlier than the
+  # factor-model gate now; the iid loadings prior requires
+  # `n_lv < n_series` strictly. The MGP relaxation is mentioned in
+  # the error so users see the escape hatch.
   suppressWarnings(expect_error(
     mvgam(
       formula = y ~ -1,
@@ -182,7 +186,7 @@ test_that("by = lv_axis() with n_lv >= n_series raises a clear error", {
       run_model = FALSE,
       silent = 2
     ),
-    "requires a factor model"
+    "n_lv.*strictly less than the number of series"
   ))
 })
 

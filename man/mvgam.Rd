@@ -174,6 +174,31 @@ warning is rate-limited via \code{.frequency = "regularly"}).
 Defaults to \code{TRUE}.}
 
 \item{...}{Additional arguments passed to Stan fitting}
+
+\item{threads}{Positive integer or \code{NULL}. When non-NULL the
+model is compiled with \code{cpp_options$stan_threads = TRUE} and
+cmdstanr passes \code{threads_per_chain = N} at sample time.
+Closure-unit families (\code{nmix()}, \code{occ()}) thread their
+per-closure-unit lpmf via \code{reduce_sum}; brms-native families
+thread their lpmf loops via brms's \code{partial_log_lik}. For
+closure-unit families, expect ~30-40\% sampling throughput
+improvement at \code{threads = 4} on a fixture with N_unit >= 50;
+smaller fixtures may see thread-overhead-dominated
+regressions. The internal grainsize is auto-tuned to ~8
+chunks regardless of \code{threads}.}
+
+\item{cpp_options}{Optional named list forwarded to
+\code{cmdstanr::cmdstan_model()}. Common entries:
+\code{stan_threads = TRUE} (auto-set when \code{threads} is non-NULL),
+\code{stan_opencl = TRUE}, \code{CXXFLAGS = "-march=native"} for native
+CPU tuning. Use only on the \code{backend = "cmdstanr"} path.}
+
+\item{stanc_options}{Optional list forwarded to
+\code{cmdstanr::cmdstan_model(stanc_options = ...)}. Most commonly
+\code{list("O1")} to enable the stanc3 optimiser. Test per-model
+since some custom-family lpmfs (including some configurations
+of \code{nmix()}) can regress under \code{O1}; benchmark before
+enabling.}
 }
 \value{
 mvgam object with dual brmsfit-like structure

@@ -512,9 +512,12 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
   unit_id <- NULL
   if (is_closure_unit_family(x$family)) {
     default_cap <- closure_unit_default_cap(x$family)
+    # Multi-season families return `c("series", "site", "time")`;
+    # single-season families return NULL and use the 2-axis default.
     arrays <- build_closure_unit_arrays(
       obs_data, response_var = resp,
-      default_cap = default_cap
+      default_cap = default_cap,
+      unit_grouping_vars = closure_unit_grouping(x$family)
     )
     # `visit_idx[g, 1:n_rep[g]]` gives the obs_data row indices
     # for unit g; invert to a row -> unit map.

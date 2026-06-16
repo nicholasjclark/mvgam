@@ -101,8 +101,8 @@ stan_code <- stancode(mf, data = ecology_data, family = poisson())
 cat(stan_code)
 
 # With custom priors
-custom_priors <- brms::prior("normal(0, 0.5)", class = "ar1_trend") +
-                 brms::prior("exponential(2)", class = "sigma_trend")
+custom_priors <- prior("normal(0, 0.5)", class = "ar1_trend") +
+                 prior("exponential(2)", class = "sigma_trend")
 stan_code_custom <- stancode(mf, data = ecology_data,
                              family = poisson(), prior = custom_priors)
 }

@@ -32,11 +32,11 @@
 #'   }
 #'
 #' @details
-#' This function implements the DRY (Don't Repeat Yourself) consolidation of Stan
-#' code generation. It processes formulas, validates time series structure, sets up
-#' brms models, generates stanvars, assembles Stan code, and applies polishing.
-#' The polished Stan code is identical whether accessed via \code{mvgam()},
-#' \code{stancode()}, or \code{standata()}.
+#' This function is the single Stan code-generation entry point used by
+#' \code{mvgam()}, \code{stancode()}, and \code{standata()}. It processes
+#' formulas, validates time series structure, sets up brms models, generates
+#' stanvars, assembles Stan code, and applies polishing. The polished Stan
+#' code is byte-identical across the three call sites.
 #'
 #' @noRd
 generate_stan_components_mvgam_formula <- function(formula, data, family = gaussian(),
@@ -453,8 +453,8 @@ has_obs_intercept <- function(formula) {
 #' cat(stan_code)
 #'
 #' # With custom priors
-#' custom_priors <- brms::prior("normal(0, 0.5)", class = "ar1_trend") +
-#'                  brms::prior("exponential(2)", class = "sigma_trend")
+#' custom_priors <- prior("normal(0, 0.5)", class = "ar1_trend") +
+#'                  prior("exponential(2)", class = "sigma_trend")
 #' stan_code_custom <- stancode(mf, data = ecology_data,
 #'                              family = poisson(), prior = custom_priors)
 #' }
@@ -551,8 +551,8 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
 #' str(stan_data)
 #'
 #' # With custom priors
-#' custom_priors <- brms::prior("normal(0, 0.5)", class = "ar1_trend") +
-#'                  brms::prior("exponential(2)", class = "sigma_trend")
+#' custom_priors <- prior("normal(0, 0.5)", class = "ar1_trend") +
+#'                  prior("exponential(2)", class = "sigma_trend")
 #' stan_data_custom <- standata(mf, data = ecology_data,
 #'                              family = poisson(), prior = custom_priors)
 #' }

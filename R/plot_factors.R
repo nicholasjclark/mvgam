@@ -123,6 +123,114 @@ plot_factors <- function(
 }
 
 
+# Per-(series, time) latent-state ribbon for a closure-unit
+# `mvgam` fit. Calls the family-registered `latent_state` method
+# (returns `[ndraws x N_unit]`), groups unit columns by
+# `(series, time)`, pools across sites for multi-season fits, and
+# emits a ribbon-and-median plot faceted by series. Unified entry
+# point used by `plot.mvgam(type = "latent_state")` for both
+# `nmix()` (marginal latent `N`) and `occ()` (marginal occupancy
+# `psi`).
+#
+# @noRd
+plot_latent_state <- function(object, probs = c(0.5, 0.8, 0.95),
+                                ndraws = NULL, ...) {
+  if (!is_closure_unit_family(object$family)) {
+    stop(insight::format_error(c(
+      "plot(type = 'latent_state') requires a closure-unit family.",
+      i = paste0(
+        "Use family = nmix() or family = occ() to fit a model with ",
+        "a latent abundance or occupancy state."
+      )
+    )))
+  }
+  state_fn <- dispatch_closure_unit_method(object$family, "latent_state")
+  if (is.null(state_fn)) {
+    stop(insight::format_error(c(
+      paste0(
+        "Family '", resolve_family_name(object$family),
+        "' does not expose a latent-state surface."
+      ),
+      i = paste0(
+        "Multi-response closure-unit families (mvn / mvt / diri / ",
+        "multi / categ) have no per-unit latent state."
+      )
+    )))
+  }
+  # Marginal latent state (no conditioning on observed detections);
+  # this is the surface comparable to flocker's `get_Z(history_",
+  # "condition = FALSE)` and spOccupancy's `psi.samples`.
+  state <- if ("conditional" %in% names(formals(state_fn))) {
+    state_fn(object, conditional = FALSE)
+  } else {
+    state_fn(object)
+  }
+  checkmate::assert_matrix(state)
+
+  # Recover per-unit (series, time) labels via the same grouping
+  # the fit used. Multi-season families include a `site` axis but
+  # we pool across sites for the ribbon.
+  data <- object$data
+  resp_var <- closure_unit_response_var(object$formula)
+  arrays <- build_closure_unit_arrays(
+    data, response_var = resp_var,
+    default_cap = closure_unit_default_cap(object$family),
+    unit_grouping_vars = closure_unit_grouping(object$family)
+  )
+  first_rows <- arrays$visit_idx[, 1L]
+  unit_meta <- data.frame(
+    series = as.factor(data[["series"]][first_rows]),
+    time   = as.integer(data[["time"]][first_rows])
+  )
+  if (ncol(state) != nrow(unit_meta)) {
+    stop(insight::format_error(c(
+      "Latent-state matrix column count does not match closure units.",
+      x = paste0(
+        "ncol(state) = ", ncol(state),
+        ", N_unit = ", nrow(unit_meta), "."
+      )
+    )))
+  }
+
+  series_levels <- levels(unit_meta$series)
+  time_levels <- sort(unique(unit_meta$time))
+  y_label <- if (resolve_family_name(object$family) == "occ") {
+    "Posterior occupancy (psi)"
+  } else {
+    "Posterior latent N"
+  }
+
+  set_color_scheme_local("red")
+  layers <- list()
+  for (sp in series_levels) {
+    # Collect per-time pooled posterior draws for this species.
+    # Each (series, time) cell pools `ndraws * n_sites` values, so
+    # quantile bands reflect cross-site and posterior uncertainty
+    # jointly.
+    sp_idx <- unit_meta$series == sp
+    if (!any(sp_idx)) next
+    pooled <- vapply(time_levels, function(tt) {
+      cols <- which(sp_idx & unit_meta$time == tt)
+      as.numeric(state[, cols, drop = FALSE])
+    }, FUN.VALUE = numeric(nrow(state) *
+                            max(1L, sum(sp_idx & unit_meta$time ==
+                                          time_levels[1L]))))
+    # Per-time draw pool. `pooled` is `[ndraws * n_sites_t, n_time]`.
+    layers <- c(
+      layers,
+      mvgam_band_layer(pooled, time_levels, probs = probs,
+                        group = sp),
+      list(mvgam_median_layer(pooled, time_levels, group = sp))
+    )
+  }
+  ggplot2::ggplot() +
+    layers +
+    ggplot2::labs(x = "Time", y = y_label) +
+    ggplot2::facet_wrap(~ series) +
+    mvgam_theme()
+}
+
+
 # Internal: extract per-factor (ndraws x n_time) matrices of
 # factor paths from the Stan posterior. Returns a list of length
 # `n_lv`, names "Factor 1" ... "Factor n_lv". Pattern selection

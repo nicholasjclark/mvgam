@@ -161,6 +161,21 @@ one-time \code{rlang::warn()} when \code{FALSE}. Defaults to \code{TRUE}.}
 \item{...}{Other arguments forwarded to \code{mvgam()}. Notable ones
 include \code{data2} (lookup list for string-named \code{traits} / \code{phylo}
 slots), \code{algorithm}, \code{chains}, and \code{silent}.}
+
+\item{threads}{Positive integer or \code{NULL}. Forwarded to
+\code{\link[=mvgam]{mvgam()}} / \code{cmdstanr}. With closure-unit families
+(\code{nmix()}, \code{occ()}), enables \code{reduce_sum} threading of the
+per-closure-unit lpmf. See \code{\link[=mvgam]{mvgam()}} for the threading
+notes and bench guidance.}
+
+\item{cpp_options}{Optional named list forwarded to
+\code{cmdstanr::cmdstan_model()} (e.g. \code{CXXFLAGS = "-march=native"}).
+\code{stan_threads = TRUE} is auto-set when \code{threads} is non-NULL.}
+
+\item{stanc_options}{Optional list forwarded to
+\code{cmdstanr::cmdstan_model(stanc_options = ...)} (e.g.
+\code{list("O1")} to enable the stanc3 optimiser). Bench
+per-model before enabling.}
 }
 \value{
 A \code{list} of class \code{c("mvgam", "jsdgam")}. The full mvgam

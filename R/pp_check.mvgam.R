@@ -235,7 +235,12 @@ pp_check.mvgam <- function(
         "ppc_resid_acf",
         "ppc_resid_pacf",
         "ppc_resid_qq",
-        "ppc_resid_vs_fitted"
+        "ppc_resid_vs_fitted",
+        # Closure-unit-only chi-squared / Freeman-Tukey discrepancy
+        # GOF (Gelman et al. 1996). Returns a `mvgam_ppc_fit_stat`
+        # object with print + plot methods rather than a bare ggplot;
+        # the rest of the bayesplot-dispatch path is bypassed.
+        "ppc_fit_stat"
       )
     )
     valid_types <- sub("^ppc_", "", valid_types)
@@ -249,6 +254,34 @@ pp_check.mvgam <- function(
         call. = FALSE
       )
     }
+  }
+
+  # Short-circuit for the closure-unit fit-statistic GOF: it has a
+  # custom computation (per-draw discrepancy on epred + yrep) and
+  # returns a dedicated `mvgam_ppc_fit_stat` object, so it bypasses
+  # the bayesplot dispatch entirely.
+  if (identical(type, "fit_stat")) {
+    if (!is_closure_unit_family(object$family)) {
+      stop(insight::format_error(c(
+        "pp_check(type = 'fit_stat') is only available for closure-unit families.",
+        i = "Use family = occ() or family = nmix() to enable this discrepancy GOF."
+      )))
+    }
+    if (!ndraws_given) {
+      ndraws <- 500L
+      message(
+        "Using 500 posterior draws for ppc type 'fit_stat' by default."
+      )
+    }
+    stat <- list(...)$stat %||% "chi_squared"
+    return(closure_unit_fit_stat_ppc(
+      object   = object,
+      newdata  = newdata,
+      stat     = stat,
+      group    = group,
+      ndraws   = ndraws,
+      draw_ids = draw_ids
+    ))
   }
 
   bptype <- type
@@ -683,8 +716,12 @@ closure_unit_pp_check_setup <- function(object, newdata, y, yrep,
                                           type) {
   resp_var <- closure_unit_response_var(object$formula)
   default_cap <- closure_unit_default_cap(object$family)
+  # Multi-season families return `c("series", "site", "time")` here;
+  # single-season families return NULL and fall back to the 2-axis
+  # default inside `build_closure_unit_arrays()`.
   arrays <- build_closure_unit_arrays(
-    newdata, response_var = resp_var, default_cap = default_cap
+    newdata, response_var = resp_var, default_cap = default_cap,
+    unit_grouping_vars = closure_unit_grouping(object$family)
   )
   if (grepl("resid", type)) {
     # `yrep` is already `[ndraws x N_unit]` (per-unit residuals);
@@ -885,6 +922,176 @@ build_resid_vs_fitted_panel <- function(
       y = "DS residuals"
     ) +
     mvgam_theme()
+}
+
+
+# Internal: closure-unit chi-squared / Freeman-Tukey discrepancy
+# GOF (Gelman et al. 1996). For each posterior draw s:
+#   T_obs_s = D(y_obs, E[y|theta_s]),  T_rep_s = D(y_rep_s, E[y|theta_s])
+# with D either chi-squared (sum((y - e)^2 / (e + eps))) or
+# Freeman-Tukey (sum((sqrt(y) - sqrt(e))^2)). Per-visit yrep + epred
+# are aggregated to the closure-unit grain via the shared
+# `aggregate_closure_unit_visits()` helper. An optional `group =`
+# vector of unit-constant covariate columns further sums per group
+# level before applying D. Bayesian p-value is the posterior
+# probability P(T_rep >= T_obs).
+#'@noRd
+closure_unit_fit_stat_ppc <- function(object, newdata, stat,
+                                        group, ndraws, draw_ids) {
+  stat <- match.arg(stat, c("chi_squared", "freeman_tukey"))
+  if (is.null(newdata)) newdata <- object$data %||% object$obs_data
+
+  # Per-visit yrep + epred. Both arrive as [ndraws x N_visit] so they
+  # share the closure-unit aggregator below.
+  yrep_visit <- posterior_predict(
+    object, newdata = newdata, summary = FALSE,
+    ndraws = ndraws, draw_ids = draw_ids
+  )
+  epred_visit <- posterior_epred(
+    object, newdata = newdata, summary = FALSE,
+    ndraws = ndraws, draw_ids = draw_ids
+  )
+
+  # aggregate_closure_unit_visits() is the single shared per-visit
+  # to per-unit summer used by every closure-unit post-fit surface
+  # (pp_check bars / dens_overlay / etc., log_lik, residuals). Calling
+  # it twice keeps the indexing and array bookkeeping in one place;
+  # the y_unit field on the second call is discarded.
+  agg_y <- aggregate_closure_unit_visits(
+    object, newdata = newdata, yrep_visit = yrep_visit
+  )
+  agg_e <- aggregate_closure_unit_visits(
+    object, newdata = newdata, yrep_visit = epred_visit
+  )
+  y_unit     <- agg_y$y_unit
+  yrep_unit  <- agg_y$yrep_unit
+  epred_unit <- agg_e$yrep_unit
+  arrays     <- agg_y$arrays
+
+  # Optional further aggregation by user-supplied group columns.
+  # Group columns must be unit-constant; the existing guard surfaces
+  # a typed error if not.
+  if (!is.null(group)) {
+    checkmate::assert_character(group, min.len = 1L, any.missing = FALSE)
+    bad <- setdiff(group, names(newdata))
+    if (length(bad) > 0L) {
+      stop(insight::format_error(c(
+        "Group column(s) not found in newdata.",
+        x = paste0(paste(bad, collapse = ", "), " missing.")
+      )))
+    }
+    first_visits <- arrays$visit_idx[, 1L]
+    for (g in group) {
+      check_closure_unit_var_unit_constant(
+        as.character(newdata[[g]]), arrays, g
+      )
+    }
+    group_keys <- do.call(paste, c(
+      lapply(group, function(g) {
+        as.character(newdata[[g]][first_visits])
+      }),
+      sep = "|"
+    ))
+    grp_levels <- unique(group_keys)
+    unit_to_grp <- match(group_keys, grp_levels)
+    y_unit     <- as.numeric(tapply(y_unit, unit_to_grp, sum))
+    yrep_unit  <- t(rowsum(t(yrep_unit),  group = unit_to_grp))
+    epred_unit <- t(rowsum(t(epred_unit), group = unit_to_grp))
+    grain <- paste(group, collapse = " x ")
+  } else {
+    grain <- "closure unit"
+  }
+
+  D <- if (identical(stat, "chi_squared")) {
+    function(y, e) sum((y - e)^2 / (e + 1e-6))
+  } else {
+    function(y, e) sum((sqrt(pmax(0, y)) - sqrt(pmax(0, e)))^2)
+  }
+  S <- nrow(yrep_unit)
+  T_obs <- vapply(seq_len(S),
+                  function(s) D(y_unit, epred_unit[s, ]),
+                  numeric(1L))
+  T_rep <- vapply(seq_len(S),
+                  function(s) D(yrep_unit[s, ], epred_unit[s, ]),
+                  numeric(1L))
+  bayes_p <- mean(T_rep >= T_obs)
+
+  structure(
+    list(
+      stat    = stat,    group   = group,   grain   = grain,
+      T_obs   = T_obs,   T_rep   = T_rep,   bayes_p = bayes_p,
+      n_draws = S,       family  = resolve_family_name(object$family)
+    ),
+    class = c("mvgam_ppc_fit_stat", "list")
+  )
+}
+
+
+#' Print a closure-unit GOF discrepancy result
+#'
+#' @param x A `mvgam_ppc_fit_stat` object returned by
+#'   `pp_check(fit, type = "fit_stat")`.
+#' @param ... Unused.
+#' @return Invisibly returns `x`.
+#' @author Nicholas J Clark
+#' @method print mvgam_ppc_fit_stat
+#' @export
+print.mvgam_ppc_fit_stat <- function(x, ...) {
+  stat_lab <- if (identical(x$stat, "chi_squared")) {
+    "chi-squared"
+  } else {
+    "Freeman-Tukey"
+  }
+  cat("Posterior predictive check (closure-unit discrepancy)\n")
+  cat(sprintf("  Family:           %s\n",       x$family))
+  cat(sprintf("  Statistic:        %s\n",       stat_lab))
+  cat(sprintf("  Aggregation:      %s\n",       x$grain))
+  cat(sprintf("  Posterior draws:  %d\n",       x$n_draws))
+  cat(sprintf("  Bayesian p-value: %.3f\n",     x$bayes_p))
+  if (x$bayes_p < 0.05 || x$bayes_p > 0.95) {
+    cat(
+      "  Note: extreme p-value indicates poor model fit at this grain.\n"
+    )
+  }
+  invisible(x)
+}
+
+
+#' Plot a closure-unit GOF discrepancy result
+#'
+#' Scatter of `T(y_rep, theta)` against `T(y_obs, theta)` per
+#' posterior draw, with the 1:1 reference line and the Bayesian
+#' p-value annotated in the subtitle.
+#'
+#' @param x A `mvgam_ppc_fit_stat` object.
+#' @param ... Unused.
+#' @return A `ggplot` object.
+#' @author Nicholas J Clark
+#' @method plot mvgam_ppc_fit_stat
+#' @export
+plot.mvgam_ppc_fit_stat <- function(x, ...) {
+  d <- data.frame(T_obs = x$T_obs, T_rep = x$T_rep)
+  rng <- range(c(d$T_obs, d$T_rep))
+  stat_lab <- if (identical(x$stat, "chi_squared")) {
+    "chi-squared"
+  } else {
+    "Freeman-Tukey"
+  }
+  ggplot2::ggplot(d, ggplot2::aes(x = .data$T_obs, y = .data$T_rep)) +
+    ggplot2::geom_point(alpha = 0.4, colour = "steelblue") +
+    ggplot2::geom_abline(intercept = 0, slope = 1,
+                         linetype = 2, colour = "grey40") +
+    ggplot2::coord_equal(xlim = rng, ylim = rng) +
+    ggplot2::labs(
+      title = paste0(
+        "PPC: ", stat_lab,
+        " discrepancy (", x$grain, " grain)"
+      ),
+      subtitle = paste0("Bayesian p-value = ",
+                        format(round(x$bayes_p, 3), nsmall = 3)),
+      x = "T(y_obs, theta)", y = "T(y_rep, theta)"
+    ) +
+    ggplot2::theme_classic()
 }
 
 

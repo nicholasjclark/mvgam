@@ -937,11 +937,35 @@ build_next_steps <- function(x) {
   has_covariates <- !is.null(x$fixed) &&
     nrow(x$fixed) > 1L
   forecastable <- !grepl("^ZMVN", trend_model)
+  is_cu <- !is.null(x$family) && is_closure_unit_family(x$family)
   # Candidates in priority order; first five matching entries
-  # populate the printed list.
+  # populate the printed list. Closure-unit (occ / nmix) fits get
+  # routed to the family-aware GOF + latent-state surfaces
+  # (chi-squared / Freeman-Tukey discrepancy, latent psi or N
+  # posterior, per-(series, time) ribbon plot) which are the
+  # ecologically meaningful next steps; non-closure-unit fits get
+  # the standard mvgam suggestion set.
+  pp_text <- if (is_cu) {
+    paste0(
+      "`pp_check(fit, type = \"fit_stat\", ",
+      "stat = \"chi_squared\")`: closure-unit GOF (Bayesian p-value)"
+    )
+  } else {
+    "`pp_check(fit)`: posterior predictive checks"
+  }
   candidates <- list(
-    list(when = TRUE,
-         text = "`pp_check(fit)`: posterior predictive checks"),
+    list(when = TRUE, text = pp_text),
+    list(when = is_cu,
+         text = paste0(
+           "`predict(fit, type = \"latent_state\")`: ",
+           "posterior latent state (psi for occ; N for nmix), ",
+           "conditional on observed detections"
+         )),
+    list(when = is_cu,
+         text = paste0(
+           "`plot(fit, type = \"latent_state\")`: ribbon of ",
+           "latent state across (series, time)"
+         )),
     list(when = has_factors,
          text = paste0(
            "`shared_variation(fit)`: factor-implied ",
@@ -964,7 +988,7 @@ build_next_steps <- function(x) {
     Filter(function(c) isTRUE(c$when), candidates),
     function(c) c$text, character(1L)
   )
-  utils::head(texts, 5L)
+  utils::head(texts, 6L)
 }
 
 # ==============================================================================

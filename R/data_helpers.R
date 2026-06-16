@@ -47,10 +47,25 @@
 #' and `jsdgam(family = occ() / nmix())` expect. One row per
 #' `(species, site, season, visit)` tuple. Single-species data
 #' drops the `series` axis; single-season data sets `season = 1`
-#' for every row and `time = site`. Multi-season data emits a
-#' fused `time = (site - 1) * T + season` (the canonical
-#' closure-unit identifier) alongside the raw `site` and `season`
-#' columns for downstream joins.
+#' for every row and `time = site`. Multi-season data has two
+#' modes selected via `multi_season`:
+#'
+#' \itemize{
+#'   \item `"fused"` (default): `time = (site - 1) * T + season`,
+#'     so each (site, season) pair is a unique closure-unit
+#'     identifier. Use when seasons are independent given covariates
+#'     (single-season analysis applied per season, no cross-season
+#'     dynamics modelled).
+#'   \item `"hierarchical"`: `time = season`. Pair with
+#'     `occ(multi_season = TRUE)` / `nmix(multi_season = TRUE)` and
+#'     reference the `site` column in `obs_formula` (e.g.,
+#'     `s(site, bs = "re")`) so per-site variation enters the
+#'     observation model while the trend pipeline operates on the
+#'     season axis. See `?occ` for the multi-season scope and
+#'     identification caveats (the model parameterizes joint
+#'     cross-species occupancy dynamics, NOT explicit colonization
+#'     and extinction rates).
+#' }
 #'
 #' @param y One of four layouts:
 #'   \itemize{
@@ -109,14 +124,30 @@
 #'   Defaults to `"season"`.
 #' @param visit_col Name of the visit identifier. Defaults to
 #'   `"visit"`.
-#' @param time_col Name of the fused closure-unit identifier.
+#' @param time_col Name of the closure-unit time identifier.
 #'   Defaults to `"time"`. Single-season: `time = site`.
-#'   Multi-season: `time = (site - 1) * T + season` so each
-#'   `(site, season)` pair is a unique closure unit.
+#'   Multi-season + `multi_season = "fused"`:
+#'   `time = (site - 1) * T + season` (one closure unit per
+#'   (site, season)). Multi-season + `multi_season =
+#'   "hierarchical"`: `time = season` (one closure unit per
+#'   (species, site, season), with site referenced separately in
+#'   `obs_formula`).
 #' @param series_col Name of the species column. Defaults to
 #'   `"series"`.
 #' @param y_col Name of the detection / count column. Defaults to
 #'   `"y"`.
+#' @param multi_season Character scalar controlling the
+#'   multi-season `time` encoding. `"fused"` (default) fuses
+#'   `(site, season)` into a single `time` axis so each
+#'   `(site, season)` pair is a unique closure unit. This matches
+#'   the existing single-season closure-unit grouping
+#'   `(series, time)` and works with `occ()` / `nmix()` unchanged.
+#'   `"hierarchical"` keeps `time = season` and exposes `site` as
+#'   a side-car covariate for use in `obs_formula`; pair with
+#'   `occ(multi_season = TRUE)` or `nmix(multi_season = TRUE)` so
+#'   the 3-axis closure-unit grouping `(series, site, time)` is
+#'   activated. Ignored for single-season inputs (2D matrix, 3D
+#'   `[N, J, K]` array, or 4D array with `T = 1`).
 #'
 #' @return A long-format `data.frame` with columns
 #'   `(series, time, site, season, visit, y, <site_covs>,
@@ -137,13 +168,16 @@ pivot_detection_array <- function(y,
                                     visit_col = "visit",
                                     time_col = "time",
                                     series_col = "series",
-                                    y_col = "y") {
+                                    y_col = "y",
+                                    multi_season = c("fused",
+                                                       "hierarchical")) {
   checkmate::assert_string(site_col)
   checkmate::assert_string(season_col)
   checkmate::assert_string(visit_col)
   checkmate::assert_string(time_col)
   checkmate::assert_string(series_col)
   checkmate::assert_string(y_col)
+  multi_season <- match.arg(multi_season)
 
   # Coerce `y` to a canonical 4D `[N, J, T, K]` array. Single-species
   # and single-season cases slot in via singleton axes that drop /
@@ -157,7 +191,9 @@ pivot_detection_array <- function(y,
   J <- dim(y_arr)[2L]
   T_ <- dim(y_arr)[3L]
   K <- dim(y_arr)[4L]
-  multi_season <- T_ > 1L
+  # Local flag for the "is there >1 season in the data?" question.
+  # Distinct from the user-facing `multi_season` mode arg.
+  is_multi_season <- T_ > 1L
 
   reserved_cols <- c(series_col, site_col, season_col, visit_col,
                       time_col, y_col)
@@ -185,7 +221,7 @@ pivot_detection_array <- function(y,
   }
   if (!is.null(obs_covs)) {
     obs_covs <- normalise_obs_covs(obs_covs, J = J, T_ = T_, K = K,
-                                     multi_season = multi_season)
+                                     multi_season = is_multi_season)
     assert_no_reserved_cols(names(obs_covs), reserved_cols, "obs_covs")
   }
 
@@ -207,7 +243,21 @@ pivot_detection_array <- function(y,
   out[[site_col]]   <- grid$site
   out[[season_col]] <- grid$season
   out[[visit_col]]  <- grid$visit
-  out[[time_col]]   <- (grid$site - 1L) * T_ + grid$season
+  # Two branches. Hierarchical multi-season puts site on its own
+  # axis: `time = season`, so the 3-axis closure-unit grouping
+  # `(series, site, time)` inside `occ(multi_season = TRUE)` /
+  # `nmix(multi_season = TRUE)` reads site separately for the
+  # obs-formula. The other branch fuses (site, season) into a
+  # single closure-unit time slot via `(site - 1) * T + season`,
+  # which automatically reduces to `time = site` when T = 1
+  # because season = 1 there. So single-season inputs and
+  # fused-multi-season inputs share one branch.
+  out[[time_col]] <- if (is_multi_season &&
+                          identical(multi_season, "hierarchical")) {
+    grid$season
+  } else {
+    (grid$site - 1L) * T_ + grid$season
+  }
   out[[y_col]]      <- y_arr[cbind(grid$series, grid$site,
                                      grid$season, grid$visit)]
 
@@ -239,7 +289,7 @@ pivot_detection_array <- function(y,
   if (drop_species_axis) {
     out[[series_col]] <- NULL
   }
-  if (!multi_season) {
+  if (!is_multi_season) {
     out[[season_col]] <- NULL
   }
   out

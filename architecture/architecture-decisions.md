@@ -143,12 +143,12 @@ mu_biomass += mu_biomass_trend;
 **Factor Model Detection Logic**:
 - **Trigger**: Presence of `n_lv` parameter in trend specification
 - **Validation**: Only factor-compatible trend types can accept `n_lv` parameter
-- **Requirement**: `n_lv < n_series` (fewer latent variables than observed series)
+- **Requirement**: `n_lv < n_series` under the default iid `Z` prior. `n_lv <= n_series` is allowed when `loadings_prior = "mgp"` is supplied (the multiplicative-gamma-process prior of Bhattacharya & Dunson 2011 treats `n_lv` as a truncation ceiling and shrinks redundant columns toward zero). Gate lives in `validate_n_lv_ceiling()` (`R/validations.R`), shared by `mvgam()` and `jsdgam()`.
 - **Compatible Trends**: AR, RW, VAR, ZMVN (including correlated and grouped variants)
 - **Incompatible Trends**: CAR (continuous time), PW (piecewise)
 
 **Key Factor Model Requirements**:
-1. **Detection**: Factor models triggered by `n_lv < n_series` on compatible trend types
+1. **Detection**: Factor models triggered by `is_factor_model_spec(n_lv, n_series)` (R/validations.R), TRUE for `n_lv <= n_series` on compatible trend types
 2. **Validation**: Registry-based compatibility checking prevents invalid factor models
 3. **Variance Constraint**: Dynamic factor variances must be fixed to 1 for identifiability
 4. **Matrix Z Location**: Four branches handled by `generate_matrix_z_multiblock_stanvars()`:
@@ -172,6 +172,8 @@ mu_biomass += mu_biomass_trend;
 **Structured loadings priors via `loadings_prior`**: Optional top-level `mvgam(loadings_prior = ...)` argument that swaps the default iid Student-t prior on `Z` for the structured matrix-normal of Heaps & Jermyn (2024). The user supplies one or both of (i) a per-series feature matrix expanded into an ARD exponential kernel via `gp_exponential_cov()` and (ii) one or more pairwise distance matrices each contributing an `exp(-d / theta)` factor. These combine multiplicatively into the among-row scale matrix `Phi`, and the per-column prior `Z[, i] ~ multi_normal_cholesky(0, L_Phi * sqrt(Psi_diag[i]))` replaces the default. Optional multiplicative-gamma-process column shrinkage on `Psi_diag` (Bhattacharya & Dunson 2011, used in Heaps Eq. 9) is opt-in via `column_shrinkage = "mgp"`.
 
 The key inferential property is `E(Delta) = tr(Psi^2) * Phi`, where `Delta = Z * Z'` is the prior expected shared variation matrix among series (Heaps Sect. 3). `Phi` is therefore proportional to the prior expectation of an observable, interpretable quantity (the cross-series covariance pattern induced by the latent factors), not the latent loadings themselves. Encoding domain knowledge into `Phi` shapes the prior on the observable rather than on a rotation-arbitrary latent object. Length-scales receive a default `lognormal(0, 1)` prior on the auto-standardised distance scale (pairwise matrices are rescaled so `max(d) = 1` inside the normaliser), matching Heaps' practice across the simulation (Sect. 6.1.2) and gas-demand (Sect. 6.3.1) applications. Combination with `trend_map` is rejected: a partial or fully-fixed loadings matrix has no free parameters left for a structured prior.
+
+**Closure-unit grouping cardinality**: Closure-unit families default to a 2-column `(series, time)` grouping. `occ(multi_season = TRUE)` and `nmix(multi_season = TRUE)` opt into 3-column `(series, site, time)` via `attr(family, "mvgam_unit_grouping")`; `prepare_closure_unit_family()` threads it through both the validator and the array builder. The factor model architecture is unchanged: `Z` stays `[N_species, n_lv]`, `lv_trend` stays `[N_time_trend, n_lv]` and the trend pipeline operates on the season axis. Per-site variation enters via the obs-formula, preserving the "trends only on `mu`" rule.
 
 ### 3. Code Deduplication for User Extensibility
 

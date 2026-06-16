@@ -32,8 +32,15 @@
 #'       [posterior::as_draws_array()] when you need the raw
 #'       draws (e.g. for custom summaries).}
 #'     \item{`"series"`}{Input-data exploratory plot (works
-#'       without a fit — wraps the observation data carried on
+#'       without a fit, wraps the observation data carried on
 #'       the object).}
+#'     \item{`"latent_state"`}{Per-(series, time) ribbon of the
+#'       marginal latent state for closure-unit families: latent
+#'       abundance `N` for `nmix()` (and its variants) or
+#'       occupancy `psi` for `occ()`. Pools across sites for
+#'       multi-season fits so each ribbon summarises the marginal
+#'       posterior at each (species, time) cell. Errors clearly
+#'       for non-closure-unit fits.}
 #'   }
 #'
 #'   For posterior forecasts, parametric effects, random
@@ -70,7 +77,8 @@
 #' @export
 plot.mvgam <- function(
   x,
-  type = c("residuals", "smooths", "trend", "factors", "series"),
+  type = c("residuals", "smooths", "trend", "factors", "series",
+            "latent_state"),
   series = NULL,
   ndraws = NULL,
   ...
@@ -92,7 +100,8 @@ plot.mvgam <- function(
       ...
     ),
     factors = plot_factors(x, ...),
-    series = plot_mvgam_series(object = x, series = series, ...)
+    series = plot_mvgam_series(object = x, series = series, ...),
+    latent_state = plot_latent_state(x, ndraws = ndraws, ...)
   )
 }
 

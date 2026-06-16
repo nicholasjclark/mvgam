@@ -6,7 +6,7 @@
 \usage{
 \method{plot}{mvgam}(
   x,
-  type = c("residuals", "smooths", "trend", "factors", "series"),
+  type = c("residuals", "smooths", "trend", "factors", "series", "latent_state"),
   series = NULL,
   ndraws = NULL,
   ...
@@ -41,8 +41,15 @@ Per-draw factor paths themselves live on \code{object$fit} as
 \code{\link[posterior:draws_array]{posterior::as_draws_array()}} when you need the raw
 draws (e.g. for custom summaries).}
 \item{\code{"series"}}{Input-data exploratory plot (works
-without a fit — wraps the observation data carried on
+without a fit, wraps the observation data carried on
 the object).}
+\item{\code{"latent_state"}}{Per-(series, time) ribbon of the
+marginal latent state for closure-unit families: latent
+abundance \code{N} for \code{nmix()} (and its variants) or
+occupancy \code{psi} for \code{occ()}. Pools across sites for
+multi-season fits so each ribbon summarises the marginal
+posterior at each (species, time) cell. Errors clearly
+for non-closure-unit fits.}
 }
 
 For posterior forecasts, parametric effects, random

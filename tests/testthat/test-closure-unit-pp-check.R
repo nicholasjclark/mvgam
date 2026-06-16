@@ -117,3 +117,50 @@ test_that("check_closure_unit_var_unit_constant() accepts unit-constant covariat
     check_closure_unit_var_unit_constant(d$elev, arrays, "elev")
   )
 })
+
+# ------------------------------------------------------------
+# pp_check(type = "fit_stat"): chi-squared / Freeman-Tukey
+# discrepancy GOF (Gelman et al. 1996). The dispatch is gated on
+# closure-unit families; non-closure-unit fits get a typed error
+# pointing to occ() / nmix(). The math itself is small and tested
+# directly: chi-squared at y == E[y] is zero, and the F-T form is
+# scale-equivariant under shared sqrt.
+# ------------------------------------------------------------
+
+test_that("pp_check(type = 'fit_stat') errors on non-closure-unit family", {
+  # gaussian mvgam stub: family is gaussian(), not closure-unit
+  d <- data.frame(y = rnorm(10L), x = rnorm(10L),
+                  series = factor(rep(1L, 10L)),
+                  time = seq_len(10L))
+  obj <- structure(
+    list(data = d, formula = y ~ x, family = gaussian()),
+    class = "mvgam"
+  )
+  expect_error(
+    pp_check(obj, type = "fit_stat"),
+    "only available for closure-unit families"
+  )
+})
+
+test_that("mvgam_ppc_fit_stat print + plot methods produce expected output", {
+  # Hand-construct a fit_stat result with a known Bayesian p-value
+  # so the formatting is testable without a real Stan fit.
+  set.seed(7L)
+  T_obs <- rnorm(50L, mean = 100, sd = 5)
+  T_rep <- rnorm(50L, mean = 100, sd = 5)
+  obj <- structure(
+    list(
+      stat = "chi_squared", group = NULL, grain = "closure unit",
+      T_obs = T_obs, T_rep = T_rep,
+      bayes_p = mean(T_rep >= T_obs),
+      n_draws = 50L, family = "occ"
+    ),
+    class = c("mvgam_ppc_fit_stat", "list")
+  )
+  out <- capture.output(print(obj))
+  expect_true(any(grepl("chi-squared", out)))
+  expect_true(any(grepl("Bayesian p-value", out)))
+  expect_true(any(grepl("closure unit", out)))
+  p <- plot(obj)
+  expect_s3_class(p, "ggplot")
+})

@@ -1237,9 +1237,9 @@ test_that("predict.mvgam(type = 'terms') errors with migration pointer", {
 })
 
 
-test_that("predict.mvgam(type = 'latent_N'/'detection') errors clearly", {
+test_that("predict.mvgam(type = 'latent_state'/'detection') errors clearly", {
   expect_error(
-    predict.mvgam(predict_stub_obj(), type = "latent_N"),
+    predict.mvgam(predict_stub_obj(), type = "latent_state"),
     "not available for this family"
   )
   expect_error(

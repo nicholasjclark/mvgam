@@ -11,8 +11,8 @@
 #' @param newdata An optional data.frame containing new predictor values.
 #'   If `NULL` (the default), the original training data is used.
 #' @param type Character; one of `"response"` (default), `"link"`,
-#'   `"expected"`, `"variance"`, `"terms"`, `"latent_N"`,
-#'   `"occupancy"`, `"detection"`. See Details.
+#'   `"expected"`, `"variance"`, `"terms"`, `"latent_state"`,
+#'   `"detection"`. See Details.
 #' @param process_error Logical. If `FALSE` (the default) the trend is
 #'   fixed at its posterior mean and only parameter uncertainty
 #'   propagates, treating the latent trend as a nuisance random
@@ -84,14 +84,19 @@
 #'     Not yet ported on this branch; use [posterior_smooths.mvgam()]
 #'     for per-smooth draws and [fixef.mvgam()] / [ranef.mvgam()] for
 #'     parametric and random-effect components.
-#'   \item `"latent_N"`: closure-unit nmix() only. Posterior
-#'     latent abundance N per closure unit, conditioned on the
-#'     observed counts (Royle 2004 reverse-Bayes).
-#'   \item `"occupancy"`: closure-unit occ() only. Posterior
-#'     occupancy probability P(z = 1 | y_g) per site,
-#'     conditioned on the observed detection history. Returns
-#'     the probability matrix by default; use `posterior_occupancy(draw = TRUE)`
-#'     directly for 0/1 z draws.
+#'   \item `"latent_state"`: closure-unit families. Family-aware
+#'     posterior of the latent state per closure unit, conditioned
+#'     on the observed detection history:
+#'     \itemize{
+#'       \item `nmix()`: posterior latent abundance `N`
+#'         conditional on the observed visit counts, via
+#'         `posterior_latent_N()` (Royle 2004).
+#'       \item `occ()`: posterior occupancy probability
+#'         `P(z = 1 | y_g)` via `posterior_occupancy()`. Returns
+#'         the probability matrix by default; use
+#'         `posterior_occupancy(draw = TRUE)` directly for 0/1 z
+#'         draws.
+#'     }
 #'   \item `"detection"`: closure-unit families (nmix(), occ()).
 #'     Per-visit detection probability p_{g,j} on the response
 #'     scale.
@@ -126,8 +131,8 @@
 predict.mvgam <- function(object,
                           newdata = NULL,
                           type = c("response", "link", "expected",
-                                   "variance", "terms", "latent_N",
-                                   "occupancy", "detection"),
+                                   "variance", "terms", "latent_state",
+                                   "detection"),
                           process_error = FALSE,
                           ndraws = NULL,
                           draw_ids = NULL,
@@ -170,11 +175,14 @@ predict.mvgam <- function(object,
 
   # Closure-unit family types: dispatch via the per-family
   # extractors in families.R. Each family registers its valid
-  # `type` strings on `attr(family, "mvgam_predict_types")` (e.g.
-  # nmix => c("latent_N", "detection"); occ => c("occupancy",
-  # "detection")). `detection` is shared across all closure-unit
-  # families; the latent-state type is family-specific.
-  if (type %in% c("latent_N", "detection", "occupancy")) {
+  # `type` strings on `attr(family, "mvgam_predict_types")`. Both
+  # nmix() and occ() expose c("latent_state", "detection"). The
+  # generic "latent_state" token routes through
+  # `dispatch_closure_unit_method(family, "latent_state")` to the
+  # family-aware kernel: `posterior_latent_N()` for nmix returning
+  # posterior `N`; `posterior_occupancy()` for occ returning
+  # posterior `psi`.
+  if (type %in% c("latent_state", "detection")) {
     family_types <- attr(object$family, "mvgam_predict_types",
                           exact = TRUE) %||% character(0)
     if (!is_closure_unit_family(object$family) ||
@@ -195,21 +203,27 @@ predict.mvgam <- function(object,
         i = "Refit with family = nmix() or family = occ() to enable closure-unit predict types."
       )))
     }
-    pred <- switch(
-      type,
-      latent_N  = posterior_latent_N(
-        object, newdata = newdata,
-        draw_ids = draw_ids, conditional = TRUE
-      ),
-      occupancy = posterior_occupancy(
-        object, newdata = newdata,
+    pred <- if (identical(type, "latent_state")) {
+      kernel <- dispatch_closure_unit_method(
+        object$family, "latent_state"
+      )
+      # posterior_occupancy() carries an extra `draw` arg:
+      # FALSE returns the probability matrix, TRUE returns 0/1
+      # z draws. At the predict() call site we want probability.
+      kernel_formals <- names(formals(kernel))
+      kernel_args <- list(
+        object   = object,
+        newdata  = newdata,
         draw_ids = draw_ids,
-        conditional = TRUE, draw = FALSE
-      ),
-      detection = posterior_detection(
+        conditional = TRUE
+      )
+      if ("draw" %in% kernel_formals) kernel_args$draw <- FALSE
+      do.call(kernel, kernel_args)
+    } else {
+      posterior_detection(
         object, newdata = newdata, draw_ids = draw_ids
       )
-    )
+    }
     if (!summary) return(pred)
     return(summarize_predictions(pred, probs = probs, robust = robust))
   }

@@ -62,8 +62,8 @@
 #'
 #' ```r
 #' new_priors <- c(
-#'   brms::prior(normal(0, 1), class = "b"),
-#'   brms::prior(exponential(1), class = "sigma")
+#'   prior(normal(0, 1), class = "b"),
+#'   prior(exponential(1), class = "sigma")
 #' )
 #' refit <- update(mod, prior = new_priors)
 #' ```
@@ -114,8 +114,8 @@
 #' mod5 <- update(
 #'   mod,
 #'   prior = c(
-#'     brms::prior(normal(0, 1), class = "b"),
-#'     brms::prior(exponential(1), class = "sigma")
+#'     prior(normal(0, 1), class = "b"),
+#'     prior(exponential(1), class = "sigma")
 #'   )
 #' )
 #' }

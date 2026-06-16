@@ -74,8 +74,8 @@ loosen a constraint) pass \code{prior = ...} directly to
 for that call only:
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{new_priors <- c(
-  brms::prior(normal(0, 1), class = "b"),
-  brms::prior(exponential(1), class = "sigma")
+  prior(normal(0, 1), class = "b"),
+  prior(exponential(1), class = "sigma")
 )
 refit <- update(mod, prior = new_priors)
 }\if{html}{\out{</div>}}
@@ -117,8 +117,8 @@ mod4 <- update(mod, formula. = ~ . + s(x))
 mod5 <- update(
   mod,
   prior = c(
-    brms::prior(normal(0, 1), class = "b"),
-    brms::prior(exponential(1), class = "sigma")
+    prior(normal(0, 1), class = "b"),
+    prior(exponential(1), class = "sigma")
   )
 )
 }

@@ -131,7 +131,7 @@ extraction; \code{get_Z(history_condition = TRUE)} for
 conditional z draws.
 }
 
-mvgam: \code{predict(fit, type = "occupancy")} returns the
+mvgam: \code{predict(fit, type = "latent_state")} returns the
 conditional probability \code{P(z = 1 | y)} per site;
 \code{posterior_occupancy(fit, conditional = TRUE, draw = TRUE)}
 returns 0/1 z draws; \code{posterior_occupancy(conditional = FALSE)}

@@ -92,9 +92,9 @@ test_that("log_lik.mvgam returns [S x N_unit] for nmix (closure-unit grain for L
   expect_true(all(is.finite(ll)))
 })
 
-test_that("predict.mvgam(type = 'latent_N') returns [S x N_unit] integer N draws covering truth", {
+test_that("predict.mvgam(type = 'latent_state') returns [S x N_unit] integer N draws covering truth", {
   bundle <- local_nmix_fit()
-  ln <- predict(bundle$fit, type = "latent_N", summary = FALSE)
+  ln <- predict(bundle$fit, type = "latent_state", summary = FALSE)
   expect_equal(dim(ln), c(150L, length(unique(bundle$data$series))))
   expect_true(all(ln == as.integer(ln)))
   # Per-unit mean should land near the simulated N's mean.
@@ -126,7 +126,7 @@ test_that("predict.mvgam(type = 'latent_N') errors on non-nmix families", {
   fit <- mvgam(y ~ elev, data = d, chains = 1, iter = 100,
                warmup = 50, silent = 2, refresh = 0)
   expect_error(
-    predict(fit, type = "latent_N"),
+    predict(fit, type = "latent_state"),
     "not available for this family"
   )
   expect_error(
@@ -167,7 +167,7 @@ test_that("nmix vector-p R-side prediction recovers the detection-covariate effe
   expect_no_error(posterior_epred(fit))
   expect_no_error(posterior_predict(fit))
   expect_no_error(log_lik(fit))
-  expect_no_error(predict(fit, type = "latent_N", summary = FALSE))
+  expect_no_error(predict(fit, type = "latent_state", summary = FALSE))
 })
 
 test_that("nmix smooth-in-p recovers a known non-linear effect", {
@@ -338,7 +338,7 @@ test_that("nmix('royle_nichols') end-to-end fit returns correct grain for every 
   ll <- log_lik(fit)
   expect_equal(dim(ll), c(150L, n_unit))
   expect_true(all(is.finite(ll)))
-  latent <- predict(fit, type = "latent_N", summary = FALSE)
+  latent <- predict(fit, type = "latent_state", summary = FALSE)
   expect_equal(dim(latent), c(150L, n_unit))
   expect_true(all(latent >= 0L & latent <= 15L))
   expect_true(all(latent == as.integer(latent)))
@@ -525,7 +525,7 @@ test_that("nmix('poisson_poisson') end-to-end fit returns correct grain for ever
   ll <- log_lik(fit)
   expect_equal(dim(ll), c(150L, n_unit))
   expect_true(all(is.finite(ll)))
-  latent <- predict(fit, type = "latent_N", summary = FALSE)
+  latent <- predict(fit, type = "latent_state", summary = FALSE)
   expect_equal(dim(latent), c(150L, n_unit))
   expect_true(all(latent >= 0L & latent <= 30L))
   expect_true(all(latent == as.integer(latent)))
