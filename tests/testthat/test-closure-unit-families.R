@@ -1108,6 +1108,51 @@ test_that("stancode under nmix('royle_nichols') emits partial_sum + reduce_sum s
   # RN has no log(int) in the inner loop, so log_n_lookup must NOT
   # be emitted for this family.
   expect_false(grepl("log_n_lookup", sc, fixed = TRUE))
+  # Haines (2016) closed-form fast-path for the all-zero detection
+  # case. cmax == 0 collapses sum_{N=0}^infty Poisson(N|lambda) *
+  # prod_t (1-r_t)^N to exp(lambda * (prod_t (1-r_t) - 1)) via the
+  # Poisson MGF -- exact, scalar, no log_sum_exp, no K_max
+  # truncation bias on the dominant all-zero units.
+  expect_match(sc, "if (cmax == 0)", fixed = TRUE)
+  expect_match(sc, "real log_z = sum(log_1m_r_v);", fixed = TRUE)
+  expect_match(sc, "lp += exp(log_lam) * (exp(log_z) - 1.0);",
+               fixed = TRUE)
+})
+
+test_that("RN Haines closed form (Y_max = 0) matches brute-force marginalisation to round-off", {
+  # Pin the Poisson-MGF identity used in the Stan code at machine
+  # precision. The closed form `lp = lambda * (z - 1)` with
+  # `z = prod_t (1 - r_t)` must agree with the truncated sum
+  # `sum_{k=0}^{K_max} Poisson(k|lambda) * z^k` in the limit
+  # K_max -> infty. We pick K_max = 200 (well above all tested
+  # lambdas) so the truncation error is below double precision and
+  # any deviation > 1e-12 surfaces as a bug in the Stan emission.
+  closed_form <- function(lambda, r_t) {
+    z <- prod(1 - r_t)
+    lambda * (z - 1)
+  }
+  brute_force_log <- function(lambda, r_t, K_max) {
+    z <- prod(1 - r_t)
+    k_vals <- 0:K_max
+    log_terms <- stats::dpois(k_vals, lambda, log = TRUE) + k_vals * log(z)
+    m <- max(log_terms)
+    m + log(sum(exp(log_terms - m)))
+  }
+  # Span the typical RN parameter space: low / moderate / high
+  # encounter rate per visit; 2 / 5 / 10 visits; lambda in
+  # {0.1, 1, 5, 15, 30}. All combinations must agree to round-off.
+  scenarios <- expand.grid(
+    lambda = c(0.1, 1, 5, 15, 30),
+    n_visit = c(2L, 5L, 10L),
+    r = c(0.05, 0.3, 0.7)
+  )
+  for (i in seq_len(nrow(scenarios))) {
+    s <- scenarios[i, ]
+    r_t <- rep(s$r, s$n_visit)
+    closed <- closed_form(s$lambda, r_t)
+    brute  <- brute_force_log(s$lambda, r_t, 200L)
+    expect_equal(closed, brute, tolerance = 1e-12)
+  }
 })
 
 test_that("stancode under nmix('poisson_poisson') emits partial_sum + log_n_lookup + reduce_sum", {
