@@ -424,7 +424,12 @@ jsdgam <- function(formula,
   if (!missing(newdata)) forward_args$newdata <- newdata
   if (!missing(knots)) forward_args$knots <- knots
   if (!missing(factor_knots)) forward_args$trend_knots <- factor_knots
-  if (!missing(priors)) forward_args$priors <- priors
+  # Reason: forward under the singular brms convention so the
+  # prior table actually reaches the codegen pipeline. mvgam()
+  # accepts both forms via normalise_prior_arg_alias() but
+  # canonicalising at the call site avoids any chance of the
+  # plural surviving into `...` and being dropped.
+  if (!missing(priors)) forward_args$prior <- priors
   if (!is.null(loadings_prior_resolved)) {
     forward_args$loadings_prior <- loadings_prior_resolved
   }

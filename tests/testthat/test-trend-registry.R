@@ -733,3 +733,52 @@ test_that("has_stochastic_trend() returns FALSE for trendless mvgam objects", {
   expect_false(mvgam:::has_stochastic_trend(obj))
 })
 
+test_that("normalise_prior_arg_alias() renames 'priors' to 'prior'", {
+  # Reason: the brms convention is the singular form; historic mvgam
+  # and jsdgam docs use the plural. Without aliasing, the plural
+  # form falls into `...` and is silently dropped by every consumer
+  # downstream that takes `prior = NULL`.
+  fake_prior <- structure(
+    data.frame(
+      prior = "normal(0, 1)", class = "b",
+      coef = "", group = "", resp = "", dpar = "",
+      nlpar = "a", lb = NA, ub = NA, tag = "",
+      source = "user", stringsAsFactors = FALSE
+    ),
+    class = c("brmsprior", "data.frame")
+  )
+
+  # Plural alias renamed in place.
+  out <- mvgam:::normalise_prior_arg_alias(list(priors = fake_prior))
+  expect_named(out, "prior")
+  expect_identical(out$prior, fake_prior)
+
+  # Singular passthrough untouched.
+  out_s <- mvgam:::normalise_prior_arg_alias(list(prior = fake_prior))
+  expect_named(out_s, "prior")
+  expect_identical(out_s$prior, fake_prior)
+
+  # No prior at all -> no rename, no addition.
+  expect_identical(
+    mvgam:::normalise_prior_arg_alias(list(chains = 2L)),
+    list(chains = 2L)
+  )
+
+  # Conflicting prior + priors with different values errors.
+  other <- fake_prior
+  other$prior <- "normal(0, 10)"
+  expect_error(
+    mvgam:::normalise_prior_arg_alias(
+      list(prior = fake_prior, priors = other)
+    ),
+    "Both 'prior' and 'priors' supplied"
+  )
+
+  # Same value under both names is a no-op (no error).
+  expect_silent(
+    mvgam:::normalise_prior_arg_alias(
+      list(prior = fake_prior, priors = fake_prior)
+    )
+  )
+})
+

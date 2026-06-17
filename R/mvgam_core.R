@@ -376,15 +376,26 @@ mvgam_single <- function(formula, trend_formula, data, backend,
   # Create mvgam_formula object for shared processing
   mvgam_formula_obj <- mvgam_formula(formula, trend_formula)
 
+  # Reason: brms uses 'prior' (singular), historic mvgam / jsdgam
+  # docs use 'priors'. Without aliasing, the plural form falls
+  # into `...` and is silently dropped by every consumer downstream
+  # that takes `prior = NULL`.
+  forward_dots <- normalise_prior_arg_alias(list(...))
+
   # Use existing shared infrastructure (same as stancode())
-  stan_components <- generate_stan_components_mvgam_formula(
-    formula = mvgam_formula_obj,
-    data = data,
-    family = family,
-    backend = backend,
-    trend_map = trend_map,
-    loadings_prior = loadings_prior,
-    ...
+  stan_components <- do.call(
+    generate_stan_components_mvgam_formula,
+    c(
+      list(
+        formula = mvgam_formula_obj,
+        data = data,
+        family = family,
+        backend = backend,
+        trend_map = trend_map,
+        loadings_prior = loadings_prior
+      ),
+      forward_dots
+    )
   )
 
   # Deprecated run_model = FALSE: short-circuit before parse / compile
@@ -405,9 +416,11 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     ))
   }
 
-  # Fit the combined model using backend functions directly
-  dots <- list(...)
-  
+  # Fit the combined model using backend functions directly.
+  # Reuse the alias-normalised list captured above so the singular /
+  # plural prior alias survives the fitting branch too.
+  dots <- forward_dots
+
   # Extract fitting parameters with defaults
   algorithm <- dots$algorithm %||% "sampling"
   iter <- dots$iter %||% 2000

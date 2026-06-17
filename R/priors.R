@@ -544,6 +544,36 @@ combine_obs_trend_priors <- function(obs_priors, trend_priors) {
   structure(combined, class = c("brmsprior", "data.frame"))
 }
 
+#' Normalise the `priors` / `prior` argument alias
+#'
+#' Accepts a `...` list and returns it with any `priors` entry
+#' renamed to `prior`. The brms convention is the singular form;
+#' historic mvgam / jsdgam docs use the plural. Without this
+#' normalisation, callers using the plural lose their brms prior
+#' table silently because internal codegen takes `prior = NULL`
+#' and never inspects `...$priors`.
+#'
+#' Errors if both forms are supplied and disagree, to surface the
+#' ambiguity rather than picking one silently.
+#'
+#' @param dots A list captured from `...`.
+#' @return The same list with `prior` populated.
+#' @noRd
+normalise_prior_arg_alias <- function(dots) {
+  if (is.null(dots$priors)) {
+    return(dots)
+  }
+  if (!is.null(dots$prior) && !identical(dots$prior, dots$priors)) {
+    stop(insight::format_error(c(
+      "Both 'prior' and 'priors' supplied with different values.",
+      i = "Pass priors once via 'prior =' (brms convention)."
+    )))
+  }
+  dots$prior  <- dots$priors
+  dots$priors <- NULL
+  dots
+}
+
 #' Filter Observation Priors from Combined Prior Object
 #'
 #' @description
