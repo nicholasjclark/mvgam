@@ -16,7 +16,7 @@
 # HELPER FUNCTIONS
 # =============================================================================
 
-#' Determine if trend formula should include intercept based on mvgam conventions
+#' Decide if a trend formula should include an intercept (mvgam convention)
 #' 
 #' @description
 #' Analyzes trend formulas to determine intercept inclusion following mvgam 
@@ -55,8 +55,8 @@ should_trend_formula_have_intercept <- function(formula) {
     return(TRUE)
   }
   
-  # For pure trend constructor formulas (~ RW(), ~ AR()) with default R intercept,
-  # follow mvgam convention of no intercept for trend innovations
+  # Pure trend constructor formulas (~ RW(), ~ AR()) follow the mvgam
+  # convention of no intercept for trend innovations
   return(FALSE)
 }
 
@@ -125,8 +125,10 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   # Trend context handling - validate and reduce data if this is trend setup
   if (is_trend_setup && !is.null(trend_formula)) {
     # Use consolidated validation and data extraction with metadata capture
-    result <- extract_trend_data(data, trend_formula, time_var, series_var,
-                                response_vars = response_vars, .return_metadata = TRUE)
+    result <- extract_trend_data(
+      data, trend_formula, time_var, series_var,
+      response_vars = response_vars, .return_metadata = TRUE
+    )
     data <- result$trend_data
     trend_metadata <- result$metadata
     
@@ -136,7 +138,8 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
 
   # Handle trend formulas without response variables
   # Only apply this logic to regular formula objects, not brms formula objects
-  if (inherits(formula, "formula") && !inherits(formula, c("brmsformula", "mvbrmsformula", "bform"))) {
+  if (inherits(formula, "formula") &&
+      !inherits(formula, c("brmsformula", "mvbrmsformula", "bform"))) {
     # Check if formula lacks response variable (e.g., ~ 1, ~ x + y)
     formula_chr <- deparse(formula)
     if (!grepl("~.*~", formula_chr) && grepl("^\\s*~", formula_chr)) {
@@ -225,7 +228,7 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
 
   # Add version metadata to prevent restructure() from calling update()
   # standata() and prepare_predictions() call restructure() which checks version
-  # and attempts update() if version is NULL or < "1.0". For multivariate models,
+  # and attempts update() if version is NULL or < "1.0". Multivariate models
   # update() throws an error. Adding current brms version prevents this.
   mock_setup$version <- list(brms = utils::packageVersion("brms"))
 
@@ -248,8 +251,10 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     brmsterms = extract_brmsterms_from_setup(mock_setup),
     brmsfit = mock_setup,  # Keep the mock brmsfit for prediction
     trend_specs = trend_specs,  # Include parsed trend specifications
-    trend_metadata = if (exists("trend_metadata")) trend_metadata else NULL,  # Include trend metadata if available
-    setup_time = system.time({})[["elapsed"]] # Track performance
+    # Pass through any trend metadata captured upstream so
+    # downstream stancode generation can reuse it.
+    trend_metadata = if (exists("trend_metadata")) trend_metadata else NULL,
+    setup_time = system.time({})[["elapsed"]]
   )
 
   # Validate extracted components
@@ -270,7 +275,9 @@ extract_prior_from_setup <- function(setup_object) {
     prior_info <- setup_object$prior
   } else {
     # Reconstruct from formula and data
-    prior_info <- brms::get_prior(setup_object$formula, setup_object$data, setup_object$family)
+    prior_info <- brms::get_prior(
+      setup_object$formula, setup_object$data, setup_object$family
+    )
   }
 
   return(prior_info)
@@ -309,7 +316,8 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
     combine = "or"
   )
 
-  # Cache formula metadata for efficient validation filtering (DRY principle)
+  # Cache formula metadata so latent_params lookups in downstream
+  # validators read from an attribute instead of reparsing the AST.
   formula <- cache_formula_latent_params(formula)
   if (!is.null(trend_formula)) {
     trend_formula <- cache_formula_latent_params(trend_formula)
@@ -346,7 +354,9 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
       inherits(trend_formula, "mvbrmsterms")) {
 
     # Extract response-specific trend specifications
-    trend_specs <- extract_response_trends(trend_formula, response_names, validate_separate = TRUE)
+    trend_specs <- extract_response_trends(
+      trend_formula, response_names, validate_separate = TRUE
+    )
 
     # Create base formula for brms setup
     base_formula <- create_trend_base_formula(trend_specs)
@@ -366,9 +376,10 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
     missing_responses <- setdiff(names(trend_formula), response_names)
     if (length(missing_responses) > 0) {
       stop(insight::format_error(c(
-        cli::format_inline(
-          "Unknown responses in {.field trend_formula}: {paste(missing_responses, collapse = ', ')}"
-        ),
+        cli::format_inline(paste0(
+          "Unknown responses in {.field trend_formula}: ",
+          "{paste(missing_responses, collapse = ', ')}"
+        )),
         i = paste(
           "Available responses:",
           paste(response_names, collapse = ", ")
@@ -392,14 +403,17 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
     }
 
   } else {
-    # Single trend formula applied to all responses
-    # Parse the trend formula to extract trend objects instead of storing raw formulas
+    # Single trend formula applied to all responses. Parse it first
+    # so we store the trend objects, not the raw formula.
     parsed_trend <- parse_trend_formula(trend_formula)
 
     trend_specs <- if (is_mv_main && !is.null(response_names)) {
       # Apply same parsed trend to all responses
       setNames(
-        replicate(length(response_names), parsed_trend$trend_model, simplify = FALSE),
+        replicate(
+          length(response_names), parsed_trend$trend_model,
+          simplify = FALSE
+        ),
         response_names
       )
     } else {
@@ -462,7 +476,8 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
 #' is_multivariate_formula(cbind(success, failure) ~ x)  # FALSE
 #' }
 #'
-#' @seealso \code{\link{extract_response_names}}, \code{\link{parse_multivariate_trends}}
+#' @seealso \code{\link{extract_response_names}},
+#'   \code{\link{parse_multivariate_trends}}
 #' @noRd
 is_multivariate_formula <- function(formula) {
   # Parameter validation - support all brms formula types
@@ -497,7 +512,8 @@ is_multivariate_formula <- function(formula) {
       )
 
       pform_names <- names(formula$pforms)
-      # Distributional parameters = univariate, non-distributional = multivariate
+      # Distributional parameters are univariate, non-dpar
+      # responses are multivariate.
       if (all(pform_names %in% distributional_params)) {
         return(FALSE)
       }
@@ -560,7 +576,10 @@ has_mvbind_response <- function(formula) {
   if (length(response_expr) < 3) {
     stop(insight::format_error(c(
       "Invalid mvbind() specification in formula.",
-      x = "mvbind() requires at least 2 response variables for multivariate models.",
+      x = paste0(
+        "mvbind() requires at least 2 response variables for ",
+        "multivariate models."
+      ),
       i = "Ensure syntax: mvbind(y1, y2, ...) ~ predictors"
     )), call. = FALSE)
   }
@@ -572,20 +591,23 @@ has_mvbind_response <- function(formula) {
 #'
 #' @description
 #' Extracts response variable names from both univariate and multivariate brms
-#' formula objects. Handles all major multivariate patterns plus univariate cases
+#' formula objects. Handles the major multivariate patterns plus
+#' univariate cases.
 #' with fail-fast error handling. Never returns NULL - always succeeds or fails.
 #'
 #' Note: cbind() responses are NOT extracted as cbind() creates binomial trial
 #' specifications, not true multivariate models per brms standards.
 #'
-#' @param formula Formula object. Can be formula, brmsformula, mvbrmsformula, or bform
+#' @param formula Formula object. Can be formula, brmsformula,
+#'   mvbrmsformula, or bform.
 #' @return Character vector of response variable names (never NULL/empty)
 #'
 #' @details
 #' Handles all brms formula patterns with fail-fast behavior:
 #' \itemize{
 #'   \item mvbrmsformula objects: extracts from $responses field
-#'   \item brmsformula with pforms: combines main response with additional responses
+#'   \item brmsformula with pforms: combines main response with
+#'   additional responses
 #'   \item formula with mvbind(): parses expression tree safely
 #'   \item formula univariate: extracts single response using all.vars()
 #'   \item Fail-fast errors: throws informative errors instead of returning NULL
@@ -595,7 +617,8 @@ has_mvbind_response <- function(formula) {
 #' \dontrun{
 #' # Multivariate patterns
 #' extract_response_names(mvbind(y1, y2) ~ x)  # c("y1", "y2")
-#' extract_response_names(bf(count ~ temp, biomass ~ precip))  # c("count", "biomass")
+#' # bf(count ~ temp, biomass ~ precip) -> c("count", "biomass")
+#' extract_response_names(bf(count ~ temp, biomass ~ precip))
 #' extract_response_names(bf(y1 ~ x) + bf(y2 ~ z))  # c("y1", "y2")
 #'
 #' # Univariate patterns
@@ -606,10 +629,13 @@ has_mvbind_response <- function(formula) {
 #' extract_response_names(~ x)  # ERROR: no response variable
 #' }
 #'
-#' @seealso \code{\link{is_multivariate_formula}}, \code{\link{parse_multivariate_trends}}
+#' @seealso \code{\link{is_multivariate_formula}},
+#'   \code{\link{parse_multivariate_trends}}
 #' @noRd
 extract_response_names <- function(formula) {
-  checkmate::assert_multi_class(formula, c("formula", "brmsformula", "mvbrmsformula", "bform"))
+  checkmate::assert_multi_class(
+    formula, c("formula", "brmsformula", "mvbrmsformula", "bform")
+  )
 
   # Case 1: mvbrmsformula - use $responses field directly (brms standard)
   # This covers: bf() + bf() combinations and mvbf() objects
@@ -623,7 +649,8 @@ extract_response_names <- function(formula) {
   if (inherits(formula, "brmsformula")) {
     # Check for nonlinear formula using existing detection
     if (!is.null(formula$pforms) && length(formula$pforms) > 0) {
-      # For nonlinear formulas, pforms contain parameter definitions, not responses
+      # For nonlinear formulas, pforms contain parameter
+      # definitions, not responses.
       # Return only the main response variable
       if (is.null(formula$resp)) {
         stop(insight::format_error(c(
@@ -730,7 +757,8 @@ extract_mvbind_responses <- function(formula) {
   # Extract function name, handling namespaced calls like mvgam::mvbind
   call_name <- if (is.name(response_expr[[1]])) {
     as.character(response_expr[[1]])
-  } else if (is.call(response_expr[[1]]) && identical(response_expr[[1]][[1]], quote(`::`))) {
+  } else if (is.call(response_expr[[1]]) &&
+             identical(response_expr[[1]][[1]], quote(`::`))) {
     as.character(response_expr[[1]][[3]])
   } else {
     ""
@@ -747,9 +775,10 @@ extract_mvbind_responses <- function(formula) {
   if (length(response_args) == 0) {
     stop(insight::format_error(c(
       "mvbind() call contains no arguments.",
-      i = cli::format_inline(
-        "Provide at least one response variable: {.code mvbind(response1, response2, ...)}"
-      )
+      i = cli::format_inline(paste0(
+        "Provide at least one response variable: ",
+        "{.code mvbind(response1, response2, ...)}"
+      ))
     )), call. = FALSE)
   }
 
@@ -765,7 +794,10 @@ extract_mvbind_responses <- function(formula) {
     if (is.null(var_name) || nchar(var_name) == 0) {
       arg_text <- deparse(arg)
       stop(insight::format_error(c(
-        paste0("Could not extract response variable name from mvbind() argument ", i, "."),
+        paste0(
+          "Could not extract response variable name from mvbind() ",
+          "argument ", i, "."
+        ),
         x = paste0("Argument: ", arg_text),
         i = "Ensure all mvbind() arguments reference valid variable names."
       )), call. = FALSE)
@@ -832,7 +864,9 @@ extract_variable_name <- function(expr, max_depth = 10) {
 #' @param response_names Character vector of response names
 #' @return Named list of trend specifications per response
 #' @noRd
-extract_response_trends <- function(trend_formula, response_names, validate_separate = FALSE) {
+extract_response_trends <- function(trend_formula,
+                                    response_names,
+                                    validate_separate = FALSE) {
   checkmate::assert_character(response_names, null.ok = TRUE)
   checkmate::assert_logical(validate_separate, len = 1)
 
@@ -864,7 +898,9 @@ extract_response_trends <- function(trend_formula, response_names, validate_sepa
 
       if (!is.null(resp_name)) {
         resp_formula <- trend_terms$terms[[i]]$formula
-        # Validate multivariate trends don't use advanced features (only for separate response trends)
+        # Validate that multivariate trends do not lean on
+        # constructor specials only available on the univariate
+        # path. Applies only to separate-response trends.
         if (validate_separate) {
           validate_multivariate_trend_constraints(resp_formula, resp_name)
         }
@@ -929,7 +965,9 @@ handle_nonlinear_model <- function(formula, trend_specs = NULL) {
   nl_components <- extract_nonlinear_components(formula)
 
   # Determine where trends should be injected
-  trend_injection_point <- determine_trend_injection_point(nl_components, trend_specs)
+  trend_injection_point <- determine_trend_injection_point(
+    nl_components, trend_specs
+  )
 
   # Validate trend compatibility with nonlinear structure
   validate_nonlinear_trend_compatibility(nl_components, trend_specs)
@@ -1037,9 +1075,10 @@ determine_trend_injection_point <- function(nl_components, trend_specs) {
         return(trend_specs$target_parameter)
       } else {
         insight::format_warning(c(
-          cli::format_inline(
-            "Specified trend target parameter {.val {trend_specs$target_parameter}} not found."
-          ),
+          cli::format_inline(paste0(
+            "Specified trend target parameter ",
+            "{.val {trend_specs$target_parameter}} not found."
+          )),
           i = cli::format_inline(
             "Using main parameter {.val {main_param}} instead."
           )
