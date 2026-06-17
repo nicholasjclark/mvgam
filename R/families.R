@@ -3509,11 +3509,14 @@ prepare_closure_unit_family <- function(family, data, response_var,
     # unit groups by `time` (site) only -- the K species rows at
     # each site form the per-unit contributions, in contrast to the
     # count-based families where each (species, site) pair is its
-    # own closure unit with replicate visits.
+    # own closure unit with replicate visits. The "time" default is
+    # overridden when the family carries an `mvgam_unit_grouping`
+    # attribute (e.g. a future spatial multi-response variant could
+    # opt in to (site, time) without further plumbing here).
     arrays <- build_closure_unit_arrays(
       data, response_var = response_var,
       compute_y_max = FALSE,
-      unit_grouping_vars = "time"
+      unit_grouping_vars = closure_unit_grouping(family) %||% "time"
     )
   } else {
     # cap is required only when neither a scalar default nor a
