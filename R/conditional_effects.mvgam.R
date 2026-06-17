@@ -291,6 +291,11 @@ detect_conditional_effects <- function(x) {
     cond <- lapply(cond, function(g) setdiff(g, nlpar_names))
     cond <- cond[lengths(cond) > 0L]
   }
+  # Drop brms `|id|` correlation-tag tokens and other non-data
+  # names so marginaleffects only sees addressable columns. Shares
+  # the filter with find_predictors.mvgam via mvgam_keep_data_columns().
+  cond <- lapply(cond, function(g) mvgam_keep_data_columns(g, x))
+  cond <- cond[lengths(cond) > 0L]
   # Drop duplicates while preserving order
   keys <- vapply(cond, paste, FUN.VALUE = character(1L), collapse = ":")
   cond[!duplicated(keys)]

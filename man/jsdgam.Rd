@@ -18,6 +18,7 @@ jsdgam(
   priors,
   n_lv = 2L,
   traits = NULL,
+  trait_slopes = NULL,
   phylo = NULL,
   loadings_prior = NULL,
   backend = getOption("brms.backend", "cmdstanr"),
@@ -133,6 +134,24 @@ Forwarded as \code{loadings_prior$features}; categorical columns are
 one-hot encoded and numerics z-scored downstream by
 \code{encode_loadings_features()}. Mutually exclusive with an
 explicit \code{loadings_prior} argument.}
+
+\item{trait_slopes}{Optional one-sided \code{formula} (e.g.
+\code{~ trait1 + trait2}) requesting trait-mediated environmental
+slopes, i.e. the Hmsc "fourth corner" regression. Each fixed
+term in \code{formula} becomes a non-linear parameter whose value
+is regressed on the supplied traits plus a species-level
+random deviation (\code{(1 | sp | species)} correlating intercept
+and slope deviations under LKJ). The trait columns must
+already live in \code{data}, must be constant within species, and
+must reference per-species values rather than per-observation
+covariates. Smooth specials (\code{s()}, \code{gp()}) in \code{formula} are
+rejected because brms's top-level non-linear formula cannot
+host them; supply smooths inside \code{trait_slopes} itself
+(e.g. \code{~ s(trait1)}) where they land in a sub-formula and
+brms accepts them. Weakly-informative default priors
+(\code{normal(0, 1)} on each gamma, \code{student_t(3, 0, 2.5)} on the
+species SD) are emitted; user \verb{priors =} rows override on
+matching class / coef / nlpar tuples.}
 
 \item{phylo}{Optional phylogeny. Either an \code{ape::phylo} object
 (in which case \code{ape::cophenetic.phylo()} produces a pairwise

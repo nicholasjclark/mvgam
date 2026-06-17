@@ -65,6 +65,20 @@ mvgam_formula_predictors <- function(f) {
 }
 
 
+# Drop tokens that are not actual columns of the fit's data frame.
+# brms RE syntax surfaces correlation IDs (`(1 | sp | series)`) and
+# nested-group separators as if they were variables; this filter
+# enforces "predictor names are addressable in the model data".
+# Skips the filter when data is unavailable (mock objects in unit
+# tests) so the helper composes with stub fixtures.
+mvgam_keep_data_columns <- function(vars, x) {
+  if (is.null(x$data)) {
+    return(vars)
+  }
+  intersect(vars, colnames(x$data))
+}
+
+
 #' @importFrom insight find_formula
 #' @export
 find_formula.mvgam <- function(x, verbose = TRUE, ...) {
@@ -120,6 +134,10 @@ find_predictors.mvgam <- function(x, effects = "fixed",
     extras <- extras[!is.na(extras) & nzchar(extras)]
     preds <- unique(c(preds, extras))
   }
+
+  # Drop brms `|id|` correlation-tag tokens and any other
+  # non-data names that slipped through all.vars().
+  preds <- mvgam_keep_data_columns(preds, x)
 
   if (flatten) preds else list(conditional = preds)
 }

@@ -137,6 +137,24 @@
 #'   `encode_loadings_features()`. Mutually exclusive with an
 #'   explicit `loadings_prior` argument.
 #'
+#' @param trait_slopes Optional one-sided `formula` (e.g.
+#'   `~ trait1 + trait2`) requesting trait-mediated environmental
+#'   slopes, i.e. the Hmsc "fourth corner" regression. Each fixed
+#'   term in `formula` becomes a non-linear parameter whose value
+#'   is regressed on the supplied traits plus a species-level
+#'   random deviation (`(1 | sp | species)` correlating intercept
+#'   and slope deviations under LKJ). The trait columns must
+#'   already live in `data`, must be constant within species, and
+#'   must reference per-species values rather than per-observation
+#'   covariates. Smooth specials (`s()`, `gp()`) in `formula` are
+#'   rejected because brms's top-level non-linear formula cannot
+#'   host them; supply smooths inside `trait_slopes` itself
+#'   (e.g. `~ s(trait1)`) where they land in a sub-formula and
+#'   brms accepts them. Weakly-informative default priors
+#'   (`normal(0, 1)` on each gamma, `student_t(3, 0, 2.5)` on the
+#'   species SD) are emitted; user `priors =` rows override on
+#'   matching class / coef / nlpar tuples.
+#'
 #' @param phylo Optional phylogeny. Either an `ape::phylo` object
 #'   (in which case `ape::cophenetic.phylo()` produces a pairwise
 #'   distance matrix and a non-ultrametric tree triggers a one-time
@@ -266,6 +284,7 @@ jsdgam <- function(formula,
                    priors,
                    n_lv = 2L,
                    traits = NULL,
+                   trait_slopes = NULL,
                    phylo = NULL,
                    loadings_prior = NULL,
                    backend = getOption("brms.backend", "cmdstanr"),
@@ -407,6 +426,33 @@ jsdgam <- function(formula,
     warn_simplex_obs_formula_lacks_species(formula, species_chr)
   }
 
+  # trait_slopes: Hmsc-style trait-mediated environmental response.
+  # When supplied, rewrite `formula` into a brms nl formula whose
+  # nlpars regress each fixed slope on the traits, plus a shared
+  # species-level RE block correlating the intercept and slope
+  # deviations under LKJ. Emit weakly-informative default priors on
+  # the new nlpars; user-supplied priors merge on top via the
+  # existing prior pipeline.
+  trait_slopes_priors <- NULL
+  if (!is.null(trait_slopes)) {
+    validate_trait_slopes(
+      trait_slopes = trait_slopes,
+      obs_formula  = formula,
+      data         = data_train,
+      species_chr  = "series"
+    )
+    # Reason: emit default priors from the ORIGINAL formula (one
+    # nlpar per fixed term); the rewritten brms formula's top-level
+    # RHS contains the nlpar tokens themselves and would yield
+    # spurious b2 / b3 / b4 priors.
+    trait_slopes_priors <- default_trait_slopes_priors(formula)
+    formula <- build_trait_slopes_formula(
+      obs_formula  = formula,
+      trait_slopes = trait_slopes,
+      species_var  = "series"
+    )
+  }
+
   # Forward to mvgam(). Optional args (knots, factor_knots, newdata,
   # priors) only enter the call if the user supplied them so mvgam's
   # own argument defaults handle the missing case.
@@ -429,7 +475,23 @@ jsdgam <- function(formula,
   # accepts both forms via normalise_prior_arg_alias() but
   # canonicalising at the call site avoids any chance of the
   # plural surviving into `...` and being dropped.
-  if (!missing(priors)) forward_args$prior <- priors
+  # When trait_slopes is set, the wrapper-emitted default nlpar
+  # priors go first so user-supplied 'priors =' rows can override
+  # them via the existing brms prior-merge semantics (last wins on
+  # matching class / coef / nlpar tuples).
+  user_prior <- if (!missing(priors)) priors else NULL
+  combined_prior <- if (!is.null(trait_slopes_priors)) {
+    if (!is.null(user_prior)) {
+      c(trait_slopes_priors, user_prior)
+    } else {
+      trait_slopes_priors
+    }
+  } else {
+    user_prior
+  }
+  if (!is.null(combined_prior)) {
+    forward_args$prior <- combined_prior
+  }
   if (!is.null(loadings_prior_resolved)) {
     forward_args$loadings_prior <- loadings_prior_resolved
   }
