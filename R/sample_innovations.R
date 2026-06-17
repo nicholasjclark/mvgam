@@ -64,10 +64,21 @@ trend_covariance_patterns <- list(
 get_covariance_pattern <- function(trend_type) {
   checkmate::assert_string(trend_type, min.chars = 1)
 
-  # Normalize trend type (handle variations like "AR1", "VAR2")
-  base_type <- gsub("[0-9]+$", "", toupper(trend_type))
+  # Reason: match dictionary keys case-insensitively after stripping
+  # any numeric suffix ("AR1" -> "AR"). The dictionary keys keep
+  # their natural case so adding a new trend type does not require
+  # knowing the lookup convention.
+  base_type <- gsub("[0-9]+$", "", trend_type)
+  key_idx <- match(
+    tolower(base_type),
+    tolower(names(trend_covariance_patterns))
+  )
 
-  pattern <- trend_covariance_patterns[[base_type]]
+  pattern <- if (!is.na(key_idx)) {
+    trend_covariance_patterns[[key_idx]]
+  } else {
+    NULL
+  }
 
   if (is.null(pattern)) {
     # Default to cholesky_scaled for unknown types (most common pattern)

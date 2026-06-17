@@ -703,3 +703,33 @@ test_that("create_mvgam_trend handles all parameters consistently", {
   })
 })
 
+test_that("get_covariance_pattern() matches dictionary keys case-insensitively", {
+  # Reason: the dictionary stores keys in their natural case ("None",
+  # "PW", "RW", "AR", ...). Callers may pass any case. The lookup
+  # must normalise before indexing so the no-trend dispatch ("None")
+  # is not silently routed to the cholesky_scaled default, which
+  # would force prediction surfaces through sample_process_errors()
+  # and fail on missing trend_metadata for a trendless fit.
+  expect_equal(mvgam:::get_covariance_pattern("None"), "none")
+  expect_equal(mvgam:::get_covariance_pattern("none"), "none")
+  expect_equal(mvgam:::get_covariance_pattern("NONE"), "none")
+  expect_equal(mvgam:::get_covariance_pattern("AR"),   "cholesky_scaled")
+  expect_equal(mvgam:::get_covariance_pattern("ar"),   "cholesky_scaled")
+  expect_equal(mvgam:::get_covariance_pattern("AR1"),  "cholesky_scaled")
+  expect_equal(mvgam:::get_covariance_pattern("VAR2"), "full_covariance")
+  expect_equal(mvgam:::get_covariance_pattern("CAR"),  "diagonal")
+  expect_equal(mvgam:::get_covariance_pattern("PW"),   "none")
+})
+
+test_that("has_stochastic_trend() returns FALSE for trendless mvgam objects", {
+  # Reason: a trendless fit (no trend_model, no trend_formula) carries
+  # trend_type = "None". Misrouting this case as a stochastic trend
+  # bombs every prediction surface that conditionally calls
+  # sample_process_errors() on the missing trend_metadata.
+  obj <- structure(
+    list(trend_type = "None"),
+    class = "mvgam"
+  )
+  expect_false(mvgam:::has_stochastic_trend(obj))
+})
+
