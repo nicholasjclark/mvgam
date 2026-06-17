@@ -1025,6 +1025,12 @@ build_closure_unit_arrays <- function(data,
 #'   counts `y ~ Poisson(N * p)` with log-link per-individual
 #'   encounter rate `p`.
 #'
+#' @param multi_season Logical. When `TRUE`, closure units are
+#'   defined by `(series, site, time)` instead of the default
+#'   `(series, time)`. The data must carry a `site` column;
+#'   produce it from a 4-axis observation array with
+#'   [pivot_detection_array()] (set `multi_season = "hierarchical"`).
+#'
 #' @examples
 #' \dontrun{
 #' # Constant detection probability, abundance varies with elevation
@@ -1271,8 +1277,10 @@ build_closure_unit_arrays <- function(data,
 #'
 #' @export
 nmix <- function(type = c("poisson_binomial", "royle_nichols",
-                          "poisson_poisson")) {
+                          "poisson_poisson"),
+                 multi_season = FALSE) {
   type <- match.arg(type)
+  checkmate::assert_flag(multi_season)
   variant_config <- switch(
     type,
     poisson_binomial = list(
@@ -1364,6 +1372,16 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
       "log_n_lookup"
     )
   )
+  # Multi-season grouping. Closure units are defined by
+  # (series, site, season) instead of the default (series, time).
+  # The data must carry a `site` column; `pivot_detection_array`
+  # with `multi_season = "hierarchical"` emits it. Downstream
+  # readers (validator, array builder, log_lik, pp_check, tidier,
+  # plot_factors, kfold) all consume the attribute via
+  # closure_unit_grouping().
+  if (multi_season) {
+    attr(fam, "mvgam_unit_grouping") <- c("series", "site", "time")
+  }
   # mvgam_stanvars is populated at data preparation time, once
   # the closure-unit arrays from the user's data are known.
   attr(fam, "mvgam_stanvars") <- NULL
@@ -1515,6 +1533,12 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #' returns the per-visit detection probability p_{g,j} on the
 #' response scale.
 #'
+#' @param multi_season Logical. When `TRUE`, closure units are
+#'   defined by `(series, site, time)` instead of the default
+#'   `(series, time)`. The data must carry a `site` column;
+#'   produce it from a 4-axis observation array with
+#'   [pivot_detection_array()] (set `multi_season = "hierarchical"`).
+#'
 #' @examples
 #' \dontrun{
 #' # Constant detection, occupancy varies with elevation
@@ -1527,7 +1551,8 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #' }
 #'
 #' @export
-occ <- function() {
+occ <- function(multi_season = FALSE) {
+  checkmate::assert_flag(multi_season)
   fam <- brms::custom_family(
     name  = "occ",
     dpars = c("mu", "p"),
@@ -1552,6 +1577,16 @@ occ <- function() {
   # `cap` data column optional for occ() fits.
   attr(fam, "mvgam_default_cap")     <- 1L
   attr(fam, "mvgam_predict_types")   <- c("latent_state", "detection")
+  # Multi-season grouping. Closure units are defined by
+  # (series, site, season) instead of the default (series, time).
+  # The data must carry a `site` column; `pivot_detection_array`
+  # with `multi_season = "hierarchical"` emits it. Downstream
+  # readers (validator, array builder, log_lik, pp_check, tidier,
+  # plot_factors, kfold) all consume the attribute via
+  # closure_unit_grouping().
+  if (multi_season) {
+    attr(fam, "mvgam_unit_grouping") <- c("series", "site", "time")
+  }
   # occ_lpmf drops K_max from the nmix signature because the
   # latent z is binary; the lpmf reads Y_max directly as the
   # per-unit `any detection?` indicator.
@@ -3470,7 +3505,11 @@ prepare_closure_unit_family <- function(family, data, response_var,
     # cap is required only when neither a scalar default nor a
     # data-driven buffer is configured. Count families (PB / PPM)
     # carry `mvgam_default_cap_buffer = 100L` so the validator
-    # accepts data without an explicit cap column.
+    # accepts data without an explicit cap column. Multi-season
+    # families carry an `mvgam_unit_grouping` attr that the
+    # accessor returns; otherwise the validator + builder default
+    # to (series, time).
+    unit_grouping_vars <- closure_unit_grouping(family)
     validate_closure_unit_data(
       data,
       response_var       = response_var,
@@ -3478,12 +3517,14 @@ prepare_closure_unit_family <- function(family, data, response_var,
       has_det_covariates = has_det_covariates,
       binary_y_check     = binary_y_check,
       cap_required       = is.null(default_cap) &&
-                            is.null(default_cap_buffer)
+                            is.null(default_cap_buffer),
+      unit_grouping_vars = unit_grouping_vars
     )
     arrays <- build_closure_unit_arrays(
       data, response_var = response_var,
       default_cap        = default_cap,
-      default_cap_buffer = default_cap_buffer
+      default_cap_buffer = default_cap_buffer,
+      unit_grouping_vars = unit_grouping_vars
     )
   }
   family_stanvars <- switch(

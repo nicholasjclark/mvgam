@@ -1540,3 +1540,84 @@ test_that("uses_threading() detects reduce_sum in stancode", {
     mvgam:::uses_threading(structure(list(), class = "mvgam"))
   )
 })
+
+# ----------------------------------------------------------------
+# multi_season opt-in on the closure-unit family constructors.
+# Default is single-season (no mvgam_unit_grouping attr); the
+# downstream validator/builder fall back to (series, time).
+# multi_season = TRUE sets mvgam_unit_grouping = c("series",
+# "site", "time"); prepare_closure_unit_family() forwards this
+# into validate_closure_unit_data() and build_closure_unit_arrays()
+# so the closure unit is keyed on the 3-axis tuple.
+# ----------------------------------------------------------------
+
+test_that("occ() default has no mvgam_unit_grouping attr", {
+  expect_null(closure_unit_grouping(occ()))
+})
+
+test_that("occ(multi_season = TRUE) sets mvgam_unit_grouping = c('series','site','time')", {
+  expect_identical(
+    closure_unit_grouping(occ(multi_season = TRUE)),
+    c("series", "site", "time")
+  )
+})
+
+test_that("nmix() default has no mvgam_unit_grouping attr (all variants)", {
+  expect_null(closure_unit_grouping(nmix()))
+  expect_null(closure_unit_grouping(nmix("royle_nichols")))
+  expect_null(closure_unit_grouping(nmix("poisson_poisson")))
+})
+
+test_that("nmix(multi_season = TRUE) sets the 3-axis grouping (all variants)", {
+  expect_identical(
+    closure_unit_grouping(nmix(multi_season = TRUE)),
+    c("series", "site", "time")
+  )
+  expect_identical(
+    closure_unit_grouping(nmix("royle_nichols", multi_season = TRUE)),
+    c("series", "site", "time")
+  )
+  expect_identical(
+    closure_unit_grouping(nmix("poisson_poisson", multi_season = TRUE)),
+    c("series", "site", "time")
+  )
+})
+
+test_that("prepare_closure_unit_family() routes multi_season grouping into standata N_unit", {
+  # Build a 3-axis closure-unit dataset: 2 species x 3 sites x 2
+  # seasons x 2 visits = 24 rows. Single-season grouping (series,
+  # time) collapses across sites and yields 2 * 2 = 4 closure
+  # units; multi-season grouping (series, site, time) yields the
+  # full 2 * 3 * 2 = 12 units. Asserting the standata N_unit on
+  # the same data, switching only the family arg, pins both
+  # branches of prepare_closure_unit_family() in one test.
+  d <- expand.grid(
+    series = factor(c("sp1", "sp2")),
+    site   = factor(seq_len(3L)),
+    time   = seq_len(2L),
+    visit  = seq_len(2L),
+    KEEP.OUT.ATTRS = FALSE
+  )
+  d$y <- 0L
+  mf <- mvgam_formula(y ~ 1)
+  sd_single <- standata(mf, data = d, family = occ())
+  sd_multi  <- standata(mf, data = d, family = occ(multi_season = TRUE))
+  # Single-season: closure units = (series, time) = 2 * 2 = 4.
+  expect_identical(as.integer(sd_single$N_unit), 4L)
+  # Multi-season: closure units = (series, site, time) = 12.
+  expect_identical(as.integer(sd_multi$N_unit), 12L)
+})
+
+test_that("occ(multi_season = TRUE) rejects data without a 'site' column", {
+  d <- data.frame(
+    series = factor(c("sp1", "sp1", "sp2", "sp2")),
+    time   = c(1L, 2L, 1L, 2L),
+    visit  = c(1L, 1L, 1L, 1L),
+    y      = 0L
+  )
+  mf <- mvgam_formula(y ~ 1)
+  expect_error(
+    standata(mf, data = d, family = occ(multi_season = TRUE)),
+    "'site'"
+  )
+})

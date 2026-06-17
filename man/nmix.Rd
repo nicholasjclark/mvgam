@@ -4,7 +4,10 @@
 \alias{nmix}
 \title{Closure-unit Poisson-binomial N-mixture family}
 \usage{
-nmix(type = c("poisson_binomial", "royle_nichols", "poisson_poisson"))
+nmix(
+  type = c("poisson_binomial", "royle_nichols", "poisson_poisson"),
+  multi_season = FALSE
+)
 }
 \arguments{
 \item{type}{Character scalar selecting the N-mixture variant.
@@ -19,6 +22,12 @@ is the Neyman Type A model used for encounter counts (e.g.
 camera-trap captures): latent \code{N ~ Poisson(lambda)}, per-visit
 counts \code{y ~ Poisson(N * p)} with log-link per-individual
 encounter rate \code{p}.}
+
+\item{multi_season}{Logical. When \code{TRUE}, closure units are
+defined by \verb{(series, site, time)} instead of the default
+\verb{(series, time)}. The data must carry a \code{site} column;
+produce it from a 4-axis observation array with
+\code{\link[=pivot_detection_array]{pivot_detection_array()}} (set \code{multi_season = "hierarchical"}).}
 }
 \value{
 A \code{brms::customfamily} object with the

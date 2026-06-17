@@ -4,7 +4,14 @@
 \alias{occ}
 \title{Closure-unit single-season occupancy family}
 \usage{
-occ()
+occ(multi_season = FALSE)
+}
+\arguments{
+\item{multi_season}{Logical. When \code{TRUE}, closure units are
+defined by \verb{(series, site, time)} instead of the default
+\verb{(series, time)}. The data must carry a \code{site} column;
+produce it from a 4-axis observation array with
+\code{\link[=pivot_detection_array]{pivot_detection_array()}} (set \code{multi_season = "hierarchical"}).}
 }
 \value{
 A \code{brms::customfamily} object with the
