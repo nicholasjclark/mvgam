@@ -20,7 +20,7 @@ test_that("mu expression classification handles all brms varieties correctly", {
     monotonic = list(
       name = "monotonic",
       generate_code = function() {
-        brms::make_stancode(Y ~ mo(X_mono), data = test_data, family = gaussian())
+        brms::make_stancode(Y ~ mo(X_mono), data = test_data, family = gaussian(), parse = FALSE)
       },
       expected_mu_lines = 3,
       expected_loop_pattern = TRUE,
@@ -31,7 +31,7 @@ test_that("mu expression classification handles all brms varieties correctly", {
     simple_gp = list(
       name = "simple_gp",
       generate_code = function() {
-        brms::make_stancode(Y ~ gp(X_gp), data = test_data, family = gaussian())
+        brms::make_stancode(Y ~ gp(X_gp), data = test_data, family = gaussian(), parse = FALSE)
       },
       expected_mu_lines = 2,  # May vary with brms version
       expected_computed_variables = TRUE,
@@ -42,7 +42,7 @@ test_that("mu expression classification handles all brms varieties correctly", {
     spectral_gp = list(
       name = "spectral_gp",
       generate_code = function() {
-        brms::make_stancode(Y ~ gp(X_gp, c = 5/4, k = 20), data = test_data, family = gaussian())
+        brms::make_stancode(Y ~ gp(X_gp, c = 5/4, k = 20), data = test_data, family = gaussian(), parse = FALSE)
       },
       expected_mu_lines = 2,  # May vary
       expected_computed_variables = TRUE,
@@ -53,7 +53,7 @@ test_that("mu expression classification handles all brms varieties correctly", {
     spline = list(
       name = "spline",
       generate_code = function() {
-        brms::make_stancode(Y ~ s(X_spline), data = test_data, family = gaussian())
+        brms::make_stancode(Y ~ s(X_spline), data = test_data, family = gaussian(), parse = FALSE)
       },
       expected_mu_lines = 2,
       expected_vectorized = TRUE,
@@ -64,7 +64,7 @@ test_that("mu expression classification handles all brms varieties correctly", {
     random_effects = list(
       name = "random_effects",
       generate_code = function() {
-        brms::make_stancode(Y ~ (1|group_id), data = test_data, family = gaussian())
+        brms::make_stancode(Y ~ (1|group_id), data = test_data, family = gaussian(), parse = FALSE)
       },
       expected_mu_lines = 2,
       expected_loop_pattern = TRUE,
@@ -75,7 +75,7 @@ test_that("mu expression classification handles all brms varieties correctly", {
     glm_optimization = list(
       name = "glm_optimization",
       generate_code = function() {
-        brms::make_stancode(Y ~ X_fixed + (1|group_id), data = test_data, family = gaussian())
+        brms::make_stancode(Y ~ X_fixed + (1|group_id), data = test_data, family = gaussian(), parse = FALSE)
       },
       expected_mu_lines = 2,
       expected_glm = TRUE,
@@ -87,7 +87,7 @@ test_that("mu expression classification handles all brms varieties correctly", {
       name = "multi_gp",
       generate_code = function() {
         test_data$group_factor <- as.factor(sample(c("A", "B", "C"), N, replace = TRUE))
-        brms::make_stancode(Y ~ gp(X_gp, by = group_factor), data = test_data, family = gaussian())
+        brms::make_stancode(Y ~ gp(X_gp, by = group_factor), data = test_data, family = gaussian(), parse = FALSE)
       },
       expected_mu_lines = 2,  # May vary
       expected_indexed_pattern = TRUE,
@@ -101,7 +101,7 @@ test_that("mu expression classification handles all brms varieties correctly", {
         test_data$X_spline2 <- runif(N, 0, 10)
         test_data$X_spline3 <- runif(N, 0, 10)
         brms::make_stancode(Y ~ s(X_spline) + s(X_spline2) + s(X_spline3),
-                           data = test_data, family = gaussian())
+                           data = test_data, family = gaussian(), parse = FALSE)
       },
       expected_mu_lines = 2,
       expected_vectorized = TRUE,
@@ -235,7 +235,7 @@ test_that("execution plan generation works with dynamic brms code", {
     X_mono = sample(1:5, 50, replace = TRUE)
   )
 
-  stancode <- brms::make_stancode(Y ~ mo(X_mono), data = test_data, family = gaussian())
+  stancode <- brms::make_stancode(Y ~ mo(X_mono), data = test_data, family = gaussian(), parse = FALSE)
   result <- extract_mu_construction_with_classification(stancode)
   execution_plan <- attr(result$mu_construction, "execution_plan")
 
@@ -262,7 +262,7 @@ test_that("function discovery works with dynamic brms code", {
     X = runif(50, 0, 10)
   )
 
-  stancode <- brms::make_stancode(Y ~ gp(X), data = test_data, family = gaussian())
+  stancode <- brms::make_stancode(Y ~ gp(X), data = test_data, family = gaussian(), parse = FALSE)
   context <- create_analysis_context(stancode)
 
   # Should discover some declared functions (exact functions may vary with brms version)
@@ -294,7 +294,7 @@ test_that("classification integrates properly with existing pipeline", {
     X = rnorm(30, 0, 1)
   )
 
-  simple_stancode <- brms::make_stancode(Y ~ X, data = test_data, family = gaussian())
+  simple_stancode <- brms::make_stancode(Y ~ X, data = test_data, family = gaussian(), parse = FALSE)
 
   # Should work without error in the existing pipeline
   result <- extract_mu_construction_with_classification(simple_stancode)
@@ -320,7 +320,8 @@ test_that("performance is acceptable for complex models", {
   complex_stancode <- brms::make_stancode(
     Y ~ X1 + s(X2) + (1|group),
     data = test_data,
-    family = gaussian()
+    family = gaussian(),
+    parse = FALSE
   )
 
   # Should complete within reasonable time (2 seconds)

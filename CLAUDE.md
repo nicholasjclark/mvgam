@@ -9,6 +9,8 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 - You CANNOT use filter calls in `testthat::test_file()` for selective execution (use the `desc` argument for this instead)
 - No test errors or warnings are allowed. This is NON-NEGOTIABLE
 - Every printed warning must be traced to root cause and either fixed or explained. Do NOT silently move on after seeing one, and do NOT mute with blanket `suppressWarnings()`
+- **NEVER pipe test output into `tail`/`head`/`grep`/etc.** Redirect to a log file, then Read it. Never re-run a test just to see the summary — the first run already wrote it to disk.
+- **CI tests MUST NOT skip on missing fixtures.** Fixture-dependent tests go in `tests/local/`, period.
 
 ### Building and Documentation
 - `Rscript -e "devtools::document()"` - Generate roxygen2 documentation

@@ -2186,17 +2186,16 @@ test_that("stancode and standata are consistent", {
   data <- setup_stan_test_data()$univariate
   mf <- mvgam_formula(y ~ s(x), trend_formula = ~ AR(p = 1))
 
-  code <- stancode(mf, data = data, family = poisson())
-  standata_result <- standata(mf, data = data, family = poisson())
+  out <- mvgam_stan_setup(mf, data = data, family = poisson())
 
   # Both should succeed
-  expect_s3_class(code, "stancode")
-  expect_type(standata_result, "list")
+  expect_s3_class(out$code, "stancode")
+  expect_type(out$data, "list")
 
   # Code should reference data elements that exist in standata
   # This is a simplified check - real validation would parse Stan code
-  if ("N" %in% names(standata_result)) {
-    expect_match2(code, "int.*N")
+  if ("N" %in% names(out$data)) {
+    expect_match2(out$code, "int.*N")
   }
 })
 
@@ -2212,31 +2211,29 @@ test_that("stan functions work with complex model specifications", {
   priors <- brms::prior("normal(0, 1)", class = "ar1_trend")
 
   # Should handle complex specifications
-  code <- SW(stancode(mf, data = data, prior = priors))
-  standata_result <- SW(standata(mf, data = data, prior = priors))
+  out <- SW(mvgam_stan_setup(mf, data = data, prior = priors))
 
-  expect_s3_class(code, "stancode")
-  expect_type(standata_result, "list")
+  expect_s3_class(out$code, "stancode")
+  expect_type(out$data, "list")
 
   # Should contain complex model elements
-  expect_match2(code, "count")
-  expect_match2(code, "biomass")
-  expect_match2(code, "ar1_trend")
+  expect_match2(out$code, "count")
+  expect_match2(out$code, "biomass")
+  expect_match2(out$code, "ar1_trend")
 })
 
 test_that("stan functions preserve object attributes and metadata", {
   data <- setup_stan_test_data()$univariate
   mf <- mvgam_formula(y ~ x, trend_formula = ~ RW())
 
-  code <- stancode(mf, data = data, family = poisson())
-  standata_result <- standata(mf, data = data, family = poisson())
+  out <- mvgam_stan_setup(mf, data = data, family = poisson())
 
   # stancode should have correct class
-  expect_equal(class(code), c("mvgamstancode", "stancode", "character"))
+  expect_equal(class(out$code), c("mvgamstancode", "stancode", "character"))
 
   # standata should preserve key information
-  expect_type(standata_result, "list")
-  expect_true(length(names(standata_result)) > 0)  # Should have named elements
+  expect_type(out$data, "list")
+  expect_true(length(names(out$data)) > 0)  # Should have named elements
 })
 
 # Edge Cases and Error Handling ----
@@ -2253,11 +2250,10 @@ test_that("stan functions handle edge cases gracefully", {
   mf <- mvgam_formula(y ~ 1, trend_formula = ~ RW())
 
   # Should handle small datasets
-  code <- stancode(mf, data = small_data, family = poisson())
-  standata_result <- standata(mf, data = small_data, family = poisson())
+  out <- mvgam_stan_setup(mf, data = small_data, family = poisson())
 
-  expect_s3_class(code, "stancode")
-  expect_type(standata_result, "list")
+  expect_s3_class(out$code, "stancode")
+  expect_type(out$data, "list")
 })
 
 test_that("stan functions provide informative error messages", {
@@ -2775,9 +2771,10 @@ test_that("trend_map matrix moves Z into the data block; no Z_raw", {
     count ~ x,
     trend_formula = ~ -1 + AR(p = 1, trend_map = Z_user, cor = TRUE)
   )
-  code <- stancode(mf, data = data, family = poisson(),
-                   validate = FALSE)
-  sd <- standata(mf, data = data, family = poisson())
+  out <- mvgam_stan_setup(mf, data = data, family = poisson(),
+                           validate = FALSE)
+  code <- out$code
+  sd <- out$data
 
   # Z declared in the data block (no Z_raw / construction / prior).
   expect_true(stan_pattern(
@@ -2804,8 +2801,10 @@ test_that("trend_map 'shared' yields single-column Z in data", {
     count ~ 1,
     trend_formula = ~ -1 + RW(trend_map = "shared")
   )
-  code <- stancode(mf, data = data, family = poisson(), validate = FALSE)
-  sd <- standata(mf, data = data, family = poisson())
+  out <- mvgam_stan_setup(mf, data = data, family = poisson(),
+                           validate = FALSE)
+  code <- out$code
+  sd <- out$data
 
   expect_true(stan_pattern(
     "matrix\\[N_series_trend, N_lv_trend\\] Z;", code
@@ -2826,8 +2825,10 @@ test_that("trend_map data.frame builds binary Z aligned to series", {
     count ~ 1,
     trend_formula = ~ -1 + AR(p = 1, trend_map = tm)
   )
-  code <- stancode(mf, data = data, family = poisson(), validate = FALSE)
-  sd <- standata(mf, data = data, family = poisson())
+  out <- mvgam_stan_setup(mf, data = data, family = poisson(),
+                           validate = FALSE)
+  code <- out$code
+  sd <- out$data
 
   expected_Z <- matrix(c(1, 0,
                          1, 0,
@@ -2847,8 +2848,10 @@ test_that("trend_map 'identity' emits Z as data (not tdata default)", {
     count ~ 1,
     trend_formula = ~ -1 + RW(trend_map = "identity")
   )
-  code <- stancode(mf, data = data, family = poisson(), validate = FALSE)
-  sd <- standata(mf, data = data, family = poisson())
+  out <- mvgam_stan_setup(mf, data = data, family = poisson(),
+                           validate = FALSE)
+  code <- out$code
+  sd <- out$data
 
   expect_true(stan_pattern(
     "matrix\\[N_series_trend, N_lv_trend\\] Z;", code
@@ -2894,9 +2897,10 @@ test_that("trend_map with NA emits Z_template + Z_is_free + Z_free_vec", {
     count ~ x,
     trend_formula = ~ -1 + AR(p = 1, trend_map = Z_user, cor = TRUE)
   )
-  code <- stancode(mf, data = data, family = poisson(),
-                   validate = FALSE)
-  sd <- standata(mf, data = data, family = poisson())
+  out <- mvgam_stan_setup(mf, data = data, family = poisson(),
+                           validate = FALSE)
+  code <- out$code
+  sd <- out$data
 
   # Z_template in data with NAs replaced by 0.
   expect_true(stan_pattern(
@@ -3027,20 +3031,25 @@ test_that("loadings_prior with distances only emits exponential decay prior", {
 })
 
 
-test_that("loadings_prior combines features and distances multiplicatively", {
+test_that("loadings_prior combines features and distances multiplicatively, threads standata", {
   fx <- loadings_prior_fixture()
-  code <- suppressWarnings(stancode(
+  out <- suppressWarnings(mvgam_stan_setup(
     fx$mf, data = fx$data, family = poisson(),
     data2 = list(features = fx$features, phylo = fx$d_phylo),
     loadings_prior = list(
       features = "features", distances = "phylo"
     )
   ))
-  sc <- as.character(code)
+  sc <- as.character(out$code)
   expect_match(sc, "gp_exponential_cov", fixed = TRUE)
   expect_match(sc, "dist_phylo", fixed = TRUE)
   # Multiplicative combination uses Stan's elementwise `.*`.
   expect_match(sc, ".*", fixed = TRUE)
+  # Standata carries both feature and distance threads.
+  expect_equal(out$data$n_features, 1L)
+  expect_equal(dim(out$data$row_features), c(4L, 1L))
+  expect_equal(dim(out$data$dist_phylo), c(4L, 4L))
+  expect_equal(max(out$data$dist_phylo), 1)
 })
 
 
@@ -3060,22 +3069,6 @@ test_that("loadings_prior with column_shrinkage = 'mgp' emits MGP machinery", {
   expect_match(sc, "Psi_diag", fixed = TRUE)
   expect_match(sc, "inv_gamma\\(mgp_a1")
   expect_match(sc, "sqrt\\(Psi_diag")
-})
-
-
-test_that("loadings_prior standata threads features and distances correctly", {
-  fx <- loadings_prior_fixture()
-  sd <- suppressWarnings(standata(
-    fx$mf, data = fx$data, family = poisson(),
-    data2 = list(features = fx$features, phylo = fx$d_phylo),
-    loadings_prior = list(
-      features = "features", distances = "phylo"
-    )
-  ))
-  expect_equal(sd$n_features, 1L)
-  expect_equal(dim(sd$row_features), c(4L, 1L))
-  expect_equal(dim(sd$dist_phylo), c(4L, 4L))
-  expect_equal(max(sd$dist_phylo), 1)
 })
 
 

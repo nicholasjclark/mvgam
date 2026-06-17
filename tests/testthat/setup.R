@@ -28,3 +28,18 @@ expect_range <- function(object, lower = -Inf, upper = Inf, ...) {
 
 SM <- suppressMessages
 SW <- suppressWarnings
+
+# Build both Stan code and Stan data from one
+# `generate_stan_components_mvgam_formula()` call. Tests that need
+# both surfaces should use this instead of calling `stancode()` and
+# `standata()` separately, since each public dispatcher re-runs the
+# full pipeline (and triggers a fresh V8 isolate for the Stan code
+# polish step) on its own.
+mvgam_stan_setup <- function(formula, data, family = gaussian(), ...) {
+  cc <- mvgam:::generate_stan_components_mvgam_formula(
+    formula = formula, data = data, family = family, ...
+  )
+  code <- cc$combined_components$stancode
+  class(code) <- c("mvgamstancode", "stancode", "character")
+  list(code = code, data = cc$combined_components$standata)
+}
