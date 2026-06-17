@@ -8,10 +8,15 @@
 #     species multi-season support; per-species `beta` coefficients
 #     are directly comparable.
 #
-#   - flocker::flock(multiseason = "colex"): single-species multi-
-#     season colext model with explicit colonisation gamma and
-#     extinction epsilon. flocker has no multi-species multi-season
-#     family, so we fit one model per species and aggregate.
+#   - flocker::flock(multiseason = "autologistic"): single-species
+#     multi-season autologistic model with an AR-on-logit-psi
+#     coupling and a stationary occupancy regression on env. flocker
+#     has no multi-species multi-season family, so we fit one model
+#     per species and aggregate. The colex / colex_eq alternative
+#     misspecifies the factor-model truth (it constrains seasonal
+#     variation to a colonisation-extinction process) and the b_env
+#     posterior is identified only by season-1 data under explicit
+#     init -- earlier runs blew up to 10^13 for 4/5 species.
 #
 # This fixture is built around an environmental covariate so the
 # three packages produce directly-comparable per-species effect
@@ -193,7 +198,7 @@ if (file.exists(cache_flocker)) {
   cat("[cache] Loading per-species flocker fits.\n")
   fits_flocker <- readRDS(cache_flocker)
 } else {
-  cat("[fit ] per-species flocker(multiseason='colex'),",
+  cat("[fit ] per-species flocker(multiseason='autologistic'),",
       "f_occ = ~ env -- slow.\n")
   fits_flocker <- vector("list", N)
   names(fits_flocker) <- species_levels
@@ -207,18 +212,25 @@ if (file.exists(cache_flocker)) {
     unit_env <- lapply(seq_len(T_), function(t) {
       data.frame(env = env)
     })
-    # `multi_init = "explicit"` so the env effect on initial
-    # occupancy is identified by `f_occ = ~ env`. Equilibrium
-    # initialisation rejects an explicit f_occ.
     fdata <- flocker::make_flocker_data(
       obs = y_s, type = "multi",
       unit_covs = unit_env,
       event_covs = list(dummy = array(1, dim = c(J, K_visits, T_)))
     )
+    # Autologistic + explicit init: `f_occ = ~ env` is the stationary
+    # occupancy regression (identified by every season's data, not
+    # just season 1 as under colex), `f_auto = ~ 1` is the constant
+    # AR-on-logit-psi coupling. Tightened normal(0, 1.5) prior on
+    # the occupancy fixed effects so the per-species fit stays
+    # bounded under the factor-model truth even if it remains a
+    # mild misspecification (truth has independent seasons via lv,
+    # autologistic has AR-coupled seasons).
     fits_flocker[[s]] <- flocker::flock(
-      f_occ = ~ env, f_det = ~ 1,
-      f_col = ~ 1, f_ex  = ~ 1,
-      multiseason = "colex",
+      f_occ  = ~ env,
+      f_det  = ~ 1,
+      f_col  = ~ 1,
+      f_auto = ~ 1,
+      multiseason = "autologistic",
       multi_init  = "explicit",
       flocker_data = fdata,
       chains = 2L, iter = 1500L, warmup = 500L,
