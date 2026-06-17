@@ -88,18 +88,44 @@ draws under arbitrary upper truncations by supplying
 the fit-time cap to expand the latent-state support;
 fit-time caps are reused when \code{newdata} is \code{NULL}.
 }
-\section{Choosing between Poisson-binomial and Royle-Nichols}{
+\section{Choosing a variant}{
 
-The two parameterisations are NOT statistically distinguishable
-from data alone, because their visit-level variance structures
-coincide at fixed \code{N} and \code{r}. Family choice is a scientific
-judgement about the detection mechanism: per-visit \code{p} for
-sampling-effort or observation-condition heterogeneity that
-applies uniformly to all individuals in a unit; per-individual
-\code{r} for territorial / song-post / camera-placement heterogeneity
-driven by individual behaviour. Royle-Nichols requires binary
-detection (0/1) per visit; Poisson-binomial accepts arbitrary
-count data.
+All three variants share the latent-abundance prior
+\code{N ~ Poisson(lambda)}; they differ in how \code{N} maps to the
+visit-level observation.
+
+\describe{
+\item{\code{"poisson_binomial"} (default; Royle 2004)}{Per-visit
+counts \code{y ~ Binomial(N, p)}. \code{y} is bounded by \code{N} (each
+individual contributes at most one count per visit). Fits
+replicate effort-bounded surveys: bird point counts,
+electrofishing passes, plot-level vegetation tallies.
+Detection covariates attach to \code{p} via
+\code{bf(y ~ ..., p ~ visit_effort)}.}
+\item{\code{"royle_nichols"} (Royle and Nichols 2003)}{Binary per
+visit, \code{y ~ Bernoulli(1 - (1 - r)^N)}. Requires \code{y} to be
+0 / 1. Fits surveys where the response is detect /
+not-detect: camera-trap photos collapsed over an interval,
+occupancy-style replicates, eDNA samples scored as binary.
+Detection is per-individual, so two individuals at a site
+can each push the visit-level probability up.}
+\item{\code{"poisson_poisson"} (Neyman Type A; Neyman 1939)}{Counts
+\code{y ~ Poisson(N * p)}. \code{y} is unbounded and can exceed \code{N}
+because each individual contributes an independent Poisson
+encounter rate. Fits encounter surveys where the same
+individual can be recorded multiple times per visit:
+camera-trap event counts, acoustic detection counts,
+mark-resight encounters. Log-link on both \code{lambda} and
+\code{p}.}
+}
+
+Pick the variant from the survey, not the data: 0 / 1 visits
+need \code{royle_nichols}; counts that cap at abundance need
+\code{poisson_binomial}; counts that can re-detect the same
+individual need \code{poisson_poisson}. PB and RN have the same
+visit-level variance at fixed \verb{(N, p)} and \verb{(N, r)} so the
+data cannot tell them apart after the fact; PPM separates from
+PB only via the upper tail (PPM has no \code{y <= N} ceiling).
 }
 
 \section{Identification (Royle-Nichols)}{
