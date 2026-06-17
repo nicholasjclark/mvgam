@@ -45,5 +45,7 @@ and WAIC. \emph{Statistics and Computing}, 27:1413-1432.
 \doi{10.1007/s11222-016-9696-4}
 }
 \seealso{
-\code{\link[=loo.mvgam]{loo.mvgam()}}, \code{\link[=log_lik.mvgam]{log_lik.mvgam()}}.
+\code{\link[=loo.mvgam]{loo.mvgam()}}, \code{\link[=log_lik.mvgam]{log_lik.mvgam()}},
+\code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} for rolling-time CV,
+\code{\link[=kfold.mvgam]{kfold.mvgam()}} for grouped k-fold CV with selective refit.
 }

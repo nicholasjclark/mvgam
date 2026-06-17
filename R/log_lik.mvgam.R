@@ -23,7 +23,13 @@
 #'   log-likelihood. When `FALSE` the trend is fixed at its posterior
 #'   mean, returning a goodness-of-fit log-likelihood that ignores
 #'   process noise.
-#' @param ... Ignored.
+#' @param ... Forwarded to [posterior_linpred.mvgam()], which in
+#'   turn forwards brms-style prediction args to the underlying
+#'   prediction machinery. Common pass-throughs include
+#'   `allow_new_levels = TRUE` and `sample_new_levels = "gaussian"`
+#'   for predicting on factor levels that were not in the
+#'   training data (e.g. inside `kfold.mvgam()` refits scoring on
+#'   held-out groups).
 #'
 #' @return Numeric matrix \[ndraws x nobs\] of pointwise log densities.
 #'
@@ -63,7 +69,10 @@ log_lik.mvgam <- function(object,
 
   newdata <- newdata %||% object$data
 
-  # Link-scale linear predictor with optional trend realisations baked in
+  # Link-scale linear predictor with optional trend realisations baked in.
+  # Forward `...` so `allow_new_levels` / `sample_new_levels` from callers
+  # (e.g. kfold.mvgam refits scoring on held-out factor levels) reach
+  # brms::validate_newdata via prepare_predictions.
   linpred <- posterior_linpred(
     object,
     newdata = newdata,
@@ -71,7 +80,8 @@ log_lik.mvgam <- function(object,
     ndraws = ndraws,
     draw_ids = draw_ids,
     re_formula = re_formula,
-    resp = resp
+    resp = resp,
+    ...
   )
 
   # Multivariate fits return a named list of [ndraws x nobs] matrices,
@@ -526,11 +536,10 @@ log_lik_binomial <- function(linpred, link, y, family_pars, trials) {
 }
 
 log_lik_beta_binomial <- function(linpred, link, y, family_pars, trials) {
-  if (!requireNamespace("extraDistr", quietly = TRUE)) {
-    stop(insight::format_error(
-      "Package {.pkg extraDistr} is required for beta_binomial log_lik."
-    ))
-  }
+  insight::check_if_installed(
+    "extraDistr",
+    reason = "to compute log-likelihood for the beta_binomial family"
+  )
   mu <- .linkinv(linpred, link)
   phi <- family_pars$phi
   trials <- as.integer(trials)

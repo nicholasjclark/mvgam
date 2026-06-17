@@ -1044,6 +1044,40 @@ get_validation_rule_dispatch_table <- function() {
   )
 }
 
+
+#' Does any trend in a `trend_specs` payload require regular time
+#' intervals?
+#'
+#' @description
+#' Returns `TRUE` when at least one trend's `validation_rules`
+#' contains `"requires_regular_intervals"`. Handles three shapes:
+#' `NULL` (returns `FALSE`), a single `mvgam_trend` object, or a
+#' named list of trend specs. Used by the data validators
+#' upstream so the gate matches each trend's declared rule rather
+#' than a hardcoded trend-type predicate.
+#'
+#' @param trend_specs `NULL`, an `mvgam_trend`, or a list of
+#'   `mvgam_trend` objects.
+#' @return Logical scalar.
+#' @noRd
+any_trend_requires_regular_intervals <- function(trend_specs) {
+  if (is.null(trend_specs)) return(FALSE)
+  rule <- "requires_regular_intervals"
+  specs <- if (inherits(trend_specs, "mvgam_trend")) {
+    list(trend_specs)
+  } else if (is_multivariate_trend_specs(trend_specs)) {
+    trend_specs
+  } else {
+    list(trend_specs)
+  }
+  for (spec in specs) {
+    if (rule %in% (spec$validation_rules %||% character(0))) {
+      return(TRUE)
+    }
+  }
+  FALSE
+}
+
 #' Validate Trend Grouping
 #'
 #' @description
@@ -2458,9 +2492,15 @@ validate_time_series_for_trends <- function(data, trend_specs, silent = 1, respo
     )), call. = FALSE)
   }
 
-  # Phase 3: Context-specific validations (only what's essential)
-  if (trend_type != "CAR") {
-    # Only validate regular time intervals for non-CAR trends using original time values
+  # Gate on each trend's own `validation_rules` rather than a
+  # hardcoded `!= "CAR"` predicate: that bypassed the dispatch
+  # table and incorrectly enforced regular intervals for any trend
+  # whose math is exchangeable in time (e.g. ZMVN, whose `MVN(0,
+  # Sigma)` likelihood has Sigma indexed by series only). The
+  # rules are the authoritative reference; CAR's
+  # `allows_irregular_intervals` and ZMVN's omission of
+  # `requires_regular_intervals` both fall out naturally.
+  if (any_trend_requires_regular_intervals(trend_specs)) {
     original_times <- attr(data, "mvgam_original_time")
     if (!is.null(original_times)) {
       validate_regular_time_intervals(original_times, time_var)
@@ -2595,46 +2635,38 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
   time_indices <- match(sorted_ordering$time_val, sorted_unique_times)
   series_indices <- match(sorted_ordering$series_val, sorted_unique_series)
 
-  # Calculate per-series time information for forecasting
-  if (requireNamespace("dplyr", quietly = TRUE)) {
-    # Use attribute-based accessors for series and time data
-    time_vals <- get_time_for_grouping(data)
-    series_vals <- get_series_for_grouping(data)
+  # Calculate per-series time information for forecasting.
+  # dplyr is in Imports so always available.
+  time_vals <- get_time_for_grouping(data)
+  series_vals <- get_series_for_grouping(data)
 
-    series_time_info <- data.frame(
-      series = series_vals,
-      time = time_vals,
-      stringsAsFactors = FALSE
-    ) %>%
-      dplyr::group_by(.data$series) %>%
-      dplyr::summarise(
-        first_time = min(.data$time, na.rm = TRUE),
-        last_time = max(.data$time, na.rm = TRUE),
-        n_obs_series = dplyr::n(),
-        time_span = max(.data$time, na.rm = TRUE) - min(.data$time, na.rm = TRUE),
-        .groups = "drop"
-      )
+  series_time_info <- data.frame(
+    series = series_vals,
+    time = time_vals,
+    stringsAsFactors = FALSE
+  ) %>%
+    dplyr::group_by(.data$series) %>%
+    dplyr::summarise(
+      first_time = min(.data$time, na.rm = TRUE),
+      last_time = max(.data$time, na.rm = TRUE),
+      n_obs_series = dplyr::n(),
+      time_span = max(.data$time, na.rm = TRUE) - min(.data$time, na.rm = TRUE),
+      .groups = "drop"
+    )
 
-    # Create named vectors for quick access (ordered by sorted unique_series)
-    last_times <- setNames(
-      series_time_info$last_time[match(sorted_unique_series, series_time_info[[1]])],
-      sorted_unique_series
-    )
-    first_times <- setNames(
-      series_time_info$first_time[match(sorted_unique_series, series_time_info[[1]])],
-      sorted_unique_series
-    )
-    series_lengths <- setNames(
-      series_time_info$n_obs_series[match(sorted_unique_series, series_time_info[[1]])],
-      sorted_unique_series
-    )
-  } else {
-    # Fallback without dplyr
-    series_time_info <- NULL
-    last_times <- NULL
-    first_times <- NULL
-    series_lengths <- NULL
-  }
+  # Create named vectors for quick access (ordered by sorted unique_series)
+  last_times <- setNames(
+    series_time_info$last_time[match(sorted_unique_series, series_time_info[[1]])],
+    sorted_unique_series
+  )
+  first_times <- setNames(
+    series_time_info$first_time[match(sorted_unique_series, series_time_info[[1]])],
+    sorted_unique_series
+  )
+  series_lengths <- setNames(
+    series_time_info$n_obs_series[match(sorted_unique_series, series_time_info[[1]])],
+    sorted_unique_series
+  )
 
   # Backward compatible structure: Original fields maintained
   dimensions <- list(
@@ -2764,8 +2796,9 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
     )
   }
 
-  # Validate regular intervals for non-CAR trends
-  if (!is.null(trend_type) && trend_type != "CAR") {
+  # Gate on the trend's own rule rather than a hardcoded
+  # `!= "CAR"` predicate; see the matching call upstream.
+  if (any_trend_requires_regular_intervals(trend_specs)) {
     validate_regular_time_intervals(attr(data, "mvgam_original_time"), time_var)
   }
 

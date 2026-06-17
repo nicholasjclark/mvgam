@@ -135,6 +135,11 @@
 #' abline(h = 0, lty = 'dashed')
 #' }
 #'
+#' @seealso [waic.mvgam()], [log_lik.mvgam()],
+#'   [lfo_cv.mvgam()] for time-block (rolling) CV,
+#'   [kfold.mvgam()] for grouped k-fold CV with optional
+#'   selective refit.
+#'
 #' @export
 
 loo.mvgam <- function(x, ...,

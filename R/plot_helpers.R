@@ -62,7 +62,12 @@ set_color_scheme_local <- function(scheme, envir = parent.frame()) {
 mvgam_theme <- function() {
   ggplot2::theme_classic() +
     ggplot2::theme(
-      strip.background = ggplot2::element_blank(),
+      # Grey strip bar + thin border so faceted plots (lfo, kfold,
+      # pp_check residual panels, conditional_smooths) read as
+      # distinct panels rather than blending into the canvas.
+      strip.background = ggplot2::element_rect(
+        fill = "grey85", colour = "grey60"
+      ),
       strip.text = ggplot2::element_text(face = "bold"),
       axis.title = ggplot2::element_text(size = 11),
       legend.position = "right"

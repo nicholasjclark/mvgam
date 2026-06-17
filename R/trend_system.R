@@ -2954,7 +2954,15 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #'   supplied `data`. Defaults to `time` to be consistent with other
 #'   functionalities in \pkg{mvgam}, though note that the data need not be time
 #'   series in this case. See examples below for further details and
-#'   explanations
+#'   explanations.
+#'
+#'   Unlike \code{\link{AR}} / \code{\link{VAR}} / \code{\link{RW}}, ZMVN
+#'   does not require the `unit` values to be regularly spaced. The
+#'   likelihood is \eqn{x_{u, :} \sim MVN(0, \Sigma)} with \eqn{\Sigma}
+#'   indexed by series only, so \eqn{\Delta u} never enters the math.
+#'   Use ZMVN for spatial or otherwise non-temporal grouping factors
+#'   where gaps in the `unit` axis are natural (e.g. dropped sites,
+#'   stratified k-fold refits, irregular sampling grids).
 #'
 #' @param gr An optional grouping variable, which must be a `factor` in the
 #'   supplied `data`, for setting up hierarchical residual correlation
@@ -3030,6 +3038,10 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #' distributions for the covariance matrix in latent factor
 #' models. \emph{Statistics and Computing}, 34:143.
 #' \doi{10.1007/s11222-024-10454-0}
+#'
+#' @seealso \code{\link{AR}}, \code{\link{VAR}}, \code{\link{RW}},
+#'   \code{\link{CAR}}, \code{\link{mvgam}}, \code{\link{jsdgam}},
+#'   \code{\link{residual_cor}}, \code{\link{ordinate}}
 #'
 #' @examples
 #' \donttest{
@@ -3267,6 +3279,18 @@ get_default_validation_rules <- function(trend_type) {
     rule_requires_minimum_series_count
   )
 
+  # ZMVN is `x ~ MVN(0, Sigma)` with Sigma parameterised across
+  # series only; time enters as a stacking dimension, not as an
+  # autoregressive lag. Unlike VAR, the math is invariant to
+  # `Delta t`, so the regular-intervals rule should not fire. The
+  # remaining multivariate rules (factor support, hierarchical
+  # grouping, minimum series count) still apply.
+  static_multivariate_trend_rules <- c(
+    rule_supports_factors,
+    rule_supports_hierarchical,
+    rule_requires_minimum_series_count
+  )
+
   # Assign rules based on trend type
   rules <- switch(trend_type,
     "RW" = stationary_trend_rules,
@@ -3274,7 +3298,7 @@ get_default_validation_rules <- function(trend_type) {
     "VAR" = multivariate_trend_rules,
     "CAR" = irregular_trend_rules,
     "PW" = changepoint_trend_rules,
-    "ZMVN" = multivariate_trend_rules,
+    "ZMVN" = static_multivariate_trend_rules,
 
     # Default for unknown trend types (extensible)
     stationary_trend_rules

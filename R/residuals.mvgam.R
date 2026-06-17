@@ -480,7 +480,8 @@ compute_quantile_residuals_empirical <- function(y, yrep,
 # broadcasting. Used by both the analytic-quantile path and
 # the pearson path so dpar shape logic stays in one place.
 #'@noRd
-residuals_dpars <- function(object, ndraws, draw_ids, d, n_obs) {
+residuals_dpars <- function(object, ndraws = NULL, draw_ids = NULL,
+                            d, n_obs) {
   draws_mat <- posterior::as_draws_matrix(object$fit)
   total_draws <- nrow(draws_mat)
   draw_idx <- if (!is.null(draw_ids)) {

@@ -96,7 +96,10 @@ Simulation}. 90:14, 2499-2523.
 }
 \seealso{
 \link{forecast.mvgam}, \link{hindcast.mvgam},
-\link{score.mvgam_forecast}, \link{log_lik.mvgam}, \link{update.mvgam}
+\link{score.mvgam_forecast}, \link{log_lik.mvgam}, \link{update.mvgam},
+\code{\link[=loo.mvgam]{loo.mvgam()}} for PSIS-LOO over individual observations,
+\code{\link[=kfold.mvgam]{kfold.mvgam()}} for grouped k-fold CV (the same selective-
+refit pattern generalised to arbitrary grouping factors).
 }
 \author{
 Nicholas J Clark

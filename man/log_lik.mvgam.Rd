@@ -40,7 +40,13 @@ log-likelihood. When \code{FALSE} the trend is fixed at its posterior
 mean, returning a goodness-of-fit log-likelihood that ignores
 process noise.}
 
-\item{...}{Ignored.}
+\item{...}{Forwarded to \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}}, which in
+turn forwards brms-style prediction args to the underlying
+prediction machinery. Common pass-throughs include
+\code{allow_new_levels = TRUE} and \code{sample_new_levels = "gaussian"}
+for predicting on factor levels that were not in the
+training data (e.g. inside \code{kfold.mvgam()} refits scoring on
+held-out groups).}
 }
 \value{
 Numeric matrix [ndraws x nobs] of pointwise log densities.

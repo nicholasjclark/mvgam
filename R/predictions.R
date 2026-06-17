@@ -2147,7 +2147,7 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   checkmate::assert(
     checkmate::check_null(re_formula),
     checkmate::check_class(re_formula, "formula"),
-    checkmate::check_identical(re_formula, NA)
+    checkmate::check_scalar_na(re_formula)
   )
 
   # Validate prediction data factor levels against training data

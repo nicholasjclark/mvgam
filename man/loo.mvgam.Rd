@@ -162,6 +162,12 @@ Bayesian model evaluation using leave-one-out cross-validation
 and WAIC. \emph{Statistics and Computing}, 27:1413-1432.
 \doi{10.1007/s11222-016-9696-4}
 }
+\seealso{
+\code{\link[=waic.mvgam]{waic.mvgam()}}, \code{\link[=log_lik.mvgam]{log_lik.mvgam()}},
+\code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} for time-block (rolling) CV,
+\code{\link[=kfold.mvgam]{kfold.mvgam()}} for grouped k-fold CV with optional
+selective refit.
+}
 \author{
 Nicholas J Clark
 }

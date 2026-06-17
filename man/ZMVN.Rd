@@ -58,7 +58,15 @@ variable should be either a \code{numeric} or \code{integer} variable in the
 supplied \code{data}. Defaults to \code{time} to be consistent with other
 functionalities in \pkg{mvgam}, though note that the data need not be time
 series in this case. See examples below for further details and
-explanations}
+explanations.
+
+Unlike \code{\link{AR}} / \code{\link{VAR}} / \code{\link{RW}}, ZMVN
+does not require the \code{unit} values to be regularly spaced. The
+likelihood is \eqn{x_{u, :} \sim MVN(0, \Sigma)} with \eqn{\Sigma}
+indexed by series only, so \eqn{\Delta u} never enters the math.
+Use ZMVN for spatial or otherwise non-temporal grouping factors
+where gaps in the \code{unit} axis are natural (e.g. dropped sites,
+stratified k-fold refits, irregular sampling grids).}
 }
 \value{
 An object of class \code{mvgam_trend}, which contains a list of
@@ -178,4 +186,9 @@ Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
 distributions for the covariance matrix in latent factor
 models. \emph{Statistics and Computing}, 34:143.
 \doi{10.1007/s11222-024-10454-0}
+}
+\seealso{
+\code{\link{AR}}, \code{\link{VAR}}, \code{\link{RW}},
+\code{\link{CAR}}, \code{\link{mvgam}}, \code{\link{jsdgam}},
+\code{\link{residual_cor}}, \code{\link{ordinate}}
 }

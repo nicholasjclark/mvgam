@@ -375,12 +375,10 @@ as.mcmc.mvgam <- function(x, pars = NA, fixed = FALSE,
   checkmate::assert_logical(fixed, len = 1L)
   checkmate::assert_logical(combine_chains, len = 1L)
   checkmate::assert_logical(inc_warmup, len = 1L)
-  if (!requireNamespace("coda", quietly = TRUE)) {
-    stop(insight::format_error(c(
-      "Package 'coda' is required for 'as.mcmc.mvgam'.",
-      i = "Install it with 'install.packages(\"coda\")'."
-    )))
-  }
+  insight::check_if_installed(
+    "coda",
+    reason = "to convert an 'mvgam' fit to a 'coda::mcmc.list' object"
+  )
   warning(
     "'as.mcmc.mvgam' is deprecated; prefer ",
     "'posterior::as_draws_array(x)' or 'as.array(x)' for ",

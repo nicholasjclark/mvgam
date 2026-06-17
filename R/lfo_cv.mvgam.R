@@ -87,7 +87,10 @@
 #' Simulation*. 90:14, 2499-2523.
 #'
 #' @seealso [forecast.mvgam], [hindcast.mvgam],
-#'   [score.mvgam_forecast], [log_lik.mvgam], [update.mvgam]
+#'   [score.mvgam_forecast], [log_lik.mvgam], [update.mvgam],
+#'   [loo.mvgam()] for PSIS-LOO over individual observations,
+#'   [kfold.mvgam()] for grouped k-fold CV (the same selective-
+#'   refit pattern generalised to arbitrary grouping factors).
 #'
 #' @author Nicholas J Clark
 #' @export
@@ -635,7 +638,7 @@ plot.mvgam_lfo <- function(x, ...) {
       values = c(inlier = "grey30", outlier = "#8F2727")
     ) +
     ggplot2::labs(x = "Evaluation time", y = NULL) +
-    ggplot2::theme_bw()
+    mvgam_theme()
 }
 
 

@@ -18,7 +18,9 @@
 #'
 #' @return A `loo::waic` object.
 #'
-#' @seealso [loo.mvgam()], [log_lik.mvgam()].
+#' @seealso [loo.mvgam()], [log_lik.mvgam()],
+#'   [lfo_cv.mvgam()] for rolling-time CV,
+#'   [kfold.mvgam()] for grouped k-fold CV with selective refit.
 #'
 #' @references
 #' Vehtari, A., Gelman, A. and Gabry, J. (2017). Practical

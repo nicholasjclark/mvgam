@@ -925,25 +925,22 @@ handle_nonlinear_model <- function(formula, trend_specs = NULL) {
 extract_nonlinear_components <- function(formula) {
   checkmate::assert_formula(formula)
 
-  # Use brms internal functions if available
-  if (requireNamespace("brms", quietly = TRUE)) {
-    tryCatch({
-      # Try to parse with brms
-      bf_terms <- brms::brmsterms(formula)
+  # brms is in Depends so the import is guaranteed; parse via
+  # brms::brmsterms() and fall back to the heuristic regex form
+  # if brms refuses the formula.
+  tryCatch({
+    bf_terms <- brms::brmsterms(formula)
 
-      return(list(
-        response = bf_terms$respform,
-        predictors = bf_terms$pforms,
-        nonlinear_params = names(bf_terms$nlpars),
-        family = bf_terms$family
-      ))
-    }, error = function(e) {
-      # Fallback to manual parsing
-      return(parse_nonlinear_manually(formula))
-    })
-  } else {
+    return(list(
+      response = bf_terms$respform,
+      predictors = bf_terms$pforms,
+      nonlinear_params = names(bf_terms$nlpars),
+      family = bf_terms$family
+    ))
+  }, error = function(e) {
+    # Fallback to manual parsing
     return(parse_nonlinear_manually(formula))
-  }
+  })
 }
 
 #' Parse Nonlinear Formula Manually

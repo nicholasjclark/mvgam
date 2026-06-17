@@ -457,6 +457,28 @@ test_that("helper functions work correctly", {
   expect_true("allows_irregular_intervals" %in% car_rules)
   expect_true("incompatible_with_factors" %in% car_rules)
 
+  # VAR is a true autoregressive multivariate trend; the Δt
+  # spacing enters the AR coefficient interpretation, so the
+  # regular-intervals rule must stay.
+  var_rules <- get_default_validation_rules("VAR")
+  expect_true("requires_regular_intervals" %in% var_rules)
+  expect_true("supports_factors" %in% var_rules)
+  expect_true("requires_minimum_series_count" %in% var_rules)
+
+  # ZMVN is `MVN(0, Sigma)` with covariance indexed by series
+  # only; time is a stacking dimension and Δt does NOT enter the
+  # likelihood (Stan: `to_vector(innovations_trend) ~ std_normal()`)
+  # nor the R-side propagator (`propagate_zmvn` does not accept a
+  # `time` arg). The regular-intervals rule should NOT fire so
+  # that ZMVN fits accept gappy / non-contiguous time grids, such
+  # as the jsdgam(unit = site) layout where dropping a fold of
+  # sites in a kfold refit leaves an irregular site axis.
+  zmvn_rules <- get_default_validation_rules("ZMVN")
+  expect_false("requires_regular_intervals" %in% zmvn_rules)
+  expect_true("supports_factors" %in% zmvn_rules)
+  expect_true("supports_hierarchical" %in% zmvn_rules)
+  expect_true("requires_minimum_series_count" %in% zmvn_rules)
+
   # Test apply_mvgam_trend_defaults
   partial_trend <- list(trend = "RW", ma = TRUE)
   complete_trend <- apply_mvgam_trend_defaults(partial_trend)
