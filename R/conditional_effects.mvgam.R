@@ -252,7 +252,27 @@ detect_conditional_effects <- function(x) {
   } else {
     x$formula
   }
-  termlabs <- attr(stats::terms(obs_f, keep.order = TRUE), "term.labels")
+  # Reason: for non-linear formulas (bf(..., nl = TRUE)) the
+  # top-level RHS only enumerates nlpar names (e.g. `a + b * env`),
+  # not the user-relevant covariates. The actual fixed-effect terms
+  # live in the per-nlpar sub-formulas under `$pforms`. Collect
+  # term labels from each sub-formula's RHS so callers see env,
+  # trait1 etc. instead of just `a` and `b`.
+  is_nl <- isTRUE(attr(obs_f, "nl"))
+  nlpar_names <- if (is_nl && inherits(x$formula, "brmsformula")) {
+    names(x$formula$pforms %||% list())
+  } else {
+    character(0L)
+  }
+  termlabs <- if (length(nlpar_names) > 0L) {
+    nlpar_terms <- unlist(lapply(x$formula$pforms, function(pf) {
+      attr(stats::terms(pf, keep.order = TRUE), "term.labels")
+    }), use.names = FALSE)
+    top <- attr(stats::terms(obs_f, keep.order = TRUE), "term.labels")
+    c(nlpar_terms, top)
+  } else {
+    attr(stats::terms(obs_f, keep.order = TRUE), "term.labels")
+  }
   if (!is.null(x$trend_formula)) {
     termlabs <- c(
       termlabs,
@@ -263,6 +283,14 @@ detect_conditional_effects <- function(x) {
   termlabs <- termlabs[!grepl("^offset\\(", termlabs)]
   cond <- unlist(lapply(termlabs, split_term_labels),
                  recursive = FALSE)
+  # Filter out nlpar tokens that survived from the top-level
+  # nl formula. `b * env` splits into c("b", "env"); the nlpar
+  # `b` must be dropped from the grouping so we plot env on its
+  # own. Empty groupings (a bare nlpar like `a`) are pruned.
+  if (length(nlpar_names) > 0L) {
+    cond <- lapply(cond, function(g) setdiff(g, nlpar_names))
+    cond <- cond[lengths(cond) > 0L]
+  }
   # Drop duplicates while preserving order
   keys <- vapply(cond, paste, FUN.VALUE = character(1L), collapse = ":")
   cond[!duplicated(keys)]

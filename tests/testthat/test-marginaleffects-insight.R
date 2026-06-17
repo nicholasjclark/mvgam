@@ -86,6 +86,51 @@ test_that("find_predictors.mvgam pulls obs + trend + meta vars", {
   expect_true(all(c("x1", "x2", "time", "series") %in% preds))
 })
 
+test_that("detect_conditional_effects recurses into nl sub-formulas", {
+  # Reason: bf(..., nl = TRUE) hides the user-relevant covariates
+  # inside per-nlpar pforms; the top-level RHS only enumerates the
+  # nlpar names themselves (`a + b * env`). Naive parsing of the
+  # top-level formula would return c("a", "b", "env") and split
+  # the `b * env` interaction into a nonsense (b, env) grouping.
+  # The recursion pulls trait1 etc. out of each pform and filters
+  # nlpar tokens from the split.
+  obs_nl <- brms::bf(
+    y  ~ a + b * env,
+    a  ~ trait1 + (1 | species),
+    b  ~ trait1 + (1 | species),
+    nl = TRUE
+  )
+  stub <- structure(
+    list(formula = obs_nl, trend_formula = NULL),
+    class = "mvgam"
+  )
+  cond <- mvgam:::detect_conditional_effects(stub)
+  flat <- unlist(cond, use.names = FALSE)
+  # Should surface env (top-level data var), trait1 (sub-formula
+  # term) and species (RE grouping factor), and NOT the nlpar
+  # names a / b.
+  expect_true("env" %in% flat)
+  expect_true("trait1" %in% flat)
+  expect_true("species" %in% flat)
+  expect_false("a" %in% flat)
+  expect_false("b" %in% flat)
+  # No grouping should contain a nlpar after filtering.
+  for (g in cond) {
+    expect_false(any(g %in% c("a", "b")))
+  }
+})
+
+test_that("detect_conditional_effects leaves linear formulas alone", {
+  # Regression guard: the nl branch must not leak into the plain
+  # linear path. A bare y ~ env model should produce just c("env").
+  stub <- structure(
+    list(formula = y ~ env, trend_formula = NULL),
+    class = "mvgam"
+  )
+  cond <- mvgam:::detect_conditional_effects(stub)
+  expect_equal(cond, list("env"))
+})
+
 test_that("conditional_effects.mvgam is registered and re-exports the generic", {
   expect_true(
     !is.null(getS3method("conditional_effects", "mvgam", optional = TRUE))
