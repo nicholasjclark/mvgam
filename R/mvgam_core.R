@@ -249,6 +249,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
                            loadings_prior = NULL,
                            backend = getOption("brms.backend", "cmdstanr"),
                            combine = TRUE, family = gaussian(),
+                           threads = NULL,
                            run_model = TRUE, ...) {
 
   checkmate::assert(
@@ -260,6 +261,19 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   checkmate::assert_character(backend, len = 1)
   checkmate::assert_logical(combine, len = 1)
   checkmate::assert_flag(run_model)
+  # `threads` is forwarded as-is. The inner pipeline (mvgam_single,
+  # stancode.mvgam_formula) does its own validation; eager
+  # validate_threads() here would replace NULL with a brmsthreads
+  # sentinel that downstream `assert_int(threads, lower = 1)` checks
+  # reject. The named arg buys autocomplete + a stable signature
+  # without changing the value semantics.
+  if (!is.null(threads)) {
+    checkmate::assert(
+      checkmate::check_number(threads, lower = 1),
+      checkmate::check_class(threads, "brmsthreads"),
+      .var.name = "threads"
+    )
+  }
   if (isFALSE(run_model)) {
     rlang::warn(
       paste0(
@@ -299,8 +313,12 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
     }
   }
 
-  # Single dataset processing
-  mvgam_object <- mvgam_single(
+  # Single dataset processing. `threads` is forwarded only when the
+  # user actually set it; sending `threads = NULL` explicitly down
+  # the pipeline trips the `assert_int(threads, lower = 1)` check
+  # in stancode.mvgam_formula (which has its own positive-integer
+  # default of `getOption("mc.cores", 1)`).
+  mvgam_single_args <- list(
     formula = formula,
     trend_formula = trend_formula,
     data = data,
@@ -310,9 +328,12 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
     backend = backend,
     family = family,
     data_name = data_name,
-    run_model = run_model,
-    ...
+    run_model = run_model
   )
+  if (!is.null(threads)) {
+    mvgam_single_args$threads <- threads
+  }
+  mvgam_object <- do.call(mvgam_single, c(mvgam_single_args, list(...)))
 
   return(mvgam_object)
 }

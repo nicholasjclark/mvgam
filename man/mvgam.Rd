@@ -14,6 +14,7 @@ mvgam(
   backend = getOption("brms.backend", "cmdstanr"),
   combine = TRUE,
   family = gaussian(),
+  threads = NULL,
   run_model = TRUE,
   ...
 )
@@ -156,6 +157,18 @@ separate linear predictors for each response category are not supported:
 \code{\link[brms:brmsfamily]{brms::categorical()}}, \code{\link[brms:brmsfamily]{brms::multinomial()}}, \code{\link[brms:brmsfamily]{brms::dirichlet()}}. For
 these response types, use brms directly.}
 
+\item{threads}{Positive integer or \code{NULL}. When non-NULL the
+model is compiled with \code{cpp_options$stan_threads = TRUE} and
+cmdstanr passes \code{threads_per_chain = N} at sample time.
+Closure-unit families (\code{nmix()}, \code{occ()}) thread their
+per-closure-unit lpmf via \code{reduce_sum}; brms-native families
+thread their lpmf loops via brms's \code{partial_log_lik}. For
+closure-unit families, expect ~30-40\% sampling throughput
+improvement at \code{threads = 4} on a fixture with N_unit >= 50;
+smaller fixtures may see thread-overhead-dominated
+regressions. The internal grainsize is auto-tuned to ~8
+chunks regardless of \code{threads}.}
+
 \item{run_model}{\strong{(deprecated; do not use in new code)} Logical.
 Setting \code{run_model = FALSE} short-circuits before Stan parse /
 compile / sampling and returns a stub \code{mvgam} object whose
@@ -174,18 +187,6 @@ warning is rate-limited via \code{.frequency = "regularly"}).
 Defaults to \code{TRUE}.}
 
 \item{...}{Additional arguments passed to Stan fitting}
-
-\item{threads}{Positive integer or \code{NULL}. When non-NULL the
-model is compiled with \code{cpp_options$stan_threads = TRUE} and
-cmdstanr passes \code{threads_per_chain = N} at sample time.
-Closure-unit families (\code{nmix()}, \code{occ()}) thread their
-per-closure-unit lpmf via \code{reduce_sum}; brms-native families
-thread their lpmf loops via brms's \code{partial_log_lik}. For
-closure-unit families, expect ~30-40\% sampling throughput
-improvement at \code{threads = 4} on a fixture with N_unit >= 50;
-smaller fixtures may see thread-overhead-dominated
-regressions. The internal grainsize is auto-tuned to ~8
-chunks regardless of \code{threads}.}
 
 \item{cpp_options}{Optional named list forwarded to
 \code{cmdstanr::cmdstan_model()}. Common entries:

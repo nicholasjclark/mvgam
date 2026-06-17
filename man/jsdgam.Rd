@@ -22,6 +22,7 @@ jsdgam(
   phylo = NULL,
   loadings_prior = NULL,
   backend = getOption("brms.backend", "cmdstanr"),
+  threads = NULL,
   run_model = TRUE,
   ...
 )
@@ -170,6 +171,12 @@ see \verb{[mvgam()]} for the accepted field list.}
 
 \item{backend}{Stan backend (defaults to "cmdstanr")}
 
+\item{threads}{Positive integer or \code{NULL}. Forwarded to
+\code{\link[=mvgam]{mvgam()}} / \code{cmdstanr}. With closure-unit families
+(\code{nmix()}, \code{occ()}), enables \code{reduce_sum} threading of the
+per-closure-unit lpmf. See \code{\link[=mvgam]{mvgam()}} for the threading
+notes and bench guidance.}
+
 \item{run_model}{\strong{(deprecated)} Logical. Forwarded to \code{mvgam()};
 when \code{FALSE}, skips Stan parse / compile / sampling and returns a
 stub \code{mvgam} / \code{jsdgam} object with \verb{$stancode} and \verb{$standata}
@@ -180,12 +187,6 @@ one-time \code{rlang::warn()} when \code{FALSE}. Defaults to \code{TRUE}.}
 \item{...}{Other arguments forwarded to \code{mvgam()}. Notable ones
 include \code{data2} (lookup list for string-named \code{traits} / \code{phylo}
 slots), \code{algorithm}, \code{chains}, and \code{silent}.}
-
-\item{threads}{Positive integer or \code{NULL}. Forwarded to
-\code{\link[=mvgam]{mvgam()}} / \code{cmdstanr}. With closure-unit families
-(\code{nmix()}, \code{occ()}), enables \code{reduce_sum} threading of the
-per-closure-unit lpmf. See \code{\link[=mvgam]{mvgam()}} for the threading
-notes and bench guidance.}
 
 \item{cpp_options}{Optional named list forwarded to
 \code{cmdstanr::cmdstan_model()} (e.g. \code{CXXFLAGS = "-march=native"}).

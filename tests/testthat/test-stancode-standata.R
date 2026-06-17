@@ -3469,6 +3469,30 @@ test_that("run_model = FALSE deprecation fires only once per session via rlang",
 })
 
 
+test_that("threads is a first-class named arg on mvgam() and jsdgam()", {
+  # threads was historically captured in `...` and pulled from
+  # `dots$threads` inside mvgam_single, leaving the outer signature
+  # silent. Promoting it to a named arg gives users autocomplete
+  # plus a checkmate-style early-fail on a bad value, before the
+  # expensive Stan compile.
+  expect_true("threads" %in% formalArgs(mvgam))
+  expect_true("threads" %in% formalArgs(jsdgam))
+  # Default is NULL (no threading). validate_threads(NULL) returns
+  # `brms::threading()`, the "no threading" sentinel.
+  fmls <- formals(mvgam)
+  expect_null(eval(fmls$threads))
+})
+
+test_that("mvgam() rejects an invalid threads argument before compile", {
+  # validate_threads errors on anything that is not NULL, numeric,
+  # or a `brms::threading()` object. The outer call runs the check
+  # before any compile so the error path is fast.
+  expect_error(
+    mvgam(y ~ 1, data = data.frame(y = 1:5), threads = "many"),
+    "threads"
+  )
+})
+
 test_that("threads = N forwards brms partial_log_lik into mvgam stancode", {
   # Threading was being dropped at the mvgam mock-fit setup; only
   # closure-unit families threaded (via mvgam's own partial_sum

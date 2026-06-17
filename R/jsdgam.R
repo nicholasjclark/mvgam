@@ -306,6 +306,7 @@ jsdgam <- function(formula,
                    phylo = NULL,
                    loadings_prior = NULL,
                    backend = getOption("brms.backend", "cmdstanr"),
+                   threads = NULL,
                    run_model = TRUE,
                    ...) {
   call <- match.call(expand.dots = FALSE)
@@ -485,6 +486,13 @@ jsdgam <- function(formula,
     backend = backend,
     run_model = run_model
   )
+  # Only forward `threads` when the user actually set it; mvgam()
+  # defaults the unset case via `getOption("mc.cores", 1)` further
+  # down (in stancode.mvgam_formula), and passing NULL trips that
+  # default's `assert_int(threads, lower = 1)` check.
+  if (!is.null(threads)) {
+    forward_args$threads <- threads
+  }
   if (!missing(newdata)) forward_args$newdata <- newdata
   if (!missing(knots)) forward_args$knots <- knots
   if (!missing(factor_knots)) forward_args$trend_knots <- factor_knots
