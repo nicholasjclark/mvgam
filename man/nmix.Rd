@@ -27,7 +27,16 @@ encounter rate \code{p}.}
 defined by \verb{(series, site, time)} instead of the default
 \verb{(series, time)}. The data must carry a \code{site} column;
 produce it from a 4-axis observation array with
-\code{\link[=pivot_detection_array]{pivot_detection_array()}} (set \code{multi_season = "hierarchical"}).}
+\code{\link[=pivot_detection_array]{pivot_detection_array()}} (set \code{multi_season = "hierarchical"}).
+Per-unit \code{Y_max[g]} and the K_max buffer (\code{Y_max[g] + 100} for
+PB and PPM by default; static \code{K_max = 25} for RN) are
+computed from the visits in unit \code{g} only. With few visits per
+(site, season) and a highly abundant species, that cap may
+bind and downward-bias \code{lambda}; inspect \code{standata(fit)$K_max}
+against \code{posterior_latent_N()} / \code{latent_N_saturation(fit)}
+after fitting and raise \code{cap} if needed. Sparse visits +
+low detection probability also produces prior-dominated
+posteriors; check marginal posteriors against the prior.}
 }
 \value{
 A \code{brms::customfamily} object with the

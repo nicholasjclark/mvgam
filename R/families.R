@@ -1030,6 +1030,15 @@ build_closure_unit_arrays <- function(data,
 #'   `(series, time)`. The data must carry a `site` column;
 #'   produce it from a 4-axis observation array with
 #'   [pivot_detection_array()] (set `multi_season = "hierarchical"`).
+#'   Per-unit `Y_max[g]` and the K_max buffer (`Y_max[g] + 100` for
+#'   PB and PPM by default; static `K_max = 25` for RN) are
+#'   computed from the visits in unit `g` only. With few visits per
+#'   (site, season) and a highly abundant species, that cap may
+#'   bind and downward-bias `lambda`; inspect `standata(fit)$K_max`
+#'   against `posterior_latent_N()` / `latent_N_saturation(fit)`
+#'   after fitting and raise `cap` if needed. Sparse visits +
+#'   low detection probability also produces prior-dominated
+#'   posteriors; check marginal posteriors against the prior.
 #'
 #' @examples
 #' \dontrun{
@@ -1538,6 +1547,12 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #'   `(series, time)`. The data must carry a `site` column;
 #'   produce it from a 4-axis observation array with
 #'   [pivot_detection_array()] (set `multi_season = "hierarchical"`).
+#'   The per-unit visits shrink to those within a single
+#'   (site, season): with few visits per unit and low detection
+#'   probability the posterior occupancy can become prior-dominated;
+#'   check marginal posteriors against the prior (e.g. via
+#'   `pp_check(fit)`) and consider a hierarchical detection sub-
+#'   formula (`p ~ ...`) to share detection information across units.
 #'
 #' @examples
 #' \dontrun{

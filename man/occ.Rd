@@ -11,7 +11,13 @@ occ(multi_season = FALSE)
 defined by \verb{(series, site, time)} instead of the default
 \verb{(series, time)}. The data must carry a \code{site} column;
 produce it from a 4-axis observation array with
-\code{\link[=pivot_detection_array]{pivot_detection_array()}} (set \code{multi_season = "hierarchical"}).}
+\code{\link[=pivot_detection_array]{pivot_detection_array()}} (set \code{multi_season = "hierarchical"}).
+The per-unit visits shrink to those within a single
+(site, season): with few visits per unit and low detection
+probability the posterior occupancy can become prior-dominated;
+check marginal posteriors against the prior (e.g. via
+\code{pp_check(fit)}) and consider a hierarchical detection sub-
+formula (\code{p ~ ...}) to share detection information across units.}
 }
 \value{
 A \code{brms::customfamily} object with the
