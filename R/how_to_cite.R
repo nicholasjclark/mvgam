@@ -696,6 +696,19 @@ uses_gp_smooth <- function(object) {
 }
 
 
+# Threading detection: returns TRUE iff the compiled stancode
+# contains a `reduce_sum(...)` call -- either the brms-emitted
+# `partial_log_lik_lpmf` for native families, or one of the
+# mvgam-emitted `partial_sum_*_lpmf` wrappers for closure-unit
+# families. Either path means within-chain parallelism was on.
+#'@noRd
+uses_threading <- function(object) {
+  sc <- object$stancode
+  if (is.null(sc)) return(FALSE)
+  grepl("reduce_sum\\(", sc)
+}
+
+
 # Read sampling info from the stanfit S4 on `object$fit`.
 # mvgam normalises both rstan and cmdstanr output into a
 # stanfit, so the `stan_args` slot is the only access path
@@ -916,6 +929,16 @@ how_to_cite.mvgam <- function(object, ...) {
         "niku_gllvm_2019",
         "tikhonov_hmsc_2020"
       )
+    ),
+    list(
+      detect = uses_threading(object),
+      text = paste0(
+        " Sampling was accelerated by within-chain parallelism via",
+        " Stan's `reduce_sum` (Intel oneTBB) on the closure-unit",
+        " or population likelihood, as exposed through brms's",
+        " threading interface (Burkner 2017)."
+      ),
+      refs = "burkner_brms"
     )
   )
 

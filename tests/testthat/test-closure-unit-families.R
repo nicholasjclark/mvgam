@@ -1481,3 +1481,21 @@ test_that("build_closure_unit_arrays computes K_max = Y_max + buffer", {
   expect_equal(arrays$Y_max, c(3L, 2L))
   expect_equal(arrays$K_max, c(103L, 102L))
 })
+
+
+test_that("uses_threading() detects reduce_sum in stancode", {
+  threaded <- structure(
+    list(stancode = "target += reduce_sum(partial_sum_nmix_lpmf, ...);"),
+    class = "mvgam"
+  )
+  unthreaded <- structure(
+    list(stancode = "target += normal_id_glm_lpdf(...);"),
+    class = "mvgam"
+  )
+  expect_true(mvgam:::uses_threading(threaded))
+  expect_false(mvgam:::uses_threading(unthreaded))
+  # Missing stancode slot -> FALSE (defensive).
+  expect_false(
+    mvgam:::uses_threading(structure(list(), class = "mvgam"))
+  )
+})
