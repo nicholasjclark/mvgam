@@ -269,6 +269,24 @@
 #'   phylo = species_tree,
 #'   chains = 2, silent = 2
 #' )
+#'
+#' # Hmsc-style trait-mediated environmental slopes ("fourth corner").
+#' # `trait_slopes` rewrites the obs formula into a brms non-linear
+#' # form where each fixed slope is regressed on the supplied traits
+#' # plus a species-level random deviation. The trait column must be
+#' # in `data` and constant within species (one value per species
+#' # level). The headline coefficient is `b_b1_trait1` -- the slope
+#' # of species' env response on trait1.
+#' mod_fourth_corner <- jsdgam(
+#'   formula = y ~ env,
+#'   factor_formula = ~ -1,
+#'   data = my_data, unit = site, species = species,
+#'   family = gaussian(), n_lv = 2,
+#'   trait_slopes = ~ trait1,
+#'   chains = 2, silent = 2
+#' )
+#' summary(mod_fourth_corner)
+#' conditional_effects(mod_fourth_corner)
 #' }
 #' @export
 jsdgam <- function(formula,
