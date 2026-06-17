@@ -1324,9 +1324,12 @@ test_that("nmix('royle_nichols') constructor exposes the RN family name and bina
                    "royle_nichols")
   expect_true(isTRUE(attr(fam, "mvgam_binary_response",
                           exact = TRUE)))
-  # RN keeps default_cap unset because latent N can exceed 1; the
-  # user must supply the cap column.
-  expect_null(attr(fam, "mvgam_default_cap", exact = TRUE))
+  # RN defaults K_max to 25 to match unmarked::occuRN. Users still
+  # override via a 'cap' column when latent_N_saturation() flags
+  # truncation bias.
+  expect_identical(
+    attr(fam, "mvgam_default_cap", exact = TRUE), 25L
+  )
   expect_identical(attr(fam, "mvgam_predict_types", exact = TRUE),
                    c("latent_state", "detection"))
 })
@@ -1414,4 +1417,67 @@ test_that("how_to_cite reference_db carries the Neyman 1939 entry", {
   ny <- db[["neyman_type_a_1939"]]
   expect_true(grepl("Neyman J", ny$text))
   expect_true(grepl("neyman1939contagious", ny$bibtex))
+})
+
+
+test_that("nmix('royle_nichols') sets the auto-default K_max attribute", {
+  fam <- nmix("royle_nichols")
+  expect_equal(
+    attr(fam, "mvgam_default_cap", exact = TRUE), 25L
+  )
+  # PB and PPM have no scalar default_cap; they auto-compute
+  # K_max[g] = max(y in g) + 100 via the buffer attr instead.
+  expect_null(attr(nmix(),
+                    "mvgam_default_cap", exact = TRUE))
+  expect_null(attr(nmix("poisson_poisson"),
+                    "mvgam_default_cap", exact = TRUE))
+  expect_identical(
+    attr(nmix(),
+          "mvgam_default_cap_buffer", exact = TRUE), 100L
+  )
+  expect_identical(
+    attr(nmix("poisson_poisson"),
+          "mvgam_default_cap_buffer", exact = TRUE), 100L
+  )
+  expect_null(attr(nmix("royle_nichols"),
+                    "mvgam_default_cap_buffer", exact = TRUE))
+})
+
+test_that("latent_N_saturation rejects non-closure-unit fits", {
+  fake <- structure(
+    list(family = gaussian()), class = "mvgam"
+  )
+  expect_error(
+    latent_N_saturation(fake),
+    "closure-unit family"
+  )
+})
+
+
+test_that("build_closure_unit_arrays errors when user 'cap' < observed max", {
+  dat <- data.frame(
+    y      = c(2L, 1L, 3L, 0L, 2L, 1L),
+    cap    = c(2L, 2L, 2L, 5L, 5L, 5L),
+    time   = c(1L, 1L, 1L, 2L, 2L, 2L),
+    series = factor(rep("s1", 6L))
+  )
+  expect_error(
+    mvgam:::build_closure_unit_arrays(data = dat,
+                                        response_var = "y"),
+    "is below the observed max"
+  )
+})
+
+test_that("build_closure_unit_arrays computes K_max = Y_max + buffer", {
+  dat <- data.frame(
+    y      = c(2L, 1L, 3L, 0L, 2L, 1L),
+    time   = c(1L, 1L, 1L, 2L, 2L, 2L),
+    series = factor(rep("s1", 6L))
+  )
+  arrays <- mvgam:::build_closure_unit_arrays(
+    data = dat, response_var = "y",
+    default_cap_buffer = 100L
+  )
+  expect_equal(arrays$Y_max, c(3L, 2L))
+  expect_equal(arrays$K_max, c(103L, 102L))
 })

@@ -657,6 +657,28 @@ closure_unit_grouping <- function(family) {
   attr(family, "mvgam_unit_grouping", exact = TRUE)
 }
 
+
+#' Per-unit K_max buffer for count closure-unit families
+#'
+#' Reads the `mvgam_default_cap_buffer` family attribute. When set
+#' on a count family (`nmix()` Poisson-binomial, `nmix("poisson_
+#' poisson")`), `build_closure_unit_arrays()` computes a per-unit
+#' default `K_max[g] = max(y in g) + buffer` whenever the user
+#' supplies no `cap` column. Returns `NULL` when no buffer is
+#' configured (royle_nichols handles this via the static
+#' `mvgam_default_cap`; the multi-response families do not use
+#' K_max at all).
+#'
+#' @param family A `brmsfamily` (or family-like list).
+#' @return Positive integer or `NULL`.
+#' @noRd
+closure_unit_default_cap_buffer <- function(family) {
+  if (is.null(family)) return(NULL)
+  buf <- attr(family, "mvgam_default_cap_buffer", exact = TRUE)
+  if (is.null(buf)) return(NULL)
+  as.integer(buf)
+}
+
 #' Build per-closure-unit indexing arrays from long-format data
 #'
 #' Walks the user's long-format observation data and groups rows
@@ -717,6 +739,7 @@ build_closure_unit_arrays <- function(data,
                                        time_var    = "time",
                                        cap_var     = "cap",
                                        default_cap = NULL,
+                                       default_cap_buffer = NULL,
                                        compute_y_max = TRUE,
                                        unit_grouping_vars = NULL) {
   checkmate::assert_data_frame(data, min.rows = 1L)
@@ -726,19 +749,22 @@ build_closure_unit_arrays <- function(data,
   checkmate::assert_string(cap_var)
   checkmate::assert_integerish(default_cap, lower = 1L, len = 1L,
                                null.ok = TRUE)
+  checkmate::assert_integerish(default_cap_buffer, lower = 0L,
+                               len = 1L, null.ok = TRUE)
   checkmate::assert_flag(compute_y_max)
   if (is.null(unit_grouping_vars)) {
     unit_grouping_vars <- c(series_var, time_var)
   }
   checkmate::assert_character(unit_grouping_vars, min.len = 1L,
                               any.missing = FALSE)
-  # Required columns: response + grouping always; cap only when no
-  # default has been supplied AND we need it (count-family path).
-  # Binary-response families pass `default_cap = 1L` to make `cap`
-  # optional. Multi-response families pass `compute_y_max = FALSE`,
-  # which drops the cap requirement entirely.
+  # Required columns: response + grouping always; cap only when
+  # neither a scalar default (`default_cap`) nor a data-driven
+  # buffer (`default_cap_buffer`) is configured. Multi-response
+  # families pass `compute_y_max = FALSE`, which drops the cap
+  # requirement entirely.
   required_cols <- c(response_var, unit_grouping_vars)
-  if (compute_y_max && is.null(default_cap)) {
+  if (compute_y_max && is.null(default_cap) &&
+        is.null(default_cap_buffer)) {
     required_cols <- c(required_cols, cap_var)
   }
   for (col in required_cols) {
@@ -812,38 +838,80 @@ build_closure_unit_arrays <- function(data,
       i = "Filter or impute before passing the data to mvgam()."
     )))
   }
-  cap_vals <- if (cap_var %in% colnames(data)) {
-    as.integer(data[[cap_var]])
-  } else {
-    rep(as.integer(default_cap), nrow(data))
-  }
-  if (anyNA(cap_vals)) {
-    stop(insight::format_error(
-      paste0(
-        "Missing values in '", cap_var,
-        "' are not allowed for closure-unit families."
-      )
-    ))
-  }
-  # Pre-flight invariant: cap must be constant within a closure
-  # unit. `validate_closure_unit_data()` catches this earlier in
-  # the mvgam pipeline with a richer error message; this defence
-  # protects standalone callers (tests, downstream tools).
+  # Three cap branches in order of precedence:
+  #   1. User-supplied `cap` column -> broadcast per row, then
+  #      assert constant within a closure unit.
+  #   2. Per-unit data-driven default via `default_cap_buffer`
+  #      (count families): K_max[g] = Y_max[g] + buffer. Mirrors
+  #      `unmarked::pcount(K = max(y) + 100)`. Conservative on
+  #      small Y to avoid truncating the posterior; the cost is
+  #      a wider inner k-loop. Users who know their abundance
+  #      ceiling should supply `cap` explicitly to tighten.
+  #   3. Scalar `default_cap` (e.g. RN's static K_max = 25):
+  #      broadcast to every unit.
+  cap_in_data <- cap_var %in% colnames(data)
   Y_max <- integer(n_unit)
   K_max <- integer(n_unit)
-  for (g in seq_len(n_unit)) {
-    rows_g <- visit_idx[g, seq_len(rep_counts[g])]
-    Y_max[g] <- max(y_vals[rows_g])
-    cap_g <- cap_vals[rows_g]
-    if (length(unique(cap_g)) > 1L) {
+  if (cap_in_data) {
+    cap_vals <- as.integer(data[[cap_var]])
+    if (anyNA(cap_vals)) {
       stop(insight::format_error(
         paste0(
-          "'", cap_var,
-          "' must be constant within a closure unit."
+          "Missing values in '", cap_var,
+          "' are not allowed for closure-unit families."
         )
       ))
     }
-    K_max[g] <- cap_g[1L]
+    for (g in seq_len(n_unit)) {
+      rows_g <- visit_idx[g, seq_len(rep_counts[g])]
+      Y_max[g] <- max(y_vals[rows_g])
+      cap_g <- cap_vals[rows_g]
+      if (length(unique(cap_g)) > 1L) {
+        stop(insight::format_error(
+          paste0(
+            "'", cap_var,
+            "' must be constant within a closure unit."
+          )
+        ))
+      }
+      K_max[g] <- cap_g[1L]
+      # Closure-unit lpmf marginalises N from `max(y)` to K_max[g].
+      # A cap below the observed maximum makes the floor exceed
+      # the ceiling, producing an empty sum and a garbage
+      # likelihood. Surface the offending unit so the user can
+      # raise the cap.
+      if (K_max[g] < Y_max[g]) {
+        stop(insight::format_error(c(
+          paste0(
+            "'", cap_var,
+            "[", unit_levels[g],
+            "]' = ", K_max[g],
+            " is below the observed max '",
+            response_var, "' = ", Y_max[g], "."
+          ),
+          i = paste0(
+            "Cap must be at least the unit's observed maximum",
+            " count; raise the '", cap_var, "' value or drop",
+            " the column to use the data-driven default."
+          )
+        )))
+      }
+    }
+  } else if (!is.null(default_cap_buffer)) {
+    for (g in seq_len(n_unit)) {
+      rows_g <- visit_idx[g, seq_len(rep_counts[g])]
+      Y_max[g] <- max(y_vals[rows_g])
+      K_max[g] <- Y_max[g] + as.integer(default_cap_buffer)
+    }
+  } else {
+    # Falls back to the scalar default_cap; NULL here means the
+    # validator should have refused the call upstream.
+    cap_scalar <- as.integer(default_cap)
+    for (g in seq_len(n_unit)) {
+      rows_g <- visit_idx[g, seq_len(rep_counts[g])]
+      Y_max[g] <- max(y_vals[rows_g])
+      K_max[g] <- cap_scalar
+    }
   }
   list(
     N_unit      = n_unit,
@@ -1088,16 +1156,34 @@ build_closure_unit_arrays <- function(data,
 #' is still weakly identified, so an informative prior on that
 #' intercept remains advisable.
 #'
-#' @section K_max for Poisson-Poisson:
-#' Unlike Royle-Nichols (which has a two-sided saturation rule),
-#' Poisson-Poisson `K_max[g]` only needs to satisfy
-#' `ppois(K_max[g], lambda_hat, lower.tail = FALSE) < 1e-4`
-#' (the Poisson tail negligible). A safe rough default is
-#' `K_max[g] = max(Y_max[g], ceiling(lambda_hat + 4 * sqrt(lambda_hat)))`
-#' where `lambda_hat` is an initial estimate of the per-unit
-#' abundance (e.g. `mean(y_g) / mean(p_hat)` with `p_hat` from a
-#' prior-mean encounter rate). Users supply this as the `cap`
-#' column on the input data.
+#' @section K_max defaults and saturation:
+#' Each variant has a default that fires when the user supplies no
+#' `cap` column on the input data:
+#' \itemize{
+#'   \item Poisson-binomial and Poisson-Poisson default to
+#'     `K_max[g] = max(y in g) + 100`, the per-unit data-driven
+#'     buffer used by `unmarked::pcount`. Conservative: pays a
+#'     wider inner k-loop when counts are small (`K_max ~ 101`
+#'     even with `N ~ 5`). Override via a `cap` column to tighten
+#'     the marginalisation when abundance is known to be low.
+#'   \item Royle-Nichols defaults to `K_max = 25` per unit (the
+#'     `unmarked::occuRN` convention), because binary `y` carries
+#'     no per-unit floor.
+#' }
+#' Whenever a user supplies a `cap` column whose value is below
+#' the observed maximum `y` for a unit, the validator errors with
+#' the offending unit identifier; the marginalisation floor
+#' (`max(y)`) would otherwise exceed the ceiling (`K_max`) and the
+#' likelihood would silently degenerate to an empty sum.
+#'
+#' Post-fit, [latent_N_saturation()] reports the share of the
+#' conditional posterior that sits at `K_max[g]` for each unit;
+#' units flagged there should have their cap raised to remove
+#' truncation bias in `lambda`. The Royle-Nichols default is the
+#' most likely to need overriding because of the static fallback;
+#' Poisson-Poisson should also satisfy
+#' `ppois(K_max[g], lambda_hat, lower.tail = FALSE) < 1e-4` for
+#' the tail to be negligible.
 #'
 #' @section JSDM with imperfect detection:
 #' Passing `nmix()` to [jsdgam()] with `n_lv > 0` composes the
@@ -1232,13 +1318,26 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
   fam$linkfun <- link_info$linkfun
   attr(fam, "mvgam_closure_unit")  <- TRUE
   attr(fam, "mvgam_nmix_type")     <- type
-  # Royle-Nichols takes binary detection input; trigger the
-  # y in {0, 1} validation. Poisson-binomial and Poisson-Poisson
-  # accept count input. None of the variants set
-  # mvgam_default_cap: latent N exceeds 1 for all three and the
-  # user must supply the `cap` column.
+  # K_max defaults mirror unmarked's long-standing conventions
+  # (chosen to keep the marginalisation safely conservative; pay
+  # the cost in wasted inner k-loop iterations rather than risk
+  # truncating a posterior).
+  #   * Poisson-binomial / Poisson-Poisson see counts, so the per-
+  #     unit floor is data-driven: `K_max[g] = max(y in g) + 100`.
+  #     This matches `unmarked::pcount(K = max(y) + 100)` and runs
+  #     hot when counts are small (K_max ~ 101 even when N ~ 5),
+  #     so users with abundant data should set `cap` to a tighter
+  #     value to avoid wasted likelihood evaluations.
+  #   * Royle-Nichols sees only 0 / 1, so there is no data-driven
+  #     floor. Default `K_max = 25` matches
+  #     `unmarked::occuRN(K = 25)`. Override via the `cap` column
+  #     when the latent_N_saturation() diagnostic flags
+  #     truncation.
   if (type == "royle_nichols") {
     attr(fam, "mvgam_binary_response") <- TRUE
+    attr(fam, "mvgam_default_cap")     <- 25L
+  } else {
+    attr(fam, "mvgam_default_cap_buffer") <- 100L
   }
   attr(fam, "mvgam_predict_types") <- c("latent_state", "detection")
   # The lpmf signature determines which data fields brms must
@@ -3317,6 +3416,7 @@ prepare_closure_unit_family <- function(family, data, response_var,
   binary_y_check <- isTRUE(attr(family, "mvgam_binary_response",
                                  exact = TRUE))
   default_cap <- closure_unit_default_cap(family)
+  default_cap_buffer <- closure_unit_default_cap_buffer(family)
   multi_response <- is_multi_response_family(family)
   if (multi_response) {
     # Multi-response families (diri / multinomial /
@@ -3333,17 +3433,23 @@ prepare_closure_unit_family <- function(family, data, response_var,
       unit_grouping_vars = "time"
     )
   } else {
+    # cap is required only when neither a scalar default nor a
+    # data-driven buffer is configured. Count families (PB / PPM)
+    # carry `mvgam_default_cap_buffer = 100L` so the validator
+    # accepts data without an explicit cap column.
     validate_closure_unit_data(
       data,
       response_var       = response_var,
       has_obs_covariates = has_obs_covariates,
       has_det_covariates = has_det_covariates,
       binary_y_check     = binary_y_check,
-      cap_required       = is.null(default_cap)
+      cap_required       = is.null(default_cap) &&
+                            is.null(default_cap_buffer)
     )
     arrays <- build_closure_unit_arrays(
       data, response_var = response_var,
-      default_cap = default_cap
+      default_cap        = default_cap,
+      default_cap_buffer = default_cap_buffer
     )
   }
   family_stanvars <- switch(
@@ -4078,6 +4184,100 @@ posterior_latent_N <- function(object, newdata = NULL,
     object, newdata = newdata,
     draw_ids = draw_ids, conditional = conditional
   )
+}
+
+
+#' Per-unit posterior saturation of the closure-unit K_max truncation
+#'
+#' For a fit using a closure-unit family with a per-unit upper
+#' truncation `K_max` (`nmix()`, `nmix("royle_nichols")`,
+#' `nmix("poisson_poisson")`), reports the share of conditional
+#' posterior `N` draws that sit at the truncation point. Units
+#' whose posterior abundance hits `K_max` carry truncation-induced
+#' downward bias and are a signal that the `cap` column should be
+#' raised (or supplied at all, since `nmix("royle_nichols")`
+#' defaults to `K_max = 25`).
+#'
+#' @param object A fitted `mvgam` with a closure-unit family.
+#' @param newdata Optional `data.frame`. When `NULL` uses the fit's
+#'   training data.
+#' @param threshold Numeric in `[0, 1]`. Units with
+#'   `mean(N_draws == K_max) > threshold` are flagged in the
+#'   returned `saturated` column. Default `0.05`.
+#' @param ndraws,draw_ids Forwarded to the internal latent-N
+#'   sampler. `ndraws` caps the per-unit posterior; `draw_ids`
+#'   selects a draw subset.
+#'
+#' @return A `data.frame` with one row per closure unit and columns
+#'   \describe{
+#'     \item{`unit`}{Integer index `1:N_unit`.}
+#'     \item{`label`}{Optional character label if the fit was built
+#'       from a long-format frame with unique unit identifiers.}
+#'     \item{`K_max`}{The per-unit upper truncation that bounded
+#'       the marginalisation.}
+#'     \item{`p_saturated`}{Posterior probability that latent `N`
+#'       equals `K_max`.}
+#'     \item{`saturated`}{Logical, `p_saturated > threshold`.}
+#'   }
+#'   A 0-row `saturated` set means the configured `K_max` was
+#'   sufficient for all units in the sampled posterior.
+#'
+#' @seealso [nmix()].
+#'
+#' @export
+latent_N_saturation <- function(object, newdata = NULL,
+                                 threshold = 0.05,
+                                 ndraws = NULL,
+                                 draw_ids = NULL) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_number(threshold, lower = 0, upper = 1)
+  if (!is_closure_unit_family(object$family)) {
+    stop(insight::format_error(
+      "latent_N_saturation() requires a closure-unit family."
+    ))
+  }
+  # K_max comes from the per-unit array assembled at fit / predict
+  # time; for multi-response families (mvn, mvt, diri, multi, categ)
+  # K_max is NA and the diagnostic does not apply.
+  comp <- extract_closure_unit_components(
+    object, newdata = newdata, draw_ids = draw_ids
+  )
+  K_max <- comp$arrays$K_max
+  if (is.null(K_max) || all(is.na(K_max))) {
+    stop(insight::format_error(c(
+      "K_max is not defined for this family.",
+      i = paste0(
+        "latent_N_saturation() applies only to nmix() and its ",
+        "royle_nichols / poisson_poisson variants."
+      )
+    )))
+  }
+  draws <- posterior_latent_N(
+    object, newdata = newdata,
+    draw_ids = draw_ids, conditional = TRUE
+  )
+  if (!is.null(ndraws)) {
+    checkmate::assert_int(ndraws, lower = 1L)
+    n <- min(nrow(draws), as.integer(ndraws))
+    draws <- draws[seq_len(n), , drop = FALSE]
+  }
+  p_sat <- vapply(
+    seq_len(ncol(draws)),
+    function(g) mean(draws[, g] >= K_max[g]),
+    numeric(1L)
+  )
+  unit_labels <- comp$arrays$unit_labels %||%
+    as.character(seq_along(K_max))
+  out <- data.frame(
+    unit        = seq_along(K_max),
+    label       = unit_labels,
+    K_max       = as.integer(K_max),
+    p_saturated = p_sat,
+    saturated   = p_sat > threshold,
+    stringsAsFactors = FALSE
+  )
+  attr(out, "threshold") <- threshold
+  out
 }
 
 #' Per-closure-unit latent-abundance draws for an

@@ -208,17 +208,35 @@ is still weakly identified, so an informative prior on that
 intercept remains advisable.
 }
 
-\section{K_max for Poisson-Poisson}{
+\section{K_max defaults and saturation}{
 
-Unlike Royle-Nichols (which has a two-sided saturation rule),
-Poisson-Poisson \code{K_max[g]} only needs to satisfy
-\code{ppois(K_max[g], lambda_hat, lower.tail = FALSE) < 1e-4}
-(the Poisson tail negligible). A safe rough default is
-\code{K_max[g] = max(Y_max[g], ceiling(lambda_hat + 4 * sqrt(lambda_hat)))}
-where \code{lambda_hat} is an initial estimate of the per-unit
-abundance (e.g. \code{mean(y_g) / mean(p_hat)} with \code{p_hat} from a
-prior-mean encounter rate). Users supply this as the \code{cap}
-column on the input data.
+Each variant has a default that fires when the user supplies no
+\code{cap} column on the input data:
+\itemize{
+\item Poisson-binomial and Poisson-Poisson default to
+\verb{K_max[g] = max(y in g) + 100}, the per-unit data-driven
+buffer used by \code{unmarked::pcount}. Conservative: pays a
+wider inner k-loop when counts are small (\code{K_max ~ 101}
+even with \code{N ~ 5}). Override via a \code{cap} column to tighten
+the marginalisation when abundance is known to be low.
+\item Royle-Nichols defaults to \code{K_max = 25} per unit (the
+\code{unmarked::occuRN} convention), because binary \code{y} carries
+no per-unit floor.
+}
+Whenever a user supplies a \code{cap} column whose value is below
+the observed maximum \code{y} for a unit, the validator errors with
+the offending unit identifier; the marginalisation floor
+(\code{max(y)}) would otherwise exceed the ceiling (\code{K_max}) and the
+likelihood would silently degenerate to an empty sum.
+
+Post-fit, \code{\link[=latent_N_saturation]{latent_N_saturation()}} reports the share of the
+conditional posterior that sits at \code{K_max[g]} for each unit;
+units flagged there should have their cap raised to remove
+truncation bias in \code{lambda}. The Royle-Nichols default is the
+most likely to need overriding because of the static fallback;
+Poisson-Poisson should also satisfy
+\code{ppois(K_max[g], lambda_hat, lower.tail = FALSE) < 1e-4} for
+the tail to be negligible.
 }
 
 \section{JSDM with imperfect detection}{
