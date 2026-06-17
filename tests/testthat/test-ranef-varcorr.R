@@ -216,6 +216,53 @@ test_that("mvgam_ranef_aliases verifies cor index order for M = 3 and M = 4", {
 
 # ---- mvgam_beta_aliases for nl sub-formulas -----------------------
 
+test_that("mvgam_ranef_aliases reads nlpar per row under shared-ID syntax", {
+  # Reason: brms's `(1 | sp | series)` shared-correlation tag puts
+  # multiple nlpars under one id in the reframe table. A scalar
+  # `pfx <- rows$nlpar[1L]` collapses every row under the first
+  # nlpar, so r_<group>__b1[...] aliases never appear and the
+  # second nlpar's posterior draws are unreachable by name.
+  set.seed(19L)
+  n_obs <- 40L
+  df <- data.frame(
+    y       = rnorm(n_obs),
+    env     = rnorm(n_obs),
+    trait1  = rnorm(n_obs),
+    species = factor(sample(letters[1:5], n_obs, replace = TRUE))
+  )
+  # Shared-ID nl bf: both nlpars hang off the same |sp| block.
+  obs_nl <- brms::bf(
+    y  ~ a + b1 * env,
+    a  ~ trait1 + (1 | sp | species),
+    b1 ~ trait1 + (1 | sp | species),
+    nl = TRUE
+  )
+  sd_ <- brms::standata(
+    obs_nl, data = df, family = brms::brmsfamily("gaussian")
+  )
+  stub <- structure(
+    list(
+      formula  = obs_nl,
+      data     = df,
+      family   = brms::brmsfamily("gaussian"),
+      standata = as.list(sd_)
+    ),
+    class = "mvgam"
+  )
+  alias <- mvgam_ranef_aliases(stub)
+  # Both nlpar surfaces must emit their species random-deviation
+  # aliases, not just the first one.
+  expect_true(any(grepl("^r_species__a\\[",  names(alias))))
+  expect_true(any(grepl("^r_species__b1\\[", names(alias))))
+  # Each nlpar gets its own sd entry.
+  expect_true("sd_species__a_Intercept"  %in% names(alias))
+  expect_true("sd_species__b1_Intercept" %in% names(alias))
+  # The shared-ID block emits one cor entry pairing the two nlpars.
+  expect_true(
+    "cor_species__a_Intercept__b1_Intercept" %in% names(alias)
+  )
+})
+
 test_that("mvgam_ranef_aliases prefixes nlpar so duplicate (group, coef) survive", {
   # Reason: a nl fit with (1 | species) under BOTH nlpar a and nlpar
   # b would otherwise alias sd_species__Intercept twice and fail

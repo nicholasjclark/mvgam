@@ -371,19 +371,26 @@ mvgam_ranef_aliases <- function(x) {
     # Reason: when the RE attaches to an nlpar / dpar / response
     # block, brms prefixes the user-facing names with that key
     # (sd_<group>__<nlpar>_<coef>, r_<group>__<nlpar>[lvl, coef]).
-    # Without that prefix, fits with the same (group, coef) under
-    # two nlpars produce duplicate alias names that posterior /
-    # marginaleffects reject.
-    pfx <- rows$nlpar[1L] %||% rows$dpar[1L] %||% rows$resp[1L] %||% ""
-    if (!is.null(pfx) && nzchar(pfx)) {
-      coef_alias <- paste0(pfx, "_", coefs)
-      pair_sep <- paste0(pfx, "_")
-      group_token <- paste0(group, "__", pfx)
-    } else {
-      coef_alias <- coefs
-      pair_sep <- ""
-      group_token <- group
-    }
+    # The shared-ID syntax `(1 | sp | series)` puts two nlpars
+    # under one id, so the prefix must be read per-row (not just
+    # the first row) or the second nlpar's parameters collide
+    # with the first's aliases.
+    row_pfx <- ifelse(
+      !is.na(rows$nlpar) & nzchar(rows$nlpar), rows$nlpar,
+      ifelse(
+        !is.na(rows$dpar)  & nzchar(rows$dpar),  rows$dpar,
+        ifelse(
+          !is.na(rows$resp) & nzchar(rows$resp), rows$resp,
+          ""
+        )
+      )
+    )
+    coef_alias <- ifelse(
+      nzchar(row_pfx), paste0(row_pfx, "_", coefs), coefs
+    )
+    group_token_per_coef <- ifelse(
+      nzchar(row_pfx), paste0(group, "__", row_pfx), group
+    )
     # Stan parameter form depends on whether brms estimates a
     # correlation matrix for this group:
     #   - correlated (M >= 2, cor = TRUE): a single matrix
@@ -404,7 +411,7 @@ mvgam_ranef_aliases <- function(x) {
       sprintf("r_%d_%d[%d]", id, grid$coef_idx, grid$level_idx)
     }
     r_new <- sprintf(
-      "r_%s[%s,%s]", group_token,
+      "r_%s[%s,%s]", group_token_per_coef[grid$coef_idx],
       levels[grid$level_idx], coefs[grid$coef_idx]
     )
     r_map <- stats::setNames(r_old, r_new)
