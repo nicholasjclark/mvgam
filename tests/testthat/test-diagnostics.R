@@ -255,6 +255,68 @@ test_that("prior_summary errors when fit has no prior slot", {
                regexp = "not stored with a prior table")
 })
 
+test_that("extract_prior_from_setup returns the merged full table when user supplies a partial prior", {
+  # The stored prior table on an mvgam fit must include every
+  # parameter class the model exposes, with the user-supplied row
+  # tagged source = 'user' and the defaults preserved with
+  # source = 'default'. Before fix #1 of the prior-surface audit,
+  # the function returned the user subset only, so prior_summary()
+  # silently under-reported. This test pins the merge behaviour.
+  dat <- data.frame(
+    y      = rpois(40, 3),
+    x      = rnorm(40),
+    series = factor(rep("a", 40)),
+    time   = seq_len(40)
+  )
+  setup <- list(
+    formula = y ~ x,
+    data    = dat,
+    family  = poisson(),
+    data2   = NULL,
+    prior   = brms::prior(normal(0, 2), class = "b", coef = "x")
+  )
+  merged <- mvgam:::extract_prior_from_setup(setup)
+  expect_s3_class(merged, "brmsprior")
+  # The user row should be present and tagged as user-supplied.
+  user_row <- merged[
+    merged$class == "b" & merged$coef == "x", ,
+    drop = FALSE
+  ]
+  expect_equal(nrow(user_row), 1L)
+  expect_equal(user_row$prior, "normal(0, 2)")
+  expect_equal(user_row$source, "user")
+  # The Intercept default that brms emits must still be present
+  # (the gap fix #1 closes: previously only the user row survived).
+  intercept_row <- merged[
+    merged$class == "Intercept", ,
+    drop = FALSE
+  ]
+  expect_gte(nrow(intercept_row), 1L)
+  expect_true(any(intercept_row$source == "default"))
+})
+
+test_that("extract_prior_from_setup returns the default table verbatim when no user prior", {
+  # NULL user prior -> full default table, with every row tagged
+  # default or (vectorized).
+  dat <- data.frame(
+    y      = rpois(40, 3),
+    x      = rnorm(40),
+    series = factor(rep("a", 40)),
+    time   = seq_len(40)
+  )
+  setup <- list(
+    formula = y ~ x,
+    data    = dat,
+    family  = poisson(),
+    data2   = NULL,
+    prior   = NULL
+  )
+  out <- mvgam:::extract_prior_from_setup(setup)
+  expect_s3_class(out, "brmsprior")
+  expect_true(all(out$source %in%
+                    c("default", "(vectorized)")))
+})
+
 test_that("bayes_R2.mvgam errors for multivariate without resp", {
   stub <- make_mvgam_stub(mv = TRUE)
   expect_error(

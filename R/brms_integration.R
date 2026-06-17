@@ -270,17 +270,20 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
 #' @return Data frame of prior specifications
 #' @noRd
 extract_prior_from_setup <- function(setup_object) {
-  # Extract prior information - let errors bubble up
-  if (!is.null(setup_object$prior)) {
-    prior_info <- setup_object$prior
-  } else {
-    # Reconstruct from formula and data
-    prior_info <- brms::get_prior(
-      setup_object$formula, setup_object$data, setup_object$family
-    )
-  }
-
-  return(prior_info)
+  # Always return the full merged prior table: brms defaults for
+  # every parameter class, with user-supplied rows overlaid on top
+  # and tagged `source = "user"`. brms::validate_prior() is the
+  # canonical merge engine; calling it here makes prior_summary()
+  # on an mvgam fit match the brmsfit convention exactly.
+  # The user prior may be NULL (no overrides), in which case
+  # validate_prior just returns the default table.
+  brms::validate_prior(
+    prior   = setup_object$prior,
+    formula = setup_object$formula,
+    data    = setup_object$data,
+    family  = setup_object$family,
+    data2   = setup_object$data2
+  )
 }
 
 #' Extract brms Terms from Setup
