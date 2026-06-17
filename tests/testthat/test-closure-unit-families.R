@@ -1143,15 +1143,56 @@ test_that("stancode under nmix('poisson_poisson') emits partial_sum + log_n_look
   expect_match(sc, "int K_max_global = max(K_max);", fixed = TRUE)
   expect_match(sc, "vector[K_max_global] log_n_lookup;", fixed = TRUE)
   expect_match(sc, "log_n_lookup[n_lk] = log(n_lk);", fixed = TRUE)
-  # Likelihood call: log_n_lookup tail arg present.
+  # Likelihood call: log_n_lookup + k_start_ppm tail args present.
   expect_match(
     sc,
-    "nmix_poisson_poisson_lpmf(Y | mu, p, N_unit, n_rep, K_max, Y_max, visit_idx, log_n_lookup)",
+    paste0(
+      "nmix_poisson_poisson_lpmf(Y | mu, p, N_unit, n_rep, K_max, ",
+      "Y_max, visit_idx, log_n_lookup, k_start_ppm)"
+    ),
     fixed = TRUE
   )
   # Data: K_max and unbounded Y_max (counts).
   expect_match(sc, "array[N_unit] int<lower=1> K_max;", fixed = TRUE)
   expect_match(sc, "array[N_unit] int<lower=0> Y_max;", fixed = TRUE)
+  # Per-unit Poisson-tail lower bound on the latent-N loop. The
+  # lpmf reads k_start_ppm[g] as the inner-loop start; skipping
+  # cells below it costs negligible mass (see make_nmix_poisson_
+  # poisson_stanvars derivation).
+  expect_match(sc, "array[N_unit] int<lower=1> k_start_ppm;",
+               fixed = TRUE)
+  expect_match(sc, "int kg_lo = k_start_ppm[g];", fixed = TRUE)
+  expect_match(sc, "for (k in kg_lo : Kg)", fixed = TRUE)
+})
+
+test_that("nmix('poisson_poisson') k_start_ppm bound collapses to 1 for low-count units", {
+  # Low Y_max stays at k_start = 1 (no skipped cells); high Y_max
+  # gets a Poisson-tail-derived lower bound (~ Y_max - 7*sqrt(Y_max),
+  # floor 1). Asserts the standata column matches the closed form.
+  d <- make_nmix_data(n_unit = 4, n_visit = 3)
+  # Force a known Y_max profile by overriding y. Per-unit max
+  # detection counts: {0, 5, 100, 500}. The data prep computes
+  # Y_max[g] = max(y) over visits in unit g. Raise cap so the
+  # closure-unit validator (K_max >= Y_max) is satisfied.
+  d$y <- as.integer(c(
+    0, 0, 0,
+    1, 5, 4,
+    80, 100, 95,
+    490, 500, 480
+  ))
+  d$cap <- 600L
+  mf <- mvgam_formula(y ~ 1)
+  sd <- standata(mf, data = d, family = nmix("poisson_poisson"))
+  y_max_expected <- c(0L, 5L, 100L, 500L)
+  expect_identical(as.integer(sd$Y_max), y_max_expected)
+  # k_start_ppm[g] = max(1, Y_max[g] - 7 * ceil(sqrt(Y_max[g]))).
+  offset <- 7L * as.integer(ceiling(sqrt(y_max_expected)))
+  expected <- pmax(1L, y_max_expected - offset)
+  # Sanity-check the closed-form math: Y_max <= 49 yields a 1 floor
+  # (7*sqrt(Y_max) >= Y_max for Y_max <= 49); Y_max = 100 yields 30
+  # (offset = 70); Y_max = 500 yields 339 (offset = 161).
+  expect_identical(expected, c(1L, 1L, 30L, 339L))
+  expect_identical(as.integer(sd$k_start_ppm), expected)
 })
 
 test_that("nmix log-space recurrence matches brute-force log-sum-exp on canonical cases", {

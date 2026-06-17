@@ -1345,15 +1345,25 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
   # transformed-data `log_n_lookup` cache to skip per-iter scalar
   # log() calls in the inner marginalisation loop. Royle-Nichols
   # does not (the inner k-loop is k * log_1m_r vector mult, no
-  # log of an integer), so its vars list omits it.
-  attr(fam, "mvgam_vars") <- if (type == "royle_nichols") {
-    c("N_unit", "n_rep", "K_max", "Y_max", "visit_idx")
-  } else {
+  # log of an integer), so its vars list omits it. Poisson-
+  # Poisson additionally carries `k_start_ppm`, a per-unit lower
+  # bound on the latent-N k-loop that lets high-count units skip
+  # the deep Poisson tail; see make_nmix_poisson_poisson_stanvars
+  # for the derivation.
+  attr(fam, "mvgam_vars") <- switch(
+    type,
+    royle_nichols = c(
+      "N_unit", "n_rep", "K_max", "Y_max", "visit_idx"
+    ),
+    poisson_poisson = c(
+      "N_unit", "n_rep", "K_max", "Y_max", "visit_idx",
+      "log_n_lookup", "k_start_ppm"
+    ),
     c(
       "N_unit", "n_rep", "K_max", "Y_max", "visit_idx",
       "log_n_lookup"
     )
-  }
+  )
   # mvgam_stanvars is populated at data preparation time, once
   # the closure-unit arrays from the user's data are known.
   attr(fam, "mvgam_stanvars") <- NULL
@@ -3081,7 +3091,9 @@ nmix_poisson_poisson_stan_funs <- function(max_rep) {
     "  // is compiled with stan_threads, TBB splits the slice across",
     "  // threads. log_mu and log_p are precomputed on the wrapper.",
     "  // log_n_lookup[k] = log(k) replaces the per-iter scalar log()",
-    "  // call inside the inner k loop.",
+    "  // call inside the inner k loop. k_start_ppm[g] is the data-",
+    "  // precomputed lower bound on the latent-N loop; cells below",
+    "  // it carry negligible Poisson-tail mass (see make_*_stanvars).",
     "  real partial_sum_nmix_poisson_poisson_lpmf(",
     "    array[] int g_slice,",
     "    int start, int end,",
@@ -3093,10 +3105,12 @@ nmix_poisson_poisson_stan_funs <- function(max_rep) {
     "    array[] int K_max,",
     "    array[] int Y_max,",
     "    array[,] int visit_idx,",
-    "    vector log_n_lookup) {",
+    "    vector log_n_lookup,",
+    "    array[] int k_start_ppm) {",
     "    real lp = 0;",
     "    for (g in start : end) {",
     "      int Kg = K_max[g];",
+    "      int kg_lo = k_start_ppm[g];",
     "      array[n_rep[g]] int idx = visit_idx[g, 1:n_rep[g]];",
     "      real log_lam = log_mu[idx[1]];",
     "      array[n_rep[g]] int counts = y[idx];",
@@ -3104,12 +3118,13 @@ nmix_poisson_poisson_stan_funs <- function(max_rep) {
     "      vector[n_rep[g]] p_v       = p[idx];",
     "      vector[n_rep[g]] counts_v  = to_vector(counts);",
     "      int any_detection = Y_max[g] > 0;",
-    "      // O(n_rep) precomputes; reused for every k in 1..Kg.",
+    "      // O(n_rep) precomputes; reused for every k in kg_lo..Kg.",
     "      real sum_counts   = sum(counts_v);",
     "      real sum_y_log_p  = dot_product(counts_v, log_p_v);",
     "      real sum_p_v      = sum(p_v);",
     "      real lgamma_const = sum(lgamma(counts_v + 1));",
-    "      vector[Kg + 1] component_lps;",
+    "      int n_cells = Kg - kg_lo + 2;",
+    "      vector[n_cells] component_lps;",
     "      // k = 0 only consistent with all-zero counts. If any",
     "      // visit detected anything, the k = 0 cell is impossible;",
     "      // otherwise it contributes poisson_log_lpmf(0|log_lam)",
@@ -3119,13 +3134,13 @@ nmix_poisson_poisson_stan_funs <- function(max_rep) {
     "      } else {",
     "        component_lps[1] = poisson_log_lpmf(0 | log_lam);",
     "      }",
-    "      for (k in 1 : Kg) {",
+    "      for (k in kg_lo : Kg) {",
     "        // Factored sum_t poisson_log_lpmf(y_t|log(k)+log_p_v[t])",
     "        // = log(k) * sum_y + sum_y_log_p",
     "        //   - k * sum_p_v - lgamma_const.",
     "        // log(k) read from transformed-data log_n_lookup; the",
     "        // tdata vector is sized to K_max_global so k <= Kg fits.",
-    "        component_lps[k + 1] = poisson_log_lpmf(k | log_lam)",
+    "        component_lps[k - kg_lo + 2] = poisson_log_lpmf(k | log_lam)",
     "          + log_n_lookup[k] * sum_counts + sum_y_log_p",
     "          - k * sum_p_v - lgamma_const;",
     "      }",
@@ -3146,7 +3161,8 @@ nmix_poisson_poisson_stan_funs <- function(max_rep) {
     "    array[] int K_max,",
     "    array[] int Y_max,",
     "    array[,] int visit_idx,",
-    "    vector log_n_lookup) {",
+    "    vector log_n_lookup,",
+    "    array[] int k_start_ppm) {",
     "    // Link-scale conversions hoisted to the wrapper so the",
     "    // per-thread partial sum sees them precomputed.",
     "    vector[num_elements(mu)] log_mu = log(mu);",
@@ -3157,7 +3173,7 @@ nmix_poisson_poisson_stan_funs <- function(max_rep) {
     "    return reduce_sum(",
     "      partial_sum_nmix_poisson_poisson_lpmf, g_seq, grainsize,",
     "      y, log_mu, log_p, p, n_rep, K_max, Y_max, visit_idx,",
-    "      log_n_lookup",
+    "      log_n_lookup, k_start_ppm",
     "    );",
     "  }",
     "",
@@ -3172,11 +3188,12 @@ nmix_poisson_poisson_stan_funs <- function(max_rep) {
     "    array[] int K_max,",
     "    array[] int Y_max,",
     "    array[,] int visit_idx,",
-    "    vector log_n_lookup) {",
+    "    vector log_n_lookup,",
+    "    array[] int k_start_ppm) {",
     "    int N = num_elements(mu);",
     "    return nmix_poisson_poisson_lpmf(",
     "      y | mu, rep_vector(p, N), N_unit,",
-    "      n_rep, K_max, Y_max, visit_idx, log_n_lookup",
+    "      n_rep, K_max, Y_max, visit_idx, log_n_lookup, k_start_ppm",
     "    );",
     "  }",
     sep = "\n"
@@ -3372,8 +3389,8 @@ make_nmix_poisson_poisson_stanvars <- function(arrays) {
   # a vector instead of calling scalar log() per iteration. Saves
   # max(K_max) scalar log evaluations per closure unit per leapfrog
   # step. Indexed by integer k at the lpmf call site; loop bounds
-  # k in 1..Kg guarantee k <= K_max_global.
-  base + brms::stanvar(
+  # k in kg_lo..Kg guarantee k <= K_max_global.
+  base <- base + brms::stanvar(
     scode = paste(
       "  int K_max_global = max(K_max);",
       "  vector[K_max_global] log_n_lookup;",
@@ -3383,6 +3400,23 @@ make_nmix_poisson_poisson_stanvars <- function(arrays) {
       sep = "\n"
     ),
     block = "tdata"
+  )
+  # Per-unit lower bound on the latent-N k-loop. Drops cells more
+  # than ~7 conservative SDs below Y_max[g] (max observed count).
+  # Reason: conditional on N = k, per-visit counts are Poisson(k*p)
+  # with worst-case p ~= 1 giving SD ~ sqrt(Y_max) around the MLE
+  # N_hat ~= Y_max/p. The log-likelihood at m SDs below the mode
+  # drops by m^2/2; m = 7 gives < 1e-11 relative mass, below
+  # double-precision noise once aggregated via log_sum_exp. Pure
+  # efficiency: posterior is identical up to round-off. Low-count
+  # units collapse to k_start = 1 (no skip).
+  y_max <- as.integer(arrays$Y_max)
+  k_start_ppm <- pmax(1L, y_max - 7L * as.integer(ceiling(sqrt(y_max))))
+  base + brms::stanvar(
+    x     = k_start_ppm,
+    name  = "k_start_ppm",
+    scode = "array[N_unit] int<lower=1> k_start_ppm;",
+    block = "data"
   )
 }
 
