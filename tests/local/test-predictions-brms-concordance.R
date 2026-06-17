@@ -504,3 +504,84 @@ test_that("posterior_linpred(transform = FALSE) matches link scale of epred", {
                                  process_error = FALSE)
   testthat::expect_equal(exp(linpred_f), linpred_t, tolerance = 1e-8)
 })
+
+
+# -- Non-linear formulas (bf(..., nl = TRUE)) ------------------------
+#
+# Permanent regression gate for #324 P2d: the nl support surface (prior
+# plumbing, parameter aliasing, conditional_effects recursion) must
+# leave a fit indistinguishable from a brms-direct fit on the same
+# data + priors. Two shapes: an intercept-only nl growth model that
+# exercises the basic nl emit path, and the trait-mediated fourth-
+# corner shape that #324's wrapper will internally rewrite into.
+
+test_that("nl growth bf(y ~ b1 * exp(b2 * x)) concords with brms", {
+  require_fixtures("val_brms_nl_growth.rds", "val_mvgam_nl_growth.rds")
+  brms_fit <- load_brms("nl_growth")
+  mvgam_fit <- load_mvgam("nl_growth")
+  newdata <- mvgam_fit$data
+  assert_linpred_concordance(brms_fit, mvgam_fit, newdata,
+                              threshold = 0.95)
+  assert_epred_concordance(brms_fit, mvgam_fit, newdata,
+                            threshold = 0.95)
+  pp <- posterior_predict(mvgam_fit, ndraws = 100)
+  assert_predict_scale_constraints(pp, gaussian())
+})
+
+test_that("nl growth fixture: nlpar priors emitted in stancode", {
+  # Locks the Phase 2a fix: user-supplied prior(..., nlpar = "...")
+  # rows must surface in the generated Stan as lprior += normal_lpdf
+  # lines under the nlpar's b_<name> vector. Previously dropped in the
+  # plural-priors typo path; now flows through the alias plumbing.
+  require_fixtures("val_mvgam_nl_growth.rds")
+  mvgam_fit <- load_mvgam("nl_growth")
+  sc <- mvgam_fit$stancode
+  testthat::expect_true(grepl(
+    "lprior\\s*\\+=\\s*normal_lpdf\\(b_b1\\b", sc
+  ))
+  testthat::expect_true(grepl(
+    "lprior\\s*\\+=\\s*normal_lpdf\\(b_b2\\b", sc
+  ))
+})
+
+test_that("nl trait fixture: posterior_epred concords with brms", {
+  require_fixtures("val_brms_nl_trait.rds", "val_mvgam_nl_trait.rds")
+  brms_fit <- load_brms("nl_trait")
+  mvgam_fit <- load_mvgam("nl_trait")
+  newdata <- mvgam_fit$data
+  assert_linpred_concordance(brms_fit, mvgam_fit, newdata,
+                              threshold = 0.88)
+  assert_epred_concordance(brms_fit, mvgam_fit, newdata,
+                            threshold = 0.85)
+})
+
+test_that("nl trait fixture: b_a / b_b parameter names alias correctly", {
+  # Locks the Phase 2b fix: nl sub-formulas do NOT get the linear
+  # main-formula Intercept-centring, so b_<nlpar> has length K and
+  # the alias map must surface all K positions including the
+  # Intercept (b_a_Intercept, b_a_trait1, ...). Mismatches drop or
+  # mis-map parameters and break every downstream summary path.
+  require_fixtures("val_mvgam_nl_trait.rds")
+  mvgam_fit <- load_mvgam("nl_trait")
+  alias <- mvgam:::mvgam_beta_aliases(mvgam_fit)
+  expected <- c("b_a_Intercept", "b_a_trait1",
+                "b_b_Intercept", "b_b_trait1")
+  testthat::expect_true(all(expected %in% names(alias)))
+  # Each alias points to its positional brms-internal slot.
+  testthat::expect_identical(alias[["b_a_Intercept"]], "b_a[1]")
+  testthat::expect_identical(alias[["b_a_trait1"]],    "b_a[2]")
+})
+
+test_that("nl trait fixture: detect_conditional_effects surfaces trait1 + env", {
+  # Locks the Phase 2c fix: the discovery recurses into pforms so
+  # env (top-level) and trait1 (sub-formula) both surface, and the
+  # nlpar tokens themselves (a, b) drop out of any grouping.
+  require_fixtures("val_mvgam_nl_trait.rds")
+  mvgam_fit <- load_mvgam("nl_trait")
+  cond <- mvgam:::detect_conditional_effects(mvgam_fit)
+  flat <- unlist(cond, use.names = FALSE)
+  testthat::expect_true("env" %in% flat)
+  testthat::expect_true("trait1" %in% flat)
+  testthat::expect_false("a" %in% flat)
+  testthat::expect_false("b" %in% flat)
+})

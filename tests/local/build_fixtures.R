@@ -628,5 +628,68 @@ fit_loadings_prior_cached <- function(name) {
 }
 fit_loadings_prior_cached("loadings_prior")
 
+# ----------------------------------------------------------------------
+# NON-LINEAR FORMULAS (bf(..., nl = TRUE))
+# Locks in the permanent regression gate for #324 P2d: every
+# downstream prediction surface (linpred, epred, predict) on an nl
+# fit must match a brms-direct fit on the same data + priors. Two
+# shapes covered: an intercept-only nl growth model and the trait-
+# mediated fourth-corner shape that #324's wrapper will emit.
+# ----------------------------------------------------------------------
+
+set.seed(20260618L)
+nl_growth_data <- data.frame(
+  x = seq(-2, 2, length.out = 60L)
+)
+nl_growth_data$y <- 0.8 * exp(0.5 * nl_growth_data$x) +
+  rnorm(nrow(nl_growth_data), 0, 0.1)
+nl_growth_data$time   <- seq_len(nrow(nl_growth_data))
+nl_growth_data$series <- factor("s1")
+
+cat("\n[nl-1] bf(y ~ b1 * exp(b2 * x), b1 + b2 ~ 1, nl = TRUE)\n")
+nl_growth_pri <- prior(normal(1, 1), nlpar = "b1") +
+  prior(normal(0, 1), nlpar = "b2")
+fit_brms_cached("nl_growth",
+  bf(y ~ b1 * exp(b2 * x), b1 + b2 ~ 1, nl = TRUE),
+  nl_growth_data, gaussian(), prior = nl_growth_pri)
+fit_mvgam_cached("nl_growth",
+  bf(y ~ b1 * exp(b2 * x), b1 + b2 ~ 1, nl = TRUE),
+  NULL, nl_growth_data, gaussian(), prior = nl_growth_pri)
+
+set.seed(20260618L)
+nl_S <- 5L; nl_n_site <- 12L
+nl_traits <- data.frame(
+  species = factor(paste0("sp", seq_len(nl_S))),
+  trait1  = scale(rnorm(nl_S))[, 1]
+)
+nl_trait_data <- expand.grid(
+  site    = factor(paste0("st", seq_len(nl_n_site))),
+  species = nl_traits$species
+)
+nl_trait_data$env <- rnorm(nrow(nl_trait_data))
+nl_trait_data <- merge(nl_trait_data, nl_traits, by = "species")
+nl_trait_data$y <- with(nl_trait_data,
+  0.5 + (0.3 + 0.7 * trait1) * env +
+    rnorm(nrow(nl_trait_data), 0, 0.3)
+)
+nl_trait_data$time   <- as.integer(nl_trait_data$site)
+nl_trait_data$series <- nl_trait_data$species
+
+cat("\n[nl-2] trait-mediated fourth-corner\n")
+nl_trait_pri <- prior(normal(0, 1), nlpar = "a") +
+  prior(normal(0, 1), nlpar = "b") +
+  prior(student_t(3, 0, 2.5), class = "sd", nlpar = "a") +
+  prior(student_t(3, 0, 2.5), class = "sd", nlpar = "b")
+nl_trait_form <- bf(
+  y  ~ a + b * env,
+  a  ~ trait1 + (1 | species),
+  b  ~ trait1 + (1 | species),
+  nl = TRUE
+)
+fit_brms_cached("nl_trait", nl_trait_form,
+  nl_trait_data, gaussian(), prior = nl_trait_pri)
+fit_mvgam_cached("nl_trait", nl_trait_form, NULL,
+  nl_trait_data, gaussian(), prior = nl_trait_pri)
+
 cat("\n=== All fixtures present in", FIXTURE_DIR, "===\n")
 cat("Files: ", length(list.files(FIXTURE_DIR, pattern = "\\.rds$")), "\n")
