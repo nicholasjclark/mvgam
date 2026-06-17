@@ -3467,3 +3467,30 @@ test_that("run_model = FALSE deprecation fires only once per session via rlang",
                            run_model = FALSE))
   )
 })
+
+
+test_that("threads = N forwards brms partial_log_lik into mvgam stancode", {
+  # Threading was being dropped at the mvgam mock-fit setup; only
+  # closure-unit families threaded (via mvgam's own partial_sum
+  # stanvars). The plumbing fix forwards `threads = N` (when N > 1)
+  # so brms emits its partial_log_lik_lpmf for brms-native fits.
+  set.seed(1L)
+  n <- 50L
+  dat <- data.frame(
+    y      = rnorm(n),
+    x      = rnorm(n),
+    grp    = factor(sample(letters[1:6], n, replace = TRUE)),
+    time   = seq_len(n),
+    series = factor(rep("s1", n))
+  )
+  mf <- mvgam_formula(y ~ x + (1 | grp))
+  sc_default <- SW(stancode(mf, data = dat, family = gaussian()))
+  sc_one     <- SW(stancode(mf, data = dat, family = gaussian(),
+                              threads = 1L))
+  sc_four    <- SW(stancode(mf, data = dat, family = gaussian(),
+                              threads = 4L))
+  expect_false(grepl("partial_log_lik_lpmf", sc_default))
+  expect_false(grepl("partial_log_lik_lpmf", sc_one))
+  expect_true(grepl("partial_log_lik_lpmf", sc_four))
+  expect_true(grepl("reduce_sum", sc_four))
+})

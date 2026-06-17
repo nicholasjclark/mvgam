@@ -456,13 +456,18 @@ generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
   # Generate Stan code using brms with combined stanvars. `data2`
   # rides along so specials that look up auxiliary objects
   # (`car()` adjacency matrices, `cov_ranef()` covariance matrices)
-  # can resolve their references.
+  # can resolve their references. `threads` rides along so brms
+  # emits its `partial_log_lik_lpmf` + `reduce_sum` instrumentation
+  # for brms-native families when the user requested threading;
+  # closure-unit families thread via their own stanvars and ignore
+  # this path.
   base_code <- brms::make_stancode(
     formula = obs_setup$formula,
     data = obs_setup$data,
     family = obs_setup$family,
     data2 = obs_setup$data2,
     stanvars = all_stanvars,
+    threads = obs_setup$threads,
     prior = obs_setup$prior
   )
 

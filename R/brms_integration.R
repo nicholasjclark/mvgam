@@ -180,10 +180,36 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     trend_specs <- parse_multivariate_trends(formula, trend_formula)
   }
 
-  # Use mock backend for rapid setup (creates brmsfit object needed for prediction)
+  # Use mock backend for rapid setup (creates brmsfit object
+  # needed for prediction).
+  #
   # `data2` is forwarded explicitly so brms specials that reference
   # objects living outside `data` (e.g. `car()` adjacency matrices,
   # `cov_ranef()` covariance matrices) can resolve their lookups.
+  #
+  # `threads` is forwarded so brms emits its
+  # `partial_log_lik_lpmf` + `reduce_sum` instrumentation for
+  # brms-native families. Without this, the mock fit produces
+  # unthreaded stancode and the user-requested threading is
+  # silently dropped on every brms-native fit. Closure-unit
+  # families thread via their own `partial_sum_*_lpmf`
+  # stanvars and do not depend on this path.
+  dots <- list(...)
+  # Forward threads only when the user actually asked for > 1
+  # thread. Default `threads = getOption("mc.cores", 1)` upstream
+  # would otherwise emit brms's `partial_log_lik_lpmf` wrapper on
+  # every fit (correctness-preserving but unnecessary compile-time
+  # overhead and a behaviour change vs prior releases).
+  raw_threads <- dots$threads
+  if (inherits(raw_threads, "brmsthreads")) {
+    raw_threads <- raw_threads$threads
+  }
+  brm_threads <- if (is.numeric(raw_threads) &&
+                       isTRUE(raw_threads > 1)) {
+    as.integer(raw_threads)
+  } else {
+    NULL
+  }
   mock_setup <- brms::brm(
     formula = formula,
     data = data,
@@ -191,6 +217,7 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     stanvars = stanvars,
     prior = prior,
     data2 = data2,
+    threads = brm_threads,
     backend = "mock",
     mock_fit = 1,
     rename = FALSE
@@ -214,6 +241,7 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     data2 = data2,
     family = family,
     stanvars = stanvars,
+    threads = brm_threads,  # honoured by downstream make_stancode
     stancode = brms::stancode(mock_setup),
     standata = brms::standata(mock_setup),
     prior = extract_prior_from_setup(mock_setup),
