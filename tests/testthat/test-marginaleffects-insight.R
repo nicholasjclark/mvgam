@@ -86,6 +86,49 @@ test_that("find_predictors.mvgam pulls obs + trend + meta vars", {
   expect_true(all(c("x1", "x2", "time", "series") %in% preds))
 })
 
+test_that("find_predictors.mvgam walks nl sub-formulas and jsdgam aliases", {
+  # nl: trait1 in a sub-formula must surface alongside env (top-level).
+  obs_nl <- brms::bf(
+    y  ~ a + b * env,
+    a  ~ trait1 + (1 | species),
+    b  ~ trait1 + (1 | species),
+    nl = TRUE
+  )
+  stub_nl <- structure(
+    list(
+      formula = obs_nl, trend_formula = NULL,
+      trend_metadata = NULL, model_data = NULL
+    ),
+    class = "mvgam"
+  )
+  preds <- insight::find_predictors(stub_nl, flatten = TRUE)
+  expect_true("env" %in% preds)
+  expect_true("trait1" %in% preds)
+  expect_true("species" %in% preds)
+  expect_false("a" %in% preds)
+  expect_false("b" %in% preds)
+
+  # jsdgam: the user's species / unit column names persist via
+  # attr(model_data, "prepped_trend_model"). find_predictors must
+  # surface them so downstream tools building newdata grids do
+  # not have to know the aliasing.
+  stub_jsdgam <- structure(
+    list(
+      formula = y ~ env, trend_formula = NULL,
+      trend_metadata = NULL,
+      model_data = structure(
+        data.frame(y = 1:3, env = 1:3, species = letters[1:3],
+                    site = 1:3),
+        prepped_trend_model = list(unit = "site", species = "species")
+      )
+    ),
+    class = "mvgam"
+  )
+  preds_j <- insight::find_predictors(stub_jsdgam, flatten = TRUE)
+  expect_true("species" %in% preds_j)
+  expect_true("site" %in% preds_j)
+})
+
 test_that("detect_conditional_effects recurses into nl sub-formulas", {
   # Reason: bf(..., nl = TRUE) hides the user-relevant covariates
   # inside per-nlpar pforms; the top-level RHS only enumerates the

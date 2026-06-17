@@ -368,6 +368,22 @@ mvgam_ranef_aliases <- function(x) {
     n_lvl <- length(levels)
     n_coef <- length(coefs)
     has_cor <- isTRUE(rows$cor[1L]) && n_coef > 1L
+    # Reason: when the RE attaches to an nlpar / dpar / response
+    # block, brms prefixes the user-facing names with that key
+    # (sd_<group>__<nlpar>_<coef>, r_<group>__<nlpar>[lvl, coef]).
+    # Without that prefix, fits with the same (group, coef) under
+    # two nlpars produce duplicate alias names that posterior /
+    # marginaleffects reject.
+    pfx <- rows$nlpar[1L] %||% rows$dpar[1L] %||% rows$resp[1L] %||% ""
+    if (!is.null(pfx) && nzchar(pfx)) {
+      coef_alias <- paste0(pfx, "_", coefs)
+      pair_sep <- paste0(pfx, "_")
+      group_token <- paste0(group, "__", pfx)
+    } else {
+      coef_alias <- coefs
+      pair_sep <- ""
+      group_token <- group
+    }
     # Stan parameter form depends on whether brms estimates a
     # correlation matrix for this group:
     #   - correlated (M >= 2, cor = TRUE): a single matrix
@@ -375,7 +391,8 @@ mvgam_ranef_aliases <- function(x) {
     #   - uncorrelated or single-coef: per-coef vectors
     #     `r_<id>_<coef_idx>[<level_idx>]` are emitted.
     # Both forms alias to the same user-facing
-    # `r_<group>[<level>, <coef>]` name.
+    # `r_<group>[<level>, <coef>]` (or
+    # `r_<group>__<nlpar>[<level>, <coef>]`) name.
     grid <- expand.grid(
       level_idx = seq_len(n_lvl),
       coef_idx = seq_len(n_coef),
@@ -387,15 +404,15 @@ mvgam_ranef_aliases <- function(x) {
       sprintf("r_%d_%d[%d]", id, grid$coef_idx, grid$level_idx)
     }
     r_new <- sprintf(
-      "r_%s[%s,%s]", group,
+      "r_%s[%s,%s]", group_token,
       levels[grid$level_idx], coefs[grid$coef_idx]
     )
     r_map <- stats::setNames(r_old, r_new)
-    # sd_<id>[<coef_idx>] -> sd_<group>__<coef>
+    # sd_<id>[<coef_idx>] -> sd_<group>__[<nlpar>_]<coef>
     sd_old <- sprintf("sd_%d[%d]", id, seq_len(n_coef))
-    sd_new <- sprintf("sd_%s__%s", group, coefs)
+    sd_new <- sprintf("sd_%s__%s", group, coef_alias)
     sd_map <- stats::setNames(sd_old, sd_new)
-    # cor_<id>[<k>] -> cor_<group>__<coef_j>__<coef_k>
+    # cor_<id>[<k>] -> cor_<group>__[<nlpar>_]<coef_j>__[<nlpar>_]<coef_k>
     # Pair order follows brms's column-major upper-triangle packing
     # (`choose(k - 1, 2) + j` for j < k); see comment block above.
     cor_map <- character(0L)
@@ -404,7 +421,8 @@ mvgam_ranef_aliases <- function(x) {
       js <- unlist(lapply(2:n_coef, function(k) seq_len(k - 1L)))
       cor_old <- sprintf("cor_%d[%d]", id, seq_along(js))
       cor_new <- sprintf(
-        "cor_%s__%s__%s", group, coefs[js], coefs[ks]
+        "cor_%s__%s__%s", group,
+        coef_alias[js], coef_alias[ks]
       )
       cor_map <- stats::setNames(cor_old, cor_new)
     }

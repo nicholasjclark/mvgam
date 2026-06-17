@@ -37,6 +37,34 @@ mvgam_rhs_predictors <- function(f) {
 }
 
 
+# Predictor variables anywhere in a brms (or plain) formula: top-level
+# RHS plus any per-parameter sub-formulas living in `$pforms`. brms
+# stores both nl sub-formulas (`bf(..., nl = TRUE)`'s nlpar formulas)
+# and distributional dpar sub-formulas (`sigma ~ x`, `hu ~ z`, etc.)
+# under the same `$pforms` slot, keyed by the parameter name. The
+# parameter names themselves (a, b, sigma, ...) are not data
+# columns so they are filtered out of the returned vector. The
+# return order is preserved for callers that want a stable list.
+mvgam_formula_predictors <- function(f) {
+  if (is.null(f)) {
+    return(character(0L))
+  }
+  if (inherits(f, "brmsformula")) {
+    top <- mvgam_rhs_predictors(f$formula)
+    nlpars <- character(0L)
+    sub <- character(0L)
+    if (length(f$pforms) > 0L) {
+      nlpars <- names(f$pforms)
+      sub <- unlist(lapply(f$pforms, mvgam_rhs_predictors),
+                    use.names = FALSE)
+    }
+    setdiff(unique(c(top, sub)), nlpars)
+  } else {
+    mvgam_rhs_predictors(f)
+  }
+}
+
+
 #' @importFrom insight find_formula
 #' @export
 find_formula.mvgam <- function(x, verbose = TRUE, ...) {
@@ -64,16 +92,31 @@ find_response.mvgam <- function(x, combine = TRUE, ...) {
 find_predictors.mvgam <- function(x, effects = "fixed",
                                   component = "conditional",
                                   flatten = FALSE, verbose = TRUE, ...) {
+  # Reason: walk the full brmsformula (top-level + nl/dpar pforms)
+  # rather than just the obs formula's top-level RHS, so trait1,
+  # sigma covariates, and other sub-formula-only variables surface
+  # for marginaleffects::datagrid and insight downstream.
   preds <- unique(c(
-    mvgam_rhs_predictors(mvgam_obs_formula(x)),
+    mvgam_formula_predictors(x$formula),
     mvgam_rhs_predictors(x$trend_formula)
   ))
 
   # Time / series / grouping variables are addressable in the data
-  # grid even though they sit outside the formulas.
+  # grid even though they sit outside the formulas. jsdgam aliases
+  # the user's species column to 'series' on data_train; persist the
+  # original column name so downstream tools that look up the user-
+  # facing variable (conditional_effects, predict newdata builders)
+  # find both. mv_spec$species_var is set by jsdgam(); the trend
+  # metadata covers the regular mvgam case.
   meta <- x$trend_metadata$variables
   if (!is.null(meta)) {
     extras <- c(meta$time_var, meta$series_var, meta$gr_var, meta$subgr_var)
+    extras <- extras[!is.na(extras) & nzchar(extras)]
+    preds <- unique(c(preds, extras))
+  }
+  jsdgam_meta <- attr(x$model_data, "prepped_trend_model")
+  if (!is.null(jsdgam_meta)) {
+    extras <- unlist(jsdgam_meta[c("unit", "species")], use.names = FALSE)
     extras <- extras[!is.na(extras) & nzchar(extras)]
     preds <- unique(c(preds, extras))
   }
@@ -125,6 +168,8 @@ model.frame.mvgam <- function(formula, trend_effects = FALSE, ...) {
   vars <- if (trend_effects) {
     mvgam_rhs_predictors(formula$trend_formula)
   } else {
+    # Walk the same surface find_predictors() does so nl / dpar
+    # sub-formula vars and jsdgam aliases ride along.
     response <- all.vars(mvgam_obs_formula(formula)[[2L]])
     preds <- find_predictors(formula, flatten = TRUE)
     unique(c(response, preds))
