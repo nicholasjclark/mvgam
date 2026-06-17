@@ -675,7 +675,9 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       # constructor call from parsed `mv_spec$trend_specs`.
       trend_call = user_trend_formula,
       family = obs_setup$family,
-      prior = obs_setup$prior,
+      prior = lift_mvgam_stanvar_priors(
+        obs_setup$prior, combined_stancode %||% obs_setup$stancode
+      ),
       data = obs_setup$data,
       test_data = newdata,
       data.name = data_name,
@@ -750,7 +752,9 @@ create_mvgam_stub_from_stan_components <- function(stan_components,
       trend_formula = if (!is.null(trend_setup)) trend_setup$formula else NULL,
       trend_call = trend_formula,
       family = obs_setup$family %||% family,
-      prior = obs_setup$prior,
+      prior = lift_mvgam_stanvar_priors(
+        obs_setup$prior, stan_components$combined_components$stancode
+      ),
       data = obs_setup$data %||% data,
       test_data = newdata,
       data.name = data_name,

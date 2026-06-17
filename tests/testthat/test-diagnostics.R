@@ -317,6 +317,127 @@ test_that("extract_prior_from_setup returns the default table verbatim when no u
                     c("default", "(vectorized)")))
 })
 
+# lift_mvgam_stanvar_priors: scanner tests over hand-built stancode
+# fragments. Each fragment contains exactly the prior pattern under
+# test; the helper should detect it and append a row tagged
+# source = "mvgam" on top of an empty brmsprior baseline.
+
+empty_brmsprior <- function() {
+  brms::validate_prior(
+    prior   = NULL,
+    formula = y ~ 1,
+    data    = data.frame(y = rnorm(20)),
+    family  = gaussian()
+  )[0L, , drop = FALSE]
+}
+
+test_that("lift detects Z_free_vec partial-Z loadings prior", {
+  sc <- "model { Z_free_vec ~ student_t(3, 0, 1); }"
+  out <- mvgam:::lift_mvgam_stanvar_priors(empty_brmsprior(), sc)
+  expect_s3_class(out, "brmsprior")
+  expect_equal(nrow(out), 1L)
+  expect_equal(out$class, "Z_free_vec")
+  expect_equal(out$prior, "student_t(3, 0, 1)")
+  expect_equal(out$source, "mvgam")
+})
+
+test_that("lift detects theta_features lognormal kernel prior", {
+  sc <- "  target += lognormal_lpdf(theta_features | 0, 1);"
+  out <- mvgam:::lift_mvgam_stanvar_priors(empty_brmsprior(), sc)
+  expect_equal(out$class, "theta_features")
+  expect_equal(out$prior, "lognormal(0, 1)")
+  expect_equal(out$source, "mvgam")
+})
+
+test_that("lift detects per-distance theta_dist_<NAME> kernel priors", {
+  sc <- paste(
+    "target += lognormal_lpdf(theta_dist_phylo | 0, 1);",
+    "target += lognormal_lpdf(theta_dist_geo | 0, 1);",
+    sep = "\n"
+  )
+  out <- mvgam:::lift_mvgam_stanvar_priors(empty_brmsprior(), sc)
+  expect_equal(nrow(out), 2L)
+  expect_setequal(out$class, c("theta_dist_phylo", "theta_dist_geo"))
+  expect_true(all(out$source == "mvgam"))
+})
+
+test_that("lift detects both MGP varrho_inv priors with distinct coefs", {
+  sc <- paste(
+    "model {",
+    "  varrho_inv[1] ~ inv_gamma(mgp_a1, 1);",
+    "  if (N_lv_trend > 1) {",
+    "    varrho_inv[2:N_lv_trend] ~ inv_gamma(mgp_a2, 1);",
+    "  }",
+    "}",
+    sep = "\n"
+  )
+  out <- mvgam:::lift_mvgam_stanvar_priors(empty_brmsprior(), sc)
+  expect_equal(nrow(out), 2L)
+  expect_true(all(out$class == "varrho_inv"))
+  expect_setequal(out$coef, c("1", "2:N_lv_trend"))
+  expect_setequal(
+    out$prior,
+    c("inv_gamma(mgp_a1, 1)", "inv_gamma(mgp_a2, 1)")
+  )
+})
+
+test_that("lift detects closure-unit Psi exponential prior", {
+  sc <- "model {\n  Psi ~ exponential(1);\n}"
+  out <- mvgam:::lift_mvgam_stanvar_priors(empty_brmsprior(), sc)
+  expect_equal(out$class, "Psi")
+  expect_equal(out$prior, "exponential(1)")
+})
+
+test_that("lift returns prior unchanged when stancode has no matches", {
+  sc <- "model { Intercept ~ student_t(3, 0, 2.5); }"
+  base <- empty_brmsprior()
+  out <- mvgam:::lift_mvgam_stanvar_priors(base, sc)
+  expect_equal(nrow(out), 0L)
+})
+
+test_that("lift returns prior unchanged when stancode is NULL or empty", {
+  base <- empty_brmsprior()
+  expect_identical(
+    mvgam:::lift_mvgam_stanvar_priors(base, NULL), base
+  )
+  expect_identical(
+    mvgam:::lift_mvgam_stanvar_priors(base, ""), base
+  )
+})
+
+test_that("lift preserves brmsprior columns when appending mvgam rows", {
+  base <- brms::validate_prior(
+    prior   = brms::prior(normal(0, 2), class = "b", coef = "x"),
+    formula = y ~ x,
+    data    = data.frame(y = rnorm(20), x = rnorm(20)),
+    family  = gaussian()
+  )
+  sc <- paste(
+    "Z_free_vec ~ student_t(3, 0, 1);",
+    "Psi ~ exponential(1);",
+    sep = "\n"
+  )
+  out <- mvgam:::lift_mvgam_stanvar_priors(base, sc)
+  # Columns of the union are preserved.
+  expect_setequal(names(out), names(base))
+  # User row still there and tagged "user".
+  user_row <- out[out$class == "b" & out$coef == "x", , drop = FALSE]
+  expect_equal(user_row$source, "user")
+  # Two mvgam rows added.
+  mvgam_rows <- out[out$source == "mvgam", , drop = FALSE]
+  expect_equal(nrow(mvgam_rows), 2L)
+  expect_setequal(mvgam_rows$class, c("Z_free_vec", "Psi"))
+})
+
+test_that("lift rejects non-brmsprior prior input", {
+  expect_error(
+    mvgam:::lift_mvgam_stanvar_priors(
+      data.frame(prior = "x"), "Psi ~ exponential(1);"
+    ),
+    "brmsprior"
+  )
+})
+
 test_that("bayes_R2.mvgam errors for multivariate without resp", {
   stub <- make_mvgam_stub(mv = TRUE)
   expect_error(

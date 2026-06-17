@@ -85,26 +85,15 @@ try_stanheaders_formatting <- function(stan_code, silent = TRUE, line_length = 8
     return(NULL)
   }
 
-  # Check if required packages are available
-  if (!requireNamespace("V8", quietly = TRUE)) {
-    if (!silent) {
-      message("V8 package not available for Stan formatting")
-    }
+  # Acquire the cached V8 context with stanc.js already sourced. A
+  # fresh V8 isolate carries ~1-2 GB of native heap that R's GC
+  # cannot see; spawning one per polish call accumulates across the
+  # test sweep until V8 itself OOMs. stanc.js is a pure function so
+  # one shared isolate suffices.
+  ctx <- get_stanc_v8_context(silent = silent)
+  if (is.null(ctx)) {
     return(NULL)
   }
-
-  # Check if StanHeaders stanc.js exists
-  stanc_js_path <- system.file('stanc.js', package = 'StanHeaders')
-  if (!file.exists(stanc_js_path)) {
-    if (!silent) {
-      message("StanHeaders stanc.js not found")
-    }
-    return(NULL)
-  }
-
-  # Initialize V8 context with StanHeaders stanc.js
-  ctx <- V8::v8()
-  ctx$source(stanc_js_path)
 
   # Call stanc with auto-format using the working web demo approach
   result <- ctx$call('stanc', 'model', stan_code, c('auto-format', as.character(line_length)))
@@ -121,6 +110,46 @@ try_stanheaders_formatting <- function(stan_code, silent = TRUE, line_length = 8
   }
 
   return(NULL)
+}
+
+# Package-private cache for the V8 isolate holding stanc.js. stanc
+# itself is a pure function (input string in, formatted string out)
+# so one isolate can serve every polish call for the session.
+.stanc_v8_env <- new.env(parent = emptyenv())
+
+#' Get the cached V8 context with stanc.js sourced
+#'
+#' First call initialises the V8 isolate and sources StanHeaders'
+#' stanc.js into it. Subsequent calls return the same isolate.
+#' Returns NULL (with optional message) if V8 or stanc.js are
+#' unavailable, so the polish step degrades gracefully.
+#'
+#' @param silent Logical; suppress availability messages.
+#'
+#' @return A V8 context object, or NULL when the inputs are missing.
+#'
+#' @noRd
+get_stanc_v8_context <- function(silent = TRUE) {
+  if (!is.null(.stanc_v8_env$ctx)) {
+    return(.stanc_v8_env$ctx)
+  }
+  if (!requireNamespace("V8", quietly = TRUE)) {
+    if (!silent) {
+      message("V8 package not available for Stan formatting")
+    }
+    return(NULL)
+  }
+  stanc_js_path <- system.file("stanc.js", package = "StanHeaders")
+  if (!file.exists(stanc_js_path)) {
+    if (!silent) {
+      message("StanHeaders stanc.js not found")
+    }
+    return(NULL)
+  }
+  ctx <- V8::v8()
+  ctx$source(stanc_js_path)
+  .stanc_v8_env$ctx <- ctx
+  ctx
 }
 
 

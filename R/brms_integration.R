@@ -286,6 +286,142 @@ extract_prior_from_setup <- function(setup_object) {
   )
 }
 
+#' Lift mvgam-emitted Stan priors into the brmsprior table
+#'
+#' brms's `validate_prior()` only sees priors that flow through its
+#' own prior pipeline. mvgam emits several additional priors via
+#' stanvars that bypass that pipeline:
+#'   - partial-Z loadings (`Z_free_vec ~ student_t(3, 0, 1)`)
+#'   - loadings_prior features kernel
+#'     (`theta_features ~ lognormal(0, 1)`)
+#'   - loadings_prior distance kernels (one `theta_dist_<NAME>` per
+#'     supplied distance matrix)
+#'   - MGP column shrinkage (`varrho_inv[1]` + `varrho_inv[2:]`)
+#'   - closure-unit family scale (`Psi ~ exponential(1)` for mvn /
+#'     mvt families)
+#'
+#' This helper scans the fully assembled Stan model for those known
+#' emission sites and appends matching `brmsprior` rows tagged
+#' `source = "mvgam"`. The scan is pattern-driven, not flag-driven:
+#' adding a new mvgam-side prior is a single regex entry here.
+#'
+#' @param prior A `brmsprior` returned by `validate_prior()`.
+#' @param stancode Character string (or vector of lines) holding the
+#'   full assembled Stan model. NULL / empty returns `prior` as-is.
+#'
+#' @return The merged `brmsprior` with mvgam-side rows appended.
+#' @noRd
+lift_mvgam_stanvar_priors <- function(prior, stancode) {
+  checkmate::assert_class(prior, "brmsprior")
+  checkmate::assert(
+    checkmate::check_null(stancode),
+    checkmate::check_character(stancode),
+    .var.name = "stancode"
+  )
+  if (is.null(stancode)) return(prior)
+  sc <- paste(as.character(stancode), collapse = "\n")
+  if (!nzchar(sc)) return(prior)
+
+  rows <- list()
+
+  # Z_free_vec - partial-Z mode prior on free loadings
+  if (grepl(
+    "Z_free_vec\\s*~\\s*student_t\\(\\s*3\\s*,\\s*0\\s*,\\s*1\\s*\\)",
+    sc
+  )) {
+    rows[[length(rows) + 1L]] <- brms::prior_string(
+      "student_t(3, 0, 1)", class = "Z_free_vec"
+    )
+  }
+
+  # theta_features - ARD kernel hyperparameter when features supplied
+  if (grepl(
+    paste0(
+      "lognormal_lpdf\\(\\s*theta_features\\s*\\|\\s*",
+      "0\\s*,\\s*1\\s*\\)"
+    ),
+    sc
+  )) {
+    rows[[length(rows) + 1L]] <- brms::prior_string(
+      "lognormal(0, 1)", class = "theta_features"
+    )
+  }
+
+  # theta_dist_<NAME> - one per supplied distance matrix in data2
+  dist_re <- paste0(
+    "lognormal_lpdf\\(\\s*theta_dist_([A-Za-z0-9_]+)\\s*\\|\\s*",
+    "0\\s*,\\s*1\\s*\\)"
+  )
+  hits <- regmatches(sc, gregexpr(dist_re, sc))[[1L]]
+  if (length(hits) > 0L) {
+    names_only <- regmatches(
+      hits, regexpr("theta_dist_[A-Za-z0-9_]+", hits)
+    )
+    for (nm in unique(names_only)) {
+      rows[[length(rows) + 1L]] <- brms::prior_string(
+        "lognormal(0, 1)", class = nm
+      )
+    }
+  }
+
+  # MGP column shrinkage on varrho_inv (column_shrinkage = "mgp")
+  if (grepl(
+    paste0(
+      "varrho_inv\\[\\s*1\\s*\\]\\s*~\\s*",
+      "inv_gamma\\(\\s*mgp_a1\\s*,\\s*1\\s*\\)"
+    ),
+    sc
+  )) {
+    rows[[length(rows) + 1L]] <- brms::prior_string(
+      "inv_gamma(mgp_a1, 1)", class = "varrho_inv", coef = "1"
+    )
+  }
+  if (grepl(
+    paste0(
+      "varrho_inv\\[\\s*2\\s*:\\s*N_lv_trend\\s*\\]\\s*~\\s*",
+      "inv_gamma\\(\\s*mgp_a2\\s*,\\s*1\\s*\\)"
+    ),
+    sc
+  )) {
+    rows[[length(rows) + 1L]] <- brms::prior_string(
+      "inv_gamma(mgp_a2, 1)",
+      class = "varrho_inv", coef = "2:N_lv_trend"
+    )
+  }
+
+  # Closure-unit Psi prior (mvn / mvt closure-unit families)
+  if (grepl(
+    "(^|[[:space:];}])Psi\\s*~\\s*exponential\\(\\s*1\\s*\\)",
+    sc
+  )) {
+    rows[[length(rows) + 1L]] <- brms::prior_string(
+      "exponential(1)", class = "Psi"
+    )
+  }
+
+  if (length(rows) == 0L) return(prior)
+
+  mvgam_block <- Reduce(`+`, rows)
+  # validate_prior() tags rows with `source`; prior_string() does
+  # not. Set explicitly so prior_summary readers can filter on origin.
+  mvgam_block$source <- "mvgam"
+
+  # Align columns then rbind. brmsprior is a data.frame subclass.
+  missing_cols <- setdiff(names(prior), names(mvgam_block))
+  for (col in missing_cols) {
+    mvgam_block[[col]] <- if (is.character(prior[[col]])) "" else NA
+  }
+  missing_in_prior <- setdiff(names(mvgam_block), names(prior))
+  for (col in missing_in_prior) {
+    prior[[col]] <- if (is.character(mvgam_block[[col]])) "" else NA
+  }
+  mvgam_block <- mvgam_block[, names(prior), drop = FALSE]
+
+  out <- rbind(prior, mvgam_block)
+  class(out) <- class(prior)
+  out
+}
+
 #' Extract brms Terms from Setup
 #' @param setup_object brms setup object
 #' @return brmsterms object
