@@ -115,5 +115,7 @@ Regression Analysis of Multivariate Abundance Data in R.
 }
 \seealso{
 [mvgam_residcor-class], \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}},
-\code{\link[=print.mvgam_residcor]{print.mvgam_residcor()}}.
+\code{\link[=print.mvgam_residcor]{print.mvgam_residcor()}}, \code{\link[=ordinate]{ordinate()}} for a biplot view of
+the same Z Z' surface, \code{\link[=plot.mvgam]{plot.mvgam()}} with \code{type = "factors"}
+for per-factor posterior ribbons.
 }

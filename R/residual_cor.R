@@ -82,7 +82,9 @@
 #' `Sigma = Z Z'` per draw on the species axis.
 #'
 #' @seealso \[mvgam_residcor-class\], [summary.mvgam_residcor()],
-#'   [print.mvgam_residcor()].
+#'   [print.mvgam_residcor()], [ordinate()] for a biplot view of
+#'   the same Z Z' surface, [plot.mvgam()] with `type = "factors"`
+#'   for per-factor posterior ribbons.
 #'
 #' @references Hui, F. K. C. (2016). boral - Bayesian Ordination and
 #'   Regression Analysis of Multivariate Abundance Data in R.

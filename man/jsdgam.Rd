@@ -265,6 +265,6 @@ models. \emph{Statistics and Computing}, 34:143.
 \doi{10.1007/s11222-024-10454-0}
 }
 \seealso{
-\verb{[mvgam()]}, \verb{[lv_axis()]}, \verb{[residual_cor()]},
-\verb{[ordinate()]}.
+\code{\link[=mvgam]{mvgam()}}, \code{\link[=lv_axis]{lv_axis()}}, \code{\link[=residual_cor]{residual_cor()}},
+\code{\link[=ordinate]{ordinate()}}.
 }

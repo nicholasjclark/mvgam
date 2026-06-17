@@ -11,6 +11,8 @@
   alpha = 0.5,
   rotation = c("svd", "varimax", "promax", "none"),
   label_sites = TRUE,
+  traits = NULL,
+  trait_arrow_scale = 1,
   ...
 )
 }
@@ -63,6 +65,21 @@ as discussed in Details. \code{alpha} ignored.}
 \item{label_sites}{Logical. When \code{TRUE}, site scores are
 drawn as text labels (the training time values); when
 \code{FALSE}, as points only.}
+
+\item{traits}{Optional trait overlay. Accepts \code{NULL} (default,
+no overlay), the literal string \code{"auto"} (pull the trait
+frame off the fit if \code{mvgam()} was called with a trait-
+informed \code{loadings_prior}), or an explicit \code{data.frame} /
+\code{matrix} with one row per series. Numeric columns are
+regressed on the rotated series loadings to give each trait's
+direction in the LV space; the resulting arrows are overlaid
+in steelblue. Row alignment follows \code{rownames(traits)} when
+set; otherwise rows must match the fit's series-level order.
+Only meaningful when \code{biplot = TRUE}.}
+
+\item{trait_arrow_scale}{Positive numeric. Visual scaling
+factor for trait-arrow lengths. The default \code{1} matches the
+longest trait arrow to the longest series-loading radius.}
 
 \item{...}{Ignored.}
 }
@@ -122,8 +139,9 @@ fit models may require a manual sign-flip alignment.
 }
 
 \seealso{
-\code{ordinate.jsdgam()}, \code{plot_factors()},
-\code{\link[=residual_cor]{residual_cor()}}
+\code{\link[=ordinate.jsdgam]{ordinate.jsdgam()}}, \code{\link[=residual_cor]{residual_cor()}},
+\code{\link[=plot.mvgam]{plot.mvgam()}} (especially \code{type = "factors"} and
+\code{type = "latent_state"})
 }
 \author{
 Nicholas J Clark

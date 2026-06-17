@@ -180,8 +180,8 @@
 #'   `posterior_epred`, etc.) applies; jsdgam-specific surfaces
 #'   (`ordinate`, `residual_cor`) recognise the additional class.
 #'
-#' @seealso `[mvgam()]`, `[lv_axis()]`, `[residual_cor()]`,
-#'   `[ordinate()]`.
+#' @seealso [mvgam()], [lv_axis()], [residual_cor()],
+#'   [ordinate()].
 #'
 #' @references
 #' Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,

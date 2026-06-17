@@ -34,13 +34,41 @@
 #' @param label_sites Logical. When `TRUE`, site scores are
 #'   drawn as labels (from the `unit` argument of the original
 #'   `jsdgam()` call); when `FALSE`, as points only.
+#' @param traits Optional trait overlay. One of:
+#'   \describe{
+#'     \item{`NULL` (default)}{No trait arrows; the previous
+#'       biplot behaviour.}
+#'     \item{`"auto"`}{If the fit was trait-informed via
+#'       `jsdgam(traits = ...)`, pull the trait frame back off
+#'       the fit and use it as the overlay. Emits a one-time
+#'       warning and skips the overlay if no traits are found.}
+#'     \item{a `data.frame` or `matrix`}{Per-species trait values
+#'       (one row per species; columns are traits). Rows are
+#'       aligned via `rownames(traits)` when set; otherwise rows
+#'       must already match the fit's series-level order. Non-
+#'       numeric columns are ignored.}
+#'   }
+#'   When a non-NULL frame is in play, each numeric trait is
+#'   regressed on the rotated species loadings to give its
+#'   direction in the LV space; the resulting arrows are overlaid
+#'   on the biplot in steelblue. The regression-on-loadings recipe
+#'   works whether the fit was trait-informed via
+#'   `jsdgam(traits = ...)` or not, so it can either visualise the
+#'   structural trait gradient (informed) or serve as a post-hoc
+#'   overlay (naive). Only meaningful when `biplot = TRUE`.
+#' @param trait_arrow_scale Positive numeric. Visual scaling
+#'   factor for trait-arrow lengths. The default `1` places the
+#'   longest trait arrow at the same radius as the longest species
+#'   arrow; values `> 1` lengthen, values `< 1` shorten.
 #' @param ... Ignored.
 #'
 #' @return A `ggplot` object.
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso `jsdgam()`, [residual_cor()]
+#' @seealso [jsdgam()], [residual_cor()],
+#'   [plot.mvgam()] (especially `type = "factors"` and
+#'   `type = "latent_state"`)
 #'
 #' @examples
 #' \donttest{
@@ -60,6 +88,33 @@
 #'
 #' # Residual ordination biplot
 #' ordinate(mod, alpha = 0.7)
+#'
+#' # Overlay per-species trait arrows on the same biplot. Rows
+#' # of `traits` are aligned to species via rownames; numeric
+#' # columns become arrows in the LV space. The default
+#' # `trait_arrow_scale = 1` matches the longest trait arrow to
+#' # the longest species-loading radius for visual balance.
+#' species_traits <- data.frame(
+#'   body_mass = c(45, 22, 110, 8, 65),
+#'   row.names = levels(portal_data$series)[1:5]
+#' )
+#' ordinate(mod, alpha = 0.7, traits = species_traits)
+#'
+#' # Shrink the trait arrows when they would otherwise dominate
+#' # the biplot.
+#' ordinate(mod, traits = species_traits, trait_arrow_scale = 0.6)
+#'
+#' # If the fit was trait-informed via jsdgam(traits = ...), pull
+#' # the trait frame straight off the fit object.
+#' mod_traits <- jsdgam(
+#'   formula = captures ~ ndvi_ma12:series + mintemp:series +
+#'     gp(time, k = 15),
+#'   factor_formula = ~ -1, data = portal_data,
+#'   unit = time, species = series, family = poisson(),
+#'   n_lv = 2, traits = species_traits,
+#'   chains = 2, silent = 2
+#' )
+#' ordinate(mod_traits, traits = "auto")
 #'
 #' # Compare to a residual correlation plot
 #' plot(residual_cor(mod))
@@ -230,15 +285,170 @@ ordinate_orth_rotate <- function(lv_estimates, lv_coefs, n_lv,
 }
 
 
+#' Internal: try to pull the trait frame the user passed to
+#' `jsdgam(traits = ...)` back off the fitted object. Searches a
+#' short list of known persistence paths and returns the first
+#' non-NULL match; returns `NULL` when the fit wasn't trait-
+#' informed (no `loadings_prior$features` payload anywhere).
+#'
+#' @noRd
+ordinate_extract_fit_traits <- function(object) {
+  ts <- object$mv_spec$trend_specs
+  # Single-trend (typical jsdgam ZMVN) shape: trend_specs is one
+  # mvgam_trend object with the loadings_prior attached directly.
+  if (inherits(ts, "mvgam_trend") && !is.null(ts$loadings_prior)) {
+    f <- ts$loadings_prior$features
+    if (!is.null(f)) return(f)
+  }
+  # Multi-trend shape: list of mvgam_trend objects. Walk them and
+  # return the first features payload encountered.
+  if (is.list(ts) && !inherits(ts, "mvgam_trend")) {
+    for (spec in ts) {
+      f <- spec$loadings_prior$features
+      if (!is.null(f)) return(f)
+    }
+  }
+  NULL
+}
+
+
+#' Internal: per-trait arrow coordinates in the rotated LV space.
+#' Each numeric trait column is regressed on the species' rotated
+#' loadings for `which_lvs`; the slope pair `(b_lv1, b_lv2)` is
+#' the trait's direction in the biplot. Arrow lengths are rescaled
+#' so the longest trait arrow matches `arrow_scale` times the
+#' longest species-loading radius, keeping both layers visually
+#' comparable. Returns `NULL` when `traits` is `NULL`, when no
+#' numeric columns remain, or when the alignment fails.
+#'
+#' The same regression-on-loadings recipe works whether the fit
+#' was trait-informed (`jsdgam(traits = ...)`) or not. For trait-
+#' informed fits the arrows visualise the trait gradient already
+#' encoded in `factor_formula`; for naive fits they are a post-hoc
+#' overlay showing which direction each trait grows in LV space.
+#'
+#' @noRd
+ordinate_trait_arrows <- function(traits, loadings_2d,
+                                  species_names, arrow_scale) {
+  if (is.null(traits)) return(NULL)
+  if (!is.data.frame(traits) && !is.matrix(traits)) {
+    stop(insight::format_error(c(
+      "Argument 'traits' must be a data.frame or matrix.",
+      i = paste0(
+        "Rows correspond to species; columns are trait values. ",
+        "Either set 'rownames(traits)' to the fit's species ",
+        "labels, or supply one row per species in series_levels ",
+        "order."
+      )
+    )))
+  }
+  traits <- as.data.frame(traits)
+  if (!is.null(rownames(traits)) &&
+      any(species_names %in% rownames(traits))) {
+    missing_sp <- setdiff(species_names, rownames(traits))
+    if (length(missing_sp) > 0L) {
+      stop(insight::format_error(c(
+        "Some species are missing from 'traits' rownames.",
+        x = paste0(
+          "Missing: ",
+          paste(missing_sp[seq_len(min(5L, length(missing_sp)))],
+                collapse = ", "),
+          if (length(missing_sp) > 5L) ", ..." else ""
+        ),
+        i = "Supply a trait row for every species in the fit."
+      )))
+    }
+    traits <- traits[species_names, , drop = FALSE]
+  }
+  if (NROW(traits) != length(species_names)) {
+    stop(insight::format_error(c(
+      "Trait row count does not match species count.",
+      x = paste0(
+        "traits: ", NROW(traits),
+        ", species: ", length(species_names), "."
+      ),
+      i = paste0(
+        "Set 'rownames(traits)' to the species labels, or supply ",
+        "one row per species in the same order as the fit's ",
+        "series levels."
+      )
+    )))
+  }
+  numeric_cols <- vapply(traits, is.numeric, logical(1L))
+  if (!any(numeric_cols)) return(NULL)
+  traits_num <- traits[, numeric_cols, drop = FALSE]
+  scores <- as.matrix(loadings_2d)
+  arrow_dat <- do.call(rbind, lapply(
+    seq_along(traits_num),
+    function(j) {
+      t_raw <- traits_num[, j]
+      if (!is.finite(stats::sd(t_raw)) ||
+          stats::sd(t_raw) == 0) {
+        return(NULL)
+      }
+      t_std <- as.numeric(scale(t_raw, center = TRUE, scale = TRUE))
+      fit <- stats::lm.fit(x = cbind(1, scores), y = t_std)
+      coefs <- fit$coefficients[-1L]
+      data.frame(
+        x = coefs[1L], y = coefs[2L],
+        trait_name = colnames(traits_num)[j]
+      )
+    }
+  ))
+  if (is.null(arrow_dat) || NROW(arrow_dat) == 0L) return(NULL)
+  loading_radii <- sqrt(rowSums(loadings_2d^2))
+  trait_radii <- sqrt(arrow_dat$x^2 + arrow_dat$y^2)
+  max_trait_r <- max(trait_radii)
+  if (max_trait_r <= 0 || !is.finite(max_trait_r)) return(NULL)
+  target_r <- arrow_scale * max(loading_radii)
+  factor_scale <- target_r / max_trait_r
+  arrow_dat$x <- arrow_dat$x * factor_scale
+  arrow_dat$y <- arrow_dat$y * factor_scale
+  arrow_dat
+}
+
+
+#' Internal: trait-arrow plot layers (segment + repel label).
+#' Drawn in steelblue to differentiate from species-loading
+#' darkred arrows. Returns `NULL` (an empty layer list) when
+#' `trait_dat` is `NULL` so `+ NULL` is a safe no-op in the build.
+#'
+#' @noRd
+ordinate_trait_layers <- function(trait_dat) {
+  if (is.null(trait_dat) || NROW(trait_dat) == 0L) return(NULL)
+  list(
+    ggplot2::geom_segment(
+      data = trait_dat,
+      ggplot2::aes(x = 0, y = 0, xend = x, yend = y),
+      arrow = grid::arrow(
+        length = grid::unit(0.12, "cm"), type = "closed"
+      ),
+      alpha = 0.85, color = "steelblue", linewidth = 0.6
+    ),
+    mvgam_repel_layer(
+      data = trait_dat,
+      mapping = ggplot2::aes(label = trait_name),
+      type = "label",
+      color = "steelblue", box.padding = 0.15, label.size = 0.1,
+      alpha = 0.85, max.overlaps = 20
+    )
+  )
+}
+
+
 #' Internal: build the ordination biplot from the SVD components
 #' and caller-supplied site / species labels. Every ordinate.*
 #' method ends here so the layered ggplot output is identical
-#' across object classes.
+#' across object classes. When `traits` is non-NULL, per-trait
+#' regression on the rotated loadings yields arrows overlaid on
+#' the same biplot in a contrasting colour.
 #'
 #' @noRd
 ordinate_build_plot <- function(svd_comp, which_lvs, biplot,
                                  label_sites, site_names,
-                                 species_names) {
+                                 species_names,
+                                 traits = NULL,
+                                 trait_arrow_scale = 1) {
   if (any(which_lvs > svd_comp$n_lv)) {
     suggestion <- if (svd_comp$n_lv == 1L) {
       "Refit with n_lv >= 2 or inspect factors via 'plot_factors()'."
@@ -305,6 +515,13 @@ ordinate_build_plot <- function(svd_comp, which_lvs, biplot,
   }
   if (biplot) {
     p <- p + ordinate_biplot_layers(sp_dat, species_names)
+    trait_dat <- ordinate_trait_arrows(
+      traits = traits,
+      loadings_2d = as.matrix(sp_dat[, c("x", "y")]),
+      species_names = species_names,
+      arrow_scale = trait_arrow_scale
+    )
+    p <- p + ordinate_trait_layers(trait_dat)
   }
   p <- p + mvgam_theme()
   # Attach rotated arrays as a structured attribute so power users
@@ -352,6 +569,8 @@ ordinate.jsdgam <- function(
   alpha = 0.5,
   rotation = c("svd", "varimax", "promax", "none"),
   label_sites = TRUE,
+  traits = NULL,
+  trait_arrow_scale = 1,
   ...
 ) {
   checkmate::assert_integerish(
@@ -360,19 +579,22 @@ ordinate.jsdgam <- function(
   validate_proportional(alpha)
   checkmate::assert_flag(biplot)
   checkmate::assert_flag(label_sites)
+  checkmate::assert_number(trait_arrow_scale, lower = 0)
   rotation <- match.arg(rotation)
   insight::check_if_installed(
     "ggrepel",
     reason = "to adequately plot ordination scores"
   )
 
+  traits <- resolve_auto_traits(traits, object)
   comp <- ordinate_factor_components(object, alpha, rotation)
   sp_names <- resolve_series_info(object)$series_levels
   unit_name <- attr(object$model_data, "prepped_trend_model")$unit
   site_names <- unique(object$obs_data[[unit_name]])
   ordinate_build_plot(
     comp, which_lvs, biplot, label_sites,
-    site_names = site_names, species_names = sp_names
+    site_names = site_names, species_names = sp_names,
+    traits = traits, trait_arrow_scale = trait_arrow_scale
   )
 }
 
@@ -428,6 +650,19 @@ ordinate.jsdgam <- function(
 #' @param label_sites Logical. When `TRUE`, site scores are
 #'   drawn as text labels (the training time values); when
 #'   `FALSE`, as points only.
+#' @param traits Optional trait overlay. Accepts `NULL` (default,
+#'   no overlay), the literal string `"auto"` (pull the trait
+#'   frame off the fit if `mvgam()` was called with a trait-
+#'   informed `loadings_prior`), or an explicit `data.frame` /
+#'   `matrix` with one row per series. Numeric columns are
+#'   regressed on the rotated series loadings to give each trait's
+#'   direction in the LV space; the resulting arrows are overlaid
+#'   in steelblue. Row alignment follows `rownames(traits)` when
+#'   set; otherwise rows must match the fit's series-level order.
+#'   Only meaningful when `biplot = TRUE`.
+#' @param trait_arrow_scale Positive numeric. Visual scaling
+#'   factor for trait-arrow lengths. The default `1` matches the
+#'   longest trait arrow to the longest series-loading radius.
 #' @param ... Ignored.
 #'
 #' @return A `ggplot` object. The returned object carries a
@@ -477,8 +712,9 @@ ordinate.jsdgam <- function(
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso `ordinate.jsdgam()`, `plot_factors()`,
-#'   [residual_cor()]
+#' @seealso [ordinate.jsdgam()], [residual_cor()],
+#'   [plot.mvgam()] (especially `type = "factors"` and
+#'   `type = "latent_state"`)
 #'
 #' @method ordinate mvgam
 #' @export
@@ -489,6 +725,8 @@ ordinate.mvgam <- function(
   alpha = 0.5,
   rotation = c("svd", "varimax", "promax", "none"),
   label_sites = TRUE,
+  traits = NULL,
+  trait_arrow_scale = 1,
   ...
 ) {
   checkmate::assert_integerish(
@@ -497,6 +735,7 @@ ordinate.mvgam <- function(
   validate_proportional(alpha)
   checkmate::assert_flag(biplot)
   checkmate::assert_flag(label_sites)
+  checkmate::assert_number(trait_arrow_scale, lower = 0)
   insight::check_if_installed(
     "ggrepel",
     reason = "to adequately plot ordination scores"
@@ -536,10 +775,48 @@ ordinate.mvgam <- function(
     # Last-resort fallback: 1..n_time bare integer labels.
     seq_len(NROW(svd_comp$scores))
   }
+  traits <- resolve_auto_traits(traits, object)
   ordinate_build_plot(
     svd_comp, which_lvs, biplot, label_sites,
-    site_names = site_names, species_names = species_names
+    site_names = site_names, species_names = species_names,
+    traits = traits, trait_arrow_scale = trait_arrow_scale
   )
+}
+
+
+#' Internal: resolve `traits = "auto"` to the trait frame stored
+#' on a trait-informed fit, warn once if none is found. Returns
+#' the input unchanged when it is `NULL` or already a frame /
+#' matrix, so the downstream `ordinate_trait_arrows()` validator
+#' handles the structural checks.
+#'
+#' @noRd
+resolve_auto_traits <- function(traits, object) {
+  if (is.null(traits)) return(NULL)
+  if (!is.character(traits)) return(traits)
+  if (!identical(traits, "auto")) {
+    stop(insight::format_error(c(
+      "Argument 'traits' string value must be 'auto'.",
+      x = paste0("Got '", traits[1L], "'."),
+      i = "Use traits = NULL, traits = 'auto', or a data.frame."
+    )))
+  }
+  found <- ordinate_extract_fit_traits(object)
+  if (is.null(found) &&
+      !identical(Sys.getenv("TESTTHAT"), "true")) {
+    rlang::warn(
+      message = c(
+        "traits = 'auto' requested but the fit carries no traits.",
+        i = paste0(
+          "Pass an explicit data.frame to 'traits', or refit ",
+          "with jsdgam(traits = ...). Skipping the overlay."
+        )
+      ),
+      .frequency = "once",
+      .frequency_id = "mvgam_ordinate_auto_traits"
+    )
+  }
+  found
 }
 
 

@@ -14,6 +14,8 @@ ordinate(object, ...)
   alpha = 0.5,
   rotation = c("svd", "varimax", "promax", "none"),
   label_sites = TRUE,
+  traits = NULL,
+  trait_arrow_scale = 1,
   ...
 )
 }
@@ -59,6 +61,34 @@ plot.}
 \item{label_sites}{Logical. When \code{TRUE}, site scores are
 drawn as labels (from the \code{unit} argument of the original
 \code{jsdgam()} call); when \code{FALSE}, as points only.}
+
+\item{traits}{Optional trait overlay. One of:
+\describe{
+\item{\code{NULL} (default)}{No trait arrows; the previous
+biplot behaviour.}
+\item{\code{"auto"}}{If the fit was trait-informed via
+\code{jsdgam(traits = ...)}, pull the trait frame back off
+the fit and use it as the overlay. Emits a one-time
+warning and skips the overlay if no traits are found.}
+\item{a \code{data.frame} or \code{matrix}}{Per-species trait values
+(one row per species; columns are traits). Rows are
+aligned via \code{rownames(traits)} when set; otherwise rows
+must already match the fit's series-level order. Non-
+numeric columns are ignored.}
+}
+When a non-NULL frame is in play, each numeric trait is
+regressed on the rotated species loadings to give its
+direction in the LV space; the resulting arrows are overlaid
+on the biplot in steelblue. The regression-on-loadings recipe
+works whether the fit was trait-informed via
+\code{jsdgam(traits = ...)} or not, so it can either visualise the
+structural trait gradient (informed) or serve as a post-hoc
+overlay (naive). Only meaningful when \code{biplot = TRUE}.}
+
+\item{trait_arrow_scale}{Positive numeric. Visual scaling
+factor for trait-arrow lengths. The default \code{1} places the
+longest trait arrow at the same radius as the longest species
+arrow; values \verb{> 1} lengthen, values \verb{< 1} shorten.}
 }
 \value{
 A \code{ggplot} object.
@@ -103,13 +133,42 @@ mod <- jsdgam(
 # Residual ordination biplot
 ordinate(mod, alpha = 0.7)
 
+# Overlay per-species trait arrows on the same biplot. Rows
+# of `traits` are aligned to species via rownames; numeric
+# columns become arrows in the LV space. The default
+# `trait_arrow_scale = 1` matches the longest trait arrow to
+# the longest species-loading radius for visual balance.
+species_traits <- data.frame(
+  body_mass = c(45, 22, 110, 8, 65),
+  row.names = levels(portal_data$series)[1:5]
+)
+ordinate(mod, alpha = 0.7, traits = species_traits)
+
+# Shrink the trait arrows when they would otherwise dominate
+# the biplot.
+ordinate(mod, traits = species_traits, trait_arrow_scale = 0.6)
+
+# If the fit was trait-informed via jsdgam(traits = ...), pull
+# the trait frame straight off the fit object.
+mod_traits <- jsdgam(
+  formula = captures ~ ndvi_ma12:series + mintemp:series +
+    gp(time, k = 15),
+  factor_formula = ~ -1, data = portal_data,
+  unit = time, species = series, family = poisson(),
+  n_lv = 2, traits = species_traits,
+  chains = 2, silent = 2
+)
+ordinate(mod_traits, traits = "auto")
+
 # Compare to a residual correlation plot
 plot(residual_cor(mod))
 }
 
 }
 \seealso{
-\code{jsdgam()}, \code{\link[=residual_cor]{residual_cor()}}
+\code{\link[=jsdgam]{jsdgam()}}, \code{\link[=residual_cor]{residual_cor()}},
+\code{\link[=plot.mvgam]{plot.mvgam()}} (especially \code{type = "factors"} and
+\code{type = "latent_state"})
 }
 \author{
 Nicholas J Clark
