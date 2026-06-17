@@ -161,11 +161,17 @@ mvgam_beta_aliases <- function(x) {
   #   `X`             obs main formula  -> b[k]            -> b_<term>
   #   `X_<resp>`      MV response       -> b_<resp>[k]     -> b_<resp>_<term>
   #   `X_<dpar>`      dpar formula      -> b_<dpar>[k]     -> b_<dpar>_<term>
+  #   `X_<nlpar>`     nl sub-formula    -> b_<nlpar>[k]    -> b_<nlpar>_<term>
   #   `X_trend`       mvgam-only        -> b_trend[k]      -> b_<term>_trend
   # The trend block is the only one with a name suffix (rather than
   # prefix); all others reduce to the same template, so we drive the
   # whole map from a single sweep over `names(x$standata)`.
-  build <- function(X, pos_prefix, alias_prefix, alias_suffix) {
+  # Reason: nl sub-formulas do NOT get the Intercept-centring
+  # transform, so the column count of `X_<nlpar>` matches the
+  # length of `b_<nlpar>` directly (Intercept stays at position 1).
+  # `strip_intercept = FALSE` opts out of the centring assumption.
+  build <- function(X, pos_prefix, alias_prefix, alias_suffix,
+                    strip_intercept = TRUE) {
     if (is.null(X) || !is.matrix(X) || ncol(X) == 0L) {
       return(character(0L))
     }
@@ -173,7 +179,7 @@ mvgam_beta_aliases <- function(x) {
     if (length(cn) == 0L) {
       return(character(0L))
     }
-    if (identical(cn[1L], "Intercept")) {
+    if (strip_intercept && identical(cn[1L], "Intercept")) {
       cn <- cn[-1L]
     }
     if (length(cn) == 0L) {
@@ -182,6 +188,20 @@ mvgam_beta_aliases <- function(x) {
     new <- paste0(alias_prefix, cn, alias_suffix)
     old <- paste0(pos_prefix, "[", seq_along(cn), "]")
     stats::setNames(old, new)
+  }
+  # Non-linear sub-formulas surface via brmsformula$pforms keyed by
+  # the nlpar name, but only when the top-level formula is flagged
+  # with attr(., "nl") = TRUE. Capture once at the top of the
+  # sweep so the per-block branch can decide whether to strip.
+  obs_form <- x$formula
+  is_nl <- isTRUE(attr(
+    if (inherits(obs_form, "brmsformula")) obs_form$formula else obs_form,
+    "nl"
+  ))
+  nlpar_names <- if (is_nl && inherits(obs_form, "brmsformula")) {
+    names(obs_form$pforms %||% list())
+  } else {
+    character(0L)
   }
   X_blocks <- grep("^X(_.+)?$", names(x$standata), value = TRUE)
   parts <- lapply(X_blocks, function(blk) {
@@ -196,7 +216,8 @@ mvgam_beta_aliases <- function(x) {
         X,
         pos_prefix = paste0("b_", suffix),
         alias_prefix = paste0("b_", suffix, "_"),
-        alias_suffix = ""
+        alias_suffix = "",
+        strip_intercept = !(suffix %in% nlpar_names)
       )
     }
   })

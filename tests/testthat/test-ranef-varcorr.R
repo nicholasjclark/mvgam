@@ -214,6 +214,78 @@ test_that("mvgam_ranef_aliases verifies cor index order for M = 3 and M = 4", {
 })
 
 
+# ---- mvgam_beta_aliases for nl sub-formulas -----------------------
+
+test_that("mvgam_beta_aliases keeps the Intercept column for nl nlpars", {
+  # Reason: brms does NOT intercept-centre non-linear sub-formulas, so
+  # `b_<nlpar>` has length K (not K - 1) and position 1 is the
+  # Intercept itself. Stripping the Intercept the way the linear
+  # main-formula path does drops a parameter AND mis-maps the rest.
+  set.seed(13L)
+  n_obs <- 40L
+  df <- data.frame(
+    y      = rnorm(n_obs),
+    env    = rnorm(n_obs),
+    trait1 = rnorm(n_obs),
+    species = factor(sample(letters[1:5], n_obs, replace = TRUE))
+  )
+  obs_nl <- brms::bf(
+    y  ~ a + b * env,
+    a  ~ trait1 + (1 | species),
+    b  ~ trait1 + (1 | species),
+    nl = TRUE
+  )
+  sd_ <- brms::standata(
+    obs_nl, data = df, family = brms::brmsfamily("gaussian")
+  )
+  stub <- structure(
+    list(
+      formula  = obs_nl,
+      data     = df,
+      family   = brms::brmsfamily("gaussian"),
+      standata = as.list(sd_)
+    ),
+    class = "mvgam"
+  )
+  alias <- mvgam_beta_aliases(stub)
+  expect_setequal(
+    names(alias),
+    c("b_a_Intercept", "b_a_trait1",
+      "b_b_Intercept", "b_b_trait1")
+  )
+  expect_identical(alias[["b_a_Intercept"]], "b_a[1]")
+  expect_identical(alias[["b_a_trait1"]],    "b_a[2]")
+  expect_identical(alias[["b_b_Intercept"]], "b_b[1]")
+  expect_identical(alias[["b_b_trait1"]],    "b_b[2]")
+})
+
+test_that("mvgam_beta_aliases still strips Intercept on linear main formulas", {
+  # Regression guard: the nl branch added in #324 P2b must not
+  # leak Intercept retention to the centred (linear) main formula.
+  set.seed(14L)
+  n_obs <- 30L
+  df <- data.frame(y = rnorm(n_obs), env = rnorm(n_obs))
+  brms_form <- brms::bf(y ~ env)
+  sd_ <- brms::standata(
+    brms_form, data = df, family = brms::brmsfamily("gaussian")
+  )
+  stub <- structure(
+    list(
+      formula  = brms_form,
+      data     = df,
+      family   = brms::brmsfamily("gaussian"),
+      standata = as.list(sd_)
+    ),
+    class = "mvgam"
+  )
+  alias <- mvgam_beta_aliases(stub)
+  expect_identical(alias[["b_env"]], "b[1]")
+  # The centred Intercept is exposed separately (b_Intercept), not
+  # in the b[k] block, so the alias map should NOT contain it.
+  expect_false(any(grepl("Intercept", names(alias))))
+})
+
+
 # ---- ranef.mvgam / VarCorr.mvgam dispatch + shape -----------------
 
 test_that("ranef.mvgam matches brms::ranef.brmsfit signature", {
