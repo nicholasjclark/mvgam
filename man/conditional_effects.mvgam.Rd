@@ -14,6 +14,7 @@
   rug = FALSE,
   process_error = FALSE,
   series = NULL,
+  resp = NULL,
   ...
 )
 

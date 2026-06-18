@@ -535,3 +535,132 @@ test_that("format_prior_distribution maps every common brms family", {
   expect_equal(fmt("(flat)"), "\\text{flat}")
   expect_equal(fmt(""), "\\text{flat}")
 })
+
+
+# ---------------------------------------------------------------
+# Phase C: latent branches (has_cor / gr) + factor-model block
+# ---------------------------------------------------------------
+
+test_that("AR(cor = TRUE) emits MVNormal innovations", {
+  mod <- make_methods_md_prefit(
+    y ~ x, trend_formula = ~ AR(p = 1, cor = TRUE)
+  )
+  out <- methods_md(mod)
+  # Vector epsilon row with MVNormal Sigma (cross-series cor).
+  expect_true(grepl(
+    "\\\\boldsymbol\\{\\\\epsilon\\}_t &\\\\sim \\\\text\\{MVNormal\\}",
+    out
+  ))
+  expect_false(grepl(
+    "\\\\epsilon\\^\\{\\(\\\\eta\\)\\}_\\{i,t\\} &\\\\sim \\\\text\\{Normal\\}",
+    out
+  ))
+})
+
+test_that("AR(gr = ...) emits hierarchical cor decomposition", {
+  dat <- data.frame(
+    time = rep(1:30, 4),
+    series = factor(rep(paste0("s", 1:4), each = 30)),
+    region = factor(rep(c("r1", "r1", "r2", "r2"), each = 30)),
+    x = rnorm(120),
+    y = rpois(120, lambda = 3)
+  )
+  mod <- make_methods_md_prefit(
+    y ~ x, trend_formula = ~ AR(p = 1, gr = region, subgr = series),
+    data = dat
+  )
+  out <- methods_md(mod)
+  # Hierarchical cor decomposition row present.
+  expect_true(grepl("\\\\boldsymbol\\{\\\\Omega\\}_\\{region\\}", out))
+  expect_true(grepl("\\\\alpha_\\{cor\\}", out))
+  expect_true(grepl(
+    "\\\\boldsymbol\\{\\\\Omega\\}_\\{\\\\text\\{global\\}\\}",
+    out
+  ))
+  # gr -> cor = TRUE so innovations are MVNormal.
+  expect_true(grepl(
+    "\\\\boldsymbol\\{\\\\epsilon\\}_t &\\\\sim \\\\text\\{MVNormal\\}",
+    out
+  ))
+})
+
+test_that("Factor model (n_lv > 0) emits decomposition + iid Z + QR", {
+  mod <- make_methods_md_prefit(
+    y ~ x, trend_formula = ~ AR(p = 1, n_lv = 2)
+  )
+  out <- methods_md(mod)
+  # Loading decomposition.
+  expect_true(grepl(
+    "\\\\sum_\\{k=1\\}\\^\\{2\\} Z_\\{i,k\\} \\\\tilde\\\\eta_\\{k,t\\}",
+    out
+  ))
+  # iid default Z prior.
+  expect_true(grepl(
+    "Z_\\{i,k\\} &\\\\sim \\\\text\\{Student-t\\}\\(3, 0, 0\\.5\\)",
+    out
+  ))
+  # QR identification annotation.
+  expect_true(grepl(
+    "thin QR identification",
+    out
+  ))
+  # In factor mode the latent dynamics are on tilde-eta_{k,t}.
+  expect_true(grepl(
+    "\\\\tilde\\\\eta_\\{k,t\\}",
+    out
+  ))
+})
+
+test_that("MGP loadings_prior emits varrho + Psi rows + Normal(0, sqrt(Psi))", {
+  # n_lv = 2 forces a non-trivial column shrinkage.
+  mod <- make_methods_md_prefit(
+    y ~ x, trend_formula = ~ AR(p = 1, n_lv = 2)
+  )
+  # Inject the MGP loadings spec on the prefit's trend spec (the
+  # canonical pre-fit location) so the renderer dispatches to the
+  # MGP branch without needing a full Stan run.
+  mod$mv_spec$trend_specs$loadings_prior_spec <- list(
+    features_mat   = NULL,
+    distance_mats  = list(),
+    column_shrinkage = "mgp",
+    mgp_a1 = 2, mgp_a2 = 3,
+    n_series = 4L, n_features = 0L, n_distances = 0L
+  )
+  out <- methods_md(mod)
+  expect_true(grepl(
+    "\\\\varrho_1 &\\\\sim \\\\text\\{InvGamma\\}\\(a_1, 1\\)", out
+  ))
+  expect_true(grepl(
+    "\\\\Psi_k &= \\\\prod_\\{l \\\\le k\\} \\\\varrho_l", out
+  ))
+  expect_true(grepl(
+    "Z_\\{i,k\\} &\\\\sim \\\\text\\{Normal\\}\\(0, \\\\sqrt\\{\\\\Psi_k\\}\\)",
+    out
+  ))
+})
+
+test_that("loadings_prior features + distances kernel emits kernel rows", {
+  mod <- make_methods_md_prefit(
+    y ~ x, trend_formula = ~ AR(p = 1, n_lv = 2)
+  )
+  mod$mv_spec$trend_specs$loadings_prior_spec <- list(
+    features_mat   = matrix(rnorm(4), nrow = 4L, ncol = 1L),
+    distance_mats  = list(phylo = matrix(0, 4L, 4L)),
+    column_shrinkage = "iid",
+    mgp_a1 = NA, mgp_a2 = NA,
+    n_series = 4L, n_features = 1L, n_distances = 1L
+  )
+  out <- methods_md(mod)
+  # Kernel assembly: distance term + features term, Hadamard
+  # product joiner.
+  expect_true(grepl("\\\\exp\\(-d_\\{phylo\\}", out))
+  expect_true(grepl(
+    "\\\\text\\{GP\\}_\\{\\\\text\\{exp\\}\\}", out
+  ))
+  expect_true(grepl("\\\\odot", out))
+  expect_true(grepl("L_\\\\Phi", out))
+  # Z prior is MVNormal(0, L_Phi L_Phi^T) for kernel-only branch.
+  expect_true(grepl(
+    "Z_\\{\\\\cdot,k\\} &\\\\sim \\\\text\\{MVNormal\\}", out
+  ))
+})

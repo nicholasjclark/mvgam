@@ -38,6 +38,7 @@ dat <- data.frame(
   sdx = abs(rnorm(n, 0.2, 0.05)),
   ord = factor(sample(1:5, n, replace = TRUE), ordered = TRUE),
   grp = factor(rep(c("a", "b", "c", "d"), each = 30L)),
+  region = factor(rep(c("r1", "r1", "r2", "r2"), each = 30L)),
   y = rpois(n, 3)
 )
 
@@ -82,7 +83,17 @@ fixtures <- list(
        extra_data = list(
          yC = rnorm(120),
          trait1 = rep(rnorm(4), each = 30)
-       ))
+       )),
+  list(name = "16_factor_iid",
+       f = y ~ x,
+       t = ~ AR(p = 1, n_lv = 2)),
+  list(name = "17_factor_mgp",
+       f = y ~ x,
+       t = ~ AR(p = 1, n_lv = 2),
+       loadings_prior = list(column_shrinkage = "mgp")),
+  list(name = "18_ar_hier_cor",
+       f = y ~ x,
+       t = ~ AR(p = 1, gr = region, subgr = series))
 )
 
 # Render each fixture through methods_md(), concatenate into one
@@ -96,11 +107,17 @@ render_one <- function(spec) {
   for (nm in names(spec$extra_data %||% list())) {
     fixture_data[[nm]] <- spec$extra_data[[nm]]
   }
-  mod <- suppressWarnings(suppressMessages(mvgam(
+  mvgam_args <- list(
     formula = spec$f, trend_formula = spec$t,
     data = fixture_data, family = fam,
     run_model = FALSE, silent = 2
-  )))
+  )
+  if (!is.null(spec$loadings_prior)) {
+    mvgam_args$loadings_prior <- spec$loadings_prior
+  }
+  mod <- suppressWarnings(suppressMessages(
+    do.call(mvgam, mvgam_args)
+  ))
   methods_md(mod)
 }
 

@@ -10,7 +10,8 @@
   type = c("response", "link", "expected", "trend"),
   ndraws = NULL,
   obs_uncertainty = TRUE,
-  resample_innovations = FALSE
+  resample_innovations = FALSE,
+  resp = NULL
 )
 }
 \arguments{

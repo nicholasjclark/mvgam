@@ -8,6 +8,7 @@
   x,
   type = c("residuals", "smooths", "trend", "factors", "series", "latent_state"),
   series = NULL,
+  resp = NULL,
   ndraws = NULL,
   ...
 )

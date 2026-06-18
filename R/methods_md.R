@@ -445,6 +445,7 @@ render_model_section <- function(ctx) {
   rows <- c(rows, nlpar_linear_predictor_rows(obj, notation))
   rows <- c(rows, term_definition_rows(obj, notation))
   rows <- c(rows, latent_dynamics_rows(obj, notation))
+  rows <- c(rows, factor_model_rows(obj, notation))
 
   block <- align_block(rows)
   glossary <- model_glossary(obj)
@@ -750,14 +751,29 @@ model_glossary <- function(obj) {
   if (methods_md_has_latent_trend(obj)) {
     tt <- obj$trend_metadata$trend_type
     label <- trend_order_label(obj)
+    is_factor <- methods_md_has_factor_model(obj)
     defs <- c(defs, paste0(
-      "- $\\eta_{i,t}$: latent ", label,
-      " trend at series $i$ time $t$"
+      "- $\\eta_{i,t}$: latent state at series $i$ time $t$"
     ))
-    defs <- c(defs, paste0(
-      "- $\\epsilon^{(\\eta)}_{i,t}$: process innovation, ",
-      "SD $\\sigma_\\eta$"
-    ))
+    if (is_factor) {
+      n_lv <- obj$trend_metadata$n_lv
+      defs <- c(defs, paste0(
+        "- $\\tilde\\eta_{k,t}$: latent ", label,
+        " factor $k = 1, \\ldots, ", n_lv, "$ at time $t$"
+      ))
+      defs <- c(defs, paste0(
+        "- $Z_{i,k}$: loading of series $i$ on factor $k$"
+      ))
+      defs <- c(defs, paste0(
+        "- $\\tilde\\epsilon^{(\\eta)}_{k,t}$: factor ",
+        "innovation, SD $\\sigma_\\eta$"
+      ))
+    } else {
+      defs <- c(defs, paste0(
+        "- $\\epsilon^{(\\eta)}_{i,t}$: process innovation, ",
+        "SD $\\sigma_\\eta$"
+      ))
+    }
     if (identical(tt, "AR") || identical(tt, "VAR") ||
         identical(tt, "ARMA")) {
       defs <- c(defs, paste0(
@@ -767,6 +783,16 @@ model_glossary <- function(obj) {
     if (identical(tt, "CAR")) {
       defs <- c(defs, paste0(
         "- $\\rho$: continuous-time AR decay rate"
+      ))
+    }
+    gr <- trend_grouping_var(obj)
+    if (!is.null(gr)) {
+      defs <- c(defs, paste0(
+        "- $\\boldsymbol{\\Omega}_{", gr, "}$, ",
+        "$\\boldsymbol{\\Omega}_{\\text{global}}$, ",
+        "$\\alpha_{cor}$: per-group correlation matrix, ",
+        "shared global correlation matrix, and pooling weight ",
+        "for the hierarchical residual structure"
       ))
     }
   }
@@ -1615,6 +1641,161 @@ methods_md_has_latent_trend <- function(obj) {
 
 
 # ---------------------------------------------------------------
+# Shared helpers for latent-trend renderers
+# ---------------------------------------------------------------
+
+#' @noRd
+trend_spec_for <- function(obj) {
+  # Pulls the first mvgam_trend spec off the fit. `trend_specs`
+  # may be a single mvgam_trend (univariate) or a list
+  # (multivariate); methods_md renders structure from the first
+  # spec.
+  ts <- obj$trend_components$specifications %||%
+    obj$mv_spec$trend_specs
+  if (is.null(ts)) return(NULL)
+  if (inherits(ts, "mvgam_trend")) ts else ts[[1L]]
+}
+
+#' @noRd
+trend_grouping_var <- function(obj) {
+  spec <- trend_spec_for(obj)
+  gr <- spec$gr
+  if (is.null(gr) || identical(gr, "NA")) NULL else gr
+}
+
+#' @noRd
+sigma_symbol <- function(gr = NULL) {
+  if (is.null(gr)) {
+    "\\boldsymbol{\\Sigma}"
+  } else {
+    paste0("\\boldsymbol{\\Sigma}_{", gr, "}")
+  }
+}
+
+# Factor-mode awareness for the dynamics symbols. When n_lv > 0,
+# the trend dynamics live on the latent factors
+# (`\tilde\eta_{k,t}`) and are mapped to the per-series state
+# `\eta_{i,t}` through the loadings (see `factor_model_rows`).
+# Outside factor mode the symbols collapse to the original
+# per-series form so the diff is invisible.
+
+#' @noRd
+time_subscript <- function(lag) {
+  # Build the time subscript as a character of length(lag).
+  # Vector input arrives from AR / VAR / ARMA with multiple lags.
+  ifelse(lag == 0L, "t", paste0("t-", lag))
+}
+
+#' @noRd
+trend_eta <- function(obj, lag = 0L) {
+  is_factor <- methods_md_has_factor_model(obj)
+  idx <- if (is_factor) "k" else "i"
+  tilde <- if (is_factor) "\\tilde" else ""
+  paste0(tilde, "\\eta_{", idx, ",", time_subscript(lag), "}")
+}
+
+#' @noRd
+trend_eta_vec <- function(obj, lag = 0L) {
+  is_factor <- methods_md_has_factor_model(obj)
+  body <- if (is_factor) {
+    "\\tilde{\\boldsymbol{\\eta}}"
+  } else {
+    "\\boldsymbol{\\eta}"
+  }
+  paste0(body, "_{", time_subscript(lag), "}")
+}
+
+#' @noRd
+trend_eps <- function(obj) {
+  is_factor <- methods_md_has_factor_model(obj)
+  idx <- if (is_factor) "k" else "i"
+  tilde <- if (is_factor) "\\tilde" else ""
+  paste0(tilde, "\\epsilon^{(\\eta)}_{", idx, ",t}")
+}
+
+#' @noRd
+trend_eps_lag <- function(obj, lag) {
+  is_factor <- methods_md_has_factor_model(obj)
+  idx <- if (is_factor) "k" else "i"
+  tilde <- if (is_factor) "\\tilde" else ""
+  paste0(tilde, "\\epsilon^{(\\eta)}_{", idx, ",t-", lag, "}")
+}
+
+#' @noRd
+trend_eps_vec <- function(obj) {
+  is_factor <- methods_md_has_factor_model(obj)
+  body <- if (is_factor) {
+    "\\tilde{\\boldsymbol{\\epsilon}}"
+  } else {
+    "\\boldsymbol{\\epsilon}"
+  }
+  paste0(body, "_t")
+}
+
+#' @noRd
+innovation_rows <- function(obj, is_vector, has_cor, gr = NULL) {
+  # Hierarchical grouping forces cross-series correlation
+  # (see AR() / VAR() `@param gr`).
+  if (!is.null(gr)) has_cor <- TRUE
+  sig <- sigma_symbol(gr)
+  eps_vec <- trend_eps_vec(obj)
+
+  rows <- if (has_cor) {
+    list(list(
+      lhs = eps_vec,
+      op  = "\\sim",
+      rhs = paste0("\\text{MVNormal}(\\mathbf{0}, ", sig, ")")
+    ))
+  } else if (is_vector) {
+    list(list(
+      lhs = eps_vec,
+      op  = "\\sim",
+      rhs = paste0(
+        "\\text{MVNormal}(\\mathbf{0}, \\text{diag}",
+        "(\\sigma_\\eta^2))"
+      )
+    ))
+  } else {
+    list(list(
+      lhs = trend_eps(obj),
+      op  = "\\sim",
+      rhs = "\\text{Normal}(0, \\sigma_\\eta)"
+    ))
+  }
+
+  if (!is.null(gr)) {
+    rows <- c(rows, hierarchical_cor_rows(gr))
+  }
+  rows
+}
+
+#' @noRd
+hierarchical_cor_rows <- function(gr) {
+  # Hierarchical residual correlation decomposition emitted when
+  # the user supplies `gr` to AR() / VAR().
+  list(
+    list(
+      lhs = paste0("\\boldsymbol{\\Omega}_{", gr, "}"),
+      op  = "=",
+      rhs = paste0(
+        "\\alpha_{cor} \\boldsymbol{\\Omega}_{\\text{global}}",
+        " + (1 - \\alpha_{cor}) \\boldsymbol{\\Omega}_{", gr,
+        ", \\text{local}}"
+      )
+    ),
+    list(
+      lhs = sigma_symbol(gr),
+      op  = "=",
+      rhs = paste0(
+        "\\text{diag}(\\sigma_\\eta) \\boldsymbol{\\Omega}_{",
+        gr, "} \\text{diag}(\\sigma_\\eta)"
+      )
+    )
+  )
+}
+
+
+# ---------------------------------------------------------------
 # Latent registry
 # ---------------------------------------------------------------
 # Each entry returns a list of {lhs, op, rhs} rows for the
@@ -1655,38 +1836,36 @@ latent_dynamics_rows <- function(obj, notation) {
 
 #' @noRd
 render_latent_rw <- function(obj, notation) {
-  list(
-    list(
-      lhs = "\\eta_{i,t}",
+  has_cor <- isTRUE(obj$trend_metadata$has_cor)
+  gr <- trend_grouping_var(obj)
+  c(
+    list(list(
+      lhs = trend_eta(obj),
       op  = "=",
-      rhs = "\\eta_{i,t-1} + \\epsilon^{(\\eta)}_{i,t}"
-    ),
-    list(
-      lhs = "\\epsilon^{(\\eta)}_{i,t}",
-      op  = "\\sim",
-      rhs = "\\text{Normal}(0, \\sigma_\\eta)"
-    )
+      rhs = paste0(trend_eta(obj, lag = 1L), " + ", trend_eps(obj))
+    )),
+    innovation_rows(obj, is_vector = FALSE,
+                    has_cor = has_cor, gr = gr)
   )
 }
 
 #' @noRd
 render_latent_ar <- function(obj, notation) {
   lags <- obj$trend_metadata$ar_lags %||% 1L
+  has_cor <- isTRUE(obj$trend_metadata$has_cor)
+  gr <- trend_grouping_var(obj)
   rhs_terms <- paste(
-    paste0("\\phi_{", lags, "} \\eta_{i,t-", lags, "}"),
+    paste0("\\phi_{", lags, "} ", trend_eta(obj, lag = lags)),
     collapse = " + "
   )
-  list(
-    list(
-      lhs = "\\eta_{i,t}",
+  c(
+    list(list(
+      lhs = trend_eta(obj),
       op  = "=",
-      rhs = paste0(rhs_terms, " + \\epsilon^{(\\eta)}_{i,t}")
-    ),
-    list(
-      lhs = "\\epsilon^{(\\eta)}_{i,t}",
-      op  = "\\sim",
-      rhs = "\\text{Normal}(0, \\sigma_\\eta)"
-    )
+      rhs = paste0(rhs_terms, " + ", trend_eps(obj))
+    )),
+    innovation_rows(obj, is_vector = FALSE,
+                    has_cor = has_cor, gr = gr)
   )
 }
 
@@ -1694,27 +1873,20 @@ render_latent_ar <- function(obj, notation) {
 render_latent_var <- function(obj, notation) {
   lags <- obj$trend_metadata$ar_lags %||% 1L
   has_cor <- isTRUE(obj$trend_metadata$has_cor)
+  gr <- trend_grouping_var(obj)
   rhs_terms <- paste(
-    paste0("\\boldsymbol{\\Phi}_{", lags,
-             "} \\boldsymbol{\\eta}_{t-", lags, "}"),
+    paste0("\\boldsymbol{\\Phi}_{", lags, "} ",
+             trend_eta_vec(obj, lag = lags)),
     collapse = " + "
   )
-  innovations <- if (has_cor) {
-    "\\text{MVNormal}(\\mathbf{0}, \\boldsymbol{\\Sigma})"
-  } else {
-    "\\text{MVNormal}(\\mathbf{0}, \\text{diag}(\\sigma_\\eta^2))"
-  }
-  list(
-    list(
-      lhs = "\\boldsymbol{\\eta}_t",
+  c(
+    list(list(
+      lhs = trend_eta_vec(obj),
       op  = "=",
-      rhs = paste0(rhs_terms, " + \\boldsymbol{\\epsilon}_t")
-    ),
-    list(
-      lhs = "\\boldsymbol{\\epsilon}_t",
-      op  = "\\sim",
-      rhs = innovations
-    )
+      rhs = paste0(rhs_terms, " + ", trend_eps_vec(obj))
+    )),
+    innovation_rows(obj, is_vector = TRUE,
+                    has_cor = has_cor, gr = gr)
   )
 }
 
@@ -1722,67 +1894,74 @@ render_latent_var <- function(obj, notation) {
 render_latent_arma <- function(obj, notation) {
   ar_lags <- obj$trend_metadata$ar_lags %||% 1L
   ma_lags <- obj$trend_metadata$ma_lags %||% 1L
+  has_cor <- isTRUE(obj$trend_metadata$has_cor)
+  gr <- trend_grouping_var(obj)
   ar_rhs <- paste(
-    paste0("\\phi_{", ar_lags, "} \\eta_{i,t-", ar_lags, "}"),
+    paste0("\\phi_{", ar_lags, "} ",
+             trend_eta(obj, lag = ar_lags)),
     collapse = " + "
   )
   ma_rhs <- paste(
-    paste0("\\theta_{", ma_lags,
-             "} \\epsilon^{(\\eta)}_{i,t-", ma_lags, "}"),
+    paste0("\\theta_{", ma_lags, "} ",
+             trend_eps_lag(obj, ma_lags)),
     collapse = " + "
   )
-  list(
-    list(
-      lhs = "\\eta_{i,t}",
+  c(
+    list(list(
+      lhs = trend_eta(obj),
       op  = "=",
       rhs = paste0(
-        ar_rhs, " + \\epsilon^{(\\eta)}_{i,t} + ", ma_rhs
+        ar_rhs, " + ", trend_eps(obj), " + ", ma_rhs
       )
-    ),
-    list(
-      lhs = "\\epsilon^{(\\eta)}_{i,t}",
-      op  = "\\sim",
-      rhs = "\\text{Normal}(0, \\sigma_\\eta)"
-    )
+    )),
+    innovation_rows(obj, is_vector = FALSE,
+                    has_cor = has_cor, gr = gr)
   )
 }
 
 #' @noRd
 render_latent_car <- function(obj, notation) {
-  list(
-    list(
-      lhs = "\\eta_{i,t}",
+  has_cor <- isTRUE(obj$trend_metadata$has_cor)
+  gr <- trend_grouping_var(obj)
+  c(
+    list(list(
+      lhs = trend_eta(obj),
       op  = "=",
       rhs = paste0(
-        "\\rho^{\\Delta t_{i,t}} \\eta_{i,t-1} + ",
-        "\\epsilon^{(\\eta)}_{i,t}"
+        "\\rho^{\\Delta t_{i,t}} ", trend_eta(obj, lag = 1L),
+        " + ", trend_eps(obj)
       )
-    ),
-    list(
-      lhs = "\\epsilon^{(\\eta)}_{i,t}",
-      op  = "\\sim",
-      rhs = "\\text{Normal}(0, \\sigma_\\eta)"
-    )
+    )),
+    innovation_rows(obj, is_vector = FALSE,
+                    has_cor = has_cor, gr = gr)
   )
 }
 
 #' @noRd
 render_latent_zmvn <- function(obj, notation) {
   has_cor <- isTRUE(obj$trend_metadata$has_cor)
+  gr <- trend_grouping_var(obj)
+  if (!is.null(gr)) has_cor <- TRUE
   cov <- if (has_cor) {
-    "\\boldsymbol{\\Sigma}"
+    sigma_symbol(gr)
   } else {
     "\\text{diag}(\\sigma_\\eta^2)"
   }
-  list(list(
-    lhs = "\\boldsymbol{\\eta}_t",
+  rows <- list(list(
+    lhs = trend_eta_vec(obj),
     op  = "\\sim",
     rhs = paste0("\\text{MVNormal}(\\mathbf{0}, ", cov, ")")
   ))
+  if (!is.null(gr)) {
+    rows <- c(rows, hierarchical_cor_rows(gr))
+  }
+  rows
 }
 
 #' @noRd
 render_latent_pw <- function(obj, notation) {
+  # PW does not use n_lv (factor mode incompatible at validator),
+  # so the symbol stays \eta_{i,t} unconditionally.
   list(
     list(
       lhs = "\\eta_{i,t}",
@@ -1798,6 +1977,190 @@ render_latent_pw <- function(obj, notation) {
       rhs = "\\text{Laplace}(0, \\tau)"
     )
   )
+}
+
+
+# ---------------------------------------------------------------
+# Factor-model block
+# ---------------------------------------------------------------
+# Triggered when n_lv > 0. Emits the loadings decomposition
+# eta_{i,t} = sum_k Z_{i,k} tilde-eta_{k,t}, the Z prior (one of
+# iid / kernel-only / pure-MGP / kernel + MGP / partial-Z /
+# fully-fixed), and the QR thin-identification annotation
+# (skipped when trend_map pins Z). Mirrors the Stan emission in
+# generate_factor_model() / make_loadings_prior_stanvars().
+
+#' @noRd
+methods_md_has_factor_model <- function(obj) {
+  n_lv <- obj$trend_metadata$n_lv
+  !is.null(n_lv) && is.numeric(n_lv) && length(n_lv) == 1L &&
+    n_lv > 0L
+}
+
+#' @noRd
+factor_model_rows <- function(obj, notation) {
+  if (!methods_md_has_factor_model(obj)) return(list())
+  n_lv <- obj$trend_metadata$n_lv
+  fixed_Z <- obj$trend_metadata$fixed_Z
+  spec <- trend_spec_for(obj)
+  loadings_spec <- spec$loadings_prior_spec
+
+  # QR rotation default. trend_map (`fixed_Z`) and explicit
+  # `rotate = FALSE` (per-factor `by = lv_axis()` smooth) both
+  # disable QR. Mirrors R/stan_assembly.R:3034.
+  rotate <- if (is.null(spec$rotate)) TRUE else isTRUE(spec$rotate)
+  if (!is.null(fixed_Z)) rotate <- FALSE
+
+  rows <- list(list(
+    lhs = "\\eta_{i,t}",
+    op  = "=",
+    rhs = paste0(
+      "\\sum_{k=1}^{", n_lv, "} Z_{i,k} \\tilde\\eta_{k,t}"
+    )
+  ))
+  rows <- c(rows, loadings_prior_rows(loadings_spec, fixed_Z))
+  if (rotate) {
+    rows <- c(rows, qr_identification_rows())
+  }
+  rows
+}
+
+#' @noRd
+loadings_prior_rows <- function(spec, fixed_Z) {
+  if (!is.null(fixed_Z)) {
+    return(list(list(
+      lhs = "Z_{i,k}",
+      op  = "=",
+      rhs = "\\text{fixed by \\texttt{trend\\_map}}"
+    )))
+  }
+  if (is.null(spec)) {
+    return(list(list(
+      lhs = "Z_{i,k}",
+      op  = "\\sim",
+      rhs = "\\text{Student-t}(3, 0, 0.5)"
+    )))
+  }
+  has_features  <- isTRUE(spec$n_features > 0L)
+  has_distances <- isTRUE(spec$n_distances > 0L)
+  uses_mgp      <- identical(spec$column_shrinkage, "mgp")
+  has_kernel    <- has_features || has_distances
+
+  rows <- list()
+  if (has_kernel) {
+    rows <- c(rows, kernel_assembly_rows(spec))
+  }
+  if (uses_mgp) {
+    rows <- c(rows, mgp_shrinkage_rows())
+  }
+  rows <- c(rows, list(z_column_prior_row(uses_mgp, has_kernel)))
+  rows
+}
+
+#' @noRd
+z_column_prior_row <- function(uses_mgp, has_kernel) {
+  # Picks the matching one of the four Z-prior branches emitted
+  # by make_loadings_prior_stanvars():
+  #   * iid default (no kernel, no MGP)
+  #   * pure MGP (column shrinkage only)
+  #   * kernel only
+  #   * kernel + MGP (multiplicative)
+  if (uses_mgp && has_kernel) {
+    list(
+      lhs = "Z_{\\cdot,k}",
+      op  = "\\sim",
+      rhs = paste0(
+        "\\text{MVNormal}(\\mathbf{0}, \\sqrt{\\Psi_k} \\, ",
+        "L_\\Phi L_\\Phi^\\top \\sqrt{\\Psi_k})"
+      )
+    )
+  } else if (uses_mgp) {
+    list(
+      lhs = "Z_{i,k}",
+      op  = "\\sim",
+      rhs = "\\text{Normal}(0, \\sqrt{\\Psi_k})"
+    )
+  } else if (has_kernel) {
+    list(
+      lhs = "Z_{\\cdot,k}",
+      op  = "\\sim",
+      rhs = "\\text{MVNormal}(\\mathbf{0}, L_\\Phi L_\\Phi^\\top)"
+    )
+  } else {
+    list(
+      lhs = "Z_{i,k}",
+      op  = "\\sim",
+      rhs = "\\text{Student-t}(3, 0, 0.5)"
+    )
+  }
+}
+
+#' @noRd
+kernel_assembly_rows <- function(spec) {
+  # Phi = (prod_d exp(-d / theta_d)) * gp_exponential(features;
+  # theta_features). Per R/stan_assembly.R:3241-3268; one factor
+  # per supplied distance matrix, plus the features GP factor
+  # when n_features > 0.
+  has_features <- isTRUE(spec$n_features > 0L)
+  dnames <- names(spec$distance_mats) %||% character(0L)
+  terms <- character(0L)
+  for (nm in dnames) {
+    terms <- c(terms, paste0(
+      "\\exp(-d_{", nm, "} / \\theta_{d_{", nm, "}})"
+    ))
+  }
+  if (has_features) {
+    terms <- c(terms, paste0(
+      "\\text{GP}_{\\text{exp}}(\\text{features}; 1, ",
+      "\\boldsymbol{\\theta}_{\\text{features}})"
+    ))
+  }
+  rhs <- paste(terms, collapse = " \\odot ")
+  list(
+    list(
+      lhs = "\\boldsymbol{\\Phi}",
+      op  = "=",
+      rhs = rhs
+    ),
+    list(
+      lhs = "L_\\Phi",
+      op  = "=",
+      rhs = "\\text{Cholesky}(\\boldsymbol{\\Phi})"
+    )
+  )
+}
+
+#' @noRd
+mgp_shrinkage_rows <- function() {
+  list(
+    list(
+      lhs = "\\varrho_1",
+      op  = "\\sim",
+      rhs = "\\text{InvGamma}(a_1, 1)"
+    ),
+    list(
+      lhs = "\\varrho_h",
+      op  = "\\sim",
+      rhs = "\\text{InvGamma}(a_2, 1) \\quad (h \\ge 2)"
+    ),
+    list(
+      lhs = "\\Psi_k",
+      op  = "=",
+      rhs = "\\prod_{l \\le k} \\varrho_l"
+    )
+  )
+}
+
+#' @noRd
+qr_identification_rows <- function() {
+  list(list(
+    lhs = "\\tilde Z",
+    op  = "=",
+    rhs = paste0(
+      "\\text{thin QR identification of } Z ",
+      "(Heaps 2024)"
+    )
+  ))
 }
 
 
