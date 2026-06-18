@@ -1718,21 +1718,32 @@ render_priors_section <- function(ctx) {
   }
 
   # When both umbrella and specific rows survive for the same
-  # parameter class, drop the umbrella. The specifics carry the
-  # actual labels; the umbrella renders as a generic placeholder
-  # (e.g. `\\sigma^{(gp)}_j` next to `\\sigma^{(gp)}_x`).
+  # (class, dpar, nlpar, resp) tuple, drop the umbrella. The
+  # specifics carry the actual labels; the umbrella renders as
+  # a generic placeholder (e.g. `\\sigma^{(gp)}_j` next to
+  # `\\sigma^{(gp)}_x`). Scoping by dpar / nlpar / resp matters
+  # under distributional regression, nl formulas, and mvbind --
+  # an umbrella for response y1 must not be dropped just because
+  # response y2 has a specific row.
   vec_classes <- c(
     "b", "sd", "sds", "L", "cor",
     "sdgp", "lscale", "meanme", "sdme", "simo"
   )
   drop <- logical(nrow(prior))
-  for (cls in unique(prior$class[prior$class %in% vec_classes])) {
-    cls_rows <- prior$class == cls
+  scope_dpar <- prior$dpar %||% rep("", nrow(prior))
+  scope_nlpar <- prior$nlpar %||% rep("", nrow(prior))
+  scope_resp <- prior$resp %||% rep("", nrow(prior))
+  scope_key <- paste(
+    prior$class, scope_dpar, scope_nlpar, scope_resp,
+    sep = "\x1f"
+  )
+  for (k in unique(scope_key[prior$class %in% vec_classes])) {
+    k_rows <- scope_key == k
     has_specific <- any(
-      cls_rows & (nzchar(prior$coef) | nzchar(prior$group))
+      k_rows & (nzchar(prior$coef) | nzchar(prior$group))
     )
     if (has_specific) {
-      drop <- drop | (cls_rows & !nzchar(prior$coef) &
+      drop <- drop | (k_rows & !nzchar(prior$coef) &
                         !nzchar(prior$group))
     }
   }
@@ -1979,7 +1990,21 @@ formula_text <- function(f) {
   # `structure(list(formula = y ~ x, pforms = list(...)))`
   # by default. Reconstruct a `brms::bf(...)` call instead so
   # the Implementation code block is copy-paste-ready.
-  if (inherits(f, c("brmsformula", "mvbrmsformula", "bform"))) {
+  if (inherits(f, "mvbrmsformula")) {
+    # Compose `brms::bf(yA ~ x) + brms::bf(yB ~ x) +
+    # brms::set_rescor(FALSE)` by recursing into each per-
+    # response brmsformula in $forms and appending the rescor
+    # flag when set.
+    bfs <- vapply(f$forms, formula_text, character(1L))
+    out <- paste(bfs, collapse = " + ")
+    if (isFALSE(f$rescor)) {
+      out <- paste0(out, " + brms::set_rescor(FALSE)")
+    } else if (isTRUE(f$rescor)) {
+      out <- paste0(out, " + brms::set_rescor(TRUE)")
+    }
+    return(out)
+  }
+  if (inherits(f, c("brmsformula", "bform"))) {
     main <- if (!is.null(f$formula)) f$formula else f
     parts <- paste(deparse(main, width.cutoff = 60L),
                     collapse = " ")
@@ -2032,23 +2057,25 @@ backfill_umbrella_priors <- function(prior) {
   if (is.null(prior) || nrow(prior) == 0L) return(prior)
   dpar <- prior$dpar %||% rep("", nrow(prior))
   nlpar <- prior$nlpar %||% rep("", nrow(prior))
+  resp <- prior$resp %||% rep("", nrow(prior))
   pri <- prior$prior %||% rep("", nrow(prior))
   has_text <- !is.na(pri) & nzchar(pri) & pri != "(flat)"
-  # Umbrella rows: class set, dpar / nlpar set or unset, coef and
-  # group both empty, prior text non-empty.
+  # Umbrella rows: class set, dpar / nlpar / resp set or unset, coef
+  # and group both empty, prior text non-empty.
   umbrella_mask <- has_text &
     !nzchar(prior$coef %||% "") &
     !nzchar(prior$group %||% "")
   umbrella <- prior[umbrella_mask, , drop = FALSE]
   if (nrow(umbrella) == 0L) return(prior)
+  u_dpar <- umbrella$dpar %||% rep("", nrow(umbrella))
+  u_nlpar <- umbrella$nlpar %||% rep("", nrow(umbrella))
+  u_resp <- umbrella$resp %||% rep("", nrow(umbrella))
   for (i in seq_len(nrow(prior))) {
     if (has_text[i]) next
-    cls <- prior$class[i]
-    dp <- dpar[i]
-    nlp <- nlpar[i]
-    matches <- umbrella$class == cls &
-      (umbrella$dpar %||% rep("", nrow(umbrella))) == dp &
-      (umbrella$nlpar %||% rep("", nrow(umbrella))) == nlp
+    matches <- umbrella$class == prior$class[i] &
+      u_dpar == dpar[i] &
+      u_nlpar == nlpar[i] &
+      u_resp == resp[i]
     if (any(matches)) {
       prior$prior[i] <- umbrella$prior[which(matches)[1L]]
     }
@@ -2062,8 +2089,45 @@ backfill_umbrella_priors <- function(prior) {
 #' unhandled classes; the prior-section walker drops `NULL` rows
 #' from the output rather than rendering an opaque placeholder, so
 #' new prior classes are silently skipped until a renderer lands.
+#'
+#' Per-response scoping (mvbind / mvbrmsformula): when `row$resp` is
+#' non-empty, the resolved symbol is wrapped with a `(<resp>)`
+#' superscript via `apply_resp_superscript()` -- this is the only
+#' place in the file that knows about resp on prior rows, so every
+#' branch below stays oblivious to multi-response.
 #' @noRd
 format_parameter_symbol <- function(row) {
+  sym <- format_parameter_symbol_base(row)
+  if (is.null(sym)) return(NULL)
+  resp <- row$resp %||% ""
+  if (nzchar(resp)) sym <- apply_resp_superscript(sym, resp)
+  sym
+}
+
+#' @noRd
+apply_resp_superscript <- function(sym, r) {
+  # Three cases for inserting `^{(<r>)}` into an already-formatted
+  # symbol without producing the invalid `^{...}^{(...)}` double
+  # superscript:
+  #   1. Symbol already has a `^{(...)}` group (e.g. `\\alpha^{(sigma)}`
+  #      from dpar, or `\\beta^{(\\text{mo})}_{x}` from monotonic):
+  #      merge into that group as a comma-separated tag.
+  #   2. Symbol has a subscript but no superscript (e.g. `\\beta_{x}`):
+  #      insert `^{(<r>)}` between the base and the subscript so the
+  #      conventional super-then-sub order survives.
+  #   3. Plain symbol (e.g. `\\alpha`): append.
+  super_pat <- "\\^\\{\\(([^)]+)\\)\\}"
+  if (grepl(super_pat, sym)) {
+    return(sub(super_pat, paste0("^{(\\1, ", r, ")}"), sym))
+  }
+  if (grepl("_\\{", sym)) {
+    return(sub("_\\{", paste0("^{(", r, ")}_{"), sym))
+  }
+  paste0(sym, "^{(", r, ")}")
+}
+
+#' @noRd
+format_parameter_symbol_base <- function(row) {
   cls <- row$class %||% ""
   coef <- row$coef %||% ""
   group <- row$group %||% ""

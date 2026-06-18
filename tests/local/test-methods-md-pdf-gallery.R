@@ -58,16 +58,30 @@ fixtures <- list(
   list(name = "12_dpar_sigma",
        f = brms::bf(y ~ x, sigma ~ x),
        t = NULL,
-       family = gaussian())
+       family = gaussian()),
+  list(name = "13_mvbind",
+       f = brms::bf(brms::mvbind(yA, yB) ~ x) + brms::set_rescor(FALSE),
+       t = NULL,
+       family = gaussian(),
+       extra_data = list(
+         yA = rnorm(120), yB = rnorm(120)
+       ))
 )
 
 # Render each fixture through methods_md(), concatenate into one
 # document, hand to pandoc + xelatex.
 render_one <- function(spec) {
   fam <- spec$family %||% poisson()
+  # Per-fixture column additions (e.g. mvbind needs yA / yB
+  # alongside the shared base columns). Merged into the shared
+  # dat so spec$f compiles without rewriting the gallery data.
+  fixture_data <- dat
+  for (nm in names(spec$extra_data %||% list())) {
+    fixture_data[[nm]] <- spec$extra_data[[nm]]
+  }
   mod <- suppressWarnings(suppressMessages(mvgam(
     formula = spec$f, trend_formula = spec$t,
-    data = dat, family = fam,
+    data = fixture_data, family = fam,
     run_model = FALSE, silent = 2
   )))
   methods_md(mod)
