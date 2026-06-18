@@ -232,23 +232,25 @@ residuals.mvgam <- function(object,
                               any.missing = FALSE,
                               unique = TRUE)
 
-  # Per-response recursive entry. `.single_response` is an internal
-  # marker the mv branch sets to (a) skip the multivariate fan-out
-  # on the recursive call and (b) tell the body below which
-  # response's column to read from the data. Pulled off `...` so
-  # it does not leak into pp_args downstream.
+  # Per-response routing. Two ways the caller can scope this:
+  #   * Explicit `resp = "<r>"` in `...` -- the user is asking for
+  #     one response only (matches brms / marginaleffects API).
+  #   * `.single_response = r` -- internal marker set by the mv
+  #     fan-out below; equivalent semantics, kept distinct because
+  #     `resp` also has to thread through pp_args to brms's
+  #     posterior helpers and we want to be able to strip the
+  #     internal marker without losing the user's intent.
   dots <- list(...)
-  single_response <- dots$.single_response
+  single_response <- dots$.single_response %||% dots$resp
   dots$.single_response <- NULL
 
   # Multivariate (mvbind / mvbrmsformula). mvgam's residuals path
-  # assumes a single-column response; `posterior_epred` / `posterior_predict`
-  # already accept `resp = "<r>"` to return a single per-response
-  # matrix. Loop the responses, set `.single_response = r` so the
-  # recursive call falls through to the univariate body with the
-  # right y column, and collect into a list keyed by response --
-  # matching the shape `posterior_predict.mvgam` returns on the
-  # same fit.
+  # assumes a single-column response; `posterior_epred` /
+  # `posterior_predict` accept `resp = "<r>"` to return a single
+  # per-response matrix. When the caller did not scope to one
+  # response, loop the responses and collect into a list keyed by
+  # response -- matching the shape `posterior_predict.mvgam`
+  # returns on the same fit.
   if (is.null(single_response) &&
         inherits(object$formula, "mvbrmsformula")) {
     responses <- object$formula$responses

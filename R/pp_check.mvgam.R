@@ -202,13 +202,27 @@ pp_check.mvgam <- function(
     newdata <- object$data %||% object$obs_data
   }
 
-  # brms parity: for multivariate fits require a single resp argument.
+  # Multivariate fits (mvbind / mvbrmsformula). When the caller
+  # supplies `resp = "<one>"`, fall through to the univariate
+  # path scoped to that response. When `resp` is NULL, fan out
+  # over all responses and return a named list of plots --
+  # matches what `residuals.mvgam` and `posterior_predict.mvgam`
+  # already do on the same fit; saves the user a manual loop.
   is_mv <- brms::is.mvbrmsformula(object$formula)
   resp_names <- if (is_mv) object$formula$responses else character(0)
   if (is_mv) {
-    if (is.null(resp) || length(resp) != 1L) {
+    if (is.null(resp)) {
+      call <- match.call()
+      out <- lapply(resp_names, function(r) {
+        call$resp <- r
+        eval(call, parent.frame())
+      })
+      names(out) <- resp_names
+      return(out)
+    }
+    if (length(resp) != 1L) {
       stop(insight::format_error(c(
-        "{.field resp} must be a single response name for a multivariate model.",
+        "{.field resp} must be a single response name.",
         i = cli::format_inline(
           "Available responses: {.val {resp_names}}."
         )
@@ -504,11 +518,16 @@ pp_check.mvgam <- function(
   if (grepl("resid", type)) {
     y[!is.na(y)] <- 0
     # residuals(summary = FALSE) returns [ndraws x nobs] (brms
-    # convention; matches posterior_predict output below).
+    # convention; matches posterior_predict output below). On
+    # multivariate fits residuals() returns a per-response list
+    # when `resp` is NULL; the upstream pp_check.mvgam path either
+    # set `resp` to a single response (from the mv fan-out) or
+    # the user did, so forwarding here scopes residuals to a
+    # single matrix the `-1 *` and subsequent ppc kernels accept.
     yrep <- -1 * residuals(
       object, summary = FALSE,
       ndraws = if (!is.null(draw_ids)) NULL else ndraws,
-      draw_ids = draw_ids
+      draw_ids = draw_ids, resp = resp
     )
   } else {
     pred_args <- list(
@@ -1101,23 +1120,37 @@ plot.mvgam_ppc_fit_stat <- function(x, ...) {
 # `patchwork::wrap_plots`.
 #'@noRd
 mvgam_resid_panel <- function(
-  object, newdata = NULL, ndraws = 100L, ...
+  object, newdata = NULL, ndraws = 100L, resp = NULL, ...
 ) {
+  # Multivariate fan-out: when the caller did not pin a single
+  # response, build one 4-panel grid per response and return a
+  # named list. Each pp_check call below would otherwise return
+  # its own list-per-response (post pp_check.mvgam mv handling),
+  # and `patchwork::wrap_plots` cannot consume nested lists.
+  if (brms::is.mvbrmsformula(object$formula) && is.null(resp)) {
+    resp_names <- object$formula$responses
+    out <- lapply(resp_names, function(r) {
+      mvgam_resid_panel(object, newdata = newdata,
+                         ndraws = ndraws, resp = r, ...)
+    })
+    names(out) <- resp_names
+    return(out)
+  }
   p1 <- pp_check(
     object, type = "resid_vs_fitted", newdata = newdata,
-    ndraws = ndraws, ...
+    ndraws = ndraws, resp = resp, ...
   )
   p2 <- pp_check(
     object, type = "resid_qq", newdata = newdata,
-    ndraws = ndraws, ...
+    ndraws = ndraws, resp = resp, ...
   )
   p3 <- pp_check(
     object, type = "resid_acf", newdata = newdata,
-    ndraws = ndraws, ...
+    ndraws = ndraws, resp = resp, ...
   )
   p4 <- pp_check(
     object, type = "resid_pacf", newdata = newdata,
-    ndraws = ndraws, ...
+    ndraws = ndraws, resp = resp, ...
   )
   patchwork::wrap_plots(p1, p2, p3, p4, ncol = 2L, nrow = 2L)
 }

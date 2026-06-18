@@ -75,10 +75,30 @@ conditional_effects.mvgam <- function(x,
                                       rug = FALSE,
                                       process_error = FALSE,
                                       series = NULL,
+                                      resp = NULL,
                                       ...) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_character(effects, null.ok = TRUE)
   checkmate::assert_logical(process_error, len = 1L)
+  # `resp` is the per-response selector for multivariate fits
+  # (mvbind / mvbrmsformula). NULL on a mv fit fans out across
+  # responses and returns a named list of `brms_conditional_effects`
+  # objects; a single response name scopes the result. Univariate
+  # fits ignore the arg.
+  checkmate::assert_string(resp, null.ok = TRUE)
+
+  # Multivariate fan-out: build one effects list per response and
+  # return a named list, mirroring residuals.mvgam / pp_check.mvgam.
+  if (is.null(resp) && brms::is.mvbrmsformula(x$formula)) {
+    resp_names <- x$formula$responses
+    call <- match.call()
+    out <- lapply(resp_names, function(r) {
+      call$resp <- r
+      eval(call, parent.frame())
+    })
+    names(out) <- resp_names
+    return(out)
+  }
   type <- match.arg(
     type,
     c("response", "link", "expected",
@@ -194,6 +214,13 @@ conditional_effects.mvgam <- function(x,
       rug = rug,
       process_error = process_error
     )
+    if (!is.null(resp)) {
+      # Multivariate: thread the per-response selector through to
+      # get_predict.mvgam so its posterior_predict / posterior_epred
+      # calls return a single matrix and the marginaleffects pipeline
+      # does not error on the list-shaped multi-response draws.
+      pp_args$resp <- resp
+    }
     if (identical(series_mode$kind, "all")) {
       pp_args$condition <- c(cond, "series")
     } else if (identical(series_mode$kind, "one")) {
@@ -247,6 +274,30 @@ print.mvgam_conditional_effects <- function(x, ...) plot(x, ...)
 # present), splits smooth / interaction terms, and returns a list of
 # unique up-to-3-way variable groupings.
 detect_conditional_effects <- function(x) {
+  # Multivariate brmsformula has no single `$formula` slot.
+  # `$forms` is a list of per-response brmsformula objects with
+  # potentially distinct RHSs (`bf(yA ~ a) + bf(yB ~ b)`); for
+  # mvbind both forms share the RHS but the shape is the same.
+  # Union the term labels across responses so every covariate
+  # the user might want to plot ends up in the term list.
+  if (inherits(x$formula, "mvbrmsformula")) {
+    per_resp <- lapply(x$formula$forms, function(bf) {
+      attr(stats::terms(bf$formula, keep.order = TRUE),
+           "term.labels")
+    })
+    termlabs <- unique(unlist(per_resp, use.names = FALSE))
+    if (!is.null(x$trend_formula)) {
+      termlabs <- c(
+        termlabs,
+        attr(stats::terms(x$trend_formula, keep.order = TRUE),
+             "term.labels")
+      )
+    }
+    termlabs <- termlabs[!grepl("^offset\\(", termlabs)]
+    cond <- unlist(lapply(termlabs, split_term_labels),
+                   recursive = FALSE)
+    return(unique(cond))
+  }
   obs_f <- if (inherits(x$formula, "brmsformula")) {
     x$formula$formula
   } else {

@@ -367,6 +367,32 @@ mvgam_smooth_label_spec <- function(formula, family = NULL) {
       !inherits(formula, "mvbrmsformula")) {
     formula <- brms::bf(formula, family = family)
   }
+  # Multivariate fits (mvbind / mvbrmsformula). Calling
+  # `brms::brmsterms()` directly on a mvbrmsformula triggers a
+  # `validate_formula.mvbrmsformula` pass that rejects
+  # `set_rescor(TRUE)` unless each per-response `bf()` carries an
+  # explicit gaussian / student family. mvgam users pass `family =`
+  # to `mvgam()` instead of inside each `bf()`, so per-response
+  # `$family` is NULL and the rescor validator errors. Iterate the
+  # per-response `$forms` (each a regular brmsformula), inject the
+  # shared family, and union the smooth labels across responses.
+  if (inherits(formula, "mvbrmsformula")) {
+    per_resp <- lapply(formula$forms, function(bf) {
+      if (is.null(bf$family) && !is.null(family)) {
+        bf$family <- family
+      }
+      mvgam_smooth_label_spec(bf, family = family)
+    })
+    per_resp <- per_resp[!vapply(per_resp, is.null, logical(1L))]
+    if (length(per_resp) == 0L) return(NULL)
+    labels <- unique(unlist(lapply(per_resp, `[[`, "labels"),
+                              use.names = FALSE))
+    spec <- unlist(lapply(per_resp, `[[`, "spec"),
+                    recursive = FALSE, use.names = FALSE)
+    spec <- spec[!duplicated(vapply(spec, function(s) s$label,
+                                       character(1L)))]
+    return(list(labels = labels, spec = spec))
+  }
   bt <- brms::brmsterms(formula)
   sm <- bt$dpars$mu$sm
   if (is.null(sm)) return(NULL)
