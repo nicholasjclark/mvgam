@@ -65,6 +65,13 @@ fixtures <- list(
        family = gaussian(),
        extra_data = list(
          yA = rnorm(120), yB = rnorm(120)
+       )),
+  list(name = "14_mvbind_rescor",
+       f = brms::bf(brms::mvbind(yA, yB) ~ x) + brms::set_rescor(TRUE),
+       t = NULL,
+       family = gaussian(),
+       extra_data = list(
+         yA = rnorm(120), yB = rnorm(120)
        ))
 )
 

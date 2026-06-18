@@ -158,16 +158,28 @@ render_data_section <- function(ctx) {
   fam <- obj$family
   fam_name <- fam$family %||% "gaussian"
   link <- fam$link %||% "identity"
-  resp <- response_letter(obj)
   dims <- describe_data_dimensions(obj)
+
+  # Multi-response: list response columns explicitly so the
+  # reader sees the mvbind structure (`yA`, `yB`) rather than
+  # an opaque bold `Y` vector label.
+  responses <- get_response_names(obj)
+  resp_line <- if (length(responses) > 1L) {
+    paste0(
+      "$\\mathbf{Y} = (",
+      paste0(responses, collapse = ", "),
+      ")$: ", family_data_label(fam_name),
+      " observed jointly per (i, t)"
+    )
+  } else {
+    paste0("$", response_letter(obj),
+            "$: ", family_data_label(fam_name))
+  }
 
   lines <- c(
     "## Data",
     "",
-    paste0(
-      "$", resp,
-      "$: ", family_data_label(fam_name)
-    )
+    resp_line
   )
   if (length(dims) > 0L) {
     lines <- c(lines, paste0(dims, collapse = ", "))
@@ -334,25 +346,73 @@ render_model_section <- function(ctx) {
 
   responses <- get_response_names(obj)
   if (length(responses) > 1L) {
-    # mvbind / multivariate brmsformula: emit one likelihood +
-    # one linear-predictor row per response. Slice the obj down
-    # to a single-response view per response and reuse the
-    # existing helpers wholesale -- the slice filters the prior
-    # table so every downstream extractor / symbol formatter
-    # sees the per-response subset without any new threading.
-    for (r in responses) {
-      obj_r <- subset_obj_to_response(obj, r)
-      mu_r <- paste0("\\mu^{(", r, ")}_{i,t}")
+    # mvbind / multivariate brmsformula. Two flavours:
+    #
+    #   * `set_rescor(TRUE)` -- residuals are jointly MVNormal
+    #     across responses with an LKJ-distributed correlation
+    #     matrix. Render ONE joint likelihood + per-response
+    #     linpred, plus the Sigma + Omega decomposition rows.
+    #   * `set_rescor(FALSE)` (or unset) -- responses are
+    #     independent. Render one likelihood + one linpred per
+    #     response via the slice pattern.
+    if (has_rescor(obj)) {
+      mu_vec <- paste0("(\\mu^{(", responses, ")}_{i,t})",
+                        collapse = ", ")
       rows[[length(rows) + 1L]] <- list(
-        lhs = paste0(r, "_{i,t}"),
+        lhs = paste0("\\mathbf{Y}_{i,t}"),
         op  = "\\sim",
-        rhs = family_distribution_text(fam_name, mu_r, obj_r)
+        rhs = paste0(
+          "\\text{MVNormal}\\!\\left(",
+          "(",
+          paste0("\\mu^{(", responses, ")}_{i,t}",
+                  collapse = ", "),
+          ")^{\\top}, \\boldsymbol{\\Sigma}\\right)"
+        )
+      )
+      sigma_vec <- paste0("\\sigma^{(", responses, ")}",
+                           collapse = ", ")
+      rows[[length(rows) + 1L]] <- list(
+        lhs = "\\boldsymbol{\\Sigma}",
+        op  = "=",
+        rhs = paste0(
+          "\\text{diag}(", sigma_vec, ") \\, \\boldsymbol{\\Omega} \\,",
+          " \\text{diag}(", sigma_vec, ")"
+        )
       )
       rows[[length(rows) + 1L]] <- list(
-        lhs = link_application(link, mu_r),
-        op  = "=",
-        rhs = linear_predictor_rhs(obj_r, notation)
+        lhs = "\\boldsymbol{\\Omega}",
+        op  = "\\sim",
+        rhs = "\\text{LKJCorr}(\\eta)"
       )
+      for (r in responses) {
+        obj_r <- subset_obj_to_response(obj, r)
+        mu_r <- paste0("\\mu^{(", r, ")}_{i,t}")
+        rows[[length(rows) + 1L]] <- list(
+          lhs = link_application(link, mu_r),
+          op  = "=",
+          rhs = linear_predictor_rhs(obj_r, notation)
+        )
+      }
+    } else {
+      # Slice the obj down to a single-response view per
+      # response and reuse the existing helpers wholesale --
+      # the slice filters the prior table so every downstream
+      # extractor / symbol formatter sees the per-response
+      # subset without any new threading.
+      for (r in responses) {
+        obj_r <- subset_obj_to_response(obj, r)
+        mu_r <- paste0("\\mu^{(", r, ")}_{i,t}")
+        rows[[length(rows) + 1L]] <- list(
+          lhs = paste0(r, "_{i,t}"),
+          op  = "\\sim",
+          rhs = family_distribution_text(fam_name, mu_r, obj_r)
+        )
+        rows[[length(rows) + 1L]] <- list(
+          lhs = link_application(link, mu_r),
+          op  = "=",
+          rhs = linear_predictor_rhs(obj_r, notation)
+        )
+      }
     }
   } else {
     mu <- mu_symbol(obj)
@@ -660,6 +720,23 @@ mu_symbol <- function(obj) {
     return("\\boldsymbol{\\mu}_{i,t}")
   }
   "\\mu_{i,t}"
+}
+
+#' @noRd
+has_rescor <- function(obj) {
+  # True when the user set `set_rescor(TRUE)` on a multivariate
+  # brms formula. Prefer the formula attribute (authoritative);
+  # fall back to detecting brms's `Lrescor` row in the prior
+  # table (post-fit objects with stripped formula metadata).
+  f <- obj$formula
+  if (inherits(f, "mvbrmsformula") && isTRUE(f$rescor)) {
+    return(TRUE)
+  }
+  prior <- obj$prior
+  if (!is.null(prior) && nrow(prior) > 0L) {
+    return(any(prior$class == "Lrescor"))
+  }
+  FALSE
 }
 
 #' @noRd
@@ -2217,6 +2294,9 @@ format_parameter_symbol_base <- function(row) {
   if (identical(cls, "L")) {
     grp <- if (nzchar(group)) group else "j"
     return(paste0("\\mathbf{L}_{", grp, "}"))
+  }
+  if (identical(cls, "Lrescor")) {
+    return("\\mathbf{L}_{\\text{rescor}}")
   }
   if (identical(cls, "cor")) {
     grp <- if (nzchar(group)) group else "j"
