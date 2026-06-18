@@ -359,7 +359,9 @@ model_glossary <- function(obj) {
     } else ""
     k_text <- if (!is.null(spec$k) && !is.na(spec$k)) {
       paste0(", approximated with ", spec$k, " basis functions")
-    } else ", approximated via Hilbert-space basis"
+    } else {
+      ", exact (full covariance kernel)"
+    }
     kern_text <- gp_kernel_human_label(spec$cov %||% "exp_quad")
     rho_sym <- if (length(vars) > 1L) {
       paste0("$\\boldsymbol{\\rho}_{", sub, "}$")

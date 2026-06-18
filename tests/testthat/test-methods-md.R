@@ -117,6 +117,15 @@ test_that("Approximate 1D GP renders with kernel + length scale + marginal SD", 
   expect_true(grepl("approximated with 5 basis functions", out))
 })
 
+test_that("Exact GP (no k) renders as 'exact (full covariance kernel)'", {
+  mod <- make_methods_md_prefit(y ~ gp(x))
+  out <- methods_md(mod)
+  expect_true(grepl("f\\^\\{\\(\\\\text\\{gp\\}\\)\\}_\\{x\\}", out))
+  expect_true(grepl("exact \\(full covariance kernel\\)", out))
+  # Should not claim a basis-function count.
+  expect_false(grepl("approximated with", out))
+})
+
 test_that("Approximate 2D GP renders vector length-scale + both vars", {
   set.seed(1L)
   dat <- data.frame(

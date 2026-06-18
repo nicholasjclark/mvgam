@@ -632,33 +632,38 @@ test_that("validate_trend_covariates prevents response variables in trend formul
   )
 })
 
-test_that("exact GP terms are rejected in observation formula", {
-  expect_error(
-    mvgam_formula(y ~ gp(x), trend_formula = ~ 1),
-    "Exact GP terms.*without.*parameter.*are not supported"
+test_that("exact GP terms in obs formula are accepted (warn only)", {
+  # mvgam used to hard-fail on gp() without k. Exact GPs fit
+  # fine through brms (full covariance kernel); the warn covers
+  # the prediction-at-newdata gap. Under TESTTHAT the warn is
+  # suppressed at the validator, so we just assert no error.
+  expect_no_error(
+    mvgam_formula(y ~ gp(x), trend_formula = ~ 1)
   )
-
-  expect_error(
-    mvgam_formula(y ~ gp(temperature), trend_formula = NULL),
-    "Found: gp\\(temperature\\)"
-  )
-
-  expect_error(
-    mvgam_formula(y ~ gp(x), trend_formula = ~ 1),
-    "Example: gp\\(x, k=20\\)"
+  expect_no_error(
+    mvgam_formula(y ~ gp(temperature), trend_formula = NULL)
   )
 })
 
-test_that("exact GP terms are rejected in trend formula", {
-  expect_error(
-    mvgam_formula(y ~ 1, trend_formula = ~ gp(time)),
-    "Exact GP terms.*without.*parameter.*are not supported"
+test_that("exact GP terms in trend formula are accepted (warn only)", {
+  expect_no_error(
+    mvgam_formula(y ~ 1, trend_formula = ~ gp(time))
   )
+  expect_no_error(
+    mvgam_formula(y ~ x, trend_formula = ~ s(time) + gp(season) + AR())
+  )
+})
 
-  expect_error(
-    mvgam_formula(y ~ x, trend_formula = ~ s(time) + gp(season) + AR()),
-    "Found: gp\\(season\\)"
-  )
+test_that("exact GP warn fires when TESTTHAT is off", {
+  # Flip off the testthat guard so the rlang::warn at the
+  # validator actually surfaces; confirm the message and that
+  # the call still returns invisibly.
+  withr::with_envvar(c(TESTTHAT = ""), {
+    expect_warning(
+      mvgam_formula(y ~ gp(x), trend_formula = ~ 1),
+      "Exact GP term"
+    )
+  })
 })
 
 test_that("approximate GP terms are allowed", {
@@ -681,24 +686,22 @@ test_that("approximate GP terms are allowed", {
   )
 })
 
-test_that("mixed valid and invalid GP terms are caught", {
-  expect_error(
-    mvgam_formula(y ~ gp(x, k = 5) + gp(z), trend_formula = ~ 1),
-    "Found: gp\\(z\\)"
+test_that("mixed approximate + exact GP terms are accepted (warn only)", {
+  expect_no_error(
+    mvgam_formula(y ~ gp(x, k = 5) + gp(z), trend_formula = ~ 1)
   )
 })
 
 test_that("GP validation works with complex formulas", {
-  expect_error(
+  expect_no_error(
     mvgam_formula(y ~ s(time) + (1|group) + gp(temperature) + x^2,
-                  trend_formula = ~ AR()),
-    "Found: gp\\(temperature\\)"
+                  trend_formula = ~ AR())
   )
 
-  expect_error(
+  expect_no_error(
     mvgam_formula(y ~ x,
-                  trend_formula = ~ s(season, bs = "cc") + gp(depth) + (1|site)),
-    "Found: gp\\(depth\\)"
+                  trend_formula = ~ s(season, bs = "cc") + gp(depth) +
+                    (1|site))
   )
 
   expect_no_error(

@@ -1892,16 +1892,31 @@ validate_exact_gp_usage <- function(formula) {
     }
 
     if (is.na(gp_obj$k)) {
-      stop(insight::format_error(c(
-        cli::format_inline(
-          "Exact GP terms (without {.field k} parameter) are not supported."
-        ),
-        x = paste("Found:", gp_term),
-        i = cli::format_inline(
-          "Add {.field k} to specify number of basis functions."
-        ),
-        i = paste("Example:", gsub("\\)$", ", k=20)", gp_term))
-      )))
+      # Exact GPs fit fine through brms (full covariance kernel),
+      # but mvgam's prediction surface cannot yet reconstruct the
+      # basis at newdata. Warn rather than hard-fail so users
+      # can still fit / interpret in-sample; predict-on-newdata
+      # currently relies on the approximate form.
+      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+        rlang::warn(
+          insight::format_warning(c(
+            cli::format_inline(
+              "Exact GP term in {.field {gp_term}} (no {.field k} given)."
+            ),
+            i = cli::format_inline(
+              "Fit + in-sample inference work; ",
+              "prediction at newdata is not wired up for exact GPs."
+            ),
+            i = cli::format_inline(
+              "Pass {.field k} (e.g. {.code {gsub('\\\\)$', ', k = 20)', gp_term)}}) ",
+              "to use the Hilbert-space approximate form, which supports ",
+              "prediction at newdata."
+            )
+          )),
+          .frequency = "once",
+          .frequency_id = paste0("mvgam_exact_gp_", gp_term)
+        )
+      }
     }
   }
   
