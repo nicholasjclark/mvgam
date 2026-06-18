@@ -701,8 +701,10 @@ get_residcor_series_names <- function(object, cov_struct) {
 #'
 #' @noRd
 trend_spec_for_residcor <- function(object) {
-  ts <- object$mv_spec$trend_specs
-  if (inherits(ts, "mvgam_trend")) ts else ts[[1L]]
+  # Thin wrapper for callers that want the local name; the body
+  # lives in `first_trend_spec()` (R/multivariate_helpers.R) so
+  # methods_md and residual_cor share one implementation.
+  first_trend_spec(object)
 }
 
 

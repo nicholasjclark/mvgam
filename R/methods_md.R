@@ -297,9 +297,9 @@ closure_unit_data_dimensions <- function(obj) {
   data <- obj$data %||% data.frame()
   if (nrow(data) == 0L) return(character(0L))
   # Closure-unit grouping is (series, time) by default and
-  # (series, site, time) under multi_season -- read it off the
-  # family attribute to avoid hard-coding.
-  ug <- attr(obj$family, "mvgam_unit_grouping") %||%
+  # (series, site, time) under multi_season -- delegate to the
+  # shared accessor in R/families.R.
+  ug <- closure_unit_grouping(obj$family) %||%
     c("series", "time")
   ug <- intersect(ug, names(data))
   if (!length(ug)) return(character(0L))
@@ -319,7 +319,7 @@ closure_unit_data_dimensions <- function(obj) {
 
 #' @noRd
 factor_loadings_data_dimensions <- function(obj) {
-  spec <- trend_spec_for(obj)
+  spec <- first_trend_spec(obj)
   if (is.null(spec)) return(character(0L))
   ls <- spec$loadings_prior_spec
   if (is.null(ls)) return(character(0L))
@@ -2172,7 +2172,7 @@ methods_md_has_latent_trend <- function(obj) {
 
 #' @noRd
 methods_md_is_closure_unit <- function(obj) {
-  isTRUE(attr(obj$family, "mvgam_closure_unit"))
+  is_closure_unit_family(obj$family)
 }
 
 #' @noRd
@@ -2183,13 +2183,12 @@ methods_md_is_detection_family <- function(obj) {
 
 #' @noRd
 methods_md_is_mv_custom_family <- function(obj) {
-  isTRUE(attr(obj$family, "mvgam_multi_response"))
+  is_multi_response_family(obj$family)
 }
 
 #' @noRd
 methods_md_is_multi_season <- function(obj) {
-  ug <- attr(obj$family, "mvgam_unit_grouping")
-  !is.null(ug) && length(ug) >= 3L
+  length(closure_unit_grouping(obj$family)) >= 3L
 }
 
 
@@ -2198,20 +2197,8 @@ methods_md_is_multi_season <- function(obj) {
 # ---------------------------------------------------------------
 
 #' @noRd
-trend_spec_for <- function(obj) {
-  # Pulls the first mvgam_trend spec off the fit. `trend_specs`
-  # may be a single mvgam_trend (univariate) or a list
-  # (multivariate); methods_md renders structure from the first
-  # spec.
-  ts <- obj$trend_components$specifications %||%
-    obj$mv_spec$trend_specs
-  if (is.null(ts)) return(NULL)
-  if (inherits(ts, "mvgam_trend")) ts else ts[[1L]]
-}
-
-#' @noRd
 trend_grouping_var <- function(obj) {
-  spec <- trend_spec_for(obj)
+  spec <- first_trend_spec(obj)
   gr <- spec$gr
   if (is.null(gr) || identical(gr, "NA")) NULL else gr
 }
@@ -2555,7 +2542,7 @@ factor_model_rows <- function(obj, notation) {
   if (!methods_md_has_factor_model(obj)) return(list())
   n_lv <- obj$trend_metadata$n_lv
   fixed_Z <- obj$trend_metadata$fixed_Z
-  spec <- trend_spec_for(obj)
+  spec <- first_trend_spec(obj)
   loadings_spec <- spec$loadings_prior_spec
 
   # QR rotation default. trend_map (`fixed_Z`) and explicit
@@ -2932,6 +2919,46 @@ render_implementation_section <- function(ctx) {
   if (!is.na(info$warmup)) {
     call_lines <- c(call_lines, paste0("  warmup        = ", info$warmup))
   }
+  # Within-chain threading. mvgam exposes it as `threads_per_chain`
+  # (R/mvgam_core.R); the Stan slot uses the same name.
+  if (!is.na(info$threads) && info$threads > 1L) {
+    call_lines <- c(call_lines, paste0(
+      "  threads_per_chain = ", info$threads
+    ))
+  }
+  # NUTS sampler control: only surface when the user moved them
+  # off Stan defaults (adapt_delta = 0.8, max_treedepth = 10), so
+  # readers see what was tuned rather than what wasn't.
+  control_lines <- character(0L)
+  if (!is.na(info$adapt_delta) && info$adapt_delta != 0.8) {
+    control_lines <- c(control_lines, paste0(
+      "    adapt_delta = ", info$adapt_delta
+    ))
+  }
+  if (!is.na(info$max_treedepth) && info$max_treedepth != 10L) {
+    control_lines <- c(control_lines, paste0(
+      "    max_treedepth = ", info$max_treedepth
+    ))
+  }
+  if (length(control_lines) > 0L) {
+    call_lines <- c(call_lines, paste0(
+      "  control       = list(\n",
+      paste(control_lines, collapse = ",\n"),
+      "\n  )"
+    ))
+  }
+  if (!is.na(info$init) && nzchar(info$init)) {
+    call_lines <- c(call_lines, paste0(
+      "  init          = \"", info$init, "\""
+    ))
+  }
+  if (!identical(info$algorithm, "sampling") &&
+        !identical(info$algorithm, "none") &&
+        nzchar(info$algorithm)) {
+    call_lines <- c(call_lines, paste0(
+      "  algorithm     = \"", info$algorithm, "\""
+    ))
+  }
   # Align trailing commas: every line except the last gets one.
   call_lines <- paste0(
     call_lines, c(rep(",", length(call_lines) - 1L), "")
@@ -2958,30 +2985,30 @@ extract_implementation_info <- function(obj) {
   mvgam_v <- obj$mvgam_version %||% utils::packageVersion("mvgam")
   brms_v <- obj$brms_version %||% utils::packageVersion("brms")
   stan_v <- backend_stan_version(backend)
-  info <- list(
-    backend   = backend,
-    algorithm = algorithm,
-    mvgam_v   = format(mvgam_v),
-    brms_v    = format(brms_v),
-    stan_v    = stan_v,
-    chains    = NA_integer_,
-    warmup    = NA_integer_,
-    iter      = NA_integer_
-  )
-  fit <- obj$fit
-  if (!is.null(fit) &&
-      methods::is(fit, "stanfit")) {
-    sa <- tryCatch(
-      methods::slot(fit, "stan_args"),
-      error = function(e) list()
+  # Reuse the shared sampling-args extractor from how_to_cite.R.
+  # `extract_sampling_info()` reads `obj$fit@stan_args` and
+  # returns (chains, warmup, iter, threads, adapt_delta,
+  # max_treedepth, init), or NULL for variational / Laplace
+  # / pathfinder fits with empty stan_args.
+  sampling <- extract_sampling_info(obj)
+  if (is.null(sampling)) {
+    sampling <- list(
+      chains = NA_integer_, warmup = NA_integer_,
+      iter = NA_integer_, threads = NA_integer_,
+      adapt_delta = NA_real_, max_treedepth = NA_integer_,
+      init = NA_character_
     )
-    if (length(sa) > 0L) {
-      info$chains <- length(sa)
-      info$warmup <- as.integer(sa[[1L]]$warmup %||% NA_integer_)
-      info$iter   <- as.integer(sa[[1L]]$iter   %||% NA_integer_)
-    }
   }
-  info
+  c(
+    list(
+      backend   = backend,
+      algorithm = algorithm,
+      mvgam_v   = format(mvgam_v),
+      brms_v    = format(brms_v),
+      stan_v    = stan_v
+    ),
+    sampling
+  )
 }
 
 #' @noRd
@@ -3195,10 +3222,20 @@ format_parameter_symbol_base <- function(row) {
   coef <- row$coef %||% ""
   group <- row$group %||% ""
   dpar <- row$dpar %||% ""
+  nlpar <- row$nlpar %||% ""
 
   if (identical(cls, "Intercept")) {
+    # Ordinal threshold rows arrive as class "Intercept" with the
+    # threshold index in `coef` (e.g. "1", "2", ..., "K-1") for
+    # cumulative / sratio / cratio / acat families.
+    if (nzchar(coef) && grepl("^[0-9]+$", coef)) {
+      return(paste0("\\theta_{", coef, "}"))
+    }
     if (nzchar(dpar)) {
       return(paste0("\\alpha^{(", dpar, ")}"))
+    }
+    if (nzchar(nlpar)) {
+      return(paste0("\\alpha^{(", nlpar, ")}"))
     }
     return("\\alpha")
   }
@@ -3206,6 +3243,17 @@ format_parameter_symbol_base <- function(row) {
     if (nzchar(dpar)) {
       lbl <- if (nzchar(coef)) paste0(dpar, ",", coef) else dpar
       return(paste0("\\beta_{", lbl, "}"))
+    }
+    # nl sub-formula coefficients: brms emits b_<nlpar>_<term>
+    # priors with nzchar(nlpar). Carry the nlpar through as a
+    # superscript so each nlpar's coefficient set is visually
+    # distinct from the top-level beta_{term} family.
+    if (nzchar(nlpar)) {
+      base <- paste0("\\beta^{(", nlpar, ")}")
+      if (nzchar(coef)) {
+        return(paste0(base, "_{", coef, "}"))
+      }
+      return(base)
     }
     if (nzchar(coef)) {
       if (grepl("^mo[A-Za-z_.][A-Za-z0-9_.]*$", coef)) {
@@ -3383,11 +3431,15 @@ format_prior_distribution <- function(prior_str) {
   }
   args <- match_args("^lkj_corr_cholesky\\((.*)\\)$")
   if (!is.null(args)) {
-    return(paste0("\\text{LKJCorr}(", paste(args, collapse = ", "), ")"))
+    return(paste0(
+      "\\text{LKJCholesky}(", paste(args, collapse = ", "), ")"
+    ))
   }
   args <- match_args("^lkj(_corr)?\\((.*)\\)$")
   if (!is.null(args)) {
-    return(paste0("\\text{LKJCorr}(", paste(args, collapse = ", "), ")"))
+    return(paste0(
+      "\\text{LKJCorr}(", paste(args, collapse = ", "), ")"
+    ))
   }
   # Unrecognised distribution: render verbatim wrapped in \text{}
   # so the row still appears.

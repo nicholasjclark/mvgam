@@ -11,6 +11,23 @@
 #      and return a named list
 
 
+#' Return the first mvgam_trend spec on a fitted (or prefit)
+#' mvgam object. `mv_spec$trend_specs` is either a single
+#' `mvgam_trend` (univariate) or a list of them (multivariate);
+#' callers that only need to read one slot (loadings prior,
+#' gr / subgr, trend type) take the first.
+#'
+#' Used by `methods_md()` model-section renderers and
+#' `residual_cor()` extractors; both want a single per-fit spec.
+#'
+#' @noRd
+first_trend_spec <- function(object) {
+  ts <- object$mv_spec$trend_specs
+  if (is.null(ts)) return(NULL)
+  if (inherits(ts, "mvgam_trend")) ts else ts[[1L]]
+}
+
+
 #' @noRd
 get_response_names <- function(obj) {
   # Three-tier fallback for multi-response detection:

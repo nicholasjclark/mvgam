@@ -714,14 +714,39 @@ uses_threading <- function(object) {
 # stanfit, so the `stan_args` slot is the only access path
 # needed. Returns NULL when stan_args is empty (variational /
 # Laplace / Pathfinder fits).
+#
+# Fields returned: chains, warmup, iter (consumed by
+# `how_to_cite()` for the methods-section sentence) plus the
+# extended set (threads, adapt_delta, max_treedepth, init) that
+# `methods_md()`'s Implementation block emits. Defaults stay
+# NA when the user accepted the brms / Stan default so callers
+# can branch on `is.na()` to decide whether to print.
 #'@noRd
 extract_sampling_info <- function(object) {
-  sa <- methods::slot(object$fit, "stan_args")
+  fit <- object$fit
+  if (is.null(fit) || !methods::is(fit, "stanfit")) return(NULL)
+  sa <- methods::slot(fit, "stan_args")
   if (length(sa) == 0L) return(NULL)
+  first <- sa[[1L]]
+  ctl <- first$control
+  init_val <- first$init
+  has_explicit_init <- !is.null(init_val) &&
+    length(init_val) == 1L && is.character(init_val) &&
+    !identical(init_val, "random")
   list(
-    chains = length(sa),
-    warmup = sa[[1L]]$warmup %||% NA_integer_,
-    iter = sa[[1L]]$iter %||% NA_integer_
+    chains        = length(sa),
+    warmup        = first$warmup %||% NA_integer_,
+    iter          = first$iter   %||% NA_integer_,
+    threads       = as.integer(
+      first$threads_per_chain %||% NA_integer_
+    ),
+    adapt_delta   = if (is.null(ctl)) NA_real_ else {
+      as.numeric(ctl$adapt_delta %||% NA_real_)
+    },
+    max_treedepth = if (is.null(ctl)) NA_integer_ else {
+      as.integer(ctl$max_treedepth %||% NA_integer_)
+    },
+    init          = if (has_explicit_init) init_val else NA_character_
   )
 }
 

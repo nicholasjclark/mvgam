@@ -531,7 +531,7 @@ test_that("format_prior_distribution maps every common brms family", {
   expect_equal(fmt("cauchy(0, 5)"), "\\text{Cauchy}(0, 5)")
   expect_equal(fmt("beta(1, 1)"), "\\text{Beta}(1, 1)")
   expect_equal(fmt("uniform(-1, 1)"), "\\text{Uniform}(-1, 1)")
-  expect_equal(fmt("lkj_corr_cholesky(1)"), "\\text{LKJCorr}(1)")
+  expect_equal(fmt("lkj_corr_cholesky(1)"), "\\text{LKJCholesky}(1)")
   expect_equal(fmt("(flat)"), "\\text{flat}")
   expect_equal(fmt(""), "\\text{flat}")
 })
@@ -782,6 +782,66 @@ test_that("diri() emits Dirichlet + alpha = phi * pi + softmax row", {
     "\\\\boldsymbol\\{\\\\pi\\}_i &= \\\\text\\{softmax\\}",
     out
   ))
+})
+
+test_that("nl b_<nlpar>_<term> prior carries nlpar superscript on beta", {
+  set.seed(1L)
+  d <- data.frame(
+    time = rep(1:30, 4), series = factor(rep(1:4, each = 30)),
+    x = rnorm(120),
+    trait1 = rep(rnorm(4), each = 30),
+    yC = rnorm(120)
+  )
+  # Explicit nlpar priors so the prior table carries the rows the
+  # renderer needs (default flat priors are filtered out).
+  mod <- suppressWarnings(suppressMessages(mvgam(
+    formula = bf(yC ~ a + b * x, a + b ~ trait1, nl = TRUE),
+    data = d, family = gaussian(),
+    prior = c(
+      brms::prior(normal(0, 1), nlpar = "a"),
+      brms::prior(normal(0, 1), nlpar = "b")
+    ),
+    run_model = FALSE, silent = 2
+  )))
+  out <- methods_md(mod)
+  expect_true(grepl("\\\\beta\\^\\{\\(a\\)\\}_\\{trait1\\}", out))
+  expect_true(grepl("\\\\beta\\^\\{\\(b\\)\\}_\\{trait1\\}", out))
+})
+
+test_that("Ordinal Intercept rows render as theta_{k} thresholds", {
+  set.seed(1L)
+  d <- data.frame(
+    time = rep(1:30, 4), series = factor(rep(1:4, each = 30)),
+    x = rnorm(120),
+    yord = factor(sample(1:5, 120, replace = TRUE), ordered = TRUE)
+  )
+  mod <- suppressWarnings(suppressMessages(mvgam(
+    formula = yord ~ x,
+    data = d, family = cumulative(),
+    run_model = FALSE, silent = 2
+  )))
+  out <- methods_md(mod)
+  expect_true(grepl("\\\\theta_\\{1\\}", out) ||
+              grepl("\\\\theta_\\{[0-9]+\\}", out))
+})
+
+test_that("mvbind rescor priors carry response superscripts", {
+  set.seed(1L)
+  d <- data.frame(
+    time = rep(1:30, 2), series = factor(rep(1:2, each = 30)),
+    x = rnorm(60), yA = rnorm(60), yB = rnorm(60)
+  )
+  mod <- suppressWarnings(suppressMessages(mvgam(
+    formula = brms::bf(brms::mvbind(yA, yB) ~ x) +
+      brms::set_rescor(TRUE),
+    data = d, family = gaussian(),
+    run_model = FALSE, silent = 2
+  )))
+  out <- methods_md(mod)
+  expect_true(grepl("\\\\sigma\\^\\{\\(yA\\)\\}", out))
+  expect_true(grepl("\\\\sigma\\^\\{\\(yB\\)\\}", out))
+  expect_true(grepl("\\\\mathbf\\{L\\}_\\{\\\\text\\{rescor\\}\\}", out))
+  expect_true(grepl("\\\\text\\{LKJCholesky\\}", out))
 })
 
 test_that("mvn() emits MVNormal + Sigma decomposition + LKJCholesky", {
