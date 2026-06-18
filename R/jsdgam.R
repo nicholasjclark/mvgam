@@ -39,8 +39,12 @@
 #'   model formula. These behave exactly like the formula for a GLM
 #'   except that smooth terms (`s()`, `te()`, `ti()`, `t2()`), time
 #'   varying `dynamic()` terms, nonparametric `gp()` terms and
-#'   `offset()` can be added to the right-hand side. See
-#'   `mvgam_formulae` for details.
+#'   `offset()` can be added to the right-hand side. `gp()` accepts
+#'   both the approximate Hilbert-space form (`gp(x, k = 20)`) and
+#'   the exact full-covariance form (`gp(x)`, no `k`). Both fit
+#'   fine, but only the approximate form currently supports
+#'   prediction at newdata; exact `gp()` terms emit a one-shot
+#'   warning to that effect.
 #'
 #' @param factor_formula A `formula` for the latent factors' linear
 #'   predictor. Use `by = lv_axis()` inside `s()`, `te()`, `ti()`,

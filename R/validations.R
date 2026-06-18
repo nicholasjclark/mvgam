@@ -1832,10 +1832,15 @@ get_trend_validation_patterns <- function() {
   return(patterns)
 }
 
-#' Validate observation formula excludes mvgam trend constructors
+#' Warn (once) on exact GP terms
 #'
-#' Validate that all gp() terms use approximate GP (have k parameter)
-#' 
+#' Scans a formula for `gp()` terms that omit `k`. Exact GPs fit
+#' through brms cleanly but mvgam's prediction surface cannot yet
+#' reconstruct their basis at newdata, so the warn flags that
+#' specific gap. Earlier versions hard-failed here; we now allow
+#' the fit and let users opt into the approximate form when they
+#' need newdata prediction.
+#'
 #' @param formula A formula object
 #' @noRd
 validate_exact_gp_usage <- function(formula) {

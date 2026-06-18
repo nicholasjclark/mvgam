@@ -32,8 +32,12 @@ jsdgam(
 model formula. These behave exactly like the formula for a GLM
 except that smooth terms (\code{s()}, \code{te()}, \code{ti()}, \code{t2()}), time
 varying \code{dynamic()} terms, nonparametric \code{gp()} terms and
-\code{offset()} can be added to the right-hand side. See
-\code{mvgam_formulae} for details.}
+\code{offset()} can be added to the right-hand side. \code{gp()} accepts
+both the approximate Hilbert-space form (\code{gp(x, k = 20)}) and
+the exact full-covariance form (\code{gp(x)}, no \code{k}). Both fit
+fine, but only the approximate form currently supports
+prediction at newdata; exact \code{gp()} terms emit a one-shot
+warning to that effect.}
 
 \item{factor_formula}{A \code{formula} for the latent factors' linear
 predictor. Use \code{by = lv_axis()} inside \code{s()}, \code{te()}, \code{ti()},

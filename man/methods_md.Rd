@@ -6,11 +6,29 @@
 \alias{methods_md.mvgam_prefit}
 \title{Render a model's mathematical description}
 \usage{
-methods_md(object, file = NULL, notation = "default", ...)
+methods_md(
+  object,
+  file = NULL,
+  notation = "default",
+  implementation = TRUE,
+  ...
+)
 
-\method{methods_md}{mvgam}(object, file = NULL, notation = "default", ...)
+\method{methods_md}{mvgam}(
+  object,
+  file = NULL,
+  notation = "default",
+  implementation = TRUE,
+  ...
+)
 
-\method{methods_md}{mvgam_prefit}(object, file = NULL, notation = "default", ...)
+\method{methods_md}{mvgam_prefit}(
+  object,
+  file = NULL,
+  notation = "default",
+  implementation = TRUE,
+  ...
+)
 }
 \arguments{
 \item{object}{A fitted \code{mvgam} / \code{jsdgam} object, or a prefit
@@ -21,9 +39,13 @@ When \code{NULL} (default), the result is returned invisibly and
 printed if the caller is interactive.}
 
 \item{notation}{Character; symbol convention to use. One of
-\code{"default"} (McElreath: Greek coefficients, \verb{\eqn{R[i]}} for
-multilevel) or \code{"brms"} (keep brms parameter names verbatim).
-Defaults to \code{"default"}.}
+\code{"default"} (Greek coefficients, \verb{\eqn{R[i]}} subscript for
+varying intercepts) or \code{"brms"} (keep brms parameter names
+verbatim). Defaults to \code{"default"}.}
+
+\item{implementation}{Logical; append an Implementation
+section that reconstructs the \code{mvgam} / \code{jsdgam} call used
+to fit the model. Defaults to \code{TRUE}.}
 
 \item{...}{Currently ignored.}
 }
@@ -34,16 +56,13 @@ display, or pass to \code{writeLines()} / \code{cat()} to emit verbatim.
 }
 \description{
 Produce a markdown document describing the fitted \code{mvgam} or
-\code{jsdgam} model in mathematical form, following the notation
-conventions used in McElreath's \emph{Statistical Rethinking} and
-applied papers (e.g. McElreath's wild-hippocampus paper).
-Three sections are emitted: Data (dimensions and response),
-Model (likelihood, linear predictor, latent dynamics, all in
-one \verb{align*} block), and Priors (every prior the Stan model
-uses, brms-tracked and mvgam-emitted alike, in a second
-\verb{align*} block). No prose justification is included; the
-output is a math-only spec the user can paste straight into a
-methods write-up.
+\code{jsdgam} model in mathematical form. Three sections are
+emitted: Data (dimensions and response), Model (likelihood,
+linear predictor, latent dynamics, all in one \verb{align*} block),
+and Priors (every prior the Stan model uses, brms-tracked and
+mvgam-emitted alike, in a second \verb{align*} block). No prose
+justification is included; the output is a math-only spec the
+user can paste straight into a methods write-up.
 }
 \examples{
 \donttest{

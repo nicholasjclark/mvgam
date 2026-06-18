@@ -20,9 +20,22 @@ mvgam(
 )
 }
 \arguments{
-\item{formula}{Main observation model formula (supports brms syntax)}
+\item{formula}{Main observation model formula (supports brms syntax).
+Smooth specials \code{s()}, \code{t2()}, \code{gp()}, varying intercepts and
+slopes, monotonic \code{mo()}, measurement-error \code{me()}, distributional
+\code{dpar} sub-formulas, and \code{offset()} are all available. \code{gp()}
+accepts both the approximate Hilbert-space form
+(\code{gp(x, k = 20)}) and the exact full-covariance form
+(\code{gp(x)}, no \code{k}). The two forms differ on what mvgam can do
+after the fit: the approximate form supports prediction at
+newdata; the exact form fits + scores in-sample fine but
+\code{predict()} / \code{posterior_epred()} at new covariate values is
+not wired up. Picking up an exact \code{gp()} term emits a
+one-shot warning saying as much.}
 
-\item{trend_formula}{Trend formula specification (may be response-specific)}
+\item{trend_formula}{Trend formula specification (may be response-specific).
+Same \code{gp()} caveat applies on the trend side: exact GPs fit
+but do not support forecasts / new-time-point prediction yet.}
 
 \item{data}{Data frame or list of multiply imputed datasets}
 

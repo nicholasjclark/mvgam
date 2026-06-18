@@ -16,8 +16,21 @@
 #' mvgam implementation using single-fit dual-object architecture
 #' with native multiple imputation support and brms ecosystem integration.
 #'
-#' @param formula Main observation model formula (supports brms syntax)
-#' @param trend_formula Trend formula specification (may be response-specific)
+#' @param formula Main observation model formula (supports brms syntax).
+#'   Smooth specials `s()`, `t2()`, `gp()`, varying intercepts and
+#'   slopes, monotonic `mo()`, measurement-error `me()`, distributional
+#'   `dpar` sub-formulas, and `offset()` are all available. `gp()`
+#'   accepts both the approximate Hilbert-space form
+#'   (`gp(x, k = 20)`) and the exact full-covariance form
+#'   (`gp(x)`, no `k`). The two forms differ on what mvgam can do
+#'   after the fit: the approximate form supports prediction at
+#'   newdata; the exact form fits + scores in-sample fine but
+#'   `predict()` / `posterior_epred()` at new covariate values is
+#'   not wired up. Picking up an exact `gp()` term emits a
+#'   one-shot warning saying as much.
+#' @param trend_formula Trend formula specification (may be response-specific).
+#'   Same `gp()` caveat applies on the trend side: exact GPs fit
+#'   but do not support forecasts / new-time-point prediction yet.
 #' @param data Data frame or list of multiply imputed datasets
 #' @param newdata Optional test-set `data.frame` persisted on the
 #'   fit as `object$test_data`. Used by `plot(fit, type = "series")`
