@@ -160,6 +160,95 @@ test_that("notation arg accepts 'default' and 'brms', rejects others", {
                "element of set")
 })
 
+# Family-distribution renderer: covers brms-native shapes the
+# methods_md user is most likely to fit. Targeted unit tests on
+# family_distribution_text + family_data_label so adding a new
+# family is one switch entry plus one assertion line here.
+
+test_that("family_distribution_text covers core brms families", {
+  ft <- mvgam:::family_distribution_text
+  mu <- "\\mu"
+  expect_equal(ft("poisson", mu, NULL),
+               "\\text{Poisson}(\\mu)")
+  expect_equal(ft("bernoulli", mu, NULL),
+               "\\text{Bernoulli}(\\mu)")
+  expect_equal(ft("binomial", mu, NULL),
+               "\\text{Binomial}(n_{i,t}, \\mu)")
+  expect_equal(ft("gaussian", mu, NULL),
+               "\\text{Normal}(\\mu, \\sigma)")
+  expect_equal(ft("student", mu, NULL),
+               "\\text{StudentT}(\\nu, \\mu, \\sigma)")
+  expect_equal(ft("lognormal", mu, NULL),
+               "\\text{LogNormal}(\\mu, \\sigma)")
+  expect_equal(ft("Gamma", mu, NULL),
+               "\\text{Gamma}(\\alpha, \\mu)")
+  expect_equal(ft("beta", mu, NULL),
+               "\\text{Beta}(\\mu, \\phi)")
+  expect_equal(ft("negbinomial", mu, NULL),
+               "\\text{NegBin}(\\mu, \\phi)")
+})
+
+test_that("family_distribution_text covers tweedie + hurdle + ZI", {
+  ft <- mvgam:::family_distribution_text
+  mu <- "\\mu"
+  expect_equal(ft("tweedie", mu, NULL),
+               "\\text{Tweedie}(\\mu, \\phi, \\xi)")
+  expect_equal(ft("hurdle_poisson", mu, NULL),
+               "\\text{Hurdle-Poisson}(\\mu, \\pi_{\\text{hu}})")
+  expect_equal(
+    ft("hurdle_negbinomial", mu, NULL),
+    "\\text{Hurdle-NegBin}(\\mu, \\phi, \\pi_{\\text{hu}})"
+  )
+  expect_equal(ft("zero_inflated_poisson", mu, NULL),
+               "\\text{ZIPoisson}(\\mu, \\pi_{\\text{zi}})")
+  expect_equal(
+    ft("zero_inflated_negbinomial", mu, NULL),
+    "\\text{ZINegBin}(\\mu, \\phi, \\pi_{\\text{zi}})"
+  )
+  expect_equal(
+    ft("zero_inflated_binomial", mu, NULL),
+    "\\text{ZIBinomial}(n_{i,t}, \\mu, \\pi_{\\text{zi}})"
+  )
+})
+
+test_that("family_distribution_text covers ordinal families", {
+  ft <- mvgam:::family_distribution_text
+  mu <- "\\eta_{i,t}"
+  expect_equal(
+    ft("cumulative", mu, NULL),
+    "\\text{OrderedCumulative}(\\boldsymbol{\\theta}, \\eta_{i,t})"
+  )
+  expect_equal(
+    ft("sratio", mu, NULL),
+    "\\text{OrderedStoppingRatio}(\\boldsymbol{\\theta}, \\eta_{i,t})"
+  )
+  expect_equal(
+    ft("cratio", mu, NULL),
+    "\\text{OrderedContinuationRatio}(\\boldsymbol{\\theta}, \\eta_{i,t})"
+  )
+  expect_equal(
+    ft("acat", mu, NULL),
+    "\\text{OrderedAdjacentCategory}(\\boldsymbol{\\theta}, \\eta_{i,t})"
+  )
+})
+
+test_that("family_data_label maps mixture / ordinal families", {
+  fl <- mvgam:::family_data_label
+  expect_equal(
+    fl("hurdle_poisson"),
+    "non-negative integer counts with point mass at zero"
+  )
+  expect_equal(
+    fl("zero_inflated_poisson"),
+    "zero-inflated non-negative integer counts"
+  )
+  expect_equal(fl("cumulative"), "ordered categorical observations")
+  expect_equal(
+    fl("tweedie"),
+    "non-negative real observations (compound Poisson-gamma)"
+  )
+})
+
 # Prior distribution formatter: targeted unit tests on the
 # regex-based string mapper. Easier to keep in sync with brms
 # prior-string conventions when tested directly.

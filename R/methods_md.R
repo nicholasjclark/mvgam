@@ -252,6 +252,19 @@ family_data_label <- function(fam_name) {
     beta = "proportions in (0, 1)",
     negbinomial = "non-negative integer counts",
     nb = "non-negative integer counts",
+    tweedie = "non-negative real observations (compound Poisson-gamma)",
+    hurdle_poisson = "non-negative integer counts with point mass at zero",
+    hurdle_negbinomial = "non-negative integer counts with point mass at zero",
+    hurdle_gamma = "non-negative real observations with point mass at zero",
+    hurdle_lognormal = "non-negative real observations with point mass at zero",
+    zero_inflated_poisson = "zero-inflated non-negative integer counts",
+    zero_inflated_negbinomial = "zero-inflated non-negative integer counts",
+    zero_inflated_beta = "zero-inflated proportions in [0, 1)",
+    zero_inflated_binomial = "zero-inflated binomial counts",
+    cumulative = "ordered categorical observations",
+    sratio = "ordered categorical observations",
+    cratio = "ordered categorical observations",
+    acat = "ordered categorical observations",
     paste0(fam_name, " observations")
   )
 }
@@ -462,6 +475,49 @@ family_distribution_text <- function(fam_name, mu, obj) {
     beta        = paste0("\\text{Beta}(", mu, ", \\phi)"),
     negbinomial = paste0("\\text{NegBin}(", mu, ", \\phi)"),
     nb          = paste0("\\text{NegBin}(", mu, ", \\phi)"),
+    tweedie     = paste0(
+      "\\text{Tweedie}(", mu, ", \\phi, \\xi)"
+    ),
+    hurdle_poisson = paste0(
+      "\\text{Hurdle-Poisson}(", mu, ", \\pi_{\\text{hu}})"
+    ),
+    hurdle_negbinomial = paste0(
+      "\\text{Hurdle-NegBin}(", mu,
+      ", \\phi, \\pi_{\\text{hu}})"
+    ),
+    hurdle_gamma = paste0(
+      "\\text{Hurdle-Gamma}(", mu,
+      ", \\alpha, \\pi_{\\text{hu}})"
+    ),
+    hurdle_lognormal = paste0(
+      "\\text{Hurdle-LogNormal}(", mu,
+      ", \\sigma, \\pi_{\\text{hu}})"
+    ),
+    zero_inflated_poisson = paste0(
+      "\\text{ZIPoisson}(", mu, ", \\pi_{\\text{zi}})"
+    ),
+    zero_inflated_negbinomial = paste0(
+      "\\text{ZINegBin}(", mu, ", \\phi, \\pi_{\\text{zi}})"
+    ),
+    zero_inflated_beta = paste0(
+      "\\text{ZIBeta}(", mu, ", \\phi, \\pi_{\\text{zi}})"
+    ),
+    zero_inflated_binomial = paste0(
+      "\\text{ZIBinomial}(n_{i,t}, ", mu,
+      ", \\pi_{\\text{zi}})"
+    ),
+    cumulative  = paste0(
+      "\\text{OrderedCumulative}(\\boldsymbol{\\theta}, ", mu, ")"
+    ),
+    sratio      = paste0(
+      "\\text{OrderedStoppingRatio}(\\boldsymbol{\\theta}, ", mu, ")"
+    ),
+    cratio      = paste0(
+      "\\text{OrderedContinuationRatio}(\\boldsymbol{\\theta}, ", mu, ")"
+    ),
+    acat        = paste0(
+      "\\text{OrderedAdjacentCategory}(\\boldsymbol{\\theta}, ", mu, ")"
+    ),
     paste0("\\text{", fam_name, "}(", mu, ")")
   )
 }
