@@ -104,6 +104,55 @@ test_that("Smooth term renders f_{x}(x) inline + basis decomposition", {
   expect_true(grepl("\\\\lambda_\\{x\\}", out))
 })
 
+test_that("Approximate 1D GP renders with kernel + length scale + marginal SD", {
+  mod <- make_methods_md_prefit(y ~ gp(x, k = 5))
+  out <- methods_md(mod)
+  expect_true(grepl("f\\^\\{\\(\\\\text\\{gp\\}\\)\\}_\\{x\\}", out))
+  expect_true(grepl(
+    "\\\\text\\{GP\\}\\\\left\\(0, k_\\{\\\\text\\{ExpQuad\\}\\}",
+    out
+  ))
+  expect_true(grepl("\\\\rho_\\{x\\}", out))
+  expect_true(grepl("\\\\sigma\\^\\{\\(\\\\text\\{gp\\}\\)\\}_\\{x\\}", out))
+  expect_true(grepl("approximated with 5 basis functions", out))
+})
+
+test_that("Approximate 2D GP renders vector length-scale + both vars", {
+  set.seed(1L)
+  dat <- data.frame(
+    time = rep(1:30, 4),
+    series = factor(rep(paste0("s", 1:4), each = 30)),
+    x = rnorm(120), z = rnorm(120),
+    grp = factor(rep(c("a","b","c","d"), each = 30)),
+    y = rpois(120, 3)
+  )
+  mod <- make_methods_md_prefit(y ~ gp(x, z, k = 5), data = dat)
+  out <- methods_md(mod)
+  # Bold rho for multi-dim length scale; subscript carries both vars.
+  expect_true(grepl(
+    "\\\\boldsymbol\\{\\\\rho\\}_\\{x, z\\}", out
+  ))
+  expect_true(grepl("Gaussian process in \\$x, z\\$", out))
+})
+
+test_that("By-factor GP carries the grouping variable in the subscript", {
+  set.seed(1L)
+  dat <- data.frame(
+    time = rep(1:30, 4),
+    series = factor(rep(paste0("s", 1:4), each = 30)),
+    x = rnorm(120),
+    grp = factor(rep(c("a","b","c","d"), each = 30)),
+    y = rpois(120, 3)
+  )
+  mod <- make_methods_md_prefit(
+    y ~ gp(x, by = grp, k = 5), data = dat
+  )
+  out <- methods_md(mod)
+  # Subscript uses `\mid` to separate vars from the by var.
+  expect_true(grepl("x \\\\mid grp", out))
+  expect_true(grepl("stratified by \\$grp\\$", out))
+})
+
 test_that("Group-level RE renders alpha_{grp[i]} + hyperprior shape", {
   mod <- make_methods_md_prefit(y ~ (1 | grp))
   out <- methods_md(mod)

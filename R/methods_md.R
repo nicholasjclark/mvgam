@@ -329,6 +329,10 @@ model_glossary <- function(obj) {
   )
   prior <- obj$prior
   smooth_specs <- obs_smooth_specs_from_prior(prior)
+  gp_specs <- obs_gp_specs_from_formula(obj)
+  if (length(gp_specs) == 0L) {
+    gp_specs <- obs_gp_specs_from_prior(prior)
+  }
   re_groups <- obs_re_groups_from_prior(prior)
   for (spec in smooth_specs) {
     bare <- spec$var
@@ -342,6 +346,31 @@ model_glossary <- function(obj) {
       basis_label(spec$bs, spec$fname),
       " in $", bare, "$, basis size ", k_label,
       ", smoothness $\\lambda_{", bare, "}$"
+    ))
+  }
+  for (spec in gp_specs) {
+    sub <- gp_subscript(spec)
+    vars <- if (!is.null(spec$vars)) spec$vars else spec$var
+    dims_text <- paste(vars, collapse = ", ")
+    by_text <- if (!is.null(spec$by) && !is.na(spec$by) &&
+                    nzchar(spec$by)) {
+      paste0(", stratified by $", spec$by, "$")
+    } else ""
+    k_text <- if (!is.null(spec$k) && !is.na(spec$k)) {
+      paste0(", approximated with ", spec$k, " basis functions")
+    } else ", approximated via Hilbert-space basis"
+    kern_text <- gp_kernel_human_label(spec$cov %||% "exp_quad")
+    rho_sym <- if (length(vars) > 1L) {
+      paste0("$\\boldsymbol{\\rho}_{", sub, "}$")
+    } else {
+      paste0("$\\rho_{", sub, "}$")
+    }
+    defs <- c(defs, paste0(
+      "- $f^{(\\text{gp})}_{", sub, "}$: Gaussian process in $",
+      dims_text, "$", by_text, " with ", kern_text,
+      " kernel, length scale ", rho_sym,
+      " and marginal SD $\\sigma^{(\\text{gp})}_{", sub, "}$",
+      k_text
     ))
   }
   for (grp in re_groups) {
@@ -533,6 +562,9 @@ linear_predictor_rhs <- function(obj, notation) {
   if (length(classes$smooth) > 0L) {
     parts <- c(parts, render_smooth_inline(classes$smooth))
   }
+  if (length(classes$gp) > 0L) {
+    parts <- c(parts, render_gp_inline(classes$gp))
+  }
   if (length(classes$re) > 0L) {
     parts <- c(parts, render_re_inline(classes$re))
   }
@@ -553,9 +585,12 @@ classify_obs_parameters <- function(obj) {
   # posterior draws yet. This works for both fitted mvgam objects
   # and prefits (run_model = FALSE).
   prior <- obj$prior
+  gp <- obs_gp_specs_from_formula(obj)
+  if (length(gp) == 0L) gp <- obs_gp_specs_from_prior(prior)
   list(
     fixed  = obs_fixed_terms_from_prior(prior),
     smooth = obs_smooth_terms_from_prior(prior),
+    gp     = gp,
     re     = obs_re_groups_from_prior(prior)
   )
 }
@@ -631,6 +666,30 @@ parse_smooth_coef <- function(coef_str) {
 }
 
 #' @noRd
+gp_kernel_human_label <- function(cov) {
+  switch(
+    cov %||% "exp_quad",
+    "exp_quad"    = "exponentiated-quadratic",
+    "matern52"    = "Matern (5/2)",
+    "matern32"    = "Matern (3/2)",
+    "exponential" = "exponential",
+    cov
+  )
+}
+
+#' @noRd
+gp_kernel_label <- function(cov) {
+  switch(
+    cov %||% "exp_quad",
+    "exp_quad"      = "k_{\\text{ExpQuad}}",
+    "matern52"      = "k_{\\text{Matern}_{5/2}}",
+    "matern32"      = "k_{\\text{Matern}_{3/2}}",
+    "exponential"   = "k_{\\text{Exp}}",
+    paste0("k_{\\text{", cov, "}}")
+  )
+}
+
+#' @noRd
 basis_label <- function(bs, fname) {
   if (identical(fname, "gp")) {
     return("Gaussian process smooth")
@@ -670,6 +729,90 @@ obs_re_groups_from_prior <- function(prior) {
 }
 
 #' @noRd
+obs_gp_specs_from_prior <- function(prior) {
+  # Kept for back-compat: returns a stripped one-per-term list
+  # from the prior table. Drops 2D + by-factor detail because
+  # brms concatenates names without a separator (gpz1z2 etc).
+  # Prefer obs_gp_specs_from_formula() when the formula is
+  # available -- it recovers vars, k, by, and cov_kernel cleanly.
+  if (is.null(prior) || nrow(prior) == 0L) return(list())
+  gp_rows <- prior$class == "sdgp" & nzchar(prior$coef)
+  if (!any(gp_rows)) return(list())
+  coefs <- prior$coef[gp_rows]
+  unique_coefs <- unique(coefs)
+  lapply(unique_coefs, function(co) {
+    list(
+      vars = sub("^gp", "", co), k = NA_integer_,
+      by = NA_character_, cov = "exp_quad", coef = co
+    )
+  })
+}
+
+#' @noRd
+obs_gp_specs_from_formula <- function(obj) {
+  # Walk the obs formula AST for `gp(...)` calls and recover the
+  # full spec per term: variable list, k, by, cov kernel. This
+  # is the authoritative extractor; the prior-table fallback
+  # loses 2D and by-factor detail.
+  f <- obj$formula
+  if (is.null(f)) return(list())
+  if (inherits(f, c("brmsformula", "bform", "mvbrmsformula"))) {
+    f <- f$formula %||% f
+  }
+  rhs <- tryCatch(stats::as.formula(f)[[length(stats::as.formula(f))]],
+                   error = function(e) NULL)
+  if (is.null(rhs)) return(list())
+  specs <- list()
+  walk <- function(e) {
+    if (is.call(e)) {
+      head <- tryCatch(as.character(e[[1L]]),
+                        error = function(err) "")
+      if (identical(head, "gp")) {
+        specs[[length(specs) + 1L]] <<- gp_call_to_spec(e)
+      } else {
+        for (k in seq_along(e)[-1L]) walk(e[[k]])
+      }
+    }
+  }
+  walk(rhs)
+  specs
+}
+
+#' @noRd
+gp_call_to_spec <- function(call) {
+  args <- as.list(call)[-1L]
+  arg_names <- names(args) %||% rep("", length(args))
+  pos_mask <- arg_names == ""
+  vars <- vapply(
+    args[pos_mask],
+    function(a) as.character(a),
+    character(1L)
+  )
+  k <- if ("k" %in% arg_names) {
+    tryCatch(
+      as.integer(eval(args[["k"]])),
+      error = function(e) NA_integer_
+    )
+  } else NA_integer_
+  by <- if ("by" %in% arg_names) {
+    tryCatch(
+      as.character(args[["by"]]),
+      error = function(e) NA_character_
+    )
+  } else NA_character_
+  cov <- if ("cov" %in% arg_names) {
+    tryCatch(
+      as.character(eval(args[["cov"]])),
+      error = function(e) "exp_quad"
+    )
+  } else "exp_quad"
+  list(
+    vars = vars, k = k, by = by, cov = cov,
+    coef = paste0("gp", paste(vars, collapse = ""))
+  )
+}
+
+#' @noRd
 render_fixed_inline <- function(terms, notation) {
   if ("Intercept" %in% terms) {
     others <- setdiff(terms, "Intercept")
@@ -697,6 +840,35 @@ render_smooth_inline <- function(smooths) {
 }
 
 #' @noRd
+render_gp_inline <- function(specs) {
+  paste(
+    vapply(specs, function(s) {
+      vars <- if (!is.null(s$vars)) s$vars else s$var
+      sub <- gp_subscript(s)
+      vars_in <- paste(
+        paste0(vars, "_{i,t}"),
+        collapse = ", "
+      )
+      paste0(
+        "f^{(\\text{gp})}_{", sub, "}(", vars_in, ")"
+      )
+    }, character(1L)),
+    collapse = " + "
+  )
+}
+
+#' @noRd
+gp_subscript <- function(spec) {
+  vars <- if (!is.null(spec$vars)) spec$vars else spec$var
+  base <- paste(vars, collapse = ", ")
+  if (!is.null(spec$by) && !is.na(spec$by) && nzchar(spec$by)) {
+    paste0(base, " \\mid ", spec$by)
+  } else {
+    base
+  }
+}
+
+#' @noRd
 render_re_inline <- function(groups) {
   # McElreath-style varying intercepts: alpha_{group[i]}
   paste(
@@ -709,6 +881,10 @@ render_re_inline <- function(groups) {
 term_definition_rows <- function(obj, notation) {
   prior <- obj$prior
   smooths <- obs_smooth_terms_from_prior(prior)
+  gp_specs <- obs_gp_specs_from_formula(obj)
+  if (length(gp_specs) == 0L) {
+    gp_specs <- obs_gp_specs_from_prior(prior)
+  }
   re_groups <- obs_re_groups_from_prior(prior)
 
   rows <- list()
@@ -719,6 +895,28 @@ term_definition_rows <- function(obj, notation) {
       rhs = paste0(
         "\\sum_{k=1}^{K_{", bare, "}} ",
         "\\beta^{(", bare, ")}_k B_k(", bare, ")"
+      )
+    )
+  }
+  for (spec in gp_specs) {
+    sub <- gp_subscript(spec)
+    vars <- if (!is.null(spec$vars)) spec$vars else spec$var
+    vars_in <- paste(vars, collapse = ", ")
+    rho_arg <- if (length(vars) > 1L) {
+      paste0("\\boldsymbol{\\rho}_{", sub, "}")
+    } else {
+      paste0("\\rho_{", sub, "}")
+    }
+    kernel_name <- gp_kernel_label(spec$cov %||% "exp_quad")
+    rows[[length(rows) + 1L]] <- list(
+      lhs = paste0(
+        "f^{(\\text{gp})}_{", sub, "}(", vars_in, ")"
+      ),
+      op  = "\\sim",
+      rhs = paste0(
+        "\\text{GP}\\left(0, ", kernel_name,
+        "(", rho_arg, ", \\sigma^{(\\text{gp})}_{",
+        sub, "})\\right)"
       )
     )
   }
@@ -1302,6 +1500,14 @@ format_parameter_symbol <- function(row) {
       sub("^[a-z2]+\\(\\s*([A-Za-z_.][A-Za-z0-9_.]*).*", "\\1", coef)
     } else "j"
     return(paste0("\\lambda_{", bare, "}"))
+  }
+  if (identical(cls, "sdgp")) {
+    bare <- if (nzchar(coef)) sub("^gp", "", coef) else "j"
+    return(paste0("\\sigma^{(\\text{gp})}_{", bare, "}"))
+  }
+  if (identical(cls, "lscale")) {
+    bare <- if (nzchar(coef)) sub("^gp", "", coef) else "j"
+    return(paste0("\\rho_{", bare, "}"))
   }
   if (identical(cls, "L")) {
     return("\\mathbf{L}")
