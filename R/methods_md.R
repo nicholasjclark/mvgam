@@ -828,10 +828,10 @@ obs_me_specs_from_formula <- function(obj) {
   if (inherits(f, c("brmsformula", "bform", "mvbrmsformula"))) {
     f <- f$formula %||% f
   }
-  rhs <- tryCatch(
-    stats::as.formula(f)[[length(stats::as.formula(f))]],
-    error = function(e) NULL
-  )
+  rhs <- tryCatch({
+    form <- stats::as.formula(f)
+    form[[length(form)]]
+  }, error = function(e) NULL)
   if (is.null(rhs)) return(list())
   specs <- list()
   walk <- function(e) {
@@ -907,6 +907,11 @@ obs_smooth_specs_from_prior <- function(prior) {
   out
 }
 
+#' Parse a brms `sds` smooth coef label (e.g. `"s(x, k = 5, bs = \"cr\")"`)
+#' into a spec list with `var / vars / k / bs / fname` fields. Returns
+#' a default spec with all-NA fields when `coef_str` does not parse
+#' as a call; this keeps the term-definition loop tolerant of stray
+#' prior-table rows without raising during methods_md rendering.
 #' @noRd
 parse_smooth_coef <- function(coef_str) {
   default <- list(
@@ -1079,8 +1084,10 @@ obs_gp_specs_from_formula <- function(obj) {
   if (inherits(f, c("brmsformula", "bform", "mvbrmsformula"))) {
     f <- f$formula %||% f
   }
-  rhs <- tryCatch(stats::as.formula(f)[[length(stats::as.formula(f))]],
-                   error = function(e) NULL)
+  rhs <- tryCatch({
+    form <- stats::as.formula(f)
+    form[[length(form)]]
+  }, error = function(e) NULL)
   if (is.null(rhs)) return(list())
   specs <- list()
   walk <- function(e) {
@@ -1156,16 +1163,27 @@ render_fixed_inline <- function(terms, notation) {
 }
 
 #' @noRd
-render_smooth_inline <- function(specs) {
+compose_inline_terms <- function(specs, term_composer) {
+  # Shared shape for every per-spec inline renderer: apply
+  # `term_composer` to each spec and join the resulting LaTeX
+  # fragments with the additive separator. Centralised so that
+  # adding a new effect type is one new `render_*_inline` line
+  # rather than another copy of the paste/vapply/collapse skeleton.
+  if (length(specs) == 0L) return(character(0L))
   paste(
-    vapply(specs, function(s) {
-      paste0(
-        "f_{", spec_subscript(s), "}(",
-        spec_vars_indexed(s), ")"
-      )
-    }, character(1L)),
+    vapply(specs, term_composer, character(1L)),
     collapse = " + "
   )
+}
+
+#' @noRd
+render_smooth_inline <- function(specs) {
+  compose_inline_terms(specs, function(s) {
+    paste0(
+      "f_{", spec_subscript(s), "}(",
+      spec_vars_indexed(s), ")"
+    )
+  })
 }
 
 #' @noRd
@@ -1173,16 +1191,12 @@ render_me_inline <- function(specs) {
   # Measurement-error effects (brms `me(x, sdx)`): the linear
   # predictor uses the latent true covariate `\\tilde{x}_{i,t}`
   # rather than the noisy observation `x_{i,t}`.
-  paste(
-    vapply(specs, function(s) {
-      v <- s$var
-      paste0(
-        "\\beta^{(\\text{me})}_{", v, "} \\, \\tilde{", v,
-        "}_{i,t}"
-      )
-    }, character(1L)),
-    collapse = " + "
-  )
+  compose_inline_terms(specs, function(s) {
+    paste0(
+      "\\beta^{(\\text{me})}_{", s$var, "} \\, \\tilde{",
+      s$var, "}_{i,t}"
+    )
+  })
 }
 
 #' @noRd
@@ -1190,29 +1204,22 @@ render_mo_inline <- function(specs) {
   # Monotonic effects (Burkner & Charpentier 2020). Each mo()
   # term contributes b^{(mo)}_x * m_x(x_{i,t}), where m_x is a
   # cumulative step transform built from a Dirichlet simplex.
-  paste(
-    vapply(specs, function(s) {
-      v <- s$var
-      paste0(
-        "\\beta^{(\\text{mo})}_{", v, "} \\, m_{", v,
-        "}(", v, "_{i,t})"
-      )
-    }, character(1L)),
-    collapse = " + "
-  )
+  compose_inline_terms(specs, function(s) {
+    paste0(
+      "\\beta^{(\\text{mo})}_{", s$var, "} \\, m_{",
+      s$var, "}(", s$var, "_{i,t})"
+    )
+  })
 }
 
 #' @noRd
 render_gp_inline <- function(specs) {
-  paste(
-    vapply(specs, function(s) {
-      paste0(
-        "f^{(\\text{gp})}_{", gp_subscript(s), "}(",
-        spec_vars_indexed(s), ")"
-      )
-    }, character(1L)),
-    collapse = " + "
-  )
+  compose_inline_terms(specs, function(s) {
+    paste0(
+      "f^{(\\text{gp})}_{", gp_subscript(s), "}(",
+      spec_vars_indexed(s), ")"
+    )
+  })
 }
 
 #' @noRd
@@ -1255,22 +1262,16 @@ render_re_inline <- function(specs) {
   # Per-group inline contribution to the linear predictor:
   #   intercept-only group:  alpha_{grp[i]}
   #   varying-slope group:   alpha_{grp[i]} + beta^{(grp)}_{x, grp[i]} x_{i,t}
-  paste(
-    vapply(specs, function(s) {
-      pieces <- paste0("\\alpha_{", s$group, "[i]}")
-      for (slope in s$slopes) {
-        pieces <- c(
-          pieces,
-          paste0(
-            "\\beta^{(", s$group, ")}_{", slope,
-            ", ", s$group, "[i]} ", slope, "_{i,t}"
-          )
-        )
-      }
-      paste(pieces, collapse = " + ")
-    }, character(1L)),
-    collapse = " + "
-  )
+  compose_inline_terms(specs, function(s) {
+    pieces <- paste0("\\alpha_{", s$group, "[i]}")
+    for (slope in s$slopes) {
+      pieces <- c(pieces, paste0(
+        "\\beta^{(", s$group, ")}_{", slope, ", ",
+        s$group, "[i]} ", slope, "_{i,t}"
+      ))
+    }
+    paste(pieces, collapse = " + ")
+  })
 }
 
 #' @noRd
@@ -2003,6 +2004,12 @@ backfill_umbrella_priors <- function(prior) {
   prior
 }
 
+#' Map a single brms-prior-table row to its LaTeX math symbol.
+#' Dispatches on `class`, with `coef`, `group`, and `dpar` modifying
+#' the rendered subscript / superscript when set. Returns `NULL` for
+#' unhandled classes; the prior-section walker drops `NULL` rows
+#' from the output rather than rendering an opaque placeholder, so
+#' new prior classes are silently skipped until a renderer lands.
 #' @noRd
 format_parameter_symbol <- function(row) {
   cls <- row$class %||% ""
