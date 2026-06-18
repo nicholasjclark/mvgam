@@ -1041,13 +1041,23 @@ sample_family_batched <- function(object, mu, fc_data, ndraws_use,
 # the `[ndraws_use, ...]` rows in `hindcasts` / `forecasts`.
 #'@noRd
 extract_family_pars_for_draws <- function(object, draws_mat,
-                                            draw_idx) {
+                                            draw_idx, resp = NULL) {
   dpar_names <- get_family_dpars(object$family$family)
   if (length(dpar_names) == 0L) return(list())
+  # For multivariate (mvbind / mvbrmsformula) fits, brms emits
+  # one parameter per response with the response name suffixed
+  # (e.g. `sigma_y1`, `sigma_y2`). Caller passes `resp = "<r>"`
+  # to scope extraction to that response's columns; without the
+  # suffix the base `^<nm>(\\[|$)` pattern never matches and the
+  # extractor returns an empty list.
   out <- list()
   for (nm in dpar_names) {
-    cols <- grep(paste0("^", nm, "(\\[|$)"),
-                  colnames(draws_mat), value = TRUE)
+    pat <- if (!is.null(resp) && nzchar(resp)) {
+      paste0("^", nm, "_", resp, "(\\[|$)")
+    } else {
+      paste0("^", nm, "(\\[|$)")
+    }
+    cols <- grep(pat, colnames(draws_mat), value = TRUE)
     if (length(cols) == 0L) next
     out[[nm]] <- draws_mat[draw_idx, cols, drop = FALSE]
   }

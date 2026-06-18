@@ -232,6 +232,39 @@ residuals.mvgam <- function(object,
                               any.missing = FALSE,
                               unique = TRUE)
 
+  # Per-response recursive entry. `.single_response` is an internal
+  # marker the mv branch sets to (a) skip the multivariate fan-out
+  # on the recursive call and (b) tell the body below which
+  # response's column to read from the data. Pulled off `...` so
+  # it does not leak into pp_args downstream.
+  dots <- list(...)
+  single_response <- dots$.single_response
+  dots$.single_response <- NULL
+
+  # Multivariate (mvbind / mvbrmsformula). mvgam's residuals path
+  # assumes a single-column response; `posterior_epred` / `posterior_predict`
+  # already accept `resp = "<r>"` to return a single per-response
+  # matrix. Loop the responses, set `.single_response = r` so the
+  # recursive call falls through to the univariate body with the
+  # right y column, and collect into a list keyed by response --
+  # matching the shape `posterior_predict.mvgam` returns on the
+  # same fit.
+  if (is.null(single_response) &&
+        inherits(object$formula, "mvbrmsformula")) {
+    responses <- object$formula$responses
+    out <- lapply(responses, function(r) {
+      do.call(residuals.mvgam, c(
+        list(object = object, newdata = newdata, type = type,
+             ndraws = ndraws, draw_ids = draw_ids,
+             summary = summary, robust = robust, probs = probs,
+             resp = r, .single_response = r),
+        dots
+      ))
+    })
+    names(out) <- responses
+    return(out)
+  }
+
   # Pin draw_ids once so the analytic / empirical / closure-unit
   # paths all see the same posterior subsample. Pinning is
   # essential for `type = "quantile"` on continuous families
@@ -278,17 +311,17 @@ residuals.mvgam <- function(object,
   }
 
   d <- newdata %||% mvgam_training_data(object)
-  resp <- mvgam_response_name(object)
+  resp <- single_response %||% mvgam_response_name(object)
   y <- as.numeric(d[[resp]])
   pp_args <- c(list(object = object, newdata = newdata,
                      ndraws = ndraws, draw_ids = draw_ids,
-                     summary = FALSE), list(...))
+                     summary = FALSE), dots)
 
   resids <- switch(
     type,
     "quantile" = compute_quantile_residuals(
       object = object, y = y, pp_args = pp_args,
-      d = d, draw_ids = draw_ids
+      d = d, draw_ids = draw_ids, resp = single_response
     ),
     "ordinary" = {
       yrep <- do.call(posterior_predict, pp_args)
@@ -396,13 +429,15 @@ quantile_family_specs <- list(
 # use the empirical PIT over `posterior_predict` draws.
 #'@noRd
 compute_quantile_residuals <- function(object, y, pp_args,
-                                         d, draw_ids = NULL) {
+                                         d, draw_ids = NULL,
+                                         resp = NULL) {
   fam <- object$family$family
   spec <- quantile_family_specs[[fam]]
   if (!is.null(spec)) {
     return(compute_quantile_residuals_analytic(
       object = object, y = y, spec = spec,
-      pp_args = pp_args, d = d, draw_ids = draw_ids
+      pp_args = pp_args, d = d, draw_ids = draw_ids,
+      resp = resp
     ))
   }
   yrep <- do.call(posterior_predict, pp_args)
@@ -417,10 +452,12 @@ compute_quantile_residuals <- function(object, y, pp_args,
 #'@noRd
 compute_quantile_residuals_analytic <- function(object, y, spec,
                                                   pp_args, d,
-                                                  draw_ids = NULL) {
+                                                  draw_ids = NULL,
+                                                  resp = NULL) {
   mu <- do.call(posterior_epred, pp_args)
   dpars <- residuals_dpars(object, draw_ids = draw_ids,
-                            d = d, n_obs = length(y))
+                            d = d, n_obs = length(y),
+                            resp = resp)
   y_mat <- matrix(rep(y, nrow(mu)), nrow = nrow(mu), byrow = TRUE)
   u <- spec(y_mat, mu, dpars)
   # Clip u away from {0, 1} so qnorm never returns +/-Inf for
@@ -481,7 +518,7 @@ compute_quantile_residuals_empirical <- function(y, yrep,
 # the pearson path so dpar shape logic stays in one place.
 #'@noRd
 residuals_dpars <- function(object, ndraws = NULL, draw_ids = NULL,
-                            d, n_obs) {
+                            d, n_obs, resp = NULL) {
   draws_mat <- posterior::as_draws_matrix(object$fit)
   total_draws <- nrow(draws_mat)
   draw_idx <- if (!is.null(draw_ids)) {
@@ -492,7 +529,7 @@ residuals_dpars <- function(object, ndraws = NULL, draw_ids = NULL,
     seq_len(total_draws)
   }
   per_series <- extract_family_pars_for_draws(
-    object, draws_mat, draw_idx
+    object, draws_mat, draw_idx, resp = resp
   )
   lapply(per_series, function(mat) {
     nc <- ncol(mat)
