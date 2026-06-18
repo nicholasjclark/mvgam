@@ -723,69 +723,6 @@ mu_symbol <- function(obj) {
 }
 
 #' @noRd
-has_rescor <- function(obj) {
-  # True when the user set `set_rescor(TRUE)` on a multivariate
-  # brms formula. Prefer the formula attribute (authoritative);
-  # fall back to detecting brms's `Lrescor` row in the prior
-  # table (post-fit objects with stripped formula metadata).
-  f <- obj$formula
-  if (inherits(f, "mvbrmsformula") && isTRUE(f$rescor)) {
-    return(TRUE)
-  }
-  prior <- obj$prior
-  if (!is.null(prior) && nrow(prior) > 0L) {
-    return(any(prior$class == "Lrescor"))
-  }
-  FALSE
-}
-
-#' @noRd
-subset_obj_to_response <- function(obj, r) {
-  # Per-response slice of a multi-response fit. Filters the
-  # prior table to rows scoped to response `r` (including rows
-  # with no `resp` set, which are shared across responses), and
-  # pins `response_names = r`. Every downstream extractor /
-  # renderer reads from `obj$prior` and `obj$response_names`,
-  # so the slice is enough to make them render the per-response
-  # view without per-helper threading.
-  out <- obj
-  out$response_names <- r
-  prior <- obj$prior
-  if (!is.null(prior) && nrow(prior) > 0L) {
-    rsp <- prior$resp %||% rep("", nrow(prior))
-    keep <- rsp == r | !nzchar(rsp)
-    out$prior <- prior[keep, , drop = FALSE]
-  }
-  out
-}
-
-#' @noRd
-get_response_names <- function(obj) {
-  # Multi-response detection. Prefer obj$response_names when the
-  # fit has populated it; else read unique non-empty `resp`
-  # values off the prior table (multivariate prefits land them
-  # there even when response_names is NULL); else delegate to
-  # extract_response_names() in brms_integration.R for the
-  # formula-LHS triage (handles mvbrmsformula / brmsformula /
-  # plain formula + mvbind). Guard against the response-less
-  # formula case extract_response_names treats as an error.
-  rn <- obj$response_names
-  if (length(rn) > 0L) return(rn)
-  prior <- obj$prior
-  if (!is.null(prior) && nrow(prior) > 0L) {
-    rsp <- prior$resp %||% rep("", nrow(prior))
-    have <- unique(rsp[nzchar(rsp)])
-    if (length(have) > 0L) return(have)
-  }
-  f <- obj$formula
-  if (is.null(f)) return(character(0L))
-  if (inherits(f, "formula") && length(f) < 3L) {
-    return(character(0L))
-  }
-  extract_response_names(f)
-}
-
-#' @noRd
 link_application <- function(link, mu) {
   switch(
     link,

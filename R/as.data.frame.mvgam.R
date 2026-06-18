@@ -405,10 +405,26 @@ mvgam_ranef_aliases <- function(x) {
       coef_idx = seq_len(n_coef),
       KEEP.OUT.ATTRS = FALSE
     )
+    # brms's stancode pattern for the positional names depends on
+    # whether the RE attaches to a nlpar / dpar / response block.
+    # When it does (row_pfx non-empty), the stancode infixes that
+    # token between the id and the coef index:
+    #   univariate:    r_<id>_<coef_idx>[<lev>], sd_<id>[<coef_idx>]
+    #   mv / nlpar:    r_<id>_<pfx>_<coef_idx>[<lev>],
+    #                  sd_<id>_<pfx>[<coef_idx>]
+    # row_pfx is per-row to handle the shared-id case
+    # `(x | sp | series)` where the two coefs may live under
+    # different nlpars; pick the per-coef token.
+    pfx_per_coef <- row_pfx
+    coef_infix <- ifelse(nzchar(pfx_per_coef),
+                          paste0("_", pfx_per_coef), "")
     r_old <- if (has_cor) {
-      sprintf("r_%d[%d,%d]", id, grid$level_idx, grid$coef_idx)
+      sprintf("r_%d%s[%d,%d]", id, coef_infix[grid$coef_idx],
+              grid$level_idx, grid$coef_idx)
     } else {
-      sprintf("r_%d_%d[%d]", id, grid$coef_idx, grid$level_idx)
+      sprintf("r_%d%s_%d[%d]", id,
+              coef_infix[grid$coef_idx],
+              grid$coef_idx, grid$level_idx)
     }
     r_new <- sprintf(
       "r_%s[%s,%s]", group_token_per_coef[grid$coef_idx],
@@ -416,6 +432,10 @@ mvgam_ranef_aliases <- function(x) {
     )
     r_map <- stats::setNames(r_old, r_new)
     # sd_<id>[<coef_idx>] -> sd_<group>__[<nlpar>_]<coef>
+    # Unlike `r_`, brms's stancode emits `sd_` without the
+    # nlpar / dpar / response infix because `id` already
+    # distinguishes per-response (mv) and per-nlpar/dpar
+    # grouping blocks (each gets its own id).
     sd_old <- sprintf("sd_%d[%d]", id, seq_len(n_coef))
     sd_new <- sprintf("sd_%s__%s", group, coef_alias)
     sd_map <- stats::setNames(sd_old, sd_new)

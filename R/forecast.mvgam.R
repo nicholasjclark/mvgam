@@ -385,7 +385,8 @@ build_training_tail_data <- function(training, max_lag) {
 #'@noRd
 build_hindcast_arms <- function(object, training, type, draw_idx,
                                   obs_uncertainty,
-                                  resample_innovations = FALSE) {
+                                  resample_innovations = FALSE,
+                                  resp = NULL) {
   series_levels <- names(training$observations)
   out <- vector("list", length(series_levels))
   names(out) <- series_levels
@@ -418,7 +419,7 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
     }
     out[[s]] <- hindcast_one_series(
       object, sub_for_linpred, type, draw_idx, obs_uncertainty,
-      resample_innovations
+      resample_innovations, resp = resp
     )
   }
   out
@@ -436,7 +437,8 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
 #'@noRd
 hindcast_one_series <- function(object, sub_data, type, draw_idx,
                                   obs_uncertainty,
-                                  resample_innovations = FALSE) {
+                                  resample_innovations = FALSE,
+                                  resp = NULL) {
   full <- switch(
     type,
     "trend" = extract_component_linpred(
@@ -445,31 +447,33 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
     ),
     "link" = extract_component_linpred(
       mvgam_fit = object, newdata = sub_data,
-      component = "obs"
+      component = "obs", resp = resp
     ) + extract_component_linpred(
       mvgam_fit = object, newdata = sub_data,
       component = "trend", incl_latent_state = TRUE
     ),
     "expected" = posterior_epred(
       object, newdata = sub_data, ndraws = NULL,
-      process_error = resample_innovations
+      process_error = resample_innovations, resp = resp
     ),
     "response" = if (isTRUE(obs_uncertainty)) {
       posterior_predict(
         object, newdata = sub_data, ndraws = NULL,
-        process_error = resample_innovations
+        process_error = resample_innovations, resp = resp
       )
     } else {
       posterior_epred(
         object, newdata = sub_data, ndraws = NULL,
-        process_error = resample_innovations
+        process_error = resample_innovations, resp = resp
       )
     }
   )
   if (is.list(full) && !is.matrix(full)) {
-    stop(insight::format_error(
-      "Multivariate response hindcasts are not yet supported."
-    ))
+    stop(insight::format_error(c(
+      "Hindcast received a list-shaped posterior with no `resp` scope.",
+      i = paste0("Multivariate fits should fan out via the ",
+                 "`hindcast.mvgam` entry; this is an internal bug.")
+    )))
   }
   full[draw_idx, , drop = FALSE]
 }

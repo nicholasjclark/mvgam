@@ -120,24 +120,49 @@ ranef.mvgam <- function(object, summary = TRUE, robust = FALSE,
   }
   drws <- extract_mvgam_draws(object)
   n_chains <- posterior::nchains(drws)
-  out <- vector("list", length(all_groups))
-  names(out) <- all_groups
-  for (g in all_groups) {
-    rows <- reframe[reframe$group == g, , drop = FALSE]
+  # Multi-response, nlpar, and dpar grouping rows live under
+  # `<group>__<resp|nlpar|dpar>` in the aliased draws (see
+  # `mvgam_ranef_aliases`). Reuse the same per-row prefix logic
+  # here so the lookup matches the alias output exactly. Each
+  # (group, prefix) pair becomes its own entry in the returned
+  # list, keeping the brms-parity shape on univariate fits
+  # (`prefix == ""`, key = bare group name).
+  reframe$row_prefix <- ifelse(
+    !is.na(reframe$nlpar) & nzchar(reframe$nlpar), reframe$nlpar,
+    ifelse(
+      !is.na(reframe$dpar) & nzchar(reframe$dpar), reframe$dpar,
+      ifelse(
+        !is.na(reframe$resp) & nzchar(reframe$resp), reframe$resp,
+        ""
+      )
+    )
+  )
+  alias_keys <- ifelse(
+    nzchar(reframe$row_prefix),
+    paste0(reframe$group, "__", reframe$row_prefix),
+    reframe$group
+  )
+  reframe$alias_key <- alias_keys
+  keys <- unique(reframe$alias_key)
+  if (!is.null(groups)) {
+    keys <- intersect(keys, as.character(groups))
+  }
+  out <- vector("list", length(keys))
+  names(out) <- keys
+  for (k in keys) {
+    rows <- reframe[reframe$alias_key == k, , drop = FALSE]
     coefs <- as.character(rows$coef)
     if (!is.null(pars)) {
       coefs <- intersect(coefs, as.character(pars))
     }
-    if (length(coefs) == 0L) {
-      next
-    }
-    levels <- group_levels[[g]]
-    # Build the per-group alias names. `outer` walks levels in the
-    # row index and coefs in the column index; `as.vector` flattens
-    # column-major so the result is coef-major, level-minor — the
-    # same order extract_mvgam_draws emits after renaming.
+    if (length(coefs) == 0L) next
+    g_bare <- rows$group[1L]
+    levels <- group_levels[[g_bare]]
+    # outer() walks levels (rows) x coefs (cols); as.vector
+    # flattens column-major to match the (level-minor, coef-major)
+    # storage the alias map emits.
     rpars <- as.vector(outer(levels, coefs, function(l, c) {
-      sprintf("r_%s[%s,%s]", g, l, c)
+      sprintf("r_%s[%s,%s]", k, l, c)
     }))
     mat <- posterior::as_draws_matrix(
       posterior::subset_draws(drws, variable = rpars)
@@ -154,10 +179,8 @@ ranef.mvgam <- function(object, summary = TRUE, robust = FALSE,
     } else {
       attr(arr, "nchains") <- n_chains
     }
-    out[[g]] <- arr
+    out[[k]] <- arr
   }
-  # Drop groups that were emptied by the pars filter so the
-  # return shape stays brms-parity.
   out[!vapply(out, is.null, logical(1L))]
 }
 
@@ -261,14 +284,43 @@ VarCorr.mvgam <- function(x, sigma = 1, summary = TRUE,
   }
   reframe <- meta$reframe
   drws <- extract_mvgam_draws(x)
-  all_groups <- unique(reframe$group)
-  out <- vector("list", length(all_groups))
-  names(out) <- all_groups
-  for (g in all_groups) {
-    rows <- reframe[reframe$group == g, , drop = FALSE]
+  # Mirror ranef.mvgam's per-row prefix logic so the lookup keys
+  # match the alias map for multi-response, nlpar and dpar fits.
+  # Univariate rows have an empty prefix and the key is the bare
+  # group name, preserving the brms-parity list shape.
+  reframe$row_prefix <- ifelse(
+    !is.na(reframe$nlpar) & nzchar(reframe$nlpar), reframe$nlpar,
+    ifelse(
+      !is.na(reframe$dpar) & nzchar(reframe$dpar), reframe$dpar,
+      ifelse(
+        !is.na(reframe$resp) & nzchar(reframe$resp), reframe$resp,
+        ""
+      )
+    )
+  )
+  reframe$alias_key <- ifelse(
+    nzchar(reframe$row_prefix),
+    paste0(reframe$group, "__", reframe$row_prefix),
+    reframe$group
+  )
+  # For sd the alias map writes `sd_<group>__<prefix>_<coef>`
+  # (e.g. `sd_grp__y1_Intercept`) -- see `mvgam_ranef_aliases`.
+  # cor uses the same prefixed coef token.
+  reframe$coef_alias <- ifelse(
+    nzchar(reframe$row_prefix),
+    paste0(reframe$row_prefix, "_", reframe$coef),
+    as.character(reframe$coef)
+  )
+  keys <- unique(reframe$alias_key)
+  out <- vector("list", length(keys))
+  names(out) <- keys
+  for (k in keys) {
+    rows <- reframe[reframe$alias_key == k, , drop = FALSE]
     coefs <- as.character(rows$coef)
+    coef_aliases <- as.character(rows$coef_alias)
+    g_bare <- rows$group[1L]
     n_coef <- length(coefs)
-    sd_names <- sprintf("sd_%s__%s", g, coefs)
+    sd_names <- sprintf("sd_%s__%s", g_bare, coef_aliases)
     sd_mat <- posterior::as_draws_matrix(
       posterior::subset_draws(drws, variable = sd_names)
     )
@@ -280,7 +332,8 @@ VarCorr.mvgam <- function(x, sigma = 1, summary = TRUE,
       # (`cor[choose(k - 1, 2) + j] = Cor[j, k]`).
       ks <- rep(2:n_coef, times = seq_len(n_coef - 1L))
       js <- unlist(lapply(2:n_coef, function(k) seq_len(k - 1L)))
-      cor_names <- sprintf("cor_%s__%s__%s", g, coefs[js], coefs[ks])
+      cor_names <- sprintf("cor_%s__%s__%s", g_bare,
+                            coef_aliases[js], coef_aliases[ks])
       cor_mat <- posterior::as_draws_matrix(
         posterior::subset_draws(drws, variable = cor_names)
       )
@@ -302,7 +355,7 @@ VarCorr.mvgam <- function(x, sigma = 1, summary = TRUE,
         )
       }
     }
-    out[[g]] <- group_out
+    out[[k]] <- group_out
   }
   out
 }

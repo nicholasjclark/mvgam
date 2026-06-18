@@ -49,6 +49,13 @@ mvgam_formula_predictors <- function(f) {
   if (is.null(f)) {
     return(character(0L))
   }
+  # mvbrmsformula has no top-level `$formula` slot; iterate the
+  # per-response brmsformulas in `$forms` and union their
+  # predictors. Each form may have its own nlpar / dpar pforms.
+  if (inherits(f, "mvbrmsformula")) {
+    return(unique(unlist(lapply(f$forms, mvgam_formula_predictors),
+                           use.names = FALSE)))
+  }
   if (inherits(f, "brmsformula")) {
     top <- mvgam_rhs_predictors(f$formula)
     nlpars <- character(0L)
@@ -96,6 +103,14 @@ find_formula.mvgam <- function(x, verbose = TRUE, ...) {
 find_response.mvgam <- function(x, combine = TRUE, ...) {
   if (length(x$response_names) > 0L) {
     return(x$response_names)
+  }
+  # Multivariate: each per-response form is a brmsformula with
+  # its own LHS. Return every response so marginaleffects and
+  # insight find every available column.
+  if (inherits(x$formula, "mvbrmsformula")) {
+    return(unlist(lapply(x$formula$forms, function(bf) {
+      all.vars(bf$formula[[2L]])[1L]
+    }), use.names = FALSE))
   }
   all.vars(mvgam_obs_formula(x)[[2L]])[1L]
 }

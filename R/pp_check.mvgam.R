@@ -202,24 +202,16 @@ pp_check.mvgam <- function(
     newdata <- object$data %||% object$obs_data
   }
 
-  # Multivariate fits (mvbind / mvbrmsformula). When the caller
-  # supplies `resp = "<one>"`, fall through to the univariate
-  # path scoped to that response. When `resp` is NULL, fan out
-  # over all responses and return a named list of plots --
-  # matches what `residuals.mvgam` and `posterior_predict.mvgam`
-  # already do on the same fit; saves the user a manual loop.
+  # Multivariate fits (mvbind / mvbrmsformula). When `resp` is
+  # NULL, fan out per response via the shared helper and return
+  # a named list. When the caller supplied `resp`, validate it
+  # and fall through to the univariate path scoped to that
+  # response.
   is_mv <- brms::is.mvbrmsformula(object$formula)
-  resp_names <- if (is_mv) object$formula$responses else character(0)
+  fan <- mv_resp_fan_out(object, resp)
+  if (!is.null(fan)) return(fan)
   if (is_mv) {
-    if (is.null(resp)) {
-      call <- match.call()
-      out <- lapply(resp_names, function(r) {
-        call$resp <- r
-        eval(call, parent.frame())
-      })
-      names(out) <- resp_names
-      return(out)
-    }
+    resp_names <- object$formula$responses
     if (length(resp) != 1L) {
       stop(insight::format_error(c(
         "{.field resp} must be a single response name.",
@@ -1122,20 +1114,12 @@ plot.mvgam_ppc_fit_stat <- function(x, ...) {
 mvgam_resid_panel <- function(
   object, newdata = NULL, ndraws = 100L, resp = NULL, ...
 ) {
-  # Multivariate fan-out: when the caller did not pin a single
-  # response, build one 4-panel grid per response and return a
-  # named list. Each pp_check call below would otherwise return
-  # its own list-per-response (post pp_check.mvgam mv handling),
-  # and `patchwork::wrap_plots` cannot consume nested lists.
-  if (brms::is.mvbrmsformula(object$formula) && is.null(resp)) {
-    resp_names <- object$formula$responses
-    out <- lapply(resp_names, function(r) {
-      mvgam_resid_panel(object, newdata = newdata,
-                         ndraws = ndraws, resp = r, ...)
-    })
-    names(out) <- resp_names
-    return(out)
-  }
+  # Multivariate fan-out via the shared helper: returns one
+  # 4-panel grid per response in a named list. Without this each
+  # inner `pp_check` call would itself return a list per response
+  # and `patchwork::wrap_plots` refuses nested lists.
+  fan <- mv_resp_fan_out(object, resp)
+  if (!is.null(fan)) return(fan)
   p1 <- pp_check(
     object, type = "resid_vs_fitted", newdata = newdata,
     ndraws = ndraws, resp = resp, ...

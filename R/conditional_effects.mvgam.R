@@ -89,16 +89,8 @@ conditional_effects.mvgam <- function(x,
 
   # Multivariate fan-out: build one effects list per response and
   # return a named list, mirroring residuals.mvgam / pp_check.mvgam.
-  if (is.null(resp) && brms::is.mvbrmsformula(x$formula)) {
-    resp_names <- x$formula$responses
-    call <- match.call()
-    out <- lapply(resp_names, function(r) {
-      call$resp <- r
-      eval(call, parent.frame())
-    })
-    names(out) <- resp_names
-    return(out)
-  }
+  fan <- mv_resp_fan_out(x, resp)
+  if (!is.null(fan)) return(fan)
   type <- match.arg(
     type,
     c("response", "link", "expected",

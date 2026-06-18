@@ -81,12 +81,21 @@ hindcast.mvgam <- function(object,
                                     "expected", "trend"),
                            ndraws = NULL,
                            obs_uncertainty = TRUE,
-                           resample_innovations = FALSE) {
+                           resample_innovations = FALSE,
+                           resp = NULL) {
   checkmate::assert_class(object, "mvgam")
   type <- match.arg(type)
   checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
   checkmate::assert_flag(obs_uncertainty)
   checkmate::assert_flag(resample_innovations)
+  checkmate::assert_string(resp, null.ok = TRUE)
+
+  # Multivariate fan-out via the shared helper: hindcast operates
+  # on the obs-side posterior, which returns a per-response list
+  # on mv fits; scope per response and return a named list of
+  # `mvgam_forecast` objects.
+  fan <- mv_resp_fan_out(object, resp)
+  if (!is.null(fan)) return(fan)
 
   series_info <- resolve_series_info(object)
   series_levels <- series_info$series_levels
@@ -111,11 +120,13 @@ hindcast.mvgam <- function(object,
   training <- build_training_arms(object, series_levels)
   hindcasts <- build_hindcast_arms(
     object, training, type, draw_idx, obs_uncertainty,
-    resample_innovations = resample_innovations
+    resample_innovations = resample_innovations,
+    resp = resp
   )
 
   family_pars <- if (type == "link") {
-    extract_family_pars_for_draws(object, draws_mat, draw_idx)
+    extract_family_pars_for_draws(object, draws_mat, draw_idx,
+                                    resp = resp)
   } else {
     NULL
   }

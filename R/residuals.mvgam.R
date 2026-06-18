@@ -232,40 +232,15 @@ residuals.mvgam <- function(object,
                               any.missing = FALSE,
                               unique = TRUE)
 
-  # Per-response routing. Two ways the caller can scope this:
-  #   * Explicit `resp = "<r>"` in `...` -- the user is asking for
-  #     one response only (matches brms / marginaleffects API).
-  #   * `.single_response = r` -- internal marker set by the mv
-  #     fan-out below; equivalent semantics, kept distinct because
-  #     `resp` also has to thread through pp_args to brms's
-  #     posterior helpers and we want to be able to strip the
-  #     internal marker without losing the user's intent.
+  # Multivariate fan-out: when no resp was given, return a named
+  # list of per-response residual matrices. Shared helper threads
+  # the user's call back through this method with resp scoped per
+  # response; downstream the body's `resp` argument captures it
+  # and the univariate machinery runs unchanged.
   dots <- list(...)
-  single_response <- dots$.single_response %||% dots$resp
-  dots$.single_response <- NULL
-
-  # Multivariate (mvbind / mvbrmsformula). mvgam's residuals path
-  # assumes a single-column response; `posterior_epred` /
-  # `posterior_predict` accept `resp = "<r>"` to return a single
-  # per-response matrix. When the caller did not scope to one
-  # response, loop the responses and collect into a list keyed by
-  # response -- matching the shape `posterior_predict.mvgam`
-  # returns on the same fit.
-  if (is.null(single_response) &&
-        inherits(object$formula, "mvbrmsformula")) {
-    responses <- object$formula$responses
-    out <- lapply(responses, function(r) {
-      do.call(residuals.mvgam, c(
-        list(object = object, newdata = newdata, type = type,
-             ndraws = ndraws, draw_ids = draw_ids,
-             summary = summary, robust = robust, probs = probs,
-             resp = r, .single_response = r),
-        dots
-      ))
-    })
-    names(out) <- responses
-    return(out)
-  }
+  resp <- dots$resp
+  fan <- mv_resp_fan_out(object, resp)
+  if (!is.null(fan)) return(fan)
 
   # Pin draw_ids once so the analytic / empirical / closure-unit
   # paths all see the same posterior subsample. Pinning is
@@ -313,8 +288,11 @@ residuals.mvgam <- function(object,
   }
 
   d <- newdata %||% mvgam_training_data(object)
-  resp <- single_response %||% mvgam_response_name(object)
-  y <- as.numeric(d[[resp]])
+  # `resp` is populated when the mv fan-out scoped this call (or
+  # the user supplied it explicitly via `...`); otherwise fall
+  # back to the single response on a univariate fit.
+  resp_col <- resp %||% mvgam_response_name(object)
+  y <- as.numeric(d[[resp_col]])
   pp_args <- c(list(object = object, newdata = newdata,
                      ndraws = ndraws, draw_ids = draw_ids,
                      summary = FALSE), dots)
@@ -323,7 +301,7 @@ residuals.mvgam <- function(object,
     type,
     "quantile" = compute_quantile_residuals(
       object = object, y = y, pp_args = pp_args,
-      d = d, draw_ids = draw_ids, resp = single_response
+      d = d, draw_ids = draw_ids, resp = resp
     ),
     "ordinary" = {
       yrep <- do.call(posterior_predict, pp_args)
