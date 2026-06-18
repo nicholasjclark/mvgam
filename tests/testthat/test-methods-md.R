@@ -153,6 +153,30 @@ test_that("By-factor GP carries the grouping variable in the subscript", {
   expect_true(grepl("stratified by \\$grp\\$", out))
 })
 
+test_that("Tensor t2(x, z) smooth renders as f_{x, z} with both args", {
+  set.seed(1L)
+  dat <- data.frame(
+    time = rep(1:30, 4),
+    series = factor(rep(paste0("s", 1:4), each = 30)),
+    x = rnorm(120), z = rnorm(120),
+    grp = factor(rep(c("a","b","c","d"), each = 30)),
+    y = rpois(120, 3)
+  )
+  mod <- make_methods_md_prefit(y ~ t2(x, z, k = 5), data = dat)
+  out <- methods_md(mod)
+  # Linear predictor has both vars indexed
+  expect_true(grepl("f_\\{x, z\\}\\(x_\\{i,t\\}, z_\\{i,t\\}\\)", out))
+  # Term definition uses the joined key in basis-size / coef subscripts
+  expect_true(grepl(
+    "\\\\sum_\\{k=1\\}\\^\\{K_\\{x:z\\}\\}",
+    out
+  ))
+  expect_true(grepl("\\\\beta\\^\\{\\(x:z\\)\\}_k B_k\\(x, z\\)", out))
+  # Glossary names the tensor basis kind and lists both dims
+  expect_true(grepl("tensor product smooth \\(t2\\)", out))
+  expect_true(grepl("in \\$x\\$, \\$z\\$", out))
+})
+
 test_that("gp_call_to_spec errors on a malformed call with no variables", {
   # gp() with only named args (no positional variable list) is
   # nonsensical; should error rather than silently produce a

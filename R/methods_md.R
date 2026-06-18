@@ -332,17 +332,21 @@ model_glossary <- function(obj) {
   gp_specs <- get_gp_specs(obj)
   re_groups <- obs_re_groups_from_prior(prior)
   for (spec in smooth_specs) {
-    bare <- spec$var
+    sub <- spec_subscript(spec)
+    sub_key <- spec_key(spec)
+    in_phrase <- paste0(
+      "$", paste(spec$vars, collapse = "$, $"), "$"
+    )
     k_label <- if (!is.na(spec$k)) {
-      paste0("$K_{", bare, "} = ", spec$k, "$")
+      paste0("$K_{", sub_key, "} = ", spec$k, "$")
     } else {
-      paste0("$K_{", bare, "}$ (mgcv default)")
+      paste0("$K_{", sub_key, "}$ (mgcv default)")
     }
     defs <- c(defs, paste0(
-      "- $f_{", bare, "}$: ",
+      "- $f_{", sub, "}$: ",
       basis_label(spec$bs, spec$fname),
-      " in $", bare, "$, basis size ", k_label,
-      ", smoothness $\\lambda_{", bare, "}$"
+      " in ", in_phrase, ", basis size ", k_label,
+      ", smoothness $\\lambda_{", sub_key, "}$"
     ))
   }
   for (spec in gp_specs) {
@@ -584,7 +588,7 @@ classify_obs_parameters <- function(obj) {
   prior <- obj$prior
   list(
     fixed  = obs_fixed_terms_from_prior(prior),
-    smooth = obs_smooth_terms_from_prior(prior),
+    smooth = obs_smooth_specs_from_prior(prior),
     gp     = get_gp_specs(obj),
     re     = obs_re_groups_from_prior(prior)
   )
@@ -606,8 +610,13 @@ obs_fixed_terms_from_prior <- function(prior) {
 
 #' @noRd
 obs_smooth_terms_from_prior <- function(prior) {
+  # Returns one subscript label per smooth term. For 1D smooths
+  # this is the bare variable; for tensor smooths it is the
+  # comma-joined variable list ("x, z") so the math subscript
+  # matches what the renderer emits.
   specs <- obs_smooth_specs_from_prior(prior)
-  vapply(specs, function(s) s$var, character(1L))
+  vapply(specs, function(s) paste(s$vars, collapse = ", "),
+         character(1L))
 }
 
 #' @noRd
@@ -617,13 +626,15 @@ obs_smooth_specs_from_prior <- function(prior) {
   if (!any(sds_rows)) return(list())
   coefs <- prior$coef[sds_rows]
   specs <- lapply(coefs, parse_smooth_coef)
-  # Dedupe by variable; first-occurrence wins.
+  # Dedupe by full variable list; first-occurrence wins.
   seen <- character(0L)
   out <- list()
   for (s in specs) {
-    if (is.null(s$var) || is.na(s$var) || s$var %in% seen) next
+    if (is.null(s$vars) || all(is.na(s$vars))) next
+    key <- paste(s$vars, collapse = ":")
+    if (key %in% seen) next
     out[[length(out) + 1L]] <- s
-    seen <- c(seen, s$var)
+    seen <- c(seen, key)
   }
   out
 }
@@ -631,7 +642,7 @@ obs_smooth_specs_from_prior <- function(prior) {
 #' @noRd
 parse_smooth_coef <- function(coef_str) {
   default <- list(
-    var = NA_character_, k = NA_integer_,
+    var = NA_character_, vars = NA_character_, k = NA_integer_,
     bs = "tp", fname = "s"
   )
   expr <- tryCatch(
@@ -642,8 +653,12 @@ parse_smooth_coef <- function(coef_str) {
   call_args <- as.list(expr)[-1L]
   arg_names <- names(call_args) %||% rep("", length(call_args))
   pos_idx <- which(arg_names == "")
-  var <- if (length(pos_idx) >= 1L) {
-    as.character(call_args[[pos_idx[1L]]])
+  vars <- if (length(pos_idx) >= 1L) {
+    vapply(
+      pos_idx,
+      function(i) as.character(call_args[[i]]),
+      character(1L)
+    )
   } else NA_character_
   k <- if ("k" %in% arg_names) {
     tryCatch(
@@ -657,7 +672,9 @@ parse_smooth_coef <- function(coef_str) {
       error = function(e) "tp"
     )
   } else "tp"
-  list(var = var, k = k, bs = bs, fname = fname)
+  list(
+    var = vars[1L], vars = vars, k = k, bs = bs, fname = fname
+  )
 }
 
 #' @noRd
@@ -844,10 +861,14 @@ render_fixed_inline <- function(terms, notation) {
 }
 
 #' @noRd
-render_smooth_inline <- function(smooths) {
-  bare <- sub("^s_", "", smooths)
+render_smooth_inline <- function(specs) {
   paste(
-    paste0("f_{", bare, "}(", bare, "_{i,t})"),
+    vapply(specs, function(s) {
+      paste0(
+        "f_{", spec_subscript(s), "}(",
+        spec_vars_indexed(s), ")"
+      )
+    }, character(1L)),
     collapse = " + "
   )
 }
@@ -856,13 +877,9 @@ render_smooth_inline <- function(smooths) {
 render_gp_inline <- function(specs) {
   paste(
     vapply(specs, function(s) {
-      sub <- gp_subscript(s)
-      vars_in <- paste(
-        paste0(s$vars, "_{i,t}"),
-        collapse = ", "
-      )
       paste0(
-        "f^{(\\text{gp})}_{", sub, "}(", vars_in, ")"
+        "f^{(\\text{gp})}_{", gp_subscript(s), "}(",
+        spec_vars_indexed(s), ")"
       )
     }, character(1L)),
     collapse = " + "
@@ -870,8 +887,33 @@ render_gp_inline <- function(specs) {
 }
 
 #' @noRd
+spec_subscript <- function(spec) {
+  # Math-subscript form of the variable list: "x" for univariate
+  # smooths/GPs, "x, z" for tensor / multi-dim. Shared by every
+  # renderer that needs a per-term subscript label.
+  paste(spec$vars, collapse = ", ")
+}
+
+#' @noRd
+spec_key <- function(spec) {
+  # Stable identifier per term, safe to embed in a LaTeX
+  # subscript that already nests inside `_{...}` (no commas).
+  # Used as the per-term key in basis-size $K_{key}$ and basis
+  # coefficient $\beta^{(key)}$ tags.
+  paste(spec$vars, collapse = ":")
+}
+
+#' @noRd
+spec_vars_indexed <- function(spec, suffix = "_{i,t}") {
+  # "x_{i,t}, z_{i,t}" -- the indexed argument list used inside
+  # a function call f_{sub}(x_{i,t}, z_{i,t}). suffix is a hook
+  # for callers that want a different index pattern.
+  paste(paste0(spec$vars, suffix), collapse = ", ")
+}
+
+#' @noRd
 gp_subscript <- function(spec) {
-  base <- paste(spec$vars, collapse = ", ")
+  base <- spec_subscript(spec)
   if (!is.null(spec$by) && !is.na(spec$by) && nzchar(spec$by)) {
     paste0(base, " \\mid ", spec$by)
   } else {
@@ -891,24 +933,27 @@ render_re_inline <- function(groups) {
 #' @noRd
 term_definition_rows <- function(obj, notation) {
   prior <- obj$prior
-  smooths <- obs_smooth_terms_from_prior(prior)
+  smooth_specs <- obs_smooth_specs_from_prior(prior)
   gp_specs <- get_gp_specs(obj)
   re_groups <- obs_re_groups_from_prior(prior)
 
   rows <- list()
-  for (bare in smooths) {
+  for (spec in smooth_specs) {
+    sub <- spec_subscript(spec)
+    sub_key <- spec_key(spec)
+    vars_in <- sub
     rows[[length(rows) + 1L]] <- list(
-      lhs = paste0("f_{", bare, "}(", bare, ")"),
+      lhs = paste0("f_{", sub, "}(", vars_in, ")"),
       op  = "=",
       rhs = paste0(
-        "\\sum_{k=1}^{K_{", bare, "}} ",
-        "\\beta^{(", bare, ")}_k B_k(", bare, ")"
+        "\\sum_{k=1}^{K_{", sub_key, "}} ",
+        "\\beta^{(", sub_key, ")}_k B_k(", vars_in, ")"
       )
     )
   }
   for (spec in gp_specs) {
     sub <- gp_subscript(spec)
-    vars_in <- paste(spec$vars, collapse = ", ")
+    vars_in <- spec_subscript(spec)
     rho_arg <- if (length(spec$vars) > 1L) {
       paste0("\\boldsymbol{\\rho}_{", sub, "}")
     } else {
