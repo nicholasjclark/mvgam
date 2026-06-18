@@ -290,6 +290,32 @@ test_that("Monotonic mo(x) renders beta^{(mo)}_x m_x + Dirichlet simplex", {
   expect_true(grepl("monotonic step transform of ordinal", out))
 })
 
+test_that("dpar second-formula renders its own linear predictor", {
+  set.seed(1L)
+  dat <- data.frame(
+    time = rep(1:30, 4),
+    series = factor(rep(paste0("s", 1:4), each = 30)),
+    x = rnorm(120), y = rnorm(120)
+  )
+  mod <- make_methods_md_prefit(
+    brms::bf(y ~ x, sigma ~ x),
+    data = dat, family = gaussian()
+  )
+  out <- methods_md(mod)
+  # Sigma gets its own row, log-linked by default.
+  expect_true(grepl(
+    "\\\\log \\\\sigma_\\{i,t\\} &= \\\\alpha\\^\\{\\(sigma\\)\\}",
+    out
+  ))
+  expect_true(grepl(
+    "\\\\beta_\\{sigma,x\\} x_\\{i,t\\}", out
+  ))
+  # Priors block carries the distinct alpha^{(sigma)}.
+  expect_true(grepl(
+    "\\\\alpha\\^\\{\\(sigma\\)\\} &\\\\sim", out
+  ))
+})
+
 test_that("Response column never surfaces in the Predictors list", {
   set.seed(1L)
   dat <- data.frame(

@@ -54,15 +54,20 @@ fixtures <- list(
   list(name = "10_me",         f = y ~ me(x, sdx),                   t = NULL),
   list(name = "11_kitchen",
        f = y ~ x + s(z, k = 4) + gp(x, k = 5) + mo(ord) + (1 | grp),
-       t = ~ AR(p = 2))
+       t = ~ AR(p = 2)),
+  list(name = "12_dpar_sigma",
+       f = brms::bf(y ~ x, sigma ~ x),
+       t = NULL,
+       family = gaussian())
 )
 
 # Render each fixture through methods_md(), concatenate into one
 # document, hand to pandoc + xelatex.
 render_one <- function(spec) {
+  fam <- spec$family %||% poisson()
   mod <- suppressWarnings(suppressMessages(mvgam(
     formula = spec$f, trend_formula = spec$t,
-    data = dat, family = poisson(),
+    data = dat, family = fam,
     run_model = FALSE, silent = 2
   )))
   methods_md(mod)

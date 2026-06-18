@@ -198,10 +198,15 @@ describe_predictors <- function(obj) {
     )
     resp_cols <- lhs
   }
+  # Restrict to columns the model formula actually references.
+  # Without this guard, every column in the user's data frame
+  # surfaces here, including ones the model ignores -- which
+  # misleads readers about what enters the linear predictor.
+  used_vars <- formula_used_vars(obj)
   # Skip canonical panel keys plus the response column(s); they are
   # already covered by the dimensions line above.
   skip <- unique(c(resp_cols, "time", "series"))
-  predictors <- setdiff(names(data), skip)
+  predictors <- intersect(setdiff(names(data), skip), used_vars)
   if (length(predictors) == 0L) return(character(0L))
   out <- character(0L)
   for (nm in predictors) {
@@ -227,6 +232,31 @@ describe_predictors <- function(obj) {
     out <- c(out, paste0("- $", nm, "$: ", desc))
   }
   out
+}
+
+#' @noRd
+formula_used_vars <- function(obj) {
+  # Collect every variable referenced anywhere in the model
+  # specification: obs formula (LHS + RHS, plus dpar / nlpar
+  # sub-formulas inside a brmsformula), and the trend formula
+  # (if any). Used to filter the Predictors list down to columns
+  # the model actually consumes.
+  vars <- character(0L)
+  add <- function(f) {
+    if (is.null(f)) return()
+    vars <<- c(vars, tryCatch(all.vars(stats::as.formula(f)),
+                                error = function(e) character(0L)))
+  }
+  obs <- obj$formula
+  if (inherits(obs, c("brmsformula", "bform", "mvbrmsformula"))) {
+    add(obs$formula)
+    for (sub in obs$pforms %||% list()) add(sub)
+  } else {
+    add(obs)
+  }
+  tf <- obj$trend_formula %||% obj$trend_model$formula
+  add(tf)
+  unique(vars)
 }
 
 #' @noRd
@@ -319,12 +349,91 @@ render_model_section <- function(ctx) {
     rhs = linear_predictor_rhs(obj, notation)
   )
 
+  rows <- c(rows, dpar_linear_predictor_rows(obj, notation))
   rows <- c(rows, term_definition_rows(obj, notation))
   rows <- c(rows, latent_dynamics_rows(obj, notation))
 
   block <- align_block(rows)
   glossary <- model_glossary(obj)
   paste(c("## Model", "", block, "", glossary), collapse = "\n")
+}
+
+#' @noRd
+dpar_linear_predictor_rows <- function(obj, notation) {
+  # Distributional parameter sub-formulas (`bf(y ~ x, sigma ~ x)`)
+  # emit prior rows with non-empty `dpar`. For each unique dpar
+  # present, render one extra row in the model section showing
+  # its own (linked) linear predictor. Default link map mirrors
+  # brms's per-dpar default link (sigma -> log, phi -> log,
+  # shape -> log, nu -> identity, ...). Unknown dpars fall
+  # through to identity.
+  prior <- obj$prior
+  if (is.null(prior) || nrow(prior) == 0L) return(list())
+  dpars <- prior$dpar %||% rep("", nrow(prior))
+  present <- unique(dpars[nzchar(dpars)])
+  if (length(present) == 0L) return(list())
+  rows <- list()
+  for (dp in present) {
+    link <- dpar_default_link(dp)
+    sym <- paste0("\\", dp, "_{i,t}")
+    # Greek for canonical dpars; else just the name in roman.
+    sym <- dpar_symbol(dp)
+    lhs <- link_application(link, sym)
+    rhs <- dpar_predictor_rhs(prior, dp)
+    rows[[length(rows) + 1L]] <- list(
+      lhs = lhs, op = "=", rhs = rhs
+    )
+  }
+  rows
+}
+
+#' @noRd
+dpar_default_link <- function(dp) {
+  # Mirrors brms's default link per distributional parameter.
+  switch(
+    dp,
+    sigma = "log", phi = "log", shape = "log", kappa = "log",
+    nu = "identity", hu = "logit",
+    zi = "logit", mu = "identity",
+    "identity"
+  )
+}
+
+#' @noRd
+dpar_symbol <- function(dp) {
+  # Map common dpar names to their Greek / mathematical form.
+  base <- switch(
+    dp,
+    sigma = "\\sigma", phi = "\\phi", shape = "\\alpha",
+    kappa = "\\kappa", nu = "\\nu",
+    hu = "\\pi_{\\text{hu}}", zi = "\\pi_{\\text{zi}}",
+    mu = "\\mu",
+    paste0("\\text{", dp, "}")
+  )
+  paste0(base, "_{i,t}")
+}
+
+#' @noRd
+dpar_predictor_rhs <- function(prior, dp) {
+  # Build the linear-predictor RHS for one dpar, mirroring the
+  # main linear predictor: intercept (when present) + per-coef
+  # b rows. Smooth / GP / RE / mo / me on dpar sub-formulas are
+  # uncommon enough that we render the bare fixed-effect form
+  # here and surface them via the prior table.
+  has_int <- any(prior$class == "Intercept" & prior$dpar == dp)
+  b_rows <- prior$class == "b" & prior$dpar == dp & nzchar(prior$coef)
+  coefs <- unique(prior$coef[b_rows])
+  parts <- character(0L)
+  if (has_int) {
+    parts <- c(parts, paste0("\\alpha^{(", dp, ")}"))
+  }
+  for (co in coefs) {
+    parts <- c(parts, paste0(
+      "\\beta_{", dp, ",", co, "} ", co, "_{i,t}"
+    ))
+  }
+  if (length(parts) == 0L) return("0")
+  paste(parts, collapse = " + ")
 }
 
 #' @noRd
@@ -551,19 +660,43 @@ link_application <- function(link, mu) {
 }
 
 #' @noRd
+dpar_aware_param <- function(name, obj) {
+  # Render a family auxiliary parameter (sigma, phi, nu, ...)
+  # either as the bare symbol (`\\sigma`) when it is a single
+  # population-level scalar, or as the indexed symbol
+  # (`\\sigma_{i,t}`) when the user attached a dpar sub-formula
+  # that makes it vary across observations.
+  prior <- obj$prior
+  has_dpar <- !is.null(prior) && nrow(prior) > 0L &&
+    any((prior$dpar %||% "") == name)
+  base <- switch(
+    name,
+    sigma = "\\sigma", phi = "\\phi", nu = "\\nu",
+    alpha = "\\alpha", shape = "\\alpha", kappa = "\\kappa",
+    paste0("\\", name)
+  )
+  if (has_dpar) paste0(base, "_{i,t}") else base
+}
+
+#' @noRd
 family_distribution_text <- function(fam_name, mu, obj) {
+  sigma <- dpar_aware_param("sigma", obj)
+  phi   <- dpar_aware_param("phi", obj)
+  nu    <- dpar_aware_param("nu", obj)
+  shape <- dpar_aware_param("shape", obj)
   switch(
     fam_name,
     poisson     = paste0("\\text{Poisson}(", mu, ")"),
     bernoulli   = paste0("\\text{Bernoulli}(", mu, ")"),
     binomial    = paste0("\\text{Binomial}(n_{i,t}, ", mu, ")"),
-    gaussian    = paste0("\\text{Normal}(", mu, ", \\sigma)"),
-    student     = paste0("\\text{StudentT}(\\nu, ", mu, ", \\sigma)"),
-    lognormal   = paste0("\\text{LogNormal}(", mu, ", \\sigma)"),
-    Gamma       = paste0("\\text{Gamma}(\\alpha, ", mu, ")"),
-    beta        = paste0("\\text{Beta}(", mu, ", \\phi)"),
-    negbinomial = paste0("\\text{NegBin}(", mu, ", \\phi)"),
-    nb          = paste0("\\text{NegBin}(", mu, ", \\phi)"),
+    gaussian    = paste0("\\text{Normal}(", mu, ", ", sigma, ")"),
+    student     = paste0("\\text{StudentT}(", nu, ", ", mu,
+                          ", ", sigma, ")"),
+    lognormal   = paste0("\\text{LogNormal}(", mu, ", ", sigma, ")"),
+    Gamma       = paste0("\\text{Gamma}(", shape, ", ", mu, ")"),
+    beta        = paste0("\\text{Beta}(", mu, ", ", phi, ")"),
+    negbinomial = paste0("\\text{NegBin}(", mu, ", ", phi, ")"),
+    nb          = paste0("\\text{NegBin}(", mu, ", ", phi, ")"),
     tweedie     = paste0(
       "\\text{Tweedie}(", mu, ", \\phi, \\xi)"
     ),
@@ -1533,8 +1666,12 @@ render_priors_section <- function(ctx) {
 
   # When both umbrella and specific rows survive for the same
   # parameter class, drop the umbrella. The specifics carry the
-  # actual labels; the umbrella renders as a generic placeholder.
-  vec_classes <- c("b", "sd", "sds", "L", "cor")
+  # actual labels; the umbrella renders as a generic placeholder
+  # (e.g. `\\sigma^{(gp)}_j` next to `\\sigma^{(gp)}_x`).
+  vec_classes <- c(
+    "b", "sd", "sds", "L", "cor",
+    "sdgp", "lscale", "meanme", "sdme", "simo"
+  )
   drop <- logical(nrow(prior))
   for (cls in unique(prior$class[prior$class %in% vec_classes])) {
     cls_rows <- prior$class == cls
@@ -1785,6 +1922,28 @@ implementation_prose <- function(fn, info) {
 #' @noRd
 formula_text <- function(f) {
   if (is.null(f)) return("NULL")
+  # brmsformula / mvbrmsformula deparse to an unreadable
+  # `structure(list(formula = y ~ x, pforms = list(...)))`
+  # by default. Reconstruct a `brms::bf(...)` call instead so
+  # the Implementation code block is copy-paste-ready.
+  if (inherits(f, c("brmsformula", "mvbrmsformula", "bform"))) {
+    main <- if (!is.null(f$formula)) f$formula else f
+    parts <- paste(deparse(main, width.cutoff = 60L),
+                    collapse = " ")
+    pforms <- f$pforms %||% list()
+    if (length(pforms) > 0L) {
+      for (nm in names(pforms)) {
+        parts <- c(parts, paste0(nm, " = ",
+                                  paste(deparse(pforms[[nm]],
+                                                 width.cutoff = 60L),
+                                        collapse = " ")))
+      }
+    }
+    if (isTRUE(f$nl)) {
+      parts <- c(parts, "nl = TRUE")
+    }
+    return(paste0("brms::bf(", paste(parts, collapse = ", "), ")"))
+  }
   paste(deparse(f, width.cutoff = 60L), collapse = " ")
 }
 
@@ -1852,6 +2011,9 @@ format_parameter_symbol <- function(row) {
   dpar <- row$dpar %||% ""
 
   if (identical(cls, "Intercept")) {
+    if (nzchar(dpar)) {
+      return(paste0("\\alpha^{(", dpar, ")}"))
+    }
     return("\\alpha")
   }
   if (identical(cls, "b")) {
