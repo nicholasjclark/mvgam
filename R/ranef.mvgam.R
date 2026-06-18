@@ -127,15 +127,8 @@ ranef.mvgam <- function(object, summary = TRUE, robust = FALSE,
   # (group, prefix) pair becomes its own entry in the returned
   # list, keeping the brms-parity shape on univariate fits
   # (`prefix == ""`, key = bare group name).
-  reframe$row_prefix <- ifelse(
-    !is.na(reframe$nlpar) & nzchar(reframe$nlpar), reframe$nlpar,
-    ifelse(
-      !is.na(reframe$dpar) & nzchar(reframe$dpar), reframe$dpar,
-      ifelse(
-        !is.na(reframe$resp) & nzchar(reframe$resp), reframe$resp,
-        ""
-      )
-    )
+  reframe$row_prefix <- make_row_prefix(
+    reframe$nlpar, reframe$dpar, reframe$resp
   )
   alias_keys <- ifelse(
     nzchar(reframe$row_prefix),
@@ -288,15 +281,8 @@ VarCorr.mvgam <- function(x, sigma = 1, summary = TRUE,
   # match the alias map for multi-response, nlpar and dpar fits.
   # Univariate rows have an empty prefix and the key is the bare
   # group name, preserving the brms-parity list shape.
-  reframe$row_prefix <- ifelse(
-    !is.na(reframe$nlpar) & nzchar(reframe$nlpar), reframe$nlpar,
-    ifelse(
-      !is.na(reframe$dpar) & nzchar(reframe$dpar), reframe$dpar,
-      ifelse(
-        !is.na(reframe$resp) & nzchar(reframe$resp), reframe$resp,
-        ""
-      )
-    )
+  reframe$row_prefix <- make_row_prefix(
+    reframe$nlpar, reframe$dpar, reframe$resp
   )
   reframe$alias_key <- ifelse(
     nzchar(reframe$row_prefix),

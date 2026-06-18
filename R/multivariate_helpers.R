@@ -78,6 +78,28 @@ has_rescor <- function(obj) {
 
 
 #' @noRd
+make_row_prefix <- function(nlpar, dpar, resp) {
+  # Per-row routing prefix for brms parameter aliasing. brms's
+  # stancode writes per-row aliases using whichever of these is
+  # set, in priority order: nlpar > dpar > resp. Returns "" when
+  # none is set (the univariate, no-dpar, no-nlpar case).
+  # Centralised so the ifelse ladder lives in one place; was
+  # previously duplicated in mvgam_ranef_aliases / ranef.mvgam /
+  # VarCorr.mvgam.
+  ifelse(
+    !is.na(nlpar) & nzchar(nlpar), nlpar,
+    ifelse(
+      !is.na(dpar) & nzchar(dpar), dpar,
+      ifelse(
+        !is.na(resp) & nzchar(resp), resp,
+        ""
+      )
+    )
+  )
+}
+
+
+#' @noRd
 mv_resp_fan_out <- function(object, resp) {
   # Per-response fan-out for multivariate user-facing methods.
   # When `resp` is NULL on an mv fit, re-invoke the calling
@@ -92,6 +114,14 @@ mv_resp_fan_out <- function(object, resp) {
   # `match.call(sys.function(-1L), sys.call(-1L))`, swap `resp`
   # per iteration, and eval in the caller's parent frame so any
   # symbolic arguments resolve in the user's environment.
+  #
+  # Assumes direct S3 method invocation (`residuals(fit)` etc.).
+  # Does not support `do.call(method.mvgam, ...)` or S4 dispatch,
+  # which insert intermediate frames and shift the -1L / -2L
+  # offsets. Every caller in mvgam today uses direct dispatch, so
+  # this is safe; revisit if a future caller wraps the method via
+  # do.call or a magrittr pipe and the response loop ends up
+  # iterating against an unexpected frame.
   if (!is.null(resp) ||
         !inherits(object$formula, "mvbrmsformula")) {
     return(NULL)

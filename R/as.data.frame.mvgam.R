@@ -375,16 +375,7 @@ mvgam_ranef_aliases <- function(x) {
     # under one id, so the prefix must be read per-row (not just
     # the first row) or the second nlpar's parameters collide
     # with the first's aliases.
-    row_pfx <- ifelse(
-      !is.na(rows$nlpar) & nzchar(rows$nlpar), rows$nlpar,
-      ifelse(
-        !is.na(rows$dpar)  & nzchar(rows$dpar),  rows$dpar,
-        ifelse(
-          !is.na(rows$resp) & nzchar(rows$resp), rows$resp,
-          ""
-        )
-      )
-    )
+    row_pfx <- make_row_prefix(rows$nlpar, rows$dpar, rows$resp)
     coef_alias <- ifelse(
       nzchar(row_pfx), paste0(row_pfx, "_", coefs), coefs
     )
