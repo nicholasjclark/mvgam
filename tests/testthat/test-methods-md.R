@@ -307,12 +307,51 @@ test_that("dpar second-formula renders its own linear predictor", {
     "\\\\log \\\\sigma_\\{i,t\\} &= \\\\alpha\\^\\{\\(sigma\\)\\}",
     out
   ))
+  # `\\,` thin space between coef token and the data-column
+  # symbol; shared with the nl per-nlpar predictor format.
   expect_true(grepl(
-    "\\\\beta_\\{sigma,x\\} x_\\{i,t\\}", out
+    "\\\\beta_\\{sigma,x\\} \\\\, x_\\{i,t\\}", out
   ))
   # Priors block carries the distinct alpha^{(sigma)}.
   expect_true(grepl(
     "\\\\alpha\\^\\{\\(sigma\\)\\} &\\\\sim", out
+  ))
+})
+
+test_that("nl formula renders per-nlpar decompositions", {
+  set.seed(1L)
+  dat <- data.frame(
+    time = rep(1:20, 4),
+    series = factor(rep(paste0("s", 1:4), each = 20)),
+    env = rnorm(80),
+    trait1 = rep(rnorm(4), each = 20),
+    y = rnorm(80)
+  )
+  f <- brms::bf(y ~ a + b * env,
+                a + b ~ trait1,
+                nl = TRUE)
+  mod <- suppressWarnings(suppressMessages(mvgam(
+    formula = f, data = dat, family = gaussian(),
+    run_model = FALSE, silent = 2L
+  )))
+  out <- methods_md(mod)
+  # Top-level mu uses nlpar tokens verbatim with (i, t) subscripts.
+  expect_true(grepl("a_\\{i,t\\}", out))
+  expect_true(grepl("b_\\{i,t\\}", out))
+  expect_true(grepl("env_\\{i,t\\}", out))
+  # Each nlpar gets its own decomposition row with alpha^{(np)}
+  # and beta_{np,trait1}.
+  expect_true(grepl(
+    "a_\\{i,t\\} &= \\\\alpha\\^\\{\\(a\\)\\}", out
+  ))
+  expect_true(grepl(
+    "b_\\{i,t\\} &= \\\\alpha\\^\\{\\(b\\)\\}", out
+  ))
+  expect_true(grepl(
+    "\\\\beta_\\{a,trait1\\} \\\\, trait1_\\{i,t\\}", out
+  ))
+  expect_true(grepl(
+    "\\\\beta_\\{b,trait1\\} \\\\, trait1_\\{i,t\\}", out
   ))
 })
 

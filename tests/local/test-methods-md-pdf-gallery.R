@@ -72,6 +72,16 @@ fixtures <- list(
        family = gaussian(),
        extra_data = list(
          yA = rnorm(120), yB = rnorm(120)
+       )),
+  list(name = "15_nl_trait_slopes",
+       f = brms::bf(yC ~ a + b * x,
+                     a + b ~ trait1,
+                     nl = TRUE),
+       t = NULL,
+       family = gaussian(),
+       extra_data = list(
+         yC = rnorm(120),
+         trait1 = rep(rnorm(4), each = 30)
        ))
 )
 
@@ -97,8 +107,13 @@ render_one <- function(spec) {
 blocks <- vapply(fixtures, function(s) {
   cat("rendering fixture", s$name, "...\n")
   body <- render_one(s)
-  paste0("\n# Fixture: ", s$name, " -- `",
-         paste(deparse(s$f), collapse = " "), "`\n\n",
+  # `formula_text()` reconstructs brmsformula / mvbrmsformula
+  # back to a `brms::bf(...) [+ brms::set_rescor(...)]` string;
+  # raw `deparse()` on a brms object would spit the `structure(
+  # list(formula = ..., pforms = ...))` internal form into the
+  # header.
+  title <- mvgam:::formula_text(s$f)
+  paste0("\n# Fixture: ", s$name, " -- `", title, "`\n\n",
          body, "\n\n")
 }, character(1L))
 

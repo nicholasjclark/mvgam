@@ -1597,7 +1597,17 @@ deparse0 <- function(expr, ...) {
 #' @return Logical indicating if formula is nonlinear
 #' @noRd
 is_nonlinear_formula <- function(formula) {
-  checkmate::assert(inherits(formula, c("formula", "brmsformula", "brmsterms")))
+  checkmate::assert(inherits(formula, c("formula", "brmsformula",
+                                          "mvbrmsformula", "brmsterms")))
+
+  # mvbrmsformula is the multi-response wrapper; nl is a per-response
+  # property recorded on each form in `$forms`. Return TRUE if any
+  # form carries `nl = TRUE` so callers that branch on "is this an
+  # nl model anywhere" route correctly.
+  if (inherits(formula, "mvbrmsformula")) {
+    return(any(vapply(formula$forms, is_nonlinear_formula,
+                       logical(1L))))
+  }
 
   # Check for brms bf() structure with nl = TRUE
   if (inherits(formula, "brmsterms")) {

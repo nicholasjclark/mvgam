@@ -421,14 +421,28 @@ render_model_section <- function(ctx) {
       op  = "\\sim",
       rhs = family_distribution_text(fam_name, mu, obj)
     )
-    rows[[length(rows) + 1L]] <- list(
-      lhs = link_application(link, mu),
-      op  = "=",
-      rhs = linear_predictor_rhs(obj, notation)
-    )
+    # Non-linear formulas (`bf(y ~ a + b*env, a + b ~ ..., nl = TRUE)`)
+    # render the top-level mu with the nlpar tokens used verbatim
+    # (a_{i,t}, b_{i,t}); each nlpar then gets its own decomposition
+    # row below. Linear formulas use the standard
+    # `linear_predictor_rhs` walker.
+    if (is_nonlinear_formula(obj$formula)) {
+      rows[[length(rows) + 1L]] <- list(
+        lhs = link_application(link, mu),
+        op  = "=",
+        rhs = nl_top_linpred_rhs(obj)
+      )
+    } else {
+      rows[[length(rows) + 1L]] <- list(
+        lhs = link_application(link, mu),
+        op  = "=",
+        rhs = linear_predictor_rhs(obj, notation)
+      )
+    }
   }
 
   rows <- c(rows, dpar_linear_predictor_rows(obj, notation))
+  rows <- c(rows, nlpar_linear_predictor_rows(obj, notation))
   rows <- c(rows, term_definition_rows(obj, notation))
   rows <- c(rows, latent_dynamics_rows(obj, notation))
 
@@ -494,25 +508,131 @@ dpar_symbol <- function(dp) {
 
 #' @noRd
 dpar_predictor_rhs <- function(prior, dp) {
-  # Build the linear-predictor RHS for one dpar, mirroring the
-  # main linear predictor: intercept (when present) + per-coef
-  # b rows. Smooth / GP / RE / mo / me on dpar sub-formulas are
-  # uncommon enough that we render the bare fixed-effect form
-  # here and surface them via the prior table.
-  has_int <- any(prior$class == "Intercept" & prior$dpar == dp)
-  b_rows <- prior$class == "b" & prior$dpar == dp & nzchar(prior$coef)
-  coefs <- unique(prior$coef[b_rows])
+  # Shared shape with nl sub-formulas; see `sub_predictor_rhs`.
+  # dpar fits emit `Intercept` as its own class row keyed on the
+  # dpar column, so `intercept_in_b = FALSE`.
+  sub_predictor_rhs(prior, dp, col = "dpar",
+                     intercept_in_b = FALSE)
+}
+
+#' @noRd
+sub_predictor_rhs <- function(prior, value, col,
+                                intercept_in_b = FALSE) {
+  # Build the linear-predictor RHS for one sub-formula entry
+  # (a dpar or an nlpar). Mirrors the main linear predictor:
+  # intercept (when present) + per-coef b rows. Smooth / GP / RE /
+  # mo / me on sub-formulas are uncommon enough that the bare
+  # fixed-effect form is rendered here and other shapes surface
+  # via the priors block.
+  #
+  # `intercept_in_b` toggles where brms emits the per-sub-formula
+  # intercept:
+  #   * dpar (`sigma ~ x`): a separate `Intercept` class row tagged
+  #     with the dpar column. Detect via `class == "Intercept"`.
+  #   * nlpar (`bf(..., a ~ ..., nl = TRUE)`): brms folds the
+  #     intercept INTO the `b` class as `b_<nlpar>_Intercept` with
+  #     no separate `Intercept` row. Detect via the coef name.
+  col_vals <- prior[[col]] %||% rep("", nrow(prior))
+  b_rows <- prior$class == "b" & col_vals == value &
+    nzchar(prior$coef)
+  b_coefs <- prior$coef[b_rows]
+  if (intercept_in_b) {
+    has_int <- "Intercept" %in% b_coefs
+    coefs <- unique(b_coefs[b_coefs != "Intercept"])
+  } else {
+    has_int <- any(prior$class == "Intercept" & col_vals == value)
+    coefs <- unique(b_coefs)
+  }
   parts <- character(0L)
   if (has_int) {
-    parts <- c(parts, paste0("\\alpha^{(", dp, ")}"))
+    parts <- c(parts, paste0("\\alpha^{(", value, ")}"))
   }
   for (co in coefs) {
     parts <- c(parts, paste0(
-      "\\beta_{", dp, ",", co, "} ", co, "_{i,t}"
+      "\\beta_{", value, ",", co, "} \\, ", co, "_{i,t}"
     ))
   }
   if (length(parts) == 0L) return("0")
   paste(parts, collapse = " + ")
+}
+
+#' @noRd
+nl_top_linpred_rhs <- function(obj) {
+  # Render the top-level RHS of a `bf(..., nl = TRUE)` formula
+  # verbatim, with each nlpar token decorated with the `(i, t)`
+  # subscript so the reader knows it stands for the per-obs
+  # value defined in the per-nlpar decomposition below. The
+  # nlpars are the names of `$pforms`. Other tokens (covariates
+  # like `env`, operators like `*`, `+`) pass through unchanged
+  # via `deparse` then a per-token rewrite. Math output is
+  # intentionally plain (no `\beta`-style coefs) because in nl
+  # form the top-level RHS encodes the structural equation
+  # rather than a linear-coefficient sum.
+  f <- obj$formula
+  nlpars <- names(f$pforms %||% list())
+  if (length(nlpars) == 0L) {
+    return(linear_predictor_rhs(obj, "default"))
+  }
+  rhs_src <- paste(deparse(f$formula[[3L]], width.cutoff = 80L),
+                    collapse = " ")
+  # Decorate each nlpar token. Use word boundaries so `b` in `bx`
+  # is not rewritten when only `b` is the nlpar.
+  for (np in nlpars) {
+    pat <- paste0("\\b", np, "\\b")
+    rhs_src <- gsub(pat, paste0(np, "_{i,t}"), rhs_src)
+  }
+  # Subscript bare data covariates `x` -> `x_{i,t}` so they look
+  # like the rest of the math block. Skip already-subscripted
+  # tokens via the same word-boundary trick (no `_{` immediately
+  # after). Pull the covariate list from formula_used_vars and
+  # rewrite only those (avoids touching constants / numbers).
+  for (v in setdiff(formula_used_vars(obj), nlpars)) {
+    pat <- paste0("\\b", v, "\\b(?!_\\{)")
+    rhs_src <- gsub(pat, paste0(v, "_{i,t}"),
+                     rhs_src, perl = TRUE)
+  }
+  # `*` is the multiplication marker; render as a thin space so
+  # `a + b * env` becomes `a_{i,t} + b_{i,t} env_{i,t}` rather
+  # than dropping the operator entirely.
+  rhs_src <- gsub("\\s*\\*\\s*", " \\\\, ", rhs_src)
+  rhs_src
+}
+
+#' @noRd
+nlpar_linear_predictor_rows <- function(obj, notation) {
+  # Per-nlpar decomposition rows for `bf(..., nl = TRUE)`. Each
+  # entry in `$pforms` (e.g. `a ~ trait1 + (1 | sp | species)`)
+  # gets one row in the Model section showing how that nlpar
+  # decomposes into intercept + fixed coefs. Random-effect terms
+  # in the sub-formula surface in the Priors block and via the
+  # standard ranef glossary; v1 of the nlpar row covers the
+  # fixed-effect part only.
+  if (!is_nonlinear_formula(obj$formula)) {
+    return(list())
+  }
+  prior <- obj$prior
+  if (is.null(prior) || nrow(prior) == 0L) return(list())
+  nlpars <- unique(prior$nlpar[nzchar(prior$nlpar %||% "")])
+  if (length(nlpars) == 0L) return(list())
+  out <- vector("list", length(nlpars))
+  for (i in seq_along(nlpars)) {
+    np <- nlpars[i]
+    out[[i]] <- list(
+      lhs = paste0(np, "_{i,t}"),
+      op  = "=",
+      rhs = nlpar_predictor_rhs(prior, np)
+    )
+  }
+  out
+}
+
+#' @noRd
+nlpar_predictor_rhs <- function(prior, np) {
+  # nl sub-formula intercept lives inside the `b` class as
+  # `b_<nlpar>_Intercept`, so split via the coef name not the
+  # row class.
+  sub_predictor_rhs(prior, np, col = "nlpar",
+                     intercept_in_b = TRUE)
 }
 
 #' @noRd
@@ -875,9 +995,16 @@ classify_obs_parameters <- function(obj) {
 #' @noRd
 obs_fixed_terms_from_prior <- function(prior) {
   if (is.null(prior) || nrow(prior) == 0L) return(character(0L))
-  has_int <- any(prior$class == "Intercept" & nzchar(prior$dpar) == FALSE)
+  # Skip rows scoped to a dpar or nlpar; those drive their own
+  # per-dpar / per-nlpar predictor row, not the top-level mu.
+  nlpar_col <- prior$nlpar %||% rep("", nrow(prior))
+  has_int <- any(
+    prior$class == "Intercept" &
+      !nzchar(prior$dpar) &
+      !nzchar(nlpar_col)
+  )
   b_rows <- prior$class == "b" & !nzchar(prior$dpar) &
-    nzchar(prior$coef)
+    !nzchar(nlpar_col) & nzchar(prior$coef)
   coefs <- prior$coef[b_rows]
   # Drop basis stubs and the bare "" umbrella row; those are not
   # user-supplied population effects. Also drop the monotonic
@@ -2031,7 +2158,13 @@ formula_text <- function(f) {
                                         collapse = " ")))
       }
     }
-    if (isTRUE(f$nl)) {
+    # brms records the nl status as an attribute on the inner
+    # formula slot (`attr(f$formula, "nl")`), not as `f$nl`.
+    # Also accept `f$nl` for forward-compat with any wrapper
+    # that promotes it to a top-level slot.
+    is_nl <- isTRUE(f$nl) ||
+      isTRUE(attr(f$formula, "nl"))
+    if (is_nl) {
       parts <- c(parts, "nl = TRUE")
     }
     return(paste0("brms::bf(", paste(parts, collapse = ", "), ")"))
