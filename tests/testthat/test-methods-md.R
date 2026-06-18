@@ -664,3 +664,148 @@ test_that("loadings_prior features + distances kernel emits kernel rows", {
     "Z_\\{\\\\cdot,k\\} &\\\\sim \\\\text\\{MVNormal\\}", out
   ))
 })
+
+
+# ---------------------------------------------------------------
+# Phase D: closure-unit + mv-custom family rendering
+# ---------------------------------------------------------------
+
+make_occ_prefit <- function() {
+  set.seed(1L)
+  d <- data.frame(
+    series = factor(rep(seq_len(8), each = 4)),
+    time = rep(1L, 32),
+    visit = rep(seq_len(4), 8),
+    y = rbinom(32, 1L, 0.4),
+    elev = rep(rnorm(8), each = 4),
+    tod = stats::runif(32)
+  )
+  suppressWarnings(suppressMessages(mvgam(
+    formula = bf(y ~ elev, p ~ tod),
+    data = d, family = occ(),
+    run_model = FALSE, silent = 2
+  )))
+}
+
+make_nmix_prefit <- function(type = "poisson_binomial") {
+  set.seed(1L)
+  d <- data.frame(
+    series = factor(rep(seq_len(8), each = 4)),
+    time = rep(1L, 32),
+    visit = rep(seq_len(4), 8),
+    y = if (type == "royle_nichols") {
+      rbinom(32, 1L, 0.4)
+    } else {
+      rpois(32, 3)
+    },
+    cap = rep(10L, 32),
+    elev = rep(rnorm(8), each = 4),
+    tod = stats::runif(32)
+  )
+  suppressWarnings(suppressMessages(mvgam(
+    formula = bf(y ~ elev, p ~ tod),
+    data = d, family = nmix(type),
+    run_model = FALSE, silent = 2
+  )))
+}
+
+test_that("occ() emits state + obs + logit(p) rows", {
+  out <- methods_md(make_occ_prefit())
+  expect_true(grepl(
+    "y_\\{i,j\\} \\\\mid z_\\{i\\} &\\\\sim \\\\text\\{Bernoulli\\}",
+    out
+  ))
+  expect_true(grepl("z_\\{i\\} &\\\\sim \\\\text\\{Bernoulli\\}", out))
+  expect_true(grepl("\\\\text\\{logit\\}\\(\\\\psi_\\{i\\}\\)", out))
+  expect_true(grepl("\\\\text\\{logit\\}\\(p_\\{i,j\\}\\)", out))
+  # Data section calls out the closure-unit grouping dims.
+  expect_true(grepl("\\$G = 8\\$ closure units", out))
+  expect_true(grepl("\\\\bar J", out))
+})
+
+test_that("nmix Poisson-binomial emits N | lambda + Binomial obs row", {
+  out <- methods_md(make_nmix_prefit("poisson_binomial"))
+  expect_true(grepl(
+    "y_\\{i,j\\} \\\\mid N_\\{i\\} &\\\\sim \\\\text\\{Binomial\\}",
+    out
+  ))
+  expect_true(grepl(
+    "N_\\{i\\} &\\\\sim \\\\text\\{Poisson\\}\\(\\\\lambda_\\{i\\}\\)",
+    out
+  ))
+  # Detection link is logit for PB.
+  expect_true(grepl("\\\\text\\{logit\\}\\(p_\\{i,j\\}\\)", out))
+})
+
+test_that("nmix RN emits Bernoulli(1 - (1 - p)^N) obs row", {
+  out <- methods_md(make_nmix_prefit("royle_nichols"))
+  expect_true(grepl(
+    "\\\\text\\{Bernoulli\\}\\(1 - \\(1 - p_\\{i,j\\}\\)\\^\\{N_\\{i\\}\\}\\)",
+    out
+  ))
+})
+
+test_that("nmix PPM emits Poisson(N * p) and log(p) link", {
+  out <- methods_md(make_nmix_prefit("poisson_poisson"))
+  expect_true(grepl(
+    "\\\\text\\{Poisson\\}\\(N_\\{i\\} \\\\cdot p_\\{i,j\\}\\)",
+    out
+  ))
+  # PPM detection link is log per R/families.R::nmix_poisson_poisson.
+  expect_true(grepl("\\\\log p_\\{i,j\\}", out))
+})
+
+test_that("diri() emits Dirichlet + alpha = phi * pi + softmax row", {
+  set.seed(1L)
+  K <- 3L; n_sites <- 5L
+  d <- expand.grid(
+    time = 1:n_sites, series = factor(paste0("sp", 1:K))
+  )
+  d$env <- rep(rnorm(n_sites), times = K)
+  d$y <- runif(n_sites * K)
+  d$y <- d$y / tapply(d$y, d$time, sum)[match(d$time, names(tapply(d$y, d$time, sum)))]
+  mod <- suppressWarnings(suppressMessages(jsdgam(
+    formula = y ~ env * series, factor_formula = ~ -1,
+    data = d, unit = time, species = series,
+    family = diri(), n_lv = 2L,
+    run_model = FALSE, silent = 2, backend = "cmdstanr"
+  )))
+  out <- methods_md(mod)
+  expect_true(grepl(
+    "\\\\mathbf\\{Y\\}_i &\\\\sim \\\\text\\{Dirichlet\\}",
+    out
+  ))
+  expect_true(grepl(
+    "\\\\boldsymbol\\{\\\\alpha\\}_i &= \\\\phi", out
+  ))
+  expect_true(grepl(
+    "\\\\boldsymbol\\{\\\\pi\\}_i &= \\\\text\\{softmax\\}",
+    out
+  ))
+})
+
+test_that("mvn() emits MVNormal + Sigma decomposition + LKJCholesky", {
+  set.seed(1L)
+  K <- 3L; n_sites <- 6L
+  d <- expand.grid(
+    time = 1:n_sites, series = factor(paste0("sp", 1:K))
+  )
+  d$env <- rep(rnorm(n_sites), times = K)
+  d$y <- rnorm(n_sites * K)
+  mod <- suppressWarnings(suppressMessages(jsdgam(
+    formula = y ~ env, factor_formula = ~ -1,
+    data = d, unit = time, species = series,
+    family = mvn(), n_lv = 1L,
+    run_model = FALSE, silent = 2, backend = "cmdstanr"
+  )))
+  out <- methods_md(mod)
+  expect_true(grepl(
+    "\\\\mathbf\\{Y\\}_i &\\\\sim \\\\text\\{MVNormal\\}",
+    out
+  ))
+  expect_true(grepl("\\\\text\\{diag\\}\\(\\\\boldsymbol\\{\\\\Psi\\}\\)", out))
+  expect_true(grepl(
+    "L_\\\\Omega &\\\\sim \\\\text\\{LKJCholesky\\}\\(1\\)",
+    out
+  ))
+})

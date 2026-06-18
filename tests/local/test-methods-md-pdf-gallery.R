@@ -93,7 +93,46 @@ fixtures <- list(
        loadings_prior = list(column_shrinkage = "mgp")),
   list(name = "18_ar_hier_cor",
        f = y ~ x,
-       t = ~ AR(p = 1, gr = region, subgr = series))
+       t = ~ AR(p = 1, gr = region, subgr = series)),
+  list(name = "19_occ_single_season",
+       f = brms::bf(y_occ ~ x, p ~ z),
+       t = NULL,
+       family = occ(),
+       data_overrides = list(
+         # Each (series, time) is one closure unit; we have
+         # 4 units x 30 visits each.
+         y_occ = rbinom(120, 1L, 0.4)
+       )),
+  list(name = "20_nmix_pb",
+       f = brms::bf(y_nmix ~ x, p ~ z),
+       t = NULL,
+       family = nmix("poisson_binomial"),
+       data_overrides = list(
+         y_nmix = rpois(120, 3),
+         cap = rep(10L, 120)
+       )),
+  list(name = "21_diri",
+       use_jsdgam = TRUE,
+       f = y_diri ~ x * series,
+       factor_formula = ~ -1,
+       family = diri(),
+       n_lv = 2L,
+       data_overrides = list(
+         y_diri = local({
+           y <- runif(120)
+           sums <- tapply(y, rep(1:30, 4), sum)
+           y / sums[match(rep(1:30, 4), names(sums))]
+         })
+       )),
+  list(name = "22_mvn",
+       use_jsdgam = TRUE,
+       f = y_mvn ~ x,
+       factor_formula = ~ -1,
+       family = mvn(),
+       n_lv = 1L,
+       data_overrides = list(
+         y_mvn = rnorm(120)
+       ))
 )
 
 # Render each fixture through methods_md(), concatenate into one
@@ -106,6 +145,26 @@ render_one <- function(spec) {
   fixture_data <- dat
   for (nm in names(spec$extra_data %||% list())) {
     fixture_data[[nm]] <- spec$extra_data[[nm]]
+  }
+  for (nm in names(spec$data_overrides %||% list())) {
+    fixture_data[[nm]] <- spec$data_overrides[[nm]]
+  }
+  # jsdgam fixtures (mvn / mvt / diri / multi / categ) need
+  # `unit` and `species` instead of mvgam's series / time keys.
+  if (isTRUE(spec$use_jsdgam)) {
+    jsdgam_args <- list(
+      formula = spec$f,
+      factor_formula = spec$factor_formula %||% ~ -1,
+      data = fixture_data,
+      unit = quote(time), species = quote(series),
+      family = fam,
+      n_lv = spec$n_lv %||% 1L,
+      run_model = FALSE, silent = 2, backend = "cmdstanr"
+    )
+    mod <- suppressWarnings(suppressMessages(
+      do.call(jsdgam, jsdgam_args)
+    ))
+    return(methods_md(mod))
   }
   mvgam_args <- list(
     formula = spec$f, trend_formula = spec$t,

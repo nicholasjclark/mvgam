@@ -156,7 +156,7 @@ align_block <- function(rows) {
 render_data_section <- function(ctx) {
   obj <- ctx$object
   fam <- obj$family
-  fam_name <- fam$family %||% "gaussian"
+  fam_name <- resolve_family_name(fam) %||% "gaussian"
   link <- fam$link %||% "identity"
   dims <- describe_data_dimensions(obj)
 
@@ -286,6 +286,56 @@ describe_data_dimensions <- function(obj) {
   if (!is.na(n_time)) {
     parts <- c(parts, paste0("$T = ", n_time, "$ time points"))
   }
+  parts <- c(parts, closure_unit_data_dimensions(obj))
+  parts <- c(parts, factor_loadings_data_dimensions(obj))
+  parts
+}
+
+#' @noRd
+closure_unit_data_dimensions <- function(obj) {
+  if (!methods_md_is_closure_unit(obj)) return(character(0L))
+  data <- obj$data %||% data.frame()
+  if (nrow(data) == 0L) return(character(0L))
+  # Closure-unit grouping is (series, time) by default and
+  # (series, site, time) under multi_season -- read it off the
+  # family attribute to avoid hard-coding.
+  ug <- attr(obj$family, "mvgam_unit_grouping") %||%
+    c("series", "time")
+  ug <- intersect(ug, names(data))
+  if (!length(ug)) return(character(0L))
+  units_df <- unique(data[, ug, drop = FALSE])
+  n_unit <- nrow(units_df)
+  # Visits per unit -- count rows per unit-key combination.
+  unit_key <- do.call(paste, c(data[, ug, drop = FALSE], sep = "\v"))
+  visits <- tabulate(match(unit_key, unique(unit_key)))
+  mean_visits <- round(mean(visits), 2L)
+  parts <- c(
+    paste0("$G = ", n_unit, "$ closure units"),
+    paste0("$\\bar J = ", mean_visits, "$ visits per unit ",
+           "(range ", min(visits), "-", max(visits), ")")
+  )
+  parts
+}
+
+#' @noRd
+factor_loadings_data_dimensions <- function(obj) {
+  spec <- trend_spec_for(obj)
+  if (is.null(spec)) return(character(0L))
+  ls <- spec$loadings_prior_spec
+  if (is.null(ls)) return(character(0L))
+  parts <- character(0L)
+  if (isTRUE(ls$n_features > 0L)) {
+    parts <- c(parts, paste0(
+      "$p_{\\text{features}} = ", ls$n_features,
+      "$ trait features"
+    ))
+  }
+  if (isTRUE(ls$n_distances > 0L)) {
+    parts <- c(parts, paste0(
+      "$p_{\\text{distances}} = ", ls$n_distances,
+      "$ distance matrices"
+    ))
+  }
   parts
 }
 
@@ -316,6 +366,28 @@ family_data_label <- function(fam_name) {
     sratio = "ordered categorical observations",
     cratio = "ordered categorical observations",
     acat = "ordered categorical observations",
+    occ = "per-visit binary detections (single-season occupancy)",
+    nmix = paste0(
+      "per-visit binomial counts (N-mixture, ",
+      "Poisson abundance + binomial detection)"
+    ),
+    nmix_poisson_binomial = paste0(
+      "per-visit binomial counts (N-mixture, ",
+      "Poisson abundance + binomial detection)"
+    ),
+    nmix_royle_nichols = paste0(
+      "per-visit binary detections (Royle-Nichols, ",
+      "Poisson abundance + per-individual detection)"
+    ),
+    nmix_poisson_poisson = paste0(
+      "per-visit counts (Poisson abundance + ",
+      "Poisson encounter rate; Neyman Type A marginal)"
+    ),
+    mvn = "joint multivariate normal observations per unit",
+    mvt = "joint multivariate Student-t observations per unit",
+    diri = "per-unit simplex compositions",
+    multi = "per-unit multinomial category counts",
+    categ = "per-unit single categorical draws",
     paste0(fam_name, " observations")
   )
 }
@@ -336,7 +408,7 @@ render_model_section <- function(ctx) {
   obj <- ctx$object
   notation <- ctx$notation
   fam <- obj$family
-  fam_name <- fam$family %||% "gaussian"
+  fam_name <- resolve_family_name(fam) %||% "gaussian"
   link <- fam$link %||% "identity"
 
   rows <- list()
@@ -414,6 +486,20 @@ render_model_section <- function(ctx) {
         )
       }
     }
+  } else if (!is.null(closure_unit_family_kind(obj))) {
+    # Closure-unit detection family (occ / nmix variants). The
+    # per-visit observation row + per-unit latent state row +
+    # state linpred replace the standard `y ~ Family(mu)` /
+    # `link(mu) = ...` pair. The detection linpred (`logit(p) =
+    # ...` or `log p = ...`) is emitted by
+    # `dpar_linear_predictor_rows` below via the `p` dpar rows
+    # brms generates from `bf(..., p ~ <covs>)`.
+    rows <- c(rows, closure_unit_likelihood_rows(obj, notation))
+  } else if (!is.null(mv_custom_family_kind(obj))) {
+    # Multi-response custom family (mvn / mvt / diri / multi /
+    # categ): joint likelihood + Sigma decomposition (mvn /
+    # mvt) or softmax composition (diri / multi / categ).
+    rows <- c(rows, mv_custom_likelihood_rows(obj, notation))
   } else {
     mu <- mu_symbol(obj)
     rows[[length(rows) + 1L]] <- list(
@@ -466,12 +552,11 @@ dpar_linear_predictor_rows <- function(obj, notation) {
   dpars <- prior$dpar %||% rep("", nrow(prior))
   present <- unique(dpars[nzchar(dpars)])
   if (length(present) == 0L) return(list())
+  visit_grain <- methods_md_is_closure_unit(obj)
   rows <- list()
   for (dp in present) {
-    link <- dpar_default_link(dp)
-    sym <- paste0("\\", dp, "_{i,t}")
-    # Greek for canonical dpars; else just the name in roman.
-    sym <- dpar_symbol(dp)
+    link <- dpar_default_link(dp, family = obj$family)
+    sym <- dpar_symbol(dp, visit_grain = visit_grain)
     lhs <- link_application(link, sym)
     rhs <- dpar_predictor_rhs(prior, dp)
     rows[[length(rows) + 1L]] <- list(
@@ -482,29 +567,44 @@ dpar_linear_predictor_rows <- function(obj, notation) {
 }
 
 #' @noRd
-dpar_default_link <- function(dp) {
-  # Mirrors brms's default link per distributional parameter.
+dpar_default_link <- function(dp, family = NULL) {
+  # brms stashes each custom_family's per-dpar link as
+  # `family$link_<dp>` (e.g. `nmix("poisson_poisson")$link_p
+  # == "log"` while `nmix("poisson_binomial")$link_p == "logit"`).
+  # Read from the family object when present; fall back to the
+  # static map for the standard brms families that don't carry
+  # the slot.
+  if (!is.null(family)) {
+    link_slot <- family[[paste0("link_", dp)]]
+    if (!is.null(link_slot) && nzchar(link_slot)) return(link_slot)
+  }
   switch(
     dp,
     sigma = "log", phi = "log", shape = "log", kappa = "log",
     nu = "identity", hu = "logit",
     zi = "logit", mu = "identity",
+    p = "logit", r = "logit",
     "identity"
   )
 }
 
 #' @noRd
-dpar_symbol <- function(dp) {
+dpar_symbol <- function(dp, visit_grain = FALSE) {
   # Map common dpar names to their Greek / mathematical form.
+  # `visit_grain = TRUE` swaps the `_{i,t}` subscript for
+  # `_{i,j}` (closure-unit detection sub-formulas operate per
+  # visit `j` within unit `i`).
   base <- switch(
     dp,
     sigma = "\\sigma", phi = "\\phi", shape = "\\alpha",
     kappa = "\\kappa", nu = "\\nu",
     hu = "\\pi_{\\text{hu}}", zi = "\\pi_{\\text{zi}}",
     mu = "\\mu",
+    p = "p", r = "r",
     paste0("\\text{", dp, "}")
   )
-  paste0(base, "_{i,t}")
+  subscript <- if (visit_grain) "_{i,j}" else "_{i,t}"
+  paste0(base, subscript)
 }
 
 #' @noRd
@@ -639,14 +739,22 @@ nlpar_predictor_rhs <- function(prior, np) {
 #' @noRd
 model_glossary <- function(obj) {
   fam <- obj$family
-  fam_name <- fam$family %||% "gaussian"
+  fam_name <- resolve_family_name(fam) %||% "gaussian"
   link <- fam$link %||% "identity"
   defs <- c(
-    paste0("- $i$ indexes observations, $t$ indexes time"),
-    paste0(
+    paste0("- $i$ indexes observations, $t$ indexes time")
+  )
+  defs <- c(defs, closure_unit_glossary(obj))
+  defs <- c(defs, mv_custom_glossary(obj))
+  if (is.null(closure_unit_family_kind(obj)) &&
+        is.null(mv_custom_family_kind(obj))) {
+    defs <- c(defs, paste0(
       "- $\\mu_{i,t}$: conditional mean of $",
       response_letter(obj), "_{i,t}$ on the ", link, "-link scale"
-    ),
+    ))
+  }
+  defs <- c(
+    defs,
     "- $\\alpha$: population intercept",
     "- $\\beta_{j}$: population effect on covariate $j$"
   )
@@ -966,6 +1074,404 @@ family_distribution_text <- function(fam_name, mu, obj) {
     ),
     paste0("\\text{", fam_name, "}(", mu, ")")
   )
+}
+
+
+# ---------------------------------------------------------------
+# Closure-unit family rows (occ / nmix variants)
+# ---------------------------------------------------------------
+# Per-visit observation + per-unit latent state + state linpred
+# + detection linpred. Replaces the standard `y ~ Family(mu)` /
+# `link(mu) = ...` two-row pair that the main composer emits
+# for non-closure-unit families. Stan parameterisations verified
+# against R/families.R:
+#   * occ              : z_i ~ Bernoulli(psi_i); y | z ~ Bern
+#   * nmix (PB)        : N_i ~ Poisson(lambda); y | N ~ Bin
+#   * nmix (RN)        : N_i ~ Poisson(lambda); y | N ~ Bern(1 - (1-r)^N)
+#   * nmix (PPM)       : N_i ~ Poisson(lambda); y | N ~ Poisson(N r)
+#   (PPM marginal y_{i,j} ~ Poisson(lambda_i r_{i,j}) -- the
+#    Neyman Type A; both forms render correctly.)
+
+#' @noRd
+closure_unit_family_kind <- function(obj) {
+  # Returns one of: "occ", "nmix_pb", "nmix_rn", "nmix_ppm",
+  # or NULL when the family is not a detection family.
+  if (!methods_md_is_detection_family(obj)) return(NULL)
+  fam_name <- resolve_family_name(obj$family) %||% ""
+  switch(
+    fam_name,
+    occ                    = "occ",
+    nmix                   = "nmix_pb",
+    nmix_poisson_binomial  = "nmix_pb",
+    nmix_royle_nichols     = "nmix_rn",
+    nmix_poisson_poisson   = "nmix_ppm",
+    NULL
+  )
+}
+
+#' @noRd
+closure_unit_state_symbol <- function(kind) {
+  # The state parameter (\psi for occupancy, \lambda for
+  # abundance) that the state linpred maps onto.
+  switch(
+    kind,
+    occ      = "\\psi",
+    nmix_pb  = "\\lambda",
+    nmix_rn  = "\\lambda",
+    nmix_ppm = "\\lambda",
+    NULL
+  )
+}
+
+#' @noRd
+closure_unit_detection_symbol <- function(kind) {
+  # Per-visit detection-probability symbol. All variants name
+  # the brms dpar `p`, so the math output uses `p` for naming
+  # parity with `obj$prior$dpar == "p"` (which drives the
+  # detection linpred row via `dpar_linear_predictor_rows`).
+  # The mathematical interpretation of `p` differs by kind --
+  # per-visit detection (PB / occ), per-individual detection
+  # (RN), or per-visit encounter rate (PPM) -- and is
+  # documented in `closure_unit_glossary()`.
+  "p"
+}
+
+#' @noRd
+closure_unit_likelihood_rows <- function(obj, notation) {
+  kind <- closure_unit_family_kind(obj)
+  if (is.null(kind)) return(list())
+  det_sym   <- closure_unit_detection_symbol(kind)
+  # Multi-season fits index closure units by `(series, site,
+  # season)`, so the latent state and state probability carry a
+  # `_{i,t}` (season) subscript. Single-season uses bare `_i`.
+  unit_idx <- if (methods_md_is_multi_season(obj)) "{i,t}" else "{i}"
+  state_sym <- paste0(
+    closure_unit_state_symbol(kind), "_", unit_idx
+  )
+  latent_lhs <- paste0(
+    if (identical(kind, "occ")) "z" else "N",
+    "_", unit_idx
+  )
+
+  obs_rhs <- switch(
+    kind,
+    occ      = paste0(
+      "\\text{Bernoulli}(", latent_lhs, " \\cdot ",
+      det_sym, "_{i,j})"
+    ),
+    nmix_pb  = paste0(
+      "\\text{Binomial}(", latent_lhs, ", ", det_sym, "_{i,j})"
+    ),
+    nmix_rn  = paste0(
+      "\\text{Bernoulli}(1 - (1 - ", det_sym, "_{i,j})^{",
+      latent_lhs, "})"
+    ),
+    nmix_ppm = paste0(
+      "\\text{Poisson}(", latent_lhs, " \\cdot ",
+      det_sym, "_{i,j})"
+    )
+  )
+  latent_rhs <- switch(
+    kind,
+    occ      = paste0("\\text{Bernoulli}(", state_sym, ")"),
+    nmix_pb  = paste0("\\text{Poisson}(", state_sym, ")"),
+    nmix_rn  = paste0("\\text{Poisson}(", state_sym, ")"),
+    nmix_ppm = paste0("\\text{Poisson}(", state_sym, ")")
+  )
+  obs_lhs <- paste0("y_{i,j} \\mid ", latent_lhs)
+
+  rows <- list(
+    list(lhs = obs_lhs, op = "\\sim", rhs = obs_rhs),
+    list(lhs = latent_lhs, op = "\\sim", rhs = latent_rhs)
+  )
+
+  # State linpred -- reuses linear_predictor_rhs unchanged so
+  # every covariate machinery (fixed / smooth / GP / RE / mo /
+  # me / trend) flows in automatically. Only the LHS symbol
+  # and link change. When the user adds `trend_formula = ~
+  # AR(p = 1)` to a multi-season fit, the AR-on-logit-psi
+  # dynamics arrive automatically through `latent_dynamics_rows`
+  # (no extra renderer needed -- the AR rendering treats `eta`
+  # as the season-indexed addition to the state linpred).
+  state_link <- closure_unit_state_link(kind)
+  state_link_lhs <- link_application(state_link, state_sym)
+  rows[[length(rows) + 1L]] <- list(
+    lhs = state_link_lhs,
+    op  = "=",
+    rhs = linear_predictor_rhs(obj, notation)
+  )
+  rows
+}
+
+#' @noRd
+closure_unit_state_link <- function(kind) {
+  switch(
+    kind,
+    occ      = "logit",
+    nmix_pb  = "log",
+    nmix_rn  = "log",
+    nmix_ppm = "log",
+    "log"
+  )
+}
+
+
+# ---------------------------------------------------------------
+# Multi-response custom family rows (mvn / mvt / diri / multi /
+# categ)
+# ---------------------------------------------------------------
+# These families take a vector observation per unit -- the
+# joint MVNormal / Dirichlet / Multinomial / Categorical
+# replaces the standard `y ~ Family(mu)` single row. Sigma
+# decomposition rows for mvn / mvt mirror the LKJ-Cholesky
+# parameterisation used in `mvn_stan_funs()` / `mvt_stan_funs()`
+# (R/families.R).
+
+#' @noRd
+mv_custom_family_kind <- function(obj) {
+  if (!methods_md_is_mv_custom_family(obj)) return(NULL)
+  fam_name <- resolve_family_name(obj$family) %||% ""
+  switch(
+    fam_name,
+    mvn   = "mvn",
+    mvt   = "mvt",
+    diri  = "diri",
+    multi = "multi",
+    categ = "categ",
+    NULL
+  )
+}
+
+#' @noRd
+mv_custom_likelihood_rows <- function(obj, notation) {
+  kind <- mv_custom_family_kind(obj)
+  if (is.null(kind)) return(list())
+  rows <- list()
+  # Joint observation row.
+  obs_row <- switch(
+    kind,
+    mvn = list(
+      lhs = "\\mathbf{Y}_i",
+      op  = "\\sim",
+      rhs = paste0(
+        "\\text{MVNormal}(\\boldsymbol{\\mu}_i, ",
+        "\\boldsymbol{\\Sigma})"
+      )
+    ),
+    mvt = list(
+      lhs = "\\mathbf{Y}_i",
+      op  = "\\sim",
+      rhs = paste0(
+        "\\text{MVStudentT}(\\nu, \\boldsymbol{\\mu}_i, ",
+        "\\boldsymbol{\\Sigma})"
+      )
+    ),
+    diri = list(
+      lhs = "\\mathbf{Y}_i",
+      op  = "\\sim",
+      rhs = "\\text{Dirichlet}(\\boldsymbol{\\alpha}_i)"
+    ),
+    multi = list(
+      lhs = "\\mathbf{Y}_i",
+      op  = "\\sim",
+      rhs = paste0(
+        "\\text{Multinomial}(N_i, \\boldsymbol{\\pi}_i)"
+      )
+    ),
+    categ = list(
+      lhs = "Y_i",
+      op  = "\\sim",
+      rhs = "\\text{Categorical}(\\boldsymbol{\\pi}_i)"
+    )
+  )
+  rows[[length(rows) + 1L]] <- obs_row
+  # Per-family parameter decomposition rows.
+  rows <- c(rows, mv_custom_decomposition_rows(kind))
+  # Composition / linpred rows -- one shared softmax-style line
+  # for simplex families; explicit mu / Sigma for mvn / mvt.
+  rows <- c(rows, mv_custom_composition_rows(kind, obj, notation))
+  rows
+}
+
+#' @noRd
+mv_custom_decomposition_rows <- function(kind) {
+  switch(
+    kind,
+    mvn  = sigma_lkj_decomposition_rows(),
+    mvt  = sigma_lkj_decomposition_rows(),
+    diri = list(list(
+      lhs = "\\boldsymbol{\\alpha}_i",
+      op  = "=",
+      rhs = "\\phi \\, \\boldsymbol{\\pi}_i"
+    )),
+    list()
+  )
+}
+
+#' @noRd
+sigma_lkj_decomposition_rows <- function() {
+  list(
+    list(
+      lhs = "\\boldsymbol{\\Sigma}",
+      op  = "=",
+      rhs = paste0(
+        "\\text{diag}(\\boldsymbol{\\Psi}) \\, L_\\Omega ",
+        "L_\\Omega^\\top \\text{diag}(\\boldsymbol{\\Psi})"
+      )
+    ),
+    list(
+      lhs = "L_\\Omega",
+      op  = "\\sim",
+      rhs = "\\text{LKJCholesky}(1)"
+    ),
+    list(
+      lhs = "\\boldsymbol{\\Psi}",
+      op  = "\\sim",
+      rhs = "\\text{Exponential}(1)"
+    )
+  )
+}
+
+#' @noRd
+mv_custom_glossary <- function(obj) {
+  kind <- mv_custom_family_kind(obj)
+  if (is.null(kind)) return(character(0L))
+  if (kind %in% c("mvn", "mvt")) {
+    defs <- c(
+      paste0(
+        "- $\\mathbf{Y}_i$: per-unit response vector ",
+        "(one entry per category)"
+      ),
+      paste0(
+        "- $\\boldsymbol{\\mu}_i$: per-unit mean vector"
+      ),
+      paste0(
+        "- $\\boldsymbol{\\Sigma}$: joint residual covariance, ",
+        "$\\text{diag}(\\boldsymbol{\\Psi})\\, L_\\Omega L_\\Omega^\\top\\,",
+        "\\text{diag}(\\boldsymbol{\\Psi})$"
+      )
+    )
+    if (identical(kind, "mvt")) {
+      defs <- c(defs, "- $\\nu$: degrees of freedom (Student-t)")
+    }
+    defs
+  } else if (kind %in% c("diri", "multi", "categ")) {
+    defs <- c(
+      paste0(
+        "- $\\mathbf{Y}_i$: per-unit response vector ",
+        "(one entry per category)"
+      ),
+      paste0(
+        "- $\\boldsymbol{\\pi}_i$: per-unit category ",
+        "probabilities (simplex)"
+      ),
+      paste0(
+        "- $\\eta^{(c)}_i$: linear predictor for category ",
+        "$c$ at unit $i$ (category 1 fixed at 0 as reference)"
+      )
+    )
+    if (identical(kind, "diri")) {
+      defs <- c(defs, paste0(
+        "- $\\phi$: Dirichlet precision parameter ",
+        "($\\boldsymbol{\\alpha}_i = \\phi \\boldsymbol{\\pi}_i$)"
+      ))
+    }
+    if (identical(kind, "multi")) {
+      defs <- c(defs, "- $N_i$: per-unit trial count")
+    }
+    defs
+  } else {
+    character(0L)
+  }
+}
+
+#' @noRd
+mv_custom_composition_rows <- function(kind, obj, notation) {
+  # Simplex families (diri / multi / categ) all map a vector of
+  # per-category linpreds to a probability simplex via softmax
+  # with the first category fixed as reference (Stan / brms
+  # convention -- see R/families.R::diri_stan_funs et al.).
+  if (kind %in% c("diri", "multi", "categ")) {
+    return(list(list(
+      lhs = "\\boldsymbol{\\pi}_i",
+      op  = "=",
+      rhs = paste0(
+        "\\text{softmax}([0, \\eta^{(2)}_i, \\ldots, ",
+        "\\eta^{(K)}_i]^\\top)"
+      )
+    )))
+  }
+  # mvn / mvt: emit the per-response mu linpred row (the obs
+  # formula targets `mu` for category 1; further categories are
+  # tied to mu by brms's mv response stacking). For now keep
+  # the simple shared placeholder; Phase E will lift per-
+  # response linpreds.
+  list(list(
+    lhs = "\\boldsymbol{\\mu}_i",
+    op  = "=",
+    rhs = linear_predictor_rhs(obj, notation)
+  ))
+}
+
+#' @noRd
+closure_unit_glossary <- function(obj) {
+  kind <- closure_unit_family_kind(obj)
+  if (is.null(kind)) return(character(0L))
+  det_sym <- closure_unit_detection_symbol(kind)
+  unit_idx <- if (methods_md_is_multi_season(obj)) "{i,t}" else "{i}"
+  multi_season <- methods_md_is_multi_season(obj)
+  defs <- c(
+    "- $j$ indexes visits within closure unit $i$"
+  )
+  if (multi_season) {
+    defs <- c(defs, paste0(
+      "- $t$ indexes seasons (closure units = ",
+      "(series, site, season))"
+    ))
+  }
+  if (identical(kind, "occ")) {
+    defs <- c(defs,
+      paste0(
+        "- $z_", unit_idx, " \\in \\{0, 1\\}$: latent ",
+        "occupancy state"
+      ),
+      paste0(
+        "- $\\psi_", unit_idx, " \\in (0, 1)$: occupancy ",
+        "probability (state linpred on the logit scale)"
+      ),
+      paste0(
+        "- $", det_sym, "_{i,j} \\in (0, 1)$: per-visit ",
+        "detection probability"
+      )
+    )
+  } else {
+    defs <- c(defs,
+      paste0(
+        "- $N_", unit_idx, " \\in \\mathbb{Z}_{\\ge 0}$: ",
+        "latent abundance"
+      ),
+      paste0(
+        "- $\\lambda_", unit_idx, " > 0$: abundance ",
+        "intensity (state linpred on the log scale)"
+      )
+    )
+    if (identical(kind, "nmix_rn")) {
+      defs <- c(defs, paste0(
+        "- $", det_sym, "_{i,j} \\in (0, 1)$: ",
+        "per-individual detection probability"
+      ))
+    } else if (identical(kind, "nmix_ppm")) {
+      defs <- c(defs, paste0(
+        "- $", det_sym, "_{i,j} > 0$: per-visit encounter rate"
+      ))
+    } else {
+      defs <- c(defs, paste0(
+        "- $", det_sym, "_{i,j} \\in (0, 1)$: per-visit ",
+        "detection probability"
+      ))
+    }
+  }
+  defs
 }
 
 #' @noRd
@@ -1637,6 +2143,53 @@ term_definition_rows <- function(obj, notation) {
 methods_md_has_latent_trend <- function(obj) {
   tt <- obj$trend_metadata$trend_type
   !is.null(tt) && !identical(tt, "None") && !identical(tt, "none")
+}
+
+
+# ---------------------------------------------------------------
+# Family-kind predicates
+# ---------------------------------------------------------------
+# Three orthogonal predicates read off the family object
+# attributes (set in `R/families.R::occ()` / `::nmix()` /
+# `::mvn()` etc.):
+#   * is_closure_unit:   `attr(family, "mvgam_closure_unit")`.
+#                        Family uses the closure-unit data layout
+#                        (per-visit obs, per-unit latent state).
+#   * is_detection:      `attr(family, "mvgam_predict_types")`
+#                        carries `"detection"`. Only occ / nmix
+#                        variants have a detection sub-formula.
+#   * is_mv_custom:      `attr(family, "mvgam_multi_response")`.
+#                        Multi-response custom families
+#                        (mvn / mvt / diri / multi / categ) whose
+#                        likelihood is a single joint MVNormal /
+#                        Dirichlet / Multinomial / Categorical
+#                        per unit.
+#
+# `is_multi_season`: detected via the closure-unit grouping arity
+# (`length(attr(family, "mvgam_unit_grouping")) == 3L` -- three
+# columns `(series, site, time)` instead of the default
+# `(series, time)`).
+
+#' @noRd
+methods_md_is_closure_unit <- function(obj) {
+  isTRUE(attr(obj$family, "mvgam_closure_unit"))
+}
+
+#' @noRd
+methods_md_is_detection_family <- function(obj) {
+  pt <- attr(obj$family, "mvgam_predict_types")
+  !is.null(pt) && "detection" %in% pt
+}
+
+#' @noRd
+methods_md_is_mv_custom_family <- function(obj) {
+  isTRUE(attr(obj$family, "mvgam_multi_response"))
+}
+
+#' @noRd
+methods_md_is_multi_season <- function(obj) {
+  ug <- attr(obj$family, "mvgam_unit_grouping")
+  !is.null(ug) && length(ug) >= 3L
 }
 
 
