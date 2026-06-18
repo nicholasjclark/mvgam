@@ -315,6 +315,13 @@ jsdgam <- function(formula,
                    ...) {
   call <- match.call(expand.dots = FALSE)
 
+  # Stash silent on a global option so deep validators (the
+  # exact-GP notice in particular) can honour `silent >= 2`
+  # without threading the arg through every intermediate call.
+  call_silent <- list(...)$silent %||% 1L
+  old_silent <- options(mvgam.silent = call_silent)
+  on.exit(options(old_silent), add = TRUE)
+
   # NSE capture of unit + species column names. Defaults are bare
   # symbols `time` / `series` so substitute() returns those names.
   unit_chr <- as.character(substitute(unit))

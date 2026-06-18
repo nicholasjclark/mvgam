@@ -265,6 +265,13 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
                            threads = NULL,
                            run_model = TRUE, ...) {
 
+  # Stash silent on a global option so deep validators (the
+  # exact-GP notice in particular) can honour `silent >= 2`
+  # without threading the arg through every intermediate call.
+  call_silent <- list(...)$silent %||% 1L
+  old_silent <- options(mvgam.silent = call_silent)
+  on.exit(options(old_silent), add = TRUE)
+
   checkmate::assert(
     checkmate::check_data_frame(data),
     checkmate::check_list(data, types = "data.frame"),

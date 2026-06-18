@@ -1845,6 +1845,13 @@ get_trend_validation_patterns <- function() {
 #' @noRd
 maybe_warn_exact_gp <- function(gp_term) {
   if (identical(Sys.getenv("TESTTHAT"), "true")) return(invisible())
+  # Honour `silent >= 2` (mirrors brms / mvgam silent semantics:
+  # 0 = chatty, 1 = default, 2 = also suppress mvgam notices).
+  # mvgam() / jsdgam() stash the entry-time `silent` on this
+  # option so deep validators can read it without threading.
+  if (isTRUE(getOption("mvgam.silent", 0L) >= 2L)) {
+    return(invisible())
+  }
   if (isTRUE(.exact_gp_warned[[gp_term]])) return(invisible())
   assign(gp_term, TRUE, envir = .exact_gp_warned)
   # NOTE: do not wrap the message body in `insight::format_warning()`
