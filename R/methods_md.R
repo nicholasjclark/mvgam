@@ -183,20 +183,15 @@ render_data_section <- function(ctx) {
 describe_predictors <- function(obj) {
   data <- obj$data %||% data.frame()
   if (nrow(data) == 0L) return(character(0L))
+  # Response column(s). Prefer obj$response_names; fall back to
+  # the formula LHS via mvgam_obs_formula() so prefits (where
+  # response_names is NULL) still skip the response column.
   resp_cols <- obj$response_names %||% character(0L)
-  # Fall back to the formula LHS when response_names is empty
-  # (prefits often have not populated it yet). Without this the
-  # response column would surface in the predictor list.
   if (length(resp_cols) == 0L && !is.null(obj$formula)) {
-    f <- if (inherits(obj$formula,
-                       c("brmsformula", "bform", "mvbrmsformula"))) {
-      obj$formula$formula %||% obj$formula
-    } else obj$formula
-    lhs <- tryCatch(
-      all.vars(stats::as.formula(f)[[2L]]),
-      error = function(e) character(0L)
-    )
-    resp_cols <- lhs
+    f <- mvgam_obs_formula(obj)
+    if (inherits(f, "formula") && length(f) >= 3L) {
+      resp_cols <- all.vars(f[[2L]])
+    }
   }
   # Restrict to columns the model formula actually references.
   # Without this guard, every column in the user's data frame
@@ -236,27 +231,27 @@ describe_predictors <- function(obj) {
 
 #' @noRd
 formula_used_vars <- function(obj) {
-  # Collect every variable referenced anywhere in the model
-  # specification: obs formula (LHS + RHS, plus dpar / nlpar
-  # sub-formulas inside a brmsformula), and the trend formula
-  # (if any). Used to filter the Predictors list down to columns
-  # the model actually consumes.
-  vars <- character(0L)
-  add <- function(f) {
-    if (is.null(f)) return()
-    vars <<- c(vars, tryCatch(all.vars(stats::as.formula(f)),
-                                error = function(e) character(0L)))
-  }
+  # Every variable referenced anywhere in the model spec:
+  # obs formula (LHS + RHS, plus dpar / nlpar sub-formulas) and
+  # the trend formula. Delegates to `mvgam_formula_predictors()`
+  # in insight.mvgam.R for the obs side -- that function already
+  # walks `$pforms`. Trend side gets the same `mvgam_rhs_predictors`
+  # treatment.
   obs <- obj$formula
-  if (inherits(obs, c("brmsformula", "bform", "mvbrmsformula"))) {
-    add(obs$formula)
-    for (sub in obs$pforms %||% list()) add(sub)
-  } else {
-    add(obs)
-  }
+  obs_vars <- mvgam_formula_predictors(obs)
+  # Response columns from the LHS surface separately via
+  # response_names; include them so Predictors filtering does
+  # not blank out single-response fits.
+  resp_vars <- if (!is.null(obs)) {
+    f <- if (inherits(obs, c("brmsformula", "bform", "mvbrmsformula"))) {
+      obs$formula %||% obs
+    } else obs
+    if (inherits(f, "formula") && length(f) >= 3L) all.vars(f[[2L]])
+    else character(0L)
+  } else character(0L)
   tf <- obj$trend_formula %||% obj$trend_model$formula
-  add(tf)
-  unique(vars)
+  trend_vars <- mvgam_formula_predictors(tf)
+  unique(c(obs_vars, resp_vars, trend_vars))
 }
 
 #' @noRd
@@ -331,23 +326,47 @@ render_model_section <- function(ctx) {
   fam <- obj$family
   fam_name <- fam$family %||% "gaussian"
   link <- fam$link %||% "identity"
-  mu <- mu_symbol(obj)
-  resp <- response_subscripted(obj)
 
   rows <- list()
   for (ir in index_range_rows(obj)) {
     rows[[length(rows) + 1L]] <- ir
   }
-  rows[[length(rows) + 1L]] <- list(
-    lhs = resp,
-    op  = "\\sim",
-    rhs = family_distribution_text(fam_name, mu, obj)
-  )
-  rows[[length(rows) + 1L]] <- list(
-    lhs = link_application(link, mu),
-    op  = "=",
-    rhs = linear_predictor_rhs(obj, notation)
-  )
+
+  responses <- get_response_names(obj)
+  if (length(responses) > 1L) {
+    # mvbind / multivariate brmsformula: emit one likelihood +
+    # one linear-predictor row per response. Slice the obj down
+    # to a single-response view per response and reuse the
+    # existing helpers wholesale -- the slice filters the prior
+    # table so every downstream extractor / symbol formatter
+    # sees the per-response subset without any new threading.
+    for (r in responses) {
+      obj_r <- subset_obj_to_response(obj, r)
+      mu_r <- paste0("\\mu^{(", r, ")}_{i,t}")
+      rows[[length(rows) + 1L]] <- list(
+        lhs = paste0(r, "_{i,t}"),
+        op  = "\\sim",
+        rhs = family_distribution_text(fam_name, mu_r, obj_r)
+      )
+      rows[[length(rows) + 1L]] <- list(
+        lhs = link_application(link, mu_r),
+        op  = "=",
+        rhs = linear_predictor_rhs(obj_r, notation)
+      )
+    }
+  } else {
+    mu <- mu_symbol(obj)
+    rows[[length(rows) + 1L]] <- list(
+      lhs = response_subscripted(obj),
+      op  = "\\sim",
+      rhs = family_distribution_text(fam_name, mu, obj)
+    )
+    rows[[length(rows) + 1L]] <- list(
+      lhs = link_application(link, mu),
+      op  = "=",
+      rhs = linear_predictor_rhs(obj, notation)
+    )
+  }
 
   rows <- c(rows, dpar_linear_predictor_rows(obj, notation))
   rows <- c(rows, term_definition_rows(obj, notation))
@@ -637,11 +656,56 @@ response_subscripted <- function(obj) {
 
 #' @noRd
 mu_symbol <- function(obj) {
-  resp_names <- obj$response_names
-  if (length(resp_names) > 1L) {
+  if (length(get_response_names(obj)) > 1L) {
     return("\\boldsymbol{\\mu}_{i,t}")
   }
   "\\mu_{i,t}"
+}
+
+#' @noRd
+subset_obj_to_response <- function(obj, r) {
+  # Per-response slice of a multi-response fit. Filters the
+  # prior table to rows scoped to response `r` (including rows
+  # with no `resp` set, which are shared across responses), and
+  # pins `response_names = r`. Every downstream extractor /
+  # renderer reads from `obj$prior` and `obj$response_names`,
+  # so the slice is enough to make them render the per-response
+  # view without per-helper threading.
+  out <- obj
+  out$response_names <- r
+  prior <- obj$prior
+  if (!is.null(prior) && nrow(prior) > 0L) {
+    rsp <- prior$resp %||% rep("", nrow(prior))
+    keep <- rsp == r | !nzchar(rsp)
+    out$prior <- prior[keep, , drop = FALSE]
+  }
+  out
+}
+
+#' @noRd
+get_response_names <- function(obj) {
+  # Multi-response detection. Prefer obj$response_names when the
+  # fit has populated it; else read unique non-empty `resp`
+  # values off the prior table (multivariate prefits land them
+  # there even when response_names is NULL); else delegate to
+  # extract_response_names() in brms_integration.R for the
+  # formula-LHS triage (handles mvbrmsformula / brmsformula /
+  # plain formula + mvbind). Guard against the response-less
+  # formula case extract_response_names treats as an error.
+  rn <- obj$response_names
+  if (length(rn) > 0L) return(rn)
+  prior <- obj$prior
+  if (!is.null(prior) && nrow(prior) > 0L) {
+    rsp <- prior$resp %||% rep("", nrow(prior))
+    have <- unique(rsp[nzchar(rsp)])
+    if (length(have) > 0L) return(have)
+  }
+  f <- obj$formula
+  if (is.null(f)) return(character(0L))
+  if (inherits(f, "formula") && length(f) < 3L) {
+    return(character(0L))
+  }
+  extract_response_names(f)
 }
 
 #' @noRd
@@ -823,16 +887,10 @@ obs_me_specs_from_formula <- function(obj) {
   # the latent-variable name plus the measurement-error SD column.
   # Used to filter the synthesised `me<var><sdvar>` coef out of
   # the plain fixed list and to drive the me() block renderers.
-  f <- obj$formula
-  if (is.null(f)) return(list())
-  if (inherits(f, c("brmsformula", "bform", "mvbrmsformula"))) {
-    f <- f$formula %||% f
-  }
-  rhs <- tryCatch({
-    form <- stats::as.formula(f)
-    form[[length(form)]]
-  }, error = function(e) NULL)
-  if (is.null(rhs)) return(list())
+  if (is.null(obj$formula)) return(list())
+  f <- mvgam_obs_formula(obj)
+  if (!inherits(f, "formula") || length(f) < 3L) return(list())
+  rhs <- f[[3L]]
   specs <- list()
   walk <- function(e) {
     if (is.call(e)) {
@@ -1079,16 +1137,10 @@ obs_gp_specs_from_formula <- function(obj) {
   # full spec per term: variable list, k, by, cov kernel. This
   # is the authoritative extractor; the prior-table fallback
   # loses 2D and by-factor detail.
-  f <- obj$formula
-  if (is.null(f)) return(list())
-  if (inherits(f, c("brmsformula", "bform", "mvbrmsformula"))) {
-    f <- f$formula %||% f
-  }
-  rhs <- tryCatch({
-    form <- stats::as.formula(f)
-    form[[length(form)]]
-  }, error = function(e) NULL)
-  if (is.null(rhs)) return(list())
+  if (is.null(obj$formula)) return(list())
+  f <- mvgam_obs_formula(obj)
+  if (!inherits(f, "formula") || length(f) < 3L) return(list())
+  rhs <- f[[3L]]
   specs <- list()
   walk <- function(e) {
     if (is.call(e)) {
