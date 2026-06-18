@@ -599,16 +599,15 @@ test_that("Factor model (n_lv > 0) emits decomposition + iid Z + QR", {
     "Z_\\{i,k\\} &\\\\sim \\\\text\\{Student-t\\}\\(3, 0, 0\\.5\\)",
     out
   ))
-  # QR identification annotation.
-  expect_true(grepl(
-    "thin QR identification",
-    out
-  ))
   # In factor mode the latent dynamics are on tilde-eta_{k,t}.
+  # The post-hoc thin-QR rotation of (Z, tilde-eta) is
+  # post-processing -- it must NOT appear in the model section.
   expect_true(grepl(
     "\\\\tilde\\\\eta_\\{k,t\\}",
     out
   ))
+  expect_false(grepl("thin QR", out))
+  expect_false(grepl("\\\\tilde Z", out))
 })
 
 test_that("MGP loadings_prior emits varrho + Psi rows + Normal(0, sqrt(Psi))", {

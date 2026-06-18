@@ -189,7 +189,10 @@ blocks <- vapply(fixtures, function(s) {
   # list(formula = ..., pforms = ...))` internal form into the
   # header.
   title <- mvgam:::formula_text(s$f)
-  paste0("\n# Fixture: ", s$name, " -- `", title, "`\n\n",
+  # Escape literal `_` in the fixture name so pandoc does not
+  # parse it as an italic marker inside the heading.
+  safe_name <- gsub("_", "\\\\_", s$name, fixed = FALSE)
+  paste0("\n# Fixture: ", safe_name, " -- `", title, "`\n\n",
          body, "\n\n")
 }, character(1L))
 

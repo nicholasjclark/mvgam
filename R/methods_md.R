@@ -293,7 +293,13 @@ describe_data_dimensions <- function(obj) {
 
 #' @noRd
 closure_unit_data_dimensions <- function(obj) {
-  if (!methods_md_is_closure_unit(obj)) return(character(0L))
+  # Only the detection families (occ / nmix variants) have a
+  # per-visit / per-unit grain that needs the G + J-bar callout
+  # in the data section. The mv-custom families (mvn / mvt / diri
+  # / multi / categ) also carry `mvgam_closure_unit = TRUE` but
+  # each unit holds one K-vector observation, so the "visits per
+  # unit" framing does not apply.
+  if (!methods_md_is_detection_family(obj)) return(character(0L))
   data <- obj$data %||% data.frame()
   if (nrow(data) == 0L) return(character(0L))
   # Closure-unit grouping is (series, time) by default and
@@ -957,10 +963,37 @@ index_range_rows <- function(obj) {
 
 #' @noRd
 response_letter <- function(obj) {
-  nm <- obj$response_names
+  # Prefer the formula LHS so the rendered name preserves any
+  # `_` in the user's column (e.g. `y_occ`). brms's response
+  # normalisation strips `_` from `response_names` / the prior
+  # table to fit Stan parameter naming, so those paths would
+  # give `yocc`. Fall back to the brms-normalised name when the
+  # formula LHS is unavailable.
+  f <- mvgam_obs_formula(obj)
+  nm <- if (inherits(f, "formula") && length(f) >= 3L) {
+    all.vars(f[[2L]])
+  } else NULL
+  if (is.null(nm) || length(nm) == 0L) nm <- get_response_names(obj)
   if (is.null(nm) || length(nm) == 0L) return("Y")
   if (length(nm) > 1L) return("\\mathbf{Y}")
-  nm[[1L]]
+  escape_math_text(nm[[1L]])
+}
+
+#' @noRd
+escape_math_text <- function(s) {
+  # Inside `$...$` pandoc / LaTeX treats `_` as a subscript
+  # marker, so a multi-character name like `y_diri` would
+  # render as `y` with subscript `diri`. A bare `\_` is still
+  # rendered awkwardly by xelatex in math mode (visible gaps
+  # around the literal). Wrap any identifier that contains a
+  # `_` in `\text{...}` so it renders as upright text, with
+  # the `_` itself escaped to keep LaTeX happy.
+  if (is.null(s) || !is.character(s)) return(s)
+  out <- vapply(s, function(x) {
+    if (!grepl("_", x, fixed = TRUE)) return(x)
+    paste0("\\text{", gsub("_", "\\\\_", x, fixed = FALSE), "}")
+  }, character(1L))
+  if (length(out) == 1L) unname(out) else out
 }
 
 #' @noRd
@@ -2545,12 +2578,11 @@ factor_model_rows <- function(obj, notation) {
   spec <- first_trend_spec(obj)
   loadings_spec <- spec$loadings_prior_spec
 
-  # QR rotation default. trend_map (`fixed_Z`) and explicit
-  # `rotate = FALSE` (per-factor `by = lv_axis()` smooth) both
-  # disable QR. Mirrors R/stan_assembly.R:3034.
-  rotate <- if (is.null(spec$rotate)) TRUE else isTRUE(spec$rotate)
-  if (!is.null(fixed_Z)) rotate <- FALSE
-
+  # Factor-model decomposition is the sampled parameterisation
+  # eta = sum_k Z * tilde-eta. The post-hoc thin-QR rotation of
+  # (Z, tilde-eta) is post-processing for ordinate() / biplots
+  # and is not part of fitting the model, so it does not appear
+  # here.
   rows <- list(list(
     lhs = "\\eta_{i,t}",
     op  = "=",
@@ -2559,9 +2591,6 @@ factor_model_rows <- function(obj, notation) {
     )
   ))
   rows <- c(rows, loadings_prior_rows(loadings_spec, fixed_Z))
-  if (rotate) {
-    rows <- c(rows, qr_identification_rows())
-  }
   rows
 }
 
@@ -2691,17 +2720,6 @@ mgp_shrinkage_rows <- function() {
   )
 }
 
-#' @noRd
-qr_identification_rows <- function() {
-  list(list(
-    lhs = "\\tilde Z",
-    op  = "=",
-    rhs = paste0(
-      "\\text{thin QR identification of } Z ",
-      "(Heaps 2024)"
-    )
-  ))
-}
 
 
 # ---------------------------------------------------------------
@@ -3125,14 +3143,30 @@ trend_formula_text <- function(obj) {
 #' @noRd
 family_call_text <- function(family) {
   if (is.null(family)) return("gaussian()")
-  fam <- family$family %||% "gaussian"
+  # `family$family` collapses every brms customfamily to the
+  # literal "custom"; the user-visible constructor lives on
+  # `family$name`. resolve_family_name() routes through both.
+  fam <- resolve_family_name(family) %||% "gaussian"
   link <- family$link %||% "identity"
+  # nmix() carries the variant in its name (nmix_royle_nichols /
+  # nmix_poisson_poisson / nmix_poisson_binomial). Reconstruct
+  # the user-facing nmix("...") call rather than printing the
+  # internal name.
+  if (grepl("^nmix_", fam)) {
+    variant <- sub("^nmix_", "", fam)
+    return(paste0("nmix(\"", variant, "\")"))
+  }
   default_link <- switch(
     fam,
     poisson = "log", bernoulli = "logit", binomial = "logit",
     gaussian = "identity", student = "identity",
     Gamma = "inverse", lognormal = "identity",
     beta = "logit", negbinomial = "log", nb = "log",
+    occ = "logit",
+    diri = "identity", multi = "identity", categ = "identity",
+    mvn = "identity", mvt = "identity",
+    tweedie = "log",
+    nmix = "log",
     "identity"
   )
   if (identical(link, default_link)) {
@@ -3347,7 +3381,7 @@ format_parameter_symbol_base <- function(row) {
     return(paste0("\\theta^{(", nm, ")}_{\\text{dist}}"))
   }
   if (identical(cls, "varrho_inv")) {
-    idx <- if (nzchar(coef)) coef else ""
+    idx <- if (nzchar(coef)) escape_math_text(coef) else ""
     return(paste0("\\varrho^{-1}_{", idx, "}"))
   }
   if (identical(cls, "Psi")) {
@@ -3388,59 +3422,42 @@ format_prior_distribution <- function(prior_str) {
     args <- strsplit(m[[2L]], "\\s*,\\s*")[[1L]]
     trimws(args)
   }
+  # Shared formatter so every distribution emits `\text{Name}(...)`
+  # with literal `_` characters in hyper-parameter names escaped
+  # (a bare `mgp_a1` would render `mgp` subscript `a1`).
+  emit <- function(label, args) {
+    paste0(
+      "\\text{", label, "}(",
+      paste(vapply(args, escape_math_text, character(1L)),
+            collapse = ", "),
+      ")"
+    )
+  }
 
   args <- match_args("^normal\\((.*)\\)$")
-  if (!is.null(args)) {
-    return(paste0("\\text{Normal}(", paste(args, collapse = ", "), ")"))
-  }
+  if (!is.null(args)) return(emit("Normal", args))
   args <- match_args("^student_t\\((.*)\\)$")
-  if (!is.null(args)) {
-    return(paste0(
-      "\\text{StudentT}(", paste(args, collapse = ", "), ")"
-    ))
-  }
+  if (!is.null(args)) return(emit("StudentT", args))
   args <- match_args("^lognormal\\((.*)\\)$")
-  if (!is.null(args)) {
-    return(paste0("\\text{LogNormal}(", paste(args, collapse = ", "), ")"))
-  }
+  if (!is.null(args)) return(emit("LogNormal", args))
   args <- match_args("^exponential\\((.*)\\)$")
-  if (!is.null(args)) {
-    return(paste0("\\text{Exponential}(", paste(args, collapse = ", "), ")"))
-  }
+  if (!is.null(args)) return(emit("Exponential", args))
   args <- match_args("^gamma\\((.*)\\)$")
-  if (!is.null(args)) {
-    return(paste0("\\text{Gamma}(", paste(args, collapse = ", "), ")"))
-  }
+  if (!is.null(args)) return(emit("Gamma", args))
   args <- match_args("^inv_gamma\\((.*)\\)$")
-  if (!is.null(args)) {
-    return(paste0(
-      "\\text{InvGamma}(", paste(args, collapse = ", "), ")"
-    ))
-  }
+  if (!is.null(args)) return(emit("InvGamma", args))
   args <- match_args("^cauchy\\((.*)\\)$")
-  if (!is.null(args)) {
-    return(paste0("\\text{Cauchy}(", paste(args, collapse = ", "), ")"))
-  }
+  if (!is.null(args)) return(emit("Cauchy", args))
   args <- match_args("^beta\\((.*)\\)$")
-  if (!is.null(args)) {
-    return(paste0("\\text{Beta}(", paste(args, collapse = ", "), ")"))
-  }
+  if (!is.null(args)) return(emit("Beta", args))
   args <- match_args("^uniform\\((.*)\\)$")
-  if (!is.null(args)) {
-    return(paste0("\\text{Uniform}(", paste(args, collapse = ", "), ")"))
-  }
+  if (!is.null(args)) return(emit("Uniform", args))
   args <- match_args("^lkj_corr_cholesky\\((.*)\\)$")
-  if (!is.null(args)) {
-    return(paste0(
-      "\\text{LKJCholesky}(", paste(args, collapse = ", "), ")"
-    ))
-  }
+  if (!is.null(args)) return(emit("LKJCholesky", args))
   args <- match_args("^lkj(_corr)?\\((.*)\\)$")
-  if (!is.null(args)) {
-    return(paste0(
-      "\\text{LKJCorr}(", paste(args, collapse = ", "), ")"
-    ))
-  }
+  if (!is.null(args)) return(emit("LKJCorr", args))
+  args <- match_args("^dirichlet\\((.*)\\)$")
+  if (!is.null(args)) return(emit("Dirichlet", args))
   # Unrecognised distribution: render verbatim wrapped in \text{}
   # so the row still appears.
   paste0("\\text{", gsub("([{}_])", "\\\\\\1", s), "}")
