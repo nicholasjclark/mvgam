@@ -345,6 +345,7 @@ model_glossary <- function(obj) {
   smooth_specs <- obs_smooth_specs_from_prior(prior)
   gp_specs <- get_gp_specs(obj)
   mo_specs <- obs_mo_specs_from_prior(prior)
+  me_specs <- obs_me_specs_from_formula(obj)
   re_specs <- obs_re_specs_from_prior(prior)
   for (spec in smooth_specs) {
     sub <- spec_subscript(spec)
@@ -400,6 +401,18 @@ model_glossary <- function(obj) {
       v, "}$ over the $D_{", v,
       "} - 1$ step increments and scaled by population effect ",
       "$\\beta^{(\\text{mo})}_{", v, "}$"
+    ))
+  }
+  for (s in me_specs) {
+    v <- s$var
+    sdv <- if (!is.na(s$sdvar)) s$sdvar else "se"
+    defs <- c(defs, paste0(
+      "- $\\tilde{", v, "}_{i,t}$: latent true covariate ",
+      "underlying noisy observation $", v,
+      "_{i,t}$, with known per-observation measurement-error SD ",
+      "$", sdv, "_{i,t}$ and population hyper-mean ",
+      "$\\mu^{(\\text{me})}_{", v,
+      "}$ and hyper-SD $\\sigma^{(\\text{me})}_{", v, "}$"
     ))
   }
   for (s in re_specs) {
@@ -615,6 +628,9 @@ linear_predictor_rhs <- function(obj, notation) {
   if (length(classes$mo) > 0L) {
     parts <- c(parts, render_mo_inline(classes$mo))
   }
+  if (length(classes$me) > 0L) {
+    parts <- c(parts, render_me_inline(classes$me))
+  }
   if (length(classes$re) > 0L) {
     parts <- c(parts, render_re_inline(classes$re))
   }
@@ -640,6 +656,7 @@ classify_obs_parameters <- function(obj) {
     smooth = obs_smooth_specs_from_prior(prior),
     gp     = get_gp_specs(obj),
     mo     = obs_mo_specs_from_prior(prior),
+    me     = obs_me_specs_from_formula(obj),
     re     = obs_re_specs_from_prior(prior)
   )
 }
@@ -651,14 +668,63 @@ obs_fixed_terms_from_prior <- function(prior) {
   b_rows <- prior$class == "b" & !nzchar(prior$dpar) &
     nzchar(prior$coef)
   coefs <- prior$coef[b_rows]
-  # Drop smooth-basis stubs (sx_1 etc) and the bare "" umbrella row;
-  # those are not user-supplied population effects. Also drop
-  # monotonic coefs (`mo<var>`); those render through their own
-  # block, not the linear `\\beta_{<term>} <term>` shape.
+  # Drop basis stubs and the bare "" umbrella row; those are not
+  # user-supplied population effects. Also drop the monotonic
+  # and measurement-error coefs (`mo<var>`, `me<var><sdvar>`);
+  # each renders through its own block, not the linear
+  # `\\beta_{<term>} <term>` shape.
+  #   s(x) basis    -> sx_1, sx_2, ...
+  #   t2(x, z) tensor -> t2xz_1, t2xz_2, ...
+  #   te / ti are not in scope (brms rejects them at term parse)
   coefs <- coefs[!grepl("^s[A-Za-z0-9_]+_[0-9]+$", coefs)]
+  coefs <- coefs[!grepl("^t2[A-Za-z0-9_]+_[0-9]+$", coefs)]
   coefs <- coefs[!grepl("^mo[A-Za-z_.][A-Za-z0-9_.]*$", coefs)]
+  coefs <- coefs[!grepl("^me[A-Za-z_.][A-Za-z0-9_.]*$", coefs)]
   terms <- unique(coefs)
   if (has_int) c("Intercept", terms) else terms
+}
+
+#' @noRd
+obs_me_specs_from_formula <- function(obj) {
+  # Walk the obs formula AST for `me(x, sdx)` calls and recover
+  # the latent-variable name plus the measurement-error SD column.
+  # Used to filter the synthesised `me<var><sdvar>` coef out of
+  # the plain fixed list and to drive the me() block renderers.
+  f <- obj$formula
+  if (is.null(f)) return(list())
+  if (inherits(f, c("brmsformula", "bform", "mvbrmsformula"))) {
+    f <- f$formula %||% f
+  }
+  rhs <- tryCatch(
+    stats::as.formula(f)[[length(stats::as.formula(f))]],
+    error = function(e) NULL
+  )
+  if (is.null(rhs)) return(list())
+  specs <- list()
+  walk <- function(e) {
+    if (is.call(e)) {
+      head <- tryCatch(as.character(e[[1L]]),
+                        error = function(err) "")
+      if (identical(head, "me")) {
+        args <- as.list(e)[-1L]
+        if (length(args) >= 1L) {
+          var <- as.character(args[[1L]])
+          sdvar <- if (length(args) >= 2L) {
+            as.character(args[[2L]])
+          } else NA_character_
+          specs[[length(specs) + 1L]] <<- list(
+            var = var, sdvar = sdvar,
+            coef = paste0("me", var,
+                          if (!is.na(sdvar)) sdvar else "")
+          )
+        }
+      } else {
+        for (k in seq_along(e)[-1L]) walk(e[[k]])
+      }
+    }
+  }
+  walk(rhs)
+  specs
 }
 
 #' @noRd
@@ -970,6 +1036,23 @@ render_smooth_inline <- function(specs) {
 }
 
 #' @noRd
+render_me_inline <- function(specs) {
+  # Measurement-error effects (brms `me(x, sdx)`): the linear
+  # predictor uses the latent true covariate `\\tilde{x}_{i,t}`
+  # rather than the noisy observation `x_{i,t}`.
+  paste(
+    vapply(specs, function(s) {
+      v <- s$var
+      paste0(
+        "\\beta^{(\\text{me})}_{", v, "} \\, \\tilde{", v,
+        "}_{i,t}"
+      )
+    }, character(1L)),
+    collapse = " + "
+  )
+}
+
+#' @noRd
 render_mo_inline <- function(specs) {
   # Monotonic effects (Burkner & Charpentier 2020). Each mo()
   # term contributes b^{(mo)}_x * m_x(x_{i,t}), where m_x is a
@@ -1063,6 +1146,7 @@ term_definition_rows <- function(obj, notation) {
   smooth_specs <- obs_smooth_specs_from_prior(prior)
   gp_specs <- get_gp_specs(obj)
   mo_specs <- obs_mo_specs_from_prior(prior)
+  me_specs <- obs_me_specs_from_formula(obj)
   re_specs <- obs_re_specs_from_prior(prior)
 
   rows <- list()
@@ -1117,6 +1201,30 @@ term_definition_rows <- function(obj, notation) {
       op  = "\\sim",
       rhs = paste0(
         "\\text{Dirichlet}(\\boldsymbol{\\alpha}_{", v, "})"
+      )
+    )
+  }
+  for (s in me_specs) {
+    v <- s$var
+    sdv <- if (!is.na(s$sdvar)) s$sdvar else "se"
+    # Observation layer: noisy x_i is centred on the latent
+    # tilde{x}_i with known SD sdvar_i (data).
+    rows[[length(rows) + 1L]] <- list(
+      lhs = paste0(v, "_{i,t}"),
+      op  = "\\sim",
+      rhs = paste0(
+        "\\text{Normal}\\!\\left(\\tilde{", v,
+        "}_{i,t}, ", sdv, "_{i,t}\\right)"
+      )
+    )
+    # Latent layer: tilde{x}_i drawn from a population-level
+    # Normal with hyper-mean and hyper-SD.
+    rows[[length(rows) + 1L]] <- list(
+      lhs = paste0("\\tilde{", v, "}_{i,t}"),
+      op  = "\\sim",
+      rhs = paste0(
+        "\\text{Normal}\\!\\left(\\mu^{(\\text{me})}_{", v,
+        "}, \\sigma^{(\\text{me})}_{", v, "}\\right)"
       )
     )
   }
@@ -1390,6 +1498,24 @@ render_priors_section <- function(ctx) {
   # Backfill the umbrella prior text onto matching vectorized rows
   # so each row carries both the prior expression and the label.
   prior <- backfill_umbrella_priors(prior)
+
+  # Rewrite measurement-error b coefs from `me<var><sdvar>`
+  # (brms's concatenated label) to just `me<var>` so the symbol
+  # formatter emits `\\beta^{(me)}_<var>` rather than the
+  # opaque `\\beta^{(me)}_<varsdvar>`. The me_specs from the
+  # formula walker carry both var and sdvar so we can dissect
+  # unambiguously.
+  me_specs <- obs_me_specs_from_formula(obj)
+  if (length(me_specs) > 0L) {
+    for (s in me_specs) {
+      if (is.na(s$sdvar)) next
+      old_coef <- paste0("me", s$var, s$sdvar)
+      mask <- prior$class == "b" & prior$coef == old_coef
+      if (any(mask)) {
+        prior$coef[mask] <- paste0("me", s$var)
+      }
+    }
+  }
 
   # Drop smooth-basis "b" stubs (`sx_1`, `sx_2`, ...): they share
   # the smooth's hyperprior via the `sds` class.
@@ -1739,6 +1865,16 @@ format_parameter_symbol <- function(row) {
           "\\beta^{(\\text{mo})}_{", sub("^mo", "", coef), "}"
         ))
       }
+      if (grepl("^me[A-Za-z_.][A-Za-z0-9_.]*$", coef)) {
+        # Coef is `me<var><sdvar>` concatenated; the variable
+        # name is the longest leading alpha-numeric prefix that
+        # leaves a non-empty suffix for the sdvar. Without the
+        # formula we cannot split unambiguously, so render the
+        # raw `me<...>` tail without trying to dissect it.
+        return(paste0(
+          "\\beta^{(\\text{me})}_{", sub("^me", "", coef), "}"
+        ))
+      }
       return(paste0("\\beta_{", coef, "}"))
     }
     return("\\boldsymbol{\\beta}")
@@ -1748,6 +1884,14 @@ format_parameter_symbol <- function(row) {
       sub("[0-9]+$", "", sub("^mo", "", coef))
     } else "j"
     return(paste0("\\boldsymbol{\\zeta}_{", bare, "}"))
+  }
+  if (identical(cls, "meanme")) {
+    bare <- if (nzchar(coef)) sub("^me", "", coef) else "j"
+    return(paste0("\\mu^{(\\text{me})}_{", bare, "}"))
+  }
+  if (identical(cls, "sdme")) {
+    bare <- if (nzchar(coef)) sub("^me", "", coef) else "j"
+    return(paste0("\\sigma^{(\\text{me})}_{", bare, "}"))
   }
   if (identical(cls, "sigma")) return("\\sigma")
   if (identical(cls, "shape")) return("\\alpha")

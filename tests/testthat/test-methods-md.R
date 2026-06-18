@@ -232,6 +232,37 @@ test_that("Varying slope (x | grp) renders MVNormal + LKJ joint", {
   ))
 })
 
+test_that("me(x, sdx) renders observation + latent + hyperprior layers", {
+  set.seed(1L)
+  dat <- data.frame(
+    time = rep(1:30, 4),
+    series = factor(rep(paste0("s", 1:4), each = 30)),
+    x = rnorm(120), sdx = abs(rnorm(120, 0.2, 0.05)),
+    y = rpois(120, 3)
+  )
+  mod <- make_methods_md_prefit(y ~ me(x, sdx), data = dat)
+  out <- methods_md(mod)
+  # Linear predictor uses latent tilde{x}, not the noisy x_{i,t}.
+  expect_true(grepl(
+    "\\\\beta\\^\\{\\(\\\\text\\{me\\}\\)\\}_\\{x\\} \\\\, \\\\tilde\\{x\\}_\\{i,t\\}",
+    out
+  ))
+  # Observation layer: noisy x ~ Normal(tilde{x}, sdx).
+  expect_true(grepl(
+    "x_\\{i,t\\} &\\\\sim \\\\text\\{Normal\\}.*\\\\tilde\\{x\\}_\\{i,t\\}.*sdx_\\{i,t\\}",
+    out
+  ))
+  # Latent layer: tilde{x} ~ Normal(hyper-mean, hyper-SD).
+  expect_true(grepl(
+    "\\\\tilde\\{x\\}_\\{i,t\\} &\\\\sim \\\\text\\{Normal\\}.*\\\\mu\\^\\{\\(\\\\text\\{me\\}\\)\\}_\\{x\\}.*\\\\sigma\\^\\{\\(\\\\text\\{me\\}\\)\\}_\\{x\\}",
+    out
+  ))
+  # Glossary entry exists.
+  expect_true(grepl(
+    "latent true covariate underlying noisy observation", out
+  ))
+})
+
 test_that("Monotonic mo(x) renders beta^{(mo)}_x m_x + Dirichlet simplex", {
   set.seed(1L)
   dat <- data.frame(
