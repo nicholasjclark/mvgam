@@ -3090,19 +3090,19 @@ formula_text <- function(f) {
   if (is.null(f)) return("NULL")
   # brmsformula / mvbrmsformula deparse to an unreadable
   # `structure(list(formula = y ~ x, pforms = list(...)))`
-  # by default. Reconstruct a `brms::bf(...)` call instead so
+  # by default. Reconstruct a `bf(...)` call instead so
   # the Implementation code block is copy-paste-ready.
   if (inherits(f, "mvbrmsformula")) {
-    # Compose `brms::bf(yA ~ x) + brms::bf(yB ~ x) +
-    # brms::set_rescor(FALSE)` by recursing into each per-
+    # Compose `bf(yA ~ x) + bf(yB ~ x) +
+    # set_rescor(FALSE)` by recursing into each per-
     # response brmsformula in $forms and appending the rescor
     # flag when set.
     bfs <- vapply(f$forms, formula_text, character(1L))
     out <- paste(bfs, collapse = " + ")
     if (isFALSE(f$rescor)) {
-      out <- paste0(out, " + brms::set_rescor(FALSE)")
+      out <- paste0(out, " + set_rescor(FALSE)")
     } else if (isTRUE(f$rescor)) {
-      out <- paste0(out, " + brms::set_rescor(TRUE)")
+      out <- paste0(out, " + set_rescor(TRUE)")
     }
     return(out)
   }
@@ -3128,7 +3128,7 @@ formula_text <- function(f) {
     if (is_nl) {
       parts <- c(parts, "nl = TRUE")
     }
-    return(paste0("brms::bf(", paste(parts, collapse = ", "), ")"))
+    return(paste0("bf(", paste(parts, collapse = ", "), ")"))
   }
   paste(deparse(f, width.cutoff = 60L), collapse = " ")
 }
