@@ -344,6 +344,7 @@ model_glossary <- function(obj) {
   prior <- obj$prior
   smooth_specs <- obs_smooth_specs_from_prior(prior)
   gp_specs <- get_gp_specs(obj)
+  mo_specs <- obs_mo_specs_from_prior(prior)
   re_specs <- obs_re_specs_from_prior(prior)
   for (spec in smooth_specs) {
     sub <- spec_subscript(spec)
@@ -388,6 +389,17 @@ model_glossary <- function(obj) {
       " kernel, length scale ", rho_sym,
       " and marginal SD $\\sigma^{(\\text{gp})}_{", sub, "}$",
       k_text
+    ))
+  }
+  for (s in mo_specs) {
+    v <- s$var
+    defs <- c(defs, paste0(
+      "- $m_{", v, "}(", v,
+      ")$: monotonic step transform of ordinal $", v,
+      "$, built from a Dirichlet simplex $\\boldsymbol{\\zeta}_{",
+      v, "}$ over the $D_{", v,
+      "} - 1$ step increments and scaled by population effect ",
+      "$\\beta^{(\\text{mo})}_{", v, "}$"
     ))
   }
   for (s in re_specs) {
@@ -600,6 +612,9 @@ linear_predictor_rhs <- function(obj, notation) {
   if (length(classes$gp) > 0L) {
     parts <- c(parts, render_gp_inline(classes$gp))
   }
+  if (length(classes$mo) > 0L) {
+    parts <- c(parts, render_mo_inline(classes$mo))
+  }
   if (length(classes$re) > 0L) {
     parts <- c(parts, render_re_inline(classes$re))
   }
@@ -624,6 +639,7 @@ classify_obs_parameters <- function(obj) {
     fixed  = obs_fixed_terms_from_prior(prior),
     smooth = obs_smooth_specs_from_prior(prior),
     gp     = get_gp_specs(obj),
+    mo     = obs_mo_specs_from_prior(prior),
     re     = obs_re_specs_from_prior(prior)
   )
 }
@@ -636,10 +652,29 @@ obs_fixed_terms_from_prior <- function(prior) {
     nzchar(prior$coef)
   coefs <- prior$coef[b_rows]
   # Drop smooth-basis stubs (sx_1 etc) and the bare "" umbrella row;
-  # those are not user-supplied population effects.
+  # those are not user-supplied population effects. Also drop
+  # monotonic coefs (`mo<var>`); those render through their own
+  # block, not the linear `\\beta_{<term>} <term>` shape.
   coefs <- coefs[!grepl("^s[A-Za-z0-9_]+_[0-9]+$", coefs)]
+  coefs <- coefs[!grepl("^mo[A-Za-z_.][A-Za-z0-9_.]*$", coefs)]
   terms <- unique(coefs)
   if (has_int) c("Intercept", terms) else terms
+}
+
+#' @noRd
+obs_mo_specs_from_prior <- function(prior) {
+  # brms emits class = "b" + coef = "mo<var>" for the magnitude
+  # of each monotonic effect, plus class = "simo" + coef like
+  # "mo<var>1" for the Dirichlet simplex of step increments.
+  # Detect via the b rows -- one per mo() term in the formula.
+  if (is.null(prior) || nrow(prior) == 0L) return(list())
+  mo_rows <- prior$class == "b" &
+    grepl("^mo[A-Za-z_.][A-Za-z0-9_.]*$", prior$coef)
+  if (!any(mo_rows)) return(list())
+  coefs <- unique(prior$coef[mo_rows])
+  lapply(coefs, function(c) {
+    list(var = sub("^mo", "", c), coef = c)
+  })
 }
 
 #' @noRd
@@ -935,6 +970,23 @@ render_smooth_inline <- function(specs) {
 }
 
 #' @noRd
+render_mo_inline <- function(specs) {
+  # Monotonic effects (Burkner & Charpentier 2020). Each mo()
+  # term contributes b^{(mo)}_x * m_x(x_{i,t}), where m_x is a
+  # cumulative step transform built from a Dirichlet simplex.
+  paste(
+    vapply(specs, function(s) {
+      v <- s$var
+      paste0(
+        "\\beta^{(\\text{mo})}_{", v, "} \\, m_{", v,
+        "}(", v, "_{i,t})"
+      )
+    }, character(1L)),
+    collapse = " + "
+  )
+}
+
+#' @noRd
 render_gp_inline <- function(specs) {
   paste(
     vapply(specs, function(s) {
@@ -1010,6 +1062,7 @@ term_definition_rows <- function(obj, notation) {
   prior <- obj$prior
   smooth_specs <- obs_smooth_specs_from_prior(prior)
   gp_specs <- get_gp_specs(obj)
+  mo_specs <- obs_mo_specs_from_prior(prior)
   re_specs <- obs_re_specs_from_prior(prior)
 
   rows <- list()
@@ -1044,6 +1097,26 @@ term_definition_rows <- function(obj, notation) {
         "\\text{GP}\\left(0, ", kernel_name,
         "(", rho_arg, ", \\sigma^{(\\text{gp})}_{",
         sub, "})\\right)"
+      )
+    )
+  }
+  for (s in mo_specs) {
+    v <- s$var
+    # Cumulative step transform from a Dirichlet simplex over
+    # the D-1 step increments (Burkner & Charpentier 2020).
+    rows[[length(rows) + 1L]] <- list(
+      lhs = paste0("m_{", v, "}(", v, ")"),
+      op  = "=",
+      rhs = paste0(
+        "(D_{", v, "} - 1) \\sum_{j=1}^{", v, "} ",
+        "\\zeta_{", v, ",j}"
+      )
+    )
+    rows[[length(rows) + 1L]] <- list(
+      lhs = paste0("\\boldsymbol{\\zeta}_{", v, "}"),
+      op  = "\\sim",
+      rhs = paste0(
+        "\\text{Dirichlet}(\\boldsymbol{\\alpha}_{", v, "})"
       )
     )
   }
@@ -1661,9 +1734,20 @@ format_parameter_symbol <- function(row) {
       return(paste0("\\beta_{", lbl, "}"))
     }
     if (nzchar(coef)) {
+      if (grepl("^mo[A-Za-z_.][A-Za-z0-9_.]*$", coef)) {
+        return(paste0(
+          "\\beta^{(\\text{mo})}_{", sub("^mo", "", coef), "}"
+        ))
+      }
       return(paste0("\\beta_{", coef, "}"))
     }
     return("\\boldsymbol{\\beta}")
+  }
+  if (identical(cls, "simo")) {
+    bare <- if (nzchar(coef)) {
+      sub("[0-9]+$", "", sub("^mo", "", coef))
+    } else "j"
+    return(paste0("\\boldsymbol{\\zeta}_{", bare, "}"))
   }
   if (identical(cls, "sigma")) return("\\sigma")
   if (identical(cls, "shape")) return("\\alpha")

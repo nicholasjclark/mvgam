@@ -232,6 +232,33 @@ test_that("Varying slope (x | grp) renders MVNormal + LKJ joint", {
   ))
 })
 
+test_that("Monotonic mo(x) renders beta^{(mo)}_x m_x + Dirichlet simplex", {
+  set.seed(1L)
+  dat <- data.frame(
+    time = rep(1:30, 4),
+    series = factor(rep(paste0("s", 1:4), each = 30)),
+    x = factor(sample(1:5, 120, replace = TRUE), ordered = TRUE),
+    y = rpois(120, 3)
+  )
+  mod <- make_methods_md_prefit(y ~ mo(x), data = dat)
+  out <- methods_md(mod)
+  # Linear predictor uses the mo-specific magnitude * step
+  # transform form, not the plain beta_{mox} x_{i,t}.
+  expect_true(grepl(
+    "\\\\beta\\^\\{\\(\\\\text\\{mo\\}\\)\\}_\\{x\\} \\\\, m_\\{x\\}",
+    out
+  ))
+  expect_false(grepl("\\\\beta_\\{mox\\}", out))
+  # Term def: cumulative step + Dirichlet simplex.
+  expect_true(grepl("\\(D_\\{x\\} - 1\\) \\\\sum", out))
+  expect_true(grepl(
+    "\\\\boldsymbol\\{\\\\zeta\\}_\\{x\\} &\\\\sim \\\\text\\{Dirichlet\\}",
+    out
+  ))
+  # Glossary line names the monotonic step transform.
+  expect_true(grepl("monotonic step transform of ordinal", out))
+})
+
 test_that("Response column never surfaces in the Predictors list", {
   set.seed(1L)
   dat <- data.frame(
