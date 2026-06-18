@@ -184,6 +184,20 @@ describe_predictors <- function(obj) {
   data <- obj$data %||% data.frame()
   if (nrow(data) == 0L) return(character(0L))
   resp_cols <- obj$response_names %||% character(0L)
+  # Fall back to the formula LHS when response_names is empty
+  # (prefits often have not populated it yet). Without this the
+  # response column would surface in the predictor list.
+  if (length(resp_cols) == 0L && !is.null(obj$formula)) {
+    f <- if (inherits(obj$formula,
+                       c("brmsformula", "bform", "mvbrmsformula"))) {
+      obj$formula$formula %||% obj$formula
+    } else obj$formula
+    lhs <- tryCatch(
+      all.vars(stats::as.formula(f)[[2L]]),
+      error = function(e) character(0L)
+    )
+    resp_cols <- lhs
+  }
   # Skip canonical panel keys plus the response column(s); they are
   # already covered by the dimensions line above.
   skip <- unique(c(resp_cols, "time", "series"))
@@ -330,7 +344,7 @@ model_glossary <- function(obj) {
   prior <- obj$prior
   smooth_specs <- obs_smooth_specs_from_prior(prior)
   gp_specs <- get_gp_specs(obj)
-  re_groups <- obs_re_groups_from_prior(prior)
+  re_specs <- obs_re_specs_from_prior(prior)
   for (spec in smooth_specs) {
     sub <- spec_subscript(spec)
     sub_key <- spec_key(spec)
@@ -376,10 +390,28 @@ model_glossary <- function(obj) {
       k_text
     ))
   }
-  for (grp in re_groups) {
+  for (s in re_specs) {
+    grp <- s$group
+    if (!s$has_slope) {
+      defs <- c(defs, paste0(
+        "- $\\alpha_{", grp, "[i]}$: varying intercept across ",
+        "levels of $", grp, "$ with hyper-SD $\\sigma_{", grp, "}$"
+      ))
+      next
+    }
+    slope_terms <- paste(
+      paste0(
+        "$\\beta^{(", grp, ")}_{", s$slopes, ", ", grp, "[i]}$"
+      ),
+      collapse = ", "
+    )
     defs <- c(defs, paste0(
-      "- $\\alpha_{", grp, "[i]}$: varying intercept across ",
-      "levels of $", grp, "$ with hyper-SD $\\sigma_{", grp, "}$"
+      "- $\\alpha_{", grp, "[i]}$, ", slope_terms,
+      ": correlated varying intercept and slopes across ",
+      "levels of $", grp, "$, jointly distributed as MVNormal ",
+      "with covariance $\\boldsymbol{\\Sigma}_{", grp,
+      "}$ built from per-coefficient SDs and LKJ-prior ",
+      "correlation matrix $\\boldsymbol{\\Omega}_{", grp, "}$"
     ))
   }
   if (methods_md_has_latent_trend(obj)) {
@@ -592,7 +624,7 @@ classify_obs_parameters <- function(obj) {
     fixed  = obs_fixed_terms_from_prior(prior),
     smooth = obs_smooth_specs_from_prior(prior),
     gp     = get_gp_specs(obj),
-    re     = obs_re_groups_from_prior(prior)
+    re     = obs_re_specs_from_prior(prior)
   )
 }
 
@@ -736,10 +768,37 @@ basis_label <- function(bs, fname) {
 
 #' @noRd
 obs_re_groups_from_prior <- function(prior) {
-  if (is.null(prior) || nrow(prior) == 0L) return(character(0L))
+  # Returns a bare character vector for back-compat (existing
+  # call sites that only want group names).
+  specs <- obs_re_specs_from_prior(prior)
+  vapply(specs, function(s) s$group, character(1L))
+}
+
+#' @noRd
+obs_re_specs_from_prior <- function(prior) {
+  # Per-group spec: list(group, slopes, has_slope, has_corr).
+  # `slopes` is the set of slope coefs under `(x + y | grp)`
+  # (i.e. coef-keyed `sd` rows other than the bare Intercept).
+  # `has_corr` true when brms emits an L row keyed on the group
+  # (correlated random intercept + slope under `|grp`).
+  if (is.null(prior) || nrow(prior) == 0L) return(list())
   sd_rows <- prior$class == "sd" & nzchar(prior$group)
-  if (!any(sd_rows)) return(character(0L))
-  unique(prior$group[sd_rows])
+  if (!any(sd_rows)) return(list())
+  groups <- unique(prior$group[sd_rows])
+  l_groups <- if (any(prior$class == "L" & nzchar(prior$group))) {
+    prior$group[prior$class == "L" & nzchar(prior$group)]
+  } else character(0L)
+  lapply(groups, function(g) {
+    g_rows <- prior$class == "sd" & prior$group == g & nzchar(prior$coef)
+    coefs <- prior$coef[g_rows]
+    slopes <- setdiff(coefs, "Intercept")
+    list(
+      group = g,
+      slopes = slopes,
+      has_slope = length(slopes) > 0L,
+      has_corr = g %in% l_groups
+    )
+  })
 }
 
 #' @noRd
@@ -924,10 +983,24 @@ gp_subscript <- function(spec) {
 }
 
 #' @noRd
-render_re_inline <- function(groups) {
-  # McElreath-style varying intercepts: alpha_{group[i]}
+render_re_inline <- function(specs) {
+  # Per-group inline contribution to the linear predictor:
+  #   intercept-only group:  alpha_{grp[i]}
+  #   varying-slope group:   alpha_{grp[i]} + beta^{(grp)}_{x, grp[i]} x_{i,t}
   paste(
-    paste0("\\alpha_{", groups, "[i]}"),
+    vapply(specs, function(s) {
+      pieces <- paste0("\\alpha_{", s$group, "[i]}")
+      for (slope in s$slopes) {
+        pieces <- c(
+          pieces,
+          paste0(
+            "\\beta^{(", s$group, ")}_{", slope,
+            ", ", s$group, "[i]} ", slope, "_{i,t}"
+          )
+        )
+      }
+      paste(pieces, collapse = " + ")
+    }, character(1L)),
     collapse = " + "
   )
 }
@@ -937,7 +1010,7 @@ term_definition_rows <- function(obj, notation) {
   prior <- obj$prior
   smooth_specs <- obs_smooth_specs_from_prior(prior)
   gp_specs <- get_gp_specs(obj)
-  re_groups <- obs_re_groups_from_prior(prior)
+  re_specs <- obs_re_specs_from_prior(prior)
 
   rows <- list()
   for (spec in smooth_specs) {
@@ -974,14 +1047,53 @@ term_definition_rows <- function(obj, notation) {
       )
     )
   }
-  for (grp in re_groups) {
-    # Bare cluster letter in the definition (no [i]); the [i]
-    # subscript only appears when the varying intercept is used
-    # in the linear predictor above.
+  for (s in re_specs) {
+    grp <- s$group
+    if (!s$has_slope) {
+      # Intercept-only group: alpha_{grp} ~ Normal(0, sigma_{grp}).
+      rows[[length(rows) + 1L]] <- list(
+        lhs = paste0("\\alpha_{", grp, "}"),
+        op  = "\\sim",
+        rhs = paste0("\\text{Normal}(0, \\sigma_{", grp, "})")
+      )
+      next
+    }
+    # Varying-slope group: joint MVNormal over (alpha, beta_x, ...)
+    # with LKJ correlation on Omega and a diagonal of SDs.
+    slope_syms <- paste0(
+      "\\beta^{(", grp, ")}_{", s$slopes, ", ", grp, "}"
+    )
+    vec_lhs <- paste0(
+      "(\\alpha_{", grp, "}, ",
+      paste(slope_syms, collapse = ", "), ")^\\top"
+    )
     rows[[length(rows) + 1L]] <- list(
-      lhs = paste0("\\alpha_{", grp, "}"),
+      lhs = vec_lhs,
       op  = "\\sim",
-      rhs = paste0("\\text{Normal}(0, \\sigma_{", grp, "})")
+      rhs = paste0(
+        "\\text{MVNormal}\\!\\left(\\mathbf{0}, ",
+        "\\boldsymbol{\\Sigma}_{", grp, "}\\right)"
+      )
+    )
+    # Sigma_grp = diag(sigma) Omega_grp diag(sigma).
+    sd_diag_syms <- c(
+      paste0("\\sigma^{(\\alpha)}_{", grp, "}"),
+      paste0("\\sigma^{(\\beta_{", s$slopes, "})}_{", grp, "}")
+    )
+    rows[[length(rows) + 1L]] <- list(
+      lhs = paste0("\\boldsymbol{\\Sigma}_{", grp, "}"),
+      op  = "=",
+      rhs = paste0(
+        "\\text{diag}(", paste(sd_diag_syms, collapse = ", "), ")",
+        "\\,\\boldsymbol{\\Omega}_{", grp, "}\\,",
+        "\\text{diag}(", paste(sd_diag_syms, collapse = ", "), ")"
+      )
+    )
+    # LKJ on Omega via brms' Cholesky-factor parameterisation.
+    rows[[length(rows) + 1L]] <- list(
+      lhs = paste0("\\boldsymbol{\\Omega}_{", grp, "}"),
+      op  = "\\sim",
+      rhs = "\\text{LKJCorr}(\\eta)"
     )
   }
   rows
@@ -1223,7 +1335,7 @@ render_priors_section <- function(ctx) {
   # When both umbrella and specific rows survive for the same
   # parameter class, drop the umbrella. The specifics carry the
   # actual labels; the umbrella renders as a generic placeholder.
-  vec_classes <- c("b", "sd", "sds")
+  vec_classes <- c("b", "sd", "sds", "L", "cor")
   drop <- logical(nrow(prior))
   for (cls in unique(prior$class[prior$class %in% vec_classes])) {
     cls_rows <- prior$class == cls
@@ -1253,6 +1365,20 @@ render_priors_section <- function(ctx) {
     }
   }
   prior <- prior[!drop, , drop = FALSE]
+
+  # For an intercept-only group (single sd row, coef == "Intercept"),
+  # blank out the coef so format_parameter_symbol emits the plain
+  # `\sigma_{grp}` form. The `\sigma^{(\alpha)}_{grp}` superscript
+  # is only needed to disambiguate against slope SDs under the same
+  # group; one-row groups have nothing to disambiguate against.
+  is_sd <- prior$class == "sd"
+  for (g in unique(prior$group[is_sd & nzchar(prior$group)])) {
+    g_rows <- which(is_sd & prior$group == g)
+    if (length(g_rows) == 1L &&
+          identical(prior$coef[g_rows], "Intercept")) {
+      prior$coef[g_rows] <- ""
+    }
+  }
 
   # Order: defaults first, then user overrides, then mvgam lifts.
   src <- prior$source %||% rep("", nrow(prior))
@@ -1547,7 +1673,19 @@ format_parameter_symbol <- function(row) {
   if (identical(cls, "hu"))    return("\\pi_{\\text{hu}}")
   if (identical(cls, "sd")) {
     grp <- if (nzchar(group)) group else "j"
-    return(paste0("\\sigma_{", grp, "}"))
+    if (!nzchar(coef)) {
+      return(paste0("\\sigma_{", grp, "}"))
+    }
+    # Disambiguate intercept vs slope SDs under a varying-slope
+    # group (`(x | grp)` emits one sd row per coef under the
+    # same group). Render `sigma^{(\\alpha)}_{grp}` for the
+    # intercept and `sigma^{(\\beta_{<coef>})}_{grp}` for slopes.
+    sup <- if (identical(coef, "Intercept")) {
+      "\\alpha"
+    } else {
+      paste0("\\beta_{", coef, "}")
+    }
+    return(paste0("\\sigma^{(", sup, ")}_{", grp, "}"))
   }
   if (identical(cls, "sds")) {
     bare <- if (nzchar(coef)) {
@@ -1564,10 +1702,12 @@ format_parameter_symbol <- function(row) {
     return(paste0("\\rho_{", bare, "}"))
   }
   if (identical(cls, "L")) {
-    return("\\mathbf{L}")
+    grp <- if (nzchar(group)) group else "j"
+    return(paste0("\\mathbf{L}_{", grp, "}"))
   }
   if (identical(cls, "cor")) {
-    return("\\boldsymbol{\\Omega}")
+    grp <- if (nzchar(group)) group else "j"
+    return(paste0("\\boldsymbol{\\Omega}_{", grp, "}"))
   }
   if (identical(cls, "Z_free_vec")) {
     return("\\mathbf{Z}_{\\text{free}}")

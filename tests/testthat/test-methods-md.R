@@ -197,6 +197,56 @@ test_that("gp_call_to_spec errors on a malformed call with no variables", {
   )
 })
 
+test_that("Varying slope (x | grp) renders MVNormal + LKJ joint", {
+  set.seed(1L)
+  dat <- data.frame(
+    time = rep(1:30, 4),
+    series = factor(rep(paste0("s", 1:4), each = 30)),
+    x = rnorm(120),
+    grp = factor(rep(c("a","b","c","d"), each = 30)),
+    y = rpois(120, 3)
+  )
+  mod <- make_methods_md_prefit(y ~ x + (x | grp), data = dat)
+  out <- methods_md(mod)
+  # Linear predictor contains both intercept and slope deviations.
+  expect_true(grepl("\\\\alpha_\\{grp\\[i\\]\\}", out))
+  expect_true(grepl(
+    "\\\\beta\\^\\{\\(grp\\)\\}_\\{x, grp\\[i\\]\\} x_\\{i,t\\}",
+    out
+  ))
+  # Term def: joint MVNormal + LKJ on Omega.
+  expect_true(grepl("\\\\text\\{MVNormal\\}", out))
+  expect_true(grepl(
+    "\\\\boldsymbol\\{\\\\Omega\\}_\\{grp\\} &\\\\sim \\\\text\\{LKJCorr\\}",
+    out
+  ))
+  expect_true(grepl(
+    "\\\\boldsymbol\\{\\\\Sigma\\}_\\{grp\\}", out
+  ))
+  # Priors: distinct intercept and slope SDs.
+  expect_true(grepl(
+    "\\\\sigma\\^\\{\\(\\\\alpha\\)\\}_\\{grp\\}", out
+  ))
+  expect_true(grepl(
+    "\\\\sigma\\^\\{\\(\\\\beta_\\{x\\}\\)\\}_\\{grp\\}", out
+  ))
+})
+
+test_that("Response column never surfaces in the Predictors list", {
+  set.seed(1L)
+  dat <- data.frame(
+    time = rep(1:30, 4),
+    series = factor(rep(paste0("s", 1:4), each = 30)),
+    x = rnorm(120),
+    grp = factor(rep(c("a","b","c","d"), each = 30)),
+    y = rpois(120, 3)
+  )
+  mod <- make_methods_md_prefit(y ~ x, data = dat)
+  out <- methods_md(mod)
+  # The Predictors bullet list must not include "y" as a covariate.
+  expect_false(grepl("- \\$y\\$:", out))
+})
+
 test_that("Group-level RE renders alpha_{grp[i]} + hyperprior shape", {
   mod <- make_methods_md_prefit(y ~ (1 | grp))
   out <- methods_md(mod)
