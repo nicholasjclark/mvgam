@@ -1832,6 +1832,46 @@ get_trend_validation_patterns <- function() {
   return(patterns)
 }
 
+#' Per-session memo of exact-GP terms that have already warned.
+#' Keys are the literal `gp_term` strings (e.g. `"gp(x)"`); the
+#' value is `TRUE`. Reset between R sessions automatically; not
+#' user-facing.
+#' @noRd
+.exact_gp_warned <- new.env(parent = emptyenv())
+
+#' Fire the "exact GP, no newdata prediction" warning at most once
+#' per term per session. Silent under `TESTTHAT=true` so the test
+#' suite does not surface the noise.
+#' @noRd
+maybe_warn_exact_gp <- function(gp_term) {
+  if (identical(Sys.getenv("TESTTHAT"), "true")) return(invisible())
+  if (isTRUE(.exact_gp_warned[[gp_term]])) return(invisible())
+  assign(gp_term, TRUE, envir = .exact_gp_warned)
+  # NOTE: do not wrap the message body in `insight::format_warning()`
+  # -- that function emits a warning as a side effect on top of
+  # returning the formatted string, so combining it with message()
+  # produces two user-facing notices for one logical event.
+  # Build the multi-line body by hand and emit via message() so the
+  # user sees exactly one prefixed notice per (term, session).
+  example <- gsub("\\)$", ", k = 20)", gp_term)
+  body <- paste(
+    cli::format_inline(
+      "Exact GP term in {.field {gp_term}} (no {.field k} given)."
+    ),
+    cli::format_inline(
+      "i Fit + in-sample inference work; ",
+      "prediction at newdata is not wired up for exact GPs."
+    ),
+    cli::format_inline(
+      "i Pass {.field k} (e.g. {.code {example}}) to use the ",
+      "Hilbert-space approximate form, which supports prediction ",
+      "at newdata."
+    ),
+    sep = "\n"
+  )
+  message(body)
+}
+
 #' Warn (once) on exact GP terms
 #'
 #' Scans a formula for `gp()` terms that omit `k`. Exact GPs fit
@@ -1902,26 +1942,15 @@ validate_exact_gp_usage <- function(formula) {
       # basis at newdata. Warn rather than hard-fail so users
       # can still fit / interpret in-sample; predict-on-newdata
       # currently relies on the approximate form.
-      if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-        rlang::warn(
-          insight::format_warning(c(
-            cli::format_inline(
-              "Exact GP term in {.field {gp_term}} (no {.field k} given)."
-            ),
-            i = cli::format_inline(
-              "Fit + in-sample inference work; ",
-              "prediction at newdata is not wired up for exact GPs."
-            ),
-            i = cli::format_inline(
-              "Pass {.field k} (e.g. {.code {gsub('\\\\)$', ', k = 20)', gp_term)}}) ",
-              "to use the Hilbert-space approximate form, which supports ",
-              "prediction at newdata."
-            )
-          )),
-          .frequency = "once",
-          .frequency_id = paste0("mvgam_exact_gp_", gp_term)
-        )
-      }
+      #
+      # Dedupe per (process, term) so a single mvgam() call doesn't
+      # fire the same warn from each validator entry station (the
+      # obs validator, the trend validator, and setup_brms_lightweight
+      # all hit this code path during one fit). rlang's `.frequency`
+      # was not honouring the dedupe across re-entries; an explicit
+      # package env makes the "once per term per session" semantics
+      # bullet-proof.
+      maybe_warn_exact_gp(gp_term)
     }
   }
   

@@ -654,13 +654,16 @@ test_that("exact GP terms in trend formula are accepted (warn only)", {
   )
 })
 
-test_that("exact GP warn fires when TESTTHAT is off", {
-  # Flip off the testthat guard so the rlang::warn at the
-  # validator actually surfaces; confirm the message and that
-  # the call still returns invisibly.
+test_that("exact GP notice fires once per term per session (TESTTHAT off)", {
+  # Flip off the testthat guard so the validator notice
+  # actually surfaces. Surface via message() now (not
+  # warning) -- expect_message catches it cleanly and the
+  # session memo prevents repeats within one call.
   withr::with_envvar(c(TESTTHAT = ""), {
-    expect_warning(
-      mvgam_formula(y ~ gp(x), trend_formula = ~ 1),
+    # Use a fresh term ("gp(z)") so the per-session memo
+    # built from earlier tests does not silence this one.
+    expect_message(
+      mvgam_formula(y ~ gp(z), trend_formula = ~ 1),
       "Exact GP term"
     )
   })
