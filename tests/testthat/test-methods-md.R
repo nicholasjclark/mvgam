@@ -44,12 +44,10 @@ test_that("Data section labels family + reports dimensions", {
   expect_true(grepl("T = 30", out))
 })
 
-test_that("Model section emits inline math rows for likelihood + link", {
+test_that("Model section emits a single align block with likelihood + link", {
   mod <- make_methods_md_prefit(y ~ x)
   out <- methods_md(mod)
-  # No align* wrapper; each row is a $...$ inline math statement
-  # so the output is legible in every markdown viewer.
-  expect_false(grepl("\\\\begin\\{aligned\\}", out))
+  expect_true(grepl("\\\\begin\\{aligned\\}", out))
   expect_true(grepl("\\\\sim \\\\text\\{Poisson\\}", out))
   expect_true(grepl("\\\\log \\\\mu_\\{i,t\\}", out))
   expect_true(grepl("\\\\alpha", out))
@@ -77,7 +75,7 @@ test_that("Gaussian family renders Normal likelihood + identity link", {
 test_that("RW trend emits eta_{t-1} dynamics + Normal innovation", {
   mod <- make_methods_md_prefit(y ~ 1, trend_formula = ~ RW())
   out <- methods_md(mod)
-  expect_true(grepl("\\\\eta_\\{i,t\\} = \\\\eta_\\{i,t-1\\}", out))
+  expect_true(grepl("\\\\eta_\\{i,t\\} &= \\\\eta_\\{i,t-1\\}", out))
   expect_true(grepl("\\\\epsilon\\^\\{\\(\\\\eta\\)\\}_\\{i,t\\}", out))
   expect_true(grepl("\\\\sigma_\\\\eta", out))
 })
@@ -111,7 +109,7 @@ test_that("Group-level RE renders alpha_{grp[i]} + hyperprior shape", {
   out <- methods_md(mod)
   expect_true(grepl("\\\\alpha_\\{grp\\[i\\]\\}", out))
   expect_true(grepl(
-    "\\\\alpha_\\{grp\\} \\\\sim \\\\text\\{Normal\\}\\(0",
+    "\\\\alpha_\\{grp\\} &\\\\sim \\\\text\\{Normal\\}\\(0",
     out
   ))
   expect_true(grepl("\\\\sigma_\\{grp\\}", out))
@@ -137,7 +135,7 @@ test_that("Priors section backfills umbrella text onto specific rows", {
   out <- methods_md(mod)
   # sigma_{grp} should appear (specific group label), not sigma_j.
   expect_true(grepl(
-    "\\\\sigma_\\{grp\\} \\\\sim \\\\text\\{StudentT\\}", out
+    "\\\\sigma_\\{grp\\} &\\\\sim \\\\text\\{StudentT\\}", out
   ))
   expect_false(grepl("\\\\sigma_\\{j\\}", out))
 })

@@ -131,15 +131,17 @@ methods_md_section_registry <- function(implementation = TRUE) {
 #' @noRd
 align_block <- function(rows) {
   if (length(rows) == 0L) return(character(0L))
-  # One `$...$` inline math line per row. No `\begin{aligned}`
-  # wrapper so the output renders in any markdown viewer
-  # (GitHub, RStudio markdown preview, VS Code, Pandoc, Quarto)
-  # and reads acceptably as raw text in a plain terminal when no
-  # renderer is available. Visual `&=` column alignment is lost,
-  # which plain text could not express anyway.
-  vapply(rows, function(r) {
-    paste0("$", r$lhs, " ", r$op, " ", r$rhs, "$")
+  # Single `$$\begin{aligned}...\end{aligned}$$` block. Pandoc /
+  # Quarto / RStudio / MathJax / KaTeX all render this as a
+  # centered, tightly stacked display equation. `\\` ends each
+  # row, `&` aligns at the relation operator. Plain-text fallback
+  # is degraded (raw LaTeX commands show through) but every other
+  # surface gets the canonical methods-section look.
+  body <- vapply(rows, function(r) {
+    paste0(r$lhs, " &", r$op, " ", r$rhs)
   }, character(1L))
+  body[-length(body)] <- paste0(body[-length(body)], " \\\\")
+  c("$$", "\\begin{aligned}", body, "\\end{aligned}", "$$")
 }
 
 
