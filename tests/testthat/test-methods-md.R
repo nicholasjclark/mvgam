@@ -153,6 +153,17 @@ test_that("By-factor GP carries the grouping variable in the subscript", {
   expect_true(grepl("stratified by \\$grp\\$", out))
 })
 
+test_that("gp_call_to_spec errors on a malformed call with no variables", {
+  # gp() with only named args (no positional variable list) is
+  # nonsensical; should error rather than silently produce a
+  # stub with vars = character(0).
+  bad_call <- str2lang("gp(k = 5)")
+  expect_error(
+    mvgam:::gp_call_to_spec(bad_call),
+    "no positional variable arguments"
+  )
+})
+
 test_that("Group-level RE renders alpha_{grp[i]} + hyperprior shape", {
   mod <- make_methods_md_prefit(y ~ (1 | grp))
   out <- methods_md(mod)

@@ -329,10 +329,7 @@ model_glossary <- function(obj) {
   )
   prior <- obj$prior
   smooth_specs <- obs_smooth_specs_from_prior(prior)
-  gp_specs <- obs_gp_specs_from_formula(obj)
-  if (length(gp_specs) == 0L) {
-    gp_specs <- obs_gp_specs_from_prior(prior)
-  }
+  gp_specs <- get_gp_specs(obj)
   re_groups <- obs_re_groups_from_prior(prior)
   for (spec in smooth_specs) {
     bare <- spec$var
@@ -350,7 +347,7 @@ model_glossary <- function(obj) {
   }
   for (spec in gp_specs) {
     sub <- gp_subscript(spec)
-    vars <- if (!is.null(spec$vars)) spec$vars else spec$var
+    vars <- spec$vars
     dims_text <- paste(vars, collapse = ", ")
     by_text <- if (!is.null(spec$by) && !is.na(spec$by) &&
                     nzchar(spec$by)) {
@@ -585,12 +582,10 @@ classify_obs_parameters <- function(obj) {
   # posterior draws yet. This works for both fitted mvgam objects
   # and prefits (run_model = FALSE).
   prior <- obj$prior
-  gp <- obs_gp_specs_from_formula(obj)
-  if (length(gp) == 0L) gp <- obs_gp_specs_from_prior(prior)
   list(
     fixed  = obs_fixed_terms_from_prior(prior),
     smooth = obs_smooth_terms_from_prior(prior),
-    gp     = gp,
+    gp     = get_gp_specs(obj),
     re     = obs_re_groups_from_prior(prior)
   )
 }
@@ -749,6 +744,19 @@ obs_gp_specs_from_prior <- function(prior) {
 }
 
 #' @noRd
+get_gp_specs <- function(obj) {
+  # Single entry point for everything that walks gp() terms.
+  # The formula walker recovers vars / k / by / cov; the
+  # prior-table extractor is the fallback when the formula
+  # round-trip drops the gp() call (unusual but defensive).
+  specs <- obs_gp_specs_from_formula(obj)
+  if (length(specs) == 0L) {
+    specs <- obs_gp_specs_from_prior(obj$prior)
+  }
+  specs
+}
+
+#' @noRd
 obs_gp_specs_from_formula <- function(obj) {
   # Walk the obs formula AST for `gp(...)` calls and recover the
   # full spec per term: variable list, k, by, cov kernel. This
@@ -788,6 +796,11 @@ gp_call_to_spec <- function(call) {
     function(a) as.character(a),
     character(1L)
   )
+  if (length(vars) == 0L) {
+    stop(insight::format_error(
+      "gp() call has no positional variable arguments."
+    ))
+  }
   k <- if ("k" %in% arg_names) {
     tryCatch(
       as.integer(eval(args[["k"]])),
@@ -843,10 +856,9 @@ render_smooth_inline <- function(smooths) {
 render_gp_inline <- function(specs) {
   paste(
     vapply(specs, function(s) {
-      vars <- if (!is.null(s$vars)) s$vars else s$var
       sub <- gp_subscript(s)
       vars_in <- paste(
-        paste0(vars, "_{i,t}"),
+        paste0(s$vars, "_{i,t}"),
         collapse = ", "
       )
       paste0(
@@ -859,8 +871,7 @@ render_gp_inline <- function(specs) {
 
 #' @noRd
 gp_subscript <- function(spec) {
-  vars <- if (!is.null(spec$vars)) spec$vars else spec$var
-  base <- paste(vars, collapse = ", ")
+  base <- paste(spec$vars, collapse = ", ")
   if (!is.null(spec$by) && !is.na(spec$by) && nzchar(spec$by)) {
     paste0(base, " \\mid ", spec$by)
   } else {
@@ -881,10 +892,7 @@ render_re_inline <- function(groups) {
 term_definition_rows <- function(obj, notation) {
   prior <- obj$prior
   smooths <- obs_smooth_terms_from_prior(prior)
-  gp_specs <- obs_gp_specs_from_formula(obj)
-  if (length(gp_specs) == 0L) {
-    gp_specs <- obs_gp_specs_from_prior(prior)
-  }
+  gp_specs <- get_gp_specs(obj)
   re_groups <- obs_re_groups_from_prior(prior)
 
   rows <- list()
@@ -900,9 +908,8 @@ term_definition_rows <- function(obj, notation) {
   }
   for (spec in gp_specs) {
     sub <- gp_subscript(spec)
-    vars <- if (!is.null(spec$vars)) spec$vars else spec$var
-    vars_in <- paste(vars, collapse = ", ")
-    rho_arg <- if (length(vars) > 1L) {
+    vars_in <- paste(spec$vars, collapse = ", ")
+    rho_arg <- if (length(spec$vars) > 1L) {
       paste0("\\boldsymbol{\\rho}_{", sub, "}")
     } else {
       paste0("\\rho_{", sub, "}")
