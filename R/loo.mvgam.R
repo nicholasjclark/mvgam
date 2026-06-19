@@ -19,9 +19,18 @@
 #'   `process_error` argument on [log_lik.mvgam()]. When `FALSE` (default)
 #'   the trend is fixed at its posterior mean, giving PSIS weights that
 #'   reflect parameter uncertainty alone. Set `TRUE` to fold sampled
-#'   trend realisations into the per-observation log-likelihood — useful
+#'   trend realisations into the per-observation log-likelihood, useful
 #'   for continuous-family fits where the observation noise is small
 #'   relative to the trend.
+#'
+#' @param by_species Logical, default `FALSE`. When `TRUE`, return a
+#'   data frame with one row per series (`species` column) and per-series
+#'   ELPD estimates instead of a single `psis_loo` object. Matches the
+#'   `spOccupancy::waicOcc(by.sp = TRUE)` workflow for ranking species-
+#'   level fit in joint-species distribution models. Requires a `series`
+#'   column on the fit's data. For closure-unit families the log_lik
+#'   columns are at the per-unit grain; each unit is mapped to a series
+#'   via the first row of its visit block.
 #'
 #' @param ... Further arguments passed to [loo::loo()]
 #'
@@ -153,7 +162,8 @@ loo.mvgam <- function(x, ...,
                       moment_match_args = list(),
                       reloo_args = list(),
                       model_names = NULL,
-                      incl_dynamics = FALSE) {
+                      incl_dynamics = FALSE,
+                      by_species = FALSE) {
   # brms-parity arguments that need machinery we do not yet have. Fail
   # fast rather than silently ignoring; users picking these flags expect
   # them to do something.
@@ -185,6 +195,9 @@ loo.mvgam <- function(x, ...,
     exp(logliks),
     chain_id = sort(rep(seq_len(chains), n_per_chain))
   )
+  if (isTRUE(by_species)) {
+    return(per_species_ic(x, logliks, criterion = "loo"))
+  }
   loo::loo(logliks, r_eff = releffs, save_psis = save_psis, ...)
 }
 
@@ -277,6 +290,104 @@ named_list = function(names, values = NULL) {
     values <- vector("list", length(names))
   }
   setNames(values, names)
+}
+
+# Compute per-species information criterion estimates from a
+# pointwise log-likelihood matrix. Used by both loo.mvgam(by_species
+# = TRUE) and waic.mvgam(by_species = TRUE) so the column-to-species
+# mapping logic lives in one place. Returns a data frame with one
+# row per series: (species, elpd, se_elpd, p, n_obs), where
+# `elpd` / `p` come from the selected criterion. Closure-unit
+# log_lik matrices are at the per-unit grain; each unit is mapped
+# to a series via the first row of its visit block (closure units
+# are defined within a series, so every row in a unit shares the
+# same species label).
+#'@noRd
+per_species_ic <- function(x, logliks,
+                            criterion = c("loo", "waic")) {
+  criterion <- match.arg(criterion)
+  col_species <- per_obs_species_labels(x, ncol(logliks))
+  if (length(col_species) != ncol(logliks)) {
+    stop(insight::format_error(c(
+      "Cannot split log_lik by species: column count mismatch.",
+      x = paste0(
+        "log_lik has ", ncol(logliks), " columns but the data ",
+        "implies ", length(col_species), " observations."
+      ),
+      i = "by_species = TRUE assumes clean_ll() did not drop any columns."
+    )))
+  }
+  chains <- posterior::nchains(posterior::as_draws_array(x$fit))
+  n_per_chain <- NROW(logliks) / chains
+  chain_id <- sort(rep(seq_len(chains), n_per_chain))
+  by_idx <- split(seq_along(col_species),
+                  factor(col_species, levels = unique(col_species)))
+  est_name <- if (identical(criterion, "loo")) "elpd_loo" else "elpd_waic"
+  p_name   <- if (identical(criterion, "loo")) "p_loo"    else "p_waic"
+  rows <- lapply(names(by_idx), function(sp) {
+    idx <- by_idx[[sp]]
+    ll  <- logliks[, idx, drop = FALSE]
+    ic  <- if (identical(criterion, "loo")) {
+      r_eff <- loo::relative_eff(exp(ll), chain_id = chain_id)
+      loo::loo(ll, r_eff = r_eff)
+    } else {
+      loo::waic(ll)
+    }
+    data.frame(
+      species = sp,
+      elpd    = ic$estimates[est_name, "Estimate"],
+      se_elpd = ic$estimates[est_name, "SE"],
+      p       = ic$estimates[p_name, "Estimate"],
+      n_obs   = length(idx),
+      stringsAsFactors = FALSE
+    )
+  })
+  out <- do.call(rbind, rows)
+  rownames(out) <- NULL
+  out
+}
+
+# Map each log_lik column to a series label, matching the grain
+# log_lik returns. For detection-family closure-unit fits (occ /
+# nmix variants) log_lik is per-unit; every visit row in a unit
+# shares the same species, so reading the first visit row of each
+# unit is sufficient. For row-grain fits the data's `series` column
+# maps directly. Multi-response custom families (mvn / mvt / diri
+# / multi / categ) put species on the K-vector axis WITHIN a unit
+# rather than across units; by_species is not meaningful there
+# and is rejected up front.
+#'@noRd
+per_obs_species_labels <- function(x, n_cols) {
+  if (is_multi_response_family(x$family)) {
+    stop(insight::format_error(c(
+      "by_species = TRUE is not meaningful for multi-response families.",
+      x = paste0(
+        "Family '", resolve_family_name(x$family) %||% "?",
+        "' puts species on the per-unit K-vector axis, not as ",
+        "separate rows."
+      ),
+      i = "Use loo()/waic() without by_species to score per closure unit."
+    )))
+  }
+  data <- x$data %||% data.frame()
+  if (!"series" %in% names(data)) {
+    stop(insight::format_error(c(
+      "by_species = TRUE requires a 'series' column on the fit's data.",
+      i = "Add a series factor before fitting if you want per-series IC."
+    )))
+  }
+  series_col <- as.character(data$series)
+  if (is_closure_unit_family(x$family)) {
+    arrs <- build_closure_unit_arrays(
+      data,
+      response_var = closure_unit_response_var(x$formula),
+      default_cap = closure_unit_default_cap(x$family),
+      unit_grouping_vars = closure_unit_grouping(x$family)
+    )
+    series_col[arrs$visit_idx[, 1L]]
+  } else {
+    series_col
+  }
 }
 
 #'@noRd

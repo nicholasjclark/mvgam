@@ -259,3 +259,76 @@ test_that("mvgam_loo_E_loo asserts its 'posterior_fn' is a function", {
     "function"
   )
 })
+
+
+# ---------------------------------------------------------------
+# by_species split for loo() / waic(): column mapping + aggregator
+# ---------------------------------------------------------------
+
+# Build a non-closure-unit stub whose data + family give a direct
+# (row -> series) mapping for per_obs_species_labels.
+make_by_species_stub <- function() {
+  stub <- make_loo_extras_stub()
+  stub$data <- data.frame(
+    series = factor(rep(c("a", "b"), each = 4L)),
+    time = rep(1:4, 2L),
+    y = rnorm(8L),
+    x = rnorm(8L)
+  )
+  stub$family <- gaussian()
+  stub$formula <- y ~ x
+  stub
+}
+
+test_that("per_obs_species_labels maps log_lik columns to series", {
+  stub <- make_by_species_stub()
+  labels <- mvgam:::per_obs_species_labels(stub, n_cols = 8L)
+  expect_identical(
+    labels,
+    c("a", "a", "a", "a", "b", "b", "b", "b")
+  )
+})
+
+test_that("per_obs_species_labels rejects fits without a series column", {
+  stub <- make_by_species_stub()
+  stub$data$series <- NULL
+  expect_error(
+    mvgam:::per_obs_species_labels(stub, n_cols = 8L),
+    "requires a 'series' column"
+  )
+})
+
+test_that("per_obs_species_labels rejects mv-custom families", {
+  stub <- make_by_species_stub()
+  # Synthesise an mvgam_multi_response attribute that mirrors what
+  # diri() / mvn() / multi() / categ() / mvt() set in their
+  # constructors. The body of those constructors needs Stan to
+  # round-trip, so the attr-only stub is the lightest fixture
+  # that exercises the rejection.
+  stub$family <- structure(
+    list(family = "mvgam_dirichlet", name = "diri"),
+    class = "customfamily",
+    mvgam_multi_response = TRUE
+  )
+  expect_error(
+    mvgam:::per_obs_species_labels(stub, n_cols = 8L),
+    "not meaningful for multi-response families"
+  )
+})
+
+test_that("per_species_ic returns one elpd row per series", {
+  stub <- make_by_species_stub()
+  set.seed(7L)
+  logliks <- matrix(rnorm(40 * 8L, mean = -1, sd = 0.5),
+                    nrow = 40L, ncol = 8L)
+  out_loo <- mvgam:::per_species_ic(stub, logliks, criterion = "loo")
+  expect_s3_class(out_loo, "data.frame")
+  expect_setequal(out_loo$species, c("a", "b"))
+  expect_named(out_loo,
+               c("species", "elpd", "se_elpd", "p", "n_obs"))
+  expect_identical(out_loo$n_obs, c(4L, 4L))
+  # WAIC path returns the same column set.
+  out_waic <- mvgam:::per_species_ic(stub, logliks, criterion = "waic")
+  expect_named(out_waic,
+               c("species", "elpd", "se_elpd", "p", "n_obs"))
+})

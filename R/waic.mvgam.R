@@ -15,6 +15,12 @@
 #'   `compare` and `model_names` are no-ops for single-model WAIC.
 #' @param incl_dynamics Logical, default `FALSE`. Maps to the
 #'   `process_error` argument on [log_lik.mvgam()].
+#' @param by_species Logical, default `FALSE`. When `TRUE`, return a
+#'   data frame with one row per series (`species` column) and per-
+#'   series WAIC estimates instead of a single `loo::waic` object.
+#'   Matches the `spOccupancy::waicOcc(by.sp = TRUE)` workflow for
+#'   ranking species-level fit in joint-species distribution models.
+#'   See [loo.mvgam()] for the column-to-species mapping convention.
 #'
 #' @return A `loo::waic` object.
 #'
@@ -32,14 +38,22 @@
 #' @export
 waic.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
                        pointwise = FALSE, model_names = NULL,
-                       incl_dynamics = FALSE) {
+                       incl_dynamics = FALSE,
+                       by_species = FALSE) {
   if (isTRUE(pointwise)) {
     stop(insight::format_error(c(
       "{.field pointwise = TRUE} is not yet supported on mvgam waic.",
       i = "Compute WAIC in-memory by leaving {.field pointwise = FALSE}."
     )))
   }
-  loo::waic(log_lik(x, resp = resp, process_error = incl_dynamics, ...))
+  logliks <- log_lik(
+    x, resp = resp, process_error = incl_dynamics, ...
+  )
+  if (isTRUE(by_species)) {
+    logliks <- clean_ll(x, logliks)
+    return(per_species_ic(x, logliks, criterion = "waic"))
+  }
+  loo::waic(logliks)
 }
 
 #' @importFrom loo waic

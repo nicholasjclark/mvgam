@@ -18,7 +18,8 @@
   moment_match_args = list(),
   reloo_args = list(),
   model_names = NULL,
-  incl_dynamics = FALSE
+  incl_dynamics = FALSE,
+  by_species = FALSE
 )
 
 \method{loo_compare}{mvgam}(
@@ -47,6 +48,15 @@ from deparsing the call. Otherwise will use the passed values as model names}
 
 \item{incl_dynamics}{Logical, passed through to \code{\link[=loo.mvgam]{loo.mvgam()}} /
 \code{\link[=waic.mvgam]{waic.mvgam()}}. Default \code{FALSE} to match \code{\link[=loo.mvgam]{loo.mvgam()}}.}
+
+\item{by_species}{Logical, default \code{FALSE}. When \code{TRUE}, return a
+data frame with one row per series (\code{species} column) and per-series
+ELPD estimates instead of a single \code{psis_loo} object. Matches the
+\code{spOccupancy::waicOcc(by.sp = TRUE)} workflow for ranking species-
+level fit in joint-species distribution models. Requires a \code{series}
+column on the fit's data. For closure-unit families the log_lik
+columns are at the per-unit grain; each unit is mapped to a series
+via the first row of its visit block.}
 
 \item{criterion}{Information criterion used for comparison. One of
 \code{"loo"} (default) or \code{"waic"}.}

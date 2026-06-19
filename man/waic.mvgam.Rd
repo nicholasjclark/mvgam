@@ -11,7 +11,8 @@
   resp = NULL,
   pointwise = FALSE,
   model_names = NULL,
-  incl_dynamics = FALSE
+  incl_dynamics = FALSE,
+  by_species = FALSE
 )
 }
 \arguments{
@@ -28,6 +29,13 @@
 
 \item{incl_dynamics}{Logical, default \code{FALSE}. Maps to the
 \code{process_error} argument on \code{\link[=log_lik.mvgam]{log_lik.mvgam()}}.}
+
+\item{by_species}{Logical, default \code{FALSE}. When \code{TRUE}, return a
+data frame with one row per series (\code{species} column) and per-
+series WAIC estimates instead of a single \code{loo::waic} object.
+Matches the \code{spOccupancy::waicOcc(by.sp = TRUE)} workflow for
+ranking species-level fit in joint-species distribution models.
+See \code{\link[=loo.mvgam]{loo.mvgam()}} for the column-to-species mapping convention.}
 }
 \value{
 A \code{loo::waic} object.
