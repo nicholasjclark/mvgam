@@ -733,6 +733,85 @@ closure_unit_default_cap_buffer <- function(family) {
 #'   `Y_max`, `visit_idx`, `max_rep`, `unit_labels`. `K_max` and
 #'   `Y_max` are `NA` when `compute_y_max = FALSE`.
 #' @noRd
+# Fill missing closure-unit identifier columns on an incoming
+# newdata so synthetic prediction grids (e.g. those built by
+# `marginaleffects::datagrid()`, which drops every column the
+# model formula does not reference) round-trip through the per-
+# unit prediction pipeline.
+#
+# The natural interpretation of a per-row marginaleffects grid on
+# a closure-unit fit is "each row is one hypothetical single-
+# visit closure unit". To get that, we stamp:
+#   * `series` to the first training level (held constant so the
+#     state intercept stays interpretable across the grid).
+#   * `time` to `seq_len(nrow(newdata))` so each row has a
+#     distinct unit identifier; `build_closure_unit_arrays()`
+#     then treats the rows as `N_grid` independent units of
+#     1 visit each. Per-row state-level covariate variation
+#     produces per-row state predictions as intended.
+#   * `visit` to `1L`.
+#   * `cap` to the family's `mvgam_default_cap` attribute or, if
+#     absent, the first training row's cap value.
+#   * the response column to `0L` to satisfy
+#     `validate_closure_unit_data()`'s integer / binary checks;
+#     the response is never consumed by `posterior_epred()` /
+#     `posterior_predict()` for these families.
+#
+# No-op (returns newdata unchanged) when:
+#   * the family is not a closure-unit family, or
+#   * `newdata` is NULL, or
+#   * the fit has no `data` slot to source defaults from, or
+#   * all four identifier columns are already present.
+#
+# Used by `get_predict.mvgam` so every marginaleffects entry
+# point (`predictions`, `slopes`, `comparisons`, `plot_predictions`,
+# `conditional_effects`) works on closure-unit fits out of the
+# box.
+#'@noRd
+complete_closure_unit_newdata <- function(object, newdata) {
+  if (is.null(newdata)) return(newdata)
+  if (!is_closure_unit_family(object$family)) return(newdata)
+  data <- object$data %||% data.frame()
+  if (nrow(data) == 0L) return(newdata)
+  need_series <- !"series" %in% names(newdata)
+  need_time   <- !"time" %in% names(newdata)
+  need_visit  <- !"visit" %in% names(newdata)
+  need_cap    <- !"cap" %in% names(newdata)
+  if (!any(need_series, need_time, need_visit, need_cap)) {
+    return(newdata)
+  }
+  template <- data[1L, , drop = FALSE]
+  if (need_series) {
+    newdata$series <- factor(
+      as.character(template$series),
+      levels = levels(data$series)
+    )
+  }
+  if (need_time) {
+    newdata$time <- seq_len(nrow(newdata))
+  }
+  if (need_visit) {
+    newdata$visit <- 1L
+  }
+  if (need_cap) {
+    cap_val <- closure_unit_default_cap(object$family) %||%
+                 template$cap %||% 1L
+    newdata$cap <- as.integer(rep(cap_val, nrow(newdata)))
+  }
+  # Override the response with a safe default so the binary /
+  # non-negative-integer validator passes. Predictions do not
+  # consume the response column for closure-unit families.
+  response_var <- tryCatch(
+    closure_unit_response_var(object$formula),
+    error = function(e) NULL
+  )
+  if (!is.null(response_var) && response_var %in% names(newdata)) {
+    newdata[[response_var]] <- 0L
+  }
+  newdata
+}
+
+
 build_closure_unit_arrays <- function(data,
                                        response_var,
                                        series_var  = "series",

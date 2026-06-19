@@ -30,6 +30,14 @@ get_predict.mvgam <- function(model,
   checkmate::assert_class(model, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1L)
   checkmate::assert_logical(process_error, len = 1L)
+  # marginaleffects::datagrid() drops every column the model
+  # formula does not reference. Closure-unit families need
+  # `series` / `time` / `visit` / `cap` to pass through the
+  # per-unit prediction pipeline, so fill any that are missing
+  # with sensible defaults (each grid row becomes one synthetic
+  # single-visit closure unit). No-op for non-closure-unit
+  # families and for newdata that already carries the columns.
+  newdata <- complete_closure_unit_newdata(model, newdata)
   # mvgam's predict() type vocabulary:
   #   link     - linear predictor on the link scale
   #   expected - E[Y], expectation of the response (epred); no
