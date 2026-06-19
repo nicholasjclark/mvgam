@@ -798,15 +798,17 @@ complete_closure_unit_newdata <- function(object, newdata) {
                  template$cap %||% 1L
     newdata$cap <- as.integer(rep(cap_val, nrow(newdata)))
   }
-  # Override the response with a safe default so the binary /
-  # non-negative-integer validator passes. Predictions do not
-  # consume the response column for closure-unit families.
+  # Always (re)stamp the response with a safe default so the
+  # binary / non-negative-integer validator passes. Predictions
+  # do not consume the response column for closure-unit families,
+  # so overwriting present values or filling a missing column has
+  # the same downstream effect.
   response_var <- tryCatch(
     closure_unit_response_var(object$formula),
     error = function(e) NULL
   )
-  if (!is.null(response_var) && response_var %in% names(newdata)) {
-    newdata[[response_var]] <- 0L
+  if (!is.null(response_var)) {
+    newdata[[response_var]] <- rep(0L, nrow(newdata))
   }
   newdata
 }

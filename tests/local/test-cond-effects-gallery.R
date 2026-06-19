@@ -60,8 +60,13 @@ fixtures <- list(
     title = "occ() : elev + tod_c"
   ),
   list(
+    path  = "/tmp/nmix_pb_smoke_fit.rds",
+    fname = "02_nmix_pb",
+    title = "nmix('poisson_binomial') : env + tod_c"
+  ),
+  list(
     path  = "/tmp/diri_smoke_fit.rds",
-    fname = "02_diri",
+    fname = "03_diri",
     title = "diri() : env * series"
   )
 )

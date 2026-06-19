@@ -248,3 +248,130 @@ test_that("pp_check_mv_category() returns NULL for non-multi-response families",
   )
   expect_null(mvgam:::pp_check_mv_category(obj, obj$data))
 })
+
+
+# ---------------------------------------------------------------
+# complete_closure_unit_newdata(): auto-fill closure-unit cols
+# missing from a marginaleffects-style synthetic grid. Family-
+# by-family coverage so default_cap / default_cap_buffer paths
+# all stamp the right cap, and the response gets overridden.
+# ---------------------------------------------------------------
+
+stub_with_family <- function(fam, response_var = "y") {
+  formula <- stats::as.formula(paste(response_var, "~ env"))
+  structure(
+    list(
+      family  = fam,
+      formula = formula,
+      data    = data.frame(
+        series = factor(rep(1:2, each = 3L)),
+        time   = rep(1:3, 2L),
+        visit  = rep(1:3, 2L),
+        y      = c(0L, 1L, 0L, 1L, 1L, 0L),
+        cap    = rep(7L, 6L),
+        env    = rnorm(6L)
+      )
+    ),
+    class = "mvgam"
+  )
+}
+
+# Bare datagrid-shaped newdata: formula vars only, identifier
+# columns stripped. Mirrors what marginaleffects::datagrid()
+# hands to get_predict.mvgam.
+make_stripped_grid <- function(n = 5L) {
+  data.frame(
+    rowid = seq_len(n),
+    env   = seq(-2, 2, length.out = n)
+  )
+}
+
+test_that("complete_closure_unit_newdata stamps occ defaults", {
+  stub <- stub_with_family(occ())
+  out  <- mvgam:::complete_closure_unit_newdata(
+    stub, make_stripped_grid(5L)
+  )
+  expect_true(all(c("series", "time", "visit", "cap", "y") %in%
+                    names(out)))
+  expect_identical(out$cap, rep(1L, 5L))
+  expect_identical(out$visit, rep(1L, 5L))
+  expect_identical(out$time, 1:5)
+  expect_identical(as.character(out$series), rep("1", 5L))
+  # Response overridden to satisfy binary_y_check.
+  expect_identical(out$y, rep(0L, 5L))
+})
+
+test_that("complete_closure_unit_newdata stamps nmix(PB) cap from template", {
+  stub <- stub_with_family(nmix())
+  out  <- mvgam:::complete_closure_unit_newdata(
+    stub, make_stripped_grid(4L)
+  )
+  expect_identical(out$cap, rep(7L, 4L))
+})
+
+test_that("complete_closure_unit_newdata stamps nmix('royle_nichols') cap = 25", {
+  stub <- stub_with_family(nmix("royle_nichols"))
+  out  <- mvgam:::complete_closure_unit_newdata(
+    stub, make_stripped_grid(3L)
+  )
+  expect_identical(out$cap, rep(25L, 3L))
+})
+
+test_that("complete_closure_unit_newdata stamps nmix('poisson_poisson') cap from template", {
+  stub <- stub_with_family(nmix("poisson_poisson"))
+  out  <- mvgam:::complete_closure_unit_newdata(
+    stub, make_stripped_grid(3L)
+  )
+  expect_identical(out$cap, rep(7L, 3L))
+})
+
+test_that("complete_closure_unit_newdata is a no-op for non-closure-unit families", {
+  stub <- structure(
+    list(family = gaussian(),
+         formula = y ~ env,
+         data = data.frame(y = rnorm(5L), env = rnorm(5L))),
+    class = "mvgam"
+  )
+  grid <- make_stripped_grid(5L)
+  out  <- mvgam:::complete_closure_unit_newdata(stub, grid)
+  expect_identical(out, grid)
+})
+
+test_that("complete_closure_unit_newdata is a no-op when columns already present", {
+  stub <- stub_with_family(occ())
+  full <- stub$data[1:3, , drop = FALSE]
+  out  <- mvgam:::complete_closure_unit_newdata(stub, full)
+  # Nothing changed (no rowid, no synthetic time stamp).
+  expect_identical(out, full)
+})
+
+test_that("complete_closure_unit_newdata fills only the missing identifier cols", {
+  stub <- stub_with_family(occ())
+  partial <- data.frame(
+    series = factor("1", levels = c("1", "2")),
+    env    = 0,
+    y      = 99L
+  )
+  partial <- partial[rep(1L, 3L), , drop = FALSE]
+  rownames(partial) <- NULL
+  out <- mvgam:::complete_closure_unit_newdata(stub, partial)
+  # series was present; left alone (still all "1").
+  expect_identical(as.character(out$series), rep("1", 3L))
+  # time / visit / cap stamped.
+  expect_identical(out$time, 1:3)
+  expect_identical(out$visit, rep(1L, 3L))
+  expect_identical(out$cap, rep(1L, 3L))
+  # response always overridden to 0L.
+  expect_identical(out$y, rep(0L, 3L))
+})
+
+test_that("complete_closure_unit_newdata handles multi-species fits", {
+  stub <- stub_with_family(occ())
+  # Original series factor has levels c("1", "2"); helper picks
+  # the FIRST level as the default fill.
+  out  <- mvgam:::complete_closure_unit_newdata(
+    stub, make_stripped_grid(3L)
+  )
+  expect_identical(levels(out$series), levels(stub$data$series))
+  expect_identical(as.character(out$series), rep("1", 3L))
+})
