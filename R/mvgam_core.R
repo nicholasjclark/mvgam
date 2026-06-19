@@ -221,6 +221,13 @@
 #' # Extend the formula. Routed through stats::update.formula() so
 #' # `~ . + new_term` semantics work.
 #' mod3 <- update(mod, formula. = ~ . + s(time))
+#'
+#' # Methods-section helpers. `how_to_cite()` returns the prose
+#' # paragraph for a paper; `methods_md()` returns the matching
+#' # math statement of the model (likelihood, link, latent
+#' # dynamics, priors, sampler configuration) as Markdown + LaTeX.
+#' how_to_cite(mod)
+#' cat(methods_md(mod))
 #' }
 #'
 #' @references
@@ -253,7 +260,13 @@
 #' Use \code{how_to_cite(fit)} for a citation-ready methods
 #' description that adapts to the model's actual structure
 #' (trend type, factor identification, sampling algorithm,
-#' backend).
+#' backend). For the matching math-only model statement
+#' (likelihood, link, latent dynamics, priors, sampler config)
+#' rendered as a Markdown + LaTeX block, use
+#' \code{\link{methods_md}(fit)}.
+#'
+#' @seealso \code{\link{methods_md}}, \code{\link{how_to_cite}},
+#'   \code{\link{jsdgam}}.
 #'
 #' @export
 mvgam <- function(formula, trend_formula = NULL, data = NULL,

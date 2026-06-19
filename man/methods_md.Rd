@@ -85,7 +85,11 @@ methods_md(mod)
 
 }
 \seealso{
-\code{\link{how_to_cite}}, \code{\link{prior_summary}}
+\code{\link{how_to_cite}}, \code{\link{prior_summary}},
+\code{\link{mvgam}}, \code{\link{jsdgam}}.
+\code{how_to_cite()} produces the prose methods paragraph;
+\code{methods_md()} produces the matching math statement of
+the model.
 }
 \author{
 Nicholas J Clark

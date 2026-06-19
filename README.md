@@ -328,9 +328,11 @@ can use the highly versatile `pp_check()` function to plot these:
 
 <img src="man/figures/README-unnamed-chunk-18-1.png" width="100%" />
 
-When describing the model, it can be helpful to use the `how_to_cite()`
-function to generate a scaffold for describing the model and sampling
-details in scientific communications
+When describing the model, `how_to_cite()` writes the prose methods
+paragraph, and `methods_md()` returns the matching math statement of
+the model (likelihood, link, latent dynamics, priors, sampler
+configuration) as a Markdown + LaTeX block that paste-renders through
+Pandoc / Quarto / RStudio.
 
     description <- how_to_cite(mod)
 

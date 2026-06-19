@@ -21,7 +21,10 @@
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso \code{\link[utils]{citation}}, \code{\link{mvgam}}
+#' @seealso \code{\link[utils]{citation}}, \code{\link{mvgam}},
+#'   \code{\link{methods_md}}. `how_to_cite()` produces the
+#'   prose methods paragraph; `methods_md()` produces the
+#'   matching math statement of the model.
 #'
 #' @examples
 #' \donttest{

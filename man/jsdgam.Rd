@@ -278,6 +278,15 @@ mod_fourth_corner <- jsdgam(
 )
 summary(mod_fourth_corner)
 conditional_effects(mod_fourth_corner)
+
+# Methods-section helpers. `how_to_cite()` returns the prose
+# paragraph for a paper; `methods_md()` returns the matching
+# math statement of the model (joint Dirichlet / MVNormal /
+# multinomial likelihood when used, latent factor
+# decomposition, structured loadings prior, sampler config)
+# as Markdown + LaTeX.
+how_to_cite(mod)
+cat(methods_md(mod))
 }
 }
 \references{
@@ -308,5 +317,5 @@ models. \emph{Statistics and Computing}, 34:143.
 }
 \seealso{
 \code{\link[=mvgam]{mvgam()}}, \code{\link[=lv_axis]{lv_axis()}}, \code{\link[=residual_cor]{residual_cor()}},
-\code{\link[=ordinate]{ordinate()}}.
+\code{\link[=ordinate]{ordinate()}}, \code{\link[=methods_md]{methods_md()}}, \code{\link[=how_to_cite]{how_to_cite()}}.
 }

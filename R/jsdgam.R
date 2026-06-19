@@ -203,7 +203,7 @@
 #'   (`ordinate`, `residual_cor`) recognise the additional class.
 #'
 #' @seealso [mvgam()], [lv_axis()], [residual_cor()],
-#'   [ordinate()].
+#'   [ordinate()], [methods_md()], [how_to_cite()].
 #'
 #' @references
 #' Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,
@@ -291,6 +291,15 @@
 #' )
 #' summary(mod_fourth_corner)
 #' conditional_effects(mod_fourth_corner)
+#'
+#' # Methods-section helpers. `how_to_cite()` returns the prose
+#' # paragraph for a paper; `methods_md()` returns the matching
+#' # math statement of the model (joint Dirichlet / MVNormal /
+#' # multinomial likelihood when used, latent factor
+#' # decomposition, structured loadings prior, sampler config)
+#' # as Markdown + LaTeX.
+#' how_to_cite(mod)
+#' cat(methods_md(mod))
 #' }
 #' @export
 jsdgam <- function(formula,

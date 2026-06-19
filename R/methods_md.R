@@ -47,7 +47,11 @@
 #' }
 #'
 #' @author Nicholas J Clark
-#' @seealso \code{\link{how_to_cite}}, \code{\link{prior_summary}}
+#' @seealso \code{\link{how_to_cite}}, \code{\link{prior_summary}},
+#'   \code{\link{mvgam}}, \code{\link{jsdgam}}.
+#'   `how_to_cite()` produces the prose methods paragraph;
+#'   `methods_md()` produces the matching math statement of
+#'   the model.
 #' @export
 methods_md <- function(object, file = NULL, notation = "default",
                        implementation = TRUE, ...) {
