@@ -93,6 +93,10 @@
 #'
 #' @seealso [mgcv::gamSim()] for the conceptual inspiration;
 #'   [`mvgam()`] for the fitter the simulated data can be fed to.
+#'   For detection-error families ([occ()] / [nmix()] variants),
+#'   use [sim_closure_unit_data()] instead: the closure-unit
+#'   grain (sites x visits) does not fit the time-series layout
+#'   `sim_mvgam()` produces.
 #'
 #' @examples
 #' \donttest{

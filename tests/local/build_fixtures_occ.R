@@ -9,7 +9,12 @@
 #   Rscript -e 'devtools::load_all(quiet = TRUE);
 #               source("tests/local/build_fixtures_occ.R")'
 
-if (!exists("force")) force <- FALSE
+# `force` is a base R function (force(x) evaluates promises), so a
+# bare `exists("force")` always returns TRUE and `force` resolves
+# to the closure rather than the intended logical default. Scope
+# the existence check to the calling frame so a caller can still
+# override with `force <- TRUE; source(...)`.
+if (!exists("force", inherits = FALSE)) force <- FALSE
 
 stopifnot(requireNamespace("flocker", quietly = TRUE))
 stopifnot(requireNamespace("brms",    quietly = TRUE))

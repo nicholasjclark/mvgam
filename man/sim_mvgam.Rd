@@ -128,6 +128,10 @@ str(sim$true_smooths)
 \seealso{
 \code{\link[mgcv:gamSim]{mgcv::gamSim()}} for the conceptual inspiration;
 \code{\link[=mvgam]{mvgam()}} for the fitter the simulated data can be fed to.
+For detection-error families (\code{\link[=occ]{occ()}} / \code{\link[=nmix]{nmix()}} variants),
+use \code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}} instead: the closure-unit
+grain (sites x visits) does not fit the time-series layout
+\code{sim_mvgam()} produces.
 }
 \author{
 Nicholas J Clark
