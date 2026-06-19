@@ -164,3 +164,87 @@ test_that("mvgam_ppc_fit_stat print + plot methods produce expected output", {
   p <- plot(obj)
   expect_s3_class(p, "ggplot")
 })
+
+
+# ------------------------------------------------------------
+# pp_check_mv_category(): auto-grouping helper for multi-response
+# custom families (diri / multi / categ via simplex layout, mvn /
+# mvt via series). Single helper, two branches, exercised here
+# without needing a real Stan fit.
+# ------------------------------------------------------------
+
+# Stub multi-response family without the full custom_family
+# infrastructure. The family-kind predicates read these attrs
+# directly so a structure() + class is all the helper needs to
+# pick the right branch.
+make_mv_family_stub <- function(family_name,
+                                  multi = TRUE,
+                                  simplex = TRUE) {
+  structure(
+    list(family = family_name, name = sub("^mvgam_", "", family_name)),
+    class = "customfamily",
+    mvgam_multi_response = multi,
+    mvgam_simplex_response = simplex,
+    mvgam_closure_unit = TRUE,
+    mvgam_unit_grouping = c("time")
+  )
+}
+
+# Long-form simplex data: 2 sites x 3 categories. Each (site, cat)
+# row carries one component of a probability vector summing to 1
+# within a site. build_closure_unit_arrays() with unit_grouping =
+# "time" treats each site as one closure unit.
+make_simplex_long <- function() {
+  data.frame(
+    series = factor(rep(paste0("y", 1:3), 2L),
+                    levels = paste0("y", 1:3)),
+    time   = rep(c(1L, 2L), each = 3L),
+    y      = c(0.2, 0.5, 0.3, 0.4, 0.4, 0.2)
+  )
+}
+
+test_that("pp_check_mv_category() maps simplex rows to within-unit position", {
+  fam <- make_mv_family_stub("mvgam_dirichlet")
+  obj <- structure(
+    list(family = fam,
+         formula = y ~ 1,
+         data = make_simplex_long()),
+    class = "mvgam"
+  )
+  cats <- mvgam:::pp_check_mv_category(obj, obj$data)
+  expect_s3_class(cats, "factor")
+  expect_identical(levels(cats),
+                   c("cat_1", "cat_2", "cat_3"))
+  # Each site fills positions 1..3 in row order, so the vector is
+  # rep(1:3, 2) wrapped as cat_<int>.
+  expect_identical(as.integer(cats),
+                   rep(1:3, times = 2L))
+})
+
+test_that("pp_check_mv_category() uses series column for mvn / mvt", {
+  fam <- make_mv_family_stub("mvgam_mvnormal", simplex = FALSE)
+  obj <- structure(
+    list(family = fam,
+         formula = y ~ 1,
+         data = data.frame(
+           series = factor(c("a", "b", "a", "b")),
+           y      = rnorm(4L)
+         )),
+    class = "mvgam"
+  )
+  cats <- mvgam:::pp_check_mv_category(obj, obj$data)
+  expect_s3_class(cats, "factor")
+  expect_identical(levels(cats), c("a", "b"))
+  expect_identical(as.character(cats), c("a", "b", "a", "b"))
+})
+
+test_that("pp_check_mv_category() returns NULL for non-multi-response families", {
+  obj <- structure(
+    list(family = gaussian(),
+         formula = y ~ 1,
+         data = data.frame(series = factor(letters[1:3]),
+                            y = rnorm(3L))),
+    class = "mvgam"
+  )
+  expect_null(mvgam:::pp_check_mv_category(obj, obj$data))
+})

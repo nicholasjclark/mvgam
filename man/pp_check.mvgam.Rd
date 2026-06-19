@@ -86,6 +86,24 @@ functions (e.g. \code{type = "ecdf_overlay_grouped"}, \code{type = "bars_grouped
 \code{marginaleffects::plot_predictions()} provides a complementary
 conditional surface.
 }
+\section{Multi-response families}{
+
+\code{diri()} / \code{multi()} / \code{categ()} / \code{mvn()} / \code{mvt()} place
+K outcomes on each closure unit
+(simplex families) or each (site, species) row (mv-normal /
+mv-T). A pooled \code{dens_overlay} would collapse every
+category / species into one curve and hide per-category
+fit. When the user does not pass \code{group}, \code{pp_check()}
+auto-groups by the per-family category axis (within-unit
+position for the simplex families, the \code{series} column for
+\code{mvn()} / \code{mvt()}) and switches \code{type} to its \verb{_grouped}
+variant so bayesplot facets per category. Default \code{type}
+becomes \code{"ribbon"} for simplex families and \code{"dens_overlay"}
+for \code{mvn()} / \code{mvt()}. To opt out and recover the pooled
+plot, pass \code{group = "<existing-column>"} explicitly
+(e.g. \code{group = "series"}).
+}
+
 \section{Closure-unit families (\code{nmix()}, \code{occ()})}{
 
 Closure-unit observation families compute predictions at

@@ -43,6 +43,22 @@
 #'   `marginaleffects::plot_predictions()` provides a complementary
 #'   conditional surface.
 #'
+#' @section Multi-response families:
+#'   `diri()` / `multi()` / `categ()` / `mvn()` / `mvt()` place
+#'   K outcomes on each closure unit
+#'   (simplex families) or each (site, species) row (mv-normal /
+#'   mv-T). A pooled `dens_overlay` would collapse every
+#'   category / species into one curve and hide per-category
+#'   fit. When the user does not pass `group`, `pp_check()`
+#'   auto-groups by the per-family category axis (within-unit
+#'   position for the simplex families, the `series` column for
+#'   `mvn()` / `mvt()`) and switches `type` to its `_grouped`
+#'   variant so bayesplot facets per category. Default `type`
+#'   becomes `"ribbon"` for simplex families and `"dens_overlay"`
+#'   for `mvn()` / `mvt()`. To opt out and recover the pooled
+#'   plot, pass `group = "<existing-column>"` explicitly
+#'   (e.g. `group = "series"`).
+#'
 #' @section Closure-unit families (`nmix()`, `occ()`):
 #'   Closure-unit observation families compute predictions at
 #'   the closure-unit grain (one per site x season) because
@@ -189,7 +205,8 @@ pp_check.mvgam <- function(
   set_color_scheme_local("red")
 
   dots <- list(...)
-  if (missing(type)) {
+  type_missing <- missing(type)
+  if (type_missing) {
     type <- "dens_overlay"
   }
 
@@ -200,6 +217,38 @@ pp_check.mvgam <- function(
     # Fitting data lives on $data; some objects also expose $obs_data
     # as an alias and may have it empty.
     newdata <- object$data %||% object$obs_data
+  }
+
+  # Multi-response custom families (diri / multi / categ / mvn /
+  # mvt): a default `dens_overlay` would pool every category /
+  # species into a single curve and hide the per-category fit.
+  # When the user has not asked for a specific `group` or `type`,
+  # pick a per-family default type, build a category vector
+  # aligned with the long-form prediction grain, attach it to
+  # `newdata` under a reserved name, and swap `type` to its
+  # `_grouped` variant. The user can opt out by passing
+  # `group = "<existing-column>"` explicitly.
+  mv_cat <- NULL
+  if (is.null(group) && is_multi_response_family(object$family)) {
+    mv_cat <- pp_check_mv_category(object, newdata)
+    if (!is.null(mv_cat)) {
+      if (type_missing) {
+        type <- if (is_simplex_response_family(object$family)) {
+          "ribbon"
+        } else {
+          "dens_overlay"
+        }
+      }
+      grouped_type <- paste0(type, "_grouped")
+      available <- as.character(bayesplot::available_ppc(""))
+      if (paste0("ppc_", grouped_type) %in% available) {
+        type <- grouped_type
+        newdata[["_mvgam_pp_category"]] <- mv_cat
+        group <- "_mvgam_pp_category"
+      } else {
+        mv_cat <- NULL
+      }
+    }
   }
 
   # Multivariate fits (mvbind / mvbrmsformula). When `resp` is
@@ -716,6 +765,55 @@ pp_check.mvgam <- function(
 # state). For `resid_*` types, `yrep` arrives already at the
 # unit grain because `residuals.mvgam` aggregates internally; we
 # only synthesise a length-matched `y_unit` vector (set to zeros
+# Build a factor mapping each long-form prediction column to a
+# category, used to auto-group pp_check on multi-response custom
+# families (diri / multi / categ on the per-unit K-vector axis;
+# mvn / mvt on the per-row species axis). Returns NULL when the
+# family is not multi-response or when no sensible mapping
+# exists, in which case pp_check falls through to its default
+# pooled behaviour.
+#
+# Simplex families (diri / multi / categ): every closure unit
+# packs K rows into the long layout via
+# `build_closure_unit_arrays()$visit_idx`. The within-unit
+# position 1..K of each row is its category label.
+#
+# mv-normal / mv-T: one row per (site, species); the `series`
+# column on the fit's data is the natural category axis.
+#'@noRd
+pp_check_mv_category <- function(object, newdata) {
+  fam <- object$family
+  if (!is_multi_response_family(fam)) return(NULL)
+  if (is_simplex_response_family(fam)) {
+    # Simplex families default to single-axis `time` grouping at
+    # fit time (R/families.R:3534 in prepare_closure_unit_family).
+    # Mirror that fallback here so the category vector matches the
+    # per-unit K-row layout that posterior_predict actually emits.
+    arrs <- build_closure_unit_arrays(
+      newdata,
+      response_var = closure_unit_response_var(object$formula),
+      compute_y_max = FALSE,
+      unit_grouping_vars = closure_unit_grouping(fam) %||% "time"
+    )
+    cat_int <- integer(nrow(newdata))
+    for (g in seq_len(arrs$N_unit)) {
+      Kg <- arrs$n_rep[g]
+      idx <- arrs$visit_idx[g, seq_len(Kg)]
+      cat_int[idx] <- seq_len(Kg)
+    }
+    levels_int <- sort(unique(cat_int))
+    return(factor(
+      paste0("cat_", cat_int),
+      levels = paste0("cat_", levels_int)
+    ))
+  }
+  if ("series" %in% names(newdata)) {
+    return(as.factor(newdata$series))
+  }
+  NULL
+}
+
+
 # by the caller for the residual histograms).
 #
 # Returns a list `(y, yrep, arrays, first_visits)`. The
