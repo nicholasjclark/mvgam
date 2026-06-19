@@ -76,24 +76,28 @@ mvgam_attach <- function() {
   ensure_registry_initialized()
 
   # marginaleffects ships a per-class `type_dictionary` data.frame
-  # that gates the `type` argument upstream of `get_predict()`. The
-  # mvgam row carries the predict.mvgam vocabulary (response, link,
-  # expected, detection, latent_N); append the brms-convention
-  # "prediction" so users can request posterior_predict() draws via
-  # marginaleffects. Use rbind so any future marginaleffects-side
-  # updates to the mvgam row remain in
-  # effect.
+  # that validates the `type` argument upstream of `get_predict()`.
+  # The mvgam row that ships with marginaleffects predates the
+  # predict.mvgam vocabulary standardisation and carries the stale
+  # token `latent_N` instead of the modern `latent_state`. Append
+  # the brms-convention "prediction" and the modern "latent_state"
+  # so both pass the marginaleffects check; the per-family
+  # availability check still runs inside predict.mvgam.
   if (requireNamespace("marginaleffects", quietly = TRUE)) {
     me_ns <- asNamespace("marginaleffects")
     if (exists("type_dictionary", envir = me_ns, inherits = FALSE)) {
       td <- get("type_dictionary", envir = me_ns)
-      if (!any(td$class == "mvgam" & td$type == "prediction")) {
+      missing_types <- setdiff(
+        c("prediction", "latent_state"),
+        td$type[td$class == "mvgam"]
+      )
+      if (length(missing_types) > 0L) {
         binding_locked <- bindingIsLocked("type_dictionary", me_ns)
         if (binding_locked) unlockBinding("type_dictionary", me_ns)
         try(
           assign(
             "type_dictionary",
-            rbind(td, data.frame(class = "mvgam", type = "prediction")),
+            rbind(td, data.frame(class = "mvgam", type = missing_types)),
             envir = me_ns
           ),
           silent = TRUE

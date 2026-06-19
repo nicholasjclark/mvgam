@@ -45,8 +45,16 @@ get_predict.mvgam <- function(model,
   #   response - outcome-scale draws WITH observation-process noise
   #              (posterior_predict). Integer for count families.
   # `prediction` is accepted as a brms-style alias for `response`.
+  # `latent_state` / `detection` are closure-unit-only family
+  # types (psi / N for the state, per-visit p for detection)
+  # that delegate to predict.mvgam, which already runs the
+  # family-availability gate and dispatches to the per-family
+  # kernel (posterior_occupancy / posterior_latent_N /
+  # posterior_detection).
   checkmate::assert_choice(
-    type, c("response", "link", "expected", "prediction")
+    type,
+    c("response", "link", "expected", "prediction",
+      "latent_state", "detection")
   )
 
   # Default process_error = FALSE collapses the latent trend to its
@@ -61,7 +69,13 @@ get_predict.mvgam <- function(model,
     response   = posterior_predict(model, newdata = newdata,
                                     process_error = process_error, ...),
     prediction = posterior_predict(model, newdata = newdata,
-                                    process_error = process_error, ...)
+                                    process_error = process_error, ...),
+    latent_state = predict(model, newdata = newdata,
+                            type = "latent_state",
+                            summary = FALSE, ...),
+    detection    = predict(model, newdata = newdata,
+                            type = "detection",
+                            summary = FALSE, ...)
   )
 
   # Multivariate fits return a per-response list; marginaleffects
