@@ -9,6 +9,8 @@
   newdata = NULL,
   re_formula = NULL,
   scale = c("response", "linear"),
+  components = c("response", "latent_state", "detection"),
+  unit_level = NULL,
   resp = NULL,
   ndraws = NULL,
   summary = TRUE,
@@ -35,7 +37,35 @@ all random effects.}
 \item{scale}{Character; one of \code{"response"} (default) or \code{"linear"}.
 \code{"response"} returns expected values on the response scale via
 \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}. \code{"linear"} returns the linear predictor
-on the link scale via \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}}.}
+on the link scale via \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}}. Ignored when
+\code{components} is not \code{"response"}.}
+
+\item{components}{Character; one of \code{"response"} (default),
+\code{"latent_state"}, or \code{"detection"}. Selects which posterior
+component to return.
+\itemize{
+\item \code{"response"} keeps the brms-default behaviour: marginal
+expected values at the per-row grain, scaled via \code{scale}.
+\item \code{"latent_state"} (closure-unit families only) routes through
+\code{\link[=predict.mvgam]{predict.mvgam()}} with \code{type = "latent_state"}, returning the
+conditional latent state per closure unit (\code{P(z = 1 | y)} for
+\code{occ()}, posterior \code{N} for \code{nmix()} variants).
+\item \code{"detection"} (closure-unit families only) routes through
+\code{\link[=predict.mvgam]{predict.mvgam()}} with \code{type = "detection"}, returning per-
+visit detection probabilities.
+}
+
+Modelled on the \code{flocker::fitted_flocker(components = ...)}
+argument so flocker users have a one-call equivalent.}
+
+\item{unit_level}{Logical or \code{NULL} (default). When \code{TRUE} for a
+closure-unit detection family and \code{components = "response"},
+aggregates the per-visit response matrix to the per-unit grain
+(sum across visits within a unit) via the shared
+\code{aggregate_closure_unit_visits()} helper. Ignored when
+\code{components != "response"} (those grains are fixed by the
+component definition) and when the family is not a
+visit-aggregating closure-unit family.}
 
 \item{resp}{Character specifying which response variable for
 multivariate models. If \code{NULL}, fitted values are returned for

@@ -111,3 +111,134 @@ test_that("fitted.mvgam validates probs and other inputs", {
   expect_error(fitted(stub_object(), robust = "yes"), "robust")
   expect_error(fitted(stub_object(), summary = NA), "summary")
 })
+
+
+# ---------------------------------------------------------------
+# components + unit_level routing (task #308): delegation pattern
+# verified through stubbed posterior_epred / predict; the heavy
+# work belongs to predict.mvgam and aggregate_closure_unit_visits,
+# both of which have their own tests.
+# ---------------------------------------------------------------
+
+# Family stub that satisfies is_closure_unit_family() and
+# needs_closure_unit_aggregation() so the dispatch reaches the
+# aggregator branch without needing a real fit.
+make_occ_family_stub <- function() {
+  structure(
+    list(family = "occ", name = "occ"),
+    class = "customfamily",
+    mvgam_closure_unit  = TRUE,
+    mvgam_unit_grouping = c("series", "time"),
+    mvgam_default_cap   = 1L
+  )
+}
+
+stub_closure_object <- function() {
+  structure(
+    list(
+      family  = make_occ_family_stub(),
+      formula = y ~ 1,
+      data    = data.frame(
+        series = factor(rep(1:2, each = 3L)),
+        time   = rep(1:3, 2L),
+        y      = c(0L, 1L, 0L, 1L, 1L, 0L)
+      )
+    ),
+    class = "mvgam"
+  )
+}
+
+test_that("fitted.mvgam validates components arg", {
+  expect_error(fitted(stub_object(), components = "bogus"))
+})
+
+test_that("fitted.mvgam validates unit_level arg", {
+  expect_error(fitted(stub_object(), unit_level = "yes"))
+})
+
+test_that("fitted.mvgam(components = 'latent_state') delegates to predict()", {
+  testthat::local_mocked_bindings(
+    predict.mvgam = function(object, type, ...) {
+      structure(matrix(0.5, 4L, 2L), called_with_type = type)
+    },
+    posterior_epred = function(...) stop("should not be called"),
+    .package = "mvgam"
+  )
+  out <- fitted(stub_object(), components = "latent_state",
+                summary = FALSE)
+  expect_true(is.matrix(out))
+  expect_identical(attr(out, "called_with_type"), "latent_state")
+})
+
+test_that("fitted.mvgam(components = 'detection') delegates to predict()", {
+  testthat::local_mocked_bindings(
+    predict.mvgam = function(object, type, ...) {
+      structure(matrix(0.7, 4L, 6L), called_with_type = type)
+    },
+    .package = "mvgam"
+  )
+  out <- fitted(stub_object(), components = "detection",
+                summary = FALSE)
+  expect_identical(attr(out, "called_with_type"), "detection")
+})
+
+test_that("fitted.mvgam(components != 'response') warns on unit_level", {
+  testthat::local_mocked_bindings(
+    predict.mvgam = function(object, type, ...) {
+      matrix(0.5, 4L, 2L)
+    },
+    .package = "mvgam"
+  )
+  expect_warning(
+    fitted(stub_object(), components = "latent_state",
+           unit_level = TRUE, summary = FALSE),
+    "'unit_level' ignored"
+  )
+})
+
+test_that("fitted.mvgam(unit_level = TRUE) aggregates via the visit summer", {
+  visit_draws <- function(...) {
+    matrix(seq_len(4L * 6L), nrow = 4L, ncol = 6L)
+  }
+  agg_called <- FALSE
+  testthat::local_mocked_bindings(
+    posterior_epred = visit_draws,
+    aggregate_closure_unit_visits = function(object, newdata, yrep_visit) {
+      agg_called <<- TRUE
+      list(
+        y_unit    = c(1, 1),
+        yrep_unit = yrep_visit[, 1:2, drop = FALSE],
+        arrays    = list()
+      )
+    },
+    .package = "mvgam"
+  )
+  out <- fitted(stub_closure_object(), unit_level = TRUE,
+                summary = FALSE)
+  expect_true(agg_called)
+  expect_equal(dim(out), c(4L, 2L))
+})
+
+test_that("fitted.mvgam(unit_level = TRUE) warns on non-aggregating family", {
+  testthat::local_mocked_bindings(
+    posterior_epred = univariate_draws,
+    .package = "mvgam"
+  )
+  obj <- stub_object()
+  obj$family <- gaussian()
+  expect_warning(
+    fitted(obj, unit_level = TRUE, summary = FALSE),
+    "'unit_level = TRUE' ignored"
+  )
+})
+
+test_that("fitted.mvgam(unit_level = TRUE) errors on multi-response fit", {
+  testthat::local_mocked_bindings(
+    posterior_epred = mv_epred_draws,
+    .package = "mvgam"
+  )
+  out <- expect_error(
+    fitted(stub_closure_object(), unit_level = TRUE, summary = FALSE),
+    "multi-response"
+  )
+})

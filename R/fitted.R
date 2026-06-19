@@ -17,7 +17,32 @@
 #' @param scale Character; one of `"response"` (default) or `"linear"`.
 #'   `"response"` returns expected values on the response scale via
 #'   [posterior_epred.mvgam()]. `"linear"` returns the linear predictor
-#'   on the link scale via [posterior_linpred.mvgam()].
+#'   on the link scale via [posterior_linpred.mvgam()]. Ignored when
+#'   `components` is not `"response"`.
+#' @param components Character; one of `"response"` (default),
+#'   `"latent_state"`, or `"detection"`. Selects which posterior
+#'   component to return.
+#'
+#'   * `"response"` keeps the brms-default behaviour: marginal
+#'     expected values at the per-row grain, scaled via `scale`.
+#'   * `"latent_state"` (closure-unit families only) routes through
+#'     [predict.mvgam()] with `type = "latent_state"`, returning the
+#'     conditional latent state per closure unit (`P(z = 1 | y)` for
+#'     `occ()`, posterior `N` for `nmix()` variants).
+#'   * `"detection"` (closure-unit families only) routes through
+#'     [predict.mvgam()] with `type = "detection"`, returning per-
+#'     visit detection probabilities.
+#'
+#'   Modelled on the `flocker::fitted_flocker(components = ...)`
+#'   argument so flocker users have a one-call equivalent.
+#' @param unit_level Logical or `NULL` (default). When `TRUE` for a
+#'   closure-unit detection family and `components = "response"`,
+#'   aggregates the per-visit response matrix to the per-unit grain
+#'   (sum across visits within a unit) via the shared
+#'   `aggregate_closure_unit_visits()` helper. Ignored when
+#'   `components != "response"` (those grains are fixed by the
+#'   component definition) and when the family is not a
+#'   visit-aggregating closure-unit family.
 #' @param resp Character specifying which response variable for
 #'   multivariate models. If `NULL`, fitted values are returned for
 #'   all responses (a named list).
@@ -107,6 +132,9 @@ fitted.mvgam <- function(object,
                          newdata = NULL,
                          re_formula = NULL,
                          scale = c("response", "linear"),
+                         components = c("response", "latent_state",
+                                         "detection"),
+                         unit_level = NULL,
                          resp = NULL,
                          ndraws = NULL,
                          summary = TRUE,
@@ -118,6 +146,7 @@ fitted.mvgam <- function(object,
                          ...) {
   checkmate::assert_class(object, "mvgam")
   scale <- match.arg(scale)
+  components <- match.arg(components)
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
   checkmate::assert_logical(process_error, len = 1, any.missing = FALSE)
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
@@ -134,9 +163,39 @@ fitted.mvgam <- function(object,
   checkmate::assert_string(resp, null.ok = TRUE)
   checkmate::assert_logical(summary, len = 1, any.missing = FALSE)
   checkmate::assert_logical(robust, len = 1, any.missing = FALSE)
+  checkmate::assert_logical(unit_level, len = 1, null.ok = TRUE,
+                              any.missing = FALSE)
   checkmate::assert_numeric(
     probs, lower = 0, upper = 1, min.len = 1, any.missing = FALSE
   )
+
+  # `latent_state` / `detection` components delegate to predict()
+  # which already runs the family-availability gate and dispatches
+  # to the per-family kernel (posterior_latent_N / posterior_occupancy
+  # / posterior_detection). `unit_level` is a no-op for these
+  # components because their grain is fixed by the component
+  # definition (latent_state is per-unit, detection is per-visit).
+  if (components != "response") {
+    if (isTRUE(unit_level) || isFALSE(unit_level)) {
+      warning(insight::format_warning(c(
+        paste0("'unit_level' ignored for components = '",
+               components, "'."),
+        i = "Component grain is fixed (latent_state per-unit, detection per-visit)."
+      )))
+    }
+    pred <- predict(
+      object,
+      newdata  = newdata,
+      type     = components,
+      ndraws   = ndraws,
+      resp     = resp,
+      summary  = FALSE,
+      ...
+    )
+    return(summarise_or_pass(
+      pred, summary = summary, probs = probs, robust = robust
+    ))
+  }
 
   posterior_call <- if (scale == "response") {
     posterior_epred
@@ -155,12 +214,43 @@ fitted.mvgam <- function(object,
     ...
   )
 
-  if (!summary) {
-    return(draws)
+  # Closure-unit per-unit aggregation. `unit_level = NULL` keeps the
+  # per-row default; `TRUE` collapses visits to closure-unit totals
+  # via the shared sum-of-visits aggregator that pp_check.mvgam and
+  # residuals.mvgam already use. The predicate restricts the
+  # aggregation to detection families (occ / nmix); mv-custom
+  # families operate at the row grain regardless.
+  if (isTRUE(unit_level)) {
+    if (!needs_closure_unit_aggregation(object$family)) {
+      warning(insight::format_warning(c(
+        "'unit_level = TRUE' ignored for this family.",
+        i = "Per-unit aggregation applies to detection families (occ() / nmix())."
+      )))
+    } else if (is.list(draws) && !is.matrix(draws)) {
+      stop(insight::format_error(c(
+        "'unit_level = TRUE' is not supported on multi-response fits.",
+        i = "Pass `resp = '<name>'` to scope to one response first."
+      )))
+    } else {
+      nd <- newdata %||% object$data
+      draws <- aggregate_closure_unit_visits(object, nd, draws)$yrep_unit
+    }
   }
 
+  summarise_or_pass(draws, summary = summary, probs = probs,
+                     robust = robust)
+}
+
+# Shared summary/pass-through used by both the response and the
+# component-delegated paths. Mirrors the original behaviour at the
+# tail of fitted.mvgam (named-list of matrices on mv fits, single
+# matrix otherwise).
+#'@noRd
+summarise_or_pass <- function(draws, summary, probs, robust) {
+  if (!summary) return(draws)
   if (is.list(draws) && !is.matrix(draws)) {
-    return(lapply(draws, summarize_predictions, probs = probs, robust = robust))
+    return(lapply(draws, summarize_predictions, probs = probs,
+                  robust = robust))
   }
   summarize_predictions(draws, probs = probs, robust = robust)
 }
