@@ -12,7 +12,11 @@
 \item{...}{Currently unused; present for S3 generic dispatch.}
 }
 \value{
-A \code{brmsprior} data frame.
+A \code{brmsprior} data frame covering every adjustable
+prior row (observation and trend components). Rows the user
+overrode at fit time carry \code{source = "user"}; rows left at
+their defaults carry \code{source = "default"} (or whatever source
+string \pkg{brms} assigned).
 }
 \description{
 Convenience shortcut for the post-fit prior table. In brms the

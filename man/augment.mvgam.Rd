@@ -75,7 +75,14 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-augment(mod)
+
+# `augment()` returns the training data with fitted, residual,
+# and (when applicable) closure-unit columns appended. Use it
+# when you want a single tibble for plotting / scoring against
+# `.observed` and `.fitted`.
+aug <- augment(mod)
+head(aug)
+cor(aug$.observed, aug$.fitted, use = "complete.obs")
 }
 
 }

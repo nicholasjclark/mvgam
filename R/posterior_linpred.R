@@ -274,6 +274,14 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #' # Link-scale linear predictor draws (log lambda for the Poisson).
 #' lp <- posterior_linpred(mod, ndraws = 50L)
 #' dim(lp)
+#'
+#' # Apply the inverse link manually to get the per-draw rate. With
+#' # `process_error = FALSE` on both sides this equals what
+#' # `posterior_epred()` returns (`process_error = TRUE` adds
+#' # marginal trend noise so the relationship is approximate).
+#' lp_det <- posterior_linpred(mod, ndraws = 50L, process_error = FALSE)
+#' ep_det <- posterior_epred(mod,  ndraws = 50L, process_error = FALSE)
+#' all.equal(colMeans(exp(lp_det)), colMeans(ep_det), tolerance = 1e-6)
 #' }
 #'
 #' @importFrom brms posterior_linpred

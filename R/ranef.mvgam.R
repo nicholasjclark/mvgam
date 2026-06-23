@@ -64,7 +64,13 @@
 #'               data    = simdat$data_train,
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
-#' ranef(mod)
+#'
+#' # `ranef()` returns a per-group nested list with one matrix per
+#' # level: rows are levels, columns are `Estimate`, `Est.Error`,
+#' # and the 95% credible bounds.
+#' re <- ranef(mod)
+#' str(re, max.level = 2)
+#' re$series[, , "Intercept"]
 #' }
 #'
 #' @method ranef mvgam
@@ -229,7 +235,15 @@ brms::ranef
 #'               data    = simdat$data_train,
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
-#' VarCorr(mod)
+#'
+#' # `VarCorr()` returns the per-grouping variance / covariance
+#' # estimates. Each grouping has an `sd` matrix (rows = effects,
+#' # columns = posterior summary) and, for multi-effect groupings,
+#' # a `cor` matrix giving the implied correlation structure. Use
+#' # `ranef()` for the level-specific BLUP-style estimates.
+#' vc <- VarCorr(mod)
+#' str(vc, max.level = 2)
+#' vc$series$sd
 #' }
 #'
 #' @method VarCorr mvgam

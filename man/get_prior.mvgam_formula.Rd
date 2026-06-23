@@ -48,6 +48,56 @@ The function handles embedded families automatically when using \code{bf()}
 specifications and supports all brms family types for observation models
 while trend components are always modeled as Gaussian State-Space processes.
 }
+\examples{
+\donttest{
+# Workflow: discover the adjustable priors, override a subset,
+# then pass the result back to `mvgam()`.
+set.seed(1)
+dat <- sim_mvgam(
+  family       = poisson(),
+  n_series     = 2L,
+  n_timepoints = 50L,
+  trend_model  = AR()
+)$data_train
+
+# Wrap the formula pair in `mvgam_formula()` so this S3 method
+# dispatches; the returned `brmsprior` data frame lists every
+# adjustable row keyed by `class` and `coef`.
+mf <- mvgam_formula(
+  formula       = y ~ s(x, k = 5),
+  trend_formula = ~ AR(p = 1)
+)
+get_prior(mf, data = dat, family = poisson())
+
+# Override a subset. Each `prior(...)` returns one row; untouched
+# classes keep their defaults. Trend-side classes carry a
+# `_trend` suffix so they do not collide with obs-side classes
+# of the same name (e.g. `b` vs `b_trend`).
+my_priors <- c(
+  prior(normal(0, 1),    class = b),
+  prior(exponential(2),  class = sigma_trend),
+  prior(normal(0, 0.5),  class = ar1_trend)
+)
+
+mod <- mvgam(
+  formula       = y ~ s(x, k = 5),
+  trend_formula = ~ AR(p = 1),
+  data          = dat,
+  family        = poisson(),
+  priors        = my_priors,
+  chains        = 2,
+  samples       = 250,
+  burnin        = 500,
+  silent        = 2
+)
+
+# Inspect the posterior to confirm the overrides took effect. The
+# `ar1_trend` and `sigma_trend` rows should sit on the scale set
+# by their custom priors rather than the flat defaults.
+summary(mod, include_betas = FALSE)
+}
+
+}
 \seealso{
 \code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}},
 \code{\link[brms]{set_prior}}, \code{\link[brms]{prior}}

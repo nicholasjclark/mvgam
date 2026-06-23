@@ -56,9 +56,46 @@ per-series effect into \code{obs_formula}.
 # NULL invisibly.
 lv_axis()
 
-# Typical use is inside `by =` in a trend or factor formula
-# to fit a per-latent-factor smooth.
-f <- ~ s(elev, by = lv_axis()) - 1
-f
+\donttest{
+# ---- Non-factor mode (no `n_lv`) ----
+# The validator rewrites `by = lv_axis()` to `by = series`
+# internally, so each series gets its own smooth on the trend
+# side. Use this when you want per-series flexibility without
+# the factor-loading machinery.
+set.seed(1)
+dat <- sim_mvgam(
+  family       = poisson(),
+  n_series     = 3L,
+  n_timepoints = 50L
+)$data_train
+
+mod_nonfac <- mvgam(
+  formula       = y ~ 0,
+  trend_formula = ~ s(x, k = 5, by = lv_axis()) + AR(p = 1),
+  data          = dat,
+  family        = poisson(),
+  chains        = 2,
+  samples       = 250,
+  burnin        = 500,
+  silent        = 2
+)
+summary(mod_nonfac, include_betas = FALSE)
+conditional_effects(mod_nonfac)
+
+# ---- Factor mode (`n_lv` set on the trend constructor) ----
+# `by = lv_axis()` stays as a per-factor marker; mvgam emits a
+# factor-model Stan program with `n_lv` per-factor smooths and a
+# loading matrix Z[s, k] that maps factors to species. The
+# per-species smooth response is sum over k of Z[s, k] * the
+# factor-k smooth contribution. This is the ordination-on-the-
+# trend pattern that powers `jsdgam()`. Here we show only the
+# generated Stan code so the example stays light; consult
+# [jsdgam()] for fitted-model examples of the factor case.
+mf_factor <- mvgam_formula(
+  formula       = y ~ 0,
+  trend_formula = ~ s(x, k = 5, by = lv_axis()) + VAR(n_lv = 2)
+)
+cat(stancode(mf_factor, data = dat, family = poisson()))
+}
 
 }

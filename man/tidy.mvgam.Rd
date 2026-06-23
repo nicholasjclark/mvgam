@@ -97,7 +97,16 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-tidy(mod)
+
+# `tidy()` returns one row per posterior parameter with
+# broom-standard columns (`term`, `estimate`, `std.error`,
+# `conf.low`, `conf.high`) for filtering and downstream piping.
+td <- tidy(mod)
+td
+
+# Add Rhat / effective-sample-size columns when you want to
+# screen for convergence issues alongside the point estimates.
+tidy(mod, rhat = TRUE, ess = TRUE)
 }
 
 }

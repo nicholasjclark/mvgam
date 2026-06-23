@@ -156,7 +156,14 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               chains  = 2, silent = 2)
 
 # Summary matrix of fitted values on the response scale.
-head(fitted(mod))
+ft <- fitted(mod)
+head(ft)
+
+# Per-cell residuals on the response scale (observed minus
+# posterior mean). Use `pp_check(mod, type = "resid_ribbon")`
+# for a graphical view that respects the model family.
+resids <- simdat$data_train$y - ft[, "Estimate"]
+summary(resids)
 }
 
 }

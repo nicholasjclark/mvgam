@@ -84,7 +84,13 @@ mod <- mvgam(y ~ s(x) + (1 | series),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
-ranef(mod)
+
+# `ranef()` returns a per-group nested list with one matrix per
+# level: rows are levels, columns are `Estimate`, `Est.Error`,
+# and the 95\% credible bounds.
+re <- ranef(mod)
+str(re, max.level = 2)
+re$series[, , "Intercept"]
 }
 
 }

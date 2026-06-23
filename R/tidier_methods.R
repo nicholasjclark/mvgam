@@ -85,7 +85,16 @@ generics::glance
 #'               data    = simdat$data_train,
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
-#' tidy(mod)
+#'
+#' # `tidy()` returns one row per posterior parameter with
+#' # broom-standard columns (`term`, `estimate`, `std.error`,
+#' # `conf.low`, `conf.high`) for filtering and downstream piping.
+#' td <- tidy(mod)
+#' td
+#'
+#' # Add Rhat / effective-sample-size columns when you want to
+#' # screen for convergence issues alongside the point estimates.
+#' tidy(mod, rhat = TRUE, ess = TRUE)
 #' }
 #'
 #' @export
@@ -183,6 +192,19 @@ tidy_spec <- function(x, obj_vars) {
     head_betas(x$trend_mgcv_model, obj_vars$trend_betas)
   } else character(0L)
 
+  # Smoothness penalties (`sds_*`) are reported as `ran_pars` (the
+  # per-smooth variance components); the individual basis-coefficient
+  # draws (`s_*` / `zs_*`) are `ran_vals`. Matches brms's
+  # `tidy.brmsfit` convention so users get a familiar view.
+  obs_smooth_all <- obj_vars$observation_smoothpars$orig_name %||%
+    character(0L)
+  obs_smooth_sds <- grep("^sds_", obs_smooth_all, value = TRUE)
+  obs_smooth_vals <- setdiff(obs_smooth_all, obs_smooth_sds)
+  trend_smooth_all <- obj_vars$trend_smoothpars$orig_name %||%
+    character(0L)
+  trend_smooth_sds <- grep("^sds_", trend_smooth_all, value = TRUE)
+  trend_smooth_vals <- setdiff(trend_smooth_all, trend_smooth_sds)
+
   re_pars <- obj_vars$observation_re_params$orig_name %||%
     character(0L)
   re_beta <- random_effect_beta_names(x, obj_vars)
@@ -195,10 +217,14 @@ tidy_spec <- function(x, obj_vars) {
     type = c(
       "observation_family_extra_param",
       "observation_beta",
+      "observation_smooth_param",
+      "observation_smooth_coef",
       "random_effect_group_level",
       "random_effect_beta",
       "trend_model_param",
       "trend_beta",
+      "trend_smooth_param",
+      "trend_smooth_coef",
       "trend_random_effect_group_level",
       "trend_random_effect_beta"
     ),
@@ -208,17 +234,25 @@ tidy_spec <- function(x, obj_vars) {
       "ran_pars",
       "ran_vals",
       "ran_pars",
+      "ran_vals",
+      "ran_pars",
       "fixed",
+      "ran_pars",
+      "ran_vals",
       "ran_pars",
       "ran_vals"
     ),
     params = list(
       obs_family,
       obs_beta,
+      obs_smooth_sds,
+      obs_smooth_vals,
       re_pars,
       re_beta,
       trend_dynamic,
       trend_beta,
+      trend_smooth_sds,
+      trend_smooth_vals,
       trend_re_pars,
       trend_re_beta
     )
@@ -254,16 +288,23 @@ trend_dynamic_pattern_for <- function(x, trend_model_name) {
 }
 
 
-# Internal: pull the first `nsdf` non-smoother betas from an
-# obj_vars block. Returns character(0) when the model has no
-# parametric coefficients on that side.
+# Internal: parametric (non-smoother) betas from an obj_vars block.
+# When a fitted `mgcv_model` is available, the first `nsdf` rows are
+# the non-smoother coefficients (mgcv convention). Post-brms-
+# integration the legacy `mgcv_model` slot is not populated, so we
+# fall back to returning every orig_name in `betas_df`. The
+# categorize step already excludes smooth-coefficient rows
+# (`s_*` / `zs_*` / `sds_*` live in `*_smoothpars` instead).
 #'@noRd
 head_betas <- function(mgcv_model, betas_df) {
-  if (is.null(mgcv_model) || is.null(betas_df) ||
-        mgcv_model$nsdf <= 0L) {
+  if (is.null(betas_df) || nrow(betas_df) == 0L) {
     return(character(0L))
   }
-  utils::head(betas_df$orig_name, mgcv_model$nsdf)
+  if (!is.null(mgcv_model) && !is.null(mgcv_model$nsdf)) {
+    if (mgcv_model$nsdf <= 0L) return(character(0L))
+    return(utils::head(betas_df$orig_name, mgcv_model$nsdf))
+  }
+  betas_df$orig_name
 }
 
 
@@ -457,7 +498,14 @@ split_hier_Sigma <- function(x, params) {
 #'               data    = simdat$data_train,
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
-#' augment(mod)
+#'
+#' # `augment()` returns the training data with fitted, residual,
+#' # and (when applicable) closure-unit columns appended. Use it
+#' # when you want a single tibble for plotting / scoring against
+#' # `.observed` and `.fitted`.
+#' aug <- augment(mod)
+#' head(aug)
+#' cor(aug$.observed, aug$.fitted, use = "complete.obs")
 #' }
 #'
 #' @importFrom stats residuals
@@ -576,7 +624,12 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
 #'               data    = simdat$data_train,
 #'               family  = poisson(),
 #'               chains  = 2, silent = 2)
+#'
+#' # `glance()` returns a one-row tibble summarising the fit's
+#' # sampling configuration and data dimensions; pass
+#' # `looic = TRUE` to add an out-of-sample fit score (slower).
 #' glance(mod)
+#' glance(mod, looic = TRUE)
 #' }
 #'
 #' @export

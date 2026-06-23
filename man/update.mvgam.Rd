@@ -102,10 +102,18 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# Refit with the same formula but tighter sampling. update()
-# reuses the cached Stan model so it skips compilation.
-upd <- update(mod, chains = 2, silent = 2,
-               iter = 200, warmup = 100, refresh = 0)
+# Refit with a richer obs-side formula (adding a smooth of
+# `time`). `update()` reuses the original family, trend
+# constructor, priors, and data when the call doesn't override
+# them, so only the new term has to be named.
+upd <- update(mod, formula. = ~ . + s(time, k = 5), silent = 2)
+
+# Compare the two fits via leave-one-out cross-validation. A
+# positive `elpd_diff` for the richer model indicates the smooth
+# on time improved expected log predictive density; check that
+# the difference exceeds its standard error before drawing a
+# firm conclusion.
+loo_compare(loo(mod), loo(upd))
 }
 
 }

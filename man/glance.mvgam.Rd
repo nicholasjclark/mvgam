@@ -44,7 +44,12 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,
               family  = poisson(),
               chains  = 2, silent = 2)
+
+# `glance()` returns a one-row tibble summarising the fit's
+# sampling configuration and data dimensions; pass
+# `looic = TRUE` to add an out-of-sample fit score (slower).
 glance(mod)
+glance(mod, looic = TRUE)
 }
 
 }

@@ -38,6 +38,7 @@ VAR(
   series = NA,
   p = 1,
   ma = FALSE,
+  cor = TRUE,
   gr = NA,
   subgr = NA,
   n_lv = NULL,

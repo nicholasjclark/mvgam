@@ -487,6 +487,13 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #' # state-extrapolating alternative.
 #' ep <- posterior_epred(mod, ndraws = 50L)
 #' dim(ep)
+#'
+#' # Summarise across draws to get the posterior mean and 90% CI
+#' # for each cell, then compare against the observed series.
+#' ep_summary <- t(apply(
+#'   ep, 2L, quantile, probs = c(0.05, 0.5, 0.95)
+#' ))
+#' head(ep_summary)
 #' }
 #'
 #' @importFrom brms posterior_epred
