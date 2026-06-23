@@ -127,21 +127,20 @@ matrices, arrays, or \verb{posterior::draws_*} objects.
 }
 \examples{
 \donttest{
-sim <- sim_mvgam(family = Gamma())
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
+mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
 
-mod1 <- mvgam(
-  y ~ s(season, bs = "cc"),
-  trend_model = AR(),
-  data = sim$data_train,
-  family = Gamma(),
-  chains = 2,
-  silent = 2
-)
-
-head(as.matrix(mod1, variable = "betas"))
-head(as.matrix(mod1, variable = "trend_params"))
-head(as.matrix(mod1, variable = "^sd_", regex = TRUE))
+# Trend-dynamics parameters as a draws data frame.
+as.data.frame(mod, variable = "trend_params")
+# The same draws as a posterior::draws_array.
+as_draws_array(mod, variable = "trend_params")
 }
+
 }
 \seealso{
 \link{mvgam_diagnostics} for higher-level summaries derived from

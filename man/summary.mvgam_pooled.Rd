@@ -52,21 +52,6 @@ The combined posteriors are created using
 from all imputed datasets at the Stan level. Parameter estimates
 reflect uncertainty from both the model and the imputation process.
 }
-\examples{
-\dontrun{
-# Fit models to multiply imputed datasets
-pooled_fit <- mvgam_multiple(
-  y ~ x,
-  trend_formula = ~ RW(),
-  data_list = list(imp1, imp2, imp3),
-  combine = TRUE
-)
-
-# Get enhanced summary with MI diagnostics
-summary(pooled_fit)
-}
-
-}
 \seealso{
 \code{\link{summary.mvgam}}, \code{\link{mvgam_multiple}},
 \code{\link{pool_mvgam_fits}}

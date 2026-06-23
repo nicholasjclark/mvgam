@@ -162,3 +162,29 @@ test_that("compiled fit dispatches via family branching", {
   expect_type(code, "character")
   expect_true(nchar(code) > 100L)
 })
+
+
+test_that("draw_recipe_coefs produces community-mean structure", {
+  # The simulator draws ONE community mean per covariate, then per-
+  # species slopes around that mean with sd 0.5. With n_species
+  # large, the empirical per-covariate sd across species should
+  # match the per-species sd (~0.5), much tighter than the legacy
+  # iid N(0, 0.75) distribution. The community mean itself can be
+  # large or small; the within-covariate spread is what's pinned.
+  set.seed(2024)
+  s <- sim_closure_unit_data(
+    type = 2L, family = occ(),
+    n_species = 50L, n_sites = 5L, n_visits = 2L
+  )
+  state <- s$truth$state_coefs
+  expect_true(all(c("env", "elev") %in% colnames(state)))
+  # Per-covariate spread across species (sd of slopes).
+  env_sd  <- stats::sd(state[, "env"])
+  elev_sd <- stats::sd(state[, "elev"])
+  # Slopes are drawn from N(community_mean, 0.5); empirical sd
+  # across 50 species should sit tightly around 0.5. Tolerance
+  # 0.25 catches a regression to the legacy N(0, 0.75) draw whose
+  # empirical sd would land around 0.75.
+  expect_lt(abs(env_sd  - 0.5), 0.25)
+  expect_lt(abs(elev_sd - 0.5), 0.25)
+})

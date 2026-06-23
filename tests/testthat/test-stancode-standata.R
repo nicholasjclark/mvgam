@@ -557,6 +557,19 @@ test_that("stancode generates correct VAR(p = 2, ma = TRUE) VARMA model with ten
   expect_true(stan_pattern("if \\(t - i <= 0\\)", code_with_trend))
   expect_true(stan_pattern("mu_t_trend\\[t\\] \\+= A_trend\\[i\\] \\* lv_trend\\[t - i, :\\]';", code_with_trend))
 
+  # `mu_t_trend` must be declared with Stan >= 2.32 array syntax.
+  # Pre-2.32 form `vector[N_lv_trend] mu_t_trend[N_time_trend];`
+  # compiles via the stancode polisher but breaks when the same
+  # code path is sent to brms/cmdstanr from `mvgam()` directly.
+  expect_true(stan_pattern(
+    "array\\[N_time_trend\\] vector\\[N_lv_trend\\] mu_t_trend;",
+    code_with_trend
+  ))
+  expect_false(stan_pattern(
+    "vector\\[N_lv_trend\\] mu_t_trend\\[N_time_trend\\];",
+    code_with_trend
+  ))
+
   # MA component
   expect_true(stan_pattern("if \\(t - 1 <= 0\\)", code_with_trend))
   expect_true(stan_pattern("mu_t_trend\\[t\\] \\+= D_trend\\[1\\] \\* ma_init_trend;", code_with_trend))

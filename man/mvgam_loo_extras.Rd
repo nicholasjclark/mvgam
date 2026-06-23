@@ -185,6 +185,24 @@ and log-likelihood primitives (\code{\link{log_lik.mvgam}}, \code{\link{loo.mvga
 \code{\link{posterior_linpred.mvgam}}, \code{\link{posterior_predict.mvgam}}) with
 helpers from the \pkg{loo} package.
 }
+\examples{
+\donttest{
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
+
+mod <- mvgam(y ~ s(x),
+              trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
+
+LOO(mod)            # brms-style alias for loo()
+loo_R2(mod)         # leave-one-out Bayesian R^2
+head(loo_predict(mod))   # per-observation LOO posterior mean
+}
+
+}
 \seealso{
 \link{mvgam_diagnostics} for posterior summaries and convergence
 diagnostics,

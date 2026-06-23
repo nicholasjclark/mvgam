@@ -40,25 +40,3 @@ Instead of calling this function, define these functions and let auto-discovery 
 
 This approach requires zero manual registration calls and is automatically future-proof.
 }
-\examples{
-\dontrun{
-# RECOMMENDED: Convention-based approach (auto-discovered)
-generate_garch_trend_stanvars <- function(trend_specs, data_info) {
-  # GARCH trend implementation
-  list(brms::stanvar(...))
-}
-
-garch_trend_properties <- function() {
-  list(
-    supports_factors = TRUE,
-    incompatibility_reason = NULL
-  )
-}
-# No registration call needed! Auto-discovered on package load.
-
-# ALTERNATIVE: Manual registration (discouraged)
-register_custom_trend("GARCH",
-                     supports_factors = TRUE,
-                     generator_func = generate_garch_trend_stanvars)
-}
-}

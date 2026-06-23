@@ -24,26 +24,6 @@ NULL
 #'
 #' @author Nicholas J Clark
 #'
-#' @examples
-#' \donttest{
-#' # Simulate data and fit a model
-#' simdat <- sim_mvgam(
-#'   n_series = 1,
-#'   trend_model = AR()
-#' )
-#'
-#' mod <- mvgam(
-#'   y ~ s(season, bs = 'cc', k = 6),
-#'   trend_model = AR(),
-#'   data = simdat$data_train,
-#'   chains = 2,
-#'   silent = 2
-#' )
-#'
-#' # Extract model variables
-#' variables(mod)
-#' }
-#'
 #' @export
 #' @export variables
 variables.mvgam <- function(x, ...) {
@@ -59,14 +39,21 @@ variables.mvgam <- function(x, ...) {
     all_vars <- setdiff(all_vars, x$exclude)
   }
 
-  # Surface brms-style `b_<term>` / `b_<term>_trend` and
-  # `r_<group>[<level>,<coef>]` / `sd_<group>__<coef>` /
-  # `cor_<group>__<coef1>__<coef2>` names in place of the positional
-  # Stan slots. Mirrors the rename applied in `extract_mvgam_draws`
-  # so character-vector and draws-array consumers see identical
-  # names.
+  # Apply the brms-style `b_<term>` / `r_<group>[...]` etc.
+  # renames in place of positional Stan slots. Mirrors the
+  # rename applied in `extract_mvgam_draws` so character-vector
+  # and draws-array consumers see identical names.
   alias_map <- c(mvgam_beta_aliases(x), mvgam_ranef_aliases(x))
-  apply_mvgam_beta_aliases(all_vars, alias_map)
+  all_vars <- apply_mvgam_beta_aliases(all_vars, alias_map)
+
+  # Drop the empty-obs-formula placeholder coefficient from the
+  # user-facing parameter list. The pinned `constant(0)` prior
+  # means there is no posterior sample for it; returning the name
+  # would leak the workaround. Filter after the alias rename
+  # because the alias map renames positional `b[k]` to
+  # `b_<colname>`, which would reintroduce the placeholder name.
+  ph_prefix <- paste0("b_", MVGAM_EMPTY_OBS_PLACEHOLDER)
+  all_vars[!startsWith(all_vars, ph_prefix)]
 }
 
 
@@ -101,14 +88,6 @@ variables.mvgam <- function(x, ...) {
 #' The alias column is reserved for mapping Stan parameter names to mgcv-style
 #' coefficient names (e.g., "s_x_1\[3\]" might alias to "s(x).3"). Currently
 #' set to NA as this mapping is not yet implemented.
-#'
-#' @examples
-#' \dontrun{
-#' # Internal function called by tidy(), mcmc_plot(), etc.
-#' params <- categorize_mvgam_parameters(mvgam_fit)
-#' names(params)  # observation_pars, trend_pars, etc.
-#' head(params$observation_betas)
-#' }
 #'
 #' @noRd
 categorize_mvgam_parameters <- function(x) {
@@ -331,13 +310,6 @@ extract_parameters_by_type <- function(mvgam_fit,
 #'   \item observation_re_params: Random effect parameters (sd_, r_, cor_)
 #' }
 #'
-#' @examples
-#' \dontrun{
-#' # Extract observation parameters for prediction
-#' obs_pars <- extract_obs_parameters(mvgam_fit)
-#' obs_draws <- posterior::subset_draws(mvgam_fit$fit, variable = obs_pars)
-#' }
-#'
 #' @noRd
 extract_obs_parameters <- function(mvgam_fit) {
   extract_parameters_by_type(mvgam_fit, type = "observation")
@@ -373,14 +345,6 @@ extract_obs_parameters <- function(mvgam_fit) {
 #' Note: Computed trend state arrays (trend\[i,j\], lv_trend\[i,j\],
 #'   innovations_trend\[i,j\]) are excluded as they are derived
 #'   quantities, not model parameters.
-#'
-#' @examples
-#' \dontrun{
-#' # Extract trend parameters for prediction
-#' trend_pars <- extract_trend_parameters(mvgam_fit)
-#' trend_draws <- posterior::subset_draws(mvgam_fit$fit,
-#'   variable = trend_pars)
-#' }
 #'
 #' @noRd
 extract_trend_parameters <- function(mvgam_fit) {

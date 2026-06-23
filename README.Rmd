@@ -33,13 +33,12 @@ knitr::opts_chunk$set(
 
 The `mvgam` 📦 fits Bayesian Dynamic Generalized Additive Models (DGAMs) that can include highly flexible nonlinear predictor effects, latent variables and multivariate time series models. The package does this by relying on functionalities from the impressive [`brms`](https://paulbuerkner.com/brms/){target="_blank"} and [`mgcv`](https://cran.r-project.org/package=mgcv){target="_blank"} packages. Parameters are estimated using the probabilistic programming language [`Stan`](https://mc-stan.org/), giving users access to the most advanced Bayesian inference algorithms available. This allows `mvgam` to fit a very wide range of models, including:
 
-* [Multivariate State-Space Time Series Models](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html){target="_blank"}
-* [Continuous-Time Autoregressive Time Series Models](https://nicholasjclark.github.io/mvgam/reference/RW.html#ref-examples){target="_blank"}
-* [Shared Signal Time Series Models](https://nicholasjclark.github.io/mvgam/articles/shared_states.html){target="_blank"}
-* [Dynamic Factor Models](https://nicholasjclark.github.io/mvgam/reference/lv_correlations.html){target="_blank"}
-* [Hierarchical N-mixture Models](https://nicholasjclark.github.io/mvgam/articles/nmixtures.html){target="_blank"}
-* [Hierarchical Generalized Additive Models](https://www.youtube.com/watch?v=2POK_FVwCHk){target="_blank"}
-* [Joint Species Distribution Models](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html){target="_blank"}
+* [Multivariate state space time series models](https://nicholasjclark.github.io/mvgam/reference/mvgam.html){target="_blank"}
+* [Continuous time autoregressive time series models](https://nicholasjclark.github.io/mvgam/reference/RW.html){target="_blank"}
+* [Dynamic factor models](https://nicholasjclark.github.io/mvgam/reference/residual_cor.html){target="_blank"}
+* [Hierarchical N mixture models](https://nicholasjclark.github.io/mvgam/reference/nmix.html){target="_blank"}
+* [Hierarchical generalized additive models](https://www.youtube.com/watch?v=2POK_FVwCHk){target="_blank"}
+* [Joint species distribution models](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html){target="_blank"}
 
 ## Installation
 You can install the stable package version from `CRAN` using: `install.packages('mvgam')`, or install the latest development version using: `devtools::install_github("nicholasjclark/mvgam")`. You will also need a working version of `Stan` installed (along with either `rstan` and/or `cmdstanr`). Please refer to installation links for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}.
@@ -48,7 +47,7 @@ You can install the stable package version from `CRAN` using: `install.packages(
 [![`mvgam` usage cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
 
 ## A simple example
-We can explore the package’s primary functions using one of it's built-in datasets. Use `plot_mvgam_series()` to inspect features for time series from [the Portal Project](https://portal.weecology.org/){target="_blank"}, which represent counts of baited captures for four desert rodent species over time (see `?portal_data` for more details about the dataset).
+We can explore the package's primary functions using one of its built-in datasets. The `portal_data` from [the Portal Project](https://portal.weecology.org/){target="_blank"} carries counts of baited captures for four desert rodent species over time (see `?portal_data`). Use `mvgam_data()` to verify that the data layout suits a proposed observation family and to inspect the series before fitting.
 ```{r include = FALSE}
 library(mvgam)
 library(ggplot2)
@@ -61,21 +60,11 @@ library(mvgam)
 
 ```{r, fig.alt = "Visualizing multivariate time series in R using mvgam", warning=FALSE}
 data(portal_data)
-plot_mvgam_series(
-  data = portal_data, 
-  y = 'captures',
-  series = 'all'
-)
-plot_mvgam_series(
-  data = portal_data, 
-  y = 'captures',
-  series = 1
-)
-plot_mvgam_series(
-  data = portal_data, 
-  y = 'captures',
-  series = 4
-)
+mvgam_data(portal_data, y = "captures", family = poisson())
+```
+
+```{r, fig.alt = "Single-series exploratory panel for a Portal Project rodent species", warning=FALSE}
+mvgam_data(portal_data, y = "captures", family = poisson(), series = 1L)
 ```
 
 These plots show that the time series are count responses, with missing data, many zeroes, seasonality and temporal autocorrelation all present. These features make time series analysis and forecasting very difficult using conventional software. But `mvgam` shines in these tasks. 
@@ -90,30 +79,29 @@ data_test <- portal_data %>%
 ```
 
 Formulate an `mvgam` model; this model fits a State-Space GAM in which each species has its own intercept, linear association with `ndvi_ma12` and potentially nonlinear association with `mintemp`. These effects are estimated jointly with a full time series model for the temporal dynamics (in this case a Vector Autoregressive process). We assume the outcome follows a Poisson distribution and will condition the model in `Stan` using MCMC sampling with `Cmdstan`:
-```{r, include=FALSE}
+```{r mod_portal_var, include=FALSE, cache=TRUE}
 mod <- mvgam(
   # Observation model is empty as we don't have any
   # covariates that impact observation error
   formula = captures ~ 0,
-  
-  # Process model contains varying intercepts, 
-  # varying slopes of ndvi_ma12 and varying smooths 
-  # of mintemp for each series. 
-  # Temporal dynamics are modelled with a Vector 
-  # Autoregression (VAR(1))
-  trend_formula = ~ 
-    trend +
-    s(trend, bs = 're', by = ndvi_ma12) +
-    s(mintemp, bs = 'bs', by = trend) - 1,
-  trend_model = VAR(cor = TRUE),
-  
-  # Obvservations are conditionally Poisson
+
+  # Process model contains per-series random intercepts on
+  # ndvi_ma12 and per-series smooths of mintemp, written
+  # against `by = lv_axis()` so the smooths live on the
+  # trend side. Temporal dynamics are modelled with a
+  # Vector Autoregression (VAR(1)).
+  trend_formula = ~
+    s(ndvi_ma12, bs = 're', by = lv_axis()) +
+    s(mintemp, bs = 'bs', by = lv_axis()) - 1 +
+    VAR(),
+
+  # Observations are conditionally Poisson
   family = poisson(),
   priors = c(prior(normal(0, 2),
-                 class = b),
+                   class = b),
              prior(exponential(2.5),
-                   class = sigma)),
-  
+                   class = sigma_trend)),
+
   # Condition on the training data
   data = data_train,
   control = list(adapt_delta = 0.99),
@@ -126,19 +114,18 @@ mod <- mvgam(
   # Observation model is empty as we don't have any
   # covariates that impact observation error
   formula = captures ~ 0,
-  
-  # Process model contains varying intercepts, 
-  # varying slopes of ndvi_ma12 and varying smooths 
-  # of mintemp for each series. 
-  # Temporal dynamics are modelled with a Vector 
-  # Autoregression (VAR(1))
-  trend_formula = ~ 
-    trend +
-    s(trend, bs = 're', by = ndvi_ma12) +
-    s(mintemp, bs = 'bs', by = trend) - 1,
-  trend_model = VAR(cor = TRUE),
-  
-  # Obvservations are conditionally Poisson
+
+  # Process model contains per-series random intercepts on
+  # ndvi_ma12 and per-series smooths of mintemp, written
+  # against `by = lv_axis()` so the smooths live on the
+  # trend side. Temporal dynamics are modelled with a
+  # Vector Autoregression (VAR(1)).
+  trend_formula = ~
+    s(ndvi_ma12, bs = 're', by = lv_axis()) +
+    s(mintemp, bs = 'bs', by = lv_axis()) - 1 +
+    VAR(),
+
+  # Observations are conditionally Poisson
   family = poisson(),
 
   # Condition on the training data
@@ -169,14 +156,7 @@ conditional_effects(mod,
                     type = 'link')
 ```
 
-If you have the `gratia` package installed, it can also be used to plot partial effects of smooths
-```{r, fig.alt = "Plotting GAM smooth functions in mvgam using gratia", message=FALSE}
-require(gratia)
-draw(mod, 
-     trend_effects = TRUE)
-```
-
-Or design more targeted plots using `plot_predictions()` from the `marginaleffects` package
+Design more targeted plots using `plot_predictions()` from the `marginaleffects` package
 ```{r, fig.alt = "Using marginaleffects and mvgam to plot GAM smooth functions in R"}
 plot_predictions(
   mod,
@@ -274,7 +254,7 @@ The post-processing methods we have shown above are just the tip of the iceberg.
 * `student_t()` for heavy-tailed real-valued data
 * `lognormal()` for non-negative real-valued data
 * `Gamma()` for non-negative real-valued data
-* `betar()` for proportional data on `(0,1)`
+* `Beta()` for proportional data on `(0,1)`
 * `bernoulli()` for binary data
 * `poisson()` for count data
 * `nb()` for overdispersed count data
@@ -282,41 +262,38 @@ The post-processing methods we have shown above are just the tip of the iceberg.
 * `beta_binomial()` for overdispersed count data with known number of trials
 * `nmix()` for count data with imperfect detection (unknown number of trials)
   
-See `??mvgam_families` for more information. Below is a simple example for simulating and modelling proportional data with `Beta` observations over a set of seasonal series with independent Gaussian Process dynamic trends:
+See `??mvgam_families` for more information. Below is a simple example for simulating and modelling proportional data with `Beta` observations over a set of series with a smoothed covariate effect and independent autoregressive dynamic trends:
 ```{r beta_sim, message=FALSE, warning=FALSE}
 set.seed(100)
 data <- sim_mvgam(
-  family = betar(),
-  T = 80,
-  trend_model = GP(),
-  prop_trend = 0.5,
-  seasonality = "shared"
+  family       = Beta(),
+  n_series     = 3L,
+  n_timepoints = 80L,
+  trend_model  = AR(),
+  prop_trend   = 0.5
 )
-plot_mvgam_series(
-  data = data$data_train, 
-  series = "all"
-)
+mvgam_data(data$data_train, y = "y", family = Beta())
 ```
 
-```{r, include=FALSE}
+```{r mod_beta_ar, include=FALSE, cache=TRUE}
 mod <- mvgam(
-  y ~ s(season, bs = "cc", k = 7) +
-    s(season, by = series, m = 1, k = 5),
-  trend_model = GP(),
+  y ~ s(x, by = series, k = 6),
+  trend_formula = ~ AR(p = 1),
   data = data$data_train,
   newdata = data$data_test,
-  family = betar()
+  family = Beta(),
+  silent = 2
 )
 ```
 
 ```{r, eval=FALSE}
 mod <- mvgam(
-  y ~ s(season, bs = "cc", k = 7) +
-    s(season, by = series, m = 1, k = 5),
-  trend_model = GP(),
+  y ~ s(x, by = series, k = 6),
+  trend_formula = ~ AR(p = 1),
   data = data$data_train,
   newdata = data$data_test,
-  family = betar()
+  family = Beta(),
+  silent = 2
 )
 ```
 

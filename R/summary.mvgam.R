@@ -42,6 +42,21 @@
 #'   \item{\code{Tail_ESS}}{Tail effective sample size}
 #' }
 #'
+#' @examples
+#' \donttest{
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 60L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
+#'
+#' # `include_betas = FALSE` keeps the printed summary readable when
+#' # the model carries many smooth coefficients.
+#' summary(mod, include_betas = FALSE)
+#' }
+#'
 #' @export
 summary.mvgam <- function(object, probs = c(0.025, 0.975),
                           robust = FALSE, include_states = FALSE, ...) {
@@ -798,9 +813,12 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
     formulas <- sapply(x$formula$forms, function(f) format(f$formula))
     # Join with newline + 9 spaces to align with "Formula: "
     formulas_str <- paste0(formulas, collapse = " \n         ")
-    cat("Formula: ", formulas_str, " \n", sep = "")
+    cat("Formula: ", strip_empty_obs_placeholder(formulas_str),
+        " \n", sep = "")
   } else {
-    cat("Formula: ", format(x$formula), " \n", sep = "")
+    cat("Formula: ",
+        strip_empty_obs_placeholder(format(x$formula)),
+        " \n", sep = "")
   }
 
   # Section 3: Data and dimensions (brms style)
@@ -1172,20 +1190,6 @@ check_mvgam_convergence <- function(all_summaries, nchains) {
 #'
 #' @seealso \code{\link{summary.mvgam}}, \code{\link{mvgam_multiple}},
 #'   \code{\link{pool_mvgam_fits}}
-#'
-#' @examples
-#' \dontrun{
-#' # Fit models to multiply imputed datasets
-#' pooled_fit <- mvgam_multiple(
-#'   y ~ x,
-#'   trend_formula = ~ RW(),
-#'   data_list = list(imp1, imp2, imp3),
-#'   combine = TRUE
-#' )
-#'
-#' # Get enhanced summary with MI diagnostics
-#' summary(pooled_fit)
-#' }
 #'
 #' @export
 summary.mvgam_pooled <- function(object, probs = c(0.025, 0.975),

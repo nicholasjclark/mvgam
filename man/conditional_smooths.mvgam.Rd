@@ -83,23 +83,6 @@ inherits the \code{brms_conditional_effects} class so brms's
 \code{plot.brms_conditional_effects()} method works
 out-of-the-box.
 }
-\examples{
-\donttest{
-set.seed(1)
-sim <- sim_mvgam(family = gaussian())
-mod <- mvgam(
-  y ~ 1 + s(season, bs = "cc"),
-  trend_model = AR(),
-  data = sim$data_train,
-  family = gaussian(),
-  chains = 2,
-  silent = 2
-)
-cs <- conditional_smooths(mod)
-plot(cs)
-}
-
-}
 \seealso{
 \code{\link[brms]{conditional_smooths.brmsfit}},
 \code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}},

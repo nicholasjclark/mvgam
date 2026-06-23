@@ -110,6 +110,31 @@ log densities directly so LOO-IC and WAIC do not suffer the
 underflow-then-floor pattern that a \code{log(dtweedie(...))}
 two-step introduces.
 }
+\examples{
+\donttest{
+# Tweedie generates non-negative continuous observations with a
+# point mass at zero. The dpars are `mphi` (dispersion) and
+# `mtheta` (power exponent on the open interval (1, 2)).
+set.seed(3)
+simdat <- sim_mvgam(family = tweedie(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
+
+mod <- mvgam(
+  y ~ 1,
+  trend_formula = ~ AR(p = 1),
+  data          = simdat$data_train,
+  family        = tweedie(),
+  chains        = 2,
+  silent        = 2
+)
+summary(mod, include_betas = FALSE)
+
+# Posterior intervals for the AR dynamics. The observation-side
+# dpars (`mphi`, `mtheta`) are picked up under "obs_params".
+mcmc_plot(mod, variable = "trend_params", type = "intervals")
+}
+
+}
 \references{
 Australian Institute of Marine Science (AIMS) (2023).
 \code{open-AIMS/tweedie}: a brms \code{custom_family} implementation

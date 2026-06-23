@@ -141,24 +141,20 @@ scale.
 }
 }
 \examples{
-\dontrun{
-# Fit a model
-fit <- mvgam(count ~ s(time), data = data, family = poisson())
+\donttest{
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
+mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
 
-# Posterior predictive summary on the response scale (default)
-pred <- predict(fit)
-
-# Raw posterior predictive draws
-draws <- predict(fit, summary = FALSE)
-
-# Linear predictor (link scale)
-lp <- predict(fit, type = "link")
-
-# Expected values (response scale)
-mu <- predict(fit, type = "expected")
-
-# Conditional variance Var\[Y|theta\] per draw
-v <- predict(fit, type = "variance")
+# Summary matrix with columns Estimate, Est.Error, Q2.5, Q97.5.
+head(predict(mod))
+# Raw posterior draws (rows = draws, cols = observations).
+draws <- predict(mod, summary = FALSE)
+dim(draws)
 }
 
 }

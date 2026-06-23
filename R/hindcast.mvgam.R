@@ -73,6 +73,24 @@ hindcast <- function(object, ...) {
 #'   alternative marginal-MC prediction surface that integrates
 #'   over the trend's stochastic dynamics instead of reading the
 #'   fitted latent state.
+#' @examples
+#' \donttest{
+#' set.seed(11)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 80L, trend_model = AR())
+#'
+#' mod <- mvgam(
+#'   y ~ s(x),
+#'   trend_formula = ~ AR(p = 1),
+#'   data    = simdat$data_train,
+#'   family  = poisson(),
+#'   chains  = 2, silent = 2
+#' )
+#'
+#' hc <- hindcast(mod)
+#' plot(hc)
+#' }
+#'
 #' @method hindcast mvgam
 #' @export
 hindcast.mvgam <- function(object,

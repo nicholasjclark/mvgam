@@ -164,6 +164,30 @@
 #' Bürkner, P.-C. (2018). Advanced Bayesian multilevel modeling
 #'   with the R package brms. *The R Journal*, 10, 395-411.
 #'
+#' @examples
+#' \donttest{
+#' # Tweedie generates non-negative continuous observations with a
+#' # point mass at zero. The dpars are `mphi` (dispersion) and
+#' # `mtheta` (power exponent on the open interval (1, 2)).
+#' set.seed(3)
+#' simdat <- sim_mvgam(family = tweedie(), n_series = 1L,
+#'                      n_timepoints = 60L, trend_model = AR())
+#'
+#' mod <- mvgam(
+#'   y ~ 1,
+#'   trend_formula = ~ AR(p = 1),
+#'   data          = simdat$data_train,
+#'   family        = tweedie(),
+#'   chains        = 2,
+#'   silent        = 2
+#' )
+#' summary(mod, include_betas = FALSE)
+#'
+#' # Posterior intervals for the AR dynamics. The observation-side
+#' # dpars (`mphi`, `mtheta`) are picked up under "obs_params".
+#' mcmc_plot(mod, variable = "trend_params", type = "intervals")
+#' }
+#'
 #' @export
 tweedie <- function(M = 30L) {
   checkmate::assert_integerish(
@@ -773,27 +797,30 @@ complete_closure_unit_newdata <- function(object, newdata) {
   if (!is_closure_unit_family(object$family)) return(newdata)
   data <- object$data %||% data.frame()
   if (nrow(data) == 0L) return(newdata)
-  need_series <- !"series" %in% names(newdata)
-  need_time   <- !"time" %in% names(newdata)
-  need_visit  <- !"visit" %in% names(newdata)
-  need_cap    <- !"cap" %in% names(newdata)
-  if (!any(need_series, need_time, need_visit, need_cap)) {
-    return(newdata)
-  }
+  # Trigger: only normalise when this looks like a
+  # marginaleffects-style grid. `datagrid()` strips every column
+  # the model formula does not reference, so closure-unit-specific
+  # columns (`visit`, `cap`) go missing. Real long-format newdata
+  # supplied by the user keeps them, in which case we return
+  # unchanged so meaningful (series, time, visit) labels survive,
+  # which forecasting and multi-season fits depend on.
+  is_grid <- !"visit" %in% names(newdata) || !"cap" %in% names(newdata)
+  if (!is_grid) return(newdata)
   template <- data[1L, , drop = FALSE]
-  if (need_series) {
+  if (!"series" %in% names(newdata)) {
     newdata$series <- factor(
       as.character(template$series),
       levels = levels(data$series)
     )
   }
-  if (need_time) {
-    newdata$time <- seq_len(nrow(newdata))
-  }
-  if (need_visit) {
-    newdata$visit <- 1L
-  }
-  if (need_cap) {
+  # On the grid path, every row should be its own closure unit
+  # so each prediction varies the covariate independently.
+  # `datagrid()` pins `time` at a single typical value drawn from
+  # training, which would otherwise collapse the whole grid into
+  # one unit and flatten the predicted curve.
+  newdata$time  <- seq_len(nrow(newdata))
+  newdata$visit <- 1L
+  if (!"cap" %in% names(newdata)) {
     cap_val <- closure_unit_default_cap(object$family) %||%
                  template$cap %||% 1L
     newdata$cap <- as.integer(rep(cap_val, nrow(newdata)))
@@ -1121,26 +1148,6 @@ build_closure_unit_arrays <- function(data,
 #'   low detection probability also produces prior-dominated
 #'   posteriors; check marginal posteriors against the prior.
 #'
-#' @examples
-#' \dontrun{
-#' # Constant detection probability, abundance varies with elevation
-#' mvgam(y ~ s(elev), family = nmix(), data = closure_unit_data)
-#'
-#' # Distributional regression on detection
-#' mvgam(bf(y ~ s(elev), p ~ s(tod)),
-#'       family = nmix(),
-#'       data = closure_unit_data)
-#'
-#' # Royle-Nichols variant on binary detection / non-detection data
-#' mvgam(y ~ s(elev), family = nmix("royle_nichols"),
-#'       data = closure_unit_binary_data)
-#'
-#' # Poisson-Poisson variant on encounter counts
-#' mvgam(bf(y ~ s(elev), p ~ tod),
-#'       family = nmix("poisson_poisson"),
-#'       data = closure_unit_count_data)
-#' }
-#'
 #' @section Choosing a variant:
 #' All three variants share the latent-abundance prior
 #' `N ~ Poisson(lambda)`; they differ in how `N` maps to the
@@ -1364,6 +1371,30 @@ build_closure_unit_arrays <- function(data,
 #'   from repeated presence-absence data or point counts.
 #'   *Ecology*, 84, 777-790.
 #'   \doi{10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2}.
+#'
+#' @examples
+#' \donttest{
+#' # Poisson-binomial N-mixture: per-visit counts with imperfect
+#' # detection. The state mu is lambda (expected abundance) and
+#' # the dpar p is the detection probability per visit.
+#' set.seed(5)
+#' simdat <- sim_closure_unit_data(family = nmix(), n_species = 1L,
+#'                                   n_sites = 50L, n_visits = 4L,
+#'                                   type = 1L)
+#'
+#' mod <- mvgam(
+#'   bf(y ~ env, p ~ tod_c),
+#'   data    = simdat$data_train,
+#'   family  = nmix(),
+#'   chains  = 2,
+#'   silent  = 2
+#' )
+#' summary(mod, include_betas = FALSE)
+#'
+#' # Marginal env effect on the response scale (expected count
+#' # = lambda * p).
+#' conditional_effects(mod)
+#' }
 #'
 #' @export
 nmix <- function(type = c("poisson_binomial", "royle_nichols",
@@ -1636,14 +1667,29 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #'   formula (`p ~ ...`) to share detection information across units.
 #'
 #' @examples
-#' \dontrun{
-#' # Constant detection, occupancy varies with elevation
-#' mvgam(y ~ s(elev), family = occ(), data = closure_unit_data)
+#' \donttest{
+#' # Single-species occupancy fit with separate covariates on
+#' # the occupancy (psi) and detection (p) sub-formulas. The
+#' # closure-unit grain is (series, time) -- 50 sites, 4 visits
+#' # each.
+#' set.seed(4)
+#' simdat <- sim_closure_unit_data(family = occ(), n_species = 1L,
+#'                                   n_sites = 50L, n_visits = 4L,
+#'                                   type = 1L)
 #'
-#' # Distributional regression on detection
-#' mvgam(bf(y ~ s(elev), p ~ s(tod)),
-#'       family = occ(),
-#'       data = closure_unit_data)
+#' mod <- mvgam(
+#'   bf(y ~ env, p ~ tod_c),
+#'   data    = simdat$data_train,
+#'   family  = occ(),
+#'   chains  = 2,
+#'   silent  = 2
+#' )
+#' summary(mod, include_betas = FALSE)
+#'
+#' # Marginal env effect on the response scale (occupancy *
+#' # detection). For the logit-occupancy view pass
+#' # `type = "link"`.
+#' conditional_effects(mod)
 #' }
 #'
 #' @export
@@ -1996,25 +2042,6 @@ make_occ_stanvars <- function(arrays) {
 #'   models. *Statistics and Computing*, 34:143.
 #'   \doi{10.1007/s11222-024-10454-0}
 #'
-#' @examples
-#' \dontrun{
-#' # Compositional JSDM on long-format proportions data. The formula
-#' # interacts the environmental covariate with `species` so each
-#' # species gets its own intercept and `env` slope; this is the
-#' # interpretable form for a simplex multi-response family. The
-#' # brms-native-style `y ~ 0 + species + env:species` is equivalent.
-#' mod <- jsdgam(
-#'   formula = y ~ env * species,
-#'   factor_formula = ~ -1,
-#'   data = my_long_format_data,
-#'   unit = site,
-#'   species = species,
-#'   family = diri(),
-#'   n_lv = 2
-#' )
-#' plot(residual_cor(mod))
-#' }
-#'
 #' @export
 diri <- function() {
   fam <- brms::custom_family(
@@ -2207,23 +2234,6 @@ make_diri_stanvars <- function(arrays) {
 #'   Ecology and Evolution*, 30(12):766-779.
 #'   \doi{10.1016/j.tree.2015.09.007}
 #'
-#' @examples
-#' \dontrun{
-#' # Microbiome-style read-count JSDM. The `env * taxon` interaction
-#' # gives each taxon its own intercept and environmental response;
-#' # see `?diri` for the rationale on why a per-`species` interaction
-#' # is the interpretable form for a simplex multi-response family.
-#' mod <- jsdgam(
-#'   formula = y ~ env * taxon,
-#'   factor_formula = ~ -1,
-#'   data = read_counts_long,
-#'   unit = site,
-#'   species = taxon,
-#'   family = multi(),
-#'   n_lv = 2
-#' )
-#' }
-#'
 #' @export
 multi <- function() {
   fam <- brms::custom_family(
@@ -2356,22 +2366,6 @@ make_multi_stanvars <- function(arrays) {
 #'   variables: joint modeling in community ecology. *Trends in
 #'   Ecology and Evolution*, 30(12):766-779.
 #'   \doi{10.1016/j.tree.2015.09.007}
-#'
-#' @examples
-#' \dontrun{
-#' # JSDM on single-trial habitat-type observations per site. The
-#' # `elev * habitat_class` interaction gives each habitat class its
-#' # own elevation response; see `?diri` for the rationale.
-#' mod <- jsdgam(
-#'   formula = y ~ elev * habitat_class,
-#'   factor_formula = ~ -1,
-#'   data = habitat_long,
-#'   unit = site,
-#'   species = habitat_class,
-#'   family = categ(),
-#'   n_lv = 2
-#' )
-#' }
 #'
 #' @export
 categ <- function() {
@@ -2529,24 +2523,6 @@ make_categ_stanvars <- function(arrays) {
 #'   distributions for the covariance matrix in latent factor
 #'   models. *Statistics and Computing*, 34:143.
 #'   \doi{10.1007/s11222-024-10454-0}
-#'
-#' @examples
-#' \dontrun{
-#' # gllvm-style continuous JSDM. The `env * species` interaction
-#' # gives each species its own intercept and environmental
-#' # response; the latent factor model handles residual
-#' # species-by-species correlation.
-#' mod <- jsdgam(
-#'   formula = y ~ env * species,
-#'   factor_formula = ~ -1,
-#'   data = wide_to_long_data,
-#'   unit = site,
-#'   species = species,
-#'   family = mvn(),
-#'   n_lv = 2
-#' )
-#' plot(residual_cor(mod))
-#' }
 #'
 #' @export
 mvn <- function() {
@@ -2742,24 +2718,6 @@ make_mvn_stanvars <- function(arrays) {
 #'   distributions for the covariance matrix in latent factor
 #'   models. *Statistics and Computing*, 34:143.
 #'   \doi{10.1007/s11222-024-10454-0}
-#'
-#' @examples
-#' \dontrun{
-#' # Heavy-tailed gllvm-style JSDM. Use mvt() over mvn() when
-#' # responses contain occasional outliers (rare extreme abundances,
-#' # sensor glitches) that under mvn() would be absorbed by widening
-#' # `Psi` and the inferred `Z Z'` off-diagonals.
-#' mod <- jsdgam(
-#'   formula = y ~ env * species,
-#'   factor_formula = ~ -1,
-#'   data = wide_to_long_data,
-#'   unit = site,
-#'   species = species,
-#'   family = mvt(),
-#'   n_lv = 2
-#' )
-#' plot(residual_cor(mod))
-#' }
 #'
 #' @export
 mvt <- function() {

@@ -24,16 +24,6 @@ Returns quantile-based credible intervals for posterior
 predictive draws. Mirrors \code{\link[brms:predictive_interval.brmsfit]{brms::predictive_interval.brmsfit()}}
 and routes through \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}.
 }
-\examples{
-\donttest{
-sim <- sim_mvgam(family = gaussian())
-mod <- mvgam(y ~ s(season, bs = "cc"), trend_model = AR(),
-             data = sim$data_train, family = gaussian(),
-             chains = 2, silent = 2)
-predictive_interval(mod)
-}
-
-}
 \seealso{
 \code{\link[brms:predictive_interval.brmsfit]{brms::predictive_interval.brmsfit()}},
 \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}, \code{\link[=posterior_interval.mvgam]{posterior_interval.mvgam()}}.

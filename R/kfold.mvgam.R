@@ -107,26 +107,21 @@
 #'
 #' @examples
 #' \donttest{
-#' # Fit a small jsdgam to portal_data
-#' mod <- jsdgam(
-#'   formula = captures ~ ndvi_ma12:series + mintemp:series +
-#'     gp(time, k = 15),
-#'   factor_formula = ~ -1, data = portal_data,
-#'   unit = time, species = series, family = poisson(),
-#'   n_lv = 2, silent = 2, chains = 2
-#' )
+#' # Use CAR() so the refit on fold-deleted rows still has a
+#' # well-defined trend (AR refits would error on the resulting
+#' # irregular time spacing).
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = gaussian(), n_series = 1L,
+#'                      n_timepoints = 60L, type = 6L)
 #'
-#' # Pure PSIS (no refits) leave-one-site-out
-#' kf_psis <- kfold(mod, group = "series",
-#'                  pareto_k_threshold = Inf)
+#' mod <- mvgam(y ~ s(season, bs = "cc"),
+#'               trend_formula = ~ CAR(),
+#'               data    = simdat$data_train,
+#'               family  = gaussian(),
+#'               chains  = 2, silent = 2)
 #'
-#' # Hybrid: PSIS first, refit only high Pareto-k folds
-#' kf_hybrid <- kfold(mod, group = "series")
-#'
-#' # Exact (brms-style): refit every fold
-#' kf_exact <- kfold(mod, group = "series", exact = TRUE)
-#'
-#' loo_compare(kf_psis, kf_hybrid, kf_exact)
+#' k <- kfold(mod, K = 3L, save_fits = FALSE)
+#' k$estimates
 #' }
 #'
 #' @author Nicholas J Clark
@@ -349,7 +344,10 @@ build_kfold_partition <- function(group_key, K = NULL,
   if (K < 2L) {
     stop(insight::format_error("'K' must be at least 2."))
   }
-  switch(
+  # loo::kfold_split_* returns numeric; coerce to integer so
+  # downstream vapply(..., integer(1L)) calls land on the
+  # expected storage mode.
+  as.integer(switch(
     fold_split,
     "grouped"    = loo::kfold_split_grouped(K = K, x = group_key),
     "stratified" = loo::kfold_split_stratified(
@@ -358,7 +356,7 @@ build_kfold_partition <- function(group_key, K = NULL,
     "random"     = loo::kfold_split_random(
       K = K, N = length(group_key)
     )
-  )
+  ))
 }
 
 

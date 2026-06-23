@@ -107,6 +107,34 @@ factor-loadings branch (\code{compute_residual_cor()} -> \code{n_lv > 0})
 fires identically on the inherited class and reconstructs
 \verb{Sigma = Z Z'} per draw on the species axis.
 }
+\examples{
+\donttest{
+# Multi-species occupancy factor model -- the Z Z' product gives
+# the species-by-species residual covariance after fixed effects
+# are accounted for.
+set.seed(1)
+simdat <- sim_closure_unit_data(
+  family    = occ(),
+  n_species = 4L,
+  n_sites   = 50L,
+  n_visits  = 4L,
+  type      = 2L
+)
+mod <- jsdgam(
+  formula        = bf(y ~ env, p ~ tod_c),
+  factor_formula = ~ -1,
+  data           = simdat$data_train,
+  family         = occ(),
+  n_lv           = 2L,
+  chains         = 2,
+  silent         = 2
+)
+
+rc <- residual_cor(mod)
+round(rc$cor, 2)
+}
+
+}
 \references{
 Hui, F. K. C. (2016). boral - Bayesian Ordination and
 Regression Analysis of Multivariate Abundance Data in R.

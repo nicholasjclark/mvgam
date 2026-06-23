@@ -29,17 +29,6 @@ This generic function dispatches to appropriate methods based on object class:
 \item Default: Falls back to \code{brms::get_prior}
 }
 }
-\examples{
-\dontrun{
-# Works with regular formulas (delegates to brms)
-get_prior(y ~ x + (1|group), data = dat)
-
-# Works with mvgam_formula objects
-mf <- mvgam_formula(y ~ x, trend_formula = ~ AR(p = 1))
-get_prior(mf, data = dat)
-}
-
-}
 \seealso{
 \code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}}
 }

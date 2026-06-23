@@ -52,6 +52,22 @@
 #' MCMC. \emph{Bayesian Analysis}, 16(2):667-718.
 #' \doi{10.1214/20-BA1221}
 #'
+#' @examples
+#' \donttest{
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 60L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
+#'
+#' coef(mod)
+#' fixef(mod)
+#' vcov(mod)
+#' bayes_R2(mod)
+#' }
+#'
 #' @author Nicholas J Clark
 NULL
 
@@ -355,4 +371,113 @@ vcov.mvgam <- function(object, correlation = FALSE, pars = NULL, ...) {
   }
   colnames(mat) <- sub("^b_", "", colnames(mat))
   if (isTRUE(correlation)) stats::cor(mat) else stats::cov(mat)
+}
+
+
+# Internal: detect the n_lv = n_series + iid-Z funnel pattern on a
+# fitted mvgam. Returns TRUE when the trend is a by_lv factor model
+# at the full-rank boundary, the loadings prior is the default iid
+# (no structured prior via MGP / features / distances), and AT
+# LEAST ONE of:
+#   * any divergent transition recorded in NUTS diagnostics; OR
+#   * at least one watched parameter has rank-normalised Rhat > 1.05.
+#
+# Threshold and divergence gate justified per Vehtari et al. (2021,
+# Bayesian Analysis 16(2)): the rank-normalised estimator recommends
+# 1.01 as the ceiling, so 1.05 is the conservative middle ground
+# between the modern recommendation and the legacy 1.1. Divergent
+# transitions are a faster early signal than Rhat for the rotational
+# funnel (Betancourt's geometric pathology case study); the
+# structural pre-checks already constrain the call to a narrow
+# high-risk class, so divergence inside that class is nearly
+# pathology-specific. The watch-list covers the declared (`A_trend`,
+# `L_Omega_trend`) and transformed (`Sigma_trend`, `L_Sigma_trend`)
+# variance-block parameters plus the latent state and process
+# noise. A single parameter exceeding threshold is sufficient: the
+# funnel affects all rotation-orbit parameters jointly, so one hit
+# implies the others.
+#
+# Used by the post-fit advisor wired into `mvgam_core.R` to suggest
+# `loadings_prior = "mgp"` or a fixed-Z `trend_map` when convergence
+# breaks.
+#'@noRd
+flag_by_lv_full_rank_funnel <- function(mvgam_fit) {
+  md <- mvgam_fit$trend_metadata
+  if (!isTRUE(md$has_by_lv)) return(FALSE)
+  n_lv <- md$n_lv_for_grain %||% md$n_lv
+  n_series <- length(md$levels$series %||% character(0))
+  if (is.null(n_lv) || length(n_series) == 0L ||
+      n_series == 0L || as.integer(n_lv) != as.integer(n_series)) {
+    return(FALSE)
+  }
+  # Reason: `uses_loadings_prior()` returns TRUE only for the
+  # structured prior families (MGP via `n_features`, kernel via
+  # `dist_*`). Iid Z leaves both markers absent, so the funnel
+  # only applies when this helper returns FALSE.
+  if (isTRUE(uses_loadings_prior(mvgam_fit))) return(FALSE)
+
+  # Divergent-transition early signal.
+  np <- tryCatch(bayesplot::nuts_params(mvgam_fit$fit),
+                  error = function(e) NULL)
+  if (!is.null(np) && "Parameter" %in% names(np)) {
+    div_rows <- np[np$Parameter == "divergent__", , drop = FALSE]
+    if (nrow(div_rows) > 0L && any(div_rows$Value > 0, na.rm = TRUE)) {
+      return(TRUE)
+    }
+  }
+
+  rh <- tryCatch(bayesplot::rhat(mvgam_fit$fit),
+                  error = function(e) numeric())
+  if (length(rh) == 0L) return(FALSE)
+  watched <- grep(
+    paste0(
+      "^(init_trend|lv_trend|sigma_trend|Sigma_trend|",
+      "L_Sigma_trend|L_Omega_trend|A_trend)\\["
+    ),
+    names(rh)
+  )
+  if (length(watched) == 0L) return(FALSE)
+  any(rh[watched] > 1.05, na.rm = TRUE)
+}
+
+
+# Internal: fire the post-fit advisor warning when
+# `flag_by_lv_full_rank_funnel()` is TRUE and the user did not
+# silence runtime output via `silent = 2`. Suppressed under
+# `TESTTHAT = true` by `mvgam_warn_once_user()`.
+#'@noRd
+warn_by_lv_full_rank_funnel <- function(mvgam_fit, silent) {
+  if (identical(as.integer(silent), 2L)) return(invisible(NULL))
+  if (!flag_by_lv_full_rank_funnel(mvgam_fit)) return(invisible(NULL))
+  mvgam_warn_once_user(
+    message = paste0(
+      "Convergence diagnostics suggest 'Z' is weakly identified at ",
+      "'n_lv = n_series' with the default iid prior. Consider ",
+      "'loadings_prior = \"mgp\"' for column shrinkage, or pin ",
+      "loadings with a 'trend_map' (e.g. diag(n_series)) for a ",
+      "non-factor model."
+    ),
+    class = "mvgam_by_lv_full_rank_funnel"
+  )
+}
+
+
+# Internal: one-shot user-facing rlang warning that is suppressed
+# under `testthat`. Centralises the
+# `Sys.getenv("TESTTHAT")` + `.frequency = "once"` idiom used by
+# several runtime advisors. The `class` argument doubles as the
+# rlang `.frequency_id` so each call site gets its own one-shot
+# counter.
+#'@noRd
+mvgam_warn_once_user <- function(message, class) {
+  checkmate::assert_string(message)
+  checkmate::assert_string(class)
+  if (identical(Sys.getenv("TESTTHAT"), "true")) return(invisible(NULL))
+  rlang::warn(
+    message,
+    class = class,
+    .frequency = "once",
+    .frequency_id = class
+  )
+  invisible(NULL)
 }

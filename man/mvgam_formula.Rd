@@ -106,19 +106,6 @@ mvgam_formula(y ~ x, trend_formula = ~ RW() + offset(z))
 }
 }
 
-\examples{
-\dontrun{
-# Create formula specifications
-mf1 <- mvgam_formula(y ~ x + (1|group))
-mf2 <- mvgam_formula(count ~ treatment, trend_formula = ~ AR(p = 1))
-mf3 <- mvgam_formula(mvbind(y1, y2) ~ x, trend_formula = ~ VAR(lags = 1))
-
-# Use with inspection functions (data provided to the function)
-priors <- get_prior(mf2, data = ecology_data, family = poisson())
-stancode <- stancode(mf2, data = ecology_data, family = poisson())
-}
-
-}
 \seealso{
 \code{\link{get_prior.mvgam_formula}}, \code{\link{stancode}},
 \code{\link{standata}}, \code{\link{mvgam}}

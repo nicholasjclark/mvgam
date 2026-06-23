@@ -95,99 +95,29 @@ scale of your outcome. Note also that no missing values are allowed in
 }
 \examples{
 \donttest{
-# Basic linear piecewise trend with defaults (will issue warnings)
-set.seed(101)
-linear_data <- data.frame(
-  y = rnorm(50, mean = 1:50, sd = 2),
-  time = 1:50,
-  series = factor("series_1")
+# Linear PW on a single Poisson series. `y ~ -1` removes the
+# observation intercept so the PW trend's `m_trend` parameter
+# is the unique constant offset (otherwise the two compete for
+# the same constant on the link scale).
+set.seed(2024)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 80L)
+
+mod <- mvgam(
+  y ~ -1,
+  trend_formula = ~ PW(growth = "linear"),
+  data          = simdat$data_train,
+  family        = poisson(),
+  chains        = 2,
+  silent        = 2
 )
+summary(mod, include_betas = FALSE)
 
-mod1 <- mvgam(
-  y ~ 0,
-  trend_model = PW(growth = "linear"),
-  data = linear_data,
-  chains = 2,
-  silent = 2
-)
-
-# Custom variable names for time and series
-growth_data <- data.frame(
-  count = rpois(60, exp(seq(0, 2, length.out = 60))),
-  week = 1:60,
-  population = factor("pop_A"),
-  carrying_capacity = 100
-)
-
-mod2 <- mvgam(
-  count ~ 0,
-  trend_model = PW(
-    time = week,
-    series = population,
-    cap = carrying_capacity,
-    growth = "logistic",
-    n_changepoints = 5
-  ),
-  family = poisson(),
-  data = growth_data,
-  chains = 2,
-  silent = 2
-)
-
-# Example of logistic growth with possible changepoints
-dNt <- function(r, N, k) {
-  r * N * (k - N)
-}
-
-Nt <- function(r, N, t, k) {
-  for (i in 1:(t - 1)) {
-    if (i \%in\% c(5, 15, 25, 41, 45, 60, 80)) {
-      N[i + 1] <- max(
-        1,
-        N[i] + dNt(r + runif(1, -0.1, 0.1), N[i], k)
-      )
-    } else {
-      N[i + 1] <- max(1, N[i] + dNt(r, N[i], k))
-    }
-  }
-  N
-}
-
-set.seed(11)
-expected <- Nt(0.004, 2, 100, 30)
-plot(expected, xlab = "Time")
-
-y <- rpois(100, expected)
-plot(y, xlab = "Time")
-
-mod_data <- data.frame(
-  y = y,
-  time = 1:100,
-  cap = 35,
-  series = as.factor("series_1")
-)
-mod3 <- mvgam(
-  y ~ 0,
-  trend_model = PW(growth = "logistic"),  # Uses default 'cap' variable
-  family = poisson(),
-  data = mod_data,
-  chains = 2,
-  silent = 2
-)
-summary(mod3)
-
-hc <- hindcast(mod3)
-plot(hc)
-
-library(ggplot2)
-mcmc_plot(mod3, variable = "delta_trend", regex = TRUE) +
-  scale_y_discrete(labels = mod3$trend_model$changepoints) +
-  labs(
-    y = "Potential changepoint",
-    x = "Rate change"
-  )
-
-how_to_cite(mod3)
+# PW exposes the base growth rate (k_trend), offset (m_trend)
+# and the changepoint rate deltas (delta_trend[changepoint,
+# series]). Visualise the full set with the trend_params
+# keyword.
+mcmc_plot(mod, variable = "trend_params", type = "intervals")
 }
 
 }

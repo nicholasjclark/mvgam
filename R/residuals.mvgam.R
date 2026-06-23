@@ -182,31 +182,20 @@
 #'
 #' @examples
 #' \donttest{
-#' simdat <- sim_mvgam(n_series = 1L, trend_model = AR())
-#' mod <- mvgam(
-#'   y ~ s(season, bs = "cc"),
-#'   trend_formula = ~ AR(),
-#'   noncentred = TRUE,
-#'   data = simdat$data_train,
-#'   chains = 2L,
-#'   silent = 2L
-#' )
-#' resids <- residuals(mod)
-#' str(resids)
-#' }
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 60L, trend_model = AR())
 #'
-#' \dontrun{
-#' # Closure-unit families: residuals collapse to the per-unit
-#' # grain (one row per site x season), using the per-unit sum
-#' # as the summary statistic for the empirical PIT.
-#' occ_fit <- mvgam(bf(y ~ elev, p ~ tod), family = occ(),
-#'                  data = closure_unit_data)
-#' rs <- residuals(occ_fit)
-#' nrow(rs) # one row per closure unit
-#' # Pair with the per-visit posterior_predict draws when
-#' # within-unit prediction detail is needed.
-#' yrep_visit <- posterior_predict(occ_fit)
-#' dim(yrep_visit) # [ndraws x n_visit]
+#' mod <- mvgam(y ~ s(x),
+#'               trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
+#'
+#' # Randomised quantile residuals on the response scale.
+#' # Summarised columns are Estimate, Est.Error, Q2.5, Q97.5.
+#' r <- residuals(mod)
+#' head(r)
 #' }
 #'
 #' @export
@@ -406,7 +395,12 @@ quantile_family_specs <- list(
 # Internal: top-level dispatcher for `type = "quantile"`.
 # Continuous standard families use the analytic per-draw CDF
 # (Dunn & Smyth 1996 in its original form); all other families
-# use the empirical PIT over `posterior_predict` draws.
+# use the empirical PIT over `posterior_predict` draws. For
+# in-sample residuals (the user passed no `newdata`) both paths
+# route through `state_aware_predict` so the per-draw conditional
+# `trend[t, s]` from the stanfit is honoured. With marginal-MC
+# predictions on a strong-trend SSM the PIT saturates at the
+# qnorm clamping bounds and the diagnostic becomes uninformative.
 #'@noRd
 compute_quantile_residuals <- function(object, y, pp_args,
                                          d, draw_ids = NULL,
@@ -420,7 +414,15 @@ compute_quantile_residuals <- function(object, y, pp_args,
       resp = resp
     ))
   }
-  yrep <- do.call(posterior_predict, pp_args)
+  in_sample <- is.null(pp_args$newdata)
+  yrep <- if (in_sample) {
+    state_aware_predict(
+      object = object, newdata = d, type = "response",
+      draw_ids = draw_ids, resp = resp
+    )
+  } else {
+    do.call(posterior_predict, pp_args)
+  }
   compute_quantile_residuals_empirical(y, yrep, nrow(yrep))
 }
 
@@ -429,12 +431,24 @@ compute_quantile_residuals <- function(object, y, pp_args,
 # standard families. `spec(y_mat, mu_mat, dpars) -> PIT matrix`.
 # `y` is broadcast across draws; `dpars` are reused from the
 # pearson path's helper so the dpar broadcasting logic is shared.
+# In-sample evaluation routes the `mu` extraction through
+# `state_aware_predict` so per-draw conditional state from the
+# stanfit is used; the dpar broadcast is unchanged because
+# observation-family scale parameters are state-agnostic.
 #'@noRd
 compute_quantile_residuals_analytic <- function(object, y, spec,
                                                   pp_args, d,
                                                   draw_ids = NULL,
                                                   resp = NULL) {
-  mu <- do.call(posterior_epred, pp_args)
+  in_sample <- is.null(pp_args$newdata)
+  mu <- if (in_sample) {
+    state_aware_predict(
+      object = object, newdata = d, type = "expected",
+      draw_ids = draw_ids, resp = resp
+    )
+  } else {
+    do.call(posterior_epred, pp_args)
+  }
   dpars <- residuals_dpars(object, draw_ids = draw_ids,
                             d = d, n_obs = length(y),
                             resp = resp)

@@ -87,6 +87,28 @@ score <- function(object, ...) UseMethod("score")
 #'   *Journal of the American Statistical Association*,
 #'   102(477), 359-378.
 #'
+#' @examples
+#' \donttest{
+#' set.seed(11)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 80L, trend_model = AR(),
+#'                      proportional_train = 0.75)
+#'
+#' mod <- mvgam(
+#'   y ~ s(x),
+#'   trend_formula = ~ AR(p = 1),
+#'   data    = simdat$data_train,
+#'   newdata = simdat$data_test,
+#'   family  = poisson(),
+#'   chains  = 2, silent = 2
+#' )
+#'
+#' # Score requires a forecast object with held-out test draws.
+#' fc <- forecast(mod, newdata = mod$test_data)
+#' sc <- score(fc, score = "crps")
+#' head(sc[[1L]])
+#' }
+#'
 #' @method score mvgam_forecast
 #' @export
 #' @export score

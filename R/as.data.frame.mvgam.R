@@ -55,25 +55,24 @@
 #'   [posterior_predict.mvgam()] for prediction-scale outputs,
 #'   [posterior::draws] for the underlying draws classes.
 #'
-#' @author Nicholas J Clark
-#'
 #' @examples
 #' \donttest{
-#' sim <- sim_mvgam(family = Gamma())
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 60L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
 #'
-#' mod1 <- mvgam(
-#'   y ~ s(season, bs = "cc"),
-#'   trend_model = AR(),
-#'   data = sim$data_train,
-#'   family = Gamma(),
-#'   chains = 2,
-#'   silent = 2
-#' )
-#'
-#' head(as.matrix(mod1, variable = "betas"))
-#' head(as.matrix(mod1, variable = "trend_params"))
-#' head(as.matrix(mod1, variable = "^sd_", regex = TRUE))
+#' # Trend-dynamics parameters as a draws data frame.
+#' as.data.frame(mod, variable = "trend_params")
+#' # The same draws as a posterior::draws_array.
+#' as_draws_array(mod, variable = "trend_params")
 #' }
+#'
+#' @author Nicholas J Clark
+#'
 NULL
 
 
@@ -105,8 +104,11 @@ resolve_mvgam_keyword <- function(keyword, x, all_vars) {
     set[!grepl(re, set)]
   }
   switch(keyword,
-    "betas" = drop(pick("^b_"), "^b_trend\\["),
-    "trend_betas" = pick("^b_trend\\["),
+    "betas" = drop(
+      pick("^b_"),
+      "(^b_trend\\[|^b_.*_trend$)"
+    ),
+    "trend_betas" = pick("^(b_trend\\[|b_.*_trend$)"),
     "obs_params" = drop(
       pick(paste0(
         "^(sigma|sigmay|phi|shape|nu|hu|zi|kappa|alpha|delta|",
@@ -117,13 +119,14 @@ resolve_mvgam_keyword <- function(keyword, x, all_vars) {
     "smooth_params" = drop(pick("^sds_"), "_trend"),
     "trend_smooth_params" = pick("^sds_.*_trend"),
     "trend_params" = if (has_trend_f) {
-      # With a trend_formula every trend-dynamics parameter carries
-      # the `_trend` suffix; drop trend-side fixed effects, smooth
-      # SDs, and the bulk per-obs / per-state arrays so the keyword
-      # returns scalars and short summaries only.
+      # Latent-dynamics params only: drop trend-side regression
+      # coefficients (positional `b_trend[k]`, brms-aliased
+      # `b_<term>_trend`, centred `Intercept_trend`), smooth SDs,
+      # and the bulk per-obs / per-state arrays.
       cands <- pick("_trend")
       drop(cands, paste0(
-        "^(b_trend\\[|sds_.*_trend|innovations_trend\\[|",
+        "^(b_trend\\[|b_.*_trend|Intercept_trend$|",
+        "sds_.*_trend|innovations_trend\\[|",
         "scaled_innovations_trend\\[|lv_trend\\[|mu_trend\\[|",
         "trend\\[|trend_states\\[|Y_pred_trend\\[)"
       ))

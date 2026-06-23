@@ -12,20 +12,28 @@ formula sentinel.
 }
 \description{
 Use inside the \verb{by =} argument of a smooth or GP term in a
-\code{trend_formula} to indicate that the smooth should be fit
-independently for each latent factor of a factor model
-(\code{n_lv < n_series}). For example:
+\code{trend_formula} to mark the smooth as per-latent-factor (factor
+model) or per-series (non-factor model). For example:
 }
 \details{
 \preformatted{
-factor_formula = ~ s(elev, by = lv_axis()) +
-                  gp(lon, lat, by = lv_axis()) - 1
+trend_formula = ~ s(elev, by = lv_axis()) +
+                 gp(lon, lat, by = lv_axis()) - 1 +
+                 VAR(n_lv = 2)
 }
 
-This is the canonical syntax for constrained ordination in mvgam.
-Each factor \verb{k = 1, ..., n_lv} receives its own smooth basis; the
-species-specific responses arise from the factor loadings \code{Z[s, k]}
-multiplied by the per-factor smooth contributions.
+When \code{n_lv} is set on the trend constructor (factor model), each
+factor \verb{k = 1, ..., n_lv} receives its own smooth basis and
+species-specific responses arise from the factor loadings
+\code{Z[s, k]} multiplied by the per-factor smooth contributions. This
+is the canonical syntax for constrained ordination in mvgam.
+
+When \code{n_lv} is \strong{not} set on the trend constructor (non-factor
+model, e.g. \code{trend_formula = ~ s(x, by = lv_axis()) + VAR()}),
+each series receives its own smooth on the trend side. The
+formula is rewritten internally so brms sees the equivalent of
+\code{by = series}, but the smooth stays on the trend (latent-state)
+side rather than the observation side.
 
 \code{lv_axis()} is a sentinel: it has no side effects and returns
 \code{NULL} invisibly. Calling it outside the \verb{by =} position of a
@@ -44,9 +52,13 @@ trend side, and the helper directs users to either
 per-series effect into \code{obs_formula}.
 }
 \examples{
-\donttest{
-# Inside a factor-model jsdgam fit (illustration, not a fit):
-formula_obj <- ~ s(elev, by = lv_axis()) - 1
-formula_obj
-}
+# `lv_axis()` is a formula sentinel; on its own it returns
+# NULL invisibly.
+lv_axis()
+
+# Typical use is inside `by =` in a trend or factor formula
+# to fit a per-latent-factor smooth.
+f <- ~ s(elev, by = lv_axis()) - 1
+f
+
 }

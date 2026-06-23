@@ -133,95 +133,21 @@ error.
 
 \examples{
 \donttest{
-simdat <- sim_mvgam(seasonality = "hierarchical")
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
+
 mod <- mvgam(
-  y ~ series +
-    s(season, bs = "cc", k = 6) +
-    s(season, series, bs = "fs", k = 4),
-  data = simdat$data_train,
-  chains = 2,
-  silent = 2
+  y ~ s(x),
+  trend_formula = ~ AR(p = 1),
+  data    = simdat$data_train,
+  family  = poisson(),
+  chains  = 2, silent = 2
 )
 
-# Use pp_check(mod, type = "xyz") for a list of available plot types
-
-# Default is a density overlay for all observations
-pp_check(mod)
-
-# Rootograms particularly useful for count data
-pp_check(mod, type = "rootogram")
-
-# Grouping plots by series is useful
-pp_check(mod,
-  type = "bars_grouped",
-  group = "series", ndraws = 50
-)
-pp_check(mod,
-  type = "ecdf_overlay_grouped",
-  group = "series", ndraws = 50
-)
-pp_check(mod,
-  type = "stat_freqpoly_grouped",
-  group = "series", ndraws = 50
-)
-
-# Several types can be used to plot distributions of randomized
-# quantile residuals
-pp_check(
-  object = mod,
-  x = "season",
-  type = "resid_ribbon"
-)
-pp_check(
-  object = mod,
-  x = "season",
-  group = "series",
-  type = "resid_ribbon_grouped"
-)
-pp_check(mod,
-  ndraws = 5,
-  type = "resid_hist_grouped",
-  group = "series"
-)
-
-# PSIS-LOO bayesplot variants
-pp_check(mod, type = "loo_pit_overlay")
-
-# Custom functions accepted
-pp_check(mod, type = "stat", stat = function(x) mean(x == 0))
-pp_check(mod,
-  type = "stat_grouped",
-  stat = function(x) mean(x == 0),
-  group = "series"
-)
-
-# Some functions accept covariates to set the x-axes
-pp_check(mod,
-  x = "season",
-  type = "ribbon_grouped",
-  prob = 0.5,
-  prob_outer = 0.8,
-  group = "series"
-)
-
-# Many plots can be made without the observed data
-pp_check(mod, prefix = "ppd")
-}
-
-\dontrun{
-# Closure-unit families: pp_check aggregates per-visit y and
-# yrep to the per-unit grain (sum of detections per site) and
-# then dispatches to bayesplot. Default `type = "bars"` gives
-# the per-site detection-count distribution; pair with a
-# unit-constant grouping covariate (e.g. site elevation) for
-# faceted variants.
-occ_fit <- mvgam(bf(y ~ elev, p ~ tod), family = occ(),
-                 data = closure_unit_data)
-pp_check(occ_fit, type = "bars", ndraws = 200)
-pp_check(occ_fit, type = "rootogram")
-pp_check(occ_fit, type = "stat",
-         stat = function(x) mean(x == 0))
-pp_check(occ_fit, type = "resid_hist", ndraws = 8)
+# Density overlay: 50 posterior predictive replicates on the
+# observed response density.
+pp_check(mod, type = "dens_overlay", ndraws = 50L)
 }
 
 }

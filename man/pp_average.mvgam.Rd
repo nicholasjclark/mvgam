@@ -76,15 +76,20 @@ computed) model weights. Mirrors \code{\link[brms:pp_average.brmsfit]{brms::pp_a
 }
 \examples{
 \donttest{
-sim <- sim_mvgam(family = gaussian())
-mod_a <- mvgam(y ~ s(season, bs = "cc"), trend_model = AR(),
-               data = sim$data_train, family = gaussian(),
-               chains = 1, silent = 2)
-mod_b <- mvgam(y ~ s(season, bs = "cc", k = 6),
-               trend_model = AR(),
-               data = sim$data_train, family = gaussian(),
-               chains = 1, silent = 2)
-pp_average(mod_a, mod_b, weights = "stacking")
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
+mod1 <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+               data    = simdat$data_train, family = poisson(),
+               chains  = 2, silent = 2)
+mod2 <- mvgam(y ~ 1,    trend_formula = ~ AR(p = 1),
+               data    = simdat$data_train, family = poisson(),
+               chains  = 2, silent = 2)
+
+# 50:50 averaged posterior-predict; summary matrix has
+# Estimate / Est.Error / Q2.5 / Q97.5 columns.
+head(pp_average(mod1, mod2, weights = c(0.5, 0.5),
+                 method = "posterior_predict"))
 }
 
 }

@@ -48,28 +48,6 @@ The function handles embedded families automatically when using \code{bf()}
 specifications and supports all brms family types for observation models
 while trend components are always modeled as Gaussian State-Space processes.
 }
-\examples{
-\dontrun{
-# Create mvgam_formula objects
-mf1 <- mvgam_formula(y ~ x + (1|group))  # No trend
-mf2 <- mvgam_formula(count ~ treatment, ~ AR(p = 1))  # With trend
-
-# Get priors (identical to brms when no trend)
-priors1 <- get_prior(mf1, data = dat, family = poisson())
-
-# Get combined priors with trend parameters
-priors2 <- get_prior(mf2, data = ecology_data, family = poisson())
-
-# Filter by component
-obs_priors <- priors2[priors2$trend_component == "observation", ]
-trend_priors <- priors2[priors2$trend_component == "trend", ]
-
-# Use with brms functions for customization
-custom_priors <- brms::set_prior("normal(0, 0.5)", class = "ar1_trend",
-                                prior = priors2)
-}
-
-}
 \seealso{
 \code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}},
 \code{\link[brms]{set_prior}}, \code{\link[brms]{prior}}

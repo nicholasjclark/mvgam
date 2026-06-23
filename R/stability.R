@@ -90,93 +90,18 @@
 #'
 #' @examples
 #' \donttest{
-#' # Simulate some time series that follow a latent VAR(1) process
-#' simdat <- sim_mvgam(
-#'   family = gaussian(),
-#'   n_series = 4,
-#'   trend_model = VAR(cor = TRUE),
-#'   prop_trend = 1
-#' )
+#' set.seed(0)
+#' simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
+#'                      n_timepoints = 60L, trend_model = VAR(),
+#'                      prop_trend = 0.95)
+#' mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = gaussian(),
+#'               chains  = 2, silent = 2)
 #'
-#' # Fit a model that uses a latent VAR(1)
-#' mod <- mvgam(
-#'   y ~ -1,
-#'   trend_formula = ~ 1,
-#'   trend_model = VAR(cor = TRUE),
-#'   family = gaussian(),
-#'   data = simdat$data_train,
-#'   chains = 2,
-#'   silent = 2
-#' )
-#'
-#' # Calculate stability metrics for this system
-#' metrics <- stability(mod)
-#'
-#' # Proportion of stationary forecast distribution attributable to interactions
-#' hist(
-#'   metrics$prop_int,
-#'   xlim = c(0, 1),
-#'   xlab = 'Prop_int',
-#'   main = '',
-#'   col = '#B97C7C',
-#'   border = 'white'
-#' )
-#'
-#' # Inter- vs intra-series interaction contributions
-#' layout(matrix(1:2, nrow = 2))
-#' hist(
-#'   metrics$prop_int_offdiag,
-#'   xlim = c(0, 1),
-#'   xlab = '',
-#'   main = 'Inter-series interactions',
-#'   col = '#B97C7C',
-#'   border = 'white'
-#' )
-#'
-#' hist(
-#'   metrics$prop_int_diag,
-#'   xlim = c(0, 1),
-#'   xlab = 'Contribution to interaction effect',
-#'   main = 'Intra-series interactions (density dependence)',
-#'   col = 'darkblue',
-#'   border = 'white'
-#' )
-#' layout(1)
-#'
-#' # Inter- vs intra-series contributions to forecast variance
-#' layout(matrix(1:2, nrow = 2))
-#' hist(
-#'   metrics$prop_cov_offdiag,
-#'   xlim = c(0, 1),
-#'   xlab = '',
-#'   main = 'Inter-series covariances',
-#'   col = '#B97C7C',
-#'   border = 'white'
-#' )
-#'
-#' hist(
-#'   metrics$prop_cov_diag,
-#'   xlim = c(0, 1),
-#'   xlab = 'Contribution to forecast variance',
-#'   main = 'Intra-series variances',
-#'   col = 'darkblue',
-#'   border = 'white'
-#' )
-#' layout(1)
-#'
-#' # Reactivity: system response to perturbation
-#' hist(
-#'   metrics$reactivity,
-#'   main = '',
-#'   xlab = 'Reactivity',
-#'   col = '#B97C7C',
-#'   border = 'white',
-#'   xlim = c(
-#'     -1 * max(abs(metrics$reactivity)),
-#'     max(abs(metrics$reactivity))
-#'   )
-#' )
-#' abline(v = 0, lwd = 2.5)
+#' # Posterior summaries of return rate, reactivity and related
+#' # VAR-stability diagnostics.
+#' head(stability(mod))
 #' }
 #'
 #' @export

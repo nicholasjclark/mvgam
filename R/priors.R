@@ -51,13 +51,6 @@
 #'   \item{Z}{Factor loadings matrix for factor models}
 #' }
 #'
-#' @examples
-#' # Access default for sigma_trend
-#' common_trend_priors$sigma_trend$default  # "exponential(2)"
-#'
-#' # Get bounds for ar1_trend
-#' common_trend_priors$ar1_trend$bounds     # c(-1, 1)
-#'
 #' @seealso \code{\link{register_trend_type}} for using prior specifications
 #' @noRd
 common_trend_priors <- list(
@@ -729,11 +722,6 @@ remove_trend_suffix_from_priors <- function(trend_priors, trend_specs, base_form
 #' 3. Falling back to common_trend_priors for parameters not specified
 #' 4. Returning NULL if the trend type is not registered
 #'
-#' @examples
-#' # Get prior spec for RW trend (hypothetical)
-#' rw_spec <- get_trend_prior_spec("RW")
-#' rw_spec$sigma_trend$default  # "exponential(2)" from common_trend_priors
-#'
 #' @seealso \code{\link{register_trend_type}}, \code{common_trend_priors}
 #' @noRd
 get_trend_prior_spec <- function(trend_type) {
@@ -800,23 +788,6 @@ get_trend_prior_spec <- function(trend_type) {
 #' - ar24_trend: AR coefficient for lag 24
 #' - sigma_trend: Innovation standard deviation (if include_sigma = TRUE)
 #' - LV, LV_raw: Latent variable specifications (if include_common = TRUE)
-#'
-#' @examples
-#' # Standard AR(1) specification
-#' ar1_spec <- build_ar_prior_spec(1)
-#'
-#' # Seasonal AR with lags 1, 12, 24
-#' seasonal_spec <- build_ar_prior_spec(c(1, 12, 24))
-#'
-#' # Custom AR coefficient prior
-#' custom_spec <- build_ar_prior_spec(
-#'   lags = c(1, 4),
-#'   ar_prior_base = list(
-#'     default = "normal(0, 0.3)",
-#'     bounds = c(-0.8, 0.8),
-#'     description = "Constrained AR coefficient"
-#'   )
-#' )
 #'
 #' @seealso \code{\link{get_trend_prior_spec}}, \code{common_trend_priors}
 #' @noRd
@@ -893,15 +864,6 @@ build_ar_prior_spec <- function(lags, ar_prior_base = NULL,
 #' @return Character string containing Stan distribution syntax like
 #'   "normal(0, 1)" or "exponential(2)".
 #'
-#' @examples
-#' # Create example brmsprior row
-#' prior_row <- data.frame(prior = "normal(0, 0.5)", stringsAsFactors = FALSE)
-#' map_prior_to_stan_string(prior_row)
-#'
-#' # Handle exponential distribution
-#' exp_row <- data.frame(prior = "exponential(2)", stringsAsFactors = FALSE)
-#' map_prior_to_stan_string(exp_row)
-#'
 #' @noRd
 map_prior_to_stan_string <- function(prior_row) {
   # Input validation
@@ -966,23 +928,6 @@ map_prior_to_stan_string <- function(prior_row) {
 #'
 #' @return Character string containing the matched prior specification, or
 #'   NULL if no match is found.
-#'
-#' @examples
-#' # Create example brmsprior object
-#' library(brms)
-#' prior_frame <- data.frame(
-#'   prior = c("normal(0, 1)", "exponential(1)", ""),
-#'   class = c("b", "sigma_trend", "ar1_trend"),
-#'   coef = c("x1", "", ""),
-#'   stringsAsFactors = FALSE
-#' )
-#' class(prior_frame) <- c("brmsprior", "prior_frame", "data.frame")
-#'
-#' # Extract specific coefficient prior
-#' extract_prior_string(prior_frame, "b", "x1")
-#'
-#' # Extract class-level default
-#' extract_prior_string(prior_frame, "sigma_trend")
 #'
 #' @noRd
 extract_prior_string <- function(prior_frame, class_name, coef_name = NULL,
@@ -1122,40 +1067,6 @@ get_best_prior_match <- function(matches) {
 #' The function is designed to be extensible - no hardcoded trend types. New trends
 #' automatically work if properly registered with \code{register_trend_type()}.
 #'
-#' @examples
-#' \dontrun{
-#' # Create priors using brms functions
-#' library(brms)
-#' my_priors <- c(
-#'   prior("exponential(1)", class = "sigma_trend"),
-#'   prior("normal(0, 0.3)", class = "ar1_trend"),
-#'   prior("normal(0, 1)", class = "b")  # observation model prior
-#' )
-#'
-#' # Map priors for AR trend
-#' ar_priors <- map_trend_priors(my_priors, "AR")
-#' # Returns: list(sigma_trend = "exponential(1)", ar1_trend = "normal(0, 0.3)")
-#'
-#' # Alternative using set_prior()
-#' trend_priors <- c(
-#'   set_prior("cauchy(0, 5)", class = "sigma_trend"),
-#'   set_prior("normal(0, 0.5)", class = "ar1_trend")
-#' )
-#' rw_priors <- map_trend_priors(trend_priors, "RW")
-#' # Returns: list(sigma_trend = "cauchy(0, 5)")
-#'
-#' # For AR models with multiple lags
-#' ar_seasonal_priors <- c(
-#'   prior("normal(0, 0.3)", class = "ar1_trend"),   # lag 1
-#'   prior("normal(0, 0.2)", class = "ar12_trend"),  # lag 12 (seasonal)
-#'   prior("exponential(2)", class = "sigma_trend")
-#' )
-#' seasonal_mapped <- map_trend_priors(ar_seasonal_priors, "AR")
-#' # Returns: list(ar1_trend = "normal(0, 0.3)",
-#' #               ar12_trend = "normal(0, 0.2)",
-#' #               sigma_trend = "exponential(2)")
-#' }
-#'
 #' @seealso \code{\link{get_trend_prior_spec}}, \code{\link{extract_prior_string}},
 #'   \code{\link{register_trend_type}}, \code{\link[brms]{prior}}, \code{\link[brms]{set_prior}}
 #' @noRd
@@ -1235,23 +1146,6 @@ map_trend_priors <- function(prior, trend_type) {
 #' This design ensures maximum extensibility - any new trend type can call this
 #' function for any parameter and get consistent behavior. New parameters can
 #' be added to `common_trend_priors` and automatically work across all trends.
-#'
-#' @examples
-#' \dontrun{
-#' # User specified custom sigma_trend prior
-#' my_priors <- c(prior("exponential(1)", class = "sigma_trend"))
-#' get_trend_parameter_prior(my_priors, "sigma_trend")  # "exponential(1)"
-#'
-#' # No user specification, use common default
-#' get_trend_parameter_prior(NULL, "sigma_trend")  # "exponential(2)"
-#'
-#' # Parameter not in common_trend_priors
-#' get_trend_parameter_prior(NULL, "custom_param")  # ""
-#'
-#' # Usage in trend generators
-#' sigma_prior <- get_trend_parameter_prior(prior, "sigma_trend")
-#' stan_code <- glue("sigma_trend ~ {sigma_prior};")
-#' }
 #'
 #' @seealso \code{\link{extract_prior_string}}, \code{common_trend_priors}
 #' @noRd
@@ -1439,18 +1333,6 @@ get_trend_parameter_prior <- function(prior = NULL, param_name) {
 #'   \item \code{trend_formula}: The trend model formula (or NULL)
 #' }
 #'
-#' @examples
-#' \dontrun{
-#' # Create formula specifications
-#' mf1 <- mvgam_formula(y ~ x + (1|group))
-#' mf2 <- mvgam_formula(count ~ treatment, trend_formula = ~ AR(p = 1))
-#' mf3 <- mvgam_formula(mvbind(y1, y2) ~ x, trend_formula = ~ VAR(lags = 1))
-#'
-#' # Use with inspection functions (data provided to the function)
-#' priors <- get_prior(mf2, data = ecology_data, family = poisson())
-#' stancode <- stancode(mf2, data = ecology_data, family = poisson())
-#' }
-#'
 #' @seealso
 #' \code{\link{get_prior.mvgam_formula}}, \code{\link{stancode}},
 #' \code{\link{standata}}, \code{\link{mvgam}}
@@ -1553,16 +1435,6 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
 #' }
 #'
 #' @return A \code{brmsprior} data frame with prior specifications
-#'
-#' @examples
-#' \dontrun{
-#' # Works with regular formulas (delegates to brms)
-#' get_prior(y ~ x + (1|group), data = dat)
-#'
-#' # Works with mvgam_formula objects
-#' mf <- mvgam_formula(y ~ x, trend_formula = ~ AR(p = 1))
-#' get_prior(mf, data = dat)
-#' }
 #'
 #' @seealso \code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}}
 #' @export
@@ -1689,27 +1561,6 @@ has_embedded_families <- function(formula) {
 #' specifications and supports all brms family types for observation models
 #' while trend components are always modeled as Gaussian State-Space processes.
 #'
-#' @examples
-#' \dontrun{
-#' # Create mvgam_formula objects
-#' mf1 <- mvgam_formula(y ~ x + (1|group))  # No trend
-#' mf2 <- mvgam_formula(count ~ treatment, ~ AR(p = 1))  # With trend
-#'
-#' # Get priors (identical to brms when no trend)
-#' priors1 <- get_prior(mf1, data = dat, family = poisson())
-#'
-#' # Get combined priors with trend parameters
-#' priors2 <- get_prior(mf2, data = ecology_data, family = poisson())
-#'
-#' # Filter by component
-#' obs_priors <- priors2[priors2$trend_component == "observation", ]
-#' trend_priors <- priors2[priors2$trend_component == "trend", ]
-#'
-#' # Use with brms functions for customization
-#' custom_priors <- brms::set_prior("normal(0, 0.5)", class = "ar1_trend",
-#'                                 prior = priors2)
-#' }
-#'
 #' @seealso \code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}},
 #'   \code{\link[brms]{set_prior}}, \code{\link[brms]{prior}}
 #' @export
@@ -1736,13 +1587,22 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
     )))
   }
 
-  # Extract observation priors with embedded family support
+  # Extract observation priors with embedded family support.
+  # `safe_brms_prior_call` falls back to `brms::empty_prior()` on
+  # the known empty-frame crash that occurs when the obs formula
+  # has no coefficient classes (e.g. `y ~ 0` for a pure-trend
+  # state-space model).
   if (has_embedded_families(formula)) {
     # Let brms handle embedded families - don't pass family parameter
-    obs_priors <- brms::get_prior(formula = formula, data = data, ...)
+    obs_priors <- safe_brms_prior_call(
+      brms::get_prior(formula = formula, data = data, ...)
+    )
   } else {
     # Pass family parameter for non-embedded cases
-    obs_priors <- brms::get_prior(formula = formula, data = data, family = family, ...)
+    obs_priors <- safe_brms_prior_call(
+      brms::get_prior(formula = formula, data = data,
+                      family = family, ...)
+    )
   }
 
   # Handle case where no trend formula is specified

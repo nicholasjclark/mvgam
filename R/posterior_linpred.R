@@ -60,7 +60,9 @@ get_combined_linpred <- function(mvgam_fit, newdata,
     return(obs_linpred)
   }
 
-  # Extract trend linear predictor
+  # Extract trend linear predictor (deterministic submodel only).
+  # The marginal-MC trend noise is sampled below from the trend's
+  # process covariance and added once `process_error = TRUE`.
   trend_linpred <- extract_component_linpred(
     mvgam_fit = mvgam_fit,
     newdata = newdata,
@@ -72,6 +74,22 @@ get_combined_linpred <- function(mvgam_fit, newdata,
     allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels
   )
+
+  # Sample marginal trend noise once. Returns a [ndraws x n_obs]
+  # matrix aligned with newdata rows. Skipped entirely when
+  # `process_error = FALSE` (trend contribution is the deterministic
+  # submodel only) or when the trend kernel has no stochastic
+  # component (PW, none), so neither path pays the cost of
+  # constructing the observation structure unnecessarily.
+  trend_noise <- if (isTRUE(process_error) &&
+                       has_stochastic_trend(mvgam_fit)) {
+    sample_process_errors(
+      mvgam_fit, ndraws = ndraws, newdata = newdata,
+      draw_ids = draw_ids
+    )
+  } else {
+    NULL
+  }
 
   # Detect structure: list indicates multivariate, matrix indicates univariate
   is_multivariate <- is.list(obs_linpred) && !is.matrix(obs_linpred)
@@ -100,29 +118,10 @@ get_combined_linpred <- function(mvgam_fit, newdata,
         trend_mat <- trend_linpred
       }
 
-      # Validate dimensions match before combination
-      if (nrow(trend_mat) != nrow(obs_mat) ||
-          ncol(trend_mat) != ncol(obs_mat)) {
-        stop(insight::format_error(
-          cli::format_inline(
-            "Dimension mismatch for response {.val {resp_name}}: obs_linpred is [{nrow(obs_mat)} x {ncol(obs_mat)}] but trend_linpred is [{nrow(trend_mat)} x {ncol(trend_mat)}]."
-          )
-        ))
-      }
-
-      # Apply process_error: FALSE fixes trend at posterior mean
-      if (!process_error) {
-        trend_mean <- colMeans(trend_mat)
-        trend_mat <- matrix(
-          trend_mean,
-          nrow = nrow(obs_mat),
-          ncol = ncol(obs_mat),
-          byrow = TRUE
-        )
-      }
-
-      # Combine additively on link scale
-      obs_mat + trend_mat
+      compose_linpred_with_noise(
+        obs_mat = obs_mat, trend_mat = trend_mat,
+        trend_noise = trend_noise, resp_name = resp_name
+      )
     })
     names(combined) <- names(obs_linpred)
     return(combined)
@@ -131,30 +130,47 @@ get_combined_linpred <- function(mvgam_fit, newdata,
   # Univariate case: both components are matrices
   checkmate::assert_matrix(obs_linpred)
   checkmate::assert_matrix(trend_linpred)
+  compose_linpred_with_noise(
+    obs_mat = obs_linpred, trend_mat = trend_linpred,
+    trend_noise = trend_noise, resp_name = NULL
+  )
+}
 
-  # Validate dimensions match
-  if (nrow(trend_linpred) != nrow(obs_linpred) ||
-      ncol(trend_linpred) != ncol(obs_linpred)) {
-    stop(insight::format_error(
+
+# Internal: combine the per-draw obs and trend deterministic linpreds
+# and optionally add the marginal trend-noise sample. Single helper
+# shared by the univariate and multivariate branches of
+# `get_combined_linpred`. Validates shapes and emits a contextual
+# message for the multivariate response when `resp_name` is supplied.
+#'@noRd
+compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
+                                        resp_name = NULL) {
+  if (nrow(trend_mat) != nrow(obs_mat) ||
+      ncol(trend_mat) != ncol(obs_mat)) {
+    msg <- if (!is.null(resp_name)) {
       cli::format_inline(
-        "Dimension mismatch: obs_linpred is [{nrow(obs_linpred)} x {ncol(obs_linpred)}] but trend_linpred is [{nrow(trend_linpred)} x {ncol(trend_linpred)}]."
+        "Dimension mismatch for response {.val {resp_name}}: obs_linpred is [{nrow(obs_mat)} x {ncol(obs_mat)}] but trend_linpred is [{nrow(trend_mat)} x {ncol(trend_mat)}]."
       )
-    ))
+    } else {
+      cli::format_inline(
+        "Dimension mismatch: obs_linpred is [{nrow(obs_mat)} x {ncol(obs_mat)}] but trend_linpred is [{nrow(trend_mat)} x {ncol(trend_mat)}]."
+      )
+    }
+    stop(insight::format_error(msg))
   }
-
-  # Apply process_error: FALSE fixes trend at posterior mean
-  if (!process_error) {
-    trend_mean <- colMeans(trend_linpred)
-    trend_linpred <- matrix(
-      trend_mean,
-      nrow = nrow(obs_linpred),
-      ncol = ncol(obs_linpred),
-      byrow = TRUE
-    )
+  out <- obs_mat + trend_mat
+  if (!is.null(trend_noise)) {
+    if (nrow(trend_noise) != nrow(out) ||
+        ncol(trend_noise) != ncol(out)) {
+      stop(insight::format_error(
+        cli::format_inline(
+          "Trend-noise dimension mismatch: noise is [{nrow(trend_noise)} x {ncol(trend_noise)}] but linpred is [{nrow(out)} x {ncol(out)}]."
+        )
+      ))
+    }
+    out <- out + trend_noise
   }
-
-  # Combine additively on link scale
-  obs_linpred + trend_linpred
+  out
 }
 
 
@@ -246,26 +262,18 @@ get_combined_linpred <- function(mvgam_fit, newdata,
 #'   state-extrapolating prediction surface.
 #'
 #' @examples
-#' \dontrun{
-#' # Fit a State-Space model
-#' fit <- mvgam(
-#'   count ~ temperature + s(day),
-#'   trend_formula = ~ AR(p = 1),
-#'   data = my_data,
-#'   family = poisson()
-#' )
+#' \donttest{
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 60L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
 #'
-#' # Extract linear predictor (link scale)
-#' linpred <- posterior_linpred(fit)
-#'
-#' # With new data
-#' linpred_new <- posterior_linpred(fit, newdata = new_data)
-#'
-#' # Reduce uncertainty by fixing trend at posterior mean
-#' linpred_fast <- posterior_linpred(fit, process_error = FALSE)
-#'
-#' # Subset draws for speed
-#' linpred_sub <- posterior_linpred(fit, ndraws = 100)
+#' # Link-scale linear predictor draws (log lambda for the Poisson).
+#' lp <- posterior_linpred(mod, ndraws = 50L)
+#' dim(lp)
 #' }
 #'
 #' @importFrom brms posterior_linpred

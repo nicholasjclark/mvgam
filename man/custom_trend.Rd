@@ -39,30 +39,3 @@ A custom mvgam trend object
 Allows users to define custom trend specifications. This is the main
 extension point for adding new trend types.
 }
-\examples{
-\dontrun{
-# Create a custom GARCH trend type
-GARCH <- function(p = 1, q = 1) {
-  custom_trend(
-    trend = "GARCH",
-    tpars = c("alpha", "beta", "sigma_trend"),
-    forecast_fun = "forecast_garch_rcpp",
-    stancode_fun = "generate_garch_stan",
-    standata_fun = "prepare_garch_data",
-    bounds = list(
-      alpha = c(0, 1),
-      beta = c(0, 1),
-      sigma_trend = c(0, Inf)
-    ),
-    characteristics = list(
-      supports_predictors = TRUE,
-      supports_correlation = FALSE,
-      supports_factors = FALSE,
-      max_order = max(p, q),
-      requires_sorting = TRUE
-    ),
-    p = p, q = q
-  )
-}
-}
-}

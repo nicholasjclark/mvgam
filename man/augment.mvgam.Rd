@@ -68,25 +68,14 @@ the same \code{.unit} share the same \verb{.resid*} values. See
 
 \examples{
 \donttest{
-sim <- sim_mvgam(family = gaussian(), n_series = 1L,
-                  n_timepoints = 50L, seed = 1L)
-mod <- mvgam(y ~ s(season, bs = "cc"),
-             trend_formula = ~ AR(p = 1),
-             data = sim$data_train,
-             family = gaussian(),
-             chains = 1L, silent = 2L)
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
+mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
 augment(mod)
-}
-
-\dontrun{
-# Closure-unit families: per-unit .resid* rows are recycled
-# back to the per-visit observation frame and tagged with a
-# `.unit` column. Use it to recover the unit-grain residuals
-# or to facet diagnostics by site.
-occ_fit <- mvgam(bf(y ~ elev, p ~ tod), family = occ(),
-                 data = closure_unit_data)
-out <- augment(occ_fit)
-head(out[, c(".unit", ".observed", ".fitted", ".resid")])
 }
 
 }

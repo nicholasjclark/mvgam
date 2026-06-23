@@ -42,35 +42,60 @@ plot_mvgam_series <- function(
   log_scale = FALSE
 ) {
   checkmate::assert_class(object, "mvgam")
+
+  meta <- object$trend_metadata$variables %||%
+    list(time_var = "time", series_var = "series")
+  resp <- (object$response_names %||% "y")[1L]
+  series_levels <- resolve_series_info(object)$series_levels
+
+  series_obs_plot(
+    train         = mvgam_training_data(object),
+    test          = newdata %||% object$test_data,
+    response      = resp,
+    meta          = meta,
+    series_levels = series_levels,
+    series        = series,
+    lines         = lines,
+    n_bins        = n_bins,
+    log_scale     = log_scale
+  )
+}
+
+
+# Internal: shared observed-series plot body. Builds the same
+# faceted multi-series plot (when `series = "all"`) or 4-panel
+# patchwork (when `series` resolves to one index) regardless of
+# whether the input comes from a fitted `mvgam` object
+# (`plot_mvgam_series()` / `plot.mvgam(type = "series")`) or a
+# raw long-format data frame (`mvgam_data()` pre-fit). Both
+# callers pass already-resolved metadata so this helper does no
+# class dispatch.
+#'@noRd
+series_obs_plot <- function(train, test, response, meta,
+                             series_levels, series = NULL,
+                             lines = TRUE, n_bins = NULL,
+                             log_scale = FALSE) {
   checkmate::assert_flag(lines)
   checkmate::assert_flag(log_scale)
   checkmate::assert_integerish(n_bins, lower = 1L, len = 1L,
                                 null.ok = TRUE)
   set_color_scheme_local("red")
 
-  meta <- object$trend_metadata$variables %||%
-    list(time_var = "time", series_var = "series")
-  resp <- (object$response_names %||% "y")[1L]
-  series_levels <- resolve_series_info(object)$series_levels
-  n_series <- length(series_levels)
-  newdata <- newdata %||% object$test_data
-
-  series <- resolve_series_index(series, n_series)
+  series_idx <- resolve_series_index(series, length(series_levels))
 
   dat <- rbind(
-    series_long_df(mvgam_training_data(object),
-                   resp, meta, label = "train"),
-    series_long_df(newdata, resp, meta, label = "validate")
+    series_long_df(train, response, meta, label = "train"),
+    series_long_df(test,  response, meta, label = "validate")
   )
   dat$series <- factor(dat$series, levels = series_levels)
 
-  ylab <- if (log_scale) paste0("log(", resp, " + 1)") else resp
+  ylab <- if (log_scale) paste0("log(", response, " + 1)") else response
   if (log_scale) dat$y <- log(dat$y + 1)
 
-  if (identical(series, "all")) {
+  if (identical(series_idx, "all")) {
     return(series_all_plot(dat, ylab, lines))
   }
-  s_name <- series_levels[series]
+  s_name <- series_levels[series_idx]
   dat_s <- dat[as.character(dat$series) == s_name, , drop = FALSE]
   if (nrow(dat_s) == 0L) {
     stop(insight::format_error(c(

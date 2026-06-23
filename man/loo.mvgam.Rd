@@ -89,80 +89,25 @@ out-of-sample evaluations for further scrutiny (see
 }
 \examples{
 \donttest{
-#--------------------------------------------------
-# Simulate 4 time series with hierarchical seasonality
-# and independent AR1 dynamic processes
-#--------------------------------------------------
-set.seed(111)
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
 
-simdat <- sim_mvgam(
-  seasonality = 'hierarchical',
-  trend_model = AR(),
-  family = gaussian()
-)
+mod1 <- mvgam(y ~ s(x),
+               trend_formula = ~ AR(p = 1),
+               data    = simdat$data_train,
+               family  = poisson(),
+               chains  = 2, silent = 2)
+mod2 <- mvgam(y ~ 1,
+               trend_formula = ~ AR(p = 1),
+               data    = simdat$data_train,
+               family  = poisson(),
+               chains  = 2, silent = 2)
 
-# Fit a model with shared seasonality
-mod1 <- mvgam(
-  y ~ s(season, bs = 'cc', k = 6),
-  data = rbind(simdat$data_train, simdat$data_test),
-  family = gaussian(),
-  chains = 2,
-  silent = 2
-)
-
-conditional_effects(mod1)
-
-mc.cores.def <- getOption('mc.cores')
-options(mc.cores = 1)
 loo(mod1)
-
-# Fit a model with hierarchical seasonality
-mod2 <- update(
-  mod1,
-  formula = y ~ s(season, bs = 'cc', k = 6) +
-    s(season, series, bs = 'fs', xt = list(bs = 'cc'), k = 4),
-  chains = 2,
-  silent = 2
-)
-
-conditional_effects(mod2)
-loo(mod2)
-
-# Add AR1 dynamic errors to mod2
-mod3 <- update(
-  mod2,
-  trend_model = AR(),
-  chains = 2,
-  silent = 2
-)
-
-conditional_effects(mod3)
-plot(mod3, type = 'trend')
-loo(mod3)
-
-#--------------------------------------------------
-# Compare models using LOO
-#--------------------------------------------------
-loo_compare(mod1, mod2, mod3)
-options(mc.cores = mc.cores.def)
-
-#--------------------------------------------------
-# Compare forecast abilities using LFO-CV
-#--------------------------------------------------
-
-lfo_mod2 <- lfo_cv(mod2, min_t = 92)
-lfo_mod3 <- lfo_cv(mod3, min_t = 92)
-
-# Plot forecast ELPD differences
-plot(
-  y = lfo_mod2$elpds - lfo_mod3$elpds,
-  x = lfo_mod2$eval_timepoints,
-  pch = 16,
-  ylab = 'ELPD_mod2 - ELPD_mod3',
-  xlab = 'Evaluation timepoint'
-)
-
-abline(h = 0, lty = 'dashed')
+# Compare two fits by ELPD difference; positive elpd_diff favours
+# the first row.
+loo_compare(mod1, mod2)
 }
 
 }

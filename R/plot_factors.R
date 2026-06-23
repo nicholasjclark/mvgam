@@ -231,23 +231,29 @@ plot_latent_state <- function(object, probs = c(0.5, 0.8, 0.95),
 }
 
 
-# Internal: extract per-factor (ndraws x n_time) matrices of
-# factor paths from the Stan posterior. Returns a list of length
-# `n_lv`, names "Factor 1" ... "Factor n_lv". Pattern selection
-# delegates to `factor_state_param_pattern()`.
+# Internal: shared column-name lookup for tilde-aware lv_trend
+# extraction. Returns a `[n_time, n_lv]` character matrix of
+# `lv_trend[t, k]` (or `lv_trend_tilde[t, k]`) column names ordered
+# `[time, factor]`, plus the resolved parameter name. Used by both
+# `extract_lv_trend_matrices()` (which builds a per-factor list of
+# `[draws, n_time]` matrices for plotting) and
+# `extract_lv_trend_array_from_draws()` in `R/predictions.R` (which
+# stacks the same draws into a `[draws, n_time, n_lv]` array for
+# the by-lv compose path). Pattern selection delegates to
+# `factor_state_param_pattern()` so Z_tilde / Z fits stay aligned
+# in lockstep.
 #'@noRd
-extract_lv_trend_matrices <- function(object, n_lv) {
-  draws_mat <- posterior::as_draws_matrix(object$fit)
-  pattern <- factor_state_param_pattern(colnames(draws_mat))
+collect_lv_trend_column_names <- function(par_names, n_lv) {
+  pattern <- factor_state_param_pattern(par_names)
   param_name <- if (pattern == "^lv_trend_tilde\\[") {
     "lv_trend_tilde"
   } else {
     "lv_trend"
   }
-  lv_cols <- grep(pattern, colnames(draws_mat), value = TRUE)
+  lv_cols <- grep(pattern, par_names, value = TRUE)
   if (length(lv_cols) == 0L) {
     stop(insight::format_error(c(
-      "Could not locate factor-path draws in object$fit.",
+      "Could not locate factor-path draws in posterior.",
       i = paste0(
         "Expected an LV-factor model with `", param_name,
         "[t, k]` stored in the posterior."
@@ -260,22 +266,38 @@ extract_lv_trend_matrices <- function(object, n_lv) {
   idx <- do.call(rbind, lapply(parts, function(p) {
     as.integer(p[2:3])
   }))
-  t_idx <- idx[, 1L]
-  lv_idx <- idx[, 2L]
-  if (max(lv_idx) != n_lv) {
+  t_pos <- idx[, 1L]
+  k_pos <- idx[, 2L]
+  if (max(k_pos) != n_lv) {
     stop(insight::format_error(c(
-      "Mismatch between detected and stored factor count.",
+      "Mismatch between expected and stored factor count.",
       x = paste0(
-        "detect_factor_n_lv() = ", n_lv,
-        ", max lv index in posterior = ", max(lv_idx), "."
+        "Expected n_lv = ", n_lv,
+        ", max factor index in posterior = ", max(k_pos), "."
       )
     )))
   }
+  cols_by_tk <- matrix(NA_character_, nrow = max(t_pos), ncol = n_lv)
+  for (k in seq_len(n_lv)) {
+    keep <- k_pos == k
+    cols_by_tk[, k] <- lv_cols[keep][order(t_pos[keep])]
+  }
+  list(cols_by_tk = cols_by_tk, param_name = param_name)
+}
+
+
+# Internal: extract per-factor (ndraws x n_time) matrices of
+# factor paths from the Stan posterior. Returns a named list of
+# length `n_lv`, names "Factor 1" ... "Factor n_lv". Shares
+# column resolution with `extract_lv_trend_array_from_draws()`
+# via `collect_lv_trend_column_names()`.
+#'@noRd
+extract_lv_trend_matrices <- function(object, n_lv) {
+  draws_mat <- posterior::as_draws_matrix(object$fit)
+  meta <- collect_lv_trend_column_names(colnames(draws_mat), n_lv)
   setNames(
     lapply(seq_len(n_lv), function(k) {
-      keep <- lv_idx == k
-      cols <- lv_cols[keep][order(t_idx[keep])]
-      draws_mat[, cols, drop = FALSE]
+      draws_mat[, meta$cols_by_tk[, k], drop = FALSE]
     }),
     paste0("Factor ", seq_len(n_lv))
   )

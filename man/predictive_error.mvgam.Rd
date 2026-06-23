@@ -42,17 +42,6 @@ Returns posterior draws of the response-scale prediction
 error (observed minus predicted) for each observation.
 Mirrors \code{\link[brms:predictive_error.brmsfit]{brms::predictive_error.brmsfit()}}.
 }
-\examples{
-\donttest{
-sim <- sim_mvgam(family = gaussian())
-mod <- mvgam(y ~ s(season, bs = "cc"), trend_model = AR(),
-             data = sim$data_train, family = gaussian(),
-             chains = 2, silent = 2)
-err <- predictive_error(mod)
-dim(err)
-}
-
-}
 \seealso{
 \code{\link[brms:predictive_error.brmsfit]{brms::predictive_error.brmsfit()}},
 \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}, \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}.

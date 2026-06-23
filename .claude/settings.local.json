@@ -50,7 +50,14 @@
       "Bash(bash:*)",
       "Bash(echo:*)",
       "Bash(chmod:*)",
-      "Bash(./.claude/hooks/package-dependency-mapper.sh test:*)"
+      "Bash(./.claude/hooks/package-dependency-mapper.sh test:*)",
+      "Bash(tee /tmp/validate11.log)",
+      "Bash(tee /tmp/local-tests.log)",
+      "WebFetch(domain:jsocolar.github.io)",
+      "WebFetch(domain:besjournals.onlinelibrary.wiley.com)",
+      "Bash(curl -s \"https://api.github.com/repos/hmsc-r/HMSC/contents\")",
+      "WebFetch(domain:www.mv.helsinki.fi)",
+      "Bash(curl -s \"https://cran.r-project.org/web/packages/Hmsc/index.html\")"
     ],
     "deny": [],
     "ask": [],

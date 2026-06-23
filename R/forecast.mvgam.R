@@ -48,7 +48,12 @@
 #'   the training data, containing the time / series cells at
 #'   which forecasts are wanted. Rows with time values beyond
 #'   the training grid drive the forecast horizon. When `NULL`,
-#'   the returned object contains hindcasts only.
+#'   the returned object contains hindcasts only and the
+#'   `$forecasts` / `$test_observations` / `$test_times` slots
+#'   are `NULL`. The fallback is deliberately strict: if you
+#'   want forecasts using the held-out data that was passed to
+#'   `mvgam(..., newdata = X)` at fit time, pass it explicitly
+#'   here as `forecast(mod, newdata = mod$test_data)`.
 #' @param ... Currently unused.
 #' @param type One of `"response"`, `"link"`, `"expected"`,
 #'   `"trend"`. `"response"` samples from the observation family
@@ -87,6 +92,27 @@
 #'   alternative marginal-MC prediction surface that integrates
 #'   over the trend's stochastic dynamics instead of extrapolating
 #'   the fitted latent state.
+#' @examples
+#' \donttest{
+#' set.seed(11)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 80L, trend_model = AR(),
+#'                      proportional_train = 0.75)
+#'
+#' mod <- mvgam(
+#'   y ~ s(x),
+#'   trend_formula = ~ AR(p = 1),
+#'   data    = simdat$data_train,
+#'   newdata = simdat$data_test,  # persisted on mod$test_data
+#'   family  = poisson(),
+#'   chains  = 2, silent = 2
+#' )
+#'
+#' # Pass the held-out data explicitly to drive the forecast horizon.
+#' fc <- forecast(mod, newdata = mod$test_data)
+#' plot(fc)
+#' }
+#'
 #' @importFrom generics forecast
 #' @method forecast mvgam
 #' @export
@@ -106,6 +132,7 @@ forecast.mvgam <- function(object,
   checkmate::assert_flag(b_uncertainty)
   checkmate::assert_flag(trend_uncertainty)
   checkmate::assert_flag(obs_uncertainty)
+  newdata <- ensure_obs_placeholder_in_newdata(newdata, object$data)
 
   trend_specs <- object$mv_spec$trend_specs
   if (is.null(trend_specs)) {
@@ -427,52 +454,108 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
 
 
 # Internal: dispatch on `type` for a single series's hindcast.
-# `trend` / `link` reuse extract_component_linpred (always
-# deterministic at the Stan-fitted state). `expected` /
-# `response` route through posterior_epred / posterior_predict
-# with `resample_innovations` toggling whether the latent state
-# gets fresh innovation draws on top (TRUE) or is read directly
-# from the Stan posterior (FALSE, the default for hindcasts).
-# Maps to the underlying helpers' `process_error` flag.
+# Standard families pull the per-draw conditional `trend[t, s]`
+# directly from the stanfit (the same per-cell value Stan would
+# emit as `ypred` in generated quantities), compose with the
+# per-draw deterministic obs-side linpred, and dispatch the
+# family RNG via `predict_single_response`. Closure-unit
+# families keep their joint-over-unit marginalisation entries
+# through `posterior_epred` / `posterior_predict`.
+# `resample_innovations` is preserved on the signature for the
+# closure-unit branch (where it maps to `process_error` in the
+# underlying helpers); it is a no-op on the standard-family
+# branch because the per-draw conditional state already supplies
+# the trajectory.
 #'@noRd
 hindcast_one_series <- function(object, sub_data, type, draw_idx,
                                   obs_uncertainty,
                                   resample_innovations = FALSE,
                                   resp = NULL) {
-  full <- switch(
-    type,
-    "trend" = extract_component_linpred(
-      mvgam_fit = object, newdata = sub_data,
-      component = "trend", incl_latent_state = TRUE
-    ),
-    "link" = extract_component_linpred(
+  family <- if (!is.null(resp)) {
+    get_family_for_resp(object, resp)
+  } else {
+    object$family
+  }
+  is_closure <- is_closure_unit_family(family)
+
+  if (is_closure) {
+    full <- switch(
+      type,
+      "trend" = extract_component_linpred(
+        mvgam_fit = object, newdata = sub_data,
+        component = "trend", incl_latent_state = TRUE
+      ),
+      "link" = extract_component_linpred(
+        mvgam_fit = object, newdata = sub_data,
+        component = "obs", resp = resp
+      ) + extract_component_linpred(
+        mvgam_fit = object, newdata = sub_data,
+        component = "trend", incl_latent_state = TRUE
+      ),
+      "expected" = posterior_epred(
+        object, newdata = sub_data, ndraws = NULL,
+        process_error = resample_innovations, resp = resp
+      ),
+      "response" = if (isTRUE(obs_uncertainty)) {
+        posterior_predict(
+          object, newdata = sub_data, ndraws = NULL,
+          process_error = resample_innovations, resp = resp
+        )
+      } else {
+        posterior_epred(
+          object, newdata = sub_data, ndraws = NULL,
+          process_error = resample_innovations, resp = resp
+        )
+      }
+    )
+  } else {
+    # Per-draw conditional `trend[t, s]` from the stanfit (`Z @
+    # lv_trend + mu_trend` per draw, exactly as Stan composes in
+    # transformed parameters). Returns NULL for trendless fits, in
+    # which case the trend contribution is the zero matrix.
+    draws_mat <- posterior::as_draws_matrix(object$fit)
+    trend_state <- extract_trend_latent_states(
+      mvgam_fit = object, newdata = sub_data, full_draws = draws_mat
+    )
+    if (is.null(trend_state)) {
+      trend_state <- matrix(0, nrow = nrow(draws_mat),
+                              ncol = nrow(sub_data))
+    }
+    obs_linpred <- extract_component_linpred(
       mvgam_fit = object, newdata = sub_data,
       component = "obs", resp = resp
-    ) + extract_component_linpred(
-      mvgam_fit = object, newdata = sub_data,
-      component = "trend", incl_latent_state = TRUE
-    ),
-    "expected" = posterior_epred(
-      object, newdata = sub_data, ndraws = NULL,
-      process_error = resample_innovations, resp = resp
-    ),
-    "response" = if (isTRUE(obs_uncertainty)) {
-      posterior_predict(
-        object, newdata = sub_data, ndraws = NULL,
-        process_error = resample_innovations, resp = resp
-      )
-    } else {
-      posterior_epred(
-        object, newdata = sub_data, ndraws = NULL,
-        process_error = resample_innovations, resp = resp
-      )
+    )
+    if (is.list(obs_linpred) && !is.matrix(obs_linpred)) {
+      stop(insight::format_error(c(
+        "Hindcast received a list-shaped obs linpred with no 'resp' scope.",
+        i = paste0("Multivariate fits should fan out via the ",
+                   "'hindcast.mvgam' entry; this is an internal bug.")
+      )))
     }
-  )
+    linpred <- obs_linpred + trend_state
+    full <- switch(
+      type,
+      "trend" = trend_state,
+      "link" = linpred,
+      "expected" = family$linkinv(linpred),
+      "response" = if (isTRUE(obs_uncertainty)) {
+        predict_single_response(
+          object = object, linpred_resp = linpred,
+          resp = resp, draw_ids = seq_len(nrow(linpred)),
+          ndraws = nrow(linpred), newdata = sub_data,
+          is_multivariate = !is.null(resp)
+        )
+      } else {
+        family$linkinv(linpred)
+      }
+    )
+  }
+
   if (is.list(full) && !is.matrix(full)) {
     stop(insight::format_error(c(
-      "Hindcast received a list-shaped posterior with no `resp` scope.",
+      "Hindcast received a list-shaped posterior with no 'resp' scope.",
       i = paste0("Multivariate fits should fan out via the ",
-                 "`hindcast.mvgam` entry; this is an internal bug.")
+                 "'hindcast.mvgam' entry; this is an internal bug.")
     )))
   }
   full[draw_idx, , drop = FALSE]

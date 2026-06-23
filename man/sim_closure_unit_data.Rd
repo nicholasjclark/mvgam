@@ -157,34 +157,19 @@ scores (only when \code{n_lv > 0L}).}
 }
 
 \examples{
-\donttest{
-# Single-species occupancy with one site-level and one
-# visit-level covariate (the textbook recipe).
-sim <- sim_closure_unit_data(
-  type = 1L, family = occ(),
-  n_sites = 50L, n_visits = 4L, seed = 1L
+# Four-species occupancy fixture with state-level env / elev
+# covariates and visit-level tod_c / effort covariates
+# (recipe 2L).
+set.seed(1)
+simdat <- sim_closure_unit_data(
+  family    = occ(),
+  n_species = 4L,
+  n_sites   = 50L,
+  n_visits  = 4L,
+  type      = 2L
 )
-head(sim$data_train)
-
-# The truth bundle is plain matrices ready for recovery checks.
-str(sim$truth)
-
-# Fit directly: data_train is already long-format with the cap,
-# visit, y, and covariate columns mvgam() expects.
-mod <- mvgam(
-  brms::bf(y ~ env, p ~ tod_c),
-  family = occ(), data = sim$data_train,
-  chains = 2L, silent = 2L
-)
-
-# Multi-species N-mixture with shared latent factors.
-sim_nmix <- sim_closure_unit_data(
-  type = 2L, family = nmix(), n_species = 5L,
-  n_sites = 40L, n_lv = 2L, seed = 7L
-)
-dim(sim_nmix$truth$lambda)  # [5, 40]
-dim(sim_nmix$truth$loadings) # [5, 2]
-}
+head(simdat$data_train)
+summary(simdat)
 
 }
 \seealso{

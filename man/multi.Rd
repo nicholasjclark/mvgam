@@ -74,24 +74,6 @@ and softmax internally and returns one probability per (site,
 species) row summing to 1 within each site.
 }
 
-\examples{
-\dontrun{
-# Microbiome-style read-count JSDM. The `env * taxon` interaction
-# gives each taxon its own intercept and environmental response;
-# see `?diri` for the rationale on why a per-`species` interaction
-# is the interpretable form for a simplex multi-response family.
-mod <- jsdgam(
-  formula = y ~ env * taxon,
-  factor_formula = ~ -1,
-  data = read_counts_long,
-  unit = site,
-  species = taxon,
-  family = multi(),
-  n_lv = 2
-)
-}
-
-}
 \references{
 Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,
 Taskinen, S., Walker, S. C. and Hui, F. K. C. (2015). So many

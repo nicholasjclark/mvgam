@@ -44,9 +44,7 @@ make_wrapper_stub <- function(with_re = FALSE) {
 
 test_that("Tier-7 methods have S3 entries on mvgam", {
   for (m in c("posterior_interval", "predictive_interval", "ngrps",
-              "predictive_error", "marginal_smooths",
-              "marginal_effects", "parnames", "nsamples",
-              "as.mcmc")) {
+              "predictive_error")) {
     expect_true(
       !is.null(getS3method(m, "mvgam", optional = TRUE)),
       info = NULL
@@ -126,26 +124,6 @@ test_that("posterior_interval pars alias falls back to variable", {
 })
 
 
-# ---- Deprecated alias dispatch -------------------------------------
-
-test_that("parnames.mvgam dispatches to variables.mvgam", {
-  stub <- make_wrapper_stub()
-  # brms's parnames generic emits its own deprecation warning,
-  # which is the documented behaviour. Suppress it here.
-  expect_identical(
-    suppressWarnings(parnames(stub)),
-    variables(stub)
-  )
-})
-
-
-test_that("nsamples.mvgam returns the posterior draw count", {
-  stub <- make_wrapper_stub()
-  # Stub uses 50 iter x 2 chains = 100 total draws.
-  expect_identical(nsamples(stub), 100L)
-})
-
-
 # ---- predictive_error response-column check ------------------------
 
 test_that("predictive_error.mvgam errors when newdata lacks the response", {
@@ -167,67 +145,41 @@ test_that("mvgam_response_name returns the LHS variable", {
 })
 
 
-# ---- as.mcmc.mvgam -------------------------------------------------
+# ---- hypothesis.mvgam ----------------------------------------------
 
-test_that("as.mcmc.mvgam matches brms signature", {
-  expected <- names(formals(getS3method("as.mcmc", "brmsfit")))
-  actual <- names(formals(getS3method("as.mcmc", "mvgam")))
-  expect_true(all(expected %in% actual))
-})
-
-
-test_that("as.mcmc.mvgam returns an mcmc.list by default", {
+test_that("hypothesis.mvgam returns a brmshypothesis on a single test", {
   stub <- make_wrapper_stub()
-  expect_warning(out <- as.mcmc(stub), "deprecated")
-  expect_s3_class(out, "mcmc.list")
-  # Stub has 2 chains x 50 iter.
-  expect_length(out, 2L)
-  expect_s3_class(out[[1L]], "mcmc")
-  expect_identical(nrow(out[[1L]]), 50L)
-  expect_equal(attr(out[[1L]], "mcpar"), c(1, 50, 1))
-})
-
-
-test_that("as.mcmc.mvgam combine_chains stacks into a single mcmc", {
-  stub <- make_wrapper_stub()
-  expect_warning(
-    out <- as.mcmc(stub, combine_chains = TRUE),
-    "deprecated"
+  h <- hypothesis(stub, "b_x > 0")
+  expect_s3_class(h, "brmshypothesis")
+  expect_named(
+    h$hypothesis,
+    c("Hypothesis", "Estimate", "Est.Error", "CI.Lower",
+      "CI.Upper", "Evid.Ratio", "Post.Prob", "Star")
   )
-  expect_s3_class(out, "mcmc")
-  expect_identical(nrow(out), 100L)
-  expect_equal(attr(out, "mcpar"), c(1, 100, 1))
+  expect_identical(nrow(h$hypothesis), 1L)
+  # Estimate equals the posterior mean of b_x drawn from the stub.
+  draws_df <- as.data.frame(posterior::as_draws_df(stub$fit))
+  expect_equal(
+    h$hypothesis$Estimate,
+    mean(draws_df$b_x),
+    tolerance = 1e-8
+  )
 })
 
 
-test_that("as.mcmc.mvgam pars filter (regex) keeps matching columns", {
+test_that("hypothesis.mvgam accepts multiple hypotheses", {
   stub <- make_wrapper_stub()
-  expect_warning(
-    out <- as.mcmc(stub, pars = "^b_"),
-    "deprecated"
-  )
-  expect_true(all(grepl("^b_", colnames(out[[1L]]))))
+  h <- hypothesis(stub, c("b_x > 0", "b_Intercept < 1"))
+  expect_s3_class(h, "brmshypothesis")
+  expect_identical(nrow(h$hypothesis), 2L)
 })
 
 
-test_that("as.mcmc.mvgam pars filter (fixed) is exact", {
+test_that("hypothesis.mvgam validates input types", {
   stub <- make_wrapper_stub()
-  expect_warning(
-    out <- as.mcmc(stub, pars = "b_x", fixed = TRUE),
-    "deprecated"
-  )
-  expect_identical(colnames(out[[1L]]), "b_x")
-})
-
-
-test_that("as.mcmc.mvgam errors when no parameter matches 'pars'", {
-  stub <- make_wrapper_stub()
-  # The deprecation warning fires before the error; suppress the
-  # warning so the expect_error matches the error condition only.
-  expect_error(
-    suppressWarnings(
-      as.mcmc(stub, pars = "no_such_par", fixed = TRUE)
-    ),
-    "No parameters matched"
-  )
+  expect_error(hypothesis(stub, 1L), "character")
+  expect_error(hypothesis(stub, "b_x > 0", alpha = 2),
+               "alpha")
+  expect_error(hypothesis(stub, "b_x > 0", robust = "yes"),
+               "robust")
 })

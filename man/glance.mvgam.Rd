@@ -37,15 +37,14 @@ criteria. Mirrors \code{broom.mixed::glance.brmsfit()}.
 }
 \examples{
 \donttest{
-sim <- sim_mvgam(family = gaussian(), n_series = 1L,
-                  n_timepoints = 50L, seed = 1L)
-mod <- mvgam(y ~ s(season, bs = "cc"),
-             trend_formula = ~ AR(p = 1),
-             data = sim$data_train,
-             family = gaussian(),
-             chains = 1L, silent = 2L)
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
+mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
 glance(mod)
-glance(mod, looic = TRUE)
 }
 
 }

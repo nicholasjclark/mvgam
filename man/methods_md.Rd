@@ -66,21 +66,17 @@ user can paste straight into a methods write-up.
 }
 \examples{
 \donttest{
-set.seed(0)
-simdat <- sim_mvgam(
-  seasonality = "hierarchical",
-  trend_model = AR(p = 1),
-  family = gaussian()
-)
-mod <- mvgam(
-  y ~ s(season, bs = "cc", k = 6),
-  trend_formula = ~ AR(p = 1),
-  data = simdat$data_train,
-  family = gaussian(),
-  chains = 2,
-  silent = 2
-)
-methods_md(mod)
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
+mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
+
+# Markdown / LaTeX statement of the model. cat() emits the
+# raw markdown; print() pretty-prints in the console.
+cat(methods_md(mod))
 }
 
 }

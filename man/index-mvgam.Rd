@@ -25,27 +25,6 @@ a character vector of parameter names
 \description{
 Index \code{mvgam} objects
 }
-\examples{
-\donttest{
-# Simulate data and fit a model
-simdat <- sim_mvgam(
-  n_series = 1,
-  trend_model = AR()
-)
-
-mod <- mvgam(
-  y ~ s(season, bs = 'cc', k = 6),
-  trend_model = AR(),
-  data = simdat$data_train,
-  chains = 2,
-  silent = 2
-)
-
-# Extract model variables
-variables(mod)
-}
-
-}
 \author{
 Nicholas J Clark
 }

@@ -115,26 +115,6 @@ and softmax internally and returns one probability per (site,
 species) row summing to 1 within each site.
 }
 
-\examples{
-\dontrun{
-# Compositional JSDM on long-format proportions data. The formula
-# interacts the environmental covariate with `species` so each
-# species gets its own intercept and `env` slope; this is the
-# interpretable form for a simplex multi-response family. The
-# brms-native-style `y ~ 0 + species + env:species` is equivalent.
-mod <- jsdgam(
-  formula = y ~ env * species,
-  factor_formula = ~ -1,
-  data = my_long_format_data,
-  unit = site,
-  species = species,
-  family = diri(),
-  n_lv = 2
-)
-plot(residual_cor(mod))
-}
-
-}
 \references{
 Aitchison, J. (1982). The statistical analysis of compositional
 data. \emph{Journal of the Royal Statistical Society Series B},

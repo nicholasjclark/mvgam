@@ -67,18 +67,17 @@
 #'
 #' @examples
 #' \donttest{
-#' set.seed(1)
-#' sim <- sim_mvgam(family = gaussian())
-#' mod <- mvgam(
-#'   y ~ 1 + s(season, bs = "cc"),
-#'   trend_model = AR(),
-#'   data = sim$data_train,
-#'   family = gaussian(),
-#'   chains = 2,
-#'   silent = 2
-#' )
-#' eta <- posterior_smooths(mod, smooth = "s(season,bs=\"cc\")")
-#' dim(eta)
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 60L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
+#'
+#' # Posterior draws of the s(x) smooth at the training x values.
+#' sm <- posterior_smooths(mod, smooth = "s(x)")
+#' dim(sm)
 #' }
 #'
 #' @method posterior_smooths mvgam
@@ -179,22 +178,6 @@ brms::posterior_smooths
 #'   [conditional_effects.mvgam()].
 #'
 #' @author Nicholas J Clark
-#'
-#' @examples
-#' \donttest{
-#' set.seed(1)
-#' sim <- sim_mvgam(family = gaussian())
-#' mod <- mvgam(
-#'   y ~ 1 + s(season, bs = "cc"),
-#'   trend_model = AR(),
-#'   data = sim$data_train,
-#'   family = gaussian(),
-#'   chains = 2,
-#'   silent = 2
-#' )
-#' cs <- conditional_smooths(mod)
-#' plot(cs)
-#' }
 #'
 #' @method conditional_smooths mvgam
 #' @export
@@ -303,15 +286,6 @@ brms::conditional_smooths
 #'   if the fit has no smooth terms.
 #'
 #' @author Nicholas J Clark
-#'
-#' @examples
-#' \donttest{
-#' sim <- sim_mvgam(family = gaussian())
-#' mod <- mvgam(y ~ 1 + s(season, bs = "cc"),
-#'              trend_model = AR(), data = sim$data_train,
-#'              family = gaussian(), chains = 2, silent = 2)
-#' smooths(mod)
-#' }
 #'
 #' @export
 smooths.mvgam <- function(x) {

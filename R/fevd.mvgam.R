@@ -26,44 +26,19 @@
 #'
 #' @examples
 #' \donttest{
-#' # Simulate some time series that follow a latent VAR(1) process
-#' simdat <- sim_mvgam(
-#'   family = gaussian(),
-#'   n_series = 4,
-#'   trend_model = VAR(cor = TRUE),
-#'   prop_trend = 1
-#' )
-#' # Fit a model that uses a latent VAR(1)
-#' mod <- mvgam(
-#'   formula = y ~ -1,
-#'   trend_formula = ~ 1,
-#'   trend_model = VAR(cor = TRUE),
-#'   family = gaussian(),
-#'   data = simdat$data_train,
-#'   chains = 2,
-#'   silent = 2
-#' )
+#' set.seed(0)
+#' simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
+#'                      n_timepoints = 60L, trend_model = VAR(),
+#'                      prop_trend = 0.95)
+#' mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = gaussian(),
+#'               chains  = 2, silent = 2)
 #'
-#' # Plot the autoregressive coefficient distributions;
-#' # use 'dir = "v"' to arrange the order of facets
-#' # correctly
-#' mcmc_plot(
-#'   mod,
-#'   variable = 'A',
-#'   regex = TRUE,
-#'   type = 'hist',
-#'   facet_args = list(dir = 'v')
-#' )
-#'
-#' # Calulate forecast error variance decompositions for each series
-#' fevds <- fevd(mod, h = 12)
-#'
-#' # Plot median contributions to forecast error variance
-#' plot(fevds)
-#'
-#' # View a summary of the error variance decompositions
-#' summary(fevds)
+#' # Forecast-error variance decomposition over h = 6 steps.
+#' fevd(mod, h = 6L)
 #' }
+#'
 #' @export
 fevd <- function(object, ...) {
   UseMethod("fevd", object)

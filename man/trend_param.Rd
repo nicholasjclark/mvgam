@@ -31,14 +31,3 @@ Creates parameter specifications for trend constructors following brms design
 patterns. Parameters can be combined using the \code{+} operator and support
 conditional inclusion, bounds, monitoring flags, and labels.
 }
-\examples{
-# Basic parameter
-sigma_param <- trend_param("sigma", bounds = c(0, Inf), label = "innovation_sd")
-
-# Conditional parameter
-theta_param <- trend_param("theta", bounds = c(-1, 1),
-                          condition = ma, label = "ma_coefficient")
-
-# Combine parameters
-all_params <- sigma_param + theta_param
-}

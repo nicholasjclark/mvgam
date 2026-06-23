@@ -87,6 +87,21 @@ that routes by \code{type} to the canonical plotting surface for
 each kind of summary. No bespoke plotting code lives here —
 every branch forwards to a single dedicated function.
 }
+\examples{
+\donttest{
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
+mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
+
+# 4-panel default dispatch (PPC + residuals + trend + smooths).
+plot(mod)
+}
+
+}
 \seealso{
 \code{\link[=pp_check.mvgam]{pp_check.mvgam()}}, \code{\link[=conditional_effects.mvgam]{conditional_effects.mvgam()}},
 \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}, \code{\link[=forecast.mvgam]{forecast.mvgam()}},

@@ -54,25 +54,6 @@ prior \code{Pr(nu < 5) ~ 0.18}).
 Data layout: long format, one row per \verb{(site, species)}, exactly
 K rows per site. Responses are continuous reals.
 }
-\examples{
-\dontrun{
-# Heavy-tailed gllvm-style JSDM. Use mvt() over mvn() when
-# responses contain occasional outliers (rare extreme abundances,
-# sensor glitches) that under mvn() would be absorbed by widening
-# `Psi` and the inferred `Z Z'` off-diagonals.
-mod <- jsdgam(
-  formula = y ~ env * species,
-  factor_formula = ~ -1,
-  data = wide_to_long_data,
-  unit = site,
-  species = species,
-  family = mvt(),
-  n_lv = 2
-)
-plot(residual_cor(mod))
-}
-
-}
 \references{
 Hui, F. K. C., Taskinen, S., Pledger, S., Foster, S. D. and
 Warton, D. I. (2015). Model-based approaches to unconstrained

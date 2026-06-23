@@ -30,52 +30,43 @@
 #'
 #' @examples
 #' \donttest{
-#' # Simulate some series and fit a few competing dynamic models
-#' set.seed(1)
-#' simdat <- sim_mvgam(
-#'   n_series = 1,
-#'   prop_trend = 0.6,
-#'   mu = 1
-#' )
+#' # Fit two competing models on the same training data, ensemble
+#' # their forecasts, and compare the per-horizon scores.
+#' set.seed(11)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 80L, trend_model = AR(),
+#'                      proportional_train = 0.75)
 #'
-#' m1 <- mvgam(
+#' # Model 1: trend only.
+#' mod1 <- mvgam(
 #'   y ~ 1,
-#'   trend_formula = ~ time +
-#'     s(season, bs = 'cc', k = 9),
-#'   trend_model = AR(p = 1),
-#'   noncentred = TRUE,
-#'   data = simdat$data_train,
+#'   trend_formula = ~ AR(p = 1),
+#'   data    = simdat$data_train,
 #'   newdata = simdat$data_test,
-#'   chains = 2,
-#'   silent = 2
+#'   family  = poisson(),
+#'   chains  = 2, silent = 2
 #' )
 #'
-#' m2 <- mvgam(
-#'   y ~ time,
-#'   trend_model = RW(),
-#'   noncentred = TRUE,
-#'   data = simdat$data_train,
+#' # Model 2: same trend, plus a smooth of x in the obs formula.
+#' mod2 <- mvgam(
+#'   y ~ s(x),
+#'   trend_formula = ~ AR(p = 1),
+#'   data    = simdat$data_train,
 #'   newdata = simdat$data_test,
-#'   chains = 2,
-#'   silent = 2
+#'   family  = poisson(),
+#'   chains  = 2, silent = 2
 #' )
 #'
-#' # Calculate forecast distributions for each model
-#' fc1 <- forecast(m1)
-#' fc2 <- forecast(m2)
+#' fc1 <- forecast(mod1, newdata = mod1$test_data)
+#' fc2 <- forecast(mod2, newdata = mod2$test_data)
+#' ens <- ensemble(fc1, fc2)
 #'
-#' # Generate the ensemble forecast
-#' ensemble_fc <- ensemble(fc1, fc2)
+#' # Compare CRPS (lower is better).
+#' mean(score(fc1, score = "crps")[[1L]]$score, na.rm = TRUE)
+#' mean(score(fc2, score = "crps")[[1L]]$score, na.rm = TRUE)
+#' mean(score(ens, score = "crps")[[1L]]$score, na.rm = TRUE)
 #'
-#' # Plot forecasts
-#' plot(fc1)
-#' plot(fc2)
-#' plot(ensemble_fc)
-#'
-#' # Score forecasts
-#' score(fc1)
-#' score(fc2)
-#' score(ensemble_fc)
+#' plot(ens)
 #' }
 #'
 #' @export

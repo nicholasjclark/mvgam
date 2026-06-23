@@ -45,25 +45,6 @@ Data layout: long format, one row per \verb{(site, species)}, exactly
 K rows per site. Responses are continuous reals; the \code{Y} vector
 is assembled into the per-unit K-vector \code{y_unit} by the lpdf.
 }
-\examples{
-\dontrun{
-# gllvm-style continuous JSDM. The `env * species` interaction
-# gives each species its own intercept and environmental
-# response; the latent factor model handles residual
-# species-by-species correlation.
-mod <- jsdgam(
-  formula = y ~ env * species,
-  factor_formula = ~ -1,
-  data = wide_to_long_data,
-  unit = site,
-  species = species,
-  family = mvn(),
-  n_lv = 2
-)
-plot(residual_cor(mod))
-}
-
-}
 \references{
 Hui, F. K. C., Taskinen, S., Pledger, S., Foster, S. D. and
 Warton, D. I. (2015). Model-based approaches to unconstrained

@@ -70,6 +70,32 @@ as "k of \code{n_lv} truncation-ceiling factors carry meaningful
 posterior signal", not as "factors 1..k under the MGP ordering
 are active".
 }
+\examples{
+\donttest{
+set.seed(1)
+simdat <- sim_closure_unit_data(
+  family    = occ(),
+  n_species = 4L,
+  n_sites   = 50L,
+  n_visits  = 4L,
+  type      = 2L
+)
+mod <- jsdgam(
+  formula        = bf(y ~ env, p ~ tod_c),
+  factor_formula = ~ -1,
+  data           = simdat$data_train,
+  family         = occ(),
+  n_lv           = 2L,
+  chains         = 2,
+  silent         = 2
+)
+
+# Posterior median count of active factors under the
+# Legramanti / Durante / Dunson (2020) criterion.
+active_factors(mod)
+}
+
+}
 \references{
 Legramanti, S., Durante, D. and Dunson, D. B. (2020). Bayesian
 cumulative shrinkage for infinite factorizations.

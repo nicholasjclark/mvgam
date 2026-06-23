@@ -289,6 +289,11 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
       stan_funs = stan_funs,
       stanvars = trend_stanvars_in,
       silent = silent,
+      # Mark this as the trend invocation so
+      # setup_brms_lightweight() skips the empty-obs-formula
+      # placeholder injection (the injected pin assignment would
+      # be orphaned by mvgam's downstream trend-stancode rewriter).
+      is_trend_setup = TRUE,
       ...
     ))) {
       stop(insight::format_error(c(
@@ -443,22 +448,6 @@ has_obs_intercept <- function(formula) {
 #' trimmed. This guarantees that \code{stancode()} produces exactly the same 
 #' model code that would be compiled and fit by \code{mvgam()}.
 #'
-#' @examples
-#' \dontrun{
-#' # Create mvgam_formula object
-#' mf <- mvgam_formula(count ~ temperature, trend_formula = ~ AR(p = 1))
-#'
-#' # Generate Stan code
-#' stan_code <- stancode(mf, data = ecology_data, family = poisson())
-#' cat(stan_code)
-#'
-#' # With custom priors
-#' custom_priors <- prior("normal(0, 0.5)", class = "ar1_trend") +
-#'                  prior("exponential(2)", class = "sigma_trend")
-#' stan_code_custom <- stancode(mf, data = ecology_data,
-#'                              family = poisson(), prior = custom_priors)
-#' }
-#'
 #' @seealso
 #' \code{\link{mvgam_formula}}, \code{\link{get_prior.mvgam_formula}},
 #' \code{\link{standata}}, \code{\link{mvgam}}
@@ -540,22 +529,6 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
 #' to what \code{mvgam()} uses internally. The returned data structure includes
 #' all observation data, trend mappings, dimensions, and stanvars needed for
 #' model compilation and fitting.
-#'
-#' @examples
-#' \dontrun{
-#' # Create mvgam_formula object
-#' mf <- mvgam_formula(count ~ temperature, trend_formula = ~ AR(p = 1))
-#'
-#' # Generate Stan data
-#' stan_data <- standata(mf, data = ecology_data, family = poisson())
-#' str(stan_data)
-#'
-#' # With custom priors
-#' custom_priors <- prior("normal(0, 0.5)", class = "ar1_trend") +
-#'                  prior("exponential(2)", class = "sigma_trend")
-#' stan_data_custom <- standata(mf, data = ecology_data,
-#'                              family = poisson(), prior = custom_priors)
-#' }
 #'
 #' @seealso
 #' \code{\link{mvgam_formula}}, \code{\link{get_prior.mvgam_formula}},

@@ -41,9 +41,26 @@ but do not support forecasts / new-time-point prediction yet.}
 
 \item{newdata}{Optional test-set \code{data.frame} persisted on the
 fit as \code{object$test_data}. Used by \code{plot(fit, type = "series")}
-to overlay the test arm without re-passing the data. Not fed
-to Stan at fit time — supply it to \code{posterior_predict()} /
-\code{forecast()} for out-of-sample evaluation.}
+to overlay the test arm without re-passing the data. This is
+a deliberate change from earlier mvgam releases: passing
+\code{newdata} to \code{mvgam()} no longer emits Stan generated-quantities
+forecasts at fit time. Keeping forecasting out of Stan keeps
+the fit object small and the sampler fast, and means downstream
+methods can choose their own newdata. To use the persisted
+data downstream, re-pass it through the relevant method.
+\code{forecast()} and \code{posterior_predict()} answer different
+questions:
+\itemize{
+\item \code{forecast(mod, newdata = mod$test_data)} propagates the
+fitted latent state forward in time per posterior draw, so
+future predictions extrapolate the actual trajectory.
+\item \code{posterior_predict(mod, newdata = mod$test_data)}
+marginalises over the trend's stochastic dynamics by Monte
+Carlo at the supplied design points and ignores the fitted
+trajectory's position relative to training time.
+}
+Use \code{forecast()} for time-series forecasting and
+\code{posterior_predict()} for marginal predictive checks.}
 
 \item{trend_map}{Optional fixed factor-loading specification.
 Accepts one of three shapes, a numeric \verb{n_series x n_lv}
@@ -223,11 +240,15 @@ with native multiple imputation support and brms ecosystem integration.
 }
 \examples{
 \donttest{
+# Simulate a single Poisson series with a smooth covariate
+# effect and a latent AR(1) process driving the trend.
+set.seed(1)
 simdat <- sim_mvgam(family = poisson())
 
-# Fit an AR(1) state-space model with one fixed effect.
+# Fit an AR(1) state-space model with a smooth on the
+# covariate.
 mod <- mvgam(
-  y ~ s(season, bs = "cc"),
+  y ~ s(x),
   trend_formula = ~ AR(p = 1),
   data = simdat$data_train,
   family = poisson(),
@@ -235,15 +256,20 @@ mod <- mvgam(
   silent = 2
 )
 
-# Refit with a different sampler configuration. update.mvgam()
-# inherits formula, family, prior, and the trend constructor
-# from the fitted object, so only the sampler arg has to be
-# named on the call.
-mod2 <- update(mod, iter = 500, chains = 1)
+# Inspect the model. `include_betas = FALSE` suppresses the
+# spline coefficient block so the printed summary stays readable.
+summary(mod, include_betas = FALSE)
 
-# Extend the formula. Routed through stats::update.formula() so
-# `~ . + new_term` semantics work.
-mod3 <- update(mod, formula. = ~ . + s(time))
+# Plot the smooth effect on the response scale.
+conditional_effects(mod)
+
+# Inspect the AR(1) posterior.
+mcmc_plot(mod, variable = "^ar1", regex = TRUE, type = "hist")
+
+# Extend the formula. `update.mvgam()` inherits formula, family,
+# prior, and the trend constructor from the fitted object, so
+# only the new term has to be named on the call.
+mod2 <- update(mod, formula. = ~ . + s(time, k = 5), silent = 2)
 
 # Methods-section helpers. `how_to_cite()` returns the prose
 # paragraph for a paper; `methods_md()` returns the matching

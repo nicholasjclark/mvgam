@@ -101,17 +101,20 @@ test_that("get_combined_linpred handles list obs + list per-response trend", {
 })
 
 
-test_that("get_combined_linpred process_error=FALSE collapses trend to mean", {
-  trend_draws <- matrix(c(0, 0.4, 0.8, 1.2,
-                           0, 0.4, 0.8, 1.2,
-                           0, 0.4, 0.8, 1.2), 3, 4, byrow = TRUE)
+test_that("get_combined_linpred process_error=FALSE preserves per-draw trend", {
+  # process_error = FALSE no longer collapses the trend to its
+  # column-mean. The deterministic-submodel draws (X %*% b_trend) are
+  # legitimate per-draw coefficient uncertainty and must ride through
+  # unchanged. Only the marginal latent-state noise contribution is
+  # toggled by `process_error`.
   testthat::local_mocked_bindings(
     extract_component_linpred = function(mvgam_fit, newdata, component, ...) {
       if (component == "obs") {
         matrix(0, 3, 4)
       } else {
-        # Trend draws differ across draws so the column-mean differs
-        # from any single draw
+        # Three draws with distinct values per row; the result must
+        # preserve each draw's row, not broadcast a single posterior
+        # mean across rows.
         rbind(c(0, 0, 0, 0),
               c(1, 1, 1, 1),
               c(2, 2, 2, 2))
@@ -122,8 +125,9 @@ test_that("get_combined_linpred process_error=FALSE collapses trend to mean", {
   )
   out <- get_combined_linpred(stub_obj(), newdata = NULL,
                               process_error = FALSE)
-  # Each column collapsed to its mean (= 1) and broadcast to all rows
-  expect_equal(out, matrix(1, 3, 4))
+  expect_equal(out, rbind(c(0, 0, 0, 0),
+                           c(1, 1, 1, 1),
+                           c(2, 2, 2, 2)))
 })
 
 
@@ -268,4 +272,70 @@ test_that("posterior_linpred(draw_ids = TRUE) rejects non-integer", {
     posterior_linpred.mvgam(stub_obj(), draw_ids = c(1.5, 2.5)),
     "draw_ids"
   )
+})
+
+
+# extract_linpred_univariate must only drop X[, 1] when it is the
+# brms-reserved intercept column (i.e., `b_Intercept` is present in
+# draws). Formulas written as `y ~ 0 + <regressor>` (including the
+# `.mvgam_empty_obs` placeholder injected for empty obs sub-formulas)
+# have no `b_Intercept`; their first column IS a real regressor with
+# its own b[k] and must NOT be dropped.
+
+mk_linpred_prep <- function(X, draws, formula_str = "y ~ 1") {
+  structure(
+    list(draws = draws, sdata = list(X = X), nobs = nrow(X),
+         formula = brms::brmsformula(stats::as.formula(formula_str))),
+    class = "brmsprep"
+  )
+}
+
+test_that("extract_linpred_univariate keeps X[,1] when no b_Intercept", {
+  # `y ~ 0 + ones`: X is a column of 1s, b[1] is the lone coef.
+  # Pre-fix bug: code unconditionally dropped X[,1] if all-1s, so
+  # the linpred came back as 0, losing the b[1] contribution.
+  draws <- posterior::as_draws_matrix(matrix(
+    rep(0.788, 4L), nrow = 4L, dimnames = list(NULL, "b[1]")
+  ))
+  X <- cbind(ones = rep(1, 5))
+  lp <- extract_linpred_univariate(
+    mk_linpred_prep(X, draws, "y ~ 0 + ones")
+  )
+  expect_identical(dim(lp), c(4L, 5L))
+  expect_true(all(abs(lp - 0.788) < 1e-9))
+})
+
+test_that("extract_linpred_univariate drops intercept col when b_Intercept present", {
+  # Standard `y ~ 1 + x`: b_Intercept handled separately, X[,1] is the
+  # all-1s intercept column and should be dropped before b[k] %*% t(X).
+  draws <- posterior::as_draws_matrix(matrix(
+    c(rep(0.5, 4L), rep(2.0, 4L)), nrow = 4L,
+    dimnames = list(NULL, c("b_Intercept", "b[1]"))
+  ))
+  X <- cbind(intercept = rep(1, 5), x = c(0, 0.5, 1, 1.5, 2))
+  lp <- extract_linpred_univariate(
+    mk_linpred_prep(X, draws, "y ~ 1 + x")
+  )
+  expected <- matrix(rep(0.5 + 2.0 * X[, "x"], each = 4L),
+                       nrow = 4L, ncol = 5L)
+  expect_identical(dim(lp), c(4L, 5L))
+  expect_true(all(abs(lp - expected) < 1e-9))
+})
+
+test_that("extract_linpred_univariate keeps cell-means factor without intercept", {
+  # `y ~ 0 + factor`: per-level indicators; col 1 is NOT all-1s
+  # (only rows with the reference level are 1). Old code's all-1s
+  # check returns FALSE; new code reaches the same branch. This
+  # test guards the path for users writing cell-means formulas.
+  X <- model.matrix(~ 0 + factor(c("a", "b", "c", "a", "b", "c")))
+  draws <- posterior::as_draws_matrix(matrix(
+    c(rep(1, 4L), rep(2, 4L), rep(3, 4L)), nrow = 4L,
+    dimnames = list(NULL, c("b[1]", "b[2]", "b[3]"))
+  ))
+  lp <- extract_linpred_univariate(
+    mk_linpred_prep(X, draws, "y ~ 0 + grp")
+  )
+  expected <- matrix(rep(c(1, 2, 3, 1, 2, 3), each = 4L),
+                       nrow = 4L, ncol = 6L)
+  expect_true(all(abs(lp - expected) < 1e-9))
 })

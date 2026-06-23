@@ -88,6 +88,30 @@ posterior with Pareto Smoothed Importance Sampling (PSIS) and
 only refit when the Pareto-k diagnostic exceeds
 \code{pareto_k_threshold}.
 }
+\examples{
+\donttest{
+set.seed(11)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 80L, trend_model = AR())
+
+mod <- mvgam(
+  y ~ s(x),
+  trend_formula = ~ AR(p = 1),
+  data    = simdat$data_train,
+  family  = poisson(),
+  chains  = 2, silent = 2
+)
+
+# `min_t` sets the first time index from which to predict; here
+# the model starts forecasting at t = 50 and steps forward one
+# observation at a time. Refits only fire when PSIS Pareto-k
+# diagnostic exceeds the threshold.
+lfo <- lfo_cv(mod, min_t = 50L, fc_horizon = 1L,
+               pareto_k_threshold = 0.7)
+sum(lfo$elpds)
+}
+
+}
 \references{
 Paul-Christian Burkner, Jonah Gabry and Aki Vehtari (2020).
 Approximate leave-future-out cross-validation for Bayesian time

@@ -78,8 +78,18 @@ test_that("hindcast.mvgam returns mvgam_forecast with NULL forecast slots", {
     .package = "posterior"
   )
   testthat::local_mocked_bindings(
-    posterior_predict = function(...) matrix(2L, nrow = 3L, ncol = 8L),
-    posterior_epred = function(...) matrix(1, nrow = 3L, ncol = 8L)
+    extract_trend_latent_states = function(...) {
+      matrix(0, nrow = 3L, ncol = 8L)
+    },
+    extract_component_linpred = function(mvgam_fit, newdata,
+                                           component, ...) {
+      matrix(0, nrow = 3L, ncol = nrow(newdata))
+    },
+    predict_single_response = function(object, linpred_resp, resp,
+                                         draw_ids, ndraws, newdata,
+                                         is_multivariate) {
+      matrix(2L, nrow = length(draw_ids), ncol = nrow(newdata))
+    }
   )
   hc <- hindcast(fit, type = "response")
   expect_s3_class(hc, "mvgam_forecast")
@@ -101,21 +111,30 @@ test_that("hindcast.mvgam returns mvgam_forecast with NULL forecast slots", {
 
 test_that("hindcast.mvgam type dispatch flows through expected helpers", {
   fit <- make_hindcast_mock()
+  fit$family$linkinv <- function(eta) eta + 100  # tag the linkinv call
   draws <- make_hindcast_draws(ndraws = 2L)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
     .package = "posterior"
   )
-  # Distinct constant per dispatch arm so we can confirm the
-  # right helper was hit.
+  # Standard families: trend pulled per-draw from stanfit via
+  # extract_trend_latent_states; obs linpred via
+  # extract_component_linpred(component = 'obs'); response sampled
+  # via predict_single_response. Distinct constants per arm so we
+  # can confirm the right helper was hit.
   testthat::local_mocked_bindings(
-    extract_component_linpred = function(mvgam_fit, newdata,
-                                         component, ...) {
-      val <- if (identical(component, "trend")) 7 else 3
-      matrix(val, nrow = 2L, ncol = nrow(newdata))
+    extract_trend_latent_states = function(...) {
+      matrix(7, nrow = 2L, ncol = 8L)
     },
-    posterior_epred = function(...) matrix(11, nrow = 2L, ncol = 8L),
-    posterior_predict = function(...) matrix(13L, nrow = 2L, ncol = 8L)
+    extract_component_linpred = function(mvgam_fit, newdata,
+                                           component, ...) {
+      matrix(3, nrow = 2L, ncol = nrow(newdata))
+    },
+    predict_single_response = function(object, linpred_resp, resp,
+                                         draw_ids, ndraws, newdata,
+                                         is_multivariate) {
+      matrix(13L, nrow = length(draw_ids), ncol = nrow(newdata))
+    }
   )
 
   hc_trend <- hindcast(fit, type = "trend")
@@ -125,7 +144,7 @@ test_that("hindcast.mvgam type dispatch flows through expected helpers", {
   expect_true(all(hc_link$hindcasts[["s1"]] == 7 + 3))
 
   hc_exp <- hindcast(fit, type = "expected")
-  expect_true(all(hc_exp$hindcasts[["s1"]] == 11))
+  expect_true(all(hc_exp$hindcasts[["s1"]] == 100 + 7 + 3))
 
   hc_resp <- hindcast(fit, type = "response")
   expect_true(all(hc_resp$hindcasts[["s1"]] == 13))
@@ -134,19 +153,30 @@ test_that("hindcast.mvgam type dispatch flows through expected helpers", {
 
 test_that("obs_uncertainty = FALSE returns family mean for response", {
   fit <- make_hindcast_mock()
+  fit$family$linkinv <- function(eta) eta + 100
   draws <- make_hindcast_draws(ndraws = 2L)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
     .package = "posterior"
   )
   testthat::local_mocked_bindings(
-    posterior_epred = function(...) matrix(17, nrow = 2L, ncol = 8L),
-    posterior_predict = function(...) matrix(19L, nrow = 2L, ncol = 8L)
+    extract_trend_latent_states = function(...) {
+      matrix(5, nrow = 2L, ncol = 8L)
+    },
+    extract_component_linpred = function(mvgam_fit, newdata,
+                                           component, ...) {
+      matrix(2, nrow = 2L, ncol = nrow(newdata))
+    },
+    predict_single_response = function(...) {
+      stop("predict_single_response should not be called when obs_uncertainty = FALSE")
+    }
   )
   hc <- hindcast(fit, type = "response", obs_uncertainty = FALSE)
-  # obs_uncertainty = FALSE routes "response" through epred,
-  # not posterior_predict.
-  expect_true(all(hc$hindcasts[["s1"]] == 17))
+  # obs_uncertainty = FALSE returns family$linkinv(obs + trend)
+  # without family-RNG noise, matching the fitted-state expected
+  # value at each cell. With linkinv = +100, trend = 5, obs = 2,
+  # the per-cell value is 107.
+  expect_true(all(hc$hindcasts[["s1"]] == 107))
 })
 
 
@@ -162,8 +192,11 @@ test_that("type = 'link' populates family_pars", {
     .package = "posterior"
   )
   testthat::local_mocked_bindings(
+    extract_trend_latent_states = function(...) {
+      matrix(0.1, nrow = 4L, ncol = 8L)
+    },
     extract_component_linpred = function(mvgam_fit, newdata,
-                                         component, ...) {
+                                           component, ...) {
       matrix(0.1, nrow = 4L, ncol = nrow(newdata))
     }
   )
@@ -195,8 +228,19 @@ test_that("ndraws subset yields the requested rows", {
     .package = "posterior"
   )
   testthat::local_mocked_bindings(
-    posterior_predict = function(...) {
-      matrix(seq_len(5L * 8L), nrow = 5L, ncol = 8L)
+    extract_trend_latent_states = function(...) {
+      matrix(0, nrow = 5L, ncol = 8L)
+    },
+    extract_component_linpred = function(mvgam_fit, newdata,
+                                           component, ...) {
+      matrix(0, nrow = 5L, ncol = nrow(newdata))
+    },
+    predict_single_response = function(object, linpred_resp, resp,
+                                         draw_ids, ndraws, newdata,
+                                         is_multivariate) {
+      matrix(seq_len(5L * 8L), nrow = 5L, ncol = 8L)[
+        draw_ids, , drop = FALSE
+      ]
     }
   )
   hc <- hindcast(fit, type = "response", ndraws = 2L)
@@ -212,9 +256,18 @@ test_that("Multi-series hindcast returns one matrix per series", {
     .package = "posterior"
   )
   testthat::local_mocked_bindings(
-    posterior_predict = function(object, newdata, ...) {
-      # 2 draws, 8 columns per series subset.
-      matrix(0L, nrow = 2L, ncol = nrow(newdata))
+    extract_trend_latent_states = function(mvgam_fit, newdata,
+                                             full_draws) {
+      matrix(0, nrow = 2L, ncol = nrow(newdata))
+    },
+    extract_component_linpred = function(mvgam_fit, newdata,
+                                           component, ...) {
+      matrix(0, nrow = 2L, ncol = nrow(newdata))
+    },
+    predict_single_response = function(object, linpred_resp, resp,
+                                         draw_ids, ndraws, newdata,
+                                         is_multivariate) {
+      matrix(0L, nrow = length(draw_ids), ncol = nrow(newdata))
     }
   )
   hc <- hindcast(fit, type = "response")

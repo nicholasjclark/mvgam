@@ -375,3 +375,42 @@ test_that("complete_closure_unit_newdata handles multi-species fits", {
   expect_identical(levels(out$series), levels(stub$data$series))
   expect_identical(as.character(out$series), rep("1", 3L))
 })
+
+test_that("complete_closure_unit_newdata overrides datagrid-pinned time", {
+  # marginaleffects::datagrid() pins `time` at a single typical
+  # value drawn from the training data. On the grid path (visit /
+  # cap missing) the helper must overwrite that pinned `time` so
+  # each row becomes its own closure unit; otherwise psi collapses
+  # to a constant across the prediction grid and conditional_effects
+  # / plot_predictions return a flat curve.
+  stub <- stub_with_family(occ())
+  grid <- data.frame(
+    rowid = 1:5,
+    env   = seq(-2, 2, length.out = 5L),
+    time  = 16L  # pinned by datagrid -- must be overwritten
+  )
+  out <- mvgam:::complete_closure_unit_newdata(stub, grid)
+  expect_identical(out$time, 1:5)
+  expect_identical(out$visit, rep(1L, 5L))
+})
+
+test_that("complete_closure_unit_newdata respects user-supplied long-format newdata", {
+  # The complement to the grid-path overwrite: when the user passes
+  # real long-format data (visit + cap present), the helper must
+  # leave (series, time, visit, cap) untouched. Forecasting and
+  # multi-season fits encode meaningful time labels that we cannot
+  # silently rewrite.
+  stub <- stub_with_family(occ())
+  real <- data.frame(
+    series = factor(rep(1:2, each = 3L), levels = c("1", "2")),
+    time   = c(7L, 7L, 7L, 8L, 8L, 8L),  # non-1:n on purpose
+    visit  = rep(1:3, 2L),
+    y      = c(1L, 0L, 1L, 0L, 1L, 0L),
+    cap    = rep(3L, 6L),
+    env    = rnorm(6L)
+  )
+  out <- mvgam:::complete_closure_unit_newdata(stub, real)
+  expect_identical(out$time, real$time)
+  expect_identical(out$visit, real$visit)
+  expect_identical(out$cap, real$cap)
+})

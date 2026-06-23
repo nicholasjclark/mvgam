@@ -73,17 +73,20 @@ computed) model weights. Mirrors
 }
 \examples{
 \donttest{
-sim <- sim_mvgam(family = gaussian())
-mod_a <- mvgam(y ~ s(season, bs = "cc"), trend_model = AR(),
-               data = sim$data_train, family = gaussian(),
-               chains = 1, silent = 2)
-mod_b <- mvgam(y ~ s(season, bs = "cc", k = 6),
-               trend_model = AR(),
-               data = sim$data_train, family = gaussian(),
-               chains = 1, silent = 2)
-avg <- posterior_average(mod_a, mod_b, weights = "stacking")
-head(avg)
-attr(avg, "weights")
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
+mod1 <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+               data    = simdat$data_train, family = poisson(),
+               chains  = 2, silent = 2)
+mod2 <- mvgam(y ~ 1,    trend_formula = ~ AR(p = 1),
+               data    = simdat$data_train, family = poisson(),
+               chains  = 2, silent = 2)
+
+# 50:50 average of one trend parameter across the two fits.
+pa <- posterior_average(mod1, mod2, variable = "ar1_trend[1]",
+                         weights = c(0.5, 0.5))
+summary(pa)
 }
 
 }

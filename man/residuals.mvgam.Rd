@@ -201,31 +201,20 @@ envelopes rather than the analytic line in that regime.
 
 \examples{
 \donttest{
-simdat <- sim_mvgam(n_series = 1L, trend_model = AR())
-mod <- mvgam(
-  y ~ s(season, bs = "cc"),
-  trend_formula = ~ AR(),
-  noncentred = TRUE,
-  data = simdat$data_train,
-  chains = 2L,
-  silent = 2L
-)
-resids <- residuals(mod)
-str(resids)
-}
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
 
-\dontrun{
-# Closure-unit families: residuals collapse to the per-unit
-# grain (one row per site x season), using the per-unit sum
-# as the summary statistic for the empirical PIT.
-occ_fit <- mvgam(bf(y ~ elev, p ~ tod), family = occ(),
-                 data = closure_unit_data)
-rs <- residuals(occ_fit)
-nrow(rs) # one row per closure unit
-# Pair with the per-visit posterior_predict draws when
-# within-unit prediction detail is needed.
-yrep_visit <- posterior_predict(occ_fit)
-dim(yrep_visit) # [ndraws x n_visit]
+mod <- mvgam(y ~ s(x),
+              trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
+
+# Randomised quantile residuals on the response scale.
+# Summarised columns are Estimate, Est.Error, Q2.5, Q97.5.
+r <- residuals(mod)
+head(r)
 }
 
 }

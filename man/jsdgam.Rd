@@ -68,9 +68,26 @@ Hmsc-style wide \verb{[J, N]} species-composition matrix.}
 
 \item{newdata}{Optional test-set \code{data.frame} persisted on the
 fit as \code{object$test_data}. Used by \code{plot(fit, type = "series")}
-to overlay the test arm without re-passing the data. Not fed
-to Stan at fit time — supply it to \code{posterior_predict()} /
-\code{forecast()} for out-of-sample evaluation.}
+to overlay the test arm without re-passing the data. This is
+a deliberate change from earlier mvgam releases: passing
+\code{newdata} to \code{mvgam()} no longer emits Stan generated-quantities
+forecasts at fit time. Keeping forecasting out of Stan keeps
+the fit object small and the sampler fast, and means downstream
+methods can choose their own newdata. To use the persisted
+data downstream, re-pass it through the relevant method.
+\code{forecast()} and \code{posterior_predict()} answer different
+questions:
+\itemize{
+\item \code{forecast(mod, newdata = mod$test_data)} propagates the
+fitted latent state forward in time per posterior draw, so
+future predictions extrapolate the actual trajectory.
+\item \code{posterior_predict(mod, newdata = mod$test_data)}
+marginalises over the trend's stochastic dynamics by Monte
+Carlo at the supplied design points and ignores the fitted
+trajectory's position relative to training time.
+}
+Use \code{forecast()} for time-series forecasting and
+\code{posterior_predict()} for marginal predictive checks.}
 
 \item{family}{A \code{family} object specifying the observation
 distribution. Supported families are documented in
@@ -100,8 +117,8 @@ mvgam models.}
 \item{share_obs_params}{Logical. Forwarded to \code{mvgam}.}
 
 \item{priors}{Optional \code{data.frame} or \code{brmsprior} vector with
-prior overrides. See \verb{[get_mvgam_priors]} and \verb{[brms::prior()]}
-for the conventions.}
+prior overrides. See \code{\link[=default_prior.mvgam_formula]{default_prior.mvgam_formula()}} and
+\code{\link[brms:set_prior]{brms::prior()}} for the conventions.}
 
 \item{n_lv}{\code{integer}. Number of latent factors to use for
 modelling residual associations. Must be \verb{>= 1}. Defaults to
@@ -220,74 +237,50 @@ or GP terms of \code{factor_formula} to fit per-latent-factor smooths
 }
 \examples{
 \donttest{
-# Basic JSDM on the Portal Data captures, two latent factors,
-# Poisson observation family. Use `residual_cor()` to summarise
-# the implied species covariance and `ordinate()` to build the
-# biplot.
+# Simulate a small closure-unit JSDM: 4 species, 50 sites,
+# 4 visits, env + elev site covariates, tod_c + effort visit
+# covariates. Recipe 2L gives both state-level and detection-
+# level covariates.
+set.seed(1)
+simdat <- sim_closure_unit_data(
+  family    = occ(),
+  n_species = 4L,
+  n_sites   = 50L,
+  n_visits  = 4L,
+  type      = 2L
+)
+
+# Fit a joint occupancy model: env on the occupancy linear
+# predictor, tod_c on the detection sub-formula, two latent
+# factors capturing residual species-species covariation.
 mod <- jsdgam(
-  formula = captures ~ ndvi_ma12:series + mintemp:series +
-                       gp(time, k = 15),
+  formula        = bf(y ~ env, p ~ tod_c),
   factor_formula = ~ -1,
-  data = portal_data, unit = time, species = series,
-  family = poisson(), n_lv = 2,
-  chains = 2, silent = 2
-)
-plot(residual_cor(mod))
-ordinate(mod, alpha = 0.7)
-
-# Constrained ordination: one spatial Gaussian process per latent
-# factor via `by = lv_axis()`. Each factor expresses a different
-# spatial gradient, and the species loadings on each factor show
-# which species respond similarly to that gradient.
-mod_constrained <- jsdgam(
-  formula = count ~ s(species, bs = "re", by = temperature),
-  factor_formula = ~ gp(lon, lat, k = 6, by = lv_axis()) - 1,
-  data = portal_data, unit = site, species = species,
-  family = poisson(), n_lv = 3,
-  chains = 2, silent = 2
+  data           = simdat$data_train,
+  family         = occ(),
+  n_lv           = 2L,
+  chains         = 2,
+  silent         = 2
 )
 
-# Trait- and phylogeny-informed loadings prior. Pass a per-species
-# trait data.frame to `traits` and an `ape::phylo` (or pre-computed
-# distance matrix) to `phylo`; the wrapper threads both into the
-# structured Heaps & Jermyn (2024) `loadings_prior` spec.
-mod_traits <- jsdgam(
-  formula = y ~ env,
-  factor_formula = ~ -1,
-  data = my_data, unit = site, species = species,
-  family = bernoulli(), n_lv = 2,
-  traits = trait_df,
-  phylo = species_tree,
-  chains = 2, silent = 2
-)
+# `include_betas = FALSE` keeps the printed summary readable
+# when the model carries many smooth coefficients.
+summary(mod, include_betas = FALSE)
 
-# Hmsc-style trait-mediated environmental slopes ("fourth corner").
-# `trait_slopes` rewrites the obs formula into a brms non-linear
-# form where each fixed slope is regressed on the supplied traits
-# plus a species-level random deviation. The trait column must be
-# in `data` and constant within species (one value per species
-# level). The headline coefficient is `b_b1_trait1` -- the slope
-# of species' env response on trait1.
-mod_fourth_corner <- jsdgam(
-  formula = y ~ env,
-  factor_formula = ~ -1,
-  data = my_data, unit = site, species = species,
-  family = gaussian(), n_lv = 2,
-  trait_slopes = ~ trait1,
-  chains = 2, silent = 2
-)
-summary(mod_fourth_corner)
-conditional_effects(mod_fourth_corner)
+# Marginal env effect on the response (occupancy * detection)
+# scale. Pass `type = "link"` for the logit-occupancy scale,
+# which often reads more cleanly for ecologists used to
+# discussing logit psi directly.
+conditional_effects(mod)
 
-# Methods-section helpers. `how_to_cite()` returns the prose
-# paragraph for a paper; `methods_md()` returns the matching
-# math statement of the model (joint Dirichlet / MVNormal /
-# multinomial likelihood when used, latent factor
-# decomposition, structured loadings prior, sampler config)
-# as Markdown + LaTeX.
-how_to_cite(mod)
-cat(methods_md(mod))
+# Inspect the implied residual species-species correlations.
+residual_cor(mod)
+
+# Two-factor ordination biplot. Site scores in latent space
+# plus species loading arrows.
+ordinate(mod, rotation = "varimax")
 }
+
 }
 \references{
 Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,

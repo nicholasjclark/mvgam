@@ -76,6 +76,32 @@ fitting is the natural way to read off the
 factor-implied covariance posterior.
 }
 
+\examples{
+\donttest{
+set.seed(1)
+simdat <- sim_closure_unit_data(
+  family    = occ(),
+  n_species = 4L,
+  n_sites   = 50L,
+  n_visits  = 4L,
+  type      = 2L
+)
+mod <- jsdgam(
+  formula        = bf(y ~ env, p ~ tod_c),
+  factor_formula = ~ -1,
+  data           = simdat$data_train,
+  family         = occ(),
+  n_lv           = 2L,
+  chains         = 2,
+  silent         = 2
+)
+
+# Posterior summary of the Z Z' shared-variation matrix
+# (the implied species-by-species residual covariance).
+shared_variation(mod)
+}
+
+}
 \references{
 Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
 distributions for the covariance matrix in latent factor

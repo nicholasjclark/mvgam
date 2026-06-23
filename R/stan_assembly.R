@@ -160,19 +160,6 @@ apply_suffix_to_stan_code <- function(stan_code, patterns, suffix) {
 #' trend components. For multivariate models, processes each response
 #' separately and applies response-specific parameter naming.
 #'
-#' @examples
-#' # Setup observation and trend components
-#' obs_setup <- setup_brms_lightweight(y ~ x, data = dat)
-#' trend_specs <- parse_multivariate_trends(y ~ x, ~ AR(p = 1))
-#'
-#' # Generate combined Stan code
-#' result <- generate_combined_stancode(obs_setup, NULL, trend_specs)
-#'
-#' # With custom priors
-#' priors <- get_prior(y ~ x, trend_formula = ~ AR(p = 1), data = dat)
-#' result <- generate_combined_stancode(obs_setup, NULL, trend_specs,
-#'                                      prior = priors)
-#'
 #' @noRd
 generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
                                       trend_specs = NULL, prior = NULL,
@@ -1679,23 +1666,6 @@ handle_nonlinear_trend_injection <- function(code_lines, block_info,
 #' The function handles both univariate and multivariate cases by detecting
 #' response suffixes in mapping array names (e.g., "_y1", "_count") and
 #' generating appropriately named variables.
-#'
-#' @examples
-#' \dontrun{
-#' # Univariate case
-#' mapping_arrays <- list(
-#'   time_arrays = "obs_trend_time",
-#'   series_arrays = "obs_trend_series"
-#' )
-#' code_lines <- generate_trend_injection_code(mapping_arrays)
-#'
-#' # Multivariate case
-#' mapping_arrays <- list(
-#'   time_arrays = c("obs_trend_time_count", "obs_trend_time_biomass"),
-#'   series_arrays = c("obs_trend_series_count", "obs_trend_series_biomass")
-#' )
-#' code_lines <- generate_trend_injection_code(mapping_arrays)
-#' }
 #'
 #' @noRd
 generate_trend_injection_code <- function(mapping_arrays) {
@@ -3898,17 +3868,6 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
 #'   \item Computation: transformed parameters for trend extraction
 #' }
 #'
-#' @examples
-#' # Basic RW trend
-#' trend_specs <- list(n_lv = 1, ma = FALSE)
-#' data_info <- list(n_series = 3, n_time = 100)
-#' stanvars <- generate_rw_trend_stanvars(trend_specs, data_info)
-#'
-#' # Factor model RW with custom priors
-#' trend_specs <- list(n_lv = 2, ma = FALSE)
-#' priors <- get_prior(y ~ x, trend_formula = ~ RW(), data = dat)
-#' stanvars <- generate_rw_trend_stanvars(trend_specs, data_info, prior = priors)
-#'
 #' @noRd
 generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Input validation
@@ -4247,21 +4206,6 @@ build_plain_ar_stanvars <- function(ar_lags, coef_sharing, prior = NULL) {
 #'
 #' Prior specifications use the _trend suffix convention for parameter matching.
 #'
-#' @examples
-#' # Standard AR(2) model
-#' trend_specs <- list(lags = 2, n_lv = 1)
-#' data_info <- list(n_obs = 100, n_series = 3, n_time = 100)
-#' stanvars <- generate_ar_trend_stanvars(trend_specs, data_info)
-#'
-#' # Factor model AR with custom priors
-#' trend_specs <- list(lags = 1, n_lv = 2, ma = FALSE)
-#' priors <- get_prior(y ~ x, trend_formula = ~ AR(p = 1), data = dat)
-#' stanvars <- generate_ar_trend_stanvars(trend_specs, data_info, prior = priors)
-#'
-#' # Seasonal AR with non-standard lags
-#' trend_specs <- list(ar_lags = c(1, 12), n_lv = 1)
-#' stanvars <- generate_ar_trend_stanvars(trend_specs, data_info, prior = priors)
-#'
 #' @noRd
 generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Input validation
@@ -4439,26 +4383,6 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 #'
 #' VAR models require careful prior specification due to high dimensionality.
 #' The _trend suffix convention applies to all VAR parameters.
-#'
-#' @examples
-#' # Standard VAR(2) model
-#' trend_specs <- list(lags = 2, n_lv = 3)
-#' data_info <- list(n_obs = 100, n_series = 3, n_time = 100)
-#' stanvars <- generate_var_trend_stanvars(trend_specs, data_info)
-#'
-#' # VARMA(2,1) model 
-#' trend_specs <- list(lags = 2, ma_lags = 1, n_lv = 3)
-#' data_info <- list(n_obs = 100, n_series = 3, n_time = 100)
-#' stanvars <- generate_var_trend_stanvars(trend_specs, data_info)
-#'
-#' # Factor model VAR with custom priors
-#' trend_specs <- list(lags = 1, n_lv = 2)
-#' priors <- get_prior(cbind(y1, y2, y3) ~ x, trend_formula = ~ VAR(p = 1), data = dat)
-#' stanvars <- generate_var_trend_stanvars(trend_specs, data_info, prior = priors)
-#'
-#' # Hierarchical VAR with grouping
-#' trend_specs <- list(lags = 1, n_lv = 3, gr = "site")
-#' stanvars <- generate_var_trend_stanvars(trend_specs, data_info, prior = priors)
 #'
 #' @noRd
 generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
@@ -5086,7 +5010,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       init_trend ~ multi_normal(mu_init_trend, Omega_trend);
 
       // Conditional means for VARMA dynamics
-      vector[N_lv_trend] mu_t_trend[N_time_trend];
+      array[N_time_trend] vector[N_lv_trend] mu_t_trend;
 
       // Compute conditional means for all time points
       for (t in 1:N_time_trend) {{
@@ -5334,16 +5258,6 @@ calculate_car_time_distances <- function(data_info) {
 #' The ar1_trend parameter in CAR models represents the damping coefficient
 #' in continuous time, distinct from discrete-time AR(1) coefficients.
 #'
-#' @examples
-#' # Standard CAR trend
-#' trend_specs <- list(n_lv = 3)  # Must equal n_series
-#' data_info <- list(n_obs = 100, n_series = 3, n_time = 100)
-#' stanvars <- generate_car_trend_stanvars(trend_specs, data_info)
-#'
-#' # CAR with custom priors
-#' priors <- get_prior(cbind(y1, y2, y3) ~ x, trend_formula = ~ CAR(), data = dat)
-#' stanvars <- generate_car_trend_stanvars(trend_specs, data_info, prior = priors)
-#'
 #' @noRd
 generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Input validation
@@ -5523,21 +5437,6 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 #' ZMVN trends use minimal prior specifications as they represent unstructured
 #' variation. The _trend suffix convention applies to variance parameters.
 #'
-#' @examples
-#' # Standard ZMVN trend
-#' trend_specs <- list(n_lv = 3)
-#' data_info <- list(n_obs = 100, n_series = 3, n_time = 100)
-#' stanvars <- generate_zmvn_trend_stanvars(trend_specs, data_info)
-#'
-#' # Factor model ZMVN with custom priors
-#' trend_specs <- list(n_lv = 2)  # n_lv < n_series
-#' priors <- get_prior(cbind(y1, y2, y3) ~ x, trend_formula = ~ ZMVN(), data = dat)
-#' stanvars <- generate_zmvn_trend_stanvars(trend_specs, data_info, prior = priors)
-#'
-#' # Hierarchical ZMVN with grouping
-#' trend_specs <- list(n_lv = 3, gr = "site")
-#' stanvars <- generate_zmvn_trend_stanvars(trend_specs, data_info, prior = priors)
-#'
 #' @noRd
 generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Input validation
@@ -5670,20 +5569,6 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 #'
 #' The _trend suffix convention applies to all PW parameters for consistency
 #' with other trend types in mvgam.
-#'
-#' @examples
-#' # Linear piecewise trend
-#' trend_specs <- list(n_changepoints = 5, changepoint_scale = 0.1, type = "linear")
-#' data_info <- list(n_obs = 100, n_series = 2, n_time = 100)
-#' stanvars <- generate_pw_trend_stanvars(trend_specs, data_info)
-#'
-#' # Logistic piecewise with custom priors
-#' priors <- get_prior(y ~ x, trend_formula = ~ PW(n_changepoints = 10), data = dat)
-#' stanvars <- generate_pw_trend_stanvars(trend_specs, data_info,
-#'                                        growth = "logistic", prior = priors)
-#'
-#' # Override growth pattern
-#' stanvars <- generate_pw_trend_stanvars(trend_specs, data_info, growth = "linear")
 #'
 # Internal: read the user-supplied `cap` column from training
 # data and reshape to the `[n_time, n_series]` matrix Stan
@@ -6626,12 +6511,6 @@ should_include_in_transformed_parameters <- function(declaration) {
 #'
 #' @param declaration Character string containing a Stan variable declaration
 #' @return Character vector of variable names this declaration depends on
-#' @examples
-#' \dontrun{
-#' # Example declaration: "vector\[Nsubgp_1\] gp_pred_1 = Xgp_1 * rgp_1;"
-#' # Returns: c("Nsubgp_1", "Xgp_1", "rgp_1")
-#' extract_dependencies_from_declaration(declaration)
-#' }
 #' @noRd
 extract_dependencies_from_declaration <- function(declaration) {
   checkmate::assert_string(declaration)
@@ -6672,12 +6551,6 @@ extract_dependencies_from_declaration <- function(declaration) {
 #' @param stancode Character string containing complete Stan model code
 #' @param referenced_vars Character vector of variable names to find declarations for
 #' @return Character vector of variable declaration lines in dependency order
-#' @examples
-#' \dontrun{
-#' # When searching for gp_pred_1, will also find rgp_1 declaration
-#' declarations <- find_variable_declarations(stan_code, c("gp_pred_1"))
-#' # Returns both: rgp_1 declaration and gp_pred_1 declaration
-#' }
 #' @noRd
 find_variable_declarations <- function(stancode, referenced_vars,
                                     search_blocks = c("data", "transformed data", "parameters", "transformed parameters", "model"),
@@ -6784,13 +6657,6 @@ find_variable_declarations <- function(stancode, referenced_vars,
 #' @param variable_mapping Named list mapping original variable names to renamed versions (original -> renamed_trend)
 #' @param time_param Character string specifying time dimension parameter name (default: "N_time_trend")
 #' @return Character vector of Stan code lines for mu_trend construction
-#' @examples
-#' \dontrun{
-#' mu_exprs <- c("mu += Intercept + gp_pred_1\[Jgp_1\];")
-#' support_decls <- c("vector\[Nsubgp_1\] gp_pred_1 = gp_exp_quad(Xgp_1, sdgp_1, lscale_1, zgp_1);")
-#' var_map <- list("Intercept" = "Intercept_trend", "gp_pred_1" = "gp_pred_1_trend", "Jgp_1" = "Jgp_1_trend")
-#' reconstruct_mu_trend_with_renamed_vars(mu_exprs, support_decls, var_map)
-#' }
 #' @noRd
 reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_declarations, variable_mapping, time_param = "N_time_trend") {
   # Enhanced validation following project standards

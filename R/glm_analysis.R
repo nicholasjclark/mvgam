@@ -25,12 +25,6 @@ NULL
 #'     \item response_mapping - Mapping between responses and GLM usage
 #'   }
 #'
-#' @examples
-#' \dontrun{
-#' stan_code <- "model { target += poisson_log_glm_lpmf(Y | X, alpha, beta); }"
-#' analysis <- analyze_stan(stan_code)
-#' }
-#'
 #' @noRd
 analyze_stan <- function(stan_code, response_names = NULL, trend_info = NULL) {
   checkmate::assert_character(stan_code, len = 1)
@@ -1011,13 +1005,6 @@ inject_trend_effects_linear <- function(stan_code, trend_injection_code) {
 #'
 #' @return New "processing_state" object with transition and operation logged
 #'
-#' @examples
-#' \dontrun{
-#' state <- transition_with_tracking(state, "analyzed", "glm_analysis",
-#'                                  list(patterns = 3),
-#'                                  list(analysis = analysis_result))
-#' }
-#'
 #' @noRd
 transition_with_tracking <- function(state, new_stage, operation,
                                    details = list(), modifications = list()) {
@@ -1078,13 +1065,6 @@ transition_with_tracking <- function(state, new_stage, operation,
 #' @param details List with additional operation details (optional)
 #'
 #' @return New "processing_state" object with operation logged
-#'
-#' @examples
-#' \dontrun{
-#' state <- processing_state(code_lines)
-#' state <- track_operations(state, "glm_analysis",
-#'                          list(patterns_found = 3))
-#' }
 #'
 #' @noRd
 track_operations <- function(state, operation, details = list()) {
@@ -1194,12 +1174,6 @@ update_model_block_positions <- function(model_block, conversion_result) {
 #' @param trend_info List containing trend information (optional)
 #'
 #' @return Character string containing processed Stan code
-#'
-#' @examples
-#' \dontrun{
-#' stan_code <- "model { target += poisson_log_glm_lpmf(Y | X, alpha, beta); }"
-#' processed <- transform_glm_code(stan_code, "mu += trend;")
-#' }
 #'
 #' @noRd
 transform_glm_code <- function(stan_code, trend_injection_code, response_names = NULL, trend_info = NULL) {

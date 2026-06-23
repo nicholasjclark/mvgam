@@ -117,12 +117,16 @@ series-time cell; the trend dynamics follow \code{trend_model}
 \code{cor = TRUE} or \code{VAR()}).
 }
 \examples{
-\donttest{
-sim <- sim_mvgam(type = 1, family = gaussian(),
-                 n_timepoints = 60, seed = 1)
-head(sim$data_train)
-str(sim$true_smooths)
-}
+# Three Poisson series with an AR(1) latent trend.
+set.seed(0)
+simdat <- sim_mvgam(
+  family       = poisson(),
+  n_series     = 3L,
+  n_timepoints = 60L,
+  trend_model  = AR()
+)
+head(simdat$data_train)
+summary(simdat)
 
 }
 \seealso{

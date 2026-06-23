@@ -32,16 +32,6 @@
 #' @seealso [brms::posterior_interval.brmsfit()],
 #'   [as.matrix.mvgam()], [predictive_interval.mvgam()].
 #'
-#' @examples
-#' \donttest{
-#' sim <- sim_mvgam(family = gaussian())
-#' mod <- mvgam(y ~ s(season, bs = "cc"), trend_model = AR(),
-#'              data = sim$data_train, family = gaussian(),
-#'              chains = 2, silent = 2)
-#' posterior_interval(mod)
-#' posterior_interval(mod, prob = 0.5)
-#' }
-#'
 #' @method posterior_interval mvgam
 #' @export
 posterior_interval.mvgam <- function(object, pars = NA,
@@ -82,15 +72,6 @@ rstantools::posterior_interval
 #' @seealso [brms::predictive_interval.brmsfit()],
 #'   [posterior_predict.mvgam()], [posterior_interval.mvgam()].
 #'
-#' @examples
-#' \donttest{
-#' sim <- sim_mvgam(family = gaussian())
-#' mod <- mvgam(y ~ s(season, bs = "cc"), trend_model = AR(),
-#'              data = sim$data_train, family = gaussian(),
-#'              chains = 2, silent = 2)
-#' predictive_interval(mod)
-#' }
-#'
 #' @method predictive_interval mvgam
 #' @export
 predictive_interval.mvgam <- function(object, prob = 0.9, ...) {
@@ -104,6 +85,73 @@ predictive_interval.mvgam <- function(object, prob = 0.9, ...) {
 #' @importFrom rstantools predictive_interval
 #' @export
 rstantools::predictive_interval
+
+
+#' Test posterior hypotheses on a fitted \pkg{mvgam} model
+#'
+#' Wraps [brms::hypothesis()] so it works on `mvgam` fits.
+#' `brms::hypothesis.brmsfit` is the default dispatch (mvgam is
+#' a `brmsfit` subclass), but its internal helpers expect a
+#' brmsfit-shaped Stan stancode / data layout that mvgam does
+#' not store, so the brms-fit method raises an `rbind` error on
+#' an mvgam object. This wrapper bypasses that path: it pulls
+#' posterior draws via [posterior::as_draws_df()] and forwards
+#' them to `brms::hypothesis.default`, which evaluates the
+#' hypothesis string against the draws data frame directly.
+#'
+#' @param x A fitted `mvgam` object.
+#' @param hypothesis Character vector of hypothesis strings.
+#'   Each string uses the standard `brms::hypothesis` grammar
+#'   (e.g. `"ar1_trend[1] > 0"`, `"sigma_trend[1] < 1"`,
+#'   `"(b_x - b_z) = 0"`).
+#' @param alpha One minus the credible-interval mass. Defaults
+#'   to `0.05` (90%-CI for one-sided, 95%-CI for two-sided).
+#' @param robust Logical. Use median / MAD instead of mean / SD
+#'   when summarising. Defaults to `FALSE`.
+#' @param ... Forwarded to `brms::hypothesis`.
+#'
+#' @return A `brmshypothesis` object. See [brms::hypothesis()].
+#'
+#' @author Nicholas J Clark
+#'
+#' @seealso [brms::hypothesis()], [posterior::as_draws_df()],
+#'   [variables.mvgam()].
+#'
+#' @examples
+#' \donttest{
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 60L, trend_model = AR())
+#'
+#' mod <- mvgam(y ~ s(x),
+#'               trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
+#'
+#' # Single hypothesis.
+#' hypothesis(mod, "ar1_trend[1] > 0")
+#'
+#' # Multiple hypotheses in one call.
+#' hypothesis(mod, c("ar1_trend[1] > 0",
+#'                    "sigma_trend[1] < 1"))
+#' }
+#'
+#' @importFrom brms hypothesis
+#' @export hypothesis
+#' @method hypothesis mvgam
+#' @export
+hypothesis.mvgam <- function(x, hypothesis, alpha = 0.05,
+                              robust = FALSE, ...) {
+  checkmate::assert_class(x, "mvgam")
+  checkmate::assert_character(hypothesis, min.len = 1L,
+                                any.missing = FALSE)
+  checkmate::assert_number(alpha, lower = 0, upper = 1)
+  checkmate::assert_flag(robust)
+  draws <- as.data.frame(posterior::as_draws_df(x$fit))
+  brms::hypothesis(draws, hypothesis = hypothesis,
+                    alpha = alpha, robust = robust, ...)
+}
 
 
 #' Number of levels per grouping factor in a fitted
@@ -124,19 +172,6 @@ rstantools::predictive_interval
 #'
 #' @seealso [brms::ngrps.brmsfit()], [ranef.mvgam()],
 #'   [VarCorr.mvgam()].
-#'
-#' @examples
-#' \donttest{
-#' set.seed(1)
-#' sim <- sim_mvgam(family = gaussian())
-#' sim$data_train$grp <- factor(sample(letters[1:4],
-#'                                     NROW(sim$data_train),
-#'                                     replace = TRUE))
-#' mod <- mvgam(y ~ 1 + (1 | grp), trend_model = AR(),
-#'              data = sim$data_train, family = gaussian(),
-#'              chains = 2, silent = 2)
-#' ngrps(mod)
-#' }
 #'
 #' @method ngrps mvgam
 #' @export
@@ -180,16 +215,6 @@ brms::ngrps
 #'
 #' @seealso [brms::predictive_error.brmsfit()],
 #'   [posterior_predict.mvgam()], [posterior_epred.mvgam()].
-#'
-#' @examples
-#' \donttest{
-#' sim <- sim_mvgam(family = gaussian())
-#' mod <- mvgam(y ~ s(season, bs = "cc"), trend_model = AR(),
-#'              data = sim$data_train, family = gaussian(),
-#'              chains = 2, silent = 2)
-#' err <- predictive_error(mod)
-#' dim(err)
-#' }
 #'
 #' @method predictive_error mvgam
 #' @export
@@ -253,194 +278,14 @@ predictive_error.mvgam <- function(object, newdata = NULL,
 rstantools::predictive_error
 
 
-# ------------------------------------------------------------------
-# Deprecated brms aliases retained for back-compat
-# ------------------------------------------------------------------
-
-
-#' Deprecated brms aliases on a fitted \pkg{mvgam} model
-#'
-#' Thin wrappers that dispatch a deprecated brms generic name to
-#' its current mvgam method, so brms-trained users do not see
-#' "no applicable method" errors when they reach for legacy
-#' names. For the four generics that brms itself has deprecated
-#' (`marginal_smooths`, `marginal_effects`, `parnames`,
-#' `nsamples`), the brms generic emits the one-time deprecation
-#' warning and the mvgam method just forwards the call.
-#' `as.mcmc.mvgam` mirrors `brms::as.mcmc.brmsfit` — both are
-#' deprecated and emit their own one-time warning recommending
-#' `posterior::as_draws_array()` or `as.array(x)` for newer
-#' tooling. It converts the posterior draws (with the standard
-#' brms-style alias map applied to column names) to a
-#' [coda::mcmc.list()] (default) or single [coda::mcmc()] for
-#' downstream coda-based diagnostics. Requires the \pkg{coda}
-#' package (suggested dependency).
-#'
-#' * `marginal_smooths.mvgam` -> [conditional_smooths.mvgam()]
-#' * `marginal_effects.mvgam` -> [conditional_effects.mvgam()]
-#' * `parnames.mvgam` -> [variables.mvgam()]
-#' * `nsamples.mvgam` -> [posterior::ndraws()]
-#' * `as.mcmc.mvgam` -> [coda::mcmc.list()]
-#'
-#' @param x,object A fitted `mvgam` object.
-#' @param ... Forwarded to the current method.
-#'
-#' @return Shape depends on the method (see the brms equivalent
-#'   for `marginal_smooths` / `marginal_effects` / `parnames` /
-#'   `nsamples`). `as.mcmc.mvgam` returns a [coda::mcmc.list()]
-#'   when `combine_chains = FALSE` (default) and a single
-#'   [coda::mcmc()] when `combine_chains = TRUE`.
-#'
-#' @author Nicholas J Clark
-#'
-#' @seealso [posterior::as_draws_array()], [as.array.mvgam()],
-#'   [variables.mvgam()].
-#'
-#' @name mvgam_brms_deprecated
-NULL
-
-
-#' @rdname mvgam_brms_deprecated
-#' @method marginal_smooths mvgam
-#' @export
-marginal_smooths.mvgam <- function(x, ...) {
-  conditional_smooths(x, ...)
-}
-
-
-#' @importFrom brms marginal_smooths
-#' @export
-brms::marginal_smooths
-
-
-#' @rdname mvgam_brms_deprecated
-#' @method marginal_effects mvgam
-#' @export
-marginal_effects.mvgam <- function(x, ...) {
-  conditional_effects(x, ...)
-}
-
-
-#' @importFrom brms marginal_effects
-#' @export
-brms::marginal_effects
-
-
-#' @rdname mvgam_brms_deprecated
-#' @method parnames mvgam
-#' @export
-parnames.mvgam <- function(x, ...) {
-  variables(x, ...)
-}
-
-
-#' @importFrom brms parnames
-#' @export
-brms::parnames
-
-
-#' @rdname mvgam_brms_deprecated
-#' @method nsamples mvgam
-#' @export
-nsamples.mvgam <- function(object, ...) {
-  posterior::ndraws(posterior::as_draws(object$fit))
-}
-
-
-#' @importFrom brms nsamples
-#' @export
-brms::nsamples
-
-
-#' @rdname mvgam_brms_deprecated
-#' @param pars Optional character vector of parameter names to
-#'   include. `NA` (the default) keeps all parameters. With
-#'   `fixed = FALSE` each entry is treated as a regular expression
-#'   and any matching parameter is kept; with `fixed = TRUE` only
-#'   exact matches are kept.
-#' @param fixed Logical. If `TRUE`, treat `pars` as exact names
-#'   rather than regular expressions.
-#' @param combine_chains Logical. If `TRUE`, return a single
-#'   [coda::mcmc()] object stacking all chains; otherwise return
-#'   a [coda::mcmc.list()] with one element per chain (the
-#'   default).
-#' @param inc_warmup Logical. If `TRUE`, include warmup draws.
-#'   Defaults to `FALSE`.
-#' @method as.mcmc mvgam
-#' @export
-as.mcmc.mvgam <- function(x, pars = NA, fixed = FALSE,
-                           combine_chains = FALSE,
-                           inc_warmup = FALSE, ...) {
-  checkmate::assert_class(x, "mvgam")
-  checkmate::assert_logical(fixed, len = 1L)
-  checkmate::assert_logical(combine_chains, len = 1L)
-  checkmate::assert_logical(inc_warmup, len = 1L)
-  insight::check_if_installed(
-    "coda",
-    reason = "to convert an 'mvgam' fit to a 'coda::mcmc.list' object"
-  )
-  warning(
-    "'as.mcmc.mvgam' is deprecated; prefer ",
-    "'posterior::as_draws_array(x)' or 'as.array(x)' for ",
-    "downstream tooling that accepts the 'posterior' draws ",
-    "format.",
-    call. = FALSE
-  )
-  # Route through `as_draws_array.mvgam` so the brms-style alias
-  # map (e.g. `b[1] -> b_Intercept`, `bs[k] -> bs_<colname>`,
-  # `r_<id>[lvl, coef] -> r_<group>[<level>, <coef>]`) is applied
-  # before any `pars` filtering or downstream consumers see the
-  # column names.
-  drws <- as_draws_array(x, inc_warmup = inc_warmup)
-  all_vars <- posterior::variables(drws)
-  if (!identical(pars, NA) && !is.null(pars)) {
-    checkmate::assert_character(pars, min.len = 1L)
-    if (isTRUE(fixed)) {
-      kept <- intersect(pars, all_vars)
-    } else {
-      kept <- unique(unlist(lapply(pars, function(p) {
-        grep(p, all_vars, value = TRUE)
-      })))
-    }
-    if (length(kept) == 0L) {
-      stop(insight::format_error(c(
-        "No parameters matched 'pars'.",
-        x = paste0(
-          "Requested: ",
-          paste0("'", pars, "'", collapse = ", "), "."
-        ),
-        i = "Use 'variables(x)' to see available names."
-      )))
-    }
-    drws <- posterior::subset_draws(drws, variable = kept)
-  }
-  if (isTRUE(combine_chains)) {
-    mat <- as.matrix(posterior::as_draws_matrix(drws))
-    attr(mat, "mcpar") <- c(1L, nrow(mat), 1L)
-    class(mat) <- "mcmc"
-    return(mat)
-  }
-  n_chains <- posterior::nchains(drws)
-  n_iter <- posterior::niterations(drws)
-  vars <- posterior::variables(drws)
-  per_chain <- lapply(seq_len(n_chains), function(ch) {
-    chain_slice <- drws[, ch, , drop = FALSE]
-    mat <- matrix(
-      as.numeric(chain_slice),
-      nrow = n_iter, ncol = length(vars),
-      dimnames = list(NULL, vars)
-    )
-    attr(mat, "mcpar") <- c(1L, n_iter, 1L)
-    class(mat) <- "mcmc"
-    mat
-  })
-  coda::as.mcmc.list(per_chain)
-}
-
-
-#' @importFrom coda as.mcmc
-#' @export
-coda::as.mcmc
+# Deprecated brms aliases (marginal_smooths / marginal_effects /
+# parnames / nsamples / as.mcmc) were dropped. brms itself
+# deprecated the first four; the modern replacements
+# (`conditional_smooths()`, `conditional_effects()`,
+# `variables()`, `posterior::ndraws()`) are already exported on
+# mvgam. `as.mcmc.mvgam` exposed the coda interface, which
+# `posterior::as_draws_array(x)` / `as.array(x)` cover for
+# downstream tooling; the coda dependency went with it.
 
 
 # Internal: return the response variable's name from the fit's
@@ -620,6 +465,38 @@ NULL
 
 #' @importFrom brms brmsfamily
 #' @export brmsfamily
+NULL
+
+# Re-export brms-specific response families so `library(mvgam)`
+# alone exposes them; users no longer need to type `brms::Beta()`
+# etc. Standard base-R families (gaussian, poisson, Gamma,
+# binomial, ...) are already on the search path.
+#' @importFrom brms Beta
+#' @export Beta
+NULL
+
+#' @importFrom brms exponential
+#' @export exponential
+NULL
+
+#' @importFrom brms lognormal
+#' @export lognormal
+NULL
+
+#' @importFrom brms student
+#' @export student
+NULL
+
+#' @importFrom brms bernoulli
+#' @export bernoulli
+NULL
+
+#' @importFrom brms negbinomial
+#' @export negbinomial
+NULL
+
+#' @importFrom brms beta_binomial
+#' @export beta_binomial
 NULL
 
 #' @importFrom brms custom_family

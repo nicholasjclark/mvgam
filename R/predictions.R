@@ -1630,8 +1630,15 @@ extract_linpred_univariate <- function(prep) {
     X <- prep$sdata$X
     checkmate::assert_matrix(X)
 
-    # Remove intercept column if present (column of all 1s)
-    if (ncol(X) > 0 && nrow(X) > 0 && all(X[, 1] == 1)) {
+    # Drop the first column only when it is brms's reserved intercept
+    # column. We detect that by the presence of `b_Intercept` in
+    # draws (handled above as a scalar offset). Formulas written as
+    # `y ~ 0 + <term>` (including the `.mvgam_empty_obs` placeholder
+    # injected for empty obs sub-formulas) have no `b_Intercept` and
+    # their first column IS a real regressor with its own b[k].
+    has_intercept_param <- "b_Intercept" %in% colnames(draws_mat)
+    if (has_intercept_param && ncol(X) > 0 && nrow(X) > 0 &&
+        all(X[, 1] == 1)) {
       if (ncol(X) > 1) {
         X <- X[, -1, drop = FALSE]
       } else {
@@ -2130,6 +2137,10 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   # Validate inputs
   checkmate::assert_class(mvgam_fit, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1)
+  # Stamp the empty-obs placeholder onto user-supplied newdata
+  # when the fit needed one. brms's `validate_data()` would
+  # otherwise reject the frame for missing the column.
+  newdata <- ensure_obs_placeholder_in_newdata(newdata, mvgam_fit$data)
   checkmate::assert_string(component)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,
                                 any.missing = FALSE)
@@ -2315,51 +2326,54 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   # Extract linear predictor (use_resp handles shared vs multivariate trends)
   linpred <- extract_linpred_from_prep(prep, resp = use_resp)
 
-  # State-space trends carry their per-(t, s) latent values in
-  # `trend[t, s]` of the stanfit. The trend submodel's brms-mocked
-  # linpred above captures only the trend covariates' contribution
-  # (X %*% beta_trend); without the latent state, every draw shares
-  # the same per-time value and the process_error toggle has nothing
-  # to vary. Add the latent state here, aligned to the same draw
-  # subset used by the submodel linpred. incl_latent_state = FALSE is
-  # the deterministic-submodel-only mode used by brms-concordance
-  # tests to match brms::posterior_linpred(incl_autocor = FALSE).
-  if (component == "trend" && incl_latent_state) {
-    latent_mat <- extract_trend_latent_states(
-      mvgam_fit = mvgam_fit,
-      newdata = newdata,
-      full_draws = full_draws
-    )
-    if (!is.null(latent_mat)) {
-      linpred <- add_latent_to_linpred(linpred, latent_mat)
-    }
-  }
-
+  # Reason: the predict_* family is time-agnostic and never reads the
+  # per-draw conditional `trend[t, s]` from the stanfit; the latent
+  # state's marginal-MC contribution is added by `get_combined_linpred`
+  # via `sample_process_errors` when `process_error = TRUE`. The
+  # `extract_trend_latent_states` helper stays available for the
+  # hindcast/forecast paths (Phase B/C/D), which explicitly want
+  # the conditional state. `incl_latent_state` is preserved on the
+  # signature for hindcast-internal callers that still want the
+  # per-draw composition; in the predict_* path it is a no-op for
+  # the standard trend kernel.
   linpred
 }
 
 
 #' Compose a per-(time, series) trend linpred for a by = lv_axis() fit.
 #'
-#' Reuses the same mock-stanfit + prepare_predictions + extract_linpred
-#' machinery the standard trend branch uses, but on a (time, .trend)
-#' prediction grid instead of the user-supplied (time, series) newdata,
-#' then folds the per-factor `mu_factor` through the posterior Z draws
-#' via one matrix multiply per draw. For `incl_latent_state = TRUE`,
-#' the Stan-side `trend[t, s] = dot(Z[s, :], lv_trend[t, :] + mu_factor)`
-#' already contains the full result, so we just lift the latent state
-#' via the existing `extract_trend_latent_states()` helper, mirroring
-#' the same per-(t, s) cell mapping that the non-by-lv path uses.
+#' Builds a per-row by per-factor lv prediction grid from `newdata`,
+#' runs the trend brmsfit on that grid via the brms mock-stanfit
+#' machinery to recover `mu_factor[d, i, k]` (the deterministic
+#' smooth contribution at newdata row i for factor k), and composes
+#' with the posterior loadings `Z[d, s, k]` to produce a
+#' `[draws x n_rows]` linpred matrix.
+#'
+#' Two return modes:
+#'   * `incl_latent_state = FALSE` (deterministic submodel only):
+#'     `linpred[d, i] = sum_k Z[d, series_i, k] * mu_factor[d, i, k]`.
+#'     Mirrors `brms::posterior_linpred(incl_autocor = FALSE)`.
+#'   * `incl_latent_state = TRUE` (latent state added on top): also
+#'     pulls raw `lv_trend[t, k]` draws via the tilde-aware selector,
+#'     looks up the in-grid `t` for each newdata row, and adds
+#'     `sum_k Z[d, series_i, k] * lv_trend[d, t_i, k]`. Times outside
+#'     the fit grid receive the per-factor marginal mean of
+#'     `lv_trend` across training times, matching the marginal-MC
+#'     semantic used by the standard non-by-lv path
+#'     (`extract_trend_latent_states()`). For state-aware out-of-
+#'     sample prediction, use `forecast.mvgam()`.
 #'
 #' Composes existing primitives rather than introducing new ones:
 #'   * `get_observation_structure()`: newdata to (time, series_int).
-#'   * `extract_Z_loadings()`: posterior Z draws as `(d, s, k)` array.
-#'   * `extract_trend_latent_states()`: latent state for the
-#'     `incl_latent_state = TRUE` path.
+#'   * `extract_Z_loadings()`: posterior Z draws as `[d, s, k]`.
+#'   * `extract_lv_trend_array_from_draws()`: posterior lv_trend
+#'     draws as `[d, t, k]` (tilde-aware, shares
+#'     `collect_lv_trend_column_names()` with
+#'     `extract_lv_trend_matrices()`).
 #'   * `extract_trend_parameters()`, `create_mock_stanfit()`,
 #'     `prepare_predictions.mock_stanfit()`,
 #'     `extract_linpred_from_prep()`: brms-mocked deterministic
-#'     submodel kernel, called with the lv-grain prediction grid.
+#'     submodel kernel, called with the per-row by .trend grid.
 #'   * `strip_dpar_infix()`: strip the `_trend` infix on parameter
 #'     draw column names before the mock-stanfit step.
 #' @noRd
@@ -2394,10 +2408,6 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata, ndraws,
     full_draws <- full_draws[sample(n_available, ndraws), , drop = FALSE]
   }
 
-  if (incl_latent_state) {
-    return(extract_trend_latent_states(mvgam_fit, newdata, full_draws))
-  }
-
   n_lv <- as.integer(mvgam_fit$trend_metadata$n_lv_for_grain)
   n_series <- as.integer(mvgam_fit$series_info$n_series %||%
                             mvgam_fit$trend_components$n_trends)
@@ -2410,29 +2420,37 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata, ndraws,
   brms_model <- mvgam_fit$trend_model
   if (is.null(brms_model)) {
     stop(insight::format_error(
-      "No trend brmsfit found on the mvgam object for by = lv_axis() composition."
+      paste0("No trend brmsfit found on the mvgam object for ",
+              "by = lv_axis() composition.")
     ))
   }
 
   obs_struct <- get_observation_structure(mvgam_fit, newdata = newdata)
-  unique_newdata_times <- obs_struct$unique_times
-  n_unique_t <- length(unique_newdata_times)
+  s_idx <- as.integer(obs_struct$series_int)
+  if (any(s_idx < 1L | s_idx > n_series)) {
+    stop(insight::format_error(
+      "newdata contains series indices outside the fitted model's range."
+    ))
+  }
+  n_rows <- nrow(newdata)
 
+  # Per-row by per-factor grid: each newdata row repeated for each
+  # factor. The previous (time, .trend)-grain build collapsed
+  # newdata across series via `collapse_to_time_level()`, which
+  # silently dropped per-row covariate variation (e.g. marginaleffects
+  # grids with several covariate values at the same time mapped to
+  # one row). expand_grid iterates `.trend` fastest, so consecutive
+  # blocks of `n_lv` columns in `mu_factor_long` belong to one
+  # newdata row; preserved via byrow = TRUE in the reshape below.
   trend_vars <- mvgam_fit$trend_metadata$covariates %||% character(0)
-  # Same time-level collapse the fitting path uses; both feed an
-  # (time, .trend) grid downstream. `collapse_to_time_level()` lives
-  # in R/validations.R alongside extract_trend_data().
-  series_vals_pred <- as.integer(obs_struct$series_int)
-  time_data <- collapse_to_time_level(
-    newdata, time_vals = obs_struct$time,
-    series_vals = series_vals_pred, trend_variables = trend_vars
-  )
+  attach_cols <- intersect(unique(c(trend_vars, "time")),
+                            colnames(newdata))
   lv_newdata <- tidyr::expand_grid(
-    time = unique_newdata_times,
-    .trend = factor(seq_len(n_lv))
+    .row_id = seq_len(n_rows),
+    .trend  = factor(seq_len(n_lv))
   )
-  if (length(trend_vars) > 0L) {
-    lv_newdata <- dplyr::left_join(lv_newdata, time_data, by = "time")
+  for (col in attach_cols) {
+    lv_newdata[[col]] <- newdata[[col]][lv_newdata$.row_id]
   }
   if (!is.null(mvgam_fit$trend_metadata$levels)) {
     validate_prediction_factor_levels(lv_newdata,
@@ -2456,40 +2474,61 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata, ndraws,
       "Multivariate trend formulas are not supported by 'by = lv_axis()' yet."
     ))
   }
-  checkmate::assert_matrix(mu_factor_long, ncols = n_unique_t * n_lv)
+  checkmate::assert_matrix(mu_factor_long, ncols = n_rows * n_lv)
 
   Z_arr <- extract_Z_loadings(full_draws,
                               n_obs_series = n_series, n_lv = n_lv)
 
   ndraws_used <- nrow(full_draws)
-  deterministic_grid <- array(NA_real_,
-                               dim = c(ndraws_used, n_unique_t, n_series))
+  linpred_mat <- matrix(NA_real_, nrow = ndraws_used, ncol = n_rows)
   for (d in seq_len(ndraws_used)) {
     mu_d <- matrix(mu_factor_long[d, ],
-                   nrow = n_unique_t, ncol = n_lv, byrow = TRUE)
+                   nrow = n_rows, ncol = n_lv, byrow = TRUE)
     Z_d <- matrix(Z_arr[d, , ], nrow = n_series, ncol = n_lv)
-    deterministic_grid[d, , ] <- mu_d %*% t(Z_d)
+    # Per row i: dot(Z_d[series_i, :], mu_d[i, :])
+    linpred_mat[d, ] <- rowSums(Z_d[s_idx, , drop = FALSE] * mu_d)
   }
 
-  t_idx <- match(obs_struct$time, unique_newdata_times)
-  s_idx <- as.integer(obs_struct$series_int)
-  if (any(is.na(t_idx))) {
+  # The latent-state contribution at newdata cells is the marginal-MC
+  # innovation envelope, added by `get_combined_linpred` via
+  # `sample_process_errors` when `process_error = TRUE`. predict_*
+  # does not extract per-draw conditional `trend[t, s]` for any
+  # newdata cell; that lives on the hindcast / forecast surface.
+  # `incl_latent_state` is preserved on the call signature for
+  # hindcast-internal callers but is a no-op in the predict_* path.
+  linpred_mat
+}
+
+
+# Internal: stack the tilde-aware `lv_trend[t, k]` draws into a
+# `[draws, n_time, n_lv]` array, sourcing draws from a posterior
+# matrix that has already been row-subsetted so the rows align with
+# whatever Z extraction was done on the same matrix. Shares the
+# column-name resolution with `extract_lv_trend_matrices()` (which
+# returns a per-factor list of `[draws, n_time]` matrices for
+# plotting) via `collect_lv_trend_column_names()`.
+#'@noRd
+extract_lv_trend_array_from_draws <- function(draws_mat, n_time, n_lv) {
+  checkmate::assert_matrix(draws_mat)
+  checkmate::assert_int(n_time, lower = 1L)
+  checkmate::assert_int(n_lv, lower = 1L)
+  meta <- collect_lv_trend_column_names(colnames(draws_mat), n_lv)
+  if (nrow(meta$cols_by_tk) != n_time) {
     stop(insight::format_error(c(
-      "newdata times outside the unique prediction grid.",
-      i = "Drop or rename the offending rows."
+      "Mismatch between expected and stored time count in lv_trend.",
+      x = paste0(
+        "Expected n_time = ", n_time,
+        ", max time index in posterior = ",
+        nrow(meta$cols_by_tk), "."
+      )
     )))
   }
-  if (any(s_idx < 1L | s_idx > n_series)) {
-    stop(insight::format_error(
-      "newdata contains series indices outside the fitted model's range."
-    ))
+  ndraws <- nrow(draws_mat)
+  lv_arr <- array(NA_real_, dim = c(ndraws, n_time, n_lv))
+  for (k in seq_len(n_lv)) {
+    lv_arr[, , k] <- draws_mat[, meta$cols_by_tk[, k], drop = FALSE]
   }
-  nobs <- length(t_idx)
-  linpred_mat <- matrix(NA_real_, nrow = ndraws_used, ncol = nobs)
-  for (j in seq_len(nobs)) {
-    linpred_mat[, j] <- deterministic_grid[, t_idx[j], s_idx[j]]
-  }
-  linpred_mat
+  lv_arr
 }
 
 
@@ -2510,6 +2549,80 @@ add_latent_to_linpred <- function(linpred, latent_mat) {
     ncols = ncol(latent_mat)
   )
   linpred + latent_mat
+}
+
+
+#' Per-draw state-aware predictive at training cells
+#'
+#' Pulls the per-draw conditional `trend[t, s]` from the stanfit (the
+#' same composition Stan used at fit time), combines with the per-draw
+#' deterministic obs-side linpred, and optionally applies the family
+#' inverse link or full RNG. Used by `hindcast_one_series` and the
+#' in-sample path of `residuals.mvgam` / `pp_check.mvgam`. The
+#' `predict_*` family never calls this helper; those paths stay
+#' time-agnostic marginal-MC by design.
+#'
+#' @param object Fitted `mvgam` object.
+#' @param newdata Data frame of cells at which to evaluate the
+#'   state-conditional predictive. Each row must align to an
+#'   in-grid `(time, series)` pair.
+#' @param type One of `c("link", "expected", "response")`.
+#' @param draw_ids Optional integer vector of posterior draw indices.
+#' @param resp Optional response name for multivariate fan-out.
+#' @return `[n_draws x n_obs]` numeric (or integer for `"response"`)
+#'   matrix.
+#'
+#' @noRd
+state_aware_predict <- function(object, newdata, type,
+                                  draw_ids = NULL, resp = NULL) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_data_frame(newdata, min.rows = 1L)
+  type <- match.arg(type, c("link", "expected", "response"))
+
+  draws_mat <- posterior::as_draws_matrix(object$fit)
+  if (!is.null(draw_ids)) {
+    draws_mat <- draws_mat[draw_ids, , drop = FALSE]
+  }
+  trend_state <- extract_trend_latent_states(
+    mvgam_fit = object, newdata = newdata, full_draws = draws_mat
+  )
+  if (is.null(trend_state)) {
+    trend_state <- matrix(0, nrow = nrow(draws_mat),
+                            ncol = nrow(newdata))
+  }
+  obs_linpred <- extract_component_linpred(
+    mvgam_fit = object, newdata = newdata,
+    component = "obs", draw_ids = draw_ids, resp = resp
+  )
+  if (is.list(obs_linpred) && !is.matrix(obs_linpred)) {
+    stop(insight::format_error(c(
+      "state_aware_predict received a list-shaped obs linpred without a 'resp' scope.",
+      i = paste0("Multivariate fits must be scoped via 'resp' ",
+                 "before reaching this helper.")
+    )))
+  }
+  linpred <- obs_linpred + trend_state
+
+  family <- if (!is.null(resp)) {
+    get_family_for_resp(object, resp)
+  } else {
+    object$family
+  }
+
+  if (identical(type, "link")) {
+    return(linpred)
+  }
+  if (identical(type, "expected")) {
+    return(family$linkinv(linpred))
+  }
+  # type = "response": route through the shared family RNG
+  # dispatcher (handles closure-unit families internally).
+  predict_single_response(
+    object = object, linpred_resp = linpred,
+    resp = resp, draw_ids = seq_len(nrow(linpred)),
+    ndraws = nrow(linpred), newdata = newdata,
+    is_multivariate = !is.null(resp)
+  )
 }
 
 
@@ -2541,19 +2654,16 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws) {
     )))
   }
 
-  # The latent state grid uses the fit-time sorted-unique times.
-  # standata$times_trend is an N_time_trend x N_series_trend matrix
-  # of fit-time time values; for shared grids all columns are equal,
-  # so the first column is the canonical map index -> raw time.
-  times_trend <- mvgam_fit$standata$times_trend
-  fit_unique_times <- if (is.matrix(times_trend)) {
-    times_trend[, 1L]
-  } else {
-    times_trend
-  }
+  # Map newdata times to position indices in the trend matrix.
+  # `standata$times_trend` is a flat row-major index used inside
+  # Stan to look up `mu_trend`; its values are NOT raw times and
+  # must not be used here. The canonical training-time grid lives
+  # on the fit object as the sorted unique time values that Stan
+  # saw at fit time, which is what `trend[i, s]` is indexed by.
+  training_times <- sort(unique(as.numeric(mvgam_fit$data$time)))
 
   obs_struct <- get_observation_structure(mvgam_fit, newdata = newdata)
-  t_idx <- match(obs_struct$time, fit_unique_times)
+  t_idx <- match(obs_struct$time, training_times)
   s_idx <- obs_struct$series_int
 
   if (any(s_idx < 1L | s_idx > N_series_trend)) {

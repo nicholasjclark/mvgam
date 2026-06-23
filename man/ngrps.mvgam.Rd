@@ -22,20 +22,6 @@ grouping factor with the number of levels it contains.
 Mirrors \code{\link[brms:ngrps.brmsfit]{brms::ngrps.brmsfit()}} and returns \code{NULL} when the
 fit has no observation-side random effects.
 }
-\examples{
-\donttest{
-set.seed(1)
-sim <- sim_mvgam(family = gaussian())
-sim$data_train$grp <- factor(sample(letters[1:4],
-                                    NROW(sim$data_train),
-                                    replace = TRUE))
-mod <- mvgam(y ~ 1 + (1 | grp), trend_model = AR(),
-             data = sim$data_train, family = gaussian(),
-             chains = 2, silent = 2)
-ngrps(mod)
-}
-
-}
 \seealso{
 \code{\link[brms:ngrps.brmsfit]{brms::ngrps.brmsfit()}}, \code{\link[=ranef.mvgam]{ranef.mvgam()}},
 \code{\link[=VarCorr.mvgam]{VarCorr.mvgam()}}.

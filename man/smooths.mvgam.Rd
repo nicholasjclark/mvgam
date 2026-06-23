@@ -20,16 +20,6 @@ the trend formula of a fitted \code{mvgam} object. Useful for
 picking a term to pass to \code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}} or
 \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}.
 }
-\examples{
-\donttest{
-sim <- sim_mvgam(family = gaussian())
-mod <- mvgam(y ~ 1 + s(season, bs = "cc"),
-             trend_model = AR(), data = sim$data_train,
-             family = gaussian(), chains = 2, silent = 2)
-smooths(mod)
-}
-
-}
 \author{
 Nicholas J Clark
 }

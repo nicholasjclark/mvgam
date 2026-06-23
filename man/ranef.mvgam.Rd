@@ -76,27 +76,15 @@ aliasing for trend REs is deferred.
 }
 \examples{
 \donttest{
-set.seed(1)
-sim <- sim_mvgam(family = gaussian())
-sim$data_train$grp <- factor(sample(letters[1:4], NROW(sim$data_train),
-                                    replace = TRUE))
-mod <- mvgam(
-  y ~ 1 + (1 | grp),
-  trend_model = AR(),
-  data = sim$data_train,
-  family = gaussian(),
-  chains = 2,
-  silent = 2
-)
-
-# Posterior summaries per grouping factor.
+set.seed(14)
+simdat <- sim_mvgam(family = poisson(), n_series = 4L,
+                     n_timepoints = 40L, trend_model = AR())
+mod <- mvgam(y ~ s(x) + (1 | series),
+              trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
 ranef(mod)
-
-# Raw draws (3D array per group).
-ranef(mod, summary = FALSE)
-
-# Restrict to a subset of coefficients.
-ranef(mod, pars = "Intercept")
 }
 
 }

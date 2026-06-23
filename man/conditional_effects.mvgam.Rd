@@ -82,6 +82,21 @@ interactions. A thin wrapper around
 model's term labels (across both observation and trend submodels)
 and produces one ggplot per term.
 }
+\examples{
+\donttest{
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
+mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
+
+# Marginal effect of x on the response scale.
+conditional_effects(mod)
+}
+
+}
 \references{
 Arel-Bundock, V., Greifer, N. and Heiss, A. (2024). How to
 interpret statistical models using marginaleffects for R and

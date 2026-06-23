@@ -108,6 +108,23 @@ S3 methods that surface Stan / NUTS diagnostics for fitted
 on the underlying stanfit (\code{nuts_params}, \code{log_posterior}) or to
 \verb{posterior::} summaries on the draws array.
 }
+\examples{
+\donttest{
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
+mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
+
+coef(mod)
+fixef(mod)
+vcov(mod)
+bayes_R2(mod)
+}
+
+}
 \references{
 Vehtari, A., Gelman, A., Simpson, D., Carpenter, B. and
 Burkner, P.-C. (2021). Rank-normalization, folding, and

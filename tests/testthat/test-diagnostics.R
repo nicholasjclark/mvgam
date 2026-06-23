@@ -16,7 +16,8 @@
 # trend_formula so resolve_mvgam_keyword takes the obs-only branch.
 make_mvgam_stub <- function(varnames = c(
                               "b_Intercept", "b_x", "b_trend[1]",
-                              "Intercept", "sigma", "phi",
+                              "b_x_trend", "Intercept", "Intercept_trend",
+                              "sigma", "phi",
                               "sd_1[1]", "sds_sx_1", "sds_sz_1_trend",
                               "ar1_trend[1]", "sigma_trend[1]",
                               "innovations_trend[1,1]",
@@ -62,7 +63,7 @@ test_that("as.matrix.mvgam(variable = NULL) returns all parameters", {
   stub <- make_mvgam_stub()
   out <- as.matrix(stub)
   expect_s3_class(out, "draws_matrix")
-  expect_equal(ncol(out), 16L)
+  expect_equal(ncol(out), 18L)
 })
 
 test_that("as.matrix.mvgam(variable = 'betas') extracts b_* only", {
@@ -74,7 +75,9 @@ test_that("as.matrix.mvgam(variable = 'betas') extracts b_* only", {
 test_that("as.matrix.mvgam(variable = 'trend_betas') extracts b_trend[", {
   stub <- make_mvgam_stub()
   out <- as.matrix(stub, variable = "trend_betas")
-  expect_equal(colnames(out), "b_trend[1]")
+  # Both positional `b_trend[k]` and the brms-aliased
+  # `b_<term>_trend` count as trend-side fixed effects.
+  expect_setequal(colnames(out), c("b_trend[1]", "b_x_trend"))
 })
 
 test_that("as.matrix.mvgam(variable = 'obs_params') excludes _trend", {
@@ -110,7 +113,12 @@ test_that("trend_params on trend-formula fit picks _trend block", {
   out <- as.matrix(stub, variable = "trend_params")
   expect_true("ar1_trend[1]" %in% colnames(out))
   expect_true("sigma_trend[1]" %in% colnames(out))
+  # Regression coefficients on the trend side (positional, brms-
+  # aliased, or centred intercept) must NOT leak into the latent-
+  # dynamics keyword.
   expect_false("b_trend[1]" %in% colnames(out))
+  expect_false("b_x_trend" %in% colnames(out))
+  expect_false("Intercept_trend" %in% colnames(out))
   expect_false("innovations_trend[1,1]" %in% colnames(out))
   expect_false("sds_sz_1_trend" %in% colnames(out))
 })
@@ -205,7 +213,7 @@ test_that("rhat.mvgam returns a named numeric vector", {
   stub <- make_mvgam_stub()
   out <- rhat(stub)
   expect_type(out, "double")
-  expect_equal(length(out), 16L)
+  expect_equal(length(out), 18L)
 })
 
 test_that("rhat.mvgam(pars = ...) filters", {
@@ -233,7 +241,7 @@ test_that("ndraws / nchains / niterations / nvariables work", {
   expect_equal(ndraws(stub), 100L)
   expect_equal(nchains(stub), 2L)
   expect_equal(niterations(stub), 50L)
-  expect_equal(nvariables(stub), 16L)
+  expect_equal(nvariables(stub), 18L)
 })
 
 test_that("getCall.mvgam returns the stored call", {

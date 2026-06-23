@@ -34,6 +34,21 @@
 #' and WAIC. \emph{Statistics and Computing}, 27:1413-1432.
 #' \doi{10.1007/s11222-016-9696-4}
 #'
+#' @examples
+#' \donttest{
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 60L, trend_model = AR())
+#'
+#' mod <- mvgam(y ~ s(x),
+#'               trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
+#'
+#' waic(mod)
+#' }
+#'
 #' @method waic mvgam
 #' @export
 waic.mvgam <- function(x, ..., compare = TRUE, resp = NULL,

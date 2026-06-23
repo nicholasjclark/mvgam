@@ -110,26 +110,18 @@ noise), use \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} â€
 point that adds sampled innovations on top of the linear predictor.
 }
 \examples{
-\dontrun{
-# Fit a State-Space model
-fit <- mvgam(
-  count ~ temperature + s(day),
-  trend_formula = ~ AR(p = 1),
-  data = my_data,
-  family = poisson()
-)
+\donttest{
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
+mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
 
-# Extract linear predictor (link scale)
-linpred <- posterior_linpred(fit)
-
-# With new data
-linpred_new <- posterior_linpred(fit, newdata = new_data)
-
-# Reduce uncertainty by fixing trend at posterior mean
-linpred_fast <- posterior_linpred(fit, process_error = FALSE)
-
-# Subset draws for speed
-linpred_sub <- posterior_linpred(fit, ndraws = 100)
+# Link-scale linear predictor draws (log lambda for the Poisson).
+lp <- posterior_linpred(mod, ndraws = 50L)
+dim(lp)
 }
 
 }

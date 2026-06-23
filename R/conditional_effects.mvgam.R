@@ -64,6 +64,20 @@
 #' Python. \emph{Journal of Statistical Software}, 111(9):1-32.
 #' \doi{10.18637/jss.v111.i09}
 #'
+#' @examples
+#' \donttest{
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 60L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
+#'
+#' # Marginal effect of x on the response scale.
+#' conditional_effects(mod)
+#' }
+#'
 #' @author Nicholas J Clark
 #' @method conditional_effects mvgam
 #' @export
@@ -227,7 +241,18 @@ conditional_effects.mvgam <- function(x,
       ggplot2::scale_colour_discrete(label = round_legend_labels) +
       ggplot2::theme_classic()
   })
-  names(out) <- vapply(cond_labs, paste, FUN.VALUE = character(1L),
+  # User-visible list names hide the internal `series` / `.trend`
+  # rewrite tokens that `detect_and_rewrite_by_lv()` swaps in for the
+  # original `by = lv_axis()` argument. The tokens stay in the
+  # `condition` passed to marginaleffects above so per-series facets
+  # still render. `mvgam_had_by_lv()` is the single accessor for the
+  # display-only marker persisted on `trend_metadata`;
+  # `strip_by_lv_rewrite_tokens()` does the strip with the
+  # empty-grouping guard.
+  display_labs <- strip_by_lv_rewrite_tokens(
+    cond_labs, mvgam_had_by_lv(x)
+  )
+  names(out) <- vapply(display_labs, paste, FUN.VALUE = character(1L),
                        collapse = ":")
   class(out) <- "mvgam_conditional_effects"
   out
@@ -338,6 +363,14 @@ detect_conditional_effects <- function(x) {
   # names so marginaleffects only sees addressable columns. Shares
   # the filter with find_predictors.mvgam via mvgam_keep_data_columns().
   cond <- lapply(cond, function(g) mvgam_keep_data_columns(g, x))
+  cond <- cond[lengths(cond) > 0L]
+  # Drop the empty-obs-formula placeholder column from
+  # user-visible effect groupings. The pinned `constant(0)`
+  # coefficient contributes zero to the linear predictor; plotting
+  # it as a covariate leaks the workaround into the figure.
+  cond <- lapply(cond, function(g) {
+    setdiff(g, MVGAM_EMPTY_OBS_PLACEHOLDER)
+  })
   cond <- cond[lengths(cond) > 0L]
   # Drop duplicates while preserving order
   keys <- vapply(cond, paste, FUN.VALUE = character(1L), collapse = ":")

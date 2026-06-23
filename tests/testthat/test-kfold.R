@@ -46,6 +46,10 @@ test_that("build_kfold_partition() respects group integrity", {
   per_group <- tapply(folds, group_key, function(f) length(unique(f)))
   expect_true(all(per_group == 1L))
   expect_setequal(unique(folds), c(1L, 2L))
+  # loo::kfold_split_* returns numeric; storage mode must be
+  # coerced to integer so downstream `vapply(..., integer(1L))`
+  # in build_group_to_fold() succeeds.
+  expect_identical(typeof(folds), "integer")
 })
 
 test_that("build_kfold_partition() honours explicit folds vector", {

@@ -22,7 +22,12 @@
 the training data, containing the time / series cells at
 which forecasts are wanted. Rows with time values beyond
 the training grid drive the forecast horizon. When \code{NULL},
-the returned object contains hindcasts only.}
+the returned object contains hindcasts only and the
+\verb{$forecasts} / \verb{$test_observations} / \verb{$test_times} slots
+are \code{NULL}. The fallback is deliberately strict: if you
+want forecasts using the held-out data that was passed to
+\code{mvgam(..., newdata = X)} at fit time, pass it explicitly
+here as \code{forecast(mod, newdata = mod$test_data)}.}
 
 \item{...}{Currently unused.}
 
@@ -69,6 +74,28 @@ alongside posterior hindcasts at the training time points.
 The latent trend is propagated forward per draw using the
 fitted state-space dynamics; the observation family then
 maps the trajectory back to the response scale.
+}
+\examples{
+\donttest{
+set.seed(11)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 80L, trend_model = AR(),
+                     proportional_train = 0.75)
+
+mod <- mvgam(
+  y ~ s(x),
+  trend_formula = ~ AR(p = 1),
+  data    = simdat$data_train,
+  newdata = simdat$data_test,  # persisted on mod$test_data
+  family  = poisson(),
+  chains  = 2, silent = 2
+)
+
+# Pass the held-out data explicitly to drive the forecast horizon.
+fc <- forecast(mod, newdata = mod$test_data)
+plot(fc)
+}
+
 }
 \seealso{
 \link[=mvgam]{mvgam_forecast-class}, \link{hindcast.mvgam},

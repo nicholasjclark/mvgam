@@ -27,31 +27,28 @@
 #'   rendered markdown as a character string. Use `print()` to
 #'   display, or pass to `writeLines()` / `cat()` to emit verbatim.
 #'
-#' @examples
-#' \donttest{
-#' set.seed(0)
-#' simdat <- sim_mvgam(
-#'   seasonality = "hierarchical",
-#'   trend_model = AR(p = 1),
-#'   family = gaussian()
-#' )
-#' mod <- mvgam(
-#'   y ~ s(season, bs = "cc", k = 6),
-#'   trend_formula = ~ AR(p = 1),
-#'   data = simdat$data_train,
-#'   family = gaussian(),
-#'   chains = 2,
-#'   silent = 2
-#' )
-#' methods_md(mod)
-#' }
-#'
 #' @author Nicholas J Clark
 #' @seealso \code{\link{how_to_cite}}, \code{\link{prior_summary}},
 #'   \code{\link{mvgam}}, \code{\link{jsdgam}}.
 #'   `how_to_cite()` produces the prose methods paragraph;
 #'   `methods_md()` produces the matching math statement of
 #'   the model.
+#'
+#' @examples
+#' \donttest{
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 60L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
+#'
+#' # Markdown / LaTeX statement of the model. cat() emits the
+#' # raw markdown; print() pretty-prints in the console.
+#' cat(methods_md(mod))
+#' }
+#'
 #' @export
 methods_md <- function(object, file = NULL, notation = "default",
                        implementation = TRUE, ...) {

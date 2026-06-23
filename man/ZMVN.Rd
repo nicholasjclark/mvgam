@@ -110,74 +110,33 @@ the active column count.
 
 \examples{
 \donttest{
-# Simulate counts of four species over ten sampling locations
-set.seed(42)
-site_dat <- data.frame(
-  site = rep(1:10, 4),
-  species = as.factor(sort(rep(letters[1:4], 10))),
-  y = c(NA, rpois(39, 3))
+# Simulate four correlated Gaussian series. ZMVN is a single-
+# snapshot residual prior, so the recoverable structure is the
+# cross-series covariance.
+set.seed(2)
+simdat <- sim_mvgam(
+  family       = gaussian(),
+  n_series     = 4L,
+  n_timepoints = 60L,
+  trend_model  = VAR(),
+  prop_trend   = 0.9
 )
-head(site_dat)
 
-# Set up a correlated residual (i.e. Joint Species Distribution) model
-trend_model <- ZMVN(unit = site, subgr = species)
 mod <- mvgam(
-  y ~ species,
-  trend_model = ZMVN(unit = site, subgr = species),
-  data = site_dat,
-  chains = 2,
-  silent = 2
+  y ~ 1,
+  trend_formula = ~ ZMVN(),
+  data          = simdat$data_train,
+  family        = gaussian(),
+  chains        = 2,
+  silent        = 2
 )
+summary(mod, include_betas = FALSE)
 
-# Inspect the estimated species-species residual covariances
-mcmc_plot(mod, variable = "Sigma", regex = TRUE, type = "hist")
-
-# A hierarchical correlation example
-set.seed(789)
-Sigma <- matrix(
-  c(1, -0.4, 0.5,
-    -0.4, 1, 0.3,
-    0.5, 0.3, 1),
-  byrow = TRUE,
-  nrow = 3
-)
-
-make_site_dat <- function(...) {
-  errors <- mgcv::rmvn(
-    n = 30,
-    mu = c(0.6, 0.8, 1.8),
-    V = Sigma
-  )
-  site_dat <- do.call(rbind, lapply(1:3, function(spec) {
-    data.frame(
-      y = rpois(30, lambda = exp(errors[, spec])),
-      species = paste0("species", spec),
-      site = 1:30
-    )
-  }))
-  site_dat
-}
-
-site_dat <- rbind(
-  make_site_dat() \%>\%
-    dplyr::mutate(group = "group1"),
-  make_site_dat() \%>\%
-    dplyr::mutate(group = "group2")
-) \%>\%
-  dplyr::mutate(
-    species = as.factor(species),
-    group = as.factor(group)
-  )
-
-# Fit the hierarchical correlated residual model
-mod <- mvgam(
-  y ~ species,
-  trend_model = ZMVN(unit = site, gr = group, subgr = species),
-  data = site_dat
-)
-
-# Inspect the estimated species-species residual covariances
-mcmc_plot(mod, variable = "Sigma", regex = TRUE, type = "hist")
+# All trend-side latent dynamics in one summary view. For ZMVN
+# the meaningful entries are sigma_trend (per-series SDs),
+# L_Omega_trend (Cholesky of the correlation matrix) and
+# Sigma_trend (the implied covariance).
+mcmc_plot(mod, variable = "trend_params", type = "intervals")
 }
 
 }

@@ -72,6 +72,25 @@ matches the behaviour LOO / PSIS / WAIC expect. Set \code{process_error = FALSE}
 only when computing per-observation goodness-of-fit independently of the
 latent dynamics (e.g. for marginaleffects-style covariate effects).
 }
+\examples{
+\donttest{
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
+
+mod <- mvgam(y ~ s(x),
+              trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
+
+# Pointwise posterior log-densities; rows are draws, columns
+# are observations. Feeds straight into loo::loo().
+ll <- log_lik(mod)
+dim(ll)
+}
+
+}
 \seealso{
 \code{\link[=loo.mvgam]{loo.mvgam()}}, \code{\link[=waic.mvgam]{waic.mvgam()}},
 \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}}.

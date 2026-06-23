@@ -9,10 +9,6 @@
 #' @return Same formula object with cached latent parameters as attributes
 #' @noRd
 #'
-#' @examples
-#' # Internal usage only
-#' formula <- brms::bf(y ~ x, sigma ~ z, nl = TRUE)
-#' cached_formula <- cache_formula_latent_params(formula)
 cache_formula_latent_params <- function(formula) {
   # Input validation
   if (is.null(formula)) {
@@ -77,13 +73,6 @@ cache_formula_latent_params <- function(formula) {
 #' @return Character vector with latent parameters filtered out
 #' @noRd
 #'
-#' @examples
-#' # Internal usage only
-#' required_vars <- c("x", "y", "sigma", "nu")
-#' formula <- brms::bf(y ~ x, sigma ~ z)
-#' cached_formula <- cache_formula_latent_params(formula)
-#' filtered_vars <- filter_required_variables(required_vars, cached_formula)
-#' # Returns: c("x", "y") - sigma filtered out as latent parameter
 filter_required_variables <- function(required_vars, formula = NULL) {
   # Input validation
   checkmate::assert_character(required_vars, any.missing = FALSE)
@@ -1384,22 +1373,7 @@ validate_n_lv_ceiling <- function(n_lv, n_species, loadings_prior,
       )
     )))
   }
-  if (!mgp_on && n_lv_int >= n_species) {
-    stop(insight::format_error(c(
-      paste0(
-        "'n_lv' must be strictly less than the number of ", noun,
-        " under the default loadings prior."
-      ),
-      x = paste0(
-        "Got n_lv = ", n_lv_int, ", n_", noun, " = ", n_species, "."
-      ),
-      i = paste0(
-        "Pass `loadings_prior = \"mgp\"` to allow n_lv up to n_",
-        noun, "; the multiplicative-gamma-process prior is ",
-        "designed for the truncation-ceiling regime."
-      )
-    )))
-  }
+  # n_lv = n_species is allowed; n_lv > n_species is caught above.
   invisible(TRUE)
 }
 
@@ -1574,6 +1548,82 @@ validate_regular_time_intervals <- function(time_values, time_var = "time") {
 
   invisible(TRUE)
 }
+
+
+# Internal: response-vs-family shape check for non-closure-unit
+# families. Closure-unit families (`occ()`, `nmix()` variants)
+# go through `validate_closure_unit_data()` instead, which does
+# its own integer / binary / cap / non-negative checks. This
+# helper covers Poisson / NB / binomial / bernoulli / Beta /
+# Gamma / lognormal / Tweedie response shape, called by
+# `mvgam_data()` pre-fit.
+#'@noRd
+validate_response_for_family <- function(y, family, y_name = "y") {
+  y_nz <- y[!is.na(y)]
+  if (!length(y_nz)) return(invisible(TRUE))
+  fam_name <- resolve_family_name(family)
+  fam <- tolower(fam_name)
+  is_integer_like <- all(y_nz == floor(y_nz))
+
+  count_family <- fam %in% c("poisson", "negbinomial", "binomial",
+                              "beta_binomial", "bernoulli")
+  if (count_family) {
+    if (any(y_nz < 0)) {
+      stop(insight::format_error(c(
+        paste0("'", y_name,
+               "' contains negative values but family is '",
+               fam_name, "'."),
+        x = paste0("Min observed: ", min(y_nz), "."),
+        i = "Count and binary families require non-negative integers."
+      )))
+    }
+    if (!is_integer_like) {
+      stop(insight::format_error(c(
+        paste0("'", y_name,
+               "' contains non-integer values but family is '",
+               fam_name, "'."),
+        i = "Count and binary families require non-negative integers."
+      )))
+    }
+    if (fam == "bernoulli" && !all(y_nz %in% c(0L, 1L))) {
+      stop(insight::format_error(c(
+        paste0("'", y_name, "' must be 0/1 for family 'bernoulli'."),
+        x = paste0("Unique observed: ",
+                   paste(sort(unique(y_nz)), collapse = ", "), ".")
+      )))
+    }
+  } else if (fam %in% c("beta", "betar")) {
+    if (any(y_nz <= 0) || any(y_nz >= 1)) {
+      stop(insight::format_error(c(
+        paste0("'", y_name,
+               "' must be strictly inside (0, 1) for family '",
+               fam_name, "'."),
+        x = paste0("Range observed: [", min(y_nz),
+                   ", ", max(y_nz), "].")
+      )))
+    }
+  } else if (fam %in% c("gamma", "lognormal")) {
+    if (any(y_nz <= 0)) {
+      stop(insight::format_error(c(
+        paste0("'", y_name,
+               "' must be strictly positive for family '",
+               fam_name, "'."),
+        x = paste0("Min observed: ", min(y_nz), ".")
+      )))
+    }
+  } else if (fam == "tweedie") {
+    if (any(y_nz < 0)) {
+      stop(insight::format_error(c(
+        paste0("'", y_name,
+               "' must be non-negative for family 'tweedie'."),
+        x = paste0("Min observed: ", min(y_nz), "."),
+        i = "Tweedie models a zero-inflated continuous response."
+      )))
+    }
+  }
+  invisible(TRUE)
+}
+
 
 #' Utility function equivalent to base::deparse0
 #'
@@ -4625,67 +4675,72 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   }
 
   # by = lv_axis() machinery: detect per-factor smooth markers in
-  # mv_spec$base_formula, rewrite each to `by = .trend`, and inject a
-  # `.trend` factor column into trend_data so the existing single brms
-  # compile sees a regular factor by-variable. The grain switches from
-  # (time, series) to (time, .trend) only when has_by_lv is TRUE; the
-  # standard path is unchanged. has_by_lv + n_lv are threaded through
-  # to extract_trend_data and downstream stanvar emission.
+  # mv_spec$base_formula, rewrite each `by` argument so the single brms
+  # compile sees a regular factor by-variable. The rewrite target and
+  # downstream codepath depend on whether the trend spec carries n_lv:
+  #
+  #   factor model (n_lv set): rewrite to `by = .trend`, switch grain
+  #     to (time, .trend), emit factor-model Stan with loadings Z.
+  #   non-factor (n_lv not set): rewrite to `by = series`, keep the
+  #     standard (time, series) grain. Each series gets its own smooth
+  #     basis on the trend side, exactly as `by = series` would on the
+  #     obs side, but with the contribution living in the latent state.
+  #
+  # has_by_lv + n_lv_for_grain are threaded through to extract_trend_data
+  # and the downstream stanvar emission only for the factor-model path.
   has_by_lv <- FALSE
   n_lv_for_grain <- NULL
+  # Reason: `has_by_lv` selects the (time, .trend)-grain codepath and is
+  # FALSE on the non-factor rewrite. `had_by_lv` records that the user
+  # wrote `by = lv_axis()` regardless of which path took it, so display
+  # code (conditional_effects list names, summary tables) can strip the
+  # internal `series` rewrite token and present per-latent-axis
+  # semantics back to the user.
+  had_by_lv <- FALSE
   if (!is.null(mv_spec$base_formula) &&
       inherits(mv_spec$base_formula, "formula")) {
-    by_lv_res <- detect_and_rewrite_by_lv(mv_spec$base_formula)
+    factor_active <- !is.null(parsed_trend$n_lv) &&
+      isTRUE(as.integer(parsed_trend$n_lv) >= 1L)
+    by_lv_res <- detect_and_rewrite_by_lv(
+      mv_spec$base_formula,
+      factor_active = factor_active
+    )
     if (by_lv_res$has_by_lv) {
-      n_lv_for_grain <- parsed_trend$n_lv
-      if (is.null(n_lv_for_grain) || n_lv_for_grain < 1L) {
-        stop(insight::format_error(c(
-          paste0(
-            "'by = lv_axis()' requires a factor model ",
-            "(n_lv < n_series)."
-          ),
-          x = paste0(
-            "No 'n_lv' is set on the trend spec; the formula uses ",
-            by_lv_res$n_by_lv, " per-factor smooth term(s) but no ",
-            "factor model is configured."
-          ),
-          i = paste0(
-            "Set 'trend_map = matrix(NA, n_species, n_lv)' (or supply ",
-            "a partial-Z matrix) so a factor model is triggered, or ",
-            "remove 'by = lv_axis()' from the trend formula."
-          )
-        )), call. = FALSE)
-      }
-      has_by_lv <- TRUE
+      had_by_lv <- TRUE
       mv_spec$base_formula <- by_lv_res$formula
       if (by_lv_res$deprecated_trend_seen) {
         warn_legacy_trend_by()
       }
 
-      # When the loadings matrix Z is user-pinned (fully or partially),
-      # the rotation concern that `by = lv_axis()` was designed to
-      # address is moot: the env constraint and the data-side constraint
-      # both pin factor identification, so the QR-skip auto-resolve
-      # is a no-op (the standard factor-model emission path is not
-      # entered anyway). Surface this as a one-time warning so users
-      # know their rotation setting will not influence the fit.
-      has_fixed_Z <- !is.null(parsed_trend$fixed_Z) ||
-        !is.null(parsed_trend$Z)
-      if (has_fixed_Z &&
-          !identical(Sys.getenv("TESTTHAT"), "true")) {
-        rlang::warn(
-          paste0(
-            "'by = lv_axis()' was supplied with a user-pinned ",
-            "'trend_map' (numeric entries on Z). The per-factor ",
-            "smooths still fit, but factor identification is ",
-            "already pinned by the user-supplied loadings; the ",
-            "rotation auto-skip behaviour does not apply."
-          ),
-          class = "mvgam_by_lv_with_pinned_Z",
-          .frequency = "once",
-          .frequency_id = "mvgam_by_lv_with_pinned_Z"
-        )
+      if (factor_active) {
+        # Factor-model path: switch grain, emit factor-model codegen.
+        has_by_lv <- TRUE
+        n_lv_for_grain <- parsed_trend$n_lv
+
+        # When Z is user-pinned (fully or partially), the rotation
+        # concern that by = lv_axis() was designed to address is moot;
+        # the env constraint and the data-side constraint both pin
+        # factor identification. Emit a one-time warning so users
+        # know the rotation auto-skip is a no-op for their fit.
+        has_fixed_Z <- !is.null(parsed_trend$fixed_Z) ||
+          !is.null(parsed_trend$Z)
+        if (has_fixed_Z) {
+          mvgam_warn_once_user(
+            message = paste0(
+              "'by = lv_axis()' was supplied with a user-pinned ",
+              "'trend_map' (numeric entries on Z). The per-factor ",
+              "smooths still fit, but factor identification is ",
+              "already pinned by the user-supplied loadings; the ",
+              "rotation auto-skip behaviour does not apply."
+            ),
+            class = "mvgam_by_lv_with_pinned_Z"
+          )
+        }
       }
+      # Non-factor path: has_by_lv stays FALSE; the formula was already
+      # rewritten to use `by = series`. The standard (time, series)
+      # codepath handles everything downstream, including conditional
+      # effects via brms native predict.
     }
   }
 
@@ -4720,32 +4775,35 @@ extract_and_validate_trend_components <- function(data, mv_spec,
     cached_formulas = mv_spec$cached_formulas
   )
 
-  # Persist the by_lv grain flags on dimensions so downstream stanvar
+  # Persist the by_lv grain markers on dimensions so downstream stanvar
   # emission (extract_and_rename_trend_parameters → times_trend) sees
   # the matching axis. The standard (time, series) path stays unchanged
-  # when has_by_lv is FALSE.
+  # when has_by_lv is FALSE. `had_by_lv` is a display-only marker (no
+  # effect on codegen) that records whether the AST detector found a
+  # `by = lv_axis()` term, used by conditional_effects.mvgam to hide
+  # the internal `series` / `.trend` rewrite tokens from the
+  # user-visible plot list names.
   dimensions$has_by_lv <- has_by_lv
+  dimensions$had_by_lv <- had_by_lv
   dimensions$n_lv_for_grain <- n_lv_for_grain
 
-  # Cross-grain check now that n_series is known. has_by_lv requires
-  # n_lv < n_series so a factor model is actually triggered downstream
-  # (the existing gate is is_factor_model <- n_lv < n_series).
+  # has_by_lv requires 1 <= n_lv <= n_series.
   if (has_by_lv) {
     n_series_for_check <- dimensions$n_series %||%
       length(dimensions$unique_series %||% character(0))
     if (n_series_for_check < 1L ||
-        n_lv_for_grain >= n_series_for_check) {
+        n_lv_for_grain > n_series_for_check) {
       stop(insight::format_error(c(
         paste0(
           "'by = lv_axis()' requires a factor model ",
-          "(n_lv < n_series)."
+          "(1 <= n_lv <= n_series)."
         ),
         x = paste0(
           "Configured n_lv = ", n_lv_for_grain,
           " but the data has n_series = ", n_series_for_check, "."
         ),
         i = paste0(
-          "Reduce 'n_lv' below the number of series, or remove ",
+          "Lower 'n_lv' to at most n_series, or remove ",
           "'by = lv_axis()' from the trend formula."
         )
       )), call. = FALSE)
@@ -4841,7 +4899,8 @@ extract_and_validate_trend_components <- function(data, mv_spec,
       data, trend_formula, time_var, series_var,
       response_vars = response_vars, .return_metadata = TRUE,
       .precomputed_dimensions = dimensions, trend_specs = mv_spec$trend_specs,
-      has_by_lv = has_by_lv, n_lv_for_grain = n_lv_for_grain
+      has_by_lv = has_by_lv, had_by_lv = had_by_lv,
+      n_lv_for_grain = n_lv_for_grain
     )
 
     if (!is.list(result) || !all(c("trend_data", "metadata") %in% names(result))) {
@@ -4943,7 +5002,8 @@ collapse_to_time_level <- function(data, time_vals, series_vals,
 extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", series_var = "series",
                               mvgam_object = NULL, newdata = NULL, response_vars = NULL,
                               .return_metadata = FALSE, .precomputed_dimensions = NULL, trend_specs = NULL,
-                              has_by_lv = FALSE, n_lv_for_grain = NULL) {
+                              has_by_lv = FALSE, had_by_lv = FALSE,
+                              n_lv_for_grain = NULL) {
 
   # Input validation for new parameters - non-negotiable per CLAUDE.md
   if (!is.null(response_vars)) {
@@ -4954,6 +5014,7 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
     checkmate::assert_list(.precomputed_dimensions, names = "named")
   }
   checkmate::assert_flag(has_by_lv)
+  checkmate::assert_flag(had_by_lv)
   checkmate::assert_integerish(n_lv_for_grain, lower = 1L, len = 1L,
                                 null.ok = TRUE)
   if (has_by_lv && is.null(n_lv_for_grain)) {
@@ -4972,6 +5033,12 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
     if (isTRUE(md_has_by_lv)) {
       has_by_lv <- TRUE
       n_lv_for_grain <- mvgam_object$trend_metadata$n_lv_for_grain
+    }
+    # had_by_lv is display-only but mirrored through prediction so
+    # downstream calls see the same metadata shape regardless of
+    # context. No effect on codegen or newdata reshaping.
+    if (isTRUE(mvgam_object$trend_metadata$had_by_lv %||% FALSE)) {
+      had_by_lv <- TRUE
     }
   }
 
@@ -5306,7 +5373,11 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
       # by = lv_axis() grain switch: persist so prediction rebuilds
       # newdata at the matching (time, .trend) grid via the same
       # extract_trend_data code path under the prediction context.
+      # `had_by_lv` is the display-only twin (see comment near
+      # `dimensions$had_by_lv <- had_by_lv` above) consumed by
+      # `conditional_effects.mvgam` via `mvgam_had_by_lv()`.
       has_by_lv = has_by_lv,
+      had_by_lv = had_by_lv,
       n_lv_for_grain = n_lv_for_grain,
       # Store factor levels for prediction validation
       levels = list(

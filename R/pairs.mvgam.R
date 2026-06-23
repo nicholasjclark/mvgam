@@ -15,14 +15,16 @@
 #'
 #' @examples
 #' \donttest{
-#' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
-#' mod <- mvgam(y ~ s(season, bs = 'cc'),
-#'              trend_model = AR(),
-#'              noncentred = TRUE,
-#'              data = simdat$data_train,
-#'              chains = 2)
-#' pairs(mod)
-#' pairs(mod, variable = c('ar1', 'sigma'), regex = TRUE)
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 60L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
+#'
+#' # Pairs plot over the trend-dynamics parameters.
+#' pairs(mod, variable = "trend_params", regex = TRUE)
 #' }
 #'
 #' @export

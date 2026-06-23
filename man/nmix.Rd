@@ -342,23 +342,27 @@ naive enumeration baseline; the threaded variant
 }
 
 \examples{
-\dontrun{
-# Constant detection probability, abundance varies with elevation
-mvgam(y ~ s(elev), family = nmix(), data = closure_unit_data)
+\donttest{
+# Poisson-binomial N-mixture: per-visit counts with imperfect
+# detection. The state mu is lambda (expected abundance) and
+# the dpar p is the detection probability per visit.
+set.seed(5)
+simdat <- sim_closure_unit_data(family = nmix(), n_species = 1L,
+                                  n_sites = 50L, n_visits = 4L,
+                                  type = 1L)
 
-# Distributional regression on detection
-mvgam(bf(y ~ s(elev), p ~ s(tod)),
-      family = nmix(),
-      data = closure_unit_data)
+mod <- mvgam(
+  bf(y ~ env, p ~ tod_c),
+  data    = simdat$data_train,
+  family  = nmix(),
+  chains  = 2,
+  silent  = 2
+)
+summary(mod, include_betas = FALSE)
 
-# Royle-Nichols variant on binary detection / non-detection data
-mvgam(y ~ s(elev), family = nmix("royle_nichols"),
-      data = closure_unit_binary_data)
-
-# Poisson-Poisson variant on encounter counts
-mvgam(bf(y ~ s(elev), p ~ tod),
-      family = nmix("poisson_poisson"),
-      data = closure_unit_count_data)
+# Marginal env effect on the response scale (expected count
+# = lambda * p).
+conditional_effects(mod)
 }
 
 }

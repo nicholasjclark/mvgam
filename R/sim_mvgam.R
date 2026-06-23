@@ -99,12 +99,16 @@
 #'   `sim_mvgam()` produces.
 #'
 #' @examples
-#' \donttest{
-#' sim <- sim_mvgam(type = 1, family = gaussian(),
-#'                  n_timepoints = 60, seed = 1)
-#' head(sim$data_train)
-#' str(sim$true_smooths)
-#' }
+#' # Three Poisson series with an AR(1) latent trend.
+#' set.seed(0)
+#' simdat <- sim_mvgam(
+#'   family       = poisson(),
+#'   n_series     = 3L,
+#'   n_timepoints = 60L,
+#'   trend_model  = AR()
+#' )
+#' head(simdat$data_train)
+#' summary(simdat)
 #'
 #' @export
 sim_mvgam <- function(type = 1L,
@@ -126,7 +130,7 @@ sim_mvgam <- function(type = 1L,
   checkmate::assert_number(prop_missing, lower = 0, upper = 0.5)
   checkmate::assert_list(family_pars)
   family <- validate_family(family)
-  fam_name <- family$family
+  fam_name <- resolve_family_name(family)
 
   if (!is.null(seed)) {
     if (exists(".Random.seed", envir = .GlobalEnv)) {
@@ -363,11 +367,11 @@ summary.mvgam_sim <- function(object, ...) {
   checkmate::assert_class(object, "mvgam_sim")
   trend_label <- if (is.null(object$trend_model)) {
     "None"
-  } else if (!is.null(object$trend_model$label) &&
-             nzchar(object$trend_model$label)) {
-    object$trend_model$label
   } else {
-    object$trend_model$type %||% "Unknown"
+    object$trend_model$trend %||%
+      object$trend_model$label %||%
+      object$trend_model$type %||%
+      "Unknown"
   }
   smooths <- object$true_smooths %||% list()
   structure(
@@ -723,6 +727,7 @@ intercept_for_family <- function(fam_name) {
     "binomial" = 0,        # logit link: probability ~ 0.5
     "bernoulli" = 0,
     "beta" = 0,            # logit link: mean ~ 0.5
+    "tweedie" = log(2),    # log link: mean ~ 2 (CP with zeros)
     0
   )
 }
@@ -948,6 +953,7 @@ link_scale_budget <- function(fam_name) {
     "binomial" = 1.5,
     "bernoulli" = 1.5,
     "beta" = 1.5,
+    "tweedie" = 0.8,
     1.0
   )
 }
@@ -974,7 +980,7 @@ sd_rescale_factor <- function(x, target_sd) {
 #'@noRd
 sim_family_pars <- function(family, family_pars, prop_trend,
                               eta_sd) {
-  fam_name <- tolower(family$family)
+  fam_name <- tolower(resolve_family_name(family))
   # obs noise SD = (1 - prop_trend) share of link-scale variance,
   # converted to family-specific scale.
   noise_sigma <- max(eta_sd * sqrt(1 - prop_trend), 0.1)
@@ -991,6 +997,10 @@ sim_family_pars <- function(family, family_pars, prop_trend,
     "bernoulli" = list(trials = 1L),
     "beta" = list(phi = family_pars$phi %||% 10),
     "gamma" = list(shape = family_pars$shape %||% 5),
+    "tweedie" = list(
+      phi   = family_pars$phi   %||% 1,
+      power = family_pars$power %||% 1.5
+    ),
     list()
   )
   out

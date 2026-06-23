@@ -172,9 +172,23 @@ test_that("newdata = NULL returns hindcasts only, no forecasts", {
     `as_draws_matrix` = function(...) draws,
     .package = "posterior"
   )
+  # Standard families: hindcast pulls per-draw trend[t, s] from the
+  # stanfit via extract_trend_latent_states, composes with the
+  # per-draw obs-side linpred, then samples the response via
+  # predict_single_response.
   testthat::local_mocked_bindings(
-    posterior_predict = function(...) {
-      matrix(2L, nrow = 3L, ncol = 10L)
+    extract_trend_latent_states = function(mvgam_fit, newdata,
+                                             full_draws) {
+      matrix(0, nrow = 3L, ncol = nrow(newdata))
+    },
+    extract_component_linpred = function(mvgam_fit, newdata,
+                                           component, ...) {
+      matrix(0, nrow = 3L, ncol = nrow(newdata))
+    },
+    predict_single_response = function(object, linpred_resp, resp,
+                                         draw_ids, ndraws, newdata,
+                                         is_multivariate) {
+      matrix(2L, nrow = length(draw_ids), ncol = nrow(newdata))
     }
   )
   fc <- forecast(fit, newdata = NULL, type = "response")
@@ -252,18 +266,29 @@ test_that("ndraws beyond available draws errors informatively", {
 
 
 test_that("All multivariate / PW trend types flow through dispatch", {
-  # Every supported trend type should now reach
-  # build_hindcast_arms (stubbed via posterior_predict /
-  # posterior_epred below). Only an invented "BOGUS" type
-  # should still fail before dispatch.
+  # Every supported trend type should reach build_hindcast_arms.
+  # Stubs cover the new Stan-direct hindcast pipeline (extract
+  # trend + obs linpred + family RNG). Only an invented "BOGUS"
+  # type should still fail before dispatch.
   draws <- make_draws_mat(ndraws = 2L)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
     .package = "posterior"
   )
   testthat::local_mocked_bindings(
-    posterior_predict = function(...) matrix(1L, 2L, 10L),
-    posterior_epred = function(...) matrix(1, 2L, 10L)
+    extract_trend_latent_states = function(mvgam_fit, newdata,
+                                             full_draws) {
+      matrix(0, nrow = 2L, ncol = nrow(newdata))
+    },
+    extract_component_linpred = function(mvgam_fit, newdata,
+                                           component, ...) {
+      matrix(0, nrow = 2L, ncol = nrow(newdata))
+    },
+    predict_single_response = function(object, linpred_resp, resp,
+                                         draw_ids, ndraws, newdata,
+                                         is_multivariate) {
+      matrix(1L, nrow = length(draw_ids), ncol = nrow(newdata))
+    }
   )
   for (tt in c("VAR", "CAR", "PW")) {
     fit_tt <- make_mock_mvgam(trend_type = tt)

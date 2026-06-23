@@ -91,33 +91,18 @@
 #'
 #' @examples
 #' \donttest{
-#' sim <- sim_mvgam(family = Gamma())
-#' mod <- mvgam(
-#'   y ~ s(season, bs = "cc"),
-#'   trend_model = AR(),
-#'   data = sim$data_train,
-#'   family = Gamma(),
-#'   chains = 2,
-#'   silent = 2
-#' )
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 60L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
 #'
-#' # Refit with a different sampler configuration.
-#' mod2 <- update(mod, iter = 500, chains = 1)
-#'
-#' # Refit on a subset of the training data.
-#' mod3 <- update(mod, newdata = sim$data_train[1:30, ])
-#'
-#' # Add a covariate to the formula.
-#' mod4 <- update(mod, formula. = ~ . + s(x))
-#'
-#' # Override priors for the refit (replaces the inherited table).
-#' mod5 <- update(
-#'   mod,
-#'   prior = c(
-#'     prior(normal(0, 1), class = "b"),
-#'     prior(exponential(1), class = "sigma")
-#'   )
-#' )
+#' # Refit with the same formula but tighter sampling. update()
+#' # reuses the cached Stan model so it skips compilation.
+#' upd <- update(mod, chains = 2, silent = 2,
+#'                iter = 200, warmup = 100, refresh = 0)
 #' }
 #'
 #' @method update mvgam

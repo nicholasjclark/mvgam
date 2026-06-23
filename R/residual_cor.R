@@ -91,6 +91,33 @@
 #'   \emph{Methods in Ecology and Evolution}, 7(6), 744-750.
 #'   \doi{10.1111/2041-210X.12514}
 #'
+#' @examples
+#' \donttest{
+#' # Multi-species occupancy factor model -- the Z Z' product gives
+#' # the species-by-species residual covariance after fixed effects
+#' # are accounted for.
+#' set.seed(1)
+#' simdat <- sim_closure_unit_data(
+#'   family    = occ(),
+#'   n_species = 4L,
+#'   n_sites   = 50L,
+#'   n_visits  = 4L,
+#'   type      = 2L
+#' )
+#' mod <- jsdgam(
+#'   formula        = bf(y ~ env, p ~ tod_c),
+#'   factor_formula = ~ -1,
+#'   data           = simdat$data_train,
+#'   family         = occ(),
+#'   n_lv           = 2L,
+#'   chains         = 2,
+#'   silent         = 2
+#' )
+#'
+#' rc <- residual_cor(mod)
+#' round(rc$cor, 2)
+#' }
+#'
 #' @export
 residual_cor <- function(object, ...) {
   UseMethod("residual_cor", object)

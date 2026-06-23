@@ -131,10 +131,12 @@ beta_shapes <- function(mu, phi) {
 #'@noRd
 sim_family_rng <- function(eta, family, pars = list()) {
   checkmate::assert_numeric(eta, finite = TRUE)
-  # brms / validate_family normalises "Gamma" to lowercase "gamma";
-  # accept either casing so callers can pass base R Gamma() or
-  # brms::brmsfamily("Gamma") interchangeably.
-  fam_name <- tolower(family$family)
+  # `resolve_family_name()` returns the user-visible name for both
+  # base R / brms families and customfamily objects (where
+  # `family$family` is the literal string "custom"). Routing
+  # through it lets sim_family_rng dispatch on `tweedie` as well
+  # as the brms-native families with one code path.
+  fam_name <- tolower(resolve_family_name(family))
   link <- family$link
   inv_link <- switch(
     link,
@@ -169,15 +171,45 @@ sim_family_rng <- function(eta, family, pars = list()) {
       length(eta), shape = pars$shape %||% 2,
       rate = (pars$shape %||% 2) / mu
     ),
+    "tweedie" = sim_tweedie(mu, pars$phi %||% 1, pars$power %||% 1.5),
     stop(insight::format_error(c(
       "Unsupported family in 'sim_family_rng'.",
       x = paste0("Got: '", fam_name, "'."),
       i = paste0(
         "Supported: gaussian, student, poisson, negbinomial, ",
-        "binomial, beta, gamma."
+        "binomial, beta, gamma, tweedie."
       )
     )))
   )
+}
+
+# Internal: Tweedie (compound Poisson-Gamma) sampler for
+# 1 < power < 2. Generates N ~ Poisson(lambda) jumps and sums
+# Gamma(shape, rate) summands. Avoids the optional `tweedie`
+# package dependency; matches Jorgensen's CP parameterisation
+# used by `brms::brmsfamily('tweedie')` and mvgam::tweedie().
+#'@noRd
+sim_tweedie <- function(mu, phi, power) {
+  checkmate::assert_numeric(mu, lower = .Machine$double.eps,
+                              finite = TRUE)
+  checkmate::assert_number(phi, lower = .Machine$double.eps)
+  checkmate::assert_number(power, lower = 1 + 1e-6,
+                            upper = 2 - 1e-6)
+  lambda <- mu^(2 - power) / (phi * (2 - power))
+  shape  <- (2 - power) / (power - 1)
+  rate   <- mu^(1 - power) / (phi * (power - 1))
+  n      <- length(mu)
+  N      <- stats::rpois(n, lambda)
+  out    <- numeric(n)
+  pos    <- N > 0L
+  if (any(pos)) {
+    out[pos] <- vapply(
+      which(pos),
+      function(i) sum(stats::rgamma(N[i], shape = shape, rate = rate[i])),
+      numeric(1)
+    )
+  }
+  out
 }
 
 

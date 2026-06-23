@@ -72,52 +72,26 @@
 #'
 #' @examples
 #' \donttest{
-#' # Fit a JSDGAM to the portal_data captures
+#' set.seed(1)
+#' simdat <- sim_closure_unit_data(
+#'   family    = occ(),
+#'   n_species = 4L,
+#'   n_sites   = 50L,
+#'   n_visits  = 4L,
+#'   type      = 2L
+#' )
 #' mod <- jsdgam(
-#'   formula = captures ~
-#'     ndvi_ma12:series + mintemp:series + gp(time, k = 15),
+#'   formula        = bf(y ~ env, p ~ tod_c),
 #'   factor_formula = ~ -1,
-#'   data = portal_data,
-#'   unit = time,
-#'   species = series,
-#'   family = poisson(),
-#'   n_lv = 2,
-#'   silent = 2,
-#'   chains = 2
+#'   data           = simdat$data_train,
+#'   family         = occ(),
+#'   n_lv           = 2L,
+#'   chains         = 2,
+#'   silent         = 2
 #' )
 #'
-#' # Residual ordination biplot
-#' ordinate(mod, alpha = 0.7)
-#'
-#' # Overlay per-species trait arrows on the same biplot. Rows
-#' # of `traits` are aligned to species via rownames; numeric
-#' # columns become arrows in the LV space. The default
-#' # `trait_arrow_scale = 1` matches the longest trait arrow to
-#' # the longest species-loading radius for visual balance.
-#' species_traits <- data.frame(
-#'   body_mass = c(45, 22, 110, 8, 65),
-#'   row.names = levels(portal_data$series)[1:5]
-#' )
-#' ordinate(mod, alpha = 0.7, traits = species_traits)
-#'
-#' # Shrink the trait arrows when they would otherwise dominate
-#' # the biplot.
-#' ordinate(mod, traits = species_traits, trait_arrow_scale = 0.6)
-#'
-#' # If the fit was trait-informed via jsdgam(traits = ...), pull
-#' # the trait frame straight off the fit object.
-#' mod_traits <- jsdgam(
-#'   formula = captures ~ ndvi_ma12:series + mintemp:series +
-#'     gp(time, k = 15),
-#'   factor_formula = ~ -1, data = portal_data,
-#'   unit = time, species = series, family = poisson(),
-#'   n_lv = 2, traits = species_traits,
-#'   chains = 2, silent = 2
-#' )
-#' ordinate(mod_traits, traits = "auto")
-#'
-#' # Compare to a residual correlation plot
-#' plot(residual_cor(mod))
+#' # SVD biplot of site + species scores in the two-factor space.
+#' ordinate(mod)
 #' }
 #'
 #' @export

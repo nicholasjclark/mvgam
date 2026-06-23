@@ -54,3 +54,19 @@ The summary includes the following columns:
 \item{\code{Tail_ESS}}{Tail effective sample size}
 }
 }
+\examples{
+\donttest{
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
+mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
+
+# `include_betas = FALSE` keeps the printed summary readable when
+# the model carries many smooth coefficients.
+summary(mod, include_betas = FALSE)
+}
+
+}

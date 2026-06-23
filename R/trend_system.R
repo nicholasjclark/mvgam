@@ -421,27 +421,6 @@ pw_trend_properties <- function() {
 #' @return Invisibly returns TRUE on successful registration
 #' @export
 #'
-#' @examples
-#' \dontrun{
-#' # RECOMMENDED: Convention-based approach (auto-discovered)
-#' generate_garch_trend_stanvars <- function(trend_specs, data_info) {
-#'   # GARCH trend implementation
-#'   list(brms::stanvar(...))
-#' }
-#'
-#' garch_trend_properties <- function() {
-#'   list(
-#'     supports_factors = TRUE,
-#'     incompatibility_reason = NULL
-#'   )
-#' }
-#' # No registration call needed! Auto-discovered on package load.
-#'
-#' # ALTERNATIVE: Manual registration (discouraged)
-#' register_custom_trend("GARCH",
-#'                      supports_factors = TRUE,
-#'                      generator_func = generate_garch_trend_stanvars)
-#' }
 register_custom_trend <- function(name, supports_factors = FALSE, generator_func,
                                  incompatibility_reason = NULL) {
   # Input validation with checkmate
@@ -524,16 +503,6 @@ ensure_registry_initialized <- function() {
 #' @return Object of class `trend_param` containing parameter specification
 #' @export
 #'
-#' @examples
-#' # Basic parameter
-#' sigma_param <- trend_param("sigma", bounds = c(0, Inf), label = "innovation_sd")
-#'
-#' # Conditional parameter
-#' theta_param <- trend_param("theta", bounds = c(-1, 1),
-#'                           condition = ma, label = "ma_coefficient")
-#'
-#' # Combine parameters
-#' all_params <- sigma_param + theta_param
 trend_param <- function(name, bounds = NULL, monitor = TRUE,
                        label = NULL, condition = TRUE) {
   checkmate::assert_string(name, min.chars = 1)
@@ -666,7 +635,7 @@ generate_monitor_params <- function(trend_spec) {
   checkmate::assert_list(trend_spec, min.len = 1)
 
   # Extract trend type (normalize for registry lookup)
-  trend_type <- normalize_trend_type(trend_spec$trend %||% trend_spec$trend_type)
+  trend_type <- get_trend_name(trend_spec)
 
   # Base parameters that most trends share
   base_params <- c("sigma_trend")
@@ -817,6 +786,22 @@ normalize_trend_type <- function(trend_type) {
   gsub("\\d+|\\(.*\\)", "", trend_type)
 }
 
+
+# Internal: pull the canonical trend constructor name from a
+# trend spec object (an mvgam_trend, the bare result of
+# `AR()` / `VAR()` / `RW()` / `CAR()` / `PW()` / `ZMVN()`).
+# Other callers across `R/` already use the
+# `spec$trend %||% spec$trend_type` pattern (see line ~638);
+# this helper centralises it and runs the same
+# `normalize_trend_type()` strip used downstream.
+#'@noRd
+get_trend_name <- function(trend_spec) {
+  if (is.null(trend_spec)) return(NA_character_)
+  raw <- trend_spec$trend %||% trend_spec$trend_type
+  if (is.null(raw) || !length(raw)) return(NA_character_)
+  normalize_trend_type(as.character(raw)[1L])
+}
+
 # -----------------------------------------------------------------------------
 # Ultra-Efficient Forecast Metadata Generation
 # -----------------------------------------------------------------------------
@@ -834,7 +819,7 @@ generate_forecast_metadata <- function(trend_spec) {
   checkmate::assert_list(trend_spec, min.len = 1)
 
   # Extract and normalize trend type
-  trend_type <- normalize_trend_type(trend_spec$trend %||% trend_spec$trend_type)
+  trend_type <- get_trend_name(trend_spec)
 
   # Convention-based function naming: "AR" → forecast_ar_rcpp
   function_name <- paste0("forecast_", tolower(trend_type), "_rcpp")
@@ -970,7 +955,7 @@ generate_summary_labels <- function(trend_spec) {
   monitor_params <- generate_monitor_params(trend_spec)
 
   # Extract trend type for context
-  trend_type <- normalize_trend_type(trend_spec$trend %||% trend_spec$trend_type)
+  trend_type <- get_trend_name(trend_spec)
 
   # Generate labels for each monitor parameter
   labels <- character(length(monitor_params))
@@ -1454,19 +1439,6 @@ factor_model_trend_rules <- c(
 #'   - tpars: Character vector of all parameter names with _trend suffix
 #'   - monitor_pars: Character vector of parameters to monitor (subset of tpars)
 #'   - bounds: Named list of bounds with updated parameter names
-#' @examples
-#' # Define parameters with bounds and monitoring
-#' param_specs <- list(
-#'   sigma = c(0, Inf),  # Monitored by default
-#'   ar = c(-1, 1),      # Monitored by default
-#'   LV_innovations = list(bounds = NULL, monitor = FALSE),  # Not monitored
-#'   theta = NULL        # Conditional parameter
-#' )
-#' result <- process_trend_params(param_specs)
-#' # result$tpars: c("sigma_trend", "ar_trend", "LV_innovations_trend")
-#' # result$monitor_pars: c("sigma_trend", "ar_trend")  # LV_innovations excluded
-#' # result$bounds: list(sigma_trend = c(0, Inf), ar_trend = c(-1, 1))
-#'
 #' @noRd
 process_trend_params <- function(param_specs, envir = parent.frame()) {
   # Handle case where no trend-specific parameters are defined
@@ -1570,32 +1542,6 @@ mvgam_trend_pattern <- function() {
 #' @return A custom mvgam trend object
 #' @export
 #'
-#' @examples
-#' \dontrun{
-#' # Create a custom GARCH trend type
-#' GARCH <- function(p = 1, q = 1) {
-#'   custom_trend(
-#'     trend = "GARCH",
-#'     tpars = c("alpha", "beta", "sigma_trend"),
-#'     forecast_fun = "forecast_garch_rcpp",
-#'     stancode_fun = "generate_garch_stan",
-#'     standata_fun = "prepare_garch_data",
-#'     bounds = list(
-#'       alpha = c(0, 1),
-#'       beta = c(0, 1),
-#'       sigma_trend = c(0, Inf)
-#'     ),
-#'     characteristics = list(
-#'       supports_predictors = TRUE,
-#'       supports_correlation = FALSE,
-#'       supports_factors = FALSE,
-#'       max_order = max(p, q),
-#'       requires_sorting = TRUE
-#'     ),
-#'     p = p, q = q
-#'   )
-#' }
-#' }
 custom_trend <- function(trend, tpars, forecast_fun, stancode_fun,
                          standata_fun = NULL, bounds = list(),
                          characteristics = list(), ...) {
@@ -2300,252 +2246,68 @@ print.mvgam_trend <- function(x, ...) {
 #'
 #' @examples
 #' \donttest{
-#' # Basic trend model usage with defaults (will issue warnings)
+#' # Simulate three Gaussian series driven by a correlated VAR(1)
+#' # process so the cross-series dependencies are recoverable.
 #' set.seed(0)
 #' simdat <- sim_mvgam(
-#'   T = 50,
-#'   n_series = 3,
-#'   prop_trend = 0.6
-#' )
-#' mod1 <- mvgam(
-#'   y ~ s(season, bs = "cc"),
-#'   trend_formula = ~ RW(),
-#'   data = simdat$data_train,
-#'   chains = 2,
-#'   silent = 2
+#'   family       = gaussian(),
+#'   n_series     = 3L,
+#'   n_timepoints = 60L,
+#'   trend_model  = VAR(),
+#'   prop_trend   = 0.95
 #' )
 #'
-#' # Using custom time and series variable names with simulated data
-#' set.seed(123)
-#' weekly_data <- sim_mvgam(
-#'   T = 52,
-#'   n_series = 2,
-#'   prop_trend = 0.5
-#' )$data_train
+#' # Fit a VAR(1) state-space model. The trend constructor goes
+#' # inside `trend_formula`; the obs side carries only the
+#' # intercept.
+#' mod <- mvgam(
+#'   y ~ 1,
+#'   trend_formula = ~ VAR(p = 1),
+#'   data          = simdat$data_train,
+#'   family        = gaussian(),
+#'   chains        = 2,
+#'   silent        = 2
+#' )
+#' summary(mod, include_betas = FALSE)
 #'
-#' # Rename variables to demonstrate custom naming
-#' weekly_data$week <- weekly_data$time
-#' weekly_data$species <- weekly_data$series
-#' weekly_data$temp <- rnorm(nrow(weekly_data))
+#' # `variable = "trend_params"` is a keyword shortcut that pulls
+#' # every trend-dynamics parameter (A_trend, sigma_trend, the
+#' # Sigma_trend covariance, etc.) in one call. See ?mvgam_draws
+#' # for the full keyword set ("betas", "obs_params",
+#' # "smooth_params", "trend_betas", "trend_params",
+#' # "trend_smooth_params").
+#' mcmc_plot(mod, variable = "trend_params", type = "intervals")
 #'
-#' mod2 <- mvgam(
-#'   y ~ temp,
-#'   trend_formula = ~ AR(time = week, series = species, p = 1),
-#'   data = weekly_data,
-#'   chains = 2,
-#'   silent = 2
+#' # Continuous-time AR(1) on irregularly-spaced data. Recipe 6
+#' # of sim_mvgam() defaults to CAR() with U(1, 6) time gaps.
+#' set.seed(7)
+#' simdat_car <- sim_mvgam(
+#'   type         = 6L,
+#'   family       = gaussian(),
+#'   n_series     = 1L,
+#'   n_timepoints = 80L
 #' )
 #'
-#' # Seasonal AR model with multiple lags using portal_data
-#' data(portal_data)
-#' mod3 <- mvgam(
-#'   captures ~ s(ndvi_ma12) + s(mintemp),
-#'   trend_formula = ~ AR(p = c(1, 12)),  # Annual seasonality
-#'   data = portal_data,
-#'   family = nb(),
-#'   chains = 2,
-#'   silent = 2
+#' # Fit the CAR(1) model. ar1_trend[1] is the continuous-time
+#' # decay parameter and adapts to the per-step time gap.
+#' mod_car <- mvgam(
+#'   y ~ 1,
+#'   trend_formula = ~ CAR(),
+#'   data          = simdat_car$data_train,
+#'   family        = gaussian(),
+#'   chains        = 2,
+#'   silent        = 2
 #' )
+#' mcmc_plot(mod_car, variable = "trend_params", type = "intervals")
 #'
-#' # Hierarchical models with custom time and series variables
-#' set.seed(456)
-#' multisite_data <- rbind(
-#'   sim_mvgam(T = 30, n_series = 3, prop_trend = 0.7)$data_train %>%
-#'     dplyr::mutate(region = "north"),
-#'   sim_mvgam(T = 30, n_series = 3, prop_trend = 0.7)$data_train %>%
-#'     dplyr::mutate(region = "south")
-#' ) %>%
-#'   dplyr::mutate(
-#'     region = as.factor(region),
-#'     unit_id = paste0(region, "_", series),
-#'     timestep = time,
-#'     temperature = rnorm(n())
-#'   ) %>%
-#'   dplyr::select(-series)  # Remove series for hierarchical structure
-#'
-#' mod4 <- mvgam(
-#'   y ~ temperature,
-#'   trend_formula = ~ VAR(
-#'     time = timestep,
-#'     gr = region,
-#'     subgr = unit_id,
-#'     p = 2
-#'   ),
-#'   data = multisite_data,
-#'   chains = 2,
-#'   silent = 2
-#' )
-#'
-#' # Multiple species across sites using portal_data
-#' portal_subset <- portal_data %>%
-#'   dplyr::mutate(
-#'     survey_date = time,
-#'     species_site = series,
-#'     count = captures,
-#'     habitat = "grassland",
-#'     temperature = mintemp
-#'   )
-#'
-#' mod5 <- mvgam(
-#'   count ~ habitat + temperature,
-#'   trend_formula = ~ RW(time = survey_date, series = species_site),
-#'   data = portal_subset,
-#'   family = nb(),
-#'   chains = 2,
-#'   silent = 2
-#' )
-#'
-#' # A short example to illustrate CAR(1) models
-#' # Function to simulate CAR1 data with seasonality
-#' sim_corcar1 <- function(n = 125,
-#'                         phi = 0.5,
-#'                         sigma = 2,
-#'                         sigma_obs = 0.75) {
-#'   # Sample irregularly spaced time intervals
-#'   time_dis <- c(1, runif(n - 1, 0, 5))
-#'
-#'   # Set up the latent dynamic process
-#'   x <- vector(length = n)
-#'   x[1] <- -0.3
-#'   for (i in 2:n) {
-#'     # Zero-distances will cause problems in sampling, so mvgam uses a
-#'     # minimum threshold; this simulation function emulates that process
-#'     if (time_dis[i] == 0) {
-#'       x[i] <- rnorm(
-#'         1,
-#'         mean = (phi^1e-3) * x[i - 1],
-#'         sd = sigma * sqrt((1 - phi^(2 * 1e-3)) / (1 - phi^2))
-#'       )
-#'     } else {
-#'       x[i] <- rnorm(
-#'         1,
-#'         mean = (phi^time_dis[i]) * x[i - 1],
-#'         sd = sigma * sqrt((1 - phi^(2 * time_dis[i])) / (1 - phi^2))
-#'       )
-#'     }
-#'   }
-#'
-#'   # Add 12-month seasonality
-#'   cov1 <- sin(2 * pi * (1:n) / 12)
-#'   cov2 <- cos(2 * pi * (1:n) / 12)
-#'   beta1 <- runif(1, 0.3, 0.7)
-#'   beta2 <- runif(1, 0.2, 0.5)
-#'   seasonality <- beta1 * cov1 + beta2 * cov2
-#'
-#'   # Take Gaussian observations with error and return
-#'   data.frame(
-#'     y = rnorm(n, mean = x + seasonality, sd = sigma_obs),
-#'     season = rep(1:12, 20)[1:n],
-#'     time = cumsum(time_dis)
-#'   )
+#' # Other trend constructors swap in the same place. For example
+#' # an AR(1) on a single series:
+#' #   trend_formula = ~ AR(p = 1)
+#' # or a zero-mean multivariate normal residual prior for cross-
+#' # series correlations:
+#' #   trend_formula = ~ ZMVN()
 #' }
 #'
-#' # Sample two time series
-#' set.seed(99)
-#' dat <- rbind(
-#'   dplyr::bind_cols(
-#'     sim_corcar1(phi = 0.65, sigma_obs = 0.55),
-#'     data.frame(series = "series1")
-#'   ),
-#'   dplyr::bind_cols(
-#'     sim_corcar1(phi = 0.8, sigma_obs = 0.35),
-#'     data.frame(series = "series2")
-#'   )
-#' ) %>%
-#'   dplyr::mutate(series = as.factor(series))
-#'
-#' # mvgam with CAR(1) trends and a shared cyclic seasonal smooth
-#' mod <- mvgam(
-#'   formula = y ~ -1,
-#'   trend_formula = ~ s(season, bs = 'cc', k = 5),
-#'   trend_model = CAR(),
-#'   priors = c(
-#'     prior(exponential(3), class = sigma),
-#'     prior(beta(4, 4), class = sigma_obs)
-#'   ),
-#'   data = dat,
-#'   family = gaussian(),
-#'   chains = 2,
-#'   silent = 2
-#' )
-#'
-#' # View usual summaries and plots
-#' summary(mod)
-#' conditional_effects(mod, type = 'expected')
-#' plot(mod, type = 'trend', series = 1)
-#' plot(mod, type = 'trend', series = 2)
-#' plot(mod, type = 'residuals', series = 1)
-#' plot(mod, type = 'residuals', series = 2)
-#' mcmc_plot(
-#'   mod,
-#'   variable = "ar1",
-#'   regex = TRUE,
-#'   type = "hist"
-#' )
-#'
-#' # Now an example illustrating hierarchical dynamics
-#' set.seed(123)
-#'
-#' # Simulate three species monitored in three different regions
-#' simdat1 <- sim_mvgam(
-#'   trend_model = VAR(),  # cor = TRUE is now automatic for VAR models
-#'   prop_trend = 0.95,
-#'   n_series = 3,
-#'   mu = c(1, 2, 3)
-#' )
-#' simdat2 <- sim_mvgam(
-#'   trend_model = VAR(),  # cor = TRUE is now automatic for VAR models
-#'   prop_trend = 0.95,
-#'   n_series = 3,
-#'   mu = c(1, 2, 3)
-#' )
-#' simdat3 <- sim_mvgam(
-#'   trend_model = VAR(),  # cor = TRUE is now automatic for VAR models
-#'   prop_trend = 0.95,
-#'   n_series = 3,
-#'   mu = c(1, 2, 3)
-#' )
-#'
-#' # Set up the data but DO NOT include 'series'
-#' all_dat <- rbind(
-#'   simdat1$data_train %>%
-#'     dplyr::mutate(region = "qld"),
-#'   simdat2$data_train %>%
-#'     dplyr::mutate(region = "nsw"),
-#'   simdat3$data_train %>%
-#'     dplyr::mutate(region = "vic")
-#' ) %>%
-#'   dplyr::mutate(
-#'     species = gsub("series", "species", series),
-#'     species = as.factor(species),
-#'     region = as.factor(region)
-#'   ) %>%
-#'   dplyr::arrange(series, time) %>%
-#'   dplyr::select(-series)
-#'
-#' # Check priors for a hierarchical AR1 model
-#' get_mvgam_priors(
-#'   formula = y ~ species,
-#'   trend_model = AR(gr = region, subgr = species),
-#'   data = all_dat
-#' )
-#'
-#' # Fit the model
-#' mod <- mvgam(
-#'   formula = y ~ species,
-#'   trend_model = AR(gr = region, subgr = species),
-#'   data = all_dat,
-#'   chains = 2,
-#'   silent = 2
-#' )
-#'
-#' # Check standard outputs
-#' summary(mod)
-#' conditional_effects(mod, type = "link")
-#'
-#' # Inspect posterior estimates for the correlation weighting parameter
-#' mcmc_plot(mod, variable = "alpha_cor_trend", type = "hist")
-#' }
 #' @export
 RW = function(
     time = NA,
@@ -2783,99 +2545,29 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, gr = NA,
 #'
 #' @examples
 #' \donttest{
-#' # Basic linear piecewise trend with defaults (will issue warnings)
-#' set.seed(101)
-#' linear_data <- data.frame(
-#'   y = rnorm(50, mean = 1:50, sd = 2),
-#'   time = 1:50,
-#'   series = factor("series_1")
+#' # Linear PW on a single Poisson series. `y ~ -1` removes the
+#' # observation intercept so the PW trend's `m_trend` parameter
+#' # is the unique constant offset (otherwise the two compete for
+#' # the same constant on the link scale).
+#' set.seed(2024)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 80L)
+#'
+#' mod <- mvgam(
+#'   y ~ -1,
+#'   trend_formula = ~ PW(growth = "linear"),
+#'   data          = simdat$data_train,
+#'   family        = poisson(),
+#'   chains        = 2,
+#'   silent        = 2
 #' )
+#' summary(mod, include_betas = FALSE)
 #'
-#' mod1 <- mvgam(
-#'   y ~ 0,
-#'   trend_model = PW(growth = "linear"),
-#'   data = linear_data,
-#'   chains = 2,
-#'   silent = 2
-#' )
-#'
-#' # Custom variable names for time and series
-#' growth_data <- data.frame(
-#'   count = rpois(60, exp(seq(0, 2, length.out = 60))),
-#'   week = 1:60,
-#'   population = factor("pop_A"),
-#'   carrying_capacity = 100
-#' )
-#'
-#' mod2 <- mvgam(
-#'   count ~ 0,
-#'   trend_model = PW(
-#'     time = week,
-#'     series = population,
-#'     cap = carrying_capacity,
-#'     growth = "logistic",
-#'     n_changepoints = 5
-#'   ),
-#'   family = poisson(),
-#'   data = growth_data,
-#'   chains = 2,
-#'   silent = 2
-#' )
-#'
-#' # Example of logistic growth with possible changepoints
-#' dNt <- function(r, N, k) {
-#'   r * N * (k - N)
-#' }
-#'
-#' Nt <- function(r, N, t, k) {
-#'   for (i in 1:(t - 1)) {
-#'     if (i %in% c(5, 15, 25, 41, 45, 60, 80)) {
-#'       N[i + 1] <- max(
-#'         1,
-#'         N[i] + dNt(r + runif(1, -0.1, 0.1), N[i], k)
-#'       )
-#'     } else {
-#'       N[i + 1] <- max(1, N[i] + dNt(r, N[i], k))
-#'     }
-#'   }
-#'   N
-#' }
-#'
-#' set.seed(11)
-#' expected <- Nt(0.004, 2, 100, 30)
-#' plot(expected, xlab = "Time")
-#'
-#' y <- rpois(100, expected)
-#' plot(y, xlab = "Time")
-#'
-#' mod_data <- data.frame(
-#'   y = y,
-#'   time = 1:100,
-#'   cap = 35,
-#'   series = as.factor("series_1")
-#' )
-#' mod3 <- mvgam(
-#'   y ~ 0,
-#'   trend_model = PW(growth = "logistic"),  # Uses default 'cap' variable
-#'   family = poisson(),
-#'   data = mod_data,
-#'   chains = 2,
-#'   silent = 2
-#' )
-#' summary(mod3)
-#'
-#' hc <- hindcast(mod3)
-#' plot(hc)
-#'
-#' library(ggplot2)
-#' mcmc_plot(mod3, variable = "delta_trend", regex = TRUE) +
-#'   scale_y_discrete(labels = mod3$trend_model$changepoints) +
-#'   labs(
-#'     y = "Potential changepoint",
-#'     x = "Rate change"
-#'   )
-#'
-#' how_to_cite(mod3)
+#' # PW exposes the base growth rate (k_trend), offset (m_trend)
+#' # and the changepoint rate deltas (delta_trend[changepoint,
+#' # series]). Visualise the full set with the trend_params
+#' # keyword.
+#' mcmc_plot(mod, variable = "trend_params", type = "intervals")
 #' }
 #'
 #' @export
@@ -3045,74 +2737,33 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #'
 #' @examples
 #' \donttest{
-#' # Simulate counts of four species over ten sampling locations
-#' set.seed(42)
-#' site_dat <- data.frame(
-#'   site = rep(1:10, 4),
-#'   species = as.factor(sort(rep(letters[1:4], 10))),
-#'   y = c(NA, rpois(39, 3))
+#' # Simulate four correlated Gaussian series. ZMVN is a single-
+#' # snapshot residual prior, so the recoverable structure is the
+#' # cross-series covariance.
+#' set.seed(2)
+#' simdat <- sim_mvgam(
+#'   family       = gaussian(),
+#'   n_series     = 4L,
+#'   n_timepoints = 60L,
+#'   trend_model  = VAR(),
+#'   prop_trend   = 0.9
 #' )
-#' head(site_dat)
 #'
-#' # Set up a correlated residual (i.e. Joint Species Distribution) model
-#' trend_model <- ZMVN(unit = site, subgr = species)
 #' mod <- mvgam(
-#'   y ~ species,
-#'   trend_model = ZMVN(unit = site, subgr = species),
-#'   data = site_dat,
-#'   chains = 2,
-#'   silent = 2
+#'   y ~ 1,
+#'   trend_formula = ~ ZMVN(),
+#'   data          = simdat$data_train,
+#'   family        = gaussian(),
+#'   chains        = 2,
+#'   silent        = 2
 #' )
+#' summary(mod, include_betas = FALSE)
 #'
-#' # Inspect the estimated species-species residual covariances
-#' mcmc_plot(mod, variable = "Sigma", regex = TRUE, type = "hist")
-#'
-#' # A hierarchical correlation example
-#' set.seed(789)
-#' Sigma <- matrix(
-#'   c(1, -0.4, 0.5,
-#'     -0.4, 1, 0.3,
-#'     0.5, 0.3, 1),
-#'   byrow = TRUE,
-#'   nrow = 3
-#' )
-#'
-#' make_site_dat <- function(...) {
-#'   errors <- mgcv::rmvn(
-#'     n = 30,
-#'     mu = c(0.6, 0.8, 1.8),
-#'     V = Sigma
-#'   )
-#'   site_dat <- do.call(rbind, lapply(1:3, function(spec) {
-#'     data.frame(
-#'       y = rpois(30, lambda = exp(errors[, spec])),
-#'       species = paste0("species", spec),
-#'       site = 1:30
-#'     )
-#'   }))
-#'   site_dat
-#' }
-#'
-#' site_dat <- rbind(
-#'   make_site_dat() %>%
-#'     dplyr::mutate(group = "group1"),
-#'   make_site_dat() %>%
-#'     dplyr::mutate(group = "group2")
-#' ) %>%
-#'   dplyr::mutate(
-#'     species = as.factor(species),
-#'     group = as.factor(group)
-#'   )
-#'
-#' # Fit the hierarchical correlated residual model
-#' mod <- mvgam(
-#'   y ~ species,
-#'   trend_model = ZMVN(unit = site, gr = group, subgr = species),
-#'   data = site_dat
-#' )
-#'
-#' # Inspect the estimated species-species residual covariances
-#' mcmc_plot(mod, variable = "Sigma", regex = TRUE, type = "hist")
+#' # All trend-side latent dynamics in one summary view. For ZMVN
+#' # the meaningful entries are sigma_trend (per-series SDs),
+#' # L_Omega_trend (Cholesky of the correlation matrix) and
+#' # Sigma_trend (the implied covariance).
+#' mcmc_plot(mod, variable = "trend_params", type = "intervals")
 #' }
 #'
 #' @export

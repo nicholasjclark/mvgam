@@ -45,10 +45,24 @@ sign_canonicalise_factors <- function(object) {
   checkmate::assert_class(object, "mvgam")
   n_lv <- detect_factor_n_lv(object)
   if (is.null(n_lv) || n_lv < 1L) return(object)
-  # Any user-supplied loadings (fully fixed OR partial) pin the
-  # sign of every column touched by the constraint, so flipping
-  # would corrupt the user's encoded structure.
-  if (!is.null(object$trend_metadata$fixed_Z)) return(object)
+  # Skip canonicalisation when Z's sign is effectively constrained:
+  #   * fixed_Z (user-pinned partial or full Z): every column touched
+  #     by the constraint has its sign pinned by the user; a flip
+  #     would corrupt the encoded structure.
+  #   * has_by_lv (per-factor smooth fits): the cached
+  #     `trend[t, s] = sum_k Z[s, k] * (lv_trend[t, k] + mu_factor[t, k])`
+  #     uses `mu_factor` baked in by Stan (not stored as a flippable
+  #     parameter). Flipping `(Z[, k], lv_trend[, k])` leaves the
+  #     `Z @ lv_trend` term invariant but flips `Z @ mu_factor`,
+  #     corrupting the cached trend used by
+  #     `compose_by_lv_trend_linpred()`. The rotation invariance
+  #     Heaps and Jermyn (2024) addresses is already neutralised by
+  #     the per-factor smooth's own constraints (the AST detector +
+  #     Stan emission auto-skip QR for has_by_lv too).
+  if (!is.null(object$trend_metadata$fixed_Z) ||
+      isTRUE(object$trend_metadata$has_by_lv)) {
+    return(object)
+  }
 
   stanfit <- object$fit
   if (is.null(stanfit) || !isS4(stanfit) || is.null(stanfit@sim)) {

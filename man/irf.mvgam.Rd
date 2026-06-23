@@ -39,45 +39,20 @@ computed and returned by this function, along with key references.
 }
 \examples{
 \donttest{
-# Fit a model to the portal time series that uses a latent VAR(1)
-mod <- mvgam(
-  formula = captures ~ -1,
-  trend_formula = ~ trend,
-  trend_model = VAR(cor = TRUE),
-  family = poisson(),
-  data = portal_data,
-  chains = 2,
-  silent = 2
-)
+set.seed(0)
+simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
+                     n_timepoints = 60L, trend_model = VAR(),
+                     prop_trend = 0.95)
+mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
+              data    = simdat$data_train,
+              family  = gaussian(),
+              chains  = 2, silent = 2)
 
-# Plot the autoregressive coefficient distributions;
-# use 'dir = "v"' to arrange the order of facets
-# correctly
-mcmc_plot(
-  mod,
-  variable = 'A',
-  regex = TRUE,
-  type = 'hist',
-  facet_args = list(dir = 'v')
-)
-
-# Calulate Generalized IRFs for each series
-irfs <- irf(
-  mod,
-  h = 12,
-  cumulative = FALSE
-)
-
-# Plot them
-plot(irfs, series = 1)
-plot(irfs, series = 2)
-plot(irfs, series = 3)
-plot(irfs, series = 4)
-
-# Calculate posterior median, upper and lower 95th quantiles
-# of the impulse responses
-summary(irfs)
+# Impulse response over h = 6 steps after a unit shock to each
+# series.
+irf(mod, h = 6L)
 }
+
 }
 \seealso{
 \code{\link{mvgam_irf-class}}, \code{\link[=VAR]{VAR()}}, \code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}, \code{\link[=stability]{stability()}}, \code{\link[=fevd]{fevd()}}

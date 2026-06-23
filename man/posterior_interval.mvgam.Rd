@@ -32,17 +32,6 @@ draws of the requested parameters. Mirrors
 \code{\link[=as.matrix.mvgam]{as.matrix.mvgam()}} (so all \code{variable} shortcuts and
 aliasing apply unchanged).
 }
-\examples{
-\donttest{
-sim <- sim_mvgam(family = gaussian())
-mod <- mvgam(y ~ s(season, bs = "cc"), trend_model = AR(),
-             data = sim$data_train, family = gaussian(),
-             chains = 2, silent = 2)
-posterior_interval(mod)
-posterior_interval(mod, prob = 0.5)
-}
-
-}
 \seealso{
 \code{\link[brms:posterior_interval.brmsfit]{brms::posterior_interval.brmsfit()}},
 \code{\link[=as.matrix.mvgam]{as.matrix.mvgam()}}, \code{\link[=predictive_interval.mvgam]{predictive_interval.mvgam()}}.

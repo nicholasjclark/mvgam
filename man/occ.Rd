@@ -154,14 +154,29 @@ response scale.
 }
 
 \examples{
-\dontrun{
-# Constant detection, occupancy varies with elevation
-mvgam(y ~ s(elev), family = occ(), data = closure_unit_data)
+\donttest{
+# Single-species occupancy fit with separate covariates on
+# the occupancy (psi) and detection (p) sub-formulas. The
+# closure-unit grain is (series, time) -- 50 sites, 4 visits
+# each.
+set.seed(4)
+simdat <- sim_closure_unit_data(family = occ(), n_species = 1L,
+                                  n_sites = 50L, n_visits = 4L,
+                                  type = 1L)
 
-# Distributional regression on detection
-mvgam(bf(y ~ s(elev), p ~ s(tod)),
-      family = occ(),
-      data = closure_unit_data)
+mod <- mvgam(
+  bf(y ~ env, p ~ tod_c),
+  data    = simdat$data_train,
+  family  = occ(),
+  chains  = 2,
+  silent  = 2
+)
+summary(mod, include_betas = FALSE)
+
+# Marginal env effect on the response scale (occupancy *
+# detection). For the logit-occupancy view pass
+# `type = "link"`.
+conditional_effects(mod)
 }
 
 }

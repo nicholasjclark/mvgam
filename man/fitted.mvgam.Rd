@@ -146,19 +146,17 @@ posterior methods. Use \code{ndraws} for subsetting.
 }
 }
 \examples{
-\dontrun{
-fit <- mvgam(count ~ s(time), data = data, family = poisson())
+\donttest{
+set.seed(13)
+simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+                     n_timepoints = 60L, trend_model = AR())
+mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+              data    = simdat$data_train,
+              family  = poisson(),
+              chains  = 2, silent = 2)
 
-# Default: fitted values on the response scale, summarised
-fv <- fitted(fit)
-head(fv)
-
-# Linear-scale (link) fitted values
-fv_link <- fitted(fit, scale = "linear")
-
-# Raw posterior draws of fitted values
-draws <- fitted(fit, summary = FALSE)
-dim(draws)
+# Summary matrix of fitted values on the response scale.
+head(fitted(mod))
 }
 
 }

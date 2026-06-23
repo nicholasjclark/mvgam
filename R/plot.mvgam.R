@@ -72,6 +72,20 @@
 #'   [hindcast.mvgam()], [plot.mvgam_forecast()],
 #'   [marginaleffects::plot_predictions()]
 #'
+#' @examples
+#' \donttest{
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 60L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
+#'
+#' # 4-panel default dispatch (PPC + residuals + trend + smooths).
+#' plot(mod)
+#' }
+#'
 #' @author Nicholas J Clark
 #' @method plot mvgam
 #' @export

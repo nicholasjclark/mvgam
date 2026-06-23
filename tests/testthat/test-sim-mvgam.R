@@ -59,6 +59,46 @@ test_that("type = 1 works across all supported families", {
 })
 
 
+test_that("tweedie family is supported by sim_mvgam", {
+  # Tweedie is a customfamily with `family$family == 'custom'`, so
+  # sim_family_rng has to route through resolve_family_name() to
+  # find the right branch. Pin the dispatch + the support shape:
+  # non-negative continuous with a real point mass at zero.
+  out <- sim_mvgam(
+    type = 1L, family = tweedie(), n_series = 1L,
+    n_timepoints = 80L, trend_model = AR(), seed = 11L
+  )
+  expect_s3_class(out, "mvgam_sim")
+  y <- out$data_train$y
+  expect_true(all(is.finite(y) | is.na(y)))
+  expect_true(all(y >= 0))
+  # Some zeros and some positives; if either side is empty the
+  # CP simulator has degenerated.
+  expect_gt(sum(y == 0, na.rm = TRUE), 0L)
+  expect_gt(sum(y > 0, na.rm = TRUE), 0L)
+})
+
+
+test_that("sim_tweedie() respects phi and power bounds", {
+  expect_error(
+    mvgam:::sim_tweedie(mu = c(1, 2), phi = 1, power = 1.0),
+    "power"
+  )
+  expect_error(
+    mvgam:::sim_tweedie(mu = c(1, 2), phi = 1, power = 2.0),
+    "power"
+  )
+  expect_error(
+    mvgam:::sim_tweedie(mu = c(1, 2), phi = 0, power = 1.5),
+    "phi"
+  )
+  # Within bounds: returns a numeric vector of length(mu).
+  out <- mvgam:::sim_tweedie(mu = rep(2, 50L), phi = 1, power = 1.5)
+  expect_length(out, 50L)
+  expect_true(all(out >= 0))
+})
+
+
 test_that("count families return non-negative integers", {
   for (fam in list(
     poisson(), brms::brmsfamily("negbinomial")
@@ -237,6 +277,33 @@ test_that("summary.mvgam_sim trend label uses 'None' when no trend", {
   # entirely the label collapses to "None". Either way the field
   # should be a single non-empty string.
   expect_true(is.character(s$trend) && nzchar(s$trend))
+})
+
+
+test_that("summary.mvgam_sim resolves trend label from constructor", {
+  # Constructor name lives on `$trend_model$trend`. The label
+  # fallback chain (in R/sim_mvgam.R) must read it; otherwise the
+  # printed summary collapses to 'Unknown' even when the model is
+  # an AR / RW. Regular-time types 1 and 2 cover AR and RW; CAR
+  # needs the irregular-time recipe of type 6 (its propagator
+  # requires per-step time gaps).
+  ar_sim <- sim_mvgam(
+    type = 1L, family = gaussian(), n_series = 1L,
+    n_timepoints = 30L, seed = 3L, trend_model = AR()
+  )
+  expect_identical(summary(ar_sim)$trend, "AR")
+
+  rw_sim <- sim_mvgam(
+    type = 1L, family = gaussian(), n_series = 1L,
+    n_timepoints = 30L, seed = 3L, trend_model = RW()
+  )
+  expect_identical(summary(rw_sim)$trend, "RW")
+
+  car_sim <- sim_mvgam(
+    type = 6L, family = gaussian(), n_series = 1L,
+    n_timepoints = 30L, seed = 3L
+  )
+  expect_identical(summary(car_sim)$trend, "CAR")
 })
 
 

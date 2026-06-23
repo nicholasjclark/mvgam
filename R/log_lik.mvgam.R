@@ -50,6 +50,24 @@
 #' @seealso [loo.mvgam()], [waic.mvgam()],
 #'   [posterior_linpred.mvgam()].
 #'
+#' @examples
+#' \donttest{
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 60L, trend_model = AR())
+#'
+#' mod <- mvgam(y ~ s(x),
+#'               trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
+#'
+#' # Pointwise posterior log-densities; rows are draws, columns
+#' # are observations. Feeds straight into loo::loo().
+#' ll <- log_lik(mod)
+#' dim(ll)
+#' }
+#'
 #' @method log_lik mvgam
 #' @export
 log_lik.mvgam <- function(object,

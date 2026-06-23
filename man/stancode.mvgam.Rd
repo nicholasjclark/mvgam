@@ -28,21 +28,3 @@ The returned object has the \code{stancode} class, making it compatible
 with brms workflows and allowing users to inspect, modify, or save the
 generated Stan code.
 }
-\examples{
-\dontrun{
-# Fit a simple mvgam model
-data(portal_data)
-mod <- mvgam(count ~ s(time),
-             trend_formula = ~ RW(),
-             data = portal_data,
-             family = poisson())
-
-# Extract and inspect Stan code
-code <- stancode(mod)
-cat(code)
-
-# Check class
-class(code)
-}
-
-}

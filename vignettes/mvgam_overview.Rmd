@@ -45,7 +45,7 @@ $$for~i~in~1:N_{series}~...$$
 $$for~t~in~1:N_{timepoints}~...$$
 
 $$g^{-1}(\tilde{\boldsymbol{y}}_{i,t})=\alpha_{i}+\sum\limits_{j=1}^J\boldsymbol{s}_{i,j,t}\boldsymbol{x}_{j,t}+\boldsymbol{Z}\boldsymbol{z}_{k,t}\,,$$
-Here $\alpha$ are the unknown intercepts, the $\boldsymbol{s}$'s are unknown smooth functions of covariates ($\boldsymbol{x}$'s), which can potentially vary among the response series, and $\boldsymbol{z}$ are dynamic latent processes. Each smooth function $\boldsymbol{s_j}$ is composed of basis expansions whose coefficients, which must be estimated, control the functional relationship between $\boldsymbol{x}_{j}$ and $g^{-1}(\tilde{\boldsymbol{y}})$. The size of the basis expansion limits the smooth’s potential complexity. A larger set of basis functions allows greater flexibility. For more information on GAMs and how they can smooth through data, see [this blogpost on how to interpret nonlinear effects from Generalized Additive Models](https://ecogambler.netlify.app/blog/interpreting-gams/){target="_blank"}. Latent processes are captured with $\boldsymbol{Z}\boldsymbol{z}_{i,t}$, where $\boldsymbol{Z}$ is an $i~by~k$ matrix of loading coefficients (which can be fixed or a combination of fixed and freely estimated parameters) and $\boldsymbol{z}_{k,t}$ are a set of $K$ latent factors that can also include their own GAM linear predictors (see the [State-Space models vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html)), the [N-mixtures vignette](https://nicholasjclark.github.io/mvgam/articles/nmixtures.html) and the example in [`jsdgam`](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html) to get an idea of how flexible these processes can be.
+Here $\alpha$ are the unknown intercepts and $\boldsymbol{z}$ are dynamic latent processes. The $\boldsymbol{s}$'s are unknown smooth functions of covariates ($\boldsymbol{x}$'s) and can vary among the response series. Each smooth function $\boldsymbol{s_j}$ is composed of basis expansions whose coefficients, which must be estimated, control the functional relationship between $\boldsymbol{x}_{j}$ and $g^{-1}(\tilde{\boldsymbol{y}})$. The size of the basis expansion limits the smooth’s potential complexity. A larger set of basis functions allows greater flexibility. For more information on GAMs and how they can smooth through data, see [this blogpost on how to interpret nonlinear effects from Generalized Additive Models](https://ecogambler.netlify.app/blog/interpreting-gams/){target="_blank"}. Latent processes are captured with $\boldsymbol{Z}\boldsymbol{z}_{i,t}$, where $\boldsymbol{Z}$ is an $i~by~k$ matrix of loading coefficients (which can be fixed or a combination of fixed and freely estimated parameters) and $\boldsymbol{z}_{k,t}$ are a set of $K$ latent factors that can also include their own GAM linear predictors. See the example in [`jsdgam`](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html) to get an idea of how flexible these processes can be.
   
 Several advantages of GAMs are that they can model a diversity of response families, including discrete distributions (i.e. Poisson, Negative Binomial, Gamma) that accommodate common ecological features such as zero-inflation or overdispersion, and that they can be formulated to include hierarchical smoothing for multivariate responses. `mvgam` supports a number of different observation families, which are summarized below:
 
@@ -110,7 +110,7 @@ Autoregressive models up to $p=3$, in which the autoregressive coefficients are 
 z_{i,t} & \sim \text{Normal}(ar1_i * z_{i,t-1}, \sigma_i) \end{align*}
 
 
-All options are the same as for Random Walks, but additional options will be available for placing priors on the autoregressive coefficients. By default, these coefficients will not be forced into stationarity, but users can impose this restriction by changing the upper and lower bounds on their priors. See `?get_mvgam_priors` for more details.
+All options are the same as for Random Walks, but additional options will be available for placing priors on the autoregressive coefficients. By default, these coefficients will not be forced into stationarity, but users can impose this restriction by changing the upper and lower bounds on their priors. See `?default_prior.mvgam_formula` for more details.
 
 ### Vector Autoregressive processes
 A Vector Autoregression of order $p=1$ can be specified if $N_{series} > 1$ using `trend_model = 'VAR1'` or `trend_model = VAR()`. A VAR(1) model takes the form:
@@ -169,7 +169,7 @@ Where $distance$ is a vector of non-negative measurements of the time difference
 `mvgam` supports an observation model regression formula, built off the `mgcv` package, as well as an optional process model regression formula. The formulae supplied to `mvgam()` are exactly like those supplied to `glm()` except that smooth terms, `s()`,
 `te()`, `ti()` and `t2()`, time-varying effects using `dynamic()`, monotonically increasing (using `s(x, bs = 'moi')`) or decreasing splines (using `s(x, bs = 'mod')`; see `?smooth.construct.moi.smooth.spec` for details), as well as Gaussian Process functions using `gp()`, can be added to the right hand side (and `.` is not supported in `mvgam` formulae). See `?mvgam_formulae` for more guidance.
   
-For setting up State-Space models, the optional process model formula can be used (see [the State-Space model vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html) and [the shared latent states vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html) for guidance on using trend formulae).
+For setting up State-Space models, the optional process model formula can be used. See `?mvgam` and `?trend_formula` for guidance on using trend formulae.
 
 ## Example time series data
 The 'portal_data' object contains time series of rodent captures from the Portal Project, [a long-term monitoring study based near the town of Portal, Arizona](https://portal.weecology.org/){target="_blank"}. Researchers have been operating a standardized set of baited traps within 24 experimental plots at this site since the 1970's. Sampling follows the lunar monthly cycle, with observations occurring on average about 28 days apart. However, missing observations do occur due to difficulties accessing the site (weather events, COVID disruptions etc...). You can read about the full sampling protocol [in this preprint by Ernest et al on the Biorxiv](https://www.biorxiv.org/content/10.1101/332783v3.full){target="_blank"}. 
@@ -197,7 +197,7 @@ data <- sim_mvgam(n_series = 4, T = 24)
 head(data$data_train, 12)
 ```
 
-Notice how we have four different time series in these simulated data, but we do not spread the outcome values into different columns. Rather, there is only a single column for the outcome variable, labelled `y` in these simulated data. We also must supply a variable labelled `time` to ensure the modelling software knows how to arrange the time series when building models. This setup still allows us to formulate multivariate time series models, as you can see in the [State-Space vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html). Below are the steps needed to shape our `portal_data` object into the correct form. First, we create a `time` variable, select the column representing counts of our target species (`PP`), and select appropriate variables that we can use as predictors
+Notice how we have four different time series in these simulated data, but we do not spread the outcome values into different columns. Rather, there is only a single column for the outcome variable, labelled `y` in these simulated data. We also must supply a variable labelled `time` to ensure the modelling software knows how to arrange the time series when building models. This setup still allows us to formulate multivariate time series models. Below are the steps needed to shape our `portal_data` object into the correct form. First, we create a `time` variable, select the column representing counts of our target species (`PP`), and select appropriate variables that we can use as predictors
 ```{r Wrangle data for modelling}
 portal_data %>%
   # Filter the data to only contain captures of the 'PP' 
@@ -277,13 +277,14 @@ log(\lambda_t) & = \beta_{year[year_t]} \\
 
 Where the $\beta_{year}$ effects are drawn from a *population* distribution that is parameterized by a common mean $(\mu_{year})$ and variance $(\sigma_{year})$. Priors on most of the model parameters can be interrogated and changed using similar functionality to the options available in `brms`. For example, the default priors on $(\mu_{year})$ and $(\sigma_{year})$ can be viewed using the following code:
 ```{r}
-get_mvgam_priors(count ~ s(year_fac, bs = "re") - 1,
-  family = poisson(),
-  data = model_data
+default_prior(
+  mvgam_formula(count ~ s(year_fac, bs = "re") - 1),
+  data = model_data,
+  family = poisson()
 )
 ```
 
-See examples in `?get_mvgam_priors` to find out different ways that priors can be altered.
+See `?default_prior.mvgam_formula` for different ways that priors can be altered.
 Once the model has finished, the first step is to inspect the `summary()` to ensure no major diagnostic warnings have been produced and to quickly summarise posterior distributions for key parameters
 ```{r}
 summary(model1)

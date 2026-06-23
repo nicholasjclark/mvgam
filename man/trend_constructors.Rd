@@ -298,252 +298,68 @@ the active column count.
 
 \examples{
 \donttest{
-# Basic trend model usage with defaults (will issue warnings)
+# Simulate three Gaussian series driven by a correlated VAR(1)
+# process so the cross-series dependencies are recoverable.
 set.seed(0)
 simdat <- sim_mvgam(
-  T = 50,
-  n_series = 3,
-  prop_trend = 0.6
-)
-mod1 <- mvgam(
-  y ~ s(season, bs = "cc"),
-  trend_formula = ~ RW(),
-  data = simdat$data_train,
-  chains = 2,
-  silent = 2
+  family       = gaussian(),
+  n_series     = 3L,
+  n_timepoints = 60L,
+  trend_model  = VAR(),
+  prop_trend   = 0.95
 )
 
-# Using custom time and series variable names with simulated data
-set.seed(123)
-weekly_data <- sim_mvgam(
-  T = 52,
-  n_series = 2,
-  prop_trend = 0.5
-)$data_train
+# Fit a VAR(1) state-space model. The trend constructor goes
+# inside `trend_formula`; the obs side carries only the
+# intercept.
+mod <- mvgam(
+  y ~ 1,
+  trend_formula = ~ VAR(p = 1),
+  data          = simdat$data_train,
+  family        = gaussian(),
+  chains        = 2,
+  silent        = 2
+)
+summary(mod, include_betas = FALSE)
 
-# Rename variables to demonstrate custom naming
-weekly_data$week <- weekly_data$time
-weekly_data$species <- weekly_data$series
-weekly_data$temp <- rnorm(nrow(weekly_data))
+# `variable = "trend_params"` is a keyword shortcut that pulls
+# every trend-dynamics parameter (A_trend, sigma_trend, the
+# Sigma_trend covariance, etc.) in one call. See ?mvgam_draws
+# for the full keyword set ("betas", "obs_params",
+# "smooth_params", "trend_betas", "trend_params",
+# "trend_smooth_params").
+mcmc_plot(mod, variable = "trend_params", type = "intervals")
 
-mod2 <- mvgam(
-  y ~ temp,
-  trend_formula = ~ AR(time = week, series = species, p = 1),
-  data = weekly_data,
-  chains = 2,
-  silent = 2
+# Continuous-time AR(1) on irregularly-spaced data. Recipe 6
+# of sim_mvgam() defaults to CAR() with U(1, 6) time gaps.
+set.seed(7)
+simdat_car <- sim_mvgam(
+  type         = 6L,
+  family       = gaussian(),
+  n_series     = 1L,
+  n_timepoints = 80L
 )
 
-# Seasonal AR model with multiple lags using portal_data
-data(portal_data)
-mod3 <- mvgam(
-  captures ~ s(ndvi_ma12) + s(mintemp),
-  trend_formula = ~ AR(p = c(1, 12)),  # Annual seasonality
-  data = portal_data,
-  family = nb(),
-  chains = 2,
-  silent = 2
+# Fit the CAR(1) model. ar1_trend[1] is the continuous-time
+# decay parameter and adapts to the per-step time gap.
+mod_car <- mvgam(
+  y ~ 1,
+  trend_formula = ~ CAR(),
+  data          = simdat_car$data_train,
+  family        = gaussian(),
+  chains        = 2,
+  silent        = 2
 )
+mcmc_plot(mod_car, variable = "trend_params", type = "intervals")
 
-# Hierarchical models with custom time and series variables
-set.seed(456)
-multisite_data <- rbind(
-  sim_mvgam(T = 30, n_series = 3, prop_trend = 0.7)$data_train \%>\%
-    dplyr::mutate(region = "north"),
-  sim_mvgam(T = 30, n_series = 3, prop_trend = 0.7)$data_train \%>\%
-    dplyr::mutate(region = "south")
-) \%>\%
-  dplyr::mutate(
-    region = as.factor(region),
-    unit_id = paste0(region, "_", series),
-    timestep = time,
-    temperature = rnorm(n())
-  ) \%>\%
-  dplyr::select(-series)  # Remove series for hierarchical structure
-
-mod4 <- mvgam(
-  y ~ temperature,
-  trend_formula = ~ VAR(
-    time = timestep,
-    gr = region,
-    subgr = unit_id,
-    p = 2
-  ),
-  data = multisite_data,
-  chains = 2,
-  silent = 2
-)
-
-# Multiple species across sites using portal_data
-portal_subset <- portal_data \%>\%
-  dplyr::mutate(
-    survey_date = time,
-    species_site = series,
-    count = captures,
-    habitat = "grassland",
-    temperature = mintemp
-  )
-
-mod5 <- mvgam(
-  count ~ habitat + temperature,
-  trend_formula = ~ RW(time = survey_date, series = species_site),
-  data = portal_subset,
-  family = nb(),
-  chains = 2,
-  silent = 2
-)
-
-# A short example to illustrate CAR(1) models
-# Function to simulate CAR1 data with seasonality
-sim_corcar1 <- function(n = 125,
-                        phi = 0.5,
-                        sigma = 2,
-                        sigma_obs = 0.75) {
-  # Sample irregularly spaced time intervals
-  time_dis <- c(1, runif(n - 1, 0, 5))
-
-  # Set up the latent dynamic process
-  x <- vector(length = n)
-  x[1] <- -0.3
-  for (i in 2:n) {
-    # Zero-distances will cause problems in sampling, so mvgam uses a
-    # minimum threshold; this simulation function emulates that process
-    if (time_dis[i] == 0) {
-      x[i] <- rnorm(
-        1,
-        mean = (phi^1e-3) * x[i - 1],
-        sd = sigma * sqrt((1 - phi^(2 * 1e-3)) / (1 - phi^2))
-      )
-    } else {
-      x[i] <- rnorm(
-        1,
-        mean = (phi^time_dis[i]) * x[i - 1],
-        sd = sigma * sqrt((1 - phi^(2 * time_dis[i])) / (1 - phi^2))
-      )
-    }
-  }
-
-  # Add 12-month seasonality
-  cov1 <- sin(2 * pi * (1:n) / 12)
-  cov2 <- cos(2 * pi * (1:n) / 12)
-  beta1 <- runif(1, 0.3, 0.7)
-  beta2 <- runif(1, 0.2, 0.5)
-  seasonality <- beta1 * cov1 + beta2 * cov2
-
-  # Take Gaussian observations with error and return
-  data.frame(
-    y = rnorm(n, mean = x + seasonality, sd = sigma_obs),
-    season = rep(1:12, 20)[1:n],
-    time = cumsum(time_dis)
-  )
+# Other trend constructors swap in the same place. For example
+# an AR(1) on a single series:
+#   trend_formula = ~ AR(p = 1)
+# or a zero-mean multivariate normal residual prior for cross-
+# series correlations:
+#   trend_formula = ~ ZMVN()
 }
 
-# Sample two time series
-set.seed(99)
-dat <- rbind(
-  dplyr::bind_cols(
-    sim_corcar1(phi = 0.65, sigma_obs = 0.55),
-    data.frame(series = "series1")
-  ),
-  dplyr::bind_cols(
-    sim_corcar1(phi = 0.8, sigma_obs = 0.35),
-    data.frame(series = "series2")
-  )
-) \%>\%
-  dplyr::mutate(series = as.factor(series))
-
-# mvgam with CAR(1) trends and a shared cyclic seasonal smooth
-mod <- mvgam(
-  formula = y ~ -1,
-  trend_formula = ~ s(season, bs = 'cc', k = 5),
-  trend_model = CAR(),
-  priors = c(
-    prior(exponential(3), class = sigma),
-    prior(beta(4, 4), class = sigma_obs)
-  ),
-  data = dat,
-  family = gaussian(),
-  chains = 2,
-  silent = 2
-)
-
-# View usual summaries and plots
-summary(mod)
-conditional_effects(mod, type = 'expected')
-plot(mod, type = 'trend', series = 1)
-plot(mod, type = 'trend', series = 2)
-plot(mod, type = 'residuals', series = 1)
-plot(mod, type = 'residuals', series = 2)
-mcmc_plot(
-  mod,
-  variable = "ar1",
-  regex = TRUE,
-  type = "hist"
-)
-
-# Now an example illustrating hierarchical dynamics
-set.seed(123)
-
-# Simulate three species monitored in three different regions
-simdat1 <- sim_mvgam(
-  trend_model = VAR(),  # cor = TRUE is now automatic for VAR models
-  prop_trend = 0.95,
-  n_series = 3,
-  mu = c(1, 2, 3)
-)
-simdat2 <- sim_mvgam(
-  trend_model = VAR(),  # cor = TRUE is now automatic for VAR models
-  prop_trend = 0.95,
-  n_series = 3,
-  mu = c(1, 2, 3)
-)
-simdat3 <- sim_mvgam(
-  trend_model = VAR(),  # cor = TRUE is now automatic for VAR models
-  prop_trend = 0.95,
-  n_series = 3,
-  mu = c(1, 2, 3)
-)
-
-# Set up the data but DO NOT include 'series'
-all_dat <- rbind(
-  simdat1$data_train \%>\%
-    dplyr::mutate(region = "qld"),
-  simdat2$data_train \%>\%
-    dplyr::mutate(region = "nsw"),
-  simdat3$data_train \%>\%
-    dplyr::mutate(region = "vic")
-) \%>\%
-  dplyr::mutate(
-    species = gsub("series", "species", series),
-    species = as.factor(species),
-    region = as.factor(region)
-  ) \%>\%
-  dplyr::arrange(series, time) \%>\%
-  dplyr::select(-series)
-
-# Check priors for a hierarchical AR1 model
-get_mvgam_priors(
-  formula = y ~ species,
-  trend_model = AR(gr = region, subgr = species),
-  data = all_dat
-)
-
-# Fit the model
-mod <- mvgam(
-  formula = y ~ species,
-  trend_model = AR(gr = region, subgr = species),
-  data = all_dat,
-  chains = 2,
-  silent = 2
-)
-
-# Check standard outputs
-summary(mod)
-conditional_effects(mod, type = "link")
-
-# Inspect posterior estimates for the correlation weighting parameter
-mcmc_plot(mod, variable = "alpha_cor_trend", type = "hist")
-}
 }
 \references{
 Heaps, S. E. and Jermyn, I. H. (2024). Structured prior

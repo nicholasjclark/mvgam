@@ -14,12 +14,6 @@
 #' 1. Primary: Fix comment spacing, then official Stan formatting via StanHeaders stanc.js with V8
 #' 2. Fallback: Only comment spacing fixes if Stan formatting fails
 #'
-#' @examples
-#' \dontrun{
-#' # Polish generated Stan code
-#' cleaned_code <- polish_generated_stan_code(stan_code_lines)
-#' }
-#'
 #' @noRd
 polish_generated_stan_code <- function(stan_code, silent = TRUE) {
   checkmate::assert_character(stan_code, min.len = 1)

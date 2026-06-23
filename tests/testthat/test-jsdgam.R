@@ -66,17 +66,35 @@ test_that("jsdgam rejects non-formula non-brmsformula 'formula' arg", {
   ))
 })
 
-test_that("jsdgam rejects n_lv >= number of species under iid prior", {
+test_that("jsdgam accepts n_lv = n_species under iid prior (user owns ID)", {
+  # Reason: n_lv = n_species is a full-rank factor model; the iid
+  # loadings prior leaves Z rotationally unidentified, but the user
+  # owns that decision. A post-fit advisor warns the user when
+  # convergence diagnostics confirm a funnel (see
+  # flag_by_lv_full_rank_funnel). validate_n_lv_ceiling() only
+  # rejects n_lv > n_species.
   dat <- build_jsdgam_toy()
-  expect_error(
+  suppressWarnings(expect_no_error(
     jsdgam(
       formula = y ~ 1, factor_formula = ~ -1,
       data = dat, species = species,
       family = poisson(), n_lv = 4L,
       run_model = FALSE, silent = 2
+    )
+  ))
+})
+
+test_that("jsdgam rejects n_lv > n_species under iid prior", {
+  dat <- build_jsdgam_toy()
+  suppressWarnings(expect_error(
+    jsdgam(
+      formula = y ~ 1, factor_formula = ~ -1,
+      data = dat, species = species,
+      family = poisson(), n_lv = 5L,
+      run_model = FALSE, silent = 2
     ),
-    "strictly less than the number of species"
-  )
+    "cannot exceed"
+  ))
 })
 
 test_that("jsdgam allows n_lv = n_species under MGP loadings_prior", {

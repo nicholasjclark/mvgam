@@ -268,23 +268,6 @@ extract_mcmc_info <- function(mvgam_obj) {
 #'   with brms workflows and allowing users to inspect, modify, or save the
 #'   generated Stan code.
 #'
-#' @examples
-#' \dontrun{
-#' # Fit a simple mvgam model
-#' data(portal_data)
-#' mod <- mvgam(count ~ s(time),
-#'              trend_formula = ~ RW(),
-#'              data = portal_data,
-#'              family = poisson())
-#'
-#' # Extract and inspect Stan code
-#' code <- stancode(mod)
-#' cat(code)
-#'
-#' # Check class
-#' class(code)
-#' }
-#'
 #' @export
 stancode.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")

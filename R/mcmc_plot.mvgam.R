@@ -20,20 +20,21 @@
 #' that can be further customized using the \pkg{ggplot2} package.
 #' @seealso \code{\link{mvgam_draws}} for an overview of some of the shortcut strings
 #' that can be used for argument `variable`
+#'
 #' @examples
 #' \donttest{
-#' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
-#' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-#'              trend_model = AR(),
-#'              noncentred = TRUE,
-#'              data = simdat$data_train,
-#'              chains = 2,
-#'              silent = 2)
-#' mcmc_plot(mod)
-#' mcmc_plot(mod, type = 'neff_hist')
-#' mcmc_plot(mod, variable = "betas", type = "areas")
-#' mcmc_plot(mod, variable = "trend_params", type = "combo")
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 60L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
+#'
+#' # Trend-dynamics intervals (sigma_trend, ar1_trend, ...).
+#' mcmc_plot(mod, variable = "trend_params", type = "intervals")
 #' }
+#'
 #' @export
 mcmc_plot.mvgam = function(
   object,

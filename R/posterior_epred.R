@@ -473,21 +473,20 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #'   via Monte Carlo).
 #'
 #' @examples
-#' \dontrun{
-#' # Fit a Poisson model
-#' fit <- mvgam(
-#'   count ~ temperature + s(day),
-#'   trend_formula = ~ AR(p = 1),
-#'   data = my_data,
-#'   family = poisson()
-#' )
+#' \donttest{
+#' set.seed(13)
+#' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
+#'                      n_timepoints = 60L, trend_model = AR())
+#' mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
+#'               data    = simdat$data_train,
+#'               family  = poisson(),
+#'               chains  = 2, silent = 2)
 #'
-#' # Extract expected values (response scale)
-#' epred <- posterior_epred(fit)
-#'
-#' # For Poisson: epred = exp(linpred)
-#' linpred <- posterior_linpred(fit)
-#' all.equal(epred, exp(linpred))
+#' # Posterior mean of the response, marginalised over the trend's
+#' # stochastic dynamics. See [forecast.mvgam()] for the
+#' # state-extrapolating alternative.
+#' ep <- posterior_epred(mod, ndraws = 50L)
+#' dim(ep)
 #' }
 #'
 #' @importFrom brms posterior_epred

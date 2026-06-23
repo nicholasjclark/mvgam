@@ -72,23 +72,6 @@ and softmax internally and returns one probability per (site,
 species) row summing to 1 within each site.
 }
 
-\examples{
-\dontrun{
-# JSDM on single-trial habitat-type observations per site. The
-# `elev * habitat_class` interaction gives each habitat class its
-# own elevation response; see `?diri` for the rationale.
-mod <- jsdgam(
-  formula = y ~ elev * habitat_class,
-  factor_formula = ~ -1,
-  data = habitat_long,
-  unit = site,
-  species = habitat_class,
-  family = categ(),
-  n_lv = 2
-)
-}
-
-}
 \references{
 Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,
 Taskinen, S., Walker, S. C. and Hui, F. K. C. (2015). So many

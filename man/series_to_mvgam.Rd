@@ -23,26 +23,3 @@ A \code{list} object containing outputs needed for
 This function converts univariate or multivariate time series (\code{xts} or
 \code{ts} objects) to the format necessary for \code{\link{mvgam}}.
 }
-\examples{
-# A ts object example
-data("sunspots")
-series <- cbind(sunspots, sunspots)
-colnames(series) <- c('blood', 'bone')
-head(series)
-series_to_mvgam(series, frequency(series), 0.85)
-
-# An xts object example
-library(xts)
-dates <- seq(as.Date("2001-05-01"), length = 30, by = "quarter")
-
-data <- cbind(
-  c(gas = rpois(30, cumprod(1 + rnorm(30, mean = 0.01, sd = 0.001)))),
-  c(oil = rpois(30, cumprod(1 + rnorm(30, mean = 0.01, sd = 0.001))))
-)
-
-series <- xts(x = data, order.by = dates)
-colnames(series) <- c('gas', 'oil')
-head(series)
-series_to_mvgam(series, freq = 4, train_prop = 0.85)
-
-}
