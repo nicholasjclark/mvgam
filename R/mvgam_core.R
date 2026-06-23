@@ -217,13 +217,11 @@
 #'
 #' @examples
 #' \donttest{
-#' # Simulate a single Poisson series with a smooth covariate
-#' # effect and a latent AR(1) process driving the trend.
+#' # ---- Single-series fit with a smooth covariate and an AR(1) trend ----
+#' # Useful as a quick first model: one response, one nonlinear
+#' # covariate effect, latent autoregressive dynamics.
 #' set.seed(1)
 #' simdat <- sim_mvgam(family = poisson())
-#'
-#' # Fit an AR(1) state-space model with a smooth on the
-#' # covariate.
 #' mod <- mvgam(
 #'   y ~ s(x),
 #'   trend_formula = ~ AR(p = 1),
@@ -232,28 +230,70 @@
 #'   chains = 2,
 #'   silent = 2
 #' )
-#'
-#' # Inspect the model. `include_betas = FALSE` suppresses the
-#' # spline coefficient block so the printed summary stays readable.
 #' summary(mod, include_betas = FALSE)
-#'
-#' # Plot the smooth effect on the response scale.
 #' conditional_effects(mod)
-#'
-#' # Inspect the AR(1) posterior.
 #' mcmc_plot(mod, variable = "^ar1", regex = TRUE, type = "hist")
 #'
-#' # Extend the formula. `update.mvgam()` inherits formula, family,
-#' # prior, and the trend constructor from the fitted object, so
-#' # only the new term has to be named on the call.
-#' mod2 <- update(mod, formula. = ~ . + s(time, k = 5), silent = 2)
+#' # ---- Multivariate VAR(1) with intercept suppression + custom priors ----
+#' # Three correlated series, no observation intercept (`y ~ 0`),
+#' # per-series smooth on the trend side, and tighter custom
+#' # priors on the regression coefficients and trend innovation
+#' # scale. Mirrors the workflow used in the README's Portal VAR
+#' # example.
+#' set.seed(2)
+#' vardat <- sim_mvgam(
+#'   family       = poisson(),
+#'   n_series     = 3L,
+#'   n_timepoints = 60L,
+#'   trend_model  = VAR(cor = TRUE)
+#' )
+#'
+#' # Inspect the default priors before fitting. Wrap the formula
+#' # pair in `mvgam_formula()` so `get_prior()` can dispatch. The
+#' # returned table lists every adjustable prior row keyed by
+#' # `class` and `coef`; pass a modified subset back via
+#' # `priors = c(prior(...), ...)` to override.
+#' mf <- mvgam_formula(
+#'   formula       = y ~ 0,
+#'   trend_formula = ~ s(x, k = 5, by = lv_axis()) + VAR()
+#' )
+#' get_prior(mf, data = vardat$data_train, family = poisson())
+#'
+#' var_mod <- mvgam(
+#'   formula       = y ~ 0,
+#'   trend_formula = ~ s(x, k = 5, by = lv_axis()) + VAR(),
+#'   data          = vardat$data_train,
+#'   family        = poisson(),
+#'   priors        = c(
+#'     prior(normal(0, 2), class = b),
+#'     prior(exponential(2.5), class = sigma_trend)
+#'   ),
+#'   chains        = 2,
+#'   samples       = 500,
+#'   burnin        = 500,
+#'   silent        = 2
+#' )
+#' summary(var_mod, include_betas = FALSE)
+#'
+#' # Hindcasts (training cells) and forecasts (held-out cells)
+#' # share a single object; plot one series to inspect the
+#' # in-sample fit and the out-of-sample predictive interval.
+#' fc <- forecast(var_mod, newdata = vardat$data_test)
+#' plot(fc, series = 1)
+#'
+#' # Per-series marginal effects of the trend-side smooth.
+#' conditional_effects(var_mod)
+#'
+#' # Impulse response: how a shock to one series propagates
+#' # through the VAR over the next eight steps.
+#' plot(irf(var_mod, h = 8L), series = 1)
 #'
 #' # Methods-section helpers. `how_to_cite()` returns the prose
 #' # paragraph for a paper; `methods_md()` returns the matching
 #' # math statement of the model (likelihood, link, latent
 #' # dynamics, priors, sampler configuration) as Markdown + LaTeX.
-#' how_to_cite(mod)
-#' cat(methods_md(mod))
+#' how_to_cite(var_mod)
+#' cat(methods_md(var_mod))
 #' }
 #'
 #' @references
@@ -613,6 +653,13 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     combined_stancode = stan_components$combined_components$stancode,
     combined_standata = stan_components$combined_components$standata,
     user_trend_formula = trend_formula,
+    # The user's full `prior` / `priors` arg (already aliased to
+    # `prior` by `normalise_prior_arg_alias` at the top of `mvgam()`).
+    # Plumbed through so `create_mvgam_from_combined_fit()` can mark
+    # mvgam-managed trend overrides (sigma_trend, ar1_trend, etc.) as
+    # `source = "user"` on the stored prior table; the brms-side path
+    # only marks rows brms itself knows about.
+    user_prior = dots$prior,
     newdata = newdata
   )
 
@@ -701,6 +748,7 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
                                           combined_stancode = NULL,
                                           combined_standata = NULL,
                                           user_trend_formula = NULL,
+                                          user_prior = NULL,
                                           newdata = NULL) {
   checkmate::assert_class(combined_fit, "stanfit")
   checkmate::assert_list(obs_setup, names = "named")
@@ -745,8 +793,25 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       # constructor call from parsed `mv_spec$trend_specs`.
       trend_call = user_trend_formula,
       family = obs_setup$family,
-      prior = lift_mvgam_stanvar_priors(
-        obs_setup$prior, combined_stancode %||% obs_setup$stancode
+      # Combine obs + trend prior tables before lifting stanvar rows so
+      # the fit stores every user-supplied row (not just the obs subset).
+      # Passing `obs_setup$prior` alone here silently dropped any
+      # `prior(..., class = sigma_trend)` / `class = ar1_trend` /
+      # `class = b_trend` overrides the user supplied via `priors = `
+      # (Stan still applied them, but they were absent from `$prior`).
+      # The trend setup carries brms's own class names (e.g. `sigma`,
+      # `b`, `sds`, `ar1`); re-suffix them so the combined table uses
+      # the same `<class>_trend` convention as
+      # `get_prior.mvgam_formula()` and the rest of the package.
+      # Then layer any mvgam-managed user trend priors back on (those
+      # are stripped from the brms pipeline by
+      # `remove_trend_suffix_from_priors()`, but Stan still applies
+      # them via the mvgam stanvar substitution path).
+      prior = assemble_stored_prior_table(
+        obs_priors      = obs_setup$prior,
+        trend_priors    = if (!is.null(trend_setup)) trend_setup$prior else NULL,
+        user_prior      = user_prior,
+        combined_stancode = combined_stancode %||% obs_setup$stancode
       ),
       data = obs_setup$data,
       test_data = newdata,

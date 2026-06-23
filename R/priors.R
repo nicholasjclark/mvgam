@@ -519,22 +519,39 @@ combine_obs_trend_priors <- function(obs_priors, trend_priors) {
     return(obs_priors)
   }
 
-  # brms's prior data frames carry slightly different columns depending
-  # on which generator built them (the obs side picks up newer columns
-  # like `tag` from brms; the trend side does not). Align the schemas
-  # before rbind so future brms schema additions don't error here.
-  all_cols <- union(colnames(obs_priors), colnames(trend_priors))
-  missing_obs <- setdiff(all_cols, colnames(obs_priors))
-  missing_trend <- setdiff(all_cols, colnames(trend_priors))
-  for (col in missing_obs) obs_priors[[col]] <- NA_character_
-  for (col in missing_trend) trend_priors[[col]] <- NA_character_
-  obs_priors <- obs_priors[, all_cols, drop = FALSE]
-  trend_priors <- trend_priors[, all_cols, drop = FALSE]
-
-  combined <- rbind(obs_priors, trend_priors)
+  aligned <- align_brmsprior_schemas(list(obs_priors, trend_priors))
+  combined <- rbind(aligned[[1L]], aligned[[2L]])
 
   # Return standard brms prior object
   structure(combined, class = c("brmsprior", "data.frame"))
+}
+
+
+#' Align column schemas of one or more `brmsprior` frames
+#'
+#' brms's prior tables can carry different columns depending on which
+#' generator built them (e.g. the obs side picks up newer columns like
+#' `tag` from brms; trend setup output and bare `prior()` rows don't).
+#' Returns a list with every input padded to the union of column names
+#' so they can be safely `rbind`ed without losing data and without
+#' breaking when brms adds new columns in future releases.
+#'
+#' Padding rule: character columns get `""`; everything else gets `NA`.
+#'
+#' @param prior_list A list of `brmsprior` data frames.
+#' @return A list of the same length with all elements sharing the
+#'   same column set in the same order.
+#' @noRd
+align_brmsprior_schemas <- function(prior_list) {
+  checkmate::assert_list(prior_list, min.len = 1L)
+  all_cols <- Reduce(union, lapply(prior_list, colnames))
+  lapply(prior_list, function(p) {
+    missing <- setdiff(all_cols, colnames(p))
+    for (col in missing) {
+      p[[col]] <- if (col %in% c("lb", "ub")) NA_real_ else ""
+    }
+    p[, all_cols, drop = FALSE]
+  })
 }
 
 #' Normalise the `priors` / `prior` argument alias
@@ -677,6 +694,142 @@ get_all_mvgam_trend_parameters <- function(trend_specs) {
 #' @param data Data for brms prior validation
 #' @return A brmsprior object with only brms-compatible parameters, suffixes removed
 #' @noRd
+#' Merge user-supplied prior overrides onto a default prior table
+#'
+#' Match each row of `user_priors` against `default_priors` using the
+#' full brms key (`class`, `coef`, `group`, `resp`, `dpar`, `nlpar`,
+#' `lb`, `ub`). brms convention: an empty user-side key field (e.g.
+#' `coef = ""`) is a wildcard that matches every row of that class.
+#' Matched rows have their `prior` string replaced and `source` set
+#' to `"user"`. Unmatched user rows are reported back so the caller
+#' can warn.
+#'
+#' @param default_priors A `brmsprior` data frame; the table to merge
+#'   onto. Must include a `source` column.
+#' @param user_priors A `brmsprior` data frame of user overrides, or
+#'   NULL.
+#' @return A list with two elements:
+#'   * `priors` -- the merged `brmsprior` data frame
+#'   * `unmatched` -- a character vector of `class` strings for user
+#'     rows that did not match any default row
+#' @noRd
+merge_user_priors <- function(default_priors, user_priors) {
+  checkmate::assert_class(default_priors, "brmsprior")
+  checkmate::assert_class(user_priors, "brmsprior", null.ok = TRUE)
+  if (is.null(user_priors) || nrow(user_priors) == 0L) {
+    return(list(priors = default_priors, unmatched = character(0L)))
+  }
+  key_cols <- intersect(
+    c("class", "coef", "group", "resp", "dpar", "nlpar", "lb", "ub"),
+    intersect(names(default_priors), names(user_priors))
+  )
+  is_wildcard <- function(x) is.na(x) | !nzchar(as.character(x))
+  unmatched_classes <- character(0L)
+  unmatched_rows <- list()
+  for (i in seq_len(nrow(user_priors))) {
+    row <- user_priors[i, , drop = FALSE]
+    keep <- rep(TRUE, nrow(default_priors))
+    for (col in key_cols) {
+      full_val <- default_priors[[col]]
+      user_val <- row[[col]]
+      keep <- keep & (is_wildcard(user_val) |
+                        (full_val == user_val) |
+                        (is.na(full_val) & is.na(user_val)))
+    }
+    if (any(keep, na.rm = TRUE)) {
+      default_priors$prior[keep] <- row$prior
+      if ("source" %in% names(default_priors)) {
+        default_priors$source[keep] <- "user"
+      }
+    } else {
+      # Unmatched user row: keep it (brms convention is to preserve
+      # user rows even when no default exists, e.g. mvgam-managed
+      # `ar1_trend` / `sigma_trend` that the brms pipeline strips).
+      # Tagged for the caller's warning, then appended below.
+      unmatched_classes <- c(unmatched_classes, row$class)
+      unmatched_rows[[length(unmatched_rows) + 1L]] <- row
+    }
+  }
+  if (length(unmatched_rows) > 0L) {
+    # `prior()` returns a slimmer frame than `validate_prior()`, so
+    # align every unmatched row to `default_priors`'s schema via the
+    # shared helper before stacking.
+    appended_rows <- align_brmsprior_schemas(
+      c(list(default_priors), unmatched_rows)
+    )[-1L]
+    appended <- do.call(rbind, lapply(appended_rows, function(r) {
+      if ("source" %in% names(r)) r$source <- "user"
+      r
+    }))
+    default_priors <- rbind(default_priors, appended)
+  }
+  list(
+    priors = structure(default_priors,
+                         class = c("brmsprior", "data.frame")),
+    unmatched = unmatched_classes
+  )
+}
+
+
+#' Assemble the post-fit prior table stored on an `mvgam` object
+#'
+#' Wraps the canonical sequence:
+#'   1. Re-suffix the brms-validated trend priors (`<class>` -> `<class>_trend`).
+#'   2. Combine obs + trend rows into a single brmsprior frame.
+#'   3. Append mvgam stanvar rows (Z_free_vec, varrho_inv, etc.).
+#'   4. Layer the user's full `priors = ` argument over the result,
+#'      marking matched rows as `source = "user"` so mvgam-managed
+#'      trend overrides (sigma_trend, ar1_trend, etc.) that the brms
+#'      pipeline strips are still recorded on the fit. Unmatched user
+#'      rows are silently retained (the warning path lives in
+#'      `get_prior.mvgam()` so fitting itself stays quiet).
+#'
+#' @param obs_priors The obs-side `brmsprior` from `setup_brms_lightweight()`.
+#' @param trend_priors The trend-side `brmsprior` from `setup_brms_lightweight()`,
+#'   or NULL when the fit has no trend model.
+#' @param user_prior The user's original `prior` / `priors` argument
+#'   (already aliased via `normalise_prior_arg_alias()`), or NULL.
+#' @param combined_stancode The assembled Stan code, used by
+#'   `lift_mvgam_stanvar_priors()` to detect mvgam-injected stanvar
+#'   rows.
+#' @return A `brmsprior` data frame ready to land on `mvgam_object$prior`.
+#' @noRd
+assemble_stored_prior_table <- function(obs_priors, trend_priors,
+                                          user_prior, combined_stancode) {
+  combined <- combine_obs_trend_priors(
+    obs_priors, add_trend_suffix_to_priors(trend_priors)
+  )
+  lifted <- lift_mvgam_stanvar_priors(combined, combined_stancode)
+  if (!is.null(user_prior) && nrow(user_prior) > 0L) {
+    lifted <- merge_user_priors(lifted, user_prior)$priors
+  }
+  lifted
+}
+
+
+#' Re-attach the `_trend` suffix to a brms-validated trend prior table
+#'
+#' Inverse of `remove_trend_suffix_from_priors`: takes the prior table
+#' returned by the trend-side `setup_brms_lightweight()` call (whose
+#' classes carry brms's own names like `b`, `sigma`, `sds`, `ar1`) and
+#' suffixes every class with `_trend` so the combined obs + trend table
+#' uses the same convention as `get_prior.mvgam_formula()`. Rows already
+#' suffixed (mvgam-injected stanvars) are left untouched.
+#'
+#' @param trend_priors A brmsprior data frame or NULL.
+#' @return The same brmsprior with `class` re-suffixed, or NULL if
+#'   `trend_priors` is NULL / empty.
+#' @noRd
+add_trend_suffix_to_priors <- function(trend_priors) {
+  checkmate::assert_class(trend_priors, "brmsprior", null.ok = TRUE)
+  if (is.null(trend_priors) || nrow(trend_priors) == 0L) return(NULL)
+  needs_suffix <- !grepl("_trend$", trend_priors$class)
+  trend_priors$class[needs_suffix] <-
+    paste0(trend_priors$class[needs_suffix], "_trend")
+  structure(trend_priors, class = c("brmsprior", "data.frame"))
+}
+
+
 remove_trend_suffix_from_priors <- function(trend_priors, trend_specs, base_formula, data) {
   checkmate::assert_class(trend_priors, "brmsprior", null.ok = TRUE)
   checkmate::assert_list(trend_specs, null.ok = TRUE)
@@ -1487,16 +1640,86 @@ get_prior.brmsformula <- function(object, ...) {
 #'
 #' @param object A fitted \code{mvgam} model.
 #' @param ... Currently unused; present for S3 generic dispatch.
-#' @return A \code{brmsprior} data frame.
+#' @return A \code{brmsprior} data frame covering every adjustable
+#'   prior row (observation and trend components). Rows the user
+#'   overrode at fit time carry `source = "user"`; rows left at
+#'   their defaults carry `source = "default"` (or whatever source
+#'   string \pkg{brms} assigned).
 #' @export
 get_prior.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
-  if (is.null(object$prior)) {
-    stop(insight::format_error(
-      "Fit was not stored with a prior table (object$prior is NULL)."
-    ))
+
+  # Re-derive the full obs + trend prior table from the formula
+  # slots on the fit; `object$prior` alone carries only the subset
+  # the user supplied at fit time and therefore hides every
+  # trend-side row that Stan also used.
+  formula_obs <- object$formula
+  trend_call <- object$trend_call
+  data <- object$data %||% object$obs_data
+  family <- object$family %||% gaussian()
+
+  rederive_failed <- is.null(formula_obs) || is.null(data)
+  if (!rederive_failed) {
+    full <- tryCatch(
+      get_prior.mvgam_formula(
+        mvgam_formula(formula_obs, trend_call),
+        data = data, family = family
+      ),
+      error = function(e) NULL
+    )
+    rederive_failed <- is.null(full)
   }
-  object$prior
+
+  # If re-derivation is not possible (e.g. the fit pre-dates the
+  # formula-slot enrichments), fall back to whatever is on
+  # `object$prior` so callers still get something usable. The user
+  # also sees only the legacy view in that case, so warn once.
+  if (rederive_failed) {
+    if (is.null(object$prior)) {
+      stop(insight::format_error(c(
+        "Fit was not stored with a prior table.",
+        i = "Refit with the current package version to enable get_prior() on fitted objects."
+      )))
+    }
+    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+      rlang::warn(
+        paste0(
+          "Returning the user-supplied prior overrides only; ",
+          "the full prior table could not be re-derived from the ",
+          "stored formula slots."
+        ),
+        class = "mvgam_get_prior_fallback",
+        .frequency = "once",
+        .frequency_id = "mvgam_get_prior_fallback"
+      )
+    }
+    return(object$prior)
+  }
+
+  # `object$prior` (combined obs + trend at fit time) carries BOTH
+  # the user-supplied rows AND brms's auto-defaults; only the
+  # `source = "user"` subset is treated as overrides here.
+  user <- object$prior
+  if (!is.null(user) && "source" %in% names(user)) {
+    user <- user[user$source == "user", , drop = FALSE]
+  }
+  merged <- merge_user_priors(full, user)
+  if (length(merged$unmatched) > 0L &&
+      !identical(Sys.getenv("TESTTHAT"), "true")) {
+    rlang::warn(
+      paste0(
+        length(merged$unmatched),
+        " user-supplied prior row(s) did not match any row in the ",
+        "default table: ",
+        paste(unique(merged$unmatched), collapse = ", "),
+        ". Check the `class` / `coef` spelling."
+      ),
+      class = "mvgam_get_prior_unmatched",
+      .frequency = "once",
+      .frequency_id = "mvgam_get_prior_unmatched"
+    )
+  }
+  merged$priors
 }
 
 #' Detect Embedded Families in Formula Objects
@@ -1561,6 +1784,55 @@ has_embedded_families <- function(formula) {
 #' specifications and supports all brms family types for observation models
 #' while trend components are always modeled as Gaussian State-Space processes.
 #'
+#' @examples
+#' \donttest{
+#' # Workflow: discover the adjustable priors, override a subset,
+#' # then pass the result back to `mvgam()`.
+#' set.seed(1)
+#' dat <- sim_mvgam(
+#'   family       = poisson(),
+#'   n_series     = 2L,
+#'   n_timepoints = 50L,
+#'   trend_model  = AR()
+#' )$data_train
+#'
+#' # Wrap the formula pair in `mvgam_formula()` so this S3 method
+#' # dispatches; the returned `brmsprior` data frame lists every
+#' # adjustable row keyed by `class` and `coef`.
+#' mf <- mvgam_formula(
+#'   formula       = y ~ s(x, k = 5),
+#'   trend_formula = ~ AR(p = 1)
+#' )
+#' get_prior(mf, data = dat, family = poisson())
+#'
+#' # Override a subset. Each `prior(...)` returns one row; untouched
+#' # classes keep their defaults. Trend-side classes carry a
+#' # `_trend` suffix so they do not collide with obs-side classes
+#' # of the same name (e.g. `b` vs `b_trend`).
+#' my_priors <- c(
+#'   prior(normal(0, 1),    class = b),
+#'   prior(exponential(2),  class = sigma_trend),
+#'   prior(normal(0, 0.5),  class = ar1_trend)
+#' )
+#'
+#' mod <- mvgam(
+#'   formula       = y ~ s(x, k = 5),
+#'   trend_formula = ~ AR(p = 1),
+#'   data          = dat,
+#'   family        = poisson(),
+#'   priors        = my_priors,
+#'   chains        = 2,
+#'   samples       = 250,
+#'   burnin        = 500,
+#'   silent        = 2
+#' )
+#'
+#' # Inspect the posterior to confirm the overrides took effect. The
+#' # `ar1_trend` and `sigma_trend` rows should sit on the scale set
+#' # by their custom priors rather than the flat defaults.
+#' summary(mod, include_betas = FALSE)
+#' }
+#'
 #' @seealso \code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}},
 #'   \code{\link[brms]{set_prior}}, \code{\link[brms]{prior}}
 #' @export
@@ -1617,12 +1889,18 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
   # Parse multivariate trends and validate
   mv_spec <- parse_multivariate_trends(formula, trend_formula)
   
-  # Extract and validate trend components
+  # Extract and validate trend components. This call also runs the
+  # `by = lv_axis()` AST rewrite (factor-active rewrites to
+  # `by = .trend`; non-factor rewrites to `by = series`), so the
+  # rewritten formula must be threaded into the downstream prior
+  # extraction; passing the raw `trend_formula` here would surface
+  # `lv_axis()` as an unresolved variable inside brms's
+  # `validate_data()`.
   components <- extract_and_validate_trend_components(
     data, mv_spec, response_names, "time", "series", trend_formula
   )
 
-  # Extract dimensions from enhanced mv_spec
+  # Extract dimensions from the validated spec
   dimensions <- if (is_multivariate_trend_specs(components$enhanced_mv_spec$trend_specs)) {
     first_spec <- components$enhanced_mv_spec$trend_specs[[1]]
     first_spec$dimensions
@@ -1630,9 +1908,28 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
     components$enhanced_mv_spec$trend_specs$dimensions
   }
 
+  # The validator rewrites `by = lv_axis()` markers in the trend
+  # formula to either `by = series` (non-factor path) or
+  # `by = .trend` (factor path); without this rewrite,
+  # `extract_trend_priors()` would surface the literal `lv_axis()`
+  # call as an unresolved variable inside brms's `validate_data()`.
+  # For all other trend formulas, the validator's `base_formula`
+  # carries only the trend-predictor side (the constructor stripped),
+  # so we must keep the original `trend_formula` and only swap in
+  # the rewritten form when the marker was actually present.
+  uses_lv_axis_marker <- inherits(trend_formula, "formula") &&
+    any(grepl("lv_axis\\(\\)|by = trend\\b",
+               deparse(trend_formula)))
+  trend_formula_for_priors <- if (uses_lv_axis_marker &&
+      inherits(components$enhanced_mv_spec$base_formula, "formula")) {
+    components$enhanced_mv_spec$base_formula
+  } else {
+    trend_formula
+  }
+
   # Extract trend model priors using validated components
   trend_priors <- extract_trend_priors(
-    trend_formula = trend_formula,
+    trend_formula = trend_formula_for_priors,
     data = components$trend_data,
     response_names = response_names,
     .precomputed_dimensions = dimensions

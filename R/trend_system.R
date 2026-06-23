@@ -2408,8 +2408,25 @@ CAR = function(time = NA, series = NA) {
 
 #' @rdname trend_constructors
 #' @export
-VAR = function(time = NA, series = NA, p = 1, ma = FALSE, gr = NA,
-               subgr = NA, n_lv = NULL, trend_map = NULL) {
+VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
+               gr = NA, subgr = NA, n_lv = NULL, trend_map = NULL) {
+  # VAR is by definition multivariate with correlated innovations;
+  # `cor` is accepted for API symmetry with AR / RW / ZMVN but
+  # cannot be FALSE. Users who want independent per-series
+  # innovations should reach for AR() instead.
+  if (isFALSE(cor)) {
+    stop(insight::format_error(c(
+      "VAR(cor = FALSE) is not supported.",
+      x = paste0(
+        "VAR processes are correlated by definition; the ",
+        "innovation covariance matrix is part of the model."
+      ),
+      i = paste0(
+        "Use AR(p = ", p, ") if you want independent per-series ",
+        "autoregressions."
+      )
+    )))
+  }
   # Validate VAR order parameter. Scalar p (e.g. p = 2) is the
   # standard interpretation: include AR coefficient matrices
   # for consecutive lags 1..p. Sparse-lag vector p (e.g.
