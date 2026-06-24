@@ -28,18 +28,13 @@ Compute forecast error variance decompositions from
 \code{mvgam} models with Vector Autoregressive dynamics
 }
 \examples{
-\donttest{
-set.seed(0)
-simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
-                     n_timepoints = 60L, trend_model = VAR(),
-                     prop_trend = 0.95)
-mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
-              data    = simdat$data_train,
-              family  = gaussian(),
-              chains  = 2, silent = 2)
-
-# Forecast-error variance decomposition over h = 6 steps.
-fevd(mod, h = 6L)
+\dontrun{
+# See `?trend_constructors` for a runnable end-to-end VAR
+# example that exercises `fevd()` alongside `irf()`,
+# `stability()` and `residual_cor()` on the same fit. The
+# shape below summarises the API.
+fevd_obj <- fevd(var_mod, h = 8L)
+plot(fevd_obj)
 }
 
 }

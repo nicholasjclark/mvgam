@@ -89,19 +89,12 @@
 #'   \code{\link{fevd}}
 #'
 #' @examples
-#' \donttest{
-#' set.seed(0)
-#' simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
-#'                      n_timepoints = 60L, trend_model = VAR(),
-#'                      prop_trend = 0.95)
-#' mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
-#'               data    = simdat$data_train,
-#'               family  = gaussian(),
-#'               chains  = 2, silent = 2)
-#'
-#' # Posterior summaries of return rate, reactivity and related
-#' # VAR-stability diagnostics.
-#' head(stability(mod))
+#' \dontrun{
+#' # See `?trend_constructors` for a runnable end-to-end VAR
+#' # example that exercises `stability()` alongside `irf()`,
+#' # `fevd()` and `residual_cor()` on the same fit. The shape
+#' # below summarises the API.
+#' head(stability(var_mod)[, c("reactivity", "mean_return_rate")])
 #' }
 #'
 #' @export

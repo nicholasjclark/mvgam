@@ -23,19 +23,13 @@
 #' @seealso \code{\link{mvgam_irf-class}}, [VAR()], [plot.mvgam_irf()], [stability()], [fevd()]
 #'
 #' @examples
-#' \donttest{
-#' set.seed(0)
-#' simdat <- sim_mvgam(family = gaussian(), n_series = 3L,
-#'                      n_timepoints = 60L, trend_model = VAR(),
-#'                      prop_trend = 0.95)
-#' mod <- mvgam(y ~ 1, trend_formula = ~ VAR(p = 1),
-#'               data    = simdat$data_train,
-#'               family  = gaussian(),
-#'               chains  = 2, silent = 2)
-#'
-#' # Impulse response over h = 6 steps after a unit shock to each
-#' # series.
-#' irf(mod, h = 6L)
+#' \dontrun{
+#' # See `?trend_constructors` for a runnable end-to-end VAR
+#' # example that exercises `irf()` alongside `fevd()`,
+#' # `stability()` and `residual_cor()` on the same fit. The
+#' # shape below summarises the API.
+#' irf_obj <- irf(var_mod, h = 8L)
+#' plot(irf_obj, series = 1)
 #' }
 #'
 #' @export

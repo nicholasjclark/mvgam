@@ -331,6 +331,25 @@ summary(mod, include_betas = FALSE)
 # "trend_smooth_params").
 mcmc_plot(mod, variable = "trend_params", type = "intervals")
 
+# Post-fit sweep on the same VAR(1). `residual_cor()` pulls
+# the innovation correlation matrix between the three series.
+# `irf()` shows how a one-time shock to one series ripples
+# through the others over h steps; `fevd()` reports the share
+# of each series' forecast-error variance attributable to each
+# shock; `stability()` summarises the long-run dynamics
+# (reactivity = peak amplification of a shock; mean_return_rate
+# = speed of decay back to the stationary distribution).
+residual_cor(mod)
+plot(irf(mod, h = 8L), series = 1)
+plot(fevd(mod, h = 8L))
+head(stability(mod)[, c("reactivity", "mean_return_rate")])
+
+# Forecast the held-out cells. `forecast()` propagates
+# uncertainty through the VAR; `plot(fc, series = i)` overlays
+# the in-sample hindcast and the out-of-sample interval.
+fc <- forecast(mod, newdata = simdat$data_test)
+plot(fc, series = 1)
+
 # Continuous-time AR(1) on irregularly-spaced data. Recipe 6
 # of sim_mvgam() defaults to CAR() with U(1, 6) time gaps.
 set.seed(7)
@@ -359,6 +378,57 @@ mcmc_plot(mod_car, variable = "trend_params", type = "intervals")
 # or a zero-mean multivariate normal residual prior for cross-
 # series correlations:
 #   trend_formula = ~ ZMVN()
+
+# Hierarchical VAR. Two regions, two outcomes per region. The
+# `gr` factor identifies the grouping unit (region) and `subgr`
+# identifies the within-group dimension (outcome). The fit
+# estimates a population innovation correlation across outcomes
+# plus per-region deviations; `alpha_cor_trend` (Beta(2, 2) by
+# default) controls the partial-pooling blend between them.
+# Simulate data with a genuine cross-outcome correlation (~0.6)
+# so the population estimate is recoverable, not floating on
+# noise.
+set.seed(3)
+n_t <- 30L; rho <- 0.6
+Sigma <- matrix(c(1, rho, rho, 1), 2L, 2L)
+L <- chol(Sigma)
+regions <- c("A", "B")
+hdat <- do.call(rbind, lapply(regions, function(r) {
+  eps <- matrix(rnorm(n_t * 2L), n_t, 2L) \%*\% L
+  data.frame(
+    time    = rep(seq_len(n_t), 2L),
+    region  = factor(r, levels = regions),
+    outcome = factor(rep(c("gdp", "cons"), each = n_t),
+                      levels = c("gdp", "cons")),
+    y       = c(eps[, 1L], eps[, 2L])
+  )
+}))
+hdat$series <- factor(paste(hdat$region, hdat$outcome, sep = "_"))
+
+mod_hv <- mvgam(
+  y ~ 1,
+  trend_formula = ~ VAR(
+    p = 1, gr = region, subgr = outcome, cor = TRUE
+  ),
+  data    = hdat,
+  family  = gaussian(),
+  chains  = 1,
+  samples = 300,
+  burnin  = 300,
+  silent  = 2
+)
+
+# Marginal posterior for the pooling weight. Mass near 1 means
+# the per-region correlations track the population correlation;
+# mass near 0 lets the regions diverge.
+mcmc_plot(mod_hv, variable = "alpha_cor_trend", type = "hist")
+
+# `residual_cor()` defaults to the population (across-outcome)
+# correlation. Passing `groups = TRUE` returns a list of
+# per-region correlations alongside the population entry, so
+# the across-region heterogeneity can be inspected directly.
+residual_cor(mod_hv)
+residual_cor(mod_hv, groups = TRUE)
 }
 
 }
