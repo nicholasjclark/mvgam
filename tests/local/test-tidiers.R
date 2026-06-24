@@ -104,6 +104,172 @@ test_that("tidy.mvgam picks up trend dynamics for AR / VAR / PW", {
 })
 
 
+# ---- tidy.mvgam: smoothpars + effects = ran_pars / ran_vals -----
+
+test_that("tidy.mvgam surfaces obs Intercept + smooth coefs + penalty", {
+  # Use an obs-side smooth fit; this fixture has `y ~ s(x)` plus
+  # an AR(1) trend, so we expect:
+  #   * `Intercept` / `b_Intercept` rows as `observation_beta`,
+  #   * `sds_*` rows as `observation_smooth_param` (ran_pars),
+  #   * `zs_*` / `s_*` rows as `observation_smooth_coef` (ran_vals).
+  # Before the post-brms-integration `head_betas()` fix the smooth
+  # block was silently dropped and `tidy()` returned only the
+  # 2-row trend_model_param block.
+  fit <- load_fixture("val_mvgam_ar1_re_smooth")
+  td <- tidy(fit)
+  expect_true("observation_beta" %in% td$type)
+  expect_true("observation_smooth_param" %in% td$type)
+  expect_true("observation_smooth_coef" %in% td$type)
+  # Smooth penalties (`sds_*`) are positive
+  sds_rows <- td[td$type == "observation_smooth_param", ]
+  expect_true(all(sds_rows$estimate > 0))
+  # Per-basis values should include both `s_*` and `zs_*` aliases
+  coef_terms <- td$term[td$type == "observation_smooth_coef"]
+  expect_true(any(grepl("^s_", coef_terms)))
+  expect_true(any(grepl("^zs_", coef_terms)))
+})
+
+
+test_that("tidy.mvgam surfaces trend-side zs_*_trend smooth coefs", {
+  # Regression guard for the categorize-pattern gap where
+  # `trend_smoothpars` was matched by `^(sds_.*_trend|s_.*_trend)`
+  # and silently dropped `zs_*_trend` / `sdgp_*_trend` /
+  # `lscale_*_trend` / `zgp_*_trend`. Those leaked into
+  # `trend_pars` and then got filtered out of tidy() entirely
+  # because they did not match the trend-dynamic regex.
+  fit <- load_fixture("val_mvgam_ar1_re_smooth_trend")
+  td <- tidy(fit)
+  zs_trend <- td[grepl("^zs_.*_trend", td$term), ]
+  expect_gt(nrow(zs_trend), 0L)
+  expect_true(all(zs_trend$type == "trend_smooth_coef"))
+})
+
+
+test_that("tidy.mvgam(effects = ran_pars) returns only variance components", {
+  fit <- load_fixture("val_mvgam_ar1_re_smooth")
+  rp <- tidy(fit, effects = "ran_pars")
+  expect_gt(nrow(rp), 0L)
+  expect_true(all(rp$type %in% c(
+    "observation_family_extra_param",
+    "observation_smooth_param",
+    "random_effect_group_level",
+    "trend_model_param",
+    "trend_smooth_param",
+    "trend_random_effect_group_level"
+  )))
+  # `s_*` per-basis coefficients are ran_vals; they must NOT
+  # appear in the ran_pars filter.
+  expect_false(any(grepl("^s_[0-9]", rp$term)))
+})
+
+
+test_that("tidy.mvgam(effects = ran_vals) returns only level deviations", {
+  fit <- load_fixture("val_mvgam_ar1_re_smooth")
+  rv <- tidy(fit, effects = "ran_vals")
+  expect_gt(nrow(rv), 0L)
+  expect_true(all(rv$type %in% c(
+    "random_effect_beta",
+    "observation_smooth_coef",
+    "trend_random_effect_beta",
+    "trend_smooth_coef"
+  )))
+})
+
+
+# ---- categorize_mvgam_parameters: bucket coverage ----------------
+
+test_that("categorize_mvgam_parameters buckets every drawn parameter", {
+  # Architectural guard for the lazy-categorization invariant:
+  # every parameter the user can see via `variables(mod)` should
+  # land in exactly one of the eight `obj_vars` buckets (plus
+  # `trends` for the state arrays). Anything that drops on the
+  # floor is a categorize regex gap.
+  fit <- load_fixture("val_mvgam_ar1_re_smooth_trend")
+  obj_vars <- mvgam:::categorize_mvgam_parameters(fit)
+  bucketed <- unique(c(
+    obj_vars$observation_pars$orig_name,
+    obj_vars$observation_betas$orig_name,
+    obj_vars$observation_smoothpars$orig_name,
+    obj_vars$observation_re_params$orig_name,
+    obj_vars$trend_pars$orig_name,
+    obj_vars$trend_betas$orig_name,
+    obj_vars$trend_smoothpars$orig_name,
+    obj_vars$trend_re_params$orig_name,
+    obj_vars$trends$orig_name
+  ))
+  all_pars <- variables(posterior::as_draws(fit$fit))
+  all_pars <- setdiff(all_pars, fit$exclude %||% character(0L))
+  # `b_Intercept_trend` is the brms uncentred generated quantity
+  # and is excluded by design (see categorize() comment).
+  all_pars <- setdiff(all_pars, "b_Intercept_trend")
+  uncategorized <- setdiff(all_pars, bucketed)
+  expect_equal(
+    length(uncategorized), 0L,
+    label = paste0(
+      "uncategorized parameters: ",
+      paste(uncategorized, collapse = ", ")
+    )
+  )
+})
+
+
+# ---- pairs.mvgam: default variable selection ---------------------
+
+test_that("pairs.mvgam default selection covers canonical params", {
+  # The default returns a list of regex patterns (brms-style) that
+  # are matched against `variables(fit)` inside bayesplot. Each
+  # fixture should pick up the right scalar hyperparameters: the
+  # parametric coefficients, family extras, trend dynamics, and
+  # smoothness penalties / RE variance components.
+  patterns_match_any <- function(patts, vars) {
+    any(vapply(patts, function(p) any(grepl(p, vars)), logical(1)))
+  }
+
+  ar_fit <- load_fixture("val_mvgam_ar1_re_smooth_trend")
+  patts <- mvgam:::default_pairs_variables(ar_fit)
+  vars <- variables(ar_fit)
+  matched <- unique(unlist(lapply(
+    patts, function(p) grep(p, vars, value = TRUE)
+  )))
+  expect_gt(length(matched), 3L)
+  # Trend-side dynamics, intercepts and variance components are in.
+  expect_true(any(grepl("^sigma_trend", matched)))
+  expect_true(any(grepl("^ar1_trend", matched)))
+  expect_true(any(grepl("^b_Intercept", matched)))
+  expect_true(any(grepl("^sds_.*_trend", matched)))
+  expect_true(any(grepl("^sd_.*_trend", matched)))
+  # Per-basis smooth coefficients and per-level RE draws stay out.
+  expect_false(any(grepl("^(s_|zs_|zgp_|r_|z_)", matched)))
+
+  # Gaussian fit: family-specific dpar `sigma` must be picked up
+  # via the family-aware dpars block.
+  gauss_fit <- load_fixture("val_mvgam_gauss_ar1_n150")
+  vars_g <- variables(gauss_fit)
+  patts_g <- mvgam:::default_pairs_variables(gauss_fit)
+  matched_g <- unique(unlist(lapply(
+    patts_g, function(p) grep(p, vars_g, value = TRUE)
+  )))
+  expect_true("sigma" %in% matched_g)
+
+  # Hurdle negbinomial: two dpars (`shape`, `hu`) both surface.
+  hurdle_fit <- load_fixture("val_mvgam_hurdle_negbinomial_ar1")
+  vars_h <- variables(hurdle_fit)
+  patts_h <- mvgam:::default_pairs_variables(hurdle_fit)
+  matched_h <- unique(unlist(lapply(
+    patts_h, function(p) grep(p, vars_h, value = TRUE)
+  )))
+  expect_true("shape" %in% matched_h)
+  expect_true("hu" %in% matched_h)
+})
+
+
+test_that("pairs.mvgam runs end-to-end on a smooth + RE fit", {
+  fit <- load_fixture("val_mvgam_ar1_re_smooth_trend")
+  res <- suppressWarnings(pairs(fit))
+  expect_s3_class(res, "bayesplot_grid")
+})
+
+
 # ---- augment.mvgam: broom-standard columns -----------------------
 
 test_that("augment.mvgam returns broom-standard fit / resid cols", {

@@ -84,11 +84,17 @@ if (!file.exists(paths$mvgam) || force) {
     tod_c  = as.numeric(t(sim$tod_visit)) - 12
   )
   message("fitting mvgam occ() ...")
+  # `threads = 2L` enables mvgam's `partial_sum_occ_lpmf` +
+  # `reduce_sum` per-closure-unit parallelism. Closure-unit
+  # families bypass the brms partial-log-lik path and so are not
+  # affected by the issue #411 / #412 gate; threading delivers a
+  # real per-chain speedup for occ() / nmix() variants.
   mvgam_fit <- mvgam(
     brms::bf(y ~ elev, p ~ tod_c),
     family = occ(),
     data   = mvgam_long,
     chains = 2L, iter = 1000L, warmup = 500L,
+    threads = 2L,
     silent = 2L, refresh = 0L
   )
   saveRDS(mvgam_fit, paths$mvgam)

@@ -176,9 +176,12 @@
 #'
 #' @param threads Positive integer or `NULL`. Forwarded to
 #'   [`mvgam()`] / `cmdstanr`. With closure-unit families
-#'   (`nmix()`, `occ()`), enables `reduce_sum` threading of the
-#'   per-closure-unit lpmf. See [`mvgam()`] for the threading
-#'   notes and bench guidance.
+#'   (`nmix()`, `occ()`) and multi-response families
+#'   (`diri()`, `mvn()`, `mvt()`), enables `reduce_sum` threading of
+#'   the per-unit lpmf. Combining `threads > 1` with a
+#'   `trend_formula` on a brms-native family currently compiles
+#'   un-threaded after a one-time warning; see [`mvgam()`] for the
+#'   full threading notes and bench guidance.
 #' @param cpp_options Optional named list forwarded to
 #'   `cmdstanr::cmdstan_model()` (e.g. `CXXFLAGS = "-march=native"`).
 #'   `stan_threads = TRUE` is auto-set when `threads` is non-NULL.

@@ -549,6 +549,17 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
   # diagonal: just "sigma_trend").
   dispatch_key <- paste0(if (hierarchical) "hier" else "flat", ".",
                           effective_pattern)
+  # Hierarchical VAR (`VAR(gr = ..., subgr = ..., cor = TRUE)`) emits
+  # the same population-vs-deviation parameter shapes as the
+  # hierarchical Cholesky-scaled case: `alpha_cor_trend`,
+  # `L_Omega_global_trend`, `L_deviation_group_trend`, and
+  # `sigma_group_trend`. See `generate_hierarchical_correlation_parameters()`
+  # in R/stan_assembly.R. Alias the dispatch key so a single extractor
+  # populates both, and `compute_residcor_hierarchical()` reads the
+  # same fields downstream.
+  if (identical(dispatch_key, "hier.full_covariance")) {
+    dispatch_key <- "hier.cholesky_scaled"
+  }
   params <- switch(
     dispatch_key,
     "hier.cholesky_scaled"  = extract_hierarchical_cholesky_params(

@@ -177,14 +177,24 @@
 #' @param threads Positive integer or `NULL`. When non-NULL the
 #'   model is compiled with `cpp_options$stan_threads = TRUE` and
 #'   cmdstanr passes `threads_per_chain = N` at sample time.
-#'   Closure-unit families (`nmix()`, `occ()`) thread their
-#'   per-closure-unit lpmf via `reduce_sum`; brms-native families
-#'   thread their lpmf loops via brms's `partial_log_lik`. For
-#'   closure-unit families, expect ~30-40% sampling throughput
-#'   improvement at `threads = 4` on a fixture with N_unit >= 50;
-#'   smaller fixtures may see thread-overhead-dominated
-#'   regressions. The internal grainsize is auto-tuned to ~8
-#'   chunks regardless of `threads`.
+#'   Closure-unit families (`nmix()`, `occ()`) and multi-response
+#'   families (`diri()`, `mvn()`, `mvt()`, `multinomial()`,
+#'   `categorical()`) thread their per-unit lpmf via `reduce_sum`;
+#'   brms-native families (`gaussian()`, `poisson()`, etc.) without
+#'   a `trend_formula` thread their lpmf loops via brms's
+#'   `partial_log_lik_lpmf`. For closure-unit families, expect
+#'   ~30-40% sampling throughput improvement at `threads = 4` on a
+#'   fixture with N_unit >= 50; smaller fixtures may see
+#'   thread-overhead-dominated regressions. The internal grainsize
+#'   is auto-tuned to ~8 chunks regardless of `threads`.
+#'
+#'   Combining `threads > 1` with a `trend_formula` on a brms-native
+#'   family is currently a no-op: mvgam's trend injector cannot find
+#'   the `mu` assignment once brms moves it inside
+#'   `partial_log_lik_lpmf`, so the code is compiled and sampled
+#'   serially after emitting a one-time warning. The full fix
+#'   (teaching the injector to splice into `partial_log_lik_lpmf`)
+#'   is filed as a separate enhancement.
 #' @param cpp_options Optional named list forwarded to
 #'   `cmdstanr::cmdstan_model()`. Common entries:
 #'   `stan_threads = TRUE` (auto-set when `threads` is non-NULL),

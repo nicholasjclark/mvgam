@@ -194,9 +194,12 @@ see \verb{[mvgam()]} for the accepted field list.}
 
 \item{threads}{Positive integer or \code{NULL}. Forwarded to
 \code{\link[=mvgam]{mvgam()}} / \code{cmdstanr}. With closure-unit families
-(\code{nmix()}, \code{occ()}), enables \code{reduce_sum} threading of the
-per-closure-unit lpmf. See \code{\link[=mvgam]{mvgam()}} for the threading
-notes and bench guidance.}
+(\code{nmix()}, \code{occ()}) and multi-response families
+(\code{diri()}, \code{mvn()}, \code{mvt()}), enables \code{reduce_sum} threading of
+the per-unit lpmf. Combining \code{threads > 1} with a
+\code{trend_formula} on a brms-native family currently compiles
+un-threaded after a one-time warning; see \code{\link[=mvgam]{mvgam()}} for the
+full threading notes and bench guidance.}
 
 \item{run_model}{\strong{(deprecated)} Logical. Forwarded to \code{mvgam()};
 when \code{FALSE}, skips Stan parse / compile / sampling and returns a

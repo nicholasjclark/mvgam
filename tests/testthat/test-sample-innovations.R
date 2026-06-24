@@ -107,6 +107,67 @@ test_that("extract_hierarchical_cholesky_params preserves named values", {
 })
 
 
+test_that("get_trend_covariance_structure routes hier VAR through Cholesky extractor", {
+  # Regression guard for the residual_cor hierarchical VAR bug:
+  # before the dispatch alias was added,
+  # `get_trend_covariance_structure()` left
+  # `params$L_Omega_global_trend` NULL for VAR(gr=, subgr=, cor=TRUE)
+  # because the switch only recognised "hier.cholesky_scaled",
+  # never "hier.full_covariance". The aliasing collapses both keys
+  # onto `extract_hierarchical_cholesky_params()` so downstream
+  # consumers (`residual_cor()`, `compute_residcor_hierarchical()`)
+  # find the population and per-group Cholesky arrays they expect.
+  n_draws <- 6
+  n_groups <- 2
+  n_sub <- 3
+  raw_mat <- make_hier_draws_mat(n_draws, n_groups, n_sub)
+  draws_mat <- posterior::as_draws_matrix(raw_mat)
+
+  fake_spec <- structure(
+    list(n_lv = NULL, gr = "region", subgr = "outcome", cor = TRUE),
+    class = "mvgam_trend"
+  )
+  fake_object <- structure(
+    list(
+      fit = draws_mat,
+      trend_metadata = list(trend_type = "VAR"),
+      trend_components = list(
+        specifications = fake_spec,
+        n_trends = n_groups * n_sub
+      ),
+      series_info = list(n_series = n_groups * n_sub),
+      standata = list(
+        N_groups_trend = n_groups,
+        N_subgroups_trend = n_sub,
+        group_inds_trend = rep(seq_len(n_groups), each = n_sub)
+      )
+    ),
+    class = "mvgam"
+  )
+
+  testthat::local_mocked_bindings(
+    get_trend_type = function(object) "VAR",
+    trend_spec_for_residcor = function(object) fake_spec,
+    .package = "mvgam"
+  )
+
+  cs <- get_trend_covariance_structure(fake_object)
+
+  expect_equal(cs$pattern, "full_covariance")
+  expect_true(cs$hierarchical)
+  expect_equal(dim(cs$params$L_Omega_global_trend),
+               c(n_draws, n_sub, n_sub))
+  expect_equal(dim(cs$params$L_deviation_group_trend),
+               c(n_draws, n_groups, n_sub, n_sub))
+  expect_equal(length(cs$params$alpha_cor_trend), n_draws)
+  # Sanity-check column→slot mapping survives the dispatch.
+  expect_equal(
+    cs$params$L_Omega_global_trend[, 2, 1],
+    as.numeric(raw_mat[, "L_Omega_global_trend[2,1]"])
+  )
+})
+
+
 test_that("extract_hierarchical_cholesky_params errors on missing param", {
   draws_mat <- matrix(0, 5, 3,
                       dimnames = list(NULL, c("a", "b", "c")))

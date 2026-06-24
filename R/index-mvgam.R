@@ -191,8 +191,23 @@ categorize_mvgam_parameters <- function(x) {
       all_pars != "b_Intercept_trend" &
       all_pars != "Intercept_trend" &
       !grepl("^b_.*_trend", all_pars) &
-      !grepl("^(sds_.*_trend|s_.*_trend)", all_pars) &  # Exclude smooth parameters
-      !grepl("^(sd_.*_trend|r_.*_trend|cor_.*_trend)", all_pars)  # Exclude RE parameters
+      # Exclude smooth params (must mirror the obs-side smooth
+      # regex so trend-side GPs and standardised bases land in
+      # `trend_smoothpars` instead of leaking into `trend_pars`).
+      !grepl(
+        paste0(
+          "^(sds_|s_|zs_|sdgp_|lscale_|zgp_).*_trend"
+        ),
+        all_pars
+      ) &
+      # Exclude RE params (mirror obs-side, which covers
+      # `sd_`, `r_`, `cor_`, `L_` and the standardised `z_` raw
+      # deviations). Asymmetry here was leaking `L_*_trend` /
+      # `z_*_trend` into `trend_pars`.
+      !grepl(
+        "^(sd_|r_|cor_|L_|z_).*_trend",
+        all_pars
+      )
   ]
   trend_pars <- create_component(trend_dynamic_pars)
 
@@ -203,20 +218,37 @@ categorize_mvgam_parameters <- function(x) {
   ]
   trend_betas <- create_component(trend_beta_pars)
 
-  # Smooth parameters from trend formula only
+  # Smooth parameters from trend formula only. Mirrors the obs-side
+  # pattern so trend-side GP marginal SDs (`sdgp_*_trend`), GP
+  # length-scales (`lscale_*_trend`), GP standardised draws
+  # (`zgp_*_trend`) and standardised smooth-basis coefficients
+  # (`zs_*_trend`) all land in `trend_smoothpars` rather than
+  # leaking into `trend_pars`.
   trend_smooth_pars <- all_pars[
-    grepl("^(sds_.*_trend|s_.*_trend)", all_pars)
+    grepl(
+      paste0(
+        "^(sds_|s_|zs_|sdgp_|lscale_|zgp_).*_trend"
+      ),
+      all_pars
+    )
   ]
   trend_smoothpars <- create_component(trend_smooth_pars)
 
-  # Random effect parameters from trend formula only
+  # Random effect parameters from trend formula only. Mirrors the
+  # obs-side regex so trend-side Cholesky factors (`L_*_trend`) and
+  # standardised raw deviations (`z_*_trend`) land here instead of
+  # leaking into `trend_pars`.
   trend_re_pars <- all_pars[
-    grepl("^(sd_.*_trend|r_.*_trend|cor_.*_trend)", all_pars)
+    grepl("^(sd_|r_|cor_|L_|z_).*_trend", all_pars)
   ]
   trend_re_params <- create_component(trend_re_pars)
 
-  # Computed trend state arrays only
-  trend_state_pars <- all_pars[grepl("^trend\\[", all_pars)]
+  # Computed trend state arrays. Uses the same `state_pattern` the
+  # trend-dynamic filter uses to exclude these from `trend_pars`,
+  # so every Stan state array (lv_trend, innovations_trend,
+  # scaled_innovations_trend, mu_trend, trend) lands in exactly
+  # one bucket and is reachable via `obj_vars$trends`.
+  trend_state_pars <- all_pars[grepl(state_pattern, all_pars)]
   trends <- create_component(trend_state_pars)
 
   # Return structured list

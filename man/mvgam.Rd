@@ -190,14 +190,24 @@ these response types, use brms directly.}
 \item{threads}{Positive integer or \code{NULL}. When non-NULL the
 model is compiled with \code{cpp_options$stan_threads = TRUE} and
 cmdstanr passes \code{threads_per_chain = N} at sample time.
-Closure-unit families (\code{nmix()}, \code{occ()}) thread their
-per-closure-unit lpmf via \code{reduce_sum}; brms-native families
-thread their lpmf loops via brms's \code{partial_log_lik}. For
-closure-unit families, expect ~30-40\% sampling throughput
-improvement at \code{threads = 4} on a fixture with N_unit >= 50;
-smaller fixtures may see thread-overhead-dominated
-regressions. The internal grainsize is auto-tuned to ~8
-chunks regardless of \code{threads}.}
+Closure-unit families (\code{nmix()}, \code{occ()}) and multi-response
+families (\code{diri()}, \code{mvn()}, \code{mvt()}, \code{multinomial()},
+\code{categorical()}) thread their per-unit lpmf via \code{reduce_sum};
+brms-native families (\code{gaussian()}, \code{poisson()}, etc.) without
+a \code{trend_formula} thread their lpmf loops via brms's
+\code{partial_log_lik_lpmf}. For closure-unit families, expect
+~30-40\% sampling throughput improvement at \code{threads = 4} on a
+fixture with N_unit >= 50; smaller fixtures may see
+thread-overhead-dominated regressions. The internal grainsize
+is auto-tuned to ~8 chunks regardless of \code{threads}.
+
+Combining \code{threads > 1} with a \code{trend_formula} on a brms-native
+family is currently a no-op: mvgam's trend injector cannot find
+the \code{mu} assignment once brms moves it inside
+\code{partial_log_lik_lpmf}, so the code is compiled and sampled
+serially after emitting a one-time warning. The full fix
+(teaching the injector to splice into \code{partial_log_lik_lpmf})
+is filed as a separate enhancement.}
 
 \item{run_model}{\strong{(deprecated; do not use in new code)} Logical.
 Setting \code{run_model = FALSE} short-circuits before Stan parse /

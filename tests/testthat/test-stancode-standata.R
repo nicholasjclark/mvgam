@@ -1411,6 +1411,18 @@ test_that("stancode generates correct hierarchical VAR(gr = habitat) model with 
   # Block-diagonal assembly of full system matrices
   expect_true(stan_pattern("cov_matrix\\[N_lv_trend\\] Sigma_trend = rep_matrix\\(0, N_lv_trend, N_lv_trend\\);", code_with_trend))
   expect_true(stan_pattern("array\\[N_lags_trend\\] matrix\\[N_lv_trend, N_lv_trend\\] A_trend;", code_with_trend))
+  # Group-series index buffer must use modern Stan array syntax;
+  # the legacy `int group_series[N];` form parses under rstan but
+  # is a hard error under cmdstanr (Stan >= 2.32).
+  expect_true(stan_pattern(
+    "array\\[N_subgroups_trend\\] int group_series;",
+    code_with_trend
+  ))
+  expect_false(grepl(
+    "int group_series\\[N_subgroups_trend\\];",
+    code_with_trend,
+    fixed = FALSE
+  ))
 
   # Heaps transformation for stationarity (VAR-specific)
   expect_true(stan_pattern("array\\[1\\] matrix\\[N_subgroups_trend, N_subgroups_trend\\] P_group;", code_with_trend))
@@ -1441,6 +1453,353 @@ test_that("stancode generates correct hierarchical VAR(gr = habitat) model with 
   expect_equal(length(gregexpr("^\\s*generated quantities\\s*\\{", code_with_trend)[[1]]), 1)
 
 })
+
+
+test_that("trend codegen emits modern Stan array syntax across every branch", {
+  # Regression guard: Stan >= 2.32 (cmdstanr default) rejects the
+  # legacy `int name[N];` form, but `rstan::stanc()` still accepts
+  # it with only a deprecation warning. That means
+  # `validate_stan_code(backend = "rstan")` (used by the rest of
+  # this file) can pass stancode that fails at sample time. Sweep
+  # the generated Stan for every trend-family / cor combination
+  # mvgam ships and assert that no declaration uses the legacy
+  # form. Comment lines (`//`) are excluded so prose like
+  # `int_pattern[1]` in roxygen-style comments cannot trip the
+  # check.
+  data <- setup_stan_test_data()$multivariate
+  trend_combos <- list(
+    list(label = "VAR p=1 cor",
+         tf = ~ 1 + VAR(p = 1, cor = TRUE)),
+    list(label = "VAR p=1 gr cor",
+         tf = ~ 1 + VAR(p = 1, gr = habitat, cor = TRUE)),
+    list(label = "AR p=1 cor",
+         tf = ~ 1 + AR(p = 1, cor = TRUE)),
+    list(label = "AR p=1 gr cor",
+         tf = ~ 1 + AR(p = 1, gr = habitat, cor = TRUE)),
+    list(label = "RW cor",
+         tf = ~ 1 + RW(cor = TRUE)),
+    list(label = "ZMVN",
+         tf = ~ 1 + ZMVN())
+  )
+  legacy_decl <- paste0(
+    "(int|real|matrix|vector|cov_matrix|corr_matrix|",
+    "cholesky_factor_corr|cholesky_factor_cov|simplex|",
+    "unit_vector|ordered|positive_ordered)\\s+",
+    "[A-Za-z_][A-Za-z0-9_]*\\["
+  )
+  for (combo in trend_combos) {
+    mf <- mvgam_formula(count ~ 1 + x, trend_formula = combo$tf)
+    code <- as.character(stancode(
+      mf, data = data, family = poisson(), validate = TRUE
+    ))
+    lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
+    code_only <- lines[!grepl("^\\s*//", lines)]
+    offenders <- grep(legacy_decl, code_only, value = TRUE)
+    expect_equal(
+      length(offenders), 0L,
+      label = paste0("trend = ", combo$label, " emits legacy array form")
+    )
+  }
+})
+
+
+test_that("user priors on array-shaped VAR hyperparameters emit per-lag", {
+  # Regression guard for the trio of dimensionality bugs in user-prior
+  # routing through `generate_var_trend_stanvars()`:
+  #   * `Amu_trend` / `Aomega_trend` are declared `array[2] vector[lags]`;
+  #     a user override must be emitted inside the `for (lag in 1:2)` loop
+  #     and must NOT also appear at top level via the centralized
+  #     `var_centralized_priors` block (which would emit a scalar
+  #     `Amu_trend ~ ...;` Stan rejects).
+  #   * `L_Omega_global_trend` and `L_deviation_group_trend` used to have
+  #     their LKJ priors hardcoded in `generate_hierarchical_correlation_model`,
+  #     silently discarding any user override.
+  data <- setup_stan_test_data()$multivariate
+  mf <- mvgam_formula(
+    count ~ 1 + x,
+    trend_formula = ~ VAR(p = 1, gr = habitat, cor = TRUE)
+  )
+  custom <- c(
+    brms::prior(normal(0, 0.3), class = "Amu_trend"),
+    brms::prior(gamma(2, 0.5), class = "Aomega_trend"),
+    brms::prior(lkj_corr_cholesky(2), class = "L_Omega_global_trend"),
+    brms::prior(lkj_corr_cholesky(4), class = "L_deviation_group_trend")
+  )
+  code <- as.character(stancode(
+    mf, data = data, family = poisson(), prior = custom, validate = TRUE
+  ))
+  lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
+  code_only <- lines[!grepl("^\\s*//", lines)]
+
+  amu_lines <- grep("Amu_trend\\[lag\\]\\s*~", code_only, value = TRUE)
+  expect_equal(length(amu_lines), 1L)
+  expect_match(amu_lines, "Amu_trend\\[lag\\]\\s*~\\s*normal\\(0,\\s*0.3\\)")
+
+  aomega_lines <- grep("Aomega_trend\\[lag\\]\\s*~", code_only, value = TRUE)
+  expect_equal(length(aomega_lines), 1L)
+  expect_match(aomega_lines, "Aomega_trend\\[lag\\]\\s*~\\s*gamma\\(2,\\s*0.5\\)")
+
+  l_global_lines <- grep("L_Omega_global_trend\\s*~", code_only, value = TRUE)
+  expect_equal(length(l_global_lines), 1L)
+  expect_match(l_global_lines, "lkj_corr_cholesky\\(2\\)")
+
+  l_dev_lines <- grep("L_deviation_group_trend\\[g_idx\\]\\s*~",
+                      code_only, value = TRUE)
+  expect_equal(length(l_dev_lines), 1L)
+  expect_match(l_dev_lines, "lkj_corr_cholesky\\(4\\)")
+})
+
+
+test_that("default priors on array-shaped VAR hyperparameters still emit per-lag", {
+  data <- setup_stan_test_data()$multivariate
+  mf <- mvgam_formula(
+    count ~ 1 + x,
+    trend_formula = ~ VAR(p = 1, gr = habitat, cor = TRUE)
+  )
+  code <- as.character(stancode(
+    mf, data = data, family = poisson(), validate = TRUE
+  ))
+  lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
+  code_only <- lines[!grepl("^\\s*//", lines)]
+
+  # Without overrides the package defaults must still surface, under the
+  # same per-lag indexing, and only once.
+  amu_lines <- grep("Amu_trend\\[lag\\]\\s*~", code_only, value = TRUE)
+  expect_equal(length(amu_lines), 1L)
+  expect_match(amu_lines,
+               "Amu_trend\\[lag\\]\\s*~\\s*normal\\(0,\\s*sqrt\\(0.455\\)\\)")
+
+  aomega_lines <- grep("Aomega_trend\\[lag\\]\\s*~", code_only, value = TRUE)
+  expect_equal(length(aomega_lines), 1L)
+  expect_match(aomega_lines,
+               "Aomega_trend\\[lag\\]\\s*~\\s*gamma\\(1.365,\\s*0.071175\\)")
+
+  l_global_lines <- grep("L_Omega_global_trend\\s*~", code_only, value = TRUE)
+  expect_equal(length(l_global_lines), 1L)
+  expect_match(l_global_lines, "lkj_corr_cholesky\\(1\\)")
+
+  l_dev_lines <- grep("L_deviation_group_trend\\[g_idx\\]\\s*~",
+                      code_only, value = TRUE)
+  expect_equal(length(l_dev_lines), 1L)
+  expect_match(l_dev_lines, "lkj_corr_cholesky\\(6\\)")
+})
+
+
+test_that("AR(p=1) latent state at t=1 uses stationary marginal init", {
+  # Regression guard: the implied prior on lv_trend[1, j] should be
+  # Normal(0, sigma_trend[j] / sqrt(1 - ar1_trend[j]^2)) (AR(1)
+  # stationary marginal), NOT Normal(0, sigma_trend[j]) (a single
+  # innovation). The fix divides the t=1 scaled innovation by
+  # sqrt(1 - square(ar1_trend[j])) so the marginal variance at the
+  # first time point matches the stationary variance.
+  data <- setup_stan_test_data()$multivariate
+  mf <- mvgam_formula(count ~ 1 + x, trend_formula = ~ AR(p = 1))
+  code <- as.character(stancode(
+    mf, data = data, family = poisson(), validate = TRUE
+  ))
+  lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
+  init_lines <- grep("lv_trend\\[1, j\\]", lines, value = TRUE)
+  expect_true(any(grepl(
+    "lv_trend\\[1, j\\]\\s*=\\s*scaled_innovations_trend\\[1, j\\]",
+    init_lines
+  )))
+  expect_true(any(grepl(
+    "sqrt\\(1\\s*-\\s*square\\(ar1_trend\\[j\\]\\)\\)", lines
+  )))
+})
+
+
+test_that("AR(p>1) / AR with MA / AR with cor keep innovation-only init", {
+  # The AR(p=1) stationary marginal correction in
+  # `generate_ar_trend_stanvars()` applies only to AR(p=1) WITHOUT
+  # MA and WITHOUT cross-series correlation. The three deferred
+  # families would each need a different stationary covariance:
+  #
+  #   * AR(p>1)            : Yule-Walker for AR(p) (only in VAR
+  #                          generator today via `initial_joint_var`)
+  #   * AR(p=1, ma=TRUE)   : ARMA(1, 1) stationary variance
+  #                          involves the MA coefficient
+  #   * AR(p=1, cor=TRUE)  : joint stationary covariance with
+  #                          off-diagonal
+  #                          sigma[i]*sigma[j]*Omega[i, j] /
+  #                          (1 - ar1[i]*ar1[j])
+  #
+  # All three must keep the per-lag innovation-only initialisation
+  # rather than accept a partial AR(1)-style correction.
+  data <- setup_stan_test_data()$multivariate
+  for (tf in list(
+    ~ AR(p = 2),
+    ~ AR(p = 1, ma = TRUE),
+    ~ AR(p = 1, cor = TRUE)
+  )) {
+    mf <- mvgam_formula(count ~ 1 + x, trend_formula = tf)
+    code <- as.character(stancode(
+      mf, data = data, family = poisson(), validate = TRUE
+    ))
+    lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
+    expect_false(any(grepl(
+      "sqrt\\(1\\s*-\\s*square\\(ar1_trend", lines
+    )))
+    expect_true(any(grepl(
+      "lv_trend\\[i,\\s*:\\s*\\]\\s*=\\s*(scaled_|ma_)innovations_trend",
+      lines
+    )))
+  }
+})
+
+
+test_that("threads + trend + brms-native family compiles serially with one warning", {
+  # Regression guard for #411 / #412. brms threading moves both the
+  # `mu` declaration and every `mu += ...` / `mu[n] = ...` assignment
+  # into `partial_log_lik_lpmf` inside `functions {}`; mvgam's
+  # obs-side trend injector at R/stan_assembly.R:1346 / :1571 only
+  # searches `model {}` and so cannot find the assignment it needs
+  # to splice the trend addition into. Until the injector learns to
+  # splice into the brms function body, the combination must compile
+  # serially and emit a one-time warning.
+  data <- setup_stan_test_data()$multivariate
+  mf <- mvgam_formula(count ~ 1 + x, trend_formula = ~ AR(p = 1))
+
+  # The TESTTHAT env-var suppresses mvgam soft-warnings by design,
+  # so flip it off locally to surface the warning class.
+  withr::local_envvar(TESTTHAT = "")
+  expect_warning(
+    code <- as.character(stancode(
+      mf, data = data, family = poisson(),
+      threads = 2L, validate = FALSE
+    )),
+    class = "mvgam_threads_trend_brms_native"
+  )
+  expect_equal(
+    sum(grepl("reduce_sum", strsplit(code, "\n", fixed = TRUE)[[1]])),
+    0L
+  )
+})
+
+
+test_that("threads + brms-native + no trend still emits reduce_sum", {
+  data <- setup_stan_test_data()$univariate
+  mf <- mvgam_formula(y ~ x)
+  code <- as.character(stancode(
+    mf, data = data, family = gaussian(),
+    threads = 2L, validate = FALSE
+  ))
+  expect_true(any(grepl(
+    "reduce_sum\\(partial_log_lik_lpmf,",
+    strsplit(code, "\n", fixed = TRUE)[[1]]
+  )))
+})
+
+
+test_that("closure-unit + threads still emits mvgam reduce_sum, no brms wrapper", {
+  # Regression guard for the second threading bug: brms's
+  # `partial_log_lik_lpmf` cannot see the transformed-data args
+  # mvgam's closure-unit lpmfs need (`visit_idx`, `log_n_lookup`),
+  # so we must suppress brms's wrapper for closure-unit families
+  # while preserving mvgam's own `partial_sum_<family>_lpmf` +
+  # `reduce_sum` call. `cpp_options$stan_threads = TRUE` is enabled
+  # by `mvgam_single()` on a separate code path, so the inner
+  # `reduce_sum` still parallelises at fit time.
+  set.seed(1)
+  d <- data.frame(
+    series = factor(rep(seq_len(6), each = 3)),
+    time   = rep(1L, 18),
+    visit  = rep(1:3, 6),
+    y      = pmin(rpois(18, 5), 20L),
+    cap    = rep(20L, 18),
+    elev   = rep(rnorm(6), each = 3)
+  )
+  mf <- mvgam_formula(y ~ elev)
+  code <- as.character(stancode(
+    mf, data = d, family = nmix("poisson_binomial"),
+    threads = 2L, validate = TRUE
+  ))
+  lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
+  expect_equal(sum(grepl("partial_log_lik_lpmf", lines)), 0L)
+  expect_true(any(grepl("partial_sum_nmix_lpmf", lines)))
+  expect_true(any(grepl(
+    "reduce_sum\\(\\s*partial_sum_nmix_lpmf,", lines
+  )))
+})
+
+
+test_that("suppress_brms_threading predicate covers all three triggers", {
+  mv_spec_with_trends <- list(has_trends = TRUE)
+  mv_spec_no_trends   <- list(has_trends = FALSE)
+
+  # Trigger 1: brms-native + trend_formula.
+  expect_true(suppress_brms_threading(
+    2L, gaussian(), mv_spec_with_trends
+  ))
+
+  # Trigger 2: closure-unit (with or without trend).
+  expect_true(suppress_brms_threading(
+    2L, nmix("poisson_binomial"), mv_spec_with_trends
+  ))
+  expect_true(suppress_brms_threading(
+    2L, occ(), mv_spec_no_trends
+  ))
+
+  # Trigger 3: multi-response (with or without trend).
+  expect_true(suppress_brms_threading(
+    2L, mvn(), mv_spec_no_trends
+  ))
+
+  # Non-trigger: brms-native + no trend -> brms threading proceeds.
+  expect_false(suppress_brms_threading(
+    2L, gaussian(), mv_spec_no_trends
+  ))
+
+  # Non-trigger: threads = 1 -> nothing to suppress.
+  expect_false(suppress_brms_threading(
+    1L, gaussian(), mv_spec_with_trends
+  ))
+  expect_false(suppress_brms_threading(
+    1L, nmix("poisson_binomial"), mv_spec_with_trends
+  ))
+})
+
+
+test_that("brms-native gate does not fire on closure-unit / multi-response", {
+  # Closure-unit families (`nmix`, `occ`) and multi-response families
+  # (`diri`, `mvn`, `mvt`, `multinomial`, `categorical`) emit their
+  # own `partial_sum_<family>_lpmf` + `reduce_sum` via mvgam-side
+  # stanvars and must remain unaffected by the brms-native gate.
+  # Exercise the predicate directly to avoid coupling the test to
+  # any one family's full codegen path.
+  mv_spec_with_trends <- list(has_trends = TRUE)
+
+  # closure-unit branch
+  expect_false(threads_no_op_for_trend_brms_native(
+    2L, nmix("poisson_binomial"), mv_spec_with_trends
+  ))
+  expect_false(threads_no_op_for_trend_brms_native(
+    2L, occ(), mv_spec_with_trends
+  ))
+
+  # multi-response branch (mvn() is the smallest constructor without
+  # extra arg requirements; the other simplex / multivariate families
+  # share the `mvgam_multi_response` attribute predicate).
+  expect_false(threads_no_op_for_trend_brms_native(
+    2L, mvn(), mv_spec_with_trends
+  ))
+
+  # brms-native + trend -> predicate returns TRUE
+  expect_true(threads_no_op_for_trend_brms_native(
+    2L, gaussian(), mv_spec_with_trends
+  ))
+
+  # brms-native + no trend -> predicate returns FALSE
+  expect_false(threads_no_op_for_trend_brms_native(
+    2L, gaussian(), list(has_trends = FALSE)
+  ))
+
+  # threads = 1 -> predicate returns FALSE
+  expect_false(threads_no_op_for_trend_brms_native(
+    1L, gaussian(), mv_spec_with_trends
+  ))
+})
+
 
 test_that("stancode generates correct CAR() continuous autoregressive trend with nested RE and monotonic effects", {
     # Create test data with irregular time intervals (CAR's specialty)

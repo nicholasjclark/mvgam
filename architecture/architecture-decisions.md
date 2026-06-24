@@ -315,6 +315,62 @@ as_draws.mvgam <- function(x, variable = NULL, ...) {
 **Principle**: Preserve all brms Stan optimizations (GLM primitives, threading, etc.)
 **Implementation**: Let brms handle observation model complexity entirely. GLM injection uses recursive preprocessing to maintain efficiency.
 
+**Threading.** mvgam ships two threading code paths.
+
+* The mvgam path. Closure-unit families (`nmix()` variants,
+  `occ()`) bypass brms entirely. So do the simplex and
+  multivariate response families: `diri()`, `mvn()`, `mvt()`,
+  `multinomial()`, and `categorical()`. Each one emits its
+  own `partial_sum_<family>_lpmf` Stan function and a matching
+  `reduce_sum(partial_sum_<family>_lpmf, ...)` call from
+  stanvars defined in mvgam. The path threads correctly
+  whether or not a `trend_formula` is supplied.
+* The brms path. Native families such as `gaussian()`,
+  `poisson()`, or `negbinomial()` rely on brms to emit
+  `partial_log_lik_lpmf` inside `functions {}` and call
+  `reduce_sum` from `model {}`. When a `trend_formula` is
+  also supplied, mvgam's trend injector for the observation
+  block (`R/stan_assembly.R:1346-1411` for `mu +=` and
+  `:1571-1602` for `mu[n] = ...`) cannot find the assignment
+  it needs to splice the trend addition into, because brms has
+  moved both the `mu` declaration and every linpred assignment
+  into `partial_log_lik_lpmf`. The combination compiles to a
+  silent serial fit or hard crashes.
+
+  The predicate `suppress_brms_threading()` in `R/make_stan.R`
+  catches the two cases where brms's `partial_log_lik_lpmf`
+  wrapper is incompatible. The first is the brms-native plus
+  trend case described above. The second covers closure-unit
+  families. The same predicate also covers the multi-response
+  set (`diri`, `mvn`, `mvt`, `multinomial`, `categorical`).
+  Each emits its own `partial_sum_<family>_lpmf` and
+  `reduce_sum`, and brms's outer wrapper cannot see the
+  transformed-data arguments those bodies depend on
+  (`visit_idx`, `log_n_lookup`, etc.).
+
+  In both branches the predicate rewrites the local `threads`
+  value handed to brms to `1L`, which stops
+  `partial_log_lik_lpmf` from being emitted. The
+  user-passed `threads` value still flows separately through
+  `mvgam_single()` to `cpp_options$stan_threads = TRUE`, so
+  the inner mvgam `reduce_sum` continues to parallelise at fit
+  time when the family supplies one.
+
+  Only the case with a native brms family plus a trend formula
+  raises an extra warning, signalled once per session via the
+  class `mvgam_threads_trend_brms_native`. The reason is that
+  no mvgam `reduce_sum` exists to fall back on for that
+  combination, so the user's parallelism intent is a true
+  no-op. The other branch stays silent, because the families
+  it covers emit their own `reduce_sum` and threading still
+  works as intended. Both branches are deliberate temporary
+  deviations from this preserve-optimizations principle. The
+  branch with a native brms family plus a trend formula can
+  be removed once the injector can splice trend additions
+  into the `partial_log_lik_lpmf` body and route the
+  `obs_trend_time` and `obs_trend_series` index arrays
+  through the brms function signature.
+
 ### 3. Simplified Constructor Architecture
 -  Trend constructors become minimal object creators using `create_mvgam_trend()`
 

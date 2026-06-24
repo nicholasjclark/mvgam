@@ -190,6 +190,25 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
   # constant offset, so soft-warn the user once per session.
   warn_pw_obs_intercept(mv_spec, obs_formula)
 
+  # Two cases need brms threading suppressed at the stancode level.
+  # Both rewrite the local `threads` so brms's downstream
+  # `partial_log_lik_lpmf` emission stays off; the compile-time
+  # `cpp_options$stan_threads` setting is enabled independently by
+  # `mvgam_single()` / `.compile_model_cmdstanr()`, so mvgam-emitted
+  # `reduce_sum` calls still parallelise.
+  #
+  # 1. brms-native + `trend_formula`: silent no-op of the user's
+  #    parallelism request; surface a one-time warning so they know.
+  # 2. closure-unit / multi-response: silent. mvgam ships its own
+  #    `partial_sum_<family>_lpmf` + `reduce_sum`; letting brms
+  #    nest a `partial_log_lik_lpmf` wrapper around them produces
+  #    an out-of-scope signature error on the transformed-data
+  #    args (`visit_idx`, `log_n_lookup`, etc.).
+  warn_threads_trend_brms_native(threads, family, mv_spec)
+  if (suppress_brms_threading(threads, family, mv_spec)) {
+    threads <- 1L
+  }
+
   # Setup observation model using lightweight brms.
   # Simplex multi-response families (`diri`, `multi`, `categ`)
   # impose a hard sum-to-zero constraint on the loadings matrix `Z`
@@ -385,6 +404,73 @@ warn_pw_obs_intercept <- function(mv_spec, obs_formula) {
     ),
     .frequency = "once",
     .frequency_id = "mvgam_pw_obs_intercept"
+  )
+}
+
+# Internal: decide whether to suppress brms's `partial_log_lik_lpmf`
+# emission for the obs-side `setup_brms_lightweight()` call. Two
+# distinct cases need the gate:
+#
+#   1. **Closure-unit and multi-response families.** These ship their
+#      own `partial_sum_<family>_lpmf` + inner `reduce_sum` call via
+#      mvgam-side stanvars. brms's outer `partial_log_lik_lpmf` would
+#      nest a second wrapper around `nmix_lpmf` / `occ_lpmf` /
+#      simplex / mvn-style lpmfs, but the brms function signature
+#      cannot see transformed-data args (`visit_idx`, `log_n_lookup`,
+#      etc.), so Stan validation fails. The fit-time
+#      `cpp_options$stan_threads = TRUE` still flows separately via
+#      `mvgam_single()` / `.compile_model_cmdstanr()`, so the inner
+#      `reduce_sum` still parallelises; we just stop brms from
+#      double-wrapping.
+#
+#   2. **brms-native families combined with a `trend_formula`.** brms
+#      moves both the `mu` declaration and every linpred assignment
+#      into `partial_log_lik_lpmf` inside `functions {}`, and mvgam's
+#      obs-side trend injector (`R/stan_assembly.R:1346-1411` for
+#      `mu +=`, `:1571-1602` for `mu[n] = ...`) only searches
+#      `model {}`, so it cannot find the assignment it needs to splice
+#      the trend addition into. The combination compiles to a silent
+#      serial fit or hard crashes.
+#
+# Case 1 is silent (mvgam's threading still works). Case 2 emits a
+# one-time warning so the user knows their parallelism request is
+# being ignored.
+#'@noRd
+suppress_brms_threading <- function(threads, family, mv_spec) {
+  if (!is.numeric(threads) || !isTRUE(threads > 1)) return(FALSE)
+  if (is_closure_unit_family(family)) return(TRUE)
+  if (is_multi_response_family(family)) return(TRUE)
+  if (!is.null(mv_spec) && isTRUE(mv_spec$has_trends)) return(TRUE)
+  FALSE
+}
+
+#'@noRd
+threads_no_op_for_trend_brms_native <- function(threads, family, mv_spec) {
+  if (!is.numeric(threads) || !isTRUE(threads > 1)) return(FALSE)
+  if (is.null(mv_spec) || !isTRUE(mv_spec$has_trends)) return(FALSE)
+  if (is_closure_unit_family(family)) return(FALSE)
+  if (is_multi_response_family(family)) return(FALSE)
+  TRUE
+}
+
+#'@noRd
+warn_threads_trend_brms_native <- function(threads, family, mv_spec) {
+  if (isTRUE(identical(Sys.getenv("TESTTHAT"), "true"))) return()
+  if (!threads_no_op_for_trend_brms_native(threads, family, mv_spec)) {
+    return()
+  }
+  rlang::warn(
+    paste0(
+      "`threads_per_chain > 1` is currently ignored for brms-native ",
+      "families combined with a `trend_formula`. mvgam's trend ",
+      "injector and brms's `partial_log_lik_lpmf` placement are not ",
+      "yet compatible, so the model compiles and samples serially. ",
+      "Closure-unit families (`occ()`, `nmix()`) and multi-response ",
+      "families (`diri()`, `mvn()`, `mvt()`, `multinomial()`, ",
+      "`categorical()`) are unaffected and continue to thread."
+    ),
+    .frequency = "once",
+    .frequency_id = "mvgam_threads_trend_brms_native"
   )
 }
 

@@ -7,7 +7,7 @@
 \method{pairs}{mvgam}(x, variable = NULL, regex = FALSE, use_alias = TRUE, ...)
 }
 \arguments{
-\item{x}{An object of class \code{mvgam} or \code{jsdgam}}
+\item{x}{An object of class \code{mvgam} or \code{jsdgam}.}
 
 \item{variable}{Names of the variables (parameters) to plot, as given by a
 character vector or a regular expression (if \code{regex = TRUE}). By
@@ -19,20 +19,24 @@ be treated as regular expressions. Defaults to \code{FALSE}.}
 \item{use_alias}{Retained for backwards-compatibility; parameter
 names are now brms-native so no aliasing is performed.}
 
-\item{...}{Further arguments to be passed to
+\item{...}{Further arguments passed to
 \code{\link[bayesplot:MCMC-scatterplots]{mcmc_pairs}}.}
 }
 \value{
-Plottable objects whose classes depend on the arguments supplied.
-See \code{\link[bayesplot:MCMC-scatterplots]{mcmc_pairs}} for details.
+A \code{bayesplot_grid} object; see
+\code{\link[bayesplot:MCMC-scatterplots]{mcmc_pairs}}.
 }
 \description{
-A \code{\link[graphics:pairs]{pairs}}
-method that is customized for MCMC output.
-}
-\details{
-For a detailed description see
-\code{\link[bayesplot:MCMC-scatterplots]{mcmc_pairs}}.
+A \code{\link[graphics:pairs]{pairs}} method for MCMC output.
+Mirrors the brms convention: when \code{variable} is left at its
+default the selection is built from a regex list targeting
+canonical inferential parameters (intercept, parametric
+coefficients, family extras, variance components, smoothness
+penalties, and the mvgam-specific trend dynamics). Per-basis
+smooth coefficients (\verb{s_*} / \verb{zs_*}) and per-level random-effect
+deviations (\verb{r_*} / \verb{z_*}) are deliberately excluded because
+spline / hierarchical fits can carry hundreds of them; supply an
+explicit \code{variable} regex when you need them.
 }
 \examples{
 \donttest{
@@ -44,8 +48,12 @@ mod <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
               family  = poisson(),
               chains  = 2, silent = 2)
 
-# Pairs plot over the trend-dynamics parameters.
-pairs(mod, variable = "trend_params", regex = TRUE)
+# Default selection: intercept(s), smoothness penalties, trend
+# dynamics, family extras.
+pairs(mod)
+
+# Custom regex for a focused pairs panel.
+pairs(mod, variable = "^(sigma|ar1)_trend", regex = TRUE)
 }
 
 }

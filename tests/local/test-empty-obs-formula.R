@@ -14,6 +14,13 @@ test_that("mvgam fits `y ~ 0` and hides the placeholder downstream", {
   set.seed(1L)
   simdat <- sim_mvgam(family = poisson(), n_series = 2L,
                        n_timepoints = 30L)
+  # `threads = 2L` here intentionally exercises the brms-native +
+  # `trend_formula` threading gate (issue #411 / #412): mvgam must
+  # warn once via class `mvgam_threads_trend_brms_native`, force the
+  # downstream brms call to `threads = 1L`, and complete a serial
+  # fit. The warning class is suppressed under TESTTHAT, so this
+  # block only checks that the fit completes; the stancode-level
+  # warning assertion lives at tests/testthat/test-stancode-standata.R.
   mod <- mvgam(
     formula       = y ~ 0,
     trend_formula = ~ AR(p = 1),
@@ -22,7 +29,8 @@ test_that("mvgam fits `y ~ 0` and hides the placeholder downstream", {
     silent        = 2,
     chains        = 1,
     samples       = 50,
-    burnin        = 100
+    burnin        = 100,
+    threads       = 2L
   )
   expect_s3_class(mod, "mvgam")
   expect_false(any(grepl(

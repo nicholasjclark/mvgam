@@ -3658,15 +3658,34 @@ generate_hierarchical_correlation_model <- function(n_groups, prior = NULL) {
     block = "model"
   )
 
+  # User overrides for L_Omega_global_trend / L_deviation_group_trend
+  # fall back to the LKJ defaults. The matched parameters are
+  # cholesky_factor_corr (scalar prior; no per-row loop needed) and
+  # array[N_groups_trend] cholesky_factor_corr (per-group loop).
+  l_omega_global_user <- get_trend_parameter_prior(
+    prior, "L_Omega_global_trend"
+  )
+  if (!nzchar(l_omega_global_user)) {
+    l_omega_global_user <- "lkj_corr_cholesky(1)"
+  }
   l_omega_global_prior <- brms::stanvar(
     name = "L_Omega_global_trend_prior",
-    scode = "L_Omega_global_trend ~ lkj_corr_cholesky(1);",
+    scode = glue::glue("L_Omega_global_trend ~ {l_omega_global_user};"),
     block = "model"
   )
 
+  l_dev_group_user <- get_trend_parameter_prior(
+    prior, "L_deviation_group_trend"
+  )
+  if (!nzchar(l_dev_group_user)) {
+    l_dev_group_user <- "lkj_corr_cholesky(6)"
+  }
   l_deviation_group_prior <- brms::stanvar(
     name = "L_deviation_group_trend_prior",
-    scode = "for (g_idx in 1:N_groups_trend) { L_deviation_group_trend[g_idx] ~ lkj_corr_cholesky(6); }",
+    scode = glue::glue(
+      "for (g_idx in 1:N_groups_trend) {{ ",
+      "L_deviation_group_trend[g_idx] ~ {l_dev_group_user}; }}"
+    ),
     block = "model"
   )
 
@@ -4279,6 +4298,59 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   })
   ar_sum <- paste(ar_terms, collapse = " + ")
 
+  # AR(1) without MA, without cross-series correlation: use the
+  # stationary marginal Normal(0, sigma / sqrt(1 - ar1^2)) to
+  # initialise lv_trend[1, :] so the prior on the first latent
+  # state matches the AR(1) stationary distribution, not the
+  # marginal Normal(0, sigma) of a single innovation.
+  #
+  # Out of scope (deferred):
+  #   * AR(p>1): stationary covariance requires the AR(p)
+  #     Yule-Walker solve, currently only implemented in the VAR
+  #     generator (`initial_joint_var` in
+  #     `generate_var_trend_stanvars`).
+  #   * ARMA(1, 1): stationary variance involves both ar1 and the
+  #     MA coefficient.
+  #   * AR(p=1, cor=TRUE): the per-series correction below is
+  #     correct for the diagonal of the joint stationary
+  #     covariance, but the off-diagonal cross-covariance for the
+  #     correlated-innovation AR(1) is
+  #     sigma[i]*sigma[j]*Omega[i, j] / (1 - ar1[i]*ar1[j]),
+  #     not the implied
+  #     sigma[i]*sigma[j]*Omega[i, j]
+  #       / sqrt((1 - ar1[i]^2)*(1 - ar1[j]^2)).
+  #     A correct correction would multiply the t=1 row of
+  #     scaled_innovations_trend by a Cholesky factor of the joint
+  #     stationary covariance rather than the per-series scalar
+  #     used here.
+  cor <- isTRUE(trend_specs$cor %||% FALSE)
+  ar_init_block <- if (identical(max_lag, 1L) && !has_ma && !cor) {
+    paste0(
+      "      // AR(1) stationary marginal initialisation:\n",
+      "      // lv_trend[1, j] ~ Normal(0, sigma_trend[j] / sqrt(1 - ar1_trend[j]^2)).\n",
+      "      // Scales the t = 1 innovation by 1/sqrt(1 - ar1^2) so the\n",
+      "      // implied marginal at the first time point matches the AR(1)\n",
+      "      // stationary variance instead of the innovation variance.\n",
+      "      for (j in 1:N_lv_trend) {\n",
+      "        lv_trend[1, j] = scaled_innovations_trend[1, j]\n",
+      "                         / sqrt(1 - square(ar1_trend[j]));\n",
+      "      }"
+    )
+  } else {
+    paste0(
+      "      // Initialize first ", max_lag, " time points from innovations.\n",
+      "      // Higher-order AR(p) and ARMA models would need the\n",
+      "      // Yule-Walker stationary covariance (AR) or the ARMA\n",
+      "      // stationary variance to match the AR(1) treatment below;\n",
+      "      // both are deferred.\n",
+      "      for (i in 1:", max_lag, ") {\n",
+      "        lv_trend[i, :] = ",
+      if (has_ma) "ma_innovations_trend" else "scaled_innovations_trend",
+      "[i, :];\n",
+      "      }"
+    )
+  }
+
   ar_tparameters_stanvar <- brms::stanvar(
     name = "ar_tparameters",
     scode = glue::glue("
@@ -4292,10 +4364,7 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         }}
       }}' else ''}
 
-      // Initialize first {max_lag} time points
-      for (i in 1:{max_lag}) {{
-        lv_trend[i, :] = {if(has_ma) 'ma_innovations_trend' else 'scaled_innovations_trend'}[i, :];
-      }}
+      {ar_init_block}
 
       // Apply AR dynamics
       for (i in {max_lag + 1}:N_time_trend) {{
@@ -4829,7 +4898,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       "      // Block-diagonal assembly using series-iteration pattern\n",
       "      for (g_idx in 1:N_groups_trend) {\n",
       "        // Collect series indices for this group\n", 
-      "        int group_series[N_subgroups_trend];\n",
+      "        array[N_subgroups_trend] int group_series;\n",
       "        int k = 0;\n",
       "        for (s in 1:N_lv_trend) {\n",
       "          if (group_inds_trend[s] == g_idx) {\n",
@@ -4963,8 +5032,17 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     )
   }
 
-  # Pre-compute VARMA MA priors to avoid nested glue::glue() scoping issues
-  varma_ma_priors <- if(is_varma) {
+  # Pre-compute VARMA MA priors to avoid nested glue::glue() scoping issues.
+  # `Dmu_trend` and `Domega_trend` are declared array[2] vector[ma_lags],
+  # so user overrides MUST be emitted per element (matching the
+  # `[k, 1]` indexing used by the model block); the centralized
+  # top-level generator would emit `Dmu_trend ~ ...;` and fail Stan's
+  # dimensionality check.
+  varma_ma_priors <- if (is_varma) {
+    dmu_user_prior <- get_trend_parameter_prior(prior, "Dmu_trend")
+    if (!nzchar(dmu_user_prior)) dmu_user_prior <- "normal(0.0, 1.0)"
+    domega_user_prior <- get_trend_parameter_prior(prior, "Domega_trend")
+    if (!nzchar(domega_user_prior)) domega_user_prior <- "gamma(2.0, 1.0)"
     paste0(
       "      // Hierarchical priors for VARMA MA coefficient matrices (D_raw_trend)\n",
       "      // Following same structure as VAR coefficients but conditional on ma_lags > 0\n",
@@ -4981,10 +5059,10 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       "        }\n",
       "      }\n\n",
       "      // Hyperpriors for hierarchical MA coefficient means and precisions\n",
-      "      Dmu_trend[1, 1] ~ normal(0.0, 1.0);\n",
-      "      Domega_trend[1, 1] ~ gamma(2.0, 1.0);\n",
-      "      Dmu_trend[2, 1] ~ normal(0.0, 1.0);\n",
-      "      Domega_trend[2, 1] ~ gamma(2.0, 1.0);"
+      "      Dmu_trend[1, 1] ~ ", dmu_user_prior, ";\n",
+      "      Domega_trend[1, 1] ~ ", domega_user_prior, ";\n",
+      "      Dmu_trend[2, 1] ~ ", dmu_user_prior, ";\n",
+      "      Domega_trend[2, 1] ~ ", domega_user_prior, ";"
     )
   } else ""
 
@@ -4992,12 +5070,26 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   lv_transpose <- "lv_trend[t, :]'"
   lv_transpose_lag <- "lv_trend[t - i, :]'"
   lv_transpose_prev <- "lv_trend[t - 1, :]'"
-  
+
   # Conditional correlation prior for hierarchical vs non-hierarchical
   omega_prior <- if(!is_hierarchical) {
     "// LKJ correlation prior on Cholesky factor\n      L_Omega_trend ~ lkj_corr_cholesky(2);"
   } else {
     "// Hierarchical correlation priors handled by add_hierarchical_support()"
+  }
+
+  # Resolve user overrides for the array-shaped hyperpriors. They
+  # MUST be emitted with per-lag indexing inside the for-loop below;
+  # routing through `generate_trend_priors_stanvar` would emit
+  # `Amu_trend ~ ...;` and trip Stan's dimensionality check (the
+  # parameter is declared array[2] vector[lags]).
+  amu_user_prior <- get_trend_parameter_prior(prior, "Amu_trend")
+  if (!nzchar(amu_user_prior)) {
+    amu_user_prior <- "normal(0, sqrt(0.455))"
+  }
+  aomega_user_prior <- get_trend_parameter_prior(prior, "Aomega_trend")
+  if (!nzchar(aomega_user_prior)) {
+    aomega_user_prior <- "gamma(1.365, 0.071175)"
   }
   
   var_model_stanvar <- brms::stanvar(
@@ -5057,29 +5149,29 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
       {omega_prior}
 
-      // Hyperpriors for hierarchical VAR coefficient means and precisions
+      // Hyperpriors for hierarchical VAR coefficient means and precisions.
+      // `Amu_trend` and `Aomega_trend` are array[2] vector[lags], so the
+      // override (or default) MUST be emitted per-lag here.
       for (lag in 1:2) {{
-        Amu_trend[lag] ~ normal(0, sqrt(0.455));
-        Aomega_trend[lag] ~ gamma(1.365, 0.071175);
+        Amu_trend[lag] ~ {amu_user_prior};
+        Aomega_trend[lag] ~ {aomega_user_prior};
       }}
     "),
     block = "model"
   )
 
-  # Generate centralized priors for trend parameters
-  # Standard parameters: sigma_trend (L_Omega_trend handled by LKJ in model block)
-  # Hierarchical hyperparameters: Amu_trend, Aomega_trend, and conditional MA/group parameters
+  # Centralized priors for trend parameters. `Amu_trend`, `Aomega_trend`
+  # (and the VARMA pair `Dmu_trend` / `Domega_trend`) are excluded here
+  # because their declared shape (`array[2] vector[lags]`) requires the
+  # per-lag loop emitted above / in `varma_ma_priors`; routing them
+  # through the top-level generator would double-assign the prior and
+  # emit a scalar-on-array Stan statement.
   if (is_hierarchical) {
     # Hierarchical models: sigma_group_trend handled by shared hierarchical system
-    var_params_to_prior <- c("Amu_trend", "Aomega_trend")
+    var_params_to_prior <- character(0)
   } else {
     # Non-hierarchical models use sigma_trend
-    var_params_to_prior <- c("sigma_trend", "Amu_trend", "Aomega_trend")
-  }
-
-  # Add VARMA MA hyperparameters
-  if (is_varma) {
-    var_params_to_prior <- c(var_params_to_prior, "Dmu_trend", "Domega_trend")
+    var_params_to_prior <- c("sigma_trend")
   }
 
   var_centralized_priors <- NULL

@@ -56,10 +56,15 @@ local_nmix_fit <- local({
       cap    = rep(30L, n_unit * n_visit),
       elev   = rep(elev, each = n_visit)
     )
+    # `threads = 2L` enables mvgam's `partial_sum_nmix_*_lpmf` +
+    # `reduce_sum` per-closure-unit parallelism. Closure-unit
+    # families thread independently of the brms partial-log-lik
+    # path, so the issue #411 / #412 gate is inert here.
     fit <- mvgam(y ~ elev,
                  family = nmix(),
                  data = d,
                  chains = 1, iter = 300, warmup = 150,
+                 threads = 2L,
                  silent = 2, refresh = 0)
     cached <<- list(fit = fit, data = d, N_per = N_per, p_true = p_true)
     cached
