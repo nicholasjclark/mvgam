@@ -45,6 +45,68 @@ Data layout: long format, one row per \verb{(site, species)}, exactly
 K rows per site. Responses are continuous reals; the \code{Y} vector
 is assembled into the per-unit K-vector \code{y_unit} by the lpdf.
 }
+\examples{
+\donttest{
+# Simulate K = 3 species at 60 sites under a low-rank residual
+# covariance Sigma = Z Z' + diag(Psi^2). Per-species intercepts
+# and an env slope drive the mean; cross-species covariance comes
+# entirely from the factor structure.
+set.seed(1)
+K <- 3L; species_levels <- paste0("y", seq_len(K)); N_lv <- 2L
+Z_true <- matrix(rnorm(K * N_lv, sd = 1.0), nrow = K, ncol = N_lv)
+psi_true <- rep(0.5, K)
+sigma_true <- tcrossprod(Z_true) + diag(psi_true^2)
+mu_intercept <- c(0.0, 0.6, -0.4)
+mu_env_slope <- c(0.3, 0.8, -0.5)
+
+n_sites <- 60L; env <- rnorm(n_sites)
+L_true <- chol(sigma_true)
+Y_wide <- matrix(NA_real_, n_sites, K)
+for (i in seq_len(n_sites)) {
+  mu_i <- mu_intercept + mu_env_slope * env[i]
+  Y_wide[i, ] <- mu_i + as.numeric(crossprod(L_true, rnorm(K)))
+}
+colnames(Y_wide) <- species_levels
+
+# Reshape to the long-format closure-unit layout: K rows per
+# site in (time, species) order with `series = species`.
+long_dat <- data.frame(
+  y      = as.numeric(t(Y_wide)),
+  series = factor(rep(species_levels, n_sites),
+                  levels = species_levels),
+  time   = rep(seq_len(n_sites), each = K),
+  env    = rep(env, each = K)
+)
+
+# Fit the gllvm-style JSDM with a rank-2 factor structure on the
+# residual covariance.
+fit <- jsdgam(
+  formula        = y ~ env * series,
+  factor_formula = ~ -1,
+  data           = long_dat,
+  unit           = time, species = series,
+  family         = mvn(),
+  n_lv           = 2L,
+  chains         = 2L,
+  burnin         = 400L, samples = 400L,
+  silent         = 2,
+  backend        = "cmdstanr"
+)
+
+# Per-species intercepts and env slopes recover their truth.
+draws <- posterior::as_draws_matrix(fit)
+draws[, c("b_seriesy2", "b_seriesy3",
+          "b_env:seriesy2", "b_env:seriesy3")] |>
+  posterior::summarise_draws(median, ~quantile(.x, c(0.05, 0.95)))
+
+# The headline diagnostic: implied residual covariance recovers
+# the off-diagonal Sigma the data was drawn under.
+res_cor <- residual_cor(fit)
+cor(sigma_true[upper.tri(sigma_true)],
+    res_cor$cov[upper.tri(res_cor$cov)])
+}
+
+}
 \references{
 Hui, F. K. C., Taskinen, S., Pledger, S., Foster, S. D. and
 Warton, D. I. (2015). Model-based approaches to unconstrained

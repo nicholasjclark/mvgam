@@ -22,10 +22,13 @@ sim_mvgam(
 recipe. See \emph{Details} for the catalog.}
 
 \item{family}{A \code{family} or \code{brmsfamily} object specifying the
-observation likelihood. Supported in v1: \code{gaussian()},
-\code{student()}, \code{poisson()}, \code{negbinomial()},
-\code{binomial()}, \code{Beta()}, \code{Gamma()} (and their \code{brms::brmsfamily}
-equivalents). Defaults to \code{gaussian()}.}
+observation likelihood. Supported: \code{gaussian()}, \code{student()},
+\code{poisson()}, \code{negbinomial()}, \code{binomial()}, \code{Beta()},
+\code{Gamma()}, \code{\link[=tweedie]{tweedie()}}, and \code{\link[=com_binomial]{com_binomial()}} (and the
+matching \code{brms::brmsfamily} equivalents). Defaults to
+\code{gaussian()}. For \code{com_binomial()} pass the dispersion \code{nu}
+and the per-row \code{trials} count via \code{family_pars} (e.g.
+\code{family_pars = list(nu = 0.5, trials = 30L)}).}
 
 \item{n_series}{Integer; number of time series to simulate.
 Defaults to \code{1L}.}
@@ -53,8 +56,9 @@ observations to mark as \code{NA}. Defaults to \code{0}.}
 
 \item{family_pars}{Optional named list of additional family
 parameters (\code{sigma}, \code{nu}, \code{size}, \code{trials}, \code{phi},
-\code{shape}). Type-specific defaults are used when an entry is
-absent.}
+\code{shape}, \code{power}). Type-specific defaults are used when an
+entry is absent. \code{com_binomial()} reads \code{nu} (dispersion)
+and \code{trials}.}
 
 \item{seed}{Optional integer seed for reproducibility.}
 }

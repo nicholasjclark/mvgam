@@ -125,6 +125,12 @@ beta_shapes <- function(mu, phi) {
 #   binomial   pars$trials (length(eta) or scalar)
 #   beta       pars$phi (precision)
 #   Gamma      pars$shape
+#   tweedie    pars$phi, pars$power
+#   com_binomial pars$trials, pars$nu (Conway-Maxwell-Binomial;
+#                logit link only; mu = plogis(eta) is the
+#                location, nu the dispersion: nu = 1 binomial,
+#                nu > 1 under-dispersed, nu < 1 over-dispersed,
+#                nu < 0 super-dispersed / bimodal)
 #
 # `family` is a brms- / stats-style `family` object; the function
 # reads `family$family` and `family$link` to decide.
@@ -172,12 +178,25 @@ sim_family_rng <- function(eta, family, pars = list()) {
       rate = (pars$shape %||% 2) / mu
     ),
     "tweedie" = sim_tweedie(mu, pars$phi %||% 1, pars$power %||% 1.5),
+    "com_binomial" = {
+      trials_vec <- if (length(pars$trials %||% 10L) == 1L) {
+        rep(as.integer(pars$trials %||% 10L), length(eta))
+      } else {
+        as.integer(pars$trials)
+      }
+      nu_vec <- if (length(pars$nu %||% 1) == 1L) {
+        rep(pars$nu %||% 1, length(eta))
+      } else {
+        pars$nu
+      }
+      rcmb_vec(mu = mu, nu = nu_vec, T = trials_vec)
+    },
     stop(insight::format_error(c(
       "Unsupported family in 'sim_family_rng'.",
       x = paste0("Got: '", fam_name, "'."),
       i = paste0(
         "Supported: gaussian, student, poisson, negbinomial, ",
-        "binomial, beta, gamma, tweedie."
+        "binomial, beta, gamma, tweedie, com_binomial."
       )
     )))
   )

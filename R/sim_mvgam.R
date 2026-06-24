@@ -11,10 +11,13 @@
 #' @param type Integer in `1:6` selecting the observation-side
 #'   recipe. See *Details* for the catalog.
 #' @param family A `family` or `brmsfamily` object specifying the
-#'   observation likelihood. Supported in v1: `gaussian()`,
-#'   `student()`, `poisson()`, `negbinomial()`,
-#'   `binomial()`, `Beta()`, `Gamma()` (and their `brms::brmsfamily`
-#'   equivalents). Defaults to `gaussian()`.
+#'   observation likelihood. Supported: `gaussian()`, `student()`,
+#'   `poisson()`, `negbinomial()`, `binomial()`, `Beta()`,
+#'   `Gamma()`, [`tweedie()`], and [`com_binomial()`] (and the
+#'   matching `brms::brmsfamily` equivalents). Defaults to
+#'   `gaussian()`. For `com_binomial()` pass the dispersion `nu`
+#'   and the per-row `trials` count via `family_pars` (e.g.
+#'   `family_pars = list(nu = 0.5, trials = 30L)`).
 #' @param n_series Integer; number of time series to simulate.
 #'   Defaults to `1L`.
 #' @param n_timepoints Integer; number of timepoints per series.
@@ -35,8 +38,9 @@
 #'   observations to mark as `NA`. Defaults to `0`.
 #' @param family_pars Optional named list of additional family
 #'   parameters (`sigma`, `nu`, `size`, `trials`, `phi`,
-#'   `shape`). Type-specific defaults are used when an entry is
-#'   absent.
+#'   `shape`, `power`). Type-specific defaults are used when an
+#'   entry is absent. `com_binomial()` reads `nu` (dispersion)
+#'   and `trials`.
 #' @param seed Optional integer seed for reproducibility.
 #'
 #' @details
@@ -298,9 +302,10 @@ sim_mvgam <- function(type = 1L,
   for (nm in names(built$covariates)) {
     data_long[[nm]] <- built$covariates[[nm]]
   }
-  # Binomial fits need a `trials` column; sim_family_pars stored
-  # the trial count under obs_pars$trials.
-  if (tolower(fam_name) == "binomial") {
+  # Binomial and Conway-Maxwell-Binomial fits need a `trials`
+  # column; sim_family_pars stored the trial count under
+  # obs_pars$trials.
+  if (tolower(fam_name) %in% c("binomial", "com_binomial")) {
     data_long$trials <- obs_pars$trials %||% 10L
   }
   if (!is.null(trend_args$time_long)) {
@@ -377,7 +382,11 @@ summary.mvgam_sim <- function(object, ...) {
   structure(
     list(
       type = object$type,
-      family = object$family$family %||% "unknown",
+      # Use resolve_family_name() so brms custom_family objects
+      # (com_binomial / tweedie / diri / mvn / mvt) report their
+      # user-visible name rather than the literal string "custom"
+      # that brms stores on family$family.
+      family = resolve_family_name(object$family),
       trend = trend_label,
       n_series = NCOL(object$true_trend),
       n_timepoints = NROW(object$true_trend),
@@ -728,6 +737,7 @@ intercept_for_family <- function(fam_name) {
     "bernoulli" = 0,
     "beta" = 0,            # logit link: mean ~ 0.5
     "tweedie" = log(2),    # log link: mean ~ 2 (CP with zeros)
+    "com_binomial" = 0,    # logit link: probability ~ 0.5
     0
   )
 }
@@ -954,6 +964,7 @@ link_scale_budget <- function(fam_name) {
     "bernoulli" = 1.5,
     "beta" = 1.5,
     "tweedie" = 0.8,
+    "com_binomial" = 1.5,
     1.0
   )
 }
@@ -1000,6 +1011,10 @@ sim_family_pars <- function(family, family_pars, prop_trend,
     "tweedie" = list(
       phi   = family_pars$phi   %||% 1,
       power = family_pars$power %||% 1.5
+    ),
+    "com_binomial" = list(
+      trials = family_pars$trials %||% 10L,
+      nu     = family_pars$nu     %||% 1
     ),
     list()
   )

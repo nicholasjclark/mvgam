@@ -73,44 +73,42 @@ bias \code{p} away from \code{0.5}.
 
 \examples{
 \donttest{
-# Simulate a small under-dispersed CMB fixture (nu_true = 1.5)
-# over n = 100 trials at p = 0.4 (theta = qlogis(0.4)).
+# Simulate an under-dispersed COM-Binomial series via
+# sim_mvgam(): nu_true = 1.5, T = 20 trials per observation,
+# the default observation-side smooth `s(x)`, and a random-walk
+# latent state on the logit-probability.
 set.seed(1)
-n <- 100
-trials <- rep(5L, n)
-theta <- qlogis(0.4)
-nu_true <- 1.5
-y <- vapply(seq_len(n), function(i) {
-  T <- trials[i]
-  lc <- lchoose(T, 0:T)
-  js <- 0:T
-  lw <- nu_true * lc + js * log(0.4) + (T - js) * log(0.6)
-  sample.int(T + 1L, size = 1L,
-               prob = exp(lw - max(lw))) - 1L
-}, integer(1))
-df <- data.frame(
-  y      = y,
-  trials = trials,
-  series = factor("s1"),
-  time   = seq_len(n)
+sim <- sim_mvgam(
+  family       = com_binomial(),
+  n_series     = 1L,
+  n_timepoints = 80L,
+  trend_model  = RW(),
+  family_pars  = list(nu = 1.5, trials = 20L)
 )
+head(sim$data_train)
 
-# Fit a CMB regression on an intercept only; nu posterior should
-# concentrate around the simulated 1.5 (under-dispersed).
+# Fit the matching state-space CMB model. `trials` is supplied
+# via the standard brms `trials()` syntax; `nu` is the
+# dispersion parameter (nu = 1 recovers the binomial,
+# nu > 1 under-dispersed, nu < 1 over-dispersed, nu < 0
+# super-dispersed / bimodal).
 fit <- mvgam(
-  bf(y | trials(trials) ~ 1),
-  data    = df,
-  family  = com_binomial(),
-  chains  = 2,
-  samples = 400,
-  burnin  = 400,
-  silent  = 2
+  bf(y | trials(trials) ~ s(x)),
+  trend_formula = ~ RW(),
+  data          = sim$data_train,
+  family        = com_binomial(),
+  chains        = 2,
+  samples       = 400,
+  burnin        = 400,
+  silent        = 2
 )
 
-# Inspect the dispersion posterior and a posterior predictive
-# check of the marginal count distribution.
-summary(fit)
+# The `nu` posterior should concentrate around the simulated
+# 1.5 and stay well above the binomial null at nu = 1.
+summary(fit, include_betas = FALSE)
 mcmc_plot(fit, variable = "nu", type = "areas")
+
+# Posterior predictive check of the marginal count distribution.
 pp_check(fit, type = "bars", ndraws = 50)
 }
 }

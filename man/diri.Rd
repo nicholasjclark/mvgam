@@ -115,6 +115,75 @@ and softmax internally and returns one probability per (site,
 species) row summing to 1 within each site.
 }
 
+\examples{
+\donttest{
+# Simulate Dirichlet compositional data on 40 sites x K = 3
+# categories under an environmental gradient. The first category
+# is the reference; per-category logit-mean offsets and env
+# slopes are encoded relative to it.
+set.seed(2)
+K <- 3L; cat_names <- paste0("y", seq_len(K)); n_sites <- 40L
+env <- rnorm(n_sites)
+intercept_true <- c(0, 0.6, -0.4)
+beta_env_true  <- c(0, 0.8, -0.6)
+phi_true <- 12
+mu_true <- outer(rep(1, n_sites), intercept_true) +
+             outer(env, beta_env_true)
+mu_true[, 1L] <- 0
+probs <- t(apply(mu_true, 1L, function(z) {
+  z <- exp(z); z / sum(z)
+}))
+Y_wide <- t(apply(probs, 1L, function(p) {
+  d <- rgamma(K, shape = p * phi_true, rate = 1)
+  d / sum(d)
+}))
+Y_wide <- pmax(Y_wide, 1e-4)
+Y_wide <- Y_wide / rowSums(Y_wide)
+colnames(Y_wide) <- cat_names
+
+# Reshape to the long-format closure-unit layout: K rows per
+# site in (time, species) order with `series = category`.
+long_dat <- data.frame(
+  y      = as.numeric(t(Y_wide)),
+  series = factor(rep(cat_names, n_sites), levels = cat_names),
+  time   = rep(seq_len(n_sites), each = K),
+  env    = rep(env, each = K)
+)
+
+# Fit the compositional JSDM. The `env * series` interaction
+# makes the environmental slope category-specific, matching
+# brms-native Dirichlet's per-category linear predictors. `n_lv`
+# adds a rank-2 latent-factor correction over the population
+# mean structure.
+fit <- jsdgam(
+  formula        = y ~ env * series,
+  factor_formula = ~ -1,
+  data           = long_dat,
+  unit           = time, species = series,
+  family         = diri(),
+  n_lv           = 2L,
+  chains         = 2L,
+  burnin         = 400L, samples = 400L,
+  silent         = 2,
+  backend        = "cmdstanr"
+)
+
+# Per-category offsets recover their truth; the K-shared
+# `b_Intercept` and `b_env` are not likelihood-identified under
+# the simplex reference subtraction and sample from their prior.
+draws <- posterior::as_draws_matrix(fit)
+draws[, c("b_seriesy2", "b_seriesy3",
+          "b_env:seriesy2", "b_env:seriesy3")] |>
+  posterior::summarise_draws(median, ~quantile(.x, c(0.05, 0.95)))
+
+# posterior_epred returns one probability per (site, species)
+# summing to 1 within each site.
+pe <- posterior_epred(fit, ndraws = 50L)
+first_site <- which(long_dat$time == 1L)
+rowSums(pe[1L:5L, first_site, drop = FALSE])
+}
+
+}
 \references{
 Aitchison, J. (1982). The statistical analysis of compositional
 data. \emph{Journal of the Royal Statistical Society Series B},

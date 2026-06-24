@@ -586,44 +586,42 @@ check_tweedie_truncation <- function(object) {
 #' @author Nicholas J Clark, Julius Bogomolovas
 #' @examples
 #' \donttest{
-#' # Simulate a small under-dispersed CMB fixture (nu_true = 1.5)
-#' # over n = 100 trials at p = 0.4 (theta = qlogis(0.4)).
+#' # Simulate an under-dispersed COM-Binomial series via
+#' # sim_mvgam(): nu_true = 1.5, T = 20 trials per observation,
+#' # the default observation-side smooth `s(x)`, and a random-walk
+#' # latent state on the logit-probability.
 #' set.seed(1)
-#' n <- 100
-#' trials <- rep(5L, n)
-#' theta <- qlogis(0.4)
-#' nu_true <- 1.5
-#' y <- vapply(seq_len(n), function(i) {
-#'   T <- trials[i]
-#'   lc <- lchoose(T, 0:T)
-#'   js <- 0:T
-#'   lw <- nu_true * lc + js * log(0.4) + (T - js) * log(0.6)
-#'   sample.int(T + 1L, size = 1L,
-#'                prob = exp(lw - max(lw))) - 1L
-#' }, integer(1))
-#' df <- data.frame(
-#'   y      = y,
-#'   trials = trials,
-#'   series = factor("s1"),
-#'   time   = seq_len(n)
+#' sim <- sim_mvgam(
+#'   family       = com_binomial(),
+#'   n_series     = 1L,
+#'   n_timepoints = 80L,
+#'   trend_model  = RW(),
+#'   family_pars  = list(nu = 1.5, trials = 20L)
 #' )
+#' head(sim$data_train)
 #'
-#' # Fit a CMB regression on an intercept only; nu posterior should
-#' # concentrate around the simulated 1.5 (under-dispersed).
+#' # Fit the matching state-space CMB model. `trials` is supplied
+#' # via the standard brms `trials()` syntax; `nu` is the
+#' # dispersion parameter (nu = 1 recovers the binomial,
+#' # nu > 1 under-dispersed, nu < 1 over-dispersed, nu < 0
+#' # super-dispersed / bimodal).
 #' fit <- mvgam(
-#'   bf(y | trials(trials) ~ 1),
-#'   data    = df,
-#'   family  = com_binomial(),
-#'   chains  = 2,
-#'   samples = 400,
-#'   burnin  = 400,
-#'   silent  = 2
+#'   bf(y | trials(trials) ~ s(x)),
+#'   trend_formula = ~ RW(),
+#'   data          = sim$data_train,
+#'   family        = com_binomial(),
+#'   chains        = 2,
+#'   samples       = 400,
+#'   burnin        = 400,
+#'   silent        = 2
 #' )
 #'
-#' # Inspect the dispersion posterior and a posterior predictive
-#' # check of the marginal count distribution.
-#' summary(fit)
+#' # The `nu` posterior should concentrate around the simulated
+#' # 1.5 and stay well above the binomial null at nu = 1.
+#' summary(fit, include_betas = FALSE)
 #' mcmc_plot(fit, variable = "nu", type = "areas")
+#'
+#' # Posterior predictive check of the marginal count distribution.
 #' pp_check(fit, type = "bars", ndraws = 50)
 #' }
 #' @export
@@ -2468,6 +2466,74 @@ make_occ_stanvars <- function(arrays) {
 #'   models. *Statistics and Computing*, 34:143.
 #'   \doi{10.1007/s11222-024-10454-0}
 #'
+#' @examples
+#' \donttest{
+#' # Simulate Dirichlet compositional data on 40 sites x K = 3
+#' # categories under an environmental gradient. The first category
+#' # is the reference; per-category logit-mean offsets and env
+#' # slopes are encoded relative to it.
+#' set.seed(2)
+#' K <- 3L; cat_names <- paste0("y", seq_len(K)); n_sites <- 40L
+#' env <- rnorm(n_sites)
+#' intercept_true <- c(0, 0.6, -0.4)
+#' beta_env_true  <- c(0, 0.8, -0.6)
+#' phi_true <- 12
+#' mu_true <- outer(rep(1, n_sites), intercept_true) +
+#'              outer(env, beta_env_true)
+#' mu_true[, 1L] <- 0
+#' probs <- t(apply(mu_true, 1L, function(z) {
+#'   z <- exp(z); z / sum(z)
+#' }))
+#' Y_wide <- t(apply(probs, 1L, function(p) {
+#'   d <- rgamma(K, shape = p * phi_true, rate = 1)
+#'   d / sum(d)
+#' }))
+#' Y_wide <- pmax(Y_wide, 1e-4)
+#' Y_wide <- Y_wide / rowSums(Y_wide)
+#' colnames(Y_wide) <- cat_names
+#'
+#' # Reshape to the long-format closure-unit layout: K rows per
+#' # site in (time, species) order with `series = category`.
+#' long_dat <- data.frame(
+#'   y      = as.numeric(t(Y_wide)),
+#'   series = factor(rep(cat_names, n_sites), levels = cat_names),
+#'   time   = rep(seq_len(n_sites), each = K),
+#'   env    = rep(env, each = K)
+#' )
+#'
+#' # Fit the compositional JSDM. The `env * series` interaction
+#' # makes the environmental slope category-specific, matching
+#' # brms-native Dirichlet's per-category linear predictors. `n_lv`
+#' # adds a rank-2 latent-factor correction over the population
+#' # mean structure.
+#' fit <- jsdgam(
+#'   formula        = y ~ env * series,
+#'   factor_formula = ~ -1,
+#'   data           = long_dat,
+#'   unit           = time, species = series,
+#'   family         = diri(),
+#'   n_lv           = 2L,
+#'   chains         = 2L,
+#'   burnin         = 400L, samples = 400L,
+#'   silent         = 2,
+#'   backend        = "cmdstanr"
+#' )
+#'
+#' # Per-category offsets recover their truth; the K-shared
+#' # `b_Intercept` and `b_env` are not likelihood-identified under
+#' # the simplex reference subtraction and sample from their prior.
+#' draws <- posterior::as_draws_matrix(fit)
+#' draws[, c("b_seriesy2", "b_seriesy3",
+#'           "b_env:seriesy2", "b_env:seriesy3")] |>
+#'   posterior::summarise_draws(median, ~quantile(.x, c(0.05, 0.95)))
+#'
+#' # posterior_epred returns one probability per (site, species)
+#' # summing to 1 within each site.
+#' pe <- posterior_epred(fit, ndraws = 50L)
+#' first_site <- which(long_dat$time == 1L)
+#' rowSums(pe[1L:5L, first_site, drop = FALSE])
+#' }
+#'
 #' @export
 diri <- function() {
   fam <- brms::custom_family(
@@ -2949,6 +3015,67 @@ make_categ_stanvars <- function(arrays) {
 #'   distributions for the covariance matrix in latent factor
 #'   models. *Statistics and Computing*, 34:143.
 #'   \doi{10.1007/s11222-024-10454-0}
+#'
+#' @examples
+#' \donttest{
+#' # Simulate K = 3 species at 60 sites under a low-rank residual
+#' # covariance Sigma = Z Z' + diag(Psi^2). Per-species intercepts
+#' # and an env slope drive the mean; cross-species covariance comes
+#' # entirely from the factor structure.
+#' set.seed(1)
+#' K <- 3L; species_levels <- paste0("y", seq_len(K)); N_lv <- 2L
+#' Z_true <- matrix(rnorm(K * N_lv, sd = 1.0), nrow = K, ncol = N_lv)
+#' psi_true <- rep(0.5, K)
+#' sigma_true <- tcrossprod(Z_true) + diag(psi_true^2)
+#' mu_intercept <- c(0.0, 0.6, -0.4)
+#' mu_env_slope <- c(0.3, 0.8, -0.5)
+#'
+#' n_sites <- 60L; env <- rnorm(n_sites)
+#' L_true <- chol(sigma_true)
+#' Y_wide <- matrix(NA_real_, n_sites, K)
+#' for (i in seq_len(n_sites)) {
+#'   mu_i <- mu_intercept + mu_env_slope * env[i]
+#'   Y_wide[i, ] <- mu_i + as.numeric(crossprod(L_true, rnorm(K)))
+#' }
+#' colnames(Y_wide) <- species_levels
+#'
+#' # Reshape to the long-format closure-unit layout: K rows per
+#' # site in (time, species) order with `series = species`.
+#' long_dat <- data.frame(
+#'   y      = as.numeric(t(Y_wide)),
+#'   series = factor(rep(species_levels, n_sites),
+#'                   levels = species_levels),
+#'   time   = rep(seq_len(n_sites), each = K),
+#'   env    = rep(env, each = K)
+#' )
+#'
+#' # Fit the gllvm-style JSDM with a rank-2 factor structure on the
+#' # residual covariance.
+#' fit <- jsdgam(
+#'   formula        = y ~ env * series,
+#'   factor_formula = ~ -1,
+#'   data           = long_dat,
+#'   unit           = time, species = series,
+#'   family         = mvn(),
+#'   n_lv           = 2L,
+#'   chains         = 2L,
+#'   burnin         = 400L, samples = 400L,
+#'   silent         = 2,
+#'   backend        = "cmdstanr"
+#' )
+#'
+#' # Per-species intercepts and env slopes recover their truth.
+#' draws <- posterior::as_draws_matrix(fit)
+#' draws[, c("b_seriesy2", "b_seriesy3",
+#'           "b_env:seriesy2", "b_env:seriesy3")] |>
+#'   posterior::summarise_draws(median, ~quantile(.x, c(0.05, 0.95)))
+#'
+#' # The headline diagnostic: implied residual covariance recovers
+#' # the off-diagonal Sigma the data was drawn under.
+#' res_cor <- residual_cor(fit)
+#' cor(sigma_true[upper.tri(sigma_true)],
+#'     res_cor$cov[upper.tri(res_cor$cov)])
+#' }
 #'
 #' @export
 mvn <- function() {
