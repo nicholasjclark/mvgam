@@ -7,7 +7,7 @@
 \method{hindcast}{mvgam}(
   object,
   ...,
-  type = c("response", "link", "expected", "trend"),
+  type = c("response", "link", "expected", "trend", "latent_state"),
   ndraws = NULL,
   obs_uncertainty = TRUE,
   resample_innovations = FALSE,
@@ -20,11 +20,16 @@
 \item{...}{Currently unused.}
 
 \item{type}{One of \code{"response"}, \code{"link"}, \code{"expected"},
-\code{"trend"}. \code{"response"} samples from the observation family
-(the default); \code{"expected"} returns the family's mean
-(\code{linkinv(eta)}); \code{"link"} returns the link-scale linpred;
-\code{"trend"} returns the latent-trend trajectory on the link
-scale.}
+\code{"trend"}, \code{"latent_state"}. \code{"response"} samples from the
+observation family (the default); \code{"expected"} returns the
+family's mean (\code{linkinv(eta)}); \code{"link"} returns the
+link-scale linpred; \code{"trend"} returns the latent-trend
+trajectory on the link scale. \code{"latent_state"} is only valid
+for closure-unit families (\code{occ()}, \code{nmix()} variants) and
+returns the posterior latent state (\code{psi} for \code{occ()}, \code{N}
+for the \code{nmix} variants) at each closure unit as an
+\code{mvgam_latent_state} object with its own \code{print()},
+\code{summary()}, \code{as.data.frame()} and \code{plot()} methods.}
 
 \item{ndraws}{Optional integer; the number of posterior draws
 to use. Defaults to all available draws.}

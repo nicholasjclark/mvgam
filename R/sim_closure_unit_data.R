@@ -219,14 +219,22 @@ sim_closure_unit_data <- function(type = 1L,
   names(visit_X) <- names(recipe$visit_covs)
 
   # State-level coefs: per species [n_species x (intercept +
-  # p_site)]. Intercepts drawn from N(0, 0.5); observed-covariate
-  # slopes drawn from N(0, 0.75) so the slope-to-noise ratio is
-  # large enough that a small fit identifies them.
+  # p_site)]. The state side runs through the family link, so the
+  # draw scale is family-aware: occ (logit link) saturates anyway,
+  # so wide draws are fine; nmix (log link) explodes lambda when
+  # slopes exceed ~1.5, which both saturates the K_max
+  # marginalisation ceiling and gives the fit nothing useful to
+  # recover. Detection-side draws stay on the wider scale (the
+  # detection link is logit for occ / nmix("poisson_binomial")
+  # and log for the other nmix variants, but per-visit covariates
+  # vary on a tighter empirical range than per-site covariates).
   state_coefs       <- draw_recipe_coefs(
-    n_species, names(recipe$site_covs)
+    n_species, names(recipe$site_covs), family = family,
+    is_state = TRUE
   )
   detection_coefs   <- draw_recipe_coefs(
-    n_species, names(recipe$visit_covs)
+    n_species, names(recipe$visit_covs), family = family,
+    is_state = FALSE
   )
   p_site  <- length(recipe$site_covs)
   p_visit <- length(recipe$visit_covs)
@@ -406,19 +414,50 @@ closure_unit_recipe <- function(type) {
 # the mean give the factor model and `residual_cor` something
 # non-trivial to recover.
 #'@noRd
-draw_recipe_coefs <- function(n_species, cov_names) {
+draw_recipe_coefs <- function(n_species, cov_names,
+                                family = NULL, is_state = TRUE) {
   p <- length(cov_names)
-  intercept <- stats::rnorm(n_species, mean = 0, sd = 0.75)
+  # Tame nmix state-side draws (log link explodes lambda past
+  # K_max if slopes drift past ~1.5). Detection-side draws also
+  # stay tight because the recipe's per-visit covariates carry
+  # wide empirical ranges (`tod_c ~ U(-6, 6)`); wide logit slopes
+  # against that range push detection probability to 0 or 1 and
+  # leave the fit nothing to recover. Logit-link state for occ()
+  # uses the wider draws since the link saturates anyway and a
+  # wider draw gives more visible occupancy variation.
+  fam_name <- if (is.null(family)) "" else resolve_family_name(family) %||% ""
+  is_nmix <- grepl("^nmix", fam_name)
+  is_closure <- is_nmix || identical(fam_name, "occ")
+  if (is_state && is_nmix) {
+    # nmix log-link state: tightest draws.
+    intercept_sd      <- 0.5
+    community_mean_sd <- 0.4
+    slope_sd          <- 0.3
+  } else if (!is_state && is_closure) {
+    # Detection side (occ logit, nmix logit / log): tame to keep
+    # detection probability / encounter rate within recoverable
+    # range across the visit-covariate U(-6, 6) span.
+    intercept_sd      <- 0.5
+    community_mean_sd <- 0.2
+    slope_sd          <- 0.15
+  } else {
+    # Original wider draws (occ logit-state default; non-closure
+    # users that may call this helper indirectly).
+    intercept_sd      <- 0.75
+    community_mean_sd <- 1.5
+    slope_sd          <- 0.5
+  }
+  intercept <- stats::rnorm(n_species, mean = 0, sd = intercept_sd)
   if (p == 0L) {
     out <- matrix(intercept, nrow = n_species, ncol = 1L)
     colnames(out) <- "intercept"
     return(out)
   }
-  community_mean <- stats::rnorm(p, mean = 0, sd = 1.5)
+  community_mean <- stats::rnorm(p, mean = 0, sd = community_mean_sd)
   slopes <- matrix(
     stats::rnorm(n_species * p,
                  mean = rep(community_mean, each = n_species),
-                 sd = 0.5),
+                 sd = slope_sd),
     nrow = n_species, ncol = p
   )
   out <- cbind(intercept, slopes)
