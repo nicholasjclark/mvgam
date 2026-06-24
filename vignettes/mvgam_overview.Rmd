@@ -76,9 +76,9 @@ state-space fits:
   `comparisons()`, `hypotheses()` and `slopes()` all dispatch
   on `mvgam` objects through the standard `posterior_epred()`,
   `posterior_predict()` and `posterior_linpred()` methods.
-  `bayesplot`, `posterior`, `loo`, `tidybayes` and `emmeans`
-  work without special-casing. `tidy()`, `augment()` and
-  `glance()` return broom-standard data frames.
+  `bayesplot`, `posterior` and `loo` work without
+  special-casing. `tidy()`, `augment()` and `glance()` return
+  broom-standard data frames.
 
 The state-space layer is what's new on top of `brms`. The latent
 trend pipeline accepts random walks, autoregressions (with
