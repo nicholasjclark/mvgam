@@ -969,10 +969,7 @@ build_next_steps <- function(x) {
   # ecologically meaningful next steps; non-closure-unit fits get
   # the standard mvgam suggestion set.
   pp_text <- if (is_cu) {
-    paste0(
-      "`pp_check(fit, type = \"fit_stat\", ",
-      "stat = \"chi_squared\")`: closure-unit GOF (Bayesian p-value)"
-    )
+    "`pp_check(fit, type = \"fit_stat\")`: closure-unit GOF p-value"
   } else {
     "`pp_check(fit)`: posterior predictive checks"
   }
@@ -980,20 +977,13 @@ build_next_steps <- function(x) {
     list(when = TRUE, text = pp_text),
     list(when = is_cu,
          text = paste0(
-           "`predict(fit, type = \"latent_state\")`: ",
-           "posterior latent state (psi for occ; N for nmix), ",
-           "conditional on observed detections"
-         )),
-    list(when = is_cu,
-         text = paste0(
-           "`plot(fit, type = \"latent_state\")`: ribbon of ",
-           "latent state across (series, time)"
+           "`hindcast(fit, type = \"latent_state\")`: ",
+           "psi (occ) or N (nmix)"
          )),
     list(when = has_factors,
          text = paste0(
-           "`shared_variation(fit)`: factor-implied ",
-           "Delta = Z * Z' (rotation-invariant; pass to ",
-           "`plot()` for a heatmap)"
+           "`shared_variation(fit)`: ",
+           "factor-implied Delta = Z Z' (rotation-invariant)"
          )),
     list(when = has_cor_trend,
          text = "`residual_cor(fit)`: implied cross-series correlations"),
@@ -1002,10 +992,9 @@ build_next_steps <- function(x) {
     list(when = TRUE,
          text = "`loo(fit)` / `loo_compare(...)`: model fit + comparison"),
     list(when = has_covariates,
-         text = paste0(
-           "`conditional_effects(fit)`: marginal posterior ",
-           "predictions across covariates"
-         ))
+         text = "`conditional_effects(fit)`: covariate effects"),
+    list(when = is_cu,
+         text = "`plot(hindcast(fit, type = \"latent_state\"))`: state ribbon")
   )
   texts <- vapply(
     Filter(function(c) isTRUE(c$when), candidates),
