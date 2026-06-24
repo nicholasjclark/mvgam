@@ -63,9 +63,11 @@ state-space fits:
   `te()`), Gaussian process smooths (`gp()`), monotonic
   effects (`mo()`), random effects through `(... | ...)`,
   smooths split by a factor (`by = `), and nonlinear formulas
-  via `bf(..., nl = TRUE)`. Anything `brms` accepts as a
-  predictor is available on both `formula` and
-  `trend_formula`.
+  via `bf(..., nl = TRUE)`. The same predictor syntax works on
+  both `formula` and `trend_formula`; the trend side does not
+  accept `brms` addition terms (`weights`, `se`, `cens`) or
+  `autocor()` families, since those collide with the
+  state-space layer.
 - **Multiple response variables.** Joint-response fits compose
   through `bf()` arms, including distributional regression on
   any auxiliary parameter (e.g. `bf(y ~ ..., sigma ~ ...)`).
@@ -164,10 +166,12 @@ correlations through `gr` / `subgr`. Three concrete cases:
   `"poisson_poisson"`) chosen at the constructor. The detection
   sub-formula is a second `bf()` arm in the model formula.
 - **`diri()` / `multi()` / `categ()`** model compositional
-  responses on the simplex. A reference category fixes one slot
-  in the length K `mu` vector and a `sum_to_zero_vector[K]`
-  constraint is applied to each column of `Z`, so the joint
-  identification works without user constraints.
+  responses on the simplex. The likelihood subtracts the
+  reference category's linear predictor from every entry of the
+  length K `mu` vector (a softmax shift, equivalent to a $K-1$
+  reference parameterisation) and a `sum_to_zero_vector[K]`
+  constraint is applied to each column of `Z`. Together these
+  identify the joint model without user constraints.
   `posterior_epred()` returns one probability per
   `(site, species)` row summing to 1 within each site.
 - **`mvn()` and `mvt()`** model continuous multivariate
@@ -248,7 +252,7 @@ recursion run on irregularly-spaced timestamps:
 \begin{align*}
 z_{i, t} & \sim \text{Normal}\!\bigl(
   \rho_i^{\Delta_t} \, z_{i, t_{-}},\;
-  \sigma_i \, \sqrt{1 - \rho_i^{2 \Delta_t}} \bigr)
+  \sigma_i \bigr)
 \end{align*}
 
 **Piecewise growth**, `PW()`. The Prophet kernel with $S$
@@ -330,8 +334,8 @@ number of active columns.
 
 For VAR trend factor models, the lag coefficient cube also
 rotates. The rotated dynamics matrix is
-$\tilde{A}_l = Q^\top A_l Q$ for the orthogonal $Q$ delivered by
-the QR factorisation. Per-factor scalar parameters
+$\tilde{A}_l = Q \, A_l \, Q^\top$ for the orthogonal $Q$
+delivered by the QR factorisation. Per-factor scalar parameters
 ($\rho_l$, $\sigma$, MA coefficients, $L_{\Omega}$) stay in the
 unrotated latent basis. See `?loadings_prior` for the structured
 priors and `?ordinate.mvgam` for biplot helpers on the rotated
@@ -609,8 +613,8 @@ CRPS variant (`twcrps`) for emphasising tail behaviour. For
 multivariate forecasts from VAR fits or factor models, `score()`
 also supports `energy` (energy score) and `variogram` (variogram
 score). Both penalise dependence patterns that per-series rules
-miss. The `interval_width` and `per_series` arguments control
-nominal coverage and aggregation.
+miss. The `interval_width` argument sets the nominal coverage
+band used by interval-based rules.
 
 ### Leave-future-out cross-validation
 
