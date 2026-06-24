@@ -88,9 +88,20 @@
 #'                family  = poisson(),
 #'                chains  = 2, silent = 2)
 #'
+#' # `elpd_loo` is the expected log pointwise predictive density;
+#' # `p_loo` is the effective number of parameters; `looic` is
+#' # `-2 * elpd_loo`. The Pareto-k diagnostic table reports per-
+#' # observation k values -- values above 0.7 (or above 1) mean
+#' # the leave-one-out approximation may be unreliable for those
+#' # cells and motivate either `moment_match = TRUE` or k-fold
+#' # cross-validation.
 #' loo(mod1)
-#' # Compare two fits by ELPD difference; positive elpd_diff favours
-#' # the first row.
+#'
+#' # Model comparison by ELPD difference. `loo_compare` orders
+#' # models from best (top row, `elpd_diff = 0`) to worst.
+#' # A negative `elpd_diff` against the best model that exceeds
+#' # roughly 4 standard errors (|elpd_diff / se_diff| > 4) is a
+#' # firm preference for the top model.
 #' loo_compare(mod1, mod2)
 #' }
 #'

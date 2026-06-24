@@ -1394,6 +1394,25 @@ build_closure_unit_arrays <- function(data,
 #' # Marginal env effect on the response scale (expected count
 #' # = lambda * p).
 #' conditional_effects(mod)
+#'
+#' # Closure-unit post-fit surface. `predict(type = "latent_state")`
+#' # returns posterior draws of latent abundance N at each unit;
+#' # `predict(type = "detection")` returns the per-visit detection
+#' # probability p. These two quantities are confounded in the raw
+#' # response and only separable under the N-mixture marginalisation.
+#' head(predict(mod, type = "latent_state"))
+#' head(predict(mod, type = "detection"))
+#'
+#' # `pp_check(type = "fit_stat", ...)` runs a closure-unit
+#' # goodness-of-fit test: collapse to per-unit sufficient
+#' # statistics, compare observed vs replicated under either the
+#' # chi-squared or Freeman-Tukey discrepancy of MacKenzie & Bailey
+#' # (2004). Returns an `mvgam_ppc_fit_stat` object with the
+#' # Bayesian p-value; values near 0 or 1 indicate poor fit.
+#' pp_check(mod, type = "fit_stat", stat = "freeman_tukey",
+#'           ndraws = 200L)
+#' pp_check(mod, type = "fit_stat", stat = "chi_squared",
+#'           ndraws = 200L)
 #' }
 #'
 #' @export
@@ -1690,6 +1709,24 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #' # detection). For the logit-occupancy view pass
 #' # `type = "link"`.
 #' conditional_effects(mod)
+#'
+#' # Closure-unit post-fit surface. `predict(type = "latent_state")`
+#' # returns posterior draws of the latent occupancy probability
+#' # psi at each unit; `predict(type = "detection")` returns the
+#' # per-visit detection probability p. Both are confounded in the
+#' # raw 0/1 record and only separable under the marginalised
+#' # occupancy likelihood.
+#' head(predict(mod, type = "latent_state"))
+#' head(predict(mod, type = "detection"))
+#'
+#' # `pp_check(type = "fit_stat", ...)` runs a closure-unit
+#' # goodness-of-fit test: collapse to per-unit sufficient
+#' # statistics, compare observed vs replicated under the
+#' # Freeman-Tukey or chi-squared discrepancy of MacKenzie &
+#' # Bailey (2004). Returns an `mvgam_ppc_fit_stat` object with
+#' # the Bayesian p-value; values near 0 or 1 indicate poor fit.
+#' pp_check(mod, type = "fit_stat", stat = "freeman_tukey",
+#'           ndraws = 200L)
 #' }
 #'
 #' @export

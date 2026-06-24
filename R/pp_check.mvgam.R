@@ -110,9 +110,31 @@
 #'   chains  = 2, silent = 2
 #' )
 #'
-#' # Density overlay: 50 posterior predictive replicates on the
-#' # observed response density.
+#' # Density overlay: posterior predictive replicates on the
+#' # observed response density. Mismatch between the dark line
+#' # (observed) and the pale ribbon (predictive) signals
+#' # family or trend mis-specification.
 #' pp_check(mod, type = "dens_overlay", ndraws = 50L)
+#'
+#' # Rootogram: square-root of count vs predicted, with bars
+#' # hanging from the predicted height to the axis. Bars dropping
+#' # below zero are observed counts under-predicted by the model;
+#' # bars rising above are over-predicted. Designed for count
+#' # families.
+#' pp_check(mod, type = "rootogram", ndraws = 50L)
+#'
+#' # PIT-ECDF: probability-integral transform values pooled across
+#' # observations. A well-calibrated fit traces the diagonal;
+#' # mass bulging above or below the band indicates under- or
+#' # over-dispersion. Bump `ndraws` for a stable PIT support.
+#' pp_check(mod, type = "pit_ecdf", ndraws = 500L)
+#'
+#' # Residual ribbon: per-observation randomised quantile residuals
+#' # over the observation index, with 50% / 90% predictive ribbons.
+#' # Trend mis-specification shows up here as serial structure in
+#' # the residuals (auto-correlation, drift) that the marginal
+#' # density check would miss.
+#' pp_check(mod, type = "resid_ribbon", ndraws = 500L)
 #' }
 #'
 #' @export
