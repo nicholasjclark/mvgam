@@ -200,9 +200,16 @@ z_{i, t} & = z_{i, t - 1} + \theta_i \, \epsilon_{i, t - 1}
 
 **Autoregression**, `AR(p = ...)`. The lag set
 $\mathcal{L} = \{1, \dots, p\}$ when `p` is a scalar, or
-$\mathcal{L} = p$ when `p` is a vector (so `AR(p = c(1, 12))`
-sets $\mathcal{L} = \{1, 12\}$). Stationary by construction
-through a Heaps (2023) prior on the lag coefficients:
+$\mathcal{L} = p$ when `p` is a vector. The vector form sets
+the lags explicitly and lets the user skip intermediate lags:
+`AR(p = c(1, 12))` evaluates only the lag 1 and lag 12
+coefficients, with no $\rho_2$ through $\rho_{11}$ in the
+model. Sparse lag sets are the right shape for periodic
+seasonal recurrence (lag 1 momentum + lag 12 annual cycle for
+monthly data; lag 1 + lag 7 for weekly data) without paying for
+the intermediate coefficients. Stationarity holds by
+construction through a Heaps (2023) prior on the active
+coefficients:
 
 \begin{align*}
 z_{i, t} & \sim \text{Normal}\!\Bigl(
@@ -213,8 +220,11 @@ z_{i, t} & \sim \text{Normal}\!\Bigl(
 
 **Vector autoregression**, `VAR(p = ...)`. Each $A_l$ is an
 $N_{\text{series}} \times N_{\text{series}}$ transition matrix.
-Innovations are correlated across series through $\Sigma$, with
-an LKJ prior on the Cholesky factor:
+`p` accepts the same scalar or vector form as `AR()`, so
+`VAR(p = c(1, 12))` fits a sparse seasonal VAR with only the
+lag 1 and lag 12 transition matrices active. Innovations are
+correlated across series through $\Sigma$, with an LKJ prior on
+the Cholesky factor:
 
 \begin{align*}
 z_t & \sim \text{Normal}\!\Bigl(
