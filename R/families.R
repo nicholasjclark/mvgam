@@ -1783,12 +1783,26 @@ build_closure_unit_arrays <- function(data,
 #' conditional_effects(mod)
 #'
 #' # Closure-unit post-fit surface. `predict(type = "latent_state")`
-#' # returns posterior draws of latent abundance N at each unit;
-#' # `predict(type = "detection")` returns the per-visit detection
-#' # probability p. These two quantities are confounded in the raw
-#' # response and only separable under the N-mixture marginalisation.
+#' # returns posterior summaries of latent abundance N at each
+#' # unit; `predict(type = "detection")` returns the per-visit
+#' # detection probability p. These two quantities are confounded
+#' # in the raw response and only separable under the N-mixture
+#' # marginalisation.
 #' head(predict(mod, type = "latent_state"))
 #' head(predict(mod, type = "detection"))
+#'
+#' # `hindcast(type = "latent_state")` packs the full per-draw
+#' # posterior at every training unit into an `mvgam_latent_state`
+#' # object with print / summary / as.data.frame / plot methods.
+#' # `summary()` returns a tidy (series, time, median, 50% and 95%
+#' # CI) frame for direct ggplot use; `plot()` returns a faceted
+#' # step-style ribbon that can be extended with extra ggplot
+#' # layers (e.g. `+ geom_point(aes(time, true_N))` to overlay a
+#' # known truth).
+#' hc <- hindcast(mod, type = "latent_state")
+#' print(hc)
+#' head(as.data.frame(hc))
+#' plot(hc)
 #'
 #' # `pp_check(type = "fit_stat", ...)` runs a closure-unit
 #' # goodness-of-fit test: collapse to per-unit sufficient
@@ -2098,13 +2112,21 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #' conditional_effects(mod)
 #'
 #' # Closure-unit post-fit surface. `predict(type = "latent_state")`
-#' # returns posterior draws of the latent occupancy probability
+#' # returns posterior summaries of the latent occupancy probability
 #' # psi at each unit; `predict(type = "detection")` returns the
 #' # per-visit detection probability p. Both are confounded in the
 #' # raw 0/1 record and only separable under the marginalised
 #' # occupancy likelihood.
 #' head(predict(mod, type = "latent_state"))
 #' head(predict(mod, type = "detection"))
+#'
+#' # `hindcast(type = "latent_state")` returns the full per-draw
+#' # posterior on psi as an `mvgam_latent_state` object with
+#' # `as.data.frame()` and a faceted `plot()` for direct inspection
+#' # and ggplot composition.
+#' hc <- hindcast(mod, type = "latent_state")
+#' print(hc)
+#' plot(hc)
 #'
 #' # `pp_check(type = "fit_stat", ...)` runs a closure-unit
 #' # goodness-of-fit test: collapse to per-unit sufficient

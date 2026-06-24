@@ -1,0 +1,482 @@
+---
+title: "N-mixture models with mvgam"
+author: "Nicholas J Clark"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_vignette:
+    toc: yes
+vignette: >
+  %\VignetteIndexEntry{N-mixture models with mvgam}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+params:
+  EVAL: !r identical(tolower(Sys.getenv("NOT_CRAN")), "true")
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE,
+  eval = if (isTRUE(exists("params"))) params$EVAL else FALSE
+)
+```
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  dpi = 100,
+  fig.asp = 0.7,
+  fig.width = 6,
+  out.width = "70%",
+  fig.align = "center"
+)
+library(mvgam)
+library(ggplot2)
+theme_set(theme_bw(base_size = 12, base_family = "serif"))
+```
+
+N-mixture models infer the true abundance of a closed population
+from repeated counts that are recorded with imperfect detection.
+The model partitions an observed count $y_{i, r}$ into a latent
+state (the unobserved abundance $N_i$ at site $i$) and a per-visit
+detection process that records each individual independently with
+probability $p_r$. This vignette walks through fitting the
+single-season Poisson-binomial N-mixture in `mvgam`, recovering
+the latent abundance against a known truth, and checking model
+fit with closure-unit-aware goodness-of-fit statistics. A
+two-species worked example carries the discussion; the same
+`bf(y ~ ..., p ~ ...)` formula extends to any number of species.
+
+## N-mixture models
+
+For an observation $y_{i, r}$ on site $i$ at visit $r$, the
+single-season Poisson-binomial N-mixture of
+[Royle (2004)](https://doi.org/10.1111/j.0006-341X.2004.00142.x)
+factors the data-generating process into a state layer and an
+observation layer:
+
+\begin{align*}
+y_{i, r} & \sim \text{Binomial}(N_i, p_r) \\
+N_i      & \sim \text{Poisson}(\lambda_i) \, .
+\end{align*}
+
+Covariates enter through the linear predictors for the abundance
+mean $\lambda_i$ (log link) and the detection probability $p_r$
+(logit link):
+
+\begin{align*}
+\log \lambda_i  & = \beta_0 + \beta^\top \mathbf{x}_i \\
+\text{logit}\, p_r & = \gamma_0 + \gamma^\top \mathbf{q}_r \, .
+\end{align*}
+
+State and observation are conditionally independent given $N_i$.
+A single visit cannot identify $\lambda$ and $p$ separately, but
+replicated visits at the same site under the closure assumption
+let the binomial mean $N_i p_r$ and the binomial variance
+$N_i p_r (1 - p_r)$ jointly inform both parameters.
+
+The latent $N_i$ is integer-valued, which leaves Hamiltonian Monte
+Carlo nothing to differentiate. `mvgam` handles this the same way
+the Stan documentation handles any discrete latent variable: the
+likelihood is marginalised analytically, summing over a finite
+range $N_i \in \{y_{i, \max}, \dots, K_{\max}\}$ where $K_{\max}$
+is a per-site upper bound the user supplies (via the `cap`
+column). The chain only ever samples the continuous parameters
+on the right-hand side of the linear predictors. For a friendly
+walk-through of marginalising discrete parameters in Stan, see
+the chapter on
+[Latent Discrete Parameters in the Stan User's Guide](https://mc-stan.org/docs/stan-users-guide/latent-discrete.html)
+and McElreath's
+[Algebra and the Missing Oxen](https://elevanth.org/blog/2018/01/29/algebra-and-missingness/)
+walkthrough.
+
+## Closure-unit data shape
+
+Closure-unit families need the data in a long format that
+preserves the closure assumption: one row per `(species, site,
+visit)` cell, with the species identifier in `series`, the
+closure-unit identifier in `time`, the visit index in `visit`,
+the count in `y`, and the per-unit upper truncation for the
+marginalisation in `cap`. The columns are required because
+[`mvgam()`](https://nicholasjclark.github.io/mvgam/reference/mvgam.html)
+needs to align observations into the marginalised likelihood
+without the user pivoting to and from a multidimensional array.
+
+The `sim_closure_unit_data()` helper generates a data frame in
+this shape together with the true generative parameters, so
+recovery checks read directly off `truth$lambda`, `truth$N`,
+`truth$p`, `truth$state_coefs`, and `truth$detection_coefs`. Each
+recipe carries a per-site state-level covariate set and a
+per-visit detection-level covariate set; recipe 1 uses a single
+covariate on each side (`env` on the state side, `tod_c` on the
+detection side) and is the cleanest entry point for an
+N-mixture example.
+
+## A two-species worked example
+
+Two species, 60 sites, four visits per site. Recipe 1 carries
+the site-level covariate `env ~ N(0, 1)` on the state side and
+the visit-level covariate `tod_c ~ U(-6, 6)` on the detection
+side. The simulator seeds the coefficient draws and the visit
+covariate values, returning the generative truth on `simdat$truth`.
+
+```{r sim-data}
+set.seed(0)
+simdat <- sim_closure_unit_data(
+  family    = nmix(),
+  type      = 1L,
+  n_species = 2L,
+  n_sites   = 60L,
+  n_visits  = 4L,
+  seed      = 130L,
+  K_max     = 30L
+)
+str(simdat$data_train)
+head(simdat$truth$state_coefs)
+head(simdat$truth$detection_coefs)
+```
+
+The data frame is ready for [`mvgam()`](https://nicholasjclark.github.io/mvgam/reference/mvgam.html)
+without further manipulation. The truth bundle records the true
+per-species intercepts and slopes on the state side
+(`state_coefs`) and the detection side (`detection_coefs`), the
+true per-site expected abundance `lambda` and realised abundance
+`N`, and the true per-visit detection probability `p`. Recovery
+checks throughout the rest of the vignette point back to these
+slots.
+
+### Fit
+
+The fit combines two `brms`-style formulas inside a `bf()` call.
+The first arm gives the state-side linear predictor for $\log
+\lambda$; the second arm gives the detection-side linear
+predictor for $\text{logit}\, p$. Each arm includes a `series`
+main effect to estimate per-species intercepts plus an
+interaction with the covariate (`env:series`, `tod_c:series`) so
+each species gets its own slope:
+
+```{r fit, results = "hide"}
+mod <- mvgam(
+  formula = bf(y ~ series + env:series,
+                p ~ series + tod_c:series),
+  data    = simdat$data_train,
+  family  = nmix(),
+  chains  = 2L,
+  samples = 500L,
+  burnin  = 500L,
+  silent  = 2L
+)
+```
+
+```{r}
+summary(mod, include_betas = FALSE)
+```
+
+The chain mixed cleanly: all R-hat values sit at 1.00 and bulk
+effective sample sizes reach into the thousands across the
+linear-predictor coefficients, so the posterior carries enough
+independent draws to support reliable inference about each
+species' abundance and detection process. The next section
+checks how well the recovered coefficients match the simulator's
+true parameters.
+
+### Recovery against truth
+
+`as.matrix(mod$fit)` exposes the posterior draws under the
+brms parameter names, which is what the recovery check uses. The
+`b[k]` indexing follows the column order of the design matrix
+that `mvgam()` built from the formula (`mod$standata$X` for the
+state side, `mod$standata$X_p` for the detection side):
+
+```{r recovery}
+post <- as.matrix(mod$fit)
+truth_state <- simdat$truth$state_coefs
+truth_det   <- simdat$truth$detection_coefs
+
+recovery <- data.frame(
+  parameter = c("sp_1 log-lambda intercept",
+                "sp_2 - sp_1 intercept",
+                "sp_1 env slope",
+                "sp_2 env slope",
+                "sp_1 logit-p intercept",
+                "sp_2 - sp_1 detection intercept",
+                "sp_1 tod_c slope",
+                "sp_2 tod_c slope"),
+  truth     = c(truth_state[1, "intercept"],
+                truth_state[2, "intercept"] -
+                  truth_state[1, "intercept"],
+                truth_state[1, "env"],
+                truth_state[2, "env"],
+                truth_det[1, "intercept"],
+                truth_det[2, "intercept"] -
+                  truth_det[1, "intercept"],
+                truth_det[1, "tod_c"],
+                truth_det[2, "tod_c"]),
+  median    = c(median(post[, "Intercept"]),
+                median(post[, "b[1]"]),
+                median(post[, "b[2]"]),
+                median(post[, "b[3]"]),
+                median(post[, "Intercept_p"]),
+                median(post[, "b_p[1]"]),
+                median(post[, "b_p[2]"]),
+                median(post[, "b_p[3]"]))
+)
+recovery$bias <- recovery$median - recovery$truth
+recovery[, -1L] <- lapply(recovery[, -1L],
+                           function(x) round(x, 2L))
+recovery
+```
+
+Detection slopes (`tod_c:series`) recover precisely, with bias
+near zero on both species. The state-side intercepts and one of
+the env slopes carry a small bias on the order of a few tenths.
+The bias is the classic N-mixture identifiability footprint:
+detection probability and abundance compensate for each other in
+the binomial mean
+$\mathbb{E}[Y_{i, r}] = N_i p_r$, so a low $p$ shifts the
+posterior toward a higher $\lambda$ at the same data. With four
+visits per site this confound rarely resolves to zero bias even
+with otherwise well-specified data;
+[Knape and Korner-Nievergelt (2015)](https://doi.org/10.1111/2041-210X.12377)
+discuss this and the conditions that mitigate it (more visits,
+informative priors, abundance covariates with strong effects on
+the log-lambda scale). The latent abundance posterior remains
+well-calibrated under this bias, which is shown next.
+
+### Latent abundance: hindcast vs truth
+
+The point of fitting an N-mixture is the latent abundance $N$,
+not the regression coefficients per se. `hindcast(mod, type =
+"latent_state")` returns the posterior at every closure unit as
+an `mvgam_latent_state` object that prints a short summary and
+hands back a tidy data frame through `summary()` (or its alias
+`as.data.frame()`):
+
+```{r latent-N-hindcast}
+hc <- hindcast(mod, type = "latent_state")
+print(hc)
+head(as.data.frame(hc), 6)
+```
+
+`plot()` on the same object returns a ggplot ribbon (step-style
+for integer-valued `N`) faceted by species. Because the output
+is a plain ggplot, the simulator truth can be overlaid as a
+points layer with `+ geom_point()` without writing any plotting
+code by hand:
+
+```{r latent-N-plot, fig.asp = 0.5, out.width = "85%"}
+truth_long <- data.frame(
+  series = factor(rep(c("sp_1", "sp_2"), each = 60L),
+                  levels = c("sp_1", "sp_2")),
+  time   = rep(seq_len(60L), 2L),
+  true_N = c(simdat$truth$N[1L, ], simdat$truth$N[2L, ])
+)
+plot(hc) +
+  geom_point(data = truth_long,
+              aes(x = time, y = true_N),
+              colour = "black", size = 1.3) +
+  labs(x = "Closure unit (site)",
+        y = expression("Latent abundance " * N),
+        title = "Posterior latent N (ribbons) vs simulator truth (points)")
+```
+
+Almost every truth point sits inside the 95% credible ribbon and
+most sit inside the 50% ribbon. Two diagnostics quantify what
+the figure shows:
+
+```{r latent-N-coverage}
+smry <- as.data.frame(hc)
+merged <- merge(smry, truth_long, by = c("series", "time"))
+mean(merged$true_N >= merged$lower_50 &
+       merged$true_N <= merged$upper_50)
+mean(merged$true_N >= merged$lower_95 &
+       merged$true_N <= merged$upper_95)
+```
+
+The 95% credible interval contains the simulator's true $N$ at
+roughly the nominal rate. The 50% interval is slightly over-wide,
+which is the expected face of the coefficient confound discussed
+above: when the model spreads uncertainty between $\lambda$ and
+$p$ rather than collapsing onto the true pair, the joint
+posterior on $N$ widens to match. The headline is that the
+recovered latent abundance lines up with truth even when
+individual regression coefficients carry small biases.
+
+### Covariate effects on abundance and detection
+
+`conditional_effects()` returns a partial-effect plot per
+covariate-by-species combination on the response scale. Because
+`y` is a count from the N-mixture, the response scale is the
+expected count $\mathbb{E}[Y] = \lambda \cdot p$ per visit;
+covariate slopes on $\lambda$ and on $p$ both contribute. To
+read each side separately, the `marginaleffects` interface
+exposes the closure-unit `latent_state` and `detection` types
+directly:
+
+```{r ce-link, fig.asp = 0.55, out.width = "80%"}
+conditional_effects(mod)
+```
+
+The state-side panel shows expected abundance rising or falling
+with `env` differently across the two species, matching the
+sign of the simulator's true `env` slopes (sp_1 positive, sp_2
+also positive but flatter). The detection-side panel mirrors the
+recovered `tod_c` effect: detection probability decreases as
+`tod_c` rises, with similar slopes on both species.
+
+`conditional_effects()` puts both species on the same panel by
+mixing their marginal expected counts. To inspect detection
+probability on its native probability scale, with each species
+on its own curve, `marginaleffects::plot_predictions()` with
+`type = "detection"` reads the per-visit detection process out
+of the fit and plots it directly:
+
+```{r me-detection, fig.asp = 0.55, out.width = "80%"}
+marginaleffects::plot_predictions(
+  mod,
+  condition = c("tod_c", "series"),
+  type      = "detection"
+) +
+  ylab("Pr(detection per visit)") +
+  ylim(c(0, 1))
+```
+
+Both species' detection curves slope downward in `tod_c` and stay
+inside the unit interval across the range of the visit-time
+covariate. The curves separate cleanly. Sp_2's curve sits higher
+than sp_1's at every value of `tod_c`, which means sp_2 is the
+more readily detected species whatever the time of day. The gap
+between the two intercepts is what the `series` term on the
+detection sub-formula picked up, and it matches the positive
+`seriessp_2` detection contrast that the recovery table
+reported.
+
+### Goodness-of-fit: closure-unit Bayesian p-values
+
+`pp_check(type = "fit_stat")` runs the
+[MacKenzie and Bailey (2004)](https://doi.org/10.1198/108571104X3361)
+closure-unit goodness-of-fit test. The statistic collapses the
+visit-level counts within each closure unit to a sufficient
+discrepancy (chi-squared by default; Freeman-Tukey as an
+alternative that handles small counts better), then compares the
+observed
+discrepancy to its posterior predictive distribution. A Bayesian
+p-value near 0.5 means the observed discrepancy is typical under
+the model; values near 0 or 1 indicate that the model
+under-disperses or over-disperses the observed counts.
+
+```{r ppc-chi}
+pp_check(mod, type = "fit_stat", stat = "chi_squared",
+          ndraws = 200L)
+```
+
+The chi-squared Bayesian p-value lands in the centre of the null
+distribution, well away from 0 or 1. The model's per-unit
+predicted counts span the same range of dispersion as the
+observed counts, so there is no sign that the
+Binomial-Poisson mixture is over- or under-dispersing the data.
+Chi-squared weights every cell equally and can react harshly to
+the small counts that closure-unit data typically carry, so the
+Freeman-Tukey discrepancy is the natural cross-check:
+
+```{r ppc-ft}
+pp_check(mod, type = "fit_stat", stat = "freeman_tukey",
+          ndraws = 200L)
+```
+
+The Freeman-Tukey p-value also lands away from the boundaries.
+Both discrepancies agree. The closure-unit likelihood is
+describing both the hidden abundance process and the per-visit
+detection layer well, even with the modest intercept bias the
+recovery table documented, and the latent abundance coverage
+shown earlier confirms it.
+
+## Alternative observation processes
+
+The Poisson-binomial assumption that detection is an independent
+Bernoulli trial for each of $N$ individuals is the most common
+N-mixture formulation, but it is not the only one. `nmix()`
+exposes two further variants chosen by the `type` argument; the
+Stan implementation marginalises latent $N$ for each of them and
+the post-fit surface (latent-state hindcast, detection
+predictions, GOF) carries through unchanged.
+
+| Variant | Constructor | Detection scale | When to prefer |
+|---------|-------------|-----------------|----------------|
+| Poisson-binomial | `nmix()` | logit $p$ per visit | Default. Direct Royle (2004) parameterisation; cleanest interpretation when individuals are independently detectable. |
+| Royle-Nichols | `nmix("royle_nichols")` | log $r$ per individual | Repeated presence-absence rather than counts. Heterogeneous detection across individuals collapses into a per-individual hazard $r$; the binary observation arises from $1 - (1 - r)^N$. |
+| Poisson-Poisson | `nmix("poisson_poisson")` | log $\rho$ per visit | Encounter-rate data where the observed count is a noisy Poisson realisation of an underlying Poisson encounter rate, with no a-priori detection ceiling. |
+
+Switching variants is a one-line change in the `family`
+argument; the data shape and formula stay the same.
+
+```{r variant-switch, eval = FALSE}
+mod_rn  <- mvgam(formula = bf(y ~ series + env:series,
+                                 p ~ series + tod_c:series),
+                 data    = simdat$data_train,
+                 family  = nmix("royle_nichols"),
+                 chains  = 2L, samples = 500L,
+                 burnin  = 500L, silent = 2L)
+
+mod_ppm <- mvgam(formula = bf(y ~ series + env:series,
+                                 p ~ series + tod_c:series),
+                 data    = simdat$data_train,
+                 family  = nmix("poisson_poisson"),
+                 chains  = 2L, samples = 500L,
+                 burnin  = 500L, silent = 2L)
+```
+
+The Royle-Nichols variant follows
+[Royle and Nichols (2003)](https://doi.org/10.1890/0012-9658\(2003\)084%5B0777:EAFRPA%5D2.0.CO;2);
+the Poisson-Poisson variant is the encounter-rate parameterisation
+adopted for `mvgam`. See `?nmix` for the constructor's full
+argument list, including the `multi_season` opt-in for fits with
+a real seasonal axis.
+
+## Where to next
+
+- `?nmix` for the constructor's family-specific dpars,
+  identification caveats, and the per-variant kernel references.
+- `?occ` for the single-season occupancy family that shares the
+  closure-unit data shape with `nmix`.
+- `?sim_closure_unit_data` for the simulator's recipe catalogue
+  and the `truth$` bundle layout.
+- `?jsdgam` for joint species distribution fits with a latent
+  factor structure (`n_lv > 0`) on the abundance side, useful
+  when residual cross-species correlation needs explicit
+  modelling.
+- The
+  [overview vignette](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
+  for the state-space architecture that the closure-unit families
+  fit into.
+
+## Further reading
+
+Knape, J. and Korner-Nievergelt, F. (2015). Estimates from
+non-replicated population surveys rely on critical assumptions.
+*Methods in Ecology and Evolution* 6, 902-906.
+[doi:10.1111/2041-210X.12377](https://doi.org/10.1111/2041-210X.12377)
+
+MacKenzie, D. I. and Bailey, L. L. (2004). Assessing the fit of
+site-occupancy models. *Journal of Agricultural, Biological, and
+Environmental Statistics* 9, 300-318.
+[doi:10.1198/108571104X3361](https://doi.org/10.1198/108571104X3361)
+
+McElreath, R. (2018).
+[Algebra and the Missing Oxen](https://elevanth.org/blog/2018/01/29/algebra-and-missingness/).
+*Elements of Evolutionary Anthropology* (blog).
+
+Royle, J. A. (2004). N-mixture models for estimating population
+size from spatially replicated counts. *Biometrics* 60, 108-115.
+[doi:10.1111/j.0006-341X.2004.00142.x](https://doi.org/10.1111/j.0006-341X.2004.00142.x)
+
+Royle, J. A. and Nichols, J. D. (2003). Estimating abundance
+from repeated presence-absence data or point counts. *Ecology*
+84(3), 777-790. DOI:
+<https://doi.org/10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2>
+
+Stan Development Team (2024).
+[Latent Discrete Parameters](https://mc-stan.org/docs/stan-users-guide/latent-discrete.html).
+*Stan User's Guide*.

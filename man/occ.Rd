@@ -179,13 +179,21 @@ summary(mod, include_betas = FALSE)
 conditional_effects(mod)
 
 # Closure-unit post-fit surface. `predict(type = "latent_state")`
-# returns posterior draws of the latent occupancy probability
+# returns posterior summaries of the latent occupancy probability
 # psi at each unit; `predict(type = "detection")` returns the
 # per-visit detection probability p. Both are confounded in the
 # raw 0/1 record and only separable under the marginalised
 # occupancy likelihood.
 head(predict(mod, type = "latent_state"))
 head(predict(mod, type = "detection"))
+
+# `hindcast(type = "latent_state")` returns the full per-draw
+# posterior on psi as an `mvgam_latent_state` object with
+# `as.data.frame()` and a faceted `plot()` for direct inspection
+# and ggplot composition.
+hc <- hindcast(mod, type = "latent_state")
+print(hc)
+plot(hc)
 
 # `pp_check(type = "fit_stat", ...)` runs a closure-unit
 # goodness-of-fit test: collapse to per-unit sufficient
