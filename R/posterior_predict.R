@@ -769,6 +769,32 @@ sample_from_family <- function(family_name, ndraws, epred,
       )
     },
 
+    "com_binomial" = {
+      # Conway-Maxwell-Binomial. `epred` here is the probability
+      # `p = plogis(linpred)`, populated by `family$linkinv` in
+      # the upstream pipeline. Reuses
+      # `posterior_predict_com_binomial()` so the CMB drawing
+      # logic lives in one place (same kernel as
+      # `predict(type = "response")`).
+      checkmate::assert_matrix(nu, nrows = ndraws,
+                                ncols = ncol(epred))
+      checkmate::assert_numeric(trials, lower = 0L,
+                                 len = ncol(epred))
+      # `epred` is on probability scale (p); rebuild linpred via
+      # qlogis so `posterior_predict_com_binomial` (which expects
+      # linpred + link) can apply its own logit inversion. Keeps
+      # the helper-facing contract identical to
+      # `log_lik_com_binomial` rather than introducing a second
+      # p-scale entry point.
+      linpred_cmb <- stats::qlogis(epred)
+      posterior_predict_com_binomial(
+        linpred     = linpred_cmb,
+        link        = "logit",
+        family_pars = list(nu = nu),
+        trials      = trials
+      )
+    },
+
     "exgaussian" = {
       checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(beta, nrows = ndraws, ncols = ncol(epred))
@@ -1171,14 +1197,15 @@ get_family_dpars <- function(family_name) {
     hurdle_cumulative = c("hu", "disc"),
 
     # Custom mvgam families
-    tweedie = c("mphi", "mtheta"),
-    nmix    = c("p"),
-    occ     = c("p"),
-    diri    = c("phi"),
-    multi   = character(0),
-    categ   = character(0),
-    mvn     = c("Psi"),
-    mvt     = c("Psi", "nu")
+    tweedie      = c("mphi", "mtheta"),
+    com_binomial = c("nu"),
+    nmix         = c("p"),
+    occ          = c("p"),
+    diri         = c("phi"),
+    multi        = character(0),
+    categ        = character(0),
+    mvn          = c("Psi"),
+    mvt          = c("Psi", "nu")
   )
 
   dpar_map[[family_name]] %||% character(0)

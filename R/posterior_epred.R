@@ -60,7 +60,8 @@ get_family_for_resp <- function(object, resp_name) {
 #'
 #' @noRd
 compute_family_epred <- function(linpred, family,
-                                 sigma = NULL, trials = NULL) {
+                                 sigma = NULL, trials = NULL,
+                                 family_pars = NULL) {
   # Handle multivariate case (list of linpred matrices)
   if (is.list(linpred) && !is.matrix(linpred)) {
     checkmate::assert_list(family, names = "named")
@@ -195,6 +196,32 @@ compute_family_epred <- function(linpred, family,
     # Poisson at theta = 1, Gamma at theta = 2). The point mass at
     # zero is absorbed into mu without any Jensen correction.
     "tweedie" = family$linkinv(linpred),
+
+    # Conway-Maxwell-Binomial: count-scale `E[Y]` over the
+    # `0:T` support needs the nu dispersion AND the trials
+    # vector. Routes to `posterior_epred_com_binomial()` so the
+    # mean kernel (`cmb_mean_vec`) is the only `E[Y]`
+    # implementation.
+    "com_binomial" = {
+      if (is.null(trials)) {
+        stop(insight::format_error(c(
+          "Family 'com_binomial' requires the 'trials' argument.",
+          i = "Provide a per-row trials vector when calling posterior_epred()."
+        )))
+      }
+      if (is.null(family_pars) || is.null(family_pars$nu)) {
+        stop(insight::format_error(c(
+          "Family 'com_binomial' requires the 'nu' dpar in 'family_pars'.",
+          i = "Pass `family_pars = list(nu = nu_draws)` from posterior_epred.mvgam()."
+        )))
+      }
+      posterior_epred_com_binomial(
+        linpred     = linpred,
+        link        = family$link,
+        family_pars = family_pars,
+        trials      = trials
+      )
+    },
 
     # Ordinal families require threshold parameters for category probability
     # computation. Routing in posterior_epred.mvgam() handles these families
@@ -663,15 +690,35 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
     return(posterior_epred_ordinal(prep))
   }
 
-  # Extract trials for binomial families
+  # Extract trials for binomial-shaped families. Recognised set
+  # lives in `extract_trials_for_family()`.
   trials <- extract_trials_for_family(object, family, newdata)
+
+  # For families whose count-scale `E[Y]` needs auxiliary dpar
+  # draws beyond `(linpred, trials)`, pull them from the stanfit
+  # here and hand them off as `family_pars`. Currently only
+  # `com_binomial` (needs nu); extend the predicate when a new
+  # family lands.
+  family_pars <- NULL
+  if (is_com_binomial_family(family)) {
+    ndraws_actual <- nrow(linpred)
+    nobs_actual <- ncol(linpred)
+    family_pars <- extract_dpars_from_stanfit(
+      stanfit    = object$fit,
+      dpar_names = "nu",
+      ndraws     = ndraws_actual,
+      nobs       = nobs_actual,
+      draw_ids   = draw_ids
+    )
+  }
 
   # Transform to response scale
   compute_family_epred(
-    linpred = linpred,
-    family = family,
-    sigma = NULL,
-    trials = trials
+    linpred     = linpred,
+    family      = family,
+    sigma       = NULL,
+    trials      = trials,
+    family_pars = family_pars
   )
 }
 
@@ -709,15 +756,20 @@ extract_trials_for_family <- function(object, family, newdata) {
     !inherits(family, "brmsfamily") &&
     !is.null(names(family))
 
+  # Use `resolve_family_name()` instead of bare `family$family` so
+  # custom families (which report `family$family = "custom"`) route
+  # correctly. Without this, trials-aware custom families like
+  # `com_binomial()` never reach the trials extractor.
   family_name <- if (is_mv_family) {
-    family[[1]]$family
+    resolve_family_name(family[[1]])
   } else {
-    family$family
+    resolve_family_name(family)
   }
 
   binomial_families <- c("binomial", "beta_binomial",
                          "zero_inflated_binomial",
-                         "zero_inflated_beta_binomial")
+                         "zero_inflated_beta_binomial",
+                         "com_binomial")
 
   if (!family_name %in% binomial_families) {
     return(NULL)

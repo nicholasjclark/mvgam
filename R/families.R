@@ -484,6 +484,395 @@ check_tweedie_truncation <- function(object) {
 }
 
 # ============================================================
+# Conway-Maxwell-Binomial (com_binomial) family
+# ============================================================
+# Bounded-count family generalising the binomial by exponentiating
+# the binomial coefficient: P(Y = y | T, p, nu) = C(T, y)^nu * p^y *
+# (1-p)^(T-y) / Z(T, p, nu), with Z the sum of unnormalised weights
+# over j = 0..T. nu = 1 recovers the standard binomial; nu > 1 under-
+# disperses; 0 < nu < 1 over-disperses; nu < 0 super-disperses,
+# concentrating mass at the boundaries (bimodal "all-or-nothing").
+# Reference: Shmueli et al. (2005), JRSS-C. R-side mathematics and
+# the recovery example come from upstream contributor jbogomolovas2
+# (also author of the TMB COM-Binomial solver and the glmmTMB
+# integration), ported to the v2 custom_family architecture.
+#
+# Stats-review notes (gate A, 2026-06-24):
+# * Logit link enforced on p (only link with a clean theta-factored
+#   normaliser; probit / cloglog would lose the separable form).
+# * Identity link on nu so super-dispersion (nu < 0) is reachable;
+#   `lb = -5` clamps the lower tail where the R-side normaliser
+#   loses relative precision without the C++ adaptive-window guard.
+# * Default `nu ~ normal(1, 0.5)` is tighter than the contributor's
+#   `normal(1, 1)` to suppress the unguarded upper tail that drives
+#   HMC treedepth saturation at large nu.
+# * Variance on the response surface is reported on the proportion
+#   scale Var[Y/T] to match the binomial convention.
+
+
+#' Conway-Maxwell-Binomial family for over-, equi-, under-, and
+#' super-dispersed bounded counts
+#'
+#' A two-parameter generalisation of the binomial that exponentiates
+#' the binomial coefficient by a real-valued dispersion parameter
+#' `nu`. `nu = 1` is the standard binomial; `nu > 1` under-disperses
+#' (concentrates mass near the mode); `0 < nu < 1` over-disperses;
+#' `nu < 0` super-disperses, producing bimodal "all-or-nothing" mass
+#' at the boundaries. Useful when a binomial fit shows systematic
+#' lack-of-fit in either tail and the response is bounded by a known
+#' trial count.
+#'
+#' @param link Link function for the success probability `p`.
+#'   Currently `logit` only -- the COM-Binomial PMF factorises
+#'   cleanly only against the canonical logit parameterisation, so
+#'   `probit` and `cloglog` are deliberately not exposed.
+#'
+#' @section Distributional parameters:
+#' \describe{
+#'   \item{`mu`}{logit-scale success probability (link = `logit`).
+#'     Distributional regression on `mu` is the standard formula
+#'     side: `bf(y | trials(trials) ~ x)`.}
+#'   \item{`nu`}{real-valued dispersion exponent (link = `identity`,
+#'     `lb = -5`). `nu = 1` is binomial. Distributional regression
+#'     is supported via `bf(y | trials(trials) ~ x, nu ~ z)`.}
+#' }
+#'
+#' @section Default priors:
+#' \itemize{
+#'   \item `nu ~ normal(1, 0.5)` -- centred at binomial equivalence;
+#'     tight enough to avoid HMC pathology in the under-dispersed
+#'     tail without crowding the contributor's recovery range
+#'     `nu_true = c(-0.30, 0.50, 1.60)`. Override via
+#'     `prior(normal(1, 1), class = "nu")` for wider exploration.
+#' }
+#'
+#' @section Sampler notes:
+#' Two corners of `(p, nu)` parameter space stress HMC and should
+#' be monitored:
+#' \itemize{
+#'   \item `nu >> 1`: the PMF concentrates on a single mode and the
+#'     log-normaliser gradient saturates; max-treedepth saturation
+#'     becomes possible above roughly `nu = 5`.
+#'   \item `nu << 0` with `p` near `0.5`: mass concentrates at both
+#'     boundaries and the likelihood is invariant under
+#'     `p -> 1 - p`, producing bimodal posteriors. Asymmetric
+#'     covariates break the symmetry.
+#' }
+#' Inspect `mcmc_plot(fit, variable = "nu", type = "trace")` and
+#' the R-hat + ESS on both `nu` and the intercept; if either
+#' degrades, tighten the prior on `nu` or shift the design to
+#' bias `p` away from `0.5`.
+#'
+#' @return A `brms::custom_family()` object suitable for the
+#'   `family` argument of `mvgam()` / `jsdgam()`. Carries
+#'   `attr(., "mvgam_stanvars")` holding the Stan function-block
+#'   stanvar so mvgam's setup auto-attaches it.
+#'
+#' @references
+#' Shmueli, G., Minka, T. P., Kadane, J. B., Borle, S. and Boatwright,
+#' P. (2005). A useful distribution for fitting discrete data:
+#' revival of the Conway-Maxwell-Poisson distribution. \emph{Journal
+#' of the Royal Statistical Society Series C}, 54:127-142.
+#'
+#' Conway, R. W. and Maxwell, W. L. (1962). A queuing model with state
+#' dependent service rates. \emph{Journal of Industrial Engineering},
+#' 12:132-136.
+#'
+#' Bogomolovas, J. (2026). COM-Binomial solver in TMB and glmmTMB.
+#' R-side mathematics adapted from
+#' \url{https://github.com/jbogomolovas2/mvgam/tree/fix-fc-trials-alignment}.
+#'
+#' @seealso \code{\link[brms]{custom_family}}, \code{\link{tweedie}}
+#' @author Nicholas J Clark, Julius Bogomolovas
+#' @examples
+#' \donttest{
+#' # Simulate a small under-dispersed CMB fixture (nu_true = 1.5)
+#' # over n = 100 trials at p = 0.4 (theta = qlogis(0.4)).
+#' set.seed(1)
+#' n <- 100
+#' trials <- rep(5L, n)
+#' theta <- qlogis(0.4)
+#' nu_true <- 1.5
+#' y <- vapply(seq_len(n), function(i) {
+#'   T <- trials[i]
+#'   lc <- lchoose(T, 0:T)
+#'   js <- 0:T
+#'   lw <- nu_true * lc + js * log(0.4) + (T - js) * log(0.6)
+#'   sample.int(T + 1L, size = 1L,
+#'                prob = exp(lw - max(lw))) - 1L
+#' }, integer(1))
+#' df <- data.frame(
+#'   y      = y,
+#'   trials = trials,
+#'   series = factor("s1"),
+#'   time   = seq_len(n)
+#' )
+#'
+#' # Fit a CMB regression on an intercept only; nu posterior should
+#' # concentrate around the simulated 1.5 (under-dispersed).
+#' fit <- mvgam(
+#'   bf(y | trials(trials) ~ 1),
+#'   data    = df,
+#'   family  = com_binomial(),
+#'   chains  = 2,
+#'   samples = 400,
+#'   burnin  = 400,
+#'   silent  = 2
+#' )
+#'
+#' # Inspect the dispersion posterior and a posterior predictive
+#' # check of the marginal count distribution.
+#' summary(fit)
+#' mcmc_plot(fit, variable = "nu", type = "areas")
+#' pp_check(fit, type = "bars", ndraws = 50)
+#' }
+#' @export
+com_binomial <- function(link = "logit") {
+  checkmate::assert_choice(link, "logit")
+  fam <- brms::custom_family(
+    name = "com_binomial",
+    dpars = c("mu", "nu"),
+    links = c("logit", "identity"),
+    lb = c(NA, -5),
+    ub = c(NA, NA),
+    type = "int",
+    # `vint1[n]` is the per-row trials integer; `lchoose_com_binomial`
+    # is the per-fit transformed-data lookup table (Stan functions
+    # cannot reach data-block globals so the table is passed in as
+    # an additional positional arg). Both are attached at fit time by
+    # `build_com_binomial_data_stanvars()`.
+    vars = c("vint1[n]", "lchoose_com_binomial")
+  )
+  # See note on `resolve_family_name()`: brms custom_family leaves
+  # `family$family = "custom"` and stores the user-visible name on
+  # `family$name`. The link helpers brms omits are restored here so
+  # mvgam dispatchers can call `family$linkinv(linpred)` directly.
+  link_info <- stats::make.link(fam$link)
+  fam$linkinv <- link_info$linkinv
+  fam$linkfun <- link_info$linkfun
+  attr(fam, "mvgam_stanvars") <- make_com_binomial_stanvars()
+  fam
+}
+
+
+#' Predicate: family is `com_binomial()`
+#'
+#' Routes through `resolve_family_name()` so the check survives the
+#' brms `family$family = "custom"` convention on customfamily
+#' objects.
+#'
+#' @noRd
+is_com_binomial_family <- function(family) {
+  if (is.null(family)) return(FALSE)
+  identical(resolve_family_name(family), "com_binomial")
+}
+
+
+#' Default population-level priors for `com_binomial()`
+#'
+#' Returns the `brms::prior` rows mvgam injects ahead of user
+#' priors when the obs-side family is `com_binomial()`. Mirrors
+#' `default_simplex_population_priors()` and the injection site in
+#' `R/make_stan.R::generate_stan_components_mvgam_formula()`.
+#'
+#' Tighter than the contributor's `normal(1, 1)` per the gate-A
+#' stats review: the upper tail of nu drives HMC pathology and the
+#' contributor's recovery range (`nu in [-0.3, 1.6]`) sits well
+#' inside `normal(1, 0.5)` (90% mass on `(0.18, 1.82)`).
+#'
+#' @noRd
+default_com_binomial_population_priors <- function() {
+  brms::prior("normal(1, 0.5)", class = "nu")
+}
+
+
+#' Build the Stan stanvars bundle for the `com_binomial()` family
+#'
+#' Returns the function-block stanvar wrapping `com_binomial_lpmf`.
+#' Auto-attached via `attr(family, "mvgam_stanvars")` at construction
+#' time. The per-fit trials data + `lchoose` lookup table stanvars
+#' get appended at fit time by
+#' `attach_com_binomial_data_stanvars()`, which has access to the
+#' user data.
+#'
+#' @noRd
+make_com_binomial_stanvars <- function() {
+  brms::stanvar(
+    name = "com_binomial_funs",
+    scode = com_binomial_stan_funs(),
+    block = "functions"
+  )
+}
+
+
+#' Attach per-fit data + transformed-data stanvars to a
+#' `com_binomial()` family
+#'
+#' Mirrors `prepare_closure_unit_family()`: takes the
+#' constructor-time family object plus the user data frame,
+#' extracts the `trials` column, and appends the integer trials
+#' array + `lchoose` lookup table to the family's `mvgam_stanvars`
+#' attribute. Called from
+#' `generate_stan_components_mvgam_formula()` ahead of
+#' `attach_family_stanvars()` so the family-attribute update is
+#' visible to the brms call.
+#'
+#' @param family The `com_binomial()` family object.
+#' @param data Long-format user data containing the `trials`
+#'   column.
+#' @return The family object with the data stanvars appended to
+#'   its `mvgam_stanvars` attribute.
+#' @noRd
+prepare_com_binomial_family <- function(family, data) {
+  cmb_data_stanvars <- build_com_binomial_data_stanvars(data)
+  existing <- attr(family, "mvgam_stanvars", exact = TRUE)
+  attr(family, "mvgam_stanvars") <- if (is.null(existing))
+    cmb_data_stanvars
+  else
+    existing + cmb_data_stanvars
+  family
+}
+
+
+#' Per-fit trials and `lchoose` lookup-table stanvars
+#'
+#' brms `custom_family(vars = "vint1[n]")` references a data array
+#' that brms does NOT auto-emit for custom families (the `trials()`
+#' aterm only auto-emits for brms-native binomial families). This
+#' helper extracts the user's `trials` column at fit time, packs it
+#' as `vint1` so the lpmf call resolves, and precomputes the
+#' `lchoose(T, j)` lookup table in transformed data so the inner
+#' lpmf reduces to a vectorised dot product + `log_sum_exp` -- no
+#' per-leapfrog `lchoose` calls.
+#'
+#' Mirrors the closure-unit `build_closure_unit_arrays()` pattern:
+#' fit-time data extraction + stanvar attachment that augments the
+#' family's `mvgam_stanvars` attribute.
+#'
+#' @param data Long-format data frame containing the `trials`
+#'   column (one row per observation).
+#' @return `brmsstanvars` bundle: the integer trials array `vint1`,
+#'   the scalar `max_com_binomial_T`, and the transformed-data
+#'   `lchoose_com_binomial` table.
+#' @noRd
+build_com_binomial_data_stanvars <- function(data) {
+  checkmate::assert_data_frame(data, min.rows = 1)
+  if (!"trials" %in% names(data)) {
+    stop(insight::format_error(c(
+      "com_binomial() requires a 'trials' column in `data`.",
+      x = "No column named 'trials' found.",
+      i = paste0("Add a per-row 'trials' integer column giving the ",
+                  "binomial denominator T for each observation.")
+    )))
+  }
+  trials <- as.integer(data$trials)
+  checkmate::assert_integerish(trials, lower = 0L, any.missing = FALSE,
+                                .var.name = "trials")
+  max_T <- max(trials)
+  brms::stanvar(
+    x = trials,
+    name = "vint1",
+    scode = "array[N] int vint1;",
+    block = "data"
+  ) +
+    brms::stanvar(
+      x = max_T,
+      name = "max_com_binomial_T",
+      scode = "int<lower=0> max_com_binomial_T;",
+      block = "data"
+    ) +
+    brms::stanvar(
+      scode = com_binomial_lookup_stan(),
+      block = "tdata",
+      position = "end"
+    )
+}
+
+
+#' Transformed-data Stan code building the `lchoose` lookup table
+#'
+#' One scalar `lchoose(T, j)` per `(T, j)` pair with `0 <= j <= T <=
+#' max_com_binomial_T`. Off-triangle entries are zero (never read by
+#' the lpmf). Built once per fit; eliminates the `T + 1` per-row
+#' `lchoose` calls the naive implementation would do at every
+#' leapfrog step.
+#'
+#' @noRd
+com_binomial_lookup_stan <- function() {
+  paste(
+    "  array[max_com_binomial_T + 1, max_com_binomial_T + 1]",
+    "    real lchoose_com_binomial;",
+    "  for (T_val in 0 : max_com_binomial_T) {",
+    "    for (j_val in 0 : max_com_binomial_T) {",
+    "      lchoose_com_binomial[T_val + 1, j_val + 1] =",
+    "        j_val <= T_val ? lchoose(T_val, j_val) : 0;",
+    "    }",
+    "  }",
+    sep = "\n"
+  )
+}
+
+
+#' Stan code for the `com_binomial` lpmf
+#'
+#' Argument order matches the brms `custom_family(vars =
+#' "vint1[n]")` calling convention: brms generates calls like
+#' `com_binomial_lpmf(Y[n] | mu[n], nu, vint1[n])`, so the lpmf
+#' signature is `(int y, real mu, real nu, int T)`.
+#'
+#' Efficiency: reads `lchoose(T, j)` from the precomputed
+#' `lchoose_com_binomial` table (built once in transformed data),
+#' replaces the inner for-loop with vectorised Stan ops, and lifts
+#' `log_inv_logit(mu)` / `log1m_inv_logit(mu)` outside the
+#' normaliser sum. Per-row cost is two `log_inv_logit` calls plus a
+#' single `log_sum_exp` over a `T + 1` vector -- no per-row
+#' `lchoose` calls and no transcendental work inside the
+#' normalisation loop.
+#'
+#' Pure-Stan implementation; the contributor's external C++ kernel
+#' (`inst/include/com_binomial.hpp`) with adaptive-window
+#' truncation and a custom partial propagator is deferred to a v2.2
+#' perf follow-up where the win on long-trial data can be
+#' benchmarked against this baseline.
+#'
+#' @noRd
+com_binomial_stan_funs <- function() {
+  paste(
+    "  /* Conway-Maxwell-Binomial log-PMF (Shmueli et al. 2005). */",
+    "  /* P(Y = y | T, p, nu) =",
+    "       C(T, y)^nu * p^y * (1-p)^(T-y) / Z(T, p, nu),",
+    "     Z(T, p, nu) =",
+    "       sum_{j=0..T} C(T, j)^nu * p^j * (1-p)^(T-j).",
+    "     mu = logit(p); nu identity-link. nu = 1 recovers the binomial.",
+    "     Reads lchoose(T, j) from the precomputed",
+    "     `lchoose_com_binomial` lookup table built in",
+    "     transformed data.",
+    "  */",
+    "  /* brms `loop = TRUE` applies the inverse link before",
+    "     calling the lpmf, so `mu` arrives here on the",
+    "     probability scale (0, 1) -- NOT on the logit scale.",
+    "     Use log(mu) / log1m(mu) directly; log_inv_logit(mu)",
+    "     would compute log(sigmoid(mu)) which is wrong when",
+    "     mu is already a probability. */",
+    "  real com_binomial_lpmf(int y, real mu, real nu, int T,",
+    "                         data array[,] real lc_table) {",
+    "    if (y < 0) reject(\"y must be >= 0; got y = \", y);",
+    "    if (y > T) reject(\"y must be <= T; got y = \", y, \", T = \", T);",
+    "    real log_p = log(mu);",
+    "    real log_q = log1m(mu);",
+    "    vector[T + 1] lc = to_vector(lc_table[T + 1, 1 : (T + 1)]);",
+    "    vector[T + 1] js = linspaced_vector(T + 1, 0, T);",
+    "    vector[T + 1] log_unnorm = nu * lc + js * log_p",
+    "                               + (T - js) * log_q;",
+    "    return nu * lc[y + 1] + y * log_p + (T - y) * log_q",
+    "           - log_sum_exp(log_unnorm);",
+    "  }",
+    sep = "\n"
+  )
+}
+
+
+# ============================================================
 # Closure-unit family helpers (nmix, occ, royle_nichols, ...)
 # ============================================================
 # Every family in this group shares the same wire format: one
@@ -3777,6 +4166,346 @@ log_lik_tweedie <- function(linpred, link, y, family_pars, trials) {
   }
   out
 }
+
+# ============================================================
+# Conway-Maxwell-Binomial R-side post-fit kernels
+# ============================================================
+# R-side numerical helpers ported from upstream contributor
+# jbogomolovas2 (also author of the TMB COM-Binomial solver and
+# the in-flight glmmTMB integration). The Stan-side lpmf is the
+# in-fit work; these helpers run post-fit for `log_lik`,
+# `posterior_predict`, `posterior_epred`, and `residuals` over
+# all (draw x observation) cells. All are vectorised: each unique
+# `T` value triggers one chunked matrix evaluation rather than
+# (ndraws * nobs) scalar lpmf calls.
+
+
+#' Numerically-stable log-sum-exp on a numeric vector
+#' @noRd
+.cmb_lse <- function(v) {
+  m <- max(v)
+  m + log(sum(exp(v - m)))
+}
+
+
+# Per-T cache of `lchoose(T, 0:T)`. The values depend only on `T`
+# and are invariant across mu, nu and every posterior draw, so
+# memoising once per unique trial count avoids re-computing the
+# lgamma terms millions of times during post-processing. The
+# environment-as-namespace pattern is the same `cmb_lchoose_env`
+# the contributor used upstream.
+#' @noRd
+.cmb_lchoose_env <- new.env(parent = emptyenv())
+
+#' Cached `lchoose(T, 0:T)` for a single trials value
+#' @noRd
+.cmb_lchoose <- function(T) {
+  key <- as.character(T)
+  v <- .cmb_lchoose_env[[key]]
+  if (is.null(v)) {
+    v <- lchoose(T, 0:T)
+    .cmb_lchoose_env[[key]] <- v
+  }
+  v
+}
+
+
+#' Row-wise maximum of a numeric matrix (one entry per row)
+#'
+#' Picks the max value per row via `max.col`, then reads it back
+#' via row + col indexing. Same idea as `matrixStats::rowMaxs` but
+#' without the extra dependency.
+#' @noRd
+.cmb_rowmax <- function(m) {
+  m[cbind(seq_len(nrow(m)), max.col(m, ties.method = "first"))]
+}
+
+
+#' COM-Binomial PMF on the support `0:T` for a single (mu, nu, T)
+#'
+#' Returns a `T + 1` vector of probabilities. Used by `.cmb_cdf`
+#' for the Dunn-Smyth residual quantile computation. Vector hot
+#' paths (mean / var / pmf summed log densities / random draws)
+#' use the dedicated `*_vec` helpers below; this scalar form
+#' exists for the per-observation CDF loop where vectorising over
+#' the support is the right granularity.
+#' @noRd
+cmb_pmf <- function(mu, nu, T) {
+  theta <- qlogis(mu)
+  lc <- .cmb_lchoose(T)
+  x <- 0:T
+  lw <- nu * lc + theta * x
+  exp(lw - .cmb_lse(lw))
+}
+
+
+#' Vectorised COM-Binomial log-PMF over (draw x obs) cells
+#'
+#' @param y Integer vector of observed counts (length n).
+#' @param mu Numeric vector on probability scale (length n).
+#' @param nu Numeric vector of dispersion exponents (length n).
+#' @param T Integer vector of trial counts (length n).
+#' @return Numeric vector of log densities (length n).
+#'
+#' Groups rows by unique `T` and evaluates each group as a single
+#' matrix op (one `lse` per row of the chunk), chunked so one
+#' large-T group never allocates an oversized matrix. Numerically
+#' identical to a scalar loop over `cmb_lpmf` but ~100x faster on
+#' typical (4000 draws) x (1000 obs) post-fit sweeps.
+#' @noRd
+cmb_lpmf_vec <- function(y, mu, nu, T) {
+  theta <- qlogis(mu)
+  out <- numeric(length(y))
+  for (TT in unique(T)) {
+    ia <- which(T == TT)
+    lc <- .cmb_lchoose(TT)
+    x <- 0:TT
+    chunk <- max(1L, as.integer(5e6 %/% (TT + 1L)))
+    for (s in seq(1L, length(ia), by = chunk)) {
+      idx <- ia[s:min(s + chunk - 1L, length(ia))]
+      lw <- outer(nu[idx], lc) + outer(theta[idx], x)
+      mx <- .cmb_rowmax(lw)
+      lse <- mx + log(rowSums(exp(lw - mx)))
+      out[idx] <- theta[idx] * y[idx] + nu[idx] * lc[y[idx] + 1L] -
+        lse
+    }
+  }
+  out
+}
+
+
+#' Vectorised COM-Binomial mean `E[Y]` (count-scale)
+#'
+#' Returns per-row `sum_j j * P(j | mu, nu, T)`. The
+#' dispatcher above the kernel is free to scale; the
+#' `posterior_epred` surface keeps count-scale, the
+#' `predict(type = "variance")` surface divides Var by T^2 to
+#' match the binomial proportion-scale convention.
+#' @noRd
+cmb_mean_vec <- function(mu, nu, T) {
+  theta <- qlogis(mu)
+  out <- numeric(length(mu))
+  for (TT in unique(T)) {
+    ia <- which(T == TT)
+    lc <- .cmb_lchoose(TT)
+    x <- 0:TT
+    chunk <- max(1L, as.integer(5e6 %/% (TT + 1L)))
+    for (s in seq(1L, length(ia), by = chunk)) {
+      idx <- ia[s:min(s + chunk - 1L, length(ia))]
+      lw <- outer(nu[idx], lc) + outer(theta[idx], x)
+      w <- exp(lw - .cmb_rowmax(lw))
+      w <- w / rowSums(w)
+      out[idx] <- as.numeric(w %*% x)
+    }
+  }
+  out
+}
+
+
+#' Vectorised COM-Binomial variance `Var[Y]` (count-scale)
+#'
+#' Returns per-row count-scale variance via direct second-moment
+#' summation `E[Y^2] - (E[Y])^2`. The
+#' `predict(type = "variance")` path divides by `T^2` to return
+#' proportion-scale `Var[Y / T]` per the gate-A stats review.
+#' @noRd
+cmb_var_vec <- function(mu, nu, T) {
+  theta <- qlogis(mu)
+  out <- numeric(length(mu))
+  for (TT in unique(T)) {
+    ia <- which(T == TT)
+    lc <- .cmb_lchoose(TT)
+    x <- 0:TT
+    x2 <- x^2
+    chunk <- max(1L, as.integer(5e6 %/% (TT + 1L)))
+    for (s in seq(1L, length(ia), by = chunk)) {
+      idx <- ia[s:min(s + chunk - 1L, length(ia))]
+      lw <- outer(nu[idx], lc) + outer(theta[idx], x)
+      w <- exp(lw - .cmb_rowmax(lw))
+      w <- w / rowSums(w)
+      ex <- as.numeric(w %*% x)
+      out[idx] <- as.numeric(w %*% x2) - ex^2
+    }
+  }
+  out
+}
+
+
+#' Vectorised COM-Binomial random draw
+#'
+#' Returns per-row integer draws from `CMB(mu, nu, T)`. Uses
+#' inverse-CDF on the cumulative weighted PMF; ties broken by
+#' `max.col(..., ties.method = "first")` so the inversion is
+#' stable for point-mass mass functions (large positive `nu`).
+#' @noRd
+rcmb_vec <- function(mu, nu, T) {
+  theta <- qlogis(mu)
+  out <- integer(length(mu))
+  for (TT in unique(T)) {
+    ia <- which(T == TT)
+    lc <- .cmb_lchoose(TT)
+    x <- 0:TT
+    chunk <- max(1L, as.integer(5e6 %/% (TT + 1L)))
+    for (s in seq(1L, length(ia), by = chunk)) {
+      idx <- ia[s:min(s + chunk - 1L, length(ia))]
+      lw <- outer(nu[idx], lc) + outer(theta[idx], x)
+      w <- exp(lw - .cmb_rowmax(lw))
+      w <- w / rowSums(w)
+      cw <- w
+      if (TT >= 1L) {
+        for (j in 2:(TT + 1L)) cw[, j] <- cw[, j - 1L] + w[, j]
+      }
+      u <- stats::runif(length(idx))
+      out[idx] <- max.col(cw >= u, ties.method = "first") - 1L
+    }
+  }
+  out
+}
+
+
+#' COM-Binomial CDF `P(X <= q)` for randomised quantile residuals
+#'
+#' Per-observation kernel. Handles the `q = -1` lower-bound edge
+#' case at `y = 0` (`floor(-1 + 1e-9) = -1`, return 0) so the
+#' Dunn-Smyth residual lower interval is `[0, P(Y = 0)]` and not
+#' a degenerate window. This is the off-by-one the contributor's
+#' `a1c6ddf` commit fixed.
+#' @noRd
+.cmb_cdf <- function(q, mu, nu, size) {
+  vapply(seq_along(q), function(i) {
+    kk <- floor(q[i] + 1e-9)
+    if (kk < 0) return(0)
+    if (kk >= size[i]) return(1)
+    sum(cmb_pmf(mu[i], nu[i], size[i])[seq_len(kk + 1L)])
+  }, numeric(1))
+}
+
+
+#' Per-draw Dunn-Smyth randomised quantile residuals for
+#' `com_binomial()`
+#'
+#' Returns one residual per observation per draw on the
+#' standard-normal scale (`qnorm` transform of the
+#' `runif(F(y - 1), F(y))` random quantile). Used by
+#' `pp_check(type = "resid_*")` and the residuals surface.
+#'
+#' @param truth Numeric / integer vector of observed counts.
+#' @param fitted Numeric vector of fitted probabilities for this
+#'   draw.
+#' @param draw Ignored for CMB; kept for interface parity with
+#'   the brms randomised-quantile signatures.
+#' @param N Integer vector of trials.
+#' @param nu Numeric vector of dispersion for this draw.
+#' @return Numeric vector of residuals; NA where `truth` is NA.
+#' @noRd
+ds_resids_com_binomial <- function(truth, fitted, draw, N, nu) {
+  na_obs <- is.na(truth)
+  a_obs <- .cmb_cdf(
+    as.vector(truth[!na_obs]) - 1L,
+    mu = fitted[!na_obs],
+    nu = nu[!na_obs],
+    size = N[!na_obs]
+  )
+  b_obs <- .cmb_cdf(
+    as.vector(truth[!na_obs]),
+    mu = fitted[!na_obs],
+    nu = nu[!na_obs],
+    size = N[!na_obs]
+  )
+  # pmin / pmax guards: when the CMB collapses to a point mass
+  # (nu >> 1) the upper and lower CDF can coincide; runif on a
+  # degenerate interval returns NaN otherwise.
+  u <- stats::runif(length(a_obs),
+                     pmin(a_obs, b_obs),
+                     pmax(a_obs, b_obs))
+  out <- rep(NA_real_, length(truth))
+  out[!na_obs] <- stats::qnorm(u)
+  out
+}
+
+
+# ---- Post-fit dispatchers for the v2 generic surface ----
+
+#' R-side `log_lik` for `com_binomial()`
+#'
+#' Signature matches `log_lik_tweedie()`: vector y / per-row
+#' trials, per-draw `(linpred, nu)` matrices. Returns the standard
+#' `[ndraws x nobs]` log-density matrix the loo / waic / pp_check
+#' machinery expects.
+#' @noRd
+log_lik_com_binomial <- function(linpred, link, y,
+                                  family_pars, trials) {
+  checkmate::assert_matrix(linpred)
+  checkmate::assert_choice(link, "logit")
+  checkmate::assert_numeric(trials, lower = 0L, len = ncol(linpred))
+  nu <- family_pars$nu
+  checkmate::assert_matrix(nu, nrows = nrow(linpred),
+                            ncols = ncol(linpred))
+  ndraws <- nrow(linpred)
+  nobs <- ncol(linpred)
+  # Flatten to column-major (R default): rows fastest, then cols.
+  # `outer(nu, lc) + outer(theta, x)` inside `cmb_lpmf_vec`
+  # evaluates each unique `T` as a single block.
+  mu_flat <- as.numeric(.linkinv(linpred, link))
+  nu_flat <- as.numeric(nu)
+  y_flat <- rep(y, each = ndraws)
+  T_flat <- rep(trials, each = ndraws)
+  out_flat <- cmb_lpmf_vec(y_flat, mu_flat, nu_flat, T_flat)
+  matrix(out_flat, nrow = ndraws, ncol = nobs)
+}
+
+
+#' R-side `posterior_predict` for `com_binomial()`
+#'
+#' Returns the standard `[ndraws x nobs]` integer matrix of
+#' posterior predictive draws. Used by the
+#' `sample_from_family("com_binomial", ...)` branch in
+#' `R/posterior_predict.R` and by `predict(type = "response")`.
+#' @noRd
+posterior_predict_com_binomial <- function(linpred, link,
+                                            family_pars, trials) {
+  checkmate::assert_matrix(linpred)
+  checkmate::assert_choice(link, "logit")
+  checkmate::assert_numeric(trials, lower = 0L, len = ncol(linpred))
+  nu <- family_pars$nu
+  checkmate::assert_matrix(nu, nrows = nrow(linpred),
+                            ncols = ncol(linpred))
+  ndraws <- nrow(linpred)
+  nobs <- ncol(linpred)
+  mu_flat <- as.numeric(.linkinv(linpred, link))
+  nu_flat <- as.numeric(nu)
+  T_flat <- rep(trials, each = ndraws)
+  out_flat <- rcmb_vec(mu_flat, nu_flat, T_flat)
+  matrix(as.integer(out_flat), nrow = ndraws, ncol = nobs)
+}
+
+
+#' R-side `posterior_epred` for `com_binomial()`
+#'
+#' Returns count-scale `E[Y | mu, nu, T] = sum_j j * P(j | mu, nu,
+#' T)` over all (draw x obs) cells. Matches the binomial /
+#' beta_binomial convention of returning the count-scale mean
+#' (multiplied by trials), so `posterior_epred()` returns the
+#' same units regardless of which trials-aware family produced
+#' the fit.
+#' @noRd
+posterior_epred_com_binomial <- function(linpred, link,
+                                          family_pars, trials) {
+  checkmate::assert_matrix(linpred)
+  checkmate::assert_choice(link, "logit")
+  checkmate::assert_numeric(trials, lower = 0L, len = ncol(linpred))
+  nu <- family_pars$nu
+  checkmate::assert_matrix(nu, nrows = nrow(linpred),
+                            ncols = ncol(linpred))
+  ndraws <- nrow(linpred)
+  nobs <- ncol(linpred)
+  mu_flat <- as.numeric(.linkinv(linpred, link))
+  nu_flat <- as.numeric(nu)
+  T_flat <- rep(trials, each = ndraws)
+  ey_flat <- cmb_mean_vec(mu_flat, nu_flat, T_flat)
+  matrix(ey_flat, nrow = ndraws, ncol = nobs)
+}
+
 
 # ============================================================
 # Closure-unit family R-side downstream methods

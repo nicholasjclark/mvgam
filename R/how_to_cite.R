@@ -428,6 +428,49 @@ reference_db <- function() {
         sep = "\n"
       )
     ),
+    shmueli_cmb = list(
+      text = "Shmueli G, Minka TP, Kadane JB, Borle S and Boatwright P (2005). A useful distribution for fitting discrete data: revival of the Conway-Maxwell-Poisson distribution. Journal of the Royal Statistical Society: Series C (Applied Statistics), 54(1), 127-142. https://doi.org/10.1111/j.1467-9876.2005.00474.x",
+      bibtex = paste(
+        "@article{shmueli2005cmp,",
+        "  title = {A useful distribution for fitting discrete data: revival of the {C}onway-{M}axwell-{P}oisson distribution},",
+        "  author = {Shmueli, Galit and Minka, Thomas P. and Kadane, Joseph B. and Borle, Sharad and Boatwright, Peter},",
+        "  journal = {Journal of the Royal Statistical Society: Series C (Applied Statistics)},",
+        "  volume = {54},",
+        "  number = {1},",
+        "  pages = {127--142},",
+        "  year = {2005},",
+        "  doi = {10.1111/j.1467-9876.2005.00474.x}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    conway_maxwell_1962 = list(
+      text = "Conway RW and Maxwell WL (1962). A queuing model with state-dependent service rates. Journal of Industrial Engineering, 12(2), 132-136.",
+      bibtex = paste(
+        "@article{conway1962queue,",
+        "  title = {A queuing model with state-dependent service rates},",
+        "  author = {Conway, Richard W. and Maxwell, William L.},",
+        "  journal = {Journal of Industrial Engineering},",
+        "  volume = {12},",
+        "  number = {2},",
+        "  pages = {132--136},",
+        "  year = {1962}",
+        "}",
+        sep = "\n"
+      )
+    ),
+    bogomolovas_cmb_tmb = list(
+      text = "Bogomolovas J (2024). Conway-Maxwell-Binomial in TMB: a fast adjoint for super- and under-dispersed bounded counts. Source code at https://github.com/jbogomolovas2/glmmTMB (com_binomial branch).",
+      bibtex = paste(
+        "@misc{bogomolovas2024cmb,",
+        "  title = {{C}onway-{M}axwell-{B}inomial in {TMB}: a fast adjoint for super- and under-dispersed bounded counts},",
+        "  author = {Bogomolovas, Jurgen},",
+        "  year = {2024},",
+        "  howpublished = {Source code at \\url{https://github.com/jbogomolovas2/glmmTMB}}",
+        "}",
+        sep = "\n"
+      )
+    ),
     neyman_type_a_1939 = list(
       text = "Neyman J (1939). On a new class of contagious distributions, applicable in entomology and bacteriology. Annals of Mathematical Statistics, 10(1), 35-57. https://doi.org/10.1214/aoms/1177732245",
       bibtex = paste(
@@ -644,6 +687,11 @@ uses_tweedie_family <- function(object) {
   family_name_is(object, "tweedie")
 }
 
+#' @noRd
+uses_com_binomial_family <- function(object) {
+  family_name_is(object, "com_binomial")
+}
+
 # Simplex multi-response: diri(), multi(), categ(). Detect via the
 # mvgam_simplex_response attribute set by the constructor.
 #' @noRd
@@ -835,6 +883,22 @@ how_to_cite.mvgam <- function(object, ...) {
         " series of Dunn and Smyth (2005)."
       ),
       refs = c("jorgensen_tweedie", "dunn_smyth_tweedie")
+    ),
+    list(
+      detect = uses_com_binomial_family(object),
+      text = paste0(
+        " Bounded counts were modelled with the",
+        " Conway-Maxwell-Binomial family (Shmueli et al. 2005;",
+        " Conway and Maxwell 1962), extending the binomial with",
+        " a dispersion exponent that admits both under- and",
+        " super-dispersed mass on a fixed trials grid. The Stan",
+        " lpmf draws on the adjoint and stability work of",
+        " Bogomolovas (2024)."
+      ),
+      refs = c(
+        "shmueli_cmb", "conway_maxwell_1962",
+        "bogomolovas_cmb_tmb"
+      )
     ),
     list(
       detect = uses_nmix_family(object),

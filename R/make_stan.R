@@ -126,6 +126,18 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
     )
   }
 
+  # Row-wise custom families (currently `com_binomial()`) attach
+  # per-fit data + transformed-data stanvars to their
+  # `mvgam_stanvars` attribute here so the next
+  # `attach_family_stanvars()` call picks them up. Mirrors the
+  # `prepare_closure_unit_family()` pattern above but stays out of
+  # the closure-unit code path -- CMB is one row per observation
+  # with no per-unit visit aggregation, so the closure-unit array
+  # builders do not apply.
+  if (is_com_binomial_family(family)) {
+    family <- prepare_com_binomial_family(family, data = data)
+  }
+
   # Custom families (e.g. tweedie()) carry their own Stan function
   # block + data stanvars in attr(family, "mvgam_stanvars"). They
   # belong on the observation submodel only; the trend submodel
@@ -225,6 +237,16 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
       feature = "'sum_to_zero_vector[K]' for simplex families"
     )
     prior <- c(default_simplex_population_priors(), prior)
+  }
+  # The COM-Binomial dispersion `nu` would otherwise inherit brms's
+  # `(flat)` default, which gives the upper tail of `nu` unbounded
+  # support and drives HMC treedepth saturation. Inject the gate-A
+  # stats-review default `normal(1, 0.5)` ahead of user priors so
+  # any user override still wins (priors merge keeps the last row
+  # per class/coef key). The per-fit data stanvars are attached
+  # earlier via `prepare_com_binomial_family()`.
+  if (is_com_binomial_family(family)) {
+    prior <- c(default_com_binomial_population_priors(), prior)
   }
   # Filter priors: only pass observation-related priors to observation setup
   obs_priors <- filter_obs_priors(prior)

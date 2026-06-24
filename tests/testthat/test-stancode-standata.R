@@ -3883,3 +3883,114 @@ test_that("threads = N forwards brms partial_log_lik into mvgam stancode", {
   expect_true(grepl("partial_log_lik_lpmf", sc_four))
   expect_true(grepl("reduce_sum", sc_four))
 })
+
+
+# ---- Conway-Maxwell-Binomial family contract --------------------
+
+test_that("com_binomial() emits expected Stan lpmf + lookup table", {
+  # Regression test for the v2.1 CMB port. Asserts that:
+  # 1. The custom lpmf function is declared in the Stan functions
+  #    block with the (int y, real mu, real nu, int T, data
+  #    array[,] real lc_table) signature
+  # 2. `vint1[n]` (the trials column) is referenced in the model
+  #    block
+  # 3. The transformed-data `lchoose_com_binomial` lookup table is
+  #    precomputed once per fit
+  # 4. The lpmf reads from the lookup table (no per-row lchoose
+  #    calls inside the function body)
+  set.seed(0)
+  dat <- data.frame(
+    y = rbinom(30, size = 5L, prob = 0.4),
+    trials = 5L,
+    x = rnorm(30),
+    series = factor("s1"),
+    time = 1:30
+  )
+  mf <- mvgam_formula(bf(y | trials(trials) ~ x))
+  sc <- as.character(stancode(
+    mf, data = dat, family = com_binomial(), validate = TRUE
+  ))
+  expect_true(grepl(
+    "real com_binomial_lpmf\\(int y, real mu, real nu, int T",
+    sc
+  ))
+  expect_true(grepl("vint1\\[n\\]", sc))
+  expect_true(grepl("lchoose_com_binomial", sc))
+  expect_true(grepl(
+    "to_vector\\(lc_table\\[T \\+ 1", sc
+  ))
+})
+
+
+test_that("com_binomial() default prior on nu is normal(1, 0.5)", {
+  # Stats-review GATE A locked in `normal(1, 0.5)` (tighter than
+  # the contributor's `normal(1, 1)`) to suppress the upper tail
+  # of nu that drives HMC treedepth saturation. Confirm the
+  # `default_com_binomial_population_priors()` injection at fit
+  # time emits this exact prior on the nu class with the
+  # truncation correction for the `lb = -5` lower bound.
+  set.seed(0)
+  dat <- data.frame(
+    y = rbinom(30, size = 5L, prob = 0.4),
+    trials = 5L,
+    x = rnorm(30),
+    series = factor("s1"),
+    time = 1:30
+  )
+  mf <- mvgam_formula(bf(y | trials(trials) ~ x))
+  sc <- as.character(stancode(
+    mf, data = dat, family = com_binomial(), validate = FALSE
+  ))
+  expect_true(grepl(
+    "lprior \\+= normal_lpdf\\(nu \\| 1, 0\\.5\\)", sc
+  ))
+  expect_true(grepl("real<lower=-5> nu", sc))
+})
+
+
+test_that("com_binomial() refuses non-logit links", {
+  expect_error(com_binomial(link = "probit"))
+  expect_error(com_binomial(link = "log"))
+})
+
+
+test_that("com_binomial() routes through the row-wise family kind", {
+  # CMB is a row-wise custom family (one observation per row, no
+  # per-unit aggregation, no multi-response). Confirm the kind
+  # predicates classify it correctly so the threading gate and
+  # other dispatch tables route as intended.
+  fam <- com_binomial()
+  expect_false(is_closure_unit_family(fam))
+  expect_false(is_multi_response_family(fam))
+  expect_false(is_simplex_response_family(fam))
+  expect_true(is_com_binomial_family(fam))
+  expect_identical(resolve_family_name(fam), "com_binomial")
+})
+
+
+test_that("com_binomial() reports `nu` as the only auxiliary dpar", {
+  # `mu` lives on `linpred` (driven by the formula); `nu` is the
+  # only posterior dpar to extract for the count-scale `E[Y]`.
+  expect_identical(
+    get_family_dpars("com_binomial"), "nu"
+  )
+})
+
+
+test_that("com_binomial() requires a `trials` column in data", {
+  # The lpmf references `vint1[n]` which mvgam fills at fit time
+  # from `data$trials`. Absence of that column triggers a hard
+  # error before brms is called.
+  dat <- data.frame(
+    y = rbinom(30, size = 5L, prob = 0.4),
+    x = rnorm(30),
+    series = factor("s1"),
+    time = 1:30
+  )
+  mf <- mvgam_formula(bf(y | trials(5) ~ x))
+  expect_error(
+    stancode(mf, data = dat, family = com_binomial(),
+             validate = FALSE),
+    "requires a 'trials' column"
+  )
+})
