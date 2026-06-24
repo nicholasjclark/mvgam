@@ -135,11 +135,22 @@ forecast.mvgam <- function(object,
   newdata <- ensure_obs_placeholder_in_newdata(newdata, object$data)
 
   trend_specs <- object$mv_spec$trend_specs
-  if (is.null(trend_specs)) {
+  # Trendless fits forecast by projecting the obs-side linear
+  # predictor onto `newdata`: no latent state propagation, just a
+  # deterministic prediction at the held-out cells. The hindcast
+  # branch already handles trendless fits via
+  # `extract_trend_latent_states()` returning NULL; the forecast
+  # branch below delegates to a posterior_predict / posterior_epred
+  # pass on `fc_grid$data`. `type = "trend"` is undefined for
+  # trendless fits (there is no latent state to extract); reject
+  # up front so the hindcast and forecast branches both see a
+  # valid `type` argument.
+  is_trendless <- is.null(trend_specs)
+  if (is_trendless && identical(type, "trend")) {
     stop(insight::format_error(c(
-      "Fit has no trend specification; cannot forecast.",
-      i = paste0("Refit with a trend constructor such as ",
-                 "'RW()' or 'AR(p = 1)'.")
+      "'type = \"trend\"' is not defined for trendless fits.",
+      i = paste0("Use 'type = \"link\"', 'type = \"expected\"', ",
+                 "or 'type = \"response\"' (the default).")
     )))
   }
   # `trend_specs` is either a single `mvgam_trend` (univariate
@@ -147,12 +158,14 @@ forecast.mvgam <- function(object,
   # multivariate response models is pending; pick the first
   # trend spec when present and let the trend-type guard below
   # reject anything we don't yet support.
-  trend_model <- if (is_multivariate_trend_specs(trend_specs)) {
+  trend_model <- if (is_trendless) {
+    NULL
+  } else if (is_multivariate_trend_specs(trend_specs)) {
     trend_specs[[1L]]
   } else {
     trend_specs
   }
-  meta <- get_enriched_trend_metadata(object)
+  meta <- if (is_trendless) NULL else get_enriched_trend_metadata(object)
 
   series_info <- resolve_series_info(object)
   series_levels <- series_info$series_levels
@@ -190,6 +203,15 @@ forecast.mvgam <- function(object,
 
   forecasts <- if (is.null(fc_grid)) {
     NULL
+  } else if (is_trendless) {
+    build_trendless_forecast_arms(
+      object = object,
+      fc_grid = fc_grid,
+      type = type,
+      draw_idx = draw_idx,
+      obs_uncertainty = obs_uncertainty,
+      series_levels = series_levels
+    )
   } else {
     build_forecast_arms(
       object = object,
@@ -563,6 +585,55 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
 
 
 # ----- Forecast arm -----------------------------------------------
+
+# Internal: trendless-forecast arm. When the fit has no
+# `trend_formula`, forecasting reduces to evaluating the obs-side
+# linear predictor on the held-out newdata; no latent-state
+# propagation runs. Returns per-series `[ndraws, n_times]` matrices
+# in the same shape `build_forecast_arms()` would, so the downstream
+# `mvgam_forecast` slot semantics and `plot.mvgam_forecast` are
+# unchanged.
+#
+# Passes `draw_ids` through to the posterior_* dispatcher so the
+# subset is materialised once (no all-draws fetch followed by a
+# slice).
+#'@noRd
+build_trendless_forecast_arms <- function(object, fc_grid, type,
+                                            draw_idx,
+                                            obs_uncertainty,
+                                            series_levels) {
+  # `type = "trend"` is rejected at the top of `forecast.mvgam()`
+  # before any work runs; the switch below is total over the
+  # remaining three types.
+  fc_data <- fc_grid$data
+  series_var <- object$trend_metadata$variables$series_var %||%
+    "series"
+  predictor <- switch(
+    type,
+    "link"     = posterior_linpred,
+    "expected" = posterior_epred,
+    "response" = if (isTRUE(obs_uncertainty)) {
+      posterior_predict
+    } else {
+      posterior_epred
+    }
+  )
+  full <- predictor(object, newdata = fc_data, draw_ids = draw_idx)
+
+  series_fac <- factor(fc_data[[series_var]], levels = series_levels)
+  out <- vector("list", length(series_levels))
+  names(out) <- series_levels
+  for (s in seq_along(series_levels)) {
+    cols <- which(series_fac == series_levels[s])
+    out[[s]] <- if (length(cols) == 0L) {
+      matrix(NA_real_, nrow = length(draw_idx), ncol = 0L)
+    } else {
+      full[, cols, drop = FALSE]
+    }
+  }
+  out
+}
+
 
 # Internal: per-series forecast matrices. Two passes:
 #   1. Per-draw kernel loop: propagate the latent trend forward

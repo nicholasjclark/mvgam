@@ -518,7 +518,11 @@ spec_type_1 <- function() {
 spec_type_2 <- function() {
   list(
     default_trend = AR(p = 1),
-    default_prop_trend = 0.4,
+    # AR identification at moderate n needs the trend to carry
+    # most of the link-scale variance; otherwise the obs-side
+    # smooths absorb the time-varying signal and the AR
+    # coefficient posterior covers zero.
+    default_prop_trend = 0.6,
     intercept = function(fam) intercept_for_family(fam),
     build_data = function(n_timepoints, n_series, series_fac,
                            time_int) {
@@ -557,7 +561,8 @@ spec_type_2 <- function() {
 spec_type_3 <- function() {
   list(
     default_trend = AR(p = 1),
-    default_prop_trend = 0.4,
+    # Same AR identifiability budget as type 2.
+    default_prop_trend = 0.6,
     intercept = function(fam) intercept_for_family(fam),
     build_data = function(n_timepoints, n_series, series_fac,
                            time_int) {
@@ -593,7 +598,8 @@ spec_type_3 <- function() {
 spec_type_4 <- function() {
   list(
     default_trend = AR(p = 1),
-    default_prop_trend = 0.4,
+    # Same AR identifiability budget as types 2 and 3.
+    default_prop_trend = 0.6,
     intercept = function(fam) intercept_for_family(fam),
     build_data = function(n_timepoints, n_series, series_fac,
                            time_int) {

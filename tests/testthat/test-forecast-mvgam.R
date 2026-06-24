@@ -352,12 +352,28 @@ test_that("compute_car_forecast_time ignores series with no forecast rows", {
 })
 
 
-test_that("Fit with no trend spec errors", {
+test_that("Trendless fit rejects type = 'trend' but accepts others", {
+  # Trendless forecasting projects the obs-side linear predictor
+  # onto newdata; there is no latent trend trajectory to extract,
+  # so only `type = "trend"` is undefined. The other types
+  # (`"link"`, `"expected"`, `"response"`) route through the
+  # `build_trendless_forecast_arms()` helper. End-to-end recovery
+  # is covered by the live-fit fixtures.
   fit <- make_mock_mvgam()
   fit$mv_spec$trend_specs <- NULL
+  draws <- make_draws_mat(ndraws = 2L)
+  testthat::local_mocked_bindings(
+    `as_draws_matrix` = function(...) draws,
+    .package = "posterior"
+  )
+  newdata <- data.frame(
+    time = 11:12,
+    series = factor("s1", levels = "s1"),
+    y = NA_real_
+  )
   expect_error(
-    forecast(fit, newdata = NULL, type = "response"),
-    "no trend specification"
+    forecast(fit, newdata = newdata, type = "trend"),
+    "not defined for trendless fits"
   )
 })
 
