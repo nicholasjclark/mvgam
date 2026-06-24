@@ -96,10 +96,47 @@ natively:
 | `multi()`, `categ()` | Multinomial and categorical responses on the closure-unit grain | -- |
 | `mvn()`, `mvt()` | Multivariate normal / Student-t residual covariance via gllvm-style factor structure | `Psi` |
 
-The closure-unit and multi-response families
-(`nmix`, `occ`, `diri`, `multi`, `categ`, `mvn`, `mvt`) typically
-go through `jsdgam()` rather than `mvgam()`; see the
-per-constructor help pages for worked examples.
+These families (`nmix`, `occ`, `diri`, `multi`, `categ`, `mvn`,
+`mvt`) typically go through `jsdgam()` rather than `mvgam()`.
+Each is documented on its own help page with a worked recovery
+example.
+
+### Closure-unit and joint-species families
+
+`jsdgam()` is the entry point for joint species distribution
+modelling and closure-unit observation processes. Data arrive
+in long format with one row per `(unit, species)` cell:
+sites by species for `diri` / `multi` / `categ` / `mvn` / `mvt`,
+or sites by visit by species for `nmix` / `occ` where the
+detection sub-formula models imperfect observation. The latent
+trend pipeline composes the same way as for `mvgam()`: factor
+structure via `n_lv`, structured `loadings_prior`, hierarchical
+correlations through `gr` / `subgr`. Three concrete cases:
+
+- **`occ()` and `nmix()`** marginalise over the latent
+  occupancy or abundance state inside the Stan likelihood. The
+  chain only samples the detection sub-formula and the
+  state process linear predictor. `nmix()` supports three
+  observation processes (`"poisson_binomial"`, `"royle_nichols"`,
+  `"poisson_poisson"`) chosen at the constructor. The detection
+  sub-formula is a second `bf()` arm in the model formula.
+- **`diri()` / `multi()` / `categ()`** model compositional
+  responses on the simplex. A reference category fixes one slot
+  in the length K `mu` vector and a `sum_to_zero_vector[K]`
+  constraint is applied to each column of `Z`, so the joint
+  identification works without user constraints.
+  `posterior_epred()` returns one probability per
+  `(site, species)` row summing to 1 within each site.
+- **`mvn()` and `mvt()`** model continuous multivariate
+  responses with the gllvm covariance
+  $\Sigma = Z Z^\top + \mathrm{diag}(\Psi^2)$.
+  `residual_cor()` extracts the implied cross-species
+  correlations after Heaps QR identification.
+
+See `?jsdgam` for the full surface, including phylogenetic
+distance matrices through `phylo`, trait-environment
+interactions through `trait_formula`, and the
+`?ordinate.mvgam` / `?ordinate.jsdgam` biplot helpers.
 
 ## Latent trend processes
 
@@ -511,6 +548,45 @@ Dawid-Sebastiani score by $4.0$, and the DRPS by $1.9$. DSS shows
 the biggest margin because that rule penalises poorly calibrated
 forecast variance most aggressively, and the trendless fit stays
 overconfident around its (flat) cycle.
+
+`score()` covers additional rules through the `score` argument:
+`sis` (interval score), `qs` (quantile score) and a weighted
+CRPS variant (`twcrps`) for emphasising tail behaviour. For
+multivariate forecasts from VAR fits or factor models, `score()`
+also supports `energy` (energy score) and `variogram` (variogram
+score). Both penalise dependence patterns that per-series rules
+miss. The `interval_width` and `per_series` arguments control
+nominal coverage and aggregation.
+
+### Leave-future-out cross-validation
+
+A single train / test split rewards models that happen to win on
+one specific horizon. `lfo_cv.mvgam()` automates the alternative:
+it scores forecasts at every refit point along the series, then
+aggregates the per-step scores across many forecast origins.
+
+```{r lfo-example, eval = FALSE}
+lfo_step2 <- lfo_cv(step2, min_t = 180, fc_horizon = 12)
+plot(lfo_step2)
+```
+
+`min_t` sets the first refit point, `fc_horizon` sets the
+prediction window per fold, and the chain is reseated through
+`update()` between folds so the Stan program does not recompile.
+The default score is the expected log predictive density (ELPD),
+returned per fold and per step ahead. The companion
+`kfold.mvgam()` runs block CV for grouped designs through
+cluster-level holdout. It supports user-defined fold maps
+through the `folds` argument.
+
+PSIS-LOO (`loo()`) dispatches on `mvgam` objects. The
+diagnostics expose the state-space pathology that defeats it.
+Time points whose latent state the chain conditioned on raise
+high pareto-k warnings. Through the latent path, the chain has
+effectively seen the observation it is being asked to predict.
+The honest comparison for time series fits is therefore either a
+held-out forecast score (as above) or `lfo_cv()`, not
+`loo_compare()`.
 
 ## How to cite
 
