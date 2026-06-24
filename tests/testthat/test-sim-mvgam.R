@@ -240,9 +240,9 @@ test_that("each type's data carries the covariates it needs", {
 
 # ---- Errors ------------------------------------------------------
 
-test_that("type outside 1..6 errors informatively", {
+test_that("type outside 1..7 errors informatively", {
   expect_error(sim_mvgam(type = 0L), "not >= 1")
-  expect_error(sim_mvgam(type = 7L), "not <= 6")
+  expect_error(sim_mvgam(type = 8L), "not <= 7")
 })
 
 
@@ -304,6 +304,23 @@ test_that("summary.mvgam_sim resolves trend label from constructor", {
     n_timepoints = 30L, seed = 3L
   )
   expect_identical(summary(car_sim)$trend, "CAR")
+
+  ar112_sim <- sim_mvgam(
+    type = 7L, family = gaussian(), n_series = 1L,
+    n_timepoints = 60L, seed = 3L
+  )
+  expect_identical(summary(ar112_sim)$trend, "AR")
+  # type 7 generates a `season` covariate cycling 1..12, no `x`.
+  expect_true("season" %in% colnames(ar112_sim$data_train))
+  expect_setequal(unique(ar112_sim$data_train$season), 1:12)
+  # spec sets sparse AR(p = c(1, 12)) on the latent state; the
+  # rescale skip path keeps the spec's chosen sigma_innov so the
+  # latent state has measurable persistence (lag-12 autocorrelation
+  # of the generated trend should be clearly non-zero).
+  z <- ar112_sim$true_trend[, 1L]
+  ac <- stats::acf(z, plot = FALSE, lag.max = 12L)$acf[, 1L, 1L]
+  expect_gt(ac[2L], 0.2)
+  expect_gt(ac[13L], 0.1)
 })
 
 

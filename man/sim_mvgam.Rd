@@ -18,7 +18,7 @@ sim_mvgam(
 )
 }
 \arguments{
-\item{type}{Integer in \code{1:6} selecting the observation-side
+\item{type}{Integer in \code{1:7} selecting the observation-side
 recipe. See \emph{Details} for the catalog.}
 
 \item{family}{A \code{family} or \code{brmsfamily} object specifying the
@@ -112,6 +112,12 @@ to \code{0.2} for this type to keep the AR component small
 relative to the smooth so the two are identifiable.}
 \item{\code{type = 6}}{\code{y ~ s(season, bs = "cc")} with \code{CAR(time, series)}. Cyclic seasonal + continuous-time AR(1) on
 irregular time gaps (\code{Δt ~ Uniform(1, 6)}).}
+\item{\code{type = 7}}{\code{y ~ s(season, bs = "cc", k = 12)} with
+sparse \code{AR(p = c(1, 12))}. Monthly seasonal cycle on the
+obs side; the latent state carries lag-1 momentum and
+lag-12 year-on-year recurrence beyond the deterministic
+cycle. Pairs with a \code{prop_trend} default of \code{0.7} so the
+AR signal dominates residual variance.}
 }
 
 For multi-series simulations (\code{n_series > 1}), the observation

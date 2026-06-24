@@ -8,7 +8,7 @@
 #' grammar (smooths + GPs + random effects + AR/RW/CAR/VAR
 #' dynamics).
 #'
-#' @param type Integer in `1:6` selecting the observation-side
+#' @param type Integer in `1:7` selecting the observation-side
 #'   recipe. See *Details* for the catalog.
 #' @param family A `family` or `brmsfamily` object specifying the
 #'   observation likelihood. Supported: `gaussian()`, `student()`,
@@ -65,6 +65,12 @@
 #'   \item{`type = 6`}{`y ~ s(season, bs = "cc")` with `CAR(time,
 #'     series)`. Cyclic seasonal + continuous-time AR(1) on
 #'     irregular time gaps (`Δt ~ Uniform(1, 6)`).}
+#'   \item{`type = 7`}{`y ~ s(season, bs = "cc", k = 12)` with
+#'     sparse `AR(p = c(1, 12))`. Monthly seasonal cycle on the
+#'     obs side; the latent state carries lag-1 momentum and
+#'     lag-12 year-on-year recurrence beyond the deterministic
+#'     cycle. Pairs with a `prop_trend` default of `0.7` so the
+#'     AR signal dominates residual variance.}
 #' }
 #'
 #' For multi-series simulations (`n_series > 1`), the observation
@@ -125,7 +131,7 @@ sim_mvgam <- function(type = 1L,
                        prop_missing = 0,
                        family_pars = list(),
                        seed = NULL) {
-  checkmate::assert_int(type, lower = 1L, upper = 6L)
+  checkmate::assert_int(type, lower = 1L, upper = 7L)
   checkmate::assert_int(n_series, lower = 1L)
   checkmate::assert_int(n_timepoints, lower = 5L)
   checkmate::assert_number(
@@ -206,7 +212,15 @@ sim_mvgam <- function(type = 1L,
     )
   }
   nonstat <- is_nonstationary_trend(trend_model)
-  if (nonstat && !is_pw) {
+  # RW takes the integrated-variance sigma_innov override below.
+  # Sparse-lag AR(p) is also classified nonstationary so the
+  # post-hoc rescale (further down) is skipped, but the spec's
+  # chosen sigma_innov is preserved: the closed-form variance of
+  # an AR(p) is sigma_innov^2 / (1 - sum(phi)^2), which does not
+  # have an RW-style sqrt(6/T) shape.
+  is_ar_trend <- !is.null(trend_model) && !is.character(trend_model) &&
+                 identical(trend_model$trend, "AR")
+  if (nonstat && !is_pw && !is_ar_trend) {
     # Pick sigma_innov so the empirical SD of the centred RW
     # over t = 1..T matches `target_trend_sd`. The variance of
     # the centred RW at t averages sigma^2 * T/6 across t, so
@@ -475,7 +489,8 @@ sim_type_spec <- function(type) {
     `3` = spec_type_3(),
     `4` = spec_type_4(),
     `5` = spec_type_5(),
-    `6` = spec_type_6()
+    `6` = spec_type_6(),
+    `7` = spec_type_7()
   )
 }
 
@@ -723,6 +738,71 @@ spec_type_6 <- function() {
 }
 
 
+# Type 7: y ~ s(season, bs = "cc"), sparse AR(p = c(1, 12)) latent
+# state. Monthly cycle on the obs side; the latent state carries
+# both short-term momentum (lag 1) and annual recurrence beyond the
+# deterministic cycle (lag 12). Demonstrates the value of a
+# state-space model when the data has structure a fixed seasonal
+# smooth cannot represent.
+#'@noRd
+spec_type_7 <- function() {
+  list(
+    default_trend = AR(p = c(1L, 12L)),
+    # High prop_trend so the AR signal dominates: the seasonal
+    # smooth is identifiable from the deterministic cycle alone,
+    # and the dynamic state needs to carry most of the residual
+    # variance for the model contrast to be visible at moderate n.
+    # Tuned upward from the AR-recipe default (types 2/3/4 use 0.6)
+    # so the seasonal smooth absorbs only the deterministic cycle
+    # and the AR(1, 12) state explains the year-to-year drift that
+    # a fixed-cycle fit cannot follow into the held-out horizon.
+    default_prop_trend = 0.85,
+    intercept = function(fam) intercept_for_family(fam),
+    build_data = function(n_timepoints, n_series, series_fac,
+                           time_int) {
+      # Cycle season 1..12 across time. Per-series time grids are
+      # identical so the obs-side smooth is fit on a single shared
+      # cyclic covariate; the latent state is what differs by
+      # series.
+      season <- ((time_int - 1L) %% 12L) + 1L
+      # Deterministic seasonal cycle. Amplitude tuned so the
+      # seasonal smooth and the AR state contribute distinct,
+      # identifiable shares of variance.
+      f_season_t <- 1.0 * sin(2 * pi * season / 12) +
+                    0.3 * cos(4 * pi * season / 12)
+      grid <- seq(1, 12, length.out = 100L)
+      f_season_grid <- 1.0 * sin(2 * pi * grid / 12) +
+                       0.3 * cos(4 * pi * grid / 12)
+      list(
+        covariates = list(season = season),
+        obs_contrib = f_season_t,
+        true_betas = numeric(),
+        true_smooths = list(
+          `s(season)` = data.frame(season = grid,
+                                     f_true = f_season_grid)
+        )
+      )
+    },
+    trend_params = function(n_series, n_timepoints, prop_trend) {
+      # Sparse AR(1, 12): phi_1 = 0.55, phi_12 = 0.40. Sum 0.95
+      # is high enough that the state visibly drifts year-on-year
+      # beyond the deterministic seasonal cycle (so a fixed
+      # smooth-on-season fit cannot match it) while keeping the
+      # process inside the stationary region. Higher sums push
+      # the AR(1, 12) into nonstationary territory and trigger
+      # divergent transitions during HMC.
+      list(
+        params = list(
+          ar    = c(0.55, 0.40),
+          sigma = trend_sigma(prop_trend)
+        ),
+        time = NULL
+      )
+    }
+  )
+}
+
+
 # ------------------------------------------------------------------
 # Shared building blocks
 # ------------------------------------------------------------------
@@ -861,7 +941,18 @@ is_nonstationary_trend <- function(trend_model) {
     trend_model$trend
   }
   if (is.null(t)) return(FALSE)
-  identical(t, "RW") || identical(t, "PW")
+  if (identical(t, "RW") || identical(t, "PW")) return(TRUE)
+  # Sparse-lag AR(p) (`p = c(1, 12)` etc.) is treated as
+  # near-nonstationary: the high-persistence regime that motivates
+  # sparse AR is what makes the latent state visibly drift, and the
+  # stationary-AR post-hoc rescale would compress that drift to a
+  # fixed marginal SD. Skip the rescale so the simulated state
+  # behaves like a long-memory process rather than a re-scaled
+  # white-noise-with-correlation.
+  if (identical(t, "AR") && length(trend_model$p %||% 1L) > 1L) {
+    return(TRUE)
+  }
+  FALSE
 }
 
 
@@ -895,6 +986,27 @@ fill_multivariate_trend_defaults <- function(trend_model,
   trend_type <- trend_model$trend
   if (is.null(trend_type)) return(params)
   cor_trend <- isTRUE(trend_model$cor)
+
+  # AR / RW: pad `params$ar` to length p when the user passes
+  # AR(p > 1) but the spec only supplied a scalar phi. A geometric
+  # taper phi_l = phi_1 * (0.3) ^ (l - 1) gives a stable, strong
+  # memory profile (sum across lags well under 1) and lets type 2
+  # / type 3 / type 4 simulate genuine AR(p) dynamics rather than
+  # erroring on the length mismatch in `build_arma_A()`.
+  if (identical(trend_type, "AR") && !is.null(params$ar) &&
+        !is.null(trend_model$p)) {
+    p_req <- if (length(trend_model$p) == 1L) {
+      as.integer(trend_model$p)
+    } else {
+      length(trend_model$p)
+    }
+    ar_vec <- as.numeric(params$ar)
+    if (length(ar_vec) < p_req) {
+      ar_taper <- ar_vec[1L] * (0.3) ^ (seq_len(p_req) - 1L)
+      ar_vec <- ar_taper
+      params$ar <- ar_vec
+    }
+  }
 
   # VAR transition matrix.
   if (identical(trend_type, "VAR") && is.null(params$A)) {
