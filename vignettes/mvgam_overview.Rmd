@@ -225,7 +225,7 @@ z_{i, t} & \sim \text{Normal}\!\Bigl(
 **Vector autoregression**, `VAR(p = ...)`. Each $A_l$ is an
 $N_{\text{series}} \times N_{\text{series}}$ transition matrix.
 `p` must be a scalar (`VAR(p = 2)` includes lags 1 and 2):
-sparse lag vectors are not supported because the Heaps (2022)
+sparse lag vectors are not supported because the Heaps (2023)
 stationary initialisation that VAR uses requires consecutive
 companion-form structure. Innovations are correlated across
 series through $\Sigma$, with an LKJ prior on the Cholesky
@@ -685,21 +685,36 @@ use `methods_md(step2)`.
 
 ## Further reading
 
+Bhattacharya, A. and Dunson, D. B. (2011). Sparse Bayesian
+infinite factor models. *Biometrika* 98, 291-306.
+[doi:10.1093/biomet/asr013](https://doi.org/10.1093/biomet/asr013)
+
+Bürkner, P.-C. (2017). brms: An R package for Bayesian
+multilevel models using Stan. *Journal of Statistical Software*
+80(1), 1-28.
+[doi:10.18637/jss.v080.i01](https://doi.org/10.18637/jss.v080.i01)
+
 Clark, N. J. and Wells, K. (2023). Dynamic Generalized Additive
-Models for forecasting discrete ecological time series.
+Models (DGAMs) for forecasting discrete ecological time series.
 *Methods in Ecology and Evolution* 14, 771-784.
+[doi:10.1111/2041-210X.13974](https://doi.org/10.1111/2041-210X.13974)
 
 Clark, N. J., Ernest, S. K. M., Senyondo, H., Simonis, J.,
 White, E. P., Yenni, G. M. and Karunarathna, K. A. N. K. (2025).
 Beyond single-species models: multispecies forecasts for
-ecological predictability. *PeerJ* 13:e18929.
+ecological predictability. *PeerJ* 13, e18929.
+[doi:10.7717/peerj.18929](https://doi.org/10.7717/peerj.18929)
+
+Heaps, S. E. (2023). Enforcing stationarity through the prior in
+vector autoregressions. *Journal of Computational and Graphical
+Statistics* 32, 74-83.
+[doi:10.1080/10618600.2022.2079648](https://doi.org/10.1080/10618600.2022.2079648)
 
 Heaps, S. E. and Jermyn, I. H. (2024). Structured prior
 distributions for the covariance matrix in latent factor models.
-*Statistics and Computing* 34:143.
-
-Burkner, P.-C. (2017). brms: An R package for Bayesian multilevel
-models using Stan. *Journal of Statistical Software* 80(1):1-28.
+*Statistics and Computing* 34, 143.
+[doi:10.1007/s11222-024-10454-0](https://doi.org/10.1007/s11222-024-10454-0)
 
 Wood, S. N. (2017). *Generalized Additive Models: An Introduction
 with R* (2nd edition). Chapman and Hall/CRC.
+[doi:10.1201/9781315370279](https://doi.org/10.1201/9781315370279)
