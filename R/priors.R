@@ -683,17 +683,6 @@ get_all_mvgam_trend_parameters <- function(trend_specs) {
   unique(all_mvgam_params)
 }
 
-#' Filter trend priors using trend system as source of truth
-#'
-#' Uses mvgam's trend registry and parameter generation system to automatically
-#' distinguish mvgam-generated dynamics parameters from brms formula parameters.
-#' 
-#' @param trend_priors A brmsprior object containing trend parameters
-#' @param trend_specs Trend specifications from mv_spec  
-#' @param base_formula The trend formula with mvgam constructors removed
-#' @param data Data for brms prior validation
-#' @return A brmsprior object with only brms-compatible parameters, suffixes removed
-#' @noRd
 #' Merge user-supplied prior overrides onto a default prior table
 #'
 #' Match each row of `user_priors` against `default_priors` using the
@@ -830,6 +819,19 @@ add_trend_suffix_to_priors <- function(trend_priors) {
 }
 
 
+#' Strip the `_trend` suffix from the keys of a `brmsprior` table so
+#' the remaining rows can be merged back into a brms-only prior set.
+#' Used by the trend-side prior pipeline to hand off
+#' brms-managed parameters once mvgam's dynamics rows have been
+#' factored out via `filter_trend_priors()`.
+#'
+#' @param trend_priors `brmsprior` rows scoped to the trend formula.
+#' @param trend_specs Trend specifications from `mv_spec`.
+#' @param base_formula The trend formula with mvgam constructors removed.
+#' @param data Data frame; passed through to brms for prior validation.
+#' @return `brmsprior` with the `_trend` suffix stripped, or NULL when
+#'   the input is empty.
+#' @noRd
 remove_trend_suffix_from_priors <- function(trend_priors, trend_specs, base_formula, data) {
   checkmate::assert_class(trend_priors, "brmsprior", null.ok = TRUE)
   checkmate::assert_list(trend_specs, null.ok = TRUE)
