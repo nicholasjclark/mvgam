@@ -104,29 +104,132 @@ per-constructor help pages for worked examples.
 
 ## Latent trend processes
 
-The trend constructors live in the `trend_formula` argument:
+The trend constructors live in the `trend_formula` argument and
+fall into six families. Each is documented in its own help page;
+the formulas below state the per-step transition the constructor
+emits.
+
+**Random walk**, `RW()`. Each series has its own non-stationary
+state; the moving average term ($\theta_i$) engages when
+`ma = TRUE`:
 
 \begin{align*}
-\text{RW:} \quad & z_{i, t} \sim \text{Normal}(z_{i, t - 1}, \sigma_i) \\
-\text{AR(p):} \quad & z_{i, t} \sim \text{Normal}\!\Bigl(\sum_{l \in \mathcal{L}} \rho_{i, l} \, z_{i, t - l}, \sigma_i\Bigr) \\
-\text{VAR(p):} \quad & z_t \sim \text{Normal}\!\Bigl(\sum_{l=1}^{p} A_l \, z_{t - l}, \Sigma\Bigr) \\
-\text{ZMVN:} \quad & z_t \sim \text{Normal}(0, \Sigma) \\
-\text{CAR(1):} \quad & z_{i, t} \sim \text{Normal}\!\Bigl(\rho_i^{\Delta t} \, z_{i, t - 1}, \sigma_i\Bigr) \\
-\text{GP:} \quad & z \sim \text{Normal}(0, K_{\alpha, \rho})
+z_{i, t} & = z_{i, t - 1} + \theta_i \, \epsilon_{i, t - 1}
+                + \epsilon_{i, t} \\
+\epsilon_{i, t} & \sim \text{Normal}(0, \sigma_i)
 \end{align*}
 
-The lag set $\mathcal{L}$ for `AR(p)` is `1:p` when `p` is a
-scalar and `p` itself when `p` is a vector. The example below
-uses `AR(p = c(1, 12))` to fit lag-1 momentum together with
-year-on-year recurrence at lag 12 from monthly data. Multivariate
-options compose through `cor = TRUE` (correlated innovations),
-`gr = ` and `subgr = ` (hierarchical partial pooling across
-groups), and factor structure (`n_lv < n_series`, with post-hoc
-QR identification of the loadings matrix following Heaps and
-Jermyn, 2024). Piecewise linear and logistic growth are available
-through `PW()` for Prophet-style changepoint trends. The full set
-is documented at `?mvgam_trends`; constructor arguments live at
-`?AR`, `?VAR`, `?RW`, `?ZMVN`, `?CAR`, `?PW`, `?GP`.
+**Autoregression**, `AR(p = ...)`. The lag set
+$\mathcal{L} = \{1, \dots, p\}$ when `p` is a scalar, or
+$\mathcal{L} = p$ when `p` is a vector (so `AR(p = c(1, 12))`
+sets $\mathcal{L} = \{1, 12\}$). Stationary by construction
+through a Heaps (2023) prior on the lag coefficients:
+
+\begin{align*}
+z_{i, t} & \sim \text{Normal}\!\Bigl(
+  \textstyle \sum_{l \in \mathcal{L}} \rho_{i, l} \, z_{i, t - l}
+  + \theta_i \, \epsilon_{i, t - 1},\;
+  \sigma_i \Bigr)
+\end{align*}
+
+**Vector autoregression**, `VAR(p = ...)`. Each $A_l$ is an
+$N_{\text{series}} \times N_{\text{series}}$ transition matrix.
+Innovations are correlated across series through $\Sigma$, with
+an LKJ prior on the Cholesky factor:
+
+\begin{align*}
+z_t & \sim \text{Normal}\!\Bigl(
+  \textstyle \sum_{l=1}^{p} A_l \, z_{t - l},\; \Sigma \Bigr)
+\end{align*}
+
+**Zero-mean multivariate normal**, `ZMVN()`. Cross-series
+covariance with no temporal recursion; useful for joint species
+distributions and similar grouped responses:
+
+\begin{align*}
+z_t & \sim \text{Normal}(0, \Sigma)
+\end{align*}
+
+**Continuous-time AR(1)**, `CAR()`. The lag coefficient decays
+geometrically with the time gap $\Delta_t = t - t_{-}$ between
+the current observation and the most recent one. Lets the AR
+recursion run on irregularly-spaced timestamps:
+
+\begin{align*}
+z_{i, t} & \sim \text{Normal}\!\bigl(
+  \rho_i^{\Delta_t} \, z_{i, t_{-}},\;
+  \sigma_i \, \sqrt{1 - \rho_i^{2 \Delta_t}} \bigr)
+\end{align*}
+
+**Gaussian process**, `GP()`. One GP per series on the training
+time grid. The covariance is a squared-exponential kernel with
+marginal SD $\alpha_i$ and length scale $\rho_i$. The basis
+approximation follows Riutort-Mayol et al. (2023):
+
+\begin{align*}
+z_i & \sim \text{Normal}(0, K_i) \\
+K_i(t_a, t_b) & = \alpha_i^2 \, \exp\!\Bigl(
+  -\tfrac{1}{2} \bigl(\tfrac{|t_a - t_b|}{\rho_i}\bigr)^2
+\Bigr)
+\end{align*}
+
+**Piecewise growth**, `PW()`. The Prophet kernel with $S$
+changepoints at known times $\{s_1, \dots, s_S\}$. The lag-zero
+rate is $k$ at $t = 0$, the offset is $m$ and the magnitude
+shift at changepoint $s_j$ is $\delta_j$. Let $a(t)$ be the
+$\mathbb{R}^S$ indicator with $a_j(t) = \mathbb{1}\{t \geq s_j\}$
+and $\gamma$ the offset-correction vector that keeps the
+trajectory continuous. Linear growth:
+
+\begin{align*}
+z_t & = \bigl(k + a(t)^\top \delta\bigr) t
+       + \bigl(m + a(t)^\top \gamma\bigr)
+\end{align*}
+
+Logistic growth uses the same $(k, m, \delta)$ but maps through
+a sigmoid with a (possibly time-varying) carrying capacity
+$C(t)$:
+
+\begin{align*}
+z_t & = \frac{C(t)}{1 + \exp\!\bigl(
+  -(k + a(t)^\top \delta)\,(t - (m + a(t)^\top \gamma))
+\bigr)}
+\end{align*}
+
+### Composing options
+
+Three orthogonal switches layer on top of any per-series trend.
+The first is `cor = TRUE`, which switches to correlated
+innovations through an LKJ prior on the Cholesky factor of
+$\Sigma$ (default: independent per-series).
+
+The second is `gr = ` / `subgr = `, which sets up hierarchical
+residual correlation matrices. The per-group covariance is
+shrunk toward a population matrix through a weight
+$\alpha_{\text{cor}} \in (0, 1)$ on the population draw:
+
+\begin{align*}
+\Omega_g & = \alpha_{\text{cor}} \, \Omega_{\text{global}}
+           + (1 - \alpha_{\text{cor}}) \, \Omega_{g, \text{local}}
+\end{align*}
+
+The third is `n_lv < n_series`. A $K$-dimensional latent process
+$\tilde{z}_t$ drives the $N_{\text{series}}$-dimensional state
+through a loadings matrix
+$Z \in \mathbb{R}^{N_{\text{series}} \times K}$. $Z$ is
+identified post-hoc by thin QR rotation (Heaps and Jermyn,
+2024):
+
+\begin{align*}
+z_t & = Z \, \tilde{z}_t, \qquad
+\tilde{z}_t \in \mathbb{R}^K
+\end{align*}
+
+The example below uses `AR(p = c(1, 12))` to fit lag-1 momentum
+together with annual recurrence at lag 12 from monthly data. The
+full surface is documented at `?mvgam_trends`; constructor
+arguments live at `?AR`, `?VAR`, `?RW`, `?ZMVN`, `?CAR`, `?PW`,
+`?GP`.
 
 ## A simulated example
 
