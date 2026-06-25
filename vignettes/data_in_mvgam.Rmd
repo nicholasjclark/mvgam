@@ -101,34 +101,40 @@ latent trajectory at those timepoints.
 
 Whatever column carries the series identifier (`series` by
 default, or any column named through `AR(series = ...)` /
-`jsdgam(species = ...)`) must be a `factor`, and its levels
-must match the unique values present in the data. The two
-failure modes are *character instead of factor* and *extra
-levels that no row references*. The first is easy to catch by
-class; the second is sneaky because the data look fine until
-`mvgam()` tries to index a series that isn't there.
+`jsdgam(species = ...)`) must be a `factor`. A column of class
+`character` looks indistinguishable in `head()` but fails the
+pre-fit check:
 
 ```{r series-class}
 class(birdsong$series)
 levels(birdsong$series)
-setdiff(levels(birdsong$series), unique(birdsong$series))
 ```
 
-An empty `setdiff()` confirms the levels and the realised values
-agree. When they disagree, `droplevels()` is the fix:
+```{r series-character-fail, error = TRUE}
+char_series <- birdsong
+char_series$series <- as.character(char_series$series)
+check_mvgam_data(char_series, family = poisson(), plot = FALSE)
+```
+
+The error is explicit about the cause and the fix: pass the
+column through `factor()` before calling `mvgam()`. Extra factor
+levels that no row references are tolerated by the validator and
+by `mvgam()` itself, but `droplevels()` is still good hygiene
+because the forecast and prediction code iterates over
+`levels(series)` and an orphan level would simply produce empty
+output for that level:
 
 ```{r dropping-levels}
-bad_levels <- birdsong
-bad_levels$series <- factor(
-  bad_levels$series,
-  levels = c(levels(bad_levels$series), "phantom_species")
+extra_level <- birdsong
+extra_level$series <- factor(
+  extra_level$series,
+  levels = c(levels(extra_level$series), "phantom_species")
 )
-setdiff(levels(bad_levels$series), unique(bad_levels$series))
+setdiff(levels(extra_level$series), unique(extra_level$series))
 
-# Fix by dropping unused levels.
-good_levels <- bad_levels
-good_levels$series <- droplevels(good_levels$series)
-levels(good_levels$series)
+# Tidy by dropping unused levels.
+extra_level$series <- droplevels(extra_level$series)
+levels(extra_level$series)
 ```
 
 You can technically supply data with no `series` column, in
@@ -242,17 +248,18 @@ and re-used if desired.
 When the data are *not* valid, the same function raises an
 informative error. Three common failure modes:
 
-```{r check-missing-cov, error = TRUE}
-miss_cov <- birdsong
-miss_cov$temp <- rnorm(nrow(miss_cov))
-miss_cov$temp[5L] <- NA
-check_mvgam_data(miss_cov, family = poisson(), plot = FALSE)
+```{r check-bad-family, error = TRUE}
+bad_y <- birdsong
+bad_y$y <- bad_y$y - 0.5  # introduce negative non-integers
+check_mvgam_data(bad_y, family = poisson(), plot = FALSE)
 ```
 
-The check passes because no formula referenced the missing
-column. The same call with `mvgam(y ~ temp, ...)` would catch
-it; covariate-completeness checks fire when the formula is
-parsed.
+The validator rejects the data because Poisson requires
+non-negative integers. Subtracting `0.5` made them negative
+and fractional, so both checks fail. Switching to `Gamma()` or
+`lognormal()` would require the response to be strictly
+positive; `bernoulli()` needs 0/1 values. Each family's support
+is documented under `?mvgam_families`.
 
 ```{r check-missing-times, error = TRUE}
 gap <- birdsong[birdsong$time != 5L, ]
@@ -260,34 +267,50 @@ check_mvgam_data(gap, family = poisson(), trend_model = AR(),
                   plot = FALSE)
 ```
 
-The `trend_model` argument switches on the regular-spacing
-check, which catches missing timepoints that an AR fit cannot
-absorb. The error message tells the user which series is broken
+Passing `trend_model = AR()` switches on the regular-spacing
+check, which catches the missing timepoint that an AR fit cannot
+absorb. The error tells the user which intervals are irregular
 and suggests either `expand.grid()` for filling gaps or `CAR()`
-for accepting irregular spacing as a modelling choice.
+for accepting irregular spacing as a modelling choice. Omitting
+`trend_model = ` runs the structural checks but skips the
+regularity check, which is what `check_mvgam_data(data, family =
+...)` does by default.
 
-```{r check-bad-response, error = TRUE}
-bad_resp <- birdsong
-bad_resp$y <- bad_resp$y + 0.5  # introduce non-integers
-check_mvgam_data(bad_resp, family = poisson(), plot = FALSE)
+A note on `NA`s. mvgam preserves missing responses to maintain
+the trend's time grid: a row with `NA` in `y` is kept in the
+data so the trend still has a value at that timepoint, and the
+likelihood simply skips the observation. Missing covariates are
+a different story. The trend pipeline expects every timepoint
+to carry a complete covariate row, so an `NA` in a column the
+formula references will produce dimension errors deep in Stan.
+`check_mvgam_data()` catches the problem at the validator layer
+when you pass the `formula` argument:
+
+```{r check-covariate-na, error = TRUE}
+miss_cov <- birdsong
+miss_cov$temp <- rnorm(nrow(miss_cov))
+miss_cov$temp[5L] <- NA
+check_mvgam_data(miss_cov, formula = y ~ temp,
+                  family = poisson(), plot = FALSE)
 ```
 
-The response-shape check rejects the data because Poisson
-requires non-negative integers and `+ 0.5` makes them all
-non-integer. Switching to `Gamma()` or `lognormal()` would
-require the response to be strictly positive instead. Each
-family's support is documented under `?mvgam_families`.
+The same check runs inside `mvgam()` itself, so even if you
+skip the inspector the friendly error is raised before any
+Stan compile. Without the `formula` argument `check_mvgam_data()`
+has no way to know which columns the model will reference, so
+the `NA` in `temp` is tolerated; supply both `formula` and
+`trend_formula` to exercise the full pre-flight check.
 
 ## Newdata for forecasts: `validate_newdata()`
 
 Forecasting requires a `newdata` frame in the same shape as the
 training data, with the same factor levels and covariate
-columns. `validate_newdata()` runs the structural check before
-`predict()` / `forecast()` are called, which is faster than
-finding out at the back end of an expensive prediction
-pipeline.
+columns. `validate_newdata(newdata, data)` runs the structural
+check before `predict()` / `forecast()` are called, which is
+faster than finding out at the back end of an expensive
+prediction pipeline.
 
-```{r validate-newdata, error = TRUE}
+```{r validate-newdata-ok}
 future_df <- data.frame(
   series = factor(
     rep(levels(birdsong$series), each = 4L),
@@ -295,14 +318,26 @@ future_df <- data.frame(
   ),
   time   = rep(81L:84L, times = 4L)
 )
-validate_newdata(future_df, training_data = birdsong)
+validate_newdata(future_df, birdsong)
 ```
 
-A clean newdata frame returns invisibly; a misaligned one (wrong
-factor levels, missing time column, missing covariate) raises
+A clean newdata frame returns invisibly. A misaligned one trips
 the same error the prediction call would, with the same hint
-about how to fix it. This is the right call to make in any
-forecasting pipeline before the first `predict()`.
+about how to fix it. The most common case is a series name in
+`newdata` that the training data never saw:
+
+```{r validate-newdata-bad, error = TRUE}
+bad_future <- data.frame(
+  series = factor("phantom_species"),
+  time   = 81L
+)
+validate_newdata(bad_future, birdsong)
+```
+
+The validator names the unknown level and tells the caller that
+`newdata$series` must be a subset of the training factor levels.
+This is the right call to make in any forecasting pipeline
+before the first `predict()`.
 
 ## Closure-unit data shape
 

@@ -131,9 +131,17 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     )
     data <- result$trend_data
     trend_metadata <- result$metadata
-    
-    # Use trend formula as main formula for brms processing
-    formula <- trend_formula
+
+    # brms cannot evaluate mvgam trend constructors (AR, RW, VAR,
+    # PW, CAR, ZMVN) as R functions in its model frame -- they
+    # are mvgam DSL, not formula terms. The fitting pipeline
+    # normally strips them via `extract_and_validate_trend_components()`
+    # before calling here, but the stancode() / standata() entry
+    # points reach this branch with the raw trend_formula. Run
+    # `parse_trend_formula()` in parsing-only mode (no data) to
+    # obtain the constructor-free `base_formula` and hand THAT to
+    # brms.
+    formula <- parse_trend_formula(trend_formula)$base_formula
   }
 
   # Handle trend formulas without response variables
@@ -174,13 +182,18 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     }
   }
 
-  # Validate brms formula compatibility
-  formula_validation <- validate_brms_formula(formula)
-  if (!formula_validation$valid) {
-    stop(insight::format_error(c(
-      "Invalid brms formula structure.",
-      x = paste(formula_validation$issues, collapse = "\n")
-    )))
+  # Validate brms formula compatibility. Skip the trend-constructor
+  # rule when we are inside the trend setup branch (formula was
+  # rewritten to `trend_formula` above and is legitimately allowed
+  # to contain AR()/VAR()/RW() etc.).
+  if (!is_trend_setup) {
+    formula_validation <- validate_brms_formula(formula)
+    if (!formula_validation$valid) {
+      stop(insight::format_error(c(
+        "Invalid brms formula structure.",
+        x = paste(formula_validation$issues, collapse = "\n")
+      )))
+    }
   }
 
   # Parse and validate trend formula if provided

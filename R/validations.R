@@ -618,6 +618,173 @@ validate_nonlinear_trend_compatibility <- function(nl_components, trend_specs) {
 #' Automatically filters out latent parameters from nonlinear formulas
 #' to avoid validation errors for model-defined parameters.
 #'
+#' Extract response (LHS) variable names from a formula-like object
+#'
+#' Handles plain `formula`, `brmsformula` (uses the
+#' `$formula` slot), and `mvbrmsformula` (iterates `$forms`).
+#' Returns an empty character vector for one-sided formulas,
+#' NULL input, or non-formula objects so callers can rely on a
+#' character vector return shape.
+#'
+#' `rlang::f_lhs()` cannot be used directly because it errors on
+#' `brmsformula` objects (they are lists internally, not true
+#' `formula`s).
+#'
+#' @noRd
+extract_response_vars <- function(formula) {
+  if (is.null(formula)) return(character(0L))
+  if (inherits(formula, "mvbrmsformula") && !is.null(formula$forms)) {
+    return(unique(unlist(lapply(formula$forms, function(x) {
+      extract_response_vars(x$formula %||% x)
+    }))))
+  }
+  if (inherits(formula, "brmsformula")) {
+    formula <- formula$formula
+  }
+  if (!inherits(formula, "formula") || length(formula) < 3L) {
+    return(character(0L))
+  }
+  all.vars(formula[[2L]])
+}
+
+
+#' Extract predictor variable names from one or more formulas
+#'
+#' Returns the unique names of variables that appear on the
+#' right-hand side of the supplied formula(s), suitable for use
+#' with `data[[var]]` lookups. Handles plain `formula`,
+#' `brmsformula` (including multi-arm fits via `pforms`), and
+#' `mvbrmsformula` (multivariate response via `forms`). Skips
+#' `NULL` entries silently so callers can pass a list of optional
+#' formulas without prior filtering.
+#'
+#' The brmsterms-based predictor walk inside
+#' `extract_and_validate_trend_components()` (also in this file)
+#' is a more elaborate variant that yields metadata for the
+#' dimension-computation pipeline. This helper is intentionally a
+#' thinner pure-R wrapper aimed at the pre-fit NA check, which
+#' only needs the column names. Keeping the two parallel avoids
+#' reaching into the dimensions pipeline for a much simpler use
+#' case.
+#'
+#' @param formulas A single formula, brmsformula, mvbrmsformula,
+#'   or a list mixing any of those.
+#' @return Character vector of unique variable names (RHS only,
+#'   response variables excluded). Empty when nothing useful is
+#'   found.
+#' @noRd
+extract_predictor_vars <- function(formulas) {
+  if (is.null(formulas)) return(character(0L))
+  # brmsformula / mvbrmsformula are lists internally; treat them
+  # as single inputs (not iterables) at the entry point so the
+  # collector recurses into $formula / $pforms / $forms correctly.
+  if (inherits(formulas, c("formula", "brmsformula", "mvbrmsformula")) ||
+      !is.list(formulas)) {
+    formulas <- list(formulas)
+  }
+
+  collect <- function(f) {
+    if (is.null(f)) return(character(0L))
+    if (inherits(f, c("brmsformula", "mvbrmsformula"))) {
+      forms <- list()
+      if (!is.null(f$formula)) forms <- c(forms, list(f$formula))
+      if (!is.null(f$pforms))  forms <- c(forms, unname(f$pforms))
+      if (!is.null(f$forms))   forms <- c(forms, unname(lapply(
+        f$forms, function(x) x$formula %||% x
+      )))
+      unlist(lapply(forms, collect))
+    } else if (inherits(f, "formula")) {
+      # RHS only when response is on LHS; full formula otherwise.
+      rhs <- if (length(f) == 3L) f[[3L]] else f
+      lhs_vars <- if (length(f) == 3L) all.vars(f[[2L]]) else character(0L)
+      setdiff(all.vars(rhs), lhs_vars)
+    } else {
+      character(0L)
+    }
+  }
+
+  unique(unlist(lapply(formulas, collect)))
+}
+
+
+#' Validate that no formula-referenced covariate contains NAs
+#'
+#' brms's default `na_action = na_omit` silently drops rows with
+#' `NA` in any model-frame column. That is harmless for the
+#' response (mvgam preserves the trend time grid separately and
+#' only skips the dropped rows in the likelihood) but it is
+#' fatal for covariates: the trend pipeline expects a row at
+#' every timepoint, and a missing-covariate row breaks the
+#' dimension alignment downstream in Stan with an opaque
+#' chain-failure error. This pre-fit check raises an error at
+#' the validator layer naming the offending columns.
+#'
+#' @param data A data frame or list of vectors / matrices.
+#' @param formulas A single formula, brmsformula, mvbrmsformula,
+#'   or list of any of those. NULL elements are skipped.
+#' @param response_vars Character vector of response column
+#'   names to exclude from the check (NAs in the response are
+#'   allowed and preserved by mvgam).
+#' @param context String used in the error message to identify
+#'   the offending data object (e.g. `"data"` or `"newdata"`).
+#' @return Invisible NULL on success; an informative error on
+#'   failure listing which columns carry how many NAs.
+#' @noRd
+validate_no_covariate_nas <- function(data, formulas,
+                                        response_vars = character(0L),
+                                        context = "data") {
+  if (is.null(data) || is.null(formulas)) {
+    return(invisible(NULL))
+  }
+  predictor_vars <- extract_predictor_vars(formulas)
+  predictor_vars <- setdiff(predictor_vars, response_vars)
+
+  # Drop names that aren't data columns. These are typically NSE
+  # bare names from trend constructors (e.g. AR(time = week)) or
+  # bs / k literals brms has already absorbed -- not covariates.
+  # `data` may be a data frame or a list (for matrix predictors).
+  available <- names(data)
+  predictor_vars <- intersect(predictor_vars, available)
+  if (length(predictor_vars) == 0L) {
+    return(invisible(NULL))
+  }
+
+  na_counts <- vapply(predictor_vars, function(v) {
+    col <- data[[v]]
+    # `is.na()` handles vectors AND matrices uniformly; a matrix
+    # column (e.g. distributed-lag predictor) returns a logical
+    # matrix and `sum()` counts every NA cell.
+    if (is.null(col)) 0L else as.integer(sum(is.na(col)))
+  }, integer(1L))
+
+  bad <- na_counts[na_counts > 0L]
+  if (length(bad) == 0L) {
+    return(invisible(NULL))
+  }
+
+  bad_lines <- vapply(seq_along(bad), function(i) {
+    paste0("'", names(bad)[i], "': ", bad[i], " NA",
+           if (bad[i] > 1L) "s" else "")
+  }, character(1L))
+
+  stop(insight::format_error(c(
+    paste0(
+      "Covariates referenced by the formula contain ",
+      "missing values in '", context, "'."
+    ),
+    x = paste(bad_lines, collapse = "; "),
+    i = paste0(
+      "mvgam preserves NAs in the response to maintain the ",
+      "time grid (the likelihood simply skips those rows), but ",
+      "covariates that appear in the formula must be complete ",
+      "for the trend pipeline to align across timepoints. Drop ",
+      "the NA rows, impute the covariate, or remove that column ",
+      "from the formula before fitting."
+    )
+  )))
+}
+
+
 #' @param data Data frame to check
 #' @param required_vars Character vector of required variable names
 #' @param context Context description for error messages
@@ -5108,14 +5275,25 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
     # Only require time_var - series_var can be created via attributes if missing
     checkmate::assert_names(names(data), must.include = time_var)
 
-    # Pre-computed dimensions are mandatory; the validator does not
-    # recompute them locally.
+    # Pre-computed dimensions are the fast path. When a caller
+    # comes through that has not threaded them in (e.g. the
+    # `is_trend_setup = TRUE` branch in `setup_brms_lightweight()`,
+    # which receives already-reduced trend data and just needs
+    # metadata), synthesise a minimal `.precomputed_dimensions`
+    # shell carrying just the predictor names. Only
+    # `$metadata$covariates` is read downstream in this code path,
+    # so a heavier brmsterms walk is unnecessary here. Unblocks
+    # the brms-special surface (trials / se / cens / me / mm / cs
+    # / car) that all reach this point via `stancode()`.
     if (is.null(.precomputed_dimensions)) {
-      stop(insight::format_error(c(
-        "Missing precomputed dimensions.",
-        x = "This function must be called with precomputed dimensions.",
-        i = "Check that extract_and_validate_trend_components() is passing dimensions correctly."
-      )), call. = FALSE)
+      .precomputed_dimensions <- list(
+        metadata = list(
+          covariates = setdiff(
+            extract_predictor_vars(trend_formula),
+            response_vars %||% character(0L)
+          )
+        )
+      )
     }
 
     # Extract everything from precomputed dimensions - skip parse_trend_formula entirely

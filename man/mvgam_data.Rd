@@ -9,6 +9,8 @@ mvgam_data(
   data,
   y = "y",
   family = gaussian(),
+  formula = NULL,
+  trend_formula = NULL,
   trend_model = NULL,
   plot = TRUE,
   newdata = NULL,
@@ -42,6 +44,18 @@ strictly positive for Gamma). Multi-response families
 (\code{diri()}, \code{multi()}, \code{categ()}, \code{mvn()}, \code{mvt()}) are not
 supported here; pass the data directly to \code{\link[=mvgam]{mvgam()}} /
 \code{\link[=jsdgam]{jsdgam()}}.}
+
+\item{formula}{Optional observation formula (a \code{formula},
+\code{brmsformula}, or \code{bf()} two-arm specification for
+closure-unit fits). When supplied, every covariate the
+formula references is checked for \code{NA} and the call errors
+if any are present. Response \code{NA}s are always allowed and
+are preserved by \code{mvgam()} to maintain the time grid.}
+
+\item{trend_formula}{Optional trend formula (e.g.
+\code{~ AR(time = week, series = species) + s(env)}). Subject to
+the same covariate \code{NA} check as \code{formula}. Bare names
+inside trend constructors (\code{time = week}, \code{series = species}) that point at real columns are also checked.}
 
 \item{trend_model}{Optional trend constructor (e.g. \code{AR()},
 \code{RW()}, \code{CAR()}). When supplied, regular time spacing is

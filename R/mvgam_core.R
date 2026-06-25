@@ -367,6 +367,29 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
     .var.name = "data"
   )
   newdata <- validate_newdata(newdata, data)
+
+  # Pre-fit covariate NA guard. brms' validate_data() default
+  # `na_action = na_omit` silently drops rows with NAs in any
+  # model-frame column. That is fine for the response (mvgam
+  # preserves the trend time grid separately), but a missing
+  # covariate row breaks dimension alignment downstream in Stan
+  # and only shows up as an opaque chain-failure error. Catch it
+  # here naming the offending column(s).
+  resp_vars <- extract_response_vars(formula)
+  validate_no_covariate_nas(
+    data           = data,
+    formulas       = list(formula, trend_formula),
+    response_vars  = resp_vars,
+    context        = "data"
+  )
+  if (!is.null(newdata)) {
+    validate_no_covariate_nas(
+      data           = newdata,
+      formulas       = list(formula, trend_formula),
+      response_vars  = resp_vars,
+      context        = "newdata"
+    )
+  }
   checkmate::assert_character(backend, len = 1)
   checkmate::assert_logical(combine, len = 1)
   checkmate::assert_flag(run_model)

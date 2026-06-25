@@ -41,6 +41,17 @@
 #'   (`diri()`, `multi()`, `categ()`, `mvn()`, `mvt()`) are not
 #'   supported here; pass the data directly to [mvgam()] /
 #'   [jsdgam()].
+#' @param formula Optional observation formula (a `formula`,
+#'   `brmsformula`, or `bf()` two-arm specification for
+#'   closure-unit fits). When supplied, every covariate the
+#'   formula references is checked for `NA` and the call errors
+#'   if any are present. Response `NA`s are always allowed and
+#'   are preserved by `mvgam()` to maintain the time grid.
+#' @param trend_formula Optional trend formula (e.g.
+#'   `~ AR(time = week, series = species) + s(env)`). Subject to
+#'   the same covariate `NA` check as `formula`. Bare names
+#'   inside trend constructors (`time = week`, `series =
+#'   species`) that point at real columns are also checked.
 #' @param trend_model Optional trend constructor (e.g. `AR()`,
 #'   `RW()`, `CAR()`). When supplied, regular time spacing is
 #'   enforced for trends that require it; `CAR()` skips that
@@ -98,6 +109,8 @@
 mvgam_data <- function(data,
                        y = "y",
                        family = gaussian(),
+                       formula = NULL,
+                       trend_formula = NULL,
                        trend_model = NULL,
                        plot = TRUE,
                        newdata = NULL,
@@ -170,6 +183,17 @@ mvgam_data <- function(data,
   # mvgam() runs at fit time.
   if (!identical(get_trend_name(trend_model), "CAR")) {
     validate_regular_time_intervals(data$time, "time")
+  }
+
+  # Covariate NA check. Runs only when at least one formula was
+  # supplied; mirrors the pre-fit guard wired into mvgam_core().
+  if (!is.null(formula) || !is.null(trend_formula)) {
+    validate_no_covariate_nas(
+      data           = data,
+      formulas       = list(formula, trend_formula),
+      response_vars  = y,
+      context        = "data"
+    )
   }
 
   series_levels <- levels(data$series)

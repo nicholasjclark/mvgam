@@ -189,3 +189,149 @@ test_that("check_mvgam_data() forwards errors from mvgam_data()", {
     regexp = "Poisson|integer|non-negative"
   )
 })
+
+
+# ---- Covariate-NA guard (validate_no_covariate_nas) --------------
+
+test_that("validate_no_covariate_nas() catches NAs in obs-formula covariates", {
+  set.seed(1L)
+  simdat <- sim_mvgam(family = poisson(), n_series = 2L,
+                       n_timepoints = 16L)
+  dat <- simdat$data_train
+  dat$temp <- rnorm(nrow(dat))
+  dat$temp[3L] <- NA
+  # Without a formula, no covariate is referenced; should pass.
+  expect_s3_class(
+    suppressMessages(mvgam_data(dat, family = poisson(), plot = FALSE)),
+    "mvgam_data"
+  )
+  # With a formula referencing the NA-bearing column, error.
+  expect_error(
+    suppressMessages(
+      mvgam_data(dat, formula = y ~ temp, family = poisson(),
+                  plot = FALSE)
+    ),
+    regexp = "Covariates referenced.*missing values.*'temp': 1 NA"
+  )
+})
+
+
+test_that("validate_no_covariate_nas() checks trend-formula covariates", {
+  set.seed(1L)
+  simdat <- sim_mvgam(family = poisson(), n_series = 2L,
+                       n_timepoints = 16L)
+  dat <- simdat$data_train
+  dat$env <- rnorm(nrow(dat))
+  dat$env[c(2L, 7L)] <- NA
+  expect_error(
+    suppressMessages(
+      mvgam_data(dat, trend_formula = ~ s(env) + AR(),
+                  family = poisson(), plot = FALSE)
+    ),
+    regexp = "Covariates referenced.*'env': 2 NAs"
+  )
+})
+
+
+test_that("validate_no_covariate_nas() ignores response + unreferenced cols", {
+  set.seed(1L)
+  simdat <- sim_mvgam(family = poisson(), n_series = 2L,
+                       n_timepoints = 16L,
+                       prop_missing = 0.2)
+  dat <- simdat$data_train
+  # Unreferenced NA column: should NOT trigger an error.
+  dat$junk <- NA_real_
+  expect_s3_class(
+    suppressMessages(
+      mvgam_data(dat, formula = y ~ 1, family = poisson(),
+                  plot = FALSE)
+    ),
+    "mvgam_data"
+  )
+  # NAs in y (the response) are also allowed by the validator.
+  expect_true(any(is.na(dat$y)))
+})
+
+
+test_that("validate_no_covariate_nas() catches NAs reached via gp() / RE group", {
+  set.seed(1L)
+  simdat <- sim_mvgam(family = poisson(), n_series = 2L,
+                       n_timepoints = 16L)
+  dat <- simdat$data_train
+  # gp() reference: NAs in the GP input column must error.
+  dat$loc <- rnorm(nrow(dat))
+  dat$loc[2L] <- NA
+  expect_error(
+    suppressMessages(
+      mvgam_data(dat, formula = y ~ gp(loc),
+                  family = poisson(), plot = FALSE)
+    ),
+    regexp = "'loc': 1 NA"
+  )
+  # Random-effect grouping factor: NA in the grouping column.
+  dat$loc <- rnorm(nrow(dat))  # clean again
+  dat$grp <- factor(rep(c("a", "b"), length.out = nrow(dat)))
+  dat$grp[3L] <- NA
+  expect_error(
+    suppressMessages(
+      mvgam_data(dat, formula = y ~ (1 | grp),
+                  family = poisson(), plot = FALSE)
+    ),
+    regexp = "'grp': 1 NA"
+  )
+})
+
+
+test_that("validate_no_covariate_nas() counts NAs in matrix-column predictors", {
+  # Matrix-column predictors (distributed-lag style) are
+  # carried as list entries rather than data.frame columns
+  # because as.data.frame() would flatten them. Exercise the
+  # validator helper directly to confirm it counts every NA
+  # cell in a 16 x 3 matrix predictor.
+  dat <- list(
+    y      = rpois(16L, 1),
+    time   = 1:16,
+    series = factor(rep("s1", 16L), levels = "s1"),
+    Z      = matrix(rnorm(48L), ncol = 3L)
+  )
+  dat$Z[c(2L, 7L), 2L] <- NA
+  expect_error(
+    validate_no_covariate_nas(dat, formulas = list(y ~ Z),
+                                response_vars = "y"),
+    regexp = "'Z': 2 NAs"
+  )
+})
+
+
+test_that("extract_response_vars() handles formula / brmsformula / mvbrmsformula", {
+  expect_identical(extract_response_vars(NULL),    character(0L))
+  expect_identical(extract_response_vars(~ x),     character(0L))
+  expect_identical(extract_response_vars(y ~ x),   "y")
+  expect_setequal(extract_response_vars(cbind(y, trials) ~ x),
+                  c("y", "trials"))
+  # brmsformula: response on $formula slot.
+  expect_identical(extract_response_vars(brms::bf(y ~ x)), "y")
+  # Two-arm bf(): still only the top response, not the dpar arm.
+  expect_identical(extract_response_vars(brms::bf(y ~ env, p ~ tod)),
+                   "y")
+})
+
+
+test_that("extract_predictor_vars() handles formula / brmsformula / bf arms", {
+  expect_identical(extract_predictor_vars(NULL),     character(0L))
+  expect_identical(extract_predictor_vars(y ~ 1),    character(0L))
+  expect_setequal(extract_predictor_vars(y ~ x + z), c("x", "z"))
+  expect_setequal(extract_predictor_vars(y ~ s(x, by = grp)),
+                  c("x", "grp"))
+  # Trend constructor bare names should be picked up.
+  expect_setequal(extract_predictor_vars(~ AR(time = week, series = sp)),
+                  c("week", "sp"))
+  # Two-arm bf() (closure-unit detection sub-formula).
+  bf_two <- brms::bf(y ~ env, p ~ tod)
+  expect_setequal(extract_predictor_vars(bf_two), c("env", "tod"))
+  # List of formulas: union the predictors, drop duplicates.
+  expect_setequal(
+    extract_predictor_vars(list(y ~ x, ~ s(z, by = grp))),
+    c("x", "z", "grp")
+  )
+})
