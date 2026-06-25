@@ -144,3 +144,48 @@ test_that("mvgam_data skips time-regularity check under CAR()", {
     )
   )
 })
+
+
+# ---- check_mvgam_data() alias ------------------------------------
+
+test_that("check_mvgam_data() is exported and dispatches to mvgam_data()", {
+  expect_true(exists("check_mvgam_data", mode = "function",
+                      envir = asNamespace("mvgam")))
+  set.seed(1L)
+  simdat <- sim_mvgam(family = poisson(), n_series = 2L,
+                       n_timepoints = 16L)
+  out_check <- suppressMessages(
+    check_mvgam_data(simdat$data_train, family = poisson(),
+                      plot = FALSE)
+  )
+  out_orig <- suppressMessages(
+    mvgam_data(simdat$data_train, family = poisson(),
+                plot = FALSE)
+  )
+  # The two entry points return objects with identical structure
+  # (sans the call attribute, which we don't track).
+  expect_s3_class(out_check, "mvgam_data")
+  expect_identical(out_check$n_series, out_orig$n_series)
+  expect_identical(out_check$series_levels, out_orig$series_levels)
+  expect_identical(out_check$time_range, out_orig$time_range)
+})
+
+
+test_that("check_mvgam_data() forwards errors from mvgam_data()", {
+  # rnorm() produces non-integer floats, which trips the
+  # validate_response_for_family() non-integer branch under
+  # family = poisson(); the negative-values branch is exercised
+  # in the earlier "errors on negative y with Poisson" test.
+  bad <- data.frame(
+    y      = rnorm(10L),
+    time   = seq_len(10L),
+    series = factor("s1", levels = "s1")
+  )
+  expect_error(
+    suppressMessages(
+      check_mvgam_data(bad, y = "y", family = poisson(),
+                        plot = FALSE)
+    ),
+    regexp = "Poisson|integer|non-negative"
+  )
+})

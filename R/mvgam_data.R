@@ -18,6 +18,9 @@
 #' family without paying for a Stan compile, and to surface the
 #' same friendly errors `mvgam()` raises at fit time. Mirrors the
 #' role of [mvgam_formula()] for the data side.
+#' `check_mvgam_data()` is an alias for the same function.
+#'
+#' @aliases check_mvgam_data
 #'
 #' @param data Long-format `data.frame` (or list) carrying at
 #'   least the response column, a `time` column, and (for
@@ -229,4 +232,11 @@ print.mvgam_data <- function(x, ...) {
     "*" = paste0("n obs:  ", length(x$data[[1L]]))
   ))
   invisible(x)
+}
+
+
+#' @rdname mvgam_data
+#' @export
+check_mvgam_data <- function(...) {
+  mvgam_data(...)
 }

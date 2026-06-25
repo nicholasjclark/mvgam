@@ -2,6 +2,7 @@
 % Please edit documentation in R/mvgam_data.R
 \name{mvgam_data}
 \alias{mvgam_data}
+\alias{check_mvgam_data}
 \title{Inspect long-format data before fitting an \code{mvgam}}
 \usage{
 mvgam_data(
@@ -16,6 +17,8 @@ mvgam_data(
   n_bins = NULL,
   log_scale = FALSE
 )
+
+check_mvgam_data(...)
 }
 \arguments{
 \item{data}{Long-format \code{data.frame} (or list) carrying at
@@ -82,6 +85,7 @@ Use this to verify data structure for a proposed observation
 family without paying for a Stan compile, and to surface the
 same friendly errors \code{mvgam()} raises at fit time. Mirrors the
 role of \code{\link[=mvgam_formula]{mvgam_formula()}} for the data side.
+\code{check_mvgam_data()} is an alias for the same function.
 }
 \examples{
 \donttest{
