@@ -131,6 +131,7 @@ lfo_cv.mvgam <- function(object,
                           fc_horizon = 1L,
                           pareto_k_threshold = 0.7,
                           score = "elpd",
+                          save_log_lik = FALSE,
                           silent = 1L,
                           ...,
                           data = NULL) {
@@ -140,6 +141,7 @@ lfo_cv.mvgam <- function(object,
   checkmate::assert_number(pareto_k_threshold,
                             lower = 0, upper = 1)
   checkmate::assert_int(min_t, lower = 1L, null.ok = TRUE)
+  checkmate::assert_flag(save_log_lik)
   checkmate::assert_int(silent, lower = 0L, upper = 2L)
   allowed_scores <- c("elpd", "crps", "drps", "sis", "brier",
                        "energy", "variogram")
@@ -332,6 +334,21 @@ lfo_cv.mvgam <- function(object,
   elpds <- updates$elpds
   score_arrays <- updates$score_arrays
 
+  # Optional accumulator of per-observation log-densities at
+  # held-out points under the LFO-weighted posterior, in the
+  # n_draws x n_eval_obs shape that `loo::loo_model_weights()`
+  # consumes for proper log-score stacking. Only allocated when
+  # save_log_lik = TRUE because the matrix can be many megabytes.
+  log_lik_acc <- if (isTRUE(save_log_lik)) {
+    lfo_collect_fold_loglik(
+      loglik = loglik_past, all_data = all_data,
+      time_var = time_var, window_times = first_window_times,
+      psis_log_weights = NULL
+    )
+  } else {
+    NULL
+  }
+
   # Walk forward over observation positions in all_unique_times.
   # Guard against the degenerate single-fold case (n_evals == 1L):
   # seq.int(2L, 1L) is c(2L, 1L) descending, which would iterate
@@ -400,6 +417,16 @@ lfo_cv.mvgam <- function(object,
     )
     elpds <- updates$elpds
     score_arrays <- updates$score_arrays
+    if (isTRUE(save_log_lik)) {
+      log_lik_acc <- cbind(
+        log_lik_acc,
+        lfo_collect_fold_loglik(
+          loglik = loglik_past, all_data = all_data,
+          time_var = time_var, window_times = window_times,
+          psis_log_weights = psis_lw
+        )
+      )
+    }
   }
 
   sum_elpd <- if (!is.null(elpds)) sum(elpds, na.rm = TRUE) else NA
@@ -414,10 +441,52 @@ lfo_cv.mvgam <- function(object,
       refits_at = refits_at,
       refit_triggered = refit_triggered,
       pareto_k_threshold = pareto_k_threshold,
-      fc_horizon = fc_horizon
+      fc_horizon = fc_horizon,
+      log_lik = log_lik_acc
     ),
     class = "mvgam_lfo"
   )
+}
+
+
+# Internal: extract the per-draw log-density matrix for the
+# observations in `window_times` from the full-data loglik
+# matrix, resampling draw rows by the PSIS weights when present.
+# Returns an n_draws x n_window_obs matrix at draws representative
+# of the LFO-adjusted posterior, ready for column-bind into a
+# cumulative log-density store that `loo::loo_model_weights()`
+# can stack on.
+#
+# When `psis_log_weights` is NULL the caller is at a fresh refit,
+# so the full-data loglik IS the LFO loglik and no resampling
+# is needed.
+#'@noRd
+lfo_collect_fold_loglik <- function(loglik, all_data, time_var,
+                                      window_times,
+                                      psis_log_weights) {
+  fc_idx <- which(
+    as.integer(all_data[[time_var]]) %in% window_times
+  )
+  if (length(fc_idx) == 0L) {
+    return(matrix(NA_real_, nrow = nrow(loglik), ncol = 0L))
+  }
+  mat <- if (is.null(psis_log_weights)) {
+    loglik[, fc_idx, drop = FALSE]
+  } else {
+    n_draws <- nrow(loglik)
+    probs <- exp(psis_log_weights -
+                   lfo_log_sum_exp(psis_log_weights))
+    idx <- sample.int(n_draws, n_draws, replace = TRUE,
+                       prob = probs)
+    loglik[idx, fc_idx, drop = FALSE]
+  }
+  # Drop columns where every draw is NA. NAs arise at gaps in the
+  # observed time series (y is missing) and would crash loo's
+  # stacking optimiser, which rejects NAs in its log-likelihood
+  # input. Within-column NAs (rare) are similarly removed by
+  # dropping the column rather than imputing.
+  keep <- colSums(is.na(mat)) == 0L
+  mat[, keep, drop = FALSE]
 }
 
 
@@ -737,6 +806,9 @@ summary.mvgam_lfo <- function(object, ...) {
 #'   `fc_horizon`). Models with non-aligned grids raise an error
 #'   because paired differences would mix observations.
 #'
+#' @seealso [lfo_cv()], [loo_model_weights.mvgam_lfo()],
+#'   [compare_elpds()], [plot.mvgam_compare_elpds()]
+#'
 #' @importFrom loo loo_compare
 #' @method loo_compare mvgam_lfo
 #' @export
@@ -818,6 +890,178 @@ loo_compare.mvgam_lfo <- function(x, ..., model_names = NULL) {
   )
   class(out) <- c("compare.loo", "matrix", "data.frame")
   out
+}
+
+
+#' Model weights from `mvgam_lfo` objects
+#'
+#' @description Derives ensemble weights from a set of `mvgam_lfo`
+#'   objects. Two methods are supported (Yao et al. 2018):
+#'   \itemize{
+#'     \item `"pseudo-BMA"` (default): softmax of total LFO ELPD
+#'       across models. Cheap, requires only the per-step ELPDs
+#'       that every `mvgam_lfo` already carries. Collapses to a
+#'       near-degenerate vector when models differ by more than
+#'       ~10 ELPD units.
+#'     \item `"stacking"`: convex optimisation on the pointwise
+#'       LFO log-density matrix. Gives much softer weights than
+#'       pseudo-BMA and is generally preferred. Requires the
+#'       `$log_lik` matrix, which `lfo_cv()` only populates when
+#'       called with `save_log_lik = TRUE` (off by default
+#'       because the matrix can be many megabytes for long
+#'       rolling windows). Errors with a hint to refit if the
+#'       matrix is missing on any input.
+#'   }
+#'   Useful for combining multiple forecasts via
+#'   [ensemble.mvgam_forecast()] when the candidate models were
+#'   evaluated on the same rolling-origin grid.
+#'
+#' @param x An `mvgam_lfo` object.
+#' @param ... Further `mvgam_lfo` objects. Models are weighted in
+#'   the order they are passed.
+#' @param method Character. Either `"pseudo-BMA"` (default) or
+#'   `"stacking"`. See description.
+#' @param model_names Optional character vector of model names.
+#'   Defaults to the deparsed argument names.
+#'
+#' @return A named numeric vector of class `"pseudobma_weights"`
+#'   (method = pseudo-BMA) or `"stacking_weights"` (method =
+#'   stacking) summing to 1, with one entry per model.
+#'
+#' @references
+#' Yao, Y., Vehtari, A., Simpson, D., Gelman, A. (2018). Using
+#' stacking to average Bayesian predictive distributions.
+#' *Bayesian Analysis* 13(3): 917-1003.
+#' \doi{10.1214/17-BA1091}
+#'
+#' @seealso [loo_compare.mvgam_lfo()], [lfo_cv()],
+#'   [ensemble.mvgam_forecast()], [compare_elpds()],
+#'   [plot.mvgam_compare_elpds()]
+#'
+#' @importFrom loo loo_model_weights
+#' @method loo_model_weights mvgam_lfo
+#' @export
+loo_model_weights.mvgam_lfo <- function(x, ...,
+                                          method = "pseudo-BMA",
+                                          model_names = NULL) {
+  checkmate::assert_class(x, "mvgam_lfo")
+  checkmate::assert_choice(method,
+                            c("pseudo-BMA", "stacking"))
+  extras <- list(...)
+  for (m in extras) {
+    checkmate::assert_class(m, "mvgam_lfo")
+  }
+  models <- c(list(x), extras)
+  if (is.null(model_names)) {
+    nms <- c(deparse(substitute(x)),
+             vapply(substitute(...()), deparse, character(1L)))
+    model_names <- nms
+  }
+  checkmate::assert_character(model_names, len = length(models),
+                              any.missing = FALSE)
+
+  # All models must share the same evaluation grid; otherwise the
+  # paired comparison underlying either method would mix
+  # observations from different rolling-origin schemes.
+  ref_times <- models[[1L]]$eval_timepoints
+  for (i in seq_along(models)) {
+    if (!identical(models[[i]]$eval_timepoints, ref_times)) {
+      stop(insight::format_error(c(
+        "Cannot weight: eval_timepoints differ across models.",
+        x = paste0("Model ", i, " has a different evaluation grid ",
+                   "than model 1."),
+        i = paste0("Refit lfo_cv() on each model with the same ",
+                   "min_t and fc_horizon against the same data.")
+      )))
+    }
+  }
+
+  if (identical(method, "stacking")) {
+    return(stack_mvgam_lfo(models, model_names))
+  }
+
+  # Pseudo-BMA: softmax of total LFO ELPD.
+  total_elpd <- vapply(models, function(m) {
+    if (is.null(m$elpds)) {
+      stop(insight::format_error(c(
+        "An mvgam_lfo object has no ELPDs; cannot weight.",
+        i = paste0("Call lfo_cv(..., score = 'elpd') (or include 'elpd' ",
+                   "in the score vector) to populate ELPDs.")
+      )))
+    }
+    sum(m$elpds, na.rm = TRUE)
+  }, numeric(1L))
+
+  shifted <- total_elpd - max(total_elpd)
+  w <- exp(shifted) / sum(exp(shifted))
+  names(w) <- model_names
+
+  class(w) <- "pseudobma_weights"
+  attr(w, "method") <- "pseudo-BMA (mvgam_lfo)"
+  w
+}
+
+
+# Internal: log-score stacking on a list of mvgam_lfo objects.
+# Requires each $log_lik to be present (populated by lfo_cv with
+# save_log_lik = TRUE) and identically shaped (same number of
+# held-out evaluation observations across models). Delegates the
+# convex optimisation to loo::loo_model_weights().
+#'@noRd
+stack_mvgam_lfo <- function(models, model_names) {
+  ll_list <- lapply(seq_along(models), function(i) {
+    ll <- models[[i]]$log_lik
+    if (is.null(ll) || !is.matrix(ll) || ncol(ll) == 0L) {
+      stop(insight::format_error(c(
+        "Stacking needs the pointwise log-likelihood matrix.",
+        x = paste0("Model ", i, " ('", model_names[i],
+                   "') has no '$log_lik' slot."),
+        i = paste0("Re-run lfo_cv() with save_log_lik = TRUE on ",
+                   "every candidate model, then call again.")
+      )))
+    }
+    ll
+  })
+  ref_cols <- ncol(ll_list[[1L]])
+  for (i in seq_along(ll_list)) {
+    if (ncol(ll_list[[i]]) != ref_cols) {
+      stop(insight::format_error(c(
+        "Pointwise log-likelihood matrices have different widths.",
+        x = paste0("Model ", i, " has ", ncol(ll_list[[i]]),
+                   " columns; model 1 has ", ref_cols, "."),
+        i = paste0("Re-run lfo_cv() on all models against the ",
+                   "same newdata and rolling-origin grid.")
+      )))
+    }
+  }
+
+  # Drop observations where any candidate's log-likelihood is NA
+  # (typically gaps in the observed time series). The comparison
+  # has to stay paired observation-for-observation across models.
+  na_cols <- Reduce("|",
+                     lapply(ll_list, function(m) {
+                       colSums(is.na(m)) > 0L
+                     }))
+  if (any(na_cols)) {
+    ll_list <- lapply(ll_list, function(m) {
+      m[, !na_cols, drop = FALSE]
+    })
+  }
+
+  # Collapse each model's per-draw matrix to the per-observation
+  # marginal LFO log-predictive density: log mean exp over draws.
+  # This bypasses the inner PSIS step that
+  # `loo::loo_model_weights()` runs on raw log-likelihood
+  # matrices, which would fire Pareto-k warnings because our rows
+  # are already LFO-resampled draws (not a posterior in the shape
+  # PSIS-LOO expects).
+  lpd_point <- vapply(ll_list, function(m) {
+    apply(m, 2L, lfo_log_mean_exp)
+  }, numeric(ncol(ll_list[[1L]])))
+  w <- loo::stacking_weights(lpd_point)
+  names(w) <- model_names
+  attr(w, "method") <- "stacking (mvgam_lfo)"
+  w
 }
 
 

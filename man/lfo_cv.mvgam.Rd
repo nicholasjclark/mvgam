@@ -15,6 +15,7 @@ lfo_cv(object, ...)
   fc_horizon = 1L,
   pareto_k_threshold = 0.7,
   score = "elpd",
+  save_log_lik = FALSE,
   silent = 1L,
   ...,
   data = NULL

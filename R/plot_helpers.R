@@ -74,6 +74,48 @@ mvgam_theme <- function() {
     )
 }
 
+#' Okabe-Ito 8-colour qualitative palette, color-blind safe.
+#' Source: Okabe & Ito 2008
+#' (https://jfly.uni-koeln.de/color/), the standard go-to for
+#' categorical groupings in scientific figures. Use it anywhere
+#' the package needs to distinguish small numbers (~2-8) of
+#' discrete groups; for sequential posterior bands of a single
+#' quantity, prefer [mvgam_palette()] (bayesplot single-hue
+#' scheme).
+#'
+#' @noRd
+okabe_ito_palette <- function() {
+  c(
+    "#D55E00", "#0072B2", "#009E73", "#CC79A7",
+    "#E69F00", "#56B4E9", "#F0E442", "#999999"
+  )
+}
+
+
+#' Pick the first `n` colours from the Okabe-Ito categorical
+#' palette, recycling if `n` exceeds palette length.
+#'
+#' @noRd
+mvgam_categorical_palette <- function(n) {
+  rep_len(okabe_ito_palette(), n)
+}
+
+
+#' Shared `scale_colour_manual` for plots that overlay several
+#' coloured categorical groups (compare_scores models,
+#' compare_elpds models). Uses the Okabe-Ito palette instead of
+#' the bayesplot single-hue schemes, which are designed for
+#' sequential posterior bands and make distinct categories hard
+#' to tell apart at small palette indices.
+#'
+#' @noRd
+mvgam_model_colour_scale <- function(n, name = NULL) {
+  ggplot2::scale_colour_manual(
+    name   = name,
+    values = mvgam_categorical_palette(n)
+  )
+}
+
 #' Light-to-dark fills for `n` symmetric quantile bands. Picks
 #' from the leading entries of the active palette so the outer
 #' (widest) band gets the lightest colour and the inner

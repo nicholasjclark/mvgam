@@ -4,6 +4,7 @@
 ^\.github$
 ^LICENSE\.md$
 ^_pkgdown\.yml$
+^vignettes/articles$
 ^docs$
 ^.claude$
 ^Claude\.md$

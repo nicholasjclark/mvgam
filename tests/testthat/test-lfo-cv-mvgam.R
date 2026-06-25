@@ -516,3 +516,104 @@ test_that("loo_compare.mvgam_lfo SE matches paired-diff convention", {
   expect_equal(cmp$elpd_diff[2L], -3, tolerance = 1e-10)
   expect_equal(cmp$se_diff[2L], 0, tolerance = 1e-10)
 })
+
+
+# ---- loo_model_weights.mvgam_lfo --------------------------------
+
+test_that("loo_model_weights.mvgam_lfo returns pseudobma_weights summing to 1", {
+  m1 <- mk_mvgam_lfo(c(-1, -2, -3))
+  m2 <- mk_mvgam_lfo(c(-3, -4, -5))
+  w <- loo_model_weights(m1, m2)
+  expect_s3_class(w, "pseudobma_weights")
+  expect_length(w, 2L)
+  expect_equal(sum(w), 1, tolerance = 1e-12)
+  # m1 has higher total ELPD (-6 vs -12), so weight[1] > weight[2].
+  expect_gt(w[1L], w[2L])
+})
+
+
+test_that("loo_model_weights.mvgam_lfo single model returns 1", {
+  m1 <- mk_mvgam_lfo(c(-1, -2, -3))
+  w <- loo_model_weights(m1)
+  expect_length(w, 1L)
+  expect_equal(unname(w[1L]), 1, tolerance = 1e-12)
+})
+
+
+test_that("loo_model_weights.mvgam_lfo errors on grid mismatch", {
+  m1 <- mk_mvgam_lfo(c(-1, -2, -3), eval_timepoints = c(10, 11, 12))
+  m2 <- mk_mvgam_lfo(c(-1, -2, -3), eval_timepoints = c(20, 21, 22))
+  expect_error(loo_model_weights(m1, m2), "eval_timepoints")
+})
+
+
+test_that("loo_model_weights.mvgam_lfo errors when ELPDs are missing", {
+  m1 <- mk_mvgam_lfo(c(-1, -2, -3))
+  m2 <- mk_mvgam_lfo(c(-1, -2, -3))
+  m2$elpds <- NULL
+  expect_error(loo_model_weights(m1, m2), "no ELPDs")
+})
+
+
+test_that("loo_model_weights.mvgam_lfo method='stacking' errs without $log_lik", {
+  m1 <- mk_mvgam_lfo(c(-1, -2, -3))
+  m2 <- mk_mvgam_lfo(c(-2, -3, -4))
+  expect_error(
+    loo_model_weights(m1, m2, method = "stacking"),
+    "log_lik"
+  )
+})
+
+
+test_that("loo_model_weights.mvgam_lfo method='stacking' runs with $log_lik", {
+  # Build two LFO shells with synthetic per-draw log-density
+  # matrices. Model A's log-densities are systematically higher,
+  # so stacking should put more weight on it. The PSIS step
+  # inside loo's stacking optimiser warns about Pareto-k on this
+  # synthetic data; that is incidental to the test (real LFO log
+  # densities are smoother) and we tolerate it explicitly here.
+  set.seed(42L)
+  m_a <- mk_mvgam_lfo(c(-1, -1, -1))
+  m_b <- mk_mvgam_lfo(c(-2, -2, -2))
+  n_draws <- 100L
+  n_eval  <- 30L
+  m_a$log_lik <- matrix(
+    stats::rnorm(n_draws * n_eval, mean = -1, sd = 0.3),
+    nrow = n_draws
+  )
+  m_b$log_lik <- matrix(
+    stats::rnorm(n_draws * n_eval, mean = -2, sd = 0.3),
+    nrow = n_draws
+  )
+  w <- withCallingHandlers(
+    loo_model_weights(m_a, m_b, method = "stacking"),
+    warning = function(cnd) {
+      if (grepl("Pareto k", conditionMessage(cnd))) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+  expect_length(w, 2L)
+  expect_equal(sum(w), 1, tolerance = 1e-8)
+  expect_gt(w[["m_a"]], w[["m_b"]])
+  expect_match(attr(w, "method"), "stacking")
+})
+
+
+test_that("loo_model_weights.mvgam_lfo method='stacking' errs on width mismatch", {
+  m_a <- mk_mvgam_lfo(c(-1, -1, -1))
+  m_b <- mk_mvgam_lfo(c(-2, -2, -2))
+  m_a$log_lik <- matrix(stats::rnorm(100L * 30L), nrow = 100L)
+  m_b$log_lik <- matrix(stats::rnorm(100L * 25L), nrow = 100L)
+  expect_error(
+    loo_model_weights(m_a, m_b, method = "stacking"),
+    "different widths"
+  )
+})
+
+
+test_that("loo_model_weights.mvgam_lfo rejects unknown method", {
+  m1 <- mk_mvgam_lfo(c(-1, -2, -3))
+  m2 <- mk_mvgam_lfo(c(-3, -4, -5))
+  expect_error(loo_model_weights(m1, m2, method = "stacking-energy"))
+})

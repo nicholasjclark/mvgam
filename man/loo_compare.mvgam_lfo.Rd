@@ -41,3 +41,7 @@ over the same evaluation grid (same \code{eval_timepoints} and same
 \code{fc_horizon}). Models with non-aligned grids raise an error
 because paired differences would mix observations.
 }
+\seealso{
+\code{\link[=lfo_cv]{lfo_cv()}}, \code{\link[=loo_model_weights.mvgam_lfo]{loo_model_weights.mvgam_lfo()}},
+\code{\link[=compare_elpds]{compare_elpds()}}, \code{\link[=plot.mvgam_compare_elpds]{plot.mvgam_compare_elpds()}}
+}

@@ -156,3 +156,68 @@ summary.mvgam_forecast = function(object, probs = c(0.025, 0.975), ...) {
 
   return(fc_preds)
 }
+
+
+#' Compact summary of an `mvgam_forecast` object
+#'
+#' Without a dedicated method, `print()` falls back to the default
+#' list printer and dumps every posterior matrix in the object,
+#' which is dozens of pages of numbers for any non-trivial fit.
+#' This method prints a single-screen header with the family, the
+#' number of series, the size of the training and forecast windows,
+#' and the number of posterior draws. Use [summary.mvgam_forecast()]
+#' for the per-timepoint posterior summary tibble or
+#' [plot.mvgam_forecast()] for the visual.
+#'
+#' @param x An `mvgam_forecast` object from [forecast.mvgam()],
+#'   [hindcast.mvgam()] or [ensemble.mvgam_forecast()].
+#' @param ... Ignored.
+#'
+#' @seealso [summary.mvgam_forecast()], [plot.mvgam_forecast()],
+#'   [forecast.mvgam()], [hindcast.mvgam()],
+#'   [ensemble.mvgam_forecast()], [score.mvgam_forecast()],
+#'   [compare_scores()]
+#'
+#' @method print mvgam_forecast
+#' @export
+print.mvgam_forecast <- function(x, ...) {
+  n_series <- length(x$series_names)
+  n_train <- if (!is.null(x$hindcasts) && length(x$hindcasts) > 0L) {
+    ncol(x$hindcasts[[1L]])
+  } else {
+    0L
+  }
+  n_test <- if (!is.null(x$forecasts) && length(x$forecasts) > 0L) {
+    ncol(x$forecasts[[1L]])
+  } else {
+    0L
+  }
+  n_draws <- if (!is.null(x$hindcasts) && length(x$hindcasts) > 0L) {
+    nrow(x$hindcasts[[1L]])
+  } else if (!is.null(x$forecasts) && length(x$forecasts) > 0L) {
+    nrow(x$forecasts[[1L]])
+  } else {
+    0L
+  }
+  ensemble_w <- attr(x, "weights", exact = TRUE)
+  bullets <- c(
+    paste0("mvgam_forecast (type '", x$type %||% "response", "')"),
+    "*" = paste0("family:    ", x$family %||% "unknown"),
+    "*" = paste0("series:    ", n_series),
+    "*" = paste0("hindcast:  ", n_train, " timepoints"),
+    "*" = paste0("forecast:  ", n_test,
+                 if (n_test == 0L) " (none; hindcast only)" else " timepoints"),
+    "*" = paste0("draws:     ", n_draws)
+  )
+  if (!is.null(ensemble_w)) {
+    bullets <- c(
+      bullets,
+      "*" = paste0("ensemble:  ", length(ensemble_w),
+                   " components (weights ",
+                   paste(sprintf("%.2f", as.numeric(ensemble_w)),
+                         collapse = ", "), ")")
+    )
+  }
+  cli::cli_inform(bullets)
+  invisible(x)
+}
