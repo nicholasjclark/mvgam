@@ -51,10 +51,18 @@ know whether `mvgam()` will accept it.
 
 ## The long-format requirement
 
-Every observation needs its own row, indexed by `time` and (when
-multiple series are present) by `series`. The package's
-in-built `birdsong` dataset is a clean example: four species
-counted weekly across 80 weeks.
+Every observation needs its own row, indexed by a time column
+and (when multiple series are present) by a series column. The
+defaults are `time` and `series`, but every trend constructor
+takes bare-name `time = ` and `series = ` arguments that override
+these defaults, and `jsdgam()` exposes `unit = ` and `species = `
+for the same purpose. So if your data carry the timestamp under
+`epiWeek` and the series identifier under `plotID`, calling
+`AR(time = epiWeek, series = plotID)` (or
+`jsdgam(unit = epiWeek, species = plotID, ...)`) keeps your own
+column names intact. The package's in-built `birdsong` dataset
+follows the defaults: four species counted weekly across 80
+weeks.
 
 ```{r birdsong-head}
 data(birdsong)
@@ -64,11 +72,14 @@ head(birdsong, 4)
 
 There is one row per `(series, time)` cell, with `series` as a
 `factor` and `time` as an integer index of week. The response
-`y` carries the weekly count. The `species`, `week`, and
-`week_in_year` columns are not required by `mvgam` and would be
-ignored; the four required columns for a multi-series fit are
-`series`, `time`, `y` (whatever the response column is called),
-and any covariates the formula references.
+`y` carries the weekly count. A multi-series fit needs the four
+columns: a series identifier (`series` by default), a time
+index (`time` by default), the response (whatever the formula
+names), and any covariates the formula references. The
+`species`, `week` and `week_in_year` columns in `birdsong` are
+not required by `mvgam` and would be ignored, but they would
+work as the series and time columns if a trend constructor were
+called with `RW(time = week, series = species)`.
 
 The same long format is what `sim_mvgam()` returns by default
 when generating fixtures:
@@ -88,12 +99,14 @@ latent trajectory at those timepoints.
 
 ## The `series` factor
 
-`series` must be a `factor`, and its levels must match the unique
-values present in the data. The two failure modes are *character
-instead of factor* and *extra levels that no row references*. The
-first is easy to catch by class; the second is sneaky because
-the data look fine until `mvgam()` tries to index a series that
-isn't there.
+Whatever column carries the series identifier (`series` by
+default, or any column named through `AR(series = ...)` /
+`jsdgam(species = ...)`) must be a `factor`, and its levels
+must match the unique values present in the data. The two
+failure modes are *character instead of factor* and *extra
+levels that no row references*. The first is easy to catch by
+class; the second is sneaky because the data look fine until
+`mvgam()` tries to index a series that isn't there.
 
 ```{r series-class}
 class(birdsong$series)
@@ -127,11 +140,13 @@ See `?ZMVN` and `?jsdgam` for those entry points.
 
 ## The `time` variable
 
-`time` must be numeric or integer. Trend constructors that
+The time column must be numeric or integer (the default name is
+`time`; any other column name passed through `AR(time = ...)`,
+`jsdgam(unit = ...)`, etc. is honoured). Trend constructors that
 assume regular sampling (`RW()`, `AR()`, `VAR()`, `PW()`) further
 require the spacing between consecutive time values to be
-constant within each series, although the response can be missing
-at any timepoint. Smaller `time` values are interpreted as
+constant within each series, although the response can be
+missing at any timepoint. Smaller time values are interpreted as
 *earlier* observations.
 
 ```{r time-range}
@@ -339,14 +354,46 @@ this section exists so you can recognise the layout when you
 encounter it and not confuse it with the per-time-step long
 format.
 
+## Custom column names
+
+The default `series` and `time` column names work for the
+majority of fits, but they are not required. Every trend
+constructor accepts bare-name `time = ` and `series = ` arguments
+that point at any column in the data; `jsdgam()` exposes the same
+through `unit = ` and `species = `. A `birdsong`-style fit can
+run directly off the `week` and `species` columns without
+renaming:
+
+```{r custom-names, results = "hide", eval = FALSE}
+# Equivalent to a `time` / `series` setup, no renaming required:
+mvgam(
+  y ~ s(week_in_year, bs = "cc", k = 10),
+  trend_formula = ~ AR(time = week, series = species),
+  data    = birdsong,
+  family  = poisson(),
+  chains  = 2L, silent = 2L
+)
+```
+
+The trend constructor's `time` / `series` arguments override the
+defaults consistently across `RW()`, `AR()`, `VAR()`, `CAR()`,
+`PW()` and `ZMVN()`. For `jsdgam()` fits the equivalent is
+`unit = ` on the top-level call. The closure-unit families
+(`occ()`, `nmix()`) take a different route. They inherit the
+unit identifier from the package validator and pass it through
+the detection arm of `bf()`.
+
 ## A pre-fit checklist
 
 Before any `mvgam()` call, the checklist that catches the most
 common failures is short:
 
-1. `class(data$series)` returns `"factor"` and
-   `setdiff(levels(data$series), unique(data$series))` is empty.
-2. `data$time` is `numeric` or `integer` and (for AR-family
+1. The series column is a `factor` with no orphan levels
+   (`setdiff(levels(data$series), unique(data$series))` is
+   empty). If you point a trend constructor at a different
+   column with `AR(series = my_col)`, the same rule applies to
+   `my_col`.
+2. The time column is `numeric` or `integer` and (for AR-family
    trends) the spacing within each series is constant.
 3. The response respects the chosen family's support
    (`?mvgam_families`).

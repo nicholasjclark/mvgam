@@ -112,13 +112,17 @@ Two fitters at the top of the package expose the same state-space
 machinery. They differ only in how the data are laid out and
 what the response represents.
 
-`mvgam()` takes a long-format data frame indexed by `time` and
-(optionally) by `series`. The series dimension drives the
-multivariate trend constructors: `VAR()`, the `cor = TRUE`
-switches, and hierarchical correlations through `gr`. The
-response is a single column on the `brms` side. Use this fitter
-to forecast one or more time series, including the closure-unit
-families when each unit produces a scalar response.
+`mvgam()` takes a long-format data frame indexed by a time
+column and (optionally) by a series column. The defaults are
+`time` and `series`, but every trend constructor accepts
+`time = ` / `series = ` arguments that point at any column in
+the data, so existing column names need not be renamed. The
+series dimension drives the multivariate trend constructors:
+`VAR()`, the `cor = TRUE` switches and hierarchical
+correlations through `gr`. The response is a single column on
+the `brms` side. Use this fitter to forecast one or more time
+series, including the closure-unit families when each unit
+produces a scalar response.
 
 `jsdgam()` is the entry point for joint species distribution and
 closure-unit fits where the grouping is biological rather than
