@@ -1259,7 +1259,8 @@ extract_dpars_from_stanfit <- function(stanfit,
                                        dpar_names,
                                        ndraws,
                                        nobs,
-                                       draw_ids = NULL) {
+                                       draw_ids = NULL,
+                                       resp = NULL) {
   # Validate stanfit can be converted to draws
   checkmate::assert_multi_class(
     stanfit,
@@ -1308,9 +1309,12 @@ extract_dpars_from_stanfit <- function(stanfit,
   dpars_list <- list()
 
   for (dpar in dpar_names) {
-    # Build patterns for scalar and indexed parameters
-    scalar_pattern <- paste0("^", dpar, "$")
-    indexed_pattern <- paste0("^", dpar, "\\[")
+    # Build patterns for scalar and indexed parameters. brms's
+    # mvbf suffixes per-arm dpars with `_<resp>` (e.g.
+    # `shape_biomass`); for univariate fits no suffix is added.
+    suffix <- if (!is.null(resp)) paste0("_", resp) else ""
+    scalar_pattern <- paste0("^", dpar, suffix, "$")
+    indexed_pattern <- paste0("^", dpar, suffix, "\\[")
 
     # Find matching columns
     scalar_cols <- grep(scalar_pattern, all_cols, value = TRUE)

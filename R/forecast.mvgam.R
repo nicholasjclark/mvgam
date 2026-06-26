@@ -811,7 +811,8 @@ build_forecast_arms <- function(object, trend_model, meta,
   }
   resp_mat <- sample_family_batched(object, mu, fc_grid$data,
                                       ndraws_use, draw_idx,
-                                      family = family_for_arm)
+                                      family = family_for_arm,
+                                      resp = resp)
   slice_per_series(resp_mat, fc_grid, obs_struct_fc,
                      ndraws_use, series_levels)
 }
@@ -1154,7 +1155,8 @@ slice_per_series <- function(mat, fc_grid, obs_struct,
 # matching `draw_ids` so they line up element-wise.
 #'@noRd
 sample_family_batched <- function(object, mu, fc_data, ndraws_use,
-                                    draw_idx, family = NULL) {
+                                    draw_idx, family = NULL,
+                                    resp = NULL) {
   family <- family %||% object$family
   family_name <- family$family
   nobs <- ncol(mu)
@@ -1164,7 +1166,8 @@ sample_family_batched <- function(object, mu, fc_data, ndraws_use,
     dpar_names = dpar_names,
     ndraws = ndraws_use,
     nobs = nobs,
-    draw_ids = draw_idx
+    draw_ids = draw_idx,
+    resp = resp
   )
   trials <- extract_trials_for_family(object, family, fc_data)
   trunc_bounds <- extract_truncation_bounds(object, nobs)
