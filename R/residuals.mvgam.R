@@ -410,7 +410,13 @@ compute_quantile_residuals <- function(object, y, pp_args,
   # on `object$formula$forms[[resp]]$family`. Use the per-arm
   # family when `resp` is supplied and the formula is mv.
   fam <- resolve_resp_family(object, resp)
-  spec <- quantile_family_specs[[fam]]
+  # brms's mvbf normalises family names to lowercase
+  # (e.g. `Gamma` -> `gamma`), which misses the spec keys that
+  # mirror R's family() constructor casing. Match case-insensitively
+  # so per-response Gamma / Gaussian arms hit the analytic path
+  # instead of falling through to the empirical-PIT branch.
+  spec_idx <- match(tolower(fam), tolower(names(quantile_family_specs)))
+  spec <- if (is.na(spec_idx)) NULL else quantile_family_specs[[spec_idx]]
   if (!is.null(spec)) {
     return(compute_quantile_residuals_analytic(
       object = object, y = y, spec = spec,

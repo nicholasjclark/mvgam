@@ -1161,7 +1161,11 @@ sample_family_batched <- function(object, mu, fc_data, ndraws_use,
                                     draw_idx, family = NULL,
                                     resp = NULL) {
   family <- family %||% object$family
-  family_name <- family$family
+  # `get_family_dpars` only matches lowercase keys; R's `Gamma()`
+  # constructor stores `family$family = "Gamma"` and brms's mvbf
+  # normalises to `"gamma"` -- both must resolve to the `shape`
+  # dpar lookup downstream.
+  family_name <- tolower(family$family)
   nobs <- ncol(mu)
   dpar_names <- get_family_dpars(family_name)
   dpars <- extract_dpars_from_stanfit(
@@ -1221,7 +1225,16 @@ sample_family_batched <- function(object, mu, fc_data, ndraws_use,
 #'@noRd
 extract_family_pars_for_draws <- function(object, draws_mat,
                                             draw_idx, resp = NULL) {
-  dpar_names <- get_family_dpars(object$family$family)
+  # For multi-response (mvbrmsformula) fits, `object$family` is the
+  # gaussian placeholder; the actual per-response family lives on
+  # `object$formula$forms[[resp]]$family`. Honour the per-response
+  # family when `resp` is supplied so we look up the correct dpar
+  # set (e.g. `shape` for Gamma rather than `sigma` for gaussian).
+  # `get_family_dpars` only matches lowercase keys, so case-fold;
+  # R's `Gamma()` constructor stores `family$family = "Gamma"` but
+  # brms's mvbf normalises to `"gamma"`, and both should resolve.
+  fam_name <- tolower(resolve_resp_family(object, resp))
+  dpar_names <- get_family_dpars(fam_name)
   if (length(dpar_names) == 0L) return(list())
   # For multivariate (mvbind / mvbrmsformula) fits, brms emits
   # one parameter per response with the response name suffixed
