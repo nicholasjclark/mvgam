@@ -400,32 +400,82 @@ for the scoring rules and rolling-origin tools that pair with
 
 ## Take-aways
 
-A multi-response mvgam fit lets you keep each measurement model
-in its proper family while sharing the dynamics that drive every
-observation. The recipe is small:
+A multi-response mvgam fit lets each measurement model keep its
+proper observation family while sharing the dynamics that drive
+every series. The recipe is small: write one `bf()` block per
+response with its own family and predictors, combine the blocks
+with `+`, and pass the combined formula to `mvgam()` with a
+single shared `trend_formula = ~ ...`. Every post-fit method
+(`summary()`, `pp_check()`, `conditional_effects()`,
+`residuals()`, `posterior_predict()`, `forecast()`, `loo()`)
+either operates directly on the joint fit or accepts a `resp`
+argument that scopes the call to a single outcome. Outcomes
+with NA values keep their own non-NA rows, so the shared latent
+state is still informed at every time point any method actually
+reported.
 
-- write one `bf()` block per response with its own family and its
-  own predictors,
-- combine them with `+`,
-- pass the combined formula to `mvgam()` with a single shared
-  `trend_formula = ~ ...`.
-
-Each post-fit method (`summary()`, `pp_check()`,
-`conditional_effects()`, `residuals()`, `posterior_predict()`,
-`forecast()`, `loo()`) either operates directly on the joint
-fit or accepts a `resp` argument that scopes the call to a single
-outcome. Outcomes with NA values keep their own non-NA rows; the
-shared latent state is still informed at every time point any
-method was observed.
+This is the data integration idea of Schaub & Abadi
+([2011](https://doi.org/10.1007/s10336-010-0632-7)) applied
+to time series rather than to population vital rates: several
+noisy measurement processes pooled through a single shared
+latent quantity, instead of being analysed in isolation. The
+latent dynamic framing follows the synthesis by Auger-Méthé and
+colleagues ([2021](https://doi.org/10.1002/ecm.1470)). The
+probabilistic machinery underneath is Stan via brms (Carpenter
+et al. [2017](https://doi.org/10.18637/jss.v076.i01); Bürkner
+[2017](https://doi.org/10.18637/jss.v080.i01)).
 
 ## Further reading
 
-- The [forecast-evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+The natural next functions to explore on the same fit are:
+
+- `score()` and `ensemble()` for proper scoring rules and
+  stacked weights on per-outcome forecasts.
+- `lfo_cv()` for rolling-origin Bayesian leave-future-out
+  cross-validation when the question is "how would this model
+  have performed in production".
+- `loo()`, `kfold.mvgam()` and `posterior_average()` for
+  in-sample model comparison and posterior-weighted predictions.
+- `irf()`, `fevd()` and `stability()` for impulse response,
+  forecast-error variance decomposition and stationarity
+  diagnostics when the latent dynamics are a VAR.
+- `methods_md()` for a citation-ready methods paragraph naming
+  the architecture pieces the fit actually used.
+
+Sibling articles in this series carry the workflow further:
+
+- The [forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
   walks through `forecast()`, `score()`, `lfo_cv()` and
-  `ensemble()` on a worked count-data example.
+  `ensemble()` on a single count outcome and the multivariate
+  scoring rules that pair with them.
 - The [JSDM article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
   shows the joint-species variant where many response columns
-  share a latent factor structure with informed priors.
-- For hierarchical / grouped trend dynamics (one shared trend per
-  group with hyperpriors across groups), see `?gr` and the
+  share a latent factor structure with informed priors via
+  `jsdgam()`.
+- For hierarchical or grouped trend dynamics (one shared trend
+  per group with hyperpriors across groups), see `?gr` and the
   hierarchical-trends section of `vignette("mvgam_overview")`.
+
+## References
+
+Auger-Méthé M, Newman K, Cole D, Empacher F, Gryba R, King AA,
+Leos-Barajas V, Mills Flemming J, Nielsen A, Petris G & Thomas L
+(2021). A guide to state-space modeling of ecological time
+series. *Ecological Monographs* 91(4): e01470.
+[doi:10.1002/ecm.1470](https://doi.org/10.1002/ecm.1470)
+
+Bürkner P-C (2017). brms: An R Package for Bayesian Multilevel
+Models Using Stan. *Journal of Statistical Software* 80(1):
+1-28.
+[doi:10.18637/jss.v080.i01](https://doi.org/10.18637/jss.v080.i01)
+
+Carpenter B, Gelman A, Hoffman MD, Lee D, Goodrich B, Betancourt
+M, Brubaker M, Guo J, Li P & Riddell A (2017). Stan: A
+Probabilistic Programming Language. *Journal of Statistical
+Software* 76(1): 1-32.
+[doi:10.18637/jss.v076.i01](https://doi.org/10.18637/jss.v076.i01)
+
+Schaub M & Abadi F (2011). Integrated population models: a novel
+analysis framework for deeper insights into population dynamics.
+*Journal of Ornithology* 152(Suppl 1): S227-S237.
+[doi:10.1007/s10336-010-0632-7](https://doi.org/10.1007/s10336-010-0632-7)
