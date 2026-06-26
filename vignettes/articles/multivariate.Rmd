@@ -25,6 +25,7 @@ knitr::opts_chunk$set(
 library(mvgam)
 library(brms)
 library(ggplot2)
+library(patchwork)
 theme_set(theme_bw(base_size = 12, base_family = "serif"))
 
 cache_dir <- file.path("pkgdown", "multivariate_cache")
@@ -267,33 +268,53 @@ sapply(list(count = res_count, biomass = res_biomass,
 
 ## State recovery: joint vs baselines
 
-The point of the joint fit is the latent state itself.
-`compare_latent_states()` extracts the posterior `trend[t]` from a
-named list of fits, aligns each fit's sign to the supplied truth
-vector when one is given, and returns either an overlay of the
-posterior trajectories or a comparison of the per-time posterior
-SD across fits.
+The point of the joint fit is the latent state itself. We pull
+the per-draw latent trajectory out of each fit with
+`hindcast(fit, type = "trend")`. The resulting `mvgam_forecast`
+plots with the package's standard ribbon and median style. A
+`geom_point()` layer adds the simulated truth on top so recovery
+is read off directly.
 
-```{r compare-trajectory, fig.asp = 0.62, fig.width = 9, out.width = "95%"}
+```{r recovery-plot, fig.asp = 0.62, fig.width = 9, out.width = "95%"}
 fits <- list(
   "Joint (3 families)" = mod_joint,
   "Counts only"        = mod_uni_count,
   "Biomass only"       = mod_uni_biomass,
   "Camera only"        = mod_uni_camera
 )
-compare_latent_states(fits, truth = truth$x, type = "trajectory")
+truth_pts <- data.frame(
+  time = seq_along(truth$x), trend = truth$x
+)
+
+plot_recovery <- function(fit, label) {
+  hc <- hindcast(fit, type = "trend")
+  # Multi-response fits return one mvgam_forecast per outcome,
+  # all sharing the same latent trend; the univariate fits return
+  # a single mvgam_forecast directly.
+  if (is.list(hc) && !inherits(hc, "mvgam_forecast")) {
+    hc <- hc[[1L]]
+  }
+  plot(hc) +
+    geom_point(
+      data = truth_pts,
+      aes(x = time, y = trend),
+      shape = 4, size = 1.2, colour = "black"
+    ) +
+    labs(title = label)
+}
+
+patchwork::wrap_plots(
+  lapply(names(fits), function(n) plot_recovery(fits[[n]], n)),
+  ncol = 2L
+)
 ```
 
-```{r compare-sd, fig.asp = 0.55, fig.width = 9, out.width = "95%"}
-compare_latent_states(fits, truth = truth$x, type = "sd")
-```
-
-The joint fit's posterior median tracks the truth more closely
-than any of the univariate baselines, and its per-time posterior
-SD sits below the other three at every time point. The camera-only
-line is the diffuse outlier: a single Bernoulli observation per
-time point carries little information. The joint fit recovers
-strength wherever any of the methods reported.
+The joint fit's ribbon tracks the simulated truth (crosses) more
+closely than any of the univariate baselines, and the ribbon is
+visibly narrower. The camera-only fit is the diffuse outlier: a
+single Bernoulli observation per time point carries little
+information. The joint fit recovers strength wherever any of the
+methods reported.
 
 ## Per-outcome posterior forecasts
 
@@ -303,7 +324,7 @@ returns one `mvgam_forecast` per outcome. We extend the time grid
 by 5 months and let mvgam propagate the shared latent state
 forward, then map back through each outcome's observation family.
 
-```{r forecast-multi, eval = TRUE}
+```{r forecast-multi, fig.asp = 1.0, fig.width = 7, out.width = "85%"}
 T_ <- max(mv_data$time)
 new <- data.frame(
   time = (T_ + 1L):(T_ + 5L),
@@ -314,12 +335,18 @@ new <- data.frame(
   count = NA_integer_, biomass = NA_real_, camera = NA_integer_
 )
 fc <- forecast(mod_joint, newdata = new)
-sapply(fc, function(f) length(f$forecasts))
+patchwork::wrap_plots(
+  lapply(names(fc), function(n) plot(fc[[n]]) + labs(title = n)),
+  ncol = 1L
+)
 ```
 
-One forecast object per outcome, ready to feed into `score()`
-(see the [forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html))
-or into separate plots for each response.
+Each panel shows that outcome's posterior-predictive ribbon
+through the 80 training months and the 5 forecast months ahead.
+The same forecast objects feed straight into `score()`; see the
+[forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+for the scoring rules and rolling-origin tools that pair with
+`forecast()` here.
 
 ## Take-aways
 

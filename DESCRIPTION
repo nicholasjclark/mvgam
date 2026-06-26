@@ -64,7 +64,8 @@ Suggests:
     colorspace,
     future,
     ape,
-    mvabund
+    mvabund,
+    patchwork
 Enhances:
     gratia (>= 0.9.0),
     tidyr

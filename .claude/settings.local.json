@@ -58,7 +58,8 @@
       "Bash(curl -s \"https://api.github.com/repos/hmsc-r/HMSC/contents\")",
       "WebFetch(domain:www.mv.helsinki.fi)",
       "Bash(curl -s \"https://cran.r-project.org/web/packages/Hmsc/index.html\")",
-      "Bash(python3 ~/.claude/hooks/prose_lint.py --files /home/nicholas-clark/Desktop/mvgam/vignettes/mvgam_overview.Rmd)"
+      "Bash(python3 ~/.claude/hooks/prose_lint.py --files /home/nicholas-clark/Desktop/mvgam/vignettes/mvgam_overview.Rmd)",
+      "WebFetch(domain:api.crossref.org)"
     ],
     "deny": [],
     "ask": [],
