@@ -405,7 +405,11 @@ quantile_family_specs <- list(
 compute_quantile_residuals <- function(object, y, pp_args,
                                          d, draw_ids = NULL,
                                          resp = NULL) {
-  fam <- object$family$family
+  # For multi-response fits, `object$family` is the (gaussian)
+  # placeholder mvbf top-level family; the per-arm family lives
+  # on `object$formula$forms[[resp]]$family`. Use the per-arm
+  # family when `resp` is supplied and the formula is mv.
+  fam <- resolve_resp_family(object, resp)
   spec <- quantile_family_specs[[fam]]
   if (!is.null(spec)) {
     return(compute_quantile_residuals_analytic(

@@ -156,3 +156,21 @@ mv_resp_fan_out <- function(object, resp) {
   names(out) <- responses
   out
 }
+
+
+#' Resolve the family for a given response in a multi-response fit.
+#'
+#' brms `mvbf` puts a placeholder family on the top-level `mvgam`
+#' object (the default `gaussian()`); the actual per-arm family
+#' lives on `object$formula$forms[[resp]]$family`. Univariate fits
+#' have one family at the top level. This helper returns the family
+#' name string (`fam$family`).
+#'
+#' @noRd
+resolve_resp_family <- function(object, resp = NULL) {
+  if (!is.null(resp) && inherits(object$formula, "mvbrmsformula")) {
+    bf_i <- object$formula$forms[[resp]]
+    if (!is.null(bf_i$family)) return(bf_i$family$family)
+  }
+  object$family$family
+}
