@@ -111,6 +111,18 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   all_summaries <- all_summaries[pars_to_keep, , drop = FALSE]
   pars <- rownames(all_summaries)
 
+  # Hide rotation- / sign-indeterminate raw factor-model parameters
+  # whenever their QR-identified counterparts are also in the posterior
+  # (Heaps & Jermyn 2024). Keeps the downstream convergence advisor
+  # and loadings table focused on identified Z_tilde / lv_trend_tilde
+  # rather than warning on Rhat noise from params with no fixed
+  # rotation under the prior.
+  identified <- filter_hidden_unrotated(pars)
+  if (length(identified) < length(pars)) {
+    all_summaries <- all_summaries[identified, , drop = FALSE]
+    pars <- rownames(all_summaries)
+  }
+
   # Build output structure with metadata
   draws_obj <- posterior::as_draws(object$fit)
   out <- list(

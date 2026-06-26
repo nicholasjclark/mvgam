@@ -206,7 +206,13 @@
 #'   (`ordinate`, `residual_cor`) recognise the additional class.
 #'
 #' @seealso [mvgam()], [lv_axis()], [residual_cor()],
-#'   [ordinate()], [methods_md()], [how_to_cite()].
+#'   [ordinate()], [shared_variation()], [active_factors()],
+#'   [compare_loadings()], [methods_md()], [how_to_cite()]. A
+#'   worked online article walking through `jsdgam()` with a
+#'   negative binomial observation model, the Heaps & Jermyn
+#'   (2024) trait-informed loadings prior, ordination biplots
+#'   and the MGP shrinkage criterion is at
+#'   \url{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}.
 #'
 #' @references
 #' Warton, D. I., Blanchet, F. G., O'Hara, R. B., Ovaskainen, O.,

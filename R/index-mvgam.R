@@ -53,7 +53,13 @@ variables.mvgam <- function(x, ...) {
   # because the alias map renames positional `b[k]` to
   # `b_<colname>`, which would reintroduce the placeholder name.
   ph_prefix <- paste0("b_", MVGAM_EMPTY_OBS_PLACEHOLDER)
-  all_vars[!startsWith(all_vars, ph_prefix)]
+  all_vars <- all_vars[!startsWith(all_vars, ph_prefix)]
+
+  # Drop rotation- / sign-indeterminate raw factor-model parameters
+  # when their QR-identified counterparts exist. Keeps `variables(x)`
+  # listing in lockstep with what `as_draws_*()`, `posterior_summary()`,
+  # `rhat()` and `neff_ratio()` return by default.
+  filter_hidden_unrotated(all_vars)
 }
 
 

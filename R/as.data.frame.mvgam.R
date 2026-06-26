@@ -476,7 +476,22 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
       )
     }
   }
+  # When the user did not supply a `variable` argument, hide
+  # rotation- / sign-indeterminate raw factor-model params whose
+  # QR-identified counterparts (Z_tilde, lv_trend_tilde,
+  # A_trend_tilde) are also in the posterior; see
+  # hidden_unrotated_factor_pars(). The raw versions have arbitrary
+  # Rhat / ESS because there is no fixed rotation under the prior,
+  # so they should not surface through the default
+  # as_draws_*() / posterior_summary() / rhat() / neff_ratio() paths.
+  # Users who want them can request them explicitly via the variable
+  # arg, which keeps the unfiltered draws in scope below.
   if (is.null(variable)) {
+    all_vars <- posterior::variables(drws)
+    keep_vars <- filter_hidden_unrotated(all_vars)
+    if (length(keep_vars) < length(all_vars)) {
+      drws <- posterior::subset_draws(drws, variable = keep_vars)
+    }
     return(drws)
   }
   checkmate::assert_character(variable, min.len = 1L)

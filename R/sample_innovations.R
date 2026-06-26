@@ -1097,17 +1097,70 @@ factor_state_param_pattern <- function(pars) {
 }
 
 # Returns the regex matching parameter-draws that the summary
-# / tidy classifiers should hide. Currently covers unrotated
-# VAR factor dynamics (`A_trend[lag][i, j]`) when the
-# QR-rotated `A_trend_tilde[lag][i, j]` counterpart is also in
-# the posterior, to avoid double display. Returns NULL when
-# nothing needs hiding.
+# / tidy classifiers should hide because their rotation- or
+# sign-indeterminate raw form has an identified counterpart in
+# the posterior. Covers:
+#   * Raw loadings `Z[i, j]` when `Z_tilde[i, j]` is present
+#     (free-Z factor fits with the Heaps & Jermyn QR rotation).
+#   * Raw factor paths `lv_trend[t, k]` and the upstream
+#     `innovations_trend[t, k]` / `scaled_innovations_trend[t, k]`
+#     when `lv_trend_tilde[t, k]` is present (same condition).
+#   * Unrotated VAR dynamics `A_trend[lag][i, j]` when
+#     `A_trend_tilde[lag][i, j]` is present.
+# Each raw family is rotation-indeterminate by design and shows
+# poor Rhat / low ESS while the identified counterpart is well
+# behaved; hiding the raw form here keeps convergence diagnostics,
+# `summary.mvgam()` print, `posterior_summary.mvgam()` and the
+# variable-keyword machinery focused on the identified params.
+# Returns NULL when nothing needs hiding.
 #'@noRd
 hidden_unrotated_factor_pars <- function(pars) {
+  patterns <- character(0L)
   if (any(grepl("^A_trend_tilde\\[", pars))) {
-    return("^A_trend\\[")
+    patterns <- c(patterns, "^A_trend\\[")
   }
-  NULL
+  if (any(grepl("^Z_tilde\\[", pars))) {
+    # Free-Z factor fit detected. The raw loadings `Z[i, j]`,
+    # raw factor paths `lv_trend[t, k]`, the innovations driving
+    # them, the rotation orthogonal matrix `Q_tilde[i, j]`, and
+    # the latent-factor-level variance-block parameters
+    # (`sigma_trend[k]`, `L_Omega_trend[i, j]`,
+    # `Sigma_trend[i, j]`) are all rotation- or sign-indeterminate
+    # because the QR step in generated quantities absorbs the
+    # rotation orbit; gate them all together on the `Z_tilde[`
+    # signal so the hide pattern survives the latent-state filter
+    # upstream of `summary.mvgam()`. The `^sigma_trend\\[` /
+    # `^L_Omega_trend\\[` / `^Sigma_trend\\[` patterns are safe
+    # against hierarchical-trend false positives: the grouped
+    # variants emit as `sigma_group_trend[g, s]` /
+    # `L_Omega_global_trend[i, j]` etc., which do not match
+    # these prefixes and remain visible.
+    patterns <- c(
+      patterns,
+      "^Z\\[",
+      "^lv_trend\\[",
+      "^innovations_trend\\[",
+      "^scaled_innovations_trend\\[",
+      "^Q_tilde\\[",
+      "^sigma_trend\\[",
+      "^L_Omega_trend\\[",
+      "^Sigma_trend\\["
+    )
+  }
+  if (length(patterns) == 0L) return(NULL)
+  paste(patterns, collapse = "|")
+}
+
+# Return the input vector with rotation- / sign-indeterminate raw
+# factor-model parameter names dropped, using the regex from
+# `hidden_unrotated_factor_pars()`. Centralises the filter used by
+# `variables.mvgam()`, `extract_mvgam_draws()` and `summary.mvgam()`
+# so name-side filtering lives in one place.
+#'@noRd
+filter_hidden_unrotated <- function(pars) {
+  hide_pat <- hidden_unrotated_factor_pars(pars)
+  if (is.null(hide_pat)) return(pars)
+  pars[!grepl(hide_pat, pars)]
 }
 
 # Internal: extract factor-loading draws from the posterior.

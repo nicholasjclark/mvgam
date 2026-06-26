@@ -453,3 +453,77 @@ test_that("bayes_R2.mvgam errors for multivariate without resp", {
     regexp = "requires 'resp' for multivariate models"
   )
 })
+
+test_that("hidden_unrotated_factor_pars hides rotation-indeterminate factor params", {
+  # Free-Z factor fit: Z_tilde[ present means raw Z, raw lv_trend,
+  # innovations, Q_tilde and the latent-factor variance block all
+  # get the rotation-indeterminacy hide pattern applied together.
+  pars_free <- c(
+    "Intercept", "b_x", "shape", "sigma_trend[1]", "sigma_trend[2]",
+    "L_Omega_trend[1,1]", "L_Omega_trend[2,1]", "Sigma_trend[1,1]",
+    "Q_tilde[1,1]", "Z[1,1]", "Z[2,1]", "Z_tilde[1,1]", "Z_tilde[2,1]",
+    "lv_trend[1,1]", "lv_trend_tilde[1,1]",
+    "innovations_trend[1,1]", "scaled_innovations_trend[1,1]"
+  )
+  pat <- mvgam:::hidden_unrotated_factor_pars(pars_free)
+  hidden <- pars_free[grepl(pat, pars_free)]
+  surviving <- pars_free[!grepl(pat, pars_free)]
+  # All raw / rotation-indeterminate params are hidden.
+  expect_setequal(
+    hidden,
+    c("sigma_trend[1]", "sigma_trend[2]",
+      "L_Omega_trend[1,1]", "L_Omega_trend[2,1]", "Sigma_trend[1,1]",
+      "Q_tilde[1,1]", "Z[1,1]", "Z[2,1]",
+      "lv_trend[1,1]", "innovations_trend[1,1]",
+      "scaled_innovations_trend[1,1]")
+  )
+  # Identified counterparts + obs-side params survive.
+  expect_setequal(
+    surviving,
+    c("Intercept", "b_x", "shape",
+      "Z_tilde[1,1]", "Z_tilde[2,1]", "lv_trend_tilde[1,1]")
+  )
+})
+
+test_that("hidden_unrotated_factor_pars is a no-op without QR-identified counterparts", {
+  # Non-factor fit: no Z_tilde, no lv_trend_tilde, no A_trend_tilde.
+  # The variance block must survive because it is properly identified
+  # in non-factor trend fits.
+  pars_nonfactor <- c(
+    "Intercept", "b_x", "sigma_trend[1]", "L_Omega_trend[1,1]",
+    "Sigma_trend[1,1]"
+  )
+  pat <- mvgam:::hidden_unrotated_factor_pars(pars_nonfactor)
+  expect_null(pat)
+  # filter_hidden_unrotated returns the input unchanged.
+  expect_identical(
+    mvgam:::filter_hidden_unrotated(pars_nonfactor), pars_nonfactor
+  )
+})
+
+test_that("hidden_unrotated_factor_pars adds A_trend hide on VAR factor fits", {
+  pars_var <- c(
+    "Z_tilde[1,1]", "A_trend[1][1,1]", "A_trend_tilde[1][1,1]"
+  )
+  pat <- mvgam:::hidden_unrotated_factor_pars(pars_var)
+  expect_true(grepl("\\^A_trend\\\\\\[", pat))
+  expect_true(grepl("A_trend\\[1\\]\\[1,1\\]", grep(pat, pars_var, value = TRUE)[1]))
+})
+
+test_that("filter_hidden_unrotated honours an explicit Z request via name", {
+  # Stub-level test: when the user explicitly asks for "Z", the
+  # default-path filter should NOT have dropped it from the pars
+  # vector the extractor sees. This guards against the regression
+  # where the filter ran before the variable argument was honoured.
+  pars <- c("Z_tilde[1,1]", "Z[1,1]", "b_x", "Intercept")
+  # Default path drops the raw Z[ name.
+  identified <- mvgam:::filter_hidden_unrotated(pars)
+  expect_false("Z[1,1]" %in% identified)
+  # The escape hatch (explicit variable arg in as_draws_array.mvgam)
+  # bypasses filter_hidden_unrotated entirely and runs the user's
+  # pattern against the full posterior name list; the integration
+  # test for that lives in tests/local/test-jsdgam-diagnostics.R
+  # because it needs a fitted jsdgam.
+  expect_true("Z_tilde[1,1]" %in% identified)
+  expect_true("b_x" %in% identified)
+})

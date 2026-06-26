@@ -63,7 +63,8 @@ Suggests:
     testthat,
     colorspace,
     future,
-    ape
+    ape,
+    mvabund
 Enhances:
     gratia (>= 0.9.0),
     tidyr

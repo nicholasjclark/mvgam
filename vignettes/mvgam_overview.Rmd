@@ -219,7 +219,11 @@ model section below.
 See `?jsdgam` for the full surface, including the phylogenetic
 and trait-environment hooks, and `?ordinate.mvgam` /
 `?ordinate.jsdgam` for biplot helpers built on the rotated
-loadings.
+loadings. The online article
+[Joint species distribution GAMs with informed loadings](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+walks through a complete `jsdgam()` workflow on count data
+with a negative binomial observation model, trait-informed
+loadings, ordination rotations and MGP shrinkage.
 
 ## Latent trend processes
 

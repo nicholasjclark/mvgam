@@ -24,6 +24,6 @@ A \code{data.frame} with columns \code{series}, \code{time}, \code{median},
 Collapses the \verb{[ndraws, n_unit]} draw matrix to one row per unit
 carrying the posterior median plus 50\% and 95\% credible interval
 endpoints. The returned \code{data.frame} is the same one that
-\code{\link[=as.data.frame.mvgam_latent_state]{as.data.frame.mvgam_latent_state()}} returns and that
+\code{as.data.frame.mvgam_latent_state()} returns and that
 \code{\link[=plot.mvgam_latent_state]{plot.mvgam_latent_state()}} uses internally.
 }

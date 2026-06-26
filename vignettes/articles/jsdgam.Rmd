@@ -1,0 +1,607 @@
+---
+title: "Joint species distribution GAMs with informed loadings"
+author: "Nicholas J Clark"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_document:
+    toc: yes
+    toc_float: yes
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  dpi = 100,
+  fig.asp = 0.7,
+  fig.width = 6,
+  out.width = "70%",
+  fig.align = "center"
+)
+library(mvgam)
+library(mvabund)
+library(ggplot2)
+library(patchwork)
+theme_set(theme_bw(base_size = 12, base_family = "serif"))
+
+# Cached jsdgam fits live under pkgdown/, which is excluded from
+# the CRAN tarball by .Rbuildignore. pkgdown runs articles from
+# the project root, so the relative path resolves at build time.
+# The visible fit chunks remain as documentation of what produced
+# each object.
+cache_dir <- file.path("pkgdown", "jsdgam_cache")
+read_cache <- function(name) {
+  readRDS(file.path(cache_dir, paste0(name, ".rds")))
+}
+```
+
+A community of species rarely behaves as a collection of
+independent units. After accounting for measured environmental
+gradients, the residual co-occurrence between species still
+carries signal. Some of it is unmeasured climate or sampling
+artefact; some of it is shared phylogeny or biotic
+interaction. Joint Species Distribution Models (JSDMs)
+compress that residual covariance into a low-rank decomposition
+`Sigma = Z Zᵀ`, where `Z` is an `n_species x n_lv` loading
+matrix mapping each species to its position in a small latent
+space (Warton et al.
+[2015](https://doi.org/10.1016/j.tree.2015.09.007); Ovaskainen
+et al. [2017](https://doi.org/10.1111/ele.12757)). The latent
+positions double as an ordination, and the implied `Sigma`
+is the residual species correlation matrix.
+
+mvgam's `jsdgam()` function fits this class of model using the
+Heaps & Jermyn ([2024](https://doi.org/10.1007/s11222-024-10454-0))
+identification scheme, which applies a QR decomposition to the
+sampled loadings inside generated quantities. The default prior
+treats the columns of `Z` as a priori exchangeable, but two
+extensions let domain knowledge enter directly. Species traits
+or a phylogeny can shape the prior on `Z` through an automatic
+relevance determination (ARD) kernel; functionally or
+phylogenetically similar species are pulled toward similar
+loadings before the data speaks. As an alternative to picking
+`n_lv` directly, a column shrinkage prior built from a
+multiplicative gamma process lets the data choose how many
+factors are active. We walk through both on the Australian ant
+trait dataset (Warton et al.
+[2015](https://doi.org/10.1016/j.tree.2015.09.007)).
+
+## The data
+
+`antTraits` ships with the `mvabund` package. It carries 30
+sites x 41 ant species capture counts together with five
+environmental covariates (`Bare.ground`, `Canopy.cover`,
+`Shrub.cover`, `Volume.lying.CWD`, `Feral.mammal.dung`) and a
+five-column species trait table. The traits cover morphology
+(`Femur.length` and `Webers.length` for body size), defence
+(`No.spines`), pilosity and worker-caste polymorphism.
+
+```{r data-head}
+data(antTraits, package = "mvabund")
+str(antTraits, max.level = 1)
+head(antTraits$abund[, 1:5])
+head(antTraits$env)
+head(antTraits$traits, 3)
+```
+
+Two of the trait columns (`Pilosity` and `Polymorphism`) ship
+as ordered factors with numeric levels. We coerce them to
+numeric so the ARD kernel reads them as ordered continuous
+traits rather than dummy-encoded categories.
+
+```{r traits-coerce}
+abund  <- antTraits$abund
+env    <- antTraits$env
+traits <- antTraits$traits
+traits$Pilosity     <- as.numeric(as.character(traits$Pilosity))
+traits$Polymorphism <- as.numeric(as.character(traits$Polymorphism))
+```
+
+`jsdgam()` expects long-form data with one row per site x
+species cell. We reshape, repeat the environmental covariates
+across species rows, and standardise the covariates so the
+linear coefficients sit on a comparable scale.
+
+```{r reshape}
+n_sites   <- nrow(abund)
+n_species <- ncol(abund)
+species_names <- colnames(abund)
+
+ant_long <- data.frame(
+  site    = factor(rep(seq_len(n_sites), times = n_species)),
+  species = factor(rep(species_names, each = n_sites),
+                   levels = species_names),
+  time    = rep(seq_len(n_sites), times = n_species),
+  counts  = as.integer(unlist(abund))
+)
+ant_long <- cbind(ant_long, env[as.integer(ant_long$site), ])
+for (col in colnames(env)) {
+  ant_long[[col]] <- as.numeric(scale(ant_long[[col]]))
+}
+head(ant_long)
+```
+
+The capture counts span 0 to 20. Plotting variance against the
+mean for each species shows the variance climbing well above
+the 1:1 Poisson line, so a Poisson observation model would
+systematically underestimate predictive uncertainty.
+
+```{r mean-variance, fig.asp = 0.7, out.width = "65%"}
+red <- mvgam:::mvgam_palette("red")[5L]
+per_sp <- do.call(rbind, tapply(
+  ant_long$counts, ant_long$species,
+  function(x) c(mean = mean(x), var = var(x))
+))
+per_sp <- as.data.frame(per_sp)
+ggplot(per_sp, aes(x = mean, y = var)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed",
+              colour = "grey50") +
+  geom_point(size = 2.2, alpha = 0.85, colour = red) +
+  scale_x_continuous(trans = "log1p") +
+  scale_y_continuous(trans = "log1p") +
+  labs(x = "Mean count per species (log1p)",
+       y = "Variance of count per species (log1p)") +
+  mvgam:::mvgam_theme()
+```
+
+A negative binomial observation model accommodates that
+dispersion through its species-level `shape` parameter.
+
+## A baseline JSDM: uninformed loadings
+
+A useful first move is to fit the model with no trait
+information at all. The loadings have to find their structure
+from the data alone, which gives a clean reference point for
+asking what an informed prior adds afterwards. We keep the
+default loading prior: each entry of `Z` is independent under
+a weak `student_t(3, 0, 1)`. The latent space is
+two-dimensional (`n_lv = 2L`) and `factor_formula = ~ -1`
+asks for no smooths on the factors themselves. Counts get
+the `negbinomial()` family to absorb dispersion beyond a
+Poisson mean.
+
+```{r mod_baseline_show, eval = FALSE}
+mod_baseline <- jsdgam(
+  formula = counts ~ Bare.ground + Canopy.cover + Shrub.cover +
+    Volume.lying.CWD + Feral.mammal.dung,
+  factor_formula = ~ -1,
+  data    = ant_long,
+  family  = negbinomial(),
+  n_lv    = 2L,
+  unit    = time,
+  species = species,
+  chains  = 2L, samples = 600L, silent = 2L
+)
+```
+
+```{r mod_baseline_load, include = FALSE}
+mod_baseline <- read_cache("mod_baseline")
+```
+
+The summary prints the observation-model intercept, the
+dispersion parameter `shape` and the identified species
+loadings `Z_tilde[i, k]`. Per-coefficient detail for the five
+environmental terms lives in `posterior_summary()`.
+
+```{r mod_baseline_summary}
+summary(mod_baseline, smooth_test = FALSE)
+```
+
+```{r mod_baseline_env_coefs}
+posterior_summary(mod_baseline)[paste0("b_", c(
+  "Bare.ground", "Canopy.cover", "Shrub.cover",
+  "Volume.lying.CWD", "Feral.mammal.dung"
+)), c("Estimate", "Q2.5", "Q97.5")]
+```
+
+All five environmental coefficients have credible intervals
+straddling zero on the log scale of the linear predictor.
+The mean component is doing very little work in this baseline
+fit; the bulk of the between-site structure lives in the
+residual factor space, which the biplot below visualises.
+
+Calling `ordinate()` returns a biplot. Site scores and species
+loadings are taken at the posterior median and the axes are
+rotated to a singular-value basis, so the first axis carries
+the dominant ordination gradient.
+
+```{r baseline-biplot, fig.asp = 0.85, out.width = "75%"}
+ordinate(mod_baseline) +
+  ggtitle("Baseline: uninformed loadings")
+```
+
+Two species sit at the extremes of LV2 (`Aphaenogaster.longiceps`
+high, `Cardiocondyla.nuda.atalanta` low) with the rest of the
+community clustered near the origin. Nothing in the layout
+references trait similarity yet, because the prior had no
+reason to encode any. Before reading further into the
+ordination it pays to confirm the observation layer fits the
+counts. Calling `pp_check(mod_baseline)` dispatches to
+`pp_check.mvgam()` for that diagnostic: a misfit on the zero
+counts or on the upper tail means the family is wrong, and
+fixing that takes priority over any ecological reading of the
+biplot.
+
+## Heaps-architecture trait-informed loadings
+
+The Heaps & Jermyn
+([2024](https://doi.org/10.1007/s11222-024-10454-0))
+architecture replaces the iid loadings prior with a structured
+one. Each column of `Z` is drawn from
+`multi_normal_cholesky(0, L_Φ · √Ψ_diag[k])`, where the
+covariance `Φ` is built by an ARD kernel on a feature matrix
+supplied by the user. The kernel estimates one inverse scale
+per feature column. Features that predict co-occurrence pull
+the relevant species toward similar loadings; features that do
+not predict it shrink to large scales and contribute little.
+For species traits the result is a prior that says "ants whose
+body size and defensive traits are similar start out near each
+other in latent space, before seeing the counts."
+
+Passing the trait table via the `traits =` alias is the only
+change to the call.
+
+```{r mod_traits_show, eval = FALSE}
+mod_traits <- jsdgam(
+  formula = counts ~ Bare.ground + Canopy.cover + Shrub.cover +
+    Volume.lying.CWD + Feral.mammal.dung,
+  factor_formula = ~ -1,
+  data    = ant_long,
+  family  = negbinomial(),
+  n_lv    = 2L,
+  traits  = traits,
+  unit    = time,
+  species = species,
+  chains  = 2L, samples = 600L,
+  adapt_delta = 0.95, silent = 2L
+)
+```
+
+```{r mod_traits_load, include = FALSE}
+mod_traits <- read_cache("mod_traits")
+```
+
+We bump `adapt_delta` from the Stan default of 0.8 to 0.95.
+The ARD geometry on 41 species and 5 trait columns has a
+funnel where the kernel scales hand off prior mass to the
+loadings; the tighter leapfrog step keeps the sampler from
+skipping over it.
+
+The summary now carries an extra `loadings_prior` block. It
+lists `theta_features[k]`, the ARD kernel length scale for each
+trait, alongside `Psi_diag[k]`, the prior scale on the kth
+loading column.
+
+```{r mod_traits_summary}
+summary(mod_traits, smooth_test = FALSE)
+```
+
+Reading `theta_features[k]` follows the standard ARD
+convention. The kernel takes the form
+`exp(-||(x_i - x_j) / theta||^2)`. A posterior
+`theta_features[k]` that is small relative to the spread of
+trait `k` says the kernel decays sharply along that
+dimension, which pulls trait-different species apart in the
+latent space. A posterior length scale much larger than the
+trait spread says the kernel barely changes with that trait,
+so the data has effectively dropped it from the loadings
+prior. The Heaps & Jermyn
+([2024](https://doi.org/10.1007/s11222-024-10454-0)) prior
+expresses the ARD covariance across species through the
+matrix `Phi` and ties it to the observable shared variation
+`Delta = Z Zᵀ` via the identity `E(Delta) = tr(Psi^2) * Phi`.
+The function `shared_variation()` returns posterior summaries
+of `Delta` directly when those magnitudes matter.
+
+The biplot, this time with `traits = "auto"` to overlay each
+trait's regression onto the rotated loadings, makes the
+restructuring visible.
+
+```{r traits-biplot, fig.asp = 0.85, out.width = "75%"}
+ordinate(mod_traits, rotation = "varimax", traits = "auto") +
+  ggtitle("Trait-informed loadings + trait arrows")
+```
+
+Four of the trait arrows point into the upper portion of the
+biplot (`Pilosity`, `Webers.length`, `Polymorphism` and
+`Femur.length`), where the larger-bodied `Camponotus` and
+`Iridomyrmex purpureus` cluster sits. `No.spines` is the only
+arrow pointing downward, into the region occupied by
+`Cardiocondyla.nuda.atalanta`, `Solenopsis.sp..A`,
+`Meranoplus.sp..A` and other smaller species. The latent
+space has acquired an ecological gradient that the baseline
+fit did not have: body size and defensive armature pulling in
+opposite directions along LV2.
+
+`compare_loadings()` makes the effect on individual species
+explicit. The two fits sit in independent QR bases. The
+function applies an orthogonal Procrustes rotation that brings
+the second fit into the basis of the first, then draws a
+segment from each species' baseline position to its position
+under the trait prior.
+
+```{r compare-loadings, fig.asp = 0.8, out.width = "85%"}
+compare_loadings(
+  mod_baseline, mod_traits,
+  labels = c("uninformed", "trait-informed"),
+  label_species = "shift"
+)
+```
+
+Species labelled in the plot are the ten with the largest
+displacement after alignment. The trait-informed cluster is
+visibly tighter than the uninformed one. The kernel has pulled
+species with shared body and spine traits closer together, at
+the price of mild shrinkage on the two outliers
+(`Aphaenogaster.longiceps`, `Cardiocondyla.nuda.atalanta`)
+that drove the uninformed biplot.
+
+## Identification: rotations of the latent basis
+
+The factor model is identified only up to rotation of the
+latent space. Any orthogonal rotation of the columns of `Z`,
+paired with the inverse rotation of the latent factor scores,
+produces the same likelihood. The Stan model samples
+unconstrained `Z` and applies a thin QR decomposition in
+generated quantities. The result is a `Z_tilde` that is
+lower-triangular with positive diagonal entries (Heaps & Jermyn
+[2024](https://doi.org/10.1007/s11222-024-10454-0)). That is
+what `ordinate()` reads by default. Different rotations
+applied after fitting re-express the same posterior on axes
+that are easier to interpret for different questions.
+
+```{r rotations, fig.asp = 0.5, out.width = "100%"}
+p_svd <- ordinate(mod_traits, rotation = "svd") +
+  ggtitle("svd (default)")
+p_vmx <- ordinate(mod_traits, rotation = "varimax") +
+  ggtitle("varimax")
+p_pro <- ordinate(mod_traits, rotation = "promax") +
+  ggtitle("promax")
+p_non <- ordinate(mod_traits, rotation = "none") +
+  ggtitle("none (raw QR)")
+(p_svd | p_vmx) / (p_pro | p_non)
+```
+
+The `svd` rotation reorders axes by singular-value variance
+and matches the BORAL convention (Hui
+[2016](https://doi.org/10.1111/2041-210X.12514)). The
+`varimax` and `promax` rotations target loading sparsity. Each
+makes per-axis interpretation cleaner when individual species
+tend to load on one factor more than the others. The `none`
+option plots the raw identified loadings. All four panels show
+the same fit. The choice between them is about which axis
+interpretation suits the question at hand. See
+`?ordinate.jsdgam` for the full set of plotting arguments
+(including `alpha` for the BORAL site / loading variance
+split, and `label_sites` for switching between text and point
+markers); `plot_factors()` is the lower-level companion that
+draws the unrotated identified factors as time series.
+
+## Residual species correlations
+
+The factor decomposition implies a residual species covariance
+`Sigma = Z Zᵀ` after accounting for the measured environment.
+`residual_cor()` returns posterior summaries of this matrix,
+with entries set to zero where the credible interval covers
+zero. The `cluster = TRUE` argument reorders rows and columns
+by an approximate Robinson ordering so block structure shows up
+on the diagonal. The companion accessor `shared_variation()`
+returns the full posterior over the covariance matrix itself,
+useful when entry magnitudes matter for downstream analysis;
+both surface entry-level posterior probabilities via
+`summary()` on the returned object.
+
+```{r resid-cor, fig.asp = 0.95, out.width = "85%"}
+rcor <- residual_cor(mod_traits, summary = TRUE)
+plot(rcor, cluster = TRUE)
+```
+
+Three large positive blocks line up on the diagonal: groups
+of species that tend to co-occur once the environment is
+accounted for. A clear band of negative correlation cuts
+across the heatmap on `Iridomyrmex.rufoniger`. Its top five
+strongest negative residual correlations are all with
+high-abundance species elsewhere in the community
+(`Iridomyrmex.purpureus`, `Aphaenogaster.longiceps`,
+`Monomorium.leae`, `Pheidole.sp..A`, `Camponotus.claripes`),
+each below -0.88. Its loadings sit in a region of the latent
+space that the rest of the community avoids, which is
+consistent with competitive dominance or with an unmeasured
+environmental contrast that we have not conditioned on.
+
+Residual correlation is *evidence consistent with* shared
+unmeasured drivers, not proof of any specific mechanism. A
+positive entry can reflect either a shared unmeasured niche
+or a simultaneous detection bias on the two species; a
+negative entry can reflect competition or an environmental
+gradient the model did not condition on. The factor model
+gives us a coherent posterior over the matrix but does not
+adjudicate between these explanations on its own.
+
+## How many factors? Data-driven dimensionality with MGP
+
+The fits so far pinned `n_lv = 2L`. A more principled choice is
+to set a ceiling and let the posterior decide. The
+multiplicative gamma process (MGP) prior of Bhattacharya &
+Dunson ([2011](https://doi.org/10.1093/biomet/asr013)) puts
+increasing shrinkage on later columns of `Z`. Only the leading
+few columns carry mass under the prior, and the data shifts
+that envelope as needed. Legramanti, Durante & Dunson
+([2020](https://doi.org/10.1093/biomet/asaa008)) propose a
+cumulative shrinkage criterion for declaring a factor active.
+
+Passing the MGP spec through `loadings_prior` composes cleanly
+with the trait kernel. Traits supply the ARD covariance across
+species within each column; MGP supplies the shrinkage across
+columns.
+
+```{r mod_mgp_show, eval = FALSE}
+mod_mgp <- jsdgam(
+  formula = counts ~ Bare.ground + Canopy.cover + Shrub.cover +
+    Volume.lying.CWD + Feral.mammal.dung,
+  factor_formula = ~ -1,
+  data    = ant_long,
+  family  = negbinomial(),
+  n_lv    = 10L,
+  loadings_prior = list(column_shrinkage = "mgp", features = traits),
+  unit    = time,
+  species = species,
+  chains  = 2L, samples = 600L, silent = 2L
+)
+```
+
+```{r mod_mgp_load, include = FALSE}
+mod_mgp <- read_cache("mod_mgp")
+```
+
+`active_factors()` summarises the posterior distribution of how
+many factors clear the activity threshold. The default
+threshold marks factor `k` as active when the posterior
+probability that its squared column-norm exceeds 1% of the
+leading column's norm is at least 0.5.
+
+```{r active-factors}
+af <- active_factors(mod_mgp)
+af
+```
+
+Plotting the same object gives the per-factor probability bars
+with the activity cutoff shown as a dashed line, plus the
+posterior median and 95% CI of the active count in the
+subtitle.
+
+```{r active-factors-plot, fig.asp = 0.55, out.width = "75%"}
+plot(af)
+```
+
+Factors 1-3 sit at probability 1, factors 4-6 cross the
+cutoff with diminishing posterior support, factor 7 sits right
+at the cutoff, and factors 8-10 are essentially shrunk to
+zero. The posterior median active count is 6 (95% CI 4 to 9),
+which is what the data and ARD-MGP prior together pick out.
+This is the spec to default to in a real analysis where the
+"right" `n_lv` is not known a priori. The `fraction` and
+`prob_threshold` arguments to `active_factors()` tune what
+counts as "active"; see `?active_factors` for the defaults
+chosen following Legramanti et al.
+
+## Take-aways
+
+A negative binomial JSDM with Heaps-identified loadings gives
+a single coherent posterior over the environmental responses,
+the latent factor scores, the species loadings and the implied
+residual species correlation matrix. The observation family
+chooses how counts disperse: `family = negbinomial()` was the
+right pick here. The loadings prior carries the domain
+knowledge: passing `traits =` (or `phylo =`) routes that
+knowledge through an ARD kernel, so functionally similar
+species cluster a priori before the data speaks. And the
+factor count is rarely known up front, so reach for
+`loadings_prior = list(column_shrinkage = "mgp", ...)` to let
+the posterior shrink later columns of `Z` and surface the
+active count via `active_factors()`.
+
+## Further reading
+
+Three extensions sit outside the scope of this article and
+deserve their own write-ups. The `phylo =` argument accepts an
+`ape::phylo` object or a pairwise distance matrix and builds
+the ARD kernel from phylogenetic distance rather than from
+trait similarity; that route is useful when the available
+signal is evolutionary rather than morphological. The
+`trait_slopes =` argument implements the trait-mediated
+regression of Pollock et al.
+([2012](https://doi.org/10.1111/j.1600-0587.2011.07085.x)) and
+the Hmsc framework of Tikhonov et al.
+([2020](https://doi.org/10.1111/2041-210X.13345)): each
+species' environmental response is itself regressed on traits.
+That complements the loadings story by modelling how trait
+similarity shapes responses to measured environment, not just
+residual co-occurrence. Finally, the `occ()` family
+marginalises imperfect detection at the closure-unit level for
+joint occupancy fits; `?jsdgam` shows a worked example.
+
+The rest of the workflow is the standard mvgam machinery
+applied to a jsdgam fit. To confirm the count layer absorbs
+the dispersion, `pp_check.mvgam()` runs the usual posterior
+predictive battery. To compare loadings priors on the same
+data, reach for `loo.mvgam()` as the cheap first pass and
+`kfold.mvgam()` when LOO Pareto-k goes red. To interrogate
+how an environmental gradient drives abundance once the
+factors have absorbed the residual structure between species,
+`conditional_effects()` plots the marginal means on the
+response scale. And when writing the methods section,
+`how_to_cite(mod_traits)` returns the citation paragraph that
+names the architecture pieces the fit actually used. The
+`?jsdgam` page covers the remaining options, including
+`lv_axis()` for per-factor smooths inside `factor_formula`.
+
+## Acknowledgements
+
+The `antTraits` data are released with the `mvabund` package
+(Wang et al. [2012](https://doi.org/10.1111/j.2041-210X.2012.00190.x)).
+The factor model architecture follows Heaps & Jermyn
+([2024](https://doi.org/10.1007/s11222-024-10454-0)). The MGP
+prior is Bhattacharya & Dunson
+([2011](https://doi.org/10.1093/biomet/asr013)) with the
+active-count criterion of Legramanti, Durante & Dunson
+([2020](https://doi.org/10.1093/biomet/asaa008)).
+
+## References
+
+Bhattacharya A and Dunson DB (2011). Sparse Bayesian infinite
+factor models. *Biometrika* 98(2), 291-306.
+[doi:10.1093/biomet/asr013](https://doi.org/10.1093/biomet/asr013)
+
+Heaps SE and Jermyn IH (2024). Structured prior distributions
+for the covariance matrix in latent factor models. *Statistics
+and Computing* 34, 143.
+[doi:10.1007/s11222-024-10454-0](https://doi.org/10.1007/s11222-024-10454-0)
+
+Hui FKC (2016). boral - Bayesian Ordination and Regression
+Analysis of Multivariate Abundance Data in R. *Methods in
+Ecology and Evolution* 7(6), 744-750.
+[doi:10.1111/2041-210X.12514](https://doi.org/10.1111/2041-210X.12514)
+
+Legramanti S, Durante D and Dunson DB (2020). Bayesian
+cumulative shrinkage for infinite factorizations.
+*Biometrika* 107(3), 745-752.
+[doi:10.1093/biomet/asaa008](https://doi.org/10.1093/biomet/asaa008)
+
+Ovaskainen O, Tikhonov G, Norberg A, Blanchet FG, Duan L,
+Dunson D, Roslin T and Abrego N (2017). How to make more out
+of community data? A conceptual framework and its
+implementation as models and software. *Ecology Letters*
+20(5), 561-576.
+[doi:10.1111/ele.12757](https://doi.org/10.1111/ele.12757)
+
+Pollock LJ, Morris WK and Vesk PA (2012). The role of
+functional traits in species distributions revealed through a
+hierarchical model. *Ecography* 35(8), 716-725.
+[doi:10.1111/j.1600-0587.2011.07085.x](https://doi.org/10.1111/j.1600-0587.2011.07085.x)
+
+Tikhonov G, Opedal OH, Abrego N, Lehikoinen A, de Jonge MMJ,
+Oksanen J and Ovaskainen O (2020). Joint species distribution
+modelling with the R-package Hmsc. *Methods in Ecology and
+Evolution* 11(3), 442-447.
+[doi:10.1111/2041-210X.13345](https://doi.org/10.1111/2041-210X.13345)
+
+Wang Y, Naumann U, Wright ST and Warton DI (2012). mvabund -
+an R package for model-based analysis of multivariate
+abundance data. *Methods in Ecology and Evolution* 3(3),
+471-474.
+[doi:10.1111/j.2041-210X.2012.00190.x](https://doi.org/10.1111/j.2041-210X.2012.00190.x)
+
+Warton DI, Blanchet FG, O'Hara RB, Ovaskainen O, Taskinen S,
+Walker SC and Hui FKC (2015). So many variables: joint
+modeling in community ecology. *Trends in Ecology and
+Evolution* 30(12), 766-779.
+[doi:10.1016/j.tree.2015.09.007](https://doi.org/10.1016/j.tree.2015.09.007)

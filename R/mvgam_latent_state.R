@@ -74,7 +74,7 @@ new_mvgam_latent_state <- function(draws, unit, family,
 #' Collapses the `[ndraws, n_unit]` draw matrix to one row per unit
 #' carrying the posterior median plus 50% and 95% credible interval
 #' endpoints. The returned `data.frame` is the same one that
-#' [as.data.frame.mvgam_latent_state()] returns and that
+#' `as.data.frame.mvgam_latent_state()` returns and that
 #' [plot.mvgam_latent_state()] uses internally.
 #'
 #' @param object A `mvgam_latent_state` object.

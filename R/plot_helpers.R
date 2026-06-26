@@ -80,7 +80,7 @@ mvgam_theme <- function() {
 #' categorical groupings in scientific figures. Use it anywhere
 #' the package needs to distinguish small numbers (~2-8) of
 #' discrete groups; for sequential posterior bands of a single
-#' quantity, prefer [mvgam_palette()] (bayesplot single-hue
+#' quantity, prefer `mvgam_palette()` (bayesplot single-hue
 #' scheme).
 #'
 #' @noRd

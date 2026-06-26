@@ -313,5 +313,11 @@ models. \emph{Statistics and Computing}, 34:143.
 }
 \seealso{
 \code{\link[=mvgam]{mvgam()}}, \code{\link[=lv_axis]{lv_axis()}}, \code{\link[=residual_cor]{residual_cor()}},
-\code{\link[=ordinate]{ordinate()}}, \code{\link[=methods_md]{methods_md()}}, \code{\link[=how_to_cite]{how_to_cite()}}.
+\code{\link[=ordinate]{ordinate()}}, \code{\link[=shared_variation]{shared_variation()}}, \code{\link[=active_factors]{active_factors()}},
+\code{\link[=compare_loadings]{compare_loadings()}}, \code{\link[=methods_md]{methods_md()}}, \code{\link[=how_to_cite]{how_to_cite()}}. A
+worked online article walking through \code{jsdgam()} with a
+negative binomial observation model, the Heaps & Jermyn
+(2024) trait-informed loadings prior, ordination biplots
+and the MGP shrinkage criterion is at
+\url{https://nicholasjclark.github.io/mvgam/articles/jsdgam.html}.
 }

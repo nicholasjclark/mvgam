@@ -174,6 +174,61 @@ active_factors.mvgam <- function(object,
   structure(out, class = "mvgam_active_factors")
 }
 
+#' Plot the posterior active-factor probabilities
+#'
+#' @description Bar plot of the posterior probability that each
+#' latent factor is active under the Legramanti, Durante & Dunson
+#' (2020) cumulative-shrinkage criterion. A dashed horizontal line
+#' marks the active threshold (`1 - prob_threshold`, default
+#' `0.5`). The subtitle reports the posterior median active count
+#' with the 95% credible interval.
+#'
+#' @param x An `mvgam_active_factors` object returned by
+#'   [active_factors()].
+#' @param ... Ignored.
+#'
+#' @return A `ggplot` object.
+#'
+#' @seealso [active_factors()]
+#'
+#' @author Nicholas J Clark
+#'
+#' @method plot mvgam_active_factors
+#' @export
+plot.mvgam_active_factors <- function(x, ...) {
+  checkmate::assert_class(x, "mvgam_active_factors")
+  # Single-category fill: pick the strong tone (`[5L]`) from the
+  # active bayesplot scheme via mvgam_palette() to match the
+  # convention in plot_mvgam_series() / pp_check.mvgam().
+  fill_col <- mvgam_palette()[5L]
+  cutoff <- 1 - x$threshold$prob_threshold
+  subtitle <- sprintf(
+    "Posterior median active count: %.1f  (95%% CI %.1f, %.1f)",
+    x$count$median, x$count$q025, x$count$q975
+  )
+  ggplot2::ggplot(
+    data = x$per_factor,
+    mapping = ggplot2::aes(x = .data$factor, y = .data$prob_active)
+  ) +
+    ggplot2::geom_col(fill = fill_col, alpha = 0.85) +
+    ggplot2::geom_hline(
+      yintercept = cutoff, linetype = "dashed", colour = "grey40"
+    ) +
+    ggplot2::scale_x_continuous(breaks = x$per_factor$factor) +
+    ggplot2::scale_y_continuous(
+      limits = c(0, 1), expand = ggplot2::expansion(mult = c(0, 0.05))
+    ) +
+    ggplot2::labs(
+      x = "Factor index", y = "Posterior probability of being active",
+      title = sprintf(
+        "Active latent factors (n_lv ceiling = %d)", x$n_lv
+      ),
+      subtitle = subtitle
+    ) +
+    mvgam_theme()
+}
+
+
 #' @export
 print.mvgam_active_factors <- function(x, ...) {
   cat("Active latent factors (Legramanti / Durante / Dunson 2020 criterion)\n")
