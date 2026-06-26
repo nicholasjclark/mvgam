@@ -573,56 +573,107 @@ they will care about most.
 
 ## Take-aways
 
-The forecast-evaluation surface in mvgam supports a single
-coherent workflow:
-
-1. **In-sample sanity check** with `loo()` and `loo_compare()`.
-   Quick, cheap, useful for catching pathological models. Do not
-   use it to pick a forecast model.
-2. **One-shot out-of-sample scoring** with `forecast(newdata =
-   test)` followed by `score(score = "crps" | "drps" | "elpd")`
-   for univariate calibration and `score("energy" | "variogram")`
-   for joint structure. Use this when the holdout window is fixed.
-3. **Rolling-origin LFO** with `lfo_cv()` when the question is
-   "how would this model have performed in production". The
-   hybrid PSIS scheme keeps the cost reasonable; the ELPD
-   trajectory shows when each model wins.
-4. **Ensemble** with `ensemble()` using stacking weights from
-   `loo_model_weights()`. Score the ensemble on the same holdout
-   used for the individuals, not on training-set metrics.
-
-Pick the score that matches the decision. Pick the
-cross-validation that matches the production question.
+A forecast evaluation workflow in mvgam reuses the same fits
+three times. First, `loo()` and `loo_compare()` catch
+pathological models cheaply in sample. They do not pick a
+forecast model, though. For that, `forecast(newdata = test)`
+followed by `score()` is the workhorse. Use `score("crps")` or
+`score("drps")` for univariate calibration. Use
+`score("energy")` or `score("variogram")` when joint structure
+matters. The production question is often closer to "how would
+this model have performed run after run": `lfo_cv()` plays out
+rolling forecasts and the hybrid PSIS scheme keeps the
+refitting cost low. Combine the candidates with `ensemble()`
+using stacking weights from `loo_model_weights()`, then score
+the ensemble on the same holdout the individuals saw. Pick the
+score that matches the decision. Pick the cross-validation
+that matches the production question.
 
 ## Further reading
 
-- Bürkner, P.-C., Gabry, J. & Vehtari, A. (2020). Approximate
-  leave-future-out cross-validation for Bayesian time series
-  models. *Journal of Statistical Computation and Simulation*
-  90(14): 2499–2523.
-  <https://doi.org/10.1080/00949655.2020.1783262>
-- Clark, N. J., Ernest, S. K. M., Senyondo, H., Simonis, J.,
-  White, E. P., Yenni, G. M. & Karunarathna, K. A. N. K.
-  (2025). Beyond single-species models: multispecies forecasts
-  to navigate the dynamics of ecological predictability.
-  *PeerJ* 13: e18929. <https://doi.org/10.7717/peerj.18929>
-- Gneiting, T. & Raftery, A. E. (2007). Strictly proper scoring
-  rules, prediction, and estimation. *JASA* 102(477): 359–378.
-  <https://doi.org/10.1198/016214506000001437>
-- Gneiting, T., Stanberry, L. I., Grimit, E. P., Held, L. &
-  Johnson, N. A. (2008). Assessing probabilistic forecasts of
-  multivariate quantities, with an application to ensemble
-  predictions of surface winds. *TEST* 17(2): 211–235.
-  <https://doi.org/10.1007/s11749-008-0114-x>
-- Scheuerer, M. & Hamill, T. M. (2015). Variogram-based proper
-  scoring rules for probabilistic forecasts of multivariate
-  quantities. *Monthly Weather Review* 143(4): 1321–1334.
-  <https://doi.org/10.1175/MWR-D-14-00269.1>
-- Vehtari, A., Gelman, A. & Gabry, J. (2017). Practical Bayesian
-  model evaluation using leave-one-out cross-validation and
-  WAIC. *Stat Comput* 27: 1413–1432.
-  <https://doi.org/10.1007/s11222-016-9696-4>
-- Yao, Y., Vehtari, A., Simpson, D. & Gelman, A. (2018). Using
-  stacking to average Bayesian predictive distributions.
-  *Bayesian Analysis* 13(3): 917–1003.
-  <https://doi.org/10.1214/17-BA1091>
+The natural next functions to explore on the same fit are:
+
+- `pp_check()` for posterior-predictive checks per outcome
+  before any scoring runs.
+- `conditional_effects()` and `marginaleffects::plot_predictions()`
+  for the covariate surface that drives the forecast.
+- `posterior_average()` and `pp_average()` for weighted
+  posterior summaries across the candidate models the
+  ensemble already mixes.
+- `irf()`, `fevd()` and `stability()` for impulse response,
+  forecast-error variance decomposition and stationarity
+  diagnostics when the latent dynamics are a VAR.
+- `methods_md()` for a citation-ready methods paragraph naming
+  the architecture pieces the fit actually used.
+
+Sibling articles in this series carry the workflow further:
+
+- The [multi-response article](https://nicholasjclark.github.io/mvgam/articles/multivariate.html)
+  shows how to share a single latent state across several
+  outcomes with different observation families.
+- The [JSDM article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+  applies the latent factor variant to multispecies count data
+  with informed loadings via `jsdgam()`.
+- For hierarchical or grouped trend dynamics (one shared trend
+  per group with hyperpriors across groups), see `?gr` and the
+  hierarchical-trends section of `vignette("mvgam_overview")`.
+
+## Acknowledgements
+
+The Portal Project rodent capture data ship with mvgam via
+`data(portal_data)` and are maintained by the Weecology group
+at <https://github.com/weecology/PortalData>. The forecast
+evaluation scheme comes from Bürkner, Gabry & Vehtari
+([2020](https://doi.org/10.1080/00949655.2020.1783262)). The
+PSIS approximation is from Vehtari, Gelman & Gabry
+([2017](https://doi.org/10.1007/s11222-016-9696-4)). Stacking
+weights are from Yao et al.
+([2018](https://doi.org/10.1214/17-BA1091)). The univariate
+scoring framework is from Gneiting & Raftery
+([2007](https://doi.org/10.1198/016214506000001437)). The
+energy score is from Gneiting et al.
+([2008](https://doi.org/10.1007/s11749-008-0114-x)). The
+variogram score is from Scheuerer & Hamill
+([2015](https://doi.org/10.1175/MWR-D-14-00269.1)). The
+multispecies forecasting framing follows Clark et al.
+([2025](https://doi.org/10.7717/peerj.18929)).
+
+## References
+
+Bürkner P-C, Gabry J and Vehtari A (2020). Approximate
+leave-future-out cross-validation for Bayesian time series
+models. *Journal of Statistical Computation and Simulation*
+90(14), 2499-2523.
+[doi:10.1080/00949655.2020.1783262](https://doi.org/10.1080/00949655.2020.1783262)
+
+Clark NJ, Ernest SKM, Senyondo H, Simonis J, White EP, Yenni
+GM and Karunarathna KANK (2025). Beyond single-species models:
+multispecies forecasts to navigate the dynamics of ecological
+predictability. *PeerJ* 13, e18929.
+[doi:10.7717/peerj.18929](https://doi.org/10.7717/peerj.18929)
+
+Gneiting T and Raftery AE (2007). Strictly proper scoring rules,
+prediction, and estimation. *Journal of the American
+Statistical Association* 102(477), 359-378.
+[doi:10.1198/016214506000001437](https://doi.org/10.1198/016214506000001437)
+
+Gneiting T, Stanberry LI, Grimit EP, Held L and Johnson NA
+(2008). Assessing probabilistic forecasts of multivariate
+quantities, with an application to ensemble predictions of
+surface winds. *TEST* 17(2), 211-235.
+[doi:10.1007/s11749-008-0114-x](https://doi.org/10.1007/s11749-008-0114-x)
+
+Scheuerer M and Hamill TM (2015). Variogram-based proper scoring
+rules for probabilistic forecasts of multivariate quantities.
+*Monthly Weather Review* 143(4), 1321-1334.
+[doi:10.1175/MWR-D-14-00269.1](https://doi.org/10.1175/MWR-D-14-00269.1)
+
+Vehtari A, Gelman A and Gabry J (2017). Practical Bayesian model
+evaluation using leave-one-out cross-validation and WAIC.
+*Statistics and Computing* 27(5), 1413-1432.
+[doi:10.1007/s11222-016-9696-4](https://doi.org/10.1007/s11222-016-9696-4)
+
+Yao Y, Vehtari A, Simpson D and Gelman A (2018). Using stacking
+to average Bayesian predictive distributions. *Bayesian
+Analysis* 13(3), 917-1003.
+[doi:10.1214/17-BA1091](https://doi.org/10.1214/17-BA1091)

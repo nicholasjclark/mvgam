@@ -714,20 +714,32 @@ held-out window or `lfo_cv()` below. `lfo_cv()` refits the chain
 on shorter prefixes, so the latent state at the scoring time was
 never conditioned on its own observation.
 
-## How to cite
+## Take-aways
+
+An mvgam workflow on a single time series moves from
+`sim_mvgam()` (or your own data) through an mgcv style formula,
+a `trend_formula = ~ AR(...)` or similar latent process and a
+Stan fit via `mvgam()`. From there the full brms post-fit
+surface lights up: `summary()`, `pp_check()`,
+`conditional_effects()`, `forecast()`, `score()`, `loo()`. The
+seasonal smooth plus AR(1, 12) extension on the same data
+illustrates how the latent state absorbs autocorrelation that a
+smooth only model leaves on the residuals, and how the
+resulting forecast bands tighten in the same way that the
+recovery numerics on a simulated truth predict they should.
 
 `how_to_cite()` returns a methods-section paragraph adapted to
 the model's actual structure (likelihood, link, trend type,
-sampler configuration, backend):
+sampler configuration, backend). For a model statement rendered
+as Markdown plus LaTeX, use `methods_md(step2)`.
 
 ```{r how-to-cite}
 how_to_cite(step2)
 ```
 
-For a math-only model statement rendered as Markdown plus LaTeX,
-use `methods_md(step2)`.
+## Further reading
 
-## Where to next
+The natural next functions to explore on the same fit are:
 
 - `?mvgam` for the full fitter signature, including
   `loadings_prior` and `trend_map`.
@@ -735,17 +747,57 @@ use `methods_md(step2)`.
   family fits.
 - `?forecast.mvgam` and `?hindcast.mvgam` for the prediction
   surface, including `type = "link" / "expected" / "trend"`.
-- `?conditional_effects.mvgam` for the `marginaleffects`-backed
-  effect-summary path; `predictions()`, `comparisons()`, and
-  `hypotheses()` from the `marginaleffects` package also dispatch
-  on `mvgam` objects.
-- `?kfold.mvgam` for k-fold CV.
-- `?lfo_cv.mvgam` for CV that holds out future timepoints.
+- `?conditional_effects.mvgam` for the effect-summary path
+  that wraps marginaleffects. `predictions()`, `comparisons()`
+  and `hypotheses()` from the marginaleffects package also
+  dispatch on `mvgam` objects.
+- `?kfold.mvgam` for k-fold model evaluation.
+- `?lfo_cv.mvgam` for evaluation that holds out future
+  timepoints.
 - `?irf` and `?fevd` for impulse responses and forecast error
   variance decomposition; `?stability` for eigenvalue checks on
   VAR trends.
 
-## Further reading
+Sibling articles in this series carry the workflow further:
+
+- The
+  [forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+  walks through `forecast()`, `score()`, `lfo_cv()` and
+  `ensemble()` on a worked count-data example.
+- The
+  [multi-response article](https://nicholasjclark.github.io/mvgam/articles/multivariate.html)
+  shows how to share a single latent state across several
+  outcomes with different observation families.
+- The
+  [JSDM article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+  applies the latent factor variant to multispecies count data
+  with informed loadings via `jsdgam()`.
+
+## Acknowledgements
+
+mvgam composes mgcv smooths (Wood
+[2017](https://doi.org/10.1201/9781315370279)) with brms's
+multilevel and multi-response machinery (Bürkner
+[2017](https://doi.org/10.18637/jss.v080.i01)) and adds a latent
+process layer in the dynamic generalised additive model tradition
+(Clark & Wells [2023](https://doi.org/10.1111/2041-210X.13974)).
+Stationary VAR priors follow Heaps
+([2023](https://doi.org/10.1080/10618600.2022.2079648)); the
+latent factor architecture follows Heaps & Jermyn
+([2024](https://doi.org/10.1007/s11222-024-10454-0)) with the
+MGP prior of Bhattacharya & Dunson
+([2011](https://doi.org/10.1093/biomet/asr013)). The piecewise
+trend implementation follows the Prophet specification of Taylor
+& Letham ([2018](https://doi.org/10.1080/00031305.2017.1380080)).
+Closure-unit families wrap the occupancy framework of MacKenzie
+et al. ([2002](https://doi.org/10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2))
+and the N-mixture approaches of Royle
+([2004](https://doi.org/10.1111/j.0006-341X.2004.00142.x)) and
+Royle & Nichols ([2003](https://doi.org/10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2)).
+The multispecies forecasting framing follows Clark et al.
+([2025](https://doi.org/10.7717/peerj.18929)).
+
+## References
 
 Bhattacharya, A. and Dunson, D. B. (2011). Sparse Bayesian
 infinite factor models. *Biometrika* 98, 291-306.
@@ -780,8 +832,8 @@ distributions for the covariance matrix in latent factor models.
 MacKenzie, D. I., Nichols, J. D., Lachman, G. B., Droege, S.,
 Royle, J. A. and Langtimm, C. A. (2002). Estimating site
 occupancy rates when detection probabilities are less than one.
-*Ecology* 83(8), 2248-2255. DOI:
-<https://doi.org/10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2>
+*Ecology* 83(8), 2248-2255.
+[doi:10.1890/0012-9658(2002)083\[2248:ESORWD\]2.0.CO;2](https://doi.org/10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2)
 
 Royle, J. A. (2004). N-mixture models for estimating population
 size from spatially replicated counts. *Biometrics* 60, 108-115.
@@ -789,8 +841,8 @@ size from spatially replicated counts. *Biometrics* 60, 108-115.
 
 Royle, J. A. and Nichols, J. D. (2003). Estimating abundance
 from repeated presence-absence data or point counts. *Ecology*
-84(3), 777-790. DOI:
-<https://doi.org/10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2>
+84(3), 777-790.
+[doi:10.1890/0012-9658(2003)084\[0777:EAFRPA\]2.0.CO;2](https://doi.org/10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2)
 
 Taylor, S. and Letham, B. (2018). Forecasting at scale. *The
 American Statistician* 72(1), 37-45.
