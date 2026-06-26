@@ -128,13 +128,17 @@ forecast.mvgam <- function(object,
                             ndraws = NULL,
                             b_uncertainty = TRUE,
                             trend_uncertainty = TRUE,
-                            obs_uncertainty = TRUE) {
+                            obs_uncertainty = TRUE,
+                            resp = NULL) {
   checkmate::assert_class(object, "mvgam")
   type <- match.arg(type)
   checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
   checkmate::assert_flag(b_uncertainty)
   checkmate::assert_flag(trend_uncertainty)
   checkmate::assert_flag(obs_uncertainty)
+  checkmate::assert_string(resp, null.ok = TRUE)
+  fan <- mv_resp_fan_out(object, resp)
+  if (!is.null(fan)) return(fan)
   newdata <- ensure_obs_placeholder_in_newdata(newdata, object$data)
 
   trend_specs <- object$mv_spec$trend_specs
@@ -201,7 +205,7 @@ forecast.mvgam <- function(object,
   # the training grid.
   hindcasts <- build_hindcast_arms(
     object, training, type, draw_idx, obs_uncertainty,
-    resample_innovations = FALSE
+    resample_innovations = FALSE, resp = resp
   )
 
   forecasts <- if (is.null(fc_grid)) {
@@ -228,7 +232,8 @@ forecast.mvgam <- function(object,
       b_uncertainty = b_uncertainty,
       trend_uncertainty = trend_uncertainty,
       obs_uncertainty = obs_uncertainty,
-      series_levels = series_levels
+      series_levels = series_levels,
+      resp = resp
     )
   }
 
@@ -653,7 +658,8 @@ build_forecast_arms <- function(object, trend_model, meta,
                                   b_uncertainty,
                                   trend_uncertainty,
                                   obs_uncertainty,
-                                  series_levels) {
+                                  series_levels,
+                                  resp = NULL) {
   n_series <- length(series_levels)
   ndraws_use <- length(draw_idx)
   per_series_h <- vapply(fc_grid$times, length, integer(1L))
@@ -700,7 +706,7 @@ build_forecast_arms <- function(object, trend_model, meta,
   obs_full <- if (type %in% c("link", "response", "expected")) {
     extract_component_linpred(
       mvgam_fit = object, newdata = fc_grid$data,
-      component = "obs"
+      component = "obs", resp = resp
     )
   } else {
     NULL
@@ -793,13 +799,19 @@ build_forecast_arms <- function(object, trend_model, meta,
     return(slice_per_series(eta_full, fc_grid, obs_struct_fc,
                               ndraws_use, series_levels))
   }
-  mu <- object$family$linkinv(eta_full)
+  family_for_arm <- if (!is.null(resp)) {
+    get_family_for_resp(object, resp)
+  } else {
+    object$family
+  }
+  mu <- family_for_arm$linkinv(eta_full)
   if (type == "expected" || isTRUE(!obs_uncertainty)) {
     return(slice_per_series(mu, fc_grid, obs_struct_fc,
                               ndraws_use, series_levels))
   }
   resp_mat <- sample_family_batched(object, mu, fc_grid$data,
-                                      ndraws_use, draw_idx)
+                                      ndraws_use, draw_idx,
+                                      family = family_for_arm)
   slice_per_series(resp_mat, fc_grid, obs_struct_fc,
                      ndraws_use, series_levels)
 }
@@ -1142,8 +1154,8 @@ slice_per_series <- function(mat, fc_grid, obs_struct,
 # matching `draw_ids` so they line up element-wise.
 #'@noRd
 sample_family_batched <- function(object, mu, fc_data, ndraws_use,
-                                    draw_idx) {
-  family <- object$family
+                                    draw_idx, family = NULL) {
+  family <- family %||% object$family
   family_name <- family$family
   nobs <- ncol(mu)
   dpar_names <- get_family_dpars(family_name)
