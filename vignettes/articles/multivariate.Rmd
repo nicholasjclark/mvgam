@@ -253,39 +253,33 @@ information per row.
 
 ## Residual diagnostics
 
-`pp_check()` accepts the same `resp` argument as the rest of the
-post-fit surface. The `"intervals"` type plots posterior
-prediction bands against the observed series and exposes any
-runs of points the model is missing.
+`plot(mod, type = "residuals", resp = X)` returns a four panel
+diagnostic of the Dunn-Smyth residuals for one outcome. The
+panels show residuals against fitted values, a Normal quantile
+plot, ACF and partial ACF. When the model is doing its job the
+residuals will sit horizontally around zero with no trend across
+the fitted range, will fall close to the quantile line and will
+show no autocorrelation lags reaching beyond the dashed bands.
 
-```{r resid-count, fig.asp = 0.5}
-pp_check(mod_joint, resp = "count", type = "intervals",
-          ndraws = 100L) +
-  labs(title = "count: predicted intervals vs observed")
+```{r resid-count, fig.asp = 0.7, fig.width = 8}
+plot(mod_joint, type = "residuals", resp = "count", ndraws = 100L)
 ```
 
-```{r resid-biomass, fig.asp = 0.5}
-pp_check(mod_joint, resp = "biomass", type = "intervals",
-          ndraws = 100L) +
-  labs(title = "biomass: predicted intervals vs observed")
+```{r resid-biomass, fig.asp = 0.7, fig.width = 8}
+plot(mod_joint, type = "residuals", resp = "biomass", ndraws = 100L)
 ```
 
-For the binary camera outcome, the calibrated check is `"bars"`
-again (continuous interval bands are not informative for 0/1
-data), separately overlaid with the Bernoulli ribbon view of
-forecast accuracy below.
-
-```{r resid-camera-pit, fig.asp = 0.5, fig.width = 5}
-pp_check(mod_joint, resp = "camera", type = "bars",
-          ndraws = 100L) +
-  labs(title = "camera: predicted vs observed counts of 0 / 1")
+```{r resid-camera, fig.asp = 0.7, fig.width = 8}
+plot(mod_joint, type = "residuals", resp = "camera", ndraws = 100L)
 ```
 
-The interval plots for `count` and `biomass` show the median
-observation tracking the predictive median, with most rows
-inside the 50% band and almost all inside the 95% band. The
-camera bar check shows the predictive count of 0s and 1s
-matching the observed split.
+The count and camera quantile plots track the diagonal almost
+exactly. The biomass plot shows a mild deviation in the upper
+tail, marking one or two large biomass values the Gamma is
+slightly undershooting. None of the three outcomes show
+residual autocorrelation outside the lag-1 confidence band,
+which is the diagnostic the shared AR(1) latent state was put
+in place to absorb.
 
 ## State recovery: joint vs baselines
 
