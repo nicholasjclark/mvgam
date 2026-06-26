@@ -156,7 +156,10 @@ extract_trend_posterior <- function(fit) {
   if (length(cols) == 0L) {
     stop(insight::format_error(c(
       "Fit has no posterior draws for `trend[]`.",
-      i = "compare_latent_states() requires a fit with a latent trend; trendless fits are not supported."
+      i = paste0(
+        "compare_latent_states() requires a fit with a latent ",
+        "trend; trendless fits are not supported."
+      )
     )), call. = FALSE)
   }
   ps[, cols, drop = FALSE]

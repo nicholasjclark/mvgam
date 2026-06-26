@@ -38,21 +38,16 @@ ecologist counting animals along a transect typically also
 operates a baited trap and runs a camera array. Each survey
 delivers a noisy, partial view of the same underlying ecological
 quantity. Standard methods for time series data either fit each
-response separately (throwing away the information sitting in
-the other methods' columns) or force every column into the same
-Gaussian observation model, which is
-wrong for counts, for biomass and for detection records. This
-article walks through the mvgam alternative: **one shared latent
-dynamic process linked to many response variables, each with its
-own observation family and per-arm covariates**. The latent state
-is informed jointly by every response through the likelihood.
-
-That is the package's value proposition for multi-response work.
-No alternative R package combines cross-series latent dynamics,
-mixed observation families, smooths/GPs/REs per response, full
-Bayesian posterior, and proper joint forecasts. We demonstrate
-this on a simulated three-method monitoring scenario where we
-know the truth and can verify recovery directly.
+response separately, throwing away the information sitting in
+the other methods' columns, or force every column into the same
+Gaussian observation model, which is wrong for counts, for
+biomass and for detection records. This article walks through
+the mvgam alternative: one shared latent dynamic process linked
+to many response variables, each with its own observation family
+and per-outcome covariates. The latent state is informed jointly
+by every response through the likelihood. We demonstrate this on
+a simulated three-method monitoring scenario where we know the
+truth and can verify recovery directly.
 
 ## The data
 
@@ -73,9 +68,9 @@ through a different measurement process:
 
 The camera array is operated on a sparser schedule than the other
 two: only 60 of the 80 months carry camera observations. mvgam
-keeps the camera arm on its own non-NA rows so the shared latent
-state is still informed during the 20 months without a camera by
-counts and biomass alone.
+keeps the camera outcome on its own non-NA rows so the shared
+latent state is still informed during the 20 months without a
+camera by counts and biomass alone.
 
 ```{r data-load}
 mv_data <- read_cache("mv_data")
@@ -91,7 +86,7 @@ cat("camera obs    =", sum(!is.na(mv_data$camera)), "/", nrow(mv_data), "\n")
 ```
 
 A scatter of the three response columns by time shows what each
-method records and where the camera arm is missing.
+method records and where the camera outcome is missing.
 
 ```{r plot-data, fig.asp = 0.7, fig.width = 8, out.width = "95%"}
 long <- with(mv_data, rbind(
@@ -106,7 +101,7 @@ ggplot(long, aes(x = time, y = value)) +
   labs(x = "Time (month)", y = "Observed value")
 ```
 
-## Three independent univariate baselines
+## Three univariate baselines
 
 To see how much the shared-process model gains over the
 default that fits each method alone, we first run three
@@ -140,18 +135,18 @@ mod_uni_biomass <- read_cache("mod_uni_biomass")
 mod_uni_camera  <- read_cache("mod_uni_camera")
 ```
 
-Each fit converges (max R-hat below 1.05) but the camera arm has
-very little information by itself. The Bernoulli observations
+Each fit converges (max R-hat below 1.05) but the camera outcome
+carries very little information by itself. The Bernoulli observations
 above provide only one bit per time point, so its AR(1) estimate
 of `x[t]` is correspondingly diffuse.
 
-## The joint multi-response fit
+## A joint fit: one process, three observation families
 
 The joint fit lives in one `mvgam()` call. We chain three `bf()`
-arms with the `+` operator (a brms idiom that mvgam re-exports).
-Each arm gets its own family and its own predictors. Every arm
-shares the same `trend_formula = ~ AR(p = 1)`: one latent state
-feeding three observation models.
+outcomes with the `+` operator (a brms idiom that mvgam re-exports).
+Each outcome gets its own family and its own predictors. Every
+outcome shares the same `trend_formula = ~ AR(p = 1)`: one latent
+state feeding three observation models.
 
 ```{r joint-fit, eval = FALSE}
 joint_formula <-
@@ -175,9 +170,9 @@ mod_joint <- read_cache("mod_joint")
 ```
 
 mvgam handles the bookkeeping. brms's default `mvbf` would
-drop those 20 rows from every arm via listwise deletion. mvgam
-instead expands the standata so each arm keeps its own non-NA
-rows. The Stan model then evaluates the count likelihood at all
+drop those 20 rows from every outcome via listwise deletion.
+mvgam instead expands the standata so each outcome keeps its own
+non-NA rows. The Stan model then evaluates the count likelihood at all
 80 time points, the biomass likelihood at all 80 and the camera
 likelihood at the 60 observed months, all contributing to a
 single shared AR(1) state.
@@ -203,13 +198,13 @@ Recovery against the truth (`phi = 0.7`, `sigma = 0.4`,
 coefficient, the innovation SD and the Gamma shape sit close to
 their generating values with 95% intervals that cover.
 
-## Posterior-predictive checks per arm
+## Posterior-predictive checks
 
-Each arm gets its own posterior-predictive check via the standard
-`pp_check()` interface, scoped with the `resp` argument. For the
-Bernoulli camera arm the `"bars"` type is more informative than
-the default density overlay (which is built for continuous
-responses).
+Each outcome gets its own posterior-predictive check via the
+standard `pp_check()` interface, scoped with the `resp` argument.
+For the Bernoulli camera outcome the `"bars"` type is more
+informative than the default density overlay (which is built for
+continuous responses).
 
 ```{r pp-count, fig.asp = 0.55}
 pp_check(mod_joint, resp = "count", ndraws = 50L) +
@@ -227,12 +222,12 @@ pp_check(mod_joint, resp = "camera", type = "bars", ndraws = 50L) +
 ```
 
 The replicate distributions cover the observed marginals for
-every arm. Calibration is sound on all three.
+every outcome. Calibration is sound on all three.
 
-## Per-arm covariate effects
+## Conditional effects
 
 `conditional_effects()` returns one list per response, faceted
-internally by predictor. The plot for each arm now carries the
+internally by predictor. The plot for each outcome now carries the
 correct response on its y-axis.
 
 ```{r ce-biomass, fig.asp = 0.55}
@@ -240,7 +235,7 @@ ce <- mvgam::conditional_effects(mod_joint)
 plot(ce[["biomass"]])[[1L]]
 ```
 
-The biomass arm picks up the seasonal sinusoid that drove the
+The biomass outcome picks up the seasonal sinusoid that drove the
 simulation: a clear peak in early months and a trough in late
 summer. The cyclic smooth penalisation is doing its job, and the
 posterior median follows the truth even though we never told the
@@ -250,17 +245,17 @@ model that month was seasonal.
 plot(ce[["camera"]])[[2L]]
 ```
 
-The camera arm's detection probability rises with deploy days,
+The camera outcome's detection probability rises with deploy days,
 consistent with the simulated effect of 0.05 log-odds per day.
 The CI is wide because Bernoulli observations carry little
 information per row.
 
-## Per-arm residual diagnostics
+## Residual diagnostics
 
-Quantile residuals for each arm are also scoped via `resp`. The
-dispatch correctly looks up the per-arm family (Poisson for
-counts, Gamma for biomass, Bernoulli for camera) and returns the
-matching analytic or empirical PIT residuals.
+Quantile residuals for each outcome are also scoped via `resp`.
+The dispatch correctly looks up the per-outcome family (Poisson
+for counts, Gamma for biomass, Bernoulli for camera) and returns
+the matching analytic or empirical PIT residuals.
 
 ```{r resid-summary}
 res_count   <- residuals(mod_joint, resp = "count")
@@ -270,7 +265,7 @@ sapply(list(count = res_count, biomass = res_biomass,
              camera = res_camera), dim)
 ```
 
-## State recovery: joint vs each baseline
+## State recovery: joint vs baselines
 
 The point of the joint fit is the latent state itself.
 `compare_latent_states()` extracts the posterior `trend[t]` from a
@@ -300,13 +295,13 @@ line is the diffuse outlier: a single Bernoulli observation per
 time point carries little information. The joint fit recovers
 strength wherever any of the methods reported.
 
-## Cross-arm posterior forecasts
+## Per-outcome posterior forecasts
 
 The same `forecast()` interface that handles univariate fits now
 works on a multi-response fit: it fans out per response and
-returns one `mvgam_forecast` per arm. We extend the time grid by
-5 months and let mvgam propagate the shared latent state forward,
-then map back through each arm's observation family.
+returns one `mvgam_forecast` per outcome. We extend the time grid
+by 5 months and let mvgam propagate the shared latent state
+forward, then map back through each outcome's observation family.
 
 ```{r forecast-multi, eval = TRUE}
 T_ <- max(mv_data$time)
@@ -322,9 +317,9 @@ fc <- forecast(mod_joint, newdata = new)
 sapply(fc, function(f) length(f$forecasts))
 ```
 
-One forecast object per arm, ready to feed into `score()` (see
-the [forecast-evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html))
-or into per-arm plotting.
+One forecast object per outcome, ready to feed into `score()`
+(see the [forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html))
+or into separate plots for each response.
 
 ## Take-aways
 
@@ -332,8 +327,8 @@ A multi-response mvgam fit lets you keep each measurement model
 in its proper family while sharing the dynamics that drive every
 observation. The recipe is small:
 
-- write one `bf()` arm per response with its own family and per-arm
-  predictors,
+- write one `bf()` block per response with its own family and its
+  own predictors,
 - combine them with `+`,
 - pass the combined formula to `mvgam()` with a single shared
   `trend_formula = ~ ...`.
@@ -342,9 +337,9 @@ Each post-fit method (`summary()`, `pp_check()`,
 `conditional_effects()`, `residuals()`, `posterior_predict()`,
 `forecast()`, `loo()`) either operates directly on the joint
 fit or accepts a `resp` argument that scopes the call to a single
-arm. Arms with NA values keep their own non-NA rows; the shared
-latent state is still informed at every time point any method was
-observed.
+outcome. Outcomes with NA values keep their own non-NA rows; the
+shared latent state is still informed at every time point any
+method was observed.
 
 ## Further reading
 
