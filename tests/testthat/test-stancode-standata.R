@@ -3996,13 +3996,13 @@ test_that("com_binomial() requires a `trials` column in data", {
 })
 
 
-test_that("multi-response fits with NA in one response align obs_trend mappings to brms's listwise N", {
-  # Regression for #429: when one response column has NAs, brms's
-  # mvbf listwise-deletes those rows from every Y_<resp> and
-  # reports N_<resp> = N_complete (the intersection). Before the
-  # fix, mvgam's per-response obs_trend_time_<resp> arrays kept
-  # the full per-response valid rows, which gave length 20 vs
-  # Stan's declared N_<resp> = 16 and crashed initialisation.
+test_that("multi-response fits with NA preserve per-response valid rows", {
+  # Regression for #429/#430: brms's mvbf listwise-deletes rows
+  # with NA in ANY response. mvgam overrides this so each
+  # response keeps its own non-NA rows and contributes to the
+  # shared latent state at every time point it was observed. The
+  # `expand_per_response_standata` helper substitutes per-arm
+  # data arrays into the combined standata.
   set.seed(1)
   T_ <- 20L
   dat <- data.frame(
@@ -4012,7 +4012,9 @@ test_that("multi-response fits with NA in one response align obs_trend mappings 
     biomass = rgamma(T_, 2, 0.5),
     camera  = rbinom(T_, 1, 0.4)
   )
-  dat$camera[c(3L, 7L, 12L, 18L)] <- NA_integer_
+  dat$count[c(5L, 11L)]              <- NA_integer_
+  dat$biomass[c(8L, 14L)]            <- NA_real_
+  dat$camera[c(3L, 7L, 12L, 18L)]    <- NA_integer_
 
   f <- bf(count   ~ 1, family = poisson()) +
        bf(biomass ~ 1, family = Gamma(link = "log")) +
@@ -4020,8 +4022,8 @@ test_that("multi-response fits with NA in one response align obs_trend mappings 
 
   mf <- mvgam_formula(f, trend_formula = ~ AR(p = 1))
   # brms emits one "Rows containing NAs were excluded" warning
-  # per bf() arm (three here); these are expected and confirm
-  # the listwise-deletion path we are testing against.
+  # per bf() arm; mvgam's per-arm expansion call emits more.
+  # All are expected.
   sd <- withCallingHandlers(
     standata(mf, data = dat),
     warning = function(w) {
@@ -4031,22 +4033,107 @@ test_that("multi-response fits with NA in one response align obs_trend mappings 
     }
   )
 
-  # Every per-response obs_trend_time_<resp> array must equal
-  # its brms-emitted N_<resp> in length.
+  # Per-response N_<resp> should equal that response's own
+  # non-NA row count, NOT the listwise intersection.
   for (r in c("count", "biomass", "camera")) {
-    n_decl <- sd[[paste0("N_", r)]]
-    len    <- length(sd[[paste0("obs_trend_time_", r)]])
-    expect_identical(len, n_decl)
-    # Same constraint for the series index array.
-    expect_identical(
-      length(sd[[paste0("obs_trend_series_", r)]]), n_decl
-    )
+    expected <- sum(!is.na(dat[[r]]))
+    expect_identical(as.integer(sd[[paste0("N_", r)]]),
+                     as.integer(expected))
+    expect_identical(length(sd[[paste0("Y_", r)]]), expected)
+    expect_identical(length(sd[[paste0("obs_trend_time_", r)]]),
+                     expected)
+    expect_identical(length(sd[[paste0("obs_trend_series_", r)]]),
+                     expected)
   }
-  # And the brms listwise intersection sets all N_<resp> to the
-  # same value (= number of rows with no NA in any response).
-  expect_identical(sd$N_count, sd$N_biomass)
-  expect_identical(sd$N_count, sd$N_camera)
-  expect_identical(sd$N_count, sum(stats::complete.cases(
-    dat[, c("count", "biomass", "camera")]
-  )))
+  # The per-response N values should differ because each response
+  # has different NA rows.
+  expect_false(sd$N_count == sd$N_biomass &&
+                 sd$N_biomass == sd$N_camera)
+})
+
+
+test_that("multi-response fits with no NAs hit the fast no-op path", {
+  # When no response has NAs, brms's listwise-deleted standata is
+  # already per-response-correct and `expand_per_response_standata`
+  # returns it unchanged after a fast no-op check.
+  set.seed(1)
+  T_ <- 20L
+  dat <- data.frame(
+    time   = seq_len(T_),
+    series = factor(rep("a", T_)),
+    count   = rpois(T_, 5),
+    biomass = rgamma(T_, 2, 0.5)
+  )
+
+  mf <- mvgam_formula(
+    bf(count ~ 1, family = poisson()) +
+      bf(biomass ~ 1, family = Gamma(link = "log")),
+    trend_formula = ~ AR(p = 1)
+  )
+  sd <- withCallingHandlers(
+    standata(mf, data = dat),
+    warning = function(w) {
+      if (grepl("Rows containing NAs", conditionMessage(w))) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+  expect_identical(as.integer(sd$N_count),   T_)
+  expect_identical(as.integer(sd$N_biomass), T_)
+})
+
+
+test_that("per-arm standata expansion handles smooths, ranef and dpar", {
+  # Verifies the trailing-then-mid key stripper in
+  # `map_combined_key_to_single` correctly recovers per-arm values
+  # under every per-key naming pattern brms emits.
+  set.seed(1)
+  T_ <- 30L
+  dat <- data.frame(
+    time     = seq_len(T_),
+    series   = factor(rep("a", T_)),
+    g        = factor(rep(c("g1", "g2", "g3"), each = T_ / 3L)),
+    x        = rnorm(T_),
+    z        = rnorm(T_),
+    m        = rep(1:12, length.out = T_),
+    count    = rpois(T_, 5),
+    biomass  = rgamma(T_, 2, 0.5),
+    camera   = rbinom(T_, 1, 0.4)
+  )
+  dat$count[c(2L, 5L)]            <- NA_integer_
+  dat$biomass[c(8L, 11L, 17L)]    <- NA_real_
+  dat$camera[c(3L, 7L, 12L, 18L)] <- NA_integer_
+
+  mf <- mvgam_formula(
+    bf(count   ~ x + (1|g),               family = poisson()) +
+      bf(biomass ~ s(m, k = 5), shape ~ z, family = Gamma(link = "log")) +
+      bf(camera  ~ x,                       family = bernoulli(link = "logit")),
+    trend_formula = ~ AR(p = 1)
+  )
+  sd <- withCallingHandlers(
+    standata(mf, data = dat),
+    warning = function(w) {
+      if (grepl("Rows containing NAs", conditionMessage(w))) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+  # Every per-response array reaches its expected per-arm length.
+  for (r in c("count", "biomass", "camera")) {
+    expected <- sum(!is.na(dat[[r]]))
+    expect_identical(as.integer(sd[[paste0("N_", r)]]),
+                     as.integer(expected))
+    expect_identical(length(sd[[paste0("Y_", r)]]), expected)
+  }
+  # Ranef Z and J arrays for count (mid-position then trailing
+  # suffix patterns) should match N_count.
+  expect_identical(length(sd$J_1_count),   as.integer(sd$N_count))
+  expect_identical(nrow(sd$Z_1_count_1),   as.integer(sd$N_count))
+  # Smooth Zs array for biomass (mid-position suffix).
+  expect_identical(nrow(sd$Zs_biomass_1_1),
+                   as.integer(sd$N_biomass))
+  # Dpar `shape ~ z` design matrix for biomass has trailing
+  # `_biomass` suffix after the dpar prefix `_shape`.
+  expect_identical(nrow(sd$X_shape_biomass),
+                   as.integer(sd$N_biomass))
 })

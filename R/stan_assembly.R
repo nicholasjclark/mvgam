@@ -1954,7 +1954,222 @@ generate_base_brms_standata <- function(formula, data, family = gaussian(),
     data2 = data2
   )
 
+  # Multi-response fits: brms's `mvbf` listwise-deletes rows with
+  # NA in any response. mvgam wants per-response data so each
+  # response keeps its own valid rows and still contributes to
+  # the shared latent state at the asynchronously sampled time
+  # points. Rebuild the per-response data arrays and substitute
+  # them back into the combined standata while preserving brms's
+  # naming. See task #430.
+  if (inherits(formula, "mvbrmsformula")) {
+    standata <- expand_per_response_standata(
+      combined_sd = standata,
+      formula     = formula,
+      data        = data,
+      stanvars    = stanvars,
+      data2       = data2
+    )
+  }
+
   return(standata)
+}
+
+
+#' Substitute per-response data into a multi-response combined standata
+#'
+#' brms's `mvbf` listwise-deletes rows with NA in any response when
+#' it emits the combined standata. For mvgam fits we want each
+#' response to keep its own non-NA rows so the shared latent state
+#' is informed at every time point at which any response was
+#' observed. This helper walks each `bf()` arm, calls brms on the
+#' single-arm formula with that arm's per-response valid data, and
+#' substitutes the resulting per-response data arrays back into the
+#' combined standata under brms's multi-response naming.
+#'
+#' The combined-key -> single-key mapping is inferred by stripping
+#' `_<resp>` from each combined key (at end or middle) and checking
+#' for a match in the single-arm standata. This handles every key
+#' shape brms emits:
+#' * trailing suffix: `Y_<resp>`, `K_<resp>`, `Xs_<resp>`
+#' * mid-position suffix: `nb_<resp>_1`, `Zs_<resp>_1_1`, `Z_1_<resp>_1`
+#' * dpar prefix: `K_sigma_<resp>`, `X_shape_<resp>`
+#' Keys that contain no response name (`M_1`, `NC_1`, `prior_only`,
+#' `N`) are shared across responses and left untouched.
+#'
+#' If the input data has no NA values in any response, the combined
+#' standata equals the listwise-deleted version and this helper
+#' returns it unchanged after a fast no-op check.
+#'
+#' @param combined_sd Combined standata from `brms::make_standata`
+#'   on the multi-response formula.
+#' @param formula `mvbrmsformula` object (a sum of `bf()` arms).
+#' @param data The original data frame (may contain NAs).
+#' @param stanvars Optional stanvars passed through to brms.
+#' @param data2 Optional auxiliary data passed through to brms.
+#' @return The combined standata with per-response data arrays
+#'   substituted in and the global `N` set to the maximum
+#'   per-response valid row count.
+#' @noRd
+expand_per_response_standata <- function(combined_sd, formula, data,
+                                          stanvars = NULL, data2 = NULL) {
+  bf_list <- formula$forms
+  if (length(bf_list) < 2L) return(combined_sd)
+
+  resp_names <- vapply(bf_list, function(bf_i) {
+    as.character(stats::formula(bf_i)[[2L]])
+  }, character(1L))
+
+  # Fast path: every response is fully observed -> brms's
+  # listwise-deleted standata already equals the per-response one.
+  any_na <- vapply(resp_names, function(r) {
+    if (!r %in% names(data)) return(FALSE)
+    anyNA(data[[r]])
+  }, logical(1L))
+  if (!any(any_na)) return(combined_sd)
+
+  for (i in seq_along(bf_list)) {
+    resp_i <- resp_names[i]
+    if (!any_na[i] && !any(any_na)) next
+    if (!resp_i %in% names(data)) next
+
+    keep_i <- !is.na(data[[resp_i]])
+    if (sum(keep_i) == 0L) {
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "Response variable {.field {resp_i}} has no non-missing values."
+        ),
+        x = "Cannot fit a multi-response model with an all-NA response."
+      )), call. = FALSE)
+    }
+    data_i <- data[keep_i, , drop = FALSE]
+
+    bf_i <- bf_list[[i]]
+    fam_i <- bf_i$family
+    # `data2` is forwarded unchanged. brms `data2` usually holds
+    # group-keyed auxiliary objects (covariance matrices, basis
+    # function tables) that index by group rather than by data
+    # row. Row-indexed auxiliary data passed via `data2` will
+    # mismatch the per-arm row count and brms will error here.
+    single_sd <- brms::make_standata(
+      formula  = bf_i,
+      data     = data_i,
+      family   = fam_i,
+      stanvars = stanvars,
+      data2    = data2
+    )
+    single_keys <- names(single_sd)
+
+    # For each combined-standata key, try to recover the matching
+    # single-arm key by stripping the response substring.
+    for (combined_key in names(combined_sd)) {
+      single_key <- map_combined_key_to_single(
+        combined_key, resp_i, single_keys
+      )
+      if (!is.null(single_key)) {
+        combined_sd[[combined_key]] <- single_sd[[single_key]]
+      }
+    }
+  }
+
+  # Set the global `N` to the maximum per-response row count so the
+  # `int<lower=1> N` declaration remains valid. The combined `N`
+  # is otherwise unused by mvgam-side trend machinery.
+  resp_Ns <- vapply(resp_names, function(r) {
+    val <- combined_sd[[paste0("N_", r)]]
+    if (is.null(val)) NA_integer_ else as.integer(val)
+  }, integer(1L))
+  if (!any(is.na(resp_Ns))) {
+    combined_sd$N <- max(resp_Ns)
+  }
+
+  # Post-hoc verification: every per-response Y_<resp> and X_<resp>
+  # row count must equal the corresponding N_<resp>. This catches
+  # any brms naming pattern the heuristic strip in
+  # `map_combined_key_to_single` missed (e.g. a future brms version
+  # introducing a new per-arm key shape we didn't anticipate).
+  for (i in seq_along(resp_names)) {
+    resp_i <- resp_names[i]
+    n_i <- resp_Ns[i]
+    if (is.na(n_i)) next
+    keep_i <- !is.na(data[[resp_i]])
+    expected <- sum(keep_i)
+    if (!identical(as.integer(n_i), as.integer(expected))) {
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "Per-response standata expansion failed for response {.field {resp_i}}."
+        ),
+        x = cli::format_inline(
+          "N_{resp_i} = {n_i} but expected {expected} (non-NA rows)."
+        ),
+        i = "This indicates `expand_per_response_standata()` could not map a per-arm key to its combined-standata equivalent."
+      )), call. = FALSE)
+    }
+    # Y_<resp> length check
+    yk <- paste0("Y_", resp_i)
+    if (!is.null(combined_sd[[yk]]) &&
+        length(combined_sd[[yk]]) != expected) {
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "Length mismatch for {.field {yk}}: have {length(combined_sd[[yk]])}, expected {expected}."
+        ),
+        i = "Per-arm response array was not substituted correctly."
+      )), call. = FALSE)
+    }
+    # X_<resp> nrow check (only when a fixed-effect design matrix exists)
+    xk <- paste0("X_", resp_i)
+    if (!is.null(combined_sd[[xk]]) && is.matrix(combined_sd[[xk]]) &&
+        nrow(combined_sd[[xk]]) != expected) {
+      stop(insight::format_error(c(
+        cli::format_inline(
+          "Row count mismatch for {.field {xk}}: have {nrow(combined_sd[[xk]])}, expected {expected}."
+        ),
+        i = "Per-arm predictor matrix was not substituted correctly."
+      )), call. = FALSE)
+    }
+    # J_<grp_idx>_<resp> ranef group-index check. Each random
+    # effect Z_<grp_idx>_<resp>_* should have a matching J_<grp_idx>_<resp>
+    # array of length N_<resp>. Walk the J_*_<resp> keys present
+    # in this combined standata.
+    j_keys <- grep(paste0("^J_[0-9]+_", resp_i, "$"),
+                    names(combined_sd), value = TRUE)
+    for (jk in j_keys) {
+      jv <- combined_sd[[jk]]
+      if (length(jv) != expected) {
+        stop(insight::format_error(c(
+          cli::format_inline(
+            "Length mismatch for {.field {jk}}: have {length(jv)}, expected {expected}."
+          ),
+          i = "Per-arm random-effect group-index array was not substituted correctly."
+        )), call. = FALSE)
+      }
+    }
+  }
+
+  combined_sd
+}
+
+
+#' Recover the single-arm standata key that corresponds to a
+#' combined-standata key for a given response.
+#'
+#' Tries trailing then mid-position suffix stripping and validates
+#' the result against the single-arm key list. Returns `NULL` when
+#' no consistent mapping is found (the key is shared across
+#' responses or belongs to a different arm).
+#'
+#' @noRd
+map_combined_key_to_single <- function(combined_key, resp_name,
+                                         single_keys) {
+  # Trailing `_<resp>`: e.g. `Y_count`, `K_sigma_contvar`, `J_1_count`.
+  cand <- sub(paste0("_", resp_name, "$"), "", combined_key)
+  if (cand != combined_key && cand %in% single_keys) return(cand)
+
+  # Mid-position `_<resp>_`: e.g. `Z_1_count_1`, `Zs_biomass_1_1`,
+  # `nb_biomass_1`, `knots_biomass_1`.
+  cand <- sub(paste0("_", resp_name, "_"), "_", combined_key)
+  if (cand != combined_key && cand %in% single_keys) return(cand)
+
+  NULL
 }
 
 
