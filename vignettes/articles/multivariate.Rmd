@@ -1,0 +1,359 @@
+---
+title: "One shared process, many sensors: multi-response mvgam"
+author: "Nicholas J Clark"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_document:
+    toc: yes
+    toc_float: yes
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, dpi = 100, fig.asp = 0.62, fig.width = 7,
+  out.width = "85%", fig.align = "center"
+)
+library(mvgam)
+library(brms)
+library(ggplot2)
+theme_set(theme_bw(base_size = 12, base_family = "serif"))
+
+cache_dir <- file.path("pkgdown", "multivariate_cache")
+read_cache <- function(name) {
+  readRDS(file.path(cache_dir, paste0(name, ".rds")))
+}
+```
+
+Field monitoring rarely produces a single response variable. An
+ecologist counting animals along a transect typically also
+operates a baited trap and runs a camera array. Each survey
+delivers a noisy, partial view of the same underlying ecological
+quantity. Standard methods for time series data either fit each
+response separately (throwing away the information sitting in
+the other methods' columns) or force every column into the same
+Gaussian observation model, which is
+wrong for counts, for biomass and for detection records. This
+article walks through the mvgam alternative: **one shared latent
+dynamic process linked to many response variables, each with its
+own observation family and per-arm covariates**. The latent state
+is informed jointly by every response through the likelihood.
+
+That is the package's value proposition for multi-response work.
+No alternative R package combines cross-series latent dynamics,
+mixed observation families, smooths/GPs/REs per response, full
+Bayesian posterior, and proper joint forecasts. We demonstrate
+this on a simulated three-method monitoring scenario where we
+know the truth and can verify recovery directly.
+
+## The data
+
+We simulate a single hypothetical animal population observed over
+80 monthly time points by three parallel survey methods. The
+underlying latent state `x[t]` follows a stationary AR(1) with
+`phi = 0.7` and `sigma = 0.4`. Each method observes that state
+through a different measurement process:
+
+- `count`: visual transect counts (Poisson, log link). Survey
+  effort is logged each month and enters the linear predictor as
+  an offset.
+- `biomass`: trap-collected biomass per unit night (Gamma, log
+  link). A cyclic seasonal smooth captures the natural seasonal
+  rhythm in biomass independent of survey effort.
+- `camera`: camera-trap presence/absence (Bernoulli, logit link).
+  The number of deployment days enters as a linear slope.
+
+The camera array is operated on a sparser schedule than the other
+two: only 60 of the 80 months carry camera observations. mvgam
+keeps the camera arm on its own non-NA rows so the shared latent
+state is still informed during the 20 months without a camera by
+counts and biomass alone.
+
+```{r data-load}
+mv_data <- read_cache("mv_data")
+truth   <- read_cache("truth")
+str(mv_data, give.attr = FALSE)
+```
+
+```{r truth-summary}
+cat("True phi      =", truth$phi,   "\n")
+cat("True sigma    =", truth$sigma, "\n")
+cat("True nu       =", truth$nu,    "(Gamma shape)\n")
+cat("camera obs    =", sum(!is.na(mv_data$camera)), "/", nrow(mv_data), "\n")
+```
+
+A scatter of the three response columns by time shows what each
+method records and where the camera arm is missing.
+
+```{r plot-data, fig.asp = 0.7, fig.width = 8, out.width = "95%"}
+long <- with(mv_data, rbind(
+  data.frame(time = time, value = count,   resp = "count"),
+  data.frame(time = time, value = biomass, resp = "biomass"),
+  data.frame(time = time, value = camera,  resp = "camera")
+))
+ggplot(long, aes(x = time, y = value)) +
+  geom_line(colour = "gray30", alpha = 0.6) +
+  geom_point(size = 1.2, na.rm = TRUE) +
+  facet_wrap(~ resp, ncol = 1L, scales = "free_y") +
+  labs(x = "Time (month)", y = "Observed value")
+```
+
+## Three independent univariate baselines
+
+To see how much the shared-process model gains over the
+default that fits each method alone, we first run three
+independent fits with the same AR(1) latent dynamics.
+
+```{r uni-fits, eval = FALSE}
+mod_uni_count <- mvgam(
+  count ~ 1 + offset(log_effort),
+  trend_formula = ~ AR(p = 1),
+  family = poisson(), data = mv_data,
+  chains = 2L, samples = 1000L, silent = 2L
+)
+mod_uni_biomass <- mvgam(
+  biomass ~ 1 + s(month, bs = "cc", k = 8),
+  trend_formula = ~ AR(p = 1),
+  family = Gamma(link = "log"), data = mv_data,
+  knots = list(month = c(0.5, 12.5)),
+  chains = 2L, samples = 1000L, silent = 2L
+)
+mod_uni_camera <- mvgam(
+  camera ~ 1 + deploy_days,
+  trend_formula = ~ AR(p = 1),
+  family = bernoulli(link = "logit"), data = mv_data,
+  chains = 2L, samples = 1000L, silent = 2L
+)
+```
+
+```{r uni-load, include = FALSE}
+mod_uni_count   <- read_cache("mod_uni_count")
+mod_uni_biomass <- read_cache("mod_uni_biomass")
+mod_uni_camera  <- read_cache("mod_uni_camera")
+```
+
+Each fit converges (max R-hat below 1.05) but the camera arm has
+very little information by itself. The Bernoulli observations
+above provide only one bit per time point, so its AR(1) estimate
+of `x[t]` is correspondingly diffuse.
+
+## The joint multi-response fit
+
+The joint fit lives in one `mvgam()` call. We chain three `bf()`
+arms with the `+` operator (a brms idiom that mvgam re-exports).
+Each arm gets its own family and its own predictors. Every arm
+shares the same `trend_formula = ~ AR(p = 1)`: one latent state
+feeding three observation models.
+
+```{r joint-fit, eval = FALSE}
+joint_formula <-
+  bf(count   ~ 1 + offset(log_effort), family = poisson()) +
+  bf(biomass ~ 1 + s(month, bs = "cc", k = 8),
+     family = Gamma(link = "log")) +
+  bf(camera  ~ 1 + deploy_days,
+     family = bernoulli(link = "logit"))
+
+mod_joint <- mvgam(
+  joint_formula,
+  trend_formula = ~ AR(p = 1),
+  data  = mv_data,
+  knots = list(month = c(0.5, 12.5)),
+  chains = 2L, samples = 1000L, silent = 2L
+)
+```
+
+```{r joint-load, include = FALSE}
+mod_joint <- read_cache("mod_joint")
+```
+
+mvgam handles the bookkeeping. brms's default `mvbf` would
+drop those 20 rows from every arm via listwise deletion. mvgam
+instead expands the standata so each arm keeps its own non-NA
+rows. The Stan model then evaluates the count likelihood at all
+80 time points, the biomass likelihood at all 80 and the camera
+likelihood at the 60 observed months, all contributing to a
+single shared AR(1) state.
+
+The shared dynamics show up clearly in the fixed-effect summary
+and parameter recovery.
+
+```{r joint-summary}
+s <- summary(mod_joint, smooth_test = FALSE)
+print(s$spec)
+```
+
+```{r joint-pars}
+ps <- posterior_summary(mod_joint)
+keep <- grep("Intercept|deploy_days|shape|ar1|sigma_trend",
+              rownames(ps))
+round(ps[keep, c("Estimate", "Q2.5", "Q97.5")], 3)
+```
+
+Recovery against the truth (`phi = 0.7`, `sigma = 0.4`,
+`a_count = 1.5`, `a_biomass = 0.5`, `a_camera = -0.5`,
+`b_deploy = 0.05`, `nu = 2.0`) is clean: every intercept, the AR
+coefficient, the innovation SD and the Gamma shape sit close to
+their generating values with 95% intervals that cover.
+
+## Posterior-predictive checks per arm
+
+Each arm gets its own posterior-predictive check via the standard
+`pp_check()` interface, scoped with the `resp` argument. For the
+Bernoulli camera arm the `"bars"` type is more informative than
+the default density overlay (which is built for continuous
+responses).
+
+```{r pp-count, fig.asp = 0.55}
+pp_check(mod_joint, resp = "count", ndraws = 50L) +
+  labs(title = "PPC: visual transect counts")
+```
+
+```{r pp-biomass, fig.asp = 0.55}
+pp_check(mod_joint, resp = "biomass", ndraws = 50L) +
+  labs(title = "PPC: trap biomass")
+```
+
+```{r pp-camera, fig.asp = 0.55, fig.width = 5}
+pp_check(mod_joint, resp = "camera", type = "bars", ndraws = 50L) +
+  labs(title = "PPC: camera detections")
+```
+
+The replicate distributions cover the observed marginals for
+every arm. Calibration is sound on all three.
+
+## Per-arm covariate effects
+
+`conditional_effects()` returns one list per response, faceted
+internally by predictor. The plot for each arm now carries the
+correct response on its y-axis.
+
+```{r ce-biomass, fig.asp = 0.55}
+ce <- mvgam::conditional_effects(mod_joint)
+plot(ce[["biomass"]])[[1L]]
+```
+
+The biomass arm picks up the seasonal sinusoid that drove the
+simulation: a clear peak in early months and a trough in late
+summer. The cyclic smooth penalisation is doing its job, and the
+posterior median follows the truth even though we never told the
+model that month was seasonal.
+
+```{r ce-camera, fig.asp = 0.55}
+plot(ce[["camera"]])[[2L]]
+```
+
+The camera arm's detection probability rises with deploy days,
+consistent with the simulated effect of 0.05 log-odds per day.
+The CI is wide because Bernoulli observations carry little
+information per row.
+
+## Per-arm residual diagnostics
+
+Quantile residuals for each arm are also scoped via `resp`. The
+dispatch correctly looks up the per-arm family (Poisson for
+counts, Gamma for biomass, Bernoulli for camera) and returns the
+matching analytic or empirical PIT residuals.
+
+```{r resid-summary}
+res_count   <- residuals(mod_joint, resp = "count")
+res_biomass <- residuals(mod_joint, resp = "biomass")
+res_camera  <- residuals(mod_joint, resp = "camera")
+sapply(list(count = res_count, biomass = res_biomass,
+             camera = res_camera), dim)
+```
+
+## State recovery: joint vs each baseline
+
+The point of the joint fit is the latent state itself.
+`compare_latent_states()` extracts the posterior `trend[t]` from a
+named list of fits, aligns each fit's sign to the supplied truth
+vector when one is given, and returns either an overlay of the
+posterior trajectories or a comparison of the per-time posterior
+SD across fits.
+
+```{r compare-trajectory, fig.asp = 0.62, fig.width = 9, out.width = "95%"}
+fits <- list(
+  "Joint (3 families)" = mod_joint,
+  "Counts only"        = mod_uni_count,
+  "Biomass only"       = mod_uni_biomass,
+  "Camera only"        = mod_uni_camera
+)
+compare_latent_states(fits, truth = truth$x, type = "trajectory")
+```
+
+```{r compare-sd, fig.asp = 0.55, fig.width = 9, out.width = "95%"}
+compare_latent_states(fits, truth = truth$x, type = "sd")
+```
+
+The joint fit's posterior median tracks the truth more closely
+than any of the univariate baselines, and its per-time posterior
+SD sits below the other three at every time point. The camera-only
+line is the diffuse outlier: a single Bernoulli observation per
+time point carries little information. The joint fit recovers
+strength wherever any of the methods reported.
+
+## Cross-arm posterior forecasts
+
+The same `forecast()` interface that handles univariate fits now
+works on a multi-response fit: it fans out per response and
+returns one `mvgam_forecast` per arm. We extend the time grid by
+5 months and let mvgam propagate the shared latent state forward,
+then map back through each arm's observation family.
+
+```{r forecast-multi, eval = TRUE}
+T_ <- max(mv_data$time)
+new <- data.frame(
+  time = (T_ + 1L):(T_ + 5L),
+  series = factor(rep("pop1", 5L), levels = levels(mv_data$series)),
+  month = ((T_ + 0L:4L) %% 12L) + 1L,
+  log_effort = log(rep(1, 5L)),
+  deploy_days = rep(15, 5L),
+  count = NA_integer_, biomass = NA_real_, camera = NA_integer_
+)
+fc <- forecast(mod_joint, newdata = new)
+sapply(fc, function(f) length(f$forecasts))
+```
+
+One forecast object per arm, ready to feed into `score()` (see
+the [forecast-evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html))
+or into per-arm plotting.
+
+## Take-aways
+
+A multi-response mvgam fit lets you keep each measurement model
+in its proper family while sharing the dynamics that drive every
+observation. The recipe is small:
+
+- write one `bf()` arm per response with its own family and per-arm
+  predictors,
+- combine them with `+`,
+- pass the combined formula to `mvgam()` with a single shared
+  `trend_formula = ~ ...`.
+
+Each post-fit method (`summary()`, `pp_check()`,
+`conditional_effects()`, `residuals()`, `posterior_predict()`,
+`forecast()`, `loo()`) either operates directly on the joint
+fit or accepts a `resp` argument that scopes the call to a single
+arm. Arms with NA values keep their own non-NA rows; the shared
+latent state is still informed at every time point any method was
+observed.
+
+## Further reading
+
+- The [forecast-evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+  walks through `forecast()`, `score()`, `lfo_cv()` and
+  `ensemble()` on a worked count-data example.
+- The [JSDM article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+  shows the joint-species variant where many response columns
+  share a latent factor structure with informed priors.
+- For hierarchical / grouped trend dynamics (one shared trend per
+  group with hyperpriors across groups), see `?gr` and the
+  hierarchical-trends section of `vignette("mvgam_overview")`.

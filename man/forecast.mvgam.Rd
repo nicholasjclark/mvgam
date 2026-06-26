@@ -12,7 +12,8 @@
   ndraws = NULL,
   b_uncertainty = TRUE,
   trend_uncertainty = TRUE,
-  obs_uncertainty = TRUE
+  obs_uncertainty = TRUE,
+  resp = NULL
 )
 }
 \arguments{

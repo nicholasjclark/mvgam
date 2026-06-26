@@ -146,6 +146,19 @@ mv_resp_fan_out <- function(object, resp) {
   parent_fn <- sys.function(-1L)
   parent_call <- match.call(definition = parent_fn,
                               call = sys.call(-1L))
+  # When the user called via an S3 generic (e.g. residuals(mod) ->
+  # residuals.mvgam(mod)), `parent_call[[1L]]` is the .mvgam method
+  # symbol, which isn't visible from the caller's frame. Strip
+  # the ".mvgam" suffix so the recursive call goes back through
+  # the generic.
+  fn_sym <- parent_call[[1L]]
+  if (is.symbol(fn_sym)) {
+    fn_name <- as.character(fn_sym)
+    bare_name <- sub("\\.mvgam$", "", fn_name)
+    if (bare_name != fn_name) {
+      parent_call[[1L]] <- as.name(bare_name)
+    }
+  }
   responses <- object$formula$responses
   eval_env <- parent.frame(n = 2L)
   out <- lapply(responses, function(r) {
