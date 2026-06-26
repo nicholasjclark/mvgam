@@ -3994,3 +3994,59 @@ test_that("com_binomial() requires a `trials` column in data", {
     "requires a 'trials' column"
   )
 })
+
+
+test_that("multi-response fits with NA in one response align obs_trend mappings to brms's listwise N", {
+  # Regression for #429: when one response column has NAs, brms's
+  # mvbf listwise-deletes those rows from every Y_<resp> and
+  # reports N_<resp> = N_complete (the intersection). Before the
+  # fix, mvgam's per-response obs_trend_time_<resp> arrays kept
+  # the full per-response valid rows, which gave length 20 vs
+  # Stan's declared N_<resp> = 16 and crashed initialisation.
+  set.seed(1)
+  T_ <- 20L
+  dat <- data.frame(
+    time   = seq_len(T_),
+    series = factor(rep("a", T_)),
+    count   = rpois(T_, 5),
+    biomass = rgamma(T_, 2, 0.5),
+    camera  = rbinom(T_, 1, 0.4)
+  )
+  dat$camera[c(3L, 7L, 12L, 18L)] <- NA_integer_
+
+  f <- bf(count   ~ 1, family = poisson()) +
+       bf(biomass ~ 1, family = Gamma(link = "log")) +
+       bf(camera  ~ 1, family = bernoulli(link = "logit"))
+
+  mf <- mvgam_formula(f, trend_formula = ~ AR(p = 1))
+  # brms emits one "Rows containing NAs were excluded" warning
+  # per bf() arm (three here); these are expected and confirm
+  # the listwise-deletion path we are testing against.
+  sd <- withCallingHandlers(
+    standata(mf, data = dat),
+    warning = function(w) {
+      if (grepl("Rows containing NAs", conditionMessage(w))) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+
+  # Every per-response obs_trend_time_<resp> array must equal
+  # its brms-emitted N_<resp> in length.
+  for (r in c("count", "biomass", "camera")) {
+    n_decl <- sd[[paste0("N_", r)]]
+    len    <- length(sd[[paste0("obs_trend_time_", r)]])
+    expect_identical(len, n_decl)
+    # Same constraint for the series index array.
+    expect_identical(
+      length(sd[[paste0("obs_trend_series_", r)]]), n_decl
+    )
+  }
+  # And the brms listwise intersection sets all N_<resp> to the
+  # same value (= number of rows with no NA in any response).
+  expect_identical(sd$N_count, sd$N_biomass)
+  expect_identical(sd$N_count, sd$N_camera)
+  expect_identical(sd$N_count, sum(stats::complete.cases(
+    dat[, c("count", "biomass", "camera")]
+  )))
+})

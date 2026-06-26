@@ -3137,8 +3137,24 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
     dimensions <- extract_time_series_dimensions(data, time_var, series_var, cached_formulas = cached_formulas, response_vars = response_vars)
   }
 
-  # Identify non-missing observations (brms will only use these)
-  non_missing_idx <- which(!is.na(data[[response_var]]))
+  # Identify non-missing observations. In multi-response fits,
+  # brms `mvbf` listwise-deletes rows with NA in ANY response, so
+  # the per-response mapping must match that intersected row set
+  # (see task #429). In univariate fits we use only the single
+  # response variable.
+  if (!is.null(response_vars) && length(response_vars) > 1L) {
+    present_resps <- intersect(response_vars, names(data))
+    if (length(present_resps) > 0L) {
+      complete_mask <- stats::complete.cases(
+        data[, present_resps, drop = FALSE]
+      )
+      non_missing_idx <- which(complete_mask)
+    } else {
+      non_missing_idx <- which(!is.na(data[[response_var]]))
+    }
+  } else {
+    non_missing_idx <- which(!is.na(data[[response_var]]))
+  }
 
   # Handle edge case where all observations are missing
   if (length(non_missing_idx) == 0) {
