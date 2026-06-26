@@ -195,7 +195,7 @@ forecast.mvgam <- function(object,
     sort(sample.int(total_draws, ndraws))
   }
 
-  training <- build_training_arms(object, series_levels)
+  training <- build_training_arms(object, series_levels, resp = resp)
   fc_grid <- resolve_forecast_grid(object, newdata, training,
                                      series_levels)
 
@@ -285,17 +285,20 @@ resolve_series_info <- function(object) {
 # plus the cached time / series variable names and the obs data
 # frame the downstream linpred calls subset.
 #'@noRd
-build_training_arms <- function(object, series_levels) {
+build_training_arms <- function(object, series_levels, resp = NULL) {
   d <- mvgam_training_data(object)
   meta_vars <- object$trend_metadata$variables %||%
     list(time_var = "time", series_var = "series")
   time_var <- meta_vars$time_var
   series_var <- meta_vars$series_var
-  # `response_names` may be a length>1 vector for response-side
-  # addition terms (`y | trials(n)`, `y | cens(c)` etc). The
-  # actual response column is always the first element.
-  resp <- (object$mv_spec$response_names %||%
-    as.character(object$formula[[2L]]))[1L]
+  # Pick the response column. Multi-response (mvbrmsformula) fits
+  # set `resp` via the per-outcome fan-out; honour it. Otherwise
+  # `response_names` may be length > 1 (e.g. addition terms like
+  # `y | trials(n)`); take its first element, which is the actual
+  # response column.
+  resp <- resp %||%
+    (object$mv_spec$response_names %||%
+       as.character(object$formula[[2L]]))[1L]
 
   series_fac <- as.factor(d[[series_var]])
   observations <- lapply(series_levels, function(lv) {

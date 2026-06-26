@@ -253,18 +253,39 @@ information per row.
 
 ## Residual diagnostics
 
-Quantile residuals for each outcome are also scoped via `resp`.
-The dispatch correctly looks up the per-outcome family (Poisson
-for counts, Gamma for biomass, Bernoulli for camera) and returns
-the matching analytic or empirical PIT residuals.
+`pp_check()` accepts the same `resp` argument as the rest of the
+post-fit surface. The `"intervals"` type plots posterior
+prediction bands against the observed series and exposes any
+runs of points the model is missing.
 
-```{r resid-summary}
-res_count   <- residuals(mod_joint, resp = "count")
-res_biomass <- residuals(mod_joint, resp = "biomass")
-res_camera  <- residuals(mod_joint, resp = "camera")
-sapply(list(count = res_count, biomass = res_biomass,
-             camera = res_camera), dim)
+```{r resid-count, fig.asp = 0.5}
+pp_check(mod_joint, resp = "count", type = "intervals",
+          ndraws = 100L) +
+  labs(title = "count: predicted intervals vs observed")
 ```
+
+```{r resid-biomass, fig.asp = 0.5}
+pp_check(mod_joint, resp = "biomass", type = "intervals",
+          ndraws = 100L) +
+  labs(title = "biomass: predicted intervals vs observed")
+```
+
+For the binary camera outcome, the calibrated check is `"bars"`
+again (continuous interval bands are not informative for 0/1
+data), separately overlaid with the Bernoulli ribbon view of
+forecast accuracy below.
+
+```{r resid-camera-pit, fig.asp = 0.5, fig.width = 5}
+pp_check(mod_joint, resp = "camera", type = "bars",
+          ndraws = 100L) +
+  labs(title = "camera: predicted vs observed counts of 0 / 1")
+```
+
+The interval plots for `count` and `biomass` show the median
+observation tracking the predictive median, with most rows
+inside the 50% band and almost all inside the 95% band. The
+camera bar check shows the predictive count of 0s and 1s
+matching the observed split.
 
 ## State recovery: joint vs baselines
 
@@ -294,13 +315,24 @@ plot_recovery <- function(fit, label) {
   if (is.list(hc) && !inherits(hc, "mvgam_forecast")) {
     hc <- hc[[1L]]
   }
-  plot(hc) +
+  # plot.mvgam_forecast overlays the response-scale observations
+  # by default. On the trend scale those values live on a
+  # different axis (Poisson counts up to 20 vs a latent state on
+  # [-1, 1]); they would crush the ribbon flat. Drop the point
+  # layer and overlay the simulated truth instead.
+  p <- plot(hc)
+  p$layers <- p$layers[!vapply(
+    p$layers,
+    function(l) inherits(l$geom, "GeomPoint"),
+    logical(1L)
+  )]
+  p +
     geom_point(
       data = truth_pts,
       aes(x = time, y = trend),
       shape = 4, size = 1.2, colour = "black"
     ) +
-    labs(title = label)
+    labs(title = label, y = "Latent state")
 }
 
 patchwork::wrap_plots(
