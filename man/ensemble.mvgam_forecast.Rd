@@ -128,7 +128,10 @@ plot(ens)
 
 \code{\link[=forecast.mvgam]{forecast.mvgam()}}, \code{\link[=hindcast.mvgam]{hindcast.mvgam()}},
 \code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}, \code{\link[=pp_average.mvgam]{pp_average.mvgam()}},
-\code{\link[=loo_model_weights.mvgam]{loo_model_weights.mvgam()}}
+\code{\link[=loo_model_weights.mvgam]{loo_model_weights.mvgam()}}. The online article
+\url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}
+shows \code{ensemble()} weighted by stacking weights derived
+from \code{loo_model_weights.mvgam_lfo()}.
 }
 \author{
 Nicholas J Clark

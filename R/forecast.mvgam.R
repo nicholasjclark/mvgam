@@ -91,7 +91,10 @@
 #'   [posterior_predict.mvgam] and [posterior_epred.mvgam] for the
 #'   alternative marginal-MC prediction surface that integrates
 #'   over the trend's stochastic dynamics instead of extrapolating
-#'   the fitted latent state.
+#'   the fitted latent state. The online article
+#'   \url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}
+#'   walks through `forecast()` together with `score()`,
+#'   `lfo_cv()` and `ensemble()` on a worked count-data example.
 #' @examples
 #' \donttest{
 #' set.seed(11)

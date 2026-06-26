@@ -424,3 +424,12 @@ from repeated presence-absence data or point counts.
 \emph{Ecology}, 84, 777-790.
 \doi{10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2}.
 }
+\seealso{
+\code{\link[=occ]{occ()}} for the related joint-occupancy family,
+\code{\link[=pp_check.mvgam]{pp_check.mvgam()}} for the closure-unit goodness-of-fit
+surface. The CRAN-shipped vignette
+\code{vignette("nmixtures")} introduces N-mixture and
+joint-occupancy modelling in mvgam end-to-end; see also
+\code{vignette("data_in_mvgam")} for the closure-unit
+data-shape requirements that \code{nmix()} consumes.
+}

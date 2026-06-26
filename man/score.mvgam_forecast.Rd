@@ -117,5 +117,8 @@ Proper Scoring Rules, Prediction, and Estimation.
 }
 \seealso{
 \link{forecast.mvgam}, \link{hindcast.mvgam},
-\link[=mvgam]{mvgam_forecast-class}
+\link[=mvgam]{mvgam_forecast-class}. The CRPS / DRPS / ELPD /
+energy / variogram scoring rules and their per-horizon
+interpretation are illustrated in the online article
+\url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}.
 }

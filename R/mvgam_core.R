@@ -342,7 +342,13 @@
 #' \code{\link{methods_md}(fit)}.
 #'
 #' @seealso \code{\link{methods_md}}, \code{\link{how_to_cite}},
-#'   \code{\link{jsdgam}}.
+#'   \code{\link{jsdgam}}. The CRAN-shipped overview is
+#'   available via \code{vignette("mvgam_overview")}; for data
+#'   formatting requirements see
+#'   \code{vignette("data_in_mvgam")}; for the
+#'   forecast-evaluation workflow (LOO, LFO, ensembling) see
+#'   the online article at
+#'   \url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}.
 #'
 #' @export
 mvgam <- function(formula, trend_formula = NULL, data = NULL,

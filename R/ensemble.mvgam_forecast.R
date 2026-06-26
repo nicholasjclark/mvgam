@@ -50,7 +50,10 @@
 #'
 #' @seealso [forecast.mvgam()], [hindcast.mvgam()],
 #'   [score.mvgam_forecast()], [pp_average.mvgam()],
-#'   [loo_model_weights.mvgam()]
+#'   [loo_model_weights.mvgam()]. The online article
+#'   \url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}
+#'   shows `ensemble()` weighted by stacking weights derived
+#'   from `loo_model_weights.mvgam_lfo()`.
 #'
 #' @export
 ensemble <- function(object, ...) {

@@ -1816,6 +1816,14 @@ build_closure_unit_arrays <- function(data,
 #'           ndraws = 200L)
 #' }
 #'
+#' @seealso [occ()] for the related joint-occupancy family,
+#'   [pp_check.mvgam()] for the closure-unit goodness-of-fit
+#'   surface. The CRAN-shipped vignette
+#'   \code{vignette("nmixtures")} introduces N-mixture and
+#'   joint-occupancy modelling in mvgam end-to-end; see also
+#'   \code{vignette("data_in_mvgam")} for the closure-unit
+#'   data-shape requirements that `nmix()` consumes.
+#'
 #' @export
 nmix <- function(type = c("poisson_binomial", "royle_nichols",
                           "poisson_poisson"),
@@ -2137,6 +2145,13 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #' pp_check(mod, type = "fit_stat", stat = "freeman_tukey",
 #'           ndraws = 200L)
 #' }
+#'
+#' @seealso [nmix()] for the related N-mixture family,
+#'   [pp_check.mvgam()] for closure-unit goodness-of-fit. The
+#'   CRAN-shipped vignette \code{vignette("nmixtures")} covers
+#'   both occupancy and N-mixture workflows; the closure-unit
+#'   data-shape requirements that `occ()` consumes are
+#'   documented in \code{vignette("data_in_mvgam")}.
 #'
 #' @export
 occ <- function(multi_season = FALSE) {

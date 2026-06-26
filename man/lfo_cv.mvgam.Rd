@@ -125,6 +125,11 @@ Simulation}. 90:14, 2499-2523.
 \code{\link[=loo.mvgam]{loo.mvgam()}} for PSIS-LOO over individual observations,
 \code{\link[=kfold.mvgam]{kfold.mvgam()}} for grouped k-fold CV (the same selective-
 refit pattern generalised to arbitrary grouping factors).
+The online article
+\url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}
+walks through \code{lfo_cv()} end-to-end on rodent count data,
+including the Pareto-k refit gate and ensemble weighting
+via \code{loo_model_weights.mvgam_lfo()}.
 }
 \author{
 Nicholas J Clark

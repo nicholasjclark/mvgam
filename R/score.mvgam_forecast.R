@@ -80,7 +80,10 @@ score <- function(object, ...) UseMethod("score")
 #'   multivariate per-horizon score itself.
 #'
 #' @seealso [forecast.mvgam], [hindcast.mvgam],
-#'   [mvgam_forecast-class][mvgam]
+#'   [mvgam_forecast-class][mvgam]. The CRPS / DRPS / ELPD /
+#'   energy / variogram scoring rules and their per-horizon
+#'   interpretation are illustrated in the online article
+#'   \url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}.
 #'
 #' @references Gneiting, T. and Raftery, A. E. (2007). Strictly
 #'   Proper Scoring Rules, Prediction, and Estimation.
