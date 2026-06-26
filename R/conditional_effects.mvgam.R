@@ -235,11 +235,19 @@ conditional_effects.mvgam <- function(x,
         x$data$series == series_mode$level, , drop = FALSE
       ]
     }
-    do.call(marginaleffects::plot_predictions,
-            c(list(x), pp_args, list(...))) +
+    p <- do.call(marginaleffects::plot_predictions,
+                  c(list(x), pp_args, list(...))) +
       ggplot2::scale_fill_discrete(label = round_legend_labels) +
       ggplot2::scale_colour_discrete(label = round_legend_labels) +
       ggplot2::theme_classic()
+    # marginaleffects defaults the y-axis label to the model's
+    # first response name. For multi-response fits we know which
+    # arm we are plotting (`resp`); overwrite so the user sees
+    # the correct response on the y-axis.
+    if (!is.null(resp)) {
+      p <- p + ggplot2::labs(y = resp)
+    }
+    p
   })
   # User-visible list names hide the internal `series` / `.trend`
   # rewrite tokens that `detect_and_rewrite_by_lv()` swaps in for the
