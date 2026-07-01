@@ -1550,6 +1550,42 @@ test_that("user priors on array-shaped VAR hyperparameters emit per-lag", {
 })
 
 
+test_that("user priors on array-shaped VARMA MA hyperparameters emit", {
+  # Regression guard for user-supplied `Dmu_trend` / `Domega_trend`
+  # priors on VARMA(p, q) fits. `Dmu_trend` / `Domega_trend` are
+  # declared `array[2] vector[ma_lags]`; the user override must reach
+  # the emitter and end up on the two scalar target rows
+  # (`Dmu_trend[1, 1] ~ ...`, `Dmu_trend[2, 1] ~ ...`) so higher-order
+  # ma_lags stay ready to plug in once the current ma_lags = 1 cap
+  # lifts. Compile is verified via stancode `validate = TRUE`.
+  data <- setup_stan_test_data()$multivariate
+  mf <- mvgam_formula(
+    count ~ 1 + x,
+    trend_formula = ~ VAR(p = 1, ma = TRUE)
+  )
+  custom <- c(
+    brms::prior(normal(0, 0.4), class = "Dmu_trend"),
+    brms::prior(gamma(3, 0.75), class = "Domega_trend")
+  )
+  code <- as.character(stancode(
+    mf, data = data, family = poisson(),
+    prior = custom, validate = TRUE
+  ))
+  lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
+  code_only <- lines[!grepl("^\\s*//", lines)]
+
+  dmu_lines <- grep("Dmu_trend\\[[12],\\s*1\\]\\s*~",
+                     code_only, value = TRUE)
+  expect_equal(length(dmu_lines), 2L)
+  expect_true(all(grepl("normal\\(0,\\s*0.4\\)", dmu_lines)))
+
+  dom_lines <- grep("Domega_trend\\[[12],\\s*1\\]\\s*~",
+                     code_only, value = TRUE)
+  expect_equal(length(dom_lines), 2L)
+  expect_true(all(grepl("gamma\\(3,\\s*0.75\\)", dom_lines)))
+})
+
+
 test_that("default priors on array-shaped VAR hyperparameters still emit per-lag", {
   data <- setup_stan_test_data()$multivariate
   mf <- mvgam_formula(
