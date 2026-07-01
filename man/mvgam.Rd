@@ -205,9 +205,13 @@ Combining \code{threads > 1} with a \code{trend_formula} on a brms-native
 family is currently a no-op: mvgam's trend injector cannot find
 the \code{mu} assignment once brms moves it inside
 \code{partial_log_lik_lpmf}, so the code is compiled and sampled
-serially after emitting a one-time warning. The full fix
-(teaching the injector to splice into \code{partial_log_lik_lpmf})
-is filed as a separate enhancement.}
+serially. This covers every currently-supported trend model
+under a brms-native family: \code{RW()}, \code{AR()}, \code{VAR()}, \code{VARMA()},
+\code{ZMVN()}, \code{CAR()}, and \code{PW()}. A per-fit warning is emitted so
+the ignored \code{threads_per_chain} value is visible in any batch
+script that fits repeatedly. The full fix (teaching the
+injector to splice into \code{partial_log_lik_lpmf}) is filed as a
+separate enhancement.}
 
 \item{run_model}{\strong{(deprecated; do not use in new code)} Logical.
 Setting \code{run_model = FALSE} short-circuits before Stan parse /

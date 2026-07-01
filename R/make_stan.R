@@ -481,6 +481,9 @@ warn_threads_trend_brms_native <- function(threads, family, mv_spec) {
   if (!threads_no_op_for_trend_brms_native(threads, family, mv_spec)) {
     return()
   }
+  # Fire per fit rather than once per session so a batch script
+  # that re-fits after a config change keeps seeing the warning
+  # every time its threads request is dropped.
   rlang::warn(
     paste0(
       "`threads_per_chain > 1` is currently ignored for brms-native ",
@@ -490,9 +493,7 @@ warn_threads_trend_brms_native <- function(threads, family, mv_spec) {
       "Closure-unit families (`occ()`, `nmix()`) and multi-response ",
       "families (`diri()`, `mvn()`, `mvt()`, `multinomial()`, ",
       "`categorical()`) are unaffected and continue to thread."
-    ),
-    .frequency = "once",
-    .frequency_id = "mvgam_threads_trend_brms_native"
+    )
   )
 }
 

@@ -192,9 +192,13 @@
 #'   family is currently a no-op: mvgam's trend injector cannot find
 #'   the `mu` assignment once brms moves it inside
 #'   `partial_log_lik_lpmf`, so the code is compiled and sampled
-#'   serially after emitting a one-time warning. The full fix
-#'   (teaching the injector to splice into `partial_log_lik_lpmf`)
-#'   is filed as a separate enhancement.
+#'   serially. This covers every currently-supported trend model
+#'   under a brms-native family: `RW()`, `AR()`, `VAR()`, `VARMA()`,
+#'   `ZMVN()`, `CAR()`, and `PW()`. A per-fit warning is emitted so
+#'   the ignored `threads_per_chain` value is visible in any batch
+#'   script that fits repeatedly. The full fix (teaching the
+#'   injector to splice into `partial_log_lik_lpmf`) is filed as a
+#'   separate enhancement.
 #' @param cpp_options Optional named list forwarded to
 #'   `cmdstanr::cmdstan_model()`. Common entries:
 #'   `stan_threads = TRUE` (auto-set when `threads` is non-NULL),
