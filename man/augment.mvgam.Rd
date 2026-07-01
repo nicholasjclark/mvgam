@@ -5,7 +5,14 @@
 \title{Augment an \code{mvgam} object's training data with fitted values
 and residuals}
 \usage{
-\method{augment}{mvgam}(x, robust = FALSE, conf.int = TRUE, conf.level = 0.95, ...)
+\method{augment}{mvgam}(
+  x,
+  robust = FALSE,
+  conf.int = TRUE,
+  conf.level = 0.95,
+  resp = NULL,
+  ...
+)
 }
 \arguments{
 \item{x}{A fitted \code{mvgam} object.}

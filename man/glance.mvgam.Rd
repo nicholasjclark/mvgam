@@ -4,7 +4,7 @@
 \alias{glance.mvgam}
 \title{One-row model summary for an \code{mvgam} fit}
 \usage{
-\method{glance}{mvgam}(x, looic = FALSE, ...)
+\method{glance}{mvgam}(x, looic = FALSE, resp = NULL, ...)
 }
 \arguments{
 \item{x}{A fitted \code{mvgam} object.}

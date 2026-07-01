@@ -511,14 +511,37 @@ split_hier_Sigma <- function(x, params) {
 #' @importFrom stats residuals
 #' @export
 augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
-                            conf.level = 0.95, ...) {
+                            conf.level = 0.95, resp = NULL, ...) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_flag(robust)
   checkmate::assert_flag(conf.int)
   checkmate::assert_number(conf.level, lower = 0, upper = 1)
+  checkmate::assert_string(resp, null.ok = TRUE)
+
+  # Multi-response (mvbrmsformula) fits with no `resp` argument
+  # fan out per outcome and stack the tibbles with a `.resp`
+  # column so downstream tidy verbs can group / filter by
+  # outcome. When `resp` is supplied, the single-response body
+  # below runs scoped to that outcome.
+  if (is.null(resp) && inherits(x$formula, "mvbrmsformula")) {
+    resp_names <- get_response_names(x)
+    stacked <- lapply(resp_names, function(r) {
+      out <- augment.mvgam(
+        x, robust = robust, conf.int = conf.int,
+        conf.level = conf.level, resp = r, ...
+      )
+      out$.resp <- r
+      out
+    })
+    return(dplyr::bind_rows(stacked))
+  }
 
   obs_data <- mvgam_training_data(x)
-  resp <- mvgam_response_name(x)
+  # `resp` is threaded downstream only when scoped from an mvbf
+  # fit; the univariate path leaves it NULL so the brms
+  # dispatchers below don't reject it.
+  down_resp <- resp
+  resp <- resp %||% mvgam_response_name(x)
   obs_data$.observed <- obs_data[[resp]]
   obs_data <- purrr::discard_at(
     obs_data,
@@ -529,11 +552,11 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
   probs <- c(a, 1 - a)
 
   fit_summ <- stats::fitted(
-    x, robust = robust, probs = probs
+    x, robust = robust, probs = probs, resp = down_resp
   ) |>
     tibble::as_tibble()
   resid_summ <- residuals(
-    x, robust = robust, probs = probs
+    x, robust = robust, probs = probs, resp = down_resp
   ) |>
     tibble::as_tibble()
   # Closure-unit families return one residual per closure unit
@@ -633,11 +656,33 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
 #' }
 #'
 #' @export
-glance.mvgam <- function(x, looic = FALSE, ...) {
+glance.mvgam <- function(x, looic = FALSE, resp = NULL, ...) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_flag(looic)
+  checkmate::assert_string(resp, null.ok = TRUE)
 
-  fam <- x$family
+  # Multi-response (mvbrmsformula) fits with no `resp` argument
+  # return one row per outcome carrying that outcome's family
+  # and link. The row order matches `x$formula$responses`.
+  if (is.null(resp) && inherits(x$formula, "mvbrmsformula")) {
+    resp_names <- get_response_names(x)
+    stacked <- lapply(resp_names, function(r) {
+      out <- glance.mvgam(x, looic = looic, resp = r, ...)
+      out$resp <- r
+      out
+    })
+    return(dplyr::bind_rows(stacked))
+  }
+
+  # Per-response family lookup: on mvbf `x$family` is the
+  # gaussian placeholder, so scope to the per-arm family when
+  # `resp` is supplied.
+  fam <- if (!is.null(resp) &&
+              inherits(x$formula, "mvbrmsformula")) {
+    get_family_for_resp(x, resp)
+  } else {
+    x$family
+  }
   # `resolve_family_name()` returns the user-visible family
   # name even for customfamily objects (e.g. "tweedie" instead
   # of the brms-internal "custom").
@@ -646,7 +691,7 @@ glance.mvgam <- function(x, looic = FALSE, ...) {
   link_name <- if (inherits(fam, "family")) fam$link else
     NA_character_
 
-  resp <- mvgam_response_name(x)
+  resp <- resp %||% mvgam_response_name(x)
   d <- mvgam_training_data(x)
   out <- tibble::tibble(
     algorithm = glance_algorithm(x),

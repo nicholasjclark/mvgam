@@ -50,6 +50,11 @@ held-out groups).}
 }
 \value{
 Numeric matrix [ndraws x nobs] of pointwise log densities.
+For multi-response (mvbf) fits with \code{resp = NULL}, the returned
+matrix is the joint per-observation log density: each column
+sums the pointwise densities across every response arm for that
+observation row (this matches \code{brms::log_lik.brmsfit()}
+semantics). Pass \code{resp = "<name>"} to scope to a single arm.
 }
 \description{
 Compute the per-observation log-likelihood for each posterior draw,

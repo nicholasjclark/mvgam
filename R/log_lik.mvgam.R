@@ -32,6 +32,11 @@
 #'   held-out groups).
 #'
 #' @return Numeric matrix \[ndraws x nobs\] of pointwise log densities.
+#'   For multi-response (mvbf) fits with `resp = NULL`, the returned
+#'   matrix is the joint per-observation log density: each column
+#'   sums the pointwise densities across every response arm for that
+#'   observation row (this matches `brms::log_lik.brmsfit()`
+#'   semantics). Pass `resp = "<name>"` to scope to a single arm.
 #'
 #' @details
 #' The implementation dispatches by `object$family$family` to per-family log
