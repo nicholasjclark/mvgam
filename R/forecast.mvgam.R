@@ -765,7 +765,7 @@ build_forecast_arms <- function(object, trend_model, meta,
     object$standata$N_lv_trend %||% n_series
   )
   Z_arr <- if (n_lv_trend < n_series &&
-                 meta$trend_type %in% c("RW", "AR", "VAR")) {
+                 meta$trend_type %in% c("RW", "AR", "VAR", "ZMVN")) {
     resolve_Z_loadings(object, draws_mat, n_series, n_lv_trend)
   } else {
     NULL

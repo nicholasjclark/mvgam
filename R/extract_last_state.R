@@ -92,7 +92,7 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
     )))
   }
   if (is_factor &&
-      !meta$trend_type %in% c("RW", "AR", "VAR")) {
+      !meta$trend_type %in% c("RW", "AR", "VAR", "ZMVN")) {
     stop(insight::format_error(c(
       paste0(
         "Factor trend variants of '", meta$trend_type,
@@ -101,17 +101,30 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
       x = paste0(
         "Got n_lv = ", n_lv, ", n_series = ", n_series, "."
       ),
-      i = "Factor forecast support currently covers RW / AR / VAR."
+      i = paste0(
+        "Factor forecast support currently covers RW / AR / VAR ",
+        "and ZMVN."
+      )
     )))
   }
 
   # In factor mode extraction happens at the LV grain
-  # (`lv_trend[t, k]`, sigma_trend[k], ar_trend[k]). The caller
-  # projects the propagated `[h, n_lv]` trajectory back to
-  # series scale via Z; see `apply_factor_projection()` in
-  # forecast.mvgam.R.
+  # (`lv_trend[t, k]` for RW/AR/VAR, `lv_trend_tilde[t, k]` for
+  # QR-identified ZMVN jsdgam fits, sigma_trend[k], ar_trend[k]).
+  # The caller projects the propagated `[h, n_lv]` trajectory
+  # back to series scale via Z; see `apply_factor_projection()`
+  # in forecast.mvgam.R.
   state_dim <- if (is_factor) n_lv else n_series
-  state_var <- if (is_factor) "lv_trend" else "trend"
+  state_var <- if (!is_factor) {
+    "trend"
+  } else if (meta$trend_type == "ZMVN") {
+    # jsdgam fits QR-identify the loadings and save
+    # `lv_trend_tilde[t, k]` in generated quantities; the raw
+    # `lv_trend[t, k]` is not exported.
+    "lv_trend_tilde"
+  } else {
+    "lv_trend"
+  }
 
   out <- switch(
     meta$trend_type,
@@ -122,7 +135,8 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
     "VAR" = extract_var_state(one_draw, meta, state_dim, n_lv, fit,
                                 state_var = state_var),
     "CAR" = extract_car_state(one_draw, meta, n_series, fit),
-    "ZMVN" = extract_zmvn_state(one_draw, meta, n_series, n_lv),
+    "ZMVN" = extract_zmvn_state(one_draw, meta, state_dim, n_lv,
+                                  state_var = state_var),
     "PW" = extract_pw_state(one_draw, meta, n_series, n_lv, fit),
     stop(insight::format_error(c(
       paste0(
@@ -488,12 +502,29 @@ extract_last_observed_times <- function(fit, n_series) {
 # ZMVN: no temporal recursion. Each forecast step is an
 # independent MVN draw, so the only params field is `Sigma`.
 # `last_state$trends` is a zero-row matrix (max_lag = 0).
+#
+# For factor-mode ZMVN (jsdgam under the Heaps identification)
+# the LVs are standard normals and all scale / correlation lives
+# on Z_tilde -- there is no sigma_trend or L_Omega_trend to
+# extract from the posterior, so params$Sigma is the identity
+# and propagate_zmvn draws independent N(0, 1) samples per LV,
+# which the caller projects to the series scale via
+# apply_factor_projection().
 #'@noRd
-extract_zmvn_state <- function(one_draw, meta, n_series, n_lv) {
-  scov <- extract_sigma_and_cov(one_draw, n_series, n_lv,
-                                 has_cor = TRUE)
+extract_zmvn_state <- function(one_draw, meta, n_series, n_lv,
+                                state_var = "trend") {
+  is_factor <- state_var != "trend"
+  if (is_factor) {
+    Sigma <- diag(n_series)
+    sigma <- rep(1, n_series)
+  } else {
+    scov <- extract_sigma_and_cov(one_draw, n_series, n_lv,
+                                   has_cor = TRUE)
+    Sigma <- scov$Sigma
+    sigma <- scov$sigma
+  }
   list(
-    params = list(Sigma = scov$Sigma, sigma = scov$sigma),
+    params = list(Sigma = Sigma, sigma = sigma),
     last_state = list(
       trends = matrix(0, nrow = 0L, ncol = n_series),
       errors = empty_errors(),
