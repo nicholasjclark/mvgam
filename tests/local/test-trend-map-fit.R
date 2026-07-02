@@ -88,11 +88,52 @@ test_that("residuals return one column per observation", {
 })
 
 
-test_that("forecast returns an mvgam_forecast object", {
-  fc <- forecast(fit, n_draws = 30L)
+test_that("forecast on fixed-Z factor fit returns the right shape", {
+  # `val_mvgam_trend_map_fx.rds` is a 4-series, 2-factor AR(1)
+  # with a dense user-supplied Z. Since this test's fit has no
+  # persisted test_data, build newdata explicitly so the
+  # horizon is fixed for the shape assertion below.
+  n_series <- fit$standata$N_series_trend
+  n_time <- fit$standata$N_time_trend
+  h <- 8L
+  series_levels <- levels(fit$data$series)
+  newdat <- data.frame(
+    time = rep((n_time + 1L):(n_time + h), n_series),
+    series = factor(
+      rep(series_levels, each = h),
+      levels = series_levels
+    )
+  )
+  newdat$count <- NA_integer_
+  fc <- forecast(fit, newdata = newdat, ndraws = 30L)
   expect_s3_class(fc, "mvgam_forecast")
-  expect_true("forecasts" %in% names(fc))
-  expect_true("hindcasts" %in% names(fc))
+  for (s in series_levels) {
+    expect_equal(dim(fc$forecasts[[s]]), c(30L, h))
+  }
+})
+
+
+test_that("forecast on fixed-Z factor gives finite link-scale draws", {
+  # Every posterior draw should produce a finite [h, n_series]
+  # trajectory once the LV-space AR(1) recursion has been
+  # projected via the fixed Z matrix. NAs would indicate
+  # either a missing lv_trend column or an infinite draw
+  # slipping past the projection.
+  n_series <- fit$standata$N_series_trend
+  n_time <- fit$standata$N_time_trend
+  h <- 6L
+  series_levels <- levels(fit$data$series)
+  newdat <- data.frame(
+    time = rep((n_time + 1L):(n_time + h), n_series),
+    series = factor(rep(series_levels, each = h),
+                     levels = series_levels)
+  )
+  newdat$count <- NA_integer_
+  fc <- forecast(fit, newdata = newdat, ndraws = 30L,
+                  type = "link")
+  for (s in series_levels) {
+    expect_true(all(is.finite(fc$forecasts[[s]])))
+  }
 })
 
 
