@@ -186,5 +186,69 @@ stability.mvgam = function(object, ...) {
       dat
     })
   )
-  return(metrics)
+  class(metrics) <- c("mvgam_stability", class(metrics))
+  metrics
+}
+
+
+#' Plot posterior distributions of latent VAR stability metrics
+#'
+#' Renders a faceted histogram of the reactivity, mean return rate
+#' and variance return rate posterior draws returned by
+#' `stability.mvgam()`. A dashed reference line at zero marks the
+#' reactivity threshold above which shocks are amplified rather
+#' than absorbed.
+#'
+#' @param x A `mvgam_stability` object returned by [stability()].
+#' @param variables Character vector picking which columns of `x`
+#'   to render. Defaults to the three core dynamic-stability
+#'   metrics (`"reactivity"`, `"mean_return_rate"`,
+#'   `"var_return_rate"`); pass any subset of `x`'s column names
+#'   to widen or narrow the panel set.
+#' @param bins Number of histogram bins passed to `geom_histogram`.
+#' @param ... Ignored.
+#'
+#' @return A `ggplot` object.
+#' @seealso [stability()], [irf()], [fevd()]
+#' @method plot mvgam_stability
+#' @importFrom ggplot2 ggplot aes geom_histogram geom_vline
+#'   facet_wrap labs
+#' @export
+plot.mvgam_stability = function(
+  x,
+  variables = c("reactivity", "mean_return_rate", "var_return_rate"),
+  bins = 30L,
+  ...
+) {
+  checkmate::assert_class(x, "mvgam_stability")
+  checkmate::assert_character(variables, min.len = 1L, any.missing = FALSE)
+  checkmate::assert_int(bins, lower = 5L)
+  keep <- intersect(variables, colnames(x))
+  if (!length(keep)) {
+    stop(insight::format_error(c(
+      "None of the requested 'variables' were found in 'x'.",
+      i = paste0(
+        "Available metrics: ",
+        paste(colnames(x), collapse = ", "), "."
+      )
+    )))
+  }
+  long <- do.call(rbind, lapply(keep, function(v) {
+    data.frame(metric = v, value = x[[v]])
+  }))
+  long$metric <- factor(long$metric, levels = keep)
+  ggplot2::ggplot(long, ggplot2::aes(x = value)) +
+    ggplot2::geom_histogram(
+      bins = bins,
+      fill = mvgam_categorical_palette(1L)[1L],
+      colour = "white"
+    ) +
+    ggplot2::geom_vline(
+      xintercept = 0,
+      linetype = "dashed",
+      colour = "grey30"
+    ) +
+    ggplot2::facet_wrap(~ metric, scales = "free", nrow = 1L) +
+    ggplot2::labs(x = "Posterior draw", y = "Frequency") +
+    mvgam_theme()
 }
