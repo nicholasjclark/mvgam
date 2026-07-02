@@ -790,7 +790,16 @@ build_forecast_arms <- function(object, trend_model, meta,
     Z_slice_d <- if (is.null(Z_arr)) {
       NULL
     } else {
-      Z_arr[d_state, , , drop = FALSE][1L, , , drop = TRUE]
+      # `drop = TRUE` on a [1, n_series, n_lv] slice returns a
+      # matrix when n_lv > 1 but collapses to a length-n_series
+      # vector when n_lv == 1 (the `trend_map = "shared"` case);
+      # reshape explicitly so `apply_factor_projection()` always
+      # sees an [n_series, n_lv] matrix.
+      matrix(
+        Z_arr[d_state, , , drop = FALSE][1L, , , drop = TRUE],
+        nrow = n_series,
+        ncol = n_lv_trend
+      )
     }
     fc_link_d <- propagate_one_draw(
       object = object,

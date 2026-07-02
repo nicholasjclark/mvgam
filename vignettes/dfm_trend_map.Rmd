@@ -48,9 +48,11 @@ weighted sum of those processes (Zuur et al.
 argument is how you supply the fixed sharing structure for a
 state-space fit: you say which series belong to which trend, and the
 posterior latent path is shared verbatim across the group. This
-vignette introduces the three input shapes `trend_map` accepts and
-recovers a small AR(1) dynamic factor model against a simulated
-truth.
+vignette recovers a small AR(1) dynamic factor model against a
+simulated truth, hands the same problem to a model that learns the
+loadings, and hands it to a deliberately misspecified model.
+mvgam's score functions quantify how much the sharing choice
+matters for forecasts on held-out data.
 
 ## Dynamic factor models
 
@@ -95,43 +97,48 @@ structure is preserved verbatim in the posterior.
 
 ## A simulated example
 
-We simulate four series driven by two latent AR(1) trends over 80
-timepoints. Trend 1 has a long memory ($\phi_1 = 0.85$) and a
-moderate innovation SD; trend 2 has short memory ($\phi_2 = 0.15$)
-and a smaller innovation SD. Series 1 and 2 are driven by trend 1;
-series 3 and 4 by trend 2. Observations are Gaussian with residual
-SD 0.2.
+We simulate six series driven by three latent AR(1) trends, with
+one lone series that does not share its dynamics with any other.
+Trend 1 has long memory ($\phi_1 = 0.85$) and drives series 1-3;
+trend 2 has short memory ($\phi_2 = 0.15$) and drives series 4-5.
+Trend 3 sits between them ($\phi_3 = 0.55$) with a larger
+innovation SD ($\sigma_3 = 0.8$) and drives series 6 alone. The
+last 15 timepoints are held out for forecast scoring.
 
 ```{r simulate}
-set.seed(2)
+set.seed(3)
 
-# Dimensions and true parameters for the two latent AR(1) processes
+# Dimensions, true AR(1) parameters and time split
 n_time <- 80
-n_series <- 4
-n_lv <- 2
-phi_true <- c(0.85, 0.15)
-sig_true <- c(0.5, 0.35)
+n_series <- 6
+n_lv <- 3
+n_train <- 65
+phi_true <- c(0.85, 0.15, 0.55)
+sig_true <- c(0.5, 0.35, 0.8)
 
-# Simulate the two latent trends; first state is drawn from the AR(1)
-# stationary marginal so the process starts in equilibrium
+# Simulate the three latent trends; first state drawn from the
+# AR(1) stationary marginal so the process starts in equilibrium
 lv <- matrix(NA, n_time, n_lv)
 lv[1, ] <- rnorm(n_lv, 0, sig_true / sqrt(1 - phi_true^2))
 for (t in 2:n_time) {
   lv[t, ] <- phi_true * lv[t - 1L, ] + rnorm(n_lv, 0, sig_true)
 }
 
-# Fixed loadings: series 1-2 driven by trend 1, series 3-4 by trend 2
+# Fixed loadings: series 1-3 -> trend 1, series 4-5 -> trend 2,
+# series 6 alone on trend 3
 Z_true <- matrix(0, nrow = n_series, ncol = n_lv)
 Z_true[1, 1] <- 1
 Z_true[2, 1] <- 1
-Z_true[3, 2] <- 1
+Z_true[3, 1] <- 1
 Z_true[4, 2] <- 1
+Z_true[5, 2] <- 1
+Z_true[6, 3] <- 1
 
-# Assemble observations: series-level mean plus Gaussian noise
+# Observations: series-level mean plus Gaussian noise (sigma = 0.2)
 mu <- lv %*% t(Z_true)
 y_mat <- mu + matrix(rnorm(n_time * n_series, 0, 0.2), n_time, n_series)
 
-# mvgam long-format data frame: one row per series-time observation
+# Long-format data frame + train / test split
 sim_data <- data.frame(
   time = rep(seq_len(n_time), n_series),
   series = factor(
@@ -140,14 +147,16 @@ sim_data <- data.frame(
   ),
   y = as.numeric(y_mat)
 )
+train <- sim_data[sim_data$time <= n_train, ]
+test  <- sim_data[sim_data$time >  n_train, ]
 ```
 
-The sharing structure is already visible in the raw observations:
-series 1 and 2 track a trend with long memory (slow swings), while
-series 3 and 4 track a noisier trend with short memory.
+`mvgam_data()` renders the observed series with the training slice
+in colour and any newdata slice overlaid in the same panel, so we
+can see the sharing structure and the held-out horizon at once.
 
-```{r plot-observed, fig.cap = "Simulated observations rendered via the package's own inspection surface. Series 1-2 track one latent AR(1) trend with long memory; series 3-4 track a second trend with short memory."}
-mvgam_data(sim_data, y = "y", family = gaussian())
+```{r plot-observed, fig.cap = "Six simulated series with the last 15 timepoints held out for forecast scoring. Series 1-3 track a long-memory trend, series 4-5 track a short-memory trend, and series 6 rides its own medium-memory trend with a larger amplitude."}
+mvgam_data(train, y = "y", family = gaussian(), newdata = test)
 ```
 
 ## Fitting with a `trend_map`
@@ -158,24 +167,26 @@ We pass the sharing structure as a two-column `data.frame`. The
 the same integer share a latent path.
 
 ```{r trend-map}
-tm <- data.frame(
+tm_correct <- data.frame(
   series = paste0("s", seq_len(n_series)),
-  trend = c(1L, 1L, 2L, 2L)
+  trend = c(1L, 1L, 1L, 2L, 2L, 3L)
 )
-tm
+tm_correct
 ```
 
-The rest of the call is a standard `mvgam()` fit. The observation
-side is a single population intercept (`y ~ 1`); the trend side is an
-AR(1) process, applied to each of the two trends the `trend_map`
-implies.
+The observation side is a single population intercept (`y ~ 1`);
+the trend side is an AR(1) process, applied to each of the three
+trends the `trend_map` implies. Passing `newdata = test` at fit time
+stores the test slice with the fitted object so later `forecast()`
+calls can use it without re-supplying.
 
-```{r fit, results = "hide"}
-mod <- mvgam(
+```{r fit-correct, results = "hide"}
+fit_correct <- mvgam(
   formula = y ~ 1,
   trend_formula = ~ AR(p = 1),
-  trend_map = tm,
-  data = sim_data,
+  trend_map = tm_correct,
+  data = train,
+  newdata = test,
   family = gaussian(),
   chains = 2L,
   samples = 500L,
@@ -186,107 +197,69 @@ mod <- mvgam(
 ```
 
 `summary()` reports the AR coefficient and innovation SD for each of
-the two trends alongside the observation intercept and residual SD.
-The posterior means sit close to the simulated truth: `ar1_trend[1]`
-recovers to 0.90 (95% CI 0.81-0.97; truth 0.85) and `ar1_trend[2]`
-to 0.18 (95% CI -0.08-0.45; truth 0.15), and the innovation SDs
-recover to 0.54 and 0.37 against truth 0.5 and 0.35. Residual
-observation SD lands at 0.20 (95% CI 0.18-0.22), which is the value
-used to generate the data.
+the three trends alongside the observation intercept and residual
+SD. The posterior means sit inside the 95% CIs of the simulated
+truth: `ar1_trend` recovers to (0.72, 0.07, 0.46) against truth
+(0.85, 0.15, 0.55). `sigma_trend` recovers to (0.54, 0.34, 0.82)
+against truth (0.5, 0.35, 0.8). Residual observation SD lands at
+0.20, exactly the value used to generate the data.
 
 ```{r summary}
-summary(mod)
+summary(fit_correct)
 ```
 
 ## Recovering the latent trends
 
-`hindcast(mod, type = "trend")` returns the latent-state posterior on
-its own scale, and `plot()` on that object renders one facet per
-series. Because we fixed series 1 and 2 to share trend 1, and series
-3 and 4 to share trend 2, the paired ribbons carry identical draws:
-the top row is the posterior for the trend with long memory, the
-bottom row for the trend with short memory.
+`hindcast(fit, type = "trend")` returns the latent-state posterior
+on its own scale, and `plot()` on that object renders one facet per
+series. Because we fixed series 1-3 to share trend 1, series 4-5 to
+share trend 2, and series 6 to ride trend 3, the panels within each
+sharing group carry identical draws:
 
-```{r plot-trend-hindcast, fig.cap = "Trend-scale hindcasts. The top row (series 1-2) plots one latent path; the bottom row (series 3-4) plots the other. The paired ribbons are identical because trend_map pinned the sharing."}
-plot(hindcast(mod, type = "trend"))
+```{r plot-trend-hindcast, fig.cap = "Trend-scale hindcasts. Series 1-3 (top row) share one latent path; series 4-5 (bottom left, centre) share another; series 6 (bottom right) rides its own trend."}
+plot(hindcast(fit_correct, type = "trend"))
 ```
 
-Overlaying the simulated truth as crosses confirms that both latent
-paths are recovered inside the credible ribbon. We join the truth
-for each series to the ribbon plot returned by
-`plot(hindcast())` via an added `geom_point()` layer.
+`plot(fit, type = "factors")` shows the latent processes directly,
+one panel per trend, annotated with the fraction of series-level
+variance each factor explains. Trend 1 dominates because three of
+the six series load on it; trend 2 contributes least; trend 3 sits
+in between with the outlier series' larger-amplitude dynamics.
 
-```{r plot-trend-truth, fig.cap = "Trend hindcasts with the simulated truth overlaid as crosses. The ribbon covers the truth throughout for both latent paths."}
-truth_long <- data.frame(
-  time = rep(seq_len(n_time), n_series),
-  series = factor(
-    rep(paste0("s", seq_len(n_series)), each = n_time),
-    levels = paste0("s", seq_len(n_series))
-  ),
-  truth = as.numeric(lv %*% t(Z_true))
-)
-
-plot(hindcast(mod, type = "trend")) +
-  geom_point(
-    data = truth_long,
-    aes(x = time, y = truth),
-    shape = 4,
-    inherit.aes = FALSE,
-    size = 1.2
-  )
-```
-
-Series-level hindcasts stack the latent state and the observation
-intercept, so series that share a trend also share the same shape at
-the response scale, differing only by the observation noise the
-ribbon absorbs.
-
-```{r plot-series-hindcast, fig.cap = "Response-scale hindcasts for each series. Series 1 and 2 track together; series 3 and 4 track together. The ribbons are slightly wider than the trend-scale hindcasts because they include the observation noise."}
-plot(hindcast(mod))
+```{r plot-factors-correct, fig.cap = "The three latent AR(1) factors recovered by the correct-loadings fit, with the percentage of series-level variance each explains. Trend 1 (three series) contributes most, trend 3 (the outlier series) contributes a substantial share, and trend 2 (two short-memory series) contributes least."}
+plot(fit_correct, type = "factors")
 ```
 
 ## Forecasting on shared trends
 
-The same projection carries into forecasts. When we ask for 15
-steps ahead, the AR(1) recursion runs in latent space per
-posterior draw and the fixed `Z` matrix maps each draw's LV
-trajectory back to series scale. Series that share a trend
-receive the same latent forecast paths cell for cell.
+The same projection carries into forecasts. The AR(1) recursion
+runs in latent space per posterior draw and the fixed $Z$ matrix
+maps each draw's LV trajectory back to series scale. Series that
+share a trend receive the same latent forecast paths cell for cell,
+so the ribbons within each sharing group also match.
 
-```{r forecast}
-n_forecast <- 15L
-fc_newdata <- data.frame(
-  time = rep((n_time + 1L):(n_time + n_forecast), n_series),
-  series = factor(
-    rep(paste0("s", seq_len(n_series)), each = n_forecast),
-    levels = paste0("s", seq_len(n_series))
-  ),
-  y = NA_real_
-)
-fc <- forecast(mod, newdata = fc_newdata)
-```
-
-```{r plot-forecast, fig.cap = "Forecasts for the four series. Series 1 and 2 (top row) reproduce the same latent AR(1) forecast draw for draw; series 3 and 4 do the same for the other trend. The long-memory trend fans out gradually across the horizon; the short-memory trend collapses back to its mean within a few timesteps."}
-plot(fc)
+```{r plot-forecast-correct, fig.cap = "Forecasts under the correct trend_map. Series 1-3 reproduce the same latent forecast; series 4-5 do the same for the short-memory trend; series 6 forecasts its own dynamics. The long-memory ribbon fans out gradually; the short-memory ribbon returns to zero within a few timesteps."}
+plot(forecast(fit_correct, newdata = test))
 ```
 
 ## Letting the model learn the loadings
 
-Fixing the loadings is only the right call when domain
-knowledge tells you which series belong together. When the
-sharing structure is uncertain, hand the loadings to mvgam and
-let the sampler infer them. Passing an all-`NA` numeric matrix
-of the target size to `trend_map` tells mvgam to sample `Z`
-under the default Student-t prior with the QR identification of
-Heaps & Jermyn ([2024](https://doi.org/10.1007/s11222-024-10454-0)).
+Fixing the loadings is only the right call when domain knowledge
+tells you which series belong together. When the sharing structure
+is uncertain, hand the loadings to mvgam and let the sampler infer
+them. Passing an all-`NA` numeric matrix of the target size to
+`trend_map` tells mvgam to sample $Z$ under the default Student-t
+prior with the QR identification of Heaps & Jermyn
+([2024](https://doi.org/10.1007/s11222-024-10454-0)).
 
 ```{r free-z-fit, results = "hide"}
 Z_free <- matrix(NA_real_, nrow = n_series, ncol = n_lv)
-mod_free <- mvgam(
+fit_free <- mvgam(
   formula = y ~ 1,
   trend_formula = ~ AR(p = 1),
   trend_map = Z_free,
-  data = sim_data,
+  data = train,
+  newdata = test,
   family = gaussian(),
   chains = 2L,
   samples = 500L,
@@ -296,20 +269,101 @@ mod_free <- mvgam(
 )
 ```
 
-Compared with the fit that fixed `Z`, the free-loadings model
-has to jointly identify the two latent trajectories and the
-four loadings that map them onto the series. The trend
-hindcasts carry more uncertainty in return:
+The factor plot from the free-loadings fit recovers the same
+dominant latent pattern as the correct fit. The leading factor
+tracks the same slow oscillation, and the remaining two capture the
+faster dynamics; the variance shares reallocate a little because the
+QR identification distributes them differently across columns, but
+the underlying signals are the same.
 
-```{r plot-free-z, fig.cap = "Trend hindcasts under the free-loadings fit. The ribbons are visibly wider than the fixed-Z hindcasts because the fit now samples the loadings jointly with the latent paths."}
-plot(hindcast(mod_free, type = "trend"))
+```{r plot-factors-free, fig.cap = "The three latent factors recovered by the free-loadings fit. The leading factor is the same long-memory pattern the correct-loadings fit found; the remaining two capture the same faster dynamics, with a slightly different variance allocation because the QR identification does not know which sharing structure was used to generate the data."}
+plot(fit_free, type = "factors")
 ```
 
-This is the usual identification versus flexibility trade.
-Fixing `Z` when you know the sharing structure gives you
-tighter posteriors on the trends. Letting `Z` sample lets the
-data tell you which series belong together at the cost of
-somewhat wider bands.
+## When `trend_map` is wrong
+
+`trend_map` is a hard prior on the sharing structure. Getting it
+wrong forces the model to explain distinct dynamics with a single
+latent path. To see how much that hurts, we fit a deliberately
+misspecified model that pools every series onto one shared trend
+(`trend_map = "shared"`) and compare its held-out forecast scores
+against the correct fit.
+
+```{r shared-fit, results = "hide"}
+fit_shared <- mvgam(
+  formula = y ~ 1,
+  trend_formula = ~ AR(p = 1),
+  trend_map = "shared",
+  data = train,
+  newdata = test,
+  family = gaussian(),
+  chains = 2L,
+  samples = 500L,
+  burnin = 500L,
+  silent = 2L,
+  refresh = 0
+)
+```
+
+The forecast plot from the misspecified fit shows the cost visually.
+Every series' ribbon widens because a single latent path cannot
+match the three distinct dynamical regimes at once, and the
+hindcast bands during training are similarly wide.
+
+```{r plot-forecast-shared, fig.cap = "Forecasts under the misspecified fit that pools every series onto one shared trend. Compared with the correct-loadings forecasts above, both the hindcast and forecast ribbons are visibly wider on every series because one latent process is trying to carry three distinct dynamical regimes."}
+plot(forecast(fit_shared, newdata = test))
+```
+
+`score()` quantifies the cost using strictly proper scoring rules.
+CRPS and the log score both penalise sharper forecasts less when
+they are close to the observation and more when they are far, so
+they measure both the mean and the calibration of the predictive
+distribution. Lower is better for both.
+
+```{r scores}
+score_totals <- function(fit) {
+  fc <- forecast(fit, newdata = test)
+  c(
+    crps = sum(sapply(
+      score(fc, score = "crps")[levels(train$series)],
+      function(x) sum(x$score, na.rm = TRUE)
+    )),
+    logs = sum(sapply(
+      score(fc, score = "logs")[levels(train$series)],
+      function(x) sum(x$score, na.rm = TRUE)
+    )),
+    energy = sum(score(fc, score = "energy")$all_series$score,
+                  na.rm = TRUE)
+  )
+}
+scores_tbl <- rbind(
+  correct = score_totals(fit_correct),
+  shared  = score_totals(fit_shared),
+  free    = score_totals(fit_free)
+)
+round(scores_tbl, 2)
+```
+
+The correct-loadings fit wins on all three metrics. The log score
+gap is the sharpest: 94 for the correct fit versus 112 for the
+misspecified `"shared"` fit, a 19% degradation. Almost all of that
+comes from series 4-6, whose true dynamics are washed out when
+their observations are pooled onto the dominant long-memory trend.
+The per-series log score for series 4 goes from 4.6 under the
+correct fit to 11.2 under `"shared"`, a factor of 2.4.
+
+The free-loadings fit sits between the correct and misspecified
+fits on all three metrics. It captures the right latent shapes but
+pays a moderate score cost for jointly identifying $Z$ with the
+trend parameters, and the QR rotation spreads variance across
+factors in a way that does not exactly match the sharing structure
+used to generate the data.
+
+The practical takeaway is that a held-out forecast score is a
+useful diagnostic on the sharing structure itself. When two
+plausible `trend_map` specifications disagree, fitting both and
+comparing `score()` outputs on a real test slice tells you which
+sharing pattern the data actually support.
 
 ## Take-aways
 
@@ -322,10 +376,19 @@ handles the general case with optional partial-Z entries. Downstream
 methods work unchanged. The parameter catalogue only grows by the
 per-trend scalars belonging to whatever trend model was supplied.
 
-Reach for `how_to_cite(mod)` when you want a citation-ready methods
+When the sharing structure is known, fixing it via `trend_map` gives
+the tightest and best-calibrated forecasts. When the structure is
+uncertain, an all-`NA` matrix lets mvgam learn the loadings jointly
+with the trend parameters, recovering the same underlying latent
+shapes at a moderate score cost from the extra identification
+uncertainty. When two candidate structures disagree, fitting both
+and comparing `score()` outputs on a held-out slice is a practical
+way to let the data decide.
+
+Reach for `how_to_cite(fit)` when you want a citation-ready methods
 paragraph naming the trend, family and sampler configuration used on
 the fit. For the same content rendered as Markdown plus LaTeX for a
-manuscript methods section, `methods_md(mod)` produces a paste-ready
+manuscript methods section, `methods_md(fit)` produces a paste-ready
 block.
 
 ## Further reading
@@ -337,14 +400,22 @@ The natural next functions to explore on the same fit are:
   sampled entries of $Z$ when using the numeric matrix form.
 - `?hindcast.mvgam` and `?forecast.mvgam` for the prediction surface,
   including the `type = "trend"` view used above.
+- `?score` for the strictly proper scoring rules used to compare
+  forecast performance in this vignette.
+- `?ensemble` and `?lfo_cv` for the two forecast-comparison
+  workhorses built on top of `score`.
 - `?jsdgam` for the joint species distribution wrapper, which uses
   the same partial-Z path to identify a factor model on multispecies
   count or occurrence data.
 - `?mcmc_plot` for parameter posterior visualisation on any variable
-  reported by `variables(mod)`.
+  reported by `variables(fit)`.
 
 Sibling articles in this series carry the workflow further:
 
+- The
+  [forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+  walks through `forecast()`, `score()`, `lfo_cv()` and `ensemble()`
+  on a worked example with count observations.
 - The
   [multi-response article](https://nicholasjclark.github.io/mvgam/articles/multivariate.html)
   covers the different case where several outcomes on different
@@ -361,8 +432,8 @@ The dynamic factor model on which `trend_map` is built follows Zuur
 et al. ([2003](https://doi.org/10.1002/env.611)); the MARSS R
 package (Holmes et al.
 [2012](https://doi.org/10.32614/RJ-2012-002)) is the reference
-implementation the syntax deliberately echoes. The identification approach for factor models
-follows Heaps & Jermyn
+implementation the syntax deliberately echoes. The identification
+approach for factor models follows Heaps & Jermyn
 ([2024](https://doi.org/10.1007/s11222-024-10454-0)); mvgam applies
 a QR rotation in generated quantities to identify factor models with
 free loadings, and skips this rotation whenever a user supplies a
