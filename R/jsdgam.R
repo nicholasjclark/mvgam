@@ -37,9 +37,10 @@
 #'
 #' @param formula A `formula` object specifying the GAM observation
 #'   model formula. These behave exactly like the formula for a GLM
-#'   except that smooth terms (`s()`, `te()`, `ti()`, `t2()`), time
-#'   varying `dynamic()` terms, nonparametric `gp()` terms and
-#'   `offset()` can be added to the right-hand side. `gp()` accepts
+#'   except that smooth terms (`s()`, `te()`, `ti()`, `t2()`),
+#'   nonparametric `gp()` terms and `offset()` can be added to the
+#'   right-hand side. Time-varying effects are expressed as
+#'   `s(time, by = X)` or `gp(time, by = X)`. `gp()` accepts
 #'   both the approximate Hilbert-space form (`gp(x, k = 20)`) and
 #'   the exact full-covariance form (`gp(x)`, no `k`). Both fit
 #'   fine, but only the approximate form currently supports

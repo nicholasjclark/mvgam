@@ -30,9 +30,10 @@ jsdgam(
 \arguments{
 \item{formula}{A \code{formula} object specifying the GAM observation
 model formula. These behave exactly like the formula for a GLM
-except that smooth terms (\code{s()}, \code{te()}, \code{ti()}, \code{t2()}), time
-varying \code{dynamic()} terms, nonparametric \code{gp()} terms and
-\code{offset()} can be added to the right-hand side. \code{gp()} accepts
+except that smooth terms (\code{s()}, \code{te()}, \code{ti()}, \code{t2()}),
+nonparametric \code{gp()} terms and \code{offset()} can be added to the
+right-hand side. Time-varying effects are expressed as
+\code{s(time, by = X)} or \code{gp(time, by = X)}. \code{gp()} accepts
 both the approximate Hilbert-space form (\code{gp(x, k = 20)}) and
 the exact full-covariance form (\code{gp(x)}, no \code{k}). Both fit
 fine, but only the approximate form currently supports

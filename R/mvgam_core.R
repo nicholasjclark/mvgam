@@ -308,6 +308,37 @@
 #' # dynamics, priors, sampler configuration) as Markdown + LaTeX.
 #' how_to_cite(var_mod)
 #' cat(methods_md(var_mod))
+#'
+#' # ---- Time-varying coefficient via s(time, by = x) ----
+#' # When a covariate's effect on the response drifts over the
+#' # study period, an interaction between `time` and the
+#' # covariate captures that drift: `s(time, by = x)` fits one
+#' # smooth per unit of `x`, evaluated at each timepoint. The
+#' # intercept is suppressed with `y ~ 0 + ...` so the smooth
+#' # carries the whole conditional mean.
+#' set.seed(3)
+#' n <- 100
+#' tvdat <- data.frame(
+#'   time = seq_len(n),
+#'   x = rnorm(n),
+#'   series = factor("s1")
+#' )
+#' # True coefficient on x grows linearly from 0 to 2 over time.
+#' tvdat$y <- tvdat$x * seq(0, 2, length.out = n) +
+#'   rnorm(n, 0, 0.3)
+#'
+#' tv_mod <- mvgam(
+#'   y ~ 0 + s(time, by = x, k = 6),
+#'   data     = tvdat,
+#'   family   = gaussian(),
+#'   chains   = 2,
+#'   samples  = 500,
+#'   burnin   = 500,
+#'   silent   = 2
+#' )
+#' # `conditional_effects()` shows the two-way surface: the
+#' # slope on x visibly steepens as time progresses.
+#' conditional_effects(tv_mod)
 #' }
 #'
 #' @references
