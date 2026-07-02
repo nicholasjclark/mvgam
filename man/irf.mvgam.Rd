@@ -49,7 +49,13 @@ plot(irf_obj, series = 1)
 
 }
 \seealso{
-\code{\link{mvgam_irf-class}}, \code{\link[=VAR]{VAR()}}, \code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}, \code{\link[=stability]{stability()}}, \code{\link[=fevd]{fevd()}}
+\code{\link{mvgam_irf-class}}, \code{\link[=VAR]{VAR()}},
+\code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}, \code{\link[=stability]{stability()}}, \code{\link[=fevd]{fevd()}},
+\code{\link[=plot.mvgam_stability]{plot.mvgam_stability()}}, \code{\link[=plot.mvgam_fevd]{plot.mvgam_fevd()}},
+\code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}}.
+For a worked article that runs \code{irf()} end to end on an
+annual bird-count VAR, see
+\url{https://nicholasjclark.github.io/mvgam/articles/vector_ar.html}.
 }
 \author{
 Nicholas J Clark

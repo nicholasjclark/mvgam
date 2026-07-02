@@ -20,7 +20,13 @@
 #' object can be used with the supplied S3 functions [plot.mvgam_irf()]
 #' and [summary.mvgam_irf()]
 #' @author Nicholas J Clark
-#' @seealso \code{\link{mvgam_irf-class}}, [VAR()], [plot.mvgam_irf()], [stability()], [fevd()]
+#' @seealso \code{\link{mvgam_irf-class}}, [VAR()],
+#'   [plot.mvgam_irf()], [stability()], [fevd()],
+#'   [plot.mvgam_stability()], [plot.mvgam_fevd()],
+#'   [plot.mvgam_forecast()].
+#'   For a worked article that runs `irf()` end to end on an
+#'   annual bird-count VAR, see
+#'   [https://nicholasjclark.github.io/mvgam/articles/vector_ar.html](https://nicholasjclark.github.io/mvgam/articles/vector_ar.html).
 #'
 #' @examples
 #' \dontrun{

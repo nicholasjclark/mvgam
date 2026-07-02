@@ -128,6 +128,10 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
 #' @return A `ggplot` object showing the expected response of each latent time
 #'   series to a shock of the focal `series`
 #'
+#' @seealso [irf()], [fevd()], [stability()],
+#'   [plot.mvgam_fevd()], [plot.mvgam_stability()],
+#'   [plot.mvgam_forecast()]
+#'
 #' @author Nicholas J Clark
 #'
 #' @export

@@ -2148,6 +2148,13 @@ print.mvgam_trend <- function(x, ...) {
 #'   version on the package website at:
 #'   https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html
 #'
+#'   For a worked example that interrogates a fitted `VAR()` trend
+#'   with `irf()`, `fevd()` and `stability()`, see
+#'   [https://nicholasjclark.github.io/mvgam/articles/vector_ar.html](https://nicholasjclark.github.io/mvgam/articles/vector_ar.html).
+#'   For the `trend_map` shortcut used to fit dynamic factor models
+#'   with fewer latent processes than observed series, see
+#'   `vignette("dfm_trend_map")`.
+#'
 #' @section Parameter Naming Convention:
 #' All trend model parameters automatically receive a "_trend" suffix to prevent
 #' naming conflicts with observation model parameters. For example:

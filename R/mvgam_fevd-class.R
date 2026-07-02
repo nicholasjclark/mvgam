@@ -113,6 +113,10 @@ summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
 #'@return A \code{\link[ggplot2]{ggplot}} object,
 #'  which can be further customized using the \pkg{ggplot2} package
 #'
+#'@seealso [fevd()], [irf()], [stability()],
+#'  [plot.mvgam_irf()], [plot.mvgam_stability()],
+#'  [plot.mvgam_forecast()]
+#'
 #'@author Nicholas J Clark
 #'
 #'@export

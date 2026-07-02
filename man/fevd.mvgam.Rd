@@ -43,7 +43,13 @@ Lütkepohl, H. (2007).
 New Introduction to Multiple Time Series Analysis. 2nd ed. Springer-Verlag Berlin Heidelberg.
 }
 \seealso{
-\code{\link[=VAR]{VAR()}}, \code{\link[=irf]{irf()}}, \code{\link[=stability]{stability()}}, \code{\link{mvgam_fevd-class}}
+\code{\link[=VAR]{VAR()}}, \code{\link[=irf]{irf()}}, \code{\link[=stability]{stability()}},
+\code{\link{mvgam_fevd-class}}, \code{\link[=plot.mvgam_fevd]{plot.mvgam_fevd()}},
+\code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}, \code{\link[=plot.mvgam_stability]{plot.mvgam_stability()}},
+\code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}}.
+For a worked article that runs \code{fevd()} end to end on an
+annual bird-count VAR, see
+\url{https://nicholasjclark.github.io/mvgam/articles/vector_ar.html}.
 }
 \author{
 Nicholas J Clark

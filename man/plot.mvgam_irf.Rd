@@ -22,6 +22,11 @@ series to a shock of the focal \code{series}
 This function takes an \code{mvgam_irf} object and produces plots of
 Impulse Response Functions
 }
+\seealso{
+\code{\link[=irf]{irf()}}, \code{\link[=fevd]{fevd()}}, \code{\link[=stability]{stability()}},
+\code{\link[=plot.mvgam_fevd]{plot.mvgam_fevd()}}, \code{\link[=plot.mvgam_stability]{plot.mvgam_stability()}},
+\code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}}
+}
 \author{
 Nicholas J Clark
 }

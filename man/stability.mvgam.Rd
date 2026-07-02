@@ -105,9 +105,14 @@ community stability and ecological interactions from time-series data.
 \emph{Ecological Monographs}, 73, 301–330.
 }
 \seealso{
-\code{\link{VAR}},
-\code{\link{irf}},
-\code{\link{fevd}}
+\code{\link{VAR}}, \code{\link{irf}}, \code{\link{fevd}},
+\code{\link{plot.mvgam_stability}},
+\code{\link{plot.mvgam_irf}},
+\code{\link{plot.mvgam_fevd}},
+\code{\link{plot.mvgam_forecast}}.
+For a worked article that runs \code{stability()} end to end
+on an annual bird-count VAR, see
+\url{https://nicholasjclark.github.io/mvgam/articles/vector_ar.html}.
 }
 \author{
 Nicholas J Clark

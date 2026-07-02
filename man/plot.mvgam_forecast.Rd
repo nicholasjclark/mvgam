@@ -64,7 +64,8 @@ marginal-MC prediction see \code{\link[=posterior_predict.mvgam]{posterior_predi
 }
 \seealso{
 \code{\link[=forecast.mvgam]{forecast.mvgam()}}, \code{\link[=hindcast.mvgam]{hindcast.mvgam()}},
-\code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}, \code{\link[=summary.mvgam_forecast]{summary.mvgam_forecast()}}
+\code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}}, \code{\link[=summary.mvgam_forecast]{summary.mvgam_forecast()}},
+\code{\link[=irf]{irf()}}, \code{\link[=fevd]{fevd()}}, \code{\link[=stability]{stability()}}
 }
 \author{
 Nicholas J Clark

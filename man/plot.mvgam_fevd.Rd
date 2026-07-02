@@ -20,6 +20,11 @@ This function takes an \code{mvgam_fevd} object and produces
 a plot of the posterior median contributions to forecast variance for each series
 in the fitted Vector Autoregression
 }
+\seealso{
+\code{\link[=fevd]{fevd()}}, \code{\link[=irf]{irf()}}, \code{\link[=stability]{stability()}},
+\code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}, \code{\link[=plot.mvgam_stability]{plot.mvgam_stability()}},
+\code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}}
+}
 \author{
 Nicholas J Clark
 }

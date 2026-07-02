@@ -19,7 +19,13 @@
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso [VAR()], [irf()], [stability()], \code{\link{mvgam_fevd-class}}
+#' @seealso [VAR()], [irf()], [stability()],
+#'   \code{\link{mvgam_fevd-class}}, [plot.mvgam_fevd()],
+#'   [plot.mvgam_irf()], [plot.mvgam_stability()],
+#'   [plot.mvgam_forecast()].
+#'   For a worked article that runs `fevd()` end to end on an
+#'   annual bird-count VAR, see
+#'   [https://nicholasjclark.github.io/mvgam/articles/vector_ar.html](https://nicholasjclark.github.io/mvgam/articles/vector_ar.html).
 #'
 #' @references Lütkepohl, H. (2007).
 #' New Introduction to Multiple Time Series Analysis. 2nd ed. Springer-Verlag Berlin Heidelberg.

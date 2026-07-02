@@ -84,9 +84,14 @@
 #' @author Nicholas J Clark
 #'
 #' @seealso
-#'   \code{\link{VAR}},
-#'   \code{\link{irf}},
-#'   \code{\link{fevd}}
+#'   \code{\link{VAR}}, \code{\link{irf}}, \code{\link{fevd}},
+#'   \code{\link{plot.mvgam_stability}},
+#'   \code{\link{plot.mvgam_irf}},
+#'   \code{\link{plot.mvgam_fevd}},
+#'   \code{\link{plot.mvgam_forecast}}.
+#'   For a worked article that runs `stability()` end to end
+#'   on an annual bird-count VAR, see
+#'   [https://nicholasjclark.github.io/mvgam/articles/vector_ar.html](https://nicholasjclark.github.io/mvgam/articles/vector_ar.html).
 #'
 #' @examples
 #' \dontrun{
@@ -209,7 +214,9 @@ stability.mvgam = function(object, ...) {
 #' @param ... Ignored.
 #'
 #' @return A `ggplot` object.
-#' @seealso [stability()], [irf()], [fevd()]
+#' @seealso [stability()], [irf()], [fevd()],
+#'   [plot.mvgam_irf()], [plot.mvgam_fevd()],
+#'   [plot.mvgam_forecast()]
 #' @method plot mvgam_stability
 #' @importFrom ggplot2 ggplot aes geom_histogram geom_vline
 #'   facet_wrap labs

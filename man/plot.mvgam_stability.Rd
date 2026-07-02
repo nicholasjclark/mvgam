@@ -35,5 +35,7 @@ reactivity threshold above which shocks are amplified rather
 than absorbed.
 }
 \seealso{
-\code{\link[=stability]{stability()}}, \code{\link[=irf]{irf()}}, \code{\link[=fevd]{fevd()}}
+\code{\link[=stability]{stability()}}, \code{\link[=irf]{irf()}}, \code{\link[=fevd]{fevd()}},
+\code{\link[=plot.mvgam_irf]{plot.mvgam_irf()}}, \code{\link[=plot.mvgam_fevd]{plot.mvgam_fevd()}},
+\code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}}
 }

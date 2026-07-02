@@ -182,6 +182,13 @@ Use \code{vignette("mvgam_overview")} to see the full details of
 available stochastic trend types in \pkg{mvgam}, or view the rendered
 version on the package website at:
 https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html
+
+For a worked example that interrogates a fitted \code{VAR()} trend
+with \code{irf()}, \code{fevd()} and \code{stability()}, see
+\url{https://nicholasjclark.github.io/mvgam/articles/vector_ar.html}.
+For the \code{trend_map} shortcut used to fit dynamic factor models
+with fewer latent processes than observed series, see
+\code{vignette("dfm_trend_map")}.
 }
 \note{
 \strong{VAR fits and \code{init = 0}}: VAR uses the Heaps-2022

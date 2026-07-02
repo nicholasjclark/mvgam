@@ -41,7 +41,8 @@
 #'   [posterior_epred.mvgam()].
 #'
 #' @seealso [forecast.mvgam()], [hindcast.mvgam()],
-#'   [score.mvgam_forecast()], [summary.mvgam_forecast()]
+#'   [score.mvgam_forecast()], [summary.mvgam_forecast()],
+#'   [irf()], [fevd()], [stability()]
 #'
 #' @author Nicholas J Clark
 #'
