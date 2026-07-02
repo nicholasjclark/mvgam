@@ -64,32 +64,63 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
   n_series <- as.integer(fit$standata$N_series_trend %||% 1L)
   n_lv <- as.integer(fit$standata$N_lv_trend %||% n_series)
 
-  # Per the trend-system architecture docs, factor models set
-  # `n_lv < n_series` and the latent dynamics live in `n_lv`
-  # space, with a Z matrix projecting to observed series.
-  # Hierarchical fits expand `n_lv = N_groups * N_subgroups`.
-  # Both cases require a dedicated extraction path; the current
-  # dispatcher supports only `n_lv == n_series`.
-  if (n_lv != n_series) {
+  # Per the trend-system architecture docs, factor models
+  # (n_lv < n_series) put the AR/RW/VAR recursion in n_lv-
+  # dimensional latent space; a per-draw Z matrix
+  # `[n_series, n_lv]` then projects the propagated LV
+  # trajectory back to observed series scale. The RW/AR/VAR
+  # extractors accept the LV grain here, and
+  # `forecast.mvgam`:`propagate_one_draw` applies the Z
+  # projection after `propagate_trend()` returns via
+  # `extract_Z_loadings()`. Hierarchical fits with
+  # `n_lv = n_groups * n_subgroups > n_series` still need a
+  # dedicated extraction path and error out below.
+  # CAR / ZMVN / PW factor variants aren't emitted by the
+  # generators today, so those branches keep the univariate
+  # `n_lv == n_series` assumption.
+  is_factor <- n_lv < n_series
+  if (n_lv > n_series) {
     stop(insight::format_error(c(
       paste0(
-        "Factor or hierarchical trends (n_lv != n_series) are ",
-        "not yet supported by 'extract_last_state'."
+        "Hierarchical trends (n_lv > n_series) are not yet ",
+        "supported by 'extract_last_state'."
       ),
       x = paste0(
         "Got n_lv = ", n_lv, ", n_series = ", n_series, "."
       ),
-      i = paste0(
-        "Hierarchical and factor trend support is pending."
-      )
+      i = "Hierarchical trend support is pending."
+    )))
+  }
+  if (is_factor &&
+      !meta$trend_type %in% c("RW", "AR", "VAR")) {
+    stop(insight::format_error(c(
+      paste0(
+        "Factor trend variants of '", meta$trend_type,
+        "' are not yet supported by 'extract_last_state'."
+      ),
+      x = paste0(
+        "Got n_lv = ", n_lv, ", n_series = ", n_series, "."
+      ),
+      i = "Factor forecast support currently covers RW / AR / VAR."
     )))
   }
 
-  switch(
+  # In factor mode extraction happens at the LV grain
+  # (`lv_trend[t, k]`, sigma_trend[k], ar_trend[k]). The caller
+  # projects the propagated `[h, n_lv]` trajectory back to
+  # series scale via Z; see `apply_factor_projection()` in
+  # forecast.mvgam.R.
+  state_dim <- if (is_factor) n_lv else n_series
+  state_var <- if (is_factor) "lv_trend" else "trend"
+
+  out <- switch(
     meta$trend_type,
-    "RW" = extract_rw_state(one_draw, meta, n_series, n_lv, fit),
-    "AR" = extract_ar_state(one_draw, meta, n_series, n_lv, fit),
-    "VAR" = extract_var_state(one_draw, meta, n_series, n_lv, fit),
+    "RW" = extract_rw_state(one_draw, meta, state_dim, n_lv, fit,
+                             state_var = state_var),
+    "AR" = extract_ar_state(one_draw, meta, state_dim, n_lv, fit,
+                             state_var = state_var),
+    "VAR" = extract_var_state(one_draw, meta, state_dim, n_lv, fit,
+                                state_var = state_var),
     "CAR" = extract_car_state(one_draw, meta, n_series, fit),
     "ZMVN" = extract_zmvn_state(one_draw, meta, n_series, n_lv),
     "PW" = extract_pw_state(one_draw, meta, n_series, n_lv, fit),
@@ -103,6 +134,13 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
       )
     )))
   )
+  # Tag the state with the LV dimensionality when non-trivial
+  # so the caller knows to apply Z projection after
+  # propagation.
+  if (is_factor) {
+    out$n_lv_active <- n_lv
+  }
+  out
 }
 
 
@@ -134,16 +172,21 @@ get_enriched_trend_metadata <- function(fit) {
 # recover the latent process internally.
 #'@noRd
 extract_trend_history <- function(one_draw, n_series, n_lv, max_lag,
-                                    n_time) {
+                                    n_time, state_var = "trend") {
   if (max_lag == 0L) {
     return(matrix(0, nrow = 0L, ncol = n_series))
   }
+  # `state_var` selects the parameter grid this reads from:
+  # `"trend"` for the series-grain full-rank fits (default), or
+  # `"lv_trend"` when the caller is running a factor model and
+  # wants the LV-grain state that `propagate_trend()` will step
+  # forward before projecting back to series scale via Z.
   start_t <- n_time - max_lag + 1L
   out <- matrix(0, nrow = max_lag, ncol = n_series)
   for (t in seq_len(max_lag)) {
     abs_t <- start_t + t - 1L
     for (s in seq_len(n_series)) {
-      nm <- paste0("trend[", abs_t, ",", s, "]")
+      nm <- paste0(state_var, "[", abs_t, ",", s, "]")
       out[t, s] <- as.numeric(one_draw[[nm]])
     }
   }
@@ -274,21 +317,27 @@ extract_ma_innovations <- function(one_draw, n_series, n_lv,
 # AR coefficients per active lag. RW skips the AR pull because
 # the kernel hardcodes the coefficient at 1.
 #'@noRd
-extract_rw_state <- function(one_draw, meta, n_series, n_lv, fit) {
+extract_rw_state <- function(one_draw, meta, n_series, n_lv, fit,
+                              state_var = "trend") {
   extract_arma_state(one_draw, meta, n_series, n_lv, fit,
-                      pull_ar = FALSE)
+                      pull_ar = FALSE, state_var = state_var)
 }
 
 #'@noRd
-extract_ar_state <- function(one_draw, meta, n_series, n_lv, fit) {
+extract_ar_state <- function(one_draw, meta, n_series, n_lv, fit,
+                              state_var = "trend") {
   extract_arma_state(one_draw, meta, n_series, n_lv, fit,
-                      pull_ar = TRUE)
+                      pull_ar = TRUE, state_var = state_var)
 }
 
 #'@noRd
 extract_arma_state <- function(one_draw, meta, n_series, n_lv, fit,
-                                pull_ar) {
+                                pull_ar, state_var = "trend") {
   n_time <- as.integer(fit$standata$N_time_trend)
+  # In factor mode the caller passes `n_series = n_lv` so the LV-
+  # grain propagation is dimensionally consistent; the AR / sigma
+  # extractors and `broadcast_to_series()` therefore return
+  # length-n_lv vectors, which is what the kernel expects.
   scov <- extract_sigma_and_cov(one_draw, n_series, n_lv,
                                  meta$has_cor)
   params <- list(sigma = scov$sigma, Sigma = scov$Sigma)
@@ -304,7 +353,8 @@ extract_arma_state <- function(one_draw, meta, n_series, n_lv, fit,
     params = params,
     last_state = list(
       trends = extract_trend_history(one_draw, n_series, n_lv,
-                                       meta$max_lag, n_time),
+                                       meta$max_lag, n_time,
+                                       state_var = state_var),
       errors = extract_ma_innovations(one_draw, n_series, n_lv,
                                         max_ma, n_time),
       linpreds = matrix(0, nrow = meta$max_lag, ncol = n_series)
@@ -319,7 +369,8 @@ extract_arma_state <- function(one_draw, meta, n_series, n_lv, fit,
 # MA coefficient cube from `D_raw_trend[i, j, 1]` when present.
 # VAR fits always have `cor = TRUE` (multivariate innovations).
 #'@noRd
-extract_var_state <- function(one_draw, meta, n_series, n_lv, fit) {
+extract_var_state <- function(one_draw, meta, n_series, n_lv, fit,
+                                state_var = "trend") {
   n_time <- as.integer(fit$standata$N_time_trend)
   m_a <- length(meta$ar_lags)
   # Stan declares A_trend as `array[N_lags_trend] matrix[N_lv,
@@ -362,7 +413,8 @@ extract_var_state <- function(one_draw, meta, n_series, n_lv, fit) {
     params = params,
     last_state = list(
       trends = extract_trend_history(one_draw, n_series, n_lv,
-                                       meta$max_lag, n_time),
+                                       meta$max_lag, n_time,
+                                       state_var = state_var),
       errors = empty_errors(),
       linpreds = matrix(0, nrow = meta$max_lag, ncol = n_series)
     )

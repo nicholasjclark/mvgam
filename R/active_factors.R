@@ -130,10 +130,24 @@ active_factors.mvgam <- function(object,
   if (is.null(n_series) || n_series < 1L) {
     n_series <- length(levels(object$obs_data$series))
   }
+  # Fallback for mvgam factor fits where `obs_data` isn't
+  # populated on the object and `resp_names` is empty (only
+  # populated for multi-response mvbf fits): reach for
+  # `resolve_series_info()`, which is the canonical series
+  # resolver every other post-fit method already uses.
+  if (is.null(n_series) || n_series < 1L) {
+    n_series <- length(resolve_series_info(object)$series_levels)
+  }
   draws_mat <- posterior::as_draws_matrix(object$fit)
-  Z_arr <- extract_Z_loadings(
+  # `resolve_Z_loadings()` returns the sampled Z / Z_tilde
+  # array when the fit has free loadings, or the fully-fixed
+  # trend_map matrix broadcast across draws when Z is data.
+  # Fixed-Z fits get column-norm summaries that are constant
+  # across draws (posterior mass on the deterministic value).
+  Z_arr <- resolve_Z_loadings(
+    object,
     draws_mat,
-    n_obs_series = as.integer(n_series),
+    n_series = as.integer(n_series),
     n_lv = as.integer(n_lv)
   )
   # Z_arr: [ndraws, n_series, n_lv]. Per-column squared norm per draw.

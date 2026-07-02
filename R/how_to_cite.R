@@ -840,9 +840,23 @@ how_to_cite.mvgam <- function(object, ...) {
       refs = "taylor_pw"
     ),
     list(
-      detect = !is.null(detect_factor_n_lv(object)),
+      # Free-loadings branch: default factor model (trend_map
+      # NULL or all-NA) and jsdgam under Heaps identification.
+      # The QR rotation only applies here.
+      detect = !is.null(detect_factor_n_lv(object)) &&
+                 is.null(object$mv_spec$trend_specs$fixed_Z),
       text = " Latent-factor loadings were sampled unconstrained and identified post-hoc via thin QR decomposition following Heaps and Jermyn (2024).",
       refs = "heaps_jermyn"
+    ),
+    list(
+      # Fixed-loadings branch: user supplied a `trend_map`
+      # with all finite entries. Z is data, so the QR
+      # identification does not apply -- the encoded sharing
+      # pattern is preserved verbatim.
+      detect = !is.null(detect_factor_n_lv(object)) &&
+                 !is.null(object$mv_spec$trend_specs$fixed_Z),
+      text = " Latent-factor loadings were fixed at the user-supplied `trend_map`, preserving the encoded series-to-trend sharing structure exactly.",
+      refs = character(0)
     ),
     list(
       detect = uses_jsdgam(object),

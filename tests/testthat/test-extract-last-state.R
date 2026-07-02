@@ -295,12 +295,42 @@ test_that("ZMVN returns Sigma + sigma and an empty trend history", {
 
 # ----- Dispatch errors -------------------------------------------
 
-test_that("Factor / hierarchical fits (n_lv != n_series) error", {
-  draws <- make_draws(list(sigma_trend = c(1, 1)))
+test_that("Factor fits (n_lv < n_series) tag the LV grain", {
+  # Since the factor-forecast support landed, the dispatcher
+  # runs AR/RW/VAR in n_lv-dimensional latent space and reads
+  # `lv_trend[t, k]` for the state history. The mock exposes
+  # those columns so the same recursion machinery can walk
+  # them, and the returned list carries `n_lv_active = n_lv`
+  # to signal to `propagate_one_draw` that a Z projection is
+  # needed.
+  n_series <- 3L
+  n_lv <- 2L
+  n_time <- 5L
+  lv_trend_mat <- matrix(rnorm(n_time * n_lv), n_time, n_lv)
+  colnames(lv_trend_mat) <- NULL
+  draws <- make_draws(list(
+    sigma_trend = c(1, 1),
+    ar1_trend = c(0.5, 0.3),
+    lv_trend = lv_trend_mat
+  ))
   meta <- list(trend_type = "AR", ar_lags = 1L,
                ma_lags = integer(0), max_lag = 1L,
                has_cor = FALSE)
-  fit <- make_mock_fit(draws, n_series = 3L, n_lv = 2L,
+  fit <- make_mock_fit(draws, n_series = n_series, n_lv = n_lv,
+                        n_time = n_time, meta)
+  res <- extract_last_state(fit, 1L)
+  expect_identical(res$n_lv_active, n_lv)
+  expect_identical(dim(res$last_state$trends), c(1L, n_lv))
+  expect_length(res$params$sigma, n_lv)
+})
+
+
+test_that("Hierarchical fits (n_lv > n_series) still error", {
+  draws <- make_draws(list(sigma_trend = c(1, 1, 1)))
+  meta <- list(trend_type = "AR", ar_lags = 1L,
+               ma_lags = integer(0), max_lag = 1L,
+               has_cor = FALSE)
+  fit <- make_mock_fit(draws, n_series = 2L, n_lv = 3L,
                         n_time = 5L, meta)
   expect_error(extract_last_state(fit, 1L),
                 "not yet supported")

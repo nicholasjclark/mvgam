@@ -1163,11 +1163,62 @@ filter_hidden_unrotated <- function(pars) {
   pars[!grepl(hide_pat, pars)]
 }
 
+# Internal: return a `[ndraws, n_series, n_lv]` loading array
+# for any post-fit method that needs Z across draws. Two
+# branches:
+#   1. Free-loadings fits (default factor model, jsdgam under
+#      the Heaps identification, any trend_map = NULL or
+#      all-NA matrix) sample Z. The posterior carries
+#      `Z_tilde[s, k]` (post-hoc QR) or raw `Z[s, k]` columns
+#      that `extract_Z_loadings()` pulls per draw.
+#   2. Fully-fixed trend_map fits (any user shorthand or
+#      numeric matrix with all finite entries) never sample Z.
+#      The deterministic loading matrix lives on
+#      `object$mv_spec$trend_specs$fixed_Z` and is broadcast
+#      across draws here so callers see the same three-way
+#      array shape they would get from the sampled branch.
+# Callers: forecast.mvgam:propagate_one_draw for the LV-space
+# forecast projection, active_factors for column-norm
+# summaries. Both need per-draw Z either way.
+#'@noRd
+resolve_Z_loadings <- function(object, draws_mat, n_series, n_lv) {
+  checkmate::assert_matrix(draws_mat)
+  checkmate::assert_int(n_series, lower = 1L)
+  checkmate::assert_int(n_lv, lower = 1L)
+  has_free_Z <- any(grepl(
+    "^Z(_tilde)?\\[", colnames(draws_mat)
+  ))
+  if (has_free_Z) {
+    return(extract_Z_loadings(draws_mat, n_series, n_lv))
+  }
+  fixed_Z <- object$mv_spec$trend_specs$fixed_Z
+  if (is.null(fixed_Z)) {
+    stop(insight::format_error(c(
+      "Cannot resolve loading matrix for factor fit.",
+      x = "Neither posterior Z / Z_tilde columns nor a fixed_Z on mv_spec.",
+      i = paste0(
+        "Expected the fit to carry `mv_spec$trend_specs$fixed_Z` ",
+        "(fully-fixed trend_map) or free-Z posterior columns."
+      )
+    )))
+  }
+  checkmate::assert_matrix(fixed_Z, nrows = n_series, ncols = n_lv)
+  ndraws <- nrow(draws_mat)
+  # Broadcast the deterministic [n_series, n_lv] loading matrix
+  # across draws so the caller's per-draw slicing sees the same
+  # array shape it would get from `extract_Z_loadings()`.
+  array(rep(as.numeric(fixed_Z), each = ndraws),
+        dim = c(ndraws, n_series, n_lv))
+}
+
+
 # Internal: extract factor-loading draws from the posterior.
 # Returns array [ndraws, n_obs_series, n_lv] sorted by series
 # index (outer) then by lv index (inner), matching Stan's
 # column-major storage convention. Selects `Z_tilde` or `Z` via
-# `factor_loading_param_pattern()`.
+# `factor_loading_param_pattern()`. For a resolver that also
+# handles fully-fixed trend_map fits (Z as data), use
+# `resolve_Z_loadings()` above.
 #'@noRd
 extract_Z_loadings <- function(draws_mat, n_obs_series, n_lv) {
   checkmate::assert_matrix(draws_mat)

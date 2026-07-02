@@ -753,6 +753,24 @@ build_forecast_arms <- function(object, trend_model, meta,
     NULL
   }
 
+  # Factor-model precompute: when the fit is a latent-factor
+  # model (n_lv < n_series) the trend recursion runs in
+  # n_lv-dimensional LV space and a per-draw Z projects the
+  # propagated `[h, n_lv]` LV trajectory back to `[h, n_series]`.
+  # Pull the whole Z array once via the shared
+  # `extract_Z_loadings()` helper (returns [ndraws, n_series,
+  # n_lv], preferring `Z_tilde` when present); the inner loop
+  # slices per draw. NULL for full-rank fits.
+  n_lv_trend <- as.integer(
+    object$standata$N_lv_trend %||% n_series
+  )
+  Z_arr <- if (n_lv_trend < n_series &&
+                 meta$trend_type %in% c("RW", "AR", "VAR")) {
+    resolve_Z_loadings(object, draws_mat, n_series, n_lv_trend)
+  } else {
+    NULL
+  }
+
   # Per-draw kernel loop. `trend_flat[i, j]` holds the trend
   # value at draw `draw_idx[i]`, observation row j of the
   # forecast grid (obs_struct_fc ordering).
@@ -769,6 +787,11 @@ build_forecast_arms <- function(object, trend_model, meta,
     # toggle.
     d_state <- if (isTRUE(trend_uncertainty)) draw_idx[i] else 1L
     d_lin <- d_state
+    Z_slice_d <- if (is.null(Z_arr)) {
+      NULL
+    } else {
+      Z_arr[d_state, , , drop = FALSE][1L, , , drop = TRUE]
+    }
     fc_link_d <- propagate_one_draw(
       object = object,
       trend_model = trend_model,
@@ -786,7 +809,8 @@ build_forecast_arms <- function(object, trend_model, meta,
       obs_struct_tail = obs_struct_tail,
       obs_struct_fc = obs_struct_fc,
       fc_time = fc_time,
-      pw_extras = pw_extras
+      pw_extras = pw_extras,
+      Z_slice = Z_slice_d
     )
     trend_flat[i, ] <- flatten_grid_to_obs_order(fc_link_d,
                                                     obs_struct_fc)
@@ -822,14 +846,18 @@ build_forecast_arms <- function(object, trend_model, meta,
 
 
 # Internal: one-draw propagation pipeline. Returns a `[h_max,
-# n_series]` link-scale trajectory.
+# n_series]` link-scale trajectory. In factor mode (Z_slice is
+# non-NULL) the recursion runs in n_lv-dimensional latent space
+# and the returned matrix is projected back to `n_series`
+# columns via `X %*% t(Z_slice)`.
 #'@noRd
 propagate_one_draw <- function(object, trend_model, meta, training,
                                  fc_grid, draws_mat, d_state, d_lin,
                                  h_max, n_series, tail_data,
                                  trend_lp_tail, trend_lp_fc,
                                  obs_struct_tail, obs_struct_fc,
-                                 fc_time = NULL, pw_extras = NULL) {
+                                 fc_time = NULL, pw_extras = NULL,
+                                 Z_slice = NULL) {
   ls_d <- extract_last_state(object, d_state,
                                 draws_mat = draws_mat)
 
@@ -853,18 +881,29 @@ propagate_one_draw <- function(object, trend_model, meta, training,
 
   max_lag <- as.integer(meta$max_lag %||% 0L)
 
+  # Factor mode: propagate in the LV-grain space `extract_last_
+  # state()` returned (n_lv columns instead of n_series). The
+  # trend-side linpred, if any, would enter the observation
+  # scale rather than the latent recursion, so passing zero
+  # linpreds here matches the standata semantics.
+  # `apply_factor_projection()` maps the LV trajectory back to
+  # series scale after propagation.
+  in_factor_mode <- !is.null(Z_slice) &&
+    !is.null(ls_d$n_lv_active)
+  n_prop <- if (in_factor_mode) ls_d$n_lv_active else n_series
+
   lp_history <- if (max_lag == 0L) {
-    matrix(0, nrow = 0L, ncol = n_series)
-  } else if (is.null(trend_lp_tail)) {
-    matrix(0, nrow = max_lag, ncol = n_series)
+    matrix(0, nrow = 0L, ncol = n_prop)
+  } else if (in_factor_mode || is.null(trend_lp_tail)) {
+    matrix(0, nrow = max_lag, ncol = n_prop)
   } else {
     grid <- reshape_linpred_to_grid(
       trend_lp_tail[d_lin, ], obs_struct_tail
     )
     pad_or_trim_rows(grid, max_lag)
   }
-  lp_forecast <- if (is.null(trend_lp_fc)) {
-    matrix(0, nrow = h_max, ncol = n_series)
+  lp_forecast <- if (in_factor_mode || is.null(trend_lp_fc)) {
+    matrix(0, nrow = h_max, ncol = n_prop)
   } else {
     grid <- reshape_linpred_to_grid(
       trend_lp_fc[d_lin, ], obs_struct_fc
@@ -873,15 +912,33 @@ propagate_one_draw <- function(object, trend_model, meta, training,
   }
   linpreds_combined <- rbind(lp_history, lp_forecast)
 
-  propagate_trend(
+  fc_lv <- propagate_trend(
     trend_model = trend_model,
     params = ls_d$params,
     h = h_max,
-    n_series = n_series,
+    n_series = n_prop,
     last_state = ls_d$last_state,
     linpreds = linpreds_combined,
     time = fc_time
   )
+  if (in_factor_mode) {
+    apply_factor_projection(fc_lv, Z_slice, n_series)
+  } else {
+    fc_lv
+  }
+}
+
+
+# Internal: project an `[h, n_lv]` LV-scale forecast trajectory
+# back to `[h, n_series]` observation scale via a `[n_series,
+# n_lv]` per-draw loadings slice. One place to change if the
+# loading convention ever shifts, and a single call site to
+# assert dimensions on.
+#'@noRd
+apply_factor_projection <- function(lv_traj, Z_slice, n_series) {
+  checkmate::assert_matrix(lv_traj, min.rows = 0L)
+  checkmate::assert_matrix(Z_slice, nrows = n_series)
+  lv_traj %*% t(Z_slice)
 }
 
 
