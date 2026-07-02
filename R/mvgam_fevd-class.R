@@ -134,13 +134,13 @@ plot.mvgam_fevd = function(x, ...) {
       target = gsub('process', 'Process', target)
     ) -> mean_evds
 
-  # Use package-wide palette so FEVD bars share the visual identity
-  # of forecast / pp_check / factor plots. The palette returns 6
-  # colour stops; recycle if the VAR has more than 6 processes.
-  palette_cols <- mvgam_palette()
+  # FEVD bars encode a categorical partition (which series
+  # contributed how much of the forecast variance), so use the
+  # colour-blind-safe Okabe-Ito qualitative palette rather than
+  # the single-hue bayesplot scheme used for the ribbon plots.
+  # `mvgam_categorical_palette()` recycles when N > 8.
   series_levels <- sort(unique(mean_evds$Series))
-  fill_values <- palette_cols[((seq_along(series_levels) - 1L) %%
-                               length(palette_cols)) + 1L]
+  fill_values <- mvgam_categorical_palette(length(series_levels))
   names(fill_values) <- series_levels
 
   ggplot2::ggplot(

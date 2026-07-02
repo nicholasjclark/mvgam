@@ -2654,16 +2654,17 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws) {
     )))
   }
 
-  # Map newdata times to position indices in the trend matrix.
-  # `standata$times_trend` is a flat row-major index used inside
-  # Stan to look up `mu_trend`; its values are NOT raw times and
-  # must not be used here. The canonical training-time grid lives
-  # on the fit object as the sorted unique time values that Stan
-  # saw at fit time, which is what `trend[i, s]` is indexed by.
-  training_times <- sort(unique(as.numeric(mvgam_fit$data$time)))
-
+  # Map newdata rows to positions in the trend matrix via the
+  # `obs_struct$time` -> `obs_struct$unique_times` lookup used by
+  # every other Stan-direct extractor
+  # (`reshape_linpred_to_grid()` in R/extract_trend_linpred.R
+  # and `align_innovations_to_grid()` in R/sample_innovations.R).
+  # Matching against the raw training years directly - the prior
+  # code path here - was silently returning NA for every row
+  # because `obs_struct$time` is already a 1..N_time_trend
+  # position vector, not a raw calendar time.
   obs_struct <- get_observation_structure(mvgam_fit, newdata = newdata)
-  t_idx <- match(obs_struct$time, training_times)
+  t_idx <- match(obs_struct$time, obs_struct$unique_times)
   s_idx <- obs_struct$series_int
 
   if (any(s_idx < 1L | s_idx > N_series_trend)) {

@@ -233,6 +233,10 @@ plot.mvgam_stability = function(
       )
     )))
   }
+  # Force the house red scheme for the duration of this call so
+  # stability sits in the same visual family as irf() / fevd() /
+  # forecast() plots.
+  set_color_scheme_local("red")
   long <- do.call(rbind, lapply(keep, function(v) {
     data.frame(metric = v, value = x[[v]])
   }))
@@ -240,7 +244,7 @@ plot.mvgam_stability = function(
   ggplot2::ggplot(long, ggplot2::aes(x = value)) +
     ggplot2::geom_histogram(
       bins = bins,
-      fill = mvgam_categorical_palette(1L)[1L],
+      fill = mvgam_palette()[4L],
       colour = "white"
     ) +
     ggplot2::geom_vline(

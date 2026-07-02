@@ -1,0 +1,490 @@
+---
+title: "State-space vector autoregressions with mvgam"
+author: "Nicholas J Clark"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_document:
+    toc: yes
+    toc_float: yes
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, dpi = 100, fig.asp = 0.62, fig.width = 7,
+  out.width = "85%", fig.align = "center"
+)
+library(mvgam)
+library(brms)
+library(dplyr)
+library(ggplot2)
+theme_set(theme_bw(base_size = 12, base_family = "serif"))
+
+cache_dir <- if (dir.exists("pkgdown")) {
+  file.path("pkgdown", "vector_ar_cache")
+} else {
+  file.path("..", "..", "pkgdown", "vector_ar_cache")
+}
+read_cache <- function(name) {
+  readRDS(file.path(cache_dir, paste0(name, ".rds")))
+}
+```
+
+Vector autoregressions describe how a small collection of time
+series move together over time by letting each series depend on
+its own recent past and on the recent past of every other series
+(Lütkepohl [2005](https://doi.org/10.1007/978-3-540-27752-1)).
+The version implemented in mvgam adds a state-space layer on
+top. The observed counts sit above a latent vector autoregression
+whose innovations may be correlated across series (Heaps
+[2022](https://doi.org/10.1080/10618600.2022.2079648); Auger-Méthé
+et al. [2021](https://doi.org/10.1002/ecm.1470)). Once fitted, the
+posterior over the transition matrix $A$ and the innovation
+covariance $\Sigma$ can be interrogated for lagged interactions
+(impulse response functions), for the share of forecast
+uncertainty each series contributes (forecast error variance
+decompositions), and for community-level stability metrics
+(reactivity, return rates). This article walks through those
+four post-fit diagnostics on an annual kestrel abundance
+dataset shipped with the MARSS package.
+
+## The data
+
+American kestrel (*Falco sparverius*) abundance was surveyed by
+the North American Breeding Bird Survey across three adjacent
+Canadian regions (British Columbia, Alberta, Saskatchewan) from
+1969 to 2008. Detection-adjusted annual counts are distributed
+with the MARSS package (Holmes et al.
+[2012](https://doi.org/10.32614/RJ-2012-002)); we invert the log
+transform inside the raw file so the response sits on the natural
+count scale, then reshape to long form with a `series` factor
+and a `time` column.
+
+```{r data}
+load(url("https://github.com/atsa-es/MARSS/raw/master/data/kestrel.rda"))
+regions <- c("BC", "Alb", "Sask")
+model_data <- do.call(rbind, lapply(seq_along(regions), function(x) {
+  data.frame(
+    year = kestrel[, 1],
+    adj_count = exp(kestrel[, 1 + x]),
+    region = regions[x]
+  )
+})) |>
+  dplyr::mutate(series = as.factor(region), time = year) |>
+  as.data.frame()
+```
+
+A quick look at the observed series with `mvgam_data()`, holding
+the last five years out for forecast scoring:
+
+```{r train-test}
+train <- model_data[model_data$year < 2004, ]
+test  <- model_data[model_data$year >= 2004, ]
+```
+
+```{r plot-observed, fig.cap = "Annual detection-adjusted kestrel counts across the three regions. The last five years are held out."}
+mvgam_data(train, y = "adj_count", family = Gamma(), newdata = test)
+```
+
+Counts sit in a similar range across regions and tick along
+without a strong long-run trend. They also share the kind of
+annual excursions that a vector autoregression is designed to
+describe (a good year in British Columbia tends to line up with
+a reasonable year in Alberta, and so on).
+
+## Building a state-space VAR(1)
+
+The observed part of the model is a Gamma likelihood; because
+the response is stacked with `series` as a factor and one
+family covers all rows, mvgam fits a single shared shape
+parameter by default. The latent part is a first-order vector
+autoregression with correlated innovations, `VAR(cor = TRUE)`,
+driven by a region intercept:
+
+$$
+\begin{aligned}
+y_{r, t}  \;&\sim\; \mathrm{Gamma}\!\left(\mathrm{shape},\; \mu_{r, t}\right) \\
+1 / \mu_{r, t} \;&=\; z_{r, t} \\
+\mathbf{z}_t \;&\sim\; \mathrm{MVN}\!\left(\alpha_{\mathrm{region}} + A\,\mathbf{z}_{t-1},\; \Sigma\right).
+\end{aligned}
+$$
+
+Priors for the region intercepts and the innovation SD are pulled
+in tighter than the defaults so the sampler does not have to
+learn scale from three dozen observations per region. The
+sampler uses `adapt_delta = 0.95` to handle the tight
+`sigma_trend` prior; the fit is cached to avoid re-running at
+render time.
+
+```{r fit-code, eval = FALSE}
+varmod <- mvgam(
+  formula       = adj_count ~ -1,
+  trend_formula = ~ region + VAR(cor = TRUE),
+  priors        = c(
+    prior(std_normal(), class = b_trend),
+    prior(exponential(2.5), class = sigma_trend)
+  ),
+  data          = train,
+  newdata       = test,
+  family        = Gamma(),
+  adapt_delta   = 0.95,
+  chains        = 2,
+  samples       = 500,
+  burnin        = 1000,
+  silent        = 2
+)
+```
+
+If instead you want each region to carry its own shape
+parameter, express that through the brms distributional
+formula. `mvgam_formula()` accepts a `brmsformula` on the
+observation side, so `bf(adj_count ~ 0, shape ~ series - 1)`
+would give one shape per region, at the cost of tying up more
+parameters on a modest dataset.
+
+```{r fit-load, include = FALSE}
+varmod <- read_cache("kestrel_fit")$varmod
+train  <- read_cache("kestrel_fit")$train
+test   <- read_cache("kestrel_fit")$test
+```
+
+## Model summary
+
+`summary()` on a VAR fit splits the parameter table between the
+observation model (here a single shared shape) and the trend
+model (the region intercepts, the VAR coefficient array
+`A_raw_trend`, and the innovation Cholesky `L_Omega_trend`). We
+suppress the spline coefficient table with `include_betas =
+FALSE` because there are no smooth terms on the observation
+side.
+
+```{r summary}
+summary(varmod, include_betas = FALSE)
+```
+
+The three region intercepts sit close to zero on the
+inverse link scale, and the VAR self-coefficients on the diagonal
+of $A$ (rows `A_raw_trend[1,i,i]`) are all positive and bounded
+well below one, so the Heaps
+([2022](https://doi.org/10.1080/10618600.2022.2079648)) prior
+that guarantees stationarity is not pushing against the data.
+
+## Inspecting the transition matrix
+
+The lagged dependence structure lives in the $3 \times 3$
+matrix $A$. `mcmc_plot()` with `variable = "A_trend"` and
+`type = "hist"` shows the posterior for every cell. Passing
+`facet_args = list(dir = "v")` walks the facets column-first, so
+row $i$, column $j$ (the effect of process $j$'s state at time
+$t-1$ on process $i$ at time $t$) sits where you would draw it
+by hand.
+
+```{r plot-A, fig.cap = "Posterior histograms for each cell of the VAR transition matrix A. Diagonals capture self-lag; off-diagonals capture lagged cross-region effects."}
+mcmc_plot(
+  varmod,
+  variable    = "A_trend",
+  regex       = TRUE,
+  type        = "hist",
+  facet_args  = list(dir = "v")
+)
+```
+
+The clearest signal is on the diagonal (`A_trend[1,1,1]`,
+`[1,2,2]`, `[1,3,3]`): each region has substantial positive
+self-persistence, so a good year raises the expected count in
+the following year within the same region. The off-diagonals
+are more ambiguous, with `A_trend[1,2,1]` (BC → Alberta)
+showing the most concentrated positive posterior, consistent
+with the two adjacent regions moving together.
+
+## Inspecting the innovation covariance
+
+The innovation covariance $\Sigma$ tells you which regions share
+contemporaneous shocks, the kind of common weather or
+detection-effort year that would nudge all three surveys in the
+same direction at once. The mvgam Stan model saves `Sigma_trend`
+directly, so we can compute the posterior median correlation
+matrix by applying `cov2cor()` to each draw:
+
+```{r sigma-cor}
+Sig_post <- as.matrix(varmod, variable = "^Sigma_trend\\[", regex = TRUE)
+cor_draws <- t(apply(Sig_post, 1, function(v) {
+  as.numeric(cov2cor(matrix(v, 3, 3)))
+}))
+med_cor <- matrix(apply(cor_draws, 2, median), 3, 3)
+rownames(med_cor) <- colnames(med_cor) <- c("BC", "Alb", "Sask")
+round(med_cor, 2)
+```
+
+The two neighbouring pairs (BC and Alberta, r ≈ 0.32; Alberta
+and Saskatchewan, r ≈ 0.29) share moderate positive innovation
+correlations, while the pair at either end of the range (BC and
+Saskatchewan, r ≈ -0.03) share essentially none. Geography falls
+out of the fit without being told.
+
+## Forecasts
+
+Passing `newdata = test` at fit time stored the held-out slice
+on the fitted object, so `forecast()` extends the VAR five years
+into the future without any extra arguments. The plot draws the
+hindcast (grey) up to the dashed vertical, then the forecast
+posterior (red) over the five held-out years.
+
+```{r plot-forecast, fig.cap = "Hindcast (grey) and five-year posterior forecast (red) from the correlated-innovation VAR. The mean count trajectory stays close to the historical average, with the ribbon widening as the horizon lengthens."}
+plot(forecast(varmod, newdata = test))
+```
+
+Forecasts fan out gradually as the VAR is integrated forward.
+Because the diagonal of $A$ is safely below one, the mean
+converges to the region intercept while the ribbon spreads
+according to the stationary covariance implied by
+$(A, \Sigma)$.
+
+## Impulse response functions
+
+An impulse response function asks the following counterfactual:
+if a shock of one standard deviation hit region $j$ at time
+zero, how would the other regions be expected to move over the
+next $h$ years? (Lütkepohl
+[2005](https://doi.org/10.1007/978-3-540-27752-1)). `irf()`
+computes the generalized IRF for every source and target pair;
+`plot(irfs, series = j)` fixes the shock at region $j$ and draws
+one panel per target region.
+
+```{r irf-fit}
+irfs <- irf(varmod, h = 12)
+```
+
+```{r plot-irf1, fig.cap = "Generalized impulse responses to a positive shock in region 1 (British Columbia). Each panel shows how the process for the target region is expected to respond over the next 12 years."}
+plot(irfs, series = 1)
+```
+
+A positive shock in British Columbia (region 1) decays within
+its own process (left panel) over roughly ten years, moves
+Alberta's process up by about 0.03 units on the inverse-link
+scale (middle panel), and pushes Saskatchewan's process slightly
+positive with a delayed peak (right panel).
+
+```{r plot-irf2, fig.cap = "Impulse responses to a shock in region 2 (Alberta). The self-response decays smoothly; British Columbia responds in the same direction as Alberta, and Saskatchewan shows a delayed positive response consistent with the adjacent-region correlation seen in Sigma."}
+plot(irfs, series = 2)
+```
+
+Shocks originating in Alberta propagate outwards to both
+neighbours, with the delayed Saskatchewan peak echoing the
+delayed cross-lag effect the transition matrix hinted at.
+
+```{r plot-irf3, fig.cap = "Impulse responses to a shock in region 3 (Saskatchewan). The self-response is the sharpest of the three, and the effect on Alberta persists longer than the effect on British Columbia."}
+plot(irfs, series = 3)
+```
+
+Saskatchewan shocks have the tightest self-response and touch
+Alberta more than they touch British Columbia, consistent with
+the geography embedded in the innovation correlations.
+
+## Forecast error variance decomposition
+
+The forecast error variance decomposition (FEVD) turns the same
+underlying quantities around and asks the complementary
+question: at horizon $h$, how much of the forecast uncertainty
+for region $i$ was generated by shocks that originated in each
+region? `fevd()` returns the posterior draws;
+`plot(fevds)` renders one stacked-bar panel per target region,
+with the bar heights showing the median share attributed to each
+source over increasing horizons.
+
+```{r fevd-fit}
+fevds <- fevd(varmod, h = 12)
+```
+
+```{r plot-fevd, fig.cap = "Forecast error variance decomposition. Each panel is a target region; each bar breaks down that region's forecast uncertainty at a given horizon into contributions from own shocks and shocks originating in the other two regions."}
+plot(fevds)
+```
+
+Own-region shocks dominate at short horizons for every region
+(the darker slice on the bottom of each bar), consistent with
+the strong diagonal in $A$. As the horizon lengthens, the
+cross-region shares grow: by year 12 Alberta contributes about
+25% of the forecast variance in British Columbia and about 20%
+of the forecast variance in Saskatchewan. The two regions at
+either end of the range contribute least to each other's
+forecast uncertainty, which is the flip side of the negligible
+BC and Saskatchewan correlation in $\Sigma$.
+
+## Community stability metrics
+
+The transition matrix and innovation covariance also determine
+whether the system as a whole would amplify or absorb small
+shocks around the stationary distribution. `stability()`
+computes posterior draws of three interpretable dynamic-stability
+metrics (Ives et al.
+[2003](https://doi.org/10.1890/0012-9615(2003)073[0301:ECSAEI]2.0.CO;2);
+Neubert & Caswell
+[1997](https://doi.org/10.1890/0012-9658(1997)078[0653:ATRFMT]2.0.CO;2)):
+
+- **Reactivity**: the log of the largest singular value of $A$.
+  Positive reactivity means small perturbations grow immediately
+  after the shock before eventually decaying; negative
+  reactivity means the perturbation shrinks straight away.
+- **Mean return rate**: the modulus of the largest eigenvalue
+  of $A$. Values closer to one imply a slower return of the
+  mean to its stationary distribution after a shock.
+- **Variance return rate**: the analogous quantity for $A
+  \otimes A$, describing how quickly forecast variance decays
+  back to its stationary level.
+
+`plot()` on the returned `mvgam_stability` object renders each
+metric as a posterior histogram with a dashed reference at zero
+(the reactivity threshold).
+
+```{r plot-stability, fig.width = 8, fig.asp = 0.45, fig.cap = "Posterior distributions of three community-stability metrics for the fitted VAR. The dashed line marks zero, the reactivity threshold above which small shocks would be amplified rather than absorbed."}
+stab <- stability(varmod)
+plot(stab)
+```
+
+Reactivity is centred near zero (posterior median $\approx$
+-0.03, 90% CI $\approx$ [-0.39, 0.69]) with 45% of the posterior
+mass sitting on the positive side of the dashed line. The data
+leave genuine uncertainty about whether the system is reactive
+or non-reactive, but any amplification would be small. Mean and
+variance return rates sit around 0.84 and 0.70 respectively,
+consistent with a stable system that takes a handful of years
+to relax back to its stationary distribution after a shock.
+
+## Take-aways
+
+Once a VAR is fitted in mvgam, the same four post-fit
+diagnostics work end to end for any observation family and any
+correlated innovation structure:
+
+- `mcmc_plot(mod, variable = "A_trend", ...)` shows the lagged
+  dependence structure per cell of the transition matrix.
+- `as.matrix(mod, variable = "Sigma_trend", ...)` + `cov2cor()`
+  recovers the posterior distribution of the innovation
+  correlation matrix, which tells you which series share
+  contemporaneous shocks.
+- `irf()` + `plot(irfs, series = j)` traces how a shock at a
+  focal series is expected to move each other series over a
+  chosen horizon.
+- `fevd()` + `plot(fevds)` decomposes the forecast variance for
+  each series into contributions from each source of shocks.
+- `stability()` + `plot(stab)` summarises the dynamic-stability
+  posterior in the units ecologists use (reactivity, return
+  rates).
+
+The transition matrix, innovation covariance, IRFs, FEVDs and
+stability metrics all rely on the same posterior draws of
+$(A, \Sigma)$; the four post-fit diagnostics just ask different
+questions of that joint object.
+
+## Further reading
+
+Complementary in-package tools:
+
+- `?VAR` for the trend-side constructor. Hierarchical panel VAR
+  support is available via the `gr` and `subgr` arguments.
+- `?forecast.mvgam`, `?score` and `?ensemble` for the forecast
+  scoring and averaging surface layered on top of any fitted
+  mvgam VAR.
+- `?how_to_cite` and `?methods_md` for citation-ready methods
+  paragraphs that describe the Heaps stationary prior and the
+  sampler configuration in place.
+
+Sibling articles in this series:
+
+- The
+  [forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
+  runs the same forecast / score machinery on a longer Portal
+  rodent time series.
+- The
+  [multivariate mvgam article](https://nicholasjclark.github.io/mvgam/articles/multivariate.html)
+  covers the different case where several outcomes on different
+  families share one latent process via a multivariate
+  observation formula.
+- The `dfm_trend_map` in-package vignette covers dynamic factor
+  models when the number of latent processes is deliberately
+  smaller than the number of observed series.
+
+## Acknowledgements
+
+The kestrel dataset was compiled from the North American
+Breeding Bird Survey and is redistributed with MARSS (Holmes et
+al. [2012](https://doi.org/10.32614/RJ-2012-002)). The stationary
+Heaps prior on the VAR coefficients follows Heaps
+([2022](https://doi.org/10.1080/10618600.2022.2079648)). The
+state-space framing follows the review by Auger-Méthé and
+colleagues ([2021](https://doi.org/10.1002/ecm.1470)) and the
+dynamic generalised additive model perspective in Clark & Wells
+([2023](https://doi.org/10.1111/2041-210X.13974)). Community
+stability metrics follow Ives et al.
+([2003](https://doi.org/10.1890/0012-9615(2003)073[0301:ECSAEI]2.0.CO;2))
+and Neubert & Caswell
+([1997](https://doi.org/10.1890/0012-9658(1997)078[0653:ATRFMT]2.0.CO;2)).
+Impulse response function and forecast error variance
+decomposition definitions follow Lütkepohl
+([2005](https://doi.org/10.1007/978-3-540-27752-1)). Formulas
+rely on mgcv smooths (Wood
+[2017](https://doi.org/10.1201/9781315370279)) and brms's
+multilevel apparatus (Bürkner
+[2017](https://doi.org/10.18637/jss.v080.i01)); sampling is
+performed with Stan (Carpenter et al.
+[2017](https://doi.org/10.18637/jss.v076.i01)).
+
+## References
+
+Auger-Méthé M, Newman K, Cole D, Empacher F, Gryba R, King AA,
+Leos-Barajas V, Mills Flemming J, Nielsen A, Petris G and Thomas
+L (2021). A guide to state-space modeling of ecological time
+series. *Ecological Monographs* 91(4), e01470.
+[doi:10.1002/ecm.1470](https://doi.org/10.1002/ecm.1470)
+
+Bürkner PC (2017). brms: An R package for Bayesian multilevel
+models using Stan. *Journal of Statistical Software* 80(1),
+1-28.
+[doi:10.18637/jss.v080.i01](https://doi.org/10.18637/jss.v080.i01)
+
+Carpenter B, Gelman A, Hoffman MD, Lee D, Goodrich B, Betancourt
+M, Brubaker M, Guo J, Li P and Riddell A (2017). Stan: A
+probabilistic programming language. *Journal of Statistical
+Software* 76(1), 1-32.
+[doi:10.18637/jss.v076.i01](https://doi.org/10.18637/jss.v076.i01)
+
+Clark NJ and Wells K (2023). Dynamic Generalized Additive Models
+(DGAMs) for forecasting discrete ecological time series.
+*Methods in Ecology and Evolution* 14, 771-784.
+[doi:10.1111/2041-210X.13974](https://doi.org/10.1111/2041-210X.13974)
+
+Heaps SE (2022). Enforcing stationarity through the prior in
+vector autoregressions. *Journal of Computational and Graphical
+Statistics* 32(1), 74-83.
+[doi:10.1080/10618600.2022.2079648](https://doi.org/10.1080/10618600.2022.2079648)
+
+Holmes EE, Ward EJ and Wills K (2012). MARSS: Multivariate
+Autoregressive State-space Models for Analyzing Time-series
+Data. *The R Journal* 4(1), 11-19.
+[doi:10.32614/RJ-2012-002](https://doi.org/10.32614/RJ-2012-002)
+
+Ives AR, Dennis B, Cottingham KL and Carpenter SR (2003).
+Estimating community stability and ecological interactions from
+time-series data. *Ecological Monographs* 73(2), 301-330.
+[doi:10.1890/0012-9615(2003)073[0301:ECSAEI]2.0.CO;2](https://doi.org/10.1890/0012-9615(2003)073[0301:ECSAEI]2.0.CO;2)
+
+Lütkepohl H (2005). *New Introduction to Multiple Time Series
+Analysis*. Springer, Berlin.
+[doi:10.1007/978-3-540-27752-1](https://doi.org/10.1007/978-3-540-27752-1)
+
+Neubert MG and Caswell H (1997). Alternatives to resilience for
+measuring the responses of ecological systems to perturbations.
+*Ecology* 78(3), 653-665.
+[doi:10.1890/0012-9658(1997)078[0653:ATRFMT]2.0.CO;2](https://doi.org/10.1890/0012-9658(1997)078[0653:ATRFMT]2.0.CO;2)
+
+Wood SN (2017). *Generalized Additive Models: An Introduction
+with R* (2nd edition). Chapman and Hall/CRC.
+[doi:10.1201/9781315370279](https://doi.org/10.1201/9781315370279)

@@ -134,6 +134,10 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
 plot.mvgam_irf = function(x, series = 1, ...) {
   checkmate::assert_class(x, "mvgam_irf")
   validate_pos_integer(series)
+  # Lock the bayesplot scheme to the house red for the duration
+  # of this call so IRFs share the visual identity of forecast(),
+  # fevd() and stability() plots.
+  set_color_scheme_local("red")
   n_processes <- dim(x[[1]][[1]])[2]
   if (series > n_processes) {
     stop(insight::format_error(c(

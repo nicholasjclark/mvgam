@@ -233,7 +233,11 @@ test_that("extract_trend_latent_states: missing trend[t,s] column errors", {
     class = "mvgam"
   )
   attr(mock_fit$obs_data, "mvgam_series") <- factor("s1", levels = "s1")
-  newdata <- data.frame(time = 3L)
+  # newdata spans t = 1, 2, 3 so `obs_struct$unique_times` sees all
+  # three positions and the last row resolves to `trend[3, 1]`,
+  # which is deliberately absent from full_draws above so the
+  # pre-loop validation raises its error.
+  newdata <- data.frame(time = c(1L, 2L, 3L))
   expect_error(
     extract_trend_latent_states(mock_fit, newdata,
                                 full_draws = full_draws),
