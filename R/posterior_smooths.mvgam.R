@@ -126,10 +126,11 @@ brms::posterior_smooths
 #' smooth term in a fitted `mvgam` object, matching the shape of
 #' \code{\link[brms]{conditional_smooths.brmsfit}}. Returns a named list of
 #' `data.frame`s with the brms-style `estimate__` / `lower__` /
-#' `upper__` / `effect1__` / `effect2__` / `cond__` columns and
-#' inherits the `brms_conditional_effects` class so brms's
-#' `plot.brms_conditional_effects()` method works
-#' out-of-the-box.
+#' `upper__` / `effect1__` / `effect2__` / `cond__` columns. The
+#' returned object carries the `mvgam_conditional_smooths` class;
+#' one-dimensional smooths render with the package's own theme via
+#' [plot.mvgam_conditional_smooths()], while two-dimensional cases
+#' are drawn as heatmap panels through the same method.
 #'
 #' @param x A fitted `mvgam` object.
 #' @param smooths Optional character vector restricting which
@@ -164,14 +165,14 @@ brms::posterior_smooths
 #' @param ndraws,draw_ids Optional posterior-draw subsetting.
 #' @param ... Unused; present for S3 / brms-parity.
 #'
-#' @return A named list with one element per smooth term. Each
-#'   element is a `data.frame` with the brms-style summary columns
-#'   (`estimate__`, `se__`, `lower__`, `upper__`,
-#'   `effect1__` (optionally `effect2__`), `cond__`) plus the focal
-#'   covariate(s). Attributes `response`, `effects`,
-#'   `surface`, `spaghetti`, and `points` are populated for the
-#'   existing brms plot dispatch. The returned object carries the
-#'   `brms_conditional_effects` class.
+#' @return A named list of class `mvgam_conditional_smooths` with
+#'   one element per smooth term. Each element is a `data.frame`
+#'   with the brms-style summary columns (`estimate__`, `se__`,
+#'   `lower__`, `upper__`, `effect1__` (optionally `effect2__`),
+#'   `cond__`) plus the focal covariate(s). Per-element attributes
+#'   `response`, `effects`, `surface`, `spaghetti`, and `points`
+#'   drive the plot method's layout choices (1D ribbon vs 2D
+#'   heatmap panel).
 #'
 #' @seealso \code{\link[brms]{conditional_smooths.brmsfit}},
 #'   [posterior_smooths.mvgam()],
@@ -259,11 +260,116 @@ conditional_smooths.mvgam <- function(x, smooths = NULL,
     attr(res, "points") <- mvgam_smooth_points(x, hit, grid_spec)
     out[[i]] <- res
   }
+  # `mvgam_conditional_smooths` owns its own plot method that
+  # renders 1D smooths with the house palette + theme. For 2D /
+  # surface cases the plot method reuses brms's plot code by
+  # re-classing each per-smooth data.frame internally; no brms
+  # class is exposed on the returned object.
   structure(
     out,
-    class = c("brms_conditional_effects", "list"),
+    class = c("mvgam_conditional_smooths", "list"),
     smooths_only = TRUE
   )
+}
+
+
+#' Plot or print a mvgam_conditional_smooths object
+#'
+#' @param x An object of class `mvgam_conditional_smooths`
+#'   returned by [conditional_smooths.mvgam()].
+#' @param plot Logical. If `TRUE` (default), draws each smooth's
+#'   ggplot; otherwise returns the list invisibly for post-processing.
+#' @param ask Logical. If `TRUE`, prompts before each new plot when
+#'   multiple smooths are drawn to the same device.
+#' @param ... Ignored.
+#'
+#' @return Invisibly returns the list of ggplot objects, one per
+#'   smooth term in `x`.
+#'
+#' @rdname conditional_smooths.mvgam
+#' @method plot mvgam_conditional_smooths
+#' @export
+plot.mvgam_conditional_smooths <- function(x, plot = TRUE,
+                                            ask = FALSE, ...) {
+  if (length(x) == 0L) return(invisible(x))
+  # Lock the palette to the mvgam red scheme for the duration of
+  # this call, matching plot.mvgam_forecast / plot.mvgam_stability
+  # / plot.mvgam_irf. Any user-side bayesplot::color_scheme_set is
+  # restored on exit.
+  set_color_scheme_local("red")
+  labels <- names(x) %||% rep_len(NA_character_, length(x))
+  ggs <- Map(build_mvgam_smooth_plot, x, labels)
+  if (isTRUE(plot)) {
+    default_ask <- grDevices::devAskNewPage()
+    on.exit(grDevices::devAskNewPage(default_ask))
+    grDevices::devAskNewPage(ask = isTRUE(ask))
+    for (g in ggs) graphics::plot(g)
+  }
+  invisible(ggs)
+}
+
+
+#' @rdname conditional_smooths.mvgam
+#' @method print mvgam_conditional_smooths
+#' @export
+print.mvgam_conditional_smooths <- function(x, ...) plot(x, ...)
+
+
+# Build one mvgam-themed ggplot from a single smooth's summary
+# data.frame. Handles the common 1D case directly with a
+# geom_ribbon + geom_line (+ optional spaghetti / points rug);
+# falls back to the brms plotter for 2D surface / faceted lines
+# so we do not have to reimplement those grids.
+#'@noRd
+build_mvgam_smooth_plot <- function(df, label) {
+  effs <- attr(df, "effects")
+  is_surface <- isTRUE(attr(df, "surface"))
+  label <- label %||% attr(df, "response") %||% ""
+  # 2D or surface smooths: reuse brms's existing plot code by
+  # wrapping the single data.frame back into a length-1
+  # brms_conditional_effects and delegating. The mvgam theme
+  # is applied on top so the panel matches the rest of our
+  # dispatcher's output.
+  if (length(effs) != 1L || is_surface) {
+    single <- structure(
+      list(df),
+      class = c("brms_conditional_effects", "list"),
+      smooths_only = TRUE
+    )
+    names(single) <- label
+    return(plot(single, plot = FALSE)[[1L]] + mvgam_theme())
+  }
+  # 1D smooth: build the ribbon + median line ourselves so we
+  # pick up the active mvgam palette and produce a plot with the
+  # house look rather than the brms blue default.
+  x_var <- effs[[1L]]
+  pal <- mvgam_palette()
+  gg <- ggplot2::ggplot(df, ggplot2::aes(x = .data[[x_var]])) +
+    ggplot2::geom_ribbon(
+      ggplot2::aes(ymin = lower__, ymax = upper__),
+      fill = pal[3L], alpha = 0.5
+    )
+  spaghetti_df <- attr(df, "spaghetti")
+  if (!is.null(spaghetti_df) && nrow(spaghetti_df) > 0L) {
+    gg <- gg + ggplot2::geom_line(
+      data = spaghetti_df,
+      ggplot2::aes(
+        x = .data[[x_var]], y = value, group = draw__
+      ),
+      colour = pal[4L], alpha = 0.15, linewidth = 0.35,
+      inherit.aes = FALSE
+    )
+  }
+  # Median line uses palette slot 5 to match `mvgam_median_layer`
+  # (the shared plot_helpers primitive) so smooth panels sit in
+  # the same visual family as the forecast / trend hindcast plots.
+  gg +
+    ggplot2::geom_line(
+      ggplot2::aes(y = estimate__),
+      colour = pal[5L], linewidth = 1
+    ) +
+    ggplot2::labs(x = x_var, y = label) +
+    mvgam_theme()
 }
 
 
@@ -549,10 +655,15 @@ mvgam_smooth_eta <- function(object, hit, newdata,
     side_model, newdata = newdata,
     check_response = FALSE, internal = TRUE
   )
-  # Focal smooth's Xs columns + the canonical bs_ aliases for
-  # those columns (stored at fit time on `object$standata$Xs`).
-  Xs_key <- paste0("Xs", suffix)
-  Xs_full <- sd_new[[Xs_key]]
+  # `side_model` is a standalone brmsfit (either the obs-side or
+  # the trend-side model), so its own `standata()` returns bare
+  # slot names (`Xs`, `Zs_r_k`) with no `_trend` / `_obs` suffix.
+  # The suffix belongs only on the *composed* mvgam draws, where
+  # `bs_...` and `s_r_k_...` coefficients carry the side tag so
+  # obs and trend smooths can coexist in one draws matrix. We
+  # read the design matrices with the bare keys and re-append
+  # the suffix when we alias into the composed draws below.
+  Xs_full <- sd_new[["Xs"]]
   smcols <- attr(Xs_full, "smcols")
   Xs_focal <- if (!is.null(Xs_full) && length(smcols) > 0L) {
     cols <- unlist(smcols[hit$rows])
@@ -571,13 +682,16 @@ mvgam_smooth_eta <- function(object, hit, newdata,
   zs_blocks <- list()
   for (r in hit$rows) {
     keys <- grep(
-      sprintf("^Zs_%d_\\d+%s$", r, suffix),
+      sprintf("^Zs_%d_\\d+$", r),
       names(sd_new), value = TRUE
     )
     for (k in keys) {
+      # Add the side suffix when aliasing into the composed
+      # mvgam draws matrix, since `s_r_k_...trend` etc. live
+      # there whereas `sd_new` uses the bare form `Zs_r_k`.
       zs_blocks[[length(zs_blocks) + 1L]] <- list(
         Z = sd_new[[k]],
-        s_pattern = sub("^Zs_", "s_", k)
+        s_pattern = paste0(sub("^Zs_", "s_", k), suffix)
       )
     }
   }

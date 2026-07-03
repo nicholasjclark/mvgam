@@ -2,6 +2,8 @@
 % Please edit documentation in R/posterior_smooths.mvgam.R
 \name{conditional_smooths.mvgam}
 \alias{conditional_smooths.mvgam}
+\alias{plot.mvgam_conditional_smooths}
+\alias{print.mvgam_conditional_smooths}
 \title{Marginal smooth-effect plots for a fitted \pkg{mvgam} model}
 \usage{
 \method{conditional_smooths}{mvgam}(
@@ -18,9 +20,14 @@
   draw_ids = NULL,
   ...
 )
+
+\method{plot}{mvgam_conditional_smooths}(x, plot = TRUE, ask = FALSE, ...)
+
+\method{print}{mvgam_conditional_smooths}(x, ...)
 }
 \arguments{
-\item{x}{A fitted \code{mvgam} object.}
+\item{x}{An object of class \code{mvgam_conditional_smooths}
+returned by \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}.}
 
 \item{smooths}{Optional character vector restricting which
 smooth terms to compute. \code{NULL} (default) returns every
@@ -61,27 +68,37 @@ the unit square) are dropped via
 
 \item{ndraws, draw_ids}{Optional posterior-draw subsetting.}
 
-\item{...}{Unused; present for S3 / brms-parity.}
+\item{...}{Ignored.}
+
+\item{plot}{Logical. If \code{TRUE} (default), draws each smooth's
+ggplot; otherwise returns the list invisibly for post-processing.}
+
+\item{ask}{Logical. If \code{TRUE}, prompts before each new plot when
+multiple smooths are drawn to the same device.}
 }
 \value{
-A named list with one element per smooth term. Each
-element is a \code{data.frame} with the brms-style summary columns
-(\code{estimate__}, \code{se__}, \code{lower__}, \code{upper__},
-\code{effect1__} (optionally \code{effect2__}), \code{cond__}) plus the focal
-covariate(s). Attributes \code{response}, \code{effects},
-\code{surface}, \code{spaghetti}, and \code{points} are populated for the
-existing brms plot dispatch. The returned object carries the
-\code{brms_conditional_effects} class.
+A named list of class \code{mvgam_conditional_smooths} with
+one element per smooth term. Each element is a \code{data.frame}
+with the brms-style summary columns (\code{estimate__}, \code{se__},
+\code{lower__}, \code{upper__}, \code{effect1__} (optionally \code{effect2__}),
+\code{cond__}) plus the focal covariate(s). Per-element attributes
+\code{response}, \code{effects}, \code{surface}, \code{spaghetti}, and \code{points}
+drive the plot method's layout choices (1D ribbon vs 2D
+heatmap panel).
+
+Invisibly returns the list of ggplot objects, one per
+smooth term in \code{x}.
 }
 \description{
 Compute and display posterior conditional effects for every
 smooth term in a fitted \code{mvgam} object, matching the shape of
 \code{\link[brms]{conditional_smooths.brmsfit}}. Returns a named list of
 \code{data.frame}s with the brms-style \code{estimate__} / \code{lower__} /
-\code{upper__} / \code{effect1__} / \code{effect2__} / \code{cond__} columns and
-inherits the \code{brms_conditional_effects} class so brms's
-\code{plot.brms_conditional_effects()} method works
-out-of-the-box.
+\code{upper__} / \code{effect1__} / \code{effect2__} / \code{cond__} columns. The
+returned object carries the \code{mvgam_conditional_smooths} class;
+one-dimensional smooths render with the package's own theme via
+\code{\link[=plot.mvgam_conditional_smooths]{plot.mvgam_conditional_smooths()}}, while two-dimensional cases
+are drawn as heatmap panels through the same method.
 }
 \seealso{
 \code{\link[brms]{conditional_smooths.brmsfit}},

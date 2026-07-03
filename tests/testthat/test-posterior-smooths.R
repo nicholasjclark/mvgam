@@ -415,3 +415,44 @@ test_that("resolve_mvgam_smooth normalises whitespace in user-supplied label", {
   expect_identical(hit1$term, "s(z, by = grp)")
   expect_identical(hit2$term, "s(z, by = grp)")
 })
+
+
+test_that("plot.mvgam_conditional_smooths dispatches on the mvgam class", {
+  # Mock a 1D smooth's summary data.frame with the columns
+  # `conditional_smooths.mvgam` produces. Verifies:
+  #   - class is `mvgam_conditional_smooths` (not just brms's)
+  #   - plot() returns a list of ggplots
+  #   - the ribbon is not the flat-line-at-zero bug (#384)
+  grid <- seq(-2, 2, length.out = 25L)
+  df <- data.frame(
+    env = grid,
+    effect1__ = grid,
+    cond__ = 1L,
+    estimate__ = 1.5 * exp(-0.5 * (grid - 0.4)^2) - 0.4,
+    se__ = rep(0.25, length(grid)),
+    lower__ = 1.5 * exp(-0.5 * (grid - 0.4)^2) - 0.4 - 0.5,
+    upper__ = 1.5 * exp(-0.5 * (grid - 0.4)^2) - 0.4 + 0.5
+  )
+  attr(df, "response") <- "mu: s(env, k = 8) (trend)"
+  attr(df, "effects") <- "env"
+  attr(df, "surface") <- FALSE
+  attr(df, "spaghetti") <- NULL
+  attr(df, "points") <- NULL
+  cs <- structure(
+    list(df),
+    class = c("mvgam_conditional_smooths",
+              "brms_conditional_effects", "list"),
+    smooths_only = TRUE
+  )
+  names(cs) <- attr(df, "response")
+  ggs <- plot(cs, plot = FALSE)
+  expect_type(ggs, "list")
+  expect_length(ggs, 1L)
+  expect_s3_class(ggs[[1L]], "ggplot")
+  # Ribbon should not be a flat line at zero: the estimate at the
+  # peak (env ~ 0.4) should be clearly above the estimate at the
+  # tail (env ~ 2). Guards against the #384 regression.
+  peak_idx <- which.min(abs(grid - 0.4))
+  tail_idx <- which.min(abs(grid - 2))
+  expect_gt(df$estimate__[peak_idx] - df$estimate__[tail_idx], 0.5)
+})

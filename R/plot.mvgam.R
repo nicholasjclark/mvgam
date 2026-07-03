@@ -127,10 +127,16 @@ plot.mvgam <- function(
 }
 
 
-# Internal: collapse the named list of ggplots returned by
+# Internal: collapse the named list returned by
 # `conditional_effects.mvgam` / `conditional_smooths.mvgam` into
-# a single ggplot via patchwork, so every `plot.mvgam` branch
-# returns a single renderable plot object.
+# a single renderable plot object.
+#
+# `conditional_effects.mvgam` returns an `mvgam_conditional_effects`
+# whose `plot()` method already yields a list of ggplots;
+# `conditional_smooths.mvgam` returns an `mvgam_conditional_smooths`
+# whose `plot()` method yields the same shape. We call `plot(...,
+# plot = FALSE)` and let S3 dispatch do the right thing for each
+# input class, then stack multi-panel results with patchwork.
 #'@noRd
 wrap_effects_list <- function(eff_list) {
   if (length(eff_list) == 0L) {
@@ -139,8 +145,7 @@ wrap_effects_list <- function(eff_list) {
       i = "The fit has no parametric or random effects of that kind."
     )))
   }
-  if (length(eff_list) == 1L) {
-    return(eff_list[[1L]])
-  }
-  patchwork::wrap_plots(eff_list)
+  ggs <- plot(eff_list, plot = FALSE)
+  if (length(ggs) == 1L) return(ggs[[1L]])
+  patchwork::wrap_plots(ggs)
 }

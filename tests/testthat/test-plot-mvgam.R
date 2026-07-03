@@ -42,9 +42,31 @@ test_that("default type is 'residuals' and routes to mvgam_resid_panel", {
 })
 
 test_that("type = 'smooths' routes to conditional_smooths", {
-  f <- .install_route_mock("conditional_smooths", value = "s")
-  expect_equal(plot(.make_stub_mvgam(), type = "smooths"), "s")
+  # Mock conditional_smooths so the routing test does not need
+  # a real fit. Returning a minimal mvgam_conditional_smooths
+  # lets `wrap_effects_list()`'s S3 `plot(eff_list, plot = FALSE)`
+  # dispatch build a themed ggplot; asserting a ggplot class
+  # documents the contract that `plot(mod, type = "smooths")`
+  # returns a renderable plot object.
+  dummy_df <- data.frame(
+    env = seq(-1, 1, length.out = 5L),
+    estimate__ = c(-0.4, 0.1, 0.5, 0.1, -0.4),
+    lower__    = c(-0.9, -0.4, 0.0, -0.4, -0.9),
+    upper__    = c( 0.1,  0.6, 1.0,  0.6,  0.1)
+  )
+  attr(dummy_df, "effects")   <- "env"
+  attr(dummy_df, "surface")   <- FALSE
+  attr(dummy_df, "response")  <- "s(env)"
+  attr(dummy_df, "spaghetti") <- NULL
+  attr(dummy_df, "points")    <- NULL
+  cs_mock <- structure(
+    list(`s(env)` = dummy_df),
+    class = c("mvgam_conditional_smooths", "list")
+  )
+  f <- .install_route_mock("conditional_smooths", value = cs_mock)
+  out <- plot(.make_stub_mvgam(), type = "smooths")
   expect_true(f$called)
+  expect_s3_class(out, "ggplot")
 })
 
 test_that("type = 'factors' routes to plot_factors", {
