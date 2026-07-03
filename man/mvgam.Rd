@@ -408,5 +408,12 @@ formatting requirements see
 \code{vignette("data_in_mvgam")}; for the
 forecast-evaluation workflow (LOO, LFO, ensembling) see
 the online article at
-\url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}.
+\url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html};
+for the multi-response \code{mvbf()} workflow and the
+integrated species distribution model pattern that ties
+several observation families to one shared latent process,
+see
+\url{https://nicholasjclark.github.io/mvgam/articles/multivariate.html}
+and
+\url{https://nicholasjclark.github.io/mvgam/articles/ipm.html}.
 }

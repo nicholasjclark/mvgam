@@ -1,0 +1,857 @@
+---
+title: "Integrated distribution models with mvgam"
+author: "Nicholas J Clark"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_document:
+    toc: yes
+    toc_float: yes
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, dpi = 100, fig.asp = 0.62, fig.width = 7,
+  out.width = "85%", fig.align = "center"
+)
+library(mvgam)
+library(brms)
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+theme_set(theme_bw(base_size = 12, base_family = "serif"))
+# The article's plots reuse the same red single-hue scheme every
+# other mvgam plotting method locks in via `set_color_scheme_local`;
+# fixing it globally in setup keeps hand-rolled overlays and
+# `bayesplot::mcmc_plot()` panels visually consistent with
+# `plot.mvgam_forecast()`, `plot.mvgam_conditional_smooths()` etc.
+bayesplot::color_scheme_set("red")
+red_pal <- bayesplot::color_scheme_get("red")
+
+cache_dir <- if (dir.exists("pkgdown")) {
+  file.path("pkgdown", "ipm_cache")
+} else {
+  file.path("..", "..", "pkgdown", "ipm_cache")
+}
+read_cache <- function(name) {
+  readRDS(file.path(cache_dir, paste0(name, ".rds")))
+}
+```
+
+Ecologists studying a single species rarely see it through a
+single lens. A long-running roadside count route delivers
+structured counts. A regional occupancy protocol adds
+detection / non-detection. Citizen-science portals stream in
+opportunistic sightings whose sampling effort is largely
+unmodelled. Analysing each stream in isolation throws away the
+shared signal every stream is a noisy view of, and no single
+stream is sharp enough to recover a nonlinear environmental
+response on its own. The integrated distribution model tradition
+(Fithian et al.
+[2015](https://doi.org/10.1111/2041-210X.12242); Isaac et al.
+[2020](https://doi.org/10.1016/j.tree.2019.08.006); Miller et
+al. [2019](https://doi.org/10.1111/2041-210X.13110)) resolves
+this by fitting one likelihood per data stream and tying every
+likelihood to the same underlying intensity. mvgam expresses
+that pattern natively via `mvbf()`: one `bf()` outcome per data
+stream, each with its own observation family, all sharing a
+single latent process on the log-intensity scale. This article
+walks through a simulated three-stream monitoring scenario where
+the truth is known, so the joint fit's inferences can be checked
+directly.
+
+## The data
+
+We simulate one species observed monthly for eight years (96
+time points). The latent log-intensity carries a smooth
+environmental response and a sparse seasonal autoregression:
+
+$$
+\log \lambda_t \;=\; \alpha \;+\; f(\text{env}_t) \;+\; z_t,
+\qquad z_t \sim \mathrm{AR}\big(\phi_1 z_{t-1} + \phi_{12} z_{t-12}, \sigma^2\big)
+$$
+
+with $f$ a bell-shaped optimum, $\phi_1 = 0.55$, $\phi_{12} = 0.30$
+and $\sigma = 0.35$. An autoregression with lag-1 momentum and a
+lag-12 seasonal recurrence fits naturally with
+`AR(p = c(1, 12))`. Auger-Méthé et al.
+([2021](https://doi.org/10.1002/ecm.1470)) review the wider state
+space family. Three observation processes deliver a partial view
+of $\lambda_t$:
+
+- **Counts.** A structured roadside route delivers Poisson counts
+  at effort $E_t$: $\text{count}_t \sim \text{Poisson}(\lambda_t E_t)$,
+  modelled with `family = poisson()` and `offset(log_effort)`.
+- **Presence-absence.** An occupancy protocol surveys a fixed area
+  $A$ per visit. The cloglog link makes
+  $p_t = 1 - \exp(-\lambda_t A)$, so detection probability ties
+  directly to the log intensity (McCullagh & Nelder
+  [1989](https://doi.org/10.1201/9780203753736), §4.2.5). The
+  matching mvgam call is `family = bernoulli(link = "cloglog")`.
+- **Presence-only.** Opportunistic sightings arrive under an
+  unmodelled observer effort. Treating them as a thinned Poisson
+  process with its own intercept absorbs the mean log thinning
+  constant and leaves the shape of $f(\text{env})$ identified
+  (Fithian et al.
+  [2015](https://doi.org/10.1111/2041-210X.12242); Renner et al.
+  [2015](https://doi.org/10.1111/2041-210X.12352)). The matching
+  call is `family = poisson()` with no offset and a free
+  intercept.
+
+The simulator is deliberately compact so the whole workflow
+stays inspectable. Every step is shown here in full:
+
+```{r data-sim}
+set.seed(2026)
+n_t <- 96L
+
+# Environmental covariate: a smoothly varying index across time.
+env <- as.numeric(scale(cumsum(rnorm(n_t, 0, 0.3))))
+
+# True environmental response: bell-shaped optimum with peak
+# near env = 0.4.
+f_env <- function(x) 1.5 * exp(-0.5 * (x - 0.4)^2) - 0.4
+
+# Sparse AR(1, 12) latent state with monthly momentum and an
+# annual seasonal recurrence.
+phi_1 <- 0.55; phi_12 <- 0.30; sigma_z <- 0.35
+z <- numeric(n_t)
+for (t in seq_len(n_t)) {
+  eta <- rnorm(1, 0, sigma_z)
+  z[t] <- eta +
+    (if (t > 1L)  phi_1  * z[t - 1L]  else 0) +
+    (if (t > 12L) phi_12 * z[t - 12L] else 0)
+}
+
+# Shared log-intensity that every measurement family will
+# link back to.
+alpha_shared <- 0.5
+log_lambda   <- alpha_shared + f_env(env) + z
+lambda       <- exp(log_lambda)
+
+# Three observation streams.
+E_c   <- runif(n_t, 0.5, 2)                    # per-time effort
+count <- rpois(n_t, lambda = lambda * E_c)
+
+A_pa  <- 0.25                                  # occupancy area
+p_pa  <- 1 - exp(-lambda * A_pa)               # cloglog p
+pa    <- rbinom(n_t, size = 1L, prob = p_pa)
+
+alpha_po_offset <- -0.8
+log_bias <- alpha_po_offset + rnorm(n_t, 0, 0.15)
+po       <- rpois(n_t, lambda = lambda * exp(log_bias))
+
+# The mvbf fit expects a single frame where each response column
+# carries one measurement. A `series` factor keeps a single
+# biological unit tied together across responses.
+ipm_data <- data.frame(
+  time       = seq_len(n_t),
+  env        = env,
+  log_effort = log(E_c),
+  count      = count,
+  pa         = pa,
+  po         = po,
+  series     = factor("series1")
+)
+
+# Truth vectors used later to score recovery.
+truth <- list(env = env, f_env_true = f_env(env),
+               z = z, phi_1 = phi_1, phi_12 = phi_12,
+               sigma_z = sigma_z)
+
+head(ipm_data)
+```
+
+The three streams sit on very different scales but track the
+same latent process. `mvgam_data()` builds the package's
+standard series display from a long-format frame with one row
+per measurement / time pair:
+
+```{r data-view, fig.width = 9, fig.height = 3.4, fig.cap = "Simulated three-stream monitoring data over 96 months."}
+long <- data.frame(
+  time   = rep(ipm_data$time, 3L),
+  y      = c(ipm_data$count, ipm_data$pa, ipm_data$po),
+  series = factor(rep(c("count", "pa", "po"), each = n_t),
+                    levels = c("count", "pa", "po"))
+)
+mvgam_data(long, y = "y", family = poisson(), series = "all")
+```
+
+Counts and opportunistic sightings both spiked in the middle of
+the record where $f(\text{env})$ crossed its optimum. The
+occupancy stream carried only one bit per time point.
+
+## The joint fit
+
+The joint model fits all three measurements in one `mvgam()`
+call. Three `bf()` outcomes chain with `+`. Each keeps its own
+family and its own observation-scale predictors; the trend
+formula is written once and applies to all of them. Setting
+`trend_map = "shared"` says explicitly that every measurement
+reads off the same latent process $\log \lambda_t$, so
+`s(env)` and the seasonal autoregression are estimated once
+from the pooled information in all three streams rather than
+three times from three narrower views of it.
+
+```{r joint-fit, eval = FALSE}
+joint_formula <-
+  bf(count ~ 1 + offset(log_effort), family = poisson()) +
+  bf(pa    ~ 1, family = bernoulli(link = "cloglog")) +
+  bf(po    ~ 1, family = poisson())
+
+mod_joint <- mvgam(
+  joint_formula,
+  trend_formula = ~ s(env, k = 8) + AR(p = c(1, 12)),
+  trend_map     = "shared",
+  data = ipm_data,
+  chains = 2L, samples = 500L,
+  control = list(adapt_delta = 0.95),
+  silent = 2L
+)
+```
+
+```{r joint-load, include = FALSE}
+mod_joint <- read_cache("mod_joint")
+```
+
+`trend_map = "shared"` collapses every measurement onto a
+single latent process, which is the whole point of an
+integrated distribution model. The alternative `"identity"`
+gives each measurement its own trend; a `data.frame(series,
+trend)` handles the intermediate case where some measurements
+share and others do not.
+
+Each measurement has its own intercept. The count intercept
+sits on the log-count scale after removing `log_effort`. The
+presence-absence intercept absorbs $\log A$, so under the
+cloglog link it acts as the reference detection probability.
+The presence-only intercept absorbs the mean log observer
+effort. None of these three constants are of scientific interest
+on their own. The shape they leave behind in the shared trend
+is.
+
+Convergence, per-measurement intercepts and the parameters on
+the trend side all arrive together from `summary()`:
+
+```{r joint-summary}
+summary(mod_joint, smooth_test = FALSE)
+```
+
+The `ar1_trend[1]`, `ar12_trend[1]` and `sigma_trend[1]`
+posteriors each cover the simulation truth: $\phi_1 = 0.55$,
+$\phi_{12} = 0.30$, $\sigma = 0.35$. `Rhat` sits at 1.00 and
+effective sample sizes stay well above the usual 400-per-chain
+floor, so the trend parameters are identified from the data
+rather than mopped up by whatever else the model can absorb.
+
+## Interpreting the joint fit
+
+The environmental response, the seasonal autoregression and the
+shared latent trajectory carry the ecological content of the
+fit. Each has a one-line accessor in the package.
+
+### The environmental response
+
+`plot(mod, type = "smooths")` renders the trend-side smooth via
+the `mvgam_conditional_smooths` class. Median and 95% band come
+from posterior draws; the display matches the house theme every
+other `plot.mvgam*` method uses:
+
+```{r smooth-env, fig.width = 6.5, fig.height = 3.4, fig.cap = "Trend-side s(env) recovered by the joint fit. The bell peaks near env = 0.4, matching the simulation truth."}
+plot(mod_joint, type = "smooths")
+```
+
+The peak sits near env $= 0.4$, and the band tightens where env
+values were densely observed. Read as an ecological response,
+the joint fit places this species' optimum in the middle of the
+observed gradient and prefers a symmetric decline in either
+direction. That is precisely the shape `f_env()` produced.
+
+### The seasonal autoregression
+
+The trend-side stochastic parameters tell you how much of the
+time series is monthly momentum, annual recurrence and
+unstructured shocks. `bayesplot::mcmc_plot()` overlays their
+posterior densities:
+
+```{r joint-pars, fig.width = 6.5, fig.height = 3, fig.cap = "Marginal posteriors for the seasonal AR coefficients and the innovation SD from the joint fit."}
+mcmc_plot(
+  mod_joint,
+  variable = c("ar1_trend[1]", "ar12_trend[1]", "sigma_trend[1]"),
+  type = "areas"
+)
+```
+
+Each posterior concentrates on the correct value. The lag-12
+posterior in particular is well separated from zero, which
+matters: the fit has picked up the annual recurrence rather
+than mopping it into the smooth.
+
+### The shared latent trajectory
+
+`hindcast(mod, type = "trend")` returns a `mvgam_forecast`
+object over the training window; its plot method draws the
+median trajectory with 50 / 80 / 95% credible bands.
+
+```{r trend-hindcast, fig.width = 7, fig.height = 3.4, fig.cap = "Posterior hindcast of the shared latent process from the joint fit. Ribbons are 50 / 80 / 95% credible intervals."}
+plot(hindcast(mod_joint, type = "trend")) +
+  labs(x = "month", y = "shared trend")
+```
+
+Every measurement's likelihood reads off this trajectory, so
+its dynamics belong to the model as a whole rather than to any
+one data stream. Read here: annual recurrence visible in the
+peaks, a monthly-scale wobble on top, band tightest where the
+count stream is most informative.
+
+### Posterior predictive checks per measurement
+
+Each observation family also has to reproduce its own marginal.
+`pp_check(mod, resp = ...)` scopes to one response, and the
+`type` argument picks the display appropriate for that
+measurement's support.
+
+```{r pp-count, fig.width = 6.5, fig.height = 3, fig.cap = "Density overlay of yrep versus y for the count measurement. Twenty posterior draws (light lines) sit over the observed histogram (dark line)."}
+pp_check(mod_joint, resp = "count",
+         type = "dens_overlay", ndraws = 20L)
+```
+
+```{r pp-pa, fig.width = 6.5, fig.height = 3, fig.cap = "Bar plot of the 0/1 marginal for the presence-absence measurement."}
+pp_check(mod_joint, resp = "pa", type = "bars", ndraws = 200L)
+```
+
+```{r pp-po, fig.width = 6.5, fig.height = 3, fig.cap = "ECDF overlay of yrep versus y for the presence-only measurement. The ECDFs bracket the observed step function across the range."}
+pp_check(mod_joint, resp = "po",
+         type = "ecdf_overlay", ndraws = 50L)
+```
+
+Choosing the display matters. Density overlays are natural for
+overdispersed counts, bars for a binary response, ECDFs for
+right-skewed integers where the density smoothing muddies the
+tail. All three checks pass here; if any were failing, that
+would be the response whose observation family needed to
+change.
+
+## When integration breaks
+
+The joint fit assumes every measurement responds to the
+environment through the same functional form of the same
+underlying intensity. When that assumption fails, integration
+does not help. Two situations are common enough to name.
+
+The first is species mismatch. Suppose the count route surveys
+one species and the citizen-science portal collects records
+for an easily confused congener. The joint fit treats the
+mixture as one species and puts the optimum somewhere between
+the two truths. Fithian et al.
+([2015](https://doi.org/10.1111/2041-210X.12242)) analyse this
+identifiability directly. The practical check is a residual
+plot per measurement: correlated residuals across measurements
+that both rise or fall together at the same time points suggest
+one shared driver; residuals that move oppositely suggest the
+measurements are pointing at different biological states.
+
+The second is response mismatch. If the presence-absence
+protocol picks up the species in a broader habitat than the
+count route (say, edge habitat that the count route misses
+because it walks transects only through core habitat), the
+smooth of env each protocol *would* fit alone will differ. The
+joint fit averages them. That average is nobody's response
+function. The remedy is to let the observation side carry
+whichever part of the response depends on the protocol: put
+a smooth on the `bf()` outcome for the measurement where the
+mismatch lives (for example, `bf(pa ~ 1 + s(env), family = bernoulli(link = "cloglog"))`),
+and keep only the shared response on the trend side.
+Koshkina et al.
+([2017](https://doi.org/10.1111/2041-210X.12738)) develop the
+formal framework for combining presence-background data with
+site occupancy under exactly this assumption.
+
+Both failure modes are diagnostic. A joint `pp_check()` that
+sits noticeably worse than any baseline fit on one measurement
+alone is the signal that the shared response assumption is
+wrong for the data at hand.
+
+## Comparing the joint fit to alternatives
+
+Real analyses do not have the truth to check inferences against.
+This section runs the checks that make the joint fit
+defensible in that setting: contrast against single-measurement
+baselines, contrast against a plausibly misspecified trend, and
+comparison via `loo()` and `lfo_cv()`.
+
+### Single-measurement baselines
+
+Each stream can be fit alone with the same trend specification.
+That yields one posterior per stream over the environmental
+response, ready for direct comparison against the joint fit.
+
+```{r baselines-fit, eval = FALSE}
+tf <- ~ s(env, k = 8) + AR(p = c(1, 12))
+
+mod_count <- mvgam(
+  bf(count ~ 1 + offset(log_effort), family = poisson()),
+  trend_formula = tf,
+  data = ipm_data,
+  chains = 2L, samples = 500L,
+  control = list(adapt_delta = 0.95),
+  silent = 2L
+)
+mod_pa <- mvgam(
+  bf(pa ~ 1, family = bernoulli(link = "cloglog")),
+  trend_formula = tf,
+  data = ipm_data,
+  chains = 2L, samples = 500L,
+  control = list(adapt_delta = 0.95),
+  silent = 2L
+)
+mod_po <- mvgam(
+  bf(po ~ 1, family = poisson()),
+  trend_formula = tf,
+  data = ipm_data,
+  chains = 2L, samples = 500L,
+  control = list(adapt_delta = 0.95),
+  silent = 2L
+)
+```
+
+```{r baselines-load, include = FALSE}
+mod_count <- read_cache("mod_count")
+mod_pa    <- read_cache("mod_pa")
+mod_po    <- read_cache("mod_po")
+```
+
+To compare recovered smooths on a common footing, we evaluate
+each fit on the same env grid and centre draws at the median
+grid value so the per-measurement intercept drops out of the
+shape comparison.
+
+```{r compare-helpers}
+grid <- seq(min(ipm_data$env), max(ipm_data$env),
+             length.out = 60L)
+f_true_grid <- 1.5 * exp(-0.5 * (grid - 0.4)^2) - 0.4
+ref_env     <- median(grid)
+f_true_ref  <- 1.5 * exp(-0.5 * (ref_env - 0.4)^2) - 0.4
+
+build_nd <- function() {
+  nd <- ipm_data[rep(1L, length(grid)), , drop = FALSE]
+  nd$env        <- grid
+  nd$log_effort <- median(ipm_data$log_effort)
+  nd$count      <- NA_integer_
+  nd$pa         <- NA_integer_
+  nd$po         <- NA_integer_
+  nd
+}
+
+env_summary <- function(mod, label, resp = NULL) {
+  nd    <- build_nd()
+  lpred <- if (is.null(resp)) {
+    posterior_linpred(mod, newdata = nd)
+  } else {
+    posterior_linpred(mod, newdata = nd, resp = resp)
+  }
+  lpred <- as.matrix(lpred)
+  ref_j <- which.min(abs(grid - ref_env))
+  centered <- sweep(lpred, 1L, lpred[, ref_j], "-")
+  q <- apply(centered, 2L, quantile,
+              probs = c(0.025, 0.5, 0.975), na.rm = TRUE)
+  data.frame(
+    model = label, env = grid,
+    med = q["50%", ], lo = q["2.5%", ], hi = q["97.5%", ]
+  )
+}
+
+truth_df <- data.frame(env = grid,
+                        y_true = f_true_grid - f_true_ref)
+```
+
+```{r compare-sharpening, fig.width = 10, fig.height = 3.6, fig.cap = "Recovery of the environmental response by each single-measurement baseline and by the joint fit. Solid black is truth; the red ribbon is the 95% credible interval for the log-intensity shift relative to the median env."}
+sharp_summ <- rbind(
+  env_summary(mod_joint, "joint", resp = "count"),
+  env_summary(mod_count, "count only"),
+  env_summary(mod_pa,    "pa only"),
+  env_summary(mod_po,    "po only")
+)
+sharp_summ$model <- factor(sharp_summ$model,
+  levels = c("joint", "count only", "pa only", "po only")
+)
+ggplot(sharp_summ) +
+  geom_ribbon(aes(env, ymin = lo, ymax = hi),
+               fill = red_pal$light, alpha = 0.6) +
+  geom_line(aes(env, med), colour = red_pal$dark_highlight,
+             linewidth = 0.7) +
+  geom_line(data = truth_df, aes(env, y = y_true),
+             colour = "black", linewidth = 0.7) +
+  facet_wrap(~ model, nrow = 1L) +
+  labs(x = "env", y = "log-intensity shift")
+```
+
+The count-only and joint panels both concentrate around the
+correct bell, with the joint fit reporting a slightly narrower
+band. The presence-only baseline recovers the shape but with a
+softer peak; the presence-absence baseline lands on a monotone
+smooth. An ecologist reading only the occupancy fit would
+conclude the species prefers the driest end of the gradient.
+The species does not.
+
+Recovery numbers make the same point in one table:
+
+```{r compare-metric}
+metric <- sharp_summ %>%
+  group_by(model) %>%
+  summarise(
+    rmse          = sqrt(mean((med - truth_df$y_true)^2)),
+    mean_ci_width = mean(hi - lo),
+    coverage_95   = mean(truth_df$y_true >= lo &
+                          truth_df$y_true <= hi)
+  )
+metric_out <- as.data.frame(metric)
+metric_out[, -1L] <- round(metric_out[, -1L], 3)
+metric_out
+```
+
+The joint fit's band is the narrowest and its 95% coverage
+sits close to nominal. Presence-absence has the widest band
+yet undercovers, because its posterior is confidently the
+wrong shape. Integrated distribution models exist for this
+pattern: pool likelihoods that see the same underlying process
+through different sampling channels, so the shared functionals
+of that process tighten around the same answer.
+
+### A misspecified trend
+
+Real fits are chosen from a small set of candidates. Dropping
+the lag-12 term is a common enough shortcut that we can measure
+what it costs. `AR(p = 1)` in place of `AR(p = c(1, 12))`
+leaves everything else untouched:
+
+```{r wrong-trend-fit, eval = FALSE}
+mod_wrong_trend <- mvgam(
+  bf(count ~ 1 + offset(log_effort), family = poisson()) +
+    bf(pa ~ 1, family = bernoulli(link = "cloglog")) +
+    bf(po ~ 1, family = poisson()),
+  trend_formula = ~ s(env, k = 8) + AR(p = 1),
+  trend_map     = "shared",
+  data = ipm_data,
+  chains = 2L, samples = 500L,
+  control = list(adapt_delta = 0.95),
+  silent = 2L
+)
+```
+
+```{r wrong-trend-load, include = FALSE}
+mod_wrong_trend <- read_cache("mod_wrong_trend")
+```
+
+The annual recurrence has to go somewhere. With no lag-12
+term to absorb it, the smooth over-fits the segments of the
+record where env happens to align with the recurring peak, and
+the recovered response function is visibly flatter than the
+truth:
+
+```{r wrong-trend-plot, fig.width = 8, fig.height = 3.6, fig.cap = "Recovered env response: joint fit versus the AR(1)-only trend. The wrong-trend fit flattens the bell as its smooth absorbs unmodelled seasonal variance."}
+mis_summ <- rbind(
+  env_summary(mod_joint,       "joint",         resp = "count"),
+  env_summary(mod_wrong_trend, "trend: AR(1)",  resp = "count")
+)
+mis_summ$model <- factor(mis_summ$model,
+  levels = c("joint", "trend: AR(1)")
+)
+ggplot(mis_summ) +
+  geom_ribbon(aes(env, ymin = lo, ymax = hi),
+               fill = red_pal$light, alpha = 0.6) +
+  geom_line(aes(env, med), colour = red_pal$dark_highlight,
+             linewidth = 0.7) +
+  geom_line(data = truth_df, aes(env, y = y_true),
+             colour = "black", linewidth = 0.7) +
+  facet_wrap(~ model, nrow = 1L) +
+  labs(x = "env", y = "log-intensity shift")
+```
+
+Read as a habitat quality summary, the AR(1)-only panel would
+report a weaker env dependence than the species actually shows.
+
+### `loo()` on a state-space fit
+
+`loo::loo()` reports the leave-one-out log density at every
+observation. On plain regression it ranks models well. On
+state-space fits it does not. Bürkner et al.
+([2020](https://doi.org/10.1080/00949655.2020.1783262)) trace
+the reason to the shared latent state between neighbouring time
+points: the pointwise density is not really out of sample. On
+the two candidates here:
+
+```{r loo-compare, cache = TRUE}
+loo::loo_compare(
+  loo::loo(mod_joint),
+  loo::loo(mod_wrong_trend)
+)
+```
+
+The wrong-trend fit tops the table. Its `s(env)` smooth absorbs
+the annual recurrence the lag-12 term should carry, and the
+extra flexibility earns higher pointwise log density even
+though the causal story is worse.
+
+### `lfo_cv()` and choosing the forecast horizon
+
+The honest comparator refits on the first $T$ time points and
+scores at time $T+1$, rolling forward.
+`lfo_cv(fc_horizon = h)` scores a full $h$-step forecast at
+each rolling refit; the choice of $h$ matters. For a
+misspecification whose signature is a seasonal recurrence, the
+forecast has to reach far enough for that recurrence to enter
+the score. At $h = 1$ the AR(1) branch of the misspecified fit can
+approximate the correct model's next-step prediction, and LFO
+cannot separate them. At $h = 12$, a full seasonal period, the
+missing lag-12 term is exactly what the score measures.
+
+```{r lfo-fit, eval = FALSE}
+lfo_j_h1  <- lfo_cv(mod_joint,       min_t = 60L, fc_horizon = 1L)
+lfo_wt_h1 <- lfo_cv(mod_wrong_trend, min_t = 60L, fc_horizon = 1L)
+
+lfo_j_h6  <- lfo_cv(mod_joint,       min_t = 60L, fc_horizon = 6L)
+lfo_wt_h6 <- lfo_cv(mod_wrong_trend, min_t = 60L, fc_horizon = 6L)
+
+lfo_j_h12  <- lfo_cv(mod_joint,       min_t = 60L, fc_horizon = 12L)
+lfo_wt_h12 <- lfo_cv(mod_wrong_trend, min_t = 60L, fc_horizon = 12L)
+```
+
+```{r lfo-load, include = FALSE}
+lfo_j_h1   <- read_cache("lfo_joint_h1")
+lfo_wt_h1  <- read_cache("lfo_wrong_trend_h1")
+lfo_j_h6   <- read_cache("lfo_joint_h6")
+lfo_wt_h6  <- read_cache("lfo_wrong_trend_h6")
+lfo_j_h12  <- read_cache("lfo_joint_h12")
+lfo_wt_h12 <- read_cache("lfo_wrong_trend_h12")
+```
+
+Rolling from time 60 onwards over 96 monthly observations, the
+three comparisons look like this:
+
+```{r lfo-compare-table}
+lfo_row <- function(lj, lw, h) {
+  cmp <- loo::loo_compare(lj, lw,
+                            model_names = c("joint", "wrong_trend"))
+  winner <- rownames(cmp)[1L]
+  data.frame(
+    horizon    = h,
+    n_evals    = length(lj$elpds),
+    joint_elpd = round(lj$sum_ELPD, 1),
+    wrong_elpd = round(lw$sum_ELPD, 1),
+    winner     = winner,
+    elpd_diff  = round(cmp[2L, "elpd_diff"], 1),
+    se_diff    = round(cmp[2L, "se_diff"],  1)
+  )
+}
+lfo_tab <- rbind(
+  lfo_row(lfo_j_h1,  lfo_wt_h1,  1L),
+  lfo_row(lfo_j_h6,  lfo_wt_h6,  6L),
+  lfo_row(lfo_j_h12, lfo_wt_h12, 12L)
+)
+lfo_tab
+```
+
+At $h = 1$ the two fits were indistinguishable. At $h = 6$ the
+misspecified fit was slightly ahead, because a horizon covering
+half a seasonal cycle let its AR(1) branch absorb the
+recurrence into its own coefficient. At $h = 12$ the joint fit
+won by roughly the same amount it had lost at $h = 6$. On this
+single 96-month realisation the $h = 12$ margin is not
+overwhelming (a $Z$-ratio near 1), but the sign and the
+direction of change across horizons are the interpretable
+signal: choose the LFO horizon to reach at least one full
+period of the recurrence you are testing.
+
+The per-step ELPD trajectory at $h = 12$ shows the same story
+step by step:
+
+```{r lfo-plot, fig.width = 7, fig.height = 3.4, fig.cap = "Per-step LFO log-densities at fc_horizon = 12 across a rolling window from month 61 to month 85. The joint fit tracks the wrong-trend fit at most steps but pulls ahead at those where the annual recurrence hits."}
+lfo_long <- rbind(
+  data.frame(t = lfo_j_h12$eval_timepoints,
+              elpd = lfo_j_h12$elpds,
+              model = "joint"),
+  data.frame(t = lfo_wt_h12$eval_timepoints,
+              elpd = lfo_wt_h12$elpds,
+              model = "wrong_trend")
+)
+ggplot(lfo_long, aes(t, elpd, colour = model)) +
+  geom_line(linewidth = 0.7) +
+  geom_point(size = 1.4) +
+  scale_colour_manual(
+    values = c(joint = red_pal$dark_highlight,
+                wrong_trend = "black")
+  ) +
+  labs(x = "eval time", y = "LFO ELPD (fc_horizon = 12)")
+```
+
+### A practical checklist
+
+Real analyses do not need the simulation truth to make this
+choice. The order that carries the joint fit here is:
+
+1. `pp_check(mod, resp = ...)` per response, with a display
+   type suited to each family's support. Fix a bad marginal
+   before doing anything else.
+2. `plot(mod, type = "smooths")` on each single-measurement
+   baseline plus the joint fit, side by side. A stream whose
+   smooth wildly disagrees with the others is a candidate for
+   its own response function on the observation side rather
+   than for the shared trend.
+3. `lfo_cv()` on the surviving candidate joint fits at a
+   forecast horizon that reaches the timescale of the
+   misspecification you are worried about. Reserve `loo()`
+   for a sanity check; do not rank state-space fits on it.
+
+## Take-aways
+
+An integrated distribution model is one `mvgam()` call. Each
+measurement contributes its own `bf()` outcome, its own family,
+its own predictors on the observation side; a shared latent
+process on the trend side ties them together. Every per-stream
+intercept absorbs the constant its measurement carries so the
+environmental response can be interpreted once rather than
+three times.
+
+In this example the joint fit put the env optimum near
+env $= 0.4$ with a 95% interval of about $\pm 0.3$, matching
+the simulation truth. The occupancy baseline placed the
+optimum at the high end of the observed env range because a
+monotone smooth was the best it could do with one detection
+bit per time point. An ecologist reading only the occupancy
+fit would have reported the wrong niche.
+
+Comparisons carry the model choice when the truth is unknown.
+Running `pp_check(mod, resp = ...)` on each response catches
+gross mismatches in the observation family. Single-measurement
+smooths overlaid on the joint smooth reveal streams whose
+response is not shared. `lfo_cv()` at a horizon matching the
+timescale of the misspecification you are worried about ranks
+the surviving candidates. `loo()` on state-space fits will lie
+to you (Bürkner et al.
+[2020](https://doi.org/10.1080/00949655.2020.1783262)); do not
+trust it to break a tie.
+
+## Further reading
+
+- The `multivariate` article (`vignette("multivariate",
+  package = "mvgam")`) demonstrates the same mvbf architecture
+  on generic count / biomass / camera measurements without the
+  ecological framing.
+- The `dfm_trend_map` in-package vignette
+  (`vignette("dfm_trend_map", package = "mvgam")`) shows how
+  `trend_map` shares fewer latent processes than observed
+  measurements when there is more than one biological signal
+  to disentangle.
+- `?trend_constructors` documents the sparse-lag
+  `AR(p = c(...))` and every alternative you might substitute
+  for the trend side of a joint fit.
+- Isaac et al.
+  ([2020](https://doi.org/10.1016/j.tree.2019.08.006)) survey
+  the wider integrated distribution model literature. Miller
+  et al.
+  ([2019](https://doi.org/10.1111/2041-210X.13110)) review the
+  same field from the methodological side.
+
+## Acknowledgements
+
+The identifiability arguments behind the presence-only
+intercept and the cloglog occupancy link follow Fithian et al.
+([2015](https://doi.org/10.1111/2041-210X.12242)) and Renner
+et al. ([2015](https://doi.org/10.1111/2041-210X.12352)). The
+joint fit here specialises the combined presence-background and
+site occupancy formulation developed by Koshkina et al.
+([2017](https://doi.org/10.1111/2041-210X.12738)). The state
+space framing follows Auger-Méthé et al.
+([2021](https://doi.org/10.1002/ecm.1470)) and the dynamic
+generalised additive model perspective in Clark & Wells
+([2023](https://doi.org/10.1111/2041-210X.13974)). The cloglog
+link on binary responses is treated in McCullagh & Nelder
+([1989](https://doi.org/10.1201/9780203753736)). Formulas rely
+on mgcv smooths (Wood
+[2017](https://doi.org/10.1201/9781315370279)) and brms's
+multilevel apparatus (Bürkner
+[2017](https://doi.org/10.18637/jss.v080.i01)); sampling is
+performed with Stan (Carpenter et al.
+[2017](https://doi.org/10.18637/jss.v076.i01)). The LFO
+comparator follows Bürkner et al.
+([2020](https://doi.org/10.1080/00949655.2020.1783262)).
+
+## References
+
+Auger-Méthé M, Newman K, Cole D, Empacher F, Gryba R, King AA,
+Leos-Barajas V, Mills Flemming J, Nielsen A, Petris G and Thomas
+L (2021). A guide to state-space modeling of ecological time
+series. *Ecological Monographs* 91(4), e01470.
+[doi:10.1002/ecm.1470](https://doi.org/10.1002/ecm.1470)
+
+Bürkner PC (2017). brms: An R package for Bayesian multilevel
+models using Stan. *Journal of Statistical Software* 80(1),
+1-28.
+[doi:10.18637/jss.v080.i01](https://doi.org/10.18637/jss.v080.i01)
+
+Bürkner PC, Gabry J and Vehtari A (2020). Approximate
+leave-future-out cross-validation for Bayesian time series
+models. *Journal of Statistical Computation and Simulation*
+90(14), 2499-2523.
+[doi:10.1080/00949655.2020.1783262](https://doi.org/10.1080/00949655.2020.1783262)
+
+Carpenter B, Gelman A, Hoffman MD, Lee D, Goodrich B, Betancourt
+M, Brubaker M, Guo J, Li P and Riddell A (2017). Stan: A
+probabilistic programming language. *Journal of Statistical
+Software* 76(1), 1-32.
+[doi:10.18637/jss.v076.i01](https://doi.org/10.18637/jss.v076.i01)
+
+Clark NJ and Wells K (2023). Dynamic Generalized Additive Models
+(DGAMs) for forecasting discrete ecological time series.
+*Methods in Ecology and Evolution* 14, 771-784.
+[doi:10.1111/2041-210X.13974](https://doi.org/10.1111/2041-210X.13974)
+
+Fithian W, Elith J, Hastie T and Keith DA (2015). Bias
+correction in species distribution models: pooling survey and
+collection data for multiple species. *Methods in Ecology and
+Evolution* 6(4), 424-438.
+[doi:10.1111/2041-210X.12242](https://doi.org/10.1111/2041-210X.12242)
+
+Isaac NJB, Jarzyna MA, Keil P, Dambly LI, Boersch-Supan PH,
+Browning E, Freeman SN, Golding N, Guillera-Arroita G, Henrys
+PA, Jarvis S, Lahoz-Monfort J, Pagel J, Pescott OL, Schmucki R,
+Simmonds EG and O'Hara RB (2020). Data integration for
+large-scale models of species distributions. *Trends in Ecology
+& Evolution* 35(1), 56-67.
+[doi:10.1016/j.tree.2019.08.006](https://doi.org/10.1016/j.tree.2019.08.006)
+
+Koshkina V, Wang Y, Gordon A, Dorazio RM, White M and Stone L
+(2017). Integrated species distribution models: combining
+presence-background data and site-occupancy data with
+imperfect detection. *Methods in Ecology and Evolution* 8(4),
+420-430.
+[doi:10.1111/2041-210X.12738](https://doi.org/10.1111/2041-210X.12738)
+
+McCullagh P and Nelder JA (1989). *Generalized Linear Models*
+(2nd edition). Chapman and Hall/CRC.
+[doi:10.1201/9780203753736](https://doi.org/10.1201/9780203753736)
+
+Miller DAW, Pacifici K, Sanderlin JS and Reich BJ (2019). The
+recent past and promising future for data integration methods
+to estimate species' distributions. *Methods in Ecology and
+Evolution* 10(1), 22-37.
+[doi:10.1111/2041-210X.13110](https://doi.org/10.1111/2041-210X.13110)
+
+Renner IW, Elith J, Baddeley A, Fithian W, Hastie T, Phillips
+SJ, Popovic G and Warton DI (2015). Point process models for
+presence-only analysis. *Methods in Ecology and Evolution*
+6(4), 366-379.
+[doi:10.1111/2041-210X.12352](https://doi.org/10.1111/2041-210X.12352)
+
+Wood SN (2017). *Generalized Additive Models: An Introduction
+with R* (2nd edition). Chapman and Hall/CRC.
+[doi:10.1201/9781315370279](https://doi.org/10.1201/9781315370279)

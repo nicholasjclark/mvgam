@@ -2827,7 +2827,13 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #'
 #' @seealso \code{\link{AR}}, \code{\link{VAR}}, \code{\link{RW}},
 #'   \code{\link{CAR}}, \code{\link{mvgam}}, \code{\link{jsdgam}},
-#'   \code{\link{residual_cor}}, \code{\link{ordinate}}
+#'   \code{\link{residual_cor}}, \code{\link{ordinate}}. The
+#'   `dfm_trend_map` vignette walks through dynamic factor models
+#'   built with a partial `trend_map`
+#'   (\code{vignette("dfm_trend_map")}); for the integrated
+#'   species distribution model pattern that shares one latent
+#'   process across several observation families, see
+#'   \url{https://nicholasjclark.github.io/mvgam/articles/ipm.html}.
 #'
 #' @examples
 #' \donttest{
