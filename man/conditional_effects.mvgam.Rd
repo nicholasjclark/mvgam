@@ -4,6 +4,7 @@
 \alias{conditional_effects.mvgam}
 \alias{plot.mvgam_conditional_effects}
 \alias{print.mvgam_conditional_effects}
+\alias{as.data.frame.mvgam_conditional_effects}
 \title{Display conditional effects of predictors for mvgam models}
 \usage{
 \method{conditional_effects}{mvgam}(
@@ -21,6 +22,8 @@
 \method{plot}{mvgam_conditional_effects}(x, plot = TRUE, ask = FALSE, ...)
 
 \method{print}{mvgam_conditional_effects}(x, ...)
+
+\method{as.data.frame}{mvgam_conditional_effects}(x, row.names = NULL, optional = FALSE, ...)
 }
 \arguments{
 \item{x}{An object of class \code{mvgam_conditional_effects}.}
@@ -66,6 +69,10 @@ the prediction grid to that series's observations.}
 otherwise returns the list invisibly so callers can post-process.}
 
 \item{ask}{Logical. If \code{TRUE}, prompts before each new plot.}
+
+\item{row.names}{Ignored, present for S3 signature compatibility.}
+
+\item{optional}{Ignored, present for S3 signature compatibility.}
 }
 \value{
 An object of class \code{mvgam_conditional_effects}: a named
@@ -81,6 +88,18 @@ interactions. A thin wrapper around
 \code{\link[marginaleffects:plot_predictions]{marginaleffects::plot_predictions()}} that auto-enumerates the
 model's term labels (across both observation and trend submodels)
 and produces one ggplot per term.
+
+\code{as.data.frame.mvgam_conditional_effects()} returns the underlying
+prediction grid as a long-format \code{data.frame} (one row per grid
+point, per effect, per response). Columns are \code{resp} (present only
+when the fit is multivariate), \code{effect} (the primary conditioning
+variable name), \code{estimate}, \code{conf.low}, \code{conf.high}, followed by
+whichever additional grid columns marginaleffects populated.
+
+Use this to reach the raw numbers when you want to build a custom
+plot, overlay several fits, or compare against a known truth. It
+removes the need to know whether the fit was univariate or
+multivariate before extracting.
 }
 \examples{
 \donttest{

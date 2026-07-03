@@ -103,8 +103,17 @@ conditional_effects.mvgam <- function(x,
 
   # Multivariate fan-out: build one effects list per response and
   # return a named list, mirroring residuals.mvgam / pp_check.mvgam.
+  # We tag the outer wrapper as `mvgam_conditional_effects` so
+  # `plot()` / `print()` dispatch is uniform whether the fit is
+  # uni- or multivariate; extraction via
+  # `as.data.frame.mvgam_conditional_effects()` also relies on
+  # the class marker to recognise the fan-out shape.
   fan <- mv_resp_fan_out(x, resp)
-  if (!is.null(fan)) return(fan)
+  if (!is.null(fan)) {
+    class(fan) <- "mvgam_conditional_effects"
+    attr(fan, "mv_wrapper") <- TRUE
+    return(fan)
+  }
   type <- match.arg(
     type,
     c("response", "link", "expected",
@@ -283,7 +292,15 @@ plot.mvgam_conditional_effects <- function(x, plot = TRUE, ask = FALSE,
     default_ask <- grDevices::devAskNewPage()
     on.exit(grDevices::devAskNewPage(default_ask))
     grDevices::devAskNewPage(ask = isTRUE(ask))
-    for (p in x) graphics::plot(p)
+    if (isTRUE(attr(x, "mv_wrapper"))) {
+      # Multivariate wrapper: `x` is a named list of per-response
+      # `mvgam_conditional_effects` objects. Recurse in per-arm
+      # order so the display sequence matches user expectation
+      # (arm-by-arm, effect-by-effect within each arm).
+      for (r in names(x)) plot(x[[r]], plot = TRUE, ask = FALSE, ...)
+    } else {
+      for (p in x) graphics::plot(p)
+    }
   }
   invisible(x)
 }
@@ -292,6 +309,65 @@ plot.mvgam_conditional_effects <- function(x, plot = TRUE, ask = FALSE,
 #' @rdname conditional_effects.mvgam
 #' @export
 print.mvgam_conditional_effects <- function(x, ...) plot(x, ...)
+
+
+#' @rdname conditional_effects.mvgam
+#' @param row.names Ignored, present for S3 signature compatibility.
+#' @param optional Ignored, present for S3 signature compatibility.
+#' @description
+#' `as.data.frame.mvgam_conditional_effects()` returns the underlying
+#' prediction grid as a long-format `data.frame` (one row per grid
+#' point, per effect, per response). Columns are `resp` (present only
+#' when the fit is multivariate), `effect` (the primary conditioning
+#' variable name), `estimate`, `conf.low`, `conf.high`, followed by
+#' whichever additional grid columns marginaleffects populated.
+#'
+#' Use this to reach the raw numbers when you want to build a custom
+#' plot, overlay several fits, or compare against a known truth. It
+#' removes the need to know whether the fit was univariate or
+#' multivariate before extracting.
+#' @export
+#' @method as.data.frame mvgam_conditional_effects
+as.data.frame.mvgam_conditional_effects <- function(x,
+                                                    row.names = NULL,
+                                                    optional = FALSE,
+                                                    ...) {
+  if (length(x) == 0L) return(data.frame())
+  # For each entry, build a per-piece DF tagged with a label
+  # column, then rbind under a shared column union. mv wrapper and
+  # univariate shape only differ in what label they contribute
+  # (`resp` vs `effect`) and how they resolve the entry's raw DF.
+  is_mv <- isTRUE(attr(x, "mv_wrapper"))
+  label_col <- if (is_mv) "resp" else "effect"
+  labels <- names(x) %||% as.character(seq_along(x))
+  entry_df <- function(entry) {
+    if (is_mv) {
+      as.data.frame.mvgam_conditional_effects(entry)
+    } else {
+      d <- entry$data
+      if (is.null(d) || nrow(d) == 0L) return(data.frame())
+      d$rowid <- NULL
+      d
+    }
+  }
+  dfs <- Map(function(entry, lab) {
+    d <- entry_df(entry)
+    if (nrow(d) == 0L) return(d)
+    cbind(setNames(list(lab), label_col), d)
+  }, x, labels)
+  dfs <- Filter(function(d) nrow(d) > 0L, dfs)
+  if (length(dfs) == 0L) return(data.frame())
+  # Union column sets so effects / responses with heterogeneous
+  # grid columns still rbind cleanly.
+  all_cols <- unique(unlist(lapply(dfs, colnames)))
+  dfs <- lapply(dfs, function(d) {
+    for (m in setdiff(all_cols, colnames(d))) d[[m]] <- NA
+    d[, all_cols, drop = FALSE]
+  })
+  out <- do.call(rbind, dfs)
+  rownames(out) <- NULL
+  out
+}
 
 
 # Enumerate the conditional-effects term labels for an mvgam fit:

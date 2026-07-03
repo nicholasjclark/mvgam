@@ -290,6 +290,47 @@ test_that("conditional_effects rejects clashes between `...` and reserved args",
   }
 })
 
+test_that("as.data.frame.mvgam_conditional_effects handles both shapes", {
+  # Univariate shape: list of ggplots keyed by effect. Simulate the
+  # marginaleffects-style ggplot payload with a $data slot.
+  fake_ggplot <- function(effect_var, n = 3L) {
+    d <- data.frame(
+      rowid     = seq_len(n),
+      estimate  = seq(0, 1, length.out = n),
+      conf.low  = seq(-1, 0, length.out = n),
+      conf.high = seq(1, 2, length.out = n),
+      grid_col  = seq(-2, 2, length.out = n)
+    )
+    d[[effect_var]] <- seq_len(n)
+    structure(list(data = d), class = c("ggplot", "list"))
+  }
+  uni <- structure(
+    list(env = fake_ggplot("env"), rain = fake_ggplot("rain")),
+    class = "mvgam_conditional_effects"
+  )
+  df_u <- as.data.frame(uni)
+  expect_true(is.data.frame(df_u))
+  expect_true(all(c("effect", "estimate", "conf.low", "conf.high")
+                    %in% colnames(df_u)))
+  expect_false("rowid" %in% colnames(df_u))
+  expect_setequal(unique(df_u$effect), c("env", "rain"))
+
+  # Multivariate shape: wrapper tagged mv_wrapper, elements are
+  # themselves mvgam_conditional_effects lists.
+  mv <- structure(
+    list(count = uni, pa = uni),
+    class = "mvgam_conditional_effects"
+  )
+  attr(mv, "mv_wrapper") <- TRUE
+  df_m <- as.data.frame(mv)
+  expect_true("resp" %in% colnames(df_m))
+  expect_setequal(unique(df_m$resp), c("count", "pa"))
+  expect_setequal(unique(df_m$effect), c("env", "rain"))
+  # Row count: two effects x n=3 grid x two arms = 12.
+  expect_equal(nrow(df_m), 12L)
+})
+
+
 test_that("re-exports of marginaleffects entry points are wired", {
   exports <- getNamespaceExports("mvgam")
   for (nm in c("predictions", "avg_predictions", "slopes", "avg_slopes",

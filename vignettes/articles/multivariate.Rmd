@@ -302,25 +302,11 @@ truth_pts <- data.frame(
 )
 
 plot_recovery <- function(fit, label) {
-  hc <- hindcast(fit, type = "trend")
-  # Multi-response fits return one mvgam_forecast per outcome,
-  # all sharing the same latent trend; the univariate fits return
-  # a single mvgam_forecast directly.
-  if (is.list(hc) && !inherits(hc, "mvgam_forecast")) {
-    hc <- hc[[1L]]
-  }
-  # plot.mvgam_forecast overlays the response-scale observations
-  # by default. On the trend scale those values live on a
-  # different axis (Poisson counts up to 20 vs a latent state on
-  # [-1, 1]); they would crush the ribbon flat. Drop the point
-  # layer and overlay the simulated truth instead.
-  p <- plot(hc)
-  p$layers <- p$layers[!vapply(
-    p$layers,
-    function(l) inherits(l$geom, "GeomPoint"),
-    logical(1L)
-  )]
-  p +
+  # `hindcast(fit, type = "trend")` returns an `mvgam_forecast`
+  # object whose `plot()` method already skips the response-scale
+  # observation overlay for trend hindcasts. We only need to
+  # overlay the simulated truth vector as ×-marks.
+  plot(hindcast(fit, type = "trend")) +
     geom_point(
       data = truth_pts,
       aes(x = time, y = trend),
@@ -344,7 +330,10 @@ second captures how tight the ribbon is.
 ```{r recovery-table}
 recovery_summary <- function(fit) {
   hc <- hindcast(fit, type = "trend")
-  if (is.list(hc) && !inherits(hc, "mvgam_forecast")) hc <- hc[[1L]]
+  # Multi-response fits return the fan-out wrapper; every arm
+  # carries the same shared trend, so peel any one for the
+  # posterior matrix.
+  if (isTRUE(attr(hc, "mv_wrapper"))) hc <- hc[[1L]]
   m <- hc$hindcasts[[1L]]
   med <- apply(m, 2L, median)
   # Latent factor models identify the trend only up to sign; flip

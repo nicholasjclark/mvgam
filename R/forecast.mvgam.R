@@ -138,7 +138,14 @@ forecast.mvgam <- function(object,
   checkmate::assert_flag(obs_uncertainty)
   checkmate::assert_string(resp, null.ok = TRUE)
   fan <- mv_resp_fan_out(object, resp)
-  if (!is.null(fan)) return(fan)
+  if (!is.null(fan)) {
+    # Tag the outer fan-out wrapper as `mvgam_forecast` so
+    # plot() / print() dispatch matches the single-response
+    # branch below. Same pattern as the hindcast fan-out.
+    class(fan) <- "mvgam_forecast"
+    attr(fan, "mv_wrapper") <- TRUE
+    return(fan)
+  }
   newdata <- ensure_obs_placeholder_in_newdata(newdata, object$data)
 
   trend_specs <- object$mv_spec$trend_specs

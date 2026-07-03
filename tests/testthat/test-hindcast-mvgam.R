@@ -248,6 +248,50 @@ test_that("ndraws subset yields the requested rows", {
 })
 
 
+test_that("mv fan-out wrapper is classed and plot dispatches", {
+  # Simulate an mvbf hindcast wrapper: outer list keyed by resp,
+  # each element itself an mvgam_forecast. plot(hc) previously
+  # errored because the outer list carried no class and R fell
+  # through to graphics::plot.default. It should now dispatch to
+  # plot.mvgam_forecast (single-panel trend view).
+  make_arm <- function(type_slot) {
+    hc_mat <- matrix(rnorm(30L), nrow = 3L, ncol = 10L)
+    structure(list(
+      family = "gaussian", family_pars = NULL,
+      type = type_slot,
+      series_names = "s1",
+      train_observations = list(s1 = seq_len(10L)),
+      train_times = list(s1 = seq_len(10L)),
+      test_observations = NULL, test_times = NULL,
+      hindcasts = list(s1 = hc_mat),
+      forecasts = NULL
+    ), class = "mvgam_forecast")
+  }
+  wrapper <- list(count = make_arm("trend"), pa = make_arm("trend"))
+  class(wrapper) <- "mvgam_forecast"
+  attr(wrapper, "mv_wrapper") <- TRUE
+
+  p <- plot(wrapper)
+  expect_s3_class(p, "ggplot")
+  # No obs point layer overlaid on trend-scale ribbon.
+  has_point <- vapply(p$layers,
+    function(l) inherits(l$geom, "GeomPoint"),
+    logical(1L))
+  expect_false(any(has_point))
+
+  # Response-scale wrapper renders one panel per response.
+  wrapper2 <- list(count = make_arm("response"),
+                   pa    = make_arm("response"))
+  class(wrapper2) <- "mvgam_forecast"
+  attr(wrapper2, "mv_wrapper") <- TRUE
+  p2 <- plot(wrapper2)
+  # patchwork stacks the per-arm plots when available; if not,
+  # we get the last per-arm ggplot back invisibly.
+  expect_true(inherits(p2, "ggplot") ||
+                inherits(p2, "patchwork"))
+})
+
+
 test_that("Multi-series hindcast returns one matrix per series", {
   fit <- make_hindcast_mock(series_levels = c("a", "b"))
   draws <- make_hindcast_draws(ndraws = 2L)

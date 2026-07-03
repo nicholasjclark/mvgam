@@ -131,9 +131,15 @@ hindcast.mvgam <- function(object,
   # Multivariate fan-out via the shared helper: hindcast operates
   # on the obs-side posterior, which returns a per-response list
   # on mv fits; scope per response and return a named list of
-  # `mvgam_forecast` objects.
+  # `mvgam_forecast` objects. Class the outer wrapper as
+  # `mvgam_forecast` too so `plot()` / `print()` dispatch is
+  # uniform whether the fit is uni- or multivariate.
   fan <- mv_resp_fan_out(object, resp)
-  if (!is.null(fan)) return(fan)
+  if (!is.null(fan)) {
+    class(fan) <- "mvgam_forecast"
+    attr(fan, "mv_wrapper") <- TRUE
+    return(fan)
+  }
 
   series_info <- resolve_series_info(object)
   series_levels <- series_info$series_levels

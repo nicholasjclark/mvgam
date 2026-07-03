@@ -72,6 +72,30 @@ plot.mvgam_forecast <- function(
     ))
   }
 
+  # Multi-response fan-out wrapper: `x` is a named list keyed
+  # by response, each element itself an `mvgam_forecast`. For
+  # trend-scale hindcasts / forecasts every arm carries the same
+  # shared latent trajectory, so we plot the first arm only and
+  # drop the arm label. For response-scale arms differ per
+  # outcome; when `patchwork` is available we return a
+  # side-by-side stack, otherwise we print each per-arm plot in
+  # turn and invisibly return the raw list.
+  if (isTRUE(attr(x, "mv_wrapper"))) {
+    plot_arm <- function(arm, title = NULL) {
+      p <- plot(arm, series = series, probs = probs,
+                 hindcast = hindcast, forecast = forecast,
+                 newdata_obs = newdata_obs, ...)
+      if (is.null(title)) p else p + ggplot2::labs(title = title)
+    }
+    if (is_trend_forecast(x[[1L]])) return(plot_arm(x[[1L]]))
+    per_arm <- Map(plot_arm, x, names(x))
+    if (requireNamespace("patchwork", quietly = TRUE)) {
+      return(Reduce(`+`, per_arm))
+    }
+    for (p in per_arm) print(p)
+    return(invisible(per_arm))
+  }
+
   series_levels <- as.character(x$series_names)
   series_idx <- resolve_series(series, series_levels)
   plotted_series <- series_levels[series_idx]
@@ -127,6 +151,14 @@ plot.mvgam_forecast <- function(
   }
   p
 }
+
+
+# Return TRUE when the forecast object is on the latent trend
+# scale, i.e. `hindcast(fit, type = "trend")` or
+# `forecast(fit, type = "trend")`. Used by the mv wrapper and
+# by the per-series observation-overlay guard.
+#'@noRd
+is_trend_forecast <- function(x) identical(x$type, "trend")
 
 
 # Resolve the user-facing series argument to an integer vector
@@ -226,13 +258,19 @@ build_forecast_layers <- function(
     }
 
     # Observations: train + (optionally) test.
+    # Skipped for trend hindcasts / forecasts because the
+    # ribbon is on the latent-process scale, but the stored
+    # `train_observations` / `test_observations` are on the
+    # response scale; overlaying them produces a scale
+    # mismatch that squashes the ribbon flat against the axis.
+    show_obs <- !is_trend_forecast(x)
     obs_times <- c()
     obs_y <- c()
-    if (!is.null(hc_mat)) {
+    if (!is.null(hc_mat) && show_obs) {
       obs_times <- c(obs_times, x$train_times[[s]])
       obs_y <- c(obs_y, x$train_observations[[s]])
     }
-    if (!is.null(fc_mat) && newdata_obs &&
+    if (!is.null(fc_mat) && newdata_obs && show_obs &&
           !is.null(x$test_observations[[s]])) {
       obs_times <- c(obs_times, x$test_times[[s]])
       obs_y <- c(obs_y, x$test_observations[[s]])
