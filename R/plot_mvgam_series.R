@@ -191,7 +191,7 @@ series_all_plot <- function(dat, ylab, lines) {
   ggplot2::ggplot(
     dat, ggplot2::aes(x = time, y = y, colour = data)
   ) +
-    ggplot2::facet_wrap(~series) +
+    mvgam_facet_series() +
     geom_obs +
     ggplot2::scale_colour_manual(
       values = c(train = palette[5L], validate = "black"),
