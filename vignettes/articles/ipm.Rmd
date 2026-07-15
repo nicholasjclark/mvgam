@@ -727,7 +727,7 @@ the simulation truth. The occupancy baseline placed the
 optimum at the high end of the observed env range because a
 monotone smooth was the best it could do with one detection
 bit per time point. An ecologist reading only the occupancy
-fit would have reported the wrong niche.
+fit would report the wrong niche.
 
 Comparisons carry the model choice when the truth is unknown.
 Running `pp_check(mod, resp = ...)` on each response catches

@@ -110,7 +110,11 @@
 #'   \url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}
 #'   walks through `lfo_cv()` end-to-end on rodent count data,
 #'   including the Pareto-k refit gate and ensemble weighting
-#'   via `loo_model_weights.mvgam_lfo()`.
+#'   via `loo_model_weights.mvgam_lfo()`. For guidance on
+#'   choosing `fc_horizon` when the misspecification you are
+#'   testing has a known timescale (e.g. an annual recurrence),
+#'   see the integrated distribution model article at
+#'   \url{https://nicholasjclark.github.io/mvgam/articles/ipm.html}.
 #'
 #' @examples
 #' \donttest{
