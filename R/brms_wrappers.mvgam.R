@@ -154,6 +154,141 @@ hypothesis.mvgam <- function(x, hypothesis, alpha = 0.05,
 }
 
 
+#' Bridge sampling and Bayes factors for `mvgam` fits
+#'
+#' Log marginal likelihood via bridge sampling (Gronau, Singmann
+#' & Wagenmakers 2020) and paired Bayes factors, delegating to the
+#' `bridgesampling` package on the underlying `stanfit`. Bridge
+#' sampling answers the M-closed model-choice question that
+#' predictive scoring (\code{\link{loo.mvgam}},
+#' \code{\link{lfo_cv.mvgam}}) cannot: which model does the data
+#' support as the data-generating process, weighted by the prior?
+#' On state-space fits this is a natural complement to LFO because
+#' the answer does not depend on the choice of forecast horizon.
+#'
+#' The routing bypasses `brms:::bridge_sampler.brmsfit`, whose
+#' internal `restructure()` and `update_misc_env()` calls assume a
+#' brmsfit that mvgam objects do not conform to. Instead the S3
+#' method resolves the requirements itself and delegates directly
+#' to `bridgesampling::bridge_sampler()` on `object$fit`.
+#'
+#' Bridge sampling requires the Stan model to use normalized
+#' probability densities (`_lpdf` / `_lpmf`), not the un-normalized
+#' variants (`_lupdf` / `_lupmf`). mvgam's shipped emitters already
+#' satisfy this; the method errors early with an informative
+#' message if the constraint is violated (typically because a user
+#' hand-edited the Stan code).
+#'
+#' @section Multivariate fits: On an `mvbf` fit the Stan program
+#'   computes a single joint log posterior pooling every response
+#'   family's likelihood, so `bridge_sampler()` naturally estimates
+#'   the joint log marginal likelihood
+#'   \eqn{\log p(y_{1}, \ldots, y_{K} \mid \mathrm{model})}. The
+#'   bridge-sampling estimator variance grows with parameter
+#'   dimension: for multi-response, factor or VAR fits pass
+#'   `samples = 10000` or larger, and consider
+#'   `method = "warp3"` when the default `"normal"` returns high
+#'   `re2` (relative squared error).
+#'
+#' @param samples An object of class `mvgam` (the argument name
+#'   `samples` matches the `bridgesampling` generic).
+#' @param recompile Logical. When `TRUE`, refits the model via
+#'   [update.mvgam()] before running the bridge sampler. Set
+#'   this when the fit was loaded from disk and its compiled
+#'   Stan DSO is no longer valid in the current R session (the
+#'   usual RDS-reload symptom is
+#'   `"the model object is not created or not valid"`). The
+#'   refit runs through the same backend the original fit used
+#'   (rstan or cmdstanr) and redraws the posterior, so estimates
+#'   from `recompile = TRUE` are stochastic in both the sampler
+#'   and the bridge estimator. `...` is passed only to
+#'   `bridgesampling::bridge_sampler()`; to customise the refit
+#'   itself, call `update()` explicitly with the desired
+#'   arguments first and then pass the recompiled fit here with
+#'   `recompile = FALSE`. Defaults to `FALSE`.
+#' @param x1,x2 `mvgam` fits, or `bridge` objects returned by
+#'   `bridge_sampler()`, to compare.
+#' @param log Logical. Return the Bayes factor on the log scale
+#'   when `TRUE`; ratio scale otherwise.
+#' @param ... Additional arguments forwarded to
+#'   `bridgesampling::bridge_sampler()` (for example `samples`,
+#'   `method`, `cores`).
+#'
+#' @return `bridge_sampler.mvgam()` returns a `bridge` object with
+#'   a finite `logml`. `bayes_factor.mvgam()` returns a
+#'   `bayes_factor` object with the numeric ratio (or log-ratio).
+#'
+#' @references
+#' Gronau QF, Singmann H and Wagenmakers E-J (2020).
+#' bridgesampling: An R package for estimating normalizing
+#' constants. *Journal of Statistical Software*. 92(10).
+#'
+#' @seealso \code{\link{loo.mvgam}}, \code{\link{lfo_cv.mvgam}}.
+#'
+#' @author Nicholas J Clark
+#'
+#' @importFrom bridgesampling bridge_sampler
+#' @export bridge_sampler
+#' @method bridge_sampler mvgam
+#' @export
+bridge_sampler.mvgam <- function(samples, recompile = FALSE, ...) {
+  checkmate::assert_class(samples, "mvgam")
+  checkmate::assert_flag(recompile)
+  if (!requireNamespace("bridgesampling", quietly = TRUE)) {
+    stop(insight::format_error(c(
+      "Package 'bridgesampling' is required.",
+      i = "Install it with install.packages('bridgesampling')."
+    )))
+  }
+  # Guard: bridge sampling needs the joint posterior density to
+  # be normalized, so reject Stan models that use `_lupdf` or
+  # `_lupmf`. Matches `brms:::is_normalized()` verbatim.
+  stancode <- as.character(samples$stancode)
+  if (any(grepl("_lup(d|m)f\\(", stancode))) {
+    stop(insight::format_error(c(
+      "The Stan model must be normalized to run bridge_sampler().",
+      x = "Found '_lupdf' or '_lupmf' calls in the fitted model.",
+      i = paste0("Refit with normalized densities. mvgam's ",
+                 "shipped emitters produce normalized Stan; ",
+                 "this error typically means the model source ",
+                 "was edited by hand.")
+    )))
+  }
+  if (isTRUE(recompile)) {
+    # `...` is reserved for bridgesampling::bridge_sampler() and
+    # would collide with mvgam()'s own argument names (e.g.
+    # `silent` differs in type). Callers who need to customise
+    # the refit should call `update()` themselves first, then
+    # pass the recompiled fit with `recompile = FALSE`.
+    samples <- update(samples, recompile = TRUE)
+  }
+  bridgesampling::bridge_sampler(samples$fit, ...)
+}
+
+
+#' @rdname bridge_sampler.mvgam
+#' @importFrom bridgesampling bayes_factor
+#' @export bayes_factor
+#' @method bayes_factor mvgam
+#' @export
+bayes_factor.mvgam <- function(x1, x2, log = FALSE, ...) {
+  checkmate::assert(
+    checkmate::check_class(x1, "mvgam"),
+    checkmate::check_class(x1, "bridge"),
+    combine = "or", .var.name = "x1"
+  )
+  checkmate::assert(
+    checkmate::check_class(x2, "mvgam"),
+    checkmate::check_class(x2, "bridge"),
+    combine = "or", .var.name = "x2"
+  )
+  checkmate::assert_flag(log)
+  bs1 <- if (inherits(x1, "bridge")) x1 else bridge_sampler(x1, ...)
+  bs2 <- if (inherits(x2, "bridge")) x2 else bridge_sampler(x2, ...)
+  bridgesampling::bayes_factor(bs1, bs2, log = log)
+}
+
+
 #' Number of levels per grouping factor in a fitted
 #' \pkg{mvgam} model
 #'

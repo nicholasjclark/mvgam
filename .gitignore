@@ -27,3 +27,7 @@ data-raw/verify_outputs/
 **/cache/*.rdx
 **/cache/*.RData
 tests/local/fixtures/lfo_cv/
+# knitr caches inside online articles
+vignettes/articles/*_cache/
+# session-only scratchpad of rendered figures
+scratchpad_figs/

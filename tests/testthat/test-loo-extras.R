@@ -321,7 +321,14 @@ test_that("per_species_ic returns one elpd row per series", {
   set.seed(7L)
   logliks <- matrix(rnorm(40 * 8L, mean = -1, sd = 0.5),
                     nrow = 40L, ncol = 8L)
-  out_loo <- mvgam:::per_species_ic(stub, logliks, criterion = "loo")
+  # Reason: synthetic rnorm log-lik gives loo() no dependence
+  # structure to smooth over, so high Pareto-k is expected. The
+  # assertions below check the shape of the returned frame, not
+  # the numerical quality of the fit, so silence the pareto-k
+  # warning at this call site rather than making it noise.
+  out_loo <- suppressWarnings(
+    mvgam:::per_species_ic(stub, logliks, criterion = "loo")
+  )
   expect_s3_class(out_loo, "data.frame")
   expect_setequal(out_loo$species, c("a", "b"))
   expect_named(out_loo,

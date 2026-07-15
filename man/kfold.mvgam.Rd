@@ -10,7 +10,7 @@
   group = NULL,
   folds = NULL,
   exact = FALSE,
-  pareto_k_threshold = 0.7,
+  pareto_k_threshold = NULL,
   fold_split = c("grouped", "stratified", "random"),
   seed = NULL,
   silent = 1L,
@@ -42,9 +42,11 @@ the built-in splitters.}
 the PSIS path. Default \code{FALSE} uses the hybrid mode.}
 
 \item{pareto_k_threshold}{Numeric in \verb{[0, Inf]}. Folds whose
-PSIS Pareto-k exceeds this trigger a refit. Default \code{0.7}
-matches the \code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}} default and the \code{loo} package
-guidance. Set \code{Inf} for pure PSIS (no refits ever).}
+PSIS Pareto-k exceeds this trigger a refit. \code{NULL} (default)
+uses the adaptive threshold \code{min(1 - 1 / log10(S), 0.7)},
+where \code{S} is the number of posterior draws (Vehtari, Simpson,
+Gelman, Yao & Gabry 2024). Pass an explicit numeric to
+override, or \code{Inf} for pure PSIS (no refits ever).}
 
 \item{fold_split}{One of \code{"grouped"}, \code{"stratified"},
 \code{"random"}. The \verb{loo::kfold_split_*} helper used when

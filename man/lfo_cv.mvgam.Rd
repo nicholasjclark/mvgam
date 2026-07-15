@@ -13,7 +13,7 @@ lfo_cv(object, ...)
   newdata = NULL,
   min_t = NULL,
   fc_horizon = 1L,
-  pareto_k_threshold = 0.7,
+  pareto_k_threshold = NULL,
   score = "elpd",
   save_log_lik = FALSE,
   silent = 1L,
@@ -46,9 +46,15 @@ familiar forecast horizon; for irregular CAR grids it is the
 next \code{fc_horizon} observed times (the CAR kernel absorbs the
 gaps via \code{time_dis}). Default \code{1}.}
 
-\item{pareto_k_threshold}{Proportion; the Pareto shape value
-above which the PSIS approximation is considered unstable
-and a refit is triggered. Default \code{0.7}.}
+\item{pareto_k_threshold}{Proportion in \verb{[0, 1]}; the Pareto
+shape value above which the PSIS approximation is considered
+unstable and a refit is triggered. \code{NULL} (default) uses the
+adaptive threshold \code{min(1 - 1 / log10(S), 0.7)}, where \code{S} is
+the number of posterior draws (Vehtari, Simpson, Gelman, Yao
+& Gabry 2024). The adaptive rule tightens the threshold for
+fits with few posterior draws where PSIS is less reliable and
+clamps at \code{0.7} once \code{S} is large enough for the classical
+guarantee to hold. Pass an explicit numeric to override.}
 
 \item{score}{Character vector of scoring rules to compute at
 each fold. Must be a subset of \code{c("elpd", "crps", "drps", "sis", "brier", "energy", "variogram")}. ELPD uses the
@@ -73,7 +79,12 @@ score (\code{NULL} if no non-ELPD score requested).
 \item \code{eval_timepoints} — integer vector of the times evaluated.
 \item \code{refits_at} — integer vector of time points where the model
 was refit.
-\item \code{pareto_k_threshold} — the threshold passed in.
+\item \code{pareto_k_threshold}: the threshold argument as supplied
+(numeric, or \code{NULL} when the adaptive default was used).
+\item \code{pareto_k_threshold_used}: the effective numeric threshold
+actually applied inside the refit gate (equal to
+\code{pareto_k_threshold} when a numeric was supplied, or the
+adaptive value when \code{NULL} was supplied).
 \item \code{fc_horizon} — the horizon used at each fold.
 }
 }
@@ -118,6 +129,10 @@ Paul-Christian Burkner, Jonah Gabry and Aki Vehtari (2020).
 Approximate leave-future-out cross-validation for Bayesian time
 series models. \emph{Journal of Statistical Computation and
 Simulation}. 90:14, 2499-2523.
+
+Aki Vehtari, Daniel Simpson, Andrew Gelman, Yuling Yao and
+Jonah Gabry (2024). Pareto smoothed importance sampling.
+\emph{Journal of Machine Learning Research}. 25(72), 1-58.
 }
 \seealso{
 \link{forecast.mvgam}, \link{hindcast.mvgam},

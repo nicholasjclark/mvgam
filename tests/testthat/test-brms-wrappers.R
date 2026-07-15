@@ -183,3 +183,45 @@ test_that("hypothesis.mvgam validates input types", {
   expect_error(hypothesis(stub, "b_x > 0", robust = "yes"),
                "robust")
 })
+
+
+# ---- bridge_sampler.mvgam gate -------------------------------------
+
+test_that("bridge_sampler.mvgam rejects un-normalized Stan (_lupdf)", {
+  stub <- make_wrapper_stub()
+  stub$stancode <- "model { target += normal_lupdf(y | mu, sigma); }"
+  expect_error(bridge_sampler(stub), "normalized")
+})
+
+
+test_that("bridge_sampler.mvgam rejects un-normalized Stan (_lupmf)", {
+  stub <- make_wrapper_stub()
+  stub$stancode <- "model { target += poisson_lupmf(y | lambda); }"
+  expect_error(bridge_sampler(stub), "normalized")
+})
+
+
+test_that("bridge_sampler.mvgam surfaces the offending token", {
+  stub <- make_wrapper_stub()
+  stub$stancode <- "model { target += normal_lupdf(y | mu, sigma); }"
+  expect_error(bridge_sampler(stub), "_lupdf")
+})
+
+
+test_that("bayes_factor.mvgam gates through the same normalization check", {
+  stub <- make_wrapper_stub()
+  stub$stancode <- "model { target += normal_lupdf(y | mu, sigma); }"
+  expect_error(bayes_factor(stub, stub), "normalized")
+})
+
+
+test_that("bayes_factor.mvgam rejects non-mvgam/non-bridge x2", {
+  stub <- make_wrapper_stub()
+  expect_error(bayes_factor(stub, "not an mvgam"), "x2")
+})
+
+
+test_that("bayes_factor.mvgam validates the log flag", {
+  stub <- make_wrapper_stub()
+  expect_error(bayes_factor(stub, stub, log = "yes"), "log")
+})

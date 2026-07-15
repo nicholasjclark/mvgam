@@ -165,10 +165,16 @@ test_that("Return object has all documented mvgam_lfo slots", {
   expect_s3_class(out, "mvgam_lfo")
   required <- c("elpds", "sum_ELPD", "scores", "pareto_ks",
                 "eval_timepoints", "refits_at",
-                "pareto_k_threshold", "fc_horizon")
+                "pareto_k_threshold",
+                "pareto_k_threshold_used", "fc_horizon")
   expect_true(all(required %in% names(out)))
   expect_identical(out$fc_horizon, 1L)
-  expect_identical(out$pareto_k_threshold, 0.7)
+  # Default fit uses the adaptive threshold: the user-supplied
+  # slot stays NULL, and `pareto_k_threshold_used` carries the
+  # numeric value that the refit gate actually applied.
+  expect_null(out$pareto_k_threshold)
+  expect_type(out$pareto_k_threshold_used, "double")
+  expect_lte(out$pareto_k_threshold_used, 0.7)
   expect_true(min_t_in_refits <- 30L %in% out$refits_at)
   # eval window is (min_t + 1):(N - fc_horizon + 1) = 31:35,
   # so 5 evaluations on a 35-step series with fc_horizon = 1.
@@ -518,6 +524,58 @@ test_that("loo_compare.mvgam_lfo SE matches paired-diff convention", {
 })
 
 
+test_that("loo_compare.mvgam_lfo emits Sivula diagnostic columns", {
+  m1 <- mk_mvgam_lfo(c(-1, -2, -3))
+  m2 <- mk_mvgam_lfo(c(-2, -3, -4))
+  cmp <- loo_compare(m1, m2)
+  expect_true(all(c("p_worse", "diag_diff", "diag_elpd") %in%
+                    colnames(cmp)))
+  # Reference row is NA-guarded on p_worse because se_diff = 0.
+  expect_true(is.na(cmp$p_worse[1L]))
+  # Candidate row has finite elpd_diff = -3 and se_diff = 0, so
+  # p_worse is NA there too (the guard triggers whenever a se_diff
+  # entry is zero, which holds for both rows in this exact-diff
+  # scenario).
+  expect_true(is.na(cmp$p_worse[2L]))
+  # n_folds = 3 -> both rows carry N < 100 in diag_elpd.
+  expect_true(all(grepl("N < 100", cmp$diag_elpd)))
+})
+
+
+test_that("mvgam_loo_compare_diagnostics computes p_worse correctly", {
+  # candidate model 3 units worse with SE 1: p_worse = P(Z > 3)
+  d <- mvgam_ps_khat_threshold  # ensures the file is loaded
+  out <- mvgam:::mvgam_loo_compare_diagnostics(
+    elpd_diff = c(0, -3),
+    se_diff = c(0, 1),
+    n_pointwise = c(200L, 200L),
+    pareto_k_list = list(c(0.1, 0.2), c(0.1, 0.2))
+  )
+  expect_true(is.na(out$p_worse[1L]))
+  expect_equal(out$p_worse[2L], pnorm(0, mean = -3, sd = 1),
+               tolerance = 1e-12)
+  expect_identical(out$diag_diff[1L], "")
+  expect_identical(out$diag_diff[2L], "|elpd_diff| < 4")
+  expect_identical(out$diag_elpd, c("", ""))
+})
+
+
+test_that("mvgam_loo_compare_diagnostics threshold overlays", {
+  # Small n triggers diag_elpd = "N < 100"; high pareto_k on
+  # the second model overlays "; k_psis > 0.7".
+  out <- mvgam:::mvgam_loo_compare_diagnostics(
+    elpd_diff = c(0, -5),
+    se_diff = c(0, 2),
+    n_pointwise = c(50L, 50L),
+    pareto_k_list = list(c(0.1, 0.3), c(0.8, 0.4))
+  )
+  expect_identical(out$diag_elpd[1L], "N < 100")
+  expect_identical(out$diag_elpd[2L], "N < 100; k_psis > 0.7")
+  # |elpd_diff| = 5 > 4 so diag_diff stays empty.
+  expect_identical(out$diag_diff, c("", ""))
+})
+
+
 # ---- loo_model_weights.mvgam_lfo --------------------------------
 
 test_that("loo_model_weights.mvgam_lfo returns pseudobma_weights summing to 1", {
@@ -616,4 +674,34 @@ test_that("loo_model_weights.mvgam_lfo rejects unknown method", {
   m1 <- mk_mvgam_lfo(c(-1, -2, -3))
   m2 <- mk_mvgam_lfo(c(-3, -4, -5))
   expect_error(loo_model_weights(m1, m2, method = "stacking-energy"))
+})
+
+
+# Adaptive Pareto-k threshold (Vehtari, Simpson, Gelman, Yao,
+# Gabry 2024). Formula: min(1 - 1 / log10(S), 0.7). Draws S is
+# taken from the posterior; unit tests exercise the helper
+# directly on synthetic S values so no fit is required.
+
+test_that("mvgam_ps_khat_threshold tightens with small S", {
+  # S = 200 -> 1 - 1/log10(200) = 0.5654...
+  expect_equal(mvgam:::mvgam_ps_khat_threshold(200L),
+               1 - 1 / log10(200), tolerance = 1e-8)
+  # S = 500 -> 1 - 1/log10(500) = 0.6289...
+  expect_equal(mvgam:::mvgam_ps_khat_threshold(500L),
+               1 - 1 / log10(500), tolerance = 1e-8)
+})
+
+test_that("mvgam_ps_khat_threshold clamps at 0.7 for large S", {
+  # Formula is monotone increasing in S; once 1 - 1 / log10(S)
+  # exceeds 0.7, the min() clamps and the classical guarantee
+  # holds. S = 5000 -> 1 - 1/3.699 = 0.7297 -> clamp to 0.7.
+  expect_equal(mvgam:::mvgam_ps_khat_threshold(5000L), 0.7)
+  expect_equal(mvgam:::mvgam_ps_khat_threshold(1000000L), 0.7)
+})
+
+test_that("mvgam_ps_khat_threshold rejects S < 2", {
+  # S = 1 would divide by log10(1) = 0. The helper rejects it up
+  # front so no downstream call has to guard against -Inf.
+  expect_error(mvgam:::mvgam_ps_khat_threshold(1L))
+  expect_error(mvgam:::mvgam_ps_khat_threshold(0L))
 })

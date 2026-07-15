@@ -192,7 +192,38 @@ loo_compare.mvgam <- function(
       waic(models[[i]], incl_dynamics = incl_dynamics)
     }
   }
-  loo_compare(estimates)
+  cmp <- loo_compare(estimates)
+  # Row order in `cmp` differs from `estimates`. Pareto-k
+  # diagnostics only apply on the loo path (WAIC has no PSIS).
+  est_ord <- match(rownames(cmp), names(estimates))
+  n_pw <- vapply(estimates[est_ord], function(e) {
+    if (!is.null(e$pointwise)) nrow(e$pointwise) else NA_integer_
+  }, integer(1L))
+  pareto_k_list <- if (criterion == "loo") {
+    lapply(estimates[est_ord], function(e) e$diagnostics$pareto_k)
+  } else {
+    NULL
+  }
+  diag_cols <- mvgam_loo_compare_diagnostics(
+    elpd_diff = as.numeric(cmp[, "elpd_diff"]),
+    se_diff = as.numeric(cmp[, "se_diff"]),
+    n_pointwise = n_pw,
+    pareto_k_list = pareto_k_list
+  )
+  # `cmp` is a `compare.loo` matrix; preserve its class + row
+  # names but widen into a data.frame so string diagnostic
+  # columns can sit alongside the numeric ones.
+  out <- data.frame(
+    cmp[, , drop = FALSE],
+    p_worse = diag_cols$p_worse,
+    diag_diff = diag_cols$diag_diff,
+    diag_elpd = diag_cols$diag_elpd,
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  rownames(out) <- rownames(cmp)
+  class(out) <- c("compare.loo", "matrix", "data.frame")
+  out
 }
 
 #' @export

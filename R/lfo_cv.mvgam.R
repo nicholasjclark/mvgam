@@ -54,9 +54,15 @@
 #'   familiar forecast horizon; for irregular CAR grids it is the
 #'   next `fc_horizon` observed times (the CAR kernel absorbs the
 #'   gaps via `time_dis`). Default `1`.
-#' @param pareto_k_threshold Proportion; the Pareto shape value
-#'   above which the PSIS approximation is considered unstable
-#'   and a refit is triggered. Default `0.7`.
+#' @param pareto_k_threshold Proportion in `[0, 1]`; the Pareto
+#'   shape value above which the PSIS approximation is considered
+#'   unstable and a refit is triggered. `NULL` (default) uses the
+#'   adaptive threshold `min(1 - 1 / log10(S), 0.7)`, where `S` is
+#'   the number of posterior draws (Vehtari, Simpson, Gelman, Yao
+#'   & Gabry 2024). The adaptive rule tightens the threshold for
+#'   fits with few posterior draws where PSIS is less reliable and
+#'   clamps at `0.7` once `S` is large enough for the classical
+#'   guarantee to hold. Pass an explicit numeric to override.
 #' @param score Character vector of scoring rules to compute at
 #'   each fold. Must be a subset of `c("elpd", "crps", "drps",
 #'   "sis", "brier", "energy", "variogram")`. ELPD uses the
@@ -77,7 +83,12 @@
 #'   * `eval_timepoints` — integer vector of the times evaluated.
 #'   * `refits_at` — integer vector of time points where the model
 #'     was refit.
-#'   * `pareto_k_threshold` — the threshold passed in.
+#'   * `pareto_k_threshold`: the threshold argument as supplied
+#'     (numeric, or `NULL` when the adaptive default was used).
+#'   * `pareto_k_threshold_used`: the effective numeric threshold
+#'     actually applied inside the refit gate (equal to
+#'     `pareto_k_threshold` when a numeric was supplied, or the
+#'     adaptive value when `NULL` was supplied).
 #'   * `fc_horizon` — the horizon used at each fold.
 #'
 #' @references
@@ -85,6 +96,10 @@
 #' Approximate leave-future-out cross-validation for Bayesian time
 #' series models. *Journal of Statistical Computation and
 #' Simulation*. 90:14, 2499-2523.
+#'
+#' Aki Vehtari, Daniel Simpson, Andrew Gelman, Yuling Yao and
+#' Jonah Gabry (2024). Pareto smoothed importance sampling.
+#' *Journal of Machine Learning Research*. 25(72), 1-58.
 #'
 #' @seealso [forecast.mvgam], [hindcast.mvgam],
 #'   [score.mvgam_forecast], [log_lik.mvgam], [update.mvgam],
@@ -134,7 +149,7 @@ lfo_cv.mvgam <- function(object,
                           newdata = NULL,
                           min_t = NULL,
                           fc_horizon = 1L,
-                          pareto_k_threshold = 0.7,
+                          pareto_k_threshold = NULL,
                           score = "elpd",
                           save_log_lik = FALSE,
                           silent = 1L,
@@ -144,7 +159,8 @@ lfo_cv.mvgam <- function(object,
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
   checkmate::assert_int(fc_horizon, lower = 1L)
   checkmate::assert_number(pareto_k_threshold,
-                            lower = 0, upper = 1)
+                            lower = 0, upper = 1,
+                            null.ok = TRUE)
   checkmate::assert_int(min_t, lower = 1L, null.ok = TRUE)
   checkmate::assert_flag(save_log_lik)
   checkmate::assert_int(silent, lower = 0L, upper = 2L)
@@ -322,6 +338,20 @@ lfo_cv.mvgam <- function(object,
   loglik_past <- log_lik(fit_past, newdata = all_data)
   idx_refit <- idx_min_t
 
+  # Resolve the numeric threshold applied inside the refit gate.
+  # The adaptive rule from Vehtari et al. (2024) tightens the
+  # threshold when the posterior draw count `S` is small and
+  # clamps at 0.7 once `S` is large enough for the classical
+  # guarantee to hold. `pareto_k_threshold` on the return object
+  # preserves whatever the user passed (numeric or NULL);
+  # `pareto_k_threshold_used` is the effective value read by the
+  # refit gate below and by print / plot methods for display.
+  pareto_k_threshold_used <- if (is.null(pareto_k_threshold)) {
+    mvgam_ps_khat_threshold(nrow(loglik_past))
+  } else {
+    pareto_k_threshold
+  }
+
   # Compute scores at the very first evaluation window.
   first_window_times <- all_unique_times[
     (idx_min_t + 1L):(idx_min_t + fc_horizon)
@@ -390,7 +420,7 @@ lfo_cv.mvgam <- function(object,
     }
 
     if (!is.na(pareto_ks[k_eval]) &&
-        pareto_ks[k_eval] > pareto_k_threshold) {
+        pareto_ks[k_eval] > pareto_k_threshold_used) {
       idx_refit <- k - 1L
       refit_time <- all_unique_times[idx_refit]
       if (silent < 1L) {
@@ -446,6 +476,7 @@ lfo_cv.mvgam <- function(object,
       refits_at = refits_at,
       refit_triggered = refit_triggered,
       pareto_k_threshold = pareto_k_threshold,
+      pareto_k_threshold_used = pareto_k_threshold_used,
       fc_horizon = fc_horizon,
       log_lik = log_lik_acc
     ),
@@ -678,11 +709,17 @@ plot.mvgam_lfo <- function(x, ...) {
   ks[is.infinite(ks)] <-
     suppressWarnings(max(ks[!is.infinite(ks)], na.rm = TRUE))
 
+  # Read the effective (numeric) threshold. Adaptive-default fits
+  # (`pareto_k_threshold = NULL`) carry the applied value on
+  # `pareto_k_threshold_used`; fits fitted before that slot
+  # existed fall back to `pareto_k_threshold`.
+  threshold_val <- obj$pareto_k_threshold_used %||%
+    obj$pareto_k_threshold
   panels <- list()
   panels$pareto_ks <- data.frame(
     eval = obj$eval_timepoints,
     value = ks,
-    threshold = obj$pareto_k_threshold,
+    threshold = threshold_val,
     facet = "Pareto K"
   )
   if (!is.null(obj$elpds)) {
@@ -886,12 +923,23 @@ loo_compare.mvgam_lfo <- function(x, ..., model_names = NULL) {
   elpd_diff[best] <- 0
 
   ord <- order(elpd_diff, decreasing = TRUE)
+  pareto_k_list <- lapply(models, function(m) m$pareto_ks)
+  diag_cols <- mvgam_loo_compare_diagnostics(
+    elpd_diff = elpd_diff[ord],
+    se_diff = se_diff[ord],
+    n_pointwise = n_folds,
+    pareto_k_list = pareto_k_list[ord]
+  )
   out <- data.frame(
     elpd_diff = elpd_diff[ord],
     se_diff = se_diff[ord],
+    p_worse = diag_cols$p_worse,
+    diag_diff = diag_cols$diag_diff,
+    diag_elpd = diag_cols$diag_elpd,
     elpd_lfo = sum_elpd[ord],
     se_elpd_lfo = se_sum[ord],
-    row.names = model_names[ord]
+    row.names = model_names[ord],
+    stringsAsFactors = FALSE
   )
   class(out) <- c("compare.loo", "matrix", "data.frame")
   out
@@ -1082,9 +1130,16 @@ stack_mvgam_lfo <- function(models, model_names) {
 #' @method print mvgam_lfo
 #' @export
 print.mvgam_lfo <- function(x, ...) {
+  # Report the numeric threshold actually used at the refit gate.
+  # Adaptive-default fits stash it on `pareto_k_threshold_used`;
+  # older fits (before that slot existed) fall back to the
+  # user-supplied `pareto_k_threshold`.
+  threshold_val <- x$pareto_k_threshold_used %||% x$pareto_k_threshold
+  adaptive_label <- if (is.null(x$pareto_k_threshold)) " (adaptive)" else ""
   cat("Approximate leave-future-out cross-validation\n")
   cat("  fc_horizon         :", x$fc_horizon, "\n")
-  cat("  pareto_k_threshold :", x$pareto_k_threshold, "\n")
+  cat("  pareto_k_threshold :", threshold_val,
+      adaptive_label, "\n", sep = "")
   cat("  evaluation points  :", length(x$eval_timepoints), "\n")
   cat("  refits             :", length(x$refits_at), "\n")
   if (!is.null(x$elpds)) {
