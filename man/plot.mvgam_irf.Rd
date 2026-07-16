@@ -4,13 +4,18 @@
 \alias{plot.mvgam_irf}
 \title{Plot impulse responses from an \code{mvgam_irf} object}
 \usage{
-\method{plot}{mvgam_irf}(x, series = 1, ...)
+\method{plot}{mvgam_irf}(x, series = 1, responses = NULL, ...)
 }
 \arguments{
 \item{x}{\code{list} object of class \code{mvgam_irf}. See \code{\link[=irf]{irf()}}}
 
 \item{series}{\code{integer} specifying which process series should be
 given the shock}
+
+\item{responses}{Optional integer vector of process indices to
+display as response panels. Useful for hierarchical VAR fits
+where the raw K-panel grid is unreadable. Defaults to all
+processes.}
 
 \item{...}{ignored}
 }

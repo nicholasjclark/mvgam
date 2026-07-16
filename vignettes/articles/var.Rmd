@@ -29,9 +29,9 @@ library(ggplot2)
 theme_set(theme_bw(base_size = 12, base_family = "serif"))
 
 cache_dir <- if (dir.exists("pkgdown")) {
-  file.path("pkgdown", "vector_ar_cache")
+  file.path("pkgdown", "var_cache")
 } else {
-  file.path("..", "..", "pkgdown", "vector_ar_cache")
+  file.path("..", "..", "pkgdown", "var_cache")
 }
 read_cache <- function(name) {
   readRDS(file.path(cache_dir, paste0(name, ".rds")))
@@ -404,7 +404,7 @@ Sibling articles in this series:
   runs the same forecast / score machinery on a longer Portal
   rodent time series.
 - The
-  [multivariate mvgam article](https://nicholasjclark.github.io/mvgam/articles/multivariate.html)
+  [multivariate mvgam article](https://nicholasjclark.github.io/mvgam/articles/mvbf.html)
   covers the different case where several outcomes on different
   families share one latent process via a multivariate
   observation formula.

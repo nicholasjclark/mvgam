@@ -51,10 +51,13 @@ probabilities for the quantile-based credible interval. Default
 }
 \value{
 An [mvgam_residcor-class] object when \code{summary = TRUE} and
-\code{groups = FALSE}. When \code{groups = TRUE} on a hierarchical trend, a
-named list of \code{mvgam_residcor} objects (one per group plus the
-population-level matrix under the name \code{"_global"}). When
-\code{summary = FALSE}, a list of per-draw arrays.
+\code{groups = FALSE}. When \code{groups = TRUE} on a hierarchical trend, an
+\code{mvgam_residcor_list} (a classed named list of \code{mvgam_residcor}
+objects, one per group plus the population-level matrix under
+the name \code{"_global"}); this class carries a
+\code{\link[=plot.mvgam_residcor_list]{plot.mvgam_residcor_list()}} method that renders a faceted
+heatmap panel across groups. When \code{summary = FALSE}, a list of
+per-draw arrays.
 }
 \description{
 Compute residual (cross-series) correlation, covariance and partial

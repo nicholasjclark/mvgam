@@ -7,7 +7,7 @@
 \usage{
 fevd(object, ...)
 
-\method{fevd}{mvgam}(object, h = 10, ...)
+\method{fevd}{mvgam}(object, h = 10, future = FALSE, ...)
 }
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}
@@ -18,6 +18,12 @@ that used a Vector Autoregressive latent process model (either as \code{VAR(cor 
 
 \item{h}{Positive \code{integer} specifying the forecast horizon over which to calculate
 the IRF}
+
+\item{future}{\code{Logical}. When \code{TRUE}, per-draw FEVD
+computation runs under whatever
+\code{\link[future:plan]{future::plan()}} the caller has set;
+see \code{\link[=irf]{irf()}} for details. Requires the \code{future} package
+(mvgam Suggests).}
 }
 \value{
 See \code{\link{mvgam_fevd-class}} for a full description of the quantities that are
@@ -49,7 +55,7 @@ New Introduction to Multiple Time Series Analysis. 2nd ed. Springer-Verlag Berli
 \code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}}.
 For a worked article that runs \code{fevd()} end to end on an
 annual bird-count VAR, see
-\url{https://nicholasjclark.github.io/mvgam/articles/vector_ar.html}.
+\url{https://nicholasjclark.github.io/mvgam/articles/var.html}.
 }
 \author{
 Nicholas J Clark

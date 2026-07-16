@@ -185,10 +185,10 @@ https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html
 
 For a worked example that interrogates a fitted \code{VAR()} trend
 with \code{irf()}, \code{fevd()} and \code{stability()}, see
-\url{https://nicholasjclark.github.io/mvgam/articles/vector_ar.html}.
+\url{https://nicholasjclark.github.io/mvgam/articles/var.html}.
 For the \code{trend_map} shortcut used to fit dynamic factor models
 with fewer latent processes than observed series, see
-\code{vignette("dfm_trend_map")}.
+\code{vignette("dfm", package = "mvgam")}.
 }
 \note{
 \strong{VAR fits and \code{init = 0}}: VAR uses the Heaps-2022
@@ -420,8 +420,8 @@ mod_hv <- mvgam(
   data    = hdat,
   family  = gaussian(),
   chains  = 1,
-  samples = 300,
-  burnin  = 300,
+  iter    = 600,
+  warmup  = 300,
   silent  = 2
 )
 

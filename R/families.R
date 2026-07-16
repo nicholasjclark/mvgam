@@ -611,8 +611,8 @@ check_tweedie_truncation <- function(object) {
 #'   data          = sim$data_train,
 #'   family        = com_binomial(),
 #'   chains        = 2,
-#'   samples       = 400,
-#'   burnin        = 400,
+#'   iter          = 800,
+#'   warmup        = 400,
 #'   silent        = 2
 #' )
 #'
@@ -1818,11 +1818,12 @@ build_closure_unit_arrays <- function(data,
 #'
 #' @seealso [occ()] for the related joint-occupancy family,
 #'   [pp_check.mvgam()] for the closure-unit goodness-of-fit
-#'   surface. The CRAN-shipped vignette
-#'   \code{vignette("nmixtures")} introduces N-mixture and
-#'   joint-occupancy modelling in mvgam end-to-end; see also
-#'   \code{vignette("data_in_mvgam")} for the closure-unit
-#'   data-shape requirements that `nmix()` consumes.
+#'   surface. The online article at
+#'   \url{https://nicholasjclark.github.io/mvgam/articles/nmix.html}
+#'   introduces N-mixture and joint-occupancy modelling in mvgam
+#'   end-to-end; see also \code{vignette("data", package = "mvgam")}
+#'   for the closure-unit data-shape requirements that `nmix()`
+#'   consumes.
 #'
 #' @export
 nmix <- function(type = c("poisson_binomial", "royle_nichols",
@@ -2148,10 +2149,11 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #'
 #' @seealso [nmix()] for the related N-mixture family,
 #'   [pp_check.mvgam()] for closure-unit goodness-of-fit. The
-#'   CRAN-shipped vignette \code{vignette("nmixtures")} covers
-#'   both occupancy and N-mixture workflows; the closure-unit
-#'   data-shape requirements that `occ()` consumes are
-#'   documented in \code{vignette("data_in_mvgam")}.
+#'   online article at
+#'   \url{https://nicholasjclark.github.io/mvgam/articles/nmix.html}
+#'   covers both occupancy and N-mixture workflows; the
+#'   closure-unit data-shape requirements that `occ()` consumes
+#'   are documented in \code{vignette("data", package = "mvgam")}.
 #'
 #' @export
 occ <- function(multi_season = FALSE) {
@@ -2551,7 +2553,7 @@ make_occ_stanvars <- function(arrays) {
 #'   family         = diri(),
 #'   n_lv           = 2L,
 #'   chains         = 2L,
-#'   burnin         = 400L, samples = 400L,
+#'   iter           = 800L, warmup = 400L,
 #'   silent         = 2,
 #'   backend        = "cmdstanr"
 #' )
@@ -3096,7 +3098,7 @@ make_categ_stanvars <- function(arrays) {
 #'   family         = mvn(),
 #'   n_lv           = 2L,
 #'   chains         = 2L,
-#'   burnin         = 400L, samples = 400L,
+#'   iter           = 800L, warmup = 400L,
 #'   silent         = 2,
 #'   backend        = "cmdstanr"
 #' )

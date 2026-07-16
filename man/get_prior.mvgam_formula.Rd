@@ -86,8 +86,8 @@ mod <- mvgam(
   family        = poisson(),
   priors        = my_priors,
   chains        = 2,
-  samples       = 250,
-  burnin        = 500,
+  iter          = 750,
+  warmup        = 500,
   silent        = 2
 )
 

@@ -3,14 +3,9 @@ title: "N-mixture models with mvgam"
 author: "Nicholas J Clark"
 date: "`r Sys.Date()`"
 output:
-  rmarkdown::html_vignette:
+  rmarkdown::html_document:
     toc: yes
-vignette: >
-  %\VignetteIndexEntry{N-mixture models with mvgam}
-  %\VignetteEngine{knitr::rmarkdown}
-  \usepackage[utf8]{inputenc}
-params:
-  EVAL: !r identical(tolower(Sys.getenv("NOT_CRAN")), "true")
+    toc_float: yes
 ---
 
 ```{r, echo = FALSE}

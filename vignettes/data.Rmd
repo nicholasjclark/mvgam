@@ -1,12 +1,12 @@
 ---
-title: "Formatting data for use in mvgam"
+title: "Formatting data for mvgam"
 author: "Nicholas J Clark"
 date: "`r Sys.Date()`"
 output:
   rmarkdown::html_vignette:
     toc: yes
 vignette: >
-  %\VignetteIndexEntry{Formatting data for use in mvgam}
+  %\VignetteIndexEntry{Formatting data for mvgam}
   %\VignetteEngine{knitr::rmarkdown}
   \usepackage[utf8]{inputenc}
 params:
@@ -384,7 +384,7 @@ correctly, the `cap` column is consistent across visits within
 a unit and the factor levels line up.
 
 The closure-unit grain is covered in more detail in the
-[N-mixture vignette](https://nicholasjclark.github.io/mvgam/articles/nmixtures.html);
+[N-mixture vignette](https://nicholasjclark.github.io/mvgam/articles/nmix.html);
 this section exists so you can recognise the layout when you
 encounter it and not confuse it with the per-time-step long
 format.
@@ -452,5 +452,5 @@ inspector.
   [overview vignette](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
   for the model surface that consumes the data validated here.
 - The
-  [N-mixture vignette](https://nicholasjclark.github.io/mvgam/articles/nmixtures.html)
+  [N-mixture vignette](https://nicholasjclark.github.io/mvgam/articles/nmix.html)
   for the closure-unit grain in worked detail.

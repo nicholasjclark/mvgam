@@ -37,9 +37,9 @@ bayesplot::color_scheme_set("red")
 red_pal <- bayesplot::color_scheme_get("red")
 
 cache_dir <- if (dir.exists("pkgdown")) {
-  file.path("pkgdown", "ipm_cache")
+  file.path("pkgdown", "idm_cache")
 } else {
-  file.path("..", "..", "pkgdown", "ipm_cache")
+  file.path("..", "..", "pkgdown", "idm_cache")
 }
 read_cache <- function(name) {
   readRDS(file.path(cache_dir, paste0(name, ".rds")))
@@ -742,12 +742,12 @@ trust it to break a tie.
 
 ## Further reading
 
-- The `multivariate` article (`vignette("multivariate",
+- The `mvbf` article (`vignette("mvbf",
   package = "mvgam")`) demonstrates the same mvbf architecture
   on generic count / biomass / camera measurements without the
   ecological framing.
-- The `dfm_trend_map` in-package vignette
-  (`vignette("dfm_trend_map", package = "mvgam")`) shows how
+- The `dfm` in-package vignette
+  (`vignette("dfm", package = "mvgam")`) shows how
   `trend_map` shares fewer latent processes than observed
   measurements when there is more than one biological signal
   to disentangle.

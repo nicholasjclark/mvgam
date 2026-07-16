@@ -1,12 +1,12 @@
 ---
-title: "Dynamic factor models with trend_map"
+title: "Dynamic factor models"
 author: "Nicholas J Clark"
 date: "`r Sys.Date()`"
 output:
   rmarkdown::html_vignette:
     toc: yes
 vignette: >
-  %\VignetteIndexEntry{Dynamic factor models with trend_map}
+  %\VignetteIndexEntry{Dynamic factor models}
   %\VignetteEngine{knitr::rmarkdown}
   \usepackage[utf8]{inputenc}
 params:
@@ -417,7 +417,7 @@ Sibling articles in this series carry the workflow further:
   walks through `forecast()`, `score()`, `lfo_cv()` and `ensemble()`
   on a worked example with count observations.
 - The
-  [multi-response article](https://nicholasjclark.github.io/mvgam/articles/multivariate.html)
+  [multi-response article](https://nicholasjclark.github.io/mvgam/articles/mvbf.html)
   covers the different case where several outcomes on different
   observation families share a single latent trend via a
   multivariate observation formula.

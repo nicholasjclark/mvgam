@@ -88,7 +88,7 @@ fit <- jsdgam(
   family         = mvn(),
   n_lv           = 2L,
   chains         = 2L,
-  burnin         = 400L, samples = 400L,
+  iter           = 800L, warmup = 400L,
   silent         = 2,
   backend        = "cmdstanr"
 )

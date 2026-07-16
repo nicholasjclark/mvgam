@@ -2150,10 +2150,10 @@ print.mvgam_trend <- function(x, ...) {
 #'
 #'   For a worked example that interrogates a fitted `VAR()` trend
 #'   with `irf()`, `fevd()` and `stability()`, see
-#'   [https://nicholasjclark.github.io/mvgam/articles/vector_ar.html](https://nicholasjclark.github.io/mvgam/articles/vector_ar.html).
+#'   [https://nicholasjclark.github.io/mvgam/articles/var.html](https://nicholasjclark.github.io/mvgam/articles/var.html).
 #'   For the `trend_map` shortcut used to fit dynamic factor models
 #'   with fewer latent processes than observed series, see
-#'   `vignette("dfm_trend_map")`.
+#'   `vignette("dfm", package = "mvgam")`.
 #'
 #' @section Parameter Naming Convention:
 #' All trend model parameters automatically receive a "_trend" suffix to prevent
@@ -2367,8 +2367,8 @@ print.mvgam_trend <- function(x, ...) {
 #'   data    = hdat,
 #'   family  = gaussian(),
 #'   chains  = 1,
-#'   samples = 300,
-#'   burnin  = 300,
+#'   iter    = 600,
+#'   warmup  = 300,
 #'   silent  = 2
 #' )
 #'
@@ -2828,12 +2828,12 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #' @seealso \code{\link{AR}}, \code{\link{VAR}}, \code{\link{RW}},
 #'   \code{\link{CAR}}, \code{\link{mvgam}}, \code{\link{jsdgam}},
 #'   \code{\link{residual_cor}}, \code{\link{ordinate}}. The
-#'   `dfm_trend_map` vignette walks through dynamic factor models
-#'   built with a partial `trend_map`
-#'   (\code{vignette("dfm_trend_map")}); for the integrated
-#'   species distribution model pattern that shares one latent
-#'   process across several observation families, see
-#'   \url{https://nicholasjclark.github.io/mvgam/articles/ipm.html}.
+#'   `dfm` vignette walks through dynamic factor models built with
+#'   a partial `trend_map`
+#'   (\code{vignette("dfm", package = "mvgam")}); for the
+#'   integrated species distribution model pattern that shares one
+#'   latent process across several observation families, see
+#'   \url{https://nicholasjclark.github.io/mvgam/articles/idm.html}.
 #'
 #' @examples
 #' \donttest{

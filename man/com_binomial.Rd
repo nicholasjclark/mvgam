@@ -98,8 +98,8 @@ fit <- mvgam(
   data          = sim$data_train,
   family        = com_binomial(),
   chains        = 2,
-  samples       = 400,
-  burnin        = 400,
+  iter          = 800,
+  warmup        = 400,
   silent        = 2
 )
 

@@ -78,8 +78,8 @@
 #'   data          = dat,
 #'   family        = poisson(),
 #'   chains        = 2,
-#'   samples       = 250,
-#'   burnin        = 500,
+#'   iter          = 750,
+#'   warmup        = 500,
 #'   silent        = 2
 #' )
 #' summary(mod_nonfac, include_betas = FALSE)

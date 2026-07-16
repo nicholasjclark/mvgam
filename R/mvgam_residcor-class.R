@@ -170,3 +170,56 @@ plot.mvgam_residcor <- function(
     ) +
     mvgam_theme()
 }
+
+
+#' Plot method for an `mvgam_residcor_list`
+#'
+#' Faceted heatmap panel across the per-group correlation
+#' matrices returned by `residual_cor(mod, groups = TRUE)` on a
+#' hierarchical VAR or factor fit. Reuses the same
+#' `mvgam_diverging_scale()` palette and `mvgam_theme()` as
+#' [plot.mvgam_residcor()], with symmetric limits `c(-1, 1)`
+#' shared across facets so the eye can compare panels directly.
+#' The `_global` reference matrix is included by default; drop it
+#' with `include_global = FALSE`.
+#'
+#' @param x An `mvgam_residcor_list` returned by
+#'   `residual_cor(mod, groups = TRUE)`.
+#' @param include_global Logical. If `TRUE` (default), include
+#'   the `_global` reference correlation as one panel.
+#' @param ncol Optional integer. Number of facet columns; defaults
+#'   to `ceiling(sqrt(n_panels))`.
+#' @param ... Currently unused.
+#'
+#' @return A [ggplot2::ggplot] object.
+#'
+#' @seealso [residual_cor()], [plot.mvgam_residcor()],
+#'   [plot.mvgam_var_matrix_list()].
+#' @author Nicholas J Clark
+#' @method plot mvgam_residcor_list
+#' @export
+plot.mvgam_residcor_list <- function(x, include_global = TRUE,
+                                      ncol = NULL, ...) {
+  checkmate::assert_flag(include_global)
+  keep <- if (isTRUE(include_global)) names(x) else
+    setdiff(names(x), "_global")
+  long <- do.call(rbind, lapply(keep, function(g) {
+    df <- gather_matrix(x[[g]]$sig_cor,
+                        drop_diag = FALSE, drop_upper = FALSE)
+    df$group <- g
+    df
+  }))
+  ncol <- ncol %||% ceiling(sqrt(length(keep)))
+  ggplot2::ggplot(long,
+                  ggplot2::aes(x = Var1, y = Var2, fill = value)) +
+    ggplot2::geom_tile(colour = "grey60") +
+    mvgam_diverging_scale(name = "Posterior\ncorrelation",
+                          limits = c(-1, 1)) +
+    ggplot2::facet_wrap(~ group, ncol = ncol) +
+    ggplot2::scale_x_discrete(
+      guide = ggplot2::guide_axis(angle = 45)
+    ) +
+    ggplot2::scale_y_discrete(limits = rev) +
+    ggplot2::labs(x = "", y = "") +
+    mvgam_theme()
+}

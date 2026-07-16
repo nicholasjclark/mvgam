@@ -7,7 +7,14 @@
 \usage{
 irf(object, ...)
 
-\method{irf}{mvgam}(object, h = 10, cumulative = FALSE, orthogonal = FALSE, ...)
+\method{irf}{mvgam}(
+  object,
+  h = 10,
+  cumulative = FALSE,
+  orthogonal = FALSE,
+  future = FALSE,
+  ...
+)
 }
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}
@@ -23,6 +30,14 @@ the IRF}
 
 \item{orthogonal}{\code{Logical} flag indicating whether orthogonalized IRFs should be
 calculated. Note that the order of the variables matters when calculating these}
+
+\item{future}{\code{Logical}. When \code{TRUE}, per-draw IRF
+computation runs under whatever
+\code{\link[future:plan]{future::plan()}} the caller has set
+(default \code{sequential} behaves like base \code{lapply} with
+negligible overhead; \code{plan(multisession, workers = N)}
+splits draws across \code{N} R processes). Requires the
+\code{future} package (mvgam Suggests).}
 }
 \value{
 An object of \code{\link{mvgam_irf-class}} containing the posterior IRFs. This
@@ -55,7 +70,7 @@ plot(irf_obj, series = 1)
 \code{\link[=plot.mvgam_forecast]{plot.mvgam_forecast()}}.
 For a worked article that runs \code{irf()} end to end on an
 annual bird-count VAR, see
-\url{https://nicholasjclark.github.io/mvgam/articles/vector_ar.html}.
+\url{https://nicholasjclark.github.io/mvgam/articles/var.html}.
 }
 \author{
 Nicholas J Clark

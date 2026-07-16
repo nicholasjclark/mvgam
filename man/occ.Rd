@@ -226,8 +226,9 @@ occupancy estimation in R. \emph{bioRxiv}.
 \seealso{
 \code{\link[=nmix]{nmix()}} for the related N-mixture family,
 \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} for closure-unit goodness-of-fit. The
-CRAN-shipped vignette \code{vignette("nmixtures")} covers
-both occupancy and N-mixture workflows; the closure-unit
-data-shape requirements that \code{occ()} consumes are
-documented in \code{vignette("data_in_mvgam")}.
+online article at
+\url{https://nicholasjclark.github.io/mvgam/articles/nmix.html}
+covers both occupancy and N-mixture workflows; the
+closure-unit data-shape requirements that \code{occ()} consumes
+are documented in \code{vignette("data", package = "mvgam")}.
 }

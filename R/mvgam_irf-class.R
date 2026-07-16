@@ -122,6 +122,10 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
 #'
 #' @param series \code{integer} specifying which process series should be
 #'   given the shock
+#' @param responses Optional integer vector of process indices to
+#'   display as response panels. Useful for hierarchical VAR fits
+#'   where the raw K-panel grid is unreadable. Defaults to all
+#'   processes.
 #'
 #' @param ... ignored
 #'
@@ -135,7 +139,7 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
 #' @author Nicholas J Clark
 #'
 #' @export
-plot.mvgam_irf = function(x, series = 1, ...) {
+plot.mvgam_irf = function(x, series = 1, responses = NULL, ...) {
   checkmate::assert_class(x, "mvgam_irf")
   validate_pos_integer(series)
   # Lock the bayesplot scheme to the house red for the duration
@@ -152,6 +156,7 @@ plot.mvgam_irf = function(x, series = 1, ...) {
       )
     )))
   }
+  resp_ids <- validate_var_plot_ids(responses, n_processes, "responses")
   h <- dim(x[[1]][[1]])[1]
   ndraws <- length(x)
 
@@ -160,12 +165,12 @@ plot.mvgam_irf = function(x, series = 1, ...) {
   # and `mvgam_median_layer` then handle quantile-band + median
   # construction per panel via their `group` arg.
   resp_keys <- paste0(
-    "Process_~", series, " %->% Process_~", seq_len(n_processes)
+    "Process_~", series, " %->% Process_~", resp_ids
   )
-  draws_mat <- do.call(cbind, lapply(seq_len(n_processes), function(resp) {
+  draws_mat <- do.call(cbind, lapply(resp_ids, function(resp) {
     t(vapply(x, function(draw) draw[[series]][, resp], numeric(h)))
   }))
-  times <- rep(seq_len(h), times = n_processes)
+  times <- rep(seq_len(h), times = length(resp_ids))
   group <- rep(resp_keys, each = h)
 
   band_probs <- c(0.2, 0.4, 0.6, 0.8)

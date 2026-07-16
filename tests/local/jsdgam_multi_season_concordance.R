@@ -158,7 +158,7 @@ if (file.exists(cache_mvgam)) {
     n_lv           = n_lv,
     prior          = prior(normal(0, 0.5), class = "sds"),
     chains         = 2L, parallel = TRUE,
-    burnin         = 500L, samples = 500L,
+    warmup         = 500L, iter = 1000L,
     silent         = 2L, backend = "cmdstanr"
   )
   saveRDS(fit_mvgam, cache_mvgam)

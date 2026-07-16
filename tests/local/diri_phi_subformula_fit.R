@@ -78,8 +78,8 @@ if (file.exists(cache)) {
     n_lv    = 2L,
     chains  = 2L,
     parallel = TRUE,
-    burnin  = 500L,
-    samples = 500L,
+    warmup  = 500L,
+    iter    = 1000L,
     silent  = 2,
     backend = "cmdstanr"
   )

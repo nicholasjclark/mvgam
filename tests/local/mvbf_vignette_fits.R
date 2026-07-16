@@ -1,8 +1,8 @@
 # Build the cached fits + simulated data consumed by
-# `vignettes/articles/multivariate.Rmd`.
+# `vignettes/articles/mvbf.Rmd`.
 #
 # Run once locally with:
-#   Rscript tests/local/multivariate_vignette_fits.R
+#   Rscript tests/local/mvbf_vignette_fits.R
 #
 # The article reads the RDS files unconditionally when present;
 # regenerate this cache whenever a relevant API or default shifts.
@@ -12,7 +12,7 @@ suppressPackageStartupMessages({
   library(mvgam)
 })
 
-cache_dir <- file.path("pkgdown", "multivariate_cache")
+cache_dir <- file.path("pkgdown", "mvbf_cache")
 if (!dir.exists(cache_dir)) {
   dir.create(cache_dir, recursive = TRUE)
 }

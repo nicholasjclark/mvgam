@@ -10,6 +10,12 @@
 #'   to [mvgam()] that used a Vector Autoregressive latent process model (either
 #'   as `VAR(cor = FALSE)` or `VAR(cor = TRUE)`)
 #'
+#' @param future \code{Logical}. When `TRUE`, per-draw stability
+#'   computation runs under whatever
+#'   \code{\link[future:plan]{future::plan()}} the caller has set;
+#'   see [`irf()`] for details. Requires the \code{future} package
+#'   (mvgam Suggests).
+#'
 #' @param ... Ignored
 #'
 #' @details These measures of stability can be used to assess how important
@@ -91,7 +97,7 @@
 #'   \code{\link{plot.mvgam_forecast}}.
 #'   For a worked article that runs `stability()` end to end
 #'   on an annual bird-count VAR, see
-#'   [https://nicholasjclark.github.io/mvgam/articles/vector_ar.html](https://nicholasjclark.github.io/mvgam/articles/vector_ar.html).
+#'   [https://nicholasjclark.github.io/mvgam/articles/var.html](https://nicholasjclark.github.io/mvgam/articles/var.html).
 #'
 #' @examples
 #' \dontrun{
@@ -107,23 +113,55 @@ stability <- function(object, ...) {
   UseMethod("stability", object)
 }
 
+# Discrete Lyapunov solver via doubling (Kitagawa 1977 / Anderson
+# 1979). Solves X = B X B' + Sigma for X, assuming B has spectral
+# radius < 1 (guaranteed under mvgam's Heaps 2022 stationarity
+# prior on VAR fits). Doubling accumulates the Neumann series
+# `sum_{k>=0} B^k Sigma (B')^k` by squaring the partial sum each
+# iteration; after `k` steps the partial sum covers `2^k` terms
+# and the multiplier factor becomes `B^{2^k}`, which decays like
+# `rho(B)^{2^k}`. Cost is O(K^3 log(1/tol)) per solve rather than
+# the O(K^6) dense LU on `I(K^2) - B kron B` the Kronecker form
+# uses. Called from `stability.mvgam()` once per posterior draw
+# (`R/stability.R:113`); dominated the wall-clock at K >= 12 in
+# the earlier implementation.
+#'@noRd
+solve_dlyap <- function(B, Sigma, tol = 1e-12, max_iter = 100L) {
+  X <- Sigma
+  A <- B
+  for (iter in seq_len(max_iter)) {
+    X <- X + A %*% X %*% t(A)
+    A <- A %*% A
+    if (max(abs(A)) < tol) break
+  }
+  X
+}
+
 #'@rdname stability.mvgam
 #'@method stability mvgam
 #'@export
-stability.mvgam = function(object, ...) {
+stability.mvgam = function(object, future = FALSE, ...) {
+  checkmate::assert_flag(future)
   assert_var_trend(object, surface = "stability()")
   var_post <- extract_var_posterior(object)
 
   metrics <- do.call(
     rbind,
-    lapply(seq_len(var_post$ndraws), function(i) {
+    mvgam_maybe_future_lapply(var_post$ndraws, function(i) {
       B <- var_post$A[i, , , drop = TRUE]
       p <- var_post$K
       Sigma <- var_post$Sigma[i, , , drop = TRUE]
 
-      # Variance of the stationary distribution (Sigma_inf)
-      vecS_inf <- solve(diag(p * p) - kronecker(B, B)) %*% as.vector(Sigma)
-      Sigma_inf <- matrix(vecS_inf, nrow = p)
+      # Stationary variance Sigma_inf satisfies the discrete Lyapunov
+      # equation Sigma_inf = B Sigma_inf B' + Sigma. Solve via
+      # doubling (Kitagawa 1977 / Anderson 1979) at O(K^3 log(1/tol))
+      # rather than the earlier `solve(I - B %x% B) %*% vec(Sigma)`
+      # Kronecker form at O(K^6), which was dominating stability()
+      # wall-clock at K >= 12.
+      Sigma_inf <- solve_dlyap(B, Sigma)
+      # Enforce symmetry so downstream `solve(Sigma_inf)` and
+      # `det(Sigma_inf)` do not inherit floating-point asymmetry.
+      Sigma_inf <- (Sigma_inf + t(Sigma_inf)) / 2
 
       # The difference in volume between Sigma_inf and Sigma is:
       # det(Sigma_inf - Sigma) = det(Sigma_inf) * det(B) ^ 2
@@ -136,13 +174,26 @@ stability.mvgam = function(object, ...) {
       # https://github.com/mdscheuerell/safs-quant-sem-2022/blob/main/lwa_analysis.R
       int_env <- det(Sigma_inf) * t(solve(Sigma_inf))
 
-      # Proportion of inter-series covariance to
-      # to overall environmental variation contribution (i.e. how important are
-      # correlated errors for controlling the shape of the stationary forecast
-      # distribution?)
+      # Proportion of inter-series covariance to overall environmental
+      # variation contribution (i.e. how important are correlated
+      # errors for controlling the shape of the stationary forecast
+      # distribution?). The mask `Sigma != 0` restricts the
+      # off-diagonal average to cells the fit actually estimates:
+      # for a non-hierarchical VAR(cor = TRUE) fit every off-diagonal
+      # is modelled and the mask covers the full lower triangle;
+      # for a hierarchical VAR the block-diagonal parameterisation
+      # leaves inter-group cells as structural zeros, and averaging
+      # them in would drive the ratio toward zero by construction.
+      sigma_mask <- Sigma != 0
+      lower_mask <- lower.tri(int_env) & sigma_mask
+      off_vals <- abs(int_env[lower_mask])
+      diag_vals <- abs(diag(int_env))
+      mean_off <- if (length(off_vals)) mean(off_vals) else 0
+      mean_diag <- if (length(diag_vals)) mean(diag_vals) else 0
       dat <- data.frame(
-        prop_cov_offdiag = mean(abs(int_env[lower.tri(int_env)])) /
-          (mean(abs(diag(int_env))) + mean(abs(int_env[lower.tri(int_env)])))
+        prop_cov_offdiag = if ((mean_diag + mean_off) > 0) {
+          mean_off / (mean_diag + mean_off)
+        } else 0
       )
 
       # Proportion of error variances to stationary forecast distribution
@@ -164,10 +215,19 @@ stability.mvgam = function(object, ...) {
       # (note the use of 2 here because we squared det(B) in the above eqn)
       int_sens <- 2 * det(B) * t(solve(B))
 
-      # Proportion of interspecific contributions to
-      # to overall interaction contribution
-      dat$prop_int_offdiag <- mean(abs(int_sens[lower.tri(int_sens)])) /
-        (mean(abs(diag(int_sens))) + mean(abs(int_sens[lower.tri(int_sens)])))
+      # Proportion of interspecific contributions to overall interaction
+      # contribution. Same block-aware masking as `prop_cov_offdiag`:
+      # for hierarchical fits `B` is block-diagonal, so only
+      # within-block off-diagonals count.
+      b_mask <- B != 0
+      lower_mask_b <- lower.tri(int_sens) & b_mask
+      off_vals_b <- abs(int_sens[lower_mask_b])
+      diag_vals_b <- abs(diag(int_sens))
+      mean_off_b <- if (length(off_vals_b)) mean(off_vals_b) else 0
+      mean_diag_b <- if (length(diag_vals_b)) mean(diag_vals_b) else 0
+      dat$prop_int_offdiag <- if ((mean_diag_b + mean_off_b) > 0) {
+        mean_off_b / (mean_diag_b + mean_off_b)
+      } else 0
 
       # Proportion of density dependent contributions to
       # to overall interaction contribution
@@ -181,13 +241,14 @@ stability.mvgam = function(object, ...) {
       dat$reactivity <- log(max(svd(B)$d))
 
       # Return rate of transition distribution to the stationary distribution
-      # Asymptotic return rate of the mean
-      # lower values = more stability
-      dat$mean_return_rate <- max(abs(eigen(B)$values))
-
-      # Asymptotic return rate of the variance
-      # lower values = more stability
-      dat$var_return_rate <- max(abs(eigen(B %x% B)$values))
+      # Asymptotic return rate of the mean and variance. Reuse the
+      # eigenvalues of B for both: eigen(B kron B) equals the
+      # tensor product of eigen(B) with itself, so
+      # max|eigen(B kron B)| = max|eigen(B)|^2 exactly. Avoids a
+      # second O(K^6) eigen decomposition on the K^2 x K^2 Kronecker.
+      lam_B <- eigen(B, only.values = TRUE)$values
+      dat$mean_return_rate <- max(abs(lam_B))
+      dat$var_return_rate <- dat$mean_return_rate^2
       dat
     })
   )

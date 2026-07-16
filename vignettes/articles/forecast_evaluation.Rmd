@@ -608,7 +608,7 @@ The natural next functions to explore on the same fit are:
 
 Sibling articles in this series carry the workflow further:
 
-- The [multi-response article](https://nicholasjclark.github.io/mvgam/articles/multivariate.html)
+- The [multi-response article](https://nicholasjclark.github.io/mvgam/articles/mvbf.html)
   shows how to share a single latent state across several
   outcomes with different observation families.
 - The [JSDM article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)

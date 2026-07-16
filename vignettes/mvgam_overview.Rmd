@@ -765,7 +765,7 @@ Sibling articles in this series carry the workflow further:
   walks through `forecast()`, `score()`, `lfo_cv()` and
   `ensemble()` on a worked count-data example.
 - The
-  [multi-response article](https://nicholasjclark.github.io/mvgam/articles/multivariate.html)
+  [multi-response article](https://nicholasjclark.github.io/mvgam/articles/mvbf.html)
   shows how to share a single latent state across several
   outcomes with different observation families.
 - The

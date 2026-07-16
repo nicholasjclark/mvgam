@@ -46,11 +46,11 @@ if (!requireNamespace("bridgesampling", quietly = TRUE)) {
     recompile = TRUE
   )
   fit_joint <- update(
-    readRDS("pkgdown/ipm_cache/mod_joint.rds"),
+    readRDS("pkgdown/idm_cache/mod_joint.rds"),
     recompile = TRUE
   )
   fit_wrong <- update(
-    readRDS("pkgdown/ipm_cache/mod_wrong_trend.rds"),
+    readRDS("pkgdown/idm_cache/mod_wrong_trend.rds"),
     recompile = TRUE
   )
 

@@ -10,6 +10,70 @@
 # single datasets and multiple imputation scenarios transparently, ensuring
 # consistent behavior across different input types.
 
+# Internal: translate the deprecated `samples` / `burnin` argument
+# pair to the brms-style `iter` / `warmup` pair. Historical mvgam
+# roxygen examples used `samples` (post-warmup draws) and `burnin`
+# (warmup draws). The brms integration pipeline
+# (`R/backends.R:493-494`) reads `iter` (total iterations) and
+# `warmup` (warmup portion). Prior to this helper both deprecated
+# names silently disappeared into `...` and every fit got
+# cmdstanr's `iter = 2000, warmup = 1000` default. Called from
+# `mvgam()` before dispatching to inner fitting machinery.
+#
+# Returns the `dots` list with `iter` and `warmup` set from the
+# deprecated names (defaulting to 1000 each when only one of the
+# pair was supplied) and the deprecated names removed. Attaches an
+# attribute `translated = TRUE` so the caller knows to re-dispatch
+# with the corrected names; `translated = FALSE` if neither
+# deprecated name was present.
+#
+# Errors when the user supplies both the deprecated pair and the
+# brms-style pair on the same call, since they configure the same
+# sampler budget and the intent would be ambiguous.
+#
+# Related: `mvgam_use_alias()` (R/mvgam_model_helpers.R) handles
+# the simpler single-argument deprecated-alias case where one name
+# maps to another without arithmetic on the value. Kept separate
+# because the pair-with-arithmetic mapping here (`iter =
+# samples + burnin`, `warmup = burnin`) does not fit that shape.
+#'@noRd
+translate_samples_burnin <- function(dots) {
+  has_deprecated <- any(c("samples", "burnin") %in% names(dots))
+  if (!has_deprecated) {
+    attr(dots, "translated") <- FALSE
+    return(dots)
+  }
+  if (any(c("iter", "warmup") %in% names(dots))) {
+    stop(insight::format_error(c(
+      "Do not mix 'samples'/'burnin' with 'iter'/'warmup'.",
+      x = "Both name pairs configure the same sampler budget.",
+      i = paste0(
+        "Prefer 'iter'/'warmup' (brms convention); ",
+        "'samples'/'burnin' are deprecated."
+      )
+    )))
+  }
+  if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+    rlang::warn(
+      paste0(
+        "mvgam(): 'samples' and 'burnin' are deprecated; use ",
+        "'iter' (total iterations, warmup + post-warmup) and ",
+        "'warmup' instead."
+      ),
+      .frequency = "once",
+      .frequency_id = "mvgam_samples_burnin_deprecated"
+    )
+  }
+  samples <- dots$samples %||% 1000L
+  burnin  <- dots$burnin  %||% 1000L
+  dots$iter    <- samples + burnin
+  dots$warmup  <- burnin
+  dots$samples <- NULL
+  dots$burnin  <- NULL
+  attr(dots, "translated") <- TRUE
+  dots
+}
+
 #' mvgam Function with Single-Fit Architecture
 #'
 #' @description
@@ -283,8 +347,8 @@
 #'     prior(exponential(2.5), class = sigma_trend)
 #'   ),
 #'   chains        = 2,
-#'   samples       = 500,
-#'   burnin        = 500,
+#'   iter          = 1000,
+#'   warmup        = 500,
 #'   silent        = 2
 #' )
 #' summary(var_mod, include_betas = FALSE)
@@ -332,8 +396,8 @@
 #'   data     = tvdat,
 #'   family   = gaussian(),
 #'   chains   = 2,
-#'   samples  = 500,
-#'   burnin   = 500,
+#'   iter     = 1000,
+#'   warmup   = 500,
 #'   silent   = 2
 #' )
 #' # `conditional_effects()` shows the two-way surface: the
@@ -380,7 +444,7 @@
 #'   \code{\link{jsdgam}}. The CRAN-shipped overview is
 #'   available via \code{vignette("mvgam_overview")}; for data
 #'   formatting requirements see
-#'   \code{vignette("data_in_mvgam")}; for the
+#'   \code{vignette("data", package = "mvgam")}; for the
 #'   forecast-evaluation workflow (LOO, LFO, ensembling) see
 #'   the online article at
 #'   \url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html};
@@ -388,9 +452,9 @@
 #'   integrated species distribution model pattern that ties
 #'   several observation families to one shared latent process,
 #'   see
-#'   \url{https://nicholasjclark.github.io/mvgam/articles/multivariate.html}
+#'   \url{https://nicholasjclark.github.io/mvgam/articles/mvbf.html}
 #'   and
-#'   \url{https://nicholasjclark.github.io/mvgam/articles/ipm.html}.
+#'   \url{https://nicholasjclark.github.io/mvgam/articles/idm.html}.
 #'
 #' @export
 mvgam <- function(formula, trend_formula = NULL, data = NULL,
@@ -401,6 +465,34 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
                            combine = TRUE, family = gaussian(),
                            threads = NULL,
                            run_model = TRUE, ...) {
+
+  # Translate the deprecated `samples` / `burnin` argument pair to
+  # the brms-style `iter` / `warmup` pair the backends actually
+  # consume. See `translate_samples_burnin()` for the mapping and
+  # deprecation rationale.
+  dots <- translate_samples_burnin(list(...))
+  if (attr(dots, "translated", exact = TRUE)) {
+    attr(dots, "translated") <- NULL
+    return(do.call(
+      mvgam,
+      c(
+        list(
+          formula        = formula,
+          trend_formula  = trend_formula,
+          data           = data,
+          newdata        = newdata,
+          trend_map      = trend_map,
+          loadings_prior = loadings_prior,
+          backend        = backend,
+          combine        = combine,
+          family         = family,
+          threads        = threads,
+          run_model      = run_model
+        ),
+        dots
+      )
+    ))
+  }
 
   # Stash silent on a global option so deep validators (the
   # exact-GP notice in particular) can honour `silent >= 2`

@@ -4,10 +4,23 @@
 \alias{plot.mvgam_fevd}
 \title{Plot forecast error variance decompositions from an \code{mvgam_fevd} object}
 \usage{
-\method{plot}{mvgam_fevd}(x, ...)
+\method{plot}{mvgam_fevd}(x, series = NULL, contributing = NULL, ...)
 }
 \arguments{
 \item{x}{\code{list} object of class \code{mvgam_fevd}. See \code{\link[=fevd]{fevd()}}}
+
+\item{series}{Optional integer vector selecting which
+target processes should be shown as facets. Useful on
+hierarchical VAR fits where the raw K x K panel would run to
+dozens of panels. Defaults to all processes.}
+
+\item{contributing}{Optional integer vector selecting which
+source processes should appear as stacked contributions to
+each target. Sources not in this set are dropped before
+computing shares, so the bars re-normalise across the
+retained sources; this makes it easy to zoom in on
+within-country dependencies on hierarchical VARs. Defaults to
+all processes.}
 
 \item{...}{ignored}
 }

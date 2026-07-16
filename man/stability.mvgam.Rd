@@ -7,7 +7,7 @@
 \usage{
 stability(object, ...)
 
-\method{stability}{mvgam}(object, ...)
+\method{stability}{mvgam}(object, future = FALSE, ...)
 }
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} resulting from a call
@@ -15,6 +15,12 @@ to \code{\link[=mvgam]{mvgam()}} that used a Vector Autoregressive latent proces
 as \code{VAR(cor = FALSE)} or \code{VAR(cor = TRUE)})}
 
 \item{...}{Ignored}
+
+\item{future}{\code{Logical}. When \code{TRUE}, per-draw stability
+computation runs under whatever
+\code{\link[future:plan]{future::plan()}} the caller has set;
+see \code{\link[=irf]{irf()}} for details. Requires the \code{future} package
+(mvgam Suggests).}
 }
 \value{
 A \code{data.frame} containing posterior draws for each stability
@@ -112,7 +118,7 @@ community stability and ecological interactions from time-series data.
 \code{\link{plot.mvgam_forecast}}.
 For a worked article that runs \code{stability()} end to end
 on an annual bird-count VAR, see
-\url{https://nicholasjclark.github.io/mvgam/articles/vector_ar.html}.
+\url{https://nicholasjclark.github.io/mvgam/articles/var.html}.
 }
 \author{
 Nicholas J Clark

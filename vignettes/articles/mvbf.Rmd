@@ -28,7 +28,7 @@ library(ggplot2)
 library(patchwork)
 theme_set(theme_bw(base_size = 12, base_family = "serif"))
 
-cache_dir <- file.path("pkgdown", "multivariate_cache")
+cache_dir <- file.path("pkgdown", "mvbf_cache")
 read_cache <- function(name) {
   readRDS(file.path(cache_dir, paste0(name, ".rds")))
 }

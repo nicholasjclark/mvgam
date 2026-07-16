@@ -19,6 +19,19 @@
 #' @param include_states Logical; if \code{TRUE}, include latent state parameters
 #'   (\code{trend\[i,s\]}, \code{lv_trend\[i,k\]}) in summary. Default is \code{FALSE} as these
 #'   are typically too numerous for display.
+#' @param include_betas Logical; if \code{TRUE} (the default), print every
+#'   per-cell expansion of the trend-side dynamic parameters
+#'   (per-country and per-cell \code{A_group_trend},
+#'   \code{Sigma_group_trend}, the full block-diagonal
+#'   \code{A_trend} / \code{Sigma_trend} / \code{Omega_trend} etc.).
+#'   Setting \code{FALSE} keeps the global hyperparameters
+#'   (\code{Amu_trend}, \code{Aomega_trend},
+#'   \code{L_Omega_global_trend}, \code{alpha_cor_trend},
+#'   \code{sigma}) and drops the per-cell arrays; useful for
+#'   hierarchical VAR fits where the expansion runs to hundreds
+#'   or thousands of rows. Individual per-country blocks can
+#'   still be pulled via \code{as.matrix()},
+#'   \code{as_draws_df()}, or \code{mcmc_plot()}.
 #' @param ... Additional arguments (currently unused).
 #'
 #' @return An object of class \code{summary.mvgam} containing:
@@ -59,13 +72,15 @@
 #'
 #' @export
 summary.mvgam <- function(object, probs = c(0.025, 0.975),
-                          robust = FALSE, include_states = FALSE, ...) {
+                          robust = FALSE, include_states = FALSE,
+                          include_betas = TRUE, ...) {
   # Input validation
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_numeric(probs, len = 2, lower = 0, upper = 1)
   checkmate::assert_true(probs[1] < probs[2])
   checkmate::assert_logical(robust, len = 1)
   checkmate::assert_logical(include_states, len = 1)
+  checkmate::assert_logical(include_betas, len = 1)
 
   # Check for fitted model
   if (is.null(object$fit)) {
@@ -110,6 +125,27 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   pars_to_keep <- !(rownames(all_summaries) %in% exclude_pars)
   all_summaries <- all_summaries[pars_to_keep, , drop = FALSE]
   pars <- rownames(all_summaries)
+
+  # `include_betas = FALSE` drops the trend-side per-cell arrays that
+  # dominate the printed summary on hierarchical or high-dimensional
+  # VAR fits (per-country A_group_trend, Sigma_group_trend, the full
+  # block-diagonal A_trend / Sigma_trend / Omega_trend). Global
+  # hyperparameters (Amu_trend, Aomega_trend, L_Omega_global_trend,
+  # alpha_cor_trend, sigma_group_trend[k, k] scalars) survive so the
+  # printed digest stays focused on parameters a reader would
+  # actually inspect.
+  if (!isTRUE(include_betas)) {
+    heavy_pat <- paste0(
+      "^(A_raw_group_trend|A_group_trend|Sigma_group_trend|",
+      "L_deviation_group_trend|A_trend|Sigma_trend|Omega_trend|",
+      "L_Omega_trend|init_trend)\\["
+    )
+    pars_to_keep <- !grepl(heavy_pat, pars)
+    if (any(!pars_to_keep)) {
+      all_summaries <- all_summaries[pars_to_keep, , drop = FALSE]
+      pars <- rownames(all_summaries)
+    }
+  }
 
   # Hide rotation- / sign-indeterminate raw factor-model parameters
   # whenever their QR-identified counterparts are also in the posterior

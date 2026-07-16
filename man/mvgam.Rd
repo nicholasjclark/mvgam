@@ -306,8 +306,8 @@ var_mod <- mvgam(
     prior(exponential(2.5), class = sigma_trend)
   ),
   chains        = 2,
-  samples       = 500,
-  burnin        = 500,
+  iter          = 1000,
+  warmup        = 500,
   silent        = 2
 )
 summary(var_mod, include_betas = FALSE)
@@ -355,8 +355,8 @@ tv_mod <- mvgam(
   data     = tvdat,
   family   = gaussian(),
   chains   = 2,
-  samples  = 500,
-  burnin   = 500,
+  iter     = 1000,
+  warmup   = 500,
   silent   = 2
 )
 # `conditional_effects()` shows the two-way surface: the
@@ -405,7 +405,7 @@ rendered as a Markdown + LaTeX block, use
 \code{\link{jsdgam}}. The CRAN-shipped overview is
 available via \code{vignette("mvgam_overview")}; for data
 formatting requirements see
-\code{vignette("data_in_mvgam")}; for the
+\code{vignette("data", package = "mvgam")}; for the
 forecast-evaluation workflow (LOO, LFO, ensembling) see
 the online article at
 \url{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html};
@@ -413,7 +413,7 @@ for the multi-response \code{mvbf()} workflow and the
 integrated species distribution model pattern that ties
 several observation families to one shared latent process,
 see
-\url{https://nicholasjclark.github.io/mvgam/articles/multivariate.html}
+\url{https://nicholasjclark.github.io/mvgam/articles/mvbf.html}
 and
-\url{https://nicholasjclark.github.io/mvgam/articles/ipm.html}.
+\url{https://nicholasjclark.github.io/mvgam/articles/idm.html}.
 }

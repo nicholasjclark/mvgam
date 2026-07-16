@@ -107,6 +107,17 @@ summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
 #'@importFrom ggplot2 ggplot aes geom_bar facet_wrap labs
 #'
 #'@param x \code{list} object of class \code{mvgam_fevd}. See [fevd()]
+#'@param series Optional integer vector selecting which
+#'  target processes should be shown as facets. Useful on
+#'  hierarchical VAR fits where the raw K x K panel would run to
+#'  dozens of panels. Defaults to all processes.
+#'@param contributing Optional integer vector selecting which
+#'  source processes should appear as stacked contributions to
+#'  each target. Sources not in this set are dropped before
+#'  computing shares, so the bars re-normalise across the
+#'  retained sources; this makes it easy to zoom in on
+#'  within-country dependencies on hierarchical VARs. Defaults to
+#'  all processes.
 #'
 #'@param ... ignored
 #'
@@ -120,18 +131,37 @@ summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
 #'@author Nicholas J Clark
 #'
 #'@export
-plot.mvgam_fevd = function(x, ...) {
+plot.mvgam_fevd = function(x, series = NULL, contributing = NULL, ...) {
   checkmate::assert_class(x, "mvgam_fevd")
   # Calculate posterior median error variance contributions
   ynames <- names(x[[1]])
+  n_proc <- length(ynames)
+  target_keep <- validate_var_plot_ids(series, n_proc, "series")
+  source_keep <- validate_var_plot_ids(
+    contributing, n_proc, "contributing"
+  )
+  target_names <- ynames[target_keep]
+  source_names <- paste0("process_", source_keep)
+
   do.call(
     rbind,
     lapply(seq_len(length(x)), function(draw) {
       fevd_df(x[[draw]], ynames = ynames)
     })
   ) %>%
+    dplyr::filter(
+      target %in% target_names,
+      Series %in% source_names
+    ) %>%
     dplyr::group_by(horizon, target, Series) %>%
-    dplyr::summarise(mean_evd = median(evd)) %>%
+    dplyr::summarise(mean_evd = median(evd), .groups = "drop") %>%
+    # When `contributing` drops sources, the retained shares no
+    # longer sum to 1; re-normalise per (target, horizon) so the
+    # stacked bars still read as a proper variance decomposition.
+    dplyr::group_by(target, horizon) %>%
+    dplyr::mutate(
+      mean_evd = mean_evd / sum(mean_evd)
+    ) %>%
     dplyr::ungroup() %>%
     dplyr::mutate(
       Series = gsub('process', 'Process', Series),

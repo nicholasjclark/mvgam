@@ -695,32 +695,86 @@ extract_posterior_param <- function(draws_mat, all_cols, param_name) {
 #' @noRd
 NULL
 
-#' Pull a 2D-indexed Stan parameter `name\[i, j\]` into a per-draw
-#' \[ndraws, nrow, ncol\] array, validating all required columns are
-#' present. Shared by Cholesky / full-covariance / factor-loadings
-#' extractors that build \[d, i, j\] arrays from posterior draws.
+#' Pull an indexed Stan matrix parameter into a per-draw
+#' `[ndraws, nrow, ncol]` array. Handles matrix-valued (`name[i, j]`)
+#' or array-of-matrix (`name[c, i, j]`, `name[c, l, i, j]`) Stan
+#' declarations via `prefix_ids`, applies an optional per-draw
+#' matrix `transform` (e.g. `stats::cov2cor`, `tcrossprod`) and
+#' can label dims 2-3 for user-facing return values. Shared by
+#' Cholesky / covariance / factor-loading extractors that build
+#' `[d, i, j]` arrays from posterior draws, and by
+#' `posterior_innovation_cor()` / `posterior_transition_matrix()`.
+#'
+#' @param draws_mat A posterior draws matrix
+#'   (`posterior::as_draws_matrix()`).
+#' @param name Character. Base parameter name (e.g. `"Sigma_trend"`,
+#'   `"A_group_trend"`).
+#' @param nrow,ncol Positive integers. Matrix dimensions.
+#' @param prefix_ids Integer vector of leading (fixed) indices.
+#'   Empty for a bare `name[i, j]` matrix; `c(group)` for
+#'   `name[group, i, j]`; `c(group, lag)` for
+#'   `name[group, lag, i, j]`.
+#' @param transform Optional function taking a `nrow x ncol` matrix
+#'   and returning a matrix of the same shape (or `NULL` for the
+#'   identity). Applied per draw.
+#' @param labels Character vector of length `max(nrow, ncol)` used
+#'   to name dims 2-3 (or `NULL` to leave unnamed). Only sensible
+#'   when `nrow == ncol`.
+#' @param required_for Human-readable hint used in the missing-cell
+#'   error message.
+#' @return `[ndraws, nrow, ncol]` numeric array.
 #'
 #' @noRd
 extract_indexed_array_2d <- function(draws_mat, name, nrow, ncol,
+                                      prefix_ids = integer(0),
+                                      transform = NULL,
+                                      labels = NULL,
                                       required_for = name) {
   checkmate::assert_matrix(draws_mat, min.rows = 1, min.cols = 1)
   checkmate::assert_string(name, min.chars = 1)
   checkmate::assert_int(nrow, lower = 1)
   checkmate::assert_int(ncol, lower = 1)
+  checkmate::assert_integerish(prefix_ids, lower = 1L, min.len = 0L)
   ndraws <- base::nrow(draws_mat)
   all_cols <- colnames(draws_mat)
-  out <- array(0, c(ndraws, nrow, ncol))
-  for (j in seq_len(ncol)) {
-    for (i in seq_len(nrow)) {
-      col_name <- sprintf("%s[%d,%d]", name, i, j)
-      if (!col_name %in% all_cols) {
-        stop(insight::format_error(c(
-          paste0("Posterior parameter '", col_name, "' not found."),
-          i = paste0("Required for ", required_for, ".")
-        )))
-      }
-      out[, i, j] <- as.numeric(draws_mat[, col_name])
-    }
+  # Build column names in column-major order (i varies fastest so
+  # the flat vector maps directly onto a [ndraws, nrow, ncol]
+  # array via R's default column-major fill), then take the whole
+  # block in one matrix slice. The earlier per-cell loop cost one
+  # named-column lookup per (nrow * ncol) iterations; a 24 x 24
+  # `Sigma_trend` block on a wide draws matrix took long enough to
+  # dominate `irf()` wall-clock on hierarchical VAR fits.
+  ij <- expand.grid(i = seq_len(nrow), j = seq_len(ncol))
+  if (length(prefix_ids)) {
+    prefix_str <- paste(as.integer(prefix_ids), collapse = ",")
+    col_names <- sprintf(
+      paste0(name, "[", prefix_str, ",%d,%d]"), ij$i, ij$j
+    )
+  } else {
+    col_names <- sprintf(paste0(name, "[%d,%d]"), ij$i, ij$j)
+  }
+  missing_cols <- setdiff(col_names, all_cols)
+  if (length(missing_cols)) {
+    stop(insight::format_error(c(
+      paste0("Posterior parameter '", missing_cols[1L], "' not found."),
+      i = paste0("Required for ", required_for, ".")
+    )))
+  }
+  # Fast path when no per-draw transform is requested: one array()
+  # call over the whole column-major slice.
+  if (is.null(transform)) {
+    out <- array(as.numeric(draws_mat[, col_names, drop = FALSE]),
+                 dim = c(ndraws, nrow, ncol))
+  } else {
+    flat <- draws_mat[, col_names, drop = FALSE]
+    stacked <- vapply(seq_len(ndraws), function(d) {
+      as.numeric(transform(matrix(as.numeric(flat[d, ]), nrow, ncol)))
+    }, numeric(nrow * ncol))
+    out <- aperm(array(stacked, dim = c(nrow, ncol, ndraws)),
+                 c(3, 1, 2))
+  }
+  if (!is.null(labels)) {
+    dimnames(out) <- list(NULL, labels, labels)
   }
   out
 }

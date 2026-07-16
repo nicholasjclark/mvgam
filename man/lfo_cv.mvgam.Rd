@@ -148,7 +148,7 @@ via \code{loo_model_weights.mvgam_lfo()}. For guidance on
 choosing \code{fc_horizon} when the misspecification you are
 testing has a known timescale (e.g. an annual recurrence),
 see the integrated distribution model article at
-\url{https://nicholasjclark.github.io/mvgam/articles/ipm.html}.
+\url{https://nicholasjclark.github.io/mvgam/articles/idm.html}.
 }
 \author{
 Nicholas J Clark

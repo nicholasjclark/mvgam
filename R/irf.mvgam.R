@@ -12,6 +12,13 @@
 #' @param cumulative \code{Logical} flag indicating whether the IRF should be cumulative
 #' @param orthogonal \code{Logical} flag indicating whether orthogonalized IRFs should be
 #' calculated. Note that the order of the variables matters when calculating these
+#' @param future \code{Logical}. When `TRUE`, per-draw IRF
+#'   computation runs under whatever
+#'   \code{\link[future:plan]{future::plan()}} the caller has set
+#'   (default \code{sequential} behaves like base `lapply` with
+#'   negligible overhead; \code{plan(multisession, workers = N)}
+#'   splits draws across \code{N} R processes). Requires the
+#'   \code{future} package (mvgam Suggests).
 #' @param ... ignored
 #' @details
 #' See \code{\link{mvgam_irf-class}} for a full description of the quantities that are
@@ -26,7 +33,7 @@
 #'   [plot.mvgam_forecast()].
 #'   For a worked article that runs `irf()` end to end on an
 #'   annual bird-count VAR, see
-#'   [https://nicholasjclark.github.io/mvgam/articles/vector_ar.html](https://nicholasjclark.github.io/mvgam/articles/vector_ar.html).
+#'   [https://nicholasjclark.github.io/mvgam/articles/var.html](https://nicholasjclark.github.io/mvgam/articles/var.html).
 #'
 #' @examples
 #' \dontrun{
@@ -51,23 +58,29 @@ irf.mvgam <- function(
   h = 10,
   cumulative = FALSE,
   orthogonal = FALSE,
+  future = FALSE,
   ...
 ) {
   validate_pos_integer(h)
   checkmate::assert_logical(cumulative, len = 1L)
   checkmate::assert_logical(orthogonal, len = 1L)
+  checkmate::assert_flag(future)
   assert_var_trend(object, surface = "irf()")
   var_post <- extract_var_posterior(object)
 
-  all_irfs <- lapply(seq_len(var_post$ndraws), function(draw) {
-    x <- list(
-      K = var_post$K,
-      A = var_post$A[draw, , , drop = TRUE],
-      Sigma = var_post$Sigma[draw, , , drop = TRUE],
-      p = 1L
-    )
-    gen_irf(x, h = h, cumulative = cumulative, orthogonal = orthogonal)
-  })
+  all_irfs <- mvgam_maybe_future_lapply(
+    var_post$ndraws,
+    function(draw) {
+      x <- list(
+        K = var_post$K,
+        A = var_post$A[draw, , , drop = TRUE],
+        Sigma = var_post$Sigma[draw, , , drop = TRUE],
+        p = 1L
+      )
+      gen_irf(x, h = h, cumulative = cumulative, orthogonal = orthogonal)
+    },
+    future = future
+  )
   class(all_irfs) <- "mvgam_irf"
   attr(all_irfs, "irf_type") <- ifelse(
     orthogonal,

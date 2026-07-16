@@ -43,10 +43,13 @@
 #' @param ... Currently ignored.
 #'
 #' @return An \[mvgam_residcor-class\] object when `summary = TRUE` and
-#'   `groups = FALSE`. When `groups = TRUE` on a hierarchical trend, a
-#'   named list of `mvgam_residcor` objects (one per group plus the
-#'   population-level matrix under the name `"_global"`). When
-#'   `summary = FALSE`, a list of per-draw arrays.
+#'   `groups = FALSE`. When `groups = TRUE` on a hierarchical trend, an
+#'   `mvgam_residcor_list` (a classed named list of `mvgam_residcor`
+#'   objects, one per group plus the population-level matrix under
+#'   the name `"_global"`); this class carries a
+#'   [plot.mvgam_residcor_list()] method that renders a faceted
+#'   heatmap panel across groups. When `summary = FALSE`, a list of
+#'   per-draw arrays.
 #'
 #' @details
 #' For non-hierarchical correlated trends the per-draw correlation
@@ -443,7 +446,10 @@ compute_residcor_hierarchical <- function(object, cov_struct, groups,
     )
   }
 
-  c(list("_global" = global_out), per_group)
+  structure(
+    c(list("_global" = global_out), per_group),
+    class = "mvgam_residcor_list"
+  )
 }
 
 

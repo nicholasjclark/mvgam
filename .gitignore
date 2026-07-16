@@ -29,5 +29,10 @@ data-raw/verify_outputs/
 tests/local/fixtures/lfo_cv/
 # knitr caches inside online articles
 vignettes/articles/*_cache/
+# Large fit fixtures cached for pkgdown articles: regenerable
+# via the matching build script under `tests/local/*_vignette_fits.R`.
+# Anything over the GitHub 50MB warning threshold goes here so
+# clones stay small and pushes stop tripping the LFS warning.
+pkgdown/hierarchical_var_cache/mod_hier.rds
 # session-only scratchpad of rendered figures
 scratchpad_figs/

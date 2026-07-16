@@ -427,9 +427,10 @@ from repeated presence-absence data or point counts.
 \seealso{
 \code{\link[=occ]{occ()}} for the related joint-occupancy family,
 \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} for the closure-unit goodness-of-fit
-surface. The CRAN-shipped vignette
-\code{vignette("nmixtures")} introduces N-mixture and
-joint-occupancy modelling in mvgam end-to-end; see also
-\code{vignette("data_in_mvgam")} for the closure-unit
-data-shape requirements that \code{nmix()} consumes.
+surface. The online article at
+\url{https://nicholasjclark.github.io/mvgam/articles/nmix.html}
+introduces N-mixture and joint-occupancy modelling in mvgam
+end-to-end; see also \code{vignette("data", package = "mvgam")}
+for the closure-unit data-shape requirements that \code{nmix()}
+consumes.
 }

@@ -9,6 +9,7 @@
   probs = c(0.025, 0.975),
   robust = FALSE,
   include_states = FALSE,
+  include_betas = TRUE,
   ...
 )
 }
@@ -24,6 +25,20 @@ and SD as measures of central tendency and spread. Default is \code{FALSE}.}
 \item{include_states}{Logical; if \code{TRUE}, include latent state parameters
 (\code{trend\[i,s\]}, \code{lv_trend\[i,k\]}) in summary. Default is \code{FALSE} as these
 are typically too numerous for display.}
+
+\item{include_betas}{Logical; if \code{TRUE} (the default), print every
+per-cell expansion of the trend-side dynamic parameters
+(per-country and per-cell \code{A_group_trend},
+\code{Sigma_group_trend}, the full block-diagonal
+\code{A_trend} / \code{Sigma_trend} / \code{Omega_trend} etc.).
+Setting \code{FALSE} keeps the global hyperparameters
+(\code{Amu_trend}, \code{Aomega_trend},
+\code{L_Omega_global_trend}, \code{alpha_cor_trend},
+\code{sigma}) and drops the per-cell arrays; useful for
+hierarchical VAR fits where the expansion runs to hundreds
+or thousands of rows. Individual per-country blocks can
+still be pulled via \code{as.matrix()},
+\code{as_draws_df()}, or \code{mcmc_plot()}.}
 
 \item{...}{Additional arguments (currently unused).}
 }

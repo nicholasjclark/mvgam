@@ -27,7 +27,7 @@ very wide range of models, including:
 -   <a
     href="https://nicholasjclark.github.io/mvgam/reference/lv_correlations.html"
     target="_blank">Dynamic Factor Models</a>
--   <a href="https://nicholasjclark.github.io/mvgam/articles/nmixtures.html"
+-   <a href="https://nicholasjclark.github.io/mvgam/articles/nmix.html"
     target="_blank">Hierarchical N-mixture Models</a>
 -   <a href="https://www.youtube.com/watch?v=2POK_FVwCHk"
     target="_blank">Hierarchical Generalized Additive Models</a>
