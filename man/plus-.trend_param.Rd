@@ -6,6 +6,14 @@
 \usage{
 \method{+}{trend_param}(e1, e2)
 }
+\arguments{
+\item{e1, e2}{\code{trend_param} objects (or \code{NULL}) to combine.}
+}
+\value{
+A \code{trend_param} object holding the row-bound union of the
+supplied trend parameters, with later definitions of a parameter
+overriding earlier ones of the same name.
+}
 \description{
 Combine trend parameters
 }

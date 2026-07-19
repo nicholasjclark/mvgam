@@ -11,6 +11,9 @@
 
 \item{...}{Additional arguments (not currently used)}
 }
+\value{
+The \code{mvgam_trend} object \code{x}, returned invisibly.
+}
 \description{
 Provides informative printing of trend specifications.
 }

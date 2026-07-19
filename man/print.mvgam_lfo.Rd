@@ -11,6 +11,9 @@
 
 \item{...}{Currently unused.}
 }
+\value{
+The \code{mvgam_lfo} object \code{x}, returned invisibly.
+}
 \description{
 Prints a compact overview of the LFO run: horizon,
 threshold, number of refits, and per-score totals / means.

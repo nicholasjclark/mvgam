@@ -12,6 +12,9 @@
 
 \item{...}{Ignored.}
 }
+\value{
+The \code{mvgam_forecast} object \code{x}, returned invisibly.
+}
 \description{
 Without a dedicated method, \code{print()} falls back to the default
 list printer and dumps every posterior matrix in the object,

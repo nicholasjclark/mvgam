@@ -12,6 +12,11 @@
 
 \item{...}{Currently ignored.}
 }
+\value{
+An object of class \code{mvgam_sim_closure_unit_summary}: a list
+of per-unit detection and abundance summaries with its own
+\link[=print.mvgam_sim_closure_unit_summary]{print()} method.
+}
 \description{
 Specialised summary that prints the closure-unit dimensions,
 the recipe, the per-species recovery targets, and a one-line

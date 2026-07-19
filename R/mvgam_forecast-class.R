@@ -178,6 +178,8 @@ summary.mvgam_forecast = function(object, probs = c(0.025, 0.975), ...) {
 #'   [ensemble.mvgam_forecast()], [score.mvgam_forecast()],
 #'   [compare_scores()]
 #'
+#' @return The `mvgam_forecast` object `x`, returned invisibly.
+#'
 #' @method print mvgam_forecast
 #' @export
 print.mvgam_forecast <- function(x, ...) {

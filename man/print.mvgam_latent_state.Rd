@@ -14,6 +14,9 @@ shown in the print header. Defaults to 2.}
 
 \item{...}{Currently unused.}
 }
+\value{
+The \code{mvgam_latent_state} object \code{x}, returned invisibly.
+}
 \description{
 Short print for a \code{mvgam_latent_state} object
 }

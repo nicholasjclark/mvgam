@@ -11,6 +11,9 @@
 
 \item{...}{Passed to \code{print.mvgam_sim_summary()}.}
 }
+\value{
+The \code{mvgam_sim} object \code{x}, returned invisibly.
+}
 \description{
 Delegates to \code{summary(x)} so the default print is informative.
 }

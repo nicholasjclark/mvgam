@@ -43,10 +43,11 @@ mvgam_attach <- function() {
 
 
 #' Package attachment hook
-#' 
+#'
 #' Called when mvgam is loaded via library() or require()
 #' @param libname Library name
 #' @param pkgname Package name
+#' @noRd
 .onAttach <- function(libname, pkgname) {
   # Set marginaleffects option
   options("marginaleffects_model_classes" = "mvgam")
@@ -67,10 +68,11 @@ mvgam_attach <- function() {
 }
 
 #' Package loading hook
-#' 
+#'
 #' Called when mvgam namespace is loaded
-#' @param libname Library name  
+#' @param libname Library name
 #' @param pkgname Package name
+#' @noRd
 .onLoad <- function(libname, pkgname) {
   # Initialize trend registry with core trend types
   ensure_registry_initialized()

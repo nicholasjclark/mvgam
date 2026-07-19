@@ -2,9 +2,12 @@
 % Please edit documentation in R/posterior_smooths.mvgam.R
 \name{smooths.mvgam}
 \alias{smooths.mvgam}
+\alias{smooths}
 \title{Enumerate smooth terms in a fitted \pkg{mvgam} model}
 \usage{
 \method{smooths}{mvgam}(x)
+
+smooths(x)
 }
 \arguments{
 \item{x}{A fitted \code{mvgam} object.}

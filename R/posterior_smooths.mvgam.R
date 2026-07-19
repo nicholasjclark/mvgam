@@ -400,6 +400,7 @@ smooths.mvgam <- function(x) {
 }
 
 
+#' @rdname smooths.mvgam
 #' @export
 smooths <- function(x) {
   UseMethod("smooths")

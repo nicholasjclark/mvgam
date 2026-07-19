@@ -14,6 +14,9 @@ numbers. Default \code{2}.}
 
 \item{...}{Currently ignored.}
 }
+\value{
+The \code{mvgam_residcor} object \code{x}, returned invisibly.
+}
 \description{
 Print a concise overview of an \code{mvgam_residcor} object
 }

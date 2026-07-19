@@ -14,6 +14,10 @@ Default \code{3}.}
 
 \item{...}{Currently ignored.}
 }
+\value{
+The \code{mvgam_sim_closure_unit_summary} object \code{x}, returned
+invisibly.
+}
 \description{
 Print method for sim_closure_unit_data() summary output
 }

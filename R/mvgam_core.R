@@ -506,7 +506,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
     checkmate::check_list(data, types = "data.frame"),
     .var.name = "data"
   )
-  newdata <- validate_newdata(newdata, data)
+  newdata <- validate_mvgam_newdata(newdata, data)
 
   # Pre-fit covariate NA guard. brms' validate_data() default
   # `na_action = na_omit` silently drops rows with NAs in any
@@ -632,7 +632,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
 # so any downstream consumer that pulls $test_data sees the
 # canonical factor shape.
 #' @noRd
-validate_newdata <- function(newdata, data) {
+validate_mvgam_newdata <- function(newdata, data) {
   if (is.null(newdata)) return(NULL)
   required <- intersect(c("time", "series"), names(data))
   validate_required_variables(newdata, required, "newdata")

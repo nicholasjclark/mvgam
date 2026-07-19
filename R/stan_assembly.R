@@ -4828,7 +4828,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
        * Used in companion matrix approach for VARMA initialization
        * @param A First matrix (m x n)
        * @param B Second matrix (p x q)
-       * @return Kronecker product A ⊗ B (mp x nq)
+       * @return Kronecker product A (x) B (mp x nq)
        */
       matrix kronecker_prod(matrix A, matrix B) {
         int m = rows(A);
@@ -4982,7 +4982,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
         }
 
         // Solve Lyapunov equation: Omega = Sigma_tilde + Phi_tilde * Omega * Phi_tilde'
-        // Vectorized form: vec(Omega) = (I - Phi_tilde ⊗ Phi_tilde)^{-1} vec(Sigma_tilde)
+        // Vectorized form: vec(Omega) = (I - Phi_tilde (x) Phi_tilde)^{-1} vec(Sigma_tilde)
         tmp = diag_matrix(rep_vector(1.0, (p + q) * m * (p + q) * m)) -
               kronecker_prod(companion_mat, companion_mat);
 

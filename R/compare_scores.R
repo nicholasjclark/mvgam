@@ -291,7 +291,7 @@ plot.mvgam_compare_scores <- function(x, relative = NULL,
     df$score <- df$score - df$base_score
     df <- df[df$model != relative, , drop = FALSE]
     df$model <- droplevels(df$model)
-    y_lab <- paste0("Δ ", y_lab, " vs ", relative)
+    y_lab <- paste0("\u0394 ", y_lab, " vs ", relative)
   }
   p <- ggplot2::ggplot(
     df,
@@ -384,7 +384,7 @@ plot.mvgam_compare_elpds <- function(x, relative = NULL,
   y_lab <- if (isTRUE(cumulative)) "Cumulative ELPD"
             else "Per-step ELPD"
   if (!is.null(relative)) {
-    y_lab <- paste0("Δ ", y_lab, " vs ", relative)
+    y_lab <- paste0("\u0394 ", y_lab, " vs ", relative)
   }
   # Recode refit_here into a readable factor so shape ends up in
   # the legend with explanatory labels rather than as raw TRUE/FALSE.

@@ -851,6 +851,8 @@ summary.mvgam_residcor <- function(object, ...) {
 #'   numbers. Default `2`.
 #' @param ... Currently ignored.
 #'
+#' @return The `mvgam_residcor` object `x`, returned invisibly.
+#'
 #' @method print mvgam_residcor
 #' @export
 print.mvgam_residcor <- function(x, digits = 2L, ...) {

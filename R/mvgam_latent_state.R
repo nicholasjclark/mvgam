@@ -124,6 +124,8 @@ as.data.frame.mvgam_latent_state <- function(x, ...) {
 #'   shown in the print header. Defaults to 2.
 #' @param ... Currently unused.
 #'
+#' @return The `mvgam_latent_state` object `x`, returned invisibly.
+#'
 #' @method print mvgam_latent_state
 #' @export
 print.mvgam_latent_state <- function(x, digits = 2L, ...) {

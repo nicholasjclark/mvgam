@@ -526,6 +526,13 @@ trend_param <- function(name, bounds = NULL, monitor = TRUE,
 }
 
 #' Combine trend parameters
+#'
+#' @param e1,e2 `trend_param` objects (or `NULL`) to combine.
+#'
+#' @return A `trend_param` object holding the row-bound union of the
+#'   supplied trend parameters, with later definitions of a parameter
+#'   overriding earlier ones of the same name.
+#'
 #' @export
 `+.trend_param` <- function(e1, e2) {
   if (is.null(e2)) return(e1)
@@ -555,6 +562,13 @@ c.trend_param <- function(x, ..., replace = FALSE) {
   out
 }
 
+#' Test whether an object is a `trend_param`
+#'
+#' @param x An object to test.
+#'
+#' @return A single logical: `TRUE` if `x` inherits from the
+#'   `trend_param` class, `FALSE` otherwise.
+#'
 #' @export
 is.trend_param <- function(x) {
   inherits(x, "trend_param")
@@ -1948,6 +1962,8 @@ eval_trend_constructor <- function(trend_call, formula_env = NULL) {
 #'
 #' @param x A mvgam_trend object
 #' @param ... Additional arguments (not currently used)
+#'
+#' @return The `mvgam_trend` object `x`, returned invisibly.
 #'
 #' @export
 print.mvgam_trend <- function(x, ...) {

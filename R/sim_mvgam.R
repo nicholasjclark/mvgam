@@ -424,6 +424,8 @@ summary.mvgam_sim <- function(object, ...) {
 #'   Default `3`.
 #' @param ... Currently ignored.
 #'
+#' @return The `mvgam_sim_summary` object `x`, returned invisibly.
+#'
 #' @method print mvgam_sim_summary
 #' @export
 print.mvgam_sim_summary <- function(x, digits = 3L, ...) {
@@ -468,6 +470,8 @@ print.mvgam_sim_summary <- function(x, digits = 3L, ...) {
 #'
 #' @param x A `mvgam_sim` object.
 #' @param ... Passed to `print.mvgam_sim_summary()`.
+#'
+#' @return The `mvgam_sim` object `x`, returned invisibly.
 #'
 #' @method print mvgam_sim
 #' @export

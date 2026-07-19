@@ -2466,7 +2466,7 @@ validate_trend_formula_restrictions <- function(formula_str,
       ),
       error_header = "brms autocorrelation terms not allowed in {.field trend_formula}:",
       error_reason = "These conflict with mvgam State-Space dynamics.",
-      error_suggestion = "Use mvgam trend types instead: {.code ar(p = 1)} → {.code AR(p = 1)}"
+      error_suggestion = "Use mvgam trend types instead: {.code ar(p = 1)} \u2192 {.code AR(p = 1)}"
     ),
 
     "addition_terms" = list(
@@ -3318,6 +3318,7 @@ eval_silent <- function(
 }
 
 #' Check if x is a try-error resulting from try()
+#' @noRd
 is_try_error <- function(x) {
   inherits(x, "try-error")
 }

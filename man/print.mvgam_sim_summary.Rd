@@ -14,6 +14,9 @@ Default \code{3}.}
 
 \item{...}{Currently ignored.}
 }
+\value{
+The \code{mvgam_sim_summary} object \code{x}, returned invisibly.
+}
 \description{
 Print method for \code{mvgam_sim_summary}
 }

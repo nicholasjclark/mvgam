@@ -717,7 +717,7 @@ extract_linpred_nonlinear <- function(prep, resp = NULL) {
   # Validate mu is matrix with correct structure
   if (!is.matrix(mu)) {
     stop(insight::format_error(
-      cli::format_inline("{.field mu} must be a matrix [ndraws × nobs].")
+      cli::format_inline("{.field mu} must be a matrix [ndraws \u00d7 nobs].")
     ))
   }
 

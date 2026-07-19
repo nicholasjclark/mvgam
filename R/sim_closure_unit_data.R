@@ -576,6 +576,10 @@ closure_unit_sample <- function(family,
 #'   [sim_closure_unit_data()].
 #' @param ... Currently ignored.
 #'
+#' @return An object of class `mvgam_sim_closure_unit_summary`: a list
+#'   of per-unit detection and abundance summaries with its own
+#'   [print()][print.mvgam_sim_closure_unit_summary] method.
+#'
 #' @method summary mvgam_sim_closure_unit
 #' @export
 summary.mvgam_sim_closure_unit <- function(object, ...) {
@@ -617,6 +621,9 @@ summary.mvgam_sim_closure_unit <- function(object, ...) {
 #' @param digits Integer; significant digits for printed numbers.
 #'   Default `3`.
 #' @param ... Currently ignored.
+#'
+#' @return The `mvgam_sim_closure_unit_summary` object `x`, returned
+#'   invisibly.
 #'
 #' @method print mvgam_sim_closure_unit_summary
 #' @export

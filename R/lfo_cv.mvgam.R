@@ -1131,6 +1131,8 @@ stack_mvgam_lfo <- function(models, model_names) {
 #' @param x An object of class `mvgam_lfo`.
 #' @param ... Currently unused.
 #'
+#' @return The `mvgam_lfo` object `x`, returned invisibly.
+#'
 #' @method print mvgam_lfo
 #' @export
 print.mvgam_lfo <- function(x, ...) {
