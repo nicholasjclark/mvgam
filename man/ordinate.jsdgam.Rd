@@ -105,14 +105,12 @@ are installed the species arrows are rendered as tapered
 loadings.
 }
 \note{
-\code{jsdgam()} itself is not yet ported on this branch;
-this function exists for forward-compatibility with the
-eventual jsdgam port. It relies on the same Stan parameters
-that an LV \code{mvgam} fit carries — \code{lv_trend_tilde[t, k]} and
-\code{Z_tilde[i, k]} for free-Z factor models, or \code{lv_trend} and
-\code{Z} for partial-Z fits — plus a few \code{jsdgam}-specific
-bookkeeping slots. Calling it on an ordinary \code{mvgam} object
-will error at those slot accesses.
+This method needs a fitted factor model. It reads the
+identified latent variables and their loadings from the
+posterior (\code{lv_trend_tilde[t, k]} and \code{Z_tilde[i, k]} for
+free-loading factor models, or \code{lv_trend} and \code{Z} when the
+loadings follow a fixed pattern). For an \code{mvgam()} fit that
+included latent factors, use \code{\link[=ordinate.mvgam]{ordinate.mvgam()}}.
 }
 \examples{
 \donttest{

@@ -10,14 +10,12 @@
 #' are installed the species arrows are rendered as tapered
 #' loadings.
 #'
-#' @note `jsdgam()` itself is not yet ported on this branch;
-#'   this function exists for forward-compatibility with the
-#'   eventual jsdgam port. It relies on the same Stan parameters
-#'   that an LV `mvgam` fit carries — `lv_trend_tilde[t, k]` and
-#'   `Z_tilde[i, k]` for free-Z factor models, or `lv_trend` and
-#'   `Z` for partial-Z fits — plus a few `jsdgam`-specific
-#'   bookkeeping slots. Calling it on an ordinary `mvgam` object
-#'   will error at those slot accesses.
+#' @note This method needs a fitted factor model. It reads the
+#'   identified latent variables and their loadings from the
+#'   posterior (`lv_trend_tilde[t, k]` and `Z_tilde[i, k]` for
+#'   free-loading factor models, or `lv_trend` and `Z` when the
+#'   loadings follow a fixed pattern). For an `mvgam()` fit that
+#'   included latent factors, use [ordinate.mvgam()].
 #'
 #' @name ordinate.jsdgam
 #'
