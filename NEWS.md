@@ -1,4 +1,10 @@
-# mvgam development version
+# mvgam 2.0.0
+
+This is a major release that rebuilds mvgam on top of 'brms'. The observation model now accepts the full 'brms' formula syntax and the latent process model is written as a separate `trend_formula`, with estimation still carried out in 'Stan'.
+
+## Breaking changes
+* The latent process model is now specified through `trend_formula` together with the trend constructors (`AR()`, `RW()`, `VAR()`, `CAR()`, `PW()`, `ZMVN()`), for example `trend_formula = ~ AR(p = 1)`. The previous `trend_model` argument is no longer part of the `mvgam()` interface.
+* `get_mvgam_priors()` has been removed. Inspect the priors for a model with the `get_prior()` and `default_prior()` methods, which accept an `mvgam_formula` alongside the data and family.
 
 ## New functionalities
 * Restructured `summary.mvgam()` to now return an object of class `mvgam_summary` that can be re-used for later purposes, or that can be printed with `print.mvgam_summary()` (#119)
