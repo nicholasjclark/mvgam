@@ -1112,7 +1112,7 @@ trend_map_from_dataframe <- function(input, series_levels) {
 #'
 #' @param trend_specs Trend specification(s)
 #' @param data Data frame with time series data
-#' @return Enhanced trend specs with processed validation
+#' @return Trend specs with processed validation
 #' @noRd
 apply_validation_rules <- function(trend_specs, data) {
 
@@ -1140,7 +1140,7 @@ apply_validation_rules <- function(trend_specs, data) {
 #'
 #' @param trend_spec Single trend specification
 #' @param data Data frame with time series data
-#' @return Enhanced trend specification
+#' @return Trend specification
 #' @noRd
 process_trend_validation_rules <- function(trend_spec, data) {
 
@@ -1164,7 +1164,7 @@ process_trend_validation_rules <- function(trend_spec, data) {
 #' @param rule Validation rule name
 #' @param trend_spec Trend specification
 #' @param data Data frame with time series data
-#' @return Enhanced trend specification
+#' @return Trend specification
 #' @noRd
 dispatch_validation_rule <- function(rule, trend_spec, data) {
 
@@ -1241,7 +1241,7 @@ any_trend_requires_regular_intervals <- function(trend_specs) {
 #'
 #' @param trend_spec Trend specification
 #' @param data Data frame with time series data
-#' @return Enhanced trend specification
+#' @return Trend specification
 #' @noRd
 validate_trend_grouping <- function(trend_spec, data, cached_formulas = NULL) {
 
@@ -1392,7 +1392,7 @@ validate_gr_constant_per_series <- function(trend_spec, data) {
 #'
 #' @param trend_spec Trend specification
 #' @param data Data frame with time series data
-#' @return Enhanced trend specification
+#' @return Trend specification
 #' @noRd
 validate_trend_time_intervals <- function(trend_spec, data) {
 
@@ -1891,7 +1891,7 @@ formula2str_mvgam <- function(formula, space = "trim") {
 
   # Handle complex brms formula objects (bf, distributional, nonlinear)
   if (inherits(formula, c("brmsformula", "bform"))) {
-    # Extract all formula components for comprehensive string representation
+    # Extract all formula components for a full string representation
     formula_strings <- character(0)
 
     # Main formula
@@ -2310,7 +2310,7 @@ validate_bf_trend_formula <- function(bf_obj) {
 
 #' Extract all formula components from a bf() object
 #'
-#' Helper function to comprehensively extract all formulas from brmsformula objects
+#' Helper function to extract all formulas from brmsformula objects
 #' for validation purposes.
 #'
 #' @param bf_obj A brmsformula or bform object
@@ -2581,7 +2581,7 @@ validate_trend_formula_restrictions <- function(formula_str,
 
 #'
 #' Ensures that multivariate models with separate trends per response only use
-#' basic temporal dynamics without advanced features (factors, correlations, groupings).
+#' basic temporal dynamics without extra features (factors, correlations, groupings).
 #'
 #' @param trend_formula Formula for a single response trend
 #' @param response_name Name of the response variable
@@ -2591,12 +2591,12 @@ validate_multivariate_trend_constraints <- function(trend_formula, response_name
   checkmate::assert_string(response_name)
 
   # Parse the trend formula to extract trend constructors
-  parsed <- try(mvgam:::parse_trend_formula(trend_formula), silent = TRUE)
+  parsed <- try(parse_trend_formula(trend_formula), silent = TRUE)
   if (inherits(parsed, "try-error")) {
     return(invisible(NULL))  # Let parse_trend_formula handle the error
   }
 
-  # Check each trend component for advanced features
+  # Check each trend component for extra features
   for (trend_component in parsed$trend_components) {
     # Check for factor models (n_lv parameter)
     if (!is.null(trend_component$n_lv) && trend_component$n_lv > 0) {
@@ -2658,7 +2658,7 @@ validate_autocor_separation <- function(obs_formula, trend_formula = NULL) {
   # Validate observation formula (minimal - let brms handle most validation)
   validated_obs <- validate_obs_formula_brms(obs_formula)
 
-  # Validate trend formula (comprehensive - mvgam State-Space requirements)
+  # Validate trend formula against mvgam State-Space requirements
   validated_trend <- validate_trend_formula_brms(trend_formula)
 
   return(list(
@@ -2865,8 +2865,8 @@ validate_trend_components <- function(trend_components) {
 #' @param time_var Name of time variable (default: "time")
 #' @param series_var Name of series variable (default: "series")
 #' @param trend_type Type of trend model ("CAR" allows irregular intervals)
-#' @param trend_specs Optional trend specification list for enhanced metadata
-#' @return List with time series dimensions and optional enhanced metadata
+#' @param trend_specs Optional trend specification list for added metadata
+#' @return List with time series dimensions and optional added metadata
 #' @noRd
 extract_time_series_dimensions <- function(data, time_var = "time", series_var = "series", trend_type = NULL, trend_specs = NULL, response_vars = NULL, cached_formulas = NULL) {
 
@@ -2990,7 +2990,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
     }
   }
 
-  # Enhanced metadata: Comprehensive information for post-processing
+  # Metadata: information for post-processing
   if (!is.null(trend_specs)) {
     dimensions$metadata <- list(
       # Variable identification
@@ -3795,7 +3795,7 @@ are_braces_balanced <- function(stan_code) {
 #'
 #' @description
 #' Extracts variable names from Stan data block declarations.
-#' This is a simplified parser for basic variable declarations.
+#' This is a minimal parser for basic variable declarations.
 #'
 #' @param data_block Character string containing Stan data block content
 #' @return Character vector of declared variable names
@@ -3816,7 +3816,7 @@ parse_data_declarations <- function(data_block) {
   var_names <- character(0)
 
   for (line in lines) {
-    # Look for variable declarations (simplified pattern)
+    # Look for variable declarations (basic pattern)
     # Pattern: type<constraints> variable_name;
     # Examples: "int N;", "vector[N] y;", "real<lower=0> sigma;"
 
@@ -3827,7 +3827,7 @@ parse_data_declarations <- function(data_block) {
     if (nchar(line) == 0) next
 
     # Basic pattern for variable declarations
-    # This is a simplified approach - a full parser would be more robust
+    # This is a basic approach - a full parser would handle more cases
     if (grepl(";\\s*$", line)) {  # Line ends with semicolon
       # Extract variable name (last word before semicolon)
       clean_line <- gsub(";\\s*$", "", line)  # Remove semicolon
@@ -3866,7 +3866,7 @@ validate_stan_code <- function(stan_code, backend = "rstan", silent = TRUE, ...)
     )))
   }
 
-  # Primary validation using rstan::stanc() (most comprehensive and up-to-date)
+  # Primary validation using rstan::stanc() (most thorough and up-to-date)
   if (backend == "rstan") {
     if (!requireNamespace("rstan", quietly = TRUE)) {
       stop(insight::format_error(c(
@@ -4211,9 +4211,29 @@ validate_grouping_structure = function(data, trend_model, name = 'data') {
     data <- validate_factor_levels(data, subgr_var, name, auto_drop = FALSE)
   }
 
-  # If both gr and subgr are specified, validate hierarchical structure
+  # If both gr and subgr are specified, the hierarchical correlation
+  # blocks are only identified when every subgrouping level appears
+  # within every grouping level. Reject designs with any missing
+  # gr / subgr combination.
   if (!is.null(gr_var) && !is.null(subgr_var)) {
-    validate_complete_grouping(data, gr_var, subgr_var, name)
+    counts <- table(data[[gr_var]], data[[subgr_var]])
+    if (any(counts == 0L)) {
+      missing_idx <- which(counts == 0L, arr.ind = TRUE)
+      gr_missing <- rownames(counts)[missing_idx[1L, 1L]]
+      subgr_missing <- colnames(counts)[missing_idx[1L, 2L]]
+      stop(insight::format_error(c(
+        cli::format_inline("Incomplete hierarchical grouping in {name}."),
+        x = cli::format_inline(
+          paste0(
+            "Every level of {.val {subgr_var}} must appear within every ",
+            "level of {.val {gr_var}}."
+          )
+        ),
+        i = cli::format_inline(
+          "Missing combination includes {.val {gr_missing}} / {.val {subgr_missing}}."
+        )
+      )), call. = FALSE)
+    }
   }
 
   return(data)
@@ -4228,7 +4248,7 @@ validate_grouping_structure = function(data, trend_model, name = 'data') {
 #'
 #' @param trend_spec Trend specification
 #' @param data Data frame with time series data
-#' @return Enhanced trend specification with processed parameters
+#' @return Trend specification with processed parameters
 #' @noRd
 validate_and_process_trend_parameters <- function(trend_spec, data) {
   # Input validation with checkmate
@@ -4795,7 +4815,7 @@ remove_mvgam_variables <- function(data) {
 #'
 #' @description
 #' Consolidates dual path trend processing by combining data extraction,
-#' validation, and dimension injection into a single comprehensive operation.
+#' validation, and dimension injection into a single operation.
 #' Replaces separate calls to extract_trend_data() and
 #' validate_time_series_for_trends() to eliminate redundant
 #' extract_time_series_dimensions() computation.

@@ -63,6 +63,13 @@ scores are computed by sampling forecast draws from the
 PSIS-weighted posterior and routing through
 \link{score.mvgam_forecast}. Defaults to \code{"elpd"}.}
 
+\item{save_log_lik}{Logical. If \code{TRUE}, retain the
+per-observation held-out log-densities in an
+\code{n_draws} by \code{n_eval_obs} matrix (under the LFO-weighted
+posterior) so the result can feed \code{loo::loo_model_weights()}
+for log-score stacking. Defaults to \code{FALSE} because the
+matrix can be large.}
+
 \item{silent}{Verbosity level between \code{0} and \code{2}. See
 \link{mvgam} for the contract.}
 

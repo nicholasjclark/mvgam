@@ -2,7 +2,7 @@
 #'
 #' @description
 #' This file contains Stan backend abstraction functions adapted from the brms package.
-#' These functions provide unified interfaces for Stan model parsing, compilation, and fitting
+#' These functions provide a common interface for Stan model parsing, compilation, and fitting
 #' across different Stan backends (rstan, cmdstanr, mock).
 #'
 #' @section Attribution:
@@ -21,7 +21,7 @@
 #' compatibility with the original brms design patterns. Key adaptations include:
 #' - Integration with mvgam's validation systems
 #' - Compatibility with mvgam object structures
-#' - Preservation of all original functionality for seamless backend switching
+#' - Preservation of all original functionality for backend switching
 #'
 #' @author Paul-Christian Bürkner (original brms implementation)
 #' @author mvgam development team (adaptations for mvgam)
@@ -283,7 +283,7 @@ compile_model <- function(model, backend, ...) {
 #' Fit Stan Model
 #'
 #' @description
-#' Fits Stan model using the specified backend with comprehensive parameter handling.
+#' Fits Stan model using the specified backend, dispatching to backend-specific handlers.
 #' Adapted from brms backend system by Paul-Christian Bürkner.
 #'
 #' @param model Compiled Stan model object
@@ -299,8 +299,8 @@ fit_model <- function(model, backend, ...) {
 
 #' Fit Stan Model with rstan Backend
 #' @description
-#' Internal function to fit Stan model using the rstan backend with comprehensive
-#' parameter handling for MCMC, variational inference, and future processing.
+#' Internal function to fit Stan model using the rstan backend, handling
+#' parameters for MCMC, variational inference, and future processing.
 #' Adapted from brms backend system by Paul-Christian Bürkner.
 #' @param model Compiled Stan model object from rstan
 #' @param sdata Named list of Stan data
@@ -425,8 +425,8 @@ fit_model <- function(model, backend, ...) {
 
 #' Fit Stan Model with cmdstanr Backend
 #' @description
-#' Internal function to fit Stan model using the cmdstanr backend with comprehensive
-#' parameter handling for MCMC, variational inference, pathfinder, and laplace.
+#' Internal function to fit Stan model using the cmdstanr backend, handling
+#' parameters for MCMC, variational inference, pathfinder, and laplace.
 #' Adapted from brms backend system by Paul-Christian Bürkner.
 #' @param model Compiled Stan model object from cmdstanr
 #' @param sdata Named list of Stan data

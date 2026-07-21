@@ -1,8 +1,8 @@
-#' Unified GLM Analysis System
+#' GLM Analysis System
 #'
 #' @description
-#' Provides unified GLM analysis that replaces multiple detect_glm_usage() calls
-#' with a single comprehensive analysis pass.
+#' Provides GLM analysis that replaces multiple detect_glm_usage() calls
+#' with a single analysis pass.
 #'
 #' @name glm_analysis
 NULL
@@ -10,7 +10,7 @@ NULL
 #' Analyze Stan Code for GLM Usage and Patterns
 #'
 #' @description
-#' Single entry point for GLM analysis performing comprehensive GLM detection,
+#' Single entry point for GLM analysis performing GLM detection,
 #' classification, and optimization decisions in a single pass.
 #'
 #' @param stan_code Character string containing Stan code to analyze
@@ -66,7 +66,7 @@ analyze_stan <- function(stan_code, response_names = NULL, trend_info = NULL) {
 #' Detect GLM Patterns in Stan Code
 #'
 #' @description
-#' Comprehensive GLM pattern detection for all supported GLM types.
+#' GLM pattern detection for all supported GLM types.
 #'
 #' @param stan_code Character string containing Stan code to analyze
 #'
@@ -979,7 +979,7 @@ inject_trend_effects_linear <- function(stan_code, trend_injection_code) {
     
     
     if (has_glm_calls) {
-      # GLM case: inject trend by modifying GLM calls to use trend-enhanced parameters
+      # GLM case: inject trend by modifying GLM calls to use trend-adjusted parameters
       modified_lines <- inject_trends_into_glm_calls(code_lines, block_info, trend_injection_code)
     } else {
       # Nonlinear case: use existing nonlinear injection logic

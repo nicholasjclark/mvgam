@@ -15,6 +15,28 @@ ZMVN(
 )
 }
 \arguments{
+\item{time}{The unquoted name of the variable that represents the unit of
+analysis in \code{data} over which latent residuals should be correlated. This
+variable should be either a \code{numeric} or \code{integer} variable in the
+supplied \code{data}. Defaults to \code{time} to be consistent with other
+functionalities in \pkg{mvgam}, though note that the data need not be time
+series in this case. See examples below for further details and
+explanations.
+
+Unlike \code{\link{AR}} / \code{\link{VAR}} / \code{\link{RW}}, ZMVN
+does not require the \code{unit} values to be regularly spaced. The
+likelihood is \eqn{x_{u, :} \sim MVN(0, \Sigma)} with \eqn{\Sigma}
+indexed by series only, so \eqn{\Delta u} never enters the math.
+Use ZMVN for spatial or otherwise non-temporal grouping factors
+where gaps in the \code{unit} axis are natural (e.g. dropped sites,
+stratified k-fold refits, irregular sampling grids).}
+
+\item{series}{The unquoted name of the variable that represents the series
+identifier in the supplied \code{data}. This variable should be either a
+\code{character} or \code{factor} variable. Defaults to \code{series} following mvgam
+conventions, allowing any series variable name. When using the
+default, a one-time warning will be issued.}
+
 \item{gr}{An optional grouping variable, which must be a \code{factor} in the
 supplied \code{data}, for setting up hierarchical residual correlation
 structures. If specified, this will automatically set up a model where the
@@ -52,21 +74,23 @@ something like:
 
 \code{series = as.factor(paste0(group, '_', subgroup))}}
 
-\item{unit}{The unquoted name of the variable that represents the unit of
-analysis in \code{data} over which latent residuals should be correlated. This
-variable should be either a \code{numeric} or \code{integer} variable in the
-supplied \code{data}. Defaults to \code{time} to be consistent with other
-functionalities in \pkg{mvgam}, though note that the data need not be time
-series in this case. See examples below for further details and
-explanations.
+\item{n_lv}{The number of latent factors to estimate for dynamic
+factor models. When \code{n_lv} is smaller than the number of series,
+the latent processes are modelled as \code{n_lv} factors with estimated
+loadings onto the series. Defaults to \code{NULL}, in which case one
+latent process is used per series.}
 
-Unlike \code{\link{AR}} / \code{\link{VAR}} / \code{\link{RW}}, ZMVN
-does not require the \code{unit} values to be regularly spaced. The
-likelihood is \eqn{x_{u, :} \sim MVN(0, \Sigma)} with \eqn{\Sigma}
-indexed by series only, so \eqn{\Delta u} never enters the math.
-Use ZMVN for spatial or otherwise non-temporal grouping factors
-where gaps in the \code{unit} axis are natural (e.g. dropped sites,
-stratified k-fold refits, irregular sampling grids).}
+\item{cor}{\code{Logical}. Include correlated process errors as part of a
+multivariate normal process model? If \code{TRUE} and if
+\code{n_series > 1} in the supplied data, a fully structured covariance
+matrix will be estimated for the process errors. Default is \code{FALSE}.
+Note: For \code{VAR()} models, correlation is always enabled (\code{cor = TRUE})
+as this is essential for optimal performance.}
+
+\item{trend_map}{Optional \code{data.frame} specifying which latent
+process each series maps onto, giving fixed (rather than estimated)
+loadings for dynamic factor models. See \code{\link{mvgam}} for the
+required format. Defaults to \code{NULL}.}
 }
 \value{
 An object of class \code{mvgam_trend}, which contains a list of

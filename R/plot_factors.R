@@ -127,7 +127,7 @@ plot_factors <- function(
 # `mvgam` fit. Calls the family-registered `latent_state` method
 # (returns `[ndraws x N_unit]`), groups unit columns by
 # `(series, time)`, pools across sites for multi-season fits, and
-# emits a ribbon-and-median plot faceted by series. Unified entry
+# emits a ribbon-and-median plot faceted by series. Single entry
 # point used by `plot.mvgam(type = "latent_state")` for both
 # `nmix()` (marginal latent `N`) and `occ()` (marginal occupancy
 # `psi`).

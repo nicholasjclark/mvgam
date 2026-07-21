@@ -57,13 +57,7 @@
 
 \method{nvariables}{mvgam}(x, ...)
 
-\method{posterior_summary}{mvgam}(
-  object,
-  pars = NULL,
-  probs = c(0.025, 0.975),
-  robust = FALSE,
-  ...
-)
+\method{posterior_summary}{mvgam}(x, pars = NULL, probs = c(0.025, 0.975), robust = FALSE, ...)
 
 \method{getCall}{mvgam}(x, ...)
 

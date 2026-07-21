@@ -37,6 +37,7 @@
 #'   `series` to each condition tuple so the plot facets by series.
 #'   A single integer or character value picks one series and filters
 #'   the prediction grid to that series's observations.
+#' @inheritParams forecast.mvgam
 #' @param ... Additional arguments forwarded to
 #'   [marginaleffects::plot_predictions()].
 #'

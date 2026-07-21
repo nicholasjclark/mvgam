@@ -454,6 +454,9 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #'   `lv_trend` posterior draws.
 #' @param ndraws Positive integer specifying number of posterior draws to
 #'   use. NULL (default) uses all available draws.
+#' @param draw_ids Optional integer vector selecting a subset of posterior
+#'   draw indices to use. NULL (default) uses all draws (subject to
+#'   `ndraws`).
 #' @param re_formula Formula for random effects. NULL (default) includes
 #'   all random effects, NA excludes all random effects.
 #' @param allow_new_levels Logical; if TRUE, allows new factor levels in

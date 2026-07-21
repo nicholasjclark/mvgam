@@ -6,8 +6,8 @@
 \usage{
 \method{posterior_linpred}{mvgam}(
   object,
-  newdata = NULL,
   transform = FALSE,
+  newdata = NULL,
   process_error = TRUE,
   ndraws = NULL,
   draw_ids = NULL,
@@ -21,14 +21,14 @@
 \arguments{
 \item{object}{A fitted mvgam object from \code{\link[=mvgam]{mvgam()}}.}
 
-\item{newdata}{Optional data frame with covariates for prediction. If
-NULL, uses original training data stored in the model object.}
-
 \item{transform}{Logical; if \code{FALSE} (default), values are returned
 on the link scale. If \code{TRUE}, the inverse link is applied and
 the call is forwarded to \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} so the
 returned matrix is on the response scale. Mirrors the
 \code{transform} argument of \code{\link[brms:posterior_linpred.brmsfit]{brms::posterior_linpred()}}.}
+
+\item{newdata}{Optional data frame with covariates for prediction. If
+NULL, uses original training data stored in the model object.}
 
 \item{process_error}{Logical; if TRUE (default), uses the full
 posterior draws of the trend parameters (per-draw variation). If
@@ -41,7 +41,7 @@ deterministic function of the parameter draws. State-space
 process noise is added inside \code{posterior_epred()} and
 \code{posterior_predict()} (matching the brms convention of returning
 marginal expectations / predictive samples). For
-deterministic-state-at-fitted-values semantics use \code{\link[generics:forecast]{generics::forecast()}} /
+deterministic-state-at-fitted-values semantics use \code{\link[=forecast]{forecast()}} /
 \code{\link[=hindcast]{hindcast()}}.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to

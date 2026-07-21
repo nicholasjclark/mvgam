@@ -23,14 +23,12 @@
 #'   - `priors` If the model priors were updated from their defaults, the prior
 #'     `dataframe` will be returned. Otherwise `NULL`
 #'
-#'   - `model_output` The `MCMC` object returned by the fitting engine. If the
-#'     model was fitted using `Stan`, this will be an object of class `stanfit`
-#'     (see \code{\link[rstan]{stanfit-class}} for details). If `JAGS` was used
-#'     as the backend, this will be an object of class `runjags` (see
-#'     \code{\link[runjags]{runjags-class}} for details)
+#'   - `model_output` The `MCMC` object returned by the fitting engine, an
+#'     object of class `stanfit`
+#'     (see \code{\link[rstan]{stanfit-class}} for details)
 #'
 #'   - `model_file` The `character` string model file used to describe the model
-#'     in either `Stan` or `JAGS` syntax
+#'     in `Stan` syntax
 #'
 #'   - `model_data` If `return_model_data` was set to `TRUE` when fitting the
 #'     model, the `list` object containing all data objects needed to condition
@@ -81,11 +79,10 @@
 #'   - `test_data` If test data were supplied (as argument `newdata` in the
 #'     original model), it will be returned. Othwerise `NULL`
 #'
-#'   - `fit_engine` `Character` describing the fit engine, either as `stan` or
-#'     `jags`
+#'   - `fit_engine` `Character` describing the fit engine, `stan`
 #'
 #'   - `backend` `Character` describing the backend used for modelling, either
-#'     as `rstan`, `cmdstanr` or `rjags`
+#'     as `rstan` or `cmdstanr`
 #'
 #'   - `algorithm` `Character` describing the algorithm used for finding the
 #'     posterior, either as `sampling`, `laplace`, `pathfinder`, `meanfield` or

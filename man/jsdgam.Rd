@@ -48,6 +48,10 @@ emits a one-time deprecation warning before being rewritten to
 \code{by = lv_axis()} internally. The companion sentinel \code{lv_axis()}
 is documented at \verb{[lv_axis()]}.}
 
+\item{knots}{An optional \code{list} of knot values for any smooth
+terms in \code{formula}, passed on to the \code{mgcv} smoother setup
+in the same way as the \code{knots} argument of \code{\link[=mvgam]{mvgam()}}.}
+
 \item{factor_knots}{An optional \code{list} of knot values for any
 smooth terms in \code{factor_formula}, mirroring the role of
 \code{knots} for the observation formula.}
@@ -67,28 +71,9 @@ matrices per species) into the long-format \code{data} that
 \code{jsdgam()} expects, and \code{\link[=pivot_species_matrix]{pivot_species_matrix()}} for the
 Hmsc-style wide \verb{[J, N]} species-composition matrix.}
 
-\item{newdata}{Optional test-set \code{data.frame} persisted on the
-fit as \code{object$test_data}. Used by \code{plot(fit, type = "series")}
-to overlay the test arm without re-passing the data. This is
-a deliberate change from earlier mvgam releases: passing
-\code{newdata} to \code{mvgam()} no longer emits Stan generated-quantities
-forecasts at fit time. Keeping forecasting out of Stan keeps
-the fit object small and the sampler fast, and means downstream
-methods can choose their own newdata. To use the persisted
-data downstream, re-pass it through the relevant method.
-\code{forecast()} and \code{posterior_predict()} answer different
-questions:
-\itemize{
-\item \code{forecast(mod, newdata = mod$test_data)} propagates the
-fitted latent state forward in time per posterior draw, so
-future predictions extrapolate the actual trajectory.
-\item \code{posterior_predict(mod, newdata = mod$test_data)}
-marginalises over the trend's stochastic dynamics by Monte
-Carlo at the supplied design points and ignores the fitted
-trajectory's position relative to training time.
-}
-Use \code{forecast()} for time-series forecasting and
-\code{posterior_predict()} for marginal predictive checks.}
+\item{newdata}{Optional held-out \code{data.frame} / \code{list} of the
+same structure as \code{data}, forwarded to \code{\link[=mvgam]{mvgam()}} and
+persisted on the returned fit for later prediction.}
 
 \item{family}{A \code{family} object specifying the observation
 distribution. Supported families are documented in
@@ -191,7 +176,9 @@ structured loadings prior, mirroring the \code{mvgam()} argument.
 When supplied the \code{traits} and \code{phylo} aliases must be \code{NULL};
 see \verb{[mvgam()]} for the accepted field list.}
 
-\item{backend}{Stan backend (defaults to "cmdstanr")}
+\item{backend}{Character string specifying the Stan backend,
+either \code{"cmdstanr"} or \code{"rstan"}. Forwarded to \code{\link[=mvgam]{mvgam()}}.
+Defaults to \code{getOption("brms.backend", "cmdstanr")}.}
 
 \item{threads}{Positive integer or \code{NULL}. Forwarded to
 \code{\link[=mvgam]{mvgam()}} / \code{cmdstanr}. With closure-unit families
@@ -205,22 +192,13 @@ full threading notes and bench guidance.}
 \item{run_model}{\strong{(deprecated)} Logical. Forwarded to \code{mvgam()};
 when \code{FALSE}, skips Stan parse / compile / sampling and returns a
 stub \code{mvgam} / \code{jsdgam} object with \verb{$stancode} and \verb{$standata}
-populated but \verb{$fit = NULL}. New code should use \code{\link[brms:stancode]{brms::stancode()}} /
-\code{\link[brms:standata]{brms::standata()}} on an \code{\link[=mvgam_formula]{mvgam_formula()}} object instead. Emits a
+populated but \verb{$fit = NULL}. New code should use \code{\link[=stancode]{stancode()}} /
+\code{\link[=standata]{standata()}} on an \code{\link[=mvgam_formula]{mvgam_formula()}} object instead. Emits a
 one-time \code{rlang::warn()} when \code{FALSE}. Defaults to \code{TRUE}.}
 
 \item{...}{Other arguments forwarded to \code{mvgam()}. Notable ones
 include \code{data2} (lookup list for string-named \code{traits} / \code{phylo}
 slots), \code{algorithm}, \code{chains}, and \code{silent}.}
-
-\item{cpp_options}{Optional named list forwarded to
-\code{cmdstanr::cmdstan_model()} (e.g. \code{CXXFLAGS = "-march=native"}).
-\code{stan_threads = TRUE} is auto-set when \code{threads} is non-NULL.}
-
-\item{stanc_options}{Optional list forwarded to
-\code{cmdstanr::cmdstan_model(stanc_options = ...)} (e.g.
-\code{list("O1")} to enable the stanc3 optimiser). Bench
-per-model before enabling.}
 }
 \value{
 A \code{list} of class \code{c("mvgam", "jsdgam")}. The full mvgam
@@ -231,9 +209,9 @@ method surface (\code{summary}, \code{predict}, \code{forecast}, \code{loo},
 \description{
 Sets up a Joint Species Distribution Model (JSDM) in which the
 residual associations among species are modelled in a reduced-rank
-format using a set of latent factors. The factor specification is
-flexible: spatial, temporal, or any other type of predictor effects
-can enter the latent factors via \code{factor_formula}, while the
+format using a set of latent factors. The factor specification accepts
+spatial, temporal, or any other type of predictor effects, which enter
+the latent factors via \code{factor_formula}, while the
 observation model itself supports all the smooth, GP and random
 effects that mvgam can handle. Use \code{by = lv_axis()} inside smooth
 or GP terms of \code{factor_formula} to fit per-latent-factor smooths

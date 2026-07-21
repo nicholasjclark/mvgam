@@ -67,6 +67,7 @@ hindcast <- function(object, ...) {
 #'   and added to the linpred, matching the marginal Monte Carlo
 #'   convention used by `posterior_epred()` /
 #'   `posterior_predict()` with `process_error = TRUE`.
+#' @inheritParams forecast.mvgam
 #'
 #' @return An object of class [mvgam_forecast-class][mvgam].
 #'   Hindcasts are returned as a named list of `[ndraws, n_times]`

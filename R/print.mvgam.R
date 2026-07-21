@@ -85,79 +85,61 @@ print.mvgam_formula <- function(x, ...) {
   invisible(x)
 }
 
-#' Print model specification section for print.mvgam (simplified version)
-#' @param model_spec Model specification from extract_model_spec
-#' @noRd
-print_model_specification_simple <- function(model_spec) {
-  # Print formulas
-  if (!is.null(model_spec$formulas$process)) {
+#' Print an unfitted \pkg{mvgam} object
+#'
+#' @param x \code{mvgam_prefit} object returned from \code{mvgam()} with
+#'   \code{run_model = FALSE}
+#' @param ... Additional arguments (unused)
+#' @return The \code{mvgam_prefit} object is returned invisibly.
+#' @export
+print.mvgam_prefit <- function(x, ...) {
+  # Formulas (distinguish observation vs process)
+  if (!is.null(x$trend_formula)) {
     cat("GAM observation formula:\n")
-    print(model_spec$formulas$observation)
+    print(x$formula)
     cat("\nGAM process formula:\n")
-    print(model_spec$formulas$process)
+    print(x$trend_formula)
   } else {
     cat("GAM formula:\n")
-    print(model_spec$formulas$observation)
+    print(x$formula)
   }
 
-  # Print family and link
-  cat("\nFamily:\n")
-  cat(paste0(model_spec$family, '\n'))
+  # Family and link
+  if (!is.null(x$family)) {
+    cat("\n\nFamily:\n")
+    cat(x$family$family, "\n")
+    cat("\nLink function:\n")
+    cat(x$family$link, "\n")
+  }
 
-  cat("\nLink function:\n")
-  cat(paste0(model_spec$link, '\n'))
-
-  # Print trend model
-  if (!model_spec$is_jsdgam) {
-    cat("\nTrend model:\n")
-    if (is.call(model_spec$trend_model)) {
-      print(model_spec$trend_model)
-      cat('\n')
+  # Trend model (if present)
+  if (!is.null(x$trend_formula)) {
+    cat("\n\nTrend model:\n")
+    trend_comps <- x$trend_components
+    if (!is.null(trend_comps) && !is.null(trend_comps$types)) {
+      cat(trend_comps$types[[1]], "\n")
     } else {
-      cat(paste0(model_spec$trend_model, '\n'))
+      cat("None\n")
     }
   }
 
-  # Print latent variable info (simplified - always "latent factors" for print.mvgam)
-  if (!is.null(model_spec$latent_variables)) {
-    cat("\nN latent factors:\n")
-    cat(model_spec$latent_variables$count, '\n')
+  # N series
+  if (!is.null(x$series_info) && !is.null(x$series_info$n_series)) {
+    cat("\n\nN series:\n")
+    cat(x$series_info$n_series, "\n")
   }
 
-  # Print dimensions
-  if (model_spec$is_jsdgam) {
-    cat('\nN species:\n')
-    cat(model_spec$dimensions$n_species, '\n')
-    cat('\nN sites:\n')
-    cat(model_spec$dimensions$n_sites, '\n')
-  } else {
-    cat('\nN series:\n')
-    cat(model_spec$dimensions$n_series, '\n')
-    cat('\nN timepoints:\n')
-    cat(model_spec$dimensions$n_timepoints, '\n')
+  # N timepoints
+  if (!is.null(x$time_info) && !is.null(x$time_info$n_timepoints)) {
+    cat("\n\nN timepoints:\n")
+    cat(x$time_info$n_timepoints, "\n")
   }
 
-  # Print upper bounds if present
-  if (!is.null(model_spec$upper_bounds)) {
-    cat('\nUpper bounds:\n')
-    cat(model_spec$upper_bounds, '\n')
-  }
-}
+  # Sampling status
+  cat("\n\nStatus:\n")
+  cat("Not fitted", "\n")
 
-
-#'@export
-print.mvgam_prefit = function(x, ...) {
-  object <- x
-
-  # Use shared extractor function for model specification
-  model_spec <- extract_model_spec(object)
-
-  # Print model specification using shared helper
-  print_model_specification(model_spec)
-
-  # Add prefit-specific status message
-  cat('\nStatus:\n')
-  cat('Not fitted', '\n')
+  invisible(x)
 }
 
 #' Extract family from mvgam object
@@ -165,6 +147,7 @@ print.mvgam_prefit = function(x, ...) {
 #' @param object mvgam object
 #' @param ... Additional arguments (unused)
 #' @return Family object
+#' @importFrom stats family
 #' @export
 family.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
@@ -224,7 +207,7 @@ nobs.mvgam <- function(object, ...) {
 
 #' Extract MCMC sampling information from mvgam object
 #'
-#' Uses posterior package for robust extraction across backends. Returns
+#' Uses posterior package for consistent extraction across backends. Returns
 #' only information that can be reliably extracted (chains, post-warmup
 #' iterations, total draws).
 #'

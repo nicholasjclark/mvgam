@@ -21,13 +21,11 @@ observations, if supplied in the original model. Otherwise \code{NULL}
 model
 \item \code{priors} If the model priors were updated from their defaults, the prior
 \code{dataframe} will be returned. Otherwise \code{NULL}
-\item \code{model_output} The \code{MCMC} object returned by the fitting engine. If the
-model was fitted using \code{Stan}, this will be an object of class \code{stanfit}
-(see \code{\link[rstan]{stanfit-class}} for details). If \code{JAGS} was used
-as the backend, this will be an object of class \code{runjags} (see
-\code{\link[runjags]{runjags-class}} for details)
+\item \code{model_output} The \code{MCMC} object returned by the fitting engine, an
+object of class \code{stanfit}
+(see \code{\link[rstan]{stanfit-class}} for details)
 \item \code{model_file} The \code{character} string model file used to describe the model
-in either \code{Stan} or \code{JAGS} syntax
+in \code{Stan} syntax
 \item \code{model_data} If \code{return_model_data} was set to \code{TRUE} when fitting the
 model, the \code{list} object containing all data objects needed to condition
 the model is returned. Each item in the \code{list} is described in detail at
@@ -64,10 +62,9 @@ will be returned. Otherwise \code{NULL}
 supplied in model fitting.
 \item \code{test_data} If test data were supplied (as argument \code{newdata} in the
 original model), it will be returned. Othwerise \code{NULL}
-\item \code{fit_engine} \code{Character} describing the fit engine, either as \code{stan} or
-\code{jags}
+\item \code{fit_engine} \code{Character} describing the fit engine, \code{stan}
 \item \code{backend} \code{Character} describing the backend used for modelling, either
-as \code{rstan}, \code{cmdstanr} or \code{rjags}
+as \code{rstan} or \code{cmdstanr}
 \item \code{algorithm} \code{Character} describing the algorithm used for finding the
 posterior, either as \code{sampling}, \code{laplace}, \code{pathfinder}, \code{meanfield} or
 \code{fullrank}

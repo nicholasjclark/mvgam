@@ -35,7 +35,7 @@
 
 \item{...}{More \code{mvgam} objects}
 
-\item{compare, resp, pointwise, moment_match, reloo, k_threshold, save_psis, moment_match_args, reloo_args, model_names}{Accepted for \link[brms:loo.brmsfit]{brms::loo.brmsfit} parity. \code{resp} is passed through to
+\item{compare, resp, pointwise, moment_match, reloo, k_threshold, save_psis, moment_match_args, reloo_args}{Accepted for \link[brms:loo.brmsfit]{brms::loo.brmsfit} parity. \code{resp} is passed through to
 \code{\link[=log_lik.mvgam]{log_lik.mvgam()}} for multivariate response selection; \code{pointwise},
 \code{moment_match}, \code{reloo} and their \verb{*_args} companions require
 refit / streaming machinery that mvgam does not yet support — v1

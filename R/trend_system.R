@@ -1,7 +1,7 @@
 #' Trend System Infrastructure for mvgam
 #'
 #' @description
-#' Complete trend infrastructure including registry management, validation,
+#' Trend infrastructure including registry management, validation,
 #' formula parsing, and trend constructor functions. This file consolidates
 #' the core trend system components for mvgam-brms integration.
 #'
@@ -484,7 +484,7 @@ ensure_registry_initialized <- function() {
 # =============================================================================
 # SECTION 2: TREND PARAMETER SYSTEM (brms-inspired)
 # =============================================================================
-# WHY: Following brms design patterns for prior() objects, we create a flexible
+# WHY: Following brms design patterns for prior() objects, we create a
 # parameter specification system that allows easy combination with `+` operator
 # and standardized conditional parameter handling.
 
@@ -817,17 +817,17 @@ get_trend_name <- function(trend_spec) {
 }
 
 # -----------------------------------------------------------------------------
-# Ultra-Efficient Forecast Metadata Generation
+# Forecast Metadata Generation
 # -----------------------------------------------------------------------------
 
 #' Generate Forecast Metadata for Ultra-Fast Dispatch
 #'
-#' Creates minimal forecast metadata optimized for maximum runtime speed.
+#' Creates minimal forecast metadata for fast runtime dispatch.
 #' Stores only function name and required parameter list for lazy extraction
 #' and zero-overhead forecasting calls.
 #'
 #' @param trend_spec An mvgam_trend object
-#' @return List with function_name and required_params for efficient dispatch
+#' @return List with function_name and required_params for dispatch
 #' @noRd
 generate_forecast_metadata <- function(trend_spec) {
   checkmate::assert_list(trend_spec, min.len = 1)
@@ -850,7 +850,7 @@ generate_forecast_metadata <- function(trend_spec) {
 #' Generate Required Parameters for Ultra-Fast Forecasting
 #'
 #' Determines minimal set of parameters needed for forecasting dispatch.
-#' Always a subset of monitor_params optimized for fast extraction.
+#' Always a subset of monitor_params, kept minimal for fast extraction.
 #'
 #' @param trend_spec An mvgam_trend object
 #' @param trend_type Normalized trend type
@@ -988,7 +988,7 @@ generate_summary_labels <- function(trend_spec) {
 #'
 #' @param param_name Technical parameter name (e.g., "ar1_trend", "sigma_trend")
 #' @param trend_type Normalized trend type
-#' @param trend_spec Complete trend specification for context
+#' @param trend_spec Trend specification for context
 #' @return Character string with user-friendly label
 #' @noRd
 generate_parameter_label <- function(param_name, trend_type, trend_spec) {
@@ -1030,13 +1030,13 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
 }
 
 # =============================================================================
-# SECTION 3: ENHANCED MVGAM_TREND OBJECT SPECIFICATION
+# SECTION 3: MVGAM_TREND OBJECT SPECIFICATION
 # =============================================================================
 
-#' Enhanced mvgam_trend Object Field Specification
+#' mvgam_trend Object Field Specification
 #'
 #' @description
-#' Comprehensive documentation of required and optional fields for the enhanced
+#' Documentation of required and optional fields for the
 #' mvgam_trend S3 class structure. This specification enables self-contained
 #' trend objects that provide all necessary information for validation,
 #' Stan code generation, and post-processing without external lookups.
@@ -1074,8 +1074,8 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
 #'
 #' @section Self-Contained Forecasting Metadata Fields:
 #' \describe{
-#'   \item{forecast_metadata}{List. Complete forecasting function information:
-#'     \itemize{
+#'   \item{forecast_metadata}{List. Forecasting function information:
+#'     \describe{
 #'       \item{function_name}{Character. Forecasting function name (e.g., "forecast_ar_rcpp")}
 #'       \item{required_args}{Character vector. Required arguments from fitted model}
 #'       \item{max_horizon}{Integer. Maximum forecasting steps supported}
@@ -1110,7 +1110,7 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
 #'   \item{label}{Character string. Human-readable description for printing.
 #'     Auto-generated from trend type and parameters if not provided.}
 #'   \item{summary_labels}{List. Naming patterns for parameter summaries:
-#'     \itemize{
+#'     \describe{
 #'       \item{parameter_labels}{List mapping parameter names to display labels}
 #'       \item{factor_labels}{List for factor loading label patterns}
 #'       \item{group_labels}{List for hierarchical parameter labels}
@@ -1120,15 +1120,15 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
 #' @section Internal Processing Fields:
 #' \describe{
 #'   \item{param_info}{List containing:
-#'     \itemize{
-#'       \item{parameters}{trend_param object with complete specifications}
+#'     \describe{
+#'       \item{parameters}{trend_param object with parameter specifications}
 #'       \item{characteristics}{List of trend capabilities and settings}
 #'     }}
 #'   \item{shared_innovations}{Logical. Whether trend uses shared Gaussian
 #'     innovation system (TRUE) or handles own innovations (FALSE).
 #'     Most trends use shared system; exceptions: CAR, VAR, PW.}
 #'   \item{dimensions}{List. Pre-calculated time series dimensions (populated during validation):
-#'     \itemize{
+#'     \describe{
 #'       \item{n_time}{Integer. Number of time points}
 #'       \item{n_series}{Integer. Number of series}
 #'       \item{n_obs}{Integer. Total observations}
@@ -1144,50 +1144,50 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
 #' @section Field Relationships and Validation Rules:
 #' The validation_rules field determines which other fields are valid:
 #' \itemize{
-#'   \item{"supports_factors" + n_lv}: Factor models allowed
-#'   \item{"incompatible_with_factors" + n_lv}: Error thrown
-#'   \item{"supports_hierarchical" + gr/subgr}: Hierarchical models allowed
-#'   \item{"requires_regular_intervals"}: Regular time validation triggered
-#'   \item{"allows_irregular_intervals"}: CAR-style irregular time handling
+#'   \item "supports_factors" + n_lv: Factor models allowed
+#'   \item "incompatible_with_factors" + n_lv: Error thrown
+#'   \item "supports_hierarchical" + gr/subgr: Hierarchical models allowed
+#'   \item "requires_regular_intervals": Regular time validation triggered
+#'   \item "allows_irregular_intervals": CAR-style irregular time handling
 #' }
 #'
 #' @section Convention-Based Function Dispatch:
 #' The trend field enables automatic function lookup:
 #' \itemize{
-#'   \item{Stan generation}: "AR" → generate_ar_trend_stanvars()
-#'   \item{Forecasting}: forecast_metadata$function_name → that function
-#'   \item{No manual registry entries needed}
+#'   \item Stan generation: "AR" → generate_ar_trend_stanvars()
+#'   \item Forecasting: forecast_metadata$function_name → that function
+#'   \item No manual registry entries needed
 #' }
 #'
 #' @section Response Suffix Handling (Multivariate):
 #' In multivariate contexts, certain fields are automatically modified:
 #' \itemize{
-#'   \item{monitor_params}: "_count", "_biomass" suffixes added to parameter names
-#'   \item{summary_labels}: Response-specific labels generated automatically
-#'   \item{response_context}: Set to response name for tracking
+#'   \item monitor_params: "_count", "_biomass" suffixes added to parameter names
+#'   \item summary_labels: Response-specific labels generated automatically
+#'   \item response_context: Set to response name for tracking
 #' }
 #'
 #' @section Backward Compatibility:
 #' During transition period, old fields may still be present:
 #' \itemize{
-#'   \item{trend_model}: Legacy field, use trend instead
-#'   \item{trend_type}: Legacy field, use trend instead
-#'   \item{forecast_fun}: Legacy field, use forecast_metadata$function_name
-#'   \item{stancode_fun}: Legacy field, replaced by convention-based lookup
-#'   \item{standata_fun}: Legacy field, replaced by convention-based lookup
+#'   \item trend_model: Legacy field, use trend instead
+#'   \item trend_type: Legacy field, use trend instead
+#'   \item forecast_fun: Legacy field, use forecast_metadata$function_name
+#'   \item stancode_fun: Legacy field, replaced by convention-based lookup
+#'   \item standata_fun: Legacy field, replaced by convention-based lookup
 #' }
 #'
 #' @section Class Structure Requirements:
 #' Objects must:
 #' \itemize{
-#'   \item{Have class c("mvgam_trend")}
-#'   \item{Pass validate_mvgam_trend() checks}
-#'   \item{Include all required core fields}
-#'   \item{Use approved validation_rules vocabulary}
-#'   \item{Have consistent field types and relationships}
+#'   \item Have class c("mvgam_trend")
+#'   \item Pass validate_mvgam_trend() checks
+#'   \item Include all required core fields
+#'   \item Use approved validation_rules vocabulary
+#'   \item Have consistent field types and relationships
 #' }
 #'
-#' @section Example Complete Object:
+#' @section Example Object:
 #' \preformatted{
 #' ar_trend <- structure(list(
 #'   # Core required fields
@@ -1281,7 +1281,7 @@ NULL
 #'     requires specification of seasonal period parameter. Used by: seasonal AR models.
 #'     Triggers: validate_seasonal_period_specification()}
 #'   \item{rule_supports_multiple_seasonality}{"supports_multiple_seasonality" - Trend
-#'     can handle multiple seasonal periods simultaneously. Used by: flexible seasonal models.
+#'     can handle multiple seasonal periods simultaneously. Used by: multi-seasonal models.
 #'     Triggers: validate_multiple_seasonal_periods()}
 #'   \item{rule_incompatible_with_seasonal_smooths}{"incompatible_with_seasonal_smooths" - Trend
 #'     conflicts with seasonal smooth terms in observation formula. Used by: trends with built-in seasonality.
@@ -1370,7 +1370,7 @@ rule_incompatible_with_seasonal_smooths <- "incompatible_with_seasonal_smooths"
 rule_requires_balanced_panels <- "requires_balanced_panels"
 rule_requires_minimum_series_count <- "requires_minimum_series_count"
 
-# Complete validation rules vocabulary for validation
+# Validation rules vocabulary
 validation_rule_vocabulary <- c(
   # Time rules
   rule_requires_regular_intervals,
@@ -1692,7 +1692,7 @@ extract_regular_terms <- function(formula_terms) {
 
 #' Parse trend formula with brms-inspired validation
 #'
-#' Extracts trend model specifications from a formula using robust validation
+#' Extracts trend model specifications from a formula using validation
 #'   patterns inspired by brms' validate_formula and mvgam's interpret_mvgam.
 #'
 #' @param trend_formula A formula object containing trend specifications
@@ -1997,7 +1997,7 @@ print.mvgam_trend <- function(x, ...) {
 # WHY: Trend constructors provide the user-facing API for creating trend
 # specifications. They must handle parameter validation, set appropriate
 # defaults, and create properly structured trend objects that integrate
-# seamlessly with the brms ecosystem. This layer abstracts Stan complexity.
+# with the brms ecosystem. This layer abstracts Stan complexity.
 
 #' Trend Model Constructors for \pkg{mvgam}
 #'
@@ -2046,18 +2046,18 @@ print.mvgam_trend <- function(x, ...) {
 #' @param time The unquoted name of the variable that represents time in the
 #'   supplied `data`. This variable should be either a `numeric` or `integer`
 #'   variable. Defaults to `time` to align with brms conventions, allowing
-#'   flexible time variable naming without requiring explicit "time" columns.
+#'   any time variable name without requiring explicit "time" columns.
 #'   When using the default, a one-time warning will be issued.
 #'
 #' @param series The unquoted name of the variable that represents the series
 #'   identifier in the supplied `data`. This variable should be either a
 #'   `character` or `factor` variable. Defaults to `series` following mvgam
-#'   conventions, allowing flexible series variable naming. When using the
+#'   conventions, allowing any series variable name. When using the
 #'   default, a one-time warning will be issued.
 #'
 #' @details
 #' **Important**: Only ONE trend constructor is allowed per `trend_formula`.
-#' For complex temporal dynamics, use flexible parameters within a single trend type:
+#' For complex temporal dynamics, use the parameter options of a single trend type:
 #' \itemize{
 #'   \item For seasonal patterns: `AR(p = c(1, 12))` instead of `RW() + AR(p = 12)`
 #'   \item For multiple time scales: `AR(p = c(1, 7, 30))` for daily, weekly, monthly
@@ -2156,6 +2156,16 @@ print.mvgam_trend <- function(x, ...) {
 #' standard `brms::set_prior(class = "<name>")` route; call
 #' `get_prior(mvgam_formula(...))` to see the exact parameter
 #' set surfaced by the current `coef_sharing` value.
+#'
+#' @param n_lv The number of latent factors to estimate for dynamic
+#'   factor models. When `n_lv` is smaller than the number of series,
+#'   the latent processes are modelled as `n_lv` factors with estimated
+#'   loadings onto the series. Defaults to `NULL`, in which case one
+#'   latent process is used per series.
+#' @param trend_map Optional `data.frame` specifying which latent
+#'   process each series maps onto, giving fixed (rather than estimated)
+#'   loadings for dynamic factor models. See \code{\link{mvgam}} for the
+#'   required format. Defaults to `NULL`.
 #'
 #' @rdname trend_constructors
 #'
@@ -2436,7 +2446,7 @@ RW = function(
     trend_map = trend_map
   )
 
-  # Legacy validation (will be replaced by enhanced validation layer)
+  # Validate the assembled trend object
   validate_mvgam_trend(trend_obj)
 
   return(trend_obj)
@@ -2579,13 +2589,13 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #' @param time The unquoted name of the variable that represents time in the
 #'   supplied `data`. This variable should be either a `numeric` or `integer`
 #'   variable. Defaults to `time` to align with brms conventions, allowing
-#'   flexible time variable naming without requiring explicit "time" columns.
+#'   any time variable name without requiring explicit "time" columns.
 #'   When using the default, a one-time warning will be issued.
 #'
 #' @param series The unquoted name of the variable that represents the series
 #'   identifier in the supplied `data`. This variable should be either a
 #'   `character` or `factor` variable. Defaults to `series` following mvgam
-#'   conventions, allowing flexible series variable naming. When using the
+#'   conventions, allowing any series variable name. When using the
 #'   default, a one-time warning will be issued.
 #'
 #' @param cap The unquoted name of the variable in `data` that specifies the
@@ -2613,6 +2623,8 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #'   variable containing maximum saturation points for the trend (see
 #'   details and examples in \code{\link{mvgam}} for more information). Default
 #'   is `'linear'`.
+#'
+#' @inheritParams AR
 #'
 #' @author Nicholas J Clark
 #'
@@ -2750,7 +2762,8 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #' \pkg{mvgam}. This function does not evaluate its arguments – it exists
 #' purely to help set up a model with particular error processes
 #'
-#' @param unit The unquoted name of the variable that represents the unit of
+#' @inheritParams AR
+#' @param time The unquoted name of the variable that represents the unit of
 #'   analysis in `data` over which latent residuals should be correlated. This
 #'   variable should be either a `numeric` or `integer` variable in the
 #'   supplied `data`. Defaults to `time` to be consistent with other
@@ -2969,7 +2982,7 @@ get_mvgam_trend_defaults <- function() {
 #' Applies universal defaults first, then auto-generates metadata fields.
 #'
 #' @param trend_obj Partial trend object (list)
-#' @return Complete trend object with all fields filled
+#' @return Trend object with all fields filled
 #' @noRd
 apply_mvgam_trend_defaults <- function(trend_obj) {
   checkmate::assert_list(trend_obj)
@@ -3086,6 +3099,8 @@ get_default_validation_rules <- function(trend_type) {
 #' @param .series Series variable (quoted or unquoted)
 #' @param .gr Grouping variable (quoted or unquoted)
 #' @param .subgr Subgrouping variable (quoted or unquoted)
+#' @param .cap Optional carrying-capacity variable (quoted or unquoted) for
+#'   logistic piecewise trends
 #' @param .validation_rules Optional override for validation rules
 #' @return mvgam_trend object
 #' @export
@@ -3155,7 +3170,7 @@ create_mvgam_trend <- function(trend_type, ...,
   # Set class
   class(trend_obj) <- "mvgam_trend"
 
-  # Validate the complete object
+  # Validate the assembled object
   validate_mvgam_trend(trend_obj)
 
   # Add consistent dispatch metadata
@@ -3237,7 +3252,7 @@ get_trend_dispatch_function <- function(trend_type, function_type) {
 #' Ensures all dispatch follows the same convention.
 #'
 #' @param trend_obj mvgam_trend object
-#' @return Enhanced trend object with consistent dispatch metadata
+#' @return Trend object with consistent dispatch metadata
 #' @noRd
 add_consistent_dispatch_metadata <- function(trend_obj) {
   trend_type <- trend_obj$trend

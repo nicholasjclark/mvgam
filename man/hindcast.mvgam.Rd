@@ -48,6 +48,10 @@ innovations are drawn from the trend's covariance structure
 and added to the linpred, matching the marginal Monte Carlo
 convention used by \code{posterior_epred()} /
 \code{posterior_predict()} with \code{process_error = TRUE}.}
+
+\item{resp}{For multivariate (multiple-response) models, the
+name of a single response variable to return results for.
+\code{NULL} (the default) returns results for all responses.}
 }
 \value{
 An object of class \link[=mvgam]{mvgam_forecast-class}.

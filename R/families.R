@@ -2080,7 +2080,7 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #' `posterior_occupancy(fit, conditional = TRUE, draw = TRUE)`
 #' returns 0/1 z draws; `posterior_occupancy(conditional = FALSE)`
 #' returns marginal psi. `predict(fit, type = "detection")`
-#' returns the per-visit detection probability p_{g,j} on the
+#' returns the per-visit detection probability \eqn{p_{g,j}} on the
 #' response scale.
 #'
 #' @param multi_season Logical. When `TRUE`, closure units are

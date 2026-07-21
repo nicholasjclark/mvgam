@@ -1,4 +1,4 @@
-# Comprehensive mu Expression Analysis System
+# mu Expression Analysis System
 # 
 # Replaces hard-coded regex patterns with dynamic structural analysis
 # for all brms mu construction patterns including monotonic, GP, spline,
@@ -6,8 +6,8 @@
 
 #' Extract and classify mu construction expressions from Stan code
 #' 
-#' Replaces extract_mu_construction_from_model_block() with comprehensive
-#' structural analysis that dynamically discovers patterns without hard-coding.
+#' Replaces extract_mu_construction_from_model_block() with structural
+#' analysis that dynamically discovers patterns without hard-coding.
 #' 
 #' @param stancode Character string containing complete Stan model code
 #' @return List with mu_construction, supporting_declarations, referenced_variables
@@ -37,7 +37,7 @@ extract_mu_construction_with_classification <- function(stancode) {
   # Classify each mu expression structurally
   classified_expressions <- classify_mu_expressions_structurally(mu_lines, stancode)
   
-  # Extract comprehensive variable references
+  # Extract all variable references
   referenced_vars <- extract_comprehensive_variable_references(classified_expressions, stancode)
   
   # Find supporting declarations using existing utility
@@ -403,7 +403,7 @@ extract_assignment_target <- function(expr) {
   return("")
 }
 
-#' Analyze indexing patterns comprehensively
+#' Analyze indexing patterns
 #' @param expr Expression string
 #' @return List of indexing pattern features
 #' @noRd
@@ -475,7 +475,7 @@ analyze_function_usage <- function(expr, context) {
   )
 }
 
-#' Analyze mathematical operations comprehensively
+#' Analyze mathematical operations
 #' @param expr Expression string
 #' @return List of mathematical operation features
 #' @noRd
@@ -512,7 +512,7 @@ count_mathematical_operators <- function(expr) {
   return(total_count)
 }
 
-#' Analyze variable relationships comprehensively
+#' Analyze variable relationships
 #' @param expr Expression string
 #' @return List of variable relationship features
 #' @noRd
@@ -661,7 +661,7 @@ check_loop_requirement <- function(features, expr_type) {
   return(features$indexing_patterns$has_loop_index || expr_type == "loop_assignment")
 }
 
-#' Extract variables comprehensively from expression
+#' Extract all variables from expression
 #' @param expr Expression string
 #' @param features Structural features
 #' @param context Analysis context
@@ -699,7 +699,7 @@ extract_expression_variables_comprehensive <- function(expr, features, context) 
   )
 }
 
-#' Extract comprehensive variable references from all classified expressions
+#' Extract all variable references from all classified expressions
 #' @param classified_expressions List of classified expressions
 #' @param stancode Full Stan code for context
 #' @return Character vector of all referenced variables needing mapping

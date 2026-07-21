@@ -98,7 +98,7 @@
 #'         draws.
 #'     }
 #'   \item `"detection"`: closure-unit families (nmix(), occ()).
-#'     Per-visit detection probability p_{g,j} on the response
+#'     Per-visit detection probability \eqn{p_{g,j}} on the response
 #'     scale.
 #' }
 #'

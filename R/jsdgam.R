@@ -25,15 +25,13 @@
 #'
 #' Sets up a Joint Species Distribution Model (JSDM) in which the
 #' residual associations among species are modelled in a reduced-rank
-#' format using a set of latent factors. The factor specification is
-#' flexible: spatial, temporal, or any other type of predictor effects
-#' can enter the latent factors via `factor_formula`, while the
+#' format using a set of latent factors. The factor specification accepts
+#' spatial, temporal, or any other type of predictor effects, which enter
+#' the latent factors via `factor_formula`, while the
 #' observation model itself supports all the smooth, GP and random
 #' effects that mvgam can handle. Use `by = lv_axis()` inside smooth
 #' or GP terms of `factor_formula` to fit per-latent-factor smooths
 #' (constrained ordination).
-#'
-#' @inheritParams mvgam
 #'
 #' @param formula A `formula` object specifying the GAM observation
 #'   model formula. These behave exactly like the formula for a GLM
@@ -55,6 +53,10 @@
 #'   `by = lv_axis()` internally. The companion sentinel `lv_axis()`
 #'   is documented at `[lv_axis()]`.
 #'
+#' @param knots An optional `list` of knot values for any smooth
+#'   terms in `formula`, passed on to the `mgcv` smoother setup
+#'   in the same way as the `knots` argument of [mvgam()].
+#'
 #' @param factor_knots An optional `list` of knot values for any
 #'   smooth terms in `factor_formula`, mirroring the role of
 #'   `knots` for the observation formula.
@@ -73,6 +75,10 @@
 #'   matrices per species) into the long-format `data` that
 #'   `jsdgam()` expects, and [pivot_species_matrix()] for the
 #'   Hmsc-style wide `[J, N]` species-composition matrix.
+#'
+#' @param newdata Optional held-out `data.frame` / `list` of the
+#'   same structure as `data`, forwarded to [mvgam()] and
+#'   persisted on the returned fit for later prediction.
 #'
 #' @param family A `family` object specifying the observation
 #'   distribution. Supported families are documented in
@@ -175,6 +181,10 @@
 #'   When supplied the `traits` and `phylo` aliases must be `NULL`;
 #'   see `[mvgam()]` for the accepted field list.
 #'
+#' @param backend Character string specifying the Stan backend,
+#'   either `"cmdstanr"` or `"rstan"`. Forwarded to [mvgam()].
+#'   Defaults to `getOption("brms.backend", "cmdstanr")`.
+#'
 #' @param threads Positive integer or `NULL`. Forwarded to
 #'   [`mvgam()`] / `cmdstanr`. With closure-unit families
 #'   (`nmix()`, `occ()`) and multi-response families
@@ -183,13 +193,6 @@
 #'   `trend_formula` on a brms-native family currently compiles
 #'   un-threaded after a one-time warning; see [`mvgam()`] for the
 #'   full threading notes and bench guidance.
-#' @param cpp_options Optional named list forwarded to
-#'   `cmdstanr::cmdstan_model()` (e.g. `CXXFLAGS = "-march=native"`).
-#'   `stan_threads = TRUE` is auto-set when `threads` is non-NULL.
-#' @param stanc_options Optional list forwarded to
-#'   `cmdstanr::cmdstan_model(stanc_options = ...)` (e.g.
-#'   `list("O1")` to enable the stanc3 optimiser). Bench
-#'   per-model before enabling.
 #' @param run_model **(deprecated)** Logical. Forwarded to `mvgam()`;
 #'   when `FALSE`, skips Stan parse / compile / sampling and returns a
 #'   stub `mvgam` / `jsdgam` object with `$stancode` and `$standata`

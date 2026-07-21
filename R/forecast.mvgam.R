@@ -82,6 +82,9 @@
 #'   observation-family sampling for `type = "response"`,
 #'   returning the family mean (`linkinv(eta)`) instead.
 #'   Defaults to `TRUE`.
+#' @param resp For multivariate (multiple-response) models, the
+#'   name of a single response variable to return results for.
+#'   `NULL` (the default) returns results for all responses.
 #'
 #' @return An object of class [mvgam_forecast-class][mvgam].
 #'   Hindcasts and forecasts are returned as named lists of
@@ -119,7 +122,6 @@
 #' @importFrom generics forecast
 #' @method forecast mvgam
 #' @export
-#' @export forecast
 forecast.mvgam <- function(object,
                             newdata = NULL,
                             ...,

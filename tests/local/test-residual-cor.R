@@ -53,7 +53,7 @@ test_that("VAR(1) summary returns tidy tibble with 3 unique pairs", {
   testthat::expect_setequal(
     colnames(s),
     c("series_1", "series_2", "Estimate", "Est.Error",
-      "Q_lower", "Q_upper", "prob_positive", "prob_negative",
+      "Q_lower", "Q_upper", "ESS", "prob_positive", "prob_negative",
       "prob_nonzero", "sig")
   )
   # Sort key: prob_nonzero desc

@@ -1,16 +1,16 @@
 #' brms Ecosystem Integration for mvgam
 #'
 #' @description
-#' Complete brms ecosystem integration and validation for mvgam models.
+#' brms integration and validation for mvgam models.
 #' This file consolidates brms setup, formula validation, multivariate
 #' parsing, and nonlinear model support.
 #'
 #' @section Architecture:
-#' The brms integration system provides seamless compatibility:
+#' The brms integration system provides compatibility across layers:
 #' - **Setup Layer**: Lightweight brms model setup for rapid prototyping
-#' - **Validation Layer**: Comprehensive formula validation and syntax checking
+#' - **Validation Layer**: Formula validation and syntax checking
 #' - **Parsing Layer**: Multivariate and nonlinear formula interpretation
-#' - **Extension Layer**: Enhanced functionality beyond base brms capabilities
+#' - **Extension Layer**: Functionality beyond base brms capabilities
 
 # =============================================================================
 # HELPER FUNCTIONS
@@ -636,9 +636,9 @@ extract_brmsterms_from_setup <- function(setup_object) {
 # =============================================================================
 # SECTION 2: MULTIVARIATE TRENDS PARSING
 # =============================================================================
-# WHY: Multivariate models require sophisticated formula parsing to handle
+# WHY: Multivariate models require careful formula parsing to handle
 # response-specific trends and cross-series dependencies. This system enables
-# flexible trend specifications while maintaining brms compatibility for
+# per-response trend specifications while maintaining brms compatibility for
 # multivariate response families and distributional modeling.
 #' @noRd
 parse_multivariate_trends <- function(formula, trend_formula = NULL) {
@@ -679,7 +679,7 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
   # Check if main formula is multivariate
   is_mv_main <- is_multivariate_formula(formula)
 
-  # Parse response names from main formula using enhanced function
+  # Parse response names from main formula
   response_names <- extract_response_names(formula)
   
 
@@ -778,7 +778,7 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
 #' @description
 #' Detects multivariate formula specifications across all brms patterns:
 #' mvbind(), bf() with multiple responses, mvbf(), and combined bf() objects.
-#' Uses brms-compatible structural validation for robust detection.
+#' Uses brms-compatible structural validation to detect them.
 #'
 #' Note: cbind() is NOT considered multivariate per brms standards - it creates
 #' binomial trial specifications (univariate models with trials structure).
@@ -857,7 +857,7 @@ is_multivariate_formula <- function(formula) {
 #'
 #' @description
 #' Helper function that checks formula response side for mvbind() binding
-#' using robust expression parsing. cbind() is explicitly excluded as it
+#' using expression parsing. cbind() is explicitly excluded as it
 #' creates binomial trial specifications, not multivariate models.
 #'
 #' @param formula Formula object to check
@@ -1036,7 +1036,7 @@ extract_response_names <- function(formula) {
 #' @return Character vector of response names, or NULL if no mvbind found
 #'
 #' @details
-#' Uses expression tree parsing instead of regex for robust handling of:
+#' Uses expression tree parsing instead of regex to correctly handle:
 #' - Simple variables: mvbind(y1, y2)
 #' - Transformed variables: mvbind(log(y1), sqrt(y2))
 #' - Complex expressions: mvbind(y1 + offset, scale(y2))
@@ -1322,9 +1322,9 @@ extract_nonlinear_components <- function(formula) {
 #' @return List of parsed components
 #' @noRd
 parse_nonlinear_manually <- function(formula) {
-  formula_str <- deparse(formula, wide.cutoff = 500)
+  formula_str <- deparse(formula, width.cutoff = 500)
 
-  # Basic parsing - would need more sophisticated implementation
+  # Basic parsing - would need a fuller implementation
   # for production use
   components <- list(
     response = extract_response_from_formula(formula),

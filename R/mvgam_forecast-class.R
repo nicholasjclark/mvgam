@@ -1,7 +1,7 @@
 #' `mvgam_forecast` object description
 #'
 #' A \code{mvgam_forecast} object returned by function \code{\link{hindcast}}
-#' or \code{\link{forecast}}. Run `methods(class = "mvgam_forecast")` to see
+#' or \code{\link[generics]{forecast}}. Run `methods(class = "mvgam_forecast")` to see
 #' an overview of available methods.
 #'
 #' @details A `mvgam_forecast` object contains the following elements:

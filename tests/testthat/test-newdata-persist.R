@@ -2,48 +2,48 @@
 # Exercises the lightweight validator and the test_data
 # persistence path without spinning up a Stan fit.
 
-test_that("validate_mvgam_newdata accepts NULL", {
+test_that("validate_newdata accepts NULL", {
   data <- data.frame(time = 1:3, series = factor("s1"))
-  expect_null(mvgam:::validate_mvgam_newdata(NULL, data))
+  expect_null(validate_newdata(NULL, data))
 })
 
-test_that("validate_mvgam_newdata coerces newdata$series to training levels", {
+test_that("validate_newdata coerces newdata$series to training levels", {
   data <- data.frame(
     time = 1:3,
     series = factor(rep("s1", 3L), levels = c("s1", "s2"))
   )
   nd <- data.frame(time = 4:5, series = "s2")
-  out <- mvgam:::validate_mvgam_newdata(nd, data)
+  out <- validate_newdata(nd, data)
   expect_true(is.factor(out$series))
   expect_equal(levels(out$series), c("s1", "s2"))
 })
 
-test_that("validate_mvgam_newdata errors on series outside training levels", {
+test_that("validate_newdata errors on series outside training levels", {
   data <- data.frame(time = 1:3, series = factor("s1"))
   nd <- data.frame(time = 4:5, series = "unknown")
   expect_error(
-    mvgam:::validate_mvgam_newdata(nd, data),
+    validate_newdata(nd, data),
     "not present"
   )
 })
 
-test_that("validate_mvgam_newdata errors on missing required columns", {
+test_that("validate_newdata errors on missing required columns", {
   data <- data.frame(time = 1:3, series = factor("s1"), y = 0)
   nd <- data.frame(series = "s1")
-  expect_error(mvgam:::validate_mvgam_newdata(nd, data))
+  expect_error(validate_newdata(nd, data))
 })
 
-test_that("validate_mvgam_newdata errors on non-data.frame input", {
+test_that("validate_newdata errors on non-data.frame input", {
   data <- data.frame(time = 1, series = factor("s1"))
   expect_error(
-    mvgam:::validate_mvgam_newdata(list(time = 1), data)
+    validate_newdata(list(time = 1), data)
   )
 })
 
-test_that("validate_mvgam_newdata is a no-op when data has no series factor", {
+test_that("validate_newdata is a no-op when data has no series factor", {
   data <- data.frame(time = 1:3, series = c("s1", "s1", "s1"))
   nd <- data.frame(time = 4:5, series = c("s1", "s1"))
-  out <- mvgam:::validate_mvgam_newdata(nd, data)
+  out <- validate_newdata(nd, data)
   expect_identical(out$series, c("s1", "s1"))
 })
 

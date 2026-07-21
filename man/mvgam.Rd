@@ -219,8 +219,8 @@ compile / sampling and returns a stub \code{mvgam} object whose
 \verb{$stancode} and \verb{$standata} slots are populated but \verb{$fit} is
 \code{NULL}. Methods that need a fitted model (\code{summary()},
 \code{predict()}, \code{forecast()}, \code{loo()}, etc.) reject the stub with
-a pointer back to the modern helpers. Use \code{\link[brms:stancode]{brms::stancode()}} and
-\code{\link[brms:standata]{brms::standata()}} on an \code{\link[=mvgam_formula]{mvgam_formula()}} object instead. Both
+a pointer back to the modern helpers. Use \code{\link[=stancode]{stancode()}} and
+\code{\link[=standata]{standata()}} on an \code{\link[=mvgam_formula]{mvgam_formula()}} object instead. Both
 dispatch on \code{mvgam_formula} and share the exact same trend /
 \code{loadings_prior} pipeline used internally by \code{mvgam()} /
 \code{jsdgam()}, so they surface the same Stan code and data without
@@ -231,19 +231,6 @@ warning is rate-limited via \code{.frequency = "regularly"}).
 Defaults to \code{TRUE}.}
 
 \item{...}{Additional arguments passed to Stan fitting}
-
-\item{cpp_options}{Optional named list forwarded to
-\code{cmdstanr::cmdstan_model()}. Common entries:
-\code{stan_threads = TRUE} (auto-set when \code{threads} is non-NULL),
-\code{stan_opencl = TRUE}, \code{CXXFLAGS = "-march=native"} for native
-CPU tuning. Use only on the \code{backend = "cmdstanr"} path.}
-
-\item{stanc_options}{Optional list forwarded to
-\code{cmdstanr::cmdstan_model(stanc_options = ...)}. Most commonly
-\code{list("O1")} to enable the stanc3 optimiser. Test per-model
-since some custom-family lpmfs (including some configurations
-of \code{nmix()}) can regress under \code{O1}; benchmark before
-enabling.}
 }
 \value{
 mvgam object with dual brmsfit-like structure

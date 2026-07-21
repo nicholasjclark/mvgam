@@ -104,7 +104,7 @@ sign_canonicalise_factors <- function(object) {
     }
     # If no diagonal Z columns are saved (shouldn't happen for
     # standard factor fits, but guards against pruned posteriors
-    # or jsdgam-style Theta naming until those are unified) leave
+    # or jsdgam-style Theta naming until those are reconciled) leave
     # this chain alone.
     if (!any(diag_present)) next
 

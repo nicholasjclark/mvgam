@@ -25,8 +25,8 @@ NULL
 get_predict.mvgam <- function(model,
                               newdata = insight::get_data(model),
                               type = "response",
-                              process_error = FALSE,
-                              ...) {
+                              ...,
+                              process_error = FALSE) {
   checkmate::assert_class(model, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1L)
   checkmate::assert_logical(process_error, len = 1L)

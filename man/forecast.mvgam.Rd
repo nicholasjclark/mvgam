@@ -63,6 +63,10 @@ noise alone. Defaults to \code{TRUE}.}
 observation-family sampling for \code{type = "response"},
 returning the family mean (\code{linkinv(eta)}) instead.
 Defaults to \code{TRUE}.}
+
+\item{resp}{For multivariate (multiple-response) models, the
+name of a single response variable to return results for.
+\code{NULL} (the default) returns results for all responses.}
 }
 \value{
 An object of class \link[=mvgam]{mvgam_forecast-class}.

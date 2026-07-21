@@ -149,7 +149,7 @@ conditional probability \code{P(z = 1 | y)} per site;
 \code{posterior_occupancy(fit, conditional = TRUE, draw = TRUE)}
 returns 0/1 z draws; \code{posterior_occupancy(conditional = FALSE)}
 returns marginal psi. \code{predict(fit, type = "detection")}
-returns the per-visit detection probability p_{g,j} on the
+returns the per-visit detection probability \eqn{p_{g,j}} on the
 response scale.
 }
 

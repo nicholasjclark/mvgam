@@ -6,7 +6,7 @@
 #'
 #' @param x Object of class `mvgam` or `jsdgam`
 #'
-#' @param compare,resp,pointwise,moment_match,reloo,k_threshold,save_psis,moment_match_args,reloo_args,model_names
+#' @param compare,resp,pointwise,moment_match,reloo,k_threshold,save_psis,moment_match_args,reloo_args
 #'   Accepted for [brms::loo.brmsfit] parity. `resp` is passed through to
 #'   [log_lik.mvgam()] for multivariate response selection; `pointwise`,
 #'   `moment_match`, `reloo` and their `*_args` companions require

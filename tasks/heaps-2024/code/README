@@ -1,9 +1,0 @@
-There are three R files to fit the models from Section 6 of the manuscript using adaptive Gibbs sampling:
-* multiprobitregr.R: use to fit the multivariate probit regression model with structured matrix-t prior to the Finnish birds data (see Section 6.2 of the manuscript).
-* hourlygasdemand.R: use to fit the stationary dynamic factor model with structured matrix-normal prior to the hourly gas demand data (see Section 6.3 of the manuscript).
-* commonfunctions.R: sourced by other two .R files and contains functions common to both.
-
-There are two Stan programs to fit the models from Section 6 of the manuscript using (non-adaptive) Hamiltonian Monte Carlo via Stan:
-* multiprobitregr.stan: use to fit the multivariate probit regression model with structured matrix-t prior to the Finnish birds data (see Section 6.2 of the manuscript).
-* hourlygasdemand.stan: use to fit the stationary dynamic factor model with structured matrix-normal prior to the hourly gas demand data (see Section 6.3 of the manuscript).
-

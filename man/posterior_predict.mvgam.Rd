@@ -46,6 +46,10 @@ state forward for newdata times beyond the training grid.}
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws.}
 
+\item{draw_ids}{Optional integer vector selecting a subset of posterior
+draw indices to use. NULL (default) uses all draws (subject to
+\code{ndraws}).}
+
 \item{re_formula}{Formula for random effects. NULL (default) includes
 all random effects, NA excludes all random effects.}
 

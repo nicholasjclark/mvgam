@@ -30,7 +30,7 @@ The returned object is fully compatible with \code{brms::set_prior()} and
 }
 \description{
 Extracts and combines prior specifications for both observation and trend
-components of an mvgam model. This method provides a unified interface
+components of an mvgam model. This method provides a single interface
 for prior inspection before model fitting. When
 \code{trend_formula = NULL}, this function behaves identically to
 \code{brms::get_prior} for observation-only models.
@@ -40,7 +40,7 @@ When a trend formula is specified, the function:
 \enumerate{
 \item Extracts observation model priors using \code{brms::get_prior}
 \item Extracts trend model priors using mvgam's trend system
-\item Combines them into a unified \code{brmsprior} object
+\item Combines them into a single \code{brmsprior} object
 \item Adds the \code{trend_component} column for easy filtering
 }
 

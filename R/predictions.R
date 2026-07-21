@@ -686,7 +686,7 @@ has_nlpars <- function(object) {
 #'
 #' Because formulas can be any R expression (exponentials, products,
 #'   custom functions), results cannot be decomposed into additive
-#'   components. Instead, the complete expression is evaluated during
+#'   components. Instead, the whole expression is evaluated during
 #'   prep creation via compute_nonlinear_dpars(), and this function
 #'   extracts the pre-computed result.
 #'
@@ -2303,7 +2303,7 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   # observation sigma dpar.
   linpred_only <- identical(component, "trend")
   prep <- prepare_predictions.mock_stanfit(
-    object = mock_fit,
+    x = mock_fit,
     brmsfit = brms_model,
     newdata = newdata,
     re_formula = re_formula,
@@ -2464,7 +2464,7 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata, ndraws,
   )
   mock_fit <- create_mock_stanfit(component_draws)
   prep <- prepare_predictions.mock_stanfit(
-    object = mock_fit, brmsfit = brms_model, newdata = lv_newdata,
+    x = mock_fit, brmsfit = brms_model, newdata = lv_newdata,
     re_formula = re_formula, allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels
   )

@@ -69,6 +69,9 @@ Default is \code{TRUE}.}
 \item{silent}{Integer controlling verbosity. 0 = silent, 1 = some output,
 2 = verbose. Default is 1.}
 
+\item{validate}{Logical; should the generated Stan code be validated?
+Default is \code{TRUE}.}
+
 \item{...}{Additional arguments passed to internal functions.}
 }
 \value{
@@ -93,5 +96,5 @@ model code that would be compiled and fit by \code{mvgam()}.
 }
 \seealso{
 \code{\link{mvgam_formula}}, \code{\link{get_prior.mvgam_formula}},
-\code{\link{standata}}, \code{\link{mvgam}}
+\code{\link[brms]{standata}}, \code{\link{mvgam}}
 }

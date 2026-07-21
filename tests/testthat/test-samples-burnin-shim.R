@@ -55,26 +55,14 @@ test_that("translate_samples_burnin errors when the deprecated pair is mixed wit
 
 test_that("translate_samples_burnin emits a deprecation warning when TESTTHAT is unset", {
   # The shim suppresses the warning when `Sys.getenv('TESTTHAT')
-  # == 'true'` so noisy fit tests do not print it repeatedly. Test
-  # the warning path by clearing that condition for one call, in a
-  # fresh subprocess so that this test file's own earlier calls do
-  # not exhaust the `.frequency = "once"` gate on the rlang side.
-  script <- tempfile(fileext = ".R")
-  writeLines(
-    c(
-      "Sys.setenv(TESTTHAT = '')",
-      "devtools::load_all(quiet = TRUE)",
-      "withCallingHandlers(",
-      "  mvgam:::translate_samples_burnin(list(samples = 100, burnin = 200)),",
-      "  warning = function(w) { cat('WARN:', conditionMessage(w), '\\n'); ",
-      "                          invokeRestart('muffleWarning') }",
-      ")"
-    ),
-    script
+  # == 'true'` so noisy fit tests do not print it repeatedly. Clear
+  # that condition to exercise the warning path. `.frequency = "once"`
+  # would otherwise stay silent if an earlier call in the suite already
+  # emitted the warning, so force verbose warnings to bypass the gate.
+  withr::local_options(rlib_warning_verbosity = "verbose")
+  withr::local_envvar(TESTTHAT = "")
+  expect_warning(
+    mvgam:::translate_samples_burnin(list(samples = 100, burnin = 200)),
+    "'samples' and 'burnin' are deprecated"
   )
-  out <- system2(
-    "Rscript", args = shQuote(script),
-    stdout = TRUE, stderr = TRUE
-  )
-  expect_true(any(grepl("'samples' and 'burnin' are deprecated", out)))
 })

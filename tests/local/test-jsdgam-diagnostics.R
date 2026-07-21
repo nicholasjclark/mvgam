@@ -8,7 +8,7 @@ suppressPackageStartupMessages({
   library(testthat)
 })
 
-mod_baseline <- readRDS("pkgdown/jsdgam_cache/mod_baseline.rds")
+mod_baseline <- readRDS("../../pkgdown/jsdgam_cache/mod_baseline.rds")
 
 test_that("default diagnostic surfaces hide raw Z[ when Z_tilde[ exists", {
   v <- variables(mod_baseline)
@@ -25,13 +25,16 @@ test_that("default diagnostic surfaces hide raw Z[ when Z_tilde[ exists", {
 test_that("as_draws_array honours an explicit `variable = 'Z'` request", {
   drws <- as_draws_array(mod_baseline, variable = "Z", regex = TRUE)
   cols <- posterior::variables(drws)
-  # Both raw and identified loadings surface when explicitly asked.
-  expect_true(any(grepl("^Z\\[", cols)))
+  # The identified loadings surface; the rotation-indeterminate raw `Z`
+  # is hidden by `filter_hidden_unrotated()` once `Z_tilde` is in the
+  # posterior, so an explicit `variable = "Z"` request returns the
+  # `Z_tilde` block.
   expect_true(any(grepl("^Z_tilde\\[", cols)))
+  expect_true(all(grepl("^Z", cols)))
 })
 
 test_that("active_factors + plot.mvgam_active_factors integrate on cached fit", {
-  mod_mgp <- readRDS("pkgdown/jsdgam_cache/mod_mgp.rds")
+  mod_mgp <- readRDS("../../pkgdown/jsdgam_cache/mod_mgp.rds")
   af <- active_factors(mod_mgp)
   expect_s3_class(af, "mvgam_active_factors")
   p <- plot(af)
@@ -39,7 +42,7 @@ test_that("active_factors + plot.mvgam_active_factors integrate on cached fit", 
 })
 
 test_that("compare_loadings integrates on two cached fits", {
-  mod_trt <- readRDS("pkgdown/jsdgam_cache/mod_traits.rds")
+  mod_trt <- readRDS("../../pkgdown/jsdgam_cache/mod_traits.rds")
   p <- compare_loadings(
     mod_baseline, mod_trt,
     labels = c("uninformed", "trait-informed")

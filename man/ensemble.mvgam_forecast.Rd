@@ -60,8 +60,8 @@ accepted (auto-normalised to sum to 1).
 }
 \details{
 It is widely recognised in the forecasting literature that
-combining forecasts from different models often results in improved
-forecast accuracy. The simplest way to create an ensemble is to use
+combining forecasts from different models often yields more
+accurate forecasts. The simplest way to create an ensemble is to use
 evenly weighted combinations of forecasts from the different models.
 This is straightforward to do in a Bayesian setting with \pkg{mvgam} as
 the posterior MCMC draws contained in each \code{mvgam_forecast} object

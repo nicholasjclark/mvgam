@@ -2,8 +2,8 @@
 % Please edit documentation in R/glm_analysis.R
 \name{glm_analysis}
 \alias{glm_analysis}
-\title{Unified GLM Analysis System}
+\title{GLM Analysis System}
 \description{
-Provides unified GLM analysis that replaces multiple detect_glm_usage() calls
-with a single comprehensive analysis pass.
+Provides GLM analysis that replaces multiple detect_glm_usage() calls
+with a single analysis pass.
 }

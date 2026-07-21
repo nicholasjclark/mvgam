@@ -36,7 +36,7 @@
 #' @param compare Logical. If `TRUE`, compare multiple models.
 #' @param pointwise Logical. Pointwise streaming mode (not
 #'   supported; passing `TRUE` raises an error).
-#' @param moment_match,reloo Logical. Advanced LOO post-processing
+#' @param moment_match,reloo Logical. LOO post-processing
 #'   modes (not supported; raise informative errors).
 #' @param k_threshold,save_psis,moment_match_args,reloo_args Forwarded
 #'   verbatim to the LOO machinery.
@@ -217,7 +217,6 @@ mvgam_E_loo_normalise <- function(preds, psis_object,
 #' @rdname mvgam_loo_extras
 #' @importFrom brms LOO
 #' @method LOO mvgam
-#' @export LOO
 #' @export
 LOO.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
                        pointwise = FALSE, moment_match = FALSE,
@@ -235,7 +234,6 @@ LOO.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
 #' @rdname mvgam_loo_extras
 #' @importFrom brms WAIC
 #' @method WAIC mvgam
-#' @export WAIC
 #' @export
 WAIC.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
                         pointwise = FALSE, model_names = NULL) {
@@ -247,7 +245,6 @@ WAIC.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
 #' @rdname mvgam_loo_extras
 #' @importFrom brms loo_R2
 #' @method loo_R2 mvgam
-#' @export loo_R2
 #' @export
 loo_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
                           robust = FALSE, probs = c(0.025, 0.975),
@@ -309,7 +306,6 @@ loo_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
 #' @rdname mvgam_loo_extras
 #' @importFrom brms loo_predict
 #' @method loo_predict mvgam
-#' @export loo_predict
 #' @export
 loo_predict.mvgam <- function(object,
                                 type = c("mean", "var", "quantile"),
@@ -325,7 +321,6 @@ loo_predict.mvgam <- function(object,
 #' @rdname mvgam_loo_extras
 #' @importFrom brms loo_epred
 #' @method loo_epred mvgam
-#' @export loo_epred
 #' @export
 loo_epred.mvgam <- function(object,
                               type = c("mean", "var", "quantile"),
@@ -341,7 +336,6 @@ loo_epred.mvgam <- function(object,
 #' @rdname mvgam_loo_extras
 #' @importFrom brms loo_linpred
 #' @method loo_linpred mvgam
-#' @export loo_linpred
 #' @export
 loo_linpred.mvgam <- function(object,
                                 type = c("mean", "var", "quantile"),
@@ -357,7 +351,6 @@ loo_linpred.mvgam <- function(object,
 #' @rdname mvgam_loo_extras
 #' @importFrom brms loo_predictive_interval
 #' @method loo_predictive_interval mvgam
-#' @export loo_predictive_interval
 #' @export
 loo_predictive_interval.mvgam <- function(object, prob = 0.9,
                                             psis_object = NULL, ...) {
@@ -374,7 +367,6 @@ loo_predictive_interval.mvgam <- function(object, prob = 0.9,
 #' @rdname mvgam_loo_extras
 #' @importFrom loo loo_subsample
 #' @method loo_subsample mvgam
-#' @export loo_subsample
 #' @export
 loo_subsample.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
                                  model_names = NULL) {
@@ -397,7 +389,6 @@ loo_subsample.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
 #' @rdname mvgam_loo_extras
 #' @importFrom loo loo_moment_match
 #' @method loo_moment_match mvgam
-#' @export loo_moment_match
 #' @export
 loo_moment_match.mvgam <- function(x, loo = NULL, k_threshold = 0.7,
                                     newdata = NULL, resp = NULL,
@@ -421,7 +412,6 @@ loo_moment_match.mvgam <- function(x, loo = NULL, k_threshold = 0.7,
 #' @rdname mvgam_loo_extras
 #' @importFrom loo loo_model_weights
 #' @method loo_model_weights mvgam
-#' @export loo_model_weights
 #' @export
 loo_model_weights.mvgam <- function(x, ..., model_names = NULL) {
   checkmate::assert_class(x, "mvgam")
@@ -453,7 +443,6 @@ loo_model_weights.mvgam <- function(x, ..., model_names = NULL) {
 #' @rdname mvgam_loo_extras
 #' @importFrom brms add_criterion
 #' @method add_criterion mvgam
-#' @export add_criterion
 #' @export
 add_criterion.mvgam <- function(x, criterion, model_name = NULL,
                                  overwrite = FALSE, file = NULL,

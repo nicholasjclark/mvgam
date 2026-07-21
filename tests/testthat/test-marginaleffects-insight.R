@@ -22,11 +22,11 @@ test_that("marginaleffects S3 methods are registered on mvgam", {
 })
 
 test_that(".onAttach sets marginaleffects_model_classes", {
-  # `loadNamespace` does not always trigger .onAttach; check the source
-  # directly so this test does not depend on load order.
-  zzz <- readLines(system.file("..", "R", "zzz.R", package = "mvgam") %||%
-                   "R/zzz.R")
-  expect_true(any(grepl("marginaleffects_model_classes", zzz)))
+  # `loadNamespace` does not always trigger .onAttach, and the installed
+  # package ships no R source, so deparse the function body directly.
+  # This does not depend on load order or on source files being present.
+  body_src <- deparse(mvgam:::.onAttach)
+  expect_true(any(grepl("marginaleffects_model_classes", body_src)))
 })
 
 test_that("model.frame.mvgam signature has trend_effects after formula", {

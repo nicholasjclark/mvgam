@@ -118,7 +118,7 @@
 \item{pointwise}{Logical. Pointwise streaming mode (not
 supported; passing \code{TRUE} raises an error).}
 
-\item{moment_match, reloo}{Logical. Advanced LOO post-processing
+\item{moment_match, reloo}{Logical. LOO post-processing
 modes (not supported; raise informative errors).}
 
 \item{k_threshold, save_psis, moment_match_args, reloo_args}{Forwarded

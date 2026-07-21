@@ -39,6 +39,10 @@ individual fits.}
 consistency across imputations (same column names, types,
 rows).}
 
+\item{newdata}{Optional held-out \code{data.frame} persisted on
+every imputation fit, so later plot / forecast methods can
+reach it through any one of them. Defaults to \code{NULL}.}
+
 \item{...}{Additional arguments passed to \code{mvgam()} for each
 imputation (e.g., chains, iter, family, priors).}
 }
@@ -85,7 +89,7 @@ principles.
 \strong{MI Diagnostics}:
 Pooled objects include convergence diagnostics per imputation
 (Rhat, ESS) accessible via \code{summary()}. The print method
-displays comprehensive MI diagnostics including total draws,
+displays MI diagnostics including total draws,
 draws per imputation, and convergence summaries.
 }
 \examples{
@@ -117,7 +121,7 @@ fit_pooled <- mvgam_multiple(
 summary(fit_pooled)
 print(fit_pooled)
 
-# Fit separately (for advanced use cases)
+# Fit separately (for finer control)
 fit_list <- mvgam_multiple(
   formula = y ~ s(season, bs = "cc", k = 5),
   trend_formula = ~ 1,

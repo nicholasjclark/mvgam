@@ -2,7 +2,7 @@
 % Please edit documentation in R/as.data.frame.mvgam.R, R/brms_wrappers.mvgam.R,
 %   R/log_lik.mvgam.R, R/loo.mvgam.R, R/marginaleffects.mvgam.R,
 %   R/mcmc_plot.mvgam.R, R/posterior_smooths.mvgam.R, R/pp_average.mvgam.R,
-%   R/ranef.mvgam.R, R/tidier_methods.R, R/waic.mvgam.R
+%   R/ranef.mvgam.R, R/reexports.R, R/tidier_methods.R, R/waic.mvgam.R
 \docType{import}
 \name{reexports}
 \alias{reexports}
@@ -38,6 +38,66 @@
 \alias{pp_average}
 \alias{ranef}
 \alias{VarCorr}
+\alias{Beta}
+\alias{LOO}
+\alias{WAIC}
+\alias{add_criterion}
+\alias{as.brmsprior}
+\alias{bayes_R2}
+\alias{bayes_factor}
+\alias{bernoulli}
+\alias{beta_binomial}
+\alias{bf}
+\alias{bridge_sampler}
+\alias{brmsfamily}
+\alias{brmsformula}
+\alias{constant}
+\alias{control_params}
+\alias{custom_family}
+\alias{default_prior}
+\alias{empty_prior}
+\alias{exponential}
+\alias{fixef}
+\alias{hypothesis}
+\alias{inits}
+\alias{is.brmsformula}
+\alias{is.brmsprior}
+\alias{is.mvbrmsformula}
+\alias{lognormal}
+\alias{loo_R2}
+\alias{loo_epred}
+\alias{loo_linpred}
+\alias{loo_predict}
+\alias{loo_predictive_interval}
+\alias{make_stancode}
+\alias{make_standata}
+\alias{mvbrmsformula}
+\alias{negbinomial}
+\alias{posterior_summary}
+\alias{prior}
+\alias{prior_}
+\alias{prior_draws}
+\alias{prior_samples}
+\alias{prior_string}
+\alias{prior_summary}
+\alias{set_prior}
+\alias{stancode}
+\alias{standata}
+\alias{stanvar}
+\alias{student}
+\alias{validate_prior}
+\alias{log_posterior}
+\alias{neff_ratio}
+\alias{nuts_params}
+\alias{forecast}
+\alias{loo_model_weights}
+\alias{loo_moment_match}
+\alias{loo_subsample}
+\alias{nchains}
+\alias{ndraws}
+\alias{niterations}
+\alias{nvariables}
+\alias{rhat}
 \alias{tidy}
 \alias{augment}
 \alias{glance}
@@ -49,15 +109,17 @@ These objects are imported from other packages. Follow the links
 below to see their documentation.
 
 \describe{
-  \item{brms}{\code{\link[brms:conditional_effects.brmsfit]{conditional_effects}}, \code{\link[brms:conditional_smooths.brmsfit]{conditional_smooths}}, \code{\link[brms:mcmc_plot.brmsfit]{mcmc_plot}}, \code{\link[brms:ngrps.brmsfit]{ngrps}}, \code{\link[brms:posterior_average.brmsfit]{posterior_average}}, \code{\link[brms:posterior_smooths.brmsfit]{posterior_smooths}}, \code{\link[brms:pp_average.brmsfit]{pp_average}}, \code{\link[brms:ranef.brmsfit]{ranef}}, \code{\link[brms:VarCorr.brmsfit]{VarCorr}}}
+  \item{bayesplot}{\code{\link[bayesplot:bayesplot-extractors]{log_posterior}}, \code{\link[bayesplot:bayesplot-extractors]{neff_ratio}}, \code{\link[bayesplot:bayesplot-extractors]{nuts_params}}}
 
-  \item{generics}{\code{\link[generics]{augment}}, \code{\link[generics]{glance}}, \code{\link[generics]{tidy}}}
+  \item{brms}{\code{\link[brms]{add_criterion}}, \code{\link[brms]{as.brmsprior}}, \code{\link[brms:bayes_factor.brmsfit]{bayes_factor}}, \code{\link[brms:bayes_R2.brmsfit]{bayes_R2}}, \code{\link[brms:brmsfamily]{bernoulli}}, \code{\link[brms:brmsfamily]{Beta}}, \code{\link[brms:brmsfamily]{beta_binomial}}, \code{\link[brms:brmsformula]{bf}}, \code{\link[brms:bridge_sampler.brmsfit]{bridge_sampler}}, \code{\link[brms]{brmsfamily}}, \code{\link[brms]{brmsformula}}, \code{\link[brms:conditional_effects.brmsfit]{conditional_effects}}, \code{\link[brms:conditional_smooths.brmsfit]{conditional_smooths}}, \code{\link[brms]{constant}}, \code{\link[brms]{control_params}}, \code{\link[brms]{custom_family}}, \code{\link[brms]{default_prior}}, \code{\link[brms:set_prior]{empty_prior}}, \code{\link[brms:brmsfamily]{exponential}}, \code{\link[brms:fixef.brmsfit]{fixef}}, \code{\link[brms:hypothesis.brmsfit]{hypothesis}}, \code{\link[brms:inits.brmsfit]{inits}}, \code{\link[brms]{is.brmsformula}}, \code{\link[brms]{is.brmsprior}}, \code{\link[brms]{is.mvbrmsformula}}, \code{\link[brms:brmsfamily]{lognormal}}, \code{\link[brms:loo.brmsfit]{LOO}}, \code{\link[brms:loo_predict.brmsfit]{loo_epred}}, \code{\link[brms:loo_predict.brmsfit]{loo_linpred}}, \code{\link[brms:loo_predict.brmsfit]{loo_predict}}, \code{\link[brms:loo_predict.brmsfit]{loo_predictive_interval}}, \code{\link[brms:loo_R2.brmsfit]{loo_R2}}, \code{\link[brms:stancode]{make_stancode}}, \code{\link[brms:standata]{make_standata}}, \code{\link[brms:mcmc_plot.brmsfit]{mcmc_plot}}, \code{\link[brms]{mvbrmsformula}}, \code{\link[brms:brmsfamily]{negbinomial}}, \code{\link[brms:ngrps.brmsfit]{ngrps}}, \code{\link[brms:posterior_average.brmsfit]{posterior_average}}, \code{\link[brms:posterior_smooths.brmsfit]{posterior_smooths}}, \code{\link[brms]{posterior_summary}}, \code{\link[brms:pp_average.brmsfit]{pp_average}}, \code{\link[brms:set_prior]{prior}}, \code{\link[brms:set_prior]{prior_}}, \code{\link[brms:prior_draws.brmsfit]{prior_draws}}, \code{\link[brms:prior_draws.brmsfit]{prior_samples}}, \code{\link[brms:set_prior]{prior_string}}, \code{\link[brms:prior_summary.brmsfit]{prior_summary}}, \code{\link[brms:ranef.brmsfit]{ranef}}, \code{\link[brms]{set_prior}}, \code{\link[brms]{stancode}}, \code{\link[brms]{standata}}, \code{\link[brms]{stanvar}}, \code{\link[brms:brmsfamily]{student}}, \code{\link[brms]{validate_prior}}, \code{\link[brms:VarCorr.brmsfit]{VarCorr}}, \code{\link[brms:waic.brmsfit]{WAIC}}}
 
-  \item{loo}{\code{\link[loo]{loo}}, \code{\link[loo]{loo_compare}}, \code{\link[loo]{waic}}}
+  \item{generics}{\code{\link[generics]{augment}}, \code{\link[generics]{forecast}}, \code{\link[generics]{glance}}, \code{\link[generics]{tidy}}}
+
+  \item{loo}{\code{\link[loo]{loo}}, \code{\link[loo]{loo_compare}}, \code{\link[loo]{loo_model_weights}}, \code{\link[loo]{loo_moment_match}}, \code{\link[loo]{loo_subsample}}, \code{\link[loo]{waic}}}
 
   \item{marginaleffects}{\code{\link[marginaleffects:comparisons]{avg_comparisons}}, \code{\link[marginaleffects:predictions]{avg_predictions}}, \code{\link[marginaleffects:slopes]{avg_slopes}}, \code{\link[marginaleffects]{comparisons}}, \code{\link[marginaleffects]{datagrid}}, \code{\link[marginaleffects]{hypotheses}}, \code{\link[marginaleffects]{plot_comparisons}}, \code{\link[marginaleffects]{plot_predictions}}, \code{\link[marginaleffects]{plot_slopes}}, \code{\link[marginaleffects]{predictions}}, \code{\link[marginaleffects]{slopes}}}
 
-  \item{posterior}{\code{\link[posterior:draws]{as_draws}}, \code{\link[posterior:draws_array]{as_draws_array}}, \code{\link[posterior:draws_df]{as_draws_df}}, \code{\link[posterior:draws_list]{as_draws_list}}, \code{\link[posterior:draws_matrix]{as_draws_matrix}}, \code{\link[posterior:draws_rvars]{as_draws_rvars}}}
+  \item{posterior}{\code{\link[posterior:draws]{as_draws}}, \code{\link[posterior:draws_array]{as_draws_array}}, \code{\link[posterior:draws_df]{as_draws_df}}, \code{\link[posterior:draws_list]{as_draws_list}}, \code{\link[posterior:draws_matrix]{as_draws_matrix}}, \code{\link[posterior:draws_rvars]{as_draws_rvars}}, \code{\link[posterior:draws-index]{nchains}}, \code{\link[posterior:draws-index]{ndraws}}, \code{\link[posterior:draws-index]{niterations}}, \code{\link[posterior:variables]{nvariables}}, \code{\link[posterior]{rhat}}}
 
   \item{rstantools}{\code{\link[rstantools]{log_lik}}, \code{\link[rstantools]{posterior_interval}}, \code{\link[rstantools]{predictive_error}}, \code{\link[rstantools]{predictive_interval}}}
 }}

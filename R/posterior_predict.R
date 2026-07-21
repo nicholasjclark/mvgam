@@ -879,12 +879,12 @@ sample_from_family <- function(family_name, ndraws, epred,
 
     "discrete_weibull" = {
       checkmate::assert_matrix(shape, nrows = ndraws, ncols = ncol(epred))
-      brms::rdiscrete_weibull(length(epred), mu = epred, shape = shape)
+      rdiscrete_weibull_mvgam(length(epred), mu = epred, shape = shape)
     },
 
     "com_poisson" = {
       checkmate::assert_matrix(shape, nrows = ndraws, ncols = ncol(epred))
-      brms::rcom_poisson(length(epred), mu = epred, shape = shape)
+      rcom_poisson_mvgam(length(epred), mu = epred, shape = shape)
     },
 
     # ============ Binomial families ============
@@ -1147,7 +1147,7 @@ get_family_dpars <- function(family_name) {
   checkmate::assert_string(family_name)
 
   # Map families to required distributional parameters
-  # Complete brms family coverage for future-proofing
+  # Covers all brms families for future-proofing
   dpar_map <- list(
     # Continuous families
     gaussian = c("sigma"),
@@ -1425,6 +1425,9 @@ extract_dpars_from_stanfit <- function(stanfit,
 #'   state forward for newdata times beyond the training grid.
 #' @param ndraws Positive integer specifying number of posterior draws to
 #'   use. NULL (default) uses all available draws.
+#' @param draw_ids Optional integer vector selecting a subset of posterior
+#'   draw indices to use. NULL (default) uses all draws (subject to
+#'   `ndraws`).
 #' @param re_formula Formula for random effects. NULL (default) includes
 #'   all random effects, NA excludes all random effects.
 #' @param allow_new_levels Logical; if TRUE, allows new factor levels in

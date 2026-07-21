@@ -1,4 +1,4 @@
-#' Generate Complete Stan Components for mvgam Formula
+#' Generate Stan Components for mvgam Formula
 #'
 #' Internal shared infrastructure function that serves as the single source of
 #' truth for Stan code generation. Used by both model fitting (\code{mvgam()}) 
@@ -541,6 +541,8 @@ has_obs_intercept <- function(formula) {
 #' @param stan_funs Optional character string containing additional Stan functions.
 #' @param silent Integer controlling verbosity. 0 = silent, 1 = some output,
 #'   2 = verbose. Default is 1.
+#' @param validate Logical; should the generated Stan code be validated?
+#'   Default is \code{TRUE}.
 #' @param ... Additional arguments passed to internal functions.
 #'
 #' @return A character string containing complete, polished Stan model code with data,
@@ -559,7 +561,7 @@ has_obs_intercept <- function(formula) {
 #'
 #' @seealso
 #' \code{\link{mvgam_formula}}, \code{\link{get_prior.mvgam_formula}},
-#' \code{\link{standata}}, \code{\link{mvgam}}
+#' \code{\link[brms]{standata}}, \code{\link{mvgam}}
 #'
 #' @export
 stancode.mvgam_formula <- function(object, data, family = gaussian(),
@@ -630,7 +632,7 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
 #' @return A named list containing all data for Stan model including observation
 #'   and trend data components. Structure matches exactly what would be passed to 
 #'   Stan during fitting by \code{mvgam()}. This data is generated using the same
-#'   shared infrastructure as \code{mvgam()}, ensuring complete consistency.
+#'   shared infrastructure as \code{mvgam()}, ensuring consistency.
 #'
 #' @details
 #' This function uses the shared Stan data generation infrastructure
@@ -641,7 +643,7 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
 #'
 #' @seealso
 #' \code{\link{mvgam_formula}}, \code{\link{get_prior.mvgam_formula}},
-#' \code{\link{stancode}}, \code{\link{mvgam}}
+#' \code{\link[brms]{stancode}}, \code{\link{mvgam}}
 #'
 #' @export
 standata.mvgam_formula <- function(object, data, family = gaussian(),

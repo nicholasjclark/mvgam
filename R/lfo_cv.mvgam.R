@@ -70,6 +70,12 @@
 #'   scores are computed by sampling forecast draws from the
 #'   PSIS-weighted posterior and routing through
 #'   [score.mvgam_forecast]. Defaults to `"elpd"`.
+#' @param save_log_lik Logical. If `TRUE`, retain the
+#'   per-observation held-out log-densities in an
+#'   `n_draws` by `n_eval_obs` matrix (under the LFO-weighted
+#'   posterior) so the result can feed `loo::loo_model_weights()`
+#'   for log-score stacking. Defaults to `FALSE` because the
+#'   matrix can be large.
 #' @param silent Verbosity level between `0` and `2`. See
 #'   [mvgam] for the contract.
 #' @param ... Currently unused.

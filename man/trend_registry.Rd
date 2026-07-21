@@ -11,7 +11,7 @@ An object of class \code{environment} of length 6.
 trend_registry
 }
 \description{
-Complete trend infrastructure including registry management, validation,
+Trend infrastructure including registry management, validation,
 formula parsing, and trend constructor functions. This file consolidates
 the core trend system components for mvgam-brms integration.
 }

@@ -107,6 +107,6 @@ mvgam_formula(y ~ x, trend_formula = ~ RW() + offset(z))
 }
 
 \seealso{
-\code{\link{get_prior.mvgam_formula}}, \code{\link{stancode}},
-\code{\link{standata}}, \code{\link{mvgam}}
+\code{\link{get_prior.mvgam_formula}}, \code{\link[brms]{stancode}},
+\code{\link[brms]{standata}}, \code{\link{mvgam}}
 }

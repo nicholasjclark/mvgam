@@ -138,7 +138,6 @@ rstantools::predictive_interval
 #' }
 #'
 #' @importFrom brms hypothesis
-#' @export hypothesis
 #' @method hypothesis mvgam
 #' @export
 hypothesis.mvgam <- function(x, hypothesis, alpha = 0.05,
@@ -166,8 +165,8 @@ hypothesis.mvgam <- function(x, hypothesis, alpha = 0.05,
 #' On state-space fits this is a natural complement to LFO because
 #' the answer does not depend on the choice of forecast horizon.
 #'
-#' The routing bypasses `brms:::bridge_sampler.brmsfit`, whose
-#' internal `restructure()` and `update_misc_env()` calls assume a
+#' The routing bypasses the internal brms `bridge_sampler.brmsfit`
+#' method, whose `restructure()` and `update_misc_env()` calls assume a
 #' brmsfit that mvgam objects do not conform to. Instead the S3
 #' method resolves the requirements itself and delegates directly
 #' to `bridgesampling::bridge_sampler()` on `object$fit`.
@@ -227,8 +226,7 @@ hypothesis.mvgam <- function(x, hypothesis, alpha = 0.05,
 #'
 #' @author Nicholas J Clark
 #'
-#' @importFrom bridgesampling bridge_sampler
-#' @export bridge_sampler
+#' @importFrom brms bridge_sampler
 #' @method bridge_sampler mvgam
 #' @export
 bridge_sampler.mvgam <- function(samples, recompile = FALSE, ...) {
@@ -267,8 +265,7 @@ bridge_sampler.mvgam <- function(samples, recompile = FALSE, ...) {
 
 
 #' @rdname bridge_sampler.mvgam
-#' @importFrom bridgesampling bayes_factor
-#' @export bayes_factor
+#' @importFrom brms bayes_factor
 #' @method bayes_factor mvgam
 #' @export
 bayes_factor.mvgam <- function(x1, x2, log = FALSE, ...) {
@@ -449,13 +446,11 @@ mvgam_training_data <- function(object) {
 
 
 # ============================================================
-# brms helper-parity re-exports + dispatch (Task #189)
+# brms helper-parity dispatch methods
 # ============================================================
 #
-# Re-export the brms generics so users can call them without
-# the `brms::` namespace prefix, and add the few mvgam-side
-# dispatch methods that brms's default dispatchers do not know
-# about. Each method here forwards to an existing mvgam helper:
+# mvgam-side dispatch methods that brms's default dispatchers do
+# not know about. Each method forwards to an existing mvgam helper:
 #
 #   default_prior.mvgam_formula -> get_prior.mvgam_formula
 #   default_prior.mvgam         -> get_prior.mvgam
@@ -465,26 +460,6 @@ mvgam_training_data <- function(object) {
 # already exist; brms::make_stancode and brms::make_standata are
 # thin wrappers around stancode() / standata() so they dispatch
 # correctly via the existing methods with no extra code.
-
-#' @importFrom brms stancode
-#' @export stancode
-NULL
-
-#' @importFrom brms standata
-#' @export standata
-NULL
-
-#' @importFrom brms make_stancode
-#' @export make_stancode
-NULL
-
-#' @importFrom brms make_standata
-#' @export make_standata
-NULL
-
-#' @importFrom brms default_prior
-#' @export default_prior
-NULL
 
 #' Stan data for a fitted mvgam model
 #'
@@ -548,135 +523,6 @@ default_prior.mvgam <- function(object, ...) {
   get_prior.mvgam(object, ...)
 }
 
-
-# ============================================================
-# brms prior / family / formula / stanvar re-exports
-# ============================================================
-# Re-export the user-facing brms helpers that mvgam workflows
-# routinely reach for, so users do not need to type `brms::`
-# for the prior-writing, family-constructing, formula-wrapping
-# and stanvar-building APIs. All zero-code re-exports; the
-# generics live in brms and dispatch unchanged.
-
-#' @importFrom brms set_prior
-#' @export set_prior
-NULL
-
-#' @importFrom brms prior
-#' @export prior
-NULL
-
-#' @importFrom brms prior_
-#' @export prior_
-NULL
-
-#' @importFrom brms prior_string
-#' @export prior_string
-NULL
-
-#' @importFrom brms empty_prior
-#' @export empty_prior
-NULL
-
-#' @importFrom brms as.brmsprior
-#' @export as.brmsprior
-NULL
-
-#' @importFrom brms is.brmsprior
-#' @export is.brmsprior
-NULL
-
-#' @importFrom brms validate_prior
-#' @export validate_prior
-NULL
-
-#' @importFrom brms prior_draws
-#' @export prior_draws
-NULL
-
-#' @importFrom brms prior_samples
-#' @export prior_samples
-NULL
-
-#' @importFrom brms brmsfamily
-#' @export brmsfamily
-NULL
-
-# Re-export brms-specific response families so `library(mvgam)`
-# alone exposes them; users no longer need to type `brms::Beta()`
-# etc. Standard base-R families (gaussian, poisson, Gamma,
-# binomial, ...) are already on the search path.
-#' @importFrom brms Beta
-#' @export Beta
-NULL
-
-#' @importFrom brms exponential
-#' @export exponential
-NULL
-
-#' @importFrom brms lognormal
-#' @export lognormal
-NULL
-
-#' @importFrom brms student
-#' @export student
-NULL
-
-#' @importFrom brms bernoulli
-#' @export bernoulli
-NULL
-
-#' @importFrom brms negbinomial
-#' @export negbinomial
-NULL
-
-#' @importFrom brms beta_binomial
-#' @export beta_binomial
-NULL
-
-#' @importFrom brms custom_family
-#' @export custom_family
-NULL
-
-#' @importFrom brms brmsformula
-#' @export brmsformula
-NULL
-
-#' @importFrom brms bf
-#' @export bf
-NULL
-
-#' @importFrom brms mvbrmsformula
-#' @export mvbrmsformula
-NULL
-
-#' @importFrom brms is.brmsformula
-#' @export is.brmsformula
-NULL
-
-#' @importFrom brms is.mvbrmsformula
-#' @export is.mvbrmsformula
-NULL
-
-#' @importFrom brms stanvar
-#' @export stanvar
-NULL
-
-#' @importFrom brms validate_newdata
-#' @export validate_newdata
-NULL
-
-#' @importFrom brms constant
-#' @export constant
-NULL
-
-#' @importFrom brms inits
-#' @export inits
-NULL
-
-#' @importFrom brms control_params
-#' @export control_params
-NULL
 
 #' Extract sampler control parameters from a fitted mvgam model
 #'

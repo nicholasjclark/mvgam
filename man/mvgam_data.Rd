@@ -82,6 +82,9 @@ index into the \code{series} factor levels. \code{NULL} resolves to
 
 \item{log_scale}{Logical. Plot the response as \code{log(y + 1)}
 on the multi-series view, where different scales are common.}
+
+\item{...}{For \code{check_mvgam_data()}, arguments forwarded on to
+\code{mvgam_data()}.}
 }
 \value{
 Invisibly, an \code{mvgam_data} list with elements

@@ -4,7 +4,7 @@
 # Summary methods for mvgam fitted models following brms conventions.
 # Uses posterior package for all computation, organized by parameter category.
 
-#' Comprehensive summary of mvgam model fits
+#' Summary of mvgam model fits
 #'
 #' @description
 #' Provides posterior summary statistics for mvgam model parameters, organized
@@ -35,7 +35,7 @@
 #' @param ... Additional arguments (currently unused).
 #'
 #' @return An object of class \code{summary.mvgam} containing:
-#' \itemize{
+#' \describe{
 #'   \item{\code{fixed}}{Fixed effect parameter summaries}
 #'   \item{\code{smooth}}{Smooth (GAM) parameter summaries}
 #'   \item{\code{spec}}{Family-specific parameter summaries (sigma, shape, etc.)}
@@ -46,7 +46,7 @@
 #'
 #' @details
 #' The summary includes the following columns:
-#' \itemize{
+#' \describe{
 #'   \item{\code{Estimate}}{Posterior mean (or median if robust = TRUE)}
 #'   \item{\code{Est.Error}}{Posterior SD (or MAD if robust = TRUE)}
 #'   \item{Quantile bounds}{Credible interval limits based on probs argument}
@@ -302,7 +302,8 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
 #' @description
 #' Internal helper that computes summaries once for all parameters using
 #' posterior package, then returns the full result for filtering by category.
-#' This is more efficient than multiple calls to posterior::summarise_draws().
+#' This makes a single call rather than multiple calls to
+#' posterior::summarise_draws().
 #'
 #' @param object An mvgam fitted object
 #' @param probs Quantile probabilities (length 2)
@@ -727,7 +728,7 @@ match_dpar_smooth_pars <- function(pars, dpar) {
 #'
 #' @details
 #' Matches the following array-indexed parameters:
-#' \itemize{
+#' \describe{
 #'   \item{\code{trend\[i,s\]}}{Main state matrix for each series}
 #'   \item{\code{lv_trend\[i,k\]}}{Latent variable states}
 #'   \item{\code{innovations_trend\[i,s\]}}{Raw innovations}
@@ -1225,8 +1226,7 @@ check_mvgam_convergence <- function(all_summaries, nchains) {
 #' from all imputed datasets at the Stan level. Parameter estimates
 #' reflect uncertainty from both the model and the imputation process.
 #'
-#' @seealso \code{\link{summary.mvgam}}, \code{\link{mvgam_multiple}},
-#'   \code{\link{pool_mvgam_fits}}
+#' @seealso \code{\link{summary.mvgam}}, \code{\link{mvgam_multiple}}
 #'
 #' @export
 summary.mvgam_pooled <- function(object, probs = c(0.025, 0.975),
@@ -1341,7 +1341,7 @@ summary.mvgam_pooled <- function(object, probs = c(0.025, 0.975),
     min_ess_across_imputations = min_ess_across_imps
   )
 
-  # Set enhanced class
+  # Set summary class
   class(base_summary) <- c("mvgam_pooled_summary", "mvgam_summary")
 
   return(base_summary)

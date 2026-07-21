@@ -113,7 +113,6 @@ coef.mvgam <- function(object, summarise = TRUE, ...) {
 #' @rdname mvgam_diagnostics
 #' @importFrom bayesplot nuts_params
 #' @method nuts_params mvgam
-#' @export nuts_params
 #' @export
 nuts_params.mvgam <- function(object, pars = NULL, ...) {
   checkmate::assert_class(object, "mvgam")
@@ -124,7 +123,6 @@ nuts_params.mvgam <- function(object, pars = NULL, ...) {
 #' @rdname mvgam_diagnostics
 #' @importFrom bayesplot log_posterior
 #' @method log_posterior mvgam
-#' @export log_posterior
 #' @export
 log_posterior.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
@@ -135,7 +133,6 @@ log_posterior.mvgam <- function(object, ...) {
 #' @rdname mvgam_diagnostics
 #' @importFrom posterior rhat
 #' @method rhat mvgam
-#' @export rhat
 #' @export
 rhat.mvgam <- function(x, pars = NULL, ...) {
   checkmate::assert_class(x, "mvgam")
@@ -151,7 +148,6 @@ rhat.mvgam <- function(x, pars = NULL, ...) {
 #' @rdname mvgam_diagnostics
 #' @importFrom bayesplot neff_ratio
 #' @method neff_ratio mvgam
-#' @export neff_ratio
 #' @export
 neff_ratio.mvgam <- function(object, pars = NULL, ...) {
   checkmate::assert_class(object, "mvgam")
@@ -174,7 +170,6 @@ neff_ratio.mvgam <- function(object, pars = NULL, ...) {
 #' @rdname mvgam_diagnostics
 #' @importFrom brms fixef
 #' @method fixef mvgam
-#' @export fixef
 #' @export
 fixef.mvgam <- function(object, summary = TRUE, robust = FALSE,
                          probs = c(0.025, 0.975), pars = NULL, ...) {
@@ -204,7 +199,6 @@ fixef.mvgam <- function(object, summary = TRUE, robust = FALSE,
 #' @rdname mvgam_diagnostics
 #' @importFrom brms bayes_R2
 #' @method bayes_R2 mvgam
-#' @export bayes_R2
 #' @export
 bayes_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
                             robust = FALSE,
@@ -265,7 +259,6 @@ bayes_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
 #' @rdname mvgam_diagnostics
 #' @importFrom brms prior_summary
 #' @method prior_summary mvgam
-#' @export prior_summary
 #' @export
 prior_summary.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
@@ -283,7 +276,6 @@ prior_summary.mvgam <- function(object, ...) {
 #' @rdname mvgam_diagnostics
 #' @importFrom posterior ndraws
 #' @method ndraws mvgam
-#' @export ndraws
 #' @export
 ndraws.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
@@ -294,7 +286,6 @@ ndraws.mvgam <- function(x, ...) {
 #' @rdname mvgam_diagnostics
 #' @importFrom posterior nchains
 #' @method nchains mvgam
-#' @export nchains
 #' @export
 nchains.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
@@ -305,7 +296,6 @@ nchains.mvgam <- function(x, ...) {
 #' @rdname mvgam_diagnostics
 #' @importFrom posterior niterations
 #' @method niterations mvgam
-#' @export niterations
 #' @export
 niterations.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
@@ -316,7 +306,6 @@ niterations.mvgam <- function(x, ...) {
 #' @rdname mvgam_diagnostics
 #' @importFrom posterior nvariables
 #' @method nvariables mvgam
-#' @export nvariables
 #' @export
 nvariables.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
@@ -327,11 +316,11 @@ nvariables.mvgam <- function(x, ...) {
 #' @rdname mvgam_diagnostics
 #' @importFrom brms posterior_summary
 #' @method posterior_summary mvgam
-#' @export posterior_summary
 #' @export
-posterior_summary.mvgam <- function(object, pars = NULL,
+posterior_summary.mvgam <- function(x, pars = NULL,
                                      probs = c(0.025, 0.975),
                                      robust = FALSE, ...) {
+  object <- x
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_character(pars, null.ok = TRUE)
   drws <- as_draws_array(object, variable = pars)

@@ -1,7 +1,7 @@
 #' Prior Specification and Inspection System for mvgam
 #'
 #' @description
-#' Complete prior extraction, combination, and inspection system for mvgam
+#' Prior extraction, combination, and inspection system for mvgam
 #' models. This file provides functions for working with priors in both
 #' observation and trend components, leveraging the native brms brmsprior
 #' class throughout.
@@ -9,7 +9,7 @@
 #' @section Architecture:
 #' The prior system uses brmsprior objects directly for maximum compatibility:
 #' - **Extraction Layer**: Get priors from observation and trend models
-#' - **Combination Layer**: Merge observation and trend priors seamlessly
+#' - **Combination Layer**: Merge observation and trend priors
 #' - **Inspection Layer**: User-facing functions for prior specification
 #' - **Validation Layer**: Ensure prior specifications are valid
 #'
@@ -135,8 +135,8 @@ extract_trend_priors <- function(trend_formula, data, response_names = NULL, .pr
 }
 
 # NOTE: parse_trend_formula() has been moved to R/trend_system.R as part of the
-# complete mvgam trend parsing system. The function provides ZMVN defaults and
-# complete mvgam_trend objects with monitor_params metadata.
+# mvgam trend parsing system. The function provides ZMVN defaults and
+# fully-populated mvgam_trend objects with monitor_params metadata.
 
 #' Generate Trend Priors from Monitor Parameters
 #'
@@ -146,7 +146,7 @@ extract_trend_priors <- function(trend_formula, data, response_names = NULL, .pr
 #' @return A brmsprior object with trend priors
 #' @noRd
 generate_trend_priors <- function(trend_spec, data, response_names = NULL) {
-  # Comprehensive parameter validation per code reviewer requirements
+  # Validate parameters before generating trend priors
   checkmate::assert_list(trend_spec, names = "named")
   checkmate::assert_data_frame(data, min.rows = 1)
   if (!is.null(response_names)) {
@@ -495,7 +495,7 @@ get_car_parameter_prior <- function(param_name, trend_obj) {
 # SECTION 4: PRIOR COMBINATION FUNCTIONS
 # =============================================================================
 # WHY: Combining observation and trend priors into a single brmsprior object
-# enables seamless use with brms functions while maintaining clear separation
+# enables use with brms functions while maintaining clear separation
 # via the _trend suffix convention.
 
 #' Combine Observation and Trend Priors
@@ -859,10 +859,10 @@ remove_trend_suffix_from_priors <- function(trend_priors, trend_specs, base_form
   structure(result, class = c("brmsprior", "data.frame"))
 }
 
-#' Get Complete Prior Specification for a Trend Type
+#' Get Prior Specification for a Trend Type
 #'
 #' @description
-#' Retrieves the complete prior specification for a given trend type by
+#' Retrieves all prior specifications for a given trend type by
 #' merging trend-specific priors from the registry with shared defaults
 #' from common_trend_priors. This enables trends to override common defaults
 #' where needed while inheriting shared specifications.
@@ -1047,7 +1047,7 @@ map_prior_to_stan_string <- function(prior_row) {
   # Clean prior string
   extracted_prior <- trimws(extracted_prior)
 
-  # Enhanced Stan distribution syntax validation
+  # Stan distribution syntax validation
   # Check for distribution name followed by parentheses with parameters
   stan_pattern <- "^[a-zA-Z_][a-zA-Z0-9_]*\\s*\\([^\\(\\)]*\\)$"
   if (!grepl(stan_pattern, extracted_prior)) {
@@ -1489,8 +1489,8 @@ get_trend_parameter_prior <- function(prior = NULL, param_name) {
 #' }
 #'
 #' @seealso
-#' \code{\link{get_prior.mvgam_formula}}, \code{\link{stancode}},
-#' \code{\link{standata}}, \code{\link{mvgam}}
+#' \code{\link{get_prior.mvgam_formula}}, \code{\link[brms]{stancode}},
+#' \code{\link[brms]{standata}}, \code{\link{mvgam}}
 #'
 #' @export
 mvgam_formula <- function(formula, trend_formula = NULL) {
@@ -1537,7 +1537,7 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
 
     checkmate::assert_formula(trend_formula, .var.name = "trend_formula")
 
-    # Use comprehensive trend formula validation from validations.R
+    # Use trend formula validation from validations.R
     validate_single_trend_formula(trend_formula, context = "trend_formula")
   }
 
@@ -1573,7 +1573,7 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
 #'
 #' @description
 #' S3 generic function for extracting prior specifications from various model
-#' objects. This function provides a unified interface for prior inspection
+#' objects. This function provides a single interface for prior inspection
 #' across different model types, with extensions for mvgam
 #' State-Space models.
 #'
@@ -1751,7 +1751,7 @@ has_embedded_families <- function(formula) {
 #'
 #' @description
 #' Extracts and combines prior specifications for both observation and trend
-#' components of an mvgam model. This method provides a unified interface
+#' components of an mvgam model. This method provides a single interface
 #' for prior inspection before model fitting. When
 #' \code{trend_formula = NULL}, this function behaves identically to
 #' \code{brms::get_prior} for observation-only models.
@@ -1778,7 +1778,7 @@ has_embedded_families <- function(formula) {
 #' \enumerate{
 #'   \item Extracts observation model priors using \code{brms::get_prior}
 #'   \item Extracts trend model priors using mvgam's trend system
-#'   \item Combines them into a unified \code{brmsprior} object
+#'   \item Combines them into a single \code{brmsprior} object
 #'   \item Adds the \code{trend_component} column for easy filtering
 #' }
 #'

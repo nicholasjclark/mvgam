@@ -38,11 +38,15 @@ Note: with \code{process_error = TRUE} the invariant
 longer holds (innovations are added in \code{epred} and \code{predict} but
 not in \code{linpred}). For deterministic-state-at-fitted-values
 semantics (matching the trained latent state without resampling),
-use \code{\link[generics:forecast]{generics::forecast()}} / \code{\link[=hindcast]{hindcast()}} which return values at the actual
+use \code{\link[=forecast]{forecast()}} / \code{\link[=hindcast]{hindcast()}} which return values at the actual
 \code{lv_trend} posterior draws.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws.}
+
+\item{draw_ids}{Optional integer vector selecting a subset of posterior
+draw indices to use. NULL (default) uses all draws (subject to
+\code{ndraws}).}
 
 \item{re_formula}{Formula for random effects. NULL (default) includes
 all random effects, NA excludes all random effects.}

@@ -1,7 +1,7 @@
 Package: mvgam
 Title: Multivariate (Dynamic) Generalized Additive Models
 Version: 2.0.0
-Date: 2025-07-23
+Date: 2026-07-20
 Authors@R: c(person("Nicholas J", "Clark", email = "nicholas.j.clark1214@gmail.com", 
                     role = c("aut", "cre"), comment = c(ORCID = "0000-0001-7131-3301")),
              person("KANK", "Karunarathna", role = c("ctb"),
@@ -32,7 +32,12 @@ Imports:
     rstantools (>= 2.1.1),
     bayesplot (>= 1.5.0),
     ggplot2 (>= 3.5.0),
-    mvnfast,
+    checkmate,
+    abind,
+    data.table,
+    glue,
+    mice,
+    statmod,
     purrr,
     dplyr,
     magrittr,
@@ -65,8 +70,9 @@ Suggests:
     future,
     ape,
     mvabund,
-    patchwork,
-    bridgesampling
+    bridgesampling,
+    V8,
+    withr
 Enhances:
     gratia (>= 0.9.0),
     tidyr

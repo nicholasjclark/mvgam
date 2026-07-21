@@ -144,7 +144,7 @@ get_brms_re_mapping <- function(brmsfit_object) {
 #'
 #' # Use in brmsfit object for predictions
 #' obs_brmsfit$fit <- mock_fit
-#' prep <- brms:::prepare_predictions(obs_brmsfit, newdata)
+#' prep <- prepare_predictions(obs_brmsfit, newdata)
 #' }
 #'
 #' @noRd
@@ -228,7 +228,7 @@ dimnames.mock_stanfit <- function(x) {
 #' and prediction metadata using brmsfit formula and family information
 #' without requiring a full Stan fit object.
 #'
-#' @param object A mock_stanfit object created by create_mock_stanfit()
+#' @param x A mock_stanfit object created by create_mock_stanfit()
 #'   containing parameter draws subset
 #' @param brmsfit A brmsfit object providing formula, family, and other
 #'   metadata needed for design matrix construction
@@ -240,6 +240,10 @@ dimnames.mock_stanfit <- function(x) {
 #'   random effects are allowed
 #' @param sample_new_levels Character specifying how to sample new levels:
 #'   "uncertainty" or "gaussian"
+#' @param linpred_only Logical. If `TRUE`, return the prep object as soon
+#'   as the design matrices are built, skipping the distributional-
+#'   parameter (`dpars`) extraction. Used by callers that only need the
+#'   linear predictor (e.g. trend submodels). Defaults to `FALSE`.
 #' @param ... Additional arguments passed to brms::make_standata()
 #'
 #' @return A brmsprep object (S3 list) containing design matrices, formula
@@ -263,9 +267,10 @@ dimnames.mock_stanfit <- function(x) {
 #' The returned brmsprep object contains all metadata needed for
 #'   computing linear predictors via extract_linpred_from_prep().
 #'
+#' @importFrom brms prepare_predictions
 #' @method prepare_predictions mock_stanfit
 #' @export
-prepare_predictions.mock_stanfit <- function(object,
+prepare_predictions.mock_stanfit <- function(x,
                                               brmsfit,
                                               newdata = NULL,
                                               re_formula = NULL,
@@ -273,6 +278,7 @@ prepare_predictions.mock_stanfit <- function(object,
                                               sample_new_levels = "uncertainty",
                                               linpred_only = FALSE,
                                               ...) {
+  object <- x
   # Validate core object types
   checkmate::assert_class(object, "mock_stanfit")
   checkmate::assert_class(brmsfit, "brmsfit")
@@ -387,7 +393,7 @@ prepare_predictions.mock_stanfit <- function(object,
   # Extract draws from mock stanfit using cached draws
   draws <- object$draws_cache
 
-  # Pre-compute random effects mapping for efficient extraction
+  # Pre-compute random effects mapping for fast extraction
   re_mapping <- get_brms_re_mapping(brmsfit)
 
   # Build minimal brmsprep structure compatible with mvgam prediction workflow

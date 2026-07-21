@@ -14,6 +14,10 @@ information criteria via \code{\link[=loo.mvgam]{loo.mvgam()}} and add \code{elp
 \code{se_elpd_loo}, \code{p_loo} and \code{looic} columns. Defaults to
 \code{FALSE} because computing \code{loo} can be slow on large fits.}
 
+\item{resp}{For multivariate (multiple-response) models, the
+name of a single response variable to return results for.
+\code{NULL} (the default) returns results for all responses.}
+
 \item{...}{Forwarded to \code{\link[=loo.mvgam]{loo.mvgam()}} when \code{looic = TRUE}.}
 }
 \value{

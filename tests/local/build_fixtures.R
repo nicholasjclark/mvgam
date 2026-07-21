@@ -220,10 +220,15 @@ fit_mvgam_cached("ar1_re_smooth_trend",
 
 cat("\n[10] Multivariate mvbind (2 responses)\n")
 set.seed(789)
+# x must be informative for both responses so the fixed-effect
+# coefficient is well identified with a stable sign; otherwise the
+# deterministic-linpred concordance check reduces to sign(b_x), which
+# flips at random between fits when x carries no signal.
+x_mv <- rnorm(n_time)
 test_data_mv <- data.frame(
-  y1 = rnorm(n_time, mean = 1 + latent),
-  y2 = rnorm(n_time, mean = 2 + latent),
-  x = rnorm(n_time),
+  y1 = rnorm(n_time, mean = 1 + 0.8 * x_mv + latent),
+  y2 = rnorm(n_time, mean = 2 - 0.6 * x_mv + latent),
+  x = x_mv,
   time = 1:n_time,
   series = factor("s1")
 )

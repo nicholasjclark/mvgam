@@ -64,7 +64,7 @@ polish_generated_stan_code <- function(stan_code, silent = TRUE) {
 #' Try StanHeaders Stan Code Formatting
 #'
 #' Attempts to format Stan code using StanHeaders stanc.js with V8.
-#' Uses official Stan formatter for robust results.
+#' Uses the official Stan formatter so output matches stanc.
 #'
 #' @param stan_code Character string containing Stan code
 #' @param silent Logical; should warnings be suppressed?

@@ -51,7 +51,7 @@ grouping structure. Currently unused, reserved for future trends.}
 requires specification of seasonal period parameter. Used by: seasonal AR models.
 Triggers: validate_seasonal_period_specification()}
 \item{rule_supports_multiple_seasonality}{"supports_multiple_seasonality" - Trend
-can handle multiple seasonal periods simultaneously. Used by: flexible seasonal models.
+can handle multiple seasonal periods simultaneously. Used by: multi-seasonal models.
 Triggers: validate_multiple_seasonal_periods()}
 \item{rule_incompatible_with_seasonal_smooths}{"incompatible_with_seasonal_smooths" - Trend
 conflicts with seasonal smooth terms in observation formula. Used by: trends with built-in seasonality.

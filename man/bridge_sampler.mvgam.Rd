@@ -55,8 +55,8 @@ On state-space fits this is a natural complement to LFO because
 the answer does not depend on the choice of forecast horizon.
 }
 \details{
-The routing bypasses \code{brms:::bridge_sampler.brmsfit}, whose
-internal \code{restructure()} and \code{update_misc_env()} calls assume a
+The routing bypasses the internal brms \code{bridge_sampler.brmsfit}
+method, whose \code{restructure()} and \code{update_misc_env()} calls assume a
 brmsfit that mvgam objects do not conform to. Instead the S3
 method resolves the requirements itself and delegates directly
 to \code{bridgesampling::bridge_sampler()} on \code{object$fit}.

@@ -63,6 +63,10 @@ matching brms's behaviour for a grouping factor. \code{"all"} adds
 A single integer or character value picks one series and filters
 the prediction grid to that series's observations.}
 
+\item{resp}{For multivariate (multiple-response) models, the
+name of a single response variable to return results for.
+\code{NULL} (the default) returns results for all responses.}
+
 \item{...}{Ignored.}
 
 \item{plot}{Logical. If \code{TRUE} (default), draws each plot;

@@ -20,13 +20,13 @@ PW(
 \item{time}{The unquoted name of the variable that represents time in the
 supplied \code{data}. This variable should be either a \code{numeric} or \code{integer}
 variable. Defaults to \code{time} to align with brms conventions, allowing
-flexible time variable naming without requiring explicit "time" columns.
+any time variable name without requiring explicit "time" columns.
 When using the default, a one-time warning will be issued.}
 
 \item{series}{The unquoted name of the variable that represents the series
 identifier in the supplied \code{data}. This variable should be either a
 \code{character} or \code{factor} variable. Defaults to \code{series} following mvgam
-conventions, allowing flexible series variable naming. When using the
+conventions, allowing any series variable name. When using the
 default, a one-time warning will be issued.}
 
 \item{cap}{The unquoted name of the variable in \code{data} that specifies the
@@ -54,6 +54,17 @@ growth of the trend. If \code{'logistic'}, the \code{cap} argument must specify 
 variable containing maximum saturation points for the trend (see
 details and examples in \code{\link{mvgam}} for more information). Default
 is \code{'linear'}.}
+
+\item{n_lv}{The number of latent factors to estimate for dynamic
+factor models. When \code{n_lv} is smaller than the number of series,
+the latent processes are modelled as \code{n_lv} factors with estimated
+loadings onto the series. Defaults to \code{NULL}, in which case one
+latent process is used per series.}
+
+\item{trend_map}{Optional \code{data.frame} specifying which latent
+process each series maps onto, giving fixed (rather than estimated)
+loadings for dynamic factor models. See \code{\link{mvgam}} for the
+required format. Defaults to \code{NULL}.}
 }
 \value{
 An object of class \code{mvgam_trend}, which contains a list of

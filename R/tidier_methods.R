@@ -452,6 +452,7 @@ split_hier_Sigma <- function(x, params) {
 #'   `.resid.upper` (for `.resid`) credible interval columns.
 #' @param conf.level Numeric. Probability covered by the
 #'   credible intervals. Defaults to `0.95`.
+#' @inheritParams forecast.mvgam
 #' @param ... Unused, included for generic consistency.
 #'
 #' @return A tibble (or `list`, when `class(x$obs_data) == "list"`)
@@ -622,6 +623,7 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
 #'   information criteria via [loo.mvgam()] and add `elpd_loo`,
 #'   `se_elpd_loo`, `p_loo` and `looic` columns. Defaults to
 #'   `FALSE` because computing `loo` can be slow on large fits.
+#' @inheritParams forecast.mvgam
 #' @param ... Forwarded to [loo.mvgam()] when `looic = TRUE`.
 #'
 #' @return A one-row tibble with columns:

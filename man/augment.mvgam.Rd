@@ -28,6 +28,10 @@ median and the median absolute deviation (MAD).}
 \item{conf.level}{Numeric. Probability covered by the
 credible intervals. Defaults to \code{0.95}.}
 
+\item{resp}{For multivariate (multiple-response) models, the
+name of a single response variable to return results for.
+\code{NULL} (the default) returns results for all responses.}
+
 \item{...}{Unused, included for generic consistency.}
 }
 \value{

@@ -28,6 +28,9 @@ create_mvgam_trend(
 
 \item{.subgr}{Subgrouping variable (quoted or unquoted)}
 
+\item{.cap}{Optional carrying-capacity variable (quoted or unquoted) for
+logistic piecewise trends}
+
 \item{.validation_rules}{Optional override for validation rules}
 }
 \value{

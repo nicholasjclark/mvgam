@@ -1,5 +1,7 @@
 ^mvgam\.Rproj$
 ^\.Rproj\.user$
+^mvgam\.Rcheck$
+^mvgam_.*\.tar\.gz$
 ^\.git$
 ^\.github$
 ^LICENSE\.md$
@@ -13,6 +15,7 @@
 ^index_files$
 ^doc$
 ^misc$
+^data-raw$
 ^pkgdown$
 ^README\.Rmd$
 ^README-.*\.png$

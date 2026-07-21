@@ -71,6 +71,8 @@
 #' @param n_bins Optional histogram bin count.
 #' @param log_scale Logical. Plot the response as `log(y + 1)`
 #'   on the multi-series view, where different scales are common.
+#' @param ... For `check_mvgam_data()`, arguments forwarded on to
+#'   `mvgam_data()`.
 #'
 #' @return Invisibly, an `mvgam_data` list with elements
 #'   `data` (the validated data), `family` (resolved family

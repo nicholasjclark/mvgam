@@ -29,10 +29,14 @@ data-raw/verify_outputs/
 tests/local/fixtures/lfo_cv/
 # knitr caches inside online articles
 vignettes/articles/*_cache/
-# Large fit fixtures cached for pkgdown articles: regenerable
-# via the matching build script under `tests/local/*_vignette_fits.R`.
-# Anything over the GitHub 50MB warning threshold goes here so
-# clones stay small and pushes stop tripping the LFS warning.
-pkgdown/hierarchical_var_cache/mod_hier.rds
+# Fit fixtures cached for pkgdown articles: regenerable via the
+# matching build script under `tests/local/*_vignette_fits.R`.
+# Model-fit RDS bytes are what really bloat the clone (single
+# `mod_hier.rds` was 92 MB and tripped GitHub's LFS warning);
+# small companion data files (`*_data.rds`, `truth.rds`, LFO
+# result summaries) stay tracked so the articles render from a
+# fresh clone against the shipped data even without refitting.
+pkgdown/*_cache/mod_*.rds
+pkgdown/*_cache/*_fit.rds
 # session-only scratchpad of rendered figures
 scratchpad_figs/

@@ -2,7 +2,7 @@
 % Please edit documentation in R/summary.mvgam.R
 \name{summary.mvgam}
 \alias{summary.mvgam}
-\title{Comprehensive summary of mvgam model fits}
+\title{Summary of mvgam model fits}
 \usage{
 \method{summary}{mvgam}(
   object,
@@ -44,7 +44,7 @@ still be pulled via \code{as.matrix()},
 }
 \value{
 An object of class \code{summary.mvgam} containing:
-\itemize{
+\describe{
 \item{\code{fixed}}{Fixed effect parameter summaries}
 \item{\code{smooth}}{Smooth (GAM) parameter summaries}
 \item{\code{spec}}{Family-specific parameter summaries (sigma, shape, etc.)}
@@ -60,7 +60,7 @@ and factor loadings).
 }
 \details{
 The summary includes the following columns:
-\itemize{
+\describe{
 \item{\code{Estimate}}{Posterior mean (or median if robust = TRUE)}
 \item{\code{Est.Error}}{Posterior SD (or MAD if robust = TRUE)}
 \item{Quantile bounds}{Credible interval limits based on probs argument}

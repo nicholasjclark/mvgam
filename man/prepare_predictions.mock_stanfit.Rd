@@ -5,7 +5,7 @@
 \title{Prepare Predictions for Mock stanfit}
 \usage{
 \method{prepare_predictions}{mock_stanfit}(
-  object,
+  x,
   brmsfit,
   newdata = NULL,
   re_formula = NULL,
@@ -16,7 +16,7 @@
 )
 }
 \arguments{
-\item{object}{A mock_stanfit object created by create_mock_stanfit()
+\item{x}{A mock_stanfit object created by create_mock_stanfit()
 containing parameter draws subset}
 
 \item{brmsfit}{A brmsfit object providing formula, family, and other
@@ -33,6 +33,11 @@ random effects are allowed}
 
 \item{sample_new_levels}{Character specifying how to sample new levels:
 "uncertainty" or "gaussian"}
+
+\item{linpred_only}{Logical. If \code{TRUE}, return the prep object as soon
+as the design matrices are built, skipping the distributional-
+parameter (\code{dpars}) extraction. Used by callers that only need the
+linear predictor (e.g. trend submodels). Defaults to \code{FALSE}.}
 
 \item{...}{Additional arguments passed to brms::make_standata()}
 }

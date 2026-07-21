@@ -20,7 +20,10 @@ test_that("gather_matrix masks upper triangle and diagonal", {
   m <- matrix(seq_len(9L), nrow = 3L,
               dimnames = list(letters[1:3], letters[1:3]))
   out <- mvgam:::gather_matrix(m)
-  expect_equal(sort(colnames(out)), c("value", "Var1", "Var2"))
+  # setequal, not sorted equality: R CMD check runs under LC_COLLATE=C
+  # where uppercase sorts before lowercase, so a sorted comparison is
+  # locale-dependent.
+  expect_setequal(colnames(out), c("value", "Var1", "Var2"))
   expect_equal(nrow(out), 9L)
   na_rows <- out[is.na(out$value), ]
   diag_rows <- na_rows[as.character(na_rows$Var1) ==

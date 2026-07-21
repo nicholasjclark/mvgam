@@ -1,12 +1,12 @@
 # ==============================================================================
-# MVGAM CORE: Enhanced Model Fitting and Multiple Imputation Support
+# MVGAM CORE: Model Fitting and Multiple Imputation Support
 # ==============================================================================
 # This file consolidates the core mvgam fitting architecture, dual-object
 # system, and multiple imputation capabilities. The single-fit dual-object
-# architecture enables seamless brms ecosystem integration while preserving
+# architecture enables brms ecosystem integration while preserving
 # mvgam-specific State-Space modeling functionality.
 
-# The mvgam function provides unified entry point that handles both
+# The mvgam function provides a single entry point that handles both
 # single datasets and multiple imputation scenarios transparently, ensuring
 # consistent behavior across different input types.
 
@@ -263,17 +263,6 @@ translate_samples_burnin <- function(dots) {
 #'   script that fits repeatedly. The full fix (teaching the
 #'   injector to splice into `partial_log_lik_lpmf`) is filed as a
 #'   separate enhancement.
-#' @param cpp_options Optional named list forwarded to
-#'   `cmdstanr::cmdstan_model()`. Common entries:
-#'   `stan_threads = TRUE` (auto-set when `threads` is non-NULL),
-#'   `stan_opencl = TRUE`, `CXXFLAGS = "-march=native"` for native
-#'   CPU tuning. Use only on the `backend = "cmdstanr"` path.
-#' @param stanc_options Optional list forwarded to
-#'   `cmdstanr::cmdstan_model(stanc_options = ...)`. Most commonly
-#'   `list("O1")` to enable the stanc3 optimiser. Test per-model
-#'   since some custom-family lpmfs (including some configurations
-#'   of `nmix()`) can regress under `O1`; benchmark before
-#'   enabling.
 #' @param run_model **(deprecated; do not use in new code)** Logical.
 #'   Setting `run_model = FALSE` short-circuits before Stan parse /
 #'   compile / sampling and returns a stub `mvgam` object whose
@@ -506,7 +495,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
     checkmate::check_list(data, types = "data.frame"),
     .var.name = "data"
   )
-  newdata <- validate_mvgam_newdata(newdata, data)
+  newdata <- validate_newdata(newdata, data)
 
   # Pre-fit covariate NA guard. brms' validate_data() default
   # `na_action = na_omit` silently drops rows with NAs in any
@@ -622,22 +611,42 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
 }
 
 
-# Lightweight newdata validator. Defers column-presence checks to
-# the canonical `validate_required_variables` helper and only adds
-# a series-level subset check + factor coercion on top. Returns
-# NULL fast when no newdata was supplied. Predictor / response
-# columns are NOT enforced here; downstream predict / forecast
-# surfaces handle formula resolution when they consume the data.
-# Factor coercion locks newdata$series to the training-grid levels
-# so any downstream consumer that pulls $test_data sees the
-# canonical factor shape.
-#' @noRd
-validate_mvgam_newdata <- function(newdata, data) {
-  if (is.null(newdata)) return(NULL)
+#' Validate `newdata` against the training data of an \pkg{mvgam} model
+#'
+#' Runs the structural checks that [predict.mvgam()] and
+#' [forecast.mvgam()] apply to a `newdata` frame, so a misaligned frame is
+#' caught up front rather than at the back of an expensive prediction
+#' pipeline. It confirms that any `time` and `series` columns present in the
+#' training `data` also appear in `newdata`, rejects `series` levels that
+#' were not in the training data, and coerces `newdata$series` to the
+#' training factor levels. Predictor and response columns are not enforced
+#' here; the prediction functions resolve those from the model formula.
+#'
+#' @param newdata A `data.frame` of prediction covariates in the same shape
+#'   as the training data (same factor levels and covariate columns).
+#' @param data The `data.frame` (or `list`) used to fit the model, whose
+#'   `series` levels define the valid set.
+#' @return `newdata` with `series` coerced to the training factor levels,
+#'   returned invisibly, or `NULL` (invisibly) when `newdata` is `NULL`.
+#' @seealso [predict.mvgam()], [forecast.mvgam()]
+#' @examples
+#' train <- data.frame(
+#'   series = factor(rep(c("a", "b"), each = 3L)),
+#'   time = rep(1:3, times = 2L),
+#'   y = rnorm(6L)
+#' )
+#' future <- data.frame(
+#'   series = factor(rep(c("a", "b"), each = 2L), levels = c("a", "b")),
+#'   time = rep(4:5, times = 2L)
+#' )
+#' validate_newdata(future, train)
+#' @export
+validate_newdata <- function(newdata, data) {
+  if (is.null(newdata)) return(invisible(NULL))
   required <- intersect(c("time", "series"), names(data))
   validate_required_variables(newdata, required, "newdata")
   train_levels <- levels(data$series)
-  if (is.null(train_levels)) return(newdata)
+  if (is.null(train_levels)) return(invisible(newdata))
   new_chr <- as.character(newdata$series)
   if (!all(new_chr %in% train_levels)) {
     bad <- unique(new_chr[!new_chr %in% train_levels])
@@ -654,7 +663,7 @@ validate_mvgam_newdata <- function(newdata, data) {
     )))
   }
   newdata$series <- factor(new_chr, levels = train_levels)
-  newdata
+  invisible(newdata)
 }
 
 # ------------------------------------------------------------------------------
@@ -663,7 +672,7 @@ validate_mvgam_newdata <- function(newdata, data) {
 # Core processing pipeline for single datasets using the two-stage Stan
 # assembly system with brms ecosystem integration.
 
-#' Process Single Dataset with Enhanced Architecture
+#' Process Single Dataset
 #' @param formula Main formula
 #' @param trend_formula Trend formula
 #' @param data Single data frame
@@ -867,7 +876,7 @@ generate_combined_stancode_and_data <- function(obs_setup, trend_setup, mv_spec,
 
   # Extract trend_specs from mv_spec for the new system
   trend_specs <- if (mv_spec$has_trends && !is.null(mv_spec$trend_specs)) {
-    # Pass the complete trend_specs (handles both univariate and multivariate)
+    # Pass the entire trend_specs (handles both univariate and multivariate)
     mv_spec$trend_specs
   } else {
     NULL
@@ -901,7 +910,7 @@ generate_combined_stancode_and_data <- function(obs_setup, trend_setup, mv_spec,
 # ==============================================================================
 # MVGAM OBJECT CREATION FROM COMBINED FIT
 # ==============================================================================
-# Creates mvgam object from combined Stan fit with complete parameter map.
+# Creates mvgam object from combined Stan fit with full parameter map.
 
 #' Create mvgam Object from Combined Stan Fit
 #'
@@ -1205,7 +1214,7 @@ extract_trend_component_info <- function(combined_fit, mv_spec) {
 # ==============================================================================
 # MULTIPLE IMPUTATION SUPPORT: RUBIN'S RULES POOLING
 # ==============================================================================
-# Provides comprehensive multiple imputation support using Rubin's rules for
+# Provides multiple imputation support using Rubin's rules for
 # proper uncertainty quantification when dealing with missing data in State-
 # Space models, ensuring valid statistical inference.
 
@@ -1241,7 +1250,7 @@ extract_trend_component_info <- function(combined_fit, mv_spec) {
 #' **MI Diagnostics**:
 #' Pooled objects include convergence diagnostics per imputation
 #' (Rhat, ESS) accessible via `summary()`. The print method
-#' displays comprehensive MI diagnostics including total draws,
+#' displays MI diagnostics including total draws,
 #' draws per imputation, and convergence summaries.
 #'
 #' @param formula Model formula (observation model). Supports brms
@@ -1261,6 +1270,9 @@ extract_trend_component_info <- function(combined_fit, mv_spec) {
 #' @param check_data Logical; if `TRUE` (default), validates
 #'   consistency across imputations (same column names, types,
 #'   rows).
+#' @param newdata Optional held-out `data.frame` persisted on
+#'   every imputation fit, so later plot / forecast methods can
+#'   reach it through any one of them. Defaults to `NULL`.
 #' @param ... Additional arguments passed to `mvgam()` for each
 #'   imputation (e.g., chains, iter, family, priors).
 #'
@@ -1306,7 +1318,7 @@ extract_trend_component_info <- function(combined_fit, mv_spec) {
 #' summary(fit_pooled)
 #' print(fit_pooled)
 #'
-#' # Fit separately (for advanced use cases)
+#' # Fit separately (for finer control)
 #' fit_list <- mvgam_multiple(
 #'   formula = y ~ s(season, bs = "cc", k = 5),
 #'   trend_formula = ~ 1,

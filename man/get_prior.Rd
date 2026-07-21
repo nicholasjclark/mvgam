@@ -16,7 +16,7 @@ A \code{brmsprior} data frame with prior specifications
 }
 \description{
 S3 generic function for extracting prior specifications from various model
-objects. This function provides a unified interface for prior inspection
+objects. This function provides a single interface for prior inspection
 across different model types, with extensions for mvgam
 State-Space models.
 }

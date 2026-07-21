@@ -60,8 +60,8 @@ pairs.mvgam <- function(
 
 
 # Internal: regex patterns that drive `pairs.mvgam()`'s default
-# variable selection. Mirrors `brms:::default_plot_variables()` for
-# the observation-side parameters (so users moving between brms and
+# variable selection. Mirrors the internal brms default_plot_variables()
+# for the observation-side parameters (so users moving between brms and
 # mvgam see the same defaults) and adds mvgam-specific patterns for
 # trend dynamics and the matching `*_trend` variants of the brms
 # patterns. Family-specific distributional parameters (e.g. `sigma`
@@ -70,8 +70,9 @@ pairs.mvgam <- function(
 #' @noRd
 default_pairs_variables <- function(x) {
   family_obj <- x$family %||% gaussian()
-  dpars <- tryCatch(brms:::valid_dpars(family_obj),
-                     error = function(e) "mu")
+  # Distributional parameter names are carried on the family object
+  # (e.g. c("mu", "sigma") for gaussian()); fall back to "mu" alone.
+  dpars <- family_obj$dpars %||% "mu"
   dpars <- setdiff(dpars, "mu")  # `mu` is the linear predictor,
                                   # not a free parameter.
   # The obs-side patterns carry no `$` end-marker, so prefixes
@@ -84,8 +85,9 @@ default_pairs_variables <- function(x) {
   c(
     # Observation-side patterns (brms parity, but the prefixes also
     # match trend-side `*_trend` parameters).
-    brms:::fixef_pars(),     # `b_`, `bs_`, `bcs_`, `bsp_`,
-                              # `bmo_`, `bme_`, `bmi_`, `bm_`
+    # brms fixed-effect parameter prefixes (`b_`, `bs_`, `bcs_`,
+    # `bsp_`, `bmo_`, `bme_`, `bmi_`, `bm_`).
+    "^b(()|(s)|(cs)|(sp)|(mo)|(me)|(mi)|(m))_",
     "^sd_", "^cor_",          # RE variance components
     "^sigma$", "^rescor_",
     if (length(dpars)) paste0("^", dpars, "$"),

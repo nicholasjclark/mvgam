@@ -28,7 +28,7 @@
 #'   display, or pass to `writeLines()` / `cat()` to emit verbatim.
 #'
 #' @author Nicholas J Clark
-#' @seealso \code{\link{how_to_cite}}, \code{\link{prior_summary}},
+#' @seealso \code{\link{how_to_cite}}, \code{\link[brms]{prior_summary}},
 #'   \code{\link{mvgam}}, \code{\link{jsdgam}}.
 #'   `how_to_cite()` produces the prose methods paragraph;
 #'   `methods_md()` produces the matching math statement of

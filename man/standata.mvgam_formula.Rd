@@ -59,7 +59,7 @@ variables, parameters, or functions.}
 A named list containing all data for Stan model including observation
 and trend data components. Structure matches exactly what would be passed to
 Stan during fitting by \code{mvgam()}. This data is generated using the same
-shared infrastructure as \code{mvgam()}, ensuring complete consistency.
+shared infrastructure as \code{mvgam()}, ensuring consistency.
 }
 \description{
 Generate complete Stan data list for an \code{mvgam_formula} object before
@@ -75,5 +75,5 @@ model compilation and fitting.
 }
 \seealso{
 \code{\link{mvgam_formula}}, \code{\link{get_prior.mvgam_formula}},
-\code{\link{stancode}}, \code{\link{mvgam}}
+\code{\link[brms]{stancode}}, \code{\link{mvgam}}
 }

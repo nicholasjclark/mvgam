@@ -1,7 +1,7 @@
 #' Stan Code Assembly System for mvgam
 #'
 #' @description
-#' Complete Stan code generation and validation pipeline for mvgam-brms
+#' Stan code generation and validation pipeline for mvgam-brms
 #' integration. This file consolidates the two-stage assembly system,
 #' trend-specific Stan code generators, and validation framework.
 #'
@@ -9,7 +9,7 @@
 #' The Stan assembly system follows a two-stage pipeline:
 #' - **Stage 1**: brms generates base Stan code; mvgam produces trend stanvars
 #' - **Stage 2**: mvgam injects trend effects into linear predictors
-#' - **Validation**: Comprehensive Stan code structure and syntax validation
+#' - **Validation**: Stan code structure and syntax validation
 #' - **Generators**: Trend-specific Stan code generation for all trend types
 
 # =============================================================================
@@ -17,7 +17,7 @@
 # =============================================================================
 # WHY: The two-stage assembly system is critical for mvgam-brms integration
 # because it allows mvgam to extend brms models without modifying brms
-# internals. Stage 1 leverages brms' robust model compilation, while Stage 2
+# internals. Stage 1 uses brms' model compilation, while Stage 2
 # adds mvgam-specific trend dynamics through stanvars injection.
 
 #' Apply Response Suffix to Trend Stanvars
@@ -219,7 +219,7 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
       non_null_specs <- specs[!sapply(specs, is.null)]
       if (length(non_null_specs) <= 1) return(FALSE)
 
-      # Use identical() for robust deep comparison of trend objects
+      # Use identical() for exact deep comparison of trend objects
       first_spec <- non_null_specs[[1]]
       all(sapply(non_null_specs[-1], function(x) {
         identical(x, first_spec, ignore.environment = TRUE)
@@ -340,7 +340,7 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
   # Deduplicate functions (GP models may have identical functions in both models)
   combined_stancode <- deduplicate_stan_functions(combined_stancode)
 
-  # Generate complete standata using brms with both the trend
+  # Generate the standata using brms with both the trend
   # stanvars and any obs-side stanvars (e.g. custom families like
   # tweedie() that attach a data int like M). `data2` (cached on
   # obs_setup) carries `car()` adjacency matrices and other
@@ -1158,7 +1158,7 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
 #' 
 #' @description
 #' Post-processes Stan code to transform GLM function calls to work with 
-#' trend-enhanced mu vectors. Applied after standard trend injection to
+#' trend-adjusted mu vectors. Applied after standard trend injection to
 #' ensure GLM functions use the combined linear predictor.
 #'
 #' @param stan_code Character string containing Stan code with trend components
@@ -1359,7 +1359,7 @@ insert_after_mu_lines_in_model_block <- function(code_lines, trend_injection_cod
   mu_line_indices <- which(grepl("\\s*mu\\s*\\+=", model_lines))
 
 
-  # Check for GLM calls regardless of existing mu += lines (robust hybrid handling)
+  # Check for GLM calls regardless of existing mu += lines (handles hybrid cases)
   model_block_text <- paste(model_lines, collapse = "\n")
   detected_glm_types <- detect_glm_usage(model_block_text, skip_lines = processed_glm_lines)
   
@@ -1412,7 +1412,7 @@ insert_after_mu_lines_in_model_block <- function(code_lines, trend_injection_cod
 
 #' Handle Trend Injection with Transformation Extraction for Any Response Type
 #'
-#' @description Unified handler for trend injection that works with both GLM
+#' @description Handler for trend injection that works with both GLM
 #' and non-GLM responses. Extracts transformation lines, injects trends, then
 #' re-adds transformations in correct order.
 #'
@@ -1448,7 +1448,7 @@ handle_response_trend_injection <- function(code_lines, resp_name) {
     model_block <- list(start_idx = 1, end_idx = length(code_lines))
   }
   
-  # Robust transformation pattern for complete statements
+  # Transformation pattern matching whole statements
   transform_pattern <- paste0("^\\s*mu_", resp_name, 
                             "\\s*=\\s*\\w+\\s*\\(.*\\);?\\s*$")
   
@@ -1902,11 +1902,11 @@ inject_multivariate_trends_into_linear_predictors <- function(
     base_stancode <- paste(code_lines, collapse = "\n")
   }
 
-  # Detect VARMA components for enhanced trend injection
+  # Detect VARMA components for trend injection
   checkmate::assert_string(base_stancode)
   has_varma_components <- any(grepl("D_trend|ma_.*_trend", base_stancode))
 
-  # Handle non-GLM responses using unified transformation handler
+  # Handle non-GLM responses using shared transformation handler
   if (length(non_glm_responses) > 0) {
     code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
 
@@ -2178,7 +2178,7 @@ map_combined_key_to_single <- function(combined_key, resp_name,
 # =============================================================================
 # WHY: Each trend type requires specialized Stan code with unique parameters,
 # priors, and computational patterns. Generators provide modular, extensible
-# Stan code creation that integrates seamlessly with the registry system
+# Stan code creation that integrates with the registry system
 # and maintains consistency across trend types.
 
 
@@ -2200,7 +2200,7 @@ append_if_not_null <- function(components, new_component) {
   }
 }
 
-#' Robust stanvar combination for mvgam
+#' Stanvar combination for mvgam
 #' @noRd
 combine_stanvars <- function(...) {
   components <- list(...)
@@ -2275,7 +2275,7 @@ combine_stanvars <- function(...) {
 # =============================================================================
 # WHY: Most trend types (RW, AR, VAR, CAR, ZMVN) use Gaussian innovations with
 # common parameters (sigma_trend, raw_innovations, correlation matrices). This
-# system provides unified generation of these shared stanvars to avoid duplication
+# system provides single-point generation of these shared stanvars to avoid duplication
 # across trend-specific generators and ensure consistent naming/structure.
 # MA transformations are handled by individual trend generators sequentially.
 
@@ -2690,7 +2690,7 @@ sort_stanvars <- function(stanvars) {
     return(stanvars)
   }
 
-  # Enhanced validation for stanvar structure
+  # Validation for stanvar structure
   if (length(stanvars) > 0) {
     for (i in seq_along(stanvars)) {
       if (!is.null(stanvars[[i]])) {
@@ -3937,7 +3937,7 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
     ))
   }
 
-  # Use registry-enhanced dispatch with clear error messages
+  # Use registry-based dispatch with clear error messages
   generator_function_name <- paste0("generate_", tolower(trend_type), "_trend_stanvars")
 
   # Check if the generator function exists
@@ -5701,7 +5701,7 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   )
   components <- append_if_not_null(components, trend_computation)
 
-  # Use the robust combine_stanvars function
+  # Use the combine_stanvars helper
   return(do.call(combine_stanvars, components))
 }
 
@@ -6276,7 +6276,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     components <- append(components, list(pw_logistic_data_stanvar))
   }
 
-  # Use robust combination
+  # Combine via combine_stanvars
   return(do.call(combine_stanvars, components))
 }
 
@@ -6603,10 +6603,10 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
           }
         }
 
-        # Recalculate missing vars after comprehensive search
+        # Recalculate missing vars after full search
         missing_vars <- setdiff(required_vars, names(mapping$original_to_renamed))
 
-        # Only error if there are still truly missing variables after comprehensive search
+        # Only error if there are still truly missing variables after full search
         if (length(missing_vars) > 0) {
           missing_str <- paste(missing_vars, collapse = ", ")
           stop(
@@ -6675,7 +6675,7 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
           # Case 1: No terms
           mu_trend_code <- paste0(base_declaration, zero_vector, ";")
         } else if (intercept_present && !covariates_present) {
-          # Case 2: Intercept only - use efficient rep_vector
+          # Case 2: Intercept only - use rep_vector for speed
           mu_trend_code <- paste0(base_declaration, intercept_vector, ";")
         } else if (!intercept_present && covariates_present) {
           # Case 3: Covariates only
@@ -6966,7 +6966,7 @@ find_variable_declarations <- function(stancode, referenced_vars,
 #' @return Character vector of Stan code lines for mu_trend construction
 #' @noRd
 reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_declarations, variable_mapping, time_param = "N_time_trend") {
-  # Enhanced validation following project standards
+  # Validation following project standards
   checkmate::assert_character(mu_construction)
   checkmate::assert_character(supporting_declarations)
   checkmate::assert_list(variable_mapping, types = "character", names = "named", min.len = 1)
@@ -7089,7 +7089,7 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
     }
   }
 
-  # Create complete mu_trend construction code
+  # Create the full mu_trend construction code
   # Check if initialization already exists in ORIGINAL mu_construction
   # to avoid duplication
   has_mu_initialization <- any(grepl("vector\\[.*\\]\\s+mu\\s*=\\s*rep_vector",
@@ -7134,7 +7134,7 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
     # Extract variable names from computed declarations
     var_names <- character(length(computed_var_declarations))
     for (i in seq_along(computed_var_declarations)) {
-      # Use robust pattern to extract declared variable name (LHS of assignment)
+      # Use a pattern to extract the declared variable name (LHS of assignment)
       var_match <- regmatches(computed_var_declarations[i], regexpr("\\b[a-zA-Z_][a-zA-Z0-9_]*_trend\\b", computed_var_declarations[i]))
       if (length(var_match) > 0) {
         var_names[i] <- var_match[1]
@@ -7142,7 +7142,7 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
     }
     var_names <- var_names[nchar(var_names) > 0]
 
-    # Use enhanced dependency resolution with depth-first traversal
+    # Use dependency resolution with depth-first traversal
     # Only search transformed parameters and model blocks (relevant for mu_trend)
     if (length(var_names) > 0) {
       full_context <- paste(c(mu_construction, supporting_declarations, computed_var_declarations), collapse = "\n")
@@ -7317,7 +7317,7 @@ extract_non_likelihood_from_model_block <- function(model_block, exclude_mu_line
   checkmate::assert_string(model_block)
   checkmate::assert_character(exclude_mu_lines)
 
-  # extract_stan_block_content() already provides the complete inner content
+  # extract_stan_block_content() already provides the full inner content
   # No need for brace extraction since the content is already unwrapped
 
   # Use general filtering function for model blocks
@@ -7367,7 +7367,7 @@ extract_non_likelihood_from_model_block <- function(model_block, exclude_mu_line
   return(filtered_content)
 }
 
-#' Extract Stan Block Content with Improved Functions Block Handling
+#' Extract Stan Block Content with Functions Block Handling
 #'
 #' @description
 #' Extracts content from Stan code blocks. Uses specialized handling for functions
@@ -7395,13 +7395,13 @@ extract_stan_block_content <- function(stancode, block_name) {
     # Special handling for functions block to avoid nested brace issues
     lines <- strsplit(stancode, "\n")[[1]]
 
-    # Find functions block start with comprehensive pattern
+    # Find functions block start with a broad pattern
     functions_start <- which(grepl("^\\s*functions\\s*\\{", lines, ignore.case = TRUE))
     if (length(functions_start) == 0) {
       return(NULL)  # Block not found - consistent with other blocks
     }
 
-    # Find next Stan block start (comprehensive pattern for all valid blocks)
+    # Find next Stan block start (pattern for all valid blocks)
     next_block_pattern <- paste0("^\\s*(data|parameters|transformed\\s+data|",
                                 "transformed\\s+parameters|model|generated\\s+quantities)\\s*\\{")
     next_block <- which(grepl(next_block_pattern, lines, ignore.case = TRUE))
@@ -7535,7 +7535,7 @@ rename_parameters_in_block <- function(block_code, suffix, mapping, block_type, 
   renamed_code <- block_code
 
   # Since trend models are always univariate, use univariate renaming
-  # Extract all identifiers from this block and apply comprehensive renaming
+  # Extract all identifiers from this block and apply renaming
   all_identifiers <- extract_stan_identifiers(block_code)
 
   if (length(all_identifiers) > 0) {
@@ -7572,15 +7572,15 @@ rename_parameters_in_block <- function(block_code, suffix, mapping, block_type, 
   ))
 }
 
-#' Get comprehensive Stan reserved words list
+#' Get the Stan reserved words list
 #'
-#' Returns comprehensive list of Stan reserved words that should never be renamed
+#' Returns the list of Stan reserved words that should never be renamed
 #' during parameter extraction. Based on Stan language specification and testing.
 #'
 #' @return Character vector of Stan reserved words
 #' @noRd
 get_stan_reserved_words <- function() {
-  # Comprehensive Stan reserved words based on Stan language specification
+  # Stan reserved words based on Stan language specification
   c(
     # Stan data types
     "int", "real", "vector", "row_vector", "matrix", "array", "void",
@@ -7731,7 +7731,7 @@ get_stan_reserved_words <- function() {
 
 #' Extract all identifiers from Stan code
 #'
-#' Uses regex to find all valid Stan identifiers for comprehensive parameter
+#' Uses regex to find all valid Stan identifiers for parameter
 #' renaming. Based on proven patterns from testing.
 #'
 #' @param stan_code Character string containing Stan code
@@ -7838,7 +7838,7 @@ filter_renameable_identifiers <- function(identifiers,
   checkmate::assert_character(identifiers)
   checkmate::assert_list(mapping, null.ok = TRUE)
 
-  # Get comprehensive Stan reserved words
+  # Get Stan reserved words
   reserved_words <- get_stan_reserved_words()
 
   # Add custom functions from mapping if available
@@ -7863,7 +7863,7 @@ filter_renameable_identifiers <- function(identifiers,
     # Innovation parameters handled by shared innovation system (avoid duplication)
     "sigma",  # Shared innovation system provides vector sigma_trend
 
-    # Comment words and obvious non-parameters based on comprehensive testing
+    # Comment words and obvious non-parameters based on testing
     "total", "number", "observations", "response", "variable",
     "population", "level", "effects", "design", "after", "centering",
     "should", "the", "likelihood", "be", "ignored", "group",
@@ -7930,9 +7930,9 @@ extract_and_rename_standata_objects <- function(standata, suffix, mapping, is_mu
   return(combine_stanvars(stanvar_list))
 }
 
-#' Extract Univariate Stan Data Objects using comprehensive filtering
+#' Extract Univariate Stan Data Objects using reserved-word filtering
 #'
-#' Applies comprehensive renaming to standata objects using same Stan reserved
+#' Applies renaming to standata objects using same Stan reserved
 #' words filtering as the code renaming to ensure consistent namespace separation.
 #'
 #' @param standata Named list of Stan data objects
@@ -7952,7 +7952,7 @@ extract_univariate_standata <- function(standata, suffix, mapping) {
 
   stanvar_list <- list()
 
-  # Get all standata names and filter using comprehensive approach
+  # Get all standata names and filter using reserved-word approach
   all_data_names <- names(standata)
   renameable_data_names <- filter_renameable_identifiers(
     all_data_names,
@@ -8367,7 +8367,7 @@ parse_stan_functions <- function(functions_content) {
       # Join all signature lines into one
       full_signature <- paste(signature_lines, collapse = " ")
 
-      # Now match the complete signature
+      # Now match the full signature
       func_match <- regexpr("^\\s*([a-zA-Z_][a-zA-Z0-9_<>,\\[\\]\\s]*?)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)\\s*\\{", full_signature, perl = TRUE)
 
       if (func_match[1] > 0) {
@@ -8392,7 +8392,7 @@ parse_stan_functions <- function(functions_content) {
           current_line <- lines[i]
           function_lines <- c(function_lines, current_line)
 
-          # Count braces in current line using robust method
+          # Count braces in current line
           open_braces <- nchar(gsub("[^{]", "", current_line))
           close_braces <- nchar(gsub("[^}]", "", current_line))
 

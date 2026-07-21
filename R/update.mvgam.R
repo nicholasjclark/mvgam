@@ -107,7 +107,7 @@
 #'
 #' # Compare the two fits via leave-one-out cross-validation. A
 #' # positive `elpd_diff` for the richer model indicates the smooth
-#' # on time improved expected log predictive density; check that
+#' # on time raised expected log predictive density; check that
 #' # the difference exceeds its standard error before drawing a
 #' # firm conclusion.
 #' loo_compare(loo(mod), loo(upd))

@@ -2,9 +2,9 @@
 % Please edit documentation in R/trend_system.R
 \name{mvgam_trend_specification}
 \alias{mvgam_trend_specification}
-\title{Enhanced mvgam_trend Object Field Specification}
+\title{mvgam_trend Object Field Specification}
 \description{
-Comprehensive documentation of required and optional fields for the enhanced
+Documentation of required and optional fields for the
 mvgam_trend S3 class structure. This specification enables self-contained
 trend objects that provide all necessary information for validation,
 Stan code generation, and post-processing without external lookups.
@@ -49,8 +49,8 @@ Format: list(ar1_trend = c(-1, 1), sigma_trend = c(0, Inf))}
 \section{Self-Contained Forecasting Metadata Fields}{
 
 \describe{
-\item{forecast_metadata}{List. Complete forecasting function information:
-\itemize{
+\item{forecast_metadata}{List. Forecasting function information:
+\describe{
 \item{function_name}{Character. Forecasting function name (e.g., "forecast_ar_rcpp")}
 \item{required_args}{Character vector. Required arguments from fitted model}
 \item{max_horizon}{Integer. Maximum forecasting steps supported}
@@ -89,7 +89,7 @@ Required for PW models with growth = "logistic".}
 \item{label}{Character string. Human-readable description for printing.
 Auto-generated from trend type and parameters if not provided.}
 \item{summary_labels}{List. Naming patterns for parameter summaries:
-\itemize{
+\describe{
 \item{parameter_labels}{List mapping parameter names to display labels}
 \item{factor_labels}{List for factor loading label patterns}
 \item{group_labels}{List for hierarchical parameter labels}
@@ -101,15 +101,15 @@ Auto-generated from trend type and parameters if not provided.}
 
 \describe{
 \item{param_info}{List containing:
-\itemize{
-\item{parameters}{trend_param object with complete specifications}
+\describe{
+\item{parameters}{trend_param object with parameter specifications}
 \item{characteristics}{List of trend capabilities and settings}
 }}
 \item{shared_innovations}{Logical. Whether trend uses shared Gaussian
 innovation system (TRUE) or handles own innovations (FALSE).
 Most trends use shared system; exceptions: CAR, VAR, PW.}
 \item{dimensions}{List. Pre-calculated time series dimensions (populated during validation):
-\itemize{
+\describe{
 \item{n_time}{Integer. Number of time points}
 \item{n_series}{Integer. Number of series}
 \item{n_obs}{Integer. Total observations}
@@ -127,11 +127,11 @@ NULL for univariate models, populated during multivariate parsing.}
 
 The validation_rules field determines which other fields are valid:
 \itemize{
-\item{"supports_factors" + n_lv}: Factor models allowed
-\item{"incompatible_with_factors" + n_lv}: Error thrown
-\item{"supports_hierarchical" + gr/subgr}: Hierarchical models allowed
-\item{"requires_regular_intervals"}: Regular time validation triggered
-\item{"allows_irregular_intervals"}: CAR-style irregular time handling
+\item "supports_factors" + n_lv: Factor models allowed
+\item "incompatible_with_factors" + n_lv: Error thrown
+\item "supports_hierarchical" + gr/subgr: Hierarchical models allowed
+\item "requires_regular_intervals": Regular time validation triggered
+\item "allows_irregular_intervals": CAR-style irregular time handling
 }
 }
 
@@ -139,9 +139,9 @@ The validation_rules field determines which other fields are valid:
 
 The trend field enables automatic function lookup:
 \itemize{
-\item{Stan generation}: "AR" → generate_ar_trend_stanvars()
-\item{Forecasting}: forecast_metadata$function_name → that function
-\item{No manual registry entries needed}
+\item Stan generation: "AR" → generate_ar_trend_stanvars()
+\item Forecasting: forecast_metadata$function_name → that function
+\item No manual registry entries needed
 }
 }
 
@@ -149,9 +149,9 @@ The trend field enables automatic function lookup:
 
 In multivariate contexts, certain fields are automatically modified:
 \itemize{
-\item{monitor_params}: "_count", "_biomass" suffixes added to parameter names
-\item{summary_labels}: Response-specific labels generated automatically
-\item{response_context}: Set to response name for tracking
+\item monitor_params: "_count", "_biomass" suffixes added to parameter names
+\item summary_labels: Response-specific labels generated automatically
+\item response_context: Set to response name for tracking
 }
 }
 
@@ -159,11 +159,11 @@ In multivariate contexts, certain fields are automatically modified:
 
 During transition period, old fields may still be present:
 \itemize{
-\item{trend_model}: Legacy field, use trend instead
-\item{trend_type}: Legacy field, use trend instead
-\item{forecast_fun}: Legacy field, use forecast_metadata$function_name
-\item{stancode_fun}: Legacy field, replaced by convention-based lookup
-\item{standata_fun}: Legacy field, replaced by convention-based lookup
+\item trend_model: Legacy field, use trend instead
+\item trend_type: Legacy field, use trend instead
+\item forecast_fun: Legacy field, use forecast_metadata$function_name
+\item stancode_fun: Legacy field, replaced by convention-based lookup
+\item standata_fun: Legacy field, replaced by convention-based lookup
 }
 }
 
@@ -171,15 +171,15 @@ During transition period, old fields may still be present:
 
 Objects must:
 \itemize{
-\item{Have class c("mvgam_trend")}
-\item{Pass validate_mvgam_trend() checks}
-\item{Include all required core fields}
-\item{Use approved validation_rules vocabulary}
-\item{Have consistent field types and relationships}
+\item Have class c("mvgam_trend")
+\item Pass validate_mvgam_trend() checks
+\item Include all required core fields
+\item Use approved validation_rules vocabulary
+\item Have consistent field types and relationships
 }
 }
 
-\section{Example Complete Object}{
+\section{Example Object}{
 
 \preformatted{
 ar_trend <- structure(list(

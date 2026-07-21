@@ -59,6 +59,7 @@
 #'   an integer index, or a character series name. Ignored by
 #'   branches that summarise across series (`"smooths"`,
 #'   `"factors"`).
+#' @inheritParams forecast.mvgam
 #' @param ndraws Optional cap on posterior draws used by branches
 #'   that subsample. Passed through to the relevant surface.
 #' @param ... Additional arguments forwarded to the dispatched

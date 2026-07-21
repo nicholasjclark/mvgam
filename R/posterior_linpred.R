@@ -287,8 +287,8 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #' @importFrom brms posterior_linpred
 #' @method posterior_linpred mvgam
 #' @export
-posterior_linpred.mvgam <- function(object, newdata = NULL,
-                                    transform = FALSE,
+posterior_linpred.mvgam <- function(object, transform = FALSE,
+                                    newdata = NULL,
                                     process_error = TRUE,
                                     ndraws = NULL,
                                     draw_ids = NULL,

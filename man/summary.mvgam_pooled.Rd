@@ -53,6 +53,5 @@ from all imputed datasets at the Stan level. Parameter estimates
 reflect uncertainty from both the model and the imputation process.
 }
 \seealso{
-\code{\link{summary.mvgam}}, \code{\link{mvgam_multiple}},
-\code{\link{pool_mvgam_fits}}
+\code{\link{summary.mvgam}}, \code{\link{mvgam_multiple}}
 }

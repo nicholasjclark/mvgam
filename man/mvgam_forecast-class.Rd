@@ -5,7 +5,7 @@
 \title{\code{mvgam_forecast} object description}
 \description{
 A \code{mvgam_forecast} object returned by function \code{\link{hindcast}}
-or \code{\link{forecast}}. Run \code{methods(class = "mvgam_forecast")} to see
+or \code{\link[generics]{forecast}}. Run \code{methods(class = "mvgam_forecast")} to see
 an overview of available methods.
 }
 \details{
