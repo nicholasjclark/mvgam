@@ -8,6 +8,10 @@ on:
 
 name: R-CMD-check
 
+concurrency:
+  group: R-CMD-check-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   R-CMD-check:
     runs-on: ${{ matrix.config.os }}
@@ -28,9 +32,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: n1hility/cancel-previous-runs@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: r-lib/actions/setup-pandoc@v2
       - uses: r-lib/actions/setup-r@v2
@@ -52,19 +53,19 @@ jobs:
               lubridate
               wrswoR
               tweedie
-              corpcor
-              splines2
               scoringRules
               matrixStats
               xts
               collapse
               rmarkdown
-              ggplot2
-              rjags
               ggrepel
               ggpp
               ggarrow
-              coda
+              ape
+              mvabund
+              future
+              bridgesampling
+              V8
               stan-dev/cmdstanr
               testthat
               usethis
@@ -72,7 +73,6 @@ jobs:
 
       - name: Build Cmdstan
         run: |
-          install.packages('mvgam', repos = "http://cran.rstudio.com")
           cmdstanr::check_cmdstan_toolchain(fix = TRUE)
           cmdstanr::install_cmdstan()
         shell: Rscript {0}

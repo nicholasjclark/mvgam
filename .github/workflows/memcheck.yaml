@@ -8,6 +8,10 @@ on:
 
 name: memcheck
 
+concurrency:
+  group: memcheck-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   memcheck:
     runs-on: ubuntu-latest
@@ -16,12 +20,8 @@ jobs:
       NOT_CRAN: false
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: n1hility/cancel-previous-runs@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
 
-      - uses: actions/checkout@v2
       - name: apt install dependency
         run: |
           sudo apt-get update

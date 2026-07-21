@@ -31,7 +31,6 @@ jobs:
             gratia
             patchwork
             remotes
-            splines2
             extraDistr
             stan-dev/cmdstanr
 
