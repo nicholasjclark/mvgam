@@ -221,15 +221,27 @@ conditional_effects.mvgam <- function(x,
     )))
   }
 
+  # marginaleffects validates `type` against its shipped mvgam
+  # `type_dictionary`, which names the latent state `latent_N`.
+  # mvgam's user-facing token is `latent_state`; translate it to the
+  # wire token so the upstream check passes. get_predict.mvgam maps
+  # `latent_N` back to predict(type = "latent_state").
+  wire_type <- if (identical(type, "latent_state")) "latent_N" else type
   out <- lapply(cond_labs, function(cond) {
     pp_args <- list(
       condition = cond,
       draw = TRUE,
-      type = type,
+      type = wire_type,
       points = points_alpha,
-      rug = rug,
-      process_error = process_error
+      rug = rug
     )
+    # Forward process_error only when TRUE. get_predict.mvgam defaults
+    # it to FALSE, so omitting the default keeps behaviour identical
+    # while avoiding marginaleffects' "argument not known to be
+    # supported" note on the common conditional_effects path.
+    if (isTRUE(process_error)) {
+      pp_args$process_error <- TRUE
+    }
     if (!is.null(resp)) {
       # Multivariate: thread the per-response selector through to
       # get_predict.mvgam so its posterior_predict / posterior_epred

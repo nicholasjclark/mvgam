@@ -38,23 +38,28 @@ get_predict.mvgam <- function(model,
   # single-visit closure unit). No-op for non-closure-unit
   # families and for newdata that already carries the columns.
   newdata <- complete_closure_unit_newdata(model, newdata)
-  # mvgam's predict() type vocabulary:
+  # Type vocabulary at the marginaleffects boundary. marginaleffects
+  # validates `type` against its shipped per-class `type_dictionary`
+  # (upstream of this method), which for the mvgam class permits
+  # `response`, `link`, `expected`, `detection` and `latent_N`. The
+  # tokens map to mvgam's prediction scales:
   #   link     - linear predictor on the link scale
   #   expected - E[Y], expectation of the response (epred); no
   #              observation-process noise
   #   response - outcome-scale draws WITH observation-process noise
   #              (posterior_predict). Integer for count families.
-  # `prediction` is accepted as a brms-style alias for `response`.
-  # `latent_state` / `detection` are closure-unit-only family
-  # types (psi / N for the state, per-visit p for detection)
-  # that delegate to predict.mvgam, which already runs the
-  # family-availability gate and dispatches to the per-family
-  # kernel (posterior_occupancy / posterior_latent_N /
-  # posterior_detection).
+  # `latent_N` / `detection` are closure-unit-only family types that
+  # delegate to predict.mvgam, which runs the family-availability gate
+  # and dispatches to the per-family kernel (posterior_occupancy /
+  # posterior_latent_N / posterior_detection). `latent_N` is the
+  # marginaleffects wire token for the latent state; mvgam's own
+  # user-facing token for the same quantity is `latent_state`, which
+  # is accepted here as an alias for direct `get_predict()` calls that
+  # bypass the dictionary check.
   checkmate::assert_choice(
     type,
-    c("response", "link", "expected", "prediction",
-      "latent_state", "detection")
+    c("response", "link", "expected", "detection",
+      "latent_N", "latent_state")
   )
 
   # Default process_error = FALSE collapses the latent trend to its
@@ -68,11 +73,12 @@ get_predict.mvgam <- function(model,
                                   process_error = process_error, ...),
     response   = posterior_predict(model, newdata = newdata,
                                     process_error = process_error, ...),
-    prediction = posterior_predict(model, newdata = newdata,
-                                    process_error = process_error, ...),
+    latent_N     = predict(model, newdata = newdata,
+                           type = "latent_state",
+                           summary = FALSE, ...),
     latent_state = predict(model, newdata = newdata,
-                            type = "latent_state",
-                            summary = FALSE, ...),
+                           type = "latent_state",
+                           summary = FALSE, ...),
     detection    = predict(model, newdata = newdata,
                             type = "detection",
                             summary = FALSE, ...)

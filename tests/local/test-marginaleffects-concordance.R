@@ -231,6 +231,30 @@ test_that("process_error TRUE vs FALSE produces a measurable shift", {
 })
 
 
+test_that("closure-unit type='latent_state' round-trips the marginaleffects pipeline", {
+  # marginaleffects ships the mvgam latent-state token as `latent_N`;
+  # mvgam's user-facing token is `latent_state`. conditional_effects
+  # translates one to the other so the upstream sanitize_type() gate
+  # passes without patching the marginaleffects namespace. get_predict
+  # accepts both tokens and maps them to predict(type='latent_state').
+  require_fixtures("val_occ_mvgam.rds")
+  occ_fit <- readRDS(file.path(local_fixture_dir(), "val_occ_mvgam.rds"))
+
+  ce <- suppressWarnings(
+    conditional_effects(occ_fit, type = "latent_state")
+  )
+  testthat::expect_s3_class(ce, "mvgam_conditional_effects")
+  testthat::expect_true(length(ce) >= 1L)
+  testthat::expect_s3_class(ce[[1L]], "ggplot")
+
+  gp_state <- get_predict(occ_fit, newdata = occ_fit$data,
+                          type = "latent_state")
+  gp_n <- get_predict(occ_fit, newdata = occ_fit$data,
+                      type = "latent_N")
+  testthat::expect_equal(gp_state$estimate, gp_n$estimate)
+})
+
+
 # -- get_group_names for ordinal ---------------------------------------
 
 test_that("get_group_names.mvgam returns factor levels for ordinal", {
