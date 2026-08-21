@@ -68,6 +68,9 @@ as \code{rstan} or \code{cmdstanr}
 \item \code{algorithm} \code{Character} describing the algorithm used for finding the
 posterior, either as \code{sampling}, \code{laplace}, \code{pathfinder}, \code{meanfield} or
 \code{fullrank}
+\item \code{init} The initial-value specification supplied to \code{mvgam()}, kept as
+the user wrote it (\code{"random"}, \code{"0"}, \code{"pathfinder"}, or a numeric
+value, list or function)
 \item \code{max_treedepth} If the model was fitted using \code{Stan}, the value supplied
 for the maximum treedepth tuning parameter is returned (see
 \code{\link[rstan]{stan}} for details). Otherwise \code{NULL}

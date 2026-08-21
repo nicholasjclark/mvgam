@@ -21,6 +21,7 @@ src/*.so
 src/*.o
 data-raw/verify_outputs/
 # Generic catch-alls for large regenerable artefacts
+*.tar.gz
 **/verify_outputs/
 **/fixtures/*.rds
 **/cache/*.rdb

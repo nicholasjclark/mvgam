@@ -279,7 +279,28 @@ translate_samples_burnin <- function(dots) {
 #'   repeated calls within the same R session do not re-warn (the
 #'   warning is rate-limited via `.frequency = "regularly"`).
 #'   Defaults to `TRUE`.
-#' @param ... Additional arguments passed to Stan fitting
+#' @param ... Additional arguments passed to Stan fitting. Two are worth
+#'   calling out. `algorithm` selects how the posterior is explored and
+#'   accepts `"sampling"` (the default), `"meanfield"`, `"fullrank"` or
+#'   `"fixed_param"` on either backend, plus `"pathfinder"` and
+#'   `"laplace"` when `backend = "cmdstanr"`. `init` sets the starting
+#'   values and accepts `"random"` (the default), `"0"`, a numeric
+#'   value, a list or a function, and additionally `"pathfinder"` when
+#'   `backend = "cmdstanr"`. The `"pathfinder"` keyword runs Stan's
+#'   Pathfinder approximation on the compiled model and draws one
+#'   starting value per chain from it. The posterior is still explored
+#'   by the algorithm you asked for, so the fit remains exact.
+#'
+#'   Treat `init = "pathfinder"` as a recovery option rather than a
+#'   speedup. On models that already warm up cleanly it is slower, not
+#'   faster: across random walk, autoregressive, correlated
+#'   autoregressive and dynamic factor trends carrying 60 to 750 latent
+#'   states, it added roughly a second of wall time, left warmup
+#'   duration essentially unchanged, and returned 15 to 25 percent
+#'   fewer effective samples per second. Its value is on models that
+#'   struggle to leave a poor starting point at all, where the extra
+#'   second buys a warmup that would otherwise stall or fill with
+#'   divergences.
 #' @return mvgam object with dual brmsfit-like structure
 #'
 #' @examples
@@ -695,6 +716,14 @@ mvgam_single <- function(formula, trend_formula, data, backend,
   # that takes `prior = NULL`.
   forward_dots <- normalise_prior_arg_alias(list(...))
 
+  # Check the sampler dimensions before any code generation, since an
+  # impossible iteration count cannot be salvaged later and the user
+  # should not wait through a compile to hear about it.
+  validate_sampler_iterations(
+    iter = forward_dots$iter %||% 2000,
+    warmup = forward_dots$warmup
+  )
+
   # Use existing shared infrastructure (same as stancode())
   stan_components <- do.call(
     generate_stan_components_mvgam_formula,
@@ -763,6 +792,8 @@ mvgam_single <- function(formula, trend_formula, data, backend,
   silent <- validate_silent(silent)
   threads <- validate_threads(threads)
   opencl <- validate_opencl(opencl)
+  algorithm <- validate_algorithm(algorithm, backend)
+  init <- validate_init(init, backend)
   
   # Parse/validate Stan code
   validated_code <- parse_model(
@@ -810,8 +841,12 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     future = future
   )
   
-  # Store backend information for later use
+  # Store backend information for later use. `init` is kept as the user
+  # wrote it because Stan records only the resolved value, which for
+  # list-valued and Pathfinder starts is a temporary file path that
+  # cannot be replayed on another machine.
   attr(combined_fit, "backend") <- backend
+  attr(combined_fit, "init") <- init
   attr(combined_fit, "algorithm") <- algorithm
   attr(combined_fit, "mvgam_version") <- utils::packageVersion("mvgam")
   attr(combined_fit, "fit_time") <- Sys.time()
@@ -1011,6 +1046,7 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       obs_model = obs_setup$brmsfit,
       trend_model = if (!is.null(trend_setup)) trend_setup$brmsfit else NULL,
       backend = backend,
+      init = attr(combined_fit, "init") %||% "random",
       algorithm = combined_fit@sim$algorithm %||% "sampling",
       brms_version = utils::packageVersion("brms"),
       mvgam_version = utils::packageVersion("mvgam"),

@@ -4173,3 +4173,37 @@ test_that("per-arm standata expansion handles smooths, ranef and dpar", {
   expect_identical(nrow(sd$X_shape_biomass),
                    as.integer(sd$N_biomass))
 })
+
+
+test_that("a modelled dpar does not collide with mvgam's injected default prior", {
+  # mvgam injects a class-level default for `nu` (com_binomial) and for
+  # `shape` / `mtail` (beta_nb). When the user gives that parameter its
+  # own sub-formula, brms replaces the scalar with a design matrix, so
+  # a prior aimed at the scalar class matches nothing and brms rejects
+  # the whole prior set. The injected row has to be dropped first.
+  set.seed(4)
+  dat <- data.frame(
+    y = rbinom(40, size = 10, prob = 0.5),
+    trials = 10L,
+    site = factor(rep(c("a", "b"), each = 20)),
+    time = 1:40,
+    series = factor(rep("series1", 40))
+  )
+  sc <- paste(unlist(stancode(
+    mvgam_formula(brms::bf(y | trials(trials) ~ 1, nu ~ site)),
+    data = dat, family = com_binomial(), backend = "cmdstanr"
+  )), collapse = "\n")
+  expect_true(grepl("b_nu", sc, fixed = TRUE))
+  # nu is identity-linked, so its default belongs on the intercept once
+  # nu is modelled. Without the move brms falls back to a positive-only
+  # gamma on a parameter that may go negative, and warns.
+  expect_true(grepl("normal_lpdf(Intercept_nu | 1, 0.5)", sc, fixed = TRUE))
+  expect_false(grepl("gamma_lpdf(Intercept_nu", sc, fixed = TRUE))
+
+  # and the scalar default is still emitted when nu is not modelled
+  sc_plain <- paste(unlist(stancode(
+    mvgam_formula(y | trials(trials) ~ 1),
+    data = dat, family = com_binomial(), backend = "cmdstanr"
+  )), collapse = "\n")
+  expect_true(grepl("normal_lpdf(nu | 1, 0.5)", sc_plain, fixed = TRUE))
+})

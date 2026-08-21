@@ -362,7 +362,7 @@ family_uses_integers <- function(family_name) {
     "zero_inflated_poisson", "zero_inflated_negbinomial",
     "zero_inflated_binomial", "zero_inflated_beta_binomial",
     "hurdle_poisson", "hurdle_negbinomial", "hurdle_cumulative",
-    "discrete_weibull", "com_poisson"
+    "discrete_weibull", "com_poisson", "beta_nb"
   )
 
   family_name %in% integer_families
@@ -682,6 +682,7 @@ sample_from_family <- function(family_name, ndraws, epred,
                                beta = NULL, bs = NULL, bias = NULL,
                                disc = NULL, thres = NULL,
                                mphi = NULL, mtheta = NULL,
+                               mtail = NULL,
                                link = "logit",
                                lb = NULL, ub = NULL, ntrys = 5) {
   checkmate::assert_string(family_name)
@@ -766,6 +767,21 @@ sample_from_family <- function(family_name, ndraws, epred,
         mu = as.numeric(epred),
         p = as.numeric(mtheta),
         phi = as.numeric(mphi)
+      )
+    },
+
+    "beta_nb" = {
+      # Beta negative binomial. `epred` is the mean mu; the Stan side
+      # sets the Beta mixing scale to mu * mtail / shape so drawing
+      # the success probability from Beta(1 + mtail, that scale) and
+      # then a negative binomial reproduces the fitted distribution.
+      checkmate::assert_matrix(shape, nrows = ndraws, ncols = ncol(epred))
+      checkmate::assert_matrix(mtail, nrows = ndraws, ncols = ncol(epred))
+      rbeta_nb_mvgam(
+        n = length(epred),
+        mu = as.numeric(epred),
+        shape = as.numeric(shape),
+        mtail = as.numeric(mtail)
       )
     },
 
@@ -1198,6 +1214,7 @@ get_family_dpars <- function(family_name) {
 
     # Custom mvgam families
     tweedie      = c("mphi", "mtheta"),
+    beta_nb      = c("shape", "mtail"),
     com_binomial = c("nu"),
     nmix         = c("p"),
     occ          = c("p"),
@@ -1799,35 +1816,24 @@ predict_single_response <- function(object, linpred_resp, resp, draw_ids,
     epred_for_family <- mu
   }
 
-  # Sample from family distribution
-  samples <- sample_from_family(
-    family_name = family_name,
-    ndraws = ndraws,
-    epred = epred_for_family,
-    sigma = dpars$sigma,
-    phi = dpars$phi,
-    shape = dpars$shape,
-    nu = dpars$nu,
-    trials = trials,
-    hu = dpars$hu,
-    zi = dpars$zi,
-    zoi = dpars$zoi,
-    coi = dpars$coi,
-    alpha = dpars$alpha,
-    ndt = dpars$ndt,
-    xi = dpars$xi,
-    quantile = dpars$quantile,
-    kappa = dpars$kappa,
-    beta = dpars$beta,
-    bs = dpars$bs,
-    bias = dpars$bias,
-    disc = dpars$disc,
-    thres = dpars$thres,
-    mphi = dpars$mphi,
-    mtheta = dpars$mtheta,
-    lb = trunc_bounds$lb,
-    ub = trunc_bounds$ub
-  )
+  # Sample from family distribution. Forward whichever distributional
+  # parameters the registry produced for this family instead of naming
+  # them one at a time; a hand-written list silently drops the
+  # parameters of any family added afterwards. Names with no matching
+  # argument belong to families that draw through a different path.
+  dpar_args <- dpars[intersect(names(dpars),
+                               names(formals(sample_from_family)))]
+  samples <- do.call(sample_from_family, c(
+    list(
+      family_name = family_name,
+      ndraws = ndraws,
+      epred = epred_for_family,
+      trials = trials,
+      lb = trunc_bounds$lb,
+      ub = trunc_bounds$ub
+    ),
+    dpar_args
+  ))
 
   # Reshape vector to matrix [ndraws x nobs]
   matrix(samples, nrow = ndraws, ncol = nobs, byrow = FALSE)

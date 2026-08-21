@@ -88,6 +88,10 @@
 #'     posterior, either as `sampling`, `laplace`, `pathfinder`, `meanfield` or
 #'     `fullrank`
 #'
+#'   - `init` The initial-value specification supplied to `mvgam()`, kept as
+#'     the user wrote it (`"random"`, `"0"`, `"pathfinder"`, or a numeric
+#'     value, list or function)
+#'
 #'   - `max_treedepth` If the model was fitted using `Stan`, the value supplied
 #'     for the maximum treedepth tuning parameter is returned (see
 #'     \code{\link[rstan]{stan}} for details). Otherwise `NULL`

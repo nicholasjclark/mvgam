@@ -246,7 +246,25 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
   # per class/coef key). The per-fit data stanvars are attached
   # earlier via `prepare_com_binomial_family()`.
   if (is_com_binomial_family(family)) {
-    prior <- c(default_com_binomial_population_priors(), prior)
+    prior <- c(
+      adjust_modelled_dpar_priors(
+        default_com_binomial_population_priors(), obs_formula, family
+      ),
+      prior
+    )
+  }
+  # The beta negative binomial `shape` would otherwise inherit brms's
+  # negative binomial `gamma(0.01, 0.01)`, which concentrates mass
+  # where the Beta mixing scale `mu * mtail / shape` diverges, and
+  # `mtail` would inherit `(flat)`. Both defaults are injected ahead
+  # of user priors so any user override still wins.
+  if (is_beta_nb_family(family)) {
+    prior <- c(
+      adjust_modelled_dpar_priors(
+        default_beta_nb_population_priors(), obs_formula, family
+      ),
+      prior
+    )
   }
   # Filter priors: only pass observation-related priors to observation setup
   obs_priors <- filter_obs_priors(prior)

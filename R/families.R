@@ -484,6 +484,254 @@ check_tweedie_truncation <- function(object) {
 }
 
 # ============================================================
+# Beta negative binomial (beta_nb) family
+# ============================================================
+# Heavy-tailed count family that mixes a negative binomial success
+# probability over a Beta distribution: Y | p ~ NegBinomial(r, p),
+# p ~ Beta(alpha, beta). Also known as the generalised Waring
+# distribution. The tail decays as a power law rather than
+# geometrically, so it accommodates the occasional very large count
+# that outbreak and boom-bust population series produce and that
+# NB2 can only absorb by inflating dispersion everywhere.
+# Reference: Irwin (1968), JRSS-A. The Stan log-PMF is written
+# against lgamma / lbeta rather than Stan's native
+# `beta_neg_binomial_lpmf`, so the family needs no minimum Stan
+# version and works on either backend.
+#
+# Parameterisation. Stan's signature is (r, alpha, beta) with
+# E[Y] = r * beta / (alpha - 1), which exists only for alpha > 1,
+# and Var[Y] finite only for alpha > 2. A regression family needs
+# the mean on the linear predictor, so mvgam samples a shifted tail
+# parameter mtail = alpha - 1 with a lower bound of zero and sets
+# beta = mu * mtail / shape. The mean is then exactly mu, and the
+# awkward alpha > 1 constraint becomes an ordinary positivity bound.
+# NB2 is recovered as mtail -> infinity.
+#
+# Stats-review notes (gate A):
+# * `shape` does not inherit the brms negative binomial default of
+#   gamma(0.01, 0.01). That prior piles mass near zero, and because
+#   beta = mu * mtail / shape diverges as shape -> 0 it drags the
+#   Beta mixing distribution toward a degenerate point mass. On data
+#   simulated from NB2(shape = 3) it returned shape = 9.0
+#   [3.9, 37.9]; gamma(2, 0.5) returned 5.4 [3.5, 10.4].
+# * `mtail ~ gamma(2, 0.25)` rather than a tighter gamma(2, 1).
+#   Since NB2 sits at mtail -> infinity, a prior with almost no mass
+#   above 8 pins the parameter whenever the data are NB2-like, and
+#   the resulting misfit is absorbed by `shape`. The wider prior cut
+#   that bias (shape 3.9 [3.0, 5.9] against a truth of 3.0) and
+#   still places 97% of its mass above the finite-variance boundary
+#   at mtail = 1.
+# * The predictive cost of using this family when NB2 is correct is
+#   about 2 elpd units; the cost of using NB2 when this family is
+#   correct was 9.0 (SE 4.4). The asymmetry favours availability.
+# * Sampling geometry was checked across the NB2 limit, a moderate
+#   tail and mtail near the variance boundary: no divergences, bulk
+#   ESS above 1200 throughout, max R-hat 1.006.
+
+
+#' Beta negative binomial family for heavy-tailed counts
+#'
+#' A three-parameter count family that mixes the negative binomial
+#' success probability over a Beta distribution, giving a
+#' power-law rather than geometric tail. Useful for outbreak counts
+#' and boom-bust population series where a negative binomial fits
+#' the bulk of the data but is repeatedly surprised by the largest
+#' observations.
+#'
+#' @details
+#' The family is parameterised so that `mu` is the mean:
+#' \deqn{Y \mid p \sim \mathrm{NegBinomial}(r, p), \quad
+#'       p \sim \mathrm{Beta}(1 + \tau, \mu \tau / r)}
+#' where `r` is `shape` and \eqn{\tau} is `mtail`. Writing Stan's
+#' native first Beta parameter as \eqn{\alpha = 1 + \tau} keeps the
+#' mean finite by construction, since \eqn{E[Y] = \mu} requires
+#' \eqn{\alpha > 1}.
+#'
+#' The variance is finite only when `mtail` exceeds 1, and the
+#' family becomes genuinely heavy-tailed below that. This is the
+#' behaviour the family exists to provide, but it has two
+#' consequences worth knowing. Randomised quantile residuals, the
+#' default in [residuals.mvgam()], are unaffected because they need
+#' only the distribution function. Moment-based scoring is not:
+#' `score(..., score = "dss")` assumes a finite predictive variance
+#' and should not be trusted when the posterior for `mtail` places
+#' appreciable mass below 1. Prefer `"crps"`, `"drps"` or `"logs"`.
+#'
+#' As `mtail` grows the family converges to the negative binomial
+#' with the same `shape`, so a posterior for `mtail` that runs off
+#' toward its prior upper range is evidence that the extra tail
+#' parameter is not needed.
+#'
+#' @section Distributional parameters:
+#' \describe{
+#'   \item{`mu`}{Mean of the response, with a log link.}
+#'   \item{`shape`}{Negative binomial shape `r`, log link, positive.
+#'     Default prior `gamma(2, 0.5)`.}
+#'   \item{`mtail`}{Tail parameter \eqn{\tau = \alpha - 1}, log
+#'     link, positive. Smaller values give heavier tails; values
+#'     below 1 give infinite variance. Default prior
+#'     `gamma(2, 0.25)`.}
+#' }
+#'
+#' @section Censoring and truncation:
+#' The Stan code supplies the distribution function alongside the
+#' density, so `cens()` and `trunc()` addition terms work as they do
+#' for the built-in count families.
+#'
+#' Two limits are worth knowing. The distribution function accumulates
+#' the mass function term by term, so both its cost and the length of
+#' the automatic-differentiation tape grow linearly in the count at
+#' which it is evaluated. At the counts these models usually see this
+#' is unnoticeable; a censoring bound in the thousands will dominate
+#' the gradient evaluation, and one in the millions is impractical.
+#'
+#' Right censoring also needs the upper tail, which is computed as
+#' `log1m_exp()` of the distribution function. That subtraction loses
+#' precision once the survival probability approaches the accumulated
+#' rounding error, roughly when `1 - F(y)` falls below `y * 5e-16`. A
+#' censoring bound placed far into the tail of a light-tailed fit can
+#' therefore return a survival probability of zero rather than a small
+#' positive number. Heavy-tailed fits, which are the point of this
+#' family, keep `1 - F(y)` large and are unaffected.
+#'
+#' @return A `customfamily` object for use with [mvgam()].
+#' @references
+#' Irwin, J. O. (1968). The generalized Waring distribution applied
+#' to accident theory. \emph{Journal of the Royal Statistical
+#' Society A}, 131(2), 205-225. \doi{10.2307/2343842}
+#' @seealso [mvgam()], [tweedie()], [com_binomial()]
+#' @examples
+#' \donttest{
+#' # Counts with a heavier tail than a negative binomial expects
+#' set.seed(1)
+#' sim <- sim_mvgam(
+#'   family = beta_nb(), n_series = 1L, n_timepoints = 80L,
+#'   trend_model = AR(),
+#'   family_pars = list(shape = 2, mtail = 2)
+#' )
+#' head(sim$data_train)
+#' }
+#' @export
+beta_nb <- function() {
+  fam <- brms::custom_family(
+    name = "beta_nb",
+    dpars = c("mu", "shape", "mtail"),
+    links = c("log", "log", "log"),
+    lb = c(NA, 0, 0),
+    ub = c(NA, NA, NA),
+    type = "int"
+  )
+  # brms::custom_family() omits the `linkinv` / `linkfun` slots that
+  # base R family objects carry and that mvgam's epred dispatcher
+  # expects; attach them from the primary link.
+  link_info <- stats::make.link(fam$link)
+  fam$linkinv <- link_info$linkinv
+  fam$linkfun <- link_info$linkfun
+  attr(fam, "mvgam_stanvars") <- make_beta_nb_stanvars()
+  fam
+}
+
+#' Is this the beta negative binomial family?
+#' @param family A family / brmsfamily / customfamily object
+#' @return Logical scalar
+#' @noRd
+is_beta_nb_family <- function(family) {
+  identical(resolve_family_name(family), "beta_nb")
+}
+
+#' Default population priors for the beta negative binomial family
+#'
+#' `shape` would otherwise inherit the brms negative binomial
+#' default of `gamma(0.01, 0.01)`, which concentrates mass where
+#' the Beta mixing scale `mu * mtail / shape` diverges. `mtail`
+#' needs enough prior range to reach the negative binomial limit;
+#' see the section notes above this family's constructor.
+#' @return A `brmsprior` object
+#' @noRd
+default_beta_nb_population_priors <- function() {
+  c(
+    brms::prior("gamma(2, 0.5)", class = "shape"),
+    brms::prior("gamma(2, 0.25)", class = "mtail")
+  )
+}
+
+#' Build the Stan stanvars bundle for the beta negative binomial
+#' @return A `brmsstanvars` object
+#' @noRd
+make_beta_nb_stanvars <- function() {
+  brms::stanvar(
+    name = "beta_nb_funs",
+    scode = beta_nb_stan_funs(),
+    block = "functions"
+  )
+}
+
+#' Stan code for the beta negative binomial function-block helpers
+#'
+#' Written against `lgamma()` and `lbeta()` rather than Stan's native
+#' `beta_neg_binomial_*` suite, which arrived only in Stan 2.36. Two
+#' things follow from that choice. The family works on the 'rstan'
+#' backend as well as 'cmdstanr', so it needs no version gate; and the
+#' distribution function is available, which is what lets `cens()` and
+#' `trunc()` addition terms work.
+#'
+#' The log-PMF matches Stan's native implementation exactly across a
+#' grid of 162 parameter combinations. The distribution function
+#' accumulates the PMF with the ratio
+#' \eqn{p(k+1)/p(k) = (r+k)(\beta+k) / ((k+1)(\alpha+\beta+r+k))},
+#' so each term costs a handful of logs rather than four log-gamma
+#' calls, and the result is exact to machine precision against a
+#' direct sum. Cost grows linearly in `y`, which matters only for
+#' censored or truncated observations.
+#'
+#' The wrapper name deliberately differs from Stan's: a function named
+#' `beta_neg_binomial_lpmf` taking three real parameters would match
+#' the built-in signature on newer Stan versions and silently bind the
+#' arguments to the wrong roles.
+#' @noRd
+beta_nb_stan_funs <- function() {
+  paste(
+    "  real beta_nb_lpmf(int y, real mu, real shape, real mtail) {",
+    "    // mtail = alpha - 1, so beta = mu * mtail / shape gives E[Y] = mu",
+    "    real alpha = 1 + mtail;",
+    "    real beta = mu * mtail / shape;",
+    "    return lgamma(y + shape) - lgamma(y + 1) - lgamma(shape)",
+    "           + lbeta(beta + y, alpha + shape) - lbeta(beta, alpha);",
+    "  }",
+    "  real beta_nb_lcdf(int y, real mu, real shape, real mtail) {",
+    "    // No mass below zero. brms builds the two-sided truncation",
+    "    // normaliser as log_diff_exp(lcdf(ub), lcdf(lb - 1)), so",
+    "    // trunc(lb = 0) calls this with -1; without the guard the",
+    "    // empty loop would return log p(0) and quietly subtract the",
+    "    // zero count from the normalising constant.",
+    "    if (y < 0) {",
+    "      return negative_infinity();",
+    "    }",
+    "    // Accumulate the PMF by its term ratio; exact for counts and",
+    "    // cheaper than re-evaluating log-gamma at every step.",
+    "    real alpha = 1 + mtail;",
+    "    real beta = mu * mtail / shape;",
+    "    real lp = beta_nb_lpmf(0 | mu, shape, mtail);",
+    "    real acc = lp;",
+    "    for (k in 0 : (y - 1)) {",
+    "      lp += log(shape + k) + log(beta + k)",
+    "            - log(k + 1) - log(alpha + beta + shape + k);",
+    "      acc = log_sum_exp(acc, lp);",
+    "    }",
+    "    return acc;",
+    "  }",
+    "  real beta_nb_lccdf(int y, real mu, real shape, real mtail) {",
+    "    real lc = beta_nb_lcdf(y | mu, shape, mtail);",
+    "    // Rounding can push the distribution function a hair above",
+    "    // zero far into the tail, where log1m_exp is undefined.",
+    "    return lc >= 0 ? negative_infinity() : log1m_exp(lc);",
+    "  }",
+    sep = "\n"
+  )
+}
+
+
+# ============================================================
 # Conway-Maxwell-Binomial (com_binomial) family
 # ============================================================
 # Bounded-count family generalising the binomial by exponentiating
@@ -683,6 +931,57 @@ default_com_binomial_population_priors <- function() {
   brms::prior("normal(1, 0.5)", class = "nu")
 }
 
+
+#' Re-aim injected dpar priors when the user models that dpar
+#'
+#' mvgam injects class-level defaults for family-specific
+#' distributional parameters (`nu` for `com_binomial()`, `shape` and
+#' `mtail` for `beta_nb()`). Giving one of those a sub-formula replaces
+#' the scalar parameter with a design matrix and an intercept, so a
+#' prior aimed at the scalar class matches nothing and brms rejects the
+#' whole prior set.
+#'
+#' Where the dpar uses an identity link its intercept is on the same
+#' scale as the scalar was, so the default moves across intact. That
+#' matters for `nu`, whose name brms already associates with the
+#' Student-t degrees of freedom: without the move brms falls back to a
+#' positive-only `gamma(2, 0.1)` on a parameter that is free to go
+#' negative, and warns about it. Under any other link the intercept
+#' lives on a different scale and the default cannot be carried over,
+#' so it is dropped and brms's own intercept default applies.
+#'
+#' @param prior A `brmsprior` of injected defaults
+#' @param formula The observation formula, possibly a `brmsformula`
+#'   carrying dpar sub-formulas in `$pforms`
+#' @param family The family object, consulted for each dpar's link
+#' @return `prior`, with rows for modelled dpars re-aimed or removed
+#' @noRd
+adjust_modelled_dpar_priors <- function(prior, formula, family) {
+  if (is.null(prior) || nrow(prior) == 0L) return(prior)
+  modelled <- if (inherits(formula, "brmsformula")) {
+    names(formula$pforms %||% list())
+  } else {
+    character(0)
+  }
+  if (!length(modelled)) return(prior)
+
+  hit <- prior$class %in% modelled
+  if (!any(hit)) return(prior)
+  identity_link <- vapply(prior$class[hit], function(dp) {
+    identical(family[[paste0("link_", dp)]], "identity")
+  }, logical(1))
+
+  moved <- which(hit)[identity_link]
+  if (length(moved)) {
+    prior$dpar[moved] <- prior$class[moved]
+    prior$class[moved] <- "Intercept"
+  }
+  dropped <- which(hit)[!identity_link]
+  if (length(dropped)) {
+    prior <- prior[-dropped, , drop = FALSE]
+  }
+  prior
+}
 
 #' Build the Stan stanvars bundle for the `com_binomial()` family
 #'
@@ -4288,6 +4587,43 @@ attach_family_stanvars <- function(stanvars, family) {
   if (is.null(stanvars)) return(fam_stanvars)
   checkmate::assert_class(stanvars, "stanvars")
   stanvars + fam_stanvars
+}
+
+#' Pointwise log-likelihood for the beta negative binomial family
+#'
+#' Discovered by name from `dispatch_log_lik()`, so no registration
+#' is needed beyond defining it here. Evaluates the closed-form
+#' log-pmf rather than round-tripping through Stan, which keeps
+#' `log_lik()` usable on refits and subsets.
+#'
+#' @param linpred `[ndraws x nobs]` matrix of linear predictors
+#' @param link Link name; the family restricts this to `"log"`
+#' @param y Numeric vector of observed counts, length `nobs`
+#' @param family_pars Named list holding `shape` and `mtail`, each an
+#'   `[ndraws x nobs]` matrix
+#' @param trials Unused; present for the dispatcher's fixed signature
+#' @return `[ndraws x nobs]` matrix of log densities
+#' @noRd
+log_lik_beta_nb <- function(linpred, link, y, family_pars, trials) {
+  checkmate::assert_matrix(linpred)
+  # beta_nb() restricts the response surface to the log link, which
+  # is what keeps `mu` strictly positive.
+  checkmate::assert_choice(link, "log")
+  mu <- .linkinv(linpred, link)
+  shape <- family_pars$shape
+  mtail <- family_pars$mtail
+  checkmate::assert_matrix(shape, nrows = nrow(linpred),
+                           ncols = ncol(linpred))
+  checkmate::assert_matrix(mtail, nrows = nrow(linpred),
+                           ncols = ncol(linpred))
+  # `dbeta_nb_mvgam()` recycles elementwise, so a single call over the
+  # whole matrix is enough once `y` is broadcast across draws.
+  y_mat <- matrix(y, nrow = nrow(linpred), ncol = ncol(linpred),
+                  byrow = TRUE)
+  matrix(
+    dbeta_nb_mvgam(y_mat, mu, shape, mtail, log = TRUE),
+    nrow = nrow(linpred), ncol = ncol(linpred)
+  )
 }
 
 #' R-side log-density evaluator for the Tweedie family

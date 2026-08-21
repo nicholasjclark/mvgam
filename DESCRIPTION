@@ -52,7 +52,7 @@ RoxygenNote: 7.3.3
 Suggests:
     scoringRules,
     matrixStats,
-    cmdstanr (>= 0.8.0),
+    cmdstanr (>= 0.8.1),
     tweedie,
     extraDistr,
     wrswoR,

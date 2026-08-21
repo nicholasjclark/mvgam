@@ -76,3 +76,58 @@ rdiscrete_weibull_mvgam <- function(n, mu, shape) {
   u <- runif(n, 0, 1)
   ceiling((log(1 - u) / log(mu))^(1 / shape) - 1)
 }
+
+# Beta negative binomial variates under mvgam's mean parameterisation.
+# The Stan side computes the Beta mixing scale as mu * mtail / shape,
+# with the first Beta parameter shifted to 1 + mtail so that the mean is
+# exactly mu; drawing the success probability from that Beta and then a
+# negative binomial reproduces the same distribution. Vectorised over
+# recycled `mu`, `shape` and `mtail`.
+rbeta_nb_mvgam <- function(n, mu, shape, mtail) {
+  checkmate::assert_int(n, lower = 0L)
+  mu <- rep_len(mu, n)
+  shape <- rep_len(shape, n)
+  mtail <- rep_len(mtail, n)
+  prob <- stats::rbeta(n, 1 + mtail, mu * mtail / shape)
+  stats::rnbinom(n, size = shape, prob = prob)
+}
+
+# Beta negative binomial log-pmf under the same parameterisation, used
+# by `log_lik_beta_nb()`. Written with `lbeta()` so the Gamma-function
+# ratio stays on the log scale for large counts.
+dbeta_nb_mvgam <- function(y, mu, shape, mtail, log = TRUE) {
+  alpha <- 1 + mtail
+  beta <- mu * mtail / shape
+  out <- lgamma(y + shape) - lgamma(y + 1) - lgamma(shape) +
+    lbeta(beta + y, alpha + shape) - lbeta(beta, alpha)
+  if (log) out else exp(out)
+}
+
+# Beta negative binomial distribution function under the same
+# parameterisation, mirroring the Stan `beta_nb_lcdf`. Accumulates the
+# mass function through its term ratio
+# p(k+1)/p(k) = (r+k)(beta+k) / ((k+1)(alpha+beta+r+k)),
+# which is exact for counts and avoids re-evaluating log-gamma at every
+# step. Returns -Inf below zero, where the distribution has no mass.
+pbeta_nb_mvgam <- function(q, mu, shape, mtail, log.p = TRUE) {
+  checkmate::assert_number(mu, lower = 0)
+  checkmate::assert_number(shape, lower = 0)
+  checkmate::assert_number(mtail, lower = 0)
+  alpha <- 1 + mtail
+  beta <- mu * mtail / shape
+  out <- vapply(q, function(y) {
+    if (y < 0) return(-Inf)
+    lp <- dbeta_nb_mvgam(0, mu, shape, mtail, log = TRUE)
+    acc <- lp
+    k <- 0
+    while (k < y) {
+      lp <- lp + log(shape + k) + log(beta + k) -
+        log(k + 1) - log(alpha + beta + shape + k)
+      m <- max(acc, lp)
+      acc <- m + log(exp(acc - m) + exp(lp - m))
+      k <- k + 1
+    }
+    acc
+  }, numeric(1))
+  if (log.p) out else exp(out)
+}

@@ -137,6 +137,54 @@ test_that("mvgam_update_call inherits family / prior / backend / algorithm", {
   expect_identical(out$algorithm, stub$algorithm)
 })
 
+test_that("mvgam_update_call inherits the initial-value specification", {
+  # A refit that silently reverted to random starts would undo the
+  # reason the original fit asked for Pathfinder in the first place
+  stub <- make_update_stub()
+  stub$init <- "pathfinder"
+  out <- mvgam_update_call(stub, formula. = NULL, newdata = NULL,
+                           dots = list())
+  expect_identical(out$init, "pathfinder")
+})
+
+test_that("mvgam_update_call drops the inherited warmup when iter is overridden", {
+  # `warmup` cannot be inherited on its own: mvgam derives it as
+  # `iter %/% 2`, so pairing the original fit's warmup with a smaller
+  # user-supplied `iter` asks Stan for a negative sampling count and
+  # fails with a message that names neither argument.
+  stub <- make_update_stub()
+  local_mocked_bindings(
+    mvgam_sampler_inheritance = function(object) {
+      list(chains = 2L, iter = 1500L, warmup = 750L, thin = 1L)
+    },
+    .package = "mvgam"
+  )
+
+  out <- mvgam_update_call(stub, formula. = NULL, newdata = NULL,
+                           dots = list(iter = 400L))
+  expect_identical(out$iter, 400L)
+  expect_null(out$warmup)
+
+  # An explicit warmup is still honoured alongside a new iter
+  out2 <- mvgam_update_call(stub, formula. = NULL, newdata = NULL,
+                            dots = list(iter = 400L, warmup = 100L))
+  expect_identical(out2$warmup, 100L)
+
+  # and both are still inherited when neither is overridden
+  out3 <- mvgam_update_call(stub, formula. = NULL, newdata = NULL,
+                            dots = list())
+  expect_identical(out3$iter, 1500L)
+  expect_identical(out3$warmup, 750L)
+})
+
+test_that("mvgam_update_call lets the caller override the inherited init", {
+  stub <- make_update_stub()
+  stub$init <- "pathfinder"
+  out <- mvgam_update_call(stub, formula. = NULL, newdata = NULL,
+                           dots = list(init = "0"))
+  expect_identical(out$init, "0")
+})
+
 test_that("mvgam_update_call lets the caller override the inherited prior", {
   # The lfo_cv refit story relies on update.mvgam reusing the
   # original fit's literal prior table by default (so brms doesn't

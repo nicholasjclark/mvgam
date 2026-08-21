@@ -8,6 +8,8 @@ This is a major release that rebuilds mvgam on top of 'brms'. The observation mo
 * The monotonic spline bases `s(x, bs = "moi")` and `s(x, bs = "mod")` have been removed. To constrain an effect to be monotonic, use the 'brms' `mo()` term in the observation formula (see `?brms::mo`), which models a monotonic effect of an ordered predictor.
 
 ## New functionalities
+* Added a `beta_nb()` observation family for counts with heavier tails than a negative binomial allows
+* Added `init = "pathfinder"` to `mvgam()` for drawing starting values from Stan's Pathfinder approximation
 * Restructured `summary.mvgam()` to now return an object of class `mvgam_summary` that can be re-used for later purposes, or that can be printed with `print.mvgam_summary()` (#119)
 * Added a new function `ordinate.jsdgam()` to plot two-dimensional ordinations of site and species scores from latent factor models estimated in `jsdgam()`
 * `residual_cor()` now supports models fitted with `mvgam()` in which latent factors were used or in which correlated dynamic processes were used

@@ -827,6 +827,7 @@ intercept_for_family <- function(fam_name) {
     "bernoulli" = 0,
     "beta" = 0,            # logit link: mean ~ 0.5
     "tweedie" = log(2),    # log link: mean ~ 2 (CP with zeros)
+    "beta_nb" = log(5),    # log link: mean ~ 5
     "com_binomial" = 0,    # logit link: probability ~ 0.5
     0
   )
@@ -1086,6 +1087,7 @@ link_scale_budget <- function(fam_name) {
     "bernoulli" = 1.5,
     "beta" = 1.5,
     "tweedie" = 0.8,
+    "beta_nb" = 0.8,
     "com_binomial" = 1.5,
     1.0
   )
@@ -1133,6 +1135,10 @@ sim_family_pars <- function(family, family_pars, prop_trend,
     "tweedie" = list(
       phi   = family_pars$phi   %||% 1,
       power = family_pars$power %||% 1.5
+    ),
+    "beta_nb" = list(
+      shape = family_pars$shape %||% 2,
+      mtail = family_pars$mtail %||% 2
     ),
     "com_binomial" = list(
       trials = family_pars$trials %||% 10L,

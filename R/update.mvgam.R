@@ -250,7 +250,8 @@ mvgam_update_inheritance <- list(
   family = list(slot = "family"),
   prior = list(slot = "prior"),
   backend = list(slot = "backend"),
-  algorithm = list(slot = "algorithm")
+  algorithm = list(slot = "algorithm"),
+  init = list(slot = "init")
 )
 
 
@@ -306,8 +307,15 @@ mvgam_update_call <- function(object, formula., newdata, dots) {
     resolved[[arg_name]] <- value
   }
   # Inherit sampler dimensions from the original stanfit unless
-  # the user explicitly overrides.
+  # the user explicitly overrides. `warmup` cannot be inherited on its
+  # own: mvgam derives it as `iter %/% 2`, so pairing the original
+  # warmup with a smaller user-supplied `iter` leaves warmup at or
+  # above the new total and asks Stan for a negative number of
+  # sampling iterations.
   sampler <- mvgam_sampler_inheritance(object)
+  if ("iter" %in% names(dots) && !"warmup" %in% names(dots)) {
+    sampler$warmup <- NULL
+  }
   for (arg_name in names(sampler)) {
     if (!arg_name %in% names(dots) && !arg_name %in% names(resolved)) {
       resolved[[arg_name]] <- sampler[[arg_name]]

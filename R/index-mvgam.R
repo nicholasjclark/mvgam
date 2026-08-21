@@ -129,7 +129,7 @@ categorize_mvgam_parameters <- function(x) {
   # and power parameters; they belong here so `tidy()`,
   # `coef()` and the family-extras section of `summary.mvgam()`
   # surface them alongside standard dpars.
-  obs_family_pattern <- "^(sigma|shape|nu|phi|zi|hu|mphi|mtheta)(_|\\[|$)"
+  obs_family_pattern <- "^(sigma|shape|nu|phi|zi|hu|mphi|mtheta|mtail)(_|\\[|$)"
   obs_family_pars <- all_pars[
     grepl(obs_family_pattern, all_pars) &
       !grepl("_trend", all_pars)

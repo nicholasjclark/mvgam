@@ -178,6 +178,10 @@ sim_family_rng <- function(eta, family, pars = list()) {
       rate = (pars$shape %||% 2) / mu
     ),
     "tweedie" = sim_tweedie(mu, pars$phi %||% 1, pars$power %||% 1.5),
+    "beta_nb" = rbeta_nb_mvgam(
+      n = length(eta), mu = mu,
+      shape = pars$shape %||% 2, mtail = pars$mtail %||% 2
+    ),
     "com_binomial" = {
       trials_vec <- if (length(pars$trials %||% 10L) == 1L) {
         rep(as.integer(pars$trials %||% 10L), length(eta))
@@ -196,7 +200,7 @@ sim_family_rng <- function(eta, family, pars = list()) {
       x = paste0("Got: '", fam_name, "'."),
       i = paste0(
         "Supported: gaussian, student, poisson, negbinomial, ",
-        "binomial, beta, gamma, tweedie, com_binomial."
+        "binomial, beta, gamma, tweedie, beta_nb, com_binomial."
       )
     )))
   )

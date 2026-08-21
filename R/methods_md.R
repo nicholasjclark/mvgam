@@ -361,6 +361,7 @@ family_data_label <- function(fam_name) {
     negbinomial = "non-negative integer counts",
     nb = "non-negative integer counts",
     tweedie = "non-negative real observations (compound Poisson-gamma)",
+    beta_nb = "heavy-tailed counts (beta negative binomial)",
     hurdle_poisson = "non-negative integer counts with point mass at zero",
     hurdle_negbinomial = "non-negative integer counts with point mass at zero",
     hurdle_gamma = "non-negative real observations with point mass at zero",
@@ -1063,6 +1064,9 @@ family_distribution_text <- function(fam_name, mu, obj) {
     beta        = paste0("\\text{Beta}(", mu, ", ", phi, ")"),
     negbinomial = paste0("\\text{NegBin}(", mu, ", ", phi, ")"),
     nb          = paste0("\\text{NegBin}(", mu, ", ", phi, ")"),
+    beta_nb     = paste0(
+      "\\text{BetaNegBinomial}(", mu, ", r, \\tau)"
+    ),
     tweedie     = paste0(
       "\\text{Tweedie}(", mu, ", \\phi, \\xi)"
     ),
@@ -3018,6 +3022,12 @@ extract_implementation_info <- function(obj) {
       init = NA_character_
     )
   }
+  # The specification the user wrote outranks the value Stan recorded,
+  # which for list-valued and Pathfinder starts is a temporary file
+  # path that would not replay on another machine.
+  if (!is.null(obj$init)) {
+    sampling$init <- printable_init(obj$init)
+  }
   c(
     list(
       backend   = backend,
@@ -3167,6 +3177,7 @@ family_call_text <- function(family) {
     diri = "identity", multi = "identity", categ = "identity",
     mvn = "identity", mvt = "identity",
     tweedie = "log",
+    beta_nb = "log",
     nmix = "log",
     "identity"
   )

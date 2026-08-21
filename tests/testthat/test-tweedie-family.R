@@ -268,3 +268,53 @@ test_that("tweedie() supports brms distributional regression on mphi", {
   sd <- standata(mf, data = dat, family = tweedie())
   expect_true(all(c("K_mphi", "X_mphi") %in% names(sd)))
 })
+
+
+# ---- custom-family dpar resolution in the forecast path -------------
+
+test_that("custom families resolve to their constructor name, not 'custom'", {
+  # brms records `family$family = "custom"` for every custom family, so
+  # any dispatcher reading that field directly looks up a family that
+  # has no registered distributional parameters. `forecast()` did read
+  # it directly, which silently dropped mphi / mtheta and left the
+  # Tweedie sampler with no dispersion or power parameter.
+  fam <- tweedie()
+  expect_identical(fam$family, "custom")
+  expect_length(mvgam:::get_family_dpars(tolower(fam$family)), 0L)
+
+  expect_identical(mvgam:::resolve_family_name(fam), "tweedie")
+  expect_identical(
+    mvgam:::get_family_dpars(mvgam:::resolve_family_name(fam)),
+    c("mphi", "mtheta")
+  )
+})
+
+test_that("resolve_resp_family() returns a usable dispatch key for custom families", {
+  stub <- structure(
+    list(family = tweedie(), formula = y ~ x), class = "mvgam"
+  )
+  expect_identical(mvgam:::resolve_resp_family(stub), "tweedie")
+
+  # Built-in families are unaffected, and Gamma still case-folds
+  gauss <- structure(
+    list(family = gaussian(), formula = y ~ x), class = "mvgam"
+  )
+  expect_identical(mvgam:::resolve_resp_family(gauss), "gaussian")
+  gam <- structure(
+    list(family = Gamma(), formula = y ~ x), class = "mvgam"
+  )
+  expect_identical(mvgam:::resolve_resp_family(gam), "gamma")
+})
+
+test_that("sample_from_family() accepts every dpar the registry can emit for it", {
+  # The forecast path splices the registry's dpar list into
+  # sample_from_family() rather than naming parameters one by one, so a
+  # family whose parameters have no matching argument would error at
+  # forecast time instead of at test time.
+  formals_avail <- names(formals(mvgam:::sample_from_family))
+  for (fam_name in c("tweedie", "com_binomial", "gaussian", "negbinomial",
+                     "beta", "student")) {
+    dpars <- mvgam:::get_family_dpars(fam_name)
+    expect_true(all(dpars %in% formals_avail))
+  }
+})

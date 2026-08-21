@@ -396,6 +396,22 @@ reference_db <- function() {
         sep = "\n"
       )
     ),
+    irwin_waring = list(
+      text = "Irwin JO (1968). The generalized Waring distribution applied to accident theory. Journal of the Royal Statistical Society: Series A (General), 131(2), 205-225. https://doi.org/10.2307/2343842",
+      bibtex = paste(
+        "@article{irwin1968waring,",
+        "  title = {The generalized {W}aring distribution applied to accident theory},",
+        "  author = {Irwin, J. O.},",
+        "  journal = {Journal of the Royal Statistical Society: Series A (General)},",
+        "  volume = {131},",
+        "  number = {2},",
+        "  pages = {205--225},",
+        "  year = {1968},",
+        "  doi = {10.2307/2343842}",
+        "}",
+        sep = "\n"
+      )
+    ),
     jorgensen_tweedie = list(
       text = "Jorgensen B (1987). Exponential dispersion models. Journal of the Royal Statistical Society: Series B (Methodological), 49(2), 127-162. https://doi.org/10.1111/j.2517-6161.1987.tb01685.x",
       bibtex = paste(
@@ -688,6 +704,11 @@ uses_tweedie_family <- function(object) {
 }
 
 #' @noRd
+uses_beta_nb_family <- function(object) {
+  family_name_is(object, "beta_nb")
+}
+
+#' @noRd
 uses_com_binomial_family <- function(object) {
   family_name_is(object, "com_binomial")
 }
@@ -767,6 +788,21 @@ uses_threading <- function(object) {
 # `methods_md()`'s Implementation block emits. Defaults stay
 # NA when the user accepted the brms / Stan default so callers
 # can branch on `is.na()` to decide whether to print.
+# An initial-value specification can be echoed back into a
+# reproduction call only when it is a single keyword. Numeric, list
+# and function starts are not printable, and neither is the temporary
+# file path Stan records in their place.
+#'@noRd
+printable_init <- function(init) {
+  if (is.null(init) || length(init) != 1L || !is.character(init)) {
+    return(NA_character_)
+  }
+  if (identical(init, "random") || !nzchar(init)) {
+    return(NA_character_)
+  }
+  init
+}
+
 #'@noRd
 extract_sampling_info <- function(object) {
   fit <- object$fit
@@ -775,10 +811,6 @@ extract_sampling_info <- function(object) {
   if (length(sa) == 0L) return(NULL)
   first <- sa[[1L]]
   ctl <- first$control
-  init_val <- first$init
-  has_explicit_init <- !is.null(init_val) &&
-    length(init_val) == 1L && is.character(init_val) &&
-    !identical(init_val, "random")
   list(
     chains        = length(sa),
     warmup        = first$warmup %||% NA_integer_,
@@ -792,7 +824,7 @@ extract_sampling_info <- function(object) {
     max_treedepth = if (is.null(ctl)) NA_integer_ else {
       as.integer(ctl$max_treedepth %||% NA_integer_)
     },
-    init          = if (has_explicit_init) init_val else NA_character_
+    init          = printable_init(first$init)
   )
 }
 
@@ -897,6 +929,16 @@ how_to_cite.mvgam <- function(object, ...) {
         " series of Dunn and Smyth (2005)."
       ),
       refs = c("jorgensen_tweedie", "dunn_smyth_tweedie")
+    ),
+    list(
+      detect = uses_beta_nb_family(object),
+      text = paste0(
+        " Counts were modelled with the beta negative binomial",
+        " family (Irwin 1968), which mixes the negative binomial",
+        " success probability over a beta distribution to give a",
+        " power-law rather than geometric tail."
+      ),
+      refs = "irwin_waring"
     ),
     list(
       detect = uses_com_binomial_family(object),

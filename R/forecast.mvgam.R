@@ -1239,8 +1239,11 @@ sample_family_batched <- function(object, mu, fc_data, ndraws_use,
   # `get_family_dpars` only matches lowercase keys; R's `Gamma()`
   # constructor stores `family$family = "Gamma"` and brms's mvbf
   # normalises to `"gamma"` -- both must resolve to the `shape`
-  # dpar lookup downstream.
-  family_name <- tolower(family$family)
+  # dpar lookup downstream. `resolve_family_name()` also recovers the
+  # constructor name for custom families, which brms records as the
+  # literal "custom" and which would otherwise resolve to no dpars at
+  # all, dropping `mphi` / `mtheta` and friends from the forecast.
+  family_name <- tolower(resolve_family_name(family))
   nobs <- ncol(mu)
   dpar_names <- get_family_dpars(family_name)
   dpars <- extract_dpars_from_stanfit(
@@ -1263,32 +1266,25 @@ sample_family_batched <- function(object, mu, fc_data, ndraws_use,
                                          nobs = nobs)
   }
 
-  samples <- sample_from_family(
-    family_name = family_name,
-    ndraws = ndraws_use,
-    epred = mu,
-    sigma = dpars$sigma,
-    phi = dpars$phi,
-    shape = dpars$shape,
-    nu = dpars$nu,
-    trials = trials,
-    hu = dpars$hu,
-    zi = dpars$zi,
-    zoi = dpars$zoi,
-    coi = dpars$coi,
-    alpha = dpars$alpha,
-    ndt = dpars$ndt,
-    xi = dpars$xi,
-    quantile = dpars$quantile,
-    kappa = dpars$kappa,
-    beta = dpars$beta,
-    bs = dpars$bs,
-    bias = dpars$bias,
-    disc = dpars$disc,
-    thres = dpars$thres,
-    lb = trunc_bounds$lb,
-    ub = trunc_bounds$ub
-  )
+  # Forward whichever distributional parameters the registry produced
+  # for this family instead of naming them one at a time. Reason: a
+  # hand-written list silently drops the parameters of any family added
+  # afterwards, which is how `mphi` / `mtheta` went missing from Tweedie
+  # forecasts. Names with no matching argument belong to families that
+  # reach their draws through a different path.
+  dpar_args <- dpars[intersect(names(dpars),
+                               names(formals(sample_from_family)))]
+  samples <- do.call(sample_from_family, c(
+    list(
+      family_name = family_name,
+      ndraws = ndraws_use,
+      epred = mu,
+      trials = trials,
+      lb = trunc_bounds$lb,
+      ub = trunc_bounds$ub
+    ),
+    dpar_args
+  ))
   matrix(samples, nrow = ndraws_use, ncol = nobs, byrow = FALSE)
 }
 

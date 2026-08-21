@@ -183,7 +183,7 @@ mv_resp_fan_out <- function(object, resp) {
 resolve_resp_family <- function(object, resp = NULL) {
   if (!is.null(resp) && inherits(object$formula, "mvbrmsformula")) {
     bf_i <- object$formula$forms[[resp]]
-    if (!is.null(bf_i$family)) return(bf_i$family$family)
+    if (!is.null(bf_i$family)) return(resolve_family_name(bf_i$family))
   }
-  object$family$family
+  resolve_family_name(object$family)
 }

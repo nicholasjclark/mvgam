@@ -1733,7 +1733,7 @@ validate_response_for_family <- function(y, family, y_name = "y") {
   is_integer_like <- all(y_nz == floor(y_nz))
 
   count_family <- fam %in% c("poisson", "negbinomial", "binomial",
-                              "beta_binomial", "bernoulli")
+                              "beta_binomial", "bernoulli", "beta_nb")
   if (count_family) {
     if (any(y_nz < 0)) {
       stop(insight::format_error(c(

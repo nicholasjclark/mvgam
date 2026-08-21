@@ -197,6 +197,11 @@ compute_family_epred <- function(linpred, family,
     # zero is absorbed into mu without any Jensen correction.
     "tweedie" = family$linkinv(linpred),
 
+    # Beta negative binomial: the family is parameterised so that
+    # E[Y] = mu exactly, with the shifted tail parameter absorbing
+    # the alpha > 1 constraint that makes the mean exist at all.
+    "beta_nb" = family$linkinv(linpred),
+
     # Conway-Maxwell-Binomial: count-scale `E[Y]` over the
     # `0:T` support needs the nu dispersion AND the trials
     # vector. Routes to `posterior_epred_com_binomial()` so the

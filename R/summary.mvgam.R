@@ -468,7 +468,7 @@ match_family_pars <- function(pars, has_dpar_formulas = character()) {
   # follow the same name convention as other observation-side
   # dpars and should appear in the Observation Model block.
   is_family <- grepl(
-    "^(sigma|shape|nu|phi|zi|hu|mphi|mtheta)(_|\\[|$)", pars
+    "^(sigma|shape|nu|phi|zi|hu|mphi|mtheta|mtail)(_|\\[|$)", pars
   )
   # Exclude trend parameters
   is_trend <- grepl("_trend", pars)

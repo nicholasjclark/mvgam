@@ -230,7 +230,28 @@ repeated calls within the same R session do not re-warn (the
 warning is rate-limited via \code{.frequency = "regularly"}).
 Defaults to \code{TRUE}.}
 
-\item{...}{Additional arguments passed to Stan fitting}
+\item{...}{Additional arguments passed to Stan fitting. Two are worth
+calling out. \code{algorithm} selects how the posterior is explored and
+accepts \code{"sampling"} (the default), \code{"meanfield"}, \code{"fullrank"} or
+\code{"fixed_param"} on either backend, plus \code{"pathfinder"} and
+\code{"laplace"} when \code{backend = "cmdstanr"}. \code{init} sets the starting
+values and accepts \code{"random"} (the default), \code{"0"}, a numeric
+value, a list or a function, and additionally \code{"pathfinder"} when
+\code{backend = "cmdstanr"}. The \code{"pathfinder"} keyword runs Stan's
+Pathfinder approximation on the compiled model and draws one
+starting value per chain from it. The posterior is still explored
+by the algorithm you asked for, so the fit remains exact.
+
+Treat \code{init = "pathfinder"} as a recovery option rather than a
+speedup. On models that already warm up cleanly it is slower, not
+faster: across random walk, autoregressive, correlated
+autoregressive and dynamic factor trends carrying 60 to 750 latent
+states, it added roughly a second of wall time, left warmup
+duration essentially unchanged, and returned 15 to 25 percent
+fewer effective samples per second. Its value is on models that
+struggle to leave a poor starting point at all, where the extra
+second buys a warmup that would otherwise stall or fill with
+divergences.}
 }
 \value{
 mvgam object with dual brmsfit-like structure
