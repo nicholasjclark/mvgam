@@ -174,13 +174,13 @@ the linear predictor for the state. Both enter through a second
 `bf()` arm.
 
 `occ()` implements the single-season occupancy model of
-[MacKenzie et al. (2002)](https://doi.org/10.1890/0012-9658\(2002\)083[2248:ESORWD]2.0.CO;2),
+[MacKenzie et al. (2002)](<https://doi.org/10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2>),
 which separates occupancy probability $\psi$ from per-visit
 detection probability. `nmix()` supports three observation
 processes chosen at the constructor: `"poisson_binomial"`
 follows [Royle (2004)](https://doi.org/10.1111/j.0006-341X.2004.00142.x),
 `"royle_nichols"` follows
-[Royle and Nichols (2003)](https://doi.org/10.1890/0012-9658\(2003\)084[0777:EAFRPA]2.0.CO;2),
+[Royle and Nichols (2003)](<https://doi.org/10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2>),
 and `"poisson_poisson"` treats each observed count as a noisy
 Poisson realisation of an underlying Poisson abundance.
 
@@ -316,6 +316,53 @@ z_{i, t} & \sim \text{Normal}\!\bigl(
   \rho_i^{\Delta_t} \, z_{i, t_{-}},\;
   \sigma_i \bigr)
 \end{align*}
+
+### Heavy-tailed innovations: `df`
+
+Every stochastic trend above draws its innovations from a Normal
+distribution, which spreads an occasional large shock across the
+whole series by inflating $\sigma$. Setting `df` on `AR()`, `RW()`,
+`CAR()` or `ZMVN()` replaces that with a multivariate Student-t, so
+the shock is absorbed by the tail and the process variance stays
+where the bulk of the data put it. This suits boom-and-bust
+population series and outbreak dynamics, where a single
+environmental event moves the whole system and then the usual
+dynamics resume.
+
+\begin{align*}
+\boldsymbol{\epsilon}_t & \sim
+  \text{MVStudentT}(\nu, \mathbf{0}, \Sigma)
+\end{align*}
+
+The default `df = Inf` gives the Normal innovations above, since a
+Student-t with infinite degrees of freedom is a Normal. `df = NA`
+estimates $\nu$, and a number above 2 fixes it.
+
+What the multivariate form shares between series is the innovation
+*scale* at each time point, not the shock itself. Large innovations
+therefore tend to occur together: at the 1% of time points where one
+series shocks hardest, another series is also large about half the
+time, against a baseline of roughly one time in ten. But each series
+still draws its own standard Normal, so the signs are independent and
+a series can sit out an event that moves its neighbours. Correlation
+between series is governed by `cor` exactly as it is for Normal
+innovations; the tail behaviour is layered on top of that rather than
+replacing it.
+
+Where `df = NA`, the degrees of freedom are estimated as `nu_trend`
+under a default `gamma(4, 0.3)` prior, which can be replaced through
+`prior`, for example `prior(gamma(2, 0.1), class = "nu_trend")`.
+
+Two things are worth knowing before reaching for it. The lower bound
+of 2 is required rather than conventional: below it the innovations
+have no finite variance and the stationary initialisation of an
+autoregressive trend is undefined. And $\nu$ is informed only
+through the tail of a latent process that is itself observed through
+the observation model, so it is weakly identified in short series;
+below roughly 200 time points expect the posterior to lean on its
+prior. `VAR()` and `PW()` do not take `df`, the first because it
+samples its states directly and the second because it is
+deterministic.
 
 ### Piecewise growth: `PW()`
 
@@ -791,10 +838,10 @@ MGP prior of Bhattacharya & Dunson
 trend implementation follows the Prophet specification of Taylor
 & Letham ([2018](https://doi.org/10.1080/00031305.2017.1380080)).
 Closure-unit families wrap the occupancy framework of MacKenzie
-et al. ([2002](https://doi.org/10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2))
+et al. ([2002](<https://doi.org/10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2>))
 and the N-mixture approaches of Royle
 ([2004](https://doi.org/10.1111/j.0006-341X.2004.00142.x)) and
-Royle & Nichols ([2003](https://doi.org/10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2)).
+Royle & Nichols ([2003](<https://doi.org/10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2>)).
 The multispecies forecasting framing follows Clark et al.
 ([2025](https://doi.org/10.7717/peerj.18929)).
 
@@ -834,7 +881,7 @@ MacKenzie, D. I., Nichols, J. D., Lachman, G. B., Droege, S.,
 Royle, J. A. and Langtimm, C. A. (2002). Estimating site
 occupancy rates when detection probabilities are less than one.
 *Ecology* 83(8), 2248-2255.
-[doi:10.1890/0012-9658(2002)083\[2248:ESORWD\]2.0.CO;2](https://doi.org/10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2)
+[doi:10.1890/0012-9658(2002)083\[2248:ESORWD\]2.0.CO;2](<https://doi.org/10.1890/0012-9658(2002)083[2248:ESORWD]2.0.CO;2>)
 
 Royle, J. A. (2004). N-mixture models for estimating population
 size from spatially replicated counts. *Biometrics* 60, 108-115.
@@ -843,7 +890,7 @@ size from spatially replicated counts. *Biometrics* 60, 108-115.
 Royle, J. A. and Nichols, J. D. (2003). Estimating abundance
 from repeated presence-absence data or point counts. *Ecology*
 84(3), 777-790.
-[doi:10.1890/0012-9658(2003)084\[0777:EAFRPA\]2.0.CO;2](https://doi.org/10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2)
+[doi:10.1890/0012-9658(2003)084\[0777:EAFRPA\]2.0.CO;2](<https://doi.org/10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2>)
 
 Taylor, S. and Letham, B. (2018). Forecasting at scale. *The
 American Statistician* 72(1), 37-45.

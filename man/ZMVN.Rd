@@ -11,7 +11,8 @@ ZMVN(
   subgr = NA,
   n_lv = NULL,
   cor = TRUE,
-  trend_map = NULL
+  trend_map = NULL,
+  df = Inf
 )
 }
 \arguments{
@@ -91,6 +92,42 @@ as this is essential for optimal performance.}
 process each series maps onto, giving fixed (rather than estimated)
 loadings for dynamic factor models. See \code{\link{mvgam}} for the
 required format. Defaults to \code{NULL}.}
+
+\item{df}{Degrees of freedom for the latent process innovations.
+Defaults to \code{Inf}, which gives the Gaussian innovations mvgam
+has always used, since a t with infinite degrees of freedom is a
+normal. Set \code{df = NA} to estimate them, or supply a number
+above \code{2} to fix them.
+
+Finite degrees of freedom let the latent process absorb an
+occasional large shock without inflating \code{sigma_trend}
+everywhere, which suits boom-and-bust population series and
+outbreak dynamics. The innovations follow a multivariate t, which
+shares the innovation \emph{scale} across series at each time
+point. Large innovations therefore tend to occur together, but
+each series keeps its own direction and magnitude: a shock in one
+series says nothing about the sign of the others, and a series can
+sit out an event that moves its neighbours. Correlation between
+series is governed by \code{cor} exactly as it is for Gaussian
+innovations; the tail behaviour is layered on top of it.
+
+When \code{df = NA} the degrees of freedom are estimated as
+\code{nu_trend}, with a default \code{gamma(4, 0.3)} prior that
+can be replaced through the \code{prior} argument, for example
+\code{prior(gamma(2, 0.1), class = "nu_trend")}. Note that
+\code{nu_trend} does not yet appear in the
+\code{\link{get_prior}} table, so the class name has to come
+from here.
+
+Two caveats. The bound of \code{2} is required rather than
+conventional: below it the innovations have no finite variance and
+the stationary initialisation of an autoregressive trend is
+undefined. And the degrees of freedom are informed only through
+the tail of the latent process, so they are weakly identified in
+short series; expect the posterior to lean on its prior below
+roughly 200 time points. Not available for \code{VAR()}, which
+samples its states directly, or \code{PW()}, which has no
+innovations.}
 }
 \value{
 An object of class \code{mvgam_trend}, which contains a list of

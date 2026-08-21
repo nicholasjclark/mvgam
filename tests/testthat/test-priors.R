@@ -805,3 +805,138 @@ test_that("get_prior.mvgam errors clearly when fit lacks any prior info", {
   )
   expect_error(get_prior(stub), "prior table")
 })
+
+
+# ---- mvgam's injected defaults must not block user priors -----------
+
+prior_test_data <- function() {
+  set.seed(1)
+  d <- expand.grid(time = 1:60, series = factor(paste0("s", 1:3)))
+  d$y <- rpois(nrow(d), 5)
+  d
+}
+
+prior_code <- function(mf, fam, pr = NULL, data = prior_test_data()) {
+  paste(unlist(stancode(mf, data = data, family = fam, prior = pr,
+                        backend = "cmdstanr")), collapse = "\n")
+}
+
+test_that("merge_default_priors() drops defaults the user has claimed", {
+  # Concatenating leaves two rows for the same class, and brms refuses
+  # the whole set with "Duplicated prior specifications are not
+  # allowed", so a user trying to override a default got an error
+  # rather than their prior.
+  defaults <- c(brms::prior("gamma(2, 0.5)", class = "shape"),
+                brms::prior("gamma(2, 0.25)", class = "mtail"))
+  user <- brms::prior("gamma(3, 1)", class = "shape")
+
+  merged <- mvgam:::merge_default_priors(defaults, user, y ~ 1)
+  expect_equal(sum(merged$class == "shape"), 1L)
+  expect_true("gamma(3, 1)" %in% merged$prior)
+  expect_false("gamma(2, 0.5)" %in% merged$prior)
+  # the default the user did not name survives
+  expect_true("gamma(2, 0.25)" %in% merged$prior)
+})
+
+test_that("merge_default_priors() passes both sides through untouched", {
+  defaults <- brms::prior("gamma(2, 0.5)", class = "shape")
+  expect_equal(
+    nrow(mvgam:::merge_default_priors(defaults, NULL, y ~ 1)), 1L
+  )
+  user <- brms::prior("normal(0, 1)", class = "b")
+  merged <- mvgam:::merge_default_priors(defaults, user, y ~ 1)
+  expect_setequal(merged$class, c("shape", "b"))
+})
+
+test_that("beta_nb() default priors can be overridden", {
+  mf <- mvgam_formula(y ~ 1)
+  sc_default <- prior_code(mf, beta_nb())
+  expect_true(grepl("gamma_lpdf(shape | 2, 0.5)", sc_default, fixed = TRUE))
+  expect_true(grepl("gamma_lpdf(mtail | 2, 0.25)", sc_default, fixed = TRUE))
+
+  sc_shape <- prior_code(mf, beta_nb(),
+                         brms::prior("gamma(3, 1)", class = "shape"))
+  expect_true(grepl("gamma_lpdf(shape | 3, 1)", sc_shape, fixed = TRUE))
+  expect_false(grepl("gamma_lpdf(shape | 2, 0.5)", sc_shape, fixed = TRUE))
+  # the parameter the user left alone keeps its default
+  expect_true(grepl("gamma_lpdf(mtail | 2, 0.25)", sc_shape, fixed = TRUE))
+
+  sc_both <- prior_code(mf, beta_nb(),
+                        c(brms::prior("gamma(3, 1)", class = "shape"),
+                          brms::prior("gamma(5, 2)", class = "mtail")))
+  expect_true(grepl("gamma_lpdf(shape | 3, 1)", sc_both, fixed = TRUE))
+  expect_true(grepl("gamma_lpdf(mtail | 5, 2)", sc_both, fixed = TRUE))
+})
+
+test_that("com_binomial() default prior can be overridden", {
+  set.seed(4)
+  dat <- data.frame(
+    y = rbinom(40, 10, 0.5), trials = 10L, time = 1:40,
+    series = factor(rep("series1", 40))
+  )
+  sc <- prior_code(mvgam_formula(y | trials(trials) ~ 1), com_binomial(),
+                   brms::prior("normal(2, 1)", class = "nu"), data = dat)
+  expect_true(grepl("normal_lpdf(nu | 2, 1)", sc, fixed = TRUE))
+  expect_false(grepl("normal_lpdf(nu | 1, 0.5)", sc, fixed = TRUE))
+})
+
+test_that("nu_trend default prior can be overridden", {
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1, df = NA))
+  sc_default <- prior_code(mf, poisson())
+  expect_true(grepl("nu_trend ~ gamma(4, 0.3)", sc_default, fixed = TRUE))
+
+  sc_user <- prior_code(mf, poisson(),
+                        brms::prior("gamma(2, 0.1)", class = "nu_trend"))
+  expect_true(grepl("nu_trend ~ gamma(2, 0.1)", sc_user, fixed = TRUE))
+  expect_false(grepl("gamma(4, 0.3)", sc_user, fixed = TRUE))
+})
+
+test_that("beta_nb() distributional parameters are discoverable", {
+  p <- get_prior(mvgam_formula(y ~ 1), data = prior_test_data(),
+                 family = beta_nb())
+  expect_true("shape" %in% p$class)
+  expect_true("mtail" %in% p$class)
+})
+
+
+test_that("nu_trend is discoverable through get_prior()", {
+  # Being able to override a prior is not much use if the class name
+  # only appears in a help page. It must be listed alongside
+  # sigma_trend and the autoregressive coefficients.
+  d <- prior_test_data()
+  p_est <- get_prior(
+    mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1, df = NA)),
+    data = d, family = poisson()
+  )
+  expect_true("nu_trend" %in% p_est$class)
+  row <- p_est[p_est$class == "nu_trend", ]
+  expect_identical(row$prior, "gamma(4, 0.3)")
+  # the bound is required, not conventional: below 2 the innovations
+  # have no finite variance
+  expect_identical(row$lb, "2")
+})
+
+test_that("nu_trend is absent unless the degrees of freedom are estimated", {
+  d <- prior_test_data()
+  p_gauss <- get_prior(
+    mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1)),
+    data = d, family = poisson()
+  )
+  expect_false("nu_trend" %in% p_gauss$class)
+
+  # a fixed df has no parameter to place a prior on either
+  p_fixed <- get_prior(
+    mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1, df = 7)),
+    data = d, family = poisson()
+  )
+  expect_false("nu_trend" %in% p_fixed$class)
+})
+
+test_that("nu_trend appears for every trend type that supports df", {
+  d <- prior_test_data()
+  for (tf in list(~ AR(p = 1, df = NA), ~ RW(df = NA), ~ ZMVN(df = NA))) {
+    p <- get_prior(mvgam_formula(y ~ 1, trend_formula = tf),
+                   data = d, family = poisson())
+    expect_true("nu_trend" %in% p$class)
+  }
+})

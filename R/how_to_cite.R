@@ -396,6 +396,19 @@ reference_db <- function() {
         sep = "\n"
       )
     ),
+    durbin_koopman_ssm = list(
+      text = "Durbin J and Koopman SJ (2012). Time Series Analysis by State Space Methods (2nd edition). Oxford University Press.",
+      bibtex = paste(
+        "@book{durbin2012ssm,",
+        "  title = {Time Series Analysis by State Space Methods},",
+        "  author = {Durbin, James and Koopman, Siem Jan},",
+        "  publisher = {Oxford University Press},",
+        "  edition = {2},",
+        "  year = {2012}",
+        "}",
+        sep = "\n"
+      )
+    ),
     irwin_waring = list(
       text = "Irwin JO (1968). The generalized Waring distribution applied to accident theory. Journal of the Royal Statistical Society: Series A (General), 131(2), 205-225. https://doi.org/10.2307/2343842",
       bibtex = paste(
@@ -708,6 +721,15 @@ uses_beta_nb_family <- function(object) {
   family_name_is(object, "beta_nb")
 }
 
+# Heavy-tailed latent innovations are a modelling choice worth
+# describing, so the methods text reports them rather than leaving the
+# process implicitly Gaussian.
+#' @noRd
+uses_heavy_tailed_trend <- function(object) {
+  df <- object$trend_metadata$df %||% Inf
+  !is_gaussian_df(df)
+}
+
 #' @noRd
 uses_com_binomial_family <- function(object) {
   family_name_is(object, "com_binomial")
@@ -929,6 +951,20 @@ how_to_cite.mvgam <- function(object, ...) {
         " series of Dunn and Smyth (2005)."
       ),
       refs = c("jorgensen_tweedie", "dunn_smyth_tweedie")
+    ),
+    list(
+      detect = uses_heavy_tailed_trend(object),
+      text = paste0(
+        " Innovations of the latent process were given a multivariate",
+        " Student-t distribution rather than a Gaussian one, so that",
+        " an occasional large shock is absorbed by the tail instead of",
+        " inflating the process variance throughout the series",
+        " (Durbin and Koopman 2012). The innovation scale is shared",
+        " across series at each time point, so large innovations tend",
+        " to occur together while each series keeps its own direction",
+        " and magnitude."
+      ),
+      refs = "durbin_koopman_ssm"
     ),
     list(
       detect = uses_beta_nb_family(object),

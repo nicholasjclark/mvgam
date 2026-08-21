@@ -951,6 +951,36 @@ default_com_binomial_population_priors <- function() {
 }
 
 
+#' Merge mvgam's default priors with the user's
+#'
+#' mvgam injects class-level defaults for parameters whose brms
+#' fallback is unsuitable. Concatenating them with a user prior that
+#' names the same class leaves two rows for it, and brms refuses the
+#' whole set with "Duplicated prior specifications are not allowed",
+#' so a user who tries to override a default gets an error instead of
+#' their prior. Drop any default the user has already spoken for,
+#' after re-aiming those whose dpar is modelled.
+#'
+#' @param defaults A `brmsprior` of mvgam defaults
+#' @param user_prior The user's `brmsprior`, possibly `NULL`
+#' @param formula The observation formula
+#' @param family The family object
+#' @return A `brmsprior` combining both, with no duplicated classes
+#' @noRd
+merge_default_priors <- function(defaults, user_prior, formula,
+                                 family = NULL) {
+  defaults <- adjust_modelled_dpar_priors(defaults, formula, family)
+  if (is.null(defaults) || nrow(defaults) == 0L) {
+    return(user_prior)
+  }
+  if (!is.null(user_prior) && nrow(user_prior) > 0L) {
+    taken <- paste(user_prior$class, user_prior$coef, user_prior$dpar)
+    keys <- paste(defaults$class, defaults$coef, defaults$dpar)
+    defaults <- defaults[!(keys %in% taken), , drop = FALSE]
+  }
+  c(defaults, user_prior)
+}
+
 #' Re-aim injected dpar priors when the user models that dpar
 #'
 #' mvgam injects class-level defaults for family-specific

@@ -48,6 +48,7 @@
 #'   \item{sigma_trend}{Innovation standard deviation (RW, AR, CAR trends)}
 #'   \item{LV}{Latent variables (all trends with state-space structure)}
 #'   \item{ar1_trend}{AR(1) coefficient (AR, CAR trends)}
+#'   \item{nu_trend}{Innovation degrees of freedom when `df = NA`}
 #'   \item{Z}{Factor loadings matrix for factor models}
 #' }
 #'
@@ -73,6 +74,13 @@ common_trend_priors <- list(
     bounds = c(-1, 1),
     description = "AR(1) coefficient",
     dimension = "vector"
+  ),
+
+  nu_trend = list(
+    default = "gamma(4, 0.3)",
+    bounds = c(2, NA),
+    description = "Innovation degrees of freedom",
+    dimension = "scalar"
   ),
 
   alpha_cor_trend = list(
@@ -391,7 +399,15 @@ get_parameter_type_default_prior <- function(param_name) {
   checkmate::assert_string(param_name)
 
   # Pattern matching for common parameter types
-  if (grepl("^ar[0-9]+_trend$", param_name)) {
+  if (identical(param_name, "nu_trend")) {
+    # Innovation degrees of freedom. The lower bound of 2 is required
+    # rather than conventional: below it the innovations have no finite
+    # variance and the stationary initialisation of an autoregressive
+    # trend is undefined.
+    return(list(
+      prior = common_trend_priors$nu_trend$default, lb = "2", ub = ""
+    ))
+  } else if (grepl("^ar[0-9]+_trend$", param_name)) {
     # AR coefficients: typically bounded [-1, 1] for stationarity
     return(list(prior = "normal(0, 0.5)", lb = "-1", ub = "1"))
   } else if (grepl("^mu_ar[0-9]+_trend$", param_name)) {
@@ -678,7 +694,7 @@ get_all_mvgam_trend_parameters <- function(trend_specs) {
   }
   
   # Add base parameters that all trends have
-  all_mvgam_params <- c(all_mvgam_params, "sigma_trend")
+  all_mvgam_params <- c(all_mvgam_params, "sigma_trend", "nu_trend")
   
   unique(all_mvgam_params)
 }

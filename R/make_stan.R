@@ -236,21 +236,19 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
       backend, "2.36.0",
       feature = "'sum_to_zero_vector[K]' for simplex families"
     )
-    prior <- c(default_simplex_population_priors(), prior)
+    prior <- merge_default_priors(
+      default_simplex_population_priors(), prior, obs_formula, family
+    )
   }
   # The COM-Binomial dispersion `nu` would otherwise inherit brms's
   # `(flat)` default, which gives the upper tail of `nu` unbounded
   # support and drives HMC treedepth saturation. Inject the gate-A
-  # stats-review default `normal(1, 0.5)` ahead of user priors so
-  # any user override still wins (priors merge keeps the last row
-  # per class/coef key). The per-fit data stanvars are attached
-  # earlier via `prepare_com_binomial_family()`.
+  # stats-review default `normal(1, 0.5)`, which `merge_default_priors()`
+  # drops if the user named the same class. The per-fit data stanvars
+  # are attached earlier via `prepare_com_binomial_family()`.
   if (is_com_binomial_family(family)) {
-    prior <- c(
-      adjust_modelled_dpar_priors(
-        default_com_binomial_population_priors(), obs_formula, family
-      ),
-      prior
+    prior <- merge_default_priors(
+      default_com_binomial_population_priors(), prior, obs_formula, family
     )
   }
   # The beta negative binomial `shape` would otherwise inherit brms's
@@ -259,11 +257,8 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
   # `mtail` would inherit `(flat)`. Both defaults are injected ahead
   # of user priors so any user override still wins.
   if (is_beta_nb_family(family)) {
-    prior <- c(
-      adjust_modelled_dpar_priors(
-        default_beta_nb_population_priors(), obs_formula, family
-      ),
-      prior
+    prior <- merge_default_priors(
+      default_beta_nb_population_priors(), prior, obs_formula, family
     )
   }
   # Filter priors: only pass observation-related priors to observation setup

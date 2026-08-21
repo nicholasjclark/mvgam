@@ -673,3 +673,50 @@ test_that("hierarchical transform produces non-trivial within-group cor", {
   expect_equal(cor_within_g1, rho, tolerance = 0.05)
   expect_equal(cor_within_g2, rho, tolerance = 0.05)
 })
+
+
+# ---- innovation degrees of freedom on the forecast path -------------
+
+test_that("extract_nu_trend_draws() covers all three sources", {
+  # This is the join between the fitted model and the forecast draw.
+  # If it returns the wrong thing, a model fits with heavy tails and
+  # forecasts Gaussian without any error being raised.
+  dm <- matrix(rnorm(40), nrow = 10, ncol = 4)
+  colnames(dm) <- c("Intercept", "sigma_trend[1]", "ar1_trend[1]", "lp__")
+
+  # Gaussian trend: nothing to carry
+  gaussian_fit <- list(trend_metadata = list(df = Inf))
+  expect_null(mvgam:::extract_nu_trend_draws(dm, gaussian_fit))
+
+  # A fit made before this feature existed has no df at all
+  legacy_fit <- list(trend_metadata = list())
+  expect_null(mvgam:::extract_nu_trend_draws(dm, legacy_fit))
+
+  # Fixed degrees of freedom are repeated across draws, because no
+  # posterior column exists for them
+  fixed_fit <- list(trend_metadata = list(df = 7))
+  expect_identical(
+    mvgam:::extract_nu_trend_draws(dm, fixed_fit), rep(7, 10)
+  )
+
+  # Estimated degrees of freedom come from the posterior column and
+  # take precedence over whatever the metadata says
+  dm_est <- cbind(dm, nu_trend = seq_len(10) + 2)
+  est_fit <- list(trend_metadata = list(df = NA_real_))
+  expect_identical(
+    mvgam:::extract_nu_trend_draws(dm_est, est_fit), as.numeric(2 + 1:10)
+  )
+  # a stale metadata value must not win over the posterior column
+  expect_identical(
+    mvgam:::extract_nu_trend_draws(dm_est, fixed_fit), as.numeric(2 + 1:10)
+  )
+})
+
+test_that("extract_nu_trend_draws() returns nothing for an unfitted df", {
+  # `df = NA` means "estimate", so before a fit exists there is no value
+  # to forecast with; the caller falls back to Gaussian draws.
+  dm <- matrix(0, 5, 1, dimnames = list(NULL, "Intercept"))
+  expect_null(
+    mvgam:::extract_nu_trend_draws(dm, list(trend_metadata = list(df = NA)))
+  )
+})

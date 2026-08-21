@@ -478,6 +478,23 @@ covariance_param_specs <- list(
 #'   order from posterior sort); reshape via
 #'   matrix(vec, dim, dim, byrow = TRUE) to get L.
 #'
+# Per-draw innovation degrees of freedom for forecasting.
+#
+# Returns NULL when the trend has Gaussian innovations, a length-ndraws
+# vector of posterior draws when they were estimated, and a repeated
+# constant when they were fixed at a finite value on the constructor.
+#'@noRd
+extract_nu_trend_draws <- function(draws_mat, object) {
+  if ("nu_trend" %in% colnames(draws_mat)) {
+    return(as.numeric(draws_mat[, "nu_trend"]))
+  }
+  df <- object$trend_metadata$df %||% Inf
+  if (is_gaussian_df(df) || is.na(df)) {
+    return(NULL)
+  }
+  rep(as.numeric(df), nrow(draws_mat))
+}
+
 #' @noRd
 get_trend_covariance_structure <- function(object, ndraws = NULL,
                                            draw_ids = NULL) {
@@ -589,6 +606,10 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
     is_lv = is_lv,
     n_obs_series = as.integer(n_obs_series),
     draws_mat = if (is_lv) draws_mat else NULL,
+    # Per-draw innovation degrees of freedom, NULL for Gaussian trends.
+    # Carried here so `sample_innovations()` draws from the same
+    # distribution the model was fitted with.
+    nu_trend = extract_nu_trend_draws(draws_mat, object),
     # Threaded to `resolve_factor_loadings()` so fixed-Z fits
     # skip the Z[i, j] posterior lookup that does not exist when
     # Z is supplied as Stan data.
@@ -1067,12 +1088,17 @@ sample_innovations <- function(cov_structure, obs_structure) {
     effective_pattern <- "diagonal"
   }
 
-  # Generate standard normals for entire (time, series) grid
-  z <- matrix(
-    rnorm(ndraws * n_times * n_series),
-    ndraws,
-    n_times * n_series
-  )
+  # Standardised innovations for the entire (time, series) grid, drawn
+  # from whichever distribution the model was fitted with. The mixing
+  # value is shared across series within a (draw, time) cell, matching
+  # the multivariate t in the Stan model rather than giving each series
+  # its own independent tail.
+  nu <- cov_structure$nu_trend
+  z <- matrix(0, ndraws, n_times * n_series)
+  for (d in seq_len(ndraws)) {
+    df_d <- if (is.null(nu)) Inf else nu[[d]]
+    z[d, ] <- as.numeric(draw_trend_innovations(n_times, n_series, df_d))
+  }
 
   # Transform by covariance pattern. Hierarchical Cholesky uses a
   # different structure (per-group convex combination of correlations),
@@ -1699,4 +1725,44 @@ transform_hierarchical_cholesky_innovations <- function(z, params, n_times,
   }
 
   result
+}
+
+
+# Draw standardised trend innovations for forecasting.
+#
+# Mirrors the Stan sampling statement built by
+# `innovation_sampling_code()`. Draws are at the identity scale and the
+# caller applies the covariance transform, exactly as the Stan
+# transformed-parameters block does, so the two sides cannot drift
+# apart in the distribution they assume.
+#
+# A multivariate t is drawn as a scale mixture with one mixing value
+# per row, shared across series. Sharing the scale makes large
+# innovations tend to occur together in time; it does not make the
+# series move together, since each still draws its own standard normal
+# and so keeps its own direction and magnitude.
+#
+# `df` here is always `Inf` or a finite value: when the degrees of
+# freedom are estimated the caller passes the posterior draw, never NA.
+#'@noRd
+draw_trend_innovations <- function(n_draws, n_series, df = Inf) {
+  checkmate::assert_int(n_draws, lower = 0L)
+  checkmate::assert_int(n_series, lower = 1L)
+  z <- matrix(stats::rnorm(n_draws * n_series), n_draws, n_series)
+  if (is_gaussian_df(df)) {
+    return(z)
+  }
+  # Repeated from `assert_trend_df()` on purpose. That runs once at the
+  # constructor; this runs on every forecast draw, where the value
+  # arrives from a posterior column rather than from the user, so a
+  # corrupted or out-of-range draw is caught before it silently
+  # produces innovations with no finite variance.
+  checkmate::assert_number(df, finite = TRUE)
+  if (df <= 2) {
+    stop(insight::format_error(
+      "Innovation 'df' must be greater than 2 to have finite variance."
+    ))
+  }
+  u <- 1 / stats::rgamma(n_draws, shape = df / 2, rate = df / 2)
+  z * sqrt(u)
 }

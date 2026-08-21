@@ -686,6 +686,17 @@ generate_monitor_params <- function(trend_spec) {
     character(0)
   }
 
+  # Estimated innovation degrees of freedom. Listed here so the
+  # parameter reaches `get_prior()` alongside `sigma_trend` and the
+  # autoregressive coefficients, rather than being overridable only by
+  # a user who already knows the class name. Absent when the
+  # innovations are Gaussian or the degrees of freedom are fixed.
+  df_params <- if (is.na(trend_spec$df %||% Inf)) {
+    "nu_trend"
+  } else {
+    character(0)
+  }
+
   # Add hierarchical correlation parameters if grouping is specified
   hierarchical_params <- if (!is.null(trend_spec$gr) && trend_spec$gr != "NA") {
     c("alpha_cor_trend", "L_Omega_global_trend", "L_deviation_group_trend", "sigma_group_trend")
@@ -694,7 +705,10 @@ generate_monitor_params <- function(trend_spec) {
   }
 
   # Combine all parameters
-  all_params <- unique(c(base_params, trend_specific, correlation_params, factor_params, hierarchical_params))
+  all_params <- unique(c(
+    base_params, trend_specific, correlation_params, factor_params,
+    df_params, hierarchical_params
+  ))
 
   return(all_params)
 }
@@ -2007,6 +2021,41 @@ print.mvgam_trend <- function(x, ...) {
 #' and piecewise trends (PW). These functions do not evaluate their arguments
 #' – they exist purely to help set up models with particular trend structures.
 #'
+#' @param df Degrees of freedom for the latent process innovations.
+#'   Defaults to \code{Inf}, which gives the Gaussian innovations mvgam
+#'   has always used, since a t with infinite degrees of freedom is a
+#'   normal. Set \code{df = NA} to estimate them, or supply a number
+#'   above \code{2} to fix them.
+#'
+#'   Finite degrees of freedom let the latent process absorb an
+#'   occasional large shock without inflating \code{sigma_trend}
+#'   everywhere, which suits boom-and-bust population series and
+#'   outbreak dynamics. The innovations follow a multivariate t, which
+#'   shares the innovation \emph{scale} across series at each time
+#'   point. Large innovations therefore tend to occur together, but
+#'   each series keeps its own direction and magnitude: a shock in one
+#'   series says nothing about the sign of the others, and a series can
+#'   sit out an event that moves its neighbours. Correlation between
+#'   series is governed by \code{cor} exactly as it is for Gaussian
+#'   innovations; the tail behaviour is layered on top of it.
+#'
+#'   When \code{df = NA} the degrees of freedom are estimated as
+#'   \code{nu_trend}, with a default \code{gamma(4, 0.3)} prior that
+#'   can be replaced through the \code{prior} argument, for example
+#'   \code{prior(gamma(2, 0.1), class = "nu_trend")}. Note that
+#'   \code{nu_trend} does not yet appear in the
+#'   \code{\link{get_prior}} table, so the class name has to come
+#'   from here.
+#'
+#'   Two caveats. The bound of \code{2} is required rather than
+#'   conventional: below it the innovations have no finite variance and
+#'   the stationary initialisation of an autoregressive trend is
+#'   undefined. And the degrees of freedom are informed only through
+#'   the tail of the latent process, so they are weakly identified in
+#'   short series; expect the posterior to lean on its prior below
+#'   roughly 200 time points. Not available for \code{VAR()}, which
+#'   samples its states directly, or \code{PW()}, which has no
+#'   innovations.
 #' @param ma \code{Logical}. Include moving average terms of order \code{1}?
 #'   Default is \code{FALSE}.
 #'
@@ -2420,7 +2469,8 @@ RW = function(
     gr = NA,
     subgr = NA,
     n_lv = NULL,
-    trend_map = NULL) {
+    trend_map = NULL,
+    df = Inf) {
 
   # Basic input validation for trend-specific parameters
   checkmate::assert_logical(ma, len = 1)
@@ -2435,6 +2485,7 @@ RW = function(
   # scope.
   trend_obj <- create_mvgam_trend(
     "RW",  # Base trend type used for ALL dispatch
+    df = assert_trend_df(df),
     .time = substitute(time),
     .series = substitute(series),
     .gr = substitute(gr),
@@ -2456,7 +2507,8 @@ RW = function(
 #' @export
 AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE,
               gr = NA, subgr = NA, n_lv = NULL, trend_map = NULL,
-              coef_sharing = c("none", "shared", "hierarchical")) {
+              coef_sharing = c("none", "shared", "hierarchical"),
+              df = Inf) {
   # Validate AR order parameter
   if (length(p) == 1) {
     checkmate::assert_int(p, lower = 1)
@@ -2475,6 +2527,7 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE,
   # fit time via `normalise_trend_map()`.
   trend_obj <- create_mvgam_trend(
     "AR",  # Base trend type used for ALL dispatch
+    df = assert_trend_df(df),
     .time = substitute(time),
     .series = substitute(series),
     .gr = substitute(gr),
@@ -2493,12 +2546,13 @@ AR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = FALSE,
 
 #' @rdname trend_constructors
 #' @export
-CAR = function(time = NA, series = NA) {
+CAR = function(time = NA, series = NA, df = Inf) {
   # CAR only supports first-order continuous autoregression (p=1)
   # Use helper function for clean object creation
   # All validation logic moved to validation layer (handles irregular time intervals, etc.)
   create_mvgam_trend(
     "CAR",  # Base trend type used for ALL dispatch
+    df = assert_trend_df(df),
     .time = substitute(time),
     .series = substitute(series),
     # CAR doesn't support gr, subgr, or n_lv - leave them as NULL
@@ -2897,7 +2951,8 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #'
 #' @export
 ZMVN = function(time = NA, series = NA, gr = NA, subgr = NA,
-                 n_lv = NULL, cor = TRUE, trend_map = NULL) {
+                 n_lv = NULL, cor = TRUE, trend_map = NULL,
+                 df = Inf) {
   # Basic parameter validation for n_lv if provided
   if (!is.null(n_lv)) {
     checkmate::assert_int(n_lv, lower = 1, null.ok = TRUE)
@@ -2922,6 +2977,7 @@ ZMVN = function(time = NA, series = NA, gr = NA, subgr = NA,
   # All validation logic moved to validation layer
   create_mvgam_trend(
     "ZMVN",  # Base trend type used for ALL dispatch
+    df = assert_trend_df(df),
     .time = substitute(time),
     .series = substitute(series),
     .gr = substitute(gr),
@@ -3271,4 +3327,53 @@ add_consistent_dispatch_metadata <- function(trend_obj) {
   trend_obj$stanvar_generator <- get_trend_dispatch_function(trend_type, "stanvar")
 
   return(trend_obj)
+}
+
+
+# Validate innovation degrees of freedom supplied to a trend
+# constructor. `Inf` keeps the Gaussian innovations mvgam has always
+# used, since a t with infinite degrees of freedom is a normal. `NA`
+# estimates them. A finite value fixes them and must exceed 2: the
+# stationary initialisation of an autoregressive trend divides by
+# `sqrt(1 - phi^2)`, which presumes the innovations have a finite
+# second moment, and a t has one only above 2 degrees of freedom.
+#' @noRd
+assert_trend_df <- function(df) {
+  usage <- paste0(
+    "Use 'df = Inf' for Gaussian innovations, 'df = NA' to estimate ",
+    "the degrees of freedom, or a number above 2 to fix them."
+  )
+  if (length(df) != 1L || !(is.numeric(df) || is.logical(df))) {
+    stop(insight::format_error(c(
+      "Argument 'df' must be a single number, 'Inf' or 'NA'.",
+      x = paste0("Got an object of class '", class(df)[1], "' of length ",
+                 length(df), "."),
+      i = usage
+    )))
+  }
+  if (is.na(df)) {
+    return(NA_real_)
+  }
+  df <- as.numeric(df)
+  if (is.infinite(df)) {
+    if (df < 0) {
+      stop(insight::format_error(c(
+        "Argument 'df' must be positive.",
+        x = "Got '-Inf'.",
+        i = usage
+      )))
+    }
+    return(Inf)
+  }
+  if (df <= 2) {
+    stop(insight::format_error(c(
+      "Argument 'df' must be greater than 2.",
+      x = paste0("Got 'df = ", df, "'."),
+      i = paste0(
+        "At or below 2 the innovations have no finite variance, so the ",
+        "stationary initialisation of an autoregressive trend is undefined."
+      )
+    )))
+  }
+  df
 }

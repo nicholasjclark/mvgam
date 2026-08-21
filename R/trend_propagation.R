@@ -165,9 +165,7 @@ propagate_car <- function(params, h, n_series, last_state, time) {
   } else {
     rep(0, n_series)
   }
-  innovations <- matrix(
-    stats::rnorm(h * n_series), nrow = h, ncol = n_series
-  )
+  innovations <- draw_trend_innovations(h, n_series, params$df %||% Inf)
   car1_recursC(
     phi = phi, sigma = sigma, time_dis = as.numeric(time),
     innovations = innovations, last_trend = last_trend, h = h
@@ -679,6 +677,9 @@ enrich_trend_metadata <- function(trend_metadata, trend_specs) {
   )
   trend_metadata$has_cor <- isTRUE(spec$cor)
   trend_metadata$n_lv <- spec$n_lv
+  # Innovation degrees of freedom, so forecasts draw from the same
+  # distribution the model was fitted with rather than always normal.
+  trend_metadata$df <- spec$df %||% Inf
   # When the user supplied `trend_map`, the normaliser stashed
   # the canonical numeric Z on `spec$fixed_Z` upstream. Persist
   # it on the fit's trend_metadata so `resolve_factor_loadings()`

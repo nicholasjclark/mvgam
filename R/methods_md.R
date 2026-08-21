@@ -2318,26 +2318,41 @@ innovation_rows <- function(obj, is_vector, has_cor, gr = NULL) {
   sig <- sigma_symbol(gr)
   eps_vec <- trend_eps_vec(obj)
 
+  # Heavy-tailed innovations report as a Student-t rather than a normal,
+  # with the degrees of freedom carried alongside the scale. The
+  # univariate row still uses the multivariate form when several series
+  # share one process, because the shared tail is what distinguishes it
+  # from independent per-series heavy tails.
+  df <- obj$trend_metadata$df %||% Inf
+  heavy <- !is_gaussian_df(df)
+  nu <- if (heavy && is.na(df)) "\\nu_\\eta" else format(df)
+  mvn <- if (heavy) {
+    paste0("\\text{MVStudentT}(", nu, ", \\mathbf{0}, ")
+  } else {
+    "\\text{MVNormal}(\\mathbf{0}, "
+  }
+
   rows <- if (has_cor) {
     list(list(
       lhs = eps_vec,
       op  = "\\sim",
-      rhs = paste0("\\text{MVNormal}(\\mathbf{0}, ", sig, ")")
+      rhs = paste0(mvn, sig, ")")
     ))
   } else if (is_vector) {
     list(list(
       lhs = eps_vec,
       op  = "\\sim",
-      rhs = paste0(
-        "\\text{MVNormal}(\\mathbf{0}, \\text{diag}",
-        "(\\sigma_\\eta^2))"
-      )
+      rhs = paste0(mvn, "\\text{diag}(\\sigma_\\eta^2))")
     ))
   } else {
     list(list(
       lhs = trend_eps(obj),
       op  = "\\sim",
-      rhs = "\\text{Normal}(0, \\sigma_\\eta)"
+      rhs = if (heavy) {
+        paste0("\\text{StudentT}(", nu, ", 0, \\sigma_\\eta)")
+      } else {
+        "\\text{Normal}(0, \\sigma_\\eta)"
+      }
     ))
   }
 
