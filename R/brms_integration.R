@@ -868,6 +868,26 @@ is_multivariate_formula <- function(formula) {
 #' Validates formula structure and ensures mvbind() is well-formed.
 #'
 #' @noRd
+# Name of the function a response call invokes, tolerating namespace
+# qualification. `as.character()` on `brms::mvbind(y1, y2)` returns
+# c("::", "brms", "mvbind"), so comparing it directly to a single name
+# errors with "the condition has length > 1" rather than reporting an
+# unrecognised response.
+#'@noRd
+response_call_name <- function(response_expr) {
+  if (!is.call(response_expr)) {
+    return("")
+  }
+  target <- response_expr[[1]]
+  if (is.name(target)) {
+    return(as.character(target))
+  }
+  if (is.call(target) && identical(target[[1]], quote(`::`))) {
+    return(as.character(target[[3]]))
+  }
+  ""
+}
+
 has_mvbind_response <- function(formula) {
   checkmate::assert_formula(formula)
 
@@ -885,7 +905,7 @@ has_mvbind_response <- function(formula) {
   }
 
   # Extract function name from call
-  call_name <- as.character(response_expr[[1]])
+  call_name <- response_call_name(response_expr)
 
   # Check if call is to mvbind (not cbind)
   if (call_name != "mvbind") {
@@ -1058,15 +1078,8 @@ extract_mvbind_responses <- function(formula) {
     return(NULL)
   }
 
-  # Extract function name, handling namespaced calls like mvgam::mvbind
-  call_name <- if (is.name(response_expr[[1]])) {
-    as.character(response_expr[[1]])
-  } else if (is.call(response_expr[[1]]) &&
-             identical(response_expr[[1]][[1]], quote(`::`))) {
-    as.character(response_expr[[1]][[3]])
-  } else {
-    ""
-  }
+  # Extract function name from call
+  call_name <- response_call_name(response_expr)
 
   if (call_name != "mvbind") {
     return(NULL)

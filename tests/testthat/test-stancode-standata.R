@@ -4207,3 +4207,132 @@ test_that("a modelled dpar does not collide with mvgam's injected default prior"
   )), collapse = "\n")
   expect_true(grepl("normal_lpdf(nu | 1, 0.5)", sc_plain, fixed = TRUE))
 })
+
+
+# ---- time as a covariate inside trend_formula ----------------------
+
+test_that("trend_covariate_names() drops the grouping columns", {
+  # `time` and `series` are added by the caller and grouped on before
+  # the summarise, and dplyr omits grouping columns from `across()`.
+  # Naming them in the selection fails with "Element `time` doesn't
+  # exist", which is what broke every trend_formula referring to time.
+  expect_identical(mvgam:::trend_covariate_names(c("time", "x")), "x")
+  expect_identical(mvgam:::trend_covariate_names(c("series", "x")), "x")
+  expect_identical(mvgam:::trend_covariate_names(c("time", "series")),
+                   character(0))
+  expect_identical(mvgam:::trend_covariate_names(c("x", "z")), c("x", "z"))
+  expect_identical(mvgam:::trend_covariate_names(character(0)), character(0))
+})
+
+test_that("trend_formula accepts the time variable as a covariate", {
+  # `~ s(time)` is the most natural latent trend to write in a dynamic
+  # GAM, and a plain `~ time` is a linear trend. Both used to error
+  # before reaching code generation.
+  set.seed(7)
+  dat <- data.frame(
+    y = rpois(120, 5), x = rnorm(120), time = 1:120,
+    series = factor(rep("series1", 120))
+  )
+
+  sc_lin <- paste(unlist(stancode(
+    mvgam_formula(y ~ 1, trend_formula = ~ time + AR(p = 1)),
+    data = dat, family = poisson(), backend = "cmdstanr")), collapse = "\n")
+  expect_true(grepl("b_trend", sc_lin, fixed = TRUE))
+
+  sc_s <- paste(unlist(stancode(
+    mvgam_formula(y ~ 1, trend_formula = ~ s(time) + AR(p = 1)),
+    data = dat, family = poisson(), backend = "cmdstanr")), collapse = "\n")
+  expect_true(grepl("sds_", sc_s, fixed = TRUE))
+  expect_true(grepl("Zs_", sc_s, fixed = TRUE))
+
+  sd_gp <- standata(
+    mvgam_formula(y ~ 1, trend_formula = ~ gp(time, k = 20) + AR(p = 1)),
+    data = dat, family = poisson(), backend = "cmdstanr")
+  expect_true(any(grepl("^Xgp_.*_trend$", names(sd_gp))))
+  expect_true(any(grepl("^slambda_.*_trend$", names(sd_gp))))
+})
+
+test_that("trend_formula still builds without any time covariate", {
+  # Guards the fix: stripping the grouping columns must not remove the
+  # design matrix for ordinary covariates, nor invent one for a trend
+  # that has no covariates at all.
+  set.seed(7)
+  dat <- data.frame(
+    y = rpois(120, 5), x = rnorm(120), time = 1:120,
+    series = factor(rep("series1", 120))
+  )
+  sc_x <- paste(unlist(stancode(
+    mvgam_formula(y ~ 1, trend_formula = ~ s(x) + AR(p = 1)),
+    data = dat, family = poisson(), backend = "cmdstanr")), collapse = "\n")
+  expect_true(grepl("sds_", sc_x, fixed = TRUE))
+
+  sc_bare <- paste(unlist(stancode(
+    mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1)),
+    data = dat, family = poisson(), backend = "cmdstanr")), collapse = "\n")
+  expect_false(grepl("sds_", sc_bare, fixed = TRUE))
+  expect_false(grepl("b_trend", sc_bare, fixed = TRUE))
+})
+
+
+test_that("trend_covariate_names() rejects a non-character selection", {
+  expect_error(mvgam:::trend_covariate_names(1:3), "character")
+  expect_error(mvgam:::trend_covariate_names(c("x", NA)), "missing")
+})
+
+test_that("time works as a trend covariate on the by = lv_axis() path", {
+  # `collapse_to_time_level()` is only reached when `has_by_lv` is TRUE,
+  # so this is the call path the fix was actually written for. It
+  # collapses twice, once to (time, series) and once to time.
+  set.seed(5)
+  dat <- expand.grid(time = 1:60, series = factor(paste0("s", 1:4)))
+  dat$y <- rpois(nrow(dat), 5)
+  dat$env <- rnorm(nrow(dat))
+
+  sc_time <- paste(unlist(stancode(
+    mvgam_formula(y ~ 1,
+                  trend_formula = ~ s(time, by = lv_axis()) + AR(p = 1, n_lv = 2)),
+    data = dat, family = poisson(), backend = "cmdstanr")), collapse = "\n")
+  expect_true(grepl("sds_", sc_time, fixed = TRUE))
+
+  # a non-time covariate on the same path is unaffected
+  sc_env <- paste(unlist(stancode(
+    mvgam_formula(y ~ 1,
+                  trend_formula = ~ s(env, by = lv_axis()) + AR(p = 1, n_lv = 2)),
+    data = dat, family = poisson(), backend = "cmdstanr")), collapse = "\n")
+  expect_true(grepl("sds_", sc_env, fixed = TRUE))
+})
+
+test_that("time works as a trend covariate when the columns are named otherwise", {
+  # The helper strips the literal names "time" and "series" because the
+  # caller creates columns with exactly those names before grouping,
+  # whatever the user's own columns are called. A user column named
+  # `year` is therefore an ordinary covariate and must survive.
+  set.seed(3)
+  dat <- data.frame(
+    y = rpois(120, 5), x = rnorm(120), year = 1:120,
+    site = factor(rep("a", 120))
+  )
+  sc <- paste(unlist(stancode(
+    mvgam_formula(y ~ 1,
+                  trend_formula = ~ s(year) + AR(p = 1, time = year, series = site)),
+    data = dat, family = poisson(), backend = "cmdstanr")), collapse = "\n")
+  expect_true(grepl("sds_", sc, fixed = TRUE))
+
+  sc_lin <- paste(unlist(stancode(
+    mvgam_formula(y ~ 1,
+                  trend_formula = ~ year + AR(p = 1, time = year, series = site)),
+    data = dat, family = poisson(), backend = "cmdstanr")), collapse = "\n")
+  expect_true(grepl("b_trend", sc_lin, fixed = TRUE))
+})
+
+test_that("time works as a trend covariate for multivariate responses", {
+  set.seed(9)
+  dat <- expand.grid(time = 1:50, series = factor(paste0("s", 1:3)))
+  dat$y1 <- rpois(nrow(dat), 5)
+  dat$y2 <- rpois(nrow(dat), 8)
+  sc <- paste(unlist(stancode(
+    mvgam_formula(brms::mvbind(y1, y2) ~ 1,
+                  trend_formula = ~ s(time) + AR(p = 1)),
+    data = dat, family = poisson(), backend = "cmdstanr")), collapse = "\n")
+  expect_true(grepl("sds_", sc, fixed = TRUE))
+})

@@ -5144,6 +5144,19 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   ))
 }
 
+# Covariates to collapse, excluding the grouping columns. `time` and
+# `series` are added by the caller and grouped on, and dplyr omits
+# grouping columns from `across()`, so naming them in the selection
+# errors with "Element `time` doesn't exist". A `trend_formula` that
+# refers to the time or series variable, for example `~ s(time)` or a
+# plain `~ time`, puts them in `trend_variables`. Grouping already
+# carries `time` through to the result, so drop both here.
+#'@noRd
+trend_covariate_names <- function(trend_variables) {
+  checkmate::assert_character(trend_variables, any.missing = FALSE)
+  setdiff(trend_variables, c("time", "series"))
+}
+
 #' Collapse a (time, series)-grained data.frame to one row per unique
 #' time for the listed time-level covariates.
 #'
@@ -5172,7 +5185,7 @@ collapse_to_time_level <- function(data, time_vals, series_vals,
   checkmate::assert_data_frame(data, min.rows = 1L)
   checkmate::assert_character(trend_variables)
 
-  if (length(trend_variables) == 0L) {
+  if (length(trend_covariate_names(trend_variables)) == 0L) {
     return(data.frame(time = sort(unique(time_vals))))
   }
 
@@ -5180,12 +5193,18 @@ collapse_to_time_level <- function(data, time_vals, series_vals,
     dplyr::mutate(time = time_vals, series = series_vals) %>%
     dplyr::group_by(.data$time, .data$series) %>%
     dplyr::summarise(
-      dplyr::across(dplyr::all_of(trend_variables), dplyr::first),
+      dplyr::across(
+        dplyr::all_of(trend_covariate_names(trend_variables)),
+        dplyr::first
+      ),
       .groups = "drop"
     ) %>%
     dplyr::group_by(.data$time) %>%
     dplyr::summarise(
-      dplyr::across(dplyr::all_of(trend_variables), dplyr::first),
+      dplyr::across(
+        dplyr::all_of(trend_covariate_names(trend_variables)),
+        dplyr::first
+      ),
       .groups = "drop"
     ) %>%
     dplyr::arrange(.data$time)
@@ -5515,7 +5534,10 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
       ) %>%
       dplyr::group_by(.data$time, .data$series) %>%
       dplyr::summarise(
-        dplyr::across(dplyr::all_of(trend_variables), dplyr::first),
+        dplyr::across(
+        dplyr::all_of(trend_covariate_names(trend_variables)),
+        dplyr::first
+      ),
         .groups = "drop"
       ) %>%
       dplyr::arrange(.data$time, .data$series)

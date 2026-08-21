@@ -250,3 +250,31 @@ test_that("formula_rhs_function_names walks only the RHS", {
   # LHS to consider.
   expect_no_error(formula_rhs_function_names(~ AR(p = 1)))
 })
+
+
+test_that("response_call_name() tolerates namespace qualification", {
+  # `as.character()` on `brms::mvbind(y1, y2)` returns
+  # c("::", "brms", "mvbind"), so comparing it to a single name errors
+  # with "the condition has length > 1" instead of reporting an
+  # unrecognised response.
+  f_plain <- y1 <- NULL
+  expect_identical(
+    mvgam:::response_call_name(quote(mvbind(y1, y2))), "mvbind"
+  )
+  expect_identical(
+    mvgam:::response_call_name(quote(brms::mvbind(y1, y2))), "mvbind"
+  )
+  expect_identical(
+    mvgam:::response_call_name(quote(cbind(s, f))), "cbind"
+  )
+  # a bare symbol is not a call and has no function name
+  expect_identical(mvgam:::response_call_name(quote(y)), "")
+})
+
+test_that("is_multivariate_formula() accepts a namespaced mvbind response", {
+  expect_true(mvgam:::is_multivariate_formula(mvbind(y1, y2) ~ x))
+  expect_true(mvgam:::is_multivariate_formula(brms::mvbind(y1, y2) ~ x))
+  expect_false(mvgam:::is_multivariate_formula(y ~ x))
+  # cbind() denotes binomial trials, not multiple responses
+  expect_false(mvgam:::is_multivariate_formula(cbind(succ, fail) ~ x))
+})
