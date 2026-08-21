@@ -150,6 +150,7 @@ natively:
 | Family | Use case | Family parameters |
 |:------:|:---------|:-----------------:|
 | `tweedie()` | Compound Poisson-Gamma counts that include many zeros | `phi`, `power` |
+| `beta_nb()` | Heavy-tailed counts whose largest values a negative binomial keeps under-predicting | `shape`, `mtail` |
 | `com_binomial()` | Conway-Maxwell-Binomial for over-, under-, super-dispersed bounded counts | `nu` |
 | `nmix()` | N-mixture detection-error models (Poisson-Binomial, Royle-Nichols, Poisson-Poisson variants) | family-specific |
 | `occ()` | Single-season occupancy with imperfect detection | `psi` |

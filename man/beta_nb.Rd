@@ -79,14 +79,31 @@ family, keep \code{1 - F(y)} large and are unaffected.
 
 \examples{
 \donttest{
-# Counts with a heavier tail than a negative binomial expects
+# Counts with a heavier tail than a negative binomial expects. The
+# dpars are `shape`, playing the usual negative binomial role, and
+# `mtail`, where smaller values give heavier tails and anything
+# below 1 gives infinite variance.
 set.seed(1)
-sim <- sim_mvgam(
+simdat <- sim_mvgam(
   family = beta_nb(), n_series = 1L, n_timepoints = 80L,
   trend_model = AR(),
   family_pars = list(shape = 2, mtail = 2)
 )
-head(sim$data_train)
+
+mod <- mvgam(
+  y ~ 1,
+  trend_formula = ~ AR(p = 1),
+  data          = simdat$data_train,
+  family        = beta_nb(),
+  chains        = 2,
+  silent        = 2
+)
+summary(mod, include_betas = FALSE)
+
+# `mtail` is what separates this family from a negative binomial.
+# A posterior that drifts toward the upper prior range is a sign
+# the extra tail parameter is not earning its place.
+mcmc_plot(mod, variable = c("shape", "mtail"), type = "hist")
 }
 }
 \references{
@@ -95,5 +112,7 @@ to accident theory. \emph{Journal of the Royal Statistical
 Society A}, 131(2), 205-225. \doi{10.2307/2343842}
 }
 \seealso{
-\code{\link[=mvgam]{mvgam()}}, \code{\link[=tweedie]{tweedie()}}, \code{\link[=com_binomial]{com_binomial()}}
+\code{\link[brms:brmsfamily]{brms::negbinomial()}}, which this family approaches as
+\code{mtail} grows, and \code{\link[=tweedie]{tweedie()}} for non-negative continuous
+responses with a point mass at zero.
 }
