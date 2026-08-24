@@ -6072,3 +6072,112 @@ assert_loadings_prior_compatible <- function(loadings_prior_spec,
     )
   )))
 }
+
+
+#' Require a `trials()` addition term for `com_binomial()`
+#'
+#' `com_binomial()` reads its per-row binomial denominator from the
+#' `trials` array, which brms emits only when the response carries
+#' a `trials()` addition term. Routing the denominator through brms
+#' keeps it aligned with the response when rows are dropped, but
+#' omitting the term leaves `trials` undefined and stanc fails on a
+#' name the user never wrote. Name the omission here instead.
+#'
+#' @param formula The observation formula, possibly a `brmsformula`.
+#' @return Invisible NULL on success; an informative error if the
+#'   `trials()` term is absent.
+#' @noRd
+assert_com_binomial_trials <- function(formula) {
+  if (!is.null(find_aterm_call(formula, "trials"))) {
+    return(invisible(NULL))
+  }
+  stop(insight::format_error(c(
+    "'com_binomial()' needs its number of trials in a 'trials()' term.",
+    x = "No 'trials()' term found in the observation formula.",
+    i = paste0(
+      "Supply the binomial denominator as an addition term, e.g. ",
+      "'bf(y | trials(n) ~ x)' for a column or 'bf(y | trials(10) ~ x)' ",
+      "for a constant."
+    )
+  )))
+}
+
+
+#' Locate an addition term in a model formula
+#'
+#' Addition terms live on the response side, so only the left-hand
+#' side is searched: a covariate that happens to share the term's
+#' name must not read as the term. Walking the parse tree matches
+#' the call rather than a bare symbol.
+#'
+#' @param formula The observation formula, possibly a `brmsformula`
+#'   or `mvgam_formula`.
+#' @param aterm Name of the addition term to find, e.g. `"trials"`.
+#' @return The matched call, or NULL when there is none.
+#' @noRd
+find_aterm_call <- function(formula, aterm) {
+  checkmate::assert(
+    checkmate::check_formula(formula),
+    checkmate::check_class(formula, "brmsformula"),
+    checkmate::check_class(formula, "mvgam_formula"),
+    .var.name = "formula"
+  )
+  checkmate::assert_string(aterm, min.chars = 1L)
+  inner <- if (!is.null(formula$formula)) formula$formula else formula
+  lhs <- if (length(inner) >= 3L) inner[[2L]] else inner
+  found <- NULL
+  walk <- function(expr) {
+    if (!is.call(expr)) {
+      return(invisible(NULL))
+    }
+    if (identical(as.character(expr[[1L]])[1L], aterm)) {
+      found <<- expr
+    }
+    for (part in as.list(expr)[-1L]) {
+      walk(part)
+    }
+    invisible(NULL)
+  }
+  walk(lhs)
+  found
+}
+
+
+#' Resolve a model's per-row binomial denominator for a data frame
+#'
+#' A model has two row spaces: the likelihood covers the observed
+#' responses only, while predictions cover every row of the target
+#' data including those whose response was missing. The denominator
+#' brms places in `standata` belongs to the first, so reusing it for
+#' the second misaligns as soon as any response is `NA`. Evaluating
+#' the `trials()` addition term against the data being predicted
+#' keeps them aligned, and covers a constant denominator such as
+#' `trials(30)`, which has no column to read.
+#'
+#' @param formula The model's observation formula.
+#' @param data The data frame predictions are being made for.
+#' @return A vector with one element per row of `data`, or NULL when
+#'   the formula carries no `trials()` term or the term names a
+#'   column absent from `data`.
+#' @noRd
+resolve_trials_denominator <- function(formula, data) {
+  checkmate::assert_data_frame(data, min.rows = 1L)
+  if (!inherits(formula, c("formula", "brmsformula", "mvgam_formula"))) {
+    return(NULL)
+  }
+  trials_call <- find_aterm_call(formula, "trials")
+  if (is.null(trials_call) || length(trials_call) < 2L) {
+    return(NULL)
+  }
+  denominator <- trials_call[[2L]]
+  needed <- all.vars(denominator)
+  if (length(needed) && !all(needed %in% names(data))) {
+    return(NULL)
+  }
+  values <- eval(denominator, data)
+  if (length(values) == 1L) {
+    values <- rep(values, nrow(data))
+  }
+  values
+}
+

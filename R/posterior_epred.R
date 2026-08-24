@@ -783,16 +783,13 @@ extract_trials_for_family <- function(object, family, newdata) {
     return(NULL)
   }
 
-  # Extract trials from standata or newdata
-  trials <- NULL
-
-  if (is.null(newdata) || identical(newdata, object$data)) {
-    trials <- object$standata$trials %||% object$data$trials
-  } else {
-    if ("trials" %in% names(newdata)) {
-      trials <- newdata$trials
-    }
-  }
+  # Predictions cover every row of the target data, including rows
+  # whose response was missing, so the denominator is resolved
+  # against that data rather than reused from `standata`, which is
+  # sized to the likelihood's observed rows.
+  pred_data <- if (is.null(newdata)) object$data else newdata
+  trials <- resolve_trials_denominator(object$formula, pred_data) %||%
+    pred_data$trials %||% object$standata$trials
 
   if (is.null(trials)) {
     stop(insight::format_error(c(

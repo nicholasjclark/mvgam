@@ -713,14 +713,20 @@ get_all_mvgam_trend_parameters <- function(trend_specs) {
 #'   onto. Must include a `source` column.
 #' @param user_priors A `brmsprior` data frame of user overrides, or
 #'   NULL.
+#' @param source String written to the `source` column of every
+#'   matched row. Defaults to `"user"`; the family-default overlay
+#'   passes `"default"` so `get_prior()` still reports those rows as
+#'   defaults rather than as something the user asked for.
 #' @return A list with two elements:
 #'   * `priors` -- the merged `brmsprior` data frame
 #'   * `unmatched` -- a character vector of `class` strings for user
 #'     rows that did not match any default row
 #' @noRd
-merge_user_priors <- function(default_priors, user_priors) {
+merge_user_priors <- function(default_priors, user_priors,
+                              source = "user") {
   checkmate::assert_class(default_priors, "brmsprior")
   checkmate::assert_class(user_priors, "brmsprior", null.ok = TRUE)
+  checkmate::assert_string(source, min.chars = 1L)
   if (is.null(user_priors) || nrow(user_priors) == 0L) {
     return(list(priors = default_priors, unmatched = character(0L)))
   }
@@ -744,7 +750,7 @@ merge_user_priors <- function(default_priors, user_priors) {
     if (any(keep, na.rm = TRUE)) {
       default_priors$prior[keep] <- row$prior
       if ("source" %in% names(default_priors)) {
-        default_priors$source[keep] <- "user"
+        default_priors$source[keep] <- source
       }
     } else {
       # Unmatched user row: keep it (brms convention is to preserve
@@ -763,7 +769,7 @@ merge_user_priors <- function(default_priors, user_priors) {
       c(list(default_priors), unmatched_rows)
     )[-1L]
     appended <- do.call(rbind, lapply(appended_rows, function(r) {
-      if ("source" %in% names(r)) r$source <- "user"
+      if ("source" %in% names(r)) r$source <- source
       r
     }))
     default_priors <- rbind(default_priors, appended)
@@ -773,6 +779,36 @@ merge_user_priors <- function(default_priors, user_priors) {
                          class = c("brmsprior", "data.frame")),
     unmatched = unmatched_classes
   )
+}
+
+
+#' Report mvgam's injected family defaults in a prior table
+#'
+#' Stan code generation replaces the brms fallback prior for a few
+#' families (see `family_default_priors()`). Without this overlay
+#' `get_prior()` would advertise the brms fallback while the model
+#' sampled under mvgam's, which for `com_binomial()` means showing a
+#' positive-only `gamma(2, 0.1)` on a `nu` declared with `lb = -5`.
+#' Re-aiming runs first so a modelled dpar reports against the
+#' intercept row that actually exists.
+#'
+#' @param obs_priors The `brmsprior` returned by `brms::get_prior()`.
+#' @param formula The observation formula.
+#' @param family The family object, or NULL for embedded families.
+#' @return `obs_priors` with mvgam's defaults substituted in place.
+#' @noRd
+overlay_family_default_priors <- function(obs_priors, formula,
+                                          family = NULL) {
+  if (is.null(family) || !inherits(family, "family")) {
+    return(obs_priors)
+  }
+  defaults <- adjust_modelled_dpar_priors(
+    family_default_priors(family), formula, family
+  )
+  if (is.null(defaults) || nrow(defaults) == 0L) {
+    return(obs_priors)
+  }
+  merge_user_priors(obs_priors, defaults, source = "default")$priors
 }
 
 
@@ -1892,6 +1928,9 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
     obs_priors <- safe_brms_prior_call(
       brms::get_prior(formula = formula, data = data,
                       family = family, ...)
+    )
+    obs_priors <- overlay_family_default_priors(
+      obs_priors, formula, family
     )
   }
 

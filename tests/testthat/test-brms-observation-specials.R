@@ -278,3 +278,51 @@ test_that("is_multivariate_formula() accepts a namespaced mvbind response", {
   # cbind() denotes binomial trials, not multiple responses
   expect_false(mvgam:::is_multivariate_formula(cbind(succ, fail) ~ x))
 })
+
+
+test_that("format_model_formula() deparses a brmsformula to one line", {
+  # `format()` on a brmsformula returns one string per list element,
+  # so printing with `sep = ""` used to glue the trailing NULLs on
+  # as `y | trials(n) ~ 1NULLNULLyNULL`.
+  expect_identical(
+    mvgam:::format_model_formula(bf(y | trials(n) ~ 1)),
+    "y | trials(n) ~ 1"
+  )
+  # A plain formula and a bare `~` right-hand side still work.
+  expect_identical(mvgam:::format_model_formula(y ~ x), "y ~ x")
+})
+
+
+test_that("an addition term is matched as a call, not as a name", {
+  # Addition terms live on the response side, so a covariate that
+  # happens to share the term's name must not read as the term.
+  expect_false(is.null(mvgam:::find_aterm_call(bf(y | trials(n) ~ x),
+                                               "trials")))
+  expect_null(mvgam:::find_aterm_call(bf(y ~ x), "trials"))
+  expect_null(mvgam:::find_aterm_call(y ~ trials, "trials"))
+})
+
+
+test_that("the trials denominator resolves against the prediction data", {
+  # A model has two row spaces: the likelihood covers observed
+  # responses only, predictions cover every row. The denominator
+  # brms stores in `standata` belongs to the first, so the
+  # prediction path resolves it from the data instead.
+  dat <- data.frame(y = 1:4, n_trials = c(5L, 6L, 7L, 8L))
+  expect_identical(
+    mvgam:::resolve_trials_denominator(bf(y | trials(n_trials) ~ 1), dat),
+    c(5L, 6L, 7L, 8L)
+  )
+  # A constant denominator has no column and is recycled to fit.
+  expect_identical(
+    mvgam:::resolve_trials_denominator(bf(y | trials(30) ~ 1), dat),
+    rep(30, 4L)
+  )
+  # Nothing to resolve when the term is absent or its column is not
+  # carried by the data being predicted.
+  expect_null(mvgam:::resolve_trials_denominator(bf(y ~ 1), dat))
+  expect_null(
+    mvgam:::resolve_trials_denominator(bf(y | trials(absent) ~ 1), dat)
+  )
+})
+

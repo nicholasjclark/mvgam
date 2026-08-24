@@ -868,7 +868,7 @@ beta_nb_stan_funs <- function() {
 #' head(sim$data_train)
 #'
 #' # Fit the matching state-space CMB model. `trials` is supplied
-#' # via the standard brms `trials()` syntax; `nu` is the
+#' # through brms's `trials()` addition term; `nu` is the
 #' # dispersion parameter (nu = 1 recovers the binomial,
 #' # nu > 1 under-dispersed, nu < 1 over-dispersed, nu < 0
 #' # super-dispersed / bimodal).
@@ -901,12 +901,13 @@ com_binomial <- function(link = "logit") {
     lb = c(NA, -5),
     ub = c(NA, NA),
     type = "int",
-    # `vint1[n]` is the per-row trials integer; `lchoose_com_binomial`
-    # is the per-fit transformed-data lookup table (Stan functions
-    # cannot reach data-block globals so the table is passed in as
-    # an additional positional arg). Both are attached at fit time by
-    # `build_com_binomial_data_stanvars()`.
-    vars = c("vint1[n]", "lchoose_com_binomial")
+    # `trials[n]` is the per-row binomial denominator, supplied by
+    # the `trials()` addition term in the model formula so brms
+    # keeps it aligned with the response when rows are dropped.
+    # `lchoose_com_binomial` is the transformed-data lookup table
+    # (Stan functions cannot reach data-block globals so the table
+    # is passed in as an additional positional arg).
+    vars = c("trials[n]", "lchoose_com_binomial")
   )
   # See note on `resolve_family_name()`: brms custom_family leaves
   # `family$family = "custom"` and stores the user-visible name on
@@ -1032,14 +1033,46 @@ adjust_modelled_dpar_priors <- function(prior, formula, family) {
   prior
 }
 
+#' Default population priors mvgam injects for a family
+#'
+#' Some families need a class-level default that brms's own
+#' fallback would get wrong: `nu` for `com_binomial()` collides
+#' with the Student-t degrees of freedom and inherits a
+#' positive-only `gamma(2, 0.1)` on a parameter free to go
+#' negative; `shape` and `mtail` for `beta_nb()` inherit a
+#' negative binomial default that concentrates mass where the
+#' Beta mixing scale diverges; the simplex families' shared
+#' population effects carry no likelihood information.
+#'
+#' Stan code generation injects these ahead of user priors and
+#' `get_prior()` reports them, so both surfaces resolve one
+#' definition and cannot drift apart.
+#'
+#' @param family The family object.
+#' @return A `brmsprior`, or `NULL` for families whose defaults
+#'   mvgam leaves entirely to brms.
+#' @noRd
+family_default_priors <- function(family) {
+  if (is_simplex_response_family(family)) {
+    default_simplex_population_priors()
+  } else if (is_com_binomial_family(family)) {
+    default_com_binomial_population_priors()
+  } else if (is_beta_nb_family(family)) {
+    default_beta_nb_population_priors()
+  } else {
+    NULL
+  }
+}
+
+
 #' Build the Stan stanvars bundle for the `com_binomial()` family
 #'
-#' Returns the function-block stanvar wrapping `com_binomial_lpmf`.
-#' Auto-attached via `attr(family, "mvgam_stanvars")` at construction
-#' time. The per-fit trials data + `lchoose` lookup table stanvars
-#' get appended at fit time by
-#' `attach_com_binomial_data_stanvars()`, which has access to the
-#' user data.
+#' Returns the function-block stanvar wrapping `com_binomial_lpmf`
+#' plus the transformed-data `lchoose` lookup table. Auto-attached
+#' via `attr(family, "mvgam_stanvars")` at construction time. Both
+#' blocks are data-independent: the per-row trials arrive through
+#' brms's `trials()` addition term and the table sizes itself from
+#' them, so nothing here needs the user's data frame.
 #'
 #' @noRd
 make_com_binomial_stanvars <- function() {
@@ -1047,86 +1080,7 @@ make_com_binomial_stanvars <- function() {
     name = "com_binomial_funs",
     scode = com_binomial_stan_funs(),
     block = "functions"
-  )
-}
-
-
-#' Attach per-fit data + transformed-data stanvars to a
-#' `com_binomial()` family
-#'
-#' Mirrors `prepare_closure_unit_family()`: takes the
-#' constructor-time family object plus the user data frame,
-#' extracts the `trials` column, and appends the integer trials
-#' array + `lchoose` lookup table to the family's `mvgam_stanvars`
-#' attribute. Called from
-#' `generate_stan_components_mvgam_formula()` ahead of
-#' `attach_family_stanvars()` so the family-attribute update is
-#' visible to the brms call.
-#'
-#' @param family The `com_binomial()` family object.
-#' @param data Long-format user data containing the `trials`
-#'   column.
-#' @return The family object with the data stanvars appended to
-#'   its `mvgam_stanvars` attribute.
-#' @noRd
-prepare_com_binomial_family <- function(family, data) {
-  cmb_data_stanvars <- build_com_binomial_data_stanvars(data)
-  existing <- attr(family, "mvgam_stanvars", exact = TRUE)
-  attr(family, "mvgam_stanvars") <- if (is.null(existing))
-    cmb_data_stanvars
-  else
-    existing + cmb_data_stanvars
-  family
-}
-
-
-#' Per-fit trials and `lchoose` lookup-table stanvars
-#'
-#' brms `custom_family(vars = "vint1[n]")` references a data array
-#' that brms does NOT auto-emit for custom families (the `trials()`
-#' aterm only auto-emits for brms-native binomial families). This
-#' helper extracts the user's `trials` column at fit time, packs it
-#' as `vint1` so the lpmf call resolves, and precomputes the
-#' `lchoose(T, j)` lookup table in transformed data so the inner
-#' lpmf reduces to a vectorised dot product + `log_sum_exp` -- no
-#' per-leapfrog `lchoose` calls.
-#'
-#' Mirrors the closure-unit `build_closure_unit_arrays()` pattern:
-#' fit-time data extraction + stanvar attachment that augments the
-#' family's `mvgam_stanvars` attribute.
-#'
-#' @param data Long-format data frame containing the `trials`
-#'   column (one row per observation).
-#' @return `brmsstanvars` bundle: the integer trials array `vint1`,
-#'   the scalar `max_com_binomial_T`, and the transformed-data
-#'   `lchoose_com_binomial` table.
-#' @noRd
-build_com_binomial_data_stanvars <- function(data) {
-  checkmate::assert_data_frame(data, min.rows = 1)
-  if (!"trials" %in% names(data)) {
-    stop(insight::format_error(c(
-      "com_binomial() requires a 'trials' column in `data`.",
-      x = "No column named 'trials' found.",
-      i = paste0("Add a per-row 'trials' integer column giving the ",
-                  "binomial denominator T for each observation.")
-    )))
-  }
-  trials <- as.integer(data$trials)
-  checkmate::assert_integerish(trials, lower = 0L, any.missing = FALSE,
-                                .var.name = "trials")
-  max_T <- max(trials)
-  brms::stanvar(
-    x = trials,
-    name = "vint1",
-    scode = "array[N] int vint1;",
-    block = "data"
   ) +
-    brms::stanvar(
-      x = max_T,
-      name = "max_com_binomial_T",
-      scode = "int<lower=0> max_com_binomial_T;",
-      block = "data"
-    ) +
     brms::stanvar(
       scode = com_binomial_lookup_stan(),
       block = "tdata",
@@ -1143,9 +1097,14 @@ build_com_binomial_data_stanvars <- function(data) {
 #' `lchoose` calls the naive implementation would do at every
 #' leapfrog step.
 #'
+#' The bound is taken from `trials` inside Stan rather than computed
+#' in R, so it follows whatever rows brms kept and cannot fall out
+#' of step with the response.
+#'
 #' @noRd
 com_binomial_lookup_stan <- function() {
   paste(
+    "  int max_com_binomial_T = max(trials);",
     "  array[max_com_binomial_T + 1, max_com_binomial_T + 1]",
     "    real lchoose_com_binomial;",
     "  for (T_val in 0 : max_com_binomial_T) {",
@@ -1162,8 +1121,8 @@ com_binomial_lookup_stan <- function() {
 #' Stan code for the `com_binomial` lpmf
 #'
 #' Argument order matches the brms `custom_family(vars =
-#' "vint1[n]")` calling convention: brms generates calls like
-#' `com_binomial_lpmf(Y[n] | mu[n], nu, vint1[n])`, so the lpmf
+#' "trials[n]")` calling convention: brms generates calls like
+#' `com_binomial_lpmf(Y[n] | mu[n], nu, trials[n])`, so the lpmf
 #' signature is `(int y, real mu, real nu, int T)`.
 #'
 #' Efficiency: reads `lchoose(T, j)` from the precomputed

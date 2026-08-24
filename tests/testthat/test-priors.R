@@ -878,6 +878,14 @@ test_that("com_binomial() default prior can be overridden", {
                    brms::prior("normal(2, 1)", class = "nu"), data = dat)
   expect_true(grepl("normal_lpdf(nu | 2, 1)", sc, fixed = TRUE))
   expect_false(grepl("normal_lpdf(nu | 1, 0.5)", sc, fixed = TRUE))
+
+  # get_prior() must advertise the prior the model samples under.
+  # brms's own fallback for `nu` is the Student-t degrees of
+  # freedom `gamma(2, 0.1)`, which has positive support only and
+  # would misreport a parameter declared with `lb = -5`.
+  tab <- get_prior(mvgam_formula(y | trials(trials) ~ 1), data = dat,
+                   family = com_binomial())
+  expect_identical(tab$prior[tab$class == "nu"], "normal(1, 0.5)")
 })
 
 test_that("nu_trend default prior can be overridden", {

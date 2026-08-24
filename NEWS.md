@@ -9,6 +9,7 @@ This is a major release that rebuilds mvgam on top of 'brms'. The observation mo
 
 ## New functionalities
 * Added a `beta_nb()` observation family for counts with heavier tails than a negative binomial allows
+* Added a `com_binomial()` observation family for under- and over-dispersed binomial counts
 * Added `init = "pathfinder"` to `mvgam()` for drawing starting values from Stan's Pathfinder approximation
 * Restructured `summary.mvgam()` to now return an object of class `mvgam_summary` that can be re-used for later purposes, or that can be printed with `print.mvgam_summary()` (#119)
 * Added a new function `ordinate.jsdgam()` to plot two-dimensional ordinations of site and species scores from latent factor models estimated in `jsdgam()`

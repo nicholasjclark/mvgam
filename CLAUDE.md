@@ -5,6 +5,7 @@ mvgam is an R package for fitting, plotting and interpreting Bayesian Multivaria
 ## Development Commands
 
 ### Testing
+- Run the full suite on 3 cores: `TESTTHAT_PARALLEL=true TESTTHAT_CPUS=3 Rscript -e "devtools::test()"`
 - YOU MUST load all functions (`devtools::load_all()`) prior to testing or debugging. Use `Rscript -e "devtools::load_all();testthat::test_file(path/to/test)"` to run specific tests
 - You CANNOT use filter calls in `testthat::test_file()` for selective execution (use the `desc` argument for this instead)
 - No test errors or warnings are allowed. This is NON-NEGOTIABLE

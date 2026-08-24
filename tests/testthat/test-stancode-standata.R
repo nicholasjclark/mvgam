@@ -3928,7 +3928,7 @@ test_that("com_binomial() emits expected Stan lpmf + lookup table", {
   # 1. The custom lpmf function is declared in the Stan functions
   #    block with the (int y, real mu, real nu, int T, data
   #    array[,] real lc_table) signature
-  # 2. `vint1[n]` (the trials column) is referenced in the model
+  # 2. `trials[n]` (the denominator) is referenced in the model
   #    block
   # 3. The transformed-data `lchoose_com_binomial` lookup table is
   #    precomputed once per fit
@@ -3950,7 +3950,7 @@ test_that("com_binomial() emits expected Stan lpmf + lookup table", {
     "real com_binomial_lpmf\\(int y, real mu, real nu, int T",
     sc
   ))
-  expect_true(grepl("vint1\\[n\\]", sc))
+  expect_true(grepl("trials\\[n\\]", sc))
   expect_true(grepl("lchoose_com_binomial", sc))
   expect_true(grepl(
     "to_vector\\(lc_table\\[T \\+ 1", sc
@@ -4013,22 +4013,35 @@ test_that("com_binomial() reports `nu` as the only auxiliary dpar", {
 })
 
 
-test_that("com_binomial() requires a `trials` column in data", {
-  # The lpmf references `vint1[n]` which mvgam fills at fit time
-  # from `data$trials`. Absence of that column triggers a hard
-  # error before brms is called.
+test_that("com_binomial() requires a `trials()` addition term", {
+  # The lpmf references `trials[n]`, which brms emits only for a
+  # response carrying `trials()`. Without it stanc would fail on an
+  # undefined variable, so the omission is named up front.
   dat <- data.frame(
     y = rbinom(30, size = 5L, prob = 0.4),
+    trials = 5L,
     x = rnorm(30),
     series = factor("s1"),
     time = 1:30
   )
-  mf <- mvgam_formula(bf(y | trials(5) ~ x))
   expect_error(
-    stancode(mf, data = dat, family = com_binomial(),
-             validate = FALSE),
-    "requires a 'trials' column"
+    stancode(mvgam_formula(bf(y ~ x)), data = dat,
+             family = com_binomial(), validate = FALSE),
+    "trials"
   )
+  # With the term present, brms sizes `trials` to the rows it kept
+  # rather than to the raw frame, which is what makes NA responses
+  # usable with a latent trend.
+  dat$y[1:5] <- NA
+  # brms announces the dropped rows; the point of the test is that
+  # `trials` follows them instead of keeping the raw frame's length.
+  expect_warning(
+    sd <- standata(mvgam_formula(bf(y | trials(trials) ~ x)), data = dat,
+                   family = com_binomial()),
+    "Rows containing NAs"
+  )
+  expect_identical(length(sd$trials), sd$N)
+  expect_identical(sd$N, 25L)
 })
 
 
@@ -4336,3 +4349,97 @@ test_that("time works as a trend covariate for multivariate responses", {
     data = dat, family = poisson(), backend = "cmdstanr")), collapse = "\n")
   expect_true(grepl("sds_", sc, fixed = TRUE))
 })
+
+
+test_that("NA responses shrink the likelihood but not the trend grid", {
+  # mvgam keeps the latent process on the full time grid and lets
+  # the likelihood run over observed rows only. Anything carried
+  # per observation must therefore follow brms's retained rows.
+  # `com_binomial()` once packed its denominator from the raw
+  # frame instead, so Stan received more values than there were
+  # observations and every chain died at data-init.
+  #
+  # Three series over twenty times means the raw row count (60)
+  # matches neither `N` nor the grid, so a leftover raw-length
+  # array cannot hide behind a coincidence.
+  set.seed(2)
+  n_time <- 20L
+  dat <- expand.grid(time = seq_len(n_time),
+                     series = factor(paste0("s", 1:3)))
+  dat$x <- rnorm(nrow(dat))
+  dat$trials <- pmax(rpois(nrow(dat), 20L), 1L)
+
+  cases <- list(
+    list(tag = "poisson", family = poisson(),
+         y = rpois(nrow(dat), 5), formula = y ~ x),
+    list(tag = "tweedie", family = tweedie(),
+         y = rgamma(nrow(dat), 2, 1), formula = y ~ x),
+    list(tag = "beta_nb", family = beta_nb(),
+         y = rnbinom(nrow(dat), mu = 5, size = 2), formula = y ~ x),
+    list(tag = "com_binomial", family = com_binomial(),
+         y = rbinom(nrow(dat), dat$trials, 0.5),
+         formula = bf(y | trials(trials) ~ x))
+  )
+
+  for (case in cases) {
+    d <- dat
+    d$y <- case$y
+    d$y[c(3L, 17L, 28L, 41L, 55L)] <- NA
+    mf <- mvgam_formula(case$formula, trend_formula = ~ AR(p = 1))
+    # brms reports the rows it dropped, once per internal pass.
+    sd <- withCallingHandlers(
+      standata(mf, data = d, family = case$family, backend = "cmdstanr"),
+      warning = function(w) {
+        if (grepl("Rows containing NAs", conditionMessage(w))) {
+          invokeRestart("muffleWarning")
+        }
+      }
+    )
+    # The likelihood sees only observed rows ...
+    expect_identical(sd$N, sum(!is.na(d$y)))
+    # ... while the trend still spans every timepoint.
+    expect_identical(sd$N_time_trend, n_time)
+    # No data array may still be sized to the raw frame.
+    raw_length <- vapply(
+      sd,
+      function(v) is.atomic(v) && is.null(dim(v)) && length(v) == nrow(d),
+      logical(1)
+    )
+    expect_identical(names(sd)[raw_length], character(0))
+  }
+})
+
+test_that("closure-unit families reject NA responses outright", {
+  # Their Stan code aggregates repeat visits per unit, so the
+  # per-unit arrays are built from the raw frame. NA responses are
+  # refused up front rather than silently misaligning those
+  # arrays; this pins the guard so it is not dropped without a
+  # deliberate replacement.
+  sim <- sim_closure_unit_data(family = occ(), type = 1L, n_sites = 6L,
+                               n_visits = 3L, seed = 3L)
+  dat <- sim$data_train
+  dat$y[1L] <- NA
+  expect_error(
+    standata(mvgam_formula(y ~ 1), data = dat, family = occ(),
+             backend = "cmdstanr"),
+    "Non-finite or non-numeric"
+  )
+})
+
+
+test_that("com_binomial() accepts a constant denominator", {
+  # `trials(30)` is the brms spelling for a fixed number of trials.
+  # Taking the denominator from the addition term rather than a
+  # hardcoded column means no `trials` column is needed.
+  set.seed(7)
+  dat <- data.frame(
+    y = rbinom(30, size = 30L, prob = 0.5),
+    x = rnorm(30), series = factor("s1"), time = 1:30
+  )
+  expect_false("trials" %in% names(dat))
+  sd <- standata(mvgam_formula(bf(y | trials(30) ~ x)), data = dat,
+                 family = com_binomial())
+  expect_true(all(sd$trials == 30L))
+  expect_identical(length(sd$trials), sd$N)
+})
+

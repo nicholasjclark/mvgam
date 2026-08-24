@@ -859,15 +859,12 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   if (is_multivariate) {
     # For multivariate, format each response formula separately
     # Extract formula from each form (not the entire form object)
-    formulas <- sapply(x$formula$forms, function(f) format(f$formula))
+    formulas <- sapply(x$formula$forms, format_model_formula)
     # Join with newline + 9 spaces to align with "Formula: "
     formulas_str <- paste0(formulas, collapse = " \n         ")
-    cat("Formula: ", strip_empty_obs_placeholder(formulas_str),
-        " \n", sep = "")
+    cat("Formula: ", formulas_str, " \n", sep = "")
   } else {
-    cat("Formula: ",
-        strip_empty_obs_placeholder(format(x$formula)),
-        " \n", sep = "")
+    cat("Formula: ", format_model_formula(x$formula), " \n", sep = "")
   }
 
   # Section 3: Data and dimensions (brms style)

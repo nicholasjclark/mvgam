@@ -88,7 +88,7 @@ sim <- sim_mvgam(
 head(sim$data_train)
 
 # Fit the matching state-space CMB model. `trials` is supplied
-# via the standard brms `trials()` syntax; `nu` is the
+# through brms's `trials()` addition term; `nu` is the
 # dispersion parameter (nu = 1 recovers the binomial,
 # nu > 1 under-dispersed, nu < 1 over-dispersed, nu < 0
 # super-dispersed / bimodal).

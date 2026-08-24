@@ -126,18 +126,6 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
     )
   }
 
-  # Row-wise custom families (currently `com_binomial()`) attach
-  # per-fit data + transformed-data stanvars to their
-  # `mvgam_stanvars` attribute here so the next
-  # `attach_family_stanvars()` call picks them up. Mirrors the
-  # `prepare_closure_unit_family()` pattern above but stays out of
-  # the closure-unit code path -- CMB is one row per observation
-  # with no per-unit visit aggregation, so the closure-unit array
-  # builders do not apply.
-  if (is_com_binomial_family(family)) {
-    family <- prepare_com_binomial_family(family, data = data)
-  }
-
   # Custom families (e.g. tweedie()) carry their own Stan function
   # block + data stanvars in attr(family, "mvgam_stanvars"). They
   # belong on the observation submodel only; the trend submodel
@@ -224,43 +212,24 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
   # Setup observation model using lightweight brms.
   # Simplex multi-response families (`diri`, `multi`, `categ`)
   # impose a hard sum-to-zero constraint on the loadings matrix `Z`
-  # via Stan's `sum_to_zero_vector[K]` (Stan >= 2.36) and remove
-  # the K-shared softmax shift inside each lpdf by subtracting
-  # `mu_unit[1]`. Both constraints are exact (no soft priors), so
-  # the K-shared population effects (`b_Intercept`, `b_env`, etc.)
-  # carry no likelihood information. A weakly-informative
-  # `student_t(3, 0, 2.5)` default prior keeps them sampling from
-  # a proper distribution; users may override via `prior`.
+  # via Stan's `sum_to_zero_vector[K]`, so they need Stan >= 2.36.
   if (is_simplex_response_family(family)) {
     assert_stan_version(
       backend, "2.36.0",
       feature = "'sum_to_zero_vector[K]' for simplex families"
     )
-    prior <- merge_default_priors(
-      default_simplex_population_priors(), prior, obs_formula, family
-    )
   }
-  # The COM-Binomial dispersion `nu` would otherwise inherit brms's
-  # `(flat)` default, which gives the upper tail of `nu` unbounded
-  # support and drives HMC treedepth saturation. Inject the gate-A
-  # stats-review default `normal(1, 0.5)`, which `merge_default_priors()`
-  # drops if the user named the same class. The per-fit data stanvars
-  # are attached earlier via `prepare_com_binomial_family()`.
   if (is_com_binomial_family(family)) {
-    prior <- merge_default_priors(
-      default_com_binomial_population_priors(), prior, obs_formula, family
-    )
+    assert_com_binomial_trials(obs_formula)
   }
-  # The beta negative binomial `shape` would otherwise inherit brms's
-  # negative binomial `gamma(0.01, 0.01)`, which concentrates mass
-  # where the Beta mixing scale `mu * mtail / shape` diverges, and
-  # `mtail` would inherit `(flat)`. Both defaults are injected ahead
-  # of user priors so any user override still wins.
-  if (is_beta_nb_family(family)) {
-    prior <- merge_default_priors(
-      default_beta_nb_population_priors(), prior, obs_formula, family
-    )
-  }
+  # Families whose brms fallback prior would be unsuitable carry an
+  # mvgam default; `family_default_priors()` is the one definition
+  # `get_prior()` also reports. `merge_default_priors()` drops any
+  # default the user named, so a user prior still wins.
+  prior <- merge_default_priors(
+    family_default_priors(family), prior, obs_formula, family
+  )
+
   # Filter priors: only pass observation-related priors to observation setup
   obs_priors <- filter_obs_priors(prior)
   

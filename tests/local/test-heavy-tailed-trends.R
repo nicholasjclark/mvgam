@@ -117,8 +117,11 @@ test_that("a fixed df fits without estimating a parameter", {
   expect_identical(unique(cs$nu_trend), 5)
 })
 
-test_that("heavy tails work on the other supporting trend types", {
-  for (tf in list(~ RW(df = NA), ~ ZMVN(df = NA))) {
+test_that("heavy tails work on another supporting trend type", {
+  # One further trend type is fitted here; that every supporting
+  # type emits `nu_trend` is pinned without Stan in
+  # `tests/testthat/test-trend-stancode-shape.R`.
+  for (tf in list(~ RW(df = NA))) {
     mod <- ht_fit(sim_g, tf)
     expect_s3_class(mod, "mvgam")
     s <- posterior::summarise_draws(

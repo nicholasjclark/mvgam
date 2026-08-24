@@ -416,6 +416,24 @@ strip_empty_obs_placeholder <- function(formula_str) {
 }
 
 
+# Internal: deparse a model formula for display. `format()` on a
+# `brmsformula` returns one string per list element (`formula`,
+# `pforms`, `family`, `resp`, ...), so printing with `sep = ""`
+# glues the trailing `NULL`s onto the formula text. Reaching the
+# plain formula first keeps an addition-term model displaying as
+# `y | trials(n) ~ 1`. Stripping per formula rather than on a
+# joined string matters for multivariate models, where
+# `strip_empty_obs_placeholder()` would otherwise only clear the
+# placeholder from the first response.
+#' @noRd
+format_model_formula <- function(formula) {
+  if (!is.null(formula$formula)) {
+    formula <- formula$formula
+  }
+  strip_empty_obs_placeholder(format(formula))
+}
+
+
 # Internal: `formula = y ~ 0` (or `~ -1`) is a legitimate
 # state-space pattern where the entire linear predictor flows
 # through the trend formula. brms cannot natively process such
