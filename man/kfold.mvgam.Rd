@@ -111,7 +111,7 @@ refit cost. Both extensions sit cleanly on top of the existing
 # irregular time spacing).
 set.seed(13)
 simdat <- sim_mvgam(family = gaussian(), n_series = 1L,
-                     n_timepoints = 60L, type = 6L)
+                     n_timepoints = 120L, type = 6L)
 
 mod <- mvgam(y ~ s(season, bs = "cc"),
               trend_formula = ~ CAR(),

@@ -178,7 +178,7 @@ set.seed(2)
 simdat <- sim_mvgam(
   family       = gaussian(),
   n_series     = 4L,
-  n_timepoints = 60L,
+  n_timepoints = 120L,
   trend_model  = VAR(),
   prop_trend   = 0.9
 )

@@ -85,7 +85,7 @@ family, keep \code{1 - F(y)} large and are unaffected.
 # below 1 gives infinite variance.
 set.seed(1)
 simdat <- sim_mvgam(
-  family = beta_nb(), n_series = 1L, n_timepoints = 80L,
+  family = beta_nb(), n_series = 1L, n_timepoints = 120L,
   trend_model = AR(),
   family_pars = list(shape = 2, mtail = 2)
 )

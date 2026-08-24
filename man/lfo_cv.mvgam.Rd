@@ -111,7 +111,7 @@ only refit when the Pareto-k diagnostic exceeds
 \donttest{
 set.seed(11)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-                     n_timepoints = 80L, trend_model = AR())
+                     n_timepoints = 120L, trend_model = AR())
 
 mod <- mvgam(
   y ~ s(x),

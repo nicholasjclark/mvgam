@@ -2334,7 +2334,7 @@ print.mvgam_trend <- function(x, ...) {
 #' simdat <- sim_mvgam(
 #'   family       = gaussian(),
 #'   n_series     = 3L,
-#'   n_timepoints = 60L,
+#'   n_timepoints = 120L,
 #'   trend_model  = VAR(),
 #'   prop_trend   = 0.95
 #' )
@@ -2386,7 +2386,7 @@ print.mvgam_trend <- function(x, ...) {
 #'   type         = 6L,
 #'   family       = gaussian(),
 #'   n_series     = 1L,
-#'   n_timepoints = 80L
+#'   n_timepoints = 120L
 #' )
 #'
 #' # Fit the CAR(1) model. ar1_trend[1] is the continuous-time
@@ -2727,7 +2727,7 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #' # the same constant on the link scale).
 #' set.seed(2024)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-#'                      n_timepoints = 80L)
+#'                      n_timepoints = 120L)
 #'
 #' mod <- mvgam(
 #'   y ~ -1,
@@ -2927,7 +2927,7 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #' simdat <- sim_mvgam(
 #'   family       = gaussian(),
 #'   n_series     = 4L,
-#'   n_timepoints = 60L,
+#'   n_timepoints = 120L,
 #'   trend_model  = VAR(),
 #'   prop_trend   = 0.9
 #' )

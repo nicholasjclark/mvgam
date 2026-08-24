@@ -66,7 +66,7 @@ set.seed(1)
 dat <- sim_mvgam(
   family       = poisson(),
   n_series     = 3L,
-  n_timepoints = 50L
+  n_timepoints = 120L
 )$data_train
 
 mod_nonfac <- mvgam(

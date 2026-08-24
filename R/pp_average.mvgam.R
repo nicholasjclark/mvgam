@@ -58,7 +58,7 @@
 #' \donttest{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-#'                      n_timepoints = 60L, trend_model = AR())
+#'                      n_timepoints = 120L, trend_model = AR())
 #' mod1 <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
 #'                data    = simdat$data_train, family = poisson(),
 #'                chains  = 2, silent = 2)
@@ -239,7 +239,7 @@ brms::posterior_average
 #' \donttest{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-#'                      n_timepoints = 60L, trend_model = AR())
+#'                      n_timepoints = 120L, trend_model = AR())
 #' mod1 <- mvgam(y ~ s(x), trend_formula = ~ AR(p = 1),
 #'                data    = simdat$data_train, family = poisson(),
 #'                chains  = 2, silent = 2)

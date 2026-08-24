@@ -86,7 +86,7 @@ forecast horizons and (when present) test observations.
 # their forecasts, and compare the per-horizon scores.
 set.seed(11)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-                     n_timepoints = 80L, trend_model = AR(),
+                     n_timepoints = 120L, trend_model = AR(),
                      proportional_train = 0.75)
 
 # Model 1: trend only.

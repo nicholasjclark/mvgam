@@ -171,7 +171,7 @@
 #' # `mtheta` (power exponent on the open interval (1, 2)).
 #' set.seed(3)
 #' simdat <- sim_mvgam(family = tweedie(), n_series = 1L,
-#'                      n_timepoints = 60L, trend_model = AR())
+#'                      n_timepoints = 120L, trend_model = AR())
 #'
 #' mod <- mvgam(
 #'   y ~ 1,
@@ -610,7 +610,7 @@ check_tweedie_truncation <- function(object) {
 #' # below 1 gives infinite variance.
 #' set.seed(1)
 #' simdat <- sim_mvgam(
-#'   family = beta_nb(), n_series = 1L, n_timepoints = 80L,
+#'   family = beta_nb(), n_series = 1L, n_timepoints = 120L,
 #'   trend_model = AR(),
 #'   family_pars = list(shape = 2, mtail = 2)
 #' )
@@ -864,7 +864,7 @@ beta_nb_stan_funs <- function() {
 #' sim <- sim_mvgam(
 #'   family       = com_binomial(),
 #'   n_series     = 1L,
-#'   n_timepoints = 80L,
+#'   n_timepoints = 120L,
 #'   trend_model  = RW(),
 #'   family_pars  = list(nu = 1.5, trials = 20L)
 #' )

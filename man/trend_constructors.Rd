@@ -361,7 +361,7 @@ set.seed(0)
 simdat <- sim_mvgam(
   family       = gaussian(),
   n_series     = 3L,
-  n_timepoints = 60L,
+  n_timepoints = 120L,
   trend_model  = VAR(),
   prop_trend   = 0.95
 )
@@ -413,7 +413,7 @@ simdat_car <- sim_mvgam(
   type         = 6L,
   family       = gaussian(),
   n_series     = 1L,
-  n_timepoints = 80L
+  n_timepoints = 120L
 )
 
 # Fit the CAR(1) model. ar1_trend[1] is the continuous-time

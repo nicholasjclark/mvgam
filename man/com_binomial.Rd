@@ -84,7 +84,7 @@ set.seed(1)
 sim <- sim_mvgam(
   family       = com_binomial(),
   n_series     = 1L,
-  n_timepoints = 80L,
+  n_timepoints = 120L,
   trend_model  = RW(),
   family_pars  = list(nu = 1.5, trials = 20L)
 )

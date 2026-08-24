@@ -114,7 +114,7 @@
 #' simdat <- sim_mvgam(
 #'   family       = poisson(),
 #'   n_series     = 3L,
-#'   n_timepoints = 60L,
+#'   n_timepoints = 120L,
 #'   trend_model  = AR()
 #' )
 #' head(simdat$data_train)

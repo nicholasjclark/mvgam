@@ -108,7 +108,7 @@ role of \code{\link[=mvgam_formula]{mvgam_formula()}} for the data side.
 \donttest{
 set.seed(1)
 simdat <- sim_mvgam(family = poisson(), n_series = 3L,
-                     n_timepoints = 40L)
+                     n_timepoints = 120L)
 
 # Verify structure for a Poisson fit and view the multi-series
 # plot.

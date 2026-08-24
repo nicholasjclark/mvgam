@@ -78,7 +78,7 @@ aliasing for trend REs is deferred.
 \donttest{
 set.seed(14)
 simdat <- sim_mvgam(family = poisson(), n_series = 4L,
-                     n_timepoints = 40L, trend_model = AR())
+                     n_timepoints = 120L, trend_model = AR())
 mod <- mvgam(y ~ s(x) + (1 | series),
               trend_formula = ~ AR(p = 1),
               data    = simdat$data_train,

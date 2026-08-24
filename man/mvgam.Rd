@@ -289,7 +289,7 @@ set.seed(2)
 vardat <- sim_mvgam(
   family       = poisson(),
   n_series     = 3L,
-  n_timepoints = 60L,
+  n_timepoints = 120L,
   trend_model  = VAR(cor = TRUE)
 )
 

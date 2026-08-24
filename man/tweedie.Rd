@@ -117,7 +117,7 @@ two-step introduces.
 # `mtheta` (power exponent on the open interval (1, 2)).
 set.seed(3)
 simdat <- sim_mvgam(family = tweedie(), n_series = 1L,
-                     n_timepoints = 60L, trend_model = AR())
+                     n_timepoints = 120L, trend_model = AR())
 
 mod <- mvgam(
   y ~ 1,

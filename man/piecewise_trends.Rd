@@ -112,7 +112,7 @@ scale of your outcome. Note also that no missing values are allowed in
 # the same constant on the link scale).
 set.seed(2024)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
-                     n_timepoints = 80L)
+                     n_timepoints = 120L)
 
 mod <- mvgam(
   y ~ -1,

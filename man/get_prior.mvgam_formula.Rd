@@ -56,7 +56,7 @@ set.seed(1)
 dat <- sim_mvgam(
   family       = poisson(),
   n_series     = 2L,
-  n_timepoints = 50L,
+  n_timepoints = 120L,
   trend_model  = AR()
 )$data_train
 
