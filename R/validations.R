@@ -371,7 +371,22 @@ validate_closure_unit_data <- function(data,
     rep(1L, nrow(data))
   }
 
-  if (any(!is.finite(suppressWarnings(as.numeric(y_vals))))) {
+  # A missing response is a visit that did not happen, which is
+  # routine in repeat-visit designs. Those rows carry no count to
+  # check, so every response check below runs over the observed
+  # visits and the unit arrays skip the rest.
+  observed <- !is.na(y_vals)
+  if (!any(observed)) {
+    stop(insight::format_error(c(
+      paste0("All values of '", response_var, "' are missing."),
+      i = paste0(
+        "Closure-unit families need at least one observed visit to ",
+        "estimate detection."
+      )
+    )))
+  }
+  y_obs <- suppressWarnings(as.numeric(y_vals[observed]))
+  if (any(!is.finite(y_obs))) {
     stop(insight::format_error(
       paste0(
         "Non-finite or non-numeric values found in '",
@@ -379,13 +394,14 @@ validate_closure_unit_data <- function(data,
       )
     ))
   }
-  y_int <- as.integer(y_vals)
-  if (any(y_int < 0L)) {
+  y_int <- rep(NA_integer_, length(y_vals))
+  y_int[observed] <- as.integer(y_vals[observed])
+  if (any(y_int[observed] < 0L)) {
     stop(insight::format_error(
       paste0("Negative counts found in '", response_var, "'.")
     ))
   }
-  if (any(abs(as.numeric(y_vals) - y_int) > 1e-8)) {
+  if (any(abs(y_obs - y_int[observed]) > 1e-8)) {
     stop(insight::format_error(c(
       paste0(
         "Non-integer values found in response '",
@@ -397,8 +413,8 @@ validate_closure_unit_data <- function(data,
       )
     )))
   }
-  if (binary_y_check && any(y_int > 1L)) {
-    bad <- which(y_int > 1L)[1L]
+  if (binary_y_check && any(y_int[observed] > 1L, na.rm = TRUE)) {
+    bad <- which(!is.na(y_int) & y_int > 1L)[1L]
     stop(insight::format_error(c(
       paste0(
         "Binary-response closure-unit family requires '",
@@ -429,8 +445,8 @@ validate_closure_unit_data <- function(data,
       paste0("'", cap_var, "' must be a positive integer.")
     ))
   }
-  if (any(cap_int < y_int)) {
-    bad <- which(cap_int < y_int)[1L]
+  if (any(cap_int < y_int, na.rm = TRUE)) {
+    bad <- which(!is.na(y_int) & cap_int < y_int)[1L]
     stop(insight::format_error(c(
       paste0(
         "Some '", cap_var, "' values are below the observed counts."

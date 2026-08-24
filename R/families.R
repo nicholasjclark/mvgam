@@ -1601,17 +1601,37 @@ build_closure_unit_arrays <- function(data,
   # Per-unit visit counts indexed in `unit_levels` order. `table`
   # would re-order alphabetically; an explicit tabulate keeps
   # the unit ordering deterministic.
-  rep_counts  <- tabulate(unit_int, nbins = n_unit)
-  if (any(rep_counts < 1L)) {
-    stop(insight::format_error(
-      "Every closure unit must have at least one visit row."
-    ))
+  # A missing response is a visit that did not happen. brms drops
+  # those rows from the likelihood, so the unit arrays are built
+  # over the observed visits and `visit_idx` holds positions in
+  # brms's retained rows rather than rows of the raw frame. Units
+  # left with no observed visit carry no information about
+  # detection and are dropped; their timepoints still appear in
+  # the latent process, which spans the full grid regardless.
+  observed <- !is.na(data[[response_var]])
+  retained_pos <- cumsum(observed)
+  rows_by_unit <- lapply(
+    seq_len(n_unit), function(g) which(unit_int == g & observed)
+  )
+  visited <- lengths(rows_by_unit) > 0L
+  if (!any(visited)) {
+    stop(insight::format_error(c(
+      "Every closure unit has only missing responses.",
+      i = paste0(
+        "Closure-unit families need at least one observed visit ",
+        "in at least one unit."
+      )
+    )))
   }
+  rows_by_unit <- rows_by_unit[visited]
+  unit_levels  <- unit_levels[visited]
+  n_unit       <- length(unit_levels)
+  rep_counts   <- lengths(rows_by_unit)
   max_rep <- max(rep_counts)
   visit_idx <- matrix(1L, nrow = n_unit, ncol = max_rep)
   for (g in seq_len(n_unit)) {
-    rows_g <- which(unit_int == g)
-    visit_idx[g, seq_along(rows_g)] <- as.integer(rows_g)
+    visit_idx[g, seq_len(rep_counts[g])] <-
+      as.integer(retained_pos[rows_by_unit[[g]]])
   }
   if (!compute_y_max) {
     # Multi-response path: count families need Y_max + cap-driven
@@ -1630,16 +1650,10 @@ build_closure_unit_arrays <- function(data,
       unit_labels = unit_levels
     ))
   }
+  # Missing entries stay in `y_vals` but are never indexed: every
+  # per-unit lookup below runs over `rows_by_unit`, which holds
+  # observed visits only.
   y_vals <- as.integer(data[[response_var]])
-  if (anyNA(y_vals)) {
-    stop(insight::format_error(c(
-      paste0(
-        "Closure-unit families do not yet support missing values ",
-        "in the response '", response_var, "'."
-      ),
-      i = "Filter or impute before passing the data to mvgam()."
-    )))
-  }
   # Three cap branches in order of precedence:
   #   1. User-supplied `cap` column -> broadcast per row, then
   #      assert constant within a closure unit.
@@ -1665,7 +1679,7 @@ build_closure_unit_arrays <- function(data,
       ))
     }
     for (g in seq_len(n_unit)) {
-      rows_g <- visit_idx[g, seq_len(rep_counts[g])]
+      rows_g <- rows_by_unit[[g]]
       Y_max[g] <- max(y_vals[rows_g])
       cap_g <- cap_vals[rows_g]
       if (length(unique(cap_g)) > 1L) {
@@ -1701,7 +1715,7 @@ build_closure_unit_arrays <- function(data,
     }
   } else if (!is.null(default_cap_buffer)) {
     for (g in seq_len(n_unit)) {
-      rows_g <- visit_idx[g, seq_len(rep_counts[g])]
+      rows_g <- rows_by_unit[[g]]
       Y_max[g] <- max(y_vals[rows_g])
       K_max[g] <- Y_max[g] + as.integer(default_cap_buffer)
     }
@@ -1710,7 +1724,7 @@ build_closure_unit_arrays <- function(data,
     # validator should have refused the call upstream.
     cap_scalar <- as.integer(default_cap)
     for (g in seq_len(n_unit)) {
-      rows_g <- visit_idx[g, seq_len(rep_counts[g])]
+      rows_g <- rows_by_unit[[g]]
       Y_max[g] <- max(y_vals[rows_g])
       K_max[g] <- cap_scalar
     }

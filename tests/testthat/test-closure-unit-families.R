@@ -815,15 +815,22 @@ test_that("build_closure_unit_arrays() errors when cap varies within a unit", {
   )
 })
 
-test_that("build_closure_unit_arrays() rejects NA in response or cap", {
+test_that("build_closure_unit_arrays() skips unvisited occasions", {
   d <- make_nmix_data()
   d_na_y <- d
   d_na_y$y[1L] <- NA_integer_
-  expect_error(
-    build_closure_unit_arrays(d_na_y, response_var = "y"),
-    "missing values in the response"
-  )
-  d_na_cap <- d
+  arrays <- build_closure_unit_arrays(d_na_y, response_var = "y")
+  # The unvisited occasion leaves its unit one replicate shorter,
+  # and the indices count positions among the rows brms keeps
+  # rather than rows of the raw frame.
+  expect_identical(sum(arrays$n_rep), sum(!is.na(d_na_y$y)))
+  expect_true(max(arrays$visit_idx) <= sum(!is.na(d_na_y$y)))
+})
+
+test_that("build_closure_unit_arrays() still rejects a missing cap", {
+  # The cap bounds the latent state for a whole unit, so unlike a
+  # response there is no observed visit to fall back on.
+  d_na_cap <- make_nmix_data()
   d_na_cap$cap[1L] <- NA_integer_
   expect_error(
     build_closure_unit_arrays(d_na_cap, response_var = "y"),

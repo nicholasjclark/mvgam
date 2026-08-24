@@ -4409,23 +4409,39 @@ test_that("NA responses shrink the likelihood but not the trend grid", {
   }
 })
 
-test_that("closure-unit families reject NA responses outright", {
-  # Their Stan code aggregates repeat visits per unit, so the
-  # per-unit arrays are built from the raw frame. NA responses are
-  # refused up front rather than silently misaligning those
-  # arrays; this pins the guard so it is not dropped without a
-  # deliberate replacement.
-  sim <- sim_closure_unit_data(family = occ(), type = 1L, n_sites = 6L,
-                               n_visits = 3L, seed = 3L)
+test_that("closure-unit families keep their unit arrays over observed visits", {
+  # A missing response is a visit that did not happen, which is the
+  # normal case in repeat-visit survey designs. The per-unit arrays
+  # index brms's retained rows, so they must cover the observed
+  # visits exactly: `sum(n_rep)` is the likelihood's row count and
+  # no `visit_idx` entry may point past it.
+  sim <- sim_closure_unit_data(family = occ(), type = 1L,
+                               n_sites = 8L, n_visits = 4L, seed = 3L)
   dat <- sim$data_train
-  dat$y[1L] <- NA
-  expect_error(
-    standata(mvgam_formula(y ~ 1), data = dat, family = occ(),
-             backend = "cmdstanr"),
-    "Non-finite or non-numeric"
+  dat$y[seq(2L, nrow(dat), by = 7L)] <- NA_integer_
+  sd <- expect_warning(
+    standata(mvgam_formula(y ~ 1), data = dat, family = occ()),
+    "Rows containing NAs"
   )
-})
+  expect_identical(as.integer(sd$N), sum(!is.na(dat$y)))
+  expect_identical(sum(sd$n_rep), as.integer(sd$N))
+  expect_true(max(sd$visit_idx) <= sd$N)
+  expect_true(all(sd$Y_max <= sd$K_max))
 
+  # A unit whose visits are all missing carries nothing about
+  # detection and is dropped rather than left to index an empty
+  # visit list in the Stan loop.
+  unit <- paste(dat$series, dat$time)
+  blanked <- dat
+  blanked$y[unit == unique(unit)[2L]] <- NA_integer_
+  sd_dropped <- expect_warning(
+    standata(mvgam_formula(y ~ 1), data = blanked, family = occ()),
+    "Rows containing NAs"
+  )
+  expect_identical(as.integer(sd_dropped$N_unit),
+                   as.integer(sd$N_unit) - 1L)
+  expect_identical(sum(sd_dropped$n_rep), as.integer(sd_dropped$N))
+})
 
 test_that("com_binomial() accepts a constant denominator", {
   # `trials(30)` is the brms spelling for a fixed number of trials.

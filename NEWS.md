@@ -23,6 +23,7 @@ This is a major release that rebuilds mvgam on top of 'brms'. The observation mo
 * Changed default `type` in `conditional_effects()` to `expected` to match behaviour of 'brms'
 
 ## Bug fixes
+* Closure-unit families (`occ()`, `nmix()`) now accept missing responses, so occasions that were never visited can be left as `NA`
 * Bug fix to ensure forecast scores are properly computed when plotting objects of class `mvgam_forecast` if only a single out-of-sample observation was included in `newdata` (#111)
 * Bug fix to ensure offsets supplied with `offset(...)` in formulae are correctly incorporated when using `gp()` terms
 * Bug fix to ensure piecewise trends are correctly predicted when using `process_error = TRUE` in `predict()`
