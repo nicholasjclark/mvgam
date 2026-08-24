@@ -770,9 +770,9 @@ beta_nb_stan_funs <- function() {
 # * Identity link on nu so super-dispersion (nu < 0) is reachable;
 #   `lb = -5` clamps the lower tail where the R-side normaliser
 #   loses relative precision without the C++ adaptive-window guard.
-# * Default `nu ~ normal(1, 0.5)` is tighter than the contributor's
-#   `normal(1, 1)` to suppress the unguarded upper tail that drives
-#   HMC treedepth saturation at large nu.
+# * Default `nu ~ normal(1, 1)`, centred on independence and scaled
+#   to the range the data can resolve; the response saturates
+#   outside roughly nu in (-1, 4).
 # * Variance on the response surface is reported on the proportion
 #   scale Var[Y/T] to match the binomial convention.
 
@@ -806,11 +806,14 @@ beta_nb_stan_funs <- function() {
 #'
 #' @section Default priors:
 #' \itemize{
-#'   \item `nu ~ normal(1, 0.5)` -- centred at binomial equivalence;
-#'     tight enough to avoid HMC pathology in the under-dispersed
-#'     tail without crowding the contributor's recovery range
-#'     `nu_true = c(-0.30, 0.50, 1.60)`. Override via
-#'     `prior(normal(1, 1), class = "nu")` for wider exploration.
+#'   \item `nu ~ normal(1, 1)` -- centred at `nu = 1`, where the
+#'     trials are independent and the distribution is binomial.
+#'     The scale spans the range the data can resolve: the
+#'     response saturates below `nu = -1` and above `nu = 4`, so
+#'     values outside roughly `(-1, 4)` are barely distinguishable.
+#'     Strongly under-dispersed data sit near `nu = 3`. Override
+#'     with `prior(normal(1, 2), class = "nu")` to explore wider,
+#'     or a tighter scale to pull harder toward the binomial.
 #' }
 #'
 #' @section Sampler notes:
@@ -941,14 +944,26 @@ is_com_binomial_family <- function(family) {
 #' `default_simplex_population_priors()` and the injection site in
 #' `R/make_stan.R::generate_stan_components_mvgam_formula()`.
 #'
-#' Tighter than the contributor's `normal(1, 1)` per the gate-A
-#' stats review: the upper tail of nu drives HMC pathology and the
-#' contributor's recovery range (`nu in [-0.3, 1.6]`) sits well
-#' inside `normal(1, 0.5)` (90% mass on `(0.18, 1.82)`).
+#' `nu` is the natural parameter of the COM-Binomial exponential
+#' family and enters the likelihood linearly, so a normal prior on
+#' it regularises the way one on a regression coefficient does. It
+#' is centred at `nu = 1`, where the Bernoulli trials making up
+#' each count are independent and the distribution is binomial.
+#'
+#' The scale follows how much the data can say. The response
+#' saturates at both ends of `nu`: below about -1 the distribution
+#' is already all-or-none, and above about 4 it is nearly a point
+#' mass at half the trials, so neighbouring values become
+#' indistinguishable. Measured as the Kullback-Leibler divergence
+#' between `nu` and `nu + 0.5` at 30 trials, information peaks near
+#' `nu = 0` (1.82) and falls to 0.006 by `nu = 3`. A unit scale
+#' places 95% of the prior mass on `(-0.96, 2.96)`, covering the
+#' range the data can resolve while still pulling in the saturated
+#' tails.
 #'
 #' @noRd
 default_com_binomial_population_priors <- function() {
-  brms::prior("normal(1, 0.5)", class = "nu")
+  brms::prior("normal(1, 1)", class = "nu")
 }
 
 

@@ -3958,12 +3958,13 @@ test_that("com_binomial() emits expected Stan lpmf + lookup table", {
 })
 
 
-test_that("com_binomial() default prior on nu is normal(1, 0.5)", {
-  # Stats-review GATE A locked in `normal(1, 0.5)` (tighter than
-  # the contributor's `normal(1, 1)`) to suppress the upper tail
-  # of nu that drives HMC treedepth saturation. Confirm the
-  # `default_com_binomial_population_priors()` injection at fit
-  # time emits this exact prior on the nu class with the
+test_that("com_binomial() default prior on nu is normal(1, 1)", {
+  # `nu` is the natural parameter of the COM-Binomial exponential
+  # family, so a normal prior on it regularises as one on a
+  # regression coefficient does. It is centred on independence
+  # (`nu = 1`) and scaled to the range the data can resolve, the
+  # response saturating outside roughly `nu` in `(-1, 4)`. Confirm
+  # the injection emits this prior on the nu class along with the
   # truncation correction for the `lb = -5` lower bound.
   set.seed(0)
   dat <- data.frame(
@@ -3978,7 +3979,7 @@ test_that("com_binomial() default prior on nu is normal(1, 0.5)", {
     mf, data = dat, family = com_binomial(), validate = FALSE
   ))
   expect_true(grepl(
-    "lprior \\+= normal_lpdf\\(nu \\| 1, 0\\.5\\)", sc
+    "lprior \\+= normal_lpdf\\(nu \\| 1, 1\\)", sc
   ))
   expect_true(grepl("real<lower=-5> nu", sc))
 })
@@ -4210,7 +4211,7 @@ test_that("a modelled dpar does not collide with mvgam's injected default prior"
   # nu is identity-linked, so its default belongs on the intercept once
   # nu is modelled. Without the move brms falls back to a positive-only
   # gamma on a parameter that may go negative, and warns.
-  expect_true(grepl("normal_lpdf(Intercept_nu | 1, 0.5)", sc, fixed = TRUE))
+  expect_true(grepl("normal_lpdf(Intercept_nu | 1, 1)", sc, fixed = TRUE))
   expect_false(grepl("gamma_lpdf(Intercept_nu", sc, fixed = TRUE))
 
   # and the scalar default is still emitted when nu is not modelled
@@ -4218,7 +4219,7 @@ test_that("a modelled dpar does not collide with mvgam's injected default prior"
     mvgam_formula(y | trials(trials) ~ 1),
     data = dat, family = com_binomial(), backend = "cmdstanr"
   )), collapse = "\n")
-  expect_true(grepl("normal_lpdf(nu | 1, 0.5)", sc_plain, fixed = TRUE))
+  expect_true(grepl("normal_lpdf(nu | 1, 1)", sc_plain, fixed = TRUE))
 })
 
 

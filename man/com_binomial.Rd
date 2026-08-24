@@ -44,11 +44,14 @@ is supported via \code{bf(y | trials(trials) ~ x, nu ~ z)}.}
 \section{Default priors}{
 
 \itemize{
-\item \code{nu ~ normal(1, 0.5)} -- centred at binomial equivalence;
-tight enough to avoid HMC pathology in the under-dispersed
-tail without crowding the contributor's recovery range
-\code{nu_true = c(-0.30, 0.50, 1.60)}. Override via
-\code{prior(normal(1, 1), class = "nu")} for wider exploration.
+\item \code{nu ~ normal(1, 1)} -- centred at \code{nu = 1}, where the
+trials are independent and the distribution is binomial.
+The scale spans the range the data can resolve: the
+response saturates below \code{nu = -1} and above \code{nu = 4}, so
+values outside roughly \verb{(-1, 4)} are barely distinguishable.
+Strongly under-dispersed data sit near \code{nu = 3}. Override
+with \code{prior(normal(1, 2), class = "nu")} to explore wider,
+or a tighter scale to pull harder toward the binomial.
 }
 }
 

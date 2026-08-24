@@ -107,8 +107,8 @@ test_that("the posterior for nu reproduces each dataset's likelihood", {
   # property of that draw, so it fails for a correct model about a
   # tenth of the time. What must hold every run is that the sampler
   # lands where the likelihood for that dataset points: the default
-  # `normal(1, 0.5)` prior moves the posterior median by only about
-  # 0.02 at this sample size, measured against a near-flat prior.
+  # prior moves the posterior median by only about 0.02 at this
+  # sample size, measured against a near-flat prior.
   fits <- .cmb_fits()
   for (nm in names(fits)) {
     nu_draws <- as.numeric(as.array(fits[[nm]], variable = "nu"))

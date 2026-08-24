@@ -18,6 +18,7 @@ This is a major release that rebuilds mvgam on top of 'brms'. The observation mo
 * Added a `mvgam_use_cases` help file to provide links to online resources that discuss how to use 'mvgam' in practice
 
 ## Changing defaults
+* The `com_binomial()` default prior on `nu` is now `normal(1, 1)` rather than `normal(1, 0.5)`, which was too tight to reach the strongly under-dispersed counts that sit near `nu = 3`
 * The `forecast()` method is now imported from 'generics' to help avoid conflict issues with other forecasting packages
 * Deprecated the `incl_dynamics` argument in the `loo()` and `loo_compare()` functions to ensure better consistency in log-likelihood and resulting LOO estimates from models with different observation families
 * Changed default `type` in `conditional_effects()` to `expected` to match behaviour of 'brms'

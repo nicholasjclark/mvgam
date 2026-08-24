@@ -9,7 +9,7 @@
 # injected class-level prior matched nothing and brms rejected the
 # whole prior set. Overriding the prior collided with the same
 # injection and raised a duplicate-specification error, which left
-# `normal(1, 0.5)` effectively fixed.
+# the default scale effectively fixed.
 #
 # Run with:
 #   Rscript -e "devtools::load_all('.'); testthat::test_file('tests/local/com_binomial_dispersion.R')"
@@ -51,11 +51,10 @@ test_that("dispersion accepts its own linear predictor", {
 
 
 test_that("a wider prior reaches strongly under-dispersed data", {
-  # `normal(1, 0.5)` puts nu = 3 four prior standard deviations from
-  # its mean, and real under-dispersed counts do sit there. The
-  # override has to change the answer rather than merely be
-  # accepted, so both fits use the same data and differ only in the
-  # prior.
+  # Strongly under-dispersed counts sit near nu = 3, two prior
+  # standard deviations above the default mean. The override has to
+  # change the answer rather than merely be accepted, so both fits
+  # use the same data and differ only in the prior.
   set.seed(2029)
   n_t <- 200L
   trials <- pmax(rpois(n_t, 30L), 1L)
