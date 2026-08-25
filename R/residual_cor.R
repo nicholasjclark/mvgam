@@ -729,7 +729,7 @@ get_residcor_series_names <- function(object, cov_struct) {
 
 
 #' Return the active trend spec for an mvgam fit (multivariate
-#' fits use the first spec — per-response hierarchical heterogeneity
+#' fits use the first spec; per-response hierarchical heterogeneity
 #' is out of scope for residual_cor).
 #'
 #' @noRd

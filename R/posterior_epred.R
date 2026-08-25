@@ -447,7 +447,7 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #'   inverse link, matching brms's analytical convention for
 #'   autocorrelated residual models (e.g. Jensen correction
 #'   \eqn{\sigma^2/(1-\rho^2)/2} for AR(1) Poisson). If FALSE, the
-#'   trend is fixed at its posterior mean (no innovations) — faster
+#'   trend is fixed at its posterior mean (no innovations), which is faster
 #'   but ignores process noise.
 #'
 #'   Note: with `process_error = TRUE` the invariant
@@ -610,7 +610,7 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
   }
 
   # Extract family information for transformation
-  # Use resp argument as single source of truth for response selection
+  # `resp` decides which response is being predicted
   is_mv <- inherits(object$formula, "mvbrmsformula") &&
     !is.null(object$formula$forms) &&
     length(object$formula$forms) > 1

@@ -64,8 +64,10 @@ waic.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
   logliks <- log_lik(
     x, resp = resp, process_error = incl_dynamics, ...
   )
+  # Drop the all-NA columns a missing response leaves behind, the same
+  # way loo.mvgam does, so both criteria score the same observations.
+  logliks <- clean_ll(x, logliks)
   if (isTRUE(by_species)) {
-    logliks <- clean_ll(x, logliks)
     return(per_species_ic(x, logliks, criterion = "waic"))
   }
   loo::waic(logliks)

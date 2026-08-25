@@ -92,8 +92,8 @@ variables.mvgam <- function(x, ...) {
 #' suffix to avoid naming conflicts with observation model parameters.
 #'
 #' The alias column is reserved for mapping Stan parameter names to mgcv-style
-#' coefficient names (e.g., "s_x_1\[3\]" might alias to "s(x).3"). Currently
-#' set to NA as this mapping is not yet implemented.
+#' coefficient names (e.g., "s_x_1\[3\]" might alias to "s(x).3"). It holds
+#' NA; Stan names are what the draws carry.
 #'
 #' @noRd
 categorize_mvgam_parameters <- function(x) {

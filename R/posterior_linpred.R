@@ -196,7 +196,7 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #'   computation.
 #'
 #'   `posterior_linpred()` does NOT add sampled stochastic innovations
-#'   from the trend's covariance structure — it remains a
+#'   from the trend's covariance structure; it remains a
 #'   deterministic function of the parameter draws. State-space
 #'   process noise is added inside `posterior_epred()` and
 #'   `posterior_predict()` (matching the brms convention of returning
@@ -244,7 +244,7 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #' \itemize{
 #'   \item TRUE: Full posterior uncertainty from both observation and
 #'     trend parameters (per-draw variation). Does NOT add sampled
-#'     stochastic innovations — the linpred remains a deterministic
+#'     stochastic innovations; the linpred remains a deterministic
 #'     function of the parameters at each draw.
 #'   \item FALSE: Trend fixed at posterior mean; only observation
 #'     uncertainty propagated (faster but understates total uncertainty).
@@ -252,7 +252,7 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #'
 #' If you want predictive samples that include the unobserved
 #' stochastic component of the latent trend (state-space process
-#' noise), use [posterior_predict.mvgam()] — that is the only entry
+#' noise), use [posterior_predict.mvgam()], the only entry
 #' point that adds sampled innovations on top of the linear predictor.
 #'
 #' @seealso [brms::posterior_linpred()] for the brms generic,

@@ -4121,7 +4121,7 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
     }
   }
 
-  # Extract and validate parameters (single source of truth)
+  # Read the dimensions once, then validate them
   n_obs <- data_info$n_obs
   n_series <- data_info$n_series %||% 1
   n_lv <- trend_specs$n_lv %||% n_series
@@ -5540,7 +5540,9 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   components <- append_if_not_null(base_components, trend_computation)
 
   # Add VAR hierarchical correlation parameters required for compilation
-  # Use DRY approach via selective calls to avoid architectural conflicts from add_hierarchical_support() 
+  # Added by selective calls rather than through
+  # add_hierarchical_support(), which would also emit blocks the VAR
+  # template declares for itself.
   if (is_hierarchical && !is.null(hierarchical_info)) {
     # Validate hierarchical_info has required fields
     checkmate::assert_names(names(hierarchical_info), 
@@ -6676,7 +6678,9 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
     mu_construction_result <- extract_mu_construction_with_classification(stancode)
 
     if (length(mu_construction_result$mu_construction) > 0) {
-      # Store extracted mu lines AND supporting declarations to filter them from model block (DRY solution)
+      # Keep the extracted mu lines together with the declarations they
+      # depend on, so both can be filtered out of the model block in one
+      # pass.
       extracted_mu_lines <- c(
         mu_construction_result$mu_construction,
         mu_construction_result$supporting_declarations
@@ -6832,7 +6836,7 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
   }
 
   # 4. Extract model block content (without headers) but exclude likelihood statements
-  # Process AFTER mu_trend extraction to avoid duplicate mu construction (DRY solution)
+  # Runs after mu_trend extraction so mu is not constructed twice.
   model_block <- extract_stan_block_content(stancode, "model")
   model_stanvar_created <- FALSE
 

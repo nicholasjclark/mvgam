@@ -539,7 +539,7 @@ validate_closure_unit_data <- function(data,
     if (binary_y_check) {
       if (!identical(Sys.getenv("TESTTHAT"), "true")) {
         rlang::warn(
-          insight::format_warning(c(
+          insight::format_message(c(
             "Every closure unit has a single visit and no covariates.",
             i = paste0(
               "Only the product of state and detection probability ",
@@ -572,7 +572,7 @@ validate_closure_unit_data <- function(data,
   if (single_visit_share > 0.3 && !all(rep_counts == 1L)) {
     if (!identical(Sys.getenv("TESTTHAT"), "true")) {
       rlang::warn(
-        insight::format_warning(c(
+        insight::format_message(c(
           paste0(
             "More than 30% of closure units have a single visit ",
             "(", round(100 * single_visit_share),
@@ -852,7 +852,7 @@ validate_required_variables <- function(data, required_vars, context = "data", f
 #' `trend_map` input shapes to a canonical numeric loading
 #' matrix `Z` of dimension `n_series × n_lv`. Every consumer of
 #' fixed loadings (the `mvgam()` arg, the trend constructors,
-#' the future `nmix`/`jsdgam` ports) calls this function — there
+#' the future `nmix`/`jsdgam` ports) calls this function, so there
 #' is no parallel parsing anywhere else.
 #'
 #' Accepted shapes:
@@ -864,7 +864,7 @@ validate_required_variables <- function(data, required_vars, context = "data", f
 #'     (partial Z); the free entries are sampled jointly while
 #'     the fixed entries stay pinned. `n_lv` is inferred from
 #'     `ncol(Z)`.
-#'   \item `data.frame(series, trend)` — one row per series
+#'   \item `data.frame(series, trend)`: one row per series
 #'     assigning each to a single trend integer. The resulting
 #'     Z is binary `0/1` with `Z[s, k] = 1` iff
 #'     `trend_map$trend[trend_map$series == s] == k`.
@@ -2723,8 +2723,8 @@ validate_setup_components <- function(components) {
 #' Validate Time Series Structure for Trends
 #'
 #' @description
-#' Ensures time series data is compatible with specified trend models.
-#' Leverages existing mvgam validation functions.
+#' Ensures time series data is compatible with specified trend models,
+#' by calling the individual mvgam validators.
 #'
 #' @param data Data to validate (data.frame or list)
 #' @param trend_specs Trend specification containing trend model info
@@ -2874,8 +2874,8 @@ validate_trend_components <- function(trend_components) {
 #'
 #' @description
 #' Extracts core time series dimensions directly from data and validates
-#' structure based on trend type. This is the single source of truth for
-#' all time series dimensions used throughout the system.
+#' structure based on trend type. Every time series dimension the model
+#' needs is read here.
 #'
 #' @param data Data frame containing time series
 #' @param time_var Name of time variable (default: "time")
@@ -3560,7 +3560,7 @@ validate_factor_levels <- function(data, var_name, data_name = "data", auto_drop
     } else {
       # Warn about unused levels
       rlang::warn(
-        message = insight::format_warning(c(
+        message = insight::format_message(c(
           cli::format_inline(
             "Factor variable {.field {var_name}} in {data_name} has unused levels: {paste(unused_levels, collapse = ', ')}."
           ),
@@ -3652,6 +3652,117 @@ extract_factor_levels <- function(data, var_name) {
 #'   prediction data contains factor levels not in training data.
 #'
 #' @noRd
+# Internal: tell the user once when a `series` column they supplied is
+# superseded by the one `gr` and `subgr` imply.
+#
+# `gr` and `subgr` together identify a series, so mvgam builds the
+# column itself and ignores whatever `series` the data carried. Staying
+# silent leaves a user whose own column disagreed believing the model
+# was grouped their way, and every post-fit label then reads back in
+# mvgam's spelling rather than theirs.
+#'@noRd
+warn_series_superseded <- function(data, series_var, series_values,
+                                   gr_var, subgr_var) {
+  if (identical(Sys.getenv("TESTTHAT"), "true")) {
+    return(invisible(NULL))
+  }
+  # `silent >= 2` suppresses mvgam's own notices. mvgam() and jsdgam()
+  # stash the entry-time value on this option so validators this deep
+  # can read it without it being threaded through every call.
+  if (isTRUE(getOption("mvgam.silent", 0L) >= 2L)) {
+    return(invisible(NULL))
+  }
+  if (is.null(series_var) || !series_var %in% names(data)) {
+    return(invisible(NULL))
+  }
+  supplied <- as.character(data[[series_var]])
+  derived <- as.character(series_values)
+  if (identical(supplied, derived)) {
+    return(invisible(NULL))
+  }
+  rlang::warn(
+    insight::format_message(c(
+      paste0(
+        "The '", series_var, "' column was replaced by the series that '",
+        gr_var, "' and '", subgr_var, "' define."
+      ),
+      x = paste0(
+        "Supplied: '", supplied[1L], "'. Used: '", derived[1L], "'."
+      ),
+      i = paste0(
+        "Hierarchical trends name a series by its grouping variables, ",
+        "so supplying '", series_var, "' is not needed."
+      ),
+      i = paste0(
+        "Every post-fit summary, plot and forecast labels this series ",
+        "'", derived[1L], "'."
+      )
+    )),
+    .frequency = "once",
+    .frequency_id = "mvgam_series_superseded"
+  )
+  invisible(NULL)
+}
+
+
+# Internal: TRUE when a metadata variable name points at a usable
+# column. Trend metadata stores an absent variable as NULL, NA or the
+# literal string "NA" depending on how it was recorded.
+#'@noRd
+named_var <- function(var) {
+  !is.null(var) && length(var) == 1L && !is.na(var) &&
+    nzchar(var) && !identical(var, "NA")
+}
+
+
+# Internal: TRUE when a metadata variable names a column the data
+# actually carries.
+#'@noRd
+usable_var <- function(var, data) {
+  named_var(var) && var %in% names(data)
+}
+
+
+# Internal: require the grouping columns a hierarchical trend needs.
+#
+# Reason: a bare `checkmate::assert_names()` reports the missing names
+# without saying why they are wanted, which reads as an internal
+# assertion to someone who simply passed a newdata built from the
+# covariates they model over.
+#'@noRd
+assert_grouping_columns <- function(data, gr_var, subgr_var) {
+  wanted <- c(gr_var, subgr_var)
+  missing <- wanted[!vapply(wanted, usable_var, logical(1L), data = data)]
+  if (!length(missing)) {
+    return(invisible(TRUE))
+  }
+  stop(insight::format_error(c(
+    "Columns needed to identify each series are missing from 'newdata'.",
+    x = cli::format_inline("Missing: {.field {missing}}."),
+    i = cli::format_inline(paste0(
+      "This model groups its trend by {.field {gr_var}} and ",
+      "{.field {subgr_var}}, which together name a series, so ",
+      "'newdata' must carry both."
+    ))
+  )), call. = FALSE)
+}
+
+
+# Internal: the series identifier a hierarchical trend uses.
+#
+# `gr` and `subgr` together name a series, so mvgam derives the column
+# rather than reading one the user supplied. Every site that needs the
+# value builds it here, so the fitting path, the prediction path and
+# the level validator cannot drift apart on separator or ordering.
+#'@noRd
+hierarchical_series_values <- function(data, gr_var, subgr_var) {
+  interaction(
+    data[[gr_var]], data[[subgr_var]],
+    drop = TRUE, sep = "_", lex.order = TRUE
+  )
+}
+
+
 validate_prediction_factor_levels <- function(data, metadata) {
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_list(metadata, names = "named")
@@ -3667,22 +3778,45 @@ validate_prediction_factor_levels <- function(data, metadata) {
   }
   checkmate::assert_list(metadata$variables, names = "named")
 
-  # Validate series levels
+  # Validate series levels.
+  #
+  # A hierarchical trend derives its series identifier from `gr` and
+  # `subgr`, so any `series` column sitting in the data is not the one
+  # the model was fitted on and must not be compared against the stored
+  # levels. Rebuild the derived value instead: that still catches a
+  # `gr` / `subgr` combination the training data never contained, even
+  # though each level on its own is known.
   if (!is.null(metadata$levels$series)) {
-    series_var <- metadata$variables$series_var
-    if (!is.null(series_var) && series_var %in% names(data)) {
-      newdata_levels <- extract_factor_levels(data, series_var)
-      if (!is.null(newdata_levels)) {
-        invalid <- setdiff(newdata_levels, metadata$levels$series)
-        if (length(invalid) > 0) {
-          stop(insight::format_error(c(
-            "Series levels in newdata not found in training data.",
-            x = cli::format_inline("Invalid: {.val {invalid}}."),
-            i = cli::format_inline(
-              "Training data has levels: {.val {metadata$levels$series}}."
-            )
-          )), call. = FALSE)
-        }
+    gr_var <- metadata$variables$gr_var
+    subgr_var <- metadata$variables$subgr_var
+    # `series_source` records that the column was derived, but a pair
+    # of grouping variables says the same thing, so either is enough.
+    # Relying on the field alone would let a fit whose metadata lacks
+    # it fall through and be checked against a stale column.
+    derived_hier <- identical(metadata$series_source, "hierarchical") ||
+      (named_var(gr_var) && named_var(subgr_var))
+    newdata_levels <- NULL
+    if (derived_hier) {
+      assert_grouping_columns(data, gr_var, subgr_var)
+      newdata_levels <- levels(droplevels(
+        hierarchical_series_values(data, gr_var, subgr_var)
+      ))
+    } else {
+      series_var <- metadata$variables$series_var
+      if (!is.null(series_var) && series_var %in% names(data)) {
+        newdata_levels <- extract_factor_levels(data, series_var)
+      }
+    }
+    if (!is.null(newdata_levels)) {
+      invalid <- setdiff(newdata_levels, metadata$levels$series)
+      if (length(invalid) > 0) {
+        stop(insight::format_error(c(
+          "Series levels in newdata not found in training data.",
+          x = cli::format_inline("Invalid: {.val {invalid}}."),
+          i = cli::format_inline(
+            "Training data has levels: {.val {metadata$levels$series}}."
+          )
+        )), call. = FALSE)
       }
     }
   }
@@ -4694,8 +4828,10 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
       if (!is.null(gr_var) && !is.null(subgr_var) &&
           !is.na(gr_var) && !is.na(subgr_var) &&
           gr_var != "NA" && subgr_var != "NA") {
-        checkmate::assert_names(names(data), must.include = c(gr_var, subgr_var))
-        series_values <- interaction(data[[gr_var]], data[[subgr_var]], drop = TRUE, sep = '_', lex.order = TRUE)
+        assert_grouping_columns(data, gr_var, subgr_var)
+        series_values <- hierarchical_series_values(
+          data, gr_var, subgr_var
+        )
         series_source <- "hierarchical"
       }
     } else if (stored_source == "multivariate" && !is.null(metadata$response_vars)) {
@@ -4718,9 +4854,13 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
       # series column, fall through to Strategy 3 so the original
       # series values are preserved (the codegen path reads the series
       # column directly).
-      checkmate::assert_names(names(data), must.include = c(gr_var, subgr_var))
-      series_values <- interaction(data[[gr_var]], data[[subgr_var]], drop = TRUE, sep = '_', lex.order = TRUE)
+      assert_grouping_columns(data, gr_var, subgr_var)
+      series_values <- hierarchical_series_values(
+        data, gr_var, subgr_var
+      )
       series_source <- "hierarchical"
+      warn_series_superseded(data, series_var, series_values,
+                             gr_var, subgr_var)
     }
   }
 

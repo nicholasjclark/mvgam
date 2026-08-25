@@ -212,15 +212,7 @@ bayes_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   # response_names that is structural, not a second response;
   # is.mvbrmsformula is the authoritative MV indicator.
   is_mv <- brms::is.mvbrmsformula(object$formula)
-  if (is_mv && is.null(resp)) {
-    stop(insight::format_error(c(
-      "bayes_R2 requires 'resp' for multivariate models.",
-      i = paste0(
-        "Available responses: ",
-        paste(shQuote(object$response_names), collapse = ", "), "."
-      )
-    )))
-  }
+  assert_resp_for_mv(object, resp, "bayes_R2")
   resp_use <- if (is.null(resp)) object$response_names[1L] else resp
   # Bayesian R^2 of Gelman et al. (2019): var(epred) / (var(epred) +
   # var(residual)) per draw, where residuals are y - epred. The

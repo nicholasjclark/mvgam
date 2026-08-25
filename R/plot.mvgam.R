@@ -2,7 +2,7 @@
 #'
 #' Plot method for fitted `mvgam` objects. A thin S3 dispatcher
 #' that routes by `type` to the canonical plotting surface for
-#' each kind of summary. No bespoke plotting code lives here —
+#' each kind of summary. No bespoke plotting code lives here:
 #' every branch forwards to a single dedicated function.
 #'
 #' @param x A fitted `mvgam` object.

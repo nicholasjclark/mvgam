@@ -658,12 +658,7 @@ pp_check.mvgam <- function(
   if (needs_psis) {
     ll <- log_lik(object, newdata = newdata, process_error = TRUE,
                   resp = resp, draw_ids = draw_ids)
-    chains <- posterior::nchains(posterior::as_draws_array(object$fit))
-    n_per_chain <- NROW(ll) / chains
-    r_eff <- loo::relative_eff(
-      exp(ll),
-      chain_id = sort(rep(seq_len(chains), n_per_chain))
-    )
+    r_eff <- mvgam_r_eff_log_lik(object, ll, draw_ids = draw_ids)
     psis_obj <- suppressWarnings(
       loo::psis(-ll, r_eff = r_eff)
     )
@@ -932,7 +927,7 @@ build_resid_qq_panel <- function(resid_draws) {
 # Internal: Resids-vs-fitted panel. `per_obs = TRUE` (the default
 # at the call site in `pp_check.mvgam`) collapses each
 # observation to its posterior median for both fitted and
-# residual — one point per observation, matching the
+# residual: one point per observation, matching the
 # `plot.lm` convention. `per_obs = FALSE` retains the pooled
 # (draw x obs) scatter that exposes the per-draw spread of
 # discrete-PIT residuals at low fitted values. The thin-plate

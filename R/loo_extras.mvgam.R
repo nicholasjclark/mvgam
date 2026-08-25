@@ -100,16 +100,72 @@ NULL
 
 # Internal: relative effective sample size for a per-observation
 # log-likelihood matrix, using the chain layout of `x$fit`. Mirrors
-# brms's `r_eff_log_lik` helper. Shared by every LOO-extras method
-# that needs to build a PSIS object.
+# brms's `r_eff_log_lik` helper. Shared by every method that builds a
+# PSIS object, so the chain bookkeeping lives in one place.
+#
+# `draw_ids` names the draws retained in `ll` when the caller
+# subsampled, indexing into the chain-major flattened draws.
+#
+# Reason: loo::relative_eff() reshapes the matrix into a draws x
+# chains array and so demands every chain contribute the same number
+# of rows. A subsampled or otherwise unbalanced set of draws breaks
+# that, and building the chain vector by recycling a fractional
+# count silently produces one shorter than the matrix. Where the
+# chain layout cannot be recovered exactly, report r_eff = 1, which
+# is loo's documented reading for draws that are not a contiguous
+# MCMC sample; a random subsample across chains is close to
+# independent, so the assumption costs little.
 #'@noRd
-mvgam_r_eff_log_lik <- function(x, ll) {
-  chains <- posterior::nchains(posterior::as_draws_array(x$fit))
-  n_per_chain <- NROW(ll) / chains
-  loo::relative_eff(
-    exp(ll),
-    chain_id = sort(rep(seq_len(chains), n_per_chain))
+mvgam_r_eff_log_lik <- function(x, ll, draw_ids = NULL) {
+  n_draws <- NROW(ll)
+  n_obs <- NCOL(ll)
+  chains <- tryCatch(
+    posterior::nchains(posterior::as_draws_array(x$fit)),
+    error = function(e) 1L
   )
+  chain_id <- mvgam_chain_id(chains, n_draws, draw_ids, x)
+  if (is.null(chain_id)) {
+    return(rep(1, n_obs))
+  }
+  loo::relative_eff(exp(ll), chain_id = chain_id)
+}
+
+
+# Internal: chain membership for each retained draw, or NULL when a
+# balanced chain layout cannot be recovered.
+#'@noRd
+mvgam_chain_id <- function(chains, n_draws, draw_ids = NULL, x = NULL) {
+  if (!isTRUE(chains > 1L)) {
+    return(NULL)
+  }
+  if (is.null(draw_ids)) {
+    if (n_draws %% chains != 0L) {
+      return(NULL)
+    }
+    return(rep(seq_len(chains), each = n_draws %/% chains))
+  }
+  total <- tryCatch(
+    posterior::ndraws(posterior::as_draws_array(x$fit)),
+    error = function(e) NA_integer_
+  )
+  if (is.na(total) || total %% chains != 0L) {
+    return(NULL)
+  }
+  per_chain <- total %/% chains
+  cid <- ((as.integer(draw_ids) - 1L) %/% per_chain) + 1L
+  if (length(cid) != n_draws) {
+    return(NULL)
+  }
+  counts <- table(factor(cid, levels = seq_len(chains)))
+  if (any(counts == 0L) || length(unique(as.integer(counts))) != 1L) {
+    return(NULL)
+  }
+  # relative_eff() reads the matrix chain-block by chain-block, so the
+  # ids must arrive grouped by chain.
+  if (is.unsorted(cid)) {
+    return(NULL)
+  }
+  cid
 }
 
 
@@ -161,12 +217,34 @@ mvgam_loo_R2 <- function(y, epred, ll, r_eff) {
 # samples and the PSIS expectation drifts substantially from the
 # brms equivalent.
 #'@noRd
+# Internal: stop with a consistent message when a method that can only
+# operate on one response at a time is handed a multivariate fit and
+# no `resp`. Reason: the guard was spelled out separately in each
+# method that had one, so the methods that lacked it failed deep in
+# the prediction stack with an internal message
+# ("is.numeric(x) is not TRUE") instead of naming the fix.
+#'@noRd
+assert_resp_for_mv <- function(object, resp, fn_name) {
+  if (!brms::is.mvbrmsformula(object$formula) || !is.null(resp)) {
+    return(invisible(NULL))
+  }
+  stop(insight::format_error(c(
+    paste0("'", fn_name, "()' requires 'resp' for multivariate models."),
+    i = paste0(
+      "Available responses: ",
+      paste(shQuote(object$response_names), collapse = ", "), "."
+    )
+  )), call. = FALSE)
+}
+
+
 mvgam_loo_E_loo <- function(object, posterior_fn,
                              type = c("mean", "var", "quantile"),
                              probs = 0.5, psis_object = NULL,
                              resp = NULL, ...) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_function(posterior_fn)
+  assert_resp_for_mv(object, resp, loo_fn_name(posterior_fn))
   type <- match.arg(type)
   if (exists(".Random.seed", envir = .GlobalEnv)) {
     rng_old <- get(".Random.seed", envir = .GlobalEnv)
@@ -191,8 +269,21 @@ mvgam_loo_E_loo <- function(object, posterior_fn,
 }
 
 
+# Internal: map the prediction function back to the exported wrapper
+# the caller actually typed, so the guard names a real function.
+#'@noRd
+loo_fn_name <- function(posterior_fn) {
+  for (nm in c("posterior_predict", "posterior_epred", "posterior_linpred")) {
+    if (identical(posterior_fn, get(nm, envir = asNamespace("mvgam")))) {
+      return(sub("^posterior_", "loo_", nm))
+    }
+  }
+  "loo_predict"
+}
+
+
 # Internal: per-slab normalisation that mirrors the brms helper
-# `E_loo_value` — wraps a vector into a 1-col matrix, transposes
+# `E_loo_value`: wraps a vector into a 1-col matrix, transposes
 # the quantile matrix into observation-row layout, and assigns
 # column labels (`"mean"`, `"var"`, or `"q{prob*100}"`).
 #'@noRd
@@ -258,15 +349,7 @@ loo_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   checkmate::assert_list(args_epred)
   checkmate::assert_list(args_loglik)
   is_mv <- brms::is.mvbrmsformula(object$formula)
-  if (is_mv && is.null(resp)) {
-    stop(insight::format_error(c(
-      "'loo_R2' requires 'resp' for multivariate models.",
-      i = paste0(
-        "Available responses: ",
-        paste(shQuote(object$response_names), collapse = ", "), "."
-      )
-    )))
-  }
+  assert_resp_for_mv(object, resp, "loo_R2")
   if (!is.null(seed)) {
     if (exists(".Random.seed", envir = .GlobalEnv)) {
       rng_old <- get(".Random.seed", envir = .GlobalEnv)
@@ -357,6 +440,10 @@ loo_predictive_interval.mvgam <- function(object, prob = 0.9,
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_number(prob, lower = 0, upper = 1)
   alpha <- (1 - prob) / 2
+  # brms's method takes no `resp`, so a multivariate caller supplies
+  # it through `...`; it reaches `loo_predict()`, which carries the
+  # guard. Declaring it here instead would break signature parity
+  # with brms.
   loo_predict(
     object, type = "quantile", probs = c(alpha, 1 - alpha),
     psis_object = psis_object, ...

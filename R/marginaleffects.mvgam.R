@@ -5,8 +5,8 @@
 #' `get_coef`, `get_vcov` and `set_coef`. Bayesian models bypass the
 #' delta-method path and use the `posterior_draws` attribute attached
 #' by `get_predict`, so `get_coef` / `get_vcov` / `set_coef` exist
-#' mostly to satisfy the S3 surface — they are not load-bearing for
-#' predictions or slopes.
+#' only to satisfy the S3 surface. Neither predictions nor slopes
+#' read them.
 #'
 #' @name mvgam_marginaleffects
 #'
@@ -213,8 +213,8 @@ get_vcov.mvgam <- function(model, vcov = NULL, ...) {
 #' @export
 set_coef.mvgam <- function(model, coefs, ...) {
   # Bayesian uncertainty propagation goes through the posterior_draws
-  # attribute on get_predict; coefficient overrides on the fitted
-  # object are not load-bearing for the marginaleffects pipeline.
+  # attribute on get_predict; marginaleffects never reads a
+  # coefficient override set on the fitted object.
   model
 }
 

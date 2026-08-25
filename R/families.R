@@ -466,7 +466,7 @@ check_tweedie_truncation <- function(object) {
     " (ratio = ", format(lambda_max / M, digits = 3), ")."
   )
   if (lambda_max > 0.7 * M) {
-    rlang::warn(insight::format_warning(c(
+    rlang::warn(insight::format_message(c(
       "Tweedie truncation 'M' may be too small.",
       x = paste0(
         "max(lambda) at the posterior mean is ",
@@ -1152,7 +1152,7 @@ com_binomial_lookup_stan <- function() {
 #' Pure-Stan implementation; the contributor's external C++ kernel
 #' (`inst/include/com_binomial.hpp`) with adaptive-window
 #' truncation and a custom partial propagator is deferred to a v2.2
-#' perf follow-up where the win on long-trial data can be
+#' a separate change where the win on long-trial data can be
 #' benchmarked against this baseline.
 #'
 #' @noRd
@@ -4577,7 +4577,7 @@ prepare_closure_unit_family <- function(family, data, response_var,
       !has_obs_covariates && !has_det_covariates) {
     if (!identical(Sys.getenv("TESTTHAT"), "true")) {
       rlang::warn(
-        insight::format_warning(c(
+        insight::format_message(c(
           "nmix(\"poisson_poisson\") with intercept-only mu and p is weakly identified.",
           x = paste0(
             "Only the product `lambda * p` is identified by the ",

@@ -29,7 +29,7 @@
 #'
 #' @details The plot palette is read lazily from
 #'   `bayesplot::color_scheme_get()` so a user-side
-#'   `bayesplot::color_scheme_set()` call composes — change the
+#'   `bayesplot::color_scheme_set()` call composes, so changing the
 #'   bayesplot scheme to retheme every panel without touching
 #'   the call. The hindcast band is plotted in light grey to
 #'   distinguish in-sample uncertainty from the multi-band

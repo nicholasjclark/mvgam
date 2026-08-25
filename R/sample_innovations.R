@@ -84,7 +84,7 @@ get_covariance_pattern <- function(trend_type) {
     # Default to cholesky_scaled for unknown types (most common pattern)
     if (!identical(Sys.getenv("TESTTHAT"), "true")) {
       rlang::warn(
-        insight::format_warning(
+        insight::format_message(
           c(
             paste0("Unknown trend type '", trend_type, "' encountered."),
             i = "Defaulting to 'cholesky_scaled' covariance pattern.",
@@ -326,7 +326,7 @@ get_trend_type <- function(object) {
   if (!is.null(object$trend_formula)) {
     if (!identical(Sys.getenv("TESTTHAT"), "true")) {
       rlang::warn(
-        insight::format_warning(
+        insight::format_message(
           c(
             "Could not determine trend type from object structure.",
             i = paste0(

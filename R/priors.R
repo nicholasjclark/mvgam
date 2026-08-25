@@ -3,8 +3,8 @@
 #' @description
 #' Prior extraction, combination, and inspection system for mvgam
 #' models. This file provides functions for working with priors in both
-#' observation and trend components, leveraging the native brms brmsprior
-#' class throughout.
+#' observation and trend components, using the brms brmsprior class
+#' throughout.
 #'
 #' @section Architecture:
 #' The prior system uses brmsprior objects directly for maximum compatibility:
@@ -22,9 +22,9 @@
 # =============================================================================
 # SECTION 1: COMMON TREND PRIOR SPECIFICATIONS
 # =============================================================================
-# WHY: Shared prior specifications enable DRY principle for parameters used
-# across multiple trend types (e.g., sigma_trend used by RW, AR, CAR trends).
-# Centralized definitions ensure consistency and easier maintenance.
+# Prior specifications shared by parameters that appear in more than one
+# trend type (sigma_trend is used by RW, AR and CAR), defined once so the
+# trends cannot drift apart on a default.
 
 #' Common Prior Specifications for Trend Parameters
 #'
@@ -1264,7 +1264,8 @@ get_best_prior_match <- function(matches) {
 #'   Returns empty list if trend_type is not registered or no matching priors found.
 #'
 #' @details
-#' This function leverages the existing trend registry system for extensibility:
+#' This function reads the trend registry, so a newly registered trend
+#' needs no change here:
 #' 1. Gets prior specification from \code{get_trend_prior_spec(trend_type)}
 #' 2. For each parameter in the specification, uses \code{extract_prior_string()}
 #'    to find matching prior in the brmsprior object
@@ -1290,7 +1291,7 @@ map_trend_priors <- function(prior, trend_type) {
   if (is.null(trend_prior_spec)) {
     if (!identical(Sys.getenv("TESTTHAT"), "true")) {
       rlang::warn(
-        insight::format_warning(c(
+        insight::format_message(c(
           cli::format_inline(
             "Trend type {.field {trend_type}} not found in registry."
           ),
@@ -1336,8 +1337,8 @@ map_trend_priors <- function(prior, trend_type) {
 #'
 #' @description
 #' Centralized helper for any trend generator to access user-defined priors
-#' with automatic fallback to common defaults. This function provides the
-#' foundation for simple, DRY prior resolution across all trend types.
+#' with automatic fallback to common defaults, so every trend type
+#' resolves its priors through one path.
 #'
 #' @param prior A brmsprior object containing custom prior specifications, or NULL
 #' @param param_name Character string parameter name (e.g., "sigma_trend", "ar1_trend")

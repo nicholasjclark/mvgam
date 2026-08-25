@@ -364,8 +364,9 @@ predictive_error.mvgam <- function(object, newdata = NULL,
   if (!is.null(re.form) && is.null(re_formula)) {
     re_formula <- re.form
   }
+  assert_resp_for_mv(object, resp, "predictive_error")
   data <- if (is.null(newdata)) object$data else newdata
-  resp_name <- mvgam_response_name(object)
+  resp_name <- mvgam_response_name(object, resp)
   if (!resp_name %in% names(data)) {
     stop(insight::format_error(c(
       paste0(
@@ -410,23 +411,52 @@ predictive_error.mvgam <- function(object, newdata = NULL,
 rstantools::predictive_error
 
 
-# Deprecated brms aliases (marginal_smooths / marginal_effects /
-# parnames / nsamples / as.mcmc) were dropped. brms itself
-# deprecated the first four; the modern replacements
-# (`conditional_smooths()`, `conditional_effects()`,
-# `variables()`, `posterior::ndraws()`) are already exported on
-# mvgam. `as.mcmc.mvgam` exposed the coda interface, which
-# `posterior::as_draws_array(x)` / `as.array(x)` cover for
-# downstream tooling; the coda dependency went with it.
+# Deprecated brms aliases. `marginal_smooths()`, `marginal_effects()`
+# and `as.mcmc()` are covered by `conditional_smooths()`,
+# `conditional_effects()` and `posterior::as_draws_array()`, and
+# carry no mvgam method.
+#
+# `parnames()` and `nsamples()` do need one. An `mvgam` object also
+# inherits from `brmsfit`, so a call to either resolves to the brms
+# method, which reads the raw stanfit and reports parameters and
+# draws that `variables()` and `ndraws()` deliberately filter out.
+# Old code calling the deprecated spelling then disagrees with the
+# current spelling on the same fit. Delegating keeps the two answers
+# identical while brms still raises its own deprecation warning.
+
+#' @importFrom brms parnames
+#' @method parnames mvgam
+#' @export
+parnames.mvgam <- function(x, ...) {
+  variables(x, ...)
+}
 
 
-# Internal: return the response variable's name from the fit's
-# observation formula. Single source of truth for predictive
-# methods that need the column.
+#' @importFrom brms nsamples
+#' @method nsamples mvgam
+#' @export
+nsamples.mvgam <- function(object, ...) {
+  posterior::ndraws(posterior::as_draws(object$fit))
+}
+
+
+# Internal: the response variable's name from the fit's observation
+# formula, read by every predictive method that needs the column.
+#
+# `resp` names one arm of a multivariate fit. Without it a
+# multivariate fit has no single response to read, so the resolver
+# reports NA and leaves the caller to raise the guard message rather
+# than letting NA leak into a column lookup.
 #'@noRd
-mvgam_response_name <- function(object) {
+mvgam_response_name <- function(object, resp = NULL) {
   checkmate::assert_class(object, "mvgam")
+  if (!is.null(resp)) {
+    return(resp)
+  }
   f <- object$formula
+  if (brms::is.mvbrmsformula(f)) {
+    return(NA_character_)
+  }
   if (inherits(f, "brmsformula")) f <- f$formula
   all.vars(f[[2L]])[1L]
 }
@@ -435,8 +465,8 @@ mvgam_response_name <- function(object) {
 # Internal: training data for a fitted `mvgam`. Prefers
 # `obs_data` (the post-fit canonical slot) and falls back to
 # `data` (raw input). Returns NULL when neither slot is set.
-# Single source of truth so every downstream consumer reads the
-# training data the same way. Assertion is intentionally
+# Defined once so every caller reads the training data the same
+# way. Assertion is intentionally
 # omitted: called in low-overhead inner loops where the caller
 # has already validated.
 #'@noRd

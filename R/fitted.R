@@ -84,7 +84,7 @@
 #'   }
 #'
 #'   For multivariate models with `resp = NULL`, returns a named list
-#'   of matrices (one per response variable) — each summarised
+#'   of matrices (one per response variable), each summarised
 #'   independently when `summary = TRUE`.
 #'
 #' @details

@@ -36,7 +36,7 @@ FALSE, fixes the trend at its posterior mean for faster
 computation.
 
 \code{posterior_linpred()} does NOT add sampled stochastic innovations
-from the trend's covariance structure — it remains a
+from the trend's covariance structure; it remains a
 deterministic function of the parameter draws. State-space
 process noise is added inside \code{posterior_epred()} and
 \code{posterior_predict()} (matching the brms convention of returning
@@ -98,7 +98,7 @@ The \code{process_error} argument controls uncertainty propagation:
 \itemize{
 \item TRUE: Full posterior uncertainty from both observation and
 trend parameters (per-draw variation). Does NOT add sampled
-stochastic innovations — the linpred remains a deterministic
+stochastic innovations; the linpred remains a deterministic
 function of the parameters at each draw.
 \item FALSE: Trend fixed at posterior mean; only observation
 uncertainty propagated (faster but understates total uncertainty).
@@ -106,7 +106,7 @@ uncertainty propagated (faster but understates total uncertainty).
 
 If you want predictive samples that include the unobserved
 stochastic component of the latent trend (state-space process
-noise), use \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} — that is the only entry
+noise), use \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}, the only entry
 point that adds sampled innovations on top of the linear predictor.
 }
 \examples{

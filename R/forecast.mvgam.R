@@ -247,7 +247,8 @@ forecast.mvgam <- function(object,
   }
 
   family_pars <- if (type == "link") {
-    extract_family_pars_for_draws(object, draws_mat, draw_idx)
+    extract_family_pars_for_draws(object, draws_mat, draw_idx,
+                                    resp = resp)
   } else {
     NULL
   }
@@ -413,8 +414,8 @@ resolve_forecast_grid <- function(object, newdata, training,
 # `max_lag`. Used to build the kernel's `linpreds` past-tail
 # block via extract_component_linpred on these rows alone.
 #
-# Sorting each per-series block by time before stacking is
-# load-bearing: the kernel reads `linpreds` rows in temporal
+# Each per-series block must be sorted by time before stacking:
+# the kernel reads `linpreds` rows in temporal
 # order to centre `lv = trend - mu_trend` at each lag. A
 # tail block with reversed or shuffled time order would offset
 # the centring by `mu_trend[T] - mu_trend[T-1]`, injecting a

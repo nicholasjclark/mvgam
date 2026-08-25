@@ -107,3 +107,43 @@ test_that("augment(fit) returns a per-visit tibble with recycled .resid and a .u
   # whenever the detection covariate `tod_c` differs across visits.
   expect_gt(length(unique(out$.fitted)), n_site)
 })
+
+
+# ------------------------------------------------------------------
+# Draw subsampling
+#
+# A closure-unit family draws its detection probabilities separately
+# from the linear predictor. Unless `ndraws` is turned into concrete
+# `draw_ids` first, each of those extractions subsamples on its own,
+# which pairs a detection probability with a latent state from an
+# unrelated iteration and errors on the shape mismatch.
+# ------------------------------------------------------------------
+
+testthat::test_that("log_lik honours ndraws on a closure-unit fit", {
+  for (nd in c(5L, 25L)) {
+    ll <- log_lik(mvgam_fit, ndraws = nd)
+    testthat::expect_equal(nrow(ll), nd)
+    testthat::expect_true(all(is.finite(ll)))
+  }
+})
+
+
+testthat::test_that("log_lik honours draw_ids on a closure-unit fit", {
+  ll <- log_lik(mvgam_fit, draw_ids = 1:7)
+  testthat::expect_equal(nrow(ll), 7L)
+  # The same draws must give the same answer, which they cannot if
+  # the state and the detection probability are sampled apart.
+  testthat::expect_identical(ll, log_lik(mvgam_fit, draw_ids = 1:7))
+})
+
+
+testthat::test_that("the closure-unit surface accepts ndraws throughout", {
+  nd <- 5L
+  testthat::expect_equal(nrow(posterior_epred(mvgam_fit, ndraws = nd)), nd)
+  testthat::expect_equal(nrow(posterior_predict(mvgam_fit, ndraws = nd)), nd)
+  testthat::expect_s3_class(
+    SW(pp_check(mvgam_fit, ndraws = nd)), "ggplot"
+  )
+  testthat::expect_true(is.matrix(residuals(mvgam_fit, ndraws = nd)))
+  testthat::expect_true(is.matrix(predict(mvgam_fit, ndraws = nd)))
+})

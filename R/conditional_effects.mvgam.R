@@ -53,7 +53,7 @@
 #'   [marginaleffects::avg_slopes()],
 #'   [marginaleffects::avg_comparisons()] for marginal-effect tables,
 #'   [posterior_epred.mvgam()] for the prediction primitive that
-#'     `plot_predictions` calls under the hood,
+#'     `plot_predictions` calls,
 #'   [pp_check.mvgam()] for posterior predictive checks,
 #'   \[mvgam_diagnostics\] for parameter-level diagnostics
 #'   (`fixef`, `rhat`, `bayes_R2`, ...),
@@ -202,7 +202,7 @@ conditional_effects.mvgam <- function(x,
   # the user passes through `...`. Without this, R's positional-merge
   # in do.call() silently drops the user's override. Only args that
   # mvgam injects into pp_args but does NOT take as formal parameters
-  # are vulnerable here — `type`, `points`, `rug`, `process_error` are
+  # are vulnerable here: `type`, `points`, `rug` and `process_error` are
   # already consumed by the signature and cannot reach `...`.
   reserved <- c("condition", "draw", "newdata")
   dot_names <- names(list(...))

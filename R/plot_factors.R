@@ -28,7 +28,7 @@
 #'   loadings vector that maps factor k onto the series, and the
 #'   draw-level shares are then averaged across draws.
 #'   `Lower` / `Upper` are the 2.5th and 97.5th percentiles of
-#'   the draw-level shares — a credible interval on the share
+#'   the draw-level shares, a credible interval on the share
 #'   itself.
 #'
 #'   The metric weights each factor's variance by how strongly

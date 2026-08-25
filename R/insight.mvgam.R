@@ -140,14 +140,12 @@ find_predictors.mvgam <- function(x, effects = "fixed",
   meta <- x$trend_metadata$variables
   if (!is.null(meta)) {
     extras <- c(meta$time_var, meta$series_var, meta$gr_var, meta$subgr_var)
-    extras <- extras[!is.na(extras) & nzchar(extras)]
-    preds <- unique(c(preds, extras))
+    preds <- unique(c(preds, varying_meta_vars(extras, x)))
   }
   jsdgam_meta <- attr(x$model_data, "prepped_trend_model")
   if (!is.null(jsdgam_meta)) {
     extras <- unlist(jsdgam_meta[c("unit", "species")], use.names = FALSE)
-    extras <- extras[!is.na(extras) & nzchar(extras)]
-    preds <- unique(c(preds, extras))
+    preds <- unique(c(preds, varying_meta_vars(extras, x)))
   }
 
   # Drop brms `|id|` correlation-tag tokens and any other
@@ -155,6 +153,32 @@ find_predictors.mvgam <- function(x, effects = "fixed",
   preds <- mvgam_keep_data_columns(preds, x)
 
   if (flatten) preds else list(conditional = preds)
+}
+
+
+
+
+# Internal: keep the meta variables that take more than one value in
+# the training data.
+#
+# Reason: time, series and the grouping columns are surfaced so
+# `marginaleffects::datagrid()` can address them, but the same list
+# is what `slopes()` and `comparisons()` iterate over when the caller
+# names no variables. A column holding a single value supports
+# neither a slope nor a contrast, and asking for one aborts the whole
+# call, so a single-series fit could not be handed to `avg_slopes()`
+# at all. A meta variable that genuinely varies is still reported.
+#'@noRd
+varying_meta_vars <- function(vars, x) {
+  vars <- vars[!is.na(vars) & nzchar(vars)]
+  if (!length(vars)) return(character(0))
+  dat <- x$data %||% x$obs_data
+  if (is.null(dat)) return(vars)
+  keep <- vapply(vars, function(v) {
+    if (!v %in% names(dat)) return(TRUE)
+    length(unique(dat[[v]][!is.na(dat[[v]])])) > 1L
+  }, logical(1L))
+  vars[keep]
 }
 
 
@@ -212,31 +236,75 @@ model.frame.mvgam <- function(formula, trend_effects = FALSE, ...) {
 }
 
 
+# Families mvgam classifies for `insight::model_info()`, keyed on the
+# name `resolve_family_name()` reports.
+#
+# Reason: every family mvgam defines itself carries the literal
+# `family$family == "custom"`, so reading that field classified all ten
+# of them as nothing at all. `model_info()` is what marginaleffects and
+# the easystats packages read to decide how to treat a fit, so a blank
+# answer there silently changes their behaviour.
+#'@noRd
+mvgam_model_info_families <- function() {
+  list(
+    binomial = c(
+      "binomial", "bernoulli", "beta_binomial", "com_binomial",
+      "zero_inflated_binomial", "zero_inflated_beta_binomial", "occ"
+    ),
+    count = c(
+      "poisson", "negbinomial", "negbinomial2", "negative_binomial",
+      "geometric", "zero_inflated_poisson", "zero_inflated_negbinomial",
+      "hurdle_poisson", "hurdle_negbinomial", "com_poisson",
+      "discrete_weibull", "beta_nb", "nmix", "nmix_royle_nichols",
+      "nmix_poisson_poisson"
+    ),
+    continuous = c(
+      "gaussian", "student", "skew_normal", "gamma", "lognormal",
+      "shifted_lognormal", "exponential", "weibull", "frechet",
+      "inverse.gaussian", "exgaussian", "asym_laplace", "von_mises",
+      "tweedie", "mvn", "mvt", "hurdle_gamma", "hurdle_lognormal"
+    ),
+    categorical = c("categorical", "categ"),
+    proportion = c(
+      "beta", "zero_inflated_beta", "zero_one_inflated_beta"
+    ),
+    multinomial = c("multinomial", "dirichlet_multinomial", "multi"),
+    simplex = c("dirichlet", "dirichlet2", "diri")
+  )
+}
+
+
 #' @importFrom insight model_info
 #' @export
 model_info.mvgam <- function(x, response = NULL, ...) {
-  fam_name <- x$family$family
-  link <- x$family$link %||% NA_character_
+  fam <- x$family
+  fam_name <- tryCatch(resolve_family_name(fam),
+                       error = function(e) fam$family %||% NA_character_)
+  fam_name <- tolower(fam_name %||% NA_character_)
+  link <- fam$link %||% NA_character_
+  cls <- mvgam_model_info_families()
+
+  # Group-level terms show up as `sd_` scales and `r_` deviations.
+  pars <- tryCatch(variables(x), error = function(e) character(0))
+
   list(
-    is_binomial = fam_name %in% c("binomial", "bernoulli", "beta_binomial"),
-    is_count = fam_name %in% c("poisson", "negbinomial", "negative_binomial",
-                                "zero_inflated_poisson",
-                                "zero_inflated_negbinomial",
-                                "hurdle_poisson", "hurdle_negbinomial"),
-    is_continuous = fam_name %in% c("gaussian", "student", "skew_normal",
-                                    "gamma", "Gamma", "lognormal",
-                                    "exponential", "weibull"),
-    is_ordinal = fam_name %in% c("cumulative", "sratio", "cratio", "acat"),
-    is_categorical = fam_name == "categorical",
-    is_zero_inflated = grepl("zero_inflated|hurdle", fam_name),
-    is_proportion = fam_name == "Beta",
-    is_linear = link == "identity",
-    is_logit = link == "logit",
-    is_probit = link == "probit",
-    is_log = link == "log",
-    is_mixed = FALSE,
-    is_multivariate = isTRUE(x$series_info$is_multivariate) &&
-                      length(x$response_names) > 1L,
+    is_binomial = fam_name %in% cls$binomial,
+    is_count = fam_name %in% cls$count,
+    is_continuous = fam_name %in% cls$continuous,
+    is_ordinal = isTRUE(tryCatch(is_ordinal_family(fam),
+                                 error = function(e) FALSE)),
+    is_categorical = fam_name %in% cls$categorical,
+    is_multinomial = fam_name %in% cls$multinomial,
+    is_dirichlet = fam_name %in% cls$simplex,
+    is_zero_inflated = grepl("zero_inflated|zero_one_inflated|hurdle",
+                             fam_name),
+    is_proportion = fam_name %in% cls$proportion,
+    is_linear = identical(link, "identity"),
+    is_logit = identical(link, "logit"),
+    is_probit = identical(link, "probit"),
+    is_log = identical(link, "log"),
+    is_mixed = any(grepl("^sd_|^r_", pars)),
+    is_multivariate = isTRUE(brms::is.mvbrmsformula(x$formula)),
     is_bayesian = TRUE,
     family = fam_name,
     link_function = link,

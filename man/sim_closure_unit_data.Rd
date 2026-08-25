@@ -35,7 +35,7 @@ Defaults to \code{30L}.}
 
 \item{n_visits}{Integer; number of visits per closure unit.
 Defaults to \code{4L}. All units share the same visit count
-(ragged units are deferred to a follow-up).}
+(every unit carries the same number of visits).}
 
 \item{n_lv}{Integer; number of latent factors for the
 multi-species joint species distribution model. Defaults to

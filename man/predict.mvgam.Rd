@@ -118,10 +118,13 @@ draw's sampled trend innovation, so it reflects observation
 noise at the trend-integrated mean rather than pure
 observation noise at the posterior-mean trend. Set
 \code{process_error = FALSE} for the latter.
-\item \code{"terms"}: per-term decomposition of the linear predictor.
-Not yet ported on this branch; use \code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}}
-for per-smooth draws and \code{\link[=fixef.mvgam]{fixef.mvgam()}} / \code{\link[=ranef.mvgam]{ranef.mvgam()}} for
-parametric and random-effect components.
+\item \code{"terms"}: accepted so that a call carried over from
+\code{\link[mgcv:predict.gam]{mgcv::predict.gam()}} is answered rather than silently
+mismatched. mvgam splits the decomposition across
+\code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}} for per-smooth draws and
+\code{\link[=fixef.mvgam]{fixef.mvgam()}} / \code{\link[=ranef.mvgam]{ranef.mvgam()}} for the parametric and
+random-effect components, so the call errors with a pointer
+at those.
 \item \code{"latent_state"}: closure-unit families. Family-aware
 posterior of the latent state per closure unit, conditioned
 on the observed detection history:

@@ -1095,18 +1095,23 @@ sample_from_family <- function(family_name, ndraws, epred,
     "cratio" = ,
     "acat" = stop(insight::format_error(c(
       cli::format_inline(
-        "Posterior predictive sampling for family {.val {family_name}} is not yet implemented."
+        "Posterior predictive sampling is unavailable for family
+         {.val {family_name}}."
       ),
-      i = "Currently supported ordinal family: {.val cumulative}."
+      i = "The supported ordinal family is {.val cumulative}."
     ))),
 
     # ============ Unsupported families ============
 
-    stop(insight::format_error(
+    stop(insight::format_error(c(
       cli::format_inline(
-        "Posterior predictive sampling for family {.val {family_name}} is not yet implemented."
+        "Posterior predictive sampling is unavailable for family
+         {.val {family_name}}."
+      ),
+      i = paste0(
+        "See ?mvgam_families for the families mvgam can draw from."
       )
-    ))
+    )))
   )
 
   # Apply truncation if bounds are specified
@@ -1154,9 +1159,10 @@ sample_from_family <- function(family_name, ndraws, epred,
 #'   Note: "trials" is NOT returned as it comes from data, not posterior.
 #'
 #' @details
-#' Includes all brms families for completeness. Families not yet implemented
-#' in \code{sample_from_family()} will error at sampling time, not here.
-#' Families not in the mapping return an empty character vector.
+#' Covers the brms families, whether or not
+#' \code{sample_from_family()} can draw from them; one it cannot draw
+#' from errors at sampling time rather than here. A family absent from
+#' the mapping returns an empty character vector.
 #'
 #' @noRd
 get_family_dpars <- function(family_name) {

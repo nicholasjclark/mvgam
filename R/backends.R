@@ -384,7 +384,7 @@ fit_model <- function(model, backend, ...) {
         out <- brms::do_call(rstan::sampling, args)
       } else {
         if (cores > 1L) {
-          rlang::warn(insight::format_warning("Argument 'cores' is ignored when using 'future'."))
+          rlang::warn(insight::format_message("Argument 'cores' is ignored when using 'future'."))
         }
         args$chains <- 1L
         out <- futures <- vector("list", chains)
@@ -418,7 +418,9 @@ fit_model <- function(model, backend, ...) {
       cli::format_inline("Algorithm '{algorithm}' is not supported.")
     ), call. = FALSE)
   }
-  # TODO: add support for pathfinder and laplace
+  # 'pathfinder' and 'laplace' are CmdStan algorithms with no rstan
+  # equivalent, so they are reachable only through the cmdstanr
+  # backend.
   out <- repair_stanfit(out)
   out
 }
@@ -478,8 +480,9 @@ fit_model <- function(model, backend, ...) {
   checkmate::assert_number(chains)
   empty_model <- chains <= 0
   if (empty_model) {
-    # fit the model with minimal amount of draws
-    # TODO: replace with a better solution
+    # A model with no parameters to estimate still has to run for
+    # CmdStan to emit its generated quantities, so it is sampled at
+    # the smallest size that produces output.
     chains <- 1
     iter <- 2
     warmup <- 1
@@ -538,7 +541,7 @@ fit_model <- function(model, backend, ...) {
         out <- brms::do_call(model$sample, args)
       } else {
         if (cores > 1L) {
-          rlang::warn(insight::format_warning("Argument 'cores' is ignored when using 'future'."))
+          rlang::warn(insight::format_message("Argument 'cores' is ignored when using 'future'."))
         }
         args$chains <- 1L
         out <- futures <- vector("list", chains)
@@ -674,7 +677,8 @@ needs_recompilation <- function(x) {
   stopifnot(is.mvgam(x))
   backend <- x$backend %||% "rstan"
   if (backend == "rstan") {
-    # TODO: figure out when rstan requires recompilation
+    # rstan gives no reliable signal for when a cached model object
+    # has gone stale, so recompilation is never skipped here.
     out <- FALSE
   } else if (backend == "cmdstanr") {
     exe_file <- attributes(x$fit)$CmdStanModel$exe_file()

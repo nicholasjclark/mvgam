@@ -30,7 +30,7 @@
 #' - by-factor GP: `Xgp_<id>_<g>` and `slambda_<id>_<g>` for each level
 #'
 #' If a candidate term is missing required structures, the function
-#'   errors with the unrecognised pattern (no silent skip — silent skip
+#'   errors with the unrecognised pattern (no silent skip, because a silent skip
 #'   was the cause of bug #53 where by-factor GP contributions were
 #'   never added to the linear predictor).
 #'
@@ -2331,7 +2331,7 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   # state's marginal-MC contribution is added by `get_combined_linpred`
   # via `sample_process_errors` when `process_error = TRUE`. The
   # `extract_trend_latent_states` helper stays available for the
-  # hindcast/forecast paths (Phase B/C/D), which explicitly want
+  # hindcast and forecast paths, which explicitly want
   # the conditional state. `incl_latent_state` is preserved on the
   # signature for hindcast-internal callers that still want the
   # per-draw composition; in the predict_* path it is a no-op for

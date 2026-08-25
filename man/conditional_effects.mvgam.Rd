@@ -134,7 +134,7 @@ conditional-effect engine,
 \code{\link[marginaleffects:slopes]{marginaleffects::avg_slopes()}},
 \code{\link[marginaleffects:comparisons]{marginaleffects::avg_comparisons()}} for marginal-effect tables,
 \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} for the prediction primitive that
-\code{plot_predictions} calls under the hood,
+\code{plot_predictions} calls,
 \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} for posterior predictive checks,
 [mvgam_diagnostics] for parameter-level diagnostics
 (\code{fixef}, \code{rhat}, \code{bayes_R2}, ...),

@@ -195,11 +195,11 @@ reference_db <- function() {
         sep = "\n"
       )
     ),
-    clark_multispecies = list(
-      text = "Clark NJ, Ernest SKM, Senyondo H, Simonis J, White EP, Yenni GM and Karunarathna KANK (2025). Beyond single-species models: leveraging multispecies forecasts to navigate the dynamics of ecological predictability. PeerJ 13, e18929.",
+    clark_multispecies = list( # prose-lint-disable-line
+      text = "Clark NJ, Ernest SKM, Senyondo H, Simonis J, White EP, Yenni GM and Karunarathna KANK (2025). Beyond single-species models: leveraging multispecies forecasts to navigate the dynamics of ecological predictability. PeerJ 13, e18929.", # prose-lint-disable-line
       bibtex = paste(
         "@article{clark2025multispecies,",
-        "  title = {Beyond single-species models: leveraging multispecies forecasts to navigate the dynamics of ecological predictability},",
+        "  title = {Beyond single-species models: leveraging multispecies forecasts to navigate the dynamics of ecological predictability},", # prose-lint-disable-line
         "  author = {Clark, Nicholas J. and Ernest, S. K. Morgan and Senyondo, Henry and Simonis, Juniper and White, Ethan P. and Yenni, Glenda M. and Karunarathna, K. A. N. K.},",
         "  journal = {PeerJ},",
         "  volume = {13},",
@@ -307,7 +307,7 @@ reference_db <- function() {
       text = "Tikhonov G, Opedal OH, Abrego N, Lehikoinen A, de Jonge MMJ, Oksanen J and Ovaskainen O (2020). Joint species distribution modelling with the R-package Hmsc. Methods in Ecology and Evolution 11(3), 442-447. https://doi.org/10.1111/2041-210X.13345",
       bibtex = paste(
         "@article{tikhonov2020hmsc,",
-        "  title = {Joint species distribution modelling with the {R-package Hmsc}},",
+        "  title = {Joint species distribution modelling with the {R}-package {H}msc},",
         "  author = {Tikhonov, Gleb and Opedal, {\\O}ystein H. and Abrego, Nerea and Lehikoinen, Aleksi and de Jonge, Melinda M. J. and Oksanen, Jari and Ovaskainen, Otso},",
         "  journal = {Methods in Ecology and Evolution},",
         "  volume = {11},",
@@ -636,22 +636,6 @@ reference_db <- function() {
         "  pages = {e0216129},",
         "  year = {2019},",
         "  doi = {10.1371/journal.pone.0216129}",
-        "}",
-        sep = "\n"
-      )
-    ),
-    tikhonov_hmsc_2020 = list(
-      text = "Tikhonov G, Opedal OH, Abrego N, Lehikoinen A, de Jonge MMJ, Oksanen J and Ovaskainen O (2020). Joint species distribution modelling with the r-package Hmsc. Methods in Ecology and Evolution, 11(3), 442-447. https://doi.org/10.1111/2041-210X.13345",
-      bibtex = paste(
-        "@article{tikhonov2020hmsc,",
-        "  title = {Joint species distribution modelling with the {R}-package {H}msc},",
-        "  author = {Tikhonov, Gleb and Opedal, {\\O}ystein H. and Abrego, Nerea and Lehikoinen, Aleksi and de Jonge, Melinda M. J. and Oksanen, Jari and Ovaskainen, Otso},",
-        "  journal = {Methods in Ecology and Evolution},",
-        "  volume = {11},",
-        "  number = {3},",
-        "  pages = {442--447},",
-        "  year = {2020},",
-        "  doi = {10.1111/2041-210X.13345}",
         "}",
         sep = "\n"
       )

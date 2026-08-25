@@ -118,7 +118,15 @@ correlated within regions, then you should specify \code{gr = region} and
 \code{subgr = species}. Internally, \code{mvgam()} will create the \code{series} element
 for the data using:
 
-\code{series = interaction(group, subgroup, drop = TRUE)}}
+\verb{series = interaction(gr, subgr, drop = TRUE, sep = "_",}
+\verb{lex.order = TRUE)}
+
+so a region \code{r1} and a species \code{sp1} give the series \code{"r1_sp1"}, and
+the levels sort lexically. Post-fit output labels each series that
+way, so \code{summary()}, \code{plot()} and \code{forecast()} all report \code{"r1_sp1"}
+rather than any \code{series} column the data happened to carry. A
+\code{series} column supplied alongside \code{gr} and \code{subgr} is replaced by
+the derived one, with a warning.}
 
 \item{n_lv}{The number of latent factors to estimate for dynamic
 factor models. When \code{n_lv} is smaller than the number of series,

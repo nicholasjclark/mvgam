@@ -58,7 +58,31 @@ test_that("insight::find_predictors picks up obs + trend + meta vars", {
   testthat::expect_type(preds, "list")
   testthat::expect_true("x" %in% preds$conditional)
   testthat::expect_true("time" %in% preds$conditional)
+})
+
+test_that("find_predictors reports a series column that varies", {
+  require_fixtures("val_mvgam_var_cor.rds")
+  mv <- load_mvgam("var_cor")
+  preds <- insight::find_predictors(mv)
   testthat::expect_true("series" %in% preds$conditional)
+  testthat::expect_true("time" %in% preds$conditional)
+})
+
+test_that("find_predictors drops a meta variable holding one value", {
+  require_fixtures("val_mvgam_ar1_fx_trend.rds")
+  mv <- load_mvgam("ar1_fx_trend")
+  # This fit carries a single series, so 'series' supports neither a
+  # slope nor a contrast and must not be offered as a predictor.
+  testthat::expect_equal(length(unique(mv$data$series)), 1L)
+  testthat::expect_false("series" %in% insight::find_predictors(mv)$conditional)
+})
+
+test_that("avg_slopes runs on a single-series fit", {
+  require_fixtures("val_mvgam_beta_ar1.rds")
+  mv <- load_mvgam("beta_ar1")
+  out <- SW(marginaleffects::avg_slopes(mv))
+  testthat::expect_s3_class(out, "data.frame")
+  testthat::expect_gt(nrow(out), 0L)
 })
 
 test_that("model.frame.mvgam returns predictors + response only", {
@@ -885,7 +909,7 @@ test_that("posterior_smooths(mvgam) accepts user-supplied newdata", {
 })
 
 
-test_that("conditional_smooths(mvgam) returns brms_conditional_effects shape", {
+test_that("conditional_smooths(mvgam) matches brms shape", {
   require_fixtures(
     "val_mvgam_ar1_re_smooth.rds", "val_brms_ar1_re_smooth.rds"
   )
@@ -893,7 +917,10 @@ test_that("conditional_smooths(mvgam) returns brms_conditional_effects shape", {
   br <- load_brms("ar1_re_smooth")
   mv_cs <- conditional_smooths(mv)
   br_cs <- brms::conditional_smooths(br)
-  expect_s3_class(mv_cs, "brms_conditional_effects")
+  # mvgam returns its own class so that plot() picks up the house
+  # theme; the per-smooth data frames still match brms column for
+  # column, which is what downstream code reads.
+  expect_s3_class(mv_cs, "mvgam_conditional_smooths")
   expect_identical(length(mv_cs), length(br_cs))
   expect_identical(
     sort(colnames(mv_cs[[1L]])), sort(colnames(br_cs[[1L]]))
@@ -945,7 +972,7 @@ test_that("conditional_smooths(mvgam) facets by-factor on real fit", {
   require_fixtures("val_mvgam_ar1_s_by.rds")
   mv <- load_mvgam("ar1_s_by")
   cs <- conditional_smooths(mv)
-  expect_s3_class(cs, "brms_conditional_effects")
+  expect_s3_class(cs, "mvgam_conditional_smooths")
   expect_true(length(cs) >= 1L)
   # By-factor smooth: cond__ column should carry per-level facet
   # labels.

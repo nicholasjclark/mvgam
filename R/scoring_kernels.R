@@ -4,7 +4,7 @@
 #   Univariate per-(time) cell : CRPS, DRPS, SIS, Brier
 #   Multivariate per-horizon   : Energy, Variogram
 #
-# DRY: every per-cell scorer wraps a `(truth, fc_col, ...)` ->
+# Every per-cell scorer wraps a `(truth, fc_col, ...)` ->
 # `c(score, in_interval)` kernel via apply_univariate_score(),
 # which handles the NA guard, the output shape, and column
 # naming. Multivariate scorers wrap a `(truth_at_h, fc_at_h,

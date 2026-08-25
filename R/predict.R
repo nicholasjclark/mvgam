@@ -80,10 +80,13 @@
 #'     noise at the trend-integrated mean rather than pure
 #'     observation noise at the posterior-mean trend. Set
 #'     `process_error = FALSE` for the latter.
-#'   \item `"terms"`: per-term decomposition of the linear predictor.
-#'     Not yet ported on this branch; use [posterior_smooths.mvgam()]
-#'     for per-smooth draws and [fixef.mvgam()] / [ranef.mvgam()] for
-#'     parametric and random-effect components.
+#'   \item `"terms"`: accepted so that a call carried over from
+#'     [mgcv::predict.gam()] is answered rather than silently
+#'     mismatched. mvgam splits the decomposition across
+#'     [posterior_smooths.mvgam()] for per-smooth draws and
+#'     [fixef.mvgam()] / [ranef.mvgam()] for the parametric and
+#'     random-effect components, so the call errors with a pointer
+#'     at those.
 #'   \item `"latent_state"`: closure-unit families. Family-aware
 #'     posterior of the latent state per closure unit, conditioned
 #'     on the observed detection history:
@@ -240,10 +243,13 @@ predict.mvgam <- function(object,
     return(summarize_predictions(pred, probs = probs, robust = robust))
   }
 
-  # Per-term decomposition: defer with a clear migration pointer.
+  # mgcv answers `type = "terms"` with a per-term matrix. mvgam has
+  # no single equivalent because a term's draws come from different
+  # accessors, so the type is accepted and redirected rather than
+  # rejected as an unknown choice.
   if (type == "terms") {
     stop(insight::format_error(c(
-      "type = 'terms' is not implemented on this branch.",
+      "type = 'terms' has no single equivalent in mvgam.",
       i = paste0(
         "Use posterior_smooths.mvgam() for per-smooth draws, ",
         "fixef.mvgam() / ranef.mvgam() for parametric and random ",
@@ -445,17 +451,16 @@ predict_variance <- function(object, newdata, process_error, ndraws,
     resp = resp
   )
 
-  # Multivariate guard: we don't yet have the per-response sigma /
-  # shape / phi extraction wired for variance. Error clearly with a
-  # pointer at the per-response workaround.
+  # A multivariate fit carries one dispersion parameter per response,
+  # so a variance is only defined once a response is named.
   if (is.list(mu_full) && !is.matrix(mu_full)) {
     stop(insight::format_error(c(
-      "type = 'variance' is not yet implemented for multivariate fits.",
+      "type = 'variance' requires 'resp' for multivariate models.",
       i = paste0(
-        "Call predict(object, type = 'variance', resp = '<response>') ",
-        "for each response separately."
+        "Available responses: ",
+        paste(shQuote(object$response_names), collapse = ", "), "."
       )
-    )))
+    )), call. = FALSE)
   }
 
   draws_mat <- posterior::as_draws_matrix(object$fit)
@@ -481,7 +486,8 @@ predict_variance <- function(object, newdata, process_error, ndraws,
   ndraws_mu <- nrow(mu)
   nobs_mu <- ncol(mu)
 
-  fpars <- extract_family_pars_for_draws(object, draws_mat, draw_idx)
+  fpars <- extract_family_pars_for_draws(object, draws_mat, draw_idx,
+                                         resp = resp)
 
   # broadcast: dpar matrices arrive as [ndraws x n_series] for
   # multivariate (already errored above) or [ndraws x 1] / [ndraws x

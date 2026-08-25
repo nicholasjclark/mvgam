@@ -670,7 +670,7 @@ jsdgam_phylo_to_dist <- function(phylo, species_levels) {
     if (!ape::is.ultrametric(phylo)) {
       if (!identical(Sys.getenv("TESTTHAT"), "true")) {
         rlang::warn(
-          insight::format_warning(c(
+          insight::format_message(c(
             paste0(
               "Phylogeny passed to 'phylo' is not ultrametric."
             ),

@@ -117,7 +117,7 @@ If \code{summary = TRUE}, returns a matrix with columns:
 }
 
 For multivariate models with \code{resp = NULL}, returns a named list
-of matrices (one per response variable) — each summarised
+of matrices (one per response variable), each summarised
 independently when \code{summary = TRUE}.
 }
 \description{

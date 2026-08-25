@@ -55,7 +55,7 @@ See \code{facets} for finer control.}
 and the smooth has two or more dimensions, controls how many
 facet levels of the non-focal covariate(s) to use (default:
 \code{3}, matching brms). Setting \code{facets = 5} produces 5 evenly
-spaced facets across the non-focal range — an mvgam-only knob
+spaced facets across the non-focal range, an mvgam-only knob
 for marginaleffects-style multidimensional displays.}
 
 \item{resolution}{Positive integer. Grid resolution per

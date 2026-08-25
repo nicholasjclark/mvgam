@@ -856,8 +856,8 @@ trend_sigma <- function(prop_trend) {
 # preserve the linearly-growing variance that defines the
 # process; sim_mvgam picks `sigma_innov` upfront instead.
 #
-# RW is the only non-stationary kernel on this branch. PW joins
-# the list once the piecewise-linear / -logistic kernel lands.
+# RW is the only non-stationary kernel this predicate recognises;
+# PW is identified separately, by the helper below.
 #'@noRd
 # Internal: TRUE when the trend constructor is `PW()`. PW
 # trends need their own simulation path (deterministic kernel

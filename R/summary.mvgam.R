@@ -1129,7 +1129,7 @@ check_mvgam_convergence <- function(all_summaries, nchains) {
       )
 
       rlang::warn(
-        insight::format_warning(msg_parts),
+        insight::format_message(msg_parts),
         .frequency = "once",
         .frequency_id = "mvgam_rhat_convergence"
       )
@@ -1143,7 +1143,7 @@ check_mvgam_convergence <- function(all_summaries, nchains) {
 
     if (min_bulk < ess_threshold) {
       rlang::warn(
-        insight::format_warning(c(
+        insight::format_message(c(
           sprintf(
             "Bulk ESS too low (min = %.0f, should be > %.0f).",
             min_bulk,
@@ -1165,7 +1165,7 @@ check_mvgam_convergence <- function(all_summaries, nchains) {
 
     if (min_tail < ess_threshold) {
       rlang::warn(
-        insight::format_warning(c(
+        insight::format_message(c(
           sprintf(
             "Tail ESS too low (min = %.0f, should be > %.0f).",
             min_tail,

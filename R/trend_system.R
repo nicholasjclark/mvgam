@@ -1891,14 +1891,19 @@ parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL
     # Add regular_terms to trend_model for covariate extraction
     trend_model$regular_terms <- regular_terms
     
-    # Use precomputed dimensions - no fallback in ultra-DRY architecture
+    # Dimensions are computed once by the caller and passed down; there
+    # is deliberately no fallback that recomputes them here, so the
+    # trend and the Stan data cannot disagree about the grid.
     if (!is.null(.precomputed_dimensions)) {
       dimensions <- .precomputed_dimensions
     } else if (!is.null(data)) {
       stop(insight::format_error(c(
-        "Missing precomputed dimensions in ultra-DRY architecture.",
-        x = "When data is provided, precomputed dimensions must be supplied.",
-        i = "Check that calling function is passing dimensions correctly."
+        "Trend dimensions were not supplied alongside 'data'.",
+        x = "Series and time dimensions are needed to build the trend.",
+        i = paste0(
+          "This is an internal call; report it at ",
+          "https://github.com/nicholasjclark/mvgam/issues."
+        )
       )), call. = FALSE)
     } else {
       # No data provided - dimensions not needed for formula parsing only
@@ -2183,7 +2188,15 @@ print.mvgam_trend <- function(x, ...) {
 #'   `subgr = species`. Internally, `mvgam()` will create the `series` element
 #'   for the data using:
 #'
-#'   `series = interaction(group, subgroup, drop = TRUE)`
+#'   `series = interaction(gr, subgr, drop = TRUE, sep = "_",`
+#'   `lex.order = TRUE)`
+#'
+#'   so a region `r1` and a species `sp1` give the series `"r1_sp1"`, and
+#'   the levels sort lexically. Post-fit output labels each series that
+#'   way, so `summary()`, `plot()` and `forecast()` all report `"r1_sp1"`
+#'   rather than any `series` column the data happened to carry. A
+#'   `series` column supplied alongside `gr` and `subgr` is replaced by
+#'   the derived one, with a warning.
 #'
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #'   arguments to be interpreted by the parsing functions in \pkg{mvgam}.
@@ -2868,7 +2881,12 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #'   case, by `site`) and create the `series` element for the data using
 #'   something like:
 #'
-#'   `series = as.factor(paste0(group, '_', subgroup))`
+#'   `series = interaction(gr, subgr, drop = TRUE, sep = "_",`
+#'   `lex.order = TRUE)`
+#'
+#'   so a region `r1` and a species `sp1` give the series `"r1_sp1"`. A
+#'   `series` column supplied alongside `gr` and `subgr` is replaced by
+#'   the derived one, with a warning.
 #'
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #'   arguments to be interpreted by the parsing functions in \pkg{mvgam}

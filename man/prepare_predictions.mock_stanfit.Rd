@@ -58,7 +58,7 @@ mock_stanfit objects, enabling mvgam to use brms prediction
 infrastructure with parameter subsets extracted from combined
 Stan fits.
 
-The function leverages brms::standata() to generate design matrices
+The function calls brms::standata() to generate design matrices
 for fixed effects, random effects, smooths, GPs, and other special
 terms. This ensures compatibility with all brms formula features.
 

@@ -9,8 +9,8 @@ marginaleffects API (>= 0.20) requires only \code{get_predict},
 \code{get_coef}, \code{get_vcov} and \code{set_coef}. Bayesian models bypass the
 delta-method path and use the \code{posterior_draws} attribute attached
 by \code{get_predict}, so \code{get_coef} / \code{get_vcov} / \code{set_coef} exist
-mostly to satisfy the S3 surface — they are not load-bearing for
-predictions or slopes.
+only to satisfy the S3 surface. Neither predictions nor slopes
+read them.
 }
 \references{
 Arel-Bundock, V., Greifer, N. and Heiss, A. (2024). How to

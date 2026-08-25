@@ -154,7 +154,7 @@ brms::posterior_smooths
 #'   and the smooth has two or more dimensions, controls how many
 #'   facet levels of the non-focal covariate(s) to use (default:
 #'   `3`, matching brms). Setting `facets = 5` produces 5 evenly
-#'   spaced facets across the non-focal range — an mvgam-only knob
+#'   spaced facets across the non-focal range, an mvgam-only knob
 #'   for marginaleffects-style multidimensional displays.
 #' @param resolution Positive integer. Grid resolution per
 #'   covariate dimension. Defaults to `100`.
@@ -638,11 +638,11 @@ mvgam_smooth_eta <- function(object, hit, newdata,
   }
   # brms::standata routes through the brmsfit-shaped side model's
   # stored basis (computed at fit time), so PredictMat handles
-  # any newdata grid — sparse or dense — without re-running
+  # any newdata grid, sparse or dense, without re-running
   # smoothCon. This is exactly what brms's posterior_smooths does.
   #
   # Pass `check_response = FALSE` and `internal = TRUE` so brms
-  # skips response + aterm validation on `newdata` — this matches
+  # skips response + aterm validation on `newdata`, which matches
   # what `brms:::posterior_smooths.btl` does and prevents
   # family-specific aterm columns (e.g. `| trials(N)` for
   # binomial fits) from raising errors when the caller's grid

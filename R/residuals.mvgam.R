@@ -280,7 +280,7 @@ residuals.mvgam <- function(object,
   # `resp` is populated when the mv fan-out scoped this call (or
   # the user supplied it explicitly via `...`); otherwise fall
   # back to the single response on a univariate fit.
-  resp_col <- resp %||% mvgam_response_name(object)
+  resp_col <- mvgam_response_name(object, resp)
   y <- as.numeric(d[[resp_col]])
   pp_args <- c(list(object = object, newdata = newdata,
                      ndraws = ndraws, draw_ids = draw_ids,
@@ -554,8 +554,8 @@ residuals_dpars <- function(object, ndraws = NULL, draw_ids = NULL,
 
 # Internal: shape the residual draws matrix into the form
 # requested by `summary` / `robust` / `probs`. Mirrors the
-# brms / mvgam summary convention so downstream consumers
-# (augment.mvgam, plot.mvgam_resids, etc.) see a stable shape.
+# brms / mvgam summary convention so its callers
+# (augment.mvgam, plot.mvgam_resids) see a stable shape.
 #'@noRd
 residuals_finalise <- function(resids, summary, robust, probs) {
   if (!summary) return(resids)

@@ -25,7 +25,7 @@
 #'  summaries of the residual covariance matrix, with per-entry ESS
 #'  matching the correlation surface.}
 #'  \item{mean_abs_offdiag}{Mean of the absolute off-diagonal entries
-#'  of the posterior median correlation — a scalar summary of overall
+#'  of the posterior median correlation, a scalar summary of overall
 #'  correlation strength.}
 #'  \item{n_series, series_names}{Dimensions of the matrix and the
 #'  series labels.}

@@ -1,5 +1,5 @@
 # Shared ggplot building blocks for every plot method in mvgam.
-# Single source of truth for palette, theme, ribbon stacking,
+# Defines the palette, theme, ribbon stacking,
 # observation overlays, faceting, and label-repel wrappers.
 # Nothing in this file is exported.
 
@@ -315,8 +315,8 @@ mvgam_repel_layer <- function(
 #' canonical sign convention: cool blue for large-negative
 #' associations, grey at zero, warm red for large-positive ones.
 #' Sign conventions for correlation heatmaps are independent of
-#' the active bayesplot single-hue scheme — diverging plots need
-#' both warm and cool ends — so the colours are read from the
+#' the active bayesplot single-hue scheme (diverging plots need
+#' both warm and cool ends), so the colours are read from the
 #' fixed bayesplot `"red"` and `"blue"` schemes regardless of
 #' the caller's `color_scheme_set`. Defaults to the `[-1, 1]`
 #' correlation range; pass `limits = c(-L, L)` to widen for
@@ -370,7 +370,7 @@ gather_matrix <- function(mat, drop_diag = TRUE, drop_upper = TRUE) {
 #' Reorder a symmetric correlation matrix using approximate
 #' Robinson ordering (Gruvaeus & Wainer 1972), so visually
 #' coherent positive and negative clusters sit adjacent in the
-#' heatmap. Distances use `1 - cormat` — a valid non-negative
+#' heatmap. Distances use `1 - cormat`, a valid non-negative
 #' metric where r = 1 → d = 0, r = 0 → d = 1, r = -1 → d = 2,
 #' which preserves sign by treating large-negative correlations
 #' as maximally distant from large-positive ones. Linkage is
@@ -512,9 +512,9 @@ reorder_clusters <- function(x, dis, ...) {
 #' Single entry point that returns a `[ndraws, n_series, n_lv]`
 #' array of Z loadings regardless of whether Z was sampled at
 #' fit time (default factor model) or fixed by the user via
-#' `trend_map` (the fixed-Z path). Every downstream consumer
-#' that needs Z — sample_innovations, residual_cor, plot_factors,
-#' ordinate.jsdgam — calls this resolver so the fixed-vs-sampled
+#' `trend_map` (the fixed-Z path). Everything that needs Z
+#' (sample_innovations, residual_cor, plot_factors and
+#' ordinate.jsdgam) calls this resolver so the fixed-vs-sampled
 #' decision lives in exactly one place.
 #'
 #' Two callable styles:

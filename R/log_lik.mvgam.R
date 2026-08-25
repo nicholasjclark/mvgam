@@ -92,6 +92,18 @@ log_lik.mvgam <- function(object,
 
   newdata <- newdata %||% object$data
 
+  # A closure-unit family draws its detection probabilities separately
+  # from the linear predictor, so `ndraws` is materialised as concrete
+  # `draw_ids` first. Left as `ndraws`, each call would subsample
+  # independently and pair a detection probability with a latent state
+  # from an unrelated iteration.
+  if (is_closure_unit_family(object$family)) {
+    draw_ids <- closure_unit_resolve_draw_ids(object, ndraws, draw_ids)
+    if (!is.null(draw_ids)) {
+      ndraws <- NULL
+    }
+  }
+
   # Link-scale linear predictor with optional trend realisations baked in.
   # Forward `...` so `allow_new_levels` / `sample_new_levels` from callers
   # (e.g. kfold.mvgam refits scoring on held-out factor levels) reach
@@ -362,7 +374,22 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
   # Trials for binomial-family responses
   trials <- extract_trials_for_family(object, family_obj, newdata)
 
-  dispatch_log_lik(
+  ll <- dispatch_log_lik(
+    family_name = family_name,
+    link = family_link,
+    linpred = linpred,
+    y = y,
+    family_pars = family_pars,
+    trials = trials
+  )
+
+  # `weights()`, `cens()` and `trunc()` each change what a row
+  # contributes, and every information criterion reads this matrix, so
+  # they are applied here rather than in each caller.
+  apply_addition_terms(
+    ll = ll,
+    object = object,
+    resp = resp,
     family_name = family_name,
     link = family_link,
     linpred = linpred,
@@ -476,127 +503,107 @@ dispatch_log_lik <- function(family_name, link, linpred, y,
 .apply_log_density <- function(linpred, y, fn) {
   out <- matrix(NA_real_, nrow = nrow(linpred), ncol = ncol(linpred))
   for (j in seq_along(y)) {
+    # A missing response has no density. Families that branch on the
+    # response value (the hurdle, zero-inflated and ordinal kernels)
+    # would otherwise evaluate `if (NA)` and abort the whole call, so
+    # the column is left as NA and dropped downstream by `clean_ll()`.
+    if (is.na(y[j])) {
+      next
+    }
     out[, j] <- fn(y[j], j)
   }
   out
 }
 
 log_lik_gaussian <- function(linpred, link, y, family_pars, trials) {
-  mu <- .linkinv(linpred, link)
-  sigma <- family_pars$sigma
-  .apply_log_density(linpred, y, function(yj, j) {
-    stats::dnorm(yj, mean = mu[, j], sd = sigma[, j], log = TRUE)
-  })
+  dist_log_density(
+    family_dist_spec("gaussian", link, linpred, family_pars, trials),
+    linpred, y
+  )
 }
 
 log_lik_student <- function(linpred, link, y, family_pars, trials) {
-  mu <- .linkinv(linpred, link)
-  sigma <- family_pars$sigma
-  nu <- family_pars$nu
-  .apply_log_density(linpred, y, function(yj, j) {
-    # location-scale Student t: standardise then apply dt
-    z <- (yj - mu[, j]) / sigma[, j]
-    stats::dt(z, df = nu[, j], log = TRUE) - log(sigma[, j])
-  })
+  dist_log_density(
+    family_dist_spec("student", link, linpred, family_pars, trials),
+    linpred, y
+  )
 }
 
 log_lik_lognormal <- function(linpred, link, y, family_pars, trials) {
-  mu <- linpred  # meanlog lives on the linpred scale regardless of link
-  sigma <- family_pars$sigma
-  .apply_log_density(linpred, y, function(yj, j) {
-    stats::dlnorm(yj, meanlog = mu[, j], sdlog = sigma[, j], log = TRUE)
-  })
+  dist_log_density(
+    family_dist_spec("lognormal", link, linpred, family_pars, trials),
+    linpred, y
+  )
 }
 
 log_lik_gamma <- function(linpred, link, y, family_pars, trials) {
-  mu <- .linkinv(linpred, link)
-  shape <- family_pars$shape
-  .apply_log_density(linpred, y, function(yj, j) {
-    rate <- shape[, j] / mu[, j]
-    stats::dgamma(yj, shape = shape[, j], rate = rate, log = TRUE)
-  })
+  dist_log_density(
+    family_dist_spec("gamma", link, linpred, family_pars, trials),
+    linpred, y
+  )
 }
 
 log_lik_weibull <- function(linpred, link, y, family_pars, trials) {
-  mu <- .linkinv(linpred, link)
-  shape <- family_pars$shape
-  scale <- mu / gamma(1 + 1 / shape)
-  .apply_log_density(linpred, y, function(yj, j) {
-    stats::dweibull(yj, shape = shape[, j], scale = scale[, j], log = TRUE)
-  })
+  dist_log_density(
+    family_dist_spec("weibull", link, linpred, family_pars, trials),
+    linpred, y
+  )
 }
 
 log_lik_exponential <- function(linpred, link, y, family_pars, trials) {
-  mu <- .linkinv(linpred, link)
-  .apply_log_density(linpred, y, function(yj, j) {
-    stats::dexp(yj, rate = 1 / mu[, j], log = TRUE)
-  })
+  dist_log_density(
+    family_dist_spec("exponential", link, linpred, family_pars, trials),
+    linpred, y
+  )
 }
 
 log_lik_beta <- function(linpred, link, y, family_pars, trials) {
-  mu <- .linkinv(linpred, link)
-  phi <- family_pars$phi
-  .apply_log_density(linpred, y, function(yj, j) {
-    a <- mu[, j] * phi[, j]
-    b <- (1 - mu[, j]) * phi[, j]
-    stats::dbeta(yj, shape1 = a, shape2 = b, log = TRUE)
-  })
+  dist_log_density(
+    family_dist_spec("beta", link, linpred, family_pars, trials),
+    linpred, y
+  )
 }
 
 log_lik_bernoulli <- function(linpred, link, y, family_pars, trials) {
-  prob <- .linkinv(linpred, link)
-  .apply_log_density(linpred, y, function(yj, j) {
-    stats::dbinom(yj, size = 1L, prob = prob[, j], log = TRUE)
-  })
+  dist_log_density(
+    family_dist_spec("bernoulli", link, linpred, family_pars, trials),
+    linpred, y
+  )
 }
 
 log_lik_binomial <- function(linpred, link, y, family_pars, trials) {
-  prob <- .linkinv(linpred, link)
-  trials <- as.integer(trials)
-  .apply_log_density(linpred, y, function(yj, j) {
-    stats::dbinom(yj, size = trials[j], prob = prob[, j], log = TRUE)
-  })
+  dist_log_density(
+    family_dist_spec("binomial", link, linpred, family_pars, trials),
+    linpred, y
+  )
 }
 
 log_lik_beta_binomial <- function(linpred, link, y, family_pars, trials) {
-  insight::check_if_installed(
-    "extraDistr",
-    reason = "to compute log-likelihood for the beta_binomial family"
+  dist_log_density(
+    family_dist_spec("beta_binomial", link, linpred, family_pars, trials),
+    linpred, y
   )
-  mu <- .linkinv(linpred, link)
-  phi <- family_pars$phi
-  trials <- as.integer(trials)
-  .apply_log_density(linpred, y, function(yj, j) {
-    extraDistr::dbbinom(
-      yj, size = trials[j],
-      alpha = mu[, j] * phi[, j],
-      beta = (1 - mu[, j]) * phi[, j],
-      log = TRUE
-    )
-  })
 }
 
 log_lik_poisson <- function(linpred, link, y, family_pars, trials) {
-  mu <- .linkinv(linpred, link)
-  .apply_log_density(linpred, y, function(yj, j) {
-    stats::dpois(yj, lambda = mu[, j], log = TRUE)
-  })
+  dist_log_density(
+    family_dist_spec("poisson", link, linpred, family_pars, trials),
+    linpred, y
+  )
 }
 
 log_lik_negbinomial <- function(linpred, link, y, family_pars, trials) {
-  mu <- .linkinv(linpred, link)
-  shape <- family_pars$shape
-  .apply_log_density(linpred, y, function(yj, j) {
-    stats::dnbinom(yj, mu = mu[, j], size = shape[, j], log = TRUE)
-  })
+  dist_log_density(
+    family_dist_spec("negbinomial", link, linpred, family_pars, trials),
+    linpred, y
+  )
 }
 
 log_lik_geometric <- function(linpred, link, y, family_pars, trials) {
-  mu <- .linkinv(linpred, link)
-  # Geometric is NB with size = 1
-  .apply_log_density(linpred, y, function(yj, j) {
-    stats::dnbinom(yj, mu = mu[, j], size = 1, log = TRUE)
-  })
+  dist_log_density(
+    family_dist_spec("geometric", link, linpred, family_pars, trials),
+    linpred, y
+  )
 }
 
 # Hurdle Poisson: P(Y=0) = hu; P(Y=k>0) = (1 - hu) * dpois(k|mu) /
@@ -738,7 +745,7 @@ log_lik_zero_inflated_beta <- function(linpred, link, y,
   })
 }
 
-# Ordinal cumulative model on a 1D linpred — uses thresholds + disc from
+# Ordinal cumulative model on a 1D linpred, using thresholds + disc from
 # posterior draws. brms parameterisation: P(Y <= k) = pnorm(thres[k] - eta * disc)
 # for probit link, or plogis for logit. Returns [ndraws x nobs] log densities.
 log_lik_cumulative <- function(linpred, link, y, family_pars, trials) {
@@ -758,21 +765,21 @@ log_lik_cumulative <- function(linpred, link, y, family_pars, trials) {
     ))
   )
   ncat <- ncol(thres) + 1L
-  out <- matrix(NA_real_, nrow = nrow(linpred), ncol = ncol(linpred))
-  for (j in seq_along(y)) {
-    yj <- as.integer(y[j])
+  # Routed through the shared applier so the missing-response guard
+  # lives in one place rather than in each kernel that branches on
+  # the response value.
+  .apply_log_density(linpred, y, function(yj, j) {
+    yj <- as.integer(yj)
     eta_j <- linpred[, j] * disc[, j]
     if (yj == 1L) {
-      out[, j] <- log(link_cdf(thres[, 1L] - eta_j))
+      log(link_cdf(thres[, 1L] - eta_j))
     } else if (yj == ncat) {
-      out[, j] <- log1p(-link_cdf(thres[, ncat - 1L] - eta_j))
+      log1p(-link_cdf(thres[, ncat - 1L] - eta_j))
     } else {
-      lo <- link_cdf(thres[, yj - 1L] - eta_j)
-      hi <- link_cdf(thres[, yj] - eta_j)
-      out[, j] <- log(hi - lo)
+      log(link_cdf(thres[, yj] - eta_j) -
+            link_cdf(thres[, yj - 1L] - eta_j))
     }
-  }
-  out
+  })
 }
 
 

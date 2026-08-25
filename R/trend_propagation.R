@@ -4,9 +4,8 @@
 # difference is whether `last_state` comes from a burn-in (sim) or
 # from posterior draws (forecast).
 #
-# Used by sim_mvgam (Phase D of the sim_mvgam rewrite) and intended
-# for use by the eventual forecast.mvgam once the forecasting
-# surface comes online.
+# Shared by sim_mvgam and forecast.mvgam so a simulated trend and a
+# forecast trend advance by the same recursion.
 
 
 #' Propagate an `mvgam` trend forward in time
@@ -648,8 +647,8 @@ rmvn <- function(n, mu, Sigma) {
 #                     for sparse-lag `AR(p = c(...))`, empty for
 #                     ZMVN / PW.
 #   * `ma_lags`     - integer vector of active MA lag indices.
-#                     `1L` when `spec$ma == TRUE` (only q = 1 is
-#                     supported on this branch), empty otherwise.
+#                     `1L` when `spec$ma == TRUE` (q = 1 is the
+#                     only order mvgam fits), empty otherwise.
 #   * `max_lag`     - cached max of ar_lags and ma_lags.
 #   * `has_cor`     - logical; `spec$cor`.
 #   * `n_lv`        - integer factor-model dimension (or NULL).
@@ -683,7 +682,7 @@ enrich_trend_metadata <- function(trend_metadata, trend_specs) {
   # When the user supplied `trend_map`, the normaliser stashed
   # the canonical numeric Z on `spec$fixed_Z` upstream. Persist
   # it on the fit's trend_metadata so `resolve_factor_loadings()`
-  # can broadcast it across draws in downstream consumers.
+  # can broadcast it across draws wherever Z is needed.
   trend_metadata$fixed_Z <- spec$fixed_Z
   if (identical(spec$trend, "PW")) {
     trend_metadata$pw_changepoint_range <-
@@ -733,9 +732,9 @@ resolve_active_lags <- function(p, override = NULL) {
 }
 
 
-# Internal: derive the active MA lag set. On this branch only
-# q = 1 is supported across all trend types that allow MA, so the
-# result is either `c(1L)` or empty.
+# Internal: derive the active MA lag set. Every trend type that
+# allows an MA term fits q = 1, so the result is either `c(1L)` or
+# empty.
 #'@noRd
 derive_ma_lags <- function(spec) {
   if (isTRUE(spec$ma)) 1L else integer(0)

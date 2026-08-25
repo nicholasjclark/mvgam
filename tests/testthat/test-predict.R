@@ -1225,10 +1225,10 @@ test_that("predict.mvgam(type = 'expected') routes to posterior_epred", {
 })
 
 
-test_that("predict.mvgam(type = 'terms') errors with migration pointer", {
+test_that("predict.mvgam(type = 'terms') errors with a redirect", {
   expect_error(
     predict.mvgam(predict_stub_obj(), type = "terms"),
-    "not implemented"
+    "no single equivalent"
   )
   expect_error(
     predict.mvgam(predict_stub_obj(), type = "terms"),

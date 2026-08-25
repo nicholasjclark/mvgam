@@ -909,7 +909,7 @@ mvgam_single <- function(formula, trend_formula, data, backend,
 generate_combined_stancode_and_data <- function(obs_setup, trend_setup, mv_spec, validate = TRUE, prior = NULL,
                                                 backend = "rstan") {
 
-  # Extract trend_specs from mv_spec for the new system
+  # Extract trend_specs from mv_spec for the Stan code generator.
   trend_specs <- if (mv_spec$has_trends && !is.null(mv_spec$trend_specs)) {
     # Pass the entire trend_specs (handles both univariate and multivariate)
     mv_spec$trend_specs

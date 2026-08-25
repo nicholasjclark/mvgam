@@ -81,13 +81,13 @@
 #' @param ... Currently unused.
 #'
 #' @return A `list` of class `mvgam_lfo` containing:
-#'   * `elpds` — vector of approximate ELPDs at each evaluation
+#'   * `elpds`: vector of approximate ELPDs at each evaluation
 #'     time point (if `"elpd"` is in `score`).
-#'   * `scores` — named list of vectors, one per requested non-ELPD
+#'   * `scores`: named list of vectors, one per requested non-ELPD
 #'     score (`NULL` if no non-ELPD score requested).
-#'   * `pareto_ks` — Pareto-k diagnostic at each evaluation step.
-#'   * `eval_timepoints` — integer vector of the times evaluated.
-#'   * `refits_at` — integer vector of time points where the model
+#'   * `pareto_ks`: Pareto-k diagnostic at each evaluation step.
+#'   * `eval_timepoints`: integer vector of the times evaluated.
+#'   * `refits_at`: integer vector of time points where the model
 #'     was refit.
 #'   * `pareto_k_threshold`: the threshold argument as supplied
 #'     (numeric, or `NULL` when the adaptive default was used).
@@ -95,7 +95,7 @@
 #'     actually applied inside the refit gate (equal to
 #'     `pareto_k_threshold` when a numeric was supplied, or the
 #'     adaptive value when `NULL` was supplied).
-#'   * `fc_horizon` — the horizon used at each fold.
+#'   * `fc_horizon`: the horizon used at each fold.
 #'
 #' @references
 #' Paul-Christian Burkner, Jonah Gabry and Aki Vehtari (2020).
@@ -213,9 +213,9 @@ lfo_cv.mvgam <- function(object,
                  paste(names(all_data), collapse = ", "), ".")
     )))
   }
-  # Per-series time grids must all match. Async-series LFO is a
-  # follow-up; for now an informative error rather than silent
-  # misalignment.
+  # Every series must share a time grid: a rolling origin has no
+  # single meaning when series are observed at different times, so
+  # that case is refused rather than silently misaligned.
   series_fac <- factor(all_data[[series_var]])
   series_time_sets <- lapply(
     split(as.integer(all_data[[time_var]]), series_fac),

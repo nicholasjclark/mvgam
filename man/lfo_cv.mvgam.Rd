@@ -78,13 +78,13 @@ matrix can be large.}
 \value{
 A \code{list} of class \code{mvgam_lfo} containing:
 \itemize{
-\item \code{elpds} — vector of approximate ELPDs at each evaluation
+\item \code{elpds}: vector of approximate ELPDs at each evaluation
 time point (if \code{"elpd"} is in \code{score}).
-\item \code{scores} — named list of vectors, one per requested non-ELPD
+\item \code{scores}: named list of vectors, one per requested non-ELPD
 score (\code{NULL} if no non-ELPD score requested).
-\item \code{pareto_ks} — Pareto-k diagnostic at each evaluation step.
-\item \code{eval_timepoints} — integer vector of the times evaluated.
-\item \code{refits_at} — integer vector of time points where the model
+\item \code{pareto_ks}: Pareto-k diagnostic at each evaluation step.
+\item \code{eval_timepoints}: integer vector of the times evaluated.
+\item \code{refits_at}: integer vector of time points where the model
 was refit.
 \item \code{pareto_k_threshold}: the threshold argument as supplied
 (numeric, or \code{NULL} when the adaptive default was used).
@@ -92,7 +92,7 @@ was refit.
 actually applied inside the refit gate (equal to
 \code{pareto_k_threshold} when a numeric was supplied, or the
 adaptive value when \code{NULL} was supplied).
-\item \code{fc_horizon} — the horizon used at each fold.
+\item \code{fc_horizon}: the horizon used at each fold.
 }
 }
 \description{

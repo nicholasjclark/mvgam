@@ -57,7 +57,7 @@ mvgam_split_models <- function(x, ..., model_names = NULL,
 
 
 # Internal: check that all fits in `models` agree on the response
-# variable(s) — both the name(s) and the actual numeric values.
+# variable(s): both the name(s) and the numeric values.
 # Mirrors brms's `match_response`/`hash_response` (the latter
 # hashes standata$Y; we use direct equality on the response
 # columns extracted from `$data`). Returns TRUE/FALSE.
@@ -71,7 +71,10 @@ mvgam_match_response <- function(models) {
     if (!is.null(m$response_names)) {
       m$response_names
     } else {
-      mvgam_response_name(m)
+      # Reached only when `response_names` is unset, which a
+      # multivariate fit always populates, so the resolver is being
+      # asked about a univariate fit and needs no `resp`.
+      mvgam_response_name(m, resp = NULL)
     }
   })
   ref_names <- resp_names[[1L]]

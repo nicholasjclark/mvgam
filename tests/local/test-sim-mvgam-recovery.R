@@ -15,7 +15,7 @@
 # Map each catalog type to the formula a user would fit. The
 # trend_model lives on the simulated mvgam_sim$trend_model slot
 # so the recovery fit always matches the generative trend.
-# gp() smooth on this branch requires an explicit k argument
+# gp() smooths require an explicit k argument
 # (Hilbert-space GP basis); fully-exact GP is not supported as
 # a fit-time term.
 type_formulas <- list(

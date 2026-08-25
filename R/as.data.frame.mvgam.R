@@ -76,7 +76,7 @@
 NULL
 
 
-# Single source of truth for the keyword shortcuts. Each entry maps
+# The keyword shortcuts, defined once. Each entry maps
 # a keyword to a function that returns the matching parameter names
 # given the current stanfit's variables and the parent fit object
 # (the latter is needed to disambiguate trend-formula vs obs-only
@@ -90,7 +90,7 @@ mvgam_keyword_shortcuts <- c(
 # Resolve a single keyword to a character vector of parameter names
 # present in `all_vars`. Patterns are brms-native: keywords map
 # directly to the parameter names brms emits. The trend-dynamics
-# block (`trend_params`) is the one place context matters — with
+# block (`trend_params`) is the one place context matters, since with
 # a `trend_formula` those parameters carry the `_trend` suffix,
 # otherwise they sit at the top level.
 #'@noRd
@@ -151,7 +151,7 @@ resolve_mvgam_keyword <- function(keyword, x, all_vars) {
 # through `extract_mvgam_draws` sees the brms-native names.
 #
 # Univariate only in v1; multivariate fits store per-response
-# standata blocks (`X_<resp>`) and need per-response prefixes —
+# standata blocks (`X_<resp>`) and need per-response prefixes:
 # the helper returns an empty map for MV so positional names are
 # preserved unchanged.
 #'@noRd
@@ -291,7 +291,7 @@ mvgam_ranef_metadata <- function(x) {
   # `_trend` suffix (`M_<id>_trend`) and are intentionally
   # excluded from this gate. If brms ever changes the obs-side
   # key naming, the gate falls closed (no aliasing) rather than
-  # producing an incorrect map — safe failure mode.
+  # producing an incorrect map, which is the safe failure mode.
   std_names <- names(x$standata)
   has_obs_re <- any(grepl("^M_\\d+$", std_names))
   if (!has_obs_re) {
@@ -520,7 +520,7 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
   # Keyword shortcuts may legitimately return an empty set (e.g.
   # `obs_params` for Poisson, which has no distributional params).
   # Only error when the user supplied free patterns / names that did
-  # not match — that's a typo signal worth catching.
+  # not match, which is a typo signal worth catching.
   if (length(free) > 0L && length(free_matched) == 0L) {
     stop(insight::format_error(c(
       "No parameters matched the supplied 'variable' argument.",

@@ -10,7 +10,7 @@
 #'   Accepted for [brms::loo.brmsfit] parity. `resp` is passed through to
 #'   [log_lik.mvgam()] for multivariate response selection; `pointwise`,
 #'   `moment_match`, `reloo` and their `*_args` companions require
-#'   refit / streaming machinery that mvgam does not yet support — v1
+#'   refit / streaming machinery that mvgam does not support; v1
 #'   raises a clear error when any of them is requested. `compare`,
 #'   `k_threshold`, `save_psis` and `model_names` pass through to
 #'   [loo::loo()] or are no-ops for single-model evaluation.
@@ -145,12 +145,7 @@ loo.mvgam <- function(x, ...,
   logliks <- clean_ll(x, logliks)
 
   # Compute relative effective sample size for PSIS.
-  chains <- posterior::nchains(posterior::as_draws_array(x$fit))
-  n_per_chain <- NROW(logliks) / chains
-  releffs <- loo::relative_eff(
-    exp(logliks),
-    chain_id = sort(rep(seq_len(chains), n_per_chain))
-  )
+  releffs <- mvgam_r_eff_log_lik(x, logliks)
   if (isTRUE(by_species)) {
     return(per_species_ic(x, logliks, criterion = "loo"))
   }
@@ -304,9 +299,6 @@ per_species_ic <- function(x, logliks,
       i = "by_species = TRUE assumes clean_ll() did not drop any columns."
     )))
   }
-  chains <- posterior::nchains(posterior::as_draws_array(x$fit))
-  n_per_chain <- NROW(logliks) / chains
-  chain_id <- sort(rep(seq_len(chains), n_per_chain))
   by_idx <- split(seq_along(col_species),
                   factor(col_species, levels = unique(col_species)))
   est_name <- if (identical(criterion, "loo")) "elpd_loo" else "elpd_waic"
@@ -315,8 +307,7 @@ per_species_ic <- function(x, logliks,
     idx <- by_idx[[sp]]
     ll  <- logliks[, idx, drop = FALSE]
     ic  <- if (identical(criterion, "loo")) {
-      r_eff <- loo::relative_eff(exp(ll), chain_id = chain_id)
-      loo::loo(ll, r_eff = r_eff)
+      loo::loo(ll, r_eff = mvgam_r_eff_log_lik(x, ll))
     } else {
       loo::waic(ll)
     }

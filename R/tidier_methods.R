@@ -161,9 +161,9 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
 # the original implementation carried around.
 #'@noRd
 tidy_spec <- function(x, obj_vars) {
-  # Canonical source of truth for the trend type: `enrich_trend_metadata`
-  # populates `trend_type` as a single string ("AR", "VAR", "PW", ...).
-  # Falls back to whatever's on `$trend_model` for legacy fits.
+  # `enrich_trend_metadata` records the trend type as a single string
+  # ("AR", "VAR", "PW", ...); `$trend_model` is read only when that
+  # slot is unset.
   meta <- get_enriched_trend_metadata(x)
   trend_model_name <- meta$trend_type %||%
     (if (inherits(x$trend_model, "mvgam_trend"))
@@ -542,7 +542,7 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
   # fit; the univariate path leaves it NULL so the brms
   # dispatchers below don't reject it.
   down_resp <- resp
-  resp <- resp %||% mvgam_response_name(x)
+  resp <- mvgam_response_name(x, resp)
   obs_data$.observed <- obs_data[[resp]]
   obs_data <- purrr::discard_at(
     obs_data,
@@ -693,7 +693,7 @@ glance.mvgam <- function(x, looic = FALSE, resp = NULL, ...) {
   link_name <- if (inherits(fam, "family")) fam$link else
     NA_character_
 
-  resp <- resp %||% mvgam_response_name(x)
+  resp <- mvgam_response_name(x, resp)
   d <- mvgam_training_data(x)
   out <- tibble::tibble(
     algorithm = glance_algorithm(x),

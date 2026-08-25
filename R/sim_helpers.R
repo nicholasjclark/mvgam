@@ -1,4 +1,4 @@
-# Internal helpers for sim_mvgam (Phase D). Each helper builds one
+# Internal helpers for sim_mvgam. Each helper builds one
 # kind of observation-side structure that the typed catalog
 # composes into a full simulation. Kept here (rather than inline in
 # sim_mvgam) so each piece can be unit-tested in isolation.
@@ -119,7 +119,7 @@ beta_shapes <- function(mu, phi) {
 # Supported families (v1):
 #   gaussian   pars$sigma
 #   student    pars$nu, pars$sigma
-#   poisson    (none — log link)
+#   poisson    (none, log link)
 #   negbinomial pars$size (brms NB2 parametrisation;
 #                          uses extraDistr::rnbinom)
 #   binomial   pars$trials (length(eta) or scalar)
@@ -240,7 +240,7 @@ sim_tweedie <- function(mu, phi, power) {
 # `negative_binomial_2(mu, size)`; the equivalent in base R is
 # `stats::rnbinom(n, size, mu)` (note: positional arg order is
 # size first). `extraDistr::rnbinom` accepts named `mu` + `size`
-# directly — preferred for clarity if extraDistr is available;
+# directly, which is clearer when extraDistr is available;
 # falls back to base R otherwise.
 #'@noRd
 sim_negbinom <- function(mu, size) {

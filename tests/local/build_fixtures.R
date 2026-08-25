@@ -469,6 +469,10 @@ test_data_hier <- data.frame(
                        times = n_t_h)),
   time = rep(seq_len(n_t_h), each = n_series_h)
 )
+# Built with interaction()'s default "." separator, which does not
+# match the "_" form mvgam derives from gr and subgr. The mismatch is
+# deliberate: it exercises the path where a supplied series column is
+# superseded.
 test_data_hier$series <- interaction(test_data_hier$region,
                                       test_data_hier$species,
                                       drop = TRUE)

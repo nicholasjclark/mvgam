@@ -30,7 +30,7 @@ are added to the link-scale linear predictor before applying the
 inverse link, matching brms's analytical convention for
 autocorrelated residual models (e.g. Jensen correction
 \eqn{\sigma^2/(1-\rho^2)/2} for AR(1) Poisson). If FALSE, the
-trend is fixed at its posterior mean (no innovations) — faster
+trend is fixed at its posterior mean (no innovations), which is faster
 but ignores process noise.
 
 Note: with \code{process_error = TRUE} the invariant

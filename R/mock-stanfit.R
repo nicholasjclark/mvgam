@@ -22,32 +22,55 @@ get_safe_dummy_value <- function(family_obj) {
   # Validate family object type
   checkmate::assert_class(family_obj, "brmsfamily")
 
-  # Check if integer/discrete family (brms uses type = "int" or "real")
-  # Integer families need integer dummy values for Stan type checking
-  if (!is.null(family_obj$type) && family_obj$type == "int") {
-    return(1L)
-  }
-
-  # For continuous families, check lower bound
-  # Extract bounds from ybounds (brms stores as [lower, upper])
+  # brms records the support as `ybounds` plus a `closed` flag per
+  # bound. Both halves matter: a family bounded above rejects a dummy
+  # placed at or beyond its upper limit just as readily as one below
+  # its lower limit. Reason: Beta has ybounds c(0, 1) with both bounds
+  # open, so consulting the lower bound alone yields 1 and brms then
+  # refuses the whole newdata with "requires response smaller than 1",
+  # which breaks every prediction and forecast path that carries NA
+  # responses.
   ybounds <- family_obj$ybounds
+  closed <- family_obj$closed
+  is_int <- !is.null(family_obj$type) && family_obj$type == "int"
 
-  if (is.null(ybounds) || length(ybounds) < 2) {
-    # Fallback to 0 if ybounds not available (shouldn't happen with valid family)
-    return(0)
+  if (is.null(ybounds) || length(ybounds) < 2L) {
+    return(if (is_int) 1L else 0)
   }
 
-  lb <- ybounds[1]
+  lb <- ybounds[1L]
+  ub <- ybounds[2L]
 
-  # Positive-constrained continuous families (gamma, weibull, exponential, etc.)
-  # Use lb >= 0 (not > 0) because families with lb=0 still need positive dummy
-  # values to pass validation (gamma requires y > 0, not y >= 0)
-  if (is.finite(lb) && lb >= 0) {
-    return(1)
+  # Step in from an open bound so the dummy sits strictly inside the
+  # support; a closed bound is usable as-is. An absent `closed` flag
+  # is treated as open, which is the conservative reading.
+  step <- if (is_int) 1 else 1e-6
+  lo <- if (!is.finite(lb)) {
+    -Inf
+  } else if (isTRUE(closed[1L])) {
+    lb
+  } else {
+    lb + step
+  }
+  hi <- if (!is.finite(ub)) {
+    Inf
+  } else if (isTRUE(closed[2L])) {
+    ub
+  } else {
+    ub - step
   }
 
-  # Unconstrained families (gaussian, student, etc.)
-  return(0)
+  value <- if (is.finite(lo) && is.finite(hi)) {
+    (lo + hi) / 2
+  } else if (is.finite(lo)) {
+    max(lo, 1)
+  } else if (is.finite(hi)) {
+    min(hi, 0)
+  } else {
+    0
+  }
+
+  if (is_int) as.integer(round(value)) else value
 }
 
 #' Extract Random Effects Parameter Mapping from brms Object
@@ -256,7 +279,7 @@ dimnames.mock_stanfit <- function(x) {
 #'   infrastructure with parameter subsets extracted from combined
 #'   Stan fits.
 #'
-#' The function leverages brms::standata() to generate design matrices
+#' The function calls brms::standata() to generate design matrices
 #'   for fixed effects, random effects, smooths, GPs, and other special
 #'   terms. This ensures compatibility with all brms formula features.
 #'
@@ -361,7 +384,7 @@ prepare_predictions.mock_stanfit <- function(x,
   # the formula. NA cells: brms rejects them with an unhelpful
   # "missing value where TRUE/FALSE needed" before reaching the
   # linpred machinery. Dummy values are never read by the
-  # linpred / epred / predict paths — they exist only to satisfy
+  # linpred, epred and predict paths; they exist only to satisfy
   # brms's standata validation.
   for (rv in resp_vars) {
     family_obj <- if (brms::is.mvbrmsformula(brmsfit$formula)) {
@@ -369,12 +392,20 @@ prepare_predictions.mock_stanfit <- function(x,
     } else {
       brmsfit$family
     }
-    dummy_value <- get_safe_dummy_value(family_obj)
+    # An ordinal response is an ordered factor, so a numeric dummy
+    # cannot be written into the column: the assignment lands outside
+    # the levels, stays NA, and brms rejects the newdata. Its first
+    # level stands in instead.
+    existing <- newdata_with_resp[[rv]]
+    dummy_value <- if (is.factor(existing)) {
+      levels(existing)[1L]
+    } else {
+      get_safe_dummy_value(family_obj)
+    }
     if (!rv %in% names(newdata_with_resp)) {
       newdata_with_resp[[rv]] <- rep(dummy_value, nrow(newdata_with_resp))
-    } else if (anyNA(newdata_with_resp[[rv]])) {
-      na_idx <- is.na(newdata_with_resp[[rv]])
-      newdata_with_resp[[rv]][na_idx] <- dummy_value
+    } else if (anyNA(existing)) {
+      newdata_with_resp[[rv]][is.na(existing)] <- dummy_value
     }
   }
 

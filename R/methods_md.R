@@ -1441,9 +1441,8 @@ mv_custom_composition_rows <- function(kind, obj, notation) {
   }
   # mvn / mvt: emit the per-response mu linpred row (the obs
   # formula targets `mu` for category 1; further categories are
-  # tied to mu by brms's mv response stacking). For now keep
-  # the simple shared placeholder; Phase E will lift per-
-  # response linpreds.
+  # tied to mu by brms's mv response stacking), so a single shared
+  # placeholder stands for the set.
   list(list(
     lhs = "\\boldsymbol{\\mu}_i",
     op  = "=",

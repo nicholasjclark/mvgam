@@ -88,7 +88,7 @@ from \code{ggplot}).
 \description{
 Plot method for fitted \code{mvgam} objects. A thin S3 dispatcher
 that routes by \code{type} to the canonical plotting surface for
-each kind of summary. No bespoke plotting code lives here —
+each kind of summary. No bespoke plotting code lives here:
 every branch forwards to a single dedicated function.
 }
 \examples{
