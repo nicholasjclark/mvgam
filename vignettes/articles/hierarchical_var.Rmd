@@ -317,13 +317,14 @@ here and interpret only the structural blocks below.
 
 How much does the partial-pooling prior shrink each country's
 AR persistence toward the global mean? Plotting the medians and
-90% intervals for the self-persistence diagonal by country
-answers that directly. The helper
-`posterior_transition_matrix(mod_hier, group = <name>)` returns
-the `[ndraws, K, K]` array of posterior draws for a country's
-$A_c$; passing `group = NULL` returns the shrinkage target
-built from the hyperparameters `Amu_trend[1, 1]` (diagonal mean)
-and `Amu_trend[2, 1]` (off-diagonal mean).
+95% intervals for the self-persistence diagonal by country
+answers that directly. `posterior_transition_matrix(mod_hier,
+group = <name>)` returns the `[ndraws, K, K]` array of posterior
+draws for one country's $A_c$, `groups = "all"` returns the set
+of them classed for a faceted plot, and `group = NULL` returns
+the shrinkage target built from the hyperparameters
+`Amu_trend[1, 1]` (diagonal mean) and `Amu_trend[2, 1]`
+(off-diagonal mean).
 
 ```{r plot-A-country-diag, fig.cap = "Posterior medians and 95% intervals for the three self-persistence coefficients (diagonal of A_c) by country. Points close together across countries indicate that the partial-pooling prior has pulled the country-specific estimates toward the same global value."}
 A_all <- posterior_transition_matrix(mod_hier, groups = "all")
@@ -572,7 +573,7 @@ Gelman A and Hill J (2007). *Data Analysis Using Regression and
 Multilevel/Hierarchical Models*. Cambridge University Press.
 [doi:10.1017/CBO9780511790942](https://doi.org/10.1017/CBO9780511790942)
 
-Heaps SE (2022). Enforcing stationarity through the prior in
+Heaps SE (2023). Enforcing stationarity through the prior in
 vector autoregressions. *Journal of Computational and Graphical
 Statistics* 32(1), 74-83.
 [doi:10.1080/10618600.2022.2079648](https://doi.org/10.1080/10618600.2022.2079648)

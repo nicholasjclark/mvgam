@@ -60,13 +60,13 @@ response on its own. The integrated distribution model tradition
 [2020](https://doi.org/10.1016/j.tree.2019.08.006); Miller et
 al. [2019](https://doi.org/10.1111/2041-210X.13110)) resolves
 this by fitting one likelihood per data stream and tying every
-likelihood to the same underlying intensity. mvgam expresses
-that pattern natively via `mvbf()`: one `bf()` outcome per data
-stream, each with its own observation family, all sharing a
-single latent process on the log-intensity scale. This article
-walks through a simulated three-stream monitoring scenario where
-the truth is known, so the joint fit's inferences can be checked
-directly.
+likelihood to the same underlying intensity. mvgam expresses that
+pattern natively through a multivariate `brms` formula: one
+`bf()` outcome per data stream, chained with `+`, each carrying
+its own observation family, all sharing a single latent process
+on the log-intensity scale. This article walks through a
+simulated three-stream monitoring scenario where the truth is
+known, so the joint fit's inferences can be checked directly.
 
 ## The data
 
@@ -212,7 +212,7 @@ mod_joint <- mvgam(
   trend_formula = ~ s(env, k = 8) + AR(p = c(1, 12)),
   trend_map     = "shared",
   data = ipm_data,
-  chains = 2L, samples = 500L,
+  chains = 2L, iter = 1500L, warmup = 1000L,
   control = list(adapt_delta = 0.95),
   silent = 2L
 )
@@ -242,7 +242,7 @@ Convergence, per-measurement intercepts and the parameters on
 the trend side all arrive together from `summary()`:
 
 ```{r joint-summary}
-summary(mod_joint, smooth_test = FALSE)
+summary(mod_joint, include_betas = FALSE)
 ```
 
 The `ar1_trend[1]`, `ar12_trend[1]` and `sigma_trend[1]`
@@ -401,7 +401,7 @@ mod_count <- mvgam(
   bf(count ~ 1 + offset(log_effort), family = poisson()),
   trend_formula = tf,
   data = ipm_data,
-  chains = 2L, samples = 500L,
+  chains = 2L, iter = 1500L, warmup = 1000L,
   control = list(adapt_delta = 0.95),
   silent = 2L
 )
@@ -409,7 +409,7 @@ mod_pa <- mvgam(
   bf(pa ~ 1, family = bernoulli(link = "cloglog")),
   trend_formula = tf,
   data = ipm_data,
-  chains = 2L, samples = 500L,
+  chains = 2L, iter = 1500L, warmup = 1000L,
   control = list(adapt_delta = 0.95),
   silent = 2L
 )
@@ -417,7 +417,7 @@ mod_po <- mvgam(
   bf(po ~ 1, family = poisson()),
   trend_formula = tf,
   data = ipm_data,
-  chains = 2L, samples = 500L,
+  chains = 2L, iter = 1500L, warmup = 1000L,
   control = list(adapt_delta = 0.95),
   silent = 2L
 )
@@ -541,7 +541,7 @@ mod_wrong_trend <- mvgam(
   trend_formula = ~ s(env, k = 8) + AR(p = 1),
   trend_map     = "shared",
   data = ipm_data,
-  chains = 2L, samples = 500L,
+  chains = 2L, iter = 1500L, warmup = 1000L,
   control = list(adapt_delta = 0.95),
   silent = 2L
 )
@@ -660,16 +660,15 @@ lfo_tab <- rbind(
 lfo_tab
 ```
 
-At $h = 1$ the two fits were indistinguishable. At $h = 6$ the
-misspecified fit was slightly ahead, because a horizon covering
-half a seasonal cycle let its AR(1) branch absorb the
-recurrence into its own coefficient. At $h = 12$ the joint fit
-won by roughly the same amount it had lost at $h = 6$. On this
-single 96-month realisation the $h = 12$ margin is not
-overwhelming (a $Z$-ratio near 1), but the sign and the
-direction of change across horizons are the interpretable
-signal: choose the LFO horizon to reach at least one full
-period of the recurrence you are testing.
+At $h = 1$ the two fits are indistinguishable. At $h = 6$ the
+misspecified fit edges ahead, because a horizon covering half a
+seasonal cycle lets its AR(1) branch absorb the recurrence into
+its own coefficient. At $h = 12$ the joint fit wins back roughly
+what it lost at $h = 6$. On a single 96-month realisation the
+$h = 12$ margin is not overwhelming (a $Z$-ratio near 1), but
+the sign and the direction of change across horizons are the
+interpretable signal: choose the LFO horizon to reach at least
+one full period of the recurrence you are testing.
 
 The per-step ELPD trajectory at $h = 12$ shows the same story
 step by step:
@@ -742,18 +741,24 @@ trust it to break a tie.
 
 ## Further reading
 
-- The `mvbf` article (`vignette("mvbf",
-  package = "mvgam")`) demonstrates the same mvbf architecture
-  on generic count / biomass / camera measurements without the
-  ecological framing.
-- The `dfm` in-package vignette
-  (`vignette("dfm", package = "mvgam")`) shows how
-  `trend_map` shares fewer latent processes than observed
-  measurements when there is more than one biological signal
-  to disentangle.
-- `?trend_constructors` documents the sparse-lag
-  `AR(p = c(...))` and every alternative you might substitute
-  for the trend side of a joint fit.
+- The
+  [multi-response article](https://nicholasjclark.github.io/mvgam/articles/mvbf.html)
+  demonstrates the same architecture on generic count / biomass /
+  camera measurements without the ecological framing.
+- The
+  [dynamic factor vignette](https://nicholasjclark.github.io/mvgam/articles/dfm.html)
+  shows how `trend_map` shares fewer latent processes than
+  observed measurements when there is more than one biological
+  signal to disentangle.
+- The
+  [N-mixture article](https://nicholasjclark.github.io/mvgam/articles/nmix.html)
+  covers the complementary route to detection error, where
+  repeated visits to a closed unit identify the detection
+  probability inside a single likelihood rather than across
+  streams.
+- `?AR` and `?RW` document the sparse-lag `AR(p = c(...))` and
+  every alternative you might substitute for the trend side of a
+  joint fit.
 - Isaac et al.
   ([2020](https://doi.org/10.1016/j.tree.2019.08.006)) survey
   the wider integrated distribution model literature. Miller

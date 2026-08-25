@@ -189,8 +189,8 @@ fit_correct <- mvgam(
   newdata = test,
   family = gaussian(),
   chains = 2L,
-  samples = 500L,
-  burnin = 500L,
+  iter = 1000L,
+  warmup = 500L,
   silent = 2L,
   refresh = 0
 )
@@ -262,8 +262,8 @@ fit_free <- mvgam(
   newdata = test,
   family = gaussian(),
   chains = 2L,
-  samples = 500L,
-  burnin = 500L,
+  iter = 1000L,
+  warmup = 500L,
   silent = 2L,
   refresh = 0
 )
@@ -298,8 +298,8 @@ fit_shared <- mvgam(
   newdata = test,
   family = gaussian(),
   chains = 2L,
-  samples = 500L,
-  burnin = 500L,
+  iter = 1000L,
+  warmup = 500L,
   silent = 2L,
   refresh = 0
 )
@@ -424,7 +424,17 @@ Sibling articles in this series carry the workflow further:
 - The
   [JSDM article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
   applies the factor-model architecture to community ecology data
-  with informed loadings.
+  with informed loadings, including the multiplicative gamma
+  process prior that lets the data choose the factor count.
+- The
+  [VAR article](https://nicholasjclark.github.io/mvgam/articles/var.html)
+  covers the opposite extreme, where every series keeps its own
+  latent process and the interest is in how those processes
+  drive one another.
+- The
+  [overview vignette](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
+  places `trend_map` alongside the other trend-side switches
+  (`cor`, `gr`, `n_lv`) it composes with.
 
 ## Acknowledgements
 

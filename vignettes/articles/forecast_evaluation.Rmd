@@ -66,8 +66,8 @@ rodent species (DM, DO, PB, PP) trapped monthly at the Portal
 LTREB site, with two pre-standardised covariates: a 12-month
 moving average of NDVI (`ndvi_ma12`) and the previous month's
 minimum temperature (`mintemp`). The response `captures` is an
-integer count; about 10% of the cells are missing because the
-field team could not always reach the plot.
+integer count, and roughly a fifth of the cells are missing
+because the field team could not always reach the plot.
 
 ```{r data-head}
 data(portal_data)
@@ -116,7 +116,7 @@ mod_spline <- mvgam(
     s(time, by = series, k = 8) + series,
   family = poisson(),
   data   = train,
-  chains = 2L, samples = 600L, silent = 2L
+  chains = 2L, iter = 1600L, warmup = 1000L, silent = 2L
 )
 ```
 
@@ -136,7 +136,7 @@ mod_ar <- mvgam(
   trend_formula = ~ AR(),
   family = poisson(),
   data   = train,
-  chains = 2L, samples = 600L, silent = 2L
+  chains = 2L, iter = 1600L, warmup = 1000L, silent = 2L
 )
 ```
 
@@ -156,7 +156,7 @@ mod_var <- mvgam(
   trend_formula = ~ VAR(cor = TRUE),
   family = poisson(),
   data   = train,
-  chains = 2L, samples = 600L, silent = 2L
+  chains = 2L, iter = 1600L, warmup = 1000L, silent = 2L
 )
 ```
 
@@ -421,8 +421,12 @@ minimum training length `min_t`, the procedure expands the
 training window one timepoint at a time and forecasts `fc_horizon`
 steps ahead. At each step, PSIS importance weights are computed
 against the existing fit; only when Pareto-k exceeds a threshold
-(default 0.7) does mvgam refit the model. That hybrid scheme
-gives near-exact LFO ELPD at a fraction of the cost.
+does mvgam refit the model. Leaving `pareto_k_threshold = NULL`
+takes the adaptive rule `min(1 - 1 / log10(S), 0.7)` on the
+number of posterior draws `S`, which tightens the gate for fits
+with few draws and clamps at 0.7 once PSIS is on firm ground.
+That hybrid scheme gives near-exact LFO ELPD at a fraction of
+the cost of refitting everywhere.
 
 ```{r lfo_show, eval = FALSE}
 lfo_spline <- lfo_cv(mod_spline, min_t = 60L, fc_horizon = 4L,
@@ -608,15 +612,23 @@ The natural next functions to explore on the same fit are:
 
 Sibling articles in this series carry the workflow further:
 
+- The [VAR article](https://nicholasjclark.github.io/mvgam/articles/var.html)
+  takes the `VAR(cor = TRUE)` fit used above apart cell by cell,
+  with impulse responses, variance decompositions and stability
+  metrics.
 - The [multi-response article](https://nicholasjclark.github.io/mvgam/articles/mvbf.html)
   shows how to share a single latent state across several
   outcomes with different observation families.
 - The [JSDM article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
   applies the latent factor variant to multispecies count data
   with informed loadings via `jsdgam()`.
-- For hierarchical or grouped trend dynamics (one shared trend
-  per group with hyperpriors across groups), see `?gr` and the
-  hierarchical-trends section of `vignette("mvgam_overview")`.
+- The [overview vignette](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
+  introduces the trend constructors the three candidates here
+  draw on.
+- For grouped trend dynamics (one transition matrix and
+  innovation covariance per group, shrunk toward a global mean),
+  see the `gr` and `subgr` arguments in `?VAR` and the
+  [hierarchical VAR article](https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html).
 
 ## Acknowledgements
 
@@ -648,8 +660,8 @@ models. *Journal of Statistical Computation and Simulation*
 
 Clark NJ, Ernest SKM, Senyondo H, Simonis J, White EP, Yenni
 GM and Karunarathna KANK (2025). Beyond single-species models:
-multispecies forecasts to navigate the dynamics of ecological
-predictability. *PeerJ* 13, e18929.
+leveraging multispecies forecasts to navigate the dynamics <!-- prose-lint-disable-line -->
+of ecological predictability. *PeerJ* 13, e18929.
 [doi:10.7717/peerj.18929](https://doi.org/10.7717/peerj.18929)
 
 Gneiting T and Raftery AE (2007). Strictly proper scoring rules,

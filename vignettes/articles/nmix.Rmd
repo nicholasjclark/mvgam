@@ -13,8 +13,7 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
   message = FALSE,
-  warning = FALSE,
-  eval = if (isTRUE(exists("params"))) params$EVAL else FALSE
+  warning = FALSE
 )
 ```
 
@@ -32,17 +31,19 @@ library(ggplot2)
 theme_set(theme_bw(base_size = 12, base_family = "serif"))
 ```
 
-N-mixture models infer the true abundance of a closed population
-from repeated counts that are recorded with imperfect detection.
-The model partitions an observed count $y_{i, r}$ into a latent
-state (the unobserved abundance $N_i$ at site $i$) and a per-visit
-detection process that records each individual independently with
-probability $p_r$. This vignette walks through fitting the
-single-season Poisson-binomial N-mixture in `mvgam`, recovering
-the latent abundance against a known truth, and checking model
-fit with closure-unit-aware goodness-of-fit statistics. A
-two-species worked example carries the discussion; the same
-`bf(y ~ ..., p ~ ...)` formula extends to any number of species.
+A count of animals at a site is two quantities wearing one
+number: how many were present, and how many of those were seen.
+N-mixture models pull them apart. Repeated visits to a population
+that stays closed over the survey window let the latent abundance
+$N_i$ at site $i$ be identified separately from the per-visit
+probability $p_r$ that any one individual is recorded, because
+the two leave different signatures in the mean and the variance
+of the observed counts. This article fits the single-season
+Poisson-binomial N-mixture in `mvgam`, recovers the latent
+abundance against a known truth, and checks the fit with
+closure-unit goodness-of-fit statistics. A two-species example
+carries the discussion; the same `bf(y ~ ..., p ~ ...)` formula
+extends to any number of species.
 
 ## N-mixture models
 
@@ -159,8 +160,8 @@ mod <- mvgam(
   data    = simdat$data_train,
   family  = nmix(),
   chains  = 2L,
-  samples = 500L,
-  burnin  = 500L,
+  iter    = 1000L,
+  warmup  = 500L,
   silent  = 2L
 )
 ```
@@ -412,15 +413,15 @@ mod_rn  <- mvgam(formula = bf(y ~ series + env:series,
                                  p ~ series + tod_c:series),
                  data    = simdat$data_train,
                  family  = nmix("royle_nichols"),
-                 chains  = 2L, samples = 500L,
-                 burnin  = 500L, silent = 2L)
+                 chains  = 2L, iter = 1000L,
+                 warmup  = 500L, silent = 2L)
 
 mod_ppm <- mvgam(formula = bf(y ~ series + env:series,
                                  p ~ series + tod_c:series),
                  data    = simdat$data_train,
                  family  = nmix("poisson_poisson"),
-                 chains  = 2L, samples = 500L,
-                 burnin  = 500L, silent = 2L)
+                 chains  = 2L, iter = 1000L,
+                 warmup  = 500L, silent = 2L)
 ```
 
 The Royle-Nichols variant follows
@@ -443,9 +444,20 @@ a real seasonal axis.
   when residual cross-species correlation needs explicit
   modelling.
 - The
+  [integrated distribution article](https://nicholasjclark.github.io/mvgam/articles/idm.html)
+  for the next step up: when detection-corrected counts are only
+  one of several survey streams watching the same population,
+  each stream keeps its own likelihood and they share one latent
+  intensity.
+- The
+  [JSDM article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+  for a worked community fit where the loadings, not the
+  detection process, carry the cross-species structure.
+- The
+  [data formatting vignette](https://nicholasjclark.github.io/mvgam/articles/data.html)
+  for the closure-unit column layout in isolation, and the
   [overview vignette](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
-  for the state-space architecture that the closure-unit families
-  fit into.
+  for the state-space architecture these families fit into.
 
 ## Further reading
 

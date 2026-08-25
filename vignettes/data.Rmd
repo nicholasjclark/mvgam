@@ -194,7 +194,7 @@ among series, `ZMVN()` ignores the `time` axis entirely.
 
 Every observation family in `mvgam` carries a support that the
 response must respect: `poisson()` and `negbinomial()` need
-non-negative integers; `Beta()` (and `Beta_binomial()`'s second
+non-negative integers; `Beta()` (and `beta_binomial()`'s second
 arm) need values strictly in $(0, 1)$; `Gamma()` and
 `lognormal()` need strictly positive reals; `bernoulli()` needs
 0/1 values. Most regression packages will silently fit something
@@ -209,7 +209,7 @@ bad_family <- data.frame(
   series = factor("series_1")
 )
 mvgam(y ~ 1, data = bad_family, family = Beta(),
-      chains = 1L, samples = 100L, silent = 2L)
+      chains = 1L, iter = 1100L, warmup = 1000L, silent = 2L)
 ```
 
 The error states the actual problem (Beta needs $(0, 1)$, the
@@ -225,8 +225,8 @@ exposed under a more discoverable name) runs every validator
 level alignment, regular time spacing for trends that need it,
 response-family compatibility, and any covariates the user
 plans to reference. When `plot = TRUE` it also draws the
-standard EDA view (time-series, ACF, histogram, ECDF) so the
-shape of the data is visible at a glance.
+standard EDA view (time series, histogram, ACF, empirical CDF)
+so the shape of the data is visible at a glance.
 
 ```{r check-good, fig.asp = 0.85, out.width = "85%"}
 check_mvgam_data(
@@ -237,13 +237,13 @@ check_mvgam_data(
 ```
 
 The print line confirms the family, the number of series, the
-time range and the row count. The 4-panel patchwork shows the
-time-series, ACF, ECDF, and histogram for the first species,
-which is the right level of detail when checking a single
-series; passing `series = "all"` instead returns one faceted
-time-series plot covering every species. The same call returns
-a structured `mvgam_data` object invisibly so it can be assigned
-and re-used if desired.
+time range and the row count. The four-panel patchwork shows the
+time series, histogram, ACF and empirical CDF for the first
+species, which is the right level of detail when checking a
+single series; passing `series = "all"` instead returns one
+faceted time-series plot covering every species. The same call
+returns a structured `mvgam_data` object invisibly so it can be
+assigned and re-used if desired.
 
 When the data are *not* valid, the same function raises an
 informative error. Three common failure modes:
@@ -258,8 +258,10 @@ The validator rejects the data because Poisson requires
 non-negative integers. Subtracting `0.5` made them negative
 and fractional, so both checks fail. Switching to `Gamma()` or
 `lognormal()` would require the response to be strictly
-positive; `bernoulli()` needs 0/1 values. Each family's support
-is documented under `?mvgam_families`.
+positive; `bernoulli()` needs 0/1 values. Each family documents
+its own support: see `?brmsfamily` for the brms library, and
+`?tweedie`, `?beta_nb`, `?com_binomial`, `?nmix` or `?occ` for
+the families mvgam adds on top of it.
 
 ```{r check-missing-times, error = TRUE}
 gap <- birdsong[birdsong$time != 5L, ]
@@ -384,7 +386,7 @@ correctly, the `cap` column is consistent across visits within
 a unit and the factor levels line up.
 
 The closure-unit grain is covered in more detail in the
-[N-mixture vignette](https://nicholasjclark.github.io/mvgam/articles/nmix.html);
+[N-mixture article](https://nicholasjclark.github.io/mvgam/articles/nmix.html);
 this section exists so you can recognise the layout when you
 encounter it and not confuse it with the per-time-step long
 format.
@@ -430,8 +432,8 @@ common failures is short:
    `my_col`.
 2. The time column is `numeric` or `integer` and (for AR-family
    trends) the spacing within each series is constant.
-3. The response respects the chosen family's support
-   (`?mvgam_families`).
+3. The response respects the chosen family's support (see the
+   family's own help page).
 4. Every covariate the formula references has no `NA`s.
 5. `check_mvgam_data(data, family = ..., trend_model = ...)`
    runs without error.
@@ -446,11 +448,17 @@ inspector.
   argument list.
 - `?validate_newdata` for the newdata pre-check used in
   forecasting pipelines.
-- `?mvgam_families` for the per-family response-shape rules.
+- `?brmsfamily` for the brms family library, plus `?tweedie`,
+  `?beta_nb`, `?com_binomial`, `?nmix` and `?occ` for the
+  response-shape rules of the families mvgam adds.
 - `?CAR` for the irregular-sampling escape hatch.
 - The
   [overview vignette](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
   for the model surface that consumes the data validated here.
 - The
-  [N-mixture vignette](https://nicholasjclark.github.io/mvgam/articles/nmix.html)
+  [N-mixture article](https://nicholasjclark.github.io/mvgam/articles/nmix.html)
   for the closure-unit grain in worked detail.
+- The
+  [dynamic factor vignette](https://nicholasjclark.github.io/mvgam/articles/dfm.html)
+  for the `trend_map` structures that decide which series share a
+  latent path once the data are in shape.

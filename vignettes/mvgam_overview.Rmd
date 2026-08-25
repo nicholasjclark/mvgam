@@ -37,14 +37,17 @@ library(ggplot2)
 theme_set(theme_bw(base_size = 12, base_family = "serif"))
 ```
 
-`mvgam` fits Bayesian dynamic generalized additive models and
-helps with plotting and forecasting them. The observation model is written as a `brms`
-formula and compiled through the `brms` Stan code generator;
-`mvgam` extends that pipeline with a latent state layer so the
-fitted model is a state-space model rather than a regression. An
-observation process maps the latent state to the response through
-a chosen likelihood, and a trend process governs how the latent
-state evolves over time.
+A regression fitted to a time series has nowhere to put the
+structure it cannot explain, so that structure lands in the
+residuals and gets charged to observation noise. `mvgam` gives it
+somewhere else to go. The observation model is written as a
+`brms` formula and compiled through the `brms` Stan code
+generator; `mvgam` extends that pipeline with a latent state
+layer, so the fitted object is a state-space model rather than
+a regression. An observation
+process maps the latent state to the response through a chosen
+likelihood, and a trend process governs how the latent state
+evolves over time.
 
 Because the observation side is compiled by `brms`, the full
 `brms` modelling vocabulary carries through into state-space fits.
@@ -132,8 +135,9 @@ occupancy and N-mixture models work on sites by visit by
 species, with the detection process attached as a second `bf()`
 arm. `jsdgam()` composes the same trend pipeline as `mvgam()`,
 with factor structure via `n_lv` and `loadings_prior`, and adds
-phylogenetic distance matrices through `phylo` and trait by
-environment interactions through `trait_formula`.
+phylogenetic distance matrices through `phylo`, trait-informed
+loading priors through `traits`, and trait by environment
+interactions through `trait_slopes`.
 
 The family table below applies to both fitters. The closure-unit
 and joint multivariate response families work in either, and the
@@ -147,21 +151,26 @@ integration layer. `mvgam` adds a small library of families for
 time-series and ecological use cases that `brms` does not ship
 natively:
 
-| Family | Use case | Family parameters |
+| Family | Use case | Distributional parameters |
 |:------:|:---------|:-----------------:|
-| `tweedie()` | Compound Poisson-Gamma counts that include many zeros | `phi`, `power` |
+| `tweedie()` | Compound Poisson-Gamma counts that include many zeros | `mphi`, `mtheta` |
 | `beta_nb()` | Heavy-tailed counts whose largest values a negative binomial keeps under-predicting | `shape`, `mtail` |
 | `com_binomial()` | Conway-Maxwell-Binomial for over-, under-, super-dispersed bounded counts | `nu` |
-| `nmix()` | N-mixture detection-error models (Poisson-Binomial, Royle-Nichols, Poisson-Poisson variants) | family-specific |
-| `occ()` | Single-season occupancy with imperfect detection | `psi` |
+| `nmix()` | N-mixture detection-error models (Poisson-Binomial, Royle-Nichols, Poisson-Poisson variants) | `mu`, `p` |
+| `occ()` | Single-season occupancy with imperfect detection | `mu`, `p` |
 | `diri()` | Dirichlet compositional responses | `phi` |
 | `multi()`, `categ()` | Multinomial and categorical responses on the closure-unit grain | -- |
-| `mvn()`, `mvt()` | Multivariate normal / Student-t responses with low-rank residual covariance | `Psi` |
+| `mvn()`, `mvt()` | Multivariate normal / Student-t responses with low-rank residual covariance | -- |
 
-Each family is documented on its own help page with a worked
-recovery example. The two groups that need extra explanation are
-the closure-unit families and the joint multivariate response
-families, both summarised below.
+The parameter column names what a `bf()` arm or a `prior()` call
+can address. For the closure-unit families `mu` carries the state
+(abundance or occupancy) and `p` the detection side; for `mvn()`
+and `mvt()` the residual covariance is built from the loadings
+and the species scales `Psi` rather than from a distributional
+parameter. Each family is documented on its own help page with a
+worked recovery example. The two groups that need extra
+explanation are the closure-unit families and the joint
+multivariate response families, both summarised below.
 
 ### Closure-unit families: `occ()` and `nmix()`
 
@@ -456,10 +465,11 @@ truncation ceiling on the factor count. Under MGP,
 `active_factors()` reports the posterior distribution of the
 number of active columns.
 
-See `?mvgam_trends` for the full surface, `?AR`, `?VAR`, `?RW`,
-`?ZMVN`, `?CAR`, `?PW` for the per-constructor arguments,
-`?loadings_prior` for the structured priors, and
-`?ordinate.mvgam` for biplot helpers on the rotated loadings.
+See `?AR`, `?VAR`, `?RW`, `?ZMVN`, `?CAR` and `?PW` for the
+per-constructor arguments, `list_trend_types()` for what is
+registered in the current session, the `loadings_prior` argument
+on `?mvgam` for the structured priors, and `?ordinate.mvgam` for
+biplot helpers on the rotated loadings.
 Smooth Gaussian process effects on covariates remain available
 through `gp()` inside either `formula` or `trend_formula`.
 
@@ -475,10 +485,10 @@ deterministic seasonal cycle on the obs side and a sparse-lag
 `AR(p = c(1, 12))` latent state. The seasonal cycle is
 identifiable from the smooth alone. The latent state carries
 momentum at lag 1 and recurrence at lag 12 on top of that fixed
-cycle. The simulator returns 240 monthly observations and holds
-the final 12 back as a test set, so the question "does adding
-the latent state help on a forecast the model has never seen?"
-has somewhere to land.
+cycle. `proportional_train` splits the 240 monthly observations
+into a training window and a held-out tail, so the question
+"does adding the latent state help on a forecast the model has
+never seen?" has somewhere to land.
 
 ```{r sim-data}
 set.seed(7)
@@ -545,8 +555,8 @@ step1 <- mvgam(
   data    = train,
   newdata = test,
   chains  = 2,
-  samples = 400,
-  burnin  = 400,
+  iter    = 800,
+  warmup  = 400,
   silent  = 2
 )
 ```
@@ -606,8 +616,8 @@ step2 <- mvgam(
   data          = train,
   newdata       = test,
   chains        = 2,
-  samples       = 400,
-  burnin        = 400,
+  iter          = 800,
+  warmup        = 400,
   silent        = 2
 )
 ```
@@ -806,20 +816,41 @@ The natural next functions to explore on the same fit are:
   variance decomposition; `?stability` for eigenvalue checks on
   VAR trends.
 
-Sibling articles in this series carry the workflow further:
+Getting data into the shape this vignette assumes is covered in
+the
+[data formatting vignette](https://nicholasjclark.github.io/mvgam/articles/data.html),
+which is the right place to start if a fit refuses to compile.
+From here, each trend process has an article of its own:
 
+- The
+  [VAR article](https://nicholasjclark.github.io/mvgam/articles/var.html)
+  fits `VAR(cor = TRUE)` to three regional bird counts and reads
+  impulse responses, variance decompositions and stability
+  metrics off the posterior; the
+  [hierarchical VAR article](https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html)
+  scales that to a panel of eight economies.
+- The
+  [dynamic factor vignette](https://nicholasjclark.github.io/mvgam/articles/dfm.html)
+  works through `trend_map`, the argument that decides which
+  series share a latent path.
+- The
+  [multi-response article](https://nicholasjclark.github.io/mvgam/articles/mvbf.html)
+  shares a single latent state across several outcomes with
+  different observation families, and the
+  [integrated distribution article](https://nicholasjclark.github.io/mvgam/articles/idm.html)
+  applies that pattern to survey protocols that each see the same
+  species differently.
+- The
+  [JSDM article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
+  applies the latent factor variant to multispecies count data
+  with informed loadings via `jsdgam()`, and the
+  [N-mixture article](https://nicholasjclark.github.io/mvgam/articles/nmix.html)
+  covers the closure-unit families that marginalise imperfect
+  detection.
 - The
   [forecast evaluation article](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html)
   walks through `forecast()`, `score()`, `lfo_cv()` and
   `ensemble()` on a worked count-data example.
-- The
-  [multi-response article](https://nicholasjclark.github.io/mvgam/articles/mvbf.html)
-  shows how to share a single latent state across several
-  outcomes with different observation families.
-- The
-  [JSDM article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
-  applies the latent factor variant to multispecies count data
-  with informed loadings via `jsdgam()`.
 
 ## Acknowledgements
 
@@ -863,8 +894,9 @@ Models (DGAMs) for forecasting discrete ecological time series.
 
 Clark, N. J., Ernest, S. K. M., Senyondo, H., Simonis, J.,
 White, E. P., Yenni, G. M. and Karunarathna, K. A. N. K. (2025).
-Beyond single-species models: multispecies forecasts for
-ecological predictability. *PeerJ* 13, e18929.
+Beyond single-species models: leveraging multispecies forecasts <!-- prose-lint-disable-line -->
+to navigate the dynamics of ecological predictability.
+*PeerJ* 13, e18929.
 [doi:10.7717/peerj.18929](https://doi.org/10.7717/peerj.18929)
 
 Heaps, S. E. (2023). Enforcing stationarity through the prior in

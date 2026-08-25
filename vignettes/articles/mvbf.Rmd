@@ -113,20 +113,20 @@ mod_uni_count <- mvgam(
   count ~ 1 + offset(log_effort),
   trend_formula = ~ AR(p = 1),
   family = poisson(), data = mv_data,
-  chains = 2L, samples = 1000L, silent = 2L
+  chains = 2L, iter = 2000L, warmup = 1000L, silent = 2L
 )
 mod_uni_biomass <- mvgam(
   biomass ~ 1 + s(month, bs = "cc", k = 8),
   trend_formula = ~ AR(p = 1),
   family = Gamma(link = "log"), data = mv_data,
   knots = list(month = c(0.5, 12.5)),
-  chains = 2L, samples = 1000L, silent = 2L
+  chains = 2L, iter = 2000L, warmup = 1000L, silent = 2L
 )
 mod_uni_camera <- mvgam(
   camera ~ 1 + deploy_days,
   trend_formula = ~ AR(p = 1),
   family = bernoulli(link = "logit"), data = mv_data,
-  chains = 2L, samples = 1000L, silent = 2L
+  chains = 2L, iter = 2000L, warmup = 1000L, silent = 2L
 )
 ```
 
@@ -162,7 +162,7 @@ mod_joint <- mvgam(
   trend_formula = ~ AR(p = 1),
   data  = mv_data,
   knots = list(month = c(0.5, 12.5)),
-  chains = 2L, samples = 1000L, silent = 2L
+  chains = 2L, iter = 2000L, warmup = 1000L, silent = 2L
 )
 ```
 
@@ -178,11 +178,15 @@ non-NA rows. The Stan model then evaluates the count likelihood at all
 likelihood at the 60 observed months, all contributing to a
 single shared AR(1) state.
 
-The shared dynamics show up clearly in the fixed-effect summary
-and parameter recovery.
+`summary()` returns a classed object whose `spec` slot holds the
+distributional parameters each family contributes, so the Gamma
+shape belonging to the biomass arm can be read on its own.
+`posterior_summary()` then pulls the intercepts, the covariate
+slope and the trend parameters into one table for the recovery
+check.
 
 ```{r joint-summary}
-s <- summary(mod_joint, smooth_test = FALSE)
+s <- summary(mod_joint)
 print(s$spec)
 ```
 
@@ -432,13 +436,18 @@ Sibling articles in this series carry the workflow further:
   walks through `forecast()`, `score()`, `lfo_cv()` and
   `ensemble()` on a single count outcome and the multivariate
   scoring rules that pair with them.
+- The [integrated distribution article](https://nicholasjclark.github.io/mvgam/articles/idm.html)
+  takes the same architecture into species distribution
+  modelling, where the streams are survey protocols and the
+  shared state is a log-intensity.
 - The [JSDM article](https://nicholasjclark.github.io/mvgam/articles/jsdgam.html)
   shows the joint-species variant where many response columns
   share a latent factor structure with informed priors via
   `jsdgam()`.
-- For hierarchical or grouped trend dynamics (one shared trend
-  per group with hyperpriors across groups), see `?gr` and the
-  hierarchical-trends section of `vignette("mvgam_overview")`.
+- For grouped trend dynamics (one transition matrix and
+  innovation covariance per group, shrunk toward a global mean),
+  see the `gr` and `subgr` arguments in `?VAR` and the
+  [hierarchical VAR article](https://nicholasjclark.github.io/mvgam/articles/hierarchical_var.html).
 
 ## Acknowledgements
 

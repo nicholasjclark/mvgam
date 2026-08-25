@@ -12,3 +12,322 @@ navbar:
   structure:
     left: [intro, articles, reference, news]
     right: [search, github]
+
+articles:
+- title: Getting started
+  desc: >
+    Shape your data, then meet the modelling surface that consumes it.
+  contents:
+  - data
+  - mvgam_overview
+
+- title: Latent dynamics
+  desc: >
+    Trend processes that carry temporal structure the observation model
+    cannot see, and the post-fit tools that interrogate them.
+  contents:
+  - articles/var
+  - articles/hierarchical_var
+  - dfm
+
+- title: Many responses, one process
+  desc: >
+    Sharing a latent state across outcomes measured on different
+    scales, across species, and across survey protocols.
+  contents:
+  - articles/mvbf
+  - articles/jsdgam
+  - articles/idm
+
+- title: Imperfect detection
+  desc: >
+    Closure-unit families that separate what is there from what was
+    seen.
+  contents:
+  - articles/nmix
+
+- title: Evaluating forecasts
+  desc: >
+    Scoring rules, rolling-origin cross-validation and ensembles.
+  contents:
+  - articles/forecast_evaluation
+
+reference:
+- title: Model fitting
+  desc: >
+    Entry points that compile a state-space model and sample it.
+  contents:
+  - mvgam
+  - jsdgam
+  - mvgam_multiple
+  - update.mvgam
+  - mvgam-class
+  - print.mvgam
+  - print.mvgam_prefit
+  - inits.mvgam
+  - control_params.mvgam
+  - mvgam_use_cases
+  - mvgam-package
+  - startup
+
+- title: Formula and trend specification
+  desc: >
+    Building the observation formula, choosing a latent trend
+    process, and registering your own.
+  contents:
+  - mvgam_formula
+  - print.mvgam_formula
+  - formula.mvgam
+  - RW
+  - PW
+  - ZMVN
+  - lv_axis
+  - trend_param
+  - "+.trend_param"
+  - is.trend_param
+  - is.mvgam_trend
+  - print.mvgam_trend
+  - create_mvgam_trend
+  - custom_trend
+  - register_custom_trend
+  - register_trend_type
+  - trend_registry
+  - list_trend_types
+  - mvgam_trend_choices
+  - mvgam_trend_specification
+  - validation_rules_vocabulary
+
+- title: Observation families
+  desc: >
+    Likelihoods mvgam adds on top of the brms family library, for
+    counts, compositions, occupancy and abundance.
+  contents:
+  - mvgam_families
+  - tweedie
+  - beta_nb
+  - com_binomial
+  - nmix
+  - occ
+  - diri
+  - multi
+  - categ
+  - mvn
+  - mvt
+  - family.mvgam
+  - check_tweedie_truncation
+  - latent_N_saturation
+
+- title: Priors
+  desc: >
+    Inspecting the default prior set and overriding it before a fit.
+  contents:
+  - get_prior
+  - get_prior.default
+  - get_prior.formula
+  - get_prior.brmsformula
+  - get_prior.mvgam
+  - get_prior.mvgam_formula
+  - default_prior.mvgam
+  - default_prior.mvgam_formula
+
+- title: Data preparation and validation
+  desc: >
+    Checking that long-format data carry the columns, levels and
+    response shape a proposed family expects.
+  contents:
+  - mvgam_data
+  - validate_newdata
+  - series_to_mvgam
+  - pivot_detection_array
+  - pivot_species_matrix
+
+- title: Simulation
+  desc: >
+    Generative recipes that return the truths they drew from, for
+    recovery checks.
+  contents:
+  - sim_mvgam
+  - print.mvgam_sim
+  - summary.mvgam_sim
+  - print.mvgam_sim_summary
+  - sim_closure_unit_data
+  - summary.mvgam_sim_closure_unit
+  - print.mvgam_sim_closure_unit_summary
+
+- title: Prediction and forecasting
+  desc: >
+    Propagating the fitted latent state forward, and marginalising
+    over it for covariate-driven prediction.
+  contents:
+  - predict.mvgam
+  - fitted.mvgam
+  - posterior_epred
+  - posterior_epred.mvgam
+  - posterior_linpred
+  - posterior_linpred.mvgam
+  - posterior_predict
+  - posterior_predict.mvgam
+  - hindcast
+  - hindcast.mvgam
+  - forecast.mvgam
+  - mvgam_forecast-class
+  - print.mvgam_forecast
+  - summary.mvgam_forecast
+  - plot.mvgam_forecast
+  - print.mvgam_latent_state
+  - summary.mvgam_latent_state
+  - plot.mvgam_latent_state
+  - ensemble.mvgam_forecast
+  - posterior_average.mvgam
+  - pp_average.mvgam
+  - posterior_interval.mvgam
+  - predictive_interval.mvgam
+  - predictive_error.mvgam
+
+- title: Model criticism and cross-validation
+  desc: >
+    Posterior predictive checks, residuals, information criteria and
+    the forecast-honest alternatives to them.
+  contents:
+  - pp_check.mvgam
+  - print.mvgam_ppc_fit_stat
+  - plot.mvgam_ppc_fit_stat
+  - residuals.mvgam
+  - log_lik.mvgam
+  - logLik.mvgam
+  - loo.mvgam
+  - waic.mvgam
+  - mvgam_loo_extras
+  - bridge_sampler.mvgam
+  - kfold.mvgam
+  - print.mvgam_kfold
+  - summary.mvgam_kfold
+  - plot.mvgam_kfold
+  - lfo_cv.mvgam
+  - print.mvgam_lfo
+  - summary.mvgam_lfo
+  - plot.mvgam_lfo
+  - loo_compare.mvgam_lfo
+  - loo_model_weights.mvgam_lfo
+  - score
+  - score.mvgam_forecast
+  - compare_scores
+  - summary.mvgam_compare_scores
+  - plot.mvgam_compare_scores
+  - compare_elpds
+  - plot.mvgam_compare_elpds
+
+- title: Posterior summaries and diagnostics
+  desc: >
+    Reading parameters off a fit, checking convergence, and
+    recovering the Stan program that produced it.
+  contents:
+  - summary.mvgam
+  - print.mvgam_summary
+  - summary.mvgam_pooled
+  - print.mvgam_pooled_summary
+  - tidy.mvgam
+  - glance.mvgam
+  - augment.mvgam
+  - mvgam_draws
+  - mvgam_diagnostics
+  - index-mvgam
+  - ranef.mvgam
+  - VarCorr.mvgam
+  - ngrps.mvgam
+  - nobs.mvgam
+  - model.frame.mvgam
+  - smooths.mvgam
+  - posterior_smooths.mvgam
+  - conditional_smooths.mvgam
+  - hypothesis.mvgam
+  - how_to_cite.mvgam
+  - methods_md
+  - bibtex
+  - stancode.mvgam
+  - stancode.mvgam_formula
+  - standata.mvgam
+  - standata.mvgam_formula
+  - print.mvgamstancode
+
+- title: Marginal and conditional effects
+  desc: >
+    Covariate effect summaries through the marginaleffects and
+    insight interfaces.
+  contents:
+  - conditional_effects.mvgam
+  - mvgam_marginaleffects
+  - mvgam_insight
+
+- title: Interrogating a fitted VAR
+  desc: >
+    Impulse responses, variance decompositions and stability metrics
+    read off the posterior for the transition matrix and innovation
+    covariance.
+  contents:
+  - irf.mvgam
+  - mvgam_irf-class
+  - summary.mvgam_irf
+  - plot.mvgam_irf
+  - fevd.mvgam
+  - mvgam_fevd-class
+  - summary.mvgam_fevd
+  - plot.mvgam_fevd
+  - stability.mvgam
+  - plot.mvgam_stability
+  - posterior_transition_matrix
+  - print.mvgam_var_matrix
+  - print.mvgam_var_matrix_list
+  - plot.mvgam_var_matrix
+  - plot.mvgam_var_matrix_list
+
+- title: Latent factors and joint species distribution models
+  desc: >
+    Ordinations, loading comparisons, factor activity and the
+    residual correlations a factor model implies.
+  contents:
+  - ordinate.mvgam
+  - ordinate.jsdgam
+  - active_factors
+  - plot.mvgam_active_factors
+  - compare_loadings
+  - shared_variation
+  - plot.mvgam_shared_variation
+  - residual_cor
+  - mvgam_residcor-class
+  - print.mvgam_residcor
+  - summary.mvgam_residcor
+  - plot.mvgam_residcor
+  - plot.mvgam_residcor_list
+  - trait_slopes_helpers
+  - sample_innovations
+
+- title: Plotting
+  desc: >
+    The general-purpose plot methods for a fitted model.
+  contents:
+  - plot.mvgam
+  - mcmc_plot.mvgam
+  - pairs.mvgam
+
+- title: Datasets
+  desc: >
+    Example data used across the vignettes, articles and examples.
+  contents:
+  - birdsong
+  - portal_data
+  - coral_surveys
+  - lake_chemistry
+  - glm_analysis
+
+- title: Re-exports and internals
+  desc: >
+    Generics re-exported from brms, posterior, loo and
+    marginaleffects, plus internal helpers documented for
+    completeness.
+  contents:
+  - reexports
+  - "%>%"
+  - as_draws_matrix.mock_stanfit
+  - dimnames.mock_stanfit
+  - prepare_predictions.mock_stanfit

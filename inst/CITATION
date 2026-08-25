@@ -10,7 +10,7 @@ bibentry(
   volume = "14",
   number = "",
   pages = "771-784",
-  doi = "10.18637/jss.v100.i05",
+  doi = "10.1111/2041-210X.13974",
   textVersion = paste(
     "Clark & Wells (2023).",
     "Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series.",

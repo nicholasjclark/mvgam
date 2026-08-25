@@ -178,7 +178,7 @@ mod_baseline <- jsdgam(
   n_lv    = 2L,
   unit    = time,
   species = species,
-  chains  = 2L, samples = 600L, silent = 2L
+  chains  = 2L, iter = 1600L, warmup = 1000L, silent = 2L
 )
 ```
 
@@ -192,7 +192,7 @@ loadings `Z_tilde[i, k]`. Per-coefficient detail for the five
 environmental terms lives in `posterior_summary()`.
 
 ```{r mod_baseline_summary}
-summary(mod_baseline, smooth_test = FALSE)
+summary(mod_baseline)
 ```
 
 ```{r mod_baseline_env_coefs}
@@ -246,8 +246,8 @@ For species traits the result is a prior that says "ants whose
 body size and defensive traits are similar start out near each
 other in latent space, before seeing the counts."
 
-Passing the trait table via the `traits =` alias is the only
-change to the call.
+Passing the trait table through the `traits` argument is the
+only change to the call.
 
 ```{r mod_traits_show, eval = FALSE}
 mod_traits <- jsdgam(
@@ -260,7 +260,7 @@ mod_traits <- jsdgam(
   traits  = traits,
   unit    = time,
   species = species,
-  chains  = 2L, samples = 600L,
+  chains  = 2L, iter = 1600L, warmup = 1000L,
   adapt_delta = 0.95, silent = 2L
 )
 ```
@@ -281,7 +281,7 @@ trait, alongside `Psi_diag[k]`, the prior scale on the kth
 loading column.
 
 ```{r mod_traits_summary}
-summary(mod_traits, smooth_test = FALSE)
+summary(mod_traits)
 ```
 
 Reading `theta_features[k]` follows the standard ARD
@@ -382,8 +382,9 @@ interpretation suits the question at hand. See
 `?ordinate.jsdgam` for the full set of plotting arguments
 (including `alpha` for the BORAL site / loading variance
 split, and `label_sites` for switching between text and point
-markers); `plot_factors()` is the lower-level companion that
-draws the unrotated identified factors as time series.
+markers). `plot(fit, type = "factors")` draws the identified
+latent processes themselves against the unit index, annotated
+with the share of series-level variance each one explains.
 
 ## Residual species correlations
 
@@ -454,7 +455,7 @@ mod_mgp <- jsdgam(
   loadings_prior = list(column_shrinkage = "mgp", features = traits),
   unit    = time,
   species = species,
-  chains  = 2L, samples = 600L, silent = 2L
+  chains  = 2L, iter = 1600L, warmup = 1000L, silent = 2L
 )
 ```
 
@@ -485,13 +486,15 @@ plot(af)
 Factors 1-3 sit at probability 1, factors 4-6 cross the
 cutoff with diminishing posterior support, factor 7 sits right
 at the cutoff, and factors 8-10 are essentially shrunk to
-zero. The posterior median active count is 6 (95% CI 4 to 9),
-which is what the data and ARD-MGP prior together pick out.
-This is the spec to default to in a real analysis where the
-"right" `n_lv` is not known a priori. The `fraction` and
-`prob_threshold` arguments to `active_factors()` tune what
-counts as "active"; see `?active_factors` for the defaults
-chosen following Legramanti et al.
+zero. The posterior median active count is 6, with a 95%
+interval of 4 to 9. Where the right `n_lv` is not known a
+priori, this is the specification to reach for first: set a
+generous ceiling, let the shrinkage prior decide and read the
+answer off `active_factors()` instead of refitting at a
+sequence of candidate dimensions. The `fraction` and
+`prob_threshold` arguments move the activity cutoff when the
+defaults, which follow Legramanti et al., prove too permissive
+for the question at hand.
 
 ## Take-aways
 
@@ -543,6 +546,22 @@ response scale. And when writing the methods section,
 names the architecture pieces the fit actually used. The
 `?jsdgam` page covers the remaining options, including
 `lv_axis()` for per-factor smooths inside `factor_formula`.
+
+Sibling articles in this series:
+
+- The
+  [dynamic factor vignette](https://nicholasjclark.github.io/mvgam/articles/dfm.html)
+  is the temporal counterpart of the same factor architecture,
+  where `trend_map` fixes which series share a latent path
+  instead of leaving the loadings to a prior.
+- The
+  [N-mixture article](https://nicholasjclark.github.io/mvgam/articles/nmix.html)
+  covers the closure-unit families that the `occ()` route above
+  belongs to, including the goodness-of-fit checks they need.
+- The
+  [overview vignette](https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html)
+  places the factor model inside the wider state-space surface
+  the two fitters share.
 
 ## Acknowledgements
 
