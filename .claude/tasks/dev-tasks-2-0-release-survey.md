@@ -201,6 +201,19 @@ minutes. Cached fits are read once, never re-fitted to inspect.
     also produces, since subsetting draws may drop rows and reorder
     them but cannot invent a pairing no single draw gives.
 
+- [x] **8.0 Hierarchical VAR fits had no post-fit surface**
+  > A grouped trend carries its correlations as a population Cholesky
+  > factor plus per-group deviations whatever the trend constructor
+  > was, so parameter extraction aliased a hierarchical `VAR()` to the
+  > hierarchical Cholesky case. The innovation transform asked a
+  > narrower question and did not, so such a fit was handed the
+  > parameters of one structure and then asked for the covariance of
+  > another. Every surface that samples process error failed together:
+  > `posterior_epred()`, `posterior_predict()`, `log_lik()`,
+  > `fitted()`, `residuals()`, the `loo_*` family, every `pp_check()`
+  > type, `bayes_R2()` and `plot(type = "residuals")`. One helper now
+  > names the structure for both readers.
+
 - [ ] **3.0 Close the post-fit coverage gaps**
   > `plot_slopes`, `plot_comparisons`, `hypotheses`,
   > `posterior_transition_matrix`, `latent_N_saturation` and

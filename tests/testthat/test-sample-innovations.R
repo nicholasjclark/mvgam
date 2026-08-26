@@ -720,3 +720,37 @@ test_that("extract_nu_trend_draws() returns nothing for an unfitted df", {
     mvgam:::extract_nu_trend_draws(dm, list(trend_metadata = list(df = NA)))
   )
 })
+
+
+test_that("one naming of the covariance structure serves both readers", {
+  # A grouped trend carries its correlations as a population Cholesky
+  # factor plus per-group deviations whatever the constructor was, so a
+  # hierarchical VAR is parameterised exactly as a hierarchical AR.
+  # Parameter extraction and the innovation transform both ask this
+  # helper, so they cannot disagree about which shape they hold: when
+  # they did, a hierarchical VAR was handed Cholesky parameters and
+  # then asked for a full covariance nothing had produced, taking down
+  # every post-fit surface that samples process error.
+  expect_equal(
+    covariance_structure_key(TRUE, "full_covariance"),
+    "hier.cholesky_scaled"
+  )
+  expect_equal(
+    covariance_structure_key(TRUE, "cholesky_scaled"),
+    "hier.cholesky_scaled"
+  )
+  # A grouped trend without correlations keeps its own diagonal shape.
+  expect_equal(covariance_structure_key(TRUE, "diagonal"), "hier.diagonal")
+  # Ungrouped trends are named by their pattern alone; a flat VAR does
+  # carry a full covariance and must not be folded into the Cholesky
+  # branch.
+  expect_equal(
+    covariance_structure_key(FALSE, "full_covariance"),
+    "flat.full_covariance"
+  )
+  expect_equal(
+    covariance_structure_key(FALSE, "cholesky_scaled"),
+    "flat.cholesky_scaled"
+  )
+  expect_equal(covariance_structure_key(FALSE, "diagonal"), "flat.diagonal")
+})

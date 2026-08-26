@@ -452,6 +452,33 @@ covariance_param_specs <- list(
 )
 
 
+#' Name the covariance structure innovations are drawn from
+#'
+#' A hierarchical trend carries its correlations as a population
+#' Cholesky factor plus per-group deviations, whatever the trend
+#' constructor was, so a hierarchical `VAR(gr = ...)` is parameterised
+#' exactly as a hierarchical `AR(gr = ...)`. Naming the structure once
+#' keeps the parameter extraction and the innovation transform from
+#' disagreeing about which shape they are working with: reading it two
+#' ways is how a hierarchical VAR came to be handed the parameters of
+#' one structure and then asked for the covariance of another.
+#'
+#' @param hierarchical Whether the trend is grouped
+#' @param effective_pattern Covariance pattern after the
+#'   no-correlations collapse to `"diagonal"`
+#' @return A single key of the form `"hier.cholesky_scaled"`
+#'
+#' @noRd
+covariance_structure_key <- function(hierarchical, effective_pattern) {
+  if (isTRUE(hierarchical) &&
+      effective_pattern %in% c("cholesky_scaled", "full_covariance")) {
+    return("hier.cholesky_scaled")
+  }
+  paste0(if (isTRUE(hierarchical)) "hier" else "flat", ".",
+         effective_pattern)
+}
+
+
 #' Get Trend Covariance Structure from Posterior
 #'
 #' Extracts covariance parameters from posterior draws based on the
@@ -564,19 +591,14 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
   # secondary order then depends on the source storage convention.
   # The fallback covers patterns that are single-index (e.g. simple
   # diagonal: just "sigma_trend").
-  dispatch_key <- paste0(if (hierarchical) "hier" else "flat", ".",
-                          effective_pattern)
   # Hierarchical VAR (`VAR(gr = ..., subgr = ..., cor = TRUE)`) emits
   # the same population-vs-deviation parameter shapes as the
   # hierarchical Cholesky-scaled case: `alpha_cor_trend`,
   # `L_Omega_global_trend`, `L_deviation_group_trend`, and
   # `sigma_group_trend`. See `generate_hierarchical_correlation_parameters()`
-  # in R/stan_assembly.R. Alias the dispatch key so a single extractor
-  # populates both, and `compute_residcor_hierarchical()` reads the
-  # same fields downstream.
-  if (identical(dispatch_key, "hier.full_covariance")) {
-    dispatch_key <- "hier.cholesky_scaled"
-  }
+  # in R/stan_assembly.R. One extractor populates both, and
+  # `compute_residcor_hierarchical()` reads the same fields downstream.
+  dispatch_key <- covariance_structure_key(hierarchical, effective_pattern)
   params <- switch(
     dispatch_key,
     "hier.cholesky_scaled"  = extract_hierarchical_cholesky_params(
@@ -1143,11 +1165,15 @@ sample_innovations <- function(cov_structure, obs_structure) {
     z[d, ] <- as.numeric(draw_trend_innovations(n_times, n_series, df_d))
   }
 
-  # Transform by covariance pattern. Hierarchical Cholesky uses a
-  # different structure (per-group convex combination of correlations),
-  # so route it to its dedicated transform.
-  is_hier_chol <- isTRUE(cov_structure$hierarchical) &&
-                  effective_pattern == "cholesky_scaled"
+  # Transform by covariance structure. The hierarchical case uses a
+  # per-group convex combination of correlations, so it has its own
+  # transform. The structure is named by the same helper the parameter
+  # extraction used, so the two cannot disagree about which shape the
+  # parameters in hand describe.
+  is_hier_chol <- identical(
+    covariance_structure_key(cov_structure$hierarchical, effective_pattern),
+    "hier.cholesky_scaled"
+  )
 
   if (is_hier_chol) {
     innovations_flat <- transform_hierarchical_cholesky_innovations(
