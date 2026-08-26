@@ -303,11 +303,12 @@ stability.mvgam = function(object, ndraws = NULL, draw_ids = NULL,
 #' @method summary mvgam_stability
 #' @export
 summary.mvgam_stability <- function(object, probs = c(0.025, 0.975),
-                                    robust = TRUE, ...) {
+                                    robust = TRUE, bins = 30L, ...) {
   checkmate::assert_class(object, "mvgam_stability")
   checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1,
                             any.missing = FALSE, sorted = TRUE)
   checkmate::assert_flag(robust)
+  checkmate::assert_int(bins, lower = 5L)
   metrics <- colnames(object)
   out <- do.call(rbind, lapply(metrics, function(v) {
     draws <- object[[v]]
@@ -323,20 +324,59 @@ summary.mvgam_stability <- function(object, probs = c(0.025, 0.975),
   colnames(out) <- c("metric", "Estimate", "Est.Error",
                      paste0("Q", 100 * min(probs)),
                      paste0("Q", 100 * max(probs)))
+  # A median and an interval say where a metric sits but not what
+  # shape it has, and the shape is often why the metric was asked for:
+  # reactivity is read for whether its mass crosses zero, not for its
+  # midpoint. Binning each metric on the way through keeps that shape
+  # at a few hundred numbers rather than a few thousand draws, so the
+  # summary can be drawn as the same histogram without carrying what
+  # it was built from.
+  attr(out, "bin_counts") <- lapply(stats::setNames(metrics, metrics),
+                                    function(v) bin_draws(object[[v]], bins))
+  attr(out, "ndraws") <- nrow(object)
   class(out) <- c("mvgam_stability_summary", class(out))
   out
 }
 
 
+#' Bin a vector of draws for later display
+#'
+#' Keeps the counts and the edges rather than the draws, which is all a
+#' histogram needs and is a fraction of the size. A metric that never
+#' varies gets a single degenerate bin rather than an error.
+#'
+#' @param draws Numeric vector of posterior draws
+#' @param bins Number of bins
+#' @return List with `breaks` and `counts`
+#'
+#' @noRd
+bin_draws <- function(draws, bins) {
+  draws <- draws[is.finite(draws)]
+  if (!length(draws)) {
+    return(list(breaks = c(0, 0), counts = 0L))
+  }
+  rng <- range(draws)
+  if (isTRUE(all.equal(rng[1L], rng[2L]))) {
+    return(list(breaks = c(rng[1L], rng[1L]), counts = length(draws)))
+  }
+  breaks <- seq(rng[1L], rng[2L], length.out = bins + 1L)
+  h <- graphics::hist(draws, breaks = breaks, plot = FALSE)
+  list(breaks = h$breaks, counts = as.integer(h$counts))
+}
+
+
 #' Plot summarised stability metrics
 #'
-#' Draws the posterior median and interval of each metric. The
-#' distribution of a metric is often the point of asking, so
-#' `stability(summary = FALSE)` returns the draws and plots them as
-#' histograms instead.
+#' Draws the same histogram as the plot for the draws. `summary()`
+#' bins each metric on its way through, so the shape survives without
+#' the draws behind it: a metric is often asked for to see whether its
+#' mass crosses zero, which a median and an interval alone do not
+#' answer. Pass `intervals = TRUE` for a median and interval instead.
 #'
 #' @param x An object of class `mvgam_stability_summary`
 #' @param variables Metrics to draw
+#' @param intervals Logical; draw each metric as a median and interval
+#'   rather than as its binned posterior
 #' @param ... ignored
 #'
 #' @return A `ggplot` object
@@ -346,10 +386,12 @@ summary.mvgam_stability <- function(object, probs = c(0.025, 0.975),
 plot.mvgam_stability_summary <- function(
   x,
   variables = c("reactivity", "mean_return_rate", "var_return_rate"),
+  intervals = FALSE,
   ...
 ) {
   checkmate::assert_class(x, "mvgam_stability_summary")
   checkmate::assert_character(variables, min.len = 1L, any.missing = FALSE)
+  checkmate::assert_flag(intervals)
   keep <- intersect(variables, x$metric)
   if (!length(keep)) {
     stop(insight::format_error(c(
@@ -362,16 +404,54 @@ plot.mvgam_stability_summary <- function(
   dat$metric <- factor(dat$metric, levels = keep)
   bounds <- grep("^Q", colnames(dat), value = TRUE)
   set_color_scheme_local("red")
-  ggplot2::ggplot(
-    dat, ggplot2::aes(x = .data$metric, y = .data$Estimate)
-  ) +
-    ggplot2::geom_hline(yintercept = 0, linetype = "dashed",
-                        colour = "grey30") +
-    ggplot2::geom_pointrange(
-      ggplot2::aes(ymin = .data[[bounds[1L]]], ymax = .data[[bounds[2L]]]),
-      colour = mvgam_palette()[4L]
+
+  counts <- attr(x, "bin_counts")
+  if (intervals || is.null(counts)) {
+    return(
+      ggplot2::ggplot(
+        dat, ggplot2::aes(x = .data$metric, y = .data$Estimate)
+      ) +
+        ggplot2::geom_hline(yintercept = 0, linetype = "dashed",
+                            colour = "grey30") +
+        ggplot2::geom_pointrange(
+          ggplot2::aes(ymin = .data[[bounds[1L]]],
+                       ymax = .data[[bounds[2L]]]),
+          colour = mvgam_palette()[4L]
+        ) +
+        ggplot2::labs(x = NULL, y = "Posterior estimate") +
+        mvgam_theme()
+    )
+  }
+
+  # Rebuild the bars from the stored edges and counts. Each bar is
+  # drawn at its own midpoint and width so an uneven final bin is not
+  # silently widened to match the rest.
+  long <- do.call(rbind, lapply(keep, function(v) {
+    b <- counts[[v]]
+    if (is.null(b) || !length(b$counts)) {
+      return(NULL)
+    }
+    lower <- utils::head(b$breaks, -1L)
+    upper <- utils::tail(b$breaks, -1L)
+    data.frame(
+      metric = v,
+      mid = (lower + upper) / 2,
+      width = upper - lower,
+      count = b$counts,
+      stringsAsFactors = FALSE
+    )
+  }))
+  long$metric <- factor(long$metric, levels = keep)
+  ggplot2::ggplot(long, ggplot2::aes(x = .data$mid, y = .data$count)) +
+    ggplot2::geom_col(
+      ggplot2::aes(width = .data$width),
+      fill = mvgam_palette()[4L],
+      colour = "white"
     ) +
-    ggplot2::labs(x = NULL, y = "Posterior estimate") +
+    ggplot2::geom_vline(xintercept = 0, linetype = "dashed",
+                        colour = "grey30") +
+    ggplot2::facet_wrap(~ metric, scales = "free", nrow = 1L) +
+    ggplot2::labs(x = "Posterior draw", y = "Frequency") +
     mvgam_theme()
 }
 

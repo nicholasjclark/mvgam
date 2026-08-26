@@ -175,8 +175,24 @@ test_that("stability() summarises unless asked for its draws", {
   expect_error(stability(fit, ndraws = ndraws(fit) + 1L),
                "more draws than the posterior holds")
 
+  # The summary carries each metric's binned posterior, so it draws the
+  # same histogram the draws do. A median and an interval alone would
+  # not say whether reactivity's mass crosses zero, which is usually
+  # why the metric was asked for.
+  bins <- attr(st, "bin_counts")
+  expect_equal(length(bins), 9L)
+  expect_equal(sum(bins$reactivity$counts), ndraws(fit))
+  ref <- graphics::hist(
+    draws$reactivity,
+    breaks = seq(min(draws$reactivity), max(draws$reactivity),
+                 length.out = 31L),
+    plot = FALSE
+  )
+  expect_equal(bins$reactivity$counts, as.integer(ref$counts))
+
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
   expect_s3_class(plot(st), "ggplot")
+  expect_s3_class(plot(st, intervals = TRUE), "ggplot")
   expect_s3_class(plot(draws), "ggplot")
 })

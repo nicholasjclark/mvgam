@@ -7,6 +7,7 @@
 \method{plot}{mvgam_stability_summary}(
   x,
   variables = c("reactivity", "mean_return_rate", "var_return_rate"),
+  intervals = FALSE,
   ...
 )
 }
@@ -15,14 +16,18 @@
 
 \item{variables}{Metrics to draw}
 
+\item{intervals}{Logical; draw each metric as a median and interval
+rather than as its binned posterior}
+
 \item{...}{ignored}
 }
 \value{
 A \code{ggplot} object
 }
 \description{
-Draws the posterior median and interval of each metric. The
-distribution of a metric is often the point of asking, so
-\code{stability(summary = FALSE)} returns the draws and plots them as
-histograms instead.
+Draws the same histogram as the plot for the draws. \code{summary()}
+bins each metric on its way through, so the shape survives without
+the draws behind it: a metric is often asked for to see whether its
+mass crosses zero, which a median and an interval alone do not
+answer. Pass \code{intervals = TRUE} for a median and interval instead.
 }

@@ -754,3 +754,35 @@ test_that("one naming of the covariance structure serves both readers", {
   )
   expect_equal(covariance_structure_key(FALSE, "diagonal"), "flat.diagonal")
 })
+
+
+test_that("bin_draws() keeps the shape of a posterior at a fraction of it", {
+  set.seed(3L)
+  draws <- rnorm(4000)
+  b <- bin_draws(draws, bins = 30L)
+  # The bins are the histogram the draws themselves would give.
+  ref <- graphics::hist(
+    draws,
+    breaks = seq(min(draws), max(draws), length.out = 31L),
+    plot = FALSE
+  )
+  expect_equal(b$breaks, ref$breaks)
+  expect_equal(b$counts, as.integer(ref$counts))
+  # Every draw is accounted for, so a plot built from the bins has the
+  # same mass as one built from the draws.
+  expect_equal(sum(b$counts), length(draws))
+
+  # A metric that never varies has no range to divide, and gets one
+  # degenerate bin rather than an error.
+  flat <- bin_draws(rep(2.5, 100L), bins = 30L)
+  expect_equal(flat$counts, 100L)
+  expect_equal(flat$breaks, c(2.5, 2.5))
+
+  # Non-finite draws are dropped rather than poisoning the range.
+  mixed <- bin_draws(c(rnorm(50), NA, Inf), bins = 10L)
+  expect_equal(sum(mixed$counts), 50L)
+  expect_true(all(is.finite(mixed$breaks)))
+
+  # Nothing to bin is empty, not an error.
+  expect_equal(bin_draws(numeric(0), bins = 10L)$counts, 0L)
+})

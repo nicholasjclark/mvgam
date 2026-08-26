@@ -4,7 +4,7 @@
 \alias{summary.mvgam_stability}
 \title{Summarise posterior stability metrics}
 \usage{
-\method{summary}{mvgam_stability}(object, probs = c(0.025, 0.975), robust = TRUE, ...)
+\method{summary}{mvgam_stability}(object, probs = c(0.025, 0.975), robust = TRUE, bins = 30L, ...)
 }
 \arguments{
 \item{object}{An object of class \code{mvgam_stability}}
