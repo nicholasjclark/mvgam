@@ -659,6 +659,11 @@ pp_check.mvgam <- function(
   if (needs_psis) {
     ll <- log_lik(object, newdata = newdata, process_error = TRUE,
                   resp = resp, draw_ids = draw_ids)
+    # Importance sampling refuses a column with no density in it, so
+    # the unscorable rows a missing response leaves go first. The
+    # observed values and replicates were narrowed to the same rows
+    # above, where the NA responses were dropped from `y`.
+    ll <- clean_ll(object, ll)
     r_eff <- mvgam_r_eff_log_lik(object, ll, draw_ids = draw_ids)
     psis_obj <- suppressWarnings(
       loo::psis(-ll, r_eff = r_eff)

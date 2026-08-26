@@ -213,7 +213,7 @@ bayes_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   # is.mvbrmsformula is the authoritative MV indicator.
   is_mv <- brms::is.mvbrmsformula(object$formula)
   assert_resp_for_mv(object, resp, "bayes_R2")
-  resp_use <- if (is.null(resp)) object$response_names[1L] else resp
+  resp_use <- scored_response_name(object, resp)
   # Bayesian R^2 of Gelman et al. (2019): var(epred) / (var(epred) +
   # var(residual)) per draw, where residuals are y - epred. The
   # `resp` argument is only meaningful for multivariate fits;
@@ -234,8 +234,10 @@ bayes_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
     )))
   }
   resid <- sweep(epred, 2L, y, FUN = "-")
-  var_ep <- apply(epred, 1L, stats::var)
-  var_re <- apply(resid, 1L, stats::var)
+  # A row with no response has no residual, so the variances are taken
+  # over the observations that do.
+  var_ep <- apply(epred, 1L, stats::var, na.rm = TRUE)
+  var_re <- apply(resid, 1L, stats::var, na.rm = TRUE)
   r2 <- var_ep / (var_ep + var_re)
   if (!isTRUE(summary)) {
     return(r2)

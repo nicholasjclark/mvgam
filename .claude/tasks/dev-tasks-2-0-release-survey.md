@@ -244,6 +244,13 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > case. `residual_cor()` and `posterior_transition_matrix()` already
   > summarise and answer in under two seconds on the same fit, and the
   > `posterior_*` and `loo_*` families return draws by design.
+  >
+  > Summarising a stability metric to a midpoint and an interval threw
+  > away what it is usually read for, since reactivity is asked about
+  > for whether its mass crosses zero. The summary carries each
+  > metric's binned posterior instead, so the histogram is drawn from
+  > the counts rather than the draws: the same breaks, the same
+  > counts, at 10.8 KB against 283 KB.
 
 - [ ] **3.0 Close the post-fit coverage gaps**
   > `plot_slopes`, `plot_comparisons`, `hypotheses`,

@@ -149,7 +149,16 @@ loo.mvgam <- function(x, ...,
   if (isTRUE(by_species)) {
     return(per_species_ic(x, logliks, criterion = "loo"))
   }
-  loo::loo(logliks, r_eff = releffs, save_psis = save_psis, ...)
+  out <- loo::loo(logliks, r_eff = releffs, save_psis = save_psis, ...)
+  # Carry the scored columns onto the result so a caller weighting
+  # predictions by these importance weights can narrow them to the
+  # same observations.
+  attr(out, "scored_columns") <- attr(logliks, "scored_columns")
+  if (!is.null(out$psis_object)) {
+    attr(out$psis_object, "scored_columns") <-
+      attr(logliks, "scored_columns")
+  }
+  out
 }
 
 #' @importFrom loo loo_compare
@@ -368,10 +377,20 @@ per_obs_species_labels <- function(x, n_cols) {
   }
 }
 
+#' Drop unscorable columns from a log-likelihood matrix
+#'
+#' A row whose response is missing contributes no density, so its
+#' column is all `NA` and cannot be scored. Which columns survived is
+#' recorded on the result: anything paired with the scored matrix
+#' afterwards, such as a prediction weighted by the PSIS object built
+#' from it, has to be narrowed to the same columns or the two describe
+#' different observations.
+#'
 #'@noRd
 clean_ll = function(x, logliks) {
   # First remove any columns that are all NA (these had missing observations)
-  logliks <- logliks[, !apply(logliks, 2, function(x) all(!is.finite(x)))]
+  scored <- which(!apply(logliks, 2, function(x) all(!is.finite(x))))
+  logliks <- logliks[, scored, drop = FALSE]
 
   # Next resample any remaining non-finite values (occasionally happens with
   # some observation families)
@@ -387,5 +406,6 @@ clean_ll = function(x, logliks) {
   logliks <- apply(logliks, 2, samp_noinf)
 
   # return
+  attr(logliks, "scored_columns") <- scored
   logliks
 }

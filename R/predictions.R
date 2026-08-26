@@ -2321,7 +2321,18 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   # signature for hindcast-internal callers that still want the
   # per-draw composition; in the predict_* path it is a no-op for
   # the standard trend kernel.
-  linpred
+
+  # A `draws_matrix` keeps its class through subsetting and
+  # arithmetic, so a predictor composed from one is a `draws_matrix`
+  # too and a prediction's class ends up depending on whether the
+  # model happened to have random effects. The class is dropped on the
+  # way out, where the predictor stops being posterior draws and
+  # becomes a value: an S4 slot declared to hold a plain matrix
+  # rejects the classed one outright.
+  if (is.list(linpred) && !is.matrix(linpred)) {
+    return(lapply(linpred, as_plain_matrix))
+  }
+  as_plain_matrix(linpred)
 }
 
 

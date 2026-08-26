@@ -238,6 +238,46 @@ assert_resp_for_mv <- function(object, resp, fn_name) {
 }
 
 
+#' Narrow predictions to the observations the weights cover
+#'
+#' `clean_ll()` drops the columns a missing response left unscorable
+#' and records which survived, so the importance weights built from it
+#' describe fewer observations than a prediction does. Selecting the
+#' same columns is what keeps the two talking about the same rows.
+#' Predictions that already match are returned untouched, so a fit with
+#' no missing responses pays nothing.
+#'
+#' @param preds Matrix `[ndraws x nobs]` or array `[ndraws x nobs x k]`
+#' @param psis_object The PSIS object the weights come from
+#' @return `preds` restricted to the scored observations
+#'
+#' @noRd
+narrow_to_scored <- function(preds, psis_object) {
+  scored <- attr(psis_object, "scored_columns")
+  n_weighted <- dim(psis_object)[2L]
+  n_pred <- dim(preds)[2L]
+  if (is.null(n_pred) || is.null(n_weighted) || n_pred == n_weighted) {
+    return(preds)
+  }
+  if (is.null(scored) || length(scored) != n_weighted ||
+      max(scored) > n_pred) {
+    stop(insight::format_error(c(
+      "Predictions and importance weights cover different observations.",
+      x = paste0("Predicted ", n_pred, " observations; weighted ",
+                 n_weighted, "."),
+      i = paste0(
+        "This happens when a 'psis_object' was built from a different ",
+        "model or response. Leave it unset to have it computed here."
+      )
+    )))
+  }
+  if (length(dim(preds)) == 3L) {
+    return(preds[, scored, , drop = FALSE])
+  }
+  preds[, scored, drop = FALSE]
+}
+
+
 mvgam_loo_E_loo <- function(object, posterior_fn,
                              type = c("mean", "var", "quantile"),
                              probs = 0.5, psis_object = NULL,
@@ -259,6 +299,11 @@ mvgam_loo_E_loo <- function(object, posterior_fn,
   }
   set.seed(aligned_seed)
   preds <- posterior_fn(object, resp = resp, ...)
+  # A prediction covers every row of the data; the weights cover only
+  # the rows the likelihood could score. Narrow the prediction to those
+  # before pairing the two, or a fit with any missing response asks
+  # `loo::E_loo()` to weight observations it has no weights for.
+  preds <- narrow_to_scored(preds, psis_object)
   if (length(dim(preds)) == 3L) {
     out <- apply(preds, 3L, mvgam_E_loo_normalise,
                   psis_object = psis_object, type = type,
@@ -357,7 +402,7 @@ loo_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
     }
     set.seed(seed)
   }
-  resp_use <- if (is.null(resp)) object$response_names[1L] else resp
+  resp_use <- scored_response_name(object, resp)
   y <- object$data[[resp_use]]
   if (is.null(y) || !is.numeric(y)) {
     stop(insight::format_error(c(
@@ -374,6 +419,15 @@ loo_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
     c(list(object), resp_arg, args_epred)
   )
   ll <- do.call(log_lik, c(list(object), resp_arg, args_loglik))
+  # A row with no response contributes no density, so its column is
+  # unscorable and importance sampling refuses it. Dropping those
+  # columns means the observed values and the expectations paired with
+  # them have to lose the same ones, or the three describe different
+  # observations.
+  ll <- clean_ll(object, ll)
+  scored <- attr(ll, "scored_columns")
+  y <- y[scored]
+  epred <- epred[, scored, drop = FALSE]
   r_eff <- mvgam_r_eff_log_lik(object, ll)
   r2 <- mvgam_loo_R2(y, epred, ll, r_eff)
   colnames(r2) <- "R2"

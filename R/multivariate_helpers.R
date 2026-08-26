@@ -27,6 +27,43 @@ first_trend_spec <- function(object) {
   if (inherits(ts, "mvgam_trend")) ts else ts[[1L]]
 }
 
+#' Name the response a univariate scoring method works on
+#'
+#' Scoring methods that reduce a fit to one number, such as
+#' `bayes_R2()` and `loo_R2()`, need the response to read observed
+#' values from. A multivariate fit has to be told which one; a
+#' univariate fit has exactly one, though a binomial fit also carries
+#' its denominator in the same slot, so the first entry is the
+#' response and the rest are addition terms.
+#'
+#' Reading the slot directly is what broke these methods on fits with
+#' no trend formula, where it was left empty. `get_response_names()`
+#' falls back to the prior table and then to the formula, so it
+#' answers whatever the slot holds.
+#'
+#' @param object An `mvgam` model object
+#' @param resp Response the caller asked for, or `NULL`
+#' @return A single response name
+#'
+#' @noRd
+scored_response_name <- function(object, resp = NULL) {
+  if (!is.null(resp) && nzchar(resp)) {
+    return(resp)
+  }
+  rn <- get_response_names(object)
+  if (length(rn) == 0L) {
+    stop(insight::format_error(c(
+      "Cannot determine which response to score.",
+      i = paste0(
+        "Name it with 'resp', or refit the model so its response is ",
+        "recorded."
+      )
+    )))
+  }
+  rn[1L]
+}
+
+
 
 #' @noRd
 get_response_names <- function(obj) {
@@ -186,4 +223,27 @@ resolve_resp_family <- function(object, resp = NULL) {
     if (!is.null(bf_i$family)) return(resolve_family_name(bf_i$family))
   }
   resolve_family_name(object$family)
+}
+
+
+#' Drop the posterior draws classes from a matrix
+#'
+#' `posterior::as_draws_matrix()` returns an object that keeps its
+#' class through subsetting and arithmetic, so anything computed from
+#' it carries the class too. A prediction whose class depends on
+#' whether the model had random effects is a surprise on its own, and
+#' S4 slots that accept a plain matrix reject it outright. Values,
+#' dimensions and dimnames are untouched.
+#'
+#' @param x A matrix, possibly of class `draws_matrix`
+#' @return The same matrix with the draws classes removed
+#'
+#' @noRd
+as_plain_matrix <- function(x) {
+  if (!inherits(x, "draws")) {
+    return(x)
+  }
+  attr(x, "nchains") <- NULL
+  class(x) <- setdiff(class(x), c("draws_matrix", "draws"))
+  x
 }

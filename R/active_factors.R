@@ -126,18 +126,7 @@ active_factors.mvgam <- function(object,
       "active_factors() requires a latent-factor fit (n_lv > 0)."
     ))
   }
-  n_series <- length(object$trend_components$resp_names)
-  if (is.null(n_series) || n_series < 1L) {
-    n_series <- length(levels(object$obs_data$series))
-  }
-  # Fallback for mvgam factor fits where `obs_data` isn't
-  # populated on the object and `resp_names` is empty (only
-  # populated for multi-response mvbf fits): reach for
-  # `resolve_series_info()`, which is the canonical series
-  # resolver every other post-fit method already uses.
-  if (is.null(n_series) || n_series < 1L) {
-    n_series <- length(resolve_series_info(object)$series_levels)
-  }
+  n_series <- loading_series_count(object)
   draws_mat <- posterior::as_draws_matrix(object$fit)
   # `resolve_Z_loadings()` returns the sampled Z / Z_tilde
   # array when the fit has free loadings, or the fully-fixed
@@ -264,4 +253,29 @@ print.mvgam_active_factors <- function(x, ...) {
   pf$median_norm_sq <- round(pf$median_norm_sq, 4)
   print(pf, row.names = FALSE)
   invisible(x)
+}
+
+
+#' Count the series a factor model's loadings span
+#'
+#' The count comes from whichever record the fit carries: multi-
+#' response fits name their responses, `jsdgam()` keeps the observation
+#' data, and everything else is answered by the canonical series
+#' resolver. Reading only the first two is what left a factor fit from
+#' `mvgam()` with a count of zero, since neither is populated there.
+#'
+#' @param object An `mvgam` model object
+#' @return Integer count of series
+#'
+#' @noRd
+loading_series_count <- function(object) {
+  n <- length(object$trend_components$resp_names)
+  if (n > 0L) {
+    return(as.integer(n))
+  }
+  n <- length(levels(object$obs_data$series))
+  if (n > 0L) {
+    return(as.integer(n))
+  }
+  as.integer(length(resolve_series_info(object)$series_levels))
 }

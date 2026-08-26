@@ -209,14 +209,17 @@ extract_median_Z <- function(object) {
       )
     )))
   }
-  n_series <- length(object$trend_components$resp_names)
-  if (is.null(n_series) || n_series < 1L) {
-    n_series <- length(levels(object$obs_data$series))
-  }
+  n_series <- loading_series_count(object)
   draws_mat <- posterior::as_draws_matrix(object$fit)
-  z_arr <- extract_Z_loadings(
+  # `resolve_Z_loadings()` answers for both kinds of factor fit: the
+  # sampled loadings where they are free, and the `trend_map` matrix
+  # broadcast across draws where they were supplied as data. Reading
+  # the posterior directly found no loadings at all on a fixed-Z fit,
+  # because there are none to find.
+  z_arr <- resolve_Z_loadings(
+    object,
     draws_mat,
-    n_obs_series = as.integer(n_series),
+    n_series = as.integer(n_series),
     n_lv = as.integer(n_lv)
   )
   med <- apply(z_arr, c(2L, 3L), stats::median)

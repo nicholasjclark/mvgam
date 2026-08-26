@@ -712,7 +712,11 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
     return(list(
       has_trends = FALSE,
       is_multivariate = FALSE,
-      response_names = NULL,
+      # A fit without a latent process still has responses. Leaving
+      # this empty made every reader of the slot fall over on a
+      # trendless fit, and the responses are already there to be read
+      # off the observation formula.
+      response_names = extract_response_names(formula),
       trend_specs = NULL,
       base_formula = NULL,
       cached_formulas = list(
