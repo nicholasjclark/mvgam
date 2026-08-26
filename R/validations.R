@@ -6337,3 +6337,29 @@ resolve_trials_denominator <- function(formula, data) {
   values
 }
 
+
+#' Report each distinct warning raised under an expression once
+#'
+#' Several mvgam entry points reach their answer by running an inner
+#' routine more than once: the code generator makes three passes
+#' through brms, and the residual panel calls `pp_check()` once per
+#' panel. Each pass re-raises whatever the last one did, so a single
+#' user-facing call can repeat one warning several times over. This
+#' keeps the first occurrence of each distinct message and drops the
+#' repeats, so a second, different warning is never hidden behind the
+#' first.
+#'
+#' @param expr Expression to evaluate
+#' @return The value of `expr`
+#'
+#' @noRd
+warn_once_per_call <- function(expr) {
+  seen <- character()
+  withCallingHandlers(expr, warning = function(w) {
+    msg <- conditionMessage(w)
+    if (msg %in% seen) {
+      invokeRestart("muffleWarning")
+    }
+    seen <<- c(seen, msg)
+  })
+}

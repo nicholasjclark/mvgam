@@ -498,9 +498,8 @@ pp_check.mvgam <- function(
   # -1 * residual so that errors are in the correct direction
   # If a subsample of draws is requested, pin it once here so yrep and
   # the PSIS log-weights below refer to the same posterior draws.
-  if (!is.null(ndraws) && is.null(draw_ids)) {
-    total_draws <- posterior::ndraws(posterior::as_draws_array(object$fit))
-    draw_ids <- sort(sample.int(total_draws, min(ndraws, total_draws)))
+  draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
+  if (!is.null(draw_ids)) {
     ndraws <- NULL
   }
 
@@ -531,7 +530,9 @@ pp_check.mvgam <- function(
   }
 
   if (anyNA(y)) {
-    warning("NA responses are not shown in 'pp_check'.")
+    warning(insight::format_message(
+      "Observations with a missing response are omitted from the plot."
+    ))
     take <- !is.na(y)
     y <- y[take]
     yrep <- yrep[, take, drop = FALSE]
@@ -1161,21 +1162,17 @@ mvgam_resid_panel <- function(
   # and `patchwork::wrap_plots` refuses nested lists.
   fan <- mv_resp_fan_out(object, resp)
   if (!is.null(fan)) return(fan)
-  p1 <- pp_check(
-    object, type = "resid_vs_fitted", newdata = newdata,
-    ndraws = ndraws, resp = resp, ...
-  )
-  p2 <- pp_check(
-    object, type = "resid_qq", newdata = newdata,
-    ndraws = ndraws, resp = resp, ...
-  )
-  p3 <- pp_check(
-    object, type = "resid_acf", newdata = newdata,
-    ndraws = ndraws, resp = resp, ...
-  )
-  p4 <- pp_check(
-    object, type = "resid_pacf", newdata = newdata,
-    ndraws = ndraws, resp = resp, ...
-  )
-  patchwork::wrap_plots(p1, p2, p3, p4, ncol = 2L, nrow = 2L)
+  # The four panels each run the same residual extraction over the
+  # same rows, so anything it reports about the data holds for the
+  # whole grid and is worth saying once rather than four times.
+  panels <- warn_once_per_call(lapply(
+    c("resid_vs_fitted", "resid_qq", "resid_acf", "resid_pacf"),
+    function(type) {
+      pp_check(
+        object, type = type, newdata = newdata,
+        ndraws = ndraws, resp = resp, ...
+      )
+    }
+  ))
+  patchwork::wrap_plots(panels, ncol = 2L, nrow = 2L)
 }

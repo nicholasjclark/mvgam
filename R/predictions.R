@@ -2090,10 +2090,14 @@ strip_dpar_sdata <- function(sdata, dpar) {
   checkmate::assert_list(sdata, names = "named")
   checkmate::assert_string(dpar)
   # Shared structural entries that index into both mu and
-  # dpars; keep regardless of `_<dpar>` membership.
+  # dpars; keep regardless of `_<dpar>` membership. Row counts and
+  # responses are per response, never per distributional parameter,
+  # so `N_<resp>` and `Y_<resp>` are matched alongside the bare and
+  # numbered forms: a multivariate fit names them after the response
+  # and would otherwise lose the very count the predictor is sized by.
   shared_pat <- paste0(
-    "^N$|^N_[0-9]|^J_|^M_[0-9]|^NC_[0-9]|^nlevels|",
-    "^prior_only$|^offsets$|^Y$"
+    "^N($|_)|^J_|^M_[0-9]|^NC_[0-9]|^nlevels|",
+    "^prior_only$|^offsets$|^Y($|_)"
   )
   has_dpar <- is_dpar_param(names(sdata), dpar)
   is_shared <- grepl(shared_pat, names(sdata))
@@ -2129,8 +2133,7 @@ strip_dpar_infix <- function(x, dpar) {
 }
 
 extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
-                                     resp = NULL, ndraws = NULL,
-                                     draw_ids = NULL,
+                                     resp = NULL, draw_ids = NULL,
                                      re_formula = NULL, allow_new_levels = FALSE,
                                      sample_new_levels = "uncertainty",
                                      incl_latent_state = TRUE) {
@@ -2144,14 +2147,7 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   checkmate::assert_string(component)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,
                                 any.missing = FALSE)
-  if (!is.null(ndraws) && !is.null(draw_ids)) {
-    stop(insight::format_error(c(
-      "Cannot supply both 'ndraws' and 'draw_ids'.",
-      i = "Pass one or the other; 'draw_ids' takes precedence when both look set."
-    )))
-  }
   checkmate::assert_string(resp, null.ok = TRUE)
-  checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
   checkmate::assert_logical(allow_new_levels, len = 1)
   checkmate::assert_logical(incl_latent_state, len = 1)
   checkmate::assert_choice(sample_new_levels, c("uncertainty", "gaussian"))
@@ -2235,7 +2231,6 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
     return(compose_by_lv_trend_linpred(
       mvgam_fit = mvgam_fit,
       newdata = newdata,
-      ndraws = ndraws,
       draw_ids = draw_ids,
       re_formula = re_formula,
       allow_new_levels = allow_new_levels,
@@ -2248,9 +2243,9 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   full_draws <- posterior::as_draws_matrix(mvgam_fit$fit)
   n_available <- nrow(full_draws)
 
-  # Subset to requested draws. draw_ids takes precedence (already
-  # validated against ndraws conflict above) so callers can pin the
-  # exact rows shared with paired extractions (e.g. dpar pulls).
+  # Draws arrive already chosen: the count a user gave was turned into
+  # indices at the boundary they called through, so this extraction
+  # and every one it is combined with read the same rows.
   if (!is.null(draw_ids)) {
     if (max(draw_ids) > n_available) {
       stop(insight::format_error(c(
@@ -2260,16 +2255,6 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
       )))
     }
     full_draws <- full_draws[draw_ids, , drop = FALSE]
-  } else if (!is.null(ndraws)) {
-    if (ndraws > n_available) {
-      stop(insight::format_error(
-        cli::format_inline(
-          "Requested {ndraws} draws but only {n_available} available."
-        )
-      ))
-    }
-    draw_indices <- sample(n_available, ndraws)
-    full_draws <- full_draws[draw_indices, , drop = FALSE]
   }
   
   # Extract component-specific draws
@@ -2377,7 +2362,7 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
 #'   * `strip_dpar_infix()`: strip the `_trend` infix on parameter
 #'     draw column names before the mock-stanfit step.
 #' @noRd
-compose_by_lv_trend_linpred <- function(mvgam_fit, newdata, ndraws,
+compose_by_lv_trend_linpred <- function(mvgam_fit, newdata,
                                          draw_ids, re_formula,
                                          allow_new_levels,
                                          sample_new_levels,
@@ -2388,6 +2373,8 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata, ndraws,
 
   full_draws <- posterior::as_draws_matrix(mvgam_fit$fit)
   n_available <- nrow(full_draws)
+  # As above: the draws are already chosen, so the factor scores and
+  # the loadings composed with them come from the same iterations.
   if (!is.null(draw_ids)) {
     if (max(draw_ids) > n_available) {
       stop(insight::format_error(c(
@@ -2397,15 +2384,6 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata, ndraws,
       )))
     }
     full_draws <- full_draws[draw_ids, , drop = FALSE]
-  } else if (!is.null(ndraws)) {
-    if (ndraws > n_available) {
-      stop(insight::format_error(
-        cli::format_inline(
-          "Requested {ndraws} draws but only {n_available} available."
-        )
-      ))
-    }
-    full_draws <- full_draws[sample(n_available, ndraws), , drop = FALSE]
   }
 
   n_lv <- as.integer(mvgam_fit$trend_metadata$n_lv_for_grain)

@@ -640,6 +640,44 @@ validate_covariance_inputs <- function(object, ndraws, draw_ids) {
 }
 
 
+#' Take the rows of a draws matrix belonging to the chosen draws
+#'
+#' The companion to `resolve_draw_indices()`, and the shape every
+#' extractor in the package ends in: find the columns holding a
+#' quantity, then keep the rows holding the iterations the rest of the
+#' answer is built from. Going through one reader is what keeps a
+#' second extractor from choosing its own draws.
+#'
+#' @param x A draws matrix, or any matrix whose rows are draws
+#' @param ndraws Requested number of draws, or `NULL`
+#' @param draw_ids Draw indices the caller already has, or `NULL`
+#' @return `x` restricted to the chosen rows
+#'
+#' @noRd
+subset_draws_rows <- function(x, ndraws = NULL, draw_ids = NULL) {
+  x[resolve_draw_indices(nrow(x), ndraws, draw_ids), , drop = FALSE]
+}
+
+
+#' Turn a draw count into draw indices
+#'
+#' The single place a requested number of draws becomes a set of
+#' rows. Everything a post-fit method assembles has to be read out of
+#' the same iterations, and it only takes two extractions choosing
+#' differently for a mean to be paired with a dispersion, a trend or a
+#' set of innovations that belong to another draw. A count therefore
+#' resolves to indices once and those indices are passed on, rather
+#' than each extraction being handed the count and choosing again.
+#'
+#' A count covering the whole posterior still resolves, because the
+#' subsample is random: handed the bare count, one extraction would
+#' return the draws shuffled and another would not.
+#'
+#' @param total_draws Number of draws the posterior holds
+#' @param ndraws Requested number of draws, or `NULL`
+#' @param draw_ids Draw indices the caller already has, or `NULL`
+#' @return An integer vector of indices
+#'
 #' @noRd
 resolve_draw_indices <- function(total_draws, ndraws, draw_ids) {
   if (!is.null(draw_ids)) {
@@ -656,11 +694,16 @@ resolve_draw_indices <- function(total_draws, ndraws, draw_ids) {
   if (!is.null(ndraws)) {
     if (ndraws > total_draws) {
       stop(insight::format_error(c(
-        "Requested 'ndraws' exceeds available draws.",
-        x = paste0("Requested: ", ndraws, ", available: ", total_draws, ".")
+        "Requested more draws than the posterior holds.",
+        x = paste0("Asked for ", ndraws, "; the fit has ",
+                   total_draws, "."),
+        i = "Lower 'ndraws', or leave it unset to use every draw."
       )))
     }
-    return(seq_len(ndraws))
+    if (ndraws == total_draws) {
+      return(seq_len(total_draws))
+    }
+    return(sort(sample.int(total_draws, ndraws)))
   }
 
   seq_len(total_draws)

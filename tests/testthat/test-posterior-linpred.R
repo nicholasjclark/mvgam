@@ -339,3 +339,115 @@ test_that("extract_linpred_univariate keeps cell-means factor without intercept"
                        nrow = 4L, ncol = 6L)
   expect_true(all(abs(lp - expected) < 1e-9))
 })
+
+
+# ---- Distributional parameters -----------------------------------
+
+test_that("predicted_dpar_names() names only what carries a formula", {
+  obj <- structure(
+    list(formula = brms::bf(y ~ x, sigma ~ x)),
+    class = c("mvgam", "brmsfit")
+  )
+  expect_equal(predicted_dpar_names(obj, c("sigma", "nu")), "sigma")
+  # Non-linear parameters live in `pforms` too, so the family's own
+  # parameters are the ones asked for.
+  expect_equal(predicted_dpar_names(obj, "nu"), character())
+
+  scalar_only <- structure(
+    list(formula = brms::bf(y ~ x)),
+    class = c("mvgam", "brmsfit")
+  )
+  expect_equal(predicted_dpar_names(scalar_only, "sigma"), character())
+
+  mv <- structure(
+    list(formula = brms::bf(y1 ~ x, sigma ~ x) + brms::bf(y2 ~ x)),
+    class = c("mvgam", "brmsfit")
+  )
+  # Scoping to a response asks only that arm.
+  expect_equal(predicted_dpar_names(mv, "sigma", resp = "y1"), "sigma")
+  expect_equal(predicted_dpar_names(mv, "sigma", resp = "y2"), character())
+})
+
+
+test_that("dpar_link() reads the parameter's own link", {
+  # brms keeps the mean's link apart from the rest.
+  expect_equal(dpar_link(brms::Beta(), "phi"), "log")
+  expect_equal(dpar_link(com_binomial(), "nu"), "identity")
+  expect_equal(dpar_link(occ(), "p"), "logit")
+  # Poisson-Poisson's `p` is an encounter rate rather than a
+  # probability, so it is log-linked where its siblings are logit.
+  expect_equal(dpar_link(nmix("poisson_poisson"), "p"), "log")
+
+  # A family built by stats carries no per-parameter links, so the
+  # default brms would have applied is what counts. Reading these as
+  # identity would return the parameter on the link scale.
+  expect_equal(dpar_link(gaussian(), "sigma"), "log")
+  expect_equal(dpar_link(stats::Gamma(), "shape"), "log")
+
+  # A parameter the family has no link for anywhere is an error, not
+  # a silent identity.
+  expect_error(dpar_link(poisson(), "sigma"), "No link is recorded")
+})
+
+
+test_that("resolve_draw_indices() is the one rule for choosing draws", {
+  # Indices the caller already holds are passed through untouched, so
+  # a count can never override an explicit choice.
+  expect_equal(resolve_draw_indices(100L, ndraws = 10L,
+                                    draw_ids = c(2L, 5L)),
+               c(2L, 5L))
+  expect_error(
+    resolve_draw_indices(100L, ndraws = NULL, draw_ids = c(1L, 101L)),
+    "exceed available draws"
+  )
+  # No count and no indices means every draw, in the order sampled.
+  expect_equal(resolve_draw_indices(10L, NULL, NULL), seq_len(10L))
+  # A count covering the posterior also keeps that order. Returning
+  # nothing here, or a permutation, is what let two extractions
+  # disagree while both claiming to use every draw.
+  expect_equal(resolve_draw_indices(10L, ndraws = 10L, draw_ids = NULL),
+               seq_len(10L))
+  # Asking for more than exists is refused rather than truncated.
+  expect_error(
+    resolve_draw_indices(10L, ndraws = 11L, draw_ids = NULL),
+    "more draws than the posterior holds"
+  )
+  # A smaller count gives that many distinct indices, in order.
+  set.seed(1L)
+  ids <- resolve_draw_indices(100L, ndraws = 10L, draw_ids = NULL)
+  expect_length(ids, 10L)
+  expect_equal(ids, sort(ids))
+  expect_equal(anyDuplicated(ids), 0L)
+  expect_true(all(ids >= 1L & ids <= 100L))
+})
+
+
+test_that("resolve_draw_ids() materialises a count as indices", {
+  stub <- structure(
+    list(fit = posterior::as_draws_matrix(
+      posterior::draws_matrix(a = rnorm(100))
+    )),
+    class = c("mvgam", "brmsfit")
+  )
+  # Indices the caller already has are passed straight through, so a
+  # count is never allowed to override them.
+  expect_equal(resolve_draw_ids(stub, ndraws = 10, draw_ids = c(2L, 5L)),
+               c(2L, 5L))
+  # Only the absence of a count leaves nothing to choose.
+  expect_null(resolve_draw_ids(stub, ndraws = NULL, draw_ids = NULL))
+  # A count covering the whole posterior still resolves, because the
+  # extractions subsample at random: handed the bare count they would
+  # each return every draw in a different order.
+  expect_equal(resolve_draw_ids(stub, ndraws = 100, draw_ids = NULL),
+               seq_len(100))
+  # Asking for more than exists is an error, not a silent truncation.
+  expect_error(resolve_draw_ids(stub, ndraws = 150, draw_ids = NULL),
+               "more draws than the posterior holds")
+  # A count below the total becomes that many sorted, distinct indices.
+  set.seed(1L)
+  ids <- resolve_draw_ids(stub, ndraws = 10, draw_ids = NULL)
+  expect_length(ids, 10L)
+  expect_equal(ids, sort(ids))
+  expect_equal(anyDuplicated(ids), 0L)
+  expect_true(all(ids >= 1L & ids <= 100L))
+})

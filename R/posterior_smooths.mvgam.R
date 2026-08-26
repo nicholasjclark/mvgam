@@ -109,8 +109,11 @@ posterior_smooths.mvgam <- function(object, smooth, newdata = NULL,
     )))
   }
   hit <- resolve_mvgam_smooth(object, smooth)
+  # A count becomes indices at the boundary, so nothing below chooses
+  # its own draws.
   mvgam_smooth_eta(
-    object, hit, newdata, ndraws = ndraws, draw_ids = draw_ids
+    object, hit, newdata,
+    draw_ids = resolve_draw_ids(object, ndraws, draw_ids)
   )
 }
 
@@ -228,6 +231,10 @@ conditional_smooths.mvgam <- function(x, smooths = NULL,
     function(t) paste0("mu: ", t$term, if (t$side == "trend") " (trend)" else ""),
     character(1L)
   )
+  # One set of draws for the whole figure. Left as a count, each term
+  # in the loop below would subsample on its own and the panels would
+  # be drawn from different iterations of the same posterior.
+  draw_ids <- resolve_draw_ids(x, ndraws, draw_ids)
   for (i in seq_along(terms_list)) {
     hit <- terms_list[[i]]
     grid_spec <- build_smooth_grid(
@@ -236,8 +243,7 @@ conditional_smooths.mvgam <- function(x, smooths = NULL,
       too_far = too_far
     )
     eta <- mvgam_smooth_eta(
-      x, hit, grid_spec$newdata,
-      ndraws = ndraws, draw_ids = draw_ids
+      x, hit, grid_spec$newdata, draw_ids = draw_ids
     )
     summary_arr <- brms::posterior_summary(
       eta, probs = probs, robust = TRUE
@@ -620,7 +626,7 @@ mvgam_smooth_index <- function(formula, data, family = NULL) {
 # both `posterior_smooths.mvgam` and `conditional_smooths.mvgam`.
 #'@noRd
 mvgam_smooth_eta <- function(object, hit, newdata,
-                              ndraws = NULL, draw_ids = NULL) {
+                              draw_ids = NULL) {
   side <- hit$side
   if (is.null(newdata)) newdata <- object$data
   side_form <- mvgam_side_formula(object, side)
@@ -698,7 +704,7 @@ mvgam_smooth_eta <- function(object, hit, newdata,
   }
   drws <- extract_mvgam_draws(object)
   drws_mat <- posterior::as_draws_matrix(drws)
-  drws_mat <- subset_draws_for_smooth(drws_mat, ndraws, draw_ids)
+  drws_mat <- subset_draws_rows(drws_mat, draw_ids = draw_ids)
   eta <- matrix(0, nrow = nrow(drws_mat),
                  ncol = nrow(newdata))
   if (!is.null(Xs_focal) && ncol(Xs_focal) > 0L) {
@@ -732,36 +738,6 @@ mvgam_smooth_eta <- function(object, hit, newdata,
 }
 
 
-# Apply brms-style ndraws / draw_ids subsetting to a draws matrix.
-#'@noRd
-subset_draws_for_smooth <- function(drws_mat, ndraws, draw_ids) {
-  n_avail <- nrow(drws_mat)
-  if (!is.null(draw_ids)) {
-    if (max(draw_ids) > n_avail) {
-      stop(insight::format_error(c(
-        "'draw_ids' references draws beyond the available range.",
-        x = paste0(
-          "Max requested: ", max(draw_ids),
-          "; available: ", n_avail, "."
-        )
-      )))
-    }
-    return(drws_mat[draw_ids, , drop = FALSE])
-  }
-  if (!is.null(ndraws)) {
-    if (ndraws > n_avail) {
-      stop(insight::format_error(c(
-        "'ndraws' exceeds available posterior draws.",
-        x = paste0(
-          "Requested: ", ndraws,
-          "; available: ", n_avail, "."
-        )
-      )))
-    }
-    return(drws_mat[sample(n_avail, ndraws), , drop = FALSE])
-  }
-  drws_mat
-}
 
 
 # Build the prediction grid for one smooth term. Mirrors brms's

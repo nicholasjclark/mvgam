@@ -39,7 +39,7 @@
 #' code is byte-identical across the three call sites.
 #'
 #' @noRd
-generate_stan_components_mvgam_formula <- function(formula, data, family = gaussian(),
+build_stan_components <- function(formula, data, family = gaussian(),
                                                    prior = NULL, data2 = NULL,
                                                    sample_prior = "no", sparse = NULL,
                                                    knots = NULL, drop_unused_levels = TRUE,
@@ -374,6 +374,25 @@ generate_stan_components_mvgam_formula <- function(formula, data, family = gauss
     trend_metadata = if (exists("trend_metadata")) trend_metadata else NULL
   ))
 }
+
+#' Generate the Stan components for an `mvgam_formula`
+#'
+#' The single code-generation entry point behind `mvgam()`,
+#' `stancode()` and `standata()`. Delegates to
+#' `build_stan_components()`, which runs brms's code generator three
+#' times: once for the lightweight skeleton, once for the base Stan
+#' code and once for the base Stan data. All three validate the same
+#' data frame, so anything brms reports about that data would
+#' otherwise reach the user three times over for one model.
+#'
+#' @inheritParams build_stan_components
+#' @inherit build_stan_components return
+#'
+#' @noRd
+generate_stan_components_mvgam_formula <- function(...) {
+  warn_once_per_call(build_stan_components(...))
+}
+
 
 # Internal: soft-warn when a PW trend coincides with an
 # observation-side intercept. Both terms shift the linear

@@ -147,20 +147,7 @@ hindcast.mvgam <- function(object,
 
   draws_mat <- posterior::as_draws_matrix(object$fit)
   total_draws <- nrow(draws_mat)
-  if (is.null(ndraws)) ndraws <- total_draws
-  if (ndraws > total_draws) {
-    stop(insight::format_error(c(
-      "'ndraws' exceeds the number of posterior draws.",
-      x = paste0("Got ndraws = ", ndraws,
-                 ", total draws = ", total_draws, "."),
-      i = "Use a smaller value or set ndraws = NULL to use all draws."
-    )))
-  }
-  draw_idx <- if (ndraws == total_draws) {
-    seq_len(total_draws)
-  } else {
-    sort(sample.int(total_draws, ndraws))
-  }
+  draw_idx <- resolve_draw_indices(total_draws, ndraws, NULL)
 
   training <- build_training_arms(object, series_levels)
   hindcasts <- build_hindcast_arms(
@@ -224,20 +211,7 @@ hindcast_latent_state <- function(object, ndraws = NULL,
   }
 
   total_draws <- nrow(posterior::as_draws_matrix(object$fit))
-  if (is.null(ndraws)) ndraws <- total_draws
-  if (ndraws > total_draws) {
-    stop(insight::format_error(c(
-      "'ndraws' exceeds the number of posterior draws.",
-      x = paste0("Got ndraws = ", ndraws,
-                 ", total draws = ", total_draws, "."),
-      i = "Use a smaller value or set ndraws = NULL to use all draws."
-    )))
-  }
-  draw_idx <- if (ndraws == total_draws) {
-    seq_len(total_draws)
-  } else {
-    sort(sample.int(total_draws, ndraws))
-  }
+  draw_idx <- resolve_draw_indices(total_draws, ndraws, NULL)
 
   kernel <- dispatch_closure_unit_method(object$family,
                                             "latent_state")

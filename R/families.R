@@ -907,10 +907,10 @@ com_binomial <- function(link = "logit") {
     # `trials[n]` is the per-row binomial denominator, supplied by
     # the `trials()` addition term in the model formula so brms
     # keeps it aligned with the response when rows are dropped.
-    # `lchoose_com_binomial` is the transformed-data lookup table
-    # (Stan functions cannot reach data-block globals so the table
-    # is passed in as an additional positional arg).
-    vars = c("trials[n]", "lchoose_com_binomial")
+    # `lfact_com_binomial` is the transformed-data table of log
+    # factorials (Stan functions cannot reach data-block globals so
+    # the table is passed in as an additional positional arg).
+    vars = c("trials[n]", "lfact_com_binomial")
   )
   # See note on `resolve_family_name()`: brms custom_family leaves
   # `family$family = "custom"` and stores the user-visible name on
@@ -1104,13 +1104,18 @@ make_com_binomial_stanvars <- function() {
 }
 
 
-#' Transformed-data Stan code building the `lchoose` lookup table
+#' Transformed-data Stan code building the log-factorial table
 #'
-#' One scalar `lchoose(T, j)` per `(T, j)` pair with `0 <= j <= T <=
-#' max_com_binomial_T`. Off-triangle entries are zero (never read by
-#' the lpmf). Built once per fit; eliminates the `T + 1` per-row
-#' `lchoose` calls the naive implementation would do at every
-#' leapfrog step.
+#' `lchoose(T, j)` is `lfact[T] - lfact[j] - lfact[T - j]`, so one
+#' vector of log factorials up to `max(trials)` serves every `(T, j)`
+#' pair. Storing the binomial coefficients themselves would need a
+#' `(max(trials) + 1)^2` array, which on a panel with a denominator
+#' in the low thousands runs to millions of doubles for information a
+#' vector of a few thousand already carries.
+#'
+#' `lgamma(k + 1)` is evaluated per element rather than accumulated
+#' as a running sum of `log(k)`, so rounding error does not grow
+#' along the table.
 #'
 #' The bound is taken from `trials` inside Stan rather than computed
 #' in R, so it follows whatever rows brms kept and cannot fall out
@@ -1120,13 +1125,9 @@ make_com_binomial_stanvars <- function() {
 com_binomial_lookup_stan <- function() {
   paste(
     "  int max_com_binomial_T = max(trials);",
-    "  array[max_com_binomial_T + 1, max_com_binomial_T + 1]",
-    "    real lchoose_com_binomial;",
-    "  for (T_val in 0 : max_com_binomial_T) {",
-    "    for (j_val in 0 : max_com_binomial_T) {",
-    "      lchoose_com_binomial[T_val + 1, j_val + 1] =",
-    "        j_val <= T_val ? lchoose(T_val, j_val) : 0;",
-    "    }",
+    "  vector[max_com_binomial_T + 1] lfact_com_binomial;",
+    "  for (k_lf in 0 : max_com_binomial_T) {",
+    "    lfact_com_binomial[k_lf + 1] = lgamma(k_lf + 1);",
     "  }",
     sep = "\n"
   )
@@ -1140,20 +1141,20 @@ com_binomial_lookup_stan <- function() {
 #' `com_binomial_lpmf(Y[n] | mu[n], nu, trials[n])`, so the lpmf
 #' signature is `(int y, real mu, real nu, int T)`.
 #'
-#' Efficiency: reads `lchoose(T, j)` from the precomputed
-#' `lchoose_com_binomial` table (built once in transformed data),
-#' replaces the inner for-loop with vectorised Stan ops, and lifts
-#' `log_inv_logit(mu)` / `log1m_inv_logit(mu)` outside the
-#' normaliser sum. Per-row cost is two `log_inv_logit` calls plus a
-#' single `log_sum_exp` over a `T + 1` vector -- no per-row
-#' `lchoose` calls and no transcendental work inside the
-#' normalisation loop.
+#' Two properties of the kernel keep the cost down. Every factor that
+#' does not depend on the outcome `j` is shared by the numerator and
+#' by each term of the normaliser, so it cancels; dropping it leaves
+#' the natural-parameter form `theta * j - nu * (log j! + log (T-j)!)`
+#' with `theta = logit(p)`, and removes one length-`T + 1` autodiff
+#' vector operation per row per gradient. The normaliser itself is
+#' then summed only over the terms that carry mass, under an explicit
+#' bound on what the omitted terms can contribute, which matters
+#' because the series is over `T + 1` outcomes and `T` is the
+#' binomial denominator: a panel with denominators in the thousands
+#' would otherwise pay thousands of autodiff nodes per row.
 #'
-#' Pure-Stan implementation; the contributor's external C++ kernel
-#' (`inst/include/com_binomial.hpp`) with adaptive-window
-#' truncation and a custom partial propagator is deferred to a v2.2
-#' a separate change where the win on long-trial data can be
-#' benchmarked against this baseline.
+#' The same remainder-bound reasoning already governs the latent-`N`
+#' loop in the `nmix()` families.
 #'
 #' @noRd
 com_binomial_stan_funs <- function() {
@@ -1164,10 +1165,33 @@ com_binomial_stan_funs <- function() {
     "     Z(T, p, nu) =",
     "       sum_{j=0..T} C(T, j)^nu * p^j * (1-p)^(T-j).",
     "     mu = logit(p); nu identity-link. nu = 1 recovers the binomial.",
-    "     Reads lchoose(T, j) from the precomputed",
-    "     `lchoose_com_binomial` lookup table built in",
-    "     transformed data.",
+    "     Writing theta = log(p) - log(1-p) and expanding C(T, j) into",
+    "     log factorials leaves lw(j) below; everything dropped is",
+    "     common to the numerator and to every term of Z, so it",
+    "     cancels in the ratio.",
     "  */",
+    "  real com_binomial_lw(int j, int T, real nu, real theta,",
+    "                       data vector lfact) {",
+    "    return theta * j - nu * (lfact[j + 1] + lfact[T - j + 1]);",
+    "  }",
+    "  /* Largest integer in [0, T] not exceeding the continuous mode",
+    "     (T + 1) * inv_logit(theta / nu), by binary search: Stan has",
+    "     no real-to-int cast, and the argument depends on parameters",
+    "     so it cannot be computed in transformed data. */",
+    "  int com_binomial_mode(int T, real nu, real theta) {",
+    "    real jr = (T + 1) * inv_logit(theta / nu);",
+    "    int lo = 0;",
+    "    int hi = T;",
+    "    while (lo < hi) {",
+    "      int mid = (lo + hi + 1) %/% 2;",
+    "      if (mid <= jr) {",
+    "        lo = mid;",
+    "      } else {",
+    "        hi = mid - 1;",
+    "      }",
+    "    }",
+    "    return lo;",
+    "  }",
     "  /* brms `loop = TRUE` applies the inverse link before",
     "     calling the lpmf, so `mu` arrives here on the",
     "     probability scale (0, 1) -- NOT on the logit scale.",
@@ -1175,17 +1199,86 @@ com_binomial_stan_funs <- function() {
     "     would compute log(sigmoid(mu)) which is wrong when",
     "     mu is already a probability. */",
     "  real com_binomial_lpmf(int y, real mu, real nu, int T,",
-    "                         data array[,] real lc_table) {",
+    "                         data vector lfact) {",
     "    if (y < 0) reject(\"y must be >= 0; got y = \", y);",
     "    if (y > T) reject(\"y must be <= T; got y = \", y, \", T = \", T);",
-    "    real log_p = log(mu);",
-    "    real log_q = log1m(mu);",
-    "    vector[T + 1] lc = to_vector(lc_table[T + 1, 1 : (T + 1)]);",
-    "    vector[T + 1] js = linspaced_vector(T + 1, 0, T);",
-    "    vector[T + 1] log_unnorm = nu * lc + js * log_p",
-    "                               + (T - js) * log_q;",
-    "    return nu * lc[y + 1] + y * log_p + (T - y) * log_q",
-    "           - log_sum_exp(log_unnorm);",
+    "    if (T == 0) {",
+    "      return 0;",
+    "    }",
+    "    real theta = log(mu) - log1m(mu);",
+    "    /* Relative tolerance on the omitted mass. Each branch below",
+    "       bounds the whole omitted sum, not merely the next term. */",
+    "    real leps = log(1e-12);",
+    "    real mx;",
+    "    real s;",
+    "    real f;",
+    "    if (nu > 0) {",
+    "      /* lw is concave in j, so it has a single mode and its terms",
+    "         fall away monotonically on either side. Stopping at j",
+    "         therefore leaves at most (remaining count) * exp(lw(j)),",
+    "         and the tolerance is split between the two directions. */",
+    "      real lhalf = leps - log(2);",
+    "      int j0 = com_binomial_mode(T, nu, theta);",
+    "      mx = com_binomial_lw(j0, T, nu, theta, lfact);",
+    "      s = 1;",
+    "      for (k in 1 : (T - j0)) {",
+    "        f = com_binomial_lw(j0 + k, T, nu, theta, lfact);",
+    "        if (log(T - j0 - k + 1) + f - mx < lhalf) {",
+    "          break;",
+    "        }",
+    "        if (f > mx) {",
+    "          s = s * exp(mx - f) + 1;",
+    "          mx = f;",
+    "        } else {",
+    "          s += exp(f - mx);",
+    "        }",
+    "      }",
+    "      for (k in 1 : j0) {",
+    "        f = com_binomial_lw(j0 - k, T, nu, theta, lfact);",
+    "        if (log(j0 - k + 1) + f - mx < lhalf) {",
+    "          break;",
+    "        }",
+    "        if (f > mx) {",
+    "          s = s * exp(mx - f) + 1;",
+    "          mx = f;",
+    "        } else {",
+    "          s += exp(f - mx);",
+    "        }",
+    "      }",
+    "    } else {",
+    "      /* lw is convex in j (linear at nu = 0), so its maxima are",
+    "         the two endpoints. Whatever interval [L, R] is left",
+    "         unsummed is bounded by (R - L + 1) * exp(max(lw(L),",
+    "         lw(R))), so the two ends are consumed inward until that",
+    "         bound falls below tolerance. */",
+    "      real f0 = com_binomial_lw(0, T, nu, theta, lfact);",
+    "      real fT = com_binomial_lw(T, T, nu, theta, lfact);",
+    "      int L = 1;",
+    "      int R = T - 1;",
+    "      mx = fmax(f0, fT);",
+    "      s = exp(f0 - mx) + exp(fT - mx);",
+    "      while (L <= R) {",
+    "        real fL = com_binomial_lw(L, T, nu, theta, lfact);",
+    "        real fR = com_binomial_lw(R, T, nu, theta, lfact);",
+    "        if (log(R - L + 1) + fmax(fL, fR) - mx < leps) {",
+    "          break;",
+    "        }",
+    "        if (fL >= fR) {",
+    "          f = fL;",
+    "          L += 1;",
+    "        } else {",
+    "          f = fR;",
+    "          R -= 1;",
+    "        }",
+    "        if (f > mx) {",
+    "          s = s * exp(mx - f) + 1;",
+    "          mx = f;",
+    "        } else {",
+    "          s += exp(f - mx);",
+    "        }",
+    "      }",
+    "    }",
+    "    return com_binomial_lw(y, T, nu, theta, lfact) - (mx + log(s));",
     "  }",
     sep = "\n"
   )
@@ -5155,32 +5248,38 @@ dispatch_closure_unit_method <- function(family, method_kind) {
   fn
 }
 
-#' Materialise `ndraws` to a concrete `draw_ids` vector for the
-#' closure-unit kernels.
+#' Materialise a draw count as concrete draw indices
 #'
-#' `posterior_epred.mvgam()` and `posterior_predict.mvgam()` accept
-#' both `ndraws` and `draw_ids`, but the closure-unit kernels
-#' (`posterior_epred_nmix`, `posterior_predict_mvn`, ...) accept
-#' only `draw_ids`. Materialising `ndraws` here means a single
-#' random subsample is shared by `mu`, dpars (`Psi`, `nu`), and
-#' any downstream extraction the kernel performs, instead of each
-#' call drawing a different subset.
+#' A prediction assembles its answer from several extractions: the
+#' linear predictor, the distributional parameters, the latent states.
+#' Asked for a count rather than for indices, each of those subsamples
+#' on its own, and they do not agree: some take the first `ndraws`
+#' rows, others draw at random. The result pairs a dispersion with a
+#' mean from an unrelated iteration. Resolving the count to indices
+#' once, before any extraction runs, makes every part of the answer
+#' come from the same iterations.
 #'
-#' Convention matches `posterior::resample_draws()`: when both
-#' `ndraws` and `draw_ids` are supplied the explicit `draw_ids`
-#' wins. When neither is supplied the kernel sees `draw_ids =
-#' NULL` and uses the full posterior.
+#' A count always resolves to indices, even one covering the whole
+#' posterior: the extractions subsample by drawing at random, and
+#' asking for every draw returns them in a random order rather than in
+#' the order they were sampled, so two extractions given the same
+#' count would still disagree. `NULL` comes back only when there is
+#' genuinely nothing to choose, meaning no count was asked for.
 #'
-#' @param object Fitted `mvgam` object.
-#' @param ndraws Integer or NULL.
-#' @param draw_ids Integer vector or NULL.
-#' @return `draw_ids` vector or NULL.
+#' @param object An `mvgam` model object
+#' @param ndraws Requested number of draws, or `NULL`
+#' @param draw_ids Draw indices the caller already has, or `NULL`
+#' @return An integer vector of indices, or `NULL`
+#'
 #' @noRd
-closure_unit_resolve_draw_ids <- function(object, ndraws, draw_ids) {
-  if (!is.null(draw_ids) || is.null(ndraws)) return(draw_ids)
-  total <- posterior::ndraws(posterior::as_draws_matrix(object$fit))
-  if (ndraws >= total) return(NULL)
-  sort(sample.int(total, ndraws))
+resolve_draw_ids <- function(object, ndraws, draw_ids) {
+  if (!is.null(draw_ids) || is.null(ndraws)) {
+    return(draw_ids)
+  }
+  resolve_draw_indices(
+    posterior::ndraws(posterior::as_draws_matrix(object$fit)),
+    ndraws = ndraws, draw_ids = NULL
+  )
 }
 
 #' Resolve the response variable name from an mvgam formula slot
@@ -5265,7 +5364,7 @@ extract_p_for_closure_unit <- function(object, newdata, draw_ids,
     ))
   }
   if (is.null(draw_ids)) {
-    draw_ids <- seq_len(ndraws)
+    draw_ids <- resolve_draw_indices(nrow(draws_mat), ndraws, NULL)
   } else if (length(draw_ids) != ndraws) {
     draw_ids <- draw_ids[seq_len(ndraws)]
   }
@@ -5289,13 +5388,13 @@ extract_p_for_closure_unit <- function(object, newdata, draw_ids,
 #'   inverse already applied).
 #' @noRd
 extract_p_via_dpar_linpred <- function(object, newdata, draw_ids) {
-  linpred_p <- extract_component_linpred(
-    mvgam_fit = object,
-    newdata   = newdata,
-    component = "p",
-    draw_ids  = draw_ids
+  # Detection probability is one more parameter carrying a formula of
+  # its own, so it is rebuilt the same way as any other. `nobs` is left
+  # open because closure-unit families work at visit grain, which the
+  # caller reconciles against the unit grain.
+  predicted_dpar_draws(
+    object, "p", newdata = newdata, draw_ids = draw_ids
   )
-  stats::plogis(linpred_p)
 }
 
 #' Extract state, detection-probability and closure-unit arrays
@@ -5977,10 +6076,16 @@ extract_mv_response_components <- function(object, newdata = NULL,
   # layer. When `linpred` is supplied (log_lik path) skip the
   # recomputation so the caller's already-subsampled linpred is
   # used; this keeps Psi aligned to the same draw indices as mu.
+  # Resolve draw_ids up front so mu and Psi come from the same
+  # iterations. Left as a count, the linpred below subsamples at
+  # random while Psi is read from the first rows of the posterior, and
+  # the two describe different draws.
+  draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
   if (is.null(linpred)) {
     linpred <- posterior_linpred(
       object, newdata = newdata, draw_ids = draw_ids,
-      ndraws = ndraws, process_error = FALSE
+      ndraws = if (is.null(draw_ids)) ndraws else NULL,
+      process_error = FALSE
     )
   }
   mu <- object$family$linkinv(linpred)
@@ -6296,7 +6401,7 @@ extract_simplex_response_components <- function(object,
   # (when sourced from a sub-formula) use the same posterior rows.
   # Without this, an ndraws-only call would randomly subsample once
   # for mu and again for phi, mis-aligning the two by draw index.
-  draw_ids <- closure_unit_resolve_draw_ids(object, ndraws, draw_ids)
+  draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
 
   if (is.null(linpred)) {
     linpred <- posterior_linpred(

@@ -1038,7 +1038,7 @@ test_that("extract_dpars_from_stanfit validates inputs correctly", {
   # ndraws exceeds available draws
   expect_error(
     extract_dpars_from_stanfit(valid_draws, "sigma", 100, 5),
-    "exceeds available draws"
+    "more draws than the posterior holds"
   )
 
   # draw_ids exceeds available draws
@@ -1403,5 +1403,40 @@ test_that("compute_family_variance: errors when required dpar missing", {
       family = list(family = "negbinomial", linkinv = exp)
     ),
     "shape"
+  )
+})
+
+
+test_that("a denominator of zero is a legal binomial observation", {
+  # A row whose response was never observed has no trials behind it,
+  # and zero is the natural padding: brms accepts it when fitting, so
+  # prediction has to accept it coming back out. Requiring at least
+  # one trial made posterior_epred(), loo(), pp_check() and plot()
+  # fail together on any fit padded that way.
+  stub <- structure(
+    list(
+      formula = brms::bf(y | trials(trials) ~ x),
+      data = data.frame(
+        y = c(1L, 2L, NA_integer_), trials = c(5L, 5L, 0L),
+        x = rnorm(3)
+      ),
+      standata = list(trials = c(5L, 5L))
+    ),
+    class = c("mvgam", "brmsfit")
+  )
+  expect_equal(
+    extract_trials_for_family(stub, binomial(), newdata = NULL),
+    c(5, 5, 0)
+  )
+  # com_binomial() reaches the same extractor.
+  expect_equal(
+    extract_trials_for_family(stub, com_binomial(), newdata = NULL),
+    c(5, 5, 0)
+  )
+  # A negative denominator is still refused, matching brms.
+  stub$data$trials <- c(5L, 5L, -1L)
+  expect_error(
+    extract_trials_for_family(stub, binomial(), newdata = NULL),
+    "trials"
   )
 })

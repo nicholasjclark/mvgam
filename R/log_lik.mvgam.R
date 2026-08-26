@@ -92,16 +92,14 @@ log_lik.mvgam <- function(object,
 
   newdata <- newdata %||% object$data
 
-  # A closure-unit family draws its detection probabilities separately
-  # from the linear predictor, so `ndraws` is materialised as concrete
-  # `draw_ids` first. Left as `ndraws`, each call would subsample
-  # independently and pair a detection probability with a latent state
-  # from an unrelated iteration.
-  if (is_closure_unit_family(object$family)) {
-    draw_ids <- closure_unit_resolve_draw_ids(object, ndraws, draw_ids)
-    if (!is.null(draw_ids)) {
-      ndraws <- NULL
-    }
+  # The linear predictor and the distributional parameters are drawn
+  # by separate extractions, so `ndraws` is materialised as concrete
+  # `draw_ids` first. Left as a count, each extraction would subsample
+  # independently and pair a dispersion, or a detection probability,
+  # with a mean from an unrelated iteration.
+  draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
+  if (!is.null(draw_ids)) {
+    ndraws <- NULL
   }
 
   # Link-scale linear predictor with optional trend realisations baked in.
@@ -333,41 +331,32 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
     ))
   }
 
-  # Distributional parameters (sigma, shape, hu, zi, ...) as [ndraws x nobs].
-  # Multivariate fits store dpars as `<dpar>_<resp>` in the posterior;
-  # extract under that name then rename back to the bare key so the
-  # per-family helpers see a uniform structure.
-  dpar_names <- get_family_dpars(family_name)
-  family_pars <- if (length(dpar_names) > 0) {
-    extract_names <- if (!is.null(resp)) {
-      paste0(dpar_names, "_", resp)
-    } else {
-      dpar_names
-    }
-    out <- extract_dpars_from_stanfit(
-      stanfit = object$fit,
-      dpar_names = extract_names,
-      ndraws = nrow(linpred),
-      nobs = ncol(linpred),
-      draw_ids = draw_ids
-    )
-    names(out) <- dpar_names
-    out
-  } else {
-    list()
-  }
+  # Distributional parameters (sigma, shape, hu, zi, ...) as
+  # [ndraws x nobs], whether each was sampled as a scalar or predicted
+  # by a formula of its own.
+  family_pars <- resolve_family_pars(
+    object,
+    dpar_names = get_family_dpars(family_name),
+    ndraws = nrow(linpred),
+    nobs = ncol(linpred),
+    draw_ids = draw_ids,
+    newdata = newdata,
+    resp = resp
+  )
 
   # Ordinal families need threshold and disc draws from the posterior
   # in addition to the standard dpars.
   if (family_name %in% c("cumulative", "sratio", "cratio", "acat")) {
     family_pars$thres <- extract_ordinal_thresholds(
       object,
-      ndraws = nrow(linpred)
+      ndraws = nrow(linpred),
+      draw_ids = draw_ids
     )
     family_pars$disc <- extract_ordinal_disc(
       object,
       ndraws = nrow(linpred),
-      nobs = ncol(linpred)
+      nobs = ncol(linpred),
+      draw_ids = draw_ids
     )
   }
 

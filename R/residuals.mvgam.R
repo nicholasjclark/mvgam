@@ -239,14 +239,9 @@ residuals.mvgam <- function(object,
   # closure-unit intercept threads `draw_ids` through but
   # silently ignores `ndraws`, so the conversion has to happen
   # here for the requested subsample to take effect.
-  if (is.null(draw_ids) && !is.null(ndraws)) {
-    total_draws <- posterior::ndraws(
-      posterior::as_draws(object$fit)
-    )
-    if (ndraws < total_draws) {
-      draw_ids <- sort(sample.int(total_draws, ndraws))
-      ndraws <- NULL
-    }
+  draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
+  if (!is.null(draw_ids)) {
+    ndraws <- NULL
   }
 
   # Closure-unit families (nmix, occ) violate the per-visit
@@ -524,14 +519,11 @@ compute_quantile_residuals_empirical <- function(y, yrep,
 residuals_dpars <- function(object, ndraws = NULL, draw_ids = NULL,
                             d, n_obs, resp = NULL) {
   draws_mat <- posterior::as_draws_matrix(object$fit)
-  total_draws <- nrow(draws_mat)
-  draw_idx <- if (!is.null(draw_ids)) {
-    draw_ids
-  } else if (!is.null(ndraws) && ndraws < total_draws) {
-    sample.int(total_draws, ndraws)
-  } else {
-    seq_len(total_draws)
-  }
+  # The parameters standardising a residual have to come from the same
+  # iterations as the fitted value it is standardising, so a count is
+  # turned into indices rather than subsampled again here.
+  draw_idx <- resolve_draw_ids(object, ndraws, draw_ids) %||%
+    seq_len(nrow(draws_mat))
   per_series <- extract_family_pars_for_draws(
     object, draws_mat, draw_idx, resp = resp
   )

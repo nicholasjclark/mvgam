@@ -15,6 +15,7 @@
   allow_new_levels = FALSE,
   sample_new_levels = "uncertainty",
   resp = NULL,
+  dpar = NULL,
   ...
 )
 }
@@ -65,6 +66,12 @@ Either "uncertainty" (default) or "gaussian".}
 \item{resp}{Character specifying which response variable for
 multivariate models. NULL (default) returns predictions for all
 responses.}
+
+\item{dpar}{Character naming a distributional parameter, such as
+\code{"sigma"} or \code{"nu"}. The default \code{NULL} answers for the mean.
+Naming a parameter that carries a formula of its own returns its
+linear predictor, which has no latent trend term; naming one that
+was sampled as a scalar returns those draws across the rows.}
 
 \item{...}{Additional arguments passed to internal methods.}
 }

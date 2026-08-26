@@ -3924,16 +3924,18 @@ test_that("threads = N forwards brms partial_log_lik into mvgam stancode", {
 # ---- Conway-Maxwell-Binomial family contract --------------------
 
 test_that("com_binomial() emits expected Stan lpmf + lookup table", {
-  # Regression test for the v2.1 CMB port. Asserts that:
+  # Asserts that:
   # 1. The custom lpmf function is declared in the Stan functions
-  #    block with the (int y, real mu, real nu, int T, data
-  #    array[,] real lc_table) signature
+  #    block with the (int y, real mu, real nu, int T, data vector
+  #    lfact) signature
   # 2. `trials[n]` (the denominator) is referenced in the model
   #    block
-  # 3. The transformed-data `lchoose_com_binomial` lookup table is
-  #    precomputed once per fit
-  # 4. The lpmf reads from the lookup table (no per-row lchoose
-  #    calls inside the function body)
+  # 3. The transformed-data log-factorial table is precomputed once
+  #    per fit, as a vector rather than the square array of binomial
+  #    coefficients an earlier implementation built
+  # 4. The lpmf reads that table rather than calling `lchoose()` per
+  #    row, and bounds the normalising sum instead of enumerating
+  #    every one of the T + 1 outcomes
   set.seed(0)
   dat <- data.frame(
     y = rbinom(30, size = 5L, prob = 0.4),
@@ -3951,10 +3953,15 @@ test_that("com_binomial() emits expected Stan lpmf + lookup table", {
     sc
   ))
   expect_true(grepl("trials\\[n\\]", sc))
-  expect_true(grepl("lchoose_com_binomial", sc))
+  expect_true(grepl("data vector lfact", sc))
   expect_true(grepl(
-    "to_vector\\(lc_table\\[T \\+ 1", sc
+    "vector\\[max_com_binomial_T \\+ 1\\] lfact_com_binomial", sc
   ))
+  expect_false(grepl("lchoose", sc))
+  # The normaliser is bounded rather than enumerated, so the helper
+  # that locates the mode and the weight function are both emitted.
+  expect_true(grepl("com_binomial_mode\\(T, nu, theta\\)", sc))
+  expect_true(grepl("com_binomial_lw\\(", sc))
 })
 
 

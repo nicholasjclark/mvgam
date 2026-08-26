@@ -176,17 +176,18 @@ test_that("conditional_smooths.mvgam errors on no-smooth fits", {
 })
 
 
-# ---- subset_draws_for_smooth ---------------------------------------
+# ---- subset_draws_rows ---------------------------------------------
 
-test_that("subset_draws_for_smooth validates ndraws and draw_ids", {
+test_that("subset_draws_rows validates ndraws and draw_ids", {
   mat <- matrix(rnorm(20L), nrow = 10L)
-  expect_identical(nrow(subset_draws_for_smooth(mat, NULL, NULL)), 10L)
-  expect_identical(nrow(subset_draws_for_smooth(mat, 5L, NULL)), 5L)
-  expect_identical(nrow(subset_draws_for_smooth(mat, NULL, c(1L, 3L))),
-                   2L)
-  expect_error(subset_draws_for_smooth(mat, 99L, NULL), "exceeds")
-  expect_error(subset_draws_for_smooth(mat, NULL, c(1L, 99L)),
-               "beyond")
+  expect_identical(nrow(subset_draws_rows(mat, NULL, NULL)), 10L)
+  expect_identical(nrow(subset_draws_rows(mat, 5L, NULL)), 5L)
+  expect_identical(nrow(subset_draws_rows(mat, NULL, c(1L, 3L))), 2L)
+  # A count covering every row keeps them in the order they were
+  # sampled rather than shuffling them.
+  expect_identical(subset_draws_rows(mat, 10L, NULL), mat)
+  expect_error(subset_draws_rows(mat, 99L, NULL), "more draws")
+  expect_error(subset_draws_rows(mat, NULL, c(1L, 99L)), "exceed")
 })
 
 

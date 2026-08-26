@@ -1235,6 +1235,223 @@ get_family_dpars <- function(family_name) {
 }
 
 
+#' Resolve every distributional parameter a fitted family declares
+#'
+#' brms settles a distributional parameter one of two ways, in
+#' `prepare_predictions.brmsframe()`: either the user gave it a formula
+#' of its own, in which case it is a linear predictor evaluated per
+#' observation, or it was sampled as a scalar (or one scalar per
+#' series) and can be read straight off the draws. This does the same,
+#' and is the single seam the prediction paths go through so the two
+#' cases never have to be told apart at a call site.
+#'
+#' Names are the bare parameter names throughout. A multivariate fit
+#' stores its parameters suffixed with the response, but that suffix is
+#' an artefact of how brms writes the posterior, so it is applied on
+#' the way in and stripped on the way out.
+#'
+#' @param object An `mvgam` model object
+#' @param dpar_names Bare names of the parameters the family declares
+#' @param ndraws Number of draws the prediction covers
+#' @param nobs Number of rows the prediction covers
+#' @param draw_ids Draw indices to keep, or `NULL` for all
+#' @param newdata Data the prediction covers; `object$data` if `NULL`
+#' @param resp Response name for a multivariate fit, or `NULL`
+#' @return Named list of `[ndraws x nobs]` matrices, keyed by bare
+#'   name. A parameter the posterior does not carry is left out.
+#'
+#' @noRd
+resolve_family_pars <- function(object, dpar_names, ndraws, nobs,
+                                draw_ids = NULL, newdata = NULL,
+                                resp = NULL) {
+  checkmate::assert_class(object, "mvgam")
+  checkmate::assert_character(dpar_names, min.len = 0)
+  if (length(dpar_names) == 0) {
+    return(list())
+  }
+
+  # The prediction paths resolve the count before they compute the
+  # mean, so `draw_ids` normally arrives already settled. Resolving
+  # again here is idempotent and makes the seam safe to call on its
+  # own: the two branches below read from different extractors, and a
+  # bare count would let each choose its own draws.
+  draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
+
+  predicted <- predicted_dpar_names(object, dpar_names, resp = resp)
+  sampled <- setdiff(dpar_names, predicted)
+
+  out <- list()
+  for (dpar in predicted) {
+    out[[dpar]] <- predicted_dpar_draws(
+      object, dpar, nobs = nobs, ndraws = ndraws, draw_ids = draw_ids,
+      newdata = newdata, resp = resp
+    )
+  }
+
+  if (length(sampled) > 0) {
+    suffixed <- if (!is.null(resp) && nzchar(resp)) {
+      paste0(sampled, "_", resp)
+    } else {
+      sampled
+    }
+    found <- extract_dpars_from_stanfit(
+      stanfit = object$fit,
+      dpar_names = suffixed,
+      ndraws = ndraws,
+      nobs = nobs,
+      draw_ids = draw_ids
+    )
+    # `extract_dpars_from_stanfit()` drops a parameter it cannot find,
+    # so match names back rather than assuming the two lists align.
+    names(found) <- sampled[match(names(found), suffixed)]
+    out[names(found)] <- found
+  }
+
+  out[intersect(dpar_names, names(out))]
+}
+
+
+#' Names of the distributional parameters carrying their own formula
+#'
+#' A distributional submodel such as `sigma ~ x` or `nu ~ z` is
+#' recorded by brms in `pforms` on the model formula. Such a parameter
+#' has no scalar counterpart in the posterior: it is a linear predictor
+#' evaluated per observation, so it has to be rebuilt from its
+#' coefficients rather than read off the draws. Non-linear parameters
+#' also live in `pforms`, so the names are intersected with the ones
+#' the family actually recognises.
+#'
+#' @param object An `mvgam` model object
+#' @param dpar_names Distributional parameters the family declares
+#' @param resp Response name for a multivariate fit, or `NULL`
+#' @return Character vector, possibly empty
+#'
+#' @noRd
+predicted_dpar_names <- function(object, dpar_names, resp = NULL) {
+  formula <- object$formula
+  if (is.null(formula)) {
+    return(character())
+  }
+  if (brms::is.mvbrmsformula(formula)) {
+    forms <- formula$forms
+    if (!is.null(resp) && nzchar(resp) && !is.null(forms[[resp]])) {
+      forms <- forms[resp]
+    }
+    named <- unlist(lapply(forms, function(f) names(f$pforms)))
+  } else {
+    named <- names(formula$pforms)
+  }
+  intersect(dpar_names, named %||% character())
+}
+
+
+#' Draws of a distributional parameter that carries its own formula
+#'
+#' A parameter given a formula of its own is a linear predictor, not a
+#' sampled scalar, so it is rebuilt from its coefficients and then put
+#' on the parameter's own scale. `extract_component_linpred()` already
+#' composes such a predictor from its parametric, smooth,
+#' random-effect and Gaussian-process terms; this adds the inverse
+#' link, so the result matches the scale a non-distributional fit
+#' would have sampled the scalar on.
+#'
+#' @param object An `mvgam` model object
+#' @param dpar Name of the distributional parameter
+#' @param nobs Number of rows the prediction covers; `NULL` skips the
+#'   conformity check for callers working at a different grain
+#' @param draw_ids Draw indices to keep, or `NULL` for all
+#' @param newdata Data the prediction covers; `object$data` if `NULL`
+#' @param resp Response name for a multivariate fit, or `NULL`
+#' @return A `[ndraws x nobs]` matrix
+#'
+#' @noRd
+predicted_dpar_draws <- function(object, dpar, nobs = NULL,
+                                 ndraws = NULL, draw_ids = NULL,
+                                 newdata = NULL, resp = NULL) {
+  linpred <- extract_component_linpred(
+    mvgam_fit = object,
+    newdata = newdata %||% object$data,
+    component = dpar,
+    draw_ids = draw_ids,
+    resp = resp
+  )
+  if (is.list(linpred) && !is.matrix(linpred)) {
+    stop(insight::format_error(c(
+      paste0(
+        "Distributional parameter '", dpar,
+        "' resolved to one predictor per response."
+      ),
+      i = "Scope the call to a single response with 'resp'."
+    )))
+  }
+  out <- as.matrix(.linkinv(linpred, dpar_link(object$family, dpar)))
+  if (!is.null(ndraws) && nrow(out) != ndraws) {
+    stop(insight::format_error(c(
+      paste0(
+        "Distributional parameter '", dpar,
+        "' was predicted from a different number of draws than the ",
+        "linear predictor."
+      ),
+      x = paste0("Got ", nrow(out), " rows; expected ", ndraws, ".")
+    )))
+  }
+  if (!is.null(nobs) && ncol(out) != nobs) {
+    stop(insight::format_error(c(
+      paste0(
+        "Distributional parameter '", dpar, "' was predicted for a ",
+        "different number of rows than the linear predictor covers."
+      ),
+      x = paste0("Got ", ncol(out), " columns; expected ", nobs, "."),
+      i = paste0(
+        "This happens when a covariate in the '", dpar, "' formula is ",
+        "missing from the prediction data. Supply it in 'newdata'."
+      )
+    )))
+  }
+  out
+}
+
+
+#' Link of one distributional parameter
+#'
+#' brms keeps the mean's link on `family$link` and every other
+#' parameter's on `family$link_<dpar>`. A family built by
+#' `stats::gaussian()` or `stats::Gamma()` carries no per-parameter
+#' links at all, so brms's own constructor is asked for the default it
+#' would have applied. Guessing is not an option here: assuming an
+#' identity where a log belongs hands back a parameter still on the
+#' link scale, and every value derived from it is then wrong by an
+#' exponential, with nothing to show for it. Custom families declare
+#' every link when they are built and so never reach the fallback.
+#'
+#' @param family A family object
+#' @param dpar Name of the distributional parameter
+#' @return A single link name
+#'
+#' @noRd
+dpar_link <- function(family, dpar) {
+  link <- family[[paste0("link_", dpar)]]
+  if (!is.null(link)) {
+    return(link)
+  }
+  name <- tolower(resolve_family_name(family))
+  link <- brms::brmsfamily(name)[[paste0("link_", dpar)]]
+  if (is.null(link)) {
+    stop(insight::format_error(c(
+      paste0(
+        "No link is recorded for distributional parameter '", dpar,
+        "' of family '", name, "'."
+      ),
+      i = paste0(
+        "The family needs a 'link_", dpar, "' entry before the ",
+        "parameter can be put on its own scale."
+      )
+    )))
+  }
+  link
+}
+
+
 #' Extract Distributional Parameters from Stanfit Object
 #'
 #' Extracts posterior draws for distributional parameters (dpars) required by
@@ -1318,14 +1535,9 @@ extract_dpars_from_stanfit <- function(stanfit,
     }
     draw_indices <- draw_ids
     ndraws <- length(draw_ids)
-  } else if (ndraws > total_draws) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Requested {.field ndraws} ({ndraws}) exceeds available draws ({total_draws})."
-      )
-    ))
   } else {
-    draw_indices <- seq_len(ndraws)
+    draw_indices <- resolve_draw_indices(total_draws, ndraws, NULL)
+    ndraws <- length(draw_indices)
   }
 
   # Extract each dpar
@@ -1574,17 +1786,22 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
     newdata <- object$data
   }
 
-  # Closure-unit families intercept upstream because the
-  # per-visit sampling step needs joint-over-unit latent state
-  # draws (N for nmix, z for occ) plus the rebuilt closure-unit
-  # arrays from the current newdata; the generic linpred +
-  # sample_from_family path cannot produce that without the
-  # unit-level structure.
+  # The linear predictor and the distributional parameters are drawn
+  # by separate extractions, so a requested count is materialised as
+  # concrete indices before either runs; otherwise the two subsample
+  # independently and answer from unrelated iterations.
+  draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
+  if (!is.null(draw_ids)) {
+    ndraws <- NULL
+  }
+
+  # Closure-unit families intercept upstream because the per-visit
+  # sampling step needs joint-over-unit latent state draws (N for
+  # nmix, z for occ) plus the rebuilt closure-unit arrays from the
+  # current newdata; the generic linpred + sample_from_family path
+  # cannot produce that without the unit-level structure.
   if (is_closure_unit_family(object$family)) {
     predict_fn <- dispatch_closure_unit_method(object$family, "predict")
-    draw_ids <- closure_unit_resolve_draw_ids(
-      object, ndraws, draw_ids
-    )
     return(predict_fn(
       object, newdata = newdata, draw_ids = draw_ids
     ))
@@ -1624,30 +1841,21 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
     total_draws <- nrow(linpred_all)
   }
 
-  if (!is.null(draw_ids)) {
-    if (max(draw_ids) > total_draws) {
-      stop(insight::format_error(c(
-        "Requested 'draw_ids' exceed available draws.",
-        x = paste0(
-          "Max requested: ", max(draw_ids),
-          ", available: ", total_draws, "."
-        )
-      )))
-    }
-    ndraws <- length(draw_ids)
-  } else if (!is.null(ndraws)) {
-    if (ndraws > total_draws) {
-      stop(insight::format_error(
-        cli::format_inline(
-          "Requested {.field ndraws} ({ndraws}) exceeds available draws ({total_draws})."
-        )
-      ))
-    }
-    draw_ids <- sample(total_draws, ndraws)
-  } else {
+  # A requested count became indices above, so either the caller named
+  # the draws it wants or every draw is used.
+  if (is.null(draw_ids)) {
     draw_ids <- seq_len(total_draws)
-    ndraws <- total_draws
   }
+  if (max(draw_ids) > total_draws) {
+    stop(insight::format_error(c(
+      "Requested 'draw_ids' exceed available draws.",
+      x = paste0(
+        "Max requested: ", max(draw_ids),
+        ", available: ", total_draws, "."
+      )
+    )))
+  }
+  ndraws <- length(draw_ids)
 
   # Multivariate detection (consistent with posterior_epred.mvgam)
   is_mv <- inherits(object$formula, "mvbrmsformula") &&
@@ -1781,28 +1989,15 @@ predict_single_response <- function(object, linpred_resp, resp, draw_ids,
   family_name <- resolve_family_name(family)
 
   # Get dpar names for this family
-  dpar_names <- get_family_dpars(family_name)
-
-  # For multivariate, dpars are named {dpar}_{resp} in Stan output
-  if (is_multivariate) {
-    dpar_names_stan <- paste0(dpar_names, "_", resp)
-  } else {
-    dpar_names_stan <- dpar_names
-  }
-
-  # Extract dpars with matching draw_ids
-  dpars <- extract_dpars_from_stanfit(
-    stanfit = object$fit,
-    dpar_names = dpar_names_stan,
+  dpars <- resolve_family_pars(
+    object,
+    dpar_names = get_family_dpars(family_name),
     ndraws = ndraws,
     nobs = nobs,
-    draw_ids = draw_ids
+    draw_ids = draw_ids,
+    newdata = newdata,
+    resp = if (is_multivariate) resp else NULL
   )
-
-  # Rename back to standard names for sample_from_family
-  if (is_multivariate && length(dpars) > 0) {
-    names(dpars) <- dpar_names
-  }
 
   # Extract trials for binomial families
   trials <- extract_trials_for_family(object, family, newdata)
@@ -1814,9 +2009,10 @@ predict_single_response <- function(object, linpred_resp, resp, draw_ids,
   # link-scale linear predictor rather than the response-scale mu.
   ordinal_families <- c("cumulative", "sratio", "cratio", "acat")
   if (family_name %in% ordinal_families) {
-    dpars$thres <- extract_ordinal_thresholds(object, ndraws = ndraws)
+    dpars$thres <- extract_ordinal_thresholds(object, ndraws = ndraws,
+                                              draw_ids = draw_ids)
     dpars$disc <- extract_ordinal_disc(object, ndraws = ndraws,
-                                       nobs = nobs)
+                                       nobs = nobs, draw_ids = draw_ids)
     epred_for_family <- linpred
   } else {
     epred_for_family <- mu

@@ -188,6 +188,15 @@ predict.mvgam <- function(object,
     any.missing = FALSE
   )
 
+  # A requested count becomes indices here, at the boundary, so that
+  # nothing below is ever handed a bare count and left to choose its
+  # own draws. Every extraction the answer is assembled from then
+  # reads the same iterations.
+  draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
+  if (!is.null(draw_ids)) {
+    ndraws <- NULL
+  }
+
   # Closure-unit family types: dispatch via the per-family
   # extractors in families.R. Each family registers its valid
   # `type` strings on `attr(family, "mvgam_predict_types")`. Both
@@ -383,7 +392,7 @@ predict_variance <- function(object, newdata, process_error, ndraws,
         needs_phi <- identical(family_name, "diri")
         comp <- extract_simplex_response_components(
           object, newdata = newdata, draw_ids = NULL,
-          needs_phi = needs_phi
+          ndraws = ndraws, needs_phi = needs_phi
         )
         prob <- comp$prob_row
         base_var <- prob * (1 - prob)
@@ -414,7 +423,7 @@ predict_variance <- function(object, newdata, process_error, ndraws,
       needs_nu <- identical(family_name, "mvt")
       comp <- extract_mv_response_components(
         object, newdata = newdata, draw_ids = NULL,
-        needs_nu = needs_nu
+        ndraws = ndraws, needs_nu = needs_nu
       )
       base_var <- comp$Psi_row^2
       if (needs_nu) {
@@ -475,12 +484,8 @@ predict_variance <- function(object, newdata, process_error, ndraws,
   }
 
   # Pick the draw subsample once, use it for both mu and dpars so they
-  # align. NULL ndraws or ndraws >= total_draws means use everything.
-  draw_idx <- if (is.null(ndraws) || ndraws >= total_draws) {
-    seq_len(total_draws)
-  } else {
-    sort(sample.int(total_draws, ndraws))
-  }
+  # align.
+  draw_idx <- resolve_draw_indices(total_draws, ndraws, NULL)
 
   mu <- mu_full[draw_idx, , drop = FALSE]
   ndraws_mu <- nrow(mu)

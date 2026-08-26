@@ -19,7 +19,9 @@ NULL
 #' @param process_error Logical; if TRUE, includes draw-by-draw uncertainty
 #'   from trend parameters. If FALSE, uses posterior mean of trend component,
 #'   which speeds computation but understates total uncertainty.
-#' @param ndraws Integer number of posterior draws to use (NULL = all)
+#' @param draw_ids Integer vector of posterior draws to use (NULL = all).
+#'   Indices rather than a count, so every extraction combined below
+#'   reads the same iterations.
 #' @param re_formula Formula for random effects (NULL = all, NA = none)
 #' @param allow_new_levels Logical; allow new factor levels in random effects
 #' @param sample_new_levels Character; method for sampling new levels
@@ -32,12 +34,18 @@ NULL
 #' @noRd
 get_combined_linpred <- function(mvgam_fit, newdata,
                                  process_error = TRUE,
-                                 ndraws = NULL,
                                  draw_ids = NULL,
                                  re_formula = NULL,
                                  allow_new_levels = FALSE,
                                  sample_new_levels = "uncertainty",
                                  resp = NULL) {
+  # The observation predictor, the trend predictor and the process
+  # errors are three separate extractions whose results are added
+  # together. They take draw indices rather than a count precisely so
+  # that a row of the answer cannot pair an observation-side effect
+  # with a trend from an unrelated iteration; the count was resolved
+  # at the boundary the caller came through.
+
   # Check if trend model exists and has required structure
   has_trend <- !is.null(mvgam_fit$trend_model) &&
                !is.null(mvgam_fit$trend_model$formula)
@@ -48,7 +56,6 @@ get_combined_linpred <- function(mvgam_fit, newdata,
     newdata = newdata,
     component = "obs",
     resp = resp,
-    ndraws = ndraws,
     draw_ids = draw_ids,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
@@ -68,7 +75,6 @@ get_combined_linpred <- function(mvgam_fit, newdata,
     newdata = newdata,
     component = "trend",
     resp = resp,
-    ndraws = ndraws,
     draw_ids = draw_ids,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
@@ -84,8 +90,7 @@ get_combined_linpred <- function(mvgam_fit, newdata,
   trend_noise <- if (isTRUE(process_error) &&
                        has_stochastic_trend(mvgam_fit)) {
     sample_process_errors(
-      mvgam_fit, ndraws = ndraws, newdata = newdata,
-      draw_ids = draw_ids
+      mvgam_fit, newdata = newdata, draw_ids = draw_ids
     )
   } else {
     NULL
@@ -219,6 +224,11 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #' @param resp Character specifying which response variable for
 #'   multivariate models. NULL (default) returns predictions for all
 #'   responses.
+#' @param dpar Character naming a distributional parameter, such as
+#'   `"sigma"` or `"nu"`. The default `NULL` answers for the mean.
+#'   Naming a parameter that carries a formula of its own returns its
+#'   linear predictor, which has no latent trend term; naming one that
+#'   was sampled as a scalar returns those draws across the rows.
 #' @param ... Additional arguments passed to internal methods.
 #'
 #' @return Matrix with dimensions `\\[ndraws x nobs\\]` containing linear
@@ -296,6 +306,7 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
                                     allow_new_levels = FALSE,
                                     sample_new_levels = "uncertainty",
                                     resp = NULL,
+                                    dpar = NULL,
                                     ...) {
   # Validate mvgam-specific parameters only (other validation delegated)
   checkmate::assert_class(object, "mvgam")
@@ -303,10 +314,13 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
   checkmate::assert_logical(process_error, len = 1)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,
                                 any.missing = FALSE)
+  checkmate::assert_string(dpar, null.ok = TRUE)
 
   # transform = TRUE forwards to posterior_epred so the inverse link
-  # and any family-specific E[Y] transformation are applied.
-  if (transform) {
+  # and any family-specific E[Y] transformation are applied. The
+  # request is passed on as it arrived, because that method resolves
+  # the count at its own boundary.
+  if (transform && is.null(dpar)) {
     return(posterior_epred(
       object = object,
       newdata = newdata,
@@ -318,6 +332,20 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
       sample_new_levels = sample_new_levels,
       resp = resp,
       ...
+    ))
+  }
+
+  # Past the delegation above, a count becomes indices, so nothing
+  # below is left to choose its own draws.
+  draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
+
+  # A named distributional parameter answers for that parameter rather
+  # than for the mean, and carries no latent trend: mvgam does not
+  # accept a trend formula on a distributional parameter.
+  if (!is.null(dpar)) {
+    return(dpar_posterior_linpred(
+      object, dpar = dpar, transform = transform, newdata = newdata,
+      draw_ids = draw_ids, resp = resp
     ))
   }
 
@@ -338,11 +366,67 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
     mvgam_fit = object,
     newdata = newdata,
     process_error = process_error,
-    ndraws = ndraws,
     draw_ids = draw_ids,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels,
     resp = resp
   )
+}
+
+
+#' Linear predictor of one distributional parameter
+#'
+#' Answers for the named parameter rather than for the mean. A
+#' parameter given a formula of its own has a linear predictor, which
+#' is returned on the link scale unless `transform` asks for the
+#' parameter's own scale. A parameter sampled as a scalar has no linear
+#' predictor, so its draws are returned broadcast across the rows,
+#' which is what brms does in the same position.
+#'
+#' @inheritParams posterior_linpred.mvgam
+#' @param dpar Name of the distributional parameter
+#' @param draw_ids Draw indices to answer for, or `NULL` for all
+#' @return A `[ndraws x nobs]` matrix
+#'
+#' @noRd
+dpar_posterior_linpred <- function(object, dpar, transform = FALSE,
+                                   newdata = NULL, draw_ids = NULL,
+                                   resp = NULL) {
+  family_name <- tolower(resolve_resp_family(object, resp))
+  valid <- get_family_dpars(family_name)
+  if (!dpar %in% valid) {
+    stop(insight::format_error(c(
+      paste0(
+        "'", dpar, "' is not a distributional parameter of family '",
+        family_name, "'."
+      ),
+      i = if (length(valid) > 0) {
+        paste0("Available: ", paste0("'", valid, "'", collapse = ", "), ".")
+      } else {
+        paste0("Family '", family_name,
+               "' has no distributional parameters.")
+      }
+    )))
+  }
+  newdata <- newdata %||% object$data
+  predicted <- predicted_dpar_names(object, dpar, resp = resp)
+  if (length(predicted) == 0) {
+    # Sampled as a scalar, so there is nothing to transform.
+    out <- resolve_family_pars(
+      object, dpar_names = dpar,
+      ndraws = length(draw_ids %||% seq_len(ndraws(object))),
+      nobs = nrow(newdata), draw_ids = draw_ids, newdata = newdata,
+      resp = resp
+    )
+    return(out[[dpar]])
+  }
+  linpred <- extract_component_linpred(
+    mvgam_fit = object, newdata = newdata, component = dpar,
+    draw_ids = draw_ids, resp = resp
+  )
+  if (!transform) {
+    return(linpred)
+  }
+  .linkinv(linpred, dpar_link(object$family, dpar))
 }

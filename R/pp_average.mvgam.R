@@ -169,7 +169,7 @@ posterior_average.mvgam <- function(x, ..., variable = NULL,
       n_avail <- posterior::ndraws(
         posterior::as_draws(models[[i]]$fit)
       )
-      draw_ids <- sort(sample.int(n_avail, ndraws_per[i]))
+      draw_ids <- resolve_draw_indices(n_avail, ndraws_per[i], NULL)
       found <- intersect(variable, variables(models[[i]]))
       if (length(found) > 0L) {
         out[[i]] <- as.data.frame(

@@ -189,20 +189,7 @@ forecast.mvgam <- function(object,
 
   draws_mat <- posterior::as_draws_matrix(object$fit)
   total_draws <- nrow(draws_mat)
-  if (is.null(ndraws)) ndraws <- total_draws
-  if (ndraws > total_draws) {
-    stop(insight::format_error(c(
-      "'ndraws' exceeds the number of posterior draws.",
-      x = paste0("Got ndraws = ", ndraws,
-                 ", total draws = ", total_draws, "."),
-      i = "Use a smaller value or set ndraws = NULL to use all draws."
-    )))
-  }
-  draw_idx <- if (ndraws == total_draws) {
-    seq_len(total_draws)
-  } else {
-    sort(sample.int(total_draws, ndraws))
-  }
+  draw_idx <- resolve_draw_indices(total_draws, ndraws, NULL)
 
   training <- build_training_arms(object, series_levels, resp = resp)
   fc_grid <- resolve_forecast_grid(object, newdata, training,
@@ -1247,12 +1234,13 @@ sample_family_batched <- function(object, mu, fc_data, ndraws_use,
   family_name <- tolower(resolve_family_name(family))
   nobs <- ncol(mu)
   dpar_names <- get_family_dpars(family_name)
-  dpars <- extract_dpars_from_stanfit(
-    stanfit = object$fit,
+  dpars <- resolve_family_pars(
+    object,
     dpar_names = dpar_names,
     ndraws = ndraws_use,
     nobs = nobs,
     draw_ids = draw_idx,
+    newdata = fc_data,
     resp = resp
   )
   trials <- extract_trials_for_family(object, family, fc_data)
@@ -1261,10 +1249,12 @@ sample_family_batched <- function(object, mu, fc_data, ndraws_use,
   ordinal_families <- c("cumulative", "sratio", "cratio", "acat")
   if (family_name %in% ordinal_families) {
     dpars$thres <- extract_ordinal_thresholds(object,
-                                                ndraws = ndraws_use)
+                                                ndraws = ndraws_use,
+                                                draw_ids = draw_idx)
     dpars$disc <- extract_ordinal_disc(object,
                                          ndraws = ndraws_use,
-                                         nobs = nobs)
+                                         nobs = nobs,
+                                         draw_ids = draw_idx)
   }
 
   # Forward whichever distributional parameters the registry produced

@@ -561,20 +561,23 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
     newdata <- object$data
   }
 
+  # The linear predictor and the distributional parameters are drawn
+  # by separate extractions, so a requested count is materialised as
+  # concrete indices before either runs; otherwise the two subsample
+  # independently and answer from unrelated iterations.
+  draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
+  if (!is.null(draw_ids)) {
+    ndraws <- NULL
+  }
+
   # Closure-unit families intercept BEFORE get_combined_linpred +
   # has_stochastic_trend, because the family-specific extractor
   # manages its own linpred / dpar extraction and the no-trend
   # closure-unit path otherwise triggers a generic trend-metadata
-  # fallback that is irrelevant here.
+  # fallback that is irrelevant here. Their kernels accept `draw_ids`
+  # only, which the resolution above has already supplied.
   if (is_closure_unit_family(object$family)) {
     epred_fn <- dispatch_closure_unit_method(object$family, "epred")
-    # Materialise `ndraws` as `draw_ids` so the kernel's
-    # posterior_linpred call subsamples consistently with the rest
-    # of the pipeline; the closure-unit kernels accept `draw_ids`
-    # only.
-    draw_ids <- closure_unit_resolve_draw_ids(
-      object, ndraws, draw_ids
-    )
     return(epred_fn(
       object, newdata = newdata, draw_ids = draw_ids
     ))
@@ -585,7 +588,6 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
     mvgam_fit = object,
     newdata = newdata,
     process_error = process_error,
-    ndraws = ndraws,
     draw_ids = draw_ids,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
@@ -661,8 +663,10 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
     nobs_actual <- ncol(linpred)
 
     # Extract ordinal-specific parameters
-    thres <- extract_ordinal_thresholds(object, ndraws_actual)
-    disc <- extract_ordinal_disc(object, ndraws_actual, nobs_actual)
+    thres <- extract_ordinal_thresholds(object, ndraws_actual,
+                                        draw_ids = draw_ids)
+    disc <- extract_ordinal_disc(object, ndraws_actual, nobs_actual,
+                                 draw_ids = draw_ids)
 
     # Validate extracted dimensions match linear predictor
     if (nrow(thres) != ndraws_actual) {
@@ -702,21 +706,19 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
   # lives in `extract_trials_for_family()`.
   trials <- extract_trials_for_family(object, family, newdata)
 
-  # For families whose count-scale `E[Y]` needs auxiliary dpar
-  # draws beyond `(linpred, trials)`, pull them from the stanfit
-  # here and hand them off as `family_pars`. Currently only
-  # `com_binomial` (needs nu); extend the predicate when a new
-  # family lands.
+  # `com_binomial()` is the one family whose count-scale `E[Y]` needs
+  # an auxiliary parameter beyond `(linpred, trials)`: the mean of a
+  # Conway-Maxwell-binomial has no closed form in `mu` alone and is
+  # summed over the support using `nu`.
   family_pars <- NULL
   if (is_com_binomial_family(family)) {
-    ndraws_actual <- nrow(linpred)
-    nobs_actual <- ncol(linpred)
-    family_pars <- extract_dpars_from_stanfit(
-      stanfit    = object$fit,
+    family_pars <- resolve_family_pars(
+      object,
       dpar_names = "nu",
-      ndraws     = ndraws_actual,
-      nobs       = nobs_actual,
-      draw_ids   = draw_ids
+      ndraws = nrow(linpred),
+      nobs = ncol(linpred),
+      draw_ids = draw_ids,
+      newdata = newdata
     )
   }
 
@@ -802,8 +804,12 @@ extract_trials_for_family <- function(object, family, newdata) {
     )))
   }
 
-  # Validate trials values
-  checkmate::assert_numeric(trials, lower = 1, finite = TRUE,
+  # A denominator of zero is a legal binomial observation: no trials
+  # were run, so the response is necessarily zero and the expected
+  # value with it. brms accepts it (`data_response()` rejects only
+  # negatives), and it is the natural padding for a cell the
+  # likelihood never saw, so the bound here matches.
+  checkmate::assert_numeric(trials, lower = 0, finite = TRUE,
                             any.missing = FALSE, min.len = 1,
                             .var.name = "trials")
 
@@ -1285,9 +1291,11 @@ is_ordinal_family <- function(family) {
 #' Thresholds are ordered: theta_1 < theta_2 < ... < theta_{K-1}.
 #'
 #' @noRd
-extract_ordinal_thresholds <- function(object, ndraws = NULL) {
+extract_ordinal_thresholds <- function(object, ndraws = NULL,
+                                       draw_ids = NULL) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
+  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
 
   # Get posterior draws from the stanfit stored in object$fit
   draws_mat <- posterior::as_draws_matrix(object$fit)
@@ -1315,10 +1323,10 @@ extract_ordinal_thresholds <- function(object, ndraws = NULL) {
   # Extract as matrix
   thres_matrix <- as.matrix(draws_mat[, thres_cols, drop = FALSE])
 
-  # Subsample draws if requested (use seq_len for consistency with disc)
-  if (!is.null(ndraws) && ndraws < nrow(thres_matrix)) {
-    thres_matrix <- thres_matrix[seq_len(ndraws), , drop = FALSE]
-  }
+  # The thresholds have to come from the same iterations as the linear
+  # predictor they cut, so the caller's draw indices are used rather
+  # than the leading rows of the posterior.
+  thres_matrix <- subset_draws_rows(thres_matrix, ndraws, draw_ids)
 
   # Remove column names - prep$dpars$thres expects unnamed matrix
   colnames(thres_matrix) <- NULL
@@ -1344,10 +1352,12 @@ extract_ordinal_thresholds <- function(object, ndraws = NULL) {
 #' When disc > 1, category boundaries are sharper; disc < 1, smoother.
 #'
 #' @noRd
-extract_ordinal_disc <- function(object, ndraws, nobs) {
+extract_ordinal_disc <- function(object, ndraws, nobs,
+                                 draw_ids = NULL) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_int(ndraws, lower = 1)
   checkmate::assert_int(nobs, lower = 1)
+  checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
 
   # Get posterior draws from the stanfit stored in object$fit
   draws_mat <- posterior::as_draws_matrix(object$fit)
@@ -1370,8 +1380,8 @@ extract_ordinal_disc <- function(object, ndraws, nobs) {
       ))
     }
 
-    # Subsample if needed (use seq_len for consistency with thresholds)
-    disc_draws <- disc_draws[seq_len(ndraws), , drop = FALSE]
+    # As with the thresholds: the same iterations as the predictor.
+    disc_draws <- subset_draws_rows(disc_draws, ndraws, draw_ids)
 
     # Expand to [ndraws x nobs] if scalar disc
     if (ncol(disc_draws) == 1) {

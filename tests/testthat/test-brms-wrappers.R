@@ -225,3 +225,28 @@ test_that("bayes_factor.mvgam validates the log flag", {
   stub <- make_wrapper_stub()
   expect_error(bayes_factor(stub, stub, log = "yes"), "log")
 })
+
+
+test_that("warn_once_per_call() drops repeats but never a new message", {
+  # Building a model runs brms's code generator more than once over
+  # the same data, so the same warning would otherwise reach the user
+  # once per pass.
+  seen <- character()
+  withCallingHandlers(
+    warn_once_per_call({
+      warning("same message")
+      warning("same message")
+      warning("same message")
+      warning("a different message")
+      "value"
+    }),
+    warning = function(w) {
+      seen <<- c(seen, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  expect_equal(seen, c("same message", "a different message"))
+
+  # The value of the expression is passed through untouched.
+  expect_equal(warn_once_per_call(41L + 1L), 42L)
+})

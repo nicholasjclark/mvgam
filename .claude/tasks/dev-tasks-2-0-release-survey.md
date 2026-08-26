@@ -109,6 +109,98 @@ minutes. Cached fits are read once, never re-fitted to inspect.
     dummy, and `waic()` did not drop all-NA columns the way `loo()`
     does.
 
+- [x] **7.0 Fix what a user's second round of testing turned up**
+  > Six reports against 2.0.0, each reproduced before being changed.
+
+  - [x] 7.1 A denominator of zero broke `posterior_epred()`, `loo()`,
+    `pp_check()` and both residual plots at once. brms accepts zero
+    trials when fitting, and it is the natural padding for a cell the
+    likelihood never saw, so prediction has to accept it coming back
+    out. Two of mvgam's three trials assertions already allowed it.
+  - [x] 7.2 `summary()` dropped every population-level slope, on every
+    fit: it read the raw stanfit, where brms keeps coefficients as an
+    unnamed `b[1]`, and only the brmsfit method resolves those to
+    `b_x`. Reported against a distributional fit, but `y ~ 1 + x`
+    showed the intercept alone. Distributional coefficients were also
+    printed twice, once mislabelled, and neither the sub-formula nor
+    the links of anything but the mean appeared in the header.
+  - [x] 7.3 One `mvgam()` call raised brms's dropped-rows warning three
+    times, once per pass through the code generator, and a residual
+    panel raised its own four times, once per panel, naming
+    `pp_check()` to a user who called `plot()`. One helper now reports
+    each distinct message once per user-facing call.
+  - [x] 7.4 A distributional sub-formula fit and sampled correctly and
+    then failed on every post-fit surface, for every family, because
+    the extractor looked for a scalar the model never produces. One
+    resolver now covers both cases and serves all four prediction
+    paths. Two defects surfaced underneath it: `stats::gaussian()`
+    records no link for `sigma`, so the parameter came back on the log
+    scale as a negative standard deviation, and a multivariate fit
+    lost the row count its predictor is sized by.
+  - [x] 7.5 `posterior_linpred(dpar = )` accepted the argument and
+    answered for the mean.
+  - [x] 7.6 `com_binomial()` was slow at large denominators. Folding
+    out the terms that cancel between numerator and normaliser, and
+    bounding the normalising sum the way the `nmix()` families already
+    bound their latent-`N` loop, gives 6.3x at a denominator of 1466
+    and 1.35x at 20. The lookup table holds log factorials rather than
+    every binomial coefficient, so it is linear in the denominator
+    rather than square. Checked against exact enumeration over 1287
+    cells spanning both branches: agreement to 6.7e-11, and
+    probabilities summing to one within 1.8e-12.
+
+  - [x] 7.7 Found while fixing 7.4: a detection probability given a
+    sub-formula was squashed through `plogis()` for every closure-unit
+    family, but `nmix("poisson_poisson")` models `p` as an encounter
+    rate on a log link, and its own kernel uses it as a Poisson rate.
+    Rates above one were silently capped.
+
+  - [x] 7.8 A sweep for the pattern behind 7.4 across every extraction
+    in the package. A post-fit answer is assembled from several reads
+    of the posterior, and each of them subsampled on its own when
+    handed a count rather than indices, so the pieces that were then
+    added together came from different iterations. Nothing about the
+    output showed it. The worst instance was not in the distributional
+    path at all: `get_combined_linpred()` drew the observation
+    predictor, the trend predictor and the process errors separately,
+    so on a fit with a trend-side formula, asking for the whole
+    posterior returned rows of which one in a thousand paired a
+    predictor with its own trend. Resolving a count to indices is now
+    one function, called once per entry point and again inside each
+    extractor, and it yields indices even for a count covering
+    everything, since the extractors draw at random and would
+    otherwise return the posterior shuffled. Verified by checking that
+    every row of a subsampled prediction is a row the fully specified
+    prediction also produces.
+  - [x] 7.9 Five more instances of the same pattern, found by sweeping
+    every extraction rather than only the one the report pointed at.
+    An ordinal fit read its thresholds and its `disc` from the leading
+    rows of the posterior while the predictor they cut came from a
+    random subsample. A multivariate response family asked for a
+    random subsample of the mean and then read `Psi` from the first
+    rows. `predict(type = "variance")` ignored `ndraws` altogether on
+    those families. The innovations had a rule of their own, taking
+    the first draws rather than a sample. Seven further sites each
+    restated the rule correctly but separately, which is how the
+    versions drifted apart in the first place. There is now one
+    function deciding which draws, and a reader that applies it to a
+    draws matrix; twenty-two call sites go through them and no
+    bespoke selection remains outside.
+  - [x] 7.10 Made the pattern unreachable rather than merely absent. A
+    draw count stops at the boundary a user calls through: every entry
+    point turns it into indices, and the extractors underneath accept
+    indices alone, so a caller written later cannot pass a count down
+    to be resolved twice. Two more instances turned up while doing it.
+    A seventh private copy of the selection rule sat behind
+    `posterior_smooths()`, unsorted and shuffling when asked for
+    everything. And `conditional_smooths()` called its extractor once
+    per smooth term inside a loop, so the panels of one figure were
+    drawn from different iterations of the same posterior. The
+    invariant now has a test of its own: every row a subsampled
+    prediction produces has to be a row the fully specified prediction
+    also produces, since subsetting draws may drop rows and reorder
+    them but cannot invent a pairing no single draw gives.
+
 - [ ] **3.0 Close the post-fit coverage gaps**
   > `plot_slopes`, `plot_comparisons`, `hypotheses`,
   > `posterior_transition_matrix`, `latent_N_saturation` and

@@ -426,11 +426,42 @@ strip_empty_obs_placeholder <- function(formula_str) {
 # `strip_empty_obs_placeholder()` would otherwise only clear the
 # placeholder from the first response.
 #' @noRd
+#' Format the link of every distributional parameter a family carries
+#'
+#' brms names a link per distributional parameter, keeping the mean's on
+#' `family$link` and the rest on `family$link_<dpar>`. A header that
+#' reports only the mean leaves a reader of a `sigma ~ x` or `nu ~ x`
+#' block with no way to tell which scale those coefficients are on.
+#' Families that declare no distributional parameters, such as Poisson,
+#' still report the single mean link.
+#'
+#' @param family A family object
+#' @return A single string of the form `"mu = logit; nu = identity"`
+#'
+#' @noRd
+format_family_links <- function(family) {
+  dpars <- family$dpars
+  if (length(dpars) == 0) {
+    return(paste0("mu = ", family$link))
+  }
+  links <- vapply(dpars, function(dpar) {
+    family[[paste0("link_", dpar)]] %||% family$link
+  }, character(1))
+  paste0(dpars, " = ", links, collapse = "; ")
+}
+
+
 format_model_formula <- function(formula) {
+  # A distributional model carries one extra formula per parameter in
+  # `pforms`. brms prints each on its own line under the response
+  # formula, and a reader who wrote `sigma ~ x` needs to see it in the
+  # summary, so they are collected here before `formula` is narrowed
+  # to the response formula alone.
+  dpar_lines <- unlist(lapply(formula$pforms, format), use.names = FALSE)
   if (!is.null(formula$formula)) {
     formula <- formula$formula
   }
-  strip_empty_obs_placeholder(format(formula))
+  c(strip_empty_obs_placeholder(format(formula)), dpar_lines)
 }
 
 

@@ -174,17 +174,19 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   is_trend_param <- grepl("_trend", pars)
 
   # Detect distributional parameters (those with formulas like sigma ~ x)
-  dpars_with_formulas <- get_dpar_names(pars)
+  dpars_with_formulas <- get_dpar_names(object$formula)
 
   # Observation model parameters (no _trend suffix, no dpar prefix)
-  obs_fixed_idx <- match_fixed_pars(pars) & !is_trend_param
+  obs_fixed_idx <- match_fixed_pars(pars, dpars_with_formulas) &
+    !is_trend_param
   if (any(obs_fixed_idx)) {
     out$fixed <- all_summaries[obs_fixed_idx, , drop = FALSE]
     # Clean names: b_Intercept → Intercept, b_x → x
     rownames(out$fixed) <- gsub("^b_", "", rownames(out$fixed))
   }
 
-  obs_smooth_idx <- match_smooth_pars(pars) & !is_trend_param
+  obs_smooth_idx <- match_smooth_pars(pars, dpars_with_formulas) &
+    !is_trend_param
   if (any(obs_smooth_idx)) {
     out$smooth <- all_summaries[obs_smooth_idx, , drop = FALSE]
   }
@@ -314,8 +316,12 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
 #'
 #' @noRd
 compute_all_summaries <- function(object, probs, robust) {
-  # Extract draws
-  draws <- posterior::as_draws_df(object$fit)
+  # Draws are taken from the fitted object rather than `object$fit`
+  # so brms's parameter renaming is applied: the raw Stan model
+  # carries population-level coefficients as an unnamed vector `b`,
+  # and only the brmsfit method resolves `b[k]` to `b_<coef>`. The
+  # trend-side parameters mvgam adds pass through unchanged.
+  draws <- posterior::as_draws_df(object)
 
   # Compute summaries using posterior package
   # Suppress ESS capping warnings (users can call diagnostics functions if needed)
@@ -408,16 +414,18 @@ rename_summary_cols <- function(col_names, probs, robust) {
 #' Identifies fixed effect parameters (b_*) excluding trend formula effects.
 #'
 #' @param pars Character vector of all parameter names
+#' @param dpars Character vector of distributional parameters that carry
+#'   their own formula; their coefficients get their own block
 #' @return Logical vector indicating which parameters are fixed effects
 #'
 #' @noRd
-match_fixed_pars <- function(pars) {
+match_fixed_pars <- function(pars, dpars = character()) {
   # Get all b_ parameters
   is_b_par <- grepl("^b_", pars)
   # Exclude trend formula parameters
   is_trend <- grepl("_trend", pars)
 
-  is_b_par & !is_trend
+  is_b_par & !is_trend & !match_dpar_fixed_pars(pars, dpars)
 }
 
 #' Match smooth parameter names
@@ -429,8 +437,8 @@ match_fixed_pars <- function(pars) {
 #' @return Logical vector indicating which parameters are smooth terms
 #'
 #' @noRd
-match_smooth_pars <- function(pars) {
-  grepl("^s(ds)?_", pars)
+match_smooth_pars <- function(pars, dpars = character()) {
+  grepl("^s(ds)?_", pars) & !match_dpar_smooth_pars(pars, dpars)
 }
 
 #' Match random effect parameter names
@@ -646,31 +654,38 @@ match_loadings_prior_pars <- function(pars) {
 #' Get distributional parameter names
 #'
 #' @description
-#' Extracts unique distributional parameter names from parameter vector
-#' following brms pattern (b_sigma_*, b_phi_*, etc.). Returns names of
-#' distributional parameters that have formulas.
+#' Names the distributional parameters the user gave a formula of their
+#' own, read from `pforms` on the model formula. Reading the formula
+#' rather than the parameter names keeps a covariate whose own name
+#' contains an underscore, such as `b_body_mass`, from being mistaken
+#' for a coefficient of a distributional parameter called `body`.
 #'
-#' @param pars Character vector of parameter names
+#' @param formula An `brmsformula` or `mvbrmsformula`
 #' @return Character vector of unique distributional parameter names
 #'
 #' @noRd
-get_dpar_names <- function(pars) {
-  checkmate::assert_character(pars, min.len = 0)
-
-  # Match b_{dpar}_ pattern (e.g., b_sigma_Intercept, b_phi_x)
-  # Exclude trend parameters (b_trend)
-  dpar_pars <- pars[grepl("^b_[a-z][a-z0-9_]*_", pars) & !grepl("_trend", pars)]
-
-  if (length(dpar_pars) == 0) {
-    return(character(0))
+get_dpar_names <- function(formula) {
+  forms <- if (brms::is.mvbrmsformula(formula)) {
+    formula$forms
+  } else {
+    list(formula)
   }
+  unique(unlist(lapply(forms, function(f) names(f$pforms)))) %||% character()
+}
 
-  # Extract dpar names (sigma, phi, nu, etc.)
-  dpars <- gsub("^b_([a-z][a-z0-9_]*)_.*", "\\1", dpar_pars)
-  dpars <- unique(dpars)
-  checkmate::assert_character(dpars, min.chars = 1, any.missing = FALSE)
 
-  dpars
+#' Regex alternation over distributional parameter names
+#'
+#' @param dpars Character vector of distributional parameter names
+#' @return A single regex group, or `NULL` when there are none
+#'
+#' @noRd
+dpar_alternation <- function(dpars) {
+  checkmate::assert_character(dpars, any.missing = FALSE)
+  if (length(dpars) == 0) {
+    return(NULL)
+  }
+  paste0("(", paste(dpars, collapse = "|"), ")")
 }
 
 #' Match distributional parameter fixed effects
@@ -680,17 +695,17 @@ get_dpar_names <- function(pars) {
 #' (e.g., b_sigma_Intercept, b_sigma_x for sigma).
 #'
 #' @param pars Character vector of parameter names
-#' @param dpar Distributional parameter name (e.g., "sigma", "phi")
+#' @param dpars One or more distributional parameter names
 #' @return Logical vector indicating matching parameters
 #'
 #' @noRd
-match_dpar_fixed_pars <- function(pars, dpar) {
+match_dpar_fixed_pars <- function(pars, dpars) {
   checkmate::assert_character(pars, min.len = 0)
-  checkmate::assert_string(dpar, min.chars = 1)
-  if (length(pars) == 0) return(logical(0))
+  alt <- dpar_alternation(dpars)
+  if (length(pars) == 0 || is.null(alt)) return(rep(FALSE, length(pars)))
 
   # Match b_{dpar}_* pattern
-  grepl(paste0("^b_", dpar, "_"), pars)
+  grepl(paste0("^b_", alt, "_"), pars)
 }
 
 #' Match distributional parameter smooth terms
@@ -700,17 +715,17 @@ match_dpar_fixed_pars <- function(pars, dpar) {
 #' (e.g., s_sigma_x_1\[1\] for sigma ~ s(x)).
 #'
 #' @param pars Character vector of parameter names
-#' @param dpar Distributional parameter name (e.g., "sigma", "phi")
+#' @param dpars One or more distributional parameter names
 #' @return Logical vector indicating matching parameters
 #'
 #' @noRd
-match_dpar_smooth_pars <- function(pars, dpar) {
+match_dpar_smooth_pars <- function(pars, dpars) {
   checkmate::assert_character(pars, min.len = 0)
-  checkmate::assert_string(dpar, min.chars = 1)
-  if (length(pars) == 0) return(logical(0))
+  alt <- dpar_alternation(dpars)
+  if (length(pars) == 0 || is.null(alt)) return(rep(FALSE, length(pars)))
 
   # Match s_{dpar}_* or sds_{dpar}_* patterns
-  grepl(paste0("^s(ds)?_", dpar, "_"), pars)
+  grepl(paste0("^s(ds)?_", alt, "_"), pars)
 }
 
 #' Identify latent state parameters
@@ -834,7 +849,8 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
     pick_family <- function(f) f$family %||% x$family
     families <- sapply(x$formula$forms,
                        function(f) resolve_family_name(pick_family(f)))
-    links <- sapply(x$formula$forms, function(f) pick_family(f)$link)
+    links <- sapply(x$formula$forms,
+                    function(f) format_family_links(pick_family(f)))
 
     # Format families following brms convention
     # Pattern: "resp1: family1 \n          resp2: family2"
@@ -852,20 +868,20 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   } else {
     # Univariate model
     cat(" Family: ", resolve_family_name(x$family), " \n", sep = "")
-    cat("  Links: mu = ", x$family$link, " \n", sep = "")
+    cat("  Links: ", format_family_links(x$family), " \n", sep = "")
   }
 
   # Section 2: Formula
-  if (is_multivariate) {
+  formulas <- if (is_multivariate) {
     # For multivariate, format each response formula separately
     # Extract formula from each form (not the entire form object)
-    formulas <- sapply(x$formula$forms, format_model_formula)
-    # Join with newline + 9 spaces to align with "Formula: "
-    formulas_str <- paste0(formulas, collapse = " \n         ")
-    cat("Formula: ", formulas_str, " \n", sep = "")
+    unlist(lapply(x$formula$forms, format_model_formula), use.names = FALSE)
   } else {
-    cat("Formula: ", format_model_formula(x$formula), " \n", sep = "")
+    format_model_formula(x$formula)
   }
+  # Join with newline + 9 spaces to align with "Formula: "
+  cat("Formula: ", paste0(formulas, collapse = " \n         "), " \n",
+      sep = "")
 
   # Section 3: Data and dimensions (brms style)
   nobs <- x$n_series * x$n_timepoints

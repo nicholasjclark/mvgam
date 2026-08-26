@@ -215,7 +215,7 @@ test_that("ndraws beyond available draws errors informatively", {
   )
   expect_error(
     hindcast(fit, type = "response", ndraws = 50L),
-    "exceeds the number of posterior draws"
+    "more draws than the posterior holds"
   )
 })
 
