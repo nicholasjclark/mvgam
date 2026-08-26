@@ -247,3 +247,41 @@ as_plain_matrix <- function(x) {
   class(x) <- setdiff(class(x), c("draws_matrix", "draws"))
   x
 }
+
+
+#' Is this parameter from the trend model?
+#'
+#' The trend side of a model names its parameters with a `_trend`
+#' suffix, either at the end or before the index, so `sigma_trend[1]`
+#' and `b_x_trend` are trend parameters. Asking whether the name merely
+#' contains `_trend` reads a covariate as structure: a user with a
+#' column called `pre_trend_score` gets `b_pre_trend_score`, which is
+#' an observation-side coefficient and belongs in the observation
+#' block. Every trend parameter the package emits ends the suffix, so
+#' the suffix is what is tested.
+#'
+#' @param pars Character vector of parameter names
+#' @return Logical vector
+#'
+#' @noRd
+is_trend_parameter <- function(pars) {
+  grepl("_trend$|_trend\\[", pars)
+}
+
+
+#' Is this parameter an autoregressive coefficient?
+#'
+#' An `AR(p)` trend emits one coefficient per lag, `ar1_trend` through
+#' `ar<p>_trend`. The test was written in two spellings across five
+#' places, which is one fact and five chances to disagree about it.
+#' Note the hierarchical mean and standard deviation of a coefficient,
+#' `mu_ar1_trend` and `sigma_ar1_trend`, are different parameters and
+#' are deliberately excluded by the anchor.
+#'
+#' @param pars Character vector of parameter names
+#' @return Logical vector
+#'
+#' @noRd
+is_ar_coefficient <- function(pars) {
+  grepl("^ar[0-9]+_trend$", pars)
+}

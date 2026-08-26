@@ -132,7 +132,7 @@ categorize_mvgam_parameters <- function(x) {
   obs_family_pattern <- "^(sigma|shape|nu|phi|zi|hu|mphi|mtheta|mtail)(_|\\[|$)"
   obs_family_pars <- all_pars[
     grepl(obs_family_pattern, all_pars) &
-      !grepl("_trend", all_pars)
+      !is_trend_parameter(all_pars)
   ]
   observation_pars <- create_component(obs_family_pars)
 
@@ -145,7 +145,7 @@ categorize_mvgam_parameters <- function(x) {
   obs_beta_pattern <- "^(b_|b\\[|bs_|bs\\[|bsp_|bsp\\[|simo_|Intercept)"
   obs_beta_pars <- all_pars[
     grepl(obs_beta_pattern, all_pars) &
-      !grepl("_trend", all_pars) &
+      !is_trend_parameter(all_pars) &
       all_pars != "Intercept_trend"
   ]
   observation_betas <- create_component(obs_beta_pars)
@@ -156,7 +156,7 @@ categorize_mvgam_parameters <- function(x) {
   obs_smooth_pattern <- "^(sds_|s_|zs_|sdgp_|lscale_|zgp_)"
   obs_smooth_pars <- all_pars[
     grepl(obs_smooth_pattern, all_pars) &
-      !grepl("_trend", all_pars)
+      !is_trend_parameter(all_pars)
   ]
   observation_smoothpars <- create_component(obs_smooth_pars)
 
@@ -166,7 +166,7 @@ categorize_mvgam_parameters <- function(x) {
   obs_re_pattern <- "^(sd_|r_|cor_|L_|z_)"
   obs_re_pars <- all_pars[
     grepl(obs_re_pattern, all_pars) &
-      !grepl("_trend", all_pars) &
+      !is_trend_parameter(all_pars) &
       !grepl("L_Omega_trend", all_pars)
   ]
   observation_re_params <- create_component(obs_re_pars)
@@ -190,7 +190,7 @@ categorize_mvgam_parameters <- function(x) {
     grepl(hide_pattern, all_pars)
   }
   trend_dynamic_pars <- all_pars[
-    (grepl("_trend", all_pars) |
+    (is_trend_parameter(all_pars) |
        grepl(loading_pattern, all_pars)) &
       !grepl(state_pattern, all_pars) &
       !hide_match &

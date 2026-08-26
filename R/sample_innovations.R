@@ -1233,12 +1233,43 @@ sample_innovations <- function(cov_structure, obs_structure) {
 # `categorize_mvgam_parameters` (index-mvgam.R) stay in lockstep.
 #'@noRd
 factor_loading_param_pattern <- function(pars) {
-  if (any(grepl("^Z_tilde\\[", pars))) "^Z_tilde\\[" else "^Z\\["
+  if (has_identified_loadings(pars)) "^Z_tilde\\[" else "^Z\\["
+}
+
+
+#' Does this fit carry QR-identified loadings?
+#'
+#' A free-loading factor fit is rotated to a canonical form and the
+#' result is emitted as `Z_tilde`, alongside the raw `Z` it came from.
+#' Several places need to know whether that happened, and the answer
+#' has to be the same in all of them: the name of the parameter that
+#' settles it lives here, and nowhere else.
+#'
+#' @param pars Character vector of parameter names
+#' @return A single logical
+#'
+#' @noRd
+has_identified_loadings <- function(pars) {
+  any(grepl("^Z_tilde\\[", pars))
+}
+
+
+#' Does this fit carry QR-identified factor states?
+#'
+#' The companion to `has_identified_loadings()` for the factor paths
+#' the loadings multiply.
+#'
+#' @param pars Character vector of parameter names
+#' @return A single logical
+#'
+#' @noRd
+has_identified_factor_states <- function(pars) {
+  any(grepl("^lv_trend_tilde\\[", pars))
 }
 
 #'@noRd
 factor_state_param_pattern <- function(pars) {
-  if (any(grepl("^lv_trend_tilde\\[", pars))) {
+  if (has_identified_factor_states(pars)) {
     "^lv_trend_tilde\\["
   } else {
     "^lv_trend\\["
@@ -1268,7 +1299,7 @@ hidden_unrotated_factor_pars <- function(pars) {
   if (any(grepl("^A_trend_tilde\\[", pars))) {
     patterns <- c(patterns, "^A_trend\\[")
   }
-  if (any(grepl("^Z_tilde\\[", pars))) {
+  if (has_identified_loadings(pars)) {
     # Free-Z factor fit detected. The raw loadings `Z[i, j]`,
     # raw factor paths `lv_trend[t, k]`, the innovations driving
     # them, the rotation orthogonal matrix `Q_tilde[i, j]`, and

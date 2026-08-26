@@ -171,7 +171,7 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
 
   # Organize summaries by observation vs trend formula
   # First identify which parameters belong to trend model
-  is_trend_param <- grepl("_trend", pars)
+  is_trend_param <- is_trend_parameter(pars)
 
   # Detect distributional parameters (those with formulas like sigma ~ x)
   dpars_with_formulas <- get_dpar_names(object$formula)
@@ -255,7 +255,7 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     # Flag set when loadings were extracted from QR-identified
     # `Z_tilde` draws rather than raw `Z`, so print.summary.mvgam
     # can surface a scope footnote when relevant.
-    out$loadings_identified <- any(grepl("^Z_tilde\\[", pars))
+    out$loadings_identified <- has_identified_loadings(pars)
   }
 
   loadings_prior_idx <- match_loadings_prior_pars(pars)
@@ -423,7 +423,7 @@ match_fixed_pars <- function(pars, dpars = character()) {
   # Get all b_ parameters
   is_b_par <- grepl("^b_", pars)
   # Exclude trend formula parameters
-  is_trend <- grepl("_trend", pars)
+  is_trend <- is_trend_parameter(pars)
 
   is_b_par & !is_trend & !match_dpar_fixed_pars(pars, dpars)
 }
@@ -479,7 +479,7 @@ match_family_pars <- function(pars, has_dpar_formulas = character()) {
     "^(sigma|shape|nu|phi|zi|hu|mphi|mtheta|mtail)(_|\\[|$)", pars
   )
   # Exclude trend parameters
-  is_trend <- grepl("_trend", pars)
+  is_trend <- is_trend_parameter(pars)
 
   # Exclude distributional parameters that have formulas
   is_dpar_with_formula <- FALSE
@@ -504,7 +504,7 @@ match_family_pars <- function(pars, has_dpar_formulas = character()) {
 #' @noRd
 match_trend_pars <- function(pars) {
   # Get all parameters with _trend suffix
-  is_trend <- grepl("_trend", pars)
+  is_trend <- is_trend_parameter(pars)
   # Exclude latent states (handled separately with include_states
   # argument). Both `lv_trend[t, k]` (partial-Z fits) and
   # `lv_trend_tilde[t, k]` (QR-identified factor paths) qualify.
@@ -581,7 +581,7 @@ match_trend_specific_pars <- function(pars) {
   if (length(pars) == 0) return(logical(0))
 
   # Parameters with _trend that aren't formula effects or states
-  is_trend <- grepl("_trend", pars)
+  is_trend <- is_trend_parameter(pars)
 
   # Not fixed effects (not Intercept_trend or b_trend[i])
   is_not_fixed <- pars != "Intercept_trend" & !grepl("^b_trend\\[", pars)

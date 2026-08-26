@@ -426,6 +426,20 @@ strip_empty_obs_placeholder <- function(formula_str) {
 # `strip_empty_obs_placeholder()` would otherwise only clear the
 # placeholder from the first response.
 #' @noRd
+format_model_formula <- function(formula) {
+  # A distributional model carries one extra formula per parameter in
+  # `pforms`. brms prints each on its own line under the response
+  # formula, and a reader who wrote `sigma ~ x` needs to see it in the
+  # summary, so they are collected here before `formula` is narrowed
+  # to the response formula alone.
+  dpar_lines <- unlist(lapply(formula$pforms, format), use.names = FALSE)
+  if (!is.null(formula$formula)) {
+    formula <- formula$formula
+  }
+  c(strip_empty_obs_placeholder(format(formula)), dpar_lines)
+}
+
+
 #' Format the link of every distributional parameter a family carries
 #'
 #' brms names a link per distributional parameter, keeping the mean's on
@@ -448,20 +462,6 @@ format_family_links <- function(family) {
     family[[paste0("link_", dpar)]] %||% family$link
   }, character(1))
   paste0(dpars, " = ", links, collapse = "; ")
-}
-
-
-format_model_formula <- function(formula) {
-  # A distributional model carries one extra formula per parameter in
-  # `pforms`. brms prints each on its own line under the response
-  # formula, and a reader who wrote `sigma ~ x` needs to see it in the
-  # summary, so they are collected here before `formula` is narrowed
-  # to the response formula alone.
-  dpar_lines <- unlist(lapply(formula$pforms, format), use.names = FALSE)
-  if (!is.null(formula$formula)) {
-    formula <- formula$formula
-  }
-  c(strip_empty_obs_placeholder(format(formula)), dpar_lines)
 }
 
 

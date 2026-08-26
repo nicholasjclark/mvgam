@@ -407,7 +407,7 @@ get_parameter_type_default_prior <- function(param_name) {
     return(list(
       prior = common_trend_priors$nu_trend$default, lb = "2", ub = ""
     ))
-  } else if (grepl("^ar[0-9]+_trend$", param_name)) {
+  } else if (is_ar_coefficient(param_name)) {
     # AR coefficients: typically bounded [-1, 1] for stationarity
     return(list(prior = "normal(0, 0.5)", lb = "-1", ub = "1"))
   } else if (grepl("^mu_ar[0-9]+_trend$", param_name)) {
@@ -481,7 +481,7 @@ create_empty_brmsprior <- function() {
 #' @noRd
 get_ar_parameter_prior <- function(param_name, trend_obj) {
   # AR trends can have custom logic for stationarity constraints
-  if (grepl("^ar[0-9]+_trend$", param_name)) {
+  if (is_ar_coefficient(param_name)) {
     # For AR coefficients, we might want tighter bounds for stability
     return(list(prior = "", lb = "-0.99", ub = "0.99"))
   }
@@ -1311,7 +1311,7 @@ map_trend_priors <- function(prior, trend_type) {
   for (param_name in names(trend_prior_spec)) {
 
     # Handle special AR lag patterns (ar1_trend, ar2_trend, ar12_trend, etc.)
-    if (grepl("^ar\\d+_trend$", param_name)) {
+    if (is_ar_coefficient(param_name)) {
       # Extract specific AR lag parameter
       prior_string <- extract_prior_string(prior, param_name,
                                           handle_suffix = TRUE)

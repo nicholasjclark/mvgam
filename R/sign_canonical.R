@@ -79,7 +79,7 @@ sign_canonicalise_factors <- function(object) {
   # unnecessary. Detect Z_tilde columns once and skip if present.
   first_chain <- samples_list[[1L]]
   if (!is.null(first_chain) &&
-      any(grepl("^Z_tilde\\[", names(first_chain)))) {
+      has_identified_loadings(names(first_chain))) {
     object$trend_metadata$sign_canonicalised <- TRUE
     return(object)
   }

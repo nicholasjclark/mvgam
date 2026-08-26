@@ -912,7 +912,7 @@ filter_rw_forecast_params <- function(monitor_params, trend_spec) {
 #' @noRd
 filter_ar_forecast_params <- function(monitor_params, trend_spec) {
   # AR minimally needs: coefficients + variance
-  ar_coeffs <- monitor_params[grepl("^ar\\d+_trend$", monitor_params)]
+  ar_coeffs <- monitor_params[is_ar_coefficient(monitor_params)]
   required <- c(ar_coeffs, "sigma_trend")
 
   # Add correlation if present
@@ -1013,7 +1013,7 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
     return("Trend innovation covariance matrix")
   } else if (param_name == "L_Omega_trend") {
     return("Trend correlation matrix (Cholesky factor)")
-  } else if (grepl("^ar\\d+_trend$", param_name)) {
+  } else if (is_ar_coefficient(param_name)) {
     lag <- gsub("ar(\\d+)_trend", "\\1", param_name)
     return(paste0("AR(", lag, ") coefficient"))
   } else if (grepl("^A_trend\\[", param_name)) {
