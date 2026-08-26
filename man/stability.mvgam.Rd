@@ -7,7 +7,15 @@
 \usage{
 stability(object, ...)
 
-\method{stability}{mvgam}(object, future = FALSE, ...)
+\method{stability}{mvgam}(
+  object,
+  ndraws = NULL,
+  draw_ids = NULL,
+  summary = TRUE,
+  probs = c(0.025, 0.975),
+  future = FALSE,
+  ...
+)
 }
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} resulting from a call
@@ -15,6 +23,21 @@ to \code{\link[=mvgam]{mvgam()}} that used a Vector Autoregressive latent proces
 as \code{VAR(cor = FALSE)} or \code{VAR(cor = TRUE)})}
 
 \item{...}{Ignored}
+
+\item{ndraws}{Optional integer; the number of posterior draws to use.
+Each draw costs a Lyapunov solve, so a wide panel is worth
+answering from a subset. Default \code{NULL} uses every draw.}
+
+\item{draw_ids}{Optional integer vector naming the posterior draws to
+use, in place of \code{ndraws}.}
+
+\item{summary}{Logical; return the posterior median and interval of
+each metric (the default), or the per-draw metrics themselves. The
+spread of a metric is often the point of asking, and \code{plot()} draws
+histograms of the draws.}
+
+\item{probs}{The lower and upper percentiles to report alongside the
+median when \code{summary = TRUE}.}
 
 \item{future}{\code{Logical}. When \code{TRUE}, per-draw stability
 computation runs under whatever

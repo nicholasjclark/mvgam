@@ -10,6 +10,17 @@
 #'   to [mvgam()] that used a Vector Autoregressive latent process model (either
 #'   as `VAR(cor = FALSE)` or `VAR(cor = TRUE)`)
 #'
+#'@param ndraws Optional integer; the number of posterior draws to use.
+#'  Each draw costs a Lyapunov solve, so a wide panel is worth
+#'  answering from a subset. Default `NULL` uses every draw.
+#'@param draw_ids Optional integer vector naming the posterior draws to
+#'  use, in place of `ndraws`.
+#'@param summary Logical; return the posterior median and interval of
+#'  each metric (the default), or the per-draw metrics themselves. The
+#'  spread of a metric is often the point of asking, and `plot()` draws
+#'  histograms of the draws.
+#'@param probs The lower and upper percentiles to report alongside the
+#'  median when `summary = TRUE`.
 #' @param future \code{Logical}. When `TRUE`, per-draw stability
 #'   computation runs under whatever
 #'   \code{\link[future:plan]{future::plan()}} the caller has set;
@@ -140,10 +151,22 @@ solve_dlyap <- function(B, Sigma, tol = 1e-12, max_iter = 100L) {
 #'@rdname stability.mvgam
 #'@method stability mvgam
 #'@export
-stability.mvgam = function(object, future = FALSE, ...) {
+stability.mvgam = function(object, ndraws = NULL, draw_ids = NULL,
+                           summary = TRUE, probs = c(0.025, 0.975),
+                           future = FALSE, ...) {
+  checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
+  checkmate::assert_integerish(draw_ids, lower = 1L, null.ok = TRUE)
+  checkmate::assert_flag(summary)
+  checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1,
+                            any.missing = FALSE, sorted = TRUE)
   checkmate::assert_flag(future)
   assert_var_trend(object, surface = "stability()")
-  var_post <- extract_var_posterior(object)
+  # Each draw costs a Lyapunov solve at O(K^3 log(1/tol)), so a wide
+  # panel is worth answering from a subset. The coefficients and the
+  # innovation covariance are read from the same draws, since a
+  # stationary variance built from one draw's transition matrix and
+  # another's covariance describes no posterior sample.
+  var_post <- extract_var_posterior(object, ndraws, draw_ids)
 
   metrics <- do.call(
     rbind,
@@ -253,7 +276,103 @@ stability.mvgam = function(object, future = FALSE, ...) {
     })
   )
   class(metrics) <- c("mvgam_stability", class(metrics))
+  if (summary) {
+    return(summary(metrics, probs = probs))
+  }
   metrics
+}
+
+
+#' Summarise posterior stability metrics
+#'
+#' Reports the posterior median and interval of each stability metric.
+#' `stability()` returns this by default, matching the other post-fit
+#' surfaces; the draws behind it are available with
+#' `stability(summary = FALSE)` and are what `plot()` draws histograms
+#' of.
+#'
+#' @param object An object of class `mvgam_stability`
+#' @param probs The lower and upper percentiles to report alongside the
+#'   median
+#' @param robust Logical; report the median and median absolute
+#'   deviation rather than the mean and standard deviation
+#' @param ... ignored
+#'
+#' @return A `data.frame` with one row per metric
+#'
+#' @method summary mvgam_stability
+#' @export
+summary.mvgam_stability <- function(object, probs = c(0.025, 0.975),
+                                    robust = TRUE, ...) {
+  checkmate::assert_class(object, "mvgam_stability")
+  checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1,
+                            any.missing = FALSE, sorted = TRUE)
+  checkmate::assert_flag(robust)
+  metrics <- colnames(object)
+  out <- do.call(rbind, lapply(metrics, function(v) {
+    draws <- object[[v]]
+    data.frame(
+      metric = v,
+      estimate = if (robust) stats::median(draws) else mean(draws),
+      est_error = if (robust) stats::mad(draws) else stats::sd(draws),
+      lower = unname(stats::quantile(draws, min(probs))),
+      upper = unname(stats::quantile(draws, max(probs))),
+      stringsAsFactors = FALSE
+    )
+  }))
+  colnames(out) <- c("metric", "Estimate", "Est.Error",
+                     paste0("Q", 100 * min(probs)),
+                     paste0("Q", 100 * max(probs)))
+  class(out) <- c("mvgam_stability_summary", class(out))
+  out
+}
+
+
+#' Plot summarised stability metrics
+#'
+#' Draws the posterior median and interval of each metric. The
+#' distribution of a metric is often the point of asking, so
+#' `stability(summary = FALSE)` returns the draws and plots them as
+#' histograms instead.
+#'
+#' @param x An object of class `mvgam_stability_summary`
+#' @param variables Metrics to draw
+#' @param ... ignored
+#'
+#' @return A `ggplot` object
+#'
+#' @method plot mvgam_stability_summary
+#' @export
+plot.mvgam_stability_summary <- function(
+  x,
+  variables = c("reactivity", "mean_return_rate", "var_return_rate"),
+  ...
+) {
+  checkmate::assert_class(x, "mvgam_stability_summary")
+  checkmate::assert_character(variables, min.len = 1L, any.missing = FALSE)
+  keep <- intersect(variables, x$metric)
+  if (!length(keep)) {
+    stop(insight::format_error(c(
+      "None of the requested 'variables' were found in 'x'.",
+      i = paste0("Available metrics: ",
+                 paste(x$metric, collapse = ", "), ".")
+    )))
+  }
+  dat <- x[x$metric %in% keep, , drop = FALSE]
+  dat$metric <- factor(dat$metric, levels = keep)
+  bounds <- grep("^Q", colnames(dat), value = TRUE)
+  set_color_scheme_local("red")
+  ggplot2::ggplot(
+    dat, ggplot2::aes(x = .data$metric, y = .data$Estimate)
+  ) +
+    ggplot2::geom_hline(yintercept = 0, linetype = "dashed",
+                        colour = "grey30") +
+    ggplot2::geom_pointrange(
+      ggplot2::aes(ymin = .data[[bounds[1L]]], ymax = .data[[bounds[2L]]]),
+      colour = mvgam_palette()[4L]
+    ) +
+    ggplot2::labs(x = NULL, y = "Posterior estimate") +
+    mvgam_theme()
 }
 
 

@@ -54,7 +54,7 @@ test_that("fevd() produces shares that sum to 1 per response at every horizon", 
 
 test_that("stability() returns a finite data.frame with all expected metrics", {
   fit <- load_var_fit()
-  st <- stability(fit)
+  st <- stability(fit, summary = FALSE)
   expect_s3_class(st, "data.frame")
   expected_cols <- c(
     "prop_cov_offdiag", "prop_cov_diag", "prop_int", "prop_int_adj",
@@ -150,4 +150,33 @@ test_that("the response surfaces answer from the draws they were given", {
   # Asking for more draws than exist is refused rather than truncated.
   expect_error(irf(fit, h = 4L, ndraws = total + 1L),
                "more draws than the posterior holds")
+})
+
+
+test_that("stability() summarises unless asked for its draws", {
+  fit <- load_var_fit()
+
+  # The default reports each metric once, matching every other
+  # post-fit surface in the package.
+  st <- stability(fit)
+  expect_s3_class(st, "mvgam_stability_summary")
+  expect_equal(nrow(st), 9L)
+  expect_true(all(c("metric", "Estimate", "Est.Error") %in% names(st)))
+
+  # The draws remain available, and are what the histograms are of.
+  draws <- stability(fit, summary = FALSE)
+  expect_s3_class(draws, "mvgam_stability")
+  expect_equal(nrow(draws), ndraws(fit))
+  expect_equal(summary(draws)$Estimate, st$Estimate, tolerance = 1e-10)
+
+  # Each draw costs a Lyapunov solve, so the metrics can be answered
+  # from a subset.
+  expect_equal(nrow(stability(fit, ndraws = 5L, summary = FALSE)), 5L)
+  expect_error(stability(fit, ndraws = ndraws(fit) + 1L),
+               "more draws than the posterior holds")
+
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  expect_s3_class(plot(st), "ggplot")
+  expect_s3_class(plot(draws), "ggplot")
 })

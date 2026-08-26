@@ -235,6 +235,15 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > draws behind `summary = FALSE`, and take `ndraws` / `draw_ids`
   > like every other post-fit method. The summary is 340 KB against
   > 382 MB, and a subset of draws answers roughly seven times faster.
+  >
+  > `stability()` was the last of the three VAR surfaces still handing
+  > back its draws, so it reports each metric once as well, keeps them
+  > behind `summary = FALSE`, and takes the same draw arguments: each
+  > draw costs a Lyapunov solve, so a subset answers about four times
+  > faster. A survey of every other post-fit surface found no further
+  > case. `residual_cor()` and `posterior_transition_matrix()` already
+  > summarise and answer in under two seconds on the same fit, and the
+  > `posterior_*` and `loo_*` families return draws by design.
 
 - [ ] **3.0 Close the post-fit coverage gaps**
   > `plot_slopes`, `plot_comparisons`, `hypotheses`,
