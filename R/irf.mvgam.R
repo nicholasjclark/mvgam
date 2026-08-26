@@ -9,6 +9,18 @@
 #' `VAR(cor = TRUE)`; see [VAR()] for details)
 #' @param h Positive \code{integer} specifying the forecast horizon over which to calculate
 #' the IRF
+#' @param ndraws Optional integer; the number of posterior draws to
+#'   summarise over. A response is built from one transition matrix per
+#'   draw, so a wide panel is worth answering from a subset. Default
+#'   `NULL` uses every draw.
+#' @param draw_ids Optional integer vector naming the posterior draws
+#'   to use, in place of `ndraws`.
+#' @param summary Logical; return the posterior median and interval of
+#'   each response (the default), or the per-draw responses themselves.
+#'   The draws are one `K` by `K` matrix per horizon per draw, which on
+#'   a wide panel runs to hundreds of megabytes.
+#' @param probs The lower and upper percentiles to report alongside the
+#'   median when `summary = TRUE`.
 #' @param cumulative \code{Logical} flag indicating whether the IRF should be cumulative
 #' @param orthogonal \code{Logical} flag indicating whether orthogonalized IRFs should be
 #' calculated. Note that the order of the variables matters when calculating these
@@ -58,15 +70,22 @@ irf.mvgam <- function(
   h = 10,
   cumulative = FALSE,
   orthogonal = FALSE,
+  ndraws = NULL,
+  draw_ids = NULL,
+  summary = TRUE,
+  probs = c(0.025, 0.975),
   future = FALSE,
   ...
 ) {
   validate_pos_integer(h)
   checkmate::assert_logical(cumulative, len = 1L)
   checkmate::assert_logical(orthogonal, len = 1L)
+  checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
+  checkmate::assert_integerish(draw_ids, lower = 1L, null.ok = TRUE)
+  checkmate::assert_flag(summary)
   checkmate::assert_flag(future)
   assert_var_trend(object, surface = "irf()")
-  var_post <- extract_var_posterior(object)
+  var_post <- extract_var_posterior(object, ndraws, draw_ids)
 
   all_irfs <- mvgam_maybe_future_lapply(
     var_post$ndraws,
@@ -87,7 +106,17 @@ irf.mvgam <- function(
     "Orthogonalized",
     "Generalized"
   )
-  all_irfs
+  if (!summary) {
+    return(all_irfs)
+  }
+  # A response is summarised over draws before it is returned, because
+  # the draws themselves are one K by K matrix per horizon per draw and
+  # a wide VAR makes that far larger than anything a reader wants in
+  # hand. `summary = FALSE` keeps them for anyone who does.
+  as_var_surface_summary(
+    summary(all_irfs, probs = probs), "mvgam_irf_summary",
+    irf_type = attr(all_irfs, "irf_type")
+  )
 }
 
 #### Functions to compute Generalized Impulse Response functions

@@ -17,7 +17,7 @@ load_var_fit <- function() {
 
 test_that("irf() returns the expected nested-list shape from a real VAR(1) fit", {
   fit <- load_var_fit()
-  ir <- irf(fit, h = 6L)
+  ir <- irf(fit, h = 6L, summary = FALSE)
   expect_s3_class(ir, "mvgam_irf")
   # One entry per posterior draw, each holding K named matrices.
   ndraws <- length(ir)
@@ -31,8 +31,8 @@ test_that("irf() returns the expected nested-list shape from a real VAR(1) fit",
 
 test_that("irf() respects orthogonal = TRUE vs FALSE", {
   fit <- load_var_fit()
-  ir_gen <- irf(fit, h = 4L, orthogonal = FALSE)
-  ir_orth <- irf(fit, h = 4L, orthogonal = TRUE)
+  ir_gen <- irf(fit, h = 4L, orthogonal = FALSE, summary = FALSE)
+  ir_orth <- irf(fit, h = 4L, orthogonal = TRUE, summary = FALSE)
   expect_identical(attr(ir_gen, "irf_type"), "Generalized")
   expect_identical(attr(ir_orth, "irf_type"), "Orthogonalized")
   # The two parameterisations differ; the orthogonal one is
@@ -42,7 +42,7 @@ test_that("irf() respects orthogonal = TRUE vs FALSE", {
 
 test_that("fevd() produces shares that sum to 1 per response at every horizon", {
   fit <- load_var_fit()
-  fv <- fevd(fit, h = 8L)
+  fv <- fevd(fit, h = 8L, summary = FALSE)
   expect_s3_class(fv, "mvgam_fevd")
   # For every draw, every response, every horizon, the K shock
   # contributions should sum to 1 exactly.
@@ -74,8 +74,8 @@ test_that("stability() returns a finite data.frame with all expected metrics", {
 
 test_that("summary() and plot() methods dispatch on irf/fevd outputs", {
   fit <- load_var_fit()
-  ir <- irf(fit, h = 4L)
-  fv <- fevd(fit, h = 4L)
+  ir <- irf(fit, h = 4L, summary = FALSE)
+  fv <- fevd(fit, h = 4L, summary = FALSE)
   expect_s3_class(summary(ir), "data.frame")
   expect_s3_class(summary(fv), "data.frame")
   expect_s3_class(plot(ir, series = 1L), "ggplot")
@@ -91,4 +91,63 @@ test_that("irf/fevd/stability all reject non-VAR fits with a consistent message"
   expect_error(irf(fit_ar),       "VAR\\(1\\) latent trend")
   expect_error(fevd(fit_ar),      "VAR\\(1\\) latent trend")
   expect_error(stability(fit_ar), "VAR\\(1\\) latent trend")
+})
+
+
+test_that("the response surfaces summarise unless asked for their draws", {
+  fit <- load_var_fit()
+
+  # The default answers with the posterior median and interval of each
+  # shock-response pair. The draws behind it are one K by K matrix per
+  # horizon per draw, which on a wide panel is orders of magnitude
+  # larger than anything a reader wants in hand.
+  ir <- irf(fit, h = 5L)
+  expect_s3_class(ir, "mvgam_irf_summary")
+  expect_true(all(c("shock", "horizon") %in% names(ir)))
+  expect_true(any(grepl("Q50$", names(ir))))
+  expect_lt(as.numeric(object.size(ir)),
+            as.numeric(object.size(irf(fit, h = 5L, summary = FALSE))))
+
+  fv <- fevd(fit, h = 5L)
+  expect_s3_class(fv, "mvgam_fevd_summary")
+  # Every horizon of every pair is reported once.
+  expect_equal(nrow(fv), length(unique(fv$shock)) * 5L)
+
+  # Summarising a summary returns the same table rather than trying to
+  # take quantiles of quantiles.
+  expect_equal(nrow(summary(ir)), nrow(ir))
+
+  # Both objects plot: the summary from its quantiles, the draws from
+  # the bands they imply.
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  expect_s3_class(plot(ir), "ggplot")
+  expect_s3_class(plot(fv), "ggplot")
+  expect_s3_class(plot(irf(fit, h = 5L, summary = FALSE), series = 1), "ggplot")
+  # A pair that was never computed is named rather than silently empty.
+  expect_error(plot(ir, shocks = "nonexistent"), "Unknown shock-response")
+})
+
+
+test_that("the response surfaces answer from the draws they were given", {
+  fit <- load_var_fit()
+  total <- ndraws(fit)
+
+  # Naming draws is honoured, and the coefficients and the innovation
+  # covariance must come from the same ones: a response built from a
+  # transition matrix of one draw and a covariance of another describes
+  # no posterior sample at all.
+  ids <- c(2L, 7L, 15L)
+  ir <- irf(fit, h = 4L, draw_ids = ids, summary = FALSE)
+  expect_length(ir, length(ids))
+  expect_equal(irf(fit, h = 4L, draw_ids = ids, summary = FALSE), ir)
+
+  # A count is honoured too, and asking for fewer draws returns fewer.
+  expect_length(irf(fit, h = 4L, ndraws = 5L, summary = FALSE), 5L)
+  expect_length(fevd(fit, h = 4L, ndraws = 5L, summary = FALSE), 5L)
+  expect_length(irf(fit, h = 4L, summary = FALSE), total)
+
+  # Asking for more draws than exist is refused rather than truncated.
+  expect_error(irf(fit, h = 4L, ndraws = total + 1L),
+               "more draws than the posterior holds")
 })

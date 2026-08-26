@@ -12,6 +12,10 @@ irf(object, ...)
   h = 10,
   cumulative = FALSE,
   orthogonal = FALSE,
+  ndraws = NULL,
+  draw_ids = NULL,
+  summary = TRUE,
+  probs = c(0.025, 0.975),
   future = FALSE,
   ...
 )
@@ -30,6 +34,22 @@ the IRF}
 
 \item{orthogonal}{\code{Logical} flag indicating whether orthogonalized IRFs should be
 calculated. Note that the order of the variables matters when calculating these}
+
+\item{ndraws}{Optional integer; the number of posterior draws to
+summarise over. A response is built from one transition matrix per
+draw, so a wide panel is worth answering from a subset. Default
+\code{NULL} uses every draw.}
+
+\item{draw_ids}{Optional integer vector naming the posterior draws
+to use, in place of \code{ndraws}.}
+
+\item{summary}{Logical; return the posterior median and interval of
+each response (the default), or the per-draw responses themselves.
+The draws are one \code{K} by \code{K} matrix per horizon per draw, which on
+a wide panel runs to hundreds of megabytes.}
+
+\item{probs}{The lower and upper percentiles to report alongside the
+median when \code{summary = TRUE}.}
 
 \item{future}{\code{Logical}. When \code{TRUE}, per-draw IRF
 computation runs under whatever

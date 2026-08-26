@@ -12,6 +12,17 @@
 #' @param h Positive \code{integer} specifying the forecast horizon over which to calculate
 #' the IRF
 #'
+#' @param ndraws Optional integer; the number of posterior draws to
+#'   summarise over. A decomposition is built from one transition
+#'   matrix per draw, so a wide panel is worth answering from a subset.
+#'   Default `NULL` uses every draw.
+#' @param draw_ids Optional integer vector naming the posterior draws
+#'   to use, in place of `ndraws`.
+#' @param summary Logical; return the posterior median and interval of
+#'   each decomposition (the default), or the per-draw decompositions
+#'   themselves.
+#' @param probs The lower and upper percentiles to report alongside the
+#'   median when `summary = TRUE`.
 #' @param future \code{Logical}. When `TRUE`, per-draw FEVD
 #'   computation runs under whatever
 #'   \code{\link[future:plan]{future::plan()}} the caller has set;
@@ -54,11 +65,16 @@ fevd <- function(object, ...) {
 #' @rdname fevd.mvgam
 #' @method fevd mvgam
 #' @export
-fevd.mvgam <- function(object, h = 10, future = FALSE, ...) {
+fevd.mvgam <- function(object, h = 10, ndraws = NULL, draw_ids = NULL,
+                       summary = TRUE, probs = c(0.025, 0.975),
+                       future = FALSE, ...) {
   validate_pos_integer(h)
+  checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
+  checkmate::assert_integerish(draw_ids, lower = 1L, null.ok = TRUE)
+  checkmate::assert_flag(summary)
   checkmate::assert_flag(future)
   assert_var_trend(object, surface = "fevd()")
-  var_post <- extract_var_posterior(object)
+  var_post <- extract_var_posterior(object, ndraws, draw_ids)
 
   all_fevds <- mvgam_maybe_future_lapply(
     var_post$ndraws,
@@ -74,7 +90,14 @@ fevd.mvgam <- function(object, h = 10, future = FALSE, ...) {
     future = future
   )
   class(all_fevds) <- "mvgam_fevd"
-  all_fevds
+  if (!summary) {
+    return(all_fevds)
+  }
+  # See `irf()`: the draws are one K by K matrix per horizon per draw,
+  # so they are summarised unless asked for.
+  as_var_surface_summary(
+    summary(all_fevds, probs = probs), "mvgam_fevd_summary"
+  )
 }
 
 #### Functions to compute forecast error variance decompositions

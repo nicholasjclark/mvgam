@@ -10,6 +10,11 @@ This is a major release that rebuilds mvgam on top of 'brms'. The observation mo
 * `dynamic()` has been removed. It expanded to a low-rank squared exponential Gaussian Process smooth, so write that smooth yourself as `s(time, by = x, bs = "gp")`, or use `gp(time, by = x)`
 * In `trend_formula`, `by = trend` is deprecated in favour of `by = lv_axis()`. Old calls still work but emit a warning
 
+### Impulse responses and variance decompositions
+* `irf()` and `fevd()` now return the posterior median and interval of each shock-response pair rather than the per-draw responses. Both are built from one transition matrix per draw, so on a wide panel the draws ran to hundreds of megabytes for something read as a band: a 24-process VAR returned 382 MB where the summary is 340 KB. Pass `summary = FALSE` for the draws, whose class and plot method are unchanged
+* `irf()` and `fevd()` gained `ndraws` and `draw_ids`, matching every other post-fit method. Cost grows with the number of draws times the square of the number of processes, so a wide panel is worth summarising from a subset
+* `plot()` on a summarised response accepts the same `series` and `responses` arguments as the draws plot, so existing plotting code is unaffected
+
 ### Renamed observation families
 * `nb()` is now `negbinomial()`, `student_t()` is now `student()` and `betar()` is now `Beta()`, following the 'brms' names. The former names have been removed rather than deprecated, so calls using them will error
 

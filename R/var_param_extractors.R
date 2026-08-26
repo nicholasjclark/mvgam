@@ -78,9 +78,18 @@ assert_var_trend <- function(object, surface) {
 #'   * `K`: integer, the VAR dimension.
 #'   * `ndraws`: integer, the number of posterior draws.
 #' @noRd
-extract_var_posterior <- function(object) {
+extract_var_posterior <- function(object, ndraws = NULL,
+                                  draw_ids = NULL) {
   checkmate::assert_class(object, "mvgam")
   draws_mat <- posterior::as_draws_matrix(object$fit)
+  # Impulse responses and variance decompositions are built one
+  # transition matrix per draw, so their cost and their size both grow
+  # with the number of draws multiplied by the square of the number of
+  # processes. A wide VAR is therefore worth summarising from a subset,
+  # and the same subset has to serve the coefficients and the
+  # innovation covariance or a response would be built from a matrix
+  # pair no single draw produced.
+  draws_mat <- subset_draws_rows(draws_mat, ndraws, draw_ids)
   # Reads the raw `A_trend`. For factor VAR with Heaps QR
   # identification the generated-quantities block also emits
   # `A_trend_tilde = Q A_trend Q'`; callers that want the

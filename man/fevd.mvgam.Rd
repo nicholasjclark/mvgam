@@ -7,7 +7,16 @@
 \usage{
 fevd(object, ...)
 
-\method{fevd}{mvgam}(object, h = 10, future = FALSE, ...)
+\method{fevd}{mvgam}(
+  object,
+  h = 10,
+  ndraws = NULL,
+  draw_ids = NULL,
+  summary = TRUE,
+  probs = c(0.025, 0.975),
+  future = FALSE,
+  ...
+)
 }
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}
@@ -18,6 +27,21 @@ that used a Vector Autoregressive latent process model (either as \code{VAR(cor 
 
 \item{h}{Positive \code{integer} specifying the forecast horizon over which to calculate
 the IRF}
+
+\item{ndraws}{Optional integer; the number of posterior draws to
+summarise over. A decomposition is built from one transition
+matrix per draw, so a wide panel is worth answering from a subset.
+Default \code{NULL} uses every draw.}
+
+\item{draw_ids}{Optional integer vector naming the posterior draws
+to use, in place of \code{ndraws}.}
+
+\item{summary}{Logical; return the posterior median and interval of
+each decomposition (the default), or the per-draw decompositions
+themselves.}
+
+\item{probs}{The lower and upper percentiles to report alongside the
+median when \code{summary = TRUE}.}
 
 \item{future}{\code{Logical}. When \code{TRUE}, per-draw FEVD
 computation runs under whatever

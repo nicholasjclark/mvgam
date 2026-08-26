@@ -3,7 +3,8 @@
 # Not a test file. Invoke manually with, for example:
 #   Rscript tests/local/postfit_sweep.R
 #   Rscript tests/local/postfit_sweep.R --fixtures=beta_ar1,mv_gauss
-#   Rscript tests/local/postfit_sweep.R --groups=ppcheck,marginaleffects
+#   Rscript tests/local/postfit_sweep.R --groups=invariants
+#   Rscript tests/local/postfit_sweep.R --include-caches --budget=60
 #
 # Loads each cached fit once and drives every applicable post-fit
 # method against it, recording a status and a shape string per call.
@@ -31,6 +32,19 @@ only_fixtures <- arg_value("fixtures")
 only_groups <- arg_value("groups")
 out_path <- arg_value("out", "tests/local/postfit_sweep_results.tsv")[1L]
 
+# The pkgdown caches hold fits from whenever their article was last
+# rendered, so a failure on one says the cache is old at least as often
+# as it says the code is wrong. They are swept only on request, and
+# reported apart from the current fixtures either way, so a stale cache
+# cannot bury a live defect under a pile of its own.
+include_caches <- "--include-caches" %in% args
+
+# A single pathological fit should not be able to stall the sweep or
+# exhaust the machine: a wide VAR builds draws x n_series x n_series
+# arrays and will take both if allowed to. Calls over budget are
+# recorded as such rather than waited on.
+call_budget <- as.numeric(arg_value("budget", "120")[1L])
+
 FIXTURE_DIR <- "tests/local/fixtures"
 PKGDOWN_DIRS <- Sys.glob("pkgdown/*_cache")
 
@@ -42,10 +56,16 @@ results$rows <- list()
 # Record one call. `expr` is evaluated lazily so a failure is captured
 # rather than aborting the sweep. `shape` summarises the returned
 # object so a silently wrong dimension is visible in the log.
+# Provenance of the fit currently being swept, set by the driver loop
+# so every row records whether it came from a maintained fixture or
+# from a cache that may simply be old.
+current_source <- "fixture"
+
 run_call <- function(fixture, group, label, expr, shape = shape_of) {
   if (!is.null(only_groups) && !(group %in% only_groups)) return(invisible(NULL))
   warns <- character(0)
   t0 <- Sys.time()
+  setTimeLimit(elapsed = call_budget, transient = TRUE)
   val <- withCallingHandlers(
     tryCatch(suppressMessages(force(expr)),
              error = function(e) structure(conditionMessage(e),
@@ -55,21 +75,48 @@ run_call <- function(fixture, group, label, expr, shape = shape_of) {
       invokeRestart("muffleWarning")
     }
   )
+  setTimeLimit(elapsed = Inf, transient = FALSE)
   secs <- round(as.numeric(difftime(Sys.time(), t0, units = "secs")), 2)
   failed <- inherits(val, "sweep_error")
+  # A call stopped by the budget is neither a pass nor a defect; it is
+  # a statement about cost, and is kept apart from both.
+  timed_out <- failed &&
+    grepl("reached elapsed time limit", as.character(val), fixed = TRUE)
   row <- list(
     fixture = fixture,
+    source = current_source,
     group = group,
     label = label,
-    status = if (failed) "ERR" else "OK",
-    detail = if (failed) squash(as.character(val)) else squash(shape(val)),
+    status = if (timed_out) "SLOW" else if (failed) "ERR" else "OK",
+    detail = if (timed_out) {
+      paste0("exceeded ", call_budget, "s budget")
+    } else if (failed) {
+      squash(as.character(val))
+    } else {
+      squash(shape(val))
+    },
     warnings = squash(paste(unique(warns), collapse = " | ")),
     secs = secs
   )
   results$rows[[length(results$rows) + 1L]] <- row
-  cat(sprintf("  %-3s %-22s %-46s %s\n", row$status, group, label,
+  flush_row(row)
+  cat(sprintf("  %-4s %-22s %-46s %s\n", row$status, group, label,
               substr(row$detail, 1L, 70L)))
-  invisible(val)
+  invisible(if (failed) structure(as.character(val), class = "sweep_error") else val)
+}
+
+
+# Rows are appended as they are produced. The sweep is long enough that
+# it is often interrupted, and results that only exist at the end are
+# results that get lost.
+flush_started <- FALSE
+flush_row <- function(row) {
+  df <- as.data.frame(row, stringsAsFactors = FALSE)
+  utils::write.table(
+    df, out_path, sep = "\t", row.names = FALSE,
+    col.names = !flush_started, append = flush_started, quote = TRUE
+  )
+  flush_started <<- TRUE
 }
 
 squash <- function(x) {
@@ -128,16 +175,26 @@ discover_fits <- function() {
     }
   }
 
-  for (d in PKGDOWN_DIRS) {
-    for (p in Sys.glob(file.path(d, "*.rds"))) {
-      paths <- c(paths, p)
-      names_ <- c(names_,
-                  paste0(sub("_cache$", "", basename(d)), ":",
-                         tools::file_path_sans_ext(basename(p))))
+  n_fixture <- length(paths)
+
+  if (include_caches) {
+    for (d in PKGDOWN_DIRS) {
+      for (p in Sys.glob(file.path(d, "*.rds"))) {
+        paths <- c(paths, p)
+        names_ <- c(names_,
+                    paste0(sub("_cache$", "", basename(d)), ":",
+                           tools::file_path_sans_ext(basename(p))))
+      }
     }
   }
 
-  data.frame(name = names_, path = paths, stringsAsFactors = FALSE)
+  data.frame(
+    name = names_,
+    path = paths,
+    source = c(rep("fixture", n_fixture),
+               rep("cache", length(paths) - n_fixture)),
+    stringsAsFactors = FALSE
+  )
 }
 
 # What a given fit can legally be asked to do. Every group below gates
@@ -482,8 +539,13 @@ group_structure <- function(nm, fit, cap) {
   }
   if (cap$is_var) {
     run_call(nm, "structure", "stability()", stability(fit))
-    run_call(nm, "structure", "irf()", irf(fit, h = 5L))
-    run_call(nm, "structure", "fevd()", fevd(fit, h = 5L))
+    # Both shapes: the summary a reader gets by default, and the
+    # draws behind it, capped so a wide VAR does not return hundreds
+    # of megabytes to a sweep that only checks its shape.
+    run_call(nm, "structure", "irf()", irf(fit, h = 5L, ndraws = 50L))
+    run_call(nm, "structure", "fevd()", fevd(fit, h = 5L, ndraws = 50L))
+    run_call(nm, "structure", "irf(summary = FALSE)",
+             irf(fit, h = 5L, ndraws = 50L, summary = FALSE))
     run_call(nm, "structure", "posterior_transition_matrix()",
              posterior_transition_matrix(fit))
   }
@@ -495,6 +557,150 @@ group_structure <- function(nm, fit, cap) {
 
 # -- Driver ------------------------------------------------------------
 
+# -- Invariants --------------------------------------------------------
+# Everything above asks whether a method ran. This asks whether what it
+# returned can be true. A method that errors announces itself; one that
+# returns a plausible-looking matrix of the wrong thing does not, and
+# those are the defects that reach a release. Each check states a
+# property that must hold for any fit, so it catches faults nobody has
+# thought to look for yet rather than the ones already known.
+
+# Report a property rather than a value: `run_call` logs the string, so
+# a violated invariant reads as a finding instead of a shape.
+holds <- function(ok, detail = "") {
+  if (isTRUE(ok)) "holds" else paste0("VIOLATED ", detail)
+}
+
+group_invariants <- function(nm, fit, cap) {
+  if (cap$is_closure || cap$is_multi_resp_fam || cap$is_mv) {
+    # These answer at a different grain (per unit, per category, per
+    # response); their contracts are checked by their own suites.
+    return(invisible(NULL))
+  }
+  nobs <- nrow(cap$data)
+  total <- tryCatch(ndraws(fit), error = function(e) NA_integer_)
+  if (!is.finite(total)) return(invisible(NULL))
+  n <- min(12L, total)
+  ids <- sort(sample.int(total, n))
+
+  # 1. Shape. A draw-level surface answers for every row of the data on
+  #    every draw asked for, whatever the response contained.
+  run_call(nm, "invariants", "shape: epred/predict/log_lik", {
+    ep <- dim(posterior_epred(fit, draw_ids = ids))
+    pp <- dim(posterior_predict(fit, draw_ids = ids))
+    ll <- dim(log_lik(fit, draw_ids = ids))
+    # An ordinal mean is a probability per category, so it answers
+    # [draws x rows x categories] where a draw and a density answer
+    # [draws x rows].
+    ep_ok <- if (cap$is_ordinal) {
+      length(ep) == 3L && identical(ep[1:2], c(n, nobs))
+    } else {
+      identical(ep, c(n, nobs))
+    }
+    holds(ep_ok && identical(pp, c(n, nobs)) && identical(ll, c(n, nobs)),
+          paste(vapply(list(ep, pp, ll), paste, character(1),
+                       collapse = "x"), collapse = " / "))
+  }, shape = identity)
+
+  # 2. Determinism. Naming the same draws twice has to give the same
+  #    answer, or something below is re-drawing rather than reading.
+  run_call(nm, "invariants", "determinism: same draw_ids", {
+    a <- posterior_epred(fit, draw_ids = ids, process_error = FALSE)
+    b <- posterior_epred(fit, draw_ids = ids, process_error = FALSE)
+    holds(isTRUE(all.equal(a, b)))
+  }, shape = identity)
+
+  # 3. Draw alignment. Subsetting draws may drop rows and reorder them;
+  #    it cannot produce a row no single draw gives. A violation means
+  #    two extractions chose their draws independently.
+  run_call(nm, "invariants", "alignment: subset rows are full rows", {
+    key <- function(m) {
+      unname(apply(round(as.matrix(m), 8), 1, paste, collapse = "|"))
+    }
+    full <- key(posterior_linpred(fit, draw_ids = seq_len(total),
+                                  process_error = FALSE))
+    part <- key(posterior_linpred(fit, draw_ids = ids,
+                                  process_error = FALSE))
+    holds(all(part %in% full),
+          paste0(sum(!part %in% full), " of ", length(part), " unmatched"))
+  }, shape = identity)
+
+  # 4. epred is the inverse link of linpred wherever the family has no
+  #    further transformation between them. Where it does, the two are
+  #    expected to differ and the check is skipped rather than failed.
+  plain_epred <- cap$family %in% c("gaussian", "poisson", "bernoulli",
+                                   "negbinomial", "Gamma", "lognormal",
+                                   "student", "beta")
+  if (plain_epred) {
+    run_call(nm, "invariants", "epred == linkinv(linpred)", {
+      lp <- posterior_linpred(fit, draw_ids = ids, process_error = FALSE)
+      ep <- posterior_epred(fit, draw_ids = ids, process_error = FALSE)
+      inv <- fit$family$linkinv(lp)
+      holds(isTRUE(all.equal(as.numeric(ep), as.numeric(inv),
+                             tolerance = 1e-8)),
+            paste0("max|diff| = ",
+                   signif(max(abs(as.numeric(ep) - as.numeric(inv))), 3)))
+    }, shape = identity)
+  }
+
+  # 5. Support. A draw from the response distribution has to be a value
+  #    that response can take.
+  run_call(nm, "invariants", "support of posterior_predict", {
+    y <- as.numeric(posterior_predict(fit, draw_ids = ids))
+    y <- y[!is.na(y)]
+    bad <- switch(
+      cap$family,
+      poisson = ,
+      negbinomial = y < 0 | y != floor(y),
+      bernoulli = !y %in% c(0, 1),
+      binomial = y < 0 | y != floor(y),
+      beta = y <= 0 | y >= 1,
+      Gamma = ,
+      lognormal = y <= 0,
+      rep(FALSE, length(y))
+    )
+    holds(!any(bad), paste0(sum(bad), " of ", length(y), " out of support"))
+  }, shape = identity)
+
+  # 6. Coverage of missing responses. A row the likelihood never saw is
+  #    still a row the model can predict for, so predictions span the
+  #    data rather than the fitted subset.
+  run_call(nm, "invariants", "predictions span rows, not just fitted", {
+    n_fitted <- fit$standata$N %||% nobs
+    ep <- posterior_epred(fit, draw_ids = ids)
+    holds(ncol(ep) == nobs,
+          paste0("epred cols = ", ncol(ep), ", data rows = ", nobs,
+                 ", likelihood rows = ", n_fitted))
+  }, shape = identity)
+
+  # 7. The summary reports what the formula asked for. Every
+  #    population-level coefficient the design matrix carries has to
+  #    appear somewhere in the printed summary.
+  run_call(nm, "invariants", "summary reports every fixed effect", {
+    smry <- summary(fit)
+    shown <- unlist(lapply(
+      grep("^(fixed|dpar_.*_fixed|trend_fixed)$", names(smry), value = TRUE),
+      function(k) rownames(smry[[k]])
+    ))
+    coefs <- sub("^b_", "",
+                 grep("^b_", variables(fit), value = TRUE))
+    coefs <- coefs[!grepl("_trend$", coefs)]
+    # A parameter given a formula of its own gets a block of its own,
+    # and the block heading carries the name, so the rows inside drop
+    # the prefix: `b_b1_Intercept` is printed as `Intercept` under the
+    # heading for `b1`.
+    prefixes <- get_dpar_names(fit$formula)
+    bare <- vapply(coefs, function(cf) {
+      hit <- prefixes[startsWith(cf, paste0(prefixes, "_"))]
+      if (length(hit)) sub(paste0("^", hit[1L], "_"), "", cf) else cf
+    }, character(1), USE.NAMES = FALSE)
+    missing <- unique(coefs[!bare %in% shown])
+    holds(length(missing) == 0,
+          paste0("absent from summary: ", paste(missing, collapse = ", ")))
+  }, shape = identity)
+}
+
+
 GROUPS <- list(
   summary = group_summary,
   predict = group_predict,
@@ -504,7 +710,8 @@ GROUPS <- list(
   criticism = group_criticism,
   draws = group_draws,
   plot = group_plot,
-  structure = group_structure
+  structure = group_structure,
+  invariants = group_invariants
 )
 
 fits <- discover_fits()
@@ -535,8 +742,9 @@ for (i in seq_len(nrow(fits))) {
                            if (cap$is_mv) " / mv" else "",
                            if (cap$is_factor) " / factor" else "",
                            if (cap$is_closure) " / closure-unit" else "")
+  current_source <<- fits$source[i]
   cat("\n==========================================================\n")
-  cat(nm, " -- ", reached[[nm]], "\n", sep = "")
+  cat(nm, " -- ", reached[[nm]], " [", current_source, "]\n", sep = "")
   cat("==========================================================\n")
 
   for (gname in names(GROUPS)) {
@@ -561,9 +769,6 @@ res <- do.call(rbind, lapply(results$rows, function(r) {
   as.data.frame(r, stringsAsFactors = FALSE)
 }))
 
-utils::write.table(res, out_path, sep = "\t", row.names = FALSE,
-                   quote = TRUE)
-
 cat("\n\n##########################################################\n")
 cat("SWEEP SUMMARY\n")
 cat("##########################################################\n\n")
@@ -571,7 +776,36 @@ cat("Fixtures swept :", length(reached), "\n")
 cat("Fixtures skipped:", length(skipped), "\n")
 cat("Calls made     :", nrow(res), "\n")
 cat("Failures       :", sum(res$status == "ERR"), "\n")
+cat("Over budget    :", sum(res$status == "SLOW"), "\n")
 cat("With warnings  :", sum(nzchar(res$warnings)), "\n\n")
+
+# A failure on a maintained fixture is evidence about the code. A
+# failure on a cache is evidence about the cache until the cache is
+# rebuilt, so the two are never added together.
+if (any(res$source == "cache")) {
+  cat("--- failures by provenance ---\n")
+  for (src in c("fixture", "cache")) {
+    sub <- res[res$source == src, , drop = FALSE]
+    if (!nrow(sub)) next
+    cat(sprintf("  %-8s %4d calls, %3d failures, %2d over budget\n",
+                src, nrow(sub), sum(sub$status == "ERR"),
+                sum(sub$status == "SLOW")))
+  }
+  cat("\n")
+}
+
+violations <- res[res$group == "invariants" &
+                    grepl("^VIOLATED", res$detail), , drop = FALSE]
+cat("--- invariants ---\n")
+cat(sprintf("  %d checked, %d violated\n",
+            sum(res$group == "invariants"), nrow(violations)))
+if (nrow(violations)) {
+  for (i in seq_len(nrow(violations))) {
+    cat(sprintf("  %-28s %-40s %s\n", violations$fixture[i],
+                violations$label[i], substr(violations$detail[i], 1L, 80L)))
+  }
+}
+cat("\n")
 
 if (length(skipped)) {
   cat("--- skipped fixtures ---\n")
@@ -579,7 +813,8 @@ if (length(skipped)) {
   cat("\n")
 }
 
-fails <- res[res$status == "ERR", , drop = FALSE]
+fails <- res[res$status == "ERR" & res$source == "fixture", , drop = FALSE]
+if (nrow(fails)) cat("--- failures on maintained fixtures ---\n")
 if (nrow(fails)) {
   cat("--- failures by surface ---\n")
   tb <- sort(table(paste(fails$group, fails$label, sep = " :: ")),
@@ -603,5 +838,14 @@ if (nrow(warned)) {
 
 cat("\n--- coverage reached ---\n")
 for (n in names(reached)) cat(sprintf("  %-40s %s\n", n, reached[[n]]))
+
+slow <- res[res$status == "SLOW", , drop = FALSE]
+if (nrow(slow)) {
+  cat("\n--- calls over the ", call_budget, "s budget ---\n", sep = "")
+  for (i in seq_len(nrow(slow))) {
+    cat(sprintf("  %-28s %s :: %s\n", slow$fixture[i], slow$group[i],
+                slow$label[i]))
+  }
+}
 
 cat("\nResults written to", out_path, "\n")

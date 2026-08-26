@@ -214,6 +214,28 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > type, `bayes_R2()` and `plot(type = "residuals")`. One helper now
   > names the structure for both readers.
 
+- [x] **9.0 Sweep harness, and the response surfaces it stalled on**
+  > The harness judged a call by whether it ran. It now also asks
+  > whether what came back can be true: shapes against draws and rows,
+  > the same draws twice giving the same answer, a subsampled
+  > prediction being made of rows the full one also produces, `epred`
+  > agreeing with the inverse link of `linpred`, draws lying inside
+  > the family's support, predictions spanning every row rather than
+  > the fitted ones, and the summary reporting every coefficient the
+  > design matrix carries. It separates maintained fixtures from
+  > pkgdown caches, since a cache that predates a change fails for
+  > reasons of its own and buried two hundred spurious results in the
+  > last run. Rows are written as they are produced, and a call may
+  > exceed a time budget without stalling the sweep.
+  >
+  > It stalled on a twenty-four process VAR because `irf()` and
+  > `fevd()` returned one transition matrix per draw per horizon, 382
+  > MB for a figure read as a band, with no way to ask for fewer
+  > draws. Both now report the posterior median and interval, keep the
+  > draws behind `summary = FALSE`, and take `ndraws` / `draw_ids`
+  > like every other post-fit method. The summary is 340 KB against
+  > 382 MB, and a subset of draws answers roughly seven times faster.
+
 - [ ] **3.0 Close the post-fit coverage gaps**
   > `plot_slopes`, `plot_comparisons`, `hypotheses`,
   > `posterior_transition_matrix`, `latent_N_saturation` and
