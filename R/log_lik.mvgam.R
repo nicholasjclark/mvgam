@@ -346,7 +346,7 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
 
   # Ordinal families need threshold and disc draws from the posterior
   # in addition to the standard dpars.
-  if (family_name %in% c("cumulative", "sratio", "cratio", "acat")) {
+  if (family_name %in% ORDINAL_FAMILIES) {
     family_pars$thres <- extract_ordinal_thresholds(
       object,
       ndraws = nrow(linpred),

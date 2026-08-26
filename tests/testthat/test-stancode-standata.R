@@ -2357,8 +2357,10 @@ test_that("stancode handles multivariate specifications with shared RW trend and
   # Should create mu_trend from Intercept_trend using rep_vector
   expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0.0, N_trend\\);", code_shared))
 
-  # Should construct Sigma_trend covariance matrix
-  expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] Sigma_trend = diag_pre_multiply\\(sigma_trend, L_Omega_trend\\);", code_shared))
+  # Should report Sigma_trend as a covariance, not as the scaled
+  # Cholesky factor it is built from
+  expect_true(stan_pattern("cov_matrix\\[N_lv_trend\\] Sigma_trend = multiply_lower_tri_self_transpose\\(", code_shared))
+  expect_true(stan_pattern("diag_pre_multiply\\(\\s*sigma_trend,\\s*L_Omega_trend\\)\\);", code_shared))
 
   # RW latent variables
   # Should declare lv_trend matrix for latent variables (with _trend suffix)

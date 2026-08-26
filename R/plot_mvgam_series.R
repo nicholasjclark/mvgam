@@ -89,7 +89,28 @@ series_obs_plot <- function(train, test, response, meta,
   )
   dat$series <- factor(dat$series, levels = series_levels)
 
+  # An ordinal response arrives as an ordered factor, which none of the
+  # four panels can take. Its level index is the representation the rest
+  # of the package already predicts on, so the panels are drawn against
+  # that and the axis says which levels the numbers stand for.
+  ordinal_levels <- NULL
+  if (is.factor(dat$y)) {
+    if (!is.ordered(dat$y)) {
+      stop(insight::format_error(c(
+        paste0("Response '", response,
+               "' is an unordered factor, which has no series to plot."),
+        i = paste0("A histogram, an autocorrelation and an empirical CDF ",
+                   "all need the response to be ordered.")
+      )))
+    }
+    ordinal_levels <- levels(dat$y)
+    dat$y <- as.integer(dat$y)
+  }
+
   ylab <- if (log_scale) paste0("log(", response, " + 1)") else response
+  if (!is.null(ordinal_levels)) {
+    ylab <- paste0(ylab, " (", paste(ordinal_levels, collapse = " < "), ")")
+  }
   if (log_scale) dat$y <- log(dat$y + 1)
 
   if (identical(series_idx, "all")) {

@@ -2204,8 +2204,19 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
     use_resp <- resp
   }
 
-  # Validate brms_model exists
+  # A trend component is only fitted when the user asked for one, so
+  # the common way to arrive here is a fit with no trend rather than a
+  # fit whose component is missing.
   if (is.null(brms_model)) {
+    if (identical(component, "trend")) {
+      stop(insight::format_error(c(
+        "This 'mvgam' fit has no latent trend to predict from.",
+        i = paste0(
+          "A trend is declared through 'trend_formula', for example ",
+          "trend_formula = ~ AR()."
+        )
+      )))
+    }
     stop(insight::format_error(
       cli::format_inline(
         "No brmsfit model found for component {.field {component}}."

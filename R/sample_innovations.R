@@ -529,12 +529,13 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
 
   metadata <- object$trend_metadata
   if (is.null(metadata)) {
-    stop(insight::format_error(
-      c(
-        "trend_metadata required for covariance parameter extraction.",
-        i = "This object may have been created with an older mvgam version."
+    stop(insight::format_error(c(
+      "This 'mvgam' fit has no latent trend, so it has no trend covariance.",
+      i = paste0(
+        "A trend is declared through 'trend_formula', for example ",
+        "trend_formula = ~ AR(cor = TRUE)."
       )
-    ))
+    )))
   }
 
   trend_type <- get_trend_type(object)
@@ -969,14 +970,14 @@ extract_hierarchical_cholesky_params <- function(draws_mat, group_info) {
   }
 
   # alpha_cor_trend: scalar per draw
-  alpha <- pull_col("alpha_cor_trend")
+  alpha <- pull_col(HIER_COV_PARS$alpha)
 
   # L_Omega_global_trend: 2D matrix per draw, shape [n_sub, n_sub]
   L_global <- array(0, c(ndraws, n_sub, n_sub))
   for (j in seq_len(n_sub)) {
     for (i in seq_len(n_sub)) {
       L_global[, i, j] <- pull_col(
-        sprintf("L_Omega_global_trend[%d,%d]", i, j)
+        paste0(HIER_COV_PARS$global, "[", i, ",", j, "]")
       )
     }
   }
@@ -987,7 +988,7 @@ extract_hierarchical_cholesky_params <- function(draws_mat, group_info) {
     for (j in seq_len(n_sub)) {
       for (i in seq_len(n_sub)) {
         L_dev[, g, i, j] <- pull_col(
-          sprintf("L_deviation_group_trend[%d,%d,%d]", g, i, j)
+          paste0(HIER_COV_PARS$deviation, "[", g, ",", i, ",", j, "]")
         )
       }
     }
@@ -998,7 +999,7 @@ extract_hierarchical_cholesky_params <- function(draws_mat, group_info) {
   for (g in seq_len(n_groups)) {
     for (s in seq_len(n_sub)) {
       sigma_grp[, g, s] <- pull_col(
-        sprintf("sigma_group_trend[%d,%d]", g, s)
+        paste0(HIER_COV_PARS$sigma, "[", g, ",", s, "]")
       )
     }
   }
@@ -1680,6 +1681,79 @@ map_innovations_to_obs <- function(innovations_flat, n_times, n_series,
 }
 
 
+# The Stan names a grouped trend's covariance is read from. Both
+# readers of that structure -- the innovation transform here and the
+# forecast state reader in extract_last_state.R -- name it through
+# these, so neither can spell a parameter the other does not.
+HIER_COV_PARS <- list(
+  alpha = "alpha_cor_trend",
+  global = "L_Omega_global_trend",
+  deviation = "L_deviation_group_trend",
+  sigma = "sigma_group_trend"
+)
+
+
+#' Stan names of a matrix parameter's elements
+#'
+#' Stan writes a matrix element as `name[i,j]` and a per-group matrix
+#' as `name[g,i,j]`. Names come back in column-major order, so the
+#' values they pull fill a matrix directly.
+#'
+#' @param prefix Parameter name
+#' @param n_row,n_col Matrix dimensions
+#' @param lead Leading index for a per-group matrix, or `NULL`
+#' @return Character vector of length `n_row * n_col`
+#'
+#' @noRd
+stan_matrix_names <- function(prefix, n_row, n_col, lead = NULL) {
+  head <- if (is.null(lead)) "" else paste0(lead, ",")
+  paste0(prefix, "[", head,
+         rep(seq_len(n_row), times = n_col), ",",
+         rep(seq_len(n_col), each = n_row), "]")
+}
+
+
+#' Stan names of a vector parameter's elements
+#'
+#' @param prefix Parameter name
+#' @param n Vector length
+#' @param lead Leading index for a per-group vector, or `NULL`
+#' @return Character vector of length `n`
+#'
+#' @noRd
+stan_vector_names <- function(prefix, n, lead = NULL) {
+  head <- if (is.null(lead)) "" else paste0(lead, ",")
+  paste0(prefix, "[", head, seq_len(n), "]")
+}
+
+
+#' Cholesky factor of one group's trend covariance
+#'
+#' A grouped trend gives every group the same population correlation
+#' pulled part of the way towards its own, then scales by that group's
+#' standard deviations. Both the innovation transform and the forecast
+#' reader need the resulting factor, and reading it two ways is what let
+#' them disagree about the structure before.
+#'
+#' @param alpha Weight on the population correlation, one draw
+#' @param L_global Lower Cholesky factor of the population correlation
+#' @param L_deviation Lower Cholesky factor of the group's own
+#' @param sigma Numeric vector of the group's standard deviations
+#' @return Lower-triangular matrix `L` with `L %*% t(L)` the group's
+#'   covariance
+#'
+#' @noRd
+hierarchical_group_cholesky <- function(alpha, L_global, L_deviation,
+                                        sigma) {
+  combined <- alpha * tcrossprod(L_global) +
+    (1 - alpha) * tcrossprod(L_deviation)
+  # R's chol() is upper-triangular; transpose for Stan's lower-triangular
+  # cholesky_decompose() convention. Row-scaling by sigma is
+  # diag(sigma) %*% L.
+  t(chol(combined)) * sigma
+}
+
+
 #' Transform Innovations: Hierarchical Cholesky Pattern
 #'
 #' For models declared with `gr=` grouping. The per-group covariance is
@@ -1783,23 +1857,15 @@ transform_hierarchical_cholesky_innovations <- function(z, params, n_times,
   for (d in seq_len(ndraws)) {
     # drop = FALSE not needed for 3D->2D slice; R returns a matrix.
     L_glob_d <- L_glob_arr[d, , ]
-    glob_cor <- tcrossprod(L_glob_d)
     alpha_d <- alpha[d]
-    one_minus_alpha_d <- 1 - alpha_d
 
     for (g in seq_len(n_groups)) {
-      L_dev_dg <- L_dev_arr[d, g, , ]
-      local_cor <- tcrossprod(L_dev_dg)
-
-      combined_cor <- alpha_d * glob_cor + one_minus_alpha_d * local_cor
-
-      # R's chol() is upper-tri; transpose to match Stan's lower-tri
-      # cholesky_decompose() convention.
-      L_grp <- t(chol(combined_cor))
-
-      # Row-scale by per-group sigmas (equivalent to diag(sigma) %*% L)
-      sigma_dg <- sigma_arr[d, g, ]
-      L_full <- L_grp * sigma_dg
+      L_full <- hierarchical_group_cholesky(
+        alpha = alpha_d,
+        L_global = L_glob_d,
+        L_deviation = L_dev_arr[d, g, , ],
+        sigma = sigma_arr[d, g, ]
+      )
 
       series_g <- series_by_group[[g]]
 

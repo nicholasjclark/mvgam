@@ -244,3 +244,62 @@ test_that("extract_trend_latent_states: missing trend[t,s] column errors", {
     regexp = "Latent trend state column missing from posterior draws"
   )
 })
+
+test_that("ordinal_category_mean: expectation over the ordered levels", {
+  # Two draws, three observations, three categories.
+  epred <- array(0, dim = c(2L, 3L, 3L))
+  epred[, , 1L] <- matrix(c(1, 0, 0.5, 0.25, 0, 0.2), nrow = 2L)
+  epred[, , 2L] <- matrix(c(0, 1, 0.5, 0.25, 0.5, 0.3), nrow = 2L)
+  epred[, , 3L] <- matrix(c(0, 0, 0, 0.5, 0.5, 0.5), nrow = 2L)
+
+  expect_equal(
+    ordinal_category_mean(epred),
+    matrix(c(1, 2, 1.5, 2.25, 2.5, 2.3), nrow = 2L)
+  )
+})
+
+test_that("ordinal_category_variance: zero on a point mass, and E[k^2]-E[k]^2", {
+  epred <- array(0, dim = c(1L, 2L, 3L))
+  # First observation puts all mass on level 2; second splits 1 and 3.
+  epred[1L, 1L, ] <- c(0, 1, 0)
+  epred[1L, 2L, ] <- c(0.5, 0, 0.5)
+
+  v <- ordinal_category_variance(epred)
+  expect_equal(v[1L, 1L], 0)
+  # 0.5*1 + 0.5*9 - 2^2
+  expect_equal(v[1L, 2L], 1)
+})
+
+test_that("ordinal_category_variance: matches the variance of the levels drawn", {
+  set.seed(11)
+  probs <- c(0.2, 0.5, 0.3)
+  epred <- array(rep(probs, each = 1L), dim = c(1L, 1L, 3L))
+  analytic <- ordinal_category_variance(epred)[1L, 1L]
+  drawn <- sample(seq_along(probs), 2e5, replace = TRUE, prob = probs)
+  expect_equal(analytic, stats::var(drawn), tolerance = 0.02)
+})
+
+test_that("summarize_predictions: keeps the category margin of an ordinal epred", {
+  set.seed(12)
+  draws <- array(stats::runif(50 * 4 * 3), dim = c(50L, 4L, 3L),
+                 dimnames = list(NULL, paste0("obs", 1:4), c("lo", "mid", "hi")))
+  out <- summarize_predictions(draws, probs = c(0.025, 0.975), robust = FALSE)
+
+  # brms summarises each category separately and stacks along dim 3.
+  expect_equal(dim(out), c(4L, 4L, 3L))
+  expect_equal(dimnames(out)[[1L]], paste0("obs", 1:4))
+  expect_equal(dimnames(out)[[2L]], c("Estimate", "Est.Error", "Q2.5", "Q97.5"))
+  expect_equal(dimnames(out)[[3L]], c("lo", "mid", "hi"))
+  # Each slice equals the summary of that category on its own.
+  expect_equal(
+    out[, , 2L],
+    summarize_predictions(draws[, , 2L], probs = c(0.025, 0.975),
+                          robust = FALSE)
+  )
+})
+
+test_that("summarize_predictions: a single-observation category slice stays a matrix", {
+  draws <- array(stats::rnorm(10 * 1 * 2), dim = c(10L, 1L, 2L))
+  out <- summarize_predictions(draws, probs = 0.5, robust = TRUE)
+  expect_equal(dim(out), c(1L, 3L, 2L))
+})

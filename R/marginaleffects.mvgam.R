@@ -228,9 +228,7 @@ set_coef.mvgam <- function(model, coefs, ...) {
 #' @importFrom marginaleffects get_group_names
 #' @export
 get_group_names.mvgam <- function(model, ...) {
-  fam_name <- model$family$family
-  if (identical(fam_name, "cumulative") || identical(fam_name, "sratio") ||
-      identical(fam_name, "cratio") || identical(fam_name, "acat")) {
+  if (is_ordinal_family(model$family)) {
     resp <- model$response_names[1L]
     y <- model$data[[resp]]
     if (is.factor(y)) {

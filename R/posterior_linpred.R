@@ -191,10 +191,14 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #' @param newdata Optional data frame with covariates for prediction. If
 #'   NULL, uses original training data stored in the model object.
 #' @param transform Logical; if `FALSE` (default), values are returned
-#'   on the link scale. If `TRUE`, the inverse link is applied and
-#'   the call is forwarded to [posterior_epred.mvgam()] so the
-#'   returned matrix is on the response scale. Mirrors the
-#'   `transform` argument of [brms::posterior_linpred()].
+#'   on the link scale. If `TRUE`, the inverse link of `mu` is applied,
+#'   so the result is on that parameter's own scale. This is not the
+#'   mean of the response: a binomial `mu` is a probability rather than
+#'   a count, and a hurdle or zero-inflated `mu` is the base
+#'   distribution's parameter before any mass is moved to zero. Use
+#'   [posterior_epred.mvgam()] for `E[Y]`. Mirrors the `transform`
+#'   argument of [brms::posterior_linpred()], which sets `dpar = "mu"`
+#'   and answers on the response scale.
 #' @param process_error Logical; if TRUE (default), uses the full
 #'   posterior draws of the trend parameters (per-draw variation). If
 #'   FALSE, fixes the trend at its posterior mean for faster
@@ -316,27 +320,8 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
                                 any.missing = FALSE)
   checkmate::assert_string(dpar, null.ok = TRUE)
 
-  # transform = TRUE forwards to posterior_epred so the inverse link
-  # and any family-specific E[Y] transformation are applied. The
-  # request is passed on as it arrived, because that method resolves
-  # the count at its own boundary.
-  if (transform && is.null(dpar)) {
-    return(posterior_epred(
-      object = object,
-      newdata = newdata,
-      process_error = process_error,
-      ndraws = ndraws,
-      draw_ids = draw_ids,
-      re_formula = re_formula,
-      allow_new_levels = allow_new_levels,
-      sample_new_levels = sample_new_levels,
-      resp = resp,
-      ...
-    ))
-  }
-
-  # Past the delegation above, a count becomes indices, so nothing
-  # below is left to choose its own draws.
+  # A count becomes indices here, so nothing below is left to choose
+  # its own draws.
   draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
 
   # A named distributional parameter answers for that parameter rather
@@ -362,7 +347,7 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
   }
 
   # Delegate to get_combined_linpred (all other validation handled there)
-  get_combined_linpred(
+  linpred <- get_combined_linpred(
     mvgam_fit = object,
     newdata = newdata,
     process_error = process_error,
@@ -372,6 +357,39 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
     sample_new_levels = sample_new_levels,
     resp = resp
   )
+  if (!transform) {
+    return(linpred)
+  }
+  # `transform = TRUE` answers for `mu` on its own scale, which is the
+  # inverse of that parameter's link and nothing more. It is not the
+  # mean of the response: a binomial `mu` is a probability rather than
+  # a count, and a hurdle or zero-inflated `mu` is the base
+  # distribution's parameter before any mass is moved to zero.
+  # `posterior_epred()` is what answers for `E[Y]`.
+  apply_mu_linkinv(linpred, object$family)
+}
+
+
+#' Apply the inverse link of `mu` to a linear predictor
+#'
+#' The one rule for putting a mean predictor on the response scale,
+#' shared by every response of a multivariate fit.
+#'
+#' @param linpred A matrix, or a named list of them for a multivariate
+#'   fit
+#' @param family A family object, or a named list of them
+#' @return The same shape, with each element on its parameter's scale
+#'
+#' @noRd
+apply_mu_linkinv <- function(linpred, family) {
+  if (is.list(linpred) && !is.matrix(linpred)) {
+    out <- lapply(names(linpred), function(resp_name) {
+      apply_mu_linkinv(linpred[[resp_name]], family[[resp_name]])
+    })
+    names(out) <- names(linpred)
+    return(out)
+  }
+  family$linkinv(linpred)
 }
 
 

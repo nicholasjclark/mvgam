@@ -49,18 +49,18 @@ get_family_for_resp <- function(object, resp_name) {
 #'   list of matrices for multivariate models.
 #' @param family Family object with `$family` (name) and `$linkinv` (function).
 #'   For multivariate, a named list of family objects keyed by response name.
-#' @param sigma Optional matrix `\\[ndraws x nobs\\]` of sigma values. Required for
-#'   lognormal family where E\[Y\] = exp(mu + sigma^2/2). For multivariate, a
-#'   named list of matrices keyed by response name.
 #' @param trials Optional vector of trial counts for binomial family where
 #'   E\[Y\] = p * trials. Length 1 or ncol(linpred).
+#' @param family_pars Optional named list of ``\\[ndraws x nobs\\]`` matrices
+#'   holding the distributional parameters a family's mean needs beyond
+#'   the predictor, as named by `epred_extra_dpars()`. For multivariate,
+#'   a named list of such lists keyed by response name.
 #'
 #' @return Matrix `\\[ndraws x nobs\\]` of expected values on response scale, or
 #'   named list of matrices for multivariate models.
 #'
 #' @noRd
-compute_family_epred <- function(linpred, family,
-                                 sigma = NULL, trials = NULL,
+compute_family_epred <- function(linpred, family, trials = NULL,
                                  family_pars = NULL) {
   # Handle multivariate case (list of linpred matrices)
   if (is.list(linpred) && !is.matrix(linpred)) {
@@ -70,8 +70,8 @@ compute_family_epred <- function(linpred, family,
       compute_family_epred(
         linpred = linpred[[resp_name]],
         family = family[[resp_name]],
-        sigma = if (!is.null(sigma)) sigma[[resp_name]] else NULL,
-        trials = trials
+        trials = trials,
+        family_pars = family_pars[[resp_name]]
       )
     })
     names(result) <- names(linpred)
@@ -93,18 +93,6 @@ compute_family_epred <- function(linpred, family,
   family_name <- resolve_family_name(family)
   checkmate::assert_string(family_name)
 
-  # Validate sigma when provided
-  if (!is.null(sigma)) {
-    checkmate::assert_matrix(sigma)
-    if (nrow(sigma) != nrow(linpred) || ncol(sigma) != ncol(linpred)) {
-      stop(insight::format_error(
-        cli::format_inline(
-          "Dimension mismatch: {.field sigma} is [{nrow(sigma)} x {ncol(sigma)}] but {.field linpred} is [{nrow(linpred)} x {ncol(linpred)}]."
-        )
-      ))
-    }
-  }
-
   # Validate trials when provided
   if (!is.null(trials)) {
     checkmate::assert_numeric(trials, min.len = 1)
@@ -115,6 +103,19 @@ compute_family_epred <- function(linpred, family,
         )
       ))
     }
+  }
+
+  # A family named in `epred_extra_dpars()` has a mean that is not the
+  # inverse link of its predictor, and a kernel that says what it is
+  # instead. Routing on that registry keeps one list rather than two:
+  # the families needing extra parameters and the families needing a
+  # kernel are the same families, and adding one means editing one
+  # place. `log_lik.mvgam()` dispatches to its own kernels the same way.
+  if (length(epred_extra_dpars(family)) > 0L &&
+      !is.null(epred_kernel(family_name))) {
+    return(family_mean_from_kernel(
+      family_name, family$linkinv(linpred), family_pars, trials
+    ))
   }
 
   # Dispatch based on family
@@ -130,17 +131,8 @@ compute_family_epred <- function(linpred, family,
     "gamma" = ,
     "negbinomial" = ,
     "negative binomial" = ,
-    "student" = ,
-    # Hurdle families: E[Y|Y>0] = g^-1(eta) for the count component
-    "hurdle_poisson" = ,
-    "hurdle_negbinomial" = ,
-    "hurdle_gamma" = ,
-    "hurdle_lognormal" = ,
-    # Zero-inflated families: E[Y|Y>0] = g^-1(eta) for the count component
-    "zero_inflated_poisson" = ,
-    "zero_inflated_negbinomial" = ,
-    "zero_inflated_binomial" = ,
-    "zero_inflated_beta" = family$linkinv(linpred),
+    "student" = family$linkinv(linpred),
+
 
     # Count families requiring trials: E[Y] = p * trials
     "binomial" = ,
@@ -161,17 +153,6 @@ compute_family_epred <- function(linpred, family,
       }
     },
 
-    # Lognormal: E[Y] = exp(mu + sigma^2/2)
-    "lognormal" = {
-      if (is.null(sigma)) {
-        stop(insight::format_error(
-          cli::format_inline(
-            "Family {.val {family_name}} requires {.field sigma} argument for computing expected values. E[Y] = exp(mu + sigma^2/2)."
-          )
-        ))
-      }
-      exp(linpred + sigma^2 / 2)
-    },
 
     # nmix() and its variants are intercepted upstream in
     # posterior_epred.mvgam(); these branches are defensive (e.g.
@@ -706,31 +687,204 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
   # lives in `extract_trials_for_family()`.
   trials <- extract_trials_for_family(object, family, newdata)
 
-  # `com_binomial()` is the one family whose count-scale `E[Y]` needs
-  # an auxiliary parameter beyond `(linpred, trials)`: the mean of a
-  # Conway-Maxwell-binomial has no closed form in `mu` alone and is
-  # summed over the support using `nu`.
-  family_pars <- NULL
-  if (is_com_binomial_family(family)) {
-    family_pars <- resolve_family_pars(
-      object,
-      dpar_names = "nu",
-      ndraws = nrow(linpred),
-      nobs = ncol(linpred),
-      draw_ids = draw_ids,
-      newdata = newdata
-    )
-  }
+  # Some families need more than `(linpred, trials)` for a mean: a
+  # mixture at zero needs its mixing probability, a lognormal needs the
+  # dispersion its Jensen correction uses, and a
+  # Conway-Maxwell-binomial has no closed-form mean in `mu` alone.
+  # `epred_extra_dpars()` names them so the draws are resolved here,
+  # against the same iterations the predictor came from.
+  family_pars <- resolve_epred_family_pars(
+    object, family, linpred, draw_ids = draw_ids, newdata = newdata
+  )
 
   # Transform to response scale
   compute_family_epred(
     linpred     = linpred,
     family      = family,
-    sigma       = NULL,
     trials      = trials,
     family_pars = family_pars
   )
 }
+
+#' Resolve the extra draws a family's mean needs
+#'
+#' Covers the univariate and multivariate cases together: a
+#' multivariate fit resolves each response's parameters scoped to that
+#' response, so `compute_family_epred()` can hand each recursion its
+#' own.
+#'
+#' @param object An mvgam fit
+#' @param family A family object, or a named list of them
+#' @param linpred The linear predictor, or a named list of them
+#' @param draw_ids Draw indices already settled by the caller
+#' @param newdata Prediction data, or `NULL` for the training data
+#' @return A named list of `dpar` draw matrices, a named list of such
+#'   lists for a multivariate fit, or `NULL` when nothing is needed
+#'
+#' @noRd
+resolve_epred_family_pars <- function(object, family, linpred,
+                                      draw_ids = NULL, newdata = NULL,
+                                      resp = NULL) {
+  if (is.list(linpred) && !is.matrix(linpred)) {
+    out <- lapply(names(linpred), function(resp_name) {
+      resolve_epred_family_pars(
+        object, family[[resp_name]], linpred[[resp_name]],
+        draw_ids = draw_ids, newdata = newdata, resp = resp_name
+      )
+    })
+    names(out) <- names(linpred)
+    return(out)
+  }
+
+  dpar_names <- epred_extra_dpars(family)
+  if (length(dpar_names) == 0L) {
+    return(NULL)
+  }
+  resolve_family_pars(
+    object,
+    dpar_names = dpar_names,
+    ndraws = nrow(linpred),
+    nobs = ncol(linpred),
+    draw_ids = draw_ids,
+    newdata = newdata,
+    resp = resp
+  )
+}
+
+
+#' Distributional parameters a family's mean needs beyond the predictor
+#'
+#' Most families have `E[Y]` equal to the inverse link of the linear
+#' predictor, so the predictor is all `compute_family_epred()` needs.
+#' The families named here do not: a mixture at zero, a Jensen
+#' correction or a sum over the support puts another parameter in the
+#' mean. Naming them in one place is what lets `posterior_epred()`
+#' resolve those draws before it dispatches, rather than each family
+#' discovering at the last moment that it was handed the predictor
+#' alone.
+#'
+#' @param family A family or brmsfamily object
+#' @return Character vector of `dpar` names, empty when the mean needs
+#'   nothing beyond the predictor
+#'
+#' @noRd
+epred_extra_dpars <- function(family) {
+  if (is.null(family) || is.null(family$family)) {
+    return(character(0))
+  }
+  epred_extra_dpars_for(resolve_family_name(family))
+}
+
+
+#' @rdname epred_extra_dpars
+#' @noRd
+epred_extra_dpars_for <- function(family_name) {
+  switch(
+    family_name,
+    "lognormal" = "sigma",
+    "hurdle_poisson" = ,
+    "hurdle_gamma" = "hu",
+    "hurdle_negbinomial" = c("hu", "shape"),
+    "hurdle_lognormal" = c("hu", "sigma"),
+    "zero_inflated_poisson" = ,
+    "zero_inflated_negbinomial" = ,
+    "zero_inflated_beta" = ,
+    "zero_inflated_binomial" = ,
+    "zero_inflated_beta_binomial" = "zi",
+    "zero_one_inflated_beta" = c("zoi", "coi"),
+    "shifted_lognormal" = c("sigma", "ndt"),
+    "gen_extreme_value" = c("sigma", "xi"),
+    "com_binomial" = "nu",
+    character(0)
+  )
+}
+
+
+#' The mean kernel a family's `E[Y]` is defined by
+#'
+#' Each family's mean lives in one `posterior_epred_<family>()`
+#' function copied from brms. Looking it up by name is how
+#' `log_lik.mvgam()` reaches its own per-family densities, and it means
+#' a family's mean is written once rather than once in a kernel and
+#' again in a dispatch branch.
+#'
+#' @param family_name Resolved family name
+#' @return The kernel, or `NULL` when the family has none
+#'
+#' @noRd
+epred_kernel <- function(family_name) {
+  tryCatch(
+    get(paste0("posterior_epred_", family_name), mode = "function",
+        envir = asNamespace("mvgam")),
+    error = function(e) NULL
+  )
+}
+
+
+#' Mean of a family whose mean is not its inverse link
+#'
+#' Applies the per-family mean its brms counterpart uses, so the two
+#' agree on what `posterior_epred()` returns and there is one
+#' definition of each mean rather than a kernel and a dispatch branch
+#' free to drift apart. `mu` here is the base distribution's
+#' parameter, already on the response scale.
+#'
+#' @param family_name Resolved family name
+#' @param mu Numeric matrix ``\\[ndraws x nobs\\]`` of the base
+#'   distribution's parameter
+#' @param family_pars Named list of `dpar` draw matrices, as
+#'   `epred_extra_dpars()` asked for
+#' @param trials Trial counts, for the zero-inflated binomial
+#' @return Numeric matrix ``\\[ndraws x nobs\\]`` of `E[Y]`
+#'
+#' @noRd
+family_mean_from_kernel <- function(family_name, mu, family_pars,
+                                    trials = NULL) {
+  kernel <- epred_kernel(family_name)
+  if (is.null(kernel)) {
+    stop(insight::format_error(
+      paste0("No mean kernel is registered for family '",
+             family_name, "'.")
+    ))
+  }
+
+  needed <- epred_extra_dpars_for(family_name)
+  missing <- setdiff(needed, names(family_pars))
+  if (length(missing) > 0L) {
+    stop(insight::format_error(c(
+      paste0("Family '", family_name,
+             "' needs more than its linear predictor for E[Y]."),
+      x = paste0("Missing: ", paste(shQuote(missing), collapse = ", "), "."),
+      i = paste0(
+        "Resolve them with `resolve_family_pars()` and pass them as ",
+        "'family_pars'. What separates E[Y] from the base ",
+        "distribution's parameter is a mixing probability, a shift or ",
+        "a dispersion, depending on the family."
+      )
+    )))
+  }
+
+  for (dpar in needed) {
+    value <- family_pars[[dpar]]
+    checkmate::assert_matrix(value)
+    if (nrow(value) != nrow(mu) || ncol(value) != ncol(mu)) {
+      stop(insight::format_error(c(
+        paste0("Dimension mismatch for '", dpar, "' in E[Y]."),
+        x = paste0("Got [", nrow(value), " x ", ncol(value),
+                   "]; expected [", nrow(mu), " x ", ncol(mu), "].")
+      )))
+    }
+  }
+
+  prep <- list(
+    dpars = c(list(mu = mu), family_pars),
+    ndraws = nrow(mu),
+    nobs = ncol(mu),
+    data = list(trials = trials)
+  )
+  kernel(prep)
+}
+
 
 #' Extract trials from model object or newdata for binomial families
 #'
@@ -1249,6 +1403,11 @@ posterior_epred_com_poisson <- function(prep) {
 # These functions extract threshold parameters from posterior draws to
 # build the prep object expected by posterior_epred_ordinal().
 
+# The ordered families, named once so a branch cannot be added for
+# three of the four.
+ORDINAL_FAMILIES <- c("cumulative", "sratio", "cratio", "acat")
+
+
 #' Check if Family is Ordinal
 #'
 #' Determines whether a family object represents an ordinal model
@@ -1270,7 +1429,60 @@ is_ordinal_family <- function(family) {
   if (is.null(family) || is.null(family$family)) {
     return(FALSE)
   }
-  family$family %in% c("cumulative", "sratio", "cratio", "acat")
+  family$family %in% ORDINAL_FAMILIES
+}
+
+
+#' Expectation of a function of the ordered level under an ordinal epred
+#'
+#' An ordinal epred holds a probability per category rather than a mean,
+#' so a summary on the response scale is an expectation over the ordered
+#' levels. `posterior_predict()` draws those levels as the integers
+#' `1..K`, so taking `k` as the level keeps every ordinal summary on the
+#' same scale as the draws themselves.
+#'
+#' @param epred Array ``\\[ndraws x nobs x ncat\\]`` of category
+#'   probabilities
+#' @param f Function applied to the level index before averaging
+#' @return Numeric matrix ``\\[ndraws x nobs\\]``
+#'
+#' @noRd
+ordinal_category_moment <- function(epred, f) {
+  checkmate::assert_array(epred, mode = "numeric", d = 3L)
+  out <- matrix(0, nrow = dim(epred)[1L], ncol = dim(epred)[2L])
+  for (k in seq_len(dim(epred)[3L])) {
+    out <- out + f(k) * epred[, , k]
+  }
+  dimnames(out) <- dimnames(epred)[1:2]
+  out
+}
+
+
+#' Expected ordered level under an ordinal epred
+#'
+#' @param epred Array ``\\[ndraws x nobs x ncat\\]`` of category
+#'   probabilities
+#' @return Numeric matrix ``\\[ndraws x nobs\\]`` of expected levels
+#'
+#' @noRd
+ordinal_category_mean <- function(epred) {
+  ordinal_category_moment(epred, function(k) k)
+}
+
+
+#' Conditional variance of an ordinal response
+#'
+#' `E[k^2] - E[k]^2` over the ordered levels, which is the variance of
+#' the category `posterior_predict()` draws.
+#'
+#' @param epred Array ``\\[ndraws x nobs x ncat\\]`` of category
+#'   probabilities
+#' @return Numeric matrix ``\\[ndraws x nobs\\]`` of variances
+#'
+#' @noRd
+ordinal_category_variance <- function(epred) {
+  ordinal_category_moment(epred, function(k) k^2) -
+    ordinal_category_mean(epred)^2
 }
 
 

@@ -326,3 +326,27 @@ test_that("the trials denominator resolves against the prediction data", {
   )
 })
 
+
+test_that("an addition term is not counted as a response", {
+  # `y | trials(n)` names one response. Reading variable names off the
+  # whole left-hand side used to return the addition variables too,
+  # which then reached every consumer that treats `response_names` as
+  # the response columns of the data.
+  expect_equal(extract_response_names(y | trials(n) ~ x), "y")
+  expect_equal(extract_response_names(y | weights(w) + cens(c) ~ x), "y")
+  expect_equal(extract_response_names(y | trunc(lb = 0) ~ x), "y")
+  expect_equal(extract_response_names(y | se(s, sigma = TRUE) ~ x), "y")
+})
+
+test_that("responses without addition terms are unchanged", {
+  expect_equal(extract_response_names(y ~ x), "y")
+  expect_equal(extract_response_names(log(y) ~ x), "y")
+  expect_equal(extract_response_names(mvbind(y1, y2) ~ x), c("y1", "y2"))
+})
+
+test_that("a multivariate response keeps every outcome past its addition terms", {
+  expect_equal(
+    extract_response_names(mvbind(y1, y2) | weights(w) ~ x),
+    c("y1", "y2")
+  )
+})

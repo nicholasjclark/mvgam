@@ -354,20 +354,17 @@ test_that("compute_family_epred handles lognormal with sigma", {
   set.seed(123)
   linpred <- matrix(rnorm(20, mean = 1), nrow = 4, ncol = 5)
   sigma <- matrix(abs(rnorm(20, mean = 0.5)), nrow = 4, ncol = 5)
+  lognormal_family <- brms::lognormal()
 
-  lognormal_family <- list(
-    family = "lognormal",
-    linkinv = exp
-  )
-
-  # Requires sigma argument
+  # The Jensen correction needs sigma, so the mean is refused without it
   expect_error(
     compute_family_epred(linpred, lognormal_family),
-    "requires.*sigma"
+    "sigma"
   )
 
   # With sigma: E[Y] = exp(mu + sigma^2/2)
-  epred <- compute_family_epred(linpred, lognormal_family, sigma = sigma)
+  epred <- compute_family_epred(linpred, lognormal_family,
+                                family_pars = list(sigma = sigma))
   expected <- exp(linpred + sigma^2 / 2)
   expect_equal(epred, expected)
   expect_true(all(epred > 0))
@@ -411,11 +408,11 @@ test_that("compute_family_epred validates inputs", {
     "Must be of type 'matrix'"
   )
 
-  # Dimension mismatch for sigma
-  family <- list(family = "lognormal", linkinv = exp)
+  # A distributional parameter that does not match the predictor
   wrong_sigma <- matrix(1, nrow = 2, ncol = 3)
   expect_error(
-    compute_family_epred(linpred, family, sigma = wrong_sigma),
+    compute_family_epred(linpred, brms::lognormal(),
+                         family_pars = list(sigma = wrong_sigma)),
     "Dimension mismatch"
   )
 })
@@ -1439,4 +1436,156 @@ test_that("a denominator of zero is a legal binomial observation", {
     extract_trials_for_family(stub, binomial(), newdata = NULL),
     "trials"
   )
+})
+
+# A family whose mean is not the inverse link of its predictor has that
+# mean written twice: once in the per-family kernel copied from brms,
+# and once in the dispatch `compute_family_epred()` runs. The two are
+# free to disagree, and did: eight families returned the base
+# distribution's parameter as E[Y] while their kernels, tested on their
+# own, computed the right thing. This drives both and requires them to
+# agree, so a family cannot be added to one and not the other.
+epred_kernel_for <- function(family_name) {
+  tryCatch(
+    get(paste0("posterior_epred_", family_name),
+        envir = asNamespace("mvgam"), mode = "function"),
+    error = function(e) NULL
+  )
+}
+
+test_that("compute_family_epred agrees with every family's own mean kernel", {
+  dpar_value <- function(dpar) {
+    switch(dpar,
+      sigma = 0.7, shape = 2.5, phi = 4, nu = 6, hu = 0.3, zi = 0.25,
+      zoi = 0.2, coi = 0.6, beta = 1.3, alpha = 0.5, kappa = 2,
+      xi = 0.1, quantile = 0.5, ndt = 0.2, 0.5)
+  }
+  families <- c(
+    "gaussian", "poisson", "binomial", "bernoulli", "negbinomial",
+    "student", "lognormal", "beta", "beta_binomial", "exponential",
+    "weibull", "geometric", "skew_normal", "exgaussian",
+    "hurdle_poisson", "hurdle_negbinomial", "hurdle_gamma",
+    "hurdle_lognormal", "zero_inflated_poisson",
+    "zero_inflated_negbinomial", "zero_inflated_binomial",
+    "zero_inflated_beta", "zero_inflated_beta_binomial",
+    "zero_one_inflated_beta", "von_mises", "frechet",
+    "gen_extreme_value", "asym_laplace", "shifted_lognormal"
+  )
+  set.seed(19)
+  ndraws <- 3L
+  nobs <- 4L
+  trials <- rep(10, nobs)
+  compared <- 0L
+
+  for (family_name in families) {
+    kernel <- epred_kernel_for(family_name)
+    if (is.null(kernel)) next
+    family <- brms::brmsfamily(family_name)
+    eta <- matrix(stats::rnorm(ndraws * nobs, 0.3, 0.2), ndraws, nobs)
+    extra <- setdiff(family$dpars, "mu")
+    dpars <- c(
+      list(mu = family$linkinv(eta)),
+      stats::setNames(
+        lapply(extra, function(d) matrix(dpar_value(d), ndraws, nobs)),
+        extra
+      )
+    )
+    from_kernel <- kernel(list(
+      dpars = dpars, ndraws = ndraws, nobs = nobs,
+      data = list(trials = trials)
+    ))
+    needed <- epred_extra_dpars(family)
+    from_dispatch <- compute_family_epred(
+      linpred = eta, family = family, trials = trials,
+      family_pars = if (length(needed)) dpars[needed] else NULL
+    )
+    expect_equal(as.numeric(from_dispatch), as.numeric(from_kernel))
+    compared <- compared + 1L
+  }
+  # Guard against the loop silently comparing nothing.
+  expect_gt(compared, 25L)
+})
+
+test_that("epred_extra_dpars names what a family's mean needs beyond mu", {
+  expect_equal(epred_extra_dpars(brms::hurdle_poisson()), "hu")
+  expect_equal(epred_extra_dpars(brms::zero_inflated_poisson()), "zi")
+  expect_equal(epred_extra_dpars(brms::lognormal()), "sigma")
+  expect_setequal(epred_extra_dpars(brms::hurdle_negbinomial()),
+                  c("hu", "shape"))
+  expect_setequal(epred_extra_dpars(brms::zero_one_inflated_beta()),
+                  c("zoi", "coi"))
+  # A family whose mean is the inverse link needs nothing extra.
+  expect_equal(epred_extra_dpars(poisson()), character(0))
+  expect_equal(epred_extra_dpars(NULL), character(0))
+})
+
+test_that("a family's mean kernel refuses to run without its parameters", {
+  mu <- matrix(2, 3L, 4L)
+  expect_error(
+    family_mean_from_kernel("hurdle_poisson", mu, family_pars = list()),
+    "hu"
+  )
+  expect_error(
+    family_mean_from_kernel("nosuchfamily", mu, family_pars = list()),
+    "No mean kernel"
+  )
+})
+
+# `sample_from_family()` and `compute_family_epred()` are handed the same
+# quantity: the inverse link of the linear predictor. Six samplers instead
+# treated it as E[Y] and transformed it back, which shifted the draws and,
+# for the lognormal families, produced NaN wherever that parameter was not
+# positive. Averaging the draws and comparing against the mean ties the two
+# layers together, so neither can change its mind about what it was given.
+test_that("sampled draws average to the mean the same predictor implies", {
+  dpar_value <- function(dpar) {
+    switch(dpar,
+      sigma = 0.4, shape = 6, phi = 8, nu = 8, hu = 0.3, zi = 0.25,
+      zoi = 0.2, coi = 0.6, beta = 1.3, ndt = 0.2, 0.5)
+  }
+  # `hurdle_negbinomial` is left out deliberately. Its sampler is the
+  # one brms uses, which reaches a zero-truncated negative binomial by
+  # the tilt that is exact only for the Poisson, and so averages about
+  # five percent below the analytic mean. mvgam reproduces brms rather
+  # than diverging from it, so the draws are right and the comparison
+  # is not one this test can make.
+  families <- c(
+    "poisson", "negbinomial", "binomial", "bernoulli", "beta",
+    "beta_binomial", "lognormal", "hurdle_poisson",
+    "hurdle_lognormal", "zero_inflated_poisson",
+    "zero_inflated_negbinomial", "zero_inflated_binomial",
+    "zero_inflated_beta", "zero_inflated_beta_binomial"
+  )
+  set.seed(2024)
+  ndraws <- 40000L
+  trials <- 12
+  checked <- 0L
+
+  for (family_name in families) {
+    family <- brms::brmsfamily(family_name)
+    eta <- matrix(0.2, ndraws, 1L)
+    mu <- family$linkinv(eta)
+    extra <- setdiff(family$dpars, "mu")
+    dpars <- stats::setNames(
+      lapply(extra, function(d) matrix(dpar_value(d), ndraws, 1L)), extra
+    )
+    needed <- epred_extra_dpars(family)
+    expected <- compute_family_epred(
+      linpred = eta, family = family, trials = trials,
+      family_pars = if (length(needed)) dpars[needed] else NULL
+    )[1L, 1L]
+
+    args <- dpars[intersect(names(dpars), names(formals(sample_from_family)))]
+    drawn <- do.call(sample_from_family, c(
+      list(family_name = family_name, ndraws = ndraws, epred = mu,
+           trials = trials, lb = NULL, ub = NULL),
+      args
+    ))
+    expect_false(anyNA(drawn))
+    # Monte Carlo error over 40k draws. The defects this guards against
+    # were off by a factor, not by a few percent.
+    expect_equal(mean(drawn), expected, tolerance = 0.05)
+    checked <- checked + 1L
+  }
+  expect_equal(checked, length(families))
 })

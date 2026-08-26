@@ -552,8 +552,19 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
   a <- (1 - conf.level) / 2
   probs <- c(a, 1 - a)
 
-  fit_summ <- stats::fitted(
-    x, robust = robust, probs = probs, resp = down_resp
+  fit_draws <- stats::fitted(
+    x, robust = robust, probs = probs, resp = down_resp,
+    summary = FALSE
+  )
+  # An ordinal fit predicts a probability per category, so it has no
+  # single fitted value to put in a column. The expected ordered level
+  # is that prediction on the scale the residuals and
+  # `posterior_predict()` already work on.
+  if (length(dim(fit_draws)) == 3L) {
+    fit_draws <- ordinal_category_mean(fit_draws)
+  }
+  fit_summ <- summarize_predictions(
+    fit_draws, probs = probs, robust = robust
   ) |>
     tibble::as_tibble()
   resid_summ <- residuals(

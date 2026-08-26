@@ -135,7 +135,7 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
     "VAR" = extract_var_state(one_draw, meta, state_dim, n_lv, fit,
                                 state_var = state_var),
     "CAR" = extract_car_state(one_draw, meta, n_series, fit),
-    "ZMVN" = extract_zmvn_state(one_draw, meta, state_dim, n_lv,
+    "ZMVN" = extract_zmvn_state(one_draw, meta, state_dim, n_lv, fit,
                                   state_var = state_var),
     "PW" = extract_pw_state(one_draw, meta, n_series, n_lv, fit),
     stop(insight::format_error(c(
@@ -244,9 +244,21 @@ broadcast_to_series <- function(vec, n_series) {
 
 # Internal: pull `sigma_trend` per series and (optionally) build
 # the innovation covariance `Sigma` from `L_Omega_trend`.
+#
+# A grouped trend carries neither of those. Its scales are
+# `sigma_group_trend[g, k]` and its correlations are a population
+# factor plus a per-group deviation, so it is read through the same
+# helper the innovation transform uses and assembled as one
+# block-diagonal covariance over the series, groups being independent.
 #'@noRd
 extract_sigma_and_cov <- function(one_draw, n_series, n_lv,
-                                    has_cor) {
+                                    has_cor, standata = NULL) {
+  group_info <- hierarchical_group_info(standata)
+  if (!is.null(group_info)) {
+    return(extract_hierarchical_sigma_and_cov(
+      one_draw, n_series, group_info
+    ))
+  }
   sigma_nms <- paste0("sigma_trend[", seq_len(n_lv), "]")
   sigma_vec <- broadcast_to_series(
     as.numeric(one_draw[sigma_nms]), n_series
@@ -259,9 +271,72 @@ extract_sigma_and_cov <- function(one_draw, n_series, n_lv,
         L[i, j] <- as.numeric(one_draw[[nm]])
       }
     }
-    diag(sigma_vec) %*% tcrossprod(L) %*% diag(sigma_vec)
+    # `diag(x)` for a length-one x builds an x-by-x identity rather
+    # than a 1x1 matrix holding x, so the scaling is applied by row
+    # and column instead.
+    sigma_vec * tcrossprod(L) * rep(sigma_vec, each = n_series)
   } else {
     diag(sigma_vec^2, nrow = n_series)
+  }
+  list(sigma = sigma_vec, Sigma = Sigma)
+}
+
+
+# Internal: the group structure of a hierarchical trend, or NULL when
+# the trend is not grouped. `standata` is the fit's Stan data, which is
+# where the group index of each series is recorded.
+#'@noRd
+hierarchical_group_info <- function(standata) {
+  if (is.null(standata) || is.null(standata$N_groups_trend)) {
+    return(NULL)
+  }
+  get_group_info(standata)
+}
+
+
+# Internal: per-series scales and the block-diagonal innovation
+# covariance of a grouped trend, for one posterior draw.
+#'@noRd
+extract_hierarchical_sigma_and_cov <- function(one_draw, n_series,
+                                                group_info) {
+  n_groups <- as.integer(group_info$n_groups)
+  n_sub <- as.integer(group_info$n_subgroups)
+  group_inds <- as.integer(group_info$group_inds)
+  checkmate::assert_integerish(
+    group_inds, lower = 1, upper = n_groups, len = n_series,
+    any.missing = FALSE
+  )
+
+  read_matrix <- function(prefix, group = NULL) {
+    nms <- stan_matrix_names(prefix, n_sub, n_sub, lead = group)
+    matrix(as.numeric(one_draw[nms]), nrow = n_sub, ncol = n_sub)
+  }
+
+  alpha <- as.numeric(one_draw[[HIER_COV_PARS$alpha]])
+  L_global <- read_matrix(HIER_COV_PARS$global)
+
+  # Each series' position within its own group, which is the row of
+  # that group's covariance the series occupies.
+  within_pos <- as.integer(
+    stats::ave(seq_along(group_inds), group_inds, FUN = seq_along)
+  )
+
+  sigma_vec <- numeric(n_series)
+  Sigma <- matrix(0, nrow = n_series, ncol = n_series)
+  for (g in seq_len(n_groups)) {
+    sigma_g <- as.numeric(one_draw[
+      stan_vector_names(HIER_COV_PARS$sigma, n_sub, lead = g)
+    ])
+    L_dev <- read_matrix(HIER_COV_PARS$deviation, group = g)
+    L_full <- hierarchical_group_cholesky(
+      alpha = alpha, L_global = L_global, L_deviation = L_dev,
+      sigma = sigma_g
+    )
+    series_g <- which(group_inds == g)
+    pos_g <- within_pos[series_g]
+    sigma_vec[series_g] <- sigma_g[pos_g]
+    Sigma[series_g, series_g] <- tcrossprod(L_full)[pos_g, pos_g,
+                                                    drop = FALSE]
   }
   list(sigma = sigma_vec, Sigma = Sigma)
 }
@@ -353,7 +428,7 @@ extract_arma_state <- function(one_draw, meta, n_series, n_lv, fit,
   # extractors and `broadcast_to_series()` therefore return
   # length-n_lv vectors, which is what the kernel expects.
   scov <- extract_sigma_and_cov(one_draw, n_series, n_lv,
-                                 meta$has_cor)
+                                 meta$has_cor, fit$standata)
   params <- list(sigma = scov$sigma, Sigma = scov$Sigma)
   if (pull_ar) {
     params$ar <- extract_ar_coefs(one_draw, meta$ar_lags,
@@ -403,7 +478,7 @@ extract_var_state <- function(one_draw, meta, n_series, n_lv, fit,
     }
   }
   scov <- extract_sigma_and_cov(one_draw, n_series, n_lv,
-                                 has_cor = TRUE)
+                                 has_cor = TRUE, standata = fit$standata)
   params <- list(A = A_cube,
                   sigma = scov$sigma,
                   Sigma = scov$Sigma)
@@ -511,7 +586,7 @@ extract_last_observed_times <- function(fit, n_series) {
 # which the caller projects to the series scale via
 # apply_factor_projection().
 #'@noRd
-extract_zmvn_state <- function(one_draw, meta, n_series, n_lv,
+extract_zmvn_state <- function(one_draw, meta, n_series, n_lv, fit,
                                 state_var = "trend") {
   is_factor <- state_var != "trend"
   if (is_factor) {
@@ -519,7 +594,8 @@ extract_zmvn_state <- function(one_draw, meta, n_series, n_lv,
     sigma <- rep(1, n_series)
   } else {
     scov <- extract_sigma_and_cov(one_draw, n_series, n_lv,
-                                   has_cor = TRUE)
+                                   has_cor = TRUE,
+                                   standata = fit$standata)
     Sigma <- scov$Sigma
     sigma <- scov$sigma
   }

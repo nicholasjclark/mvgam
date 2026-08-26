@@ -185,31 +185,50 @@ test_that("get_combined_linpred returns obs only when no trend model", {
 })
 
 
-# transform = TRUE: posterior_linpred.mvgam must forward to
-# posterior_epred so the inverse link / family-specific E[Y]
-# transformation is applied (brms convention).
-test_that("posterior_linpred(transform = TRUE) forwards to posterior_epred", {
-  sentinel <- matrix(rnorm(12), nrow = 4, ncol = 3)
-  call_log <- list()
+# transform = TRUE answers for `mu` on its own scale, which is the
+# inverse of that parameter's link and nothing more. brms does the same
+# by setting `dpar = "mu"`; `posterior_epred()` is what answers for
+# `E[Y]`, and the two differ wherever a family moves mass to zero,
+# multiplies by trials or carries a Jensen correction.
+test_that("posterior_linpred(transform = TRUE) applies mu's inverse link", {
   testthat::local_mocked_bindings(
-    posterior_epred.mvgam = function(object, ...) {
-      call_log[["called"]] <<- TRUE
-      call_log[["dots"]] <<- list(...)
-      sentinel
+    extract_component_linpred = function(mvgam_fit, newdata, component, ...) {
+      if (component == "obs") matrix(1, 4, 3) else matrix(0.5, 4, 3)
     },
+    has_stochastic_trend = function(object) FALSE,
     .package = "mvgam"
   )
-  out <- posterior_linpred.mvgam(
-    stub_obj(),
-    newdata = NULL,
-    transform = TRUE,
-    process_error = FALSE,
-    ndraws = 4
+  obj <- stub_obj()
+  obj$data <- data.frame(x = 1:3)
+  obj$family <- poisson()
+
+  linear <- posterior_linpred.mvgam(obj, transform = FALSE,
+                                    process_error = TRUE)
+  response <- posterior_linpred.mvgam(obj, transform = TRUE,
+                                      process_error = TRUE)
+
+  expect_equal(linear, matrix(1.5, 4, 3))
+  expect_equal(response, exp(linear))
+})
+
+test_that("posterior_linpred(transform = TRUE) does not answer for E[Y]", {
+  # A binomial `mu` is a probability, so the transformed predictor must
+  # not carry the trial counts that `posterior_epred()` multiplies in.
+  testthat::local_mocked_bindings(
+    extract_component_linpred = function(mvgam_fit, newdata, component, ...) {
+      if (component == "obs") matrix(0, 4, 3) else matrix(0, 4, 3)
+    },
+    has_stochastic_trend = function(object) FALSE,
+    .package = "mvgam"
   )
-  expect_true(isTRUE(call_log$called))
-  expect_identical(out, sentinel)
-  expect_identical(call_log$dots$process_error, FALSE)
-  expect_identical(call_log$dots$ndraws, 4)
+  obj <- stub_obj()
+  obj$data <- data.frame(x = 1:3)
+  obj$family <- binomial()
+
+  out <- posterior_linpred.mvgam(obj, transform = TRUE,
+                                 process_error = TRUE)
+  expect_equal(out, matrix(0.5, 4, 3))
+  expect_true(all(out <= 1))
 })
 
 

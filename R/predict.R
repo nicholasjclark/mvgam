@@ -487,6 +487,17 @@ predict_variance <- function(object, newdata, process_error, ndraws,
   # align.
   draw_idx <- resolve_draw_indices(total_draws, ndraws, NULL)
 
+  # An ordinal family predicts a probability per category rather than a
+  # mean, so its epred carries a third margin and none of the dispersion
+  # parameters below apply. posterior_predict() draws the ordered levels
+  # as the integers 1..K, so the variance of that draw is what the
+  # category probabilities imply.
+  if (is_ordinal_family(object$family)) {
+    return(ordinal_category_variance(
+      mu_full[draw_idx, , , drop = FALSE]
+    ))
+  }
+
   mu <- mu_full[draw_idx, , drop = FALSE]
   ndraws_mu <- nrow(mu)
   nobs_mu <- ncol(mu)
@@ -547,27 +558,58 @@ predict_variance <- function(object, newdata, process_error, ndraws,
 
 #' Summarize Posterior Prediction Draws
 #'
-#' Computes summary statistics from a matrix of posterior draws following
-#'   the brms output format.
+#' Computes summary statistics from posterior draws following the brms
+#'   output format.
 #'
-#' @param draws Matrix of posterior draws with dimensions ``\\[ndraws x nobs\\]``.
+#' @param draws Posterior draws, either a matrix
+#'   ``\\[ndraws x nobs\\]`` or, for the ordinal and categorical
+#'   families, an array ``\\[ndraws x nobs x ncat\\]``.
 #' @param probs Numeric vector of probabilities for quantile computation.
 #' @param robust Logical. If `FALSE`, uses mean and sd. If `TRUE`, uses
 #'   median and mad.
 #'
-#' @return Matrix with columns for point estimate, uncertainty, and
-#'   quantiles.
+#' @return For matrix input, a matrix with columns for point estimate,
+#'   uncertainty and quantiles. For array input, an array
+#'   ``\\[nobs x nstat x ncat\\]`` holding the same columns for each
+#'   category.
 #'
 #' @noRd
 summarize_predictions <- function(draws, probs, robust) {
+  checkmate::assert_numeric(probs, lower = 0, upper = 1, min.len = 1)
+  checkmate::assert_logical(robust, len = 1)
+
+  # The ordinal and categorical families predict a probability per
+  # category, so their draws carry a third margin. Each category is
+  # summarised on its own and the results are stacked back along that
+  # margin, which is the shape brms returns for the same families.
+  if (length(dim(draws)) == 3L) {
+    checkmate::assert_array(draws, mode = "numeric", d = 3L)
+    cats <- seq_len(dim(draws)[3L])
+    per_cat <- lapply(cats, function(k) {
+      slice <- matrix(
+        draws[, , k], nrow = dim(draws)[1L], ncol = dim(draws)[2L],
+        dimnames = dimnames(draws)[1:2]
+      )
+      summarize_predictions(slice, probs = probs, robust = robust)
+    })
+    out <- array(
+      unlist(per_cat, use.names = FALSE),
+      dim = c(dim(per_cat[[1L]]), length(cats)),
+      dimnames = list(
+        dimnames(draws)[[2L]],
+        colnames(per_cat[[1L]]),
+        dimnames(draws)[[3L]]
+      )
+    )
+    return(out)
+  }
+
   checkmate::assert_matrix(
     draws,
     mode = "numeric",
     min.rows = 1,
     min.cols = 1
   )
-  checkmate::assert_numeric(probs, lower = 0, upper = 1, min.len = 1)
-  checkmate::assert_logical(robust, len = 1)
 
   # Compute point estimates and uncertainty
   if (robust) {

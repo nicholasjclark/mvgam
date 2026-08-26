@@ -1050,11 +1050,6 @@ extract_response_names <- function(formula) {
   # Case 3: Standard formula with mvbind binding ONLY (corrected)
   # This covers: mvbind(y1, y2) ~ x (cbind EXCLUDED - not multivariate per brms)
   if (inherits(formula, "formula")) {
-    mvbind_result <- extract_mvbind_responses(formula)
-    if (!is.null(mvbind_result)) {
-      return(mvbind_result)
-    }
-
     # Handle univariate formula case - extract single response with fail-fast
     if (length(formula) < 3) {
       stop(insight::format_error(c(
@@ -1063,6 +1058,17 @@ extract_response_names <- function(formula) {
           "Provide a formula with the form {.code response ~ predictors}."
         )
       )), call. = FALSE)
+    }
+
+    # Everything after the first `|` on the left-hand side is an
+    # addition term rather than a response, so `y | trials(n)` names
+    # one response and not two. brms draws the same line in
+    # `validate_resp_formula()`.
+    formula <- strip_addition_terms(formula)
+
+    mvbind_result <- extract_mvbind_responses(formula)
+    if (!is.null(mvbind_result)) {
+      return(mvbind_result)
     }
 
     response_terms <- all.vars(formula[[2]])
@@ -1097,6 +1103,28 @@ extract_response_names <- function(formula) {
     i = "Supported types: formula, brmsformula, mvbrmsformula, bform."
   )), call. = FALSE)
 }
+
+#' Drop the addition terms from a formula's left-hand side
+#'
+#' `y | trials(n) ~ x` carries the response and the terms that qualify
+#' it in one expression. Reading variable names off the whole
+#' left-hand side counts the qualifiers as responses, so they are
+#' removed first.
+#'
+#' @param formula A two-sided formula
+#' @return The same formula with the left-hand side reduced to the
+#'   response expression
+#'
+#' @noRd
+strip_addition_terms <- function(formula) {
+  lhs <- formula[[2L]]
+  if (!is.call(lhs) || !identical(as.character(lhs[[1L]]), "|")) {
+    return(formula)
+  }
+  formula[[2L]] <- lhs[[2L]]
+  formula
+}
+
 
 #' Extract Response Names from mvbind Expression
 #'

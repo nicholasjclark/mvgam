@@ -2335,10 +2335,15 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
       )
       stanvar_components <- append(stanvar_components, list(l_omega_stanvar))
 
-      # Derived covariance matrix in transformed parameters
+      # Derived covariance matrix in transformed parameters. The
+      # scaled Cholesky factor is the intermediate, not the reported
+      # quantity: `Sigma_trend` is read as a covariance wherever it
+      # appears, including by the VAR generator below and by the label
+      # `generate_parameter_label()` gives it.
       sigma_matrix_code <- paste0(
-        "matrix[", effective_dim, ", ", effective_dim, "] Sigma_trend = ",
-        "diag_pre_multiply(sigma_trend, L_Omega_trend);"
+        "cov_matrix[", effective_dim, "] Sigma_trend = ",
+        "multiply_lower_tri_self_transpose(",
+        "diag_pre_multiply(sigma_trend, L_Omega_trend));"
       )
 
       sigma_matrix_stanvar <- brms::stanvar(

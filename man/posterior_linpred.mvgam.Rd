@@ -23,10 +23,14 @@
 \item{object}{A fitted mvgam object from \code{\link[=mvgam]{mvgam()}}.}
 
 \item{transform}{Logical; if \code{FALSE} (default), values are returned
-on the link scale. If \code{TRUE}, the inverse link is applied and
-the call is forwarded to \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} so the
-returned matrix is on the response scale. Mirrors the
-\code{transform} argument of \code{\link[brms:posterior_linpred.brmsfit]{brms::posterior_linpred()}}.}
+on the link scale. If \code{TRUE}, the inverse link of \code{mu} is applied,
+so the result is on that parameter's own scale. This is not the
+mean of the response: a binomial \code{mu} is a probability rather than
+a count, and a hurdle or zero-inflated \code{mu} is the base
+distribution's parameter before any mass is moved to zero. Use
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} for \code{E[Y]}. Mirrors the \code{transform}
+argument of \code{\link[brms:posterior_linpred.brmsfit]{brms::posterior_linpred()}}, which sets \code{dpar = "mu"}
+and answers on the response scale.}
 
 \item{newdata}{Optional data frame with covariates for prediction. If
 NULL, uses original training data stored in the model object.}

@@ -786,3 +786,95 @@ test_that("bin_draws() keeps the shape of a posterior at a fraction of it", {
   # Nothing to bin is empty, not an error.
   expect_equal(bin_draws(numeric(0), bins = 10L)$counts, 0L)
 })
+
+test_that("extract_sigma_and_cov: a single series gives a 1x1 covariance", {
+  # `diag(x)` for a length-one x builds an x-by-x identity rather than
+  # a 1x1 matrix holding x, so a one-series correlated trend used to
+  # produce a non-conformable Sigma and abort the forecast.
+  one_draw <- c("sigma_trend[1]" = 0.4, "L_Omega_trend[1,1]" = 1)
+  out <- extract_sigma_and_cov(one_draw, n_series = 1L, n_lv = 1L,
+                               has_cor = TRUE)
+
+  expect_equal(dim(out$Sigma), c(1L, 1L))
+  expect_equal(as.numeric(out$Sigma), 0.16)
+  expect_equal(out$sigma, 0.4, ignore_attr = TRUE)
+})
+
+test_that("extract_sigma_and_cov: two series scale the correlation both ways", {
+  one_draw <- c(
+    "sigma_trend[1]" = 2, "sigma_trend[2]" = 3,
+    "L_Omega_trend[1,1]" = 1,
+    "L_Omega_trend[2,1]" = 0.6, "L_Omega_trend[2,2]" = 0.8
+  )
+  out <- extract_sigma_and_cov(one_draw, n_series = 2L, n_lv = 2L,
+                               has_cor = TRUE)
+
+  L <- matrix(c(1, 0.6, 0, 0.8), nrow = 2L)
+  expected <- diag(c(2, 3)) %*% tcrossprod(L) %*% diag(c(2, 3))
+  expect_equal(out$Sigma, expected, ignore_attr = TRUE)
+  expect_equal(diag(out$Sigma), c(4, 9), ignore_attr = TRUE)
+})
+
+test_that("extract_sigma_and_cov: a grouped trend reads its own parameters", {
+  # A grouped trend carries no `sigma_trend` or `L_Omega_trend` at all:
+  # its scales are per group and its correlations are a population
+  # factor pulled towards each group's own. Asking for the flat names
+  # used to abort the forecast with a subscript error.
+  n_sub <- 2L
+  n_groups <- 2L
+  group_inds <- c(1L, 1L, 2L, 2L)
+  one_draw <- c("alpha_cor_trend" = 0.5)
+  L_global <- matrix(c(1, 0.5, 0, sqrt(1 - 0.25)), nrow = n_sub)
+  for (i in 1:n_sub) for (j in 1:n_sub) {
+    one_draw[sprintf("L_Omega_global_trend[%d,%d]", i, j)] <- L_global[i, j]
+  }
+  L_dev <- list(diag(n_sub), matrix(c(1, -0.4, 0, sqrt(1 - 0.16)), nrow = n_sub))
+  sigmas <- list(c(1, 2), c(3, 0.5))
+  for (g in seq_len(n_groups)) {
+    for (i in 1:n_sub) for (j in 1:n_sub) {
+      one_draw[sprintf("L_deviation_group_trend[%d,%d,%d]", g, i, j)] <-
+        L_dev[[g]][i, j]
+    }
+    for (k in 1:n_sub) {
+      one_draw[sprintf("sigma_group_trend[%d,%d]", g, k)] <- sigmas[[g]][k]
+    }
+  }
+  group_info <- list(n_groups = n_groups, n_subgroups = n_sub,
+                     group_inds = group_inds)
+
+  out <- extract_hierarchical_sigma_and_cov(one_draw, 4L, group_info)
+
+  expect_equal(dim(out$Sigma), c(4L, 4L))
+  expect_equal(out$sigma, c(1, 2, 3, 0.5), ignore_attr = TRUE)
+  # Groups are independent, so every cross-group entry is zero.
+  expect_true(all(out$Sigma[1:2, 3:4] == 0))
+  expect_true(all(out$Sigma[3:4, 1:2] == 0))
+  # Each block is the covariance the shared helper builds.
+  for (g in seq_len(n_groups)) {
+    L_full <- hierarchical_group_cholesky(
+      alpha = 0.5, L_global = L_global, L_deviation = L_dev[[g]],
+      sigma = sigmas[[g]]
+    )
+    idx <- which(group_inds == g)
+    expect_equal(out$Sigma[idx, idx], tcrossprod(L_full),
+                 ignore_attr = TRUE)
+  }
+  expect_equal(diag(out$Sigma), out$sigma^2, ignore_attr = TRUE)
+})
+
+test_that("hierarchical_group_cholesky: alpha weights population against group", {
+  L_global <- matrix(c(1, 0.8, 0, 0.6), nrow = 2L)
+  L_dev <- diag(2L)
+  sigma <- c(1, 1)
+
+  # alpha = 1 keeps the population correlation alone.
+  all_pop <- hierarchical_group_cholesky(1, L_global, L_dev, sigma)
+  expect_equal(tcrossprod(all_pop), tcrossprod(L_global))
+  # alpha = 0 keeps the group's own.
+  all_grp <- hierarchical_group_cholesky(0, L_global, L_dev, sigma)
+  expect_equal(tcrossprod(all_grp), diag(2L))
+  # sigma scales the covariance by its outer product.
+  scaled <- hierarchical_group_cholesky(1, L_global, L_dev, c(2, 3))
+  expect_equal(tcrossprod(scaled),
+               diag(c(2, 3)) %*% tcrossprod(L_global) %*% diag(c(2, 3)))
+})

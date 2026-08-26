@@ -672,6 +672,26 @@ ordinal_sample <- function(eta, thres, disc = 1, link = "logit") {
 }
 
 
+#' Draw beta-binomial variates in the mean-precision parameterisation
+#'
+#' `extraDistr::rbbinom()` takes the two Beta shapes, while brms and
+#' mvgam both parameterise the family by a per-trial probability and a
+#' precision. Converting in one place keeps the two samplers that need
+#' it agreeing with `dbeta_binomial()` and with the Stan likelihood.
+#'
+#' @param n Number of variates
+#' @param size Trial counts
+#' @param mu Per-trial probability
+#' @param phi Precision
+#' @return Integer vector of length `n`
+#'
+#' @noRd
+rbeta_binomial_draws <- function(n, size, mu, phi) {
+  probs <- stats::rbeta(n, mu * phi, (1 - mu) * phi)
+  stats::rbinom(n, size = size, prob = probs)
+}
+
+
 sample_from_family <- function(family_name, ndraws, epred,
                                sigma = NULL, phi = NULL,
                                shape = NULL, nu = NULL,
@@ -819,28 +839,21 @@ sample_from_family <- function(family_name, ndraws, epred,
 
     "lognormal" = {
       checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
-      # epred = exp(mu + sigma^2/2), so mu = log(epred) - sigma^2/2
-      mu <- log(epred) - sigma^2 / 2
-      stats::rlnorm(length(epred), meanlog = mu, sdlog = sigma)
+      # `epred` here is the inverse link of the predictor, which for a
+      # lognormal is `meanlog` itself and not `E[Y]`. brms samples from
+      # the same parameter; correcting it to the mean would both shift
+      # the draws and produce NaN wherever `meanlog` is not positive.
+      stats::rlnorm(length(epred), meanlog = epred, sdlog = sigma)
     },
 
     "shifted_lognormal" = {
       checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(ndt, nrows = ndraws, ncols = ncol(epred))
-      # Validate epred > ndt (shift must be less than expected value)
-      if (any(epred <= ndt)) {
-        stop(insight::format_error(
-          cli::format_inline(
-            "For shifted_lognormal, expected values must exceed shift (ndt). Found {sum(epred <= ndt)} values where epred <= ndt."
-          )
-        ))
-      }
-      # epred = exp(meanlog + sigma^2/2) + ndt
-      # So meanlog = log(epred - ndt) - sigma^2/2
-      meanlog <- log(epred - ndt) - sigma^2 / 2
+      # As for the lognormal, `epred` is `meanlog` rather than `E[Y]`,
+      # so it is the shift's own parameter and needs no correction.
       brms::rshifted_lnorm(
         length(epred),
-        meanlog = meanlog,
+        meanlog = epred,
         sdlog = sigma,
         shift = ndt
       )
@@ -929,13 +942,11 @@ sample_from_family <- function(family_name, ndraws, epred,
     "beta_binomial" = {
       checkmate::assert_numeric(trials, min.len = 1)
       checkmate::assert_matrix(phi, nrows = ndraws, ncols = ncol(epred))
-      # epred = mu * trials, mu = epred / trials
-      if (length(trials) == 1) {
-        mu <- epred / trials
-      } else {
-        mu <- sweep(epred, 2, trials, `/`)
-      }
-      extraDistr::rbbinom(length(epred), size = trials, mu = mu, sigma = phi)
+      # `epred` is the inverse link of the predictor, so it is already
+      # the per-trial probability the sampler wants, as it is for the
+      # plain binomial above.
+      rbeta_binomial_draws(length(epred), size = trials, mu = epred,
+                           phi = phi)
     },
 
     "bernoulli" = {
@@ -960,26 +971,17 @@ sample_from_family <- function(family_name, ndraws, epred,
     "zero_inflated_binomial" = {
       checkmate::assert_numeric(trials, min.len = 1)
       checkmate::assert_matrix(zi, nrows = ndraws, ncols = ncol(epred))
-      if (length(trials) == 1) {
-        prob <- epred / trials
-      } else {
-        prob <- sweep(epred, 2, trials, `/`)
-      }
       tmp <- stats::runif(length(epred))
-      ifelse(tmp < zi, 0L, stats::rbinom(length(epred), size = trials, prob = prob))
+      ifelse(tmp < zi, 0L,
+             stats::rbinom(length(epred), size = trials, prob = epred))
     },
 
     "zero_inflated_beta_binomial" = {
       checkmate::assert_numeric(trials, min.len = 1)
       checkmate::assert_matrix(zi, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(phi, nrows = ndraws, ncols = ncol(epred))
-      if (length(trials) == 1) {
-        mu <- epred / trials
-      } else {
-        mu <- sweep(epred, 2, trials, `/`)
-      }
-      draws <- extraDistr::rbbinom(length(epred), size = trials, mu = mu,
-                                   sigma = phi)
+      draws <- rbeta_binomial_draws(length(epred), size = trials,
+                                    mu = epred, phi = phi)
       tmp <- stats::runif(length(epred))
       draws[tmp < zi] <- 0L
       draws
@@ -1070,8 +1072,8 @@ sample_from_family <- function(family_name, ndraws, epred,
       checkmate::assert_matrix(hu, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(sigma, nrows = ndraws, ncols = ncol(epred))
       tmp <- stats::runif(length(epred))
-      mu <- log(epred) - sigma^2 / 2
-      ifelse(tmp < hu, 0, stats::rlnorm(length(epred), meanlog = mu, sdlog = sigma))
+      ifelse(tmp < hu, 0,
+             stats::rlnorm(length(epred), meanlog = epred, sdlog = sigma))
     },
 
     "hurdle_cumulative" = {
@@ -2007,8 +2009,7 @@ predict_single_response <- function(object, linpred_resp, resp, draw_ids,
 
   # Ordinal families need thres + disc draws and operate on the
   # link-scale linear predictor rather than the response-scale mu.
-  ordinal_families <- c("cumulative", "sratio", "cratio", "acat")
-  if (family_name %in% ordinal_families) {
+  if (family_name %in% ORDINAL_FAMILIES) {
     dpars$thres <- extract_ordinal_thresholds(object, ndraws = ndraws,
                                               draw_ids = draw_ids)
     dpars$disc <- extract_ordinal_disc(object, ndraws = ndraws,

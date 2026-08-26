@@ -1246,8 +1246,7 @@ sample_family_batched <- function(object, mu, fc_data, ndraws_use,
   trials <- extract_trials_for_family(object, family, fc_data)
   trunc_bounds <- extract_truncation_bounds(object, nobs)
 
-  ordinal_families <- c("cumulative", "sratio", "cratio", "acat")
-  if (family_name %in% ordinal_families) {
+  if (family_name %in% ORDINAL_FAMILIES) {
     dpars$thres <- extract_ordinal_thresholds(object,
                                                 ndraws = ndraws_use,
                                                 draw_ids = draw_idx)
