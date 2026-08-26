@@ -252,6 +252,64 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > the counts rather than the draws: the same breaks, the same
   > counts, at 10.8 KB against 283 KB.
 
+- [x] **10.0 The response scale meant two things**
+  > Found by driving every family through the dispatch rather than by
+  > a fixture, since no fixture reaches most of them. `E[Y]` was the
+  > inverse link of the predictor for twelve families whose mean is
+  > not that: every hurdle and zero-inflated family returned the base
+  > distribution's parameter with none of the mass moved to zero, and
+  > `lognormal` errored, because the dispersion its Jensen correction
+  > needs was never resolved. The means were already written and
+  > unit-tested, copied from brms, and nothing called them. Each is
+  > now read from the one function defining it, found by name the way
+  > `log_lik.mvgam()` finds its densities, with the parameters it
+  > needs named once and resolved before dispatch. Six samplers made
+  > the mirror-image mistake and transformed what they were handed as
+  > though it were `E[Y]`: two turned 45% of a lognormal fit's draws
+  > into `NaN`, three divided a probability by the trial count, and
+  > one called a beta-binomial generator with arguments it does not
+  > take. A test averages the draws against the mean, so neither
+  > layer can change its mind about what it was given.
+  >
+  > `posterior_linpred(transform = TRUE)` answered with `E[Y]`, which
+  > is neither what its documentation claims nor what brms does: brms
+  > sets `dpar = "mu"` and answers on that parameter's scale, so a
+  > binomial gives a probability rather than a count.
+  >
+  > `hurdle_negbinomial` remains about five percent below its
+  > analytic mean. Its sampler is brms's, which reaches a truncated
+  > negative binomial by a tilt exact only for the Poisson; matching
+  > brms is what the concordance tests want, so the difference is
+  > recorded rather than removed.
+
+- [x] **11.0 A grouped trend could not be forecast**
+  > The covariance of a grouped trend is a population factor pulled
+  > towards each group's own, and the forecast reader asked for the
+  > flat parameterisation such a fit does not carry. It now reads the
+  > grouped structure through the helper the innovation transform
+  > already used, and both name their parameters through one list,
+  > since spelling a name two ways is what let the readers disagree in
+  > the first place. A single-series correlated trend failed for a
+  > different reason: `diag()` builds an identity matrix from a
+  > length-one vector rather than a one-by-one matrix holding it.
+  >
+  > `Sigma_trend` was the scaled Cholesky factor on the general trend
+  > path and the covariance on the VAR path, under a label calling it
+  > a covariance. It is the covariance on both. Cached fixtures still
+  > hold the old value until they are refit.
+
+- [x] **12.0 The ordinal post-fit surface**
+  > An ordinal fit predicts a probability per category, which the
+  > shared summariser could not take, so `predict()`, `fitted()` and
+  > `augment()` failed together. The summary keeps that margin the way
+  > brms does, `augment()` reports the expected ordered level,
+  > `predict(type = "variance")` answers with the variance of the
+  > category `posterior_predict()` draws, and `plot(type = "series")`
+  > draws against the ordered level rather than refusing the factor.
+  > Separately, an addition term was counted as a response, so
+  > `y | trials(n)` named two, which broke every forecast that pads
+  > the response with `NA`.
+
 - [ ] **3.0 Close the post-fit coverage gaps**
   > `plot_slopes`, `plot_comparisons`, `hypotheses`,
   > `posterior_transition_matrix`, `latent_N_saturation` and
