@@ -12,6 +12,36 @@ by \code{get_predict}, so \code{get_coef} / \code{get_vcov} / \code{set_coef} ex
 only to satisfy the S3 surface. Neither predictions nor slopes
 read them.
 }
+\section{Prediction scale}{
+
+The \code{type} tokens mvgam registers differ from the ones other model
+classes use, so it is worth naming them. \code{"expected"} is \code{E[Y]},
+the quantity most classes reach through \code{"response"}; \code{"response"}
+here is the outcome scale, carrying observation noise, and returns
+integers for a count family. \code{"link"} is the linear predictor.
+marginaleffects orders \code{"response"} first and takes its default
+from that, so pass \code{type = "expected"} when the expectation is what
+is wanted. Results are summarised by the posterior median, which
+for a skewed predictive sits below the mean.
+}
+
+\section{The latent trend}{
+
+\code{process_error = FALSE}, the default, holds the trend at its
+deterministic submodel, which is the counterfactual these surfaces
+are usually read for: a covariate effect with the trend fixed,
+drawn against a credible band that stays legible. It corresponds to
+brms's \code{incl_autocor = FALSE}, though brms defaults the other way.
+
+The cost is that a slope or a comparison taken this way is biased
+low against the fitted model's own \code{E[Y]}, by
+\eqn{\exp(\sigma^2 / (2(1 - \rho^2)))} on a log link, since the
+trend's stationary spread is left out of the expectation being
+differentiated. Pass \code{process_error = TRUE} for the unbiased
+effect; the band widens with it, because the latent state's own
+uncertainty is then part of the answer.
+}
+
 \references{
 Arel-Bundock, V., Greifer, N. and Heiss, A. (2024). How to
 interpret statistical models using marginaleffects for R and

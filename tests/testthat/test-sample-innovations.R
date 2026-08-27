@@ -883,3 +883,78 @@ test_that("hierarchical_group_cholesky: alpha weights population against group",
   expect_equal(tcrossprod(scaled),
                diag(c(2, 3)) %*% tcrossprod(L_global) %*% diag(c(2, 3)))
 })
+
+
+# A marginal prediction integrates over the state's own spread, so the
+# covariance the innovation transforms read is the stationary one. The
+# tests below pin that arithmetic against closed forms, since a fitted
+# fixture can only ever show one corner of it.
+
+
+test_that("an AR(2) companion solve matches the closed form", {
+  # Var = s2 (1 - p2) / ((1 + p2)((1 - p2)^2 - p1^2))
+  p1 <- c(0.4, -0.3, 0.5)
+  p2 <- c(0.2, 0.25, -0.4)
+  got <- ar_companion_multiplier(
+    list(matrix(p1, nrow = 1L), matrix(p2, nrow = 1L)), c(1L, 2L)
+  )
+  want <- (1 - p2) / ((1 + p2) * ((1 - p2)^2 - p1^2))
+  expect_equal(as.numeric(got), want, tolerance = 1e-6)
+})
+
+
+test_that("an AR(1) companion solve agrees with the scalar form", {
+  # The two routes into the same quantity must not drift apart.
+  phi <- c(0.7, -0.5, 0.05)
+  got <- ar_companion_multiplier(list(matrix(phi, nrow = 1L)), 1L)
+  expect_equal(as.numeric(got), 1 / (1 - phi^2), tolerance = 1e-8)
+})
+
+
+test_that("a sparse lag set is solved on its own companion", {
+  # `p = c(1, 12)` declares no coefficient between the two, which the
+  # companion carries as a zero rather than as a special case.
+  phi <- list(matrix(0.3, nrow = 1L), matrix(0.4, nrow = 1L))
+  got <- ar_companion_multiplier(phi, c(1L, 12L))
+  expect_true(is.finite(got[1L, 1L]))
+  expect_gt(got[1L, 1L], 1)
+})
+
+
+test_that("an explosive autoregression keeps its innovations", {
+  # Each coefficient sits inside the unit interval while the process
+  # does not, which is why the bound on the parameter is not enough.
+  got <- ar_companion_multiplier(
+    list(matrix(0.9, nrow = 1L), matrix(0.9, nrow = 1L)), c(1L, 2L)
+  )
+  expect_identical(as.numeric(got), 1)
+})
+
+
+test_that("correlated series settle at the exact cross-covariance", {
+  # Gamma0[i, j] = Sigma[i, j] / (1 - ar_i * ar_j), which is not the
+  # geometric mean of each series' own factor.
+  n <- 2L
+  sigma <- matrix(c(0.8, 1.3), nrow = 1L)
+  omega <- matrix(c(1, 0.6, 0.6, 1), n, n)
+  L <- array(t(chol(omega)), dim = c(1L, n, n))
+  phi <- matrix(c(0.8, 0.1), nrow = 1L)
+  out <- stationary_correlated_params(
+    list(sigma_trend = sigma, L_Omega_trend = L), phi
+  )
+  got <- diag(out$sigma_trend[1L, ]) %*%
+    tcrossprod(matrix(out$L_Omega_trend[1L, , ], n, n)) %*%
+    diag(out$sigma_trend[1L, ])
+  sig <- diag(sigma[1L, ]) %*% omega %*% diag(sigma[1L, ])
+  expect_equal(got, sig / (1 - outer(phi[1L, ], phi[1L, ])),
+                tolerance = 1e-10)
+})
+
+
+test_that("a draws reader returns NULL for a parameter not carried", {
+  dm <- matrix(1, nrow = 4L, ncol = 2L,
+                dimnames = list(NULL, c("a[1]", "a[2]")))
+  expect_equal(dim(read_draws_vector(dm, "a", 2L)), c(4L, 2L))
+  expect_null(read_draws_vector(dm, "b", 2L, required = FALSE))
+  expect_error(read_draws_vector(dm, "b", 2L), "incomplete")
+})

@@ -155,12 +155,12 @@ test_that("a conditional read repeats and a marginal one does not", {
   # a reproducible answer.
   fit <- readRDS(file.path("fixtures", "val_mvgam_ar1_fx.rds"))
   expect_equal(
-    posterior_epred(fit, latent_state = "conditional"),
-    posterior_epred(fit, latent_state = "conditional")
+    posterior_epred(fit, trend_state = "conditional"),
+    posterior_epred(fit, trend_state = "conditional")
   )
   expect_equal(log_lik(fit), log_lik(fit))
   expect_false(isTRUE(all.equal(
-    posterior_epred(fit, latent_state = "marginal"),
-    posterior_epred(fit, latent_state = "marginal")
+    posterior_epred(fit, trend_state = "marginal"),
+    posterior_epred(fit, trend_state = "marginal")
   )))
 })

@@ -477,7 +477,7 @@ test_that("resolve_draw_ids() materialises a count as indices", {
 })
 
 
-test_that("latent_state = 'conditional' reads the fitted state", {
+test_that("trend_state = 'conditional' reads the fitted state", {
   # The conditional surface takes `trend[t, s]` and must not add the
   # deterministic trend submodel on top of it: the Stan kernel is
   # written on the centred convention, so that contribution is already
@@ -499,13 +499,13 @@ test_that("latent_state = 'conditional' reads the fitted state", {
   )
   out <- get_combined_linpred(
     stub_obj(n_draws = 4L), newdata = NULL, process_error = TRUE,
-    latent_state = "conditional", draw_ids = 1:4
+    trend_state = "conditional", draw_ids = 1:4
   )
   expect_equal(out, matrix(1.25, 4, 3))
 })
 
 
-test_that("latent_state = 'marginal' samples the innovations once", {
+test_that("trend_state = 'marginal' samples the innovations once", {
   # The innovations are composed here and nowhere else. Adding a
   # second, independent sample downstream put twice the process
   # variance into every marginal prediction.
@@ -523,7 +523,7 @@ test_that("latent_state = 'marginal' samples the innovations once", {
   )
   out <- get_combined_linpred(
     stub_obj(), newdata = NULL, process_error = TRUE,
-    latent_state = "marginal"
+    trend_state = "marginal"
   )
   expect_equal(out, matrix(2, 4, 3))
   expect_identical(n_calls, 1L)
@@ -545,7 +545,7 @@ test_that("a conditional read ignores process_error", {
   for (pe in c(TRUE, FALSE)) {
     out <- get_combined_linpred(
       stub_obj(n_draws = 4L), newdata = NULL, process_error = pe,
-      latent_state = "conditional", draw_ids = 1:4
+      trend_state = "conditional", draw_ids = 1:4
     )
     expect_equal(out, matrix(3, 4, 3))
   }
@@ -568,16 +568,16 @@ test_that("a fit with no latent state falls back to the submodel", {
   )
   out <- get_combined_linpred(
     stub_obj(n_draws = 4L), newdata = NULL, process_error = TRUE,
-    latent_state = "conditional", draw_ids = 1:4
+    trend_state = "conditional", draw_ids = 1:4
   )
   expect_equal(out, matrix(1.5, 4, 3))
 })
 
 
-test_that("latent_state rejects an unknown surface", {
+test_that("trend_state rejects an unknown surface", {
   expect_error(
     get_combined_linpred(stub_obj(), newdata = NULL,
-                          latent_state = "nonsense"),
+                          trend_state = "nonsense"),
     "should be one of"
   )
 })

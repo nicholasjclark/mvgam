@@ -2570,18 +2570,18 @@ add_latent_to_linpred <- function(linpred, latent_mat) {
 #' @param newdata The `newdata` the caller was given, or `NULL`
 #' @param weighted Whether the result will be reweighted by importance
 #'   ratios
-#' @return `args`, with `latent_state` stamped on when the conditional
+#' @return `args`, with `trend_state` stamped on when the conditional
 #'   surface applies and the caller has not named it already
 #'
 #' @noRd
 diagnostic_surface_args <- function(args, newdata, weighted = FALSE) {
   checkmate::assert_list(args)
   checkmate::assert_logical(weighted, len = 1L)
-  if ("latent_state" %in% names(args)) {
+  if ("trend_state" %in% names(args)) {
     return(args)
   }
   if (is.null(newdata) || isTRUE(weighted)) {
-    args$latent_state <- "conditional"
+    args$trend_state <- "conditional"
   }
   args
 }

@@ -8,7 +8,7 @@
   object,
   newdata = NULL,
   process_error = TRUE,
-  latent_state = c("marginal", "conditional"),
+  trend_state = c("marginal", "conditional"),
   ndraws = NULL,
   draw_ids = NULL,
   re_formula = NULL,
@@ -26,26 +26,27 @@ NULL, uses original training data stored in the model object.}
 
 \item{process_error}{Logical; if TRUE (default), the expectation
 integrates over the trend's stochastic dynamics. mvgam does this
-by Monte Carlo, drawing one innovation per posterior draw from
-the trend's process covariance and adding it to the link-scale
-predictor before the inverse link, which works uniformly across
-families, links and trend types. What it integrates over is a
-single innovation step, so for an AR(1) Poisson the Jensen
-correction it carries is \eqn{\sigma^2/2} rather than the
-stationary \eqn{\sigma^2/(2(1-\rho^2))}. The two part company
-once \eqn{\rho} is far from zero, so read this expectation as
-one step of the trend's dynamics rather than its stationary
-spread. If FALSE the trend contributes its
-deterministic submodel alone, which is faster and leaves process
-noise out. Read only under \code{latent_state = "marginal"}: a
-conditional read takes the state the model inferred and has no
-innovations to sample.
+by Monte Carlo, drawing the latent state per posterior draw from
+the distribution the trend settles into and adding it to the
+link-scale predictor before the inverse link, which works
+uniformly across families, links and trend types. For an
+autoregressive trend that distribution is the stationary one, so
+an AR(1) draws at \eqn{\sigma^2/(1-\rho^2)} rather than at the
+innovation variance, and the resulting Jensen correction on a log
+link is \eqn{\sigma^2/(2(1-\rho^2))}. A random walk has no
+stationary distribution and a \code{ZMVN()} trend has no dynamics to
+settle into, so both draw their innovations directly; \code{CAR()}
+does the same, its decay depending on the gap between
+observations. If FALSE the trend contributes its deterministic
+submodel alone, which is faster and leaves process noise out.
+Read only under \code{trend_state = "marginal"}: a conditional read
+takes the state the model inferred and has nothing to sample.
 
 The innovations are drawn afresh on each call, so two calls on
 one fit give different answers. Set a seed for a reproducible
 one.}
 
-\item{latent_state}{Which trend contribution the expectation is
+\item{trend_state}{Which trend contribution the expectation is
 taken over. \code{"marginal"}, the default, integrates over the trend
 dynamics, so a covariate effect reads the same whether it is
 asked at the first time point or the fiftieth. \code{"conditional"}

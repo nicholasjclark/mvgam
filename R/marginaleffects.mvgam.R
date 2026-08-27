@@ -8,6 +8,32 @@
 #' only to satisfy the S3 surface. Neither predictions nor slopes
 #' read them.
 #'
+#' @section Prediction scale:
+#' The `type` tokens mvgam registers differ from the ones other model
+#' classes use, so it is worth naming them. `"expected"` is `E[Y]`,
+#' the quantity most classes reach through `"response"`; `"response"`
+#' here is the outcome scale, carrying observation noise, and returns
+#' integers for a count family. `"link"` is the linear predictor.
+#' marginaleffects orders `"response"` first and takes its default
+#' from that, so pass `type = "expected"` when the expectation is what
+#' is wanted. Results are summarised by the posterior median, which
+#' for a skewed predictive sits below the mean.
+#'
+#' @section The latent trend:
+#' `process_error = FALSE`, the default, holds the trend at its
+#' deterministic submodel, which is the counterfactual these surfaces
+#' are usually read for: a covariate effect with the trend fixed,
+#' drawn against a credible band that stays legible. It corresponds to
+#' brms's `incl_autocor = FALSE`, though brms defaults the other way.
+#'
+#' The cost is that a slope or a comparison taken this way is biased
+#' low against the fitted model's own `E[Y]`, by
+#' \eqn{\exp(\sigma^2 / (2(1 - \rho^2)))} on a log link, since the
+#' trend's stationary spread is left out of the expectation being
+#' differentiated. Pass `process_error = TRUE` for the unbiased
+#' effect; the band widens with it, because the latent state's own
+#' uncertainty is then part of the answer.
+#'
 #' @name mvgam_marginaleffects
 #'
 #' @references

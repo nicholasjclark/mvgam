@@ -8,7 +8,7 @@
   object,
   newdata = NULL,
   process_error = TRUE,
-  latent_state = c("marginal", "conditional"),
+  trend_state = c("marginal", "conditional"),
   ndraws = NULL,
   draw_ids = NULL,
   re_formula = NULL,
@@ -31,14 +31,14 @@ link-scale predictor before the inverse link and the draw of
 observation-family noise. If FALSE the trend contributes its
 deterministic submodel alone and only observation noise spreads
 the predictive distribution. Read only under
-\code{latent_state = "marginal"}.
+\code{trend_state = "marginal"}.
 
 The innovations are composed once, on the linear predictor, so
 \code{posterior_linpred()} under the same setting carries them too.
 They are drawn afresh on each call: set a seed for a reproducible
 answer.}
 
-\item{latent_state}{Which trend contribution the draws carry.
+\item{trend_state}{Which trend contribution the draws carry.
 \code{"marginal"}, the default, integrates over the trend dynamics, so
 a covariate effect reads the same whatever time it is asked at.
 \code{"conditional"} reads the latent state the model inferred at each

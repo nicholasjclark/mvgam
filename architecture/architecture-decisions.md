@@ -1095,12 +1095,25 @@ intentional, and the wrong choice will silently mislead.
 **Surface A, Marginal Monte Carlo** (`posterior_predict()`,
 `posterior_epred()`, `posterior_linpred()`): the fitted
 `trend[t, s]` never enters. The trend contributes its
-deterministic submodel plus one innovation per posterior draw,
-re-sampled on every call under `process_error = TRUE`, so the
-answer does not depend on which time it is asked at. Note it
-integrates one innovation step, not the stationary distribution
-of the state: for an AR(1) Poisson the Jensen correction is
-`sigma^2/2`, not `sigma^2/(2*(1-ar^2))`.
+deterministic submodel plus a state drawn per posterior draw from
+the distribution it settles into, re-sampled on every call under
+`process_error = TRUE`, so the answer does not depend on which
+time it is asked at.
+
+What it settles into is the stationary distribution, not one
+innovation: an AR(1) at `sigma^2 / (1 - ar^2)`, which is the same
+scaling the Stan model uses for its own first state. Sampling the
+innovation covariance instead left the marginal mean 12% low
+against a simulation with known truth. `AR(p)` solves the
+companion Lyapunov equation, which covers a sparse lag set such
+as `p = c(1, 12)` without special casing; correlated series take
+`Sigma[i, j] / (1 - ar_i * ar_j)` exactly; `VAR()` reads
+`Omega_trend`, the stationary joint variance its Stan model
+already computes. A random walk has no stationary distribution,
+`ZMVN()` has no dynamics to settle into, and `CAR()` decays by
+`ar^gap` so irregular gaps admit no single variance; all three
+keep their innovation covariance, as does any draw whose
+autoregression is explosive.
 
 **Surface B, Conditional state** (`forecast.mvgam()`,
 `hindcast.mvgam()`, `residuals()`, `pp_check()`): reads the
@@ -1126,7 +1139,7 @@ downstream doubles the process variance. Wherever importance
 weights meet draws, both halves come from the same surface,
 including the `loo_*` prediction trio and `pp_check()`'s
 `loo_pit*` types. And the conditional read has one
-implementation: `get_combined_linpred(latent_state =
+implementation: `get_combined_linpred(trend_state =
 "conditional")`, reached through the `posterior_*` methods. A
 second copy of it drifted from the first once already.
 
@@ -1138,7 +1151,7 @@ importance weights are involved. `residuals()`, `pp_check()` and
 report two pictures of its own in-sample uncertainty.
 
 **Argument names**: `incl_autocor` on `log_lik()` / `loo()` /
-`waic()`, `latent_state` on the `posterior_*` methods (default
+`waic()`, `trend_state` on the `posterior_*` methods (default
 `"marginal"`). `process_error` and `incl_dynamics` are the
 superseded spellings, still accepted, and lose when both are
 given.

@@ -19,8 +19,8 @@ NULL
 #' @param process_error Logical; if TRUE, the trend carries a sampled
 #'   innovation on top of its deterministic submodel. If FALSE the
 #'   submodel contributes alone, still at its own per-draw values.
-#'   Read only under `latent_state = "marginal"`.
-#' @param latent_state Which prediction surface the trend contribution
+#'   Read only under `trend_state = "marginal"`.
+#' @param trend_state Which prediction surface the trend contribution
 #'   comes from. `"marginal"` integrates over the trend dynamics by
 #'   sampling innovations, the semantic the `posterior_*` methods carry.
 #'   `"conditional"` reads the fitted `trend[t, s]` draws instead, the
@@ -40,14 +40,14 @@ NULL
 #' @noRd
 get_combined_linpred <- function(mvgam_fit, newdata,
                                  process_error = TRUE,
-                                 latent_state = c("marginal",
+                                 trend_state = c("marginal",
                                                   "conditional"),
                                  draw_ids = NULL,
                                  re_formula = NULL,
                                  allow_new_levels = FALSE,
                                  sample_new_levels = "uncertainty",
                                  resp = NULL) {
-  latent_state <- match.arg(latent_state)
+  trend_state <- match.arg(trend_state)
   # The observation predictor, the trend predictor and the process
   # errors are three separate extractions whose results are added
   # together. They take draw indices rather than a count precisely so
@@ -83,7 +83,7 @@ get_combined_linpred <- function(mvgam_fit, newdata,
   # and adding the deterministic submodel on top would count it twice.
   # A row whose time falls outside the fitted grid has no such state
   # and receives the per-series marginal instead.
-  conditional_state <- if (identical(latent_state, "conditional")) {
+  conditional_state <- if (identical(trend_state, "conditional")) {
     draws_mat <- posterior::as_draws_matrix(mvgam_fit$fit)
     if (!is.null(draw_ids)) {
       draws_mat <- draws_mat[draw_ids, , drop = FALSE]
@@ -236,14 +236,14 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #'   deterministic submodel contributes alone. Either way the
 #'   submodel's own draws ride through per draw, so `FALSE` is not a
 #'   collapse to a posterior mean. Read only under
-#'   `latent_state = "marginal"`, since a conditional read takes the
+#'   `trend_state = "marginal"`, since a conditional read takes the
 #'   state the model inferred and has no innovation to sample.
 #'
 #'   The innovations are drawn afresh on each call, so two calls on
 #'   one fit differ; set a seed for a reproducible answer. For the
 #'   fitted latent state at the training grid use [hindcast()], and
 #'   for one extrapolated beyond it [forecast()].
-#' @param latent_state Which trend contribution the prediction carries.
+#' @param trend_state Which trend contribution the prediction carries.
 #'   `"marginal"`, the default, integrates over the trend dynamics and
 #'   is the semantic this method documents. `"conditional"` reads the
 #'   latent state the model inferred at each time instead, which is
@@ -342,7 +342,7 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 posterior_linpred.mvgam <- function(object, transform = FALSE,
                                     newdata = NULL,
                                     process_error = TRUE,
-                                    latent_state = c("marginal",
+                                    trend_state = c("marginal",
                                                      "conditional"),
                                     ndraws = NULL,
                                     draw_ids = NULL,
@@ -356,7 +356,7 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_flag(transform)
   checkmate::assert_logical(process_error, len = 1)
-  latent_state <- match.arg(latent_state)
+  trend_state <- match.arg(trend_state)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,
                                 any.missing = FALSE)
   checkmate::assert_string(dpar, null.ok = TRUE)
@@ -392,7 +392,7 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
     mvgam_fit = object,
     newdata = newdata,
     process_error = process_error,
-    latent_state = latent_state,
+    trend_state = trend_state,
     draw_ids = draw_ids,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,

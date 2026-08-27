@@ -618,6 +618,14 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
     }
   )
 
+  # A marginal prediction integrates over the state's own spread, not
+  # over one innovation, so the covariance the transforms read is the
+  # stationary one wherever the kernel settles at all.
+  params <- rescale_params_to_stationary(
+    params = params, object = object, draws_mat = draws_mat,
+    group_info = group_info
+  )
+
   list(
     pattern = pattern,
     n_series = as.integer(n_series),
@@ -870,32 +878,11 @@ extract_indexed_array_2d <- function(draws_mat, name, nrow, ncol,
 extract_simple_cholesky_params <- function(draws_mat, n_series) {
   checkmate::assert_matrix(draws_mat, min.rows = 1, min.cols = 1)
   checkmate::assert_int(n_series, lower = 1)
-  ndraws <- nrow(draws_mat)
-  all_cols <- colnames(draws_mat)
-
-  pull_col <- function(name) {
-    if (!name %in% all_cols) {
-      stop(insight::format_error(c(
-        paste0("Posterior parameter '", name, "' not found."),
-        i = "Required for simple Cholesky covariance."
-      )))
-    }
-    as.numeric(draws_mat[, name])
-  }
-
-  sigma <- matrix(0, ndraws, n_series)
-  for (s in seq_len(n_series)) {
-    sigma[, s] <- pull_col(sprintf("sigma_trend[%d]", s))
-  }
-
-  L_omega <- array(0, c(ndraws, n_series, n_series))
-  for (j in seq_len(n_series)) {
-    for (i in seq_len(n_series)) {
-      L_omega[, i, j] <- pull_col(sprintf("L_Omega_trend[%d,%d]", i, j))
-    }
-  }
-
-  list(sigma_trend = sigma, L_Omega_trend = L_omega)
+  list(
+    sigma_trend = read_draws_vector(draws_mat, "sigma_trend", n_series),
+    L_Omega_trend = read_draws_matrix(draws_mat, "L_Omega_trend",
+                                       n_series, n_series)
+  )
 }
 
 
@@ -1727,6 +1714,59 @@ stan_vector_names <- function(prefix, n, lead = NULL) {
 }
 
 
+#' Read a vector parameter's draws
+#'
+#' Pairs the naming convention with the read, so a caller states the
+#' parameter once rather than spelling its Stan names again.
+#'
+#' @param required Whether a missing name is an error. `FALSE` returns
+#'   `NULL`, for a parameter only some trend kernels carry.
+#' @return `[ndraws x n]` matrix, or `NULL`
+#'
+#' @noRd
+read_draws_vector <- function(draws_mat, prefix, n, lead = NULL,
+                              required = TRUE) {
+  nm <- stan_vector_names(prefix, n, lead = lead)
+  missing <- setdiff(nm, colnames(draws_mat))
+  if (length(missing) > 0L) {
+    if (!isTRUE(required)) {
+      return(NULL)
+    }
+    stop(insight::format_error(c(
+      paste0("Posterior parameter '", prefix, "' is incomplete."),
+      x = paste0("Missing: ", paste(utils::head(missing, 3L),
+                                    collapse = ", "), ".")
+    )))
+  }
+  matrix(as.numeric(draws_mat[, nm]), nrow = nrow(draws_mat))
+}
+
+
+#' Read a matrix parameter's draws
+#'
+#' @inheritParams read_draws_vector
+#' @return `[ndraws x n_row x n_col]` array, or `NULL`
+#'
+#' @noRd
+read_draws_matrix <- function(draws_mat, prefix, n_row, n_col,
+                              lead = NULL, required = TRUE) {
+  nm <- stan_matrix_names(prefix, n_row, n_col, lead = lead)
+  missing <- setdiff(nm, colnames(draws_mat))
+  if (length(missing) > 0L) {
+    if (!isTRUE(required)) {
+      return(NULL)
+    }
+    stop(insight::format_error(c(
+      paste0("Posterior parameter '", prefix, "' is incomplete."),
+      x = paste0("Missing: ", paste(utils::head(missing, 3L),
+                                    collapse = ", "), ".")
+    )))
+  }
+  array(as.numeric(draws_mat[, nm]),
+        dim = c(nrow(draws_mat), n_row, n_col))
+}
+
+
 #' Cholesky factor of one group's trend covariance
 #'
 #' A grouped trend gives every group the same population correlation
@@ -1931,4 +1971,260 @@ draw_trend_innovations <- function(n_draws, n_series, df = Inf) {
   }
   u <- 1 / stats::rgamma(n_draws, shape = df / 2, rate = df / 2)
   z * sqrt(u)
+}
+
+
+#' Variance of the latent state a marginal prediction integrates over
+#'
+#' A marginal prediction answers for a latent state drawn from its own
+#' distribution, not from a single innovation. A stationary
+#' autoregression settles wider than the innovations driving it: an
+#' AR(1) at `sigma^2 / (1 - ar^2)`, which is the very scaling the Stan
+#' model uses to draw its first state. Sampling the innovation
+#' covariance instead leaves every marginal prediction too narrow and,
+#' through a non-identity link, its mean biased with it.
+#'
+#' Three assumptions are stated rather than solved. A random walk has
+#' no stationary distribution, a `ZMVN()` trend has no dynamics to
+#' settle into, and a `CAR()` trend decays by `ar^gap`, so under the
+#' irregular gaps it exists for there is no single stationary
+#' variance. All three keep the innovation covariance. So does any
+#' draw whose autoregression is jointly explosive, which `p > 1`
+#' allows even though each coefficient is bounded to the unit
+#' interval.
+#'
+#' @param object A fitted `mvgam` object
+#' @param draws_mat Posterior draws, already subset to the draws in play
+#' @param n_series Number of series or latent factors
+#' @return A `[ndraws x n_series]` matrix of variance multipliers, or
+#'   `NULL` when the trend keeps its innovation covariance
+#'
+#' @noRd
+ar_stationary_multiplier <- function(object, draws_mat, n_series) {
+  spec <- trend_spec_for_residcor(object)
+  lags <- resolve_active_lags(spec$p)
+  if (length(lags) == 0L) {
+    return(NULL)
+  }
+  phi <- lapply(lags, function(l) {
+    read_draws_vector(draws_mat, paste0("ar", l, "_trend"), n_series,
+                      required = FALSE)
+  })
+  if (any(vapply(phi, is.null, logical(1L)))) {
+    return(NULL)
+  }
+  mult <- if (identical(as.integer(lags), 1L)) {
+    denom <- 1 - phi[[1L]]^2
+    ifelse(denom > .Machine$double.eps, 1 / denom, 1)
+  } else {
+    ar_companion_multiplier(phi, as.integer(lags))
+  }
+  # An `ma` term filters the innovations before the recursion sees
+  # them, widening what the autoregression then settles around.
+  theta <- if (isTRUE(spec$ma)) {
+    read_draws_vector(draws_mat, "theta1_trend", n_series,
+                      required = FALSE)
+  } else {
+    NULL
+  }
+  if (!is.null(theta)) {
+    d_ma <- 1 - theta^2
+    mult <- mult * ifelse(d_ma > .Machine$double.eps, 1 / d_ma, 1)
+  }
+  mult
+}
+
+
+#' Stationary variance of a scalar autoregression of order above one
+#'
+#' Solves the state's own Lyapunov equation on the companion form,
+#' which covers a sparse lag set such as `p = c(1, 12)` without
+#' special casing: the lags the user did not ask for simply carry a
+#' zero coefficient. A draw the doubling solver cannot settle is
+#' explosive, and keeps its innovation variance.
+#'
+#' @noRd
+ar_companion_multiplier <- function(phi, lags) {
+  ndraws <- nrow(phi[[1L]])
+  n_series <- ncol(phi[[1L]])
+  max_lag <- max(lags)
+  out <- matrix(1, ndraws, n_series)
+  innov <- matrix(0, max_lag, max_lag)
+  innov[1L, 1L] <- 1
+  sub_rows <- if (max_lag > 1L) seq.int(2L, max_lag) else integer(0)
+  for (d in seq_len(ndraws)) {
+    for (s in seq_len(n_series)) {
+      companion <- matrix(0, max_lag, max_lag)
+      for (li in seq_along(lags)) {
+        companion[1L, lags[li]] <- phi[[li]][d, s]
+      }
+      if (length(sub_rows) > 0L) {
+        companion[cbind(sub_rows, sub_rows - 1L)] <- 1
+      }
+      v <- solve_dlyap(companion, innov)[1L, 1L]
+      if (is.finite(v) && v > 0 && v < 1e8) {
+        out[d, s] <- v
+      }
+    }
+  }
+  out
+}
+
+
+#' Rescale a trend's innovation covariance to its stationary spread
+#'
+#' Applied once, on the parameters every innovation transform reads,
+#' so the diagonal, correlated, grouped and factor paths all inherit
+#' it without restating the rule.
+#'
+#' A `VAR()` fit needs no rescaling here: its Stan model already
+#' carries `Omega_trend`, the stationary joint variance of the
+#' companion state, and the leading block of that is what a marginal
+#' prediction integrates over.
+#'
+#' The multiplier scales each series' own variance exactly. Any
+#' correlation between series rides through unchanged, which is exact
+#' when they share an autoregressive coefficient and an approximation
+#' when they do not, since a stationary cross-covariance carries
+#' `1 / (1 - ar_i * ar_j)` rather than the geometric mean of the two
+#' series' own factors.
+#'
+#' @noRd
+rescale_params_to_stationary <- function(params, object, draws_mat,
+                                          group_info = NULL) {
+  # A multivariate fit names its trend type after the response, and a
+  # shared trend still answers for every one of them, so the name is
+  # dropped before the kernel is identified.
+  trend_type <- unname(as.character(get_trend_type(object)))[1L]
+  if (identical(trend_type, "VAR")) {
+    # Sized from the covariance being replaced, since a shared or
+    # factor trend carries fewer latent series than the fit has
+    # responses.
+    k <- dim(params$Sigma_trend)[2L]
+    omega <- if (is.null(k)) {
+      NULL
+    } else {
+      read_draws_matrix(draws_mat, "Omega_trend", k, k, required = FALSE)
+    }
+    if (!is.null(omega)) {
+      params$Sigma_trend <- omega
+    }
+    return(params)
+  }
+  if (!identical(trend_type, "AR")) {
+    return(params)
+  }
+  # The multiplier is sized from the scales it multiplies rather than
+  # from the fit's series count: a trend shared across responses, a
+  # factor trend and a `trend_map` fit all carry fewer latent series
+  # than the observation model has, and reading the wrong width would
+  # silently leave the covariance unscaled.
+  if (!is.null(params$sigma_trend)) {
+    n <- ncol(params$sigma_trend)
+    # Correlated series settle at `Sigma[i, j] / (1 - ar_i * ar_j)`,
+    # which is not the geometric mean of each series' own factor. The
+    # gap grows with the spread of the coefficients, reaching a fifth
+    # of the cross-covariance on a fitted pair, so it is computed
+    # rather than approximated wherever the lag-one coefficients are
+    # the whole autoregression.
+    phi <- ar_lag_one_draws(object, draws_mat, n)
+    if (!is.null(params$L_Omega_trend) && !is.null(phi)) {
+      return(stationary_correlated_params(params, phi))
+    }
+    mult <- ar_stationary_multiplier(object, draws_mat, n)
+    if (!is.null(mult) && identical(dim(mult), dim(params$sigma_trend))) {
+      params$sigma_trend <- params$sigma_trend * sqrt(mult)
+    }
+    return(params)
+  }
+  sg <- params[[HIER_COV_PARS$sigma]]
+  if (is.null(sg) || length(dim(sg)) != 3L) {
+    return(params)
+  }
+  n_groups <- dim(sg)[2L]
+  n_sub <- dim(sg)[3L]
+  mult <- ar_stationary_multiplier(object, draws_mat, n_groups * n_sub)
+  if (is.null(mult) || is.null(group_info$group_inds)) {
+    return(params)
+  }
+  scale <- sqrt(mult)
+  # Which series a group's scale belongs to is read from the fit's own
+  # `group_inds_trend`, the same mapping the innovation transform
+  # aligns on. Assuming the series run group-major would agree with it
+  # only when the groups happen to be contiguous.
+  group_inds <- as.integer(group_info$group_inds)
+  within_pos <- as.integer(
+    stats::ave(seq_along(group_inds), group_inds, FUN = seq_along)
+  )
+  for (sr in seq_along(group_inds)) {
+    if (sr <= ncol(scale)) {
+      sg[, group_inds[sr], within_pos[sr]] <-
+        sg[, group_inds[sr], within_pos[sr]] * scale[, sr]
+    }
+  }
+  params[[HIER_COV_PARS$sigma]] <- sg
+  params
+}
+
+
+#' Lag-one coefficients when they are the whole autoregression
+#'
+#' Returns `NULL` for a higher-order or sparse lag set, where the
+#' stationary cross-covariance no longer reduces to a lag-one form.
+#'
+#' @noRd
+ar_lag_one_draws <- function(object, draws_mat, n_series) {
+  spec <- trend_spec_for_residcor(object)
+  lags <- resolve_active_lags(spec$p)
+  if (!identical(as.integer(lags), 1L) || isTRUE(spec$ma)) {
+    return(NULL)
+  }
+  read_draws_vector(draws_mat, "ar1_trend", n_series, required = FALSE)
+}
+
+
+#' Stationary covariance of correlated AR(1) series
+#'
+#' `Gamma0[i, j] = Sigma[i, j] / (1 - ar_i * ar_j)`, returned in the
+#' scale-and-correlation form the innovation transform reads. A draw
+#' whose result is not a covariance keeps its innovations.
+#'
+#' @noRd
+stationary_correlated_params <- function(params, phi) {
+  sigma <- params$sigma_trend
+  L <- params$L_Omega_trend
+  ndraws <- nrow(sigma)
+  n <- ncol(sigma)
+  if (n == 1L) {
+    # One series has no cross-covariance to get right, so it takes the
+    # scalar factor without a decomposition per draw.
+    denom <- 1 - phi[, 1L]^2
+    keep <- denom > .Machine$double.eps
+    sigma[keep, 1L] <- sigma[keep, 1L] / sqrt(denom[keep])
+    params$sigma_trend <- sigma
+    return(params)
+  }
+  for (d in seq_len(ndraws)) {
+    m <- 1 / (1 - outer(phi[d, ], phi[d, ]))
+    if (any(!is.finite(m)) || any(diag(m) <= 0)) {
+      next
+    }
+    Ld <- matrix(L[d, , ], n, n)
+    omega <- tcrossprod(Ld) * m
+    root <- sqrt(diag(m))
+    omega <- omega / outer(root, root)
+    diag(omega) <- 1
+    # A draw can leave `omega` a hair outside the positive-definite
+    # cone through rounding, and it is one draw of many rather than a
+    # fault to report. It keeps its innovations and the rest proceed.
+    chol_omega <- tryCatch(t(chol(omega)), error = function(e) NULL)
+    if (is.null(chol_omega)) {
+      next
+    }
+    sigma[d, ] <- sigma[d, ] * root
+    L[d, , ] <- chol_omega
+  }
+  params$sigma_trend <- sigma
+  params$L_Omega_trend <- L
+  params
 }

@@ -9,7 +9,7 @@
   transform = FALSE,
   newdata = NULL,
   process_error = TRUE,
-  latent_state = c("marginal", "conditional"),
+  trend_state = c("marginal", "conditional"),
   ndraws = NULL,
   draw_ids = NULL,
   re_formula = NULL,
@@ -43,7 +43,7 @@ predictor marginal over the trend dynamics. If FALSE the
 deterministic submodel contributes alone. Either way the
 submodel's own draws ride through per draw, so \code{FALSE} is not a
 collapse to a posterior mean. Read only under
-\code{latent_state = "marginal"}, since a conditional read takes the
+\code{trend_state = "marginal"}, since a conditional read takes the
 state the model inferred and has no innovation to sample.
 
 The innovations are drawn afresh on each call, so two calls on
@@ -51,7 +51,7 @@ one fit differ; set a seed for a reproducible answer. For the
 fitted latent state at the training grid use \code{\link[=hindcast]{hindcast()}}, and
 for one extrapolated beyond it \code{\link[=forecast]{forecast()}}.}
 
-\item{latent_state}{Which trend contribution the prediction carries.
+\item{trend_state}{Which trend contribution the prediction carries.
 \code{"marginal"}, the default, integrates over the trend dynamics and
 is the semantic this method documents. \code{"conditional"} reads the
 latent state the model inferred at each time instead, which is

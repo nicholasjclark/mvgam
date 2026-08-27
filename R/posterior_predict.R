@@ -1648,13 +1648,13 @@ extract_dpars_from_stanfit <- function(stanfit,
 #'   observation-family noise. If FALSE the trend contributes its
 #'   deterministic submodel alone and only observation noise spreads
 #'   the predictive distribution. Read only under
-#'   `latent_state = "marginal"`.
+#'   `trend_state = "marginal"`.
 #'
 #'   The innovations are composed once, on the linear predictor, so
 #'   `posterior_linpred()` under the same setting carries them too.
 #'   They are drawn afresh on each call: set a seed for a reproducible
 #'   answer.
-#' @param latent_state Which trend contribution the draws carry.
+#' @param trend_state Which trend contribution the draws carry.
 #'   `"marginal"`, the default, integrates over the trend dynamics, so
 #'   a covariate effect reads the same whatever time it is asked at.
 #'   `"conditional"` reads the latent state the model inferred at each
@@ -1750,7 +1750,7 @@ extract_dpars_from_stanfit <- function(stanfit,
 #' @export
 posterior_predict.mvgam <- function(object, newdata = NULL,
                                     process_error = TRUE,
-                                    latent_state = c("marginal",
+                                    trend_state = c("marginal",
                                                      "conditional"),
                                     ndraws = NULL,
                                     draw_ids = NULL,
@@ -1763,7 +1763,7 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
   checkmate::assert_logical(process_error, len = 1)
-  latent_state <- match.arg(latent_state)
+  trend_state <- match.arg(trend_state)
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1L, null.ok = TRUE)
   if (!is.null(ndraws) && !is.null(draw_ids)) {
@@ -1824,7 +1824,7 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
     object,
     newdata = newdata,
     process_error = process_error,
-    latent_state = latent_state,
+    trend_state = trend_state,
     ndraws = NULL,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
