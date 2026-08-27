@@ -96,6 +96,14 @@ Residuals are computed conditionally on each posterior draw
 of the model parameters so the returned object carries the
 full posterior uncertainty in the residual distribution.
 
+Both types compare a prediction against the observation that was
+actually recorded, so in sample they read the latent trend state
+the model inferred at that time, the state \code{\link[=hindcast.mvgam]{hindcast.mvgam()}}
+returns. Given \code{newdata} the fit never saw there is no such state,
+and the prediction integrates over the trend dynamics instead,
+which widens the residual as it should. \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} and
+\code{\link[=predictive_error.mvgam]{predictive_error.mvgam()}} follow the same rule.
+
 Pearson residuals are not provided. In a state-space model
 with a stochastic trend the posterior absorbs most of the
 low-frequency residual structure, so the per-observation

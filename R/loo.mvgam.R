@@ -15,13 +15,17 @@
 #'   `k_threshold`, `save_psis` and `model_names` pass through to
 #'   [loo::loo()] or are no-ops for single-model evaluation.
 #'
-#' @param incl_dynamics Logical, default `FALSE`. Maps to the
-#'   `process_error` argument on [log_lik.mvgam()]. When `FALSE` (default)
-#'   the trend is fixed at its posterior mean, giving PSIS weights that
-#'   reflect parameter uncertainty alone. Set `TRUE` to fold sampled
-#'   trend realisations into the per-observation log-likelihood, useful
-#'   for continuous-family fits where the observation noise is small
-#'   relative to the trend.
+#' @param incl_autocor Logical, default `TRUE`. Passed to
+#'   [log_lik.mvgam()] as its argument of the same name, so each
+#'   observation is scored on the conditional surface, under the latent
+#'   trend state the model inferred at that time. That is what makes an
+#'   ELPD describe the series that was observed; `FALSE` scores the
+#'   deterministic submodel alone.
+#' @param incl_dynamics Superseded by `incl_autocor` and still
+#'   accepted, so calls written against it keep working. `TRUE` maps
+#'   to `incl_autocor = TRUE` and `FALSE` to `incl_autocor = FALSE`.
+#'   When only `incl_dynamics` is given it decides; when both are
+#'   given `incl_autocor` decides and `incl_dynamics` is ignored.
 #'
 #' @param by_species Logical, default `FALSE`. When `TRUE`, return a
 #'   data frame with one row per series (`species` column) and per-series
@@ -51,18 +55,30 @@
 #' See [loo::loo()] and [loo::loo_compare()] for further details on how this
 #' importance sampling works.
 #'
-#' Note: In-sample predictive metrics such as PSIS-LOO can sometimes be overly
-#' optimistic for models that include process error components (e.g. those with
-#' `trend_model`, `trend_formula`, or `factor_formula`). Consider using
-#' out-of-sample evaluations for further scrutiny (see
-#' \code{\link{forecast.mvgam}}, \code{\link{score.mvgam_forecast}},
-#' \code{\link{lfo_cv}}).
+#' A fit carrying a latent trend strains this approximation, and not
+#' occasionally. Leaving an observation out does not remove its
+#' influence on the state the model inferred at that time, so the
+#' density being re-weighted still conditions on a state that saw it.
+#' The ELPD then describes conditional in-sample fit rather than
+#' out-of-sample accuracy, and the effective number of parameters
+#' climbs towards the number of observations. Read the Pareto \eqn{k}
+#' diagnostics before trusting a comparison, and prefer
+#' [lfo_cv.mvgam()], which refits along the time axis and scores each
+#' window against data the model has not seen. [forecast.mvgam()] with
+#' [score.mvgam_forecast()] serves the same purpose on a held-out
+#' horizon.
 #'
 #' @references
 #' Vehtari, A., Gelman, A. and Gabry, J. (2017). Practical
 #' Bayesian model evaluation using leave-one-out cross-validation
 #' and WAIC. \emph{Statistics and Computing}, 27:1413-1432.
 #' \doi{10.1007/s11222-016-9696-4}
+#'
+#' Bürkner, P.-C., Gabry, J. and Vehtari, A. (2020). Approximate
+#' leave-future-out cross-validation for Bayesian time series
+#' models. \emph{Journal of Statistical Computation and
+#' Simulation}, 90(14):2499-2523.
+#' \doi{10.1080/00949655.2020.1783262}
 #'
 #' @author Nicholas J Clark
 #'
@@ -118,8 +134,14 @@ loo.mvgam <- function(x, ...,
                       moment_match_args = list(),
                       reloo_args = list(),
                       model_names = NULL,
-                      incl_dynamics = FALSE,
+                      incl_autocor = TRUE,
+                      incl_dynamics = NULL,
                       by_species = FALSE) {
+  incl_autocor <- resolve_incl_autocor(
+    incl_autocor = incl_autocor,
+    legacy = incl_dynamics,
+    autocor_supplied = !missing(incl_autocor)
+  )
   # brms-parity arguments that need machinery we do not yet have. Fail
   # fast rather than silently ignoring; users picking these flags expect
   # them to do something.
@@ -136,12 +158,13 @@ loo.mvgam <- function(x, ...,
     )))
   }
 
-  # Brms-parity log-likelihood path. `incl_dynamics` maps to the
-  # `process_error` argument on log_lik.mvgam: FALSE (default) fixes the
-  # trend at its posterior mean so PSIS weights are not dominated by
-  # latent-state variance; TRUE folds sampled trend realisations into
-  # the per-observation log-density.
-  logliks <- log_lik(x, process_error = incl_dynamics, resp = resp)
+  # An ELPD is a statement about the observations in hand, so each
+  # column is scored under the state the model inferred at that time
+  # rather than under a fresh draw from the trend's marginal
+  # dynamics. Marginalising instead leaves the weights describing a
+  # series the model never saw, which is what drove an effective
+  # parameter count above the number of observations.
+  logliks <- log_lik(x, incl_autocor = incl_autocor, resp = resp)
   logliks <- clean_ll(x, logliks)
 
   # Compute relative effective sample size for PSIS.
@@ -173,8 +196,11 @@ loo.mvgam <- function(x, ...,
 #' @param criterion Information criterion used for comparison. One of
 #'   `"loo"` (default) or `"waic"`.
 #'
-#' @param incl_dynamics Logical, passed through to [loo.mvgam()] /
-#'   [waic.mvgam()]. Default `FALSE` to match [loo.mvgam()].
+#' @param incl_autocor Logical, passed through to [loo.mvgam()] /
+#'   [waic.mvgam()]. Default `TRUE` to match [loo.mvgam()].
+#'
+#' @param incl_dynamics Superseded by `incl_autocor` and still
+#'   accepted; ignored when `incl_autocor` is also given.
 #'
 #' @rdname loo.mvgam
 #'
@@ -184,16 +210,22 @@ loo_compare.mvgam <- function(
   ...,
   criterion = c("loo", "waic"),
   model_names = NULL,
-  incl_dynamics = FALSE
+  incl_autocor = TRUE,
+  incl_dynamics = NULL
 ) {
+  incl_autocor <- resolve_incl_autocor(
+    incl_autocor = incl_autocor,
+    legacy = incl_dynamics,
+    autocor_supplied = !missing(incl_autocor)
+  )
   criterion <- match.arg(criterion)
   models <- split_mod_dots(x, ..., model_names = model_names)
   estimates <- named_list(names(models))
   for (i in seq_along(models)) {
     estimates[[i]] <- if (criterion == "loo") {
-      loo(models[[i]], incl_dynamics = incl_dynamics)
+      loo(models[[i]], incl_autocor = incl_autocor)
     } else {
-      waic(models[[i]], incl_dynamics = incl_dynamics)
+      waic(models[[i]], incl_autocor = incl_autocor)
     }
   }
   cmp <- loo_compare(estimates)

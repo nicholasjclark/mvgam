@@ -30,6 +30,14 @@
 #' of the model parameters so the returned object carries the
 #' full posterior uncertainty in the residual distribution.
 #'
+#' Both types compare a prediction against the observation that was
+#' actually recorded, so in sample they read the latent trend state
+#' the model inferred at that time, the state [hindcast.mvgam()]
+#' returns. Given `newdata` the fit never saw there is no such state,
+#' and the prediction integrates over the trend dynamics instead,
+#' which widens the residual as it should. [pp_check.mvgam()] and
+#' [predictive_error.mvgam()] follow the same rule.
+#'
 #' Pearson residuals are not provided. In a state-space model
 #' with a stochastic trend the posterior absorbs most of the
 #' low-frequency residual structure, so the per-observation
@@ -288,7 +296,10 @@ residuals.mvgam <- function(object,
       d = d, draw_ids = draw_ids, resp = resp
     ),
     "ordinary" = {
-      yrep <- do.call(posterior_predict, pp_args)
+      yrep <- do.call(
+        posterior_predict,
+        diagnostic_surface_args(pp_args, newdata)
+      )
       sweep(yrep, 2L, y, FUN = function(yh, yi) yi - yh)
     }
   )
@@ -317,7 +328,10 @@ compute_closure_unit_residuals <- function(object, newdata, type,
          draw_ids = draw_ids, ndraws = ndraws),
     list(...)
   )
-  yrep_visit <- do.call(posterior_predict, pp_args)
+  yrep_visit <- do.call(
+    posterior_predict,
+    diagnostic_surface_args(pp_args, newdata)
+  )
   agg <- aggregate_closure_unit_visits(
     object, newdata = newdata, yrep_visit = yrep_visit
   )
@@ -366,6 +380,19 @@ compute_closure_unit_residuals <- function(object, newdata, type,
 # to the empirical-PIT path (Hartig 2024 / DHARMa convention),
 # which inherits coverage from `posterior_predict.mvgam`.
 #'@noRd
+# Internal: prediction arguments for a residual. Names the surface
+# through the shared rule, and carries the response the mv fan-out
+# scoped this call to, which the marginal branch used to drop.
+#'@noRd
+residuals_pred_args <- function(pp_args, resp) {
+  args <- diagnostic_surface_args(pp_args, pp_args$newdata)
+  if (!"resp" %in% names(args)) {
+    args$resp <- resp
+  }
+  args
+}
+
+
 quantile_family_specs <- list(
   gaussian = function(y, mu, dpars) {
     stats::pnorm(y, mean = mu, sd = dpars$sigma)
@@ -390,12 +417,11 @@ quantile_family_specs <- list(
 # Internal: top-level dispatcher for `type = "quantile"`.
 # Continuous standard families use the analytic per-draw CDF
 # (Dunn & Smyth 1996 in its original form); all other families
-# use the empirical PIT over `posterior_predict` draws. For
-# in-sample residuals (the user passed no `newdata`) both paths
-# route through `state_aware_predict` so the per-draw conditional
-# `trend[t, s]` from the stanfit is honoured. With marginal-MC
-# predictions on a strong-trend SSM the PIT saturates at the
-# qnorm clamping bounds and the diagnostic becomes uninformative.
+# use the empirical PIT over `posterior_predict` draws. Both read
+# the surface `diagnostic_surface_args()` names, which in sample is
+# the per-draw `trend[t, s]` the model inferred. Against
+# marginal-MC predictions on a strong-trend fit the PIT saturates
+# at the qnorm clamping bounds and says nothing.
 #'@noRd
 compute_quantile_residuals <- function(object, y, pp_args,
                                          d, draw_ids = NULL,
@@ -419,15 +445,9 @@ compute_quantile_residuals <- function(object, y, pp_args,
       resp = resp
     ))
   }
-  in_sample <- is.null(pp_args$newdata)
-  yrep <- if (in_sample) {
-    state_aware_predict(
-      object = object, newdata = d, type = "response",
-      draw_ids = draw_ids, resp = resp
-    )
-  } else {
-    do.call(posterior_predict, pp_args)
-  }
+  yrep <- do.call(
+    posterior_predict, residuals_pred_args(pp_args, resp)
+  )
   compute_quantile_residuals_empirical(y, yrep, nrow(yrep))
 }
 
@@ -436,24 +456,21 @@ compute_quantile_residuals <- function(object, y, pp_args,
 # standard families. `spec(y_mat, mu_mat, dpars) -> PIT matrix`.
 # `y` is broadcast across draws; `dpars` are reused from the
 # pearson path's helper so the dpar broadcasting logic is shared.
-# In-sample evaluation routes the `mu` extraction through
-# `state_aware_predict` so per-draw conditional state from the
-# stanfit is used; the dpar broadcast is unchanged because
-# observation-family scale parameters are state-agnostic.
+# Each spec wants the family's own `mu`, not the mean of the
+# response: a lognormal PIT takes `log(mu)` as its meanlog, and
+# `E[Y]` there carries a dispersion term the CDF must not see. The
+# predictor's inverse link is what supplies it. The dpar broadcast
+# is unchanged, since observation-family scale parameters do not
+# depend on the latent state.
 #'@noRd
 compute_quantile_residuals_analytic <- function(object, y, spec,
                                                   pp_args, d,
                                                   draw_ids = NULL,
                                                   resp = NULL) {
-  in_sample <- is.null(pp_args$newdata)
-  mu <- if (in_sample) {
-    state_aware_predict(
-      object = object, newdata = d, type = "expected",
-      draw_ids = draw_ids, resp = resp
-    )
-  } else {
-    do.call(posterior_epred, pp_args)
-  }
+  mu <- do.call(
+    posterior_linpred,
+    c(residuals_pred_args(pp_args, resp), list(transform = TRUE))
+  )
   dpars <- residuals_dpars(object, draw_ids = draw_ids,
                             d = d, n_obs = length(y),
                             resp = resp)

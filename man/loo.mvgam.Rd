@@ -18,7 +18,8 @@
   moment_match_args = list(),
   reloo_args = list(),
   model_names = NULL,
-  incl_dynamics = FALSE,
+  incl_autocor = TRUE,
+  incl_dynamics = NULL,
   by_species = FALSE
 )
 
@@ -27,7 +28,8 @@
   ...,
   criterion = c("loo", "waic"),
   model_names = NULL,
-  incl_dynamics = FALSE
+  incl_autocor = TRUE,
+  incl_dynamics = NULL
 )
 }
 \arguments{
@@ -46,8 +48,11 @@ raises a clear error when any of them is requested. \code{compare},
 \item{model_names}{If \code{NULL} (the default) will use model names derived
 from deparsing the call. Otherwise will use the passed values as model names}
 
-\item{incl_dynamics}{Logical, passed through to \code{\link[=loo.mvgam]{loo.mvgam()}} /
-\code{\link[=waic.mvgam]{waic.mvgam()}}. Default \code{FALSE} to match \code{\link[=loo.mvgam]{loo.mvgam()}}.}
+\item{incl_autocor}{Logical, passed through to \code{\link[=loo.mvgam]{loo.mvgam()}} /
+\code{\link[=waic.mvgam]{waic.mvgam()}}. Default \code{TRUE} to match \code{\link[=loo.mvgam]{loo.mvgam()}}.}
+
+\item{incl_dynamics}{Superseded by \code{incl_autocor} and still
+accepted; ignored when \code{incl_autocor} is also given.}
 
 \item{by_species}{Logical, default \code{FALSE}. When \code{TRUE}, return a
 data frame with one row per series (\code{species} column) and per-series
@@ -80,12 +85,18 @@ original model fit (i.e. leave-one-out cross-validation).
 See \code{\link[loo:loo]{loo::loo()}} and \code{\link[loo:loo_compare]{loo::loo_compare()}} for further details on how this
 importance sampling works.
 
-Note: In-sample predictive metrics such as PSIS-LOO can sometimes be overly
-optimistic for models that include process error components (e.g. those with
-\code{trend_model}, \code{trend_formula}, or \code{factor_formula}). Consider using
-out-of-sample evaluations for further scrutiny (see
-\code{\link{forecast.mvgam}}, \code{\link{score.mvgam_forecast}},
-\code{\link{lfo_cv}}).
+A fit carrying a latent trend strains this approximation, and not
+occasionally. Leaving an observation out does not remove its
+influence on the state the model inferred at that time, so the
+density being re-weighted still conditions on a state that saw it.
+The ELPD then describes conditional in-sample fit rather than
+out-of-sample accuracy, and the effective number of parameters
+climbs towards the number of observations. Read the Pareto \eqn{k}
+diagnostics before trusting a comparison, and prefer
+\code{\link[=lfo_cv.mvgam]{lfo_cv.mvgam()}}, which refits along the time axis and scores each
+window against data the model has not seen. \code{\link[=forecast.mvgam]{forecast.mvgam()}} with
+\code{\link[=score.mvgam_forecast]{score.mvgam_forecast()}} serves the same purpose on a held-out
+horizon.
 }
 \examples{
 \donttest{
@@ -127,6 +138,12 @@ Vehtari, A., Gelman, A. and Gabry, J. (2017). Practical
 Bayesian model evaluation using leave-one-out cross-validation
 and WAIC. \emph{Statistics and Computing}, 27:1413-1432.
 \doi{10.1007/s11222-016-9696-4}
+
+Bürkner, P.-C., Gabry, J. and Vehtari, A. (2020). Approximate
+leave-future-out cross-validation for Bayesian time series
+models. \emph{Journal of Statistical Computation and
+Simulation}, 90(14):2499-2523.
+\doi{10.1080/00949655.2020.1783262}
 }
 \seealso{
 \code{\link[=waic.mvgam]{waic.mvgam()}}, \code{\link[=log_lik.mvgam]{log_lik.mvgam()}},

@@ -318,11 +318,49 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > fitted but barely inspected; offsets and new-level prediction have
   > no coverage. Six fixtures have no builder.
 
-- [ ] **4.0 Resolve the pre-existing local-suite failures**
-  > Three reproduce on a clean checkout of `HEAD`: a `loo_R2`
-  > concordance gap against brms and two `update(recompile = FALSE)`
-  > errors. Separately, `p_loo` of 669 against n = 30 on a cached fit
-  > wants a statistical opinion.
+- [x] **4.0 The likelihood was scored on the wrong surface**
+  > The `loo_R2` failure and the `p_loo` question were one cause.
+  > `log_lik()` integrated over the trend dynamics instead of reading
+  > the state the model inferred at each time, so every ELPD built on
+  > it described a series the model never saw. On the fixed-effect
+  > Poisson pair that put `p_loo` at 784 against 30 observations,
+  > `elpd` at -898 against brms's -90, and `loo_R2` on its clamp at
+  > -1 against 0.82. Decision 22 already assigned model comparison to
+  > the conditional surface, and the likelihood was the one member of
+  > that group still on the marginal one, with `residuals()` and
+  > `pp_check()` beside it already reading the state. Conditioning
+  > brings `elpd` to -90.35 against -89.78, `p_loo` to 19.9 against
+  > 19.2, and `loo_R2` to 0.79 with an interval covering brms's. The
+  > argument is spelled `incl_autocor` as brms spells it;
+  > `process_error` and `incl_dynamics` are still accepted and lose
+  > to it when both are given.
+  >
+  > Two defects surfaced underneath. The trend state was looked up by
+  > position within whatever frame it was handed, so scoring a later
+  > window of a series read the state of an earlier one, at the right
+  > shape and without complaint; the lookup now runs on raw times
+  > against the fitted grid. And `posterior_epred()` and
+  > `posterior_predict()` each drew a second, independent set of
+  > innovations on top of the set `get_combined_linpred()` had already
+  > composed, so a marginal prediction carried twice the process
+  > variance and, through a non-identity link, a mean biased upward
+  > with it. One place samples them now, which moved `bayes_R2` from
+  > 0.63 to 0.899 against brms's 0.897.
+  >
+  > `loo_predict()`, `loo_epred()` and `loo_linpred()` reweight a
+  > prediction by importance weights, so they had the same pairing to
+  > answer for. brms hands one set of arguments to both halves and
+  > lets each carry its autocorrelation term, so mvgam takes the
+  > prediction under the state the weights were built from. Against
+  > the brms twin `loo_predict()` correlates 0.921 with the
+  > observations where brms reaches 0.929, and the two answers sit
+  > 1.4 apart on counts spanning 0 to 48.
+  >
+  > The two `update(recompile = FALSE)` errors are the guard working.
+  > An AR(1) initial state is now drawn from its stationary
+  > distribution, so a June fixture and `HEAD` emit different Stan
+  > code and `recompile = FALSE` is right to refuse. They clear when
+  > the fixtures are rebuilt.
 
 - [ ] **5.0 Rebuild every vignette and the pkgdown site**
   > Caches date from June and July, before the prior and default

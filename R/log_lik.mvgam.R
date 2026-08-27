@@ -17,12 +17,21 @@
 #' @param ndraws Optional integer; subsample to `ndraws` posterior draws.
 #' @param draw_ids Optional integer vector of draw indices to use (mutually
 #'   exclusive with `ndraws`).
-#' @param process_error Logical. When `TRUE` (default) each posterior draw
-#'   carries a sampled latent-trend realisation through the linear
-#'   predictor, integrating the trend's stochastic dynamics into the
-#'   log-likelihood. When `FALSE` the trend is fixed at its posterior
-#'   mean, returning a goodness-of-fit log-likelihood that ignores
-#'   process noise.
+#' @param incl_autocor Logical. When `TRUE` (default) the linear
+#'   predictor carries the latent trend state the model inferred at
+#'   each time, so the density describes the observation that was
+#'   actually seen there. This is the conditional surface, the one
+#'   [hindcast.mvgam()] and [residuals.mvgam()] read. When `FALSE`
+#'   the trend contributes
+#'   only its deterministic submodel, giving a density that leaves the
+#'   autocorrelation out. The marginal surface, which integrates over
+#'   the trend dynamics, belongs to [posterior_epred.mvgam()] and is
+#'   not a basis for an ELPD.
+#' @param process_error Superseded by `incl_autocor` and still
+#'   accepted, so calls written against it keep working. `TRUE` maps
+#'   to `incl_autocor = TRUE` and `FALSE` to `incl_autocor = FALSE`.
+#'   When only `process_error` is given it decides; when both are
+#'   given `incl_autocor` decides and `process_error` is ignored.
 #' @param ... Forwarded to [posterior_linpred.mvgam()], which in
 #'   turn forwards brms-style prediction args to the underlying
 #'   prediction machinery. Common pass-throughs include
@@ -47,12 +56,16 @@
 #' `beta_binomial` are extracted from `newdata` or from the model object via
 #' the existing `extract_trials_for_family()` helper.
 #'
-#' For state-space-dominated fits, `process_error = TRUE` is the default and
-#' matches the behaviour LOO / PSIS / WAIC expect. Set `process_error = FALSE`
-#' only when computing per-observation goodness-of-fit independently of the
-#' latent dynamics (e.g. for marginaleffects-style covariate effects).
+#' A density is evaluated under the latent trend state the model
+#' inferred at that time, which is the state [hindcast.mvgam()] returns
+#' and [residuals.mvgam()] scores against. That is what lets [loo()],
+#' [waic()] and the importance weights built from them describe the
+#' series that was observed. The `posterior_*` methods answer a
+#' different question, integrating over the trend dynamics so that a
+#' covariate effect reads the same whatever time it is asked at, and
+#' they should not be used to build an ELPD.
 #'
-#' @seealso [loo.mvgam()], [waic.mvgam()],
+#' @seealso [loo.mvgam()], [waic.mvgam()], [hindcast.mvgam()],
 #'   [posterior_linpred.mvgam()].
 #'
 #' @examples
@@ -81,14 +94,19 @@ log_lik.mvgam <- function(object,
                           resp = NULL,
                           ndraws = NULL,
                           draw_ids = NULL,
-                          process_error = TRUE,
+                          incl_autocor = TRUE,
+                          process_error = NULL,
                           ...) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
-  checkmate::assert_logical(process_error, len = 1)
   checkmate::assert_string(resp, null.ok = TRUE)
+  incl_autocor <- resolve_incl_autocor(
+    incl_autocor = incl_autocor,
+    legacy = process_error,
+    autocor_supplied = !missing(incl_autocor)
+  )
 
   newdata <- newdata %||% object$data
 
@@ -102,19 +120,25 @@ log_lik.mvgam <- function(object,
     ndraws <- NULL
   }
 
-  # Link-scale linear predictor with optional trend realisations baked in.
-  # Forward `...` so `allow_new_levels` / `sample_new_levels` from callers
-  # (e.g. kfold.mvgam refits scoring on held-out factor levels) reach
-  # brms::validate_newdata via prepare_predictions.
-  linpred <- posterior_linpred(
-    object,
+  # Link-scale linear predictor carrying the state the model inferred,
+  # rather than a fresh draw from the trend's marginal dynamics: a
+  # density for an observation at a given time has to be evaluated
+  # under the state the model put there, which is what makes the
+  # importance weights `loo()` builds from it describe that
+  # observation. `allow_new_levels` / `sample_new_levels` come through
+  # `...` from callers such as `kfold.mvgam()`, which scores on
+  # held-out factor levels.
+  dots <- list(...)
+  linpred <- get_combined_linpred(
+    mvgam_fit = object,
     newdata = newdata,
-    process_error = process_error,
-    ndraws = ndraws,
+    process_error = FALSE,
+    latent_state = if (isTRUE(incl_autocor)) "conditional" else "marginal",
     draw_ids = draw_ids,
     re_formula = re_formula,
-    resp = resp,
-    ...
+    allow_new_levels = dots$allow_new_levels %||% FALSE,
+    sample_new_levels = dots$sample_new_levels %||% "uncertainty",
+    resp = resp
   )
 
   # Multivariate fits return a named list of [ndraws x nobs] matrices,
@@ -830,4 +854,32 @@ logLik.mvgam <- function(object, pointwise = FALSE, ...) {
     nobs = nobs(object),
     class = "logLik"
   )
+}
+
+
+#' Resolve the autocorrelation switch from its two spellings
+#'
+#' `incl_autocor` is the name brms uses and the one mvgam documents.
+#' `process_error` and `incl_dynamics` are the names mvgam used before
+#' and are still accepted, so calls written against them keep working.
+#' Supplying both spellings is not an error: the brms one wins, which
+#' is what the documentation promises, and the superseded value is
+#' ignored rather than silently combined with it.
+#'
+#' @param incl_autocor Value of the documented argument
+#' @param legacy Value of the superseded argument, or `NULL` when the
+#'   caller did not name it
+#' @param autocor_supplied Whether the caller named `incl_autocor`
+#' @return A single logical
+#'
+#' @noRd
+resolve_incl_autocor <- function(incl_autocor, legacy, autocor_supplied) {
+  checkmate::assert_logical(incl_autocor, len = 1L, any.missing = FALSE)
+  checkmate::assert_logical(legacy, len = 1L, any.missing = FALSE,
+                            null.ok = TRUE)
+  checkmate::assert_logical(autocor_supplied, len = 1L)
+  if (is.null(legacy) || isTRUE(autocor_supplied)) {
+    return(incl_autocor)
+  }
+  legacy
 }

@@ -11,7 +11,8 @@
   resp = NULL,
   ndraws = NULL,
   draw_ids = NULL,
-  process_error = TRUE,
+  incl_autocor = TRUE,
+  process_error = NULL,
   ...
 )
 }
@@ -33,12 +34,22 @@ univariate fits.}
 \item{draw_ids}{Optional integer vector of draw indices to use (mutually
 exclusive with \code{ndraws}).}
 
-\item{process_error}{Logical. When \code{TRUE} (default) each posterior draw
-carries a sampled latent-trend realisation through the linear
-predictor, integrating the trend's stochastic dynamics into the
-log-likelihood. When \code{FALSE} the trend is fixed at its posterior
-mean, returning a goodness-of-fit log-likelihood that ignores
-process noise.}
+\item{incl_autocor}{Logical. When \code{TRUE} (default) the linear
+predictor carries the latent trend state the model inferred at
+each time, so the density describes the observation that was
+actually seen there. This is the conditional surface, the one
+\code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and \code{\link[=residuals.mvgam]{residuals.mvgam()}} read. When \code{FALSE}
+the trend contributes
+only its deterministic submodel, giving a density that leaves the
+autocorrelation out. The marginal surface, which integrates over
+the trend dynamics, belongs to \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} and is
+not a basis for an ELPD.}
+
+\item{process_error}{Superseded by \code{incl_autocor} and still
+accepted, so calls written against it keep working. \code{TRUE} maps
+to \code{incl_autocor = TRUE} and \code{FALSE} to \code{incl_autocor = FALSE}.
+When only \code{process_error} is given it decides; when both are
+given \code{incl_autocor} decides and \code{process_error} is ignored.}
 
 \item{...}{Forwarded to \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}}, which in
 turn forwards brms-style prediction args to the underlying
@@ -72,10 +83,14 @@ at zero with the corresponding base family). Trials for \code{binomial} /
 \code{beta_binomial} are extracted from \code{newdata} or from the model object via
 the existing \code{extract_trials_for_family()} helper.
 
-For state-space-dominated fits, \code{process_error = TRUE} is the default and
-matches the behaviour LOO / PSIS / WAIC expect. Set \code{process_error = FALSE}
-only when computing per-observation goodness-of-fit independently of the
-latent dynamics (e.g. for marginaleffects-style covariate effects).
+A density is evaluated under the latent trend state the model
+inferred at that time, which is the state \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} returns
+and \code{\link[=residuals.mvgam]{residuals.mvgam()}} scores against. That is what lets \code{\link[=loo]{loo()}},
+\code{\link[=waic]{waic()}} and the importance weights built from them describe the
+series that was observed. The \verb{posterior_*} methods answer a
+different question, integrating over the trend dynamics so that a
+covariate effect reads the same whatever time it is asked at, and
+they should not be used to build an ELPD.
 }
 \examples{
 \donttest{
@@ -97,6 +112,6 @@ dim(ll)
 
 }
 \seealso{
-\code{\link[=loo.mvgam]{loo.mvgam()}}, \code{\link[=waic.mvgam]{waic.mvgam()}},
+\code{\link[=loo.mvgam]{loo.mvgam()}}, \code{\link[=waic.mvgam]{waic.mvgam()}}, \code{\link[=hindcast.mvgam]{hindcast.mvgam()}},
 \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}}.
 }

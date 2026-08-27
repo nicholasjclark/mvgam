@@ -343,9 +343,16 @@ brms::ngrps
 #'   `[n_draws x n_observations]` containing observed minus
 #'   predicted for each draw and observation.
 #'
+#' @details
+#' This is the quantity [residuals.mvgam()] returns under
+#' `type = "ordinary"`, and it reads the same surface: in sample the
+#' prediction carries the latent trend state the model inferred at
+#' that time, while `newdata` the fit never saw integrates over the
+#' trend dynamics instead.
+#'
 #' @author Nicholas J Clark
 #'
-#' @seealso [brms::predictive_error.brmsfit()],
+#' @seealso [brms::predictive_error.brmsfit()], [residuals.mvgam()],
 #'   [posterior_predict.mvgam()], [posterior_epred.mvgam()].
 #'
 #' @method predictive_error mvgam
@@ -384,10 +391,13 @@ predictive_error.mvgam <- function(object, newdata = NULL,
   } else {
     posterior_epred
   }
-  preds <- pred_fun(
-    object, newdata = newdata, re_formula = re_formula,
-    resp = resp, ndraws = ndraws, draw_ids = draw_ids, ...
-  )
+  # The same quantity `residuals(type = "ordinary")` returns, so it
+  # reads the same surface: in sample, the state the model inferred.
+  preds <- do.call(pred_fun, diagnostic_surface_args(
+    list(object, newdata = newdata, re_formula = re_formula,
+         resp = resp, ndraws = ndraws, draw_ids = draw_ids, ...),
+    newdata
+  ))
   y <- as.numeric(data[[resp_name]])
   if (ncol(preds) != length(y)) {
     stop(insight::format_error(c(

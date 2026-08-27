@@ -16,9 +16,15 @@ NULL
 #'
 #' @param mvgam_fit mvgam object from mvgam()
 #' @param newdata data.frame with prediction covariates
-#' @param process_error Logical; if TRUE, includes draw-by-draw uncertainty
-#'   from trend parameters. If FALSE, uses posterior mean of trend component,
-#'   which speeds computation but understates total uncertainty.
+#' @param process_error Logical; if TRUE, the trend carries a sampled
+#'   innovation on top of its deterministic submodel. If FALSE the
+#'   submodel contributes alone, still at its own per-draw values.
+#'   Read only under `latent_state = "marginal"`.
+#' @param latent_state Which prediction surface the trend contribution
+#'   comes from. `"marginal"` integrates over the trend dynamics by
+#'   sampling innovations, the semantic the `posterior_*` methods carry.
+#'   `"conditional"` reads the fitted `trend[t, s]` draws instead, the
+#'   semantic `hindcast()` and the likelihood surfaces carry.
 #' @param draw_ids Integer vector of posterior draws to use (NULL = all).
 #'   Indices rather than a count, so every extraction combined below
 #'   reads the same iterations.
@@ -34,11 +40,14 @@ NULL
 #' @noRd
 get_combined_linpred <- function(mvgam_fit, newdata,
                                  process_error = TRUE,
+                                 latent_state = c("marginal",
+                                                  "conditional"),
                                  draw_ids = NULL,
                                  re_formula = NULL,
                                  allow_new_levels = FALSE,
                                  sample_new_levels = "uncertainty",
                                  resp = NULL) {
+  latent_state <- match.arg(latent_state)
   # The observation predictor, the trend predictor and the process
   # errors are three separate extractions whose results are added
   # together. They take draw indices rather than a count precisely so
@@ -67,33 +76,54 @@ get_combined_linpred <- function(mvgam_fit, newdata,
     return(obs_linpred)
   }
 
-  # Extract trend linear predictor (deterministic submodel only).
-  # The marginal-MC trend noise is sampled below from the trend's
-  # process covariance and added once `process_error = TRUE`.
-  trend_linpred <- extract_component_linpred(
-    mvgam_fit = mvgam_fit,
-    newdata = newdata,
-    component = "trend",
-    resp = resp,
-    draw_ids = draw_ids,
-    re_formula = re_formula,
-    allow_new_levels = allow_new_levels,
-    sample_new_levels = sample_new_levels
-  )
-
-  # Sample marginal trend noise once. Returns a [ndraws x n_obs]
-  # matrix aligned with newdata rows. Skipped entirely when
-  # `process_error = FALSE` (trend contribution is the deterministic
-  # submodel only) or when the trend kernel has no stochastic
-  # component (PW, none), so neither path pays the cost of
-  # constructing the observation structure unnecessarily.
-  trend_noise <- if (isTRUE(process_error) &&
-                       has_stochastic_trend(mvgam_fit)) {
-    sample_process_errors(
-      mvgam_fit, newdata = newdata, draw_ids = draw_ids
+  # A conditional read asks for the state the model actually inferred
+  # at each time, so it takes the fitted `trend[t, s]` draws. Those
+  # already carry the trend formula's contribution, because the trend
+  # kernel is written on the centred convention `(trend - mu_trend)`,
+  # and adding the deterministic submodel on top would count it twice.
+  # A row whose time falls outside the fitted grid has no such state
+  # and receives the per-series marginal instead.
+  conditional_state <- if (identical(latent_state, "conditional")) {
+    draws_mat <- posterior::as_draws_matrix(mvgam_fit$fit)
+    if (!is.null(draw_ids)) {
+      draws_mat <- draws_mat[draw_ids, , drop = FALSE]
+    }
+    extract_trend_latent_states(
+      mvgam_fit = mvgam_fit, newdata = newdata, full_draws = draws_mat
     )
   } else {
     NULL
+  }
+
+  if (!is.null(conditional_state)) {
+    # Shape of a shared trend, so the multivariate branch below
+    # composes it against each response the same way.
+    trend_linpred <- conditional_state
+    trend_noise <- NULL
+  } else {
+    # Marginal read: the deterministic submodel, plus one sample of
+    # the trend's own process noise. The noise is skipped when
+    # `process_error = FALSE` or when the trend kernel has no
+    # stochastic component (PW, none), so neither path pays for an
+    # observation structure it will not use.
+    trend_linpred <- extract_component_linpred(
+      mvgam_fit = mvgam_fit,
+      newdata = newdata,
+      component = "trend",
+      resp = resp,
+      draw_ids = draw_ids,
+      re_formula = re_formula,
+      allow_new_levels = allow_new_levels,
+      sample_new_levels = sample_new_levels
+    )
+    trend_noise <- if (isTRUE(process_error) &&
+                         has_stochastic_trend(mvgam_fit)) {
+      sample_process_errors(
+        mvgam_fit, newdata = newdata, draw_ids = draw_ids
+      )
+    } else {
+      NULL
+    }
   }
 
   # Detect structure: list indicates multivariate, matrix indicates univariate
@@ -199,19 +229,27 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #'   [posterior_epred.mvgam()] for `E[Y]`. Mirrors the `transform`
 #'   argument of [brms::posterior_linpred()], which sets `dpar = "mu"`
 #'   and answers on the response scale.
-#' @param process_error Logical; if TRUE (default), uses the full
-#'   posterior draws of the trend parameters (per-draw variation). If
-#'   FALSE, fixes the trend at its posterior mean for faster
-#'   computation.
+#' @param process_error Logical; if TRUE (default), the trend
+#'   contributes a sampled innovation from its covariance structure on
+#'   top of its deterministic submodel, which is what makes the
+#'   predictor marginal over the trend dynamics. If FALSE the
+#'   deterministic submodel contributes alone. Either way the
+#'   submodel's own draws ride through per draw, so `FALSE` is not a
+#'   collapse to a posterior mean. Read only under
+#'   `latent_state = "marginal"`, since a conditional read takes the
+#'   state the model inferred and has no innovation to sample.
 #'
-#'   `posterior_linpred()` does NOT add sampled stochastic innovations
-#'   from the trend's covariance structure; it remains a
-#'   deterministic function of the parameter draws. State-space
-#'   process noise is added inside `posterior_epred()` and
-#'   `posterior_predict()` (matching the brms convention of returning
-#'   marginal expectations / predictive samples). For
-#'   deterministic-state-at-fitted-values semantics use [forecast()] /
-#'   [hindcast()].
+#'   The innovations are drawn afresh on each call, so two calls on
+#'   one fit differ; set a seed for a reproducible answer. For the
+#'   fitted latent state at the training grid use [hindcast()], and
+#'   for one extrapolated beyond it [forecast()].
+#' @param latent_state Which trend contribution the prediction carries.
+#'   `"marginal"`, the default, integrates over the trend dynamics and
+#'   is the semantic this method documents. `"conditional"` reads the
+#'   latent state the model inferred at each time instead, which is
+#'   what the `loo_*` wrappers ask for so that a prediction and the
+#'   importance weights it is paired with describe the same
+#'   observation. See [hindcast.mvgam()] for the state-aware surface.
 #' @param ndraws Positive integer specifying number of posterior draws to
 #'   use. NULL (default) uses all available draws. Mutually exclusive
 #'   with `draw_ids`; supply one or the other.
@@ -304,6 +342,8 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 posterior_linpred.mvgam <- function(object, transform = FALSE,
                                     newdata = NULL,
                                     process_error = TRUE,
+                                    latent_state = c("marginal",
+                                                     "conditional"),
                                     ndraws = NULL,
                                     draw_ids = NULL,
                                     re_formula = NULL,
@@ -316,6 +356,7 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_flag(transform)
   checkmate::assert_logical(process_error, len = 1)
+  latent_state <- match.arg(latent_state)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,
                                 any.missing = FALSE)
   checkmate::assert_string(dpar, null.ok = TRUE)
@@ -351,6 +392,7 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
     mvgam_fit = object,
     newdata = newdata,
     process_error = process_error,
+    latent_state = latent_state,
     draw_ids = draw_ids,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,

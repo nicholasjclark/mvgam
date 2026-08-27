@@ -160,3 +160,123 @@ test_that("logLik.mvgam(pointwise = TRUE) returns the log_lik matrix", {
   expected <- log_lik(mvgam_fit)
   testthat::expect_identical(dim(ll_mat), dim(expected))
 })
+
+
+# ---------------------------------------------------------------------
+# The surface an ELPD is built on
+# ---------------------------------------------------------------------
+#
+# `log_lik()` scores each observation under the latent trend state the
+# model inferred at that time. Scoring the marginal instead leaves the
+# weights describing a series the model never saw: on this fixture it
+# put the effective parameter count at 784 against 30 observations and
+# pinned `loo_R2` on its clamp. The tests below compare against the
+# brms twin, which carries its autocorrelation term the same way.
+
+
+test_that("loo on the conditional surface agrees with the brms twin", {
+  require_fixtures("val_mvgam_ar1_fx.rds", "val_brms_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  bm <- load_brms("ar1_fx")
+  lm_ <- SW(loo(mv))
+  lb <- SW(loo(bm))
+  n_obs <- nrow(mv$data)
+  # An effective parameter count above the observation count is the
+  # signature of scoring on the wrong surface.
+  expect_lt(lm_$estimates["p_loo", "Estimate"], n_obs)
+  expect_lt(
+    abs(lm_$estimates["p_loo", "Estimate"] -
+          lb$estimates["p_loo", "Estimate"]),
+    10
+  )
+  expect_lt(
+    abs(lm_$estimates["elpd_loo", "Estimate"] -
+          lb$estimates["elpd_loo", "Estimate"]),
+    20
+  )
+})
+
+
+test_that("conditioning tracks the observations, marginalising does not", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  y <- mv$data[["y"]]
+  cor_cond <- cor(
+    colMeans(posterior_epred(mv, latent_state = "conditional")), y
+  )
+  cor_marg <- cor(
+    colMeans(posterior_epred(mv, latent_state = "marginal")), y
+  )
+  # The fitted state carries the signal in a state-space fit; the
+  # marginal surface deliberately integrates it away.
+  expect_gt(cor_cond, 0.9)
+  expect_gt(cor_cond, cor_marg)
+})
+
+
+test_that("bayes_R2 agrees with the brms twin", {
+  require_fixtures("val_mvgam_ar1_fx.rds", "val_brms_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  bm <- load_brms("ar1_fx")
+  r2_mv <- SW(bayes_R2(mv))[, "Estimate"]
+  r2_bm <- SW(brms::bayes_R2(bm))[, "Estimate"]
+  expect_true(is.finite(r2_mv))
+  expect_lt(abs(r2_mv - r2_bm), 0.15)
+})
+
+
+test_that("loo_predict pairs its predictions with its weights", {
+  require_fixtures("val_mvgam_ar1_fx.rds", "val_brms_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  bm <- load_brms("ar1_fx")
+  y <- mv$data[["y"]]
+  lp_mv <- as.numeric(SM(SW(loo_predict(mv, type = "mean"))))
+  lp_bm <- as.numeric(SM(SW(loo_predict(bm, type = "mean"))))
+  expect_length(lp_mv, length(y))
+  expect_true(all(is.finite(lp_mv)))
+  # Weights from a conditional density paired with a marginal
+  # prediction is the mismatch that pinned loo_R2 at its clamp.
+  expect_gt(cor(lp_mv, y), 0.8)
+  expect_lt(abs(cor(lp_mv, y) - cor(lp_bm, y)), 0.15)
+})
+
+
+test_that("the superseded spelling still selects the surface", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  expect_equal(log_lik(mv, process_error = TRUE),
+                log_lik(mv, incl_autocor = TRUE))
+  expect_equal(log_lik(mv, process_error = FALSE),
+                log_lik(mv, incl_autocor = FALSE))
+  # Named together, the current spelling decides.
+  expect_equal(log_lik(mv, incl_autocor = FALSE, process_error = TRUE),
+                log_lik(mv, incl_autocor = FALSE))
+  # The two surfaces are genuinely different densities.
+  expect_false(isTRUE(all.equal(log_lik(mv, incl_autocor = TRUE),
+                                 log_lik(mv, incl_autocor = FALSE))))
+})
+
+
+test_that("a multivariate fit scores on the conditional surface", {
+  require_fixtures("val_mvgam_mv_gauss.rds")
+  mv <- load_mvgam("mv_gauss")
+  ll <- log_lik(mv)
+  expect_equal(ncol(ll), nrow(mv$data))
+  expect_true(all(is.finite(ll)))
+  # A shared trend is composed against every response the same way,
+  # so each response's conditional predictor is its own observation
+  # predictor plus the one latent state, and nothing else.
+  dm <- as.matrix(posterior::as_draws_matrix(mv$fit))
+  state <- mvgam:::extract_trend_latent_states(mv, mv$data, dm)
+  for (r in mv$response_names) {
+    obs <- mvgam:::extract_component_linpred(
+      mv, newdata = mv$data, component = "obs", resp = r
+    )
+    expect_equal(
+      unname(as.matrix(
+        posterior_linpred(mv, resp = r, latent_state = "conditional")
+      )),
+      unname(as.matrix(obs + state))
+    )
+  }
+})

@@ -1641,25 +1641,29 @@ extract_dpars_from_stanfit <- function(stanfit,
 #' @param object A fitted mvgam object from [mvgam()].
 #' @param newdata Optional data frame with covariates for prediction. If
 #'   NULL, uses original training data stored in the model object.
-#' @param process_error Logical; if TRUE (default), the posterior
-#'   predictive distribution is the **marginal** `\[Y | X\]` integrated
-#'   over the trend's stochastic dynamics. mvgam achieves this by
-#'   Monte Carlo: sampled innovations are added to the link-scale
-#'   linear predictor before applying the inverse link and drawing
-#'   observation-family noise, matching brms's analytical convention
-#'   for autocorrelated residual models. If FALSE, the trend is fixed
-#'   at its Stan-fitted posterior draws (no innovation resampling)
-#'   and only observation-family noise contributes to the predictive
-#'   distribution.
+#' @param process_error Logical; if TRUE (default), the predictive
+#'   distribution integrates over the trend's stochastic dynamics.
+#'   mvgam does this by Monte Carlo, adding sampled innovations to the
+#'   link-scale predictor before the inverse link and the draw of
+#'   observation-family noise. If FALSE the trend contributes its
+#'   deterministic submodel alone and only observation noise spreads
+#'   the predictive distribution. Read only under
+#'   `latent_state = "marginal"`.
 #'
-#'   Note: with `process_error = TRUE` the invariant
-#'   \code{posterior_epred(x) == linkinv(posterior_linpred(x))} no
-#'   longer holds (innovations are added in `epred` and `predict` but
-#'   not in `linpred`). For deterministic-state-at-fitted-values
-#'   semantics (matching the trained latent state without resampling)
-#'   use \[forecast.mvgam\] / \[hindcast.mvgam\], which read the
-#'   `lv_trend` posterior draws directly and extrapolate the latent
-#'   state forward for newdata times beyond the training grid.
+#'   The innovations are composed once, on the linear predictor, so
+#'   `posterior_linpred()` under the same setting carries them too.
+#'   They are drawn afresh on each call: set a seed for a reproducible
+#'   answer.
+#' @param latent_state Which trend contribution the draws carry.
+#'   `"marginal"`, the default, integrates over the trend dynamics, so
+#'   a covariate effect reads the same whatever time it is asked at.
+#'   `"conditional"` reads the latent state the model inferred at each
+#'   time, which is what the `loo_*` wrappers ask for so a prediction
+#'   and the importance weights it is paired with describe the same
+#'   observation. A row whose time falls outside the fitted grid has
+#'   no such state and takes the per-series marginal; for a state
+#'   extrapolated forward use \[forecast.mvgam\], and for the fitted
+#'   state at the training grid \[hindcast.mvgam\].
 #' @param ndraws Positive integer specifying number of posterior draws to
 #'   use. NULL (default) uses all available draws.
 #' @param draw_ids Optional integer vector selecting a subset of posterior
@@ -1746,6 +1750,8 @@ extract_dpars_from_stanfit <- function(stanfit,
 #' @export
 posterior_predict.mvgam <- function(object, newdata = NULL,
                                     process_error = TRUE,
+                                    latent_state = c("marginal",
+                                                     "conditional"),
                                     ndraws = NULL,
                                     draw_ids = NULL,
                                     re_formula = NULL,
@@ -1757,6 +1763,7 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
   checkmate::assert_logical(process_error, len = 1)
+  latent_state <- match.arg(latent_state)
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1L, null.ok = TRUE)
   if (!is.null(ndraws) && !is.null(draw_ids)) {
@@ -1817,6 +1824,7 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
     object,
     newdata = newdata,
     process_error = process_error,
+    latent_state = latent_state,
     ndraws = NULL,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
@@ -1824,17 +1832,11 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
     resp = resp
   )
 
-  # Add stochastic process innovations from the trend covariance to
-  # each linpred matrix BEFORE sampling observation noise. This is the
-  # only entry point that adds innovations: posterior_linpred and
-  # posterior_epred stay deterministic, preserving the
-  # epred == linkinv(linpred) invariant.
-  if (isTRUE(process_error) && has_stochastic_trend(object)) {
-    innovations <- sample_process_errors(
-      object, ndraws = NULL, newdata = newdata
-    )
-    linpred_all <- add_innovations_to_linpred(linpred_all, innovations)
-  }
+  # The trend's innovations are already carried on the linear
+  # predictor: `posterior_linpred()` composes them through
+  # `get_combined_linpred()` under `process_error = TRUE`. Sampling a
+  # second, independent set here added the process variance twice
+  # before the observation noise was drawn on top.
 
   # Sample draw_ids ONCE for consistent subsampling across all responses
   if (is.list(linpred_all) && !is.matrix(linpred_all)) {
@@ -1893,41 +1895,6 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
     newdata = newdata,
     is_multivariate = is_mv
   )
-}
-
-
-#' Add Process Innovations to a Linpred Matrix or List
-#'
-#' Adds a ``\\[ndraws x nobs\\]`` innovations matrix to either a single linpred
-#' matrix (univariate / single-response) or each element of a list of
-#' linpred matrices (multivariate). Both inputs share the same posterior
-#' draw order because each is fetched with `ndraws = NULL`.
-#'
-#' @noRd
-add_innovations_to_linpred <- function(linpred_all, innovations) {
-  checkmate::assert_matrix(innovations, any.missing = FALSE)
-  if (is.list(linpred_all) && !is.matrix(linpred_all)) {
-    return(lapply(linpred_all, function(m) {
-      check_linpred_innov_dims(m, innovations)
-      m + innovations
-    }))
-  }
-  check_linpred_innov_dims(linpred_all, innovations)
-  linpred_all + innovations
-}
-
-
-#' @noRd
-check_linpred_innov_dims <- function(linpred, innovations) {
-  if (!identical(dim(linpred), dim(innovations))) {
-    stop(insight::format_error(c(
-      "Process-error innovations dim mismatch with linpred.",
-      x = paste0("linpred=[", paste(dim(linpred), collapse = "x"),
-                 "], innovations=[",
-                 paste(dim(innovations), collapse = "x"), "].")
-    )))
-  }
-  invisible(NULL)
 }
 
 

@@ -216,12 +216,17 @@ bayes_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   resp_use <- scored_response_name(object, resp)
   # Bayesian R^2 of Gelman et al. (2019): var(epred) / (var(epred) +
   # var(residual)) per draw, where residuals are y - epred. The
-  # `resp` argument is only meaningful for multivariate fits;
-  # passing it to a univariate posterior_epred is a hard error.
+  # expectation is taken conditional on the latent state, because the
+  # residual it is measured against is the one the observed series
+  # leaves; marginalising over the trend would score the fit against a
+  # series the model never saw. The `resp` argument is only meaningful for
+  # multivariate fits; passing it to a univariate posterior_epred is
+  # a hard error.
   epred <- if (is_mv) {
-    posterior_epred(object, resp = resp_use, ...)
+    posterior_epred(object, resp = resp_use,
+                    latent_state = "conditional", ...)
   } else {
-    posterior_epred(object, ...)
+    posterior_epred(object, latent_state = "conditional", ...)
   }
   y <- object$data[[resp_use]]
   if (is.null(y) || !is.numeric(y)) {

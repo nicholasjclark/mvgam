@@ -8,6 +8,7 @@
   object,
   newdata = NULL,
   process_error = TRUE,
+  latent_state = c("marginal", "conditional"),
   ndraws = NULL,
   draw_ids = NULL,
   re_formula = NULL,
@@ -23,23 +24,41 @@
 \item{newdata}{Optional data frame with covariates for prediction. If
 NULL, uses original training data stored in the model object.}
 
-\item{process_error}{Logical; if TRUE (default), the expected value is
-the \strong{marginal} E[Y | X] integrated over the trend's stochastic
-dynamics. mvgam achieves this by Monte Carlo: sampled innovations
-are added to the link-scale linear predictor before applying the
-inverse link, matching brms's analytical convention for
-autocorrelated residual models (e.g. Jensen correction
-\eqn{\sigma^2/(1-\rho^2)/2} for AR(1) Poisson). If FALSE, the
-trend is fixed at its posterior mean (no innovations), which is faster
-but ignores process noise.
+\item{process_error}{Logical; if TRUE (default), the expectation
+integrates over the trend's stochastic dynamics. mvgam does this
+by Monte Carlo, drawing one innovation per posterior draw from
+the trend's process covariance and adding it to the link-scale
+predictor before the inverse link, which works uniformly across
+families, links and trend types. What it integrates over is a
+single innovation step, so for an AR(1) Poisson the Jensen
+correction it carries is \eqn{\sigma^2/2} rather than the
+stationary \eqn{\sigma^2/(2(1-\rho^2))}. The two part company
+once \eqn{\rho} is far from zero, so read this expectation as
+one step of the trend's dynamics rather than its stationary
+spread. If FALSE the trend contributes its
+deterministic submodel alone, which is faster and leaves process
+noise out. Read only under \code{latent_state = "marginal"}: a
+conditional read takes the state the model inferred and has no
+innovations to sample.
 
-Note: with \code{process_error = TRUE} the invariant
-\code{posterior_epred(x) == linkinv(posterior_linpred(x))} no
-longer holds (innovations are added in \code{epred} and \code{predict} but
-not in \code{linpred}). For deterministic-state-at-fitted-values
-semantics (matching the trained latent state without resampling),
-use \code{\link[=forecast]{forecast()}} / \code{\link[=hindcast]{hindcast()}} which return values at the actual
-\code{lv_trend} posterior draws.}
+The innovations are drawn afresh on each call, so two calls on
+one fit give different answers. Set a seed for a reproducible
+one.}
+
+\item{latent_state}{Which trend contribution the expectation is
+taken over. \code{"marginal"}, the default, integrates over the trend
+dynamics, so a covariate effect reads the same whether it is
+asked at the first time point or the fiftieth. \code{"conditional"}
+reads the latent state the model inferred at each time, which is
+the quantity \code{\link[=hindcast]{hindcast()}} returns and the one an ELPD is built
+from; \code{\link[=loo_R2.mvgam]{loo_R2.mvgam()}} and \code{\link[=bayes_R2.mvgam]{bayes_R2.mvgam()}} ask for it, because
+an R^2 describes the series that was observed rather than a
+counterfactual one. A row whose time falls outside the fitted
+grid has no such state and takes the per-series marginal.
+
+The two surfaces answer different questions of the same model, so
+the choice is worth making deliberately. \code{\link[=hindcast]{hindcast()}} returns the
+conditional reading with the fitted state's own draws.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws.}

@@ -2551,78 +2551,39 @@ add_latent_to_linpred <- function(linpred, latent_mat) {
   linpred + latent_mat
 }
 
-
-#' Per-draw state-aware predictive at training cells
+#' Choose the prediction surface a diagnostic should read
 #'
-#' Pulls the per-draw conditional `trend[t, s]` from the stanfit (the
-#' same composition Stan used at fit time), combines with the per-draw
-#' deterministic obs-side linpred, and optionally applies the family
-#' inverse link or full RNG. Used by `hindcast_one_series` and the
-#' in-sample path of `residuals.mvgam` / `pp_check.mvgam`. The
-#' `predict_*` family never calls this helper; those paths stay
-#' time-agnostic marginal-MC by design.
+#' A residual or a posterior predictive check compares a prediction
+#' against the observation that was actually recorded, so in sample it
+#' reads the latent state the model inferred at that time rather than
+#' a fresh draw of the trend. That is the state `hindcast()` returns,
+#' and reading it keeps every diagnostic describing one series.
 #'
-#' @param object Fitted `mvgam` object.
-#' @param newdata Data frame of cells at which to evaluate the
-#'   state-conditional predictive. Each row must align to an
-#'   in-grid `(time, series)` pair.
-#' @param type One of `c("link", "expected", "response")`.
-#' @param draw_ids Optional integer vector of posterior draw indices.
-#' @param resp Optional response name for multivariate fan-out.
-#' @return `[n_draws x n_obs]` numeric (or integer for `"response"`)
-#'   matrix.
+#' Given `newdata` the fit never saw, there is no such state to read
+#' and the marginal surface is what remains, carrying the trend's
+#' process uncertainty as it should. The exception is a check weighted
+#' by importance ratios: those are built from the likelihood, which is
+#' conditional, so the draws they reweight have to be conditional too
+#' whatever data they cover.
+#'
+#' @param args Argument list destined for a `posterior_*` method
+#' @param newdata The `newdata` the caller was given, or `NULL`
+#' @param weighted Whether the result will be reweighted by importance
+#'   ratios
+#' @return `args`, with `latent_state` stamped on when the conditional
+#'   surface applies and the caller has not named it already
 #'
 #' @noRd
-state_aware_predict <- function(object, newdata, type,
-                                  draw_ids = NULL, resp = NULL) {
-  checkmate::assert_class(object, "mvgam")
-  checkmate::assert_data_frame(newdata, min.rows = 1L)
-  type <- match.arg(type, c("link", "expected", "response"))
-
-  draws_mat <- posterior::as_draws_matrix(object$fit)
-  if (!is.null(draw_ids)) {
-    draws_mat <- draws_mat[draw_ids, , drop = FALSE]
+diagnostic_surface_args <- function(args, newdata, weighted = FALSE) {
+  checkmate::assert_list(args)
+  checkmate::assert_logical(weighted, len = 1L)
+  if ("latent_state" %in% names(args)) {
+    return(args)
   }
-  trend_state <- extract_trend_latent_states(
-    mvgam_fit = object, newdata = newdata, full_draws = draws_mat
-  )
-  if (is.null(trend_state)) {
-    trend_state <- matrix(0, nrow = nrow(draws_mat),
-                            ncol = nrow(newdata))
+  if (is.null(newdata) || isTRUE(weighted)) {
+    args$latent_state <- "conditional"
   }
-  obs_linpred <- extract_component_linpred(
-    mvgam_fit = object, newdata = newdata,
-    component = "obs", draw_ids = draw_ids, resp = resp
-  )
-  if (is.list(obs_linpred) && !is.matrix(obs_linpred)) {
-    stop(insight::format_error(c(
-      "state_aware_predict received a list-shaped obs linpred without a 'resp' scope.",
-      i = paste0("Multivariate fits must be scoped via 'resp' ",
-                 "before reaching this helper.")
-    )))
-  }
-  linpred <- obs_linpred + trend_state
-
-  family <- if (!is.null(resp)) {
-    get_family_for_resp(object, resp)
-  } else {
-    object$family
-  }
-
-  if (identical(type, "link")) {
-    return(linpred)
-  }
-  if (identical(type, "expected")) {
-    return(family$linkinv(linpred))
-  }
-  # type = "response": route through the shared family RNG
-  # dispatcher (handles closure-unit families internally).
-  predict_single_response(
-    object = object, linpred_resp = linpred,
-    resp = resp, draw_ids = seq_len(nrow(linpred)),
-    ndraws = nrow(linpred), newdata = newdata,
-    is_multivariate = !is.null(resp)
-  )
+  args
 }
 
 
@@ -2654,18 +2615,34 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws) {
     )))
   }
 
-  # Map newdata rows to positions in the trend matrix via the
-  # `obs_struct$time` -> `obs_struct$unique_times` lookup used by
-  # every other Stan-direct extractor
-  # (`reshape_linpred_to_grid()` in R/extract_trend_linpred.R
-  # and `align_innovations_to_grid()` in R/sample_innovations.R).
-  # Matching against the raw training years directly - the prior
-  # code path here - was silently returning NA for every row
-  # because `obs_struct$time` is already a 1..N_time_trend
-  # position vector, not a raw calendar time.
+  # Map newdata rows to columns of the fitted trend matrix. The lookup
+  # runs on the raw time values against the grid the model was fitted
+  # on, because the observation structure renumbers time from one
+  # within whatever frame it is handed: a frame holding only the later
+  # half of a series would otherwise read the state of the earlier
+  # half, silently and with the right shape. Working from the raw
+  # values also makes a time the fit never saw fall out as `NA`, which
+  # is what the marginal substitution below keys on.
   obs_struct <- get_observation_structure(mvgam_fit, newdata = newdata)
-  t_idx <- match(obs_struct$time, obs_struct$unique_times)
   s_idx <- obs_struct$series_int
+  time_var <- mvgam_fit$trend_metadata$variables$time_var %||% "time"
+  train_data <- mvgam_fit$obs_data %||% mvgam_fit$data
+  raw_t_idx <- if (time_var %in% names(newdata) &&
+                     time_var %in% names(train_data)) {
+    match(newdata[[time_var]], sort(unique(train_data[[time_var]])))
+  } else {
+    NULL
+  }
+  # A closure-unit family predicts at the unit grain rather than per
+  # newdata row, so the raw lookup only applies when it covers the
+  # same rows the observation structure does. Otherwise the position
+  # that structure assigned is the only alignment available.
+  t_idx <- if (!is.null(raw_t_idx) &&
+                 length(raw_t_idx) == length(s_idx)) {
+    raw_t_idx
+  } else {
+    match(obs_struct$time, obs_struct$unique_times)
+  }
 
   if (any(s_idx < 1L | s_idx > N_series_trend)) {
     stop(insight::format_error(

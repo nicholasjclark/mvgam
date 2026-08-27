@@ -105,3 +105,62 @@ test_that("ordinal thresholds follow the draws of their predictor", {
     expect_equal(nrow(posterior_predict(fit, ndraws = n)), n)
   }
 })
+
+
+# The three invariants below guard the composition of the trend's
+# contribution rather than the choice of draws. Each failed silently:
+# the answers stayed finite, plausibly scaled and wrong.
+
+
+test_that("a scored row reads the state of its own time", {
+  # The latent state used to be looked up by position within whatever
+  # frame it was handed, so scoring the later half of a series read
+  # the state of the earlier half. The shape was right and nothing
+  # warned. Scoring a window has to agree with scoring everything and
+  # keeping that window's columns.
+  fit <- readRDS(file.path("fixtures", "val_mvgam_ar1_fx.rds"))
+  n <- nrow(fit$data)
+  window <- seq.int(n - 9L, n)
+  full <- log_lik(fit)
+  part <- log_lik(fit, newdata = fit$data[window, , drop = FALSE])
+  expect_equal(dim(part), c(nrow(full), length(window)))
+  expect_equal(unname(as.matrix(part)),
+                unname(as.matrix(full)[, window]),
+                tolerance = 1e-8)
+})
+
+
+test_that("the trend's innovations are composed once", {
+  # `posterior_epred()` and `posterior_predict()` each drew a second,
+  # independent set of innovations on top of the set the linear
+  # predictor already carried, so a marginal prediction held twice the
+  # process variance. Drawn from one seed, the expectation has to be
+  # exactly the inverse link of the predictor: a second draw anywhere
+  # in the chain breaks the identity.
+  fit <- readRDS(file.path("fixtures", "val_mvgam_ar1_fx.rds"))
+  set.seed(99L)
+  ep <- posterior_epred(fit)
+  set.seed(99L)
+  lp <- posterior_linpred(fit)
+  expect_equal(unname(as.matrix(ep)),
+                unname(as.matrix(fit$family$linkinv(lp))),
+                tolerance = 1e-10)
+})
+
+
+test_that("a conditional read repeats and a marginal one does not", {
+  # Conditioning reads the state the model inferred, so it holds no
+  # RNG and answers the same way twice. Marginalising samples the
+  # trend afresh, which is the documented reason a seed is needed for
+  # a reproducible answer.
+  fit <- readRDS(file.path("fixtures", "val_mvgam_ar1_fx.rds"))
+  expect_equal(
+    posterior_epred(fit, latent_state = "conditional"),
+    posterior_epred(fit, latent_state = "conditional")
+  )
+  expect_equal(log_lik(fit), log_lik(fit))
+  expect_false(isTRUE(all.equal(
+    posterior_epred(fit, latent_state = "marginal"),
+    posterior_epred(fit, latent_state = "marginal")
+  )))
+})

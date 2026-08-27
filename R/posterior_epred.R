@@ -421,23 +421,40 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #' @param object A fitted mvgam object from [mvgam()].
 #' @param newdata Optional data frame with covariates for prediction. If
 #'   NULL, uses original training data stored in the model object.
-#' @param process_error Logical; if TRUE (default), the expected value is
-#'   the **marginal** E\[Y | X\] integrated over the trend's stochastic
-#'   dynamics. mvgam achieves this by Monte Carlo: sampled innovations
-#'   are added to the link-scale linear predictor before applying the
-#'   inverse link, matching brms's analytical convention for
-#'   autocorrelated residual models (e.g. Jensen correction
-#'   \eqn{\sigma^2/(1-\rho^2)/2} for AR(1) Poisson). If FALSE, the
-#'   trend is fixed at its posterior mean (no innovations), which is faster
-#'   but ignores process noise.
+#' @param process_error Logical; if TRUE (default), the expectation
+#'   integrates over the trend's stochastic dynamics. mvgam does this
+#'   by Monte Carlo, drawing one innovation per posterior draw from
+#'   the trend's process covariance and adding it to the link-scale
+#'   predictor before the inverse link, which works uniformly across
+#'   families, links and trend types. What it integrates over is a
+#'   single innovation step, so for an AR(1) Poisson the Jensen
+#'   correction it carries is \eqn{\sigma^2/2} rather than the
+#'   stationary \eqn{\sigma^2/(2(1-\rho^2))}. The two part company
+#'   once \eqn{\rho} is far from zero, so read this expectation as
+#'   one step of the trend's dynamics rather than its stationary
+#'   spread. If FALSE the trend contributes its
+#'   deterministic submodel alone, which is faster and leaves process
+#'   noise out. Read only under `latent_state = "marginal"`: a
+#'   conditional read takes the state the model inferred and has no
+#'   innovations to sample.
 #'
-#'   Note: with `process_error = TRUE` the invariant
-#'   \code{posterior_epred(x) == linkinv(posterior_linpred(x))} no
-#'   longer holds (innovations are added in `epred` and `predict` but
-#'   not in `linpred`). For deterministic-state-at-fitted-values
-#'   semantics (matching the trained latent state without resampling),
-#'   use [forecast()] / [hindcast()] which return values at the actual
-#'   `lv_trend` posterior draws.
+#'   The innovations are drawn afresh on each call, so two calls on
+#'   one fit give different answers. Set a seed for a reproducible
+#'   one.
+#' @param latent_state Which trend contribution the expectation is
+#'   taken over. `"marginal"`, the default, integrates over the trend
+#'   dynamics, so a covariate effect reads the same whether it is
+#'   asked at the first time point or the fiftieth. `"conditional"`
+#'   reads the latent state the model inferred at each time, which is
+#'   the quantity [hindcast()] returns and the one an ELPD is built
+#'   from; [loo_R2.mvgam()] and [bayes_R2.mvgam()] ask for it, because
+#'   an R^2 describes the series that was observed rather than a
+#'   counterfactual one. A row whose time falls outside the fitted
+#'   grid has no such state and takes the per-series marginal.
+#'
+#'   The two surfaces answer different questions of the same model, so
+#'   the choice is worth making deliberately. [hindcast()] returns the
+#'   conditional reading with the fitted state's own draws.
 #' @param ndraws Positive integer specifying number of posterior draws to
 #'   use. NULL (default) uses all available draws.
 #' @param draw_ids Optional integer vector selecting a subset of posterior
@@ -517,6 +534,8 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #' @export
 posterior_epred.mvgam <- function(object, newdata = NULL,
                                   process_error = TRUE,
+                                  latent_state = c("marginal",
+                                                   "conditional"),
                                   ndraws = NULL,
                                   draw_ids = NULL,
                                   re_formula = NULL,
@@ -527,6 +546,7 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
   # Validate mvgam-specific parameters
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_logical(process_error, len = 1)
+  latent_state <- match.arg(latent_state)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,
                                 any.missing = FALSE)
 
@@ -569,6 +589,7 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
     mvgam_fit = object,
     newdata = newdata,
     process_error = process_error,
+    latent_state = latent_state,
     draw_ids = draw_ids,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
@@ -576,21 +597,14 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
     resp = resp
   )
 
-  # Marginal expectation for state-space models: integrate over the
-  # trend's stochastic dynamics by adding sampled innovations to the
-  # link-scale linpred before applying inverse link. Matches brms's
-  # convention for posterior_epred on AR-cov models, where the
-  # autocorrelation residual distribution is integrated analytically
-  # (e.g. Jensen correction sigma^2/(1-ar^2)/2 for Poisson log link).
-  # mvgam achieves the same marginal mean by Monte Carlo, which works
-  # uniformly across families/links and trend types.
-  if (isTRUE(process_error) && has_stochastic_trend(object)) {
-    innovations <- sample_process_errors(
-      object, ndraws = ndraws, newdata = newdata,
-      draw_ids = draw_ids
-    )
-    linpred <- add_innovations_to_linpred(linpred, innovations)
-  }
+  # The marginal expectation integrates over the trend's dynamics by
+  # carrying sampled innovations on the link scale before the inverse
+  # link is applied, which reaches the same place as the analytic
+  # correction brms makes for an AR-cov model (sigma^2/(1-ar^2)/2 for
+  # a Poisson log link) while working uniformly across families,
+  # links and trend types. `get_combined_linpred()` samples them, and
+  # samples them once: drawing a second set here as well put twice
+  # the process variance into every marginal prediction.
 
   # Extract family information for transformation
   # `resp` decides which response is being predicted

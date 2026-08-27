@@ -424,3 +424,43 @@ test_that("a missing response yields NA rather than aborting", {
   expect_true(all(is.na(ll[, 2L])))
   expect_true(all(is.finite(ll[, -2L])))
 })
+
+
+test_that("resolve_incl_autocor keeps the superseded spelling working", {
+  # Nothing supplied but the current argument: it is used as given.
+  expect_true(resolve_incl_autocor(TRUE, legacy = NULL,
+                                    autocor_supplied = FALSE))
+  expect_false(resolve_incl_autocor(FALSE, legacy = NULL,
+                                     autocor_supplied = FALSE))
+  # Only the superseded argument named: it decides.
+  expect_false(resolve_incl_autocor(TRUE, legacy = FALSE,
+                                     autocor_supplied = FALSE))
+  expect_true(resolve_incl_autocor(FALSE, legacy = TRUE,
+                                    autocor_supplied = FALSE))
+})
+
+
+test_that("resolve_incl_autocor prefers the current spelling", {
+  # Both named: the documented argument wins and the superseded value
+  # is ignored rather than combined with it.
+  expect_false(resolve_incl_autocor(FALSE, legacy = TRUE,
+                                     autocor_supplied = TRUE))
+  expect_true(resolve_incl_autocor(TRUE, legacy = FALSE,
+                                    autocor_supplied = TRUE))
+})
+
+
+test_that("resolve_incl_autocor rejects a non-logical", {
+  expect_error(
+    resolve_incl_autocor("yes", legacy = NULL, autocor_supplied = FALSE),
+    "logical"
+  )
+  expect_error(
+    resolve_incl_autocor(TRUE, legacy = "no", autocor_supplied = FALSE),
+    "logical"
+  )
+  expect_error(
+    resolve_incl_autocor(NA, legacy = NULL, autocor_supplied = FALSE),
+    "missing"
+  )
+})

@@ -71,6 +71,15 @@ of the \pkg{bayesplot} package. Returns a \pkg{ggplot2} object that
 can be further customised.
 }
 \details{
+Replicates are drawn against the latent trend state the model
+inferred at each time, so the check compares the model's fitted
+trajectory with the series that produced it, the same basis
+\code{\link[=residuals.mvgam]{residuals.mvgam()}} and \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} use. Supplying \code{newdata}
+the fit never saw integrates over the trend dynamics instead. The
+\verb{loo_*} types always read the conditional state whatever data they
+cover, because their importance weights come from the likelihood,
+which reads it too.
+
 For a detailed explanation of each of the ppc functions,
 see the \code{\link[bayesplot:PPC-overview]{PPC}} documentation of the
 \pkg{\link[bayesplot:bayesplot-package]{bayesplot}} package. LOO-PIT

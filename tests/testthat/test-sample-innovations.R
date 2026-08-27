@@ -589,46 +589,51 @@ test_that("sample_process_errors returns zeros for deterministic trends", {
 })
 
 
-test_that("add_innovations_to_linpred adds matrix in univariate case", {
+test_that("compose_linpred_with_noise adds the trend and its noise", {
   ndraws <- 4
   nobs <- 6
-  linpred <- matrix(seq_len(ndraws * nobs), ndraws, nobs)
-  innov <- matrix(0.1, ndraws, nobs)
-  out <- add_innovations_to_linpred(linpred, innov)
+  obs <- matrix(seq_len(ndraws * nobs), ndraws, nobs)
+  trend <- matrix(2, ndraws, nobs)
+  noise <- matrix(0.1, ndraws, nobs)
+  out <- compose_linpred_with_noise(obs, trend, noise)
   expect_true(is.matrix(out))
   expect_equal(dim(out), c(ndraws, nobs))
-  expect_equal(out, linpred + innov)
+  expect_equal(out, obs + trend + noise)
 })
 
 
-test_that("add_innovations_to_linpred adds matrix per-response in mv case", {
-  ndraws <- 3
-  nobs <- 5
-  linpred_list <- list(
-    y1 = matrix(0, ndraws, nobs),
-    y2 = matrix(10, ndraws, nobs)
+test_that("compose_linpred_with_noise omits noise when there is none", {
+  obs <- matrix(1, 3, 5)
+  trend <- matrix(2, 3, 5)
+  expect_equal(
+    compose_linpred_with_noise(obs, trend, NULL),
+    obs + trend
   )
-  innov <- matrix(0.5, ndraws, nobs)
-  out <- add_innovations_to_linpred(linpred_list, innov)
-  expect_true(is.list(out) && !is.matrix(out))
-  expect_equal(names(out), c("y1", "y2"))
-  expect_equal(out$y1, linpred_list$y1 + innov)
-  expect_equal(out$y2, linpred_list$y2 + innov)
 })
 
 
-test_that("add_innovations_to_linpred errors on dim mismatch", {
-  ndraws <- 3
-  nobs <- 5
-  linpred <- matrix(0, ndraws, nobs)
-  bad <- matrix(0, ndraws, nobs + 1)
+test_that("compose_linpred_with_noise errors on a trend dim mismatch", {
+  obs <- matrix(0, 3, 5)
+  bad_trend <- matrix(0, 3, 6)
   expect_error(
-    add_innovations_to_linpred(linpred, bad),
-    "dim mismatch"
+    compose_linpred_with_noise(obs, bad_trend, NULL),
+    "Dimension mismatch"
   )
+  # The response is named so a multivariate fit says which one failed.
   expect_error(
-    add_innovations_to_linpred(list(y = linpred), bad),
-    "dim mismatch"
+    compose_linpred_with_noise(obs, bad_trend, NULL, resp_name = "y2"),
+    "y2"
+  )
+})
+
+
+test_that("compose_linpred_with_noise errors on a noise dim mismatch", {
+  obs <- matrix(0, 3, 5)
+  trend <- matrix(0, 3, 5)
+  bad_noise <- matrix(0, 3, 6)
+  expect_error(
+    compose_linpred_with_noise(obs, trend, bad_noise),
+    "Trend-noise dimension mismatch"
   )
 })
 

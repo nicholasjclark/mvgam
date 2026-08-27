@@ -9,6 +9,7 @@
   transform = FALSE,
   newdata = NULL,
   process_error = TRUE,
+  latent_state = c("marginal", "conditional"),
   ndraws = NULL,
   draw_ids = NULL,
   re_formula = NULL,
@@ -35,19 +36,28 @@ and answers on the response scale.}
 \item{newdata}{Optional data frame with covariates for prediction. If
 NULL, uses original training data stored in the model object.}
 
-\item{process_error}{Logical; if TRUE (default), uses the full
-posterior draws of the trend parameters (per-draw variation). If
-FALSE, fixes the trend at its posterior mean for faster
-computation.
+\item{process_error}{Logical; if TRUE (default), the trend
+contributes a sampled innovation from its covariance structure on
+top of its deterministic submodel, which is what makes the
+predictor marginal over the trend dynamics. If FALSE the
+deterministic submodel contributes alone. Either way the
+submodel's own draws ride through per draw, so \code{FALSE} is not a
+collapse to a posterior mean. Read only under
+\code{latent_state = "marginal"}, since a conditional read takes the
+state the model inferred and has no innovation to sample.
 
-\code{posterior_linpred()} does NOT add sampled stochastic innovations
-from the trend's covariance structure; it remains a
-deterministic function of the parameter draws. State-space
-process noise is added inside \code{posterior_epred()} and
-\code{posterior_predict()} (matching the brms convention of returning
-marginal expectations / predictive samples). For
-deterministic-state-at-fitted-values semantics use \code{\link[=forecast]{forecast()}} /
-\code{\link[=hindcast]{hindcast()}}.}
+The innovations are drawn afresh on each call, so two calls on
+one fit differ; set a seed for a reproducible answer. For the
+fitted latent state at the training grid use \code{\link[=hindcast]{hindcast()}}, and
+for one extrapolated beyond it \code{\link[=forecast]{forecast()}}.}
+
+\item{latent_state}{Which trend contribution the prediction carries.
+\code{"marginal"}, the default, integrates over the trend dynamics and
+is the semantic this method documents. \code{"conditional"} reads the
+latent state the model inferred at each time instead, which is
+what the \verb{loo_*} wrappers ask for so that a prediction and the
+importance weights it is paired with describe the same
+observation. See \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} for the state-aware surface.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws. Mutually exclusive

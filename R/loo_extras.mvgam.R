@@ -207,15 +207,12 @@ mvgam_loo_R2 <- function(y, epred, ll, r_eff) {
 # 3D multivariate prediction arrays, returns a 3D array with the
 # per-response slabs stacked along the last dimension).
 #
-# mvgam's posterior_* and `log_lik` methods stochastically
-# resample latent-state contributions on each call. To keep the
-# PSIS weights (derived from log_lik inside `loo()`) aligned
-# row-by-row with the prediction draws (from `posterior_fn`),
-# both calls run under a shared RNG seed; the user's RNG state
-# is snapshotted on entry and restored on exit. Without this
-# tie, predictions and weights reference different latent-state
-# samples and the PSIS expectation drifts substantially from the
-# brms equivalent.
+# Weights and predictions are both taken conditional on the latent
+# state, so the two describe the same observation rather than two
+# draws of the trend. What remains stochastic is the observation
+# noise `posterior_predict()` draws, and the calls run under a
+# shared seed so a repeated call answers the same way; the user's
+# RNG state is snapshotted on entry and restored on exit.
 #'@noRd
 # Internal: stop with a consistent message when a method that can only
 # operate on one response at a time is handed a multivariate fit and
@@ -291,14 +288,32 @@ mvgam_loo_E_loo <- function(object, posterior_fn,
     on.exit(assign(".Random.seed", rng_old, envir = .GlobalEnv))
   }
   aligned_seed <- 1L
+  # `latent_state` names a prediction surface, so it is held back from
+  # the weighting call, which reaches `loo::loo()` through `...` and
+  # would not know the argument.
+  dots <- list(...)
+  surface <- dots$latent_state
+  dots$latent_state <- NULL
   if (is.null(psis_object)) {
     message("Running PSIS to compute weights")
     set.seed(aligned_seed)
-    loo_object <- loo(object, resp = resp, save_psis = TRUE, ...)
+    loo_object <- do.call(
+      loo, c(list(object, resp = resp, save_psis = TRUE), dots)
+    )
     psis_object <- loo_object$psis_object
   }
   set.seed(aligned_seed)
-  preds <- posterior_fn(object, resp = resp, ...)
+  # The weights come from a density evaluated under the latent state
+  # the model inferred at each time, so the prediction they reweight
+  # is taken under that same state. brms pairs the two the same way,
+  # handing one set of arguments to both `loo()` and the prediction,
+  # each carrying its autocorrelation term. A caller naming the
+  # surface is left to it.
+  preds <- do.call(
+    posterior_fn,
+    c(list(object, resp = resp),
+      list(latent_state = surface %||% "conditional"), dots)
+  )
   # A prediction covers every row of the data; the weights cover only
   # the rows the likelihood could score. Narrow the prediction to those
   # before pairing the two, or a fit with any missing response asks
@@ -414,10 +429,16 @@ loo_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
     )))
   }
   resp_arg <- if (is_mv) list(resp = resp_use) else list()
-  epred <- do.call(
-    posterior_epred,
-    c(list(object), resp_arg, args_epred)
-  )
+  # The expectation and the importance weights have to describe the
+  # same observation, so both are taken conditional on the latent
+  # state the model inferred at that time. Pairing a marginal
+  # expectation with weights built from a conditional density is what
+  # pinned this statistic at its clamp.
+  epred_args <- c(list(object), resp_arg, args_epred)
+  if (!"latent_state" %in% names(epred_args)) {
+    epred_args$latent_state <- "conditional"
+  }
+  epred <- do.call(posterior_epred, epred_args)
   ll <- do.call(log_lik, c(list(object), resp_arg, args_loglik))
   # A row with no response contributes no density, so its column is
   # unscorable and importance sampling refuses it. Dropping those

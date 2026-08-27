@@ -13,8 +13,15 @@
 #'   [log_lik.mvgam()] for multivariate response selection;
 #'   `pointwise` is not yet supported and raises a clear error;
 #'   `compare` and `model_names` are no-ops for single-model WAIC.
-#' @param incl_dynamics Logical, default `FALSE`. Maps to the
-#'   `process_error` argument on [log_lik.mvgam()].
+#' @param incl_autocor Logical, default `TRUE`. Passed to
+#'   [log_lik.mvgam()] as its argument of the same name, so each
+#'   observation is scored on the conditional surface, under the latent
+#'   trend state the model inferred at that time.
+#' @param incl_dynamics Superseded by `incl_autocor` and still
+#'   accepted, so calls written against it keep working. `TRUE` maps
+#'   to `incl_autocor = TRUE` and `FALSE` to `incl_autocor = FALSE`.
+#'   When only `incl_dynamics` is given it decides; when both are
+#'   given `incl_autocor` decides and `incl_dynamics` is ignored.
 #' @param by_species Logical, default `FALSE`. When `TRUE`, return a
 #'   data frame with one row per series (`species` column) and per-
 #'   series WAIC estimates instead of a single `loo::waic` object.
@@ -53,8 +60,14 @@
 #' @export
 waic.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
                        pointwise = FALSE, model_names = NULL,
-                       incl_dynamics = FALSE,
+                       incl_autocor = TRUE,
+                       incl_dynamics = NULL,
                        by_species = FALSE) {
+  incl_autocor <- resolve_incl_autocor(
+    incl_autocor = incl_autocor,
+    legacy = incl_dynamics,
+    autocor_supplied = !missing(incl_autocor)
+  )
   if (isTRUE(pointwise)) {
     stop(insight::format_error(c(
       "{.field pointwise = TRUE} is not yet supported on mvgam waic.",
@@ -62,7 +75,7 @@ waic.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
     )))
   }
   logliks <- log_lik(
-    x, resp = resp, process_error = incl_dynamics, ...
+    x, resp = resp, incl_autocor = incl_autocor, ...
   )
   # Drop the all-NA columns a missing response leaves behind, the same
   # way loo.mvgam does, so both criteria score the same observations.

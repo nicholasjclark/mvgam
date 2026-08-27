@@ -8,6 +8,7 @@
   object,
   newdata = NULL,
   process_error = TRUE,
+  latent_state = c("marginal", "conditional"),
   ndraws = NULL,
   draw_ids = NULL,
   re_formula = NULL,
@@ -23,25 +24,30 @@
 \item{newdata}{Optional data frame with covariates for prediction. If
 NULL, uses original training data stored in the model object.}
 
-\item{process_error}{Logical; if TRUE (default), the posterior
-predictive distribution is the \strong{marginal} \verb{\[Y | X\]} integrated
-over the trend's stochastic dynamics. mvgam achieves this by
-Monte Carlo: sampled innovations are added to the link-scale
-linear predictor before applying the inverse link and drawing
-observation-family noise, matching brms's analytical convention
-for autocorrelated residual models. If FALSE, the trend is fixed
-at its Stan-fitted posterior draws (no innovation resampling)
-and only observation-family noise contributes to the predictive
-distribution.
+\item{process_error}{Logical; if TRUE (default), the predictive
+distribution integrates over the trend's stochastic dynamics.
+mvgam does this by Monte Carlo, adding sampled innovations to the
+link-scale predictor before the inverse link and the draw of
+observation-family noise. If FALSE the trend contributes its
+deterministic submodel alone and only observation noise spreads
+the predictive distribution. Read only under
+\code{latent_state = "marginal"}.
 
-Note: with \code{process_error = TRUE} the invariant
-\code{posterior_epred(x) == linkinv(posterior_linpred(x))} no
-longer holds (innovations are added in \code{epred} and \code{predict} but
-not in \code{linpred}). For deterministic-state-at-fitted-values
-semantics (matching the trained latent state without resampling)
-use [forecast.mvgam] / [hindcast.mvgam], which read the
-\code{lv_trend} posterior draws directly and extrapolate the latent
-state forward for newdata times beyond the training grid.}
+The innovations are composed once, on the linear predictor, so
+\code{posterior_linpred()} under the same setting carries them too.
+They are drawn afresh on each call: set a seed for a reproducible
+answer.}
+
+\item{latent_state}{Which trend contribution the draws carry.
+\code{"marginal"}, the default, integrates over the trend dynamics, so
+a covariate effect reads the same whatever time it is asked at.
+\code{"conditional"} reads the latent state the model inferred at each
+time, which is what the \verb{loo_*} wrappers ask for so a prediction
+and the importance weights it is paired with describe the same
+observation. A row whose time falls outside the fitted grid has
+no such state and takes the per-series marginal; for a state
+extrapolated forward use [forecast.mvgam], and for the fitted
+state at the training grid [hindcast.mvgam].}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws.}

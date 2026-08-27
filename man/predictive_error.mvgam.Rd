@@ -42,8 +42,15 @@ Returns posterior draws of the response-scale prediction
 error (observed minus predicted) for each observation.
 Mirrors \code{\link[brms:predictive_error.brmsfit]{brms::predictive_error.brmsfit()}}.
 }
+\details{
+This is the quantity \code{\link[=residuals.mvgam]{residuals.mvgam()}} returns under
+\code{type = "ordinary"}, and it reads the same surface: in sample the
+prediction carries the latent trend state the model inferred at
+that time, while \code{newdata} the fit never saw integrates over the
+trend dynamics instead.
+}
 \seealso{
-\code{\link[brms:predictive_error.brmsfit]{brms::predictive_error.brmsfit()}},
+\code{\link[brms:predictive_error.brmsfit]{brms::predictive_error.brmsfit()}}, \code{\link[=residuals.mvgam]{residuals.mvgam()}},
 \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}, \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}}.
 }
 \author{

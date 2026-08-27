@@ -342,9 +342,10 @@ lfo_cv.mvgam <- function(object,
   refits_at <- c(refits_at, min_t)
 
   # log_lik on the FULL data so we can index into it at any
-  # future window. The marginal log density (process_error = TRUE
-  # in posterior_linpred under log_lik.mvgam) is what PSIS-LFO
-  # expects for ELPD.
+  # future window. It scores each observation under the latent state
+  # the model inferred at that time, which is the density an ELPD is
+  # built from; the times beyond the training window this fit was
+  # refitted on have no such state and take the per-series marginal.
   loglik_past <- log_lik(fit_past, newdata = all_data)
   idx_refit <- idx_min_t
 

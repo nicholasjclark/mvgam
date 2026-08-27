@@ -11,7 +11,8 @@
   resp = NULL,
   pointwise = FALSE,
   model_names = NULL,
-  incl_dynamics = FALSE,
+  incl_autocor = TRUE,
+  incl_dynamics = NULL,
   by_species = FALSE
 )
 }
@@ -27,8 +28,16 @@
 \code{pointwise} is not yet supported and raises a clear error;
 \code{compare} and \code{model_names} are no-ops for single-model WAIC.}
 
-\item{incl_dynamics}{Logical, default \code{FALSE}. Maps to the
-\code{process_error} argument on \code{\link[=log_lik.mvgam]{log_lik.mvgam()}}.}
+\item{incl_autocor}{Logical, default \code{TRUE}. Passed to
+\code{\link[=log_lik.mvgam]{log_lik.mvgam()}} as its argument of the same name, so each
+observation is scored on the conditional surface, under the latent
+trend state the model inferred at that time.}
+
+\item{incl_dynamics}{Superseded by \code{incl_autocor} and still
+accepted, so calls written against it keep working. \code{TRUE} maps
+to \code{incl_autocor = TRUE} and \code{FALSE} to \code{incl_autocor = FALSE}.
+When only \code{incl_dynamics} is given it decides; when both are
+given \code{incl_autocor} decides and \code{incl_dynamics} is ignored.}
 
 \item{by_species}{Logical, default \code{FALSE}. When \code{TRUE}, return a
 data frame with one row per series (\code{species} column) and per-

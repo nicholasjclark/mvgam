@@ -27,7 +27,17 @@
 #' @return A ggplot object that can be further
 #'   customized using the \pkg{ggplot2} package.
 #'
-#' @details For a detailed explanation of each of the ppc functions,
+#' @details
+#' Replicates are drawn against the latent trend state the model
+#' inferred at each time, so the check compares the model's fitted
+#' trajectory with the series that produced it, the same basis
+#' [residuals.mvgam()] and [hindcast.mvgam()] use. Supplying `newdata`
+#' the fit never saw integrates over the trend dynamics instead. The
+#' `loo_*` types always read the conditional state whatever data they
+#' cover, because their importance weights come from the likelihood,
+#' which reads it too.
+#'
+#' For a detailed explanation of each of the ppc functions,
 #'   see the \code{\link[bayesplot:PPC-overview]{PPC}} documentation of the
 #'   \pkg{\link[bayesplot:bayesplot-package]{bayesplot}} package. LOO-PIT
 #'   bayesplot variants (\code{loo_pit}, \code{loo_pit_overlay},
@@ -353,6 +363,13 @@ pp_check.mvgam <- function(
   } else {
     names(formals(ppc_fun))
   }
+  # A `loo_*` check reweights its replicates by importance weights
+  # built from the likelihood, which scores each observation under the
+  # latent state the model inferred at that time. The replicates have
+  # to be drawn under that same state, or the weights and the draws
+  # they reweight describe different series and the calibration the
+  # check reports is of neither.
+  psis_weighted <- any(c("psis_object", "lw") %in% ppc_formals)
   if ("group" %in% ppc_formals) {
     if (is.null(group)) {
       stop(
@@ -526,6 +543,9 @@ pp_check.mvgam <- function(
       resp = resp,
       ...
     )
+    pred_args <- diagnostic_surface_args(
+      pred_args, newdata, weighted = psis_weighted
+    )
     yrep <- do_call(method, pred_args)
   }
 
@@ -657,7 +677,7 @@ pp_check.mvgam <- function(
   needs_psis <- any(c("psis_object", "lw") %in%
                     setdiff(ppc_formals, names(ppc_args)))
   if (needs_psis) {
-    ll <- log_lik(object, newdata = newdata, process_error = TRUE,
+    ll <- log_lik(object, newdata = newdata, incl_autocor = TRUE,
                   resp = resp, draw_ids = draw_ids)
     # Importance sampling refuses a column with no density in it, so
     # the unscorable rows a missing response leaves go first. The

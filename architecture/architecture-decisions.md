@@ -1090,24 +1090,60 @@ Used for: `mvgam_forecast`, `mvgam_irf`, `mvgam_fevd`, `mvgam_lfo`.
 
 **Design Principle**: mvgam ships two prediction surfaces with
 distinct semantics around the latent state. The split is
-intentional. User-facing docs must point at both and explain
-which to pick; the wrong choice will silently mislead.
+intentional, and the wrong choice will silently mislead.
 
 **Surface A, Marginal Monte Carlo** (`posterior_predict()`,
-`posterior_epred()`, `posterior_linpred()`): integrates over the
-trend's stochastic dynamics. Treats the latent state as
-stationary at the per-series posterior mean for any prediction
-time. Re-samples innovations per call under `process_error =
-TRUE`. This is the `marginaleffects` / brms convention for
-models with correlated residuals.
+`posterior_epred()`, `posterior_linpred()`): the fitted
+`trend[t, s]` never enters. The trend contributes its
+deterministic submodel plus one innovation per posterior draw,
+re-sampled on every call under `process_error = TRUE`, so the
+answer does not depend on which time it is asked at. Note it
+integrates one innovation step, not the stationary distribution
+of the state: for an AR(1) Poisson the Jensen correction is
+`sigma^2/2`, not `sigma^2/(2*(1-ar^2))`.
 
-**Surface B, Deterministic state** (`forecast.mvgam()`,
-`hindcast.mvgam()`): reads the fitted latent state from the Stan
-posterior. `hindcast()` returns it at the training grid;
-`forecast()` extrapolates it forward via the trend kernel for
-newdata beyond training. Exact and reproducible across calls.
+**Surface B, Conditional state** (`forecast.mvgam()`,
+`hindcast.mvgam()`, `residuals()`, `pp_check()`): reads the
+fitted latent state from the posterior. `hindcast()` returns it
+at the training grid; `forecast()` extrapolates it forward. A
+time outside the grid has no state and takes the per-series
+marginal. Exact and reproducible across calls.
 
 **Rule**: counterfactuals and covariate-level reasoning go
-through Surface A. Forecasting, hindcasting, model comparison
-via ELPD / scoring rules go through Surface B. Surface A
-`@seealso` blocks must cross-link to Surface B and vice versa.
+through Surface A. Forecasting, hindcasting and model comparison
+via ELPD or scoring rules go through Surface B. `@seealso` blocks
+must cross-link the two.
+
+**The likelihood is Surface B**, and so is everything built on
+it: `loo()`, `waic()`, `lfo_cv()`, `kfold()`, `loo_R2()`,
+`bayes_R2()`. Scoring the marginal leaves the importance weights
+describing a series the model never saw, and the effective
+parameter count runs past the number of observations.
+
+**Three invariants hold this together.** Innovations are sampled
+in exactly one place, `get_combined_linpred()`; a second draw
+downstream doubles the process variance. Wherever importance
+weights meet draws, both halves come from the same surface,
+including the `loo_*` prediction trio and `pp_check()`'s
+`loo_pit*` types. And the conditional read has one
+implementation: `get_combined_linpred(latent_state =
+"conditional")`, reached through the `posterior_*` methods. A
+second copy of it drifted from the first once already.
+
+**Diagnostics name their surface through one helper**,
+`diagnostic_surface_args()`: in sample the conditional state, out
+of sample the marginal, and the conditional state regardless when
+importance weights are involved. `residuals()`, `pp_check()` and
+`predictive_error()` all route through it, so the same fit cannot
+report two pictures of its own in-sample uncertainty.
+
+**Argument names**: `incl_autocor` on `log_lik()` / `loo()` /
+`waic()`, `latent_state` on the `posterior_*` methods (default
+`"marginal"`). `process_error` and `incl_dynamics` are the
+superseded spellings, still accepted, and lose when both are
+given.
+
+**Caveat**: PSIS-LOO is optimistic for a state-space fit on
+either surface, because leaving out `y[t]` does not remove its
+influence on the state inferred at `t`. Steer model comparison
+to `lfo_cv()`.

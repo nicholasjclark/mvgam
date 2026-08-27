@@ -17,10 +17,15 @@
 #' inputs through the combination, avoiding the need for fitted Stan
 #' models in fast unit tests.
 
-stub_obj <- function(has_trend = TRUE) {
+stub_obj <- function(has_trend = TRUE, n_draws = 0L) {
   out <- structure(list(), class = "mvgam")
   if (has_trend) {
     out$trend_model <- list(formula = ~ 1)
+  }
+  # A conditional read reaches for the posterior before it asks for
+  # the latent state, so those tests need draws to subset.
+  if (n_draws > 0L) {
+    out$fit <- posterior::draws_matrix(par = seq_len(n_draws))
   }
   out
 }
@@ -469,4 +474,110 @@ test_that("resolve_draw_ids() materialises a count as indices", {
   expect_equal(ids, sort(ids))
   expect_equal(anyDuplicated(ids), 0L)
   expect_true(all(ids >= 1L & ids <= 100L))
+})
+
+
+test_that("latent_state = 'conditional' reads the fitted state", {
+  # The conditional surface takes `trend[t, s]` and must not add the
+  # deterministic trend submodel on top of it: the Stan kernel is
+  # written on the centred convention, so that contribution is already
+  # inside the state and adding it again would count it twice.
+  testthat::local_mocked_bindings(
+    extract_component_linpred = function(mvgam_fit, newdata, component, ...) {
+      if (component == "obs") {
+        matrix(1, nrow = 4, ncol = 3)
+      } else {
+        matrix(100, nrow = 4, ncol = 3)
+      }
+    },
+    extract_trend_latent_states = function(mvgam_fit, newdata, full_draws) {
+      matrix(0.25, nrow = 4, ncol = 3)
+    },
+    has_stochastic_trend = function(object) TRUE,
+    sample_process_errors = function(...) matrix(999, nrow = 4, ncol = 3),
+    .package = "mvgam"
+  )
+  out <- get_combined_linpred(
+    stub_obj(n_draws = 4L), newdata = NULL, process_error = TRUE,
+    latent_state = "conditional", draw_ids = 1:4
+  )
+  expect_equal(out, matrix(1.25, 4, 3))
+})
+
+
+test_that("latent_state = 'marginal' samples the innovations once", {
+  # The innovations are composed here and nowhere else. Adding a
+  # second, independent sample downstream put twice the process
+  # variance into every marginal prediction.
+  n_calls <- 0L
+  testthat::local_mocked_bindings(
+    extract_component_linpred = function(mvgam_fit, newdata, component, ...) {
+      matrix(0, nrow = 4, ncol = 3)
+    },
+    has_stochastic_trend = function(object) TRUE,
+    sample_process_errors = function(...) {
+      n_calls <<- n_calls + 1L
+      matrix(2, nrow = 4, ncol = 3)
+    },
+    .package = "mvgam"
+  )
+  out <- get_combined_linpred(
+    stub_obj(), newdata = NULL, process_error = TRUE,
+    latent_state = "marginal"
+  )
+  expect_equal(out, matrix(2, 4, 3))
+  expect_identical(n_calls, 1L)
+})
+
+
+test_that("a conditional read ignores process_error", {
+  testthat::local_mocked_bindings(
+    extract_component_linpred = function(mvgam_fit, newdata, component, ...) {
+      matrix(0, nrow = 4, ncol = 3)
+    },
+    extract_trend_latent_states = function(mvgam_fit, newdata, full_draws) {
+      matrix(3, nrow = 4, ncol = 3)
+    },
+    has_stochastic_trend = function(object) TRUE,
+    sample_process_errors = function(...) matrix(999, nrow = 4, ncol = 3),
+    .package = "mvgam"
+  )
+  for (pe in c(TRUE, FALSE)) {
+    out <- get_combined_linpred(
+      stub_obj(n_draws = 4L), newdata = NULL, process_error = pe,
+      latent_state = "conditional", draw_ids = 1:4
+    )
+    expect_equal(out, matrix(3, 4, 3))
+  }
+})
+
+
+test_that("a fit with no latent state falls back to the submodel", {
+  # A deterministic trend (PW, none) carries no `trend[t, s]` draws, so
+  # the conditional read has nothing to condition on and the trend
+  # contributes its deterministic submodel alone.
+  testthat::local_mocked_bindings(
+    extract_component_linpred = function(mvgam_fit, newdata, component, ...) {
+      if (component == "obs") matrix(1, 4, 3) else matrix(0.5, 4, 3)
+    },
+    extract_trend_latent_states = function(mvgam_fit, newdata, full_draws) {
+      NULL
+    },
+    has_stochastic_trend = function(object) FALSE,
+    .package = "mvgam"
+  )
+  out <- get_combined_linpred(
+    stub_obj(n_draws = 4L), newdata = NULL, process_error = TRUE,
+    latent_state = "conditional", draw_ids = 1:4
+  )
+  expect_equal(out, matrix(1.5, 4, 3))
+})
+
+
+test_that("latent_state rejects an unknown surface", {
+  expect_error(
+    get_combined_linpred(stub_obj(), newdata = NULL,
+                          latent_state = "nonsense"),
+    "should be one of"
+  )
 })
