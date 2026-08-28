@@ -623,6 +623,11 @@ mvgam_stancode_prior_rows <- function(sc) {
     m <- regmatches(hit, regexec(tilde_re, hit))[[1L]]
     if (length(m) < 4L || !is_mvgam_param(m[2L])) next
     coef <- gsub("^\\[|\\]$", "", m[3L])
+    # A multi-dimensional slice is a loop body rather than a prior on
+    # a named coefficient: `Z[ : , i_z] ~ ...` sits inside a `for` and
+    # names a Stan local. `varrho_inv[1]` and `varrho_inv[2:N]` carry
+    # a single index and are the rows a reader wants.
+    if (grepl(",", coef, fixed = TRUE)) next
     add(m[2L], coef, gsub("[[:space:]]+", " ", trimws(m[4L])))
   }
 

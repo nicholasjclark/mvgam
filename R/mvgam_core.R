@@ -74,6 +74,18 @@ translate_samples_burnin <- function(dots) {
   dots
 }
 
+# The `mvgam()` formals a per-imputation fit needs. They are formals
+# rather than dots, so a forwarding call reaches them only by name.
+# `data` and `combine` are supplied by the call itself, and everything
+# a user passes through `...` travels on its own.
+# `tests/testthat/test-mvgam-core.R` asserts this covers every formal
+# the single-dataset path would have used.
+mvgam_imputation_forwarded <- c(
+  "formula", "trend_formula", "newdata", "trend_map", "loadings_prior",
+  "backend", "family", "threads", "run_model"
+)
+
+
 #' mvgam Function with Single-Fit Architecture
 #'
 #' @description
@@ -584,15 +596,25 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
 
   # Handle multiple imputation input
   if (is.list(data) && !is.data.frame(data)) {
-    if (combine) {
-      return(mvgam_multiple(formula, trend_formula, data, backend,
-                           combine = TRUE, data_name = data_name,
-                           newdata = newdata, ...))
-    } else {
-      return(mvgam_multiple(formula, trend_formula, data, backend,
-                           combine = FALSE, data_name = data_name,
-                           newdata = newdata, ...))
-    }
+    # `family`, `trend_map`, `loadings_prior`, `threads` and
+    # `run_model` are formals rather than dots, so they reach neither
+    # this call nor `...` unless named. Left out, every imputation was
+    # fitted under the default family.
+    forwarded <- mget(
+      setdiff(mvgam_imputation_forwarded, "threads"),
+      envir = environment()
+    )
+    # `threads = NULL` trips the integer assertion downstream, so it
+    # goes only when the user set it.
+    if (!is.null(threads)) forwarded$threads <- threads
+    return(do.call(
+      mvgam_multiple,
+      c(
+        list(data_list = data, combine = combine, data_name = data_name),
+        forwarded,
+        list(...)
+      )
+    ))
   }
 
   # Single dataset processing. `threads` is forwarded only when the

@@ -129,6 +129,28 @@ update.mvgam <- function(object, formula. = NULL, newdata = NULL,
       i = "'data' is reserved for the original 'mvgam()' call; 'newdata' is the supported argument name on 'update()'."
     )))
   }
+  # A jsdgam is a `c("mvgam", "jsdgam")` object, so it reaches this
+  # method. Rebuilding its call would reach `mvgam()`, which knows
+  # nothing of `factor_formula`, `n_lv`, `species`, `unit`, `traits`,
+  # `trait_slopes` or `phylo`, and the refit would carry none of them:
+  # a joint model rebuilt as an ordinary one, with nothing said. The
+  # arguments cannot be recovered either, since `jsdgam_call` records
+  # them as the symbols the user wrote rather than their values.
+  if (inherits(object, "jsdgam")) {
+    stop(insight::format_error(c(
+      "Cannot 'update()' a 'jsdgam' fit.",
+      x = paste0(
+        "The factor structure, and any traits or phylogeny, are not ",
+        "recoverable from the fitted object, so a refit would drop ",
+        "them silently."
+      ),
+      i = paste0(
+        "Call 'jsdgam()' again with the arguments you want changed. ",
+        "'stancode(object)' and 'standata(object)' show what this ",
+        "fit was built from."
+      )
+    )))
+  }
   if (isTRUE(attr(object, "is_pooled")) ||
       inherits(object, "mvgam_pooled")) {
     stop(insight::format_error(c(
@@ -248,11 +270,102 @@ mvgam_normalise_stancode <- function(stancode) {
 mvgam_update_inheritance <- list(
   trend_formula = list(slot = "trend_call"),
   family = list(slot = "family"),
-  prior = list(slot = "prior"),
+  # mvgam lifts its own priors out of the generated Stan so a fit can
+  # report what it sampled under, and regenerates them from the trend
+  # spec on every fit. Handing them back to brms, which knows no
+  # parameter called `theta_features` or `Z`, is an error rather than
+  # a no-op, so only what a user or brms set travels.
+  # Wrapped rather than named directly: this list is built when the
+  # package loads, before the function below is bound.
+  prior = list(
+    slot = "prior",
+    normaliser = function(value) drop_mvgam_sourced_priors(value)
+  ),
   backend = list(slot = "backend"),
   algorithm = list(slot = "algorithm"),
-  init = list(slot = "init")
+  init = list(slot = "init"),
+  newdata = list(getter = function(object) object$test_data),
+  # brms keeps this as a `brmsthreads` object, present whether or not
+  # the user asked for threading, with a NULL count when they did not.
+  # `mvgam()` takes the count, so that is what travels.
+  threads = list(
+    getter = function(object) object$obs_model$threads$threads
+  ),
+  # A `trend_map` written on the trend constructor travels inside
+  # `trend_call`, and supplying it at the top level as well is a
+  # collision `mvgam()` refuses outright. Only a fit that set it at
+  # the top level needs it handed back.
+  trend_map = list(
+    getter = function(object) {
+      if (trend_call_names_arg(object$trend_call, "trend_map")) {
+        return(NULL)
+      }
+      object$trend_metadata$fixed_Z
+    }
+  ),
+  loadings_prior = list(
+    getter = function(object) {
+      denormalise_loadings_prior(
+        object$mv_spec$trend_specs$loadings_prior_spec %||%
+          object$trend_components$specifications$loadings_prior_spec
+      )
+    }
+  )
 )
+
+
+# Arguments a refit does not carry over, each with the reason: some
+# because the fit does not store them, others because they change
+# nothing about the model. An argument is either inherited above or
+# named here, and `tests/testthat/test-update.R` asserts that every
+# argument reaching the code generator appears in one of the two.
+# Silence is what let `loadings_prior` go missing: a refit dropped the
+# whole structured prior and nothing said so.
+mvgam_update_uninherited <- c(
+  knots = "not stored; only the resulting smooth basis is kept",
+  sample_prior = "not stored on the fitted object",
+  sparse = "not stored on the fitted object",
+  normalize = "not stored on the fitted object",
+  drop_unused_levels = "not stored on the fitted object",
+  stan_funs = "not stored on the fitted object",
+  data2 = "stored, but empty on every fit examined",
+  stanvars = "stored with mvgam's own mixed in, so re-passing would double-inject",
+  combine = "multiple-imputation only, and a pooled fit is refused",
+  run_model = "a fitted object is by definition the run_model = TRUE case",
+  save_model = "writes the Stan file out; the model is unchanged",
+  silent = "verbosity only",
+  validate = "whether the assembled code is checked, not what it holds"
+)
+
+
+#' Turn a resolved loadings-prior spec back into user-facing arguments
+#'
+#' `normalise_loadings_prior()` allow-lists the names a user writes
+#' and rejects the rest, so the resolved spec cannot be handed back as
+#' it stands. This maps the two that were renamed and drops the sizes
+#' the normaliser recomputes.
+#'
+#' @param spec A `loadings_prior_spec`, or NULL.
+#' @return A list `mvgam(loadings_prior = )` accepts, or NULL.
+#' @noRd
+denormalise_loadings_prior <- function(spec) {
+  if (is.null(spec)) return(NULL)
+  out <- list(
+    features = spec$features_mat,
+    distances = spec$distance_mats,
+    column_shrinkage = spec$column_shrinkage
+  )
+  # The spec carries the MGP hyperparameters whatever the shrinkage,
+  # while `normalise_loadings_prior()` refuses them unless the
+  # shrinkage is `"mgp"`, so they travel only when they mean
+  # something.
+  if (identical(spec$column_shrinkage, "mgp")) {
+    out$mgp_a1 <- spec$mgp_a1
+    out$mgp_a2 <- spec$mgp_a2
+  }
+  out <- out[!vapply(out, is.null, logical(1L))]
+  if (length(out) == 0L) NULL else out
+}
 
 
 # Internal: extract chain / iter / warmup / thin from `object$fit`
@@ -285,6 +398,76 @@ mvgam_sampler_inheritance <- function(object) {
 # resolution order is (1) user-supplied via `...`, (2) the named
 # `object` slot, (3) the `mvgam()` default. Returns a list ready
 # to feed `do.call(mvgam, ...)`.
+#' Visit every named argument of a stored trend call
+#'
+#' `all.vars()` and `all.names()` see the values an argument was given
+#' but never the argument's own name, so the call has to be walked.
+#' Both readers below want the same walk.
+#'
+#' @param trend_call The `trend_call` slot, or NULL.
+#' @param visit Called as `visit(name, value)` for each named
+#'   argument, at any depth.
+#' @return `NULL`, invisibly. Callers accumulate through `visit`.
+#' @noRd
+walk_trend_call_args <- function(trend_call, visit) {
+  if (!inherits(trend_call, "formula")) return(invisible(NULL))
+  recurse <- function(e) {
+    if (!is.call(e)) return(invisible(NULL))
+    arg_names <- names(e)
+    for (i in seq_along(e)) {
+      named <- !is.null(arg_names) && nzchar(arg_names[[i]])
+      if (named) visit(arg_names[[i]], e[[i]])
+      recurse(e[[i]])
+    }
+    invisible(NULL)
+  }
+  recurse(trend_call[[length(trend_call)]])
+  invisible(NULL)
+}
+
+
+#' Does a stored trend call name a given constructor argument?
+#'
+#' @param trend_call The `trend_call` slot, or NULL.
+#' @param arg Argument name to look for.
+#' @return `TRUE` when the call names it anywhere.
+#' @noRd
+trend_call_names_arg <- function(trend_call, arg) {
+  checkmate::assert_string(arg)
+  found <- FALSE
+  walk_trend_call_args(trend_call, function(name, value) {
+    if (identical(name, arg)) found <<- TRUE
+  })
+  found
+}
+
+
+#' Drop the prior rows mvgam lifted from its own generated Stan
+#'
+#' Those rows exist to report what the compiled model sampled under.
+#' They name mvgam parameters rather than brms ones, so a refit
+#' regenerates them from the trend spec and brms rejects them if they
+#' are passed in.
+#'
+#' @param prior A `brmsprior`, or NULL.
+#' @return The same table without its mvgam-sourced rows.
+#' @noRd
+drop_mvgam_sourced_priors <- function(prior) {
+  if (is.null(prior) || nrow(prior) == 0L) return(prior)
+  if (!"source" %in% names(prior)) return(prior)
+  keep <- !identical_source(prior$source, "mvgam")
+  out <- prior[keep, , drop = FALSE]
+  structure(out, class = class(prior))
+}
+
+
+# Vectorised `==` that treats NA as "not mvgam" rather than NA.
+#'@noRd
+identical_source <- function(source, value) {
+  !is.na(source) & source == value
+}
+
+
 # Trend-constructor arguments whose resolved value the fitted object
 # already carries, keyed by the `trend_metadata` slot holding it.
 # `update()` rebuilds the trend side from the expression the user
@@ -325,23 +508,12 @@ restore_trend_call_env <- function(trend_call, metadata) {
   if (length(unresolved) == 0L) return(trend_call)
 
   bindings <- list()
-  collect <- function(e) {
-    if (!is.call(e)) return(invisible(NULL))
-    arg_names <- names(e)
-    for (i in seq_along(e)) {
-      arg <- e[[i]]
-      named <- !is.null(arg_names) && nzchar(arg_names[[i]])
-      if (named && is.symbol(arg) &&
-            as.character(arg) %in% unresolved &&
-            arg_names[[i]] %in% names(trend_arg_metadata)) {
-        value <- metadata[[trend_arg_metadata[[arg_names[[i]]]]]]
-        if (!is.null(value)) bindings[[as.character(arg)]] <<- value
-      }
-      collect(arg)
-    }
-    invisible(NULL)
-  }
-  collect(trend_call[[length(trend_call)]])
+  walk_trend_call_args(trend_call, function(name, value) {
+    if (!is.symbol(value) || !as.character(value) %in% unresolved) return()
+    if (!name %in% names(trend_arg_metadata)) return()
+    stored <- metadata[[trend_arg_metadata[[name]]]]
+    if (!is.null(stored)) bindings[[as.character(value)]] <<- stored
+  })
 
   if (length(bindings) == 0L) return(trend_call)
   environment(trend_call) <- list2env(bindings, parent = parent)
@@ -364,10 +536,18 @@ mvgam_update_call <- function(object, formula., newdata, dots) {
       next
     }
     entry <- mvgam_update_inheritance[[arg_name]]
-    value <- object[[entry$slot]]
+    value <- if (!is.null(entry$getter)) {
+      entry$getter(object)
+    } else {
+      object[[entry$slot]]
+    }
     if (!is.null(entry$normaliser)) {
       value <- entry$normaliser(value)
     }
+    # A getter finding nothing means the fit did not use the argument,
+    # which is not the same as passing it NULL: `threads = NULL` trips
+    # the integer assertion downstream.
+    if (is.null(value) && !is.null(entry$getter)) next
     resolved[[arg_name]] <- value
   }
   # The trend call came back as the user wrote it, which may name a

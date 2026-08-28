@@ -11,10 +11,12 @@ method against every cached fit and logs a status and shape per call
 (`--fixtures=`, `--groups=` to filter).
 `tests/local/test-hierarchical-trends.R` covers `gr`/`subgr` fits end
 to end. `R/mvgam_families.R` restores the family hub topic.
-
-**Still to modify** — `R/log_lik.mvgam.R`, `R/residuals.mvgam.R`,
-`R/loo.mvgam.R` for the addition terms; `tests/local/build_fixtures.R`
-for the six fixtures no builder regenerates.
+`R/stan_source.R` holds the rules for reading the Stan source brms
+generated. `tests/local/test-new-levels.R`,
+`tests/local/test-update-trend-args.R`,
+`tests/testthat/test-multi-response-kernels.R` and
+`tests/testthat/test-mvgam-core.R` cover what the sweep could not
+reach.
 
 **Notes** — long commands run in the background and write to a log
 that is then read. Fixture-dependent tests live in `tests/local/`; CI
@@ -25,7 +27,7 @@ minutes. Cached fits are read once, never re-fitted to inspect.
 
 - [x] **0.0 Fixed during the survey**
   > Each was reproduced against a cached fit before being changed, and
-  > re-checked after. Full CI suite: 6180 pass, 0 fail.
+  > re-checked after, with the CI suite green.
 
   - [x] 0.1 `get_safe_dummy_value()` read only the lower bound, so Beta
     got a dummy of 1 and brms rejected any newdata carrying `NA`
@@ -467,31 +469,106 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > since putting a value back must reproduce the model rather than
   > merely get past the failure.
 
-- [ ] **3.3 `update()` silently refits a different model**
-  > `update.mvgam()` reconstructs the fitting call from
-  > `mvgam_update_inheritance`, which names six arguments.
-  > `mvgam()` takes more than six that decide what Stan is emitted,
-  > and `loadings_prior` is one of them. A refit of a fit carrying a
-  > structured loadings prior loses the whole thing: the Stan code
-  > drops `row_features`, `dist_cluster`, `theta_features` and the
-  > `multi_normal_cholesky` prior on `Z`, leaving a plain
-  > `student_t(3, 0, 0.5)`. Nothing says so. The
-  > `recompile = FALSE` guard refuses, which is the only reason it is
-  > visible at all; the default `recompile = TRUE` path refits the
-  > wrong model quietly.
+- [x] **3.3 A refit was not the model that was fitted**
+  > `update.mvgam()` rebuilds the fitting call from
+  > `mvgam_update_inheritance`, which named six arguments while eleven
+  > model-defining ones were absent. A refit of a fit carrying a
+  > structured loadings prior lost the whole thing, the Stan code
+  > dropping `row_features`, `dist_cluster`, `theta_features` and the
+  > `multi_normal_cholesky` prior on `Z`. Only the
+  > `recompile = FALSE` guard made it visible.
   >
-  > The value is recoverable.
-  > `trend_components$specifications$loadings_prior_spec` holds the
-  > evaluated spec, with `features_mat`, `distance_mats`,
-  > `column_shrinkage`, `mgp_a1` and `mgp_a2`.
-  > `call$loadings_prior` is not usable on its own: on the fixture it
-  > is the bare symbol `loadings_prior`, so it carries the same
-  > out-of-scope failure 3.2 fixed for the trend call.
+  > `newdata`, `threads`, `trend_map` and `loadings_prior` are now
+  > inherited, the last through `denormalise_loadings_prior()`, since
+  > `normalise_loadings_prior()` allow-lists the user-facing names and
+  > will not take the resolved spec back. The table gained getters for
+  > the nested paths, and skips an argument whose getter finds
+  > nothing, because absent and `NULL` differ.
   >
-  > Two lists have to agree here, the arguments that define a model
-  > and the arguments a refit inherits, and nothing holds them
-  > together. The fix wants a test asserting the second covers the
-  > first, so the next argument added cannot quietly go missing.
+  > `mvgam_update_uninherited` names the rest with a reason:
+  > `knots`, `sample_prior`, `sparse`, `normalize`,
+  > `drop_unused_levels` and `stan_funs` are stored nowhere;
+  > `stanvars` is stored with mvgam's own mixed in, so re-passing
+  > double-injects; `data2`, `combine` and `run_model` do not apply;
+  > `save_model`, `silent` and `validate` change nothing about the
+  > model. A test asserts every argument reaching the code generator
+  > appears in one list or the other, that none appears in both, and
+  > that every reason says something. It caught three arguments within
+  > minutes of existing.
+  >
+  > Two getters were wrong when first written and the local test
+  > caught both. `threads` is a `brmsthreads` object rather than a
+  > count, so handing it back tripped an integer assertion on every
+  > refit. And a `trend_map` written on the trend constructor already
+  > travels inside `trend_call`, so supplying it at the top level too
+  > is a collision `mvgam()` refuses; it is withheld when
+  > `trend_call_names_arg()` finds it there. A name-level guard sees
+  > neither, which is why the fixture-driven test earns its place.
+  >
+  > Six arguments still cannot be carried, so a refit of a fit that
+  > set `knots` or `sparse` still differs silently. Closing that needs
+  > them stored at fit time, which is 3.8.
+
+- [x] **3.4 `update()` on a `jsdgam` returned something else entirely**
+  > There is no `update.jsdgam`, so `update.mvgam` ran on a
+  > `c("mvgam", "jsdgam")` object and ended at
+  > `do.call(mvgam, call_args)`, where none of `factor_formula`,
+  > `n_lv`, `traits`, `trait_slopes`, `phylo`, `species` or `unit`
+  > survives. On `val_jsdgam_trait` the rebuilt trend call is `~ -1`,
+  > so the refit carried no factors, no traits and no phylogeny.
+  >
+  > `update()` now refuses a `jsdgam`, naming what cannot be recovered
+  > and pointing at `jsdgam()`. It does not make the refit work:
+  > `jsdgam_call` records `formula`, `factor_formula`, `data`,
+  > `family`, `unit`, `species` and `trait_slopes` as the symbols the
+  > user wrote, so there is nothing to replay. A working
+  > `update.jsdgam` needs 3.8.
+
+- [x] **3.5 Multiple imputation dropped the family**
+  > The imputation path forwarded eight names. `family`, `trend_map`,
+  > `loadings_prior`, `threads` and `run_model` are formals of
+  > `mvgam()` rather than dots, so they reached neither the forwarding
+  > call nor `...`, and
+  > `mvgam(y ~ x, data = <imputed frames>, family = poisson())` fitted
+  > gaussian on every imputation.
+  >
+  > `mvgam_imputation_forwarded` names the set and the call builds
+  > from it with `mget()`. `threads` still travels only when set,
+  > since an explicit `NULL` trips the integer assertion downstream. A
+  > test asserts the set equals `formals(mvgam)` minus the two the
+  > call supplies itself.
+
+- [ ] **3.6 Three documented `jsdgam()` arguments do nothing**
+  > `share_obs_params` is forwarded to a name nothing consumes, and is
+  > documented. `factor_knots` is forwarded as `trend_knots`, which
+  > nothing consumes either. The wrapper also pins
+  > `trend_model = ZMVN(cor = TRUE, subgr = "series")`, which the
+  > default branch overrides, which is why a fitted jsdgam carries
+  > `subgr = "NA"`.
+
+- [ ] **3.7 The specification prior table has blank rows**
+  > The fitted object now reports what the compiled model samples.
+  > `get_prior()` on a specification reads the trend registry instead,
+  > and five parameters have no entry there: `PW()`'s `delta_trend`
+  > against `double_exponential(0, 0.05)` in the Stan, and
+  > `VAR(ma = TRUE)`'s `Amu_trend`, `Aomega_trend`, `Dmu_trend` and
+  > `Domega_trend` against the normal and gamma priors it emits. Same
+  > defect as `sigma_trend` carried, on the mirror path: a reader
+  > deciding what to override sees nothing to override.
+
+- [ ] **3.8 A fit does not record what it was built from**
+  > What 3.3 and 3.4 both stop at. A fitted object keeps the values
+  > the code generator needed and not the arguments the user gave, so
+  > six of `mvgam()`'s cannot be carried into a refit at all, and none
+  > of `jsdgam()`'s can. `object$call` does not rescue it:
+  > `match.call()` over a `do.call` frame leaves every argument a bare
+  > symbol or `..1`, and `jsdgam_call` is unevaluated the same way.
+  >
+  > The fix is to record the resolved arguments at fit time, which
+  > would let `update()` carry `knots`, `sample_prior`, `sparse`,
+  > `normalize`, `drop_unused_levels` and `stan_funs`, and let
+  > `update.jsdgam` exist. Every cached fixture predates such a slot,
+  > so it belongs with 5.0's refit.
 
 - [x] **4.0 The likelihood was scored on the wrong surface**
   > The `loo_R2` failure and the `p_loo` question were one cause.
@@ -613,6 +690,20 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > `x$trend_model$trend_model`, which is the collision in one
   > expression. `trend_prefit` is the name that describes the slot.
   >
+  > `process_error` still means two things. 13.0 gave it the
+  > innovation axis everywhere, but `log_lik()` keeps it as the
+  > superseded spelling of the surface, where innovations are pinned
+  > off. Back-compatibility is the reason and `incl_dynamics` is the
+  > 1.x name that would serve instead.
+  >
+  > `trend_arg_metadata` names the trend-constructor arguments whose
+  > values a fit stores, `trend_map` and `n_lv`, and
+  > `mvgam_update_inheritance` names the top-level ones. Those are two
+  > lists of one idea, an argument whose value the object can give
+  > back, and nothing makes them agree. A constructor naming any other
+  > out-of-scope variable, `AR(p = 1, gr = my_grouping)` say, still
+  > fails on refit.
+  >
   > Three Stan names still break the `_trend` suffix rule:
   > `time_dis`, `theta_features` and `varrho_inv`. `time_dis` reaches
   > into the compiled C++ signatures in `RcppExports.R`, and the
@@ -633,9 +724,10 @@ minutes. Cached fits are read once, never re-fitted to inspect.
 ## Behaviour confirmed, worth documenting
 
 `posterior_epred()` and `posterior_predict()` default to
-`process_error = TRUE`, marginalising over the trend by drawing fresh
-innovations, so two calls on the same fit and the same `draw_ids`
-differ — by as much as 160 units on a cached Poisson fit. brms's
-equivalents are deterministic, so this will surprise people;
-reproducible output needs a seed. On the deterministic path, passing
-the training data back as `newdata` is an exact no-op.
+`process_error = FALSE` and `incl_autocor = FALSE`, so the trend
+contributes its deterministic submodel and the answer is the same on
+every call. Passing the training data back as `newdata` is an exact
+no-op. Under `process_error = TRUE` innovations are drawn afresh, so
+two calls on one fit and the same `draw_ids` differ, by as much as
+160 units on a cached Poisson fit; reproducible output there needs a
+seed.

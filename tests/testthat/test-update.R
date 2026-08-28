@@ -362,3 +362,191 @@ test_that("restore_trend_call_env leaves a name the fit does not carry", {
     exists("grouping_var", envir = environment(out), inherits = TRUE)
   )
 })
+
+
+test_that("update() refuses a jsdgam rather than dropping its structure", {
+  # A jsdgam is a `c("mvgam", "jsdgam")` object, so it dispatches
+  # here. Rebuilding its call reaches `mvgam()`, which knows nothing
+  # of `factor_formula`, `n_lv`, `species`, `unit`, `traits`,
+  # `trait_slopes` or `phylo`; the refit carried none of them and said
+  # nothing. The arguments cannot be recovered either, because
+  # `jsdgam_call` holds the symbols the user wrote rather than their
+  # values.
+  stub <- structure(
+    list(formula = y ~ x, trend_call = ~ -1),
+    class = c("mvgam", "jsdgam")
+  )
+  expect_error(update(stub), "Cannot 'update\\(\\)' a 'jsdgam' fit")
+  expect_error(update(stub), "not recoverable")
+  # The refusal comes before anything else is attempted, so a caller
+  # passing arguments still gets the real reason.
+  expect_error(update(stub, formula. = ~ . + z), "jsdgam")
+})
+
+
+test_that("an ordinary mvgam fit is not caught by that guard", {
+  stub <- structure(
+    list(formula = y ~ x, trend_call = ~ AR(p = 1)),
+    class = "mvgam"
+  )
+  # It gets past the jsdgam check and fails later for its own reasons,
+  # rather than being refused as a joint model.
+  err <- tryCatch(update(stub), error = function(e) conditionMessage(e))
+  expect_false(grepl("jsdgam", err))
+})
+
+
+test_that("every mvgam() argument is inherited or named as not", {
+  # `loadings_prior` went missing because nothing compared the two
+  # lists. An argument is either carried over by
+  # `mvgam_update_inheritance` or listed in
+  # `mvgam_update_uninherited` with a reason; anything in neither
+  # fails here rather than silently changing a refit.
+  supplied_by_update <- c("formula", "data", "...")
+  formals_needed <- setdiff(names(formals(mvgam)), supplied_by_update)
+  accounted <- c(
+    names(mvgam_update_inheritance), names(mvgam_update_uninherited)
+  )
+  expect_true(all(formals_needed %in% accounted))
+
+  # The dots `mvgam()` forwards to the code generator are model
+  # defining too, so they are held to the same rule.
+  generator_args <- setdiff(
+    names(formals(build_stan_components)),
+    c("formula", "data", "family", "...")
+  )
+  expect_true(all(generator_args %in% accounted))
+
+  # Nothing is claimed in both places.
+  expect_length(
+    intersect(names(mvgam_update_inheritance),
+              names(mvgam_update_uninherited)),
+    0L
+  )
+  # Every reason says something.
+  expect_true(all(nzchar(mvgam_update_uninherited)))
+})
+
+
+test_that("denormalise_loadings_prior returns what mvgam accepts", {
+  # The resolved spec renames two fields and adds sizes the
+  # normaliser recomputes, so it cannot be handed back as it stands:
+  # `normalise_loadings_prior()` allow-lists the user-facing names and
+  # errors on the rest.
+  expect_null(denormalise_loadings_prior(NULL))
+
+  spec <- list(
+    features_mat = matrix(1:6, nrow = 3L),
+    distance_mats = list(cluster = diag(3)),
+    column_shrinkage = "mgp", mgp_a1 = 2, mgp_a2 = 4,
+    n_series = 3L, n_features = 2L, n_distances = 1L
+  )
+  # The spec carries the MGP hyperparameters whatever the shrinkage,
+  # and `normalise_loadings_prior()` refuses them unless it is "mgp",
+  # so they travel only when they mean something.
+  not_mgp <- spec
+  not_mgp$column_shrinkage <- "none"
+  expect_false(any(c("mgp_a1", "mgp_a2") %in%
+                     names(denormalise_loadings_prior(not_mgp))))
+  expect_equal(denormalise_loadings_prior(spec)$mgp_a1, 2)
+  out <- denormalise_loadings_prior(spec)
+  allowed <- c("features", "distances", "column_shrinkage",
+                "mgp_a1", "mgp_a2")
+  expect_true(all(names(out) %in% allowed))
+  expect_equal(out$features, spec$features_mat)
+  expect_equal(out$distances, spec$distance_mats)
+  # The recomputed sizes do not travel.
+  expect_false(any(c("n_series", "n_features", "n_distances") %in%
+                     names(out)))
+
+  # A spec holding nothing yields nothing rather than an empty list.
+  expect_null(denormalise_loadings_prior(list(n_series = 3L)))
+})
+
+
+test_that("the threads getter yields a count, not a brmsthreads", {
+  # brms stores threading as a `brmsthreads` object on every fit, with
+  # a NULL count when the user asked for none. `mvgam()` asserts an
+  # integer, so handing the object back errored on any refit.
+  entry <- mvgam_update_inheritance$threads
+  unset <- list(obs_model = list(threads = brms::threading(NULL)))
+  expect_null(entry$getter(unset))
+
+  set <- list(obs_model = list(threads = brms::threading(2)))
+  expect_equal(entry$getter(set), 2)
+  expect_false(inherits(entry$getter(set), "brmsthreads"))
+  # A fit with no obs_model at all yields nothing rather than erroring.
+  expect_null(entry$getter(list()))
+})
+
+
+test_that("trend_call_names_arg sees the argument, not its value", {
+  # `all.vars()` and `all.names()` return the values an argument was
+  # given but never the argument's own name, so the call is walked.
+  tc <- ~ -1 + AR(p = 1, trend_map = Z_user, cor = TRUE)
+  expect_true(trend_call_names_arg(tc, "trend_map"))
+  expect_true(trend_call_names_arg(tc, "cor"))
+  expect_false(trend_call_names_arg(tc, "n_lv"))
+  # The value's own name is not the argument's.
+  expect_false(trend_call_names_arg(tc, "Z_user"))
+  expect_false(trend_call_names_arg(NULL, "trend_map"))
+  expect_false(trend_call_names_arg(~ AR(p = 1), "trend_map"))
+})
+
+
+test_that("trend_map is withheld when the constructor already has it", {
+  # Supplying it at both the constructor and the top level is a
+  # collision `mvgam()` refuses, so a refit must hand back only what
+  # the original call put at the top level.
+  entry <- mvgam_update_inheritance$trend_map
+  Z <- matrix(c(1, 0, 0, 1), nrow = 2L)
+
+  on_constructor <- list(
+    trend_call = ~ AR(p = 1, trend_map = Z_user),
+    trend_metadata = list(fixed_Z = Z)
+  )
+  expect_null(entry$getter(on_constructor))
+
+  at_top_level <- list(
+    trend_call = ~ AR(p = 1),
+    trend_metadata = list(fixed_Z = Z)
+  )
+  expect_equal(entry$getter(at_top_level), Z)
+
+  # A fit with no fixed loadings hands back nothing either way.
+  expect_null(entry$getter(list(trend_call = ~ AR(p = 1),
+                                 trend_metadata = list())))
+})
+
+
+test_that("walk_trend_call_args visits every named argument once", {
+  # The one walk both readers use: `restore_trend_call_env()` looks at
+  # the values, `trend_call_names_arg()` at the names.
+  seen <- list()
+  walk_trend_call_args(
+    ~ -1 + AR(p = 1, trend_map = Z_user, cor = TRUE),
+    function(name, value) seen[[name]] <<- value
+  )
+  expect_setequal(names(seen), c("p", "trend_map", "cor"))
+  expect_equal(seen$p, 1)
+  expect_true(is.symbol(seen$trend_map))
+  expect_true(seen$cor)
+
+  # Positional arguments carry no name and are not visited.
+  seen2 <- character(0)
+  walk_trend_call_args(~ AR(1), function(name, value) {
+    seen2 <<- c(seen2, name)
+  })
+  expect_length(seen2, 0L)
+
+  # Nested calls are reached.
+  seen3 <- character(0)
+  walk_trend_call_args(
+    ~ AR(p = 1, gr = interaction(a, drop = TRUE)),
+    function(name, value) seen3 <<- c(seen3, name)
+  )
+  expect_true(all(c("p", "gr", "drop") %in% seen3))
+
+  # A missing call visits nothing rather than erroring.
+  expect_silent(walk_trend_call_args(NULL, function(...) stop("unreached")))
+})
