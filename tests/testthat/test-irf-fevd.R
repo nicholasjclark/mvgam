@@ -207,3 +207,88 @@ test_that("var_fecov() builds a forecast-error covariance with positive diagonal
     expect_true(all(diag(msey[, , i]) > 0))
   }
 })
+
+
+# ---- posterior_transition_matrix ------------------------------------
+# Driven on the same draws_matrix mock as the other VAR surfaces, so
+# the argument surface and the summary shape are covered without
+# sampling. End-to-end coverage is in tests/local/postfit_sweep.R.
+
+# `finalise_transition_matrix()` reports an effective sample size per
+# cell, and `posterior::ess_basic()` warns when it has to cap one.
+# Independent draws invite that cap, which no real chain would, so
+# the mock is passed through an AR(1) filter first to give it the
+# serial correlation a posterior actually has.
+correlate_draws <- function(mock, rho = 0.5) {
+  m <- as.matrix(mock$fit)
+  for (j in seq_len(ncol(m))) {
+    m[, j] <- as.numeric(
+      stats::filter(m[, j], rho, method = "recursive")
+    )
+  }
+  mock$fit <- posterior::as_draws_matrix(m)
+  mock
+}
+
+test_that("posterior_transition_matrix() summarises the A matrix", {
+  mock <- correlate_draws(build_var_mock(K = 3L, ndraws = 200L))
+  out <- posterior_transition_matrix(mock)
+  expect_s3_class(out, "mvgam_var_matrix")
+  expect_equal(dim(out$A), c(3L, 3L))
+  expect_equal(out$n_series, 3L)
+  # Every per-cell summary carries the same shape as the estimate.
+  for (slot in c("A_se", "A_lower", "A_upper", "prob_positive")) {
+    expect_equal(dim(out[[slot]]), c(3L, 3L))
+  }
+  expect_true(all(out$A_lower <= out$A))
+  expect_true(all(out$A >= -1e-12 + pmin(out$A_lower, out$A)))
+  expect_true(all(out$A <= out$A_upper))
+  expect_true(all(out$prob_positive >= 0 & out$prob_positive <= 1))
+})
+
+
+test_that("posterior_transition_matrix(summary = FALSE) keeps the draws", {
+  mock <- correlate_draws(build_var_mock(K = 3L, ndraws = 200L))
+  arr <- posterior_transition_matrix(mock, summary = FALSE)
+  expect_equal(dim(arr), c(200L, 3L, 3L))
+  # The summarised estimate is the posterior mean of those draws.
+  out <- posterior_transition_matrix(mock)
+  expect_equal(out$A, apply(arr, c(2, 3), mean), ignore_attr = TRUE)
+  # And the median under `robust`.
+  rob <- posterior_transition_matrix(mock, robust = TRUE)
+  expect_equal(rob$A, apply(arr, c(2, 3), stats::median),
+               ignore_attr = TRUE)
+})
+
+
+test_that("posterior_transition_matrix() takes one groups argument", {
+  # `group` and `groups` were mutually exclusive spellings of one
+  # idea. `groups` is now the only one, and on a non-hierarchical fit
+  # it is refused rather than silently ignored.
+  expect_false("group" %in% names(formals(posterior_transition_matrix)))
+  expect_true("groups" %in% names(formals(posterior_transition_matrix)))
+
+  mock <- correlate_draws(build_var_mock(K = 3L, ndraws = 200L))
+  expect_error(
+    posterior_transition_matrix(mock, groups = "all"),
+    "only applies to hierarchical VAR fits"
+  )
+  expect_error(
+    posterior_transition_matrix(mock, groups = 1L),
+    "only applies to hierarchical VAR fits"
+  )
+  # The default still answers on the same fit.
+  expect_s3_class(posterior_transition_matrix(mock), "mvgam_var_matrix")
+})
+
+
+test_that("posterior_transition_matrix() gates on the trend type", {
+  fake <- structure(
+    list(trend_components = list(types = "RW")),
+    class = "mvgam"
+  )
+  expect_error(
+    posterior_transition_matrix(fake),
+    "requires a VAR\\(1\\) latent trend"
+  )
+})

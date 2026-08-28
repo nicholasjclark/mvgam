@@ -148,19 +148,25 @@ test_that("the trend's innovations are composed once", {
 })
 
 
-test_that("a conditional read repeats and a marginal one does not", {
+test_that("only a sampled trend makes a prediction differ across calls", {
   # Conditioning reads the state the model inferred, so it holds no
-  # RNG and answers the same way twice. Marginalising samples the
-  # trend afresh, which is the documented reason a seed is needed for
-  # a reproducible answer.
+  # RNG and answers the same way twice. The default marginal surface
+  # holds none either: `process_error = FALSE` contributes the trend's
+  # deterministic submodel, so it repeats too. Drawing innovations is
+  # what makes an answer vary, and is the documented reason a seed is
+  # needed for a reproducible one.
   fit <- readRDS(file.path("fixtures", "val_mvgam_ar1_fx.rds"))
   expect_equal(
     posterior_epred(fit, incl_autocor = TRUE),
     posterior_epred(fit, incl_autocor = TRUE)
   )
   expect_equal(log_lik(fit), log_lik(fit))
-  expect_false(isTRUE(all.equal(
+  expect_equal(
     posterior_epred(fit, incl_autocor = FALSE),
     posterior_epred(fit, incl_autocor = FALSE)
+  )
+  expect_false(isTRUE(all.equal(
+    posterior_epred(fit, incl_autocor = FALSE, process_error = TRUE),
+    posterior_epred(fit, incl_autocor = FALSE, process_error = TRUE)
   )))
 })

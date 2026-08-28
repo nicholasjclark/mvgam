@@ -343,3 +343,39 @@ test_that("re-exports of marginaleffects entry points are wired", {
     )
   }
 })
+
+
+test_that("an offset is not offered as a conditional effect", {
+  # `stats::terms()` files an offset under the "offset" attribute
+  # rather than in "term.labels", so it never reaches the effect
+  # list. mvgam used to filter `^offset\\(` out of the labels, which
+  # could never match anything; the guard here is that the answer
+  # stays right if that ever changes.
+  stub <- structure(
+    list(formula = y ~ env + offset(log(n)), trend_formula = NULL),
+    class = "mvgam"
+  )
+  expect_equal(mvgam:::detect_conditional_effects(stub), list("env"))
+
+  # brms reaches the same set from the same formula.
+  expect_equal(
+    unlist(brms:::get_all_effects(
+      brms::brmsterms(brms::bf(y ~ env + offset(log(n))))
+    )),
+    "env"
+  )
+
+  # An offset alongside a smooth, and an offset on the trend side.
+  smooth_stub <- structure(
+    list(formula = y ~ s(env) + offset(log(n)), trend_formula = NULL),
+    class = "mvgam"
+  )
+  expect_equal(mvgam:::detect_conditional_effects(smooth_stub),
+               list("env"))
+  trend_stub <- structure(
+    list(formula = y ~ env, trend_formula = ~ z + offset(log(n))),
+    class = "mvgam"
+  )
+  expect_equal(mvgam:::detect_conditional_effects(trend_stub),
+               list("env", "z"))
+})

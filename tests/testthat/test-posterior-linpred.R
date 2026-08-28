@@ -664,3 +664,78 @@ test_that("diagnostic_surface_args names the surface as incl_autocor", {
     FALSE
   )
 })
+
+
+# Random-effect contribution: `population_random_pred()` reads one
+# posterior column per level the model was fitted to, indexed by the
+# grouping vector brms puts in the standata. Nothing here samples.
+
+# Build the minimal prep the helper reads: one design matrix, one
+# grouping index, and a mapping from the design matrix to the
+# posterior columns holding that factor's coefficients.
+re_prep_stub <- function(J, n_levels, group = "grp") {
+  z_name <- "Z_1_1"
+  param_names <- paste0("r_1_1[", seq_len(n_levels), "]")
+  structure(list(
+    sdata = stats::setNames(
+      list(rep(1, length(J)), J), c(z_name, "J_1")
+    ),
+    re_mapping = stats::setNames(
+      list(structure(param_names, group = group)), z_name
+    )
+  ), class = "brmsprep")
+}
+
+
+test_that("population_random_pred() adds each level's own coefficient", {
+  draws <- matrix(
+    c(10, 20, 30,
+      11, 21, 31),
+    nrow = 2, byrow = TRUE,
+    dimnames = list(NULL, paste0("r_1_1[", 1:3, "]"))
+  )
+  # Four observations drawn from levels 1, 3, 2, 1.
+  prep <- re_prep_stub(J = c(1L, 3L, 2L, 1L), n_levels = 3L)
+  out <- population_random_pred(prep, draws, n_draws = 2L, n_obs = 4L)
+  expect_equal(unname(out), matrix(c(10, 30, 20, 10,
+                                     11, 31, 21, 11),
+                                   nrow = 2, byrow = TRUE))
+})
+
+
+test_that("a grouping level the model never saw is named, not indexed", {
+  # brms extends the grouping index under `allow_new_levels = TRUE`,
+  # but no coefficient was ever drawn for the new level. Indexing
+  # past the end of the draws gave `subscript out of bounds`, an
+  # internal message arrived at by following brms's own advice to set
+  # that argument.
+  draws <- matrix(
+    1, nrow = 2, ncol = 3,
+    dimnames = list(NULL, paste0("r_1_1[", 1:3, "]"))
+  )
+  prep <- re_prep_stub(J = c(1L, 2L, 4L), n_levels = 3L)
+  expect_error(
+    population_random_pred(prep, draws, n_draws = 2L, n_obs = 3L),
+    "grouping level the model never saw"
+  )
+  # The message names the factor, both counts, and the way out.
+  err <- tryCatch(
+    population_random_pred(prep, draws, n_draws = 2L, n_obs = 3L),
+    error = function(e) conditionMessage(e)
+  )
+  expect_match(err, "grp")
+  expect_match(err, "re_formula = NA")
+})
+
+
+test_that("the prediction entry points share one new-level default", {
+  # brms's own `snl_options` is uncertainty / gaussian / old_levels,
+  # and mvgam's entry points offer all three. Two validators
+  # underneath took only the first two, so a documented call was
+  # accepted at the door and refused inside; the end-to-end path is
+  # driven in tests/local/test-new-levels.R, which needs a fit.
+  for (fn in list(predict.mvgam, fitted.mvgam, posterior_predict.mvgam,
+                  posterior_epred.mvgam, posterior_linpred.mvgam)) {
+    expect_identical(eval(formals(fn)$sample_new_levels), "uncertainty")
+  }
+})

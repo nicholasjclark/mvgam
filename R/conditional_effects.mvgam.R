@@ -389,6 +389,12 @@ as.data.frame.mvgam_conditional_effects <- function(x,
 # walks the observation formula plus the trend formula (when
 # present), splits smooth / interaction terms, and returns a list of
 # unique up-to-3-way variable groupings.
+#
+# An offset needs no exclusion here: `stats::terms()` records it
+# under the "offset" attribute rather than in "term.labels", so it
+# never reaches this list, which is also how brms arrives at the
+# same set. Its value still enters the prediction, held at the
+# reference the conditioning grid gives it.
 detect_conditional_effects <- function(x) {
   # Multivariate brmsformula has no single `$formula` slot.
   # `$forms` is a list of per-response brmsformula objects with
@@ -409,7 +415,6 @@ detect_conditional_effects <- function(x) {
              "term.labels")
       )
     }
-    termlabs <- termlabs[!grepl("^offset\\(", termlabs)]
     cond <- unlist(lapply(termlabs, split_term_labels),
                    recursive = FALSE)
     return(unique(cond))
@@ -447,7 +452,6 @@ detect_conditional_effects <- function(x) {
            "term.labels")
     )
   }
-  termlabs <- termlabs[!grepl("^offset\\(", termlabs)]
   cond <- unlist(lapply(termlabs, split_term_labels),
                  recursive = FALSE)
   # Filter out nlpar tokens that survived from the top-level

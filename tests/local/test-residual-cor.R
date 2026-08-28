@@ -153,8 +153,13 @@ test_that("residual_cor on LV fit: cov_draws match tcrossprod(Z) per draw", {
       }
     }
     expected <- tcrossprod(Z_d)
+    # `residual_cor()` and `tcrossprod()` reach the same product by
+    # different summation orders, so they agree to roughly 1e-7
+    # relative rather than to the last bit. A wrong loading or a
+    # misread draw would differ by orders of magnitude, which this
+    # still catches.
     testthat::expect_equal(res[["cov_draws"]][d, , ], expected,
-                           tolerance = 1e-8)
+                           tolerance = 1e-6)
   }
 })
 

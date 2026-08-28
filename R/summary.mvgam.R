@@ -16,10 +16,6 @@
 #'   for credible intervals. Default is \code{c(0.025, 0.975)} for 95% intervals.
 #' @param robust Logical; if \code{TRUE}, use median and MAD instead of mean
 #'   and SD as measures of central tendency and spread. Default is \code{FALSE}.
-#' @param include_trend_states Logical; if \code{TRUE}, include the
-#'   latent trend's own time-indexed states (\code{trend\[i,s\]},
-#'   \code{lv_trend\[i,k\]}) in the summary. Default is \code{FALSE},
-#'   as these are typically too numerous to display.
 #' @param include_betas Logical; if \code{TRUE} (the default), print every
 #'   per-cell expansion of the trend-side dynamic parameters
 #'   (per-country and per-cell \code{A_group_trend},
@@ -73,14 +69,13 @@
 #'
 #' @export
 summary.mvgam <- function(object, probs = c(0.025, 0.975),
-                          robust = FALSE, include_trend_states = FALSE,
+                          robust = FALSE,
                           include_betas = TRUE, ...) {
   # Input validation
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_numeric(probs, len = 2, lower = 0, upper = 1)
   checkmate::assert_true(probs[1] < probs[2])
   checkmate::assert_logical(robust, len = 1)
-  checkmate::assert_logical(include_trend_states, len = 1)
   checkmate::assert_logical(include_betas, len = 1)
 
   # Check for fitted model
@@ -112,12 +107,15 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   # Get all parameter names from rownames
   pars <- rownames(all_summaries)
 
-  # Exclude latent states unless requested
-  if (!include_trend_states) {
-    pars_to_keep <- !is_trend_state_param(pars)
-    all_summaries <- all_summaries[pars_to_keep, , drop = FALSE]
-    pars <- rownames(all_summaries)
-  }
+  # Drop the trend's own time-indexed states. There is one row per
+  # (time, series) and no summary slot claims them, so they would be
+  # discarded downstream regardless; pruning here keeps the work off
+  # the categorisers. `hindcast(type = "trend")` returns them as a
+  # trajectory, and `as.data.frame(variable = "^trend\\[", regex =
+  # TRUE)` as draws.
+  pars_to_keep <- !is_trend_state_param(pars)
+  all_summaries <- all_summaries[pars_to_keep, , drop = FALSE]
+  pars <- rownames(all_summaries)
 
   # Exclude lprior, lp__, and uncentered b_Intercept_trend
   # brms shows only centered Intercept_trend in summaries, hiding the
@@ -506,10 +504,9 @@ match_family_pars <- function(pars, has_dpar_formulas = character()) {
 match_trend_pars <- function(pars) {
   # Get all parameters with _trend suffix
   is_trend <- is_trend_parameter(pars)
-  # Exclude the trend's own states, which the `include_trend_states`
-  # argument handles separately. Both `lv_trend[t, k]` (partial-Z
-  # fits) and `lv_trend_tilde[t, k]` (QR-identified factor paths)
-  # qualify.
+  # Exclude the trend's own states; no summary slot claims them.
+  # Both `lv_trend[t, k]` (partial-Z fits) and `lv_trend_tilde[t, k]`
+  # (QR-identified factor paths) qualify.
   is_state <- grepl("^(trend|lv_trend|lv_trend_tilde)\\[", pars)
 
   is_trend & !is_state
@@ -1221,8 +1218,6 @@ check_mvgam_convergence <- function(all_summaries, nchains) {
 #'   0.975)} for 95% intervals.
 #' @param robust Logical; if \code{TRUE}, use median and MAD instead of
 #'   mean and SD. Default is \code{FALSE}.
-#' @param include_trend_states Logical; if \code{TRUE}, include the
-#'   latent trend's own time-indexed states. Default is \code{FALSE}.
 #' @param ... Additional arguments passed to \code{\link{summary.mvgam}}.
 #'
 #' @return An object of class \code{c("mvgam_pooled_summary",
@@ -1248,14 +1243,13 @@ check_mvgam_convergence <- function(all_summaries, nchains) {
 #'
 #' @export
 summary.mvgam_pooled <- function(object, probs = c(0.025, 0.975),
-                                  robust = FALSE, include_trend_states = FALSE,
+                                  robust = FALSE,
                                   ...) {
   # Input validation
   checkmate::assert_class(object, "mvgam_pooled")
   checkmate::assert_numeric(probs, len = 2, lower = 0, upper = 1)
   checkmate::assert_true(probs[1] < probs[2])
   checkmate::assert_logical(robust, len = 1)
-  checkmate::assert_logical(include_trend_states, len = 1)
 
   # Call parent method to get standard summary
   base_summary <- NextMethod("summary")

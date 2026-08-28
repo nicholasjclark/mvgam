@@ -83,3 +83,59 @@ test_that("the summary header carries every formula and every link", {
   # Families declaring no distributional parameters report the mean.
   expect_equal(format_family_links(poisson()), "mu = log")
 })
+
+
+test_that("is_trend_state_param() names the states and nothing else", {
+  # The trend's time-indexed states, which no summary block claims.
+  expect_true(all(is_trend_state_param(c(
+    "trend[1,1]", "lv_trend[3,2]", "lv_trend_tilde[3,2]",
+    "innovations_trend[1,1]", "mu_trend[4]",
+    "scaled_innovations_trend[2,1]"
+  ))))
+  # Trend hyperparameters and formula effects are summarised, so they
+  # must not be caught by the same predicate.
+  expect_false(any(is_trend_state_param(c(
+    "sigma_trend", "ar1_trend[1]", "Intercept_trend", "b_trend[1]",
+    "Sigma_trend[1,1]", "L_Omega_trend[2,1]", "Z[1,2]"
+  ))))
+  # `latent_state` is the closure-unit quantity, not this one.
+  expect_false(is_trend_state_param("latent_N[1]"))
+  expect_equal(is_trend_state_param(character()), logical(0))
+})
+
+
+test_that("no summary block claims a trend state", {
+  # Every block is built by a `match_*` predicate. If none of them
+  # admits `trend[i, s]`, then carrying those rows further only to
+  # discard them is wasted work, which is what the removed
+  # `include_states` argument did: it kept them and changed nothing.
+  states <- c("trend[1,1]", "lv_trend[2,1]", "innovations_trend[1,1]",
+              "mu_trend[3]", "scaled_innovations_trend[1,1]")
+  matchers <- list(
+    fixed = function(p) match_fixed_pars(p, character()),
+    smooth = function(p) match_smooth_pars(p, character()),
+    random = match_random_pars,
+    family = function(p) match_family_pars(p, character()),
+    trend_fixed = match_trend_fixed_pars,
+    trend_smooth = match_trend_smooth_pars,
+    trend_random = match_trend_random_pars,
+    trend_specific = match_trend_specific_pars,
+    loadings = match_z_loadings,
+    loadings_prior = match_loadings_prior_pars
+  )
+  for (nm in names(matchers)) {
+    expect_false(any(matchers[[nm]](states)))
+  }
+})
+
+
+test_that("summary() offers no argument for the trend states", {
+  # Removed rather than fixed: 1.1.x never had one, and the states
+  # are reachable through hindcast(type = "trend"),
+  # as.data.frame(variable = "^trend\\[") and plot(type = "trend").
+  expect_false("include_states" %in% names(formals(summary.mvgam)))
+  expect_false("include_trend_states" %in% names(formals(summary.mvgam)))
+  expect_false(
+    "include_trend_states" %in% names(formals(summary.mvgam_pooled))
+  )
+})

@@ -28,7 +28,7 @@ This is a major release that rebuilds mvgam on top of 'brms'. The observation mo
 * `hindcast()` spells that second axis `process_error` as well, replacing `resample_innovations`
 * `posterior_transition_matrix()` takes `groups` alone. Naming one panel returns its matrix; naming several, or passing `"all"`, returns the classed list. The mutually exclusive `group` argument has gone
 * `residual_cor(groups = )` is now `by_group`, since it is a logical and `groups` names a character vector elsewhere in the package
-* `summary(include_states = )` is now `include_trend_states`. `latent_state` names the closure-unit quantity that `nmix()` and `occ()` fits infer, so the trend's own states no longer borrow the word
+* `summary(include_states = )` has been removed. It never had any effect: no summary slot claims the trend's time-indexed states, so `TRUE` and `FALSE` returned identical objects. 1.1.x had no such argument either. Read the states through `hindcast(type = "trend")` for the trajectory, `as.data.frame(variable = "^trend\\[", regex = TRUE)` for the draws or `plot(type = "trend")` for a picture
 * `score(alpha = )` is now `quantile_level`, which is what it sets for the pinball loss and does not read as a credible level
 * `forecast(b_uncertainty = )` is now `coef_uncertainty`. It fixes every coefficient feeding either linear predictor: fixed effects, smooth bases, random effect levels and Hilbert-space GP bases alike. The old name pointed at the population-level `b` class, which is one of the four
 
@@ -117,6 +117,8 @@ This is a major release that rebuilds mvgam on top of 'brms'. The observation mo
 * Deprecated the `incl_dynamics` argument in the `loo()` and `loo_compare()` functions to ensure better consistency in log-likelihood and resulting LOO estimates from models with different observation families
 
 ## Bug fixes
+* `update()` now works on a model whose trend constructor took an argument from a variable, such as `AR(p = 1, trend_map = Z)` or `AR(p = 1, n_lv = k)`. A formula stores the expression rather than the value, so once `Z` was out of scope, which it always is after saving and reading the fit back, rebuilding the call failed with `object 'Z' not found`. `update(recompile = FALSE)` runs the same rebuild, so that question could not be asked either. The values are on the fitted object and are now put back within reach of the expression
+* `prior_summary()` on a fitted model now reports every prior the compiled 'Stan' model carries, read from that code rather than reassembled beside it. Two rows were wrong: `sigma_trend` showed the residual scale 'brms' supplies for the gaussian trend submodel, `student_t(3, 0, 2.5)`, while 'Stan' sampled the `exponential(2)` default, and `ar1_trend` was absent altogether. `update()` inherits that table, so a refit re-specified the model and `update(recompile = FALSE)` refused on a stancode mismatch
 * Closure-unit families (`occ()`, `nmix()`) now accept missing responses, so occasions that were never visited can be left as `NA`
 * `com_binomial()` handles missing responses correctly
 * Bug fix to ensure forecast scores are properly computed when plotting objects of class `mvgam_forecast` if only a single out-of-sample observation was included in `newdata`

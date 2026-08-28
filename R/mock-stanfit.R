@@ -125,8 +125,11 @@ get_brms_re_mapping <- function(brmsfit_object) {
       "r_", group_idx, "_", term_idx, "[", 1:n_levels, "]"
     )
     
-    # Store mapping
-    mapping[[z_name]] <- param_names
+    # Store mapping, carrying the grouping factor's name so an error
+    # raised while indexing these columns can say which factor it is
+    # about. The parameter names are brms's numeric convention and
+    # name nothing a user would recognise.
+    mapping[[z_name]] <- structure(param_names, group = group_name)
   }
   
   return(mapping)
@@ -346,7 +349,7 @@ prepare_predictions.mock_stanfit <- function(x,
   checkmate::assert_logical(allow_new_levels, len = 1)
   checkmate::assert_choice(
     sample_new_levels,
-    choices = c("uncertainty", "gaussian")
+    choices = c("uncertainty", "gaussian", "old_levels")
   )
 
   # Validate logical relationship between parameters

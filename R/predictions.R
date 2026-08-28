@@ -1317,6 +1317,30 @@ population_random_pred <- function(prep, draws_mat, n_draws, n_obs) {
 
     r_draws <- draws_mat[, param_names, drop = FALSE]
 
+    # brms extends the grouping index when `allow_new_levels = TRUE`,
+    # but the posterior holds a coefficient only for each level the
+    # model was fitted to. Drawing one for a level it never saw is
+    # brms's own `get_new_rdraws()`, which mvgam does not reproduce,
+    # so the gap is named here rather than indexed past the end of
+    # `r_draws`.
+    if (length(J) > 0L && max(J) > ncol(r_draws)) {
+      group_name <- attr(param_names, "group", exact = TRUE)
+      stop(insight::format_error(c(
+        paste0(
+          "Prediction for a grouping level the model never saw is ",
+          "not supported."
+        ),
+        x = cli::format_inline(
+          "Grouping factor {.field {group_name %||% J_name}} was fitted with {ncol(r_draws)} level{?s}, and 'newdata' asks for {max(J)}."
+        ),
+        i = paste0(
+          "Use 're_formula = NA' to predict from the population ",
+          "effects instead, or supply 'newdata' whose levels the ",
+          "model was fitted to."
+        )
+      )), call. = FALSE)
+    }
+
     # Compute contribution: vectorized indexing
     # r_draws[, J] gives [n_draws × n_obs] via column indexing
     # Z broadcast to [n_draws × n_obs] for element-wise multiplication
@@ -2150,7 +2174,10 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   checkmate::assert_string(resp, null.ok = TRUE)
   checkmate::assert_logical(allow_new_levels, len = 1)
   checkmate::assert_logical(incl_latent_state, len = 1)
-  checkmate::assert_choice(sample_new_levels, c("uncertainty", "gaussian"))
+  checkmate::assert_choice(
+    sample_new_levels,
+    c("uncertainty", "gaussian", "old_levels")
+  )
   checkmate::assert(
     checkmate::check_null(re_formula),
     checkmate::check_class(re_formula, "formula"),

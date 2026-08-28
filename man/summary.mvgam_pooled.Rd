@@ -4,13 +4,7 @@
 \alias{summary.mvgam_pooled}
 \title{Summary method for multiple imputation mvgam models}
 \usage{
-\method{summary}{mvgam_pooled}(
-  object,
-  probs = c(0.025, 0.975),
-  robust = FALSE,
-  include_trend_states = FALSE,
-  ...
-)
+\method{summary}{mvgam_pooled}(object, probs = c(0.025, 0.975), robust = FALSE, ...)
 }
 \arguments{
 \item{object}{An object of class \code{mvgam_pooled}.}
@@ -21,9 +15,6 @@ probabilities for credible intervals. Default is \code{c(0.025,
 
 \item{robust}{Logical; if \code{TRUE}, use median and MAD instead of
 mean and SD. Default is \code{FALSE}.}
-
-\item{include_trend_states}{Logical; if \code{TRUE}, include the
-latent trend's own time-indexed states. Default is \code{FALSE}.}
 
 \item{...}{Additional arguments passed to \code{\link{summary.mvgam}}.}
 }

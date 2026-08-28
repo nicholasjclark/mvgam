@@ -383,6 +383,18 @@ fit_mvgam_cached("ar1_t2",
   y ~ 1 + t2(z, w), ~ AR(p = 1),
   test_data_t2, poisson())
 
+# The intercept-free twin. `val_brms_ar1_t2_noint` was built outside
+# this script and its mvgam counterpart never was, so
+# `tests/local/test-marginaleffects-concordance.R` skipped every run.
+# Built here, it takes `grp` like every other fixture, so the test no
+# longer has to strip a `group` column marginaleffects reserves.
+fit_brms_cached("ar1_t2_noint",
+  y ~ 0 + t2(z, w, k = c(4, 4)) + ar(time = time, p = 1, cov = TRUE),
+  test_data_t2, poisson())
+fit_mvgam_cached("ar1_t2_noint",
+  y ~ 0 + t2(z, w, k = c(4, 4)), ~ AR(p = 1),
+  test_data_t2, poisson())
+
 cat("\n[20] Gaussian AR(1), N=150 — PSIS-stable concordance fixture\n")
 # Larger N with high signal-to-noise keeps Pareto-k diagnostics in
 # the stable region (<0.7), so cross-package PSIS-weighted
@@ -539,6 +551,16 @@ fit_trend_map_cached <- function(name, Z_user) {
   fit
 }
 fit_trend_map_cached("trend_map_fx", Z_true)
+
+# The same four series and two factors with `Z` sampled rather than
+# supplied, which is the path `residual_cor()` reads as
+# `pattern = "factor_loadings"` and the one
+# `tests/local/test-factor-forecast.R` forecasts through. No script
+# built it before, so a clean clone could not regenerate what those
+# two tests consume.
+fit_mvgam_cached("lv_factor",
+  y ~ 1, ~ -1 + AR(p = 1, n_lv = 2),
+  test_data_tm, poisson())
 
 # ----------------------------------------------------------------------
 # STRUCTURED-PRIOR FACTOR MODEL: loadings_prior end-to-end fixture

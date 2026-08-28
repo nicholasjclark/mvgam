@@ -311,19 +311,187 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > the response with `NA`.
 
 - [ ] **3.0 Close the post-fit coverage gaps**
-  > `plot_slopes`, `plot_comparisons`, `hypotheses`,
-  > `posterior_transition_matrix`, `latent_N_saturation` and
-  > `compare_elpds` are never called on a fitted model anywhere;
-  > `tweedie()` is never fitted; the five multi-response families are
-  > fitted but barely inspected; offsets and new-level prediction have
-  > no coverage. Six fixtures have no builder.
+  > Partly done. What the sweep found so far, each reproduced on a
+  > cached fit before being changed.
   >
-  > Found while renaming it in 13.0, and pre-existing:
-  > `summary(include_trend_states = TRUE)` returns the same rows as
-  > `FALSE` on `val_mvgam_ar1_int`. `is_trend_state_param()` itself
-  > answers correctly, so the states are being filtered out somewhere
-  > downstream of the switch rather than by it. Nothing covers the
-  > `TRUE` branch beyond checking that the call runs.
+  > `summary(include_states =)` never did anything. No summary block
+  > claims the trend's time-indexed states: every `match_*` predicate
+  > is narrower, and `match_trend_specific_pars()` excludes them by
+  > name, so `TRUE` kept rows that were then discarded unclaimed and
+  > the two calls returned `identical()` objects. 1.1.x had no such
+  > argument, and six routes to the states already work
+  > (`hindcast(type = "trend")`, `plot(type = "trend")`,
+  > `as.data.frame(regex)`, `variables()`, `as_draws_df()`,
+  > `mcmc_plot(regex)`), so it was removed rather than implemented.
+  >
+  > Predicting a grouping level the model never saw crashed with
+  > `subscript out of bounds`, reached by following brms's own advice
+  > to set `allow_new_levels = TRUE`. brms extends the grouping index
+  > to cover the new level while the posterior holds a coefficient
+  > only per fitted level, so `population_random_pred()` indexed past
+  > the end of the draws. Drawing those coefficients is brms's
+  > `get_new_rdraws()`, 107 lines covering three `sample_new_levels`
+  > semantics, `by` variables and correlated-RE covariance, and it is
+  > unexported so `:::` is not open to a CRAN package. The limitation
+  > is now named, with the counts and `re_formula = NA` in the
+  > message. Everything else on that fit was already fine: 13 of 14
+  > surfaces answered, including every call without `newdata` and
+  > every call on known levels.
+  >
+  > `sample_new_levels = "old_levels"` was documented and accepted at
+  > three entry points, matching brms's `snl_options`, then refused by
+  > two validators underneath that took only the first two. Both now
+  > match the documented surface.
+  >
+  > Two of the survey's premises were stale and are recorded as such
+  > rather than acted on. The `posterior_*` trio and
+  > `resolve_forecast_grid()` already agree on the series axis: both
+  > refuse an unseen series whatever `allow_new_levels` says. And
+  > `conditional_effects()` was not stripping offsets in place of
+  > holding them at a reference value, because `stats::terms()` files
+  > an offset under the "offset" attribute rather than in
+  > "term.labels", so the filter could never match. It matched brms's
+  > `get_all_effects()` already; the dead filter is gone and a test
+  > pins the behaviour.
+  >
+  > Fixtures: three had no builder anywhere, not six.
+  > `val_mvgam_lv_factor` is consumed by two tests and now has one.
+  > `val_mvgam_gauss_ar1_na` and `val_sbc_recovery_ar1_ranks` were
+  > consumed by nothing and have been deleted. Separately,
+  > `val_mvgam_ar1_t2_noint` is consumed by
+  > `test-marginaleffects-concordance.R` and did not exist, so that
+  > test skipped every run; a builder now produces it with `grp`
+  > rather than the `group` column marginaleffects reserves, which
+  > retires the workaround that test carries.
+  >
+  > `posterior_transition_matrix()` had no CI coverage at all and now
+  > has four tests on the existing VAR draws mock, covering the
+  > summary shape, `summary = FALSE`, `robust`, the collapsed `groups`
+  > argument and the trend-type gate.
+  >
+  > The five multi-response families had no kernel test at all. Every
+  > fixture that fits one drives `residual_cor()` and
+  > `as.data.frame()` on the result and nothing else, so the densities
+  > themselves were never checked. `diri`, `multi`, `categ`, `mvn` and
+  > `mvt` now have 21 tests against references the kernels play no
+  > part in: a two-category Dirichlet against a Beta, three categories
+  > against `extraDistr::ddirichlet`, `multi` against
+  > `stats::dmultinom`, `categ` against the same at size one, `mvn`
+  > summed over a unit against `mvtnorm::dmvnorm` with a diagonal
+  > covariance, and `mvt` per element against `mvtnorm::dmvt`. All
+  > five agree; the gap was coverage rather than correctness. The
+  > `mvn` check also settles independently that its covariance is
+  > `diag(Psi^2)`.
+  >
+  > `tweedie()` and `beta_nb()` are recorded above as needing the
+  > same. They already carry 18 and 22 tests covering density, epred,
+  > RNG, distribution function and stancode.
+  >
+  > Still open: `plot_slopes`, `plot_comparisons`, `hypotheses` and
+  > `latent_N_saturation` run from `tests/local` but not from CI.
+
+- [x] **3.1 A fitted model reported a prior it never sampled under**
+  > Found by chasing the two `update(recompile = FALSE)` errors 4.0
+  > had attributed to stale fixtures. The stancode a fixture stores
+  > and the stancode `HEAD` emits differ by one line:
+  > `sigma_trend ~ exponential(2)` against
+  > `sigma_trend ~ student_t(3, 0, 2.5)`. Rebuilding was the obvious
+  > fix and would have buried the bug, because a fixture built
+  > minutes earlier carried the same fault.
+  >
+  > The trend submodel goes to brms as a gaussian, so brms hands back
+  > a `sigma` row carrying its own `student_t(3, 0, 2.5)`. That is a
+  > residual scale, and the trend's process noise is `sigma_trend`,
+  > which the Stan generator samples under `common_trend_priors`.
+  > `add_trend_suffix_to_priors()` appended `_trend` to every class it
+  > was given, filing brms's value under mvgam's name. The same rule
+  > sits 650 lines earlier with the guard in place, excluding `sigma`
+  > and then dropping it, so this was one rule written twice with one
+  > copy incomplete.
+  >
+  > The defect sat on the fitted object alone. `get_prior()` on a
+  > specification and the emitted Stan agree on `exponential(2)`; the
+  > table stored on the fit is the one `prior_summary()` prints and
+  > `update()` inherits, so a refit re-specified the model and the
+  > guard refused it. The prior surface reports what the model samples
+  > on the specification path and now on the fitted one too.
+  >
+  > The table is now read from the compiled model rather than
+  > reassembled beside it, so it cannot disagree with what the sampler
+  > ran. `lift_mvgam_stanvar_priors()` scanned for four parameters by
+  > name; one scanner now takes every `x ~ dist(args)` and
+  > `dist_lpdf(x | args)` statement naming an mvgam parameter, which
+  > subsumes those four and supplies `sigma_trend` and `ar1_trend`.
+  > The latter was sampled under `normal(0, 0.5)` and reported by
+  > nothing. A left-hand side that is a function call, as in
+  > `to_vector(innovations_trend) ~ std_normal()`, is a non-centring
+  > device and stays out.
+  >
+  > `suffix_trend_prior_classes()` is the one implementation of the
+  > `_trend` suffix rule, reached by both callers. It drops brms's
+  > residual-scale row, keeps a `sigma` scoped to a coefficient, and
+  > leaves an empty or already-suffixed class alone.
+  >
+  > CI tests cover the bookkeeping row, both guards, other classes
+  > being left untouched, and a coef-scoped `sigma` from a
+  > distributional sub-formula not being mistaken for it; the scanner
+  > keeps the emission-site tests it already had.
+  > `val_mvgam_ar1_fx`, `val_mvgam_ar1_t2_noint` and
+  > `val_mvgam_lv_factor` were rebuilt, since a fixture stores its
+  > prior table at fit time and no code fix reaches back into one.
+
+- [x] **3.2 `update()` could not rebuild a trend call naming a variable**
+  > Found while checking that the Stan the code generator writes is
+  > unchanged by a refactor: two of the 32 cached fixtures could not
+  > have their specification reconstructed at all, and the reason was
+  > not the refactor.
+  >
+  > A formula holds the expression and the environment it was written
+  > in, not the values it names. `~ AR(p = 1, trend_map = Z)` written
+  > against a local `Z`, then saved and read back, names something out
+  > of scope, so `update()` failed with `object 'Z' not found` before
+  > reaching `mvgam()`. `update(recompile = FALSE)` runs the same
+  > rebuild, so a user could not even ask whether a refit needed
+  > recompiling. It reaches `trend_map` and `n_lv`, which is the
+  > natural way to write either.
+  >
+  > The fit already carries the resolved values under
+  > `trend_metadata`, so `restore_trend_call_env()` binds them into a
+  > child of the formula's own environment. The expression stays as
+  > the user wrote it and a name the fit holds no value for is left
+  > alone, reaching `mvgam()` to fail against the user's own argument
+  > rather than part-way through the rebuild.
+  >
+  > The local test asserts more than the absence of the error: the
+  > rebuilt Stan code has to equal what the fixture was built from,
+  > since putting a value back must reproduce the model rather than
+  > merely get past the failure.
+
+- [ ] **3.3 `update()` silently refits a different model**
+  > `update.mvgam()` reconstructs the fitting call from
+  > `mvgam_update_inheritance`, which names six arguments.
+  > `mvgam()` takes more than six that decide what Stan is emitted,
+  > and `loadings_prior` is one of them. A refit of a fit carrying a
+  > structured loadings prior loses the whole thing: the Stan code
+  > drops `row_features`, `dist_cluster`, `theta_features` and the
+  > `multi_normal_cholesky` prior on `Z`, leaving a plain
+  > `student_t(3, 0, 0.5)`. Nothing says so. The
+  > `recompile = FALSE` guard refuses, which is the only reason it is
+  > visible at all; the default `recompile = TRUE` path refits the
+  > wrong model quietly.
+  >
+  > The value is recoverable.
+  > `trend_components$specifications$loadings_prior_spec` holds the
+  > evaluated spec, with `features_mat`, `distance_mats`,
+  > `column_shrinkage`, `mgp_a1` and `mgp_a2`.
+  > `call$loadings_prior` is not usable on its own: on the fixture it
+  > is the bare symbol `loadings_prior`, so it carries the same
+  > out-of-scope failure 3.2 fixed for the trend call.
+  >
+  > Two lists have to agree here, the arguments that define a model
+  > and the arguments a refit inherits, and nothing holds them
+  > together. The fix wants a test asserting the second covers the
+  > first, so the next argument added cannot quietly go missing.
 
 - [x] **4.0 The likelihood was scored on the wrong surface**
   > The `loo_R2` failure and the `p_loo` question were one cause.
@@ -363,11 +531,11 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > observations where brms reaches 0.929, and the two answers sit
   > 1.4 apart on counts spanning 0 to 48.
   >
-  > The two `update(recompile = FALSE)` errors are the guard working.
-  > An AR(1) initial state is now drawn from its stationary
-  > distribution, so a June fixture and `HEAD` emit different Stan
-  > code and `recompile = FALSE` is right to refuse. They clear when
-  > the fixtures are rebuilt.
+  > The two `update(recompile = FALSE)` errors were read here as the
+  > guard working on a stale fixture, and as clearing on a rebuild.
+  > Both readings were wrong; see 3.1. The stancode diff is one line
+  > and it is a prior, not the initial state, and a fixture built
+  > after this note reproduced the fault exactly.
 
 - [x] **13.0 One idea, one name**
   > A survey of the exported surface against the conventions the
