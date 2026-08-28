@@ -364,7 +364,7 @@ add_targeted_comments <- function(lines) {
 
   # Comment 8: Prior contributions (target += lprior should be first in final section)
   # Find target += lprior in model block
-  model_pattern <- "^\\s*model\\s*\\{\\s*$"
+  model_pattern <- stan_block_header("model", own_line = TRUE)
   model_lines <- grep(model_pattern, lines)
 
   if (length(model_lines) > 0) {
@@ -419,17 +419,19 @@ reorganize_lprior_statements <- function(lines) {
   if (length(lines) == 0) return(lines)
 
   # Find parameters block (transformed parameters always follows)
-  params_pattern <- "^\\s*parameters\\s*\\{\\s*$"
+  params_pattern <- stan_block_header("parameters", own_line = TRUE)
   params_line <- grep(params_pattern, lines)
   if (length(params_line) == 0) return(lines)
 
   # Find transformed parameters block (always after parameters)
-  tparams_pattern <- "^\\s*transformed parameters\\s*\\{\\s*$"
+  tparams_pattern <- stan_block_header(
+    "transformed parameters", own_line = TRUE
+  )
   tparams_line <- grep(tparams_pattern, lines)
   if (length(tparams_line) == 0) return(lines)
 
   # Find model block (always after transformed parameters)
-  model_pattern <- "^\\s*model\\s*\\{\\s*$"
+  model_pattern <- stan_block_header("model", own_line = TRUE)
   model_line <- grep(model_pattern, lines)
   if (length(model_line) == 0) return(lines)
 
@@ -547,7 +549,7 @@ reorganize_target_statements <- function(lines) {
   if (length(lines) == 0) return(lines)
 
   # Find model block
-  model_pattern <- "^\\s*model\\s*\\{\\s*$"
+  model_pattern <- stan_block_header("model", own_line = TRUE)
   model_line <- grep(model_pattern, lines)
   if (length(model_line) == 0) return(lines)
 
@@ -709,7 +711,7 @@ clean_stan_comments <- function(lines) {
     # Track if we're in functions block
     if (grepl("^functions\\s*\\{", line_trimmed)) {
       in_functions_block <- TRUE
-    } else if (grepl("^(data|transformed data|parameters|transformed parameters|model|generated quantities)\\s*\\{", line_trimmed)) {
+    } else if (grepl(stan_any_block_header(), line_trimmed)) {
       in_functions_block <- FALSE
     }
 
@@ -767,7 +769,7 @@ reorganize_model_block_statements <- function(lines) {
   if (length(lines) == 0) return(lines)
 
   # Find model block
-  model_pattern <- "^\\s*model\\s*\\{\\s*$"
+  model_pattern <- stan_block_header("model", own_line = TRUE)
   model_start <- grep(model_pattern, lines)[1]
   if (is.na(model_start)) return(lines)
 

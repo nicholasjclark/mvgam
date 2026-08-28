@@ -764,43 +764,7 @@ detect_glm_usage <- function(stan_code, response_names = NULL, skip_lines = inte
     return(names(detected)[detected])
   }
 
-  # Parse model block for response-specific GLM usage (using processed code)
-  stan_code <- processed_stan_code
-  model_start <- grep("^\\s*model\\s*\\{", lines)
-  if (length(model_start) == 0) {
-    return(setNames(rep(FALSE, length(response_names)), response_names))
-  }
-
-  # Find model block end
-  brace_count <- 1
-  model_end <- model_start[1]
-  for (i in (model_start[1] + 1):length(lines)) {
-    line <- lines[i]
-    open_braces <- lengths(regmatches(line, gregexpr("\\{", line)))
-    close_braces <- lengths(regmatches(line, gregexpr("\\}", line)))
-    brace_count <- brace_count + open_braces - close_braces
-    if (brace_count == 0) {
-      model_end <- i
-      break
-    }
-  }
-
-  model_lines <- lines[(model_start[1] + 1):(model_end - 1)]
-  result <- setNames(rep(FALSE, length(response_names)), response_names)
-
-  likelihood_lines <- grep("target \\+=.*_l(pdf|pmf)", model_lines, value = TRUE)
-
-  for (line in likelihood_lines) {
-    response_matches <- regmatches(line, regexpr("Y_\\w+", line))
-    if (length(response_matches) > 0) {
-      response_name <- gsub("Y_", "", response_matches[1])
-      if (response_name %in% response_names) {
-        result[[response_name]] <- grepl("_glm_l(pdf|pmf)", line)
-      }
-    }
-  }
-
-  return(result)
+  return(map_responses_to_glm(lines, response_names))
 }
 
 #' Parse GLM Function Parameters
@@ -7609,14 +7573,20 @@ extract_stan_block_content <- function(stancode, block_name) {
           next
         }
 
-        # For other blocks, detect next block boundary
-        next_block_pattern <- switch(tolower(gsub("\\s+", " ", trimws(block_name))),
-          "data" = "^\\s*transformed\\s+data\\s*\\{",
-          "transformed data" = "^\\s*parameters\\s*\\{",
-          "parameters" = "^\\s*transformed\\s+parameters\\s*\\{",
-          "transformed parameters" = "^\\s*model\\s*\\{",
-          "model" = "^\\s*generated\\s+quantities\\s*\\{"
-        )
+        # For other blocks, the boundary is the header of whichever
+        # block Stan declares next. `stan_block_names` holds that
+        # order, so the succession is read from it rather than
+        # restated here.
+        this_block <- tolower(gsub("\\s+", " ", trimws(block_name)))
+        successor <- stan_block_names[
+          match(this_block, stan_block_names) + 1L
+        ]
+        next_block_pattern <- if (length(successor) == 1L &&
+                                    !is.na(successor)) {
+          stan_block_header(successor)
+        } else {
+          NULL
+        }
 
         if (!is.null(next_block_pattern) && grepl(next_block_pattern, line, ignore.case = TRUE)) {
           # Remove trailing brace if present
@@ -8435,27 +8405,11 @@ extract_stan_functions_block <- function(stan_code) {
     return(NULL)  # No functions block
   }
 
-  # Find next block start (data, transformed data, etc.)
-  block_patterns <- c("^\\s*data\\s*\\{", "^\\s*transformed\\s+data\\s*\\{",
-                     "^\\s*parameters\\s*\\{", "^\\s*transformed\\s+parameters\\s*\\{",
-                     "^\\s*model\\s*\\{", "^\\s*generated\\s+quantities\\s*\\{")
-
-  next_block_lines <- c()
-  for (pattern in block_patterns) {
-    matches <- grep(pattern, lines, ignore.case = TRUE)
-    if (length(matches) > 0) {
-      next_block_lines <- c(next_block_lines, matches[matches > functions_start[1]])
-    }
-  }
-
-  if (length(next_block_lines) == 0) {
-    # Functions block extends to end of file
-    content_lines <- lines[(functions_start[1] + 1):length(lines)]
-  } else {
-    # Functions block ends before next block
-    next_block <- min(next_block_lines)
-    content_lines <- lines[(functions_start[1] + 1):(next_block - 1)]
-  }
+  next_block <- stan_next_block_line(
+    lines, after = functions_start[1], exclude = "functions"
+  )
+  last <- if (is.na(next_block)) length(lines) else next_block - 1L
+  content_lines <- lines[(functions_start[1] + 1):last]
 
   # Remove only the final closing brace of the functions block (if it exists)
   if (length(content_lines) > 0 && grepl("^\\s*}\\s*$", content_lines[length(content_lines)])) {
@@ -8694,23 +8648,13 @@ replace_stan_functions_block <- function(stan_code, new_functions_content) {
     return(stan_code)  # No functions block to replace
   }
 
-  # Find next block start
-  block_patterns <- c("^\\s*data\\s*\\{", "^\\s*transformed\\s+data\\s*\\{",
-                     "^\\s*parameters\\s*\\{", "^\\s*transformed\\s+parameters\\s*\\{",
-                     "^\\s*model\\s*\\{", "^\\s*generated\\s+quantities\\s*\\{")
-
-  next_block_lines <- c()
-  for (pattern in block_patterns) {
-    matches <- grep(pattern, lines, ignore.case = TRUE)
-    if (length(matches) > 0) {
-      next_block_lines <- c(next_block_lines, matches[matches > functions_start[1]])
-    }
-  }
-
-  if (length(next_block_lines) == 0) {
-    functions_end <- length(lines)
+  next_block <- stan_next_block_line(
+    lines, after = functions_start[1], exclude = "functions"
+  )
+  functions_end <- if (is.na(next_block)) {
+    length(lines)
   } else {
-    functions_end <- min(next_block_lines) - 1
+    next_block - 1L
   }
 
   # Reconstruct Stan code

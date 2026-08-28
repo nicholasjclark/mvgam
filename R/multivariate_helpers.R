@@ -260,6 +260,12 @@ as_plain_matrix <- function(x) {
 #' block. Every trend parameter the package emits ends the suffix, so
 #' the suffix is what is tested.
 #'
+#' The `_trend\\[` alternative is why this differs from a bare
+#' `grepl("_trend$", ...)`. A posterior draw carries an index, so
+#' `sigma_trend[1]` has to match; a prior class never does, which is
+#' why the prior tables test the suffix on its own rather than calling
+#' here.
+#'
 #' @param pars Character vector of parameter names
 #' @return Logical vector
 #'

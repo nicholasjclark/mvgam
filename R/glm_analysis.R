@@ -149,6 +149,42 @@ determine_glm_preservation <- function(glm_patterns, trend_info = NULL) {
   return(optimization_plan)
 }
 
+#' Which responses brms wrote a GLM-optimised likelihood for
+#'
+#' Where it can, brms emits `poisson_log_glm_lpmf(Y | Xc, Intercept,
+#' b)`, which builds `mu` inside the call and so leaves nothing for a
+#' trend to be added to. Every caller deciding whether to unwind that
+#' form asks here, because the answer was previously worked out in two
+#' places from the same twenty lines.
+#'
+#' @param lines Character vector of Stan source lines.
+#' @param response_names Character vector of response names.
+#' @return Named logical, one entry per response, TRUE where brms used
+#'   the GLM form.
+#' @noRd
+map_responses_to_glm <- function(lines, response_names) {
+  checkmate::assert_character(lines)
+  checkmate::assert_character(response_names)
+  result <- setNames(rep(FALSE, length(response_names)), response_names)
+  model_lines <- stan_block_body(lines, "model")
+  if (is.null(model_lines)) return(result)
+
+  likelihood_lines <- grep(
+    "target \\+=.*_l(pdf|pmf)", model_lines, value = TRUE
+  )
+  for (line in likelihood_lines) {
+    matched <- regmatches(line, regexpr("Y_\\w+", line))
+    if (length(matched) == 0L) next
+    # Anchored, so a response whose own name contains `Y_` survives.
+    response <- sub("^Y_", "", matched[1L])
+    if (response %in% response_names) {
+      result[[response]] <- grepl("_glm_l(pdf|pmf)", line)
+    }
+  }
+  result
+}
+
+
 #' Create Response-GLM Mapping
 #'
 #' @description
@@ -171,41 +207,7 @@ create_response_mapping <- function(stan_code, response_names, glm_patterns) {
   }
 
   lines <- strsplit(stan_code, "\n")[[1]]
-  model_start <- grep("^\\s*model\\s*\\{", lines)
-
-  if (length(model_start) == 0) {
-    return(setNames(rep(FALSE, length(response_names)), response_names))
-  }
-
-  brace_count <- 1
-  model_end <- model_start[1]
-  for (i in (model_start[1] + 1):length(lines)) {
-    line <- lines[i]
-    open_braces <- lengths(regmatches(line, gregexpr("\\{", line)))
-    close_braces <- lengths(regmatches(line, gregexpr("\\}", line)))
-    brace_count <- brace_count + open_braces - close_braces
-    if (brace_count == 0) {
-      model_end <- i
-      break
-    }
-  }
-
-  model_lines <- lines[(model_start[1] + 1):(model_end - 1)]
-  result <- setNames(rep(FALSE, length(response_names)), response_names)
-
-  likelihood_lines <- grep("target \\+=.*_l(pdf|pmf)", model_lines, value = TRUE)
-
-  for (line in likelihood_lines) {
-    response_matches <- regmatches(line, regexpr("Y_\\w+", line))
-    if (length(response_matches) > 0) {
-      response_name <- gsub("Y_", "", response_matches[1])
-      if (response_name %in% response_names) {
-        result[[response_name]] <- grepl("_glm_l(pdf|pmf)", line)
-      }
-    }
-  }
-
-  return(result)
+  return(map_responses_to_glm(lines, response_names))
 }
 
 #' Inject Trends Into GLM Function Calls
