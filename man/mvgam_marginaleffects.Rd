@@ -27,11 +27,13 @@ for a skewed predictive sits below the mean.
 
 \section{The latent trend}{
 
-\code{process_error = FALSE}, the default, holds the trend at its
+\code{process_error = FALSE}, the default, leaves the trend at its
 deterministic submodel, which is the counterfactual these surfaces
-are usually read for: a covariate effect with the trend fixed,
-drawn against a credible band that stays legible. It corresponds to
-brms's \code{incl_autocor = FALSE}, though brms defaults the other way.
+are usually read for: a covariate effect with the latent process
+held out, drawn against a credible band that stays legible. It does
+not fix the trend at a posterior mean, and it does not condition on
+the state the model inferred; every coefficient still varies draw
+to draw.
 
 The cost is that a slope or a comparison taken this way is biased
 low against the fitted model's own \code{E[Y]}, by
@@ -40,6 +42,12 @@ trend's stationary spread is left out of the expectation being
 differentiated. Pass \code{process_error = TRUE} for the unbiased
 effect; the band widens with it, because the latent state's own
 uncertainty is then part of the answer.
+
+A fit whose covariates carry little of the signal, with most of the
+series-level variation in a strong autoregressive process, has
+little for either setting to show. Read such a model through
+\code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and \code{\link[=forecast.mvgam]{forecast.mvgam()}} instead, which return the
+state the model inferred rather than a covariate counterfactual.
 }
 
 \references{

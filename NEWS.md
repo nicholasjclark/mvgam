@@ -24,6 +24,13 @@ This is a major release that rebuilds mvgam on top of 'brms'. The observation mo
 * The default family in `mvgam()` is now `gaussian()` rather than `poisson()`, so count models must state `family = poisson()` explicitly
 * `sim_mvgam()` has a new signature. `T` is now `n_timepoints`, scenarios are chosen with the new `type` argument, and `seasonality`, `use_lv`, `drift`, `trend_rel` and `freq` are gone. The default family is now `gaussian()`
 * The default family in `jsdgam()` is now `binomial()` rather than `poisson()`, so presence-absence data no longer needs the family stated explicitly while count data does
+* One argument now names the prediction surface everywhere it can be chosen. `incl_autocor` decides whether a prediction reads the latent state the model inferred at each time or answers from the covariate structure of the two submodels; it replaces `trend_state` on `posterior_epred()`, `posterior_predict()` and `posterior_linpred()`, and joins `predict()` and `fitted()`, which previously buried the choice in `...`. `process_error` keeps its separate job of deciding whether the marginal surface samples innovations
+* `hindcast()` spells that second axis `process_error` as well, replacing `resample_innovations`
+* `posterior_transition_matrix()` takes `groups` alone. Naming one panel returns its matrix; naming several, or passing `"all"`, returns the classed list. The mutually exclusive `group` argument has gone
+* `residual_cor(groups = )` is now `by_group`, since it is a logical and `groups` names a character vector elsewhere in the package
+* `summary(include_states = )` is now `include_trend_states`. `latent_state` names the closure-unit quantity that `nmix()` and `occ()` fits infer, so the trend's own states no longer borrow the word
+* `score(alpha = )` is now `quantile_level`, which is what it sets for the pinball loss and does not read as a credible level
+* `forecast(b_uncertainty = )` is now `coef_uncertainty`. It fixes every coefficient feeding either linear predictor: fixed effects, smooth bases, random effect levels and Hilbert-space GP bases alike. The old name pointed at the population-level `b` class, which is one of the four
 
 ### Removed smooth bases and constructors
 * The monotonic spline bases `s(x, bs = "moi")` and `s(x, bs = "mod")` have been removed. To constrain an effect to be monotonic, use the 'brms' `mo()` term in the observation formula (see `?brms::mo`), which models a monotonic effect of an ordered predictor
@@ -101,6 +108,7 @@ This is a major release that rebuilds mvgam on top of 'brms'. The observation mo
 * Changed default `type` in `conditional_effects()` to `expected` to match behaviour of 'brms'
 * `CAR()` now constrains the autoregressive parameter to the strict interior of `(0, 1)`, avoiding the boundary behaviour that stalled sampling
 * Exact Gaussian Process terms now emit a warning rather than failing, and the notice is issued once per term per session
+* `posterior_epred()`, `posterior_predict()`, `posterior_linpred()` and `fitted()` now default to `process_error = FALSE`, which is what `predict()` has always done. The five entry points previously disagreed, so `predict(mod)` and `posterior_predict(mod)` answered differently on one fit with no argument given. The default leaves the latent process out and describes the covariate structure; pass `process_error = TRUE` to integrate over the trend's dynamics, or read the fitted state through `hindcast()` and `forecast()`
 
 ## Deprecations
 * `samples` and `burnin` are deprecated in `mvgam()`. Use `iter` (total iterations) and `warmup` instead; supplying both pairs on one call is an error

@@ -8,7 +8,7 @@
   object,
   score = "crps",
   interval_width = 0.9,
-  alpha = 0.5,
+  quantile_level = 0.5,
   lower = -Inf,
   upper = Inf,
   log = FALSE,
@@ -27,7 +27,10 @@ observations live on the same scale as the forecasts).}
 for the per-series \code{in_interval} indicator (and the SIS
 penalty width).}
 
-\item{alpha}{Quantile level for \code{"qs"} (default median).}
+\item{quantile_level}{Quantile the \code{"qs"} pinball loss is
+taken at. Defaults to \code{0.5}, the median. Unrelated to the
+central interval the other scorers use, which
+\code{interval_width} sets.}
 
 \item{lower, upper}{Threshold bounds for \code{"twcrps"} /
 \code{"twenergy"}. Defaults \code{-Inf} / \code{Inf} recover the
@@ -69,14 +72,15 @@ continuous predictives.}
 \item{\code{"drps"}}{Discrete Ranked Probability Score; CRPS
 specialised to count outcomes.}
 \item{\code{"sis"}}{Scaled Interval Score; width of the central
-PI plus an \code{alpha}-scaled penalty for misses.}
+PI plus a penalty for misses scaled by its miscoverage
+rate, \code{1 - interval_width}.}
 \item{\code{"brier"}}{Mean squared error of draws against
 truth; canonical for binary outcomes.}
 \item{\code{"logs"}}{Logarithmic score \verb{-log f(y)} via a kernel
 density estimate; bridges to ELPD / LOO.}
 \item{\code{"dss"}}{Dawid-Sebastiani score: cheap moment-based
 proper score depending only on predictive mean / SD.}
-\item{\code{"qs"}}{Quantile (pinball) loss at level \code{alpha}.}
+\item{\code{"qs"}}{Quantile (pinball) loss at \code{quantile_level}.}
 \item{\code{"twcrps"}}{Threshold-weighted CRPS focusing scoring
 on the \verb{[lower, upper]} region.}
 \item{\code{"energy"}}{Multivariate Energy score across series.}

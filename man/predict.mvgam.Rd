@@ -10,6 +10,7 @@
   type = c("response", "link", "expected", "variance", "terms", "latent_state",
     "detection"),
   process_error = FALSE,
+  incl_autocor = FALSE,
   ndraws = NULL,
   draw_ids = NULL,
   re_formula = NULL,
@@ -32,14 +33,42 @@ If \code{NULL} (the default), the original training data is used.}
 \code{"expected"}, \code{"variance"}, \code{"terms"}, \code{"latent_state"},
 \code{"detection"}. See Details.}
 
-\item{process_error}{Logical. If \code{FALSE} (the default) the trend is
-fixed at its posterior mean and only parameter uncertainty
-propagates, treating the latent trend as a nuisance random
-effect for scenario-based prediction from the GAM components
-alone. If \code{TRUE}, the trend's stochastic dynamics are integrated
-by Monte Carlo. Use \code{\link[=forecast.mvgam]{forecast.mvgam()}} / \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} for
-predictions that respect the temporal dynamics of the latent
-trend at specific time points.}
+\item{process_error}{Logical; if \code{TRUE}, the trend contributes a
+sampled innovation on top of its deterministic submodel, drawn per
+posterior draw from the distribution the trend settles into. For an
+autoregressive trend that is the stationary distribution, so an
+AR(1) draws at \eqn{\sigma^2/(1-\rho^2)} rather than at the
+innovation variance, and the resulting Jensen correction on a log
+link is \eqn{\sigma^2/(2(1-\rho^2))}. A random walk has no
+stationary distribution and a \code{ZMVN()} trend has no dynamics to
+settle into, so both draw their innovations directly; \code{CAR()} does
+the same, its decay depending on the gap between observations. If
+\code{FALSE}, the default, the trend contributes its deterministic
+submodel alone, still at its own per-draw values, so \code{FALSE} is
+not a collapse to a posterior mean. Read only under
+\code{incl_autocor = FALSE}, since conditioning on the fitted state
+leaves no innovation to sample.
+
+The innovations are drawn afresh on each call, so two calls on one
+fit give different answers. Set a seed for a reproducible one.}
+
+\item{incl_autocor}{Logical; which prediction surface the trend
+contribution comes from. \code{FALSE}, the default, keeps the fitted
+\code{trend[t, s]} out and answers from the two submodels' covariate
+structure, so an effect reads the same whether it is asked at the
+first time point or the fiftieth. \code{TRUE} reads the latent state
+the model inferred at each time, which is the quantity
+\code{\link[=hindcast]{hindcast()}} returns and the one an ELPD is built from;
+\code{\link[=loo_R2.mvgam]{loo_R2.mvgam()}} and \code{\link[=bayes_R2.mvgam]{bayes_R2.mvgam()}} ask for it, because an
+R^2 describes the series that was observed rather than a
+counterfactual one. A row whose time falls outside the fitted grid
+has no such state and takes the per-series marginal.
+
+The default suits a model whose covariates carry the signal. When
+most of the series-level variation sits in the trend instead, as
+in a fit with few covariates and a strong autoregressive process,
+this surface has little left to say; \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and
+\code{\link[=forecast.mvgam]{forecast.mvgam()}} are the better reading there.}
 
 \item{ndraws}{Positive integer specifying the number of posterior draws
 to use. If \code{NULL} (the default), all draws are used.}
@@ -112,12 +141,12 @@ scale. Routes through \code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam(
 using family-specific mean-variance formulas. Supported
 families: gaussian, student, lognormal, poisson, bernoulli,
 binomial, negbinomial, gamma, beta. Other families raise an
-informative error. When \code{process_error = TRUE}, the returned
-variance is conditional on both the parameter draw and that
-draw's sampled trend innovation, so it reflects observation
-noise at the trend-integrated mean rather than pure
-observation noise at the posterior-mean trend. Set
-\code{process_error = FALSE} for the latter.
+informative error. Under the default the variance is
+conditional on the parameter draw alone, so it is the
+observation noise around the mean the two submodels give.
+\code{process_error = TRUE} conditions on that draw's sampled
+trend innovation as well, giving the observation noise at
+the trend-integrated mean.
 \item \code{"terms"}: accepted so that a call carried over from
 \code{\link[mgcv:predict.gam]{mgcv::predict.gam()}} is answered rather than silently
 mismatched. mvgam splits the decomposition across

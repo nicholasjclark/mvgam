@@ -58,8 +58,8 @@
 #'     dynamics modelled).
 #'   \item `"hierarchical"`: `time = season`. Pair with
 #'     `occ(multi_season = TRUE)` / `nmix(multi_season = TRUE)` and
-#'     reference the `site` column in `obs_formula` (e.g.,
-#'     `s(site, bs = "re")`) so per-site variation enters the
+#'     reference the `site` column in the observation `formula`
+#'     (e.g. `s(site, bs = "re")`) so per-site variation enters the
 #'     observation model while the trend pipeline operates on the
 #'     season axis. See `?occ` for the multi-season scope and
 #'     identification caveats (the model parameterizes joint
@@ -131,7 +131,7 @@
 #'   (site, season)). Multi-season + `multi_season =
 #'   "hierarchical"`: `time = season` (one closure unit per
 #'   (species, site, season), with site referenced separately in
-#'   `obs_formula`).
+#'   the observation `formula`).
 #' @param series_col Name of the species column. Defaults to
 #'   `"series"`.
 #' @param y_col Name of the detection / count column. Defaults to
@@ -143,9 +143,9 @@
 #'   the existing single-season closure-unit grouping
 #'   `(series, time)` and works with `occ()` / `nmix()` unchanged.
 #'   `"hierarchical"` keeps `time = season` and exposes `site` as
-#'   a side-car covariate for use in `obs_formula`; pair with
-#'   `occ(multi_season = TRUE)` or `nmix(multi_season = TRUE)` so
-#'   the 3-axis closure-unit grouping `(series, site, time)` is
+#'   a side-car covariate for use in the observation `formula`; pair
+#'   with `occ(multi_season = TRUE)` or `nmix(multi_season = TRUE)`
+#'   so the 3-axis closure-unit grouping `(series, site, time)` is
 #'   activated. Ignored for single-season inputs (2D matrix, 3D
 #'   `[N, J, K]` array, or 4D array with `T = 1`).
 #'

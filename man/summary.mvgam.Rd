@@ -8,7 +8,7 @@
   object,
   probs = c(0.025, 0.975),
   robust = FALSE,
-  include_states = FALSE,
+  include_trend_states = FALSE,
   include_betas = TRUE,
   ...
 )
@@ -22,9 +22,10 @@ for credible intervals. Default is \code{c(0.025, 0.975)} for 95\% intervals.}
 \item{robust}{Logical; if \code{TRUE}, use median and MAD instead of mean
 and SD as measures of central tendency and spread. Default is \code{FALSE}.}
 
-\item{include_states}{Logical; if \code{TRUE}, include latent state parameters
-(\code{trend\[i,s\]}, \code{lv_trend\[i,k\]}) in summary. Default is \code{FALSE} as these
-are typically too numerous for display.}
+\item{include_trend_states}{Logical; if \code{TRUE}, include the
+latent trend's own time-indexed states (\code{trend\[i,s\]},
+\code{lv_trend\[i,k\]}) in the summary. Default is \code{FALSE},
+as these are typically too numerous to display.}
 
 \item{include_betas}{Logical; if \code{TRUE} (the default), print every
 per-cell expansion of the trend-side dynamic parameters

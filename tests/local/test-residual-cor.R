@@ -90,10 +90,10 @@ test_that("residual_cor on hierarchical AR returns global cor by default", {
 })
 
 
-test_that("hierarchical residual_cor(groups = TRUE) returns named list", {
+test_that("hierarchical residual_cor(by_group = TRUE) returns named list", {
   require_fixtures("val_mvgam_hier_ar_cor.rds")
   fit <- load_mvgam("hier_ar_cor")
-  res <- residual_cor(fit, groups = TRUE)
+  res <- residual_cor(fit, by_group = TRUE)
   testthat::expect_type(res, "list")
   testthat::expect_true("_global" %in% names(res))
   # Per-group entries: real factor labels from data$region.

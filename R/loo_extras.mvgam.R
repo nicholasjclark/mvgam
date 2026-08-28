@@ -288,12 +288,12 @@ mvgam_loo_E_loo <- function(object, posterior_fn,
     on.exit(assign(".Random.seed", rng_old, envir = .GlobalEnv))
   }
   aligned_seed <- 1L
-  # `trend_state` names a prediction surface, so it is held back from
+  # `incl_autocor` names a prediction surface, so it is held back from
   # the weighting call, which reaches `loo::loo()` through `...` and
   # would not know the argument.
   dots <- list(...)
-  surface <- dots$trend_state
-  dots$trend_state <- NULL
+  surface <- dots$incl_autocor
+  dots$incl_autocor <- NULL
   if (is.null(psis_object)) {
     message("Running PSIS to compute weights")
     set.seed(aligned_seed)
@@ -312,7 +312,7 @@ mvgam_loo_E_loo <- function(object, posterior_fn,
   preds <- do.call(
     posterior_fn,
     c(list(object, resp = resp),
-      list(trend_state = surface %||% "conditional"), dots)
+      list(incl_autocor = surface %||% TRUE), dots)
   )
   # A prediction covers every row of the data; the weights cover only
   # the rows the likelihood could score. Narrow the prediction to those
@@ -435,8 +435,8 @@ loo_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   # expectation with weights built from a conditional density is what
   # pinned this statistic at its clamp.
   epred_args <- c(list(object), resp_arg, args_epred)
-  if (!"trend_state" %in% names(epred_args)) {
-    epred_args$trend_state <- "conditional"
+  if (!"incl_autocor" %in% names(epred_args)) {
+    epred_args$incl_autocor <- TRUE
   }
   epred <- do.call(posterior_epred, epred_args)
   ll <- do.call(log_lik, c(list(object), resp_arg, args_loglik))

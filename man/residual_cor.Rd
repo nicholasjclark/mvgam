@@ -9,7 +9,7 @@ residual_cor(object, ...)
 
 \method{residual_cor}{mvgam}(
   object,
-  groups = FALSE,
+  by_group = FALSE,
   partial = FALSE,
   summary = TRUE,
   robust = FALSE,
@@ -22,7 +22,7 @@ residual_cor(object, ...)
 
 \item{...}{Currently ignored.}
 
-\item{groups}{Logical. Only relevant for hierarchical trends
+\item{by_group}{Logical. Only relevant for hierarchical trends
 (\code{gr = ...} supplied to the trend constructor). When \code{FALSE}
 (default) the population-level correlation
 (\code{tcrossprod(L_Omega_global)}) is returned. When \code{TRUE}, a named
@@ -51,7 +51,7 @@ probabilities for the quantile-based credible interval. Default
 }
 \value{
 An [mvgam_residcor-class] object when \code{summary = TRUE} and
-\code{groups = FALSE}. When \code{groups = TRUE} on a hierarchical trend, an
+\code{by_group = FALSE}. When \code{by_group = TRUE} on a hierarchical trend, an
 \code{mvgam_residcor_list} (a classed named list of \code{mvgam_residcor}
 objects, one per group plus the population-level matrix under
 the name \code{"_global"}); this class carries a

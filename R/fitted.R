@@ -57,12 +57,7 @@
 #' @param probs Numeric vector of probabilities for quantile
 #'   computation. Default is `c(0.025, 0.975)` for 95% credible
 #'   intervals.
-#' @param process_error Logical. If `TRUE` (the default), uses the
-#'   full posterior draws of trend parameters. If `FALSE`, fixes the
-#'   trend at its posterior mean for faster computation. Stochastic
-#'   process innovations are not added here (only by
-#'   [posterior_predict.mvgam()]); fitted values stay deterministic
-#'   functions of the parameter draws.
+#' @inheritParams posterior_epred.mvgam
 #' @param allow_new_levels Logical. If `TRUE`, allows predictions for
 #'   new factor levels not seen during training. Default is `FALSE`.
 #' @param sample_new_levels Character specifying how to sample new
@@ -89,11 +84,19 @@
 #'
 #' @details
 #' `fitted.mvgam()` follows the brms convention: it returns the
-#' expected value E\[Y | X\] (or the linear predictor with `scale =
-#' "linear"`) and does **not** include observation-level noise or the
-#' state-space process noise that [posterior_predict.mvgam()] adds.
-#' Use `predict()` if you want predictive samples that include those
-#' noise components.
+#' expected value E\[Y | X\], or the linear predictor with `scale =
+#' "linear"`, and leaves out the observation-family noise that
+#' [posterior_predict.mvgam()] draws on top. Use `predict()` for
+#' predictive samples that carry it.
+#'
+#' The latent process is a separate question from that noise, and
+#' `process_error` decides it on both methods alike: under the default
+#' `FALSE` the trend contributes its deterministic submodel and the
+#' fitted values describe the covariate structure alone, while `TRUE`
+#' integrates over the trend's dynamics by sampling a state per draw.
+#' Neither setting fixes the trend at a posterior mean. For the state
+#' the model actually inferred at each time, pass `incl_autocor = TRUE`
+#' or read it directly from [hindcast.mvgam()].
 #'
 #' Two brms `fitted()` arguments are not yet supported and will be
 #' ignored if passed via `...`:
@@ -145,7 +148,8 @@ fitted.mvgam <- function(object,
                          summary = TRUE,
                          robust = FALSE,
                          probs = c(0.025, 0.975),
-                         process_error = TRUE,
+                         process_error = FALSE,
+                         incl_autocor = FALSE,
                          allow_new_levels = FALSE,
                          sample_new_levels = "uncertainty",
                          ...) {
@@ -154,6 +158,7 @@ fitted.mvgam <- function(object,
   components <- match.arg(components)
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
   checkmate::assert_logical(process_error, len = 1, any.missing = FALSE)
+  checkmate::assert_logical(incl_autocor, len = 1, any.missing = FALSE)
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
   checkmate::assert(
     checkmate::check_class(re_formula, "formula"),
@@ -211,6 +216,7 @@ fitted.mvgam <- function(object,
     object,
     newdata = newdata,
     process_error = process_error,
+    incl_autocor = incl_autocor,
     ndraws = ndraws,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,

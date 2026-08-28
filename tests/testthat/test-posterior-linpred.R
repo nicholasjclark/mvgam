@@ -581,3 +581,86 @@ test_that("trend_state rejects an unknown surface", {
     "should be one of"
   )
 })
+
+
+test_that("autocor_to_trend_state maps the surface selector", {
+  expect_identical(autocor_to_trend_state(TRUE), "conditional")
+  expect_identical(autocor_to_trend_state(FALSE), "marginal")
+  expect_error(autocor_to_trend_state("conditional"), "logical")
+  expect_error(autocor_to_trend_state(c(TRUE, FALSE)), "length 1")
+  expect_error(autocor_to_trend_state(NA), "missing")
+})
+
+
+test_that("every prediction entry point spells the surface the same way", {
+  # One idea, one name: `incl_autocor` picks the surface and
+  # `process_error` decides whether the marginal surface samples
+  # innovations. A method offering either under a second spelling is
+  # how the two came to disagree.
+  entry_points <- list(
+    posterior_epred = posterior_epred.mvgam,
+    posterior_predict = posterior_predict.mvgam,
+    posterior_linpred = posterior_linpred.mvgam,
+    predict = predict.mvgam,
+    fitted = fitted.mvgam
+  )
+  for (nm in names(entry_points)) {
+    args <- formals(entry_points[[nm]])
+    expect_true("incl_autocor" %in% names(args))
+    expect_true("process_error" %in% names(args))
+    expect_false("trend_state" %in% names(args))
+  }
+})
+
+
+test_that("the prediction entry points share one set of defaults", {
+  # `predict()` forwards to `posterior_predict()`, so a default that
+  # differs between them answers two ways on one fit with no argument
+  # given.
+  entry_points <- list(
+    posterior_epred.mvgam, posterior_predict.mvgam,
+    posterior_linpred.mvgam, predict.mvgam, fitted.mvgam
+  )
+  for (fn in entry_points) {
+    args <- formals(fn)
+    expect_identical(eval(args$process_error), FALSE)
+    expect_identical(eval(args$incl_autocor), FALSE)
+  }
+})
+
+
+test_that("the ELPD surfaces condition on the fitted state", {
+  # Decision 22 assigns model comparison to the conditional surface,
+  # so `log_lik()` and everything built on it default the other way
+  # from the prediction methods.
+  expect_identical(eval(formals(log_lik.mvgam)$incl_autocor), TRUE)
+  expect_identical(eval(formals(loo.mvgam)$incl_autocor), TRUE)
+  expect_identical(eval(formals(waic.mvgam)$incl_autocor), TRUE)
+})
+
+
+test_that("diagnostic_surface_args names the surface as incl_autocor", {
+  # In sample the conditional state, out of sample the marginal, and
+  # the conditional state whenever importance weights are involved.
+  expect_identical(
+    diagnostic_surface_args(list(), newdata = NULL)$incl_autocor, TRUE
+  )
+  expect_null(
+    diagnostic_surface_args(
+      list(), newdata = data.frame(x = 1)
+    )$incl_autocor
+  )
+  expect_identical(
+    diagnostic_surface_args(
+      list(), newdata = data.frame(x = 1), weighted = TRUE
+    )$incl_autocor,
+    TRUE
+  )
+  # A caller that named the surface keeps it.
+  expect_identical(
+    diagnostic_surface_args(
+      list(incl_autocor = FALSE), newdata = NULL
+    )$incl_autocor,
+    FALSE
+  )
+})

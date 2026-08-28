@@ -123,11 +123,11 @@ test_that("Every scorer routes without error and returns the expected shape", {
 })
 
 
-test_that("qs uses alpha and twcrps uses lower/upper", {
+test_that("qs uses quantile_level and twcrps uses lower/upper", {
   set.seed(11L)
   fc <- make_mock_forecast(n_series = 1L, h = 3L, ndraws = 80L)
-  s_median <- score(fc, "qs", alpha = 0.5)$s1$score
-  s_upper <- score(fc, "qs", alpha = 0.95)$s1$score
+  s_median <- score(fc, "qs", quantile_level = 0.5)$s1$score
+  s_upper <- score(fc, "qs", quantile_level = 0.95)$s1$score
   expect_false(isTRUE(all.equal(s_median, s_upper)))
 
   s_plain <- score(fc, "crps")$s1$score

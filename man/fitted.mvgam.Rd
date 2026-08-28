@@ -16,7 +16,8 @@
   summary = TRUE,
   robust = FALSE,
   probs = c(0.025, 0.975),
-  process_error = TRUE,
+  process_error = FALSE,
+  incl_autocor = FALSE,
   allow_new_levels = FALSE,
   sample_new_levels = "uncertainty",
   ...
@@ -86,12 +87,42 @@ median absolute deviation (MAD).}
 computation. Default is \code{c(0.025, 0.975)} for 95\% credible
 intervals.}
 
-\item{process_error}{Logical. If \code{TRUE} (the default), uses the
-full posterior draws of trend parameters. If \code{FALSE}, fixes the
-trend at its posterior mean for faster computation. Stochastic
-process innovations are not added here (only by
-\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}); fitted values stay deterministic
-functions of the parameter draws.}
+\item{process_error}{Logical; if \code{TRUE}, the trend contributes a
+sampled innovation on top of its deterministic submodel, drawn per
+posterior draw from the distribution the trend settles into. For an
+autoregressive trend that is the stationary distribution, so an
+AR(1) draws at \eqn{\sigma^2/(1-\rho^2)} rather than at the
+innovation variance, and the resulting Jensen correction on a log
+link is \eqn{\sigma^2/(2(1-\rho^2))}. A random walk has no
+stationary distribution and a \code{ZMVN()} trend has no dynamics to
+settle into, so both draw their innovations directly; \code{CAR()} does
+the same, its decay depending on the gap between observations. If
+\code{FALSE}, the default, the trend contributes its deterministic
+submodel alone, still at its own per-draw values, so \code{FALSE} is
+not a collapse to a posterior mean. Read only under
+\code{incl_autocor = FALSE}, since conditioning on the fitted state
+leaves no innovation to sample.
+
+The innovations are drawn afresh on each call, so two calls on one
+fit give different answers. Set a seed for a reproducible one.}
+
+\item{incl_autocor}{Logical; which prediction surface the trend
+contribution comes from. \code{FALSE}, the default, keeps the fitted
+\code{trend[t, s]} out and answers from the two submodels' covariate
+structure, so an effect reads the same whether it is asked at the
+first time point or the fiftieth. \code{TRUE} reads the latent state
+the model inferred at each time, which is the quantity
+\code{\link[=hindcast]{hindcast()}} returns and the one an ELPD is built from;
+\code{\link[=loo_R2.mvgam]{loo_R2.mvgam()}} and \code{\link[=bayes_R2.mvgam]{bayes_R2.mvgam()}} ask for it, because an
+R^2 describes the series that was observed rather than a
+counterfactual one. A row whose time falls outside the fitted grid
+has no such state and takes the per-series marginal.
+
+The default suits a model whose covariates carry the signal. When
+most of the series-level variation sits in the trend instead, as
+in a fit with few covariates and a strong autoregressive process,
+this surface has little left to say; \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and
+\code{\link[=forecast.mvgam]{forecast.mvgam()}} are the better reading there.}
 
 \item{allow_new_levels}{Logical. If \code{TRUE}, allows predictions for
 new factor levels not seen during training. Default is \code{FALSE}.}
@@ -129,10 +160,18 @@ the underlying mvgam posterior methods permit.
 }
 \details{
 \code{fitted.mvgam()} follows the brms convention: it returns the
-expected value E[Y | X] (or the linear predictor with \code{scale = "linear"}) and does \strong{not} include observation-level noise or the
-state-space process noise that \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} adds.
-Use \code{predict()} if you want predictive samples that include those
-noise components.
+expected value E[Y | X], or the linear predictor with \code{scale = "linear"}, and leaves out the observation-family noise that
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} draws on top. Use \code{predict()} for
+predictive samples that carry it.
+
+The latent process is a separate question from that noise, and
+\code{process_error} decides it on both methods alike: under the default
+\code{FALSE} the trend contributes its deterministic submodel and the
+fitted values describe the covariate structure alone, while \code{TRUE}
+integrates over the trend's dynamics by sampling a state per draw.
+Neither setting fixes the trend at a posterior mean. For the state
+the model actually inferred at each time, pass \code{incl_autocor = TRUE}
+or read it directly from \code{\link[=hindcast.mvgam]{hindcast.mvgam()}}.
 
 Two brms \code{fitted()} arguments are not yet supported and will be
 ignored if passed via \code{...}:

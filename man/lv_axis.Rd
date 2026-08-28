@@ -49,7 +49,7 @@ validator (in \code{R/validations.R}) rejects \code{by = series} in
 \code{trend_formula}. That pattern is semantically confusing on the
 trend side, and the helper directs users to either
 \code{by = lv_axis()} (for per-factor smooths) or to moving the
-per-series effect into \code{obs_formula}.
+per-series effect into the observation \code{formula}.
 }
 \examples{
 # `lv_axis()` is a formula sentinel; on its own it returns

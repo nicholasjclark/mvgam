@@ -202,10 +202,10 @@ test_that("conditioning tracks the observations, marginalising does not", {
   mv <- load_mvgam("ar1_fx")
   y <- mv$data[["y"]]
   cor_cond <- cor(
-    colMeans(posterior_epred(mv, trend_state = "conditional")), y
+    colMeans(posterior_epred(mv, incl_autocor = TRUE)), y
   )
   cor_marg <- cor(
-    colMeans(posterior_epred(mv, trend_state = "marginal")), y
+    colMeans(posterior_epred(mv, incl_autocor = FALSE)), y
   )
   # The fitted state carries the signal in a state-space fit; the
   # marginal surface deliberately integrates it away.
@@ -274,7 +274,7 @@ test_that("a multivariate fit scores on the conditional surface", {
     )
     expect_equal(
       unname(as.matrix(
-        posterior_linpred(mv, resp = r, trend_state = "conditional")
+        posterior_linpred(mv, resp = r, incl_autocor = TRUE)
       )),
       unname(as.matrix(obs + state))
     )

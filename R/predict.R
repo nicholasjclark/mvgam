@@ -13,14 +13,7 @@
 #' @param type Character; one of `"response"` (default), `"link"`,
 #'   `"expected"`, `"variance"`, `"terms"`, `"latent_state"`,
 #'   `"detection"`. See Details.
-#' @param process_error Logical. If `FALSE` (the default) the trend is
-#'   fixed at its posterior mean and only parameter uncertainty
-#'   propagates, treating the latent trend as a nuisance random
-#'   effect for scenario-based prediction from the GAM components
-#'   alone. If `TRUE`, the trend's stochastic dynamics are integrated
-#'   by Monte Carlo. Use [forecast.mvgam()] / [hindcast.mvgam()] for
-#'   predictions that respect the temporal dynamics of the latent
-#'   trend at specific time points.
+#' @inheritParams posterior_epred.mvgam
 #' @param ndraws Positive integer specifying the number of posterior draws
 #'   to use. If `NULL` (the default), all draws are used.
 #' @param draw_ids Integer vector specifying which draws to use. If `NULL`,
@@ -74,12 +67,12 @@
 #'     using family-specific mean-variance formulas. Supported
 #'     families: gaussian, student, lognormal, poisson, bernoulli,
 #'     binomial, negbinomial, gamma, beta. Other families raise an
-#'     informative error. When `process_error = TRUE`, the returned
-#'     variance is conditional on both the parameter draw and that
-#'     draw's sampled trend innovation, so it reflects observation
-#'     noise at the trend-integrated mean rather than pure
-#'     observation noise at the posterior-mean trend. Set
-#'     `process_error = FALSE` for the latter.
+#'     informative error. Under the default the variance is
+#'     conditional on the parameter draw alone, so it is the
+#'     observation noise around the mean the two submodels give.
+#'     `process_error = TRUE` conditions on that draw's sampled
+#'     trend innovation as well, giving the observation noise at
+#'     the trend-integrated mean.
 #'   \item `"terms"`: accepted so that a call carried over from
 #'     [mgcv::predict.gam()] is answered rather than silently
 #'     mismatched. mvgam splits the decomposition across
@@ -149,6 +142,7 @@ predict.mvgam <- function(object,
                                    "variance", "terms", "latent_state",
                                    "detection"),
                           process_error = FALSE,
+                          incl_autocor = FALSE,
                           ndraws = NULL,
                           draw_ids = NULL,
                           re_formula = NULL,
@@ -165,6 +159,7 @@ predict.mvgam <- function(object,
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
   type <- match.arg(type)
   checkmate::assert_logical(process_error, len = 1, any.missing = FALSE)
+  checkmate::assert_logical(incl_autocor, len = 1, any.missing = FALSE)
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
   checkmate::assert(
@@ -278,6 +273,7 @@ predict.mvgam <- function(object,
       object,
       newdata = newdata,
       process_error = process_error,
+      incl_autocor = incl_autocor,
       ndraws = ndraws,
       draw_ids = draw_ids,
       re_formula = re_formula,
@@ -291,6 +287,7 @@ predict.mvgam <- function(object,
       newdata = newdata,
       transform = FALSE,
       process_error = process_error,
+      incl_autocor = incl_autocor,
       ndraws = ndraws,
       draw_ids = draw_ids,
       re_formula = re_formula,
@@ -303,6 +300,7 @@ predict.mvgam <- function(object,
       object,
       newdata = newdata,
       process_error = process_error,
+      incl_autocor = incl_autocor,
       ndraws = ndraws,
       draw_ids = draw_ids,
       re_formula = re_formula,
@@ -315,6 +313,7 @@ predict.mvgam <- function(object,
       object,
       newdata = newdata,
       process_error = process_error,
+      incl_autocor = incl_autocor,
       ndraws = ndraws,
       draw_ids = draw_ids,
       re_formula = re_formula,
@@ -356,7 +355,8 @@ predict.mvgam <- function(object,
 #' draw_ids plumbing through `posterior_epred()`.
 #'
 #' @noRd
-predict_variance <- function(object, newdata, process_error, ndraws,
+predict_variance <- function(object, newdata, process_error,
+                             incl_autocor, ndraws,
                              re_formula, allow_new_levels,
                              sample_new_levels, resp) {
   # Closure-unit families have closed-form per-visit marginal
@@ -372,6 +372,7 @@ predict_variance <- function(object, newdata, process_error, ndraws,
       object,
       newdata           = newdata,
       process_error     = process_error,
+      incl_autocor      = incl_autocor,
       ndraws            = ndraws,
       re_formula        = re_formula,
       allow_new_levels  = allow_new_levels,
@@ -457,6 +458,7 @@ predict_variance <- function(object, newdata, process_error, ndraws,
     object,
     newdata = newdata,
     process_error = process_error,
+    incl_autocor = incl_autocor,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels,

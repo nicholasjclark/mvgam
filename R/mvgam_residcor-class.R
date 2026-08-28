@@ -175,7 +175,7 @@ plot.mvgam_residcor <- function(
 #' Plot method for an `mvgam_residcor_list`
 #'
 #' Faceted heatmap panel across the per-group correlation
-#' matrices returned by `residual_cor(mod, groups = TRUE)` on a
+#' matrices returned by `residual_cor(mod, by_group = TRUE)` on a
 #' hierarchical VAR or factor fit. Reuses the same
 #' `mvgam_diverging_scale()` palette and `mvgam_theme()` as
 #' [plot.mvgam_residcor()], with symmetric limits `c(-1, 1)`
@@ -184,7 +184,7 @@ plot.mvgam_residcor <- function(
 #' with `include_global = FALSE`.
 #'
 #' @param x An `mvgam_residcor_list` returned by
-#'   `residual_cor(mod, groups = TRUE)`.
+#'   `residual_cor(mod, by_group = TRUE)`.
 #' @param include_global Logical. If `TRUE` (default), include
 #'   the `_global` reference correlation as one panel.
 #' @param ncol Optional integer. Number of facet columns; defaults

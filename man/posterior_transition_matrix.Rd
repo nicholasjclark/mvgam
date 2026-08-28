@@ -6,7 +6,6 @@
 \usage{
 posterior_transition_matrix(
   object,
-  group = NULL,
   groups = NULL,
   summary = TRUE,
   robust = FALSE,
@@ -17,21 +16,17 @@ posterior_transition_matrix(
 \item{object}{A fitted \code{mvgam} object whose trend is a
 VAR(1).}
 
-\item{group}{Optional integer or character. On a hierarchical
-VAR fit selects the panel whose transition matrix should be
-returned; leave \code{NULL} for the global shrinkage target
-built from \code{Amu_trend}. Integer indices match the fitted
-grouping factor's levels in the order stored on
-\code{object$data[[gr]]}; passing a name looks the level up in
-the same set. Ignored on non-hierarchical fits.}
-
-\item{groups}{Optional character or integer vector, or the
-string \code{"all"}. On a hierarchical fit, returns a named list
-of \code{mvgam_var_matrix} objects (one per selected panel),
-classed as \code{mvgam_var_matrix_list} so \code{plot()} produces a
-faceted panel (heatmap grid or per-outcome self-persistence
-pointrange, see \code{\link[=plot.mvgam_var_matrix_list]{plot.mvgam_var_matrix_list()}}). Mutually
-exclusive with \code{group}; ignored on non-hierarchical fits.}
+\item{groups}{Which panels of a hierarchical VAR fit to
+return. \code{NULL} (the default) gives the global shrinkage
+target built from \code{Amu_trend}, and is the only setting a
+non-hierarchical fit accepts. Name one panel, by level name
+or by integer index into the fitted grouping factor's levels
+as stored on \code{object$data[[gr]]}, and that panel's matrix is
+returned on its own. Name several, or pass \code{"all"}, and the
+result is a named list of \code{mvgam_var_matrix} objects classed
+as \code{mvgam_var_matrix_list}, so \code{plot()} produces a faceted
+panel (heatmap grid or per-outcome self-persistence
+pointrange, see \code{\link[=plot.mvgam_var_matrix_list]{plot.mvgam_var_matrix_list()}}).}
 
 \item{summary}{Logical. \code{TRUE} (default) returns an
 \code{mvgam_var_matrix} object with per-cell point estimates,
@@ -51,7 +46,8 @@ for the per-cell credible interval when \code{summary = TRUE}.
 Defaults to \code{c(0.025, 0.975)}.}
 }
 \value{
-With \code{summary = TRUE}, an object of class
+One matrix, or a list of them when \code{groups} names more
+than one panel. With \code{summary = TRUE}, an object of class
 \code{mvgam_var_matrix} with slots \code{A}, \code{A_se}, \code{A_lower},
 \code{A_upper}, \code{A_ess}, \code{prob_positive}, \code{prob_negative},
 \code{prob_nonzero}, \code{n_series}, \code{series_names}, \code{group_label},

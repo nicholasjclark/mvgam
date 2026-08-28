@@ -7,8 +7,8 @@
 \method{posterior_epred}{mvgam}(
   object,
   newdata = NULL,
-  process_error = TRUE,
-  trend_state = c("marginal", "conditional"),
+  process_error = FALSE,
+  incl_autocor = FALSE,
   ndraws = NULL,
   draw_ids = NULL,
   re_formula = NULL,
@@ -24,42 +24,42 @@
 \item{newdata}{Optional data frame with covariates for prediction. If
 NULL, uses original training data stored in the model object.}
 
-\item{process_error}{Logical; if TRUE (default), the expectation
-integrates over the trend's stochastic dynamics. mvgam does this
-by Monte Carlo, drawing the latent state per posterior draw from
-the distribution the trend settles into and adding it to the
-link-scale predictor before the inverse link, which works
-uniformly across families, links and trend types. For an
-autoregressive trend that distribution is the stationary one, so
-an AR(1) draws at \eqn{\sigma^2/(1-\rho^2)} rather than at the
+\item{process_error}{Logical; if \code{TRUE}, the trend contributes a
+sampled innovation on top of its deterministic submodel, drawn per
+posterior draw from the distribution the trend settles into. For an
+autoregressive trend that is the stationary distribution, so an
+AR(1) draws at \eqn{\sigma^2/(1-\rho^2)} rather than at the
 innovation variance, and the resulting Jensen correction on a log
 link is \eqn{\sigma^2/(2(1-\rho^2))}. A random walk has no
 stationary distribution and a \code{ZMVN()} trend has no dynamics to
-settle into, so both draw their innovations directly; \code{CAR()}
-does the same, its decay depending on the gap between
-observations. If FALSE the trend contributes its deterministic
-submodel alone, which is faster and leaves process noise out.
-Read only under \code{trend_state = "marginal"}: a conditional read
-takes the state the model inferred and has nothing to sample.
+settle into, so both draw their innovations directly; \code{CAR()} does
+the same, its decay depending on the gap between observations. If
+\code{FALSE}, the default, the trend contributes its deterministic
+submodel alone, still at its own per-draw values, so \code{FALSE} is
+not a collapse to a posterior mean. Read only under
+\code{incl_autocor = FALSE}, since conditioning on the fitted state
+leaves no innovation to sample.
 
-The innovations are drawn afresh on each call, so two calls on
-one fit give different answers. Set a seed for a reproducible
-one.}
+The innovations are drawn afresh on each call, so two calls on one
+fit give different answers. Set a seed for a reproducible one.}
 
-\item{trend_state}{Which trend contribution the expectation is
-taken over. \code{"marginal"}, the default, integrates over the trend
-dynamics, so a covariate effect reads the same whether it is
-asked at the first time point or the fiftieth. \code{"conditional"}
-reads the latent state the model inferred at each time, which is
-the quantity \code{\link[=hindcast]{hindcast()}} returns and the one an ELPD is built
-from; \code{\link[=loo_R2.mvgam]{loo_R2.mvgam()}} and \code{\link[=bayes_R2.mvgam]{bayes_R2.mvgam()}} ask for it, because
-an R^2 describes the series that was observed rather than a
-counterfactual one. A row whose time falls outside the fitted
-grid has no such state and takes the per-series marginal.
+\item{incl_autocor}{Logical; which prediction surface the trend
+contribution comes from. \code{FALSE}, the default, keeps the fitted
+\code{trend[t, s]} out and answers from the two submodels' covariate
+structure, so an effect reads the same whether it is asked at the
+first time point or the fiftieth. \code{TRUE} reads the latent state
+the model inferred at each time, which is the quantity
+\code{\link[=hindcast]{hindcast()}} returns and the one an ELPD is built from;
+\code{\link[=loo_R2.mvgam]{loo_R2.mvgam()}} and \code{\link[=bayes_R2.mvgam]{bayes_R2.mvgam()}} ask for it, because an
+R^2 describes the series that was observed rather than a
+counterfactual one. A row whose time falls outside the fitted grid
+has no such state and takes the per-series marginal.
 
-The two surfaces answer different questions of the same model, so
-the choice is worth making deliberately. \code{\link[=hindcast]{hindcast()}} returns the
-conditional reading with the fitted state's own draws.}
+The default suits a model whose covariates carry the signal. When
+most of the series-level variation sits in the trend instead, as
+in a fit with few covariates and a strong autoregressive process,
+this surface has little left to say; \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and
+\code{\link[=forecast.mvgam]{forecast.mvgam()}} are the better reading there.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws.}

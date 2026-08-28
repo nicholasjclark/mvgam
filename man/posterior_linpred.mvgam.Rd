@@ -8,8 +8,8 @@
   object,
   transform = FALSE,
   newdata = NULL,
-  process_error = TRUE,
-  trend_state = c("marginal", "conditional"),
+  process_error = FALSE,
+  incl_autocor = FALSE,
   ndraws = NULL,
   draw_ids = NULL,
   re_formula = NULL,
@@ -36,28 +36,42 @@ and answers on the response scale.}
 \item{newdata}{Optional data frame with covariates for prediction. If
 NULL, uses original training data stored in the model object.}
 
-\item{process_error}{Logical; if TRUE (default), the trend
-contributes a sampled innovation from its covariance structure on
-top of its deterministic submodel, which is what makes the
-predictor marginal over the trend dynamics. If FALSE the
-deterministic submodel contributes alone. Either way the
-submodel's own draws ride through per draw, so \code{FALSE} is not a
-collapse to a posterior mean. Read only under
-\code{trend_state = "marginal"}, since a conditional read takes the
-state the model inferred and has no innovation to sample.
+\item{process_error}{Logical; if \code{TRUE}, the trend contributes a
+sampled innovation on top of its deterministic submodel, drawn per
+posterior draw from the distribution the trend settles into. For an
+autoregressive trend that is the stationary distribution, so an
+AR(1) draws at \eqn{\sigma^2/(1-\rho^2)} rather than at the
+innovation variance, and the resulting Jensen correction on a log
+link is \eqn{\sigma^2/(2(1-\rho^2))}. A random walk has no
+stationary distribution and a \code{ZMVN()} trend has no dynamics to
+settle into, so both draw their innovations directly; \code{CAR()} does
+the same, its decay depending on the gap between observations. If
+\code{FALSE}, the default, the trend contributes its deterministic
+submodel alone, still at its own per-draw values, so \code{FALSE} is
+not a collapse to a posterior mean. Read only under
+\code{incl_autocor = FALSE}, since conditioning on the fitted state
+leaves no innovation to sample.
 
-The innovations are drawn afresh on each call, so two calls on
-one fit differ; set a seed for a reproducible answer. For the
-fitted latent state at the training grid use \code{\link[=hindcast]{hindcast()}}, and
-for one extrapolated beyond it \code{\link[=forecast]{forecast()}}.}
+The innovations are drawn afresh on each call, so two calls on one
+fit give different answers. Set a seed for a reproducible one.}
 
-\item{trend_state}{Which trend contribution the prediction carries.
-\code{"marginal"}, the default, integrates over the trend dynamics and
-is the semantic this method documents. \code{"conditional"} reads the
-latent state the model inferred at each time instead, which is
-what the \verb{loo_*} wrappers ask for so that a prediction and the
-importance weights it is paired with describe the same
-observation. See \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} for the state-aware surface.}
+\item{incl_autocor}{Logical; which prediction surface the trend
+contribution comes from. \code{FALSE}, the default, keeps the fitted
+\code{trend[t, s]} out and answers from the two submodels' covariate
+structure, so an effect reads the same whether it is asked at the
+first time point or the fiftieth. \code{TRUE} reads the latent state
+the model inferred at each time, which is the quantity
+\code{\link[=hindcast]{hindcast()}} returns and the one an ELPD is built from;
+\code{\link[=loo_R2.mvgam]{loo_R2.mvgam()}} and \code{\link[=bayes_R2.mvgam]{bayes_R2.mvgam()}} ask for it, because an
+R^2 describes the series that was observed rather than a
+counterfactual one. A row whose time falls outside the fitted grid
+has no such state and takes the per-series marginal.
+
+The default suits a model whose covariates carry the signal. When
+most of the series-level variation sits in the trend instead, as
+in a fit with few covariates and a strong autoregressive process,
+this surface has little left to say; \code{\link[=hindcast.mvgam]{hindcast.mvgam()}} and
+\code{\link[=forecast.mvgam]{forecast.mvgam()}} are the better reading there.}
 
 \item{ndraws}{Positive integer specifying number of posterior draws to
 use. NULL (default) uses all available draws. Mutually exclusive
@@ -115,20 +129,13 @@ trend formula (if present)
 For models without a trend component (trend_formula = NULL), behavior
 matches \code{\link[brms:posterior_linpred.brmsfit]{brms::posterior_linpred()}}.
 
-The \code{process_error} argument controls uncertainty propagation:
-\itemize{
-\item TRUE: Full posterior uncertainty from both observation and
-trend parameters (per-draw variation). Does NOT add sampled
-stochastic innovations; the linpred remains a deterministic
-function of the parameters at each draw.
-\item FALSE: Trend fixed at posterior mean; only observation
-uncertainty propagated (faster but understates total uncertainty).
-}
-
-If you want predictive samples that include the unobserved
-stochastic component of the latent trend (state-space process
-noise), use \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}, the only entry
-point that adds sampled innovations on top of the linear predictor.
+Innovations are sampled once, on the linear predictor, so
+\code{process_error = TRUE} here carries the same state that
+\code{\link[=posterior_epred.mvgam]{posterior_epred.mvgam()}} and \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} carry
+under that setting; the latter two then apply the inverse link and
+the observation family on top. Under \code{FALSE} the predictor still
+varies draw to draw, because every coefficient in both submodels
+does; what it leaves out is the latent process.
 }
 \examples{
 \donttest{

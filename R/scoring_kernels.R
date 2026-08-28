@@ -347,8 +347,9 @@ dss_mcmc_object <- function(truth, fc, ...) {
 }
 
 #'@noRd
-qs_mcmc_object <- function(truth, fc, alpha = 0.5, ...) {
-  apply_univariate_score(truth, fc, qs_cell, alpha = alpha)
+qs_mcmc_object <- function(truth, fc, quantile_level = 0.5, ...) {
+  # `qs_cell()` keeps scoringRules' own spelling at that boundary.
+  apply_univariate_score(truth, fc, qs_cell, alpha = quantile_level)
 }
 
 #'@noRd

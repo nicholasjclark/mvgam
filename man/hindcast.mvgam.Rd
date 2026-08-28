@@ -10,7 +10,7 @@
   type = c("response", "link", "expected", "trend", "latent_state"),
   ndraws = NULL,
   obs_uncertainty = TRUE,
-  resample_innovations = FALSE,
+  process_error = FALSE,
   resp = NULL
 )
 }
@@ -39,15 +39,15 @@ observation-family sampling for \code{type = "response"},
 returning the family mean (\code{linkinv(eta)}) instead.
 Defaults to \code{TRUE}.}
 
-\item{resample_innovations}{Logical. When \code{FALSE} (the
-default), hindcasts use the Stan-fitted latent state directly
-(\code{trend[t, s]} and \code{mu_trend[t, s]} read from the posterior);
-\code{type = "response"} then samples only observation-family
-noise on top of the exact fitted state. When \code{TRUE}, fresh
-innovations are drawn from the trend's covariance structure
-and added to the linpred, matching the marginal Monte Carlo
-convention used by \code{posterior_epred()} /
-\code{posterior_predict()} with \code{process_error = TRUE}.}
+\item{process_error}{Logical. When \code{FALSE} (the default),
+hindcasts read the Stan-fitted latent state directly
+(\code{trend[t, s]} and \code{mu_trend[t, s]} from the posterior), and
+\code{type = "response"} samples only observation-family noise on
+top of that exact state. When \code{TRUE}, fresh innovations are
+drawn from the trend's covariance structure and added to the
+linear predictor instead, which is what
+\code{posterior_epred()} and \code{posterior_predict()} do under the
+same argument.}
 
 \item{resp}{For multivariate (multiple-response) models, the
 name of a single response variable to return results for.

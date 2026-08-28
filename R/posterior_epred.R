@@ -421,41 +421,41 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #' @param object A fitted mvgam object from [mvgam()].
 #' @param newdata Optional data frame with covariates for prediction. If
 #'   NULL, uses original training data stored in the model object.
-#' @param process_error Logical; if TRUE (default), the expectation
-#'   integrates over the trend's stochastic dynamics. mvgam does this
-#'   by Monte Carlo, drawing the latent state per posterior draw from
-#'   the distribution the trend settles into and adding it to the
-#'   link-scale predictor before the inverse link, which works
-#'   uniformly across families, links and trend types. For an
-#'   autoregressive trend that distribution is the stationary one, so
-#'   an AR(1) draws at \eqn{\sigma^2/(1-\rho^2)} rather than at the
+#' @param process_error Logical; if `TRUE`, the trend contributes a
+#'   sampled innovation on top of its deterministic submodel, drawn per
+#'   posterior draw from the distribution the trend settles into. For an
+#'   autoregressive trend that is the stationary distribution, so an
+#'   AR(1) draws at \eqn{\sigma^2/(1-\rho^2)} rather than at the
 #'   innovation variance, and the resulting Jensen correction on a log
 #'   link is \eqn{\sigma^2/(2(1-\rho^2))}. A random walk has no
 #'   stationary distribution and a `ZMVN()` trend has no dynamics to
-#'   settle into, so both draw their innovations directly; `CAR()`
-#'   does the same, its decay depending on the gap between
-#'   observations. If FALSE the trend contributes its deterministic
-#'   submodel alone, which is faster and leaves process noise out.
-#'   Read only under `trend_state = "marginal"`: a conditional read
-#'   takes the state the model inferred and has nothing to sample.
+#'   settle into, so both draw their innovations directly; `CAR()` does
+#'   the same, its decay depending on the gap between observations. If
+#'   `FALSE`, the default, the trend contributes its deterministic
+#'   submodel alone, still at its own per-draw values, so `FALSE` is
+#'   not a collapse to a posterior mean. Read only under
+#'   `incl_autocor = FALSE`, since conditioning on the fitted state
+#'   leaves no innovation to sample.
 #'
-#'   The innovations are drawn afresh on each call, so two calls on
-#'   one fit give different answers. Set a seed for a reproducible
-#'   one.
-#' @param trend_state Which trend contribution the expectation is
-#'   taken over. `"marginal"`, the default, integrates over the trend
-#'   dynamics, so a covariate effect reads the same whether it is
-#'   asked at the first time point or the fiftieth. `"conditional"`
-#'   reads the latent state the model inferred at each time, which is
-#'   the quantity [hindcast()] returns and the one an ELPD is built
-#'   from; [loo_R2.mvgam()] and [bayes_R2.mvgam()] ask for it, because
-#'   an R^2 describes the series that was observed rather than a
-#'   counterfactual one. A row whose time falls outside the fitted
-#'   grid has no such state and takes the per-series marginal.
+#'   The innovations are drawn afresh on each call, so two calls on one
+#'   fit give different answers. Set a seed for a reproducible one.
+#' @param incl_autocor Logical; which prediction surface the trend
+#'   contribution comes from. `FALSE`, the default, keeps the fitted
+#'   `trend[t, s]` out and answers from the two submodels' covariate
+#'   structure, so an effect reads the same whether it is asked at the
+#'   first time point or the fiftieth. `TRUE` reads the latent state
+#'   the model inferred at each time, which is the quantity
+#'   [hindcast()] returns and the one an ELPD is built from;
+#'   [loo_R2.mvgam()] and [bayes_R2.mvgam()] ask for it, because an
+#'   R^2 describes the series that was observed rather than a
+#'   counterfactual one. A row whose time falls outside the fitted grid
+#'   has no such state and takes the per-series marginal.
 #'
-#'   The two surfaces answer different questions of the same model, so
-#'   the choice is worth making deliberately. [hindcast()] returns the
-#'   conditional reading with the fitted state's own draws.
+#'   The default suits a model whose covariates carry the signal. When
+#'   most of the series-level variation sits in the trend instead, as
+#'   in a fit with few covariates and a strong autoregressive process,
+#'   this surface has little left to say; [hindcast.mvgam()] and
+#'   [forecast.mvgam()] are the better reading there.
 #' @param ndraws Positive integer specifying number of posterior draws to
 #'   use. NULL (default) uses all available draws.
 #' @param draw_ids Optional integer vector selecting a subset of posterior
@@ -534,9 +534,8 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #' @method posterior_epred mvgam
 #' @export
 posterior_epred.mvgam <- function(object, newdata = NULL,
-                                  process_error = TRUE,
-                                  trend_state = c("marginal",
-                                                   "conditional"),
+                                  process_error = FALSE,
+                                  incl_autocor = FALSE,
                                   ndraws = NULL,
                                   draw_ids = NULL,
                                   re_formula = NULL,
@@ -547,7 +546,7 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
   # Validate mvgam-specific parameters
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_logical(process_error, len = 1)
-  trend_state <- match.arg(trend_state)
+  trend_state <- autocor_to_trend_state(incl_autocor)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,
                                 any.missing = FALSE)
 

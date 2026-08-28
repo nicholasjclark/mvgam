@@ -18,7 +18,7 @@
 #' }
 #'
 #' @param object A fitted \[mvgam\]\[mvgam::mvgam\] object.
-#' @param groups Logical. Only relevant for hierarchical trends
+#' @param by_group Logical. Only relevant for hierarchical trends
 #'   (`gr = ...` supplied to the trend constructor). When `FALSE`
 #'   (default) the population-level correlation
 #'   (`tcrossprod(L_Omega_global)`) is returned. When `TRUE`, a named
@@ -43,7 +43,7 @@
 #' @param ... Currently ignored.
 #'
 #' @return An \[mvgam_residcor-class\] object when `summary = TRUE` and
-#'   `groups = FALSE`. When `groups = TRUE` on a hierarchical trend, an
+#'   `by_group = FALSE`. When `by_group = TRUE` on a hierarchical trend, an
 #'   `mvgam_residcor_list` (a classed named list of `mvgam_residcor`
 #'   objects, one per group plus the population-level matrix under
 #'   the name `"_global"`); this class carries a
@@ -131,14 +131,14 @@ residual_cor <- function(object, ...) {
 #' @method residual_cor mvgam
 #' @export
 residual_cor.mvgam <- function(object,
-                               groups = FALSE,
+                               by_group = FALSE,
                                partial = FALSE,
                                summary = TRUE,
                                robust = FALSE,
                                probs = c(0.025, 0.975),
                                ...) {
   checkmate::assert_class(object, "mvgam")
-  checkmate::assert_flag(groups)
+  checkmate::assert_flag(by_group)
   checkmate::assert_flag(partial)
   checkmate::assert_flag(summary)
   checkmate::assert_flag(robust)
@@ -148,7 +148,7 @@ residual_cor.mvgam <- function(object,
 
   compute_residual_cor(
     object = object,
-    groups = groups,
+    by_group = by_group,
     partial = partial,
     summary = summary,
     robust = robust,
@@ -172,13 +172,13 @@ residual_cor.mvgam <- function(object,
 #'      - `"cholesky_scaled"` with correlations: reconstruct as
 #'        `diag(sigma) %*% L_Omega %*% t(L_Omega) %*% diag(sigma)`.
 #'      - `"hierarchical_cholesky"`: population-level `tcrossprod(L_global)`
-#'        by default, per-group mixed when `groups = TRUE`.
+#'        by default, per-group mixed when `by_group = TRUE`.
 #'
 #' All branches end at the same `finalise_residcor()` summariser to
 #' keep the cor / cov / partial / probability machinery in one place.
 #'
 #' @noRd
-compute_residual_cor <- function(object, groups, partial, summary,
+compute_residual_cor <- function(object, by_group, partial, summary,
                                   robust, probs) {
   # Design note: factor covariance (n_lv > 0) is checked before the
   # trend-pattern dispatch because latent factors induce their own
@@ -239,7 +239,7 @@ compute_residual_cor <- function(object, groups, partial, summary,
     return(compute_residcor_hierarchical(
       object = object,
       cov_struct = cov_struct,
-      groups = groups,
+      by_group = by_group,
       partial = partial,
       summary = summary,
       robust = robust,
@@ -378,13 +378,13 @@ extract_cov_draws_flat <- function(cov_struct) {
 
 #' Hierarchical-trend residual correlation summary.
 #'
-#' When `groups = FALSE` (default) returns the population-level
-#' `tcrossprod(L_global)` summary. When `groups = TRUE` returns a
+#' When `by_group = FALSE` (default) returns the population-level
+#' `tcrossprod(L_global)` summary. When `by_group = TRUE` returns a
 #' named list with element `"_global"` plus one per group, each
 #' summarised independently.
 #'
 #' @noRd
-compute_residcor_hierarchical <- function(object, cov_struct, groups,
+compute_residcor_hierarchical <- function(object, cov_struct, by_group,
                                           partial, summary, robust,
                                           probs, series_names) {
   ndraws <- cov_struct$ndraws
@@ -418,7 +418,7 @@ compute_residcor_hierarchical <- function(object, cov_struct, groups,
     group_label = "_global"
   )
 
-  if (!groups) return(global_out)
+  if (!by_group) return(global_out)
 
   per_group <- vector("list", length = n_groups)
   names(per_group) <- group_labels

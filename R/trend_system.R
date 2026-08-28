@@ -2488,11 +2488,11 @@ print.mvgam_trend <- function(x, ...) {
 #' mcmc_plot(mod_hv, variable = "alpha_cor_trend", type = "hist")
 #'
 #' # `residual_cor()` defaults to the population (across-outcome)
-#' # correlation. Passing `groups = TRUE` returns a list of
+#' # correlation. Passing `by_group = TRUE` returns a list of
 #' # per-region correlations alongside the population entry, so
 #' # the across-region heterogeneity can be inspected directly.
 #' residual_cor(mod_hv)
-#' residual_cor(mod_hv, groups = TRUE)
+#' residual_cor(mod_hv, by_group = TRUE)
 #' }
 #'
 #' @export

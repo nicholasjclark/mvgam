@@ -1641,29 +1641,7 @@ extract_dpars_from_stanfit <- function(stanfit,
 #' @param object A fitted mvgam object from [mvgam()].
 #' @param newdata Optional data frame with covariates for prediction. If
 #'   NULL, uses original training data stored in the model object.
-#' @param process_error Logical; if TRUE (default), the predictive
-#'   distribution integrates over the trend's stochastic dynamics.
-#'   mvgam does this by Monte Carlo, adding sampled innovations to the
-#'   link-scale predictor before the inverse link and the draw of
-#'   observation-family noise. If FALSE the trend contributes its
-#'   deterministic submodel alone and only observation noise spreads
-#'   the predictive distribution. Read only under
-#'   `trend_state = "marginal"`.
-#'
-#'   The innovations are composed once, on the linear predictor, so
-#'   `posterior_linpred()` under the same setting carries them too.
-#'   They are drawn afresh on each call: set a seed for a reproducible
-#'   answer.
-#' @param trend_state Which trend contribution the draws carry.
-#'   `"marginal"`, the default, integrates over the trend dynamics, so
-#'   a covariate effect reads the same whatever time it is asked at.
-#'   `"conditional"` reads the latent state the model inferred at each
-#'   time, which is what the `loo_*` wrappers ask for so a prediction
-#'   and the importance weights it is paired with describe the same
-#'   observation. A row whose time falls outside the fitted grid has
-#'   no such state and takes the per-series marginal; for a state
-#'   extrapolated forward use \[forecast.mvgam\], and for the fitted
-#'   state at the training grid \[hindcast.mvgam\].
+#' @inheritParams posterior_epred.mvgam
 #' @param ndraws Positive integer specifying number of posterior draws to
 #'   use. NULL (default) uses all available draws.
 #' @param draw_ids Optional integer vector selecting a subset of posterior
@@ -1749,9 +1727,8 @@ extract_dpars_from_stanfit <- function(stanfit,
 #' @method posterior_predict mvgam
 #' @export
 posterior_predict.mvgam <- function(object, newdata = NULL,
-                                    process_error = TRUE,
-                                    trend_state = c("marginal",
-                                                     "conditional"),
+                                    process_error = FALSE,
+                                    incl_autocor = FALSE,
                                     ndraws = NULL,
                                     draw_ids = NULL,
                                     re_formula = NULL,
@@ -1763,7 +1740,7 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
   checkmate::assert_logical(process_error, len = 1)
-  trend_state <- match.arg(trend_state)
+  trend_state <- autocor_to_trend_state(incl_autocor)
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1L, null.ok = TRUE)
   if (!is.null(ndraws) && !is.null(draw_ids)) {

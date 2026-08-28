@@ -224,9 +224,9 @@ bayes_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   # a hard error.
   epred <- if (is_mv) {
     posterior_epred(object, resp = resp_use,
-                    trend_state = "conditional", ...)
+                    incl_autocor = TRUE, ...)
   } else {
-    posterior_epred(object, trend_state = "conditional", ...)
+    posterior_epred(object, incl_autocor = TRUE, ...)
   }
   y <- object$data[[resp_use]]
   if (is.null(y) || !is.numeric(y)) {

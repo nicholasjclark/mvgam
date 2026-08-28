@@ -28,9 +28,11 @@
 #' @param rug Logical. If `TRUE` and `type = "response"`, rug tick
 #'   marks are drawn along the axes.
 #' @param process_error Logical. Passed to `plot_predictions()` /
-#'   `get_predict.mvgam`. Defaults to `FALSE` so the latent trend
-#'   collapses to its posterior mean; set `TRUE` to include per-draw
-#'   latent-state uncertainty.
+#'   `get_predict.mvgam`. Defaults to `FALSE`, so the trend
+#'   contributes its deterministic submodel and the panel shows the
+#'   covariate effect with the latent process held out. Set `TRUE` to
+#'   integrate over the trend's dynamics, which widens the band by the
+#'   latent state's own spread.
 #' @param series Optional control over the `series` factor in
 #'   multi-series fits. `NULL` (the default) marginalises over series,
 #'   matching brms's behaviour for a grouping factor. `"all"` adds

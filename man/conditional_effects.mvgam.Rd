@@ -52,9 +52,11 @@ overlaid on the plot.}
 marks are drawn along the axes.}
 
 \item{process_error}{Logical. Passed to \code{plot_predictions()} /
-\code{get_predict.mvgam}. Defaults to \code{FALSE} so the latent trend
-collapses to its posterior mean; set \code{TRUE} to include per-draw
-latent-state uncertainty.}
+\code{get_predict.mvgam}. Defaults to \code{FALSE}, so the trend
+contributes its deterministic submodel and the panel shows the
+covariate effect with the latent process held out. Set \code{TRUE} to
+integrate over the trend's dynamics, which widens the band by the
+latent state's own spread.}
 
 \item{series}{Optional control over the \code{series} factor in
 multi-series fits. \code{NULL} (the default) marginalises over series,

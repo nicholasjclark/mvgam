@@ -319,12 +319,12 @@ How much does the partial-pooling prior shrink each country's
 AR persistence toward the global mean? Plotting the medians and
 95% intervals for the self-persistence diagonal by country
 answers that directly. `posterior_transition_matrix(mod_hier,
-group = <name>)` returns the `[ndraws, K, K]` array of posterior
+groups = <name>)` returns the `[ndraws, K, K]` array of posterior
 draws for one country's $A_c$, `groups = "all"` returns the set
-of them classed for a faceted plot, and `group = NULL` returns
-the shrinkage target built from the hyperparameters
-`Amu_trend[1, 1]` (diagonal mean) and `Amu_trend[2, 1]`
-(off-diagonal mean).
+of them classed for a faceted plot, and the default `groups =
+NULL` returns the shrinkage target built from the
+hyperparameters `Amu_trend[1, 1]` (diagonal mean) and
+`Amu_trend[2, 1]` (off-diagonal mean).
 
 ```{r plot-A-country-diag, fig.cap = "Posterior medians and 95% intervals for the three self-persistence coefficients (diagonal of A_c) by country. Points close together across countries indicate that the partial-pooling prior has pulled the country-specific estimates toward the same global value."}
 A_all <- posterior_transition_matrix(mod_hier, groups = "all")
@@ -375,7 +375,7 @@ low, some countries should show idiosyncratic structure.
 
 ```{r plot-country-cor, fig.width = 8, fig.height = 5, fig.cap = "Posterior mean innovation correlation matrix for each country. Each cell is the correlation between two outcomes (GDP, consumption, investment) once each country's transition matrix has absorbed the lagged structure. Similarity across countries reflects the pull of the alpha_cor_trend partial-pooling weight."}
 plot(
-  residual_cor(mod_hier, groups = TRUE),
+  residual_cor(mod_hier, by_group = TRUE),
   include_global = FALSE
 )
 ```
@@ -466,12 +466,13 @@ VAR at any level:
 
 - `summary(mod, include_betas = FALSE)` keeps the printout
   focused on the hyperparameters.
-- `posterior_transition_matrix(mod, group = <name>)` returns
-  each country's $A_c$ as a `[ndraws, K, K]` array. Pass
-  `group = NULL` for the shrinkage target built from `Amu_trend`.
+- `posterior_transition_matrix(mod, groups = <name>)` returns
+  each country's $A_c$ as a `[ndraws, K, K]` array. Leave
+  `groups` at its default for the shrinkage target built from
+  `Amu_trend`.
 - `residual_cor(mod)` returns the global innovation correlation
   as an `mvgam_residcor` object with print, summary and plot
-  methods. Pass `groups = TRUE` to receive the same object per
+  methods. Pass `by_group = TRUE` to receive the same object per
   country plus a `_global` reference matrix.
 - `mcmc_plot(mod, variable = "alpha_cor_trend")` reads off how
   much pooling the data support on the innovation correlations.

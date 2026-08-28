@@ -5,17 +5,15 @@
 # slots NULL.
 #
 # Semantic note: by default hindcasts read the Stan-fitted latent
-# state directly from the posterior
-# (`resample_innovations = FALSE`). `trend[t, s]`,
-# `mu_trend[t, s]`, and `innovations_trend[t, s]` are all stored
-# in the Stan output, so reconstruction is exact. This surfaces
-# overfit-vs-predict gaps directly: a random walk with sigma -> 0
-# absorbs the response into the trend, so its hindcast response
-# draws hug the training values even when the corresponding
-# forecast() would be flat. Set `resample_innovations = TRUE` to
-# draw fresh innovations on top of the linpred instead (the
-# marginal MC convention that `posterior_predict(newdata = ...)`
-# uses by default).
+# state directly from the posterior (`process_error = FALSE`).
+# `trend[t, s]`, `mu_trend[t, s]` and `innovations_trend[t, s]`
+# are all stored in the Stan output, so reconstruction is exact.
+# This surfaces overfit-vs-predict gaps directly: a random walk
+# with sigma -> 0 absorbs the response into the trend, so its
+# hindcast response draws hug the training values even when the
+# corresponding forecast() would be flat. Set
+# `process_error = TRUE` to draw fresh innovations on top of the
+# linpred instead.
 
 
 #' Generic for posterior hindcasts
@@ -58,15 +56,15 @@ hindcast <- function(object, ...) {
 #'   observation-family sampling for `type = "response"`,
 #'   returning the family mean (`linkinv(eta)`) instead.
 #'   Defaults to `TRUE`.
-#' @param resample_innovations Logical. When `FALSE` (the
-#'   default), hindcasts use the Stan-fitted latent state directly
-#'   (`trend[t, s]` and `mu_trend[t, s]` read from the posterior);
-#'   `type = "response"` then samples only observation-family
-#'   noise on top of the exact fitted state. When `TRUE`, fresh
-#'   innovations are drawn from the trend's covariance structure
-#'   and added to the linpred, matching the marginal Monte Carlo
-#'   convention used by `posterior_epred()` /
-#'   `posterior_predict()` with `process_error = TRUE`.
+#' @param process_error Logical. When `FALSE` (the default),
+#'   hindcasts read the Stan-fitted latent state directly
+#'   (`trend[t, s]` and `mu_trend[t, s]` from the posterior), and
+#'   `type = "response"` samples only observation-family noise on
+#'   top of that exact state. When `TRUE`, fresh innovations are
+#'   drawn from the trend's covariance structure and added to the
+#'   linear predictor instead, which is what
+#'   `posterior_epred()` and `posterior_predict()` do under the
+#'   same argument.
 #' @inheritParams forecast.mvgam
 #'
 #' @return An object of class [mvgam_forecast-class][mvgam].
@@ -106,13 +104,13 @@ hindcast.mvgam <- function(object,
                                     "latent_state"),
                            ndraws = NULL,
                            obs_uncertainty = TRUE,
-                           resample_innovations = FALSE,
+                           process_error = FALSE,
                            resp = NULL) {
   checkmate::assert_class(object, "mvgam")
   type <- match.arg(type)
   checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
   checkmate::assert_flag(obs_uncertainty)
-  checkmate::assert_flag(resample_innovations)
+  checkmate::assert_flag(process_error)
   checkmate::assert_string(resp, null.ok = TRUE)
 
   # latent_state branch: closure-unit families only; returns the
@@ -152,7 +150,7 @@ hindcast.mvgam <- function(object,
   training <- build_training_arms(object, series_levels)
   hindcasts <- build_hindcast_arms(
     object, training, type, draw_idx, obs_uncertainty,
-    resample_innovations = resample_innovations,
+    process_error = process_error,
     resp = resp
   )
 

@@ -20,11 +20,13 @@
 #' for a skewed predictive sits below the mean.
 #'
 #' @section The latent trend:
-#' `process_error = FALSE`, the default, holds the trend at its
+#' `process_error = FALSE`, the default, leaves the trend at its
 #' deterministic submodel, which is the counterfactual these surfaces
-#' are usually read for: a covariate effect with the trend fixed,
-#' drawn against a credible band that stays legible. It corresponds to
-#' brms's `incl_autocor = FALSE`, though brms defaults the other way.
+#' are usually read for: a covariate effect with the latent process
+#' held out, drawn against a credible band that stays legible. It does
+#' not fix the trend at a posterior mean, and it does not condition on
+#' the state the model inferred; every coefficient still varies draw
+#' to draw.
 #'
 #' The cost is that a slope or a comparison taken this way is biased
 #' low against the fitted model's own `E[Y]`, by
@@ -33,6 +35,12 @@
 #' differentiated. Pass `process_error = TRUE` for the unbiased
 #' effect; the band widens with it, because the latent state's own
 #' uncertainty is then part of the answer.
+#'
+#' A fit whose covariates carry little of the signal, with most of the
+#' series-level variation in a strong autoregressive process, has
+#' little for either setting to show. Read such a model through
+#' [hindcast.mvgam()] and [forecast.mvgam()] instead, which return the
+#' state the model inferred rather than a covariate counterfactual.
 #'
 #' @name mvgam_marginaleffects
 #'
@@ -88,10 +96,10 @@ get_predict.mvgam <- function(model,
       "latent_N", "latent_state")
   )
 
-  # Default process_error = FALSE collapses the latent trend to its
-  # posterior mean for slopes / comparisons / predictions. Users who
-  # want per-draw latent-state uncertainty can pass
-  # `process_error = TRUE` through `predictions()`.
+  # Default process_error = FALSE leaves the latent process out, so a
+  # slope or comparison reads the covariate structure of both
+  # submodels alone. Passing `process_error = TRUE` through
+  # `predictions()` integrates over the trend's dynamics instead.
   draws <- switch(type,
     link       = posterior_linpred(model, newdata = newdata,
                                    process_error = process_error, ...),

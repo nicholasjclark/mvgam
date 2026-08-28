@@ -276,8 +276,8 @@ group_summary <- function(nm, fit, cap) {
            shape = identity)
   run_call(nm, "summary", "summary(include_betas=FALSE)",
            summary(fit, include_betas = FALSE))
-  run_call(nm, "summary", "summary(include_states=TRUE)",
-           summary(fit, include_states = TRUE))
+  run_call(nm, "summary", "summary(include_trend_states=TRUE)",
+           summary(fit, include_trend_states = TRUE))
   run_call(nm, "summary", "print()", printed(fit), shape = identity)
   run_call(nm, "summary", "family()", family(fit))
   run_call(nm, "summary", "formula()", formula(fit))

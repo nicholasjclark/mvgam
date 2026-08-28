@@ -8,7 +8,7 @@
 }
 \arguments{
 \item{x}{An \code{mvgam_residcor_list} returned by
-\code{residual_cor(mod, groups = TRUE)}.}
+\code{residual_cor(mod, by_group = TRUE)}.}
 
 \item{include_global}{Logical. If \code{TRUE} (default), include
 the \verb{_global} reference correlation as one panel.}
@@ -23,7 +23,7 @@ A \link[ggplot2:ggplot]{ggplot2::ggplot} object.
 }
 \description{
 Faceted heatmap panel across the per-group correlation
-matrices returned by \code{residual_cor(mod, groups = TRUE)} on a
+matrices returned by \code{residual_cor(mod, by_group = TRUE)} on a
 hierarchical VAR or factor fit. Reuses the same
 \code{mvgam_diverging_scale()} palette and \code{mvgam_theme()} as
 \code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}}, with symmetric limits \code{c(-1, 1)}

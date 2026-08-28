@@ -16,10 +16,10 @@
 #      observation-family noise -- all batched after the loop.
 #
 # Uncertainty-toggle semantics:
-#   * `b_uncertainty = FALSE`     -> every forecast draw uses
+#   * `coef_uncertainty = FALSE`  -> every forecast draw uses
 #     row 1 of the cached obs and trend-submodel linpred
-#     matrices, fixing every regression coefficient that feeds
-#     either linear predictor (fixed effects, smooths, REs,
+#     matrices, fixing every coefficient that feeds either
+#     linear predictor (fixed effects, smooths, REs,
 #     Hilbert-space GP bases).
 #   * `trend_uncertainty = FALSE` -> every forecast draw uses
 #     draw 1 of both `extract_last_state` (trend dynamics
@@ -63,13 +63,12 @@
 #'   scale.
 #' @param ndraws Optional integer; the number of posterior draws
 #'   to use. Defaults to all available draws.
-#' @param b_uncertainty Logical. When `FALSE`, every forecast
-#'   draw uses the first posterior draw of all observation- and
-#'   trend-formula regression coefficients. This includes fixed
-#'   effects, smooth bases, random effect levels, and
-#'   Hilbert-space `gp(x, k)` bases -- collapsing every source
-#'   of regression-coefficient variation, not only the global
-#'   `b` coefficients. Defaults to `TRUE`.
+#' @param coef_uncertainty Logical. When `FALSE`, every forecast
+#'   draw uses the first posterior draw of every coefficient in
+#'   the observation and trend formulas: fixed effects, smooth
+#'   bases, random effect levels and Hilbert-space `gp(x, k)`
+#'   bases alike, not only the population-level `b`. Defaults to
+#'   `TRUE`.
 #' @param trend_uncertainty Logical. When `FALSE`, every
 #'   forecast draw uses the first posterior draw of all
 #'   trend-side quantities: the trend dynamics parameters
@@ -128,14 +127,14 @@ forecast.mvgam <- function(object,
                             type = c("response", "link",
                                        "expected", "trend"),
                             ndraws = NULL,
-                            b_uncertainty = TRUE,
+                            coef_uncertainty = TRUE,
                             trend_uncertainty = TRUE,
                             obs_uncertainty = TRUE,
                             resp = NULL) {
   checkmate::assert_class(object, "mvgam")
   type <- match.arg(type)
   checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
-  checkmate::assert_flag(b_uncertainty)
+  checkmate::assert_flag(coef_uncertainty)
   checkmate::assert_flag(trend_uncertainty)
   checkmate::assert_flag(obs_uncertainty)
   checkmate::assert_string(resp, null.ok = TRUE)
@@ -197,11 +196,11 @@ forecast.mvgam <- function(object,
 
   # The hindcast slot inside a forecast() result uses the same
   # deterministic-state convention as hindcast()
-  # (resample_innovations = FALSE) so the two surfaces agree at
+  # (process_error = FALSE) so the two surfaces agree at
   # the training grid.
   hindcasts <- build_hindcast_arms(
     object, training, type, draw_idx, obs_uncertainty,
-    resample_innovations = FALSE, resp = resp
+    process_error = FALSE, resp = resp
   )
 
   forecasts <- if (is.null(fc_grid)) {
@@ -225,7 +224,7 @@ forecast.mvgam <- function(object,
       type = type,
       draws_mat = draws_mat,
       draw_idx = draw_idx,
-      b_uncertainty = b_uncertainty,
+      coef_uncertainty = coef_uncertainty,
       trend_uncertainty = trend_uncertainty,
       obs_uncertainty = obs_uncertainty,
       series_levels = series_levels,
@@ -430,7 +429,7 @@ build_training_tail_data <- function(training, max_lag) {
 # linpred infrastructure so dpar / trials / family handling stays
 # centralised. Slices to the chosen draws.
 #
-# `resample_innovations` controls the latent-state pathway:
+# `process_error` controls the latent-state pathway:
 # FALSE uses the Stan-fitted `trend[t, s]` and `mu_trend[t, s]`
 # directly (deterministic-state hindcast); TRUE draws fresh
 # innovations from the trend's covariance and adds them on top via
@@ -442,7 +441,7 @@ build_training_tail_data <- function(training, max_lag) {
 #'@noRd
 build_hindcast_arms <- function(object, training, type, draw_idx,
                                   obs_uncertainty,
-                                  resample_innovations = FALSE,
+                                  process_error = FALSE,
                                   resp = NULL) {
   series_levels <- names(training$observations)
   out <- vector("list", length(series_levels))
@@ -476,7 +475,7 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
     }
     out[[s]] <- hindcast_one_series(
       object, sub_for_linpred, type, draw_idx, obs_uncertainty,
-      resample_innovations, resp = resp
+      process_error, resp = resp
     )
   }
   out
@@ -491,15 +490,15 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
 # family RNG via `predict_single_response`. Closure-unit
 # families keep their joint-over-unit marginalisation entries
 # through `posterior_epred` / `posterior_predict`.
-# `resample_innovations` is preserved on the signature for the
-# closure-unit branch (where it maps to `process_error` in the
-# underlying helpers); it is a no-op on the standard-family
-# branch because the per-draw conditional state already supplies
+# `process_error` is carried on the signature for the
+# closure-unit branch, which forwards it to `posterior_epred()`
+# and `posterior_predict()`. It is a no-op on the standard-family
+# branch, where the per-draw conditional state already supplies
 # the trajectory.
 #'@noRd
 hindcast_one_series <- function(object, sub_data, type, draw_idx,
                                   obs_uncertainty,
-                                  resample_innovations = FALSE,
+                                  process_error = FALSE,
                                   resp = NULL) {
   family <- if (!is.null(resp)) {
     get_family_for_resp(object, resp)
@@ -524,17 +523,17 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
       ),
       "expected" = posterior_epred(
         object, newdata = sub_data, ndraws = NULL,
-        process_error = resample_innovations, resp = resp
+        process_error = process_error, resp = resp
       ),
       "response" = if (isTRUE(obs_uncertainty)) {
         posterior_predict(
           object, newdata = sub_data, ndraws = NULL,
-          process_error = resample_innovations, resp = resp
+          process_error = process_error, resp = resp
         )
       } else {
         posterior_epred(
           object, newdata = sub_data, ndraws = NULL,
-          process_error = resample_innovations, resp = resp
+          process_error = process_error, resp = resp
         )
       }
     )
@@ -544,12 +543,12 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
     # transformed parameters). Returns NULL for trendless fits, in
     # which case the trend contribution is the zero matrix.
     draws_mat <- posterior::as_draws_matrix(object$fit)
-    trend_state <- extract_trend_latent_states(
+    fitted_states <- extract_trend_latent_states(
       mvgam_fit = object, newdata = sub_data, full_draws = draws_mat
     )
-    if (is.null(trend_state)) {
-      trend_state <- matrix(0, nrow = nrow(draws_mat),
-                              ncol = nrow(sub_data))
+    if (is.null(fitted_states)) {
+      fitted_states <- matrix(0, nrow = nrow(draws_mat),
+                               ncol = nrow(sub_data))
     }
     obs_linpred <- extract_component_linpred(
       mvgam_fit = object, newdata = sub_data,
@@ -562,10 +561,10 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
                    "'hindcast.mvgam' entry; this is an internal bug.")
       )))
     }
-    linpred <- obs_linpred + trend_state
+    linpred <- obs_linpred + fitted_states
     full <- switch(
       type,
-      "trend" = trend_state,
+      "trend" = fitted_states,
       "link" = linpred,
       "expected" = family$linkinv(linpred),
       "response" = if (isTRUE(obs_uncertainty)) {
@@ -655,7 +654,7 @@ build_trendless_forecast_arms <- function(object, fc_grid, type,
 build_forecast_arms <- function(object, trend_model, meta,
                                   training, fc_grid, type,
                                   draws_mat, draw_idx,
-                                  b_uncertainty,
+                                  coef_uncertainty,
                                   trend_uncertainty,
                                   obs_uncertainty,
                                   series_levels,
@@ -701,8 +700,8 @@ build_forecast_arms <- function(object, trend_model, meta,
   }
 
   # Pre-compute the obs-formula linpred for the forecast grid;
-  # this and the trend caches above receive the b_uncertainty
-  # toggle (collapsed to row 1 when FALSE).
+  # this and the trend caches above receive the
+  # `coef_uncertainty` toggle (collapsed to row 1 when FALSE).
   obs_full <- if (type %in% c("link", "response", "expected")) {
     extract_component_linpred(
       mvgam_fit = object, newdata = fc_grid$data,
@@ -711,7 +710,7 @@ build_forecast_arms <- function(object, trend_model, meta,
   } else {
     NULL
   }
-  if (isTRUE(!b_uncertainty)) {
+  if (isTRUE(!coef_uncertainty)) {
     if (!is.null(obs_full)) obs_full <- matrix(
       obs_full[1L, ], nrow = nrow(obs_full), ncol = ncol(obs_full),
       byrow = TRUE

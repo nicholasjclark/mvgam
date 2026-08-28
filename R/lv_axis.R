@@ -49,7 +49,7 @@
 #'   `trend_formula`. That pattern is semantically confusing on the
 #'   trend side, and the helper directs users to either
 #'   `by = lv_axis()` (for per-factor smooths) or to moving the
-#'   per-series effect into `obs_formula`.
+#'   per-series effect into the observation `formula`.
 #'
 #' @return `NULL` (invisibly). The function exists solely as a
 #'   formula sentinel.

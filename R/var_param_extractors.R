@@ -242,20 +242,17 @@ validate_var_plot_ids <- function(ids, n_proc, arg) {
 #'
 #' @param object A fitted `mvgam` object whose trend is a
 #'   VAR(1).
-#' @param group Optional integer or character. On a hierarchical
-#'   VAR fit selects the panel whose transition matrix should be
-#'   returned; leave `NULL` for the global shrinkage target
-#'   built from `Amu_trend`. Integer indices match the fitted
-#'   grouping factor's levels in the order stored on
-#'   `object$data[[gr]]`; passing a name looks the level up in
-#'   the same set. Ignored on non-hierarchical fits.
-#' @param groups Optional character or integer vector, or the
-#'   string `"all"`. On a hierarchical fit, returns a named list
-#'   of `mvgam_var_matrix` objects (one per selected panel),
-#'   classed as `mvgam_var_matrix_list` so `plot()` produces a
-#'   faceted panel (heatmap grid or per-outcome self-persistence
-#'   pointrange, see [plot.mvgam_var_matrix_list()]). Mutually
-#'   exclusive with `group`; ignored on non-hierarchical fits.
+#' @param groups Which panels of a hierarchical VAR fit to
+#'   return. `NULL` (the default) gives the global shrinkage
+#'   target built from `Amu_trend`, and is the only setting a
+#'   non-hierarchical fit accepts. Name one panel, by level name
+#'   or by integer index into the fitted grouping factor's levels
+#'   as stored on `object$data[[gr]]`, and that panel's matrix is
+#'   returned on its own. Name several, or pass `"all"`, and the
+#'   result is a named list of `mvgam_var_matrix` objects classed
+#'   as `mvgam_var_matrix_list`, so `plot()` produces a faceted
+#'   panel (heatmap grid or per-outcome self-persistence
+#'   pointrange, see [plot.mvgam_var_matrix_list()]).
 #' @param summary Logical. `TRUE` (default) returns an
 #'   `mvgam_var_matrix` object with per-cell point estimates,
 #'   credible intervals, standard errors, effective sample
@@ -271,7 +268,8 @@ validate_var_plot_ids <- function(ids, n_proc, arg) {
 #'   for the per-cell credible interval when `summary = TRUE`.
 #'   Defaults to `c(0.025, 0.975)`.
 #'
-#' @return With `summary = TRUE`, an object of class
+#' @return One matrix, or a list of them when `groups` names more
+#'   than one panel. With `summary = TRUE`, an object of class
 #'   `mvgam_var_matrix` with slots `A`, `A_se`, `A_lower`,
 #'   `A_upper`, `A_ess`, `prob_positive`, `prob_negative`,
 #'   `prob_nonzero`, `n_series`, `series_names`, `group_label`,
@@ -294,8 +292,7 @@ validate_var_plot_ids <- function(ids, n_proc, arg) {
 #'   [plot.mvgam_var_matrix()].
 #' @author Nicholas J Clark
 #' @export
-posterior_transition_matrix <- function(object, group = NULL,
-                                         groups = NULL,
+posterior_transition_matrix <- function(object, groups = NULL,
                                          summary = TRUE,
                                          robust = FALSE,
                                          probs = c(0.025, 0.975)) {
@@ -304,45 +301,44 @@ posterior_transition_matrix <- function(object, group = NULL,
   checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1,
                             any.missing = FALSE, unique = TRUE)
   probs <- sort(probs)
-  if (!is.null(group) && !is.null(groups)) {
-    stop(insight::format_error(c(
-      "Pass either 'group' or 'groups', not both.",
-      i = paste0(
-        "'group' returns a single mvgam_var_matrix; 'groups' ",
-        "returns a classed list of them."
-      )
-    )))
-  }
-  # Single-panel path (or `group` selects one): scalar return
-  if (is.null(groups)) {
+
+  one_matrix <- function(group) {
     arr <- extract_transition_matrix_draws(object, group)
     if (!summary) return(arr)
-    return(finalise_transition_matrix(
+    finalise_transition_matrix(
       arr,
       group_label = attr(arr, "group_label"),
       robust      = robust,
       probs       = probs
-    ))
+    )
   }
-  # groups path: iterate + return a classed list
+
+  # No selection asks for the global shrinkage target, which is also
+  # the only matrix a non-hierarchical fit has.
+  if (is.null(groups)) {
+    return(one_matrix(NULL))
+  }
+
   is_hier <- is_hierarchical_var(colnames(
     posterior::as_draws_matrix(object$fit)
   ))
   if (!is_hier) {
     stop(insight::format_error(c(
       "'groups' only applies to hierarchical VAR fits.",
-      i = "Use 'group = NULL' on non-hierarchical fits."
+      i = "Leave 'groups' at NULL on a non-hierarchical fit."
     )))
   }
+
   target_names <- resolve_transition_matrix_groups(object, groups)
-  out <- lapply(target_names, function(g) {
-    arr <- extract_transition_matrix_draws(object, g)
-    if (!summary) return(arr)
-    finalise_transition_matrix(
-      arr, group_label = attr(arr, "group_label"),
-      robust = robust, probs = probs
-    )
-  })
+
+  # Naming one panel answers with that panel's matrix. `"all"` is
+  # plural whatever the fit holds, so it keeps the list shape that
+  # `plot.mvgam_var_matrix_list()` facets.
+  if (length(target_names) == 1L && !identical(groups, "all")) {
+    return(one_matrix(target_names))
+  }
+
+  out <- lapply(target_names, one_matrix)
   names(out) <- target_names
   structure(out, class = "mvgam_var_matrix_list")
 }

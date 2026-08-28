@@ -336,7 +336,7 @@ test_that("hierarchical residcor falls back when factor lookup fails", {
     ),
     class = "mvgam"
   )
-  res <- residual_cor(obj, groups = TRUE)
+  res <- residual_cor(obj, by_group = TRUE)
   expect_true(all(c("group_1", "group_2") %in% names(res)))
   expect_identical(rownames(res$`_global`$cor),
                    c("subgroup_1", "subgroup_2", "subgroup_3"))
@@ -359,7 +359,7 @@ test_that("residual_cor hierarchical default returns global cor only", {
 })
 
 
-test_that("residual_cor hierarchical with groups = TRUE returns list", {
+test_that("residual_cor hierarchical with by_group = TRUE returns list", {
   cov_struct <- mk_hier_cov_struct()
   testthat::local_mocked_bindings(
     get_trend_covariance_structure = function(object) cov_struct,
@@ -385,7 +385,7 @@ test_that("residual_cor hierarchical with groups = TRUE returns list", {
     ),
     class = "mvgam"
   )
-  res <- residual_cor(obj, groups = TRUE)
+  res <- residual_cor(obj, by_group = TRUE)
   expect_type(res, "list")
   expect_true("_global" %in% names(res))
   expect_true(all(c("g1", "g2") %in% names(res)))

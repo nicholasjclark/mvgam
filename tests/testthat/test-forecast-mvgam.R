@@ -7,7 +7,7 @@
 # them via `local_mocked_bindings()` and assert on:
 #   * mvgam_forecast class shape (10 fields, list-of-matrices
 #     for hindcasts / forecasts).
-#   * uncertainty-toggle semantics (b_uncertainty,
+#   * uncertainty-toggle semantics (coef_uncertainty,
 #     trend_uncertainty, obs_uncertainty).
 #   * newdata-handling edge cases (NULL, no-novel-times,
 #     unseen-series error).

@@ -317,6 +317,13 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > `tweedie()` is never fitted; the five multi-response families are
   > fitted but barely inspected; offsets and new-level prediction have
   > no coverage. Six fixtures have no builder.
+  >
+  > Found while renaming it in 13.0, and pre-existing:
+  > `summary(include_trend_states = TRUE)` returns the same rows as
+  > `FALSE` on `val_mvgam_ar1_int`. `is_trend_state_param()` itself
+  > answers correctly, so the states are being filtered out somewhere
+  > downstream of the switch rather than by it. Nothing covers the
+  > `TRUE` branch beyond checking that the call runs.
 
 - [x] **4.0 The likelihood was scored on the wrong surface**
   > The `loo_R2` failure and the `p_loo` question were one cause.
@@ -362,63 +369,89 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > code and `recompile = FALSE` is right to refuse. They clear when
   > the fixtures are rebuilt.
 
-- [ ] **13.0 One idea, one name**
+- [x] **13.0 One idea, one name**
   > A survey of the exported surface against the conventions the
   > architecture doc records. The prior work fixed the cases where a
-  > name hid a wrong number; these are the ones where it hides a
-  > second meaning. Already done: `by_species` became `by_series`,
-  > `coef(summarise =)` became `summary`, and the two Stan dimensions
-  > `n_features` and `n_change_trend` took the `N_` capital.
+  > name hid a wrong number; these were the ones where it hid a
+  > second meaning.
   >
-  > Three tokens carry two meanings. `latent_state` is the
-  > closure-unit quantity everywhere except `summary.mvgam()`, where
-  > `include_states` and `is_latent_state_param()` mean the trend
-  > state. `trend_state` is the surface selector on the `posterior_*`
-  > methods and also a local holding state draws in
-  > `forecast.mvgam()` and `index-mvgam.R`. `trend_model` is a
-  > constructor when passed, a character type name on a trend spec,
-  > and a `brmsfit` on the fitted object, so `mod$trend_model` is
-  > nothing like what the user handed to `sim_mvgam()`.
+  > The prediction surface was selected by two independent things
+  > wearing five names between them. One axis picks whether a
+  > prediction reads the state the model inferred or answers from the
+  > two submodels' covariate structure; the other picks whether the
+  > second of those samples innovations. `incl_autocor` is now the
+  > first everywhere it can be chosen and `process_error` the second,
+  > with `trend_state` demoted to the internal name
+  > `get_combined_linpred()` reads and one function translating
+  > between them. `predict()` and `fitted()` had hidden the surface
+  > in `...`; both now name it.
   >
-  > The surface selector itself is spelled five ways across the
-  > methods that offer it: `incl_autocor`, `trend_state`,
-  > `process_error`, the superseded `incl_dynamics`, and
-  > `resample_innovations`, which `forecast.mvgam()` forwards
-  > verbatim as `process_error`. A sixth, `incl_latent_state`, is
-  > internal. Worse than the spelling, the defaults disagree between
-  > entry points that call each other: `predict()` defaults `FALSE`
-  > and calls `posterior_predict()`, which defaults `TRUE`, so the
-  > two answer differently on the same fit with no argument given.
+  > The defaults disagreed where it mattered most. `predict()`
+  > defaulted `process_error = FALSE` and forwarded to
+  > `posterior_predict()`, which defaulted `TRUE`, so one fit gave
+  > two answers with no argument given. All five prediction entry
+  > points now default `FALSE`, which is the counterfactual reading
+  > decision 22 assigns them; the ELPD surfaces keep
+  > `incl_autocor = TRUE`, which is the conditional one. A test
+  > asserts both sets of defaults, so a sixth entry point cannot be
+  > added on its own terms.
   >
-  > `groups` means a character vector of levels on `ranef()`, a
-  > logical on `residual_cor()`, and a character vector or `"all"` on
-  > `posterior_transition_matrix()`, which also takes `group` as a
-  > mutually exclusive second spelling. `alpha` means a pinball
-  > quantile level, an SVD variance split and a credible mass in
-  > three different methods.
+  > Four documented behaviours were not the code's. `fitted()`,
+  > `predict()`, `conditional_effects()` and the marginaleffects
+  > section each said `process_error = FALSE` fixes the trend at its
+  > posterior mean; it removes the latent state and leaves every
+  > coefficient varying. `posterior_linpred()` said innovations are
+  > added only by `posterior_predict()`. `obs_formula` was documented
+  > in `lv_axis.R` and `data_helpers.R` as an argument neither
+  > `mvgam()` nor `jsdgam()` has. The docs now also say when the
+  > default surface has little to show, and point at `hindcast()` and
+  > `forecast()` for a fit whose covariates carry little signal.
   >
-  > Two names describe the wrong thing. `b_uncertainty` collapses
-  > every source of coefficient variation, smooths and random effects
-  > included, which its own documentation admits. `process_error =
-  > FALSE` does not fix the trend at its posterior mean, which is
-  > what `fitted()` still claims at `R/fitted.R:62`; it removes the
-  > latent state entirely, and the same paragraph's claim that
-  > innovations are added only by `posterior_predict()` is untrue of
-  > `posterior_epred()`. `obs_formula` is documented in `lv_axis.R`
-  > and `data_helpers.R` as an argument neither `mvgam()` nor
-  > `jsdgam()` has.
+  > The rest were one token carrying two meanings.
+  > `summary(include_states =)` became `include_trend_states` and
+  > `is_latent_state_param()` became `is_trend_state_param()`, since
+  > `latent_state` is the closure-unit quantity everywhere else. A
+  > `trend_state` local in `forecast.mvgam()` became
+  > `fitted_states`. `residual_cor(groups =)` became `by_group`,
+  > being a logical where `groups` is a character vector elsewhere.
+  > `posterior_transition_matrix()` had `group` and `groups` as
+  > mutually exclusive spellings and now takes `groups` alone,
+  > returning one matrix for one panel and the classed list for
+  > several. `score(alpha =)` became `quantile_level`.
+  > `forecast(b_uncertainty =)` became `coef_uncertainty`, since it
+  > fixes smooths, random effects and GP bases as well as `b`.
+  >
+  > Two collisions were left alone on purpose, both being another
+  > package's contract rather than mvgam's: `ranef(groups =)` and
+  > `hypothesis(alpha =)` are spelled and used exactly as brms
+  > spells them, and `ordinate(alpha =)` follows the BORAL
+  > convention its own documentation cites.
+  >
+  > The architecture doc's decision 22 records the two axes and the
+  > single translation. Decisions 4, 5 and 8 showed pre-split
+  > lowercase Stan dimensions in their code blocks; those now match
+  > what the assembler emits.
+
+- [ ] **13.1 The migration the names still need**
+  > Deferred from 13.0 because each renames something a fitted object
+  > carries, so cached fixtures stop being readable until they are
+  > rebuilt. Belongs with 5.0's refit rather than ahead of it.
+  >
+  > `trend_model` means three things. It is a constructor when passed
+  > (`sim_mvgam(trend_model = AR())`), a character type name on a
+  > trend spec, and a `brmsfit` on the fitted object: `class(
+  > fit$trend_model)` is `"brmsfit"`, the trend-side prefit, across
+  > 74 read sites. `tidier_methods.R:170` reaches
+  > `x$trend_model$trend_model`, which is the collision in one
+  > expression. `trend_prefit` is the name that describes the slot.
   >
   > Three Stan names still break the `_trend` suffix rule:
-  > `time_dis`, `theta_features` and `varrho_inv`. These were left
-  > alone deliberately. `time_dis` reaches into the compiled C++
-  > signatures in `RcppExports.R`, and the other two are parameters,
-  > so renaming them changes posterior column names and every fit
-  > carrying a structured loadings prior stops being readable. That
-  > is a migration with a fixture rebuild behind it, not a tidy-up.
-  > `N_free_Z` puts its qualifier before the noun where every sibling
-  > puts it after. The architecture doc's own decision 4 and 8 code
-  > blocks still show the pre-split lowercase dimensions that
-  > decision 5 forbids.
+  > `time_dis`, `theta_features` and `varrho_inv`. `time_dis` reaches
+  > into the compiled C++ signatures in `RcppExports.R`, and the
+  > other two are parameters, so renaming them changes posterior
+  > column names and every fit carrying a structured loadings prior
+  > stops being readable. `N_free_Z` puts its qualifier before the
+  > noun where every sibling puts it after.
 
 - [ ] **5.0 Rebuild every vignette and the pkgdown site**
   > Caches date from June and July, before the prior and default

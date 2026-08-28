@@ -10,7 +10,7 @@
   ...,
   type = c("response", "link", "expected", "trend"),
   ndraws = NULL,
-  b_uncertainty = TRUE,
+  coef_uncertainty = TRUE,
   trend_uncertainty = TRUE,
   obs_uncertainty = TRUE,
   resp = NULL
@@ -42,13 +42,12 @@ scale.}
 \item{ndraws}{Optional integer; the number of posterior draws
 to use. Defaults to all available draws.}
 
-\item{b_uncertainty}{Logical. When \code{FALSE}, every forecast
-draw uses the first posterior draw of all observation- and
-trend-formula regression coefficients. This includes fixed
-effects, smooth bases, random effect levels, and
-Hilbert-space \code{gp(x, k)} bases -- collapsing every source
-of regression-coefficient variation, not only the global
-\code{b} coefficients. Defaults to \code{TRUE}.}
+\item{coef_uncertainty}{Logical. When \code{FALSE}, every forecast
+draw uses the first posterior draw of every coefficient in
+the observation and trend formulas: fixed effects, smooth
+bases, random effect levels and Hilbert-space \code{gp(x, k)}
+bases alike, not only the population-level \code{b}. Defaults to
+\code{TRUE}.}
 
 \item{trend_uncertainty}{Logical. When \code{FALSE}, every
 forecast draw uses the first posterior draw of all

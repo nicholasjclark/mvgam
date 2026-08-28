@@ -34,14 +34,15 @@ score <- function(object, ...) UseMethod("score")
 #'   \item{`"drps"`}{Discrete Ranked Probability Score; CRPS
 #'     specialised to count outcomes.}
 #'   \item{`"sis"`}{Scaled Interval Score; width of the central
-#'     PI plus an `alpha`-scaled penalty for misses.}
+#'     PI plus a penalty for misses scaled by its miscoverage
+#'     rate, `1 - interval_width`.}
 #'   \item{`"brier"`}{Mean squared error of draws against
 #'     truth; canonical for binary outcomes.}
 #'   \item{`"logs"`}{Logarithmic score `-log f(y)` via a kernel
 #'     density estimate; bridges to ELPD / LOO.}
 #'   \item{`"dss"`}{Dawid-Sebastiani score: cheap moment-based
 #'     proper score depending only on predictive mean / SD.}
-#'   \item{`"qs"`}{Quantile (pinball) loss at level `alpha`.}
+#'   \item{`"qs"`}{Quantile (pinball) loss at `quantile_level`.}
 #'   \item{`"twcrps"`}{Threshold-weighted CRPS focusing scoring
 #'     on the `[lower, upper]` region.}
 #'   \item{`"energy"`}{Multivariate Energy score across series.}
@@ -57,7 +58,10 @@ score <- function(object, ...) UseMethod("score")
 #' @param interval_width Central PI width used by every scorer
 #'   for the per-series `in_interval` indicator (and the SIS
 #'   penalty width).
-#' @param alpha Quantile level for `"qs"` (default median).
+#' @param quantile_level Quantile the `"qs"` pinball loss is
+#'   taken at. Defaults to `0.5`, the median. Unrelated to the
+#'   central interval the other scorers use, which
+#'   `interval_width` sets.
 #' @param lower,upper Threshold bounds for `"twcrps"` /
 #'   `"twenergy"`. Defaults `-Inf` / `Inf` recover the
 #'   unweighted scores.
@@ -118,7 +122,7 @@ score <- function(object, ...) UseMethod("score")
 score.mvgam_forecast <- function(object,
                                    score = "crps",
                                    interval_width = 0.9,
-                                   alpha = 0.5,
+                                   quantile_level = 0.5,
                                    lower = -Inf,
                                    upper = Inf,
                                    log = FALSE,
@@ -131,7 +135,7 @@ score.mvgam_forecast <- function(object,
   score <- match.arg(score, c(univariate, multivariate))
   checkmate::assert_number(interval_width,
                              lower = 0.05, upper = 0.95)
-  checkmate::assert_number(alpha, lower = 0, upper = 1)
+  checkmate::assert_number(quantile_level, lower = 0, upper = 1)
   checkmate::assert_number(lower)
   checkmate::assert_number(upper)
   checkmate::assert_flag(log)
@@ -144,7 +148,8 @@ score.mvgam_forecast <- function(object,
     return(score_univariate(
       object, series_names, score,
       interval_width = interval_width,
-      alpha = alpha, lower = lower, upper = upper, log = log
+      quantile_level = quantile_level, lower = lower,
+      upper = upper, log = log
     ))
   }
 
@@ -204,7 +209,7 @@ validate_scoreable_forecast <- function(object, score) {
 # aggregate.
 #'@noRd
 score_univariate <- function(object, series_names, score,
-                               interval_width, alpha, lower,
+                               interval_width, quantile_level, lower,
                                upper, log) {
   series_score <- lapply(series_names, function(lv) {
     truth <- object$test_observations[[lv]]
@@ -216,7 +221,8 @@ score_univariate <- function(object, series_names, score,
     kernel_out <- dispatch_univariate_score(
       score, truth, fc,
       interval_width = interval_width,
-      alpha = alpha, lower = lower, upper = upper, log = log
+      quantile_level = quantile_level, lower = lower,
+      upper = upper, log = log
     )
     data.frame(
       score = as.numeric(kernel_out[, "score"]),
@@ -374,7 +380,7 @@ empty_multivariate_df <- function(score, interval_width) {
 # kernel with only the args it consumes -- no unused-arg leakage.
 #'@noRd
 dispatch_univariate_score <- function(score, truth, fc,
-                                        interval_width, alpha,
+                                        interval_width, quantile_level,
                                         lower, upper, log) {
   switch(
     score,
@@ -390,7 +396,7 @@ dispatch_univariate_score <- function(score, truth, fc,
     "brier" = brier_mcmc_object(truth, fc),
     "logs" = logs_mcmc_object(truth, fc),
     "dss" = dss_mcmc_object(truth, fc),
-    "qs" = qs_mcmc_object(truth, fc, alpha = alpha),
+    "qs" = qs_mcmc_object(truth, fc, quantile_level = quantile_level),
     "twcrps" = twcrps_mcmc_object(
       truth, fc, lower = lower, upper = upper
     )

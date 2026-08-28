@@ -230,23 +230,23 @@ test_that("DSS matches its analytic formula on Gaussian draws", {
 test_that("Quantile score is 0 when truth equals the alpha quantile", {
   fc <- matrix(seq.int(1L, 100L), nrow = 100L, ncol = 1L)
   # 0.5 quantile of 1..100 is 50.5; pick truth at the median.
-  out <- qs_mcmc_object(truth = 50.5, fc = fc, alpha = 0.5)
+  out <- qs_mcmc_object(truth = 50.5, fc = fc, quantile_level = 0.5)
   # Pinball at the alpha-quantile is identically zero.
   expect_lt(as.numeric(out[1, "score"]), 1e-8)
 })
 
 
-test_that("Quantile score differs across alpha and is finite-positive", {
+test_that("Quantile score differs across levels and is finite-positive", {
   # When truth lies in the upper tail, the 0.95-quantile pinball
   # loss applies the larger asymmetric weight (0.95 vs 0.05),
   # so QS_0.95 is the larger of the two. Asserting that
   # direction confirms the pinball loss is computed with the
-  # correct asymmetric weighting (alpha * positive_residual +
-  # (1 - alpha) * negative_residual).
+  # correct asymmetric weighting (q * positive_residual +
+  # (1 - q) * negative_residual).
   fc <- matrix(stats::rnorm(1000L), nrow = 1000L, ncol = 1L)
   truth <- 3
-  s_lower <- qs_mcmc_object(truth, fc, alpha = 0.05)
-  s_upper <- qs_mcmc_object(truth, fc, alpha = 0.95)
+  s_lower <- qs_mcmc_object(truth, fc, quantile_level = 0.05)
+  s_upper <- qs_mcmc_object(truth, fc, quantile_level = 0.95)
   expect_true(all(is.finite(c(as.numeric(s_lower[1, "score"]),
                               as.numeric(s_upper[1, "score"])))))
   expect_true(as.numeric(s_upper[1, "score"]) >

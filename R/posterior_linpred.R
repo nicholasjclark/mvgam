@@ -9,6 +9,26 @@
 NULL
 
 
+#' Translate the user-facing surface selector to the internal one
+#'
+#' `incl_autocor` is how every user-facing method spells the choice of
+#' prediction surface; `trend_state` is the name
+#' `get_combined_linpred()` reads. Translating in one place keeps the
+#' two from drifting apart, which is how a method came to offer the
+#' choice under two spellings whose defaults disagreed.
+#'
+#' @param incl_autocor Logical; `TRUE` conditions on the fitted latent
+#'   state, `FALSE` answers from the deterministic submodels.
+#'
+#' @return Either `"conditional"` or `"marginal"`.
+#'
+#' @noRd
+autocor_to_trend_state <- function(incl_autocor) {
+  checkmate::assert_logical(incl_autocor, len = 1L, any.missing = FALSE)
+  if (isTRUE(incl_autocor)) "conditional" else "marginal"
+}
+
+
 #' Get Combined Linear Predictor
 #'
 #' Extracts and combines observation and trend linear predictors from an
@@ -229,27 +249,7 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #'   [posterior_epred.mvgam()] for `E[Y]`. Mirrors the `transform`
 #'   argument of [brms::posterior_linpred()], which sets `dpar = "mu"`
 #'   and answers on the response scale.
-#' @param process_error Logical; if TRUE (default), the trend
-#'   contributes a sampled innovation from its covariance structure on
-#'   top of its deterministic submodel, which is what makes the
-#'   predictor marginal over the trend dynamics. If FALSE the
-#'   deterministic submodel contributes alone. Either way the
-#'   submodel's own draws ride through per draw, so `FALSE` is not a
-#'   collapse to a posterior mean. Read only under
-#'   `trend_state = "marginal"`, since a conditional read takes the
-#'   state the model inferred and has no innovation to sample.
-#'
-#'   The innovations are drawn afresh on each call, so two calls on
-#'   one fit differ; set a seed for a reproducible answer. For the
-#'   fitted latent state at the training grid use [hindcast()], and
-#'   for one extrapolated beyond it [forecast()].
-#' @param trend_state Which trend contribution the prediction carries.
-#'   `"marginal"`, the default, integrates over the trend dynamics and
-#'   is the semantic this method documents. `"conditional"` reads the
-#'   latent state the model inferred at each time instead, which is
-#'   what the `loo_*` wrappers ask for so that a prediction and the
-#'   importance weights it is paired with describe the same
-#'   observation. See [hindcast.mvgam()] for the state-aware surface.
+#' @inheritParams posterior_epred.mvgam
 #' @param ndraws Positive integer specifying number of posterior draws to
 #'   use. NULL (default) uses all available draws. Mutually exclusive
 #'   with `draw_ids`; supply one or the other.
@@ -292,20 +292,13 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #' For models without a trend component (trend_formula = NULL), behavior
 #' matches [brms::posterior_linpred()].
 #'
-#' The \code{process_error} argument controls uncertainty propagation:
-#' \itemize{
-#'   \item TRUE: Full posterior uncertainty from both observation and
-#'     trend parameters (per-draw variation). Does NOT add sampled
-#'     stochastic innovations; the linpred remains a deterministic
-#'     function of the parameters at each draw.
-#'   \item FALSE: Trend fixed at posterior mean; only observation
-#'     uncertainty propagated (faster but understates total uncertainty).
-#' }
-#'
-#' If you want predictive samples that include the unobserved
-#' stochastic component of the latent trend (state-space process
-#' noise), use [posterior_predict.mvgam()], the only entry
-#' point that adds sampled innovations on top of the linear predictor.
+#' Innovations are sampled once, on the linear predictor, so
+#' `process_error = TRUE` here carries the same state that
+#' [posterior_epred.mvgam()] and [posterior_predict.mvgam()] carry
+#' under that setting; the latter two then apply the inverse link and
+#' the observation family on top. Under `FALSE` the predictor still
+#' varies draw to draw, because every coefficient in both submodels
+#' does; what it leaves out is the latent process.
 #'
 #' @seealso [brms::posterior_linpred()] for the brms generic,
 #'   [posterior_epred.mvgam()] for expected values on response scale,
@@ -341,9 +334,8 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #' @export
 posterior_linpred.mvgam <- function(object, transform = FALSE,
                                     newdata = NULL,
-                                    process_error = TRUE,
-                                    trend_state = c("marginal",
-                                                     "conditional"),
+                                    process_error = FALSE,
+                                    incl_autocor = FALSE,
                                     ndraws = NULL,
                                     draw_ids = NULL,
                                     re_formula = NULL,
@@ -356,7 +348,7 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_flag(transform)
   checkmate::assert_logical(process_error, len = 1)
-  trend_state <- match.arg(trend_state)
+  trend_state <- autocor_to_trend_state(incl_autocor)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,
                                 any.missing = FALSE)
   checkmate::assert_string(dpar, null.ok = TRUE)

@@ -55,7 +55,7 @@ mvgam(y ~ x1 + x2, trend_formula = ~ AR(), data = data)
 
 **Implementation**:
 - `extract_and_rename_trend_parameters()` in `R/stan_assembly.R`: Processes brms trend models and renames all parameters/data with `_trend` suffix
-- `create_times_trend_matrix()`: Generates 2D integer arrays using explicit Stan syntax `int times_trend[n_time, n_series];`  
+- `create_times_trend_matrix()`: Generates 2D integer arrays using explicit Stan syntax `array[N_time_trend, N_series_trend] int times_trend;`  
 - Stanvars collection architecture: Returns proper brms `stanvars` collections compatible with `c()` combination method
 - Reserved word filtering: Excludes 432 Stan reserved words from renaming
 
@@ -173,7 +173,7 @@ mu_biomass += mu_biomass_trend;
 
 The key inferential property is `E(Delta) = tr(Psi^2) * Phi`, where `Delta = Z * Z'` is the prior expected shared variation matrix among series (Heaps Sect. 3). `Phi` is therefore proportional to the prior expectation of an observable, interpretable quantity (the cross-series covariance pattern induced by the latent factors), not the latent loadings themselves. Encoding domain knowledge into `Phi` shapes the prior on the observable rather than on a rotation-arbitrary latent object. Length-scales receive a default `lognormal(0, 1)` prior on the auto-standardised distance scale (pairwise matrices are rescaled so `max(d) = 1` inside the normaliser), matching Heaps' practice across the simulation (Sect. 6.1.2) and gas-demand (Sect. 6.3.1) applications. Combination with `trend_map` is rejected: a partial or fully-fixed loadings matrix has no free parameters left for a structured prior.
 
-**Closure-unit grouping cardinality**: Closure-unit families default to a 2-column `(series, time)` grouping. `occ(multi_season = TRUE)` and `nmix(multi_season = TRUE)` opt into 3-column `(series, site, time)` via `attr(family, "mvgam_unit_grouping")`; `prepare_closure_unit_family()` threads it through both the validator and the array builder. The factor model architecture is unchanged: `Z` stays `[N_species, n_lv]`, `lv_trend` stays `[N_time_trend, n_lv]` and the trend pipeline operates on the season axis. Per-site variation enters via the obs-formula, preserving the "trends only on `mu`" rule.
+**Closure-unit grouping cardinality**: Closure-unit families default to a 2-column `(series, time)` grouping. `occ(multi_season = TRUE)` and `nmix(multi_season = TRUE)` opt into 3-column `(series, site, time)` via `attr(family, "mvgam_unit_grouping")`; `prepare_closure_unit_family()` threads it through both the validator and the array builder. The factor model architecture is unchanged: `Z` stays `[N_species, N_lv_trend]`, `lv_trend` stays `[N_time_trend, N_lv_trend]` and the trend pipeline operates on the season axis. Per-site variation enters via the obs-formula, preserving the "trends only on `mu`" rule.
 
 ### 3. Code Deduplication for User Extensibility
 
@@ -519,12 +519,12 @@ Trend parameters (variances, ar parameters, etc..) must avoid naming conflicts w
 **Naming Convention**:
 ```r
 // Trend variance parameters - use _trend suffix
-vector<lower=0>[n_lv] sigma_trend;     // Univariate trend variances
-matrix[n_lv, n_lv] Sigma_trend;        // Multivariate trend covariance
+vector<lower=0>[N_lv_trend] sigma_trend;          // Univariate trend variances
+matrix[N_lv_trend, N_lv_trend] Sigma_trend;      // Multivariate trend covariance
 
 // NOT allowed - conflicts with brms parameters
-vector<lower=0>[n_lv] sigma;           // CONFLICTS with gaussian family
-matrix[n_lv, n_lv] Sigma;              // CONFLICTS with multivariate families
+vector<lower=0>[N_lv_trend] sigma;               // CONFLICTS with gaussian family
+matrix[N_lv_trend, N_lv_trend] Sigma;            // CONFLICTS with multivariate families
 ```
 
 **Standardized Parameter Names**:
@@ -643,8 +643,8 @@ valid_blocks <- c("tparameters", "transformed_parameters", "tdata", "transformed
 **Stage 1: Trend Value Computation** (in transformed parameters block):
 ```r
 // Universal computation for ALL trend models:
-for (i in 1:n_trend) {
-  for (s in 1:n_lv_trend) {
+for (i in 1:N_time_trend) {
+  for (s in 1:N_series_trend) {
     trend[i, s] = dot_product(Z[s, :], lv_trend[i, :]) + mu_trend[times_trend[i, s]];
   }
 }
@@ -1098,7 +1098,11 @@ intentional, and the wrong choice will silently mislead.
 deterministic submodel plus a state drawn per posterior draw from
 the distribution it settles into, re-sampled on every call under
 `process_error = TRUE`, so the answer does not depend on which
-time it is asked at.
+time it is asked at. Under the default `FALSE` the submodel
+contributes alone. That is the right reading for a covariate
+effect and the wrong one for a fit whose covariates carry little
+of the signal, where `hindcast()` and `forecast()` are what to
+reach for.
 
 What it settles into is the stationary distribution, not one
 innovation: an AR(1) at `sigma^2 / (1 - ar^2)`, which is the same
@@ -1140,7 +1144,8 @@ weights meet draws, both halves come from the same surface,
 including the `loo_*` prediction trio and `pp_check()`'s
 `loo_pit*` types. And the conditional read has one
 implementation: `get_combined_linpred(trend_state =
-"conditional")`, reached through the `posterior_*` methods. A
+"conditional")`, reached through the `posterior_*` methods under
+`incl_autocor = TRUE`. A
 second copy of it drifted from the first once already.
 
 **Diagnostics name their surface through one helper**,
@@ -1150,11 +1155,16 @@ importance weights are involved. `residuals()`, `pp_check()` and
 `predictive_error()` all route through it, so the same fit cannot
 report two pictures of its own in-sample uncertainty.
 
-**Argument names**: `incl_autocor` on `log_lik()` / `loo()` /
-`waic()`, `trend_state` on the `posterior_*` methods (default
-`"marginal"`). `process_error` and `incl_dynamics` are the
-superseded spellings, still accepted, and lose when both are
-given.
+**Argument names**: two axes, one spelling each. `incl_autocor`
+picks the surface on every method that offers a choice, defaulting
+`FALSE` on the prediction methods and `TRUE` on `log_lik()` /
+`loo()` / `waic()`. `process_error` decides whether the marginal
+surface samples innovations, and defaults `FALSE` everywhere, so
+`predict()` and the method it forwards to answer alike.
+`trend_state` is the internal name `get_combined_linpred()` reads;
+`autocor_to_trend_state()` is the one translation between them.
+`incl_dynamics` is the superseded 1.x spelling, still accepted on
+the ELPD surfaces, and loses when both are given.
 
 **Caveat**: PSIS-LOO is optimistic for a state-space fit on
 either surface, because leaving out `y[t]` does not remove its
