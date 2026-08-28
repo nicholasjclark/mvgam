@@ -286,15 +286,7 @@ generate_trend_priors <- function(trend_spec, data, response_names = NULL) {
           )))
         }
 
-        # Add _trend suffix to all classes except sigma (which conflicts with trend constructor)
-        # and exclude sigma entirely to prevent conflicts
-        mask <- base_priors$class != "" & base_priors$class != "sigma"
-        base_priors$class[mask] <- paste0(base_priors$class[mask], "_trend")
-
-        # Remove sigma rows to prevent conflicts with trend constructor sigma_trend
-        base_priors <- base_priors[base_priors$class != "sigma", , drop = FALSE]
-
-        prior_list$base <- base_priors
+        prior_list$base <- suffix_trend_prior_classes(base_priors)
       }
     }
   }
@@ -938,6 +930,15 @@ assemble_stored_prior_table <- function(obs_priors, trend_priors,
 #' uses the same convention as `get_prior.mvgam_formula()`. Rows already
 #' suffixed (mvgam-injected stanvars) are left untouched.
 #'
+#' The trend submodel is handed to brms as a gaussian, so brms returns
+#' a `sigma` row carrying its own residual-scale default. The trend's
+#' process noise is `sigma_trend`, which the Stan generator samples
+#' under `common_trend_priors` and which reaches the stored table from
+#' the compiled code via `lift_mvgam_stanvar_priors()`. Suffixing
+#' brms's row would file its value under mvgam's name, so it is
+#' dropped. A row scoped to a coefficient belongs to a distributional
+#' sub-formula and is kept.
+#'
 #' @param trend_priors A brmsprior data frame or NULL.
 #' @return The same brmsprior with `class` re-suffixed, or NULL if
 #'   `trend_priors` is NULL / empty.
@@ -945,10 +946,33 @@ assemble_stored_prior_table <- function(obs_priors, trend_priors,
 add_trend_suffix_to_priors <- function(trend_priors) {
   checkmate::assert_class(trend_priors, "brmsprior", null.ok = TRUE)
   if (is.null(trend_priors) || nrow(trend_priors) == 0L) return(NULL)
-  needs_suffix <- !grepl("_trend$", trend_priors$class)
-  trend_priors$class[needs_suffix] <-
-    paste0(trend_priors$class[needs_suffix], "_trend")
-  structure(trend_priors, class = c("brmsprior", "data.frame"))
+  out <- suffix_trend_prior_classes(trend_priors)
+  structure(out, class = c("brmsprior", "data.frame"))
+}
+
+
+#' Suffix a trend-side prior table's classes with `_trend`
+#'
+#' The one implementation of that rule. It was written twice, and the
+#' copies drifted: one dropped brms's residual-scale `sigma` row but
+#' would suffix an already-suffixed class twice, the other guarded the
+#' double suffix but turned an empty class into `"_trend"` and filed
+#' brms's `sigma` value under mvgam's `sigma_trend`.
+#'
+#' @param priors A prior table carrying a `class` column.
+#' @return The same table, minus brms's bookkeeping `sigma` row, with
+#'   every remaining unsuffixed non-empty class suffixed.
+#' @noRd
+suffix_trend_prior_classes <- function(priors) {
+  if (is.null(priors) || nrow(priors) == 0L) return(priors)
+  coefs <- priors$coef %||% rep("", nrow(priors))
+  bookkeeping_sigma <- priors$class == "sigma" & !nzchar(coefs)
+  priors <- priors[!bookkeeping_sigma, , drop = FALSE]
+  if (nrow(priors) == 0L) return(priors)
+  needs_suffix <- nzchar(priors$class) & !grepl("_trend$", priors$class)
+  priors$class[needs_suffix] <-
+    paste0(priors$class[needs_suffix], "_trend")
+  priors
 }
 
 

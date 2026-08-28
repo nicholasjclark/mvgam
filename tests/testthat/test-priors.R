@@ -1008,3 +1008,64 @@ test_that("a user prior on the trend correlation reaches the model", {
   expect_true(grepl("L_Omega_trend ~ lkj_corr_cholesky(9)",
                      prior_code(mf, poisson(), pr = user), fixed = TRUE))
 })
+
+
+test_that("brms's trend-side sigma is not filed under sigma_trend", {
+  # The trend submodel goes to brms as a gaussian, so brms hands back
+  # a `sigma` row carrying its own student_t(3, 0, 2.5). That residual
+  # scale is bookkeeping; the trend's process noise is `sigma_trend`,
+  # which the Stan generator samples under `common_trend_priors` and
+  # which reaches the stored table from the compiled code. Suffixing
+  # brms's row filed its value under mvgam's name, so a fitted model
+  # reported a prior it never sampled under and `update()` fed that
+  # back, re-specifying the model.
+  trend_priors <- brms::prior_string("student_t(3, 0, 2.5)",
+                                      class = "sigma")
+  out <- add_trend_suffix_to_priors(trend_priors)
+  expect_equal(nrow(out), 0L)
+  expect_false(any(grepl("student_t", out$prior)))
+
+  # `suffix_trend_prior_classes()` is the one implementation of the
+  # rule; both callers reach the same answer.
+  expect_equal(nrow(suffix_trend_prior_classes(trend_priors)), 0L)
+})
+
+
+test_that("suffix_trend_prior_classes carries both guards", {
+  # The rule was written twice and the copies drifted: one turned an
+  # empty class into "_trend", the other suffixed an already-suffixed
+  # class twice.
+  empty_class <- brms::prior_string("normal(0, 1)", class = "b")
+  empty_class$class <- ""
+  expect_equal(suffix_trend_prior_classes(empty_class)$class, "")
+
+  already <- brms::prior_string("exponential(2)", class = "sigma_trend")
+  expect_equal(suffix_trend_prior_classes(already)$class, "sigma_trend")
+})
+
+
+test_that("add_trend_suffix_to_priors leaves other classes alone", {
+  trend_priors <- rbind(
+    brms::prior_string("normal(0, 1)", class = "b"),
+    brms::prior_string("student_t(3, 0, 2.5)", class = "sds")
+  )
+  out <- add_trend_suffix_to_priors(trend_priors)
+  expect_equal(sort(out$class), c("b_trend", "sds_trend"))
+  expect_equal(sort(out$prior),
+               sort(c("normal(0, 1)", "student_t(3, 0, 2.5)")))
+  # A row already suffixed is not suffixed twice.
+  already <- brms::prior_string("exponential(2)", class = "sigma_trend")
+  expect_equal(add_trend_suffix_to_priors(already)$class, "sigma_trend")
+})
+
+
+test_that("a coef-scoped sigma row is not mistaken for the bookkeeping one", {
+  # Only the bare `sigma` row is brms's residual scale. A row scoped
+  # to a coefficient belongs to a distributional sub-formula and keeps
+  # whatever the user or brms set.
+  scoped <- brms::prior_string("normal(0, 3)", class = "sigma",
+                                coef = "x")
+  out <- add_trend_suffix_to_priors(scoped)
+  expect_equal(out$prior, "normal(0, 3)")
+  expect_equal(out$class, "sigma_trend")
+})

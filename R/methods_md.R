@@ -1383,8 +1383,7 @@ mv_custom_glossary <- function(obj) {
       ),
       paste0(
         "- $\\boldsymbol{\\Sigma}$: joint residual covariance, ",
-        "$\\text{diag}(\\boldsymbol{\\Psi})\\, L_\\Omega L_\\Omega^\\top\\,",
-        "\\text{diag}(\\boldsymbol{\\Psi})$"
+        "$\\text{diag}(\\boldsymbol{\\Psi}^2)$"
       )
     )
     if (identical(kind, "mvt")) {

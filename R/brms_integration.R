@@ -556,6 +556,92 @@ inject_obs_zero_placeholder <- function(formula, data, prior) {
 #'
 #' @return The merged `brmsprior` with mvgam-side rows appended.
 #' @noRd
+# Parameters mvgam injects that do not carry the `_trend` suffix.
+# Everything else it emits is suffixed, so the two rules together name
+# the whole mvgam-side surface without naming any brms parameter.
+mvgam_unsuffixed_params <- c(
+  "Z", "Z_free_vec", "Psi", "varrho_inv", "theta_features"
+)
+
+
+# The latent states. Their sampling statements are the trend equation
+# and the non-centred reparameterisation it is written under, not
+# priors a user set or could change.
+mvgam_state_params <- c(
+  "trend", "lv_trend", "lv_trend_tilde",
+  "innovations_trend", "scaled_innovations_trend"
+)
+
+
+#' Read every mvgam prior statement out of an assembled Stan model
+#'
+#' The compiled code is what the sampler ran, so a prior table read
+#' from it cannot disagree with what the model sampled. Two emission
+#' forms appear: `x ~ dist(args);` and the `target += dist_lpdf(x |
+#' args)` an mvgam stanvar writes when it also adds a Jacobian or a
+#' truncation term. A container call on the left, as in
+#' `to_vector(Z) ~ student_t(3, 0, 0.5)`, is unwrapped to the
+#' parameter it holds.
+#'
+#' The latent states are excluded. `innovations_trend` carries a
+#' `std_normal()` because the trend is written non-centred, so that
+#' statement is a reparameterisation rather than a prior anyone set,
+#' and the state paths are governed by the trend equation rather than
+#' by a prior of their own.
+#'
+#' @param sc Character scalar holding the assembled Stan model.
+#' @return A list of single-row `brmsprior` objects, possibly empty.
+#' @noRd
+mvgam_stancode_prior_rows <- function(sc) {
+  checkmate::assert_string(sc)
+  is_mvgam_param <- function(nm) {
+    (grepl("_trend$", nm) | nm %in% mvgam_unsuffixed_params |
+       grepl("^theta_dist_", nm)) &
+      !nm %in% mvgam_state_params
+  }
+  rows <- list()
+  seen <- character(0L)
+  add <- function(class, coef, prior) {
+    key <- paste0(class, "|", coef)
+    if (key %in% seen) return(invisible(NULL))
+    seen[[length(seen) + 1L]] <<- key
+    rows[[length(rows) + 1L]] <<- brms::prior_string(
+      prior, class = class, coef = coef
+    )
+    invisible(NULL)
+  }
+
+  # `x ~ dist(args);`, with an optional index becoming the coef.
+  tilde_re <- paste0(
+    "(?:^|[[:space:];{}])",
+    "(?:(?:to_vector|to_matrix|to_array_1d)[[:space:]]*\\([[:space:]]*)?",
+    "([A-Za-z_][A-Za-z0-9_]*)",
+    "(\\[[^]]*\\])?[[:space:]]*\\)?[[:space:]]*~[[:space:]]*",
+    "([A-Za-z_][A-Za-z0-9_]*[[:space:]]*\\([^;]*\\))[[:space:]]*;"
+  )
+  for (hit in regmatches(sc, gregexpr(tilde_re, sc))[[1L]]) {
+    m <- regmatches(hit, regexec(tilde_re, hit))[[1L]]
+    if (length(m) < 4L || !is_mvgam_param(m[2L])) next
+    coef <- gsub("^\\[|\\]$", "", m[3L])
+    add(m[2L], coef, gsub("[[:space:]]+", " ", trimws(m[4L])))
+  }
+
+  # `dist_lpdf(x | args)`, the form a stanvar writes when it adds its
+  # own terms to `target`.
+  lpdf_re <- paste0(
+    "([A-Za-z_][A-Za-z0-9_]*)_lpdf\\([[:space:]]*",
+    "([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*\\|([^)]*)\\)"
+  )
+  for (hit in regmatches(sc, gregexpr(lpdf_re, sc))[[1L]]) {
+    m <- regmatches(hit, regexec(lpdf_re, hit))[[1L]]
+    if (length(m) < 4L || !is_mvgam_param(m[3L])) next
+    args <- gsub("[[:space:]]+", " ", trimws(m[4L]))
+    add(m[3L], "", paste0(m[2L], "(", args, ")"))
+  }
+  rows
+}
+
+
 lift_mvgam_stanvar_priors <- function(prior, stancode) {
   checkmate::assert_class(prior, "brmsprior")
   checkmate::assert(
@@ -567,82 +653,7 @@ lift_mvgam_stanvar_priors <- function(prior, stancode) {
   sc <- paste(as.character(stancode), collapse = "\n")
   if (!nzchar(sc)) return(prior)
 
-  rows <- list()
-
-  # Z_free_vec - partial-Z mode prior on free loadings
-  if (grepl(
-    "Z_free_vec\\s*~\\s*student_t\\(\\s*3\\s*,\\s*0\\s*,\\s*1\\s*\\)",
-    sc
-  )) {
-    rows[[length(rows) + 1L]] <- brms::prior_string(
-      "student_t(3, 0, 1)", class = "Z_free_vec"
-    )
-  }
-
-  # theta_features - ARD kernel hyperparameter when features supplied
-  if (grepl(
-    paste0(
-      "lognormal_lpdf\\(\\s*theta_features\\s*\\|\\s*",
-      "0\\s*,\\s*1\\s*\\)"
-    ),
-    sc
-  )) {
-    rows[[length(rows) + 1L]] <- brms::prior_string(
-      "lognormal(0, 1)", class = "theta_features"
-    )
-  }
-
-  # theta_dist_<NAME> - one per supplied distance matrix in data2
-  dist_re <- paste0(
-    "lognormal_lpdf\\(\\s*theta_dist_([A-Za-z0-9_]+)\\s*\\|\\s*",
-    "0\\s*,\\s*1\\s*\\)"
-  )
-  hits <- regmatches(sc, gregexpr(dist_re, sc))[[1L]]
-  if (length(hits) > 0L) {
-    names_only <- regmatches(
-      hits, regexpr("theta_dist_[A-Za-z0-9_]+", hits)
-    )
-    for (nm in unique(names_only)) {
-      rows[[length(rows) + 1L]] <- brms::prior_string(
-        "lognormal(0, 1)", class = nm
-      )
-    }
-  }
-
-  # MGP column shrinkage on varrho_inv (column_shrinkage = "mgp")
-  if (grepl(
-    paste0(
-      "varrho_inv\\[\\s*1\\s*\\]\\s*~\\s*",
-      "inv_gamma\\(\\s*mgp_a1\\s*,\\s*1\\s*\\)"
-    ),
-    sc
-  )) {
-    rows[[length(rows) + 1L]] <- brms::prior_string(
-      "inv_gamma(mgp_a1, 1)", class = "varrho_inv", coef = "1"
-    )
-  }
-  if (grepl(
-    paste0(
-      "varrho_inv\\[\\s*2\\s*:\\s*N_lv_trend\\s*\\]\\s*~\\s*",
-      "inv_gamma\\(\\s*mgp_a2\\s*,\\s*1\\s*\\)"
-    ),
-    sc
-  )) {
-    rows[[length(rows) + 1L]] <- brms::prior_string(
-      "inv_gamma(mgp_a2, 1)",
-      class = "varrho_inv", coef = "2:N_lv_trend"
-    )
-  }
-
-  # Closure-unit Psi prior (mvn / mvt closure-unit families)
-  if (grepl(
-    "(^|[[:space:];}])Psi\\s*~\\s*exponential\\(\\s*1\\s*\\)",
-    sc
-  )) {
-    rows[[length(rows) + 1L]] <- brms::prior_string(
-      "exponential(1)", class = "Psi"
-    )
-  }
+  rows <- mvgam_stancode_prior_rows(sc)
 
   if (length(rows) == 0L) return(prior)
 

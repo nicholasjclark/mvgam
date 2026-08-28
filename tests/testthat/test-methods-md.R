@@ -865,9 +865,14 @@ test_that("mvn() emits MVNormal + Sigma decomposition + LKJCholesky", {
   # The kernel evaluates independent normals with a per-element
   # scale, so the covariance is diagonal. It previously rendered a
   # Cholesky decomposition under an LKJ prior, naming a correlation
-  # the emitted Stan has no parameter for.
+  # this family's Sigma has no parameter for. The equation and the
+  # symbol glossary describe the same quantity and must agree.
   expect_true(grepl(
     "\\\\text\\{diag\\}\\(\\\\boldsymbol\\{\\\\Psi\\}\\^2\\)", out
   ))
-  expect_false(grepl("LKJCholesky", out))
+  expect_false(grepl("L_\\\\Omega L_\\\\Omega\\^\\\\top", out))
+  # The trend's own correlation is a different matter: this fit
+  # samples `L_Omega_trend ~ lkj_corr_cholesky(2)`, so the prior
+  # table reports it and the write-up renders it.
+  expect_true(grepl("LKJCholesky", out))
 })
