@@ -285,6 +285,70 @@ mvgam_sampler_inheritance <- function(object) {
 # resolution order is (1) user-supplied via `...`, (2) the named
 # `object` slot, (3) the `mvgam()` default. Returns a list ready
 # to feed `do.call(mvgam, ...)`.
+# Trend-constructor arguments whose resolved value the fitted object
+# already carries, keyed by the `trend_metadata` slot holding it.
+# `update()` rebuilds the trend side from the expression the user
+# wrote, so an argument they passed by name has to be put back within
+# reach of that expression.
+trend_arg_metadata <- c(trend_map = "fixed_Z", n_lv = "n_lv")
+
+
+#' Make a stored trend call evaluable again
+#'
+#' A formula keeps the expression, not the value, and carries the
+#' environment it was written in. Written inside a function, or read
+#' back from an `.rds` in a fresh session, that environment no longer
+#' holds what the constructor referred to:
+#' `~ AR(p = 1, trend_map = Z)` fails with `object 'Z' not found`.
+#' The values are on the fit, so they are bound into a child of the
+#' formula's own environment, leaving the expression as the user wrote
+#' it while making it resolvable.
+#'
+#' A name the fit does not carry is left alone, so it reaches
+#' `mvgam()` and fails there against the user's own argument rather
+#' than somewhere inside the rebuild.
+#'
+#' @param trend_call The `trend_call` slot, or NULL.
+#' @param metadata The `trend_metadata` slot, or NULL.
+#' @return `trend_call`, with an environment that resolves what it
+#'   names wherever the fit knows the value.
+#' @noRd
+restore_trend_call_env <- function(trend_call, metadata) {
+  if (!inherits(trend_call, "formula") || is.null(metadata)) {
+    return(trend_call)
+  }
+  parent <- environment(trend_call) %||% globalenv()
+  unresolved <- Filter(
+    function(v) !exists(v, envir = parent, inherits = TRUE),
+    all.vars(trend_call)
+  )
+  if (length(unresolved) == 0L) return(trend_call)
+
+  bindings <- list()
+  collect <- function(e) {
+    if (!is.call(e)) return(invisible(NULL))
+    arg_names <- names(e)
+    for (i in seq_along(e)) {
+      arg <- e[[i]]
+      named <- !is.null(arg_names) && nzchar(arg_names[[i]])
+      if (named && is.symbol(arg) &&
+            as.character(arg) %in% unresolved &&
+            arg_names[[i]] %in% names(trend_arg_metadata)) {
+        value <- metadata[[trend_arg_metadata[[arg_names[[i]]]]]]
+        if (!is.null(value)) bindings[[as.character(arg)]] <<- value
+      }
+      collect(arg)
+    }
+    invisible(NULL)
+  }
+  collect(trend_call[[length(trend_call)]])
+
+  if (length(bindings) == 0L) return(trend_call)
+  environment(trend_call) <- list2env(bindings, parent = parent)
+  trend_call
+}
+
+
 #'@noRd
 mvgam_update_call <- function(object, formula., newdata, dots) {
   resolved <- list()
@@ -306,6 +370,12 @@ mvgam_update_call <- function(object, formula., newdata, dots) {
     }
     resolved[[arg_name]] <- value
   }
+  # The trend call came back as the user wrote it, which may name a
+  # matrix or a count that is no longer in scope.
+  resolved$trend_formula <- restore_trend_call_env(
+    resolved$trend_formula, object$trend_metadata
+  )
+
   # Inherit sampler dimensions from the original stanfit unless
   # the user explicitly overrides. `warmup` cannot be inherited on its
   # own: mvgam derives it as `iter %/% 2`, so pairing the original

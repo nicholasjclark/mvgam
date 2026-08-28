@@ -298,3 +298,67 @@ test_that("update.mvgam accepts legacy fits if trend_formula is supplied", {
   )
   expect_identical(deparse(out$trend_formula), "~AR(p = 1)")
 })
+
+
+test_that("restore_trend_call_env binds what the fit already carries", {
+  # A formula keeps the expression and the environment it was written
+  # in, not the values it names. Written inside a function, or read
+  # back from an `.rds` in a fresh session, that environment no longer
+  # holds the loading matrix the constructor referred to, and
+  # `update()` failed with `object 'Z_user' not found` before it
+  # reached `mvgam()`.
+  trend_call <- ~ -1 + AR(p = 1, trend_map = Z_user, cor = TRUE)
+  environment(trend_call) <- new.env(parent = emptyenv())
+  expect_false(
+    exists("Z_user", envir = environment(trend_call), inherits = TRUE)
+  )
+
+  Z <- matrix(c(1, 0, 0.8, 0.2, 0, 1, 0.3, 0.7), nrow = 4)
+  out <- restore_trend_call_env(trend_call, list(fixed_Z = Z))
+  expect_true(
+    exists("Z_user", envir = environment(out), inherits = TRUE)
+  )
+  expect_equal(get("Z_user", envir = environment(out)), Z)
+  # The expression itself is left as the user wrote it.
+  expect_equal(deparse(out[[2L]]), deparse(trend_call[[2L]]))
+})
+
+
+test_that("restore_trend_call_env covers n_lv as well as trend_map", {
+  trend_call <- ~ AR(p = 1, n_lv = n_lv_lp)
+  environment(trend_call) <- new.env(parent = emptyenv())
+  out <- restore_trend_call_env(trend_call, list(n_lv = 3L))
+  expect_equal(get("n_lv_lp", envir = environment(out)), 3L)
+})
+
+
+test_that("restore_trend_call_env leaves resolvable calls untouched", {
+  # Nothing to put back when every name already resolves, and a
+  # literal argument names nothing at all.
+  env <- new.env(parent = emptyenv())
+  assign("Z_user", matrix(1, 2, 2), envir = env)
+  trend_call <- ~ AR(p = 1, trend_map = Z_user)
+  environment(trend_call) <- env
+  out <- restore_trend_call_env(trend_call, list(fixed_Z = matrix(9, 2, 2)))
+  expect_identical(environment(out), env)
+
+  literal <- ~ AR(p = 1, cor = TRUE)
+  environment(literal) <- env
+  expect_identical(
+    environment(restore_trend_call_env(literal, list(fixed_Z = NULL))),
+    env
+  )
+})
+
+
+test_that("restore_trend_call_env leaves a name the fit does not carry", {
+  # An argument mvgam stores no resolved value for reaches `mvgam()`
+  # and fails there against the user's own call, rather than part-way
+  # through the rebuild.
+  trend_call <- ~ AR(p = 1, gr = grouping_var)
+  environment(trend_call) <- new.env(parent = emptyenv())
+  out <- restore_trend_call_env(trend_call, list(fixed_Z = matrix(1, 2, 2)))
+  expect_false(
+    exists("grouping_var", envir = environment(out), inherits = TRUE)
+  )
+})
