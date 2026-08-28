@@ -162,7 +162,7 @@ information at all. The loadings have to find their structure
 from the data alone, which gives a clean reference point for
 asking what an informed prior adds afterwards. We keep the
 default loading prior: each entry of `Z` is independent under
-a weak `student_t(3, 0, 1)`. The latent space is
+a weak `student_t(3, 0, 0.5)`. The latent space is
 two-dimensional (`n_lv = 2L`) and `factor_formula = ~ -1`
 asks for no smooths on the factors themselves. Counts get
 the `negbinomial()` family to absorb dispersion beyond a

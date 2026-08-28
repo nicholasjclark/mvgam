@@ -219,7 +219,7 @@ pooling.
 
 We replace three priors the mvgam defaults leave diffuse: the AR
 coefficient location (`Amu_trend`, tighter around zero than the
-default `normal(0, 1)`), the global correlation Cholesky
+default `normal(0, sqrt(0.455))`), the global correlation Cholesky
 (`L_Omega_global_trend`, mildly shrunk toward the identity with
 `lkj(2)`), and the residual observation SD (already small on
 standardised data). The rest of the priors are the mvgam
