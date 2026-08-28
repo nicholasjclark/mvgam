@@ -22,12 +22,12 @@
 #'   to `incl_autocor = TRUE` and `FALSE` to `incl_autocor = FALSE`.
 #'   When only `incl_dynamics` is given it decides; when both are
 #'   given `incl_autocor` decides and `incl_dynamics` is ignored.
-#' @param by_species Logical, default `FALSE`. When `TRUE`, return a
-#'   data frame with one row per series (`species` column) and per-
+#' @param by_series Logical, default `FALSE`. When `TRUE`, return a
+#'   data frame with one row per series (`series` column) and per-
 #'   series WAIC estimates instead of a single `loo::waic` object.
 #'   Matches the `spOccupancy::waicOcc(by.sp = TRUE)` workflow for
-#'   ranking species-level fit in joint-species distribution models.
-#'   See [loo.mvgam()] for the column-to-species mapping convention.
+#'   ranking per-series fit in joint-species distribution models.
+#'   See [loo.mvgam()] for the column-to-series mapping convention.
 #'
 #' @return A `loo::waic` object.
 #'
@@ -62,7 +62,7 @@ waic.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
                        pointwise = FALSE, model_names = NULL,
                        incl_autocor = TRUE,
                        incl_dynamics = NULL,
-                       by_species = FALSE) {
+                       by_series = FALSE) {
   incl_autocor <- resolve_incl_autocor(
     incl_autocor = incl_autocor,
     legacy = incl_dynamics,
@@ -80,8 +80,8 @@ waic.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
   # Drop the all-NA columns a missing response leaves behind, the same
   # way loo.mvgam does, so both criteria score the same observations.
   logliks <- clean_ll(x, logliks)
-  if (isTRUE(by_species)) {
-    return(per_species_ic(x, logliks, criterion = "waic"))
+  if (isTRUE(by_series)) {
+    return(per_series_ic(x, logliks, criterion = "waic"))
   }
   loo::waic(logliks)
 }

@@ -362,6 +362,64 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > code and `recompile = FALSE` is right to refuse. They clear when
   > the fixtures are rebuilt.
 
+- [ ] **13.0 One idea, one name**
+  > A survey of the exported surface against the conventions the
+  > architecture doc records. The prior work fixed the cases where a
+  > name hid a wrong number; these are the ones where it hides a
+  > second meaning. Already done: `by_species` became `by_series`,
+  > `coef(summarise =)` became `summary`, and the two Stan dimensions
+  > `n_features` and `n_change_trend` took the `N_` capital.
+  >
+  > Three tokens carry two meanings. `latent_state` is the
+  > closure-unit quantity everywhere except `summary.mvgam()`, where
+  > `include_states` and `is_latent_state_param()` mean the trend
+  > state. `trend_state` is the surface selector on the `posterior_*`
+  > methods and also a local holding state draws in
+  > `forecast.mvgam()` and `index-mvgam.R`. `trend_model` is a
+  > constructor when passed, a character type name on a trend spec,
+  > and a `brmsfit` on the fitted object, so `mod$trend_model` is
+  > nothing like what the user handed to `sim_mvgam()`.
+  >
+  > The surface selector itself is spelled five ways across the
+  > methods that offer it: `incl_autocor`, `trend_state`,
+  > `process_error`, the superseded `incl_dynamics`, and
+  > `resample_innovations`, which `forecast.mvgam()` forwards
+  > verbatim as `process_error`. A sixth, `incl_latent_state`, is
+  > internal. Worse than the spelling, the defaults disagree between
+  > entry points that call each other: `predict()` defaults `FALSE`
+  > and calls `posterior_predict()`, which defaults `TRUE`, so the
+  > two answer differently on the same fit with no argument given.
+  >
+  > `groups` means a character vector of levels on `ranef()`, a
+  > logical on `residual_cor()`, and a character vector or `"all"` on
+  > `posterior_transition_matrix()`, which also takes `group` as a
+  > mutually exclusive second spelling. `alpha` means a pinball
+  > quantile level, an SVD variance split and a credible mass in
+  > three different methods.
+  >
+  > Two names describe the wrong thing. `b_uncertainty` collapses
+  > every source of coefficient variation, smooths and random effects
+  > included, which its own documentation admits. `process_error =
+  > FALSE` does not fix the trend at its posterior mean, which is
+  > what `fitted()` still claims at `R/fitted.R:62`; it removes the
+  > latent state entirely, and the same paragraph's claim that
+  > innovations are added only by `posterior_predict()` is untrue of
+  > `posterior_epred()`. `obs_formula` is documented in `lv_axis.R`
+  > and `data_helpers.R` as an argument neither `mvgam()` nor
+  > `jsdgam()` has.
+  >
+  > Three Stan names still break the `_trend` suffix rule:
+  > `time_dis`, `theta_features` and `varrho_inv`. These were left
+  > alone deliberately. `time_dis` reaches into the compiled C++
+  > signatures in `RcppExports.R`, and the other two are parameters,
+  > so renaming them changes posterior column names and every fit
+  > carrying a structured loadings prior stops being readable. That
+  > is a migration with a fixture rebuild behind it, not a tidy-up.
+  > `N_free_Z` puts its qualifier before the noun where every sibling
+  > puts it after. The architecture doc's own decision 4 and 8 code
+  > blocks still show the pre-split lowercase dimensions that
+  > decision 5 forbids.
+
 - [ ] **5.0 Rebuild every vignette and the pkgdown site**
   > Caches date from June and July, before the prior and default
   > changes. Roughly 60 numeric claims need re-checking, and

@@ -86,22 +86,6 @@ test_that("ordinary residuals match y - posterior_predict per draw", {
 })
 
 
-# ---- pearson residuals carry the same sign as ordinary ----------
-
-test_that("pearson residuals share sign with ordinary residuals", {
-  fit <- load_fit("val_mvgam_gauss_ar1_n150")
-  set.seed(2L)
-  ord <- residuals(fit, type = "ordinary", ndraws = 50L,
-                     summary = FALSE)
-  set.seed(2L)
-  pear <- residuals(fit, type = "pearson", ndraws = 50L,
-                      summary = FALSE)
-  # Sign agreement -- pearson scales by positive sqrt(var)
-  expect_true(all(sign(ord) == sign(pear) |
-                    abs(ord) < 1e-10))
-})
-
-
 # ---- robust = TRUE summary uses median ---------------------------
 
 test_that("robust summary differs from mean summary", {

@@ -1515,7 +1515,7 @@ is_mgp_loadings_prior <- function(loadings_prior) {
 #' Shared entry-point gate for `jsdgam()` and `mvgam()`. The ceiling
 #' depends on the loadings prior:
 #' \itemize{
-#'   \item iid Z (default `student_t(3, 0, 1)`) or kernel-driven
+#'   \item iid Z (default `student_t(3, 0, 0.5)`) or kernel-driven
 #'     structured priors: `n_lv < n_species`. At the boundary, `Z Z'`
 #'     saturates the residual covariance and Psi is unidentified
 #'     from observed residuals, producing an HMC funnel.
@@ -5862,7 +5862,7 @@ format_pipeline_error <- function(message, context = NULL) {
 #   column_shrinkage   "iid" or "mgp"
 #   mgp_a1, mgp_a2     numeric (NA when shrinkage = "iid")
 #   n_series           int p
-#   n_features         int c (0 when features is NULL)
+#   N_features_trend         int c (0 when features is NULL)
 #   n_distances        int K (length of distance_mats)
 #'@noRd
 normalise_loadings_prior <- function(input, data2, data,
@@ -5982,7 +5982,7 @@ normalise_loadings_prior <- function(input, data2, data,
     mgp_a1 = mgp_a1,
     mgp_a2 = mgp_a2,
     n_series = n_series_actual,
-    n_features = if (is.null(features_mat)) 0L else ncol(features_mat),
+    N_features_trend = if (is.null(features_mat)) 0L else ncol(features_mat),
     n_distances = length(distance_mats)
   )
 }
@@ -6114,7 +6114,7 @@ assert_loadings_prior_spec_consistent <- function(spec) {
   checkmate::assert_list(spec)
   required <- c(
     "features_mat", "distance_mats", "column_shrinkage",
-    "mgp_a1", "mgp_a2", "n_series", "n_features", "n_distances"
+    "mgp_a1", "mgp_a2", "n_series", "N_features_trend", "n_distances"
   )
   missing <- setdiff(required, names(spec))
   if (length(missing) > 0L) {
@@ -6128,11 +6128,11 @@ assert_loadings_prior_spec_consistent <- function(spec) {
     )))
   }
   if (!is.null(spec$features_mat) &&
-      spec$n_features != ncol(spec$features_mat)) {
+      spec$N_features_trend != ncol(spec$features_mat)) {
     stop(insight::format_error(c(
       "Loadings-prior spec has inconsistent feature dimensions.",
       x = paste0(
-        "spec$n_features = ", spec$n_features,
+        "spec$N_features_trend = ", spec$N_features_trend,
         " but ncol(features_mat) = ",
         ncol(spec$features_mat), "."
       ),

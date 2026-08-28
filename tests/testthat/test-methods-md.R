@@ -623,7 +623,7 @@ test_that("MGP loadings_prior emits varrho + Psi rows + Normal(0, sqrt(Psi))", {
     distance_mats  = list(),
     column_shrinkage = "mgp",
     mgp_a1 = 2, mgp_a2 = 3,
-    n_series = 4L, n_features = 0L, n_distances = 0L
+    n_series = 4L, N_features_trend = 0L, n_distances = 0L
   )
   out <- methods_md(mod)
   expect_true(grepl(
@@ -647,7 +647,7 @@ test_that("loadings_prior features + distances kernel emits kernel rows", {
     distance_mats  = list(phylo = matrix(0, 4L, 4L)),
     column_shrinkage = "iid",
     mgp_a1 = NA, mgp_a2 = NA,
-    n_series = 4L, n_features = 1L, n_distances = 1L
+    n_series = 4L, N_features_trend = 1L, n_distances = 1L
   )
   out <- methods_md(mod)
   # Kernel assembly: distance term + features term, Hadamard
@@ -862,9 +862,12 @@ test_that("mvn() emits MVNormal + Sigma decomposition + LKJCholesky", {
     "\\\\mathbf\\{Y\\}_i &\\\\sim \\\\text\\{MVNormal\\}",
     out
   ))
-  expect_true(grepl("\\\\text\\{diag\\}\\(\\\\boldsymbol\\{\\\\Psi\\}\\)", out))
+  # The kernel evaluates independent normals with a per-element
+  # scale, so the covariance is diagonal. It previously rendered a
+  # Cholesky decomposition under an LKJ prior, naming a correlation
+  # the emitted Stan has no parameter for.
   expect_true(grepl(
-    "L_\\\\Omega &\\\\sim \\\\text\\{LKJCholesky\\}\\(1\\)",
-    out
+    "\\\\text\\{diag\\}\\(\\\\boldsymbol\\{\\\\Psi\\}\\^2\\)", out
   ))
+  expect_false(grepl("LKJCholesky", out))
 })

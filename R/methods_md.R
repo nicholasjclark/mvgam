@@ -331,9 +331,9 @@ factor_loadings_data_dimensions <- function(obj) {
   ls <- spec$loadings_prior_spec
   if (is.null(ls)) return(character(0L))
   parts <- character(0L)
-  if (isTRUE(ls$n_features > 0L)) {
+  if (isTRUE(ls$N_features_trend > 0L)) {
     parts <- c(parts, paste0(
-      "$p_{\\text{features}} = ", ls$n_features,
+      "$p_{\\text{features}} = ", ls$N_features_trend,
       "$ trait features"
     ))
   }
@@ -1335,8 +1335,8 @@ mv_custom_likelihood_rows <- function(obj, notation) {
 mv_custom_decomposition_rows <- function(kind) {
   switch(
     kind,
-    mvn  = sigma_lkj_decomposition_rows(),
-    mvt  = sigma_lkj_decomposition_rows(),
+    mvn  = mv_scale_rows(),
+    mvt  = mv_scale_rows(),
     diri = list(list(
       lhs = "\\boldsymbol{\\alpha}_i",
       op  = "=",
@@ -1347,20 +1347,18 @@ mv_custom_decomposition_rows <- function(kind) {
 }
 
 #' @noRd
-sigma_lkj_decomposition_rows <- function() {
+# The `mvn` and `mvt` kernels evaluate independent normals with a
+# per-element scale: `normal_lpdf(y_unit | mu_unit, psi_unit)` in
+# R/families.R. Rendering a Cholesky decomposition with an LKJ prior
+# here described a correlation the emitted Stan does not carry, and
+# named a parameter the model never declares.
+#'@noRd
+mv_scale_rows <- function() {
   list(
     list(
       lhs = "\\boldsymbol{\\Sigma}",
       op  = "=",
-      rhs = paste0(
-        "\\text{diag}(\\boldsymbol{\\Psi}) \\, L_\\Omega ",
-        "L_\\Omega^\\top \\text{diag}(\\boldsymbol{\\Psi})"
-      )
-    ),
-    list(
-      lhs = "L_\\Omega",
-      op  = "\\sim",
-      rhs = "\\text{LKJCholesky}(1)"
+      rhs = "\\text{diag}(\\boldsymbol{\\Psi}^2)"
     ),
     list(
       lhs = "\\boldsymbol{\\Psi}",
@@ -2629,7 +2627,7 @@ loadings_prior_rows <- function(spec, fixed_Z) {
       rhs = "\\text{Student-t}(3, 0, 0.5)"
     )))
   }
-  has_features  <- isTRUE(spec$n_features > 0L)
+  has_features  <- isTRUE(spec$N_features_trend > 0L)
   has_distances <- isTRUE(spec$n_distances > 0L)
   uses_mgp      <- identical(spec$column_shrinkage, "mgp")
   has_kernel    <- has_features || has_distances
@@ -2688,8 +2686,8 @@ kernel_assembly_rows <- function(spec) {
   # Phi = (prod_d exp(-d / theta_d)) * gp_exponential(features;
   # theta_features). Per R/stan_assembly.R:3241-3268; one factor
   # per supplied distance matrix, plus the features GP factor
-  # when n_features > 0.
-  has_features <- isTRUE(spec$n_features > 0L)
+  # when N_features_trend > 0.
+  has_features <- isTRUE(spec$N_features_trend > 0L)
   dnames <- names(spec$distance_mats) %||% character(0L)
   terms <- character(0L)
   for (nm in dnames) {

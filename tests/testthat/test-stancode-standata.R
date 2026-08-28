@@ -2720,8 +2720,8 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
   expect_true(stan_pattern("int<lower=1> N_lv_trend;", code_with_trend, fixed = TRUE))
 
   # Piecewise-specific data
-  expect_true(stan_pattern("int<lower=0> n_change_trend;", code_with_trend))
-  expect_true(stan_pattern("vector\\[n_change_trend\\] t_change_trend;", code_with_trend))
+  expect_true(stan_pattern("int<lower=0> N_change_trend;", code_with_trend))
+  expect_true(stan_pattern("vector\\[N_change_trend\\] t_change_trend;", code_with_trend))
   expect_true(stan_pattern("real<lower=0> change_scale_trend;", code_with_trend))
 
   # GLM optimization components
@@ -2743,13 +2743,13 @@ test_that("stancode generates correct PW(n_changepoints = 10) piecewise trend st
   expect_true(stan_pattern("for \\(i in 1:N_time_trend\\) time_trend\\[i\\] = i;", code_with_trend))
 
   # Changepoint matrix computation
-  expect_true(stan_pattern("matrix\\[N_time_trend, n_change_trend\\] Kappa_trend = get_changepoint_matrix\\(time_trend, t_change_trend, N_time_trend, n_change_trend\\);", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_time_trend, N_change_trend\\] Kappa_trend = get_changepoint_matrix\\(time_trend, t_change_trend, N_time_trend, N_change_trend\\);", code_with_trend))
 
   # 4. Parameters Block - PW-specific parameters
   # Base trend parameters
   expect_true(stan_pattern("vector\\[N_lv_trend\\] k_trend;", code_with_trend))
   expect_true(stan_pattern("vector\\[N_lv_trend\\] m_trend;", code_with_trend))
-  expect_true(stan_pattern("matrix\\[n_change_trend, N_lv_trend\\] delta_trend;", code_with_trend))
+  expect_true(stan_pattern("matrix\\[N_change_trend, N_lv_trend\\] delta_trend;", code_with_trend))
 
   # Standard observation model parameters
   expect_true(stan_pattern("vector\\[Kc\\] b;", code_with_trend))
@@ -3408,10 +3408,10 @@ test_that("loadings_prior with features only emits ARD prior on Z", {
     loadings_prior = list(features = "features")
   ))
   sc <- as.character(code)
-  expect_match(sc, "int<lower=1>\\s+n_features\\s*;")
+  expect_match(sc, "int<lower=1>\\s+N_features_trend\\s*;")
   expect_match(
     sc,
-    "array\\[n_features\\]\\s+real<lower=0>\\s+theta_features\\s*;"
+    "array\\[N_features_trend\\]\\s+real<lower=0>\\s+theta_features\\s*;"
   )
   expect_match(sc, "gp_exponential_cov", fixed = TRUE)
   expect_match(sc, "cholesky_decompose", fixed = TRUE)
@@ -3456,7 +3456,7 @@ test_that("loadings_prior combines features and distances multiplicatively, thre
   # Multiplicative combination uses Stan's elementwise `.*`.
   expect_match(sc, ".*", fixed = TRUE)
   # Standata carries both feature and distance threads.
-  expect_equal(out$data$n_features, 1L)
+  expect_equal(out$data$N_features_trend, 1L)
   expect_equal(dim(out$data$row_features), c(4L, 1L))
   expect_equal(dim(out$data$dist_phylo), c(4L, 4L))
   expect_equal(max(out$data$dist_phylo), 1)
@@ -3618,7 +3618,12 @@ test_that("get_prior() surfaces mu_/sigma_ rows under coef_sharing = \"hierarchi
   expect_true("mu_ar2_trend" %in% classes)
   expect_true("sigma_ar1_trend" %in% classes)
   expect_true("sigma_ar2_trend" %in% classes)
-  expect_true("ar1_trend" %in% classes)
+  # The per-series coefficients are drawn from the population
+  # distribution those hyperparameters describe, so they are the
+  # model's structure rather than a prior anyone can set. Offering a
+  # row for them promised an override that silently did nothing.
+  expect_false("ar1_trend" %in% classes)
+  expect_false("ar2_trend" %in% classes)
 })
 
 

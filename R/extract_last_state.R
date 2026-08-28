@@ -631,10 +631,10 @@ extract_pw_state <- function(one_draw, meta, n_series, n_lv,
     as.numeric(one_draw[m_nms]), n_series
   )
 
-  # `delta_trend` is declared `matrix[n_change_trend, N_lv_trend]`
+  # `delta_trend` is declared `matrix[N_change_trend, N_lv_trend]`
   # in Stan, so the posterior names are `delta_trend[i, j]` with
   # `i` the changepoint index and `j` the latent series.
-  n_change <- as.integer(fit$standata$n_change_trend %||% 0L)
+  n_change <- as.integer(fit$standata$N_change_trend %||% 0L)
   delta <- matrix(0, nrow = n_change, ncol = n_series)
   if (n_change > 0L) {
     for (i in seq_len(n_change)) {

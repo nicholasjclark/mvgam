@@ -46,7 +46,6 @@
 #' Available common parameters:
 #' \describe{
 #'   \item{sigma_trend}{Innovation standard deviation (RW, AR, CAR trends)}
-#'   \item{LV}{Latent variables (all trends with state-space structure)}
 #'   \item{ar1_trend}{AR(1) coefficient (AR, CAR trends)}
 #'   \item{nu_trend}{Innovation degrees of freedom when `df = NA`}
 #'   \item{Z}{Factor loadings matrix for factor models}
@@ -60,13 +59,6 @@ common_trend_priors <- list(
     bounds = c(0, NA),
     description = "Innovation standard deviation",
     dimension = "vector"
-  ),
-
-  LV = list(
-    default = "std_normal()",
-    bounds = c(NA, NA),
-    description = "Latent variables",
-    dimension = "matrix"
   ),
 
   ar1_trend = list(
@@ -90,8 +82,50 @@ common_trend_priors <- list(
     dimension = "scalar"
   ),
 
-  Z = list(
+  m_trend = list(
+    default = "student_t(3, 0, 2.5)",
+    bounds = c(NA, NA),
+    description = "Piecewise trend offset",
+    dimension = "vector"
+  ),
+
+  k_trend = list(
     default = "std_normal()",
+    bounds = c(NA, NA),
+    description = "Piecewise base growth rate",
+    dimension = "vector"
+  ),
+
+  sigma_group_trend = list(
+    default = "exponential(2)",
+    bounds = c(0, NA),
+    description = "Per-group innovation standard deviation",
+    dimension = "vector"
+  ),
+
+  L_Omega_trend = list(
+    default = "lkj_corr_cholesky(2)",
+    bounds = c(NA, NA),
+    description = "Trend correlation Cholesky factor",
+    dimension = "matrix"
+  ),
+
+  L_Omega_global_trend = list(
+    default = "lkj_corr_cholesky(1)",
+    bounds = c(NA, NA),
+    description = "Population correlation Cholesky factor, grouped trend",
+    dimension = "matrix"
+  ),
+
+  L_deviation_group_trend = list(
+    default = "lkj_corr_cholesky(6)",
+    bounds = c(NA, NA),
+    description = "Per-group deviation Cholesky factor, grouped trend",
+    dimension = "matrix"
+  ),
+
+  Z = list(
+    default = "student_t(3, 0, 0.5)",
     bounds = c(NA, NA),
     description = "Factor loadings matrix",
     dimension = "matrix"
@@ -315,6 +349,18 @@ generate_trend_priors_from_monitor_params <- function(trend_obj) {
     monitor_params <- setdiff(monitor_params, "L_Omega_trend")
   }
 
+  # Under partial pooling a per-series coefficient is drawn from the
+  # population distribution its own hyperparameters describe, so
+  # `ar{lag}_trend ~ normal(mu_ar{lag}_trend, sigma_ar{lag}_trend)` is
+  # the model rather than a prior. Offering a row for it promises an
+  # override that would break the pooling; the editable rows are the
+  # two hyperparameters, which the generator does read. The
+  # coefficients stay in `monitor_params` because forecasting reads
+  # them from there.
+  if (identical(trend_obj$coef_sharing %||% "none", "hierarchical")) {
+    monitor_params <- monitor_params[!is_ar_coefficient(monitor_params)]
+  }
+
   if (length(monitor_params) == 0) {
     return(create_empty_brmsprior())
   }
@@ -378,16 +424,46 @@ get_default_trend_parameter_prior <- function(param_name, trend_obj) {
   trend_type <- trend_obj$trend
   custom_function <- paste0("get_", tolower(trend_type), "_parameter_prior")
 
+  # A trend-specific resolver may exist only to tighten a bound, as
+  # AR's does for stationarity. Where it names no distribution the
+  # shared default still supplies one, so the bound is honoured
+  # without the summary going silent on the prior itself.
+  custom_result <- NULL
   if (exists(custom_function, mode = "function")) {
     custom_prior <- get(custom_function, mode = "function")
-    result <- custom_prior(param_name, trend_obj)
-    if (!is.null(result)) {
-      return(result)
+    custom_result <- custom_prior(param_name, trend_obj)
+    if (!is.null(custom_result) && nzchar(custom_result$prior)) {
+      return(custom_result)
     }
   }
 
-  # Use parameter-type-based defaults
-  get_parameter_type_default_prior(param_name)
+  # The shared defaults, read in the order the Stan generator reads
+  # them. Skipping this step let the summary report a prior the model
+  # never sampled under: `sigma_trend` came back empty here, so brms
+  # filled in its own `student_t(3, 0, 2.5)`, while the Stan code
+  # carried `exponential(2)`. Passing that summary back through
+  # `update()` then changed the model.
+  if (param_name %in% names(common_trend_priors)) {
+    spec <- common_trend_priors[[param_name]]
+    bounds <- spec$bounds
+    return(list(
+      prior = spec$default,
+      lb = custom_result$lb %||%
+        (if (!is.na(bounds[1L])) as.character(bounds[1L]) else ""),
+      ub = custom_result$ub %||%
+        (if (!is.na(bounds[2L])) as.character(bounds[2L]) else "")
+    ))
+  }
+  # A resolver that named only bounds still needs a distribution, and
+  # for a lag above one the shared table has no entry to supply it.
+  # Returning the bounds alone left `ar2_trend` and its siblings
+  # reporting nothing while Stan sampled them.
+  pattern <- get_parameter_type_default_prior(param_name)
+  if (!is.null(custom_result)) {
+    pattern$lb <- custom_result$lb %||% pattern$lb
+    pattern$ub <- custom_result$ub %||% pattern$ub
+  }
+  pattern
 }
 
 #' Get Default Prior Based on Parameter Type
@@ -497,10 +573,15 @@ get_ar_parameter_prior <- function(param_name, trend_obj) {
 #' @return List with prior, lb, ub elements, or NULL for default handling
 #' @noRd
 get_car_parameter_prior <- function(param_name, trend_obj) {
-  # CAR has some special parameter handling
-  if (param_name == "ar1") {
-    # Legacy CAR parameter without _trend suffix
-    return(list(prior = "", lb = "0", ub = "1"))
+  # A continuous-time damping coefficient is raised to a real power,
+  # so Stan declares it strictly inside the unit interval rather than
+  # on it. This branch tested the suffix-less `ar1`, a name no trend
+  # monitors, so it never fired and the reported bounds were the
+  # ordinary autoregressive ones, putting most of the reported mass
+  # outside the support the model actually samples on. The
+  # distribution itself comes from the shared default, as elsewhere.
+  if (identical(param_name, "ar1_trend")) {
+    return(list(prior = "", lb = "0.001", ub = "0.999"))
   }
 
   # Return NULL to use default parameter-type handling
@@ -971,92 +1052,6 @@ get_trend_prior_spec <- function(trend_type) {
   return(result)
 }
 
-#' Build Dynamic AR Prior Specification for Non-Continuous Lags
-#'
-#' @description
-#' Generates prior specifications for AR models with arbitrary lag structures,
-#' including non-continuous lags like AR(p = c(1, 12, 24)). Creates individual
-#' ar{lag}_trend specifications for each lag while sharing common parameters.
-#'
-#' @param lags Numeric vector of lag values (e.g., c(1, 12, 24))
-#' @param ar_prior_base Named list with AR coefficient prior specification
-#'   (defaults to common_trend_priors$ar1_trend)
-#' @param include_sigma Logical indicating whether to include sigma_trend
-#'   (defaults to TRUE)
-#' @param include_common Logical indicating whether to include common parameters
-#'   like LV (defaults to TRUE)
-#'
-#' @return Named list of prior specifications for all AR parameters
-#'
-#' @details
-#' For AR(p = c(1, 12, 24)), this creates:
-#' - ar1_trend: AR coefficient for lag 1
-#' - ar12_trend: AR coefficient for lag 12
-#' - ar24_trend: AR coefficient for lag 24
-#' - sigma_trend: Innovation standard deviation (if include_sigma = TRUE)
-#' - LV, LV_raw: Latent variable specifications (if include_common = TRUE)
-#'
-#' @seealso \code{\link{get_trend_prior_spec}}, \code{common_trend_priors}
-#' @noRd
-build_ar_prior_spec <- function(lags, ar_prior_base = NULL,
-                               include_sigma = TRUE,
-                               include_common = TRUE) {
-  checkmate::assert_numeric(lags, min.len = 1, any.missing = FALSE,
-                           finite = TRUE)
-  checkmate::assert_list(ar_prior_base, null.ok = TRUE, names = "named")
-  checkmate::assert_logical(include_sigma, len = 1, any.missing = FALSE)
-  checkmate::assert_logical(include_common, len = 1, any.missing = FALSE)
-
-  # Validate lags are positive integers
-  if (any(lags <= 0) || any(lags != as.integer(lags))) {
-    stop(insight::format_error(c(
-      "Invalid lag specification.",
-      x = "All lags must be positive integers."
-    )))
-  }
-
-  # Use default AR prior if not specified
-  if (is.null(ar_prior_base)) {
-    ar_prior_base <- common_trend_priors$ar1_trend
-  }
-
-  # Validate ar_prior_base structure
-  required_fields <- c("default", "bounds", "description")
-  missing_fields <- setdiff(required_fields, names(ar_prior_base))
-  if (length(missing_fields) > 0) {
-    stop(insight::format_error(c(
-      "Invalid ar_prior_base specification.",
-      x = cli::format_inline(
-        "Missing required fields: {.val {missing_fields}}"
-      )
-    )))
-  }
-
-  result <- list()
-
-  # Generate ar{lag}_trend specifications for each lag
-  for (lag in lags) {
-    param_name <- paste0("ar", lag, "_trend")
-    result[[param_name]] <- list(
-      default = ar_prior_base$default,
-      bounds = ar_prior_base$bounds,
-      description = paste0("AR(", lag, ") coefficient"),
-      dimension = ar_prior_base$dimension %||% "vector"
-    )
-  }
-
-  # Add sigma_trend if requested
-  if (include_sigma) {
-    result$sigma_trend <- common_trend_priors$sigma_trend
-  }
-
-  # Add common trend parameters if requested
-  if (include_common) {
-    result$LV <- common_trend_priors$LV
-  }
-
-  return(result)
-}
 
 #' Convert brmsprior row to Stan distribution string
 #'

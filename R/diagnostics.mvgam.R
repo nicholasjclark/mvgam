@@ -15,10 +15,10 @@
 #' @param pars Optional character vector of parameter names. For
 #'   `nuts_params` these are sampler-parameter names; otherwise they
 #'   are model-parameter names. `NULL` returns all parameters.
-#' @param summarise Logical. If `TRUE` (the default) `coef` returns
-#'   posterior means; if `FALSE` it returns the full chain matrix.
 #' @param summary Logical. If `TRUE` (the default), summary statistics
 #'   are returned; if `FALSE`, the raw posterior draws are returned.
+#'   `coef` summarises to posterior means rather than to the
+#'   Estimate / Est.Error / quantile matrix its siblings return.
 #' @param robust Logical. If `TRUE`, use median + median absolute
 #'   deviation instead of mean + standard deviation. Default `FALSE`.
 #' @param probs Numeric vector of length 2 giving the lower and upper
@@ -94,16 +94,16 @@ mvgam_post_summary <- function(draws, robust = FALSE,
 #' @rdname mvgam_diagnostics
 #' @method coef mvgam
 #' @export
-coef.mvgam <- function(object, summarise = TRUE, ...) {
+coef.mvgam <- function(object, summary = TRUE, ...) {
   checkmate::assert_class(object, "mvgam")
-  checkmate::assert_logical(summarise, len = 1L)
+  checkmate::assert_logical(summary, len = 1L)
   # Reuse the `betas` keyword so the b_trend[*] block is filtered
   # consistently with as.matrix(object, variable = "betas").
   draws_mat <- as_draws_matrix(object, variable = "betas")
   if (ncol(draws_mat) == 0L) {
-    return(if (isTRUE(summarise)) numeric() else matrix(0, 0, 0))
+    return(if (isTRUE(summary)) numeric() else matrix(0, 0, 0))
   }
-  if (isTRUE(summarise)) {
+  if (isTRUE(summary)) {
     return(colMeans(draws_mat))
   }
   draws_mat
@@ -399,7 +399,7 @@ flag_by_lv_full_rank_funnel <- function(mvgam_fit) {
     return(FALSE)
   }
   # Reason: `uses_loadings_prior()` returns TRUE only for the
-  # structured prior families (MGP via `n_features`, kernel via
+  # structured prior families (MGP via `N_features_trend`, kernel via
   # `dist_*`). Iid Z leaves both markers absent, so the funnel
   # only applies when this helper returns FALSE.
   if (isTRUE(uses_loadings_prior(mvgam_fit))) return(FALSE)

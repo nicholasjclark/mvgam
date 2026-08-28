@@ -284,7 +284,7 @@ detect_factor_n_lv <- function(object) {
 
 # Predicate: did the fit use a structured `loadings_prior`?
 # Detection looks at the `standata` slot, where the structured
-# prior contract emits `n_features` (for ARD features) and
+# prior contract emits `N_features_trend` (for ARD features) and
 # `dist_<name>` (for each pairwise distance matrix). Either
 # marker is sufficient. Used by `summary.mvgam` and
 # `how_to_cite()` to surface Heaps citations only when the
@@ -293,7 +293,7 @@ detect_factor_n_lv <- function(object) {
 uses_loadings_prior <- function(object) {
   sd <- object$standata
   if (is.null(sd)) return(FALSE)
-  has_features <- !is.null(sd$n_features) && sd$n_features > 0L
+  has_features <- !is.null(sd$N_features_trend) && sd$N_features_trend > 0L
   has_distances <- any(grepl("^dist_", names(sd)))
   has_features || has_distances
 }

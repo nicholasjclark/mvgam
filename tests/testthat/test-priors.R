@@ -948,3 +948,63 @@ test_that("nu_trend appears for every trend type that supports df", {
     expect_true("nu_trend" %in% p$class)
   }
 })
+
+
+# ---- what is reported must be what is sampled -----------------------
+#
+# A default written in more than one place drifts. `sigma_trend` was
+# sampled under `exponential(2)` while the table reported brms's
+# `student_t(3, 0, 2.5)`, and because `update()` passes the stored
+# table back through `mvgam()`, every update re-specified the model.
+# `ar1_trend` was sampled under a prior the table did not mention at
+# all, and `L_Omega_trend` was emitted as a literal, so a user prior on
+# it was discarded without a word.
+
+
+test_that("both prior resolvers agree on every shared default", {
+  # One reads for the Stan generator, the other builds the table the
+  # user is shown. They must not answer differently.
+  ar <- AR(p = 1)
+  ar$dimensions <- list(n_series = 3L)
+  for (par in names(mvgam:::common_trend_priors)) {
+    from_codegen <- mvgam:::get_trend_parameter_prior(NULL, par)
+    from_table <- mvgam:::get_default_trend_parameter_prior(par, ar)$prior
+    expect_identical(from_codegen, from_table)
+  }
+})
+
+
+test_that("every shared default names a distribution", {
+  # `LV` sat here with a default for a parameter the generator never
+  # emits, reachable only from a function with no caller.
+  for (par in names(mvgam:::common_trend_priors)) {
+    expect_true(nzchar(mvgam:::common_trend_priors[[par]]$default))
+  }
+})
+
+
+test_that("the trend priors reported are the ones sampled", {
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1, cor = TRUE))
+  code <- prior_code(mf, poisson())
+  tab <- as.data.frame(get_prior(mf, data = prior_test_data(),
+                                  family = poisson()))
+  sampled <- grep("^\\s*[A-Za-z_0-9]+_trend\\s*~", strsplit(code, "\n")[[1]],
+                  value = TRUE)
+  expect_gt(length(sampled), 0L)
+  for (line in trimws(sampled)) {
+    par <- sub("\\s*~.*", "", line)
+    dist <- trimws(sub(";.*", "", sub(".*~\\s*", "", line)))
+    reported <- tab$prior[tab$class == par]
+    expect_true(length(reported) > 0L)
+    expect_true(dist %in% reported)
+  }
+})
+
+
+test_that("a user prior on the trend correlation reaches the model", {
+  # Emitted as a literal, this one ignored the user entirely.
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1, cor = TRUE))
+  user <- brms::prior_string("lkj_corr_cholesky(9)", class = "L_Omega_trend")
+  expect_true(grepl("L_Omega_trend ~ lkj_corr_cholesky(9)",
+                     prior_code(mf, poisson(), pr = user), fixed = TRUE))
+})

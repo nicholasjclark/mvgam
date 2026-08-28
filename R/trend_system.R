@@ -716,16 +716,40 @@ generate_monitor_params <- function(trend_spec) {
 #' Generate RW-specific monitor parameters
 #' @param trend_spec RW trend specification
 #' @return Character vector of RW-specific parameters
+#' Parameters an `ma` term adds, by trend type
+#'
+#' Named once so the trends cannot drift apart on it. `RW()` and
+#' `AR()` sample the moving-average coefficient itself; a VARMA
+#' samples the hyperparameters its stationary parameterisation is
+#' built from. A trend given the term without its parameters listed
+#' samples under a prior nothing reports and nothing can override.
+#'
+#' @noRd
+ma_monitor_params <- list(
+  RW = "theta1_trend",
+  AR = "theta1_trend",
+  VAR = c("Dmu_trend", "Domega_trend")
+)
+
+
+#' Monitor parameters an `ma` term contributes to one trend
+#'
+#' @param trend_spec Trend specification
+#' @param trend_type Base trend type, one of `names(ma_monitor_params)`
+#' @return Character vector, empty when the term was not asked for
+#'
+#' @noRd
+ma_params_for <- function(trend_spec, trend_type) {
+  if (!isTRUE(trend_spec$ma %||% FALSE)) {
+    return(character(0))
+  }
+  ma_monitor_params[[trend_type]] %||% character(0)
+}
+
+
 #' @noRd
 generate_rw_monitor_params <- function(trend_spec) {
-  params <- character(0)
-
-  # MA parameters if enabled
-  if (trend_spec$ma %||% FALSE) {
-    params <- c(params, "theta1_trend")
-  }
-
-  return(params)
+  ma_params_for(trend_spec, "RW")
 }
 
 #' Generate AR-specific monitor parameters
@@ -761,7 +785,8 @@ generate_ar_monitor_params <- function(trend_spec) {
       paste0("sigma_ar", lag_vec, "_trend")
     )
   }
-  return(ar_params)
+
+  c(ar_params, ma_params_for(trend_spec, "AR"))
 }
 
 #' Generate VAR-specific monitor parameters
@@ -774,10 +799,7 @@ generate_var_monitor_params <- function(trend_spec) {
   # Base VAR hyperparameters - always present
   var_params <- c("Amu_trend", "Aomega_trend")
 
-  # Add MA hyperparameters if VARMA model
-  if (trend_spec$ma %||% FALSE) {
-    var_params <- c(var_params, "Dmu_trend", "Domega_trend")
-  }
+  var_params <- c(var_params, ma_params_for(trend_spec, "VAR"))
 
 
   # VAR uses variance-correlation decomposition (sigma_trend + L_Omega_trend)
@@ -2048,9 +2070,9 @@ print.mvgam_trend <- function(x, ...) {
 #'   \code{nu_trend}, with a default \code{gamma(4, 0.3)} prior that
 #'   can be replaced through the \code{prior} argument, for example
 #'   \code{prior(gamma(2, 0.1), class = "nu_trend")}. Note that
-#'   \code{nu_trend} does not yet appear in the
-#'   \code{\link{get_prior}} table, so the class name has to come
-#'   from here.
+#'   \code{nu_trend} is listed in the \code{\link{get_prior}} table
+#'   alongside \code{sigma_trend}, so the class name can be read from
+#'   there.
 #'
 #'   Two caveats. The bound of \code{2} is required rather than
 #'   conventional: below it the innovations have no finite variance and
@@ -2425,7 +2447,7 @@ print.mvgam_trend <- function(x, ...) {
 #' # `gr` factor identifies the grouping unit (region) and `subgr`
 #' # identifies the within-group dimension (outcome). The fit
 #' # estimates a population innovation correlation across outcomes
-#' # plus per-region deviations; `alpha_cor_trend` (Beta(2, 2) by
+#' # plus per-region deviations; `alpha_cor_trend` (beta(3, 2) by
 #' # default) controls the partial-pooling blend between them.
 #' # Simulate data with a genuine cross-outcome correlation (~0.6)
 #' # so the population estimate is recoverable, not floating on

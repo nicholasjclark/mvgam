@@ -141,7 +141,7 @@ translate_samples_burnin <- function(dots) {
 #' @param loadings_prior Optional named list specifying a
 #'   structured prior on the unconstrained factor loadings
 #'   matrix following Heaps & Jermyn (2024). When supplied, the
-#'   default iid `to_vector(Z) ~ student_t(3, 0, 1)` prior is
+#'   default iid `to_vector(Z) ~ student_t(3, 0, 0.5)` prior is
 #'   replaced with a per-column matrix-normal prior of the form
 #'   `Z[, i] ~ multi_normal_cholesky(0, L_Phi * sqrt(Psi_diag[i]))`,
 #'   where the among-row scale matrix `Phi` is assembled

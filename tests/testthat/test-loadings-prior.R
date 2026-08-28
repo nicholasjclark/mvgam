@@ -20,7 +20,7 @@ test_that("normalise_loadings_prior resolves features from data2", {
     data2 = list(row_features = features),
     data = data
   )
-  expect_equal(spec$n_features, 1L)
+  expect_equal(spec$N_features_trend, 1L)
   expect_equal(spec$n_distances, 0L)
   expect_equal(rownames(spec$features_mat), c("s1", "s2", "s3"))
 })
@@ -32,7 +32,7 @@ test_that("normalise_loadings_prior accepts inline matrix for features", {
   spec <- normalise_loadings_prior(
     list(features = mat), data2 = NULL, data = data
   )
-  expect_equal(spec$n_features, 1L)
+  expect_equal(spec$N_features_trend, 1L)
 })
 
 test_that("normalise_loadings_prior errors on missing data2 lookup", {
@@ -108,7 +108,7 @@ test_that("normalise_loadings_prior accepts pure MGP (no features / distances)",
   )
   expect_identical(spec$column_shrinkage, "mgp")
   expect_null(spec$features_mat)
-  expect_identical(spec$n_features, 0L)
+  expect_identical(spec$N_features_trend, 0L)
   expect_identical(spec$n_distances, 0L)
   expect_equal(spec$mgp_a1, 2)
   expect_equal(spec$mgp_a2, 4)
@@ -213,9 +213,9 @@ test_that("normalise_loadings_prior returns the expected struct shape", {
   )
   expect_named(spec, c("features_mat", "distance_mats",
                        "column_shrinkage", "mgp_a1", "mgp_a2",
-                       "n_series", "n_features", "n_distances"))
+                       "n_series", "N_features_trend", "n_distances"))
   expect_equal(spec$n_series, 3L)
-  expect_equal(spec$n_features, 1L)
+  expect_equal(spec$N_features_trend, 1L)
   expect_equal(spec$n_distances, 1L)
   expect_equal(spec$column_shrinkage, "iid")
 })
@@ -261,7 +261,7 @@ test_that("assert_loadings_prior_spec_consistent rejects bad feature dim", {
     distance_mats = list(),
     column_shrinkage = "iid",
     mgp_a1 = NA, mgp_a2 = NA,
-    n_series = 4L, n_features = 5L, n_distances = 0L
+    n_series = 4L, N_features_trend = 5L, n_distances = 0L
   )
   expect_error(
     assert_loadings_prior_spec_consistent(bad),
@@ -275,7 +275,7 @@ test_that("assert_loadings_prior_spec_consistent rejects bad distance count", {
     distance_mats = list(a = diag(0, 3L), b = diag(0, 3L)),
     column_shrinkage = "iid",
     mgp_a1 = NA, mgp_a2 = NA,
-    n_series = 3L, n_features = 0L, n_distances = 5L
+    n_series = 3L, N_features_trend = 0L, n_distances = 5L
   )
   expect_error(
     assert_loadings_prior_spec_consistent(bad),

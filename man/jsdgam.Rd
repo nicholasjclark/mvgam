@@ -110,7 +110,7 @@ prior overrides. See \code{\link[=default_prior.mvgam_formula]{default_prior.mvg
 modelling residual associations. Must be \verb{>= 1}. Defaults to
 \code{2}. The upper bound depends on the \code{loadings_prior}:
 \itemize{
-\item Default iid Z prior (\code{student_t(3, 0, 1)}) or any
+\item Default iid Z prior (\code{student_t(3, 0, 0.5)}) or any
 kernel-driven structured prior built from \code{traits} /
 \code{phylo} / \code{loadings_prior$distances}: \code{n_lv} is the
 \strong{exact factor count} that enters the likelihood, and

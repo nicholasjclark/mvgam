@@ -19,7 +19,7 @@
 \alias{vcov.mvgam}
 \title{Diagnostic quantities for mvgam models}
 \usage{
-\method{coef}{mvgam}(object, summarise = TRUE, ...)
+\method{coef}{mvgam}(object, summary = TRUE, ...)
 
 \method{nuts_params}{mvgam}(object, pars = NULL, ...)
 
@@ -66,8 +66,10 @@
 \arguments{
 \item{object, x}{A fitted \code{mvgam} object.}
 
-\item{summarise}{Logical. If \code{TRUE} (the default) \code{coef} returns
-posterior means; if \code{FALSE} it returns the full chain matrix.}
+\item{summary}{Logical. If \code{TRUE} (the default), summary statistics
+are returned; if \code{FALSE}, the raw posterior draws are returned.
+\code{coef} summarises to posterior means rather than to the
+Estimate / Est.Error / quantile matrix its siblings return.}
 
 \item{...}{Additional arguments forwarded to the underlying
 \verb{bayesplot::*} / \verb{posterior::*} function.}
@@ -75,9 +77,6 @@ posterior means; if \code{FALSE} it returns the full chain matrix.}
 \item{pars}{Optional character vector of parameter names. For
 \code{nuts_params} these are sampler-parameter names; otherwise they
 are model-parameter names. \code{NULL} returns all parameters.}
-
-\item{summary}{Logical. If \code{TRUE} (the default), summary statistics
-are returned; if \code{FALSE}, the raw posterior draws are returned.}
 
 \item{robust}{Logical. If \code{TRUE}, use median + median absolute
 deviation instead of mean + standard deviation. Default \code{FALSE}.}

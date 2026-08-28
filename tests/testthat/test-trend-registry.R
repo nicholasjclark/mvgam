@@ -782,3 +782,47 @@ test_that("normalise_prior_arg_alias() renames 'priors' to 'prior'", {
   )
 })
 
+
+
+# ---- an `ma` term must bring its parameters with it ------------------
+#
+# The branch adding them was written out once per trend, and the copies
+# drifted: `RW()` and `VAR()` listed theirs while `AR()` did not, so an
+# `AR(ma = TRUE)` fit sampled `theta1_trend` under a prior nothing
+# reported and nothing could override. The names now live in one table.
+
+
+test_that("each trend lists the parameters its ma term samples", {
+  expect_identical(
+    generate_rw_monitor_params(RW(ma = TRUE)), "theta1_trend"
+  )
+  expect_true(
+    "theta1_trend" %in% generate_ar_monitor_params(AR(p = 1, ma = TRUE))
+  )
+  expect_true(
+    all(c("Dmu_trend", "Domega_trend") %in%
+          generate_var_monitor_params(VAR(ma = TRUE)))
+  )
+})
+
+
+test_that("no ma term means no ma parameters", {
+  expect_length(generate_rw_monitor_params(RW()), 0L)
+  expect_false(
+    "theta1_trend" %in% generate_ar_monitor_params(AR(p = 1))
+  )
+  expect_false(
+    any(c("Dmu_trend", "Domega_trend") %in%
+          generate_var_monitor_params(VAR()))
+  )
+})
+
+
+test_that("the ma parameter table names every trend that accepts one", {
+  # A trend accepting `ma` without an entry here would silently list
+  # nothing, which is how the AR gap arose.
+  for (ctor in list(RW(ma = TRUE), AR(p = 1, ma = TRUE), VAR(ma = TRUE))) {
+    expect_gt(length(ma_params_for(ctor, ctor$trend)), 0L)
+  }
+  expect_length(ma_params_for(AR(p = 1), "AR"), 0L)
+})

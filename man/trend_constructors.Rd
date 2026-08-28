@@ -161,9 +161,9 @@ When \code{df = NA} the degrees of freedom are estimated as
 \code{nu_trend}, with a default \code{gamma(4, 0.3)} prior that
 can be replaced through the \code{prior} argument, for example
 \code{prior(gamma(2, 0.1), class = "nu_trend")}. Note that
-\code{nu_trend} does not yet appear in the
-\code{\link{get_prior}} table, so the class name has to come
-from here.
+\code{nu_trend} is listed in the \code{\link{get_prior}} table
+alongside \code{sigma_trend}, so the class name can be read from
+there.
 
 Two caveats. The bound of \code{2} is required rather than
 conventional: below it the innovations have no finite variance and
@@ -447,7 +447,7 @@ mcmc_plot(mod_car, variable = "trend_params", type = "intervals")
 # `gr` factor identifies the grouping unit (region) and `subgr`
 # identifies the within-group dimension (outcome). The fit
 # estimates a population innovation correlation across outcomes
-# plus per-region deviations; `alpha_cor_trend` (Beta(2, 2) by
+# plus per-region deviations; `alpha_cor_trend` (beta(3, 2) by
 # default) controls the partial-pooling blend between them.
 # Simulate data with a genuine cross-outcome correlation (~0.6)
 # so the population estimate is recoverable, not floating on

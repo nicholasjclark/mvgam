@@ -13,7 +13,7 @@
   model_names = NULL,
   incl_autocor = TRUE,
   incl_dynamics = NULL,
-  by_species = FALSE
+  by_series = FALSE
 )
 }
 \arguments{
@@ -39,12 +39,12 @@ to \code{incl_autocor = TRUE} and \code{FALSE} to \code{incl_autocor = FALSE}.
 When only \code{incl_dynamics} is given it decides; when both are
 given \code{incl_autocor} decides and \code{incl_dynamics} is ignored.}
 
-\item{by_species}{Logical, default \code{FALSE}. When \code{TRUE}, return a
-data frame with one row per series (\code{species} column) and per-
+\item{by_series}{Logical, default \code{FALSE}. When \code{TRUE}, return a
+data frame with one row per series (\code{series} column) and per-
 series WAIC estimates instead of a single \code{loo::waic} object.
 Matches the \code{spOccupancy::waicOcc(by.sp = TRUE)} workflow for
-ranking species-level fit in joint-species distribution models.
-See \code{\link[=loo.mvgam]{loo.mvgam()}} for the column-to-species mapping convention.}
+ranking per-series fit in joint-species distribution models.
+See \code{\link[=loo.mvgam]{loo.mvgam()}} for the column-to-series mapping convention.}
 }
 \value{
 A \code{loo::waic} object.

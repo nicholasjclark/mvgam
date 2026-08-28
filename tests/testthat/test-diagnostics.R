@@ -186,9 +186,9 @@ test_that("coef.mvgam returns named posterior means of b_* by default", {
   expect_setequal(names(out), c("b_Intercept", "b_x"))
 })
 
-test_that("coef.mvgam(summarise = FALSE) returns the full chain", {
+test_that("coef.mvgam(summary = FALSE) returns the full chain", {
   stub <- make_mvgam_stub()
-  out <- coef(stub, summarise = FALSE)
+  out <- coef(stub, summary = FALSE)
   expect_s3_class(out, "draws_matrix")
   expect_equal(ncol(out), 2L)
 })

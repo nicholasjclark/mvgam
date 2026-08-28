@@ -262,12 +262,12 @@ test_that("mvgam_loo_E_loo asserts its 'posterior_fn' is a function", {
 
 
 # ---------------------------------------------------------------
-# by_species split for loo() / waic(): column mapping + aggregator
+# by_series split for loo() / waic(): column mapping + aggregator
 # ---------------------------------------------------------------
 
 # Build a non-closure-unit stub whose data + family give a direct
-# (row -> series) mapping for per_obs_species_labels.
-make_by_species_stub <- function() {
+# (row -> series) mapping for per_obs_series_labels.
+make_by_series_stub <- function() {
   stub <- make_loo_extras_stub()
   stub$data <- data.frame(
     series = factor(rep(c("a", "b"), each = 4L)),
@@ -280,26 +280,26 @@ make_by_species_stub <- function() {
   stub
 }
 
-test_that("per_obs_species_labels maps log_lik columns to series", {
-  stub <- make_by_species_stub()
-  labels <- mvgam:::per_obs_species_labels(stub, n_cols = 8L)
+test_that("per_obs_series_labels maps log_lik columns to series", {
+  stub <- make_by_series_stub()
+  labels <- mvgam:::per_obs_series_labels(stub, n_cols = 8L)
   expect_identical(
     labels,
     c("a", "a", "a", "a", "b", "b", "b", "b")
   )
 })
 
-test_that("per_obs_species_labels rejects fits without a series column", {
-  stub <- make_by_species_stub()
+test_that("per_obs_series_labels rejects fits without a series column", {
+  stub <- make_by_series_stub()
   stub$data$series <- NULL
   expect_error(
-    mvgam:::per_obs_species_labels(stub, n_cols = 8L),
+    mvgam:::per_obs_series_labels(stub, n_cols = 8L),
     "requires a 'series' column"
   )
 })
 
-test_that("per_obs_species_labels rejects mv-custom families", {
-  stub <- make_by_species_stub()
+test_that("per_obs_series_labels rejects mv-custom families", {
+  stub <- make_by_series_stub()
   # Synthesise an mvgam_multi_response attribute that mirrors what
   # diri() / mvn() / multi() / categ() / mvt() set in their
   # constructors. The body of those constructors needs Stan to
@@ -311,13 +311,13 @@ test_that("per_obs_species_labels rejects mv-custom families", {
     mvgam_multi_response = TRUE
   )
   expect_error(
-    mvgam:::per_obs_species_labels(stub, n_cols = 8L),
+    mvgam:::per_obs_series_labels(stub, n_cols = 8L),
     "not meaningful for multi-response families"
   )
 })
 
-test_that("per_species_ic returns one elpd row per series", {
-  stub <- make_by_species_stub()
+test_that("per_series_ic returns one elpd row per series", {
+  stub <- make_by_series_stub()
   set.seed(7L)
   logliks <- matrix(rnorm(40 * 8L, mean = -1, sd = 0.5),
                     nrow = 40L, ncol = 8L)
@@ -327,15 +327,15 @@ test_that("per_species_ic returns one elpd row per series", {
   # the numerical quality of the fit, so silence the pareto-k
   # warning at this call site rather than making it noise.
   out_loo <- suppressWarnings(
-    mvgam:::per_species_ic(stub, logliks, criterion = "loo")
+    mvgam:::per_series_ic(stub, logliks, criterion = "loo")
   )
   expect_s3_class(out_loo, "data.frame")
-  expect_setequal(out_loo$species, c("a", "b"))
+  expect_setequal(out_loo$series, c("a", "b"))
   expect_named(out_loo,
-               c("species", "elpd", "se_elpd", "p", "n_obs"))
+               c("series", "elpd", "se_elpd", "p", "n_obs"))
   expect_identical(out_loo$n_obs, c(4L, 4L))
   # WAIC path returns the same column set.
-  out_waic <- mvgam:::per_species_ic(stub, logliks, criterion = "waic")
+  out_waic <- mvgam:::per_series_ic(stub, logliks, criterion = "waic")
   expect_named(out_waic,
-               c("species", "elpd", "se_elpd", "p", "n_obs"))
+               c("series", "elpd", "se_elpd", "p", "n_obs"))
 })

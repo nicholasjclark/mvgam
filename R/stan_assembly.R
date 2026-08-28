@@ -2539,9 +2539,13 @@ generate_innovation_model <- function(effective_dim, cor = FALSE,
     }
 
     if (cor && effective_dim > 1) {
-      prior_code <- c(prior_code,
-        "L_Omega_trend ~ lkj_corr_cholesky(2);"
-      )
+      # Read through the shared resolver so a user prior on the
+      # correlation factor is honoured rather than overwritten by a
+      # literal, and so the prior table reports what is sampled.
+      prior_code <- c(prior_code, paste0(
+        "L_Omega_trend ~ ",
+        get_trend_parameter_prior(prior, "L_Omega_trend"), ";"
+      ))
     }
 
     prior_code <- c(prior_code, innovation_code)
@@ -3275,8 +3279,10 @@ generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
                                   trend_type = NULL,
                                   loadings_prior_spec = NULL,
                                   rotate = TRUE,
-                                  family = NULL) {
+                                  family = NULL,
+                                  prior = NULL) {
   checkmate::assert_logical(is_factor_model, len = 1)
+  checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
   checkmate::assert_integerish(n_lv, lower = 1, any.missing = FALSE)
   checkmate::assert_character(trend_type, len = 1, null.ok = TRUE)
   checkmate::assert_list(loadings_prior_spec, null.ok = TRUE)
@@ -3308,7 +3314,8 @@ generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
     # via the LQ change of variables.
     brms::stanvar(
       name = "factor_z_priors",
-      scode = "to_vector(Z) ~ student_t(3, 0, 0.5);",
+      scode = paste0("to_vector(Z) ~ ",
+                     get_trend_parameter_prior(prior, "Z"), ";"),
       block = "model"
     )
   }
@@ -3376,7 +3383,7 @@ generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
 #' Returns a combined `brms::stanvar` covering the data /
 #' transformed-data / parameters / transformed-parameters / model
 #' block fragments needed to swap the default
-#' `to_vector(Z) ~ student_t(3, 0, 1)` for the per-column
+#' `to_vector(Z) ~ student_t(3, 0, 0.5)` for the per-column
 #' matrix-normal prior
 #'
 #'   `Z\[, i\] ~ multi_normal_cholesky(zero_vec, L_Phi * sqrt(Psi_diag\[i\]))`
@@ -3409,7 +3416,7 @@ generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
 #'   `features_mat` (numeric p x c matrix or NULL),
 #'   `distance_mats` (named list of p x p matrices, possibly
 #'   empty), `column_shrinkage` ("iid" or "mgp"), `mgp_a1`,
-#'   `mgp_a2`, `n_series`, `n_features`, `n_distances`.
+#'   `mgp_a2`, `n_series`, `N_features_trend`, `n_distances`.
 #' @return Combined `brms::stanvar` injecting all required
 #'   declarations and prior statements.
 #' @references
@@ -3423,7 +3430,7 @@ generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
 #' @noRd
 make_loadings_prior_stanvars <- function(spec) {
   assert_loadings_prior_spec_consistent(spec)
-  has_features <- spec$n_features > 0L
+  has_features <- spec$N_features_trend > 0L
   has_distances <- spec$n_distances > 0L
   uses_mgp <- identical(spec$column_shrinkage, "mgp")
   dist_names <- names(spec$distance_mats) %||% character(0)
@@ -3435,15 +3442,15 @@ make_loadings_prior_stanvars <- function(spec) {
   if (has_features) {
     data_vars <- c(data_vars, list(
       brms::stanvar(
-        x = as.integer(spec$n_features),
-        name = "n_features",
-        scode = "int<lower=1> n_features;",
+        x = as.integer(spec$N_features_trend),
+        name = "N_features_trend",
+        scode = "int<lower=1> N_features_trend;",
         block = "data"
       ),
       brms::stanvar(
         x = spec$features_mat,
         name = "row_features",
-        scode = "matrix[N_series_trend, n_features] row_features;",
+        scode = "matrix[N_series_trend, N_features_trend] row_features;",
         block = "data"
       )
     ))
@@ -3454,7 +3461,7 @@ make_loadings_prior_stanvars <- function(spec) {
       brms::stanvar(
         name = "row_features_arr",
         scode = paste(
-          "array[N_series_trend] vector[n_features] row_features_arr;",
+          "array[N_series_trend] vector[N_features_trend] row_features_arr;",
           "for (i_rf in 1:N_series_trend) {",
           "  row_features_arr[i_rf] = row_features[i_rf, ]';",
           "}",
@@ -3469,7 +3476,7 @@ make_loadings_prior_stanvars <- function(spec) {
     param_vars <- c(param_vars, list(
       brms::stanvar(
         name = "theta_features",
-        scode = "array[n_features] real<lower=0> theta_features;",
+        scode = "array[N_features_trend] real<lower=0> theta_features;",
         block = "parameters"
       )
     ))
@@ -3996,9 +4003,6 @@ generate_hierarchical_correlation_model <- function(n_groups, prior = NULL) {
   l_omega_global_user <- get_trend_parameter_prior(
     prior, "L_Omega_global_trend"
   )
-  if (!nzchar(l_omega_global_user)) {
-    l_omega_global_user <- "lkj_corr_cholesky(1)"
-  }
   l_omega_global_prior <- brms::stanvar(
     name = "L_Omega_global_trend_prior",
     scode = glue::glue("L_Omega_global_trend ~ {l_omega_global_user};"),
@@ -4008,9 +4012,6 @@ generate_hierarchical_correlation_model <- function(n_groups, prior = NULL) {
   l_dev_group_user <- get_trend_parameter_prior(
     prior, "L_deviation_group_trend"
   )
-  if (!nzchar(l_dev_group_user)) {
-    l_dev_group_user <- "lkj_corr_cholesky(6)"
-  }
   l_deviation_group_prior <- brms::stanvar(
     name = "L_deviation_group_trend_prior",
     scode = glue::glue(
@@ -4023,7 +4024,7 @@ generate_hierarchical_correlation_model <- function(n_groups, prior = NULL) {
   # Prior for group-specific innovation variances
   sigma_group_prior <- brms::stanvar(
     name = "sigma_group_trend_prior",
-    scode = glue::glue("for (g_idx in 1:N_groups_trend) {{ to_vector(sigma_group_trend[g_idx]) ~ {get_trend_parameter_prior(prior, 'sigma_trend')}; }}"),
+    scode = glue::glue("for (g_idx in 1:N_groups_trend) {{ to_vector(sigma_group_trend[g_idx]) ~ {get_trend_parameter_prior(prior, 'sigma_group_trend')}; }}"),
     block = "model"
   )
 
@@ -4327,7 +4328,8 @@ generate_rw_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       fixed_Z = trend_specs$fixed_Z,
       loadings_prior_spec = trend_specs$loadings_prior_spec,
       rotate = !isTRUE(data_info$has_by_lv),
-      family = data_info$family
+      family = data_info$family,
+      prior = prior
     )
     components <- append_if_not_null(components, factor_priors)
   }
@@ -4458,7 +4460,6 @@ build_plain_ar_stanvars <- function(ar_lags, coef_sharing, prior = NULL) {
           prior, paste0("ar", lag, "_trend")
         )
       }
-      if (!nzchar(prior_str)) prior_str <- "normal(0, 0.5)"
       prior_lines <- c(prior_lines, paste0(sampled, " ~ ", prior_str, ";"))
     } else if (coef_sharing == "hierarchical") {
       mu_name <- paste0("mu_ar", lag, "_trend")
@@ -4469,9 +4470,7 @@ build_plain_ar_stanvars <- function(ar_lags, coef_sharing, prior = NULL) {
         paste0("vector<lower=-1,upper=1>[N_lv_trend] ar", lag, "_trend;")
       )
       mu_prior <- get_trend_parameter_prior(prior, mu_name)
-      if (!nzchar(mu_prior)) mu_prior <- "normal(0, 0.5)"
       sigma_prior <- get_trend_parameter_prior(prior, sigma_name)
-      if (!nzchar(sigma_prior)) sigma_prior <- "exponential(2)"
       prior_lines <- c(prior_lines,
         paste0(mu_name, " ~ ", mu_prior, ";"),
         paste0(sigma_name, " ~ ", sigma_prior, ";"),
@@ -4484,7 +4483,6 @@ build_plain_ar_stanvars <- function(ar_lags, coef_sharing, prior = NULL) {
         "vector<lower=-1,upper=1>[N_lv_trend] ar", lag, "_trend;"
       ))
       prior_str <- get_trend_parameter_prior(prior, sampled)
-      if (!nzchar(prior_str)) prior_str <- "normal(0, 0.5)"
       prior_lines <- c(prior_lines, paste0(sampled, " ~ ", prior_str, ";"))
     }
   }
@@ -4735,7 +4733,8 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       fixed_Z = trend_specs$fixed_Z,
       loadings_prior_spec = trend_specs$loadings_prior_spec,
       rotate = !isTRUE(data_info$has_by_lv),
-      family = data_info$family
+      family = data_info$family,
+      prior = prior
     )
     components <- append_if_not_null(components, factor_priors)
   }
@@ -5405,7 +5404,9 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # Conditional correlation prior for hierarchical vs non-hierarchical
   omega_prior <- if(!is_hierarchical) {
-    "// LKJ correlation prior on Cholesky factor\n      L_Omega_trend ~ lkj_corr_cholesky(2);"
+    paste0("// LKJ correlation prior on Cholesky factor\n      ",
+           "L_Omega_trend ~ ",
+           get_trend_parameter_prior(prior, "L_Omega_trend"), ";")
   } else {
     "// Hierarchical correlation priors handled by add_hierarchical_support()"
   }
@@ -5585,7 +5586,8 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       trend_type = "VAR",
       loadings_prior_spec = trend_specs$loadings_prior_spec,
       rotate = !isTRUE(data_info$has_by_lv),
-      family = data_info$family
+      family = data_info$family,
+      prior = prior
     )
     components <- append_if_not_null(components, factor_priors)
   }
@@ -5951,7 +5953,8 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
       fixed_Z = trend_specs$fixed_Z,
       loadings_prior_spec = trend_specs$loadings_prior_spec,
       rotate = !isTRUE(data_info$has_by_lv),
-      family = data_info$family
+      family = data_info$family,
+      prior = prior
     )
     components <- append_if_not_null(components, factor_priors)
   }
@@ -6251,15 +6254,15 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   # Create individual stanvars for each PW data component
   n_change_stanvar <- brms::stanvar(
     x = n_changepoints,
-    name = "n_change_trend",
-    scode = "int<lower=0> n_change_trend;",
+    name = "N_change_trend",
+    scode = "int<lower=0> N_change_trend;",
     block = "data"
   )
 
   t_change_stanvar <- brms::stanvar(
     x = as.numeric(t_change_values),
     name = "t_change_trend",
-    scode = "vector[n_change_trend] t_change_trend;",
+    scode = "vector[N_change_trend] t_change_trend;",
     block = "data"
   )
 
@@ -6300,7 +6303,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
       vector[N_time_trend] time_trend;
       for (i in 1:N_time_trend) time_trend[i] = i;
       // sorted changepoint matrix
-      matrix[N_time_trend, n_change_trend] Kappa_trend = get_changepoint_matrix(time_trend, t_change_trend, N_time_trend, n_change_trend);
+      matrix[N_time_trend, N_change_trend] Kappa_trend = get_changepoint_matrix(time_trend, t_change_trend, N_time_trend, N_change_trend);
     "),
     block = "tdata"
   )
@@ -6316,7 +6319,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
       vector[N_lv_trend] m_trend;
 
       // trend rate adjustments per series
-      matrix[n_change_trend, N_lv_trend] delta_trend;
+      matrix[N_change_trend, N_lv_trend] delta_trend;
     "),
     block = "parameters"
   )
@@ -6333,7 +6336,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
           lv_trend[1 : N_time_trend, s] = logistic_trend(k_trend[s], m_trend[s],
                                         to_vector(delta_trend[ : , s]), time_trend,
                                         to_vector(cap_trend[ : , s]), Kappa_trend, t_change_trend,
-                                        n_change_trend);
+                                        N_change_trend);
         }}
       "),
       block = "tparameters"
@@ -6363,22 +6366,32 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
 
   # PW trend priors - always generate defaults if no custom priors
   # PW has its own default priors that should always be included
+  # One statement per parameter, carrying the user's prior where they
+  # gave one. Emitting the default and then appending the user's as a
+  # second stanvar did not override it: `combine_stanvars()` keeps
+  # both, so Stan accumulated two log-densities and the posterior sat
+  # under the product of the two priors. `delta_trend` is a matrix, so
+  # its statement is vectorised; a bare `delta_trend ~ dist` is
+  # ill-typed and Stan refuses to compile it.
+  pw_prior_line <- function(param, fallback, vectorise = FALSE) {
+    chosen <- get_trend_parameter_prior(prior, param)
+    if (!nzchar(chosen)) {
+      chosen <- fallback
+    }
+    lhs <- if (isTRUE(vectorise)) paste0("to_vector(", param, ")") else param
+    paste0("      ", lhs, " ~ ", chosen, ";")
+  }
   pw_model_stanvar <- brms::stanvar(
     name = "pw_model",
-    scode = glue::glue("
-      // PW trend default priors
-      m_trend ~ student_t(3, 0, 2.5);
-      k_trend ~ std_normal();
-      to_vector(delta_trend) ~ double_exponential(0, {changepoint_scale});
-    "),
+    scode = paste(c(
+      "      // PW trend priors",
+      pw_prior_line("m_trend", "student_t(3, 0, 2.5)"),
+      pw_prior_line("k_trend", "std_normal()"),
+      pw_prior_line("delta_trend",
+                    paste0("double_exponential(0, ", changepoint_scale, ")"),
+                    vectorise = TRUE)
+    ), collapse = "\n"),
     block = "model"
-  )
-
-  # Also check for custom priors if provided
-  pw_custom_priors <- generate_trend_priors_stanvar(
-    param_names = c("m_trend", "k_trend", "delta_trend"),
-    prior = prior,
-    stanvar_name = "pw_custom_priors"
   )
 
   # Add all required components to the list
@@ -6394,10 +6407,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     pw_model_stanvar  # Always include default priors
   ))
 
-  # Add custom priors if specified (will override defaults)
-  if (!is.null(pw_custom_priors)) {
-    components <- append(components, list(pw_custom_priors))
-  }
+
 
   # Add logistic-specific data if needed
   if (!is.null(pw_logistic_data_stanvar)) {

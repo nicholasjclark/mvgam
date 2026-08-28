@@ -38,7 +38,7 @@ test_that("loadings_prior standata threads encoded features and distance", {
   sd <- fit$standata
   # 1 continuous trait + 2 one-hot cluster indicators (both
   # levels retained per Heaps Sect. 6.2).
-  expect_equal(sd$n_features, 3L)
+  expect_equal(sd$N_features_trend, 3L)
   expect_equal(dim(sd$row_features), c(8L, 3L))
   expect_equal(dim(sd$dist_cluster), c(8L, 8L))
   # Distance matrix standardised to max-distance one.

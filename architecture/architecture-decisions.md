@@ -152,7 +152,7 @@ mu_biomass += mu_biomass_trend;
 2. **Validation**: Registry-based compatibility checking prevents invalid factor models
 3. **Variance Constraint**: Dynamic factor variances must be fixed to 1 for identifiability
 4. **Matrix Z Location**: Four branches handled by `generate_matrix_z_multiblock_stanvars()`:
-   - Sampled Z (default factor model): `parameters` block declares `matrix[N_series_trend, N_lv_trend] Z`; the default prior is `to_vector(Z) ~ student_t(3, 0, 1)`; identification is post-hoc via thin QR in generated quantities (see "Post-hoc QR identification" below).
+   - Sampled Z (default factor model): `parameters` block declares `matrix[N_series_trend, N_lv_trend] Z`; the default prior is `to_vector(Z) ~ student_t(3, 0, 0.5)`; identification is post-hoc via thin QR in generated quantities (see "Post-hoc QR identification" below).
    - Sampled Z with structured prior: when `loadings_prior` is supplied, the default iid prior is replaced with a per-column matrix-normal `Z[, i] ~ multi_normal_cholesky(0, L_Phi * sqrt(Psi_diag[i]))`. See "Structured loadings priors" below.
    - Partial Z (user supplied via `trend_map` with NAs): fixed entries broadcast through a data-block template; free entries are sampled as a flat vector and assembled in transformed parameters; bypasses the QR identification step so the user-encoded pattern is preserved on `Z` directly.
    - Fully fixed Z (user supplied via `trend_map` with no NAs): `data` block matrix, no parameters, no prior, no QR; identification comes from the user's structural choices.

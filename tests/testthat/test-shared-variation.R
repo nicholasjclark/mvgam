@@ -28,7 +28,7 @@ test_that("match_loadings_prior_pars matches expected names only", {
     "theta_dist_phylo", "theta_dist_cluster",
     "Psi_diag[1]", "Psi_diag[2]",
     "varrho_inv[1]", "varrho_inv[2]",
-    "n_features", "Z_tilde[1,1]", "row_features[1,1]",
+    "N_features_trend", "Z_tilde[1,1]", "row_features[1,1]",
     "ar1_trend[1]", "sigma_trend[1]"
   )
   hits <- match_loadings_prior_pars(pars)

@@ -109,7 +109,7 @@
 #'   modelling residual associations. Must be `>= 1`. Defaults to
 #'   `2`. The upper bound depends on the `loadings_prior`:
 #'   \itemize{
-#'     \item Default iid Z prior (`student_t(3, 0, 1)`) or any
+#'     \item Default iid Z prior (`student_t(3, 0, 0.5)`) or any
 #'       kernel-driven structured prior built from `traits` /
 #'       `phylo` / `loadings_prior$distances`: `n_lv` is the
 #'       **exact factor count** that enters the likelihood, and

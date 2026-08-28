@@ -388,7 +388,7 @@ test_that("PW pulls k / m / delta from posterior and t_change from standata", {
                ma_lags = integer(0), max_lag = 0L,
                has_cor = FALSE)
   fit <- make_mock_fit(draws, n_series, n_lv, n_time, meta)
-  fit$standata$n_change_trend <- n_change
+  fit$standata$N_change_trend <- n_change
   fit$standata$t_change_trend <- t_change_data
   fit$standata$cap_trend <- cap_data
   res <- extract_last_state(fit, 1L)
@@ -417,7 +417,7 @@ test_that("PW handles no-changepoint case gracefully", {
                has_cor = FALSE)
   fit <- make_mock_fit(draws, n_series = 2L, n_lv = 2L,
                         n_time = 10L, meta)
-  fit$standata$n_change_trend <- 0L
+  fit$standata$N_change_trend <- 0L
   fit$standata$t_change_trend <- numeric(0L)
   res <- extract_last_state(fit, 1L)
   expect_identical(dim(res$params$delta), c(0L, 2L))

@@ -20,7 +20,7 @@
   model_names = NULL,
   incl_autocor = TRUE,
   incl_dynamics = NULL,
-  by_species = FALSE
+  by_series = FALSE
 )
 
 \method{loo_compare}{mvgam}(
@@ -54,8 +54,8 @@ from deparsing the call. Otherwise will use the passed values as model names}
 \item{incl_dynamics}{Superseded by \code{incl_autocor} and still
 accepted; ignored when \code{incl_autocor} is also given.}
 
-\item{by_species}{Logical, default \code{FALSE}. When \code{TRUE}, return a
-data frame with one row per series (\code{species} column) and per-series
+\item{by_series}{Logical, default \code{FALSE}. When \code{TRUE}, return a
+data frame with one row per series (\code{series} column) and per-series
 ELPD estimates instead of a single \code{psis_loo} object. Matches the
 \code{spOccupancy::waicOcc(by.sp = TRUE)} workflow for ranking species-
 level fit in joint-species distribution models. Requires a \code{series}
