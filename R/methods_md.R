@@ -1641,16 +1641,6 @@ obs_mo_specs_from_prior <- function(prior) {
   })
 }
 
-#' @noRd
-obs_smooth_terms_from_prior <- function(prior) {
-  # Returns one subscript label per smooth term. For 1D smooths
-  # this is the bare variable; for tensor smooths it is the
-  # comma-joined variable list ("x, z") so the math subscript
-  # matches what the renderer emits.
-  specs <- obs_smooth_specs_from_prior(prior)
-  vapply(specs, function(s) paste(s$vars, collapse = ", "),
-         character(1L))
-}
 
 #' @noRd
 obs_smooth_specs_from_prior <- function(prior) {
@@ -1770,13 +1760,6 @@ basis_label <- function(bs, fname) {
   )
 }
 
-#' @noRd
-obs_re_groups_from_prior <- function(prior) {
-  # Returns a bare character vector for back-compat (existing
-  # call sites that only want group names).
-  specs <- obs_re_specs_from_prior(prior)
-  vapply(specs, function(s) s$group, character(1L))
-}
 
 #' @noRd
 obs_re_specs_from_prior <- function(prior) {
@@ -2735,7 +2718,6 @@ mgp_shrinkage_rows <- function() {
     )
   )
 }
-
 
 
 # ---------------------------------------------------------------

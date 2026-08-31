@@ -248,17 +248,6 @@ sim_negbinom <- function(mu, size) {
 }
 
 
-# Internal: Compute the marginal link-scale SD a smooth or
-# random-effect contributes, so sim_mvgam can target a chosen
-# `prop_trend` variance share when balancing trend vs obs-side
-# components.
-#'@noRd
-component_sd <- function(values) {
-  if (length(values) < 2L) return(0)
-  stats::sd(as.numeric(values))
-}
-
-
 # Internal: Build a covariate vector of length `n` from a chosen
 # distribution. Used by sim_mvgam to populate `x`, `z`, `w`, etc.
 #'@noRd

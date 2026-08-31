@@ -284,66 +284,6 @@ sample_truncated_rejection <- function(n, dist, lb = -Inf, ub = Inf,
 }
 
 
-#' Check for Invalid Truncated Samples
-#'
-#' Checks predicted values against truncation bounds and warns if many samples
-#' are invalid. Rounds values for discrete distributions.
-#'
-#' @param x Matrix of samples `\\[ndraws x nobs\\]`
-#' @param lb Lower bounds (vector of length nobs, scalar, or NULL)
-#' @param ub Upper bounds (vector of length nobs, scalar, or NULL)
-#' @param threshold Numeric in (0,1); fraction of invalid samples triggering
-#'   warning. Default 0.01 (1%) matches brms::check_discrete_trunc_bounds().
-#'
-#' @return Matrix x rounded to integers (for discrete distributions)
-#'
-#' @noRd
-check_truncation_bounds <- function(x, lb = NULL, ub = NULL, threshold = 0.01) {
-  checkmate::assert_matrix(x)
-  checkmate::assert_numeric(lb, null.ok = TRUE)
-  checkmate::assert_numeric(ub, null.ok = TRUE)
-  checkmate::assert_number(threshold, lower = 0, upper = 1)
-
-  if (is.null(lb) && is.null(ub)) {
-    return(x)
-  }
-
-  lb_check <- if (is.null(lb)) -Inf else lb
-  ub_check <- if (is.null(ub)) Inf else ub
-
-  # Expand bounds to match matrix dimensions
-  if (length(lb_check) == 1) lb_check <- rep(lb_check, ncol(x))
-  if (length(ub_check) == 1) ub_check <- rep(ub_check, ncol(x))
-
-  # Flatten for comparison
-  y <- as.vector(t(x))
-  lb_expanded <- rep(lb_check, each = nrow(x))
-  ub_expanded <- rep(ub_check, each = nrow(x))
-
-  # Count invalid: NA or outside bounds
-  pct_invalid <- mean(is.na(y) | y < lb_expanded | y > ub_expanded,
-                      na.rm = FALSE)
-
-  if (pct_invalid >= threshold) {
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      rlang::warn(
-        c(
-          paste0(
-            round(pct_invalid * 100),
-            "% of all predicted values were invalid."
-          ),
-          "i" = "Increasing argument {.arg ntrys} may help."
-        ),
-        .frequency = "once",
-        .frequency_id = "mvgam_trunc_invalid"
-      )
-    }
-  }
-
-  round(x)
-}
-
-
 #' Determine if Family Uses Integer Values
 #'
 #' Returns TRUE for count/discrete families that produce integer samples.

@@ -879,59 +879,6 @@ parse_glm_parameters_single <- function(stan_code, glm_type) {
   )
 }
 
-#' Transform GLM Call with Combined Linear Predictor
-#'
-#' @description
-#' Transforms GLM function calls to use combined linear predictor with trends.
-#'
-#' @param stan_code Character string containing original Stan code
-#' @param glm_type Character string specifying GLM function base name
-#' @param params List of parsed GLM parameters
-#' @return Character string with transformed Stan code
-#' @noRd
-transform_glm_call <- function(stan_code, glm_type, params) {
-  checkmate::assert_character(stan_code, min.len = 1)
-  checkmate::assert_string(glm_type)
-  checkmate::assert_list(params, names = "named")
-
-  # Original pattern to match - use same pattern as detect_glm_usage
-  original_pattern <- paste0(stan_density_call_pattern(glm_type),
-                             "\\s*\\([^\\)]+\\)")
-
-  # Build replacement using GLM structure: glm_function(Y | mu_matrix, 0.0, mu_ones, ...)
-  # This preserves GLM optimization while allowing trend injection into mu
-  other_params_str <- if (!is.null(params$other_params)) {
-    paste0(", ", paste(params$other_params, collapse = ", "))
-  } else {
-    ""
-  }
-
-  # Put back the spelling the program used. Writing `_lpdf` over a
-  # `_lupdf` would restore the normalising constants a user turned off
-  # with `normalize = FALSE`.
-  suffix <- stan_density_suffix(stan_code, glm_type)
-  if (is.null(suffix)) {
-    return(stan_code)
-  }
-
-  if (!glm_type %in% c("normal_id_glm", "poisson_log_glm",
-                       "neg_binomial_2_log_glm", "bernoulli_logit_glm",
-                       "ordered_logistic_glm", "categorical_logit_glm")) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Unsupported GLM type for transformation: {glm_type}"
-      )
-    ))
-  }
-  # glm_function(Y | mu_matrix, 0.0, mu_ones, ...) keeps Stan's GLM
-  # optimisation while leaving mu free for the trend.
-  replacement <- paste0(
-    glm_type, suffix, "(", params$y_var,
-    " | to_matrix(mu), 0.0, mu_ones", other_params_str, ")"
-  )
-
-  gsub(original_pattern, replacement, stan_code)
-}
 
 
 #' Extract Mapping Arrays from Trend Stanvars
@@ -1181,69 +1128,6 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
   return(modified_stancode)
 }
 
-#' Transform GLM Calls After Standard Trend Injection
-#' 
-#' @description
-#' Post-processes Stan code to transform GLM function calls to work with 
-#' trend-adjusted mu vectors. Applied after standard trend injection to
-#' ensure GLM functions use the combined linear predictor.
-#'
-#' @param stan_code Character string containing Stan code with trend components
-#' @param detected_glm_types Character vector of detected GLM function types.
-#'   Must be supported GLM types from the mvgam GLM transformation system.
-#' @return Character string with modified Stan code containing transformed GLM calls
-#' @noRd
-transform_glm_calls_post_processing <- function(stan_code, detected_glm_types) {
-  checkmate::assert_character(stan_code, min.chars = 1)
-  checkmate::assert_character(detected_glm_types, min.len = 1)
-  
-  # Validate GLM types are supported
-  supported_glm_types <- c("normal_id_glm", "poisson_log_glm", "neg_binomial_2_log_glm", 
-                          "bernoulli_logit_glm", "ordered_logistic_glm", "categorical_logit_glm")
-  invalid_types <- setdiff(detected_glm_types, supported_glm_types)
-  if (length(invalid_types) > 0) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Unsupported GLM types detected: {.field {invalid_types}}"
-      ),
-      i = cli::format_inline(
-        "Supported types: {.field {supported_glm_types}}"
-      )
-    )), call. = FALSE)
-  }
-  
-  modified_code <- stan_code
-  
-  # Transform each detected GLM type
-  for (glm_type in detected_glm_types) {
-    # Use cached parameters from analysis (required)
-    if (is.null(analysis$glm_parameters[[glm_type]])) {
-      stop(insight::format_error(c(
-        cli::format_inline(
-          "GLM parameters not found in analysis for type: {.field {glm_type}}"
-        ),
-        i = "Analysis object must contain pre-parsed GLM parameters."
-      )), call. = FALSE)
-    }
-    params <- analysis$glm_parameters[[glm_type]]
-    
-    # Transform with validation
-    previous_code <- modified_code
-    modified_code <- transform_glm_call(modified_code, glm_type, params)
-    
-    # Verify transformation occurred
-    if (identical(previous_code, modified_code)) {
-      stop(insight::format_error(c(
-        cli::format_inline(
-          "GLM transformation failed for type: {.field {glm_type}}"
-        ),
-        x = "No changes were made to the Stan code during transformation."
-      )), call. = FALSE)
-    }
-  }
-  
-  return(modified_code)
-}
 
 #' Convert GLM-Only Code to Standard Form for Trend Injection
 #' 
@@ -6447,7 +6331,6 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     trend_computation,
     pw_model_stanvar  # Always include default priors
   ))
-
 
 
   # Add logistic-specific data if needed

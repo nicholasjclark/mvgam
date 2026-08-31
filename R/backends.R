@@ -672,22 +672,6 @@ compiled_model <- function(x) {
   out
 }
 
-# Does the model need recompilation before being able to sample again?
-needs_recompilation <- function(x) {
-  stopifnot(is.mvgam(x))
-  backend <- x$backend %||% "rstan"
-  if (backend == "rstan") {
-    # rstan gives no reliable signal for when a cached model object
-    # has gone stale, so recompilation is never skipped here.
-    out <- FALSE
-  } else if (backend == "cmdstanr") {
-    exe_file <- attributes(x$fit)$CmdStanModel$exe_file()
-    out <- !is.character(exe_file) || !file.exists(exe_file)
-  } else if (backend == "mock") {
-    out <- FALSE
-  }
-  out
-}
 
 # extract the elapsed time during model fitting
 # @param x brmsfit object
@@ -1118,15 +1102,6 @@ repair_stanfit <- function(x) {
   x
 }
 
-#' Possible Options for file_refit Argument
-#' @description
-#' Returns valid options for file refit control.
-#' Adapted from brms backend system.
-#' @return Character vector of valid options
-#' @noRd
-file_refit_options <- function() {
-  c("never", "always", "on_change")
-}
 
 #' Unlist lapply Output
 #' @description

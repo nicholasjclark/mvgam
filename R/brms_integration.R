@@ -390,7 +390,6 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
 }
 
 
-
 #' Extract Prior Information from brms Setup
 #' @param setup_object brms setup object
 #' @param codegen A list from `mvgam_codegen_options()`, or NULL. The
@@ -1438,78 +1437,7 @@ create_trend_base_formula <- function(trend_specs) {
   }
 }
 
-# =============================================================================
-# SECTION 4: NONLINEAR MODEL SUPPORT
-# =============================================================================
-# WHY: Nonlinear models require specialized handling to determine where trend
-# effects should be injected into the parameter structure. This system enables
-# mvgam trends to work with brms nonlinear modeling capabilities while
-# maintaining proper identifiability and parameter interpretation.
-#' @noRd
-handle_nonlinear_model <- function(formula, trend_specs = NULL) {
-  checkmate::assert_formula(formula)
-  checkmate::assert_list(trend_specs, null.ok = TRUE)
 
-  # Check if this is a nonlinear model
-  is_nonlinear <- is_nonlinear_formula(formula)
-
-  if (!is_nonlinear) {
-    # Standard linear model, return as-is
-    return(list(
-      formula = formula,
-      is_nonlinear = FALSE,
-      nl_components = NULL,
-      trend_injection_point = "mu"
-    ))
-  }
-
-  # Process nonlinear formula structure
-  nl_components <- extract_nonlinear_components(formula)
-
-  # Determine where trends should be injected
-  trend_injection_point <- determine_trend_injection_point(
-    nl_components, trend_specs
-  )
-
-  # Validate trend compatibility with nonlinear structure
-  validate_nonlinear_trend_compatibility(nl_components, trend_specs)
-
-  return(list(
-    formula = formula,
-    is_nonlinear = TRUE,
-    nl_components = nl_components,
-    trend_injection_point = trend_injection_point
-  ))
-}
-
-#' Extract Nonlinear Components
-#'
-#' @description
-#' Extracts components from nonlinear brms formula for processing.
-#'
-#' @param formula Nonlinear brms formula
-#' @return List of nonlinear model components
-#' @noRd
-extract_nonlinear_components <- function(formula) {
-  checkmate::assert_formula(formula)
-
-  # brms is in Depends so the import is guaranteed; parse via
-  # brms::brmsterms() and fall back to the heuristic regex form
-  # if brms refuses the formula.
-  tryCatch({
-    bf_terms <- brms::brmsterms(formula)
-
-    return(list(
-      response = bf_terms$respform,
-      predictors = bf_terms$pforms,
-      nonlinear_params = names(bf_terms$nlpars),
-      family = bf_terms$family
-    ))
-  }, error = function(e) {
-    # Fallback to manual parsing
-    return(parse_nonlinear_manually(formula))
-  })
-}
 
 #' Parse Nonlinear Formula Manually
 #'

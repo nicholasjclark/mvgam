@@ -2559,25 +2559,6 @@ extract_lv_trend_array_from_draws <- function(draws_mat, n_time, n_lv) {
 }
 
 
-#' Add latent state matrix to linpred (matrix or per-resp list)
-#' @noRd
-add_latent_to_linpred <- function(linpred, latent_mat) {
-  if (is.list(linpred) && !is.matrix(linpred)) {
-    return(lapply(linpred, function(m) {
-      checkmate::assert_matrix(m,
-        nrows = nrow(latent_mat),
-        ncols = ncol(latent_mat)
-      )
-      m + latent_mat
-    }))
-  }
-  checkmate::assert_matrix(linpred,
-    nrows = nrow(latent_mat),
-    ncols = ncol(latent_mat)
-  )
-  linpred + latent_mat
-}
-
 #' Choose the prediction surface a diagnostic should read
 #'
 #' A residual or a posterior predictive check compares a prediction

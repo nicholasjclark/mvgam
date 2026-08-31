@@ -595,37 +595,6 @@ validate_closure_unit_data <- function(data,
 }
 
 
-#' Validate Nonlinear Trend Compatibility
-#'
-#' @description
-#' Validates that trend specifications are compatible with nonlinear model structure.
-#'
-#' @param nl_components List of nonlinear components
-#' @param trend_specs Trend specification
-#' @return Invisible TRUE if valid, stops with error if invalid
-#' @noRd
-validate_nonlinear_trend_compatibility <- function(nl_components, trend_specs) {
-  checkmate::assert_list(nl_components)
-  checkmate::assert_list(trend_specs, null.ok = TRUE)
-
-  if (is.null(trend_specs)) {
-    return(invisible(TRUE))
-  }
-
-  # Check that trend type is compatible with nonlinear models
-  incompatible_trends <- c()  # Currently all trends should work
-
-  if (trend_specs$type %in% incompatible_trends) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Trend type {.val {trend_specs$type}} is not compatible with nonlinear models."
-      ),
-      i = "Consider using different trend specification."
-    )))
-  }
-
-  invisible(TRUE)
-}
 
 #' Validate required variables exist in data
 #'
@@ -2661,27 +2630,6 @@ validate_multivariate_trend_constraints <- function(trend_formula, response_name
   invisible(NULL)
 }
 
-#' Main validation function for autocorrelation separation
-#'
-#' Validates proper separation between observation-level (brms) and trend-level
-#' (mvgam) autocorrelation handling.
-#'
-#' @param obs_formula Observation formula (any brms-compatible type)
-#' @param trend_formula Trend specification (formula, bf(), or named list)
-#' @return List with validated formulas
-#' @noRd
-validate_autocor_separation <- function(obs_formula, trend_formula = NULL) {
-  # Validate observation formula (minimal - let brms handle most validation)
-  validated_obs <- validate_obs_formula_brms(obs_formula)
-
-  # Validate trend formula against mvgam State-Space requirements
-  validated_trend <- validate_trend_formula_brms(trend_formula)
-
-  return(list(
-    obs_formula = validated_obs,
-    trend_formula = validated_trend
-  ))
-}
 
 #' Validate Setup Components
 #' @param components List of setup components
@@ -3869,77 +3817,7 @@ validate_prediction_factor_levels <- function(data, metadata) {
 }
 
 
-#' Validate Stan Code Structure
-#'
-#' @description
-#' Validates that Stan code contains required blocks (data, parameters, model).
-#'
-#' @param stan_code Character string containing Stan model code
-#' @return Invisible TRUE if valid, stops with error if invalid
-#' @noRd
-validate_stan_code_structure <- function(stan_code) {
-  checkmate::assert_string(stan_code, min.chars = 1)
 
-  # Required Stan blocks
-  required_blocks <- c("data", "parameters", "model")
-
-  # Check for each required block
-  missing_blocks <- character(0)
-
-  for (block in required_blocks) {
-    # Pattern to match block declaration
-    block_pattern <- paste0("\\b", block, "\\s*\\{")
-
-    if (!grepl(block_pattern, stan_code, ignore.case = FALSE)) {
-      missing_blocks <- c(missing_blocks, block)
-    }
-  }
-
-  if (length(missing_blocks) > 0) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Missing required Stan block{?s}: {.field {missing_blocks}}"
-      ),
-      i = "Stan models must contain data, parameters, and model blocks."
-    )))
-  }
-
-  invisible(TRUE)
-}
-
-#' Check if Braces are Balanced
-#'
-#' @description
-#' Checks if opening and closing braces are properly balanced in Stan code.
-#'
-#' @param stan_code Character string containing Stan model code
-#' @return Logical indicating whether braces are balanced
-#' @noRd
-are_braces_balanced <- function(stan_code) {
-  checkmate::assert_string(stan_code)
-
-  # Split into individual characters
-  chars <- unlist(strsplit(stan_code, "", fixed = TRUE))
-
-  # Track brace depth
-  depth <- 0
-
-  for (char in chars) {
-    if (char == "{") {
-      depth <- depth + 1
-    } else if (char == "}") {
-      depth <- depth - 1
-
-      # If depth goes negative, we have unmatched closing brace
-      if (depth < 0) {
-        return(FALSE)
-      }
-    }
-  }
-
-  # Return TRUE only if depth is exactly 0 (all braces matched)
-  return(depth == 0)
-}
 
 #' Parse Data Declarations from Stan Data Block
 #'

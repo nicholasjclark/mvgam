@@ -4934,35 +4934,6 @@ cmb_mean_vec <- function(mu, nu, T) {
 }
 
 
-#' Vectorised COM-Binomial variance `Var[Y]` (count-scale)
-#'
-#' Returns per-row count-scale variance via direct second-moment
-#' summation `E[Y^2] - (E[Y])^2`. The
-#' `predict(type = "variance")` path divides by `T^2` to return
-#' proportion-scale `Var[Y / T]` per the gate-A stats review.
-#' @noRd
-cmb_var_vec <- function(mu, nu, T) {
-  theta <- qlogis(mu)
-  out <- numeric(length(mu))
-  for (TT in unique(T)) {
-    ia <- which(T == TT)
-    lc <- .cmb_lchoose(TT)
-    x <- 0:TT
-    x2 <- x^2
-    chunk <- max(1L, as.integer(5e6 %/% (TT + 1L)))
-    for (s in seq(1L, length(ia), by = chunk)) {
-      idx <- ia[s:min(s + chunk - 1L, length(ia))]
-      lw <- outer(nu[idx], lc) + outer(theta[idx], x)
-      w <- exp(lw - .cmb_rowmax(lw))
-      w <- w / rowSums(w)
-      ex <- as.numeric(w %*% x)
-      out[idx] <- as.numeric(w %*% x2) - ex^2
-    }
-  }
-  out
-}
-
-
 #' Vectorised COM-Binomial random draw
 #'
 #' Returns per-row integer draws from `CMB(mu, nu, T)`. Uses

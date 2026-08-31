@@ -11,36 +11,6 @@ core_deps <- c(
   "brms"
 )
 
-#' Check which core dependencies are not yet loaded
-#' @noRd
-core_unloaded <- function() {
-  search <- paste0("package:", core_deps)
-  core_deps[!search %in% search()]
-}
-
-#' Quietly attach core dependencies without startup messages
-#' @noRd
-mvgam_attach <- function() {
-  to_load <- core_unloaded()
-  
-  # For dependencies, attach them quietly using attachNamespace
-  # This prevents startup messages while making functions available
-  for (pkg in to_load) {
-    if (pkg %in% loadedNamespaces()) {
-      # Namespace already loaded, just attach
-      suppressWarnings(attachNamespace(pkg))
-    } else {
-      # Load and attach namespace quietly
-      suppressPackageStartupMessages({
-        requireNamespace(pkg, quietly = TRUE)
-        attachNamespace(pkg)
-      })
-    }
-  }
-  
-  invisible(to_load)
-}
-
 
 #' Package attachment hook
 #'
