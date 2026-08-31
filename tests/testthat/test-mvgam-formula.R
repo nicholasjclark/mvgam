@@ -271,7 +271,8 @@ test_that("family compatibility across different distributions", {
 
     # Should be identical (attributes don't affect data structure)
     expect_identical(mvgam_result[, names(brms_result)], brms_result,
-                     info = paste("Failed for family:", family$family))
+                     label = paste("prior table for family",
+                                   family$family))
 
     # Verify structure (should have only observation parameters, no _trend suffix)
     expect_true(all(!grepl("_trend$", mvgam_result$class)))
@@ -470,7 +471,7 @@ test_that("all brms addition-terms detected in trend_formula", {
     expect_error(
       mvgam_formula(y ~ x, trend_formula = term),
       "brms addition-terms not allowed",
-      info = paste("Failed to catch:", deparse(term))
+      label = paste("trend_formula", deparse(term))
     )
   }
 })
@@ -596,7 +597,7 @@ test_that("comprehensive addition-terms catalog coverage", {
     expect_error(
       mvgam_formula(y ~ x, trend_formula = term),
       "brms addition-terms not allowed",
-      info = paste("Addition-term not caught:", deparse(term))
+      label = paste("trend_formula", deparse(term))
     )
   }
 })

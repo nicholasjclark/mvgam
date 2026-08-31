@@ -167,16 +167,24 @@ test_that("all trend types generate correct prior structures", {
             mvgam_trend_priors$coef == brms_row$coef &
             mvgam_trend_priors$group == brms_row$group, , drop = FALSE]
 
-          expect_true(nrow(matching_rows) > 0,
-                     info = paste("Missing trend equivalent for brms class:", brms_row$class,
-                                "in", test_name))
+          expect_true(
+            nrow(matching_rows) > 0,
+            label = paste("trend equivalent of brms class", brms_row$class,
+                          "in", test_name)
+          )
 
           if (nrow(matching_rows) > 0) {
             # Test bounds equivalence
-            expect_equal(matching_rows$lb[1], brms_row$lb,
-                        info = paste("Lower bound mismatch for", expected_trend_class, "in", test_name))
-            expect_equal(matching_rows$ub[1], brms_row$ub,
-                        info = paste("Upper bound mismatch for", expected_trend_class, "in", test_name))
+            expect_equal(
+              matching_rows$lb[1], brms_row$lb,
+              label = paste("lower bound of", expected_trend_class,
+                            "in", test_name)
+            )
+            expect_equal(
+              matching_rows$ub[1], brms_row$ub,
+              label = paste("upper bound of", expected_trend_class,
+                            "in", test_name)
+            )
           }
         }
       }
@@ -235,10 +243,10 @@ test_that("multivariate models handle priors correctly", {
   trend_classes <- priors_factor$class[grepl("_trend$", priors_factor$class)]
 
   # Z parameter should exist for factor models (not with _trend suffix)
-  expect_true("Z" %in% all_classes,
-              info = "Factor loading parameter Z should be generated for factor models")
-  expect_true(length(trend_classes) > 0,
-              info = "Trend parameters should be generated")
+  # A factor model prices its loadings, so `Z` earns a prior row of its
+  # own alongside the suffixed trend parameters.
+  expect_true("Z" %in% all_classes)
+  expect_true(length(trend_classes) > 0)
 
   # Edge case: Factor models with complex predictors
   edge_cases <- list(
@@ -283,8 +291,11 @@ test_that("multivariate models handle priors correctly", {
             mvgam_obs$coef == brms_row$coef &
             mvgam_obs$group == brms_row$group, , drop = FALSE]
 
-          expect_true(nrow(matching_obs) > 0,
-                     info = paste("Missing observation prior for brms class:", brms_row$class, "in", case_name))
+          expect_true(
+            nrow(matching_obs) > 0,
+            label = paste("observation prior for brms class",
+                          brms_row$class, "in", case_name)
+          )
         }
       }
     }
@@ -296,7 +307,7 @@ test_that("multivariate models handle priors correctly", {
       non_z_classes <- trend_classes[trend_classes != "Z"]
       if (length(non_z_classes) > 0) {
         expect_true(all(grepl("_trend$", non_z_classes)),
-                   info = paste("Non-trend suffixed classes found in edge case:", case_name))
+                    label = paste("trend suffixes in edge case", case_name))
       }
     }
   }
@@ -600,9 +611,11 @@ test_that("distributional models work correctly with trends", {
         priors_distrib$group == brms_row$group &
         priors_distrib$dpar == brms_row$dpar, , drop = FALSE]
 
-      expect_true(nrow(matching_obs) > 0,
-                 info = paste("Missing distributional parameter:", brms_row$class,
-                            "dpar:", brms_row$dpar))
+      expect_true(
+        nrow(matching_obs) > 0,
+        label = paste("distributional parameter", brms_row$class,
+                      "for dpar", brms_row$dpar)
+      )
     }
   }
 
@@ -641,7 +654,7 @@ test_that("multivariate responses with mvbind work correctly", {
   for (resp in response_names) {
     resp_params <- priors_mvbind[priors_mvbind$resp == resp, ]
     expect_true(nrow(resp_params) > 0,
-               info = paste("Missing parameters for response:", resp))
+                label = paste("parameters for response", resp))
   }
 
   # Should have trend parameters
@@ -662,9 +675,11 @@ test_that("multivariate responses with mvbind work correctly", {
         obs_priors_mv$group == brms_row$group &
         obs_priors_mv$resp == brms_row$resp, , drop = FALSE]
 
-      expect_true(nrow(matching) > 0,
-                 info = paste("Missing mvbind parameter:", brms_row$class,
-                            "resp:", brms_row$resp))
+      expect_true(
+        nrow(matching) > 0,
+        label = paste("mvbind parameter", brms_row$class,
+                      "for response", brms_row$resp)
+      )
     }
   }
 })
@@ -694,7 +709,7 @@ test_that("non-Gaussian families work with trends", {
     # Should have trend parameters
     trend_classes <- priors_family$class[grepl("_trend$", priors_family$class)]
     expect_true(length(trend_classes) > 0,
-               info = paste("No trend parameters for family:", family_name))
+                label = paste("trend parameters for family", family_name))
 
     # Verify observation parameters match brms
     brms_family_priors <- brms::get_prior(family_spec$formula,
@@ -703,10 +718,14 @@ test_that("non-Gaussian families work with trends", {
     obs_priors_fam <- priors_family[!grepl("_trend$", priors_family$class), ]
 
     # Basic structure check
-    expect_true(nrow(obs_priors_fam) > 0,
-               info = paste("No observation parameters for family:", family_name))
-    expect_true(nrow(brms_family_priors) > 0,
-               info = paste("brms returned no parameters for family:", family_name))
+    expect_true(
+      nrow(obs_priors_fam) > 0,
+      label = paste("observation parameters for family", family_name)
+    )
+    expect_true(
+      nrow(brms_family_priors) > 0,
+      label = paste("brms parameters for family", family_name)
+    )
   }
 })
 
@@ -739,8 +758,10 @@ test_that("embedded family edge cases work correctly", {
   })
 
   # Should have zi parameters
+  # An embedded zero-inflated family has to price its `zi` parameter,
+  # which is the half a plain family lookup would miss.
   zi_params <- priors_complex_embedded[priors_complex_embedded$dpar == "zi", ]
-  expect_true(nrow(zi_params) > 0, info = "Missing zero-inflation parameters")
+  expect_true(nrow(zi_params) > 0)
 })
 
 

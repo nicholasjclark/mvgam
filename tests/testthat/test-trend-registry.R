@@ -560,7 +560,8 @@ test_that("validation rules vocabulary is complete", {
   trend_types <- c("RW", "AR", "VAR", "CAR", "PW", "ZMVN")
   for (trend_type in trend_types) {
     rules <- get_default_validation_rules(trend_type)
-    expect_true(length(rules) > 0, info = paste("No rules assigned for", trend_type))
+    expect_true(length(rules) > 0,
+                label = paste("validation rules for", trend_type))
     expect_true(all(rules %in% c(
       "requires_regular_intervals", "allows_irregular_intervals",
       "supports_factors", "incompatible_with_factors",
@@ -568,7 +569,7 @@ test_that("validation rules vocabulary is complete", {
       "requires_hierarchical", "requires_seasonal_period",
       "supports_multiple_seasonality", "incompatible_with_seasonal_smooths",
       "requires_balanced_panels", "requires_minimum_series_count"
-    )), info = paste("Invalid rules found for", trend_type))
+    )), label = paste("recognised rule names for", trend_type))
   }
 })
 

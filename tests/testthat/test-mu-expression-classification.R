@@ -127,22 +127,27 @@ test_that("mu expression classification handles all brms varieties correctly", {
     })
 
     # Test return structure
-    expect_true(is.list(result), info = paste("Pattern:", test_case$name))
-    expect_true(all(c("mu_construction", "supporting_declarations", "referenced_variables") %in% names(result)),
-                info = paste("Pattern:", test_case$name))
+    pattern <- paste("Pattern:", test_case$name)
+    expect_true(is.list(result), label = pattern)
+    expect_true(
+      all(c("mu_construction", "supporting_declarations",
+            "referenced_variables") %in% names(result)),
+      label = paste(pattern, "- result fields")
+    )
 
     # Test mu line extraction
     expect_true(length(result$mu_construction) >= 1,
-                info = paste("Pattern:", test_case$name, "- should have at least 1 mu line"))
+                label = paste(pattern, "- at least 1 mu line"))
 
     # Test that classification metadata is attached
     classification <- attr(result$mu_construction, "classification")
-    expect_false(is.null(classification), info = paste("Pattern:", test_case$name, "- classification metadata"))
+    expect_false(is.null(classification),
+                 label = paste(pattern, "- classification metadata"))
 
     if (!is.null(classification)) {
       # Test classification structure
       expect_equal(length(classification), length(result$mu_construction),
-                   info = paste("Pattern:", test_case$name, "- classification count"))
+                   label = paste(pattern, "- classification count"))
 
       # Test that each classification has required fields
       for (i in seq_along(classification)) {
@@ -150,48 +155,51 @@ test_that("mu expression classification handles all brms varieties correctly", {
         required_fields <- c("original", "normalized", "type", "execution_order",
                             "requires_loop", "variables", "structural_features")
         expect_true(all(required_fields %in% names(cls)),
-                   info = paste("Pattern:", test_case$name, "- classification fields"))
+                    label = paste(pattern, "- classification fields"))
 
         # Test execution order is valid (0-3)
         expect_true(cls$execution_order %in% 0:3,
-                   info = paste("Pattern:", test_case$name, "- execution order range"))
+                    label = paste(pattern, "- execution order range"))
 
         # Test variables structure
         expect_true(is.list(cls$variables),
-                   info = paste("Pattern:", test_case$name, "- variables structure"))
-        expect_true(all(c("functions", "indices", "parameters", "all_identifiers") %in% names(cls$variables)),
-                   info = paste("Pattern:", test_case$name, "- variables fields"))
+                    label = paste(pattern, "- variables structure"))
+        expect_true(
+          all(c("functions", "indices", "parameters",
+                "all_identifiers") %in% names(cls$variables)),
+          label = paste(pattern, "- variables fields")
+        )
       }
 
       # Pattern-specific tests
       if (isTRUE(test_case$expected_loop_pattern)) {
         loop_expressions <- sapply(classification, function(x) x$requires_loop)
         expect_true(any(loop_expressions),
-                   info = paste("Pattern:", test_case$name, "- should have loop expressions"))
+                    label = paste(pattern, "- loop expressions"))
       }
 
       if (isTRUE(test_case$expected_computed_variables)) {
         computed_expressions <- sapply(classification, function(x) x$execution_order == 0)
         expect_true(any(computed_expressions),
-                   info = paste("Pattern:", test_case$name, "- should have computed variables"))
+                    label = paste(pattern, "- computed variables"))
       }
 
       if (isTRUE(test_case$expected_vectorized)) {
         vectorized_expressions <- sapply(classification, function(x) x$execution_order == 1)
         expect_true(any(vectorized_expressions),
-                   info = paste("Pattern:", test_case$name, "- should have vectorized expressions"))
+                    label = paste(pattern, "- vectorized expressions"))
       }
 
       if (isTRUE(test_case$expected_indexed_pattern)) {
         indexed_expressions <- sapply(classification, function(x) x$execution_order == 2)
         expect_true(any(indexed_expressions),
-                   info = paste("Pattern:", test_case$name, "- should have indexed expressions"))
+                    label = paste(pattern, "- indexed expressions"))
       }
     }
 
     # Test variable extraction
     expect_true(length(result$referenced_variables) > 0,
-                info = paste("Pattern:", test_case$name, "- has referenced variables"))
+                label = paste(pattern, "- referenced variables"))
 
     # Test that at least some expected variables are found (allowing for brms changes)
     found_expected_vars <- 0
@@ -203,15 +211,15 @@ test_that("mu expression classification handles all brms varieties correctly", {
       }
     }
     expect_true(found_expected_vars >= 1,
-               info = paste("Pattern:", test_case$name, "- should find at least 1 expected variable"))
+                label = paste(pattern, "- at least 1 expected variable"))
 
     # Test that functions are excluded from variable references
     if (!is.null(classification)) {
       all_functions <- unique(unlist(lapply(classification, function(x) x$variables$functions)))
       overlap <- intersect(result$referenced_variables, all_functions)
       expect_equal(length(overlap), 0,
-                   info = paste("Pattern:", test_case$name, "- functions should not be in variables:",
-                               paste(overlap, collapse = ", ")))
+                   label = paste(pattern, "- functions among variables:",
+                                 paste(overlap, collapse = ", ")))
     }
 
     # GLM-specific test
@@ -221,7 +229,7 @@ test_that("mu expression classification handles all brms varieties correctly", {
       if (has_glm) {
         context <- create_analysis_context(stancode)
         expect_true(isTRUE(context$has_glm),
-                   info = paste("Pattern:", test_case$name, "- should detect GLM"))
+                    label = paste(pattern, "- GLM detected"))
       }
     }
   }
@@ -329,8 +337,9 @@ test_that("performance is acceptable for complex models", {
   result <- extract_mu_construction_with_classification(complex_stancode)
   end_time <- Sys.time()
 
-  expect_true(as.numeric(end_time - start_time) < 2.0,
-             info = "Classification should complete within 2 seconds")
+  # Two seconds is a generous ceiling for a single classification pass;
+  # anything slower means the analyser has started re-scanning.
+  expect_true(as.numeric(end_time - start_time) < 2.0)
 
   # Should still produce valid results
   expect_true(length(result$mu_construction) > 0)

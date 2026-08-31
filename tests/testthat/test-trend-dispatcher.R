@@ -1050,7 +1050,7 @@ test_that("PW cap argument integrates with stanvar generation", {
                        "changepoint_range", "changepoint_scale")
   for (param in expected_params) {
     expect_true(param %in% names(pw_logistic),
-                info = paste("Parameter", param, "should be present in PW object"))
+                label = paste("PW object field", param))
   }
 
   # Test variable name extraction for Stan data generation

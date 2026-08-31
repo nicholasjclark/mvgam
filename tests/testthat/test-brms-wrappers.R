@@ -47,7 +47,7 @@ test_that("Tier-7 methods have S3 entries on mvgam", {
               "predictive_error")) {
     expect_true(
       !is.null(getS3method(m, "mvgam", optional = TRUE)),
-      info = NULL
+      label = paste0("getS3method('", m, "', 'mvgam')")
     )
   }
 })

@@ -106,7 +106,7 @@ test_that("setup_brms_lightweight maintains all original functionality", {
 
   for (component in required_components) {
     expect_true(component %in% names(setup),
-                info = paste("Missing component:", component))
+                label = paste("setup component", component))
   }
 
   # Components should have correct types
