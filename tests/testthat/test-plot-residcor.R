@@ -94,6 +94,13 @@ test_that("type = 'precision' errors when sig_prec is absent", {
     plot(rc, type = "precision"),
     "precision matrix"
   )
+  # The message has to name the argument that fixes it. It named
+  # `compute_precision`, which `residual_cor()` does not take.
+  expect_error(
+    plot(rc, type = "precision"),
+    "partial = TRUE",
+    fixed = TRUE
+  )
 })
 
 test_that("type = 'precision' works when sig_prec is supplied", {

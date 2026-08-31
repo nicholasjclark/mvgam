@@ -522,13 +522,22 @@ finalise_residcor <- function(cov_draws, series_names, partial,
   )
 
   if (partial) {
-    prec_stats <- summarise_unconstrained_array(prec_draws, robust, probs,
-                                                 series_names)
+    # `prec_draws` holds partial correlations, bounded like any other
+    # correlation, so they take the same Fisher-z summary the
+    # correlation surface takes rather than the native-scale one the
+    # covariance takes. That is also what supplies `sig_prec`, which
+    # `plot(type = "precision")` reads.
+    prec_stats <- summarise_correlation_array(prec_draws, robust, probs,
+                                               series_names)
     out$prec <- prec_stats$point
     out$prec_se <- prec_stats$se
     out$prec_lower <- prec_stats$lower
     out$prec_upper <- prec_stats$upper
     out$prec_ess <- prec_stats$ess
+    out$prec_prob_positive <- prec_stats$prob_positive
+    out$prec_prob_negative <- prec_stats$prob_negative
+    out$prec_prob_nonzero <- prec_stats$prob_nonzero
+    out$sig_prec <- prec_stats$sig
   }
 
   structure(out, class = "mvgam_residcor")

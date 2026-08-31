@@ -208,7 +208,6 @@ build_forecast_layers <- function(
 ) {
   hindcast_fill <- "grey70"
   outer_prob <- max(probs)
-  alpha_outer <- (1 - outer_prob) / 2
   layers <- list()
 
   for (s in plotted) {
@@ -219,26 +218,9 @@ build_forecast_layers <- function(
 
     # Hindcast arm: single outer-prob grey ribbon plus median.
     if (!is.null(hc_mat)) {
-      hc_lo <- apply(
-        hc_mat, 2L, stats::quantile,
-        probs = alpha_outer, na.rm = TRUE
-      )
-      hc_hi <- apply(
-        hc_mat, 2L, stats::quantile,
-        probs = 1 - alpha_outer, na.rm = TRUE
-      )
-      hc_df <- data.frame(
-        time = hc_times, lower = hc_lo, upper = hc_hi, series = s
-      )
-      layers <- c(layers, list(
-        ggplot2::geom_ribbon(
-          data = hc_df,
-          mapping = ggplot2::aes(
-            x = time, ymin = lower, ymax = upper
-          ),
-          fill = hindcast_fill,
-          inherit.aes = FALSE
-        )
+      layers <- c(layers, mvgam_band_layer(
+        hc_mat, hc_times, probs = outer_prob,
+        group = s, fill = hindcast_fill
       ))
       layers <- c(
         layers,

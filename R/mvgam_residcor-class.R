@@ -24,9 +24,11 @@
 #'  \item{cov, cov_se, cov_lower, cov_upper, cov_ess}{Posterior
 #'  summaries of the residual covariance matrix, with per-entry ESS
 #'  matching the correlation surface.}
-#'  \item{mean_abs_offdiag}{Mean of the absolute off-diagonal entries
-#'  of the posterior median correlation, a scalar summary of overall
-#'  correlation strength.}
+#'  \item{mean_abs_offdiag}{A `list` of `point`, `lower` and `upper`
+#'  summarising the mean absolute off-diagonal correlation. The mean is
+#'  taken within each draw and then summarised across draws, so the
+#'  interval describes overall correlation strength rather than being
+#'  read off a single summary matrix.}
 #'  \item{n_series, series_names}{Dimensions of the matrix and the
 #'  series labels.}
 #'  \item{pattern, hierarchical, group_label}{Bookkeeping fields
@@ -34,12 +36,15 @@
 #'  \item{probs, prob_threshold}{The credible interval and threshold
 #'  used by `residual_cor()` to populate `sig_cor`.}
 #'
-#' Precision-matrix slots (`prec`, `prec_se`, `prec_lower`,
-#' `prec_upper`, `prec_ess`) are populated when `partial = TRUE` is
-#' passed to `residual_cor()`. The `sig_prec` thresholded matrix is
-#' reserved for a future extension; until then,
-#' [plot.mvgam_residcor()] with `type = "precision"` errors clearly
-#' when called on an object built without `partial = TRUE`.
+#' Passing `partial = TRUE` to `residual_cor()` adds the partial
+#' correlation surface, which mirrors the correlation one entry for
+#' entry: `prec`, `prec_se`, `prec_lower`, `prec_upper`, `prec_ess`,
+#' `prec_prob_positive`, `prec_prob_negative`, `prec_prob_nonzero`
+#' and the thresholded `sig_prec`. Partial correlations are bounded
+#' the way correlations are, so they are summarised on the same
+#' Fisher-z scale. Without `partial = TRUE` none of these are
+#' present, and [plot.mvgam_residcor()] with `type = "precision"`
+#' says so.
 #'
 #' @details
 #' Hui (2016) provides an excellent description of the quantities that this function calculates, so this passage
@@ -98,9 +103,10 @@ NULL
 #' @param type Character. Which matrix to plot. `"correlation"`
 #'   (the default) reads `x$sig_cor`; `"precision"` reads
 #'   `x$sig_prec` (the partial correlations, Ovaskainen et al.
-#'   2016). Precision panels widen the colour-scale limits from
-#'   the correlation default `[-1, 1]` to the entry-magnitude
-#'   range of `sig_prec`.
+#'   2016), which `residual_cor()` populates only under
+#'   `partial = TRUE`. Precision panels widen the colour-scale
+#'   limits from the correlation default `[-1, 1]` to the
+#'   entry-magnitude range of `sig_prec`.
 #' @param cluster Logical. When `TRUE`, the matrix is reordered
 #'   by an approximate Robinson ordering (Gruvaeus & Wainer
 #'   1972; average linkage on the `1 - cormat` distance) so
@@ -137,8 +143,8 @@ plot.mvgam_residcor <- function(
     x$sig_prec %||% stop(insight::format_error(c(
       "The `mvgam_residcor` object does not contain a precision matrix.",
       i = paste0(
-        "Pass `compute_precision = TRUE` to `residual_cor()` ",
-        "to populate `sig_prec`."
+        "Pass `partial = TRUE` to `residual_cor()` to populate ",
+        "`sig_prec`."
       )
     )))
   }

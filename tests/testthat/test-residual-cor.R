@@ -238,6 +238,53 @@ test_that("residual_cor(partial = TRUE) populates prec fields", {
 })
 
 
+test_that("the partial surface mirrors the correlation one", {
+  # A partial correlation is bounded the way a correlation is, so it
+  # takes the same summary and carries the same evidence fields.
+  # Summarising it on the native scale left no `sig_prec`, and
+  # `plot(type = "precision")` had nothing to read.
+  Sigma <- matrix(c(2.0, 0.6, 0.3,
+                    0.6, 1.5, 0.1,
+                    0.3, 0.1, 1.0), 3, 3)
+  cov_struct <- mk_full_cov_struct(Sigma)
+  testthat::local_mocked_bindings(
+    get_trend_covariance_structure = function(object) cov_struct,
+    .package = "mvgam"
+  )
+  res <- residual_cor(build_fake_mvgam(), partial = TRUE)
+  # The correlation surface prefixes its moments with `cor_` and
+  # leaves its probabilities bare, being the only ones until now.
+  mirrored <- c(se = "cor_se", lower = "cor_lower", upper = "cor_upper",
+                ess = "cor_ess", prob_positive = "prob_positive",
+                prob_negative = "prob_negative",
+                prob_nonzero = "prob_nonzero")
+  for (field in names(mirrored)) {
+    prec <- res[[paste0("prec_", field)]]
+    expect_true(!is.null(prec))
+    expect_equal(dim(prec), dim(res[[mirrored[[field]]]]))
+  }
+  expect_true(!is.null(res$sig_prec))
+  expect_equal(dim(res$sig_prec), dim(res$sig_cor))
+  # The thresholding rule is the correlation surface's own, so an
+  # entry survives in exactly the cases its probability clears.
+  keeps <- res$prec_prob_nonzero > res$prob_threshold
+  expect_equal(res$sig_prec[!keeps], rep(0, sum(!keeps)))
+})
+
+
+test_that("the partial surface is absent unless it was asked for", {
+  Sigma <- diag(3)
+  cov_struct <- mk_full_cov_struct(Sigma)
+  testthat::local_mocked_bindings(
+    get_trend_covariance_structure = function(object) cov_struct,
+    .package = "mvgam"
+  )
+  res <- residual_cor(build_fake_mvgam())
+  expect_null(res$sig_prec)
+  expect_null(res$prec)
+})
+
+
 # ---- per-entry ESS ----------------------------------------------------
 
 # Local fixture: full-covariance draws with realistic posterior

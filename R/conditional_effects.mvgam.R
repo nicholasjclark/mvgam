@@ -263,7 +263,7 @@ conditional_effects.mvgam <- function(x,
                   c(list(x), pp_args, list(...))) +
       ggplot2::scale_fill_discrete(label = round_legend_labels) +
       ggplot2::scale_colour_discrete(label = round_legend_labels) +
-      ggplot2::theme_classic()
+      mvgam_theme()
     # marginaleffects defaults the y-axis label to the model's
     # first response name. For multi-response fits we know which
     # arm we are plotting (`resp`); overwrite so the user sees

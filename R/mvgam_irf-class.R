@@ -1,22 +1,41 @@
 #' `mvgam_irf` object description
 #'
-#' A \code{mvgam_irf} object returned by function \code{\link{irf}}.
-#' Run `methods(class = "mvgam_irf")` to see an overview of available methods.
+#' The objects returned by [irf()]. Run `methods(class = "mvgam_irf")`
+#' and `methods(class = "mvgam_irf_summary")` to see an overview of
+#' available methods.
 #'
-#' @details Generalized or Orthogonalized Impulse Response Functions can be
-#'   computed using the posterior estimates of Vector Autoregressive parameters.
-#'   This function generates a positive "shock" for a target process at time
-#'   `t = 0` and then calculates how each of the remaining processes in the
-#'   latent VAR are expected to respond over the forecast horizon `h`. The
-#'   function computes IRFs for all processes in the object and returns them in
-#'   an array that can be plotted using the S3 `plot` function. To inspect
-#'   community-level metrics of stability using latent VAR processes, you can
-#'   use the related [stability()] function.
+#' @details Generalized or Orthogonalized Impulse Response Functions
+#'   are computed from the posterior estimates of Vector Autoregressive
+#'   parameters. [irf()] applies a positive shock to one process at
+#'   time `t = 0` and calculates how each of the remaining processes in
+#'   the latent VAR responds over the horizon `h`, for every process in
+#'   turn. To inspect community-level metrics of stability from the
+#'   same parameters, use [stability()].
 #'
-#'   A `mvgam_irf` object contains a `list` of posterior impulse response
-#'   functions, each stored as its own `list`
+#'   A shock response is a `K` by `K` matrix per horizon per posterior
+#'   draw, which on a wide panel runs to hundreds of megabytes for a
+#'   quantity read as a median and an interval. [irf()] therefore
+#'   returns the summary, and the two forms carry different classes:
 #'
-#' @seealso [mvgam], [VAR]
+#'   - `mvgam_irf_summary`, the default. A long-format `tibble`
+#'     inheriting from `mvgam_var_surface_summary`, with one row per
+#'     shock-response pair per horizon. `shock` names the pair as
+#'     `"Process_j -> Process_k"`, `horizon` is the step ahead, and
+#'     three further columns carry the posterior median and the
+#'     interval bounds, named for the percentiles asked for:
+#'     `irfQ50`, and by default `irfQ2.5` and `irfQ97.5`. An
+#'     `irf_type` attribute records whether the responses are
+#'     orthogonalised.
+#'
+#'   - `mvgam_irf`, returned under `summary = FALSE`. A `list` with one
+#'     element per posterior draw, each itself a `list` holding one
+#'     `h` by `K` matrix of responses per shocked process. Pass it to
+#'     `summary()` to reach the form above.
+#'
+#'   Both forms take `ndraws` and `draw_ids`, so a subset of the
+#'   posterior answers faster where the full one is not needed.
+#'
+#' @seealso [mvgam], [VAR], [irf], [stability]
 #'
 #' @references PH Pesaran & Shin Yongcheol (1998).
 #'   Generalized impulse response analysis in linear multivariate models.

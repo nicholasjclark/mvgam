@@ -171,6 +171,10 @@ print.mvgam_latent_state <- function(x, digits = 2L, ...) {
 #' @export
 plot.mvgam_latent_state <- function(x, series = NULL, ...) {
   checkmate::assert_class(x, "mvgam_latent_state")
+  # Pin the scheme the way every other mvgam figure does, so a
+  # user's own `bayesplot::color_scheme_set()` does not leave this
+  # panel the odd one out.
+  set_color_scheme_local("red")
   smry <- summary(x)
   if (!is.null(series)) {
     keep <- if (is.numeric(series)) {
@@ -183,37 +187,33 @@ plot.mvgam_latent_state <- function(x, series = NULL, ...) {
   }
   is_step <- identical(x$state_short, "N")
   x_lab   <- if (x$has_time) "Time" else "Closure-unit index"
-  ribbon_outer <- if (is_step) {
-    ggplot2::geom_step(ggplot2::aes(y = .data$lower_95),
-                        colour = NA)
-  } else {
-    NULL
-  }
   if (is_step) {
     p <- ggplot2::ggplot(smry, ggplot2::aes(x = .data$time)) +
       ggplot2::geom_ribbon(ggplot2::aes(ymin = .data$lower_95,
                                           ymax = .data$upper_95),
-                            fill = "#DCBCBC", alpha = 0.8,
+                            fill = mvgam_colour("light"), alpha = 0.8,
                             stat = "identity") +
       ggplot2::geom_ribbon(ggplot2::aes(ymin = .data$lower_50,
                                           ymax = .data$upper_50),
-                            fill = "#B97C7C", alpha = 0.9,
+                            fill = mvgam_colour("mid"), alpha = 0.9,
                             stat = "identity") +
       ggplot2::geom_step(ggplot2::aes(y = .data$median),
-                          colour = "#7C0000", linewidth = 0.7)
+                          colour = mvgam_colour("dark_highlight"),
+                          linewidth = 0.7)
   } else {
     p <- ggplot2::ggplot(smry, ggplot2::aes(x = .data$time)) +
       ggplot2::geom_ribbon(ggplot2::aes(ymin = .data$lower_95,
                                           ymax = .data$upper_95),
-                            fill = "#DCBCBC", alpha = 0.8) +
+                            fill = mvgam_colour("light"), alpha = 0.8) +
       ggplot2::geom_ribbon(ggplot2::aes(ymin = .data$lower_50,
                                           ymax = .data$upper_50),
-                            fill = "#B97C7C", alpha = 0.9) +
+                            fill = mvgam_colour("mid"), alpha = 0.9) +
       ggplot2::geom_line(ggplot2::aes(y = .data$median),
-                          colour = "#7C0000", linewidth = 0.7)
+                          colour = mvgam_colour("dark_highlight"),
+                          linewidth = 0.7)
   }
   p +
     ggplot2::facet_wrap(~ series, scales = "free_y") +
     ggplot2::labs(x = x_lab, y = x$state_label) +
-    ggplot2::theme_bw()
+    mvgam_theme()
 }

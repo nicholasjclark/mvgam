@@ -4,36 +4,55 @@
 \alias{mvgam_fevd-class}
 \title{\code{mvgam_fevd} object description}
 \description{
-A \code{mvgam_fevd} object returned by function \code{\link[=fevd]{fevd()}}. Run
-\code{methods(class = "mvgam_fevd")} to see an overview of available methods.
+The objects returned by \code{\link[=fevd]{fevd()}}. Run
+\code{methods(class = "mvgam_fevd")} and
+\code{methods(class = "mvgam_fevd_summary")} to see an overview of
+available methods.
 }
 \details{
-A forecast error variance decomposition is useful for quantifying
-the amount of information each series that in a Vector Autoregression
-contributes to the forecast distributions of the other series in the
-autoregression. This object contains the forecast error variance
-decomposition using the orthogonalised impulse response coefficient
-matrices \eqn{\Psi_h}, which can be used to quantify the contribution of
-series \eqn{j} to the h-step forecast error variance of series \eqn{k}:
+A forecast error variance decomposition quantifies how much
+of the forecast uncertainty in one series of a Vector
+Autoregression is attributable to each of the others. It is built
+from the orthogonalised impulse response coefficient matrices
+\eqn{\Psi_h}, which give the contribution of series \eqn{j} to the
+h-step forecast error variance of series \eqn{k}:
 \deqn{
   \sigma_k^2(h) = \sum_{j=1}^K(\psi_{kj, 0}^2 + \ldots + \psi_{kj,
   h-1}^2) \quad
   }
-If the orthogonalised impulse reponses \eqn{(\psi_{kj, 0}^2 + \ldots +
-  \psi_{kj, h-1}^2)} are divided by the variance of the forecast error
-\eqn{\sigma_k^2(h)}, this yields an interpretable percentage representing
-how much of the forecast error variance for \eqn{k} can be explained by an
-exogenous shock to \eqn{j}. This percentage is what is calculated and
-returned in objects of class \code{mvgam_fevd}, where the posterior
-distribution of variance decompositions for each variable in the original
-model is contained in a separate slot within the returned \code{list} object
+Dividing the orthogonalised responses \eqn{(\psi_{kj, 0}^2 +
+  \ldots + \psi_{kj, h-1}^2)} by the forecast error variance
+\eqn{\sigma_k^2(h)} gives the proportion of the forecast error
+variance for \eqn{k} explained by an exogenous shock to \eqn{j},
+and that proportion is what these objects carry.
+
+A decomposition is a \code{K} by \code{K} matrix per horizon per posterior
+draw, which on a wide panel runs to hundreds of megabytes for a
+quantity read as a median and an interval. \code{\link[=fevd]{fevd()}} therefore
+returns the summary, and the two forms carry different classes:
+\itemize{
+\item \code{mvgam_fevd_summary}, the default. A long-format \code{tibble}
+inheriting from \code{mvgam_var_surface_summary}, with one row per
+shock-response pair per horizon. \code{shock} names the pair as
+\code{"Process_j -> Process_k"}, \code{horizon} is the step ahead, and
+three further columns carry the posterior median and the
+interval bounds, named for the percentiles asked for:
+\code{fevdQ50}, and by default \code{fevdQ2.5} and \code{fevdQ97.5}.
+\item \code{mvgam_fevd}, returned under \code{summary = FALSE}. A \code{list} with
+one element per posterior draw, each holding the decomposition
+matrices for that draw. Pass it to \code{summary()} to reach the form
+above.
+}
+
+Both forms take \code{ndraws} and \code{draw_ids}, so a subset of the
+posterior answers faster where the full one is not needed.
 }
 \references{
-Lütkepohl, H (2006). New Introduction to Multiple Time Series
-Analysis. Springer, New York.
+Lütkepohl, H (2006). New Introduction to Multiple Time
+Series Analysis. Springer, New York.
 }
 \seealso{
-\code{\link[=mvgam]{mvgam()}}, \code{\link[=VAR]{VAR()}}
+\code{\link[=mvgam]{mvgam()}}, \code{\link[=VAR]{VAR()}}, \code{\link[=fevd]{fevd()}}, \code{\link[=irf]{irf()}}
 }
 \author{
 Nicholas J Clark

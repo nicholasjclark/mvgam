@@ -13,9 +13,10 @@
 \item{type}{Character. Which matrix to plot. \code{"correlation"}
 (the default) reads \code{x$sig_cor}; \code{"precision"} reads
 \code{x$sig_prec} (the partial correlations, Ovaskainen et al.
-2016). Precision panels widen the colour-scale limits from
-the correlation default \verb{[-1, 1]} to the entry-magnitude
-range of \code{sig_prec}.}
+2016), which \code{residual_cor()} populates only under
+\code{partial = TRUE}. Precision panels widen the colour-scale
+limits from the correlation default \verb{[-1, 1]} to the
+entry-magnitude range of \code{sig_prec}.}
 
 \item{cluster}{Logical. When \code{TRUE}, the matrix is reordered
 by an approximate Robinson ordering (Gruvaeus & Wainer

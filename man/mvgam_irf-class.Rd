@@ -4,22 +4,41 @@
 \alias{mvgam_irf-class}
 \title{\code{mvgam_irf} object description}
 \description{
-A \code{mvgam_irf} object returned by function \code{\link{irf}}.
-Run \code{methods(class = "mvgam_irf")} to see an overview of available methods.
+The objects returned by \code{\link[=irf]{irf()}}. Run \code{methods(class = "mvgam_irf")}
+and \code{methods(class = "mvgam_irf_summary")} to see an overview of
+available methods.
 }
 \details{
-Generalized or Orthogonalized Impulse Response Functions can be
-computed using the posterior estimates of Vector Autoregressive parameters.
-This function generates a positive "shock" for a target process at time
-\code{t = 0} and then calculates how each of the remaining processes in the
-latent VAR are expected to respond over the forecast horizon \code{h}. The
-function computes IRFs for all processes in the object and returns them in
-an array that can be plotted using the S3 \code{plot} function. To inspect
-community-level metrics of stability using latent VAR processes, you can
-use the related \code{\link[=stability]{stability()}} function.
+Generalized or Orthogonalized Impulse Response Functions
+are computed from the posterior estimates of Vector Autoregressive
+parameters. \code{\link[=irf]{irf()}} applies a positive shock to one process at
+time \code{t = 0} and calculates how each of the remaining processes in
+the latent VAR responds over the horizon \code{h}, for every process in
+turn. To inspect community-level metrics of stability from the
+same parameters, use \code{\link[=stability]{stability()}}.
 
-A \code{mvgam_irf} object contains a \code{list} of posterior impulse response
-functions, each stored as its own \code{list}
+A shock response is a \code{K} by \code{K} matrix per horizon per posterior
+draw, which on a wide panel runs to hundreds of megabytes for a
+quantity read as a median and an interval. \code{\link[=irf]{irf()}} therefore
+returns the summary, and the two forms carry different classes:
+\itemize{
+\item \code{mvgam_irf_summary}, the default. A long-format \code{tibble}
+inheriting from \code{mvgam_var_surface_summary}, with one row per
+shock-response pair per horizon. \code{shock} names the pair as
+\code{"Process_j -> Process_k"}, \code{horizon} is the step ahead, and
+three further columns carry the posterior median and the
+interval bounds, named for the percentiles asked for:
+\code{irfQ50}, and by default \code{irfQ2.5} and \code{irfQ97.5}. An
+\code{irf_type} attribute records whether the responses are
+orthogonalised.
+\item \code{mvgam_irf}, returned under \code{summary = FALSE}. A \code{list} with one
+element per posterior draw, each itself a \code{list} holding one
+\code{h} by \code{K} matrix of responses per shocked process. Pass it to
+\code{summary()} to reach the form above.
+}
+
+Both forms take \code{ndraws} and \code{draw_ids}, so a subset of the
+posterior answers faster where the full one is not needed.
 }
 \references{
 PH Pesaran & Shin Yongcheol (1998).
@@ -27,7 +46,7 @@ Generalized impulse response analysis in linear multivariate models.
 Economics Letters 58: 17–29.
 }
 \seealso{
-\link{mvgam}, \link{VAR}
+\link{mvgam}, \link{VAR}, \link{irf}, \link{stability}
 }
 \author{
 Nicholas J Clark

@@ -800,6 +800,10 @@ summary.mvgam_kfold <- function(object, ...) {
 #' @method plot mvgam_kfold
 #' @export
 plot.mvgam_kfold <- function(x, ...) {
+  # Pin the scheme the way every other mvgam figure does, so a
+  # user's own `bayesplot::color_scheme_set()` does not leave this
+  # panel the odd one out.
+  set_color_scheme_local("red")
   group <- rownames(x$pointwise) %||% names(x$pareto_k)
   elpd <- as.numeric(x$pointwise[, "elpd_kfold"])
   elpd_threshold <- stats::quantile(
@@ -838,7 +842,8 @@ plot.mvgam_kfold <- function(x, ...) {
                         scales = "free_y") +
     ggplot2::geom_hline(
       ggplot2::aes(yintercept = .data$threshold),
-      colour = "#A25050", linetype = "dashed", linewidth = 1,
+      colour = mvgam_colour("mid_highlight"),
+      linetype = "dashed", linewidth = 1,
       na.rm = TRUE
     ) +
     ggplot2::geom_line(
@@ -853,7 +858,7 @@ plot.mvgam_kfold <- function(x, ...) {
       na.rm = TRUE
     ) +
     ggplot2::scale_colour_manual(
-      values = c(inlier = "grey30", outlier = "#8F2727")
+      values = c(inlier = "grey30", outlier = mvgam_colour("dark"))
     ) +
     ggplot2::labs(
       x = if (is.null(x$group)) "row" else

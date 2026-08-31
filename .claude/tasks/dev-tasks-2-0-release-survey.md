@@ -802,17 +802,57 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > looked: the storage is only worth adding once the values reach
   > brms.
 
-- [ ] **3.9 `?mvgam-class` describes the 1.x object**
-  > Found while checking whether the arguments 3.6 removed left stale
-  > slot documentation behind. They did, and so did most of the rest
-  > of the page. Of the 22 slots it documents, 17 are absent from a
-  > cached 2.0 fit, `drift`, `use_lv`, `n_lv`, `model_output`,
-  > `model_file`, `monitor_pars`, `mgcv_model`, `ytimes`, `resids` and
-  > `upper_bounds` among them, two of them described in terms of a
-  > `return_model_data` argument 2.0 does not take. Twenty-three slots
-  > a fit does carry are undocumented, including `fit`, `stancode`,
-  > `standata`, `mv_spec`, `trend_metadata` and `criteria`. The page
-  > needs writing against the object rather than patching.
+- [x] **3.9 The class pages described the wrong objects**
+  > `?mvgam-class` was a 1.x page. Seventeen of its twenty-two slots
+  > were absent from a fit and twenty-three a fit carries went
+  > unmentioned, two of the seventeen described in terms of a
+  > `return_model_data` argument 2.0 does not take. It is rewritten
+  > from the constructor: the fit and its data, the Stan program, the
+  > specification prediction reads, how it was fitted, and the four
+  > slots `jsdgam()` adds on top.
+  >
+  > `?mvgam_irf-class` and `?mvgam_fevd-class` described the draws
+  > alone, where both functions return a summary and keep the draws
+  > behind `summary = FALSE`. Both now name the class of each form,
+  > the columns of the summary and the argument that reaches the
+  > draws. `?mvgam_residcor-class` called `mean_abs_offdiag` a
+  > scalar where it is a point and an interval.
+  >
+  > `plot(type = "precision")` was offered and could not run: it
+  > reads `sig_prec`, which nothing populated, and its error named
+  > `compute_precision`, an argument `residual_cor()` does not take.
+  > The partial correlations were being summarised on the native
+  > scale though they are bounded like any correlation, so they took
+  > neither the Fisher-z interval the correlations take nor the
+  > thresholding that produces `sig_prec`. One summariser now serves
+  > both, which supplies the missing slot and the evidence fields
+  > beside it.
+  >
+  > A test reads the bullets out of each class page and checks them
+  > against objects built from cached fits, so a slot added later
+  > cannot go undocumented in silence.
+
+- [x] **3.12 The figures did not agree on a theme or a palette**
+  > Four of roughly twenty plot methods applied `theme_bw()` or
+  > `theme_classic()` in place of `mvgam_theme()`, so an impulse
+  > response drawn from its summary and one drawn from its draws came
+  > out under different looks. Twelve hex codes across four files
+  > were bayesplot scheme entries written by hand; `mvgam_colour()`
+  > reads them by role instead. Three of those files then had no
+  > `set_color_scheme_local("red")` where the other twelve plot
+  > methods do, which would have left them the only figures following
+  > a user's own scheme, so they pin it too.
+  >
+  > The hindcast arm of a forecast plot rebuilt the ribbon
+  > `mvgam_band_layer()` already builds, differing only in wanting
+  > one flat fill; the helper takes a `fill` and the arm is one call,
+  > with the bounds checked identical. Two locals fell dead with it,
+  > and a third, `ribbon_outer` in the latent-state plot, was
+  > computed and read by nothing.
+  >
+  > Two tests hold the line: one fails if any file outside
+  > `plot_helpers.R` applies a ggplot2 theme, the other if any of
+  > them writes a colour that a bayesplot scheme carries.
 
 - [ ] **3.10 `info =` in expectations across six test files**
   > CLAUDE.md rules it out and testthat's expectations do not take it.

@@ -3,104 +3,115 @@
 #' A fitted \code{mvgam} object returned by function \code{\link{mvgam}}.
 #' Run `methods(class = "mvgam")` to see an overview of available methods.
 #'
-#' @details A `mvgam` object contains the following elements:
+#' @details An `mvgam` object inherits from `brmsfit` and carries the
+#'   following elements. Reach for the accessors before the slots
+#'   themselves: `variables()`, `as_draws_df()` and `as.data.frame()`
+#'   read the posterior, `stancode()` and `standata()` return the
+#'   program and its data, and `prior_summary()` returns the prior
+#'   table.
 #'
-#'   - `call` the original observation model formula
+#'   The fit and what it was fitted to:
 #'
-#'   - `trend_call` If a `trend_formula was supplied`, the original trend model
-#'     formula is returned. Otherwise `NULL`
+#'   - `fit` The `stanfit` object holding the posterior draws of the
+#'     combined observation and trend model
 #'
-#'   - `family` \code{character} description of the observation distribution
+#'   - `formula` The observation formula, as brms validated it
 #'
-#'   - `trend_model` \code{character} description of the latent trend model
+#'   - `trend_formula` The trend formula with the trend constructor
+#'     removed, which is the formula the trend submodel was built
+#'     from. `NULL` when no `trend_formula` was supplied
 #'
-#'   - `trend_map` \code{data.frame} describing the mapping of trend states to
-#'     observations, if supplied in the original model. Otherwise `NULL`
+#'   - `trend_call` The trend formula as the user wrote it, with the
+#'     constructor intact, so `update()` can rebuild the model without
+#'     reconstructing the call. `NULL` when no `trend_formula` was
+#'     supplied
 #'
-#'   - `drift` Logical specifying whether a drift term was used in the trend
-#'     model
+#'   - `family` The observation `family` object
 #'
-#'   - `priors` If the model priors were updated from their defaults, the prior
-#'     `dataframe` will be returned. Otherwise `NULL`
+#'   - `prior` A `brmsprior` table of the priors the model sampled
+#'     under, read from the compiled Stan program so it cannot
+#'     disagree with what the sampler ran
 #'
-#'   - `model_output` The `MCMC` object returned by the fitting engine, an
-#'     object of class `stanfit`
-#'     (see \code{\link[rstan]{stanfit-class}} for details)
+#'   - `data` The observation model frame
 #'
-#'   - `model_file` The `character` string model file used to describe the model
-#'     in `Stan` syntax
+#'   - `test_data` The `newdata` supplied at fitting, or `NULL`
 #'
-#'   - `model_data` If `return_model_data` was set to `TRUE` when fitting the
-#'     model, the `list` object containing all data objects needed to condition
-#'     the model is returned. Each item in the `list` is described in detail at
-#'     the top of the `model_file`. Otherwise `NULL`
+#'   - `data.name` The deparsed name of the `data` argument
 #'
-#'   - `inits` If `return_model_data` was set to `TRUE` when fitting the model,
-#'     the initial value functions used to initialise the MCMC chains will be
-#'     returned. Otherwise `NULL`
+#'   The Stan program:
 #'
-#'   - `monitor_pars` The parameters that were monitored during MCMC sampling
-#'     are returned as a `character vector`
+#'   - `stancode` The combined Stan program as a `character` string
 #'
-#'   - `sp_names` A `character vector` specifying the names for each smoothing
-#'     parameter
+#'   - `standata` The `standata` list the program was fitted to
 #'
-#'   - `mgcv_model` An object of class `gam` containing the `mgcv` version of
-#'     the observation model. This object is used for generating the linear
-#'     predictor matrix when making predictions for new data. The coefficients
-#'     in this model object will contain the posterior median coefficients from
-#'     the GAM linear predictor, but these are only used if generating plots of
-#'     smooth functions that `mvgam` currently cannot handle (such as plots for
-#'     three-dimensional smooths). This model therefore should not be used for
-#'     inference. See \code{\link[mgcv]{gamObject}} for details
+#'   - `exclude` Parameter names withheld from summaries, `lprior` and
+#'     `lp__`
 #'
-#'   - `trend_mgcv_model` If a `trend_formula was supplied`, an object of class
-#'     `gam` containing the `mgcv` version of the trend model. Otherwise `NULL`
+#'   The model specification, used by prediction and forecasting:
 #'
-#'   - `ytimes` The `matrix` object used in model fitting for indexing which
-#'     series and timepoints were observed in each row of the supplied data.
-#'     Used internally by some downstream plotting and prediction functions
+#'   - `mv_spec` The parsed model specification, including the trend
+#'     specifications and the response names
 #'
-#'   - `resids` A named `list` object containing posterior draws of Dunn-Smyth
-#'     randomized quantile residuals
+#'   - `response_names` A `character` vector of response variables
 #'
-#'   - `use_lv` Logical flag indicating whether latent dynamic factors were used
-#'     in the model
+#'   - `trend_metadata` The resolved trend details a prediction needs,
+#'     including the time and series variables, the trend type and the
+#'     number of latent factors
 #'
-#'   - `n_lv` If `use_lv == TRUE`, the number of latent dynamic factors used in
-#'     the model
+#'   - `trend_components` Per-component trend information derived from
+#'     the posterior. `NULL` when the model has no trend
 #'
-#'   - `upper_bounds` If bounds were supplied in the original model fit, they
-#'     will be returned. Otherwise `NULL`
+#'   - `series_info` The number of series, their names and, for a
+#'     multivariate model, the response names and their count
 #'
-#'   - `obs_data` The original data object (either a `list` or `dataframe`)
-#'     supplied in model fitting.
+#'   - `time_info` The number of time points, their range and their
+#'     spacing, or `has_time = FALSE` when the data carry no time
+#'     variable
 #'
-#'   - `test_data` If test data were supplied (as argument `newdata` in the
-#'     original model), it will be returned. Othwerise `NULL`
+#'   - `obs_model` A `brmsfit` holding the observation-side model brms
+#'     generated, used as the design-matrix source for prediction at
+#'     new data
 #'
-#'   - `fit_engine` `Character` describing the fit engine, `stan`
+#'   - `trend_model` A `brmsfit` holding the trend-side model, serving
+#'     the same purpose for the trend submodel. `NULL` when no
+#'     `trend_formula` was supplied
 #'
-#'   - `backend` `Character` describing the backend used for modelling, either
-#'     as `rstan` or `cmdstanr`
+#'   How it was fitted:
 #'
-#'   - `algorithm` `Character` describing the algorithm used for finding the
-#'     posterior, either as `sampling`, `laplace`, `pathfinder`, `meanfield` or
-#'     `fullrank`
+#'   - `backend` `Character`, either `rstan` or `cmdstanr`
 #'
-#'   - `init` The initial-value specification supplied to `mvgam()`, kept as
-#'     the user wrote it (`"random"`, `"0"`, `"pathfinder"`, or a numeric
-#'     value, list or function)
+#'   - `algorithm` `Character`, one of `sampling`, `laplace`,
+#'     `pathfinder`, `meanfield` or `fullrank`
 #'
-#'   - `max_treedepth` If the model was fitted using `Stan`, the value supplied
-#'     for the maximum treedepth tuning parameter is returned (see
-#'     \code{\link[rstan]{stan}} for details). Otherwise `NULL`
+#'   - `init` The initial-value specification, kept as the user wrote
+#'     it (`"random"`, `"0"`, `"pathfinder"`, or a numeric value, list
+#'     or function)
 #'
-#'   - `adapt_delta` If the model was fitted using `Stan`, the value supplied
-#'     for the adapt_delta tuning parameter is returned (see
-#'     \code{\link[rstan]{stan}} for details). Otherwise `NULL`
+#'   - `criteria` A named `list` of model-fit criteria that
+#'     [add_criterion()] has computed, empty on a new fit
 #'
-#' @seealso [mvgam]
+#'   - `call` The matched call
+#'
+#'   - `brms_version`, `mvgam_version` The package versions the model
+#'     was fitted under
+#'
+#'   - `creation_time` A `POSIXct` timestamp
+#'
+#'   A fit from [jsdgam()] has class `c("mvgam", "jsdgam")` and carries
+#'   four further elements, which [ordinate()], [residual_cor()] and
+#'   the `print` method read:
+#'
+#'   - `obs_data` The data frame as `jsdgam()` prepared it, with the
+#'     `time` and `series` columns it derives from `unit` and `species`
+#'
+#'   - `model_data` The same frame, carrying a `prepped_trend_model`
+#'     attribute that records the `unit` and `species` column names
+#'
+#'   - `model_spec` A `list` whose `is_jsdgam` element marks the fit
+#'
+#'   - `jsdgam_call` The `jsdgam()` call
+#'
+#' @seealso [mvgam], [jsdgam], [mvgam_forecast-class]
 #'
 #' @author Nicholas J Clark
 #'

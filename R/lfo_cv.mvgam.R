@@ -716,6 +716,10 @@ lfo_sum_rows <- function(x) {
 #' @export
 plot.mvgam_lfo <- function(x, ...) {
   obj <- x
+  # Pin the scheme the way every other mvgam figure does, so a
+  # user's own `bayesplot::color_scheme_set()` does not leave this
+  # panel the odd one out.
+  set_color_scheme_local("red")
   ks <- obj$pareto_ks
   ks[is.infinite(ks)] <-
     suppressWarnings(max(ks[!is.infinite(ks)], na.rm = TRUE))
@@ -771,7 +775,7 @@ plot.mvgam_lfo <- function(x, ...) {
                          scales = "free_y") +
     ggplot2::geom_hline(
       ggplot2::aes(yintercept = .data$threshold),
-      colour = "#A25050", linetype = "dashed", linewidth = 1
+      colour = mvgam_colour("mid_highlight"), linetype = "dashed", linewidth = 1
     ) +
     ggplot2::geom_line(linewidth = 0.5, colour = "grey30") +
     ggplot2::geom_point(shape = 16, colour = "white", size = 2) +
@@ -780,7 +784,7 @@ plot.mvgam_lfo <- function(x, ...) {
       shape = 16, show.legend = FALSE, size = 1.5
     ) +
     ggplot2::scale_colour_manual(
-      values = c(inlier = "grey30", outlier = "#8F2727")
+      values = c(inlier = "grey30", outlier = mvgam_colour("dark"))
     ) +
     ggplot2::labs(x = "Evaluation time", y = NULL) +
     mvgam_theme()

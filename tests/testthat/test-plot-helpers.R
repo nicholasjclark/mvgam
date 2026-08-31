@@ -222,3 +222,76 @@ test_that("resolve_factor_loadings errors on incomplete inputs", {
     "Must be of type 'single integerish value'"
   )
 })
+
+
+# One theme, one palette, no call site restating either.
+#
+# The package draws roughly twenty figures. Four of them applied
+# `theme_bw()` or `theme_classic()` directly instead of
+# `mvgam_theme()`, so the same impulse response came out under one
+# look from its summary and another from its draws. Twelve hex codes
+# across four files were bayesplot scheme entries written by hand,
+# which meant those panels ignored a user's `color_scheme_set()`
+# while every other panel followed it.
+
+test_that("mvgam_colour reads a scheme entry by its role", {
+  bayesplot::color_scheme_set("red")
+  on.exit(bayesplot::color_scheme_set("blue"), add = TRUE)
+  expect_equal(mvgam:::mvgam_colour("light"), "#DCBCBC")
+  expect_equal(mvgam:::mvgam_colour("dark_highlight"), "#7C0000")
+  # Explicit scheme wins over the active one.
+  expect_equal(mvgam:::mvgam_colour("light", scheme = "blue"), "#d1e1ec")
+  # And the active scheme is what an unqualified call follows.
+  bayesplot::color_scheme_set("blue")
+  expect_equal(mvgam:::mvgam_colour("light"), "#d1e1ec")
+  expect_error(mvgam:::mvgam_colour("darkest"), "role")
+})
+
+test_that("no plot applies a ggplot2 theme of its own", {
+  # `mvgam_theme()` is built on `theme_classic()`, so the one call
+  # inside it is the only one allowed.
+  r_files <- list.files(
+    test_path("..", "..", "R"), pattern = "\\.R$", full.names = TRUE
+  )
+  if (!length(r_files)) {
+    r_files <- list.files("R", pattern = "\\.R$", full.names = TRUE)
+  }
+  offenders <- character(0)
+  for (f in r_files) {
+    lines <- readLines(f, warn = FALSE)
+    code <- grep("^\\s*#", lines, value = TRUE, invert = TRUE)
+    hits <- grep("ggplot2::theme_[a-z]+\\(", code, value = TRUE)
+    if (length(hits) && basename(f) != "plot_helpers.R") {
+      offenders <- c(offenders, paste0(basename(f), ": ", trimws(hits)))
+    }
+  }
+  expect_equal(offenders, character(0))
+})
+
+test_that("no plot writes a scheme colour as a literal", {
+  # Every hex the bayesplot schemes carry, so a call site cannot
+  # freeze one and stop following `color_scheme_set()`.
+  schemes <- c("red", "blue", "green", "purple", "teal", "gray",
+               "yellow", "orange")
+  scheme_hex <- unique(toupper(unlist(lapply(
+    schemes, function(s) unname(unlist(bayesplot::color_scheme_get(s)))
+  ))))
+  r_files <- list.files(
+    test_path("..", "..", "R"), pattern = "\\.R$", full.names = TRUE
+  )
+  if (!length(r_files)) {
+    r_files <- list.files("R", pattern = "\\.R$", full.names = TRUE)
+  }
+  offenders <- character(0)
+  for (f in r_files) {
+    if (basename(f) == "plot_helpers.R") next
+    lines <- readLines(f, warn = FALSE)
+    code <- grep("^\\s*#", lines, value = TRUE, invert = TRUE)
+    for (hx in scheme_hex) {
+      if (any(grepl(hx, toupper(code), fixed = TRUE))) {
+        offenders <- c(offenders, paste0(basename(f), ": ", hx))
+      }
+    }
+  }
+  expect_equal(offenders, character(0))
+})

@@ -8,79 +8,95 @@ A fitted \code{mvgam} object returned by function \code{\link{mvgam}}.
 Run \code{methods(class = "mvgam")} to see an overview of available methods.
 }
 \details{
-A \code{mvgam} object contains the following elements:
+An \code{mvgam} object inherits from \code{brmsfit} and carries the
+following elements. Reach for the accessors before the slots
+themselves: \code{variables()}, \code{as_draws_df()} and \code{as.data.frame()}
+read the posterior, \code{stancode()} and \code{standata()} return the
+program and its data, and \code{prior_summary()} returns the prior
+table.
+
+The fit and what it was fitted to:
 \itemize{
-\item \code{call} the original observation model formula
-\item \code{trend_call} If a \verb{trend_formula was supplied}, the original trend model
-formula is returned. Otherwise \code{NULL}
-\item \code{family} \code{character} description of the observation distribution
-\item \code{trend_model} \code{character} description of the latent trend model
-\item \code{trend_map} \code{data.frame} describing the mapping of trend states to
-observations, if supplied in the original model. Otherwise \code{NULL}
-\item \code{drift} Logical specifying whether a drift term was used in the trend
-model
-\item \code{priors} If the model priors were updated from their defaults, the prior
-\code{dataframe} will be returned. Otherwise \code{NULL}
-\item \code{model_output} The \code{MCMC} object returned by the fitting engine, an
-object of class \code{stanfit}
-(see \code{\link[rstan]{stanfit-class}} for details)
-\item \code{model_file} The \code{character} string model file used to describe the model
-in \code{Stan} syntax
-\item \code{model_data} If \code{return_model_data} was set to \code{TRUE} when fitting the
-model, the \code{list} object containing all data objects needed to condition
-the model is returned. Each item in the \code{list} is described in detail at
-the top of the \code{model_file}. Otherwise \code{NULL}
-\item \code{inits} If \code{return_model_data} was set to \code{TRUE} when fitting the model,
-the initial value functions used to initialise the MCMC chains will be
-returned. Otherwise \code{NULL}
-\item \code{monitor_pars} The parameters that were monitored during MCMC sampling
-are returned as a \verb{character vector}
-\item \code{sp_names} A \verb{character vector} specifying the names for each smoothing
-parameter
-\item \code{mgcv_model} An object of class \code{gam} containing the \code{mgcv} version of
-the observation model. This object is used for generating the linear
-predictor matrix when making predictions for new data. The coefficients
-in this model object will contain the posterior median coefficients from
-the GAM linear predictor, but these are only used if generating plots of
-smooth functions that \code{mvgam} currently cannot handle (such as plots for
-three-dimensional smooths). This model therefore should not be used for
-inference. See \code{\link[mgcv]{gamObject}} for details
-\item \code{trend_mgcv_model} If a \verb{trend_formula was supplied}, an object of class
-\code{gam} containing the \code{mgcv} version of the trend model. Otherwise \code{NULL}
-\item \code{ytimes} The \code{matrix} object used in model fitting for indexing which
-series and timepoints were observed in each row of the supplied data.
-Used internally by some downstream plotting and prediction functions
-\item \code{resids} A named \code{list} object containing posterior draws of Dunn-Smyth
-randomized quantile residuals
-\item \code{use_lv} Logical flag indicating whether latent dynamic factors were used
-in the model
-\item \code{n_lv} If \code{use_lv == TRUE}, the number of latent dynamic factors used in
-the model
-\item \code{upper_bounds} If bounds were supplied in the original model fit, they
-will be returned. Otherwise \code{NULL}
-\item \code{obs_data} The original data object (either a \code{list} or \code{dataframe})
-supplied in model fitting.
-\item \code{test_data} If test data were supplied (as argument \code{newdata} in the
-original model), it will be returned. Othwerise \code{NULL}
-\item \code{fit_engine} \code{Character} describing the fit engine, \code{stan}
-\item \code{backend} \code{Character} describing the backend used for modelling, either
-as \code{rstan} or \code{cmdstanr}
-\item \code{algorithm} \code{Character} describing the algorithm used for finding the
-posterior, either as \code{sampling}, \code{laplace}, \code{pathfinder}, \code{meanfield} or
-\code{fullrank}
-\item \code{init} The initial-value specification supplied to \code{mvgam()}, kept as
-the user wrote it (\code{"random"}, \code{"0"}, \code{"pathfinder"}, or a numeric
-value, list or function)
-\item \code{max_treedepth} If the model was fitted using \code{Stan}, the value supplied
-for the maximum treedepth tuning parameter is returned (see
-\code{\link[rstan]{stan}} for details). Otherwise \code{NULL}
-\item \code{adapt_delta} If the model was fitted using \code{Stan}, the value supplied
-for the adapt_delta tuning parameter is returned (see
-\code{\link[rstan]{stan}} for details). Otherwise \code{NULL}
+\item \code{fit} The \code{stanfit} object holding the posterior draws of the
+combined observation and trend model
+\item \code{formula} The observation formula, as brms validated it
+\item \code{trend_formula} The trend formula with the trend constructor
+removed, which is the formula the trend submodel was built
+from. \code{NULL} when no \code{trend_formula} was supplied
+\item \code{trend_call} The trend formula as the user wrote it, with the
+constructor intact, so \code{update()} can rebuild the model without
+reconstructing the call. \code{NULL} when no \code{trend_formula} was
+supplied
+\item \code{family} The observation \code{family} object
+\item \code{prior} A \code{brmsprior} table of the priors the model sampled
+under, read from the compiled Stan program so it cannot
+disagree with what the sampler ran
+\item \code{data} The observation model frame
+\item \code{test_data} The \code{newdata} supplied at fitting, or \code{NULL}
+\item \code{data.name} The deparsed name of the \code{data} argument
+}
+
+The Stan program:
+\itemize{
+\item \code{stancode} The combined Stan program as a \code{character} string
+\item \code{standata} The \code{standata} list the program was fitted to
+\item \code{exclude} Parameter names withheld from summaries, \code{lprior} and
+\code{lp__}
+}
+
+The model specification, used by prediction and forecasting:
+\itemize{
+\item \code{mv_spec} The parsed model specification, including the trend
+specifications and the response names
+\item \code{response_names} A \code{character} vector of response variables
+\item \code{trend_metadata} The resolved trend details a prediction needs,
+including the time and series variables, the trend type and the
+number of latent factors
+\item \code{trend_components} Per-component trend information derived from
+the posterior. \code{NULL} when the model has no trend
+\item \code{series_info} The number of series, their names and, for a
+multivariate model, the response names and their count
+\item \code{time_info} The number of time points, their range and their
+spacing, or \code{has_time = FALSE} when the data carry no time
+variable
+\item \code{obs_model} A \code{brmsfit} holding the observation-side model brms
+generated, used as the design-matrix source for prediction at
+new data
+\item \code{trend_model} A \code{brmsfit} holding the trend-side model, serving
+the same purpose for the trend submodel. \code{NULL} when no
+\code{trend_formula} was supplied
+}
+
+How it was fitted:
+\itemize{
+\item \code{backend} \code{Character}, either \code{rstan} or \code{cmdstanr}
+\item \code{algorithm} \code{Character}, one of \code{sampling}, \code{laplace},
+\code{pathfinder}, \code{meanfield} or \code{fullrank}
+\item \code{init} The initial-value specification, kept as the user wrote
+it (\code{"random"}, \code{"0"}, \code{"pathfinder"}, or a numeric value, list
+or function)
+\item \code{criteria} A named \code{list} of model-fit criteria that
+\code{\link[=add_criterion]{add_criterion()}} has computed, empty on a new fit
+\item \code{call} The matched call
+\item \code{brms_version}, \code{mvgam_version} The package versions the model
+was fitted under
+\item \code{creation_time} A \code{POSIXct} timestamp
+}
+
+A fit from \code{\link[=jsdgam]{jsdgam()}} has class \code{c("mvgam", "jsdgam")} and carries
+four further elements, which \code{\link[=ordinate]{ordinate()}}, \code{\link[=residual_cor]{residual_cor()}} and
+the \code{print} method read:
+\itemize{
+\item \code{obs_data} The data frame as \code{jsdgam()} prepared it, with the
+\code{time} and \code{series} columns it derives from \code{unit} and \code{species}
+\item \code{model_data} The same frame, carrying a \code{prepped_trend_model}
+attribute that records the \code{unit} and \code{species} column names
+\item \code{model_spec} A \code{list} whose \code{is_jsdgam} element marks the fit
+\item \code{jsdgam_call} The \code{jsdgam()} call
 }
 }
 \seealso{
-\link{mvgam}
+\link{mvgam}, \link{jsdgam}, \linkS4class{mvgam_forecast}
 }
 \author{
 Nicholas J Clark

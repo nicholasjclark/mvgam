@@ -119,9 +119,11 @@ plot.mvgam_var_surface_summary <- function(x, series = NULL,
   ) +
     ggplot2::geom_ribbon(
       ggplot2::aes(ymin = .data[[cols$lower]], ymax = .data[[cols$upper]]),
-      fill = "#B97C7C", alpha = 0.5
+      fill = mvgam_colour("mid"), alpha = 0.5
     ) +
-    ggplot2::geom_line(colour = "#7C0000", linewidth = 0.7) +
+    ggplot2::geom_line(
+      colour = mvgam_colour("dark_highlight"), linewidth = 0.7
+    ) +
     ggplot2::facet_wrap(~ shock, scales = "free_y") +
     ggplot2::labs(
       x = "Horizon",
@@ -131,7 +133,7 @@ plot.mvgam_var_surface_summary <- function(x, series = NULL,
         "Impulse response"
       }
     ) +
-    ggplot2::theme_bw()
+    mvgam_theme()
 }
 
 

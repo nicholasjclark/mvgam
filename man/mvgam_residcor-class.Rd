@@ -26,9 +26,11 @@ other entries are set to zero.}
 \item{cov, cov_se, cov_lower, cov_upper, cov_ess}{Posterior
 summaries of the residual covariance matrix, with per-entry ESS
 matching the correlation surface.}
-\item{mean_abs_offdiag}{Mean of the absolute off-diagonal entries
-of the posterior median correlation, a scalar summary of overall
-correlation strength.}
+\item{mean_abs_offdiag}{A \code{list} of \code{point}, \code{lower} and \code{upper}
+summarising the mean absolute off-diagonal correlation. The mean is
+taken within each draw and then summarised across draws, so the
+interval describes overall correlation strength rather than being
+read off a single summary matrix.}
 \item{n_series, series_names}{Dimensions of the matrix and the
 series labels.}
 \item{pattern, hierarchical, group_label}{Bookkeeping fields
@@ -36,12 +38,15 @@ recording the residual structure that was summarised.}
 \item{probs, prob_threshold}{The credible interval and threshold
 used by \code{residual_cor()} to populate \code{sig_cor}.}
 
-Precision-matrix slots (\code{prec}, \code{prec_se}, \code{prec_lower},
-\code{prec_upper}, \code{prec_ess}) are populated when \code{partial = TRUE} is
-passed to \code{residual_cor()}. The \code{sig_prec} thresholded matrix is
-reserved for a future extension; until then,
-\code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}} with \code{type = "precision"} errors clearly
-when called on an object built without \code{partial = TRUE}.
+Passing \code{partial = TRUE} to \code{residual_cor()} adds the partial
+correlation surface, which mirrors the correlation one entry for
+entry: \code{prec}, \code{prec_se}, \code{prec_lower}, \code{prec_upper}, \code{prec_ess},
+\code{prec_prob_positive}, \code{prec_prob_negative}, \code{prec_prob_nonzero}
+and the thresholded \code{sig_prec}. Partial correlations are bounded
+the way correlations are, so they are summarised on the same
+Fisher-z scale. Without \code{partial = TRUE} none of these are
+present, and \code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}} with \code{type = "precision"}
+says so.
 }
 \description{
 A \code{mvgam_residcor} object returned by function \code{\link[=residual_cor]{residual_cor()}}.

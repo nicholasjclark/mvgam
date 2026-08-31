@@ -1169,7 +1169,7 @@ plot.mvgam_ppc_fit_stat <- function(x, ...) {
                         format(round(x$bayes_p, 3), nsmall = 3)),
       x = "T(y_obs, theta)", y = "T(y_rep, theta)"
     ) +
-    ggplot2::theme_classic()
+    mvgam_theme()
 }
 
 

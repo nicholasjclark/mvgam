@@ -20,6 +20,33 @@ mvgam_palette <- function(scheme = NULL) {
   unname(unlist(cs))
 }
 
+#' One colour of the active bayesplot scheme, by the role it plays
+#' rather than its position. Reading a scheme entry through this is
+#' what lets every mvgam figure follow a user's
+#' `bayesplot::color_scheme_set()`; a hex written at the call site
+#' pins that one panel to whatever scheme was current when it was
+#' written, and the package then draws two schemes at once.
+#'
+#' @param role One of the six bayesplot scheme roles: `light`,
+#'   `light_highlight`, `mid`, `mid_highlight`, `dark`,
+#'   `dark_highlight`.
+#' @param scheme Optional scheme name; the active scheme by default.
+#' @return A single colour string.
+#'
+#' @noRd
+mvgam_colour <- function(role, scheme = NULL) {
+  roles <- c("light", "light_highlight", "mid", "mid_highlight",
+             "dark", "dark_highlight")
+  checkmate::assert_choice(role, roles)
+  cs <- if (is.null(scheme)) {
+    bayesplot::color_scheme_get()
+  } else {
+    bayesplot::color_scheme_get(scheme)
+  }
+  cs[[role]]
+}
+
+
 #' Run an expression with a temporary bayesplot colour scheme,
 #' restoring the prior scheme on exit. Suits short call-style
 #' wrappers (`with_color_scheme("red", do.call(...))`).
@@ -142,7 +169,8 @@ mvgam_band_layer <- function(
   times,
   probs = c(0.5, 0.8, 0.95),
   palette = mvgam_palette(),
-  group = NULL
+  group = NULL,
+  fill = NULL
 ) {
   checkmate::assert_matrix(draws_mat, mode = "numeric")
   checkmate::assert_numeric(
@@ -159,7 +187,15 @@ mvgam_band_layer <- function(
   # Sort outer-to-inner so the narrowest band is plotted last
   # (on top).
   probs <- sort(probs, decreasing = TRUE)
-  fills <- mvgam_band_fills(length(probs), palette = palette)
+  # A single flat fill is what a panel wants when its bands are not
+  # the subject, as the hindcast arm of a forecast plot does with its
+  # one grey interval behind the forecast's own.
+  checkmate::assert_string(fill, null.ok = TRUE)
+  fills <- if (is.null(fill)) {
+    mvgam_band_fills(length(probs), palette = palette)
+  } else {
+    rep(fill, length(probs))
+  }
   alpha <- (1 - probs) / 2
   lapply(seq_along(probs), function(i) {
     lo <- apply(
