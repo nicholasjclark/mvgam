@@ -37,19 +37,29 @@ mvgam_removed_args <- c(
   prior_simulation = "use 'sample_prior = \"only\"'",
   return_model_data = "use 'standata()' on the fitted model",
   save_all_pars = "every sampled parameter is kept",
-  parallel = "use 'cores', which brms passes to the backend"
+  parallel = "use 'cores', which brms passes to the backend",
+  sparse = paste0(
+    "a sparse design matrix is requested on the formula, as in ",
+    "'bf(y ~ x, sparse = TRUE)', which is where brms reads it"
+  ),
+  stan_funs = paste0(
+    "extra Stan code is supplied through 'stanvars', as in ",
+    "'stanvars = brms::stanvar(scode = ..., block = \"functions\")'"
+  )
 )
 
-# Reason: this runs on the dots of `mvgam()`, the one call every
-# fitting path funnels through, `jsdgam()` included.
-reject_removed_args <- function(dots) {
+# Reason: called on the dots of every entry point that reaches the
+# code generator, so an argument mvgam no longer takes is named
+# wherever it is written rather than disappearing into `...`.
+reject_removed_args <- function(dots, fn = "mvgam") {
+  checkmate::assert_string(fn, min.chars = 1)
   found <- intersect(names(mvgam_removed_args), names(dots))
   if (!length(found)) {
     return(invisible(NULL))
   }
   stop(insight::format_error(c(
     cli::format_inline(
-      "{.fn mvgam} no longer takes {.arg {found}}."
+      "{.fn {fn}} no longer takes {.arg {found}}."
     ),
     x = cli::format_inline(
       "{cli::qty(found)}{?This argument was/These arguments were} ",
@@ -368,6 +378,19 @@ mvgam_imputation_forwarded <- c(
 #'   struggle to leave a poor starting point at all, where the extra
 #'   second buys a warmup that would otherwise stall or fill with
 #'   divergences.
+#'
+#'   Four arguments shape the Stan program rather than the sampler, and
+#'   are passed on to brms unchanged. `knots` gives knot positions by
+#'   covariate name and reaches the basis constructors for the
+#'   observation and trend formulas alike. `drop_unused_levels` decides
+#'   whether a factor level with no observations still earns a
+#'   coefficient. `sample_prior` takes `"no"`, `"yes"` or `"only"`, and
+#'   under `"only"` the observation likelihood drops out while the
+#'   latent process keeps its own prior, so the draws describe the
+#'   model before it sees the response. `normalize` decides whether the
+#'   sampling statements carry their normalising constants; dropping
+#'   them is faster and leaves the posterior unchanged. `save_model`
+#'   names a file to write the assembled Stan program to.
 #' @return mvgam object with dual brmsfit-like structure
 #'
 #' @examples
@@ -1111,6 +1134,12 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       data = obs_setup$data,
       test_data = newdata,
       data.name = data_name,
+      # The brms code-generation options the fit was built under, kept
+      # verbatim so a refit rebuilds the same program rather than
+      # falling back to the defaults. Everything else in this object
+      # records what the generator produced; this records what it was
+      # asked for.
+      codegen = obs_setup$codegen,
       stancode = combined_stancode %||% obs_setup$stancode,
       standata = combined_standata %||% obs_setup$standata,
       exclude = c("lprior", "lp__"),

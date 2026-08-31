@@ -11,7 +11,6 @@
   prior = NULL,
   data2 = NULL,
   sample_prior = "no",
-  sparse = NULL,
   knots = NULL,
   drop_unused_levels = TRUE,
   stanvars = NULL,
@@ -39,10 +38,8 @@ specifications. Can be created using \code{brms::prior()}.}
 \item{sample_prior}{Character string indicating whether to sample from priors
 only. Options: \code{"no"} (default), \code{"yes"}, \code{"only"}.}
 
-\item{sparse}{Logical; should sparse matrix operations be used? Default is
-\code{NULL} (automatic selection).}
-
-\item{knots}{Optional list of knot positions for spline terms.}
+\item{knots}{Optional named list of knot positions for spline terms, passed
+to the basis constructors for both the observation and trend formulas.}
 
 \item{drop_unused_levels}{Logical; should unused factor levels be dropped?
 Default is \code{TRUE}.}

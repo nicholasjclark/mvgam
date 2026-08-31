@@ -60,6 +60,71 @@ should_trend_formula_have_intercept <- function(formula) {
   return(FALSE)
 }
 
+#' Collect the brms code-generation options into one list
+#'
+#' @param knots Named list of knot positions for smooth terms, or NULL.
+#' @param sample_prior One of "no", "yes" or "only".
+#' @param drop_unused_levels Whether to drop unused factor levels.
+#' @param normalize Whether brms normalises its sampling statements.
+#' @return A named list carrying all four values.
+#' @noRd
+mvgam_codegen_options <- function(knots = NULL, sample_prior = "no",
+                                  drop_unused_levels = TRUE,
+                                  normalize = TRUE) {
+  checkmate::assert_list(knots, names = "named", null.ok = TRUE)
+  checkmate::assert_choice(sample_prior, c("no", "yes", "only"))
+  checkmate::assert_flag(drop_unused_levels)
+  checkmate::assert_flag(normalize)
+  list(
+    knots = knots,
+    sample_prior = sample_prior,
+    drop_unused_levels = drop_unused_levels,
+    normalize = normalize
+  )
+}
+
+# Which options each brms generator declares. Both sets are derived
+# from the one options list rather than written out again, so an
+# option added to `mvgam_codegen_options()` is routed without a second
+# edit. `brms::standata()` takes no `normalize`: whether the sampling
+# statements carry their normalising constants is a property of the
+# program alone.
+mvgam_codegen_stancode_options <- names(formals(mvgam_codegen_options))
+mvgam_codegen_standata_options <- setdiff(
+  mvgam_codegen_stancode_options, "normalize"
+)
+
+#' Build the options list from a call's dots
+#'
+#' `get_prior()` hands its dots to brms for the observation side. The
+#' trend side is built by mvgam rather than brms, so it has to be given
+#' the same options explicitly or the two halves of one prior table
+#' describe different models.
+#'
+#' @param dots A list of named arguments, usually `list(...)`.
+#' @return A list from `mvgam_codegen_options()`.
+#' @noRd
+codegen_from_dots <- function(dots) {
+  checkmate::assert_list(dots)
+  named <- intersect(names(dots), names(formals(mvgam_codegen_options)))
+  do.call(mvgam_codegen_options, dots[named])
+}
+
+#' Take the options one brms generator declares
+#'
+#' @param codegen A list from `mvgam_codegen_options()`, or NULL.
+#' @param accepted Character vector of option names the generator takes.
+#' @return A named list ready to splice into the brms call.
+#' @noRd
+codegen_args_for <- function(codegen, accepted) {
+  checkmate::assert_list(codegen, names = "named", null.ok = TRUE)
+  checkmate::assert_character(accepted, min.len = 1, any.missing = FALSE)
+  if (is.null(codegen)) {
+    return(list())
+  }
+  codegen[intersect(names(codegen), accepted)]
+}
+
 # =============================================================================
 # SECTION 1: BRMS LIGHTWEIGHT SETUP SYSTEM
 # =============================================================================
@@ -82,6 +147,8 @@ should_trend_formula_have_intercept <- function(formula) {
 #'   trend validation. Required when is_trend_setup = TRUE.
 #' @param time_var Character name of time variable. Default: "time".
 #' @param series_var Character name of series variable. Default: "series".
+#' @param codegen A list from `mvgam_codegen_options()` holding the brms
+#'   code-generation options, or NULL to take brms's own defaults.
 #' @param ... Additional arguments passed to brms functions
 #' @noRd
 setup_brms_lightweight <- function(formula, data, family = gaussian(),
@@ -92,6 +159,7 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
                                    response_vars = NULL,
                                    time_var = "time",
                                    series_var = "series",
+                                   codegen = NULL,
                                    ...) {
   # Accept both regular formulas and brms formula objects
   checkmate::assert(
@@ -109,6 +177,7 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   )
   # Validation for new parameters
   checkmate::assert_logical(is_trend_setup, len = 1)
+  checkmate::assert_list(codegen, names = "named", null.ok = TRUE)
   checkmate::assert_character(response_vars, null.ok = TRUE)
   checkmate::assert_string(time_var)
   checkmate::assert_string(series_var)
@@ -250,18 +319,25 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   } else {
     NULL
   }
-  mock_setup <- brms::brm(
-    formula = formula,
-    data = data,
-    family = family,
-    stanvars = stanvars,
-    prior = prior,
-    data2 = data2,
-    threads = brm_threads,
-    backend = "mock",
-    mock_fit = 1,
-    rename = FALSE
-  )
+  # The code-generation options ride along here and again in every
+  # downstream regeneration, so the mock fit, the assembled Stan
+  # program and the assembled Stan data are all built under the same
+  # basis expansions, factor levels and prior-only setting.
+  mock_setup <- do.call(brms::brm, c(
+    list(
+      formula = formula,
+      data = data,
+      family = family,
+      stanvars = stanvars,
+      prior = prior,
+      data2 = data2,
+      threads = brm_threads,
+      backend = "mock",
+      mock_fit = 1,
+      rename = FALSE
+    ),
+    codegen_args_for(codegen, mvgam_codegen_stancode_options)
+  ))
 
   # Add version metadata to prevent restructure() from calling update()
   # standata() and prepare_predictions() call restructure() which checks version
@@ -294,9 +370,10 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     family = family,
     stanvars = stanvars,
     threads = brm_threads,  # honoured by downstream make_stancode
+    codegen = codegen,      # read again by the downstream generators
     stancode = brms::stancode(mock_setup),
     standata = brms::standata(mock_setup),
-    prior = extract_prior_from_setup(mock_setup),
+    prior = extract_prior_from_setup(mock_setup, codegen),
     brmsterms = extract_brmsterms_from_setup(mock_setup),
     brmsfit = mock_setup,  # Keep the mock brmsfit for prediction
     trend_specs = trend_specs,  # Include parsed trend specifications
@@ -316,9 +393,13 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
 
 #' Extract Prior Information from brms Setup
 #' @param setup_object brms setup object
+#' @param codegen A list from `mvgam_codegen_options()`, or NULL. The
+#'   prior table is keyed by the coefficients the design matrix holds,
+#'   so it has to be merged under the same knots and factor levels the
+#'   Stan data is built under.
 #' @return Data frame of prior specifications
 #' @noRd
-extract_prior_from_setup <- function(setup_object) {
+extract_prior_from_setup <- function(setup_object, codegen = NULL) {
   # Always return the full merged prior table: brms defaults for
   # every parameter class, with user-supplied rows overlaid on top
   # and tagged `source = "user"`. brms::validate_prior() is the
@@ -326,13 +407,16 @@ extract_prior_from_setup <- function(setup_object) {
   # on an mvgam fit match the brmsfit convention exactly.
   # The user prior may be NULL (no overrides), in which case
   # validate_prior just returns the default table.
-  prior <- safe_brms_prior_call(brms::validate_prior(
-    prior   = setup_object$prior,
-    formula = setup_object$formula,
-    data    = setup_object$data,
-    family  = setup_object$family,
-    data2   = setup_object$data2
-  ))
+  prior <- safe_brms_prior_call(do.call(brms::validate_prior, c(
+    list(
+      prior   = setup_object$prior,
+      formula = setup_object$formula,
+      data    = setup_object$data,
+      family  = setup_object$family,
+      data2   = setup_object$data2
+    ),
+    codegen_args_for(codegen, mvgam_codegen_standata_options)
+  )))
   # Drop the empty-obs-formula placeholder row from the merged
   # prior table so users do not see it in `prior_summary()` or
   # `mod$prior`. The pin row is structural only.

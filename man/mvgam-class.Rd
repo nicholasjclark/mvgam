@@ -34,6 +34,10 @@ disagree with what the sampler ran
 \item \code{data} The observation model frame
 \item \code{test_data} The \code{newdata} supplied at fitting, or \code{NULL}
 \item \code{data.name} The deparsed name of the \code{data} argument
+\item \code{codegen} The \code{knots}, \code{sample_prior}, \code{drop_unused_levels} and
+\code{normalize} settings the Stan program was generated under, so
+that \code{\link[=update]{update()}} rebuilds the same program rather than the
+default one
 }
 
 The Stan program:

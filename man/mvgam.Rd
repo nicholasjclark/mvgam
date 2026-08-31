@@ -251,7 +251,20 @@ duration essentially unchanged, and returned 15 to 25 percent
 fewer effective samples per second. Its value is on models that
 struggle to leave a poor starting point at all, where the extra
 second buys a warmup that would otherwise stall or fill with
-divergences.}
+divergences.
+
+Four arguments shape the Stan program rather than the sampler, and
+are passed on to brms unchanged. \code{knots} gives knot positions by
+covariate name and reaches the basis constructors for the
+observation and trend formulas alike. \code{drop_unused_levels} decides
+whether a factor level with no observations still earns a
+coefficient. \code{sample_prior} takes \code{"no"}, \code{"yes"} or \code{"only"}, and
+under \code{"only"} the observation likelihood drops out while the
+latent process keeps its own prior, so the draws describe the
+model before it sees the response. \code{normalize} decides whether the
+sampling statements carry their normalising constants; dropping
+them is faster and leaves the posterior unchanged. \code{save_model}
+names a file to write the assembled Stan program to.}
 }
 \value{
 mvgam object with dual brmsfit-like structure

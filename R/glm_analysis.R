@@ -86,7 +86,8 @@ detect_glm_patterns <- function(stan_code) {
   )
 
   detected <- vapply(glm_patterns, function(pattern) {
-    any(grepl(paste0("target\\s*\\+=.*", pattern, "_l(pdf|pmf)"), stan_code))
+    any(grepl(paste0("target\\s*\\+=.*",
+                     stan_density_call_pattern(pattern)), stan_code))
   }, logical(1))
 
   names(detected) <- glm_patterns
@@ -151,11 +152,11 @@ determine_glm_preservation <- function(glm_patterns, trend_info = NULL) {
 
 #' Which responses brms wrote a GLM-optimised likelihood for
 #'
-#' Where it can, brms emits `poisson_log_glm_lpmf(Y | Xc, Intercept,
-#' b)`, which builds `mu` inside the call and so leaves nothing for a
-#' trend to be added to. Every caller deciding whether to unwind that
-#' form asks here, because the answer was previously worked out in two
-#' places from the same twenty lines.
+#' Where it can, brms folds the linear predictor into the likelihood
+#' call itself, as in `poisson_log_glm_lpmf(Y | Xc, Intercept, b)`.
+#' That form constructs `mu` internally and never names it, so a trend
+#' has no `mu` to reach and the call has to be unwound before one can
+#' be injected. Every caller deciding whether to unwind asks here.
 #'
 #' @param lines Character vector of Stan source lines.
 #' @param response_names Character vector of response names.
@@ -170,7 +171,8 @@ map_responses_to_glm <- function(lines, response_names) {
   if (is.null(model_lines)) return(result)
 
   likelihood_lines <- grep(
-    "target \\+=.*_l(pdf|pmf)", model_lines, value = TRUE
+    paste0("target \\+=.*", stan_density_call_pattern()), model_lines,
+    value = TRUE
   )
   for (line in likelihood_lines) {
     matched <- regmatches(line, regexpr("Y_\\w+", line))
@@ -178,7 +180,7 @@ map_responses_to_glm <- function(lines, response_names) {
     # Anchored, so a response whose own name contains `Y_` survives.
     response <- sub("^Y_", "", matched[1L])
     if (response %in% response_names) {
-      result[[response]] <- grepl("_glm_l(pdf|pmf)", line)
+      result[[response]] <- grepl(stan_density_call_pattern("_glm"), line)
     }
   }
   result
@@ -236,7 +238,7 @@ inject_trends_into_glm_calls <- function(code_lines, block_info, trend_injection
   
   for (i in model_range) {
     line <- code_lines[i]
-    if (grepl("_glm_lpmf|_glm_lpdf", line)) {
+    if (grepl(stan_density_call_pattern("_glm"), line)) {
       glm_line_idx <- i
       
       
@@ -794,7 +796,7 @@ apply_glm_transformations <- function(code_lines, block_info, analysis) {
     params <- analysis$glm_parameters[[glm_type]]
 
     # Find GLM call line to transform
-    glm_pattern <- paste0(glm_type, "_l(pdf|pmf)")
+    glm_pattern <- stan_density_call_pattern(glm_type)
     glm_line_idx <- NULL
     for (i in block_info$start_idx:block_info$end_idx) {
       if (grepl(glm_pattern, modified_lines[i]) && !i %in% processed_glm_lines) {
@@ -878,22 +880,29 @@ transform_single_glm_call <- function(glm_line, glm_type, params) {
     ""
   }
 
-  # Generate appropriate replacement based on GLM type
-  if (glm_type == "normal_id_glm") {
-    replacement <- paste0(glm_type, "_lpdf(", params$y_var, " | to_matrix(mu), 0.0, mu_ones", other_params_str, ")")
-  } else if (glm_type %in% c("poisson_log_glm", "neg_binomial_2_log_glm",
-                            "bernoulli_logit_glm", "ordered_logistic_glm", "categorical_logit_glm")) {
-    replacement <- paste0(glm_type, "_lpmf(", params$y_var, " | to_matrix(mu), 0.0, mu_ones", other_params_str, ")")
-  } else {
+  if (!glm_type %in% c("normal_id_glm", "poisson_log_glm",
+                       "neg_binomial_2_log_glm", "bernoulli_logit_glm",
+                       "ordered_logistic_glm", "categorical_logit_glm")) {
     stop(insight::format_error(
       cli::format_inline(
         "Unsupported GLM type for transformation: {.field {glm_type}}"
       )
     ), call. = FALSE)
   }
+  # Put back the spelling the line used, so a program generated under
+  # `normalize = FALSE` keeps its unnormalised densities.
+  suffix <- stan_density_suffix(glm_line, glm_type)
+  if (is.null(suffix)) {
+    return(glm_line)
+  }
+  replacement <- paste0(
+    glm_type, suffix, "(", params$y_var,
+    " | to_matrix(mu), 0.0, mu_ones", other_params_str, ")"
+  )
 
   # Replace GLM call in the line
-  original_pattern <- paste0(glm_type, "_l(pdf|pmf)\\s*\\([^\\)]+\\)")
+  original_pattern <- paste0(stan_density_call_pattern(glm_type),
+                             "\\s*\\([^\\)]+\\)")
   gsub(original_pattern, replacement, glm_line)
 }
 
@@ -977,7 +986,8 @@ inject_trend_effects_linear <- function(stan_code, trend_injection_code) {
 
     # Check if this is GLM code that needs GLM-compatible trend injection
     model_lines <- code_lines[block_info$start_idx:block_info$end_idx] 
-    has_glm_calls <- any(grepl("_glm_lpmf|_glm_lpdf", model_lines))
+    has_glm_calls <- any(grepl(stan_density_call_pattern("_glm"),
+                               model_lines))
     
     
     if (has_glm_calls) {

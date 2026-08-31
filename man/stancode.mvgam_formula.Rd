@@ -11,14 +11,12 @@
   prior = NULL,
   data2 = NULL,
   sample_prior = "no",
-  sparse = NULL,
   knots = NULL,
   drop_unused_levels = TRUE,
   backend = "rstan",
   threads = getOption("mc.cores", 1),
   normalize = TRUE,
   save_model = NULL,
-  stan_funs = NULL,
   silent = 1L,
   validate = TRUE,
   ...
@@ -44,10 +42,8 @@ specifications. Can be created using \code{brms::prior()}.}
 \item{sample_prior}{Character string indicating whether to sample from priors
 only. Options: \code{"no"} (default), \code{"yes"}, \code{"only"}.}
 
-\item{sparse}{Logical; should sparse matrix operations be used? Default is
-\code{NULL} (automatic selection).}
-
-\item{knots}{Optional list of knot positions for spline terms.}
+\item{knots}{Optional named list of knot positions for spline terms, passed
+to the basis constructors for both the observation and trend formulas.}
 
 \item{drop_unused_levels}{Logical; should unused factor levels be dropped?
 Default is \code{TRUE}.}
@@ -58,13 +54,11 @@ Default is \code{TRUE}.}
 \item{threads}{Number of threads to use for parallelization. Default is
 \code{getOption("mc.cores", 1)}.}
 
-\item{normalize}{Logical; should data be normalized for efficient sampling?
-Default is \code{TRUE}.}
+\item{normalize}{Logical; should brms drop the normalising constants from
+its sampling statements? Default is \code{TRUE}.}
 
-\item{save_model}{File path to save the compiled Stan model. If \code{NULL}
-(default), the model is not saved.}
-
-\item{stan_funs}{Optional character string containing additional Stan functions.}
+\item{save_model}{File path to write the assembled Stan program to. If
+\code{NULL} (default), nothing is written.}
 
 \item{silent}{Integer controlling verbosity. 0 = silent, 1 = some output,
 2 = verbose. Default is 1.}

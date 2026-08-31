@@ -313,6 +313,28 @@ mvgam_update_inheritance <- list(
   )
 )
 
+# The four brms code-generation options all come off one slot, so they
+# join the registry through one loop rather than four near-identical
+# entries. A fit made before the slot existed returns NULL and the
+# refit takes the `mvgam()` default, which is what it did before.
+#
+# Reason: built on first read rather than at load, because the names
+# come from `mvgam_codegen_options()` in another file and DESCRIPTION
+# sets no `Collate`, so which file is sourced first is a property of
+# the locale.
+codegen_inheritance_entries <- function() {
+  entries <- lapply(names(mvgam_codegen_options()), function(nm) {
+    list(getter = function(object) object$codegen[[nm]])
+  })
+  stats::setNames(entries, names(mvgam_codegen_options()))
+}
+
+# The registry every reader goes through: the hand-written entries
+# above plus the code-generation options.
+update_inheritance_table <- function() {
+  c(mvgam_update_inheritance, codegen_inheritance_entries())
+}
+
 
 # Arguments a refit does not carry over, each with the reason: some
 # because the fit does not store them, others because they change
@@ -322,12 +344,6 @@ mvgam_update_inheritance <- list(
 # Silence is what let `loadings_prior` go missing: a refit dropped the
 # whole structured prior and nothing said so.
 mvgam_update_uninherited <- c(
-  knots = "not stored; only the resulting smooth basis is kept",
-  sample_prior = "not stored on the fitted object",
-  sparse = "not stored on the fitted object",
-  normalize = "not stored on the fitted object",
-  drop_unused_levels = "not stored on the fitted object",
-  stan_funs = "not stored on the fitted object",
   data2 = "stored, but empty on every fit examined",
   stanvars = "stored with mvgam's own mixed in, so re-passing would double-inject",
   combine = "multiple-imputation only, and a pooled fit is refused",
@@ -530,12 +546,13 @@ mvgam_update_call <- function(object, formula., newdata, dots) {
     stats::update.formula(object$formula, formula.)
   }
   resolved$data <- if (is.null(newdata)) object$data else newdata
-  for (arg_name in names(mvgam_update_inheritance)) {
+  inheritance <- update_inheritance_table()
+  for (arg_name in names(inheritance)) {
     if (arg_name %in% names(dots)) {
       resolved[[arg_name]] <- dots[[arg_name]]
       next
     }
-    entry <- mvgam_update_inheritance[[arg_name]]
+    entry <- inheritance[[arg_name]]
     value <- if (!is.null(entry$getter)) {
       entry$getter(object)
     } else {

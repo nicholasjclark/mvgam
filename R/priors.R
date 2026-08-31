@@ -174,7 +174,9 @@ common_trend_priors <- list(
 #' @param response_names Character vector of response variable names
 #' @return A brmsprior object with trend model priors
 #' @noRd
-extract_trend_priors <- function(trend_formula, data, response_names = NULL, .precomputed_dimensions = NULL) {
+extract_trend_priors <- function(trend_formula, data, response_names = NULL,
+                                 .precomputed_dimensions = NULL,
+                                 codegen = NULL) {
   if (!is.null(trend_formula)) {
     checkmate::assert_formula(trend_formula)
   }
@@ -199,7 +201,8 @@ extract_trend_priors <- function(trend_formula, data, response_names = NULL, .pr
 
   # Generate priors based on trend type using convention-based dispatch
   # Pass data through for base formula prior extraction
-  trend_priors <- generate_trend_priors(trend_spec, data, response_names)
+  trend_priors <- generate_trend_priors(trend_spec, data, response_names,
+                                        codegen = codegen)
 
   return(trend_priors)
 }
@@ -210,12 +213,14 @@ extract_trend_priors <- function(trend_formula, data, response_names = NULL, .pr
 
 #' Generate Trend Priors from Monitor Parameters
 #'
+#' @param codegen A list from `mvgam_codegen_options()`, or NULL
 #' @param trend_spec Trend specification from parse_trend_formula
 #' @param response_names Character vector of response names for
 #'   multivariate models
 #' @return A brmsprior object with trend priors
 #' @noRd
-generate_trend_priors <- function(trend_spec, data, response_names = NULL) {
+generate_trend_priors <- function(trend_spec, data, response_names = NULL,
+                                  codegen = NULL) {
   # Validate parameters before generating trend priors
   checkmate::assert_list(trend_spec, names = "named")
   checkmate::assert_data_frame(data, min.rows = 1)
@@ -270,10 +275,13 @@ generate_trend_priors <- function(trend_spec, data, response_names = NULL) {
     if (!all.equal(base_formula, ~ 0, check.attributes = FALSE) == TRUE) {
 
       # Call verified setup_brms_lightweight function
+      # The same options the observation side is given, so a prior
+      # table reports the coefficients the fit will actually estimate.
       trend_setup <- setup_brms_lightweight(
         formula = base_formula,
         data = data,
-        family = gaussian()
+        family = gaussian(),
+        codegen = codegen
       )
 
       # Validate that setup returned expected structure
@@ -2051,7 +2059,8 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
     trend_formula = trend_formula_for_priors,
     data = components$trend_data,
     response_names = response_names,
-    .precomputed_dimensions = dimensions
+    .precomputed_dimensions = dimensions,
+    codegen = codegen_from_dots(list(...))
   )
 
   # Combine observation and trend priors using existing helper function

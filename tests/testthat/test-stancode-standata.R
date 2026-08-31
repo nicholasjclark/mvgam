@@ -4474,3 +4474,401 @@ test_that("com_binomial() accepts a constant denominator", {
   expect_identical(length(sd$trials), sd$N)
 })
 
+
+# ---- brms code-generation options ---------------------------------
+# `knots`, `sample_prior`, `drop_unused_levels` and `normalize` are
+# documented arguments that reach brms three times over: once when the
+# mock fit is built, once when the Stan program is regenerated and once
+# when the Stan data is. Each of these pins one of those journeys.
+
+codegen_test_data <- function(n_time = 24L, n_series = 2L) {
+  set.seed(11)
+  out <- data.frame(
+    time = rep(seq_len(n_time), n_series),
+    series = factor(rep(paste0("s", seq_len(n_series)), each = n_time)),
+    elev = runif(n_time * n_series, 0, 100)
+  )
+  out$y <- rpois(nrow(out), 5)
+  out
+}
+
+test_that("mvgam_codegen_options() refuses malformed settings", {
+  expect_error(mvgam:::mvgam_codegen_options(knots = list(1, 2)),
+               "names")
+  expect_error(mvgam:::mvgam_codegen_options(sample_prior = "maybe"),
+               "sample_prior")
+  expect_error(mvgam:::mvgam_codegen_options(normalize = NA),
+               "normalize")
+})
+
+test_that("codegen_args_for() hands each generator what it declares", {
+  opts <- mvgam:::mvgam_codegen_options(normalize = FALSE)
+  expect_named(
+    mvgam:::codegen_args_for(opts, mvgam:::mvgam_codegen_stancode_options),
+    c("knots", "sample_prior", "drop_unused_levels", "normalize")
+  )
+  # `brms::standata()` declares no `normalize`, so it never sees one.
+  expect_named(
+    mvgam:::codegen_args_for(opts, mvgam:::mvgam_codegen_standata_options),
+    c("knots", "sample_prior", "drop_unused_levels")
+  )
+  expect_identical(
+    mvgam:::codegen_args_for(NULL, mvgam:::mvgam_codegen_stancode_options),
+    list()
+  )
+})
+
+test_that("knots reach the basis on both formulas", {
+  dat <- codegen_test_data()
+  kn <- list(elev = seq(0, 100, length.out = 5))
+
+  obs <- mvgam_formula(y ~ s(elev, bs = "cr", k = 5),
+                       trend_formula = ~ AR(p = 1))
+  sd_default <- standata(obs, data = dat, family = poisson())
+  sd_knots <- standata(obs, data = dat, family = poisson(), knots = kn)
+  expect_false(isTRUE(all.equal(sd_default$Xs, sd_knots$Xs)))
+  expect_false(isTRUE(all.equal(sd_default$Zs_1_1, sd_knots$Zs_1_1)))
+
+  # The basis has to match what brms builds from the same knots, not
+  # merely differ from the default.
+  brms_knots <- brms::make_standata(y ~ s(elev, bs = "cr", k = 5),
+                                    data = dat, family = poisson(),
+                                    knots = kn)
+  expect_equal(sd_knots$Xs, brms_knots$Xs, ignore_attr = TRUE)
+
+  trend <- mvgam_formula(y ~ 1,
+                         trend_formula = ~ s(elev, bs = "cr", k = 5) +
+                           AR(p = 1))
+  td_default <- standata(trend, data = dat, family = poisson())
+  td_knots <- standata(trend, data = dat, family = poisson(), knots = kn)
+  expect_false(isTRUE(all.equal(td_default$Xs_trend, td_knots$Xs_trend)))
+})
+
+test_that("a knot count that disagrees with k is refused", {
+  # mgcv raises this, which is only reachable once the knots arrive.
+  dat <- codegen_test_data()
+  expect_error(
+    standata(mvgam_formula(y ~ s(elev, bs = "cr", k = 5),
+                           trend_formula = ~ AR(p = 1)),
+              data = dat, family = poisson(),
+              knots = list(elev = seq(0, 100, length.out = 6))),
+    "knots"
+  )
+})
+
+test_that("drop_unused_levels decides whether an empty level is priced", {
+  dat <- codegen_test_data()
+  dat$grp <- factor(rep(c("a", "b"), length.out = nrow(dat)),
+                    levels = c("a", "b", "c"))
+  mf <- mvgam_formula(y ~ grp, trend_formula = ~ AR(p = 1))
+
+  expect_identical(
+    as.integer(standata(mf, data = dat, family = poisson())$K), 2L
+  )
+  # The prior table is keyed by the same coefficients, so it has to be
+  # merged under the same setting: merging under the default leaves no
+  # row for `b_grpc` and brms rejects the whole table.
+  kept <- standata(mf, data = dat, family = poisson(),
+                   drop_unused_levels = FALSE)
+  expect_identical(as.integer(kept$K), 3L)
+})
+
+test_that("sample_prior moves the data, not the program", {
+  dat <- codegen_test_data()
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1))
+
+  # brms gates the likelihood on `prior_only`, which is Stan data, so
+  # "only" changes the standata and leaves the program untouched.
+  expect_identical(
+    as.integer(standata(mf, data = dat, family = poisson())$prior_only), 0L
+  )
+  expect_identical(
+    as.integer(standata(mf, data = dat, family = poisson(),
+                        sample_prior = "only")$prior_only), 1L
+  )
+  expect_identical(
+    stancode(mf, data = dat, family = poisson(), silent = 2L),
+    stancode(mf, data = dat, family = poisson(), sample_prior = "only",
+             silent = 2L)
+  )
+
+  # "yes" keeps the likelihood and adds draws from the prior alongside.
+  expect_true(grepl(
+    "prior_Intercept",
+    stancode(mf, data = dat, family = poisson(), sample_prior = "yes",
+             silent = 2L)
+  ))
+})
+
+test_that("normalize = FALSE emits the unnormalised densities", {
+  dat <- codegen_test_data()
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1))
+  unnormalised <- stancode(mf, data = dat, family = poisson(),
+                           normalize = FALSE, silent = 2L)
+  expect_true(grepl("_lup[dm]f", unnormalised))
+  expect_false(identical(
+    unnormalised,
+    stancode(mf, data = dat, family = poisson(), silent = 2L)
+  ))
+  # The trend's own `sigma` prior is mvgam's to set, so brms's copy is
+  # dropped under either spelling. Leaving the unnormalised spelling
+  # unrecognised left `student_t_lupdf(sigma | ...)` in the program,
+  # where the renamer then suffixed the function instead of the
+  # parameter and Stan rejected it.
+  expect_false(grepl("student_t_lupdf_trend", unnormalised))
+})
+
+test_that("the reserved-word list carries both density spellings", {
+  reserved <- mvgam:::get_stan_reserved_words()
+  normalised <- grep("_lp[dm]f$", reserved, value = TRUE)
+  expect_true(length(normalised) > 0)
+  expect_true(all(
+    sub("_lp([dm])f$", "_lup\\1f", normalised) %in% reserved
+  ))
+})
+
+test_that("save_model writes the assembled program", {
+  dat <- codegen_test_data()
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1))
+  path <- withr::local_tempfile(fileext = ".stan")
+
+  code <- stancode(mf, data = dat, family = poisson(), save_model = path,
+                   silent = 2L)
+  expect_true(file.exists(path))
+  # What lands on disk is mvgam's program, not the brms one it starts
+  # from, so it names the trend.
+  written <- paste(readLines(path), collapse = "\n")
+  expect_identical(written, as.character(code))
+  expect_true(grepl("trend", written))
+})
+
+test_that("save_model refuses a directory that does not exist", {
+  dat <- codegen_test_data()
+  expect_error(
+    stancode(mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1)),
+              data = dat, family = poisson(),
+              save_model = file.path(tempdir(), "no_such_dir", "m.stan")),
+    "does not exist"
+  )
+})
+
+test_that("brms-deprecated arguments are named rather than dropped", {
+  dat <- codegen_test_data()
+  mf <- mvgam_formula(y ~ elev, trend_formula = ~ AR(p = 1))
+
+  # brms moved both of these off its own top level, so mvgam points at
+  # where brms now reads them rather than resurrecting the argument.
+  expect_error(
+    stancode(mf, data = dat, family = poisson(), sparse = TRUE),
+    "sparse = TRUE"
+  )
+  expect_error(
+    standata(mf, data = dat, family = poisson(),
+             stan_funs = "real f(real x) { return x; }"),
+    "stanvars"
+  )
+
+  # The supported spelling still works.
+  expect_true(grepl(
+    "csr_matrix_times_vector",
+    stancode(mvgam_formula(bf(y ~ elev, sparse = TRUE),
+                           trend_formula = ~ AR(p = 1)),
+              data = dat, family = poisson(), silent = 2L)
+  ))
+})
+
+test_that("a fit records the options its program was generated under", {
+  # `update()` reads all four off one slot, so a fit made before the
+  # slot existed inherits nothing and falls back to the defaults.
+  opts <- names(mvgam:::mvgam_codegen_options())
+  expect_true(all(opts %in% names(mvgam:::update_inheritance_table())))
+  expect_false(any(opts %in% names(mvgam:::mvgam_update_uninherited)))
+
+  stored <- list(codegen = mvgam:::mvgam_codegen_options(
+    knots = list(elev = 1:5), normalize = FALSE
+  ))
+  getters <- mvgam:::update_inheritance_table()
+  expect_identical(getters$knots$getter(stored), list(elev = 1:5))
+  expect_false(getters$normalize$getter(stored))
+  expect_null(getters$knots$getter(list()))
+})
+
+test_that("the options reach a fit with no trend formula", {
+  # A trend-free fit takes its program and data straight off the mock
+  # brms fit, never through the assembly stage, so it is a separate
+  # journey for the options to make.
+  dat <- codegen_test_data()
+  kn <- list(elev = seq(0, 100, length.out = 5))
+  mf <- mvgam_formula(y ~ s(elev, bs = "cr", k = 5))
+
+  sd_knots <- standata(mf, data = dat, family = poisson(), knots = kn)
+  expect_false(isTRUE(all.equal(
+    standata(mf, data = dat, family = poisson())$Xs, sd_knots$Xs
+  )))
+  expect_equal(
+    sd_knots$Xs,
+    brms::make_standata(y ~ s(elev, bs = "cr", k = 5), data = dat,
+                        family = poisson(), knots = kn)$Xs,
+    ignore_attr = TRUE
+  )
+  expect_true(grepl(
+    "_lup[dm]f",
+    stancode(mf, data = dat, family = poisson(), normalize = FALSE,
+             silent = 2L)
+  ))
+})
+
+test_that("a knots fit carries its basis into newdata predictions", {
+  # `posterior_smooths()` and `conditional_smooths()` rebuild their
+  # design matrices with `brms::standata()` on the stored brms fit. If
+  # the knots never reached that fit, a prediction grid would be built
+  # on a default basis and the smooth would be read off the wrong
+  # coefficients without anything erroring.
+  dat <- codegen_test_data()
+  kn <- list(elev = seq(0, 100, length.out = 5))
+  form <- mvgam_formula(y ~ s(elev, bs = "cr", k = 5),
+                        trend_formula = ~ AR(p = 1))
+
+  with_knots <- mvgam:::build_stan_components(
+    formula = form, data = dat, family = poisson(), knots = kn,
+    validate = FALSE, silent = 2L
+  )
+  without <- mvgam:::build_stan_components(
+    formula = form, data = dat, family = poisson(),
+    validate = FALSE, silent = 2L
+  )
+  expect_identical(with_knots$obs_setup$codegen$knots, kn)
+  expect_identical(with_knots$trend_setup$codegen,
+                   with_knots$obs_setup$codegen)
+
+  grid <- data.frame(
+    elev = seq(5, 95, length.out = 12), time = 1:12,
+    series = factor("s1", levels = levels(dat$series))
+  )
+  regen <- function(components) {
+    brms::standata(components$obs_setup$brmsfit, newdata = grid,
+                   check_response = FALSE, internal = TRUE)$Xs
+  }
+  expect_false(isTRUE(all.equal(regen(with_knots), regen(without))))
+})
+
+test_that("normalize = FALSE survives the GLM path", {
+  # brms writes a `*_glm_lupmf` call under `normalize = FALSE`, and
+  # mvgam's GLM detection recognised only the normalised spelling, so
+  # the trend injector could not find the likelihood and the assembly
+  # aborted. An intercept-only formula hides this: brms emits a plain
+  # `poisson_log_lpmf` and never reaches the GLM path at all, so the
+  # fixture needs a predictor.
+  dat <- codegen_test_data()
+  dat$z <- rnorm(nrow(dat))
+  dat$bin <- rbinom(nrow(dat), 1L, 0.5)
+  dat$cont <- rnorm(nrow(dat))
+
+  cases <- list(
+    list(resp = "y", family = poisson()),
+    list(resp = "y", family = brms::negbinomial()),
+    list(resp = "cont", family = gaussian()),
+    list(resp = "bin", family = brms::bernoulli())
+  )
+  for (case in cases) {
+    mf <- mvgam_formula(
+      stats::as.formula(paste0(case$resp, " ~ elev + z")),
+      trend_formula = ~ AR(p = 1)
+    )
+    code <- stancode(mf, data = dat, family = case$family,
+                     normalize = FALSE, silent = 2L)
+    expect_true(grepl("_glm_lu?p[dm]f", code),
+                label = paste("GLM call kept for", case$family$family))
+    # The rewritten call keeps the spelling it replaced, so turning the
+    # constants off is not quietly undone.
+    expect_true(grepl("_glm_lup[dm]f", code),
+                label = paste("unnormalised kept for", case$family$family))
+  }
+})
+
+test_that("stan_density_suffix reports the spelling a program used", {
+  expect_identical(
+    mvgam:::stan_density_suffix("target += poisson_log_glm_lpmf(Y | Xc);",
+                                "poisson_log_glm"),
+    "_lpmf"
+  )
+  expect_identical(
+    mvgam:::stan_density_suffix("target += normal_id_glm_lupdf(Y | Xc);",
+                                "normal_id_glm"),
+    "_lupdf"
+  )
+  expect_null(
+    mvgam:::stan_density_suffix("target += normal_lpdf(y | 0, 1);",
+                                "poisson_log_glm")
+  )
+})
+
+test_that("the generator option sets stay pinned to the options list", {
+  # A fifth option added to `mvgam_codegen_options()` and forgotten in
+  # either set would be dropped on its way to brms without a word, so
+  # both sets are derived rather than written out again.
+  expect_identical(
+    mvgam:::mvgam_codegen_stancode_options,
+    names(mvgam:::mvgam_codegen_options())
+  )
+  expect_identical(
+    mvgam:::mvgam_codegen_standata_options,
+    setdiff(names(mvgam:::mvgam_codegen_options()), "normalize")
+  )
+})
+
+test_that("codegen_from_dots reads the options a call carries", {
+  opts <- mvgam:::codegen_from_dots(
+    list(knots = list(x = 1:5), normalize = FALSE, chains = 4, iter = 100)
+  )
+  expect_identical(opts$knots, list(x = 1:5))
+  expect_false(opts$normalize)
+  # Sampler arguments are not code-generation options.
+  expect_identical(names(opts), names(mvgam:::mvgam_codegen_options()))
+})
+
+test_that("get_prior reports the trend model that gets fitted", {
+  # The observation side takes these through the dots brms reads; the
+  # trend side is assembled by mvgam and has to be given them too, or a
+  # user cannot set a prior on a coefficient the fit will estimate.
+  dat <- codegen_test_data()
+  dat$grp <- factor(rep(c("a", "b"), length.out = nrow(dat)),
+                    levels = c("a", "b", "c"))
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ grp + AR(p = 1))
+
+  trend_coefs <- function(...) {
+    tbl <- get_prior(mf, data = dat, family = poisson(), ...)
+    sort(tbl$coef[tbl$class == "b_trend" & nzchar(tbl$coef)])
+  }
+  # The trend formula carries no intercept, so every observed level
+  # earns a coefficient and the unused one appears only when it is kept.
+  expect_identical(trend_coefs(), c("grpa", "grpb"))
+  expect_identical(trend_coefs(drop_unused_levels = FALSE),
+                   c("grpa", "grpb", "grpc"))
+})
+
+test_that("a shrinkage prior gets the Stan data it declares", {
+  # `horseshoe()` declares data of its own. The program was generated
+  # with the prior and the data without it, so the fit declared six
+  # variables nothing supplied.
+  dat <- codegen_test_data()
+  dat$x1 <- rnorm(nrow(dat))
+  dat$x2 <- rnorm(nrow(dat))
+  mf <- mvgam_formula(y ~ x1 + x2, trend_formula = ~ AR(p = 1))
+  hs <- brms::prior(horseshoe(1), class = "b")
+
+  code <- stancode(mf, data = dat, family = poisson(), prior = hs,
+                   silent = 2L)
+  sdata <- standata(mf, data = dat, family = poisson(), prior = hs,
+                    silent = 2L)
+  declared <- unique(unlist(regmatches(
+    code, gregexpr("\\b(hs_[a-z_]+|Kscales)\\b", code)
+  )))
+  supplied <- names(sdata)
+  # Every name the data block reads has to be a name the data carries.
+  expect_true(all(
+    intersect(declared, c("hs_df", "hs_df_global", "hs_df_slab",
+                          "hs_scale_global", "hs_scale_slab", "Kscales")) %in%
+      supplied
+  ))
+})

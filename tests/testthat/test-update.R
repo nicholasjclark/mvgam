@@ -399,14 +399,13 @@ test_that("an ordinary mvgam fit is not caught by that guard", {
 test_that("every mvgam() argument is inherited or named as not", {
   # `loadings_prior` went missing because nothing compared the two
   # lists. An argument is either carried over by
-  # `mvgam_update_inheritance` or listed in
+  # `update_inheritance_table()` or listed in
   # `mvgam_update_uninherited` with a reason; anything in neither
   # fails here rather than silently changing a refit.
   supplied_by_update <- c("formula", "data", "...")
   formals_needed <- setdiff(names(formals(mvgam)), supplied_by_update)
-  accounted <- c(
-    names(mvgam_update_inheritance), names(mvgam_update_uninherited)
-  )
+  inherited <- names(update_inheritance_table())
+  accounted <- c(inherited, names(mvgam_update_uninherited))
   expect_true(all(formals_needed %in% accounted))
 
   # The dots `mvgam()` forwards to the code generator are model
@@ -419,8 +418,7 @@ test_that("every mvgam() argument is inherited or named as not", {
 
   # Nothing is claimed in both places.
   expect_length(
-    intersect(names(mvgam_update_inheritance),
-              names(mvgam_update_uninherited)),
+    intersect(inherited, names(mvgam_update_uninherited)),
     0L
   )
   # Every reason says something.
@@ -468,7 +466,7 @@ test_that("the threads getter yields a count, not a brmsthreads", {
   # brms stores threading as a `brmsthreads` object on every fit, with
   # a NULL count when the user asked for none. `mvgam()` asserts an
   # integer, so handing the object back errored on any refit.
-  entry <- mvgam_update_inheritance$threads
+  entry <- update_inheritance_table()$threads
   unset <- list(obs_model = list(threads = brms::threading(NULL)))
   expect_null(entry$getter(unset))
 
@@ -498,7 +496,7 @@ test_that("trend_map is withheld when the constructor already has it", {
   # Supplying it at both the constructor and the top level is a
   # collision `mvgam()` refuses, so a refit must hand back only what
   # the original call put at the top level.
-  entry <- mvgam_update_inheritance$trend_map
+  entry <- update_inheritance_table()$trend_map
   Z <- matrix(c(1, 0, 0, 1), nrow = 2L)
 
   on_constructor <- list(

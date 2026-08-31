@@ -354,12 +354,19 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
   } else {
     trend_stanvars
   }
+  # `prior` and `threads` ride along for the same reason `codegen`
+  # does: the sibling call to `make_stancode()` above is given both, and
+  # a program and its data built under different arguments do not fit
+  # together. A shrinkage prior declares Stan data of its own.
   combined_standata <- generate_base_brms_standata(
     formula = obs_setup$formula,
     data = obs_setup$data,
     family = obs_setup$family,
     stanvars = standata_stanvars,
-    data2 = obs_setup$data2
+    data2 = obs_setup$data2,
+    codegen = obs_setup$codegen,
+    prior = obs_setup$prior,
+    threads = obs_setup$threads
   )
 
   # Validate final Stan code if requested
@@ -387,6 +394,48 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
     responses_with_trends = responses_with_trends,
     backend = backend
   ))
+}
+
+# Stan spells the unnormalised form of a density `_lupdf` / `_lupmf`,
+# and brms emits that form throughout under `normalize = FALSE`. Every
+# pattern that has to recognise a density call allows both spellings,
+# written once here so a pattern cannot learn only one.
+stan_density_call_rx <- "lu?p[dm]f"
+
+#' Regex matching a Stan density call on one distribution stem
+#'
+#' @param stem Distribution name, e.g. `"poisson_log_glm"`. Empty
+#'   matches any density call.
+#' @return A regex string covering the normalised and unnormalised
+#'   spellings alike.
+#' @noRd
+stan_density_call_pattern <- function(stem = "") {
+  checkmate::assert_string(stem)
+  paste0(stem, "_", stan_density_call_rx)
+}
+
+#' The density-call suffix a Stan program actually used
+#'
+#' Rewriting a call has to put back the spelling it replaced. Writing
+#' `_lpdf` over a `_lupdf` would quietly restore the normalising
+#' constants a user turned off with `normalize = FALSE`.
+#'
+#' @param stan_code Character vector of Stan source.
+#' @param stem Distribution name to look for.
+#' @return `"_lpdf"`, `"_lupdf"`, `"_lpmf"` or `"_lupmf"`, or NULL when
+#'   the program never calls that density.
+#' @noRd
+stan_density_suffix <- function(stan_code, stem) {
+  checkmate::assert_character(stan_code, min.len = 1)
+  checkmate::assert_string(stem, min.chars = 1)
+  joined <- paste(stan_code, collapse = "\n")
+  hit <- regmatches(
+    joined, regexpr(stan_density_call_pattern(stem), joined)
+  )
+  if (!length(hit) || !nzchar(hit[1L])) {
+    return(NULL)
+  }
+  sub(paste0("^\\Q", stem, "\\E"), "", hit[1L], perl = TRUE)
 }
 
 #' Generate Base Stan Code with Stanvars
@@ -448,15 +497,23 @@ generate_base_stancode_with_stanvars <- function(obs_setup, trend_stanvars,
   # for brms-native families when the user requested threading;
   # closure-unit families thread via their own stanvars and ignore
   # this path.
-  base_code <- brms::make_stancode(
-    formula = obs_setup$formula,
-    data = obs_setup$data,
-    family = obs_setup$family,
-    data2 = obs_setup$data2,
-    stanvars = all_stanvars,
-    threads = obs_setup$threads,
-    prior = obs_setup$prior
-  )
+  # The code-generation options cached on the setup ride along so the
+  # regenerated program matches the one the mock fit was built under:
+  # `knots` fixes the basis, `drop_unused_levels` fixes the factor
+  # contrasts, `sample_prior` decides whether the prior is sampled and
+  # `normalize` decides whether the sampling statements drop constants.
+  base_code <- do.call(brms::make_stancode, c(
+    list(
+      formula = obs_setup$formula,
+      data = obs_setup$data,
+      family = obs_setup$family,
+      data2 = obs_setup$data2,
+      stanvars = all_stanvars,
+      threads = obs_setup$threads,
+      prior = obs_setup$prior
+    ),
+    codegen_args_for(obs_setup$codegen, mvgam_codegen_stancode_options)
+  ))
 
   return(base_code)
 }
@@ -759,7 +816,9 @@ detect_glm_usage <- function(stan_code, response_names = NULL, skip_lines = inte
   
   if (is.null(response_names)) {
     detected <- sapply(glm_patterns, function(pattern) {
-      any(grepl(paste0("target\\s*\\+=.*", pattern, "_l(pdf|pmf)"), processed_stan_code))
+      any(grepl(paste0("target\\s*\\+=.*",
+                       stan_density_call_pattern(pattern)),
+                processed_stan_code))
     })
     return(names(detected)[detected])
   }
@@ -784,7 +843,7 @@ parse_glm_parameters_single <- function(stan_code, glm_type) {
   code_lines <- strsplit(stan_code, "\n", fixed = TRUE)[[1]]
 
   # Find the line containing the GLM function call - use same pattern as detect_glm_usage
-  glm_pattern <- paste0(glm_type, "_l(pdf|pmf)")
+  glm_pattern <- stan_density_call_pattern(glm_type)
   glm_line_idx <- grep(glm_pattern, code_lines)[1]
 
   if (is.na(glm_line_idx)) {
@@ -794,7 +853,7 @@ parse_glm_parameters_single <- function(stan_code, glm_type) {
   glm_line <- code_lines[glm_line_idx]
 
   # Extract the GLM function call from the line - use same pattern as detect_glm_usage
-  pattern <- paste0(glm_type, "_l(pdf|pmf)\\([^)]+\\)")
+  pattern <- paste0(stan_density_call_pattern(glm_type), "\\([^)]+\\)")
   matches <- regmatches(glm_line, regexpr(pattern, glm_line))
 
   if (length(matches) == 0) {
@@ -840,7 +899,8 @@ transform_glm_call <- function(stan_code, glm_type, params) {
   checkmate::assert_list(params, names = "named")
 
   # Original pattern to match - use same pattern as detect_glm_usage
-  original_pattern <- paste0(glm_type, "_l(pdf|pmf)\\s*\\([^\\)]+\\)")
+  original_pattern <- paste0(stan_density_call_pattern(glm_type),
+                             "\\s*\\([^\\)]+\\)")
 
   # Build replacement using GLM structure: glm_function(Y | mu_matrix, 0.0, mu_ones, ...)
   # This preserves GLM optimization while allowing trend injection into mu
@@ -850,22 +910,29 @@ transform_glm_call <- function(stan_code, glm_type, params) {
     ""
   }
 
-  if (glm_type == "normal_id_glm") {
-    # normal_id_glm_lpdf(Y | mu_matrix, alpha_real, beta_vector, sigma)
-    replacement <- paste0(glm_type, "_lpdf(", params$y_var, " | to_matrix(mu), 0.0, mu_ones", other_params_str, ")")
+  # Put back the spelling the program used. Writing `_lpdf` over a
+  # `_lupdf` would restore the normalising constants a user turned off
+  # with `normalize = FALSE`.
+  suffix <- stan_density_suffix(stan_code, glm_type)
+  if (is.null(suffix)) {
+    return(stan_code)
+  }
 
-  } else if (glm_type %in% c("poisson_log_glm", "neg_binomial_2_log_glm",
-                            "bernoulli_logit_glm", "ordered_logistic_glm", "categorical_logit_glm")) {
-    # GLM_lpmf(Y | mu_matrix, alpha_real, beta_vector, ...)
-    replacement <- paste0(glm_type, "_lpmf(", params$y_var, " | to_matrix(mu), 0.0, mu_ones", other_params_str, ")")
-
-  } else {
+  if (!glm_type %in% c("normal_id_glm", "poisson_log_glm",
+                       "neg_binomial_2_log_glm", "bernoulli_logit_glm",
+                       "ordered_logistic_glm", "categorical_logit_glm")) {
     stop(insight::format_error(
       cli::format_inline(
         "Unsupported GLM type for transformation: {glm_type}"
       )
     ))
   }
+  # glm_function(Y | mu_matrix, 0.0, mu_ones, ...) keeps Stan's GLM
+  # optimisation while leaving mu free for the trend.
+  replacement <- paste0(
+    glm_type, suffix, "(", params$y_var,
+    " | to_matrix(mu), 0.0, mu_ones", other_params_str, ")"
+  )
 
   gsub(original_pattern, replacement, stan_code)
 }
@@ -1235,7 +1302,7 @@ convert_glm_to_standard_form <- function(code_lines, block_info, detected_glm_ty
   params <- analysis$glm_parameters[[glm_type]]
   
   # Find GLM call line to preprocess (skip already processed lines)
-  glm_pattern <- paste0(glm_type, "_l(pdf|pmf)")
+  glm_pattern <- stan_density_call_pattern(glm_type)
   glm_line_idx <- NULL
   for (i in block_info$start_idx:block_info$end_idx) {
     if (grepl(glm_pattern, modified_lines[i]) && !i %in% processed_glm_lines) {
@@ -1704,7 +1771,9 @@ inject_multivariate_trends_into_linear_predictors <- function(
 
     for (resp_name in glm_responses) {
       # Transform GLM function call to use to_matrix(mu_<resp>)
-      glm_pattern <- paste0("target \\+= [a-z_]+_glm_l(pdf|pmf)\\(Y_", resp_name, " \\|")
+      glm_pattern <- paste0("target \\+= [a-z_]+",
+                            stan_density_call_pattern("_glm"),
+                            "\\(Y_", resp_name, " \\|")
       glm_lines <- which(grepl(glm_pattern, code_lines))
 
       if (length(glm_lines) > 0) {
@@ -1726,7 +1795,9 @@ inject_multivariate_trends_into_linear_predictors <- function(
           } else {
             # Other GLM types: no sigma parameter
             new_line <- gsub(
-              "(target \\+= [a-z_]+_glm_l(pdf|pmf)\\(Y_[a-z_]+ \\|) [^,]+, [^,]+, [^,;]+;",
+              paste0("(target \\+= [a-z_]+",
+                     stan_density_call_pattern("_glm"),
+                     "\\(Y_[a-z_]+ \\|) [^,]+, [^,]+, [^,;]+;"),
               paste0("\\1 to_matrix(mu_", resp_name, "), 0.0, mu_ones_", resp_name, ");"),
               old_line
             )
@@ -1894,10 +1965,18 @@ inject_multivariate_trends_into_linear_predictors <- function(
 #' @param data Data for the model
 #' @param family Family specification
 #' @param stanvars Optional stanvars to inject
+#' @param codegen A list from `mvgam_codegen_options()`, or NULL
+#' @param prior The `brmsprior` the program was generated under. Shrinkage
+#'   priors (`horseshoe()`, `R2D2()`) and mixture families declare their own
+#'   Stan data, so a program built with one has to be given the same one here
+#'   or it declares variables nothing supplies.
+#' @param threads Thread count, which decides whether brms emits `grainsize`
 #' @return List of Stan data
 #' @noRd
 generate_base_brms_standata <- function(formula, data, family = gaussian(),
-                                       stanvars = NULL, data2 = NULL) {
+                                        stanvars = NULL, data2 = NULL,
+                                        codegen = NULL, prior = NULL,
+                                        threads = NULL) {
   # Accept both regular formulas and brms formula objects
   checkmate::assert(
     checkmate::check_class(formula, "formula"),
@@ -1910,13 +1989,18 @@ generate_base_brms_standata <- function(formula, data, family = gaussian(),
 
   # `data2` resolves auxiliary objects referenced by brms specials
   # (`car()`, `cov_ranef()`) whose values live outside `data`.
-  standata <- brms::make_standata(
-    formula = formula,
-    data = data,
-    family = family,
-    stanvars = stanvars,
-    data2 = data2
-  )
+  standata <- do.call(brms::make_standata, c(
+    list(
+      formula = formula,
+      data = data,
+      family = family,
+      stanvars = stanvars,
+      data2 = data2,
+      prior = prior,
+      threads = threads
+    ),
+    codegen_args_for(codegen, mvgam_codegen_standata_options)
+  ))
 
   # Multi-response fits: brms's `mvbf` listwise-deletes rows with
   # NA in any response. mvgam wants per-response data so each
@@ -1931,7 +2015,8 @@ generate_base_brms_standata <- function(formula, data, family = gaussian(),
       formula     = formula,
       data        = data,
       stanvars    = stanvars,
-      data2       = data2
+      data2       = data2,
+      codegen     = codegen
     )
   }
 
@@ -1970,12 +2055,18 @@ generate_base_brms_standata <- function(formula, data, family = gaussian(),
 #' @param data The original data frame (may contain NAs).
 #' @param stanvars Optional stanvars passed through to brms.
 #' @param data2 Optional auxiliary data passed through to brms.
+#' @param codegen A list from `mvgam_codegen_options()`, or NULL. The
+#'   prior is deliberately not threaded here: this rebuilds one `bf()`
+#'   arm at a time, and the combined prior names parameters a single
+#'   arm does not have, which brms rejects. Prior-declared Stan data
+#'   comes from the combined call this one refines.
 #' @return The combined standata with per-response data arrays
 #'   substituted in and the global `N` set to the maximum
 #'   per-response valid row count.
 #' @noRd
 expand_per_response_standata <- function(combined_sd, formula, data,
-                                          stanvars = NULL, data2 = NULL) {
+                                          stanvars = NULL, data2 = NULL,
+                                          codegen = NULL) {
   bf_list <- formula$forms
   if (length(bf_list) < 2L) return(combined_sd)
 
@@ -2014,13 +2105,16 @@ expand_per_response_standata <- function(combined_sd, formula, data,
     # function tables) that index by group rather than by data
     # row. Row-indexed auxiliary data passed via `data2` will
     # mismatch the per-arm row count and brms will error here.
-    single_sd <- brms::make_standata(
-      formula  = bf_i,
-      data     = data_i,
-      family   = fam_i,
-      stanvars = stanvars,
-      data2    = data2
-    )
+    single_sd <- do.call(brms::make_standata, c(
+      list(
+        formula  = bf_i,
+        data     = data_i,
+        family   = fam_i,
+        stanvars = stanvars,
+        data2    = data2
+      ),
+      codegen_args_for(codegen, mvgam_codegen_standata_options)
+    ))
     single_keys <- names(single_sd)
 
     # For each combined-standata key, try to recover the matching
@@ -7360,7 +7454,8 @@ filter_block_content <- function(block_content, block_type = "model") {
 
       # lprior declarations and sigma priors (avoid duplication with observation model)
       grepl("^\\s*real\\s+lprior\\s*=\\s*0\\s*;", line),
-      grepl("lprior\\s*\\+=\\s*student_t_lpdf\\s*\\(\\s*sigma\\s*\\|", line),
+      grepl(paste0("lprior\\s*\\+=\\s*student_t_", stan_density_call_rx,
+                   "\\s*\\(\\s*sigma\\s*\\|"), line),
 
       # Skip lccdf line only if it follows sigma prior
       (is_sigma_lccdf && prev_line_was_sigma_prior)
@@ -7381,9 +7476,12 @@ filter_block_content <- function(block_content, block_type = "model") {
       skip_line <- skip_line || any(c(
         # Actual likelihood statements (not priors)
         grepl("~\\s+normal\\s*\\(", line),
-        grepl("target\\s*\\+=.*normal.*lpdf\\s*\\(\\s*Y\\s*\\|", line),
-        grepl("target\\s*\\+=.*normal.*glm.*lpdf\\s*\\(", line),
-        grepl("target\\s*\\+=.*multi_normal.*lpdf\\s*\\(", line),
+        grepl(paste0("target\\s*\\+=.*normal.*", stan_density_call_rx,
+                     "\\s*\\(\\s*Y\\s*\\|"), line),
+        grepl(paste0("target\\s*\\+=.*normal.*glm.*", stan_density_call_rx,
+                     "\\s*\\("), line),
+        grepl(paste0("target\\s*\\+=.*multi_normal.*", stan_density_call_rx,
+                     "\\s*\\("), line),
         grepl("target\\s*\\+=.*Y\\s*\\|", line),
         # Filter out lprior accumulation since observation model handles it
         grepl("^\\s*target\\s*\\+=\\s*lprior\\s*;", line),
@@ -7393,7 +7491,10 @@ filter_block_content <- function(block_content, block_type = "model") {
     }
 
     # Track if this line was a sigma prior for next iteration
-    prev_line_was_sigma_prior <- grepl("lprior\\s*\\+=\\s*student_t_lpdf\\s*\\(\\s*sigma\\s*\\|", line)
+    prev_line_was_sigma_prior <- grepl(
+      paste0("lprior\\s*\\+=\\s*student_t_", stan_density_call_rx,
+             "\\s*\\(\\s*sigma\\s*\\|"), line
+    )
 
     if (!skip_line) {
       filtered_lines <- c(filtered_lines, line)
@@ -7680,8 +7781,12 @@ rename_parameters_in_block <- function(block_code, suffix, mapping, block_type, 
 #' @return Character vector of Stan reserved words
 #' @noRd
 get_stan_reserved_words <- function() {
-  # Stan reserved words based on Stan language specification
-  c(
+  # Stan reserved words based on Stan language specification.
+  # `normalize = FALSE` makes brms call the unnormalised form of every
+  # density, spelled `_lupdf` / `_lupmf`. Those names are derived from
+  # the normalised ones at the end of this function rather than listed
+  # again, so the two spellings cannot fall out of step.
+  reserved <- c(
     # Stan data types
     "int", "real", "vector", "row_vector", "matrix", "array", "void",
     "simplex", "unit_vector", "ordered", "positive_ordered",
@@ -7827,6 +7932,8 @@ get_stan_reserved_words <- function() {
     "bessel_second_kind", "modified_bessel_first_kind", "modified_bessel_second_kind",
     "falling_factorial", "rising_factorial", "expm1", "log1p", "hypot"
   )
+  normalised <- grep("_lp[dm]f$", reserved, value = TRUE)
+  c(reserved, sub("_lp([dm])f$", "_lup\\1f", normalised))
 }
 
 #' Extract all identifiers from Stan code

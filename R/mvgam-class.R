@@ -38,6 +38,11 @@
 #'
 #'   - `data.name` The deparsed name of the `data` argument
 #'
+#'   - `codegen` The `knots`, `sample_prior`, `drop_unused_levels` and
+#'     `normalize` settings the Stan program was generated under, so
+#'     that [update()] rebuilds the same program rather than the
+#'     default one
+#'
 #'   The Stan program:
 #'
 #'   - `stancode` The combined Stan program as a `character` string

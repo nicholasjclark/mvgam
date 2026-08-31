@@ -1,3 +1,29 @@
+#' Write an assembled Stan program to disk
+#'
+#' `save_model` names a path rather than a directory, and brms appends
+#' no extension of its own, so the path is taken as given. The parent
+#' directory has to exist: creating one silently would put a Stan file
+#' somewhere the user did not ask for.
+#'
+#' @param stancode Character string holding the assembled program.
+#' @param path File path to write to.
+#' @return `path`, invisibly.
+#' @noRd
+write_stan_program <- function(stancode, path) {
+  checkmate::assert_string(stancode, min.chars = 1)
+  checkmate::assert_string(path, min.chars = 1)
+  parent <- dirname(path)
+  if (!dir.exists(parent)) {
+    stop(insight::format_error(c(
+      "Cannot write the Stan program to 'save_model'.",
+      x = paste0("The directory '", parent, "' does not exist."),
+      i = "Create it first, or give a path under a directory that exists."
+    )))
+  }
+  writeLines(stancode, con = path)
+  invisible(path)
+}
+
 #' Generate Stan Components for mvgam Formula
 #'
 #' Internal shared infrastructure function that serves as the single source of
@@ -10,14 +36,12 @@
 #' @param prior Prior specifications from \code{get_prior()} or \code{set_prior()}
 #' @param data2 Optional additional data for predictions
 #' @param sample_prior Whether to sample from priors only ("no", "yes", "only")
-#' @param sparse Whether to use sparse matrix representations
 #' @param knots Optional knot locations for smooth terms
 #' @param drop_unused_levels Whether to drop unused factor levels
 #' @param backend Stan backend to use ("rstan" or "cmdstanr")
 #' @param threads Number of threads for threading
 #' @param normalize Whether to normalize design matrices
-#' @param save_model Path to save compiled Stan model
-#' @param stan_funs Additional Stan functions to include
+#' @param save_model Path to write the assembled Stan program to
 #' @param silent Verbosity level (0-2)
 #' @param stanvars Additional stanvars to include
 #' @param validate Whether to validate generated Stan code
@@ -40,21 +64,20 @@
 #'
 #' @noRd
 build_stan_components <- function(formula, data, family = gaussian(),
-                                                   prior = NULL, data2 = NULL,
-                                                   sample_prior = "no", sparse = NULL,
-                                                   knots = NULL, drop_unused_levels = TRUE,
-                                                   backend = "rstan",
-                                                   threads = getOption("mc.cores", 1),
-                                                   normalize = TRUE, save_model = NULL,
-                                                   stan_funs = NULL, silent = 1L,
-                                                   stanvars = NULL, validate = TRUE,
-                                                   trend_map = NULL,
-                                                   loadings_prior = NULL, ...) {
+                                 prior = NULL, data2 = NULL,
+                                 sample_prior = "no",
+                                 knots = NULL, drop_unused_levels = TRUE,
+                                 backend = "rstan",
+                                 threads = getOption("mc.cores", 1),
+                                 normalize = TRUE, save_model = NULL,
+                                 silent = 1L,
+                                 stanvars = NULL, validate = TRUE,
+                                 trend_map = NULL,
+                                 loadings_prior = NULL, ...) {
 
   # Input validation
   checkmate::assert_class(formula, "mvgam_formula")
   checkmate::assert_data_frame(data, min.rows = 1)
-  if (!is.null(knots)) checkmate::assert_list(knots, names = "named")
   if (!is.null(data2)) {
     checkmate::assert(
       checkmate::check_data_frame(data2),
@@ -62,16 +85,24 @@ build_stan_components <- function(formula, data, family = gaussian(),
       .var.name = "data2"
     )
   }
-  if (!is.null(sparse)) checkmate::assert_logical(sparse, len = 1)
   if (!is.null(save_model)) checkmate::assert_string(save_model)
   if (!is.null(stanvars)) checkmate::assert_class(stanvars, "stanvars")
   if (!is.null(prior)) checkmate::assert_class(prior, "brmsprior")
-  checkmate::assert_choice(sample_prior, c("no", "yes", "only"))
-  checkmate::assert_logical(drop_unused_levels, len = 1)
   checkmate::assert_choice(backend, c("rstan", "cmdstanr"))
   checkmate::assert_int(threads, lower = 1)
-  checkmate::assert_logical(normalize, len = 1)
   checkmate::assert_int(silent, lower = 0, upper = 2)
+
+  # One list carries the brms code-generation options from here to
+  # the mock fit and on to every regeneration underneath it, so the
+  # program, its data and the prior table cannot be built under
+  # different bases or different factor levels. It validates its own
+  # arguments.
+  codegen <- mvgam_codegen_options(
+    knots = knots,
+    sample_prior = sample_prior,
+    drop_unused_levels = drop_unused_levels,
+    normalize = normalize
+  )
 
   # Extract components from mvgam_formula
   obs_formula <- formula$formula
@@ -239,15 +270,9 @@ build_stan_components <- function(formula, data, family = gaussian(),
     family = family,
     prior = obs_priors,
     data2 = data2,
-    sample_prior = sample_prior,
-    sparse = sparse,
-    knots = knots,
-    drop_unused_levels = drop_unused_levels,
+    codegen = codegen,
     backend = backend,
     threads = threads,
-    normalize = normalize,
-    save_model = save_model,
-    stan_funs = stan_funs,
     stanvars = obs_stanvars,
     silent = silent,
     ...
@@ -301,15 +326,9 @@ build_stan_components <- function(formula, data, family = gaussian(),
       family = gaussian(), # Trends are gaussian processes per architecture
       prior = remove_trend_suffix_from_priors(trend_priors, mv_spec$trend_specs, mv_spec$base_formula, trend_data),
       data2 = data2,
-      sample_prior = sample_prior,
-      sparse = sparse,
-      knots = knots,
-      drop_unused_levels = drop_unused_levels,
+      codegen = codegen,
       backend = backend,
       threads = threads,
-      normalize = normalize,
-      save_model = save_model,
-      stan_funs = stan_funs,
       stanvars = trend_stanvars_in,
       silent = silent,
       # Mark this as the trend invocation so
@@ -364,6 +383,13 @@ build_stan_components <- function(formula, data, family = gaussian(),
 
   # Polish Stan code for consistent formatting and spacing
   combined_components$stancode <- paste(polish_generated_stan_code(combined_components$stancode), collapse = "\n")
+
+  # `save_model` writes the program mvgam assembles, not the brms
+  # program it starts from, since the assembled one is what gets
+  # compiled and is the only one that names the trend.
+  if (!is.null(save_model)) {
+    write_stan_program(combined_components$stancode, save_model)
+  }
   
   # Return all components needed for mvgam object creation
   return(list(
@@ -526,20 +552,18 @@ has_obs_intercept <- function(formula) {
 #' @param data2 Optional data frame for out-of-sample prediction points.
 #' @param sample_prior Character string indicating whether to sample from priors
 #'   only. Options: \code{"no"} (default), \code{"yes"}, \code{"only"}.
-#' @param sparse Logical; should sparse matrix operations be used? Default is
-#'   \code{NULL} (automatic selection).
-#' @param knots Optional list of knot positions for spline terms.
+#' @param knots Optional named list of knot positions for spline terms, passed
+#'   to the basis constructors for both the observation and trend formulas.
 #' @param drop_unused_levels Logical; should unused factor levels be dropped?
 #'   Default is \code{TRUE}.
 #' @param backend Character string specifying Stan backend. Options:
 #'   \code{"rstan"} (default) or \code{"cmdstanr"}.
 #' @param threads Number of threads to use for parallelization. Default is
 #'   \code{getOption("mc.cores", 1)}.
-#' @param normalize Logical; should data be normalized for efficient sampling?
-#'   Default is \code{TRUE}.
-#' @param save_model File path to save the compiled Stan model. If \code{NULL}
-#'   (default), the model is not saved.
-#' @param stan_funs Optional character string containing additional Stan functions.
+#' @param normalize Logical; should brms drop the normalising constants from
+#'   its sampling statements? Default is \code{TRUE}.
+#' @param save_model File path to write the assembled Stan program to. If
+#'   \code{NULL} (default), nothing is written.
 #' @param silent Integer controlling verbosity. 0 = silent, 1 = some output,
 #'   2 = verbose. Default is 1.
 #' @param validate Logical; should the generated Stan code be validated?
@@ -567,21 +591,22 @@ has_obs_intercept <- function(formula) {
 #' @export
 stancode.mvgam_formula <- function(object, data, family = gaussian(),
                                    prior = NULL, data2 = NULL,
-                                   sample_prior = "no", sparse = NULL,
+                                   sample_prior = "no",
                                    knots = NULL, drop_unused_levels = TRUE,
                                    backend = "rstan",
                                    threads = getOption("mc.cores", 1),
                                    normalize = TRUE, save_model = NULL,
-                                   stan_funs = NULL, silent = 1L,
+                                   silent = 1L,
                                    validate = TRUE, ...) {
+  reject_removed_args(list(...), fn = "stancode")
 
   # Generate all Stan components using shared function
   combined_components <- generate_stan_components_mvgam_formula(
     formula = object, data = data, family = family, prior = prior,
-    data2 = data2, sample_prior = sample_prior, sparse = sparse,
+    data2 = data2, sample_prior = sample_prior,
     knots = knots, drop_unused_levels = drop_unused_levels,
     backend = backend, threads = threads, normalize = normalize,
-    save_model = save_model, stan_funs = stan_funs, silent = silent,
+    save_model = save_model, silent = silent,
     validate = validate,
     ...
   )
@@ -619,9 +644,8 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
 #' @param data2 Optional data frame for out-of-sample prediction points.
 #' @param sample_prior Character string indicating whether to sample from priors
 #'   only. Options: \code{"no"} (default), \code{"yes"}, \code{"only"}.
-#' @param sparse Logical; should sparse matrix operations be used? Default is
-#'   \code{NULL} (automatic selection).
-#' @param knots Optional list of knot positions for spline terms.
+#' @param knots Optional named list of knot positions for spline terms, passed
+#'   to the basis constructors for both the observation and trend formulas.
 #' @param drop_unused_levels Logical; should unused factor levels be dropped?
 #'   Default is \code{TRUE}.
 #' @param stanvars Optional \code{stanvars} object containing additional Stan
@@ -649,15 +673,17 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
 #' @export
 standata.mvgam_formula <- function(object, data, family = gaussian(),
                                    prior = NULL, data2 = NULL,
-                                   sample_prior = "no", sparse = NULL,
+                                   sample_prior = "no",
                                    knots = NULL, drop_unused_levels = TRUE,
-                                   stanvars = NULL, threads = getOption("mc.cores", 1),
+                                   stanvars = NULL,
+                                   threads = getOption("mc.cores", 1),
                                    ...) {
+  reject_removed_args(list(...), fn = "standata")
 
   # Generate all Stan components using shared function
   combined_components <- generate_stan_components_mvgam_formula(
     formula = object, data = data, family = family, prior = prior,
-    data2 = data2, sample_prior = sample_prior, sparse = sparse,
+    data2 = data2, sample_prior = sample_prior,
     knots = knots, drop_unused_levels = drop_unused_levels,
     stanvars = stanvars, threads = threads, ...
   )
