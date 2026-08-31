@@ -241,14 +241,12 @@ checked <- merge(state, seen_max, by = c("series", "time"))
 n_below <- sum(checked$median < checked$y)
 ```
 
-One quick check: a population can never be smaller than the number
-of individuals we counted in it. Across all `r nrow(checked)` closure
-units, `r n_below` have a posterior median below the largest count
-recorded there.
-
-The intervals are wide, and wider for species 2 throughout. The data
-mostly tell us about the product $N p$, so separating abundance from
-detection costs us precision on both.
+The ribbons are wide, and wider for species 2. The counts mostly
+tell us about the product $N p$, so separating the two costs
+precision on both. One sanity check while we are here: a population
+can never be smaller than the number of individuals we counted in
+it, and `r n_below` of the `r nrow(checked)` closure units break
+that.
 
 ## Alternative observation processes
 
