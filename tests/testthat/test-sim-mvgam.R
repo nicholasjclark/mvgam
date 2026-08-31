@@ -304,6 +304,17 @@ test_that("summary.mvgam_sim resolves trend label from constructor", {
     n_timepoints = 30L, seed = 3L
   )
   expect_identical(summary(car_sim)$trend, "CAR")
+  # Type 6 documents irregular spacing, so the recorded time must
+  # actually be irregular and the season covariate must be the
+  # function of it that build_data claims. Both were previously
+  # drawn independently of the gaps the CAR kernel propagated over.
+  car_times <- sort(unique(car_sim$data_train$time))
+  expect_false(all(abs(diff(car_times) - 1) < 1e-8))
+  expect_true(all(diff(car_times) >= 1 & diff(car_times) <= 6))
+  expect_equal(
+    car_sim$data_train$season,
+    (car_sim$data_train$time %% 12) + 1
+  )
 
   # 240 points, not 60: the assertions below are about the AR
   # process, and a 60-point sample ACF is noisy enough to swing

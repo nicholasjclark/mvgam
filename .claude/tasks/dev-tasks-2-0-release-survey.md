@@ -1045,6 +1045,49 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > reports under-dispersion, and a short how-to should not have to
   > explain away a failing diagnostic.
 
+- [x] **5.4 Two simulator types generated data nothing could recover**
+  > Found by fitting `type = 7` for `mvgam_overview` and then reading
+  > the other six, since a type whose truth cannot be recovered makes
+  > every vignette built on it wrong in the same quiet way.
+  >
+  > `type = 7` put a cyclic seasonal smooth on the observation side
+  > under a lag-12 autoregression. On monthly data a lag-12
+  > autoregression is an annual cycle, so the two describe the same
+  > periodicity and the posterior trades variance between them rather
+  > than resolving either. Every smooth coefficient, `sigma`,
+  > `sigma_trend` and `ar1_trend` failed to mix together, worst R-hat
+  > 1.96 and `sigma` at 9.9 effective draws. The observation side now
+  > carries a smooth of a non-periodic covariate, leaving the AR
+  > structure as the only source of temporal correlation: worst R-hat
+  > 1.05, `sigma` at 107, and both AR truths inside their intervals.
+  > `default_prop_trend` drops from 0.85 to 0.6, the high share having
+  > been what held two rival components apart.
+  >
+  > `type = 6` drew its irregular time grid three separate times and
+  > used a different draw for each purpose. `build_data()` built one
+  > grid for the `season` covariate and returned it under
+  > `time_long`, which the driver never read because it looked for
+  > that name on the trend arguments instead; `trend_params()` drew a
+  > second, independent set of gaps for the CAR kernel; and the
+  > recorded `time` column kept the regular integers, so the article's
+  > documented `Δt ~ Uniform(1, 6)` never reached the data at all. A
+  > CAR fit therefore saw regular spacing, a season covariate that was
+  > not a function of the time beside it, and a latent process
+  > propagated over gaps nothing else knew about. The grid is now
+  > drawn once in `build_data()` and serves all three, and
+  > `trend_params()` no longer invents one. `sigma` was hardcoded to
+  > `trend_sigma(0.5)` there as well, ignoring `prop_trend`; the
+  > post-hoc rescale hid it.
+  >
+  > The tests passed before both fixes, which is the point: they
+  > asserted the trend's class and never that the data carried the
+  > structure the type documents. `type = 6` now asserts the spacing
+  > is irregular, lies inside the documented bounds and that `season`
+  > is exactly the function of `time` the builder claims. `type = 7`
+  > asserts lag-1 persistence over 240 points rather than 60, a
+  > 60-point sample ACF swinging between 0.10 and 0.71 across seeds
+  > and so testing the draw rather than the specification.
+
 - [ ] **5.2 Three CRAN vignettes render with no output on the website**
   > `data.Rmd`, `dfm.Rmd` and `mvgam_overview.Rmd` gate every chunk on
   > `params$EVAL`, which reads `NOT_CRAN`. That gate is right for CRAN,
@@ -1055,23 +1098,70 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   >
   > 5.1 is the reason this matters: the one article whose chunks had
   > never executed was hiding two package bugs and four false claims.
-  > Each of these three needs rendering with the gate open before the
-  > workflow sets it, or a silent gap becomes a failing site build.
-
-- [ ] **5.3 The response-family check skips bounded families**
-  > `mvgam()` refuses a negative response under `poisson()` with its
-  > own message naming the column, the minimum observed and what the
-  > family needs. The same data under `Beta()` falls through to brms,
-  > which reports `Family 'beta' requires response greater than 0` from
-  > `data_response.brmsframe()`. Beta needs the open unit interval, so
-  > the message names half the constraint, and it arrives from a
-  > function the user did not call.
   >
-  > Found by rendering `data.Rmd`, which demonstrates six rejections;
-  > the other five are mvgam's own and give class, observed value and
-  > remedy. Worth extending the check to the bounded continuous
-  > families so the article's claim that mvgam catches these holds for
-  > all of them.
+  > All three have since been rendered with the gate open, and each
+  > carried something. `data.Rmd` overstated a claim the validator
+  > did not support, which is 5.3. `dfm.Rmd` drew a conclusion its
+  > own scores contradicted. `mvgam_overview.Rmd` displayed priors
+  > the model does not use and built its comparison on a simulation
+  > that cannot be recovered, which is 5.4. What remains is setting
+  > `NOT_CRAN: true` in `.github/workflows/pkgdown.yaml`, which
+  > belongs with 5.0's rebuild so the site is published from fits
+  > made by the shipping version.
+
+- [x] **5.3 The response-family check never ran during a fit**
+  > The premise was narrower than the fault. `Beta()` does have a
+  > branch in `validate_response_for_family()`, and it names the
+  > column, the observed range and the whole constraint. The
+  > validator was simply unreachable from `mvgam()`: its only caller
+  > was `mvgam_data()`, the pre-fit inspection helper, whose own
+  > header claims it "composes the same validators mvgam() runs at
+  > fit time". No family's rejection came from mvgam during a fit.
+  > Every one came from brms's `data_response.brmsframe()`, which
+  > names neither the column nor the values and states only the
+  > bound it reaches first, so `zero_one_inflated_beta` reported its
+  > upper limit and never mentioned the lower one.
+  >
+  > Eight supported families had no branch at all and so could not
+  > have been caught even where the validator did run: `geometric`,
+  > `weibull`, `exponential`, `frechet`, `inverse.gaussian`,
+  > `zero_inflated_beta`, `zero_one_inflated_beta` and `von_mises`.
+  > A factor response, which `bernoulli()` and the ordinal families
+  > legitimately take, aborted the validator outright on
+  > `'floor' not meaningful for factors`.
+  >
+  > Support is now one table rather than a branch per family, so a
+  > family is covered by naming it. The values are brms's own,
+  > `family_info(family, "ybounds")`, `"closed"` and `use_int()`,
+  > which is unexported and so closed to a CRAN package the way
+  > `get_new_rdraws()` was in 3.0. Copying them is safe only if the
+  > copy is checked, so the test drives brms through its public
+  > `make_standata()` over eighteen shared families and seven probe
+  > vectors and asserts both refuse the same ones. mvgam's own
+  > families are not in brms and carry their own entries, which is
+  > why the table cannot be replaced by a brms call outright.
+  >
+  > The message names the column, states the support as an
+  > inequality the reader can check their column against, gives the
+  > observed range, counts the violations and points at the first
+  > offending row. Where a neighbouring family would accept the data
+  > it says which: an exact zero under `Beta()` names
+  > `zero_inflated_beta()`.
+  >
+  > The bernoulli 0/1 branch is gone rather than kept: bounds of
+  > [0, 1] plus the integer check already confine a response to
+  > those two values, so nothing could reach it.
+  >
+  > `newdata` is held to the same support as the training response,
+  > matching the covariate-NA guard beside it. A forecast frame
+  > carries an absent or all-NA response, which the check passes
+  > over, so only a value actually supplied is tested.
+  >
+  > `mvgam_data()`'s examples only ever showed valid data, so they
+  > demonstrated the plot and never the reason to call it. They now
+  > show a count column with a negative, a proportion with exact
+  > zeros, and an irregular time grid refused for `AR()` and taken
+  > by `CAR()`.
 
 - [ ] **5.0 Rebuild every vignette and the pkgdown site**
   > Caches date from June and July, before the prior and default

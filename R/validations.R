@@ -1500,75 +1500,237 @@ validate_regular_time_intervals <- function(time_values, time_var = "time") {
 }
 
 
+# Response support per family: the interval a response must lie
+# in, whether each endpoint is included, and whether values must
+# be whole numbers. Families brms also defines carry brms's own
+# values, read from `family_info(family, "ybounds")`, `"closed"`
+# and `use_int()`. `test-mvgam-data.R` drives brms through its
+# public interface and asserts it refuses exactly what this table
+# refuses, so the two cannot drift apart. mvgam's native families
+# are not in brms and carry their own entries.
+#
+# Ordinal, categorical and multi-response families are absent on
+# purpose: their responses are levels rather than points on an
+# interval, and brms checks them against the category count it
+# derives from the data. Closure-unit families go through
+# `validate_closure_unit_data()`.
+#'@noRd
+mvgam_response_support <- local({
+  count <- list(bounds = c(0, Inf), closed = c(TRUE, NA),
+                integer = TRUE)
+  positive <- list(bounds = c(0, Inf), closed = c(FALSE, NA),
+                   integer = FALSE)
+  unit_open <- list(bounds = c(0, 1), closed = c(FALSE, FALSE),
+                    integer = FALSE)
+  counts <- c("poisson", "negbinomial", "geometric", "binomial",
+              "beta_binomial", "com_poisson", "discrete_weibull",
+              "hurdle_poisson", "hurdle_negbinomial",
+              "zero_inflated_poisson", "zero_inflated_negbinomial",
+              "zero_inflated_binomial",
+              "zero_inflated_beta_binomial",
+              "com_binomial", "beta_nb")
+  positives <- c("gamma", "lognormal", "weibull", "exponential",
+                 "frechet", "inverse.gaussian",
+                 "shifted_lognormal", "wiener")
+  out <- c(
+    stats::setNames(rep(list(count), length(counts)), counts),
+    stats::setNames(rep(list(positive), length(positives)),
+                    positives)
+  )
+  out$bernoulli <- list(bounds = c(0, 1), closed = c(TRUE, TRUE),
+                        integer = TRUE)
+  out$beta <- unit_open
+  out$betar <- unit_open
+  out$dirichlet <- unit_open
+  out$logistic_normal <- unit_open
+  out$zero_inflated_beta <- list(bounds = c(0, 1),
+                                 closed = c(TRUE, FALSE),
+                                 integer = FALSE)
+  out$zero_one_inflated_beta <- list(bounds = c(0, 1),
+                                     closed = c(TRUE, TRUE),
+                                     integer = FALSE)
+  out$xbeta <- list(bounds = c(0, 1), closed = c(TRUE, TRUE),
+                    integer = FALSE)
+  out$von_mises <- list(bounds = c(-pi, pi), closed = c(TRUE, TRUE),
+                        integer = FALSE)
+  # The hurdle continuous families place a point mass at zero, so
+  # they admit it where their base family does not.
+  out$hurdle_gamma <- list(bounds = c(0, Inf), closed = c(TRUE, NA),
+                           integer = FALSE)
+  out$hurdle_lognormal <- out$hurdle_gamma
+  out$tweedie <- list(bounds = c(0, Inf), closed = c(TRUE, NA),
+                      integer = FALSE)
+  out
+})
+
+
+# Render a family's support as the inequality a reader can check
+# their own column against, e.g. "0 < y < 1" or "y >= 0".
+#'@noRd
+describe_response_support <- function(spec, y_name) {
+  lo <- spec$bounds[1L]
+  hi <- spec$bounds[2L]
+  parts <- character()
+  if (is.finite(lo)) {
+    parts <- c(parts, paste0(
+      format(lo, digits = 4L), if (isTRUE(spec$closed[1L])) " <= " else " < "
+    ))
+  }
+  body <- paste0(paste(parts, collapse = ""), "'", y_name, "'")
+  if (is.finite(hi)) {
+    body <- paste0(
+      body, if (isTRUE(spec$closed[2L])) " <= " else " < ",
+      format(hi, digits = 4L)
+    )
+  }
+  if (isTRUE(spec$integer)) {
+    body <- paste0(body, " (integers only)")
+  }
+  body
+}
+
+
 # Internal: response-vs-family shape check for non-closure-unit
 # families. Closure-unit families (`occ()`, `nmix()` variants)
 # go through `validate_closure_unit_data()` instead, which does
-# its own integer / binary / cap / non-negative checks. This
-# helper covers Poisson / NB / binomial / bernoulli / Beta /
-# Gamma / lognormal / Tweedie response shape, called by
-# `mvgam_data()` pre-fit.
+# its own integer / binary / cap / non-negative checks. Driven by
+# `mvgam_response_support`, so a family is covered by naming it
+# there rather than by another branch here.
 #'@noRd
 validate_response_for_family <- function(y, family, y_name = "y") {
+  # A factor response carries no numeric order to range-check, and
+  # the families that accept one (bernoulli, the ordinal and
+  # categorical families) are validated by brms against their own
+  # level requirements. Comparing a factor to floor() errors.
+  if (!is.numeric(y) && !is.logical(y)) return(invisible(TRUE))
   y_nz <- y[!is.na(y)]
   if (!length(y_nz)) return(invisible(TRUE))
   fam_name <- resolve_family_name(family)
-  fam <- tolower(fam_name)
-  is_integer_like <- all(y_nz == floor(y_nz))
+  spec <- mvgam_response_support[[tolower(fam_name)]]
+  if (is.null(spec)) return(invisible(TRUE))
 
-  count_family <- fam %in% c("poisson", "negbinomial", "binomial",
-                              "beta_binomial", "bernoulli", "beta_nb")
-  if (count_family) {
-    if (any(y_nz < 0)) {
-      stop(insight::format_error(c(
-        paste0("'", y_name,
-               "' contains negative values but family is '",
-               fam_name, "'."),
-        x = paste0("Min observed: ", min(y_nz), "."),
-        i = "Count and binary families require non-negative integers."
-      )))
+  observed <- paste0("Observed range: [", format(min(y_nz), digits = 4L),
+                     ", ", format(max(y_nz), digits = 4L), "].")
+  present <- !is.na(y)
+  lo <- spec$bounds[1L]
+  hi <- spec$bounds[2L]
+  below <- if (!is.finite(lo)) rep(FALSE, length(y)) else if (
+    isTRUE(spec$closed[1L])) present & y < lo else present & y <= lo
+  above <- if (!is.finite(hi)) rep(FALSE, length(y)) else if (
+    isTRUE(spec$closed[2L])) present & y > hi else present & y >= hi
+  outside <- below | above
+
+  if (any(outside)) {
+    stop(insight::format_error(c(
+      paste0("'", y_name, "' has values outside the support of ",
+             "family '", fam_name, "'."),
+      x = paste0("Requires: ",
+                 describe_response_support(spec, y_name), "."),
+      x = paste0(observed, " ", sum(outside), " of ", sum(present),
+                 " values fall outside, the first at row ",
+                 which(outside)[1L], "."),
+      i = response_support_hint(tolower(fam_name))
+    )))
+  }
+
+  if (isTRUE(spec$integer) && any(present & y != floor(y))) {
+    frac <- present & y != floor(y)
+    stop(insight::format_error(c(
+      paste0("'", y_name, "' has non-integer values but family '",
+             fam_name, "' counts events."),
+      x = paste0(sum(frac), " of ", sum(present),
+                 " values are not integers, the first at row ",
+                 which(frac)[1L], "."),
+      i = paste0("Round the column if the fractions are a storage ",
+                 "artefact, or model it with a continuous family.")
+    )))
+  }
+
+  invisible(TRUE)
+}
+
+
+# The one line of advice that is specific to a family, rather than
+# a restatement of the bound the caller has just been shown.
+#'@noRd
+response_support_hint <- function(fam) {
+  if (fam == "bernoulli") {
+    return(paste0("Bernoulli takes 0/1 values, or a factor with two ",
+                  "levels."))
+  }
+  if (fam %in% c("beta", "betar")) {
+    return(paste0("Beta excludes both endpoints; use ",
+                  "zero_inflated_beta() for exact zeros or ",
+                  "zero_one_inflated_beta() for both."))
+  }
+  if (fam == "zero_inflated_beta") {
+    return(paste0("This family admits exact zeros but not ones; ",
+                  "use zero_one_inflated_beta() for both."))
+  }
+  if (fam == "tweedie") {
+    return("Tweedie models a zero-inflated continuous response.")
+  }
+  if (fam == "von_mises") {
+    return("Angles are measured in radians on [-pi, pi].")
+  }
+  if (fam %in% c("gamma", "lognormal", "weibull", "exponential",
+                 "frechet", "inverse.gaussian",
+                 "shifted_lognormal")) {
+    return(paste0("This family excludes zero; use its hurdle ",
+                  "counterpart if exact zeros are real observations."))
+  }
+  if (isTRUE(mvgam_response_support[[fam]]$integer)) {
+    return(paste0("Counts cannot be negative; check the column for ",
+                  "missing-data sentinels such as -1 or -999."))
+  }
+  "Check the response column, or choose a family whose support covers it."
+}
+
+
+# Internal: run `validate_response_for_family()` over each
+# response `mvgam()` has already resolved, so a fit rejects a response
+# its family cannot take with a message naming the column and the
+# values observed, rather than letting brms report the constraint
+# from a function the user did not call. Multi-response families
+# take a matrix response and closure-unit families are checked by
+# `validate_closure_unit_data()`, so both are left to their own
+# validators.
+#'@noRd
+validate_response_shapes <- function(data, resp_vars, family) {
+  if (is.null(family) || !length(resp_vars)) return(invisible(TRUE))
+  # A list of frames is the multiple-imputation path; each frame
+  # carries the same response and any one of them can be wrong.
+  frames <- if (is.data.frame(data)) {
+    list(data)
+  } else if (is.list(data)) {
+    Filter(is.data.frame, data)
+  } else {
+    list()
+  }
+  if (!length(frames)) return(invisible(TRUE))
+
+  # A multivariate call may pair one family per response; anything
+  # else applies the single family to each.
+  fams <- if (is.list(family) && !inherits(family, "family") &&
+                length(family) == length(resp_vars)) {
+    family
+  } else {
+    rep(list(family), length(resp_vars))
+  }
+
+  for (i in seq_along(resp_vars)) {
+    # `validate_family()` normalises a character, family or
+    # customfamily into one object and refuses anything else, which
+    # is a fault in the user's own argument and belongs here.
+    fam <- validate_family(fams[[i]])
+    if (is_multi_response_family(fam) || is_closure_unit_family(fam)) {
+      next
     }
-    if (!is_integer_like) {
-      stop(insight::format_error(c(
-        paste0("'", y_name,
-               "' contains non-integer values but family is '",
-               fam_name, "'."),
-        i = "Count and binary families require non-negative integers."
-      )))
-    }
-    if (fam == "bernoulli" && !all(y_nz %in% c(0L, 1L))) {
-      stop(insight::format_error(c(
-        paste0("'", y_name, "' must be 0/1 for family 'bernoulli'."),
-        x = paste0("Unique observed: ",
-                   paste(sort(unique(y_nz)), collapse = ", "), ".")
-      )))
-    }
-  } else if (fam %in% c("beta", "betar")) {
-    if (any(y_nz <= 0) || any(y_nz >= 1)) {
-      stop(insight::format_error(c(
-        paste0("'", y_name,
-               "' must be strictly inside (0, 1) for family '",
-               fam_name, "'."),
-        x = paste0("Range observed: [", min(y_nz),
-                   ", ", max(y_nz), "].")
-      )))
-    }
-  } else if (fam %in% c("gamma", "lognormal")) {
-    if (any(y_nz <= 0)) {
-      stop(insight::format_error(c(
-        paste0("'", y_name,
-               "' must be strictly positive for family '",
-               fam_name, "'."),
-        x = paste0("Min observed: ", min(y_nz), ".")
-      )))
-    }
-  } else if (fam == "tweedie") {
-    if (any(y_nz < 0)) {
-      stop(insight::format_error(c(
-        paste0("'", y_name,
-               "' must be non-negative for family 'tweedie'."),
-        x = paste0("Min observed: ", min(y_nz), "."),
-        i = "Tweedie models a zero-inflated continuous response."
-      )))
+    for (frame in frames) {
+      if (!resp_vars[i] %in% names(frame)) next
+      validate_response_for_family(
+        frame[[resp_vars[i]]], fam, y_name = resp_vars[i]
+      )
     }
   }
   invisible(TRUE)

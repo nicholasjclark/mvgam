@@ -631,6 +631,18 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
       context        = "newdata"
     )
   }
+
+  # Response-shape guard. brms reports a family's support from
+  # `data_response.brmsframe()`, which names neither the column nor
+  # the values that broke it, and states only the bound it reached
+  # first. Checking here names both and gives the whole constraint.
+  validate_response_shapes(data, resp_vars, family)
+  if (!is.null(newdata)) {
+    # A forecast frame carries an all-NA or absent response, which
+    # the check passes over; a value it does carry has to satisfy
+    # the family the same way the training response does.
+    validate_response_shapes(newdata, resp_vars, family)
+  }
   checkmate::assert_character(backend, len = 1)
   checkmate::assert_logical(combine, len = 1)
   checkmate::assert_flag(run_model)

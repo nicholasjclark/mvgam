@@ -198,6 +198,12 @@ sim_mvgam <- function(type = 1L,
   trend_args$params <- fill_multivariate_trend_defaults(
     trend_model, trend_args$params, n_series
   )
+  # A type that builds its own irregular time grid supplies the
+  # gaps the trend must be propagated over, so the latent process
+  # and the recorded time column describe the same spacing.
+  if (!is.null(built$trend_time)) {
+    trend_args$time <- built$trend_time
+  }
   is_pw <- is_pw_trend(trend_model)
   if (is_pw) {
     # PW (piecewise linear or logistic) needs its own param
@@ -321,9 +327,9 @@ sim_mvgam <- function(type = 1L,
   if (tolower(fam_name) %in% c("binomial", "com_binomial")) {
     data_long$trials <- obs_pars$trials %||% 10L
   }
-  if (!is.null(trend_args$time_long)) {
+  if (!is.null(built$time_long)) {
     # CAR uses irregular continuous time; overwrite integer time.
-    data_long$time <- trend_args$time_long
+    data_long$time <- built$time_long
   }
 
   # Train / test split on time index, preserved across series.
@@ -697,12 +703,13 @@ spec_type_6 <- function() {
     build_data = function(n_timepoints, n_series, series_fac,
                            time_int) {
       total_n <- n_timepoints * n_series
-      # Build irregular continuous time grid: cumulative
-      # uniform-(1, 6) gaps from t = 0. All series share the
-      # SAME gap sequence so forecast.mvgam's CAR helper
-      # (which requires a single length-h time vector across
-      # series) can consume the simulated test data without
-      # tripping the per-series gap-mismatch guard.
+      # Build the irregular continuous time grid once. The same
+      # gaps set the recorded time column, the season covariate
+      # derived from it, and the spacing the CAR kernel
+      # propagates over, so the three cannot disagree. All series
+      # share the gap sequence, because forecast.mvgam's CAR
+      # helper takes a single length-h time vector across series
+      # and rejects per-series gap patterns that differ.
       shared_gaps <- c(0, stats::runif(n_timepoints - 1L, 1, 6))
       shared_times <- cumsum(shared_gaps)
       time_long <- rep(shared_times, n_series)
@@ -720,45 +727,39 @@ spec_type_6 <- function() {
         true_smooths = list(
           `s(season)` = data.frame(season = grid, f_true = true_sm)
         ),
-        time_long = time_long
+        time_long = time_long,
+        trend_time = shared_gaps
       )
     },
     trend_params = function(n_series, n_timepoints, prop_trend) {
-      # CAR needs per-series time gaps; propagate_trend takes a
-      # single length-h vector. For multi-series we propagate one
-      # gap pattern shared across series (matches the
-      # data_long$time we built).
-      first_series_gaps <-
-        c(0, stats::runif(n_timepoints - 1L, 1, 6))
+      # The gaps CAR propagates over come from `build_data` via
+      # `trend_time`, so the dynamics run on the spacing the data
+      # records rather than on a second draw of it.
       list(
         params = list(phi = 0.7,
-                       sigma = trend_sigma(0.5)),
-        time = first_series_gaps,
-        time_long = NULL
+                       sigma = trend_sigma(prop_trend)),
+        time = NULL
       )
     }
   )
 }
 
 
-# Type 7: y ~ s(season, bs = "cc"), sparse AR(p = c(1, 12)) latent
-# state. Monthly cycle on the obs side; the latent state carries
-# both short-term momentum (lag 1) and annual recurrence beyond the
-# deterministic cycle (lag 12). Demonstrates the value of a
-# state-space model when the data has structure a fixed seasonal
-# smooth cannot represent.
+# Type 7: y ~ s(x), sparse AR(p = c(1, 12)) latent state. The
+# observation side carries a smooth of a non-periodic covariate and
+# the latent state carries all of the temporal structure, at lag 1
+# and lag 12. Demonstrates the value of a state-space model when
+# serial dependence is the only source of that structure.
 #'@noRd
 spec_type_7 <- function() {
   list(
     default_trend = AR(p = c(1L, 12L)),
-    # The observation side carries a smooth of a non-periodic
-    # covariate. An earlier version put a cyclic seasonal smooth
-    # here, which cannot be separated from the lag-12 coefficient:
-    # on monthly data a lag-12 autoregression is itself an annual
-    # cycle, so the two describe the same periodicity and the
-    # posterior trades variance between them. Fits showed the
-    # smooth coefficients, sigma, sigma_trend and ar1_trend all
-    # failing to mix together.
+    # The observation-side covariate must not be periodic. A
+    # cyclic seasonal smooth cannot be separated from the lag-12
+    # coefficient, because on monthly data a lag-12
+    # autoregression is itself an annual cycle: the two describe
+    # the same periodicity and the posterior trades variance
+    # between them rather than resolving either.
     default_prop_trend = 0.6,
     intercept = function(fam) intercept_for_family(fam),
     build_data = function(n_timepoints, n_series, series_fac,
@@ -779,10 +780,9 @@ spec_type_7 <- function() {
     },
     trend_params = function(n_series, n_timepoints, prop_trend) {
       # Sparse AR(1, 12): phi_1 = 0.55, phi_12 = 0.40. Sum 0.95
-      # is high enough that the state visibly drifts year-on-year
-      # beyond the deterministic seasonal cycle (so a fixed
-      # smooth-on-season fit cannot match it) while keeping the
-      # process inside the stationary region. Higher sums push
+      # is high enough that the state visibly recurs year-on-year,
+      # so a fit carrying no dynamics cannot match it, while
+      # keeping the process inside the stationary region. Higher sums push
       # the AR(1, 12) into nonstationary territory and trigger
       # divergent transitions during HMC.
       list(

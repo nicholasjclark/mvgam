@@ -105,6 +105,28 @@
 #' # 4-panel single-series view (time series, histogram, ACF,
 #' # ECDF).
 #' mvgam_data(simdat$data_train, family = poisson(), series = 1L)
+#'
+#' # The point of checking first: a response the family cannot
+#' # take is refused here, naming the column, the offending values
+#' # and the support, rather than after a Stan compile.
+#' counts <- simdat$data_train
+#' counts$y[3L] <- -1
+#' try(mvgam_data(counts, family = poisson(), plot = FALSE))
+#'
+#' # The same column read as a proportion. Beta excludes both
+#' # endpoints, so an exact zero has to be modelled rather than
+#' # ignored, and the error names the family that does so.
+#' props <- simdat$data_train
+#' props$y <- props$y / (max(props$y) + 1)
+#' try(mvgam_data(props, family = Beta(), plot = FALSE))
+#'
+#' # Irregular time is refused for a trend that assumes even
+#' # spacing, and accepted for CAR(), which models the gaps.
+#' gappy <- simdat$data_train[simdat$data_train$time != 5L, ]
+#' try(mvgam_data(gappy, family = poisson(), trend_model = AR(),
+#'                 plot = FALSE))
+#' mvgam_data(gappy, family = poisson(), trend_model = CAR(),
+#'             plot = FALSE)
 #' }
 #'
 #' @export
