@@ -18,6 +18,7 @@
   normalize = TRUE,
   save_model = NULL,
   silent = 1L,
+  stanvars = NULL,
   validate = TRUE,
   ...
 )

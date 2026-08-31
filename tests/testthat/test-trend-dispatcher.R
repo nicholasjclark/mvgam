@@ -1223,17 +1223,6 @@ test_that("piecewise parameter validation handles edge cases correctly", {
 })
 
 # Tests for Enhanced Validation Layer
-test_that("validate_and_process_trend_parameters works correctly", {
-  # Test AR trend parameter processing
-  ar_spec <- list(trend = "AR", p = c(3, 1, 2), time = "time", series = "series")
-  test_data <- data.frame(time = 1:10, series = factor(rep(1:2, each = 5)))
-
-  result <- validate_and_process_trend_parameters(ar_spec, test_data)
-
-  # Lag parameters should be sorted
-  expect_equal(result$p, c(1, 2, 3))
-  expect_equal(result$trend, "AR")
-})
 
 test_that("process_lag_parameters handles complex lag structures", {
   # Test basic lag processing
@@ -1277,69 +1266,3 @@ test_that("process_capacity_parameter handles PW capacity validation", {
   )
 })
 
-test_that("rule-based validation dispatch works correctly", {
-  # Create test trend spec with validation rules
-  trend_spec <- list(
-    trend = "AR",
-    p = c(2, 1),
-    validation_rules = c("requires_parameter_processing"),
-    time = "time",
-    series = "series"
-  )
-
-  test_data <- data.frame(time = 1:10, series = factor(rep(1:2, each = 5)))
-
-  # Test applying validation rules
-  result <- apply_validation_rules(trend_spec, test_data)
-
-  # Should have processed parameters
-  expect_equal(result$p, c(1, 2))  # Sorted
-  expect_equal(result$trend, "AR")
-})
-
-test_that("validation rule dispatch table contains all expected rules", {
-  dispatch_table <- get_validation_rule_dispatch_table()
-
-  # Current implemented validation rules
-  expected_rules <- c(
-    "requires_grouping_validation",
-    "requires_regular_intervals",
-    "supports_factors",
-    "requires_parameter_processing"
-  )
-
-  expect_true(all(expected_rules %in% names(dispatch_table)))
-
-  # All entries should be functions
-  for (rule in names(dispatch_table)) {
-    expect_type(dispatch_table[[rule]], "closure")
-  }
-})
-
-test_that("validation functions handle edge cases correctly", {
-  # Test trend grouping validation. validate_gr_constant_per_series
-  # (active since the 7.2 layout work) requires gr to be constant
-  # within each series, so build the fixture with two distinct series
-  # each fully in one group.
-  trend_spec <- list(trend = "AR", gr = "group_var", subgr = "subgroup_var")
-  test_data <- data.frame(
-    time = rep(1:5, 2),
-    series = factor(rep(c("s1", "s2"), each = 5)),
-    group_var = factor(rep(c("A", "B"), each = 5)),
-    subgroup_var = factor(rep(c("X", "Y"), times = 5))
-  )
-
-  # Should pass validation
-  result <- validate_trend_grouping(trend_spec, test_data)
-  expect_equal(result$gr, "group_var")
-  expect_equal(result$subgr, "subgroup_var")
-
-  # Grouping variable not found in data fails the data presence
-  # check inside validate_trend_grouping.
-  trend_spec_missing <- list(trend = "AR", gr = "missing_var",
-                              subgr = "missing_sub")
-  expect_error(
-    validate_trend_grouping(trend_spec_missing, test_data),
-    "not found"
-  )
-})

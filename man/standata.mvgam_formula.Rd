@@ -13,8 +13,13 @@
   sample_prior = "no",
   knots = NULL,
   drop_unused_levels = TRUE,
-  stanvars = NULL,
+  backend = "rstan",
   threads = getOption("mc.cores", 1),
+  normalize = TRUE,
+  save_model = NULL,
+  silent = 1L,
+  stanvars = NULL,
+  validate = TRUE,
   ...
 )
 }
@@ -44,11 +49,27 @@ to the basis constructors for both the observation and trend formulas.}
 \item{drop_unused_levels}{Logical; should unused factor levels be dropped?
 Default is \code{TRUE}.}
 
-\item{stanvars}{Optional \code{stanvars} object containing additional Stan
-variables, parameters, or functions.}
+\item{backend}{Character string specifying Stan backend. Options:
+\code{"rstan"} (default) or \code{"cmdstanr"}.}
 
 \item{threads}{Number of threads to use for parallelization. Default is
 \code{getOption("mc.cores", 1)}.}
+
+\item{normalize}{Logical; should brms drop the normalising constants
+from its sampling statements? Default is \code{TRUE}.}
+
+\item{save_model}{File path to write the assembled Stan program to.
+If \code{NULL} (default), nothing is written.}
+
+\item{silent}{Integer controlling verbosity, following the \pkg{brms}
+convention. 0 prints Stan's exceptions as well as its progress, 1
+(the default) prints progress alone, and 2 prints nothing.}
+
+\item{stanvars}{Optional \code{stanvars} object containing additional Stan
+variables, parameters, or functions.}
+
+\item{validate}{Logical; should the assembled Stan code be validated?
+Default is \code{TRUE}.}
 
 \item{...}{Additional arguments passed to internal functions.}
 }

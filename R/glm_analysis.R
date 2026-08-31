@@ -63,35 +63,42 @@ analyze_stan <- function(stan_code, response_names = NULL, trend_info = NULL) {
   )
 }
 
+
+# The brms GLM likelihoods mvgam knows how to unwind. brms folds the
+# linear predictor into these calls, so a trend has no `mu` to reach
+# until the call is rewritten. Listed once: detection, the type gate on
+# transformation and the per-line type lookup all read this vector, and
+# a seventh form added here reaches all three.
+mvgam_glm_families <- c(
+  "normal_id_glm",
+  "poisson_log_glm",
+  "neg_binomial_2_log_glm",
+  "bernoulli_logit_glm",
+  "ordered_logistic_glm",
+  "categorical_logit_glm"
+)
+
+#' Which GLM likelihoods a Stan program calls
+#'
+#' @param stan_code Character vector of Stan source.
+#' @return Named logical over `mvgam_glm_families`.
+#' @noRd
+glm_calls_present <- function(stan_code) {
+  checkmate::assert_character(stan_code, min.len = 1)
+  vapply(mvgam_glm_families, function(fam) {
+    any(grepl(paste0("target\\s*\\+=.*", stan_density_call_pattern(fam)),
+              stan_code))
+  }, logical(1L))
+}
+
 #' Detect GLM Patterns in Stan Code
 #'
-#' @description
-#' GLM pattern detection for all supported GLM types.
-#'
-#' @param stan_code Character string containing Stan code to analyze
-#'
-#' @return Named logical vector indicating which GLM patterns are present
-#'
+#' @param stan_code Character string containing Stan model code
+#' @return Named logical vector, one entry per GLM family
 #' @noRd
 detect_glm_patterns <- function(stan_code) {
   checkmate::assert_character(stan_code, len = 1)
-
-  glm_patterns <- c(
-    "normal_id_glm",
-    "poisson_log_glm",
-    "neg_binomial_2_log_glm",
-    "bernoulli_logit_glm",
-    "ordered_logistic_glm",
-    "categorical_logit_glm"
-  )
-
-  detected <- vapply(glm_patterns, function(pattern) {
-    any(grepl(paste0("target\\s*\\+=.*",
-                     stan_density_call_pattern(pattern)), stan_code))
-  }, logical(1))
-
-  names(detected) <- glm_patterns
-  return(detected)
+  glm_calls_present(stan_code)
 }
 
 #' Classify Mu Construction Patterns
@@ -242,15 +249,12 @@ inject_trends_into_glm_calls <- function(code_lines, block_info, trend_injection
       glm_line_idx <- i
       
       
-      # Extract GLM type
-      if (grepl("poisson_log_glm_lpmf", line)) {
-        glm_type <- "poisson_log"
-      } else if (grepl("bernoulli_logit_glm_lpmf", line)) {
-        glm_type <- "bernoulli_logit" 
-      } else if (grepl("normal_id_glm_lpdf", line)) {
-        glm_type <- "normal_id"
-      } else if (grepl("neg_binomial_2_log_glm_lpmf", line)) {
-        glm_type <- "neg_binomial_2_log"
+      # The family this line calls, under either density spelling.
+      for (fam in mvgam_glm_families) {
+        if (grepl(stan_density_call_pattern(fam), line)) {
+          glm_type <- sub("_glm$", "", fam)
+          break
+        }
       }
       
       break
@@ -258,8 +262,27 @@ inject_trends_into_glm_calls <- function(code_lines, block_info, trend_injection
   }
   
   
-  if (is.null(glm_line_idx) || is.null(glm_type)) {
+  # No GLM call in the model block is the ordinary case for a family
+  # brms does not optimise, and there is nothing to unwind.
+  if (is.null(glm_line_idx)) {
     return(code_lines)
+  }
+
+  # Matching a GLM call and then failing to name its family used to
+  # return the line untouched, which left the trend computed and never
+  # added to the linear predictor: a fit of a model with no trend that
+  # compiled and sampled without complaint. Refuse instead, so a family
+  # added to `mvgam_glm_families` without a transformation is caught at
+  # code generation rather than in the results.
+  if (is.null(glm_type)) {
+    stop(insight::format_error(c(
+      "Found a GLM likelihood whose family could not be identified.",
+      x = paste0("The call was: ", trimws(code_lines[glm_line_idx])),
+      i = paste0(
+        "Recognised families are: ",
+        paste(mvgam_glm_families, collapse = ", "), "."
+      )
+    )), call. = FALSE)
   }
   
   # Parse GLM parameters using existing pattern
@@ -399,43 +422,41 @@ transform_glm_call_to_mu_format <- function(glm_line, glm_type, glm_params) {
   mu_var <- if (resp_name == "") "mu" else paste0("mu_", resp_name)
   mu_ones_var <- if (resp_name == "") "mu_ones" else paste0("mu_ones_", resp_name)
   
-  # GLM family transformation configuration
-  glm_family_config <- list(
-    "normal_id" = list(
-      function_suffix = "_lpdf",
-      additional_params = function(glm_params) glm_params$sigma
-    ),
-    "neg_binomial_2_log" = list(
-      function_suffix = "_lpmf", 
-      additional_params = function(glm_params) glm_params$shape
-    ),
-    "poisson_log" = list(
-      function_suffix = "_lpmf",
-      additional_params = function(glm_params) NULL
-    ),
-    "bernoulli_logit" = list(
-      function_suffix = "_lpmf",
-      additional_params = function(glm_params) NULL
-    ),
-    "categorical_logit" = list(
-      function_suffix = "_lpmf",
-      additional_params = function(glm_params) NULL
-    )
+  # What each family carries after the coefficients. The density
+  # suffix is not configured here: it is read off the call being
+  # replaced, so a program generated under `normalize = FALSE` keeps
+  # its unnormalised spelling instead of silently regaining the
+  # constants.
+  extra_argument <- list(
+    "normal_id" = function(p) p$sigma,
+    "neg_binomial_2_log" = function(p) p$shape,
+    "poisson_log" = function(p) NULL,
+    "bernoulli_logit" = function(p) NULL,
+    "ordered_logistic" = function(p) NULL,
+    "categorical_logit" = function(p) NULL
   )
-  
-  # Get configuration for GLM type
-  config <- glm_family_config[[glm_type]]
-  if (is.null(config)) {
+
+  getter <- extra_argument[[glm_type]]
+  if (is.null(getter)) {
     stop(insight::format_error(
       cli::format_inline("Unsupported GLM type: {.field {glm_type}}")
     ))
   }
-  
+  suffix <- stan_density_suffix(glm_line, paste0(glm_type, "_glm"))
+  if (is.null(suffix)) {
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "No {.field {glm_type}} GLM call found in the line to transform."
+      ),
+      i = "The line was located by a pattern that should have matched."
+    )))
+  }
+
   # Build function name
-  glm_function <- paste0(glm_type, "_glm", config$function_suffix)
-  
+  glm_function <- paste0(glm_type, "_glm", suffix)
+
   # Get additional parameters if any
-  additional_params <- config$additional_params(glm_params)
+  additional_params <- getter(glm_params)
   additional_str <- if (!is.null(additional_params)) {
     paste0(", ", additional_params)
   } else {
@@ -880,9 +901,7 @@ transform_single_glm_call <- function(glm_line, glm_type, params) {
     ""
   }
 
-  if (!glm_type %in% c("normal_id_glm", "poisson_log_glm",
-                       "neg_binomial_2_log_glm", "bernoulli_logit_glm",
-                       "ordered_logistic_glm", "categorical_logit_glm")) {
+  if (!glm_type %in% mvgam_glm_families) {
     stop(insight::format_error(
       cli::format_inline(
         "Unsupported GLM type for transformation: {.field {glm_type}}"

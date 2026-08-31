@@ -540,20 +540,24 @@ test_that("trend constructors use process_trend_params correctly", {
   })
 })
 
-test_that("validation rules vocabulary is complete", {
-  # Test that all validation rule constants are defined
+test_that("every rule constant is one a trend actually declares", {
+  # The vocabulary is only worth having if each entry appears in some
+  # trend's defaults; a constant nothing declares is a promise the
+  # package does not keep.
+  constants <- c(
+    rule_requires_regular_intervals, rule_allows_irregular_intervals,
+    rule_supports_factors, rule_incompatible_with_factors,
+    rule_supports_hierarchical, rule_incompatible_with_hierarchical,
+    rule_requires_minimum_series_count
+  )
+  declared <- unique(unlist(lapply(
+    c("RW", "AR", "VAR", "CAR", "PW", "ZMVN"), get_default_validation_rules
+  )))
+  expect_setequal(constants, declared)
+
+  # `requires_regular_intervals` is the one the fitting path reads, so
+  # it has to keep its exact spelling.
   expect_equal(rule_requires_regular_intervals, "requires_regular_intervals")
-  expect_equal(rule_allows_irregular_intervals, "allows_irregular_intervals")
-  expect_equal(rule_supports_factors, "supports_factors")
-  expect_equal(rule_incompatible_with_factors, "incompatible_with_factors")
-  expect_equal(rule_supports_hierarchical, "supports_hierarchical")
-  expect_equal(rule_requires_hierarchical, "requires_hierarchical")
-  expect_equal(rule_incompatible_with_hierarchical, "incompatible_with_hierarchical")
-  expect_equal(rule_requires_seasonal_period, "requires_seasonal_period")
-  expect_equal(rule_supports_multiple_seasonality, "supports_multiple_seasonality")
-  expect_equal(rule_incompatible_with_seasonal_smooths, "incompatible_with_seasonal_smooths")
-  expect_equal(rule_requires_balanced_panels, "requires_balanced_panels")
-  expect_equal(rule_requires_minimum_series_count, "requires_minimum_series_count")
 
   # Test that validation rule assignment works for all trend types
   trend_types <- c("RW", "AR", "VAR", "CAR", "PW", "ZMVN")
@@ -639,30 +643,6 @@ test_that("consistent dispatch metadata is added automatically", {
   })
 })
 
-test_that("trend dispatch consistency validation works", {
-  # Create trend with consistent naming
-  consistent_trend <- structure(
-    list(
-      trend = "AR",
-      forecast_metadata = list(function_name = "forecast_ar_rcpp")
-    ),
-    class = "mvgam_trend"
-  )
-  expect_silent(validate_trend_dispatch_consistency(consistent_trend))
-
-  # Create trend with inconsistent naming
-  inconsistent_trend <- structure(
-    list(
-      trend = "AR",
-      forecast_metadata = list(function_name = "forecast_wrong_rcpp")
-    ),
-    class = "mvgam_trend"
-  )
-  expect_error(
-    validate_trend_dispatch_consistency(inconsistent_trend),
-    "Inconsistent forecast function naming"
-  )
-})
 
 test_that("get_trend_dispatch_function generates correct names", {
   # Test stanvar generator names
@@ -781,7 +761,6 @@ test_that("normalise_prior_arg_alias() renames 'priors' to 'prior'", {
     )
   )
 })
-
 
 
 # ---- an `ma` term must bring its parameters with it ------------------

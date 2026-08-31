@@ -4872,3 +4872,98 @@ test_that("a shrinkage prior gets the Stan data it declares", {
       supplied
   ))
 })
+
+test_that("normalize = FALSE still injects the trend into the GLM call", {
+  # The GLM path recognised only the normalised `_lpmf` / `_lpdf`
+  # spelling when deciding which family a likelihood line called, so
+  # under `normalize = FALSE` it identified none, returned the line
+  # untouched, and the emitted program computed the latent states and
+  # then never used them. The model fitted as though it had no trend,
+  # and it compiled and sampled, so nothing complained.
+  dat <- codegen_test_data()
+  dat$z <- rnorm(nrow(dat))
+  dat$cont <- rnorm(nrow(dat))
+
+  cases <- list(
+    list(resp = "y", family = poisson(), density = "poisson_log_glm_lupmf"),
+    list(resp = "cont", family = gaussian(),
+         density = "normal_id_glm_lupdf")
+  )
+  for (case in cases) {
+    mf <- mvgam_formula(
+      stats::as.formula(paste0(case$resp, " ~ elev + z")),
+      trend_formula = ~ AR(p = 1)
+    )
+    code <- stancode(mf, data = dat, family = case$family,
+                     normalize = FALSE, silent = 2L)
+    lab <- case$family$family
+
+    # The trend has to reach mu, and mu has to reach the likelihood.
+    expect_true(grepl("mu\\[n\\] \\+= trend\\[", code),
+                label = paste("trend added to mu for", lab))
+    expect_true(grepl("to_matrix\\(mu\\)", code),
+                label = paste("likelihood reads mu for", lab))
+    # And the unnormalised spelling survives the rewrite, or turning
+    # the constants off would be quietly undone.
+    expect_true(grepl(case$density, code, fixed = TRUE),
+                label = paste("unnormalised density kept for", lab))
+  }
+})
+
+test_that("the GLM family list is stated once", {
+  # Detection, the transformation gate and the per-line type lookup all
+  # read the same vector, so a seventh form cannot reach one and miss
+  # the others.
+  fams <- mvgam:::mvgam_glm_families
+  expect_length(fams, 6L)
+  expect_true(all(grepl("_glm$", fams)))
+
+  present <- mvgam:::glm_calls_present(
+    "target += poisson_log_glm_lupmf(Y | Xc, Intercept, b);"
+  )
+  expect_named(present, fams)
+  expect_true(present[["poisson_log_glm"]])
+  expect_false(present[["normal_id_glm"]])
+})
+
+test_that("an unidentifiable GLM family is refused, not skipped", {
+  # Returning the line untouched is what let `normalize = FALSE` emit a
+  # program that computed the trend and never used it. A family added
+  # to the list without a transformation must fail loudly instead.
+  block <- list(start_idx = 1L, end_idx = 2L)
+  lines <- c("model {", "  target += mystery_glm_lpmf(Y | Xc, a, b);")
+  expect_error(
+    mvgam:::inject_trends_into_glm_calls(lines, block, "  // trend"),
+    "family could not be identified"
+  )
+
+  # A model block with no GLM call is the ordinary case and passes
+  # through unchanged.
+  plain <- c("model {", "  target += poisson_log_lpmf(Y | mu);")
+  expect_identical(
+    mvgam:::inject_trends_into_glm_calls(plain, block, "  // trend"),
+    plain
+  )
+})
+
+test_that("the two code-generation entry points agree", {
+  # `stancode()` and `standata()` reach the same generator, so an
+  # argument on one and not the other means the pair describes
+  # different models. `standata()` accepted five of these through its
+  # dots while advertising none of them, and restated defaults drift
+  # apart silently because nothing compares them.
+  sc <- formals(mvgam:::stancode.mvgam_formula)
+  sd <- formals(mvgam:::standata.mvgam_formula)
+  expect_setequal(names(sc), names(sd))
+
+  shared <- intersect(names(sc), names(sd))
+  disagreeing <- shared[!vapply(
+    shared, function(n) identical(sc[[n]], sd[[n]]), logical(1L)
+  )]
+  expect_identical(disagreeing, character(0))
+
+  # Every argument they declare has to be one the generator takes, or
+  # it is quietly discarded on the way down.
+  generator <- names(formals(mvgam:::build_stan_components))
+  expect_true(all(setdiff(names(sc), c("object", "...")) %in% generator))
+})

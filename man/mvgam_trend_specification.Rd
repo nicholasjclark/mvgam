@@ -26,10 +26,11 @@ Default "series" with warning when not explicitly specified.}
 \section{Self-Contained Validation Fields}{
 
 \describe{
-\item{validation_rules}{Character vector. Validation rules this trend requires.
-Replaces hard-coded conditionals throughout validation functions.
-Must use approved strings from validation_rule_vocabulary.
-Examples: c("requires_regular_intervals", "supports_factors", "supports_hierarchical")}
+\item{validation_rules}{Character vector of what the trend assumes
+about the data. Only \code{"requires_regular_intervals"} changes what
+mvgam does; the rest record intent. See
+\code{?validation_rules_vocabulary} for which and why.
+Examples: c("requires_regular_intervals", "supports_factors")}
 }
 }
 

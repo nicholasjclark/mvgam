@@ -1079,10 +1079,11 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
 #'
 #' @section Self-Contained Validation Fields:
 #' \describe{
-#'   \item{validation_rules}{Character vector. Validation rules this trend requires.
-#'     Replaces hard-coded conditionals throughout validation functions.
-#'     Must use approved strings from validation_rule_vocabulary.
-#'     Examples: c("requires_regular_intervals", "supports_factors", "supports_hierarchical")}
+#'   \item{validation_rules}{Character vector of what the trend assumes
+#'     about the data. Only `"requires_regular_intervals"` changes what
+#'     mvgam does; the rest record intent. See
+#'     `?validation_rules_vocabulary` for which and why.
+#'     Examples: c("requires_regular_intervals", "supports_factors")}
 #' }
 #'
 #' @section Self-Contained Parameter Monitoring Fields:
@@ -1262,187 +1263,78 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
 #' @author Nicholas J Clark
 NULL
 
-#' Validation Rules Vocabulary
+#' What a trend declares about the data it needs
 #'
 #' @description
-#' Central vocabulary of approved validation rule strings. These constants
-#' prevent typos and provide clear documentation of available validation
-#' behaviors. All validation_rules fields in mvgam_trend objects must use
-#' strings from this vocabulary.
+#' Every `mvgam_trend` object carries a `validation_rules` character
+#' vector saying what the trend's mathematics assumes about the data.
+#' The package reads those declarations directly; there is no rule
+#' engine, and declaring a rule does not by itself cause anything to be
+#' checked.
 #'
-#' @section Time Series Validation Rules:
-#' \describe{
-#'   \item{rule_requires_regular_intervals}{"requires_regular_intervals" - Trend
-#'     requires evenly spaced time points. Used by: AR, VAR, RW, ZMVN, PW.
-#'     Triggers: validate_regular_time_intervals()}
-#'   \item{rule_allows_irregular_intervals}{"allows_irregular_intervals" - Trend
-#'     can handle irregular time spacing. Used by: CAR only.
-#'     Triggers: calculate_car_time_distances(), skips regular interval validation}
+#' Read this before adding a trend type, because only one declaration
+#' currently changes what mvgam does, and the rest are metadata.
+#'
+#' @section What is enforced:
+#' `"requires_regular_intervals"` is the one declaration the fitting
+#' path acts on. `any_trend_requires_regular_intervals()` scans the
+#' trend specifications, and if any of them names it, the observed time
+#' column has to be evenly spaced or validation fails.
+#'
+#' This replaced a hardcoded test for `CAR`, which forced regular
+#' intervals on every other trend including `ZMVN`, whose likelihood is
+#' a multivariate normal indexed by series rather than time and is
+#' therefore exchangeable in time. Declaring the requirement on the
+#' trend rather than special-casing one name is what fixed that.
+#'
+#' @section What is declarative only:
+#' The remaining rules record intent and are read by nothing:
+#' `"allows_irregular_intervals"`, `"supports_factors"`,
+#' `"incompatible_with_factors"`, `"supports_hierarchical"`,
+#' `"incompatible_with_hierarchical"` and
+#' `"requires_minimum_series_count"`. They are worth keeping because
+#' they describe each trend in one place, but do not add one expecting
+#' it to be honoured.
+#'
+#' Factor compatibility in particular is enforced somewhere else
+#' entirely. [register_trend_type()] takes `supports_factors` and
+#' `incompatibility_reason` arguments, and the registry raises the error
+#' when `n_lv` is given to a trend that cannot take it. A trend that
+#' declares `"incompatible_with_factors"` here but registers with
+#' `supports_factors = TRUE` will accept `n_lv` regardless of what this
+#' vector says.
+#'
+#' @section Adding a trend type:
+#' The declarations come from `get_default_validation_rules()`, which
+#' switches on the trend name. A new trend needs, in order:
+#' \enumerate{
+#'   \item a `generate_<name>_trend_stanvars()` function, found by name
+#'     from the registry, that emits the Stan blocks;
+#'   \item a `<name>_trend_properties()` function returning at least
+#'     `supports_factors`, also found by name;
+#'   \item a `forecast_<name>_rcpp()` function if the trend is to be
+#'     forecast;
+#'   \item a branch in `get_default_validation_rules()` if the trend
+#'     needs evenly spaced time, and nothing there otherwise.
 #' }
+#' [register_custom_trend()] covers the same ground explicitly for a
+#' trend defined outside the package.
 #'
-#' @section Factor Model Validation Rules:
-#' \describe{
-#'   \item{rule_supports_factors}{"supports_factors" - Trend compatible with
-#'     factor models (n_lv parameter allowed). Used by: AR, VAR, RW, ZMVN.
-#'     Triggers: validate_factor_compatibility(), allows n_lv specification}
-#'   \item{rule_incompatible_with_factors}{"incompatible_with_factors" - Trend
-#'     cannot be used with factor models. Used by: CAR, PW.
-#'     Triggers: Error when n_lv is specified}
-#' }
-#'
-#' @section Hierarchical Model Validation Rules:
-#' \describe{
-#'   \item{rule_supports_hierarchical}{"supports_hierarchical" - Trend supports
-#'     gr/subgr grouping parameters. Used by: AR, VAR, RW, ZMVN.
-#'     Triggers: validate_grouping_structure(), allows gr/subgr specification}
-#'   \item{rule_requires_hierarchical}{"requires_hierarchical" - Trend requires
-#'     grouping structure. Currently unused, reserved for future trends.}
-#' }
-#'
-#' @section Seasonal Model Validation Rules:
-#' \describe{
-#'   \item{rule_requires_seasonal_period}{"requires_seasonal_period" - Trend
-#'     requires specification of seasonal period parameter. Used by: seasonal AR models.
-#'     Triggers: validate_seasonal_period_specification()}
-#'   \item{rule_supports_multiple_seasonality}{"supports_multiple_seasonality" - Trend
-#'     can handle multiple seasonal periods simultaneously. Used by: multi-seasonal models.
-#'     Triggers: validate_multiple_seasonal_periods()}
-#'   \item{rule_incompatible_with_seasonal_smooths}{"incompatible_with_seasonal_smooths" - Trend
-#'     conflicts with seasonal smooth terms in observation formula. Used by: trends with built-in seasonality.
-#'     Triggers: Error when seasonal smooths detected in observation formula}
-#' }
-#'
-#' @section Data Structure Validation Rules:
-#' \describe{
-#'   \item{rule_requires_balanced_panels}{"requires_balanced_panels" - All series
-#'     must have observations at all time points. Used by: some multivariate models.
-#'     Triggers: validate_balanced_panel_structure()}
-#'   \item{rule_requires_minimum_series_count}{"requires_minimum_series_count" - Trend
-#'     requires minimum number of series for identification. Used by: factor models, some VAR specifications.
-#'     Triggers: validate_minimum_series_count()}
-#' }
-#'
-#' @section Usage in Trend Constructors:
-#' Use these constants when creating validation_rules vectors:
-#' \preformatted{
-#' # Example: Standard AR trend supports regular intervals, factors, and hierarchical models
-#' validation_rules <- c(
-#'   rule_requires_regular_intervals,
-#'   rule_supports_factors,
-#'   rule_supports_hierarchical
-#' )
-#'
-#' # Example: Seasonal AR trend with multiple periods
-#' validation_rules <- c(
-#'   rule_requires_regular_intervals,
-#'   rule_supports_factors,
-#'   rule_supports_hierarchical,
-#'   rule_supports_multiple_seasonality
-#' )
-#'
-#' # Example: CAR trend allows irregular intervals but no factors/hierarchy
-#' validation_rules <- c(
-#'   rule_allows_irregular_intervals,
-#'   rule_incompatible_with_factors
-#' )
-#'
-#' # Example: Factor model requiring minimum series count
-#' validation_rules <- c(
-#'   rule_requires_regular_intervals,
-#'   rule_supports_factors,
-#'   rule_requires_minimum_series_count
-#' )
-#'
-#' # Or use pre-built combinations:
-#' validation_rules <- stationary_trend_rules
-#' validation_rules <- seasonal_trend_rules
-#' }
-#'
-#' @section Rule Interpreter Integration:
-#' These constants map to validation functions in the rule interpreter:
-#' \itemize{
-#'   \item{rule_requires_regular_intervals → validate_regular_time_intervals()}
-#'   \item{rule_supports_factors → validate_factor_compatibility()}
-#'   \item{rule_supports_hierarchical → validate_grouping_structure()}
-#'   \item{rule_incompatible_with_factors → error when n_lv specified}
-#' }
-#'
+#' @seealso [register_trend_type()], [register_custom_trend()]
 #' @name validation_rules_vocabulary
 #' @author Nicholas J Clark
 NULL
 
-# Validation Rules Constants (grouped by category)
-# Time Series Rules
+# The declarations a trend may carry. Only the first is acted on; see
+# `?validation_rules_vocabulary` for which and why.
 rule_requires_regular_intervals <- "requires_regular_intervals"
 rule_allows_irregular_intervals <- "allows_irregular_intervals"
-
-# Factor Model Rules
 rule_supports_factors <- "supports_factors"
 rule_incompatible_with_factors <- "incompatible_with_factors"
-
-# Hierarchical Model Rules
 rule_supports_hierarchical <- "supports_hierarchical"
-rule_requires_hierarchical <- "requires_hierarchical"
 rule_incompatible_with_hierarchical <- "incompatible_with_hierarchical"
-
-# Seasonal Model Rules
-rule_requires_seasonal_period <- "requires_seasonal_period"
-rule_supports_multiple_seasonality <- "supports_multiple_seasonality"
-rule_incompatible_with_seasonal_smooths <- "incompatible_with_seasonal_smooths"
-
-# Data Structure Rules
-rule_requires_balanced_panels <- "requires_balanced_panels"
 rule_requires_minimum_series_count <- "requires_minimum_series_count"
 
-# Validation rules vocabulary
-validation_rule_vocabulary <- c(
-  # Time rules
-  rule_requires_regular_intervals,
-  rule_allows_irregular_intervals,
-  # Factor rules
-  rule_supports_factors,
-  rule_incompatible_with_factors,
-  # Hierarchy rules
-  rule_supports_hierarchical,
-  rule_requires_hierarchical,
-  # Seasonal rules
-  rule_requires_seasonal_period,
-  rule_supports_multiple_seasonality,
-  rule_incompatible_with_seasonal_smooths,
-  # Data structure rules
-  rule_requires_balanced_panels,
-  rule_requires_minimum_series_count
-)
-
-# Pre-built rule combinations for common trend patterns
-stationary_trend_rules <- c(
-  rule_requires_regular_intervals,
-  rule_supports_factors,
-  rule_supports_hierarchical
-)
-
-irregular_trend_rules <- c(
-  rule_allows_irregular_intervals,
-  rule_incompatible_with_factors
-)
-
-changepoint_trend_rules <- c(
-  rule_requires_regular_intervals,
-  rule_incompatible_with_factors
-)
-
-seasonal_trend_rules <- c(
-  rule_requires_regular_intervals,
-  rule_supports_factors,
-  rule_supports_hierarchical,
-  rule_requires_seasonal_period
-)
-
-factor_model_trend_rules <- c(
-  rule_requires_regular_intervals,
-  rule_supports_factors,
-  rule_requires_minimum_series_count
-)
 
 # =============================================================================
 # SECTION 4: TREND VALIDATION AND PARSING
@@ -3263,48 +3155,6 @@ create_mvgam_trend <- function(trend_type, ...,
   return(trend_obj)
 }
 
-#' Validate Trend Dispatch Consistency
-#'
-#' @description
-#' Ensures all trend-related dispatch functions use consistent naming.
-#' This function checks that Stan generation, forecasting, and other
-#' dispatch functions follow the convention: trend_type + function_suffix.
-#'
-#' @param trend_obj mvgam_trend object
-#' @return Logical TRUE if consistent, stops with error if not
-#' @noRd
-validate_trend_dispatch_consistency <- function(trend_obj) {
-  checkmate::assert_class(trend_obj, "mvgam_trend")
-
-  trend_type <- trend_obj$trend
-  if (is.null(trend_type)) {
-    stop("Trend object must have 'trend' field")
-  }
-
-  # Define expected function naming patterns
-  expected_patterns <- list(
-    stanvar_generator = paste0("generate_", tolower(trend_type), "_trend_stanvars"),
-    forecast_function = paste0("forecast_", tolower(trend_type), "_rcpp"),
-    monitor_generator = paste0("generate_", tolower(trend_type), "_monitor_params")
-  )
-
-  # Check forecast metadata if present
-  if (!is.null(trend_obj$forecast_metadata)) {
-    expected_forecast <- expected_patterns$forecast_function
-    actual_forecast <- trend_obj$forecast_metadata$function_name
-
-    if (!is.null(actual_forecast) && actual_forecast != expected_forecast) {
-      stop(insight::format_error(c(
-        "Inconsistent forecast function naming.",
-        x = cli::format_inline("Expected: {.field {expected_forecast}}"),
-        x = cli::format_inline("Got: {.field {actual_forecast}}"),
-        i = "All dispatch functions must follow pattern: trend_type + function_suffix"
-      )))
-    }
-  }
-
-  invisible(TRUE)
-}
 
 #' Get Trend Dispatch Function Name
 #'

@@ -786,15 +786,6 @@ detect_glm_usage <- function(stan_code, response_names = NULL, skip_lines = inte
   checkmate::assert_character(response_names, null.ok = TRUE)
   checkmate::assert_integerish(skip_lines, null.ok = TRUE)
 
-  glm_patterns <- c(
-    "normal_id_glm",
-    "poisson_log_glm",
-    "neg_binomial_2_log_glm",
-    "bernoulli_logit_glm",
-    "ordered_logistic_glm",
-    "categorical_logit_glm"
-  )
-
   # Parse model block and apply skip_lines regardless of response_names
   lines <- strsplit(stan_code, "\n")[[1]]
   
@@ -811,11 +802,7 @@ detect_glm_usage <- function(stan_code, response_names = NULL, skip_lines = inte
   processed_stan_code <- paste(lines, collapse = "\n")
   
   if (is.null(response_names)) {
-    detected <- sapply(glm_patterns, function(pattern) {
-      any(grepl(paste0("target\\s*\\+=.*",
-                       stan_density_call_pattern(pattern)),
-                processed_stan_code))
-    })
+    detected <- glm_calls_present(processed_stan_code)
     return(names(detected)[detected])
   }
 

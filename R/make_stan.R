@@ -264,19 +264,30 @@ build_stan_components <- function(formula, data, family = gaussian(),
   # Filter priors: only pass observation-related priors to observation setup
   obs_priors <- filter_obs_priors(prior)
   
-  if (is.null(obs_setup <- setup_brms_lightweight(
-    formula = obs_formula,
-    data = data,
-    family = family,
-    prior = obs_priors,
+  # What both submodels are built under. Named once, because the two
+  # calls below differ only in their formula, data, family, priors and
+  # stanvars, and an argument added to one and not the other builds the
+  # observation and trend halves under different settings without
+  # saying so.
+  shared_setup <- list(
     data2 = data2,
     codegen = codegen,
     backend = backend,
     threads = threads,
-    stanvars = obs_stanvars,
-    silent = silent,
-    ...
-  ))) {
+    silent = silent
+  )
+
+  if (is.null(obs_setup <- do.call(setup_brms_lightweight, c(
+    list(
+      formula = obs_formula,
+      data = data,
+      family = family,
+      prior = obs_priors,
+      stanvars = obs_stanvars
+    ),
+    shared_setup,
+    list(...)
+  )))) {
     stop(insight::format_error(c(
       "Failed to setup observation model with brms.",
       i = cli::format_inline(
@@ -320,24 +331,26 @@ build_stan_components <- function(formula, data, family = gaussian(),
     mv_spec <- components$enhanced_mv_spec  # Already has dimensions injected
     trend_metadata <- components$metadata
     
-    if (is.null(trend_result <- setup_brms_lightweight(
-      formula = mv_spec$base_formula,
-      data = trend_data,  # Use reduced trend data
-      family = gaussian(), # Trends are gaussian processes per architecture
-      prior = remove_trend_suffix_from_priors(trend_priors, mv_spec$trend_specs, mv_spec$base_formula, trend_data),
-      data2 = data2,
-      codegen = codegen,
-      backend = backend,
-      threads = threads,
-      stanvars = trend_stanvars_in,
-      silent = silent,
-      # Mark this as the trend invocation so
-      # setup_brms_lightweight() skips the empty-obs-formula
-      # placeholder injection (the injected pin assignment would
-      # be orphaned by mvgam's downstream trend-stancode rewriter).
-      is_trend_setup = TRUE,
-      ...
-    ))) {
+    if (is.null(trend_result <- do.call(setup_brms_lightweight, c(
+      list(
+        formula = mv_spec$base_formula,
+        data = trend_data,  # Use reduced trend data
+        # Trends are gaussian processes per architecture
+        family = gaussian(),
+        prior = remove_trend_suffix_from_priors(
+          trend_priors, mv_spec$trend_specs, mv_spec$base_formula,
+          trend_data
+        ),
+        stanvars = trend_stanvars_in,
+        # Mark this as the trend invocation so
+        # setup_brms_lightweight() skips the empty-obs-formula
+        # placeholder injection (the injected pin assignment would
+        # be orphaned by mvgam's downstream trend-stancode rewriter).
+        is_trend_setup = TRUE
+      ),
+      shared_setup,
+      list(...)
+    )))) {
       stop(insight::format_error(c(
         "Failed to setup trend model with brms.",
         i = cli::format_inline(
@@ -598,7 +611,7 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
                                    backend = "rstan",
                                    threads = getOption("mc.cores", 1),
                                    normalize = TRUE, save_model = NULL,
-                                   silent = 1L,
+                                   silent = 1L, stanvars = NULL,
                                    validate = TRUE, ...) {
   reject_removed_args(list(...), fn = "stancode")
 
@@ -608,7 +621,7 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
     data2 = data2, sample_prior = sample_prior,
     knots = knots, drop_unused_levels = drop_unused_levels,
     backend = backend, threads = threads, normalize = normalize,
-    save_model = save_model, silent = silent,
+    save_model = save_model, silent = silent, stanvars = stanvars,
     validate = validate,
     ...
   )
@@ -652,8 +665,19 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
 #'   Default is \code{TRUE}.
 #' @param stanvars Optional \code{stanvars} object containing additional Stan
 #'   variables, parameters, or functions.
+#' @param backend Character string specifying Stan backend. Options:
+#'   \code{"rstan"} (default) or \code{"cmdstanr"}.
 #' @param threads Number of threads to use for parallelization. Default is
 #'   \code{getOption("mc.cores", 1)}.
+#' @param normalize Logical; should brms drop the normalising constants
+#'   from its sampling statements? Default is \code{TRUE}.
+#' @param save_model File path to write the assembled Stan program to.
+#'   If \code{NULL} (default), nothing is written.
+#' @param silent Integer controlling verbosity, following the \pkg{brms}
+#'   convention. 0 prints Stan's exceptions as well as its progress, 1
+#'   (the default) prints progress alone, and 2 prints nothing.
+#' @param validate Logical; should the assembled Stan code be validated?
+#'   Default is \code{TRUE}.
 #' @param ... Additional arguments passed to internal functions.
 #'
 #' @return A named list containing all data for Stan model including observation
@@ -677,9 +701,11 @@ standata.mvgam_formula <- function(object, data, family = gaussian(),
                                    prior = NULL, data2 = NULL,
                                    sample_prior = "no",
                                    knots = NULL, drop_unused_levels = TRUE,
-                                   stanvars = NULL,
+                                   backend = "rstan",
                                    threads = getOption("mc.cores", 1),
-                                   ...) {
+                                   normalize = TRUE, save_model = NULL,
+                                   silent = 1L, stanvars = NULL,
+                                   validate = TRUE, ...) {
   reject_removed_args(list(...), fn = "standata")
 
   # Generate all Stan components using shared function
@@ -687,7 +713,9 @@ standata.mvgam_formula <- function(object, data, family = gaussian(),
     formula = object, data = data, family = family, prior = prior,
     data2 = data2, sample_prior = sample_prior,
     knots = knots, drop_unused_levels = drop_unused_levels,
-    stanvars = stanvars, threads = threads, ...
+    backend = backend, threads = threads, normalize = normalize,
+    save_model = save_model, silent = silent, stanvars = stanvars,
+    validate = validate, ...
   )
 
   # Validate and return standata component
