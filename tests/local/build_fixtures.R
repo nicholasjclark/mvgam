@@ -722,5 +722,38 @@ fit_brms_cached("nl_trait", nl_trait_form,
 fit_mvgam_cached("nl_trait", nl_trait_form, NULL,
   nl_trait_data, gaussian(), prior = nl_trait_pri)
 
+# ----------------------------------------------------------------------
+# NORMALIZE PAIR — the same data fitted with and without the
+# normalising constants. `normalize` changes only what Stan adds to
+# `target`, so the two posteriors have to agree. They did not: the GLM
+# path recognised only the normalised `_lpmf` spelling when naming the
+# family, so under `normalize = FALSE` the trend was computed and never
+# added to the linear predictor, and the fit ran clean while modelling
+# no trend at all. Text checks on the Stan cannot catch that; two fits
+# and a comparison can.
+# ----------------------------------------------------------------------
+
+cat("\n[19] normalize = TRUE / FALSE pair\n")
+set.seed(101)
+norm_n_time <- 40L
+norm_n_series <- 3L
+norm_latent <- as.numeric(arima.sim(list(ar = 0.8), norm_n_time)) * 0.8
+norm_data <- data.frame(
+  time = rep(seq_len(norm_n_time), norm_n_series),
+  series = factor(rep(paste0("s", seq_len(norm_n_series)),
+                      each = norm_n_time)),
+  x1 = rnorm(norm_n_time * norm_n_series)
+)
+# Real amplitude on the latent process, so a fit that drops the trend
+# cannot resemble one that keeps it.
+norm_data$y <- rpois(
+  nrow(norm_data),
+  exp(1.0 + 0.4 * norm_data$x1 + rep(norm_latent, norm_n_series))
+)
+fit_mvgam_cached("normalize_on", y ~ x1, ~ AR(p = 1),
+  norm_data, poisson(), normalize = TRUE, seed = 7)
+fit_mvgam_cached("normalize_off", y ~ x1, ~ AR(p = 1),
+  norm_data, poisson(), normalize = FALSE, seed = 7)
+
 cat("\n=== All fixtures present in", FIXTURE_DIR, "===\n")
 cat("Files: ", length(list.files(FIXTURE_DIR, pattern = "\\.rds$")), "\n")
