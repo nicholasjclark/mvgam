@@ -196,13 +196,24 @@ fit_correct <- mvgam(
 )
 ```
 
+```{r recovery-values, echo = FALSE}
+post_sum <- posterior::summarise_draws(as_draws_df(fit_correct), "mean")
+grab <- function(pat) {
+  round(post_sum$mean[grepl(pat, post_sum$variable)], 2)
+}
+ar1_est <- grab("^ar1_trend\\[")
+sig_est <- grab("^sigma_trend\\[")
+obs_sd <- grab("^sigma$")
+```
+
 `summary()` reports the AR coefficient and innovation SD for each of
 the three trends alongside the observation intercept and residual
-SD. The posterior means sit inside the 95% CIs of the simulated
-truth: `ar1_trend` recovers to (0.72, 0.07, 0.46) against truth
-(0.85, 0.15, 0.55). `sigma_trend` recovers to (0.54, 0.34, 0.82)
-against truth (0.5, 0.35, 0.8). Residual observation SD lands at
-0.20, exactly the value used to generate the data.
+SD. Every simulated value falls inside its 95% credible interval:
+`ar1_trend` recovers to (`r paste(ar1_est, collapse = ", ")`) against
+a truth of (0.85, 0.15, 0.55), and `sigma_trend` to
+(`r paste(sig_est, collapse = ", ")`) against (0.5, 0.35, 0.8). The
+residual observation SD lands at `r obs_sd`, the value used to
+generate the data.
 
 ```{r summary}
 summary(fit_correct)
@@ -344,20 +355,29 @@ scores_tbl <- rbind(
 round(scores_tbl, 2)
 ```
 
-The correct-loadings fit wins on all three metrics. The log score
-gap is the sharpest: 94 for the correct fit versus 112 for the
-misspecified `"shared"` fit, a 19% degradation. Almost all of that
-comes from series 4-6, whose true dynamics are washed out when
-their observations are pooled onto the dominant long-memory trend.
-The per-series log score for series 4 goes from 4.6 under the
-correct fit to 11.2 under `"shared"`, a factor of 2.4.
+```{r score-summary, echo = FALSE}
+logs_gap <- round(100 * (scores_tbl["shared", "logs"] /
+                           scores_tbl["correct", "logs"] - 1))
+free_rank <- vapply(colnames(scores_tbl), function(m) {
+  unname(rank(scores_tbl[, m])["free"])
+}, numeric(1))
+free_worst <- names(free_rank)[free_rank == 3]
+```
 
-The free-loadings fit sits between the correct and misspecified
-fits on all three metrics. It captures the right latent shapes but
-pays a moderate score cost for jointly identifying $Z$ with the
+The correct-loadings fit wins on all three metrics. The log score
+gap is the sharpest, `r round(scores_tbl["correct", "logs"])` for the
+correct fit against `r round(scores_tbl["shared", "logs"])` for the
+misspecified `"shared"` fit, worse by `r logs_gap`%. That comes from
+series 4-6, whose dynamics are washed out when their observations
+are pooled onto the dominant long-memory trend.
+
+The free-loadings fit does not simply sit between the other two. It
+beats `"shared"` on the log score but comes last on
+`r paste(free_worst, collapse = " and ")`. It recovers the right
+latent shapes, but it pays for identifying $Z$ jointly with the
 trend parameters, and the QR rotation spreads variance across
-factors in a way that does not exactly match the sharing structure
-used to generate the data.
+factors in a way that does not match the sharing structure used to
+generate the data.
 
 The practical takeaway is that a held-out forecast score is a
 useful diagnostic on the sharing structure itself. When two

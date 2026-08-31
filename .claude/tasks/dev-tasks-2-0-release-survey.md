@@ -1016,6 +1016,48 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > fits the pair and holds their posteriors together, since text
   > assertions on the program are what missed this.
 
+- [x] **5.1 The nmix article had never run**
+  > Its chunks were live but nothing had ever executed them, so no
+  > claim in it had been checked. It reported R-hat of 1.00 directly
+  > beneath a table showing 1.01, described `conditional_effects()`
+  > panels the figure did not contain, called a 50% interval covering
+  > 87.5% "slightly over-wide", and mischaracterised which parameters
+  > carried the recovery bias.
+  >
+  > Running it turned up two package defects that had been shipping.
+  > `hindcast(type = "latent_state")` rebuilt the closure-unit grid and
+  > sorted it series-major while the kernel numbers units by first
+  > appearance over time-major data, so every unit on a multi-series
+  > `nmix()` or `occ()` fit was attributed to the wrong species and
+  > year. A posterior median of 3 animals sat in a unit where 21 had
+  > been counted, which the binomial likelihood forbids. Fixed at
+  > source: the arrays now record the grid they numbered, so two
+  > functions no longer derive one ordering separately. And
+  > `summary()` halved the reported `iter` and `warmup`, deriving
+  > warmup as `floor(niter / 2)` rather than reading the sampler's own
+  > arguments.
+  >
+  > Rewritten against the 1.x simulation with the 2.0
+  > `bf(y ~ ..., p ~ ...)` syntax, which retires the `trend_map`
+  > section. Every number in the prose is inline R computed from the
+  > fit. The goodness-of-fit section is gone: the 1.x simulation fixes
+  > `N` rather than drawing it from a Poisson, so the check correctly
+  > reports under-dispersion, and a short how-to should not have to
+  > explain away a failing diagnostic.
+
+- [ ] **5.2 Three CRAN vignettes render with no output on the website**
+  > `data.Rmd`, `dfm.Rmd` and `mvgam_overview.Rmd` gate every chunk on
+  > `params$EVAL`, which reads `NOT_CRAN`. That gate is right for CRAN,
+  > where a vignette must not fit Stan models. But
+  > `.github/workflows/pkgdown.yaml` never sets `NOT_CRAN` either, so
+  > the published site shows all three as code listings with no
+  > results, and their code has never run in CI.
+  >
+  > 5.1 is the reason this matters: the one article whose chunks had
+  > never executed was hiding two package bugs and four false claims.
+  > Each of these three needs rendering with the gate open before the
+  > workflow sets it, or a silent gap becomes a failing site build.
+
 - [ ] **5.0 Rebuild every vignette and the pkgdown site**
   > Caches date from June and July, before the prior and default
   > changes. Roughly 60 numeric claims need re-checking, and
