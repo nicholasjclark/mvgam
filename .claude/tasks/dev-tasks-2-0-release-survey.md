@@ -1167,6 +1167,17 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > Caches date from June and July, before the prior and default
   > changes. Roughly 60 numeric claims need re-checking, and
   > `nmix.Rmd` has never rendered its chunks at all.
+  >
+  > Install from HEAD before rendering anything. Every article
+  > calls `library(mvgam)`, so it renders against the installed
+  > build rather than the working tree, and the installed build
+  > carries the same `2.0.0` version string as HEAD whatever its
+  > age. Nothing warns. The build found in place during 5.5 dated
+  > from 24 July and still scored the marginal likelihood, so the
+  > article re-rendered to its original numbers and looked
+  > consistent with prose written against them. A refit alone does
+  > not fix this, because `lfo_cv()` and every post-fit call in
+  > the article run through the installed code as well.
 
 - [ ] **6.0 Final release verification**
   > Clean `document()`, clean test sweep, `R CMD check --as-cran`,

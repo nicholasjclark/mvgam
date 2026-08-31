@@ -301,9 +301,10 @@ plot(fc_var, series = 1)
 ```
 
 The VAR forecast tracks the observed DM captures with bands that
-widen out by ~6 months. That is the canonical signature of a
-stationary AR process whose forecast variance asymptotes to the
-marginal variance.
+widen over the first half of the horizon and then level off.
+That is the signature of a stationary process: forecast variance
+climbs towards the marginal variance and stops there, rather
+than growing without bound the way a random walk's would.
 
 For likelihood-based scoring (ELPD) we also need a link-scale
 forecast object:
@@ -462,6 +463,16 @@ eband <- function(m) {
 esp <- eband("fc_spline")
 ear <- eband("fc_ar")
 evr <- eband("fc_var")
+# Forecast draws are stochastic, so count the horizons rather
+# than asserting a margin that could flip between renders.
+epair <- merge(
+  ej[ej$model == "fc_ar", c("eval_horizon", "score")],
+  ej[ej$model == "fc_var", c("eval_horizon", "score")],
+  by = "eval_horizon", suffixes = c("_ar", "_var")
+)
+epair <- epair[stats::complete.cases(epair), ]
+e_ar_wins <- sum(epair$score_ar < epair$score_var)
+e_n_h <- nrow(epair)
 ```
 
 Read the spline column first. Its energy score climbs from
@@ -471,10 +482,10 @@ the four series with every step ahead. The AR and VAR models
 stay flat over the same window, spanning `r ear[1]` to
 `r ear[2]` and `r evr[1]` to `r evr[2]`, with the latent
 dynamics holding the joint forecast in place. AR and VAR run
-close, AR edging VAR at most horizons beyond the second. On
-these data and at this horizon the modelled cross-species
-correlations add no detectable benefit to the joint forecast,
-and the simpler AR is the better buy.
+close, AR scoring lower at `r e_ar_wins` of the `r e_n_h`
+horizons. On these data and over this window the modelled
+cross-species correlations add no detectable benefit to the
+joint forecast, and the simpler AR is the better buy.
 
 This is the first comparison in the article to separate the
 models decisively, and it disagrees with the per-series CRPS
