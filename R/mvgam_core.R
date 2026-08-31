@@ -10,6 +10,61 @@
 # single datasets and multiple imputation scenarios transparently, ensuring
 # consistent behavior across different input types.
 
+# Arguments mvgam 1.x took that 2.0 does not, each paired with the
+# 2.0 way of asking for the same thing. They are refused rather than
+# ignored because every one names a modelling choice: left in `...`
+# they reach brms, which drops what it does not recognise, and the
+# model that comes back is not the model that was asked for.
+mvgam_removed_args <- c(
+  share_obs_params = paste0(
+    "the observation family's parameters are shared across series by ",
+    "default; for one set per series, write a distributional formula ",
+    "such as 'bf(y ~ x, sigma ~ series)'"
+  ),
+  trend_model = paste0(
+    "trend constructors are written inside 'trend_formula', as in ",
+    "'trend_formula = ~ AR(p = 1)'"
+  ),
+  trend_knots = paste0(
+    "knot values are named by covariate rather than by formula, so ",
+    "'knots' is the one argument for the model"
+  ),
+  use_lv = paste0(
+    "a dynamic factor model is requested with 'n_lv' on the trend ",
+    "constructor, as in 'trend_formula = ~ AR(p = 1, n_lv = 3)'"
+  ),
+  noncentred = "the trend parameterisation is chosen by mvgam",
+  prior_simulation = "use 'sample_prior = \"only\"'",
+  return_model_data = "use 'standata()' on the fitted model",
+  save_all_pars = "every sampled parameter is kept",
+  parallel = "use 'cores', which brms passes to the backend"
+)
+
+# Reason: this runs on the dots of `mvgam()`, the one call every
+# fitting path funnels through, `jsdgam()` included.
+reject_removed_args <- function(dots) {
+  found <- intersect(names(mvgam_removed_args), names(dots))
+  if (!length(found)) {
+    return(invisible(NULL))
+  }
+  stop(insight::format_error(c(
+    cli::format_inline(
+      "{.fn mvgam} no longer takes {.arg {found}}."
+    ),
+    x = cli::format_inline(
+      "{cli::qty(found)}{?This argument was/These arguments were} ",
+      "removed in mvgam 2.0."
+    ),
+    i = paste0(
+      paste0(
+        "For '", found, "', ", mvgam_removed_args[found],
+        collapse = ". "
+      ),
+      "."
+    )
+  )))
+}
+
 # Internal: translate the deprecated `samples` / `burnin` argument
 # pair to the brms-style `iter` / `warmup` pair. Historical mvgam
 # roxygen examples used `samples` (post-warmup draws) and `burnin`
@@ -493,6 +548,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   # consume. See `translate_samples_burnin()` for the mapping and
   # deprecation rationale.
   dots <- translate_samples_burnin(list(...))
+  reject_removed_args(dots)
   if (attr(dots, "translated", exact = TRUE)) {
     attr(dots, "translated") <- NULL
     return(do.call(

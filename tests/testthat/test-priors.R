@@ -816,6 +816,14 @@ prior_test_data <- function() {
   d
 }
 
+grouped_prior_test_data <- function() {
+  set.seed(1)
+  d <- expand.grid(time = 1:60, series = factor(paste0("s", 1:4)))
+  d$grp <- factor(rep(c("a", "a", "b", "b"), each = 60))
+  d$y <- rpois(nrow(d), 5)
+  d
+}
+
 prior_code <- function(mf, fam, pr = NULL, data = prior_test_data()) {
   paste(unlist(stancode(mf, data = data, family = fam, prior = pr,
                         backend = "cmdstanr")), collapse = "\n")
@@ -961,19 +969,6 @@ test_that("nu_trend appears for every trend type that supports df", {
 # it was discarded without a word.
 
 
-test_that("both prior resolvers agree on every shared default", {
-  # One reads for the Stan generator, the other builds the table the
-  # user is shown. They must not answer differently.
-  ar <- AR(p = 1)
-  ar$dimensions <- list(n_series = 3L)
-  for (par in names(mvgam:::common_trend_priors)) {
-    from_codegen <- mvgam:::get_trend_parameter_prior(NULL, par)
-    from_table <- mvgam:::get_default_trend_parameter_prior(par, ar)$prior
-    expect_identical(from_codegen, from_table)
-  }
-})
-
-
 test_that("every shared default names a distribution", {
   # `LV` sat here with a default for a parameter the generator never
   # emits, reachable only from a function with no caller.
@@ -983,21 +978,84 @@ test_that("every shared default names a distribution", {
 })
 
 
+# The trend a model is written with decides which parameters it
+# samples, so a prior that goes missing goes missing for one trend
+# type alone. Checking a single AR fit is what let `delta_trend` and
+# the four VARMA hyperpriors sit blank in the reported table while the
+# Stan sampled them under real priors. The parsing is the package's
+# own `mvgam_stancode_prior_rows()`, the same reader the fitted object
+# uses, rather than a regex written a second time for the test.
+trend_formulas_by_type <- list(
+  AR = list(obs = y ~ 1, trend = ~ AR(p = 1, cor = TRUE)),
+  RW = list(obs = y ~ 1, trend = ~ RW()),
+  VAR = list(obs = y ~ 1, trend = ~ VAR(p = 1, cor = TRUE)),
+  VARMA = list(obs = y ~ 1, trend = ~ VAR(p = 1, ma = TRUE, cor = TRUE)),
+  ZMVN = list(obs = y ~ 1, trend = ~ ZMVN()),
+  CAR = list(obs = y ~ 1, trend = ~ CAR()),
+  # PW's own offset competes with an observation intercept, which
+  # warns; the no-intercept form is the identified one.
+  PW = list(obs = y ~ -1, trend = ~ PW()),
+  factor = list(obs = y ~ 1, trend = ~ AR(p = 1, n_lv = 2)),
+  hierarchical = list(obs = y ~ 1,
+                      trend = ~ AR(p = 1, gr = grp, cor = TRUE))
+)
+
 test_that("the trend priors reported are the ones sampled", {
-  mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1, cor = TRUE))
-  code <- prior_code(mf, poisson())
-  tab <- as.data.frame(get_prior(mf, data = prior_test_data(),
-                                  family = poisson()))
-  sampled <- grep("^\\s*[A-Za-z_0-9]+_trend\\s*~", strsplit(code, "\n")[[1]],
-                  value = TRUE)
-  expect_gt(length(sampled), 0L)
-  for (line in trimws(sampled)) {
-    par <- sub("\\s*~.*", "", line)
-    dist <- trimws(sub(";.*", "", sub(".*~\\s*", "", line)))
-    reported <- tab$prior[tab$class == par]
-    expect_true(length(reported) > 0L)
-    expect_true(dist %in% reported)
+  for (type in names(trend_formulas_by_type)) {
+    spec <- trend_formulas_by_type[[type]]
+    dat <- if (type == "hierarchical") {
+      grouped_prior_test_data()
+    } else {
+      prior_test_data()
+    }
+    mf <- mvgam_formula(spec$obs, trend_formula = spec$trend)
+    tab <- as.data.frame(get_prior(mf, data = dat, family = poisson()))
+    sampled <- mvgam:::mvgam_stancode_prior_rows(
+      prior_code(mf, poisson(), data = dat)
+    )
+    expect_gt(length(sampled), 0L)
+    for (row in sampled) {
+      reported <- tab$prior[tab$class == row$class]
+      expect_true(length(reported) > 0L)
+      expect_true(row$prior %in% reported)
+    }
   }
+})
+
+
+test_that("a prior a trend argument sets is reported with that value", {
+  # `delta_trend`'s scale is the user's own `changepoint_scale`, so it
+  # is the one default the shared registry cannot hold.
+  reported_delta <- function(scale) {
+    mf <- mvgam_formula(y ~ -1,
+                        trend_formula = ~ PW(changepoint_scale = scale))
+    tab <- as.data.frame(get_prior(mf, data = prior_test_data(),
+                                    family = poisson()))
+    tab$prior[tab$class == "delta_trend"]
+  }
+  expect_identical(reported_delta(0.05), "double_exponential(0, 0.05)")
+  expect_identical(reported_delta(0.4), "double_exponential(0, 0.4)")
+})
+
+
+test_that("a user prior reaches the parameters that reported nothing", {
+  # Each of these was resolved from a literal at the emission site, so
+  # the user's own value never entered the Stan.
+  mf <- mvgam_formula(y ~ 1,
+                      trend_formula = ~ VAR(p = 1, ma = TRUE, cor = TRUE))
+  user <- brms::prior_string("normal(0, 3)", class = "Amu_trend") +
+    brms::prior_string("gamma(5, 2)", class = "Domega_trend")
+  code <- prior_code(mf, poisson(), pr = user)
+  expect_true(grepl("Amu_trend[lag] ~ normal(0, 3)", code, fixed = TRUE))
+  expect_true(grepl("Domega_trend[1, 1] ~ gamma(5, 2)", code, fixed = TRUE))
+
+  pw <- mvgam_formula(y ~ -1, trend_formula = ~ PW())
+  pw_user <- brms::prior_string("double_exponential(0, 1)",
+                                class = "delta_trend")
+  expect_true(grepl(
+    "to_vector(delta_trend) ~ double_exponential(0, 1)",
+    prior_code(pw, poisson(), pr = pw_user), fixed = TRUE
+  ))
 })
 
 

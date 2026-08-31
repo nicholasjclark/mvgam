@@ -538,23 +538,84 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > test asserts the set equals `formals(mvgam)` minus the two the
   > call supplies itself.
 
-- [ ] **3.6 Three documented `jsdgam()` arguments do nothing**
-  > `share_obs_params` is forwarded to a name nothing consumes, and is
-  > documented. `factor_knots` is forwarded as `trend_knots`, which
-  > nothing consumes either. The wrapper also pins
-  > `trend_model = ZMVN(cor = TRUE, subgr = "series")`, which the
-  > default branch overrides, which is why a fitted jsdgam carries
-  > `subgr = "NA"`.
+- [x] **3.6 Three documented `jsdgam()` arguments do nothing**
+  > All three were forwarded to names `mvgam()` has no formal for, so
+  > each landed in `...` and was dropped without a word.
+  >
+  > `share_obs_params` was a 1.x argument for a 1.x model. Master gave
+  > every series its own family parameter and used the flag to collapse
+  > them; brms gives one shared parameter and reaches per-series ones
+  > through a distributional sub-formula, so the argument inverts the
+  > 2.0 default and has nothing to implement.
+  >
+  > `factor_knots` was forwarded as `trend_knots`, which master had as
+  > a real formal and 2.0 does not. Knot values are named by covariate
+  > rather than by formula, so the split the two arguments encoded is
+  > not one 2.0 needs. Removed. Checking that `knots` covers the
+  > smooths on both formulas is what turned up 3.11.
+  >
+  > The pinned `trend_model = ZMVN(cor = TRUE, subgr = "series")` was
+  > the luckiest of the three. Had it ever landed the fit would have
+  > failed outright, since `subgr` without `gr` is refused at
+  > `validate_grouping_arguments()`. It also asked for nothing the
+  > default gives: `factor_formula = ~ -1` resolves to `ZMVN()`, whose
+  > `cor` cannot be anything but `TRUE`.
+  >
+  > Nine 1.x arguments were being swallowed this way, `trend_model`
+  > among them, which is the one a user is most likely to write.
+  > `mvgam_removed_args` names each with the 2.0 way of asking for the
+  > same thing and `reject_removed_args()` refuses them in `mvgam()`,
+  > the call every fitting path funnels through, `jsdgam()` included.
+  > A test asserts no name in the table is still a formal of either
+  > function, since that would make the refusal unreachable.
 
-- [ ] **3.7 The specification prior table has blank rows**
-  > The fitted object now reports what the compiled model samples.
-  > `get_prior()` on a specification reads the trend registry instead,
-  > and five parameters have no entry there: `PW()`'s `delta_trend`
-  > against `double_exponential(0, 0.05)` in the Stan, and
-  > `VAR(ma = TRUE)`'s `Amu_trend`, `Aomega_trend`, `Dmu_trend` and
-  > `Domega_trend` against the normal and gamma priors it emits. Same
-  > defect as `sigma_trend` carried, on the mirror path: a reader
-  > deciding what to override sees nothing to override.
+- [x] **3.7 The specification prior table has blank rows**
+  > Reproduced first: `PW()` reported nothing for `delta_trend` while
+  > the Stan sampled it under `double_exponential(0, 0.05)`, and
+  > `VAR(ma = TRUE)` reported nothing for `Amu_trend`, `Aomega_trend`,
+  > `Dmu_trend` or `Domega_trend` against the normal and gamma priors
+  > it emits. Same defect `sigma_trend` carried in 3.1, on the mirror
+  > path: a reader deciding what to override saw nothing to override.
+  >
+  > The cause was two resolver chains rather than a missing entry.
+  > `get_trend_parameter_prior()` read defaults for the Stan generator
+  > and `get_default_trend_parameter_prior()` built the table the user
+  > is shown, and each emission site carried its own literal fallback
+  > the table knew nothing about. There is one chain now: the codegen
+  > reader takes the user's prior where there is one and asks the
+  > table's resolver for everything else, so the two surfaces cannot
+  > answer differently.
+  >
+  > The four VARMA hyperpriors are registry entries. `delta_trend` is
+  > not, because its scale is the user's own `changepoint_scale`
+  > argument; it resolves through `get_pw_parameter_prior()`, the same
+  > `get_<trend>_parameter_prior()` convention `AR()` and `CAR()`
+  > already use for their bounds. Seven literal fallbacks went with
+  > them, two of which restated registry entries that happened still
+  > to agree. Two more sat beside those, defaulting `n_changepoints`
+  > to 5 and `changepoint_scale` to 0.1 where `PW()` sets 10 and 0.05;
+  > both were dead, and both are gone rather than corrected, since the
+  > constructor is the one source.
+  >
+  > Found while testing the fix: `init_trend` was reaching fitted
+  > prior tables. It holds the states before the first observed time
+  > and is drawn from the stationary distribution the autoregression
+  > implies, so its statement is a function of `A_trend` and
+  > `Sigma_trend`, not a prior anyone can set. It is a state and now
+  > sits with the others the scanner excludes. The list carries tests
+  > for what it lifts and, until now, none for what it leaves, so any
+  > new state ending in `_trend` walks straight through. One test now
+  > asserts every name on the list stays out even when the Stan hands
+  > it a sampling statement.
+  >
+  > The test that guarded this was a loop over the shared defaults
+  > asserting the two resolvers agreed, which one chain makes
+  > tautological, plus a reported-equals-sampled check on a single
+  > `AR()` fit. Both are replaced by one loop running that check over
+  > nine trend configurations, parsing the Stan with the package's own
+  > `mvgam_stancode_prior_rows()` rather than a regex written a second
+  > time for the test. A trend type is where this defect hides, so the
+  > coverage had to be per trend type.
 
 - [ ] **3.8 A fit does not record what it was built from**
   > What 3.3 and 3.4 both stop at. A fitted object keeps the values
@@ -711,6 +772,58 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > column names and every fit carrying a structured loadings prior
   > stops being readable. `N_free_Z` puts its qualifier before the
   > noun where every sibling puts it after.
+
+- [ ] **3.11 Seven documented arguments never reach brms**
+  > `build_stan_components()` threads `knots`, `sample_prior`,
+  > `sparse`, `normalize`, `drop_unused_levels`, `stan_funs` and
+  > `save_model` into `setup_brms_lightweight()`, whose `...` collects
+  > them. Its `brms::brm()` call then names every argument it passes
+  > and reads the dots for `threads` alone, so all seven are dropped.
+  > The same shape as 3.3 and 3.5: a call that names its arguments
+  > while the caller believes the dots carry the rest.
+  >
+  > Shown for `knots` by comparing the emitted `standata`.
+  > `brms::make_standata()` on `y ~ s(elev, bs = "cr", k = 5)` gives a
+  > different `Xs` and `Zs_1_1` with and without knots;
+  > `standata.mvgam_formula()` gives the same matrices either way, on
+  > the observation and trend formulas alike. Naming `dots$knots` in
+  > the prefit call fixes the trend side alone, because the
+  > observation Stan data is rebuilt by `brms::make_standata()` in
+  > `R/stan_assembly.R:1913`, which has no `knots` parameter to pass.
+  > A partial fix is worse than none here, so the one-line change was
+  > reverted; the argument needs threading through the base stancode
+  > and standata generators together.
+  >
+  > This also settles 3.3's reasoning. It withheld `knots`,
+  > `sample_prior`, `sparse`, `normalize`, `drop_unused_levels` and
+  > `stan_funs` from `update()` on the grounds that a fit stores none
+  > of them. It stores none of them because none of them ever did
+  > anything, which makes six of 3.8's arguments cheaper than they
+  > looked: the storage is only worth adding once the values reach
+  > brms.
+
+- [ ] **3.9 `?mvgam-class` describes the 1.x object**
+  > Found while checking whether the arguments 3.6 removed left stale
+  > slot documentation behind. They did, and so did most of the rest
+  > of the page. Of the 22 slots it documents, 17 are absent from a
+  > cached 2.0 fit, `drift`, `use_lv`, `n_lv`, `model_output`,
+  > `model_file`, `monitor_pars`, `mgcv_model`, `ytimes`, `resids` and
+  > `upper_bounds` among them, two of them described in terms of a
+  > `return_model_data` argument 2.0 does not take. Twenty-three slots
+  > a fit does carry are undocumented, including `fit`, `stancode`,
+  > `standata`, `mv_spec`, `trend_metadata` and `criteria`. The page
+  > needs writing against the object rather than patching.
+
+- [ ] **3.10 `info =` in expectations across six test files**
+  > CLAUDE.md rules it out and testthat's expectations do not take it.
+  > Roughly twenty sites, fourteen of them in
+  > `tests/testthat/test-priors.R` and the rest spread over
+  > `test-mvgam-formula.R`, `test-setup-brms.R`, `test-trend-registry.R`,
+  > `test-trend-dispatcher.R` and `test-mu-expression-classification.R`.
+  > Most span several lines, so the message becomes a comment above
+  > the expectation rather than a deletion. Left out of 3.7's commit
+  > deliberately: it is a mechanical sweep of tests that commit does
+  > not otherwise touch.
 
 - [ ] **5.0 Rebuild every vignette and the pkgdown site**
   > Caches date from June and July, before the prior and default

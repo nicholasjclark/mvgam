@@ -5335,9 +5335,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # dimensionality check.
   varma_ma_priors <- if (is_varma) {
     dmu_user_prior <- get_trend_parameter_prior(prior, "Dmu_trend")
-    if (!nzchar(dmu_user_prior)) dmu_user_prior <- "normal(0.0, 1.0)"
     domega_user_prior <- get_trend_parameter_prior(prior, "Domega_trend")
-    if (!nzchar(domega_user_prior)) domega_user_prior <- "gamma(2.0, 1.0)"
     paste0(
       "      // Hierarchical priors for VARMA MA coefficient matrices (D_raw_trend)\n",
       "      // Following same structure as VAR coefficients but conditional on ma_lags > 0\n",
@@ -5381,13 +5379,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # `Amu_trend ~ ...;` and trip Stan's dimensionality check (the
   # parameter is declared array[2] vector[lags]).
   amu_user_prior <- get_trend_parameter_prior(prior, "Amu_trend")
-  if (!nzchar(amu_user_prior)) {
-    amu_user_prior <- "normal(0, sqrt(0.455))"
-  }
   aomega_user_prior <- get_trend_parameter_prior(prior, "Aomega_trend")
-  if (!nzchar(aomega_user_prior)) {
-    aomega_user_prior <- "gamma(1.365, 0.071175)"
-  }
   
   var_model_stanvar <- brms::stanvar(
     name = "var_model",
@@ -6091,8 +6083,12 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
 
   # Extract key parameters
   n_lv <- trend_specs$n_lv %||% 1
-  n_changepoints <- trend_specs$n_changepoints %||% 5
-  changepoint_scale <- trend_specs$changepoint_scale %||% 0.1
+  # `PW()` sets each of these, so reading them straight off the spec
+  # keeps one source. The fallbacks that used to sit here named 5 and
+  # 0.1 against the constructor's 10 and 0.05; the assertions below
+  # now catch a spec that arrives without them.
+  n_changepoints <- trend_specs$n_changepoints
+  changepoint_scale <- trend_specs$changepoint_scale
   # Use growth parameter if provided, otherwise fall back to trend_specs$type or trend_specs$growth
   trend_type <- growth %||% trend_specs$type %||% trend_specs$growth %||% "linear"
   n_obs <- data_info$n_obs
@@ -6191,7 +6187,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   # Validate PW-specific parameters
   checkmate::assert_number(n_changepoints, lower = 0)
   checkmate::assert_number(changepoint_scale, lower = 0)
-  changepoint_range <- trend_specs$changepoint_range %||% 0.8
+  changepoint_range <- trend_specs$changepoint_range
   checkmate::assert_number(changepoint_range, lower = 0, upper = 1)
 
   # Distribute changepoints across the first
@@ -6328,20 +6324,16 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     n_lv, n_series, has_by_lv = isTRUE(data_info$has_by_lv)
   )
 
-  # PW trend priors - always generate defaults if no custom priors
-  # PW has its own default priors that should always be included
   # One statement per parameter, carrying the user's prior where they
-  # gave one. Emitting the default and then appending the user's as a
-  # second stanvar did not override it: `combine_stanvars()` keeps
-  # both, so Stan accumulated two log-densities and the posterior sat
-  # under the product of the two priors. `delta_trend` is a matrix, so
-  # its statement is vectorised; a bare `delta_trend ~ dist` is
-  # ill-typed and Stan refuses to compile it.
-  pw_prior_line <- function(param, fallback, vectorise = FALSE) {
-    chosen <- get_trend_parameter_prior(prior, param)
-    if (!nzchar(chosen)) {
-      chosen <- fallback
-    }
+  # gave one and the resolver's default otherwise. Emitting the
+  # default and then appending the user's as a second stanvar did not
+  # override it: `combine_stanvars()` keeps both, so Stan accumulated
+  # two log-densities and the posterior sat under the product of the
+  # two priors. `delta_trend` is a matrix, so its statement is
+  # vectorised; a bare `delta_trend ~ dist` is ill-typed and Stan
+  # refuses to compile it.
+  pw_prior_line <- function(param, vectorise = FALSE) {
+    chosen <- get_trend_parameter_prior(prior, param, trend_obj = trend_specs)
     lhs <- if (isTRUE(vectorise)) paste0("to_vector(", param, ")") else param
     paste0("      ", lhs, " ~ ", chosen, ";")
   }
@@ -6349,11 +6341,9 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
     name = "pw_model",
     scode = paste(c(
       "      // PW trend priors",
-      pw_prior_line("m_trend", "student_t(3, 0, 2.5)"),
-      pw_prior_line("k_trend", "std_normal()"),
-      pw_prior_line("delta_trend",
-                    paste0("double_exponential(0, ", changepoint_scale, ")"),
-                    vectorise = TRUE)
+      pw_prior_line("m_trend"),
+      pw_prior_line("k_trend"),
+      pw_prior_line("delta_trend", vectorise = TRUE)
     ), collapse = "\n"),
     block = "model"
   )

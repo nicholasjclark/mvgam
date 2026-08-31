@@ -2,11 +2,10 @@
 #
 # `jsdgam()` is a thin wrapper over `mvgam()` that fits a Joint Species
 # Distribution Model with a Heaps-architecture factor model on the
-# species loadings. The wrapper accepts the legacy jsdgam signature
+# species loadings. The wrapper accepts the jsdgam signature
 # (`formula`, `factor_formula`, `unit`, `species`, `n_lv`, etc.) and
 # forwards everything to `mvgam()` via:
-#   trend_formula = factor_formula
-#   trend_model   = ZMVN(cor = TRUE, subgr = species_col)
+#   trend_formula = factor_formula   (`~ -1` resolves to ZMVN())
 #   trend_map     = matrix(NA_real_, n_species, n_lv)   (partial-Z full mask)
 # Class assignment is `c("mvgam", "jsdgam")` so existing mvgam methods
 # inherit and the small jsdgam-specific surfaces (`ordinate.jsdgam`,
@@ -54,12 +53,9 @@
 #'   is documented at `[lv_axis()]`.
 #'
 #' @param knots An optional `list` of knot values for any smooth
-#'   terms in `formula`, passed on to the `mgcv` smoother setup
-#'   in the same way as the `knots` argument of [mvgam()].
-#'
-#' @param factor_knots An optional `list` of knot values for any
-#'   smooth terms in `factor_formula`, mirroring the role of
-#'   `knots` for the observation formula.
+#'   terms, forwarded to [mvgam()] and handled exactly as its own
+#'   `knots` argument is. Knot values are named by covariate rather
+#'   than by formula, so there is one list for the model.
 #'
 #' @param data A `data.frame` or `list` containing the response
 #'   variable and the covariates referenced by `formula` and
@@ -132,8 +128,6 @@
 #'   }
 #'   See [active_factors()] for a posterior summary of how many
 #'   columns the data actually used under MGP.
-#'
-#' @param share_obs_params Logical. Forwarded to `mvgam`.
 #'
 #' @param priors Optional `data.frame` or `brmsprior` vector with
 #'   prior overrides. See [default_prior.mvgam_formula()] and
@@ -294,13 +288,11 @@
 jsdgam <- function(formula,
                    factor_formula = ~ -1,
                    knots,
-                   factor_knots,
                    data,
                    newdata,
                    family = binomial(),
                    unit = time,
                    species = series,
-                   share_obs_params = FALSE,
                    priors,
                    n_lv = 2L,
                    traits = NULL,
@@ -481,17 +473,17 @@ jsdgam <- function(formula,
     )
   }
 
-  # Forward to mvgam(). Optional args (knots, factor_knots, newdata,
-  # priors) only enter the call if the user supplied them so mvgam's
-  # own argument defaults handle the missing case.
+  # Forward to mvgam(). Optional args (knots, newdata, priors) only
+  # enter the call if the user supplied them so mvgam's own argument
+  # defaults handle the missing case. The trend comes from
+  # `factor_formula`, which defaults to `~ -1` and so resolves to
+  # `ZMVN()`, the correlated latent prior a JSDM wants.
   forward_args <- list(
     formula = formula,
     trend_formula = factor_formula,
-    trend_model = ZMVN(cor = TRUE, subgr = "series"),
     trend_map = trend_map_mat,
     data = data_train,
     family = family,
-    share_obs_params = share_obs_params,
     backend = backend,
     run_model = run_model
   )
@@ -504,7 +496,6 @@ jsdgam <- function(formula,
   }
   if (!missing(newdata)) forward_args$newdata <- newdata
   if (!missing(knots)) forward_args$knots <- knots
-  if (!missing(factor_knots)) forward_args$trend_knots <- factor_knots
   # Reason: forward under the singular brms convention so the
   # prior table actually reaches the codegen pipeline. mvgam()
   # accepts both forms via normalise_prior_arg_alias() but

@@ -396,6 +396,24 @@ test_that("lift detects closure-unit Psi exponential prior", {
   expect_equal(out$prior, "exponential(1)")
 })
 
+test_that("lift keeps every latent state out of the prior table", {
+  # The states carry sampling statements of their own, the trend
+  # equation and the reparameterisations it is written under, and
+  # every one of them ends in `_trend`. `init_trend` reached fitted
+  # prior tables for exactly that reason, so the exclusion list needs
+  # a guard rather than a reader remembering to extend it.
+  sc <- paste(
+    "model {",
+    paste0("  ", mvgam:::mvgam_state_params, " ~ normal(0, 1);",
+           collapse = "\n"),
+    "}",
+    sep = "\n"
+  )
+  out <- mvgam:::lift_mvgam_stanvar_priors(empty_brmsprior(), sc)
+  expect_equal(nrow(out), 0L)
+})
+
+
 test_that("lift returns prior unchanged when stancode has no matches", {
   sc <- "model { Intercept ~ student_t(3, 0, 2.5); }"
   base <- empty_brmsprior()

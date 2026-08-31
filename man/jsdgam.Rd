@@ -8,13 +8,11 @@ jsdgam(
   formula,
   factor_formula = ~-1,
   knots,
-  factor_knots,
   data,
   newdata,
   family = binomial(),
   unit = time,
   species = series,
-  share_obs_params = FALSE,
   priors,
   n_lv = 2L,
   traits = NULL,
@@ -49,12 +47,9 @@ emits a one-time deprecation warning before being rewritten to
 is documented at \verb{[lv_axis()]}.}
 
 \item{knots}{An optional \code{list} of knot values for any smooth
-terms in \code{formula}, passed on to the \code{mgcv} smoother setup
-in the same way as the \code{knots} argument of \code{\link[=mvgam]{mvgam()}}.}
-
-\item{factor_knots}{An optional \code{list} of knot values for any
-smooth terms in \code{factor_formula}, mirroring the role of
-\code{knots} for the observation formula.}
+terms, forwarded to \code{\link[=mvgam]{mvgam()}} and handled exactly as its own
+\code{knots} argument is. Knot values are named by covariate rather
+than by formula, so there is one list for the model.}
 
 \item{data}{A \code{data.frame} or \code{list} containing the response
 variable and the covariates referenced by \code{formula} and
@@ -99,8 +94,6 @@ that indexes the sampling unit (typical names: \code{time} or
 indexes the different response units (typical name in a JSDM:
 \code{species}). Defaults to \code{series} to stay consistent with other
 mvgam models.}
-
-\item{share_obs_params}{Logical. Forwarded to \code{mvgam}.}
 
 \item{priors}{Optional \code{data.frame} or \code{brmsprior} vector with
 prior overrides. See \code{\link[=default_prior.mvgam_formula]{default_prior.mvgam_formula()}} and

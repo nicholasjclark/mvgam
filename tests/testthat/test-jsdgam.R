@@ -455,3 +455,70 @@ test_that("default (no aliases) yields no row_features / dist_* slots", {
   expect_false("row_features" %in% names(sd))
 })
 
+
+# 4. Arguments the wrapper no longer takes --------------------------------
+
+test_that("mvgam refuses the arguments 1.x took and 2.0 does not", {
+  dat <- build_jsdgam_toy()
+  # Each of these used to reach `...`, where brms drops what it does
+  # not recognise, so the model that came back was not the model the
+  # call described.
+  expect_error(
+    mvgam(y ~ 1, trend_formula = ~ AR(p = 1), data = dat,
+          share_obs_params = TRUE),
+    "share_obs_params"
+  )
+  expect_error(
+    mvgam(y ~ 1, data = dat, trend_model = AR(p = 1)),
+    "trend_formula"
+  )
+  expect_error(
+    mvgam(y ~ 1, data = dat, use_lv = TRUE),
+    "n_lv"
+  )
+  # And through the wrapper, whose own formals no longer swallow them.
+  expect_error(
+    jsdgam(formula = y ~ 1, factor_formula = ~ -1, data = dat,
+           species = species, family = poisson(), n_lv = 2L,
+           share_obs_params = TRUE, run_model = FALSE, silent = 2),
+    "share_obs_params"
+  )
+})
+
+
+test_that("every removed argument names its replacement", {
+  # The table is what the message is built from, so an entry added
+  # without a reason would say nothing useful.
+  expect_true(all(nzchar(mvgam:::mvgam_removed_args)))
+  expect_true(all(nzchar(names(mvgam:::mvgam_removed_args))))
+  # A name that is still a formal would make the refusal unreachable
+  # and the message wrong.
+  expect_length(
+    intersect(names(mvgam:::mvgam_removed_args), names(formals(mvgam))),
+    0L
+  )
+  expect_length(
+    intersect(names(mvgam:::mvgam_removed_args), names(formals(jsdgam))),
+    0L
+  )
+})
+
+
+test_that("the trend a jsdgam builds is the correlated latent prior", {
+  dat <- build_jsdgam_toy()
+  # The wrapper used to pin `ZMVN(cor = TRUE, subgr = "series")`
+  # through an argument mvgam has no formal for, so it was dropped and
+  # the default branch decided the trend. It still does; the pin said
+  # nothing the default does not, and its `subgr` would have been
+  # refused outright, since a subgroup without a group is an error.
+  mod <- suppressWarnings(jsdgam(
+    formula = y ~ 1, factor_formula = ~ -1,
+    data = dat, unit = time, species = species,
+    family = poisson(), n_lv = 2L,
+    run_model = FALSE, silent = 2
+  ))
+  spec <- mod$mv_spec$trend_specs
+  expect_identical(spec$trend, "ZMVN")
+  expect_true(isTRUE(spec$cor))
+  expect_identical(spec$gr, "NA")
+})

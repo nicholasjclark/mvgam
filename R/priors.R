@@ -136,6 +136,34 @@ common_trend_priors <- list(
     bounds = c(-1, 1),
     description = "MA(1) coefficient",
     dimension = "vector"
+  ),
+
+  Amu_trend = list(
+    default = "normal(0, sqrt(0.455))",
+    bounds = c(NA, NA),
+    description = "Mean of the VAR coefficients, diagonal and off",
+    dimension = "vector"
+  ),
+
+  Aomega_trend = list(
+    default = "gamma(1.365, 0.071175)",
+    bounds = c(0, NA),
+    description = "Precision of the VAR coefficients, diagonal and off",
+    dimension = "vector"
+  ),
+
+  Dmu_trend = list(
+    default = "normal(0.0, 1.0)",
+    bounds = c(NA, NA),
+    description = "Mean of the VARMA moving-average coefficients",
+    dimension = "vector"
+  ),
+
+  Domega_trend = list(
+    default = "gamma(2.0, 1.0)",
+    bounds = c(0, NA),
+    description = "Precision of the VARMA moving-average coefficients",
+    dimension = "vector"
   )
 )
 
@@ -406,26 +434,31 @@ create_trend_parameter_prior <- function(param_name, trend_obj) {
 #' Get Default Prior Information for Trend Parameter
 #'
 #' @param param_name Character string parameter name
-#' @param trend_obj mvgam_trend object for context
+#' @param trend_obj mvgam_trend object for context, or NULL where the
+#'   caller has none
 #' @return List with prior, lb, ub elements
 #' @noRd
-get_default_trend_parameter_prior <- function(param_name, trend_obj) {
+get_default_trend_parameter_prior <- function(param_name,
+                                             trend_obj = NULL) {
   checkmate::assert_string(param_name)
-
-  # Check for trend-specific customization first
-  trend_type <- trend_obj$trend
-  custom_function <- paste0("get_", tolower(trend_type), "_parameter_prior")
+  checkmate::assert_class(trend_obj, "mvgam_trend", null.ok = TRUE)
 
   # A trend-specific resolver may exist only to tighten a bound, as
   # AR's does for stationarity. Where it names no distribution the
   # shared default still supplies one, so the bound is honoured
-  # without the summary going silent on the prior itself.
+  # without the summary going silent on the prior itself. Without a
+  # trend object there is no such resolver to consult.
   custom_result <- NULL
-  if (exists(custom_function, mode = "function")) {
-    custom_prior <- get(custom_function, mode = "function")
-    custom_result <- custom_prior(param_name, trend_obj)
-    if (!is.null(custom_result) && nzchar(custom_result$prior)) {
-      return(custom_result)
+  if (!is.null(trend_obj)) {
+    custom_function <- paste0(
+      "get_", tolower(trend_obj$trend), "_parameter_prior"
+    )
+    if (exists(custom_function, mode = "function")) {
+      custom_prior <- get(custom_function, mode = "function")
+      custom_result <- custom_prior(param_name, trend_obj)
+      if (!is.null(custom_result) && nzchar(custom_result$prior)) {
+        return(custom_result)
+      }
     }
   }
 
@@ -574,6 +607,33 @@ get_car_parameter_prior <- function(param_name, trend_obj) {
   # distribution itself comes from the shared default, as elsewhere.
   if (identical(param_name, "ar1_trend")) {
     return(list(prior = "", lb = "0.001", ub = "0.999"))
+  }
+
+  # Return NULL to use default parameter-type handling
+  return(NULL)
+}
+
+#' Get PW-Specific Parameter Prior
+#'
+#' @param param_name Character string parameter name
+#' @param trend_obj mvgam_trend object
+#' @return List with prior, lb, ub elements, or NULL for default handling
+#' @noRd
+get_pw_parameter_prior <- function(param_name, trend_obj) {
+  checkmate::assert_string(param_name)
+  checkmate::assert_class(trend_obj, "mvgam_trend")
+
+  # The changepoint scale is a `PW()` argument, so the prior on the
+  # rate deviations is only knowable from the trend object. Naming it
+  # here rather than at the emission site is what lets the reported
+  # prior carry the user's own scale.
+  if (identical(param_name, "delta_trend")) {
+    scale <- trend_obj$changepoint_scale
+    checkmate::assert_number(scale, lower = 0)
+    return(list(
+      prior = paste0("double_exponential(0, ", scale, ")"),
+      lb = "", ub = ""
+    ))
   }
 
   # Return NULL to use default parameter-type handling
@@ -1361,14 +1421,17 @@ map_trend_priors <- function(prior, trend_type) {
 #'
 #' @param prior A brmsprior object containing custom prior specifications, or NULL
 #' @param param_name Character string parameter name (e.g., "sigma_trend", "ar1_trend")
+#' @param trend_obj Optional mvgam_trend object. Supply it wherever a
+#'   trend type resolves a prior from its own arguments, as `PW()` does
+#'   for the changepoint scale; without it that step is skipped.
 #' @return Character string containing Stan prior distribution (e.g., "exponential(2)")
 #'   or empty string if no prior is specified (Stan will use its defaults)
 #'
 #' @details
-#' Resolution strategy:
-#' 1. **User specification first**: Checks the provided brmsprior object for the parameter
-#' 2. **Common default fallback**: Uses `common_trend_priors` if parameter is available
-#' 3. **Empty string fallback**: Returns "" if no specification found (Stan defaults)
+#' A user prior wins where one is given. Everything below that is
+#' `get_default_trend_parameter_prior()`, which is also what builds the
+#' table `get_prior()` shows, so the prior a model samples under and the
+#' prior it reports cannot come apart.
 #'
 #' This design ensures maximum extensibility - any new trend type can call this
 #' function for any parameter and get consistent behavior. New parameters can
@@ -1376,11 +1439,13 @@ map_trend_priors <- function(prior, trend_type) {
 #'
 #' @seealso \code{\link{extract_prior_string}}, \code{common_trend_priors}
 #' @noRd
-get_trend_parameter_prior <- function(prior = NULL, param_name) {
+get_trend_parameter_prior <- function(prior = NULL, param_name,
+                                      trend_obj = NULL) {
   # Input validation
   checkmate::assert_class(prior, "brmsprior", null.ok = TRUE, .var.name = "prior")
   checkmate::assert_character(param_name, len = 1, min.chars = 1,
                              any.missing = FALSE, .var.name = "param_name")
+  checkmate::assert_class(trend_obj, "mvgam_trend", null.ok = TRUE)
 
   # Strategy 1: Try user specification first
   if (!is.null(prior)) {
@@ -1412,33 +1477,10 @@ get_trend_parameter_prior <- function(prior = NULL, param_name) {
     }
   }
 
-  # Strategy 2: Fallback to common default if available
-  if (!is.list(common_trend_priors)) {
-    stop(insight::format_error(
-      "common_trend_priors must be a list structure"
-    ))
-  }
-
-  if (param_name %in% names(common_trend_priors)) {
-    default_spec <- common_trend_priors[[param_name]]
-    if (!is.list(default_spec) || !"default" %in% names(default_spec)) {
-      stop(insight::format_error(
-        cli::format_inline(
-          "Invalid structure for common_trend_priors parameter {.field {param_name}}"
-        )
-      ))
-    }
-    return(default_spec$default)
-  }
-
-  # Strategy 3: Pattern-based defaults for parameter types
-  pattern_default <- get_parameter_type_default_prior(param_name)
-  if (pattern_default$prior != "") {
-    return(pattern_default$prior)
-  }
-
-  # Strategy 4: Empty string fallback (Stan will use its defaults)
-  return("")
+  # Strategy 2: the default, resolved by the one chain that also
+  # builds the table `get_prior()` shows. Reading the defaults here
+  # separately is how the two surfaces came to disagree.
+  get_default_trend_parameter_prior(param_name, trend_obj)$prior
 }
 
 # =============================================================================

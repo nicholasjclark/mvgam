@@ -566,10 +566,14 @@ mvgam_unsuffixed_params <- c(
 
 # The latent states. Their sampling statements are the trend equation
 # and the non-centred reparameterisation it is written under, not
-# priors a user set or could change.
+# priors a user set or could change. `init_trend` holds the states
+# before the first observed time, drawn from the stationary
+# distribution the autoregression implies, so its statement is a
+# function of `A_trend` and `Sigma_trend` rather than a prior of its
+# own.
 mvgam_state_params <- c(
   "trend", "lv_trend", "lv_trend_tilde",
-  "innovations_trend", "scaled_innovations_trend"
+  "innovations_trend", "scaled_innovations_trend", "init_trend"
 )
 
 

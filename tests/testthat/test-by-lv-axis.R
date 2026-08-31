@@ -91,7 +91,6 @@ test_that("by = lv_axis() without n_lv is accepted (non-factor path)", {
     mvgam(
       formula = y ~ -1,
       trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
-      trend_model = ZMVN(cor = TRUE),
       data = dat,
       family = gaussian(),
       run_model = FALSE,
@@ -115,7 +114,6 @@ test_that("by = lv_axis() with n_lv = n_series is accepted (factor path)", {
     mvgam(
       formula = y ~ -1,
       trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
-      trend_model = ZMVN(cor = TRUE),
       trend_map = matrix(NA_real_, nrow = 3L, ncol = 3L),
       data = dat,
       family = gaussian(),
@@ -137,7 +135,6 @@ test_that("by = lv_axis() with n_lv > n_series still errors", {
     mvgam(
       formula = y ~ -1,
       trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
-      trend_model = ZMVN(cor = TRUE),
       trend_map = matrix(NA_real_, nrow = 3L, ncol = 4L),
       data = dat,
       family = gaussian(),
@@ -205,7 +202,6 @@ test_that("had_by_lv is set on non-factor by_lv fits (validation only)", {
     mvgam(
       formula = y ~ -1,
       trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
-      trend_model = ZMVN(cor = TRUE),
       data = dat, family = gaussian(),
       run_model = FALSE, silent = 2
     )
@@ -227,7 +223,6 @@ test_that("had_by_lv is set on factor by_lv fits", {
     mvgam(
       formula = y ~ -1,
       trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
-      trend_model = ZMVN(cor = TRUE),
       trend_map = matrix(NA_real_, nrow = 3L, ncol = 3L),
       data = dat, family = gaussian(),
       run_model = FALSE, silent = 2
@@ -247,7 +242,6 @@ test_that("had_by_lv stays FALSE for fits without by_lv", {
     mvgam(
       formula = y ~ -1,
       trend_formula = ~ s(elev, k = 5) - 1,
-      trend_model = ZMVN(cor = TRUE),
       data = dat, family = gaussian(),
       run_model = FALSE, silent = 2
     )
@@ -272,7 +266,6 @@ test_that("trend_call preserves original by = lv_axis() for update.mvgam", {
     mvgam(
       formula = y ~ -1,
       trend_formula = ~ s(elev, k = 5, by = lv_axis()) - 1,
-      trend_model = ZMVN(cor = TRUE),
       data = dat, family = gaussian(),
       run_model = FALSE, silent = 2
     )
