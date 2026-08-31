@@ -81,13 +81,41 @@ set_color_scheme_local <- function(scheme, envir = parent.frame()) {
   invisible(NULL)
 }
 
-#' Minimal mvgam ggplot theme. Built on `theme_classic` so it
-#' composes cleanly with the bayesplot family and matches the
-#' existing `conditional_effects.mvgam` look.
+#' The ggplot theme mvgam draws with
 #'
-#' @noRd
-mvgam_theme <- function() {
-  ggplot2::theme_classic() +
+#' @description
+#' Every figure the package draws uses this theme, which is built on
+#' [ggplot2::theme_classic()] so it composes with the bayesplot
+#' family. Apply it to a plot of your own to sit alongside mvgam
+#' output without the two looking like they came from different
+#' packages.
+#'
+#' Colours are a separate question and come from the active
+#' bayesplot scheme, so [bayesplot::color_scheme_set()] moves mvgam's
+#' figures and yours together, and
+#' [bayesplot::color_scheme_get()] reads the current one.
+#'
+#' @param base_size Base font size in points. Defaults to `11`,
+#'   matching [ggplot2::theme_classic()].
+#' @param base_family Base font family. Defaults to `""`, the
+#'   ggplot2 default.
+#' @return A [ggplot2::theme()] object.
+#'
+#' @examples
+#' library(ggplot2)
+#' ggplot(mtcars, aes(wt, mpg)) +
+#'   geom_point(colour = bayesplot::color_scheme_get("red")$dark) +
+#'   mvgam_theme()
+#'
+#' @seealso [bayesplot::color_scheme_get()]
+#' @author Nicholas J Clark
+#' @export
+mvgam_theme <- function(base_size = 11, base_family = "") {
+  checkmate::assert_number(base_size, lower = 1)
+  checkmate::assert_string(base_family)
+  ggplot2::theme_classic(
+    base_size = base_size, base_family = base_family
+  ) +
     ggplot2::theme(
       # Grey strip bar + thin border so faceted plots (lfo, kfold,
       # pp_check residual panels, conditional_smooths) read as
@@ -96,7 +124,7 @@ mvgam_theme <- function() {
         fill = "grey85", colour = "grey60"
       ),
       strip.text = ggplot2::element_text(face = "bold"),
-      axis.title = ggplot2::element_text(size = 11),
+      axis.title = ggplot2::element_text(size = base_size),
       legend.position = "right"
     )
 }

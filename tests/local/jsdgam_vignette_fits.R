@@ -65,9 +65,12 @@ ant_data <- list(
 )
 saveRDS(ant_data, file.path(cache_dir, "ant_data.rds"))
 
-CHAINS  <- 2L
-SAMPLES <- 600L
-SILENT  <- 2L
+# Matches the argument spelling the article displays, so the code
+# shown beside each fit is the code that produced it.
+CHAINS <- 2L
+ITER   <- 1600L
+WARMUP <- 1000L
+SILENT <- 2L
 
 
 # ---- mod_baseline: uninformed loadings + NB ----------------------------
@@ -83,7 +86,8 @@ mod_baseline <- jsdgam(
   unit    = time,
   species = species,
   chains  = CHAINS,
-  samples = SAMPLES,
+  iter    = ITER,
+  warmup  = WARMUP,
   silent  = SILENT
 )
 saveRDS(mod_baseline, file.path(cache_dir, "mod_baseline.rds"))
@@ -107,7 +111,8 @@ mod_traits <- jsdgam(
   unit    = time,
   species = species,
   chains  = CHAINS,
-  samples = SAMPLES,
+  iter    = ITER,
+  warmup  = WARMUP,
   adapt_delta = 0.95,
   silent  = SILENT
 )
@@ -132,7 +137,8 @@ mod_mgp <- jsdgam(
   unit    = time,
   species = species,
   chains  = CHAINS,
-  samples = SAMPLES,
+  iter    = ITER,
+  warmup  = WARMUP,
   silent  = SILENT
 )
 saveRDS(mod_mgp, file.path(cache_dir, "mod_mgp.rds"))

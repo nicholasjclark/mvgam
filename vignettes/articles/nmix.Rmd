@@ -28,7 +28,7 @@ knitr::opts_chunk$set(
 )
 library(mvgam)
 library(ggplot2)
-theme_set(theme_bw(base_size = 12, base_family = "serif"))
+theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
 ```
 
 When we count animals at a site we rarely see all of them, so the

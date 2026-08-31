@@ -30,7 +30,7 @@ library(mvgam)
 library(mvabund)
 library(ggplot2)
 library(patchwork)
-theme_set(theme_bw(base_size = 12, base_family = "serif"))
+theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
 
 # Cached jsdgam fits live under pkgdown/, which is excluded from
 # the CRAN tarball by .Rbuildignore. pkgdown runs articles from
@@ -135,7 +135,7 @@ the 1:1 Poisson line, so a Poisson observation model would
 systematically underestimate predictive uncertainty.
 
 ```{r mean-variance, fig.asp = 0.7, out.width = "65%"}
-red <- mvgam:::mvgam_palette("red")[5L]
+red <- bayesplot::color_scheme_get("red")$dark
 per_sp <- do.call(rbind, tapply(
   ant_long$counts, ant_long$species,
   function(x) c(mean = mean(x), var = var(x))
@@ -148,8 +148,7 @@ ggplot(per_sp, aes(x = mean, y = var)) +
   scale_x_continuous(trans = "log1p") +
   scale_y_continuous(trans = "log1p") +
   labs(x = "Mean count per species (log1p)",
-       y = "Variance of count per species (log1p)") +
-  mvgam:::mvgam_theme()
+       y = "Variance of count per species (log1p)")
 ```
 
 A negative binomial observation model accommodates that
@@ -390,11 +389,13 @@ with the share of series-level variance each one explains.
 
 The factor decomposition implies a residual species covariance
 `Sigma = Z Zᵀ` after accounting for the measured environment.
-`residual_cor()` returns posterior summaries of this matrix,
-with entries set to zero where the credible interval covers
-zero. The `cluster = TRUE` argument reorders rows and columns
-by an approximate Robinson ordering so block structure shows up
-on the diagonal. The companion accessor `shared_variation()`
+`residual_cor()` returns posterior summaries of this matrix.
+The heatmap carries the median correlation as fill and the
+weight of evidence as opacity, so a large correlation the data
+barely resolve is drawn faintly rather than erased. The
+`cluster = TRUE` argument reorders rows and columns by an
+approximate Robinson ordering so block structure shows up on
+the diagonal. The companion accessor `shared_variation()`
 returns the full posterior over the covariance matrix itself,
 useful when entry magnitudes matter for downstream analysis;
 both surface entry-level posterior probabilities via
@@ -405,18 +406,28 @@ rcor <- residual_cor(mod_traits, summary = TRUE)
 plot(rcor, cluster = TRUE)
 ```
 
-Three large positive blocks line up on the diagonal: groups
-of species that tend to co-occur once the environment is
-accounted for. A clear band of negative correlation cuts
-across the heatmap on `Iridomyrmex.rufoniger`. Its top five
-strongest negative residual correlations are all with
-high-abundance species elsewhere in the community
-(`Iridomyrmex.purpureus`, `Aphaenogaster.longiceps`,
-`Monomorium.leae`, `Pheidole.sp..A`, `Camponotus.claripes`),
-each below -0.88. Its loadings sit in a region of the latent
-space that the rest of the community avoids, which is
-consistent with competitive dominance or with an unmeasured
-environmental contrast that we have not conditioned on.
+```{r rufoniger, include = FALSE}
+foc <- "Iridomyrmex.rufoniger"
+foc_r <- rcor$cor[foc, ]
+foc_r <- foc_r[names(foc_r) != foc]
+foc_top <- sort(foc_r)[1:5]
+foc_lo <- rcor$cor_lower[foc, names(foc_top)]
+foc_hi <- rcor$cor_upper[foc, names(foc_top)]
+foc_names <- paste0("`", names(foc_top), "`", collapse = ", ")
+foc_worst <- sprintf("%.2f", min(foc_top))
+foc_excl <- sum(sign(foc_lo) == sign(foc_hi))
+```
+
+Positive blocks line up on the diagonal: groups of species that
+tend to co-occur once the environment is accounted for. A band
+of negative correlation cuts across the heatmap on
+`Iridomyrmex.rufoniger`. Its five strongest negative partners
+are `r foc_names`, reaching `r foc_worst`, and `r foc_excl` of
+the five have an interval clear of zero. Its loadings sit in a
+region of the latent space that the rest of the community
+avoids, which is consistent with competitive dominance or with
+an unmeasured environmental contrast that we have not
+conditioned on.
 
 Residual correlation is *evidence consistent with* shared
 unmeasured drivers, not proof of any specific mechanism. A

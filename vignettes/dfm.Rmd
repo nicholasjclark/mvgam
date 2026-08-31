@@ -34,7 +34,7 @@ knitr::opts_chunk$set(
 )
 library(mvgam)
 library(ggplot2)
-theme_set(theme_bw(base_size = 12, base_family = "serif"))
+theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
 ```
 
 Multivariate time series often move together for reasons the

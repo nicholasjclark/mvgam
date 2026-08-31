@@ -26,7 +26,7 @@ library(mvgam)
 library(brms)
 library(ggplot2)
 library(patchwork)
-theme_set(theme_bw(base_size = 12, base_family = "serif"))
+theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
 
 cache_dir <- file.path("pkgdown", "mvbf_cache")
 read_cache <- function(name) {
@@ -96,7 +96,7 @@ long <- with(mv_data, rbind(
   data.frame(time = time, value = camera,  resp = "camera")
 ))
 ggplot(long, aes(x = time, y = value)) +
-  geom_line(colour = "gray30", alpha = 0.6) +
+  geom_line(colour = bayesplot::color_scheme_get()$dark, alpha = 0.6) +
   geom_point(size = 1.2, na.rm = TRUE) +
   facet_wrap(~ resp, ncol = 1L, scales = "free_y") +
   labs(x = "Time (month)", y = "Observed value")

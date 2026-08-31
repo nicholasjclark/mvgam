@@ -27,7 +27,7 @@ library(brms)
 library(dplyr)
 library(ggplot2)
 library(patchwork)
-theme_set(theme_bw(base_size = 12, base_family = "serif"))
+theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
 # The article's plots reuse the same red single-hue scheme every
 # other mvgam plotting method locks in via `set_color_scheme_local`;
 # fixing it globally in setup keeps hand-rolled overlays and

@@ -28,7 +28,7 @@ knitr::opts_chunk$set(
 )
 library(mvgam)
 library(ggplot2)
-theme_set(theme_bw(base_size = 12, base_family = "serif"))
+theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
 
 # Cached fits + LFO objects live under pkgdown/, which is
 # excluded from the CRAN tarball by .Rbuildignore. pkgdown runs

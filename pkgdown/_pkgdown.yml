@@ -274,7 +274,10 @@ reference:
   - summary.mvgam_fevd
   - plot.mvgam_fevd
   - stability.mvgam
+  - summary.mvgam_stability
   - plot.mvgam_stability
+  - plot.mvgam_stability_summary
+  - plot.mvgam_var_surface_summary
   - posterior_transition_matrix
   - print.mvgam_var_matrix
   - print.mvgam_var_matrix_list
@@ -304,11 +307,13 @@ reference:
 
 - title: Plotting
   desc: >
-    The general-purpose plot methods for a fitted model.
+    The general-purpose plot methods for a fitted model, and the
+    theme they are drawn with.
   contents:
   - plot.mvgam
   - mcmc_plot.mvgam
   - pairs.mvgam
+  - mvgam_theme
 
 - title: Datasets
   desc: >

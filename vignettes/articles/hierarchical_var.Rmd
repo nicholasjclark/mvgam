@@ -27,7 +27,7 @@ library(brms)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
-theme_set(theme_bw(base_size = 12, base_family = "serif"))
+theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
 
 cache_dir <- if (dir.exists("pkgdown")) {
   file.path("pkgdown", "hierarchical_var_cache")
