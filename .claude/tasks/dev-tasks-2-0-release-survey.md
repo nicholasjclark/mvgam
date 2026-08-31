@@ -1210,20 +1210,54 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > by `CAR()`.
 
 - [ ] **5.0 Rebuild every vignette and the pkgdown site**
-  > Caches date from June and July, before the prior and default
-  > changes. Roughly 60 numeric claims need re-checking, and
-  > `nmix.Rmd` has never rendered its chunks at all.
+  > Five articles still hold numbers from June and July caches:
+  > `var.Rmd`, `hierarchical_var.Rmd`, `mvbf.Rmd`, `jsdgam.Rmd` and
+  > `idm.Rmd`. Each carries one inline R expression, so every figure
+  > in its prose is frozen text. `nmix.Rmd` (5.1) and
+  > `forecast_evaluation.Rmd` (5.5) are done; `data.Rmd`, `dfm.Rmd`
+  > and `mvgam_overview.Rmd` are rendered but still need the
+  > workflow gate in 5.2.
   >
-  > Install from HEAD before rendering anything. Every article
-  > calls `library(mvgam)`, so it renders against the installed
-  > build rather than the working tree, and the installed build
-  > carries the same `2.0.0` version string as HEAD whatever its
-  > age. Nothing warns. The build found in place during 5.5 dated
-  > from 24 July and still scored the marginal likelihood, so the
-  > article re-rendered to its original numbers and looked
-  > consistent with prose written against them. A refit alone does
-  > not fix this, because `lfo_cv()` and every post-fit call in
-  > the article run through the installed code as well.
+  > Per article, in order:
+  >
+  > 1. `R CMD INSTALL --preclean --no-multiarch .` first. See the
+  >    rule below; skipping this invalidates everything after it.
+  > 2. Re-run the builder in `tests/local/*_vignette_fits.R` where
+  >    one exists. `idm_cache` and `var_cache` have no builder and
+  >    need one written, or they cannot be regenerated from a clean
+  >    clone.
+  > 3. Render, then read the rendered output and check every prose
+  >    claim against the block printed directly above it.
+  > 4. Replace each quoted number with inline R computed from the
+  >    object, so the next stale cache cannot go unnoticed.
+  > 5. Check the sampler diagnostics the article prints, and say
+  >    something about them if they are poor.
+  > 6. `prose_lint.py`, then a writing pass.
+  >
+  > Two rules, both learned by getting them wrong.
+  >
+  > Install from HEAD before rendering. Every article calls
+  > `library(mvgam)`, so it renders against the installed build
+  > rather than the working tree, and the installed build carries
+  > the same `2.0.0` version string as HEAD whatever its age.
+  > Nothing warns. The build in place during 5.5 dated from 24 July
+  > and still scored the marginal likelihood, so the article
+  > re-rendered to its original numbers and read as consistent with
+  > prose written against them. Refitting does not save you: the
+  > builders use `load_all()`, but every `loo()`, `score()` and
+  > `lfo_cv()` call inside the article goes through the installed
+  > code.
+  >
+  > Do not retire a model on its forecast score. In 5.5 the energy
+  > score said the VAR earned nothing over a per-species AR, and
+  > that was read as a verdict on the model. The transition matrix
+  > and the innovation covariance answer different questions and are
+  > not equally identified: `A_trend` reached a bulk ESS of 26 where
+  > the covariance reached 322, and the VAR recovered a residual
+  > correlation of 0.58 between two congeneric pocket mice that an
+  > AR cannot represent at any horizon. Wherever an article compares
+  > models, check what the losing model estimates before dropping
+  > it, and keep forecast accuracy and structural inference apart.
 
 - [ ] **6.0 Final release verification**
   > Clean `document()`, clean test sweep, `R CMD check --as-cran`,
