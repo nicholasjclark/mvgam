@@ -346,8 +346,10 @@ test_that("Hurdle NegBin AR(1) — IQR2 dispersion stable PE=TRUE vs FALSE", {
   assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.925)
 
   # NB-shape tails make raw variance unstable across seeds. Use IQR^2.
+  # `process_error` defaults to FALSE, so it has to be named on both
+  # calls or the test compares one surface against itself.
   set.seed(1)
-  pp_pe <- posterior_predict(mvgam_fit, ndraws = 500)
+  pp_pe <- posterior_predict(mvgam_fit, ndraws = 500, process_error = TRUE)
   set.seed(2)
   pp_no <- posterior_predict(mvgam_fit, ndraws = 500, process_error = FALSE)
   iqr2_ratio <- stats::IQR(as.vector(pp_pe))^2 /
@@ -375,8 +377,11 @@ test_that("Zero-inflated Poisson AR(1) — zi extracted, epred valid", {
 test_that("process_error toggle on Poisson AR(1) widens predict variance", {
   require_fixtures("val_mvgam_ar1_hs.rds")
   mvgam_fit <- load_mvgam("ar1_hs")
+  # `process_error` defaults to FALSE, so leaving it off the first call
+  # compared the marginal surface against itself and the result came
+  # down to the two seeds.
   set.seed(1)
-  pp_pe <- posterior_predict(mvgam_fit, ndraws = 500)
+  pp_pe <- posterior_predict(mvgam_fit, ndraws = 500, process_error = TRUE)
   set.seed(2)
   pp_no <- posterior_predict(mvgam_fit, ndraws = 500, process_error = FALSE)
   v_pe <- mean(apply(pp_pe, 2, stats::var))

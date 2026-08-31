@@ -16,7 +16,10 @@ generated. `tests/local/test-new-levels.R`,
 `tests/local/test-update-trend-args.R`,
 `tests/testthat/test-multi-response-kernels.R` and
 `tests/testthat/test-mvgam-core.R` cover what the sweep could not
-reach.
+reach. `mvgam_codegen_options()` in `R/brms_integration.R` carries the
+brms code-generation settings from one place to every generator that
+needs them, and `tests/testthat/test-stancode-standata.R` pins each of
+their journeys.
 
 **Notes** — long commands run in the background and write to a log
 that is then read. Fixture-dependent tests live in `tests/local/`; CI
@@ -312,8 +315,8 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > `y | trials(n)` named two, which broke every forecast that pads
   > the response with `NA`.
 
-- [ ] **3.0 Close the post-fit coverage gaps**
-  > Partly done. What the sweep found so far, each reproduced on a
+- [x] **3.0 Close the post-fit coverage gaps**
+  > What the sweep found so far, each reproduced on a
   > cached fit before being changed.
   >
   > `summary(include_states =)` never did anything. No summary block
@@ -389,8 +392,16 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > same. They already carry 18 and 22 tests covering density, epred,
   > RNG, distribution function and stancode.
   >
-  > Still open: `plot_slopes`, `plot_comparisons`, `hypotheses` and
-  > `latent_N_saturation` run from `tests/local` but not from CI.
+  > The last four are where they belong. `plot_slopes`,
+  > `plot_comparisons` and `hypotheses` are bare re-exports carrying no
+  > mvgam code of their own: they reach the package only through
+  > `get_predict.mvgam`, `get_coef.mvgam` and `set_coef.mvgam`, which
+  > CI already drives, and nothing else about them could break without
+  > breaking those. `latent_N_saturation()` needs a posterior it cannot
+  > obtain without a fit, and its refusal on a non-closure-unit family
+  > is the one part reachable without one, which CI covers. All four
+  > keep their end-to-end run in `tests/local/postfit_sweep.R`, which
+  > is where a fixture-dependent test belongs.
 
 - [x] **3.1 A fitted model reported a prior it never sampled under**
   > Found by chasing the two `update(recompile = FALSE)` errors 4.0
@@ -617,19 +628,21 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > time for the test. A trend type is where this defect hides, so the
   > coverage had to be per trend type.
 
-- [ ] **3.8 A fit does not record what it was built from**
-  > What 3.3 and 3.4 both stop at. A fitted object keeps the values
-  > the code generator needed and not the arguments the user gave, so
-  > six of `mvgam()`'s cannot be carried into a refit at all, and none
-  > of `jsdgam()`'s can. `object$call` does not rescue it:
-  > `match.call()` over a `do.call` frame leaves every argument a bare
-  > symbol or `..1`, and `jsdgam_call` is unevaluated the same way.
+- [x] **3.8 A fit did not record what it was built from**
+  > What 3.3 and 3.4 both stopped at. The object kept the values the
+  > code generator needed and not the arguments the user gave, so
+  > several of `mvgam()`'s could not be carried into a refit.
+  > `object$call` does not rescue it: `match.call()` over a `do.call`
+  > frame leaves every argument a bare symbol or `..1`.
   >
-  > The fix is to record the resolved arguments at fit time, which
-  > would let `update()` carry `knots`, `sample_prior`, `sparse`,
-  > `normalize`, `drop_unused_levels` and `stan_funs`, and let
-  > `update.jsdgam` exist. Every cached fixture predates such a slot,
-  > so it belongs with 5.0's refit.
+  > 3.11 made this cheap and shrank it. Six arguments were withheld
+  > from `update()` on the grounds that no fit stores them; two of the
+  > six are gone, and the other four are worth storing only now that
+  > they reach brms. The fit keeps the one options list it was
+  > generated under, and `update()` reads all four off that slot
+  > through one loop rather than four near-identical registry entries.
+  > A fit made before the slot existed returns NULL and takes the
+  > `mvgam()` default, which is what it did before.
 
 - [x] **4.0 The likelihood was scored on the wrong surface**
   > The `loo_R2` failure and the `p_loo` question were one cause.
@@ -773,34 +786,77 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > stops being readable. `N_free_Z` puts its qualifier before the
   > noun where every sibling puts it after.
 
-- [ ] **3.11 Seven documented arguments never reach brms**
-  > `build_stan_components()` threads `knots`, `sample_prior`,
+- [x] **3.11 Seven documented arguments never reached brms**
+  > `build_stan_components()` threaded `knots`, `sample_prior`,
   > `sparse`, `normalize`, `drop_unused_levels`, `stan_funs` and
-  > `save_model` into `setup_brms_lightweight()`, whose `...` collects
-  > them. Its `brms::brm()` call then names every argument it passes
-  > and reads the dots for `threads` alone, so all seven are dropped.
-  > The same shape as 3.3 and 3.5: a call that names its arguments
-  > while the caller believes the dots carry the rest.
+  > `save_model` into `setup_brms_lightweight()`, whose `brms::brm()`
+  > call names every argument it passes and reads the dots for
+  > `threads` alone, so all seven were dropped. Reproduced before
+  > changing anything: the basis matrices were byte-identical with and
+  > without `knots`, `prior_only` stayed 0 under
+  > `sample_prior = "only"`, `normalize = FALSE` left the program
+  > untouched, `drop_unused_levels = FALSE` still gave `K = 2`, and
+  > `save_model` wrote nothing.
   >
-  > Shown for `knots` by comparing the emitted `standata`.
-  > `brms::make_standata()` on `y ~ s(elev, bs = "cr", k = 5)` gives a
-  > different `Xs` and `Zs_1_1` with and without knots;
-  > `standata.mvgam_formula()` gives the same matrices either way, on
-  > the observation and trend formulas alike. Naming `dots$knots` in
-  > the prefit call fixes the trend side alone, because the
-  > observation Stan data is rebuilt by `brms::make_standata()` in
-  > `R/stan_assembly.R:1913`, which has no `knots` parameter to pass.
-  > A partial fix is worse than none here, so the one-line change was
-  > reverted; the argument needs threading through the base stancode
-  > and standata generators together.
+  > The same list has to reach four brms calls, `brm()`,
+  > `make_stancode()`, `make_standata()` and `validate_prior()`, and
+  > repeating it four times is how it would drift again. One list is
+  > built by `mvgam_codegen_options()`, carried on the setup object
+  > beside `data2` and `threads`, and spliced into each call by
+  > `codegen_args_for()`, which takes only the names that generator
+  > declares. The prior table is merged under the same options, since
+  > it is keyed by the coefficients the design matrix holds:
+  > `drop_unused_levels = FALSE` prices a level the default table has
+  > no row for, and brms rejects the whole table.
   >
-  > This also settles 3.3's reasoning. It withheld `knots`,
-  > `sample_prior`, `sparse`, `normalize`, `drop_unused_levels` and
-  > `stan_funs` from `update()` on the grounds that a fit stores none
-  > of them. It stores none of them because none of them ever did
-  > anything, which makes six of 3.8's arguments cheaper than they
-  > looked: the storage is only worth adding once the values reach
-  > brms.
+  > Two of the seven are deprecated by brms itself, which reads
+  > `sparse` off `bf(y ~ x, sparse = TRUE)` and replaced `stan_funs`
+  > with `stanvars`. Resurrecting either would mean carrying an
+  > argument brms warns about, so both are named in
+  > `mvgam_removed_args` with a pointer instead, and
+  > `reject_removed_args()` now runs at the `stancode()` and
+  > `standata()` boundaries as well as `mvgam()`'s. `save_model` writes
+  > the assembled program rather than the brms one it starts from,
+  > since the assembled one is what gets compiled and the only one that
+  > names the trend.
+  >
+  > A defect surfaced underneath. `get_stan_reserved_words()` held
+  > every `_lpdf` and `_lpmf` Stan density and no `_lupdf` or `_lupmf`,
+  > and three patterns in `filter_block_content()` had the same gap.
+  > Under `normalize = FALSE` brms emits the unnormalised spelling
+  > throughout, so brms's copy of the trend `sigma` prior survived the
+  > filter and the renamer suffixed the function rather than the
+  > parameter, giving `student_t_lupdf_trend(sigma | 3, 0, 2.5)`, which
+  > Stan refuses. The unnormalised names are derived from the
+  > normalised ones and the density-call fragment is written once.
+  >
+  > Making `normalize` live then exposed a second copy of the same
+  > gap, in the GLM path. brms folds the linear predictor into a
+  > `*_glm_lupmf` call under `normalize = FALSE`, and mvgam's detection
+  > spelled `_l(pdf|pmf)` by hand at thirteen sites across three files,
+  > so the injector could not find the likelihood and assembly aborted
+  > on any fit with a trend and a predictor. All thirteen go through
+  > one pattern builder, and a rewritten call now keeps the spelling it
+  > replaced rather than a fixed `_lpdf`, since writing the normalised
+  > form back would restore the constants the user turned off.
+  >
+  > Three sibling gaps came out of the same survey. The Stan data was
+  > generated without the `prior` its program was generated with, so a
+  > `horseshoe()` or `R2D2()` fit with a trend declared six data
+  > variables nothing supplied; `threads` was missing for the same
+  > reason and would have declared `grainsize` without it. And
+  > `get_prior()` built its trend half without the options its
+  > observation half was given, so the table named coefficients the fit
+  > would not estimate, and omitted ones it would. The per-response
+  > expansion deliberately takes no prior: it rebuilds one `bf()` arm at
+  > a time, and the combined prior names parameters a single arm has no
+  > parameter for.
+  >
+  > Verified across 56 trend-by-family-by-`normalize` programs, the
+  > multivariate arm, `jsdgam(knots = )`, and the trend-free path,
+  > which takes its program and data straight off the mock fit. The
+  > mock fit stores its basis, so `posterior_smooths()` rebuilding a
+  > prediction grid reuses the knots rather than a default basis.
 
 - [x] **3.9 The class pages described the wrong objects**
   > `?mvgam-class` was a 1.x page. Seventeen of its twenty-two slots
@@ -901,16 +957,124 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > takes one level off each axis, so both are held open or the panel
   > silently loses a row and a column.
 
-- [ ] **3.10 `info =` in expectations across six test files**
-  > CLAUDE.md rules it out and testthat's expectations do not take it.
-  > Roughly twenty sites, fourteen of them in
-  > `tests/testthat/test-priors.R` and the rest spread over
-  > `test-mvgam-formula.R`, `test-setup-brms.R`, `test-trend-registry.R`,
-  > `test-trend-dispatcher.R` and `test-mu-expression-classification.R`.
-  > Most span several lines, so the message becomes a comment above
-  > the expectation rather than a deletion. Left out of 3.7's commit
-  > deliberately: it is a mechanical sweep of tests that commit does
-  > not otherwise touch.
+- [x] **3.10 `info =` in expectations**
+  > Forty sites across seven files, not the twenty across six the
+  > survey estimated, and testthat takes `info` on only some of the
+  > expectations they appear on. Where the message was static prose it
+  > became a comment above the expectation. Where a loop needed to name
+  > the failing case a comment cannot, so it became `label =`, which
+  > `test-marginaleffects-insight.R`, `test-loo-extras.R` and
+  > `test-pp-average.R` already use for exactly that.
+
+- [ ] **3.14 The codegen path's remaining duplication**
+  > Found by surveying the code-generation path for the shape 3.11
+  > fixed, two or more places that must agree with nothing keeping them
+  > in step. Everything reachable through 3.11's arguments was fixed
+  > there; what follows is not, and belongs in its own commit.
+  >
+  > The six GLM function names are listed four times over:
+  > `glm_patterns` in `detect_glm_usage()`, the byte-identical vector in
+  > `detect_glm_patterns()`, and the type branch in each of
+  > `transform_glm_call()` and `transform_single_glm_call()`. Adding a
+  > seventh form to one gives detection without transformation, or the
+  > reverse. The first two are the same function under two names, and
+  > both delegate to the same `map_responses_to_glm()`.
+  >
+  > The two `setup_brms_lightweight()` calls in
+  > `build_stan_components()` name ten arguments each and differ in
+  > five. That is the shape 3.11 was, one layer up: an argument added to
+  > the observation call and not the trend one builds the two submodels
+  > under different settings and says nothing. `codegen` is now the only
+  > thing they cannot disagree about.
+  >
+  > `stancode.mvgam_formula()` and `standata.mvgam_formula()` restate
+  > `build_stan_components()`'s defaults rather than inheriting them,
+  > and disagree about which arguments exist. `standata()` has no
+  > `validate` formal, so it parse-validates on every call while
+  > `stancode(validate = FALSE)` does not.
+  >
+  > Thirteen functions have no caller anywhere in `R/` or `tests/`:
+  > five in the nonlinear-model block of `R/brms_integration.R`,
+  > `transform_glm_calls_post_processing()` and `transform_glm_call()`
+  > in `R/stan_assembly.R`, `map_trend_priors()` and
+  > `get_trend_prior_spec()` in `R/priors.R`, and
+  > `validate_stan_code_structure()`, `are_braces_balanced()`,
+  > `parse_data_declarations()` and `validate_autocor_separation()` in
+  > `R/validations.R`. `transform_glm_calls_post_processing()` would
+  > error if it were called: its body reads a free variable that is
+  > neither a parameter nor bound locally. Deleting these needs a check
+  > against dynamic dispatch first, since the trend generators and the
+  > per-trend prior getters are reached by name through `paste0()`.
+
+- [ ] **3.15 The generator narrates itself, and cannot be told not to**
+  > "Validating combined Stan code..." prints before a step that takes
+  > no perceptible time, on every `mvgam()`, `jsdgam()`, `stancode()`,
+  > `standata()` and `update()` call. The guard reads `silent < 2`, but
+  > the threshold is never reached: `generate_combined_stancode()` has
+  > no `silent` formal and its caller hardcodes `silent = 1` in
+  > `R/mvgam_core.R`. No entry point can suppress it. The obs-only
+  > branch of the same function validates without announcing it, so the
+  > identical work is narrated on one path and silent on the other.
+  >
+  > It compounds where models are refitted. A ten-fold `kfold()` prints
+  > 41 lines by default; `silent = 2` removes 31 of them and leaves the
+  > 10 that no argument reaches. `update(recompile = FALSE)` prints it
+  > twice, once for the dry run and once for the fit.
+  >
+  > `silent` means four different things. It is a brms-style integer
+  > defaulting to 1 through the fitting path; a logical defaulting to
+  > TRUE in the Stan polisher and `validate_stan_code()`, the same name
+  > with the opposite type and polarity; a global option that deep
+  > validators read because they were never given the argument; and
+  > nothing at all in `pp_check()`, `loo_predict()` and friends,
+  > `mvgam_data()`, `register_custom_trend()` and
+  > `check_tweedie_truncation()`, which print unconditionally.
+  > `mvgam()` never documents the argument, and
+  > `stancode.mvgam_formula()` documents it backwards.
+  >
+  > Two announcements are made twice, once in `R/mvgam_core.R` and
+  > again in `R/backends.R`: compiling, and the start of sampling. Only
+  > the rstan path prints the compile pair, so the two backends differ
+  > in what they say. `R/stan_assembly.R` writes internal loop
+  > bookkeeping to stdout through `cat()`, guarded only by a check for
+  > the testthat environment variable, where `suppressMessages()`
+  > cannot reach it. And multiple imputation's two progress lines emit
+  > nothing at all: `insight::format_message()` returns a string
+  > without printing, unlike `format_warning()`, so a pooled fit runs
+  > with no progress output while looking as though it reports some.
+  >
+  > Scale is smaller than the raw counts suggest. Of roughly 212
+  > `cat()` calls, about 198 are inside `print` methods and are the
+  > point of the call. The work is in eight message sites.
+  >
+  > Keep what marks a wait: compiling, sampling, Pathfinder, PSIS, and
+  > each cross-validation refit batch. Keep what reports a decision
+  > that changes the answer: `pp_check()`'s chosen draw count, the
+  > `future` fallback, a dropped fold. Delete the announcements of
+  > instantaneous work rather than re-gating them, collapse the
+  > duplicated compile and sampling pairs to one each, and give
+  > `silent` one meaning: an integer where 2 prints nothing mvgam
+  > generates, 1 prints only waits and decisions, and 0 adds
+  > per-iteration detail. That needs a real `silent` formal on the
+  > functions a user calls, and threading it to
+  > `generate_combined_stancode()` instead of the hardcoded 1.
+
+- [x] **3.16 Two tests never turned on the thing they tested**
+  > `posterior_predict()` defaults to `process_error = FALSE`. Both
+  > process-error tests in
+  > `tests/local/test-predictions-brms-concordance.R` asked for the
+  > default and then for `FALSE`, so each compared the marginal surface
+  > against itself and rested on the two seeds. One asserted a strict
+  > inequality and had been failing on noise; the other took a ratio
+  > wide enough to pass either way. The flag itself is sound, and
+  > turning it on raises the mean predictive variance from 218 to 3993
+  > on the cached Poisson fit.
+  >
+  > Third instance this release of a test passing without exercising
+  > its subject, after `normalize = FALSE` on an intercept-only formula
+  > that never reaches the GLM path, and the class-documentation parser
+  > that matched no slots. Worth a pass at 6.0 over any test whose name
+  > names a toggle.
 
 - [ ] **5.0 Rebuild every vignette and the pkgdown site**
   > Caches date from June and July, before the prior and default
