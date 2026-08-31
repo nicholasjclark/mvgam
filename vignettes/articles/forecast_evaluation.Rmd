@@ -63,11 +63,13 @@ ranking models by score is well-defined.
 
 `portal_data` ships with the package and carries four desert
 rodent species (DM, DO, PB, PP) trapped monthly at the Portal
-LTREB site, with two pre-standardised covariates: a 12-month
-moving average of NDVI (`ndvi_ma12`) and the previous month's
-minimum temperature (`mintemp`). The response `captures` is an
-integer count, and roughly a fifth of the cells are missing
-because the field team could not always reach the plot.
+LTREB site. Two covariates come pre-centred: a 12-month moving
+average of NDVI (`ndvi_ma12`) and the previous month's minimum
+temperature (`mintemp`). Averaging over twelve months damps the
+NDVI series considerably, so it varies on a much narrower scale
+than `mintemp` does. The response `captures` is an integer
+count, and roughly a fifth of the cells are missing because the
+field team could not always reach the plot.
 
 ```{r data-head}
 data(portal_data)
@@ -94,9 +96,28 @@ mvgam_data(train, family = poisson(), y = "captures",
             series = "all")
 ```
 
-DM dominates the captures and is highly variable; DO and PB are
-intermediate; PP is sparse with long zero stretches. A useful
-forecast model should accommodate that heterogeneity.
+```{r series-shape, include = FALSE}
+zero_run <- function(y) {
+  y[is.na(y)] <- -1
+  r <- rle(y == 0)
+  if (any(r$values)) max(r$lengths[r$values]) else 0L
+}
+fe_pb_zero <- round(100 * mean(
+  train$captures[train$series == "PB"] == 0, na.rm = TRUE
+))
+fe_pp_zero <- round(100 * mean(
+  train$captures[train$series == "PP"] == 0, na.rm = TRUE
+))
+fe_pp_run <- zero_run(train$captures[train$series == "PP"])
+```
+
+DM dominates the captures and never hits zero. The other three
+are an order of magnitude smaller and each is sparse in its own
+way: PB records the most zeros at `r fe_pb_zero`% of its
+sampled months, while PP records fewer at `r fe_pp_zero`% but
+strings them into the longest run, `r fe_pp_run` months without
+a capture. A useful forecast model has to accommodate both the
+scale gap and that heterogeneity.
 
 ## Three candidate models
 
@@ -164,8 +185,8 @@ mod_var <- mvgam(
 mod_var <- read_cache("mod_var")
 ```
 
-The VAR fit's `summary()` shows the joint state-space machinery
-that distinguishes it from the simpler models:
+The VAR fit's `summary()` shows the joint parameters that
+distinguish it from the simpler models:
 
 ```{r mod_var_summary}
 summary(mod_var, include_betas = FALSE)
@@ -190,12 +211,19 @@ loo_var    <- loo(mod_var)
 loo_compare(loo_spline, loo_ar, loo_var)
 ```
 
-`loo_compare()` ranks the spline GAM first, with the VAR model
-~870 ELPD units behind and the per-species AR model ~85,000
-units behind. Take a moment to register how dramatic that gap
-is. By the LOO ranking, the simpler model is overwhelmingly the
-"better" fit, and `loo_model_weights()` makes the verdict
-explicit:
+```{r loo-numbers, include = FALSE}
+elpd_of <- function(l) l$estimates["elpd_loo", "Estimate"]
+fe_spline_gap <- abs(round(elpd_of(loo_var) - elpd_of(loo_spline)))
+k_ar <- loo_ar$diagnostics$pareto_k
+k_sp <- loo_spline$diagnostics$pareto_k
+fe_k_ar_pct <- round(100 * mean(k_ar > 0.7))
+fe_k_sp_pct <- round(100 * mean(k_sp > 0.7), 1)
+fe_k_ar_max <- round(max(k_ar), 2)
+```
+
+The ranking puts the two state-space models on top, with the
+spline GAM `r fe_spline_gap` ELPD units behind the VAR.
+`loo_model_weights()` makes that look decisive:
 
 ```{r model-weights}
 mw <- loo_model_weights(
@@ -205,55 +233,54 @@ mw <- loo_model_weights(
 mw
 ```
 
-All weight lands on the spline; the state-space models receive
-zero. Stacking weights are not posterior probabilities. They are
-the linear combination weights that minimise predictive log
-loss across LOO folds when the candidate forecasts are mixed
-(Yao et al. [2018](https://doi.org/10.1214/17-BA1091)). Here
-the optimiser sees the spline winning every fold by a wide
-margin, so it allocates a single mass point.
+Nearly all the weight goes to the VAR and none to the spline. It
+would be easy to read that as a recommendation about forecasting.
+It is not one, and the diagnostics say so before the scores do:
 
-This is the textbook PSIS-LOO failure mode when the model
-carries a latent trend, not a vindication of the spline. The
-reason is structural and worth dwelling on, because users hit
-it constantly when reaching for `loo()` on time-series fits.
+```{r pareto-k}
+sapply(list(spline = loo_spline, ar = loo_ar, var = loo_var),
+       function(l) round(mean(l$diagnostics$pareto_k > 0.7), 3))
+```
 
-The method targets the expected log predictive density of each
-fold in which a single observation is removed. It approximates
-that quantity cheaply by importance-sampling the full posterior,
-with Pareto smoothing on the weights.
-The approximation is valid only when omitting one observation
-shifts the posterior modestly, so the two posteriors overlap
-enough for the weights to behave. That assumption breaks for a
-state-space model in two compounding ways:
+The spline's importance weights are almost all well behaved, at
+`r fe_k_sp_pct`% of folds past the 0.7 threshold. The AR model
+reaches `r fe_k_ar_pct`%, with a worst value of
+`r fe_k_ar_max`. A Pareto-k above 0.7 means the
+importance-sampling estimate for that fold cannot be trusted, so
+part of the ranking above rests on numbers PSIS itself flags.
 
-1. *The latent trend leaks information across the omitted
-   point.* When observation $t$ is dropped, the latent state at
-   $t$ is still sandwiched between the observed states at
-   $t-1$ and $t+1$. Markov dynamics interpolate, and the model
-   effectively sees through the gap. The ELPD it returns is
-   therefore close to an in-sample density, not the true
-   density at unseen data.
-2. *The importance weights collapse.* The omitted observation
-   strongly identifies the latent state at $t$, so dropping it
-   shifts the posterior in a direction the importance ratio
-   from one point cannot smooth. Pareto-k diagnostics climb
-   past 0.7 on virtually every fold (you can confirm via
-   `loo(mod_ar)$diagnostics$pareto_k`), so the PSIS
-   approximation itself is unreliable.
+The reason is structural, and it also explains which way the
+ranking fell. PSIS-LOO estimates the density of observation $t$
+under a posterior fitted without it, by reweighting the posterior
+that did include it. That works while dropping one point barely
+moves the posterior. A latent trend breaks the assumption twice.
 
-The spline GAM has no latent trend, so neither problem applies
-and its LOO ELPD is honest. The verdict here is correct for
-the question PSIS-LOO actually asks: how well the model fits
-the points it was trained on. That is not the question
-forecasters care about.
+The state at time $t$ sits between the states at $t-1$ and
+$t+1$, and Markov dynamics interpolate across the gap. A model
+carrying a latent trend therefore still holds a well-informed
+state at $t$ when $y_t$ is dropped, and `log_lik()` evaluates
+the density at that state. The quantity that comes back is
+closer to an in-sample density than an out-of-sample one, and it
+flatters whichever model carries the most latent structure. The
+spline has no latent state to flatter, which is why it ranks
+last rather than first.
 
-For time-series forecast comparison the right diagnostic is
-**leave the future out**. Every evaluation point is then unseen
-relative to its training window, so there is no leak through
-neighbours and no broken importance ratio. The `lfo_cv()`
-section below runs exactly that comparison, and the ranking
-inverts.
+The same dependence ruins the weights. Because $y_t$ largely
+determines the state at $t$, removing it moves the posterior in
+a direction that one observation's importance ratio cannot
+cover. That is what the Pareto-k values are reporting.
+
+None of this makes the ranking wrong on its own terms. PSIS-LOO
+asks how well each model describes the points it trained on, and
+the state-space models do describe them better. It is the wrong
+question for a forecaster, asked through an approximation that
+has partly broken.
+
+For forecast comparison the question is leave the *future* out.
+Every evaluation point is then unseen relative to its own
+training window, so nothing interpolates through neighbours and
+no importance ratio has to stretch. The `lfo_cv()` section below
+asks it, and gets a different answer.
 
 ## Out-of-sample forecasts
 
@@ -301,14 +328,22 @@ head(crps_var$DM, 4)
 
 The `in_interval` column carries a 0/1 indicator of whether the
 held-out observation fell inside the 90% predictive interval.
-Average it within a series for an empirical coverage estimate; if
-the model is well calibrated and the holdout is representative,
-that average sits near 0.9.
+Average it within a series for an empirical coverage estimate,
+which should sit near 0.9 for a calibrated model:
 
 ```{r coverage}
 sapply(crps_var[setdiff(names(crps_var), "all_series")],
        function(d) mean(d$in_interval, na.rm = TRUE))
 ```
+
+Only DM lands there. DO falls short and both sparse series cover
+every held-out point, which means their intervals are wider than
+they need to be rather than better calibrated. Twelve months per
+species is far too short a window to read much into any of
+these, and that is the honest limitation of a single fixed
+holdout: it gives one draw of the evaluation, with no sense of
+how much it would move on a different window. The rolling-origin
+section below is the answer to that.
 
 `compare_scores()` bundles scores from several `mvgam_forecast`
 objects into one tidy frame. It returns one row per model x
@@ -319,37 +354,53 @@ crps_all <- compare_scores(fc_spline, fc_ar, fc_var, score = "crps")
 head(crps_all)
 ```
 
-The frame has one row per model x series x horizon. Plot the
-per-series CRPS trajectories or compute differences between
-specific models directly from it. Here we plot CRPS by horizon
-for each species, coloured by model, with the per-series rows
-only (skipping the joint `all_series` row):
-
-`plot()` dispatches on the `mvgam_compare_scores` class. For
-univariate scores it facets by series; switch to differences
-against any baseline model with `relative = "<model_name>"`.
+The frame has one row per model x series x horizon, so the
+per-series trajectories and any differences between models come
+straight out of it. `plot()` dispatches on the
+`mvgam_compare_scores` class, faceting by series for a
+univariate score and taking `relative = "<model_name>"` to
+switch to differences against a baseline:
 
 ```{r crps-by-horizon, fig.asp = 0.55, out.width = "85%"}
 plot(crps_all)
 ```
 
-DM and PB show the spline baseline rising fastest as the horizon
-grows. The splines extrapolate roughly linearly, while the
-state-space models stay close to the observed series via the
-latent AR(1) state. PP is the noisy sparse series where all
-three models perform similarly.
+```{r crps-means, include = FALSE}
+cm <- aggregate(
+  score ~ model + series,
+  data = crps_all[crps_all$series != "all_series", ],
+  FUN = function(z) mean(z, na.rm = TRUE)
+)
+crps_mean <- function(m, sp) {
+  round(cm$score[cm$model == m & cm$series == sp], 1)
+}
+```
 
-To see directly which horizons each state-space model beats the
-spline at, pivot to differences:
+The picture is not the same for every species. On DO the spline
+is not competitive at all, averaging a CRPS of
+`r crps_mean("fc_spline", "DO")` against
+`r crps_mean("fc_ar", "DO")` for the AR model, because its
+per-species smooth extrapolates a trajectory the observed series
+never follows. DM shows a milder version of the same thing. On
+the two sparse series the ordering reverses, and the spline is
+the better forecast.
+
+To see which horizons each state-space model beats the spline
+at, pivot to differences:
 
 ```{r crps-vs-spline, fig.asp = 0.55, out.width = "85%"}
 plot(crps_all, relative = "fc_spline")
 ```
 
-Negative values mean the AR or VAR model has a lower CRPS than
-the spline at that horizon. The state-space models help most on
-DM and PB and roughly tie on PP, the sparse series whose stretches
-of zeros are hard for any Poisson model.
+Negative values mean the AR or VAR model scored lower than the
+spline at that horizon. The gains are concentrated on DO and DM,
+the two series with enough signal for a latent state to track.
+On PB and PP the state-space models are modestly worse: those
+series spend much of the holdout at or near zero, and a latent
+AR state that keeps drifting adds variance a flat spline
+prediction avoids. Averaging CRPS over all four species would
+hide that entirely, which is the reason to score per series
+before scoring jointly.
 
 The log score (`score = "logs"`) evaluates the predictive
 log-density at each held out observation. The forecast object
@@ -401,16 +452,37 @@ energy_all <- compare_scores(fc_spline, fc_ar, fc_var,
 plot(energy_all)
 ```
 
+```{r energy-numbers, include = FALSE}
+ej <- as.data.frame(energy_all)
+ej <- ej[ej$series == "all_series", ]
+eband <- function(m) {
+  z <- ej$score[ej$model == m]
+  round(range(z, na.rm = TRUE), 1)
+}
+esp <- eband("fc_spline")
+ear <- eband("fc_ar")
+evr <- eband("fc_var")
+```
+
 Read the spline column first. Its energy score climbs from
-~7 at horizon one to ~93 by month 12 because the linear
-extrapolation drifts further from the joint trajectory of the
-four series with each step ahead. The AR and VAR models stay
-roughly flat (both between ~6 and ~13), the latent dynamics
-holding the joint forecast in place. AR and VAR run neck and
-neck. AR even edges VAR by one to three units at most horizons.
-On these data and at this horizon, the modelled correlations
-across species add no detectable benefit to the joint forecast;
-the simpler AR wins.
+`r esp[1]` at horizon one to `r esp[2]` by month 12, because the
+linear extrapolation drifts further from the joint trajectory of
+the four series with every step ahead. The AR and VAR models
+stay flat over the same window, spanning `r ear[1]` to
+`r ear[2]` and `r evr[1]` to `r evr[2]`, with the latent
+dynamics holding the joint forecast in place. AR and VAR run
+close, AR edging VAR at most horizons beyond the second. On
+these data and at this horizon the modelled cross-species
+correlations add no detectable benefit to the joint forecast,
+and the simpler AR is the better buy.
+
+This is the first comparison in the article to separate the
+models decisively, and it disagrees with the per-series CRPS
+above, where the spline won on PB and PP. Both are correct. CRPS
+asks each species separately and the spline is fine on the two
+that sit near zero; the energy score asks all four at once, and
+a joint forecast that drifts on DM and DO is wrong about the
+system regardless of what it does on the quiet series.
 
 ## Rolling-origin evaluation with `lfo_cv()`
 
@@ -454,10 +526,12 @@ list(
 )
 ```
 
-The state-space models refit more often than the spline because
-their latent dynamics are more sensitive to each new observation.
-The hybrid PSIS step still avoids refits at every other
-timepoint, which is the point.
+All three refit at the same four timepoints here, so the
+latent dynamics are not what drives the gate on this dataset;
+the window is simply short enough that each model's weights
+degrade at much the same places. The hybrid PSIS step still
+skips the remaining timepoints, which is what keeps
+rolling-origin evaluation affordable.
 
 `loo_compare()` works on `mvgam_lfo` objects directly:
 
@@ -465,9 +539,30 @@ timepoint, which is the point.
 loo_compare(lfo_spline, lfo_ar, lfo_var)
 ```
 
-Look at the trajectory of expected log predictive density across
-the rolling origin. A model whose ELPD trajectory rises faster
-(less negative) is forecasting better on average.
+```{r lfo-numbers, include = FALSE}
+lfo_tab <- loo_compare(lfo_spline, lfo_ar, lfo_var)
+lfo_worst <- round(abs(min(lfo_tab[, "elpd_diff"])), 1)
+lfo_worst_se <- round(lfo_tab[which.min(lfo_tab[, "elpd_diff"]),
+                              "se_diff"], 1)
+```
+
+The spline heads this table, which is the reverse of the LOO
+ordering. Before reading anything into it, compare each
+difference with its own standard error: the largest gap is
+`r lfo_worst` units against a standard error of
+`r lfo_worst_se`. Every difference here sits inside roughly one
+standard error of zero, so this evaluation does not separate the
+three models at all. Starting at `min_t = 60` on 68 training
+timepoints leaves only a handful of origins, and a four-step
+horizon asks a much easier question than the twelve-month
+holdout scored above.
+
+That is worth stating plainly rather than ranking anyway. The
+useful conclusion is not that the spline forecasts best, but
+that at four steps ahead these models are indistinguishable,
+while at twelve months the energy score told them decisively
+apart. The evaluation horizon, not the ranking rule, is what
+changed the answer.
 
 `compare_elpds()` is the LFO companion of `compare_scores()`. It
 stacks per-step ELPDs from several `mvgam_lfo` objects into a
@@ -485,10 +580,13 @@ falls behind across the rolling-origin window:
 plot(lfo_df, cumulative = TRUE)
 ```
 
-The LFO ranking and the LOO ranking can disagree. When they do,
-trust LFO for forecasting decisions, because its evaluation set
-is the *future* relative to each training window, which is the
-only set that matches the production decision.
+The LFO ranking and the LOO ranking disagree here, and LFO is
+the one to trust for a forecasting decision, because its
+evaluation set is the *future* relative to each training window.
+That is the set the production question is asked on. Where LFO
+cannot separate the candidates, as here, the honest reading is
+that the rolling window was too short to decide, and a longer
+holdout scored jointly is the tie-breaker.
 
 ## Ensemble forecasting
 
@@ -514,24 +612,22 @@ stack_weights <- loo_model_weights(
 stack_weights
 ```
 
-The pseudo-BMA vector is essentially `(0, 1, 0)`. The softmax
-exponentiates ELPD differences, and AR's total LFO ELPD sits
-~20 units above the VAR and ~42 above the spline.
-`exp(20) ≈ 5 × 10^8` swamps `exp(0)`, so AR takes essentially
-all the weight by construction.
+The two methods disagree, and the disagreement is the lesson.
+Pseudo-BMA puts a weight of one on the spline and nothing
+anywhere else. It is a softmax of total ELPD, so it exponentiates
+differences that the section above showed to be within a standard
+error of zero, and a gap that small still swamps its rivals once
+raised through `exp()`. The confidence is an artefact of the
+transform, not evidence from the data.
 
-Stacking gives the same headline answer here. AR collects
-~0.997 and the spline picks up a tiny ~0.003; VAR receives
-nothing. That convergence is not a coincidence: AR is the
-clear winner of the per-observation predictive density at
-most evaluation points, so the convex optimisation lands at
-almost the same corner of the simplex. When the headline
-model is this dominant, ensembling buys nothing.
-
-Stacking is still the right default. In the more usual case
-where the candidates run closer to one another, the convex
-optimiser produces appreciably softer weights than pseudo-BMA
-(Yao et al. 2018, §3.3). Here it just happens to agree.
+Stacking sees the same evaluation points and splits the weight
+between the spline and the AR model, giving almost nothing to the
+VAR. It optimises the log score of the *mixture* rather than
+ranking the candidates, so it can notice that the two leaders
+miss on different evaluation points and that averaging them beats
+either alone. That is the behaviour to expect whenever the
+candidates run close, and it is why stacking is the better
+default (Yao et al. 2018, §3.3).
 
 `ensemble()` builds a combined forecast object by resampling
 posterior draws from each component in proportion to the weights:
@@ -544,14 +640,11 @@ fc_ens <- ensemble(
 fc_ens
 ```
 
-Score the ensemble alongside the individual models on the
-holdout window with `compare_scores()`. The honest comparison is
-on CRPS and energy:
-
-`summary()` on a `mvgam_compare_scores` frame pivots it to one
-row per evaluation cell, with a column for each model. Read
-across the rows to see how the candidates differ on the same
-data point.
+Score the ensemble alongside the individual models on the same
+holdout, using CRPS and then energy. `summary()` on a
+`mvgam_compare_scores` frame pivots it to one row per evaluation
+cell with a column per model, so the candidates can be read
+across on the same data point:
 
 ```{r ensemble-crps}
 crps_ens <- compare_scores(fc_spline, fc_ar, fc_var, fc_ens,
@@ -569,29 +662,35 @@ energy_ens <- compare_scores(fc_spline, fc_ar, fc_var, fc_ens,
 summary(energy_ens)
 ```
 
-The ensemble does not beat the best individual on every species
-or every horizon. It is the *least bad* across the joint
-distribution of held-out evaluations, which is the right property
-when the user does not know in advance which species or horizon
-they will care about most.
+The ensemble wins nowhere outright and loses nowhere badly. That
+is the property worth having when the candidates disagree about
+which species they handle well, as these do: the spline is the
+better forecast on PB and PP, the state-space models on DM and
+DO, and nothing in the training data tells you which species
+will matter most next year. Mixing them buys insurance against
+that choice rather than a better score on any one cell.
 
 ## Take-aways
 
-A forecast evaluation workflow in mvgam reuses the same fits
-three times. First, `loo()` and `loo_compare()` catch
-pathological models cheaply in sample. They do not pick a
-forecast model, though. For that, `forecast(newdata = test)`
-followed by `score()` is the workhorse. Use `score("crps")` or
-`score("drps")` for univariate calibration. Use
-`score("energy")` or `score("variogram")` when joint structure
-matters. The production question is often closer to "how would
-this model have performed run after run": `lfo_cv()` plays out
-rolling forecasts and the hybrid PSIS scheme keeps the
-refitting cost low. Combine the candidates with `ensemble()`
-using stacking weights from `loo_model_weights()`, then score
-the ensemble on the same holdout the individuals saw. Pick the
-score that matches the decision. Pick the cross-validation
-that matches the production question.
+Three evaluations of the same three fits gave three different
+winners. PSIS-LOO put the VAR first and the spline last, on an
+approximation its own Pareto-k values flagged as unreliable, and
+for a question about training fit rather than forecasting.
+Rolling-origin evaluation at four steps put the spline first by
+a margin smaller than its standard error, which is another way
+of saying it could not tell them apart. The twelve-month energy
+score separated them cleanly and put the AR model first.
+
+None of those contradicts the others, because each asks a
+different question. That is the thing to take away: the score
+and the cross-validation scheme are not neutral steps you run
+after choosing a model, they are the choice. Decide the
+horizon you care about and whether the decision is per series or
+joint, then pick the evaluation that matches, and treat a
+ranking produced by any other combination as evidence about
+something else. Where the candidates disagree by species, as
+they do here, an `ensemble()` weighted by stacking is a
+defensible way to decline the choice.
 
 ## Further reading
 

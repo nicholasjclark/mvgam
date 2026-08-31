@@ -25,9 +25,12 @@ data(portal_data, package = "mvgam")
 train <- subset(portal_data, time <= 68L)
 test  <- subset(portal_data, time >  68L)
 
-CHAINS  <- 2L
-SAMPLES <- 600L
-SILENT  <- 2L
+# Matches the argument spelling the article displays, so the code
+# shown beside each fit is the code that produced it.
+CHAINS <- 2L
+ITER   <- 1600L
+WARMUP <- 1000L
+SILENT <- 2L
 
 
 # ---- mod_spline: smooths only, no trend ---------------------------------
@@ -38,7 +41,8 @@ mod_spline <- mvgam(
     s(time, by = series, k = 8) + series,
   family = poisson(),
   data   = train,
-  chains = CHAINS, samples = SAMPLES, silent = SILENT
+  chains = CHAINS, iter = ITER, warmup = WARMUP,
+  silent = SILENT
 )
 saveRDS(mod_spline, file.path(cache_dir, "mod_spline.rds"))
 
@@ -51,7 +55,8 @@ mod_ar <- mvgam(
   trend_formula = ~ AR(),
   family = poisson(),
   data   = train,
-  chains = CHAINS, samples = SAMPLES, silent = SILENT
+  chains = CHAINS, iter = ITER, warmup = WARMUP,
+  silent = SILENT
 )
 saveRDS(mod_ar, file.path(cache_dir, "mod_ar.rds"))
 
@@ -64,7 +69,8 @@ mod_var <- mvgam(
   trend_formula = ~ VAR(cor = TRUE),
   family = poisson(),
   data   = train,
-  chains = CHAINS, samples = SAMPLES, silent = SILENT
+  chains = CHAINS, iter = ITER, warmup = WARMUP,
+  silent = SILENT
 )
 saveRDS(mod_var, file.path(cache_dir, "mod_var.rds"))
 
