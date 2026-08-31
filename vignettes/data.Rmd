@@ -212,10 +212,10 @@ mvgam(y ~ 1, data = bad_family, family = Beta(),
       chains = 1L, iter = 1100L, warmup = 1000L, silent = 2L)
 ```
 
-The error states the actual problem (Beta needs $(0, 1)$, the
-response has negative values) rather than a numerical collapse
-mid-sampling. The same check runs inside the data inspector
-below, which is the recommended pre-flight call.
+The error names the constraint that failed rather than letting
+sampling collapse on a response the family cannot describe. The same
+check runs inside the data inspector below, which is the recommended
+pre-flight call.
 
 ## `check_mvgam_data()`: pre-flight validation
 

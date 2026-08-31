@@ -1058,6 +1058,21 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > Each of these three needs rendering with the gate open before the
   > workflow sets it, or a silent gap becomes a failing site build.
 
+- [ ] **5.3 The response-family check skips bounded families**
+  > `mvgam()` refuses a negative response under `poisson()` with its
+  > own message naming the column, the minimum observed and what the
+  > family needs. The same data under `Beta()` falls through to brms,
+  > which reports `Family 'beta' requires response greater than 0` from
+  > `data_response.brmsframe()`. Beta needs the open unit interval, so
+  > the message names half the constraint, and it arrives from a
+  > function the user did not call.
+  >
+  > Found by rendering `data.Rmd`, which demonstrates six rejections;
+  > the other five are mvgam's own and give class, observed value and
+  > remedy. Worth extending the check to the bounded continuous
+  > families so the article's claim that mvgam catches these holds for
+  > all of them.
+
 - [ ] **5.0 Rebuild every vignette and the pkgdown site**
   > Caches date from June and July, before the prior and default
   > changes. Roughly 60 numeric claims need re-checking, and
