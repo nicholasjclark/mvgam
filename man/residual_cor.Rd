@@ -85,9 +85,30 @@ matrix is reconstructed from the trend's posterior covariance:
 \code{ZMVN(cor = TRUE)}) reconstruct
 \code{Sigma = diag(sigma) \%*\% L_Omega \%*\% t(L_Omega) \%*\% diag(sigma)}
 per draw.
-\item Full-covariance trends (\code{VAR}, \code{VARMA}) use \code{Sigma_trend}
-directly.
+\item Full-covariance trends (\code{VAR}, \code{VARMA}) read \code{Omega_trend},
+the stationary covariance the Stan model derives from
+\code{A_trend} and \code{Sigma_trend}.
 }
+
+The covariance summarised is the one the latent states settle at,
+not the covariance of a single innovation, because a residual
+correlation describes where the process sits rather than how far
+one step moves it. The two coincide only when nothing propagates
+the state between times. They differ for \code{VAR()} and \code{VARMA()},
+where \code{Omega_trend} solves \verb{Omega = A Omega A' + Sigma}, and for
+\code{AR(cor = TRUE)}, whose scales are lifted to their stationary
+values before the correlation is taken. For \code{ZMVN()} there is no
+propagation and for \code{RW()} no stationary distribution exists, so
+both report the innovation covariance itself. A grouping variable
+does not change which rule applies: a hierarchical \code{AR()} has its
+per-group scales lifted the same way before the global and
+per-group factors are mixed, while hierarchical \code{RW()} and
+\code{ZMVN()} are left alone.
+
+To ask the other question, what the \emph{contemporaneous shocks} share,
+read \code{Sigma_trend} from the posterior and apply \code{\link[stats:cor]{stats::cov2cor()}}
+per draw. On a fitted \code{VAR()} the two can differ substantially,
+since \code{A} redistributes each shock across series at every step.
 For hierarchical trends, per-group correlations combine the global
 Cholesky factor and per-group deviations via
 \verb{alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev\[g\])}.

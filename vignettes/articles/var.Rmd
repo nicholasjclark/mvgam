@@ -120,10 +120,13 @@ $$
 
 Priors for the region intercepts and the innovation SD are pulled
 in tighter than the defaults so the sampler does not have to
-learn scale from three dozen observations per region. The
-sampler uses `adapt_delta = 0.95` to handle the tight
-`sigma_trend` prior; the fit is cached to avoid re-running at
-render time.
+learn scale from three dozen observations per region. A latent
+state per region per year is a lot of correlated parameters for
+a series this short, so the fit runs four chains at
+`adapt_delta = 0.99` rather than the defaults; at two chains and
+a looser target the individual states mix too poorly to support
+the intervals reported below. The fit is cached to avoid
+re-running it at render time.
 
 ```{r fit-code, eval = FALSE}
 varmod <- mvgam(
@@ -136,10 +139,10 @@ varmod <- mvgam(
   data          = train,
   newdata       = test,
   family        = Gamma(),
-  adapt_delta   = 0.95,
-  chains        = 2,
-  iter          = 1500,
-  warmup        = 1000,
+  adapt_delta   = 0.99,
+  chains        = 4,
+  iter          = 3000,
+  warmup        = 1500,
   silent        = 2
 )
 ```
@@ -155,6 +158,11 @@ parameters on a modest dataset.
 varmod <- read_cache("kestrel_fit")$varmod
 train  <- read_cache("kestrel_fit")$train
 test   <- read_cache("kestrel_fit")$test
+# The latent processes are ordered by the levels of the series
+# factor, which is alphabetical and not the order the regions were
+# assembled in. Everything downstream labels itself from this.
+region_order <- levels(train$series)
+n_reg <- length(region_order)
 ```
 
 ## Model summary
@@ -198,40 +206,107 @@ mcmc_plot(
 )
 ```
 
-The clearest signal is on the diagonal (`A_trend[1,1,1]`,
-`[1,2,2]`, `[1,3,3]`): each region has substantial positive
-self-persistence, so a good year raises the expected count in
-the following year within the same region. The off-diagonals
-are more ambiguous, with `A_trend[1,2,1]` (BC → Alberta)
-showing the most concentrated positive posterior, consistent
-with the two adjacent regions moving together.
+```{r a-numbers, include = FALSE}
+A_post <- as.matrix(varmod, variable = "^A_trend\\[", regex = TRUE)
+a_cell <- function(i, j) A_post[, sprintf("A_trend[1,%d,%d]", i, j)]
+a_diag_min <- min(vapply(seq_len(n_reg),
+                         function(i) mean(a_cell(i, i) > 0), numeric(1)))
+off <- expand.grid(i = seq_len(n_reg), j = seq_len(n_reg))
+off <- off[off$i != off$j, ]
+off$p_pos <- apply(off, 1L, function(r) mean(a_cell(r[["i"]], r[["j"]]) > 0))
+best <- off[which.max(off$p_pos), ]
+fe_a_diag <- sprintf("%.2f", a_diag_min)
+fe_a_best <- sprintf("%s on %s", region_order[best$j], region_order[best$i])
+fe_a_best_p <- sprintf("%.2f", best$p_pos)
+```
+
+The diagonal carries the clearest signal. Each region's own state
+at $t-1$ raises its state at $t$, with at least
+`r fe_a_diag` of the posterior above zero for all three, so a
+good year tends to be followed by another. The off-diagonals are
+weaker and none of them separates from zero. The strongest is the
+effect of `r fe_a_best`, at `r fe_a_best_p` of the posterior
+above zero, which is suggestive and no more. Note the index
+order: `A_trend[1,i,j]` is the effect of process $j$ on process
+$i$, and the processes follow the levels of the series factor, so
+`region_order` above is what names them.
 
 ## Inspecting the innovation covariance
 
-The innovation covariance $\Sigma$ tells you which regions share
-contemporaneous shocks, the kind of common weather or
-detection-effort year that would nudge all three surveys in the
-same direction at once. The mvgam Stan model saves `Sigma_trend`
-directly, so we can compute the posterior median correlation
-matrix by applying `cov2cor()` to each draw:
+The innovation covariance $\Sigma$ says which regions take the
+same shock in the same year, the common weather or
+detection-effort excursion that nudges several surveys at once.
+`Sigma_trend` is saved directly, so `cov2cor()` on each draw puts
+it on a correlation scale, labelled by `region_order` rather than
+by hand.
 
 ```{r sigma-cor}
 Sig_post <- as.matrix(varmod, variable = "^Sigma_trend\\[", regex = TRUE)
 cor_draws <- t(apply(Sig_post, 1, function(v) {
-  as.numeric(cov2cor(matrix(v, 3, 3)))
+  as.numeric(cov2cor(matrix(v, n_reg, n_reg)))
 }))
-med_cor <- matrix(apply(cor_draws, 2, median), 3, 3)
-rownames(med_cor) <- colnames(med_cor) <- c("BC", "Alb", "Sask")
+med_cor <- matrix(apply(cor_draws, 2, median), n_reg, n_reg)
+dimnames(med_cor) <- list(region_order, region_order)
 round(med_cor, 2)
 ```
 
-The two neighbouring pairs (BC and Alberta, r ≈ 0.32; Alberta
-and Saskatchewan, r ≈ 0.29) share moderate positive innovation
-correlations, while the pair at either end of the range (BC and
-Saskatchewan, r ≈ -0.03) share essentially none. Geography falls
-out of the fit without being told.
+```{r sigma-numbers, include = FALSE}
+inn <- function(a, b) {
+  i <- match(a, region_order)
+  j <- match(b, region_order)
+  z <- cor_draws[, (j - 1) * n_reg + i]
+  sprintf("%.2f (%.2f to %.2f)", median(z),
+          quantile(z, 0.05), quantile(z, 0.95))
+}
+fe_alb_bc <- inn("Alb", "BC")
+fe_alb_sask <- inn("Alb", "Sask")
+fe_bc_sask <- inn("BC", "Sask")
+```
 
-## Forecasts
+Read those against the map before reading anything into them.
+British Columbia and Saskatchewan sit at either end of the
+transect with Alberta between them, so adjacency would predict
+the two neighbouring pairs correlating and the far pair not.
+That is not the pattern. Alberta and British Columbia sit at
+`r fe_alb_bc`, the two non-adjacent provinces at `r fe_bc_sask`,
+and the other adjacent pair, Alberta and Saskatchewan, at
+`r fe_alb_sask`. Every one of those intervals covers zero, so the
+honest summary is that 35 years of annual counts do not resolve
+the contemporaneous correlations at all, and geography is not
+waiting inside them to be found.
+
+The correlation between the *states*, rather than between the
+shocks, is a different question and a better answered one.
+`residual_cor()` reports it, reading the stationary covariance
+the model derives from $A$ and $\Sigma$ together, so it describes
+where the latent processes settle rather than how far a single
+year moves them:
+
+```{r resid-cor}
+rc <- residual_cor(varmod)
+round(rc$cor, 2)
+```
+
+```{r resid-cor-numbers, include = FALSE}
+sta <- function(a, b) {
+  i <- match(a, rownames(rc$cor))
+  j <- match(b, colnames(rc$cor))
+  sprintf("%.2f (%.2f to %.2f)", rc$cor[i, j],
+          rc$cor_lower[i, j], rc$cor_upper[i, j])
+}
+fe_s_alb_bc <- sta("Alb", "BC")
+fe_s_bc_sask <- sta("BC", "Sask")
+```
+
+These are larger and two of the three exclude zero: Alberta with
+British Columbia at `r fe_s_alb_bc`, and British Columbia with
+Saskatchewan at `r fe_s_bc_sask`. Accumulating shocks through
+$A$ year after year is what builds the shared variation; any one
+year's shocks barely share anything. Which of the two matrices
+answers your question is worth settling before reading either.
+Neither restores the geography.
+
+## Forecasts## Forecasts
 
 Passing `newdata = test` at fit time stored the held-out slice
 on the fitted object, so `forecast()` extends the VAR five years
@@ -264,31 +339,54 @@ one panel per target region.
 irfs <- irf(varmod, h = 12)
 ```
 
+`plot()` takes the shocked process by position, so `series = 1`
+is the first level of `region_order` rather than the first region
+named when the data were assembled.
+
+```{r irf-numbers, include = FALSE}
+ir <- as.data.frame(irfs)
+ir$src <- region_order[as.integer(sub(".*Process_(\\d+) ->.*", "\\1",
+                                       ir$shock))]
+ir$tgt <- region_order[as.integer(sub(".*-> Process_(\\d+)", "\\1",
+                                       ir$shock))]
+self_pk <- max(abs(ir$irfQ50[ir$src == ir$tgt]))
+cross_pk <- max(abs(ir$irfQ50[ir$src != ir$tgt]))
+cross <- ir[ir$src != ir$tgt, ]
+cross_resolved <- sum(sign(cross$irfQ2.5) == sign(cross$irfQ97.5))
+fe_self_pk <- sprintf("%.2f", self_pk)
+fe_cross_pk <- sprintf("%.2f", cross_pk)
+```
+
 ```{r plot-irf1, fig.cap = "Generalized impulse responses to a positive shock in region 1 (British Columbia). Each panel shows how the process for the target region is expected to respond over the next 12 years."}
 plot(irfs, series = 1)
 ```
 
-A positive shock in British Columbia (region 1) decays within
-its own process (left panel) over roughly ten years, moves
-Alberta's process up by about 0.03 units on the inverse-link
-scale (middle panel), and pushes Saskatchewan's process slightly
-positive with a delayed peak (right panel).
+The self-response is the one that shows. A shock to
+`r region_order[1]` lifts its own process by
+`r fe_self_pk` on the inverse-link scale in the first year and
+decays from there; the responses in the other two regions peak in
+year two at a fraction of that.
 
 ```{r plot-irf2, fig.cap = "Impulse responses to a shock in region 2 (Alberta). The self-response decays smoothly; British Columbia responds in the same direction as Alberta, and Saskatchewan shows a delayed positive response consistent with the adjacent-region correlation seen in Sigma."}
 plot(irfs, series = 2)
 ```
 
-Shocks originating in Alberta propagate outwards to both
-neighbours, with the delayed Saskatchewan peak echoing the
-delayed cross-lag effect the transition matrix hinted at.
+The same shape repeats for a shock to `r region_order[2]`: a
+first-year self-response, then small positive movements
+elsewhere that peak a year later.
 
 ```{r plot-irf3, fig.cap = "Impulse responses to a shock in region 3 (Saskatchewan). The self-response is the sharpest of the three, and the effect on Alberta persists longer than the effect on British Columbia."}
 plot(irfs, series = 3)
 ```
 
-Saskatchewan shocks have the tightest self-response and touch
-Alberta more than they touch British Columbia, consistent with
-the geography embedded in the innovation correlations.
+Across all three panels the largest cross-region response is
+`r fe_cross_pk`, roughly a third of the largest self-response,
+and `r cross_resolved` of the cross-region responses have a
+credible interval excluding zero at any horizon. The medians
+trace a tidy story of shocks spreading between provinces; the
+intervals do not support telling it. What the figures establish
+is that each region responds to its own shocks and that any
+spillover is too small for this series to pin down.
 
 ## Forecast error variance decomposition
 
@@ -296,10 +394,11 @@ The forecast error variance decomposition (FEVD) turns the same
 quantities around. Rather than tracing one shock outward, it asks
 how much of the forecast uncertainty for region $i$ at horizon
 $h$ was generated by shocks originating in each region. `fevd()`
-returns the posterior draws; `plot(fevds)` renders one
-stacked-bar panel per target region, with the bar heights showing
-the median share attributed to each source over increasing
-horizons.
+reports the posterior median share and an interval for each
+source, keeping the draws behind `summary = FALSE`;
+`plot(fevds)` renders one stacked-bar panel per target region,
+the bar heights showing the median share attributed to each
+source over increasing horizons.
 
 ```{r fevd-fit}
 fevds <- fevd(varmod, h = 12)
@@ -309,35 +408,53 @@ fevds <- fevd(varmod, h = 12)
 plot(fevds)
 ```
 
-Own-region shocks dominate at short horizons for every region
-(the darker slice on the bottom of each bar), consistent with
-the strong diagonal in $A$. As the horizon lengthens, the
-cross-region shares grow: by year 12 Alberta contributes about
-25% of the forecast variance in British Columbia and about 20%
-of the forecast variance in Saskatchewan. The two regions at
-either end of the range contribute least to each other's
-forecast uncertainty, which is the flip side of the negligible
-BC and Saskatchewan correlation in $\Sigma$.
+```{r fevd-numbers, include = FALSE}
+fv <- as.data.frame(fevds)
+fv$src <- region_order[as.integer(sub(".*Process_(\\d+) ->.*", "\\1",
+                                       fv$shock))]
+fv$tgt <- region_order[as.integer(sub(".*-> Process_(\\d+)", "\\1",
+                                       fv$shock))]
+f12 <- fv[fv$horizon == 12, ]
+sh <- function(a, b) sprintf("%.0f%%", 100 *
+  f12$fevdQ50[f12$src == a & f12$tgt == b])
+fe_ab <- sh("Alb", "BC")
+fe_as <- sh("Alb", "Sask")
+fe_own_min <- sprintf("%.0f%%", 100 * min(
+  f12$fevdQ50[f12$src == f12$tgt]))
+```
+
+Own-region shocks dominate at short horizons for every region,
+the darker slice at the bottom of each bar, which is what the
+strong diagonal in $A$ implies. The cross-region shares grow with
+the horizon without ever taking over: by year 12 Alberta accounts
+for `r fe_ab` of the forecast variance in British Columbia and
+`r fe_as` of it in Saskatchewan, while every region still owns at
+least `r fe_own_min` of its own. Read this beside the impulse
+responses rather than instead of them. A variance share is a
+point estimate of a ratio and carries no statement about whether
+the underlying effect is distinguishable from zero, and the
+intervals above say these ones are not.
 
 ## Community stability metrics
 
 The transition matrix and innovation covariance also determine
 whether the system as a whole would amplify or absorb small
 shocks around the stationary distribution. `stability()`
-computes posterior draws of three interpretable dynamic-stability
-metrics (Ives et al.
+reports three interpretable dynamic-stability metrics, each
+summarised to a median and an interval with the draws available
+under `summary = FALSE` (Ives et al.
 [2003](https://doi.org/10.1890/0012-9615(2003)073[0301:ECSAEI]2.0.CO;2);
 Neubert & Caswell
 [1997](https://doi.org/10.1890/0012-9658(1997)078[0653:ATRFMT]2.0.CO;2)):
 
-- **Reactivity**: the log of the largest singular value of $A$.
+- Reactivity, the log of the largest singular value of $A$.
   Positive reactivity means small perturbations grow immediately
   after the shock before eventually decaying; negative
   reactivity means the perturbation shrinks straight away.
-- **Mean return rate**: the modulus of the largest eigenvalue
+- Mean return rate, the modulus of the largest eigenvalue
   of $A$. Values closer to one imply a slower return of the
   mean to its stationary distribution after a shock.
-- **Variance return rate**: the analogous quantity for $A
+- Variance return rate, the analogous quantity for $A
   \otimes A$, describing how quickly forecast variance decays
   back to its stationary level.
 
@@ -350,14 +467,28 @@ stab <- stability(varmod)
 plot(stab)
 ```
 
-Reactivity is centred near zero (posterior median $\approx$
--0.03, 90% CI $\approx$ [-0.39, 0.69]) with 45% of the posterior
-mass sitting on the positive side of the dashed line. The data
-leave genuine uncertainty about whether the system is reactive
-or non-reactive, but any amplification would be small. Mean and
-variance return rates sit around 0.84 and 0.70 respectively,
-consistent with a stable system that takes a handful of years
-to relax back to its stationary distribution after a shock.
+```{r stability-numbers, include = FALSE}
+st_tab <- as.data.frame(stab)
+st_val <- function(m) st_tab$Estimate[st_tab$metric == m]
+st_draws <- stability(varmod, summary = FALSE)
+react <- if (is.list(st_draws)) st_draws$reactivity else
+  st_draws[, "reactivity"]
+fe_react <- sprintf("%.2f", stats::median(react))
+fe_react_lo <- sprintf("%.2f", stats::quantile(react, 0.05))
+fe_react_hi <- sprintf("%.2f", stats::quantile(react, 0.95))
+fe_react_pos <- sprintf("%.0f%%", 100 * mean(react > 0))
+fe_mrr <- sprintf("%.2f", st_val("mean_return_rate"))
+fe_vrr <- sprintf("%.2f", st_val("var_return_rate"))
+```
+
+Reactivity is centred near zero, with a median of `r fe_react`
+and a 90% interval from `r fe_react_lo` to `r fe_react_hi`, and
+`r fe_react_pos` of the posterior sitting above the dashed line.
+The data do not settle whether this system amplifies a small
+perturbation before absorbing it, though they do bound how much
+it could amplify by. Mean and variance return rates of
+`r fe_mrr` and `r fe_vrr` describe a stable system that takes
+several years to relax back to its stationary distribution.
 
 ## Take-aways
 
@@ -367,10 +498,9 @@ innovation structure:
 
 - `mcmc_plot(mod, variable = "A_trend", ...)` shows the lagged
   dependence structure per cell of the transition matrix.
-- `as.matrix(mod, variable = "Sigma_trend", ...)` + `cov2cor()`
-  recovers the posterior distribution of the innovation
-  correlation matrix, which tells you which series share
-  contemporaneous shocks.
+- `residual_cor(mod)` turns the innovation covariance into
+  correlations with intervals and evidence, telling you which
+  series share contemporaneous shocks.
 - `irf()` + `plot(irfs, series = j)` traces how a shock at a
   focal series is expected to move each other series over a
   chosen horizon.
@@ -381,9 +511,10 @@ innovation structure:
   rates).
 
 Every one of these views draws on the same posterior for
-$(A, \Sigma)$. They differ only in which question they put to
-that joint object, which is why adding one to an analysis costs
-nothing beyond the call that computes it.
+$(A, \Sigma)$, differing only in which question they put to that
+joint object. Each returns a summary by default and the draws
+under `summary = FALSE`, so a figure costs a call rather than a
+refit.
 
 ## Further reading
 

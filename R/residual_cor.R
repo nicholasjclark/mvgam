@@ -59,9 +59,30 @@
 #'     `ZMVN(cor = TRUE)`) reconstruct
 #'     `Sigma = diag(sigma) %*% L_Omega %*% t(L_Omega) %*% diag(sigma)`
 #'     per draw.
-#'   \item Full-covariance trends (`VAR`, `VARMA`) use `Sigma_trend`
-#'     directly.
+#'   \item Full-covariance trends (`VAR`, `VARMA`) read `Omega_trend`,
+#'     the stationary covariance the Stan model derives from
+#'     `A_trend` and `Sigma_trend`.
 #' }
+#'
+#' The covariance summarised is the one the latent states settle at,
+#' not the covariance of a single innovation, because a residual
+#' correlation describes where the process sits rather than how far
+#' one step moves it. The two coincide only when nothing propagates
+#' the state between times. They differ for `VAR()` and `VARMA()`,
+#' where `Omega_trend` solves `Omega = A Omega A' + Sigma`, and for
+#' `AR(cor = TRUE)`, whose scales are lifted to their stationary
+#' values before the correlation is taken. For `ZMVN()` there is no
+#' propagation and for `RW()` no stationary distribution exists, so
+#' both report the innovation covariance itself. A grouping variable
+#' does not change which rule applies: a hierarchical `AR()` has its
+#' per-group scales lifted the same way before the global and
+#' per-group factors are mixed, while hierarchical `RW()` and
+#' `ZMVN()` are left alone.
+#'
+#' To ask the other question, what the *contemporaneous shocks* share,
+#' read `Sigma_trend` from the posterior and apply [stats::cov2cor()]
+#' per draw. On a fitted `VAR()` the two can differ substantially,
+#' since `A` redistributes each shock across series at every step.
 #' For hierarchical trends, per-group correlations combine the global
 #' Cholesky factor and per-group deviations via
 #' `alpha * tcrossprod(L_global) + (1 - alpha) * tcrossprod(L_dev\[g\])`.

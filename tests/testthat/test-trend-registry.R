@@ -181,44 +181,6 @@ test_that("list_trend_types works correctly", {
   expect_true("PW" %in% factor_incompatible)
 })
 
-test_that("Factor compatibility validation works", {
-  # Clear and initialize registry
-  rm(list = ls(envir = trend_registry), envir = trend_registry)
-  register_core_trends()
-
-  # Test factor-compatible trend with n_lv (should pass)
-  ar_spec <- list(trend_model = "AR", n_lv = 3)
-  expect_silent(validate_factor_compatibility(ar_spec))
-
-  # Test factor-compatible trend without n_lv (should pass)
-  ar_spec_no_lv <- list(trend_model = "AR", n_lv = NULL)
-  expect_silent(validate_factor_compatibility(ar_spec_no_lv))
-
-  # Test factor-incompatible trend with n_lv (should error)
-  pw_spec <- list(trend_model = "PW", n_lv = 3)
-  expect_error(validate_factor_compatibility(pw_spec),
-               "Factor models.*not supported.*trends")
-
-  # Test factor-incompatible trend without n_lv (should pass)
-  pw_spec_no_lv <- list(trend_model = "PW", n_lv = NULL)
-  expect_silent(validate_factor_compatibility(pw_spec_no_lv))
-})
-
-test_that("get_factor_compatible_trends works", {
-  # Clear and initialize registry
-  rm(list = ls(envir = trend_registry), envir = trend_registry)
-  register_core_trends()
-
-  compatible_trends <- get_factor_compatible_trends()
-
-  expect_true("AR" %in% compatible_trends)
-  expect_true("RW" %in% compatible_trends)
-  expect_true("VAR" %in% compatible_trends)
-  expect_true("ZMVN" %in% compatible_trends)
-  expect_false("PW" %in% compatible_trends)
-  expect_false("CAR" %in% compatible_trends)
-})
-
 test_that("Registry initialization is idempotent", {
   # Clear registry
   rm(list = ls(envir = trend_registry), envir = trend_registry)
@@ -302,8 +264,8 @@ test_that("Main dispatcher uses registry correctly", {
   # We can't test the actual output without the full generator functions
   # but we can test that dispatch works
   expect_silent({
-    # This will call ensure_registry_initialized, get_trend_info,
-    # validate_factor_compatibility, and the generator
+    # This will call ensure_registry_initialized, get_trend_info
+    # and the generator
     tryCatch(
       generate_trend_injection_stanvars(trend_specs, data_info),
       error = function(e) {
@@ -314,26 +276,6 @@ test_that("Main dispatcher uses registry correctly", {
       }
     )
   })
-})
-
-test_that("Factor validation error messages are informative", {
-  # Clear and initialize registry
-  rm(list = ls(envir = trend_registry), envir = trend_registry)
-  register_core_trends()
-
-  # Test CAR with n_lv
-  car_spec <- list(trend_model = "CAR", n_lv = 2)
-  expect_error(validate_factor_compatibility(car_spec),
-               "Factor models.*not supported.*trends")
-  expect_error(validate_factor_compatibility(car_spec),
-               "series-specific irregular time intervals")
-
-  # Test PW with n_lv
-  pw_spec <- list(trend_model = "PW", n_lv = 2)
-  expect_error(validate_factor_compatibility(pw_spec),
-               "Factor models.*not supported.*trends")
-  expect_error(validate_factor_compatibility(pw_spec),
-               "changepoint modeling")
 })
 
 # Tests for parameter processing function
@@ -804,4 +746,25 @@ test_that("the ma parameter table names every trend that accepts one", {
     expect_gt(length(ma_params_for(ctor, ctor$trend)), 0L)
   }
   expect_length(ma_params_for(AR(p = 1), "AR"), 0L)
+})
+
+
+test_that("a trend that cannot take factors refuses them", {
+  # The registry records `supports_factors`, but the refusal a user
+  # meets comes from the constructor, which is the only surface that
+  # sees the argument. These assert the live path rather than the
+  # registry field, and they use real constructor calls rather than a
+  # hand-built spec list.
+  expect_error(
+    PW(n_lv = 2),
+    "Factor models.*not supported for PW"
+  )
+  expect_error(
+    PW(trend_map = data.frame(series = factor("a"), trend = 1L)),
+    "trend_map.*not supported for PW"
+  )
+  # CAR carries no `n_lv` argument at all, so the refusal is R's.
+  expect_error(CAR(n_lv = 2), "unused argument")
+  # A factor-compatible trend takes it.
+  expect_silent(AR(n_lv = 2))
 })

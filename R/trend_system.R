@@ -137,26 +137,6 @@ list_trend_types <- function() {
   do.call(rbind, trend_info)
 }
 
-#' Get Factor Compatible Trends
-#'
-#' @description
-#' Get list of trend types that support factor models.
-#'
-#' @return Character vector of factor-compatible trend names
-#' @noRd
-get_factor_compatible_trends <- function() {
-  trend_names <- ls(trend_registry)
-  factor_compatible <- character()
-
-  for (name in trend_names) {
-    if (trend_registry[[name]]$supports_factors) {
-      factor_compatible <- c(factor_compatible, name)
-    }
-  }
-
-  factor_compatible
-}
-
 #' Get Default Incompatibility Reason
 #'
 #' @description

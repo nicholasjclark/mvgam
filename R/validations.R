@@ -1371,50 +1371,6 @@ enforce_n_lv_ceiling_against_data <- function(trend_specs, data,
   invisible(TRUE)
 }
 
-#' Validate Factor Compatibility
-#'
-#' @description
-#' Validates that a trend specification is compatible with factor models.
-#' Uses the trend registry to check factor support.
-#'
-#' @param trend_spec List with trend specification including trend_model name
-#' @return Invisible TRUE if valid, stops with error if invalid
-#' @noRd
-validate_factor_compatibility <- function(trend_spec) {
-  checkmate::assert_list(trend_spec)
-
-  if (is.null(trend_spec$n_lv) || trend_spec$n_lv == 0) {
-    return(invisible(TRUE))  # No factor model requested
-  }
-
-  trend_name <- trend_spec$trend_model %||% "Unknown"
-
-  # Check if trend type is registered
-  if (!exists(trend_name, envir = trend_registry)) {
-    stop(insight::format_error(c(
-      cli::format_inline("Unknown trend type: {.val {trend_name}}"),
-      i = cli::format_inline(
-        "Available types: {paste(ls(trend_registry), collapse = ', ')}"
-      )
-    )))
-  }
-
-  # Get trend info from registry
-  trend_info <- get(trend_name, envir = trend_registry)
-
-  # Check factor support
-  if (!trend_info$supports_factors) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Factor models (n_lv > 0) not supported for {trend_name} trends."
-      ),
-      x = trend_info$incompatibility_reason
-    )))
-  }
-
-  invisible(TRUE)
-}
-
 #' Validate Grouping Arguments
 #'
 #' @description
