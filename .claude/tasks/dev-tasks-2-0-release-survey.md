@@ -966,111 +966,55 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > `test-marginaleffects-insight.R`, `test-loo-extras.R` and
   > `test-pp-average.R` already use for exactly that.
 
-- [ ] **3.14 The codegen path's remaining duplication**
-  > Found by surveying the code-generation path for the shape 3.11
-  > fixed, two or more places that must agree with nothing keeping them
-  > in step. Everything reachable through 3.11's arguments was fixed
-  > there; what follows is not, and belongs in its own commit.
+- [x] **3.14 The codegen path's remaining duplication**
+  > The six copies of the GLM family names were hiding a defect. Under
+  > `normalize = FALSE` with a GLM-optimised family and a trend, the
+  > program computed the latent states and never used them: the model
+  > block held the untransformed call, so the fit was of a model with
+  > no trend, and it compiled and sampled without complaint. The
+  > per-line family lookup covered four of the six families and only
+  > the normalised `_lpmf` spelling, so nothing matched and the line
+  > came back untouched. Reachable only since 3.11 let `normalize`
+  > through; before that brms always ran at its own default. The six
+  > lists are now one, matching accepts either spelling, a rewritten
+  > call keeps the spelling it replaced, and failing to name a matched
+  > GLM family is an error rather than a silent pass.
   >
-  > The six GLM function names are listed four times over:
-  > `glm_patterns` in `detect_glm_usage()`, the byte-identical vector in
-  > `detect_glm_patterns()`, and the type branch in each of
-  > `transform_glm_call()` and `transform_single_glm_call()`. Adding a
-  > seventh form to one gives detection without transformation, or the
-  > reverse. The first two are the same function under two names, and
-  > both delegate to the same `map_responses_to_glm()`.
+  > The two `setup_brms_lightweight()` calls share one list of the
+  > settings both submodels are built under. `stancode()` and
+  > `standata()` declare the same sixteen arguments with the same
+  > defaults, where `standata()` had accepted five of them through its
+  > dots while advertising none, and a test holds the pair together.
   >
-  > The two `setup_brms_lightweight()` calls in
-  > `build_stan_components()` name ten arguments each and differ in
-  > five. That is the shape 3.11 was, one layer up: an argument added to
-  > the observation call and not the trend one builds the two submodels
-  > under different settings and says nothing. `codegen` is now the only
-  > thing they cannot disagree about.
+  > Thirty-eight functions nothing calls are gone, about 1400 lines.
+  > Reachability was walked over the parsed call graph rather than
+  > grepped, since a function reached only by another dead function
+  > still shows a reference. Building that graph took three
+  > corrections, each over-reporting: the namespace's S3 table holds
+  > only 22 of the 189 methods NAMESPACE registers, `paste0()` builds
+  > `<trend>_trend_properties`, and `findGlobals(merge = FALSE)`
+  > sees only names in call position, so every function passed as a
+  > value into a dispatch list looked dead.
   >
-  > `stancode.mvgam_formula()` and `standata.mvgam_formula()` restate
-  > `build_stan_components()`'s defaults rather than inheriting them,
-  > and disagree about which arguments exist. `standata()` has no
-  > `validate` formal, so it parse-validates on every call while
-  > `stancode(validate = FALSE)` does not.
+  > The validation-rule dispatcher was the largest of those: called
+  > only from a test, with two of its four dispatch keys absent from
+  > the eleven declared rules and eight declared rules absent from the
+  > table. Removed with the validators it pointed at, the orphaned
+  > `validate_series_time` cluster, five constants no trend declares
+  > and five combinations shadowed by locals. What survives is
+  > documented for what it is: declarations a trend makes about the
+  > data it needs, of which `requires_regular_intervals` is the only
+  > one read, and the steps a new trend type actually has to follow.
+  > ZMVN is why that one earns its place, confirmed by fitting: it runs
+  > on uneven spacing where AR, RW and VAR are refused.
   >
-  > `silent` is declared as a logical defaulting to `TRUE` in
-  > `R/stan_polish.R` and `validate_stan_code()`, and as an integer
-  > everywhere else. The callers pass integers into the logical
-  > parameters, which is harmless because the value is finally read as
-  > `silent > 0L` and R counts `TRUE` as one, so both spellings pick
-  > the same branch. Nothing prints from any of them now, so this is
-  > naming rather than behaviour. `validate_time_series_for_trends()`
-  > declares a `silent` it never reads, and three `insight` methods
-  > declare a `verbose` they never read.
-  >
-  > Thirteen functions have no caller anywhere in `R/` or `tests/`:
-  > five in the nonlinear-model block of `R/brms_integration.R`,
-  > `transform_glm_calls_post_processing()` and `transform_glm_call()`
-  > in `R/stan_assembly.R`, `map_trend_priors()` and
-  > `get_trend_prior_spec()` in `R/priors.R`, and
-  > `validate_stan_code_structure()`, `are_braces_balanced()`,
-  > `parse_data_declarations()` and `validate_autocor_separation()` in
-  > `R/validations.R`. `transform_glm_calls_post_processing()` would
-  > error if it were called: its body reads a free variable that is
-  > neither a parameter nor bound locally. Deleting these needs a check
-  > against dynamic dispatch first, since the trend generators and the
-  > per-trend prior getters are reached by name through `paste0()`.
-
-- [x] **3.15 The generator narrated itself, and could not be told not to**
-  > "Validating combined Stan code..." printed before a step that takes
-  > no perceptible time, on every `mvgam()`, `jsdgam()`, `stancode()`,
-  > `standata()` and `update()` call, and no `silent` value reached it:
-  > the caller hardcodes `silent = 1`. A ten-fold `kfold()` printed 41
-  > lines, of which `silent = 2` removed 31.
-  >
-  > The rule is brms parity, so each survivor was checked against
-  > brms's own namespace rather than argued for. brms prints two lines
-  > during a fit, "Compiling Stan program..." and "Start sampling", and
-  > nothing at all when it generates code or a prior table. Deleted:
-  > the validation notice, the compile and sampling announcements
-  > mvgam made a second time on top of the backend's, `pp_check()`'s
-  > six draw-count notices, the registration notice
-  > `register_custom_trend()` printed to say it was doing what it was
-  > asked, and a `cat()` writing loop bookkeeping to stdout where
-  > `suppressMessages()` could not reach it.
-  >
-  > Two went the other way. Multiple imputation's progress lines were
-  > dead: `insight::format_message()` returns its string without
-  > printing, unlike `format_warning()`, so a pooled fit ran silently
-  > while the source looked instrumented. `brms::brm_multiple()`
-  > reports each imputed fit and gates it at `silent < 2`, so this now
-  > does the same. And `stancode()` documented the levels backwards,
-  > promising that 0 was quiet when 0 is the noisiest setting.
-  >
-  > `silent` now travels on the fit, so a refit is as quiet as the call
-  > it rebuilds rather than reverting to the default.
-  >
-  > Verified by capturing both streams separately, since a `cat()`
-  > survives `suppressMessages()` and would not show up otherwise.
-  > Code generation is silent; `mvgam()` and `jsdgam()` print "Start
-  > sampling" by default and nothing under `silent = 2`; `update()`
-  > with no `silent` named inherits the quiet of the fit it came from;
-  > and `pp_check()`, `residual_cor()`, `posterior_predict()` and
-  > `summary()` say nothing. `loo_predict()` still announces PSIS,
-  > which is deliberate: brms announces it too and gives no argument to
-  > turn it off, so neither does this.
-
-- [x] **3.16 Two tests never turned on the thing they tested**
-  > `posterior_predict()` defaults to `process_error = FALSE`. Both
-  > process-error tests in
-  > `tests/local/test-predictions-brms-concordance.R` asked for the
-  > default and then for `FALSE`, so each compared the marginal surface
-  > against itself and rested on the two seeds. One asserted a strict
-  > inequality and had been failing on noise; the other took a ratio
-  > wide enough to pass either way. The flag itself is sound, and
-  > turning it on raises the mean predictive variance from 218 to 3993
-  > on the cached Poisson fit.
-  >
-  > Third instance this release of a test passing without exercising
-  > its subject, after `normalize = FALSE` on an intercept-only formula
-  > that never reaches the GLM path, and the class-documentation parser
-  > that matched no slots. Worth a pass at 6.0 over any test whose name
-  > names a toggle.
+  > Verified as a refactor. The Stan program and data are
+  > byte-identical across 28 configurations spanning every trend type,
+  > both `normalize` settings, the GLM and non-GLM paths, multivariate
+  > and distributional, except the two `normalize = FALSE` cases that
+  > now carry the trend. `tests/local/test-normalize-concordance.R`
+  > fits the pair and holds their posteriors together, since text
+  > assertions on the program are what missed this.
 
 - [ ] **5.0 Rebuild every vignette and the pkgdown site**
   > Caches date from June and July, before the prior and default
