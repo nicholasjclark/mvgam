@@ -1088,6 +1088,52 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > 60-point sample ACF swinging between 0.10 and 0.71 across seeds
   > and so testing the draw rather than the specification.
 
+- [x] **5.5 The forecast-evaluation article scored the old likelihood**
+  > Its fits dated from June, before the likelihood moved onto the
+  > conditional surface, and it carried one inline R expression in
+  > 691 lines. Nine of ten headline claims were inverted or false
+  > against the shipping version.
+  >
+  > The PSIS-LOO section had been incoherent on its own terms. It
+  > argued that a latent trend interpolates across the omitted
+  > observation, which predicts an inflated ELPD for a state-space
+  > model, then reported those models 85,000 units worse than the
+  > spline. Conditioning on the inferred state makes the numbers
+  > match the mechanism: LOO ranks the VAR first and the spline 100
+  > units last, because the state at t was informed by the y_t being
+  > scored. The caution keeps its force and gains its evidence, 17%
+  > of AR folds past a Pareto-k of 0.7 against the spline's 2%.
+  >
+  > The rankings disagree three ways and each is right about its own
+  > question. LFO at four steps puts the spline first by less than
+  > one standard error, so it separates nothing; the twelve-month
+  > energy score separates them cleanly and puts AR first. The
+  > horizon decides, not the ranking rule. Pseudo-BMA and stacking
+  > now genuinely differ, so the section demonstrates the softer
+  > stacking weights it previously asserted and apologised for not
+  > showing.
+  >
+  > `mod_var` does not converge and cannot be made to: `A_trend`
+  > reaches a bulk ESS of 26, and 3.3 times the draws buys 54. Sixteen
+  > transition coefficients over 68 months with a fifth of the cells
+  > missing are not identified. Disclosed rather than hidden or
+  > refitted, because it explains the forecast result.
+  >
+  > Scoring alone would have retired the VAR wrongly. Its innovation
+  > covariance is better identified than its transition matrix, and
+  > it recovers a correlation of 0.58 (0.21 to 0.80) between PB and
+  > PP, congeneric pocket mice, which a per-series AR cannot
+  > represent at any horizon. The article now separates forecast
+  > accuracy from structural inference instead of letting the energy
+  > score stand for both.
+  >
+  > Corrected alongside: PB is the series with the most zeros at 40%
+  > against PP's 27%, though PP holds the longest run; the spline's
+  > CRPS failure is on DO and it beats both state-space models on the
+  > two sparse series; all three models refit at the same four
+  > timepoints, so the claim that latent dynamics drive the gate was
+  > false. Every quoted number is computed inline.
+
 - [ ] **5.2 Three CRAN vignettes render with no output on the website**
   > `data.Rmd`, `dfm.Rmd` and `mvgam_overview.Rmd` gate every chunk on
   > `params$EVAL`, which reads `NOT_CRAN`. That gate is right for CRAN,

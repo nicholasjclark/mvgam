@@ -126,7 +126,7 @@ a Bayesian Poisson regression on the captures, but they differ
 in how they handle the temporal signal beyond the smooths on
 NDVI and minimum temperature.
 
-**Model 1, smooths only (`mod_spline`).** A baseline GAM with
+Model 1, smooths only (`mod_spline`), is a baseline GAM with
 per-species temporal smooths. No state-space dynamics; the
 forecast extrapolates the spline trajectories, which often misses
 on count data because splines were not designed for forecasting.
@@ -145,7 +145,7 @@ mod_spline <- mvgam(
 mod_spline <- read_cache("mod_spline")
 ```
 
-**Model 2, per-species AR(1) (`mod_ar`).** Replaces the temporal
+Model 2, per-species AR(1) (`mod_ar`), replaces the temporal
 spline with an independent AR(1) state-space process for each
 species. Each species' latent state evolves with its own
 auto-correlation; the obs-side smooths handle the covariate
@@ -165,7 +165,7 @@ mod_ar <- mvgam(
 mod_ar <- read_cache("mod_ar")
 ```
 
-**Model 3, correlated VAR(1) (`mod_var`).** A vector
+Model 3, correlated VAR(1) (`mod_var`), is a vector
 autoregression with `cor = TRUE`, allowing latent states for the
 four species to be cross-correlated. If one species' deviation
 predicts another's, this model can use that information to
@@ -195,6 +195,16 @@ summary(mod_var, include_betas = FALSE)
 The `A_trend` matrix carries the lag-1 cross-effects between
 species, and `Sigma_trend` (with `cor = TRUE`) is unstructured
 rather than diagonal.
+
+Read the `Rhat` and `Bulk_ESS` columns before anything else. The
+entries of `A_trend` sample poorly here, and raising the
+iterations does not rescue them: sixteen transition coefficients
+are a great deal to ask of four series over 68 months with a
+fifth of the cells missing. Carry that into every comparison
+below, because a model whose parameters are this uncertain can
+still score well for reasons that have nothing to do with
+forecasting. The innovation covariance fares better than the
+transition matrix does, which matters later.
 
 ## In-sample comparison: PSIS-LOO
 
@@ -273,10 +283,11 @@ cover. That is what the Pareto-k values are reporting.
 None of this makes the ranking wrong on its own terms. PSIS-LOO
 asks how well each model describes the points it trained on, and
 the state-space models do describe them better. It is the wrong
-question for a forecaster, asked through an approximation that
+question for a forecaster, and the approximation answering it
 has partly broken.
 
-For forecast comparison the question is leave the *future* out.
+For forecast comparison the question is to leave the *future*
+out.
 Every evaluation point is then unseen relative to its own
 training window, so nothing interpolates through neighbours and
 no importance ratio has to stretch. The `lfo_cv()` section below
@@ -355,10 +366,7 @@ crps_all <- compare_scores(fc_spline, fc_ar, fc_var, score = "crps")
 head(crps_all)
 ```
 
-The frame has one row per model x series x horizon, so the
-per-series trajectories and any differences between models come
-straight out of it. `plot()` dispatches on the
-`mvgam_compare_scores` class, faceting by series for a
+`plot()` dispatches on the `mvgam_compare_scores` class, faceting by series for a
 univariate score and taking `relative = "<model_name>"` to
 switch to differences against a baseline:
 
@@ -412,7 +420,7 @@ logs_var <- score(fc_var_link, score = "logs")
 head(logs_var$DM, 4)
 ```
 
-For integer counts, the **discrete** ranked probability score is
+For integer counts, the discrete ranked probability score is
 the count-aware sibling of CRPS:
 
 ```{r drps}
@@ -428,10 +436,10 @@ because its units are the natural ones.
 
 Univariate scoring sums per-series performance; it cannot reward
 a model for capturing the *joint* structure across species. Two
-proper scoring rules for joint forecasts are the **energy score**
+proper scoring rules for joint forecasts are the energy score
 (Gneiting et al. [2008](https://doi.org/10.1007/s11749-008-0114-x)),
-a multivariate generalisation of CRPS, and the **variogram
-score** of order 0.5 (Scheuerer & Hamill
+a multivariate generalisation of CRPS, and the variogram
+score of order 0.5 (Scheuerer & Hamill
 [2015](https://doi.org/10.1175/MWR-D-14-00269.1)), which targets
 cross-series correlation structure.
 
@@ -484,16 +492,54 @@ stay flat over the same window, spanning `r ear[1]` to
 dynamics holding the joint forecast in place. AR and VAR run
 close, AR scoring lower at `r e_ar_wins` of the `r e_n_h`
 horizons. On these data and over this window the modelled
-cross-species correlations add no detectable benefit to the
-joint forecast, and the simpler AR is the better buy.
+cross-species dynamics add no detectable benefit to the joint
+forecast, and the simpler AR is the better buy if forecast
+accuracy is the only thing being bought.
 
-This is the first comparison in the article to separate the
-models decisively, and it disagrees with the per-series CRPS
-above, where the spline won on PB and PP. Both are correct. CRPS
-asks each species separately and the spline is fine on the two
-that sit near zero; the energy score asks all four at once, and
-a joint forecast that drifts on DM and DO is wrong about the
-system regardless of what it does on the quiet series.
+That ordering disagrees with the per-series CRPS above, where
+the spline won on PB and PP. The two scores ask different
+things. CRPS takes each species on its own, and the spline is
+adequate on the two that sit near zero. The energy score takes
+all four at once, where a forecast that drifts on DM and DO is
+wrong about the system whatever it does on the quiet series.
+
+Dropping the VAR on that score alone would be a mistake, though.
+Its transition matrix and its innovation covariance answer
+different questions, and the covariance is the better identified
+of the two:
+
+```{r resid-cor}
+rc <- residual_cor(mod_var)
+round(rc$cor, 2)
+```
+
+```{r cor-numbers, include = FALSE}
+cor_ci <- function(a, b) {
+  sprintf("%.2f (%.2f to %.2f)", rc$cor[a, b],
+          rc$cor_lower[a, b], rc$cor_upper[a, b])
+}
+fe_pbpp <- cor_ci("PB", "PP")
+fe_dmdo <- cor_ci("DM", "DO")
+```
+
+One pair clears zero. PB and PP correlate at `r fe_pbpp`, and
+those two are congeners, both *Chaetodipus* pocket mice. After
+the covariates and each species' own dynamics are accounted for,
+what is left of their latent states still rises and falls
+together. The two *Dipodomys* kangaroo rats lean the same way at
+`r fe_dmdo`, but that interval covers zero, so 68 months will
+not settle it.
+
+The AR model cannot produce this at any horizon, because it
+gives every species an independent latent state by construction.
+So the VAR earns nothing on forecast accuracy over this window
+and still answers a question the simpler model cannot be asked.
+Which of the two matters is a question about the study rather
+than about the scores, and it is worth deciding before the
+scores are consulted rather than after. The
+[VAR article](https://nicholasjclark.github.io/mvgam/articles/var.html)
+takes this structure apart properly, with impulse responses and
+variance decompositions.
 
 ## Rolling-origin evaluation with `lfo_cv()`
 
@@ -568,12 +614,10 @@ timepoints leaves only a handful of origins, and a four-step
 horizon asks a much easier question than the twelve-month
 holdout scored above.
 
-That is worth stating plainly rather than ranking anyway. The
-useful conclusion is not that the spline forecasts best, but
-that at four steps ahead these models are indistinguishable,
-while at twelve months the energy score told them decisively
-apart. The evaluation horizon, not the ranking rule, is what
-changed the answer.
+So the conclusion is not that the spline forecasts best. It is
+that nothing separates these models four steps ahead, where the
+twelve-month energy score separated them cleanly. The horizon
+changed the answer, not the ranking rule.
 
 `compare_elpds()` is the LFO companion of `compare_scores()`. It
 stacks per-step ELPDs from several `mvgam_lfo` objects into a
@@ -623,8 +667,7 @@ stack_weights <- loo_model_weights(
 stack_weights
 ```
 
-The two methods disagree, and the disagreement is the lesson.
-Pseudo-BMA puts a weight of one on the spline and nothing
+The two methods disagree. Pseudo-BMA puts a weight of one on the spline and nothing
 anywhere else. It is a softmax of total ELPD, so it exponentiates
 differences that the section above showed to be within a standard
 error of zero, and a gap that small still swamps its rivals once
@@ -693,15 +736,19 @@ of saying it could not tell them apart. The twelve-month energy
 score separated them cleanly and put the AR model first.
 
 None of those contradicts the others, because each asks a
-different question. That is the thing to take away: the score
-and the cross-validation scheme are not neutral steps you run
-after choosing a model, they are the choice. Decide the
-horizon you care about and whether the decision is per series or
-joint, then pick the evaluation that matches, and treat a
-ranking produced by any other combination as evidence about
-something else. Where the candidates disagree by species, as
-they do here, an `ensemble()` weighted by stacking is a
-defensible way to decline the choice.
+different question. The score and the cross-validation scheme
+are not neutral steps that follow the choice of model; they are
+the choice. Settle the horizon you care about and whether the
+decision is per species or joint, and let that pick the
+evaluation. Where the candidates disagree by species, as they do
+here, an `ensemble()` weighted by stacking spreads the bet
+rather than forcing one.
+
+None of this settles which model to publish. The VAR forecasts
+no better than the AR and recovers a correlation between the two
+pocket mice that the AR cannot represent; if that structure is
+the reason for the study, it outranks a score it was never
+competing on.
 
 ## Further reading
 
