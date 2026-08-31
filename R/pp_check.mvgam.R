@@ -282,9 +282,6 @@ pp_check.mvgam <- function(
     }
     if (!ndraws_given) {
       ndraws <- 500L
-      message(
-        "Using 500 posterior draws for ppc type 'fit_stat' by default."
-      )
     }
     stat <- list(...)$stat %||% "chi_squared"
     return(closure_unit_fit_stat_ppc(
@@ -439,24 +436,19 @@ pp_check.mvgam <- function(
       "stat_grouped",
       "violin_grouped"
     )
+    # Each check type has a draw count that suits it, applied silently.
+    # `bayesplot` and `brms::pp_check()` announce no such default, and
+    # the chosen value is recoverable from the returned object.
     if (type %in% aps_types) {
       ndraws <- NULL
-      message("Using all posterior draws for ppc type '", type, "' by default.")
     } else if (type %in% resid_nongrouped) {
       ndraws <- 500L
-      message("Using 500 posterior draws for ppc type '", type, "' by default.")
     } else if (type %in% resid_grouped) {
       ndraws <- 8L
-      message("Using 8 posterior draws for ppc type '", type, "' by default.")
     } else if (type %in% resid_diagnostic) {
       ndraws <- 100L
-      message(
-        "Using 100 posterior draws for ppc type '", type,
-        "' by default."
-      )
     } else {
       ndraws <- 10
-      message("Using 10 posterior draws for ppc type '", type, "' by default.")
     }
   } else {
     if (type %in% resid_nongrouped && !is.null(ndraws) &&

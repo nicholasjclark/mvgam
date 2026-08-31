@@ -303,6 +303,9 @@ mvgam_update_inheritance <- list(
       object$trend_metadata$fixed_Z
     }
   ),
+  # A refit of a quiet fit is quiet. Falls back to the `mvgam()`
+  # default on a fit made before the slot existed.
+  silent = list(getter = function(object) object$silent),
   loadings_prior = list(
     getter = function(object) {
       denormalise_loadings_prior(
@@ -349,7 +352,6 @@ mvgam_update_uninherited <- c(
   combine = "multiple-imputation only, and a pooled fit is refused",
   run_model = "a fitted object is by definition the run_model = TRUE case",
   save_model = "writes the Stan file out; the model is unchanged",
-  silent = "verbosity only",
   validate = "whether the assembled code is checked, not what it holds"
 )
 

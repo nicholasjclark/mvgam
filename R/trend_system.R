@@ -429,18 +429,6 @@ register_custom_trend <- function(name, supports_factors = FALSE, generator_func
   checkmate::assert_function(generator_func)
   checkmate::assert_string(incompatibility_reason, null.ok = TRUE)
 
-  # Guide users toward convention-based approach
-  rlang::inform(
-    c(
-      paste0("Registering custom trend type: ", name),
-      "i" = "Consider using convention-based approach for future-proofing:",
-      "i" = paste0("Define generate_", tolower(name), "_trend_stanvars() and ", tolower(name), "_trend_properties()"),
-      "i" = "This eliminates the need for manual registration calls."
-    ),
-    .frequency = "once",
-    .frequency_id = paste0("convention_guide_", name)
-  )
-
   # Check for existing registration
   if (exists(name, envir = trend_registry)) {
     rlang::warn(

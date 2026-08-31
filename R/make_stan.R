@@ -564,8 +564,10 @@ has_obs_intercept <- function(formula) {
 #'   its sampling statements? Default is \code{TRUE}.
 #' @param save_model File path to write the assembled Stan program to. If
 #'   \code{NULL} (default), nothing is written.
-#' @param silent Integer controlling verbosity. 0 = silent, 1 = some output,
-#'   2 = verbose. Default is 1.
+#' @param silent Integer controlling verbosity, following the
+#'   \pkg{brms} convention. 0 prints Stan's exceptions as well as its
+#'   progress, 1 (the default) prints progress alone, and 2 prints
+#'   nothing.
 #' @param validate Logical; should the generated Stan code be validated?
 #'   Default is \code{TRUE}.
 #' @param ... Additional arguments passed to internal functions.

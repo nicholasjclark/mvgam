@@ -993,6 +993,16 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > `validate` formal, so it parse-validates on every call while
   > `stancode(validate = FALSE)` does not.
   >
+  > `silent` is declared as a logical defaulting to `TRUE` in
+  > `R/stan_polish.R` and `validate_stan_code()`, and as an integer
+  > everywhere else. The callers pass integers into the logical
+  > parameters, which is harmless because the value is finally read as
+  > `silent > 0L` and R counts `TRUE` as one, so both spellings pick
+  > the same branch. Nothing prints from any of them now, so this is
+  > naming rather than behaviour. `validate_time_series_for_trends()`
+  > declares a `silent` it never reads, and three `insight` methods
+  > declare a `verbose` they never read.
+  >
   > Thirteen functions have no caller anywhere in `R/` or `tests/`:
   > five in the nonlinear-model block of `R/brms_integration.R`,
   > `transform_glm_calls_post_processing()` and `transform_glm_call()`
@@ -1006,58 +1016,44 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > against dynamic dispatch first, since the trend generators and the
   > per-trend prior getters are reached by name through `paste0()`.
 
-- [ ] **3.15 The generator narrates itself, and cannot be told not to**
-  > "Validating combined Stan code..." prints before a step that takes
+- [x] **3.15 The generator narrated itself, and could not be told not to**
+  > "Validating combined Stan code..." printed before a step that takes
   > no perceptible time, on every `mvgam()`, `jsdgam()`, `stancode()`,
-  > `standata()` and `update()` call. The guard reads `silent < 2`, but
-  > the threshold is never reached: `generate_combined_stancode()` has
-  > no `silent` formal and its caller hardcodes `silent = 1` in
-  > `R/mvgam_core.R`. No entry point can suppress it. The obs-only
-  > branch of the same function validates without announcing it, so the
-  > identical work is narrated on one path and silent on the other.
+  > `standata()` and `update()` call, and no `silent` value reached it:
+  > the caller hardcodes `silent = 1`. A ten-fold `kfold()` printed 41
+  > lines, of which `silent = 2` removed 31.
   >
-  > It compounds where models are refitted. A ten-fold `kfold()` prints
-  > 41 lines by default; `silent = 2` removes 31 of them and leaves the
-  > 10 that no argument reaches. `update(recompile = FALSE)` prints it
-  > twice, once for the dry run and once for the fit.
+  > The rule is brms parity, so each survivor was checked against
+  > brms's own namespace rather than argued for. brms prints two lines
+  > during a fit, "Compiling Stan program..." and "Start sampling", and
+  > nothing at all when it generates code or a prior table. Deleted:
+  > the validation notice, the compile and sampling announcements
+  > mvgam made a second time on top of the backend's, `pp_check()`'s
+  > six draw-count notices, the registration notice
+  > `register_custom_trend()` printed to say it was doing what it was
+  > asked, and a `cat()` writing loop bookkeeping to stdout where
+  > `suppressMessages()` could not reach it.
   >
-  > `silent` means four different things. It is a brms-style integer
-  > defaulting to 1 through the fitting path; a logical defaulting to
-  > TRUE in the Stan polisher and `validate_stan_code()`, the same name
-  > with the opposite type and polarity; a global option that deep
-  > validators read because they were never given the argument; and
-  > nothing at all in `pp_check()`, `loo_predict()` and friends,
-  > `mvgam_data()`, `register_custom_trend()` and
-  > `check_tweedie_truncation()`, which print unconditionally.
-  > `mvgam()` never documents the argument, and
-  > `stancode.mvgam_formula()` documents it backwards.
+  > Two went the other way. Multiple imputation's progress lines were
+  > dead: `insight::format_message()` returns its string without
+  > printing, unlike `format_warning()`, so a pooled fit ran silently
+  > while the source looked instrumented. `brms::brm_multiple()`
+  > reports each imputed fit and gates it at `silent < 2`, so this now
+  > does the same. And `stancode()` documented the levels backwards,
+  > promising that 0 was quiet when 0 is the noisiest setting.
   >
-  > Two announcements are made twice, once in `R/mvgam_core.R` and
-  > again in `R/backends.R`: compiling, and the start of sampling. Only
-  > the rstan path prints the compile pair, so the two backends differ
-  > in what they say. `R/stan_assembly.R` writes internal loop
-  > bookkeeping to stdout through `cat()`, guarded only by a check for
-  > the testthat environment variable, where `suppressMessages()`
-  > cannot reach it. And multiple imputation's two progress lines emit
-  > nothing at all: `insight::format_message()` returns a string
-  > without printing, unlike `format_warning()`, so a pooled fit runs
-  > with no progress output while looking as though it reports some.
+  > `silent` now travels on the fit, so a refit is as quiet as the call
+  > it rebuilds rather than reverting to the default.
   >
-  > Scale is smaller than the raw counts suggest. Of roughly 212
-  > `cat()` calls, about 198 are inside `print` methods and are the
-  > point of the call. The work is in eight message sites.
-  >
-  > Keep what marks a wait: compiling, sampling, Pathfinder, PSIS, and
-  > each cross-validation refit batch. Keep what reports a decision
-  > that changes the answer: `pp_check()`'s chosen draw count, the
-  > `future` fallback, a dropped fold. Delete the announcements of
-  > instantaneous work rather than re-gating them, collapse the
-  > duplicated compile and sampling pairs to one each, and give
-  > `silent` one meaning: an integer where 2 prints nothing mvgam
-  > generates, 1 prints only waits and decisions, and 0 adds
-  > per-iteration detail. That needs a real `silent` formal on the
-  > functions a user calls, and threading it to
-  > `generate_combined_stancode()` instead of the hardcoded 1.
+  > Verified by capturing both streams separately, since a `cat()`
+  > survives `suppressMessages()` and would not show up otherwise.
+  > Code generation is silent; `mvgam()` and `jsdgam()` print "Start
+  > sampling" by default and nothing under `silent = 2`; `update()`
+  > with no `silent` named inherits the quiet of the fit it came from;
+  > and `pp_check()`, `residual_cor()`, `posterior_predict()` and
+  > `summary()` say nothing. `loo_predict()` still announces PSIS,
+  > which is deliberate: brms announces it too and gives no argument to
+  > turn it off, so neither does this.
 
 - [x] **3.16 Two tests never turned on the thing they tested**
   > `posterior_predict()` defaults to `process_error = FALSE`. Both

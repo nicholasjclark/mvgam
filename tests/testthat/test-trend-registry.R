@@ -242,11 +242,10 @@ test_that("Custom trend registration works", {
     list(custom_stanvar = "custom_test")
   }
 
-  # Register custom trend (now provides informational messages)
-  expect_message(register_custom_trend("CustomTrend",
-                                       supports_factors = TRUE,
-                                       generator_func = custom_generator),
-                 "Registering custom trend type")
+  # Registering says nothing: it is what the caller just asked for.
+  expect_silent(register_custom_trend("CustomTrend",
+                                      supports_factors = TRUE,
+                                      generator_func = custom_generator))
 
   # Check it was registered
   expect_true("CustomTrend" %in% ls(trend_registry))

@@ -371,10 +371,6 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
 
   # Validate final Stan code if requested
   if (validate) {
-    if (silent < 2) {
-      message("Validating combined Stan code...")
-    }
-
     validate_stan_code(
       combined_stancode,
       backend = backend,
@@ -1313,9 +1309,6 @@ convert_glm_to_standard_form <- function(code_lines, block_info, detected_glm_ty
   
   # If all GLM lines were already processed, return original code with tracking
   if (is.null(glm_line_idx)) {
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      cat("  No unprocessed GLM lines found for type:", glm_type, "\n")
-    }
     return(list(
       code_lines = modified_lines,
       processed_glm_lines = processed_glm_lines

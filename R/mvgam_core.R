@@ -903,10 +903,6 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     silent = silent
   )
   
-  # Compile Stan model
-  if (silent < 2) {
-    message("Compiling Stan model...")
-  }
   compile_args <- list(
     model         = validated_code,
     backend       = backend,
@@ -918,10 +914,6 @@ mvgam_single <- function(formula, trend_formula, data, backend,
   if (!is.null(stanc_options)) compile_args$stanc_options <- stanc_options
   compiled_model <- do.call(compile_model, compile_args)
   
-  # Fit Stan model
-  if (silent < 2) {
-    message("Fitting Stan model...")
-  }
   combined_fit <- fit_model(
     model = compiled_model,
     backend = backend,
@@ -978,7 +970,8 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     # `source = "user"` on the stored prior table; the brms-side path
     # only marks rows brms itself knows about.
     user_prior = dots$prior,
-    newdata = newdata
+    newdata = newdata,
+    silent = silent
   )
 
   return(mvgam_object)
@@ -1067,7 +1060,8 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
                                           combined_standata = NULL,
                                           user_trend_formula = NULL,
                                           user_prior = NULL,
-                                          newdata = NULL) {
+                                          newdata = NULL,
+                                          silent = 1L) {
   checkmate::assert_class(combined_fit, "stanfit")
   checkmate::assert_list(obs_setup, names = "named")
   checkmate::assert_list(trend_setup, names = "named", null.ok = TRUE)
@@ -1140,6 +1134,9 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       # records what the generator produced; this records what it was
       # asked for.
       codegen = obs_setup$codegen,
+      # The verbosity the fit ran under, so `update()` is as quiet as
+      # the call it rebuilds rather than reverting to the default.
+      silent = silent,
       stancode = combined_stancode %||% obs_setup$stancode,
       standata = combined_standata %||% obs_setup$standata,
       exclude = c("lprior", "lp__"),
@@ -1651,19 +1648,17 @@ fit_multiple_imputation_models <- function(formula, trend_formula, data_list,
                                           backend, ...) {
   n_datasets <- length(data_list)
 
-  insight::format_message(
-    paste("Fitting mvgam models to", n_datasets, "imputed datasets..."),
-    "This may take some time depending on model complexity."
-  )
-
   # Fit individual models
   fits <- vector("list", n_datasets)
   names(fits) <- paste0("imputation_", seq_len(n_datasets))
 
+  # `brms::brm_multiple()` reports each imputed fit as it starts and
+  # gates it the same way, so this follows both.
+  silent <- list(...)$silent %||% 1L
   for (i in seq_len(n_datasets)) {
-    insight::format_message(
-      paste("Fitting imputation", i, "of", n_datasets, "...")
-    )
+    if (silent < 2) {
+      message("Fitting imputed model ", i, " out of ", n_datasets)
+    }
 
     # Fit model using standard mvgam_single function
     fits[[i]] <- mvgam_single(
