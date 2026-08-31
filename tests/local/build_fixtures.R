@@ -755,5 +755,57 @@ fit_mvgam_cached("normalize_on", y ~ x1, ~ AR(p = 1),
 fit_mvgam_cached("normalize_off", y ~ x1, ~ AR(p = 1),
   norm_data, poisson(), normalize = FALSE, seed = 7)
 
+# ----------------------------------------------------------------------
+# CLOSURE-UNIT LABELLING — two species, so the closure-unit grid has a
+# series axis as well as a time axis. `hindcast(type = "latent_state")`
+# built its own (series, time) grid and sorted it series-major, while
+# the kernel numbers units in first-appearance order over time-major
+# data. Every unit was relabelled, and a species could be handed the
+# abundance belonging to another. A single-series fit cannot show it,
+# because the two orderings coincide.
+# ----------------------------------------------------------------------
+
+cat("\n[20] closure-unit labelling: two-species nmix and occ\n")
+set.seed(999)
+nmix_truth <- list(sp_1 = c(28, 26, 23, 16, 14, 14),
+                   sp_2 = c(4, 7, 15, 16, 19, 18))
+nmix_p <- c(sp_1 = 0.7, sp_2 = 0.45)
+nmix_data <- do.call(rbind, lapply(names(nmix_truth), function(sp) {
+  data.frame(
+    series = sp,
+    time = sort(rep(1:6, 5)),
+    visit = rep(1:5, 6),
+    truth = rep(nmix_truth[[sp]], each = 5),
+    y = unlist(lapply(nmix_truth[[sp]], function(N) {
+      rbinom(5, N, nmix_p[[sp]])
+    })),
+    cap = if (sp == "sp_1") 100L else 50L
+  )
+}))
+nmix_data$series <- factor(nmix_data$series, levels = names(nmix_truth))
+nmix_data <- nmix_data[order(nmix_data$time, nmix_data$series,
+                             nmix_data$visit), ]
+fit_mvgam_cached("closure_labels_nmix",
+  bf(y ~ s(time, k = 4, by = series) + series, p ~ series), NULL,
+  nmix_data, nmix(), seed = 3)
+
+set.seed(7)
+occ_data <- do.call(rbind, lapply(
+  list(list(sp = "sp_1", psi = 0.85, p = 0.7),
+       list(sp = "sp_2", psi = 0.30, p = 0.5)),
+  function(cfg) {
+    do.call(rbind, lapply(1:8, function(tt) {
+      z <- rbinom(1, 1, cfg$psi)
+      data.frame(series = cfg$sp, time = tt, visit = 1:4,
+                 y = z * rbinom(4, 1, cfg$p))
+    }))
+  }
+))
+occ_data$series <- factor(occ_data$series)
+occ_data <- occ_data[order(occ_data$time, occ_data$series,
+                           occ_data$visit), ]
+fit_mvgam_cached("closure_labels_occ", bf(y ~ series, p ~ series), NULL,
+  occ_data, occ(), seed = 4)
+
 cat("\n=== All fixtures present in", FIXTURE_DIR, "===\n")
 cat("Files: ", length(list.files(FIXTURE_DIR, pattern = "\\.rds$")), "\n")

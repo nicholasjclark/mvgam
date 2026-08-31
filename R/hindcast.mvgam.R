@@ -227,18 +227,27 @@ hindcast_latent_state <- function(object, ndraws = NULL,
                             any.missing = FALSE,
                             .var.name = "kernel return value")
 
-  # Per-unit grain from the training data. mvgam_training_data()
-  # respects the closure-unit pivot; collapsing visits via
-  # unique() gives one row per (series, time) cell which matches
-  # the column ordering of the kernel's draw matrix.
+  # Per-unit grain, taken from the arrays the kernel was built on
+  # rather than rebuilt here. `build_closure_unit_arrays()` numbers
+  # units by first appearance over the time-major data and records the
+  # grouping values in `unit_grid` in that same order, so reading it
+  # keeps the labels attached to the draw columns they belong to.
+  # Rebuilding the grid and sorting it by series relabelled every unit
+  # on any fit carrying more than one series: one species' first year
+  # was reported as another's, and a unit could be handed an abundance
+  # below the count observed there.
   meta <- object$trend_metadata$variables %||%
     list(time_var = "time", series_var = "series")
-  td <- mvgam_training_data(object)
-  unit_df <- unique(td[, c(meta$series_var, meta$time_var),
-                       drop = FALSE])
-  unit_df <- unit_df[order(unit_df[[meta$series_var]],
-                            unit_df[[meta$time_var]]), ,
-                      drop = FALSE]
+  arrays <- extract_closure_unit_components(object)$arrays
+  unit_df <- arrays$unit_grid
+  if (is.null(unit_df)) {
+    # A fit built before `unit_grid` was recorded. Fall back to the
+    # first-appearance order of the training data, which is what the
+    # arrays used, and do not sort it.
+    td <- mvgam_training_data(object)
+    unit_df <- unique(td[, c(meta$series_var, meta$time_var),
+                         drop = FALSE])
+  }
   names(unit_df)[match(c(meta$series_var, meta$time_var),
                          names(unit_df))] <- c("series", "time")
   rownames(unit_df) <- NULL

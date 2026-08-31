@@ -1706,6 +1706,14 @@ build_closure_unit_arrays <- function(data,
   unit_levels <- unique(unit_label)
   unit_int    <- match(unit_label, unit_levels)
   n_unit      <- length(unit_levels)
+  # The grouping values behind each unit, one row per unit in unit
+  # order. Callers that label units read this rather than rebuilding
+  # the grid: `hindcast(type = "latent_state")` used to rebuild it and
+  # sort by series, which relabelled every unit on a multi-series fit
+  # because this ordering is first-appearance over time-major data.
+  unit_grid <- data[match(unit_levels, unit_label),
+                    unit_grouping_vars, drop = FALSE]
+  rownames(unit_grid) <- NULL
   # Per-unit visit counts indexed in `unit_levels` order. `table`
   # would re-order alphabetically; an explicit tabulate keeps
   # the unit ordering deterministic.
@@ -1733,6 +1741,8 @@ build_closure_unit_arrays <- function(data,
   }
   rows_by_unit <- rows_by_unit[visited]
   unit_levels  <- unit_levels[visited]
+  unit_grid    <- unit_grid[visited, , drop = FALSE]
+  rownames(unit_grid) <- NULL
   n_unit       <- length(unit_levels)
   rep_counts   <- lengths(rows_by_unit)
   max_rep <- max(rep_counts)
@@ -1755,7 +1765,8 @@ build_closure_unit_arrays <- function(data,
       Y_max       = NA_integer_,
       visit_idx   = visit_idx,
       max_rep     = as.integer(max_rep),
-      unit_labels = unit_levels
+      unit_labels = unit_levels,
+      unit_grid   = unit_grid
     ))
   }
   # Missing entries stay in `y_vals` but are never indexed: every
@@ -1844,7 +1855,8 @@ build_closure_unit_arrays <- function(data,
     Y_max       = Y_max,
     visit_idx   = visit_idx,
     max_rep     = as.integer(max_rep),
-    unit_labels = unit_levels
+    unit_labels = unit_levels,
+    unit_grid   = unit_grid
   )
 }
 

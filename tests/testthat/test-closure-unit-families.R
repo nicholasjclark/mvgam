@@ -728,8 +728,14 @@ test_that("build_closure_unit_arrays() returns correctly shaped arrays", {
   arrs <- build_closure_unit_arrays(d, response_var = "y")
   expect_named(arrs, c(
     "N_unit", "n_rep", "K_max", "Y_max",
-    "visit_idx", "max_rep", "unit_labels"
+    "visit_idx", "max_rep", "unit_labels", "unit_grid"
   ))
+
+  # `unit_grid` carries the grouping values for each unit in unit
+  # order, so a caller labelling units reads it instead of rebuilding
+  # the grid and risking a different ordering.
+  expect_identical(nrow(arrs$unit_grid), 4L)
+  expect_true(all(c("series", "time") %in% names(arrs$unit_grid)))
   expect_identical(arrs$N_unit, 4L)
   expect_identical(arrs$n_rep, rep(3L, 4))
   expect_identical(arrs$K_max, rep(20L, 4))

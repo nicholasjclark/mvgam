@@ -158,13 +158,20 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     pars <- rownames(all_summaries)
   }
 
-  # Build output structure with metadata
+  # Build output structure with metadata. The sampler's own arguments
+  # are the only record of what was asked for:
+  # `posterior::niterations()` counts the draws that were kept, which
+  # is the post-warmup half, so reporting it as `iter` understates the
+  # run and leaves the warmup unknowable.
   draws_obj <- posterior::as_draws(object$fit)
+  sampler <- mvgam_sampler_inheritance(object)
   out <- list(
     formula = object$formula,
     family = object$family,
-    nchains = posterior::nchains(draws_obj),
-    niter = posterior::niterations(draws_obj),
+    nchains = sampler$chains %||% posterior::nchains(draws_obj),
+    niter = sampler$iter %||% posterior::niterations(draws_obj),
+    nwarmup = sampler$warmup,
+    nthin = sampler$thin %||% 1L,
     ndraws = posterior::ndraws(draws_obj)
   )
 
@@ -920,10 +927,14 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
     }
   }
 
-  # Section 5: Sampling information (brms style with continuation line)
-  warmup <- floor(x$niter / 2)
+  # Section 5: Sampling information (brms style with continuation line).
+  # Warmup was previously guessed as half the iterations; a fit that
+  # recorded its own arguments reports them, and one that did not says
+  # so rather than inventing a number.
+  warmup <- x$nwarmup
   cat("  Draws: ", x$nchains, " chains, each with iter = ", x$niter,
-      "; warmup = ", warmup, "; thin = 1; \n", sep = "")
+      "; warmup = ", warmup %||% "unrecorded",
+      "; thin = ", x$nthin %||% 1L, "; \n", sep = "")
   cat("         total post-warmup draws = ", x$ndraws, "\n\n", sep = "")
 
   # Section 6: Observation Model Parameters
