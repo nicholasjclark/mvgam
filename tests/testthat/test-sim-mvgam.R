@@ -305,14 +305,23 @@ test_that("summary.mvgam_sim resolves trend label from constructor", {
   )
   expect_identical(summary(car_sim)$trend, "CAR")
 
+  # 240 points, not 60: the assertions below are about the AR
+  # process, and a 60-point sample ACF is noisy enough to swing
+  # between 0.10 and 0.71 across seeds, so a short series tests the
+  # draw rather than the spec.
   ar112_sim <- sim_mvgam(
     type = 7L, family = gaussian(), n_series = 1L,
-    n_timepoints = 60L, seed = 3L
+    n_timepoints = 240L, seed = 3L
   )
   expect_identical(summary(ar112_sim)$trend, "AR")
-  # type 7 generates a `season` covariate cycling 1..12, no `x`.
-  expect_true("season" %in% colnames(ar112_sim$data_train))
-  expect_setequal(unique(ar112_sim$data_train$season), 1:12)
+  # The observation side carries a smooth of a non-periodic
+  # covariate. A cyclic seasonal smooth used to sit here, but on
+  # monthly data a lag-12 autoregression is itself an annual cycle,
+  # so the two competed for the same periodicity and neither was
+  # identified.
+  expect_true("x" %in% colnames(ar112_sim$data_train))
+  expect_false("season" %in% colnames(ar112_sim$data_train))
+  expect_named(ar112_sim$true_smooths, "s(x)")
   # spec sets sparse AR(p = c(1, 12)) on the latent state; the
   # rescale skip path keeps the spec's chosen sigma_innov so the
   # latent state has measurable persistence (lag-12 autocorrelation

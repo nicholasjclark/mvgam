@@ -65,12 +65,11 @@
 #'   \item{`type = 6`}{`y ~ s(season, bs = "cc")` with `CAR(time,
 #'     series)`. Cyclic seasonal + continuous-time AR(1) on
 #'     irregular time gaps (`Δt ~ Uniform(1, 6)`).}
-#'   \item{`type = 7`}{`y ~ s(season, bs = "cc", k = 12)` with
-#'     sparse `AR(p = c(1, 12))`. Monthly seasonal cycle on the
-#'     obs side; the latent state carries lag-1 momentum and
-#'     lag-12 year-on-year recurrence beyond the deterministic
-#'     cycle. Pairs with a `prop_trend` default of `0.7` so the
-#'     AR signal dominates residual variance.}
+#'   \item{`type = 7`}{`y ~ s(x)` with sparse
+#'     `AR(p = c(1, 12))`. The latent state carries lag-1 momentum
+#'     and lag-12 recurrence; the observation side carries a smooth
+#'     of a covariate that is not periodic, so the two are
+#'     separately identifiable. `prop_trend` defaults to `0.6`.}
 #' }
 #'
 #' For multi-series simulations (`n_series > 1`), the observation
@@ -752,38 +751,29 @@ spec_type_6 <- function() {
 spec_type_7 <- function() {
   list(
     default_trend = AR(p = c(1L, 12L)),
-    # High prop_trend so the AR signal dominates: the seasonal
-    # smooth is identifiable from the deterministic cycle alone,
-    # and the dynamic state needs to carry most of the residual
-    # variance for the model contrast to be visible at moderate n.
-    # Tuned upward from the AR-recipe default (types 2/3/4 use 0.6)
-    # so the seasonal smooth absorbs only the deterministic cycle
-    # and the AR(1, 12) state explains the year-to-year drift that
-    # a fixed-cycle fit cannot follow into the held-out horizon.
-    default_prop_trend = 0.85,
+    # The observation side carries a smooth of a non-periodic
+    # covariate. An earlier version put a cyclic seasonal smooth
+    # here, which cannot be separated from the lag-12 coefficient:
+    # on monthly data a lag-12 autoregression is itself an annual
+    # cycle, so the two describe the same periodicity and the
+    # posterior trades variance between them. Fits showed the
+    # smooth coefficients, sigma, sigma_trend and ar1_trend all
+    # failing to mix together.
+    default_prop_trend = 0.6,
     intercept = function(fam) intercept_for_family(fam),
     build_data = function(n_timepoints, n_series, series_fac,
                            time_int) {
-      # Cycle season 1..12 across time. Per-series time grids are
-      # identical so the obs-side smooth is fit on a single shared
-      # cyclic covariate; the latent state is what differs by
-      # series.
-      season <- ((time_int - 1L) %% 12L) + 1L
-      # Deterministic seasonal cycle. Amplitude tuned so the
-      # seasonal smooth and the AR state contribute distinct,
-      # identifiable shares of variance.
-      f_season_t <- 1.0 * sin(2 * pi * season / 12) +
-                    0.3 * cos(4 * pi * season / 12)
-      grid <- seq(1, 12, length.out = 100L)
-      f_season_grid <- 1.0 * sin(2 * pi * grid / 12) +
-                       0.3 * cos(4 * pi * grid / 12)
+      total_n <- n_timepoints * n_series
+      x <- stats::runif(total_n, -2, 2)
+      sm <- sim_smooth(x, k = 8L, bs = "tp", scale = 0.9)
+      grid <- seq(-2, 2, length.out = 100L)
+      true_sm <- sim_smooth_on_grid(sm$basis, sm$coefs, grid_x = grid)
       list(
-        covariates = list(season = season),
-        obs_contrib = f_season_t,
+        covariates = list(x = x),
+        obs_contrib = sm$f,
         true_betas = numeric(),
         true_smooths = list(
-          `s(season)` = data.frame(season = grid,
-                                     f_true = f_season_grid)
+          `s(x)` = data.frame(x = grid, f_true = true_sm)
         )
       )
     },

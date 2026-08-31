@@ -112,12 +112,11 @@ to \code{0.2} for this type to keep the AR component small
 relative to the smooth so the two are identifiable.}
 \item{\code{type = 6}}{\code{y ~ s(season, bs = "cc")} with \code{CAR(time, series)}. Cyclic seasonal + continuous-time AR(1) on
 irregular time gaps (\code{Δt ~ Uniform(1, 6)}).}
-\item{\code{type = 7}}{\code{y ~ s(season, bs = "cc", k = 12)} with
-sparse \code{AR(p = c(1, 12))}. Monthly seasonal cycle on the
-obs side; the latent state carries lag-1 momentum and
-lag-12 year-on-year recurrence beyond the deterministic
-cycle. Pairs with a \code{prop_trend} default of \code{0.7} so the
-AR signal dominates residual variance.}
+\item{\code{type = 7}}{\code{y ~ s(x)} with sparse
+\code{AR(p = c(1, 12))}. The latent state carries lag-1 momentum
+and lag-12 recurrence; the observation side carries a smooth
+of a covariate that is not periodic, so the two are
+separately identifiable. \code{prop_trend} defaults to \code{0.6}.}
 }
 
 For multi-series simulations (\code{n_series > 1}), the observation
