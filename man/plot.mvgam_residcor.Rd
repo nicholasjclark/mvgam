@@ -4,19 +4,22 @@
 \alias{plot.mvgam_residcor}
 \title{Plot residual correlations or precisions from a \code{mvgam_residcor} object}
 \usage{
-\method{plot}{mvgam_residcor}(x, type = c("correlation", "precision"), cluster = FALSE, ...)
+\method{plot}{mvgam_residcor}(
+  x,
+  type = c("correlation", "precision"),
+  cluster = FALSE,
+  rescale = FALSE,
+  ...
+)
 }
 \arguments{
 \item{x}{A \code{mvgam_residcor} object returned by
 \code{residual_cor(..., summary = TRUE)}.}
 
-\item{type}{Character. Which matrix to plot. \code{"correlation"}
-(the default) reads \code{x$sig_cor}; \code{"precision"} reads
-\code{x$sig_prec} (the partial correlations, Ovaskainen et al.
-2016), which \code{residual_cor()} populates only under
-\code{partial = TRUE}. Precision panels widen the colour-scale
-limits from the correlation default \verb{[-1, 1]} to the
-entry-magnitude range of \code{sig_prec}.}
+\item{type}{Character. Which surface to plot. \code{"correlation"}
+(the default) reads \code{x$cor}; \code{"precision"} reads \code{x$prec}
+(the partial correlations, Ovaskainen et al. 2016), which
+\code{residual_cor()} populates only under \code{partial = TRUE}.}
 
 \item{cluster}{Logical. When \code{TRUE}, the matrix is reordered
 by an approximate Robinson ordering (Gruvaeus & Wainer
@@ -24,23 +27,37 @@ by an approximate Robinson ordering (Gruvaeus & Wainer
 visually coherent positive and negative clusters sit
 adjacent. Defaults to \code{FALSE}.}
 
+\item{rescale}{Logical. Colour spans \verb{[-1, 1]} by default, the
+full range a correlation can take, so panels from different
+fits are directly comparable and a correlation of 0.4 does
+not look like one of 1. Set \code{TRUE} to scale colour to the
+entries actually present, which reads better on a fit whose
+correlations are all small. Defaults to \code{FALSE}.}
+
 \item{...}{Ignored.}
 }
 \value{
 A \code{ggplot} object.
 }
 \description{
-Heatmap of the significant residual correlations or precisions
+Heatmap of the residual correlations or partial correlations
 from a Joint Species Distribution (\code{jsdgam}) or dynamic
-factor (\code{mvgam}) model.
+factor (\code{mvgam}) model, with the weight of evidence behind
+each entry shown alongside its estimate.
 }
 \details{
 Only the lower triangle of off-diagonal entries is
-shown; the diagonal is dropped (it is \code{1} for any
-correlation and undefined for a precision matrix). Cells
-whose credible interval contained zero have been set to
-zero by \code{residual_cor()} and read as grey on the diverging
-palette.
+drawn; a symmetric matrix says everything once and the
+diagonal is \code{1} for any correlation.
+
+Fill carries the posterior median. Opacity carries \code{Pr(sign)},
+the larger of \code{Pr(r > 0)} and \code{Pr(r < 0)}, binned at 0.75 and
+0.95 into three ordered levels. Reading the two together is
+the point: a large correlation the data barely resolve is
+drawn faintly rather than erased, and a small one the data
+resolve well is drawn firmly. \code{x$sig_cor} applies a hard cut
+at \code{Pr(sign) > 0.95} instead, and is still on the object for
+anyone who wants it.
 }
 \seealso{
 \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=summary.mvgam_residcor]{summary.mvgam_residcor()}}

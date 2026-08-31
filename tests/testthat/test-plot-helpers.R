@@ -295,3 +295,25 @@ test_that("no plot writes a scheme colour as a literal", {
   }
   expect_equal(offenders, character(0))
 })
+
+
+test_that("legend breaks stay readable when limits come from data", {
+  # A precision heatmap scales to its own entries, and the exact
+  # arithmetic sequence then labelled the legend to seven decimals.
+  expect_equal(
+    mvgam:::pretty_symmetric_breaks(c(-1, 1)),
+    c(-1, -0.5, 0, 0.5, 1)
+  )
+  expect_equal(
+    mvgam:::pretty_symmetric_breaks(c(-0.5764995, 0.5764995)),
+    c(-0.58, -0.29, 0, 0.29, 0.58)
+  )
+  # A wide range keeps its magnitude rather than collapsing to zero.
+  expect_equal(
+    mvgam:::pretty_symmetric_breaks(c(-12.3, 12.3)),
+    c(-12.3, -6.2, 0, 6.2, 12.3)
+  )
+  # And a narrow one keeps enough digits to stay distinct.
+  narrow <- mvgam:::pretty_symmetric_breaks(c(-0.004, 0.004))
+  expect_length(unique(narrow), 5L)
+})

@@ -4,7 +4,7 @@
 \alias{plot.mvgam_residcor_list}
 \title{Plot method for an \code{mvgam_residcor_list}}
 \usage{
-\method{plot}{mvgam_residcor_list}(x, include_global = TRUE, ncol = NULL, ...)
+\method{plot}{mvgam_residcor_list}(x, include_global = TRUE, ncol = NULL, rescale = FALSE, ...)
 }
 \arguments{
 \item{x}{An \code{mvgam_residcor_list} returned by
@@ -16,7 +16,14 @@ the \verb{_global} reference correlation as one panel.}
 \item{ncol}{Optional integer. Number of facet columns; defaults
 to \code{ceiling(sqrt(n_panels))}.}
 
-\item{...}{Currently unused.}
+\item{rescale}{Logical. Colour spans \verb{[-1, 1]} by default, the
+full range a correlation can take, so panels from different
+fits are directly comparable and a correlation of 0.4 does
+not look like one of 1. Set \code{TRUE} to scale colour to the
+entries actually present, which reads better on a fit whose
+correlations are all small. Defaults to \code{FALSE}.}
+
+\item{...}{Ignored.}
 }
 \value{
 A \link[ggplot2:ggplot]{ggplot2::ggplot} object.
@@ -24,12 +31,12 @@ A \link[ggplot2:ggplot]{ggplot2::ggplot} object.
 \description{
 Faceted heatmap panel across the per-group correlation
 matrices returned by \code{residual_cor(mod, by_group = TRUE)} on a
-hierarchical VAR or factor fit. Reuses the same
-\code{mvgam_diverging_scale()} palette and \code{mvgam_theme()} as
-\code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}}, with symmetric limits \code{c(-1, 1)}
-shared across facets so the eye can compare panels directly.
-The \verb{_global} reference matrix is included by default; drop it
-with \code{include_global = FALSE}.
+hierarchical VAR or factor fit. Reads exactly as
+\code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}} does, one panel per group: fill carries
+the posterior median and opacity carries \code{Pr(sign)}. Colour
+limits are shared across facets so the eye can compare panels
+directly. The \verb{_global} reference matrix is included by default;
+drop it with \code{include_global = FALSE}.
 }
 \seealso{
 \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}},

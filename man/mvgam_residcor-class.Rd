@@ -22,7 +22,9 @@ every off-diagonal entry. Use these for a sign-determinability
 filter rather than the binary "CI does not contain zero" rule.}
 \item{sig_cor}{A \eqn{p \times p} correlation matrix containing
 only those correlations whose credible interval excludes zero. All
-other entries are set to zero.}
+other entries are set to zero. \code{\link[=plot.mvgam_residcor]{plot.mvgam_residcor()}} draws \code{cor}
+rather than this, since a hard cut renders a correlation the data
+merely leave uncertain identically to one estimated at zero.}
 \item{cov, cov_se, cov_lower, cov_upper, cov_ess}{Posterior
 summaries of the residual covariance matrix, with per-entry ESS
 matching the correlation surface.}

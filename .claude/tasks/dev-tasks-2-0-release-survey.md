@@ -854,6 +854,53 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > `plot_helpers.R` applies a ggplot2 theme, the other if any of
   > them writes a colour that a bayesplot scheme carries.
 
+- [x] **3.13 The correlation heatmap drew a threshold, not an estimate**
+  > `plot.mvgam_residcor()` drew `sig_cor`, where every pair whose
+  > `Pr(sign)` misses 0.95 is set to zero, under a legend reading
+  > "Posterior correlation". On `val_mvgam_var_cor` a correlation of
+  > 0.399 came out white, indistinguishable from zero. On
+  > `val_jsdgam_trait` all 28 species pairs were zeroed and the panel
+  > was blank, while the model estimates a largest absolute
+  > correlation of 0.433.
+  >
+  > The surrounding packages were read before choosing a
+  > replacement. `Hmsc::computeAssociations()` returns the mean and
+  > the support and thresholds nothing, leaving the cut to user code.
+  > `gllvm::getResidualCor()` returns the matrix untouched.
+  > `corrplot` offers five treatments for an unsupported entry and
+  > defaults to keeping the estimate and marking it, its hiding
+  > option blanking the glyph rather than repainting it at the
+  > midpoint. mvgam was the only one whose plot applied the cut with
+  > no way to reach the estimate.
+  >
+  > bayesplot settled it. Across 165 exports it carries no
+  > significance machinery at all, and encodes uncertainty as nested
+  > intervals whose defaults deliberately avoid 95%. Every other
+  > mvgam figure already follows that through
+  > `mvgam_band_layer(probs = c(0.5, 0.8, 0.95))`; the heatmap was
+  > the one surface that dichotomised.
+  >
+  > Fill now carries the posterior median and opacity carries
+  > `Pr(sign)`, cut at 0.75 and 0.95 into three ordered levels the
+  > way `bayesplot::mcmc_rhat()` cuts a diagnostic at 1.05 and 1.1.
+  > The evidence legend reads on its own greyscale, since it grades
+  > confidence rather than correlation, and sits below the colour
+  > bar. Only the lower triangle is drawn. `rescale` swaps the fixed
+  > `[-1, 1]` for the data range; the fixed default keeps panels
+  > comparable and stops 0.4 looking like 1. `sig_cor` stays on the
+  > object.
+  >
+  > `plot.mvgam_residcor_list()` reads the same way, through shared
+  > helpers, so the two heatmaps cannot drift apart.
+  >
+  > Two mechanics were not obvious. ggplot builds a legend key from
+  > the rows a layer holds, so on a fit where nothing clears 0.75 the
+  > other two levels drew labels with no swatch; neither
+  > `drop = FALSE` nor naming the scale's `limits` fixes it, and an
+  > invisible row per level does. And dropping the upper triangle
+  > takes one level off each axis, so both are held open or the panel
+  > silently loses a row and a column.
+
 - [ ] **3.10 `info =` in expectations across six test files**
   > CLAUDE.md rules it out and testthat's expectations do not take it.
   > Roughly twenty sites, fourteen of them in

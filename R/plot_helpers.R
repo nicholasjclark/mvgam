@@ -362,8 +362,8 @@ mvgam_repel_layer <- function(
 mvgam_diverging_scale <- function(
   name = "correlation",
   limits = c(-1, 1),
-  breaks = seq(limits[1L], limits[2L], length.out = 5L),
-  na.value = "grey30"
+  breaks = pretty_symmetric_breaks(limits),
+  na.value = "transparent"
 ) {
   warm <- mvgam_palette("red")[5L]
   cool <- mvgam_palette("blue")[5L]
@@ -374,6 +374,149 @@ mvgam_diverging_scale <- function(
     limits = limits,
     breaks = breaks,
     na.value = na.value
+  )
+}
+
+
+#' Five evenly spaced legend breaks across a symmetric range,
+#' rounded to something a reader can take in. The arithmetic
+#' sequence is exact and unreadable once the limits come from the
+#' data rather than from the unit interval: a precision heatmap
+#' scaled to its own entries labelled its legend to seven decimal
+#' places.
+#'
+#' @param limits Numeric length-2 range, symmetric about zero.
+#' @return Numeric vector of breaks.
+#'
+#' @noRd
+pretty_symmetric_breaks <- function(limits) {
+  checkmate::assert_numeric(limits, len = 2L, any.missing = FALSE)
+  raw <- seq(limits[1L], limits[2L], length.out = 5L)
+  # Two significant digits on the half-range keeps the endpoints
+  # distinct without carrying the full float.
+  digits <- max(1L, 2L - ceiling(log10(max(abs(limits), 1e-8))))
+  unique(round(raw, digits))
+}
+
+
+#' Ordered evidence levels for a correlation heatmap.
+#'
+#' `Pr(sign)` is the larger of `Pr(r > 0)` and `Pr(r < 0)`, so it
+#' runs from 0.5 (the sign is a coin flip) to 1. Cutting it into a
+#' few ordered bins follows `bayesplot::mcmc_rhat()`, which cuts a
+#' continuous diagnostic at fixed breaks and shows the bins with the
+#' colour scheme's graded steps. The point is that the bins are
+#' ordered rather than binary: a correlation the data barely resolve
+#' is drawn faintly, not erased.
+#'
+#' @param p Numeric vector of `Pr(sign)` values.
+#' @return Ordered factor with three levels.
+#'
+#' @noRd
+residcor_evidence_bin <- function(p) {
+  cut(
+    p,
+    breaks = c(-Inf, 0.75, 0.95, Inf),
+    labels = c("< 0.75", "0.75 - 0.95", "> 0.95"),
+    ordered_result = TRUE
+  )
+}
+
+
+#' Evidence levels, named so a legend key is drawn for each.
+#' @noRd
+residcor_evidence_levels <- function() {
+  levels(residcor_evidence_bin(0.5))
+}
+
+
+#' Long-format lower triangle of an estimate matrix and its
+#' matching evidence matrix, ready for a heatmap.
+#'
+#' The upper triangle and the diagonal are not returned at all: a
+#' symmetric matrix says everything once, and the diagonal is 1 for
+#' any correlation.
+#'
+#' @param estimate Symmetric matrix of posterior point estimates.
+#' @param evidence Matrix of `Pr(sign)`, same dimensions.
+#' @param cluster Reorder both by `cluster_cormat()`.
+#' @return Data frame with `Var1`, `Var2`, `value` and `ev`.
+#'
+#' @noRd
+residcor_panel_data <- function(estimate, evidence, cluster = FALSE) {
+  # A single series has no off-diagonal entry, so the lower triangle
+  # is empty and there is no panel to draw. Refusing here names the
+  # reason, where the empty frame would fail further downstream.
+  checkmate::assert_matrix(estimate, mode = "numeric", min.rows = 2L)
+  checkmate::assert_matrix(
+    evidence, mode = "numeric", nrows = nrow(estimate),
+    ncols = ncol(estimate)
+  )
+  checkmate::assert_flag(cluster)
+  if (isTRUE(cluster)) {
+    idx <- cluster_cormat(estimate)
+    estimate <- estimate[idx, idx]
+    evidence <- evidence[idx, idx]
+  }
+  keep <- lower.tri(estimate)
+  out <- expand.grid(dimnames(estimate))
+  colnames(out) <- c("Var1", "Var2")
+  out$value <- as.vector(estimate)
+  out$ev <- residcor_evidence_bin(as.vector(evidence))
+  out[as.vector(keep), , drop = FALSE]
+}
+
+
+#' One invisible row per evidence level, so every level has a
+#' legend key.
+#'
+#' ggplot builds a key from the rows a layer holds, so a level the
+#' data never reach draws its label with no swatch beside it. On a
+#' fit where nothing clears `Pr(sign) > 0.75` that emptied two
+#' thirds of the legend. These rows render nothing: no fill, no
+#' border.
+#'
+#' @param panel Output of `residcor_panel_data()`.
+#' @return `panel` with one row per evidence level.
+#'
+#' @noRd
+residcor_legend_filler <- function(panel) {
+  lv <- residcor_evidence_levels()
+  filler <- panel[rep(1L, length(lv)), , drop = FALSE]
+  filler$ev <- factor(lv, levels = lv, ordered = TRUE)
+  filler
+}
+
+
+#' Opacity scale for the evidence bins.
+#'
+#' Reads on its own greyscale rather than borrowing the diverging
+#' hue, since it grades confidence rather than correlation. The
+#' floor sits well above zero so the least certain bin is still
+#' legible.
+#'
+#' @noRd
+residcor_evidence_scale <- function() {
+  ggplot2::scale_alpha_ordinal(
+    name = "Pr(sign)",
+    range = c(0.55, 1),
+    limits = residcor_evidence_levels(),
+    drop = FALSE,
+    na.translate = FALSE
+  )
+}
+
+
+#' Guide order for a residual-correlation heatmap: the estimate's
+#' colour bar first, the evidence legend under it.
+#' @noRd
+residcor_guides <- function() {
+  ggplot2::guides(
+    fill = ggplot2::guide_colourbar(order = 1),
+    alpha = ggplot2::guide_legend(
+      order = 2,
+      override.aes = list(fill = "grey45")
+    )
   )
 }
 
