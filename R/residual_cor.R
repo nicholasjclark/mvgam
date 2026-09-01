@@ -288,8 +288,8 @@ compute_residual_cor <- function(object, by_group, partial, summary,
 #'
 #' Returns `NULL` if the trend is not a factor model. For multivariate
 #' trend specs (one per response in an mvbind fit) the first spec is
-#' used; factor models with per-response `n_lv` heterogeneity are
-#' currently out of scope.
+#' used, which is the whole story unless the responses were given
+#' different `n_lv`.
 #'
 #' @noRd
 detect_factor_n_lv <- function(object) {
@@ -758,9 +758,9 @@ get_residcor_series_names <- function(object, cov_struct) {
 }
 
 
-#' Return the active trend spec for an mvgam fit (multivariate
-#' fits use the first spec; per-response hierarchical heterogeneity
-#' is out of scope for residual_cor).
+#' Return the active trend spec for an mvgam fit. A multivariate
+#' fit uses the first spec, since `residual_cor()` reports one
+#' correlation structure.
 #'
 #' @noRd
 trend_spec_for_residcor <- function(object) {

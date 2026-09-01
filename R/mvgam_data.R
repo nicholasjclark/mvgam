@@ -202,10 +202,24 @@ mvgam_data <- function(data,
     validate_response_for_family(data[[y]], family, y_name = y)
   }
 
-  # Time regularity. CAR is the only constructor that handles
-  # irregular intervals; everything else uses the same validator
-  # mvgam() runs at fit time.
-  if (!identical(get_trend_name(trend_model), "CAR")) {
+  # Time regularity, gated on the trend's own validation rules so
+  # this answers the way the fit-time check does. Naming CAR here
+  # instead put the rule in two places, and they disagreed: a
+  # `ZMVN()` trend is exchangeable in time and its covariance is
+  # indexed by series alone, so gappy data are fine for it and the
+  # hardcoded predicate rejected them.
+  #
+  # A missing `trend_model` means the caller has not said which
+  # trend they intend, which is not the same as intending none.
+  # Checking then reports the gaps against the trends that most
+  # commonly follow, and naming a trend that tolerates them turns
+  # the check off.
+  needs_regular <- if (is.null(trend_model)) {
+    TRUE
+  } else {
+    any_trend_requires_regular_intervals(trend_model)
+  }
+  if (needs_regular) {
     validate_regular_time_intervals(data$time, "time")
   }
 

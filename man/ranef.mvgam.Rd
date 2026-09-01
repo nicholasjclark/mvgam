@@ -70,9 +70,9 @@ aliased transparently.
 }
 \details{
 Observation-side random effects only. Trend-side group-level
-effects (i.e. \code{(1 | g)} inside \code{trend_formula}) remain
-accessible via their positional Stan names; brms-parity
-aliasing for trend REs is deferred.
+effects (i.e. \code{(1 | g)} inside \code{trend_formula}) carry their
+positional Stan names rather than the brms-style labels, and
+address the same draws under either.
 }
 \examples{
 \donttest{

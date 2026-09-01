@@ -523,6 +523,23 @@ get_default_trend_parameter_prior <- function(param_name,
   pattern
 }
 
+#' Is this class one of the loadings-kernel length-scales?
+#'
+#' `theta_features` and one `theta_dist_<name>` per supplied
+#' distance matrix. They are named after the quantity rather than
+#' the submodel, so they carry no `_trend` suffix, and the set is
+#' open: a model declares one length-scale per distance source it
+#' was given.
+#'
+#' @param param_name Character vector of class names.
+#' @return Logical vector.
+#' @noRd
+is_loadings_length_scale <- function(param_name) {
+  checkmate::assert_character(param_name, any.missing = FALSE)
+  param_name == "theta_features" | grepl("^theta_dist_", param_name)
+}
+
+
 #' Get Default Prior Based on Parameter Type
 #'
 #' @param param_name Character string parameter name
@@ -540,6 +557,12 @@ get_parameter_type_default_prior <- function(param_name) {
     return(list(
       prior = common_trend_priors$nu_trend$default, lb = "2", ub = ""
     ))
+  } else if (any(is_loadings_length_scale(param_name))) {
+    # A kernel length-scale is a modelling choice, not a nuisance:
+    # for a phylogenetic distance it sets how fast covariance decays
+    # with relatedness. Reported here so it can be seen and set,
+    # rather than emitted as a literal nothing reads back.
+    return(list(prior = "lognormal(0, 1)", lb = "0", ub = ""))
   } else if (is_ar_coefficient(param_name)) {
     # AR coefficients: typically bounded [-1, 1] for stationarity
     return(list(prior = "normal(0, 0.5)", lb = "-1", ub = "1"))
@@ -1336,6 +1359,30 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
             "extract_prior_string returned non-character value for parameter {.field {param_name}}"
           )
         ))
+      }
+
+      # `constant()` is not a distribution. brms implements it by
+      # moving the parameter out of the parameters block and
+      # assigning it, which every emitter below would have to do
+      # too; written as a sampling statement it reaches Stan as a
+      # call to a `constant_lpdf` that does not exist, and the
+      # model fails to compile with the class name nowhere in the
+      # message. Refusing beats emitting a program that cannot
+      # build.
+      if (grepl("^\\s*constant\\s*\\(", user_prior)) {
+        stop(insight::format_error(c(
+          paste0("A 'constant()' prior is not supported for '",
+                 param_name, "'."),
+          x = paste0(
+            "mvgam emits its own priors as sampling statements, and ",
+            "'constant()' names no distribution Stan can evaluate."
+          ),
+          i = paste0(
+            "Give '", param_name, "' a narrow proper prior instead, ",
+            "or fix the quantity through the trend constructor where ",
+            "one takes it."
+          )
+        )))
       }
 
       # Convert to clean Stan string

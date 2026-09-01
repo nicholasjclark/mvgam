@@ -228,34 +228,63 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > `loadings_prior` arguments `stancode.mvgam_formula()` already
   > takes, which also closes 15.0.
 
-- [ ] **15.6 Length-scale priors cannot be set**
-  > `theta_features` and each `theta_dist_<name>` are emitted as
-  > literal `lognormal(0, 1)` targets (R/stan_assembly.R:3448, 3477)
-  > with no registry entry. `get_prior()` never lists them and
-  > `prior_summary()` does, so a user sees a row they cannot change.
-  > For a phylogenetic kernel that length-scale is a modelling
-  > choice, not a nuisance.
+- [x] **15.6 Length-scale priors cannot be set**
+  > `theta_features` and each `theta_dist_<name>` were emitted as
+  > literal `lognormal(0, 1)` targets with no registry entry, so
+  > `prior_summary()` reported a row `get_prior()` never offered
+  > and a prior set on one was refused. For a phylogenetic kernel
+  > that length-scale is a modelling choice, not a nuisance.
   >
-  > Separately, `R/stan_assembly.R:3326` claims the `normal(0, 1)`
-  > default matches Heaps' practice; the paper uses `N(0, 10)`.
+  > They now resolve through the chain that also builds the
+  > reported table, so an override reaches the program per distance
+  > source. Which length-scales exist is derived from the loadings
+  > spec rather than listed again, so a model cannot report one it
+  > has no distance source for.
+  >
+  > The claim that the `normal(0, 1)` default matches Heaps'
+  > practice is left standing but is unverified here; the paper was
+  > not consulted. The default now matters less, since it can be
+  > overridden, but the citation should be checked against the
+  > source before release.
 
 - [ ] **16.0 Smaller things the sweeps turned up**
-  > - `prior(constant(1), class = sigma_trend)` is accepted and
-  >   emits `sigma_trend ~ constant(1);`, which has no
-  >   `constant_lpdf` and fails at `stanc`. Legal brms input,
-  >   invalid Stan out.
-  > - `AR(p >= 2)` boxes each coefficient in `(-1, 1)`
-  >   independently. The stationary region of an AR(2) is a triangle
-  >   strictly inside that box, so the prior admits non-stationary
-  >   draws. VAR already uses the Heaps `AtoP` mapping.
-  > - `CAR()` and `AR(p = 2)` start the state from
-  >   `Normal(0, sigma_trend)` rather than the stationary variance.
-  >   AR(1)-style trends already divide by `sqrt(1 - phi^2)`.
-  > - `ZMVN()` on a single series makes
-  >   `sigma_trend^2 + sigma^2` an exact sum with nothing to split
-  >   it. Narrow, and analytic rather than measured.
-  > - `pkgdown/jsdgam_cache/figs/` holds 11 tracked PNGs, 1.4 MB,
-  >   referenced by nothing.
+  > - [x] `prior(constant(1), class = sigma_trend)` was accepted and
+  >   emitted `sigma_trend ~ constant(1);`, which names no density
+  >   Stan can evaluate, so the model failed at `stanc` with the
+  >   class nowhere in the message. brms implements `constant()` by
+  >   moving the parameter out of the parameters block and assigning
+  >   it, which every mvgam emitter would have to do too. Refused
+  >   instead, at `get_trend_parameter_prior()`, the one point all
+  >   ten emission sites resolve through.
+  > - [x] `pkgdown/jsdgam_cache/figs/` held 11 tracked PNGs, 1.4 MB.
+  >   Removed. Nothing referenced them and no script wrote them; the
+  >   only mention in the repo was this line.
+  > - [ ] `ZMVN()` on a single series makes `sigma_trend^2 +
+  >   sigma^2` an exact sum with nothing to split it. Applies only
+  >   to families carrying a residual scale, since a Poisson has no
+  >   `sigma` for the trend to trade against. A validator question
+  >   rather than a code-generation one.
+  >
+  > Two entries are struck, both parameterisation changes and
+  > neither wanted:
+  >
+  > `AR(p >= 2)` boxes each coefficient in `(-1, 1)` independently
+  > while the stationary region of an AR(2) is a triangle strictly
+  > inside that box, so the prior admits non-stationary draws. The
+  > Heaps `AtoP` and `rev_mapping` functions the VAR generator uses
+  > would fix it and reduce to the scalar case at `m = 1`. Not
+  > adopting them is a decision, not an oversight: it would move
+  > what a user's `prior(class = ar2_trend)` constrains onto the
+  > partial-autocorrelation scale and rename posterior columns. The
+  > coefficient scale stays.
+  >
+  > `CAR()` and `AR(p = 2)` start the state from `Normal(0,
+  > sigma_trend)` rather than the stationary variance, where AR(1)
+  > divides by `sqrt(1 - phi^2)`. The comment at the branch names
+  > the Yule-Walker solve this needs. Left alone for the same
+  > reason: it changes the posterior of every AR(p>1) and CAR fit,
+  > so it belongs with a deliberate parameterisation pass rather
+  > than a release sweep.
 
 - [ ] **13.1 The migration the names still need**
   > Deferred from 13.0 because each renames something a fitted object
@@ -427,6 +456,65 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   >   redirects; use the target.
   > - Non-portable compilation flags come from the local Makevars
   >   rather than from the package, so nothing to do.
+
+- [ ] **19.0 The family scales have the defect 15.6 closed for the kernel**
+  > `Psi`, the residual scale of `mvn()` and `mvt()`, and `nu`, the
+  > mvt degrees of freedom, are emitted as literals in
+  > `R/families.R`. `prior_summary()` lists them, tagged
+  > `source = "mvgam"`; `get_prior()` does not; and a prior set on
+  > either is refused by brms with a message naming
+  > `default_prior()`, which is where the class name was read.
+  > Verified on `mvn()` with `ZMVN(n_lv = 2)`: `Psi ~
+  > exponential(1);` is in the program, `Psi` is absent from
+  > `get_prior()`, and `prior(exponential(5), class = Psi)` is
+  > refused.
+  >
+  > Harder than the kernel case was. The family stanvar builders
+  > reach `Psi` through `prepare_closure_unit_family()`, which
+  > dispatches on family name and passes only `arrays`, so making
+  > the prior settable means threading one through nine branches.
+  > `nu` is harder still: its prior is written
+  > `target += gamma_lpdf(nu - 2 | 2, 0.1)`, and the shift is the
+  > model rather than a formatting choice, since the mvt has no
+  > finite variance below 2. A plain `nu ~ dist(args)` would drop
+  > it, so `nu` needs the shift kept and the distribution made
+  > settable around it, or an argument on the family.
+  >
+  > The declaration and prior are at least written once now:
+  > `make_psi_stanvars()` replaces two byte-identical blocks that
+  > differed only in a stanvar name prefix.
+
+- [ ] **18.0 mvgam's own priors are unnormalised, and the guard cannot see it**
+  > `bridge_sampler.mvgam()` rejects a program containing `_lupdf`
+  > or `_lupmf`, matching `brms:::is_normalized()`, and its message
+  > says mvgam's shipped emitters produce normalised Stan. Neither
+  > half holds. Stan drops the normalising constant for any `~`
+  > statement, and every prior mvgam emits is written that way,
+  > while brms writes its own as `lprior += student_t_lpdf(...)`.
+  > On `~ AR(p = 1, cor = TRUE)` with `normalize = TRUE`:
+  >
+  > | statement | constants |
+  > |---|---|
+  > | `lprior += student_t_lpdf(Intercept \| 3, 1.4, 2.5);` | kept |
+  > | `sigma_trend ~ exponential(2);` | dropped |
+  > | `L_Omega_trend ~ lkj_corr_cholesky(2);` | dropped |
+  > | `ar1_trend ~ normal(0, 0.5);` | dropped |
+  >
+  > The guard finds no `_lupdf`, passes, and bridge sampling then
+  > runs on a log density missing each trend prior's constant. A
+  > single marginal likelihood is offset by a fixed amount, which
+  > is harmless on its own; a Bayes factor between two models whose
+  > trend priors differ is not, because the offsets do not cancel.
+  >
+  > `normalize = FALSE` is equally unheard: brms switches to
+  > `_lupdf` and the mvgam statements do not change, because there
+  > is nothing in a `~` statement to switch.
+  >
+  > The fix is to emit mvgam's priors the way brms does, choosing
+  > the suffix from the `normalize` setting, and to have the guard
+  > test what it means rather than one spelling of it. Sizeable,
+  > and it changes `lp__` for every model, so it wants its own
+  > verification pass rather than riding along with a prior fix.
 
 - [ ] **6.0 Final release verification**
   > Clean `document()`, clean test sweep, `R CMD check --as-cran`,

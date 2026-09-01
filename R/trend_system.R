@@ -721,7 +721,7 @@ generate_monitor_params <- function(trend_spec) {
 
   # Add factor model parameters if enabled
   factor_params <- if (!is.null(trend_spec$n_lv)) {
-    c("Z")
+    c("Z", loadings_monitor_params(trend_spec$loadings_prior_spec))
   } else {
     character(0)
   }

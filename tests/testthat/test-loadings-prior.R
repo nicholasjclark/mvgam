@@ -368,3 +368,47 @@ test_that("MGP shrinkage is refused on trends that cannot carry it", {
     "shared innovation scale"
   )
 })
+
+
+test_that("each kernel length-scale can be seen and set", {
+  # The length-scales were emitted as literals with no registry
+  # entry, so `prior_summary()` reported a row `get_prior()` never
+  # offered and nothing could change. For a phylogenetic kernel the
+  # length-scale sets how fast covariance decays with relatedness,
+  # which is a modelling choice rather than a nuisance.
+  dat <- data.frame(
+    y = rpois(40, 5), time = rep(1:20, 2),
+    series = factor(rep(c("a", "b"), each = 20))
+  )
+  feat <- matrix(rnorm(6), 2, 3, dimnames = list(c("a", "b"), NULL))
+  dm <- matrix(c(0, .5, .5, 0), 2, 2,
+               dimnames = list(c("a", "b"), c("a", "b")))
+  lp <- list(features = feat, distances = list(phy = dm))
+  mf <- mvgam_formula(y ~ 1, ~ ZMVN(n_lv = 2))
+
+  tab <- get_prior(mf, data = dat, family = poisson(), loadings_prior = lp)
+  scales <- tab[is_loadings_length_scale(tab$class), ]
+  expect_setequal(scales$class, c("theta_features", "theta_dist_phy"))
+  # A length-scale is positive, and the table has to say so.
+  expect_true(all(scales$lb == "0"))
+
+  # What is reported is what is emitted.
+  sc <- stancode(mf, data = dat, family = poisson(), loadings_prior = lp)
+  for (i in seq_len(nrow(scales))) {
+    expect_true(grepl(
+      paste0(scales$class[i], " ~ ", scales$prior[i], ";"), sc, fixed = TRUE
+    ))
+  }
+
+  # An override reaches the program, per distance source.
+  user <- brms::prior_string("inv_gamma(3, 2)", class = "theta_features") +
+    brms::prior_string("lognormal(1, 0.5)", class = "theta_dist_phy")
+  sc2 <- stancode(mf, data = dat, family = poisson(),
+                  loadings_prior = lp, prior = user)
+  expect_true(grepl("theta_features ~ inv_gamma(3, 2);", sc2, fixed = TRUE))
+  expect_true(grepl("theta_dist_phy ~ lognormal(1, 0.5);", sc2, fixed = TRUE))
+
+  # A model with no kernel declares none, so none is reported.
+  plain <- get_prior(mf, data = dat, family = poisson())
+  expect_false(any(is_loadings_length_scale(plain$class)))
+})

@@ -3416,7 +3416,9 @@ test_that("loadings_prior with features only emits ARD prior on Z", {
   expect_match(sc, "gp_exponential_cov", fixed = TRUE)
   expect_match(sc, "cholesky_decompose", fixed = TRUE)
   expect_match(sc, "multi_normal_cholesky", fixed = TRUE)
-  expect_match(sc, "lognormal_lpdf\\(theta_features")
+  # The length-scale is a settable prior, so it is written as a
+  # sampling statement like every other one mvgam emits.
+  expect_match(sc, "theta_features\\s*~\\s*lognormal\\(0, 1\\)")
   expect_false(grepl("to_vector\\(Z\\)\\s*~\\s*student_t", sc))
   expect_match(sc, "qr_thin_R", fixed = TRUE)
 })

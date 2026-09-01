@@ -333,9 +333,10 @@ mvgam_ranef_metadata <- function(x) {
 # walks pairs in the same order so the alias index matches brms
 # byte-for-byte at any M.
 #
-# Trend-side random effects (REs in `trend_formula`) are deferred.
-# v1 aliases only the observation-side group structure; trend REs
-# remain accessible via their positional names. Extending here:
+# Aliasing covers the observation-side group structure. A random
+# effect declared in `trend_formula` keeps its positional Stan
+# name, which addresses the same draws under a different label.
+# Extending here:
 # iterate over the trend brmsterms via
 # `brms::brm(formula = x$trend_formula, ..., empty = TRUE)`,
 # build the same r_/sd_/cor_ maps, and append a `_trend` suffix

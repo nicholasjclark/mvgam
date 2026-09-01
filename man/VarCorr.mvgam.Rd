@@ -60,9 +60,8 @@ the same workflow.
 }
 \details{
 Observation-side group-level effects only. Trend-side
-covariance components remain accessible via their positional
-Stan names; brms-parity aliasing for the trend block is
-deferred.
+covariance components carry their positional Stan names rather
+than the brms-style labels.
 }
 \examples{
 \donttest{

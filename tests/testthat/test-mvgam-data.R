@@ -499,3 +499,40 @@ test_that("newdata is held to the same support as the training data", {
   )
   expect_match(conditionMessage(err), "outside the support")
 })
+
+
+test_that("time regularity is gated on the trend's own rules", {
+  # The rule was written twice: `validations.R` reads each trend's
+  # `validation_rules`, `mvgam_data()` named CAR directly. They
+  # disagreed on `ZMVN()`, whose covariance is indexed by series
+  # alone and so is exchangeable in time, and gappy data were
+  # refused for it in one place and accepted in the other.
+  set.seed(2)
+  irregular <- sort(sample(seq_len(40), 25))
+  dat <- data.frame(
+    y = rpois(50, 4),
+    time = rep(irregular, 2),
+    series = factor(rep(c("a", "b"), each = 25))
+  )
+  expect_silent(suppressMessages(
+    mvgam_data(dat, trend_model = ZMVN(), family = poisson())
+  ))
+  expect_silent(suppressMessages(
+    mvgam_data(dat, trend_model = CAR(), family = poisson())
+  ))
+  expect_error(
+    suppressMessages(
+      mvgam_data(dat, trend_model = AR(p = 1), family = poisson())
+    ),
+    "Irregular time intervals"
+  )
+
+  # Both surfaces answer from the same rules.
+  for (tm in list(ZMVN(), CAR(), AR(p = 1), RW())) {
+    expect_equal(
+      any_trend_requires_regular_intervals(tm),
+      "requires_regular_intervals" %in% (tm$validation_rules %||%
+                                           character(0))
+    )
+  }
+})

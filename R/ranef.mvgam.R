@@ -45,9 +45,9 @@
 #'
 #' @details
 #' Observation-side random effects only. Trend-side group-level
-#' effects (i.e. `(1 | g)` inside `trend_formula`) remain
-#' accessible via their positional Stan names; brms-parity
-#' aliasing for trend REs is deferred.
+#' effects (i.e. `(1 | g)` inside `trend_formula`) carry their
+#' positional Stan names rather than the brms-style labels, and
+#' address the same draws under either.
 #'
 #' @author Nicholas J Clark
 #'
@@ -216,9 +216,8 @@ brms::ranef
 #'
 #' @details
 #' Observation-side group-level effects only. Trend-side
-#' covariance components remain accessible via their positional
-#' Stan names; brms-parity aliasing for the trend block is
-#' deferred.
+#' covariance components carry their positional Stan names rather
+#' than the brms-style labels.
 #'
 #' @author Nicholas J Clark
 #'

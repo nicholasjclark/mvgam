@@ -958,3 +958,43 @@ test_that("a draws reader returns NULL for a parameter not carried", {
   expect_null(read_draws_vector(dm, "b", 2L, required = FALSE))
   expect_error(read_draws_vector(dm, "b", 2L), "incomplete")
 })
+
+
+test_that("the trend type is resolved in one place", {
+  # Two resolvers read the same fact to different depths.
+  # `detect_var_trend()` looked only at `trend_components$types`,
+  # so `irf()`, `fevd()`, `stability()` and
+  # `posterior_transition_matrix()` refused a fit whose type was
+  # recorded in its metadata, while `summary()` named it correctly.
+  obj <- structure(
+    list(
+      trend_components = list(types = "VAR"),
+      trend_metadata = list(trend = list(trend_type = "VAR")),
+      trend_formula = ~ VAR(p = 1)
+    ),
+    class = "mvgam"
+  )
+  expect_equal(get_trend_type(obj), "VAR")
+  expect_equal(detect_var_trend(obj), "VAR")
+
+  # Recorded only in the metadata: both surfaces still agree.
+  meta_only <- obj
+  meta_only$trend_components$types <- NA_character_
+  expect_equal(get_trend_type(meta_only), "VAR")
+  expect_equal(detect_var_trend(meta_only), "VAR")
+
+  # A `trend` slot holding an atomic vector rather than a list must
+  # not reach `$`, which errors there rather than returning NULL.
+  atomic_meta <- obj
+  atomic_meta$trend_components$types <- NA_character_
+  atomic_meta$trend_metadata$trend <- c("VAR", "something")
+  expect_no_error(suppressWarnings(get_trend_type(atomic_meta)))
+  expect_null(suppressWarnings(detect_var_trend(atomic_meta)))
+
+  # A non-VAR trend is refused rather than answered.
+  ar <- obj
+  ar$trend_components$types <- "AR"
+  ar$trend_metadata$trend$trend_type <- "AR"
+  expect_equal(get_trend_type(ar), "AR")
+  expect_null(detect_var_trend(ar))
+})

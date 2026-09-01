@@ -349,7 +349,15 @@ test_that("lift detects Z_free_vec partial-Z loadings prior", {
   expect_equal(out$source, "mvgam")
 })
 
-test_that("lift detects theta_features lognormal kernel prior", {
+test_that("lift detects a length-scale prior in either spelling", {
+  # brms writes `target += dist_lpdf(x | args)` and mvgam writes
+  # `x ~ dist(args)`, and a fitted model carries both, so the scan
+  # that builds `prior_summary()` has to read either.
+  emitted <- "  theta_features ~ inv_gamma(3, 2);"
+  row <- mvgam:::mvgam_stancode_prior_rows(emitted)[[1L]]
+  expect_equal(row$class, "theta_features")
+  expect_equal(row$prior, "inv_gamma(3, 2)")
+
   sc <- "  target += lognormal_lpdf(theta_features | 0, 1);"
   out <- mvgam:::lift_mvgam_stanvar_priors(empty_brmsprior(), sc)
   expect_equal(out$class, "theta_features")

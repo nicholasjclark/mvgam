@@ -994,6 +994,24 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
   ))
 }
 
+# Names that a `pforms` entry can carry while still describing one
+# response. Anything else there names a second response, so a
+# missing entry reads a distributional parameter as a whole extra
+# response: the formula is taken for multivariate and the trend
+# never reaches `mu`, which compiles and samples and is wrong.
+# `tests/testthat/test-brms-integration.R` asserts every mvgam
+# family's own dpars appear here, so adding a family with a new one
+# fails a test rather than producing a model with no trend.
+# `Psi` is not a dpar; mvn() and mvt() declare it as a parameter
+# through stanvars, and it is named here for the same reason.
+mvgam_distributional_params <- c(
+  "sigma", "sigma2", "shape", "nu", "phi", "kappa", "theta",
+  "zi", "hu", "disc", "bs", "ndt", "bias", "xi", "coi", "zoi",
+  "beta", "hurdle", "alpha", "sigma_error",
+  "p", "Psi", "mphi", "mtheta", "mtail"
+)
+
+
 #' Check if Formula Object is Multivariate
 #'
 #' @description
@@ -1042,20 +1060,10 @@ is_multivariate_formula <- function(formula) {
     
     # Check pforms content
     if (!is.null(formula$pforms) && length(formula$pforms) > 0) {
-      # brms-native distributional parameters plus mvgam custom-family
-      # dpars (`p` for nmix() / occ() detection; `Psi` for mvn() /
-      # mvt() residual SDs; `mphi` / `mtheta` for tweedie()).
-      distributional_params <- c(
-        "sigma", "sigma2", "shape", "nu", "phi", "kappa", "theta",
-        "zi", "hu", "disc", "bs", "ndt", "bias", "xi", "coi", "zoi",
-        "beta", "hurdle", "alpha", "sigma_error",
-        "p", "Psi", "mphi", "mtheta"
-      )
-
       pform_names <- names(formula$pforms)
       # Distributional parameters are univariate, non-dpar
       # responses are multivariate.
-      if (all(pform_names %in% distributional_params)) {
+      if (all(pform_names %in% mvgam_distributional_params)) {
         return(FALSE)
       }
       return(TRUE)

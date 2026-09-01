@@ -3249,7 +3249,7 @@ generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
   # pairwise distances. Otherwise fall back to a heavier-tailed
   # default (see comment below) on each entry of Z.
   z_prior <- if (!is.null(loadings_prior_spec)) {
-    make_loadings_prior_stanvars(loadings_prior_spec)
+    make_loadings_prior_stanvars(loadings_prior_spec, prior = prior)
   } else {
     # Heaps' framework corresponds to Phi = I_p, Psi = psi I_k
     # under a Gaussian prior on the unconstrained matrix. A
@@ -3351,6 +3351,24 @@ loadings_spec_traits <- function(spec) {
 }
 
 
+# The length-scales a loadings spec declares, in the order the
+# emitter declares them. Derived from the spec rather than listed
+# again, so a model cannot report a length-scale it has no distance
+# source for, or hide one it does.
+#' @noRd
+loadings_monitor_params <- function(spec) {
+  traits <- loadings_spec_traits(spec)
+  c(
+    if (traits$features) "theta_features" else character(0),
+    if (traits$distances) {
+      paste0("theta_dist_", names(spec$distance_mats) %||% character(0))
+    } else {
+      character(0)
+    }
+  )
+}
+
+
 # Which prior `Z` is drawn from, given the loadings spec. One
 # classifier because the emitter below and the prior table that
 # `create_trend_parameter_prior()` builds both read it. Deciding
@@ -3423,10 +3441,15 @@ mgp_psi_diag_scode <- function(dim = "N_lv_trend") {
 #' `column_shrinkage = "mgp"` (Bhattacharya & Dunson 2011, used
 #' in Heaps Eq. (9)).
 #'
-#' Length-scales receive a `log(theta) ~ normal(0, 1)` default
-#' prior, matching Heaps' practice across the simulation,
-#' Finnish-birds and gas-demand applications (paper Sects.
-#' 6.1.2, 6.2.2, 6.3.1). Pairwise distance matrices are
+#' Length-scales take a `log(theta) ~ normal(0, 1)` default,
+#' matching Heaps' practice across the simulation, Finnish-birds
+#' and gas-demand applications (paper Sects. 6.1.2, 6.2.2,
+#' 6.3.1). It is a default rather than a fixture: each
+#' length-scale appears in `get_prior()` as `theta_features` or
+#' `theta_dist_<name>` and takes an override like any other
+#' parameter, which matters for a phylogenetic kernel where the
+#' decay of covariance with relatedness is a modelling choice.
+#' Pairwise distance matrices are
 #' rescaled in `validate_pairwise_distance()` so that
 #' `max(d) == 1`, mirroring Heaps Supps S4.2.1 ("the branch
 #' lengths are standardised by scaling to make the common root
@@ -3450,7 +3473,7 @@ mgp_psi_diag_scode <- function(dim = "N_lv_trend") {
 #' Bhattacharya, A. and Dunson, D. B. (2011). Sparse Bayesian
 #' infinite factor models. \emph{Biometrika}, 98:291-306.
 #' @noRd
-make_loadings_prior_stanvars <- function(spec) {
+make_loadings_prior_stanvars <- function(spec, prior = NULL) {
   assert_loadings_prior_spec_consistent(spec)
   traits <- loadings_spec_traits(spec)
   has_features <- traits$features
@@ -3506,7 +3529,10 @@ make_loadings_prior_stanvars <- function(spec) {
     model_vars <- c(model_vars, list(
       brms::stanvar(
         name = "loadings_prior_theta_features",
-        scode = "target += lognormal_lpdf(theta_features | 0, 1);",
+        scode = paste0(
+          "theta_features ~ ",
+          get_trend_parameter_prior(prior, "theta_features"), ";"
+        ),
         block = "model"
       )
     ))
@@ -3535,8 +3561,9 @@ make_loadings_prior_stanvars <- function(spec) {
         brms::stanvar(
           name = paste0("loadings_prior_theta_dist_", nm),
           scode = paste0(
-            "target += lognormal_lpdf(theta_dist_", nm,
-            " | 0, 1);"
+            "theta_dist_", nm, " ~ ",
+            get_trend_parameter_prior(prior, paste0("theta_dist_", nm)),
+            ";"
           ),
           block = "model"
         )

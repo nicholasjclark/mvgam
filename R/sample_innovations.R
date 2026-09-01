@@ -313,9 +313,13 @@ get_trend_type <- function(object) {
     }
   }
 
-  # Secondary source: trend_metadata$trend$trend_type
+  # Secondary source: trend_metadata$trend$trend_type. The guard
+  # tests for a list rather than for non-NULL: `$` on an atomic
+  # vector is an error, not NULL, so a fit whose `trend$` slot
+  # holds a bare character vector took the fallback path into a
+  # stop() instead of through it.
   metadata <- object$trend_metadata
-  if (!is.null(metadata) && !is.null(metadata$trend)) {
+  if (!is.null(metadata) && is.list(metadata$trend)) {
     trend_type <- metadata$trend$trend_type
     if (!is.null(trend_type) && !is.na(trend_type)) {
       return(trend_type)

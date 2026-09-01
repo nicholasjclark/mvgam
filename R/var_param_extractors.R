@@ -7,15 +7,23 @@
 #' VAR-only downstream calculations behind a single shared check.
 #'
 #' @param object A fitted `mvgam` object.
-#' @return Character string ("VAR", "VAR1", "VARcor", "VAR1cor") if
-#'   the fit's first trend component is a VAR; `NULL` otherwise.
+#' @return The trend-type string when the fit carries a VAR, one of
+#'   `var_trend_types`; `NULL` otherwise.
 #' @noRd
+var_trend_types <- c("VAR", "VAR1", "VARcor", "VAR1cor")
+
 detect_var_trend <- function(object) {
-  trend_type <- object$trend_components$types[1L]
-  if (is.null(trend_type)) {
+  # Read through the shared resolver rather than the first of the
+  # three places a trend type is recorded. Reading only
+  # `trend_components$types` refused `irf()`, `fevd()`,
+  # `stability()` and `posterior_transition_matrix()` on a fit
+  # whose type was recoverable from its metadata, while
+  # `summary()` named it correctly from the same object.
+  trend_type <- get_trend_type(object)
+  if (is.null(trend_type) || is.na(trend_type)) {
     return(NULL)
   }
-  if (!trend_type %in% c("VAR", "VAR1", "VARcor", "VAR1cor")) {
+  if (!trend_type %in% var_trend_types) {
     return(NULL)
   }
   trend_type

@@ -3641,6 +3641,36 @@ mvn_stan_funs <- function() {
   )
 }
 
+#' The residual scale shared by the mvn and mvt families
+#'
+#' Both declare one positive scale per response component and give
+#' it the same prior, so the declaration and the prior are written
+#' once here rather than separately in each builder. `Psi` is on
+#' the standard-deviation scale, which is what
+#' `posterior_epred()` and the variance formulas expect.
+#'
+#' @param K Number of response components per closure unit.
+#' @param prefix Stanvar name prefix, `"mvn"` or `"mvt"`.
+#' @return A list of two `brms::stanvar` objects.
+#' @noRd
+make_psi_stanvars <- function(K, prefix) {
+  checkmate::assert_int(K, lower = 1)
+  checkmate::assert_choice(prefix, c("mvn", "mvt"))
+  list(
+    param = brms::stanvar(
+      name  = paste0(prefix, "_Psi_param"),
+      scode = paste0("  vector<lower=0>[", K, "] Psi;"),
+      block = "parameters"
+    ),
+    prior = brms::stanvar(
+      name  = paste0(prefix, "_Psi_prior"),
+      scode = "  Psi ~ exponential(1);",
+      block = "model"
+    )
+  )
+}
+
+
 #' Build the closure-unit Stan stanvars for an mvn() fit
 #'
 #' Wraps `make_closure_unit_arrays_stanvars()` with the mv-normal
@@ -3673,16 +3703,9 @@ make_mvn_stanvars <- function(arrays) {
   # `sort_stanvars()` ordering, leaving `N_series_trend` out of
   # scope when Stan parses the parameters block).
   K <- as.integer(arrays$max_rep)
-  psi_param <- brms::stanvar(
-    name  = "mvn_Psi_param",
-    scode = paste0("  vector<lower=0>[", K, "] Psi;"),
-    block = "parameters"
-  )
-  psi_prior <- brms::stanvar(
-    name  = "mvn_Psi_prior",
-    scode = "  Psi ~ exponential(1);",
-    block = "model"
-  )
+  psi <- make_psi_stanvars(K, "mvn")
+  psi_param <- psi$param
+  psi_prior <- psi$prior
   combine_stanvars(
     make_closure_unit_arrays_stanvars(
       arrays,
@@ -3852,16 +3875,9 @@ mvt_stan_funs <- function() {
 #' @noRd
 make_mvt_stanvars <- function(arrays) {
   K <- as.integer(arrays$max_rep)
-  psi_param <- brms::stanvar(
-    name  = "mvt_Psi_param",
-    scode = paste0("  vector<lower=0>[", K, "] Psi;"),
-    block = "parameters"
-  )
-  psi_prior <- brms::stanvar(
-    name  = "mvt_Psi_prior",
-    scode = "  Psi ~ exponential(1);",
-    block = "model"
-  )
+  psi <- make_psi_stanvars(K, "mvt")
+  psi_param <- psi$param
+  psi_prior <- psi$prior
   nu_param <- brms::stanvar(
     name  = "mvt_nu_param",
     scode = "  real<lower=2> nu;",
