@@ -249,7 +249,11 @@ mvgam_imputation_forwarded <- c(
 #'     \item `column_shrinkage`: `"iid"` (default; no shrinkage)
 #'       or `"mgp"` (multiplicative-gamma-process increasing
 #'       shrinkage of Bhattacharya & Dunson 2011, used in
-#'       Heaps Eq. (9)).
+#'       Heaps Eq. (9)). `"mgp"` applies its column scale through
+#'       the shared innovation scale, so it is available for
+#'       `AR()`, `RW()` and `ZMVN()` trends. `VAR()` builds its
+#'       own innovation covariance and has nowhere to put it;
+#'       pair a `VAR()` factor model with `"iid"` instead.
 #'     \item `mgp_a1`, `mgp_a2`: numeric MGP hyperparameters,
 #'       only used when `column_shrinkage = "mgp"`. Default
 #'       `(2, 4)` sits within the `a2 in [3, 5]` range

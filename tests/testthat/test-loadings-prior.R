@@ -125,7 +125,7 @@ test_that("normalise_loadings_prior accepts string shorthand 'mgp'", {
   expect_equal(spec$mgp_a2, 4)
 })
 
-test_that("make_loadings_prior_stanvars for pure MGP emits elementwise normal Z prior", {
+test_that("make_loadings_prior_stanvars leaves the MGP column scale to the innovations", {
   data <- make_test_data(4L)
   spec <- normalise_loadings_prior(
     list(column_shrinkage = "mgp"), data2 = NULL, data = data
@@ -136,13 +136,38 @@ test_that("make_loadings_prior_stanvars for pure MGP emits elementwise normal Z 
   # No Phi / Cholesky construction in the pure-MGP path.
   expect_false(grepl("Phi_loadings", sc, fixed = TRUE))
   expect_false(grepl("L_Phi_loadings", sc, fixed = TRUE))
-  # Elementwise normal per column with Psi_diag scale.
-  expect_match(sc, "Z[, i_z] ~ normal(0, sqrt(Psi_diag[i_z]));",
-               fixed = TRUE)
-  # MGP plumbing still emitted.
+  # Z is drawn at unit scale. Scaling its prior by sqrt(Psi_diag)
+  # here would give the column a second scale on top of
+  # `sigma_trend`, leaving only their product identified, and would
+  # put that scale on a centred parameter.
+  expect_match(sc, "to_vector(Z) ~ std_normal();", fixed = TRUE)
+  expect_false(grepl("sqrt(Psi_diag", sc, fixed = TRUE))
+  # The MGP parameters are still declared here; the cumulative
+  # product itself is written by whichever block consumes it.
   expect_match(sc, "varrho_inv", fixed = TRUE)
-  expect_match(sc, "Psi_diag = exp(cumulative_sum(log(varrho_inv)));",
-               fixed = TRUE)
+  expect_match(sc, "inv_gamma(mgp_a1, 1)", fixed = TRUE)
+})
+
+
+test_that("the MGP column scale reaches the trend through sigma_trend", {
+  # The end-to-end contract the split above serves: exactly one
+  # declaration of the cumulative product, and `sigma_trend` derived
+  # from it rather than sampled alongside it.
+  set.seed(1L)
+  d <- sim_mvgam(family = poisson(), n_series = 6L,
+                  n_timepoints = 20L)$data_train
+  m <- suppressWarnings(mvgam(
+    y ~ 1, trend_formula = ~ AR(n_lv = 3), data = d, family = poisson(),
+    loadings_prior = list(column_shrinkage = "mgp"), run_model = FALSE
+  ))
+  ln <- strsplit(paste(as.character(m$model_file %||% m$stancode),
+                        collapse = "\n"), "\n")[[1]]
+  expect_equal(sum(grepl("Psi_diag = exp(cumulative_sum", ln,
+                          fixed = TRUE)), 1L)
+  expect_true(any(grepl("sigma_trend = sqrt(Psi_diag)", ln, fixed = TRUE)))
+  # It is derived, so it is not also a sampled parameter.
+  expect_false(any(grepl("] sigma_trend;", ln, fixed = TRUE)))
+  expect_false(any(grepl("sigma_trend ~", ln, fixed = TRUE)))
 })
 
 test_that("normalise_loadings_prior accepts column_shrinkage = 'mgp' with defaults", {
@@ -305,5 +330,41 @@ test_that("normalise_loadings_prior errors on reserved 'dist_' name", {
       data2 = NULL, data = data
     ),
     "cannot start with 'dist_'"
+  )
+})
+
+
+test_that("MGP shrinkage is refused on trends that cannot carry it", {
+  # The column scale reaches the model through `sigma_trend`, which
+  # only the shared-innovation path builds. VAR() constructs its own
+  # innovation covariance instead, so the shrinkage would be declared
+  # and never applied. Refusing beats emitting a model whose prior
+  # does nothing.
+  set.seed(1L)
+  d <- sim_mvgam(family = poisson(), n_series = 6L,
+                  n_timepoints = 20L)$data_train
+  expect_error(
+    mvgam(y ~ 1, trend_formula = ~ VAR(n_lv = 3), data = d,
+          family = poisson(),
+          loadings_prior = list(column_shrinkage = "mgp"),
+          run_model = FALSE),
+    "not available for 'VAR\\(\\)'"
+  )
+  # The trends that do carry it are unaffected.
+  for (tf in list(~ AR(n_lv = 3), ~ RW(n_lv = 3), ~ ZMVN(n_lv = 3))) {
+    expect_no_error(suppressWarnings(mvgam(
+      y ~ 1, trend_formula = tf, data = d, family = poisson(),
+      loadings_prior = list(column_shrinkage = "mgp"), run_model = FALSE
+    )))
+  }
+  # The refusal is specific to the MGP column scale. It fires
+  # during spec validation, before code generation, so it does not
+  # depend on whether a VAR factor model assembles.
+  expect_error(
+    mvgam(y ~ 1, trend_formula = ~ VAR(n_lv = 3), data = d,
+          family = poisson(),
+          loadings_prior = list(column_shrinkage = "mgp"),
+          run_model = FALSE),
+    "shared innovation scale"
   )
 })

@@ -2215,7 +2215,9 @@ combine_stanvars <- function(...) {
 #' @noRd
 generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
                                                factor_model = FALSE,
+                                               mgp_scale = FALSE,
                                                hierarchical_info = NULL) {
+  checkmate::assert_flag(mgp_scale)
 
   # Determine effective dimension for innovations using symbolic names
   effective_dim <- "N_lv_trend"
@@ -2233,19 +2235,26 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
   } else {
     # Simple case: non-hierarchical innovations
 
-    # 1. sigma_trend - innovation standard deviations
+    # 1. sigma_trend - innovation standard deviations.
+    # Under MGP shrinkage it is not free: the prior already supplies
+    # a per-column scale through `Psi_diag`, and sampling a second
+    # one leaves only their product identified. Deriving it here
+    # gives the column one scale, and puts that scale on innovations
+    # drawn from `std_normal()`, which is where it can be traversed.
     sigma_code <- if (effective_dim == 1) {
       "vector<lower=0>[1] sigma_trend;"
     } else {
       paste0("vector<lower=0>[", effective_dim, "] sigma_trend;")
     }
 
-    sigma_stanvar <- brms::stanvar(
-      name = "sigma_trend",
-      scode = sigma_code,
-      block = "parameters"
-    )
-    stanvar_components <- append(stanvar_components, list(sigma_stanvar))
+    if (!mgp_scale) {
+      sigma_stanvar <- brms::stanvar(
+        name = "sigma_trend",
+        scode = sigma_code,
+        block = "parameters"
+      )
+      stanvar_components <- append(stanvar_components, list(sigma_stanvar))
+    }
 
     # 2. Correlation parameters (only if cor = TRUE and multivariate)
     if (cor && effective_dim > 1) {
@@ -2286,6 +2295,18 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
   stanvar_components <- append(stanvar_components, list(innovations_trend_stanvar))
 
   # 5. Final innovations in transformed parameters (after correlation/MA transformation)
+  # Under MGP the scale is derived here rather than sampled, and it
+  # is declared in the same block that consumes it so it cannot be
+  # emitted after its own use.
+  sigma_decl <- if (mgp_scale) {
+    paste0(
+      "\n    ", mgp_psi_diag_scode(effective_dim),
+      "\n    vector<lower=0>[", effective_dim,
+      "] sigma_trend = sqrt(Psi_diag);"
+    )
+  } else {
+    ""
+  }
   if (is_hierarchical) {
     # Hierarchical case: only declare scaled_innovations_trend, hierarchical system will compute it
     final_innovations_code <- paste0("
@@ -2314,7 +2335,7 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
 
   scaled_innovations_stanvar <- brms::stanvar(
     name = "scaled_innovations_trend",
-    scode = final_innovations_code,
+    scode = paste0(sigma_decl, final_innovations_code),
     block = "tparameters"
   )
   stanvar_components <- append(stanvar_components, list(scaled_innovations_stanvar))
@@ -2439,7 +2460,9 @@ nu_trend_stanvars <- function(df, prior = NULL) {
 #' @noRd
 generate_innovation_model <- function(effective_dim, cor = FALSE,
                                       is_hierarchical = FALSE,
-                                      prior = NULL, df = Inf) {
+                                      prior = NULL, df = Inf,
+                                      mgp_scale = FALSE) {
+  checkmate::assert_flag(mgp_scale)
 
   innovation_code <- innovation_sampling_code(effective_dim, df)
 
@@ -2455,8 +2478,11 @@ generate_innovation_model <- function(effective_dim, cor = FALSE,
 
     prior_code <- c("// Shared Gaussian innovation priors")
 
-    # Add sigma_trend prior if specified
-    if (sigma_prior_str != "") {
+    # Add sigma_trend prior if specified. Under MGP shrinkage
+    # `sigma_trend` is a transformed parameter equal to
+    # `sqrt(Psi_diag)`, so it carries the MGP prior already and a
+    # sampling statement on it would be a second, contradictory one.
+    if (sigma_prior_str != "" && !mgp_scale) {
       prior_code <- c(prior_code, glue::glue("sigma_trend ~ {sigma_prior_str};"))
     }
 
@@ -3350,6 +3376,20 @@ generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
 #' Bhattacharya, A. and Dunson, D. B. (2011). Sparse Bayesian
 #' infinite factor models. \emph{Biometrika}, 98:291-306.
 #' @noRd
+# The multiplicative gamma process column scale, written once.
+# `varrho_inv` carries the per-column inverse-gamma draws and their
+# cumulative product is the scale; whichever block consumes the
+# scale declares it, so this returns the code rather than a stanvar.
+#'@noRd
+mgp_psi_diag_scode <- function(dim = "N_lv_trend") {
+  checkmate::assert_string(dim, min.chars = 1)
+  paste0(
+    "vector<lower=0>[", dim, "] Psi_diag",
+    " = exp(cumulative_sum(log(varrho_inv)));"
+  )
+}
+
+
 make_loadings_prior_stanvars <- function(spec) {
   assert_loadings_prior_spec_consistent(spec)
   has_features <- spec$N_features_trend > 0L
@@ -3526,17 +3566,10 @@ make_loadings_prior_stanvars <- function(spec) {
         block = "parameters"
       )
     ))
-    tparam_vars <- c(tparam_vars, list(
-      brms::stanvar(
-        name = "Psi_diag",
-        scode = paste(
-          "vector<lower=0>[N_lv_trend] Psi_diag",
-          " = exp(cumulative_sum(log(varrho_inv)));",
-          sep = ""
-        ),
-        block = "tparameters"
-      )
-    ))
+    # `Psi_diag` is declared by the block that consumes it, which is
+    # the innovation transform in `generate_shared_innovation_stanvars()`.
+    # The loadings prior no longer scales `Z` by it, so declaring it
+    # here as well would be a second definition of one quantity.
     model_vars <- c(model_vars, list(
       brms::stanvar(
         name = "mgp_priors",
@@ -3560,18 +3593,21 @@ make_loadings_prior_stanvars <- function(spec) {
   #     avoids the p x p Cholesky and works cleanly with simplex
   #     families' `sum_to_zero_vector[K]` Z columns where rank-
   #     deficient covariances would be awkward.
+  # Under MGP the column scale is carried by `sigma_trend`, which
+  # scales innovations already drawn from `std_normal()`, so it
+  # enters non-centred. Scaling `Z`'s prior here instead would put
+  # the same factor on a centred parameter and funnel: the column
+  # contributes `Psi_diag[k]` to the trend variance either way, but
+  # only one of the two is a geometry HMC can traverse. See
+  # `generate_shared_innovation_stanvars()` for the other half.
   z_lines <- if (uses_mgp && !has_kernel) {
-    c(
-      "for (i_z in 1:N_lv_trend) {",
-      "  Z[, i_z] ~ normal(0, sqrt(Psi_diag[i_z]));",
-      "}"
-    )
+    c("to_vector(Z) ~ std_normal();")
   } else if (uses_mgp) {
     c(
       "for (i_z in 1:N_lv_trend) {",
       "  Z[, i_z] ~ multi_normal_cholesky(",
       "    rep_vector(0.0, N_series_trend),",
-      "    L_Phi_loadings * sqrt(Psi_diag[i_z])",
+      "    L_Phi_loadings",
       "  );",
       "}"
     )
@@ -4019,11 +4055,40 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
     factor_model <- !is.null(trend_specs$n_lv) && trend_specs$n_lv < n_series
 
     # Generate shared innovation stanvars
+    # The MGP column scale and a free `sigma_trend` are the same
+    # quantity; only their product reaches the likelihood. When MGP
+    # is on, the scale is derived rather than sampled.
+    mgp_scale <- identical(
+      trend_specs$loadings_prior_spec$column_shrinkage, "mgp"
+    )
+    # Under MGP the column scale is `sqrt(Psi_diag)`, so a prior on
+    # `sigma_trend` names a quantity the model derives rather than
+    # samples. Refusing beats accepting one and ignoring it.
+    user_sigma_prior <- !is.null(prior) &&
+      !is.null(extract_prior_string(prior, "sigma_trend",
+                                     handle_suffix = TRUE))
+    if (mgp_scale && user_sigma_prior) {
+      stop(insight::format_error(c(
+        paste0(
+          "A prior on 'sigma_trend' does not apply under ",
+          "multiplicative gamma process shrinkage."
+        ),
+        x = paste0(
+          "With column_shrinkage = 'mgp' the innovation scale is ",
+          "derived as sqrt(Psi_diag), not sampled."
+        ),
+        i = paste0(
+          "Shape the column scale through 'mgp_a1' and 'mgp_a2' on ",
+          "'loadings_prior', or drop the 'sigma_trend' prior."
+        )
+      )))
+    }
     shared_stanvars <- generate_shared_innovation_stanvars(
       n_lv = n_lv,
       n_series = n_series,
       cor = cor,
       factor_model = factor_model,
+      mgp_scale = mgp_scale,
       hierarchical_info = hierarchical_info
     )
 
@@ -4036,7 +4101,8 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
       cor = cor,
       is_hierarchical = is_hierarchical,
       prior = prior,
-      df = trend_specs$df %||% Inf
+      df = trend_specs$df %||% Inf,
+      mgp_scale = mgp_scale
     )
 
     # Combine shared stanvars with priors properly using combine_stanvars

@@ -3310,6 +3310,7 @@ attach_loadings_prior_spec <- function(trend_specs, spec) {
   specs <- if (is_multivar) trend_specs else list(trend_specs)
   for (i in seq_along(specs)) {
     assert_loadings_prior_compatible(spec, specs[[i]]$fixed_Z)
+    assert_column_shrinkage_compatible(spec, specs[[i]]$trend)
     specs[[i]]$loadings_prior_spec <- spec
   }
   if (is_multivar) specs else specs[[1L]]
@@ -5578,6 +5579,49 @@ assert_distance_names_unreserved <- function(nms) {
     )))
   }
   invisible(NULL)
+}
+
+
+# Trends that carry the multiplicative gamma process column scale.
+# The scale reaches the model through `sigma_trend`, which only the
+# shared-innovation path builds, so a trend that opts out of shared
+# innovations has nowhere to put it. `PW()` and `CAR()` refuse factor
+# models outright and never reach this.
+#'@noRd
+mgp_capable_trends <- c("AR", "RW", "ZMVN")
+
+
+#' Refuse MGP column shrinkage on a trend that cannot apply it.
+#'
+#' @param loadings_prior_spec Normalised loadings-prior spec, or NULL.
+#' @param trend Character trend name from the trend spec.
+#' @return Invisibly `NULL`; raises otherwise.
+#' @noRd
+assert_column_shrinkage_compatible <- function(loadings_prior_spec, trend) {
+  if (is.null(loadings_prior_spec) || is.null(trend)) {
+    return(invisible(NULL))
+  }
+  if (!identical(loadings_prior_spec$column_shrinkage, "mgp")) {
+    return(invisible(NULL))
+  }
+  trend_nm <- toupper(as.character(trend)[1L])
+  if (trend_nm %in% mgp_capable_trends) {
+    return(invisible(NULL))
+  }
+  stop(insight::format_error(c(
+    paste0(
+      "Multiplicative gamma process shrinkage is not available for ",
+      "'", trend_nm, "()' trends."
+    ),
+    x = paste0(
+      "The column scale is applied through the shared innovation ",
+      "scale, which '", trend_nm, "()' does not use."
+    ),
+    i = paste0(
+      "Use column_shrinkage = 'iid', or a trend that carries it: ",
+      paste0(mgp_capable_trends, "()", collapse = ", "), "."
+    )
+  )))
 }
 
 

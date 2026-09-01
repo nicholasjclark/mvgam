@@ -117,7 +117,11 @@ scale (matching Heaps Supps S4.2.1).
 \item \code{column_shrinkage}: \code{"iid"} (default; no shrinkage)
 or \code{"mgp"} (multiplicative-gamma-process increasing
 shrinkage of Bhattacharya & Dunson 2011, used in
-Heaps Eq. (9)).
+Heaps Eq. (9)). \code{"mgp"} applies its column scale through
+the shared innovation scale, so it is available for
+\code{AR()}, \code{RW()} and \code{ZMVN()} trends. \code{VAR()} builds its
+own innovation covariance and has nowhere to put it;
+pair a \code{VAR()} factor model with \code{"iid"} instead.
 \item \code{mgp_a1}, \code{mgp_a2}: numeric MGP hyperparameters,
 only used when \code{column_shrinkage = "mgp"}. Default
 \verb{(2, 4)} sits within the \verb{a2 in [3, 5]} range

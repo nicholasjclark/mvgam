@@ -177,9 +177,14 @@ single survey, so it is worth checking first. The species intercepts
 are on the logit scale, so we convert them with `plogis()`:
 
 ```{r detection-recovery}
-post <- as.matrix(mod$fit)
-p_sp1 <- plogis(post[, "Intercept_p"])
-p_sp2 <- plogis(post[, "Intercept_p"] + post[, "b_p[1]"])
+# as.matrix() on the model, not on mod$fit: the mvgam method
+# drops rotation- and sign-indeterminate raw parameters and names
+# coefficients after the term they belong to rather than a slot.
+post <- as.matrix(mod)
+p_int <- post[, "Intercept_p"]
+p_contrast <- post[, grep("^b_p_series", colnames(post))[1L]]
+p_sp1 <- plogis(p_int)
+p_sp2 <- plogis(p_int + p_contrast)
 
 data.frame(
   species = c("sp_1", "sp_2"),
