@@ -71,7 +71,7 @@ specifications and supports all brms family types for observation models
 while trend components are always modeled as Gaussian State-Space processes.
 }
 \examples{
-\donttest{
+\dontrun{
 # Workflow: discover the adjustable priors, override a subset,
 # then pass the result back to `mvgam()`.
 set.seed(1)

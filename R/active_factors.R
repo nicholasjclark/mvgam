@@ -7,6 +7,31 @@
 # of the leading column's norm is at most `prob_threshold`. Both
 # the loadings AND the shrinkage uncertainty propagate through.
 
+#' The per-column innovation scale, as a draws-by-column matrix
+#'
+#' A factor column contributes `sigma_trend[k] * Z[, k]`, so any
+#' question about how much signal a column carries needs both
+#' halves. Returns a `[ndraws, n_lv]` matrix of ones when the fit
+#' has no per-column scale, so callers can multiply unconditionally.
+#'
+#' @param object A fitted `mvgam`.
+#' @param draws_mat Posterior draws matrix.
+#' @param n_lv Number of latent factors.
+#' @return Numeric `[ndraws, n_lv]` matrix.
+#' @noRd
+resolve_column_scales <- function(object, draws_mat, n_lv) {
+  ndraws <- nrow(draws_mat)
+  cols <- paste0("sigma_trend[", seq_len(n_lv), "]")
+  present <- cols %in% colnames(draws_mat)
+  if (!any(present)) {
+    return(matrix(1, nrow = ndraws, ncol = n_lv))
+  }
+  out <- matrix(1, nrow = ndraws, ncol = n_lv)
+  out[, present] <- as.matrix(draws_mat[, cols[present], drop = FALSE])
+  out
+}
+
+
 #' Posterior summary of active latent factors under MGP shrinkage
 #'
 #' For a fitted `mvgam` object with a multiplicative-gamma-process
@@ -74,7 +99,7 @@
 #'   \doi{10.1093/biomet/asr013}.
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(1)
 #' simdat <- sim_closure_unit_data(
 #'   family    = occ(),
@@ -139,8 +164,21 @@ active_factors.mvgam <- function(object,
     n_series = as.integer(n_series),
     n_lv = as.integer(n_lv)
   )
-  # Z_arr: [ndraws, n_series, n_lv]. Per-column squared norm per draw.
+  # Z_arr: [ndraws, n_series, n_lv]. Per-column squared norm per
+  # draw, scaled by the column's own innovation scale.
+  #
+  # The criterion asks how much of the latent signal a column
+  # carries, and that is `sigma_trend[k] * Z[, k]`, not `Z[, k]`.
+  # The distinction is the whole answer under multiplicative gamma
+  # process shrinkage, which puts the shrinkage in `sigma_trend`
+  # and draws `Z` at unit scale: every column's norm then has the
+  # same distribution, so reading `Z` alone reports a shrunk
+  # column as active. On a ten-factor MGP fit `sigma_trend` ran
+  # from 2.06 to 0.013 while the raw column norms ran from 7.1 to
+  # 5.2, and all ten columns were called active.
+  col_scale <- resolve_column_scales(object, draws_mat, n_lv)
   norm_sq <- apply(Z_arr, c(1L, 3L), function(col) sum(col^2))
+  norm_sq <- norm_sq * col_scale^2
   # Reference scale from the leading column posterior mean.
   ref <- mean(norm_sq[, 1L])
   eps <- fraction * ref

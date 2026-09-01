@@ -80,11 +80,15 @@ draws are selected based on \code{ndraws}.}
 all random effects are included. Use \code{NA} to exclude all random
 effects.}
 
-\item{allow_new_levels}{Logical. If \code{TRUE}, allows predictions for new
-factor levels not seen during training. Default is \code{FALSE}.}
+\item{allow_new_levels}{Logical; accepted for brms compatibility.
+A grouping level the model never saw is refused whatever this is
+set to, because a new level has no fitted random effect and, for
+a new series, no latent state to propagate. Predict for levels
+the fit knows, or refit with the new levels included.}
 
-\item{sample_new_levels}{Character specifying how to sample new levels.
-Either \code{"uncertainty"} (default), \code{"gaussian"}, or \code{"old_levels"}.}
+\item{sample_new_levels}{Character; accepted for brms
+compatibility and not used, since new levels are refused. See
+\code{allow_new_levels}.}
 
 \item{resp}{Character specifying which response variable to predict for
 multivariate models. If \code{NULL}, predictions are returned for all
@@ -173,7 +177,7 @@ scale.
 }
 }
 \examples{
-\donttest{
+\dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())

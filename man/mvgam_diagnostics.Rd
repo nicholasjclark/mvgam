@@ -102,7 +102,7 @@ on the underlying stanfit (\code{nuts_params}, \code{log_posterior}) or to
 \verb{posterior::} summaries on the draws array.
 }
 \examples{
-\donttest{
+\dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())

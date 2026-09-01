@@ -31,7 +31,7 @@ identification, structured loadings prior, GP smooths,
 piecewise trends, Stan backend, and sampling algorithm.
 }
 \examples{
-\donttest{
+\dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())

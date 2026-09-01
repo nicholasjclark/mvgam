@@ -111,7 +111,7 @@ underflow-then-floor pattern that a \code{log(dtweedie(...))}
 two-step introduces.
 }
 \examples{
-\donttest{
+\dontrun{
 # Tweedie generates non-negative continuous observations with a
 # point mass at zero. The dpars are `mphi` (dispersion) and
 # `mtheta` (power exponent on the open interval (1, 2)).

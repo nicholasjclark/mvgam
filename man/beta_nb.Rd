@@ -78,7 +78,7 @@ family, keep \code{1 - F(y)} large and are unaffected.
 }
 
 \examples{
-\donttest{
+\dontrun{
 # Counts with a heavier tail than a negative binomial expects. The
 # dpars are `shape`, playing the usual negative binomial role, and
 # `mtail`, where smaller values give heavier tails and anything

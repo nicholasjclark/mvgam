@@ -7,10 +7,13 @@
 # the result, so nothing else exercised the densities themselves.
 #
 # Each reference is arrived at independently of the kernel: a
-# two-category Dirichlet against a Beta, a multinomial against
-# `stats::dmultinom`, a diagonal multivariate normal against
-# `mvtnorm::dmvnorm`, a multivariate t against `mvtnorm::dmvt`.
-# Restating the kernel's own arithmetic would test nothing.
+# two-category Dirichlet against a Beta, a three-category one
+# against its closed form, a multinomial against
+# `stats::dmultinom`, a diagonal multivariate normal against the
+# product of its margins, a one-dimensional multivariate t against
+# a location-scale `dt()`. Restating the kernel's own arithmetic
+# would test nothing, and neither would checking it against a
+# package that might share its conventions.
 
 
 # The closure-unit arrays these kernels index by: `N_unit` sites, each
@@ -46,7 +49,6 @@ test_that("log_lik_diri matches a Beta density when K = 2", {
 
 
 test_that("log_lik_diri matches a three-category Dirichlet", {
-  skip_if_not_installed("extraDistr")
   ndraws <- 2L
   y <- c(0.2, 0.5, 0.3)
   p <- c(0.25, 0.45, 0.30)
@@ -59,9 +61,13 @@ test_that("log_lik_diri matches a three-category Dirichlet", {
                         arrays = unit_arrays(1L, 3L)),
     trials = NULL
   )
-  expected <- extraDistr::ddirichlet(matrix(y, nrow = 1L),
-                                      alpha = p * phi_val, log = TRUE)
-  expect_equal(out[1L, 1L], as.numeric(expected))
+  # The Dirichlet log density in closed form, so the reference does
+  # not depend on a package that may be absent and does not share
+  # the kernel's conventions.
+  alpha <- p * phi_val
+  expected <- lgamma(sum(alpha)) - sum(lgamma(alpha)) +
+    sum((alpha - 1) * log(y))
+  expect_equal(out[1L, 1L], expected)
 })
 
 
@@ -117,7 +123,6 @@ test_that("log_lik_categ refuses an observation that is not one-hot", {
 
 
 test_that("log_lik_mvn sums to a diagonal multivariate normal", {
-  skip_if_not_installed("mvtnorm")
   # The kernel returns one normal log-density per row. Summed over a
   # unit those must equal the joint density under a diagonal Sigma,
   # which is what `Sigma = diag(Psi^2)` claims.
@@ -129,19 +134,20 @@ test_that("log_lik_mvn sums to a diagonal multivariate normal", {
   Psi_row <- matrix(psi, nrow = ndraws, ncol = 3L, byrow = TRUE)
   out <- log_lik_mvn(linpred, "identity", y,
                       list(Psi_row = Psi_row), NULL)
-  expected <- mvtnorm::dmvnorm(y, mean = mu, sigma = diag(psi^2),
-                                log = TRUE)
+  # A multivariate normal with diagonal covariance is the product
+  # of its univariate margins, so base R gives the reference
+  # without a dependency, and gives it independently.
+  expected <- sum(dnorm(y, mean = mu, sd = psi, log = TRUE))
   expect_equal(sum(out[1L, ]), expected)
   expect_equal(dim(out), c(ndraws, 3L))
 })
 
 
 test_that("log_lik_mvt matches a scaled univariate t per element", {
-  skip_if_not_installed("mvtnorm")
   # The kernel scales by Psi and corrects with the Jacobian, so each
   # element is a location-scale t. A multivariate t with diagonal
   # scale is not the product of those, so the per-element form is what
-  # is checked, against `mvtnorm::dmvt` in one dimension.
+  # is checked, against a location-scale t per element.
   ndraws <- 2L
   y <- c(1.2, -0.4)
   mu <- c(1.0, 0.0)
@@ -157,10 +163,11 @@ test_that("log_lik_mvt matches a scaled univariate t per element", {
     trials = NULL
   )
   for (k in seq_along(y)) {
-    expected <- mvtnorm::dmvt(y[k], delta = mu[k],
-                               sigma = matrix(psi[k]^2, 1, 1),
-                               df = nu[1L], log = TRUE)
-    expect_equal(out[1L, k], as.numeric(expected))
+    # A one-dimensional multivariate t is a location-scale t, so
+    # the reference is `dt()` shifted by the log Jacobian.
+    expected <- dt((y[k] - mu[k]) / psi[k], df = nu[1L], log = TRUE) -
+      log(psi[k])
+    expect_equal(out[1L, k], expected)
   }
 })
 

@@ -23,9 +23,10 @@ observations live on the same scale as the forecasts).}
 
 \item{score}{Character; one of the names above.}
 
-\item{interval_width}{Central PI width used by every scorer
-for the per-series \code{in_interval} indicator (and the SIS
-penalty width).}
+\item{interval_width}{Central PI width behind the per-series
+\code{in_interval} indicator, and the SIS penalty width. Computed
+for \code{"crps"}, \code{"drps"} and \code{"sis"}; the other scores report
+\code{in_interval} as \code{NA}.}
 
 \item{quantile_level}{Quantile the \code{"qs"} pinball loss is
 taken at. Defaults to \code{0.5}, the median. Unrelated to the
@@ -37,7 +38,11 @@ central interval the other scorers use, which
 unweighted scores.}
 
 \item{log}{Logical; apply \code{log(x + 0.001)} to truth and
-forecast draws before scoring.}
+forecast draws before scoring. Honoured by \code{"crps"},
+\code{"drps"} and \code{"sis"}; passing \code{TRUE} with any other score is
+an error, since \code{"brier"} scores a binary outcome and
+\code{"twcrps"} carries its thresholds on the untransformed
+scale.}
 
 \item{weights}{Optional length-\code{n_series} numeric vector of
 per-series weights for \code{"variogram"}.}
@@ -91,7 +96,7 @@ sqrt-differences across forecast draws.}
 }
 
 \examples{
-\donttest{
+\dontrun{
 set.seed(11)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR(),

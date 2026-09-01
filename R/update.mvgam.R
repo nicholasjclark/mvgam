@@ -90,7 +90,7 @@
 #'   model comparison on the refit object.
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())

@@ -58,11 +58,14 @@
 #'   computation. Default is `c(0.025, 0.975)` for 95% credible
 #'   intervals.
 #' @inheritParams posterior_epred.mvgam
-#' @param allow_new_levels Logical. If `TRUE`, allows predictions for
-#'   new factor levels not seen during training. Default is `FALSE`.
-#' @param sample_new_levels Character specifying how to sample new
-#'   levels. Either `"uncertainty"` (default), `"gaussian"`, or
-#'   `"old_levels"`.
+#' @param allow_new_levels Logical; accepted for brms compatibility.
+#'   A grouping level the model never saw is refused whatever this is
+#'   set to, because a new level has no fitted random effect and, for
+#'   a new series, no latent state to propagate. Predict for levels
+#'   the fit knows, or refit with the new levels included.
+#' @param sample_new_levels Character; accepted for brms
+#'   compatibility and not used, since new levels are refused. See
+#'   `allow_new_levels`.
 #' @param ... Additional arguments passed to the underlying posterior
 #'   methods.
 #'
@@ -114,7 +117,7 @@
 #'   [`brms::fitted.brmsfit()`][brms::fitted.brmsfit].
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())

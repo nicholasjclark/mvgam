@@ -78,7 +78,7 @@
 #'   [loo::psis()].
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())
@@ -283,11 +283,12 @@ mvgam_loo_E_loo <- function(object, posterior_fn,
   checkmate::assert_function(posterior_fn)
   assert_resp_for_mv(object, resp, loo_fn_name(posterior_fn))
   type <- match.arg(type)
-  if (exists(".Random.seed", envir = .GlobalEnv)) {
-    rng_old <- get(".Random.seed", envir = .GlobalEnv)
-    on.exit(assign(".Random.seed", rng_old, envir = .GlobalEnv))
-  }
+  # `local_seed()` takes responsibility for putting the caller's
+  # stream back. The two `set.seed(aligned_seed)` calls below are
+  # not redundant with it: they restart the same stream before the
+  # weighting and before the prediction, so the two draw together.
   aligned_seed <- 1L
+  local_seed(aligned_seed)
   # `incl_autocor` names a prediction surface, so it is held back from
   # the weighting call, which reaches `loo::loo()` through `...` and
   # would not know the argument.
@@ -410,13 +411,7 @@ loo_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   checkmate::assert_list(args_loglik)
   is_mv <- brms::is.mvbrmsformula(object$formula)
   assert_resp_for_mv(object, resp, "loo_R2")
-  if (!is.null(seed)) {
-    if (exists(".Random.seed", envir = .GlobalEnv)) {
-      rng_old <- get(".Random.seed", envir = .GlobalEnv)
-      on.exit(assign(".Random.seed", rng_old, envir = .GlobalEnv))
-    }
-    set.seed(seed)
-  }
+  local_seed(seed)
   resp_use <- scored_response_name(object, resp)
   y <- object$data[[resp_use]]
   if (is.null(y) || !is.numeric(y)) {

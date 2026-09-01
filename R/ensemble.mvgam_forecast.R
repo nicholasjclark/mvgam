@@ -69,13 +69,7 @@ ensemble.mvgam_forecast <- function(object, ..., weights = NULL,
                                      seed = NULL) {
   checkmate::assert_class(object, "mvgam_forecast")
   checkmate::assert_integerish(ndraws, lower = 1L, len = 1L)
-  if (!is.null(seed)) {
-    if (exists(".Random.seed", envir = .GlobalEnv)) {
-      rng_old <- get(".Random.seed", envir = .GlobalEnv)
-      on.exit(assign(".Random.seed", rng_old, envir = .GlobalEnv))
-    }
-    set.seed(seed)
-  }
+  local_seed(seed)
   ndraws <- as.integer(ndraws)
   split <- mvgam_split_models(object, ...,
                                 class = "mvgam_forecast")
@@ -99,13 +93,26 @@ ensemble.mvgam_forecast <- function(object, ..., weights = NULL,
   ndraws_per <- mvgam_round_largest_remainder(w * ndraws)
   names(w) <- names(ndraws_per) <- names(models)
 
-  # Per-series, sample `ndraws_per[m]` rows from model m's
-  # hindcasts and forecasts (with replacement when the model
-  # has fewer rows than its allocation), then row-bind across
-  # models to produce a single (ndraws x H) matrix per series.
+  # Sample `ndraws_per[m]` rows from model m once, then take
+  # those same rows for every series and for both hindcasts and
+  # forecasts, before row-binding across models into a single
+  # (ndraws x H) matrix per series.
+  #
+  # One selection, not one per series: a posterior draw is a
+  # joint object, and the dependence between series lives in
+  # which draws are taken together. Choosing rows separately per
+  # series pairs series 1's draw 40 with series 2's draw 900 and
+  # throws that dependence away. Two series identical on every
+  # draw came back correlated 0.05, and any joint score, energy
+  # or variogram, was then scoring an ensemble that had no
+  # cross-series structure left. Choosing separately per arm
+  # breaks the hindcast-to-forecast pairing the same way, so a
+  # per-draw trajectory through `plot()` was two unrelated
+  # halves.
   series_names <- names(models[[1L]]$forecasts)
-  ens_hcs <- combine_arm(models, "hindcasts", ndraws_per)
-  ens_fcs <- combine_arm(models, "forecasts", ndraws_per)
+  draw_idx <- resolve_ensemble_draws(models, ndraws_per)
+  ens_hcs <- combine_arm(models, "hindcasts", draw_idx)
+  ens_fcs <- combine_arm(models, "forecasts", draw_idx)
   names(ens_hcs) <- series_names
   names(ens_fcs) <- series_names
 
@@ -208,22 +215,39 @@ validate_forecast_compatibility <- function(models) {
 }
 
 
+# Internal: the rows to take from each model, drawn once so every
+# series and both arms are indexed by the same posterior draws.
+# Sampled with replacement when a model holds fewer rows than its
+# allocation. Returns a list of integer vectors, one per model.
+#' @noRd
+resolve_ensemble_draws <- function(models, ndraws_per) {
+  lapply(seq_along(models), function(m) {
+    take <- ndraws_per[m]
+    if (take == 0L) return(integer(0L))
+    n_avail <- NROW(models[[m]]$forecasts[[1L]])
+    sample(seq_len(n_avail), take, replace = take > n_avail)
+  })
+}
+
+
 # Internal: stack a per-series draw matrix arm (e.g. "forecasts"
-# or "hindcasts") across models, taking `ndraws_per[m]` rows
-# from model m for each series (sampled with replacement when
-# the model has fewer rows than its allocation). Returns an
-# unnamed list of (sum(ndraws_per) x H) matrices.
-#'@noRd
-combine_arm <- function(models, arm, ndraws_per) {
+# or "hindcasts") across models, taking the rows `draw_idx[[m]]`
+# names from model m for every series. Returns an unnamed list of
+# (sum(lengths(draw_idx)) x H) matrices.
+#' @noRd
+combine_arm <- function(models, arm, draw_idx) {
   n_series <- length(models[[1L]][[arm]])
   lapply(seq_len(n_series), function(s) {
     pieces <- lapply(seq_along(models), function(m) {
+      idx <- draw_idx[[m]]
+      if (!length(idx)) return(NULL)
       mat <- models[[m]][[arm]][[s]]
-      n_avail <- NROW(mat)
-      take <- ndraws_per[m]
-      if (take == 0L) return(NULL)
-      idx <- sample(seq_len(n_avail), take,
-                     replace = take > n_avail)
+      # An arm with fewer rows than the one the draws were
+      # chosen from cannot be indexed by them; wrap so the
+      # pairing stays as close as the shapes allow.
+      if (max(idx) > NROW(mat)) {
+        idx <- ((idx - 1L) %% NROW(mat)) + 1L
+      }
       mat[idx, , drop = FALSE]
     })
     do.call(rbind, pieces[!vapply(pieces, is.null, logical(1L))])

@@ -175,7 +175,7 @@ the active column count.
 }
 
 \examples{
-\donttest{
+\dontrun{
 # Simulate four correlated Gaussian series. ZMVN is a single-
 # snapshot residual prior, so the recoverable structure is the
 # cross-series covariance.

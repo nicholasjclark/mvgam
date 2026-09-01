@@ -132,7 +132,7 @@ fires identically on the inherited class and reconstructs
 \verb{Sigma = Z Z'} per draw on the species axis.
 }
 \examples{
-\donttest{
+\dontrun{
 # Multi-species occupancy factor model -- the Z Z' product gives
 # the species-by-species residual covariance after fixed effects
 # are accounted for.

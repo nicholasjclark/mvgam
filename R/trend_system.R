@@ -2299,7 +2299,7 @@ print.mvgam_trend <- function(x, ...) {
 #' @author Nicholas J Clark
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate three Gaussian series driven by a correlated VAR(1)
 #' # process so the cross-series dependencies are recoverable.
 #' set.seed(0)
@@ -2692,7 +2692,7 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #' @rdname piecewise_trends
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Linear PW on a single Poisson series. `y ~ -1` removes the
 #' # observation intercept so the PW trend's `m_trend` parameter
 #' # is the unique constant offset (otherwise the two compete for
@@ -2896,7 +2896,7 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
 #'   \url{https://nicholasjclark.github.io/mvgam/articles/idm.html}.
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate four correlated Gaussian series. ZMVN is a single-
 #' # snapshot residual prior, so the recoverable structure is the
 #' # cross-series covariance.

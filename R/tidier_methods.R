@@ -77,7 +77,7 @@ generics::glance
 #' @family tidiers
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())
@@ -491,7 +491,7 @@ split_hier_Sigma <- function(x, params) {
 #' @seealso [fitted.mvgam()], [residuals.mvgam()]
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())
@@ -652,7 +652,7 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
 #' @seealso [tidy.mvgam()], [augment.mvgam()], [loo.mvgam()]
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())

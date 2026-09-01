@@ -108,7 +108,7 @@ removes the need to know whether the fit was univariate or
 multivariate before extracting.
 }
 \examples{
-\donttest{
+\dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())

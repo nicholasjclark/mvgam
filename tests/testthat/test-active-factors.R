@@ -58,3 +58,42 @@ test_that("plot.mvgam_active_factors rejects non-class input", {
     regexp = "Must inherit"
   )
 })
+
+
+test_that("a column's activity is measured with its own scale", {
+  # A factor column contributes `sigma_trend[k] * Z[, k]`. Reading
+  # `Z` alone was right while `Z` carried the column magnitude, and
+  # wrong once multiplicative gamma process shrinkage moved that
+  # magnitude into `sigma_trend` and left `Z` at unit scale: every
+  # column's norm then has the same distribution, so a shrunk
+  # column reports as active.
+  ndraws <- 40L
+  draws <- posterior::as_draws_matrix(
+    matrix(
+      c(rep(2, ndraws), rep(0.01, ndraws)),
+      nrow = ndraws,
+      dimnames = list(NULL, c("sigma_trend[1]", "sigma_trend[2]"))
+    )
+  )
+  scales <- resolve_column_scales(NULL, draws, n_lv = 2L)
+  expect_equal(dim(scales), c(ndraws, 2L))
+  expect_equal(unname(scales[1L, ]), c(2, 0.01))
+
+  # A fit with no per-column scale multiplies by one, so every
+  # other route is left exactly as it was.
+  bare <- posterior::as_draws_matrix(
+    matrix(1, nrow = ndraws, ncol = 1L,
+           dimnames = list(NULL, "lp__"))
+  )
+  expect_equal(
+    resolve_column_scales(NULL, bare, n_lv = 3L),
+    matrix(1, nrow = ndraws, ncol = 3L)
+  )
+
+  # Equal raw norms, unequal scales: the second column is not active.
+  Z <- array(1, dim = c(ndraws, 4L, 2L))
+  raw <- apply(Z, c(1L, 3L), function(col) sum(col^2))
+  expect_equal(raw[1L, 1L], raw[1L, 2L])
+  scaled <- raw * scales^2
+  expect_gt(scaled[1L, 1L], scaled[1L, 2L] * 1000)
+})

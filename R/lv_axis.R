@@ -59,7 +59,7 @@
 #' # NULL invisibly.
 #' lv_axis()
 #'
-#' \donttest{
+#' \dontrun{
 #' # ---- Non-factor mode (no `n_lv`) ----
 #' # The validator rewrites `by = lv_axis()` to `by = series`
 #' # internally, so each series gets its own smooth on the trend

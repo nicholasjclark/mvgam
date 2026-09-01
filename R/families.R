@@ -167,7 +167,7 @@
 #'   with the R package brms. *The R Journal*, 10, 395-411.
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Tweedie generates non-negative continuous observations with a
 #' # point mass at zero. The dpars are `mphi` (dispersion) and
 #' # `mtheta` (power exponent on the open interval (1, 2)).
@@ -605,7 +605,7 @@ check_tweedie_truncation <- function(object) {
 #'   `mtail` grows, and [tweedie()] for non-negative continuous
 #'   responses with a point mass at zero.
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Counts with a heavier tail than a negative binomial expects. The
 #' # dpars are `shape`, playing the usual negative binomial role, and
 #' # `mtail`, where smaller values give heavier tails and anything
@@ -857,7 +857,7 @@ beta_nb_stan_funs <- function() {
 #' @seealso \code{\link[brms]{custom_family}}, \code{\link{tweedie}}
 #' @author Nicholas J Clark, Julius Bogomolovas
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate an under-dispersed COM-Binomial series via
 #' # sim_mvgam(): nu_true = 1.5, T = 20 trials per observation,
 #' # the default observation-side smooth `s(x)`, and a random-walk
@@ -2203,7 +2203,7 @@ build_closure_unit_arrays <- function(data,
 #'   \doi{10.1890/0012-9658(2003)084[0777:EAFRPA]2.0.CO;2}.
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Poisson-binomial N-mixture: per-visit counts with imperfect
 #' # detection. The state mu is lambda (expected abundance) and
 #' # the dpar p is the detection probability per visit.
@@ -2502,13 +2502,13 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #' equivalents in adjacent packages:
 #' \itemize{
 #'   \item ubms
-#'     (\url{https://github.com/biodiverse/ubms}):
+#'     (\url{https://github.com/ecoverseR/ubms}):
 #'     `predict(submodel = "state")` returns marginal psi;
 #'     `predict(submodel = "det")` returns p;
 #'     `posterior_predict(param = "z")` returns 0/1 latent
 #'     occupancy draws conditioned on the observed history.
 #'   \item spOccupancy
-#'     (\url{https://github.com/biodiverse/spOccupancy}):
+#'     (\url{https://github.com/ecoverseR/spOccupancy}):
 #'     `psi.0.samples` (marginal psi), `z.0.samples` (latent z
 #'     draws).
 #'   \item flocker
@@ -2539,7 +2539,7 @@ nmix <- function(type = c("poisson_binomial", "royle_nichols",
 #'   formula (`p ~ ...`) to share detection information across units.
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Single-species occupancy fit with separate covariates on
 #' # the occupancy (psi) and detection (p) sub-formulas. The
 #' # closure-unit grain is (series, time) -- 50 sites, 4 visits
@@ -2949,7 +2949,7 @@ make_occ_stanvars <- function(arrays) {
 #'   \doi{10.1007/s11222-024-10454-0}
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate Dirichlet compositional data on 40 sites x K = 3
 #' # categories under an environmental gradient. The first category
 #' # is the reference; per-category logit-mean offsets and env
@@ -3499,7 +3499,7 @@ make_categ_stanvars <- function(arrays) {
 #'   \doi{10.1007/s11222-024-10454-0}
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate K = 3 species at 60 sites under a low-rank residual
 #' # covariance Sigma = Z Z' + diag(Psi^2). Per-species intercepts
 #' # and an env slope drive the mean; cross-species covariance comes

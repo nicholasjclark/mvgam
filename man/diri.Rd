@@ -116,7 +116,7 @@ species) row summing to 1 within each site.
 }
 
 \examples{
-\donttest{
+\dontrun{
 # Simulate Dirichlet compositional data on 40 sites x K = 3
 # categories under an environmental gradient. The first category
 # is the reference; per-category logit-mean offsets and env

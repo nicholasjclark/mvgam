@@ -211,7 +211,7 @@ or GP terms of \code{factor_formula} to fit per-latent-factor smooths
 (constrained ordination).
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate a small closure-unit JSDM: 4 species, 50 sites,
 # 4 visits, env + elev site covariates, tod_c + effort visit
 # covariates. Recipe 2L gives both state-level and detection-

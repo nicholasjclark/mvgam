@@ -71,11 +71,15 @@ draw indices to use. NULL (default) uses all draws (subject to
 \item{re_formula}{Formula for random effects. NULL (default) includes
 all random effects, NA excludes all random effects.}
 
-\item{allow_new_levels}{Logical; if TRUE, allows new factor levels in
-random effects grouping variables. Default FALSE.}
+\item{allow_new_levels}{Logical; accepted for brms compatibility.
+A grouping level the model never saw is refused whatever this is
+set to, because a new level has no fitted random effect and, for
+a new series, no latent state to propagate. Predict for levels
+the fit knows, or refit with the new levels included.}
 
-\item{sample_new_levels}{Character specifying how to handle new levels.
-Either "uncertainty" (default) or "gaussian".}
+\item{sample_new_levels}{Character; accepted for brms
+compatibility and not used, since new levels are refused. See
+\code{allow_new_levels}.}
 
 \item{resp}{Character specifying which response variable for
 multivariate models. NULL (default) returns predictions for all
@@ -117,7 +121,7 @@ Unsupported families:
 }
 }
 \examples{
-\donttest{
+\dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())

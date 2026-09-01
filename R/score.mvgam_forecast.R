@@ -19,6 +19,14 @@
 score <- function(object, ...) UseMethod("score")
 
 
+# The univariate scores that take `interval_width` and `log`. The
+# others score a transformed quantity (`brier` a binary outcome) or
+# carry thresholds on the untransformed scale (`twcrps`), so a log
+# transform of the draws alone would not mean what it says.
+#' @noRd
+scores_honouring_log <- c("crps", "drps", "sis")
+
+
 #' Proper scoring rules for `mvgam_forecast` objects
 #'
 #' Compute one of eleven proper scoring rules on the held-out
@@ -55,9 +63,10 @@ score <- function(object, ...) UseMethod("score")
 #'   `"response"` or `"expected"` (so the held-out
 #'   observations live on the same scale as the forecasts).
 #' @param score Character; one of the names above.
-#' @param interval_width Central PI width used by every scorer
-#'   for the per-series `in_interval` indicator (and the SIS
-#'   penalty width).
+#' @param interval_width Central PI width behind the per-series
+#'   `in_interval` indicator, and the SIS penalty width. Computed
+#'   for `"crps"`, `"drps"` and `"sis"`; the other scores report
+#'   `in_interval` as `NA`.
 #' @param quantile_level Quantile the `"qs"` pinball loss is
 #'   taken at. Defaults to `0.5`, the median. Unrelated to the
 #'   central interval the other scorers use, which
@@ -66,7 +75,11 @@ score <- function(object, ...) UseMethod("score")
 #'   `"twenergy"`. Defaults `-Inf` / `Inf` recover the
 #'   unweighted scores.
 #' @param log Logical; apply `log(x + 0.001)` to truth and
-#'   forecast draws before scoring.
+#'   forecast draws before scoring. Honoured by `"crps"`,
+#'   `"drps"` and `"sis"`; passing `TRUE` with any other score is
+#'   an error, since `"brier"` scores a binary outcome and
+#'   `"twcrps"` carries its thresholds on the untransformed
+#'   scale.
 #' @param weights Optional length-`n_series` numeric vector of
 #'   per-series weights for `"variogram"`.
 #' @param ... Currently unused.
@@ -95,7 +108,7 @@ score <- function(object, ...) UseMethod("score")
 #'   102(477), 359-378.
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(11)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR(),
@@ -139,6 +152,27 @@ score.mvgam_forecast <- function(object,
   checkmate::assert_number(lower)
   checkmate::assert_number(upper)
   checkmate::assert_flag(log)
+
+  # `log` and `interval_width` reach three of the eight univariate
+  # scorers. The rest take neither, so a value passed with one of
+  # them governed nothing and the returned score was the untouched
+  # one, with the `interval_width` column still echoing the number
+  # the caller supplied. Refuse rather than answer a question that
+  # was not the one asked.
+  if (isTRUE(log) && !score %in% scores_honouring_log) {
+    stop(insight::format_error(c(
+      paste0("'log = TRUE' does not apply to score '", score, "'."),
+      x = paste0(
+        "It is honoured by ",
+        paste0("'", scores_honouring_log, "'", collapse = ", "),
+        ", which score on the scale of the response."
+      ),
+      i = paste0(
+        "Score on the log scale by transforming the response ",
+        "before fitting, or choose one of the scores above."
+      )
+    )))
+  }
 
   validate_scoreable_forecast(object, score)
 

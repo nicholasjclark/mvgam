@@ -46,7 +46,7 @@ K rows per site. Responses are continuous reals; the \code{Y} vector
 is assembled into the per-unit K-vector \code{y_unit} by the lpdf.
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate K = 3 species at 60 sites under a low-rank residual
 # covariance Sigma = Z Z' + diag(Psi^2). Per-species intercepts
 # and an env slope drive the mean; cross-species covariance comes

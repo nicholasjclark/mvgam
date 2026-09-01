@@ -28,7 +28,20 @@ the returned object contains hindcasts only and the
 are \code{NULL}. The fallback is deliberately strict: if you
 want forecasts using the held-out data that was passed to
 \code{mvgam(..., newdata = X)} at fit time, pass it explicitly
-here as \code{forecast(mod, newdata = mod$test_data)}.}
+here as \code{forecast(mod, newdata = mod$test_data)}.
+
+For \code{AR()}, \code{RW()}, \code{VAR()} and \code{PW()} the forecast times
+must continue the training series without a gap and at its
+own spacing, and are refused otherwise. These trends advance
+one step per time point, so the horizon is the number of
+steps taken from the last observed state; asking for
+\code{t = 41:42} after training ends at \code{t = 30} would take two
+steps rather than twelve and report a two-step-ahead spread
+for a twelve-step-ahead question. Supply every intervening
+time, whether or not the response is observed there.
+\code{CAR()} and \code{ZMVN()} are exempt: \code{CAR()} carries the elapsed
+gap into its kernel, and \code{ZMVN()} has no temporal structure
+to step through.}
 
 \item{...}{Currently unused.}
 
@@ -80,7 +93,7 @@ fitted state-space dynamics; the observation family then
 maps the trajectory back to the response scale.
 }
 \examples{
-\donttest{
+\dontrun{
 set.seed(11)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR(),

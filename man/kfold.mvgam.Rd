@@ -105,7 +105,7 @@ refit cost. Both extensions sit cleanly on top of the existing
 \code{loo} package fold helpers.
 }
 \examples{
-\donttest{
+\dontrun{
 # Use CAR() so the refit on fold-deleted rows still has a
 # well-defined trend (AR refits would error on the resulting
 # irregular time spacing).

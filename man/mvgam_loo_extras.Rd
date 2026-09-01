@@ -186,7 +186,7 @@ and log-likelihood primitives (\code{\link{log_lik.mvgam}}, \code{\link{loo.mvga
 helpers from the \pkg{loo} package.
 }
 \examples{
-\donttest{
+\dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())

@@ -78,7 +78,7 @@ hindcast <- function(object, ...) {
 #'   over the trend's stochastic dynamics instead of reading the
 #'   fitted latent state.
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(11)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())

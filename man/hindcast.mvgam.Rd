@@ -67,7 +67,7 @@ the response scale. For predictions at unseen times use
 \link{forecast.mvgam}.
 }
 \examples{
-\donttest{
+\dontrun{
 set.seed(11)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())

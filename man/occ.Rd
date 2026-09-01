@@ -128,13 +128,13 @@ mvgam's \code{occ()} uses the long-form ecology vocabulary
 equivalents in adjacent packages:
 \itemize{
 \item ubms
-(\url{https://github.com/biodiverse/ubms}):
+(\url{https://github.com/ecoverseR/ubms}):
 \code{predict(submodel = "state")} returns marginal psi;
 \code{predict(submodel = "det")} returns p;
 \code{posterior_predict(param = "z")} returns 0/1 latent
 occupancy draws conditioned on the observed history.
 \item spOccupancy
-(\url{https://github.com/biodiverse/spOccupancy}):
+(\url{https://github.com/ecoverseR/spOccupancy}):
 \code{psi.0.samples} (marginal psi), \code{z.0.samples} (latent z
 draws).
 \item flocker
@@ -154,7 +154,7 @@ response scale.
 }
 
 \examples{
-\donttest{
+\dontrun{
 # Single-species occupancy fit with separate covariates on
 # the occupancy (psi) and detection (p) sub-formulas. The
 # closure-unit grain is (series, time) -- 50 sites, 4 visits

@@ -20,7 +20,7 @@ This help page provides external links to example applications and discussions r
   \item \href{https://discourse.mc-stan.org/t/autocorrelation-for-unevenly-spaced-time-series/10001}{Autocorrelation for unevenly spaced time series}
   \item \href{https://stats.stackexchange.com/questions/664160}{Visualising autocorrelation in irregularly spaced count data}
   \item \href{https://ecogambler.netlify.app/blog/vector-autoregressions/}{Blog post: State-Space Vector Autoregressions in \code{mvgam}}
-  \item \href{https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html}{Vignette: State-Space models in \code{mvgam}}
+  \item \href{https://nicholasjclark.github.io/mvgam/articles/var.html}{Article: State-space vector autoregressions with \code{mvgam}}
   \item \href{https://www.youtube.com/watch?v=0zZopLlomsQ&t=4s}{Video tutorial: Ecological forecasting with Dynamic Generalized Additive Models}
 }
 
@@ -34,7 +34,7 @@ This help page provides external links to example applications and discussions r
   \item \href{https://discourse.mc-stan.org/t/confirmatory-factor-analysis-using-brms/23139}{Confirmatory factor analysis using \code{brms}}
   \item \href{https://discourse.mc-stan.org/t/chains-stuck-in-a-local-optimum-correlated-poisson-distributions/37414}{Chains stuck in a local optimum: correlated Poisson distributions}
   \item \href{https://ecogambler.netlify.app/blog/distributed-lags-mgcv/}{Blog post: Hierarchical distributed lag models in \code{mgcv} and \code{mvgam}}
-  \item \href{https://nicholasjclark.github.io/mvgam/articles/shared_states.html}{Vignette: Multivariate series with shared latent states}
+  \item \href{https://nicholasjclark.github.io/mvgam/articles/mvbf.html}{Article: One shared process, many sensors: multi-response \code{mvgam}}
   \item \href{https://www.youtube.com/watch?v=2POK_FVwCHk}{Video tutorial: Time series in R and Stan using the \code{mvgam} package: hierarchical GAMs}
 }
 
@@ -47,9 +47,7 @@ This help page provides external links to example applications and discussions r
   \item \href{https://stats.stackexchange.com/questions/612312}{Fitting a GAM with double seasonality to a daily time series}
   \item \href{https://stats.stackexchange.com/questions/648143}{Simulating time series with different seasonal effects}
   \item \href{https://discourse.mc-stan.org/t/adding-time-as-monotne-predictor/37109}{Adding time as a monotone predictor}
-  \item \href{https://discourse.mc-stan.org/t/accounting-for-non-independence-and-autocorrelation-in-hgam/658383}{Accounting for non-independence and autocorrelation in HGAM}
   \item \href{https://ecogambler.netlify.app/blog/time-varying-seasonality/}{Blog post: Incorporating time-varying seasonality in forecast models}
-  \item \href{https://nicholasjclark.github.io/mvgam/articles/time_varying_effects.html}{Vignette: Time-varying effects in \code{mvgam}}
   \item \href{https://www.youtube.com/watch?v=fzPJUW8x6DU}{Video tutorial: Time series in R and Stan using the \code{mvgam} package: an introduction}
 }
 }

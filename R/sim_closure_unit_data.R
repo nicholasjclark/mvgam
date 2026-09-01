@@ -183,15 +183,7 @@ sim_closure_unit_data <- function(type = 1L,
     )))
   }
 
-  if (!is.null(seed)) {
-    if (exists(".Random.seed", envir = .GlobalEnv)) {
-      rng_old <- get(".Random.seed", envir = .GlobalEnv)
-      on.exit(assign(".Random.seed", rng_old, envir = .GlobalEnv))
-    } else {
-      on.exit(rm(".Random.seed", envir = .GlobalEnv))
-    }
-    set.seed(seed)
-  }
+  local_seed(seed)
 
   recipe <- closure_unit_recipe(type)
 

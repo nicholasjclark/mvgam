@@ -113,7 +113,7 @@ loadings follow a fixed pattern). For an \code{mvgam()} fit that
 included latent factors, use \code{\link[=ordinate.mvgam]{ordinate.mvgam()}}.
 }
 \examples{
-\donttest{
+\dontrun{
 set.seed(1)
 simdat <- sim_closure_unit_data(
   family    = occ(),

@@ -378,13 +378,36 @@ test_that("jsdgam_phylo_to_dist errors when species missing from matrix", {
   )
 })
 
-test_that("jsdgam_phylo_to_dist accepts ape::phylo and returns named matrix", {
-  testthat::skip_if_not_installed("ape")
-  set.seed(7L)
-  tree <- ape::rcoal(n = 4L, tip.label = species_4())
-  out <- mvgam:::jsdgam_phylo_to_dist(tree, species_4())
+test_that("jsdgam_phylo_to_dist reads a phylo and returns named distances", {
+  # The tree is built here rather than drawn with `ape::rcoal()`, so
+  # the test needs no package that might be absent and the distances
+  # are known rather than random: `((a,b),(c,d))` with every branch
+  # 0.5 puts each pair within a clade at 1 and each pair across the
+  # clades at 2.
+  sp <- species_4()
+  tree <- structure(
+    list(
+      edge = matrix(
+        c(5L, 6L, 6L, 1L, 6L, 2L, 5L, 7L, 7L, 3L, 7L, 4L),
+        ncol = 2L, byrow = TRUE
+      ),
+      edge.length = rep(0.5, 6L),
+      tip.label = sp,
+      Nnode = 3L
+    ),
+    class = "phylo"
+  )
+  out <- mvgam:::jsdgam_phylo_to_dist(tree, sp)
   expect_equal(dim(out), c(4L, 4L))
-  expect_equal(rownames(out), species_4())
+  expect_equal(rownames(out), sp)
+  expect_equal(colnames(out), sp)
+  expect_true(isSymmetric(out))
+  expect_equal(unname(diag(out)), rep(0, 4L))
+  # Within a clade, then across. Indexed by position, since the
+  # labels come from `species_4()`.
+  expect_equal(unname(out[sp[1L], sp[2L]]), 1)
+  expect_equal(unname(out[sp[3L], sp[4L]]), 1)
+  expect_equal(unname(out[sp[1L], sp[3L]]), 2)
 })
 
 test_that("jsdgam_phylo_to_dist rejects bad object types", {

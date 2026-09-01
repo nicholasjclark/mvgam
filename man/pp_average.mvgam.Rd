@@ -75,7 +75,7 @@ two or more \code{mvgam} fits, in proportion to the supplied (or
 computed) model weights. Mirrors \code{\link[brms:pp_average.brmsfit]{brms::pp_average.brmsfit()}}.
 }
 \examples{
-\donttest{
+\dontrun{
 set.seed(13)
 simdat <- sim_mvgam(family = poisson(), n_series = 1L,
                      n_timepoints = 120L, trend_model = AR())

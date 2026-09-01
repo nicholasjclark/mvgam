@@ -55,7 +55,7 @@
 #'   [pp_average.mvgam()], [mvgam_loo_extras].
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())
@@ -84,13 +84,7 @@ posterior_average.mvgam <- function(x, ..., variable = NULL,
                                      control = list(),
                                      seed = NULL) {
   checkmate::assert_class(x, "mvgam")
-  if (!is.null(seed)) {
-    if (exists(".Random.seed", envir = .GlobalEnv)) {
-      rng_old <- get(".Random.seed", envir = .GlobalEnv)
-      on.exit(assign(".Random.seed", rng_old, envir = .GlobalEnv))
-    }
-    set.seed(seed)
-  }
+  local_seed(seed)
   variable <- mvgam_use_alias(variable, pars)
   ndraws <- mvgam_use_alias(ndraws, nsamples)
   split <- mvgam_split_models(x, ..., model_names = model_names)
@@ -236,7 +230,7 @@ brms::posterior_average
 #'   [posterior_average.mvgam()], [mvgam_loo_extras].
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())
@@ -264,13 +258,7 @@ pp_average.mvgam <- function(x, ..., weights = "stacking",
                               model_names = NULL,
                               control = list(), seed = NULL) {
   checkmate::assert_class(x, "mvgam")
-  if (!is.null(seed)) {
-    if (exists(".Random.seed", envir = .GlobalEnv)) {
-      rng_old <- get(".Random.seed", envir = .GlobalEnv)
-      on.exit(assign(".Random.seed", rng_old, envir = .GlobalEnv))
-    }
-    set.seed(seed)
-  }
+  local_seed(seed)
   method <- mvgam_validate_pp_method(method)
   ndraws <- mvgam_use_alias(ndraws, nsamples)
   split <- mvgam_split_models(x, ..., model_names = model_names)

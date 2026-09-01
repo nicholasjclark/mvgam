@@ -342,7 +342,7 @@ naive enumeration baseline; the threaded variant
 }
 
 \examples{
-\donttest{
+\dontrun{
 # Poisson-binomial N-mixture: per-visit counts with imperfect
 # detection. The state mu is lambda (expected abundance) and
 # the dpar p is the detection probability per visit.

@@ -220,6 +220,7 @@ build_stan_components <- function(formula, data, family = gaussian(),
   # observation-side intercept competes with it for the same
   # constant offset, so soft-warn the user once per session.
   warn_pw_obs_intercept(mv_spec, obs_formula)
+  warn_zmvn_single_series(mv_spec, family, data)
 
   # Two cases need brms threading suppressed at the stancode level.
   # Both rewrite the local `threads` so brms's downstream
@@ -430,6 +431,68 @@ build_stan_components <- function(formula, data, family = gaussian(),
 #' @noRd
 generate_stan_components_mvgam_formula <- function(...) {
   warn_once_per_call(build_stan_components(...))
+}
+
+
+#' Is the trend scale confounded with the observation scale?
+#'
+#' `ZMVN()` gives the latent state no temporal structure, so on a
+#' single series its innovations and the observation residuals are
+#' both iid draws with nothing to tell them apart: only
+#' `sigma_trend^2 + sigma^2` is identified and the split between
+#' them is whatever the priors say. Two series are enough to break
+#' the tie, since `Sigma_trend` then carries a cross-series
+#' covariance the observation noise cannot produce.
+#'
+#' A family with no residual scale is unaffected: a Poisson has no
+#' `sigma` for the trend to trade against.
+#'
+#' @param mv_spec The multivariate trend spec.
+#' @param family The observation family.
+#' @param data The modelling data.
+#' @return `TRUE` when the two scales are confounded.
+#' @noRd
+zmvn_scale_confounded <- function(mv_spec, family, data) {
+  specs <- mv_spec$trend_specs
+  if (is.null(specs)) return(FALSE)
+  specs <- if (is_multivariate_trend_specs(specs)) specs else list(specs)
+  has_zmvn <- any(vapply(
+    specs, function(sp) identical(sp$trend, "ZMVN"), logical(1L)
+  ))
+  if (!has_zmvn) return(FALSE)
+
+  series_var <- specs[[1L]]$series_var %||% specs[[1L]]$series %||%
+    "series"
+  if (!series_var %in% colnames(data)) return(FALSE)
+  if (length(unique(data[[series_var]])) > 1L) return(FALSE)
+
+  # `dpars` is absent on a stats family, so normalise before asking.
+  dpars <- tryCatch(
+    brms::brmsfamily(resolve_family_name(family))$dpars,
+    error = function(e) NULL
+  )
+  isTRUE("sigma" %in% dpars)
+}
+
+
+#' Warn once when a single-series ZMVN cannot split its scales
+#' @noRd
+warn_zmvn_single_series <- function(mv_spec, family, data) {
+  if (isTRUE(identical(Sys.getenv("TESTTHAT"), "true"))) return()
+  if (!zmvn_scale_confounded(mv_spec, family, data)) return()
+  rlang::warn(
+    paste0(
+      "A 'ZMVN()' trend on one series shares its scale with the ",
+      "observation error. The latent state has no temporal ",
+      "structure, so only the sum of the two variances is ",
+      "identified and the split between 'sigma_trend' and 'sigma' ",
+      "follows the priors rather than the data. Add series, choose ",
+      "a trend with temporal structure such as 'AR()' or 'RW()', ",
+      "or set a prior that says which scale you mean to pin."
+    ),
+    .frequency = "once",
+    .frequency_id = "mvgam_zmvn_single_series"
+  )
 }
 
 

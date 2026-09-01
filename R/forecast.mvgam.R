@@ -54,6 +54,19 @@
 #'   want forecasts using the held-out data that was passed to
 #'   `mvgam(..., newdata = X)` at fit time, pass it explicitly
 #'   here as `forecast(mod, newdata = mod$test_data)`.
+#'
+#'   For `AR()`, `RW()`, `VAR()` and `PW()` the forecast times
+#'   must continue the training series without a gap and at its
+#'   own spacing, and are refused otherwise. These trends advance
+#'   one step per time point, so the horizon is the number of
+#'   steps taken from the last observed state; asking for
+#'   `t = 41:42` after training ends at `t = 30` would take two
+#'   steps rather than twelve and report a two-step-ahead spread
+#'   for a twelve-step-ahead question. Supply every intervening
+#'   time, whether or not the response is observed there.
+#'   `CAR()` and `ZMVN()` are exempt: `CAR()` carries the elapsed
+#'   gap into its kernel, and `ZMVN()` has no temporal structure
+#'   to step through.
 #' @param ... Currently unused.
 #' @param type One of `"response"`, `"link"`, `"expected"`,
 #'   `"trend"`. `"response"` samples from the observation family
@@ -98,7 +111,7 @@
 #'   walks through `forecast()` together with `score()`,
 #'   `lfo_cv()` and `ensemble()` on a worked count-data example.
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(11)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR(),
@@ -193,6 +206,16 @@ forecast.mvgam <- function(object,
   training <- build_training_arms(object, series_levels, resp = resp)
   fc_grid <- resolve_forecast_grid(object, newdata, training,
                                      series_levels)
+
+  # A discrete-time trend takes one step per forecast row, so the
+  # rows have to be the times it would step to. Checked here
+  # rather than left to the propagator, which cannot tell a gap
+  # from a shorter horizon and would answer for the wrong one.
+  if (!is.null(fc_grid)) {
+    assert_forecast_times_steppable(
+      fc_grid$times, training, first_trend_spec(object)
+    )
+  }
 
   # The hindcast slot inside a forecast() result uses the same
   # deterministic-state convention as hindcast()

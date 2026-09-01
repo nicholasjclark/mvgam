@@ -105,7 +105,7 @@ scale of your outcome. Note also that no missing values are allowed in
 \code{cap}.
 }
 \examples{
-\donttest{
+\dontrun{
 # Linear PW on a single Poisson series. `y ~ -1` removes the
 # observation intercept so the PW trend's `m_trend` parameter
 # is the unique constant offset (otherwise the two compete for

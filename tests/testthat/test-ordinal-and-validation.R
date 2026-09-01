@@ -303,3 +303,37 @@ test_that("summarize_predictions: a single-observation category slice stays a ma
   out <- summarize_predictions(draws, probs = 0.5, robust = TRUE)
   expect_equal(dim(out), c(1L, 3L, 2L))
 })
+
+
+test_that("a single-series ZMVN is flagged only when it is confounded", {
+  # `ZMVN()` gives the latent state no temporal structure, so on one
+  # series its innovations and the observation residuals are both iid
+  # and only their variance sum is identified. Two series break the
+  # tie through the cross-series covariance, and a family with no
+  # residual scale never had the problem: a Poisson has no `sigma`
+  # for the trend to trade against, and a negative binomial's `shape`
+  # is a dispersion rather than an additive scale.
+  mk <- function(n) {
+    data.frame(
+      y = rnorm(30 * n), time = rep(seq_len(30), n),
+      series = factor(rep(paste0("s", seq_len(n)), each = 30))
+    )
+  }
+  flagged <- function(tf, n, fam) {
+    zmvn_scale_confounded(
+      parse_multivariate_trends(y ~ 1, tf), fam, mk(n)
+    )
+  }
+
+  expect_true(flagged(~ ZMVN(), 1L, gaussian()))
+  expect_true(flagged(~ ZMVN(), 1L, brms::student()))
+
+  # More than one series identifies the split.
+  expect_false(flagged(~ ZMVN(), 3L, gaussian()))
+  # No residual scale to trade against.
+  expect_false(flagged(~ ZMVN(), 1L, poisson()))
+  expect_false(flagged(~ ZMVN(), 1L, brms::negbinomial()))
+  # Temporal structure identifies the trend on its own.
+  expect_false(flagged(~ AR(p = 1), 1L, gaussian()))
+  expect_false(flagged(~ RW(), 1L, gaussian()))
+})

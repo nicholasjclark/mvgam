@@ -4650,7 +4650,7 @@ test_that("save_model refuses a directory that does not exist", {
     stancode(mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1)),
               data = dat, family = poisson(),
               save_model = file.path(tempdir(), "no_such_dir", "m.stan")),
-    "does not exist"
+    "not exist"
   )
 })
 

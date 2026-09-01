@@ -141,13 +141,7 @@ sim_mvgam <- function(type = 1L,
   family <- validate_family(family)
   fam_name <- resolve_family_name(family)
 
-  if (!is.null(seed)) {
-    if (exists(".Random.seed", envir = .GlobalEnv)) {
-      rng_old <- get(".Random.seed", envir = .GlobalEnv)
-      on.exit(assign(".Random.seed", rng_old, envir = .GlobalEnv))
-    }
-    set.seed(seed)
-  }
+  local_seed(seed)
 
   spec <- sim_type_spec(type)
   if (is.null(trend_model)) trend_model <- spec$default_trend
@@ -175,16 +169,16 @@ sim_mvgam <- function(type = 1L,
   target_trend_sd <- total_link_sd * sqrt(prop_trend)
   target_obs_sd <- total_link_sd * sqrt(1 - prop_trend)
 
-  # Trend propagation. Stationary processes (AR / VAR / CAR /
-  # ZMVN) use `sigma = trend_sigma(prop_trend)` and are
-  # rescaled post-propagation so the empirical SD matches the
-  # target. Non-stationary processes (RW) have variance that
-  # grows linearly with time; rescaling to a fixed empirical SD
-  # would destroy that growth and produce a stationary-looking
-  # trajectory. Instead we choose `sigma_innov` upfront so the
-  # accumulated variance at the final timepoint lands near
-  # `target_trend_sd^2`, then skip the post-hoc rescale and let
-  # the natural RW shape through.
+  # Trend propagation. Every kernel draws with
+  # `sigma = trend_sigma(prop_trend)` and is rescaled after
+  # propagation so the empirical SD matches the target. The
+  # rescale is a single scalar multiply, so it moves amplitude
+  # and leaves shape alone: a random walk keeps its
+  # linearly growing variance, an autoregression keeps its
+  # autocorrelation, and a piecewise trend keeps its
+  # changepoints. What it does not leave alone is the one thing
+  # `prop_trend` names, which is how much of the link-scale
+  # variance the trend accounts for.
   trend_args <- spec$trend_params(
     n_series = n_series, n_timepoints = n_timepoints,
     prop_trend = prop_trend
@@ -215,27 +209,6 @@ sim_mvgam <- function(type = 1L,
     trend_args$params <- fill_pw_trend_defaults(
       trend_model, trend_args$params, n_series, n_timepoints
     )
-  }
-  nonstat <- is_nonstationary_trend(trend_model)
-  # RW takes the integrated-variance sigma_innov override below.
-  # Sparse-lag AR(p) is also classified nonstationary so the
-  # post-hoc rescale (further down) is skipped, but the spec's
-  # chosen sigma_innov is preserved: the closed-form variance of
-  # an AR(p) is sigma_innov^2 / (1 - sum(phi)^2), which does not
-  # have an RW-style sqrt(6/T) shape.
-  is_ar_trend <- !is.null(trend_model) && !is.character(trend_model) &&
-                 identical(trend_model$trend, "AR")
-  if (nonstat && !is_pw && !is_ar_trend) {
-    # Pick sigma_innov so the empirical SD of the centred RW
-    # over t = 1..T matches `target_trend_sd`. The variance of
-    # the centred RW at t averages sigma^2 * T/6 across t, so
-    # solving sigma^2 * T/6 = target_trend_sd^2 gives the
-    # scaling factor sqrt(6/T). This preserves the linearly
-    # growing variance of the unscaled RW while keeping the
-    # documented `prop_trend` meaning ("the share of total
-    # link-scale variance contributed by the latent trend").
-    trend_args$params$sigma <-
-      target_trend_sd * sqrt(6 / n_timepoints)
   }
   trend_mat <- if (is_pw) {
     # PW is fully deterministic given (k, m, delta, t_change);
@@ -278,13 +251,24 @@ sim_mvgam <- function(type = 1L,
   )
   obs_centered <- built$obs_contrib - mean(built$obs_contrib)
 
-  # Rescale stationary trends to the target empirical SD. Skip
-  # for non-stationary trends -- sigma_innov was chosen upfront
-  # to match the target.
-  if (!nonstat) {
-    trend_scale <- sd_rescale_factor(trend_vec, target_trend_sd)
-    trend_mat <- trend_mat * trend_scale
-  }
+  # Rescale every trend to the target empirical SD, whatever
+  # kernel produced it. A scalar multiply changes magnitude and
+  # nothing else, so a random walk keeps its growing variance
+  # envelope, an autoregression keeps its autocorrelation and a
+  # piecewise trend keeps its changepoints; only the amplitude
+  # moves, which is what `prop_trend` names.
+  #
+  # Choosing `sigma_innov` up front instead cannot do this. It
+  # requires a closed-form stationary variance, which a random
+  # walk does not have, which the sparse-lag `AR(p = c(1, 12))`
+  # does not have in the AR(1) form the old comment used, and
+  # which a deterministic piecewise trend has no analogue of at
+  # all. Each was left carrying whatever variance its own
+  # parameters implied: at `prop_trend = 0.5`, a three-series
+  # random walk delivered 3.9 and a one-series piecewise trend
+  # delivered 0.04.
+  trend_scale <- sd_rescale_factor(trend_vec, target_trend_sd)
+  trend_mat <- trend_mat * trend_scale
   obs_scale <- sd_rescale_factor(obs_centered, target_obs_sd)
   obs_contrib <- obs_centered * obs_scale
   # Apply the obs scale to every recorded ground-truth smooth so
@@ -923,31 +907,6 @@ fill_pw_trend_defaults <- function(trend_model, params,
     )
   }
   params
-}
-
-
-is_nonstationary_trend <- function(trend_model) {
-  if (is.null(trend_model)) return(FALSE)
-  # `trend_model` may be a character ("None", "RW", "PW") or an
-  # `mvgam_trend` constructor output with a `trend` slot.
-  t <- if (is.character(trend_model)) {
-    trend_model
-  } else {
-    trend_model$trend
-  }
-  if (is.null(t)) return(FALSE)
-  if (identical(t, "RW") || identical(t, "PW")) return(TRUE)
-  # Sparse-lag AR(p) (`p = c(1, 12)` etc.) is treated as
-  # near-nonstationary: the high-persistence regime that motivates
-  # sparse AR is what makes the latent state visibly drift, and the
-  # stationary-AR post-hoc rescale would compress that drift to a
-  # fixed marginal SD. Skip the rescale so the simulated state
-  # behaves like a long-memory process rather than a re-scaled
-  # white-noise-with-correlation.
-  if (identical(t, "AR") && length(trend_model$p %||% 1L) > 1L) {
-    return(TRUE)
-  }
-  FALSE
 }
 
 

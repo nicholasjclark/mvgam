@@ -112,12 +112,10 @@ test_that("mu expression classification handles all brms varieties correctly", {
   # Test each pattern
   for (test_case in test_cases) {
 
-    # Generate Stan code dynamically
-    stancode <- tryCatch({
-      test_case$generate_code()
-    }, error = function(e) {
-      skip(paste("Could not generate", test_case$name, "Stan code:", e$message))
-    })
+    # Generate Stan code dynamically. A generator that raises is a
+    # failure, not a reason to stand down: skipping here reported a
+    # broken code path as an untested one.
+    stancode <- test_case$generate_code()
 
     # Test basic functionality - should not error
     result <- tryCatch({

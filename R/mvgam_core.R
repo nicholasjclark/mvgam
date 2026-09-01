@@ -398,7 +398,7 @@ mvgam_imputation_forwarded <- c(
 #' @return mvgam object with dual brmsfit-like structure
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # ---- Single-series fit with a smooth covariate and an AR(1) trend ----
 #' # Useful as a quick first model: one response, one nonlinear
 #' # covariate effect, latent autoregressive dynamics.

@@ -1158,7 +1158,10 @@ test_that("every surface names a trend prior class the same way", {
   rendered <- merge_trend_priors(
     list(prior = NULL, trend_model = list(prior = tp))
   )
-  expect_equal(sort(rendered$class), c("ar1_trend", "Z"))
+  # `setequal` rather than `sort`: collation puts "Z" before
+  # "ar1_trend" in the C locale and after it elsewhere, and the
+  # claim here is about membership, not order.
+  expect_setequal(rendered$class, c("ar1_trend", "Z"))
 })
 
 

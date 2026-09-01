@@ -64,7 +64,7 @@ covariance components carry their positional Stan names rather
 than the brms-style labels.
 }
 \examples{
-\donttest{
+\dontrun{
 set.seed(14)
 simdat <- sim_mvgam(family = poisson(), n_series = 4L,
                      n_timepoints = 120L, trend_model = AR())

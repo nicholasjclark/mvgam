@@ -20,7 +20,7 @@
 #'   \code{\link[bayesplot:MCMC-scatterplots]{mcmc_pairs}}.
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())

@@ -362,7 +362,7 @@ the active column count.
 }
 
 \examples{
-\donttest{
+\dontrun{
 # Simulate three Gaussian series driven by a correlated VAR(1)
 # process so the cross-series dependencies are recoverable.
 set.seed(0)

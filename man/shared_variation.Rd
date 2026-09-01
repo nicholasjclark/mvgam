@@ -77,7 +77,7 @@ factor-implied covariance posterior.
 }
 
 \examples{
-\donttest{
+\dontrun{
 set.seed(1)
 simdat <- sim_closure_unit_data(
   family    = occ(),

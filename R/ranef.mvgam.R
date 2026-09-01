@@ -55,7 +55,7 @@
 #'   [fixef.mvgam()], [variables.mvgam()].
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(14)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 4L,
 #'                      n_timepoints = 120L, trend_model = AR())
@@ -225,7 +225,7 @@ brms::ranef
 #'   [fixef.mvgam()].
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(14)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 4L,
 #'                      n_timepoints = 120L, trend_model = AR())

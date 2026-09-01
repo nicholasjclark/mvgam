@@ -239,7 +239,7 @@
 #' \doi{10.1007/s11222-024-10454-0}
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate a small closure-unit JSDM: 4 species, 50 sites,
 #' # 4 visits, env + elev site covariates, tod_c + effort visit
 #' # covariates. Recipe 2L gives both state-level and detection-

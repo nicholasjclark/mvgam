@@ -116,7 +116,7 @@
 #'   \doi{10.1111/2041-210X.12514}
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Multi-species occupancy factor model -- the Z Z' product gives
 #' # the species-by-species residual covariance after fixed effects
 #' # are accounted for.

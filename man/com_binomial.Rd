@@ -75,7 +75,7 @@ bias \code{p} away from \code{0.5}.
 }
 
 \examples{
-\donttest{
+\dontrun{
 # Simulate an under-dispersed COM-Binomial series via
 # sim_mvgam(): nu_true = 1.5, T = 20 trials per observation,
 # the default observation-side smooth `s(x)`, and a random-walk

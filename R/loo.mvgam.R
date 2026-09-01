@@ -88,7 +88,7 @@
 #'   selective refit.
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())
@@ -424,18 +424,60 @@ clean_ll = function(x, logliks) {
   scored <- which(!apply(logliks, 2, function(x) all(!is.finite(x))))
   logliks <- logliks[, scored, drop = FALSE]
 
-  # Next resample any remaining non-finite values (occasionally happens with
-  # some observation families)
+  n_replaced <- sum(!is.finite(logliks))
+  if (n_replaced == 0L) {
+    attr(logliks, "scored_columns") <- scored
+    return(logliks)
+  }
+
+  # A column that is finite for most draws and not for a few says the
+  # model gave those draws no support for that observation. Dropping
+  # the column would discard an observation the rest of the posterior
+  # scores perfectly well, so the draws are refilled from the finite
+  # ones, which keeps the column's own spread.
+  #
+  # Under a fixed seed, and restoring the caller's stream. Drawing
+  # from whatever state the session happened to be in made `loo()`
+  # answer differently on each call for the same fit, so a
+  # `loo_compare()` could not be reproduced, and re-running it could
+  # reorder the models.
   samp_noinf = function(x) {
     x_finite <- x[is.finite(x)]
-    x[!is.finite(x)] <- sample(
-      x_finite,
-      length(x[!is.finite(x)]),
-      replace = TRUE
-    )
+    bad <- !is.finite(x)
+    # Index rather than `sample(x_finite, ...)`: given a single
+    # finite value of 3.7, `sample()` reads it as `sample.int(3)`
+    # and returns integers from 1 to 3, which then enter `loo()`
+    # as log-densities. Only positive values take that branch, so
+    # it hides until a continuous family puts a density above e.
+    x[bad] <- x_finite[
+      sample.int(length(x_finite), sum(bad), replace = TRUE)
+    ]
     x
   }
+  local_seed(1L)
   logliks <- apply(logliks, 2, samp_noinf)
+
+  # The refill is a repair, and the elpd it feeds is optimistic by
+  # however much of the likelihood was unusable, so say so rather
+  # than let a number stand unqualified.
+  if (!identical(Sys.getenv("TESTTHAT"), "true")) {
+    rlang::warn(
+      insight::format_message(c(
+        paste0(
+          n_replaced,
+          " non-finite log-likelihood values were refilled from the ",
+          "finite draws of their own observation."
+        ),
+        i = paste0(
+          "The reported ELPD is optimistic by whatever those draws ",
+          "would have contributed. It usually means the family gave ",
+          "an observation no support under part of the posterior."
+        )
+      )),
+      .frequency = "once",
+      .frequency_id = "mvgam_clean_ll_refill"
+    )
+  }
 
   # return
   attr(logliks, "scored_columns") <- scored

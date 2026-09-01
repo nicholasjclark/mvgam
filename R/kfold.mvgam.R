@@ -108,7 +108,7 @@
 #'   [update.mvgam()], [loo::kfold_split_grouped()]
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Use CAR() so the refit on fold-deleted rows still has a
 #' # well-defined trend (AR refits would error on the resulting
 #' # irregular time spacing).

@@ -1,0 +1,88 @@
+# Runs the examples that `R CMD check` skips.
+#
+# Every example that fits a model sits inside `\dontrun{}`, which is
+# what brms does and what keeps the check tractable: 168 `mvgam()` and
+# `jsdgam()` calls across 59 help files would otherwise sample on every
+# run, and CRAN executes `\donttest{}` blocks. The cost is that nothing
+# runs example code at all, since the test suite does not either, so an
+# example can drift out of date without anything noticing. This job is
+# that safety net, on a schedule rather than per-commit because it
+# fits Stan models and takes hours.
+on:
+  schedule:
+    # Sundays, 04:00 UTC.
+    - cron: '0 4 * * 0'
+  workflow_dispatch:
+
+name: examples
+
+concurrency:
+  group: examples-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  examples:
+    runs-on: ubuntu-latest
+
+    name: run examples (including dontrun)
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+      NOT_CRAN: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-pandoc@v2
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+          use-public-rspm: true
+
+      # cmdstanr is not on CRAN, so install the Suggests the examples
+      # need explicitly, matching R-CMD-check.yaml.
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          dependencies: NA
+          extra-packages: |
+              local::.
+              knitr
+              extraDistr
+              lubridate
+              wrswoR
+              tweedie
+              scoringRules
+              matrixStats
+              xts
+              collapse
+              rmarkdown
+              ggrepel
+              ggpp
+              ggarrow
+              ape
+              mvabund
+              future
+              bridgesampling
+              V8
+              stan-dev/cmdstanr
+              devtools
+
+      - name: Build Cmdstan
+        run: |
+          cmdstanr::check_cmdstan_toolchain(fix = TRUE)
+          cmdstanr::install_cmdstan()
+        shell: Rscript {0}
+
+      - name: Run every example, dontrun included
+        run: |
+          # `run_dontrun = TRUE` is the whole point: these are the
+          # blocks `R CMD check` never reaches. A failure here means an
+          # example no longer runs against the shipping code, which is
+          # what users copy first.
+          devtools::run_examples(
+            run_donttest = TRUE,
+            run_dontrun  = TRUE,
+            document     = FALSE
+          )
+        shell: Rscript {0}

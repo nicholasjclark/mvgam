@@ -49,8 +49,14 @@ autocor_to_trend_state <- function(incl_autocor) {
 #'   Indices rather than a count, so every extraction combined below
 #'   reads the same iterations.
 #' @param re_formula Formula for random effects (NULL = all, NA = none)
-#' @param allow_new_levels Logical; allow new factor levels in random effects
-#' @param sample_new_levels Character; method for sampling new levels
+#' @param allow_new_levels Logical; accepted for brms compatibility.
+#'   A grouping level the model never saw is refused whatever this is
+#'   set to, because a new level has no fitted random effect and, for
+#'   a new series, no latent state to propagate. Predict for levels
+#'   the fit knows, or refit with the new levels included.
+#' @param sample_new_levels Character; accepted for brms
+#'   compatibility and not used, since new levels are refused. See
+#'   `allow_new_levels`.
 #' @param resp Character; response name for multivariate models (NULL = all)
 #'
 #' @return Matrix `\\[ndraws x nobs\\]` of combined linear predictor values on
@@ -259,10 +265,14 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #'   aligned to the same posterior subset.
 #' @param re_formula Formula for random effects. NULL (default) includes
 #'   all random effects, NA excludes all random effects.
-#' @param allow_new_levels Logical; if TRUE, allows new factor levels in
-#'   random effects grouping variables. Default FALSE.
-#' @param sample_new_levels Character specifying how to handle new levels.
-#'   Either "uncertainty" (default) or "gaussian".
+#' @param allow_new_levels Logical; accepted for brms compatibility.
+#'   A grouping level the model never saw is refused whatever this is
+#'   set to, because a new level has no fitted random effect and, for
+#'   a new series, no latent state to propagate. Predict for levels
+#'   the fit knows, or refit with the new levels included.
+#' @param sample_new_levels Character; accepted for brms
+#'   compatibility and not used, since new levels are refused. See
+#'   `allow_new_levels`.
 #' @param resp Character specifying which response variable for
 #'   multivariate models. NULL (default) returns predictions for all
 #'   responses.
@@ -307,7 +317,7 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #'   state-extrapolating prediction surface.
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = poisson(), n_series = 1L,
 #'                      n_timepoints = 120L, trend_model = AR())

@@ -71,7 +71,7 @@ posterior signal", not as "factors 1..k under the MGP ordering
 are active".
 }
 \examples{
-\donttest{
+\dontrun{
 set.seed(1)
 simdat <- sim_closure_unit_data(
   family    = occ(),

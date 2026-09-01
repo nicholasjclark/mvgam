@@ -5826,3 +5826,77 @@ warn_once_per_call <- function(expr) {
     seen <<- c(seen, msg)
   })
 }
+
+
+#' Are these forecast times the ones the trend can step to?
+#'
+#' A discrete-time trend advances one step per time point, so its
+#' forecast horizon is the number of steps taken from the last
+#' observed state. That is only the number of rows supplied when
+#' the forecast times continue the training series without a gap
+#' and at its own spacing. Handed `t = 41:42` after training ends
+#' at `t = 30`, such a trend takes two steps rather than twelve
+#' and reports a two-step-ahead spread for a twelve-step-ahead
+#' question, understating the uncertainty with nothing said.
+#'
+#' `CAR()` and `ZMVN()` are exempt and answer for themselves:
+#' `CAR()` carries the elapsed gap into its kernel, and `ZMVN()`
+#' has no temporal structure to step through. The registry says
+#' which is which, through the same `requires_regular_intervals`
+#' rule that gates the fit-time and `mvgam_data()` checks.
+#'
+#' @param fc_times Named list of forecast times per series.
+#' @param training The training arms, carrying `times` per series.
+#' @param trend_spec The fit's trend specification.
+#' @return Invisibly `TRUE`; raises otherwise.
+#' @noRd
+assert_forecast_times_steppable <- function(fc_times, training,
+                                            trend_spec) {
+  checkmate::assert_list(fc_times, null.ok = TRUE)
+  checkmate::assert_list(training)
+  if (!any_trend_requires_regular_intervals(trend_spec)) {
+    return(invisible(TRUE))
+  }
+  # The latent state lives on one time grid shared by every series,
+  # so that grid is what the trend steps along. Reading each
+  # series' own observed times instead refuses a legitimate
+  # forecast whenever a series ends on unobserved responses: brms
+  # drops those rows, the series looks short, and the check sees a
+  # gap that the latent state does not have. mvgam asks users to
+  # pad exactly that way, so it is a common shape rather than an
+  # odd one.
+  past <- sort(unique(as.integer(unlist(
+    training$times %||% list(), use.names = FALSE
+  ))))
+  if (length(past) < 2L) return(invisible(TRUE))
+  steps <- unique(diff(past))
+  if (length(steps) != 1L) return(invisible(TRUE))
+  step <- steps[1L]
+  for (lv in names(fc_times)) {
+    fut <- sort(as.integer(fc_times[[lv]]))
+    if (!length(fut)) next
+    expected <- past[length(past)] + step * seq_along(fut)
+    if (!identical(fut, as.integer(expected))) {
+      stop(insight::format_error(c(
+        paste0(
+          "'newdata' must continue the training series for a '",
+          get_trend_name(trend_spec), "' trend."
+        ),
+        x = paste0(
+          "Series '", lv, "' was observed to time ",
+          past[length(past)], ", so the next ", length(fut),
+          " times are ", expected[1L], " to ",
+          expected[length(expected)], "; got ", fut[1L], " to ",
+          fut[length(fut)], "."
+        ),
+        i = paste0(
+          "This trend advances one step per time point, so a gap ",
+          "would be forecast as though it were not there. Supply ",
+          "every intervening time, or use 'CAR()', which carries ",
+          "the elapsed gap."
+        )
+      )))
+    }
+  }
+  invisible(TRUE)
+}
