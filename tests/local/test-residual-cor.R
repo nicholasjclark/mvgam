@@ -152,14 +152,33 @@ test_that("residual_cor on LV fit: cov_draws match tcrossprod(Z) per draw", {
         Z_d[i, j] <- draws[d, sprintf("Z[%d,%d]", i, j)]
       }
     }
-    expected <- tcrossprod(Z_d)
-    # `residual_cor()` and `tcrossprod()` reach the same product by
-    # different summation orders, so they agree to roughly 1e-7
-    # relative rather than to the last bit. A wrong loading or a
-    # misread draw would differ by orders of magnitude, which this
-    # still catches.
+    # A factor model writes `trend[t, s] = Z[s, ] . lv[t, ]`, so the
+    # covariance between series is the latent covariance projected
+    # through the loadings, not `Z Z'`. This trend is an AR(1) with
+    # independent innovations, so the latent covariance is the
+    # stationary variance of each column, `sigma^2 / (1 - phi^2)`.
+    sigma_d <- vapply(
+      seq_len(n_lv),
+      function(k) draws[d, sprintf("sigma_trend[%d]", k)],
+      numeric(1L)
+    )
+    phi_d <- vapply(
+      seq_len(n_lv),
+      function(k) draws[d, sprintf("ar1_trend[%d]", k)],
+      numeric(1L)
+    )
+    omega <- diag(sigma_d^2 / (1 - phi_d^2), nrow = n_lv)
+    expected <- Z_d %*% omega %*% t(Z_d)
+    # The same product reached by a different summation order, so
+    # they agree to roughly 1e-7 relative rather than to the last
+    # bit. A wrong loading or a misread draw differs by orders of
+    # magnitude, which this still catches.
     testthat::expect_equal(res[["cov_draws"]][d, , ], expected,
                            tolerance = 1e-6)
+    # And dropping the latent scale would not pass.
+    testthat::expect_false(isTRUE(all.equal(
+      res[["cov_draws"]][d, , ], tcrossprod(Z_d), tolerance = 1e-6
+    )))
   }
 })
 

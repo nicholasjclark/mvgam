@@ -158,11 +158,19 @@ active_factors.mvgam <- function(object,
   # trend_map matrix broadcast across draws when Z is data.
   # Fixed-Z fits get column-norm summaries that are constant
   # across draws (posterior mass on the deterministic value).
+  # The model basis, not the QR-identified one: `sigma_trend[k]`
+  # belongs to the column `Z[, k]` the model sampled, while
+  # `Z_tilde[, k]` is a mixture of every column, so pairing the two
+  # measures a quantity that belongs to neither. On a ten-factor
+  # shrinkage fit the rotated norms carry a QR gradient of 51 down
+  # to 28 while the sampled ones sit flat around 41, which is what
+  # the unit-scale prior puts there.
   Z_arr <- resolve_Z_loadings(
     object,
     draws_mat,
     n_series = as.integer(n_series),
-    n_lv = as.integer(n_lv)
+    n_lv = as.integer(n_lv),
+    basis = "model"
   )
   # Z_arr: [ndraws, n_series, n_lv]. Per-column squared norm per
   # draw, scaled by the column's own innovation scale.

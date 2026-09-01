@@ -453,6 +453,54 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > Neither file runs in CI, and the local suite has no runner
   > that sweeps every file, so nothing reports a stale one.
 
+- [ ] **24.0 What the loadings basis still touches**
+  > `residual_cor()`, `shared_variation()`, `active_factors()` and
+  > `sample_innovations()` combined factor loadings with a
+  > covariance, and all four read the QR-identified `Z_tilde`
+  > while the covariance is stated for the `Z` the model sampled.
+  > `Z Z'` is invariant to that rotation, which is why it went
+  > unseen until a scale sat between the loadings. All four now
+  > take `basis = "model"`; reporting and plotting keep
+  > `"identified"`, and a fixed `trend_map` has no rotation so
+  > both agree.
+  >
+  > What is left is the pair that were judged rather than fixed.
+  > `compare_loadings()` Procrustes-aligns median `Z_tilde` with no
+  > scale, so under shrinkage a near-dead column weighs the same as
+  > the dominant one: on a ten-factor fit the raw column norms sit
+  > flat around 41 while the scales run 2.06 down to 0.013.
+  > Defensible if the intent is to compare loading patterns, wrong
+  > if it is to compare what the fits say. Decide which, and say so
+  > in the roxygen either way. `ordinate()` needs nothing: it pairs
+  > `lv_trend_tilde` with `Z_tilde`, so the scale is already in the
+  > site scores, confirmed to 6.8e-07 against the stored trend.
+
+- [ ] **25.0 One fixture stores a Cholesky factor as a covariance**
+  > `tests/local/fixtures/val_jsdgam_trait.rds` was built when the
+  > generator emitted
+  > `Sigma_trend = diag_pre_multiply(sigma_trend, L_Omega_trend)`,
+  > so its stored `Sigma_trend` is the Cholesky factor rather than
+  > the covariance: not symmetric, not positive semi-definite.
+  > Current codegen emits
+  > `multiply_lower_tri_self_transpose(...)`, so only the fixture
+  > is stale. Rebuilding it moves its agreement with a simulated
+  > truth from 0.80 to 0.999982.
+  >
+  > The rule the fixture teaches is worth keeping either way: read
+  > `sigma_trend` and `L_Omega_trend` and rebuild, rather than
+  > reading `Sigma_trend[i, j]` off the posterior of a
+  > cholesky-scaled trend. `extract_cov_draws_flat()` already does
+  > that.
+
+- [ ] **26.0 No `VAR(n_lv)` or `RW(n_lv)` fixture exists**
+  > Every factor fixture is `ZMVN` or `AR(p = 1)`. The latent
+  > covariance for a factor VAR reads the leading block of
+  > `Omega_trend`, and a factor RW has no stationary law so it
+  > falls back to the innovation covariance; both were read off
+  > generated Stan rather than confirmed against a fit. Two small
+  > fixtures would close that, and they are the two cases where
+  > `residual_cor()` on a factor model is least exercised.
+
 - [ ] **6.0 Final release verification**
   > Clean `document()`, clean test sweep, `R CMD check --as-cran`,
   > tarball under the size limit, sweep green.

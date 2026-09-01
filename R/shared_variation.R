@@ -127,10 +127,10 @@ shared_variation.mvgam <- function(object,
 
   series_names <- resolve_series_info(object)$series_levels
   # Delegate the per-draw Z Z' computation to the existing
-  # `extract_cov_draws_factor()` helper, which already routes
+  # `factor_implied_cov_draws()` helper, which already routes
   # through `resolve_factor_loadings()` for the fixed-vs-
   # sampled-Z decision.
-  delta_draws <- extract_cov_draws_factor(
+  delta_draws <- factor_implied_cov_draws(
     object, n_lv = n_lv, n_series = length(series_names)
   )
   stats <- summarise_unconstrained_array(

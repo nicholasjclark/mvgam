@@ -51,16 +51,24 @@ mk_chol_cov_struct <- function(sigma, L_Omega) {
 # posterior::as_draws_matrix(). resolve_series_info() is consulted
 # via local_mocked_bindings so the helper doesn't need a real fit.
 mk_factor_obj <- function(n_series = 3L, n_lv = 2L, ndraws = 50L,
-                          Z_target = NULL) {
+                          Z_target = NULL, sigma_target = NULL) {
   if (is.null(Z_target)) {
     Z_target <- matrix(c(0.8, 0.1, -0.3,
                          0.2, 0.5, 0.7), nrow = n_series, ncol = n_lv)
   }
-  # Build a fake draws matrix with Z[i,j] columns named in Stan order.
+  # Unequal latent scales, so a formula that drops them cannot
+  # accidentally agree with one that keeps them.
+  if (is.null(sigma_target)) {
+    sigma_target <- c(2.0, 0.25)[seq_len(n_lv)]
+  }
+  # Build a fake draws matrix with Z[i,j] columns named in Stan order,
+  # plus the latent scales the trend samples.
   col_names <- as.vector(outer(seq_len(n_series), seq_len(n_lv),
                                 FUN = function(i, j) sprintf("Z[%d,%d]", i, j)))
-  draws_mat <- matrix(NA_real_, nrow = ndraws, ncol = length(col_names))
-  colnames(draws_mat) <- col_names
+  sig_names <- sprintf("sigma_trend[%d]", seq_len(n_lv))
+  draws_mat <- matrix(NA_real_, nrow = ndraws,
+                      ncol = length(col_names) + length(sig_names))
+  colnames(draws_mat) <- c(col_names, sig_names)
   for (i in seq_len(n_series)) {
     for (j in seq_len(n_lv)) {
       nm <- sprintf("Z[%d,%d]", i, j)
@@ -69,25 +77,34 @@ mk_factor_obj <- function(n_series = 3L, n_lv = 2L, ndraws = 50L,
       draws_mat[, nm] <- Z_target[i, j]
     }
   }
+  for (j in seq_len(n_lv)) {
+    draws_mat[, sig_names[j]] <- sigma_target[j]
+  }
   list(
     obj = structure(
       list(
         mv_spec = list(trend_specs = structure(
           list(n_lv = n_lv), class = "mvgam_trend"
         )),
+        trend_metadata = list(
+          n_lv = n_lv,
+          trend = list(trend_type = "ZMVN")
+        ),
+        trend_components = list(types = "ZMVN"),
         fit = draws_mat
       ),
       class = "mvgam"
     ),
     series_levels = paste0("s", seq_len(n_series)),
-    Z_target = Z_target
+    Z_target = Z_target,
+    sigma_target = sigma_target
   )
 }
 
 
 # ---- factor-loadings path --------------------------------------------
 
-test_that("residual_cor reconstructs Sigma = ZZ^T for factor fits", {
+test_that("residual_cor projects the latent covariance through Z", {
   case <- mk_factor_obj()
   testthat::local_mocked_bindings(
     resolve_series_info = function(object) {
@@ -108,9 +125,18 @@ test_that("residual_cor reconstructs Sigma = ZZ^T for factor fits", {
   # Cor invariants
   expect_true(all(diag(res$cor) == 1))
   expect_true(isSymmetric(unname(res$cor), tol = 1e-8))
-  # Expected cor from constant Z
-  expected_cov <- tcrossprod(case$Z_target)
+  # A factor model writes `trend[t, s] = Z[s, ] . lv[t, ]`, so the
+  # covariance between series is `Z Omega Z'`, not `Z Z'`. Dropping
+  # `Omega` discards whatever scale the latent columns carry, which
+  # under shrinkage priors is the entire signal: here the two
+  # columns differ eightfold.
+  Omega <- diag(case$sigma_target^2, nrow = ncol(case$Z_target))
+  expected_cov <- case$Z_target %*% Omega %*% t(case$Z_target)
   expected_cor <- cov2cor(expected_cov)
+  # And the two formulas genuinely disagree on this mock.
+  expect_false(isTRUE(all.equal(
+    expected_cor, cov2cor(tcrossprod(case$Z_target))
+  )))
   expect_equal(unname(res$cor), expected_cor, tolerance = 1e-8)
   expect_identical(unname(rownames(res$cor)), case$series_levels)
 })

@@ -202,16 +202,19 @@ residual_cor.mvgam <- function(object,
 compute_residual_cor <- function(object, by_group, partial, summary,
                                   robust, probs) {
   # Design note: factor covariance (n_lv > 0) is checked before the
-  # trend-pattern dispatch because latent factors induce their own
-  # Sigma = Z Z^T regardless of whether the trend itself emits a
-  # cross-series covariance. Adding a future "factor-with-trend"
+  # trend-pattern dispatch because latent factors induce a
+  # cross-series covariance through the loadings whether or not the
+  # trend's own innovations are correlated. A factor fit with
+  # independent innovations is not the uncorrelated case the guard
+  # below refuses: the loadings still share each latent column
+  # between series. Adding a future "factor-with-trend"
   # interaction would require either extending detect_factor_n_lv()
   # or surfacing a "factor_loadings" pattern from
   # get_trend_covariance_structure() and unifying the dispatch.
   n_lv <- detect_factor_n_lv(object)
   if (!is.null(n_lv)) {
     series_names <- resolve_series_info(object)$series_levels
-    cov_draws <- extract_cov_draws_factor(object, n_lv,
+    cov_draws <- factor_implied_cov_draws(object, n_lv,
                                           length(series_names))
     return(finalise_residcor(
       cov_draws = cov_draws,
@@ -320,23 +323,59 @@ uses_loadings_prior <- function(object) {
 }
 
 
-#' Per-draw factor-implied covariance `Sigma = Z Z^T`.
+#' The cross-series covariance a factor model induces, per draw
 #'
-#' Delegates to `resolve_factor_loadings()` so the sampled-vs-
-#' fixed Z decision lives in one place. Returns the implied
-#' \[ndraws, n_series, n_series\] covariance array.
+#' One place for the whole calculation, so `residual_cor()` and
+#' `shared_variation()` cannot answer differently. Reads the latent
+#' covariance through the same extractor the non-factor trends use,
+#' then projects it onto the series through the loadings.
 #'
+#' @param object A fitted `mvgam` with a factor trend.
+#' @param n_lv Number of latent factors.
+#' @param n_series Number of observed series.
+#' @return `[ndraws, n_series, n_series]` covariance draws.
 #' @noRd
-extract_cov_draws_factor <- function(object, n_lv, n_series) {
+factor_implied_cov_draws <- function(object, n_lv, n_series) {
+  cov_struct <- get_trend_covariance_structure(object)
+  latent <- extract_cov_draws_flat(cov_struct)
   Z_arr <- resolve_factor_loadings(
-    object = object, n_lv = n_lv, n_series = n_series
+    object = object, n_lv = n_lv, n_series = n_series,
+    basis = "model"
   )
+  project_cov_through_loadings(latent, Z_arr)
+}
+
+
+#' Project a latent covariance onto the series through the loadings
+#'
+#' A factor model writes `trend[t, s] = Z[s, ] . lv[t, ]`, so the
+#' covariance it induces between series is `Z Omega Z'`, where
+#' `Omega` is the covariance of the latent states. Taking
+#' `Z Z'` instead drops whatever scale the latent columns carry,
+#' which under multiplicative gamma process shrinkage is the entire
+#' shrinkage: on a ten-factor fit the latent scales ran from 2.06
+#' to 0.013 while the loadings stayed at unit scale.
+#'
+#' `Z` must be the loadings the model sampled rather than the
+#' QR-identified `Z_tilde`, because `Omega` is stated in that
+#' basis. `Z Z'` is invariant to the rotation, which is why the
+#' distinction only appears once `Omega` sits between them.
+#'
+#' @param latent `[ndraws, k, k]` latent covariance draws.
+#' @param Z_arr `[ndraws, n_series, k]` loadings draws.
+#' @return `[ndraws, n_series, n_series]` covariance draws.
+#' @noRd
+project_cov_through_loadings <- function(latent, Z_arr) {
+  checkmate::assert_array(latent, d = 3L)
+  checkmate::assert_array(Z_arr, d = 3L)
   ndraws <- dim(Z_arr)[1L]
-  cov_draws <- array(0, dim = c(ndraws, n_series, n_series))
+  n_series <- dim(Z_arr)[2L]
+  out <- array(0, dim = c(ndraws, n_series, n_series))
   for (d in seq_len(ndraws)) {
-    cov_draws[d, , ] <- tcrossprod(Z_arr[d, , ])
+    Z <- matrix(Z_arr[d, , ], nrow = n_series)
+    out[d, , ] <- Z %*% matrix(latent[d, , ], nrow = ncol(Z)) %*% t(Z)
   }
-  cov_draws
+  out
 }
 
 
@@ -373,6 +412,20 @@ extract_cov_draws_flat <- function(cov_struct) {
     return(Sigma_arr)
   }
 
+  if (pattern == "cholesky_scaled" &&
+      !isTRUE(cov_struct$has_correlations)) {
+    # `cor = FALSE` samples no `L_Omega_trend`, so the covariance
+    # is the diagonal of squared scales. That is still a real
+    # answer for a factor fit, where the loadings share each
+    # latent column between series.
+    sigma_mat <- params$sigma_trend
+    checkmate::assert_matrix(sigma_mat, any.missing = FALSE)
+    for (d in seq_len(ndraws)) {
+      out[d, , ] <- diag(as.numeric(sigma_mat[d, ])^2, nrow = p)
+    }
+    return(out)
+  }
+
   if (pattern == "cholesky_scaled") {
     # L_Omega_trend is [ndraws, p, p]; sigma_trend is [ndraws, p].
     L_arr <- params$L_Omega_trend
@@ -389,10 +442,23 @@ extract_cov_draws_flat <- function(cov_struct) {
     return(out)
   }
 
+  if (pattern == "diagonal") {
+    # Independent innovations still give a factor model a
+    # cross-series covariance, since the loadings share each
+    # latent column between series.
+    sigma_mat <- params$sigma_trend
+    checkmate::assert_matrix(sigma_mat, any.missing = FALSE)
+    for (d in seq_len(ndraws)) {
+      out[d, , ] <- diag(as.numeric(sigma_mat[d, ])^2, nrow = p)
+    }
+    return(out)
+  }
+
   stop(insight::format_error(c(
     paste0("Unsupported covariance pattern for residual_cor: '",
            pattern, "'."),
-    i = "Supported patterns: full_covariance, cholesky_scaled."
+    i = paste0("Supported patterns: full_covariance, ",
+               "cholesky_scaled, diagonal.")
   )))
 }
 

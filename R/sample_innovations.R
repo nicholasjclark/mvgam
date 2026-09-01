@@ -1196,11 +1196,18 @@ sample_innovations <- function(cov_structure, obs_structure) {
   # resolver returns sampled Z draws or the broadcast fixed Z
   # transparently.
   if (isTRUE(cov_structure$is_lv)) {
+    # The model basis. The innovations were drawn from the latent
+    # covariance, which is stated for the columns the model
+    # sampled, so they have to be mapped through those same
+    # columns. Using the QR-identified loadings pairs a rotated
+    # basis with an unrotated covariance and changes the spread
+    # these innovations carry to the series.
     Z <- resolve_factor_loadings(
       draws_mat = cov_structure$draws_mat,
       fixed_Z = cov_structure$fixed_Z,
       n_series = cov_structure$n_obs_series,
-      n_lv = n_series
+      n_lv = n_series,
+      basis = "model"
     )
     innovations_flat <- map_lv_to_series_innovations(
       innovations_flat, Z, n_times, n_lv = n_series,
@@ -1223,8 +1230,21 @@ sample_innovations <- function(cov_structure, obs_structure) {
 # `extract_Z_loadings`, `extract_lv_trend_matrices`,
 # `match_z_loadings` (summary.mvgam.R), and
 # `categorize_mvgam_parameters` (index-mvgam.R) stay in lockstep.
+#' @param pars Parameter names from the fit.
+#' @param basis `"identified"` for the QR-rotated `Z_tilde`, which
+#'   is what anything reporting or plotting loadings wants;
+#'   `"model"` for the raw `Z` the model sampled, which is what
+#'   anything combining loadings with `sigma_trend`,
+#'   `Sigma_trend` or `Omega_trend` needs, since those live in the
+#'   unrotated basis. `Z Z'` is invariant to the rotation, so the
+#'   distinction only bites once a non-isotropic covariance sits
+#'   between the loadings.
 #'@noRd
-factor_loading_param_pattern <- function(pars) {
+factor_loading_param_pattern <- function(pars,
+                                         basis = c("identified",
+                                                   "model")) {
+  basis <- match.arg(basis)
+  if (identical(basis, "model")) return("^Z\\[")
   if (has_identified_loadings(pars)) "^Z_tilde\\[" else "^Z\\["
 }
 
@@ -1353,15 +1373,17 @@ filter_hidden_unrotated <- function(pars) {
 # forecast projection, active_factors for column-norm
 # summaries. Both need per-draw Z either way.
 #'@noRd
-resolve_Z_loadings <- function(object, draws_mat, n_series, n_lv) {
+resolve_Z_loadings <- function(object, draws_mat, n_series, n_lv,
+                               basis = c("identified", "model")) {
   checkmate::assert_matrix(draws_mat)
   checkmate::assert_int(n_series, lower = 1L)
   checkmate::assert_int(n_lv, lower = 1L)
+  basis <- match.arg(basis)
   has_free_Z <- any(grepl(
     "^Z(_tilde)?\\[", colnames(draws_mat)
   ))
   if (has_free_Z) {
-    return(extract_Z_loadings(draws_mat, n_series, n_lv))
+    return(extract_Z_loadings(draws_mat, n_series, n_lv, basis = basis))
   }
   fixed_Z <- object$mv_spec$trend_specs$fixed_Z
   if (is.null(fixed_Z)) {
@@ -1392,12 +1414,14 @@ resolve_Z_loadings <- function(object, draws_mat, n_series, n_lv) {
 # handles fully-fixed trend_map fits (Z as data), use
 # `resolve_Z_loadings()` above.
 #'@noRd
-extract_Z_loadings <- function(draws_mat, n_obs_series, n_lv) {
+extract_Z_loadings <- function(draws_mat, n_obs_series, n_lv,
+                               basis = c("identified", "model")) {
   checkmate::assert_matrix(draws_mat)
   checkmate::assert_int(n_obs_series, lower = 1L)
   checkmate::assert_int(n_lv, lower = 1L)
+  basis <- match.arg(basis)
   ndraws <- nrow(draws_mat)
-  pattern <- factor_loading_param_pattern(colnames(draws_mat))
+  pattern <- factor_loading_param_pattern(colnames(draws_mat), basis)
   param_name <- if (pattern == "^Z_tilde\\[") "Z_tilde" else "Z"
   cols <- grep(pattern, colnames(draws_mat), value = TRUE)
   expected_cols <- n_obs_series * n_lv

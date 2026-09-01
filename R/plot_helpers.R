@@ -737,6 +737,13 @@ reorder_clusters <- function(x, dis, ...) {
 #'
 #' When `fixed_Z` is fully populated (no NAs) the matrix is
 #' broadcast across `ndraws`. Otherwise the resolver delegates
+#' @param basis `"identified"` reads the QR-rotated `Z_tilde`,
+#'   which is what reporting and plotting want. `"model"` reads
+#'   the raw `Z` the model sampled, which is what any caller
+#'   combining loadings with `sigma_trend`, `Sigma_trend` or
+#'   `Omega_trend` needs, since those live in the unrotated
+#'   basis. A fixed `trend_map` has no rotation, so both agree.
+#'
 #' to `extract_Z_loadings()`, which prefers the QR-identified
 #' `Z_tilde[i, j]` draws (free-Z factor models) and falls back
 #' to `Z[i, j]` for partial-Z fits where the user-supplied
@@ -759,7 +766,9 @@ resolve_factor_loadings <- function(object = NULL,
                                     draws_mat = NULL,
                                     fixed_Z = NULL,
                                     n_lv = NULL,
-                                    n_series = NULL) {
+                                    n_series = NULL,
+                                    basis = c("identified", "model")) {
+  basis <- match.arg(basis)
   if (!is.null(object)) {
     checkmate::assert_class(object, "mvgam")
     if (is.null(fixed_Z)) {
@@ -811,5 +820,6 @@ resolve_factor_loadings <- function(object = NULL,
     }
     draws_mat <- posterior::as_draws_matrix(object$fit)
   }
-  extract_Z_loadings(draws_mat, n_obs_series = n_series, n_lv = n_lv)
+  extract_Z_loadings(draws_mat, n_obs_series = n_series,
+                     n_lv = n_lv, basis = basis)
 }
