@@ -53,28 +53,44 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > The kernel routes need it too, since `Phi` has unit diagonal and
   > so contributes no scale of its own.
 
-- [ ] **14.1 VAR samples its latent state centred**
-  > `generate_var_trend_stanvars()` declares `lv_trend` directly in
-  > `parameters` and samples it as
-  > `lv_trend[t, ]' ~ multi_normal(mu_t_trend[t], Sigma_trend)`,
-  > where `Sigma_trend` is built from the sampled `sigma_trend` and
-  > `L_Omega_trend`. The conditional density tightens with the
-  > sampled scale, which is a funnel. `init_trend` is the same
-  > against `Omega_trend`.
+- [ ] **14.1 VAR's E-BFMI warning, and why non-centring is not the fix**
+  > `VAR()` samples `lv_trend` and `init_trend` directly against
+  > `Sigma_trend` and `Omega_trend`, both built from the sampled
+  > `sigma_trend` and `L_Omega_trend`. A sweep read that as a funnel
+  > and recommended non-centring. It was implemented and reverted;
+  > the measurements are why.
   >
-  > Every other Gaussian-innovation trend is written non-centred
-  > from `innovations_trend ~ std_normal()`, and VAR's own
-  > `A_raw_trend` sub-priors are too. The state is the exception.
+  > Same model, data, seed and settings, 4 series over 40
+  > timepoints, 2 chains:
   >
-  > Measured on a plain `VAR()`, four series, 40 timepoints: E-BFMI
-  > 0.295 on one chain against Stan's 0.3 threshold, 17 of 800
-  > divergences, and `trace(Sigma_trend)` at bulk ESS 32.6. This is
-  > the default VAR call, so it reaches every VAR user.
+  > | | centred | non-centred |
+  > |---|---|---|
+  > | E-BFMI | 0.295, 0.409 | 0.629, 0.725 |
+  > | divergences | 17 | 50 |
+  > | max R-hat | 1.090 | 2.125 |
+  > | min ESS | 24 | 1 |
+  > | `sigma_trend` | ESS 84 | ESS 1, R-hat 2.08 |
+  > | trace of Sigma | ESS 32.6 | ESS 288 |
   >
-  > Sample a raw `std_normal()` matrix and build
-  > `lv_trend[t, ]' = mu_t_trend[t] + L_Sigma_trend * z[t, ]'`;
-  > `L_Sigma_trend` is already computed. Same for `init_trend`
-  > through `cholesky_decompose(Omega_trend)`.
+  > Non-centring fixes the funnel diagnostic and the invariant scale
+  > direction, and leaves the chains in different modes: R-hat near
+  > 2.1 on `sigma_trend`, `A_trend` and `Intercept` alike. The
+  > centred form converges on every parameter and carries one
+  > diagnostic warning. That trade is not worth taking.
+  >
+  > The comment at the declaration, that `lv_trend` belongs in the
+  > parameters block for sampling, records a choice that the
+  > evidence supports. Centred wins where the data are informative
+  > about the state, which 40 timepoints per series is.
+  >
+  > What remains open is narrower: whether the E-BFMI of 0.295 is
+  > worth addressing at all given everything converges, and if so
+  > whether a cheaper device than full non-centring helps, such as
+  > non-centring only `init_trend`, interpolating between the two
+  > forms, or marginalising the state analytically, which a Gaussian
+  > VAR admits in closed form. Do not reopen this without a
+  > like-for-like fit; the funnel diagnostic alone is not evidence
+  > enough, as this attempt shows.
 
 - [ ] **14.2 `VAR(n_lv = k)` does not compile**
   > `R/stan_assembly.R:3307` declares
