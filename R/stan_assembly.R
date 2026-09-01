@@ -3334,7 +3334,14 @@ generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
 #' `to_vector(Z) ~ student_t(3, 0, 0.5)` for the per-column
 #' matrix-normal prior
 #'
-#'   `Z\[, i\] ~ multi_normal_cholesky(zero_vec, L_Phi * sqrt(Psi_diag\[i\]))`
+#'   `Z\[, i\] ~ multi_normal_cholesky(zero_vec, L_Phi)`
+#'
+#' The column scale is deliberately absent here. Under
+#' `column_shrinkage = "mgp"` it reaches the trend through
+#' `sigma_trend`, derived as `sqrt(Psi_diag)` in
+#' `generate_shared_innovation_stanvars()`; scaling this prior by it
+#' as well would give the column two scales whose product is all the
+#' likelihood sees, and would put one of them on a centred parameter.
 #'
 #' where `Phi = exp(-d_1 / theta_dist_1) * ... *
 #' exp(-d_K / theta_dist_K) * gp_exponential_cov(features, 1.0,
@@ -3584,12 +3591,11 @@ make_loadings_prior_stanvars <- function(spec) {
       )
     ))
   }
-  # Per-column Z prior. Three branches:
-  #   - kernel + MGP: multi_normal_cholesky with L_Phi * sqrt(Psi)
-  #   - kernel only:  multi_normal_cholesky with L_Phi (Psi implicit = 1)
-  #   - pure MGP (no kernel): elementwise normal(0, sqrt(Psi_diag[h]))
-  #     per column. Bhattacharya & Dunson (2011) parameterisation;
-  #     equivalent to multi_normal_cholesky on an identity Phi but
+  # Per-column Z prior. Z is drawn at unit scale in every branch;
+  # the MGP column scale reaches the trend through `sigma_trend`.
+  #   - kernel (with or without MGP): multi_normal_cholesky, L_Phi
+  #   - pure MGP (no kernel): std_normal() over the whole matrix.
+  #     Equivalent to multi_normal_cholesky on an identity Phi but
   #     avoids the p x p Cholesky and works cleanly with simplex
   #     families' `sum_to_zero_vector[K]` Z columns where rank-
   #     deficient covariances would be awkward.

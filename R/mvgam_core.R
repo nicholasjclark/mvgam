@@ -220,8 +220,8 @@ mvgam_imputation_forwarded <- c(
 #'   matrix following Heaps & Jermyn (2024). When supplied, the
 #'   default iid `to_vector(Z) ~ student_t(3, 0, 0.5)` prior is
 #'   replaced with a per-column matrix-normal prior of the form
-#'   `Z[, i] ~ multi_normal_cholesky(0, L_Phi * sqrt(Psi_diag[i]))`,
-#'   where the among-row scale matrix `Phi` is assembled
+#'   `Z[, i] ~ multi_normal_cholesky(0, L_Phi)`, where the
+#'   among-row scale matrix `Phi` is assembled
 #'   multiplicatively from any combination of:
 #'   \itemize{
 #'     \item a per-series feature matrix (`features`), expanded
