@@ -185,8 +185,14 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
         silent = silent
       )
     }
+    # A trend-free program still carries obs-side statements the
+    # families wrote, so it needs the same pass the assembled one
+    # gets. `mvn()` and `mvt()` put a prior on `Psi` this way.
     return(list(
-      stancode = obs_setup$stancode,
+      stancode = normalise_mvgam_sampling_statements(
+        obs_setup$stancode,
+        normalize = isTRUE(obs_setup$codegen$normalize %||% TRUE)
+      ),
       standata = obs_setup$standata,
       has_trends = FALSE,
       is_multivariate = FALSE
@@ -340,6 +346,15 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
   # Deduplicate functions (GP models may have identical functions in both models)
   combined_stancode <- deduplicate_stan_functions(combined_stancode)
 
+  # The trend emitters write their priors in the tilde form, which
+  # Stan strips the normalising constant from. `normalize` is a
+  # promise about the whole program, so it is kept here, where every
+  # emitted statement is in one place, rather than at each emitter.
+  combined_stancode <- normalise_mvgam_sampling_statements(
+    combined_stancode,
+    normalize = isTRUE(obs_setup$codegen$normalize %||% TRUE)
+  )
+
   # Generate the standata using brms with both the trend
   # stanvars and any obs-side stanvars (e.g. custom families like
   # tweedie() that attach a data int like M). `data2` (cached on
@@ -433,6 +448,209 @@ stan_density_suffix <- function(stan_code, stem) {
   }
   sub(paste0("^\\Q", stem, "\\E"), "", hit[1L], perl = TRUE)
 }
+
+#' Write one prior as a Stan sampling statement
+#'
+#' Stan drops the normalising constant from `x ~ dist(args);`, so a
+#' program whose priors are written that way accumulates an `lp__`
+#' that differs from the log joint density by a fixed amount.
+#' `bridge_sampler()` reads `lp__` directly, and the offset cancels
+#' in a Bayes factor only when both models carry priors matching in
+#' family, hyperparameters and dimension. `target += dist_lpdf(x |
+#' args);` keeps the constant, which is what `normalize = TRUE`
+#' promises.
+#'
+#' The unnormalised branch keeps the tilde, which is what the
+#' emitters write and what `bridge_sampler.mvgam()` looks for before
+#' it trusts `lp__`.
+#'
+#' Every prior mvgam emits sits on a Stan parameter, and Stan
+#' parameters are continuous, so the density is always `_lpdf` and
+#' never the discrete `_lpmf`.
+#'
+#' @param lhs Left-hand side, passed through verbatim. Every shape
+#'   the emitters use is legal as a density's first argument: a bare
+#'   parameter (`sigma_trend`), a container call (`to_vector(Z)`,
+#'   `diagonal(A_raw_trend[lag])`), an index or slice
+#'   (`varrho_inv[2:N_lv_trend]`) and a transpose (`lv_trend[t, :]'`).
+#' @param dist Distribution call as the prior table spells it, for
+#'   example `"student_t(3, 0, 2.5)"` or `"std_normal()"`. Arguments
+#'   may nest parentheses, as `"normal(0, sqrt(0.455))"` does.
+#' @param normalize Whether to keep the normalising constants.
+#' @return One Stan statement, semicolon-terminated and unindented.
+#' @noRd
+stan_prior_statement <- function(lhs, dist, normalize = TRUE) {
+  checkmate::assert_string(lhs, min.chars = 1)
+  checkmate::assert_string(dist, min.chars = 1)
+  checkmate::assert_flag(normalize)
+  lhs <- trimws(lhs)
+  dist <- trimws(dist)
+
+  # The name runs to the first `(` and the arguments to the last
+  # `)`, so parentheses inside the arguments carry through
+  # untouched.
+  open <- regexpr("(", dist, fixed = TRUE)
+  chars <- strsplit(dist, "", fixed = TRUE)[[1L]]
+  balanced <- sum(chars == "(") == sum(chars == ")")
+  if (open < 2L || !endsWith(dist, ")") || !balanced) {
+    stop(insight::format_error(c(
+      paste0("Cannot write a Stan prior statement for '", lhs, "'."),
+      x = paste0("Expected 'distribution(arguments)', got '",
+                   dist, "'."),
+      i = paste0(
+        "Give the prior as a Stan distribution call such as ",
+        "'normal(0, 1)'. Truncation, written 'T[lb, ub]', is not ",
+        "supported here: a normalised statement needs the ",
+        "truncation correction the tilde form applies for you."
+      )
+    )))
+  }
+
+  # The left-hand side is passed through verbatim, so it has to be
+  # an expression naming a parameter. A block opener or a string
+  # literal reaching here means the caller matched something that is
+  # not a sampling statement, and writing it out would produce Stan
+  # that either fails to compile or silently drops the real prior.
+  if (grepl("[{}\"/*]|\\b(for|if|else|while)\\b", lhs)) {
+    stop(insight::format_error(c(
+      "Cannot write a Stan prior statement for this left-hand side.",
+      x = paste0("Got: '", lhs, "'."),
+      i = paste0(
+        "Expected an expression naming a parameter, such as ",
+        "'sigma_trend' or 'to_vector(Z)'. A block opener or a ",
+        "string literal here means a statement was matched that ",
+        "is not a prior."
+      )
+    )))
+  }
+
+  name <- trimws(substr(dist, 1L, open - 1L))
+  if (!grepl("^[A-Za-z_][A-Za-z0-9_]*$", name)) {
+    stop(insight::format_error(c(
+      paste0("Cannot write a Stan prior statement for '", lhs, "'."),
+      x = paste0("'", name, "' does not name a Stan distribution."),
+      i = paste0(
+        "Stan distribution names hold letters, digits and ",
+        "underscores only."
+      )
+    )))
+  }
+
+  if (!normalize) {
+    return(paste0(lhs, " ~ ", name, "(",
+                    trimws(substr(dist, open + 1L, nchar(dist) - 1L)),
+                    ");"))
+  }
+  args <- trimws(substr(dist, open + 1L, nchar(dist) - 1L))
+  # A parameter-free density takes no bar: the call is
+  # `std_normal_lpdf(x)`, not `std_normal_lpdf(x | )`.
+  operands <- if (nzchar(args)) paste0(lhs, " | ", args) else lhs
+  paste0("target += ", name, "_lpdf(", operands, ");")
+}
+
+
+# Internal: drop Stan comments, both spellings. A comment can hold
+# a formula, as `// bf(y ~ s(x))` does, and a block comment can span
+# the statement it documents, so neither is a sampling statement and
+# neither may be matched as one.
+#'@noRd
+strip_stan_comments <- function(x) {
+  bare <- gsub("/\\*.*?\\*/", "", x, perl = TRUE)
+  gsub("//[^\n]*", "", bare)
+}
+
+
+# Internal: the left-hand side of a sampling statement, with any
+# block a generator opened on the same physical line removed. An
+# emitter may write `for (g in 1:G) { x[g] ~ dist(...); }` on one
+# line, and everything up to the last brace before the tilde opens
+# that block rather than naming a parameter.
+#'@noRd
+stan_statement_lhs <- function(body) {
+  tilde_at <- regexpr("~", body, fixed = TRUE)
+  if (tilde_at < 1L) {
+    return(NA_character_)
+  }
+  braces <- gregexpr("{", substr(body, 1L, tilde_at), fixed = TRUE)[[1L]]
+  start <- if (braces[1L] > 0L) max(braces) + 1L else 1L
+  trimws(substr(body, start, tilde_at - 1L))
+}
+
+
+#' Normalise every sampling statement mvgam wrote
+#'
+#' The emitters write their priors as `x ~ dist(args);`, the form
+#' Stan strips the normalising constant from. brms writes its own as
+#' `lprior += dist_lpdf(...)` and never emits a tilde, so every tilde
+#' in an assembled mvgam program came from an mvgam emitter and this
+#' one pass reaches all of them. Rewriting once here rather than at
+#' each emitter means a new trend generator inherits the behaviour
+#' instead of having to remember it.
+#'
+#' Statements are split on `;` rather than by line, because several
+#' emitters wrap a long argument list over two or three lines.
+#'
+#' @param stancode Character scalar holding the assembled program.
+#' @param normalize Whether the program should keep its normalising
+#'   constants. `FALSE` leaves the tilde form in place, which is what
+#'   brms writes `_lupdf` for.
+#' @return The program, with every mvgam sampling statement rewritten
+#'   when `normalize` is `TRUE`.
+#' @noRd
+normalise_mvgam_sampling_statements <- function(stancode,
+                                                  normalize = TRUE) {
+  checkmate::assert_flag(normalize)
+  sc <- paste(as.character(stancode), collapse = "\n")
+  if (!normalize || !nzchar(sc) || !grepl("~", sc, fixed = TRUE)) {
+    return(stancode)
+  }
+  chunks <- strsplit(sc, ";", fixed = TRUE)[[1L]]
+  rewritten <- vapply(chunks, function(chunk) {
+    # A tilde inside a comment is a formula, not a statement, so
+    # detection reads the code with comments removed while the
+    # rewrite keeps whatever preceded the statement intact.
+    lines <- strsplit(chunk, "\n", fixed = TRUE)[[1L]]
+    bare <- sub("//.*$", "", lines)
+    first <- which(grepl("~", bare, fixed = TRUE))[1L]
+    if (is.na(first)) {
+      return(chunk)
+    }
+    # Lines before the statement are indentation, blank space and
+    # comments, and carry through untouched. The statement itself
+    # runs from its first line to the end of the chunk, because an
+    # emitter may wrap a long argument list over several lines.
+    prefix <- if (first > 1L) {
+      paste0(paste(lines[seq_len(first - 1L)], collapse = "\n"), "\n")
+    } else {
+      ""
+    }
+    body <- paste(bare[first:length(bare)], collapse = " ")
+    indent <- sub("^([[:space:]]*).*$", "\\1", lines[first])
+    # A generator may open a loop and write its one statement on the
+    # same physical line. Anything up to the last brace before the
+    # tilde opens a block rather than naming a parameter, so it
+    # stays where it is.
+    tilde_at <- regexpr("~", body, fixed = TRUE)
+    braces <- gregexpr("{", substr(body, 1L, tilde_at), fixed = TRUE)[[1L]]
+    opener <- ""
+    if (braces[1L] > 0L) {
+      cut <- max(braces)
+      opener <- substr(body, 1L, cut)
+      body <- substr(body, cut + 1L, nchar(body))
+      indent <- ""
+    }
+    parts <- strsplit(body, "~", fixed = TRUE)[[1L]]
+    lhs <- stan_statement_lhs(body)
+    # An argument list wrapped over several lines collapses to one
+    # line here, which stanc reformats anyway.
+    dist <- gsub("[[:space:]]+", " ",
+                   trimws(paste(parts[-1L], collapse = "~")))
+    stmt <- stan_prior_statement(lhs, dist, normalize = TRUE)
+    paste0(prefix, opener, indent, sub(";$", "", stmt))
+  }, character(1L), USE.NAMES = FALSE)
+  paste(rewritten, collapse = ";")
+}
+
 
 #' Generate Base Stan Code with Stanvars
 #'
@@ -2256,8 +2474,11 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
       stanvar_components <- append(stanvar_components, list(sigma_stanvar))
     }
 
-    # 2. Correlation parameters (only if cor = TRUE and multivariate)
-    if (cor && effective_dim > 1) {
+    # Correlation parameters. A Cholesky factor is emitted whenever
+    # correlation is asked for, including at one latent dimension
+    # where it is a 1x1 identity, because the post-fit extractors
+    # read `L_Omega_trend` without first checking the dimension.
+    if (cor) {
       # Cholesky factor for correlation matrix
       l_omega_stanvar <- brms::stanvar(
         name = "L_Omega_trend",
@@ -2312,7 +2533,7 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
     final_innovations_code <- paste0("
     // Scaled innovations declaration (computation handled by hierarchical system)
     matrix[N_time_trend, ", effective_dim, "] scaled_innovations_trend;")
-  } else if (cor && effective_dim > 1) {
+  } else if (cor) {
     # Simple correlated case
     final_innovations_code <- paste0("
     // Scaled innovations after applying correlations
@@ -2486,7 +2707,7 @@ generate_innovation_model <- function(effective_dim, cor = FALSE,
       prior_code <- c(prior_code, glue::glue("sigma_trend ~ {sigma_prior_str};"))
     }
 
-    if (cor && effective_dim > 1) {
+    if (cor) {
       # Read through the shared resolver so a user prior on the
       # correlation factor is honoured rather than overwritten by a
       # literal, and so the prior table reports what is sampled.

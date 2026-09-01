@@ -40,8 +40,55 @@ stan_pattern <- function(pattern, x, ignore.case = FALSE, ...) {
     pattern_final <- gsub("([\\[\\]()\\{\\}^$\\*\\+\\?\\.|\\\\])", "\\\\\\1", pattern_no_space)
   }
 
+  # A sampling statement has two spellings. `lhs ~ dist(args);` is
+  # what an emitter writes, and a normalised program carries
+  # `target += dist_lpdf(lhs | args);` instead. A test naming one
+  # should accept the other, so the assertions stay about which
+  # prior reached which parameter rather than about which form the
+  # program happens to use.
+  alt <- tilde_pattern_as_lpdf(pattern_final)
+  if (!is.na(alt)) {
+    pattern_final <- paste0("(", pattern_final, ")|(", alt, ")")
+  }
+
   # Apply grepl with processed pattern and whitespace-free input
   grepl(pattern_final, x_no_space, ignore.case = ignore.case, ...)
+}
+
+
+# Translate a whitespace-free `lhs~dist(args)` pattern into the
+# density-call spelling. Returns NA when the pattern is not a
+# sampling statement, so the caller leaves it alone.
+tilde_pattern_as_lpdf <- function(pattern) {
+  if (!grepl("~", pattern, fixed = TRUE)) return(NA_character_)
+  # `strsplit()` drops a trailing empty field, so the two sides are
+  # taken directly rather than by splitting.
+  lhs <- sub("~.*$", "", pattern)
+  rhs <- sub("^[^~]*~", "", pattern)
+  if (!nzchar(lhs)) return(NA_character_)
+  # A pattern naming no distribution asserts only that the
+  # parameter is sampled. The density call and any container
+  # wrapping the parameter, such as `diagonal(...)`, are left open.
+  if (!nzchar(rhs)) {
+    # The parameter has to be the density's first operand. Allowing
+    # anything before it would match the trend equation, where the
+    # same name appears among the arguments, and the assertion would
+    # pass with the prior deleted.
+    return(paste0("_lpdf\\((?:[a-z_]*\\()?", lhs, "[|)]"))
+  }
+  open <- regexpr("\\\\?\\(", rhs)
+  if (open > 0L) {
+    dist <- substr(rhs, 1L, open - 1L)
+    args <- substr(rhs, open, nchar(rhs))
+    args <- sub("^\\\\?\\(", "", args)
+    args <- sub("\\\\?\\);?$", "", args)
+    if (!nzchar(args)) {
+      return(paste0("target\\+=", dist, "_lpdf\\(", lhs, "\\)"))
+    }
+    paste0("target\\+=", dist, "_lpdf\\(", lhs, "\\|", args, "\\)")
+  } else {
+    paste0("target\\+=", rhs, "_lpdf\\(", lhs, "\\|")
+  }
 }
 
 # Test Data Setup ----
@@ -1262,13 +1309,20 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
 
   # Hierarchical correlation priors with _trend suffix
   expect_true(stan_pattern("L_Omega_global_trend ~ lkj_corr_cholesky\\(1\\);", code_with_trend))
-  expect_true(stan_pattern("for \\(g_idx in 1:N_groups_trend\\) \\{ L_deviation_group_trend\\[g_idx\\] ~ lkj_corr_cholesky\\(6\\); \\}", code_with_trend))
+  expect_true(stan_pattern(paste0(
+    "for \\(g_idx in 1:N_groups_trend\\) \\{",
+    "target \\+= lkj_corr_cholesky_lpdf\\(",
+    "L_deviation_group_trend\\[g_idx\\] \\| 6\\); \\}"
+  ), code_with_trend))
 
   # Custom alpha_cor_trend prior should be applied
   expect_true(stan_pattern("alpha_cor_trend ~ beta\\(5, 5\\);", code_with_trend))
 
   # Group-specific sigma priors and innovation priors
-  expect_true(stan_pattern("to_vector\\(sigma_group_trend\\[g_idx\\]\\) ~ exponential\\(2\\);", code_with_trend))
+  expect_true(stan_pattern(paste0(
+    "exponential_lpdf\\(to_vector\\(sigma_group_trend",
+    "\\[g_idx\\]\\) \\| 2\\);"
+  ), code_with_trend))
   expect_true(stan_pattern("to_vector\\(innovations_trend\\) ~ std_normal\\(\\);", code_with_trend))
 
   # No prior for b_trend (brms default flat prior)
@@ -1432,8 +1486,14 @@ test_that("stancode generates correct hierarchical VAR(gr = habitat) model with 
   expect_true(stan_pattern("alpha_cor_trend ~ beta\\(3, 2\\);", code_with_trend))
 
   # VAR coefficient and sigma priors (uses g_idx consistently)
-  expect_true(stan_pattern("diagonal\\(A_raw_group_trend\\[g_idx, lag\\]\\) ~ normal\\(", code_with_trend))
-  expect_true(stan_pattern("to_vector\\(sigma_group_trend\\[g_idx\\]\\) ~ exponential\\(2\\);", code_with_trend))
+  expect_true(stan_pattern(paste0(
+    "normal_lpdf\\(diagonal\\(A_raw_group_trend",
+    "\\[g_idx, lag\\]\\) \\|"
+  ), code_with_trend))
+  expect_true(stan_pattern(paste0(
+    "exponential_lpdf\\(to_vector\\(sigma_group_trend",
+    "\\[g_idx\\]\\) \\| 2\\);"
+  ), code_with_trend))
 
   # Innovation correlation priors (shared pattern) with g_idx
   expect_true(stan_pattern("L_Omega_global_trend ~ lkj_corr_cholesky\\(1\\);", code_with_trend))
@@ -1531,22 +1591,24 @@ test_that("user priors on array-shaped VAR hyperparameters emit per-lag", {
   lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
   code_only <- lines[!grepl("^\\s*//", lines)]
 
-  amu_lines <- grep("Amu_trend\\[lag\\]\\s*~", code_only, value = TRUE)
+  amu_lines <- grep("Amu_trend\\[lag\\]\\s*[~|]", code_only, value = TRUE)
   expect_equal(length(amu_lines), 1L)
-  expect_match(amu_lines, "Amu_trend\\[lag\\]\\s*~\\s*normal\\(0,\\s*0.3\\)")
+  expect_match(amu_lines, "Amu_trend\\[lag\\]\\s*[~|]\\s*(normal\\()?0,\\s*0.3")
 
-  aomega_lines <- grep("Aomega_trend\\[lag\\]\\s*~", code_only, value = TRUE)
+  aomega_lines <- grep("Aomega_trend\\[lag\\]\\s*[~|]", code_only, value = TRUE)
   expect_equal(length(aomega_lines), 1L)
-  expect_match(aomega_lines, "Aomega_trend\\[lag\\]\\s*~\\s*gamma\\(2,\\s*0.5\\)")
+  expect_match(aomega_lines, "Aomega_trend\\[lag\\]\\s*[~|]\\s*(gamma\\()?2,\\s*0.5")
 
-  l_global_lines <- grep("L_Omega_global_trend\\s*~", code_only, value = TRUE)
+  l_global_lines <- grep("L_Omega_global_trend\\s*[~|]", code_only, value = TRUE)
   expect_equal(length(l_global_lines), 1L)
-  expect_match(l_global_lines, "lkj_corr_cholesky\\(2\\)")
+  expect_match(l_global_lines,
+                 "lkj_corr_cholesky\\(2\\)|lkj_corr_cholesky_lpdf\\(.*\\| ?2\\)")
 
-  l_dev_lines <- grep("L_deviation_group_trend\\[g_idx\\]\\s*~",
+  l_dev_lines <- grep("L_deviation_group_trend\\[g_idx\\]\\s*[~|]",
                       code_only, value = TRUE)
   expect_equal(length(l_dev_lines), 1L)
-  expect_match(l_dev_lines, "lkj_corr_cholesky\\(4\\)")
+  expect_match(l_dev_lines,
+                 "lkj_corr_cholesky\\(4\\)|lkj_corr_cholesky_lpdf\\(.*\\| ?4\\)")
 })
 
 
@@ -1574,15 +1636,19 @@ test_that("user priors on array-shaped VARMA MA hyperparameters emit", {
   lines <- strsplit(code, "\n", fixed = TRUE)[[1]]
   code_only <- lines[!grepl("^\\s*//", lines)]
 
-  dmu_lines <- grep("Dmu_trend\\[[12],\\s*1\\]\\s*~",
+  # Either spelling: `Dmu_trend[1, 1] ~ dist(...)` or the density
+  # call `dist_lpdf(Dmu_trend[1, 1] | ...)`.
+  dmu_lines <- grep("Dmu_trend\\[[12], ?1\\]\\s*[~|]",
                      code_only, value = TRUE)
   expect_equal(length(dmu_lines), 2L)
-  expect_true(all(grepl("normal\\(0,\\s*0.4\\)", dmu_lines)))
+  expect_true(all(grepl("normal(\\(|_lpdf\\(.*\\| ?)0,\\s*0.4",
+                          dmu_lines)))
 
-  dom_lines <- grep("Domega_trend\\[[12],\\s*1\\]\\s*~",
+  dom_lines <- grep("Domega_trend\\[[12], ?1\\]\\s*[~|]",
                      code_only, value = TRUE)
   expect_equal(length(dom_lines), 2L)
-  expect_true(all(grepl("gamma\\(3,\\s*0.75\\)", dom_lines)))
+  expect_true(all(grepl("gamma(\\(|_lpdf\\(.*\\| ?)3,\\s*0.75",
+                          dom_lines)))
 })
 
 
@@ -1600,24 +1666,30 @@ test_that("default priors on array-shaped VAR hyperparameters still emit per-lag
 
   # Without overrides the package defaults must still surface, under the
   # same per-lag indexing, and only once.
-  amu_lines <- grep("Amu_trend\\[lag\\]\\s*~", code_only, value = TRUE)
+  amu_lines <- grep("Amu_trend\\[lag\\]\\s*[~|]", code_only, value = TRUE)
   expect_equal(length(amu_lines), 1L)
-  expect_match(amu_lines,
-               "Amu_trend\\[lag\\]\\s*~\\s*normal\\(0,\\s*sqrt\\(0.455\\)\\)")
+  expect_match(amu_lines, paste0(
+    "Amu_trend\\[lag\\]\\s*[~|]\\s*(normal\\()?0,",
+    "\\s*sqrt\\(0.455\\)"
+  ))
 
-  aomega_lines <- grep("Aomega_trend\\[lag\\]\\s*~", code_only, value = TRUE)
+  aomega_lines <- grep("Aomega_trend\\[lag\\]\\s*[~|]", code_only, value = TRUE)
   expect_equal(length(aomega_lines), 1L)
-  expect_match(aomega_lines,
-               "Aomega_trend\\[lag\\]\\s*~\\s*gamma\\(1.365,\\s*0.071175\\)")
+  expect_match(aomega_lines, paste0(
+    "Aomega_trend\\[lag\\]\\s*[~|]\\s*(gamma\\()?1.365,",
+    "\\s*0.071175"
+  ))
 
-  l_global_lines <- grep("L_Omega_global_trend\\s*~", code_only, value = TRUE)
+  l_global_lines <- grep("L_Omega_global_trend\\s*[~|]", code_only, value = TRUE)
   expect_equal(length(l_global_lines), 1L)
-  expect_match(l_global_lines, "lkj_corr_cholesky\\(1\\)")
+  expect_match(l_global_lines,
+                 "lkj_corr_cholesky\\(1\\)|lkj_corr_cholesky_lpdf\\(.*\\| ?1\\)")
 
-  l_dev_lines <- grep("L_deviation_group_trend\\[g_idx\\]\\s*~",
+  l_dev_lines <- grep("L_deviation_group_trend\\[g_idx\\]\\s*[~|]",
                       code_only, value = TRUE)
   expect_equal(length(l_dev_lines), 1L)
-  expect_match(l_dev_lines, "lkj_corr_cholesky\\(6\\)")
+  expect_match(l_dev_lines,
+                 "lkj_corr_cholesky\\(6\\)|lkj_corr_cholesky_lpdf\\(.*\\| ?6\\)")
 })
 
 
@@ -2401,9 +2473,11 @@ test_that("stancode handles multivariate specifications with shared RW trend and
   # Should have some prior for sigma_trend (distribution may vary)
   expect_match2(code_shared, "sigma_trend ~ ")
   # Should have LKJ prior for correlation
-  expect_match2(code_shared, "L_Omega_trend ~ lkj_corr_cholesky")
+  expect_match2(code_shared, "lkj_corr_cholesky_lpdf(L_Omega_trend")
   # Should have standard normal prior for innovations
-  expect_match2(code_shared, "to_vector\\(innovations_trend\\) ~ std_normal\\(\\);")
+  expect_match2(code_shared,
+                  stan_prior_line("to_vector(innovations_trend)",
+                                    "std_normal()"))
 
   # Should NOT have response-specific trend_count matrix
   expect_false(grepl("matrix.*trend_count", code_shared))
@@ -3335,9 +3409,12 @@ test_that("trend_map with NA emits Z_template + Z_is_free + Z_free_vec", {
   expect_true(stan_pattern(
     "Z\\[i, j\\] = Z_template\\[i, j\\];", code
   ))
-  # Prior on the free vector only.
-  expect_true(stan_pattern(
-    "Z_free_vec ~ student_t\\(3, 0, 1\\);", code
+  # Prior on the free vector only. The statement is compared
+  # literally rather than through `stan_pattern()`, which escapes
+  # a pattern and would also try to read this as a tilde form.
+  expect_true(grepl(
+    stan_prior_line("Z_free_vec", "student_t(3, 0, 1)"),
+    paste(as.character(code), collapse = "\n"), fixed = TRUE
   ))
   # User-supplied loadings bypass the QR identification path.
   expect_false(grepl("Z_tilde", code, fixed = TRUE))
@@ -3418,7 +3495,8 @@ test_that("loadings_prior with features only emits ARD prior on Z", {
   expect_match(sc, "multi_normal_cholesky", fixed = TRUE)
   # The length-scale is a settable prior, so it is written as a
   # sampling statement like every other one mvgam emits.
-  expect_match(sc, "theta_features\\s*~\\s*lognormal\\(0, 1\\)")
+  expect_match(sc, paste0("theta_features\\s*~\\s*lognormal\\(0, 1\\)",
+                            "|lognormal_lpdf\\(theta_features \\| 0, 1\\)"))
   expect_false(grepl("to_vector\\(Z\\)\\s*~\\s*student_t", sc))
   expect_match(sc, "qr_thin_R", fixed = TRUE)
 })
@@ -3479,7 +3557,7 @@ test_that("loadings_prior with column_shrinkage = 'mgp' emits MGP machinery", {
   sc <- as.character(code)
   expect_match(sc, "varrho_inv", fixed = TRUE)
   expect_match(sc, "Psi_diag", fixed = TRUE)
-  expect_match(sc, "inv_gamma\\(mgp_a1")
+  expect_match(sc, "inv_gamma\\(mgp_a1|inv_gamma_lpdf\\([^|]*\\| ?mgp_a1")
   expect_match(sc, "sqrt\\(Psi_diag")
 })
 
@@ -3488,7 +3566,8 @@ test_that("default factor model still emits the iid student_t default", {
   fx <- loadings_prior_fixture()
   code <- stancode(fx$mf, data = fx$data, family = poisson())
   sc <- as.character(code)
-  expect_match(sc, "to_vector\\(Z\\)\\s*~\\s*student_t")
+  expect_match(sc, paste0("to_vector\\(Z\\)\\s*~\\s*student_t",
+                            "|student_t_lpdf\\(to_vector\\(Z\\)"))
   expect_false(grepl("Phi_loadings", sc, fixed = TRUE))
   expect_false(grepl("gp_exponential_cov", sc, fixed = TRUE))
   expect_match(sc, "qr_thin_R", fixed = TRUE)
@@ -3584,7 +3663,8 @@ test_that("AR(default + shared) emits ar{lag}_shared and broadcasts to ar{lag}_t
   expect_true(grepl(
     "ar1_trend = rep_vector\\(ar1_shared\\[1\\], N_lv_trend\\);", sc
   ))
-  expect_true(grepl("ar1_shared ~ normal\\(0, 0\\.5\\);", sc))
+  expect_true(grepl(stan_prior_line("ar1_shared", "normal(0, 0.5)"), sc,
+                      fixed = TRUE))
   expect_false(grepl(
     "vector<lower=-1,\\s*upper=1>\\[N_lv_trend\\] ar1_trend;", sc
   ))
@@ -3599,10 +3679,14 @@ test_that("AR(default + hierarchical) emits mu/sigma hyperparams and pooled prio
   expect_true(grepl(
     "vector<lower=-1,\\s*upper=1>\\[N_lv_trend\\] ar1_trend;", sc
   ))
-  expect_true(grepl("mu_ar1_trend ~ normal\\(0, 0\\.5\\);", sc))
-  expect_true(grepl("sigma_ar1_trend ~ exponential\\(2\\);", sc))
+  expect_true(grepl(stan_prior_line("mu_ar1_trend", "normal(0, 0.5)"), sc,
+                      fixed = TRUE))
+  expect_true(grepl(stan_prior_line("sigma_ar1_trend", "exponential(2)"),
+                      sc, fixed = TRUE))
   expect_true(grepl(
-    "ar1_trend ~ normal\\(mu_ar1_trend, sigma_ar1_trend\\);", sc
+    stan_prior_line("ar1_trend",
+                      "normal(mu_ar1_trend, sigma_ar1_trend)"), sc,
+    fixed = TRUE
   ))
 })
 

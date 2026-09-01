@@ -115,13 +115,21 @@ test_that("extract_component_linpred works for both incl_latent_state modes", {
   expect_gt(mean(abs(lp_full - lp_det)), 1e-3)
 })
 
-test_that("extract_trend_linpred routes through the (t, k) reshape", {
+test_that("a by-lv trend linpred reshapes to the (t, s) grid", {
   skip_if_no_chunk0_cache()
   mod <- readRDS("/tmp/chunk0_models/by_lv_axis.rds")
   dat <- readRDS("/tmp/chunk0_models/data.rds")
 
-  tl <- extract_trend_linpred(fit = mod, draw_id = 1L, newdata = dat)
+  # `mu_factor` is per latent axis, and a by-lv program folds it
+  # through Z, so the linear predictor comes back at series scale
+  # like every other trend formula.
+  lp <- extract_component_linpred(
+    mvgam_fit = mod, newdata = dat, component = "trend",
+    incl_latent_state = FALSE
+  )
+  obs <- get_observation_structure(mod, newdata = dat)
+  grid <- reshape_linpred_to_grid(lp[1L, ], obs)
   n_time <- length(unique(dat$time))
   n_series <- length(unique(dat$series))
-  expect_equal(dim(tl), c(n_time, n_series))
+  expect_equal(dim(grid), c(n_time, n_series))
 })

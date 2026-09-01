@@ -378,54 +378,81 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > Check the emitted `mvt` program for a stanc3 non-linear
   > transform warning before writing tests to the new spelling.
 
-- [ ] **18.0 mvgam's own priors are unnormalised, and the guard cannot see it**
-  > `bridge_sampler.mvgam()` rejects a program containing `_lupdf`
-  > or `_lupmf`, matching `brms:::is_normalized()`, and says
-  > mvgam's emitters produce normalised Stan. Stan drops the
-  > normalising constant for any `~` statement, and every prior
-  > mvgam emits is written that way, while brms writes its own as
-  > `lprior += student_t_lpdf(...)`. The guard tests a spelling
-  > mvgam never uses, so it passes on a program that is not
-  > normalised.
+- [ ] **18.0 Finish converting the tests to the density spelling**
+  > The emitters wrote every prior as `x ~ dist(args);`, the form
+  > Stan strips the normalising constant from, so `lp__` differed
+  > from the log joint by a constant and `bridge_sampler()` read it
+  > anyway. On a three-series AR(1) fit over 25 timepoints the
+  > dropped constants come to about 70 nats, 69 of them the
+  > `std_normal()` on the innovations. That term scales with
+  > `N_time_trend` times `N_lv_trend`, so it takes a different
+  > value in two models of different trend dimension and does not
+  > cancel: comparing a two-factor fit against a three-factor one
+  > is the comparison it breaks.
   >
-  > A single marginal likelihood is then offset by a fixed amount.
-  > A Bayes factor is wrong only when the two models' trend priors
-  > differ in family, hyperparameters or dimension, since otherwise
-  > the offsets cancel. So comparisons across trend structures, the
-  > interesting ones, are the ones that break.
+  > `normalise_mvgam_sampling_statements()` rewrites the assembled
+  > program once, where `obs_setup$codegen$normalize` is already in
+  > scope. Every tilde in an mvgam program is mvgam's, since brms
+  > writes `lprior += ...`, so one pass reaches all of them and a
+  > new trend generator inherits the behaviour rather than having
+  > to remember it. `stan_prior_statement()` writes the statement,
+  > and the tests build their expected text through it.
   >
-  > Scoped: 22 emission sites, about 30 Stan lines, covering every
-  > trend type, the loadings and MGP paths and the `mvn()` and
-  > `mvt()` families. `normalize` reaches none of them. It stops at
-  > the two `setup_brms_lightweight()` calls that build the brms
-  > skeleton; the trend path runs through
-  > `generate_combined_stancode()` and
-  > `generate_trend_specific_stanvars()`, neither of which takes
-  > it. Confirmed by diffing `stancode()` at both settings: only
-  > two lines move, both brms-native. Threading it touches roughly
-  > 18 signatures.
+  > Verified three ways. Nine trend types emit no tilde and pass
+  > `stanc`. Every rewritten statement is character-identical to
+  > its tilde original in left-hand side and arguments, 52 of 52
+  > across ten trend types. And `log_prob` differs between the two
+  > settings by a constant, -348.7034475797 at five random points
+  > in a 45-parameter space with a range of 1.1e-13, which is what
+  > a normalising constant must look like and what a mangled
+  > argument could not. Gradients are therefore untouched, so no
+  > fixture needs refitting.
   >
-  > `stan_density_suffix()` is not the tool. It preserves a
-  > spelling brms already chose, which is right for the rewrites in
-  > `glm_analysis.R` and wrong here, where mvgam authors the
-  > statement and picks the suffix from `normalize` itself. This
-  > wants a statement builder.
+  > Two readers had to be repaired first, both of which would have
+  > corrupted the result. `reorganize_model_block_statements()`
+  > gathered every `target +=` at the end of the model block with
+  > no brace-depth guard, so a statement inside a `for` was lifted
+  > out of it, emptying the loop and taking the loop variable out
+  > of scope. And the `_lpdf` branch of
+  > `mvgam_stancode_prior_rows()` matched a bare identifier only,
+  > broke on nested parentheses, knew no zero-argument density and
+  > no `_lupdf`, so the prior table would have gone blank.
   >
-  > Posterior draws do not move: adding a parameter-independent
-  > constant leaves every gradient and accept step unchanged. So no
-  > fixture needs refitting, and `loo()`, predictions and forecasts
-  > are unaffected. Only `lp__` shifts, and only under
-  > `normalize = TRUE`. About a dozen tests assert the literal `~`
-  > spelling and would need rewriting.
+  > The rewriter refuses what it cannot prove it parsed. A
+  > left-hand side holding a block opener, a brace or a quote is
+  > rejected by name, so a braceless `for (i in 1:N) x ~ d(...)`
+  > errors rather than emitting
+  > `d_lpdf(for (i in 1:N) x | ...)`. Truncation says that it
+  > needs a correction the tilde form applies for you. Comments
+  > are stripped in both spellings, so a block comment quoting a
+  > formula cannot swallow the statement it documents. Being
+  > permissive here is what makes a single pass fragile; refusing
+  > is what makes it safe for an emitter nobody has written yet.
   >
-  > Two things to fix in the same pass. `mvgam_stancode_prior_rows()`
-  > reads the `target +=` form with a regex that matches a bare
-  > identifier only, so it would stop reporting `to_vector(Z)` and
-  > `varrho_inv[1]` once those move; its `~` sibling already
-  > handles containers and indices. And the guard should test what
-  > it means rather than one spelling, reusing
-  > `is_mvgam_managed_class()` so it and the prior table cannot
-  > disagree about what counts as a prior.
+  > The trend-free return path normalises too. `mvn()` and
+  > `mvt()` put a prior on `Psi` through an observation-side
+  > stanvar, so a fit with no `trend_formula` carried a tilde
+  > that `bridge_sampler()` then refused, advising a setting that
+  > could not reach it.
+  >
+  > `strip_stan_comments()` and `stan_statement_lhs()` are shared
+  > by the rewriter and the guard, so one definition answers where
+  > a statement starts and what its left-hand side is. The guard
+  > reads only the sampled parameter, not the loop bound such as
+  > `N_lags_trend` that encloses it.
+  >
+  > What is left is test conversion. `stan_pattern()` in
+  > `test-stancode-standata.R` accepts either spelling, which
+  > covers most of them at one site, and `stan_prior_line()`
+  > builds expected text through the writer itself. Two traps to
+  > watch. A negative assertion of the form
+  > `expect_false(grepl("X ~", sc))` passes vacuously once
+  > nothing is written that way, so each has to name the
+  > parameter rather than the spelling. And an assertion naming
+  > only a parameter has to anchor it as the density's first
+  > operand: the same name appears among the arguments of the
+  > trend equation, so an unanchored pattern passes with the
+  > prior deleted.
 
 - [ ] **20.0 The last part of the forecasting audit**
   > Five parts are done, and so is the sixth. The trend linear
@@ -482,77 +509,14 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > that sweeps every file, so nothing reports a stale one.
 
 - [ ] **24.0 What the loadings basis still touches**
-  > `residual_cor()`, `shared_variation()`, `active_factors()` and
-  > `sample_innovations()` combined factor loadings with a
-  > covariance, and all four read the QR-identified `Z_tilde`
-  > while the covariance is stated for the `Z` the model sampled.
-  > `Z Z'` is invariant to that rotation, which is why it went
-  > unseen until a scale sat between the loadings. All four now
-  > take `basis = "model"`; reporting and plotting keep
-  > `"identified"`, and a fixed `trend_map` has no rotation so
-  > both agree.
+  > `residual_cor()`, `shared_variation()`, `active_factors()`,
+  > `sample_innovations()` and `forecast()` combine factor loadings
+  > with a covariance, and each pairs them in the model basis: `Z`
+  > with `lv_trend` and with the dynamics parameters those are
+  > stated for. Reporting and plotting keep the identified basis,
+  > and a fixed `trend_map` has no rotation so both agree.
   >
-  > What is left is the pair that were judged rather than fixed.
-  > `compare_loadings()` Procrustes-aligns median `Z_tilde` with no
-  > scale, so under shrinkage a near-dead column weighs the same as
-  > the dominant one: on a ten-factor fit the raw column norms sit
-  > flat around 41 while the scales run 2.06 down to 0.013.
-  > Defensible if the intent is to compare loading patterns, wrong
-  > if it is to compare what the fits say. Decide which, and say so
-  > in the roxygen either way. `ordinate()` needs nothing: it pairs
-  > `lv_trend_tilde` with `Z_tilde`, so the scale is already in the
-  > site scores, confirmed to 6.8e-07 against the stored trend.
-  >
-  > `forecast()` has the same defect and it is the worst instance
-  > found so far, because it is a wrong number rather than a
-  > wrong scale. Reconstructing `trend[t, s]` from stored draws
-  > gives, for the cached AR factor fit and the jsdgam ZMVN fit:
-  >
-  > | Z basis | state | AR factor | ZMVN jsdgam |
-  > |---|---|---|---|
-  > | `Z_tilde` | `lv_trend` | 2.361 | 0.087 |
-  > | `Z_tilde` | `lv_trend_tilde` | 6.7e-08 | 3.5e-10 |
-  > | `Z` | `lv_trend` | 4.4e-08 | 9.0e-10 |
-  > | `Z` | `lv_trend_tilde` | 2.361 | 0.087 |
-  >
-  > Either basis works; mixing them does not.
-  > `forecast.mvgam.R` resolves the loadings with no `basis`
-  > argument, so it takes the `"identified"` default, while
-  > `extract_last_state()` reads `lv_trend_tilde` for a factor
-  > ZMVN and plain `lv_trend` for a factor RW, AR or VAR. So the
-  > ZMVN path is consistent and the RW, AR and VAR paths pair a
-  > raw state with rotated loadings: the 2.361 row, which is a
-  > factor of ten on a Poisson mean.
-  >
-  > The model basis is the one settled on, because every dynamics
-  > and covariance parameter the propagator reads (`ar1_trend`,
-  > `A_trend`, `sigma_trend`, `L_Omega_trend`, `D_raw_trend`) is
-  > stated for the `Z` the model sampled. Propagating a rotated
-  > state with unrotated coefficients would be a second mismatch
-  > on top of the first. `state_var` is now `lv_trend` for every
-  > factor type and the loadings are resolved with
-  > `basis = "model"`, which also retires the ZMVN special case.
-  >
-  > A second defect sat underneath it, and it was worse. Factor
-  > ZMVN threw its latent scale away: `extract_zmvn_state()` set
-  > `Sigma` to the identity on the premise that the identified
-  > latent variables are standard normal, which no fixture
-  > supports. `sigma_trend` reaches 0.62 and 0.29 on one fit and
-  > 0.048 and 0.0044 on `val_jsdgam_trait`, so `propagate_zmvn()`
-  > drew unit innovations where it wanted those, inflating every
-  > jsdgam forecast interval, by around twenty-five times on that
-  > fit. The branch is gone; `extract_sigma_and_cov()` already
-  > read the right thing at the LV grain.
-  >
-  > Verified by reconstruction: pairing the state and loadings in
-  > the model basis rebuilds the stored `trend[t, s]` to 4e-08 on
-  > the AR factor fit and 9e-10 on the jsdgam. Where a trend
-  > covariate is present the remainder is `mu_trend`, so it must
-  > be constant across series, and it is, to 1e-08; in the
-  > rotated basis it spreads by up to 0.93.
-  >
-  > Two things the same sweep turned up, both wanting a decision
-  > rather than a patch.
+  > Two things remain, both about fits nothing exercises.
   >
   > A factor fit at the truncation ceiling misses the factor path
   > entirely. `forecast.mvgam()` and `extract_last_state()` both
@@ -614,24 +578,6 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > response it was given. Decide whether the refusal covers the
   > fit's own response only, or every response in an `mvbind()`.
 
-- [ ] **28.0 `extract_trend_linpred()` is dead, and documents a
-  convention the package does not use**
-  > Nothing in `R/` calls it. Its header is written entirely
-  > around the centred convention, so it stands as a second and
-  > contradictory account of how the trend linear predictor
-  > reaches a forecast.
-  >
-  > `trend_linpred_grid()` does the live half. The shared piece,
-  > `reshape_linpred_to_grid()`, sits in the same file and stays
-  > either way.
-  >
-  > Deleting it takes `tests/testthat/test-extract-trend-linpred.R`
-  > with it, and the `by = lv_axis()` case in
-  > `tests/local/test-by-lv-axis-cached-fits.R` calls it to assert
-  > the per-factor `(t, k)` reshape. Rehome that assertion onto
-  > whatever the by-lv path actually runs before removing the
-  > function, so the coverage does not go with it.
-
 - [ ] **29.0 Two dead branches in the factor machinery**
   > Both found while auditing the loadings basis, both
   > pre-existing, and neither on the path 24.0 fixed.
@@ -655,6 +601,37 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > it stays active for partial-Z fits, which is the one case the
   > second early return already covers. Decide whether the
   > function has a job left.
+
+- [ ] **30.0 A bounded AR coefficient carries an untruncated prior**
+  > `ar{lag}_trend` is declared `vector<lower=-1, upper=1>` and
+  > given `normal(mu, sigma)`, with no correction for the density
+  > mass outside those bounds. brms subtracts an `_lccdf` term
+  > whenever a parameter's declaration is tighter than its prior's
+  > support; mvgam does not.
+  >
+  > Where the location and scale are literals, as in the plain
+  > `ar1_trend ~ normal(0, 0.5)`, the missing term is a constant.
+  > It shifts `lp__` and nothing else, and normalising the
+  > statement does not supply it, so a Bayes factor between models
+  > with different numbers of bounded parameters keeps a residual
+  > offset of about 0.047 per element.
+  >
+  > The hierarchical spelling is a different matter.
+  > `build_plain_ar_stanvars()` writes
+  > `ar{lag}_trend ~ normal(mu_ar{lag}_trend, sigma_ar{lag}_trend)`
+  > with both hyperparameters sampled, so the truncation term
+  > `log(Phi((1 - mu) / sigma) - Phi((-1 - mu) / sigma))` varies
+  > with the parameters. It is not a constant, Stan cannot drop it
+  > as one, and the posterior it defines is not the truncated
+  > normal the declaration implies. Draws move if this is fixed,
+  > so a hierarchical AR fixture would need refitting.
+  >
+  > Decide the parameterisation before writing anything: adding
+  > the `_lccdf` correction keeps the coefficient scale and the
+  > class name, while the Heaps partial-autocorrelation mapping
+  > the VAR generator already carries would remove the bound
+  > instead. 16.0 records the reasons the coefficient scale was
+  > kept, and those still apply.
 
 - [ ] **6.0 Final release verification**
   > Clean `document()`, clean test sweep, `R CMD check --as-cran`,

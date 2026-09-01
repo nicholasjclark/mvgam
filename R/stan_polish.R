@@ -762,6 +762,20 @@ clean_stan_comments <- function(lines) {
 #'
 #' @param lines Character vector of Stan code lines
 #' @return Character vector with reorganized model block
+# Internal: net brace depth a Stan line opens, ignoring braces
+# inside string literals and line comments. Used to tell a
+# top-level statement from one nested in a `for` or `if`.
+#'@noRd
+count_stan_braces <- function(line) {
+  # Strings first: a comment marker can sit inside one, and a brace
+  # inside a string opens nothing either way.
+  bare <- gsub('"[^"]*"', "", line)
+  bare <- sub("//.*$", "", bare)
+  chars <- strsplit(bare, "", fixed = TRUE)[[1L]]
+  sum(chars == "{") - sum(chars == "}")
+}
+
+
 #' @noRd
 reorganize_model_block_statements <- function(lines) {
   checkmate::assert_character(lines, min.len = 0)
@@ -804,6 +818,12 @@ reorganize_model_block_statements <- function(lines) {
   other_target_statements <- character(0)
 
   i <- model_start + 1
+  # Brace depth relative to the model block. Only a statement at
+  # depth zero may be moved: hoisting one out of a `for` or `if`
+  # empties the block it belonged to and takes any loop variable
+  # it references out of scope, which Stan will not compile.
+  depth <- 0L
+  pending_header <- FALSE
   while (i < model_end) {
     # Skip if (!prior_only) block
     if (!is.na(prior_only_start) && i >= prior_only_start && i <= prior_only_end) {
@@ -813,7 +833,11 @@ reorganize_model_block_statements <- function(lines) {
 
     line <- trimws(lines[i])
 
-    if (grepl("^target\\s*\\+=", line)) {
+    # A block header carrying no brace governs the single statement
+    # that follows it, so that statement is nested even though the
+    # depth count has not moved.
+    if (depth == 0L && !pending_header &&
+          grepl("^target\\s*\\+=", line)) {
       # Prioritize target += lprior; as first in target section
       if (grepl("target\\s*\\+=\\s*lprior", line)) {
         lprior_statement <- lines[i]
@@ -824,6 +848,11 @@ reorganize_model_block_statements <- function(lines) {
       prior_statements <- c(prior_statements, lines[i])
     }
 
+    opened <- count_stan_braces(line)
+    pending_header <- opened == 0L &&
+      grepl("^(for|if|else|while)\\b[^{]*$", line) &&
+      !grepl(";[[:space:]]*$", line)
+    depth <- depth + opened
     i <- i + 1
   }
 

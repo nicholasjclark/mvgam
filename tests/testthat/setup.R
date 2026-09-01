@@ -43,3 +43,14 @@ mvgam_stan_setup <- function(formula, data, family = gaussian(), ...) {
   class(code) <- c("mvgamstancode", "stancode", "character")
   list(code = code, data = cc$combined_components$standata)
 }
+
+
+# The statement an emitter writes for one prior. Assertions build
+# their expected text through the package's own writer, so a test
+# cannot drift from the form the program actually carries. The
+# writer itself is pinned directly in `test-stancode-standata.R`,
+# and by the generated programs `stanc` compiles, so the agreement
+# is not circular.
+stan_prior_line <- function(param, dist, normalize = TRUE) {
+  mvgam:::stan_prior_statement(param, dist, normalize = normalize)
+}

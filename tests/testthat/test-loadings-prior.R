@@ -165,9 +165,13 @@ test_that("the MGP column scale reaches the trend through sigma_trend", {
   expect_equal(sum(grepl("Psi_diag = exp(cumulative_sum", ln,
                           fixed = TRUE)), 1L)
   expect_true(any(grepl("sigma_trend = sqrt(Psi_diag)", ln, fixed = TRUE)))
-  # It is derived, so it is not also a sampled parameter.
+  # It is derived, so it is not also a sampled parameter. Both
+  # spellings of a sampling statement are named, because a
+  # normalised program writes the density call rather than a tilde
+  # and an assertion against one spelling alone passes vacuously.
   expect_false(any(grepl("] sigma_trend;", ln, fixed = TRUE)))
   expect_false(any(grepl("sigma_trend ~", ln, fixed = TRUE)))
+  expect_false(any(grepl("_lpdf(sigma_trend", ln, fixed = TRUE)))
 })
 
 test_that("normalise_loadings_prior accepts column_shrinkage = 'mgp' with defaults", {
@@ -396,7 +400,8 @@ test_that("each kernel length-scale can be seen and set", {
   sc <- stancode(mf, data = dat, family = poisson(), loadings_prior = lp)
   for (i in seq_len(nrow(scales))) {
     expect_true(grepl(
-      paste0(scales$class[i], " ~ ", scales$prior[i], ";"), sc, fixed = TRUE
+      stan_prior_line(scales$class[i], scales$prior[i]), sc,
+      fixed = TRUE
     ))
   }
 
@@ -405,8 +410,10 @@ test_that("each kernel length-scale can be seen and set", {
     brms::prior_string("lognormal(1, 0.5)", class = "theta_dist_phy")
   sc2 <- stancode(mf, data = dat, family = poisson(),
                   loadings_prior = lp, prior = user)
-  expect_true(grepl("theta_features ~ inv_gamma(3, 2);", sc2, fixed = TRUE))
-  expect_true(grepl("theta_dist_phy ~ lognormal(1, 0.5);", sc2, fixed = TRUE))
+  expect_true(grepl(stan_prior_line("theta_features", "inv_gamma(3, 2)"),
+                      sc2, fixed = TRUE))
+  expect_true(grepl(stan_prior_line("theta_dist_phy", "lognormal(1, 0.5)"),
+                      sc2, fixed = TRUE))
 
   # A model with no kernel declares none, so none is reported.
   plain <- get_prior(mf, data = dat, family = poisson())

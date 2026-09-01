@@ -64,6 +64,17 @@ Useful when teaching the effect of a structured loadings prior:
 fit one model with \code{loadings_prior = NULL} and a second with
 \verb{traits =} or \verb{phylo =}, then plot the comparison to show how
 the trait or phylogeny similarity reshapes the latent positions.
+
+The comparison is of pattern, not of magnitude. Procrustes
+alignment is orthogonal, so it rotates and reflects without
+rescaling, and the plot reads each factor on its own axis. A
+column the model has shrunk to nothing therefore occupies as
+much of the picture as the column carrying the signal: on a
+ten-factor fit whose column scales run from 2.06 down to 0.013,
+every column's plotted norm sits near 41. Read the panel for
+which species sit together and how that arrangement moves
+between fits, and read \code{\link[=active_factors]{active_factors()}} for how much each
+factor is actually doing.
 }
 \details{
 The orthogonal Procrustes rotation is the closed-form solution

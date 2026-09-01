@@ -194,8 +194,10 @@ test_that("df = Inf leaves the generated Stan code unchanged", {
   # The default must be byte-identical to the Gaussian model, otherwise
   # every existing fit changes.
   expect_identical(tdf_code(~ AR(p = 1)), tdf_code(~ AR(p = 1, df = Inf)))
-  expect_true(grepl("to_vector(innovations_trend) ~ std_normal();",
-                    tdf_code(~ AR(p = 1)), fixed = TRUE))
+  expect_true(grepl(
+    stan_prior_line("to_vector(innovations_trend)", "std_normal()"),
+    tdf_code(~ AR(p = 1)), fixed = TRUE
+  ))
   expect_false(grepl("nu_trend", tdf_code(~ AR(p = 1)), fixed = TRUE))
 })
 
@@ -205,13 +207,16 @@ test_that("df is honoured across every trend type that has innovations", {
     sc <- tdf_code(tf)
     expect_true(grepl("multi_student_t_cholesky", sc, fixed = TRUE))
     expect_true(grepl("real<lower=2> nu_trend", sc, fixed = TRUE))
-    expect_true(grepl("nu_trend ~ gamma(4, 0.3)", sc, fixed = TRUE))
+    expect_true(grepl(stan_prior_line("nu_trend", "gamma(4, 0.3)"),
+                        sc, fixed = TRUE))
   }
 })
 
 test_that("a fixed df needs no estimated parameter", {
   sc <- tdf_code(~ AR(p = 1, df = 7))
-  expect_true(grepl("multi_student_t_cholesky(7,", sc, fixed = TRUE))
+  expect_true(grepl("multi_student_t_cholesky_lpdf", sc,
+                      fixed = TRUE))
+  expect_true(grepl("| 7,", sc, fixed = TRUE))
   expect_false(grepl("real<lower=2> nu_trend", sc, fixed = TRUE))
 })
 
@@ -238,8 +243,8 @@ test_that("one registry entry drives both stancode and get_prior", {
   # Two independent copies of the default would drift apart without any
   # test noticing, so pin both surfaces to the registry string itself.
   default <- mvgam:::common_trend_priors$nu_trend$default
-  expect_true(grepl(paste0("nu_trend ~ ", default),
-                    tdf_code(~ AR(p = 1, df = NA)), fixed = TRUE))
+  expect_true(grepl(stan_prior_line("nu_trend", default),
+                      tdf_code(~ AR(p = 1, df = NA)), fixed = TRUE))
   prior_tab <- get_prior(
     mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1, df = NA)),
     data = tdf_data(), family = poisson()
@@ -335,4 +340,98 @@ test_that("draw_trend_innovations() matches the Stan innovation distribution", {
 test_that("draw_trend_innovations() validates its arguments", {
   expect_error(mvgam:::draw_trend_innovations(10L, 2L, 2), "df")
   expect_error(mvgam:::draw_trend_innovations(10L, 0L, Inf), "n_series")
+})
+
+
+# ----- writing a prior statement ----------------------------------
+
+test_that("stan_prior_statement writes both spellings", {
+  # Stan drops the normalising constant from the tilde form, so a
+  # normalised program has to spell the density call out.
+  expect_identical(
+    stan_prior_statement("sigma_trend", "exponential(2)"),
+    "target += exponential_lpdf(sigma_trend | 2);"
+  )
+  expect_identical(
+    stan_prior_statement("sigma_trend", "exponential(2)",
+                           normalize = FALSE),
+    "sigma_trend ~ exponential(2);"
+  )
+})
+
+
+test_that("stan_prior_statement handles the awkward shapes", {
+  # A parameter-free density takes no bar.
+  expect_identical(
+    stan_prior_statement("to_vector(Z)", "std_normal()"),
+    "target += std_normal_lpdf(to_vector(Z));"
+  )
+  # Arguments may nest parentheses.
+  expect_identical(
+    stan_prior_statement("Amu_trend[lag]", "normal(0, sqrt(0.455))"),
+    "target += normal_lpdf(Amu_trend[lag] | 0, sqrt(0.455));"
+  )
+  # A slice, and a transpose, pass through verbatim.
+  expect_identical(
+    stan_prior_statement("varrho_inv[2:N_lv_trend]",
+                           "inv_gamma(mgp_a2, 1)"),
+    "target += inv_gamma_lpdf(varrho_inv[2:N_lv_trend] | mgp_a2, 1);"
+  )
+  expect_identical(
+    stan_prior_statement("lv_trend[t, :]'", "multi_normal(mu, Sigma)"),
+    "target += multi_normal_lpdf(lv_trend[t, :]' | mu, Sigma);"
+  )
+})
+
+
+test_that("stan_prior_statement refuses a distribution it cannot parse", {
+  # A resolver returning nothing would otherwise reach Stan as a
+  # statement it cannot compile, with the parameter unnamed.
+  expect_error(stan_prior_statement("sigma_trend", ""),
+                 "at least 1 characters")
+  expect_error(stan_prior_statement("sigma_trend", "exponential"),
+                 "distribution\\(arguments\\)")
+  expect_error(stan_prior_statement("sigma_trend", "normal(0, 1"),
+                 "distribution\\(arguments\\)")
+})
+
+
+test_that("the normaliser leaves comments and brms lines alone", {
+  prog <- paste(
+    "model {",
+    "  // bf(y ~ s(x)) is a formula, not a statement",
+    "  sigma_trend ~ exponential(2);",
+    "  lprior += student_t_lpdf(Intercept | 3, 0, 2.5);",
+    "  target += lprior;",
+    "}", sep = "\n"
+  )
+  out <- normalise_mvgam_sampling_statements(prog, normalize = TRUE)
+  expect_true(grepl("// bf(y ~ s(x))", out, fixed = TRUE))
+  expect_true(grepl("lprior += student_t_lpdf(Intercept | 3, 0, 2.5);",
+                      out, fixed = TRUE))
+  expect_true(grepl("target += exponential_lpdf(sigma_trend | 2);",
+                      out, fixed = TRUE))
+  # Nothing to do when the program keeps the tilde form.
+  expect_identical(
+    normalise_mvgam_sampling_statements(prog, normalize = FALSE), prog
+  )
+})
+
+
+test_that("a wrapped statement inside a loop is rewritten in place", {
+  prog <- paste(
+    "model {",
+    "  for (lag in 1 : 2) {",
+    "    diagonal(A_raw_trend[lag]) ~ normal(Amu_trend[1, lag],",
+    "                                        1 / sqrt(Ao[1, lag]));",
+    "  }",
+    "}", sep = "\n"
+  )
+  out <- normalise_mvgam_sampling_statements(prog, normalize = TRUE)
+  ln <- strsplit(out, "\n", fixed = TRUE)[[1L]]
+  stmt <- grep("normal_lpdf", ln)
+  expect_length(stmt, 1L)
+  # It stays between the loop's braces.
+  expect_true(stmt > grep("for \\(lag", ln))
+  expect_true(stmt < which(trimws(ln) == "}")[1L])
 })

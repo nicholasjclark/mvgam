@@ -735,19 +735,99 @@ mvgam_stancode_prior_rows <- function(sc) {
     add(m[2L], coef, gsub("[[:space:]]+", " ", trimws(m[4L])))
   }
 
-  # `dist_lpdf(x | args)`, the form a stanvar writes when it adds its
-  # own terms to `target`.
+  # `target += dist_lpdf(x | args);`, the form a statement carries
+  # when it keeps its normalising constant. The left side takes the
+  # same shapes the tilde branch allows, a container call or a single
+  # index, so both readers name the same parameter. The bar is
+  # optional because a parameter-free density is written without one,
+  # as `std_normal_lpdf(to_vector(Z))`. Anchoring on the accumulator
+  # keeps density calls inside a function body out of the table, and
+  # the likelihood stays out because its response is not an mvgam
+  # parameter.
   lpdf_re <- paste0(
-    "([A-Za-z_][A-Za-z0-9_]*)_lpdf\\([[:space:]]*",
-    "([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*\\|([^)]*)\\)"
+    "(?:target|lprior)[[:space:]]*\\+=[[:space:]]*",
+    "([A-Za-z_][A-Za-z0-9_]*)_", stan_density_call_rx,
+    "[[:space:]]*\\([[:space:]]*",
+    "(?:(?:to_vector|to_matrix|to_array_1d)[[:space:]]*\\([[:space:]]*)?",
+    "([A-Za-z_][A-Za-z0-9_]*)",
+    "(\\[[^]]*\\])?[[:space:]]*\\)?[[:space:]]*",
+    "(?:\\|[[:space:]]*([^;]*))?\\)[[:space:]]*;"
   )
   for (hit in regmatches(sc, gregexpr(lpdf_re, sc))[[1L]]) {
     m <- regmatches(hit, regexec(lpdf_re, hit))[[1L]]
-    if (length(m) < 4L || !is_mvgam_param(m[3L])) next
-    args <- gsub("[[:space:]]+", " ", trimws(m[4L]))
-    add(m[3L], "", paste0(m[2L], "(", args, ")"))
+    if (length(m) < 5L || !is_mvgam_param(m[3L])) next
+    coef <- gsub("^\\[|\\]$", "", m[4L])
+    # A multi-index names a cell rather than a coefficient, which the
+    # prior table has no row shape for.
+    if (grepl(",", coef, fixed = TRUE)) next
+    args <- gsub("[[:space:]]+", " ", trimws(m[5L]))
+    add(m[3L], coef, paste0(m[2L], "(", args, ")"))
   }
   rows
+}
+
+
+#' Name the mvgam parameters carrying a `~` sampling statement
+#'
+#' Stan drops the normalising constant of every `x ~ dist(args);`, so
+#' each one offsets a program's `lp__` by a constant. Reading whole
+#' left-hand sides rather than one spelling of them resolves a
+#' container call, a slice, a transpose and a loop body alike:
+#' `diagonal(A_raw_trend[lag])` and `lv_trend[t, : ]'` are statements
+#' a parameter-shaped pattern does not see.
+#'
+#' Ownership comes from `is_mvgam_managed_class()`, the predicate the
+#' prior table is built from, so the two readers cannot disagree
+#' about whose parameter a statement names. Latent states count here
+#' and not there: their statements are the trend equation rather than
+#' priors, but they drop a constant all the same, and the
+#' innovations are the largest such term in a factor program.
+#'
+#' @param sc Character scalar holding the assembled Stan model.
+#' @return Character vector of parameter names, possibly empty.
+#' @noRd
+mvgam_tilde_statement_params <- function(sc) {
+  checkmate::assert_string(sc)
+  stmts <- strsplit(strip_stan_comments(sc), ";", fixed = TRUE)[[1L]]
+  stmts <- stmts[grepl("~", stmts, fixed = TRUE)]
+  if (length(stmts) == 0L) {
+    return(character(0L))
+  }
+  # `stan_statement_lhs()` drops a block a generator opened on the
+  # same line, so a loop bound is not read as a sampled parameter.
+  lhs <- vapply(stmts, stan_statement_lhs, character(1L),
+                  USE.NAMES = FALSE)
+  lhs <- lhs[!is.na(lhs)]
+  tokens <- unlist(regmatches(
+    lhs, gregexpr("[A-Za-z_][A-Za-z0-9_]*", lhs)
+  ))
+  if (length(tokens) == 0L) {
+    return(character(0L))
+  }
+  unique(tokens[is_mvgam_managed_class(tokens)])
+}
+
+
+#' Which densities in a Stan program drop a normalising constant
+#'
+#' brms signals the choice by calling `_lupdf` or `_lupmf`; mvgam
+#' signals it by writing `~`. A program can carry either, so both
+#' have to be read for the answer to cover the whole model.
+#'
+#' @param stancode Character vector or scalar holding the program.
+#' @return Character vector naming what was found, empty when the
+#'   program is normalised throughout.
+#' @noRd
+mvgam_unnormalized_terms <- function(stancode) {
+  checkmate::assert_character(stancode, null.ok = TRUE)
+  sc <- paste(as.character(stancode), collapse = "\n")
+  if (!nzchar(sc)) {
+    return(character(0L))
+  }
+  lu <- unique(unlist(regmatches(
+    sc, gregexpr("_lup[dm]f", sc)
+  )))
+  c(lu, mvgam_tilde_statement_params(sc))
 }
 
 

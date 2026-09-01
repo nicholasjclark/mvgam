@@ -28,7 +28,11 @@ test_that("loadings_prior fit carries structured-prior Stan code", {
   expect_match(sc, "theta_dist_cluster", fixed = TRUE)
   expect_match(sc, "multi_normal_cholesky", fixed = TRUE)
   expect_match(sc, "qr_thin_R", fixed = TRUE)
+  # Named in both spellings: a normalised program writes the
+  # density call, so testing only the tilde passes vacuously.
   expect_false(grepl("to_vector\\(Z\\)\\s*~\\s*student_t", sc))
+  expect_false(grepl("student_t_lpdf(to_vector(Z)", sc,
+                       fixed = TRUE))
 })
 
 

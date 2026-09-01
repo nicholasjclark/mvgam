@@ -939,11 +939,13 @@ test_that("com_binomial() default prior can be overridden", {
 test_that("nu_trend default prior can be overridden", {
   mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1, df = NA))
   sc_default <- prior_code(mf, poisson())
-  expect_true(grepl("nu_trend ~ gamma(4, 0.3)", sc_default, fixed = TRUE))
+  expect_true(grepl(stan_prior_line("nu_trend", "gamma(4, 0.3)"),
+                      sc_default, fixed = TRUE))
 
   sc_user <- prior_code(mf, poisson(),
                         brms::prior("gamma(2, 0.1)", class = "nu_trend"))
-  expect_true(grepl("nu_trend ~ gamma(2, 0.1)", sc_user, fixed = TRUE))
+  expect_true(grepl(stan_prior_line("nu_trend", "gamma(2, 0.1)"),
+                      sc_user, fixed = TRUE))
   expect_false(grepl("gamma(4, 0.3)", sc_user, fixed = TRUE))
 })
 
@@ -1086,14 +1088,16 @@ test_that("a user prior reaches the parameters that reported nothing", {
   user <- brms::prior_string("normal(0, 3)", class = "Amu_trend") +
     brms::prior_string("gamma(5, 2)", class = "Domega_trend")
   code <- prior_code(mf, poisson(), pr = user)
-  expect_true(grepl("Amu_trend[lag] ~ normal(0, 3)", code, fixed = TRUE))
-  expect_true(grepl("Domega_trend[1, 1] ~ gamma(5, 2)", code, fixed = TRUE))
+  expect_true(grepl(stan_prior_line("Amu_trend[lag]", "normal(0, 3)"),
+                      code, fixed = TRUE))
+  expect_true(grepl(stan_prior_line("Domega_trend[1, 1]", "gamma(5, 2)"),
+                      code, fixed = TRUE))
 
   pw <- mvgam_formula(y ~ -1, trend_formula = ~ PW())
   pw_user <- brms::prior_string("double_exponential(0, 1)",
                                 class = "delta_trend")
   expect_true(grepl(
-    "to_vector(delta_trend) ~ double_exponential(0, 1)",
+    stan_prior_line("to_vector(delta_trend)", "double_exponential(0, 1)"),
     prior_code(pw, poisson(), pr = pw_user), fixed = TRUE
   ))
 })
@@ -1103,7 +1107,8 @@ test_that("a user prior on the trend correlation reaches the model", {
   # Emitted as a literal, this one ignored the user entirely.
   mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1, cor = TRUE))
   user <- brms::prior_string("lkj_corr_cholesky(9)", class = "L_Omega_trend")
-  expect_true(grepl("L_Omega_trend ~ lkj_corr_cholesky(9)",
+  expect_true(grepl(stan_prior_line("L_Omega_trend",
+                                      "lkj_corr_cholesky(9)"),
                      prior_code(mf, poisson(), pr = user), fixed = TRUE))
 })
 
@@ -1192,7 +1197,11 @@ test_that("a reported innovation scale is one the model samples", {
     )
     sc <- suppressWarnings(do.call(stancode, c(common, case$args)))
     expect_equal("sigma_trend" %in% tab$class, case$sampled)
-    expect_equal(grepl("sigma_trend ~", sc), case$sampled)
+    # Sampled in either spelling: a normalised program writes the
+    # density call rather than a tilde.
+    sampled <- grepl("sigma_trend ~", sc) ||
+      grepl("_lpdf(sigma_trend", sc, fixed = TRUE)
+    expect_equal(sampled, case$sampled)
   }
 })
 
@@ -1288,7 +1297,8 @@ test_that("a user prior on Z reaches the emitted Stan", {
   sc <- stancode(mf, data = d, family = poisson(),
                  prior = prior(normal(0, 3), class = Z))
   ln <- strsplit(paste(as.character(sc), collapse = "\n"), "\n")[[1]]
-  expect_true(any(grepl("to_vector(Z) ~ normal(0, 3);", ln, fixed = TRUE)))
+  expect_true(any(grepl(stan_prior_line("to_vector(Z)", "normal(0, 3)"),
+                          ln, fixed = TRUE)))
 })
 
 
@@ -1320,7 +1330,18 @@ test_that("the reported Z prior is the one the model samples", {
       as.character(stancode(mf, data = d, family = poisson(), ...)),
       collapse = " "
     ))
-    grepl(gsub("[[:space:]]+", " ", reported), sc, fixed = TRUE)
+    # The table reports `dist(args)`. Each branch writes `Z` with
+    # a different left-hand side, `to_vector(Z)` for two of them
+    # and a column slice for the kernel, so the comparison names
+    # the distribution and its arguments and leaves the left side
+    # open. Either spelling of the statement counts.
+    dist <- sub("\\(.*$", "", reported)
+    args <- sub("\\)$", "", sub("^[^(]*\\(", "", reported))
+    tilde <- grepl(paste0("~ ", reported), sc, fixed = TRUE)
+    call <- grepl(paste0(dist, "_lpdf("), sc, fixed = TRUE) &&
+      (!nzchar(args) || grepl(paste0("| ", args, ")"), sc,
+                                fixed = TRUE))
+    tilde || call
   }
   expect_true(agrees())
   expect_true(agrees(loadings_prior = list(column_shrinkage = "mgp")))

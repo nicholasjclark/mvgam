@@ -238,18 +238,28 @@ bridge_sampler.mvgam <- function(samples, recompile = FALSE, ...) {
       i = "Install it with install.packages('bridgesampling')."
     )))
   }
-  # Guard: bridge sampling needs the joint posterior density to
-  # be normalized, so reject Stan models that use `_lupdf` or
-  # `_lupmf`. Matches `brms:::is_normalized()` verbatim.
-  stancode <- as.character(samples$stancode)
-  if (any(grepl("_lup(d|m)f\\(", stancode))) {
+  # Bridge sampling reads the joint density off the compiled model,
+  # so a density that dropped its normalising constant moves the log
+  # marginal likelihood by an unknown amount. The offset cancels in
+  # a Bayes factor only when both models carry priors matching in
+  # family, hyperparameters and dimension, which is exactly what a
+  # comparison across trend structures does not. Reading both
+  # spellings covers brms, which writes `_lupdf`, and mvgam, which
+  # writes `~`.
+  offenders <- mvgam_unnormalized_terms(samples$stancode)
+  if (length(offenders) > 0L) {
     stop(insight::format_error(c(
       "The Stan model must be normalized to run bridge_sampler().",
-      x = "Found '_lupdf' or '_lupmf' calls in the fitted model.",
-      i = paste0("Refit with normalized densities. mvgam's ",
-                 "shipped emitters produce normalized Stan; ",
-                 "this error typically means the model source ",
-                 "was edited by hand.")
+      x = paste0(
+        "Densities dropping a normalising constant: ",
+        paste(offenders, collapse = ", "), "."
+      ),
+      i = paste0(
+        "Refit with 'normalize = TRUE', which is the default. A ",
+        "model built with 'normalize = FALSE' samples faster, but ",
+        "its log marginal likelihood carries an offset that does ",
+        "not cancel between models of different dimension."
+      )
     )))
   }
   if (isTRUE(recompile)) {
