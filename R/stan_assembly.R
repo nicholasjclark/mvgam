@@ -3303,11 +3303,14 @@ generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
   if (!is.null(trend_type) && trend_type == "VAR") {
     qr_lines <- c(
       qr_lines,
+      # `size()` is not a data expression, so Stan refuses it as a
+      # top-level array size. `N_lags_trend` is the data integer the
+      # rest of the VAR code sizes `A_trend` by.
       paste0(
-        "array[size(A_trend)] matrix[N_lv_trend, N_lv_trend]",
+        "array[N_lags_trend] matrix[N_lv_trend, N_lv_trend]",
         " A_trend_tilde;"
       ),
-      "for (lag in 1:size(A_trend)) {",
+      "for (lag in 1:N_lags_trend) {",
       paste0(
         "  A_trend_tilde[lag]",
         " = Q_tilde * A_trend[lag] * Q_tilde';"
@@ -3388,6 +3391,39 @@ generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
 # cumulative product is the scale; whichever block consumes the
 # scale declares it, so this returns the code rather than a stanvar.
 #'@noRd
+# Which prior `Z` is drawn from, given the loadings spec. One
+# classifier because two surfaces read it: the emitter below, and
+# the prior table `create_trend_parameter_prior()` builds. Deciding
+# the branch separately in each is how a table comes to report a
+# prior the model does not sample.
+#'@noRd
+loadings_z_branch <- function(spec) {
+  if (is.null(spec)) return("unstructured")
+  has_kernel <- isTRUE((spec$N_features_trend %||% 0L) > 0L) ||
+    isTRUE((spec$n_distances %||% 0L) > 0L)
+  if (has_kernel) return("kernel")
+  if (identical(spec$column_shrinkage, "mgp")) return("mgp")
+  "unstructured"
+}
+
+
+# The Stan statement each branch emits for `Z`, keyed by
+# `loadings_z_branch()`. The prior table reports the same strings,
+# so the two cannot describe different models.
+#'@noRd
+loadings_z_prior_string <- function(branch) {
+  switch(
+    branch,
+    kernel = paste0(
+      "multi_normal_cholesky(rep_vector(0.0, N_series_trend),",
+      " L_Phi_loadings)"
+    ),
+    mgp = "std_normal()",
+    NULL
+  )
+}
+
+
 mgp_psi_diag_scode <- function(dim = "N_lv_trend") {
   checkmate::assert_string(dim, min.chars = 1)
   paste0(
@@ -3606,9 +3642,9 @@ make_loadings_prior_stanvars <- function(spec) {
   # contributes `Psi_diag[k]` to the trend variance either way, but
   # only one of the two is a geometry HMC can traverse. See
   # `generate_shared_innovation_stanvars()` for the other half.
-  z_lines <- if (uses_mgp && !has_kernel) {
-    c("to_vector(Z) ~ std_normal();")
-  } else if (uses_mgp) {
+  z_lines <- switch(
+    loadings_z_branch(spec),
+    mgp = c("to_vector(Z) ~ std_normal();"),
     c(
       "for (i_z in 1:N_lv_trend) {",
       "  Z[, i_z] ~ multi_normal_cholesky(",
@@ -3617,16 +3653,7 @@ make_loadings_prior_stanvars <- function(spec) {
       "  );",
       "}"
     )
-  } else {
-    c(
-      "for (i_z in 1:N_lv_trend) {",
-      "  Z[, i_z] ~ multi_normal_cholesky(",
-      "    rep_vector(0.0, N_series_trend),",
-      "    L_Phi_loadings",
-      "  );",
-      "}"
-    )
-  }
+  )
   model_vars <- c(model_vars, list(
     brms::stanvar(
       name = "factor_z_priors",

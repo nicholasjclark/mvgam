@@ -176,7 +176,8 @@ common_trend_priors <- list(
 #' @noRd
 extract_trend_priors <- function(trend_formula, data, response_names = NULL,
                                  .precomputed_dimensions = NULL,
-                                 codegen = NULL) {
+                                 codegen = NULL,
+                                 loadings_prior_spec = NULL) {
   if (!is.null(trend_formula)) {
     checkmate::assert_formula(trend_formula)
   }
@@ -202,6 +203,7 @@ extract_trend_priors <- function(trend_formula, data, response_names = NULL,
   # Generate priors based on trend type using convention-based dispatch
   # Pass data through for base formula prior extraction
   trend_priors <- generate_trend_priors(trend_spec, data, response_names,
+                                        loadings_prior_spec = loadings_prior_spec,
                                         codegen = codegen)
 
   return(trend_priors)
@@ -220,6 +222,7 @@ extract_trend_priors <- function(trend_formula, data, response_names = NULL,
 #' @return A brmsprior object with trend priors
 #' @noRd
 generate_trend_priors <- function(trend_spec, data, response_names = NULL,
+                                  loadings_prior_spec = NULL,
                                   codegen = NULL) {
   # Validate parameters before generating trend priors
   checkmate::assert_list(trend_spec, names = "named")
@@ -262,8 +265,13 @@ generate_trend_priors <- function(trend_spec, data, response_names = NULL,
   trend_model <- trend_spec$trend_model
   base_formula <- trend_spec$base_formula
 
-  # 1. Get trend constructor priors (AR, RW, etc.)
+  # 1. Get trend constructor priors (AR, RW, etc.). The loadings
+  # prior decides which branch `Z` is drawn from, so the object
+  # reported on carries the same spec the code generator reads.
   if (inherits(trend_model, "mvgam_trend")) {
+    if (!is.null(loadings_prior_spec)) {
+      trend_model$loadings_prior_spec <- loadings_prior_spec
+    }
     prior_list$constructor <- generate_trend_priors_from_monitor_params(trend_model)
   }
 
@@ -419,6 +427,18 @@ create_trend_parameter_prior <- function(param_name, trend_obj) {
 
   # Get default prior and bounds for this parameter type
   prior_info <- get_default_trend_parameter_prior(param_name, trend_obj)
+
+  # `Z` is drawn from one of three branches depending on the
+  # loadings prior; only the unstructured one matches the registry
+  # default. Both the branch and its statement come from the
+  # emitter's own helpers, so the table cannot describe a prior the
+  # model does not sample.
+  if (identical(param_name, "Z")) {
+    branch_prior <- loadings_z_prior_string(
+      loadings_z_branch(trend_obj$loadings_prior_spec)
+    )
+    if (!is.null(branch_prior)) prior_info$prior <- branch_prior
+  }
 
   # Delegate to brms::set_prior so the returned row always carries the
   # full canonical brmsprior schema (including columns like `tag` that
@@ -759,8 +779,10 @@ filter_obs_priors <- function(combined_priors) {
     return(NULL)
   }
   
-  # Filter out trend parameters (those with _trend suffix)
-  obs_mask <- !grepl("_trend$", combined_priors$class)
+  # Anything mvgam manages goes to the trend side, whether or not
+  # it carries the suffix. `Z` does not, and filing it here would
+  # hand brms a class it has no parameter for.
+  obs_mask <- !is_mvgam_managed_class(combined_priors$class)
   obs_priors <- combined_priors[obs_mask, , drop = FALSE]
   
   if (nrow(obs_priors) == 0) {
@@ -789,8 +811,8 @@ filter_trend_priors <- function(combined_priors) {
     return(NULL)
   }
   
-  # Filter for trend parameters (those with _trend suffix)
-  trend_mask <- grepl("_trend$", combined_priors$class)
+  # The complement of the observation-side split above.
+  trend_mask <- is_mvgam_managed_class(combined_priors$class)
   trend_priors <- combined_priors[trend_mask, , drop = FALSE]
   
   if (nrow(trend_priors) == 0) {
@@ -1037,7 +1059,13 @@ suffix_trend_prior_classes <- function(priors) {
   bookkeeping_sigma <- priors$class == "sigma" & !nzchar(coefs)
   priors <- priors[!bookkeeping_sigma, , drop = FALSE]
   if (nrow(priors) == 0L) return(priors)
-  needs_suffix <- nzchar(priors$class) & !grepl("_trend$", priors$class)
+  # A class mvgam deliberately leaves unsuffixed, `Z` among them,
+  # must not acquire one here: the Stan parameter is `Z`, and
+  # `Z_trend` would name nothing. Read from the same list the
+  # class predicate is built on.
+  needs_suffix <- nzchar(priors$class) &
+    !grepl("_trend$", priors$class) &
+    !priors$class %in% mvgam_unsuffixed_params
   priors$class[needs_suffix] <-
     paste0(priors$class[needs_suffix], "_trend")
   priors
@@ -1818,7 +1846,9 @@ has_embedded_families <- function(formula) {
 #' @seealso \code{\link{mvgam_formula}}, \code{\link[brms]{get_prior}},
 #'   \code{\link[brms]{set_prior}}, \code{\link[brms]{prior}}
 #' @export
-get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
+get_prior.mvgam_formula <- function(object, data, family = gaussian(),
+                                    loadings_prior = NULL,
+                                    trend_map = NULL, ...) {
 
   # Input validation (required by CLAUDE.md standards)
   checkmate::assert_class(object, "mvgam_formula")
@@ -1873,6 +1903,40 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
 
   # Parse multivariate trends and validate
   mv_spec <- parse_multivariate_trends(formula, trend_formula)
+
+  # A fixed or partial `trend_map` changes which loadings are
+  # sampled at all: a fully fixed matrix moves `Z` to the data
+  # block, and a partial one replaces it with `Z_free_vec` under a
+  # prior of its own. The table describes neither, so it is refused
+  # rather than answered for the free-loadings model the user is
+  # not fitting.
+  if (!is.null(trend_map)) {
+    stop(insight::format_error(c(
+      "'get_prior()' cannot describe a fit that supplies 'trend_map'.",
+      x = paste0(
+        "Fixed loadings move 'Z' to the data block and partial ",
+        "loadings replace it with 'Z_free_vec', so the classes ",
+        "differ from the free-loadings table this returns."
+      ),
+      i = paste0(
+        "Read the priors off the emitted program with ",
+        "'stancode()', which takes 'trend_map'."
+      )
+    )))
+  }
+
+  # Attach the loadings-prior spec exactly as the fitting path does
+  # in `make_stan.R`. Without it the table cannot know which `Z`
+  # branch will fire and reports the unstructured default for all
+  # three, which is the model only one of them fits.
+  loadings_prior_spec <- normalise_loadings_prior(
+    loadings_prior, data2 = NULL, data = data
+  )
+  if (!is.null(loadings_prior_spec)) {
+    mv_spec$trend_specs <- attach_loadings_prior_spec(
+      mv_spec$trend_specs, loadings_prior_spec
+    )
+  }
   
   # Extract and validate trend components. This call also runs the
   # `by = lv_axis()` AST rewrite (factor-active rewrites to
@@ -1918,7 +1982,8 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(), ...) {
     data = components$trend_data,
     response_names = response_names,
     .precomputed_dimensions = dimensions,
-    codegen = codegen_from_dots(list(...))
+    codegen = codegen_from_dots(list(...)),
+    loadings_prior_spec = loadings_prior_spec
   )
 
   # Combine observation and trend priors using existing helper function

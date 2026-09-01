@@ -1148,3 +1148,113 @@ test_that("a coef-scoped sigma row is not mistaken for the bookkeeping one", {
   expect_equal(out$prior, "normal(0, 3)")
   expect_equal(out$class, "sigma_trend")
 })
+
+
+test_that("a class mvgam manages is routed to the trend side", {
+  # Splitting a prior table on the `_trend` suffix alone files `Z`
+  # as observation-side, so brms is handed a class it has no
+  # parameter for and refuses it, while `default_prior()` is where
+  # the user read the class name. One predicate decides.
+  cls <- c("b", "Intercept", "sigma", "sigma_trend", "ar1_trend",
+           "Z", "Z_free_vec", "varrho_inv", "theta_features",
+           "theta_dist_phylo")
+  managed <- mvgam:::is_mvgam_managed_class(cls)
+  expect_equal(cls[managed],
+               c("sigma_trend", "ar1_trend", "Z", "Z_free_vec",
+                 "varrho_inv", "theta_features", "theta_dist_phylo"))
+  expect_equal(cls[!managed], c("b", "Intercept", "sigma"))
+})
+
+
+test_that("a user prior on Z reaches the emitted Stan", {
+  # `default_prior()` advertises the class, so setting it has to
+  # work. It previously failed with brms' "do not correspond to any
+  # model parameter", naming the class its own table supplied.
+  set.seed(1L)
+  d <- sim_mvgam(family = poisson(), n_series = 4L,
+                  n_timepoints = 20L)$data_train
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1, n_lv = 2))
+  expect_true(any(get_prior(mf, data = d, family = poisson())$class == "Z"))
+  sc <- stancode(mf, data = d, family = poisson(),
+                 prior = prior(normal(0, 3), class = Z))
+  ln <- strsplit(paste(as.character(sc), collapse = "\n"), "\n")[[1]]
+  expect_true(any(grepl("to_vector(Z) ~ normal(0, 3);", ln, fixed = TRUE)))
+})
+
+
+test_that("the suffix rule leaves deliberately unsuffixed classes alone", {
+  # `Z` names the Stan parameter directly; `Z_trend` names nothing.
+  p <- brms::prior(normal(0, 1), class = "Z")
+  p <- rbind(p, brms::prior(exponential(2), class = "sigma"))
+  out <- mvgam:::suffix_trend_prior_classes(p)
+  expect_true("Z" %in% out$class)
+  expect_false("Z_trend" %in% out$class)
+})
+
+
+test_that("the reported Z prior is the one the model samples", {
+  # `Z` is drawn from one of three branches depending on the
+  # loadings prior. The table reported the unstructured default for
+  # all three, so two of them described a model the user was not
+  # fitting. Both surfaces now read `loadings_z_branch()`.
+  set.seed(1L)
+  d <- sim_mvgam(family = poisson(), n_series = 4L,
+                  n_timepoints = 20L)$data_train
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1, n_lv = 2))
+  traits <- data.frame(sp = factor(paste0("series_", 1:4)),
+                        t1 = rnorm(4))
+  agrees <- function(...) {
+    p <- get_prior(mf, data = d, family = poisson(), ...)
+    reported <- as.character(p$prior[p$class == "Z"])[1]
+    sc <- gsub("[[:space:]]+", " ", paste(
+      as.character(stancode(mf, data = d, family = poisson(), ...)),
+      collapse = " "
+    ))
+    grepl(gsub("[[:space:]]+", " ", reported), sc, fixed = TRUE)
+  }
+  expect_true(agrees())
+  expect_true(agrees(loadings_prior = list(column_shrinkage = "mgp")))
+  expect_true(agrees(loadings_prior = list(features = traits)))
+  expect_true(agrees(loadings_prior = list(features = traits,
+                                            column_shrinkage = "mgp")))
+})
+
+
+test_that("the branch classifier names each loadings path once", {
+  expect_equal(mvgam:::loadings_z_branch(NULL), "unstructured")
+  expect_equal(
+    mvgam:::loadings_z_branch(list(column_shrinkage = "mgp")), "mgp"
+  )
+  expect_equal(
+    mvgam:::loadings_z_branch(list(N_features_trend = 2L)), "kernel"
+  )
+  # A kernel takes precedence: the emitted statement is the
+  # multivariate normal either way.
+  expect_equal(
+    mvgam:::loadings_z_branch(
+      list(N_features_trend = 2L, column_shrinkage = "mgp")
+    ),
+    "kernel"
+  )
+  expect_null(mvgam:::loadings_z_prior_string("unstructured"))
+})
+
+
+test_that("get_prior refuses a trend_map it cannot describe", {
+  # A fully fixed `trend_map` moves `Z` to the data block and a
+  # partial one replaces it with `Z_free_vec` under its own prior,
+  # so the free-loadings table describes neither. Refusing beats
+  # returning a table for a model the user is not fitting.
+  set.seed(1L)
+  d <- sim_mvgam(family = poisson(), n_series = 4L,
+                  n_timepoints = 20L)$data_train
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1, n_lv = 2))
+  tm <- data.frame(series = factor(paste0("series_", 1:4)),
+                    trend = c(1L, 1L, 2L, 2L))
+  expect_error(
+    get_prior(mf, data = d, family = poisson(), trend_map = tm),
+    "cannot describe a fit that supplies 'trend_map'"
+  )
+  # The free-loadings table is unaffected.
+  expect_gt(nrow(get_prior(mf, data = d, family = poisson())), 0L)
+})

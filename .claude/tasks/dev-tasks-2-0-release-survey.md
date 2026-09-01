@@ -53,46 +53,41 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > The kernel routes need it too, since `Phi` has unit diagonal and
   > so contributes no scale of its own.
 
-- [ ] **14.1 VAR's E-BFMI warning, and why non-centring is not the fix**
-  > `VAR()` samples `lv_trend` and `init_trend` directly against
-  > `Sigma_trend` and `Omega_trend`, both built from the sampled
-  > `sigma_trend` and `L_Omega_trend`. A sweep read that as a funnel
-  > and recommended non-centring. It was implemented and reverted;
-  > the measurements are why.
+- [x] **14.1 VAR's E-BFMI warning does not reproduce**
+  > A sweep reported E-BFMI of 0.295 on a `VAR()` fit, below Stan's
+  > 0.3 threshold, and read the centred latent state as the cause.
+  > Two parameterisations were implemented against it and both are
+  > reverted. Four seeds, same data and settings, medians:
   >
-  > Same model, data, seed and settings, 4 series over 40
-  > timepoints, 2 chains:
+  > | | E-BFMI | divergences | max R-hat | min ESS |
+  > |---|---|---|---|---|
+  > | centred | 0.416 | 4.5 | 1.17 | 5.2 |
+  > | init-state non-centred | 0.438 | 7.0 | 1.17 | 12.7 |
   >
-  > | | centred | non-centred |
-  > |---|---|---|
-  > | E-BFMI | 0.295, 0.409 | 0.629, 0.725 |
-  > | divergences | 17 | 50 |
-  > | max R-hat | 1.090 | 2.125 |
-  > | min ESS | 24 | 1 |
-  > | `sigma_trend` | ESS 84 | ESS 1, R-hat 2.08 |
-  > | trace of Sigma | ESS 32.6 | ESS 288 |
+  > Neither the difference nor the original finding survives. Across
+  > those seeds the centred form's lowest E-BFMI was 0.343, and no
+  > run fell below 0.3; the 0.295 that prompted this came from one
+  > draw. Within-variant spread swamps the between-variant
+  > difference: the non-centred initial state produced both the best
+  > run of the eight, at no divergences and 78 effective draws, and
+  > the worst, at 57 divergences and an E-BFMI of 0.256.
   >
-  > Non-centring fixes the funnel diagnostic and the invariant scale
-  > direction, and leaves the chains in different modes: R-hat near
-  > 2.1 on `sigma_trend`, `A_trend` and `Intercept` alike. The
-  > centred form converges on every parameter and carries one
-  > diagnostic warning. That trade is not worth taking.
+  > Non-centring the whole recursion was tried first and is much
+  > worse: max R-hat 2.125 against 1.090, one effective draw against
+  > 24, because the raw draws then couple to `A_trend` at every step.
+  > That is a real effect and reproduced, unlike the warning it was
+  > meant to cure.
   >
   > The comment at the declaration, that `lv_trend` belongs in the
-  > parameters block for sampling, records a choice that the
-  > evidence supports. Centred wins where the data are informative
-  > about the state, which 40 timepoints per series is.
+  > parameters block, records a choice the evidence supports. Left
+  > as it stands.
   >
-  > What remains open is narrower: whether the E-BFMI of 0.295 is
-  > worth addressing at all given everything converges, and if so
-  > whether a cheaper device than full non-centring helps, such as
-  > non-centring only `init_trend`, interpolating between the two
-  > forms, or marginalising the state analytically, which a Gaussian
-  > VAR admits in closed form. Do not reopen this without a
-  > like-for-like fit; the funnel diagnostic alone is not evidence
-  > enough, as this attempt shows.
+  > Worth keeping from this: a single fit is not evidence about
+  > sampler geometry. Three of the numbers that drove this entry,
+  > the E-BFMI, the divergence count and the ESS, each moved further
+  > across seeds than between parameterisations.
 
-- [ ] **14.2 `VAR(n_lv = k)` does not compile**
+- [x] **14.2 `VAR(n_lv = k)` does not compile**
   > `R/stan_assembly.R:3307` declares
   > `array[size(A_trend)] matrix[N_lv_trend, N_lv_trend] A_trend_tilde;`
   > in generated quantities. Stan rejects a non-data expression as a
@@ -104,7 +99,7 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > Reproduced identically before and after 14.0's fix, so it is not
   > a regression from it. Blocks testing 14.0 and 14.1 together.
 
-- [ ] **15.0 The prior a model reports is not always the prior it samples**
+- [x] **15.0 The prior a model reports is not always the prior it samples**
   > Decision 3.1 fixed this for `sigma_trend` on the fitted object.
   > The same shape is still live on `Z`, which carries the whole
   > factor and JSDM story. One registry entry, three emission sites,
@@ -123,7 +118,7 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   >
   > Do 15.1 first: it supplies the predicate this needs.
 
-- [ ] **15.1 Which classes belong to mvgam, written four times**
+- [x] **15.1 Which classes belong to mvgam, written four times**
   > `filter_obs_priors()` and `filter_trend_priors()` (R/priors.R:763,
   > 793) test a bare `_trend$` regex;
   > `get_all_mvgam_trend_parameters()` (R/priors.R:809) builds a list;
@@ -174,7 +169,17 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > The guard also reads `!all.equal(...) == TRUE`, which works only
   > because `all.equal` happens to return length one here.
 
-- [ ] **15.5 The jsdgam prior surface is unreachable**
+- [x] **15.5 The jsdgam prior surface is unreachable**
+  > Closed with 15.0: `get_prior.mvgam_formula()` takes
+  > `loadings_prior` and attaches the spec the way the fit path
+  > does, so a structured-loadings model reports the prior it
+  > samples. A `trend_map` is refused rather than answered, because
+  > fixed loadings move `Z` into the data block and partial ones
+  > replace it with `Z_free_vec`; the free-loadings table has the
+  > wrong rows for both, not merely the wrong values. The refusal
+  > names `stancode()`, which does take it.
+
+- [ ] **15.5b Describe a fixed or partial `trend_map` in the table**
   > `get_prior()` on a jsdgam specification reports `b`, `Intercept`
   > and `shape` and no trend classes at all, so a user cannot see
   > the priors they might set. The cause is structural:

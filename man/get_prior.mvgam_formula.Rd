@@ -4,7 +4,14 @@
 \alias{get_prior.mvgam_formula}
 \title{Extract Prior Specifications for mvgam Formula Objects}
 \usage{
-\method{get_prior}{mvgam_formula}(object, data, family = gaussian(), ...)
+\method{get_prior}{mvgam_formula}(
+  object,
+  data,
+  family = gaussian(),
+  loadings_prior = NULL,
+  trend_map = NULL,
+  ...
+)
 }
 \arguments{
 \item{object}{An object of class \code{mvgam_formula} created by

@@ -647,6 +647,29 @@ mvgam_unsuffixed_params <- c(
 )
 
 
+#' Does this prior class name a parameter mvgam manages?
+#'
+#' @description
+#' Most of what mvgam emits carries the `_trend` suffix, but not all
+#' of it: the loadings matrix and the loadings-prior parameters are
+#' named after the quantity rather than the submodel. Splitting a
+#' prior table on the suffix alone therefore files `Z` as
+#' observation-side, hands it to brms, and brms refuses a class it
+#' has no parameter for, while `default_prior()` was the source of
+#' the class name. One predicate so the split cannot disagree with
+#' the emitter about whose parameter a class names.
+#'
+#' @param class Character vector of prior class names.
+#' @return Logical vector, `TRUE` where mvgam owns the class.
+#' @noRd
+is_mvgam_managed_class <- function(class) {
+  checkmate::assert_character(class, any.missing = FALSE)
+  grepl("_trend$", class) |
+    class %in% mvgam_unsuffixed_params |
+    grepl("^theta_dist_", class)
+}
+
+
 # The latent states. Their sampling statements are the trend equation
 # and the non-centred reparameterisation it is written under, not
 # priors a user set or could change. `init_trend` holds the states
@@ -681,10 +704,10 @@ mvgam_state_params <- c(
 #' @noRd
 mvgam_stancode_prior_rows <- function(sc) {
   checkmate::assert_string(sc)
+  # States are excluded on top of the shared predicate: their
+  # sampling statements are the trend equation, not priors.
   is_mvgam_param <- function(nm) {
-    (grepl("_trend$", nm) | nm %in% mvgam_unsuffixed_params |
-       grepl("^theta_dist_", nm)) &
-      !nm %in% mvgam_state_params
+    is_mvgam_managed_class(nm) & !nm %in% mvgam_state_params
   }
   rows <- list()
   seen <- character(0L)
