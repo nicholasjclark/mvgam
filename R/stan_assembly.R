@@ -4109,9 +4109,9 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
     # The MGP column scale and a free `sigma_trend` are the same
     # quantity; only their product reaches the likelihood. When MGP
     # is on, the scale is derived rather than sampled.
-    mgp_scale <- identical(
-      trend_specs$loadings_prior_spec$column_shrinkage, "mgp"
-    )
+    mgp_scale <- loadings_spec_traits(
+      trend_specs$loadings_prior_spec
+    )$mgp
     # Under MGP the column scale is `sqrt(Psi_diag)`, so a prior on
     # `sigma_trend` names a quantity the model derives rather than
     # samples. Refusing beats accepting one and ignoring it.

@@ -768,3 +768,36 @@ test_that("a trend that cannot take factors refuses them", {
   # A factor-compatible trend takes it.
   expect_silent(AR(n_lv = 2))
 })
+
+
+test_that("forecasting cannot require a parameter nothing monitors", {
+  # Each filter used to name its own parameters, and the names drifted
+  # from what the trends monitor: `PW()` required a `sigma_trend` it
+  # never samples, VAR a `Sigma_trend` that Stan computes rather than
+  # monitors, and CAR an `ar1` that no trend produces under the suffix
+  # convention. Selecting from the monitor list makes that impossible
+  # rather than merely currently true.
+  specs <- list(
+    RW = RW(), RW_ma = RW(ma = TRUE), AR = AR(p = 2),
+    AR_ma = AR(p = 1, ma = TRUE), AR_cor = AR(p = 1, cor = TRUE),
+    VAR = VAR(), CAR = CAR(), ZMVN = ZMVN(), PW = PW()
+  )
+  for (spec in specs) {
+    monitored <- mvgam:::generate_monitor_params(spec)
+    required <- mvgam:::generate_forecast_required_params(
+      spec, mvgam:::get_trend_name(spec)
+    )
+    expect_true(all(required %in% monitored))
+  }
+
+  # A trend that samples no innovation scale must not require one.
+  expect_false("sigma_trend" %in% mvgam:::generate_forecast_required_params(
+    PW(), "PW"
+  ))
+  rw_mgp <- mvgam:::attach_loadings_spec_to_trend(
+    RW(), list(column_shrinkage = "mgp")
+  )
+  expect_false("sigma_trend" %in% mvgam:::generate_forecast_required_params(
+    rw_mgp, "RW"
+  ))
+})

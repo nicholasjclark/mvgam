@@ -596,9 +596,7 @@ inject_obs_zero_placeholder <- function(formula, data, prior) {
   if (length(formula) < 3L) {
     return(pass_through)
   }
-  trms <- stats::terms(formula)
-  if (length(attr(trms, "term.labels")) > 0L ||
-        attr(trms, "intercept") != 0L) {
+  if (formula_has_population_terms(formula)) {
     return(pass_through)
   }
 
@@ -750,6 +748,29 @@ mvgam_stancode_prior_rows <- function(sc) {
     add(m[3L], "", paste0(m[2L], "(", args, ")"))
   }
   rows
+}
+
+
+#' Does this formula contribute any population-level term?
+#'
+#' `~ 0` and `~ -1` describe the same empty linear predictor, so a
+#' formula compared against `~ 0` answers for one spelling and not
+#' the other. Reading the terms object answers for every spelling at
+#' once, and does not depend on `all.equal()` happening to return a
+#' length-one result, which is what kept the comparison from erroring
+#' on a vector condition.
+#'
+#' An intercept counts: `~ 1` has a term to report even though it
+#' names no predictor.
+#'
+#' @param formula A formula.
+#' @return `TRUE` when the formula has predictors or an intercept.
+#' @noRd
+formula_has_population_terms <- function(formula) {
+  if (!inherits(formula, "formula")) return(FALSE)
+  trms <- stats::terms(formula)
+  length(attr(trms, "term.labels")) > 0L ||
+    attr(trms, "intercept") != 0L
 }
 
 

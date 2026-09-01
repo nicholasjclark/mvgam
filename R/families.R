@@ -13,8 +13,9 @@
 # https://github.com/open-AIMS/tweedie (MIT-licensed). The
 # underlying compound Poisson-gamma decomposition is due to
 # Spinkney on the Stan Forums:
-# https://discourse.mc-stan.org/t/14636. Both sources are
-# cited in the user-facing roxygen for tweedie().
+# https://discourse.mc-stan.org/t/tweedie-likelihood-compound-poisson-gamma-in-stan/14636
+# Both sources are cited in the user-facing roxygen for
+# tweedie().
 #
 # R-side log_lik and posterior_predict both use mgcv (already a
 # hard mvgam dependency) for the Tweedie density and random
@@ -78,8 +79,8 @@
 #'
 #' The Stan likelihood is the compound Poisson-gamma
 #' decomposition of Spinkney (Stan Forums,
-#' \url{https://discourse.mc-stan.org/t/14636}). The mvgam
-#' implementation is adapted from the
+#' \url{https://discourse.mc-stan.org/t/tweedie-likelihood-compound-poisson-gamma-in-stan/14636}).
+#' The mvgam implementation is adapted from the
 #' \pkg{brms::custom_family} definition packaged by the
 #' Australian Institute of Marine Science at
 #' \url{https://github.com/open-AIMS/tweedie}, with attribution
@@ -142,8 +143,9 @@
 #'
 #' Spinkney (2020). Tweedie likelihood (compound Poisson-gamma)
 #'   in Stan. Stan Discourse,
-#'   \url{https://discourse.mc-stan.org/t/14636}. Source of the
-#'   compound Poisson-gamma decomposition that underlies both
+#'   \url{https://discourse.mc-stan.org/t/tweedie-likelihood-compound-poisson-gamma-in-stan/14636}
+#'   Source of the compound Poisson-gamma decomposition that
+#'   underlies both
 #'   the AIMS implementation and the Stan code shipped here.
 #'
 #' Dunn, P. K., & Smyth, G. K. (2005). Series evaluation of

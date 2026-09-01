@@ -5622,7 +5622,7 @@ assert_column_shrinkage_compatible <- function(loadings_prior_spec, trend) {
   if (is.null(loadings_prior_spec) || is.null(trend)) {
     return(invisible(NULL))
   }
-  if (!identical(loadings_prior_spec$column_shrinkage, "mgp")) {
+  if (!loadings_spec_traits(loadings_prior_spec)$mgp) {
     return(invisible(NULL))
   }
   trend_nm <- toupper(as.character(trend)[1L])

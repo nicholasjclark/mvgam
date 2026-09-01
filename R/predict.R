@@ -356,7 +356,7 @@ predict.mvgam <- function(object,
 #'
 #' @noRd
 predict_variance <- function(object, newdata, process_error,
-                             incl_autocor, ndraws,
+                             incl_autocor, ndraws, draw_ids,
                              re_formula, allow_new_levels,
                              sample_new_levels, resp) {
   # Closure-unit families have closed-form per-visit marginal
@@ -374,6 +374,7 @@ predict_variance <- function(object, newdata, process_error,
       process_error     = process_error,
       incl_autocor      = incl_autocor,
       ndraws            = ndraws,
+      draw_ids          = draw_ids,
       re_formula        = re_formula,
       allow_new_levels  = allow_new_levels,
       sample_new_levels = sample_new_levels,
@@ -395,7 +396,7 @@ predict_variance <- function(object, newdata, process_error,
       if (is_simplex_response_family(object$family)) {
         needs_phi <- identical(family_name, "diri")
         comp <- extract_simplex_response_components(
-          object, newdata = newdata, draw_ids = NULL,
+          object, newdata = newdata, draw_ids = draw_ids,
           ndraws = ndraws, needs_phi = needs_phi
         )
         prob <- comp$prob_row
@@ -426,7 +427,7 @@ predict_variance <- function(object, newdata, process_error,
       }
       needs_nu <- identical(family_name, "mvt")
       comp <- extract_mv_response_components(
-        object, newdata = newdata, draw_ids = NULL,
+        object, newdata = newdata, draw_ids = draw_ids,
         ndraws = ndraws, needs_nu = needs_nu
       )
       base_var <- comp$Psi_row^2
@@ -490,7 +491,7 @@ predict_variance <- function(object, newdata, process_error,
 
   # Pick the draw subsample once, use it for both mu and dpars so they
   # align.
-  draw_idx <- resolve_draw_indices(total_draws, ndraws, NULL)
+  draw_idx <- resolve_draw_indices(total_draws, ndraws, draw_ids)
 
   # An ordinal family predicts a probability per category rather than a
   # mean, so its epred carries a third margin and none of the dispersion

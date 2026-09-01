@@ -7,6 +7,7 @@
 register_trend_type(
   name,
   supports_factors = FALSE,
+  samples_innovation_scale = TRUE,
   generator_func,
   incompatibility_reason = NULL,
   prior_spec = NULL
@@ -16,6 +17,10 @@ register_trend_type(
 \item{name}{Character string name of the trend type}
 
 \item{supports_factors}{Logical indicating if trend supports factor models (n_lv parameter)}
+
+\item{samples_innovation_scale}{Logical; does the trend sample an
+innovation standard deviation? \code{FALSE} for a deterministic trend
+such as \code{PW()}, whose path is a function of its changepoints.}
 
 \item{generator_func}{Function that generates Stan code for this trend type}
 

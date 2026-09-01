@@ -88,7 +88,10 @@ test_that("all trend types generate correct prior structures", {
     AR = list(formula = ~ AR(p = 2), expected = c("ar1_trend", "ar2_trend", "sigma_trend")),
     VAR = list(formula = ~ VAR(p = 1), expected = c("A.*_trend", "sigma_trend")),
     ZMVN = list(formula = ~ ZMVN(), expected = c("sigma_trend")),
-    PW = list(formula = ~ PW(), expected = c("k_trend", "m_trend", "delta_trend", "sigma_trend")),
+    # No `sigma_trend`: the piecewise path is a deterministic
+    # function of its changepoints, so there is no innovation.
+    PW = list(formula = ~ PW(),
+              expected = c("k_trend", "m_trend", "delta_trend")),
     CAR = list(formula = ~ CAR(), expected = c("ar1_trend", "sigma_trend"))
   )
 
@@ -107,6 +110,12 @@ test_that("all trend types generate correct prior structures", {
       for (expected_param in spec$expected) {
         expect_true(any(grepl(expected_param, trend_classes)))
       }
+      # A trend without an innovation must not advertise a scale.
+      trend_model <- mvgam:::parse_trend_formula(spec$formula)$trend_model
+      expect_equal(
+        "sigma_trend" %in% trend_classes,
+        mvgam:::samples_innovation_scale(trend_model)
+      )
     }
 
     # Test brms equivalence for complex predictors with explicit formula pairs
@@ -156,9 +165,19 @@ test_that("all trend types generate correct prior structures", {
 
       # Test equivalence: every brms prior (except Intercept) should appear with _trend suffix
       # Trend formulas exclude intercepts by default
+      # brms's `sigma` maps onto the trend's innovation scale, so a
+      # trend that samples no innovation has nothing to map it to.
+      trend_model <-
+        mvgam:::parse_trend_formula(test_spec$mvgam_trend)$trend_model
+      unmapped <- if (mvgam:::samples_innovation_scale(trend_model)) {
+        c("", "Intercept")
+      } else {
+        c("", "Intercept", "sigma")
+      }
+
       for (i in seq_len(nrow(brms_priors))) {
         brms_row <- brms_priors[i, ]
-        if (brms_row$class != "" && brms_row$class != "Intercept") {
+        if (!brms_row$class %in% unmapped) {
           expected_trend_class <- paste0(brms_row$class, "_trend")
 
           # Find matching mvgam trend prior
@@ -1140,6 +1159,55 @@ test_that("every surface names a trend prior class the same way", {
     list(prior = NULL, trend_model = list(prior = tp))
   )
   expect_equal(sort(rendered$class), c("ar1_trend", "Z"))
+})
+
+
+test_that("a reported innovation scale is one the model samples", {
+  # Two ways to lose `sigma_trend`, and the table has to know about
+  # both. `PW()` never had one: its path is a function of the
+  # changepoints. Multiplicative gamma process shrinkage derives it
+  # as `sqrt(Psi_diag)` instead, so a prior set on it is refused.
+  # Either way, offering the row invites a prior the fit cannot take.
+  dat <- data.frame(
+    y = rpois(40, 5), time = rep(1:20, 2),
+    series = factor(rep(c("a", "b"), each = 20))
+  )
+  cases <- list(
+    list(tf = ~ PW(), args = list(), sampled = FALSE),
+    list(tf = ~ RW(), args = list(), sampled = TRUE),
+    list(tf = ~ AR(p = 1), args = list(), sampled = TRUE),
+    list(tf = ~ ZMVN(n_lv = 2), args = list(), sampled = TRUE),
+    list(tf = ~ ZMVN(n_lv = 2),
+         args = list(loadings_prior = list(column_shrinkage = "mgp")),
+         sampled = FALSE)
+  )
+  for (case in cases) {
+    mf <- mvgam_formula(y ~ -1, case$tf)
+    common <- list(mf, data = dat, family = poisson())
+    tab <- suppressWarnings(
+      do.call(get_prior, c(common, case$args))
+    )
+    sc <- suppressWarnings(do.call(stancode, c(common, case$args)))
+    expect_equal("sigma_trend" %in% tab$class, case$sampled)
+    expect_equal(grepl("sigma_trend ~", sc), case$sampled)
+  }
+})
+
+
+test_that("the registry decides whether a trend has an innovation scale", {
+  pw <- PW()
+  rw <- RW()
+  expect_false(samples_innovation_scale(pw))
+  expect_true(samples_innovation_scale(rw))
+
+  # Attaching MGP shrinkage takes the scale away from a trend that
+  # otherwise has one, and refreshes the cached parameter list that
+  # was built before any loadings prior existed.
+  spec <- list(column_shrinkage = "mgp")
+  rw_mgp <- attach_loadings_spec_to_trend(rw, spec)
+  expect_false(samples_innovation_scale(rw_mgp))
+  expect_false("sigma_trend" %in% rw_mgp$monitor_params)
+  expect_true("sigma_trend" %in% rw$monitor_params)
 })
 
 

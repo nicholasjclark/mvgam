@@ -73,8 +73,8 @@ distributional regression vignette).
 
 The Stan likelihood is the compound Poisson-gamma
 decomposition of Spinkney (Stan Forums,
-\url{https://discourse.mc-stan.org/t/14636}). The mvgam
-implementation is adapted from the
+\url{https://discourse.mc-stan.org/t/tweedie-likelihood-compound-poisson-gamma-in-stan/14636}).
+The mvgam implementation is adapted from the
 \pkg{brms::custom_family} definition packaged by the
 Australian Institute of Marine Science at
 \url{https://github.com/open-AIMS/tweedie}, with attribution
@@ -146,8 +146,9 @@ project.
 
 Spinkney (2020). Tweedie likelihood (compound Poisson-gamma)
 in Stan. Stan Discourse,
-\url{https://discourse.mc-stan.org/t/14636}. Source of the
-compound Poisson-gamma decomposition that underlies both
+\url{https://discourse.mc-stan.org/t/tweedie-likelihood-compound-poisson-gamma-in-stan/14636}
+Source of the compound Poisson-gamma decomposition that
+underlies both
 the AIMS implementation and the Stan code shipped here.
 
 Dunn, P. K., & Smyth, G. K. (2005). Series evaluation of

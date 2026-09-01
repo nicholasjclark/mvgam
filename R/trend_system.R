@@ -33,15 +33,21 @@ trend_registry <- new.env(parent = emptyenv())
 #'
 #' @param name Character string name of the trend type
 #' @param supports_factors Logical indicating if trend supports factor models (n_lv parameter)
+#' @param samples_innovation_scale Logical; does the trend sample an
+#'   innovation standard deviation? `FALSE` for a deterministic trend
+#'   such as `PW()`, whose path is a function of its changepoints.
 #' @param generator_func Function that generates Stan code for this trend type
 #' @param incompatibility_reason Character string explaining why factor models aren't supported (if applicable)
 #' @param prior_spec Named list of prior specifications for trend parameters (optional)
 #' @return Invisibly returns TRUE on successful registration
 #' @export
-register_trend_type <- function(name, supports_factors = FALSE, generator_func,
+register_trend_type <- function(name, supports_factors = FALSE,
+                               samples_innovation_scale = TRUE,
+                               generator_func,
                                incompatibility_reason = NULL, prior_spec = NULL) {
   checkmate::assert_string(name, min.chars = 1)
   checkmate::assert_logical(supports_factors, len = 1)
+  checkmate::assert_logical(samples_innovation_scale, len = 1)
   checkmate::assert_function(generator_func, args = c("trend_specs", "data_info"))
   checkmate::assert_list(prior_spec, null.ok = TRUE, names = "named")
 
@@ -76,6 +82,7 @@ register_trend_type <- function(name, supports_factors = FALSE, generator_func,
 
   trend_registry[[name]] <- list(
     supports_factors = supports_factors,
+    samples_innovation_scale = samples_innovation_scale,
     generator = generator_func,
     incompatibility_reason = incompatibility_reason,
     prior_spec = prior_spec
@@ -224,6 +231,8 @@ auto_register_trend_types <- function() {
     register_trend_type(
       name = trend_type,
       supports_factors = trend_info$supports_factors,
+      samples_innovation_scale =
+        trend_info$samples_innovation_scale %||% TRUE,
       generator_func = generator_func,
       incompatibility_reason = trend_info$incompatibility_reason
     )
@@ -372,6 +381,9 @@ car_trend_properties <- function() {
 pw_trend_properties <- function() {
   list(
     supports_factors = FALSE,
+    # The piecewise path is a deterministic function of its
+    # changepoints, so there is no innovation to carry a scale.
+    samples_innovation_scale = FALSE,
     incompatibility_reason = "Piecewise trends require series-specific changepoint modeling, incompatible with factor structure"
   )
 }
@@ -419,7 +431,12 @@ register_custom_trend <- function(name, supports_factors = FALSE, generator_func
     )
   }
 
-  register_trend_type(name, supports_factors, generator_func, incompatibility_reason)
+  register_trend_type(
+    name = name,
+    supports_factors = supports_factors,
+    generator_func = generator_func,
+    incompatibility_reason = incompatibility_reason
+  )
 }
 
 #' Check if Registry is Initialized
@@ -604,6 +621,54 @@ evaluate_param_conditions <- function(param_spec, envir = parent.frame()) {
 # Monitor Parameter Generation for Trend Objects
 # -----------------------------------------------------------------------------
 
+#' Attach a loadings prior to a trend, refreshing what it samples
+#'
+#' `monitor_params` is computed when the trend object is built, which
+#' is before any loadings prior exists. Multiplicative gamma process
+#' shrinkage then derives the innovation scale rather than sampling
+#' it, so a cache taken beforehand names a parameter the model no
+#' longer has. Recomputing here keeps the attach and the parameter
+#' list from ever describing different models.
+#'
+#' @param trend_model An `mvgam_trend` object.
+#' @param spec A normalised loadings-prior spec, or `NULL`.
+#' @return The trend object carrying the spec.
+#' @noRd
+attach_loadings_spec_to_trend <- function(trend_model, spec) {
+  if (!inherits(trend_model, "mvgam_trend") || is.null(spec)) {
+    return(trend_model)
+  }
+  trend_model$loadings_prior_spec <- spec
+  trend_model$monitor_params <- generate_monitor_params(trend_model)
+  trend_model
+}
+
+
+#' Does this trend sample an innovation standard deviation?
+#'
+#' Two things can remove it. A deterministic trend never had one:
+#' `PW()` draws its path from changepoints, and the emitted program
+#' declares no `sigma_trend` at all. Multiplicative gamma process
+#' shrinkage takes it the other way, deriving the scale as
+#' `sqrt(Psi_diag)` so that a column carries one magnitude rather
+#' than two whose product is all the likelihood sees.
+#'
+#' Both cases have to agree between the table that reports priors and
+#' the generator that emits them, or a user sets a prior the model
+#' cannot take.
+#'
+#' @param trend_spec An `mvgam_trend` object.
+#' @return `TRUE` when the model samples `sigma_trend`.
+#' @noRd
+samples_innovation_scale <- function(trend_spec) {
+  checkmate::assert_list(trend_spec, min.len = 1)
+  ensure_registry_initialized()
+  info <- get_trend_info(get_trend_name(trend_spec))
+  isTRUE(info$samples_innovation_scale) &&
+    !loadings_spec_traits(trend_spec$loadings_prior_spec)$mgp
+}
+
+
 #' Generate Monitor Parameters for Trend Objects
 #'
 #' Automatically discovers which parameters should be monitored for a given
@@ -619,8 +684,15 @@ generate_monitor_params <- function(trend_spec) {
   # Extract trend type (normalize for registry lookup)
   trend_type <- get_trend_name(trend_spec)
 
-  # Base parameters that most trends share
-  base_params <- c("sigma_trend")
+  # Most trends sample an innovation scale, but not all, and a model
+  # that does not must not report one: a prior set on it is either
+  # refused or silently dropped, and the user read the class name off
+  # the table that offered it.
+  base_params <- if (samples_innovation_scale(trend_spec)) {
+    "sigma_trend"
+  } else {
+    character(0)
+  }
 
   # Trend-specific parameters
   trend_specific <- switch(trend_type,
@@ -861,7 +933,12 @@ generate_forecast_metadata <- function(trend_spec) {
 #' @return Character vector of minimal required parameter names
 #' @noRd
 generate_forecast_required_params <- function(trend_spec, trend_type) {
-  # Get all monitor parameters
+  # Every filter below selects from this list rather than naming
+  # parameters itself, so a name the trend does not monitor cannot
+  # be required. Naming them independently is how `PW()` came to
+  # require a `sigma_trend` it never samples, VAR a `Sigma_trend`
+  # that is computed rather than monitored, and CAR an `ar1` that
+  # no trend has ever produced under the suffix convention.
   all_monitor_params <- generate_monitor_params(trend_spec)
 
   # Filter to minimal required set for each trend type
@@ -888,11 +965,10 @@ generate_forecast_required_params <- function(trend_spec, trend_type) {
 #' @noRd
 filter_rw_forecast_params <- function(monitor_params, trend_spec) {
   # RW minimally needs: variance + optional MA + correlation
-  required <- "sigma_trend"
-
-  # Add essential extras present in monitor_params
-  extras <- intersect(monitor_params, c("theta1_trend", "L_Omega_trend", "Sigma_trend"))
-  c(required, extras)
+  intersect(
+    monitor_params,
+    c("sigma_trend", "theta1_trend", "L_Omega_trend")
+  )
 }
 
 #' Filter AR parameters for minimal forecasting requirements
@@ -903,11 +979,10 @@ filter_rw_forecast_params <- function(monitor_params, trend_spec) {
 filter_ar_forecast_params <- function(monitor_params, trend_spec) {
   # AR minimally needs: coefficients + variance
   ar_coeffs <- monitor_params[is_ar_coefficient(monitor_params)]
-  required <- c(ar_coeffs, "sigma_trend")
-
-  # Add correlation if present
-  correlation_params <- intersect(monitor_params, c("L_Omega_trend", "Sigma_trend"))
-  c(required, correlation_params)
+  c(ar_coeffs, intersect(
+    monitor_params,
+    c("sigma_trend", "L_Omega_trend")
+  ))
 }
 
 #' Filter VAR parameters for minimal forecasting requirements
@@ -916,9 +991,13 @@ filter_ar_forecast_params <- function(monitor_params, trend_spec) {
 #' @return Minimal required parameters for fast VAR forecasting
 #' @noRd
 filter_var_forecast_params <- function(monitor_params, trend_spec) {
-  # VAR minimally needs: coefficient matrices + covariance
-  var_matrices <- monitor_params[grepl("^A_trend\\[", monitor_params)]
-  c(var_matrices, "Sigma_trend")
+  # VAR minimally needs: the transition-matrix hyperparameters its
+  # stationary parameterisation is built from, plus the innovation
+  # variance and correlation it draws through.
+  intersect(
+    monitor_params,
+    c("Amu_trend", "Aomega_trend", "sigma_trend", "L_Omega_trend")
+  )
 }
 
 #' Filter CAR parameters for minimal forecasting requirements
@@ -928,7 +1007,7 @@ filter_var_forecast_params <- function(monitor_params, trend_spec) {
 #' @noRd
 filter_car_forecast_params <- function(monitor_params, trend_spec) {
   # CAR minimally needs: AR coefficient + variance
-  c("ar1", "sigma_trend")
+  intersect(monitor_params, c("ar1_trend", "sigma_trend"))
 }
 
 #' Filter ZMVN parameters for minimal forecasting requirements
@@ -938,9 +1017,7 @@ filter_car_forecast_params <- function(monitor_params, trend_spec) {
 #' @noRd
 filter_zmvn_forecast_params <- function(monitor_params, trend_spec) {
   # ZMVN minimally needs: variance + optional correlation
-  required <- "sigma_trend"
-  correlation_params <- intersect(monitor_params, c("L_Omega_trend", "Sigma_trend"))
-  c(required, correlation_params)
+  intersect(monitor_params, c("sigma_trend", "L_Omega_trend"))
 }
 
 #' Filter PW parameters for minimal forecasting requirements
@@ -950,7 +1027,7 @@ filter_zmvn_forecast_params <- function(monitor_params, trend_spec) {
 #' @noRd
 filter_pw_forecast_params <- function(monitor_params, trend_spec) {
   # PW minimally needs: all growth parameters
-  c("k_trend", "m_trend", "delta_trend")
+  intersect(monitor_params, c("k_trend", "m_trend", "delta_trend"))
 }
 
 

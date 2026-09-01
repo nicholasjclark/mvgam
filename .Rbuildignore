@@ -27,6 +27,7 @@
 ^CRAN-SUBMISSION$
 ^cran-comments\.md$
 ^tests/mvgam_examples\.R$
+^Rplots\.pdf$
 ^tests/testthat/Rplots\.pdf$
 ^tests/local$
 ^memcheck\.R$

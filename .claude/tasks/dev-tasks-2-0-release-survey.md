@@ -136,29 +136,54 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > suffix rule, read by both filters, the suffixer and
   > `mvgam_stancode_prior_rows()`.
 
-- [ ] **15.2 `PW()` advertises a parameter it does not sample**
+- [x] **15.2 `PW()` advertises a parameter it does not sample**
   > `get_prior()` on a `PW()` spec lists `sigma_trend`. The emitted
   > program contains no such parameter, and
   > `prior(exponential(9), class = sigma_trend)` produces neither an
   > error nor a `9` anywhere in the Stan. The sibling of the MGP case
   > 14.0 fixed, except that one now refuses and this one is silent.
   >
-  > Two unconditional copies of one fact: `base_params <-
-  > c("sigma_trend")` (R/trend_system.R:623) feeding `get_prior()`,
-  > and `all_mvgam_params` (R/priors.R:838) feeding the suffix
-  > stripper. They already disagree for `PW()`, over `nu_trend`.
-  > Make the innovation scale a property of the trend registration.
+  > There were two instances, not one. Multiplicative gamma process
+  > shrinkage does the same thing from the other direction: it
+  > derives the scale as `sqrt(Psi_diag)`, and the emitter already
+  > refused a user prior on it, so the table was offering a row
+  > `mvgam()` would reject.
+  >
+  > The innovation scale is now a property of the trend
+  > registration, and `samples_innovation_scale()` combines it with
+  > the shrinkage case so both instances have one answer. The catch
+  > was that `monitor_params` is computed when the trend object is
+  > built, before any loadings prior exists, so a cache taken
+  > beforehand names a parameter the attached spec takes away.
+  > `attach_loadings_spec_to_trend()` refreshes it at the attach
+  > point rather than patching the one consumer that noticed.
+  >
+  > `get_all_mvgam_trend_parameters()` still names both
+  > unconditionally, deliberately. It decides what must never reach
+  > brms, which is a different question from what a model samples,
+  > and dropping a name there would send `sigma_trend` to brms as an
+  > observation-side `sigma`.
 
-- [ ] **15.3 AR bounds stated three times, with two values**
+- [x] **15.3 AR bounds stated three times, with two values**
   > The registry says `c(-1, 1)` (R/priors.R:64), the type fallback
   > says `[-1, 1]` (R/priors.R:521), and `get_ar_parameter_prior()`
   > (R/priors.R:593) says `[-0.99, 0.99]`, which is what the user is
   > shown. Stan declares `vector<lower=-1,upper=1>`. Nothing reads
   > the tightened bound. `get_car_parameter_prior()` is the same
-  > shape and does agree with its declaration, so the pattern is
-  > right and AR is the outlier. Delete the AR resolver.
+  > shape and does agree with its declaration, so the pattern was
+  > right and AR was the outlier. The resolver is deleted; both
+  > remaining statements already said what Stan declares.
+  >
+  > Checked by sweeping every reported bound against its emitted
+  > declaration across six trend configurations rather than the one
+  > parameter named here, which was worth doing twice over: it
+  > confirmed AR was the only mismatch, and it cleared a suspicion
+  > formed by reading, that `theta1_trend` had the same defect
+  > through a `[0, 1]` type fallback. A resolver catches it first,
+  > so the fallback branch never fires for it. That sweep is now a
+  > contract test, since the next drift will be somewhere else.
 
-- [ ] **15.4 `get_prior(fit)` and `prior_summary(fit)` disagree**
+- [x] **15.4 `get_prior(fit)` and `prior_summary(fit)` disagree**
   > Both document themselves as returning the table the model was
   > fitted with; both re-derive. `get_prior()` drops the
   > stanvar-lifted rows and invents a `b_trend` the fit never
@@ -166,8 +191,19 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > spelling: `~ -1 + AR(p = 1)` is not `~ 0`, so brms is asked and
   > returns a `b` row. `~ 0 + AR()` and `~ AR()` do not.
   >
-  > The guard also reads `!all.equal(...) == TRUE`, which works only
-  > because `all.equal` happens to return length one here.
+  > The guard also read `!all.equal(...) == TRUE`, which worked only
+  > because `all.equal` happened to return length one here.
+  >
+  > Both are gone. `formula_has_population_terms()` reads the terms
+  > object, so every spelling of an empty predictor answers the same
+  > way and an intercept still counts, leaving `~ 1` to report its
+  > `Intercept_trend`. It replaced an inline copy in
+  > `R/brms_integration.R` as well. `has_obs_intercept()` stays
+  > separate: it asks only about the intercept.
+  >
+  > What remains of this entry is the second half of its title. The
+  > two surfaces still re-derive rather than reading one table, and
+  > that is worth closing once `prior_summary()` is touched again.
 
 - [x] **15.5 The jsdgam prior surface is unreachable**
   > Closed with 15.0: `get_prior.mvgam_formula()` takes
@@ -256,26 +292,61 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > stops being readable. `N_free_Z` puts its qualifier before the
   > noun where every sibling puts it after.
 
-- [ ] **5.2 Three CRAN vignettes render with no output on the website**
-  > `data.Rmd`, `dfm.Rmd` and `mvgam_overview.Rmd` gate every chunk on
-  > `params$EVAL`, which reads `NOT_CRAN`. That gate is right for CRAN,
-  > where a vignette must not fit Stan models. But
-  > `.github/workflows/pkgdown.yaml` never sets `NOT_CRAN` either, so
-  > the published site shows all three as code listings with no
-  > results, and their code has never run in CI.
+- [ ] **5.2 The published site is not the site these sources describe**
+  > Three separate faults, and only the first was visible from the
+  > vignette sources alone.
   >
-  > 5.1 is the reason this matters: the one article whose chunks had
-  > never executed was hiding two package bugs and four false claims.
+  > `data.Rmd`, `dfm.Rmd` and `mvgam_overview.Rmd` gate every chunk
+  > on `params$EVAL`, which reads `NOT_CRAN`. The gate is right for
+  > CRAN, where a vignette must not fit Stan models, but
+  > `.github/workflows/pkgdown.yaml` sets `GITHUB_PAT` and
+  > `R_KEEP_PKG_SOURCE` and never sets `NOT_CRAN`, so a CI build
+  > renders all three as code listings with no results.
   >
-  > All three have since been rendered with the gate open, and each
-  > carried something. `data.Rmd` overstated a claim the validator
-  > did not support, which is 5.3. `dfm.Rmd` drew a conclusion its
-  > own scores contradicted. `mvgam_overview.Rmd` displayed priors
-  > the model does not use and built its comparison on a simulation
-  > that cannot be recovered, which is 5.4. What remains is setting
-  > `NOT_CRAN: true` in `.github/workflows/pkgdown.yaml`, which
-  > belongs with 5.0's rebuild so the site is published from fits
-  > made by the shipping version.
+  > The tracked `docs/` build appears to contradict that:
+  > `mvgam_overview.html` carries real figures, so its chunks ran.
+  > The gate predates it, having been in place since September 2024
+  > against a build committed in February 2025. The explanation is
+  > that `docs/` was built locally and committed, and an interactive
+  > `devtools` session sets `NOT_CRAN` itself. The evidence that the
+  > site is fine therefore comes from a build that never went
+  > through the workflow, which is the same trap 5.0 records for
+  > articles rendered against a stale installed package.
+  >
+  > Second, and worse: eight of the ten articles have no published
+  > page at all. `docs/articles/` holds `data_in_mvgam`,
+  > `nmixtures`, `shared_states`, `time_varying_effects` and
+  > `trend_formulas`, none of which still exists as a source, and
+  > lacks `data`, `dfm`, `var`, `hierarchical_var`, `mvbf`,
+  > `jsdgam`, `idm` and `nmix`, all of which do. `_pkgdown.yml`
+  > names every one of the missing ones in its `articles:` section,
+  > so the article index links to pages that are not there.
+  >
+  > Third, two workflow settings keep it that way. The deploy step
+  > passes `clean: false`, so the five renamed pages stay on
+  > `gh-pages` with nothing to remove them, and
+  > `build_site_github_pages(lazy = TRUE)` skips any article whose
+  > HTML is newer than its source, which is exactly the stale page
+  > that needs rebuilding.
+  >
+  > So this is not the one-line change it was written as. It needs
+  > `NOT_CRAN: true`, `clean: true` on the deploy or an explicit
+  > purge of the five dead pages, and a decision on `lazy`. Sequence
+  > it with 5.0: turning the gate on now would publish articles
+  > built on sampling that 14.0 changes.
+  >
+  > Unverified, worth checking during 5.0: the workflow pins
+  > `pkgdown` to 2.0.9, released in 2022, while `_pkgdown.yml` now
+  > carries a full `reference:` and `articles:` structure.
+  >
+  > 5.1 is why this matters. The one article whose chunks had never
+  > executed was hiding two package bugs and four false claims. All
+  > three gated vignettes have since been rendered with the gate
+  > open and each carried something: `data.Rmd` overstated a claim
+  > the validator does not support, which is 5.3; `dfm.Rmd` drew a
+  > conclusion its own scores contradict; `mvgam_overview.Rmd`
+  > displays priors the model does not use and builds its comparison
+  > on a simulation that cannot be recovered, which is 5.4.
 
 - [ ] **5.0 Rebuild every vignette and the pkgdown site**
   > Five articles still hold numbers from June and July caches:
@@ -326,6 +397,36 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > AR cannot represent at any horizon. Wherever an article compares
   > models, check what the losing model estimates before dropping
   > it, and keep forecast accuracy and structural inference apart.
+
+- [ ] **17.0 What `R CMD check --as-cran` reports**
+  > Run for the first time this session against `94c6ad2c`.
+  > `cran-comments.md` claims no ERRORs or WARNINGs; there is one
+  > WARNING, now fixed, and four NOTEs.
+  >
+  > The WARNING was `predict.mvgam: possible error in
+  > predict_variance(...): unused argument (draw_ids = draw_ids)`.
+  > `predict(type = "variance")` errored on every call, with or
+  > without `draw_ids`, so a documented prediction type had never
+  > worked. `predict_variance()` took no `draw_ids` and hardcoded
+  > `NULL` in three places where a caller's value belonged, so
+  > adding the formal alone would have left the variance reading
+  > different draws from every other type. Fixed and verified
+  > against a cached fit: 1000 x 30 unfiltered, 5 x 30 under
+  > `draw_ids = 1:5`, matching `type = "expected"`.
+  >
+  > Remaining, all mechanical:
+  > - `ev` is reported as an undefined global. It is a real column
+  >   built at `plot_helpers.R:493` and read through ggplot2's data
+  >   masking, so it belongs in `globalVariables()`. There are two
+  >   of those blocks, `R/globals.R` and `R/mvgam-package.R`, which
+  >   is the same duplication shape as the rest of 15.x.
+  > - `Rplots.pdf` at top level. `.Rbuildignore` covers
+  >   `tests/testthat/Rplots.pdf` but not the root copy a plotting
+  >   example leaves behind.
+  > - The Stan forum URL in `R/families.R`, three occurrences,
+  >   redirects; use the target.
+  > - Non-portable compilation flags come from the local Makevars
+  >   rather than from the package, so nothing to do.
 
 - [ ] **6.0 Final release verification**
   > Clean `document()`, clean test sweep, `R CMD check --as-cran`,

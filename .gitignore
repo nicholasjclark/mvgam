@@ -42,3 +42,6 @@ pkgdown/*_cache/mod_*.rds
 pkgdown/*_cache/*_fit.rds
 # session-only scratchpad of rendered figures
 scratchpad_figs/
+
+# R CMD check output
+*.Rcheck/

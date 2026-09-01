@@ -269,18 +269,22 @@ generate_trend_priors <- function(trend_spec, data, response_names = NULL,
   # prior decides which branch `Z` is drawn from, so the object
   # reported on carries the same spec the code generator reads.
   if (inherits(trend_model, "mvgam_trend")) {
-    if (!is.null(loadings_prior_spec)) {
-      trend_model$loadings_prior_spec <- loadings_prior_spec
-    }
-    prior_list$constructor <- generate_trend_priors_from_monitor_params(trend_model)
+    trend_model <- attach_loadings_spec_to_trend(
+      trend_model, loadings_prior_spec
+    )
+    prior_list$constructor <-
+      generate_trend_priors_from_monitor_params(trend_model)
   }
 
   # 2. Get base formula priors using existing mvgam infrastructure
   # Use setup_brms_lightweight which handles fake response variables automatically
   if (!is.null(base_formula) && inherits(base_formula, "formula")) {
-    # Extract priors for all formulas except no-intercept (~0)
-    # This includes intercept-only (~1) which should generate Intercept_trend
-    if (!all.equal(base_formula, ~ 0, check.attributes = FALSE) == TRUE) {
+    # Ask brms only when the trend formula has something for it to
+    # answer about. An intercept counts, so `~ 1` still produces
+    # `Intercept_trend`, while `~ 0` and `~ -1` produce nothing:
+    # comparing against `~ 0` alone reported a `b_trend` for `~ -1`
+    # that the emitted program has no parameter for.
+    if (formula_has_population_terms(base_formula)) {
 
       # Call verified setup_brms_lightweight function
       # The same options the observation side is given, so a prior
@@ -602,23 +606,6 @@ create_empty_brmsprior <- function() {
 # back to parameter-type-based defaults. This provides flexibility while
 # maintaining the convention-based approach.
 
-#' Get AR-Specific Parameter Prior (Optional Customization)
-#'
-#' @param param_name Character string parameter name
-#' @param trend_obj mvgam_trend object
-#' @return List with prior, lb, ub elements, or NULL for default handling
-#' @noRd
-get_ar_parameter_prior <- function(param_name, trend_obj) {
-  # AR trends can have custom logic for stationarity constraints
-  if (is_ar_coefficient(param_name)) {
-    # For AR coefficients, we might want tighter bounds for stability
-    return(list(prior = "", lb = "-0.99", ub = "0.99"))
-  }
-
-  # Return NULL to use default parameter-type handling
-  return(NULL)
-}
-
 #' Get CAR-Specific Parameter Prior (Optional Customization)
 #'
 #' @param param_name Character string parameter name
@@ -856,7 +843,12 @@ get_all_mvgam_trend_parameters <- function(trend_specs) {
     }
   }
   
-  # Add base parameters that all trends have
+  # These two are mvgam's whenever they appear, which is a different
+  # question from whether a given model samples them. This list only
+  # decides what must never be handed to brms, so naming them
+  # unconditionally is the safe direction: dropping one lets it reach
+  # brms as `sigma`, an observation-side prior on the wrong scale.
+  # What a model actually samples is `samples_innovation_scale()`.
   all_mvgam_params <- c(all_mvgam_params, "sigma_trend", "nu_trend")
   
   unique(all_mvgam_params)

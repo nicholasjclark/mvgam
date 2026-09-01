@@ -377,7 +377,7 @@ denormalise_loadings_prior <- function(spec) {
   # while `normalise_loadings_prior()` refuses them unless the
   # shrinkage is `"mgp"`, so they travel only when they mean
   # something.
-  if (identical(spec$column_shrinkage, "mgp")) {
+  if (loadings_spec_traits(spec)$mgp) {
     out$mgp_a1 <- spec$mgp_a1
     out$mgp_a2 <- spec$mgp_a2
   }

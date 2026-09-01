@@ -247,6 +247,54 @@ test_that("one registry entry drives both stancode and get_prior", {
   expect_identical(prior_tab$prior[prior_tab$class == "nu_trend"], default)
 })
 
+test_that("a reported bound is the bound Stan declares", {
+  # A bound is stated in the registry, in the type fallback and in
+  # any per-trend resolver, and nothing held those in step: the
+  # autoregressive resolver reported (-0.99, 0.99) against a
+  # declaration of [-1, 1], so the table understated the support the
+  # model samples on. Compare the whole table rather than one
+  # parameter, since the next drift will be somewhere else.
+  declared_bounds <- function(code) {
+    lines <- unlist(strsplit(code, "\n"))
+    pat <- paste0("^\\s*(vector|real|array[^ ]*)\\s*",
+                  "<([^>]*)>\\s*(\\[[^]]*\\])?\\s*",
+                  "([A-Za-z_][A-Za-z0-9_]*)")
+    out <- list()
+    for (m in regmatches(lines, regexec(pat, lines))) {
+      if (!length(m)) next
+      cons <- m[3L]
+      out[[m[5L]]] <- c(
+        if (grepl("lower", cons)) {
+          trimws(sub(".*lower\\s*=\\s*([^,>]*).*", "\\1", cons))
+        } else "",
+        if (grepl("upper", cons)) {
+          trimws(sub(".*upper\\s*=\\s*([^,>]*).*", "\\1", cons))
+        } else ""
+      )
+    }
+    out
+  }
+
+  forms <- list(~ AR(p = 2), ~ AR(p = 1, ma = TRUE), ~ RW(ma = TRUE),
+                ~ CAR(), ~ VAR(p = 1), ~ AR(p = 1, cor = TRUE))
+  dat <- build_test_data()
+  for (form in forms) {
+    mf <- mvgam_formula(y ~ x, trend_formula = form)
+    tab <- get_prior(mf, data = dat, family = poisson())
+    stan <- declared_bounds(
+      stancode(mf, data = dat, family = poisson(), validate = FALSE)
+    )
+    for (i in seq_len(nrow(tab))) {
+      cls <- tab$class[i]
+      if (!nzchar(cls) || is.null(stan[[cls]])) next
+      reported <- c(tab$lb[i] %||% "", tab$ub[i] %||% "")
+      reported[is.na(reported)] <- ""
+      expect_identical(reported, stan[[cls]])
+    }
+  }
+})
+
+
 test_that("assert_trend_df() rejects values with no finite variance", {
   # The AR stationary initialisation divides by sqrt(1 - phi^2), which
   # presumes a finite second moment; a t has one only above 2.
