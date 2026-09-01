@@ -2503,8 +2503,13 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata,
   }
   checkmate::assert_matrix(mu_factor_long, ncols = n_rows * n_lv)
 
+  # `mu_factor` is the per-factor smooth over the latent axis, so
+  # it belongs to the `Z` the model sampled. Stan folds it inside
+  # the projection for these fits, and the basis is named here
+  # rather than left to a default so the two halves cannot drift.
   Z_arr <- extract_Z_loadings(full_draws,
-                              n_obs_series = n_series, n_lv = n_lv)
+                              n_obs_series = n_series, n_lv = n_lv,
+                              basis = "model")
 
   ndraws_used <- nrow(full_draws)
   linpred_mat <- matrix(NA_real_, nrow = ndraws_used, ncol = n_rows)

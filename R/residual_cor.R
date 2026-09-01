@@ -90,7 +90,18 @@
 #' Credible intervals and posterior SDs for correlations are computed
 #' on the Fisher z-transformed scale (`atanh(r)`) and back-transformed
 #' for display, which keeps the intervals well-behaved for
-#' correlations near `+/- 1`. Posterior probabilities
+#' correlations near `+/- 1`. Summarising on that scale means the
+#' reported matrix is an elementwise posterior summary rather than a
+#' draw from the posterior, so it need not be positive
+#' semi-definite. The gap shows up where the implied correlation is
+#' close to degenerate, as when a handful of factors drive many
+#' series: a four-series fit on two factors can return a smallest
+#' eigenvalue near `-0.01`. That is harmless for reading, plotting
+#' and testing individual correlations, and unsuitable for anything
+#' that factorises the matrix, such as [chol()] or a simulation that
+#' treats it as a covariance. For those, take `summary = FALSE` and
+#' work per draw, where every matrix is a valid correlation matrix.
+#' Posterior probabilities
 #' (`prob_positive`, `prob_negative`) are computed on the native
 #' scale. `prob_nonzero = pmax(prob_positive, prob_negative)`
 #' summarises one-sided evidence; `sig_cor` is the correlation matrix

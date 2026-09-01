@@ -44,8 +44,9 @@ resolve_column_scales <- function(object, draws_mat, n_lv) {
 #'
 #' Criterion (Legramanti, Durante and Dunson 2020). For each
 #' posterior draw `s`, compute the per-column squared norms
-#' \deqn{c_h^{(s)} = \|Z_\text{tilde}[, h]^{(s)}\|^2,} where
-#' `Z_tilde` is the QR-identified loadings matrix. The reference
+#' \deqn{c_h^{(s)} = \|Z[, h]^{(s)}\|^2,} where `Z` is the
+#' loadings matrix the model sampled, which is the basis the
+#' column scales are stated in. The reference
 #' scale is the posterior mean of the leading-column norm
 #' `ref = mean_s c_1^{(s)}`, and the activity threshold is
 #' `eps = fraction * ref`. Factor `h` is **active** iff
@@ -54,15 +55,13 @@ resolve_column_scales <- function(object, draws_mat, n_lv) {
 #' posterior median of the per-draw active count is reported as
 #' the headline summary.
 #'
-#' Important caveat (QR-vs-MGP composition). `Psi_diag` (the MGP
-#' column-shrinkage parameter) lives in the **unrotated** Z basis;
-#' the post-hoc QR step re-orders columns of `Z_tilde` by
-#' Gram-Schmidt pivots, NOT by the MGP prior ordering. The
-#' "factor h" labelled by this function is the h-th column of
-#' `Z_tilde`, NOT necessarily the h-th MGP factor. Read the result
-#' as "k of `n_lv` truncation-ceiling factors carry meaningful
-#' posterior signal", not as "factors 1..k under the MGP ordering
-#' are active".
+#' The column scales matter here, so the criterion reads the
+#' sampled `Z` rather than the QR-identified `Z_tilde`: the MGP
+#' shrinkage parameter `Psi_diag` lives in that basis, and the QR
+#' step re-orders columns by Gram-Schmidt pivots rather than by
+#' the MGP ordering. Even so, read the result as "k of `n_lv`
+#' truncation-ceiling factors carry meaningful posterior signal",
+#' not as "factors 1..k under the MGP ordering are active".
 #'
 #' @param object A fitted `mvgam` object whose trend includes
 #'   latent factors (`n_lv > 0`).

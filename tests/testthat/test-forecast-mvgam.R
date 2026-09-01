@@ -22,7 +22,7 @@
 make_mock_mvgam <- function(series_levels = "s1", n_time = 10L,
                               trend_type = "AR",
                               ar_lags = 1L, ma_lags = integer(0),
-                              max_lag = 1L) {
+                              max_lag = 1L, n_lv = NULL) {
   d <- data.frame(
     time = rep(seq_len(n_time), length(series_levels)),
     series = factor(rep(series_levels, each = n_time),
@@ -58,7 +58,7 @@ make_mock_mvgam <- function(series_levels = "s1", n_time = 10L,
     ),
     standata = list(
       N_series_trend = length(series_levels),
-      N_lv_trend = length(series_levels),
+      N_lv_trend = n_lv %||% length(series_levels),
       N_time_trend = n_time
     ),
     backend = "rstan"
@@ -133,8 +133,7 @@ test_that("Returns mvgam_forecast with 10 contractual fields", {
         params = list(sigma = 0.1, ar = matrix(0.5, 1L, 1L)),
         last_state = list(
           trends = matrix(0, 1L, 1L),
-          errors = NULL,
-          linpreds = matrix(0, 1L, 1L)
+          errors = NULL
         )
       )
     },
@@ -234,8 +233,7 @@ test_that("type = 'link' populates family_pars", {
       list(
         params = list(sigma = 0.1, ar = matrix(0.5, 1L, 1L)),
         last_state = list(
-          trends = matrix(0, 1L, 1L), errors = NULL,
-          linpreds = matrix(0, 1L, 1L)
+          trends = matrix(0, 1L, 1L), errors = NULL
         )
       )
     },
@@ -450,6 +448,221 @@ test_that("pad_or_trim_rows handles zero-row input as a zero pad", {
   out <- pad_or_trim_rows(g, target_rows = 3L)
   expect_identical(dim(out), c(3L, 2L))
   expect_true(all(out == 0))
+})
+
+
+# ----- trend_linpred_grid -----------------------------------------
+
+# A small obs_struct standing in for `get_observation_structure()`:
+# 3 times x 2 series, stored in (time, series) row order.
+lp_obs_struct <- function() {
+  list(
+    unique_times = c(41, 42, 43),
+    time = c(41, 41, 42, 42, 43, 43),
+    series_int = c(1L, 2L, 1L, 2L, 1L, 2L),
+    n_series = 2L
+  )
+}
+
+
+test_that("trend_linpred_grid reshapes one draw to series scale", {
+  lp <- matrix(seq_len(12), nrow = 2L, byrow = TRUE)
+  out <- trend_linpred_grid(lp, lp_obs_struct(), draw_row = 2L,
+                              n_rows = 3L, n_series = 2L)
+  expect_identical(dim(out), c(3L, 2L))
+  # Row 2 of `lp` is 7:12, laid out as (t, s) pairs.
+  expect_equal(out[1, ], c(7, 8))
+  expect_equal(out[2, ], c(9, 10))
+  expect_equal(out[3, ], c(11, 12))
+})
+
+
+test_that("trend_linpred_grid is zero without a trend formula", {
+  out <- trend_linpred_grid(NULL, NULL, draw_row = 1L,
+                              n_rows = 4L, n_series = 3L)
+  expect_identical(dim(out), c(4L, 3L))
+  expect_true(all(out == 0))
+})
+
+
+test_that("trend_linpred_grid returns an empty grid for zero rows", {
+  out <- trend_linpred_grid(NULL, NULL, draw_row = 1L,
+                              n_rows = 0L, n_series = 2L)
+  expect_identical(dim(out), c(0L, 2L))
+})
+
+
+test_that("trend_linpred_grid keeps series scale, not draw width", {
+  # The grid is indexed by series even when the caller propagates
+  # at the latent-variable grain, so its width tracks `n_series`.
+  lp <- matrix(seq_len(6), nrow = 1L)
+  out <- trend_linpred_grid(lp, lp_obs_struct(), draw_row = 1L,
+                              n_rows = 2L, n_series = 2L)
+  expect_identical(ncol(out), 2L)
+  # Trimming from the head keeps the two most recent times.
+  expect_equal(out[2, ], c(5, 6))
+})
+
+
+# ----- the zero-mean propagation convention ------------------------
+
+test_that("centred propagation reproduces the kernel's mean form", {
+  # `trend_arma_recursC()` can carry a time-varying mean itself,
+  # via `trend[t] = lp[t] + A (trend[t - 1] - lp[t - 1]) + e[t]`.
+  # mvgam instead advances the zero-mean latent state and adds
+  # `mu_trend` at series scale, which is the only form that also
+  # covers a factor model. The two agree exactly, and that
+  # equivalence is what lets one convention serve every trend.
+  set.seed(404)
+  h <- 8L
+  n_series <- 2L
+  max_lag <- 1L
+  total <- h + max_lag
+  A <- array(diag(c(0.6, 0.35)), dim = c(2L, 2L, 1L))
+  B <- array(0, dim = c(2L, 2L, 0L))
+  innov <- matrix(rnorm(total * n_series, sd = 0.3),
+                    nrow = total, ncol = n_series)
+  lp <- matrix(rnorm(total * n_series, sd = 1.2),
+                 nrow = total, ncol = n_series)
+  state <- matrix(c(1.1, -0.4), nrow = 1L)
+
+  with_mean <- trend_arma_recursC(
+    ar_lags = 1L, ma_lags = integer(0), drift = c(0, 0),
+    A = A, B = B, innovations = innov, linpreds = lp,
+    last_trends = state, h = h
+  )
+  zero_mean <- trend_arma_recursC(
+    ar_lags = 1L, ma_lags = integer(0), drift = c(0, 0),
+    A = A, B = B, innovations = innov,
+    linpreds = matrix(0, nrow = total, ncol = n_series),
+    last_trends = state - lp[seq_len(max_lag), , drop = FALSE],
+    h = h
+  )
+  reconstructed <- zero_mean +
+    lp[seq.int(max_lag + 1L, total), , drop = FALSE]
+  expect_equal(reconstructed, with_mean, tolerance = 1e-12)
+})
+
+
+# ----- the mean enters once, at series scale -----------------------
+
+test_that("the forecast centres the state and re-adds the mean", {
+  # Pins both halves of the convention separately by giving the
+  # training tail and the forecast window different trend linear
+  # predictors. With a propagator that echoes the state it was
+  # handed, the answer is (state - lp_tail) + lp_forecast.
+  # Dropping the centring gives 3.5, dropping the re-add gives
+  # 1.5, and dropping both gives 2, so no single omission
+  # survives.
+  fit <- make_mock_mvgam()
+  draws <- make_draws_mat(ndraws = 3L)
+  newdata <- data.frame(time = 11:12,
+                          series = factor("s1", levels = "s1"),
+                          y = NA_integer_)
+
+  testthat::local_mocked_bindings(
+    `as_draws_matrix` = function(...) draws,
+    .package = "posterior"
+  )
+  testthat::local_mocked_bindings(
+    extract_component_linpred = function(mvgam_fit, newdata,
+                                            component, ...) {
+      if (!identical(component, "trend")) {
+        return(matrix(0, nrow = 3L, ncol = nrow(newdata)))
+      }
+      # The tail carries one row per series, the forecast grid two.
+      value <- if (nrow(newdata) == 1L) 0.5 else 1.5
+      matrix(value, nrow = 3L, ncol = nrow(newdata))
+    },
+    get_observation_structure = function(object, newdata, ...) {
+      make_obs_struct_for_grid(
+        as.integer(newdata$time),
+        rep(1L, nrow(newdata)),
+        levels(newdata$series)
+      )
+    },
+    propagate_trend = function(trend_model, params, h, n_series,
+                                 last_state = NULL, ...) {
+      matrix(rep(as.numeric(last_state$trends), h),
+               nrow = h, ncol = n_series, byrow = TRUE)
+    },
+    extract_last_state = function(...) {
+      list(
+        params = list(sigma = 0.1, ar = matrix(0.5, 1L, 1L)),
+        last_state = list(
+          trends = matrix(2, 1L, 1L),
+          errors = NULL
+        )
+      )
+    }
+  )
+
+  fc <- forecast(fit, newdata = newdata, type = "trend")
+  expect_equal(unname(as.numeric(fc$forecasts[["s1"]])),
+                 rep(2 - 0.5 + 1.5, 6L))
+})
+
+
+# ----- one basis for state and loadings ---------------------------
+
+test_that("a factor forecast projects with the sampled loadings", {
+  # A QR-identified fit stores both `Z` with `lv_trend` and
+  # `Z_tilde` with `lv_trend_tilde`, and only a matching pair
+  # rebuilds the trend. The propagated state is the raw
+  # `lv_trend`, so the projection has to use the raw `Z`. Here
+  # the two loadings matrices differ, so pairing the state with
+  # `Z_tilde` would give 2 rather than 1 in every cell.
+  fit <- make_mock_mvgam(series_levels = c("s1", "s2"),
+                           n_lv = 1L, trend_type = "ZMVN",
+                           ar_lags = integer(0), max_lag = 0L)
+  fit$mv_spec$trend_specs$trend <- "ZMVN"
+  draws <- posterior::as_draws_matrix(matrix(
+    c(1, 1, 2, 2), nrow = 1L,
+    dimnames = list(NULL, c("Z[1,1]", "Z[2,1]",
+                              "Z_tilde[1,1]", "Z_tilde[2,1]"))
+  ))
+  newdata <- data.frame(
+    time = c(11L, 11L, 12L, 12L),
+    series = factor(c("s1", "s2", "s1", "s2"),
+                      levels = c("s1", "s2")),
+    y = NA_integer_
+  )
+
+  testthat::local_mocked_bindings(
+    `as_draws_matrix` = function(...) draws,
+    .package = "posterior"
+  )
+  testthat::local_mocked_bindings(
+    extract_component_linpred = function(mvgam_fit, newdata,
+                                            component, ...) {
+      matrix(0, nrow = 1L, ncol = nrow(newdata))
+    },
+    get_observation_structure = function(object, newdata, ...) {
+      make_obs_struct_for_grid(
+        as.integer(newdata$time),
+        as.integer(newdata$series),
+        levels(newdata$series)
+      )
+    },
+    propagate_trend = function(trend_model, params, h, n_series,
+                                 ...) {
+      matrix(1, nrow = h, ncol = n_series)
+    },
+    extract_last_state = function(...) {
+      list(
+        params = list(Sigma = diag(1)),
+        last_state = list(
+          trends = matrix(0, nrow = 0L, ncol = 1L),
+          errors = NULL
+        ),
+        n_lv_active = 1L
+      )
+    }
+  )
+
+  fc <- forecast(fit, newdata = newdata, type = "trend")
+  expect_equal(unname(as.numeric(fc$forecasts[["s1"]])), c(1, 1))
+  expect_equal(unname(as.numeric(fc$forecasts[["s2"]])), c(1, 1))
 })
 
 

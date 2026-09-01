@@ -289,7 +289,36 @@ test_that("ZMVN returns Sigma + sigma and an empty trend history", {
   res <- extract_last_state(fit, 1L)
   expect_true("Sigma" %in% names(res$params))
   expect_identical(dim(res$last_state$trends), c(0L, 2L))
-  expect_identical(dim(res$last_state$linpreds), c(0L, 2L))
+  # The recursion is advanced zero-mean, so the state carries no
+  # linear-predictor field for a caller to fill.
+  expect_false("linpreds" %in% names(res$last_state))
+})
+
+
+test_that("factor ZMVN keeps the latent scale it was fitted with", {
+  # The identified latent variables are not standard normals:
+  # `sigma_trend` and `L_Omega_trend` carry the scale, and
+  # `propagate_zmvn()` draws from that covariance. Reading it at
+  # the LV grain is what keeps a factor forecast's intervals the
+  # width the model implies.
+  n_series <- 3L
+  n_lv <- 2L
+  draws <- make_draws(list(
+    sigma_trend = c(0.6, 0.3),
+    # Lower triangular with unit-norm rows, so `tcrossprod()`
+    # gives a correlation matrix and the scales stay readable.
+    L_Omega_trend = matrix(c(1, 0.5, 0, sqrt(0.75)), 2L, 2L)
+  ))
+  meta <- list(trend_type = "ZMVN",
+                 ar_lags = integer(0),
+                 ma_lags = integer(0),
+                 max_lag = 0L, has_cor = TRUE)
+  fit <- make_mock_fit(draws, n_series, n_lv = n_lv, 5L, meta)
+  res <- extract_last_state(fit, 1L)
+  expect_identical(res$n_lv_active, n_lv)
+  # Square in the latent dimension, not the series dimension.
+  expect_identical(dim(res$params$Sigma), c(n_lv, n_lv))
+  expect_equal(sqrt(diag(res$params$Sigma)), c(0.6, 0.3))
 })
 
 

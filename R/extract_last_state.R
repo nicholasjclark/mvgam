@@ -9,7 +9,6 @@
 #     last_state = list(
 #       trends   = matrix[max_lag, n_series],
 #       errors   = matrix[max_ma, n_series] | NULL,
-#       linpreds = matrix[max_lag, n_series],  # filled by caller
 #       time     = numeric(n_series)           # CAR only
 #     )
 #   )
@@ -64,20 +63,16 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
   n_series <- as.integer(fit$standata$N_series_trend %||% 1L)
   n_lv <- as.integer(fit$standata$N_lv_trend %||% n_series)
 
-  # Per the trend-system architecture docs, factor models
-  # (n_lv < n_series) put the AR/RW/VAR recursion in n_lv-
-  # dimensional latent space; a per-draw Z matrix
-  # `[n_series, n_lv]` then projects the propagated LV
-  # trajectory back to observed series scale. The RW/AR/VAR
-  # extractors accept the LV grain here, and
-  # `forecast.mvgam`:`propagate_one_draw` applies the Z
-  # projection after `propagate_trend()` returns via
-  # `extract_Z_loadings()`. Hierarchical fits with
-  # `n_lv = n_groups * n_subgroups > n_series` still need a
-  # dedicated extraction path and error out below.
-  # CAR / ZMVN / PW factor variants aren't emitted by the
-  # generators today, so those branches keep the univariate
-  # `n_lv == n_series` assumption.
+  # A factor model (n_lv < n_series) runs its recursion in
+  # n_lv-dimensional latent space, and a per-draw
+  # `[n_series, n_lv]` Z projects the propagated trajectory back
+  # to observed series scale. The RW, AR, VAR and ZMVN
+  # extractors all take that grain; the whitelist below refuses
+  # the trend types whose generators emit no factor variant.
+  # `forecast.mvgam`:`propagate_one_draw` applies the projection
+  # once `propagate_trend()` returns. Hierarchical fits with
+  # `n_lv = n_groups * n_subgroups > n_series` need a dedicated
+  # extraction path and error out below.
   is_factor <- n_lv < n_series
   if (n_lv > n_series) {
     stop(insight::format_error(c(
@@ -109,22 +104,21 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
   }
 
   # In factor mode extraction happens at the LV grain
-  # (`lv_trend[t, k]` for RW/AR/VAR, `lv_trend_tilde[t, k]` for
-  # QR-identified ZMVN jsdgam fits, sigma_trend[k], ar_trend[k]).
-  # The caller projects the propagated `[h, n_lv]` trajectory
-  # back to series scale via Z; see `apply_factor_projection()`
-  # in forecast.mvgam.R.
+  # (`lv_trend[t, k]`, `sigma_trend[k]`, `ar_trend[k]`), and the
+  # caller projects the propagated `[h, n_lv]` trajectory back to
+  # series scale via Z; see `apply_factor_projection()` in
+  # forecast.mvgam.R.
+  #
+  # A QR-identified fit also stores `lv_trend_tilde` alongside a
+  # rotated `Z_tilde`, and `Z lv` equals `Z_tilde lv_tilde`. Only
+  # the matching pair reconstructs the trend, so the whole
+  # forecast reads one basis. It is the model basis, because every
+  # other quantity the recursion consumes -- `ar<k>_trend`,
+  # `A_trend`, `sigma_trend`, `L_Omega_trend` -- is stated for the
+  # `Z` the model sampled, and rotating the state alone would
+  # leave those behind.
   state_dim <- if (is_factor) n_lv else n_series
-  state_var <- if (!is_factor) {
-    "trend"
-  } else if (meta$trend_type == "ZMVN") {
-    # jsdgam fits QR-identify the loadings and save
-    # `lv_trend_tilde[t, k]` in generated quantities; the raw
-    # `lv_trend[t, k]` is not exported.
-    "lv_trend_tilde"
-  } else {
-    "lv_trend"
-  }
+  state_var <- if (is_factor) "lv_trend" else "trend"
 
   out <- switch(
     meta$trend_type,
@@ -135,8 +129,7 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
     "VAR" = extract_var_state(one_draw, meta, state_dim, n_lv, fit,
                                 state_var = state_var),
     "CAR" = extract_car_state(one_draw, meta, n_series, fit),
-    "ZMVN" = extract_zmvn_state(one_draw, meta, state_dim, n_lv, fit,
-                                  state_var = state_var),
+    "ZMVN" = extract_zmvn_state(one_draw, state_dim, n_lv, fit),
     "PW" = extract_pw_state(one_draw, meta, n_series, n_lv, fit),
     stop(insight::format_error(c(
       paste0(
@@ -180,10 +173,9 @@ get_enriched_trend_metadata <- function(fit) {
 
 # Internal: pull the last `max_lag` rows of the [N_time, N_series]
 # `trend[t, s]` posterior matrix for one draw, sliced to the first
-# `n_series` columns. Reason: the kernel applies the brms-centred
-# convention `(trend - linpred)`, so passing `trend[t, s]` here
-# with the matching `mu_trend[t, s]` as `linpreds` lets the kernel
-# recover the latent process internally.
+# `n_series` columns. This grid carries `mu_trend`, so the caller
+# subtracts the trend linear predictor to recover the zero-mean
+# latent state that the recursion advances.
 #'@noRd
 extract_trend_history <- function(one_draw, n_series, n_lv, max_lag,
                                     n_time, state_var = "trend") {
@@ -255,6 +247,24 @@ extract_sigma_and_cov <- function(one_draw, n_series, n_lv,
                                     has_cor, standata = NULL) {
   group_info <- hierarchical_group_info(standata)
   if (!is.null(group_info)) {
+    # Hierarchical scales are indexed by observed series, so this
+    # branch cannot answer a latent-grain request. No generator
+    # emits that combination today; say so plainly if one ever
+    # does, rather than failing on a length assertion downstream.
+    if (!identical(as.integer(n_series),
+                     length(group_info$group_inds))) {
+      stop(insight::format_error(c(
+        "Grouped trend covariance requested at the wrong grain.",
+        x = paste0(
+          "Got n = ", n_series, ", group indices = ",
+          length(group_info$group_inds), "."
+        ),
+        i = paste0(
+          "Hierarchical scales are per observed series, not per ",
+          "latent factor."
+        )
+      )))
+    }
     return(extract_hierarchical_sigma_and_cov(
       one_draw, n_series, group_info
     ))
@@ -445,8 +455,7 @@ extract_arma_state <- function(one_draw, meta, n_series, n_lv, fit,
                                        meta$max_lag, n_time,
                                        state_var = state_var),
       errors = extract_ma_innovations(one_draw, n_series, n_lv,
-                                        max_ma, n_time),
-      linpreds = matrix(0, nrow = meta$max_lag, ncol = n_series)
+                                        max_ma, n_time)
     )
   )
 }
@@ -504,8 +513,7 @@ extract_var_state <- function(one_draw, meta, n_series, n_lv, fit,
       trends = extract_trend_history(one_draw, n_series, n_lv,
                                        meta$max_lag, n_time,
                                        state_var = state_var),
-      errors = empty_errors(),
-      linpreds = matrix(0, nrow = meta$max_lag, ncol = n_series)
+      errors = empty_errors()
     )
   )
 }
@@ -537,7 +545,6 @@ extract_car_state <- function(one_draw, meta, n_series, fit) {
     last_state = list(
       trends = trends_hist,
       errors = empty_errors(),
-      linpreds = matrix(0, nrow = 1L, ncol = n_series),
       time = last_time
     )
   )
@@ -578,33 +585,19 @@ extract_last_observed_times <- function(fit, n_series) {
 # independent MVN draw, so the only params field is `Sigma`.
 # `last_state$trends` is a zero-row matrix (max_lag = 0).
 #
-# For factor-mode ZMVN (jsdgam under the Heaps identification)
-# the LVs are standard normals and all scale / correlation lives
-# on Z_tilde -- there is no sigma_trend or L_Omega_trend to
-# extract from the posterior, so params$Sigma is the identity
-# and propagate_zmvn draws independent N(0, 1) samples per LV,
-# which the caller projects to the series scale via
-# apply_factor_projection().
+# In factor mode `n_series` arrives as the LV count, so the same
+# read gives `sigma_trend[1..n_lv]` and the `n_lv` square
+# `L_Omega_trend` the latent draws are actually scaled by.
 #'@noRd
-extract_zmvn_state <- function(one_draw, meta, n_series, n_lv, fit,
-                                state_var = "trend") {
-  is_factor <- state_var != "trend"
-  if (is_factor) {
-    Sigma <- diag(n_series)
-    sigma <- rep(1, n_series)
-  } else {
-    scov <- extract_sigma_and_cov(one_draw, n_series, n_lv,
-                                   has_cor = TRUE,
-                                   standata = fit$standata)
-    Sigma <- scov$Sigma
-    sigma <- scov$sigma
-  }
+extract_zmvn_state <- function(one_draw, n_series, n_lv, fit) {
+  scov <- extract_sigma_and_cov(one_draw, n_series, n_lv,
+                                 has_cor = TRUE,
+                                 standata = fit$standata)
   list(
-    params = list(Sigma = Sigma, sigma = sigma),
+    params = list(Sigma = scov$Sigma, sigma = scov$sigma),
     last_state = list(
       trends = matrix(0, nrow = 0L, ncol = n_series),
-      errors = empty_errors(),
-      linpreds = matrix(0, nrow = 0L, ncol = n_series)
+      errors = empty_errors()
     )
   )
 }
@@ -668,7 +661,6 @@ extract_pw_state <- function(one_draw, meta, n_series, n_lv,
     last_state = list(
       trends = matrix(0, nrow = 0L, ncol = n_series),
       errors = empty_errors(),
-      linpreds = matrix(0, nrow = 0L, ncol = n_series),
       cap_train = cap
     )
   )

@@ -169,7 +169,6 @@ test_that("propagate_trend accepts a caller-supplied last_state", {
   ls <- list(
     trends = matrix(0.5, nrow = 3L, ncol = 2L),
     errors = matrix(0, nrow = 1L, ncol = 2L),
-    linpreds = matrix(0, nrow = 3L, ncol = 2L),
     time = NULL
   )
   out <- propagate_trend(

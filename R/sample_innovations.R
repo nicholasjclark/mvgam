@@ -1435,6 +1435,10 @@ extract_Z_loadings <- function(draws_mat, n_obs_series, n_lv,
         "Latent-factor model needs ", param_name,
         "[s, lv] for s in 1..", n_obs_series,
         ", lv in 1..", n_lv, "."
+      ),
+      i = paste0(
+        "Read draws from the stanfit itself: mvgam's 'as_draws_*' ",
+        "methods hide the unrotated loadings."
       )
     )))
   }

@@ -12,10 +12,8 @@
 # `run_recovery_case()` is family-agnostic.
 
 
-# Map each catalog type to the formula a user would fit. The
-# trend_model lives on the simulated mvgam_sim$trend_model slot
-# so the recovery fit always matches the generative trend.
-# gp() smooths require an explicit k argument
+# Map each catalog type to the observation formula a user would
+# fit. gp() smooths require an explicit k argument
 # (Hilbert-space GP basis); fully-exact GP is not supported as
 # a fit-time term.
 type_formulas <- list(
@@ -26,6 +24,31 @@ type_formulas <- list(
   `5` = y ~ x,
   `6` = y ~ s(season, bs = "cc")
 )
+
+
+# The latent dynamics each type is simulated and fitted under.
+# These reproduce the per-type defaults in the sim_mvgam catalog;
+# one entry drives both sides of a case (see
+# `trend_model_from_formula()`), so a fit never sees a different
+# kernel from the one that generated its data.
+type_trends <- list(
+  `1` = ~ RW(),
+  `2` = ~ AR(p = 1),
+  `3` = ~ AR(p = 1),
+  `4` = ~ AR(p = 1),
+  `5` = ~ AR(p = 1),
+  `6` = ~ CAR()
+)
+
+
+# `mvgam()` reads the trend constructor from the right-hand side
+# of `trend_formula`, while `sim_mvgam()` wants the evaluated
+# `mvgam_trend` object. Evaluating that right-hand side here lets
+# a single formula specify both, rather than two spellings that
+# can drift apart.
+trend_model_from_formula <- function(trend_formula) {
+  eval(trend_formula[[2L]], envir = environment(trend_formula))
+}
 
 
 # Family-specific formula adjustment: binomial needs the
@@ -98,15 +121,18 @@ smooth_recovery_cor <- function(fit, sim, sim_smooth_name) {
 run_recovery_case <- function(type, family, family_arg,
                                 n_timepoints = 120L,
                                 seed = 42L, min_cor = 0.6) {
+  trend_formula <- type_trends[[as.character(type)]]
   sim <- sim_mvgam(
     type = type, family = family, n_series = 1L,
-    n_timepoints = n_timepoints, seed = seed
+    n_timepoints = n_timepoints,
+    trend_model = trend_model_from_formula(trend_formula),
+    seed = seed
   )
   formula <- adjust_formula_for_family(
     type_formulas[[as.character(type)]], family_arg
   )
   fit <- mvgam(
-    formula = formula, trend_model = sim$trend_model,
+    formula = formula, trend_formula = trend_formula,
     data = sim$data_train, family = family_arg,
     chains = 1L, iter = 1000L, warmup = 500L,
     refresh = 0L, silent = 2L, backend = "cmdstanr"
@@ -183,13 +209,18 @@ for (case in RECOVERY_GRID) {
 
 # ---- Edge cases ----------------------------------------------------
 
-# Edge: short series (n_timepoints = 40) — confirms recovery
+# Edge: short series (n_timepoints = 40), confirming recovery
 # degrades gracefully but doesn't error.
 test_that("short series still produces a finite fit", {
+  trend_formula <- type_trends[["1"]]
   sim <- sim_mvgam(type = 1L, family = gaussian(),
-                    n_timepoints = 40L, seed = 99L)
+                    n_timepoints = 40L,
+                    trend_model = trend_model_from_formula(
+                      trend_formula
+                    ),
+                    seed = 99L)
   fit <- mvgam(
-    formula = y ~ s(x), trend_model = sim$trend_model,
+    formula = y ~ s(x), trend_formula = trend_formula,
     data = sim$data_train, family = gaussian(),
     chains = 1L, iter = 600L, warmup = 300L,
     refresh = 0L, silent = 2L, backend = "cmdstanr"
@@ -198,17 +229,27 @@ test_that("short series still produces a finite fit", {
 })
 
 
-# Edge: prop_missing > 0 — ensure NA injection doesn't break the
+# Edge: prop_missing > 0, ensuring NA injection does not break
 # fit.
 test_that("missing-data injection doesn't break recovery", {
+  trend_formula <- type_trends[["1"]]
   sim <- sim_mvgam(type = 1L, family = gaussian(),
                     n_timepoints = 100L, prop_missing = 0.15,
+                    trend_model = trend_model_from_formula(
+                      trend_formula
+                    ),
                     seed = 88L)
-  fit <- mvgam(
-    formula = y ~ s(x), trend_model = sim$trend_model,
-    data = sim$data_train, family = gaussian(),
-    chains = 1L, iter = 1000L, warmup = 500L,
-    refresh = 0L, silent = 2L, backend = "cmdstanr"
+  # brms announces the response rows it dropped; mvgam keeps the
+  # trend's time grid separately, so the smooth is still estimated
+  # across the full covariate range and recovery is unaffected.
+  expect_warning(
+    fit <- mvgam(
+      formula = y ~ s(x), trend_formula = trend_formula,
+      data = sim$data_train, family = gaussian(),
+      chains = 1L, iter = 1000L, warmup = 500L,
+      refresh = 0L, silent = 2L, backend = "cmdstanr"
+    ),
+    "Rows containing NAs"
   )
   out <- smooth_recovery_cor(fit, sim, "s(x)")
   expect_true(out$found)
@@ -220,13 +261,14 @@ test_that("missing-data injection doesn't break recovery", {
 # produce recoverable s(x) (the smooth is unaffected by trend
 # spec).
 test_that("sparse-lag AR trend override doesn't break recovery", {
+  trend_formula <- ~ AR(p = c(1L, 3L, 12L))
   sim <- sim_mvgam(
     type = 1L, family = gaussian(),
-    trend_model = AR(p = c(1L, 3L, 12L)),
+    trend_model = trend_model_from_formula(trend_formula),
     n_timepoints = 120L, seed = 77L
   )
   fit <- mvgam(
-    formula = y ~ s(x), trend_model = sim$trend_model,
+    formula = y ~ s(x), trend_formula = trend_formula,
     data = sim$data_train, family = gaussian(),
     chains = 1L, iter = 1000L, warmup = 500L,
     refresh = 0L, silent = 2L, backend = "cmdstanr"

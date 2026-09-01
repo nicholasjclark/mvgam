@@ -27,14 +27,11 @@
 #' @param n_series Integer number of series (dimensions).
 #' @param last_state Either `NULL` (default; the dispatcher
 #'   generates a 200-step burn-in from zero) or a list with
-#'   elements `trends`, `errors`, `linpreds`, `time` as documented
-#'   in the kernel header. Forecast callers must populate
-#'   `trends` with posterior draws of the latent trend state,
-#'   NOT observed responses.
-#' @param linpreds Optional `[h + max_lag, n_series]` matrix of
-#'   obs-side linear-predictor offsets aligned with the trend
-#'   index. `NULL` defaults to the zero matrix (correct for
-#'   simulation).
+#'   elements `trends`, `errors` and `time` as documented in the
+#'   kernel header. Forecast callers must populate `trends` with
+#'   posterior draws of the latent trend state, not observed
+#'   responses, and must centre them on the trend linear
+#'   predictor: the recursion advances a zero-mean process.
 #' @param time Required only for `CAR()` trends; length-`h`
 #'   numeric vector of time gaps for the forecast steps.
 #'
@@ -80,7 +77,6 @@ propagate_trend <- function(trend_model,
                              h,
                              n_series = 1L,
                              last_state = NULL,
-                             linpreds = NULL,
                              time = NULL,
                              fc_times = NULL,
                              training_times = NULL,
@@ -102,11 +98,11 @@ propagate_trend <- function(trend_model,
     "ZMVN" = propagate_zmvn(params, h, n_series),
     "CAR" = propagate_car(params, h, n_series, last_state, time),
     "RW" = propagate_arma(trend_model, params, h, n_series,
-                            last_state, linpreds),
+                            last_state),
     "AR" = propagate_arma(trend_model, params, h, n_series,
-                            last_state, linpreds),
+                            last_state),
     "VAR" = propagate_arma(trend_model, params, h, n_series,
-                              last_state, linpreds),
+                              last_state),
     "PW" = propagate_pw(trend_model, params, h, n_series,
                           fc_times, training_times, cap,
                           changepoint_range),
@@ -352,7 +348,7 @@ sample_horizon_changepoints <- function(delta_train_s,
 # ------------------------------------------------------------------
 #'@noRd
 propagate_arma <- function(trend_model, params, h, n_series,
-                            last_state, linpreds) {
+                            last_state) {
   trend_type <- trend_model$trend
   # mvgam's AR()/VAR() constructors accept `p` as either a scalar
   # (consecutive lags 1..p) or a vector (sparse lag indices). The
@@ -369,7 +365,6 @@ propagate_arma <- function(trend_model, params, h, n_series,
   has_ma <- isTRUE(trend_model$ma)
   ma_lags <- if (has_ma) 1L else integer(0L)
 
-  m_a <- length(ar_lags)
   m_b <- length(ma_lags)
   max_ar <- max(ar_lags)
   max_ma <- if (m_b > 0L) max(ma_lags) else 0L
@@ -392,14 +387,13 @@ propagate_arma <- function(trend_model, params, h, n_series,
     Sigma <- diag(sigma_vec^2, nrow = n_series)
   }
 
-  linpreds_mat <- if (is.null(linpreds)) {
-    matrix(0, nrow = total, ncol = n_series)
-  } else {
-    checkmate::assert_matrix(
-      linpreds, nrows = total, ncols = n_series
-    )
-    linpreds
-  }
+  # `trend_arma_recursC()` carries a general time-varying-mean
+  # offset, but mvgam's programs put the trend linear predictor
+  # at series scale outside the recursion, where it also covers
+  # the factor case that an LV-grain offset cannot express. The
+  # recursion is therefore always run zero-mean and the caller
+  # adds the mean back.
+  linpreds_mat <- matrix(0, nrow = total, ncol = n_series)
 
   # Initial state via burn-in if not supplied. Burn-in runs the
   # kernel for 200 extra steps from zero so the trailing max_lag
@@ -542,7 +536,7 @@ build_arma_B <- function(has_ma, params, m_b, n_series) {
 
 # Burn in 200 zero-seed steps to draw a stationary initial state.
 # Returns a `last_state` list compatible with the propagate_arma
-# contract (trends, errors, linpreds, time).
+# contract (trends, errors, time).
 #'@noRd
 run_burnin <- function(ar_lags, ma_lags, drift, A_cube, B_cube,
                         Sigma, n_series, burn_in, max_lag) {
@@ -567,7 +561,6 @@ run_burnin <- function(ar_lags, ma_lags, drift, A_cube, B_cube,
   list(
     trends = utils::tail(bi_states, max_lag),
     errors = utils::tail(innovations, max_lag),
-    linpreds = matrix(0, nrow = max_lag, ncol = n_series),
     time = NULL
   )
 }

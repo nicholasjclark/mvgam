@@ -622,17 +622,6 @@ test_that("complex real-world formula edge case validation", {
   )
 })
 
-test_that("validate_trend_covariates prevents response variables in trend formulas", {
-  # Create test data with proper structure
-  test_data <- data.frame(
-    time = rep(1:4, 3),
-    series = rep(c("A", "B", "C"), each = 4),
-    count = rnorm(12),
-    biomass = rnorm(12),
-    temperature = rep(c(20, 22, 18, 21), 3)  # invariant within time
-  )
-})
-
 test_that("exact GP terms in obs formula are accepted (warn only)", {
   # mvgam used to hard-fail on gp() without k. Exact GPs fit
   # fine through brms (full covariance kernel); the warn covers

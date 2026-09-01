@@ -1,16 +1,15 @@
-# forecast.mvgam: posterior forecasts for univariate state-space
-# trends (RW / AR consecutive / AR sparse-lag / ARMA / ZMVN).
-# Multivariate trends (VAR / CAR / cor=TRUE / VARMA(p,1)) and PW
-# trends are handled in later phases.
+# forecast.mvgam: posterior forecasts for every state-space trend
+# mvgam fits, series-grain and factor alike: RW, AR at
+# consecutive or sparse lags, ARMA, VAR, CAR, ZMVN and PW.
 #
 # Per-draw loop wiring:
 #   1. extract_last_state(fit, d, draws_mat = cached) for the
 #      (params, last_state) tuple the kernel consumes.
-#   2. extract_trend_linpred(fit, d, newdata, trend_lp_mat =
-#      cached) for the trend-formula linpred at the training
-#      tail and the forecast horizon (the centred convention).
-#   3. propagate_trend() to forward the latent state on the link
-#      scale by `h` steps.
+#   2. trend_linpred_grid() for the trend-formula linear
+#      predictor over the training tail and the forecast
+#      horizon, at series scale.
+#   3. propagate_trend() to forward the zero-mean latent state
+#      on the link scale by `h` steps.
 #   4. Combine with the obs-side linpred for the same draw, map
 #      through the family link, and optionally sample
 #      observation-family noise -- all batched after the loop.
@@ -435,15 +434,15 @@ resolve_forecast_grid <- function(object, newdata, training,
 
 
 # Internal: per-series training-tail rows of length up to
-# `max_lag`. Used to build the kernel's `linpreds` past-tail
-# block via extract_component_linpred on these rows alone.
+# `max_lag`, the rows `extract_component_linpred()` needs to
+# give `mu_trend` over the stored state's window.
 #
-# Each per-series block must be sorted by time before stacking:
-# the kernel reads `linpreds` rows in temporal
-# order to centre `lv = trend - mu_trend` at each lag. A
-# tail block with reversed or shuffled time order would offset
-# the centring by `mu_trend[T] - mu_trend[T-1]`, injecting a
-# spurious jump at the first forecast step.
+# Each per-series block must be sorted by time before stacking.
+# `propagate_one_draw()` centres the stored state row by row
+# against this grid, so a tail block with reversed or shuffled
+# times would offset the centring by
+# `mu_trend[T] - mu_trend[T-1]` and inject a spurious jump at
+# the first forecast step.
 #'@noRd
 build_training_tail_data <- function(training, max_lag) {
   if (max_lag <= 0L) return(NULL)
@@ -800,7 +799,8 @@ build_forecast_arms <- function(object, trend_model, meta,
   )
   Z_arr <- if (n_lv_trend < n_series &&
                  meta$trend_type %in% c("RW", "AR", "VAR", "ZMVN")) {
-    resolve_Z_loadings(object, draws_mat, n_series, n_lv_trend)
+    resolve_Z_loadings(object, draws_mat, n_series, n_lv_trend,
+                         basis = "model")
   } else {
     NULL
   }
@@ -839,14 +839,11 @@ build_forecast_arms <- function(object, trend_model, meta,
       object = object,
       trend_model = trend_model,
       meta = meta,
-      training = training,
-      fc_grid = fc_grid,
       draws_mat = draws_mat,
       d_state = d_state,
       d_lin = d_lin,
       h_max = h_max,
       n_series = n_series,
-      tail_data = tail_data,
       trend_lp_tail = trend_lp_tail,
       trend_lp_fc = trend_lp_fc,
       obs_struct_tail = obs_struct_tail,
@@ -894,23 +891,43 @@ build_forecast_arms <- function(object, trend_model, meta,
 # and the returned matrix is projected back to `n_series`
 # columns via `X %*% t(Z_slice)`.
 #'@noRd
-propagate_one_draw <- function(object, trend_model, meta, training,
-                                 fc_grid, draws_mat, d_state, d_lin,
-                                 h_max, n_series, tail_data,
+propagate_one_draw <- function(object, trend_model, meta,
+                                 draws_mat, d_state, d_lin,
+                                 h_max, n_series,
                                  trend_lp_tail, trend_lp_fc,
                                  obs_struct_tail, obs_struct_fc,
                                  fc_time = NULL, pw_extras = NULL,
                                  Z_slice = NULL) {
   ls_d <- extract_last_state(object, d_state,
                                 draws_mat = draws_mat)
+  max_lag <- as.integer(meta$max_lag %||% 0L)
 
-  # PW bypasses the centred-convention linpred machinery: the
-  # trend is a closed-form Prophet-style evaluation at user-
-  # supplied times. Dispatch to propagate_trend with the
-  # PW-specific extras (fc_times, training_times, cap) and
-  # return early.
+  # Generated programs build the series-scale trend as
+  #
+  #   trend[t, s] = Z[s, ] . lv_trend[t, ] + mu_trend[t, s]
+  #
+  # so the dynamics are zero-mean and the trend-formula linear
+  # predictor enters once, at series scale, after the loadings
+  # projection. A `by = lv_axis()` fit puts its mean inside the
+  # projection instead, but linearity makes the two equivalent
+  # and `extract_component_linpred()` returns that fit's mean
+  # already projected, so the addition below is right for both.
+  # Each grid is built at series scale because `mu_trend` is
+  # indexed by series rather than by latent variable, and a
+  # trend formula carrying no covariates gives an all-zero grid,
+  # so both are applied unconditionally.
+  lp_history <- trend_linpred_grid(
+    trend_lp_tail, obs_struct_tail, d_lin, max_lag, n_series
+  )
+  lp_forecast <- trend_linpred_grid(
+    trend_lp_fc, obs_struct_fc, d_lin, h_max, n_series
+  )
+
+  # PW evaluates a closed-form Prophet-style curve at
+  # user-supplied times rather than running a recursion, so it
+  # needs the PW-specific extras and no latent state.
   if (identical(meta$trend_type, "PW")) {
-    return(propagate_trend(
+    fc_pw <- propagate_trend(
       trend_model = trend_model,
       params = ls_d$params,
       h = h_max,
@@ -919,41 +936,24 @@ propagate_one_draw <- function(object, trend_model, meta, training,
       training_times = pw_extras$training_times,
       cap = pw_extras$cap,
       changepoint_range = meta$pw_changepoint_range
-    ))
+    )
+    return(fc_pw + lp_forecast)
   }
 
-  max_lag <- as.integer(meta$max_lag %||% 0L)
-
-  # Factor mode: propagate in the LV-grain space `extract_last_
-  # state()` returned (n_lv columns instead of n_series). The
-  # trend-side linpred, if any, would enter the observation
-  # scale rather than the latent recursion, so passing zero
-  # linpreds here matches the standata semantics.
-  # `apply_factor_projection()` maps the LV trajectory back to
-  # series scale after propagation.
+  # Factor mode: propagate at the LV grain `extract_last_state()`
+  # returned (n_lv columns instead of n_series), then project
+  # back to series scale with `apply_factor_projection()`.
   in_factor_mode <- !is.null(Z_slice) &&
     !is.null(ls_d$n_lv_active)
   n_prop <- if (in_factor_mode) ls_d$n_lv_active else n_series
 
-  lp_history <- if (max_lag == 0L) {
-    matrix(0, nrow = 0L, ncol = n_prop)
-  } else if (in_factor_mode || is.null(trend_lp_tail)) {
-    matrix(0, nrow = max_lag, ncol = n_prop)
-  } else {
-    grid <- reshape_linpred_to_grid(
-      trend_lp_tail[d_lin, ], obs_struct_tail
-    )
-    pad_or_trim_rows(grid, max_lag)
+  # Factor fits store the zero-mean `lv_trend`, but series-grain
+  # fits store `trend[t, s]`, which already carries `mu_trend`.
+  # Centring the latter leaves every path advancing the same
+  # quantity.
+  if (!in_factor_mode && max_lag > 0L) {
+    ls_d$last_state$trends <- ls_d$last_state$trends - lp_history
   }
-  lp_forecast <- if (in_factor_mode || is.null(trend_lp_fc)) {
-    matrix(0, nrow = h_max, ncol = n_prop)
-  } else {
-    grid <- reshape_linpred_to_grid(
-      trend_lp_fc[d_lin, ], obs_struct_fc
-    )
-    pad_or_trim_rows(grid, h_max)
-  }
-  linpreds_combined <- rbind(lp_history, lp_forecast)
 
   fc_lv <- propagate_trend(
     trend_model = trend_model,
@@ -961,14 +961,57 @@ propagate_one_draw <- function(object, trend_model, meta, training,
     h = h_max,
     n_series = n_prop,
     last_state = ls_d$last_state,
-    linpreds = linpreds_combined,
     time = fc_time
   )
-  if (in_factor_mode) {
+  fc_series <- if (in_factor_mode) {
     apply_factor_projection(fc_lv, Z_slice, n_series)
   } else {
     fc_lv
   }
+  fc_series + lp_forecast
+}
+
+
+# Internal: the trend-formula linear predictor for one draw, as a
+# `[n_rows, n_series]` grid aligned with the propagation window.
+# `mu_trend` is indexed by series in every generated program, so
+# this is always built at series scale even when propagation runs
+# at the latent-variable grain. Returns zeros when the fit has no
+# trend formula, which is what a covariate-free trend contributes.
+#'@noRd
+trend_linpred_grid <- function(lp_mat, obs_struct, draw_row,
+                                 n_rows, n_series) {
+  checkmate::assert_matrix(lp_mat, null.ok = TRUE)
+  checkmate::assert_int(draw_row, lower = 1L)
+  checkmate::assert_int(n_rows, lower = 0L)
+  checkmate::assert_int(n_series, lower = 1L)
+  if (n_rows == 0L) {
+    return(matrix(0, nrow = 0L, ncol = n_series))
+  }
+  if (is.null(lp_mat)) {
+    return(matrix(0, nrow = n_rows, ncol = n_series))
+  }
+  grid <- reshape_linpred_to_grid(lp_mat[draw_row, ], obs_struct)
+  # `reshape_linpred_to_grid()` sizes its columns from the
+  # observation structure, so a newdata whose series column has
+  # dropped levels returns a grid narrower than the trend it must
+  # line up with. Name the two that disagree rather than letting
+  # the sum fail as non-conformable arrays.
+  if (ncol(grid) != n_series) {
+    stop(insight::format_error(c(
+      "Trend linear predictor does not span every series.",
+      x = paste0(
+        "Got ", ncol(grid), " series in the linear predictor, ",
+        "expected ", n_series, "."
+      ),
+      i = paste0(
+        "Keep every fitted series level on the 'newdata' series ",
+        "column, for example with factor(series, levels = ",
+        "levels(fit$data$series))."
+      )
+    )))
+  }
+  pad_or_trim_rows(grid, n_rows)
 }
 
 

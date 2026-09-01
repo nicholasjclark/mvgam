@@ -87,53 +87,45 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > seeds the E-BFMI, the divergence count and the ESS each moved
   > further between seeds than between parameterisations.
 
-- [ ] **15.5b Describe a fixed or partial `trend_map` in the table**
-  > `get_prior()` on a jsdgam specification reports `b`, `Intercept`
-  > and `shape` and no trend classes at all, so a user cannot see
-  > the priors they might set. The cause is structural:
-  > `mvgam_formula()` holds `formula` and `trend_formula` only,
-  > while `jsdgam()` carries its factor structure in `trend_map` and
-  > `loadings_prior`. No `mvgam_formula` can describe a jsdgam fit.
+- [ ] **15.5b `get_prior()` refuses a `trend_map` it could describe**
+  > `get_prior.mvgam_formula()` already takes `trend_map` and
+  > `loadings_prior`, and the plain path is right, with
+  > `~ ZMVN(n_lv = 2)` reporting `Intercept`, `Z`, `sigma_trend`
+  > and `L_Omega_trend`.
   >
-  > The plain path is correct: `~ ZMVN(n_lv = 2)` does report `Z`.
-  > Give `get_prior.mvgam_formula()` the `trend_map` and
-  > `loadings_prior` arguments `stancode.mvgam_formula()` already
-  > takes, which also closes 15.0.
+  > What it does with a `trend_map` is refuse, saying fixed
+  > loadings move `Z` to the data block and partial loadings
+  > replace it with `Z_free_vec`, so the classes differ from the
+  > free-loadings table, and pointing at `stancode()`. That is
+  > honest and better than a wrong table, but it withholds an
+  > answer that exists.
+  >
+  > A fully fixed map is exactly describable. Reading the priors
+  > off the emitted program for a four-series map onto two
+  > factors gives two settable classes, `sigma_trend` at
+  > `exponential(2)` and `ar1_trend` at `normal(0, 0.5)`, and no
+  > `Z` row at all, since `Z` is data. So the table for that case
+  > is the free-loadings table minus `Z`, and the refusal can
+  > narrow to the partial case.
+  >
+  > The partial case needs the matrix spelling to reproduce: a
+  > `trend_map` data frame carrying a `trend` column is validated
+  > as positive integers, and it is the `[n_series, n_lv]` matrix
+  > form whose `NA` cells mark free loadings. Confirm what
+  > `Z_free_vec` looks like in that program before deciding
+  > whether it too can be described or should keep the refusal.
 
-- [ ] **16.0 Smaller things the sweeps turned up**
-  > - [x] `prior(constant(1), class = sigma_trend)` was accepted and
-  >   emitted `sigma_trend ~ constant(1);`, which names no density
-  >   Stan can evaluate, so the model failed at `stanc` with the
-  >   class nowhere in the message. brms implements `constant()` by
-  >   moving the parameter out of the parameters block and assigning
-  >   it, which every mvgam emitter would have to do too. Refused
-  >   instead, at `get_trend_parameter_prior()`, the one point all
-  >   ten emission sites resolve through.
-  > - [x] `pkgdown/jsdgam_cache/figs/` held 11 tracked PNGs, 1.4 MB.
-  >   Removed. Nothing referenced them and no script wrote them; the
-  >   only mention in the repo was this line.
-  > - [x] `ZMVN()` on a single series makes `sigma_trend^2 +
-  >   sigma^2` an exact sum with nothing to split it.
-  >   `zmvn_scale_confounded()` decides, and `mvgam()` warns once
-  >   per session rather than refusing, since the model is still
-  >   fittable and the split is a prior choice a user may mean to
-  >   make. Two series identify it through the cross-series
-  >   covariance; a family with no residual scale never had the
-  >   problem, and a negative binomial's `shape` does not count,
-  >   being a dispersion rather than an additive scale.
-  >
-  > Two entries are struck, both parameterisation changes and
-  > neither wanted:
+- [ ] **16.0 Two parameterisation changes, both declined**
+  > Kept so neither is raised again as an oversight.
   >
   > `AR(p >= 2)` boxes each coefficient in `(-1, 1)` independently
   > while the stationary region of an AR(2) is a triangle strictly
   > inside that box, so the prior admits non-stationary draws. The
   > Heaps `AtoP` and `rev_mapping` functions the VAR generator uses
-  > would fix it and reduce to the scalar case at `m = 1`. Not
-  > adopting them is a decision, not an oversight: it would move
-  > what a user's `prior(class = ar2_trend)` constrains onto the
-  > partial-autocorrelation scale and rename posterior columns. The
-  > coefficient scale stays.
+  > would fix it and reduce to the scalar case at `m = 1`. Adopting
+  > them would move what a user's `prior(class = ar2_trend)`
+  > constrains onto the partial-autocorrelation scale and rename
+  > posterior columns. The coefficient scale stays.
   >
   > `CAR()` and `AR(p = 2)` start the state from `Normal(0,
   > sigma_trend)` rather than the stationary variance, where AR(1)
@@ -327,31 +319,64 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > both its id and its slug.
 
 - [ ] **19.0 The family scales have the defect 15.6 closed for the kernel**
-  > `Psi`, the residual scale of `mvn()` and `mvt()`, and `nu`, the
-  > mvt degrees of freedom, are emitted as literals in
-  > `R/families.R`. `prior_summary()` lists them, tagged
-  > `source = "mvgam"`; `get_prior()` does not; and a prior set on
-  > either is refused by brms with a message naming
-  > `default_prior()`, which is where the class name was read.
-  > Verified on `mvn()` with `ZMVN(n_lv = 2)`: `Psi ~
-  > exponential(1);` is in the program, `Psi` is absent from
-  > `get_prior()`, and `prior(exponential(5), class = Psi)` is
-  > refused.
+  > `Psi`, the residual scale of `mvn()` and `mvt()`, and `nu`,
+  > the mvt degrees of freedom, are emitted as literals in
+  > `R/families.R`. A survey corrected three things the entry
+  > first claimed, each of which shrinks the work.
   >
-  > Harder than the kernel case. The family stanvar builders reach
-  > `Psi` through `prepare_closure_unit_family()`, which dispatches
-  > on family name and passes only `arrays`, so making the prior
-  > settable means threading one through nine branches. `nu` is
-  > harder still: its prior is written
-  > `target += gamma_lpdf(nu - 2 | 2, 0.1)`, and the shift is the
-  > model rather than a formatting choice, since the mvt has no
-  > finite variance below 2. A plain `nu ~ dist(args)` would drop
-  > it, so `nu` needs the shift kept and the distribution made
-  > settable around it, or an argument on the family.
+  > `nu` is not in `prior_summary()` either. It is invisible on
+  > every surface: `mvgam_stancode_prior_rows()` reads the
+  > `target +=` form with a regex wanting an identifier straight
+  > before the `|`, and `gamma_lpdf(nu - 2 | 2, 0.1)` does not
+  > match, while `is_mvgam_param("nu")` is FALSE anyway.
   >
-  > The declaration and prior are written once now:
-  > `make_psi_stanvars()` replaces two byte-identical blocks that
-  > differed only in a stanvar name prefix.
+  > The refusal is not brms rejecting an unknown class on the
+  > observation side. `Psi` is in `mvgam_unsuffixed_params`, so
+  > `filter_obs_priors()` keeps it away from the obs setup; it is
+  > then dropped only by name from the trend monitor list, which
+  > it is not on, so it survives into the trend-side brms call
+  > and is refused there. The fix has to remove family-owned
+  > classes before the obs and trend split, not after.
+  >
+  > And only two of the nine dispatch branches change. The
+  > `switch()` arms are independent calls, so `mvn` and `mvt` can
+  > take a `prior` argument while the other seven keep theirs.
+  >
+  > `get_trend_parameter_prior()` is trend-specific in name only:
+  > it takes a NULL trend object and already does the override,
+  > `constant()` refusal and default lookup that every emission
+  > site needs. `Psi` and `nu` should resolve through it rather
+  > than grow a second mechanism, with defaults added to
+  > `common_trend_priors` and a `family_stanvar_prior_classes()`
+  > naming what a family owns so the emitter, the prior table and
+  > the obs/trend split cannot disagree.
+  >
+  > For `nu`, keep the shift by moving it out of the statement:
+  > sample `nu_excess` with a lower bound of zero and define
+  > `nu = 2 + nu_excess` as a transformed parameter. The prior is
+  > then an ordinary `~` statement the existing reader already
+  > understands, the class name says what it constrains, and
+  > `nu` survives unchanged in the posterior so cached fits stay
+  > readable. Writing a settable distribution into the
+  > `target +=` form instead would need the regex extended, a
+  > family-scoped allowance threaded through three more
+  > signatures, and would report a prior string that omits the
+  > shift.
+  >
+  > One hazard to design around rather than guard: `"nu"` must
+  > never go into `mvgam_unsuffixed_params`. That predicate has
+  > no family context, and `filter_obs_priors()` splits on its
+  > complement, so the entry would divert `com_binomial()`'s
+  > genuine brms `nu` prior away from brms and drop it silently.
+  > `nu_excess` collides with nothing.
+  >
+  > No fixture stops being readable: none of the 65 cached fits
+  > is an `mvn()` or `mvt()` model. The declaration and prior are
+  > written once now, since `make_psi_stanvars()` replaced two
+  > byte-identical blocks.
+  >
+  > Check the emitted `mvt` program for a stanc3 non-linear
+  > transform warning before writing tests to the new spelling.
 
 - [ ] **18.0 mvgam's own priors are unnormalised, and the guard cannot see it**
   > `bridge_sampler.mvgam()` rejects a program containing `_lupdf`
@@ -402,53 +427,56 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > `is_mvgam_managed_class()` so it and the prior table cannot
   > disagree about what counts as a prior.
 
-- [ ] **20.0 ZMVN and CAR forecasts drop the trend linear predictor**
-  > What is left of a six-part forecasting audit. The other five
-  > are done: the forecast grid is sorted so `score()` cannot pair
-  > a truth with the wrong horizon; a gap between the training end
-  > and the forecast times is refused rather than answered as a
-  > shorter horizon; `ensemble()` takes one draw selection across
-  > every series and both arms; `score(log = TRUE)` errors on the
-  > five scorers that cannot honour it; and `clean_ll()` seeds its
-  > refill and says how many values it replaced.
+- [ ] **20.0 The last part of the forecasting audit**
+  > Five parts are done, and so is the sixth. The trend linear
+  > predictor now reaches every forecast: generated Stan builds
+  > the series-scale trend as `Z . lv_trend + mu_trend`, so
+  > `propagate_one_draw()` advances a zero-mean state and adds the
+  > mean once, at series scale. The drop covered ZMVN and CAR as
+  > reported, and PW and every factor fit besides.
+  > `tests/local/test-forecast-trend-linpred.R` pins it with one
+  > fit per branch, and `tests/testthat/test-forecast-mvgam.R`
+  > fails if either the centring or the re-add is removed.
   >
-  > `propagate_zmvn()` and `propagate_car()` take no `linpreds`,
-  > though `propagate_one_draw()` builds and passes one, so a
-  > `trend_formula` carrying covariates forecasts as though every
-  > trend coefficient were zero. `jsdgam()`'s `factor_formula`
-  > maps onto a ZMVN `trend_formula`, so this is not a corner.
-  > Reported by the auditor and not yet reproduced here; no
-  > fixture pairs either trend with a non-trivial
-  > `trend_formula`, which is why the suite cannot see it.
-  >
-  > `lfo_sum_rows()` also has two NA conventions: `log p = 0` in
-  > the multi-column branch, and a dropped draw in the
-  > single-column branch, which then recycles against the full
-  > weight vector. Same audit, not yet reproduced here.
+  > What is left is `lfo_sum_rows()`, which carries two NA
+  > conventions: `log p = 0` in the multi-column branch, and a
+  > dropped draw in the single-column branch, which then recycles
+  > against the full weight vector. Not yet reproduced here.
 
-- [ ] **23.0 Two local test files do not pass**
-  > Neither failure comes from the simulator change. Reverting
-  > `R/sim_mvgam.R` to `HEAD` and rerunning gives the same counts,
-  > so both predate it.
+- [ ] **23.0 The empty-observation-formula residuals sit a standard
+  deviation high**
+  > `tests/local/test-sim-mvgam-recovery.R` passes 20 of 20. It
+  > called `mvgam(trend_model = ...)`, an argument 2.0 removed,
+  > so `reject_removed_args()` stopped all nine cases before they
+  > fitted and the recovery coverage it claims never ran. A
+  > `type_trends` map now holds one `trend_formula` per catalog
+  > type and `trend_model_from_formula()` evaluates its
+  > right-hand side for `sim_mvgam()`, so a single entry drives
+  > both the simulation and the fit rather than two spellings
+  > that can drift. The map matches the catalog defaults: `RW()`
+  > for type 1, `AR(p = 1)` for types 2 to 5, `CAR()` for type 6.
   >
-  > `tests/local/test-sim-mvgam-recovery.R` fails 9 of 9 with no
-  > passes: it calls `mvgam(trend_model = ...)`, an argument 2.0
-  > removed, so `reject_removed_args()` stops every case before it
-  > fits. The recovery coverage it claims is not running. It
-  > exercises `type = 1` and `type = 7`, the two recipes whose
-  > variance the rescale now governs, so it is worth repairing
-  > rather than deleting.
+  > `tests/local/test-empty-obs-formula.R` fails 3 of 13, and one
+  > reading of it is already ruled out. Two failures are median
+  > quantile residuals of 0.92 and 1.23 against a threshold of
+  > 0.5, and those are not PIT values read on the wrong scale: a
+  > PIT median cannot exceed 1. They are normal-scale quantile
+  > residuals, so the fit sits about a standard deviation below
+  > the observations on two of three series.
   >
-  > `tests/local/test-empty-obs-formula.R` fails 3 of 13, the same
-  > 3 either side of the simulator change. Two are median quantile
-  > residuals of 0.92 and 1.23 against a threshold of 0.5, on a
-  > model deliberately misspecified as `AR(p = 1)` against
-  > random-walk data at 30 timepoints. Raising `prop_trend` to
-  > 0.95 does not bring them under the threshold either, so the
-  > threshold is not tracking trend dominance and something else
-  > sets the residual level. The third is a placeholder-name
-  > assertion. Diagnose before adjusting: a threshold moved to fit
-  > the observed number tests nothing.
+  > Raising `prop_trend` to 0.95 does not move them, so trend
+  > dominance is not what sets the level. Nor is the simulator:
+  > the counts are the same with `R/sim_mvgam.R` at `HEAD`.
+  >
+  > The test guards `extract_linpred_univariate()` against
+  > dropping the intercept column on a `y ~ 0 + <regressor>`
+  > formula, where the lone all-1s column is the regressor rather
+  > than `b_Intercept`. Zeroing it puts a factor of `exp(b[1])`
+  > through residuals, hindcasts and predictions, and a one-sided
+  > bias of the size seen has that shape. Establish whether the obs linear predictor
+  > reaches the residuals at all before touching the threshold: a
+  > threshold moved to fit the observed number tests nothing.
+  > The third failure is a placeholder-name assertion.
   >
   > Neither file runs in CI, and the local suite has no runner
   > that sweeps every file, so nothing reports a stale one.
@@ -474,6 +502,78 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > in the roxygen either way. `ordinate()` needs nothing: it pairs
   > `lv_trend_tilde` with `Z_tilde`, so the scale is already in the
   > site scores, confirmed to 6.8e-07 against the stored trend.
+  >
+  > `forecast()` has the same defect and it is the worst instance
+  > found so far, because it is a wrong number rather than a
+  > wrong scale. Reconstructing `trend[t, s]` from stored draws
+  > gives, for the cached AR factor fit and the jsdgam ZMVN fit:
+  >
+  > | Z basis | state | AR factor | ZMVN jsdgam |
+  > |---|---|---|---|
+  > | `Z_tilde` | `lv_trend` | 2.361 | 0.087 |
+  > | `Z_tilde` | `lv_trend_tilde` | 6.7e-08 | 3.5e-10 |
+  > | `Z` | `lv_trend` | 4.4e-08 | 9.0e-10 |
+  > | `Z` | `lv_trend_tilde` | 2.361 | 0.087 |
+  >
+  > Either basis works; mixing them does not.
+  > `forecast.mvgam.R` resolves the loadings with no `basis`
+  > argument, so it takes the `"identified"` default, while
+  > `extract_last_state()` reads `lv_trend_tilde` for a factor
+  > ZMVN and plain `lv_trend` for a factor RW, AR or VAR. So the
+  > ZMVN path is consistent and the RW, AR and VAR paths pair a
+  > raw state with rotated loadings: the 2.361 row, which is a
+  > factor of ten on a Poisson mean.
+  >
+  > The model basis is the one settled on, because every dynamics
+  > and covariance parameter the propagator reads (`ar1_trend`,
+  > `A_trend`, `sigma_trend`, `L_Omega_trend`, `D_raw_trend`) is
+  > stated for the `Z` the model sampled. Propagating a rotated
+  > state with unrotated coefficients would be a second mismatch
+  > on top of the first. `state_var` is now `lv_trend` for every
+  > factor type and the loadings are resolved with
+  > `basis = "model"`, which also retires the ZMVN special case.
+  >
+  > A second defect sat underneath it, and it was worse. Factor
+  > ZMVN threw its latent scale away: `extract_zmvn_state()` set
+  > `Sigma` to the identity on the premise that the identified
+  > latent variables are standard normal, which no fixture
+  > supports. `sigma_trend` reaches 0.62 and 0.29 on one fit and
+  > 0.048 and 0.0044 on `val_jsdgam_trait`, so `propagate_zmvn()`
+  > drew unit innovations where it wanted those, inflating every
+  > jsdgam forecast interval, by around twenty-five times on that
+  > fit. The branch is gone; `extract_sigma_and_cov()` already
+  > read the right thing at the LV grain.
+  >
+  > Verified by reconstruction: pairing the state and loadings in
+  > the model basis rebuilds the stored `trend[t, s]` to 4e-08 on
+  > the AR factor fit and 9e-10 on the jsdgam. Where a trend
+  > covariate is present the remainder is `mu_trend`, so it must
+  > be constant across series, and it is, to 1e-08; in the
+  > rotated basis it spreads by up to 0.93.
+  >
+  > Two things the same sweep turned up, both wanting a decision
+  > rather than a patch.
+  >
+  > A factor fit at the truncation ceiling misses the factor path
+  > entirely. `forecast.mvgam()` and `extract_last_state()` both
+  > test `n_lv < n_series`, while `is_factor_model_spec()` uses
+  > `n_lv <= n_series` deliberately, because
+  > `validate_n_lv_ceiling()` admits `n_lv == n_species` for MGP
+  > loadings priors. Such a fit samples a free `Z` and writes
+  > `trend = Z lv`, but forecasting treats it as series-grain: no
+  > projection happens, and `ar1_trend[k]` and `sigma_trend[k]`,
+  > indexed by latent column, are handed to the recursion for
+  > series `s`. `broadcast_to_series()` passes them through
+  > because the lengths match, so nothing complains.
+  > `sample_innovations()` and `residual_cor()` avoid this by not
+  > comparing to `n_series` at all.
+  >
+  > `posterior_transition_matrix()` labels a factor VAR's latent
+  > axes with the first `n_lv` series names. Cosmetic, and masked
+  > today because `standata$series_names` is an empty character
+  > rather than NULL, so the `%||%` never fires and the labels
+  > come out `NA`. `irf()`, `fevd()` and `stability()` use
+  > `process_<k>` and are unaffected.
 
 - [ ] **25.0 One fixture stores a Cholesky factor as a covariance**
   > `tests/local/fixtures/val_jsdgam_trait.rds` was built when the
@@ -492,14 +592,69 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > cholesky-scaled trend. `extract_cov_draws_flat()` already does
   > that.
 
-- [ ] **26.0 No `VAR(n_lv)` or `RW(n_lv)` fixture exists**
-  > Every factor fixture is `ZMVN` or `AR(p = 1)`. The latent
-  > covariance for a factor VAR reads the leading block of
-  > `Omega_trend`, and a factor RW has no stationary law so it
-  > falls back to the innovation covariance; both were read off
-  > generated Stan rather than confirmed against a fit. Two small
-  > fixtures would close that, and they are the two cases where
-  > `residual_cor()` on a factor model is least exercised.
+- [ ] **27.0 A trend formula may name the response**
+  > `test-mvgam-formula.R` carried a test named
+  > "validate_trend_covariates prevents response variables in
+  > trend formulas" that built a data frame and asserted nothing.
+  > It was the suite's only SKIP. No `validate_trend_covariates()`
+  > exists in `R/`, so the stub named a function from an earlier
+  > architecture and the check it promised was never written. The
+  > stub is removed; this entry is the record.
+  >
+  > The gap is real. `mvgam_formula(count ~ 1, trend_formula =
+  > ~ count + AR())` is accepted, so the latent state can be
+  > regressed on its own observed response. Forecasting cannot
+  > honour that, since the future response is what is being
+  > predicted.
+  >
+  > Refusing it outright needs a decision rather than a patch. A
+  > multivariate fit may legitimately want one response as a
+  > covariate on another's trend, and `mvgam_formula()` sees only
+  > the formulas, so the rule has to be written in terms of the
+  > response it was given. Decide whether the refusal covers the
+  > fit's own response only, or every response in an `mvbind()`.
+
+- [ ] **28.0 `extract_trend_linpred()` is dead, and documents a
+  convention the package does not use**
+  > Nothing in `R/` calls it. Its header is written entirely
+  > around the centred convention, so it stands as a second and
+  > contradictory account of how the trend linear predictor
+  > reaches a forecast.
+  >
+  > `trend_linpred_grid()` does the live half. The shared piece,
+  > `reshape_linpred_to_grid()`, sits in the same file and stays
+  > either way.
+  >
+  > Deleting it takes `tests/testthat/test-extract-trend-linpred.R`
+  > with it, and the `by = lv_axis()` case in
+  > `tests/local/test-by-lv-axis-cached-fits.R` calls it to assert
+  > the per-factor `(t, k)` reshape. Rehome that assertion onto
+  > whatever the by-lv path actually runs before removing the
+  > function, so the coverage does not go with it.
+
+- [ ] **29.0 Two dead branches in the factor machinery**
+  > Both found while auditing the loadings basis, both
+  > pre-existing, and neither on the path 24.0 fixed.
+  >
+  > `R/stan_assembly.R` gates the correlated-innovation block on
+  > `cor && effective_dim > 1`, where `effective_dim` is the
+  > string `"N_lv_trend"`. Comparing a string to `1` is always
+  > TRUE, so the second clause never runs and the comment above
+  > it describes a condition the code does not implement. It is
+  > load-bearing by accident: an `n_lv == 1` factor fit still
+  > gets `L_Omega_trend`, which is what lets
+  > `extract_zmvn_state()` ask for `has_cor = TRUE`
+  > unconditionally. Fix the two together or neither.
+  >
+  > `sign_canonicalise_factors()` returns early for a fixed or
+  > partial `fixed_Z`, for `by = lv_axis()`, and for any fit
+  > carrying `Z_tilde`. Free-Z fits are rotated unless they are
+  > by-lv, so they always carry `Z_tilde`. Between them those
+  > three cover every factor fit mvgam can currently build, and
+  > the sign-flipping loop is unreachable. The file header says
+  > it stays active for partial-Z fits, which is the one case the
+  > second early return already covers. Decide whether the
+  > function has a job left.
 
 - [ ] **6.0 Final release verification**
   > Clean `document()`, clean test sweep, `R CMD check --as-cran`,

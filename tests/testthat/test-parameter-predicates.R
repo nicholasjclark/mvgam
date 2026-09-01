@@ -54,6 +54,14 @@ test_that("identified factor parameters are recognised in one place", {
   # disagree with it.
   expect_equal(factor_loading_param_pattern(rotated), "^Z_tilde\\[")
   expect_equal(factor_state_param_pattern(rotated), "^lv_trend_tilde\\[")
+  # A rotated fit carries both bases, and asking for the model
+  # basis must give the loadings the dynamics are stated for.
+  expect_equal(factor_loading_param_pattern(rotated, "model"),
+                 "^Z\\[")
+  expect_equal(
+    factor_loading_param_pattern(rotated, "identified"),
+    "^Z_tilde\\["
+  )
 
   # A fixed-loading fit has neither, and falls back to the raw names.
   raw <- c("Z[1,1]", "lv_trend[1,1]", "sigma_trend[1]")

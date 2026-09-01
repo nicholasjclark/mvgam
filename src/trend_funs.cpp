@@ -10,12 +10,12 @@ using namespace Rcpp;
 //   - sparse MA lag indices
 //   - univariate (dim = 1) and multivariate (VAR / VARMA, dim > 1)
 //   - cross-dimension correlation via pre-drawn innovation covariance
-//   - obs-side linear predictor offsets via the centred convention
-//     (matches brms Stan code: AR operates on trend - linpred)
+//   - a time-varying mean via the centred convention, where the
+//     recursion operates on trend - mean
 //
-// Used by both sim_mvgam (linpreds = zero, last_trends from burn-in)
-// and the future forecast.mvgam (linpreds from obs side, last_trends
-// from posterior draws of latent states).
+// Used by sim_mvgam (last_trends from burn-in) and by
+// forecast.mvgam (last_trends from posterior draws of the latent
+// state). Both pass a zero `linpreds`.
 //
 // Lag-history contract: the kernel seeds a "prefix" region of length
 // `max_lag = max(max(ar_lags), max(ma_lags))` at the start of the
@@ -41,9 +41,12 @@ using namespace Rcpp;
 //               estimate of the past `max_lag` innovations). Rows
 //               max_lag..(h + max_lag - 1) are the new innovations
 //               driving each forecast step.
-//   linpreds    [h + max_lag, dim] obs-side linear predictor offsets
-//               aligned 1:1 with the trend index. Zero matrix for
-//               sim; posterior obs linpred rows for forecast.
+//   linpreds    [h + max_lag, dim] time-varying mean the process
+//               reverts around, aligned 1:1 with the trend index.
+//               mvgam's own callers always pass a zero matrix:
+//               its programs add the trend linear predictor at
+//               series scale outside the recursion, which is the
+//               only form that also covers a factor model.
 //   last_trends [max_ar, dim] initial trend values, oldest row
 //               first. These seed positions
 //               (max_lag - max_ar)..(max_lag - 1) of the state
