@@ -213,10 +213,20 @@ get_coef.mvgam <- function(model, trend_effects = FALSE, ...) {
   }
 
   draws <- posterior::as_draws_matrix(model$fit)
-  # Trend submodel coefficients carry the `_trend` token after the
-  # leading `b_` prefix (e.g. `b_trend_x` vs `b_x` for obs).
-  pattern <- if (trend_effects) "^b_trend_" else "^b_(?!trend_)"
-  cols <- grep(pattern, colnames(draws), value = TRUE, perl = TRUE)
+  # A trend coefficient is `b_trend[i]`, not `b_trend_<name>`: the
+  # trend submodel's population effects come back as one indexed
+  # array. Matching on the underscore form found nothing on the
+  # trend side and excluded nothing on the observation side, so a
+  # trend coefficient was reported as an observation one. Read the
+  # same matcher `summary()` uses so the two cannot disagree about
+  # which side a coefficient belongs to.
+  all_cols <- colnames(draws)
+  is_trend <- match_trend_fixed_pars(all_cols)
+  cols <- if (trend_effects) {
+    all_cols[is_trend]
+  } else {
+    all_cols[grepl("^b_", all_cols) & !is_trend]
+  }
   if (length(cols) == 0L) {
     return(setNames(numeric(0L), character(0L)))
   }

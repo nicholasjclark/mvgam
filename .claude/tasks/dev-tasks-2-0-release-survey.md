@@ -428,61 +428,33 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > it, and keep forecast accuracy and structural inference apart.
 
 - [ ] **17.0 What `R CMD check --as-cran` reports**
-  > Run for the first time this session against `94c6ad2c`.
-  > `cran-comments.md` claims no ERRORs or WARNINGs; there is one
-  > WARNING, now fixed, and four NOTEs.
+  > The check reports no WARNING and one actionable NOTE:
+  > `predict(type = "variance")` answers, `ev` is declared in the
+  > single `globalVariables()` block, and `Rplots.pdf` stays out of
+  > the tarball. What remains is the
+  > non-portable compiler flag, which comes from the local
+  > Makevars rather than the package, and the URL NOTE.
   >
-  > The WARNING was `predict.mvgam: possible error in
-  > predict_variance(...): unused argument (draw_ids = draw_ids)`.
-  > `predict(type = "variance")` errored on every call, with or
-  > without `draw_ids`, so a documented prediction type had never
-  > worked. `predict_variance()` took no `draw_ids` and hardcoded
-  > `NULL` in three places where a caller's value belonged, so
-  > adding the formal alone would have left the variance reading
-  > different draws from every other type. Fixed and verified
-  > against a cached fit: 1000 x 30 unfiltered, 5 x 30 under
-  > `draw_ids = 1:5`, matching `type = "expected"`.
+  > Two things the run turned up that are worth more than the
+  > NOTEs.
   >
-  > Remaining, all mechanical:
-  > - `ev` is reported as an undefined global. It is a real column
-  >   built at `plot_helpers.R:493` and read through ggplot2's data
-  >   masking, so it belongs in `globalVariables()`. There are two
-  >   of those blocks, `R/globals.R` and `R/mvgam-package.R`, which
-  >   is the same duplication shape as the rest of 15.x.
-  > - `Rplots.pdf` at top level. `.Rbuildignore` covers
-  >   `tests/testthat/Rplots.pdf` but not the root copy a plotting
-  >   example leaves behind.
-  > - The Stan forum URL in `R/families.R`, three occurrences,
-  >   redirects; use the target.
-  > - Non-portable compilation flags come from the local Makevars
-  >   rather than from the package, so nothing to do.
-
-- [ ] **19.0 The family scales have the defect 15.6 closed for the kernel**
-  > `Psi`, the residual scale of `mvn()` and `mvt()`, and `nu`, the
-  > mvt degrees of freedom, are emitted as literals in
-  > `R/families.R`. `prior_summary()` lists them, tagged
-  > `source = "mvgam"`; `get_prior()` does not; and a prior set on
-  > either is refused by brms with a message naming
-  > `default_prior()`, which is where the class name was read.
-  > Verified on `mvn()` with `ZMVN(n_lv = 2)`: `Psi ~
-  > exponential(1);` is in the program, `Psi` is absent from
-  > `get_prior()`, and `prior(exponential(5), class = Psi)` is
-  > refused.
+  > `--run-donttest` fits Stan models. There are 168 `mvgam()` or
+  > `jsdgam()` calls across 59 help files, 55 of them inside
+  > `\donttest{}`, and CRAN runs those blocks. The check has been
+  > sampling for over an hour without reaching the end of them.
+  > This wants a decision before submission: move the fits behind
+  > `\dontrun{}`, cut them to a handful of tiny ones, or accept a
+  > check time that CRAN may refuse.
   >
-  > Harder than the kernel case was. The family stanvar builders
-  > reach `Psi` through `prepare_closure_unit_family()`, which
-  > dispatches on family name and passes only `arrays`, so making
-  > the prior settable means threading one through nine branches.
-  > `nu` is harder still: its prior is written
-  > `target += gamma_lpdf(nu - 2 | 2, 0.1)`, and the shift is the
-  > model rather than a formatting choice, since the mvt has no
-  > finite variance below 2. A plain `nu ~ dist(args)` would drop
-  > it, so `nu` needs the shift kept and the distribution made
-  > settable around it, or an argument on the family.
-  >
-  > The declaration and prior are at least written once now:
-  > `make_psi_stanvars()` replaces two byte-identical blocks that
-  > differed only in a stanvar name prefix.
+  > Five of the flagged URLs are
+  > `nicholasjclark.github.io/mvgam/articles/{idm,jsdgam,mvbf,nmix,var}.html`,
+  > returning 404 from `man/ZMVN.Rd`, `man/jsdgam.Rd`,
+  > `man/mvgam.Rd`, `man/irf.mvgam.Rd`, `man/fevd.mvgam.Rd` and
+  > others. Those articles have no published page, which is 5.2
+  > read from the manual rather than from the site. The remaining
+  > three are a dead Stan forum thread in
+  > `man/mvgam_use_cases.Rd` and two GitHub redirects in
+  > `man/occ.Rd`, all fixable now.
 
 - [ ] **18.0 mvgam's own priors are unnormalised, and the guard cannot see it**
   > `bridge_sampler.mvgam()` rejects a program containing `_lupdf`
@@ -515,6 +487,76 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > test what it means rather than one spelling of it. Sizeable,
   > and it changes `lp__` for every model, so it wants its own
   > verification pass rather than riding along with a prior fix.
+
+- [ ] **20.0 Forecasting returns wrong numbers, five ways**
+  > From an audit of `forecast`, `score`, `lfo_cv`, `kfold`, `loo`
+  > and `ensemble`. The first two are confirmed here by execution;
+  > the rest are the auditor's, verified by it and not yet by me.
+  >
+  > - [x] Row order of `newdata` permuted the truths and the
+  >   forecast columns independently, so `score()` paired each
+  >   truth with a horizon it did not belong to. `fc_times` was
+  >   already sorted; the observations and the grid rows were not.
+  > - [ ] The horizon is `nrow(newdata)`, not the distance from
+  >   the last training time. Asking for t = 41:42 alone gives sd
+  >   0.87 / 0.93 where the same times inside a t = 31:42 request
+  >   give 1.02 / 1.00. Uncertainty is understated whenever the
+  >   forecast rows do not start at the training boundary, and
+  >   `lfo_cv()` hits it on every fold between refits, so every
+  >   non-ELPD LFO score is optimistic. `compute_car_forecast_time()`
+  >   already computes true gaps; every other trend re-derives the
+  >   horizon as a row count.
+  > - [ ] `propagate_zmvn()` and `propagate_car()` take no
+  >   `linpreds`, so a `trend_formula` carrying covariates
+  >   forecasts as though every trend coefficient were zero.
+  >   `jsdgam()`'s `factor_formula` maps onto a ZMVN
+  >   `trend_formula`, so this is not a corner.
+  > - [ ] `ensemble()` samples rows independently per series and
+  >   per arm, so cross-series dependence is destroyed: two
+  >   perfectly correlated series came back at 0.017. Any joint
+  >   score on an ensemble is wrong, and an ensemble scores worse
+  >   than its own members on `energy` and `variogram`.
+  > - [ ] `score(log = TRUE)` is forwarded to `crps`, `drps` and
+  >   `sis` only. `logs`, `dss`, `qs` and `twcrps` return the
+  >   unlogged score with nothing said. `interval_width` is
+  >   dropped for those four plus `brier`, yet the column still
+  >   echoes the value that governed nothing.
+  > - [ ] `clean_ll()` replaces non-finite log-densities with
+  >   resamples of the finite ones, unseeded, so `loo()` returns a
+  >   different number on each call for any fit with one bad draw.
+  >   `lfo_sum_rows()` treats a missing density as `log p = 0` in
+  >   its multi-column branch and drops the draw in its
+  >   single-column branch, which then recycles against the full
+  >   weight vector.
+
+- [ ] **21.0 `sim_mvgam()` does not draw the trend it reports**
+  > `prop_trend` sets how much of the variance the trend should
+  > carry. A random walk with two or more series carries far more:
+  > measured across Monte Carlo replicates at `prop_trend = 0.5`,
+  > `var(trend)` came to 2.52 at two series and 5.31 at twenty
+  > against a target of 0.5. One series is correct.
+  >
+  > `is_nonstationary_trend()` classifies RW and sparse-lag
+  > `AR(p = c(1, 12))` as non-stationary, which skips the rescale
+  > every stationary trend receives, while the upfront correction
+  > assumes a single series and the matrix is centred on one
+  > global mean rather than per series. Sparse-lag AR is wrong at
+  > one series too, since it reuses a scale calibrated for AR(1).
+  >
+  > This reaches `eta` and so the simulated `y`, not just a
+  > metadata field, and these are the recipes the recovery checks
+  > are built on.
+
+- [ ] **22.0 `allow_new_levels` is documented as working**
+  > `population_random_pred()` raises for any grouping level the
+  > model has not seen, whatever `allow_new_levels` and
+  > `sample_new_levels` say. That is a deliberate limitation with
+  > tests pinning it, so it fails loudly rather than answering
+  > wrongly. But `predict.R`, `fitted.R`, `posterior_predict.R`,
+  > `posterior_epred.R` and `posterior_linpred.R` all describe the
+  > argument as allowing predictions for new levels, and name
+  > three sampling strategies for `sample_new_levels`, with no
+  > caveat in any of the five.
 
 - [ ] **6.0 Final release verification**
   > Clean `document()`, clean test sweep, `R CMD check --as-cran`,

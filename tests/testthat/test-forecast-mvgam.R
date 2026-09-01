@@ -496,3 +496,49 @@ test_that("slice_per_series handles per-series horizon differences", {
   expect_equal(as.numeric(out[["a"]]), c(411, 421, 431))
   expect_equal(as.numeric(out[["b"]]), c(412, 422))
 })
+
+
+test_that("the forecast grid does not depend on newdata row order", {
+  # `fc_times` is sorted; the truths and the rows the linear
+  # predictor is built from were taken in arrival order. Passing
+  # the same future rows shuffled therefore permuted the
+  # observations and the forecast columns independently, and
+  # `score()` paired each truth with the wrong horizon without
+  # complaining.
+  training <- data.frame(
+    time = rep(1:10, 2),
+    series = factor(rep(c("a", "b"), each = 10)),
+    y = rnorm(20)
+  )
+  future <- data.frame(
+    time = rep(11:13, 2),
+    series = factor(rep(c("a", "b"), each = 3), levels = c("a", "b")),
+    y = c(101, 102, 103, 201, 202, 203)
+  )
+  train_info <- list(
+    times = list(a = 1:10, b = 1:10),
+    observations = list(a = training$y[1:10], b = training$y[11:20]),
+    data = training, series_var = "series", time_var = "time",
+    resp = "y"
+  )
+  ordered_grid <- resolve_forecast_grid(
+    object = NULL, newdata = future, training = train_info,
+    series_levels = c("a", "b")
+  )
+  shuffled_grid <- resolve_forecast_grid(
+    object = NULL, newdata = future[c(5, 2, 6, 1, 4, 3), ],
+    training = train_info, series_levels = c("a", "b")
+  )
+
+  # Truths follow the sorted times, not the order they arrived in.
+  expect_equal(ordered_grid$observations, shuffled_grid$observations)
+  expect_equal(shuffled_grid$observations$a, c(101, 102, 103))
+  expect_equal(shuffled_grid$observations$b, c(201, 202, 203))
+
+  # And so do the rows the linear predictor is built from.
+  expect_equal(shuffled_grid$data$time, ordered_grid$data$time)
+  expect_equal(
+    as.character(shuffled_grid$data$series),
+    as.character(ordered_grid$data$series)
+  )
+})

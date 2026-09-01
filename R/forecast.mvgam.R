@@ -373,11 +373,19 @@ resolve_forecast_grid <- function(object, newdata, training,
 
   if (all(lengths(fc_times) == 0L)) return(NULL)
 
+  # `fc_times` is sorted, so the truths and the rows the linear
+  # predictor is built from have to be sorted the same way. Taking
+  # them in the order `newdata` happened to arrive in permuted the
+  # observations and the forecast columns independently, and
+  # `score()` then paired each truth with a horizon it did not
+  # belong to, without complaint. `build_training_tail_data()`
+  # sorts its own block for the same reason.
   fc_observations <- lapply(series_levels, function(lv) {
     idx <- series_fac == lv &
       newdata[[time_var]] %in% fc_times[[lv]]
     if (!any(idx) || !(resp %in% names(newdata))) return(NULL)
-    as.numeric(newdata[[resp]][idx])
+    times_lv <- as.integer(newdata[[time_var]][idx])
+    as.numeric(newdata[[resp]][idx])[order(times_lv)]
   })
   names(fc_observations) <- series_levels
 
@@ -387,6 +395,13 @@ resolve_forecast_grid <- function(object, newdata, training,
     as.integer(newdata[[time_var]][i]) %in% fc_times[[lv]]
   }, logical(1L))
   fc_data <- newdata[keep, , drop = FALSE]
+  fc_data <- fc_data[
+    order(
+      match(as.character(series_fac[keep]), series_levels),
+      as.integer(fc_data[[time_var]])
+    ), ,
+    drop = FALSE
+  ]
 
   list(
     data = fc_data,
