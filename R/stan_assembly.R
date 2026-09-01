@@ -3329,6 +3329,70 @@ generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
 }
 
 
+# What structure a loadings spec carries. Read by everything that
+# has to branch on it: the emitter, the `Z` prior classifier below,
+# and the model description in `methods_md()`. A spec that names no
+# features and no distances gives `0`, and a spec missing the field
+# entirely gives the same answer rather than a zero-length logical.
+#' @noRd
+loadings_spec_traits <- function(spec) {
+  if (is.null(spec)) {
+    return(list(features = FALSE, distances = FALSE,
+                kernel = FALSE, mgp = FALSE))
+  }
+  features <- isTRUE((spec$N_features_trend %||% 0L) > 0L)
+  distances <- isTRUE((spec$n_distances %||% 0L) > 0L)
+  list(
+    features = features,
+    distances = distances,
+    kernel = features || distances,
+    mgp = identical(spec$column_shrinkage, "mgp")
+  )
+}
+
+
+# Which prior `Z` is drawn from, given the loadings spec. One
+# classifier because the emitter below and the prior table that
+# `create_trend_parameter_prior()` builds both read it. Deciding
+# the branch separately in each is how a table comes to report a
+# prior the model does not sample. A kernel takes precedence: it
+# writes the whole multivariate statement, and MGP then enters
+# through the column scale rather than through `Z`.
+#' @noRd
+loadings_z_branch <- function(spec) {
+  traits <- loadings_spec_traits(spec)
+  if (traits$kernel) return("kernel")
+  if (traits$mgp) return("mgp")
+  "unstructured"
+}
+
+
+# The Stan statement each branch emits for `Z`, keyed by
+# `loadings_z_branch()`. The prior table reports the same strings,
+# so the two cannot describe different models.
+#'@noRd
+loadings_z_prior_string <- function(branch) {
+  switch(
+    branch,
+    kernel = paste0(
+      "multi_normal_cholesky(rep_vector(0.0, N_series_trend),",
+      " L_Phi_loadings)"
+    ),
+    mgp = "std_normal()",
+    NULL
+  )
+}
+
+
+mgp_psi_diag_scode <- function(dim = "N_lv_trend") {
+  checkmate::assert_string(dim, min.chars = 1)
+  paste0(
+    "vector<lower=0>[", dim, "] Psi_diag",
+    " = exp(cumulative_sum(log(varrho_inv)));"
+  )
+}
+
+
 #' Emit the structured Heaps prior for the free loadings matrix.
 #'
 #' Returns a combined `brms::stanvar` covering the data /
@@ -3386,58 +3450,12 @@ generate_factor_model <- function(is_factor_model, n_lv, fixed_Z = NULL,
 #' Bhattacharya, A. and Dunson, D. B. (2011). Sparse Bayesian
 #' infinite factor models. \emph{Biometrika}, 98:291-306.
 #' @noRd
-# The multiplicative gamma process column scale, written once.
-# `varrho_inv` carries the per-column inverse-gamma draws and their
-# cumulative product is the scale; whichever block consumes the
-# scale declares it, so this returns the code rather than a stanvar.
-#'@noRd
-# Which prior `Z` is drawn from, given the loadings spec. One
-# classifier because two surfaces read it: the emitter below, and
-# the prior table `create_trend_parameter_prior()` builds. Deciding
-# the branch separately in each is how a table comes to report a
-# prior the model does not sample.
-#'@noRd
-loadings_z_branch <- function(spec) {
-  if (is.null(spec)) return("unstructured")
-  has_kernel <- isTRUE((spec$N_features_trend %||% 0L) > 0L) ||
-    isTRUE((spec$n_distances %||% 0L) > 0L)
-  if (has_kernel) return("kernel")
-  if (identical(spec$column_shrinkage, "mgp")) return("mgp")
-  "unstructured"
-}
-
-
-# The Stan statement each branch emits for `Z`, keyed by
-# `loadings_z_branch()`. The prior table reports the same strings,
-# so the two cannot describe different models.
-#'@noRd
-loadings_z_prior_string <- function(branch) {
-  switch(
-    branch,
-    kernel = paste0(
-      "multi_normal_cholesky(rep_vector(0.0, N_series_trend),",
-      " L_Phi_loadings)"
-    ),
-    mgp = "std_normal()",
-    NULL
-  )
-}
-
-
-mgp_psi_diag_scode <- function(dim = "N_lv_trend") {
-  checkmate::assert_string(dim, min.chars = 1)
-  paste0(
-    "vector<lower=0>[", dim, "] Psi_diag",
-    " = exp(cumulative_sum(log(varrho_inv)));"
-  )
-}
-
-
 make_loadings_prior_stanvars <- function(spec) {
   assert_loadings_prior_spec_consistent(spec)
-  has_features <- spec$N_features_trend > 0L
-  has_distances <- spec$n_distances > 0L
-  uses_mgp <- identical(spec$column_shrinkage, "mgp")
+  traits <- loadings_spec_traits(spec)
+  has_features <- traits$features
+  has_distances <- traits$distances
+  uses_mgp <- traits$mgp
   dist_names <- names(spec$distance_mats) %||% character(0)
   data_vars <- list()
   tdata_vars <- list()
@@ -3532,7 +3550,7 @@ make_loadings_prior_stanvars <- function(spec) {
   # one ARD `gp_exponential_cov`. Pure-MGP (no kernel) skips the
   # Phi block entirely and emits an elementwise normal prior on Z
   # below (Bhattacharya & Dunson 2011 parameterisation).
-  has_kernel <- has_features || has_distances
+  has_kernel <- traits$kernel
   if (has_kernel) {
     phi_terms <- character(0)
     if (has_distances) {

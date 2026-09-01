@@ -5549,6 +5549,27 @@ assert_loadings_prior_spec_consistent <- function(spec) {
       i = "Rebuild the spec via `normalise_loadings_prior()`."
     )))
   }
+  # A spec with neither a kernel nor column shrinkage carries no
+  # structure to emit, and the emitter's kernel branch would then
+  # write `Z ~ multi_normal_cholesky(..., L_Phi_loadings)` against
+  # an `L_Phi_loadings` nothing declares, which fails at `stanc`
+  # rather than here. `normalise_loadings_prior()` already refuses
+  # to build one; this is what stops a second builder from doing so.
+  traits <- loadings_spec_traits(spec)
+  if (!traits$kernel && !traits$mgp) {
+    stop(insight::format_error(c(
+      "Loadings-prior spec carries no structure to emit.",
+      x = paste0(
+        "It names no features, no distance matrices and ",
+        "'column_shrinkage = \"", spec$column_shrinkage %||% "iid",
+        "\"'."
+      ),
+      i = paste0(
+        "An empty spec collapses to the default iid prior; drop ",
+        "'loadings_prior' instead of passing one."
+      )
+    )))
+  }
   invisible(NULL)
 }
 

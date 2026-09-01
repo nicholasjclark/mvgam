@@ -66,6 +66,10 @@ its sampling statements? Default is \code{TRUE}.}
 progress, 1 (the default) prints progress alone, and 2 prints
 nothing.}
 
+\item{stanvars}{Optional \code{\link[brms]{stanvar}} object holding
+user Stan code to add to the program, merged with the stanvars
+mvgam generates for the trend.}
+
 \item{validate}{Logical; should the generated Stan code be validated?
 Default is \code{TRUE}.}
 

@@ -9,6 +9,7 @@
   data,
   family = gaussian(),
   loadings_prior = NULL,
+  data2 = NULL,
   trend_map = NULL,
   ...
 )
@@ -22,6 +23,20 @@
 \item{family}{A description of the response distribution and link function.
 Default is \code{gaussian()}. Not required if formula contains embedded
 families via \code{bf()} specifications.}
+
+\item{loadings_prior}{Optional structured prior on the factor
+loadings, in the form \code{\link{mvgam}} accepts. The prior
+reported for \code{Z} depends on it, so pass the same value here
+that the fit will use.}
+
+\item{data2}{Optional named list holding objects a
+\code{loadings_prior} refers to by name, matching the argument
+\code{\link{mvgam}} takes.}
+
+\item{trend_map}{Not supported. Fixed and partial loadings change
+which parameters the model has, so the free-loadings table this
+returns cannot describe them; supplying it is an error that points
+at \code{\link[brms]{stancode}}, which does take it.}
 
 \item{...}{Additional arguments passed to \code{brms::get_prior}}
 }

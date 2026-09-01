@@ -1059,15 +1059,7 @@ suffix_trend_prior_classes <- function(priors) {
   bookkeeping_sigma <- priors$class == "sigma" & !nzchar(coefs)
   priors <- priors[!bookkeeping_sigma, , drop = FALSE]
   if (nrow(priors) == 0L) return(priors)
-  # A class mvgam deliberately leaves unsuffixed, `Z` among them,
-  # must not acquire one here: the Stan parameter is `Z`, and
-  # `Z_trend` would name nothing. Read from the same list the
-  # class predicate is built on.
-  needs_suffix <- nzchar(priors$class) &
-    !grepl("_trend$", priors$class) &
-    !priors$class %in% mvgam_unsuffixed_params
-  priors$class[needs_suffix] <-
-    paste0(priors$class[needs_suffix], "_trend")
+  priors$class <- apply_trend_class_suffix(priors$class)
   priors
 }
 
@@ -1770,6 +1762,17 @@ has_embedded_families <- function(formula) {
 #' @param family A description of the response distribution and link function.
 #'   Default is \code{gaussian()}. Not required if formula contains embedded
 #'   families via \code{bf()} specifications.
+#' @param loadings_prior Optional structured prior on the factor
+#'   loadings, in the form \code{\link{mvgam}} accepts. The prior
+#'   reported for \code{Z} depends on it, so pass the same value here
+#'   that the fit will use.
+#' @param data2 Optional named list holding objects a
+#'   \code{loadings_prior} refers to by name, matching the argument
+#'   \code{\link{mvgam}} takes.
+#' @param trend_map Not supported. Fixed and partial loadings change
+#'   which parameters the model has, so the free-loadings table this
+#'   returns cannot describe them; supplying it is an error that points
+#'   at \code{\link[brms]{stancode}}, which does take it.
 #' @param ... Additional arguments passed to \code{brms::get_prior}
 #'
 #' @return A \code{brmsprior} data frame combining observation and trend priors
@@ -1848,6 +1851,7 @@ has_embedded_families <- function(formula) {
 #' @export
 get_prior.mvgam_formula <- function(object, data, family = gaussian(),
                                     loadings_prior = NULL,
+                                    data2 = NULL,
                                     trend_map = NULL, ...) {
 
   # Input validation (required by CLAUDE.md standards)
@@ -1930,7 +1934,7 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
   # branch will fire and reports the unstructured default for all
   # three, which is the model only one of them fits.
   loadings_prior_spec <- normalise_loadings_prior(
-    loadings_prior, data2 = NULL, data = data
+    loadings_prior, data2 = data2, data = data
   )
   if (!is.null(loadings_prior_spec)) {
     mv_spec$trend_specs <- attach_loadings_prior_spec(

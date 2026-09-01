@@ -15,6 +15,9 @@ median}
 \item{robust}{Logical; report the median and median absolute
 deviation rather than the mean and standard deviation}
 
+\item{bins}{Number of bins used to record the shape of each metric
+alongside its interval, which is what \code{plot()} draws}
+
 \item{...}{ignored}
 }
 \value{

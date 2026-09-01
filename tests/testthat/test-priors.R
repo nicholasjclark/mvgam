@@ -1123,6 +1123,45 @@ test_that("suffix_trend_prior_classes carries both guards", {
 })
 
 
+test_that("every surface names a trend prior class the same way", {
+  # `Z` is the Stan parameter's own name, so `Z_trend` names nothing.
+  # The suffix rule was written twice and only one copy knew that,
+  # so the model description rendered a parameter the program has no
+  # equivalent of.
+  cls <- c("sigma", "ar1_trend", "Z", "Psi", "theta_dist_phy", "")
+  expect_equal(
+    apply_trend_class_suffix(cls),
+    c("sigma_trend", "ar1_trend", "Z", "Psi", "theta_dist_phy", "")
+  )
+
+  tp <- brms::prior(student_t(3, 0, 0.5), class = "Z") +
+    brms::prior(normal(0, 1), class = "ar1")
+  rendered <- merge_trend_priors(
+    list(prior = NULL, trend_model = list(prior = tp))
+  )
+  expect_equal(sort(rendered$class), c("ar1_trend", "Z"))
+})
+
+
+test_that("loadings traits answer once for every consumer", {
+  # A kernel takes precedence in the `Z` branch, but column
+  # shrinkage still has to reach the program through its own
+  # hyperpriors, so the two questions stay separate.
+  kernel_mgp <- list(N_features_trend = 3L, column_shrinkage = "mgp")
+  traits <- loadings_spec_traits(kernel_mgp)
+  expect_true(traits$kernel)
+  expect_true(traits$mgp)
+  expect_equal(loadings_z_branch(kernel_mgp), "kernel")
+
+  # A spec missing the count fields answers FALSE rather than
+  # raising on a zero-length comparison.
+  bare <- loadings_spec_traits(list(column_shrinkage = "iid"))
+  expect_false(bare$kernel)
+  expect_false(bare$mgp)
+  expect_equal(loadings_z_branch(NULL), "unstructured")
+})
+
+
 test_that("add_trend_suffix_to_priors leaves other classes alone", {
   trend_priors <- rbind(
     brms::prior_string("normal(0, 1)", class = "b"),

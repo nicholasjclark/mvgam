@@ -614,31 +614,6 @@ inject_obs_zero_placeholder <- function(formula, data, prior) {
   list(formula = new_formula, data = data, prior = new_prior)
 }
 
-#' Lift mvgam-emitted Stan priors into the brmsprior table
-#'
-#' brms's `validate_prior()` only sees priors that flow through its
-#' own prior pipeline. mvgam emits several additional priors via
-#' stanvars that bypass that pipeline:
-#'   - partial-Z loadings (`Z_free_vec ~ student_t(3, 0, 1)`)
-#'   - loadings_prior features kernel
-#'     (`theta_features ~ lognormal(0, 1)`)
-#'   - loadings_prior distance kernels (one `theta_dist_<NAME>` per
-#'     supplied distance matrix)
-#'   - MGP column shrinkage (`varrho_inv[1]` + `varrho_inv[2:]`)
-#'   - closure-unit family scale (`Psi ~ exponential(1)` for mvn /
-#'     mvt families)
-#'
-#' This helper scans the fully assembled Stan model for those known
-#' emission sites and appends matching `brmsprior` rows tagged
-#' `source = "mvgam"`. The scan is pattern-driven, not flag-driven:
-#' adding a new mvgam-side prior is a single regex entry here.
-#'
-#' @param prior A `brmsprior` returned by `validate_prior()`.
-#' @param stancode Character string (or vector of lines) holding the
-#'   full assembled Stan model. NULL / empty returns `prior` as-is.
-#'
-#' @return The merged `brmsprior` with mvgam-side rows appended.
-#' @noRd
 # Parameters mvgam injects that do not carry the `_trend` suffix.
 # Everything else it emits is suffixed, so the two rules together name
 # the whole mvgam-side surface without naming any brms parameter.
@@ -667,6 +642,27 @@ is_mvgam_managed_class <- function(class) {
   grepl("_trend$", class) |
     class %in% mvgam_unsuffixed_params |
     grepl("^theta_dist_", class)
+}
+
+
+#' Name the trend-side rows of a prior table after their Stan parameters
+#'
+#' A prior table built from the trend prefit carries brms's own class
+#' names, so `sigma` there is the trend's innovation scale and has to
+#' become `sigma_trend` before a reader can match it to the program.
+#' The classes that must not move are exactly the ones that already
+#' name an mvgam parameter: `Z` is `Z` in the Stan, and `Z_trend`
+#' names nothing. That makes the suffix rule the complement of the
+#' class predicate rather than a second list to keep in step with it.
+#'
+#' @param class Character vector of prior class names.
+#' @return The same vector, suffixed where a suffix was owed.
+#' @noRd
+apply_trend_class_suffix <- function(class) {
+  checkmate::assert_character(class, any.missing = FALSE)
+  owed <- nzchar(class) & !is_mvgam_managed_class(class)
+  class[owed] <- paste0(class[owed], "_trend")
+  class
 }
 
 
@@ -757,6 +753,31 @@ mvgam_stancode_prior_rows <- function(sc) {
 }
 
 
+#' Lift mvgam-emitted Stan priors into the brmsprior table
+#'
+#' brms's `validate_prior()` only sees priors that flow through its
+#' own prior pipeline. mvgam emits several additional priors via
+#' stanvars that bypass that pipeline:
+#'   - partial-Z loadings (`Z_free_vec ~ student_t(3, 0, 1)`)
+#'   - loadings_prior features kernel
+#'     (`theta_features ~ lognormal(0, 1)`)
+#'   - loadings_prior distance kernels (one `theta_dist_<NAME>` per
+#'     supplied distance matrix)
+#'   - MGP column shrinkage (`varrho_inv[1]` + `varrho_inv[2:]`)
+#'   - closure-unit family scale (`Psi ~ exponential(1)` for mvn /
+#'     mvt families)
+#'
+#' This helper scans the fully assembled Stan model for those known
+#' emission sites and appends matching `brmsprior` rows tagged
+#' `source = "mvgam"`. The scan is pattern-driven, not flag-driven:
+#' adding a new mvgam-side prior is a single regex entry here.
+#'
+#' @param prior A `brmsprior` returned by `validate_prior()`.
+#' @param stancode Character string (or vector of lines) holding the
+#'   full assembled Stan model. NULL / empty returns `prior` as-is.
+#'
+#' @return The merged `brmsprior` with mvgam-side rows appended.
+#' @noRd
 lift_mvgam_stanvar_priors <- function(prior, stancode) {
   checkmate::assert_class(prior, "brmsprior")
   checkmate::assert(

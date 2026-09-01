@@ -296,6 +296,8 @@ stability.mvgam = function(object, ndraws = NULL, draw_ids = NULL,
 #'   median
 #' @param robust Logical; report the median and median absolute
 #'   deviation rather than the mean and standard deviation
+#' @param bins Number of bins used to record the shape of each metric
+#'   alongside its interval, which is what `plot()` draws
 #' @param ... ignored
 #'
 #' @return A `data.frame` with one row per metric

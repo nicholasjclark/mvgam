@@ -581,6 +581,9 @@ has_obs_intercept <- function(formula) {
 #'   \pkg{brms} convention. 0 prints Stan's exceptions as well as its
 #'   progress, 1 (the default) prints progress alone, and 2 prints
 #'   nothing.
+#' @param stanvars Optional \code{\link[brms]{stanvar}} object holding
+#'   user Stan code to add to the program, merged with the stanvars
+#'   mvgam generates for the trend.
 #' @param validate Logical; should the generated Stan code be validated?
 #'   Default is \code{TRUE}.
 #' @param ... Additional arguments passed to internal functions.

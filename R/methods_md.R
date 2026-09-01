@@ -330,14 +330,15 @@ factor_loadings_data_dimensions <- function(obj) {
   if (is.null(spec)) return(character(0L))
   ls <- spec$loadings_prior_spec
   if (is.null(ls)) return(character(0L))
+  traits <- loadings_spec_traits(ls)
   parts <- character(0L)
-  if (isTRUE(ls$N_features_trend > 0L)) {
+  if (traits$features) {
     parts <- c(parts, paste0(
       "$p_{\\text{features}} = ", ls$N_features_trend,
       "$ trait features"
     ))
   }
-  if (isTRUE(ls$n_distances > 0L)) {
+  if (traits$distances) {
     parts <- c(parts, paste0(
       "$p_{\\text{distances}} = ", ls$n_distances,
       "$ distance matrices"
@@ -2609,19 +2610,16 @@ loadings_prior_rows <- function(spec, fixed_Z) {
       rhs = "\\text{Student-t}(3, 0, 0.5)"
     )))
   }
-  has_features  <- isTRUE(spec$N_features_trend > 0L)
-  has_distances <- isTRUE(spec$n_distances > 0L)
-  uses_mgp      <- identical(spec$column_shrinkage, "mgp")
-  has_kernel    <- has_features || has_distances
+  traits <- loadings_spec_traits(spec)
 
   rows <- list()
-  if (has_kernel) {
+  if (traits$kernel) {
     rows <- c(rows, kernel_assembly_rows(spec))
   }
-  if (uses_mgp) {
+  if (traits$mgp) {
     rows <- c(rows, mgp_shrinkage_rows())
   }
-  rows <- c(rows, list(z_column_prior_row(uses_mgp, has_kernel)))
+  rows <- c(rows, list(z_column_prior_row(traits$mgp, traits$kernel)))
   rows
 }
 
@@ -2669,7 +2667,7 @@ kernel_assembly_rows <- function(spec) {
   # theta_features). Per R/stan_assembly.R:3241-3268; one factor
   # per supplied distance matrix, plus the features GP factor
   # when N_features_trend > 0.
-  has_features <- isTRUE(spec$N_features_trend > 0L)
+  has_features <- loadings_spec_traits(spec)$features
   dnames <- names(spec$distance_mats) %||% character(0L)
   terms <- character(0L)
   for (nm in dnames) {
@@ -2874,16 +2872,9 @@ merge_trend_priors <- function(obj) {
     return(obs)
   }
   trend_prior <- tm$prior
-  # Suffix the class so trend-side rows render as
-  # sigma_trend / ar1_trend / Intercept_trend etc., matching the
-  # Stan parameter names emitted in the combined model.
-  cls <- trend_prior$class
-  cls_suffixed <- ifelse(
-    nzchar(cls) & !grepl("_trend$", cls),
-    paste0(cls, "_trend"),
-    cls
-  )
-  trend_prior$class <- cls_suffixed
+  # Render trend-side rows under the names the combined program
+  # gives them, so a reader can match the description to the Stan.
+  trend_prior$class <- apply_trend_class_suffix(trend_prior$class)
   if (is.null(obs) || nrow(obs) == 0L) {
     return(trend_prior)
   }
