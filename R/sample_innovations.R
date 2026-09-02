@@ -175,9 +175,17 @@ fitted_series_index <- function(object) {
   if (is.null(train)) {
     return(NULL)
   }
-  labels <- as.character(get_series_for_grouping(
-    prepare_mvgam_frame(object, train)
-  ))
+  frame <- prepare_mvgam_frame(object, train)
+  # A frame whose responses are its series states the axis outright,
+  # and the per-row values are then a single constant that no sorting
+  # can recover the axis from. The record below is per response on
+  # such a fit (`obs_trend_series_<resp>`), so there is nothing here
+  # for the label route to read either.
+  axis <- mvgam_response_axis(frame)
+  if (!is.null(axis)) {
+    return(stats::setNames(seq_along(axis), axis))
+  }
+  labels <- as.character(get_series_for_grouping(frame))
   recorded <- object$standata$obs_trend_series
   if (!is.null(recorded) && length(recorded) == length(labels)) {
     per_label <- tapply(as.integer(recorded), labels, unique)

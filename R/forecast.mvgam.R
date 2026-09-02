@@ -333,22 +333,49 @@ build_training_arms <- function(object, series_levels, resp = NULL) {
     (object$mv_spec$response_names %||%
        as.character(object$formula[[2L]]))[1L]
 
-  # Cut the arms with the same labels they are named by. Reading the
-  # raw column instead splits a fit whose series was derived from a
-  # `gr` / `subgr` pair: the names come from the derived identity and
-  # the subset from the column it superseded, and every arm comes
-  # back empty.
-  series_labels <- as.character(training_series_labels(object, d))
+  # Which rows belong to a series, answered once. Everything a series
+  # needs is a cut of the training frame, so deciding the membership
+  # here and reading it three times keeps the observations, the times
+  # and the rows the linpred is called on describing one thing.
+  #
+  # Two frames answer it differently. Where a series is a stretch of
+  # rows, membership is the rows carrying that label, and the label
+  # has to be the derived one: reading the raw column instead splits
+  # a fit whose series came from a `gr` / `subgr` pair, because the
+  # names come from the derived identity and the subset from the
+  # column it superseded. Where the responses are the series, every
+  # row carries every response, so a series is a column rather than a
+  # stretch of rows and its membership is the occasions on which that
+  # column was measured.
+  axis <- mvgam_response_axis(prepare_mvgam_frame(object, d))
+  response_keyed <- !is.null(axis)
+  series_labels <- if (response_keyed) {
+    NULL
+  } else {
+    as.character(training_series_labels(object, d))
+  }
+
+  series_rows <- lapply(series_levels, function(lv) {
+    if (response_keyed) {
+      which(!is.na(d[[lv]]))
+    } else {
+      which(series_labels == lv)
+    }
+  })
+  names(series_rows) <- series_levels
+
+  # A response-keyed series reads its own column; otherwise every
+  # series reads the one response the frame carries.
   observations <- lapply(series_levels, function(lv) {
-    idx <- series_labels == lv
-    if (!any(idx)) return(numeric(0L))
-    as.numeric(d[[resp]][idx])
+    rows <- series_rows[[lv]]
+    if (!length(rows)) return(numeric(0L))
+    as.numeric(d[[if (response_keyed) lv else resp]][rows])
   })
   names(observations) <- series_levels
   times <- lapply(series_levels, function(lv) {
-    idx <- series_labels == lv
-    if (!any(idx)) return(integer(0L))
-    sort(unique(as.integer(d[[time_var]][idx])))
+    rows <- series_rows[[lv]]
+    if (!length(rows)) return(integer(0L))
+    sort(unique(as.integer(d[[time_var]][rows])))
   })
   names(times) <- series_levels
 
@@ -357,6 +384,7 @@ build_training_arms <- function(object, series_levels, resp = NULL) {
     time_var = time_var,
     series_var = series_var,
     series_labels = series_labels,
+    series_rows = series_rows,
     resp = resp,
     observations = observations,
     times = times
@@ -512,7 +540,7 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
                            ncol = 0L)
       next
     }
-    sub <- training$data[training$series_labels == lv, , drop = FALSE]
+    sub <- training$data[training$series_rows[[lv]], , drop = FALSE]
     sub <- sub[order(sub[[training$time_var]]), , drop = FALSE]
     # Closure-unit families ship multiple rows per (series, time)
     # for the per-visit detection grain. The `"trend"` and `"link"`

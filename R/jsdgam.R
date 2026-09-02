@@ -87,8 +87,11 @@
 #'   family inside each [brms::bf()], as in
 #'   `bf(count ~ env, family = poisson()) + bf(seen ~ env, family =
 #'   bernoulli())`. The responses then form the species axis the
-#'   latent factors load across, `species` is read from them rather
-#'   than from a column, and this argument is ignored. For simplex
+#'   latent factors load across and `species` is read from them
+#'   rather than from a column. A family named there belongs to that
+#'   response; this argument then applies only to responses that
+#'   named none, and is left alone entirely when every response
+#'   speaks for itself. For simplex
 #'   multi-response families (`diri()`, `multi()`, `categ()`), write
 #'   the formula with a per-`species` interaction (e.g.
 #'   `y ~ env * species` or the brms-native-style
@@ -195,12 +198,14 @@
 #'   `trend_formula` on a brms-native family currently compiles
 #'   un-threaded after a one-time warning; see [`mvgam()`] for the
 #'   full threading notes and bench guidance.
-#' @param run_model **(deprecated)** Logical. Forwarded to `mvgam()`;
-#'   when `FALSE`, skips Stan parse / compile / sampling and returns a
-#'   stub `mvgam` / `jsdgam` object with `$stancode` and `$standata`
-#'   populated but `$fit = NULL`. New code should use [`stancode()`] /
-#'   [`standata()`] on an [`mvgam_formula()`] object instead. Emits a
-#'   one-time `rlang::warn()` when `FALSE`. Defaults to `TRUE`.
+#' @param run_model Logical, forwarded to [`mvgam()`]. When `FALSE`,
+#'   skips Stan parse, compile and sampling and returns a stub
+#'   `mvgam` / `jsdgam` object with `$stancode` and `$standata`
+#'   populated and `$fit = NULL`. This is how a joint species model
+#'   is read without fitting it: `jsdgam()` derives the species axis,
+#'   the loadings map and the trend itself, so there is no
+#'   [`mvgam_formula()`] to hand to [`stancode()`] in its place.
+#'   Defaults to `TRUE`.
 #'
 #' @param ... Other arguments forwarded to `mvgam()`. Notable ones
 #'   include `data2` (lookup list for string-named `traits` / `phylo`
@@ -563,10 +568,18 @@ jsdgam <- function(formula,
     trend_formula = trend_formula_out,
     trend_map = trend_map_mat,
     data = data_train,
-    family = family,
     backend = backend,
     run_model = run_model
   )
+  # The family belongs to the response that names it. A multivariate
+  # formula gives each species its own, which is the whole point of
+  # writing one, so the presence-absence default this function carries
+  # for the single-response case must not overwrite them. Forwarding
+  # it only when the caller named one leaves `mvgam()` to apply it to
+  # whichever responses stayed silent.
+  if (!missing(family) || !is_mv_formula) {
+    forward_args$family <- family
+  }
   # Only forward `threads` when the user actually set it; mvgam()
   # defaults the unset case via `getOption("mc.cores", 1)` further
   # down (in stancode.mvgam_formula), and passing NULL trips that

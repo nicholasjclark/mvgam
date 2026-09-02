@@ -973,3 +973,112 @@ fit_mvgam_cached(
   ~ AR(p = 1),
   mv_nc_data, NULL
 )
+
+# ----------------------------------------------------------------------
+# [28] Three responses over a row count that does not divide by three.
+# The rows of a wide frame count time points, so their number bears no
+# relation to the number of responses. Fifty times and three responses
+# is the shape a user hits following the multivariate article, and it
+# is also the smallest case where the response axis carries more
+# series than the model has factors, so the loadings have work to do.
+# Each response is on its own scale, which is the point of giving them
+# separate submodels.
+# ----------------------------------------------------------------------
+cat("\n[28] Three responses, rows not divisible by responses\n")
+set.seed(2828L)
+n_odd <- 50L
+lv_odd <- cbind(sim_ar1(n_odd, 0.75, 0.5), sim_ar1(n_odd, 0.35, 0.5))
+Z_odd <- matrix(c(1.0, 0.0,
+                  0.4, 0.8,
+                  -0.6, 0.5), nrow = 3L, ncol = 2L, byrow = TRUE)
+eta_odd <- lv_odd %*% t(Z_odd)
+odd_x <- rnorm(n_odd)
+mv_odd_data <- data.frame(
+  time = seq_len(n_odd),
+  x = odd_x,
+  cnt = rpois(n_odd, exp(1.0 + 0.4 * odd_x + eta_odd[, 1L])),
+  pa = rbinom(n_odd, 1L, plogis(-0.3 + 0.6 * odd_x + eta_odd[, 2L])),
+  mass = rgamma(n_odd, shape = 4,
+                rate = 4 / exp(0.5 + 0.3 * odd_x + eta_odd[, 3L]))
+)
+attr(mv_odd_data, "Z_true") <- Z_odd
+attr(mv_odd_data, "lv_true") <- lv_odd
+fit_mvgam_cached(
+  "mv_three_odd",
+  brms::bf(cnt ~ x, family = poisson()) +
+    brms::bf(pa ~ x, family = bernoulli()) +
+    brms::bf(mass ~ x, family = Gamma(link = "log")),
+  ~ ZMVN(n_lv = 2),
+  mv_odd_data, NULL
+)
+
+# ----------------------------------------------------------------------
+# [29] Two responses measured on each of three sites.
+# Here both axes are real at once: the frame names its series and each
+# row still carries every response. The series column is the user's
+# statement that these responses share a site's latent state, and it
+# has to keep winning over the response axis, or a three-site model
+# silently becomes a two-series one. `cor = TRUE` means the recovered
+# correlation between sites is a claim the fixture can be asked for.
+# ----------------------------------------------------------------------
+cat("\n[29] Two responses on three sites\n")
+set.seed(2929L)
+n_t_ms <- 40L
+sites_ms <- c("north", "central", "south")
+lv_ms <- vapply(seq_along(sites_ms),
+                function(i) sim_ar1(n_t_ms, 0.6, 0.5),
+                numeric(n_t_ms))
+ms_rows <- expand.grid(time = seq_len(n_t_ms), series = sites_ms,
+                       stringsAsFactors = FALSE)
+ms_state <- lv_ms[cbind(ms_rows$time, match(ms_rows$series, sites_ms))]
+ms_x <- rnorm(nrow(ms_rows))
+mv_ms_data <- data.frame(
+  time = ms_rows$time,
+  series = factor(ms_rows$series, levels = sites_ms),
+  x = ms_x,
+  cnt = rpois(nrow(ms_rows), exp(0.9 + 0.5 * ms_x + ms_state)),
+  pa = rbinom(nrow(ms_rows), 1L, plogis(-0.2 + 0.4 * ms_x + ms_state))
+)
+attr(mv_ms_data, "lv_true") <- lv_ms
+fit_mvgam_cached(
+  "mv_multiseries",
+  brms::bf(cnt ~ x, family = poisson()) +
+    brms::bf(pa ~ x, family = bernoulli()),
+  ~ AR(p = 1, cor = TRUE),
+  mv_ms_data, NULL
+)
+
+# ----------------------------------------------------------------------
+# [30] Two responses observed on different occasions.
+# brms drops a row with an NA in any response; mvgam keeps each
+# response on its own valid rows so the shared state is informed
+# wherever either was measured. On a frame whose series is derived
+# rather than named, that per-response subsetting is what carries the
+# series along with it, so the two features have to be exercised
+# together. A random walk leaves the state unpinned by a stationary
+# variance, which is the harder case for a gappy series.
+# ----------------------------------------------------------------------
+cat("\n[30] Two responses with per-response gaps\n")
+set.seed(3030L)
+n_gap <- 60L
+gap_latent <- sim_ar1(n_gap, 0.9, 0.35)
+gap_x <- rnorm(n_gap)
+mv_gap_data <- data.frame(
+  time = seq_len(n_gap),
+  x = gap_x,
+  cnt = rpois(n_gap, exp(1.1 + 0.5 * gap_x + gap_latent)),
+  gauss = rnorm(n_gap, 0.4 + 0.7 * gap_x + gap_latent, 0.5)
+)
+# Disjoint gaps, so neither response can be reconstructed from the
+# other's occasions and some times inform the state through one arm
+# only.
+mv_gap_data$cnt[c(5L, 6L, 17L, 33L, 44L)] <- NA_integer_
+mv_gap_data$gauss[c(9L, 21L, 22L, 38L, 51L, 52L)] <- NA_real_
+attr(mv_gap_data, "latent_true") <- gap_latent
+fit_mvgam_cached(
+  "mv_na_gaps",
+  brms::bf(cnt ~ x, family = poisson()) +
+    brms::bf(gauss ~ x, family = gaussian()),
+  ~ RW(),
+  mv_gap_data, NULL
+)

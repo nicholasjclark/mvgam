@@ -225,14 +225,16 @@ script that fits repeatedly. The full fix (teaching the
 injector to splice into \code{partial_log_lik_lpmf}) is filed as a
 separate enhancement.}
 
-\item{run_model}{\strong{(deprecated; do not use in new code)} Logical.
-Setting \code{run_model = FALSE} short-circuits before Stan parse /
-compile / sampling and returns a stub \code{mvgam} object whose
-\verb{$stancode} and \verb{$standata} slots are populated but \verb{$fit} is
-\code{NULL}. Methods that need a fitted model (\code{summary()},
-\code{predict()}, \code{forecast()}, \code{loo()}, etc.) reject the stub with
-a pointer back to the modern helpers. Use \code{\link[=stancode]{stancode()}} and
-\code{\link[=standata]{standata()}} on an \code{\link[=mvgam_formula]{mvgam_formula()}} object instead. Both
+\item{run_model}{Logical. Setting \code{run_model = FALSE} stops before
+Stan parse, compile and sampling and returns a stub \code{mvgam}
+object whose \verb{$stancode} and \verb{$standata} slots are populated but
+whose \verb{$fit} is \code{NULL}. Methods that need a fitted model
+(\code{summary()}, \code{predict()}, \code{forecast()}, \code{loo()}) reject the
+stub and say which helper to reach for. Where the model can be
+written as an \code{\link[=mvgam_formula]{mvgam_formula()}}, calling \code{\link[=stancode]{stancode()}} or
+\code{\link[=standata]{standata()}} on that object says the same thing more directly;
+\code{run_model = FALSE} is the route for a specification that only
+\code{\link[=jsdgam]{jsdgam()}} knows how to build. Both
 dispatch on \code{mvgam_formula} and share the exact same trend /
 \code{loadings_prior} pipeline used internally by \code{mvgam()} /
 \code{jsdgam()}, so they surface the same Stan code and data without

@@ -675,22 +675,31 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > predict, plot, summary and the accessors -- so the surfaces are
   > shown to be right rather than merely to run.
 
-- [ ] **38.0 One observation family per species in `jsdgam()`**
-  > Confirm whether `jsdgam()` accepts a different observation family
-  > for each species, and say plainly which it is. A joint species
-  > model over mixed data types is the ordinary case -- counts for one
-  > taxon, presence-absence for another, cover for a third -- and if
-  > the answer is that one family applies to every species, that is a
-  > documented limitation rather than something to infer from a
-  > failure.
+- [ ] **38.0 `jsdgam()` accepts per-species families and then drops them**
+  > A joint species model over mixed data types is the ordinary case,
+  > counts for one taxon, presence-absence for another, cover for a
+  > third, and `jsdgam()` now takes the multivariate formula that
+  > expresses it. It does not take the families. `family` defaults to
+  > `binomial()` at `R/jsdgam.R:301` and is passed through at `:566`,
+  > so whatever each `bf()` declared is overwritten. A three-response
+  > formula naming `poisson()`, `bernoulli()` and `gaussian()` stops
+  > on the Gaussian response for holding values outside the support of
+  > the binomial, which is the lucky case: three count responses would
+  > have fitted the wrong families in silence.
   >
-  > Establish it from the code first, since the constructor may
-  > accept a list and then quietly use its first element, which no
-  > fit would reveal. Then decide: support it, or refuse a list with
-  > a message naming `mvbind()` as the route to mixed families. Either
-  > way it needs a test, and if it is supported it needs a local
-  > fixture with at least two families and the full post-fit surface
-  > driven over it.
+  > The roxygen at `R/jsdgam.R:88` already documents the per-`bf()`
+  > route, so the manual and the code disagree.
+  >
+  > `mvgam()` resolves this correctly, taking the family from the
+  > response that names it and using its own argument only as the
+  > default for responses that do not. That is one behaviour and it
+  > should have one implementation, reached by both entry points and
+  > by every post-fit surface that asks what family a response has.
+  > `get_family_for_resp()` is where the answer already lives.
+  >
+  > Needs a local fixture with at least two families and the full
+  > post-fit surface driven over it. `build_fixtures.R` block [26]
+  > builds one and is currently unfittable for this reason.
 
 - [ ] **39.0 The multivariate series axis is a per-row vector and
   cannot be**
@@ -766,6 +775,252 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > re-checking afterwards. No fixture currently covers a wide frame
   > without a `series` column, which is why none of this was caught;
   > one belongs in `build_fixtures.R` with the same change.
+  >
+  > Measured since, and each narrows the change. The fix has one home
+  > at fit time: `generate_obs_trend_mapping()` is already called once
+  > per response and already receives `response_var`, so the series
+  > index it needs is the one it was asked about.
+  > `expand_per_response_standata()` is not involved, since it
+  > substitutes only the arrays brms builds and returns early when no
+  > response carries an `NA`, yet the per-response series arrays are
+  > present on a frame with no missing values at all.
+  >
+  > Post-fit is the harder half. `get_observation_structure()` takes
+  > only the fit and a frame, so it cannot know which response it is
+  > answering for, and five callers across `forecast.mvgam.R`,
+  > `predictions.R` and `sample_innovations.R` would have to say.
+  >
+  > The axis is alphabetical rather than the order the responses were
+  > written in. `create_multivariate_series()` builds its factor
+  > without naming levels, so `bf(zebra) + bf(apple)` puts `apple`
+  > on series one, and `Z` row one belongs to the response the user
+  > wrote second. Giving the factor `levels = response_vars` makes
+  > series `k` the `k`th response, which is what a reader of the
+  > loadings will assume.
+  >
+  > Six fields the dimension list computes are read nowhere:
+  > `last_times`, `first_times`, `stan_to_original`,
+  > `original_to_stan`, `requires_reordering` and `series_indices`,
+  > along with the `series_time_info` pipeline that builds them.
+  > `n_series` is live and stays. Forecasting gets its per-series last
+  > time from `extract_last_observed_times()`, which reads the series
+  > column directly and is right on a wide frame.
+  >
+  > Four tests in `test-stancode-standata.R` now state the intended
+  > behaviour. Two are red: the per-response series index is not
+  > constant within a response, and three responses over fifty rows
+  > still stops on the divisibility check. Two pass already and are
+  > the regression guards, one holding the explicit series column
+  > ahead of the response axis and one pinning the trend design to
+  > time level.
+  >
+  > An independent audit measured three things this entry had wrong or
+  > missing.
+  >
+  > There is a third wrong consumer. `training_series_labels()` feeds
+  > `build_training_arms()` at `R/forecast.mvgam.R:341`, which cuts
+  > one arm per response out of the frame. On the block split both
+  > arms come from the same response column and each covers half the
+  > timeline, so `hindcast()` on a two-response fit returns two
+  > ten-long arms at times one to ten and eleven to twenty where it
+  > should return one twenty-long arm per response.
+  >
+  > The time-level trend design is a coincidence rather than a
+  > property. It arrives through the `is_shared_trend` branch, which
+  > fires when every response names an identical trend spec, and only
+  > the `extract_trend_data` call passes the specs that let it fire.
+  > Give the arms different specs and the same grouping yields a
+  > twenty-row frame whose series column is ten `cnt` then ten `pa`,
+  > so the block split reaches the design frame itself.
+  >
+  > The fit and post-fit disagree through a named mechanism. The fit
+  > stores `series_source = "multivariate_shared"`, and Strategy 1 of
+  > `ensure_mvgam_variables()` tests for `"multivariate"` exactly
+  > (`R/validations.R:4295`), so prediction does not recognise what
+  > fitting recorded and derives the axis again.
+  >
+  > The damage is measurable rather than inferred. Against posterior
+  > `trend[t, s]` draws, `posterior_linpred(incl_autocor = TRUE)`
+  > matches the block-split column to zero and the correct column to
+  > 2.32.
+  >
+  > Two further gaps are independent of the axis and block the
+  > end-to-end surface anyway. `forecast()` stops in
+  > `resolve_forecast_grid()` (`R/forecast.mvgam.R:378`) demanding a
+  > long-format `series` column that a wide frame cannot carry, so it
+  > never reaches the mapping at all. `series_long_df()`
+  > (`R/plot_mvgam_series.R:180`) reads the raw series column, labels
+  > every row `series1`, and then levels it against the response names
+  > so every row becomes `NA`.
+  >
+  > The dead set is larger than six fields: the whole
+  > `metadata$time_info` and `metadata$ordering` blocks at
+  > `R/validations.R:2953-2985`, and `trend_model$metadata` assigned
+  > at `R/trend_system.R:1875` with no reader anywhere.
+
+- [ ] **40.0 One series axis, resolved once**
+  > "Which series is this observation on" is answered independently
+  > in at least twelve places, in four incompatible ways: the raw
+  > series column (`calculate_car_time_distances`, `series_long_df`,
+  > `resolve_forecast_grid`, `extract_last_observed_times`,
+  > `resolve_hierarchical_info`), the frame attribute
+  > (`get_series_for_grouping`, `series_group_values`), sorted labels
+  > (`fitted_series_index`, `get_observation_structure`,
+  > `build_training_arms`), and a full re-derivation
+  > (`ensure_mvgam_variables`, called three times per `standata()` and
+  > answering differently each time). `remove_mvgam_variables()`
+  > strips the derived axis between layers, which is what forces the
+  > re-derivation.
+  >
+  > Every defect this survey found in the axis is one instance of
+  > that: the hierarchical order that was a permutation of Stan's,
+  > `group_inds_trend` built in row order, the multivariate block
+  > split, the fit storing `multivariate_shared` where prediction
+  > looks for `multivariate`, and a hierarchical trend on a frame
+  > with no series column being refused at four separate layers of a
+  > single call.
+  >
+  > Resolve it once instead. One axis object, built where the data
+  > enters and stored on the fit, carrying the levels in order, the
+  > source that produced them, the index for a (row, response) pair
+  > and the rows belonging to each level. Then three rules hold the
+  > line: nothing reads the series column directly, nothing rebuilds
+  > an axis with `sort(unique(...))`, and post-fit reads what the fit
+  > recorded rather than deriving it again.
+  >
+  > What it buys is debuggability. Today, finding out why a series
+  > reads the wrong state means first working out which of the four
+  > styles the failing layer uses. With one object it is printing the
+  > axis and comparing it against `obs_trend_series`. Fit and
+  > prediction stop being able to disagree, and a new trend, family
+  > or plot inherits the answer rather than deriving its own.
+  >
+  > The migration is mechanical, twelve readers, and
+  > `tests/testthat/test-axis-ordering.R` plus the full suite is the
+  > net. Do it as its own change.
+  >
+  > What the object records, measured on a prefit of a three-response
+  > wide frame, says which half is missing. The labels are there:
+  > `trend_metadata$levels$series` holds the axis in order and
+  > `series_source` says how it was built. The mapping is not.
+  > `trend_metadata` has no `dimensions`, so nothing records
+  > `n_series` or `n_time`; `series_info` is `NULL`; and `obs_data`
+  > carries no `mvgam_*` attributes at all, so every post-fit call
+  > rebuilds the axis through `prepare_mvgam_frame()` rather than
+  > reading it. A multivariate fit has no plain `obs_trend_series`
+  > either, only `obs_trend_series_<resp>` per arm, so
+  > `fitted_series_index()` cannot take its recorded branch and
+  > always falls back to deriving from labels.
+  >
+  > So the slot to add carries the mapping, not more labels: the
+  > levels in order, the source, `n_series` and `n_time`, and the
+  > index from a row and a response to a trend column. Then
+  > `fitted_series_index()`, `get_observation_structure()`,
+  > `build_training_arms()`, `series_long_df()` and
+  > `resolve_forecast_grid()` read one record instead of each
+  > deriving its own.
+
+- [ ] **41.0 A hierarchical trend needs a series column it should not**
+  > `AR(gr = region, subgr = species)` on a frame carrying `region`
+  > and `species` and no `series` column is refused, though
+  > `architecture-decisions.md:479` states the series is
+  > `interaction(gr, subgr)` and nothing about the model needs the
+  > column. Every cached hierarchical fixture adds one, so nothing
+  > caught it; `val_mvgam_hier_ar_cor` supplies a `series` column
+  > deliberately, to exercise the path where a supplied column is
+  > superseded, and so takes the explicit strategy instead.
+  >
+  > It fails at four layers of one call, each asking for the series
+  > its own way. Two are fixed: `ensure_mvgam_variables()` read the
+  > grouping only from `parsed_trend$trend_model` while the
+  > validation pipeline passes those arguments directly, so
+  > `trend_grouping_vars()` now reads either shape; and
+  > `resolve_hierarchical_info()` demanded the raw column beside a
+  > call to `series_group_values()`, which already prefers the
+  > derived series and reports when it can find neither.
+  >
+  > What remains is that the derived axis does not survive as far as
+  > `data_info$data`, so the fourth layer finds nothing to read.
+  > That is 40.0 rather than a fifth patch, and this entry should be
+  > finished with it. A fixture on a `gr` / `subgr` frame with no
+  > series column belongs in `build_fixtures.R` at the same time.
+
+- [ ] **42.0 The suppressions the `run_model` deprecation left behind**
+  > `run_model = FALSE` stands, and carries no warning. The
+  > deprecation pointed at `stancode()` and `standata()` on an
+  > `mvgam_formula()`, which serves `mvgam()` and cannot serve
+  > `jsdgam()`: `mvgam_formula()` takes a formula
+  > and a trend formula, while `jsdgam()` derives the species axis,
+  > builds the loadings map and injects the trend itself, handing
+  > none of it back. The argument is the only way to read a joint
+  > species model without fitting it, and the tests said as much
+  > with 65 calls across seven files.
+  >
+  > It earns its keep beyond that. A prefit carries `standata`,
+  > `obs_data` and `trend_metadata` without having sampled, so the
+  > question post-processing turns on, whether what the object
+  > recorded agrees with what reading it back derives, can be asked
+  > in CI rather than only against a cached fit.
+  > `tests/testthat/test-axis-ordering.R` now does exactly that.
+  >
+  > What is left is the cleanup. Those 65 sites wrap the call in
+  > `suppressWarnings()` to keep the retired warning out of the
+  > summary, and a blanket suppression hides whatever else the call
+  > says. Remove them file by file and read what appears: a
+  > suppression that was covering a second warning is a defect the
+  > deprecation was concealing. Do it as its own pass, since the
+  > point is the warnings it exposes rather than the lines it
+  > deletes.
+
+- [ ] **43.0 A superseded series column still orders the trend axis**
+  > `hierarchical_series_values()` builds the series with
+  > `interaction(gr, subgr, sep = "_", lex.order = TRUE)`
+  > (`R/validations.R:3552`), and mvgam warns that a supplied `series`
+  > column has been replaced by it. The column is replaced in
+  > spelling and not in order. On a two-region, two-species frame the
+  > derived levels run `north_sp_a`, `north_sp_b`, `south_sp_a`,
+  > `south_sp_b`, while the trend columns are occupied by
+  > `north_sp_a`, `south_sp_a`, `north_sp_b`, `south_sp_b`, which is
+  > the supplied column's own level order.
+  >
+  > Reversing that column reverses the axis, which settles it: give
+  > the frame `south.sp_b`, `north.sp_b`, `south.sp_a`, `north.sp_a`
+  > and the trend columns come back in exactly that order. The axis
+  > follows the column the warning calls superseded.
+  >
+  > So two records of one axis disagree whenever the supplied column
+  > is not lex-ordered. `obs_trend_series` and
+  > `fitted_series_index()` agree with each other and with the
+  > column; `trend_metadata$levels$series` agrees with the derived
+  > spelling. Anything labelling trend columns from the stored list
+  > names column two `north_sp_b` where the column holds
+  > `south_sp_a`.
+  >
+  > The damage is not confined to labelling. `times_trend` follows the
+  > derived lex order while `obs_trend_series` follows the supplied
+  > column's, so `mu_trend[times_trend[i, s]]` hands series `s` another
+  > series' covariates: on the two-region, two-species frame every one
+  > of the fifteen occasions of `south_sp_a` and `north_sp_b` is
+  > exchanged in `X_trend`. The trend linear predictor is wrong, not
+  > merely the name attached to it, so this ranks with the defects that
+  > decide what Stan is given rather than with the reporting ones.
+  >
+  > Measured identically on the committed branch, so it predates this
+  > survey. Every cached hierarchical fixture supplies a `series`
+  > column, which is why nothing caught it, and
+  > `val_mvgam_hier_ar_cor` supplies one deliberately built with
+  > `interaction()`'s default order, so it sits on the disagreement.
+  >
+  > Which order is right is the decision to make, not just which
+  > field to rewrite. `lex.order = TRUE` groups a region's species
+  > together, which is what a hierarchical trend's per-group blocks
+  > want; the column's order is whatever the user's `interaction()`
+  > call produced. 40.0 removes the second record, and this entry is
+  > the reason its axis must be the one `obs_trend_series` indexes.
+  >
+  > `tests/testthat/test-axis-ordering.R` asserts both agreements and
+  > fails four cells on them, which is the intended state. A
+  > hierarchical frame supplying no `series` column is unaffected.
 
 - [ ] **6.0 Final release verification**
   > Clean `document()`, clean test sweep, `R CMD check --as-cran`,

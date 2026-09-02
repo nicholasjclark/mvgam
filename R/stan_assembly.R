@@ -84,7 +84,12 @@ apply_response_suffix_to_stanvars <- function(stanvars, response_suffix) {
   }
 }
 
-#' Apply Suffix to Parameter Name
+#' Apply a suffix to a parameter name
+#' @param name Parameter name to test.
+#' @param patterns Character vector of regular expressions. The suffix is
+#'   applied when `name` matches one of them in full.
+#' @param suffix String appended to a matching name.
+#' @return `name`, suffixed if it matched and unchanged otherwise.
 #' @noRd
 apply_suffix_to_name <- function(name, patterns, suffix) {
   for (pattern in patterns) {
@@ -95,13 +100,19 @@ apply_suffix_to_name <- function(name, patterns, suffix) {
   return(name)
 }
 
-#' Apply Suffix to Stan Code
+#' Apply a suffix to every matching name in Stan code
+#' @param stan_code Stan code to rewrite.
+#' @param patterns Character vector of regular expressions naming the
+#'   variables to suffix.
+#' @param suffix String appended to each matched name.
+#' @return `stan_code` with every match suffixed.
 #' @noRd
 apply_suffix_to_stan_code <- function(stan_code, patterns, suffix) {
   for (pattern in patterns) {
-    # Check if pattern already contains regex special characters (lookahead/lookbehind)
+    # A pattern carrying its own lookaround is anchored at the start
+    # only, since a trailing word boundary would fall inside the
+    # assertion rather than after the name.
     if (grepl("\\?[=!]|\\(\\?", pattern)) {
-      # Pattern already contains lookahead/lookbehind, use as-is with word boundary only at start
       regex_pattern <- paste0("\\b", pattern)
       # For negative lookahead patterns, extract the base pattern for replacement
       base_pattern <- gsub("\\(\\?[^)]*\\)", "", pattern)
@@ -5861,38 +5872,32 @@ calculate_car_time_distances <- function(data_info) {
   time_var <- data_info$time_var %||% "time"
   series_var <- data_info$series_var %||% "series"
 
-  # Prepare time and series data
-  all_times <- data.frame(
-    series = as.numeric(data[[series_var]]),
-    time = data[[time_var]]
-  ) %>%
-    dplyr::group_by(series) %>%
-    dplyr::arrange(time) %>%
-    dplyr::mutate(
-      time_lag = dplyr::lag(time),
-      dis_time = time - time_lag,
-      dis_time = ifelse(is.na(dis_time), 1, dis_time),
-      dis_time = pmax(1e-3, dis_time)
-    ) %>%
-    dplyr::ungroup() %>%
-    dplyr::arrange(time, series)
+  # Every series is observed on one shared grid, since a panel whose
+  # series cover different times is refused before reaching here, so
+  # the gap between two steps belongs to the grid rather than to a
+  # series and each column of the answer is the same.
+  #
+  # Reading the series column to find that out was the source of
+  # three faults. It gave `as.numeric()` a column that may hold
+  # characters, or on a frame whose series is derived may not exist;
+  # it numbered the series by factor level where the observation
+  # mapping numbers them by position on the axis; and it filled the
+  # matrix by counting rows, so row `k` held the `k`th observed gap
+  # rather than the gap at time `k`. The grid answers all three.
+  times <- sort(unique(data[[time_var]]))
+  n_series <- data_info$n_series %||%
+    length(data_info$unique_series %||% 1L)
 
-  # Convert to matrix format [n_time, n_series]
-  n_time <- length(unique(all_times$time))
-  n_series <- length(unique(all_times$series))
+  # Step `t` carries the distance from `t - 1`. The first has no
+  # predecessor, and Stan raises it to a power, so it takes 1 rather
+  # than a gap. The floor keeps a repeated timestamp from collapsing
+  # the autocorrelation to zero distance.
+  dis_time <- c(1, pmax(1e-3, diff(times)))
 
-  time_dis <- matrix(
-    NA,
-    nrow = n_time,
-    ncol = n_series
+  matrix(
+    rep(dis_time, times = n_series),
+    nrow = length(times), ncol = n_series
   )
-
-  for (s in seq_len(n_series)) {
-    series_data <- all_times[all_times$series == s, ]
-    time_dis[seq_len(nrow(series_data)), s] <- series_data$dis_time
-  }
-
-  return(time_dis)
 }
 
 #' CAR Trend Generator

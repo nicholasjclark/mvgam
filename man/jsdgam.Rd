@@ -80,8 +80,11 @@ To give each species its own family, write \code{formula} as a
 multivariate formula naming one response per species and its
 family inside each \code{\link[brms:brmsformula]{brms::bf()}}, as in
 \code{bf(count ~ env, family = poisson()) + bf(seen ~ env, family = bernoulli())}. The responses then form the species axis the
-latent factors load across, \code{species} is read from them rather
-than from a column, and this argument is ignored. For simplex
+latent factors load across and \code{species} is read from them
+rather than from a column. A family named there belongs to that
+response; this argument then applies only to responses that
+named none, and is left alone entirely when every response
+speaks for itself. For simplex
 multi-response families (\code{diri()}, \code{multi()}, \code{categ()}), write
 the formula with a per-\code{species} interaction (e.g.
 \code{y ~ env * species} or the brms-native-style
@@ -189,12 +192,14 @@ the per-unit lpmf. Combining \code{threads > 1} with a
 un-threaded after a one-time warning; see \code{\link[=mvgam]{mvgam()}} for the
 full threading notes and bench guidance.}
 
-\item{run_model}{\strong{(deprecated)} Logical. Forwarded to \code{mvgam()};
-when \code{FALSE}, skips Stan parse / compile / sampling and returns a
-stub \code{mvgam} / \code{jsdgam} object with \verb{$stancode} and \verb{$standata}
-populated but \verb{$fit = NULL}. New code should use \code{\link[=stancode]{stancode()}} /
-\code{\link[=standata]{standata()}} on an \code{\link[=mvgam_formula]{mvgam_formula()}} object instead. Emits a
-one-time \code{rlang::warn()} when \code{FALSE}. Defaults to \code{TRUE}.}
+\item{run_model}{Logical, forwarded to \code{\link[=mvgam]{mvgam()}}. When \code{FALSE},
+skips Stan parse, compile and sampling and returns a stub
+\code{mvgam} / \code{jsdgam} object with \verb{$stancode} and \verb{$standata}
+populated and \verb{$fit = NULL}. This is how a joint species model
+is read without fitting it: \code{jsdgam()} derives the species axis,
+the loadings map and the trend itself, so there is no
+\code{\link[=mvgam_formula]{mvgam_formula()}} to hand to \code{\link[=stancode]{stancode()}} in its place.
+Defaults to \code{TRUE}.}
 
 \item{...}{Other arguments forwarded to \code{mvgam()}. Notable ones
 include \code{data2} (lookup list for string-named \code{traits} / \code{phylo}

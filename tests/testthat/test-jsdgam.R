@@ -99,10 +99,8 @@ test_that("jsdgam rejects n_lv > n_species under iid prior", {
 
 test_that("jsdgam allows n_lv = n_species under MGP loadings_prior", {
   dat <- build_jsdgam_toy()
-  # 4 species, n_lv = 4, admissible only under MGP shrinkage. The
-  # `run_model = FALSE` deprecation warning fires here; suppress so
-  # it doesn't leak into the testthat summary.
-  suppressWarnings(expect_no_error(
+  # 4 species, n_lv = 4, admissible only under MGP shrinkage.
+  expect_no_error(
     jsdgam(
       formula = y ~ 1, factor_formula = ~ -1,
       data = dat, species = species,
@@ -110,7 +108,7 @@ test_that("jsdgam allows n_lv = n_species under MGP loadings_prior", {
       loadings_prior = "mgp",
       run_model = FALSE, silent = 2
     )
-  ))
+  )
 })
 
 test_that("jsdgam rejects n_lv > n_species even under MGP", {

@@ -211,8 +211,8 @@ discover_fits <- function() {
 }
 
 # What a given fit can legally be asked to do. Every group below gates
-# on these rather than on tryCatch, so a surface that is genuinely
-# inapplicable is skipped instead of logged as a failure.
+# on these rather than on tryCatch, so a surface the fit cannot answer
+# is skipped instead of logged as a failure.
 probe <- function(fit) {
   fam <- tryCatch(fit$family$family, error = function(e) NA_character_)
   si <- fit$series_info
@@ -220,7 +220,7 @@ probe <- function(fit) {
   dat <- fit$data %||% fit$obs_data
   resp <- fit$response_names
 
-  # `series_info$is_multivariate` also fires for a binomial fit,
+  # `series_info$is_multivariate` is also TRUE for a binomial fit,
   # whose `response_names` carries a structural `trials` entry;
   # the formula class is the authoritative test.
   is_mv <- isTRUE(brms::is.mvbrmsformula(fit$formula))
@@ -760,6 +760,61 @@ group_invariants <- function(nm, fit, cap) {
               identical(resolved, recorded),
             paste0(sum(resolved != recorded), " of ", length(recorded),
                    " rows read the wrong trend column"))
+    }, shape = identity)
+  }
+
+  # 6e. The labels a fit stores have to name the trend columns in the
+  #     order the columns run. `obs_trend_series` says which series
+  #     occupies each column, so reading a label off that and
+  #     comparing it against the stored list settles the order
+  #     outright. A stored list that is a permutation of the axis
+  #     costs no error: every summary, plot and correlation matrix
+  #     simply prints one series' name over another's estimates.
+  stored_levels <- fit$trend_metadata$levels$series
+  recorded_series <- fit$standata$obs_trend_series
+  if (!is.null(stored_levels) && !is.null(recorded_series) &&
+        length(stored_levels) > 1L) {
+    run_call(nm, "invariants", "stored levels follow the trend axis", {
+      labels <- as.character(training_series_labels(fit))
+      s_idx <- as.integer(recorded_series)
+      n_col <- as.integer(fit$standata$N_series_trend)
+      occupant <- vapply(seq_len(n_col), function(k) {
+        hit <- which(s_idx == k)
+        if (!length(hit)) NA_character_ else labels[hit[1L]]
+      }, character(1))
+      holds(identical(occupant, as.character(stored_levels)),
+            paste0("column ", which(occupant != stored_levels)[1L],
+                   " holds '", occupant[occupant != stored_levels][1L],
+                   "' but is stored as '",
+                   stored_levels[occupant != stored_levels][1L], "'"))
+    }, shape = identity)
+  }
+
+  # 6f. A multi-response fit records its mapping once per response,
+  #     under a suffixed name, so the plain check above never reaches
+  #     it. Each response must read one column, and between them the
+  #     responses must use the whole axis.
+  resp_names <- fit$response_names
+  if (length(resp_names) > 1L &&
+        !is.null(fit$standata[[paste0("obs_trend_series_",
+                                      resp_names[1L])]])) {
+    run_call(nm, "invariants", "each response reads its own column", {
+      per <- lapply(resp_names, function(r) {
+        unique(as.integer(fit$standata[[paste0("obs_trend_series_", r)]]))
+      })
+      names(per) <- resp_names
+      spread <- resp_names[lengths(per) > 1L]
+      n_col <- as.integer(fit$standata$N_series_trend)
+      covered <- sort(unique(unlist(per)))
+      holds(
+        length(spread) == 0L && identical(covered, seq_len(n_col)),
+        if (length(spread)) {
+          paste0("spread across columns: ", paste(spread, collapse = ", "))
+        } else {
+          paste0("columns used: ", paste(covered, collapse = ","),
+                 " of ", n_col)
+        }
+      )
     }, shape = identity)
   }
 

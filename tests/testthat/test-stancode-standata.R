@@ -3921,15 +3921,12 @@ run_model_test_data <- function(n = 24L) {
   )
 }
 
-test_that("run_model = FALSE warns once and returns NULL $fit", {
+test_that("run_model = FALSE returns a stub with no fit", {
   data <- run_model_test_data()
-  rlang::reset_warning_verbosity("mvgam_run_model_false_deprecated")
-  expect_warning(
-    mod <- mvgam(y ~ x, data = data, family = poisson(),
-                 run_model = FALSE),
-    "run_model = FALSE.*deprecated"
-  )
+  mod <- mvgam(y ~ x, data = data, family = poisson(),
+               run_model = FALSE)
   expect_s3_class(mod, "mvgam")
+  expect_s3_class(mod, "mvgam_prefit")
   expect_null(mod$fit)
 })
 
@@ -3968,17 +3965,11 @@ test_that("run_model = FALSE threads through jsdgam() too", {
     species = factor(paste0("sp", 1:3))
   )
   dat$y <- rpois(nrow(dat), 2)
-  # Reset rlang's per-session rate limit so we observe the warning
-  # even when an earlier test already triggered it.
-  rlang::reset_warning_verbosity("mvgam_run_model_false_deprecated")
-  expect_warning(
-    mod <- jsdgam(
-      formula = y ~ 1, factor_formula = ~ -1,
-      data = dat, unit = time, species = species,
-      family = poisson(), n_lv = 2L,
-      run_model = FALSE, silent = 2
-    ),
-    "run_model = FALSE.*deprecated"
+  mod <- jsdgam(
+    formula = y ~ 1, factor_formula = ~ -1,
+    data = dat, unit = time, species = species,
+    family = poisson(), n_lv = 2L,
+    run_model = FALSE, silent = 2
   )
   expect_s3_class(mod, "jsdgam")
   expect_s3_class(mod, "mvgam")
@@ -3998,25 +3989,6 @@ test_that("run_model = FALSE leaves trend_metadata populated for forecast / pred
   expect_true("trend_type" %in% names(mod$trend_metadata) ||
               "max_lag" %in% names(mod$trend_metadata))
 })
-
-test_that("run_model = FALSE deprecation fires only once per session via rlang", {
-  data <- run_model_test_data()
-  # Frequency-controlled rlang warnings re-fire after a reset; reset
-  # so we observe the same warning in both calls below.
-  rlang::reset_warning_verbosity("mvgam_run_model_false_deprecated")
-  expect_warning(
-    suppressMessages(mvgam(y ~ x, data = data, family = poisson(),
-                           run_model = FALSE)),
-    "run_model = FALSE"
-  )
-  # Second call within the same session should NOT re-warn (frequency
-  # = "regularly" suppresses repeat fires within the rate limit).
-  expect_no_warning(
-    suppressMessages(mvgam(y ~ x, data = data, family = poisson(),
-                           run_model = FALSE))
-  )
-})
-
 
 test_that("threads is a first-class named arg on mvgam() and jsdgam()", {
   # threads is a named arg rather than something captured in `...`
@@ -5205,3 +5177,137 @@ test_that("obs_trend_time runs in time order, not row order", {
 })
 
 
+
+
+test_that("each response on a wide frame gets its own latent series", {
+  # A `brms::mvbf()` frame carries one row per time and one column
+  # per response, so the series an observation belongs to is a
+  # property of the (row, response) pair rather than of the row. Every
+  # row of `count` sits on the `count` series and every row of `seen`
+  # on the `seen` series, and the two must be different columns of the
+  # trend matrix or the per-response families share one state and the
+  # model is not the one the formula asks for.
+  set.seed(1)
+  T_ <- 20L
+  dat <- data.frame(
+    time  = seq_len(T_),
+    count = rpois(T_, 5),
+    seen  = rbinom(T_, 1, 0.5)
+  )
+  f <- bf(count ~ 1, family = poisson()) +
+       bf(seen  ~ 1, family = bernoulli()) +
+       set_rescor(FALSE)
+
+  sd <- standata(
+    mvgam_formula(f, trend_formula = ~ AR(p = 1)),
+    data = dat, silent = 2L
+  )
+
+  expect_identical(as.integer(sd$N_series_trend), 2L)
+  # Constant within a response, and a different constant per response.
+  expect_identical(unique(sd$obs_trend_series_count), 1L)
+  expect_identical(unique(sd$obs_trend_series_seen), 2L)
+  # Both responses observe every time point.
+  expect_identical(sd$obs_trend_time_count, seq_len(T_))
+  expect_identical(sd$obs_trend_time_seen, seq_len(T_))
+})
+
+test_that("a wide frame does not require rows divisible by responses", {
+  # The row count of a wide frame is the number of time points and has
+  # no arithmetic relationship to the number of responses, so refusing
+  # a frame whose rows do not divide by the response count rejects
+  # ordinary data. Twenty times and three responses is the case that
+  # stopped.
+  set.seed(2)
+  T_ <- 20L
+  dat <- data.frame(
+    time    = seq_len(T_),
+    count   = rpois(T_, 5),
+    seen    = rbinom(T_, 1, 0.5),
+    biomass = rgamma(T_, 2, 0.5)
+  )
+  f <- bf(count   ~ 1, family = poisson()) +
+       bf(seen    ~ 1, family = bernoulli()) +
+       bf(biomass ~ 1, family = Gamma(link = "log")) +
+       set_rescor(FALSE)
+
+  sd <- standata(
+    mvgam_formula(f, trend_formula = ~ AR(p = 1)),
+    data = dat, silent = 2L
+  )
+
+  expect_identical(as.integer(sd$N_series_trend), 3L)
+  series_of <- c(
+    unique(sd$obs_trend_series_count),
+    unique(sd$obs_trend_series_seen),
+    unique(sd$obs_trend_series_biomass)
+  )
+  # One series each, and three distinct ones between them.
+  expect_length(series_of, 3L)
+  expect_setequal(series_of, 1:3)
+})
+
+test_that("an explicit series column supersedes the response axis", {
+  # A user who supplies a series column is saying the responses are
+  # measurements of one unit and share a latent state. That reading
+  # has to keep winning: it is what a joint model over one site means,
+  # and collapsing it to one series per response would silently fit a
+  # different model.
+  set.seed(3)
+  T_ <- 20L
+  dat <- data.frame(
+    time   = seq_len(T_),
+    series = factor(rep("site_a", T_)),
+    count  = rpois(T_, 5),
+    seen   = rbinom(T_, 1, 0.5)
+  )
+  f <- bf(count ~ 1, family = poisson()) +
+       bf(seen  ~ 1, family = bernoulli()) +
+       set_rescor(FALSE)
+
+  sd <- standata(
+    mvgam_formula(f, trend_formula = ~ AR(p = 1)),
+    data = dat, silent = 2L
+  )
+
+  expect_identical(as.integer(sd$N_series_trend), 1L)
+  expect_identical(unique(sd$obs_trend_series_count), 1L)
+  expect_identical(unique(sd$obs_trend_series_seen), 1L)
+})
+
+test_that("the wide-frame trend design is indexed at time level", {
+  # A wide frame holds one value per time in a covariate column, so a
+  # trend covariate cannot vary by response and the trend-side design
+  # carries one row per time. `times_trend[i, s]` therefore reads the
+  # same design row for every series at time `i`, and `N_trend` counts
+  # times rather than (time, series) cells. Emitting a cell-level
+  # index against a time-level design would read past the end of it
+  # as soon as a trend covariate is present.
+  set.seed(4)
+  T_ <- 20L
+  dat <- data.frame(
+    time  = seq_len(T_),
+    env   = rnorm(T_),
+    count = rpois(T_, 5),
+    seen  = rbinom(T_, 1, 0.5)
+  )
+  f <- bf(count ~ 1, family = poisson()) +
+       bf(seen  ~ 1, family = bernoulli()) +
+       set_rescor(FALSE)
+
+  sd <- standata(
+    mvgam_formula(f, trend_formula = ~ env + AR(p = 1)),
+    data = dat, silent = 2L
+  )
+
+  expect_identical(as.integer(sd$N_trend), T_)
+  expect_identical(as.integer(sd$N_series_trend), 2L)
+  expect_identical(dim(sd$times_trend), c(T_, 2L))
+  # Every series reads the same design row at a given time.
+  expect_identical(sd$times_trend[, 1], sd$times_trend[, 2])
+  # And the design holds the covariate in time order.
+  expect_equal(
+    as.numeric(sd$X_trend[, ncol(sd$X_trend)]), dat$env,
+    tolerance = 1e-8
+  )
+})

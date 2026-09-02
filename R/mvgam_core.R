@@ -352,14 +352,16 @@ mvgam_imputation_forwarded <- c(
 #'   script that fits repeatedly. The full fix (teaching the
 #'   injector to splice into `partial_log_lik_lpmf`) is filed as a
 #'   separate enhancement.
-#' @param run_model **(deprecated; do not use in new code)** Logical.
-#'   Setting `run_model = FALSE` short-circuits before Stan parse /
-#'   compile / sampling and returns a stub `mvgam` object whose
-#'   `$stancode` and `$standata` slots are populated but `$fit` is
-#'   `NULL`. Methods that need a fitted model (`summary()`,
-#'   `predict()`, `forecast()`, `loo()`, etc.) reject the stub with
-#'   a pointer back to the modern helpers. Use [`stancode()`] and
-#'   [`standata()`] on an [`mvgam_formula()`] object instead. Both
+#' @param run_model Logical. Setting `run_model = FALSE` stops before
+#'   Stan parse, compile and sampling and returns a stub `mvgam`
+#'   object whose `$stancode` and `$standata` slots are populated but
+#'   whose `$fit` is `NULL`. Methods that need a fitted model
+#'   (`summary()`, `predict()`, `forecast()`, `loo()`) reject the
+#'   stub and say which helper to reach for. Where the model can be
+#'   written as an [`mvgam_formula()`], calling [`stancode()`] or
+#'   [`standata()`] on that object says the same thing more directly;
+#'   `run_model = FALSE` is the route for a specification that only
+#'   [`jsdgam()`] knows how to build. Both
 #'   dispatch on `mvgam_formula` and share the exact same trend /
 #'   `loadings_prior` pipeline used internally by `mvgam()` /
 #'   `jsdgam()`, so they surface the same Stan code and data without
@@ -671,20 +673,6 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
       .var.name = "threads"
     )
   }
-  if (isFALSE(run_model)) {
-    rlang::warn(
-      paste0(
-        "`run_model = FALSE` is deprecated. Use `stancode()` and ",
-        "`standata()` on an `mvgam_formula()` object to retrieve the ",
-        "generated Stan code and data without fitting; both dispatch ",
-        "on `mvgam_formula` and share the same trend / loadings_prior ",
-        "pipeline used internally by `mvgam()` and `jsdgam()`."
-      ),
-      .frequency = "regularly",
-      .frequency_id = "mvgam_run_model_false_deprecated"
-    )
-  }
-
   # Capture data name from user's call (before passing to internal
   # functions). `deparse()` of a literal data frame expression (e.g.
   # `mvgam(data = as.data.frame(long_dat))` or a `do.call(mvgam, ...)`
@@ -865,11 +853,9 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     )
   )
 
-  # Deprecated run_model = FALSE: short-circuit before parse / compile
-  # / fit so callers can inspect the generated stancode + standata
-  # without paying for Stan codegen + sampling. The deprecation
-  # warning is emitted in mvgam() (so it fires at the user-facing API
-  # surface, not the internal single / multi dispatcher).
+  # `run_model = FALSE`: stop before parse, compile and fit so a
+  # caller can read the generated stancode and standata without
+  # paying for Stan codegen and sampling.
   if (isFALSE(run_model)) {
     return(create_mvgam_stub_from_stan_components(
       stan_components = stan_components,
@@ -1198,7 +1184,7 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
 }
 
 # Build a no-fit mvgam stub from generated stan_components. Used by
-# the deprecated `run_model = FALSE` path: callers get an mvgam-shaped
+# the `run_model = FALSE` path: callers get an mvgam-shaped
 # list with `stancode`, `standata`, `obs_data`, `trend_metadata` and
 # friends populated, but `fit` is left NULL because no sampling
 # happened. The stub carries `c("mvgam", "mvgam_prefit")` so the

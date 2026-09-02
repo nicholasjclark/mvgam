@@ -2818,75 +2818,29 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
   series_vals <- get_series_for_grouping(data)
 
   unique_times <- unique(time_vals)
-  unique_series <- unique(series_vals)
+  # A response-keyed frame states its axis rather than implying it
+  # through the row values, and states it in formula order, so it is
+  # taken as given below rather than sorted back to alphabetical.
+  # One axis, held once and in one order: the responses as the formula
+  # names them where the frame is response-keyed, otherwise the
+  # frame's own series sorted. Keeping a sorted and an unsorted
+  # spelling of the same axis is what let two readers disagree.
+  response_axis <- mvgam_response_axis(data)
+  series_axis <- response_axis %||% sort(unique(series_vals))
   min_time <- min(time_vals, na.rm = TRUE)
   max_time <- max(time_vals, na.rm = TRUE)
 
-  # Create data ordering mappings for Stan-required sorted order
-  ordering_df <- data.frame(
-    original_row = seq_len(nrow(data)),
-    time_val = time_vals,
-    series_val = series_vals,
-    stringsAsFactors = FALSE
-  )
-
-  # Sort for Stan: first by time, then by series (matches times_trend matrix structure)
-  sorted_ordering <- ordering_df[order(ordering_df$time_val, ordering_df$series_val), ]
-
-  # Create bidirectional mappings
-  stan_to_original <- sorted_ordering$original_row  # Maps Stan row index -> Original row index
-  original_to_stan <- integer(nrow(data))
-  original_to_stan[stan_to_original] <- seq_len(nrow(data))  # Maps Original row index -> Stan row index
-
-  # Create time/series index mappings (for times_trend matrix interpretation)
   sorted_unique_times <- sort(unique_times)
-  sorted_unique_series <- sort(unique_series)
-  time_indices <- match(sorted_ordering$time_val, sorted_unique_times)
-  series_indices <- match(sorted_ordering$series_val, sorted_unique_series)
 
-  # Calculate per-series time information for forecasting.
-  # dplyr is in Imports so always available.
-  time_vals <- get_time_for_grouping(data)
-  series_vals <- get_series_for_grouping(data)
-
-  series_time_info <- data.frame(
-    series = series_vals,
-    time = time_vals,
-    stringsAsFactors = FALSE
-  ) %>%
-    dplyr::group_by(.data$series) %>%
-    dplyr::summarise(
-      first_time = min(.data$time, na.rm = TRUE),
-      last_time = max(.data$time, na.rm = TRUE),
-      n_obs_series = dplyr::n(),
-      time_span = max(.data$time, na.rm = TRUE) - min(.data$time, na.rm = TRUE),
-      .groups = "drop"
-    )
-
-  # Create named vectors for quick access (ordered by sorted unique_series)
-  last_times <- setNames(
-    series_time_info$last_time[match(sorted_unique_series, series_time_info[[1]])],
-    sorted_unique_series
-  )
-  first_times <- setNames(
-    series_time_info$first_time[match(sorted_unique_series, series_time_info[[1]])],
-    sorted_unique_series
-  )
-  series_lengths <- setNames(
-    series_time_info$n_obs_series[match(sorted_unique_series, series_time_info[[1]])],
-    sorted_unique_series
-  )
-
-  # Backward compatible structure: Original fields maintained
   dimensions <- list(
     n_time = length(unique_times),          # Number of unique time points
-    n_series = length(unique_series),       # Number of series
+    n_series = length(series_axis),         # Number of series
     n_obs = nrow(data),                    # Total observations
     time_range = c(min_time, max_time),    # Time range
     time_var = time_var,                   # Variable names for downstream use
     series_var = series_var,
     unique_times = sorted_unique_times,    # Sorted unique time points
-    unique_series = sorted_unique_series   # Sorted unique series
+    unique_series = series_axis            # The series axis, in order
   )
 
   # Generate observation-to-trend mappings if response variables provided
@@ -2932,7 +2886,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
       dimensions = list(
         n_obs = nrow(data),
         n_time = length(unique_times),
-        n_series = length(unique_series),
+        n_series = length(series_axis),
         n_groups = trend_specs$n_groups %||% 1,
         n_subgroups = trend_specs$n_subgroups %||% 1,
         n_lv = trend_specs$n_lv %||% NULL,
@@ -2942,53 +2896,20 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
       # Unique values (sorted for Stan)
       levels = list(
         unique_times = sorted_unique_times,
-        unique_series = sorted_unique_series,
+        unique_series = series_axis,
         unique_groups = if (!is.null(trend_specs$gr) && trend_specs$gr != 'NA')
                           sort(unique(data[[trend_specs$gr]])) else NULL,
         unique_subgroups = if (!is.null(trend_specs$subgr) && trend_specs$subgr != 'NA')
                              sort(unique(data[[trend_specs$subgr]])) else NULL
       ),
 
-      # Per-series time information (key for forecasting)
-      time_info = list(
-        # Quick access vectors (ordered by sorted unique_series)
-        last_times = last_times,
-        first_times = first_times,
-        series_lengths = series_lengths,
-
-        # Global time information
-        global_last_time = max_time,
-        global_first_time = min_time,
-        max_forecast_horizon = if (!is.null(last_times)) max_time - min(last_times, na.rm = TRUE) else 0,
-
-        # Panel structure information
-        is_balanced = if (!is.null(series_lengths)) length(unique(series_lengths)) == 1 else FALSE,
-        series_time_info = series_time_info  # Full details by series
-      ),
-
-      # Data ordering mappings
-      ordering = list(
-        # Core mappings between original data and Stan-required order
-        stan_to_original = stan_to_original,
-        original_to_stan = original_to_stan,
-
-        # Index mappings for times_trend matrix interpretation
-        time_indices = time_indices,
-        series_indices = series_indices,
-        group_indices = if (!is.null(trend_specs$gr) && trend_specs$gr != 'NA')
-                          match(data[[trend_specs$gr]], sort(unique(data[[trend_specs$gr]]))) else NULL,
-        subgroup_indices = if (!is.null(trend_specs$subgr) && trend_specs$subgr != 'NA')
-                             match(data[[trend_specs$subgr]], sort(unique(data[[trend_specs$subgr]]))) else NULL,
-
-        # Efficiency flags
-        requires_reordering = !identical(seq_len(nrow(data)), stan_to_original)
-      ),
-
       # Trend model metadata
       trend = if (!is.null(trend_specs)) list(
         trend_type = trend_specs$trend %||% trend_specs$trend_model %||% NULL,
         has_trend = TRUE,
-        is_factor_model = is_factor_model_spec(trend_specs$n_lv, length(unique_series)),
+        is_factor_model = is_factor_model_spec(
+          trend_specs$n_lv, length(series_axis)
+        ),
         correlation_structure = list(
           cor = trend_specs$cor %||% FALSE,
           ma = trend_specs$ma %||% FALSE,
@@ -3093,7 +3014,10 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
   }
 
   # Scalar attributes can be copied as-is
-  scalar_attrs <- c("mvgam_time_source", "mvgam_series_source")
+  # The response axis is one entry per series, not per row, so it is
+  # carried across the subset whole rather than indexed by it.
+  scalar_attrs <- c("mvgam_time_source", "mvgam_series_source",
+                    "mvgam_series_levels")
   for (attr_name in scalar_attrs) {
     if (!is.null(attr(data, attr_name))) {
       attr(obs_data, attr_name) <- attr(data, attr_name)
@@ -3112,7 +3036,18 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
   series_values <- get_series_for_grouping(obs_data)
 
   obs_trend_time <- match(time_values, sorted_unique_times)
-  obs_trend_series <- match(series_values, sorted_unique_series)
+  # Every row of a response-keyed frame carries every response, so the
+  # series is fixed by which response is being mapped rather than by
+  # where the row sits. Reading the row values here instead is what
+  # gave one response the first half of the timeline and another the
+  # rest.
+  response_axis <- mvgam_response_axis(obs_data)
+  obs_trend_series <- if (is.null(response_axis)) {
+    match(series_values, sorted_unique_series)
+  } else {
+    rep(response_series_index(response_axis, response_var),
+        length(non_missing_idx))
+  }
 
   # Validate the mappings
   if (any(is.na(obs_trend_time))) {
@@ -3662,7 +3597,12 @@ validate_prediction_factor_levels <- function(data, metadata) {
     } else {
       series_var <- metadata$variables$series_var
       if (!is.null(series_var) && series_var %in% names(data)) {
-        newdata_levels <- extract_factor_levels(data, series_var)
+        # The series the frame holds rows for, not the levels its
+        # factor happens to declare. Subsetting a data frame keeps
+        # every level, so reading the declaration refuses a frame
+        # that names no unknown series and merely carries a dead
+        # level. The grouping branch above already drops them.
+        newdata_levels <- observed_series_levels(data[[series_var]])
       }
     }
     if (!is.null(newdata_levels)) {
@@ -4219,58 +4159,41 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
   attr(data, "mvgam_time_source") <- "implicit"
   attr(data, "mvgam_original_time") <- data[[time_var]]  # Store original for distance calculations
 
-  # Helper function to eliminate duplication between strategies
-  create_multivariate_series <- function(response_vars, n_obs,
-                                         trend_specs = NULL) {
+  # The series axis of a frame whose responses are its series
+  #
+  # A frame written with `brms::mvbf()` carries one row per time and
+  # one column per response, so the series an observation sits on is a
+  # property of the (row, response) pair and not of the row. A vector
+  # with one entry per row cannot say that, and cutting the rows into
+  # a block per response says something false: it reads as a stacked
+  # frame, gives the first stretch of the timeline to one response and
+  # the rest to another, and raises nothing.
+  #
+  # So the axis is carried as the level set instead. The levels are
+  # the responses in the order the formula names them, which makes
+  # series `k` the `k`th response and the `k`th row of the loadings.
+  # The per-row values are one constant level, which is the grain the
+  # trend design needs: a covariate column of a wide frame holds one
+  # value per time, so the design has one row per time and every
+  # series reads the same one.
+  create_multivariate_series <- function(response_vars, n_obs) {
     checkmate::assert_character(response_vars, min.len = 1,
                                 any.missing = FALSE, min.chars = 1)
     checkmate::assert_integerish(n_obs, len = 1, lower = 1)
-    checkmate::assert_list(trend_specs, null.ok = TRUE)
 
-    # Check if observations can be evenly divided across responses
-    if (n_obs %% length(response_vars) != 0) {
-      stop(insight::format_error(c(
-        "Cannot create series from multivariate structure.",
-        x = cli::format_inline(
-          "Data has {n_obs} observations but {length(response_vars)} responses."
-        ),
-        i = "Expected equal observations per response for series creation."
-      )), call. = FALSE)
-    }
-
-    n_obs_per_response <- n_obs / length(response_vars)
-
-    # Detect shared trends using existing pattern from stan_assembly.R
-    is_shared_trend <- FALSE
-    if (!is.null(trend_specs) && is.list(trend_specs)) {
-      # Apply existing detect_shared_trends logic
-      non_null_specs <- trend_specs[!sapply(trend_specs, is.null)]
-      if (length(non_null_specs) > 1) {
-        first_spec <- non_null_specs[[1]]
-        is_shared_trend <- all(sapply(non_null_specs[-1], function(x) {
-          identical(x, first_spec, ignore.environment = TRUE)
-        }))
-      }
-    }
-
-    if (is_shared_trend) {
-      # Shared trend: create single series for all responses
-      list(
-        series_values = factor(rep("shared", n_obs)),
-        series_source = "multivariate_shared"
-      )
-    } else {
-      # Response-specific trend: create separate series per response
-      list(
-        series_values = factor(rep(response_vars, each = n_obs_per_response)),
-        series_source = "multivariate"
-      )
-    }
+    list(
+      series_values = factor(
+        rep(response_vars[1L], n_obs), levels = response_vars
+      ),
+      series_levels = response_vars,
+      series_source = "multivariate"
+    )
   }
 
   # Four series creation strategies (including prediction context)
   series_values <- NULL
   series_source <- NULL
+  series_levels <- NULL
 
   # Strategy 1: Prediction context - use stored metadata to recreate series
   if (!is.null(metadata)) {
@@ -4291,8 +4214,11 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
       }
     } else if (stored_source == "multivariate" && !is.null(metadata$response_vars)) {
       # Use helper function for trend-aware series creation
-      result <- create_multivariate_series(metadata$response_vars, nrow(data), metadata$trend_specs)
+      result <- create_multivariate_series(
+        metadata$response_vars, nrow(data)
+      )
       series_values <- result$series_values
+      series_levels <- result$series_levels
       series_source <- result$series_source
     }
     # If prediction context but explicit series, fall through to Strategy 3
@@ -4328,10 +4254,9 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
   # Strategy 4: Missing series (create from multivariate structure in fitting context)
   if (is.null(series_values)) {
     if (!is.null(response_vars) && length(response_vars) > 1) {
-      # Use helper function for trend-aware series creation
-      trend_specs_param <- if (!is.null(metadata)) metadata$trend_specs else NULL
-      result <- create_multivariate_series(response_vars, nrow(data), trend_specs_param)
+      result <- create_multivariate_series(response_vars, nrow(data))
       series_values <- result$series_values
+      series_levels <- result$series_levels
       series_source <- result$series_source
     } else {
       stop(insight::format_error(c(
@@ -4343,9 +4268,13 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
     }
   }
 
-  # Store series as attribute
+  # Store series as attribute. `mvgam_series_levels` is set only when
+  # the series axis is the response axis, where the per-row values
+  # cannot carry it; everywhere else the values are the axis and the
+  # attribute stays absent.
   attr(data, "mvgam_series") <- series_values
   attr(data, "mvgam_series_source") <- series_source
+  attr(data, "mvgam_series_levels") <- series_levels
 
 
   return(data)
@@ -4438,6 +4367,72 @@ get_series_for_grouping <- function(data) {
   return(series_values)
 }
 
+#' The series a frame observes, in the order its axis runs
+#'
+#' A factor keeps levels the data never uses, and those levels have
+#' no latent state, so they are not series. Dropping them leaves the
+#' same answer a character column gives, in the order the levels
+#' declare rather than alphabetically.
+#'
+#' A frame whose responses are its series answers elsewhere, through
+#' `mvgam_response_axis()`: its per-row values are one constant and
+#' the axis is the level set, so reading the values would find a
+#' single series where the trend has one per response.
+#'
+#' @param series_vals Series values, factor or otherwise
+#' @return Character vector of observed series labels, in axis order
+#' @noRd
+observed_series_levels <- function(series_vals) {
+  if (is.factor(series_vals)) {
+    levs <- levels(series_vals)
+    return(levs[levs %in% as.character(series_vals)])
+  }
+  sort(unique(as.character(series_vals)))
+}
+
+#' The series axis of a frame whose responses are its series
+#'
+#' Returns the response names, in the order the formula gives them,
+#' for a frame written one row per time and one column per response.
+#' Every other frame answers `NULL`, because there the per-row series
+#' values are the axis and reading them is right.
+#'
+#' Ask this before reading `get_series_for_grouping()` for anything
+#' other than a grouping grain. On a response-keyed frame those values
+#' are a single constant, and the series an observation sits on
+#' depends on which response is being asked about, which the values
+#' cannot express.
+#'
+#' @param data Data frame carrying mvgam attributes
+#' @return Character vector of response names, or `NULL`
+#' @noRd
+mvgam_response_axis <- function(data) {
+  checkmate::assert_data_frame(data)
+  attr(data, "mvgam_series_levels")
+}
+
+#' Which series a named response sits on
+#'
+#' @param axis Response axis from `mvgam_response_axis()`
+#' @param response_var Name of the response being asked about
+#' @return Integer index into the trend matrix's series dimension
+#' @noRd
+response_series_index <- function(axis, response_var) {
+  checkmate::assert_character(axis, min.len = 1, any.missing = FALSE,
+                              unique = TRUE)
+  checkmate::assert_string(response_var)
+  idx <- match(response_var, axis)
+  if (is.na(idx)) {
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "Response {.field {response_var}} is not on the series axis."
+      ),
+      i = cli::format_inline("Axis holds {.val {axis}}.")
+    )), call. = FALSE)
+  }
+  idx
+}
+
 #' Check if mvgam variables are ready
 #'
 #' Verifies that both time and series attributes exist on data object
@@ -4464,6 +4459,7 @@ remove_mvgam_variables <- function(data) {
   attr(data, "mvgam_original_time") <- NULL
   attr(data, "mvgam_series") <- NULL
   attr(data, "mvgam_series_source") <- NULL
+  attr(data, "mvgam_series_levels") <- NULL
   return(data)
 }
 
@@ -5262,11 +5258,15 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
       n_lv_for_grain = n_lv_for_grain,
       # Store factor levels for prediction validation
       levels = list(
-        series = if (is.factor(series_vals)) {
-          levels(series_vals)
-        } else {
-          sort(unique(as.character(series_vals)))
-        },
+        # The series the trend actually has, in axis order. Taking a
+        # factor's declared levels instead counts any the data never
+        # observes, so the stored levels outnumber the trend columns
+        # and whatever labels those columns from this list runs off
+        # the end of it. A character column was already answering the
+        # observed question, so the two spellings of this one field
+        # disagreed with each other as well.
+        series = mvgam_response_axis(data) %||%
+          observed_series_levels(series_vals),
         gr = extract_factor_levels(
           data,
           if (!is.null(parsed_trend$trend_model$gr) &&
