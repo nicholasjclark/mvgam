@@ -877,9 +877,15 @@ test_that("validate_gr_balanced_groups passes balanced groups silently", {
   expect_null(result)
 })
 
-test_that("validate_gr_balanced_groups respects explicit subgr= bypass", {
-  # User-supplied subgr drives the factor-model path; balance is
-  # not derived from series-per-group counts in that path.
+test_that("a user-supplied subgr is counted, not waved through", {
+  # `gr` and `subgr` together name the series, so the balance of a
+  # design written that way is exactly the balance of its groups.
+  # Returning early whenever `subgr` was supplied skipped every
+  # model written the way the documentation shows: the design
+  # reached Stan, `N_subgroups_trend` took the largest group, and
+  # the smaller group was handed a slice of a correlation matrix
+  # whose prior was written for the larger one. Nothing raised,
+  # because every index stayed in range.
   unbalanced <- data.frame(
     time = rep(1:6, 5),
     series = factor(rep(paste0("s", 1:5), each = 6)),
@@ -889,13 +895,34 @@ test_that("validate_gr_balanced_groups respects explicit subgr= bypass", {
     )),
     site = factor(rep(paste0("site", 1:5), each = 6))
   )
+  expect_error(
+    mvgam:::validate_gr_balanced_groups(
+      list(gr = "habitat", subgr = "site", series = "series"),
+      unbalanced
+    ),
+    # `insight` wraps the rendered message, so the pattern is short
+    # enough to sit inside one line of it.
+    regexp = "has unbalanced groups"
+  )
+
+  # The same design with the groups evened up passes, and passes on
+  # the grouping rather than on the series column: `site` is what
+  # names the series here, and dropping the column the grouping
+  # supersedes must not change the answer.
+  balanced <- unbalanced[unbalanced$series != "s3", ]
   expect_silent(
     result <- mvgam:::validate_gr_balanced_groups(
       list(gr = "habitat", subgr = "site", series = "series"),
-      unbalanced
+      balanced
     )
   )
   expect_null(result)
+  expect_silent(
+    mvgam:::validate_gr_balanced_groups(
+      list(gr = "habitat", subgr = "site", series = "series"),
+      balanced[, setdiff(names(balanced), "series")]
+    )
+  )
 })
 
 # Test PW cap argument validation for logistic growth
@@ -1222,47 +1249,4 @@ test_that("piecewise parameter validation handles edge cases correctly", {
   )
 })
 
-# Tests for Enhanced Validation Layer
-
-test_that("process_lag_parameters handles complex lag structures", {
-  # Test basic lag processing
-  expect_equal(process_lag_parameters(c(2, 1, 3), "AR"), c(1, 2, 3))
-  expect_equal(process_lag_parameters(NULL, "AR"), 1L)
-
-  # Test error for invalid lags
-  expect_error(
-    process_lag_parameters(c(-1, 2), "AR"),
-    "Element 1 is not >= 1|Lag parameters must be positive"
-  )
-
-  expect_error(
-    process_lag_parameters(c(1, Inf), "VAR"),
-    "not in integer range|Lag parameters must be positive"
-  )
-})
-
-test_that("process_capacity_parameter handles PW capacity validation", {
-  test_data <- data.frame(time = 1:10, series = 1, capacity_col = 100:109)
-
-  # Test numeric capacity
-  expect_equal(process_capacity_parameter(50, test_data), 50)
-
-  # Test column name capacity
-  expect_equal(process_capacity_parameter("capacity_col", test_data), "capacity_col")
-
-  # Test NULL capacity
-  expect_null(process_capacity_parameter(NULL, test_data))
-
-  # Test invalid column name
-  expect_error(
-    process_capacity_parameter("missing_col", test_data),
-    "not found|Missing"
-  )
-
-  # Test invalid numeric capacity
-  expect_error(
-    process_capacity_parameter(-10, test_data),
-    "Element 1 is not >= 0|Capacity must be"
-  )
-})
 

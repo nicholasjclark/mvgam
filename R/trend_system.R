@@ -1872,7 +1872,6 @@ parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL
     # Add dimensions to trend_model for filtering if available
     if (!is.null(dimensions)) {
       trend_model$dimensions <- dimensions
-      trend_model$metadata <- dimensions$metadata
     }
   }
 

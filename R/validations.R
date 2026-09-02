@@ -884,22 +884,45 @@ assert_trend_map_input <- function(input) {
   )
   invisible(NULL)
 }
+#' The series a `trend_map` or `loadings_prior` row belongs to
+#'
+#' Both arguments are matrices with one row per series, handed in
+#' before any axis has been resolved, so both have to name the
+#' series for themselves. They asked the same question in the same
+#' ten lines and differed only in which of them the error message
+#' named.
+#'
+#' The levels are the ones something is observed at, not the ones a
+#' factor happens to declare. A column carrying a level nothing
+#' reaches gave a matrix a row for a series the trend does not
+#' have, and the argument was then refused for having the wrong
+#' number of rows.
+#'
+#' @param data The user's data frame.
+#' @param argument Name of the argument being normalised, for the
+#'   message a frame naming no series receives.
+#' @return Character vector of series levels, in axis order.
+#' @noRd
+argument_series_levels <- function(data, argument) {
+  checkmate::assert_data_frame(data)
+  checkmate::assert_string(argument)
+  if (is.null(data$series)) {
+    stop(insight::format_error(c(
+      paste0("'", argument, "' requires a 'series' column on 'data'."),
+      i = "Add a 'series' factor / character column to 'data'."
+    )))
+  }
+  as.character(observed_series_levels(data$series))
+}
+
+
 
 
 #' @noRd
 normalise_trend_map <- function(input, data) {
   if (is.null(input)) return(NULL)
   checkmate::assert_data_frame(data)
-  series_levels <- if (is.factor(data$series)) {
-    levels(data$series)
-  } else if (!is.null(data$series)) {
-    sort(unique(as.character(data$series)))
-  } else {
-    stop(insight::format_error(c(
-      "trend_map requires a 'series' column on 'data'.",
-      i = "Add a 'series' factor / character column to 'data'."
-    )))
-  }
+  series_levels <- argument_series_levels(data, "trend_map")
   n_series <- length(series_levels)
   Z <- if (is.character(input)) {
     trend_map_from_character(input, n_series)
@@ -1136,29 +1159,49 @@ any_trend_requires_regular_intervals <- function(trend_specs) {
 #' @return Invisibly NULL; called for its side-effect.
 #' @noRd
 validate_gr_balanced_groups <- function(trend_spec, data) {
-  gr_var <- trend_spec$gr
-  series_var <- trend_spec$series %||% "series"
+  # The specification arrives flat from some callers and nested
+  # under `$trend_model` from others. Reading one spelling is how a
+  # single frame acquired two series axes inside one build, and a
+  # check that silently returns on the other spelling is the same
+  # mistake with a quieter symptom.
+  groupings <- spec_groupings(trend_spec)
+  gr_var <- groupings$gr
+  subgr <- groupings$subgr
+  series_var <- trend_spec$series %||%
+    trend_spec$trend_model$series %||% "series"
 
-  # Factor-model subgr (e.g. subgr = "site") drives a path where
-  # N_subgroups is set explicitly and series-per-group balance is not
-  # derived. The auto-filled subgr = "series" (matching the default
-  # series variable) is the canonical series-level path and must still
-  # be checked.
-  subgr <- trend_spec$subgr
-  user_supplied_subgr <- !is.null(subgr) &&
-    !identical(subgr, "NA") &&
-    !identical(subgr, series_var)
-  if (user_supplied_subgr) {
+  if (!named_var(gr_var) || !gr_var %in% colnames(data)) {
     return(invisible(NULL))
   }
 
-  if (!series_var %in% colnames(data) || !gr_var %in% colnames(data)) {
+  # The series counted here have to be the series the trend will
+  # have. A `gr` / `subgr` pair names them, whether or not the frame
+  # also carries a column, and reading the column instead counted a
+  # different set: a frame naming no series skipped the check, and a
+  # frame naming its own was checked on the spelling the grouping
+  # supersedes. Both let an unbalanced design through to a Stan
+  # program that sizes every group's blocks by the largest group,
+  # leaving the smaller groups a slice of a correlation matrix they
+  # never asked for.
+  series_vals <- if (named_var(subgr) && !identical(subgr, series_var) &&
+                       subgr %in% colnames(data)) {
+    hierarchical_series_values(data, gr_var, subgr)
+  } else if (series_var %in% colnames(data)) {
+    data[[series_var]]
+  } else {
     return(invisible(NULL))
   }
 
-  series_group_table <- table(
-    series_group_values(data, series_var, gr_var)
-  )
+  # One group value per series, taken by the helper that owns that
+  # question. It reads the prepared axis when the frame carries one
+  # and the labels it is handed otherwise, which is this case: the
+  # balance is checked before any axis has been resolved.
+  series_group_table <- table(series_group_values(
+    data, series_var, gr_var, labels = series_vals
+  ))
+  # A factor column keeps levels nothing observes, and a group with
+  # no series is not an unbalanced group.
+  series_group_table <- series_group_table[series_group_table > 0L]
   group_counts <- as.integer(series_group_table)
 
   if (length(unique(group_counts)) <= 1L) {
@@ -1179,8 +1222,9 @@ validate_gr_balanced_groups <- function(trend_spec, data) {
       "' has unbalanced groups: ", counts_str, "."
     ),
     i = paste0(
-      "Subset the data to a balanced design, or combine small ",
-      "groups. Support for unbalanced groups is planned."
+      "Every group must hold the same number of series, because the ",
+      "per-group blocks share one size. Subset the data to a ",
+      "balanced design, or combine small groups."
     )
   )))
 }
@@ -1241,7 +1285,7 @@ validate_gr_constant_per_series <- function(trend_spec, data) {
 #' Single helper for the `is_factor_model` gate. Returns TRUE iff
 #' `n_lv` is set and `n_lv <= n_series`. The `<=` admits the MGP
 #' truncation-ceiling case `n_lv = n_series`; the wrapper-layer
-#' `validate_n_lv_ceiling()` rejects the iid analogue upstream so
+#' `validate_n_lv_ceiling()` refuses more factors than series so
 #' this predicate never spuriously promotes a default-prior fit to
 #' a degenerate full-rank factor model.
 #'
@@ -1303,59 +1347,25 @@ detect_factor_n_lv <- function(object, n_series = NULL) {
   as.integer(n_lv)
 }
 
-#' Detect MGP column shrinkage in a `loadings_prior` argument
+#' Validate the `n_lv` ceiling
 #'
-#' Accepts the string shorthand `"mgp"` and the list form
-#' `list(column_shrinkage = "mgp", ...)`. Returns FALSE for any
-#' other input (including NULL). Used by `validate_n_lv_ceiling()`
-#' so the iid vs MGP `n_lv` ceiling check stays in one place.
-#'
-#' `traits` / `phylo` aliases do NOT enable MGP by themselves; they
-#' layer a kernel prior on top of iid Z. Users can compose them
-#' with MGP via the explicit list form
-#' `list(features = ..., column_shrinkage = "mgp")`.
+#' Shared entry-point gate for `jsdgam()` and `mvgam()`. More
+#' factors than series is refused whatever prior the loadings
+#' carry, because the marginal `Z Z'` has rank at most the number
+#' of series and the extra columns add no expressive capacity.
+#' `n_lv = n_series` is allowed: the loadings prior is what decides
+#' whether that boundary samples well, and saying so here would
+#' refuse a model the prior makes admissible.
 #'
 #' @noRd
-is_mgp_loadings_prior <- function(loadings_prior) {
-  if (is.null(loadings_prior)) return(FALSE)
-  if (is.character(loadings_prior) && length(loadings_prior) == 1L) {
-    return(identical(loadings_prior, "mgp"))
-  }
-  if (is.list(loadings_prior)) {
-    return(identical(loadings_prior$column_shrinkage, "mgp"))
-  }
-  FALSE
-}
-
-#' Validate the `n_lv` ceiling against the prior
-#'
-#' Shared entry-point gate for `jsdgam()` and `mvgam()`. The ceiling
-#' depends on the loadings prior:
-#' \itemize{
-#'   \item iid Z (default `student_t(3, 0, 0.5)`) or kernel-driven
-#'     structured priors: `n_lv < n_species`. At the boundary, `Z Z'`
-#'     saturates the residual covariance and Psi is unidentified
-#'     from observed residuals, producing an HMC funnel.
-#'   \item MGP (`loadings_prior = "mgp"` or
-#'     `list(column_shrinkage = "mgp")`): `n_lv <= n_species`. The
-#'     prior shrinks excess columns toward zero by construction so
-#'     the truncation ceiling at K is admissible.
-#'   \item Either prior: `n_lv > n_species` always errors because
-#'     the marginal `Z Z'` has rank at most n_species.
-#' }
-#' See Bhattacharya & Dunson (2011), Schiavon, Canale, Dunson
-#' (2022, Biometrics 78:995) for MGP-side identification.
-#'
-#' @noRd
-validate_n_lv_ceiling <- function(n_lv, n_species, loadings_prior,
-                                    fit_function = "mvgam") {
+validate_n_lv_ceiling <- function(n_lv, n_species,
+                                  fit_function = "mvgam") {
   checkmate::assert_int(n_lv, lower = 1)
   checkmate::assert_int(n_species, lower = 2)
   checkmate::assert_choice(fit_function, c("mvgam", "jsdgam"))
   # `jsdgam()` users think in species; mvgam-direct users think in
   # series. The check is the same; only the noun changes.
   noun <- if (identical(fit_function, "jsdgam")) "species" else "series"
-  mgp_on <- is_mgp_loadings_prior(loadings_prior)
   n_lv_int <- as.integer(n_lv)
   if (n_lv_int > n_species) {
     stop(insight::format_error(c(
@@ -1390,8 +1400,7 @@ validate_n_lv_ceiling <- function(n_lv, n_species, loadings_prior,
 #'
 #' @noRd
 enforce_n_lv_ceiling_against_data <- function(trend_specs, data,
-                                                loadings_prior,
-                                                fit_function = "mvgam") {
+                                              fit_function = "mvgam") {
   if (is.null(trend_specs)) return(invisible(TRUE))
   specs <- if (is_multivariate_trend_specs(trend_specs)) {
     trend_specs
@@ -1411,10 +1420,9 @@ enforce_n_lv_ceiling_against_data <- function(trend_specs, data,
     n_series <- length(unique(data[[series_var]]))
     if (n_series < 2L) next
     validate_n_lv_ceiling(
-      n_lv           = as.integer(n_lv),
-      n_species      = as.integer(n_series),
-      loadings_prior = loadings_prior,
-      fit_function   = fit_function
+      n_lv         = as.integer(n_lv),
+      n_species    = as.integer(n_series),
+      fit_function = fit_function
     )
     break
   }
@@ -2633,97 +2641,6 @@ validate_setup_components <- function(components) {
   invisible(TRUE)
 }
 
-#' Validate Time Series Structure for Trends
-#'
-#' @description
-#' Ensures time series data is compatible with specified trend models,
-#' by calling the individual mvgam validators.
-#'
-#' @param data Data to validate (data.frame or list)
-#' @param trend_specs Trend specification containing trend model info
-#' @param silent Verbosity level
-#' @return Invisible TRUE if valid, stops with error if invalid
-#' @noRd
-validate_time_series_for_trends <- function(data, trend_specs, silent = 1, response_vars = NULL, cached_formulas = NULL, .precomputed_dimensions = NULL) {
-  checkmate::assert_data_frame(data, min.rows = 1)
-  checkmate::assert_list(trend_specs)
-  # Validate response_vars parameter if provided
-  if (!is.null(response_vars)) {
-    checkmate::assert_character(response_vars, min.len = 1, any.missing = FALSE, null.ok = TRUE)
-  }
-  # Validate cached_formulas parameter if provided
-  if (!is.null(cached_formulas)) {
-    checkmate::assert_list(cached_formulas)
-  }
-  # Validate precomputed dimensions parameter if provided
-  if (!is.null(.precomputed_dimensions)) {
-    checkmate::assert_list(.precomputed_dimensions, names = "named")
-  }
-
-  # Extract variable names from trend specification
-  # Standardized structure: univariate=direct, multivariate=named list
-  if (is_multivariate_trend_specs(trend_specs)) {
-    # Multivariate: extract from first response spec
-    first_spec <- trend_specs[[1]]
-    time_var <- first_spec$time_var %||% first_spec$time %||% "time"
-    series_var <- first_spec$series_var %||% first_spec$series %||% "series"
-    trend_type <- first_spec$trend_type %||% first_spec$trend_model %||% first_spec$trend
-  } else {
-    # Univariate: extract directly from trend object
-    time_var <- trend_specs$time_var %||% trend_specs$time %||% "time"
-    series_var <- trend_specs$series_var %||% trend_specs$series %||% "series"
-    trend_type <- trend_specs$trend_type %||% trend_specs$trend_model %||% trend_specs$trend
-  }
-
-  # Create time and series attributes for consistent grouping operations
-  checkmate::assert_names(names(data), must.include = time_var)
-  parsed_trend <- if (is_multivariate_trend_specs(trend_specs)) trend_specs[[1]] else trend_specs
-  data <- ensure_mvgam_variables(data, parsed_trend, time_var, series_var, response_vars)
-
-
-  # Pre-computed dimensions are mandatory; the validator does not
-  # recompute them locally.
-  if (is.null(.precomputed_dimensions)) {
-    stop(insight::format_error(c(
-      "Missing precomputed dimensions.",
-      x = "This function must be called with precomputed dimensions.",
-      i = "Check that extract_and_validate_trend_components() is passing dimensions correctly."
-    )), call. = FALSE)
-  }
-
-  dimensions <- .precomputed_dimensions
-
-  # Verify attribute creation succeeded
-  if (!has_mvgam_variables(data)) {
-    stop(insight::format_error(c(
-      "Attribute creation failed during time series validation.",
-      x = "mvgam time and series attributes are missing from data."
-    )), call. = FALSE)
-  }
-
-  # Gate on each trend's own `validation_rules` rather than a
-  # hardcoded `!= "CAR"` predicate: that bypassed the dispatch
-  # table and incorrectly enforced regular intervals for any trend
-  # whose math is exchangeable in time (e.g. ZMVN, whose `MVN(0,
-  # Sigma)` likelihood has Sigma indexed by series only). The
-  # rules are the authoritative reference; CAR's
-  # `allows_irregular_intervals` and ZMVN's omission of
-  # `requires_regular_intervals` both fall out naturally.
-  if (any_trend_requires_regular_intervals(trend_specs)) {
-    original_times <- attr(data, "mvgam_original_time")
-    if (!is.null(original_times)) {
-      validate_regular_time_intervals(original_times, time_var)
-    }
-  }
-
-
-  # Return data with preserved attributes and dimensions
-  invisible(list(
-    data = data,  # Keep attribute-enhanced data
-    dimensions = dimensions
-  ))
-}
-
 #' Check if object is a mvgam trend
 #'
 #' Tests whether an object is a valid mvgam trend specification.
@@ -2836,6 +2753,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
   # spellings then match to nothing.
   series_groups <- axis_group_values(data, trend_specs, series_vals,
                                      series_axis)
+  original_time <- attr(data, "mvgam_original_time")
 
   min_time <- min(time_vals, na.rm = TRUE)
   max_time <- max(time_vals, na.rm = TRUE)
@@ -2863,22 +2781,78 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
   # then `match()` and the gaps `CAR()` and the Gaussian processes
   # need are `diff()`, which is one representation where the package
   # kept three.
-  original_time <- attr(data, "mvgam_original_time")
+  time_values <- if (is.null(original_time)) {
+    sorted_unique_times
+  } else {
+    sort(unique(original_time))
+  }
+  # What `forecast()` extends the grid by. A regular grid has one gap and
+  # an irregular one has no single step, which is stated as `NA` rather
+  # than guessed at from the first pair.
+  time_gaps <- if (length(time_values) > 1L) diff(time_values) else numeric(0)
+  time_step <- if (length(time_gaps) &&
+                     isTRUE(all.equal(max(time_gaps), min(time_gaps)))) {
+    time_gaps[1L]
+  } else {
+    NA_real_
+  }
+
+  groupings <- spec_groupings(trend_specs)
+  n_lv <- spec_n_lv(trend_specs)
+
+  # The last time each series was seen at, in axis order. `CAR()`
+  # forecasts from it and it is a fact about the fit, so recording it
+  # here spares the forecast surface a walk of the training frame,
+  # which is where it was picking series out by a column the grouping
+  # may have superseded.
+  series_last_time <- axis_last_times(
+    data, series_vals, series_axis, original_time %||% time_vals,
+    response_axis, response_vars
+  )
+
   dimensions$axes <- list(
     series = list(
       levels = as.character(series_axis),
       source = attr(data, "mvgam_series_source") %||% "explicit",
       n = length(series_axis),
-      groups = series_groups
+      groups = series_groups,
+      last_time = series_last_time
     ),
+    # One representation of time, not three. The integer index a
+    # trend steps along is `match()` into these values and the gaps
+    # `CAR()` and the Gaussian processes measure are `diff()` of
+    # them, so recording either alongside would be a second account
+    # of the same fact, free to disagree with it.
     time = list(
-      values = if (is.null(original_time)) {
-        sorted_unique_times
-      } else {
-        sort(unique(original_time))
-      },
-      index = sorted_unique_times,
-      n = length(unique_times)
+      values = time_values,
+      n = length(unique_times),
+      step = time_step
+    ),
+    # The columns of `Z` and of `lv_trend`. A model with no factor
+    # constructor loads each series on its own state, so the factor
+    # axis is the series axis and `n_lv` says so rather than staying
+    # silent.
+    factor = list(
+      n_lv = as.integer(n_lv %||% length(series_axis))
+    ),
+    # What the second dimension of `times_trend` indexes. The series,
+    # except under `by = lv_axis()`, where Stan declares the map
+    # `[N_time_trend, N_lv_trend]` and folds `mu_factor` into
+    # `lv_trend`. Whether the trend takes that grain is not known
+    # until the trend formula has been walked, so this is left unset
+    # here and named by `extract_trend_data()`. Unset rather than
+    # defaulted to the common answer: a reader that arrives early
+    # then finds nothing instead of finding "series" and believing
+    # it.
+    grain = NULL,
+    # The columns that identify a row, so a frame the model has never
+    # seen can be placed on these axes without a second source.
+    vars = list(
+      time_var = time_var,
+      series_var = series_var,
+      gr_var = groupings$gr,
+      subgr_var = groupings$subgr,
+      response_vars = response_vars
     )
   )
 
@@ -2899,75 +2873,12 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
         response_var = resp_var,
         time_var = time_var,
         series_var = series_var,
-        dimensions = dimensions,  # Pass already-calculated dimensions
-        cached_formulas = cached_formulas,
-        response_vars = response_vars  # Pass full response_vars for multivariate series creation
+        dimensions = dimensions
       )
 
       # Store mapping with response variable name as key
       dimensions$mappings[[resp_var]] <- mapping
     }
-  }
-
-  # Metadata: information for post-processing
-  if (!is.null(trend_specs)) {
-    dimensions$metadata <- list(
-      # Variable identification
-      variables = list(
-        time_var = time_var,
-        series_var = series_var,
-        gr_var = trend_specs$gr %||% 'NA',
-        subgr_var = trend_specs$subgr %||% 'NA',
-        has_grouping = !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
-      ),
-
-      # Data dimensions
-      dimensions = list(
-        n_obs = nrow(data),
-        n_time = length(unique_times),
-        n_series = length(series_axis),
-        n_groups = trend_specs$n_groups %||% 1,
-        n_subgroups = trend_specs$n_subgroups %||% 1,
-        n_lv = trend_specs$n_lv %||% NULL,
-        time_range = c(min_time, max_time)
-      ),
-
-      # Both axes, as resolved above. Post-fit reads this rather than
-      # rebuilding the axes from the frame, which is how a derived
-      # order came to be a permutation of the one Stan was given.
-      axes = dimensions$axes,
-
-      # Unique values (sorted for Stan)
-      levels = list(
-        unique_times = sorted_unique_times,
-        unique_series = series_axis,
-        unique_groups = if (!is.null(trend_specs$gr) && trend_specs$gr != 'NA')
-                          sort(unique(data[[trend_specs$gr]])) else NULL,
-        unique_subgroups = if (!is.null(trend_specs$subgr) && trend_specs$subgr != 'NA')
-                             sort(unique(data[[trend_specs$subgr]])) else NULL
-      ),
-
-      # Trend model metadata
-      trend = if (!is.null(trend_specs)) list(
-        trend_type = trend_specs$trend %||% trend_specs$trend_model %||% NULL,
-        has_trend = TRUE,
-        is_factor_model = is_factor_model_spec(
-          trend_specs$n_lv, length(series_axis)
-        ),
-        correlation_structure = list(
-          cor = trend_specs$cor %||% FALSE,
-          ma = trend_specs$ma %||% FALSE,
-          lags = trend_specs$lags %||% 1
-        ),
-        trend_specs = trend_specs
-      ) else list(has_trend = FALSE),
-
-      # Validation flags
-      validation = list(
-        data_complete = !any(is.na(c(get_time_for_grouping(data), get_series_for_grouping(data)))),
-        validation_timestamp = Sys.time()
-      )
-    )
   }
 
   # Gate on the trend's own rule rather than a hardcoded
@@ -2991,42 +2902,20 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
 #' @param time_var Name of time variable
 #' @param series_var Name of series variable
 #' @param dimensions List from extract_time_series_dimensions with time series structure
-#' @param response_vars Character vector of response variable names for multivariate series creation
 #' @return List containing obs_trend_time and obs_trend_series arrays for Stan
 #' @noRd
-generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
-                                      series_var = "series", dimensions = NULL, cached_formulas = NULL, response_vars = NULL) {
+generate_obs_trend_mapping <- function(data, response_var,
+                                       time_var = "time",
+                                       series_var = "series",
+                                       dimensions) {
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_string(response_var)
   checkmate::assert_string(time_var)
   checkmate::assert_string(series_var)
-  if (!is.null(response_vars)) {
-    checkmate::assert_character(response_vars, min.len = 1, any.missing = FALSE)
-  }
+  checkmate::assert_list(dimensions)
 
-  # Validate dimensions parameter when provided
-  if (!is.null(dimensions)) {
-    checkmate::assert_list(dimensions)
-    required_fields <- c("unique_times", "unique_series", "n_time", "n_series")
-    missing_fields <- setdiff(required_fields, names(dimensions))
-    if (length(missing_fields) > 0) {
-      stop(insight::format_error(
-        cli::format_inline(
-          "Dimensions list missing required fields: {paste(missing_fields, collapse = ', ')}"
-        )
-      ), call. = FALSE)
-    }
-  }
-
-  # Validate required columns exist - only require variables that can't be created via attributes
-  formula_to_use <- if (!is.null(cached_formulas)) cached_formulas$formula else NULL
-  filtered_vars <- filter_required_variables(c(response_var, time_var), formula_to_use)  # series_var can be created via attributes
-  validate_required_variables(data, filtered_vars, "mapping data")
-
-  # Extract dimensions if not provided
-  if (is.null(dimensions)) {
-    dimensions <- extract_time_series_dimensions(data, time_var, series_var, cached_formulas = cached_formulas, response_vars = response_vars)
-  }
+  # The response column is checked by the caller and the time column
+  # where the time index is built, so neither is asked for again.
 
   # Identify non-missing observations. mvgam keeps each response
   # on its own valid-row set so the shared latent state is informed
@@ -3093,43 +2982,13 @@ generate_obs_trend_mapping <- function(data, response_var, time_var = "time",
         length(non_missing_idx))
   }
 
-  # Validate the mappings
-  if (any(is.na(obs_trend_time))) {
-    stop(insight::format_error(c(
-      "Failed to map some observations to time indices.",
-      x = "This indicates a data structure problem."
-    )), call. = FALSE)
-  }
-
-  if (any(is.na(obs_trend_series))) {
-    stop(insight::format_error(c(
-      "Failed to map some observations to series indices.",
-      x = "This indicates a data structure problem."
-    )), call. = FALSE)
-  }
-
-  # Validate bounds
-  if (any(obs_trend_time < 1 | obs_trend_time > dimensions$n_time)) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Time indices out of bounds: must be in [1, {dimensions$n_time}]."
-      ),
-      x = cli::format_inline(
-        "Found indices: [{min(obs_trend_time)}, {max(obs_trend_time)}]"
-      )
-    )), call. = FALSE)
-  }
-
-  if (any(obs_trend_series < 1 | obs_trend_series > dimensions$n_series)) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Series indices out of bounds: must be in [1, {dimensions$n_series}]."
-      ),
-      x = cli::format_inline(
-        "Found indices: [{min(obs_trend_series)}, {max(obs_trend_series)}]"
-      )
-    )), call. = FALSE)
-  }
+  # Neither index can be missing or out of range. `obs_data` is a
+  # subset of the frame the axes were resolved on, so every value
+  # it holds is in the list being matched against, and a `match()`
+  # into a list of length n answers in 1..n or not at all. A frame
+  # whose rows name no cell is refused where the two indices are
+  # built. Checking again here would be noise standing where a real
+  # check should be.
 
   return(list(
     obs_trend_time = as.integer(obs_trend_time),
@@ -3710,69 +3569,6 @@ validate_prediction_factor_levels <- function(data, metadata) {
   invisible(TRUE)
 }
 
-
-#' Parse Data Declarations from Stan Data Block
-#'
-#' @description
-#' Extracts variable names from Stan data block declarations.
-#' This is a minimal parser for basic variable declarations.
-#'
-#' @param data_block Character string containing Stan data block content
-#' @return Character vector of declared variable names
-#' @noRd
-parse_data_declarations <- function(data_block) {
-  checkmate::assert_string(data_block)
-
-  if (nchar(data_block) == 0) {
-    return(character(0))
-  }
-
-  # Split into lines and clean up
-  lines <- strsplit(data_block, "\n")[[1]]
-  lines <- trimws(lines)
-  lines <- lines[nchar(lines) > 0]  # Remove empty lines
-  lines <- lines[!grepl("^//", lines)]  # Remove comment lines
-
-  var_names <- character(0)
-
-  for (line in lines) {
-    # Look for variable declarations (basic pattern)
-    # Pattern: type<constraints> variable_name;
-    # Examples: "int N;", "vector[N] y;", "real<lower=0> sigma;"
-
-    # Remove inline comments
-    line <- sub("//.*$", "", line)
-    line <- trimws(line)
-
-    if (nchar(line) == 0) next
-
-    # Basic pattern for variable declarations
-    # This is a basic approach - a full parser would handle more cases
-    if (grepl(";\\s*$", line)) {  # Line ends with semicolon
-      # Extract variable name (last word before semicolon)
-      clean_line <- gsub(";\\s*$", "", line)  # Remove semicolon
-      tokens <- strsplit(clean_line, "\\s+")[[1]]
-
-      if (length(tokens) >= 2) {
-        # Variable name is typically the last token
-        var_name <- tokens[length(tokens)]
-
-        # Remove array subscripts if present: variable[N] -> variable
-        var_name <- gsub("\\[.*\\]", "", var_name)
-
-        # Remove any remaining special characters
-        var_name <- gsub("[^a-zA-Z0-9_]", "", var_name)
-
-        if (nchar(var_name) > 0) {
-          var_names <- c(var_names, var_name)
-        }
-      }
-    }
-  }
-
-  return(unique(var_names))
-}
-
 #' @noRd
 validate_stan_code <- function(stan_code, backend = "rstan", silent = TRUE, ...) {
   checkmate::assert_string(stan_code)
@@ -3867,90 +3663,6 @@ as_one_logical = function(x, allow_na = FALSE) {
     stop("Cannot coerce '", s, "' to a single logical value.", call. = FALSE)
   }
   x
-}
-
-
-#' Process Lag Parameters
-#'
-#' @description
-#' Processes lag parameters for AR/VAR models, handling complex lag structures.
-#'
-#' @param p Lag parameter(s)
-#' @param trend_type Trend type for context
-#' @return Processed lag parameter(s)
-#' @noRd
-process_lag_parameters <- function(p, trend_type) {
-  # Input validation with checkmate
-  checkmate::assert_string(trend_type, min.chars = 1)
-
-  if (is.null(p)) {
-    return(1L)  # Default lag
-  }
-
-  # Validate parameter type and range
-  checkmate::assert_integerish(p, lower = 1, min.len = 1, any.missing = FALSE)
-
-  # Convert to integer
-  p <- as.integer(p)
-
-  # Additional validation for edge cases
-  if (any(p <= 0) || any(!is.finite(p))) {
-    stop(insight::format_error(c(
-      "Lag parameters must be positive integers.",
-      x = cli::format_inline(
-        "You specified {.field p = {paste(p, collapse = ', ')}} for {.field {trend_type}} model."
-      )
-    )))
-  }
-
-  # Sort and remove duplicates for consistent processing
-  p <- sort(unique(p))
-
-  return(p)
-}
-
-#' Process Capacity Parameter
-#'
-#' @description
-#' Processes capacity parameter for piecewise (PW) models with data context validation.
-#'
-#' @param cap Capacity parameter
-#' @param data Data frame for context
-#' @return Processed capacity parameter
-#' @noRd
-process_capacity_parameter <- function(cap, data) {
-  # Input validation with checkmate
-  checkmate::assert_data_frame(data, min.rows = 1)
-
-  if (is.null(cap)) {
-    return(NULL)
-  }
-
-  # If character, validate it's a column in data
-  if (is.character(cap)) {
-    checkmate::assert_string(cap, min.chars = 1)
-    validate_required_variables(data, cap, "capacity data")
-    return(cap)
-  }
-
-  # If numeric, validate it's positive
-  if (is.numeric(cap)) {
-    checkmate::assert_number(cap, lower = 0, finite = TRUE)
-    if (cap <= 0) {
-      stop(insight::format_error(c(
-        "Capacity must be a positive finite number.",
-        x = cli::format_inline("You specified {.field cap = {cap}}.")
-      )))
-    }
-    return(cap)
-  }
-
-  stop(insight::format_error(c(
-    "Capacity parameter must be either a positive number or a column name.",
-    x = cli::format_inline(
-      "You specified {.field cap = {cap}} of type {.field {class(cap)}}."
-    )
-  )))
 }
 
 #' Validate Factor + Hierarchical Restriction
@@ -4201,6 +3913,27 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
   time_mapping <- setNames(seq_along(unique_times), unique_times)
   attr(data, "mvgam_time") <- time_mapping[as.character(data[[time_var]])]
   attr(data, "mvgam_time_source") <- "implicit"
+
+  # Every row has to name a cell of the trend matrix. A missing time
+  # or series maps to an NA index, which stays an NA index: the
+  # trend is read at `trend[NA, s]`, the observation takes a missing
+  # linear predictor, and nothing between here and the answer says
+  # so. Refusing here is the one layer that owns the question,
+  # because this is where the two indices are built.
+  missing_time <- which(is.na(attr(data, "mvgam_time")))
+  if (length(missing_time) > 0L) {
+    stop(insight::format_error(c(
+      paste0("Time variable '", time_var, "' has missing values."),
+      x = paste0(
+        length(missing_time), " row(s) carry no time, first at row ",
+        missing_time[1L], "."
+      ),
+      i = paste0(
+        "Every row must name an occasion for the latent trend to be ",
+        "read at. Drop these rows or supply their times."
+      )
+    )), call. = FALSE)
+  }
   attr(data, "mvgam_original_time") <- data[[time_var]]  # Store original for distance calculations
 
   # The series axis of a frame whose responses are its series
@@ -4329,6 +4062,23 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
   attr(data, "mvgam_series_source") <- series_source
   attr(data, "mvgam_series_levels") <- series_levels
 
+  # The other half of the same requirement, checked where the series
+  # is settled rather than where the time is.
+  missing_series <- which(is.na(series_values))
+  if (length(missing_series) > 0L) {
+    stop(insight::format_error(c(
+      "Series identity has missing values.",
+      x = paste0(
+        length(missing_series), " row(s) name no series, first at row ",
+        missing_series[1L], "."
+      ),
+      i = paste0(
+        "Every row must name a series so its latent state can be ",
+        "found. Check '", series_var, "' and any grouping variables ",
+        "for missing values."
+      )
+    )), call. = FALSE)
+  }
 
   return(data)
 }
@@ -4377,14 +4127,17 @@ get_time_for_grouping <- function(data) {
 #' @param gr_var Name of the grouping column
 #' @param order_by Series identifiers in the order the answer must
 #'   follow, or NULL to keep the order the data presents
+#' @param labels Series identity per row, for a caller that has
+#'   derived it and reaches this before any axis exists. `NULL`
+#'   reads the prepared attribute, then the series column.
 #' @return Vector of group values, one per series
 #'
 #' @noRd
 series_group_values <- function(data, series_var, gr_var,
-                                order_by = NULL) {
+                                order_by = NULL, labels = NULL) {
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_string(gr_var)
-  labels <- attr(data, "mvgam_series") %||% data[[series_var]]
+  labels <- labels %||% attr(data, "mvgam_series") %||% data[[series_var]]
   if (is.null(labels)) {
     stop(insight::format_error(
       paste0("Series variable '", series_var, "' not found in data.")
@@ -4516,14 +4269,12 @@ remove_mvgam_variables <- function(data) {
   return(data)
 }
 
-#' Extract and Validate Trend Components (Consolidated)
+#' Extract and Validate Trend Components
 #'
 #' @description
-#' Consolidates dual path trend processing by combining data extraction,
-#' validation, and dimension injection into a single operation.
-#' Replaces separate calls to extract_trend_data() and
-#' validate_time_series_for_trends() to eliminate redundant
-#' extract_time_series_dimensions() computation.
+#' Resolves the axes once, extracts the trend data on them and
+#' injects the dimensions into the specification, so a single pass
+#' answers what three separate ones used to answer differently.
 #'
 #' @param data Data frame containing time series data
 #' @param mv_spec Multivariate specification object with base_formula and
@@ -4813,24 +4564,6 @@ extract_and_validate_trend_components <- function(data, mv_spec,
     trend_metadata <- result$metadata
   }
 
-  # Validation using precomputed dimensions
-  validation_result <- validate_time_series_for_trends(
-    data,
-    mv_spec$trend_specs,
-    response_vars = response_vars,
-    cached_formulas = mv_spec$cached_formulas,
-    .precomputed_dimensions = dimensions
-  )
-
-  if (is.null(validation_result) || is.null(validation_result$dimensions)) {
-    stop(insight::format_error(c(
-      "Validation returned invalid results.",
-      i = cli::format_inline(
-        "Expected {.field validation_result} with {.field dimensions} field."
-      )
-    )), call. = FALSE)
-  }
-
   # Inject dimensions into mv_spec
   enhanced_mv_spec <- mv_spec
   if (is_multivariate_trend_specs(mv_spec$trend_specs)) {
@@ -4986,8 +4719,17 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
       trend_variables <- unique(metadata$covariates)
     }
 
-    # Validate newdata has required variables
-    required_vars <- unique(c(time_var, series_var, trend_variables))
+    # The columns a frame needs are the time, which is read here,
+    # and the trend's own covariates. Which columns name the series
+    # is not settled at this layer: a hierarchical fit reads `gr`
+    # and `subgr`, a response-keyed one reads nothing, and only the
+    # explicit case wants the column `series_var` names. Demanding
+    # that column here refused a hierarchical fit its own prediction
+    # frame, three lines before `ensure_mvgam_variables()` would
+    # have derived the axis from the grouping it does carry. That
+    # function owns the refusal, and states which of the three
+    # things is missing.
+    required_vars <- unique(c(time_var, trend_variables))
     missing_vars <- setdiff(required_vars, names(newdata))
 
     if (length(missing_vars) > 0) {
@@ -5001,15 +4743,6 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
         x = cli::format_inline("Missing: {.field {missing_vars}}"),
         i = "Ensure newdata contains all variables used during model fitting."
       )), call. = FALSE)
-    }
-
-    # Get grouping variables from metadata
-    grouping_vars <- character(0)
-    if (!is.null(metadata$variables$gr_var) && metadata$variables$gr_var != "NA") {
-      grouping_vars <- c(grouping_vars, metadata$variables$gr_var)
-    }
-    if (!is.null(metadata$variables$subgr_var) && metadata$variables$subgr_var != "NA") {
-      grouping_vars <- c(grouping_vars, metadata$variables$subgr_var)
     }
 
     # Create attribute-based time and series variables for prediction context using metadata
@@ -5185,16 +4918,6 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
       }
     }
 
-    # Extract grouping variables from parsed trend
-    grouping_vars <- character(0)
-    if (!is.null(parsed_trend$trend_model)) {
-      if (!is.null(parsed_trend$trend_model$gr) && parsed_trend$trend_model$gr != "NA") {
-        grouping_vars <- c(grouping_vars, parsed_trend$trend_model$gr)
-      }
-      if (!is.null(parsed_trend$trend_model$subgr) && parsed_trend$trend_model$subgr != "NA") {
-        grouping_vars <- c(grouping_vars, parsed_trend$trend_model$subgr)
-      }
-    }
   }
 
   # Universal (time, series) grouping using attribute-based accessors
@@ -5313,7 +5036,11 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
       # post-fit reads the axes Stan was given instead of rebuilding
       # them from the frame. Read, never rebuilt here: a second
       # construction is the thing this record exists to end.
-      axes = .precomputed_dimensions$axes,
+      # The record, completed with the one field that is not knowable
+      # where the rest of it is built. Read, never rebuilt: a second
+      # construction is the thing this record exists to end.
+      axes = complete_axes_grain(.precomputed_dimensions$axes,
+                                 has_by_lv, had_by_lv),
       # Store factor levels for prediction validation
       levels = list(
         # The series the trend actually has, in axis order. Taking a
@@ -5468,16 +5195,7 @@ normalise_loadings_prior <- function(input, data2, data,
       )
     )))
   }
-  series_levels <- if (is.factor(data$series)) {
-    levels(data$series)
-  } else if (!is.null(data$series)) {
-    sort(unique(as.character(data$series)))
-  } else {
-    stop(insight::format_error(c(
-      "'loadings_prior' requires a 'series' column on 'data'.",
-      i = "Add a 'series' factor / character column to 'data'."
-    )))
-  }
+  series_levels <- argument_series_levels(data, "loadings_prior")
   n_series_actual <- length(series_levels)
   if (!is.null(n_series) && n_series != n_series_actual) {
     stop(insight::format_error(c(

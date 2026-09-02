@@ -2753,11 +2753,15 @@ extract_hierarchical_info <- function(data_info, trend_specs) {
     ))
   }
 
-  # n_subgroups = number of series within each group. If user supplied
-  # subgr= or n_lv (factor models), prefer that. Otherwise derive from
-  # the series-to-group mapping. The Stan template declares matrices
-  # of size N_subgroups_trend; a constant series-per-group count is
-  # assumed downstream and unbalanced designs require explicit subgr=.
+  # The number of series in each group. A factor model sets this
+  # explicitly; otherwise it comes from the series-to-group mapping.
+  # The Stan template declares one block size for every group, so
+  # the counts have to agree, which `validate_gr_balanced_groups()`
+  # establishes before anything reaches here. `max()` therefore
+  # reads the shared count rather than papering over a difference:
+  # a group holding fewer series than the block it is given draws a
+  # slice of a correlation matrix it never asked for, and nothing
+  # downstream notices.
   if (!is.null(data_info$n_subgroups)) {
     n_subgroups <- data_info$n_subgroups
   } else {

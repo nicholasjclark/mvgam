@@ -1285,15 +1285,12 @@ extract_mvgam_components <- function(combined_fit, obs_setup, trend_setup,
 #' @return List with time-related metadata
 #' @noRd
 extract_time_information <- function(data) {
+  # Only the count is read, by `print()` and `summary()`. The range,
+  # the spacing and the presence marker were written and never read.
   if ("time" %in% names(data)) {
-    list(
-      n_timepoints = length(unique(data$time)),
-      time_range = range(data$time, na.rm = TRUE),
-      time_spacing = diff(sort(unique(data$time)))[1],
-      has_time = TRUE
-    )
+    list(n_timepoints = length(unique(data$time)))
   } else {
-    list(has_time = FALSE)
+    list()
   }
 }
 
@@ -1303,26 +1300,16 @@ extract_time_information <- function(data) {
 #' @return List with series-related metadata
 #' @noRd
 extract_series_information <- function(data, mv_spec) {
+  # Only the count is read, by `print()`, `summary()` and the plot
+  # and prediction helpers. The names were taken in data row order
+  # rather than axis order and were never read; the response names
+  # are read from `mv_spec` wherever they are wanted; and the two
+  # presence markers had no readers at all.
   series_info <- list()
-
   if ("series" %in% names(data)) {
     series_info$n_series <- length(unique(data$series))
-    series_info$series_names <- unique(data$series)
-    series_info$has_series = TRUE
-  } else {
-    series_info$has_series <- FALSE
   }
-
-  # Add multivariate response information
-  if (!is.null(mv_spec$response_names)) {
-    series_info$response_names <- mv_spec$response_names
-    series_info$n_responses <- length(mv_spec$response_names)
-    series_info$is_multivariate <- TRUE
-  } else {
-    series_info$is_multivariate <- FALSE
-  }
-
-  return(series_info)
+  series_info
 }
 
 #' Extract Trend Component Information

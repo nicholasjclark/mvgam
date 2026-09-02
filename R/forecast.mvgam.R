@@ -289,24 +289,17 @@ forecast.mvgam <- function(object,
 # ----- Series / training / forecast grids -------------------------
 
 # Internal: resolve the canonical series levels from the fit.
-# Falls back to factor levels of the obs data when `series_info`
-# is absent.
 #'@noRd
 resolve_series_info <- function(object) {
-  lv <- object$series_info$series_levels
-  if (is.null(lv)) {
-    # The labels a fit reports are the series identity it was built
-    # with, which for a `gr` / `subgr` trend is derived rather than
-    # read: a supplied `series` column is superseded, and reporting
-    # the superseded spelling contradicts what the supersession
-    # warning tells the user to expect. Taking them from the same
-    # place the trend index comes from also puts them in the order
-    # the trend matrix numbers its columns.
-    lv <- names(fitted_series_index(object))
-  }
-  if (is.null(lv)) {
-    lv <- mvgam_axes(object)$series$levels
-  }
+  # The labels a fit reports are the series identity it was built
+  # with, which for a `gr` / `subgr` trend is derived rather than
+  # read: a supplied `series` column is superseded, and reporting
+  # the superseded spelling contradicts what the supersession
+  # warning tells the user to expect. Taking them from the same
+  # place the trend index comes from also puts them in the order the
+  # trend matrix numbers its columns.
+  lv <- names(fitted_series_index(object)) %||%
+    mvgam_axes(object)$series$levels
   list(series_levels = as.character(lv))
 }
 
@@ -400,17 +393,19 @@ resolve_forecast_grid <- function(object, newdata, training,
   checkmate::assert_data_frame(newdata, min.rows = 1L)
   time_var <- training$time_var
   series_var <- training$series_var
-  if (!all(c(time_var, series_var) %in% names(newdata))) {
+  # Only the time is demanded here. Which columns name the series is
+  # a question `axis_row_series()` answers from the record, and a
+  # grouping names them without any `series` column at all: asking
+  # for one refused a hierarchical fit the very frame it was fitted
+  # on, at a layer that had no need to ask.
+  if (!time_var %in% names(newdata)) {
     stop(insight::format_error(c(
-      paste0(
-        "'newdata' must contain time / series columns '",
-        time_var, "' and '", series_var, "'."
-      ),
+      paste0("'newdata' must contain the time column '", time_var,
+             "'."),
       x = paste0(
-        "Got columns: ", paste(names(newdata), collapse = ", "),
-        "."
+        "Got columns: ", paste(names(newdata), collapse = ", "), "."
       )
-    )))
+    )), call. = FALSE)
   }
   resp <- training$resp
 
@@ -422,23 +417,80 @@ resolve_forecast_grid <- function(object, newdata, training,
   # every response at once; the column read below is what that case
   # has always used.
   series_ids <- axis_row_series(object, newdata)
-  series_fac <- factor(
-    as.character(series_ids %||% newdata[[series_var]]),
-    levels = series_levels
-  )
+
+  # A series the fit never had is refused by the validator that owns
+  # that fact, so a user meets one message wherever the frame
+  # entered. Refusing it again here would give the same condition a
+  # second wording, and the wording it had named the superseded
+  # column: a hierarchical frame was told its unknown level was
+  # `north.sp_a`, a series the model does have, spelled the way the
+  # column it does not read spells it. An object carrying no record
+  # has nothing to validate against, and the guard below covers it.
+  if (!is.null(object$trend_metadata)) {
+    validate_prediction_factor_levels(newdata, object$trend_metadata)
+  }
+
+  # Where the responses are the series, every row carries all of
+  # them: a wide frame holds one row per time and one column per
+  # response, so each series is forecast at every occasion the frame
+  # supplies. Asking for a per-row series here is asking a question
+  # the frame cannot answer, and demanding a `series` column left
+  # every `mvbf()` and `jsdgam()` fit unable to forecast at all.
+  if (is.null(series_ids) &&
+        identical(mvgam_axes(object)$series$source, "multivariate")) {
+    nt <- sort(unique(as.integer(newdata[[time_var]])))
+    fc_times <- stats::setNames(lapply(series_levels, function(lv) {
+      setdiff(nt, as.integer(training$times[[lv]]))
+    }), series_levels)
+    if (all(lengths(fc_times) == 0L)) return(NULL)
+    # Each response's truths come from its own column, so a frame
+    # supplying some of them and not others scores what it can.
+    fc_observations <- stats::setNames(lapply(series_levels, function(lv) {
+      if (!lv %in% names(newdata)) return(NULL)
+      idx <- as.integer(newdata[[time_var]]) %in% fc_times[[lv]]
+      if (!any(idx)) return(NULL)
+      as.numeric(newdata[[lv]][idx])[order(
+        as.integer(newdata[[time_var]][idx])
+      )]
+    }), series_levels)
+    keep <- as.integer(newdata[[time_var]]) %in%
+      unique(unlist(fc_times, use.names = FALSE))
+    fc_data <- newdata[keep, , drop = FALSE]
+    fc_data <- fc_data[
+      order(as.integer(fc_data[[time_var]])), , drop = FALSE
+    ]
+    return(list(data = fc_data, times = fc_times,
+                observations = fc_observations))
+  }
+
+  row_ids <- series_ids %||% newdata[[series_var]]
+  if (is.null(row_ids)) {
+    stop(insight::format_error(c(
+      "'newdata' names no series this model was fitted on.",
+      x = paste0(
+        "Got columns: ", paste(names(newdata), collapse = ", "), "."
+      ),
+      i = paste0(
+        "Supply the column the model reads, or the grouping columns ",
+        "that name a series between them."
+      )
+    )), call. = FALSE)
+  }
+  series_fac <- factor(as.character(row_ids), levels = series_levels)
+  # Reached when the levels the grid was given and the levels the
+  # validator checks against are not the same list: an object
+  # carrying no record at all, or one whose two accounts of the axis
+  # disagree. The values named are the ones the placement was
+  # attempted on, never the column it superseded.
   if (any(is.na(series_fac))) {
+    unresolved <- unique(as.character(row_ids)[is.na(series_fac)])
     stop(insight::format_error(c(
       "'newdata' contains series levels not seen at fit time.",
-      x = paste0(
-        "Unknown levels: ",
-        paste(
-          unique(as.character(newdata[[series_var]])[
-            is.na(series_fac)
-          ]),
-          collapse = ", "
-        ), "."
-      )
-    )))
+      x = paste0("Unknown levels: ", paste(unresolved, collapse = ", "),
+                 "."),
+      i = paste0("The model was fitted on: ",
+                 paste(series_levels, collapse = ", "), ".")
+    )), call. = FALSE)
   }
 
   fc_times <- lapply(series_levels, function(lv) {

@@ -396,10 +396,15 @@ test_that("Newdata with unseen series levels errors crisply", {
 })
 
 
-test_that("Newdata missing time / series columns errors", {
+test_that("Newdata that names no time or no series errors", {
+  # Two conditions, refused separately. The time is read here, so a
+  # frame without one cannot be placed at all. Which columns name
+  # the series is the record's question, and a frame carrying
+  # neither a series column nor a grouping answers it with nothing:
+  # asking for a named column instead turned away hierarchical fits
+  # handed the very frames they were fitted on.
   fit <- make_mock_mvgam()
   draws <- make_draws_mat(ndraws = 2L)
-  newdata <- data.frame(notime = 11:12, y = NA_integer_)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,
     .package = "posterior"
@@ -408,8 +413,20 @@ test_that("Newdata missing time / series columns errors", {
     posterior_predict = function(...) matrix(1L, 2L, 10L)
   )
   expect_error(
-    forecast(fit, newdata = newdata, type = "response"),
-    "time / series columns"
+    forecast(
+      fit,
+      newdata = data.frame(notime = 11:12, y = NA_integer_),
+      type = "response"
+    ),
+    "must contain the time column"
+  )
+  expect_error(
+    forecast(
+      fit,
+      newdata = data.frame(time = 11:12, y = NA_integer_),
+      type = "response"
+    ),
+    "names no series"
   )
 })
 

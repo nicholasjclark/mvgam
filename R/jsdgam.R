@@ -385,12 +385,11 @@ jsdgam <- function(formula,
   # "species" rather than the canonical mvgam "series". The
   # downstream wrapper-layer call in `make_stan.R` covers the
   # `mvgam()` direct path; the two share `validate_n_lv_ceiling()`
-  # so the iid vs MGP rule lives in one place.
+  # so the ceiling lives in one place.
   validate_n_lv_ceiling(
-    n_lv           = n_lv,
-    n_species      = n_species,
-    loadings_prior = loadings_prior,
-    fit_function   = "jsdgam"
+    n_lv         = n_lv,
+    n_species    = n_species,
+    fit_function = "jsdgam"
   )
 
   # Unit must be numeric / integer because mvgam's time axis is.
@@ -554,10 +553,9 @@ jsdgam <- function(formula,
       )
       if (!is.null(user_spec$n_lv)) {
         validate_n_lv_ceiling(
-          n_lv           = user_spec$n_lv,
-          n_species      = n_species,
-          loadings_prior = loadings_prior,
-          fit_function   = "jsdgam"
+          n_lv         = user_spec$n_lv,
+          n_species    = n_species,
+          fit_function = "jsdgam"
         )
       }
     }

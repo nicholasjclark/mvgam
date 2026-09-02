@@ -31,18 +31,14 @@ The mvgam package uses a two-stage assembly system that combines brms for observ
 - **Entry point**: `validate_time_series_for_trends()` in `R/validations.R`
 - **Input**: Raw data, parsed trend specifications, and response variable names
 - **Processing**: 
-  - **Centralized Analysis**: Calls `extract_time_series_dimensions(response_vars)` for complete time series processing
-  - Creates bidirectional mappings: `stan_to_original` and `original_to_stan` indices
-  - Generates time/series index mappings for trend matrix structure
-  - **Mapping Generation**: Creates observation-to-trend mapping arrays for ALL response variables in one pass
+  - Calls `extract_time_series_dimensions(response_vars)`, which resolves the series, time and factor axes once and records them
+  - Builds the observation-to-trend mapping arrays for every response variable in one pass
   - Validates factor levels and time series structure
-- **Output**: Enhanced dimensions object with embedded mapping arrays
+- **Output**: A dimensions object carrying the axis record and the mapping arrays
 - **Available data structures**: 
   - `dimensions$n_time`, `dimensions$n_series`, `dimensions$n_obs`
-  - `dimensions$ordering$stan_to_original` (maps Stan row index → Original row index)
-  - `dimensions$ordering$original_to_stan` (maps Original row index → Stan row index)
-  - `dimensions$ordering$time_indices` and `dimensions$ordering$series_indices`
-  - **`dimensions$mappings`**: Contains pre-generated observation-to-trend mapping arrays for each response variable
+  - `dimensions$axes`, the record Stan assembly and every post-fit method read. `axes$series` holds the ordered levels, how they were arrived at, their count, the group each belongs to and the last occasion each was observed on; `axes$time` holds the user's own ordered times, the integer index and the step; `axes$factor` holds `n_lv`; `axes$grain` names what the second dimension of `times_trend` indexes; `axes$vars` names the columns a row is placed by
+  - `dimensions$mappings`: the `obs_trend_time` and `obs_trend_series` arrays for each response variable
 
 ### Stage 4: brms Setup
 - **Entry point**: `setup_brms_lightweight()` in `R/brms_integration.R`

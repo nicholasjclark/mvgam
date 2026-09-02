@@ -1118,6 +1118,41 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > Closed by 48.0: the failure was the same missing family reached
   > through another path, not a ragged-arm defect.
 
+- [ ] **50.0 Four post-fit readers still take the superseded series column**
+  > Each reads `data$series` directly, so a hierarchical fit is
+  > labelled by the column its grouping supersedes and a wide
+  > `mvbf()` fit is refused or silently collapsed. `axis_row_series()`
+  > answers all four correctly.
+  >
+  > | Reader | What goes wrong |
+  > |---|---|
+  > | `R/loo.mvgam.R:392` | `by_series = TRUE` hardcodes `"series"` rather than the fit's `series_var`, refuses a `gr` / `subgr` fit carrying no such column, and labels by the supplanted spelling when one is present |
+  > | ~~`R/validations.R:897`~~ | Closed. `normalise_trend_map()` and `normalise_loadings_prior()` shared ten identical lines reading `levels(data$series)`, the declared levels, while the axis reads the observed ones: a frame carrying a level nothing reaches had its map refused for the wrong number of rows. Both now call `argument_series_levels()` |
+  > | ~~`R/validations.R:5474`~~ | Closed with the row above |
+  > | `R/conditional_effects.mvgam.R:545` | `levels(x$data$series)` is `NULL` on a wide fit, so `n_levels` is zero and every numeric `series` argument is refused as out of range |
+  >
+  > `R/plot_mvgam_series.R:180` belongs with them: where the column is
+  > absent it substitutes one series named `series1` and raises
+  > nothing, so a hierarchical or wide fit plots as a single series.
+
+- [x] **51.0 Guards that cannot fire, and one that recurses**
+  > `generate_obs_trend_mapping()` has one call site and builds both
+  > index vectors with `match()` against the axis it was handed, so
+  > the four refusals at `R/validations.R:3097`, `3104`, `3112` and
+  > `3123` cannot fire: `match()` returns `NA` or a value in
+  > `1..length(table)`, and the `NA` case is refused by
+  > `response_series_index()` with a better message. Its
+  > `required_fields` check duplicates what the single caller just
+  > built, and its `if (is.null(dimensions))` branch calls the
+  > function that called it, which only unreachability keeps from
+  > recursing.
+  >
+  > The invariant those four gesture at is real and none of them
+  > tests it: what can go wrong is `unique_series` disagreeing with
+  > the axis Stan is given, which is a permutation every one of them
+  > passes. One assertion that the two agree is worth more than the
+  > four.
+
 - [ ] **6.0 Final release verification**
   > Clean `document()`, clean test sweep, `R CMD check --as-cran`,
   > tarball under the size limit, sweep green. Gated on 31.0:

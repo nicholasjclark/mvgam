@@ -564,9 +564,32 @@ extract_car_state <- function(one_draw, meta, n_series, fit) {
 # trend data when the per-series tail is unavailable.
 #'@noRd
 extract_last_observed_times <- function(fit, n_series) {
+  # The fit recorded this when it resolved its axes, in the order the
+  # trend numbers its columns, so there is nothing to walk. Deriving
+  # it from the training frame is what had this picking series out by
+  # a column a grouping may have superseded.
+  recorded <- mvgam_axes(fit)$series$last_time
+  if (!is.null(recorded)) {
+    # One entry per trend column, and the record is the thing that
+    # makes the two counts the same. Subsetting to `n_series` here
+    # would pad with `NA` or drop a series without saying which,
+    # which is the silence this record exists to end.
+    if (length(recorded) != n_series) {
+      stop(insight::format_error(c(
+        "The recorded last times do not span the trend's series.",
+        x = paste0("Recorded: ", length(recorded), ", series: ",
+                   n_series, "."),
+        i = paste0(
+          "The axis and the trend matrix are resolved together, so ",
+          "these cannot differ on a fit built by this version."
+        )
+      )), call. = FALSE)
+    }
+    return(as.numeric(recorded))
+  }
+
   meta <- fit$trend_metadata
   time_var <- meta$variables$time_var %||% "time"
-  series_var <- meta$variables$series_var %||% "series"
   d <- mvgam_training_data(fit)
   if (is.null(d) || is.null(d[[time_var]])) {
     return(rep(NA_real_, n_series))

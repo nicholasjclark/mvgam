@@ -22,208 +22,73 @@
 #' @return List with `gr` and `subgr`, each a column name or `NULL`
 #' @noRd
 spec_groupings <- function(spec) {
+  spec <- trend_spec_head(spec)
   if (is.null(spec)) {
     return(list(gr = NULL, subgr = NULL))
   }
-  checkmate::assert_list(spec)
 
+  # `[[` on a name a list does not carry raises rather than
+  # answering `NULL`, so a specification written without a field is
+  # read by name first. A caller that happens to pass one carrying
+  # every field never sees the difference, which is why this held
+  # until a spec spelled by hand reached it.
+  field_of <- function(x, field) {
+    if (is.list(x) && field %in% names(x)) x[[field]] else NULL
+  }
   pick <- function(field) {
-    value <- spec[[field]] %||% spec$trend_model[[field]]
+    value <- field_of(spec, field) %||%
+      field_of(field_of(spec, "trend_model"), field)
     if (named_var(value)) as.character(value) else NULL
   }
   list(gr = pick("gr"), subgr = pick("subgr"))
 }
 
-#' Resolve the series and time axes of a frame
+#' One trend specification, whatever shape it arrives in
 #'
-#' The single answer to which latent state a row reads. Every axis
-#' question is put to this record rather than re-derived from the
-#' frame's columns, so a consumer cannot hold an order that another
-#' consumer contradicts.
+#' A multivariate model carries one specification per response, so the
+#' object handed round is sometimes that list and sometimes a single
+#' specification. Every response shares one trend axis, so the first
+#' answers for all of them. Reading the list as though it were a
+#' specification finds none of its fields and reports a model with no
+#' grouping and no factors, which is the shape of defect this record
+#' exists to end.
 #'
-#' The time axis is carried as its ordered original values. The integer
-#' index is then `match()` and the gaps `CAR()` and the Gaussian
-#' processes need are `diff()`, which is one representation where there
-#' were three.
-#'
-#' @param data Data frame the model is being fitted to, or predicted on
-#' @param spec Trend specification, in either spelling
-#' @param time_var Name of the time column
-#' @param series_var Name of the series column, where one is used
-#' @param response_vars Response names, for a frame keyed by response
-#' @param metadata Stored metadata, in a prediction context
-#' @return List with `series` (levels, source, n, values) and `time`
-#'   (values, n, index)
+#' @param spec A trend specification, a list of them, or `NULL`
+#' @return A single specification, or `NULL`
 #' @noRd
-resolve_axes <- function(data, spec = NULL, time_var = "time",
-                         series_var = "series", response_vars = NULL,
-                         metadata = NULL) {
-  checkmate::assert_data_frame(data, min.rows = 1)
-  checkmate::assert_string(time_var)
-  checkmate::assert_string(series_var)
-  checkmate::assert_names(names(data), must.include = time_var)
-  if (!is.null(response_vars)) {
-    checkmate::assert_character(
-      response_vars, min.len = 1, any.missing = FALSE
-    )
+trend_spec_head <- function(spec) {
+  if (is.null(spec)) {
+    return(NULL)
   }
-
-  list(
-    series = resolve_series_axis(
-      data, spec, series_var, response_vars, metadata
-    ),
-    time = resolve_time_axis(data, time_var)
-  )
+  checkmate::assert_list(spec)
+  # A list of specifications holds specifications, one per response.
+  # `is_multivariate_trend_specs()` decides by the absence of a
+  # trend field at the top level, which also describes a single
+  # specification written without one: taking its first element
+  # then reads a column name as though it were a model, and reports
+  # a grouped trend as ungrouped without a word. Requiring the
+  # entries to be lists tells the two apart.
+  looks_multivariate <- is_multivariate_trend_specs(spec) &&
+    length(spec) > 0L &&
+    all(vapply(spec, is.list, logical(1L)))
+  if (looks_multivariate) spec[[1L]] else spec
 }
 
-#' The time axis, ordered
+#' The number of latent factors a specification names
 #'
-#' @param data Data frame carrying the time column
-#' @param time_var Name of the time column
-#' @return List with the ordered original values, their count, and the
-#'   per-row index into them
+#' @param spec A trend specification, in any of its shapes
+#' @return Integer count, or `NULL` where the trend names none
 #' @noRd
-resolve_time_axis <- function(data, time_var) {
-  values <- data[[time_var]]
-  if (anyNA(values)) {
-    stop(insight::format_error(c(
-      cli::format_inline("Missing values in time column {.field {time_var}}."),
-      x = "Every row must state the time it was observed at.",
-      i = "Drop the rows or supply their times before fitting."
-    )), call. = FALSE)
+spec_n_lv <- function(spec) {
+  spec <- trend_spec_head(spec)
+  # Read by name for the same reason `spec_groupings()` does: `[[`
+  # raises on a specification written without the field.
+  field_of <- function(x, field) {
+    if (is.list(x) && field %in% names(x)) x[[field]] else NULL
   }
-  ordered <- sort(unique(values))
-  list(
-    values = ordered,
-    n = length(ordered),
-    index = match(values, ordered)
-  )
-}
-
-#' The series axis, and where it came from
-#'
-#' Four sources, tried in the order that decides them: a stored axis in
-#' a prediction context, a hierarchical grouping, the responses of a
-#' frame keyed by response, and a series column. `source` records which
-#' answered, so a later reader need not guess from the shape.
-#'
-#' @param data Data frame being resolved
-#' @param spec Trend specification, in either spelling
-#' @param series_var Name of the series column, where one is used
-#' @param response_vars Response names, for a frame keyed by response
-#' @param metadata Stored metadata, in a prediction context
-#' @return List with `levels`, `source`, `n` and per-row `values`
-#' @noRd
-resolve_series_axis <- function(data, spec, series_var, response_vars,
-                                metadata) {
-  groupings <- spec_groupings(spec)
-
-  # A prediction frame takes the axis the fit recorded, so a series the
-  # training data never held is a refusal rather than a new column.
-  if (!is.null(metadata)) {
-    stored <- resolve_stored_series_axis(data, metadata, series_var)
-    if (!is.null(stored)) {
-      return(stored)
-    }
-  }
-
-  if (!is.null(groupings$gr) && !is.null(groupings$subgr) &&
-      !identical(groupings$subgr, series_var)) {
-    assert_grouping_columns(data, groupings$gr, groupings$subgr)
-    values <- hierarchical_series_values(
-      data, groupings$gr, groupings$subgr
-    )
-    return(series_axis_record(levels(values), "hierarchical", values))
-  }
-
-  if (series_var %in% names(data)) {
-    values <- data[[series_var]]
-    return(series_axis_record(
-      observed_series_levels(values), "explicit", values
-    ))
-  }
-
-  # A frame written with `brms::mvbf()` holds one row per time and one
-  # column per response, so the series an observation sits on is a
-  # property of the (row, response) pair. A per-row vector cannot say
-  # that, and the axis is the responses in formula order instead.
-  if (!is.null(response_vars) && length(response_vars) > 1L) {
-    return(series_axis_record(response_vars, "response", NULL))
-  }
-
-  if (!is.null(response_vars) && length(response_vars) == 1L) {
-    return(series_axis_record(response_vars, "single", NULL))
-  }
-
-  stop(insight::format_error(c(
-    "No series axis could be resolved for this data.",
-    x = cli::format_inline(
-      "There is no {.field {series_var}} column, no grouping ",
-      "variables and no responses to take one from."
-    ),
-    i = cli::format_inline(
-      "Add a {.field {series_var}} column, or name {.arg gr} and ",
-      "{.arg subgr} in the trend."
-    )
-  )), call. = FALSE)
-}
-
-#' The axis a fit recorded, rebuilt on a prediction frame
-#'
-#' @param data Prediction frame
-#' @param metadata Stored metadata from the fit
-#' @param series_var Name of the series column, where one is used
-#' @return A series axis record, or `NULL` where the stored source does
-#'   not settle it and the fitting rules apply instead
-#' @noRd
-resolve_stored_series_axis <- function(data, metadata, series_var) {
-  checkmate::assert_list(metadata, names = "named")
-  source <- metadata$series_source %||% "explicit"
-
-  if (identical(source, "hierarchical")) {
-    gr_var <- metadata$variables$gr_var
-    subgr_var <- metadata$variables$subgr_var
-    if (named_var(gr_var) && named_var(subgr_var)) {
-      assert_grouping_columns(data, gr_var, subgr_var)
-      values <- hierarchical_series_values(data, gr_var, subgr_var)
-      return(series_axis_record(
-        metadata$levels$series %||% levels(values), source, values
-      ))
-    }
-  }
-
-  if (source %in% c("response", "multivariate") &&
-      !is.null(metadata$response_vars)) {
-    return(series_axis_record(
-      metadata$response_vars, "response", NULL
-    ))
-  }
-
-  NULL
-}
-
-#' Assemble one series axis record
-#'
-#' @param levels Series names, in axis order
-#' @param source One of explicit, hierarchical, response or single
-#' @param values Per-row series values, or `NULL` where the frame is
-#'   keyed by response and the rows do not carry them
-#' @return List with `levels`, `source`, `n` and `values`
-#' @noRd
-series_axis_record <- function(levels, source, values) {
-  levels <- as.character(levels)
-  checkmate::assert_character(
-    levels, min.len = 1, any.missing = FALSE, unique = TRUE
-  )
-  checkmate::assert_choice(
-    source, c("explicit", "hierarchical", "response", "single")
-  )
-  list(
-    levels = levels,
-    source = source,
-    n = length(levels),
-    values = if (is.null(values)) NULL else factor(values, levels = levels)
-  )
+  value <- field_of(spec, "n_lv") %||%
+    field_of(field_of(spec, "trend_model"), "n_lv")
+  if (is.null(value)) NULL else as.integer(value)
 }
 
 #' The group each series on the axis belongs to
@@ -277,12 +142,24 @@ axis_group_values <- function(data, spec, series_vals, series_axis) {
 #'   series. `$time` is `NULL` on a fit that predates the record.
 #' @noRd
 mvgam_axes <- function(object) {
-  axes <- object$trend_metadata$axes
-  if (!is.null(axes)) {
-    return(axes)
+  axes_from_metadata(object$trend_metadata)
+}
+
+#' The axes a stored metadata list describes
+#'
+#' The one place that knows a model saved before the record existed
+#' spelled its series as `levels$series` and `series_source`. Every
+#' reader goes through here, so the older spelling is understood in
+#' one place rather than tested for at each of them.
+#'
+#' @param meta A fit's `trend_metadata`
+#' @return The axes record, or `NULL` when it names no series
+#' @noRd
+axes_from_metadata <- function(meta) {
+  if (!is.null(meta$axes)) {
+    return(meta$axes)
   }
 
-  meta <- object$trend_metadata
   levs <- as.character(meta$levels$series %||% character(0L))
   if (!length(levs)) {
     return(NULL)
@@ -330,7 +207,7 @@ axis_row_series <- function(object, data) {
   # for all of them. Answering with that constant would put every row
   # on the first series, so the question is refused here and the
   # caller reads the response axis instead.
-  if (identical(axes$series$source, "response")) {
+  if (identical(axes$series$source, "multivariate")) {
     return(NULL)
   }
   levs <- axes$series$levels
@@ -356,4 +233,86 @@ axis_row_series <- function(object, data) {
     return(as_axis(data[[series_var]]))
   }
   NULL
+}
+
+#' Name the grain the trend design runs on
+#'
+#' Everything else about the axes is settled where they are resolved.
+#' Whether the design is indexed by series or by latent factor depends
+#' on a `by = lv_axis()` term, which is only known once the trend
+#' formula has been walked, so the record is completed here rather
+#' than built a second time.
+#'
+#' @param axes The axes record, or `NULL`
+#' @param has_by_lv Whether the emitted trend takes the factor grain
+#' @param had_by_lv Whether the user wrote `by = lv_axis()`, kept for
+#'   the non-factor rewrite where the emitted trend does not
+#' @return The record with `grain` named, or `NULL`
+#' @noRd
+complete_axes_grain <- function(axes, has_by_lv, had_by_lv) {
+  if (is.null(axes)) {
+    return(NULL)
+  }
+  axes$grain <- if (isTRUE(has_by_lv) || isTRUE(had_by_lv)) {
+    "lv"
+  } else {
+    "series"
+  }
+  axes
+}
+
+#' The last time each series on the axis was observed at
+#'
+#' Answers in the axis's own order. `CAR()` forecasts forward from
+#' these, so an answer in any other order starts each series from
+#' another's last observation.
+#'
+#' @param data The frame the axis was built from
+#' @param series_vals Per-row series identifiers
+#' @param series_axis The series axis, in order
+#' @param times Per-row times, in the units the record carries
+#' @param response_axis The response axis where the responses are the
+#'   series, from `mvgam_response_axis()`, and `NULL` otherwise
+#' @param response_vars The response columns, used to tell an
+#'   observation from a padding row on a stacked frame
+#' @return One time per axis entry, `NA` where a series has no rows
+#' @noRd
+axis_last_times <- function(data, series_vals, series_axis, times,
+                            response_axis = NULL,
+                            response_vars = NULL) {
+  # A response-keyed frame carries every response on every row, so a
+  # row's series is not in its values: they are one constant. Each
+  # response's last occasion is the last row at which that response
+  # was observed, which is what its own column says.
+  #
+  # The test is whether the axis *is* the responses, not whether the
+  # model has several. A wide frame naming its own series column has
+  # one series that every response is measured on, and there the
+  # levels are not column names at all.
+  if (!is.null(response_axis)) {
+    return(vapply(as.character(series_axis), function(resp) {
+      seen <- times[!is.na(data[[resp]])]
+      if (!length(seen)) NA_real_ else max(as.numeric(seen))
+    }, numeric(1L), USE.NAMES = FALSE))
+  }
+
+  # When a series was last *observed*, which is not the same as the
+  # last row it has. mvgam asks a panel whose series end at
+  # different times to be padded with `NA`, so a padded series has
+  # rows to the end of the grid and observations only to its own
+  # end. Reading the rows dated it from the padding, and a `CAR()`
+  # forecast then started from an occasion the series was never
+  # seen at. The response branch above has always asked the right
+  # question; this asks the same one of a stacked frame.
+  labels <- as.character(series_vals)
+  observed <- rep(TRUE, length(labels))
+  for (resp in response_vars) {
+    if (!is.null(data[[resp]])) {
+      observed <- observed & !is.na(data[[resp]])
+    }
+  }
+  vapply(as.character(series_axis), function(lv) {
+    seen <- times[labels == lv & observed]
+    if (!length(seen)) NA_real_ else max(as.numeric(seen), na.rm = TRUE)
+  }, numeric(1L), USE.NAMES = FALSE)
 }

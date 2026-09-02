@@ -61,17 +61,55 @@
 #'
 #'   - `trend_metadata` The resolved trend details a prediction needs,
 #'     including the time and series variables, the trend type and the
-#'     number of latent factors
+#'     number of latent factors. Its `axes` entry is the record of
+#'     which series and which times the model was fitted on, and is
+#'     what post-processing reads rather than rebuilding either axis
+#'     from the training data:
+#'
+#'     - `axes$series$levels` The series, in the order the trend
+#'       matrix numbers its columns. Every label a summary, plot or
+#'       forecast shows comes from here
+#'     - `axes$series$source` How the axis was arrived at: `explicit`
+#'       from a series column, `hierarchical` from `gr` and `subgr`,
+#'       or `multivariate` from the responses of a wide formula
+#'     - `axes$series$n` The number of series, matching
+#'       `N_series_trend` in the Stan data
+#'     - `axes$series$groups` The group each series belongs to, in the
+#'       same order, which is the order Stan subscripts
+#'       `group_inds_trend` with. `NULL` when the trend names no
+#'       grouping
+#'     - `axes$series$last_time` The last occasion each series was
+#'       observed on, in the same order, which is where a forecast
+#'       for that series begins
+#'     - `axes$time$values` The times the model was fitted on, ordered
+#'       and in their original units, from which `CAR()` and the
+#'       Gaussian processes take their gaps
+#'     - `axes$time$n` How many occasions there are. The integer
+#'       index a trend steps along is `match()` into `values`
+#'     - `axes$time$step` The spacing a forecast extends the grid by,
+#'       `NA` when the times are irregular
+#'     - `axes$factor$n_lv` The number of latent factors, which is the
+#'       column count of the loadings and of `lv_trend`
+#'     - `axes$grain` What the second dimension of `times_trend`
+#'       indexes: `series` ordinarily, or `lv` where a term written
+#'       with `by = lv_axis()` puts the trend design on the factor
+#'       axis
+#'     - `axes$vars` The columns a row is placed by: `time_var`,
+#'       `series_var`, `gr_var`, `subgr_var` and `response_vars`.
+#'       Prediction reads these to identify a frame the model has
+#'       never seen
+#'
+#'     A model fitted before this record existed carries no `axes`,
+#'     and its series are read from `levels$series` instead.
 #'
 #'   - `trend_components` Per-component trend information derived from
 #'     the posterior. `NULL` when the model has no trend
 #'
-#'   - `series_info` The number of series, their names and, for a
-#'     multivariate model, the response names and their count
+#'   - `series_info` The number of series. Empty when the data name
+#'     no series, in which case the count is read from `axes`
 #'
-#'   - `time_info` The number of time points, their range and their
-#'     spacing, or `has_time = FALSE` when the data carry no time
-#'     variable
+#'   - `time_info` The number of time points, or empty when the data
+#'     carry no time variable
 #'
 #'   - `obs_model` A `brmsfit` holding the observation-side model brms
 #'     generated, used as the design-matrix source for prediction at

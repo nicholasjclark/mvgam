@@ -283,17 +283,13 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     NULL
   }
 
-  out$n_series <- if (!is.null(object$series_info)) {
-    object$series_info$n_series
-  } else {
-    NULL
-  }
-
-  out$n_timepoints <- if (!is.null(object$time_info)) {
-    object$time_info$n_timepoints
-  } else {
-    NULL
-  }
+  # The same counts `print()` shows, read the same way. Reading
+  # `series_info` here instead left a hierarchical fit printing four
+  # series and summarising none, because the axis it counts is
+  # derived from a grouping and `series_info` only counts a column.
+  counts <- printed_axis_counts(object)
+  out$n_series <- counts$n_series
+  out$n_timepoints <- counts$n_timepoints
 
   # Store data name (captured at top-level mvgam() call)
   out$data_name <- object$data.name

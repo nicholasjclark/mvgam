@@ -54,17 +54,16 @@ print.mvgam <- function(x, digits = 2, ...) {
   }
 
   # Section 4: N series
-  if (!is.null(x$series_info) &&
-      !is.null(x$series_info$n_series)) {
+  counts <- printed_axis_counts(x)
+  if (!is.null(counts$n_series)) {
     cat('\n\nN series:\n')
-    cat(x$series_info$n_series, '\n')
+    cat(counts$n_series, '\n')
   }
 
   # Section 5: N timepoints
-  if (!is.null(x$time_info) &&
-      !is.null(x$time_info$n_timepoints)) {
+  if (!is.null(counts$n_timepoints)) {
     cat('\n\nN timepoints:\n')
-    cat(x$time_info$n_timepoints, '\n')
+    cat(counts$n_timepoints, '\n')
   }
 
   # Section 6: Sampling status
@@ -134,15 +133,16 @@ print.mvgam_prefit <- function(x, ...) {
   }
 
   # N series
-  if (!is.null(x$series_info) && !is.null(x$series_info$n_series)) {
+  counts <- printed_axis_counts(x)
+  if (!is.null(counts$n_series)) {
     cat("\n\nN series:\n")
-    cat(x$series_info$n_series, "\n")
+    cat(counts$n_series, "\n")
   }
 
   # N timepoints
-  if (!is.null(x$time_info) && !is.null(x$time_info$n_timepoints)) {
+  if (!is.null(counts$n_timepoints)) {
     cat("\n\nN timepoints:\n")
-    cat(x$time_info$n_timepoints, "\n")
+    cat(counts$n_timepoints, "\n")
   }
 
   # Sampling status
@@ -150,6 +150,25 @@ print.mvgam_prefit <- function(x, ...) {
   cat("Not fitted", "\n")
 
   invisible(x)
+}
+
+#' How many series and time points a model was built on
+#'
+#' Read from the axes the fit records, which a prefit carries as well
+#' as a fitted model, so the two print alike. `series_info` and
+#' `time_info` answer for a model built before the record existed and
+#' for one with no trend, where no axes are resolved.
+#'
+#' @param x An `mvgam` or `mvgam_prefit` object
+#' @return List with `n_series` and `n_timepoints`, either possibly
+#'   `NULL`
+#' @noRd
+printed_axis_counts <- function(x) {
+  axes <- mvgam_axes(x)
+  list(
+    n_series = axes$series$n %||% x$series_info$n_series,
+    n_timepoints = axes$time$n %||% x$time_info$n_timepoints
+  )
 }
 
 #' Extract family from mvgam object

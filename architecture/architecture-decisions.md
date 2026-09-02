@@ -476,8 +476,10 @@ data <- remove_mvgam_variables(data)
 
 **Series Creation Strategies**:
 - **Explicit**: `attr(data, "mvgam_series") <- data[[series_var]]`
-- **Hierarchical**: `attr(data, "mvgam_series") <- interaction(gr, subgr, sep='_')`
-- **Multivariate**: `attr(data, "mvgam_series") <- factor(rep(response_vars, each = n_obs_per_response))`
+- **Hierarchical**: `attr(data, "mvgam_series") <- hierarchical_series_values(data, gr_var, subgr_var)`, which is `interaction(gr, subgr, sep = "_", lex.order = TRUE)` so a group's subgroups sit together on the axis
+- **Multivariate**: a wide frame holds one row per time and one column per response, so the series an observation sits on belongs to the `(row, response)` pair rather than to the row. A per-row vector cannot say that. Cutting the rows into a block per response says something false: it reads as a stacked frame and hands the first stretch of the timeline to one response. The axis is carried as the level set instead, `attr(data, "mvgam_series_levels") <- response_vars`, with the per-row values held at one constant level. Series `k` is then the `k`th response and the `k`th row of the loadings.
+
+The axis all three strategies arrive at is recorded once on `trend_metadata$axes` and read back through `mvgam_axes()`. Every method a user reaches after fitting reads that record instead of deriving an axis of its own, so a printed label, a forecast horizon and a Stan index cannot come from three different readings of one frame.
 
 **Core Functions (R/validations.R)**:
 - `ensure_mvgam_variables()`: Creates time and series attributes using appropriate strategy

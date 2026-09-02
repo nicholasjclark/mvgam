@@ -55,14 +55,53 @@ specifications and the response names
 \item \code{response_names} A \code{character} vector of response variables
 \item \code{trend_metadata} The resolved trend details a prediction needs,
 including the time and series variables, the trend type and the
-number of latent factors
+number of latent factors. Its \code{axes} entry is the record of
+which series and which times the model was fitted on, and is
+what post-processing reads rather than rebuilding either axis
+from the training data:
+\itemize{
+\item \code{axes$series$levels} The series, in the order the trend
+matrix numbers its columns. Every label a summary, plot or
+forecast shows comes from here
+\item \code{axes$series$source} How the axis was arrived at: \code{explicit}
+from a series column, \code{hierarchical} from \code{gr} and \code{subgr},
+or \code{multivariate} from the responses of a wide formula
+\item \code{axes$series$n} The number of series, matching
+\code{N_series_trend} in the Stan data
+\item \code{axes$series$groups} The group each series belongs to, in the
+same order, which is the order Stan subscripts
+\code{group_inds_trend} with. \code{NULL} when the trend names no
+grouping
+\item \code{axes$series$last_time} The last occasion each series was
+observed on, in the same order, which is where a forecast
+for that series begins
+\item \code{axes$time$values} The times the model was fitted on, ordered
+and in their original units, from which \code{CAR()} and the
+Gaussian processes take their gaps
+\item \code{axes$time$n} How many occasions there are. The integer
+index a trend steps along is \code{match()} into \code{values}
+\item \code{axes$time$step} The spacing a forecast extends the grid by,
+\code{NA} when the times are irregular
+\item \code{axes$factor$n_lv} The number of latent factors, which is the
+column count of the loadings and of \code{lv_trend}
+\item \code{axes$grain} What the second dimension of \code{times_trend}
+indexes: \code{series} ordinarily, or \code{lv} where a term written
+with \code{by = lv_axis()} puts the trend design on the factor
+axis
+\item \code{axes$vars} The columns a row is placed by: \code{time_var},
+\code{series_var}, \code{gr_var}, \code{subgr_var} and \code{response_vars}.
+Prediction reads these to identify a frame the model has
+never seen
+}
+
+A model fitted before this record existed carries no \code{axes},
+and its series are read from \code{levels$series} instead.
 \item \code{trend_components} Per-component trend information derived from
 the posterior. \code{NULL} when the model has no trend
-\item \code{series_info} The number of series, their names and, for a
-multivariate model, the response names and their count
-\item \code{time_info} The number of time points, their range and their
-spacing, or \code{has_time = FALSE} when the data carry no time
-variable
+\item \code{series_info} The number of series. Empty when the data name
+no series, in which case the count is read from \code{axes}
+\item \code{time_info} The number of time points, or empty when the data
+carry no time variable
 \item \code{obs_model} A \code{brmsfit} holding the observation-side model brms
 generated, used as the design-matrix source for prediction at
 new data

@@ -206,15 +206,10 @@ build_stan_components <- function(formula, data, family = gaussian(),
     )
   }
 
-  # Wrapper-layer `n_lv` ceiling gate: shared by `mvgam()` and
-  # `jsdgam()` so the iid vs MGP ceiling decision lives in one
-  # place. Runs after `attach_loadings_prior_spec()` so the
-  # `mv_spec$trend_specs$loadings_prior` carries the resolved
-  # `column_shrinkage`; reads `n_lv` from the (possibly nested)
-  # trend spec list.
-  enforce_n_lv_ceiling_against_data(
-    mv_spec$trend_specs, data, loadings_prior
-  )
+  # The `n_lv` ceiling, shared with `jsdgam()` so more factors than
+  # series is refused in one place. Reads `n_lv` from the possibly
+  # nested trend spec list.
+  enforce_n_lv_ceiling_against_data(mv_spec$trend_specs, data)
 
   # PW trends define their own intercept via `m_trend`. An
   # observation-side intercept competes with it for the same
