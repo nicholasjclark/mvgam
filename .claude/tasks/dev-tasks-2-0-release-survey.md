@@ -463,12 +463,23 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > dominance is not what sets the level. Nor is the simulator:
   > the counts are the same with `R/sim_mvgam.R` at `HEAD`.
   >
-  > The test guards `extract_linpred_univariate()` against
-  > dropping the intercept column on a `y ~ 0 + <regressor>`
-  > formula, where the lone all-1s column is the regressor rather
-  > than `b_Intercept`. Zeroing it puts a factor of `exp(b[1])`
-  > through residuals, hindcasts and predictions, and a one-sided
-  > bias of the size seen has that shape. Establish whether the obs
+  > 31.1 is now the first suspect, and this entry should not be
+  > worked before it lands. These fits are Poisson, which has no
+  > analytic quantile spec, so their residuals take the
+  > empirical-PIT path through `posterior_predict()` and are
+  > PIT-ed against draws that ignore the fitted latent state. A
+  > residual carrying the trend rather than the fit is exactly the
+  > one-sided miscalibration recorded here. Re-run the file once
+  > 31.1 is fixed and see what is left before reading further.
+  >
+  > The reading below stands as the alternative if anything
+  > survives. The test guards `extract_linpred_univariate()`
+  > against dropping the intercept column on a
+  > `y ~ 0 + <regressor>` formula, where the lone all-1s column is
+  > the regressor rather than `b_Intercept`. Zeroing it puts a
+  > factor of `exp(b[1])` through residuals, hindcasts and
+  > predictions, and a one-sided bias of the size seen has that
+  > shape. Establish whether the obs
   > linear predictor reaches the residuals at all before touching
   > the threshold: a
   > threshold moved to fit the observed number tests nothing.
@@ -597,9 +608,124 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > instead. 16.0 records the reasons the coefficient scale was
   > kept, and those still apply.
 
+- [ ] **31.0 Six defects found writing the case study**
+  > Reported against 30ce433 and verified here against the
+  > source. Ordered by what a CRAN user meets first.
+  >
+  > **31.1 `posterior_predict()` never honoured `incl_autocor`.**
+  > It derives `trend_state` and hands it to `posterior_linpred()`,
+  > whose formal is `incl_autocor`, so the argument falls into
+  > `...` and the callee takes its own `FALSE`. Every draw has
+  > always been marginal. It is the only bad site of four:
+  > `log_lik()`, `posterior_epred()` and `posterior_linpred()`
+  > pass `trend_state` to `get_combined_linpred()`, where it is a
+  > real formal. What singles this one out is that it delegates to
+  > a sibling public method rather than to the internal one, and
+  > that is exactly where the name changes from the internal
+  > spelling to the external.
+  >
+  > The cost is silent. `diagnostic_surface_args()` sets
+  > `incl_autocor = TRUE` for in-sample diagnostics, so the helper
+  > the architecture names as the one place diagnostics choose a
+  > surface is a no-op on this path: `residuals()` reaches it at
+  > three sites and `pp_check()` at one. `loo_predict()` asks for
+  > the conditional surface explicitly and is refused, so it pairs
+  > conditional importance weights with marginal draws, against
+  > the invariant its own comment states.
+  >
+  > Only the empirical-PIT path is affected, which is every family
+  > without an analytic spec: `quantile_family_specs` holds
+  > gaussian, student, lognormal and beta, so continuous fits
+  > already read the conditional surface through
+  > `posterior_linpred()` and do not move. `loo()`, `waic()`,
+  > `lfo_cv()`, `kfold()`, `hindcast()` and `forecast()` reach
+  > `get_combined_linpred()` directly and are untouched. No fixture
+  > needs refitting; residual and `pp_check` values on a
+  > strong-trend fit will move, correctly.
+  >
+  > `test-posterior-linpred.R` asserts the argument exists and
+  > defaults correctly on all five entry points, and never that
+  > `posterior_predict()` acts on it. A behavioural test belongs
+  > with the fix: the two settings must differ on a strong-AR fit,
+  > and the conditional one must track `hindcast()`.
+  >
+  > **31.2 A prediction grid that loses or contradicts an addition
+  > term.** One fault in three places, which is why they are
+  > written together.
+  >
+  > `hindcast()`, `plot(type = "trend")` and
+  > `plot(type = "residuals")` fail on any zero-padded binomial or
+  > beta-binomial fit with "Number of trials is smaller than the
+  > number of events". `get_safe_dummy_value()` fills a padded
+  > response with 1 for a count family, and `mock-stanfit.R` calls
+  > `brms::standata()` without `check_response = FALSE`, so brms
+  > compares that 1 against a padded `trials` of 0. Padding with 1
+  > instead is the wrong repair: a padded row would then draw a
+  > real Bernoulli value and put synthetic noise into the very
+  > plots the padding exists to enable. The smooth path already
+  > passes `check_response = FALSE` and says why.
+  >
+  > `conditional_effects()` cannot find `trials`, because
+  > `find_predictors.mvgam()` reads the right-hand side only and
+  > `find_response.mvgam()` returns the first LHS name, so
+  > `datagrid()` drops the column. The repair belongs at the
+  > `get_predict.mvgam()` boundary, where
+  > `complete_closure_unit_newdata()` already backfills grid
+  > columns for the same reason, and not in `find_predictors()`:
+  > anything named there becomes a variable `avg_slopes()` will
+  > differentiate, and a slope with respect to a binomial
+  > denominator means nothing.
+  >
+  > `backfill_smooth_grid()` holds a non-focal `trials` at its
+  > median, which is fractional. Rounding an integer-valued column
+  > is a better grid value regardless and reaches no design matrix.
+  >
+  > **31.3 `plot(type = "smooths")` on any `trials()` fit.** Two
+  > further faults, a strict chain with the one above, so all
+  > three land together or none does.
+  > `mvgam_smooth_label_spec()` attaches the family only when the
+  > formula is not already a `brmsformula`, but
+  > `mvgam_side_formula()` always returns one, so `brmsterms()`
+  > validates as gaussian and rejects `trials()`. The
+  > `mvbrmsformula` branch below it already handles this; the test
+  > should be on whether the formula carries a family, not on its
+  > class. And `build_smooth_grid()` is the one bare call site of
+  > three, with the family in scope. It has to be side-aware:
+  > `mvgam_smooth_terms()` uses the fit's family for the
+  > observation side and gaussian for the trend.
+  >
+  > **31.4 `posterior_epred()` errors on `com_binomial`.**
+  > `family_mean_from_kernel()` calls `kernel(prep)`, and
+  > `posterior_epred_com_binomial()` is the last kernel still on
+  > the `(linpred, link, family_pars, trials)` signature, so `prep`
+  > binds to `linpred` and the matrix assertion fires. Convert the
+  > body, not the signature: it applies `.linkinv()` to a value
+  > already inverse-linked, so an argument-only wrapper would
+  > invert twice and return wrong means with no error. Read
+  > `prep$dpars$mu`, `prep$dpars$nu` and the trials draws as the
+  > binomial kernel does. The `"com_binomial"` arm of the switch in
+  > `posterior_epred.R` is unreachable and must go in the same
+  > change, or the converted signature leaves an install note.
+  > `posterior_predict_com_binomial()` keeps the old signature and
+  > is called correctly; leave it.
+  >
+  > **31.5 `s(series, bs = "re")` draws an empty panel.** One point
+  > per level rendered with `geom_ribbon` and `geom_line`, both of
+  > which need two points per group. brms branches on
+  > `is.numeric()` and draws points with intervals. Cosmetic.
+  >
+  > Sequence: 31.1 first and alone, since it changes numbers and
+  > nothing else here blocks it. Then 31.2, whose failures block
+  > the binomial reproducers that would demonstrate 31.1. 31.3 and
+  > 31.4 after. Re-run 23.0 once 31.1 lands, before touching
+  > anything in it.
+
 - [ ] **6.0 Final release verification**
   > Clean `document()`, clean test sweep, `R CMD check --as-cran`,
-  > tarball under the size limit, sweep green.
+  > tarball under the size limit, sweep green. Gated on 31.0:
+  > three of those defects are hard errors on ordinary
+  > `binomial()` fits and one silently misreports every residual
+  > on a discrete family.
 
 ## Behaviour confirmed, worth documenting
 
