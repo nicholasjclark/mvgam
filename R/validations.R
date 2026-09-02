@@ -1253,6 +1253,55 @@ is_factor_model_spec <- function(n_lv, n_series) {
   n_lv <= n_series
 }
 
+#' The latent dimension a fitted trend runs in
+#'
+#' The post-fit face of `is_factor_model_spec()`, and the one place
+#' that answers the question for a fitted object. Reading the Stan
+#' dimension instead cannot answer it: a non-factor fit carries
+#' `N_lv_trend == N_series_trend` with an identity `Z` in transformed
+#' data, and that is the same dimension a factor fit takes at its
+#' ceiling, which `n_lv = n_series` reaches under an MGP loadings
+#' prior or a `by = lv_axis()` term. What separates the two is
+#' whether the fit asked for factors, which the trend spec records
+#' and `N_lv_trend` has already forgotten.
+#'
+#' Asking through the shared predicate gives every post-fit surface
+#' the answer codegen used when it decided whether to sample `Z`.
+#'
+#' For multivariate trend specs (one per response in an mvbind fit)
+#' the first spec is used, which is the whole story unless the
+#' responses were given different `n_lv`.
+#'
+#' A caller that knows the series count passes it. Otherwise the
+#' fit's own `N_series_trend` answers, and where even that is
+#' missing the ceiling test is skipped rather than guessed at: a
+#' requested `n_lv` is taken at face value, which is what this
+#' returned before it consulted the predicate at all, and which
+#' `validate_n_lv_ceiling()` has already made safe by refusing
+#' `n_lv > n_series` at fit time. Guessing a series count instead
+#' would let a wrong guess silently withdraw factor handling from
+#' a fit that has it.
+#'
+#' @param object A fitted `mvgam` object.
+#' @param n_series Number of observed series. Defaults to the count
+#'   the fit was built with.
+#' @return Integer latent dimension, or NULL when the trend is not a
+#'   factor model.
+#' @noRd
+detect_factor_n_lv <- function(object, n_series = NULL) {
+  spec <- first_trend_spec(object)
+  if (is.null(spec)) return(NULL)
+  n_lv <- spec$n_lv
+  if (is.null(n_lv) || !is.numeric(n_lv) || n_lv < 1L) {
+    return(NULL)
+  }
+  n_series <- n_series %||% object$standata$N_series_trend
+  if (!is.null(n_series) && !is_factor_model_spec(n_lv, n_series)) {
+    return(NULL)
+  }
+  as.integer(n_lv)
+}
+
 #' Detect MGP column shrinkage in a `loadings_prior` argument
 #'
 #' Accepts the string shorthand `"mgp"` and the list form

@@ -252,3 +252,82 @@ test_that("VAR factor forecast preserves shared-latent invariant", {
     expect_true(all(is.finite(fc$forecasts[[s]])))
   }
 })
+
+
+# ---- a factor fit at the truncation ceiling --------------------
+# `val_mvgam_mgp_ceiling.rds` is a 3-series AR(1) fit with
+# `n_lv = 3` under MGP column shrinkage, which is what admits
+# `n_lv = n_series`. Both Stan trend dimensions are 3 there, and a
+# non-factor fit carries that same pair with an identity Z, so a
+# post-fit surface that compares them reads this fit as
+# series-grain: no Z projection happens and `ar1_trend[k]`, indexed
+# by latent column, reaches the recursion for series k with lengths
+# that match and nothing to complain. Only the requested `n_lv`
+# separates the two, which is what `detect_factor_n_lv()` reads.
+#
+# The fixture samples with a few divergences and a low E-BFMI on
+# one chain. That is the geometry the ceiling has, and why the
+# ceiling exists only under shrinkage; the fit is here to exercise
+# a code path rather than to recover the simulated loadings, so the
+# tests below assert grain and never parameter accuracy.
+
+mgp_fit <- readRDS(file.path(CACHE_DIR, "val_mvgam_mgp_ceiling.rds"))
+
+
+test_that("the ceiling fixture really is a free-Z fit at n_lv = n_series", {
+  expect_equal(mgp_fit$standata$N_lv_trend, 3L)
+  expect_equal(mgp_fit$standata$N_series_trend, 3L)
+  expect_true(any(grepl("^Z(_tilde)?\\[", variables(mgp_fit))))
+  expect_null(mgp_fit$mv_spec$trend_specs$fixed_Z)
+  # The two Stan dimensions agree, so they cannot be the source.
+  expect_identical(detect_factor_n_lv(mgp_fit), 3L)
+})
+
+
+test_that("last-state extraction at the ceiling reads the latent grain", {
+  draws_mat <- posterior::as_draws_matrix(mgp_fit$fit)
+  st <- extract_last_state(mgp_fit, draw_id = 1L, draws_mat = draws_mat)
+  # Set only in factor mode, and the flag the caller projects on.
+  expect_identical(st$n_lv_active, 3L)
+
+  n_time <- mgp_fit$standata$N_time_trend
+  k_seq <- seq_len(3L)
+  lv_last <- vapply(k_seq, function(k) {
+    draws_mat[1L, paste0("lv_trend[", n_time, ",", k, "]")]
+  }, numeric(1L))
+  series_last <- vapply(k_seq, function(s) {
+    draws_mat[1L, paste0("trend[", n_time, ",", s, "]")]
+  }, numeric(1L))
+  got <- as.numeric(st$last_state$trends[nrow(st$last_state$trends), ])
+
+  expect_equal(got, unname(lv_last))
+  # Z is not the identity here, so reading the wrong grain is
+  # visible rather than a distinction without a difference.
+  expect_false(isTRUE(all.equal(unname(lv_last), unname(series_last))))
+})
+
+
+# Shape and finiteness through the factor path. The grain itself
+# is pinned by the state test above, which is where reading the
+# wrong one shows up numerically; at the ceiling both readings
+# produce an `[h, n_series]` block of finite draws, so this test
+# covers the path rather than discriminating the defect.
+test_that("forecast at the ceiling returns a finite series block", {
+  n_time <- mgp_fit$standata$N_time_trend
+  h <- 5L
+  series_levels <- levels(mgp_fit$data$series)
+  newdat <- data.frame(
+    time = rep((n_time + 1L):(n_time + h), length(series_levels)),
+    series = factor(rep(series_levels, each = h),
+                     levels = series_levels)
+  )
+  resp <- mgp_fit$response_names[1L] %||% "y"
+  newdat[[resp]] <- NA_real_
+  fc <- forecast(mgp_fit, newdata = newdat, ndraws = 20L,
+                  type = "link")
+  for (s in series_levels) {
+    expect_equal(dim(fc$forecasts[[s]]), c(20L, h))
+    expect_true(all(is.finite(fc$forecasts[[s]])))
+  }
+  expect_false(isTRUE(all.equal(fc$forecasts[[1L]], fc$forecasts[[2L]])))
+})

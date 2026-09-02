@@ -42,9 +42,17 @@ make_draws <- function(values) {
 
 
 # Minimal mvgam-class object built around a draws_matrix.
+# `n_lv` is the Stan trend dimension, which every fit carries and
+# which equals the series count whenever no factors were asked for.
+# `spec_n_lv` is the `n_lv` the user requested, which only a factor
+# fit carries and which a real fit stores on its trend spec. The two
+# are the same number on a factor fit and say different things
+# everywhere else, so a mock that supplied only the first could not
+# represent either kind faithfully.
 make_mock_fit <- function(draws, n_series, n_lv, n_time,
                             trend_metadata,
-                            obs_data = NULL) {
+                            obs_data = NULL,
+                            spec_n_lv = NULL) {
   fit <- list(
     fit = draws,
     standata = list(
@@ -52,6 +60,9 @@ make_mock_fit <- function(draws, n_series, n_lv, n_time,
       N_lv_trend = n_lv,
       N_time_trend = n_time
     ),
+    mv_spec = list(trend_specs = structure(
+      list(n_lv = spec_n_lv), class = "mvgam_trend"
+    )),
     trend_metadata = trend_metadata,
     obs_data = obs_data
   )
@@ -313,7 +324,8 @@ test_that("factor ZMVN keeps the latent scale it was fitted with", {
                  ar_lags = integer(0),
                  ma_lags = integer(0),
                  max_lag = 0L, has_cor = TRUE)
-  fit <- make_mock_fit(draws, n_series, n_lv = n_lv, 5L, meta)
+  fit <- make_mock_fit(draws, n_series, n_lv = n_lv, 5L, meta,
+                        spec_n_lv = n_lv)
   res <- extract_last_state(fit, 1L)
   expect_identical(res$n_lv_active, n_lv)
   # Square in the latent dimension, not the series dimension.
@@ -346,7 +358,7 @@ test_that("Factor fits (n_lv < n_series) tag the LV grain", {
                ma_lags = integer(0), max_lag = 1L,
                has_cor = FALSE)
   fit <- make_mock_fit(draws, n_series = n_series, n_lv = n_lv,
-                        n_time = n_time, meta)
+                        n_time = n_time, meta, spec_n_lv = n_lv)
   res <- extract_last_state(fit, 1L)
   expect_identical(res$n_lv_active, n_lv)
   expect_identical(dim(res$last_state$trends), c(1L, n_lv))

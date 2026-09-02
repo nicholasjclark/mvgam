@@ -63,17 +63,23 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
   n_series <- as.integer(fit$standata$N_series_trend %||% 1L)
   n_lv <- as.integer(fit$standata$N_lv_trend %||% n_series)
 
-  # A factor model (n_lv < n_series) runs its recursion in
-  # n_lv-dimensional latent space, and a per-draw
-  # `[n_series, n_lv]` Z projects the propagated trajectory back
-  # to observed series scale. The RW, AR, VAR and ZMVN
-  # extractors all take that grain; the whitelist below refuses
-  # the trend types whose generators emit no factor variant.
-  # `forecast.mvgam`:`propagate_one_draw` applies the projection
-  # once `propagate_trend()` returns. Hierarchical fits with
-  # `n_lv = n_groups * n_subgroups > n_series` need a dedicated
-  # extraction path and error out below.
-  is_factor <- n_lv < n_series
+  # A factor model runs its recursion in n_lv-dimensional latent
+  # space, and a per-draw `[n_series, n_lv]` Z projects the
+  # propagated trajectory back to observed series scale. The RW,
+  # AR, VAR and ZMVN extractors all take that grain; the whitelist
+  # below refuses the trend types whose generators emit no factor
+  # variant. `forecast.mvgam`:`propagate_one_draw` applies the
+  # projection once `propagate_trend()` returns. Hierarchical fits
+  # with `n_lv = n_groups * n_subgroups > n_series` need a
+  # dedicated extraction path and error out below.
+  #
+  # Comparing the two Stan dimensions cannot answer this. A factor
+  # fit reaches `n_lv = n_series` under an MGP loadings prior or a
+  # `by = lv_axis()` term, and a non-factor fit carries the same
+  # pair with an identity Z, so the comparison reads a genuine
+  # factor fit as series-grain and hands `ar1_trend[k]`, indexed by
+  # latent column, to the recursion for series k.
+  is_factor <- !is.null(detect_factor_n_lv(fit, n_series))
   if (n_lv > n_series) {
     stop(insight::format_error(c(
       paste0(

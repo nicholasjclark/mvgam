@@ -205,8 +205,8 @@ test_that("add_criterion.mvgam initialises $criteria when absent", {
   # Verify the loop guards the slot creation, not the criterion call.
   meth <- getS3method("add_criterion", "mvgam")
   body_chr <- deparse(body(meth))
-  expect_true(expect_match2(body_chr, "is.null(x$criteria)"))
-  expect_true(expect_match2(body_chr, "x$criteria[[cname]]"))
+  expect_true(any(grepl("is.null(x$criteria)", body_chr, fixed = TRUE)))
+  expect_true(any(grepl("x$criteria[[cname]]", body_chr, fixed = TRUE)))
 })
 
 

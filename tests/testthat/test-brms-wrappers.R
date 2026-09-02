@@ -208,6 +208,18 @@ test_that("bridge_sampler.mvgam surfaces the offending token", {
 })
 
 
+test_that("bridge_sampler.mvgam rejects an mvgam tilde and names it", {
+  # `_lupdf` is how brms signals a dropped constant. mvgam signals
+  # it by writing a tilde, which Stan strips the constant from just
+  # as silently, so the gate has to read both. Naming the parameter
+  # is what tells a user which prior to look at.
+  stub <- make_wrapper_stub()
+  stub$stancode <- "model { sigma_trend ~ exponential(2); }"
+  expect_error(bridge_sampler(stub), "normalized")
+  expect_error(bridge_sampler(stub), "sigma_trend")
+})
+
+
 test_that("bayes_factor.mvgam gates through the same normalization check", {
   stub <- make_wrapper_stub()
   stub$stancode <- "model { target += normal_lupdf(y | mu, sigma); }"

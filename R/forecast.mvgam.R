@@ -786,18 +786,26 @@ build_forecast_arms <- function(object, trend_model, meta,
     NULL
   }
 
-  # Factor-model precompute: when the fit is a latent-factor
-  # model (n_lv < n_series) the trend recursion runs in
-  # n_lv-dimensional LV space and a per-draw Z projects the
-  # propagated `[h, n_lv]` LV trajectory back to `[h, n_series]`.
-  # Pull the whole Z array once via the shared
-  # `extract_Z_loadings()` helper (returns [ndraws, n_series,
-  # n_lv], preferring `Z_tilde` when present); the inner loop
-  # slices per draw. NULL for full-rank fits.
+  # Factor-model precompute: when the fit is a latent-factor model
+  # the trend recursion runs in n_lv-dimensional LV space and a
+  # per-draw Z projects the propagated `[h, n_lv]` LV trajectory
+  # back to `[h, n_series]`. Pull the whole Z array once via the
+  # shared `extract_Z_loadings()` helper (returns [ndraws,
+  # n_series, n_lv], preferring `Z_tilde` when present); the inner
+  # loop slices per draw. NULL for full-rank fits.
+  #
+  # `detect_factor_n_lv()` is asked rather than the two Stan
+  # dimensions compared, because a factor fit reaches
+  # `n_lv = n_series` under an MGP loadings prior or a
+  # `by = lv_axis()` term and a non-factor fit carries that same
+  # pair with an identity Z. Comparing them skips the projection on
+  # a fit that sampled a free Z, and `extract_last_state()` asks
+  # the same way so the two cannot disagree about the grain.
   n_lv_trend <- as.integer(
     object$standata$N_lv_trend %||% n_series
   )
-  Z_arr <- if (n_lv_trend < n_series &&
+  is_factor_fit <- !is.null(detect_factor_n_lv(object, n_series))
+  Z_arr <- if (is_factor_fit &&
                  meta$trend_type %in% c("RW", "AR", "VAR", "ZMVN")) {
     resolve_Z_loadings(object, draws_mat, n_series, n_lv_trend,
                          basis = "model")

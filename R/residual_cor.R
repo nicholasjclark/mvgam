@@ -298,25 +298,6 @@ compute_residual_cor <- function(object, by_group, partial, summary,
 }
 
 
-#' Detect the number of latent factors on a fitted mvgam trend.
-#'
-#' Returns `NULL` if the trend is not a factor model. For multivariate
-#' trend specs (one per response in an mvbind fit) the first spec is
-#' used, which is the whole story unless the responses were given
-#' different `n_lv`.
-#'
-#' @noRd
-detect_factor_n_lv <- function(object) {
-  spec <- trend_spec_for_residcor(object)
-  if (is.null(spec)) return(NULL)
-  n_lv <- spec$n_lv
-  if (is.null(n_lv) || !is.numeric(n_lv) || n_lv < 1L) {
-    return(NULL)
-  }
-  as.integer(n_lv)
-}
-
-
 # Predicate: did the fit use a structured `loadings_prior`?
 # Detection looks at the `standata` slot, where the structured
 # prior contract emits `N_features_trend` (for ARD features) and

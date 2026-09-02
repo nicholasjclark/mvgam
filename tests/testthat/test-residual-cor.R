@@ -166,6 +166,57 @@ test_that("detect_factor_n_lv returns integer when n_lv > 0", {
 })
 
 
+# A fit that requested factors keeps that grain at the truncation
+# ceiling, which an MGP loadings prior and a `by = lv_axis()` term
+# both reach. The two Stan dimensions are equal there and are equal
+# again on a non-factor fit carrying an identity Z, so a post-fit
+# surface comparing them projects one of the two through the wrong
+# basis. Only the requested `n_lv` separates them.
+mk_factor_stub <- function(n_lv, n_series) {
+  structure(
+    list(
+      mv_spec = list(trend_specs = structure(
+        list(n_lv = n_lv), class = "mvgam_trend"
+      )),
+      standata = list(N_series_trend = n_series, N_lv_trend = n_lv)
+    ),
+    class = "mvgam"
+  )
+}
+
+test_that("detect_factor_n_lv holds the factor grain at the ceiling", {
+  expect_identical(detect_factor_n_lv(mk_factor_stub(4L, 4L)), 4L)
+  expect_identical(detect_factor_n_lv(mk_factor_stub(2L, 4L)), 2L)
+})
+
+
+test_that("detect_factor_n_lv declines a trend wider than the series", {
+  # Hierarchical fits reach n_lv = n_groups * n_subgroups, which
+  # needs its own extraction path rather than a factor projection.
+  expect_null(detect_factor_n_lv(mk_factor_stub(6L, 3L)))
+})
+
+
+test_that("detect_factor_n_lv takes n_series from the caller", {
+  obj <- mk_factor_stub(4L, 4L)
+  expect_identical(detect_factor_n_lv(obj, n_series = 4L), 4L)
+  expect_null(detect_factor_n_lv(obj, n_series = 3L))
+})
+
+
+test_that("detect_factor_n_lv skips the ceiling test with no count", {
+  # With no series count from either the caller or the fit there is
+  # nothing to compare against, so a requested n_lv is taken at
+  # face value. `validate_n_lv_ceiling()` refuses n_lv > n_series at
+  # fit time, so the comparison is a second line rather than the
+  # only one, and guessing a count would withdraw factor handling
+  # from a fit that has it.
+  obj <- mk_factor_stub(4L, 4L)
+  obj$standata$N_series_trend <- NULL
+  expect_identical(detect_factor_n_lv(obj), 4L)
+})
+
+
 # Cov struct mock: hierarchical cholesky.
 mk_hier_cov_struct <- function(n_sub = 3L, n_groups = 2L,
                                 ndraws = 50L) {

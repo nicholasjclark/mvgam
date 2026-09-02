@@ -445,8 +445,12 @@ extract_transition_matrix_draws <- function(object, group) {
   # Non-hierarchical VAR: single A_trend, lag pinned to one
   K <- resolve_var_dim(object, "N_lv_trend",
                        "^A_trend\\[1,", all_cols)
-  labs <- object$standata$series_names %||%
-    paste0("process_", seq_len(K))
+  # `K` counts latent processes, which are the observed series only
+  # when the fit is not a factor model, so the axes take the
+  # `process_<k>` labels `irf()`, `fevd()` and `stability()` give
+  # the same quantity rather than a series name that would be wrong
+  # for a factor VAR.
+  labs <- paste0("process_", seq_len(K))
   out <- extract_indexed_array_2d(
     draws_mat, "A_trend", K, K,
     prefix_ids   = 1L,

@@ -2459,16 +2459,12 @@ generate_shared_innovation_stanvars <- function(n_lv, n_series, cor = FALSE,
     # one leaves only their product identified. Deriving it here
     # gives the column one scale, and puts that scale on innovations
     # drawn from `std_normal()`, which is where it can be traversed.
-    sigma_code <- if (effective_dim == 1) {
-      "vector<lower=0>[1] sigma_trend;"
-    } else {
-      paste0("vector<lower=0>[", effective_dim, "] sigma_trend;")
-    }
-
     if (!mgp_scale) {
       sigma_stanvar <- brms::stanvar(
         name = "sigma_trend",
-        scode = sigma_code,
+        scode = paste0(
+          "vector<lower=0>[", effective_dim, "] sigma_trend;"
+        ),
         block = "parameters"
       )
       stanvar_components <- append(stanvar_components, list(sigma_stanvar))
@@ -2892,24 +2888,21 @@ add_hierarchical_support <- function(components, trend_specs, data_info, prior =
 #'   N_series_trend, N_lv_trend)
 #' @noRd
 generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL,
-                                       is_factor_model = NULL,
+                                       is_factor_model,
                                        n_time = NULL) {
   # Input validation
   checkmate::assert_number(n_obs, lower = 1)
   checkmate::assert_number(n_series, lower = 1)
   checkmate::assert_number(n_lv, lower = 1, null.ok = TRUE)
-  checkmate::assert_logical(is_factor_model, len = 1, null.ok = TRUE)
+  # The caller decides, because by this point `n_lv` has been
+  # defaulted to `n_series` for a non-factor fit and so no longer
+  # says whether factors were asked for. Inferring it here from
+  # `n_lv < n_series` would read a factor model at its ceiling,
+  # which `n_lv = n_series` reaches under an MGP loadings prior or
+  # a `by = lv_axis()` term, as having none.
+  checkmate::assert_logical(is_factor_model, len = 1,
+                            any.missing = FALSE)
   checkmate::assert_number(n_time, lower = 1, null.ok = TRUE)
-
-  # Infer factor model behavior if not specified. This site is
-  # called with an already-defaulted `n_lv` where
-  # `n_lv = n_series` is the "no factor model" sentinel, so we
-  # keep the strict `<` rule rather than going through
-  # [is_factor_model_spec()] (which is for raw `trend_specs$n_lv`
-  # values where the sentinel is NULL).
-  if (is.null(is_factor_model)) {
-    is_factor_model <- !is.null(n_lv) && n_lv < n_series
-  }
 
   # Set n_lv default for non-factor models
   if (is.null(n_lv)) {

@@ -9,7 +9,7 @@
 #         below. The directory is gitignored; rebuild after a clone.
 #
 # Expected runtime: 15-25 minutes for the full set on a workstation.
-# Re-runs after partial completion are incremental — only missing
+# Re-runs after partial completion are incremental: only missing
 # fixtures are refit.
 
 suppressMessages(devtools::load_all())
@@ -101,7 +101,7 @@ test_data_hs <- data.frame(
 )
 
 # ----------------------------------------------------------------------
-# MAIN OBS-FORMULA GRID — Poisson AR(1)
+# MAIN OBS-FORMULA GRID: Poisson AR(1)
 # ----------------------------------------------------------------------
 
 cat("\n[1] Intercept-only AR(1)\n")
@@ -190,7 +190,7 @@ fit_mvgam_cached("ar1_gp2d",
   y ~ 1 + gp(z, w, k = 5), ~ AR(p = 1),
   test_data_gp2, poisson())
 
-cat("\n[7c] AR(1) + 2D GP(z, w, by = cat) — multi-dim by-factor\n")
+cat("\n[7c] AR(1) + 2D GP(z, w, by = cat), multi-dim by-factor\n")
 fit_brms_cached("ar1_gp2d_by",
   y ~ 1 + gp(z, w, by = cat, k = 5) +
     ar(time = time, p = 1, cov = TRUE),
@@ -279,7 +279,7 @@ fit_mvgam_cached("binom_ar1",
   y | trials(trials) ~ 1 + x, ~ AR(p = 1),
   test_data_binom, binomial())
 
-cat("\n[13] Ordinal (Cumulative) — fixed effects only (no AR)\n")
+cat("\n[13] Ordinal (Cumulative), fixed effects only (no AR)\n")
 set.seed(456)
 n_ord <- 30
 ord_latent <- 1.0 + 0.5 * rnorm(n_ord)
@@ -352,7 +352,7 @@ fit_mvgam_cached("zero_inflated_poisson_ar1",
   test_data_zip, zero_inflated_poisson())
 
 # ----------------------------------------------------------------------
-# HIGH-SIGNAL POISSON AR(1) — used by process_error toggle test
+# HIGH-SIGNAL POISSON AR(1), used by the process_error toggle test
 # ----------------------------------------------------------------------
 
 cat("\n[17] High-signal Poisson AR(1)\n")
@@ -395,7 +395,7 @@ fit_mvgam_cached("ar1_t2_noint",
   y ~ 0 + t2(z, w, k = c(4, 4)), ~ AR(p = 1),
   test_data_t2, poisson())
 
-cat("\n[20] Gaussian AR(1), N=150 — PSIS-stable concordance fixture\n")
+cat("\n[20] Gaussian AR(1), N=150: PSIS-stable concordance fixture\n")
 # Larger N with high signal-to-noise keeps Pareto-k diagnostics in
 # the stable region (<0.7), so cross-package PSIS-weighted
 # predictions (loo_epred / loo_linpred / loo_predictive_interval)
@@ -723,7 +723,7 @@ fit_mvgam_cached("nl_trait", nl_trait_form, NULL,
   nl_trait_data, gaussian(), prior = nl_trait_pri)
 
 # ----------------------------------------------------------------------
-# NORMALIZE PAIR — the same data fitted with and without the
+# NORMALIZE PAIR: the same data fitted with and without the
 # normalising constants. `normalize` changes only what Stan adds to
 # `target`, so the two posteriors have to agree. They did not: the GLM
 # path recognised only the normalised `_lpmf` spelling when naming the
@@ -756,7 +756,7 @@ fit_mvgam_cached("normalize_off", y ~ x1, ~ AR(p = 1),
   norm_data, poisson(), normalize = FALSE, seed = 7)
 
 # ----------------------------------------------------------------------
-# CLOSURE-UNIT LABELLING — two species, so the closure-unit grid has a
+# CLOSURE-UNIT LABELLING: two species, so the closure-unit grid has a
 # series axis as well as a time axis. `hindcast(type = "latent_state")`
 # built its own (series, time) grid and sorted it series-major, while
 # the kernel numbers units in first-appearance order over time-major
@@ -806,6 +806,42 @@ occ_data <- occ_data[order(occ_data$time, occ_data$series,
                            occ_data$visit), ]
 fit_mvgam_cached("closure_labels_occ", bf(y ~ series, p ~ series), NULL,
   occ_data, occ(), seed = 4)
+
+# A factor fit at the truncation ceiling. The MGP column-shrinkage
+# prior is what admits `n_lv = n_series`, where the two Stan trend
+# dimensions coincide and only the requested `n_lv` says the fit
+# sampled a free Z. Every other cached factor fit sits below the
+# ceiling, so this is the one that reaches the post-fit code paths
+# choosing between latent and series grain.
+set.seed(11)
+n_t_mgp <- 30L
+n_series_mgp <- 3L
+series_mgp <- paste0("sp_", seq_len(n_series_mgp))
+ar_mgp <- c(0.7, 0.4, 0.55)
+Z_mgp <- matrix(
+  c(0.9, 0.1, 0.2,
+    0.2, 0.8, 0.1,
+    0.1, 0.3, 0.7),
+  nrow = n_series_mgp, byrow = TRUE
+)
+lv_mgp <- matrix(0, n_t_mgp, n_series_mgp)
+for (k in seq_len(n_series_mgp)) {
+  lv_mgp[1L, k] <- rnorm(1L, 0, 1 / sqrt(1 - ar_mgp[k]^2))
+  for (t in 2:n_t_mgp) {
+    lv_mgp[t, k] <- ar_mgp[k] * lv_mgp[t - 1L, k] + rnorm(1L)
+  }
+}
+mu_mgp <- lv_mgp %*% t(Z_mgp)
+mgp_data <- data.frame(
+  series = factor(rep(series_mgp, each = n_t_mgp), levels = series_mgp),
+  time = rep(seq_len(n_t_mgp), times = n_series_mgp),
+  y = as.vector(mu_mgp) + rnorm(n_t_mgp * n_series_mgp, 0, 0.25)
+)
+fit_mvgam_cached(
+  "mgp_ceiling",
+  y ~ 1, ~ AR(p = 1, n_lv = n_series_mgp), mgp_data, gaussian(),
+  loadings_prior = list(column_shrinkage = "mgp"), seed = 11
+)
 
 cat("\n=== All fixtures present in", FIXTURE_DIR, "===\n")
 cat("Files: ", length(list.files(FIXTURE_DIR, pattern = "\\.rds$")), "\n")

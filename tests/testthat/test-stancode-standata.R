@@ -5,40 +5,41 @@
 
 # Test Helper Functions ----
 
-#' Robust pattern matching for Stan code with whitespace tolerance
+#' Match a pattern against generated Stan code
 #'
-#' This function wraps grepl() to provide more robust pattern matching for
-#' generated Stan code by trimming whitespace from both pattern and input.
-#' This makes tests resilient to formatting changes in code generation.
+#' Strips whitespace from both the pattern and the program before
+#' matching, so an assertion names the tokens a generator emits
+#' rather than the layout the polish step gives them. The two
+#' spellings of a sampling statement are accepted interchangeably.
 #'
-#' @param pattern Character string containing the regular expression pattern
+#' @param pattern Regular expression, or a literal when the caller
+#'   passes `fixed = TRUE`. Must escape its own `(`, `[` and `|`
+#'   otherwise.
 #' @param x Character vector where matches are sought
-#' @param fixed Logical. If TRUE, pattern is a literal string (default FALSE)
 #' @param ignore.case Logical. If TRUE, case is ignored (default FALSE)
-#' @param ... Additional arguments passed to grepl()
+#' @param ... Additional arguments passed to grepl(), `fixed = TRUE`
+#'   among them
 #'
 #' @return Logical vector indicating matches
 #' @noRd
 stan_pattern <- function(pattern, x, ignore.case = FALSE, ...) {
-  # Function to remove ALL whitespace for robust matching
   remove_whitespace <- function(text) {
     gsub("\\s+", "", text)
   }
 
-  # Remove all whitespace from both pattern and input
+  # Whitespace goes from both sides, so a pattern is written against
+  # the program's tokens rather than its layout and survives a
+  # reflow of the generated code. `\\s*` between two tokens is
+  # therefore redundant and `\\s+` can never match.
   x_no_space <- remove_whitespace(x)
 
-  # Check if pattern contains regex escapes (\\[ \\] \\( \\) etc.)
-  # If so, remove whitespace but don't double-escape
-  # If not, remove whitespace and escape for literal matching
-  if (grepl("\\\\[\\[\\]()\\{\\}^$\\*\\+\\?\\.|]", pattern)) {
-    # Pattern is already regex-escaped, just remove whitespace
-    pattern_final <- remove_whitespace(pattern)
-  } else {
-    # Pattern is literal Stan code, remove whitespace then escape metacharacters
-    pattern_no_space <- remove_whitespace(pattern)
-    pattern_final <- gsub("([\\[\\]()\\{\\}^$\\*\\+\\?\\.|\\\\])", "\\\\\\1", pattern_no_space)
-  }
+  # The pattern is a regular expression, and one naming Stan syntax
+  # has to escape its own metacharacters. Whether a caller meant a
+  # literal cannot be told from the string itself, and a wrong guess
+  # either drops an escape or doubles it, so a caller wanting a
+  # literal says so with `fixed = TRUE` and the contract is stated
+  # rather than inferred.
+  pattern_final <- remove_whitespace(pattern)
 
   # A sampling statement has two spellings. `lhs ~ dist(args);` is
   # what an emitter writes, and a normalised program carries
@@ -46,9 +47,16 @@ stan_pattern <- function(pattern, x, ignore.case = FALSE, ...) {
   # should accept the other, so the assertions stay about which
   # prior reached which parameter rather than about which form the
   # program happens to use.
-  alt <- tilde_pattern_as_lpdf(pattern_final)
-  if (!is.na(alt)) {
-    pattern_final <- paste0("(", pattern_final, ")|(", alt, ")")
+  #
+  # The alternation is a regular expression, so it is only built
+  # when one will be read as such. Under `fixed = TRUE` grepl would
+  # search for the alternation's own punctuation and match nothing.
+  dots <- list(...)
+  if (!isTRUE(dots$fixed)) {
+    alt <- tilde_pattern_as_lpdf(pattern_final)
+    if (!is.na(alt)) {
+      pattern_final <- paste0("(", pattern_final, ")|(", alt, ")")
+    }
   }
 
   # Apply grepl with processed pattern and whitespace-free input
@@ -1188,8 +1196,11 @@ test_that("stancode generates correct ZMVN(n_lv = 2) factor model with trend cov
   expect_true(stan_pattern("sigma_trend ~ exponential\\(2\\);", code_with_trend))
   expect_true(stan_pattern("to_vector\\(Z\\) ~ student_t\\(3, 0, 0.5\\);", code_with_trend))
 
-  # No prior for b_trend (brms default flat prior)
-  expect_false(grepl("b_trend ~", code_with_trend))
+  # `b_trend` keeps the flat brms default, so the program places no
+  # prior on it in either spelling. Reading the program's priors by
+  # parameter keeps that true of a normalised program too, where
+  # nothing is written with a tilde.
+  expect_length(stan_prior_on(code_with_trend, "b_trend"), 0L)
 
   # Lognormal likelihood (not GLM optimized)
   expect_true(stan_pattern("target \\+= lognormal_lpdf\\(Y \\| mu, sigma\\);", code_with_trend))
@@ -1325,8 +1336,11 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   ), code_with_trend))
   expect_true(stan_pattern("to_vector\\(innovations_trend\\) ~ std_normal\\(\\);", code_with_trend))
 
-  # No prior for b_trend (brms default flat prior)
-  expect_false(grepl("b_trend ~", code_with_trend))
+  # `b_trend` keeps the flat brms default, so the program places no
+  # prior on it in either spelling. Reading the program's priors by
+  # parameter keeps that true of a normalised program too, where
+  # nothing is written with a tilde.
+  expect_length(stan_prior_on(code_with_trend, "b_trend"), 0L)
 
   # Observation model priors (brms pattern)
   # Intercept prior location is data-driven; don't pin the value.
@@ -2155,11 +2169,11 @@ test_that("stancode handles different observation families", {
 
     # Should contain family-specific elements
     if (fam_name == "poisson") {
-      expect_match2(code, "poisson")
+      expect_true(stan_pattern("poisson", code))
     } else if (fam_name == "gaussian") {
-      expect_match2(code, "normal")
+      expect_true(stan_pattern("normal", code))
     } else if (fam_name == "bernoulli") {
-      expect_match2(code, "bernoulli")
+      expect_true(stan_pattern("bernoulli", code))
     }
   }
 })
@@ -2195,28 +2209,31 @@ test_that("stancode generates correct Stan blocks", {
   expect_equal(length(lprior_decls), 1)
 
   # Required variable declarations should be present
-  expect_match2(code, "vector\\[N\\]\\s+mu")
-  expect_match2(code, "vector\\[.*\\]\\s+mu_trend")
-  expect_match2(code, "matrix\\[.*\\]\\s+trend;")
+  expect_true(stan_pattern("vector\\[N\\]\\s*mu", code))
+  expect_true(stan_pattern("vector\\[.*\\]\\s*mu_trend", code))
+  expect_true(stan_pattern("matrix\\[.*\\]\\s*trend;", code))
 
   # Trend parameters should be declared in parameters block
-  expect_match2(code, "real.*ar1_trend")
-  expect_match2(code, "vector<lower=0>\\[.*\\]\\s+sigma_trend")
+  expect_true(stan_pattern("real.*ar1_trend", code))
+  expect_true(stan_pattern("vector<lower=0>\\[.*\\]\\s*sigma_trend", code))
 
   # Data block should contain mapping arrays
-  expect_match2(code, "array\\[N\\]\\s+int\\s+obs_trend_time")
-  expect_match2(code, "array\\[N\\]\\s+int\\s+obs_trend_series")
+  expect_true(stan_pattern("array\\[N\\]\\s*int\\s*obs_trend_time", code))
+  expect_true(stan_pattern("array\\[N\\]\\s*int\\s*obs_trend_series", code))
 
   # Trend injection should use correct pattern
-  expect_match2(code, "mu\\[n\\]\\s*\\+=\\s*trend\\[obs_trend_time\\[n\\],\\s*obs_trend_series\\[n\\]\\]")
+  expect_true(stan_pattern(paste0(
+    "mu\\[n\\]\\s*\\+=\\s*trend\\[obs_trend_time\\[n\\],",
+    "\\s*obs_trend_series\\[n\\]\\]"
+  ), code))
   expect_false(grepl("obs_ind", code))
 
   # Universal trend computation pattern should be present
   expect_true(stan_pattern("for\\(iin1:N_time_trend\\)", code))
-  expect_match2(code, "trend\\[i,\\s*s\\]\\s*=.*dot_product")
+  expect_true(stan_pattern("trend\\[i,\\s*s\\]\\s*=.*dot_product", code))
 
   # Should contain sigma_trend prior but not duplicate sigma prior
-  expect_match2(code, "sigma_trend\\s*~")
+  expect_true(stan_pattern("sigma_trend\\s*~", code))
 
   # All braces should be properly matched
   open_braces <- length(gregexpr("\\{", code)[[1]])
@@ -2363,68 +2380,90 @@ test_that("stancode handles multivariate specifications with shared RW trend and
 
   # brms observation data declarations
   # Should declare N_count with comment
-  expect_match2(code_shared, "int<lower=1> N_count;")
+  expect_true(stan_pattern("int<lower=1> N_count;", code_shared))
   # Should declare Y_count as vector
-  expect_match2(code_shared, "vector\\[N_count\\] Y_count;")
+  expect_true(stan_pattern("vector\\[N_count\\] Y_count;", code_shared))
   # Should declare X_count design matrix
-  expect_match2(code_shared, "matrix\\[N_count, K_count\\] X_count;")
+  expect_true(stan_pattern(
+    "matrix\\[N_count, K_count\\] X_count;", code_shared
+  ))
   # Should declare N_biomass with comment
-  expect_match2(code_shared, "int<lower=1> N_biomass;")
+  expect_true(stan_pattern("int<lower=1> N_biomass;", code_shared))
   # Should declare Y_biomass as vector
-  expect_match2(code_shared, "vector\\[N_biomass\\] Y_biomass;")
+  expect_true(stan_pattern("vector\\[N_biomass\\] Y_biomass;", code_shared))
 
   # Trend dimensions
   # Should declare N_trend
-  expect_match2(code_shared, "int<lower=1> N_trend;")
+  expect_true(stan_pattern("int<lower=1> N_trend;", code_shared))
   # Should declare N_series_trend
-  expect_match2(code_shared, "int<lower=1> N_series_trend;")
+  expect_true(stan_pattern("int<lower=1> N_series_trend;", code_shared))
   # Should declare N_lv_trend
-  expect_match2(code_shared, "int<lower=1> N_lv_trend;")
+  expect_true(stan_pattern("int<lower=1> N_lv_trend;", code_shared))
 
   # Observation-to-trend mapping arrays
   # Should declare obs_trend_time_count array
-  expect_match2(code_shared, "array\\[N_count\\] int obs_trend_time_count;")
+  expect_true(stan_pattern(
+    "array\\[N_count\\] int obs_trend_time_count;", code_shared
+  ))
   # Should declare obs_trend_series_count array
-  expect_match2(code_shared, "array\\[N_count\\] int obs_trend_series_count;")
+  expect_true(stan_pattern(
+    "array\\[N_count\\] int obs_trend_series_count;", code_shared
+  ))
   # Should declare obs_trend_time_biomass array
-  expect_match2(code_shared, "array\\[N_biomass\\] int obs_trend_time_biomass;")
+  expect_true(stan_pattern(
+    "array\\[N_biomass\\] int obs_trend_time_biomass;", code_shared
+  ))
   # Should declare obs_trend_series_biomass array
-  expect_match2(code_shared, "array\\[N_biomass\\] int obs_trend_series_biomass;")
+  expect_true(stan_pattern(
+    "array\\[N_biomass\\] int obs_trend_series_biomass;", code_shared
+  ))
 
   # Times trend matrix - Should declare times_trend 2D array
-  expect_match2(code_shared, "array\\[N_time_trend, N_series_trend\\] int times_trend;")
+  expect_true(stan_pattern(
+    "array\\[N_time_trend, N_series_trend\\] int times_trend;", code_shared
+  ))
 
   # Offset data structures for each response (brms consolidates them)
-  expect_match2(code_shared, "vector\\[N_count\\] offsets_count;")  # Count offsets
-  expect_match2(code_shared, "vector\\[N_biomass\\] offsets_biomass;")  # Biomass offsets
+  expect_true(stan_pattern(
+    "vector\\[N_count\\] offsets_count;", code_shared
+  ))  # Count offsets
+  expect_true(stan_pattern(
+    "vector\\[N_biomass\\] offsets_biomass;", code_shared
+  ))  # Biomass offsets
 
   # GLM compatibility vectors
   # Should declare mu_ones_count for GLM
-  expect_match2(code_shared, "vector\\[1\\] mu_ones_count;")
+  expect_true(stan_pattern("vector\\[1\\] mu_ones_count;", code_shared))
   # Should declare mu_ones_biomass for GLM
-  expect_match2(code_shared, "vector\\[1\\] mu_ones_biomass;")
+  expect_true(stan_pattern("vector\\[1\\] mu_ones_biomass;", code_shared))
 
   # Should create identity matrix Z for non-factor model
   expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z = diag_matrix\\(rep_vector\\(1.0, N_lv_trend\\)\\);", code_shared))
 
   # Observation model parameters
   # Should declare b_count coefficients
-  expect_match2(code_shared, "vector\\[Kc_count\\] b_count;")
+  expect_true(stan_pattern("vector\\[Kc_count\\] b_count;", code_shared))
   # Should declare Intercept_count
-  expect_match2(code_shared, "real Intercept_count;")
+  expect_true(stan_pattern("real Intercept_count;", code_shared))
   # Should declare sigma_count with lower bound
-  expect_match2(code_shared, "real<lower=0> sigma_count;")
+  expect_true(stan_pattern("real<lower=0> sigma_count;", code_shared))
 
   # Trend parameters with _trend suffix
   # Should declare sigma_trend vector
-  expect_match2(code_shared, "vector<lower=0>\\[N_lv_trend\\] sigma_trend;")
+  expect_true(stan_pattern(
+    "vector<lower=0>\\[N_lv_trend\\] sigma_trend;", code_shared
+  ))
   # Should declare L_Omega_trend for correlation
-  expect_match2(code_shared, "cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;")
+  expect_true(stan_pattern(
+    "cholesky_factor_corr\\[N_lv_trend\\] L_Omega_trend;", code_shared
+  ))
   # Should declare innovations_trend matrix
-  expect_match2(code_shared, "matrix\\[N_time_trend, N_lv_trend\\] innovations_trend;")
+  expect_true(stan_pattern(
+    "matrix\\[N_time_trend, N_lv_trend\\] innovations_trend;", code_shared
+  ))
 
   # Should initialize lprior
-  expect_match2(code_shared, "real lprior = 0;")
+  expect_true(stan_pattern("real lprior = 0;", code_shared))
 
   # Should create mu_trend from Intercept_trend using rep_vector
   expect_true(stan_pattern("vector\\[N_trend\\] mu_trend = rep_vector\\(0.0, N_trend\\);", code_shared))
@@ -2436,7 +2475,9 @@ test_that("stancode handles multivariate specifications with shared RW trend and
 
   # RW latent variables
   # Should declare lv_trend matrix for latent variables (with _trend suffix)
-  expect_match2(code_shared, "matrix\\[N_time_trend, N_lv_trend\\] lv_trend;")
+  expect_true(stan_pattern(
+    "matrix\\[N_time_trend, N_lv_trend\\] lv_trend;", code_shared
+  ))
   # Should declare L_Sigma_trend for scaling
   expect_true(stan_pattern("matrix\\[N_lv_trend, N_lv_trend\\] L_Sigma_trend =", code_shared))
   # Should declare scaled_innovations_trend
@@ -2448,7 +2489,9 @@ test_that("stancode handles multivariate specifications with shared RW trend and
 
   # Trend matrix computation (shared, not response-specific)
   # Should declare shared trend matrix (not trend_count/trend_biomass)
-  expect_match2(code_shared, "matrix\\[N_time_trend, N_series_trend\\] trend;")
+  expect_true(stan_pattern(
+    "matrix\\[N_time_trend, N_series_trend\\] trend;", code_shared
+  ))
 
   # Linear predictor construction with trend injection
   # Should initialize mu vectors
@@ -2463,21 +2506,34 @@ test_that("stancode handles multivariate specifications with shared RW trend and
   expect_true(stan_pattern("mu_biomass \\+= Intercept_biomass \\+ offsets_biomass;", code_shared))  # Biomass offset injection
 
   # Should use GLM function with to_matrix(mu_count) and mu_ones_count
-  expect_match2(code_shared, "normal_id_glm_lpdf\\(Y_count \\| to_matrix\\(mu_count\\), 0\\.0, mu_ones_count, sigma_count\\)")
+  expect_true(stan_pattern(paste0(
+    "normal_id_glm_lpdf\\(Y_count \\| to_matrix\\(mu_count\\), ",
+    "0\\.0, mu_ones_count, sigma_count\\)"
+  ), code_shared))
   # Should use GLM function with to_matrix(mu_biomass) and mu_ones_biomass
-  expect_match2(code_shared, "normal_id_glm_lpdf\\(Y_biomass \\| to_matrix\\(mu_biomass\\), 0\\.0, mu_ones_biomass,\\s*sigma_biomass\\)")
+  expect_true(stan_pattern(paste0(
+    "normal_id_glm_lpdf\\(Y_biomass \\| to_matrix\\(mu_biomass\\), ",
+    "0\\.0, mu_ones_biomass,\\s*sigma_biomass\\)"
+  ), code_shared))
 
   # Trend priors in model block
-  # Should NOT have prior for Intercept_trend in model block (it's in lprior)
-  expect_false(grepl("Intercept_trend\\s*~", code_shared))
+  # `~ RW(cor = TRUE)` contributes no population-level term, so the
+  # trend carries no intercept at all and `mu_trend` stays at zero.
+  # Naming the parameter says that; naming a sampling statement it
+  # was never going to have does not.
+  expect_false(grepl("Intercept_trend", code_shared, fixed = TRUE))
   # Should have some prior for sigma_trend (distribution may vary)
-  expect_match2(code_shared, "sigma_trend ~ ")
+  expect_true(stan_pattern("sigma_trend ~ ", code_shared))
   # Should have LKJ prior for correlation
-  expect_match2(code_shared, "lkj_corr_cholesky_lpdf(L_Omega_trend")
+  expect_true(stan_pattern("lkj_corr_cholesky_lpdf(L_Omega_trend",
+                             code_shared, fixed = TRUE))
   # Should have standard normal prior for innovations
-  expect_match2(code_shared,
-                  stan_prior_line("to_vector(innovations_trend)",
-                                    "std_normal()"))
+  # `stan_prior_line()` returns the statement verbatim, so it is
+  # matched as a literal rather than read as a pattern.
+  expect_true(stan_pattern(
+    stan_prior_line("to_vector(innovations_trend)", "std_normal()"),
+    code_shared, fixed = TRUE
+  ))
 
   # Should NOT have response-specific trend_count matrix
   expect_false(grepl("matrix.*trend_count", code_shared))
@@ -2519,9 +2575,19 @@ test_that("stancode integrates custom priors correctly", {
   expect_s3_class(code_with_priors, "stancode")
   expect_s3_class(code_default, "stancode")
 
-  # Custom priors should be reflected in code
-  expect_match2(code_with_priors, "normal\\(0,\\s*0\\.75\\)")
-  expect_match2(code_with_priors, "exponential\\(7\\)")
+  # Each custom prior reaches the parameter it names. Asserting the
+  # distribution text alone would pass on a program that put it on
+  # the wrong parameter, and would miss it entirely once the
+  # statement is written as a density call rather than a tilde.
+  expect_equal(stan_prior_on(code_with_priors, "ar1_trend"),
+                 "normal(0, 0.75)")
+  expect_equal(stan_prior_on(code_with_priors, "sigma_trend"),
+                 "exponential(7)")
+  # The defaults they displaced are gone.
+  expect_equal(stan_prior_on(code_default, "ar1_trend"),
+                 "normal(0, 0.5)")
+  expect_equal(stan_prior_on(code_default, "sigma_trend"),
+                 "exponential(2)")
 })
 
 test_that("stancode validates input parameters", {
@@ -2679,7 +2745,7 @@ test_that("stancode and standata are consistent", {
   # Code should reference data elements that exist in standata
   # This is a simplified check - real validation would parse Stan code
   if ("N" %in% names(out$data)) {
-    expect_match2(out$code, "int.*N")
+    expect_true(stan_pattern("int.*N", out$code))
   }
 })
 
@@ -2701,9 +2767,9 @@ test_that("stan functions work with complex model specifications", {
   expect_type(out$data, "list")
 
   # Should contain complex model elements
-  expect_match2(out$code, "count")
-  expect_match2(out$code, "biomass")
-  expect_match2(out$code, "ar1_trend")
+  expect_true(stan_pattern("count", out$code))
+  expect_true(stan_pattern("biomass", out$code))
+  expect_true(stan_pattern("ar1_trend", out$code))
 })
 
 test_that("stan functions preserve object attributes and metadata", {
@@ -3261,11 +3327,8 @@ test_that("trend_map matrix moves Z into the data block; no Z_raw", {
   sd <- out$data
 
   # Z declared in the data block (no Z_raw / construction / prior).
-  expect_true(stan_pattern(
-    "matrix\\[N_series_trend, N_lv_trend\\] Z;", code
-  ))
+  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z;", code))
   expect_false(grepl("Z_raw", code, fixed = TRUE))
-  expect_false(grepl("Z_raw ~", code))
 
   # Standata carries the matrix verbatim.
   expect_equal(dim(sd$Z), c(4L, 2L))
@@ -3290,9 +3353,7 @@ test_that("trend_map 'shared' yields single-column Z in data", {
   code <- out$code
   sd <- out$data
 
-  expect_true(stan_pattern(
-    "matrix\\[N_series_trend, N_lv_trend\\] Z;", code
-  ))
+  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z;", code))
   expect_false(grepl("Z_raw", code, fixed = TRUE))
   expect_equal(sd$N_lv_trend, 1L)
   expect_equal(dim(sd$Z), c(4L, 1L))
@@ -3325,8 +3386,9 @@ test_that("trend_map data.frame builds binary Z aligned to series", {
 
 test_that("trend_map 'identity' emits Z as data (not tdata default)", {
   # Even when n_lv == n_series, an explicit trend_map keeps Z in
-  # the data block so the user's choice is preserved through
-  # downstream consumers.
+  # the data block, so the loadings every post-fit surface reads
+  # are the ones the user wrote rather than a sampled rotation of
+  # them.
   data <- setup_stan_test_data()$multivariate
   mf <- mvgam_formula(
     count ~ 1,
@@ -3337,9 +3399,7 @@ test_that("trend_map 'identity' emits Z as data (not tdata default)", {
   code <- out$code
   sd <- out$data
 
-  expect_true(stan_pattern(
-    "matrix\\[N_series_trend, N_lv_trend\\] Z;", code
-  ))
+  expect_true(stan_pattern("matrix\\[N_series_trend, N_lv_trend\\] Z;", code))
   # No default diagonal Z assignment in tdata.
   expect_false(grepl(
     "Z = diag_matrix\\(rep_vector\\(1.0, N_lv_trend\\)\\)", code
@@ -3399,16 +3459,10 @@ test_that("trend_map with NA emits Z_template + Z_is_free + Z_free_vec", {
     code
   ))
   # Free-entry vector parameter.
-  expect_true(stan_pattern(
-    "vector\\[N_free_Z\\] Z_free_vec;", code
-  ))
+  expect_true(stan_pattern("vector\\[N_free_Z\\] Z_free_vec;", code))
   # Assembly loop in transformed parameters.
-  expect_true(stan_pattern(
-    "Z\\[i, j\\] = Z_free_vec\\[idx\\];", code
-  ))
-  expect_true(stan_pattern(
-    "Z\\[i, j\\] = Z_template\\[i, j\\];", code
-  ))
+  expect_true(stan_pattern("Z\\[i, j\\] = Z_free_vec\\[idx\\];", code))
+  expect_true(stan_pattern("Z\\[i, j\\] = Z_template\\[i, j\\];", code))
   # Prior on the free vector only. The statement is compared
   # literally rather than through `stan_pattern()`, which escapes
   # a pattern and would also try to read this as a tilde form.
@@ -3429,7 +3483,7 @@ test_that("trend_map with NA emits Z_template + Z_is_free + Z_free_vec", {
 
 test_that("fully-fixed Z is preserved (no partial-Z stanvars emitted)", {
   # Regression: when trend_map has no NAs, the fully-fixed code
-  # path stays in effect — no Z_template / Z_free_vec.
+  # path stays in effect, emitting no Z_template or Z_free_vec.
   data <- setup_stan_test_data()$multivariate
   Z_user <- matrix(c(1, 0, 0.5, 0.5, 0, 1, 0.3, 0.7),
                     nrow = 4L, ncol = 2L, byrow = TRUE)
@@ -3495,9 +3549,12 @@ test_that("loadings_prior with features only emits ARD prior on Z", {
   expect_match(sc, "multi_normal_cholesky", fixed = TRUE)
   # The length-scale is a settable prior, so it is written as a
   # sampling statement like every other one mvgam emits.
-  expect_match(sc, paste0("theta_features\\s*~\\s*lognormal\\(0, 1\\)",
-                            "|lognormal_lpdf\\(theta_features \\| 0, 1\\)"))
-  expect_false(grepl("to_vector\\(Z\\)\\s*~\\s*student_t", sc))
+  expect_true(stan_pattern("theta_features ~ lognormal(0, 1)", sc))
+  # The structured prior replaces the default iid one, so nothing
+  # student_t reaches `Z`. The default program carries that row, so
+  # the emptiness here is the structured prior displacing it rather
+  # than a pattern that no longer matches anything.
+  expect_length(stan_prior_on(sc, "Z"), 0L)
   expect_match(sc, "qr_thin_R", fixed = TRUE)
 })
 
@@ -3758,8 +3815,8 @@ test_that("default_prior dispatches on mvgam_formula (was broken in brms default
   dp <- default_prior(mf, data = dat)
   expect_s3_class(dp, "brmsprior")
   expect_true("Intercept" %in% dp$class)
-  # Must match get_prior() output exactly (DRY contract: both
-  # entry points return the same table).
+  # Must match get_prior() output exactly, so a user reading the
+  # priors through either entry point is told the same thing.
   gp <- get_prior(mf, data = dat)
   expect_identical(default_prior(mf, data = dat),
                    get_prior(mf, data = dat))

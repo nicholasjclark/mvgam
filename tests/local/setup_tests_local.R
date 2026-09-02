@@ -3,10 +3,6 @@ library("testthat")
 devtools::load_all()
 set.seed(123)
 
-expect_match2 <- function(object, regexp) {
-  any(grepl(regexp, object, fixed = TRUE))
-}
-
 expect_range <- function(object, lower = -Inf, upper = Inf, ...) {
   testthat::expect_true(all(object >= lower & object <= upper), ...)
 }

@@ -2,10 +2,6 @@
 library("testthat")
 library("mvgam")
 
-expect_match2 <- function(object, regexp) {
-  any(grepl(regexp, object, fixed = TRUE))
-}
-
 expect_character <- function(object, ...) {
   testthat::expect_true(is(object, "character"), ...)
 }
@@ -53,4 +49,23 @@ mvgam_stan_setup <- function(formula, data, family = gaussian(), ...) {
 # is not circular.
 stan_prior_line <- function(param, dist, normalize = TRUE) {
   mvgam:::stan_prior_statement(param, dist, normalize = normalize)
+}
+
+
+# The prior an assembled program places on one parameter, read out
+# of the program rather than matched against a spelling of it. A
+# normalised program writes `target += dist_lpdf(x | args);` where
+# an emitter wrote `x ~ dist(args);`, so a negative assertion built
+# on the tilde passes whether or not the prior is there. Returns an
+# empty vector when the parameter carries no prior, which is the
+# answer for a brms-owned coefficient left at its flat default.
+stan_prior_on <- function(code, param) {
+  rows <- mvgam:::mvgam_stancode_prior_rows(
+    paste(as.character(code), collapse = "\n")
+  )
+  keep <- vapply(
+    rows, function(r) identical(as.character(r$class), param),
+    logical(1L)
+  )
+  vapply(rows[keep], function(r) as.character(r$prior), character(1L))
 }
