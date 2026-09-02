@@ -183,12 +183,21 @@ on.
 
 \item{combine}{Logical, pool multiple imputation results (default TRUE)}
 
-\item{family}{Family specification. Supports most brms families including
-ordinal families (see \code{\link[brms:brmsfamily]{brms::cumulative()}}, \code{\link[brms:brmsfamily]{brms::sratio()}},
-\code{\link[brms:brmsfamily]{brms::cratio()}}, \code{\link[brms:brmsfamily]{brms::acat()}}). Multi-category families requiring
-separate linear predictors for each response category are not supported:
-\code{\link[brms:brmsfamily]{brms::categorical()}}, \code{\link[brms:brmsfamily]{brms::multinomial()}}, \code{\link[brms:brmsfamily]{brms::dirichlet()}}. For
-these response types, use brms directly.}
+\item{family}{A description of the response distribution and link
+function, given as a family function or a call to one. Supports
+most brms families, including the ordinal families
+(\code{\link[brms:brmsfamily]{brms::cumulative()}}, \code{\link[brms:brmsfamily]{brms::sratio()}}, \code{\link[brms:brmsfamily]{brms::cratio()}},
+\code{\link[brms:brmsfamily]{brms::acat()}}). Multi-category families needing a separate
+linear predictor per response category are not supported here:
+\code{\link[brms:brmsfamily]{brms::categorical()}}, \code{\link[brms:brmsfamily]{brms::multinomial()}},
+\code{\link[brms:brmsfamily]{brms::dirichlet()}}. For those, use brms directly.
+
+In a multivariate model each response may take its own family, in
+which case name it inside that response's \code{\link[brms:brmsformula]{brms::bf()}}:
+\code{bf(count ~ x, family = poisson()) + bf(seen ~ x, family = bernoulli())}. Passing a list of families to this argument, as
+\code{\link[brms:brm]{brms::brm()}} allows, is not supported; the family belongs to the
+response that names it. A single family given here applies to
+every response that does not name one of its own.}
 
 \item{threads}{Positive integer or \code{NULL}. When non-NULL the
 model is compiled with \code{cpp_options$stan_threads = TRUE} and

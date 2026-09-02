@@ -102,6 +102,98 @@ get_covariance_pattern <- function(trend_type) {
 }
 
 
+#' Prepare a frame the way the fit's own series identity was built
+#'
+#' Both the training frame and any prediction frame have to be read
+#' through the same preparation, or the series each names is spelled
+#' one way on one side and another way on the other and no comparison
+#' between them means anything.
+#'
+#' @param object A fitted `mvgam` object
+#' @param data A data frame to prepare
+#' @return `data` carrying the `mvgam_time` / `mvgam_series` attributes
+#'
+#' @noRd
+prepare_mvgam_frame <- function(object, data) {
+  meta <- object$trend_metadata
+  ensure_mvgam_variables(
+    data = data,
+    parsed_trend = NULL,
+    time_var = meta$variables$time_var %||% "time",
+    series_var = meta$variables$series_var %||% "series",
+    response_vars = object$response_names,
+    metadata = meta
+  )
+}
+
+
+#' The series label each row of a frame carries
+#'
+#' The same identity `fitted_series_index()` is keyed on, read per
+#' row rather than per level, so a caller naming its output by one
+#' and subsetting by the other cannot end up comparing a derived
+#' series against the column it superseded.
+#'
+#' @param object A fitted `mvgam` object
+#' @param data A frame to label, defaulting to the training data
+#' @return Character vector of series labels, one per row
+#'
+#' @noRd
+training_series_labels <- function(object, data = NULL) {
+  data <- data %||% mvgam_training_data(object)
+  as.character(get_series_for_grouping(
+    prepare_mvgam_frame(object, data)
+  ))
+}
+
+
+#' The index each series carries in the fitted trend matrix
+#'
+#' `trend[t, s]` numbers its second index over the series the model
+#' was fitted on, and `standata$obs_trend_series` records the index
+#' the fit gave each training row. That record is what Stan sampled
+#' against, so it settles the mapping outright.
+#'
+#' Deriving the order instead, by sorting the levels the series
+#' column happens to hold, answers a different question: a fit whose
+#' series is rebuilt from a `gr` / `subgr` pair sorts region-major
+#' while the column it superseded sorted otherwise, and the two
+#' orders are a permutation of one another. Both carry every label,
+#' so the mismatch costs no error and no missing value, and every
+#' series simply reads another series' state.
+#'
+#' A fit predating the record, or one whose trend has no series axis,
+#' falls back to the derived order.
+#'
+#' @param object A fitted `mvgam` object
+#' @return Named integer vector mapping series label to trend column,
+#'   or NULL when neither source is available
+#'
+#' @noRd
+fitted_series_index <- function(object) {
+  train <- mvgam_training_data(object)
+  if (is.null(train)) {
+    return(NULL)
+  }
+  labels <- as.character(get_series_for_grouping(
+    prepare_mvgam_frame(object, train)
+  ))
+  recorded <- object$standata$obs_trend_series
+  if (!is.null(recorded) && length(recorded) == length(labels)) {
+    per_label <- tapply(as.integer(recorded), labels, unique)
+    # A label spanning two columns would mean the preparation and the
+    # fit disagree about what a series is, which no mapping can
+    # reconcile; the derived order is then the honest answer.
+    if (all(lengths(per_label) == 1L)) {
+      out <- unlist(per_label)
+      return(sort(out))
+    }
+  }
+  levs <- sort(unique(labels))
+  stats::setNames(seq_along(levs), levs)
+}
+
+
 #' Get Observation Structure for Innovation Sampling
 #'
 #' Extracts time and series indices for each observation in newdata.
@@ -185,14 +277,7 @@ get_observation_structure <- function(object, newdata = NULL) {
   # For multivariate fits the data may not carry an explicit `series`
   # column (mvbind builds it implicitly); pass response_names so
   # ensure_mvgam_variables can recreate the multivariate series.
-  data_prepared <- ensure_mvgam_variables(
-    data = newdata,
-    parsed_trend = NULL,
-    time_var = time_var,
-    series_var = series_var,
-    response_vars = object$response_names,
-    metadata = metadata
-  )
+  data_prepared <- prepare_mvgam_frame(object, newdata)
 
   # Validate that data preparation succeeded
   checkmate::assert_data_frame(data_prepared, min.rows = 1)
@@ -217,14 +302,30 @@ get_observation_structure <- function(object, newdata = NULL) {
   time_indices <- get_time_for_grouping(data_prepared)
   series_indices <- get_series_for_grouping(data_prepared)
 
-  # Convert series to integer indices for matrix operations
-  if (is.factor(series_indices)) {
-    series_int <- as.integer(series_indices)
-    series_levels <- levels(series_indices)
-  } else {
-    series_factor <- as.factor(series_indices)
-    series_int <- as.integer(series_factor)
-    series_levels <- levels(series_factor)
+  # The integer is an index into the fitted trend matrix, so it has to
+  # be read against the series the model was fitted on rather than the
+  # ones this frame happens to contain. Factoring `newdata` on its own
+  # values numbers them from one within the frame: a caller asking
+  # about a single series, which is what the per-series hindcast arms
+  # do, would get index 1 for every series and read the first series'
+  # latent state throughout. A frame carrying a `series` column keeps
+  # its full level set through subsetting and so survives that; one
+  # whose series is rebuilt from a `gr` / `subgr` pair does not,
+  # because the rebuild sees only the levels present.
+  index <- fitted_series_index(object)
+  if (is.null(index)) {
+    levs <- sort(unique(as.character(series_indices)))
+    index <- stats::setNames(seq_along(levs), levs)
+  }
+  series_levels <- names(index)
+  series_int <- unname(index[as.character(series_indices)])
+  unmatched <- unique(as.character(series_indices)[is.na(series_int)])
+  if (length(unmatched)) {
+    stop(insight::format_error(c(
+      "newdata names series the model was not fitted on.",
+      x = cli::format_inline("Unknown: {.val {unmatched}}."),
+      i = cli::format_inline("Fitted series are {.val {series_levels}}.")
+    )))
   }
 
   unique_times <- sort(unique(time_indices))

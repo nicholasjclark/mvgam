@@ -457,3 +457,100 @@ test_that("plot.mvgam_conditional_smooths dispatches on the mvgam class", {
   tail_idx <- which.min(abs(grid - 2))
   expect_gt(df$estimate__[peak_idx] - df$estimate__[tail_idx], 0.5)
 })
+
+
+test_that("a smooth label parses under a family carrying an aterm", {
+  # `y | trials(n) ~ s(x)` only parses when brms knows the family:
+  # with none to hand it assumes gaussian, for which `trials()` is
+  # not a legal addition term, and rejects the formula. Every side
+  # formula mvgam builds is a `brmsformula`, so the family has to be
+  # attached on the strength of whether one is already there.
+  f <- brms::bf(y | trials(n) ~ s(x))
+  expect_null(f$family)
+
+  spec <- mvgam:::mvgam_smooth_label_spec(f, family = brms::brmsfamily("binomial"))
+  expect_false(is.null(spec))
+  expect_identical(spec$labels, "s(x)")
+
+  # Without a family the same formula is refused, which is what the
+  # caller was silently doing.
+  expect_error(mvgam:::mvgam_smooth_label_spec(f))
+
+  # A formula that names its own family keeps it rather than having
+  # the caller's substituted.
+  own <- brms::bf(y | trials(n) ~ s(x), family = brms::brmsfamily("binomial"))
+  expect_identical(
+    mvgam:::mvgam_smooth_label_spec(own, family = stats::gaussian())$labels,
+    "s(x)"
+  )
+})
+
+
+test_that("the trend side is read as gaussian and the obs side is not", {
+  fit <- structure(list(family = brms::brmsfamily("binomial")),
+                   class = "mvgam")
+  expect_identical(mvgam:::mvgam_side_family(fit, "obs")$family, "binomial")
+  expect_identical(mvgam:::mvgam_side_family(fit, "trend")$family, "gaussian")
+})
+
+
+test_that("an integer-valued grid column is held at a whole number", {
+  # A median lands between two observations on an even-length column,
+  # and brms refuses a fractional number of trials.
+  expect_true(mvgam:::is_integer_valued(c(1, 2, 3, 4)))
+  expect_true(mvgam:::is_integer_valued(c(10L, 20L, NA)))
+  expect_false(mvgam:::is_integer_valued(c(1.5, 2.5)))
+  expect_false(mvgam:::is_integer_valued(character(0)))
+  expect_false(mvgam:::is_integer_valued(numeric(0)))
+
+  grid <- data.frame(x = c(0, 1))
+  mf <- data.frame(x = c(0, 1), n = c(179L, 180L), y = c(1L, 2L))
+  filled <- mvgam:::backfill_smooth_grid(
+    grid, list(data = mf), y | trials(n) ~ s(x) + n,
+    covars = "x", byvars = character(0)
+  )
+  expect_equal(filled$n, rep(round(stats::median(mf$n)), nrow(grid)))
+  expect_equal(filled$n, filled$n %/% 1)
+})
+
+
+test_that("a factor smooth draws one interval per level", {
+  # `s(series, bs = "re")` puts a single grid point on each level.
+  # A ribbon and a line are both drawn from at least two points, so a
+  # panel built from them is empty whatever the fit contains, and the
+  # emptiness is silent: the plot object is well formed and every
+  # layer reports zero rows only once it is built.
+  df <- data.frame(
+    series = factor(c("a", "b", "c")),
+    estimate__ = c(0.2, -0.1, 0.4),
+    lower__ = c(-0.1, -0.5, 0.0),
+    upper__ = c(0.5, 0.3, 0.8)
+  )
+  attr(df, "effects") <- "series"
+  attr(df, "surface") <- FALSE
+
+  p <- mvgam:::build_mvgam_smooth_plot(df, "s(series)")
+  expect_s3_class(p, "ggplot")
+  geoms <- vapply(p$layers, function(l) class(l$geom)[1L], character(1))
+  expect_true("GeomPointrange" %in% geoms)
+  # The geoms that cannot draw a single point per group are the ones
+  # that made the panel empty.
+  expect_false(any(c("GeomRibbon", "GeomLine") %in% geoms))
+  # Every level reaches the panel.
+  built <- ggplot2::ggplot_build(p)
+  expect_identical(nrow(built$data[[1L]]), 3L)
+
+  # A numeric smooth keeps the ribbon and line it is drawn with.
+  dfn <- data.frame(
+    x = seq(0, 1, length.out = 10),
+    estimate__ = seq(0, 1, length.out = 10),
+    lower__ = seq(-1, 0, length.out = 10),
+    upper__ = seq(1, 2, length.out = 10)
+  )
+  attr(dfn, "effects") <- "x"
+  attr(dfn, "surface") <- FALSE
+  pn <- mvgam:::build_mvgam_smooth_plot(dfn, "s(x)")
+  geoms_n <- vapply(pn$layers, function(l) class(l$geom)[1L], character(1))
+  expect_true("GeomRibbon" %in% geoms_n)
+  expect_true("GeomLine" %in% geoms_n)
+})

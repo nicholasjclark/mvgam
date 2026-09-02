@@ -22,7 +22,14 @@ NULL
 #'
 #' @noRd
 get_family_for_resp <- function(object, resp_name) {
-  checkmate::assert_string(resp_name)
+  checkmate::assert_string(resp_name, null.ok = TRUE)
+  # An unscoped call is asking for the fit's own family, and every
+  # caller that reaches here without a response had written that
+  # branch out for itself. Answering it here keeps one description of
+  # which family applies rather than one per surface.
+  if (is.null(resp_name)) {
+    return(object$family)
+  }
 
   form <- object$formula$forms[[resp_name]]
   if (!is.null(form) && !is.null(form$family)) {
@@ -182,32 +189,6 @@ compute_family_epred <- function(linpred, family, trials = NULL,
     # E[Y] = mu exactly, with the shifted tail parameter absorbing
     # the alpha > 1 constraint that makes the mean exist at all.
     "beta_nb" = family$linkinv(linpred),
-
-    # Conway-Maxwell-Binomial: count-scale `E[Y]` over the
-    # `0:T` support needs the nu dispersion AND the trials
-    # vector. Routes to `posterior_epred_com_binomial()` so the
-    # mean kernel (`cmb_mean_vec`) is the only `E[Y]`
-    # implementation.
-    "com_binomial" = {
-      if (is.null(trials)) {
-        stop(insight::format_error(c(
-          "Family 'com_binomial' requires the 'trials' argument.",
-          i = "Provide a per-row trials vector when calling posterior_epred()."
-        )))
-      }
-      if (is.null(family_pars) || is.null(family_pars$nu)) {
-        stop(insight::format_error(c(
-          "Family 'com_binomial' requires the 'nu' dpar in 'family_pars'.",
-          i = "Pass `family_pars = list(nu = nu_draws)` from posterior_epred.mvgam()."
-        )))
-      }
-      posterior_epred_com_binomial(
-        linpred     = linpred,
-        link        = family$link,
-        family_pars = family_pars,
-        trials      = trials
-      )
-    },
 
     # Ordinal families require threshold parameters for category probability
     # computation. Routing in posterior_epred.mvgam() handles these families

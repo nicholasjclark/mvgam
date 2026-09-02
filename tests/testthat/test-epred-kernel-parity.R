@@ -122,3 +122,78 @@ test_that("a binomial mean scales the probability by the trials", {
     unname(prep$dpars$mu * matrix(trials, 5L, 4L, byrow = TRUE))
   )
 })
+
+
+test_that("every kernel the epred registry dispatches to takes `prep`", {
+  # `family_mean_from_kernel()` builds a `prep` list and calls
+  # `kernel(prep)`, so any family whose mean needs an extra dpar is
+  # reachable that way and its kernel has to accept that one
+  # argument. A kernel left on an older argument list does not fail
+  # loudly: `prep` binds to whatever the first formal is named, and
+  # the first thing to complain is a type assertion several frames
+  # down, if anything complains at all. The set is derived rather
+  # than listed, so a family added to the registry is covered here
+  # without this test being edited.
+  ns <- asNamespace("mvgam")
+  kernels <- grep("^posterior_epred_", ls(ns, all.names = TRUE),
+                  value = TRUE)
+  extra_for <- get("epred_extra_dpars_for", envir = ns)
+  reachable <- Filter(function(k) {
+    length(extra_for(sub("^posterior_epred_", "", k))) > 0L
+  }, kernels)
+  # An empty set would pass the loop while testing nothing.
+  expect_gt(length(reachable), 8L)
+  for (k in reachable) {
+    expect_identical(names(formals(get(k, envir = ns))), "prep")
+  }
+})
+
+
+test_that("the com_binomial mean sums the CMB support, not mu * trials", {
+  ns <- asNamespace("mvgam")
+  set.seed(11L)
+  ndraws <- 4L
+  nobs <- 3L
+  trials <- c(6L, 10L, 4L)
+  mu <- matrix(runif(ndraws * nobs, 0.2, 0.8), ndraws, nobs)
+  nu <- matrix(runif(ndraws * nobs, 0.6, 1.6), ndraws, nobs)
+  prep <- list(
+    dpars = list(mu = mu, nu = nu),
+    ndraws = ndraws, nobs = nobs,
+    data = list(trials = trials)
+  )
+  got <- get("posterior_epred_com_binomial", envir = ns)(prep)
+  expect_identical(dim(got), c(ndraws, nobs))
+
+  # The reference is the same sum over the 0:T support the kernel
+  # claims to compute, evaluated here from the mean helper directly.
+  want <- matrix(
+    get("cmb_mean_vec", envir = ns)(
+      as.numeric(mu), as.numeric(nu),
+      as.numeric(matrix(trials, ndraws, nobs, byrow = TRUE))
+    ),
+    ndraws, nobs
+  )
+  expect_equal(got, want)
+
+  # `mu` arrives on the response scale, so a kernel that applied the
+  # inverse link again would return a different and wrong mean. Pin
+  # that by showing the doubly-inverted input does not reproduce it.
+  double_linked <- prep
+  double_linked$dpars$mu <- stats::plogis(mu)
+  expect_false(isTRUE(all.equal(
+    get("posterior_epred_com_binomial", envir = ns)(double_linked), got
+  )))
+
+  # At nu = 1 the CMB collapses to the binomial, whose mean is
+  # `trials * p`; away from it the two must part company.
+  at_one <- prep
+  at_one$dpars$nu <- matrix(1, ndraws, nobs)
+  expect_equal(
+    get("posterior_epred_com_binomial", envir = ns)(at_one),
+    mu * matrix(trials, ndraws, nobs, byrow = TRUE)
+  )
+  expect_false(isTRUE(all.equal(
+    got, mu * matrix(trials, ndraws, nobs, byrow = TRUE)
+  )))
+})

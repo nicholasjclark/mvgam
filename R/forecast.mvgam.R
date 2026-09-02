@@ -144,6 +144,12 @@ forecast.mvgam <- function(object,
                             obs_uncertainty = TRUE,
                             resp = NULL) {
   checkmate::assert_class(object, "mvgam")
+  # Both methods take every argument by name after `...`, so a
+  # misspelling lands in `...` and the method proceeds on the default
+  # it was trying to override. That is how `incl_autocor` went
+  # unnoticed on `posterior_predict()`, and it is silent by
+  # construction, so refuse what nothing reads.
+  rlang::check_dots_empty()
   type <- match.arg(type)
   checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
   checkmate::assert_flag(coef_uncertainty)
@@ -289,6 +295,16 @@ forecast.mvgam <- function(object,
 resolve_series_info <- function(object) {
   lv <- object$series_info$series_levels
   if (is.null(lv)) {
+    # The labels a fit reports are the series identity it was built
+    # with, which for a `gr` / `subgr` trend is derived rather than
+    # read: a supplied `series` column is superseded, and reporting
+    # the superseded spelling contradicts what the supersession
+    # warning tells the user to expect. Taking them from the same
+    # place the trend index comes from also puts them in the order
+    # the trend matrix numbers its columns.
+    lv <- names(fitted_series_index(object))
+  }
+  if (is.null(lv)) {
     d <- mvgam_training_data(object)
     series_var <- object$trend_metadata$variables$series_var %||%
       "series"
@@ -317,15 +333,20 @@ build_training_arms <- function(object, series_levels, resp = NULL) {
     (object$mv_spec$response_names %||%
        as.character(object$formula[[2L]]))[1L]
 
-  series_fac <- as.factor(d[[series_var]])
+  # Cut the arms with the same labels they are named by. Reading the
+  # raw column instead splits a fit whose series was derived from a
+  # `gr` / `subgr` pair: the names come from the derived identity and
+  # the subset from the column it superseded, and every arm comes
+  # back empty.
+  series_labels <- as.character(training_series_labels(object, d))
   observations <- lapply(series_levels, function(lv) {
-    idx <- series_fac == lv
+    idx <- series_labels == lv
     if (!any(idx)) return(numeric(0L))
     as.numeric(d[[resp]][idx])
   })
   names(observations) <- series_levels
   times <- lapply(series_levels, function(lv) {
-    idx <- series_fac == lv
+    idx <- series_labels == lv
     if (!any(idx)) return(integer(0L))
     sort(unique(as.integer(d[[time_var]][idx])))
   })
@@ -335,6 +356,7 @@ build_training_arms <- function(object, series_levels, resp = NULL) {
     data = d,
     time_var = time_var,
     series_var = series_var,
+    series_labels = series_labels,
     resp = resp,
     observations = observations,
     times = times
@@ -490,9 +512,7 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
                            ncol = 0L)
       next
     }
-    sub <- training$data[
-      training$data[[training$series_var]] == lv, , drop = FALSE
-    ]
+    sub <- training$data[training$series_labels == lv, , drop = FALSE]
     sub <- sub[order(sub[[training$time_var]]), , drop = FALSE]
     # Closure-unit families ship multiple rows per (series, time)
     # for the per-visit detection grain. The `"trend"` and `"link"`
@@ -536,11 +556,7 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
                                   obs_uncertainty,
                                   process_error = FALSE,
                                   resp = NULL) {
-  family <- if (!is.null(resp)) {
-    get_family_for_resp(object, resp)
-  } else {
-    object$family
-  }
+  family <- get_family_for_resp(object, resp)
   is_closure <- is_closure_unit_family(family)
 
   if (is_closure) {
@@ -877,11 +893,7 @@ build_forecast_arms <- function(object, trend_model, meta,
     return(slice_per_series(eta_full, fc_grid, obs_struct_fc,
                               ndraws_use, series_levels))
   }
-  family_for_arm <- if (!is.null(resp)) {
-    get_family_for_resp(object, resp)
-  } else {
-    object$family
-  }
+  family_for_arm <- get_family_for_resp(object, resp)
   # `mu` is the family's own parameter, which is what
   # `sample_family_batched()` draws from below. The expectation is a
   # separate quantity wherever a family carries more in its mean than

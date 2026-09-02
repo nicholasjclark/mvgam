@@ -206,11 +206,7 @@ log_lik.mvgam <- function(object,
 # together.
 log_lik_single_response <- function(object, newdata, linpred, resp,
                                     draw_ids) {
-  family_obj <- if (!is.null(resp)) {
-    get_family_for_resp(object, resp)
-  } else {
-    object$family
-  }
+  family_obj <- get_family_for_resp(object, resp)
   family_name <- resolve_family_name(family_obj)
   family_link <- family_obj$link
 

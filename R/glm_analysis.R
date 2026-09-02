@@ -64,19 +64,75 @@ analyze_stan <- function(stan_code, response_names = NULL, trend_info = NULL) {
 }
 
 
-# The brms GLM likelihoods mvgam knows how to unwind. brms folds the
-# linear predictor into these calls, so a trend has no `mu` to reach
-# until the call is rewritten. Listed once: detection, the type gate on
-# transformation and the per-line type lookup all read this vector, and
-# a seventh form added here reaches all three.
-mvgam_glm_families <- c(
-  "normal_id_glm",
-  "poisson_log_glm",
-  "neg_binomial_2_log_glm",
-  "bernoulli_logit_glm",
-  "ordered_logistic_glm",
-  "categorical_logit_glm"
+# How each brms GLM likelihood lays its arguments out, and what the
+# same likelihood looks like once the linear predictor has been pulled
+# out into `mu`. brms folds the predictor into these calls, so a trend
+# has no `mu` to reach until the call is rewritten.
+#
+# `arguments` names the role of every argument after the `|`, in the
+# order brms writes it. The layouts differ: `normal_id_glm` and
+# friends take `(x, alpha, beta)` with a scalar intercept, while
+# `ordered_logistic_glm` takes `(x, beta, cutpoints)` and carries no
+# intercept at all. Reading positions off one shared layout gives the
+# ordinal families a design matrix multiplied by cutpoints.
+#
+# `rewrite` returns the arguments the replacement call takes, given
+# the parsed roles, the `to_matrix(mu)` expression standing in for the
+# design matrix and the `vector[1]` of ones standing in for the
+# coefficients.
+#
+# `brms::categorical()` has no entry because mvgam refuses it in
+# favour of `categ()`, and its per-category predictor has no single
+# `mu` to unwind into. A `categorical_logit_glm` line would therefore
+# be reported as an unrecognised family rather than silently rewritten.
+glm_call_layout <- list(
+  normal_id_glm = list(
+    arguments = c("design_matrix", "intercept", "coefficients", "sigma"),
+    rewrite = function(params, x, ones) c(x, "0.0", ones, params$sigma)
+  ),
+  poisson_log_glm = list(
+    arguments = c("design_matrix", "intercept", "coefficients"),
+    rewrite = function(params, x, ones) c(x, "0.0", ones)
+  ),
+  neg_binomial_2_log_glm = list(
+    arguments = c("design_matrix", "intercept", "coefficients", "shape"),
+    rewrite = function(params, x, ones) c(x, "0.0", ones, params$shape)
+  ),
+  bernoulli_logit_glm = list(
+    arguments = c("design_matrix", "intercept", "coefficients"),
+    rewrite = function(params, x, ones) c(x, "0.0", ones)
+  ),
+  ordered_logistic_glm = list(
+    arguments = c("design_matrix", "coefficients", "cutpoints"),
+    rewrite = function(params, x, ones) c(x, ones, params$cutpoints)
+  )
 )
+
+# The GLM likelihoods mvgam knows how to unwind, stated once so that
+# detection, the type gate on transformation and the per-line type
+# lookup cannot disagree with the layouts above.
+mvgam_glm_families <- names(glm_call_layout)
+
+#' The argument layout for one GLM family
+#'
+#' @param glm_type Family name including the `_glm` suffix, e.g.
+#'   `"ordered_logistic_glm"`.
+#' @return The `glm_call_layout` entry for that family.
+#' @noRd
+glm_layout_for <- function(glm_type) {
+  checkmate::assert_string(glm_type, min.chars = 1)
+  layout <- glm_call_layout[[glm_type]]
+  if (is.null(layout)) {
+    stop(insight::format_error(c(
+      cli::format_inline("Unsupported GLM type: {.field {glm_type}}"),
+      i = paste0(
+        "Recognised families are: ",
+        paste(mvgam_glm_families, collapse = ", "), "."
+      )
+    )), call. = FALSE)
+  }
+  layout
+}
 
 #' Which GLM likelihoods a Stan program calls
 #'
@@ -252,7 +308,7 @@ inject_trends_into_glm_calls <- function(code_lines, block_info, trend_injection
       # The family this line calls, under either density spelling.
       for (fam in mvgam_glm_families) {
         if (grepl(stan_density_call_pattern(fam), line)) {
-          glm_type <- sub("_glm$", "", fam)
+          glm_type <- fam
           break
         }
       }
@@ -309,62 +365,60 @@ inject_trends_into_glm_calls <- function(code_lines, block_info, trend_injection
 #' Parse GLM Parameters from Line
 #'
 #' @param glm_line Character string containing GLM function call
-#' @param glm_type Character string of GLM type (e.g., "poisson_log")
+#' @param glm_type Character string of GLM type, including the `_glm`
+#'   suffix (e.g., "poisson_log_glm")
 #'
-#' @return List with extracted parameters
+#' @return List naming each parsed argument by the role the family
+#'   gives it in `glm_call_layout`, plus `y_var` and `response_name`.
 #'
 #' @noRd
 parse_glm_parameters_from_line <- function(glm_line, glm_type) {
   checkmate::assert_character(glm_line, len = 1)
   checkmate::assert_character(glm_type, len = 1)
-  
-  # Extract function call content between parentheses
-  call_match <- regexpr("\\([^)]+\\)", glm_line)
+
+  layout <- glm_layout_for(glm_type)
+
+  # Match the density name as well as its brackets, so the argument
+  # list is read off the GLM call itself and not off whatever
+  # parenthesis happens to come first on the line.
+  call_match <- regexpr(
+    paste0(stan_density_call_pattern(glm_type), "\\([^)]+\\)"), glm_line
+  )
   if (call_match < 0) {
-    stop(insight::format_error("Invalid GLM function call format"))
+    stop(insight::format_error(c(
+      cli::format_inline("Invalid {.field {glm_type}} call format."),
+      x = paste0("The line was: ", trimws(glm_line), ".")
+    )))
   }
-  
+
   call_content <- regmatches(glm_line, call_match)
-  call_content <- gsub("^\\(|\\)$", "", call_content)
-  
+  call_content <- sub("^[^(]*\\(", "", call_content)
+  call_content <- sub("\\)$", "", call_content)
+
   # Split by | to get Y and parameters
   parts <- strsplit(call_content, "\\|")[[1]]
   if (length(parts) < 2) {
     stop(insight::format_error("GLM call missing required parameters"))
   }
-  
+
   y_var <- trimws(parts[1])
   params_part <- trimws(parts[2])
-  
+
   # Split parameters by comma
   params <- strsplit(params_part, ",")[[1]]
   params <- trimws(params)
-  
+
   # Extract response name for mu variable
   resp_name <- if (y_var == "Y") "" else gsub("Y_", "", y_var)
-  
-  result <- list(
-    y_var = y_var,
-    response_name = resp_name,
-    design_matrix = params[1] %||% "Xc",
-    intercept = params[2] %||% "Intercept", 
-    coefficients = params[3] %||% "b"
-  )
-  
-  # Parameter specifications for GLM families requiring additional parameters
-  glm_additional_params <- list(
-    "normal_id" = list(position = 4, name = "sigma"),
-    "neg_binomial_2_log" = list(position = 4, name = "shape")
-  )
-  
-  # Handle families with additional parameters
-  if (glm_type %in% names(glm_additional_params) && 
-      length(params) >= glm_additional_params[[glm_type]]$position) {
-    param_spec <- glm_additional_params[[glm_type]]
-    result[[param_spec$name]] <- params[param_spec$position]
-  }
-  
-  return(result)
+
+  # Name the arguments by role rather than by position, so a family
+  # whose layout differs from `(x, alpha, beta)` is read correctly.
+  roles <- layout$arguments
+  named <- as.list(params[seq_along(roles)])
+  names(named) <- roles
+  named <- named[!vapply(named, is.na, logical(1))]
+
+  c(list(y_var = y_var, response_name = resp_name), named)
 }
 
 #' Build Mu Construction with Trend Effects
@@ -388,11 +442,19 @@ build_mu_with_trend_effects <- function(glm_params, trend_injection_code) {
     paste0("  ", mu_var, " = rep_vector(0.0, N);"),
     "",
     paste0("  // Add fixed effects"),
-    paste0("  ", mu_var, " += ", glm_params$design_matrix, " * ", glm_params$coefficients, ";"),
-    paste0("  ", mu_var, " += ", glm_params$intercept, ";"),
-    ""
+    paste0("  ", mu_var, " += ", glm_params$design_matrix, " * ",
+           glm_params$coefficients, ";")
   )
-  
+
+  # Only some families carry a scalar intercept. The ordinal families
+  # put their cutpoints where the others put an intercept, and those
+  # belong in the likelihood rather than the linear predictor.
+  if (!is.null(glm_params$intercept)) {
+    mu_lines <- c(mu_lines,
+                  paste0("  ", mu_var, " += ", glm_params$intercept, ";"))
+  }
+  mu_lines <- c(mu_lines, "")
+
   # Parse and add trend effects
   trend_lines <- strsplit(trend_injection_code, "\n")[[1]]
   trend_lines <- gsub("mu\\[n\\]", paste0(mu_var, "[n]"), trend_lines)
@@ -402,74 +464,83 @@ build_mu_with_trend_effects <- function(glm_params, trend_injection_code) {
   return(mu_lines)
 }
 
+#' Rewrite one GLM call to read a named linear predictor
+#'
+#' Substitutes `to_matrix(mu)` for the design matrix and a `vector[1]`
+#' of ones for the coefficients, so the GLM primitive evaluates the
+#' predictor mvgam built rather than the one brms folded in. Every
+#' other argument keeps the role its family gives it, which is what
+#' carries the ordinal cutpoints through unchanged.
+#'
+#' The density suffix is read off the call being replaced, so a
+#' program generated under `normalize = FALSE` keeps its unnormalised
+#' spelling instead of silently regaining the constants.
+#'
+#' @param glm_line Character string with the original GLM call.
+#' @param glm_type Family name including the `_glm` suffix.
+#' @param glm_params List of parsed GLM parameters.
+#' @param mu_var Name of the linear predictor vector.
+#' @param mu_ones_var Name of the `vector[1]` of ones.
+#'
+#' @return Character string holding the replacement call, without the
+#'   surrounding `target +=` or terminating semicolon.
+#'
+#' @noRd
+build_glm_call_on_mu <- function(glm_line, glm_type, glm_params,
+                                 mu_var, mu_ones_var) {
+  checkmate::assert_character(glm_line, len = 1)
+  checkmate::assert_character(glm_type, len = 1)
+  checkmate::assert_list(glm_params)
+  checkmate::assert_string(mu_var, min.chars = 1)
+  checkmate::assert_string(mu_ones_var, min.chars = 1)
+
+  layout <- glm_layout_for(glm_type)
+  suffix <- stan_density_suffix(glm_line, glm_type)
+  if (is.null(suffix)) {
+    stop(insight::format_error(c(
+      cli::format_inline(
+        "No {.field {glm_type}} call found in the line to transform."
+      ),
+      i = "The line was located by a pattern that should have matched."
+    )))
+  }
+
+  arguments <- layout$rewrite(
+    glm_params, paste0("to_matrix(", mu_var, ")"), mu_ones_var
+  )
+  paste0(
+    glm_type, suffix, "(", glm_params$y_var, " | ",
+    paste(arguments, collapse = ", "), ")"
+  )
+}
+
 #' Transform GLM Call to Use Mu Format
 #'
 #' @param glm_line Character string with original GLM call
-#' @param glm_type Character string of GLM type
+#' @param glm_type Family name including the `_glm` suffix
 #' @param glm_params List of parsed GLM parameters
 #'
 #' @return Character string with transformed GLM call
 #'
 #' @noRd
 transform_glm_call_to_mu_format <- function(glm_line, glm_type, glm_params) {
-  checkmate::assert_character(glm_line, len = 1)
-  checkmate::assert_character(glm_type, len = 1)
   checkmate::assert_list(glm_params)
-  
+
   resp_name <- glm_params$response_name
-  # Create mu variable name: "mu" for univariate, "mu_response" for multivariate
+  # Univariate models name the predictor "mu"; a multivariate model
+  # names one predictor per response.
   mu_var <- if (resp_name == "") "mu" else paste0("mu_", resp_name)
-  mu_ones_var <- if (resp_name == "") "mu_ones" else paste0("mu_ones_", resp_name)
-  
-  # What each family carries after the coefficients. The density
-  # suffix is not configured here: it is read off the call being
-  # replaced, so a program generated under `normalize = FALSE` keeps
-  # its unnormalised spelling instead of silently regaining the
-  # constants.
-  extra_argument <- list(
-    "normal_id" = function(p) p$sigma,
-    "neg_binomial_2_log" = function(p) p$shape,
-    "poisson_log" = function(p) NULL,
-    "bernoulli_logit" = function(p) NULL,
-    "ordered_logistic" = function(p) NULL,
-    "categorical_logit" = function(p) NULL
-  )
-
-  getter <- extra_argument[[glm_type]]
-  if (is.null(getter)) {
-    stop(insight::format_error(
-      cli::format_inline("Unsupported GLM type: {.field {glm_type}}")
-    ))
-  }
-  suffix <- stan_density_suffix(glm_line, paste0(glm_type, "_glm"))
-  if (is.null(suffix)) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "No {.field {glm_type}} GLM call found in the line to transform."
-      ),
-      i = "The line was located by a pattern that should have matched."
-    )))
-  }
-
-  # Build function name
-  glm_function <- paste0(glm_type, "_glm", suffix)
-
-  # Get additional parameters if any
-  additional_params <- getter(glm_params)
-  additional_str <- if (!is.null(additional_params)) {
-    paste0(", ", additional_params)
+  mu_ones_var <- if (resp_name == "") {
+    "mu_ones"
   } else {
-    ""
+    paste0("mu_ones_", resp_name)
   }
-  
-  # Build transformed call uniformly
-  transformed_call <- paste0(
-    "  target += ", glm_function, "(", glm_params$y_var,
-    " | to_matrix(", mu_var, "), 0.0, ", mu_ones_var,
-    additional_str, ");"
+
+  paste0(
+    "  target += ",
+    build_glm_call_on_mu(glm_line, glm_type, glm_params, mu_var, mu_ones_var),
+    ";"
   )
-  
-  return(transformed_call)
 }
 
 #' Determine Mu Construction Type
@@ -886,39 +957,23 @@ apply_glm_transformations <- function(code_lines, block_info, analysis) {
 #' Transforms a single GLM function call to use combined linear predictor.
 #'
 #' @param glm_line Character string containing GLM function call
-#' @param glm_type Character string specifying GLM function type
+#' @param glm_type Family name including the `_glm` suffix
 #' @param params List of parsed GLM parameters
 #'
 #' @return Character string with transformed GLM call
 #'
 #' @noRd
 transform_single_glm_call <- function(glm_line, glm_type, params) {
-  # Build other parameters string
-  other_params_str <- if (!is.null(params$other_params)) {
-    paste0(", ", paste(params$other_params, collapse = ", "))
-  } else {
-    ""
-  }
-
-  if (!glm_type %in% mvgam_glm_families) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Unsupported GLM type for transformation: {.field {glm_type}}"
-      )
-    ), call. = FALSE)
-  }
-  # Put back the spelling the line used, so a program generated under
-  # `normalize = FALSE` keeps its unnormalised densities.
-  suffix <- stan_density_suffix(glm_line, glm_type)
-  if (is.null(suffix)) {
+  # The line keeps its surrounding statement, so only the call itself
+  # is rebuilt; the arguments come from the same per-family layout the
+  # trend-injection path reads.
+  if (is.null(stan_density_suffix(glm_line, glm_type))) {
     return(glm_line)
   }
-  replacement <- paste0(
-    glm_type, suffix, "(", params$y_var,
-    " | to_matrix(mu), 0.0, mu_ones", other_params_str, ")"
+  replacement <- build_glm_call_on_mu(
+    glm_line, glm_type, params, "mu", "mu_ones"
   )
 
-  # Replace GLM call in the line
   original_pattern <- paste0(stan_density_call_pattern(glm_type),
                              "\\s*\\([^\\)]+\\)")
   gsub(original_pattern, replacement, glm_line)

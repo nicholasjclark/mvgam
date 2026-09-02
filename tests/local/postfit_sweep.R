@@ -82,19 +82,32 @@ run_call <- function(fixture, group, label, expr, shape = shape_of) {
   # a statement about cost, and is kept apart from both.
   timed_out <- failed &&
     grepl("reached elapsed time limit", as.character(val), fixed = TRUE)
+  detail <- if (timed_out) {
+    paste0("exceeded ", call_budget, "s budget")
+  } else if (failed) {
+    squash(as.character(val))
+  } else {
+    squash(shape(val))
+  }
+  # An invariant reports its verdict in the detail rather than by
+  # raising, so a broken one returns normally and would otherwise be
+  # filed as a pass. The status column is what a reader scans, and it
+  # has to say what the detail says.
   row <- list(
     fixture = fixture,
     source = current_source,
     group = group,
     label = label,
-    status = if (timed_out) "SLOW" else if (failed) "ERR" else "OK",
-    detail = if (timed_out) {
-      paste0("exceeded ", call_budget, "s budget")
+    status = if (timed_out) {
+      "SLOW"
     } else if (failed) {
-      squash(as.character(val))
+      "ERR"
+    } else if (grepl("^VIOLATED", detail)) {
+      "BAD"
     } else {
-      squash(shape(val))
+      "OK"
     },
+    detail = detail,
     warnings = squash(paste(unique(warns), collapse = " | ")),
     secs = secs
   )
@@ -696,16 +709,58 @@ group_invariants <- function(nm, fit, cap) {
     #     linear predictor with no sampling on either side, so they
     #     are the same quantity reached two ways and must agree
     #     exactly rather than closely.
-    if (cap$has_time) {
+    #
+    #     `hindcast()` answers per series and stacks its arms, so its
+    #     columns run series-major while `posterior_epred()` follows
+    #     the rows of the data. Comparing the two as they stand asks
+    #     whether the data happens to be sorted by series, which on a
+    #     time-major frame it is not, and reports a violation that is
+    #     only the two layouts disagreeing. The cells have to be
+    #     matched before the values are.
+    # An ordinal mean is a probability per category, and a hindcast
+    # arm is [draws x times] per series, so the two answer at
+    # different grains and `hindcast(type = "expected")` refuses
+    # an ordinal fit outright.
+    if (cap$has_time && !cap$is_ordinal) {
       run_call(nm, "invariants", "conditional epred == hindcast", {
-        ep <- posterior_epred(fit, incl_autocor = TRUE)
-        hc <- do.call(cbind, hindcast(fit, type = "expected")$hindcasts)
-        holds(isTRUE(all.equal(unname(ep), unname(hc),
+        d <- as.data.frame(cap$data)
+        tv <- fit$trend_metadata$variables$time_var %||% "time"
+        # Named by the series identity the fit reports, which is not
+        # always the column the frame carries.
+        lab <- training_series_labels(fit, d)
+        hc <- hindcast(fit, type = "expected")$hindcasts
+        cells <- unlist(lapply(names(hc), function(s) {
+          rows <- which(lab == s)
+          rows[order(d[[tv]][rows])]
+        }))
+        ep <- posterior_epred(fit, incl_autocor = TRUE)[, cells, drop = FALSE]
+        stacked <- do.call(cbind, hc)
+        holds(isTRUE(all.equal(unname(ep), unname(stacked),
                                tolerance = 1e-10)),
               paste0("max |diff| = ",
-                     signif(max(abs(unname(ep) - unname(hc))), 3)))
+                     signif(max(abs(unname(ep) - unname(stacked))), 3)))
       }, shape = identity)
     }
+  }
+
+  # 6d. The series index a prediction resolves is an index into the
+  #     fitted trend matrix, and `standata$obs_trend_series` records
+  #     the one the fit gave each training row. Deriving it a second
+  #     time from the data is how it comes to disagree, and a
+  #     disagreement that is a permutation costs no error and no
+  #     missing value: every series simply reads another's state.
+  if (!is.null(fit$standata$obs_trend_series)) {
+    run_call(nm, "invariants", "series index matches standata", {
+      d <- as.data.frame(cap$data)
+      recorded <- as.integer(fit$standata$obs_trend_series)
+      resolved <- as.integer(
+        get_observation_structure(fit, newdata = d)$series_int
+      )
+      holds(length(resolved) == length(recorded) &&
+              identical(resolved, recorded),
+            paste0(sum(resolved != recorded), " of ", length(recorded),
+                   " rows read the wrong trend column"))
+    }, shape = identity)
   }
 
   # 7. The summary reports what the formula asked for. Every

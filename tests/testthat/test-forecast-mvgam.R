@@ -755,3 +755,19 @@ test_that("the forecast grid does not depend on newdata row order", {
     as.character(ordered_grid$data$series)
   )
 })
+
+
+test_that("an argument neither method reads is refused, not swallowed", {
+  # Every argument after `...` is matched by name, so a misspelling
+  # falls into `...` and the call proceeds on the default it meant to
+  # override. Nothing warns, and the returned object has the right
+  # class and shape, which is what made the same shape of defect hard
+  # to see on `posterior_predict()`.
+  fit <- make_mock_mvgam()
+  expect_error(hindcast(fit, incl_autcor = TRUE), "must be empty")
+  expect_error(hindcast(fit, ndraw = 5L), "must be empty")
+  expect_error(forecast(fit, newdata = fit$data, ndraw = 5L),
+               "must be empty")
+  # The offending name is reported, so the caller can see which one.
+  expect_error(hindcast(fit, incl_autcor = TRUE), "incl_autcor")
+})

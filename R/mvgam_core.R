@@ -311,12 +311,22 @@ mvgam_imputation_forwarded <- c(
 #'   }
 #' @param backend Stan backend (defaults to "cmdstanr")
 #' @param combine Logical, pool multiple imputation results (default TRUE)
-#' @param family Family specification. Supports most brms families including
-#'   ordinal families (see [brms::cumulative()], [brms::sratio()],
-#'   [brms::cratio()], [brms::acat()]). Multi-category families requiring
-#'   separate linear predictors for each response category are not supported:
-#'   [brms::categorical()], [brms::multinomial()], [brms::dirichlet()]. For
-#'   these response types, use brms directly.
+#' @param family A description of the response distribution and link
+#'   function, given as a family function or a call to one. Supports
+#'   most brms families, including the ordinal families
+#'   ([brms::cumulative()], [brms::sratio()], [brms::cratio()],
+#'   [brms::acat()]). Multi-category families needing a separate
+#'   linear predictor per response category are not supported here:
+#'   [brms::categorical()], [brms::multinomial()],
+#'   [brms::dirichlet()]. For those, use brms directly.
+#'
+#'   In a multivariate model each response may take its own family, in
+#'   which case name it inside that response's [brms::bf()]:
+#'   `bf(count ~ x, family = poisson()) + bf(seen ~ x, family =
+#'   bernoulli())`. Passing a list of families to this argument, as
+#'   [brms::brm()] allows, is not supported; the family belongs to the
+#'   response that names it. A single family given here applies to
+#'   every response that does not name one of its own.
 #' @param threads Positive integer or `NULL`. When non-NULL the
 #'   model is compiled with `cpp_options$stan_threads = TRUE` and
 #'   cmdstanr passes `threads_per_chain = N` at sample time.

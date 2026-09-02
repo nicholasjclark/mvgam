@@ -109,6 +109,12 @@ hindcast.mvgam <- function(object,
                            process_error = FALSE,
                            resp = NULL) {
   checkmate::assert_class(object, "mvgam")
+  # Both methods take every argument by name after `...`, so a
+  # misspelling lands in `...` and the method proceeds on the default
+  # it was trying to override. That is how `incl_autocor` went
+  # unnoticed on `posterior_predict()`, and it is silent by
+  # construction, so refuse what nothing reads.
+  rlang::check_dots_empty()
   type <- match.arg(type)
   checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
   checkmate::assert_flag(obs_uncertainty)

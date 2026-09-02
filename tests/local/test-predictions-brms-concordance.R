@@ -294,6 +294,40 @@ test_that("Binomial AR(1) — epred = p * trials, bounded by trials", {
   expect_gte(comp$cor, 0.925)
 })
 
+test_that("A zero-trials padded cell does not refuse the whole frame", {
+  # A cell the likelihood never saw is padded with a denominator of
+  # zero and a missing response. Every prediction path fills that
+  # response with a family-safe dummy so brms can build the design
+  # matrices, and brms then checked the dummy against the addition
+  # term and refused the frame: a dummy of 1 event against 0 trials.
+  # The dummy is a placeholder nothing reads, so validating it
+  # against a real addition term compares two unrelated things, and
+  # the padding a trend needs made every surface unreachable.
+  require_fixtures("val_mvgam_binom_ar1.rds")
+  fit <- load_mvgam("binom_ar1")
+  d <- as.data.frame(fit$data)
+  pad <- utils::tail(seq_len(nrow(d)), 5L)
+  d$y[pad] <- NA_integer_
+  d$trials[pad] <- 0L
+  fit$data <- d
+  fit$obs_data <- d
+
+  expect_equal(dim(posterior_epred(fit, ndraws = 5L)), c(5L, nrow(d)))
+  expect_s3_class(hindcast(fit, type = "expected", ndraws = 5L),
+                  "mvgam_forecast")
+  expect_s3_class(hindcast(fit, type = "trend", ndraws = 5L),
+                  "mvgam_forecast")
+  expect_ggplot(SW(plot(fit, type = "residuals")))
+  expect_ggplot(plot(fit, type = "trend"))
+
+  # A padded cell has no trials, so its expectation is zero however
+  # the linear predictor lands. Reporting anything else would mean
+  # the denominator had been read from another row.
+  ep <- posterior_epred(fit, ndraws = 5L)
+  expect_true(all(ep[, pad] == 0))
+  expect_true(any(ep[, -pad] > 0))
+})
+
 test_that("Ordinal (Cumulative) — 2D linpred, 3D epred summing to 1", {
   require_fixtures("val_brms_cumulative_fx.rds",
                    "val_mvgam_cumulative_fx.rds")
@@ -305,7 +339,27 @@ test_that("Ordinal (Cumulative) — 2D linpred, 3D epred summing to 1", {
   mvgam_lp <- posterior_linpred(mvgam_fit, newdata = newdata)
   expect_equal(length(dim(brms_lp)), 2L)
   expect_equal(length(dim(mvgam_lp)), 2L)
+  # brms carries no latent state, so the marginal surface is where the
+  # two models answer the same question.
   expect_gte(stats::cor(colMeans(brms_lp), colMeans(mvgam_lp)), 0.925)
+
+  # And the trend has to reach the likelihood. An ordinal program can
+  # sample a latent state, hand it to nothing, and still return a
+  # well-formed fit whose every surface agrees with the trend-free
+  # brms twin, because it is the trend-free model. Two things
+  # distinguish the two cases: the conditional surface has to move
+  # away from the marginal one, and the trend's own scale has to
+  # depart from the prior it was given.
+  cond_lp <- posterior_linpred(mvgam_fit, newdata = newdata,
+                               incl_autocor = TRUE)
+  expect_false(isTRUE(all.equal(colMeans(cond_lp), colMeans(mvgam_lp))))
+  expect_lt(stats::cor(colMeans(brms_lp), colMeans(cond_lp)),
+            stats::cor(colMeans(brms_lp), colMeans(mvgam_lp)))
+  sigma_draws <- as.numeric(posterior::as_draws_matrix(
+    mvgam_fit$fit)[, "sigma_trend[1]"])
+  # `exponential(2)` has mean and sd 0.5; a state the data never
+  # informed comes back sitting on both.
+  expect_gt(abs(mean(sigma_draws) - 0.5), 0.05)
 
   brms_ep <- brms::posterior_epred(brms_fit, newdata = newdata)
   mvgam_ep <- posterior_epred(mvgam_fit, newdata = newdata)

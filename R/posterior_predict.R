@@ -1860,12 +1860,9 @@ predict_single_response <- function(object, linpred_resp, resp, draw_ids,
   linpred <- linpred_resp[draw_ids, , drop = FALSE]
   nobs <- ncol(linpred)
 
-  # Get family for this response
-  if (!is_multivariate) {
-    family <- object$family
-  } else {
-    family <- get_family_for_resp(object, resp)
-  }
+  # `resp` is NULL on a univariate fit, which resolves to the fit's
+  # own family.
+  family <- get_family_for_resp(object, if (is_multivariate) resp else NULL)
 
   # Closure-unit families need joint-over-unit sampling: draw
   # the latent state (N for nmix, z for occ) per closure unit,

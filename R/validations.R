@@ -1156,8 +1156,9 @@ validate_gr_balanced_groups <- function(trend_spec, data) {
     return(invisible(NULL))
   }
 
-  unique_series_rows <- data[!duplicated(data[[series_var]]), , drop = FALSE]
-  series_group_table <- table(unique_series_rows[[gr_var]])
+  series_group_table <- table(
+    series_group_values(data, series_var, gr_var)
+  )
   group_counts <- as.integer(series_group_table)
 
   if (length(unique(group_counts)) <= 1L) {
@@ -4200,9 +4201,19 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
     }
   }
 
-  # Always create implicit time mapping for consistency
+  # Always create implicit time mapping for consistency.
+  #
+  # The index has to run in time order, not in the order the rows
+  # happen to arrive in. It is what the trend steps along, so numbering
+  # the times by first appearance makes an AR recursion advance
+  # through whatever sequence the frame was assembled in: a frame
+  # grouped by series rather than by date gives its first series'
+  # earliest time index 1 and leaves the real first time somewhere in
+  # the middle. The mapping stays a bijection either way, so nothing
+  # downstream can notice. Sorted input, which is the usual shape and
+  # the one every fixture carries, is unaffected.
   checkmate::assert_names(names(data), must.include = time_var)
-  unique_times <- unique(data[[time_var]])
+  unique_times <- sort(unique(data[[time_var]]))
   time_mapping <- setNames(seq_along(unique_times), unique_times)
   attr(data, "mvgam_time") <- time_mapping[as.character(data[[time_var]])]
   attr(data, "mvgam_time_source") <- "implicit"
@@ -4359,6 +4370,51 @@ get_time_for_grouping <- function(data) {
   }
 
   return(time_values)
+}
+
+#' The group each series belongs to, one entry per series
+#'
+#' Three callers want this one answer: the balance check counts it,
+#' the subgroup dimension takes the largest count, and
+#' `group_inds_trend` is the vector itself. Only the last is sensitive
+#' to order, and that is the one that matters: Stan reads
+#' `group_inds_trend[s]` against `s`, the trend matrix's own series
+#' index, so it must be given the series order the trend was built
+#' with. Reading the data in row order answers a different question
+#' whenever the rows are not sorted by series, and the two answers are
+#' a permutation of one another, so nothing raises and the model
+#' correlates the wrong series together.
+#'
+#' The series identity is read the way the fit reads it, through the
+#' `mvgam_series` attribute when the frame carries one, so a derived
+#' series is not silently compared against the column it superseded.
+#'
+#' @param data Data frame holding one or more rows per series
+#' @param series_var Name of the series column, used when the frame
+#'   carries no prepared series attribute
+#' @param gr_var Name of the grouping column
+#' @param order_by Series identifiers in the order the answer must
+#'   follow, or NULL to keep the order the data presents
+#' @return Vector of group values, one per series
+#'
+#' @noRd
+series_group_values <- function(data, series_var, gr_var,
+                                order_by = NULL) {
+  checkmate::assert_data_frame(data, min.rows = 1)
+  checkmate::assert_string(gr_var)
+  labels <- attr(data, "mvgam_series") %||% data[[series_var]]
+  if (is.null(labels)) {
+    stop(insight::format_error(
+      paste0("Series variable '", series_var, "' not found in data.")
+    ))
+  }
+  labels <- as.character(labels)
+  first <- !duplicated(labels)
+  groups <- data[[gr_var]][first]
+  if (is.null(order_by)) {
+    return(groups)
+  }
+  groups[match(as.character(order_by), labels[first])]
 }
 
 #' Get series variable for grouping operations

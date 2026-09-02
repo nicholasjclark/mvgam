@@ -350,6 +350,23 @@ build_mvgam_smooth_plot <- function(df, label) {
   # house look rather than the brms blue default.
   x_var <- effs[[1L]]
   pal <- mvgam_palette()
+  # A smooth over a factor, `s(series, bs = "re")` say, has one grid
+  # point per level. A ribbon and a line each need two points before
+  # they draw anything, so a panel built from them comes out empty
+  # however many levels there are. An interval per level is the shape
+  # that has something to show, and it is what brms draws for a
+  # categorical conditional effect.
+  if (!is.numeric(df[[x_var]])) {
+    return(
+      ggplot2::ggplot(df, ggplot2::aes(x = .data[[x_var]])) +
+        ggplot2::geom_pointrange(
+          ggplot2::aes(y = estimate__, ymin = lower__, ymax = upper__),
+          colour = pal[5L], linewidth = 0.8, size = 0.4
+        ) +
+        ggplot2::labs(x = x_var, y = label) +
+        mvgam_theme()
+    )
+  }
   gg <- ggplot2::ggplot(df, ggplot2::aes(x = .data[[x_var]])) +
     ggplot2::geom_ribbon(
       ggplot2::aes(ymin = lower__, ymax = upper__),
@@ -444,15 +461,21 @@ mvgam_side_suffix <- function(side) {
 # Returns NULL when the formula has no smooths.
 #'@noRd
 mvgam_smooth_label_spec <- function(formula, family = NULL) {
-  # When the caller's formula carries family-specific aterms (e.g.
-  # `y | trials(trials) ~ s(x)` on a binomial fit) but is a plain
-  # R formula rather than a `brmsformula`, brms's `brmsterms.default`
-  # falls through to a `validate_formula(family = gaussian())` call
-  # and rejects the aterm. Wrap the formula in `brms::bf()` with
-  # the supplied family so brms's parser knows trials() is valid.
-  if (!is.null(family) && !inherits(formula, "brmsformula") &&
-      !inherits(formula, "mvbrmsformula")) {
-    formula <- brms::bf(formula, family = family)
+  # A formula carrying a family-specific aterm, `y | trials(n) ~ s(x)`
+  # on a binomial fit say, only parses if brms knows the family: with
+  # none to hand `validate_formula()` assumes gaussian and rejects the
+  # aterm. What matters is whether the formula already names a family,
+  # not how it is spelled. `mvgam_side_formula()` always returns a
+  # `brmsformula`, so testing the class instead would leave every fit
+  # reaching this through a side formula with no family at all.
+  if (!is.null(family) && !inherits(formula, "mvbrmsformula")) {
+    if (inherits(formula, "brmsformula")) {
+      if (is.null(formula$family)) {
+        formula$family <- family
+      }
+    } else {
+      formula <- brms::bf(formula, family = family)
+    }
   }
   # Multivariate fits (mvbind / mvbrmsformula). Calling
   # `brms::brmsterms()` directly on a mvbrmsformula triggers a
@@ -525,6 +548,16 @@ resolve_mvgam_smooth <- function(x, smooth) {
 }
 
 
+# Which family a side of the model is parsed under. The observation
+# side carries the fit's own family, and with it any aterm that
+# family brings; the latent trend is gaussian whatever the
+# observations are.
+#'@noRd
+mvgam_side_family <- function(x, side) {
+  if (identical(side, "trend")) stats::gaussian() else x$family
+}
+
+
 # Enumerate every smooth term across the observation and trend
 # formulas. Returns a list; each entry is
 # `list(term, side, rows, term_idx, by_var)` where `rows` is the
@@ -537,7 +570,7 @@ mvgam_smooth_terms <- function(x) {
   checkmate::assert_class(x, "mvgam")
   out <- list()
   obs_idx <- mvgam_smooth_index(
-    x$formula, x$data, family = x$family
+    x$formula, x$data, family = mvgam_side_family(x, "obs")
   )
   if (!is.null(obs_idx)) {
     for (term in unique(obs_idx$term)) {
@@ -551,9 +584,8 @@ mvgam_smooth_terms <- function(x) {
   }
   trend_bf <- mvgam_side_formula(x, "trend")
   if (!is.null(trend_bf)) {
-    # Trend latent process is gaussian regardless of obs family.
     trend_idx <- mvgam_smooth_index(
-      trend_bf, x$data, family = stats::gaussian()
+      trend_bf, x$data, family = mvgam_side_family(x, "trend")
     )
     if (!is.null(trend_idx)) {
       for (term in unique(trend_idx$term)) {
@@ -753,7 +785,9 @@ build_smooth_grid <- function(x, hit, surface, facets, resolution,
   mf <- x$data
   side_form_bf <- mvgam_side_formula(x, hit$side)
   side_form <- side_form_bf$formula
-  spec <- mvgam_smooth_label_spec(side_form_bf)$spec[[hit$term_idx]]
+  spec <- mvgam_smooth_label_spec(
+    side_form_bf, family = mvgam_side_family(x, hit$side)
+  )$spec[[hit$term_idx]]
   covars <- spec$term
   byvars <- if (!is.na(hit$by_var) && !identical(hit$by_var, "NA")) {
     hit$by_var
@@ -856,6 +890,17 @@ build_smooth_grid <- function(x, hit, surface, facets, resolution,
 # median (numeric) or first level (factor); the response is set
 # to a dummy value because the basis matrices are response-free.
 #'@noRd
+# Whether every value a numeric column holds is a whole number.
+# `is.integer()` is not the question: a column read from a data
+# frame is usually double, and what matters is the value rather
+# than the storage type.
+#'@noRd
+is_integer_valued <- function(col) {
+  col <- col[!is.na(col)]
+  is.numeric(col) && length(col) > 0L && all(col == round(col))
+}
+
+
 backfill_smooth_grid <- function(grid, x, side_form, covars, byvars) {
   mf <- x$data
   resp <- all.vars(side_form[[2L]])[1L]
@@ -868,7 +913,14 @@ backfill_smooth_grid <- function(grid, x, side_form, covars, byvars) {
     if (cv %in% names(mf)) {
       col <- mf[[cv]]
       grid[[cv]] <- if (is.numeric(col)) {
-        stats::median(col, na.rm = TRUE)
+        # A median lands between two observations whenever the column
+        # has an even count, which an integer-valued covariate cannot
+        # represent: the denominator of a `trials()` term comes back
+        # as 179.5 and brms refuses a fractional number of trials.
+        # Rounding is the better grid value for such a column either
+        # way, and none of these reach a design matrix.
+        med <- stats::median(col, na.rm = TRUE)
+        if (is_integer_valued(col)) round(med) else med
       } else if (is.factor(col)) {
         factor(levels(col)[1L], levels = levels(col))
       } else {

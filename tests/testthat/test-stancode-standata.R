@@ -5050,13 +5050,39 @@ test_that("normalize = FALSE still injects the trend into the GLM call", {
   }
 })
 
+test_that("an ordinal GLM keeps its own argument layout", {
+  # `ordered_logistic_glm` takes `(x, beta, cutpoints)` and carries no
+  # scalar intercept. Rewriting it on the `(x, alpha, beta)` layout the
+  # other families use multiplies the design matrix by the cutpoints
+  # and hands Stan a real where it wants a vector, so the program does
+  # not parse. `stancode()` parses what it emits, and the assertions
+  # below pin down which argument ends up where.
+  dat <- codegen_test_data()
+  dat$z <- rnorm(nrow(dat))
+  dat$ord <- factor(sample(1:3, nrow(dat), replace = TRUE), ordered = TRUE)
+  mf <- mvgam_formula(ord ~ elev + z, trend_formula = ~ AR(p = 1))
+
+  code <- stancode(mf, data = dat, family = brms::cumulative(), silent = 2L)
+
+  # The cutpoints stay in the likelihood, where the ordinal density
+  # reads them, and the coefficients stay in the linear predictor.
+  expect_true(grepl(
+    "ordered_logistic_glm_lpmf(Y | to_matrix(mu), mu_ones, Intercept)",
+    code, fixed = TRUE
+  ))
+  expect_true(grepl("mu += Xc * b;", code, fixed = TRUE))
+  expect_false(grepl("mu += Intercept;", code, fixed = TRUE))
+  expect_true(grepl("mu\\[n\\] \\+= trend\\[", code))
+})
+
 test_that("the GLM family list is stated once", {
   # Detection, the transformation gate and the per-line type lookup all
-  # read the same vector, so a seventh form cannot reach one and miss
-  # the others.
+  # read the argument-layout table, so a sixth form cannot reach one
+  # and miss the others.
   fams <- mvgam:::mvgam_glm_families
-  expect_length(fams, 6L)
+  expect_length(fams, 5L)
   expect_true(all(grepl("_glm$", fams)))
+  expect_named(mvgam:::glm_call_layout, fams)
 
   present <- mvgam:::glm_calls_present(
     "target += poisson_log_glm_lupmf(Y | Xc, Intercept, b);"
@@ -5107,3 +5133,75 @@ test_that("the two code-generation entry points agree", {
   generator <- names(formals(mvgam:::build_stan_components))
   expect_true(all(setdiff(names(sc), c("object", "...")) %in% generator))
 })
+
+
+test_that("group_inds_trend is ordered by the trend's series axis", {
+  # Stan reads `group_inds_trend[s]` against `s`, the trend matrix's
+  # own series index, and `obs_trend_series` records which column each
+  # row was given. Deriving the order a second time by walking the
+  # data answers a different question whenever the rows are not sorted
+  # by series, and the two answers are a permutation of one another,
+  # so the program still compiles and the wrong series are correlated
+  # together. The supplied `series` column here is built the way
+  # `interaction()` builds one by default, whose level order differs
+  # from the order the rows present.
+  n_t <- 6L
+  d <- data.frame(
+    region = factor(rep(rep(c("r1", "r2"), each = 3L), times = n_t)),
+    species = factor(rep(rep(c("sp1", "sp2", "sp3"), times = 2L),
+                         times = n_t)),
+    time = rep(seq_len(n_t), each = 6L)
+  )
+  d$series <- interaction(d$region, d$species, drop = TRUE)
+  set.seed(2L)
+  d$y <- rpois(nrow(d), 3)
+
+  f <- mvgam_formula(
+    y ~ 1,
+    trend_formula = ~ AR(p = 1, gr = region, subgr = species, cor = TRUE)
+  )
+  sd <- SW(standata(f, data = d, family = poisson()))
+  expect_false(is.null(sd$group_inds_trend))
+
+  # The group of whichever series occupies each trend column.
+  s_idx <- as.integer(sd$obs_trend_series)
+  gr <- as.character(d$region)
+  occupant <- vapply(seq_len(sd$N_series_trend),
+                     function(k) gr[which(s_idx == k)[1L]], character(1))
+  expect_identical(
+    as.integer(sd$group_inds_trend),
+    match(occupant, sort(unique(gr)))
+  )
+})
+
+
+test_that("obs_trend_time runs in time order, not row order", {
+  # The index is what the trend steps along, so it has to follow the
+  # clock rather than the order the rows arrived in. A frame grouped
+  # by series rather than by date otherwise gives its first series'
+  # earliest time index 1 and leaves the real first time in the
+  # middle, and the mapping stays a bijection so nothing downstream
+  # can notice.
+  n_t <- 8L
+  d <- data.frame(
+    time = rep(seq_len(n_t), each = 2L),
+    series = factor(rep(c("a", "b"), times = n_t))
+  )
+  set.seed(5L)
+  d$y <- rpois(nrow(d), 3)
+  f <- mvgam_formula(y ~ 1, trend_formula = ~ AR(p = 1))
+
+  sd_sorted <- standata(f, data = d, family = poisson())
+  expect_identical(as.integer(sd_sorted$obs_trend_time),
+                   as.integer(d$time))
+
+  # The same rows in another order describe the same series, so every
+  # row has to keep the time index it had.
+  set.seed(9L)
+  shuffled <- d[sample(nrow(d)), , drop = FALSE]
+  sd_shuf <- standata(f, data = shuffled, family = poisson())
+  expect_identical(as.integer(sd_shuf$obs_trend_time),
+                   as.integer(shuffled$time))
+})
+
+

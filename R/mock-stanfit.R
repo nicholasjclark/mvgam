@@ -412,14 +412,28 @@ prepare_predictions.mock_stanfit <- function(x,
     }
   }
 
-  # Generate Stan data structure using brmsfit object directly
-  # This creates all design matrices via brms machinery
-  # Use internal=TRUE for compatibility with brms prediction workflow
+  # Generate Stan data structure using brmsfit object directly.
+  # This creates all design matrices via brms machinery.
+  # `internal = TRUE` matches brms's own prediction workflow.
+  #
+  # `check_response = FALSE` turns off brms's aterm validation, which
+  # asks whether the response agrees with its addition terms. The
+  # dummy filled in above was chosen to satisfy the family's support
+  # and nothing downstream reads it, so checking it against a real
+  # addition term compares two unrelated things: a padded row of a
+  # binomial fit carries `trials = 0` against a dummy response of 1,
+  # and brms refuses the whole frame with "Number of trials is
+  # smaller than the number of events". Padding the response with 0
+  # instead would only move the failure, because a padded `trials` of
+  # 0 still has to admit the rows the caller did supply.
+  # `posterior_smooths.mvgam()` turns the same check off, for the
+  # same reason.
   sdata <- brms::standata(
     brmsfit,
     newdata = newdata_with_resp,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
+    check_response = FALSE,
     internal = TRUE,
     ...
   )

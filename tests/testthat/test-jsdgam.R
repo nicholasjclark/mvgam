@@ -544,3 +544,63 @@ test_that("the trend a jsdgam builds is the correlated latent prior", {
   expect_true(isTRUE(spec$cor))
   expect_identical(spec$gr, "NA")
 })
+
+
+test_that("jsdgam accepts the formulas mvgam accepts", {
+  # A multivariate formula gives each species its own response and its
+  # own observation family, which is the only way to fit a joint
+  # species model over mixed data types. `jsdgam()` forwards to
+  # `mvgam()`, so refusing a formula `mvgam()` accepts would be an
+  # accident of the wrapper rather than a limit of the model.
+  set.seed(1L)
+  n_site <- 24L
+  d <- data.frame(
+    site = seq_len(n_site),
+    env = rnorm(n_site),
+    cnt = rpois(n_site, 3),
+    pa = rbinom(n_site, 1, 0.5)
+  )
+  mvf <- brms::bf(cnt ~ env, family = poisson()) +
+    brms::bf(pa ~ env, family = bernoulli())
+
+  m <- SW(jsdgam(
+    formula = mvf, factor_formula = ~ -1, data = d,
+    unit = site, species = species, n_lv = 1L, run_model = FALSE
+  ))
+  expect_s3_class(m, "jsdgam")
+  expect_identical(as.character(m$response_names), c("cnt", "pa"))
+
+  # Each response keeps the family it named.
+  code <- m$stancode
+  expect_true(grepl("poisson_log_glm_lpmf(Y_cnt", code, fixed = TRUE))
+  expect_true(grepl("bernoulli_logit_glm_lpmf(Y_pa", code, fixed = TRUE))
+
+  # The loadings run across the responses, which is the species axis
+  # on this layout, so the factor model is the one that was asked for
+  # rather than one latent state per response.
+  expect_identical(as.integer(m$standata$N_series_trend), 2L)
+  expect_identical(as.integer(m$standata$N_lv_trend), 1L)
+  expect_true(grepl("matrix[N_series_trend, N_lv_trend] Z", code,
+                    fixed = TRUE))
+})
+
+
+test_that("a species column is required only when the formula needs one", {
+  # The responses name the species on a multivariate formula, so
+  # demanding a species column there asks for something the layout
+  # cannot carry. The long layout still requires it.
+  set.seed(2L)
+  d <- data.frame(
+    site = rep(seq_len(10L), times = 2L),
+    species = factor(rep(c("a", "b"), each = 10L)),
+    env = rnorm(20L)
+  )
+  d$y <- rpois(20L, 2)
+  expect_error(
+    SW(jsdgam(formula = y ~ env, factor_formula = ~ -1,
+              data = d[, setdiff(names(d), "species")],
+              unit = site, species = species, n_lv = 1L,
+              family = poisson(), run_model = FALSE)),
+    "species"
+  )
+})

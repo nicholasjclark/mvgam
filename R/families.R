@@ -5122,22 +5122,30 @@ posterior_predict_com_binomial <- function(linpred, link,
 #' (multiplied by trials), so `posterior_epred()` returns the
 #' same units regardless of which trials-aware family produced
 #' the fit.
+#'
+#' Takes the `prep` list every other mean kernel takes, so
+#' `family_mean_from_kernel()` can call it the way it calls the
+#' rest. `prep$dpars$mu` arrives on the response scale already,
+#' which is why no link is applied here and why the signature
+#' could not simply be renamed: reading a link-scale predictor out
+#' of `mu` would invert it a second time and return a wrong mean
+#' with nothing to report.
 #' @noRd
-posterior_epred_com_binomial <- function(linpred, link,
-                                          family_pars, trials) {
-  checkmate::assert_matrix(linpred)
-  checkmate::assert_choice(link, "logit")
-  checkmate::assert_numeric(trials, lower = 0L, len = ncol(linpred))
-  nu <- family_pars$nu
-  checkmate::assert_matrix(nu, nrows = nrow(linpred),
-                            ncols = ncol(linpred))
-  ndraws <- nrow(linpred)
-  nobs <- ncol(linpred)
-  mu_flat <- as.numeric(.linkinv(linpred, link))
-  nu_flat <- as.numeric(nu)
-  T_flat <- rep(trials, each = ndraws)
-  ey_flat <- cmb_mean_vec(mu_flat, nu_flat, T_flat)
-  matrix(ey_flat, nrow = ndraws, ncol = nobs)
+posterior_epred_com_binomial <- function(prep) {
+  mu <- prep$dpars$mu
+  checkmate::assert_matrix(mu)
+  nu <- prep$dpars$nu
+  checkmate::assert_matrix(nu, nrows = nrow(mu), ncols = ncol(mu))
+  if (is.null(prep$data$trials)) {
+    stop(insight::format_error(c(
+      "Family 'com_binomial' requires the 'trials' data entry.",
+      i = "Pass a per-row trials vector to posterior_epred()."
+    )))
+  }
+  trials <- data2draws(prep$data$trials, dim_mu(prep))
+  ey_flat <- cmb_mean_vec(as.numeric(mu), as.numeric(nu),
+                           as.numeric(trials))
+  matrix(ey_flat, nrow = nrow(mu), ncol = ncol(mu))
 }
 
 

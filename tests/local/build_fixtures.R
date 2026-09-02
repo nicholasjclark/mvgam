@@ -58,21 +58,55 @@ fit_mvgam_cached <- function(name, formula, trend_formula, data, family, ...) {
   fit
 }
 
+fit_jsdgam_cached <- function(name, formula, factor_formula, data,
+                              n_lv, ...) {
+  path <- file.path(FIXTURE_DIR, paste0("val_jsdgam_", name, ".rds"))
+  if (file.exists(path)) {
+    cat("  cached jsdgam:", name, "\n")
+    return(readRDS(path))
+  }
+  cat("  fitting jsdgam:", name, "\n")
+  fit <- jsdgam(
+    formula = formula, factor_formula = factor_formula,
+    data = data, n_lv = n_lv,
+    chains = CHAINS, iter = ITER, warmup = WARMUP,
+    refresh = REFRESH, silent = 2, backend = "cmdstanr", ...
+  )
+  saveRDS(fit, path)
+  fit
+}
+
+
 cat("=== Building tests/local/fixtures/ ===\n\n")
 
 # ----------------------------------------------------------------------
 # SHARED TEST DATA
 # ----------------------------------------------------------------------
 
+# One AR(1) path, drawn from the stationary distribution so the
+# series has the marginal variance its parameters imply rather than
+# starting at zero and growing into it.
+sim_ar1 <- function(n, ar, sd) {
+  out <- numeric(n)
+  out[1] <- rnorm(1, 0, sd / sqrt(1 - ar^2))
+  for (t in 2:n) out[t] <- ar * out[t - 1] + rnorm(1, 0, sd)
+  out
+}
+
+# A zero-truncated draw, which is what the positive part of a hurdle
+# family is: the zeros come from the hurdle, never from the count.
+r_trunc <- function(draw) {
+  repeat {
+    v <- draw()
+    if (v > 0) return(v)
+  }
+}
+
 set.seed(42)
 n_time <- 30
 ar_coef <- 0.7
 sigma <- 0.5
-latent <- numeric(n_time)
-latent[1] <- rnorm(1, 0, sigma / sqrt(1 - ar_coef^2))
-for (t in 2:n_time) {
-  latent[t] <- ar_coef * latent[t - 1] + rnorm(1, 0, sigma)
-}
+latent <- sim_ar1(n_time, ar_coef, sigma)
 z <- seq(-2, 2, length.out = n_time)
 z_effect <- 0.5 * sin(z * pi)
 test_data <- data.frame(
@@ -88,11 +122,7 @@ test_data <- data.frame(
 set.seed(456)
 hs_n <- 60
 hs_x <- seq(-2, 2, length.out = hs_n)
-hs_latent <- numeric(hs_n)
-hs_latent[1] <- rnorm(1, 0, sigma / sqrt(1 - ar_coef^2))
-for (t in 2:hs_n) {
-  hs_latent[t] <- ar_coef * hs_latent[t - 1] + rnorm(1, 0, sigma)
-}
+hs_latent <- sim_ar1(hs_n, ar_coef, sigma)
 test_data_hs <- data.frame(
   y = rpois(hs_n, exp(0.5 + 1.5 * hs_x + hs_latent)),
   x = hs_x,
@@ -245,11 +275,21 @@ fit_mvgam_cached("mv_gauss",
 # ----------------------------------------------------------------------
 
 cat("\n[11] Beta AR(1)\n")
+# Carries a latent AR(1) and a covariate that the response actually
+# depends on. Drawing `y` from a fixed Beta and regressing it on an
+# unrelated `x` leaves nothing for either term to recover, so a fit
+# on such data agrees with any other fit on it and the concordance
+# says nothing about whether the trend or the covariate works.
 set.seed(456)
-n_beta <- 30
+n_beta <- 100
+beta_latent <- sim_ar1(n_beta, ar_coef, 0.7)
+beta_x <- rnorm(n_beta)
+beta_phi <- 8
+beta_mu <- plogis(-0.4 + 0.8 * beta_x + beta_latent)
 test_data_beta <- data.frame(
-  y = pmax(pmin(rbeta(n_beta, 2, 5), 0.999), 0.001),
-  x = rnorm(n_beta),
+  y = pmax(pmin(rbeta(n_beta, beta_mu * beta_phi,
+                      (1 - beta_mu) * beta_phi), 0.999), 0.001),
+  x = beta_x,
   time = 1:n_beta,
   series = factor("s1")
 )
@@ -262,12 +302,15 @@ fit_mvgam_cached("beta_ar1",
 
 cat("\n[12] Binomial AR(1)\n")
 set.seed(789)
-n_binom <- 30
+n_binom <- 100
 trials_vec <- rep(20, n_binom)
+binom_latent <- sim_ar1(n_binom, ar_coef, 0.7)
+binom_x <- rnorm(n_binom)
+binom_p <- plogis(-0.2 + 0.7 * binom_x + binom_latent)
 test_data_binom <- data.frame(
-  y = rbinom(n_binom, size = trials_vec, prob = 0.4),
+  y = rbinom(n_binom, size = trials_vec, prob = binom_p),
   trials = trials_vec,
-  x = rnorm(n_binom),
+  x = binom_x,
   time = 1:n_binom,
   series = factor("s1")
 )
@@ -300,11 +343,18 @@ fit_mvgam_cached("cumulative_fx",
 
 cat("\n[14] Hurdle Poisson AR(1)\n")
 set.seed(654)
-n_hp <- 30
-mu_true_hp <- exp(1.5 + 0.3 * rnorm(n_hp))
+n_hp <- 120
+hp_latent <- sim_ar1(n_hp, ar_coef, 0.7)
+hp_x <- rnorm(n_hp)
+hp_mu <- exp(1.2 + 0.5 * hp_x + hp_latent)
+hp_hu <- 0.25
 test_data_hp <- data.frame(
-  y = ifelse(runif(n_hp) < 0.3, 0, rpois(n_hp, mu_true_hp)),
-  x = rnorm(n_hp),
+  y = ifelse(
+    runif(n_hp) < hp_hu, 0L,
+    vapply(hp_mu, function(m) r_trunc(function() rpois(1, m)),
+           numeric(1))
+  ),
+  x = hp_x,
   time = 1:n_hp,
   series = factor("s1")
 )
@@ -317,12 +367,19 @@ fit_mvgam_cached("hurdle_poisson_ar1",
 
 cat("\n[15] Hurdle NegBinomial AR(1)\n")
 set.seed(655)
-n_hnb <- 30
-mu_true_hnb <- exp(1.2 + 0.4 * rnorm(n_hnb))
+n_hnb <- 120
+hnb_latent <- sim_ar1(n_hnb, ar_coef, 0.7)
+hnb_x <- rnorm(n_hnb)
+hnb_mu <- exp(1.0 + 0.5 * hnb_x + hnb_latent)
+hnb_hu <- 0.25
 test_data_hnb <- data.frame(
-  y = ifelse(runif(n_hnb) < 0.35, 0,
-              rnbinom(n_hnb, mu = mu_true_hnb, size = 2)),
-  x = rnorm(n_hnb),
+  y = ifelse(
+    runif(n_hnb) < hnb_hu, 0L,
+    vapply(hnb_mu,
+           function(m) r_trunc(function() rnbinom(1, mu = m, size = 2)),
+           numeric(1))
+  ),
+  x = hnb_x,
   time = 1:n_hnb,
   series = factor("s1")
 )
@@ -335,11 +392,16 @@ fit_mvgam_cached("hurdle_negbinomial_ar1",
 
 cat("\n[16] Zero-inflated Poisson AR(1)\n")
 set.seed(987)
-n_zip <- 30
-mu_true_zip <- exp(1.5 + 0.3 * rnorm(n_zip))
+n_zip <- 120
+zip_latent <- sim_ar1(n_zip, ar_coef, 0.7)
+zip_x <- rnorm(n_zip)
+zip_mu <- exp(1.2 + 0.5 * zip_x + zip_latent)
+zip_zi <- 0.3
+# A zero-inflated count keeps the family's own zeros: the inflation
+# adds to them rather than replacing the distribution.
 test_data_zip <- data.frame(
-  y = ifelse(runif(n_zip) < 0.4, 0, rpois(n_zip, mu_true_zip)),
-  x = rnorm(n_zip),
+  y = ifelse(runif(n_zip) < zip_zi, 0L, rpois(n_zip, zip_mu)),
+  x = zip_x,
   time = 1:n_zip,
   series = factor("s1")
 )
@@ -844,3 +906,70 @@ fit_mvgam_cached(
 
 cat("\n=== All fixtures present in", FIXTURE_DIR, "===\n")
 cat("Files: ", length(list.files(FIXTURE_DIR, pattern = "\\.rds$")), "\n")
+
+# ----------------------------------------------------------------------
+# [26] JSDM with one observation family per species.
+# Three species share two latent factors through known loadings, and
+# each is observed on its own scale: counts, presence-absence and a
+# continuous measure. The responses are the species axis, so this is
+# the only shape that can carry mixed data types in one joint model,
+# and `Z` is recoverable because the loadings are known.
+# ----------------------------------------------------------------------
+cat("\n[26] JSDM, one family per species\n")
+set.seed(2026L)
+n_site_mv <- 60L
+n_lv_mv <- 2L
+Z_mv <- matrix(
+  c(1.0, 0.2,
+    0.3, 0.9,
+    -0.8, 0.5),
+  nrow = 3L, ncol = n_lv_mv, byrow = TRUE
+)
+lv_mv <- matrix(rnorm(n_site_mv * n_lv_mv), n_site_mv, n_lv_mv)
+eta_mv <- lv_mv %*% t(Z_mv)
+mv_fam_data <- data.frame(
+  site = seq_len(n_site_mv),
+  env = rnorm(n_site_mv),
+  count = rpois(n_site_mv, exp(1.0 + 0.4 * eta_mv[, 1L])),
+  seen = rbinom(n_site_mv, 1L, plogis(0.2 + eta_mv[, 2L])),
+  mass = rnorm(n_site_mv, 2.0 + eta_mv[, 3L], 0.4)
+)
+attr(mv_fam_data, "Z_true") <- Z_mv
+fit_jsdgam_cached(
+  "mv_families",
+  brms::bf(count ~ env, family = poisson()) +
+    brms::bf(seen ~ env, family = bernoulli()) +
+    brms::bf(mass ~ env, family = gaussian()),
+  ~ -1, mv_fam_data, n_lv = n_lv_mv,
+  unit = site, species = species
+)
+
+# ----------------------------------------------------------------------
+# [27] Multivariate frame carrying no series column.
+# Every cached multivariate fit names its own series, so none of them
+# reaches the path that derives one. That path used to cut the rows
+# into a block per response, which is a stacked frame's shape and not
+# this one, and the resulting latent trend gave the first half of the
+# timeline to one response and the rest to the other. It raised
+# nothing. This fixture exists to be driven end to end on that shape.
+# ----------------------------------------------------------------------
+cat("\n[27] Multivariate, no series column\n")
+set.seed(3131L)
+n_mv_nc <- 60L
+mv_nc_latent <- sim_ar1(n_mv_nc, ar_coef, 0.6)
+mv_nc_x <- rnorm(n_mv_nc)
+mv_nc_data <- data.frame(
+  time = seq_len(n_mv_nc),
+  x = mv_nc_x,
+  cnt = rpois(n_mv_nc, exp(0.8 + 0.5 * mv_nc_x + mv_nc_latent)),
+  pa = rbinom(n_mv_nc, 1L,
+              plogis(-0.2 + 0.7 * mv_nc_x + mv_nc_latent))
+)
+attr(mv_nc_data, "latent_true") <- mv_nc_latent
+fit_mvgam_cached(
+  "mv_nocol",
+  brms::bf(cnt ~ x, family = poisson()) +
+    brms::bf(pa ~ x, family = bernoulli()),
+  ~ AR(p = 1),
+  mv_nc_data, NULL
+)

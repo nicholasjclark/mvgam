@@ -54,20 +54,63 @@ test_that("residuals(summary = FALSE) returns ndraws x nobs", {
 })
 
 
-# ---- N(0, 1) sanity check on a well-calibrated continuous fit ---
+# ---- What in-sample quantile residuals can and cannot show -------
 #
-# Pool dsresids from a gaussian AR(1) fit and assert their
-# empirical mean / sd land near 0 / 1. This is a calibration
-# smoke check, not a hypothesis test -- the gaussian AR(1)
-# fixture is small (n=150), so we use generous tolerances.
+# A gaussian quantile residual is `qnorm(pnorm(y, mu, sigma))`, and
+# `sigma` is the observation scale alone. In sample the latent state
+# is fitted to the same observations it is then measured against, so
+# `y - mu` is smaller than `sigma` and the residuals come back
+# under-dispersed: on this fixture the state tracks the data to an sd
+# of 0.11 against a posterior `sigma` of 0.21, and the residuals land
+# near an sd of 0.43. That is the same optimism that makes in-sample
+# PSIS-LOO unreliable for a state-space fit, not a defect, and no
+# threshold makes `sd == 1` a property this quantity has. Calibration
+# has to be judged out of sample or against a known truth.
+#
+# What the residuals do have to satisfy in sample is that they are
+# centred, that none is clamped, and that they answer on the state
+# the model inferred. The last is the one worth testing: reading the
+# marginal surface instead leaves the trend in the residual, the PIT
+# saturates, and values pin at the `qnorm` bounds.
 
-test_that("dsresids on a well-fitted gaussian model are near N(0,1)", {
+test_that("in-sample gaussian residuals are centred and unclamped", {
   fit <- load_fit("val_mvgam_gauss_ar1_n150")
-  r <- residuals(fit, ndraws = 500L)
-  est <- r[, "Estimate"]
+  est <- residuals(fit, ndraws = 500L)[, "Estimate"]
   est <- est[is.finite(est)]
+  expect_gt(length(est), 100L)
   expect_lt(abs(mean(est)), 0.25)
-  expect_lt(abs(stats::sd(est) - 1), 0.30)
+  # Under-dispersed by construction, but a degenerate or exploded
+  # scale still says something has gone wrong.
+  expect_gt(stats::sd(est), 0.1)
+  expect_lt(stats::sd(est), 1)
+  # Nothing pinned at the clamping bounds.
+  expect_true(all(abs(est) < 5))
+})
+
+
+test_that("residuals read the fitted state, not the marginal trend", {
+  # The defect this guards: `posterior_predict()` once dropped
+  # `incl_autocor`, so every residual on a family without an analytic
+  # quantile spec was PIT-ed against draws that ignored the fitted
+  # state. On a strong-AR fit that saturates the PIT and pins values
+  # at `qnorm(eps)`, and the autoregressive signal reappears as
+  # residual autocorrelation. The two surfaces have to differ, and
+  # the conditional one has to be the better behaved.
+  fit <- load_fit("val_mvgam_gauss_ar1_n150")
+  set.seed(1L)
+  cond <- residuals(fit, ndraws = 300L)[, "Estimate"]
+  set.seed(1L)
+  marg <- residuals(fit, ndraws = 300L, incl_autocor = FALSE)[, "Estimate"]
+  cond <- cond[is.finite(cond)]
+  marg <- marg[is.finite(marg)]
+
+  expect_false(isTRUE(all.equal(cond, marg)))
+  # Leaving the trend in widens the spread rather than shrinking it.
+  expect_gt(stats::sd(marg), stats::sd(cond))
+  expect_gt(stats::sd(marg), 1)
+  # And it is the marginal surface that clamps, not the conditional.
+  expect_true(all(abs(cond) < 5))
+  expect_gt(sum(abs(marg) > 5), 0L)
 })
 
 

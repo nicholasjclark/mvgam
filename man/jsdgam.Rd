@@ -71,10 +71,17 @@ same structure as \code{data}, forwarded to \code{\link[=mvgam]{mvgam()}} and
 persisted on the returned fit for later prediction.}
 
 \item{family}{A \code{family} object specifying the observation
-distribution. Supported families are documented in
-\code{mvgam_families}. Defaults to \code{binomial()}, which is the standard
-choice for presence/absence JSDM responses; switch to a count
-family (\code{poisson()}, \code{nb()}) when modelling counts. For simplex
+distribution shared by every species. Supported families are
+documented in \code{mvgam_families}. Defaults to \code{binomial()}, the
+standard choice for presence/absence JSDM responses; switch to a
+count family (\code{poisson()}, \code{nb()}) when modelling counts.
+
+To give each species its own family, write \code{formula} as a
+multivariate formula naming one response per species and its
+family inside each \code{\link[brms:brmsformula]{brms::bf()}}, as in
+\code{bf(count ~ env, family = poisson()) + bf(seen ~ env, family = bernoulli())}. The responses then form the species axis the
+latent factors load across, \code{species} is read from them rather
+than from a column, and this argument is ignored. For simplex
 multi-response families (\code{diri()}, \code{multi()}, \code{categ()}), write
 the formula with a per-\code{species} interaction (e.g.
 \code{y ~ env * species} or the brms-native-style

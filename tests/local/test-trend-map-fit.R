@@ -141,16 +141,29 @@ test_that("residual_cor returns a residcor object", {
 
 
 test_that("posterior recovers different per-series means", {
-  ep <- posterior_epred(fit, ndraws = 30L)
+  # What separates the series here is the latent state each one loads
+  # on, so the question is only answerable on the surface that carries
+  # it. The observation formula is `y ~ 1`, and the default surface
+  # leaves the trend at its deterministic submodel, which for this fit
+  # is zero: every row then returns `exp(Intercept)` and the series
+  # agree exactly, whatever `Z` holds. That is the documented default,
+  # not a collapse.
   series_vec <- fit$data$series
-  series_means <- vapply(
-    levels(series_vec),
-    function(s) mean(ep[, series_vec == s]),
-    numeric(1L)
-  )
+  series_mean <- function(m) {
+    vapply(levels(series_vec), function(s) mean(m[, series_vec == s]),
+           numeric(1L))
+  }
+
+  ep <- posterior_epred(fit, ndraws = 30L, incl_autocor = TRUE)
+  series_means <- series_mean(ep)
   expect_true(all(is.finite(series_means)))
   expect_true(all(series_means > 0))
   # Dense Z mixes 2 factors with different per-series weights,
   # so expected counts should not collapse to one value.
   expect_gt(stats::sd(series_means), 1e-6)
+
+  # And the marginal surface is flat here for the reason above, which
+  # is worth pinning so the two are not confused again.
+  marg <- series_mean(posterior_epred(fit, ndraws = 30L))
+  expect_equal(stats::sd(marg), 0)
 })

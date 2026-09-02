@@ -242,6 +242,24 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > on a simulation that cannot be recovered, which is 5.4.
 
 - [ ] **5.0 Rebuild every vignette and the pkgdown site**
+  > Measured, not assumed: regenerating stancode for each cached fit
+  > and diffing it against the copy the fit stores shows
+  > `forecast_eval/mod_var`, `hierarchical_var/mod_hier` and
+  > `jsdgam/mod_traits` differing in more than prior spelling, so
+  > those articles quote numbers from models the package does not
+  > generate. `jsdgam/mod_mgp` does not regenerate at all, which is
+  > 35.0. Only `forecast_eval/mod_spline` is current.
+  >
+  > The same sweep over `tests/local/fixtures/` found 28 of 36 stale
+  > and they have been rebuilt. Two causes: the AR(1) stationary
+  > initialisation, where a stored fit starts the state at
+  > `scaled_innovations_trend` and current codegen divides by
+  > `sqrt(1 - phi^2)`, which moves the posterior; and the prior
+  > spelling from 18.0, which does not. A fit stores the stancode it
+  > was sampled with, so `update(recompile = FALSE)` compares that
+  > against what the package emits now and refuses when they differ.
+  > That is the cheapest staleness detector available and it wants
+  > running before the articles are re-rendered.
   > Five articles still hold numbers from June and July caches:
   > `var.Rmd`, `hierarchical_var.Rmd`, `mvbf.Rmd`, `jsdgam.Rmd` and
   > `idm.Rmd`. Each carries one inline R expression, so every figure
@@ -386,42 +404,6 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > Check the emitted `mvt` program for a stanc3 non-linear
   > transform warning before writing tests to the new spelling.
 
-- [x] **18.0 Convert the tests to the density spelling**
-  > Done. Every prior mvgam emits is now written through
-  > `stan_prior_statement()` and normalised in one post-assembly
-  > pass, so `lp__` matches the log joint and `bridge_sampler()`
-  > can be trusted across trend structures.
-  >
-  > The test conversion found more than a spelling change. Five
-  > negative assertions named a tilde nothing writes any more and
-  > so passed whatever the program held; each now names the
-  > parameter, read through `mvgam_stancode_prior_rows()` by the
-  > `stan_prior_on()` helper. Both replacements were shown to
-  > discriminate rather than pass trivially: a default program
-  > reports `Z` at `student_t(3, 0, 0.5)`, and a user prior on
-  > `b_trend` reads back as `normal(0, 3)`.
-  >
-  > Two helpers were worse than stale. `expect_match2()` returned
-  > a bare logical that testthat never saw, so 50 unwrapped call
-  > sites asserted nothing, and it was defined in two setup files.
-  > `stan_pattern()` tried to guess whether a pattern was a
-  > literal or a regex, and neither branch worked: the detector
-  > looked for a backslash the callers never wrote, and the
-  > escaping character class closed on its own `]` so it escaped
-  > nothing. Being a no-op in both directions is why the suite
-  > stayed green. The guessing is gone and `fixed = TRUE`, already
-  > the idiom in that file, says when a pattern is a literal.
-  >
-  > One assertion was a real casualty: the custom-prior test
-  > looked for the literal `normal(0, 0.75)`, which normalisation
-  > had turned into `target += normal_lpdf(ar1_trend | 0, 0.75)`.
-  > It now asserts each prior reached the parameter it names,
-  > which the original would not have caught landing on the wrong
-  > one.
-  >
-  > The `bridge_sampler()` gate had tests for brms's `_lupdf`
-  > spelling only, never mvgam's own tilde. It has both now.
-
 - [ ] **20.0 The last part of the forecasting audit**
   > Five parts are done, and so is the sixth. The trend linear
   > predictor now reaches every forecast: generated Stan builds
@@ -487,42 +469,6 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   >
   > Neither file runs in CI, and the local suite has no runner
   > that sweeps every file, so nothing reports a stale one.
-
-- [x] **24.0 A factor fit at the ceiling forecast as if it had none**
-  > Done, and it was a live defect rather than a tidy-up.
-  > `forecast.mvgam()` and `extract_last_state()` each decided
-  > whether a fit was a factor model by comparing `N_lv_trend`
-  > against `N_series_trend`. That comparison cannot answer it: a
-  > factor fit reaches `n_lv = n_series` under an MGP loadings
-  > prior, a `by = lv_axis()` term or a fully fixed `trend_map`,
-  > and a non-factor fit carries the same pair with an identity Z
-  > in transformed data. Such a fit was read as series-grain, so
-  > no Z projection ran and `ar1_trend[k]`, indexed by latent
-  > column, reached the recursion for series k with lengths that
-  > matched and nothing to complain.
-  >
-  > Only the requested `n_lv` separates the two, and the trend
-  > spec keeps it. `detect_factor_n_lv()` moved from
-  > `R/residual_cor.R` to sit beside `is_factor_model_spec()` and
-  > now routes through it, so the forecast reads the answer
-  > codegen used when it decided whether to sample `Z`. It already
-  > had eleven callers, so the name stayed.
-  >
-  > Shown on `val_mvgam_mgp_ceiling.rds`, built for this because
-  > no cached fit sat at the ceiling: the state now reads
-  > `lv_trend[T, ]` at (1.452, 0.386, 0.228) where the series
-  > grain is (-1.114, 0.468, 0.166), opposite in sign on the first
-  > element. That fixture samples with a few divergences and a low
-  > E-BFMI on one chain, which is the geometry the ceiling has and
-  > why it exists only under shrinkage; its tests assert grain and
-  > never parameter accuracy.
-  >
-  > `posterior_transition_matrix()` labelled its latent axes from
-  > `standata$series_names`, which nothing in `R/` ever writes, so
-  > the `%||%` always fell through and the reported labels were
-  > already `process_<k>`. The dead read is gone, which is what
-  > kept a future change from silently reintroducing series names
-  > on a factor VAR's latent axes.
 
 - [ ] **25.0 One fixture stores a Cholesky factor as a covariance**
   > `tests/local/fixtures/val_jsdgam_trait.rds` was built when the
@@ -608,118 +554,6 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > instead. 16.0 records the reasons the coefficient scale was
   > kept, and those still apply.
 
-- [ ] **31.0 Six defects found writing the case study**
-  > Reported against 30ce433 and verified here against the
-  > source. Ordered by what a CRAN user meets first.
-  >
-  > **31.1 `posterior_predict()` never honoured `incl_autocor`.**
-  > It derives `trend_state` and hands it to `posterior_linpred()`,
-  > whose formal is `incl_autocor`, so the argument falls into
-  > `...` and the callee takes its own `FALSE`. Every draw has
-  > always been marginal. It is the only bad site of four:
-  > `log_lik()`, `posterior_epred()` and `posterior_linpred()`
-  > pass `trend_state` to `get_combined_linpred()`, where it is a
-  > real formal. What singles this one out is that it delegates to
-  > a sibling public method rather than to the internal one, and
-  > that is exactly where the name changes from the internal
-  > spelling to the external.
-  >
-  > The cost is silent. `diagnostic_surface_args()` sets
-  > `incl_autocor = TRUE` for in-sample diagnostics, so the helper
-  > the architecture names as the one place diagnostics choose a
-  > surface is a no-op on this path: `residuals()` reaches it at
-  > three sites and `pp_check()` at one. `loo_predict()` asks for
-  > the conditional surface explicitly and is refused, so it pairs
-  > conditional importance weights with marginal draws, against
-  > the invariant its own comment states.
-  >
-  > Only the empirical-PIT path is affected, which is every family
-  > without an analytic spec: `quantile_family_specs` holds
-  > gaussian, student, lognormal and beta, so continuous fits
-  > already read the conditional surface through
-  > `posterior_linpred()` and do not move. `loo()`, `waic()`,
-  > `lfo_cv()`, `kfold()`, `hindcast()` and `forecast()` reach
-  > `get_combined_linpred()` directly and are untouched. No fixture
-  > needs refitting; residual and `pp_check` values on a
-  > strong-trend fit will move, correctly.
-  >
-  > `test-posterior-linpred.R` asserts the argument exists and
-  > defaults correctly on all five entry points, and never that
-  > `posterior_predict()` acts on it. A behavioural test belongs
-  > with the fix: the two settings must differ on a strong-AR fit,
-  > and the conditional one must track `hindcast()`.
-  >
-  > **31.2 A prediction grid that loses or contradicts an addition
-  > term.** One fault in three places, which is why they are
-  > written together.
-  >
-  > `hindcast()`, `plot(type = "trend")` and
-  > `plot(type = "residuals")` fail on any zero-padded binomial or
-  > beta-binomial fit with "Number of trials is smaller than the
-  > number of events". `get_safe_dummy_value()` fills a padded
-  > response with 1 for a count family, and `mock-stanfit.R` calls
-  > `brms::standata()` without `check_response = FALSE`, so brms
-  > compares that 1 against a padded `trials` of 0. Padding with 1
-  > instead is the wrong repair: a padded row would then draw a
-  > real Bernoulli value and put synthetic noise into the very
-  > plots the padding exists to enable. The smooth path already
-  > passes `check_response = FALSE` and says why.
-  >
-  > `conditional_effects()` cannot find `trials`, because
-  > `find_predictors.mvgam()` reads the right-hand side only and
-  > `find_response.mvgam()` returns the first LHS name, so
-  > `datagrid()` drops the column. The repair belongs at the
-  > `get_predict.mvgam()` boundary, where
-  > `complete_closure_unit_newdata()` already backfills grid
-  > columns for the same reason, and not in `find_predictors()`:
-  > anything named there becomes a variable `avg_slopes()` will
-  > differentiate, and a slope with respect to a binomial
-  > denominator means nothing.
-  >
-  > `backfill_smooth_grid()` holds a non-focal `trials` at its
-  > median, which is fractional. Rounding an integer-valued column
-  > is a better grid value regardless and reaches no design matrix.
-  >
-  > **31.3 `plot(type = "smooths")` on any `trials()` fit.** Two
-  > further faults, a strict chain with the one above, so all
-  > three land together or none does.
-  > `mvgam_smooth_label_spec()` attaches the family only when the
-  > formula is not already a `brmsformula`, but
-  > `mvgam_side_formula()` always returns one, so `brmsterms()`
-  > validates as gaussian and rejects `trials()`. The
-  > `mvbrmsformula` branch below it already handles this; the test
-  > should be on whether the formula carries a family, not on its
-  > class. And `build_smooth_grid()` is the one bare call site of
-  > three, with the family in scope. It has to be side-aware:
-  > `mvgam_smooth_terms()` uses the fit's family for the
-  > observation side and gaussian for the trend.
-  >
-  > **31.4 `posterior_epred()` errors on `com_binomial`.**
-  > `family_mean_from_kernel()` calls `kernel(prep)`, and
-  > `posterior_epred_com_binomial()` is the last kernel still on
-  > the `(linpred, link, family_pars, trials)` signature, so `prep`
-  > binds to `linpred` and the matrix assertion fires. Convert the
-  > body, not the signature: it applies `.linkinv()` to a value
-  > already inverse-linked, so an argument-only wrapper would
-  > invert twice and return wrong means with no error. Read
-  > `prep$dpars$mu`, `prep$dpars$nu` and the trials draws as the
-  > binomial kernel does. The `"com_binomial"` arm of the switch in
-  > `posterior_epred.R` is unreachable and must go in the same
-  > change, or the converted signature leaves an install note.
-  > `posterior_predict_com_binomial()` keeps the old signature and
-  > is called correctly; leave it.
-  >
-  > **31.5 `s(series, bs = "re")` draws an empty panel.** One point
-  > per level rendered with `geom_ribbon` and `geom_line`, both of
-  > which need two points per group. brms branches on
-  > `is.numeric()` and draws points with intervals. Cosmetic.
-  >
-  > Sequence: 31.1 first and alone, since it changes numbers and
-  > nothing else here blocks it. Then 31.2, whose failures block
-  > the binomial reproducers that would demonstrate 31.1. 31.3 and
-  > 31.4 after. Re-run 23.0 once 31.1 lands, before touching
-  > anything in it.
-
 - [ ] **32.0 Three duplications on the prediction surface**
   > Found reviewing the fix for 31.1 and 31.2, and all three sit in
   > the blast radius of the bug class those entries record, which is
@@ -756,28 +590,182 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > refuse it, which matters on a surface that has now been bitten
   > three times by an argument going into `...`.
 
-- [ ] **33.0 The gaussian residual calibration check does not hold**
-  > `tests/local/test-residuals.R` asserts pooled quantile residuals
-  > on the cached gaussian AR(1) fit land near N(0, 1), and the sd
-  > comes out at 0.418 against a threshold of 0.30 either side of 1.
-  > It fails identically with 31.1 reverted, so the surface fix is
-  > not the cause.
+- [ ] **34.0 An ordinal likelihood the trend cannot reach**
+  > `stancode()` for any ordinal family with a latent trend emits
+  > `ordered_logistic_glm_lpmf(Y | to_matrix(mu), 0.0, mu_ones)` and
+  > stanc refuses it: the third argument must be a vector and `0.0`
+  > is a real. Reproduced on a fresh `cumulative()` fit with
+  > `~ ZMVN()`, so it is not a stale fixture. No ordinal trend model
+  > compiles.
   >
-  > The numbers say the state is absorbing the noise: the fit tracks
-  > the observations to an sd of 0.11 while the posterior `sigma` is
-  > 0.214, so the PIT divides by roughly twice the error actually
-  > made and the residuals come back under-dispersed by about that
-  > factor. Conditioning on a latent state fitted to the same
-  > observations is expected to do this in sample, which is the same
-  > optimism that makes PSIS-LOO unreliable for a state-space fit.
-  > On the marginal surface the same fit gives an sd of 3.157, so
-  > neither surface is anywhere near 1.
+  > `transform_glm_call_to_mu_format()` rewrites every brms GLM
+  > likelihood into one shape, `glm_fn(y | to_matrix(mu), 0.0,
+  > mu_ones, <extra>)`. That is right for the families whose Stan
+  > signature is `(x, alpha_real, beta_vector)`: `bernoulli_logit`,
+  > `poisson_log`, `normal_id`, `neg_binomial_2_log`. It is wrong for
+  > `ordered_logistic_glm_lpmf(y | x, beta_vector, cutpoints_vector)`,
+  > which has no scalar intercept and takes its arguments in another
+  > order. `categorical_logit_glm` needs the same check.
   >
-  > Decide what the check is for before moving it. If the target is
-  > calibration, it belongs out of sample or on simulated data with
-  > a known truth. If the target is a smoke test that residuals are
-  > finite and centred, the sd bound should go. Changing the
-  > threshold to fit the number measured tests nothing.
+  > The file already carries a per-family table saying what each
+  > family appends after its coefficients. The argument layout belongs
+  > in that table beside it rather than in a branch, and a second
+  > hard-coded copy of the same rewrite sits lower in the file.
+  >
+  > `val_mvgam_cumulative_fx` stores the un-rewritten brms line while
+  > its metadata records a ZMVN trend, so establish whether that fit
+  > ever had the trend in its likelihood before trusting anything it
+  > asserts.
+
+- [ ] **35.0 The MGP loadings program does not regenerate**
+  > Regenerating stancode for `pkgdown/jsdgam_cache/mod_mgp.rds`
+  > fails with `Identifier "varrho_inv" not in scope`: the
+  > transformed-parameters block reads `varrho_inv` where nothing
+  > declares it. A second codegen fault, found the same way as 34.0
+  > and unrelated to it.
+  >
+  > 13.1 records `varrho_inv` as one of three Stan names that break
+  > the `_trend` suffix rule and cannot be renamed without making
+  > cached fits unreadable. Whatever this turns out to be, decide it
+  > alongside that entry rather than separately.
+
+- [ ] **36.0 `hindcast(type = "expected")` refuses an ordinal fit**
+  > `posterior_epred()` answers for a `cumulative()` fit, returning
+  > `[draws x rows x categories]`. `hindcast(type = "expected")`
+  > fails on the same fit with "Family 'cumulative' is not yet
+  > supported for `posterior_epred()`", while `"link"`, `"response"`
+  > and `"trend"` all work.
+  >
+  > The arms a hindcast returns are `[draws x times]` per series, and
+  > an ordinal mean is a probability per category, so there is no
+  > shape for the answer to take without a decision about what a
+  > per-series ordinal hindcast means. Decide that before writing
+  > anything; the invariant sweep skips ordinal fits on this check in
+  > the meantime.
+
+- [ ] **37.0 Outcome-specific priors on a multi-response fit**
+  > Unverified either way, which is the reason for the entry. A
+  > multi-response model gives each outcome its own submodel, so a
+  > user setting `prior(normal(0, 1), class = b, resp = count)` is
+  > naming one outcome and expecting the other to keep its default.
+  > Nothing currently establishes that the emitted program honours
+  > the scoping: a prior silently applied to every response, or
+  > dropped, reads the same from the fitted object.
+  >
+  > Two halves, and both are needed. In CI, assert the Stan program
+  > itself: set a distinctive prior on one response, read the priors
+  > back off the emitted code with `mvgam_stancode_prior_rows()`, and
+  > check the named response carries it while the others do not. This
+  > needs no sampling and is where a scoping regression is cheapest
+  > to catch. Cover `class = b`, `class = Intercept`, `class = sigma`
+  > and the trend-side classes, since they reach the emitter by
+  > different routes.
+  >
+  > Locally, a fixture has to exercise it end to end: fit an
+  > `mvbind()` model with per-response priors and confirm the
+  > posterior reflects them, that `prior_summary()` reports them
+  > against the right response, and that `update()` round-trips them.
+  > `val_mvgam_mv_gauss` is the natural fixture to extend rather than
+  > adding a new fit.
+  >
+  > The wider point this entry stands for: the cached fits exist to
+  > be driven, and a fixture that is only ever asked for its shape
+  > earns nothing. Every local fixture should exercise the model end
+  > to end -- priors in, sampling, then forecast, hindcast, score,
+  > predict, plot, summary and the accessors -- so the surfaces are
+  > shown to be right rather than merely to run.
+
+- [ ] **38.0 One observation family per species in `jsdgam()`**
+  > Confirm whether `jsdgam()` accepts a different observation family
+  > for each species, and say plainly which it is. A joint species
+  > model over mixed data types is the ordinary case -- counts for one
+  > taxon, presence-absence for another, cover for a third -- and if
+  > the answer is that one family applies to every species, that is a
+  > documented limitation rather than something to infer from a
+  > failure.
+  >
+  > Establish it from the code first, since the constructor may
+  > accept a list and then quietly use its first element, which no
+  > fit would reveal. Then decide: support it, or refuse a list with
+  > a message naming `mvbind()` as the route to mixed families. Either
+  > way it needs a test, and if it is supported it needs a local
+  > fixture with at least two families and the full post-fit surface
+  > driven over it.
+
+- [ ] **39.0 The multivariate series axis is a per-row vector and
+  cannot be**
+  > On a wide `brms::mvbf()` frame the series a row belongs to is not
+  > a property of the row. Each row carries every response, so the
+  > axis is a property of the (row, response) pair. mvgam holds it in
+  > one frame-level `mvgam_series` attribute, and that attribute is
+  > then asked two questions it cannot both answer.
+  >
+  > `create_multivariate_series()` fills it with
+  > `factor(rep(response_vars, each = n_obs / K))`: the first block of
+  > rows is response one, the next is response two. That satisfies
+  > the dimension code, which reads `unique(series_vals)` and wants
+  > all `K` names present (`R/validations.R:2818`, `:5045`, `:5156`).
+  > It is wrong for `generate_obs_trend_mapping()`
+  > (`R/validations.R:3112`), which reads the same vector per response
+  > and needs every row of that response on that response's own
+  > series. Measured on a two-response, 40-row frame:
+  > `obs_trend_series_cnt` holds both 1 and 2, so within one response
+  > half the rows read one latent state and half read another. The
+  > trend grid built at `:5156` groups by the same fiction.
+  >
+  > It reaches post-fit as well. Multivariate `standata` carries
+  > `obs_trend_series_cnt` and `obs_trend_series_pa` but no plain
+  > `obs_trend_series`, so `fitted_series_index()` falls back to the
+  > derived labels and `extract_trend_latent_states()` reads the split
+  > indices. Conditional `posterior_linpred()` and `hindcast()` on a
+  > multivariate fit read the wrong latent column.
+  >
+  > Three further findings, each measured:
+  >
+  > `ensure_mvgam_variables()` runs three times in one `standata()`
+  > call and answers differently each time, reporting
+  > `multivariate`, `multivariate_shared`, `multivariate`. The
+  > branch turns on how many trend specs the caller happened to have
+  > replicated, so the axis depends on call order. This is the shape
+  > the hierarchical series had, where `standata` and
+  > `trend_metadata` disagreed.
+  >
+  > The `multivariate_shared` branch collapses the axis to a single
+  > series whenever every response names an identical trend spec.
+  > Sharing a trend *type* is not sharing a trend, and
+  > `quick-reference.md` Pattern 4 asks for
+  > `RW(cor = TRUE, n_lv = 2)` across three responses of different
+  > families, which means nothing unless each response holds its own
+  > state. `detect_shared_trends()` in `R/stan_assembly.R:223` is a
+  > different question and is right as it stands: it decides whether
+  > trend stanvars are emitted once, and one `trend[N_time, N_series]`
+  > block indexed per response is exactly what is wanted.
+  >
+  > The divisibility check at `R/validations.R:4231` belongs to the
+  > stacked reading and asks for something a wide frame has no reason
+  > to satisfy. Three responses over 40 rows stops there. That stop is
+  > the lucky case: two responses over 40 rows proceeds and is wrong.
+  >
+  > So the documented flagship pattern, per-response families over a
+  > shared latent structure, does not currently hold together, and
+  > `jsdgam()` given a multivariate formula is the same pattern with
+  > loadings on top.
+  >
+  > The repair is to stop deriving the axis from a per-row vector.
+  > `unique_series` for a multivariate frame is `response_vars`, taken
+  > directly; each per-response consumer uses its own `response_var`;
+  > the trend grid is the (time x response) product. An explicit
+  > `series` column keeps winning, which is what
+  > `pkgdown/mvbf_cache/mod_joint.rds` relies on and why it is
+  > unaffected: one level, three responses, one shared state, because
+  > the user said so.
+  >
+  > Do this as its own change. It moves fitted output for every
+  > multivariate model, so the mv fixtures are refitted with it, and
+  > `val_mvgam_mv_gauss`, `mod_joint` and the mvbf article all need
+  > re-checking afterwards. No fixture currently covers a wide frame
+  > without a `series` column, which is why none of this was caught;
+  > one belongs in `build_fixtures.R` with the same change.
 
 - [ ] **6.0 Final release verification**
   > Clean `document()`, clean test sweep, `R CMD check --as-cran`,

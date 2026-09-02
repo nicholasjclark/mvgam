@@ -77,10 +77,18 @@
 #'   persisted on the returned fit for later prediction.
 #'
 #' @param family A `family` object specifying the observation
-#'   distribution. Supported families are documented in
-#'   `mvgam_families`. Defaults to `binomial()`, which is the standard
-#'   choice for presence/absence JSDM responses; switch to a count
-#'   family (`poisson()`, `nb()`) when modelling counts. For simplex
+#'   distribution shared by every species. Supported families are
+#'   documented in `mvgam_families`. Defaults to `binomial()`, the
+#'   standard choice for presence/absence JSDM responses; switch to a
+#'   count family (`poisson()`, `nb()`) when modelling counts.
+#'
+#'   To give each species its own family, write `formula` as a
+#'   multivariate formula naming one response per species and its
+#'   family inside each [brms::bf()], as in
+#'   `bf(count ~ env, family = poisson()) + bf(seen ~ env, family =
+#'   bernoulli())`. The responses then form the species axis the
+#'   latent factors load across, `species` is read from them rather
+#'   than from a column, and this argument is ignored. For simplex
 #'   multi-response families (`diri()`, `multi()`, `categ()`), write
 #'   the formula with a per-`species` interaction (e.g.
 #'   `y ~ env * species` or the brms-native-style
@@ -328,26 +336,38 @@ jsdgam <- function(formula,
   }
 
   checkmate::assert_data_frame(data, min.rows = 1L)
-  # Accept either plain `formula` or `brms::bf(...)` (`brmsformula`)
-  # so detection / dpar sub-formulas (`p ~ visit_cov` for occ() /
-  # nmix(); `phi ~ env` for diri()) can be threaded through
-  # `mvgam()` downstream.
+  # Accept every formula spelling `mvgam()` accepts, since this
+  # forwards to it: a plain `formula`, a `brms::bf(...)` carrying
+  # detection / dpar sub-formulas (`p ~ visit_cov` for occ() /
+  # nmix(); `phi ~ env` for diri()), or a multivariate formula whose
+  # responses each name their own family.
   checkmate::assert_multi_class(
-    formula, c("formula", "brmsformula")
+    formula, c("formula", "brmsformula", "mvbrmsformula")
   )
   checkmate::assert_class(factor_formula, "formula")
+  # A multivariate formula gives each species its own response and its
+  # own family, so the species axis is the set of responses and the
+  # data carries a column per species rather than a species column.
+  # Everything below reads `species_levels` rather than the column, so
+  # the two layouts share one path.
+  is_mv_formula <- inherits(formula, "mvbrmsformula")
   checkmate::assert_names(
     names(data),
-    must.include = c(unit_chr, species_chr)
+    must.include = if (is_mv_formula) unit_chr else c(unit_chr, species_chr)
   )
   validate_pos_integer(n_lv)
 
-  # Coerce species to factor if it isn't already so n_lv comparisons
-  # against nlevels() are well defined.
-  if (!is.factor(data[[species_chr]])) {
-    data[[species_chr]] <- factor(data[[species_chr]])
+  if (is_mv_formula) {
+    species_levels <- names(formula$forms)
+  } else {
+    # Coerce species to factor if it isn't already so n_lv comparisons
+    # against nlevels() are well defined.
+    if (!is.factor(data[[species_chr]])) {
+      data[[species_chr]] <- factor(data[[species_chr]])
+    }
+    species_levels <- levels(data[[species_chr]])
   }
-  n_species <- nlevels(data[[species_chr]])
+  n_species <- length(species_levels)
   if (n_species < 2L) {
     stop(insight::format_error(c(
       "'jsdgam' requires at least 2 species levels.",
@@ -398,29 +418,33 @@ jsdgam <- function(formula,
     }
     data_train$time <- data_train[[unit_chr]]
   }
-  if (!identical(species_chr, "series")) {
-    if ("series" %in% names(data_train)) {
-      stop(insight::format_error(c(
-        paste0(
-          "'data' already contains a 'series' column, but 'species = ",
-          species_chr, "' was supplied."
-        ),
-        i = paste0(
-          "Drop the 'series' column or set 'species = series' before",
-          " calling 'jsdgam()'."
-        )
-      )))
+  # `mvgam()` builds the series axis from the responses on a
+  # multivariate formula, so there is nothing to promote there.
+  if (!is_mv_formula) {
+    if (!identical(species_chr, "series")) {
+      if ("series" %in% names(data_train)) {
+        stop(insight::format_error(c(
+          paste0(
+            "'data' already contains a 'series' column, but 'species = ",
+            species_chr, "' was supplied."
+          ),
+          i = paste0(
+            "Drop the 'series' column or set 'species = series' before",
+            " calling 'jsdgam()'."
+          )
+        )))
+      }
+      data_train$series <- data_train[[species_chr]]
     }
-    data_train$series <- data_train[[species_chr]]
+    data_train$series <- factor(data_train$series,
+                                 levels = species_levels)
   }
-  data_train$series <- factor(data_train$series,
-                               levels = levels(data[[species_chr]]))
 
   # Partial-Z full mask: n_species x n_lv matrix of NAs triggers the
   # factor model via normalise_trend_map() -> ncol(Z) -> n_lv with
   # the standard 'is_factor_model <- n_lv < n_series' gate.
   trend_map_mat <- matrix(NA_real_, nrow = n_species, ncol = as.integer(n_lv))
-  rownames(trend_map_mat) <- levels(data_train$series)
+  rownames(trend_map_mat) <- species_levels
 
   # Resolve the trait + phylogeny aliases into a loadings_prior list
   # before forwarding. The downstream pipeline (normalise_loadings_prior
@@ -432,7 +456,7 @@ jsdgam <- function(formula,
     traits = traits,
     phylo = phylo,
     loadings_prior = loadings_prior,
-    species_levels = levels(data_train$series)
+    species_levels = species_levels
   )
 
   # Soft warn (once per session) for simplex multi-response families
@@ -454,6 +478,20 @@ jsdgam <- function(formula,
   # the new nlpars; user-supplied priors merge on top via the
   # existing prior pipeline.
   trait_slopes_priors <- NULL
+  if (is_mv_formula && !is.null(trait_slopes)) {
+    stop(insight::format_error(c(
+      "'trait_slopes' is not supported with a multivariate 'formula'.",
+      x = paste0(
+        "The species-level random effect it builds groups rows by a ",
+        "'series' column, which a formula naming one response per ",
+        "species does not carry."
+      ),
+      i = paste0(
+        "Pass a single-response 'formula' with a 'species' column, ",
+        "or fit without 'trait_slopes'."
+      )
+    )))
+  }
   if (!is.null(trait_slopes)) {
     validate_trait_slopes(
       trait_slopes = trait_slopes,
@@ -478,9 +516,51 @@ jsdgam <- function(formula,
   # defaults handle the missing case. The trend comes from
   # `factor_formula`, which defaults to `~ -1` and so resolves to
   # `ZMVN()`, the correlated latent prior a JSDM wants.
+  # A multivariate formula names its responses rather than carrying a
+  # series column, and `trend_map` is validated against that column.
+  # `n_lv` on the trend constructor asks for the same factor model by
+  # the route that layout supports, so the loadings are requested
+  # there instead. A `factor_formula` that already names a
+  # constructor carries the user's own `n_lv` and is left alone.
+  trend_formula_out <- factor_formula
+  if (is_mv_formula) {
+    trend_map_mat <- NULL
+    spec <- stats::terms(factor_formula)
+    labels <- attr(spec, "term.labels")
+    if (length(find_trend_terms(factor_formula)) == 0L) {
+      # `term.labels` drops the intercept, so carry it across
+      # explicitly: rebuilding `~ site - 1` without it would hand the
+      # trend an intercept the caller removed.
+      parts <- c(labels, paste0("ZMVN(n_lv = ", as.integer(n_lv), ")"))
+      if (identical(as.integer(attr(spec, "intercept")), 0L)) {
+        parts <- c(parts, "-1")
+      }
+      trend_formula_out <- stats::as.formula(
+        paste("~", paste(parts, collapse = " + ")),
+        env = environment(factor_formula)
+      )
+    } else {
+      # The caller's own constructor carries the loadings count, so
+      # the ceiling has to be read from it rather than from the
+      # `n_lv` argument this call ignored.
+      user_spec <- eval_trend_constructor(
+        find_trend_terms(factor_formula)[1L],
+        formula_env = environment(factor_formula)
+      )
+      if (!is.null(user_spec$n_lv)) {
+        validate_n_lv_ceiling(
+          n_lv           = user_spec$n_lv,
+          n_species      = n_species,
+          loadings_prior = loadings_prior,
+          fit_function   = "jsdgam"
+        )
+      }
+    }
+  }
+
   forward_args <- list(
     formula = formula,
-    trend_formula = factor_formula,
+    trend_formula = trend_formula_out,
     trend_map = trend_map_mat,
     data = data_train,
     family = family,

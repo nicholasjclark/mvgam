@@ -1033,8 +1033,9 @@ detect_glm_usage <- function(stan_code, response_names = NULL, skip_lines = inte
 #' Extracts parameter names from GLM function calls in Stan code to avoid hardcoding.
 #'
 #' @param stan_code Character string containing Stan code
-#' @param glm_type Character string specifying GLM function base name
-#' @return List with extracted parameter names
+#' @param glm_type Family name including the `_glm` suffix
+#' @return List naming each argument by the role its family gives it,
+#'   or NULL when the program never calls that density
 #' @noRd
 parse_glm_parameters_single <- function(stan_code, glm_type) {
   checkmate::assert_character(stan_code, min.len = 1)
@@ -1052,36 +1053,11 @@ parse_glm_parameters_single <- function(stan_code, glm_type) {
   }
 
   glm_line <- code_lines[glm_line_idx]
-
-  # Extract the GLM function call from the line - use same pattern as detect_glm_usage
-  pattern <- paste0(stan_density_call_pattern(glm_type), "\\([^)]+\\)")
-  matches <- regmatches(glm_line, regexpr(pattern, glm_line))
-
-  if (length(matches) == 0) {
+  if (!grepl(paste0(glm_pattern, "\\([^)]+\\)"), glm_line)) {
     return(NULL)
   }
 
-  # Extract content between parentheses
-  call_content <- matches[1]
-  paren_start <- regexpr("\\(", call_content) + 1
-  paren_end <- nchar(call_content) - 1
-  params_text <- substr(call_content, paren_start, paren_end)
-
-
-  # Split by | to separate Y from predictors
-  parts <- strsplit(params_text, "\\|")[[1]]
-  if (length(parts) < 2) return(NULL)
-
-  y_var <- trimws(parts[1])
-  predictor_params <- trimws(strsplit(parts[2], ",")[[1]])
-  
-  list(
-    y_var = y_var,
-    design_matrix = if (length(predictor_params) > 0) predictor_params[1] else NULL,
-    intercept = if (length(predictor_params) > 1) predictor_params[2] else NULL,
-    coefficients = if (length(predictor_params) > 2) predictor_params[3] else NULL,
-    other_params = if (length(predictor_params) > 3) predictor_params[4:length(predictor_params)] else NULL
-  )
+  parse_glm_parameters_from_line(glm_line, glm_type)
 }
 
 
@@ -2780,13 +2756,9 @@ extract_hierarchical_info <- function(data_info, trend_specs) {
         i = "Cannot derive n_subgroups for hierarchical trend."
       )))
     }
-    unique_series_data <- data_info$data[
-      !duplicated(data_info$data[[series_var]]),
-      ,
-      drop = FALSE
-    ]
-    series_groups <- unique_series_data[[gr_var]]
-    group_counts <- as.integer(table(series_groups))
+    group_counts <- as.integer(table(
+      series_group_values(data_info$data, series_var, gr_var)
+    ))
     n_subgroups <- max(group_counts)
   }
 
@@ -4071,10 +4043,13 @@ generate_hierarchical_data_structures <- function(hierarchical_info, data_info) 
   # Create series-to-group mapping (one entry per series, not per observation)
   series_var <- data_info$series_var %||% "series"
   group_levels <- sort(unique(data_info$data[[gr_var]]))
-  
-  # Extract unique series-group combinations to create proper mapping
-  unique_series_data <- data_info$data[!duplicated(data_info$data[[series_var]]), ]
-  series_groups <- unique_series_data[[gr_var]]
+
+  # Ordered by the trend's own series axis, which is what Stan
+  # subscripts this array with.
+  series_groups <- series_group_values(
+    data_info$data, series_var, gr_var,
+    order_by = data_info$unique_series
+  )
   group_inds_array <- match(series_groups, group_levels)
   
   # Generate group_inds_trend array (maps each series to its group)
