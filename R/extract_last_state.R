@@ -571,17 +571,22 @@ extract_last_observed_times <- function(fit, n_series) {
   if (is.null(d) || is.null(d[[time_var]])) {
     return(rep(NA_real_, n_series))
   }
-  if (!is.null(d[[series_var]])) {
-    series_fac <- as.factor(d[[series_var]])
+  # Entry `s` of the answer is the last time trend column `s` was
+  # observed at, so the series have to be walked in the trend's own
+  # order. Sorting the raw column instead gives a permutation of that
+  # order, and truncating it to `n_series` hides the disagreement
+  # rather than raising it.
+  series_fac <- axis_row_series(fit, d)
+  if (!is.null(series_fac)) {
     out <- vapply(
-      levels(series_fac)[seq_len(n_series)],
+      levels(series_fac),
       function(lv) {
-        ts <- d[[time_var]][series_fac == lv]
+        ts <- d[[time_var]][which(series_fac == lv)]
         if (length(ts) == 0L) NA_real_ else max(ts, na.rm = TRUE)
       },
       numeric(1L)
     )
-    return(out)
+    return(out[seq_len(n_series)])
   }
   rep(max(d[[time_var]], na.rm = TRUE), n_series)
 }

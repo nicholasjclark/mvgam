@@ -185,6 +185,15 @@ fitted_series_index <- function(object) {
   if (!is.null(axis)) {
     return(stats::setNames(seq_along(axis), axis))
   }
+  # The axis the model was built on, which is the answer whenever the
+  # fit carries it. Sorting labels below is a last resort that gives
+  # an alphabetical order, and a hierarchical or response-keyed fit
+  # numbers its columns in another one.
+  recorded_axis <- mvgam_axes(object)$series$levels
+  if (!is.null(recorded_axis)) {
+    return(stats::setNames(seq_along(recorded_axis), recorded_axis))
+  }
+
   labels <- as.character(get_series_for_grouping(frame))
   recorded <- object$standata$obs_trend_series
   if (!is.null(recorded) && length(recorded) == length(labels)) {

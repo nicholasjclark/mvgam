@@ -972,7 +972,7 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > point is the warnings it exposes rather than the lines it
   > deletes.
 
-- [ ] **43.0 One spec, two spellings, two series axes**
+- [x] **43.0 One spec, two spellings, two series axes**
   > `ensure_mvgam_variables()` runs three times in a single
   > `standata()` build and returns two different series axes, because
   > its hierarchical branch tests `parsed_trend$trend_model$gr` while
@@ -1073,7 +1073,7 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > first works. Whether a refusal fires should not depend on whether
   > the user inlined the call.
 
-- [ ] **48.0 A per-`bf()` family fit has no family, and post-processing assumes one**
+- [x] **48.0 A per-`bf()` family fit has no family, and post-processing assumes one**
   > A model written as `bf(cnt ~ x, family = poisson()) + bf(pa ~ x,
   > family = bernoulli())` declares a family per response and stores
   > none at the top level, so `object$family` is `NULL`. Code that
@@ -1097,14 +1097,26 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > This went unseen because `print()` threw on the first such fixture
   > and halted `tests/local/build_fixtures.R`, so every block after it
   > was never built and the sweep never reached these surfaces.
+  >
+  > Closed. `predict_variance()` resolves the family for the response
+  > it is asked about through `get_family_for_resp()`, replacing six
+  > reads of `object$family`; `posterior_linpred(transform = TRUE)`
+  > inverts that response's link; and `apply_mu_linkinv()` now tells a
+  > family shared by every response from a list naming one each, by
+  > whether the object carries `linkinv`. All six surfaces pass on all
+  > five multivariate fixtures, `val_mvgam_mv_gauss` included, whose
+  > unscoped call was failing for the shared-family reason.
 
-- [ ] **49.0 `augment()` fails on a wide frame with ragged gaps**
+- [x] **49.0 `augment()` fails on a wide frame with ragged gaps**
   > `augment()` succeeds on `val_mvgam_mv_nocol` and fails with
   > "attempt to apply non-function" on `val_mvgam_mv_na_gaps` and
   > `val_mvgam_mv_three_odd`. The three differ in that the latter two
   > drop a different set of rows per response, so the arms have
   > different lengths. Pre-existing, and newly reachable now that
   > those fixtures build.
+  >
+  > Closed by 48.0: the failure was the same missing family reached
+  > through another path, not a ragged-arm defect.
 
 - [ ] **6.0 Final release verification**
   > Clean `document()`, clean test sweep, `R CMD check --as-cran`,

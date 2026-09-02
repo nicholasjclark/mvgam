@@ -257,3 +257,103 @@ axis_group_values <- function(data, spec, series_vals, series_axis) {
   }
   as.character(data[[gr_var]])[rows]
 }
+
+#' The axes a fit was built on
+#'
+#' The single post-fit reading of which series and which times the
+#' model was given. Post-processing asks this rather than rebuilding
+#' the axes from the training frame, because a rebuild answers with a
+#' permutation that stays in range and so raises nothing.
+#'
+#' A fit stored before the record existed still names its series in
+#' metadata, so the series half is assembled from that here. Doing it
+#' in one place is what stops each consumer growing a fallback of its
+#' own, which is the shape the package is being brought out of. Such
+#' a fit records nothing about its times, so `$time` is absent rather
+#' than empty.
+#'
+#' @param object A fitted `mvgam` object or an `mvgam_prefit`
+#' @return The axes record, or `NULL` when the object names no
+#'   series. `$time` is `NULL` on a fit that predates the record.
+#' @noRd
+mvgam_axes <- function(object) {
+  axes <- object$trend_metadata$axes
+  if (!is.null(axes)) {
+    return(axes)
+  }
+
+  meta <- object$trend_metadata
+  levs <- as.character(meta$levels$series %||% character(0L))
+  if (!length(levs)) {
+    return(NULL)
+  }
+  # Only the series half survives in an older fit's metadata: the
+  # stored levels name the series but nothing there names the times.
+  # The time half is left absent rather than filled with an empty
+  # vector, so a reader gets nothing instead of a grid of length
+  # zero that looks like an answer.
+  list(
+    series = list(
+      levels = levs,
+      source = meta$series_source %||% "explicit",
+      n = length(levs),
+      groups = NULL
+    ),
+    time = NULL
+  )
+}
+
+#' Per-row series identity, as the fit resolved it
+#'
+#' Returns a factor whose levels are the axis itself, so the order of
+#' `levels()` is the order the trend matrix numbers its columns and a
+#' row matches the series it was fitted on. A frame whose `series`
+#' column was superseded by a grouping is read through the grouping,
+#' which is what the model read; reading the column instead compares
+#' the supplanted spelling against the derived one and matches
+#' nothing.
+#'
+#' @param object A fitted `mvgam` object
+#' @param data Frame to identify the rows of
+#' @return A factor with one entry per row, or `NULL` when the frame
+#'   names no series and carries no grouping. A frame keyed by
+#'   response answers `NULL`: there the series is a property of the
+#'   `(row, response)` pair, which one value per row cannot state,
+#'   and the caller reads the response axis instead.
+#' @noRd
+axis_row_series <- function(object, data) {
+  checkmate::assert_data_frame(data)
+  meta <- object$trend_metadata
+  axes <- mvgam_axes(object)
+  # A response-keyed frame holds one row per time and one column per
+  # response, and its series column is a single constant standing in
+  # for all of them. Answering with that constant would put every row
+  # on the first series, so the question is refused here and the
+  # caller reads the response axis instead.
+  if (identical(axes$series$source, "response")) {
+    return(NULL)
+  }
+  levs <- axes$series$levels
+  gr_var <- meta$variables$gr_var
+  subgr_var <- meta$variables$subgr_var
+
+  # `factor()` given no levels takes the values' own, which is the
+  # right answer for an object recording no axis and the wrong one
+  # for an object recording a different order, so the record is used
+  # wherever it exists.
+  as_axis <- function(values) {
+    values <- as.character(values)
+    if (is.null(levs)) factor(values) else factor(values, levels = levs)
+  }
+
+  if (named_var(gr_var) && named_var(subgr_var) &&
+      all(c(gr_var, subgr_var) %in% names(data))) {
+    return(as_axis(hierarchical_series_values(data, gr_var, subgr_var)))
+  }
+
+  series_var <- meta$variables$series_var %||% "series"
+  if (series_var %in% names(data)) {
+    return(as_axis(data[[series_var]]))
+  }
+  NULL
+}

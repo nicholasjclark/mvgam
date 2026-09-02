@@ -305,10 +305,7 @@ resolve_series_info <- function(object) {
     lv <- names(fitted_series_index(object))
   }
   if (is.null(lv)) {
-    d <- mvgam_training_data(object)
-    series_var <- object$trend_metadata$variables$series_var %||%
-      "series"
-    lv <- levels(as.factor(d[[series_var]]))
+    lv <- mvgam_axes(object)$series$levels
   }
   list(series_levels = as.character(lv))
 }
@@ -417,8 +414,18 @@ resolve_forecast_grid <- function(object, newdata, training,
   }
   resp <- training$resp
 
-  series_fac <- factor(newdata[[series_var]],
-                         levels = series_levels)
+  # A frame whose series column was superseded by a grouping carries
+  # the supplanted spelling, so factoring the raw column against the
+  # trend's own levels matches nothing and reads as unknown series.
+  # The rows are identified the way the fit identified them. A
+  # response-keyed fit answers `NULL`, because there a row belongs to
+  # every response at once; the column read below is what that case
+  # has always used.
+  series_ids <- axis_row_series(object, newdata)
+  series_fac <- factor(
+    as.character(series_ids %||% newdata[[series_var]]),
+    levels = series_levels
+  )
   if (any(is.na(series_fac))) {
     stop(insight::format_error(c(
       "'newdata' contains series levels not seen at fit time.",

@@ -223,7 +223,10 @@ predict.mvgam <- function(object,
           },
           "."
         ),
-        i = "Refit with family = nmix() or family = occ() to enable closure-unit predict types."
+        i = paste(
+          "Refit with family = nmix() or family = occ() to enable",
+          "closure-unit predict types."
+        )
       )))
     }
     pred <- if (identical(type, "latent_state")) {
@@ -363,6 +366,11 @@ predict_variance <- function(object, newdata, process_error,
                              incl_autocor, ndraws, draw_ids,
                              re_formula, allow_new_levels,
                              sample_new_levels, resp) {
+  # A model written with `brms::mvbf()` gives each response its own
+  # family and stores none at the top level, so the family a variance
+  # needs is the one belonging to the response being asked about.
+  family <- get_family_for_resp(object, resp)
+
   # Closure-unit families have closed-form per-visit marginal
   # variances:
   #   nmix Y_{g,j} | lambda_g, p_{g,j} ~ Poisson(lambda_g *
@@ -371,7 +379,7 @@ predict_variance <- function(object, newdata, process_error,
   #     so Var[Y] = E[Y] * (1 - E[Y]).
   # Both route through posterior_epred and apply the
   # family-specific variance formula; no dpar broadcasting needed.
-  if (is_closure_unit_family(object$family)) {
+  if (is_closure_unit_family(family)) {
     epred <- posterior_epred(
       object,
       newdata           = newdata,
@@ -384,20 +392,20 @@ predict_variance <- function(object, newdata, process_error,
       sample_new_levels = sample_new_levels,
       resp              = resp
     )
-    family_name <- resolve_family_name(object$family)
+    family_name <- resolve_family_name(family)
     # mv-response families (mvn, mvt) carry per-row residual scale
     # in Psi (and df in nu for mvt). The marginal per-row variance
     # under the conditional gllvm parameterisation is the residual
     # variance plus the row's contribution from the factor model;
     # the latter is row-constant given the design, so the residual
     # term carries the per-row variability.
-    if (is_multi_response_family(object$family)) {
+    if (is_multi_response_family(family)) {
       # Simplex families: per-cell variance follows from the
       # softmax probability and the family's dispersion. Dirichlet:
       # Var[X_k] = p_k (1 - p_k) / (phi + 1). Multinomial:
       # Var[Y_k] = N * p_k (1 - p_k). Categorical: Bernoulli per
       # cell, Var = p_k (1 - p_k).
-      if (is_simplex_response_family(object$family)) {
+      if (is_simplex_response_family(family)) {
         needs_phi <- identical(family_name, "diri")
         comp <- extract_simplex_response_components(
           object, newdata = newdata, draw_ids = draw_ids,
@@ -502,7 +510,7 @@ predict_variance <- function(object, newdata, process_error,
   # parameters below apply. posterior_predict() draws the ordered levels
   # as the integers 1..K, so the variance of that draw is what the
   # category probabilities imply.
-  if (is_ordinal_family(object$family)) {
+  if (is_ordinal_family(family)) {
     return(ordinal_category_variance(
       mu_full[draw_idx, , , drop = FALSE]
     ))
@@ -545,8 +553,7 @@ predict_variance <- function(object, newdata, process_error,
   phi_mat   <- broadcast(fpars$phi,   ndraws_mu, nobs_mu)
   nu_mat    <- broadcast(fpars$nu,    ndraws_mu, nobs_mu)
 
-  family <- object$family
-  family_name <- family$family
+  family_name <- resolve_family_name(family)
 
   # Binomial / beta_binomial need trial counts (per-observation).
   trials_vec <- NULL

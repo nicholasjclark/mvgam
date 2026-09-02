@@ -216,7 +216,12 @@ lfo_cv.mvgam <- function(object,
   # Every series must share a time grid: a rolling origin has no
   # single meaning when series are observed at different times, so
   # that case is refused rather than silently misaligned.
-  series_fac <- factor(all_data[[series_var]])
+  # Identified the way the fit identified them, so a frame whose
+  # series column was superseded by a grouping is split into the
+  # series the model has rather than the ones the column names.
+  series_fac <- axis_row_series(object, all_data) %||%
+    factor(all_data[[series_var]])
+  series_fac <- droplevels(series_fac)
   series_time_sets <- lapply(
     split(as.integer(all_data[[time_var]]), series_fac),
     function(t) sort(unique(t))
@@ -240,6 +245,11 @@ lfo_cv.mvgam <- function(object,
     }
   }
 
+  # The rolling origin walks every time the evaluation frame holds,
+  # which reaches past the training grid by design, so this is the
+  # union and not the fit's axis. The series identity above still
+  # comes from the fit, because who a row belongs to is a question
+  # about the model; when a row was observed is not.
   all_unique_times <- sort(unique(as.integer(all_data[[time_var]])))
   n_times <- length(all_unique_times)
 

@@ -210,11 +210,15 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
       ncol(trend_mat) != ncol(obs_mat)) {
     msg <- if (!is.null(resp_name)) {
       cli::format_inline(
-        "Dimension mismatch for response {.val {resp_name}}: obs_linpred is [{nrow(obs_mat)} x {ncol(obs_mat)}] but trend_linpred is [{nrow(trend_mat)} x {ncol(trend_mat)}]."
+        "Dimension mismatch for response {.val {resp_name}}: ",
+        "obs_linpred is [{nrow(obs_mat)} x {ncol(obs_mat)}] but ",
+        "trend_linpred is [{nrow(trend_mat)} x {ncol(trend_mat)}]."
       )
     } else {
       cli::format_inline(
-        "Dimension mismatch: obs_linpred is [{nrow(obs_mat)} x {ncol(obs_mat)}] but trend_linpred is [{nrow(trend_mat)} x {ncol(trend_mat)}]."
+        "Dimension mismatch: obs_linpred is ",
+        "[{nrow(obs_mat)} x {ncol(obs_mat)}] but trend_linpred is ",
+        "[{nrow(trend_mat)} x {ncol(trend_mat)}]."
       )
     }
     stop(insight::format_error(msg))
@@ -225,7 +229,9 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
         ncol(trend_noise) != ncol(out)) {
       stop(insight::format_error(
         cli::format_inline(
-          "Trend-noise dimension mismatch: noise is [{nrow(trend_noise)} x {ncol(trend_noise)}] but linpred is [{nrow(out)} x {ncol(out)}]."
+          "Trend-noise dimension mismatch: noise is ",
+          "[{nrow(trend_noise)} x {ncol(trend_noise)}] but linpred is ",
+          "[{nrow(out)} x {ncol(out)}]."
         )
       ))
     }
@@ -382,7 +388,8 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
     if (is.null(object$data)) {
       stop(insight::format_error(
         cli::format_inline(
-          "No training data found in model object. Please provide {.field newdata} explicitly."
+          "No training data found in model object. ",
+          "Please provide {.field newdata} explicitly."
         )
       ))
     }
@@ -410,7 +417,17 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
   # a count, and a hurdle or zero-inflated `mu` is the base
   # distribution's parameter before any mass is moved to zero.
   # `posterior_epred()` is what answers for `E[Y]`.
-  apply_mu_linkinv(linpred, object$family)
+  #
+  # A model written with `brms::mvbf()` names a family per response
+  # and stores none at the top level, so the link to invert is the one
+  # belonging to the response asked for. Unscoped, `family()` answers
+  # with the named list that matches the list of predictors.
+  fam <- if (is.null(resp)) {
+    family(object)
+  } else {
+    get_family_for_resp(object, resp)
+  }
+  apply_mu_linkinv(linpred, fam)
 }
 
 
@@ -421,14 +438,24 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
 #'
 #' @param linpred A matrix, or a named list of them for a multivariate
 #'   fit
-#' @param family A family object, or a named list of them
+#' @param family A family object shared by every response, or a named
+#'   list of them keyed by response name
 #' @return The same shape, with each element on its parameter's scale
 #'
 #' @noRd
 apply_mu_linkinv <- function(linpred, family) {
   if (is.list(linpred) && !is.matrix(linpred)) {
+    # A multivariate fit reaches here two ways. One family named for
+    # every response is shared by all of them; families named per
+    # response arrive as a list keyed by response name. A family
+    # object carries `linkinv`, and a list of them does not, which is
+    # what tells the two apart.
+    shared <- is.function(family$linkinv)
     out <- lapply(names(linpred), function(resp_name) {
-      apply_mu_linkinv(linpred[[resp_name]], family[[resp_name]])
+      apply_mu_linkinv(
+        linpred[[resp_name]],
+        if (shared) family else family[[resp_name]]
+      )
     })
     names(out) <- names(linpred)
     return(out)

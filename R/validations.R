@@ -2854,6 +2854,34 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
     series_groups = series_groups          # Their groups, same order
   )
 
+  # Both axes as one record, assembled where they are decided. It is
+  # carried onto the fit so post-fit reads the axes the model was
+  # given rather than rebuilding them from the frame and answering
+  # with a permutation that stays in range.
+  #
+  # Time is held as its ordered original values. The integer index is
+  # then `match()` and the gaps `CAR()` and the Gaussian processes
+  # need are `diff()`, which is one representation where the package
+  # kept three.
+  original_time <- attr(data, "mvgam_original_time")
+  dimensions$axes <- list(
+    series = list(
+      levels = as.character(series_axis),
+      source = attr(data, "mvgam_series_source") %||% "explicit",
+      n = length(series_axis),
+      groups = series_groups
+    ),
+    time = list(
+      values = if (is.null(original_time)) {
+        sorted_unique_times
+      } else {
+        sort(unique(original_time))
+      },
+      index = sorted_unique_times,
+      n = length(unique_times)
+    )
+  )
+
   # Generate observation-to-trend mappings if response variables provided
   # This centralizes mapping generation with dimension calculation for consistency
   if (!is.null(response_vars)) {
@@ -2903,6 +2931,11 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
         n_lv = trend_specs$n_lv %||% NULL,
         time_range = c(min_time, max_time)
       ),
+
+      # Both axes, as resolved above. Post-fit reads this rather than
+      # rebuilding the axes from the frame, which is how a derived
+      # order came to be a permutation of the one Stan was given.
+      axes = dimensions$axes,
 
       # Unique values (sorted for Stan)
       levels = list(
@@ -5276,6 +5309,11 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
       has_by_lv = has_by_lv,
       had_by_lv = had_by_lv,
       n_lv_for_grain = n_lv_for_grain,
+      # Both axes as they were resolved when the model was built, so
+      # post-fit reads the axes Stan was given instead of rebuilding
+      # them from the frame. Read, never rebuilt here: a second
+      # construction is the thing this record exists to end.
+      axes = .precomputed_dimensions$axes,
       # Store factor levels for prediction validation
       levels = list(
         # The series the trend actually has, in axis order. Taking a
