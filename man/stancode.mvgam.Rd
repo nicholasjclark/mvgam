@@ -19,8 +19,9 @@ A character string containing the Stan model code with class
 \code{c("stancode", "character")}.
 }
 \description{
-Extract the Stan model code used to fit mvgam objects. This function
-follows brms conventions and returns a character vector with \code{stancode} class.
+Extract the Stan model code used to fit mvgam objects. This
+function follows brms conventions and returns a character vector
+with \code{stancode} class.
 }
 \details{
 This method extracts the Stan code that was used to fit the model.

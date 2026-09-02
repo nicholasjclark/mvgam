@@ -812,6 +812,7 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
       series_var = dimensions$series_var,
       unique_times = dimensions$unique_times,
       unique_series = dimensions$unique_series,
+      series_groups = dimensions$series_groups,
       # Reason: PW logistic needs `data` and `family` to build
       # cap_trend (cap column read from data, link-transformed).
       data = obs_setup$data %||% trend_setup$data,
@@ -2760,17 +2761,24 @@ extract_hierarchical_info <- function(data_info, trend_specs) {
   if (!is.null(data_info$n_subgroups)) {
     n_subgroups <- data_info$n_subgroups
   } else {
-    series_var <- data_info$series_var %||% "series"
-    if (is.null(data_info$data[[series_var]])) {
-      stop(insight::format_error(c(
-        paste0("Series variable '", series_var, "' not found in data."),
-        i = "Cannot derive n_subgroups for hierarchical trend."
-      )))
+    # A hierarchical trend names its series by its grouping, so the
+    # resolved axis answers this whether or not the frame also
+    # carries a series column. Only a frame that resolved no axis at
+    # all falls back to reading one.
+    series_groups <- data_info$series_groups
+    if (is.null(series_groups)) {
+      series_var <- data_info$series_var %||% "series"
+      if (is.null(data_info$data[[series_var]])) {
+        stop(insight::format_error(c(
+          paste0("Series variable '", series_var, "' not found in data."),
+          i = "Cannot derive n_subgroups for hierarchical trend."
+        )))
+      }
+      series_groups <- series_group_values(
+        data_info$data, series_var, gr_var
+      )
     }
-    group_counts <- as.integer(table(
-      series_group_values(data_info$data, series_var, gr_var)
-    ))
-    n_subgroups <- max(group_counts)
+    n_subgroups <- max(as.integer(table(series_groups)))
   }
 
   list(
@@ -4056,11 +4064,19 @@ generate_hierarchical_data_structures <- function(hierarchical_info, data_info) 
   group_levels <- sort(unique(data_info$data[[gr_var]]))
 
   # Ordered by the trend's own series axis, which is what Stan
-  # subscripts this array with.
-  series_groups <- series_group_values(
-    data_info$data, series_var, gr_var,
-    order_by = data_info$unique_series
-  )
+  # subscripts this array with. The order is resolved where the axis
+  # is, so this reads it rather than deriving a second answer.
+  series_groups <- data_info$series_groups
+  if (is.null(series_groups)) {
+    stop(insight::format_error(c(
+      "A hierarchical trend reached Stan assembly with no series groups.",
+      x = cli::format_inline(
+        "{.field {gr_var}} names the grouping, but the axis ",
+        "carries no groups for it."
+      ),
+      i = "The series axis and its groups are resolved together."
+    )), call. = FALSE)
+  }
   group_inds_array <- match(series_groups, group_levels)
   
   # Generate group_inds_trend array (maps each series to its group)

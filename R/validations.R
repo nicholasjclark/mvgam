@@ -2827,6 +2827,16 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
   # spelling of the same axis is what let two readers disagree.
   response_axis <- mvgam_response_axis(data)
   series_axis <- response_axis %||% sort(unique(series_vals))
+
+  # The group each axis entry belongs to, read from the rows that
+  # define the axis. `group_inds_trend[s]` is subscripted by the
+  # trend's own series index, so it has to follow `series_axis`;
+  # deriving it further downstream reads a frame whose series
+  # attribute was rebuilt without the trend's grouping, and the two
+  # spellings then match to nothing.
+  series_groups <- axis_group_values(data, trend_specs, series_vals,
+                                     series_axis)
+
   min_time <- min(time_vals, na.rm = TRUE)
   max_time <- max(time_vals, na.rm = TRUE)
 
@@ -2840,7 +2850,8 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
     time_var = time_var,                   # Variable names for downstream use
     series_var = series_var,
     unique_times = sorted_unique_times,    # Sorted unique time points
-    unique_series = series_axis            # The series axis, in order
+    unique_series = series_axis,           # The series axis, in order
+    series_groups = series_groups          # Their groups, same order
   )
 
   # Generate observation-to-trend mappings if response variables provided
@@ -4225,9 +4236,18 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
   }
 
   # Strategy 2: Hierarchical series (gr + subgr present in fitting context)
-  if (is.null(series_values) && !is.null(parsed_trend$trend_model)) {
-    gr_var <- if (!is.null(parsed_trend$trend_model$gr) && parsed_trend$trend_model$gr != "NA") parsed_trend$trend_model$gr else NULL
-    subgr_var <- if (!is.null(parsed_trend$trend_model$subgr) && parsed_trend$trend_model$subgr != "NA") parsed_trend$trend_model$subgr else NULL
+  #
+  # The specification arrives flat from some callers and nested under
+  # `$trend_model` from others, so the grouping is read through
+  # `spec_groupings()` rather than from one spelling. Reading only the
+  # nested one left two of the three calls in a single `standata()`
+  # build believing the model was ungrouped, and they took the axis
+  # from the superseded series column while the third took it from the
+  # grouping.
+  if (is.null(series_values)) {
+    groupings <- spec_groupings(parsed_trend)
+    gr_var <- groupings$gr
+    subgr_var <- groupings$subgr
 
     if (!is.null(gr_var) && !is.null(subgr_var) && subgr_var != series_var) {
       # When subgr is a separate variable, build series from

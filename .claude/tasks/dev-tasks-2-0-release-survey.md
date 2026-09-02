@@ -972,55 +972,139 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > point is the warnings it exposes rather than the lines it
   > deletes.
 
-- [ ] **43.0 A superseded series column still orders the trend axis**
-  > `hierarchical_series_values()` builds the series with
-  > `interaction(gr, subgr, sep = "_", lex.order = TRUE)`
-  > (`R/validations.R:3552`), and mvgam warns that a supplied `series`
-  > column has been replaced by it. The column is replaced in
-  > spelling and not in order. On a two-region, two-species frame the
-  > derived levels run `north_sp_a`, `north_sp_b`, `south_sp_a`,
-  > `south_sp_b`, while the trend columns are occupied by
-  > `north_sp_a`, `south_sp_a`, `north_sp_b`, `south_sp_b`, which is
-  > the supplied column's own level order.
+- [ ] **43.0 One spec, two spellings, two series axes**
+  > `ensure_mvgam_variables()` runs three times in a single
+  > `standata()` build and returns two different series axes, because
+  > its hierarchical branch tests `parsed_trend$trend_model$gr` while
+  > two of the three callers pass the spec flat, with `gr` and `subgr`
+  > at the top level. Those two read `NULL`, conclude the model is not
+  > hierarchical, and fall through to the branch that reads the raw
+  > `series` column. Traced on a two-region, two-species frame:
   >
-  > Reversing that column reverses the axis, which settles it: give
-  > the frame `south.sp_b`, `north.sp_b`, `south.sp_a`, `north.sp_a`
-  > and the trend columns come back in exactly that order. The axis
-  > follows the column the warning calls superseded.
+  > | caller | spelling | axis |
+  > |---|---|---|
+  > | `build_stan_components` | flat | `north.sp_a, south.sp_a, north.sp_b, south.sp_b` |
+  > | `extract_trend_data` | nested | `north_sp_a, north_sp_b, south_sp_a, south_sp_b` |
+  > | `validate_time_series_for_trends` | flat | `north.sp_a, south.sp_a, north.sp_b, south.sp_b` |
   >
-  > So two records of one axis disagree whenever the supplied column
-  > is not lex-ordered. `obs_trend_series` and
-  > `fitted_series_index()` agree with each other and with the
-  > column; `trend_metadata$levels$series` agrees with the derived
-  > spelling. Anything labelling trend columns from the stored list
-  > names column two `north_sp_b` where the column holds
-  > `south_sp_a`.
+  > `obs_trend_series` is built on the flat path and so takes the
+  > supplied column's order. `X_trend`, `times_trend` and
+  > `trend_metadata$levels$series` are built on the nested path and
+  > take `interaction(gr, subgr, lex.order = TRUE)`. Two accounts
+  > against one, and the earlier reading of this defect had it
+  > backwards: the stored levels agree with the design, and
+  > `obs_trend_series` is the one out of step.
   >
-  > The damage is not confined to labelling. `times_trend` follows the
-  > derived lex order while `obs_trend_series` follows the supplied
-  > column's, so `mu_trend[times_trend[i, s]]` hands series `s` another
-  > series' covariates: on the two-region, two-species frame every one
-  > of the fifteen occasions of `south_sp_a` and `north_sp_b` is
-  > exchanged in `X_trend`. The trend linear predictor is wrong, not
-  > merely the name attached to it, so this ranks with the defects that
-  > decide what Stan is given rather than with the reporting ones.
+  > Read off the values at `t = 1`, the trend design gives column two
+  > `north_sp_b`'s covariate while `obs_trend_series` sends
+  > `south_sp_a`'s observations to read column two. Every one of that
+  > series' occasions takes another series' covariates through
+  > `mu_trend[times_trend[i, s]]`, so the linear predictor is wrong
+  > rather than merely mislabelled.
+  >
+  > The frames at risk are hierarchical fits supplying a `series`
+  > column whose level order is not lex. `val_mvgam_hier_ar_cor`
+  > builds one with `interaction()`'s default, so it sits on the
+  > disagreement; a frame with no `series` column is unaffected,
+  > because both paths then derive the same thing.
+  >
+  > Teaching Strategy 2 the flat spelling is not the fix. Doing so
+  > earlier in this survey made `group_inds_trend` fire at a call site
+  > it had not fired at before, and one layer then derived the
+  > underscore spelling while another read the dot spelling, leaving
+  > the group index all `NA`. The axis has to be resolved once and
+  > read, which is what 40.0 does; this entry is the evidence for why
+  > its record must be the one `obs_trend_series` indexes.
   >
   > Measured identically on the committed branch, so it predates this
-  > survey. Every cached hierarchical fixture supplies a `series`
-  > column, which is why nothing caught it, and
-  > `val_mvgam_hier_ar_cor` supplies one deliberately built with
-  > `interaction()`'s default order, so it sits on the disagreement.
+  > survey. `tests/testthat/test-axis-ordering.R` asserts both
+  > agreements and fails four cells on them, which is the intended
+  > state.
+
+- [ ] **44.0 `trend_map` is accepted at sizes the declaration cannot hold**
+  > `normalise_trend_map()` sizes the loadings by `levels(data$series)`
+  > while the series axis drops any level the data never observes, and
+  > nothing compares the two. On a frame carrying an unobserved level,
+  > a four-row map is accepted and emits `Z` at `4 x 2` against
+  > `N_series_trend = 3`, declared `matrix[N_series_trend,
+  > N_lv_trend] Z;`. The three-row map, which matches the axis, is the
+  > one refused, saying it expected four. `trend_map = "identity"` on
+  > the same frame emits `Z` at `4 x 4` against a `3 x 3`
+  > declaration. The user meets this as a Stan dimension error that
+  > never mentions `trend_map`.
   >
-  > Which order is right is the decision to make, not just which
-  > field to rewrite. `lex.order = TRUE` groups a region's species
-  > together, which is what a hierarchical trend's per-group blocks
-  > want; the column's order is whatever the user's `interaction()`
-  > call produced. 40.0 removes the second record, and this entry is
-  > the reason its axis must be the one `obs_trend_series` indexes.
+  > Two more routes reach the same mismatch. `trend_map = diag(1, 3, 5)`
+  > is accepted on a three-series frame: the `n_lv` ceiling clamps the
+  > scalar to 3 and leaves the matrix five columns wide, because
+  > `trend_map_from_matrix()` checks `nrow` and never `ncol`. And a
+  > column nothing loads on passes, so a factor can reach Stan
+  > unidentified; two identical columns pass for the same reason.
+
+- [ ] **47.0 `normalise_trend_map()` reads the series column, not the axis**
+  > `normalise_trend_map()` derives its own `series_levels` from
+  > `data$series` and ends by writing `rownames(Z)` from them, and it
+  > runs before any axis exists. Three consequences follow. Rownames a
+  > user supplies on a matrix are discarded. The same matrix on a
+  > factor column and on a character column loads different series,
+  > because one takes the level order and the other alphabetical
+  > order. And a frame naming its series only through `gr` and
+  > `subgr` is refused for lacking a column the model does not need,
+  > so the refusal a user meets names the wrong thing: `hier_col` is
+  > turned away because a grouping and the loadings both claim the
+  > series axis, which is the real objection, while `hier` never
+  > reaches that gate.
+
+- [ ] **45.0 A top-level `trend_map` bypasses the constructor's refusal**
+  > `PW(trend_map = M)` is refused, saying `PW` does not support
+  > factor loadings. `mvgam(..., trend_formula = ~ PW(),
+  > trend_map = M)` is accepted and emits `Z` as data on a `PW` trend,
+  > because `apply_trend_map_alias()` writes onto the spec after the
+  > constructor has run, so the constructor's own gate never sees the
+  > value. `CAR()` escapes only because an unrelated factor-model gate
+  > stops it later.
+
+- [ ] **46.0 An inline all-`NA` `trend_map` is refused for the wrong reason**
+  > `~ AR(p = 1, trend_map = matrix(NA_real_, 3, 2))` fails with
+  > "'trend_map' must be a matrix, data.frame, or character code.
+  > Got: matrix.", which contradicts itself. `terms()` deparses the
+  > term label before the constructor evaluates it, and deparsing
+  > turns `NA_real_` into `NA`, so the matrix is re-parsed as logical
+  > and fails `is.numeric()`. Assigning the same matrix to a name
+  > first works. Whether a refusal fires should not depend on whether
+  > the user inlined the call.
+
+- [ ] **48.0 A per-`bf()` family fit has no family, and post-processing assumes one**
+  > A model written as `bf(cnt ~ x, family = poisson()) + bf(pa ~ x,
+  > family = bernoulli())` declares a family per response and stores
+  > none at the top level, so `object$family` is `NULL`. Code that
+  > reaches for it directly then calls `NULL(...)`. Measured on
+  > `val_mvgam_mv_nocol`, identically on this branch and on the
+  > committed baseline, so it predates the survey:
   >
-  > `tests/testthat/test-axis-ordering.R` asserts both agreements and
-  > fails four cells on them, which is the intended state. A
-  > hierarchical frame supplying no `series` column is unaffected.
+  > | Call | Result |
+  > |---|---|
+  > | `predict(type = 'variance', resp = 'cnt')` | argument is of length zero |
+  > | `posterior_linpred(transform = TRUE, resp = 'cnt')` | attempt to apply non-function |
+  > | `print()` | claimed the object was corrupted (fixed) |
+  >
+  > `val_mvgam_mv_gauss`, which names one family for both responses,
+  > passes all three, which isolates the cause to the per-`bf()`
+  > spelling rather than to multivariate fits in general. `family()`
+  > and `print()` now answer with the per-response families the way
+  > `brms:::family.brmsfit()` does; the remaining surfaces still read
+  > `object$family` and need the same treatment.
+  >
+  > This went unseen because `print()` threw on the first such fixture
+  > and halted `tests/local/build_fixtures.R`, so every block after it
+  > was never built and the sweep never reached these surfaces.
+
+- [ ] **49.0 `augment()` fails on a wide frame with ragged gaps**
+  > `augment()` succeeds on `val_mvgam_mv_nocol` and fails with
+  > "attempt to apply non-function" on `val_mvgam_mv_na_gaps` and
+  > `val_mvgam_mv_three_odd`. The three differ in that the latter two
+  > drop a different set of rows per response, so the arms have
+  > different lengths. Pre-existing, and newly reachable now that
+  > those fixtures build.
 
 - [ ] **6.0 Final release verification**
   > Clean `document()`, clean test sweep, `R CMD check --as-cran`,

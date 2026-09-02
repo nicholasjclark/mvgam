@@ -25,12 +25,22 @@ print.mvgam <- function(x, digits = 2, ...) {
     print(formula(x))
   }
 
-  # Section 2: Family and link
+  # Section 2: Family and link. A model written with `brms::mvbf()`
+  # declares one family per response, so `family()` answers with a
+  # named list and each response is named beside its own.
   fam <- family(x)
-  cat("\n\nFamily:\n")
-  cat(fam$family, '\n')
-  cat("\nLink function:\n")
-  cat(fam$link, '\n')
+  if (is.null(fam$family)) {
+    cat("\n\nFamilies:\n")
+    for (resp in names(fam)) {
+      cat(resp, ": ", fam[[resp]]$family, " (", fam[[resp]]$link, ")\n",
+          sep = "")
+    }
+  } else {
+    cat("\n\nFamily:\n")
+    cat(fam$family, '\n')
+    cat("\nLink function:\n")
+    cat(fam$link, '\n')
+  }
 
   # Section 3: Trend model (if present)
   if (!is.null(x$trend_formula)) {
@@ -152,14 +162,26 @@ print.mvgam_prefit <- function(x, ...) {
 family.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
 
-  if (is.null(object$family)) {
-    stop(insight::format_error(c(
-      "Family not found in mvgam object.",
-      i = "The object may be corrupted or from an incompatible version."
-    )))
+  if (!is.null(object$family)) {
+    return(object$family)
   }
 
-  return(object$family)
+  # A model written with `brms::mvbf()` gives each response its own
+  # family, so no single family describes it and none is stored. The
+  # families are on the formula, one per response, and are returned
+  # as a named list the way brms answers the same question.
+  forms <- object$formula$forms
+  if (!is.null(forms)) {
+    fams <- lapply(forms, function(form) form$family)
+    if (!any(vapply(fams, is.null, logical(1)))) {
+      return(fams)
+    }
+  }
+
+  stop(insight::format_error(c(
+    "Family not found in mvgam object.",
+    i = "The object may be corrupted or from an incompatible version."
+  )))
 }
 
 #' Extract formula from mvgam object
@@ -237,8 +259,9 @@ extract_mcmc_info <- function(mvgam_obj) {
 
 #' Extract Stan Code from mvgam Objects
 #'
-#' Extract the Stan model code used to fit mvgam objects. This function
-#' follows brms conventions and returns a character vector with \code{stancode} class.
+#' Extract the Stan model code used to fit mvgam objects. This
+#' function follows brms conventions and returns a character vector
+#' with \code{stancode} class.
 #'
 #' @param object A fitted \code{mvgam} object or \code{mvgam_prefit} object.
 #' @param ... Currently unused.
@@ -258,7 +281,10 @@ stancode.mvgam <- function(object, ...) {
   if (is.null(object$stancode)) {
     stop(insight::format_error(c(
       "Stan code not found in mvgam object.",
-      i = "The model may have been fitted with an older version that didn't store Stan code."
+      i = paste(
+        "The model may have been fitted with a version that did not",
+        "store Stan code."
+      )
     )))
   }
 

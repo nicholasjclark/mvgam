@@ -58,14 +58,14 @@ time_col <- function(prefit) {
 # holds, joining the two names with an underscore, so the
 # hierarchical frames do not name their own column's levels verbatim.
 frame_axis_labels <- function(name) {
-  # The order below is the one the trend columns actually run in, and
-  # it comes from the supplied `series` column rather than from the
-  # grouping: `hierarchical_series_values()` builds the labels with
-  # `lex.order = TRUE`, which would order them north, north, south,
-  # south. The two disagree, which is the defect these frames sit on.
-  # Written out rather than derived, so this states the answer
-  # instead of recomputing it.
-  hier <- c("north_sp_a", "south_sp_a", "north_sp_b", "south_sp_b")
+  # A hierarchical trend names its series by the grouping, which
+  # `hierarchical_series_values()` builds with `lex.order = TRUE`, so
+  # a region's species sit together. A supplied `series` column is
+  # superseded in order as well as in spelling: `hier_col` declares
+  # north, south, north, south and the trend still runs north, north,
+  # south, south. Written out rather than derived, so this states the
+  # answer instead of recomputing it.
+  hier <- c("north_sp_a", "north_sp_b", "south_sp_a", "south_sp_b")
   switch(
     name,
     long = c("a_site", "c_site", "b_site"),
@@ -79,6 +79,49 @@ frame_axis_labels <- function(name) {
     # The responses name these axes; `resp_names` carries them.
     wide = NULL,
     wide_na = NULL,
+    NULL
+  )
+}
+
+# The loadings a `trend_map` cell asked for, series by series,
+# written out rather than recovered from the matrix the cell handed
+# in, so the check has a statement of intent that did not come from
+# the normaliser. `NA` marks an entry left free. A label absent here
+# has no `trend_map`, and the block that reads this no-ops.
+cell_fixed_loadings <- function(lab) {
+  switch(
+    lab,
+    "trend_map matrix / long" = list(
+      a_site = c(1, 0), c_site = c(0, 1), b_site = c(1, 0)
+    ),
+    "trend_map matrix / character" = list(
+      a_site = c(1, 0), b_site = c(0, 1), c_site = c(1, 0)
+    ),
+    "trend_map frame / long" = list(
+      a_site = c(0, 1), c_site = c(1, 0), b_site = c(1, 0)
+    ),
+    "trend_map frame / character" = list(
+      a_site = c(0, 1), b_site = c(1, 0), c_site = c(1, 0)
+    ),
+    "trend_map partial / long" = list(
+      a_site = c(1, NA), c_site = c(0, 1), b_site = c(NA, 0)
+    ),
+    "trend_map free mask / long" = list(
+      a_site = c(NA, NA), c_site = c(NA, NA), b_site = c(NA, NA)
+    ),
+    "trend_map shared / long" = list(
+      a_site = 1, c_site = 1, b_site = 1
+    ),
+    "trend_map identity / long" = list(
+      a_site = c(1, 0, 0), c_site = c(0, 1, 0), b_site = c(0, 0, 1)
+    ),
+    "trend_map VAR / long" = list(
+      a_site = c(1, 0), c_site = c(0, 1), b_site = c(1, 0)
+    ),
+    "trend_map ZMVN / long" = list(
+      a_site = c(1, 0), c_site = c(0, 1), b_site = c(1, 0)
+    ),
+    "trend_map matrix / wide col" = list(one_site = 1),
     NULL
   )
 }
@@ -278,6 +321,87 @@ expect_axes_sound <- function(prefit, resp_names, lab, frame,
       label = paste(lab, "labels are the user's own")
     )
   }
+
+  # A `trend_map` is the only route on which `Z` reaches Stan as
+  # data, so it is the only place the row order of the loadings can
+  # be compared against anything at all: everywhere else `Z` is a
+  # parameter whose rows carry no labels until a fit exists. Row `k`
+  # has to hold the loadings asked for for the series occupying trend
+  # column `k`, and the occupant is read out of `obs_trend_series`
+  # rather than out of the stored levels, so the two accounts of the
+  # axis are not compared against each other.
+  wanted <- cell_fixed_loadings(lab)
+  if (!is.null(wanted)) {
+    n_lv <- as.integer(sd$N_lv_trend)
+    if (all(vapply(wanted, function(w) all(is.na(w)), logical(1)))) {
+      # Every loading free is the sampled-Z model, so none of the
+      # pattern reaches the data block. A template of zeros would
+      # satisfy every shape check below and fix each loading at zero.
+      expect_null(sd$Z, label = paste(lab, "fixes no loading"))
+      expect_null(sd$Z_template, label = paste(lab, "templates none"))
+    } else {
+      z_data <- sd$Z %||% sd$Z_template
+      expect_false(is.null(z_data),
+                   label = paste(lab, "Z reaches Stan as data"))
+      expect_identical(
+        dim(z_data), c(n_series, n_lv),
+        label = paste(lab, "Z is sized by the axis it is read on")
+      )
+      series_obs <- if (is.null(resp_names)) {
+        as.integer(sd$obs_trend_series)
+      } else {
+        as.integer(sd[[paste0("obs_trend_series_", resp_names[1L])]])
+      }
+      col_labels <- as.character(frame$series)
+      if (!is.null(resp_names)) {
+        col_labels <- col_labels[!is.na(frame[[resp_names[1L]]])]
+      }
+      occupant <- vapply(seq_len(n_series), function(k) {
+        col_labels[which(series_obs == k)[1L]]
+      }, character(1))
+      # The rows say who they belong to. The normaliser writes these
+      # from its own reading of the series column, so agreeing with
+      # the occupancy is the whole claim.
+      expect_identical(
+        rownames(z_data), occupant,
+        label = paste(lab, "Z rows name the series they load")
+      )
+      for (k in seq_len(n_series)) {
+        want <- wanted[[occupant[k]]]
+        expect_identical(
+          length(want), n_lv,
+          label = paste(lab, occupant[k], "row spans the axis")
+        )
+        free <- is.na(want)
+        expect_equal(
+          as.numeric(z_data[k, !free]), as.numeric(want[!free]),
+          tolerance = 1e-12,
+          label = paste(lab, occupant[k], "loads as it was asked to")
+        )
+        if (!is.null(sd$Z_is_free)) {
+          expect_identical(
+            as.integer(sd$Z_is_free[k, ]), as.integer(free),
+            label = paste(lab, occupant[k], "frees what was asked")
+          )
+          # The assembly loop reads the template wherever the mask
+          # says fixed, so a free entry carrying a value would be
+          # read in place of the sampled one if the mask ever moved.
+          expect_equal(
+            as.numeric(sd$Z_template[k, free]), rep(0, sum(free)),
+            tolerance = 1e-12,
+            label = paste(lab, occupant[k], "leaves free cells empty")
+          )
+        }
+      }
+      if (!is.null(sd$Z_is_free)) {
+        expect_identical(
+          as.integer(sd$N_free_Z),
+          sum(vapply(wanted, function(w) sum(is.na(w)), integer(1))),
+          label = paste(lab, "counts the free loadings")
+        )
+      }
+    }
+  }
 }
 
 
@@ -440,6 +564,24 @@ axis_prefit <- function(frame, spec, route) {
 # skipped, so a combination that starts being accepted is noticed
 # here rather than in a user's model.
 axis_matrix <- function() {
+  # `terms()` deparses a trend constructor's arguments before they
+  # are evaluated, and deparsing turns `NA_real_` into `NA`, so an
+  # inline all-`NA` matrix would arrive logical and be refused for
+  # the wrong reason. Naming the matrices here sidesteps that: the
+  # formula's environment is this one, and a name survives the round
+  # trip.
+  tm_fixed <- matrix(c(1, 0, 0, 1, 1, 0), nrow = 3, byrow = TRUE)
+  tm_part <- matrix(c(1, NA, 0, 1, NA, 0), nrow = 3, byrow = TRUE)
+  tm_free <- matrix(NA_real_, nrow = 3, ncol = 2)
+  tm_hier <- matrix(c(1, 0, 0, 1, 1, 0, 0, 1), nrow = 4, byrow = TRUE)
+  tm_one <- matrix(1, nrow = 1, ncol = 1)
+  tm_frame <- data.frame(
+    series = c("c_site", "a_site", "b_site"), trend = c(1L, 2L, 1L)
+  )
+  tm_stranger <- data.frame(
+    series = c("a_site", "b_site", "c_site", "ghost_site"),
+    trend = c(1L, 2L, 1L, 2L)
+  )
   tribble_rows <- list(
     # Series named by a column.
     list("explicit / RW",        "long", ~ RW(),                  "sound", "uni"),
@@ -505,16 +647,80 @@ axis_matrix <- function() {
     # coercing that column with `as.numeric()`.
     list("wide / CAR", "wide", ~ CAR(), "sound", "wide"),
     list("character / CAR", "char_series", ~ CAR(), "sound", "uni"),
+    # A grouping names the series, so a frame carrying `gr` and
+    # `subgr` and no `series` column is a complete specification.
+    # Both of these were refused, at a different layer each, by
+    # guards that asked for the column rather than for the axis.
     list("hier / RW", "hier", ~ RW(gr = region, subgr = species),
-         "refuse", "uni", "series variable"),
+         "sound", "uni"),
     list("hier / AR1", "hier",
          ~ AR(p = 1, gr = region, subgr = species),
-         "refuse", "uni", "series variable"),
+         "sound", "uni"),
 
     # `jsdgam()` reaches the same axis by two routes of its own: the
     # species named in a column, and the species named as the
     # responses of a multivariate formula. Both put the loadings on
     # the series axis, so both belong in the same battery.
+    # `trend_map` is the only route on which the loadings reach Stan
+    # as data, so it is the only place a row of `Z` can be tied to a
+    # series before a fit exists. The normaliser reads the series
+    # column itself rather than the axis, so the frames that separate
+    # level order from alphabetical order are the ones that say which
+    # reading a row was built from.
+    list("trend_map matrix / long", "long",
+         ~ AR(p = 1, trend_map = tm_fixed), "sound", "uni"),
+    list("trend_map matrix / character", "char_series",
+         ~ AR(p = 1, trend_map = tm_fixed), "sound", "uni"),
+    list("trend_map frame / long", "long",
+         ~ AR(p = 1, trend_map = tm_frame), "sound", "uni"),
+    list("trend_map frame / character", "char_series",
+         ~ AR(p = 1, trend_map = tm_frame), "sound", "uni"),
+    list("trend_map partial / long", "long",
+         ~ AR(p = 1, trend_map = tm_part), "sound", "uni"),
+    list("trend_map free mask / long", "long",
+         ~ AR(p = 1, trend_map = tm_free), "sound", "uni"),
+    list("trend_map shared / long", "long",
+         ~ AR(p = 1, trend_map = "shared"), "sound", "uni"),
+    list("trend_map identity / long", "long",
+         ~ AR(p = 1, trend_map = "identity"), "sound", "uni"),
+    list("trend_map VAR / long", "long",
+         ~ VAR(trend_map = tm_fixed), "sound", "uni"),
+    list("trend_map ZMVN / long", "long",
+         ~ ZMVN(trend_map = tm_fixed), "sound", "uni"),
+    # The only wide frame a `trend_map` reaches is one naming its own
+    # series, and there the axis is that column rather than the
+    # responses.
+    list("trend_map matrix / wide col", "wide_col",
+         ~ AR(p = 1, trend_map = tm_one), "sound", "wide"),
+
+    list("trend_map on wide responses", "wide",
+         ~ AR(p = 1, trend_map = tm_fixed), "refuse", "wide",
+         "series' column"),
+    list("trend_map with no series", "uni_bare",
+         ~ AR(p = 1, trend_map = tm_one), "refuse", "uni",
+         "series' column"),
+    list("trend_map plus grouping", "hier_col",
+         ~ AR(p = 1, gr = region, subgr = species,
+              trend_map = tm_hier), "refuse", "uni", "factor model"),
+    # Refused, but for the wrong reason. `hier_col` is turned away
+    # because a grouping and the loadings both claim the series axis,
+    # which is the real objection. `hier` never reaches that gate:
+    # `normalise_trend_map()` reads the series column before any axis
+    # exists and asks for a column this model does not need. The
+    # message is pinned so the day it improves is noticed.
+    list("trend_map on a grouping", "hier",
+         ~ AR(p = 1, gr = region, subgr = species,
+              trend_map = tm_hier), "refuse", "uni", "series' column"),
+    list("trend_map fights n_lv", "long",
+         ~ AR(p = 1, n_lv = 3, trend_map = tm_fixed), "refuse", "uni",
+         "n_lv"),
+    list("trend_map wrong height", "long",
+         ~ AR(p = 1, trend_map = tm_hier), "refuse", "uni",
+         "number of rows"),
+    list("trend_map names a stranger", "long",
+         ~ AR(p = 1, trend_map = tm_stranger), "refuse", "uni",
+         "training data"),
+
     list("jsdgam species / 2", "long", 2L, "sound", "jsdgam_species"),
     list("jsdgam mv / 2",      "wide", 2L, "sound", "jsdgam_mv"),
     list("jsdgam mv / gaps",   "wide_na", 2L, "sound", "jsdgam_mv")
@@ -615,6 +821,19 @@ test_that("no axis depends on the order the rows arrive in", {
     expect_identical(
       as.integer(a$obs_trend_series)[perm],
       as.integer(b$obs_trend_series), label = paste(nm, "series")
+    )
+    # One entry per series rather than per row, so a shuffle must
+    # leave it untouched. Deriving it from the rows instead answers
+    # with whatever order the frame arrived in, which on a frame
+    # whose rows are already blocked by group happens to agree; only
+    # a shuffled frame tells the two apart.
+    expect_identical(
+      as.integer(a$group_inds_trend),
+      as.integer(b$group_inds_trend), label = paste(nm, "groups")
+    )
+    expect_identical(
+      as.integer(a$N_subgroups_trend),
+      as.integer(b$N_subgroups_trend), label = paste(nm, "subgroups")
     )
   }
 })
