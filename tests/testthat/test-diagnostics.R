@@ -5,9 +5,9 @@
 # posterior_summary, getCall).
 #
 # Each test builds a draws_array-backed mvgam stub so the runtime
-# paths execute without invoking Stan. Catches regressions like
-# stale `x$model_output` references that previously broke the
-# diagnostic family silently.
+# paths execute without invoking Stan, exercising every slot the
+# diagnostic family reads (rather than relying on a stale
+# `x$model_output` reference that no longer exists).
 
 
 # Minimal mvgam-class stub. Carries the slots every diagnostic /
@@ -294,7 +294,7 @@ test_that("extract_prior_from_setup returns the merged full table when user supp
   expect_equal(user_row$prior, "normal(0, 2)")
   expect_equal(user_row$source, "user")
   # The Intercept default that brms emits must still be present
-  # (the gap fix #1 closes: previously only the user row survived).
+  # alongside the user row, not replaced by it.
   intercept_row <- merged[
     merged$class == "Intercept", ,
     drop = FALSE

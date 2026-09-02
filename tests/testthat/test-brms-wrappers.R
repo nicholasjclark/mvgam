@@ -1,4 +1,4 @@
-# CI-safe tests for the thin brms-parity wrappers landed in
+# CI-safe tests for the thin brms-parity wrappers in
 # `R/brms_wrappers.mvgam.R`. Locks in S3 dispatch, signature
 # parity, return shapes, and a few semantic edge cases. Numerical
 # concordance against brms lives in tests/local/.

@@ -306,8 +306,8 @@ test_that("summary.mvgam_sim resolves trend label from constructor", {
   expect_identical(summary(car_sim)$trend, "CAR")
   # Type 6 documents irregular spacing, so the recorded time must
   # actually be irregular and the season covariate must be the
-  # function of it that build_data claims. Both were previously
-  # drawn independently of the gaps the CAR kernel propagated over.
+  # function of it that build_data claims, not drawn independently
+  # of the gaps the CAR kernel propagates over.
   car_times <- sort(unique(car_sim$data_train$time))
   expect_false(all(abs(diff(car_times) - 1) < 1e-8))
   expect_true(all(diff(car_times) >= 1 & diff(car_times) <= 6))
@@ -326,10 +326,10 @@ test_that("summary.mvgam_sim resolves trend label from constructor", {
   )
   expect_identical(summary(ar112_sim)$trend, "AR")
   # The observation side carries a smooth of a non-periodic
-  # covariate. A cyclic seasonal smooth used to sit here, but on
-  # monthly data a lag-12 autoregression is itself an annual cycle,
-  # so the two competed for the same periodicity and neither was
-  # identified.
+  # covariate rather than a cyclic seasonal smooth: on monthly data
+  # a lag-12 autoregression is itself an annual cycle, so a seasonal
+  # smooth here would compete with it for the same periodicity and
+  # neither would be identified.
   expect_true("x" %in% colnames(ar112_sim$data_train))
   expect_false("season" %in% colnames(ar112_sim$data_train))
   expect_named(ar112_sim$true_smooths, "s(x)")

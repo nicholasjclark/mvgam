@@ -1,13 +1,11 @@
 # Smoke fit exercising per-row `phi ~ ...` distributional regression
-# under diri(). Confirms task #284 wiring (per-row phi extraction in
-# `posterior_predict()` / `log_lik()` / `predict(type = "variance")`).
+# under diri(), confirming per-row phi extraction in
+# `posterior_predict()` / `log_lik()` / `predict(type = "variance")`.
 #
-# Without the wiring, response-scale calls used to error with a
-# directional pointer at `posterior::as_draws_matrix(fit$fit)`.
-# With the wiring, those calls compose the per-row phi linpred
-# via the dpar pipeline + log inverse link, collapse per unit to
-# `phi[idx[1]]` to mirror the Stan lpdf, and produce finite
-# `[ndraws x N_obs]` outputs aligned with the per-row mu linpred.
+# Response-scale calls compose the per-row phi linpred via the dpar
+# pipeline + log inverse link, collapse per unit to `phi[idx[1]]` to
+# mirror the Stan lpdf, and produce finite `[ndraws x N_obs]` outputs
+# aligned with the per-row mu linpred.
 #
 # Cached at /tmp/diri_phi_subformula_fit.rds. Delete to refit.
 # Runtime ~3-5 min.

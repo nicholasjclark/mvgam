@@ -250,10 +250,10 @@ test_that("ndraws subset yields the requested rows", {
 
 test_that("mv fan-out wrapper is classed and plot dispatches", {
   # Simulate an mvbf hindcast wrapper: outer list keyed by resp,
-  # each element itself an mvgam_forecast. plot(hc) previously
-  # errored because the outer list carried no class and R fell
-  # through to graphics::plot.default. It should now dispatch to
-  # plot.mvgam_forecast (single-panel trend view).
+  # each element itself an mvgam_forecast. The outer list needs its
+  # own class so plot(hc) dispatches to plot.mvgam_forecast
+  # (single-panel trend view) instead of falling through to
+  # graphics::plot.default.
   make_arm <- function(type_slot) {
     hc_mat <- matrix(rnorm(30L), nrow = 3L, ncol = 10L)
     structure(list(

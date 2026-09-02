@@ -197,6 +197,41 @@ test_that("loo on the conditional surface agrees with the brms twin", {
 })
 
 
+test_that("the conditional surface is the one hindcast() reports", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  # Both read the fitted state and add it to the observation linear
+  # predictor, with no sampling on either side, so this is an
+  # equality rather than an agreement: `hindcast(type = "expected")`
+  # and the conditional mean are the same quantity reached two ways.
+  ep_cond <- posterior_epred(mv, incl_autocor = TRUE)
+  hc <- do.call(cbind, hindcast(mv, type = "expected")$hindcasts)
+  expect_equal(unname(ep_cond), unname(hc), tolerance = 1e-12)
+
+  ep_marg <- posterior_epred(mv, incl_autocor = FALSE)
+  expect_false(isTRUE(all.equal(unname(ep_marg), unname(hc))))
+})
+
+
+test_that("posterior_predict answers on the surface it is asked for", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
+  mv <- load_mvgam("ar1_fx")
+  # Observation noise is drawn per call, so the two surfaces are
+  # compared through their means rather than draw by draw.
+  hc <- do.call(cbind, hindcast(mv, type = "expected")$hindcasts)
+  set.seed(3L)
+  pp_cond <- posterior_predict(mv, incl_autocor = TRUE, ndraws = 200L)
+  set.seed(3L)
+  pp_marg <- posterior_predict(mv, incl_autocor = FALSE, ndraws = 200L)
+  expect_false(isTRUE(all.equal(unname(pp_cond), unname(pp_marg))))
+  expect_gt(
+    cor(colMeans(pp_cond), colMeans(hc)),
+    cor(colMeans(pp_marg), colMeans(hc))
+  )
+  expect_gt(cor(colMeans(pp_cond), colMeans(hc)), 0.9)
+})
+
+
 test_that("conditioning tracks the observations, marginalising does not", {
   require_fixtures("val_mvgam_ar1_fx.rds")
   mv <- load_mvgam("ar1_fx")

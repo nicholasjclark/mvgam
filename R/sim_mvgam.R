@@ -261,9 +261,9 @@ sim_mvgam <- function(type = 1L,
   # Choosing `sigma_innov` up front instead cannot do this. It
   # requires a closed-form stationary variance, which a random
   # walk does not have, which the sparse-lag `AR(p = c(1, 12))`
-  # does not have in the AR(1) form the old comment used, and
-  # which a deterministic piecewise trend has no analogue of at
-  # all. Each was left carrying whatever variance its own
+  # does not have either, and which a deterministic piecewise
+  # trend has no analogue of at all. Each was left carrying
+  # whatever variance its own
   # parameters implied: at `prop_trend = 0.5`, a three-series
   # random walk delivered 3.9 and a one-series piecewise trend
   # delivered 0.04.

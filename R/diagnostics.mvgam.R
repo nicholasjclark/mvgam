@@ -370,14 +370,12 @@ vcov.mvgam <- function(object, correlation = FALSE, pars = NULL, ...) {
 #   * any divergent transition recorded in NUTS diagnostics; OR
 #   * at least one watched parameter has rank-normalised Rhat > 1.05.
 #
-# Threshold and divergence gate justified per Vehtari et al. (2021,
-# Bayesian Analysis 16(2)): the rank-normalised estimator recommends
-# 1.01 as the ceiling, so 1.05 is the conservative middle ground
-# between the modern recommendation and the legacy 1.1. Divergent
+# The rank-normalised Rhat estimator recommends 1.01 as the ceiling,
+# so 1.05 is the conservative middle ground between that
+# recommendation and the traditional 1.1 threshold. Divergent
 # transitions are a faster early signal than Rhat for the rotational
-# funnel (Betancourt's geometric pathology case study); the
-# structural pre-checks already constrain the call to a narrow
-# high-risk class, so divergence inside that class is nearly
+# funnel; the structural pre-checks already constrain the call to a
+# narrow high-risk class, so divergence inside that class is nearly
 # pathology-specific. The watch-list covers the declared (`A_trend`,
 # `L_Omega_trend`) and transformed (`Sigma_trend`, `L_Sigma_trend`)
 # variance-block parameters plus the latent state and process

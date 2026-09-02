@@ -15,12 +15,12 @@ test_that("mvgam fits `y ~ 0` and hides the placeholder downstream", {
   simdat <- sim_mvgam(family = poisson(), n_series = 2L,
                        n_timepoints = 30L)
   # `threads = 2L` here intentionally exercises the brms-native +
-  # `trend_formula` threading gate (issue #411 / #412): mvgam must
-  # warn once via class `mvgam_threads_trend_brms_native`, force the
-  # downstream brms call to `threads = 1L`, and complete a serial
-  # fit. The warning class is suppressed under TESTTHAT, so this
-  # block only checks that the fit completes; the stancode-level
-  # warning assertion lives at tests/testthat/test-stancode-standata.R.
+  # `trend_formula` threading gate: mvgam must warn once via class
+  # `mvgam_threads_trend_brms_native`, force the downstream brms call
+  # to `threads = 1L`, and complete a serial fit. The warning class is
+  # suppressed under TESTTHAT, so this block only checks that the fit
+  # completes; the stancode-level warning assertion lives at
+  # tests/testthat/test-stancode-standata.R.
   mod <- mvgam(
     formula       = y ~ 0,
     trend_formula = ~ AR(p = 1),
@@ -53,16 +53,15 @@ test_that("mvgam fits `y ~ 0` and hides the placeholder downstream", {
 
 
 test_that("y ~ 0 fit produces calibrated residuals and hindcasts", {
-  # Regression guard for the `extract_linpred_univariate` intercept-
-  # column drop bug: the helper used to unconditionally drop X[, 1]
-  # whenever it was all-1s, on the assumption that brms always reserves
-  # column 1 for `b_Intercept`. For `y ~ 0 + <regressor>` formulas
-  # (including the `.mvgam_empty_obs` placeholder injected here) there
-  # is no `b_Intercept`; the lone all-1s column IS the regressor with
-  # coefficient `b[1]`. Dropping it silently zeroed the obs linpred,
-  # cascading a factor-of-`exp(b[1])` bias into residuals / hindcast /
-  # forecast / predict_*. Calibrated residuals (median ~ 0) and
-  # hindcast/obs ratios near 1 collectively guard the whole stack.
+  # `extract_linpred_univariate` must not assume that an all-1s
+  # X[, 1] column is always `b_Intercept`. For `y ~ 0 + <regressor>`
+  # formulas (including the `.mvgam_empty_obs` placeholder injected
+  # here) there is no `b_Intercept`; the lone all-1s column IS the
+  # regressor with coefficient `b[1]`. Dropping it would silently
+  # zero the obs linpred, cascading a factor-of-`exp(b[1])` bias into
+  # residuals / hindcast / forecast / predict_*. Calibrated residuals
+  # (median ~ 0) and hindcast/obs ratios near 1 collectively guard
+  # the whole stack.
   set.seed(3L)
   simdat <- sim_mvgam(family = poisson(), n_series = 3L,
                        n_timepoints = 50L)

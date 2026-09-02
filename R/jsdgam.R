@@ -16,9 +16,9 @@
 # factors via a modulo trend_map, and does NOT introduce new
 # stanvar emission. Identification is handled either by the existing
 # Heaps post-hoc QR (when `by = lv_axis()` is absent) or by the env
-# constraint and rotate auto-skip from chunk 0 (when by = lv_axis() is
-# present in `factor_formula`). The user can still supply
-# `loadings_prior` to layer the structured trait + phylo prior on top.
+# constraint and rotate auto-skip (when by = lv_axis() is present in
+# `factor_formula`). The user can still supply `loadings_prior` to
+# layer the structured trait + phylo prior on top.
 
 #' Fit Joint Species Distribution Models in mvgam
 #'

@@ -162,10 +162,9 @@ fit_mvgam_cached("ar1_gp",
   y ~ 1 + gp(z, k = 10), ~ AR(p = 1),
   test_data, poisson())
 
-# GP fixtures with extra covariates `w` and `cat` (the original
-# build state used to carry these inline; reconstruct them here so
-# future fixture rebuilds reproduce the gp2_by / gp2d / gp2d_by
-# pairs deterministically).
+# GP fixtures with extra covariates `w` and `cat`, reconstructed
+# here so fixture rebuilds reproduce the gp2_by / gp2d / gp2d_by
+# pairs deterministically.
 test_data_gp2 <- test_data
 test_data_gp2$w <- seq(-1, 1, length.out = nrow(test_data_gp2))
 test_data_gp2$cat <- factor(
@@ -661,11 +660,11 @@ fit_loadings_prior_cached("loadings_prior")
 
 # ----------------------------------------------------------------------
 # NON-LINEAR FORMULAS (bf(..., nl = TRUE))
-# Locks in the permanent regression gate for #324 P2d: every
-# downstream prediction surface (linpred, epred, predict) on an nl
-# fit must match a brms-direct fit on the same data + priors. Two
-# shapes covered: an intercept-only nl growth model and the trait-
-# mediated fourth-corner shape that #324's wrapper will emit.
+# Every downstream prediction surface (linpred, epred, predict) on
+# an nl fit must match a brms-direct fit on the same data + priors.
+# Two shapes covered: an intercept-only nl growth model and a
+# trait-mediated fourth-corner model with per-species random
+# effects.
 # ----------------------------------------------------------------------
 
 set.seed(20260618L)
@@ -725,12 +724,12 @@ fit_mvgam_cached("nl_trait", nl_trait_form, NULL,
 # ----------------------------------------------------------------------
 # NORMALIZE PAIR: the same data fitted with and without the
 # normalising constants. `normalize` changes only what Stan adds to
-# `target`, so the two posteriors have to agree. They did not: the GLM
-# path recognised only the normalised `_lpmf` spelling when naming the
-# family, so under `normalize = FALSE` the trend was computed and never
-# added to the linear predictor, and the fit ran clean while modelling
-# no trend at all. Text checks on the Stan cannot catch that; two fits
-# and a comparison can.
+# `target`, so the two posteriors have to agree. If the GLM path
+# recognised only the normalised `_lpmf` spelling when naming the
+# family, `normalize = FALSE` would compute the trend but never add
+# it to the linear predictor, and the fit would run clean while
+# modelling no trend at all. Text checks on the Stan cannot catch
+# that; two fits and a comparison can.
 # ----------------------------------------------------------------------
 
 cat("\n[19] normalize = TRUE / FALSE pair\n")

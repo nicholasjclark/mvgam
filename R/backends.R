@@ -1094,7 +1094,7 @@ repair_stanfit <- function(x) {
   # this case happens rarely but might happen when sample_prior = "yes"
   x@sim$fnames_oi <- make.unique(as.character(x@sim$fnames_oi), "__")
   for (i in seq_along(x@sim$samples)) {
-    # stanfit may have renamed dimension suffixes (#1218)
+    # stanfit may have renamed dimension suffixes
     if (length(x@sim$samples[[i]]) == length(x@sim$fnames_oi)) {
       names(x@sim$samples[[i]]) <- x@sim$fnames_oi
     }

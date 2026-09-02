@@ -223,9 +223,7 @@ test_that("tweedie_lpdf has overloaded scalar / vector dpar signatures", {
   # The Stan function block must declare both the all-scalar
   # and all-vector entry points (plus mixed) so brms's
   # distributional regression on mphi / mtheta flows through
-  # without a typecheck error. Was discovered via smoke test
-  # 2026-06-09 (mvgam(bf(y ~ x, mphi ~ site), family = tweedie())
-  # used to fail at Stan compile).
+  # without a typecheck error.
   scode <- mvgam:::tweedie_stan_funs()
   expect_true(grepl(
     "real tweedie_lpdf\\(vector y, vector mu, vector mphi,\\s*vector mtheta, int M\\)",
@@ -275,9 +273,10 @@ test_that("tweedie() supports brms distributional regression on mphi", {
 test_that("custom families resolve to their constructor name, not 'custom'", {
   # brms records `family$family = "custom"` for every custom family, so
   # any dispatcher reading that field directly looks up a family that
-  # has no registered distributional parameters. `forecast()` did read
-  # it directly, which silently dropped mphi / mtheta and left the
-  # Tweedie sampler with no dispersion or power parameter.
+  # has no registered distributional parameters. `forecast()` must
+  # resolve the constructor name instead, or it would silently drop
+  # mphi / mtheta and leave the Tweedie sampler with no dispersion or
+  # power parameter.
   fam <- tweedie()
   expect_identical(fam$family, "custom")
   expect_length(mvgam:::get_family_dpars(tolower(fam$family)), 0L)

@@ -1684,7 +1684,8 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
   checkmate::assert_logical(process_error, len = 1)
-  trend_state <- autocor_to_trend_state(incl_autocor)
+  checkmate::assert_logical(incl_autocor, len = 1,
+                            any.missing = FALSE)
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1L, null.ok = TRUE)
   if (!is.null(ndraws) && !is.null(draw_ids)) {
@@ -1741,11 +1742,14 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
   # Using linpred + inverse link (not posterior_epred) because for ZI/hurdle
   # families, posterior_epred returns E[Y]=(1-zi)*mu, but sampling requires
   # the raw mu parameter to apply zi/hu during sampling.
+  # `posterior_linpred()` is a sibling method, so it takes the
+  # user-facing `incl_autocor` rather than the `trend_state` that
+  # `get_combined_linpred()` reads.
   linpred_all <- posterior_linpred(
     object,
     newdata = newdata,
     process_error = process_error,
-    trend_state = trend_state,
+    incl_autocor = incl_autocor,
     ndraws = NULL,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,

@@ -290,11 +290,11 @@ trend_dynamic_pattern_for <- function(x, trend_model_name) {
 
 # Internal: parametric (non-smoother) betas from an obj_vars block.
 # When a fitted `mgcv_model` is available, the first `nsdf` rows are
-# the non-smoother coefficients (mgcv convention). Post-brms-
-# integration the legacy `mgcv_model` slot is not populated, so we
-# fall back to returning every orig_name in `betas_df`. The
-# categorize step already excludes smooth-coefficient rows
-# (`s_*` / `zs_*` / `sds_*` live in `*_smoothpars` instead).
+# the non-smoother coefficients (mgcv convention). The `mgcv_model`
+# slot is not populated on a brms-backed fit, so this falls back to
+# returning every orig_name in `betas_df`. The categorize step
+# already excludes smooth-coefficient rows (`s_*` / `zs_*` /
+# `sds_*` live in `*_smoothpars` instead).
 #'@noRd
 head_betas <- function(mgcv_model, betas_df) {
   if (is.null(betas_df) || nrow(betas_df) == 0L) {

@@ -1,6 +1,6 @@
 # K-fold cross-validation for mvgam fits with optional group
 # stratification and a selective-refit hybrid that mirrors the
-# `lfo_cv.mvgam()` Bürkner-Gabry-Vehtari (2020) algorithm,
+# `lfo_cv.mvgam()` approximate leave-future-out algorithm,
 # generalised from rolling-time blocks to arbitrary groups.
 #
 # Reuses:
@@ -13,16 +13,16 @@
 #     parent fit's training frame.
 #   - `update.mvgam` for per-fold refits: passing the prior arg
 #     OMITTED inherits the parent fit's pinned prior table so the
-#     compiled Stan binary is reused across all refits (per #188).
+#     compiled Stan binary is reused across all refits.
 #   - `loo::kfold_split_grouped` / `loo::kfold_split_random` for
 #     the fold partition logic.
 
 #' K-fold cross-validation for `mvgam` fits
 #'
 #' Hierarchical / grouped k-fold cross-validation. Generalises the
-#' PSIS-with-selective-refit pattern of [lfo_cv.mvgam()] (Bürkner,
-#' Gabry and Vehtari 2020) from rolling time blocks to arbitrary
-#' groups. One function covers three modes:
+#' PSIS-with-selective-refit pattern of [lfo_cv.mvgam()] from
+#' rolling time blocks to arbitrary groups. One function covers
+#' three modes:
 #'
 #' \itemize{
 #'   \item **Pure PSIS** (`pareto_k_threshold = Inf`): no refits.
@@ -64,9 +64,8 @@
 #' @param pareto_k_threshold Numeric in `[0, Inf]`. Folds whose
 #'   PSIS Pareto-k exceeds this trigger a refit. `NULL` (default)
 #'   uses the adaptive threshold `min(1 - 1 / log10(S), 0.7)`,
-#'   where `S` is the number of posterior draws (Vehtari, Simpson,
-#'   Gelman, Yao & Gabry 2024). Pass an explicit numeric to
-#'   override, or `Inf` for pure PSIS (no refits ever).
+#'   where `S` is the number of posterior draws. Pass an explicit
+#'   numeric to override, or `Inf` for pure PSIS (no refits ever).
 #' @param fold_split One of `"grouped"`, `"stratified"`,
 #'   `"random"`. The `loo::kfold_split_*` helper used when
 #'   `K < n_groups`. Ignored when `K == n_groups` (one group per
@@ -475,9 +474,9 @@ aggregate_loglik_by_group <- function(loglik, col_group) {
 
 # Internal: per-fold refit. Calls update.mvgam(object, newdata =
 # train) WITHOUT a `prior` arg so the parent's pinned prior table
-# is inherited (#188), preserving stancode and the compiled
-# binary across refits. Returns per-group ELPD contributions for
-# the held-out fold.
+# is inherited, preserving stancode and the compiled binary
+# across refits. Returns per-group ELPD contributions for the
+# held-out fold.
 #
 # @noRd
 refit_score_one_fold <- function(object, data, fold_ids,
@@ -502,8 +501,7 @@ refit_score_one_fold <- function(object, data, fold_ids,
   #                       (score the marginal / fixed-effects model)
   #   allow_new_levels + sample_new_levels -> sample new REs from
   #                       the population (more honest but brittle
-  #                       for non-Gaussian RE structures; see brms
-  #                       issue #1779).
+  #                       for non-Gaussian RE structures).
   # Default to the safer marginal path; users can override via
   # the `...` plumbed through kfold -> here.
   held_loglik <- log_lik(

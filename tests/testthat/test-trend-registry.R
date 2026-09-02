@@ -771,12 +771,13 @@ test_that("a trend that cannot take factors refuses them", {
 
 
 test_that("forecasting cannot require a parameter nothing monitors", {
-  # Each filter used to name its own parameters, and the names drifted
-  # from what the trends monitor: `PW()` required a `sigma_trend` it
-  # never samples, VAR a `Sigma_trend` that Stan computes rather than
-  # monitors, and CAR an `ar1` that no trend produces under the suffix
-  # convention. Selecting from the monitor list makes that impossible
-  # rather than merely currently true.
+  # A filter that names its own parameters independently of the
+  # trends can drift from what they actually monitor: `PW()` could
+  # require a `sigma_trend` it never samples, VAR a `Sigma_trend`
+  # that Stan computes rather than monitors, or CAR an `ar1` that no
+  # trend produces under the suffix convention. Selecting from the
+  # monitor list makes that impossible rather than merely currently
+  # true.
   specs <- list(
     RW = RW(), RW_ma = RW(ma = TRUE), AR = AR(p = 2),
     AR_ma = AR(p = 1, ma = TRUE), AR_cor = AR(p = 1, cor = TRUE),

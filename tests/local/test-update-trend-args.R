@@ -5,9 +5,10 @@
 # in, not the values it names. `~ AR(p = 1, trend_map = Z)` written
 # against a local `Z`, then saved and read back in a fresh session,
 # names something no longer in scope, so rebuilding the call for a
-# refit failed with `object 'Z' not found`. The `recompile = FALSE`
-# guard runs the same rebuild, so a user could not even ask whether a
-# refit needed recompiling.
+# refit would fail with `object 'Z' not found`. The `recompile =
+# FALSE` guard runs the same rebuild, so restoring the values from
+# the fit is what lets a user ask whether a refit needs recompiling
+# at all.
 #
 # The values are on the fit already, under `trend_metadata`. These
 # fixtures are the two that carry such an argument: `trend_map_fx`

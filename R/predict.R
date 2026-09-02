@@ -355,8 +355,8 @@ predict.mvgam <- function(object,
 #' variance is statistically incoherent. Because `posterior_epred()`
 #' subsamples randomly when `ndraws < total_draws`, we compute `mu`
 #' over the full posterior and then subsample `mu` and the dpar
-#' matrices with the same `draw_idx`. The fix is independent of
-#' draw_ids plumbing through `posterior_epred()`.
+#' matrices with the same `draw_idx`. This approach is independent
+#' of draw_ids plumbing through `posterior_epred()`.
 #'
 #' @noRd
 predict_variance <- function(object, newdata, process_error,

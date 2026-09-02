@@ -294,7 +294,7 @@ test_that("error handling works correctly", {
 
 test_that("classification integrates properly with existing pipeline", {
 
-  # Test that the new function returns the same structure as the old one
+  # Verifies the returned structure matches the documented interface
   test_data <- data.frame(
     Y = rnorm(30, 0, 1),
     X = rnorm(30, 0, 1)

@@ -230,8 +230,8 @@ extract_ar_coefs <- function(one_draw, ar_lags, n_series, n_lv) {
 # repeat the single value across series. When `n_lv == n_series`,
 # return as-is. When `1 < n_lv < n_series` (latent-factor or
 # hierarchical fits), take the first `n_series` elements; the
-# full mapping contract for those cases is pending hierarchical
-# trend support.
+# full mapping contract for those cases requires hierarchical
+# trend support that 'extract_last_state' does not yet have.
 #'@noRd
 broadcast_to_series <- function(vec, n_series) {
   if (length(vec) == n_series) return(vec)

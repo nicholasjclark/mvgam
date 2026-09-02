@@ -673,6 +673,41 @@ group_invariants <- function(nm, fit, cap) {
                  ", likelihood rows = ", n_fitted))
   }, shape = identity)
 
+  # 6b. The surface argument reaches the answer. `incl_autocor`
+  #     picks between the fitted latent state and the deterministic
+  #     submodel, and on a fit that carries a trend those are two
+  #     different numbers. A method that accepts the argument and
+  #     returns the same draws either way is not reading it.
+  if (cap$has_trend) {
+    run_call(nm, "invariants", "epred honours incl_autocor", {
+      cond <- posterior_epred(fit, draw_ids = ids, incl_autocor = TRUE)
+      marg <- posterior_epred(fit, draw_ids = ids, incl_autocor = FALSE)
+      holds(!isTRUE(all.equal(cond, marg)))
+    }, shape = identity)
+
+    run_call(nm, "invariants", "predict honours incl_autocor", {
+      cond <- posterior_predict(fit, draw_ids = ids, incl_autocor = TRUE)
+      marg <- posterior_predict(fit, draw_ids = ids, incl_autocor = FALSE)
+      holds(!isTRUE(all.equal(cond, marg)))
+    }, shape = identity)
+
+    # 6c. The conditional surface is the one `hindcast()` reports.
+    #     Both read the fitted state and add it to the observation
+    #     linear predictor with no sampling on either side, so they
+    #     are the same quantity reached two ways and must agree
+    #     exactly rather than closely.
+    if (cap$has_time) {
+      run_call(nm, "invariants", "conditional epred == hindcast", {
+        ep <- posterior_epred(fit, incl_autocor = TRUE)
+        hc <- do.call(cbind, hindcast(fit, type = "expected")$hindcasts)
+        holds(isTRUE(all.equal(unname(ep), unname(hc),
+                               tolerance = 1e-10)),
+              paste0("max |diff| = ",
+                     signif(max(abs(unname(ep) - unname(hc))), 3)))
+      }, shape = identity)
+    }
+  }
+
   # 7. The summary reports what the formula asked for. Every
   #    population-level coefficient the design matrix carries has to
   #    appear somewhere in the printed summary.

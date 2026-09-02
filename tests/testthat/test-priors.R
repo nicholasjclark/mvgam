@@ -1287,8 +1287,8 @@ test_that("a class mvgam manages is routed to the trend side", {
 
 test_that("a user prior on Z reaches the emitted Stan", {
   # `default_prior()` advertises the class, so setting it has to
-  # work. It previously failed with brms' "do not correspond to any
-  # model parameter", naming the class its own table supplied.
+  # work rather than fail with brms' "do not correspond to any
+  # model parameter" on a class its own table supplied.
   set.seed(1L)
   d <- sim_mvgam(family = poisson(), n_series = 4L,
                   n_timepoints = 20L)$data_train

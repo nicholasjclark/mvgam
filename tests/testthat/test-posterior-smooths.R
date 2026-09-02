@@ -423,7 +423,7 @@ test_that("plot.mvgam_conditional_smooths dispatches on the mvgam class", {
   # `conditional_smooths.mvgam` produces. Verifies:
   #   - class is `mvgam_conditional_smooths` (not just brms's)
   #   - plot() returns a list of ggplots
-  #   - the ribbon is not the flat-line-at-zero bug (#384)
+  #   - the ribbon is not a flat line at zero
   grid <- seq(-2, 2, length.out = 25L)
   df <- data.frame(
     env = grid,
@@ -452,7 +452,7 @@ test_that("plot.mvgam_conditional_smooths dispatches on the mvgam class", {
   expect_s3_class(ggs[[1L]], "ggplot")
   # Ribbon should not be a flat line at zero: the estimate at the
   # peak (env ~ 0.4) should be clearly above the estimate at the
-  # tail (env ~ 2). Guards against the #384 regression.
+  # tail (env ~ 2).
   peak_idx <- which.min(abs(grid - 0.4))
   tail_idx <- which.min(abs(grid - 2))
   expect_gt(df$estimate__[peak_idx] - df$estimate__[tail_idx], 0.5)

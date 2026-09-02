@@ -155,10 +155,9 @@ log_lik.mvgam <- function(object,
       # (`[S x N_unit]`), which has fewer columns than the
       # per-visit grain produced by every other family. Stitching
       # the per-response matrices via `Reduce("+", ...)` would
-      # silently truncate or recycle. Multi-response closure-unit
-      # support lands when jsdgam wires together multiple
-      # detection-error responses; flag the gap clearly until
-      # then.
+      # silently truncate or recycle, so multi-response closure-unit
+      # families are not supported here and the gap is flagged
+      # clearly instead.
       resp_names <- names(linpred)
       mv_families <- lapply(resp_names, function(r) {
         get_family_for_resp(object, r)

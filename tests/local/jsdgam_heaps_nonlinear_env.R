@@ -163,10 +163,10 @@ p_nmix <- 0.4
 # Centre log_lambda around log(2) so mean abundance ~ 2 and K_max
 # enumeration stays tight. The Stan likelihood enumerates
 # k in max(y[g, ])..K_max[g] per closure unit per leapfrog step,
-# so smaller K_max gives an order-of-magnitude wall-clock saving
-# until partial_sum threading lands (task #230). Lambda baseline +
-# nonlinear env signal still spans ~exp(-1.5)..exp(3) ~= 0.2..20
-# which is plenty to identify the smooth.
+# so smaller K_max gives an order-of-magnitude wall-clock saving.
+# Lambda baseline + nonlinear env signal still spans
+# ~exp(-1.5)..exp(3) ~= 0.2..20 which is plenty to identify the
+# smooth.
 log_lambda_base <- log(2)
 env_nmix <- as.numeric(scale(runif(J_nmix, -2, 2)))
 lv_nmix <- matrix(rnorm(J_nmix * n_lv_true), J_nmix, n_lv_true)

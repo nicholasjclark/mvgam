@@ -720,6 +720,65 @@ minutes. Cached fits are read once, never re-fitted to inspect.
   > 31.4 after. Re-run 23.0 once 31.1 lands, before touching
   > anything in it.
 
+- [ ] **32.0 Three duplications on the prediction surface**
+  > Found reviewing the fix for 31.1 and 31.2, and all three sit in
+  > the blast radius of the bug class those entries record, which is
+  > why they are worth closing rather than noting.
+  >
+  > `predict_single_response()` and `sample_family_batched()` are
+  > near-identical: each resolves the family name, builds the dpar
+  > list, resolves the draws, reads trials and truncation bounds,
+  > special-cases the ordinal threshold pair, intersects against the
+  > sampler's formals and reshapes the result. What differs is where
+  > `mu` comes from and a closure-unit branch the second lacks. One
+  > `sample_response_from_predictor()` should serve both.
+  >
+  > `extract_family_pars_for_draws()` is a second, weaker copy of
+  > `extract_dpars_from_stanfit()`. The first sorts an indexed
+  > parameter by its index, broadcasts to the observation count and
+  > refuses a mismatch; the second did none of those until the index
+  > sort was added to it. Four sites read the weaker one: the `link`
+  > slot of `forecast()` and of `hindcast()`, `predict()`'s variance
+  > path, and `residuals()`. `predict()` then hand-rolls the
+  > broadcast the other copy already does. No cached fit carries an
+  > indexed dpar, so nothing exercises the difference and a swap
+  > cannot be verified against the fixtures as they stand; a fit
+  > with a per-observation dispersion would be needed first.
+  >
+  > `if (!is.null(resp)) get_family_for_resp(object, resp) else
+  > object$family` is written out at five sites. Either a
+  > `resolve_scoped_family()` or a NULL-tolerant
+  > `get_family_for_resp()` collapses them.
+  >
+  > Alongside: `forecast()` and `hindcast()` both document `...` as
+  > unused and read it nowhere, so a misspelled argument is
+  > swallowed rather than refused. `rlang::check_dots_empty()` would
+  > refuse it, which matters on a surface that has now been bitten
+  > three times by an argument going into `...`.
+
+- [ ] **33.0 The gaussian residual calibration check does not hold**
+  > `tests/local/test-residuals.R` asserts pooled quantile residuals
+  > on the cached gaussian AR(1) fit land near N(0, 1), and the sd
+  > comes out at 0.418 against a threshold of 0.30 either side of 1.
+  > It fails identically with 31.1 reverted, so the surface fix is
+  > not the cause.
+  >
+  > The numbers say the state is absorbing the noise: the fit tracks
+  > the observations to an sd of 0.11 while the posterior `sigma` is
+  > 0.214, so the PIT divides by roughly twice the error actually
+  > made and the residuals come back under-dispersed by about that
+  > factor. Conditioning on a latent state fitted to the same
+  > observations is expected to do this in sample, which is the same
+  > optimism that makes PSIS-LOO unreliable for a state-space fit.
+  > On the marginal surface the same fit gives an sd of 3.157, so
+  > neither surface is anywhere near 1.
+  >
+  > Decide what the check is for before moving it. If the target is
+  > calibration, it belongs out of sample or on simulated data with
+  > a known truth. If the target is a smoke test that residuals are
+  > finite and centred, the sd bound should go. Changing the
+  > threshold to fit the number measured tests nothing.
+
 - [ ] **6.0 Final release verification**
   > Clean `document()`, clean test sweep, `R CMD check --as-cran`,
   > tarball under the size limit, sweep green. Gated on 31.0:

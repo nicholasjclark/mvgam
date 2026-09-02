@@ -350,8 +350,8 @@ test_that("mvgam_beta_aliases keeps the Intercept column for nl nlpars", {
 })
 
 test_that("mvgam_beta_aliases still strips Intercept on linear main formulas", {
-  # Regression guard: the nl branch added in #324 P2b must not
-  # leak Intercept retention to the centred (linear) main formula.
+  # The nl branch must not leak Intercept retention to the centred
+  # (linear) main formula.
   set.seed(14L)
   n_obs <- 30L
   df <- data.frame(y = rnorm(n_obs), env = rnorm(n_obs))

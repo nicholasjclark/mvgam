@@ -78,11 +78,30 @@ test_that("ordinary residuals match y - posterior_predict per draw", {
   set.seed(1L)
   r <- residuals(fit, type = "ordinary", ndraws = 50L,
                    summary = FALSE)
+  # In sample `diagnostic_surface_args()` asks residuals for the
+  # conditional surface, so the hand-built comparison has to ask for
+  # it too. Reading the default here compares a residual taken
+  # against the fitted state with a draw that ignores it.
   set.seed(1L)
-  yrep <- posterior_predict(fit, ndraws = 50L, summary = FALSE)
+  yrep <- posterior_predict(fit, ndraws = 50L, incl_autocor = TRUE)
   y <- as.numeric(fit$data$y)
   manual <- sweep(yrep, 2L, y, FUN = function(yh, yi) yi - yh)
   expect_equal(unname(r), unname(manual), tolerance = 1e-10)
+})
+
+
+test_that("ordinary residuals do not match the marginal surface", {
+  # The pairing above is a real constraint rather than one that
+  # holds whatever surface either side reads.
+  fit <- load_fit("val_mvgam_ar1_int")
+  set.seed(1L)
+  r <- residuals(fit, type = "ordinary", ndraws = 50L,
+                   summary = FALSE)
+  set.seed(1L)
+  yrep <- posterior_predict(fit, ndraws = 50L, incl_autocor = FALSE)
+  y <- as.numeric(fit$data$y)
+  marginal <- sweep(yrep, 2L, y, FUN = function(yh, yi) yi - yh)
+  expect_false(isTRUE(all.equal(unname(r), unname(marginal))))
 })
 
 

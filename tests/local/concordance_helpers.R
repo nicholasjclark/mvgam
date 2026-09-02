@@ -142,14 +142,12 @@ assert_epred_concordance <- function(brms_fit, mvgam_fit, newdata,
   invisible(comp$cor)
 }
 
-# Lock the by-factor GP / smooth-by fix in across every public
+# Guards by-factor GP / smooth-by handling across every public
 # prediction API. Each downstream method must produce different
 # per-column means when the only difference between grid_A and
-# grid_B is the by-factor level. A regression that silently routes
-# any of these methods around add_all_gp_contributions (the failure
-# mode of bug #53) collapses the contrast to within MC noise and
-# fails the sentinel. Reason: extends the posterior_linpred regression
-# sentinel to cover every method documented in the public API audit.
+# grid_B is the by-factor level. Silently routing any of these
+# methods around add_all_gp_contributions collapses the contrast to
+# within MC noise and fails the sentinel.
 assert_by_factor_variation <- function(mvgam_fit, grid_A, grid_B,
                                        response = "y",
                                        ndraws = 50L,

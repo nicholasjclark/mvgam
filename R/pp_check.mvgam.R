@@ -605,11 +605,17 @@ pp_check.mvgam <- function(
       return(build_resid_qq_panel(resid_draws))
     }
     if (type == "resid_vs_fitted") {
-      fitted_draws <- posterior_epred(
-        object, newdata = newdata,
-        ndraws = NULL, draw_ids = draw_ids,
-        resp = resp
-      )
+      # The fitted values name their surface through the same
+      # helper the residuals above them used, so one panel plots
+      # one picture of the fit.
+      fitted_draws <- do.call(posterior_epred, diagnostic_surface_args(
+        list(
+          object, newdata = newdata,
+          ndraws = NULL, draw_ids = draw_ids,
+          resp = resp
+        ),
+        newdata
+      ))
       if (!is.null(take)) {
         fitted_draws <- fitted_draws[, take, drop = FALSE]
       }
@@ -1014,11 +1020,11 @@ closure_unit_fit_stat_ppc <- function(object, newdata, stat,
   # Per-visit yrep + epred. Both arrive as [ndraws x N_visit] so they
   # share the closure-unit aggregator below.
   yrep_visit <- posterior_predict(
-    object, newdata = newdata, summary = FALSE,
+    object, newdata = newdata,
     ndraws = ndraws, draw_ids = draw_ids
   )
   epred_visit <- posterior_epred(
-    object, newdata = newdata, summary = FALSE,
+    object, newdata = newdata,
     ndraws = ndraws, draw_ids = draw_ids
   )
 

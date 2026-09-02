@@ -268,12 +268,11 @@ inject_trends_into_glm_calls <- function(code_lines, block_info, trend_injection
     return(code_lines)
   }
 
-  # Matching a GLM call and then failing to name its family used to
-  # return the line untouched, which left the trend computed and never
-  # added to the linear predictor: a fit of a model with no trend that
-  # compiled and sampled without complaint. Refuse instead, so a family
-  # added to `mvgam_glm_families` without a transformation is caught at
-  # code generation rather than in the results.
+  # Returning the line untouched here would leave the trend computed
+  # but never added to the linear predictor: a model with no trend
+  # that compiles and samples without complaint. Refuse instead, so a
+  # family added to `mvgam_glm_families` without a transformation is
+  # caught at code generation rather than in the results.
   if (is.null(glm_type)) {
     stop(insight::format_error(c(
       "Found a GLM likelihood whose family could not be identified.",

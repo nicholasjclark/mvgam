@@ -1314,8 +1314,8 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
   expect_true(stan_pattern("trend\\[i, s\\] = dot_product\\(Z\\[s, :\\], lv_trend\\[i, :\\]\\) \\+ mu_trend\\[times_trend\\[i, s\\]\\]", code_with_trend))
 
   # mu_trend must include fixed effects (X_trend * b_trend) when trend_formula
-  # has both fixed effects and random effects. This validates the fix for
-  # GLM-hidden fixed effects where brms passes Xc*b to normal_id_glm_lpdf.
+  # has both fixed effects and random effects, even when brms hides the
+  # fixed effects inside normal_id_glm_lpdf's Xc*b argument.
   expect_true(stan_pattern("mu_trend \\+= X_trend \\* b_trend", code_with_trend))
 
   # Hierarchical correlation priors with _trend suffix
@@ -1376,15 +1376,14 @@ test_that("stancode generates correct hierarchical ZMVN(gr = habitat) model with
 })
 
 test_that("RW(gr = habitat) emits hierarchical Stan and wires scaled_innovations_trend assignment", {
-  # Regression for the dangling-scaled_innovations_trend bug. Before the
-  # fix, generate_rw_trend_stanvars() did not call
-  # add_hierarchical_support(), so when a user supplied gr= the shared
-  # innovation system emitted a declaration-only branch and the RW
-  # recurrence then read scaled_innovations_trend with no upstream
-  # assignment, producing NaN at Stan init. The fix adds the same
-  # add_hierarchical_support() call that AR/ZMVN use, so the hierarchical
-  # correlation system fills scaled_innovations_trend[t, s] in the
-  # tparameters block before the recurrence consumes it.
+  # generate_rw_trend_stanvars() must call add_hierarchical_support(),
+  # the same call that AR/ZMVN use, so that when a user supplies gr=
+  # the hierarchical correlation system fills
+  # scaled_innovations_trend[t, s] in the tparameters block before the
+  # RW recurrence consumes it. Without that call, the shared
+  # innovation system would emit a declaration-only branch and the RW
+  # recurrence would read scaled_innovations_trend with no upstream
+  # assignment, producing NaN at Stan init.
   data <- setup_stan_test_data()$multivariate
   mf <- mvgam_formula(count ~ 1, trend_formula = ~ RW(gr = habitat))
 
@@ -1404,7 +1403,7 @@ test_that("RW(gr = habitat) emits hierarchical Stan and wires scaled_innovations
     code))
   expect_true(stan_pattern("real<lower=0, upper=1> alpha_cor_trend;", code))
 
-  # Critical bug-fix assertion: hierarchical assignment loop must populate
+  # The hierarchical assignment loop must populate
   # scaled_innovations_trend before the RW recurrence reads it.
   expect_true(stan_pattern(
     "scaled_innovations_trend\\[t, s\\] = scaled\\[k\\];", code))
@@ -1415,7 +1414,7 @@ test_that("RW(gr = habitat) emits hierarchical Stan and wires scaled_innovations
     "scaled_innovations_trend = innovations_trend \\* diag_matrix\\(sigma_trend\\)",
     code))
 
-  # RW recurrence reads scaled_innovations_trend (unchanged by the fix)
+  # RW recurrence reads scaled_innovations_trend
   expect_true(stan_pattern(
     "lv_trend\\[1,\\s*:\\s*\\] = scaled_innovations_trend\\[1,\\s*:\\s*\\]",
     code))
@@ -1578,16 +1577,15 @@ test_that("trend codegen emits modern Stan array syntax across every branch", {
 
 
 test_that("user priors on array-shaped VAR hyperparameters emit per-lag", {
-  # Regression guard for the trio of dimensionality bugs in user-prior
-  # routing through `generate_var_trend_stanvars()`:
+  # Guards user-prior routing through `generate_var_trend_stanvars()`:
   #   * `Amu_trend` / `Aomega_trend` are declared `array[2] vector[lags]`;
   #     a user override must be emitted inside the `for (lag in 1:2)` loop
   #     and must NOT also appear at top level via the centralized
   #     `var_centralized_priors` block (which would emit a scalar
   #     `Amu_trend ~ ...;` Stan rejects).
-  #   * `L_Omega_global_trend` and `L_deviation_group_trend` used to have
-  #     their LKJ priors hardcoded in `generate_hierarchical_correlation_model`,
-  #     silently discarding any user override.
+  #   * `L_Omega_global_trend` and `L_deviation_group_trend` must route
+  #     any user override through `generate_hierarchical_correlation_model`
+  #     rather than a hardcoded LKJ prior that would discard it.
   data <- setup_stan_test_data()$multivariate
   mf <- mvgam_formula(
     count ~ 1 + x,
@@ -1708,12 +1706,12 @@ test_that("default priors on array-shaped VAR hyperparameters still emit per-lag
 
 
 test_that("AR(p=1) latent state at t=1 uses stationary marginal init", {
-  # Regression guard: the implied prior on lv_trend[1, j] should be
+  # The implied prior on lv_trend[1, j] should be
   # Normal(0, sigma_trend[j] / sqrt(1 - ar1_trend[j]^2)) (AR(1)
   # stationary marginal), NOT Normal(0, sigma_trend[j]) (a single
-  # innovation). The fix divides the t=1 scaled innovation by
-  # sqrt(1 - square(ar1_trend[j])) so the marginal variance at the
-  # first time point matches the stationary variance.
+  # innovation). Dividing the t=1 scaled innovation by
+  # sqrt(1 - square(ar1_trend[j])) makes the marginal variance at
+  # the first time point match the stationary variance.
   data <- setup_stan_test_data()$multivariate
   mf <- mvgam_formula(count ~ 1 + x, trend_formula = ~ AR(p = 1))
   code <- as.character(stancode(
@@ -1734,8 +1732,9 @@ test_that("AR(p=1) latent state at t=1 uses stationary marginal init", {
 test_that("AR(p>1) / AR with MA / AR with cor keep innovation-only init", {
   # The AR(p=1) stationary marginal correction in
   # `generate_ar_trend_stanvars()` applies only to AR(p=1) WITHOUT
-  # MA and WITHOUT cross-series correlation. The three deferred
-  # families would each need a different stationary covariance:
+  # MA and WITHOUT cross-series correlation. The three families
+  # outside that scope would each need a different stationary
+  # covariance:
   #
   #   * AR(p>1)            : Yule-Walker for AR(p) (only in VAR
   #                          generator today via `initial_joint_var`)
@@ -1771,13 +1770,12 @@ test_that("AR(p>1) / AR with MA / AR with cor keep innovation-only init", {
 
 
 test_that("threads + trend + brms-native family compiles serially with one warning", {
-  # Regression guard for #411 / #412. brms threading moves both the
-  # `mu` declaration and every `mu += ...` / `mu[n] = ...` assignment
-  # into `partial_log_lik_lpmf` inside `functions {}`; mvgam's
-  # obs-side trend injector at R/stan_assembly.R:1346 / :1571 only
-  # searches `model {}` and so cannot find the assignment it needs
-  # to splice the trend addition into. Until the injector learns to
-  # splice into the brms function body, the combination must compile
+  # brms threading moves both the `mu` declaration and every
+  # `mu += ...` / `mu[n] = ...` assignment into
+  # `partial_log_lik_lpmf` inside `functions {}`; mvgam's obs-side
+  # trend injector at R/stan_assembly.R:1346 / :1571 only searches
+  # `model {}` and so cannot find the assignment it needs to splice
+  # the trend addition into. The combination must therefore compile
   # serially and emit a one-time warning.
   data <- setup_stan_test_data()$multivariate
   mf <- mvgam_formula(count ~ 1 + x, trend_formula = ~ AR(p = 1))
@@ -3179,8 +3177,8 @@ test_that("hurdle_poisson stancode has correct structure", {
   # Prior for hu should exist
   expect_true(stan_pattern("beta_lpdf\\(hu \\|", code))
 
-  # Likelihood must be INSIDE the for loop (this was the bug fix)
-  # The pattern ensures hurdle_poisson_log_lpmf appears after for(n in 1:N){
+  # Likelihood must be INSIDE the for loop. The pattern ensures
+  # hurdle_poisson_log_lpmf appears after for(n in 1:N){
   expect_true(stan_pattern(
     "for\\(n in 1:N\\)\\{[^}]*hurdle_poisson_log_lpmf\\(Y\\[n\\]\\|mu\\[n\\],hu\\)",
     code
@@ -3482,8 +3480,8 @@ test_that("trend_map with NA emits Z_template + Z_is_free + Z_free_vec", {
 })
 
 test_that("fully-fixed Z is preserved (no partial-Z stanvars emitted)", {
-  # Regression: when trend_map has no NAs, the fully-fixed code
-  # path stays in effect, emitting no Z_template or Z_free_vec.
+  # When trend_map has no NAs, the fully-fixed code path stays in
+  # effect, emitting no Z_template or Z_free_vec.
   data <- setup_stan_test_data()$multivariate
   Z_user <- matrix(c(1, 0, 0.5, 0.5, 0, 1, 0.3, 0.7),
                     nrow = 4L, ncol = 2L, byrow = TRUE)
@@ -3771,14 +3769,14 @@ test_that("get_prior() surfaces mu_/sigma_ rows under coef_sharing = \"hierarchi
 
 
 # ============================================================
-# brms helper-parity exports (Task #189)
+# brms helper-parity exports
 # ============================================================
 # Users can call stancode / standata / make_stancode /
 # make_standata / default_prior / get_prior from the mvgam
 # namespace directly. The brms wrappers (make_stancode,
-# make_standata) work via the existing mvgam_formula methods;
-# default_prior gets its own dispatch method that delegates to
-# get_prior, and standata gains a fitted-model method.
+# make_standata) work via the mvgam_formula methods; default_prior
+# gets its own dispatch method that delegates to get_prior, and
+# standata gains a fitted-model method.
 
 test_that("brms helper generics are exported by mvgam", {
   ns_exports <- getNamespaceExports("mvgam")
@@ -4021,11 +4019,10 @@ test_that("run_model = FALSE deprecation fires only once per session via rlang",
 
 
 test_that("threads is a first-class named arg on mvgam() and jsdgam()", {
-  # threads was historically captured in `...` and pulled from
-  # `dots$threads` inside mvgam_single, leaving the outer signature
-  # silent. Promoting it to a named arg gives users autocomplete
-  # plus a checkmate-style early-fail on a bad value, before the
-  # expensive Stan compile.
+  # threads is a named arg rather than something captured in `...`
+  # and pulled from `dots$threads` inside mvgam_single, so it gives
+  # users autocomplete plus a checkmate-style early-fail on a bad
+  # value, before the expensive Stan compile.
   expect_true("threads" %in% formalArgs(mvgam))
   expect_true("threads" %in% formalArgs(jsdgam))
   # Default is NULL (no threading). validate_threads(NULL) returns
@@ -4204,8 +4201,8 @@ test_that("com_binomial() requires a `trials()` addition term", {
 
 
 test_that("multi-response fits with NA preserve per-response valid rows", {
-  # Regression for #429/#430: brms's mvbf listwise-deletes rows
-  # with NA in ANY response. mvgam overrides this so each
+  # brms's mvbf listwise-deletes rows with NA in ANY response.
+  # mvgam overrides this so each
   # response keeps its own non-NA rows and contributes to the
   # shared latent state at every time point it was observed. The
   # `expand_per_response_standata` helper substitutes per-arm
@@ -4397,8 +4394,8 @@ test_that("trend_covariate_names() drops the grouping columns", {
 
 test_that("trend_formula accepts the time variable as a covariate", {
   # `~ s(time)` is the most natural latent trend to write in a dynamic
-  # GAM, and a plain `~ time` is a linear trend. Both used to error
-  # before reaching code generation.
+  # GAM, and a plain `~ time` is a linear trend. Both must reach code
+  # generation rather than error earlier.
   set.seed(7)
   dat <- data.frame(
     y = rpois(120, 5), x = rnorm(120), time = 1:120,
@@ -4424,9 +4421,9 @@ test_that("trend_formula accepts the time variable as a covariate", {
 })
 
 test_that("trend_formula still builds without any time covariate", {
-  # Guards the fix: stripping the grouping columns must not remove the
-  # design matrix for ordinary covariates, nor invent one for a trend
-  # that has no covariates at all.
+  # Stripping the grouping columns must not remove the design matrix
+  # for ordinary covariates, nor invent one for a trend that has no
+  # covariates at all.
   set.seed(7)
   dat <- data.frame(
     y = rpois(120, 5), x = rnorm(120), time = 1:120,
@@ -4451,9 +4448,9 @@ test_that("trend_covariate_names() rejects a non-character selection", {
 })
 
 test_that("time works as a trend covariate on the by = lv_axis() path", {
-  # `collapse_to_time_level()` is only reached when `has_by_lv` is TRUE,
-  # so this is the call path the fix was actually written for. It
-  # collapses twice, once to (time, series) and once to time.
+  # `collapse_to_time_level()` is only reached when `has_by_lv` is
+  # TRUE. It collapses twice, once to (time, series) and once to
+  # time.
   set.seed(5)
   dat <- expand.grid(time = 1:60, series = factor(paste0("s", 1:4)))
   dat$y <- rpois(nrow(dat), 5)

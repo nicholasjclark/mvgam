@@ -2061,9 +2061,8 @@ maybe_warn_exact_gp <- function(gp_term) {
 #' Scans a formula for `gp()` terms that omit `k`. Exact GPs fit
 #' through brms cleanly but mvgam's prediction surface cannot yet
 #' reconstruct their basis at newdata, so the warn flags that
-#' specific gap. Earlier versions hard-failed here; we now allow
-#' the fit and let users opt into the approximate form when they
-#' need newdata prediction.
+#' specific gap and lets users opt into the approximate form when
+#' they need newdata prediction.
 #'
 #' @param formula A formula object
 #' @noRd
@@ -2422,10 +2421,10 @@ validate_trend_formula_restrictions <- function(formula_str,
     "addition_terms" = list(
       # brms `formula_ad` specials that modify the *observation model*
       # and therefore have no defined meaning on a latent State-Space
-      # trend. `mi` is deliberately absent: per the design intent of
-      # GH issue #109 item 12, missing-predictor imputation is allowed
-      # on the latent scale; the obs-side rejection of `mi()` as a
-      # predictor lives in `validate_obs_formula_brms`. Detection walks
+      # trend. `mi` is deliberately absent: missing-predictor
+      # imputation is allowed on the latent scale; the obs-side
+      # rejection of `mi()` as a predictor lives in
+      # `validate_obs_formula_brms`. Detection walks
       # the formula AST (see `formula_rhs_function_names`) rather than
       # grepping the deparsed string so variable names like `defense`
       # or `se_x` cannot false-positive.
@@ -2693,10 +2692,7 @@ validate_time_series_for_trends <- function(data, trend_specs, silent = 1, respo
 
   dimensions <- .precomputed_dimensions
 
-  # ARCHITECTURAL FIX: Three-phase validation replacing circular validation chain
-  # Phase 1: Input validation (already done by extract_time_series_dimensions above)
-
-  # Phase 2: Verify attribute creation succeeded
+  # Verify attribute creation succeeded
   if (!has_mvgam_variables(data)) {
     stop(insight::format_error(c(
       "Attribute creation failed during time series validation.",

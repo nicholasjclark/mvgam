@@ -76,14 +76,13 @@ reject_removed_args <- function(dots, fn = "mvgam") {
 }
 
 # Internal: translate the deprecated `samples` / `burnin` argument
-# pair to the brms-style `iter` / `warmup` pair. Historical mvgam
-# roxygen examples used `samples` (post-warmup draws) and `burnin`
-# (warmup draws). The brms integration pipeline
-# (`R/backends.R:493-494`) reads `iter` (total iterations) and
-# `warmup` (warmup portion). Prior to this helper both deprecated
-# names silently disappeared into `...` and every fit got
-# cmdstanr's `iter = 2000, warmup = 1000` default. Called from
-# `mvgam()` before dispatching to inner fitting machinery.
+# pair (`samples` for post-warmup draws, `burnin` for warmup draws)
+# to the brms-style `iter` / `warmup` pair that the brms integration
+# pipeline (`R/backends.R:493-494`) reads (`iter` total iterations,
+# `warmup` the warmup portion). Without this translation, both
+# deprecated names would silently disappear into `...` and every fit
+# would get cmdstanr's `iter = 2000, warmup = 1000` default. Called
+# from `mvgam()` before dispatching to inner fitting machinery.
 #
 # Returns the `dots` list with `iter` and `warmup` set from the
 # deprecated names (defaulting to 1000 each when only one of the
@@ -175,9 +174,8 @@ mvgam_imputation_forwarded <- c(
 #' @param data Data frame or list of multiply imputed datasets
 #' @param newdata Optional test-set `data.frame` persisted on the
 #'   fit as `object$test_data`. Used by `plot(fit, type = "series")`
-#'   to overlay the test arm without re-passing the data. This is
-#'   a deliberate change from earlier mvgam releases: passing
-#'   `newdata` to `mvgam()` no longer emits Stan generated-quantities
+#'   to overlay the test arm without re-passing the data. Passing
+#'   `newdata` to `mvgam()` does not emit Stan generated-quantities
 #'   forecasts at fit time. Keeping forecasting out of Stan keeps
 #'   the fit object small and the sampler fast, and means downstream
 #'   methods can choose their own newdata. To use the persisted
@@ -998,10 +996,7 @@ mvgam_single <- function(formula, trend_formula, data, backend,
 # ------------------------------------------------------------------------------
 # Extracts and generates trend-specific stanvars to enable proper injection
 # into the combined Stan model while maintaining compatibility with brms.
-
-# Note: Legacy trend stanvar generation functions have been removed.
-# The modern system in stan_assembly.R using generate_trend_injection_stanvars()
-# provides the same functionality with better integration.
+# `generate_trend_injection_stanvars()` in stan_assembly.R is the entry point.
 
 # ------------------------------------------------------------------------------
 # COMBINED STAN CODE GENERATION
@@ -1123,10 +1118,10 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       family = obs_setup$family,
       # Combine obs + trend prior tables before lifting stanvar rows so
       # the fit stores every user-supplied row (not just the obs subset).
-      # Passing `obs_setup$prior` alone here silently dropped any
+      # Passing `obs_setup$prior` alone here would silently drop any
       # `prior(..., class = sigma_trend)` / `class = ar1_trend` /
       # `class = b_trend` overrides the user supplied via `priors = `
-      # (Stan still applied them, but they were absent from `$prior`).
+      # from `$prior` (Stan still applies them either way).
       # The trend setup carries brms's own class names (e.g. `sigma`,
       # `b`, `sds`, `ar1`); re-suffix them so the combined table uses
       # the same `<class>_trend` convention as

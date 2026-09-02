@@ -863,9 +863,9 @@ test_that("mvn() emits MVNormal + Sigma decomposition + LKJCholesky", {
     out
   ))
   # The kernel evaluates independent normals with a per-element
-  # scale, so the covariance is diagonal. It previously rendered a
-  # Cholesky decomposition under an LKJ prior, naming a correlation
-  # this family's Sigma has no parameter for. The equation and the
+  # scale, so the covariance is diagonal: rendering a Cholesky
+  # decomposition under an LKJ prior would name a correlation this
+  # family's Sigma has no parameter for. The equation and the
   # symbol glossary describe the same quantity and must agree.
   expect_true(grepl(
     "\\\\text\\{diag\\}\\(\\\\boldsymbol\\{\\\\Psi\\}\\^2\\)", out

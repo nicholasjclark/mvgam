@@ -43,8 +43,9 @@ test_that("nmix() tags closure-unit and predict-type attributes", {
     attr(fam, "mvgam_predict_types", exact = TRUE),
     c("latent_state", "detection")
   )
-  # The Stan stanvars slot is filled in at data-prep time; chunk 1
-  # leaves it NULL so attach_family_stanvars() passes through.
+  # The Stan stanvars slot is filled in at data-prep time; the
+  # family constructor leaves it NULL so attach_family_stanvars()
+  # passes through.
   expect_null(attr(fam, "mvgam_stanvars", exact = TRUE))
 })
 
@@ -971,11 +972,10 @@ test_that("stancode under nmix() includes the lpdf signature and data declaratio
     sc, "binomial_logit_lpmf(counts | K_min_g, lp_visits)",
     fixed = TRUE
   )
-  # log1m_p is hoisted to the wrapper (task #230) so the partial
-  # sum body reads `log1m_p[idx]` instead of recomputing log1m(p)
-  # per chunk. The wrapper precomputes all three link-scale
-  # vectors (log_mu, logit_p, log1m_p) before dispatching to
-  # reduce_sum.
+  # log1m_p is hoisted to the wrapper so the partial sum body reads
+  # `log1m_p[idx]` instead of recomputing log1m(p) per chunk. The
+  # wrapper precomputes all three link-scale vectors (log_mu,
+  # logit_p, log1m_p) before dispatching to reduce_sum.
   expect_match(sc, "real log_ff = log_lam + sum(log1m_p[idx]);",
                fixed = TRUE)
   expect_match(sc, "vector[num_elements(p)] log1m_p = log1m(p);",
@@ -1001,7 +1001,7 @@ test_that("stancode under nmix() includes the lpdf signature and data declaratio
   # AND multi-threaded fits see ~8 chunks across cores.
   expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit / 8 : 1;",
                fixed = TRUE)
-  # No remnants of the old vectorised log-sum-exp loop.
+  # No remnants of the naive vectorised log-sum-exp loop.
   expect_false(grepl("component_lps", sc, fixed = TRUE))
   expect_false(grepl("poisson_log_lpmf(k | log_lam)", sc, fixed = TRUE))
   # Data block: closure-unit arrays at unit length, not visit length.
@@ -1012,9 +1012,8 @@ test_that("stancode under nmix() includes the lpdf signature and data declaratio
   expect_match(sc, "array[N_unit, 3] int<lower=1> visit_idx;", fixed = TRUE)
   # Likelihood call wires the dpars + vint args correctly; the
   # trailing `log_n_lookup` argument is the cached log(N) vector
-  # emitted in transformed data (task #316) so the inner ratio
-  # loop indexes a vector instead of calling scalar log() per
-  # iteration.
+  # emitted in transformed data so the inner ratio loop indexes a
+  # vector instead of calling scalar log() per iteration.
   expect_match(
     sc,
     "nmix_lpmf(Y | mu, p, N_unit, n_rep, K_max, Y_max, visit_idx, log_n_lookup)",
@@ -1183,7 +1182,7 @@ test_that("stancode under nmix('poisson_poisson') emits partial_sum + log_n_look
   expect_match(sc, "vector[num_elements(p)] log_p = log(p);",
                fixed = TRUE)
   # Inner k loop uses log_n_lookup[k] instead of scalar log(k) so
-  # the AD tape skips the per-iter math op (task #316 pattern).
+  # the AD tape skips the per-iter math op.
   expect_match(sc, "log_n_lookup[k] * sum_counts", fixed = TRUE)
   # k = 0 only feasible when no detections; flip to -Inf otherwise
   # so log_sum_exp over the full K range marginalises cleanly.

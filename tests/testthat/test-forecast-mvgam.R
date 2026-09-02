@@ -265,9 +265,9 @@ test_that("ndraws beyond available draws errors informatively", {
 
 test_that("All multivariate / PW trend types flow through dispatch", {
   # Every supported trend type should reach build_hindcast_arms.
-  # Stubs cover the new Stan-direct hindcast pipeline (extract
-  # trend + obs linpred + family RNG). Only an invented "BOGUS"
-  # type should still fail before dispatch.
+  # Stubs cover the Stan-direct hindcast pipeline (extract trend +
+  # obs linpred + family RNG). Only an invented "BOGUS" type should
+  # still fail before dispatch.
   draws <- make_draws_mat(ndraws = 2L)
   testthat::local_mocked_bindings(
     `as_draws_matrix` = function(...) draws,

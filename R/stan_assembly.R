@@ -1481,7 +1481,7 @@ insert_after_mu_lines_in_model_block <- function(code_lines, trend_injection_cod
   if (length(detected_glm_types) > 0) {
     
     # Convert GLM calls to explicit form, then recurse to find new mu += lines
-    # Create GLM analysis for conversion (missing parameter bug fix)
+    # Create GLM analysis for conversion
     analysis <- analyze_stan(paste(code_lines, collapse = "\n"))
     conversion_result <- convert_glm_to_standard_form(code_lines, block_info, detected_glm_types, analysis, processed_glm_lines)
     # Recursively call with updated tracking to prevent infinite recursion
@@ -1506,7 +1506,7 @@ insert_after_mu_lines_in_model_block <- function(code_lines, trend_injection_cod
   # Calculate absolute position of last mu += line
   last_mu_pos <- block_info$start_idx + mu_line_indices[length(mu_line_indices)] - 1
   
-  # Use the new utility function to apply correct transformation order
+  # Apply the correct transformation order
   transformation_pattern <- "^\\s*mu(_\\w+)?\\s*=\\s*\\w+\\s*\\("
   
   result_code <- apply_correct_transformation_order(
@@ -2090,7 +2090,7 @@ generate_base_brms_standata <- function(formula, data, family = gaussian(),
   # the shared latent state at the asynchronously sampled time
   # points. Rebuild the per-response data arrays and substitute
   # them back into the combined standata while preserving brms's
-  # naming. See task #430.
+  # naming.
   if (inherits(formula, "mvbrmsformula")) {
     standata <- expand_per_response_standata(
       combined_sd = standata,
@@ -2873,9 +2873,9 @@ add_hierarchical_support <- function(components, trend_specs, data_info, prior =
 #' Generate All Trend Dimension Stanvars
 #'
 #' Creates ALL standardized dimension data block stanvars needed by ALL trend types.
-#' This function consolidates dimension creation that was previously duplicated
-#' across multiple functions, ensuring consistent dimension parameter generation
-#' while maintaining proper dimensional relationships for factor vs non-factor models.
+#' This function centralises dimension creation so every trend type shares one
+#' source of dimension parameters, keeping the dimensional relationships for
+#' factor vs non-factor models consistent.
 #'
 #' @param n_obs Number of observations (will be named N_trend in Stan)
 #' @param n_series Number of observed series
@@ -3870,7 +3870,7 @@ make_loadings_prior_stanvars <- function(spec, prior = NULL) {
     ))
     # `Psi_diag` is declared by the block that consumes it, which is
     # the innovation transform in `generate_shared_innovation_stanvars()`.
-    # The loadings prior no longer scales `Z` by it, so declaring it
+    # The loadings prior does not scale `Z` by it, so declaring it
     # here as well would be a second definition of one quantity.
     model_vars <- c(model_vars, list(
       brms::stanvar(
@@ -4914,7 +4914,7 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # state matches the AR(1) stationary distribution, not the
   # marginal Normal(0, sigma) of a single innovation.
   #
-  # Out of scope (deferred):
+  # Out of scope here:
   #   * AR(p>1): stationary covariance requires the AR(p)
   #     Yule-Walker solve, currently only implemented in the VAR
   #     generator (`initial_joint_var` in
@@ -5594,7 +5594,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
     block = "tparameters"
   )
 
-  # VAR/VARMA model block with joint initial distribution (Task 2.7.8.10)
+  # VAR/VARMA model block with joint initial distribution.
   # Pre-calculate dimensions for clarity and validation
   checkmate::assert_logical(is_varma, len = 1)
   checkmate::assert_int(lags, lower = 1)
@@ -6400,9 +6400,9 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
   # Extract key parameters
   n_lv <- trend_specs$n_lv %||% 1
   # `PW()` sets each of these, so reading them straight off the spec
-  # keeps one source. The fallbacks that used to sit here named 5 and
-  # 0.1 against the constructor's 10 and 0.05; the assertions below
-  # now catch a spec that arrives without them.
+  # keeps one source; the assertions below catch a spec that arrives
+  # without them rather than falling back to a hardcoded default that
+  # could disagree with the constructor.
   n_changepoints <- trend_specs$n_changepoints
   changepoint_scale <- trend_specs$changepoint_scale
   # Use growth parameter if provided, otherwise fall back to trend_specs$type or trend_specs$growth

@@ -440,9 +440,10 @@ rstantools::predictive_error
 # inherits from `brmsfit`, so a call to either resolves to the brms
 # method, which reads the raw stanfit and reports parameters and
 # draws that `variables()` and `ndraws()` deliberately filter out.
-# Old code calling the deprecated spelling then disagrees with the
-# current spelling on the same fit. Delegating keeps the two answers
-# identical while brms still raises its own deprecation warning.
+# Without delegation, code calling the deprecated spelling would
+# disagree with the current spelling on the same fit. Delegating
+# keeps the two answers identical while brms still raises its own
+# deprecation warning.
 
 #' @importFrom brms parnames
 #' @method parnames mvgam

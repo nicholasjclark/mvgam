@@ -337,9 +337,9 @@ test_that("factor ZMVN keeps the latent scale it was fitted with", {
 # ----- Dispatch errors -------------------------------------------
 
 test_that("Factor fits (n_lv < n_series) tag the LV grain", {
-  # Since the factor-forecast support landed, the dispatcher
-  # runs AR/RW/VAR in n_lv-dimensional latent space and reads
-  # `lv_trend[t, k]` for the state history. The mock exposes
+  # For a factor fit, the dispatcher runs AR/RW/VAR in
+  # n_lv-dimensional latent space and reads `lv_trend[t, k]` for
+  # the state history. The mock exposes
   # those columns so the same recursion machinery can walk
   # them, and the returned list carries `n_lv_active = n_lv`
   # to signal to `propagate_one_draw` that a Z projection is

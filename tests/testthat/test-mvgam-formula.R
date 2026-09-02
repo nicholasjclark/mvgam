@@ -623,10 +623,10 @@ test_that("complex real-world formula edge case validation", {
 })
 
 test_that("exact GP terms in obs formula are accepted (warn only)", {
-  # mvgam used to hard-fail on gp() without k. Exact GPs fit
-  # fine through brms (full covariance kernel); the warn covers
-  # the prediction-at-newdata gap. Under TESTTHAT the warn is
-  # suppressed at the validator, so we just assert no error.
+  # Exact GPs fit fine through brms (full covariance kernel) even
+  # without k; the warn covers the prediction-at-newdata gap. Under
+  # TESTTHAT the warn is suppressed at the validator, so we just
+  # assert no error.
   expect_no_error(
     mvgam_formula(y ~ gp(x), trend_formula = ~ 1)
   )

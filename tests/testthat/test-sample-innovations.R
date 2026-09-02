@@ -794,8 +794,8 @@ test_that("bin_draws() keeps the shape of a posterior at a fraction of it", {
 
 test_that("extract_sigma_and_cov: a single series gives a 1x1 covariance", {
   # `diag(x)` for a length-one x builds an x-by-x identity rather than
-  # a 1x1 matrix holding x, so a one-series correlated trend used to
-  # produce a non-conformable Sigma and abort the forecast.
+  # a 1x1 matrix holding x, so a one-series correlated trend needs its
+  # own path to avoid a non-conformable Sigma.
   one_draw <- c("sigma_trend[1]" = 0.4, "L_Omega_trend[1,1]" = 1)
   out <- extract_sigma_and_cov(one_draw, n_series = 1L, n_lv = 1L,
                                has_cor = TRUE)
@@ -823,8 +823,8 @@ test_that("extract_sigma_and_cov: two series scale the correlation both ways", {
 test_that("extract_sigma_and_cov: a grouped trend reads its own parameters", {
   # A grouped trend carries no `sigma_trend` or `L_Omega_trend` at all:
   # its scales are per group and its correlations are a population
-  # factor pulled towards each group's own. Asking for the flat names
-  # used to abort the forecast with a subscript error.
+  # factor pulled towards each group's own. The extractor must resolve
+  # the grouped names rather than the flat ones.
   n_sub <- 2L
   n_groups <- 2L
   group_inds <- c(1L, 1L, 2L, 2L)

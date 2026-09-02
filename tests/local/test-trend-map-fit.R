@@ -3,13 +3,10 @@
 # produced by tests/local/build_fixtures.R. The cached fit is a
 # 4-series, 2-factor AR(1) model with a dense user-supplied Z.
 #
-# Step 3 contract checks (Stan emission + standata round-trip)
-# live here today. Step 4 introduces the downstream resolver
-# (`resolve_factor_loadings`) that lets posterior_predict /
-# residuals / residual_cor / extract_factors run on a fixed-Z
-# fit; the downstream-method assertions below the `xxx` divider
-# are intentionally pending until that resolver lands and should
-# be re-enabled in the same commit.
+# Covers Stan emission and standata round-trip contract checks,
+# plus the downstream resolver (`resolve_factor_loadings`) that
+# lets posterior_predict / residuals / residual_cor /
+# extract_factors run on a fixed-Z fit.
 
 CACHE_DIR <- "fixtures"
 fit <- readRDS(file.path(CACHE_DIR, "val_mvgam_trend_map_fx.rds"))

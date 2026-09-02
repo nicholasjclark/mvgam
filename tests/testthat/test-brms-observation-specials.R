@@ -302,8 +302,9 @@ test_that("is_multivariate_formula() accepts a namespaced mvbind response", {
 
 test_that("format_model_formula() deparses a brmsformula to one line", {
   # `format()` on a brmsformula returns one string per list element,
-  # so printing with `sep = ""` used to glue the trailing NULLs on
-  # as `y | trials(n) ~ 1NULLNULLyNULL`.
+  # so printing with `sep = ""` would glue the trailing NULLs on
+  # as `y | trials(n) ~ 1NULLNULLyNULL` unless they are collapsed
+  # first.
   expect_identical(
     mvgam:::format_model_formula(bf(y | trials(n) ~ 1)),
     "y | trials(n) ~ 1"
@@ -349,9 +350,9 @@ test_that("the trials denominator resolves against the prediction data", {
 
 test_that("an addition term is not counted as a response", {
   # `y | trials(n)` names one response. Reading variable names off the
-  # whole left-hand side used to return the addition variables too,
-  # which then reached every consumer that treats `response_names` as
-  # the response columns of the data.
+  # whole left-hand side would also return the addition variables,
+  # which every consumer that treats `response_names` as the response
+  # columns of the data relies on being excluded.
   expect_equal(extract_response_names(y | trials(n) ~ x), "y")
   expect_equal(extract_response_names(y | weights(w) + cens(c) ~ x), "y")
   expect_equal(extract_response_names(y | trunc(lb = 0) ~ x), "y")

@@ -1,17 +1,17 @@
 # Local fitting tests for the closure-unit family infrastructure.
-# Currently covers `nmix()` (PB / RN / PPM variants); future
-# additions will fold in `occ()` and the simplex multi-response
-# trio. Moved out of tests/testthat/test-closure-unit-families.R
-# because each block compiles a Stan model and runs short HMC
-# chains; that is too expensive for the CI test suite. The cheap
-# constructor / predicate / source-helper / standata round-trip /
-# how_to_cite coverage stays in tests/testthat/.
+# Covers `nmix()` (PB / RN / PPM variants); `occ()` and the simplex
+# multi-response trio are out of scope here. Kept separate from
+# tests/testthat/test-closure-unit-families.R because each block
+# compiles a Stan model and runs short HMC chains; that is too
+# expensive for the CI test suite. The cheap constructor / predicate
+# / source-helper / standata round-trip / how_to_cite coverage
+# stays in tests/testthat/.
 #
 # Run with:
 #   Rscript -e "devtools::load_all('.'); testthat::test_file('tests/local/closure_unit_family_fitting.R')"
 #
 # Three blocks:
-#   1. PB nmix prediction surface (chunk 3 from the original file)
+#   1. PB nmix prediction surface
 #   2. Royle-Nichols Stan emission + end-to-end + smooth/RE/state
 #   3. Poisson-Poisson Stan emission + end-to-end + smooth-p
 
@@ -59,7 +59,7 @@ local_nmix_fit <- local({
     # `threads = 2L` enables mvgam's `partial_sum_nmix_*_lpmf` +
     # `reduce_sum` per-closure-unit parallelism. Closure-unit
     # families thread independently of the brms partial-log-lik
-    # path, so the issue #411 / #412 gate is inert here.
+    # path, so the brms-native threading gate is inert here.
     fit <- mvgam(y ~ elev,
                  family = nmix(),
                  data = d,

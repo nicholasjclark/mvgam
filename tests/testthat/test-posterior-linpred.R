@@ -107,7 +107,7 @@ test_that("get_combined_linpred handles list obs + list per-response trend", {
 
 
 test_that("get_combined_linpred process_error=FALSE preserves per-draw trend", {
-  # process_error = FALSE no longer collapses the trend to its
+  # process_error = FALSE must not collapse the trend to its
   # column-mean. The deterministic-submodel draws (X %*% b_trend) are
   # legitimate per-draw coefficient uncertainty and must ride through
   # unchanged. Only the marginal latent-state noise contribution is
@@ -348,9 +348,9 @@ test_that("extract_linpred_univariate drops intercept col when b_Intercept prese
 
 test_that("extract_linpred_univariate keeps cell-means factor without intercept", {
   # `y ~ 0 + factor`: per-level indicators; col 1 is NOT all-1s
-  # (only rows with the reference level are 1). Old code's all-1s
-  # check returns FALSE; new code reaches the same branch. This
-  # test guards the path for users writing cell-means formulas.
+  # (only rows with the reference level are 1), so the all-1s check
+  # must return FALSE and fall through to the same branch used for
+  # cell-means formulas.
   X <- model.matrix(~ 0 + factor(c("a", "b", "c", "a", "b", "c")))
   draws <- posterior::as_draws_matrix(matrix(
     c(rep(1, 4L), rep(2, 4L), rep(3, 4L)), nrow = 4L,
@@ -613,6 +613,40 @@ test_that("every prediction entry point spells the surface the same way", {
 })
 
 
+test_that("only a caller of get_combined_linpred names trend_state", {
+  # `trend_state` is the name `get_combined_linpred()` reads.
+  # Every other prediction function takes the user-facing
+  # `incl_autocor`, so naming `trend_state` across that boundary
+  # puts it in `...`, where it is dropped and the surface falls back
+  # to the default without saying so. A method may therefore mention
+  # `trend_state` only if it calls `get_combined_linpred()` itself.
+  methods <- list(
+    posterior_epred = posterior_epred.mvgam,
+    posterior_predict = posterior_predict.mvgam,
+    posterior_linpred = posterior_linpred.mvgam,
+    predict = predict.mvgam,
+    fitted = fitted.mvgam,
+    log_lik = log_lik.mvgam
+  )
+  for (nm in names(methods)) {
+    src <- paste(deparse(body(methods[[nm]])), collapse = " ")
+    reads_internal <- grepl("get_combined_linpred", src, fixed = TRUE)
+    if (!reads_internal) {
+      expect_false(grepl("trend_state", src, fixed = TRUE))
+    }
+  }
+})
+
+
+test_that("posterior_predict forwards the surface it was given", {
+  # The delegation this pins is to a sibling public method rather
+  # than to `get_combined_linpred()`, which is where the argument
+  # changes name.
+  src <- paste(deparse(body(posterior_predict.mvgam)), collapse = " ")
+  expect_true(grepl("incl_autocor = incl_autocor", src, fixed = TRUE))
+})
+
+
 test_that("the prediction entry points share one set of defaults", {
   # `predict()` forwards to `posterior_predict()`, so a default that
   # differs between them answers two ways on one fit with no argument
@@ -706,9 +740,9 @@ test_that("population_random_pred() adds each level's own coefficient", {
 test_that("a grouping level the model never saw is named, not indexed", {
   # brms extends the grouping index under `allow_new_levels = TRUE`,
   # but no coefficient was ever drawn for the new level. Indexing
-  # past the end of the draws gave `subscript out of bounds`, an
-  # internal message arrived at by following brms's own advice to set
-  # that argument.
+  # past the end of the draws would give `subscript out of bounds`,
+  # an internal message even though `allow_new_levels` is brms's own
+  # documented way to handle this case.
   draws <- matrix(
     1, nrow = 2, ncol = 3,
     dimnames = list(NULL, paste0("r_1_1[", 1:3, "]"))

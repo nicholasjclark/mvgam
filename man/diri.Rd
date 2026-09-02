@@ -72,15 +72,15 @@ by taking \code{phi[idx[1]]}, which assumes the \code{phi} covariate is
 constant across the K rows of any site (site-level only). A
 species-level \code{phi} covariate is statistically ill-defined for
 a Dirichlet observation; if you pass one, the lpdf silently uses
-row 1's value and the user-facing pre-fit validator for this
-contract is on the v2.0.1 roadmap.
+row 1's value, since there is no pre-fit validator for this
+contract.
 
 Post-fit response-scale dispatchers
 (\code{posterior_predict()} / \code{posterior_epred()} / \code{log_lik()})
-currently expect a scalar \code{phi} and will error directionally on
-a phi sub-formula fit. Interrogate the \verb{b_phi_*} posterior
-directly via \code{posterior::as_draws_matrix(fit$fit)} until the
-v2.0.1 plumbing for per-row \code{phi} extraction lands.
+extract the per-row \code{phi} linpred via \code{extract_phi_per_row()}
+when a \code{phi} sub-formula is present, composing it through the
+same dpar pipeline as \code{mu} and collapsing per unit to
+\code{phi[idx[1]]} to mirror the Stan lpdf.
 
 The default brms prior on \code{b_phi} regression coefficients is
 flat. Consider supplying \code{prior(student_t(3, 0, 2.5), class = b, dpar = phi)} via the \code{priors} argument to regularise the

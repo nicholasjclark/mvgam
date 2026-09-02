@@ -3,9 +3,8 @@
 # Fits one small jsdgam, caches the result, then smoke-tests each
 # inherited surface (residual_cor, predict, posterior_epred,
 # posterior_predict, log_lik, loo, print, summary, ordinate,
-# shared_variation, conditional_effects, pp_check). The audit
-# matrix in the v2.0 plan §chunk-4 lives here so testthat stays
-# fast and pure-compile.
+# shared_variation, conditional_effects, pp_check). Kept here
+# rather than in testthat/ so that suite stays fast and pure-compile.
 #
 # Run with:
 #   Rscript tests/local/jsdgam_prediction_audit.R

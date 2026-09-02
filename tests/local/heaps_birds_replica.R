@@ -147,8 +147,8 @@ cat("\nHeaps Sect. 6.2 near-replica completed successfully.\n")
 
 # 7. Full inherited surface audit on the structured-prior fit -------------
 #
-# Mirror the chunk-4 audit (tests/local/jsdgam_prediction_audit.R) on
-# this fit to confirm the structured-loadings-prior path composes
+# Mirror the surface audit (tests/local/jsdgam_prediction_audit.R)
+# on this fit to confirm the structured-loadings-prior path composes
 # cleanly with summary / predict / posterior_epred / posterior_predict /
 # log_lik / loo / print / ordinate / shared_variation /
 # conditional_effects / pp_check.

@@ -701,21 +701,44 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
     return(posterior_epred_ordinal(prep))
   }
 
-  # Extract trials for binomial-shaped families. Recognised set
-  # lives in `extract_trials_for_family()`.
-  trials <- extract_trials_for_family(object, family, newdata)
+  expected_from_linpred(
+    object, linpred, family, newdata = newdata, draw_ids = draw_ids
+  )
+}
 
-  # Some families need more than `(linpred, trials)` for a mean: a
-  # mixture at zero needs its mixing probability, a lognormal needs the
-  # dispersion its Jensen correction uses, and a
-  # Conway-Maxwell-binomial has no closed-form mean in `mu` alone.
-  # `epred_extra_dpars()` names them so the draws are resolved here,
-  # against the same iterations the predictor came from.
+
+#' The family's mean for a linear predictor already on the link scale
+#'
+#' The inverse link answers this only for a family whose expectation
+#' is its predictor. A binomial mean is `trials * p` and a
+#' zero-inflated mean is `(1 - zi) * mu`, so a surface that applies
+#' the inverse link alone reports a probability where a count was
+#' asked for, or a rate before its mixing probability.
+#'
+#' Trials come from `extract_trials_for_family()`. Families needing
+#' more than `(linpred, trials)` are named by `epred_extra_dpars()`:
+#' a mixture at zero needs its mixing probability, a lognormal the
+#' dispersion its Jensen correction uses, and a
+#' Conway-Maxwell-binomial has no closed form in `mu` alone. Those
+#' draws are resolved against the same iterations the predictor came
+#' from.
+#'
+#' @param object A fitted `mvgam` object.
+#' @param linpred `[ndraws x nobs]` link-scale predictor, or a named
+#'   list of them for a multivariate fit.
+#' @param family The observation family, or a named list of them.
+#' @param newdata Data the predictor was built for, used to read
+#'   trials and any per-observation parameter.
+#' @param draw_ids Draws the predictor was taken at, so the extra
+#'   parameters are read at the same iterations.
+#' @return Matrix of expected values, or a named list of them.
+#' @noRd
+expected_from_linpred <- function(object, linpred, family,
+                                  newdata = NULL, draw_ids = NULL) {
+  trials <- extract_trials_for_family(object, family, newdata)
   family_pars <- resolve_epred_family_pars(
     object, family, linpred, draw_ids = draw_ids, newdata = newdata
   )
-
-  # Transform to response scale
   compute_family_epred(
     linpred     = linpred,
     family      = family,
@@ -963,15 +986,33 @@ extract_trials_for_family <- function(object, family, newdata) {
   # sized to the likelihood's observed rows.
   pred_data <- if (is.null(newdata)) object$data else newdata
   trials <- resolve_trials_denominator(object$formula, pred_data) %||%
-    pred_data$trials %||% object$standata$trials
+    pred_data$trials
+
+  # `standata` answers only for the data the model was fitted to.
+  # Reusing it for a grid the caller supplied would hand each row
+  # another observation's denominator, and would go unnoticed
+  # whenever the two happen to carry the same number of rows.
+  if (is.null(trials) && is.null(newdata)) {
+    trials <- object$standata$trials
+  }
 
   if (is.null(trials)) {
+    wanted <- all.vars(find_aterm_call(object$formula, "trials") %||%
+                         list())
+    wanted <- setdiff(wanted, names(pred_data))
     stop(insight::format_error(c(
       cli::format_inline(
         "Family {.val {family_name}} requires {.field trials} data."
       ),
+      x = if (length(wanted)) {
+        cli::format_inline(
+          "{.code newdata} has no column {.field {wanted}}."
+        )
+      } else {
+        cli::format_inline("No {.field trials} column was found.")
+      },
       i = cli::format_inline(
-        "Ensure {.code trials} is present in your data or use {.code y | trials(n) ~ ...} formula syntax."
+        "Supply the denominator for every row being predicted, either as the column named in {.code y | trials(n) ~ ...} or as a {.code trials} column."
       )
     )))
   }

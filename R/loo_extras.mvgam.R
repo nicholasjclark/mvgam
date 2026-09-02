@@ -216,9 +216,8 @@ mvgam_loo_R2 <- function(y, epred, ll, r_eff) {
 #'@noRd
 # Internal: stop with a consistent message when a method that can only
 # operate on one response at a time is handed a multivariate fit and
-# no `resp`. Reason: the guard was spelled out separately in each
-# method that had one, so the methods that lacked it failed deep in
-# the prediction stack with an internal message
+# no `resp`. Reason: a method without this guard fails deep in the
+# prediction stack with an internal message
 # ("is.numeric(x) is not TRUE") instead of naming the fix.
 #'@noRd
 assert_resp_for_mv <- function(object, resp, fn_name) {

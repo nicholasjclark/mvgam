@@ -42,7 +42,9 @@ hindcast <- function(object, ...) {
 #' @param type One of `"response"`, `"link"`, `"expected"`,
 #'   `"trend"`, `"latent_state"`. `"response"` samples from the
 #'   observation family (the default); `"expected"` returns the
-#'   family's mean (`linkinv(eta)`); `"link"` returns the
+#'   family's mean, which carries any further parameter the
+#'   expectation needs (a binomial mean is `trials * p`, a
+#'   zero-inflated mean `(1 - zi) * mu`); `"link"` returns the
 #'   link-scale linpred; `"trend"` returns the latent-trend
 #'   trajectory on the link scale. `"latent_state"` is only valid
 #'   for closure-unit families (`occ()`, `nmix()` variants) and
@@ -54,7 +56,7 @@ hindcast <- function(object, ...) {
 #'   to use. Defaults to all available draws.
 #' @param obs_uncertainty Logical. When `FALSE`, skips
 #'   observation-family sampling for `type = "response"`,
-#'   returning the family mean (`linkinv(eta)`) instead.
+#'   returning the family mean instead.
 #'   Defaults to `TRUE`.
 #' @param process_error Logical. When `FALSE` (the default),
 #'   hindcasts read the Stan-fitted latent state directly

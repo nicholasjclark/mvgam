@@ -1,5 +1,5 @@
-# CI-safe tests for the Bayesian model-averaging surface landed
-# in `R/pp_average.mvgam.R` and the shared helpers in
+# CI-safe tests for the Bayesian model-averaging surface in
+# `R/pp_average.mvgam.R` and the shared helpers in
 # `R/mvgam_model_helpers.R`. Locks in S3 dispatch, signature
 # parity, helper behaviour, and error paths. Numerical concordance
 # against brms lives in `tests/local/test-marginaleffects-concordance.R`.

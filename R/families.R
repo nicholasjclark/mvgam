@@ -1311,7 +1311,7 @@ com_binomial_stan_funs <- function() {
 #      function block + per-family data block; emitted at fit
 #      time once the unit arrays are known.
 #
-# Future families (`occ()`, `royle_nichols()`, `poisson_poisson()`)
+# `occ()`, `nmix("royle_nichols")` and `nmix("poisson_poisson")`
 # reuse all four primitives; only step 4 changes per family.
 #
 # Cap tracking. The per-unit upper truncation `K_max[g]` is
@@ -1709,10 +1709,11 @@ build_closure_unit_arrays <- function(data,
   unit_int    <- match(unit_label, unit_levels)
   n_unit      <- length(unit_levels)
   # The grouping values behind each unit, one row per unit in unit
-  # order. Callers that label units read this rather than rebuilding
-  # the grid: `hindcast(type = "latent_state")` used to rebuild it and
-  # sort by series, which relabelled every unit on a multi-series fit
-  # because this ordering is first-appearance over time-major data.
+  # order. Callers that label units, such as
+  # `hindcast(type = "latent_state")`, must read this rather than
+  # rebuilding the grid and sorting by series: this ordering is
+  # first-appearance over time-major data, so sorting by series
+  # would relabel every unit on a multi-series fit.
   unit_grid <- data[match(unit_levels, unit_label),
                     unit_grouping_vars, drop = FALSE]
   rownames(unit_grid) <- NULL
@@ -2881,15 +2882,15 @@ make_occ_stanvars <- function(arrays) {
 #' constant across the K rows of any site (site-level only). A
 #' species-level `phi` covariate is statistically ill-defined for
 #' a Dirichlet observation; if you pass one, the lpdf silently uses
-#' row 1's value and the user-facing pre-fit validator for this
-#' contract is on the v2.0.1 roadmap.
+#' row 1's value, since there is no pre-fit validator for this
+#' contract.
 #'
 #' Post-fit response-scale dispatchers
 #' (`posterior_predict()` / `posterior_epred()` / `log_lik()`)
-#' currently expect a scalar `phi` and will error directionally on
-#' a phi sub-formula fit. Interrogate the `b_phi_*` posterior
-#' directly via `posterior::as_draws_matrix(fit$fit)` until the
-#' v2.0.1 plumbing for per-row `phi` extraction lands.
+#' extract the per-row `phi` linpred via `extract_phi_per_row()`
+#' when a `phi` sub-formula is present, composing it through the
+#' same dpar pipeline as `mu` and collapsing per unit to
+#' `phi[idx[1]]` to mirror the Stan lpdf.
 #'
 #' The default brms prior on `b_phi` regression coefficients is
 #' flat. Consider supplying `prior(student_t(3, 0, 2.5), class = b,
@@ -5485,10 +5486,9 @@ extract_closure_unit_components <- function(object, newdata = NULL,
   # Per-visit broadcasting happens only at the response sampling
   # step, where it is unavoidable.
   #
-  # process_error = FALSE because the current closure-unit
-  # families have no stochastic trend layer (trend_type = "None").
-  # When trend support lands this flag flips to the caller's
-  # request.
+  # process_error = FALSE because closure-unit families have no
+  # stochastic trend layer (trend_type = "None"); a family with a
+  # trend layer would pass the caller's request through instead.
   linpred <- posterior_linpred(
     object, newdata = newdata, draw_ids = draw_ids,
     process_error = FALSE

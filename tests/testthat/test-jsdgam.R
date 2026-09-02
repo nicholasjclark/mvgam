@@ -1,5 +1,5 @@
-# Tests for the `jsdgam()` wrapper (chunk 1: skeleton + legacy
-# signature port + class + slot plumbing). Three layers:
+# Tests for the `jsdgam()` wrapper: skeleton, legacy signature
+# port, class and slot plumbing. Three layers:
 #   1. Argument validation: 'unit' / 'species' / 'n_lv' / 'data'.
 #   2. Class + slot plumbing: c("mvgam", "jsdgam"); is_jsdgam flag;
 #      prepped_trend_model attribute populated correctly.
@@ -483,9 +483,9 @@ test_that("default (no aliases) yields no row_features / dist_* slots", {
 
 test_that("mvgam refuses the arguments 1.x took and 2.0 does not", {
   dat <- build_jsdgam_toy()
-  # Each of these used to reach `...`, where brms drops what it does
-  # not recognise, so the model that came back was not the model the
-  # call described.
+  # Each of these would otherwise reach `...`, where brms drops what
+  # it does not recognise, silently returning a model different from
+  # the one the call described.
   expect_error(
     mvgam(y ~ 1, trend_formula = ~ AR(p = 1), data = dat,
           share_obs_params = TRUE),
@@ -529,11 +529,10 @@ test_that("every removed argument names its replacement", {
 
 test_that("the trend a jsdgam builds is the correlated latent prior", {
   dat <- build_jsdgam_toy()
-  # The wrapper used to pin `ZMVN(cor = TRUE, subgr = "series")`
-  # through an argument mvgam has no formal for, so it was dropped and
-  # the default branch decided the trend. It still does; the pin said
-  # nothing the default does not, and its `subgr` would have been
-  # refused outright, since a subgroup without a group is an error.
+  # The default branch decides the trend without needing an explicit
+  # `ZMVN(cor = TRUE, subgr = "series")` pin: such a pin would say
+  # nothing the default does not, and its `subgr` would be refused
+  # outright, since a subgroup without a group is an error.
   mod <- suppressWarnings(jsdgam(
     formula = y ~ 1, factor_formula = ~ -1,
     data = dat, unit = time, species = species,

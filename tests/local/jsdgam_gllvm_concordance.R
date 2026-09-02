@@ -134,9 +134,9 @@ rownames(gllvm_dir_rcor) <- colnames(gllvm_dir_rcor) <- colnames(Y_dir)
 
 cat("\n--- jsdgam (family = brms::dirichlet) ---\n")
 # brms::dirichlet expects a multivariate (cbind-LHS) response. The
-# jsdgam wrapper currently forwards long-form (one row per (site,
-# species)). Capture whatever happens so we can decide whether to
-# add a dirichlet-aware path in chunk 2+.
+# jsdgam wrapper forwards long-form (one row per (site, species)),
+# so this captures whatever happens under that mismatch as input to
+# deciding whether jsdgam needs a dirichlet-aware path.
 dir_wide <- tibble::as_tibble(Y_dir) %>%
   dplyr::mutate(site = seq_len(n_sites), env = env)
 res_dir_jsdgam <- tryCatch(

@@ -348,9 +348,8 @@ test_that("re-exports of marginaleffects entry points are wired", {
 test_that("an offset is not offered as a conditional effect", {
   # `stats::terms()` files an offset under the "offset" attribute
   # rather than in "term.labels", so it never reaches the effect
-  # list. mvgam used to filter `^offset\\(` out of the labels, which
-  # could never match anything; the guard here is that the answer
-  # stays right if that ever changes.
+  # list. This guards that the answer stays right even if `terms()`
+  # ever starts putting offsets in "term.labels" instead.
   stub <- structure(
     list(formula = y ~ env + offset(log(n)), trend_formula = NULL),
     class = "mvgam"

@@ -108,16 +108,17 @@ test_that("ordinal thresholds follow the draws of their predictor", {
 
 
 # The three invariants below guard the composition of the trend's
-# contribution rather than the choice of draws. Each failed silently:
-# the answers stayed finite, plausibly scaled and wrong.
+# contribution rather than the choice of draws. A violation of any
+# one stays finite and plausibly scaled, so nothing but the check
+# itself catches it.
 
 
 test_that("a scored row reads the state of its own time", {
-  # The latent state used to be looked up by position within whatever
-  # frame it was handed, so scoring the later half of a series read
-  # the state of the earlier half. The shape was right and nothing
-  # warned. Scoring a window has to agree with scoring everything and
-  # keeping that window's columns.
+  # Looking the latent state up by position within whatever frame it
+  # is handed would score the later half of a series against the
+  # state of the earlier half, with the right shape and no warning.
+  # Scoring a window has to agree with scoring everything and keeping
+  # that window's columns.
   fit <- readRDS(file.path("fixtures", "val_mvgam_ar1_fx.rds"))
   n <- nrow(fit$data)
   window <- seq.int(n - 9L, n)

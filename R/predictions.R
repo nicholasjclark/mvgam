@@ -30,9 +30,9 @@
 #' - by-factor GP: `Xgp_<id>_<g>` and `slambda_<id>_<g>` for each level
 #'
 #' If a candidate term is missing required structures, the function
-#'   errors with the unrecognised pattern (no silent skip, because a silent skip
-#'   was the cause of bug #53 where by-factor GP contributions were
-#'   never added to the linear predictor).
+#'   errors with the unrecognised pattern rather than silently
+#'   skipping it, since a silent skip would leave by-factor GP
+#'   contributions out of the linear predictor.
 #'
 #' Full GP (`gp(x)` without `k`) emits no `slambda_*` and is not
 #'   detected.
@@ -2143,8 +2143,8 @@ strip_dpar_sdata <- function(sdata, dpar) {
 #' `_trend` follows the same convention: trend is always a
 #' suffix, so passing `dpar = "trend"` gives the trend-side
 #' rename used by `extract_component_linpred()`. The single
-#' regex unifies the previously bespoke `gsub("_trend", "", ...)`
-#' with the dpar path.
+#' regex handles both the `gsub("_trend", "", ...)` case and the
+#' dpar path.
 #'
 #' @param x Character vector of brms parameter or standata names.
 #' @param dpar Character scalar; the infix to strip (e.g.,
@@ -2462,13 +2462,13 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata,
   n_rows <- nrow(newdata)
 
   # Per-row by per-factor grid: each newdata row repeated for each
-  # factor. The previous (time, .trend)-grain build collapsed
-  # newdata across series via `collapse_to_time_level()`, which
-  # silently dropped per-row covariate variation (e.g. marginaleffects
-  # grids with several covariate values at the same time mapped to
-  # one row). expand_grid iterates `.trend` fastest, so consecutive
-  # blocks of `n_lv` columns in `mu_factor_long` belong to one
-  # newdata row; preserved via byrow = TRUE in the reshape below.
+  # factor. Collapsing newdata across series to a (time, .trend)
+  # grain via `collapse_to_time_level()` would silently drop per-row
+  # covariate variation (e.g. marginaleffects grids with several
+  # covariate values at the same time mapped to one row). expand_grid
+  # iterates `.trend` fastest, so consecutive blocks of `n_lv`
+  # columns in `mu_factor_long` belong to one newdata row; preserved
+  # via byrow = TRUE in the reshape below.
   trend_vars <- mvgam_fit$trend_metadata$covariates %||% character(0)
   attach_cols <- intersect(unique(c(trend_vars, "time")),
                             colnames(newdata))

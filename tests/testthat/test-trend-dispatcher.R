@@ -145,7 +145,7 @@ test_that("Factor validation error messages are consistent", {
 
   expect_error(PW(n_lv = 1), "Factor models.*not supported")
 
-  # Check they mention specific alternatives (AR now factor-compatible)
+  # Check they mention specific alternatives (AR is factor-compatible)
   expect_error(PW(n_lv = 1), "factor-compatible trends.*AR.*RW.*VAR")
 
   # Check they have specific reasons
@@ -193,15 +193,15 @@ test_that("trend constructors work with dispatcher integration", {
     expect_s3_class(ar1_trend, "mvgam_trend")
     expect_equal(ar1_trend$trend, "AR")  # Base type for dispatch
     expect_equal(ar1_trend$p, 1)
-    # ar_lags and max_lag now computed in Stan assembly layer
+    # ar_lags and max_lag are computed in the Stan assembly layer
 
     # Test AR constructor with multiple lags
     ar_seasonal <- AR(p = c(1, 12, 24))
     expect_s3_class(ar_seasonal, "mvgam_trend")
     expect_equal(ar_seasonal$trend, "AR")  # Base type for dispatch
     expect_equal(ar_seasonal$p, c(1, 12, 24))
-    # Parameter processing moved to Stan assembly layer
-    # tpars field no longer exists in simplified constructors
+    # Parameter processing lives in the Stan assembly layer; the
+    # constructor carries no tpars field
 
     # Test VAR constructor with order
     var2_trend <- VAR(p = 2)
@@ -209,7 +209,7 @@ test_that("trend constructors work with dispatcher integration", {
     expect_equal(var2_trend$trend, "VAR")  # Base type for dispatch
     expect_equal(var2_trend$p, 2)
     expect_true(var2_trend$cor)
-    # Parameter names now generated in Stan assembly layer
+    # Parameter names are generated in the Stan assembly layer
   })
 })
 
@@ -228,7 +228,7 @@ test_that("grouping validation helper works correctly", {
   expect_equal(result_gr_only$gr, "region")
   expect_equal(result_gr_only$subgr, "series")
 
-  # gr with explicit subgr = "series" is now allowed and matches the
+  # gr with explicit subgr = "series" is allowed and matches the
   # auto-fill default.
   result_series_subgr <- mvgam:::validate_grouping_arguments(
     "region", "series"

@@ -47,8 +47,9 @@ to step through.}
 
 \item{type}{One of \code{"response"}, \code{"link"}, \code{"expected"},
 \code{"trend"}. \code{"response"} samples from the observation family
-(the default); \code{"expected"} returns the family's mean
-(\code{linkinv(eta)}); \code{"link"} returns the link-scale linpred;
+(the default); \code{"expected"} returns the family's mean, which
+carries any further parameter the expectation needs (a binomial
+mean is \code{trials * p}, a zero-inflated mean \code{(1 - zi) * mu}); \code{"link"} returns the link-scale linpred;
 \code{"trend"} returns the latent-trend trajectory on the link
 scale.}
 
@@ -73,7 +74,7 @@ noise alone. Defaults to \code{TRUE}.}
 
 \item{obs_uncertainty}{Logical. When \code{FALSE}, skips
 observation-family sampling for \code{type = "response"},
-returning the family mean (\code{linkinv(eta)}) instead.
+returning the family mean instead.
 Defaults to \code{TRUE}.}
 
 \item{resp}{For multivariate (multiple-response) models, the

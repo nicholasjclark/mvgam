@@ -3208,7 +3208,7 @@ backfill_umbrella_priors <- function(prior) {
 #' the rendered subscript / superscript when set. Returns `NULL` for
 #' unhandled classes; the prior-section walker drops `NULL` rows
 #' from the output rather than rendering an opaque placeholder, so
-#' new prior classes are silently skipped until a renderer lands.
+#' a prior class with no dedicated renderer is silently skipped.
 #'
 #' Per-response scoping (mvbind / mvbrmsformula): when `row$resp` is
 #' non-empty, the resolved symbol is wrapped with a `(<resp>)`

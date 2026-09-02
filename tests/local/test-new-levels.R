@@ -1,13 +1,13 @@
 # Prediction for a grouping level the model was not fitted to.
 #
 # brms refuses such a level and tells the caller to set
-# `allow_new_levels = TRUE`. Doing so used to give `subscript out of
+# `allow_new_levels = TRUE`. Doing so would give `subscript out of
 # bounds`: brms extends the grouping index to cover the new level,
 # while the posterior holds a coefficient only for each level the
-# model saw, so the index ran past the end of the draws. Drawing a
+# model saw, so the index runs past the end of the draws. Drawing a
 # coefficient for a level the model never saw is brms's own
 # `get_new_rdraws()`, which mvgam does not reproduce, so the
-# limitation is now named instead.
+# limitation is named instead.
 #
 # Needs a fit carrying a random effect. `population_random_pred()`'s
 # guard is unit tested without one in

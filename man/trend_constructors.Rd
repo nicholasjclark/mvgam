@@ -100,8 +100,7 @@ rejected at validation time.
 \item Groups must be balanced (the same number of series in each
 group). Unbalanced designs are not yet supported by the underlying
 Stan template; if you supply unbalanced data without an explicit
-\code{subgr} argument, the model will fail at Stan initialisation. See
-the package issue tracker for the planned ragged-array support.
+\code{subgr} argument, the model will fail at Stan initialisation.
 }}
 
 \item{subgr}{A subgrouping \code{factor} variable specifying which element in

@@ -114,10 +114,10 @@ test_that("fitted.mvgam validates probs and other inputs", {
 
 
 # ---------------------------------------------------------------
-# components + unit_level routing (task #308): delegation pattern
-# verified through stubbed posterior_epred / predict; the heavy
-# work belongs to predict.mvgam and aggregate_closure_unit_visits,
-# both of which have their own tests.
+# components + unit_level routing: delegation pattern verified
+# through stubbed posterior_epred / predict; the heavy work belongs
+# to predict.mvgam and aggregate_closure_unit_visits, both of which
+# have their own tests.
 # ---------------------------------------------------------------
 
 # Family stub that satisfies is_closure_unit_family() and

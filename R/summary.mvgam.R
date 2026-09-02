@@ -928,9 +928,8 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   }
 
   # Section 5: Sampling information (brms style with continuation line).
-  # Warmup was previously guessed as half the iterations; a fit that
-  # recorded its own arguments reports them, and one that did not says
-  # so rather than inventing a number.
+  # A fit that recorded its own arguments reports them; one that did
+  # not says so rather than inventing a number.
   warmup <- x$nwarmup
   cat("  Draws: ", x$nchains, " chains, each with iter = ", x$niter,
       "; warmup = ", warmup %||% "unrecorded",

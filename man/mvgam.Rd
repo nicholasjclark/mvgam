@@ -41,9 +41,8 @@ but do not support forecasts / new-time-point prediction yet.}
 
 \item{newdata}{Optional test-set \code{data.frame} persisted on the
 fit as \code{object$test_data}. Used by \code{plot(fit, type = "series")}
-to overlay the test arm without re-passing the data. This is
-a deliberate change from earlier mvgam releases: passing
-\code{newdata} to \code{mvgam()} no longer emits Stan generated-quantities
+to overlay the test arm without re-passing the data. Passing
+\code{newdata} to \code{mvgam()} does not emit Stan generated-quantities
 forecasts at fit time. Keeping forecasting out of Stan keeps
 the fit object small and the sampler fast, and means downstream
 methods can choose their own newdata. To use the persisted

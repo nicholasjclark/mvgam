@@ -382,7 +382,7 @@ compute_closure_unit_residuals <- function(object, newdata, type,
 #'@noRd
 # Internal: prediction arguments for a residual. Names the surface
 # through the shared rule, and carries the response the mv fan-out
-# scoped this call to, which the marginal branch used to drop.
+# scoped this call to; the marginal branch must not drop it.
 #'@noRd
 residuals_pred_args <- function(pp_args, resp) {
   args <- diagnostic_surface_args(pp_args, pp_args$newdata)

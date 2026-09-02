@@ -1,10 +1,10 @@
 # Local fixture: jsdgam trait_slopes vs Hmsc fourth-corner Gamma.
 #
-# Closes the verification gap for #324 P3 by checking that the
-# trait-on-slope coefficient mvgam recovers via the bf(nl = TRUE)
-# rewrite agrees with the canonical Hmsc::Hmsc(TrFormula = ...) fit
-# on the same data. Gaussian responses keep the link simple so the
-# Gamma matrix indices are directly comparable.
+# Checks that the trait-on-slope coefficient mvgam recovers via the
+# bf(nl = TRUE) rewrite agrees with the canonical
+# Hmsc::Hmsc(TrFormula = ...) fit on the same data. Gaussian
+# responses keep the link simple so the Gamma matrix indices are
+# directly comparable.
 #
 # Hmsc stores the fourth-corner regression in a (n_traits + 1) x
 # (n_env + 1) Gamma matrix:

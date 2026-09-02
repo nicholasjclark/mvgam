@@ -89,30 +89,31 @@ test_that("Poisson AR(1) + GP(z)", {
 })
 
 test_that("Poisson AR(1) + GP(z) + GP(w, by = cat)", {
-  # By-factor GP regression test (#53): brms generates per-level basis
-  # matrices (Xgp_<id>_<g>, slambda_<id>_<g>) and per-level coefficients
+  # By-factor GP: brms generates per-level basis matrices
+  # (Xgp_<id>_<g>, slambda_<id>_<g>) and per-level coefficients
   # (zgp_<id>_<g>[k]) while sdgp_<id>[g] and lscale_<id>[g, d] are
-  # bracket-indexed. Prior to the fix, detect_gp_terms split term 2's
-  # basis matrices into separate "terms" 2_1 and 2_2 and silently
-  # dropped them, returning identical predictions for every level of
-  # cat. The two assertions below catch both the structural bug
-  # (predictions varying across levels) and the numerical correctness
-  # (concordance with brms's own per-level prediction).
+  # bracket-indexed. `detect_gp_terms` must keep term 2's basis
+  # matrices as one term rather than splitting them into separate
+  # "terms" 2_1 and 2_2, which would silently drop them and return
+  # identical predictions for every level of cat. The two assertions
+  # below catch both that structural failure (predictions varying
+  # across levels) and numerical correctness (concordance with
+  # brms's own per-level prediction).
   require_fixtures("val_brms_ar1_gp2_by.rds", "val_mvgam_ar1_gp2_by.rds")
   brms_fit <- load_brms("ar1_gp2_by")
   mvgam_fit <- load_mvgam("ar1_gp2_by")
   newdata <- mvgam_fit$data
-  # Threshold lowered from 0.88 to 0.83 after the `group` → `grp`
-  # rename: brms's data hash determines the MCMC seed, so the rename
-  # produces a different posterior realisation for the by-factor GP
-  # path even though the model is identical. 0.83 still captures
-  # strong agreement well above MC noise.
+  # Threshold is 0.83 rather than 0.88 here because brms's data hash
+  # determines the MCMC seed, so the `grp` column name produces a
+  # different posterior realisation for the by-factor GP path even
+  # though the model is identical. 0.83 still captures strong
+  # agreement well above MC noise.
   assert_linpred_concordance(brms_fit, mvgam_fit, newdata, threshold = 0.83)
 
-  # Regression sentinel: predictions on a fixed (w, z) grid must differ
-  # across cat levels. A passing concordance test catches drift but
-  # not a future regression to the silent-skip path; this assertion
-  # locks the by-factor contribution in.
+  # Predictions on a fixed (w, z) grid must differ across cat levels.
+  # A passing concordance test above catches drift but not a
+  # by-factor contribution silently dropped from the linear
+  # predictor; this assertion guards that separately.
   wgrid <- seq(min(mvgam_fit$data$w),
                max(mvgam_fit$data$w),
                length.out = 6L)
@@ -142,10 +143,9 @@ test_that("Poisson AR(1) + 2D GP(z, w)", {
 })
 
 test_that("Poisson AR(1) + 2D GP(z, w, by = cat)", {
-  # Combines the two extensions that triggered bug #53:
-  # multi-dimensional basis (lscale_<id>[lvl, d] with d > 1) AND a
-  # by-factor (per-level Xgp_<id>_<g>). Either alone is covered
-  # above; this block locks the combination in.
+  # Combines multi-dimensional basis (lscale_<id>[lvl, d] with
+  # d > 1) with a by-factor (per-level Xgp_<id>_<g>). Either alone
+  # is covered above; this block checks the combination.
   require_fixtures("val_brms_ar1_gp2d_by.rds", "val_mvgam_ar1_gp2d_by.rds")
   brms_fit <- load_brms("ar1_gp2d_by")
   mvgam_fit <- load_mvgam("ar1_gp2d_by")
@@ -513,12 +513,11 @@ test_that("posterior_linpred(transform = FALSE) matches link scale of epred", {
 
 # -- Non-linear formulas (bf(..., nl = TRUE)) ------------------------
 #
-# Permanent regression gate for #324 P2d: the nl support surface (prior
-# plumbing, parameter aliasing, conditional_effects recursion) must
-# leave a fit indistinguishable from a brms-direct fit on the same
-# data + priors. Two shapes: an intercept-only nl growth model that
-# exercises the basic nl emit path, and the trait-mediated fourth-
-# corner shape that #324's wrapper will internally rewrite into.
+# The nl support surface (prior plumbing, parameter aliasing,
+# conditional_effects recursion) must leave a fit indistinguishable
+# from a brms-direct fit on the same data + priors. Two shapes: an
+# intercept-only nl growth model that exercises the basic nl emit
+# path, and a trait-mediated fourth-corner shape.
 
 test_that("nl growth bf(y ~ b1 * exp(b2 * x)) concords with brms", {
   require_fixtures("val_brms_nl_growth.rds", "val_mvgam_nl_growth.rds")
@@ -534,10 +533,9 @@ test_that("nl growth bf(y ~ b1 * exp(b2 * x)) concords with brms", {
 })
 
 test_that("nl growth fixture: nlpar priors emitted in stancode", {
-  # Locks the Phase 2a fix: user-supplied prior(..., nlpar = "...")
-  # rows must surface in the generated Stan as lprior += normal_lpdf
-  # lines under the nlpar's b_<name> vector. Previously dropped in the
-  # plural-priors typo path; now flows through the alias plumbing.
+  # User-supplied prior(..., nlpar = "...") rows must surface in the
+  # generated Stan as lprior += normal_lpdf lines under the nlpar's
+  # b_<name> vector, flowing through the alias plumbing.
   require_fixtures("val_mvgam_nl_growth.rds")
   mvgam_fit <- load_mvgam("nl_growth")
   sc <- mvgam_fit$stancode
@@ -561,11 +559,11 @@ test_that("nl trait fixture: posterior_epred concords with brms", {
 })
 
 test_that("nl trait fixture: b_a / b_b parameter names alias correctly", {
-  # Locks the Phase 2b fix: nl sub-formulas do NOT get the linear
-  # main-formula Intercept-centring, so b_<nlpar> has length K and
-  # the alias map must surface all K positions including the
-  # Intercept (b_a_Intercept, b_a_trait1, ...). Mismatches drop or
-  # mis-map parameters and break every downstream summary path.
+  # nl sub-formulas do NOT get the linear main-formula
+  # Intercept-centring, so b_<nlpar> has length K and the alias map
+  # must surface all K positions including the Intercept
+  # (b_a_Intercept, b_a_trait1, ...). Mismatches drop or mis-map
+  # parameters and break every downstream summary path.
   require_fixtures("val_mvgam_nl_trait.rds")
   mvgam_fit <- load_mvgam("nl_trait")
   alias <- mvgam:::mvgam_beta_aliases(mvgam_fit)
@@ -578,9 +576,9 @@ test_that("nl trait fixture: b_a / b_b parameter names alias correctly", {
 })
 
 test_that("nl trait fixture: detect_conditional_effects surfaces trait1 + env", {
-  # Locks the Phase 2c fix: the discovery recurses into pforms so
-  # env (top-level) and trait1 (sub-formula) both surface, and the
-  # nlpar tokens themselves (a, b) drop out of any grouping.
+  # The discovery recurses into pforms so env (top-level) and
+  # trait1 (sub-formula) both surface, and the nlpar tokens
+  # themselves (a, b) drop out of any grouping.
   require_fixtures("val_mvgam_nl_trait.rds")
   mvgam_fit <- load_mvgam("nl_trait")
   cond <- mvgam:::detect_conditional_effects(mvgam_fit)

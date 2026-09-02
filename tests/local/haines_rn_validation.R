@@ -1,8 +1,8 @@
 # R reference + numerical validation for the Haines (2016)
-# closed-form Royle-Nichols likelihood. Used as the design input
-# for task #312 (port to Stan as a fast path for nmix("royle_nichols")
-# when per-individual detection rate r is constant within each
-# closure unit).
+# closed-form Royle-Nichols likelihood, used as the design input
+# for a Stan fast path for nmix("royle_nichols") when
+# per-individual detection rate r is constant within each closure
+# unit.
 #
 # Math:
 #   L_g = e^{-lambda} * sum_{k=0..D} C(D, k) * (-1)^k *

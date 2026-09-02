@@ -1121,14 +1121,14 @@ test_that("posterior_epred matches linpred for Gaussian without process_error", 
 })
 
 # ==============================================================================
-# REGRESSION: 7.2 multi-series univariate + trend covariate
+# Multi-series univariate + trend covariate
 # ==============================================================================
 test_that("multi-series univariate with trend covariate fits and predicts", {
-  # Before the N_trend / N_time_trend split, brms generated the trend
-  # design matrix at nrow(trend_data) = n_time * n_series rows while
-  # Stan declared it as matrix[N_trend = n_time, K_trend]. The fit
-  # failed at Stan init with a dim mismatch. This case exercises the
-  # path end-to-end (compile + sample + predict).
+  # brms generates the trend design matrix at
+  # nrow(trend_data) = n_time * n_series rows, while Stan declares it
+  # as matrix[N_trend = n_time, K_trend]; the N_trend / N_time_trend
+  # split keeps these dimensions apart. This case exercises the path
+  # end-to-end (compile + sample + predict).
   set.seed(7)
   n_time <- 12
   n_series <- 3
@@ -1172,11 +1172,11 @@ test_that("multi-series univariate with trend covariate fits and predicts", {
 })
 
 # ==============================================================================
-# REGRESSION: 7.4 / 7.5 hierarchical RW(gr=) and AR(gr=) end-to-end
+# Hierarchical RW(gr=) and AR(gr=) end-to-end
 # ==============================================================================
 
 # Balanced 2-2 forest/grassland fixture: matches the dim contract of
-# the current Stan template (N_subgroups_trend = max(group_counts)).
+# the Stan template (N_subgroups_trend = max(group_counts)).
 make_hierarchical_balanced <- function(n_time = 24, n_series = 4) {
   series_levels <- paste0("s", seq_len(n_series))
   habitat <- rep(c("forest", "grassland"),
@@ -1193,12 +1193,12 @@ make_hierarchical_balanced <- function(n_time = 24, n_series = 4) {
 }
 
 test_that("RW(gr = habitat) fits balanced hierarchical and predicts cleanly", {
-  # Before the 7.5 fix, generate_rw_trend_stanvars() did not call
-  # add_hierarchical_support(), so the shared-innovation stanvars
-  # emitted a declaration-only branch for scaled_innovations_trend
-  # under gr=. lv_trend resolved to NaN at Stan init. The fix adds the
-  # same add_hierarchical_support() call the AR/ZMVN paths use; this
-  # test exercises the full fit + predict path end-to-end.
+  # generate_rw_trend_stanvars() must call add_hierarchical_support(),
+  # the same call the AR/ZMVN paths use, or the shared-innovation
+  # stanvars emit a declaration-only branch for
+  # scaled_innovations_trend under gr= and lv_trend resolves to NaN
+  # at Stan init. This test exercises the full fit + predict path
+  # end-to-end.
   set.seed(1)
   d <- make_hierarchical_balanced(n_time = 24, n_series = 4)
 
@@ -1222,8 +1222,8 @@ test_that("RW(gr = habitat) fits balanced hierarchical and predicts cleanly", {
   expect_equal(as.integer(fit$standata$group_inds_trend),
                c(1L, 2L, 1L, 2L))
 
-  # Latent trend states and scaled innovations must be finite for every
-  # draw - the original bug produced NaN at init for these matrices.
+  # Latent trend states and scaled innovations must be finite for
+  # every draw.
   lv <- posterior::as_draws_matrix(fit$fit,
                                     variable = "lv_trend",
                                     regex = TRUE)
@@ -1251,10 +1251,10 @@ test_that("RW(gr = habitat) fits balanced hierarchical and predicts cleanly", {
 test_that("AR(p=1, gr = habitat, cor = FALSE) fits and predicts cleanly", {
   # Companion to the RW(gr=) test. Exercises the diagonal-hierarchical
   # arm shared by AR(gr=, cor=FALSE) and RW(gr=); the same downstream
-  # extract_hierarchical_diagonal_params() patch covers both. Before
-  # the fix the posterior_epred matrix-of-sigma assertion failed because
-  # the hierarchical extractor returned sigma_group_trend instead of
-  # broadcasting to per-series sigma_trend.
+  # extract_hierarchical_diagonal_params() covers both. The
+  # posterior_epred matrix-of-sigma assertion requires the
+  # hierarchical extractor to broadcast to per-series sigma_trend
+  # rather than returning sigma_group_trend directly.
   set.seed(2)
   d <- make_hierarchical_balanced(n_time = 24, n_series = 4)
 

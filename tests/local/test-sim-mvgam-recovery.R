@@ -176,9 +176,8 @@ RECOVERY_GRID <- list(
        min_cor = 0.55),
   # Type 4 (gp covariate) skipped: mvgam exposes gp() terms via
   # a separate API from smooths() / posterior_smooths(), so the
-  # generic smooth-correlation recovery check doesn't apply.
-  # GP recovery should be validated separately via
-  # conditional_effects() comparison; deferred.
+  # generic smooth-correlation recovery check doesn't apply. GP
+  # recovery belongs in a separate conditional_effects() comparison.
   list(label = "type 6 gaussian", type = 6L,
        family = gaussian(), family_arg = gaussian(),
        min_cor = 0.55)

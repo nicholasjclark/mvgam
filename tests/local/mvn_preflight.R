@@ -85,8 +85,8 @@ cat("    PASS: stub compiles cleanly.\n")
 
 # 2. Fit a few iterations on dummy data with small Psi to confirm
 #    cholesky_decompose stays well-conditioned at the lower-Psi
-#    boundary (Phase 2C plan called this out as a numerical-stability
-#    concern).
+#    boundary, a numerical-stability concern for small residual
+#    variances.
 cat("[2/3] Fitting K=4, n_lv=2, 12 sites of dummy data...\n")
 set.seed(1)
 K <- 4L

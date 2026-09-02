@@ -1,12 +1,10 @@
 # End-to-end tests for the broom S3 trio --
 # `tidy.mvgam` / `augment.mvgam` / `glance.mvgam` -- exercised
-# against real cached fixtures. These were dead-code paths before
-# the rewrite (`tidy.mvgam` called the missing `mcmc_summary`,
-# `augment.mvgam` read empty obs_data, `glance.mvgam` did not
-# exist).
+# against real cached fixtures, since each reads fields (MCMC
+# summaries, obs_data) that only exist on an actual fit.
 #
 # Fixtures are intentionally varied across response families so
-# the new spec-table dispatch in `tidy.mvgam` is hit across
+# the spec-table dispatch in `tidy.mvgam` is hit across
 # `observation_family_extra_param` (e.g. gaussian sigma),
 # `observation_beta` (intercepts + slopes), `trend_model_param`
 # (AR coefficients, sigma_trend), `trend_beta` (trend formula
@@ -112,9 +110,8 @@ test_that("tidy.mvgam surfaces obs Intercept + smooth coefs + penalty", {
   #   * `Intercept` / `b_Intercept` rows as `observation_beta`,
   #   * `sds_*` rows as `observation_smooth_param` (ran_pars),
   #   * `zs_*` / `s_*` rows as `observation_smooth_coef` (ran_vals).
-  # Before the post-brms-integration `head_betas()` fix the smooth
-  # block was silently dropped and `tidy()` returned only the
-  # 2-row trend_model_param block.
+  # `head_betas()` must not silently drop the smooth block, leaving
+  # `tidy()` to return only the 2-row trend_model_param block.
   fit <- load_fixture("val_mvgam_ar1_re_smooth")
   td <- tidy(fit)
   expect_true("observation_beta" %in% td$type)
@@ -131,12 +128,11 @@ test_that("tidy.mvgam surfaces obs Intercept + smooth coefs + penalty", {
 
 
 test_that("tidy.mvgam surfaces trend-side zs_*_trend smooth coefs", {
-  # Regression guard for the categorize-pattern gap where
-  # `trend_smoothpars` was matched by `^(sds_.*_trend|s_.*_trend)`
-  # and silently dropped `zs_*_trend` / `sdgp_*_trend` /
-  # `lscale_*_trend` / `zgp_*_trend`. Those leaked into
-  # `trend_pars` and then got filtered out of tidy() entirely
-  # because they did not match the trend-dynamic regex.
+  # The `trend_smoothpars` categorize pattern must match
+  # `zs_*_trend` / `sdgp_*_trend` / `lscale_*_trend` / `zgp_*_trend`
+  # in addition to `^(sds_.*_trend|s_.*_trend)`. Anything it misses
+  # leaks into `trend_pars` and is filtered out of tidy() entirely
+  # for not matching the trend-dynamic regex.
   fit <- load_fixture("val_mvgam_ar1_re_smooth_trend")
   td <- tidy(fit)
   zs_trend <- td[grepl("^zs_.*_trend", td$term), ]

@@ -27,8 +27,7 @@
 #     innovations are still drawn per propagate call, so the
 #     result reflects innovation noise alone.
 #   * `obs_uncertainty = FALSE`   -> skip the family sampling
-#     and return the family mean `linkinv(eta)` for
-#     `type = "response"`.
+#     and return the family mean for `type = "response"`.
 #
 # The returned `mvgam_forecast` object follows the contract
 # documented in R/mvgam_forecast-class.R.
@@ -69,8 +68,9 @@
 #' @param ... Currently unused.
 #' @param type One of `"response"`, `"link"`, `"expected"`,
 #'   `"trend"`. `"response"` samples from the observation family
-#'   (the default); `"expected"` returns the family's mean
-#'   (`linkinv(eta)`); `"link"` returns the link-scale linpred;
+#'   (the default); `"expected"` returns the family's mean, which
+#'   carries any further parameter the expectation needs (a binomial
+#'   mean is `trials * p`, a zero-inflated mean `(1 - zi) * mu`); `"link"` returns the link-scale linpred;
 #'   `"trend"` returns the latent-trend trajectory on the link
 #'   scale.
 #' @param ndraws Optional integer; the number of posterior draws
@@ -91,7 +91,7 @@
 #'   noise alone. Defaults to `TRUE`.
 #' @param obs_uncertainty Logical. When `FALSE`, skips
 #'   observation-family sampling for `type = "response"`,
-#'   returning the family mean (`linkinv(eta)`) instead.
+#'   returning the family mean instead.
 #'   Defaults to `TRUE`.
 #' @param resp For multivariate (multiple-response) models, the
 #'   name of a single response variable to return results for.
@@ -181,10 +181,9 @@ forecast.mvgam <- function(object,
     )))
   }
   # `trend_specs` is either a single `mvgam_trend` (univariate
-  # response) or a list of them (multivariate). Forecasting for
-  # multivariate response models is pending; pick the first
-  # trend spec when present and let the trend-type guard below
-  # reject anything we don't yet support.
+  # response) or a list of them (multivariate). For multivariate
+  # fits, pick the first trend spec when present and let the
+  # trend-type guard below reject anything unsupported.
   trend_model <- if (is_trendless) {
     NULL
   } else if (is_multivariate_trend_specs(trend_specs)) {
@@ -603,7 +602,9 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
       type,
       "trend" = fitted_states,
       "link" = linpred,
-      "expected" = family$linkinv(linpred),
+      "expected" = expected_from_linpred(
+        object, linpred, family, newdata = sub_data
+      ),
       "response" = if (isTRUE(obs_uncertainty)) {
         predict_single_response(
           object = object, linpred_resp = linpred,
@@ -612,7 +613,9 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
           is_multivariate = !is.null(resp)
         )
       } else {
-        family$linkinv(linpred)
+        expected_from_linpred(
+          object, linpred, family, newdata = sub_data
+        )
       }
     )
   }
@@ -879,9 +882,22 @@ build_forecast_arms <- function(object, trend_model, meta,
   } else {
     object$family
   }
+  # `mu` is the family's own parameter, which is what
+  # `sample_family_batched()` draws from below. The expectation is a
+  # separate quantity wherever a family carries more in its mean than
+  # its predictor.
   mu <- family_for_arm$linkinv(eta_full)
   if (type == "expected" || isTRUE(!obs_uncertainty)) {
-    return(slice_per_series(mu, fc_grid, obs_struct_fc,
+    # `eta_full` is already sliced to `draw_idx`, so the extra
+    # parameters a family's mean needs are read at those same
+    # iterations. Leaving them to be resolved independently draws a
+    # second subsample of the same size and pairs `mu` with a `zi`
+    # or `shape` from an unrelated draw.
+    expected <- expected_from_linpred(
+      object, eta_full, family_for_arm, newdata = fc_grid$data,
+      draw_ids = draw_idx
+    )
+    return(slice_per_series(expected, fc_grid, obs_struct_fc,
                               ndraws_use, series_levels))
   }
   resp_mat <- sample_family_batched(object, mu, fc_grid$data,
@@ -1044,8 +1060,7 @@ apply_factor_projection <- function(lv_traj, Z_slice, n_series) {
 # common case for mvgam CAR fits where `time` is a global
 # continuous coordinate and the test split is also shared.
 # Heterogeneous per-series forecast times error with a
-# message; the kernel-side extension to accept a `[h,
-# n_series]` matrix is pending.
+# message.
 #'@noRd
 compute_car_forecast_time <- function(object, fc_grid,
                                         series_levels) {
@@ -1346,10 +1361,10 @@ sample_family_batched <- function(object, mu, fc_data, ndraws_use,
 
   # Forward whichever distributional parameters the registry produced
   # for this family instead of naming them one at a time. Reason: a
-  # hand-written list silently drops the parameters of any family added
-  # afterwards, which is how `mphi` / `mtheta` went missing from Tweedie
-  # forecasts. Names with no matching argument belong to families that
-  # reach their draws through a different path.
+  # hand-written list would silently drop the parameters of any family
+  # added afterwards, such as Tweedie's `mphi` / `mtheta`. Names with
+  # no matching argument belong to families that reach their draws
+  # through a different path.
   dpar_args <- dpars[intersect(names(dpars),
                                names(formals(sample_from_family)))]
   samples <- do.call(sample_from_family, c(
@@ -1400,6 +1415,14 @@ extract_family_pars_for_draws <- function(object, draws_mat,
     }
     cols <- grep(pat, colnames(draws_mat), value = TRUE)
     if (length(cols) == 0L) next
+    # An indexed parameter is read back in the order its index
+    # counts, not the order the names sort in: `sigma[10]` precedes
+    # `sigma[2]` lexically and would put one observation's value on
+    # another's row.
+    idx <- suppressWarnings(
+      as.integer(sub("^.*\\[(\\d+)\\]$", "\\1", cols))
+    )
+    if (!anyNA(idx)) cols <- cols[order(idx)]
     out[[nm]] <- draws_mat[draw_idx, cols, drop = FALSE]
   }
   out

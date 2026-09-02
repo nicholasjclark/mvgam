@@ -686,8 +686,8 @@ generate_monitor_params <- function(trend_spec) {
 
   # Most trends sample an innovation scale, but not all, and a model
   # that does not must not report one: a prior set on it is either
-  # refused or silently dropped, and the user read the class name off
-  # the table that offered it.
+  # refused or silently dropped, even though the user reads the class
+  # name off the table that offered it.
   base_params <- if (samples_innovation_scale(trend_spec)) {
     "sigma_trend"
   } else {
@@ -2116,8 +2116,7 @@ print.mvgam_trend <- function(x, ...) {
 #'     \item Groups must be balanced (the same number of series in each
 #'       group). Unbalanced designs are not yet supported by the underlying
 #'       Stan template; if you supply unbalanced data without an explicit
-#'       `subgr` argument, the model will fail at Stan initialisation. See
-#'       the package issue tracker for the planned ragged-array support.
+#'       `subgr` argument, the model will fail at Stan initialisation.
 #'   }
 #'
 #' @param coef_sharing Character string, one of `"none"`,

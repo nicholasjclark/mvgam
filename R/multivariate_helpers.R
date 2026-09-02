@@ -1,5 +1,5 @@
 # Shared utilities for multivariate (mvbind / mvbrmsformula) fits.
-# Centralises three patterns previously duplicated across
+# Centralises three patterns shared across
 # residuals.mvgam / pp_check.mvgam / plot.mvgam /
 # conditional_effects.mvgam / hindcast.mvgam / methods_md:
 #
@@ -137,9 +137,8 @@ make_row_prefix <- function(nlpar, dpar, resp) {
   # stancode writes per-row aliases using whichever of these is
   # set, in priority order: nlpar > dpar > resp. Returns "" when
   # none is set (the univariate, no-dpar, no-nlpar case).
-  # Centralised so the ifelse ladder lives in one place; was
-  # previously duplicated in mvgam_ranef_aliases / ranef.mvgam /
-  # VarCorr.mvgam.
+  # Centralised so the ifelse ladder lives in one place, shared by
+  # mvgam_ranef_aliases / ranef.mvgam / VarCorr.mvgam.
   ifelse(
     !is.na(nlpar) & nzchar(nlpar), nlpar,
     ifelse(
@@ -159,10 +158,9 @@ mv_resp_fan_out <- function(object, resp) {
   # When `resp` is NULL on an mv fit, re-invoke the calling
   # function once per response with `resp = r` and return a named
   # list; otherwise return NULL so the caller can fall through to
-  # its univariate body. Centralises the pattern previously
-  # copy-pasted into residuals.mvgam, pp_check.mvgam,
-  # conditional_effects.mvgam, mvgam_resid_panel, and
-  # hindcast.mvgam.
+  # its univariate body. Centralises the pattern shared by
+  # residuals.mvgam, pp_check.mvgam, conditional_effects.mvgam,
+  # mvgam_resid_panel, and hindcast.mvgam.
   #
   # Implementation: capture the caller's matched call via
   # `match.call(sys.function(-1L), sys.call(-1L))`, swap `resp`
