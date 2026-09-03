@@ -25,11 +25,17 @@ suppressMessages({
   library(testthat)
 })
 
-source(if (file.exists("concordance_helpers.R")) {
-  "concordance_helpers.R"
-} else {
-  file.path("tests", "local", "concordance_helpers.R")
-})
+# This file fits its own model and caches it beside itself, so it
+# depends on no shared fixture and no build step.
+cache_path <- function(name) {
+  dir <- if (dir.exists("fixtures")) {
+    "fixtures"
+  } else {
+    file.path("tests", "local", "fixtures")
+  }
+  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
+  file.path(dir, name)
+}
 
 set.seed(700L)
 
@@ -146,6 +152,20 @@ sim_truth <- list(
   beta_depth = beta_depth
 )
 
+# The value of `expr` alongside every warning raised computing it.
+# This frame deliberately carries unobserved cells, so the notices
+# about them are part of the contract a user is owed and are counted
+# rather than discarded. Returned as a list so nothing is attached to
+# a fitted object that would then be cached.
+with_warnings <- function(expr) {
+  seen <- character(0)
+  value <- withCallingHandlers(expr, warning = function(w) {
+    seen <<- c(seen, conditionMessage(w))
+    invokeRestart("muffleWarning")
+  })
+  list(value = value, warnings = seen)
+}
+
 by_lv_formula <- ~ s(elev, k = 5, by = lv_axis()) - 1 + ZMVN(cor = TRUE)
 plain_formula <- ~ s(elev, k = 5) - 1 + ZMVN(cor = TRUE)
 obs_formula <- y ~ region + depth
@@ -159,16 +179,45 @@ obs_formula <- y ~ region + depth
 # contrast is checked here and the fits below only have to answer for
 # the posterior.
 
-prefit_by_lv <- mvgam(
+built_by_lv <- with_warnings(mvgam(
   formula = obs_formula, trend_formula = by_lv_formula,
   trend_map = trend_map, data = dat, family = gaussian(),
   run_model = FALSE, silent = 2
-)
-prefit_plain <- mvgam(
+))
+built_plain <- with_warnings(mvgam(
   formula = obs_formula, trend_formula = plain_formula,
   trend_map = trend_map, data = dat, family = gaussian(),
   run_model = FALSE, silent = 2
-)
+))
+prefit_by_lv <- built_by_lv$value
+prefit_plain <- built_plain$value
+
+
+test_that("the dropped rows are reported once per build", {
+  # mvgam refuses a panel whose series cover different occasions and
+  # asks for the short ones to be padded with `NA`. brms then drops
+  # those rows from the likelihood and says so. The notice is correct
+  # and a user needs it, so it is asserted rather than silenced.
+  #
+  # The count is the claim, not the presence. Assembling a model runs
+  # brms's code generator more than once over the same frame, and a
+  # notice raised once per internal pass rather than once per call is
+  # a defect this package has had before. A notice that stops being
+  # raised at all is worse: rows would leave the likelihood in
+  # silence.
+  na_notice <- function(w) grep("Rows containing NAs", w, value = TRUE)
+  expect_length(na_notice(built_by_lv$warnings), 1L)
+  expect_length(na_notice(built_plain$warnings), 1L)
+
+  # And nothing else was raised. Without this, a new and unrelated
+  # warning would sit unexamined beside the expected one.
+  for (built in list(built_by_lv, built_plain)) {
+    expect_identical(
+      setdiff(built$warnings, na_notice(built$warnings)),
+      character(0)
+    )
+  }
+})
 
 
 test_that("the unobserved cells leave the likelihood, not the grid", {
@@ -468,18 +517,22 @@ test_that("the by-lv program folds mu_factor into the latent states", {
 
 # -- Fits -------------------------------------------------------------
 
-cache_by_lv <- local_fixture_path("val_mvgam_by_lv_axis.rds")
+cache_by_lv <- cache_path("val_mvgam_by_lv_axis.rds")
 if (file.exists(cache_by_lv)) {
   cat("[cache] Loading by_lv_axis fit.\n")
   fit <- readRDS(cache_by_lv)
 } else {
   cat("[fit ] mvgam(s(elev, by = lv_axis()), ZMVN, n_lv = 2)\n")
-  fit <- mvgam(
+  # Captured, not asserted: this call runs only on a cache miss, so a
+  # count here would be a claim the file makes on some runs and not
+  # others. The identical claim is made unconditionally above, on a
+  # build of the same frame and the same formula.
+  fit <- with_warnings(mvgam(
     formula = obs_formula, trend_formula = by_lv_formula,
     trend_map = trend_map, data = dat, family = gaussian(),
     chains = 2L, iter = 1000L, warmup = 500L,
     silent = 2, backend = "cmdstanr"
-  )
+  ))$value
 }
 if (!identical(attr(fit, "sim_truth"), sim_truth)) {
   attr(fit, "sim_truth") <- sim_truth
@@ -951,8 +1004,39 @@ test_that("summary and the criticism methods run on this fit", {
                                              obs_rows))
   expect_true(all(is.finite(ll[, obs_rows, drop = FALSE])))
 
-  ic <- suppressWarnings(loo(fit))
+  # `loo()` warns when a Pareto-k exceeds its threshold, which is a
+  # statement about this fit rather than noise. Suppressing it throws
+  # away the one diagnostic that says whether the approximation can
+  # be trusted, so it is captured and turned into claims: the
+  # estimate is finite, no k reaches the point where the
+  # approximation breaks, and the warning that arrived, if any, is
+  # the k notice those numbers already account for rather than
+  # something else that slipped through.
+  loo_warnings <- character(0)
+  ic <- withCallingHandlers(
+    loo(fit),
+    warning = function(w) {
+      loo_warnings <<- c(loo_warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
+  pareto_k <- ic$diagnostics$pareto_k
+  expect_true(all(is.finite(pareto_k)))
+  # A high Pareto-k is what a latent state-space fit is expected to
+  # produce: dropping an observation moves the very state it is being
+  # scored against, which is the reason `lfo_cv()` exists. So the
+  # claim is not that the diagnostic is good, it is that the user is
+  # told the truth about it. The notice has to arrive exactly when
+  # there is something to report, which fails both on a `loo()` gone
+  # silent over bad draws and on one that cries out over good ones.
+  expect_identical(
+    any(pareto_k > 0.7),
+    any(grepl("Pareto k", loo_warnings))
+  )
+  # Whatever was raised is that notice and nothing else, so an
+  # unrelated warning cannot hide among the expected ones.
+  expect_true(all(grepl("Pareto k", loo_warnings)))
   # A `loo` built on non-finite terms would be quietly wrong, so the
   # number of observations it kept is pinned to the observed rows.
   expect_identical(length(ic$diagnostics$pareto_k), length(obs_rows))
@@ -961,15 +1045,44 @@ test_that("summary and the criticism methods run on this fit", {
 
 
 test_that("pp_check and the plotting methods render", {
-  expect_s3_class(pp_check(fit, ndraws = 20L), "ggplot")
+  # `plot()` returns a ggplot, so that is what is asserted. The
+  # alternation this replaced ended in `is.list(p)`, which an empty
+  # list satisfies: any method returning `list()` passed it.
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+
+  drawn <- list(pp_check = with_warnings(pp_check(fit, ndraws = 20L)))
   for (ty in c("residuals", "trend", "factors")) {
-    # `plot()` returns a ggplot, so that is what is asserted. The
-    # alternation this replaced ended in `is.list(p)`, which an empty
-    # list satisfies: any method returning `list()` passed it.
-    p <- plot(fit, type = ty)
-    expect_s3_class(p, "ggplot")
+    drawn[[ty]] <- with_warnings(plot(fit, type = ty))
   }
-  expect_s3_class(mcmc_plot(fit), "ggplot")
+  drawn$mcmc <- with_warnings(mcmc_plot(fit))
+  for (nm in names(drawn)) {
+    expect_s3_class(drawn[[nm]]$value, "ggplot")
+  }
+
+  # A plot of observed against fitted has rows it cannot draw, and
+  # says so. Counted rather than silenced, and counted per call: the
+  # residual panel runs the same check once per panel, so reporting
+  # it once for the grid is the contract and reporting it four times
+  # is the defect.
+  miss <- function(w) grep("missing response", w, value = TRUE)
+  expect_length(miss(drawn$pp_check$warnings), 1L)
+  expect_length(miss(drawn$residuals$warnings), 1L)
+
+  # A plot that draws no observations owes no such notice, so this
+  # separates one raised where it belongs from one raised on every
+  # plot the package makes.
+  expect_identical(miss(drawn$trend$warnings), character(0))
+  expect_identical(miss(drawn$factors$warnings), character(0))
+  expect_identical(miss(drawn$mcmc$warnings), character(0))
+
+  # And nothing unrelated was raised anywhere in the set.
+  for (nm in names(drawn)) {
+    expect_identical(
+      setdiff(drawn[[nm]]$warnings, miss(drawn[[nm]]$warnings)),
+      character(0)
+    )
+  }
 })
 
 cat("\nDone.\n")

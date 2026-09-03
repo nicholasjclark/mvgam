@@ -226,6 +226,294 @@ Either the column route should work, or the message should stop
 offering it. The test asserts the message's own promise, so it fails
 until the two agree.
 
+## pp_check
+
+**10. `intervals` and `ribbon` raise a deprecation on every call, and
+that costs `x` its coverage.**
+
+`pp_check(fit, type = "intervals")` and `type = "ribbon"` reach
+`bayesplot::ppc_intervals`, which builds its layer with
+`geom_linerange(size = )`. ggplot2 deprecated that in 3.4.0, so every
+call raises
+
+    Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.
+    Please use `linewidth` instead.
+
+mvgam forwards only `y`, `yrep` and `x`, so the call is bayesplot's
+and so is the repair. It is recorded here because it reaches every
+user of those two types, on any fit, with or without an `x`.
+
+The consequence for this suite is that the `x` argument has no test.
+These two are the only types that take one: the third,
+`error_scatter_avg_vs_x`, is deprecated inside bayesplot itself.
+Reaching an assertion means silencing a notice every user receives,
+which is a worse trade than leaving the argument uncovered, so
+`test-var-trend.R` covers `group` and states why it stops there.
+
+A lifecycle notice is also raised once per session, so an
+`expect_warning()` on it passes or fails on what ran before the file
+rather than on anything the package did.
+
+## Test defects fixed along the way
+
+**A vacuous assertion that became false the moment it was tested.**
+`test-hierarchical-trends.R` claimed the derived series identifier
+was "lexically ordered" and checked it with
+
+    expect_equal(levels(vals), sort(levels(vals)))
+
+The fixture it ran against named its regions `r1`, `r2` and its
+species `sp1`, `sp2`, `sp3`, so the levels were already alphabetical
+and `sort()` was the identity. The expectation held without
+constraining anything. Refitting the file on regions `south`, `north`
+and species `sp_c`, `sp_a`, `sp_b` shows the real contract is the
+order each column declares, grouping first, a group's subgroups
+adjacent, which `test-axis-ordering.R` states for its `hier3` cell
+and which the fitted axis confirms. The assertion now says that, and
+adds that the order is not the sorted one, so a frame whose levels
+happen to sort correctly can no longer satisfy it.
+
+**Six suppressed Pareto-k warnings.** `suppressWarnings(loo(fit))`
+appeared in every file written in this pass. `loo()` warns when a
+Pareto-k crosses its threshold, which is the one diagnostic saying
+whether the approximation can be trusted; suppressing it discards
+exactly the signal a test exists to catch. Each is now captured and
+turned into claims: the estimate is finite, every k is below one, and
+any warning raised has to be the k notice those numbers account for,
+so an unrelated warning fails rather than passing unseen.
+
+## loo()
+
+**11. Every fit with a latent trend breaks PSIS-loo, and the numbers
+belong on the record rather than under a suppression.**
+
+Unmasking `suppressWarnings(loo(fit))` across the seven fits written
+in this pass gives, per fit, the share of observations whose Pareto-k
+crosses the thresholds:
+
+| fit | n | max k | > 0.7 | >= 1 |
+|---|---|---|---|---|
+| var_trend | 180 | 1.14 | 22.8% | 1.1% |
+| pw_trend | 120 | 1.98 | 10.0% | 5.8% |
+| ar_multilag | 192 | 1.09 | 35.9% | 1.0% |
+| arma_trend | 160 | 1.12 | 62.5% | 1.2% |
+| car_irregular | 78 | 1.52 | 50.0% | 5.1% |
+| by_lv_axis | 276 | 0.93 | 1.4% | 0% |
+| hier_trend | 240 | 0.99 | 9.2% | 0% |
+
+This is the expected behaviour of a state-space model rather than a
+defect: dropping an observation moves the latent state it is being
+scored against, so the importance ratios have no finite variance.
+`com_binomial_fitting.R` fits the same family with no trend and
+satisfies `all(k < 1)` on the same assertion, which is what makes the
+table above read as a property of the trend.
+
+It is recorded because it bears on how `loo()` should be read on
+these models, and because two of the three published comparisons in
+the package rank trend models by `elpd_loo`. `lfo_cv()` is the tool
+that answers the question these fits are being asked, and nothing in
+`loo()`'s output on a trend fit says so.
+
+**12. WITHDRAWN. `type = "response"` is the outcome scale, and was
+behaving correctly.**
+
+Recorded here as a claim that `predictions(type = "response")`
+handed back a predictive median where an expectation was asked for,
+seen on three fixtures and then a fourth. It does return a predictive
+median, and that is the documented contract: `?forecast.mvgam` says
+`"response"` samples from the observation family while `"expected"`
+returns the family's mean. Checked across the three types on one
+poisson fit:
+
+| call | value |
+|---|---|
+| `predictions(type = "expected")` | 14.202 |
+| `colMeans(posterior_epred())` | 14.213 |
+| `predictions(type = "response")` | 14.000 |
+| `median(posterior_predict())` | 14.000 |
+| `predictions(type = "link")` | 2.653 = log(14.2) |
+
+Every type answers with what it names. The assertion was what was
+wrong: it compared `"response"` against `posterior_epred()`, which
+are different quantities, so a whole number read as a symptom when it
+was the contract. The assumption came from brms and marginaleffects,
+which both spell the expectation `"response"`. mvgam parts company
+from them deliberately by carrying a separate `"expected"`.
+
+The tests now pin all three types to their own meanings, so a type
+that quietly answered with another's quantity fails.
+
+## Hierarchical trends
+
+**13. `forecast()` fails outright when the frame carries a superseded
+`series` column.**
+
+`test-hierarchical-trends.R`, "a hierarchical fit forecasts on its
+own axis". A `gr` / `subgr` model derives its own series identifier,
+and that spelling differs from any `series` column the frame also
+holds. The grouping gives `south_sp_c`, joined by an underscore and
+ordered region first. `interaction()` gives `south.sp_c`, joined by
+a dot and ordered species first. So the two disagree on the
+separator and on the order.
+
+`build_forecast_arms()` cuts the training tail by the raw column, so
+nothing matches a derived label, and an empty frame reaches
+`get_observation_structure()`:
+
+    Assertion on 'newdata' failed: Must have at least 1 rows,
+    but has 0 rows.
+
+Isolated by removing the column from the fit and repeating the
+identical call, which succeeds. The failure therefore follows the
+column's presence and has nothing to do with the newdata: any
+hierarchical model whose frame happens to carry a `series` column
+cannot be forecast. It at least stops rather than returning a
+number.
+
+## Families
+
+**4a. Three families are classified as closure-unit, not one.**
+
+`test-mvbf-wide.R`, "only the closure-unit families are classified as
+such". Finding 4 recorded `mvn()` reaching an occupancy-only code
+path. Asked of the family table rather than of one fit,
+`is_closure_unit_family()` answers `TRUE` for `mvn()`, `mvt()` and
+`diri()` as well as for `occ()` and `nmix()`.
+
+None of the three models a detection process over repeat visits to a
+closed unit. `mvn()` and `mvt()` are multivariate observation models
+and `diri()` is a composition, so every path this predicate guards is
+reached by three families it was never written for. That is what
+sends an `mvn` fit into a `pp_check` type its own family refuses and
+makes `augment()` demand a `cap` column with no meaning for it.
+
+The assertion asks the registry directly, so it covers every family
+at once.
+
+**14. `marginaleffects` does not know mvgam accepts `resp`.**
+
+Same block. Naming a response raises
+
+    These arguments are not known to be supported for models of
+    class `mvgam`: resp.
+
+marginaleffects keeps a whitelist per model class and mvgam has not
+registered `resp` on it, so every user of a multivariate fit meets
+this on every call that names an arm. The argument is forwarded and
+honoured; only the notice is wrong.
+
+## Multivariate log_lik
+
+**15. The joint density drops every response at an occasion where any
+one of them is missing.**
+
+`test-mvbf-wide.R`, "log_lik is per response, and the joint is their
+sum". The frame gives each of three responses its own gaps: three
+occasions for `count`, two for `seen`, five for `mass`, disjoint, so
+no occasion is missing from all three.
+
+`log_lik(fit)` nonetheless returns ten columns of `NA`, which is the
+union of the three gap sets. An occasion where `mass` was not
+recorded loses the `count` and `seen` densities along with it. Summed
+over draws the joint reads -302.6 where the arms add to -330.3.
+
+`loo()` is computed from these numbers, so a wide fit whose responses
+were not all measured on the same occasions is being compared on a
+likelihood that omits observations it holds. The disjoint gaps are
+what make it visible: a frame whose responses go missing together
+gives the same answer either way.
+
+## trend_map
+
+**16. A matrix `trend_map` ignores its rownames, then writes the
+declared ones over them.**
+
+`test-trend-map-fit.R`, "a matrix map keys its rows by the names the
+user gave". A matrix carries rownames, and a user who supplies them
+is saying which series each row of loadings belongs to. They are
+dropped: rows are taken in position order against the frame's
+declared series levels.
+
+Measured on a four-series frame declaring `delta, alpha, charlie,
+bravo`. One map names its rows in that order, another names the same
+contents `alpha, delta, bravo, charlie`. Both emit an identical `Z`,
+and both come back carrying the rownames `delta, alpha, charlie,
+bravo`.
+
+So the emitted matrix asserts the assignment the user asked for while
+holding another series' numbers. Two series load on each other's
+factors. Nothing raises, every dimension agrees and reading `Z` back
+confirms the mistake rather than revealing it. On this one route the
+loadings are the user's own statement of which series loads on what,
+which is what makes the silence costly.
+
+The data-frame form is unaffected: it names its series in a column
+and a stranger there is refused.
+
+**17. The factor plot draws the occasion's rank where every other
+plot draws its time.**
+
+`test-trend-map-fit.R`, "every plot draws the occasions the user
+supplied". The fit is numbered from three, so its occasions run 3 to
+52 and their ranks run 1 to 50. Measured off the built plots:
+
+| call | x range |
+|---|---|
+| `plot(type = "factors")` | 1 to 50 |
+| `plot(type = "trend")` | 3 to 52 |
+| `plot(type = "series")` | 3 to 52 |
+| `plot(hindcast(fit), series = 1)` | 3 to 52 |
+
+The axis is labelled `Time` in all four. Three of them mean it.
+
+A reader comparing a factor trajectory against a series trajectory,
+or against anything dated, is off by the offset between the two
+numberings, and on a frame that starts at one the two coincide and
+nothing shows. Reading the rendered plot is what turned it up, so
+the check now measures the x values the plot draws.
+
+## Closure-unit families
+
+**18. Every `occ()` and `nmix()` compile prints a Stan warning about
+integer division.**
+
+mvgam writes its own threading block for closure units, and the
+grainsize line in it reads
+
+    int grainsize = N_unit >= 8 ? N_unit / 8 : 1;
+
+`grainsize` is an `int`, so rounding is what is wanted, but `/`
+between two integers makes stanc say so at every compile:
+
+    Found int division:
+        N_unit / 8
+    Values will be rounded towards zero. If rounding is not desired
+    you can write the division as N_unit / 8.0
+    If rounding is intended please use the integer division operator
+    %/%.
+
+The arithmetic is right and the notice is cosmetic, but it reaches
+every user who fits a closure-unit model, and it is the kind of
+notice that teaches people to read past compiler output. `%/%` says
+what the line means and silences it.
+
+**19. `latent_N_saturation()` names its units by index.**
+
+`test-occ-closure-units.R`, "the saturation table names its units".
+The table comes back with a `label` column reading `1_1`, `1_2`,
+`1_3`, which is the series index joined to the occasion index. The
+units it describes are `site_01` at times 3, 4 and 5.
+
+So a reader has no way from the table back to a site or a date, and
+the mapping is positional and undocumented. It is the fault behind
+finding 8 in a place a reader is more likely to act on: a saturated
+unit is one whose latent state is pinned at the ceiling, which is
+what says the survey effort there was insufficient. Nobody can go
+back and revisit a unit called `12_2`.
+
+Every other per-unit surface on the same fit is keyed properly, and
+the frame carries both columns the label would need.
+
 ## Gaps closed rather than found
 
 Two things the plan names as untested now have coverage, and the

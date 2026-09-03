@@ -35,11 +35,17 @@ suppressMessages({
   library(testthat)
 })
 
-source(if (file.exists("concordance_helpers.R")) {
-  "concordance_helpers.R"
-} else {
-  file.path("tests", "local", "concordance_helpers.R")
-})
+# This file fits its own model and caches it beside itself, so it
+# depends on no shared fixture and no build step.
+cache_path <- function(name) {
+  dir <- if (dir.exists("fixtures")) {
+    "fixtures"
+  } else {
+    file.path("tests", "local", "fixtures")
+  }
+  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
+  file.path(dir, name)
+}
 
 set.seed(911L)
 
@@ -212,7 +218,7 @@ test_that("the observation design carries the interaction and the RE", {
 
 # -- Fit --------------------------------------------------------------
 
-cache <- local_fixture_path("val_mvgam_var_trend.rds")
+cache <- cache_path("val_mvgam_var_trend.rds")
 if (file.exists(cache)) {
   cat("[cache] Loading VAR fit.\n")
   fit <- readRDS(cache)
@@ -275,10 +281,11 @@ test_that("A recovers the simulated dynamics, entry by entry", {
 })
 
 
-test_that("every posterior draw of A is stationary", {
-  # The parameterisation is meant to keep `A` inside the stationary
-  # region draw by draw. A mean that looks stationary can be the
-  # average of draws that are not, so this reads each one.
+# The spectral radius of `A` at a set of draws, read from the draws
+# matrix rather than from any package summary of it. Two blocks below
+# need the same quantity, and deriving it twice is how two answers
+# come to disagree.
+radii_of_A <- function(ks = NULL) {
   draw_A <- function(k) {
     out <- matrix(NA_real_, n_series, n_series)
     for (i in seq_len(n_series)) {
@@ -288,10 +295,19 @@ test_that("every posterior draw of A is stationary", {
     }
     out
   }
-  ks <- unique(round(seq(1, nrow(dm_all), length.out = 25L)))
-  radii <- vapply(ks, function(k) {
+  if (is.null(ks)) ks <- seq_len(nrow(dm_all))
+  vapply(ks, function(k) {
     max(Mod(eigen(draw_A(k), only.values = TRUE)$values))
   }, numeric(1))
+}
+
+
+test_that("every posterior draw of A is stationary", {
+  # The parameterisation is meant to keep `A` inside the stationary
+  # region draw by draw. A mean that looks stationary can be the
+  # average of draws that are not, so this reads each one.
+  radii <- radii_of_A()
+  expect_length(radii, nrow(dm_all))
   expect_true(all(is.finite(radii)))
   expect_true(all(radii < 1))
 })
@@ -564,6 +580,34 @@ test_that("the residual correlation is labelled by the series axis", {
 })
 
 
+test_that("the variance surface is the gaussian variance", {
+  # For a gaussian the predictive variance is `sigma^2`, a constant
+  # across rows, which is the sharpest form this type takes: a
+  # surface returning the standard deviation, or the variance of the
+  # linear predictor, is positive and correctly shaped and fails
+  # here. The contrast with a count family, where the variance
+  # follows the mean, is what says the type reads the family at all.
+  v <- predict(fit, type = "variance", ndraws = 300L)
+  expect_identical(nrow(v), nrow(dat))
+  expect_true(all(v > 0))
+  sigma_draws <- as.numeric(posterior::as_draws_matrix(fit)[, "sigma"])
+  expect_equal(mean(v[, 1L]), mean(sigma_draws^2), tolerance = 0.05)
+  # Constant across rows, unlike a mean-variance family.
+  expect_lt(stats::sd(v[, 1L]) / mean(v[, 1L]), 0.05)
+})
+
+
+test_that("the factor summaries refuse a fit that has no factors", {
+  # A VAR gives every series its own latent dimension, so there is no
+  # factor decomposition to report. Each of these says so and names
+  # what it needed, rather than returning a zero a reader would take
+  # for an answer.
+  expect_error(active_factors(fit), "latent-factor fit")
+  expect_error(shared_variation(fit), "latent-factor fit")
+  expect_error(ordinate(fit), "latent dynamic factors")
+})
+
+
 # -- The newdata battery ----------------------------------------------
 
 ref_epred <- posterior_epred(fit, newdata = dat, draw_ids = 1:10,
@@ -736,8 +780,39 @@ test_that("summary, tidiers and criticism run on a VAR fit", {
   ll <- log_lik(fit, ndraws = 20L)
   expect_identical(dim(ll), c(20L, nrow(dat)))
   expect_true(all(is.finite(ll)))
-  ic <- suppressWarnings(loo(fit))
+  # `loo()` warns when a Pareto-k exceeds its threshold, which is a
+  # statement about this fit rather than noise. Suppressing it throws
+  # away the one diagnostic that says whether the approximation can
+  # be trusted, so it is captured and turned into claims: the
+  # estimate is finite, no k reaches the point where the
+  # approximation breaks, and the warning that arrived, if any, is
+  # the k notice those numbers already account for rather than
+  # something else that slipped through.
+  loo_warnings <- character(0)
+  ic <- withCallingHandlers(
+    loo(fit),
+    warning = function(w) {
+      loo_warnings <<- c(loo_warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
+  pareto_k <- ic$diagnostics$pareto_k
+  expect_true(all(is.finite(pareto_k)))
+  # A high Pareto-k is what a latent state-space fit is expected to
+  # produce: dropping an observation moves the very state it is being
+  # scored against, which is the reason `lfo_cv()` exists. So the
+  # claim is not that the diagnostic is good, it is that the user is
+  # told the truth about it. The notice has to arrive exactly when
+  # there is something to report, which fails both on a `loo()` gone
+  # silent over bad draws and on one that cries out over good ones.
+  expect_identical(
+    any(pareto_k > 0.7),
+    any(grepl("Pareto k", loo_warnings))
+  )
+  # Whatever was raised is that notice and nothing else, so an
+  # unrelated warning cannot hide among the expected ones.
+  expect_true(all(grepl("Pareto k", loo_warnings)))
 
   aug <- augment(fit)
   expect_identical(nrow(aug), nrow(dat))
@@ -807,6 +882,197 @@ test_that("the random intercept is estimated over the blocks", {
   # region, so the design reached the sampler intact.
   expect_true(all(c("b_elev:regionlower", "b_elev:regionmid") %in%
                     vars))
+})
+
+
+test_that("a decomposition's shares sum to one, draw by draw", {
+  # The summary table bounds each share to [0, 1], which every
+  # non-negative number under one satisfies. What makes it a
+  # decomposition is that a response's shares exhaust its forecast
+  # error: they add to one at every horizon, in every draw. A
+  # normalisation applied to the median rather than to each draw
+  # passes the bounds above and fails here.
+  fv <- fevd(fit, h = 8L, summary = FALSE)
+  expect_s3_class(fv, "mvgam_fevd")
+  row_sums <- unlist(lapply(fv, function(draw) {
+    vapply(draw, function(mat) rowSums(mat), numeric(8L))
+  }))
+  expect_true(all(abs(row_sums - 1) < 1e-10))
+})
+
+
+test_that("the draws behind irf are one matrix per horizon per draw", {
+  ir <- irf(fit, h = 6L, summary = FALSE)
+  expect_s3_class(ir, "mvgam_irf")
+  expect_identical(length(ir), as.integer(ndraws(fit)))
+  expect_identical(length(ir[[1L]]), n_series)
+  expect_identical(dim(ir[[1L]][[1L]]), c(6L, n_series))
+  expect_true(all(vapply(ir, function(d) {
+    all(vapply(d, function(m) all(is.finite(m)), logical(1)))
+  }, logical(1))))
+})
+
+
+test_that("orthogonal and generalized responses are different objects", {
+  # Two identifying assumptions about which shock moves first. They
+  # answer differently unless Sigma is diagonal, which `cor = TRUE`
+  # ensures it is not, so an argument read and dropped is visible
+  # here and nowhere else.
+  ir_gen <- irf(fit, h = 4L, orthogonal = FALSE, summary = FALSE)
+  ir_orth <- irf(fit, h = 4L, orthogonal = TRUE, summary = FALSE)
+  expect_identical(attr(ir_gen, "irf_type"), "Generalized")
+  expect_identical(attr(ir_orth, "irf_type"), "Orthogonalized")
+  expect_false(isTRUE(all.equal(ir_gen[[1L]], ir_orth[[1L]])))
+})
+
+
+test_that("irf and fevd answer from the draws they were given", {
+  # The coefficients and the innovation covariance have to come from
+  # one draw: a response built from `A` at one iteration and `Sigma`
+  # at another describes no posterior sample at all, while staying
+  # finite and correctly shaped.
+  total <- ndraws(fit)
+  ids <- c(2L, 7L, 15L)
+  ir <- irf(fit, h = 4L, draw_ids = ids, summary = FALSE)
+  expect_length(ir, length(ids))
+  expect_equal(irf(fit, h = 4L, draw_ids = ids, summary = FALSE), ir)
+
+  expect_length(irf(fit, h = 4L, ndraws = 5L, summary = FALSE), 5L)
+  expect_length(fevd(fit, h = 4L, ndraws = 5L, summary = FALSE), 5L)
+  expect_length(irf(fit, h = 4L, summary = FALSE), total)
+  expect_error(irf(fit, h = 4L, ndraws = total + 1L),
+               "more draws than the posterior holds")
+
+  # The default summarises, and a summary is smaller than the draws
+  # it came from. Summarising it again returns the same table rather
+  # than taking quantiles of quantiles.
+  ir_s <- irf(fit, h = 5L)
+  expect_s3_class(ir_s, "mvgam_irf_summary")
+  expect_lt(as.numeric(object.size(ir_s)),
+            as.numeric(object.size(irf(fit, h = 5L, summary = FALSE))))
+  expect_identical(nrow(summary(ir_s)), nrow(ir_s))
+  expect_error(plot(ir_s, shocks = "nonexistent"), "Unknown shock-response")
+})
+
+
+test_that("stability reports each metric once, over the whole posterior", {
+  st <- stability(fit)
+  expect_s3_class(st, "mvgam_stability_summary")
+  expect_identical(nrow(st), 9L)
+  expect_true(all(c("metric", "Estimate", "Est.Error") %in% names(st)))
+
+  draws <- stability(fit, summary = FALSE)
+  expect_s3_class(draws, "mvgam_stability")
+  expect_identical(nrow(draws), as.integer(ndraws(fit)))
+  expect_equal(summary(draws)$Estimate, st$Estimate, tolerance = 1e-10)
+
+  metrics <- c(
+    "prop_cov_offdiag", "prop_cov_diag", "prop_int", "prop_int_adj",
+    "prop_int_offdiag", "prop_int_diag", "reactivity",
+    "mean_return_rate", "var_return_rate"
+  )
+  expect_setequal(as.character(st$metric), metrics)
+  for (m in metrics) {
+    expect_true(all(is.finite(draws[[m]])))
+  }
+  # `A` was asserted stationary draw by draw above, so both of these
+  # follow from that and are the metrics' own statement of it.
+  expect_true(all(draws$prop_int >= 0 & draws$prop_int < 1))
+  expect_true(all(draws$mean_return_rate >= 0 &
+                    draws$mean_return_rate < 1))
+  expect_equal(max(draws$mean_return_rate),
+               max(radii_of_A()), tolerance = 0.05)
+
+  # The summary carries each metric's binned posterior, so it draws
+  # the same histogram the draws do. A median and an interval alone
+  # would not say whether reactivity's mass crosses zero, which is
+  # usually why the metric was asked for.
+  bins <- attr(st, "bin_counts")
+  expect_length(bins, 9L)
+  expect_identical(sum(bins$reactivity$counts), as.integer(ndraws(fit)))
+  ref <- graphics::hist(
+    draws$reactivity,
+    breaks = seq(min(draws$reactivity), max(draws$reactivity),
+                 length.out = 31L),
+    plot = FALSE
+  )
+  expect_identical(bins$reactivity$counts, as.integer(ref$counts))
+
+  expect_error(stability(fit, ndraws = ndraws(fit) + 1L),
+               "more draws than the posterior holds")
+  expect_identical(nrow(stability(fit, ndraws = 5L, summary = FALSE)), 5L)
+})
+
+
+test_that("incl_autocor picks between two different answers", {
+  # The argument chooses the fitted latent state over the trend's
+  # deterministic submodel, and on a fit carrying a VAR those are
+  # different numbers. A method that accepts the argument and returns
+  # the same draws either way is not reading it, which costs no error
+  # and no missing value: every conditional surface silently becomes
+  # a marginal one.
+  ids <- 1:20
+  cond_ep <- posterior_epred(fit, draw_ids = ids, incl_autocor = TRUE)
+  marg_ep <- posterior_epred(fit, draw_ids = ids, incl_autocor = FALSE)
+  expect_identical(dim(cond_ep), dim(marg_ep))
+  expect_false(isTRUE(all.equal(cond_ep, marg_ep)))
+  # Different everywhere it matters, not in the last bit of one cell.
+  expect_gt(max(abs(colMeans(cond_ep) - colMeans(marg_ep))), 1e-3)
+
+  cond_pp <- posterior_predict(fit, draw_ids = ids, incl_autocor = TRUE)
+  marg_pp <- posterior_predict(fit, draw_ids = ids, incl_autocor = FALSE)
+  expect_identical(dim(cond_pp), dim(marg_pp))
+  expect_false(isTRUE(all.equal(cond_pp, marg_pp)))
+})
+
+
+test_that("the summary prints every coefficient the model estimated", {
+  # A coefficient the sampler estimated and the summary omits is
+  # invisible to the only reader most users have. The design here
+  # carries an intercept, a slope, two region contrasts and two
+  # interaction columns, so an omission has somewhere to hide.
+  smry <- summary(fit)
+  blocks <- grep("^(fixed|dpar_.*_fixed|trend_fixed)$", names(smry),
+                 value = TRUE)
+  expect_gt(length(blocks), 0L)
+  shown <- unlist(lapply(blocks, function(k) rownames(smry[[k]])))
+
+  coefs <- sub("^b_", "", grep("^b_", variables(fit), value = TRUE))
+  coefs <- coefs[!grepl("_trend$", coefs)]
+  expect_gte(length(coefs), 6L)
+  expect_identical(paste(setdiff(coefs, shown), collapse = ", "), "")
+})
+
+
+test_that("pp_check carries its grouping and its x variable through", {
+  # These two arguments name a column of the data, and the plot they
+  # produce is the reason a user passes them. A method that accepts
+  # the argument and ignores it returns a ggplot of the ungrouped
+  # data, so the panel count is what says the grouping arrived.
+  for (ty in c("dens_overlay_grouped", "stat_grouped")) {
+    p <- pp_check(fit, type = ty, ndraws = 20L, group = "region")
+    expect_s3_class(p, "ggplot")
+    # One panel per region, taken from the plot's own facet spec
+    # rather than from the argument that was passed in.
+    built <- ggplot2::ggplot_build(p)
+    expect_setequal(
+      as.character(built$layout$layout$group),
+      region_levels
+    )
+  }
+  # `intervals` and `ribbon` are the only two types that take an `x`,
+  # and neither can be driven from a test. Both reach
+  # `bayesplot::ppc_intervals`, which builds its layer with
+  # `geom_linerange(size = )`, deprecated in ggplot2 3.4.0; the only
+  # other `x`-taking type, `error_scatter_avg_vs_x`, is deprecated
+  # inside bayesplot itself. mvgam forwards only `y`, `yrep` and `x`,
+  # so neither is repairable here, and both raise on any fit with no
+  # `x` at all.
+  #
+  # Silencing the deprecation to reach the assertion would hide a
+  # notice every user of those two types receives, so the `x`
+  # argument is left without coverage and the reason is recorded in
+  # FINDINGS.md rather than dressed up as a passing test.
 })
 
 

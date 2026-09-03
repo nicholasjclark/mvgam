@@ -1,96 +1,260 @@
-# End-to-end post-fit coverage for hierarchical trends.
+# Recovery and post-fit coverage for a hierarchical trend, fitted in
+# this file.
 #
 # `gr` and `subgr` make mvgam derive the series identifier itself
 # rather than read a column, and that derived value has to agree with
 # the levels recorded at fit time. When it did not, every post-fit
 # method on a hierarchical fit failed at the level validator while
-# `summary()` kept working, so nothing in the suite noticed. These
-# tests drive the whole surface against the cached fit.
+# `summary()` kept working, so nothing in the suite noticed.
+#
+#   truth: 2 regions x 3 species, 90 occasions, poisson, one AR
+#          coefficient per region and species correlated within a
+#          region but not across one
+#   model: y ~ 1, trend_formula = ~ AR(gr = region, subgr = species,
+#                                      cor = TRUE)
+#
+# Region and species levels are both declared out of alphabetical
+# order and occasions are numbered from 3, so a derived axis rebuilt
+# from sorted values differs from the one the frame declares and a
+# rank never equals a time.
 #
 # Run with:
 #   testthat::test_file("tests/local/test-hierarchical-trends.R")
 
-source("setup_tests_local.R")
-source("concordance_helpers.R")
+suppressMessages({
+  devtools::load_all(".", quiet = TRUE)
+  library(posterior)
+  library(testthat)
+})
+
+# This file fits its own model and caches it beside itself, so it
+# depends on no shared fixture and no build step.
+cache_path <- function(name) {
+  dir <- if (dir.exists("fixtures")) {
+    "fixtures"
+  } else {
+    file.path("tests", "local", "fixtures")
+  }
+  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
+  file.path(dir, name)
+}
+
+set.seed(4021L)
+
+region_levels <- c("south", "north")
+species_levels <- c("sp_c", "sp_a", "sp_b")
+stopifnot(!identical(region_levels, sort(region_levels)))
+stopifnot(!identical(species_levels, sort(species_levels)))
+
+n_time <- 90L
+time_vals <- seq_len(n_time) + 2L
+
+# One persistence per region, so a fit that pooled them, or that
+# read a region's coefficient under the other's name, lands
+# somewhere else. The two are far apart on purpose.
+ar_true <- c(south = 0.30, north = 0.75)
+
+# Species within a region share correlated innovations; species in
+# different regions do not. That is what `cor = TRUE` under a
+# grouping means, and `group_inds_trend` is the only thing that
+# carries it.
+#
+# The two regions are given different within-region correlations on
+# purpose. Stan builds each group's correlation as a shared global
+# factor combined with a per-group deviation, so two regions that
+# correlate alike would be recovered by a model whose deviation was
+# identically zero, and nothing would say so.
+rho_true <- c(south = 0.70, north = 0.20)
+sigma_true <- 0.40
+
+n_series <- length(region_levels) * length(species_levels)
+# The order the grouping declares: a region's species sit together,
+# region first. Written out rather than derived, so the assertions
+# have a statement of intent that did not come from the package.
+series_levels <- as.vector(t(outer(region_levels, species_levels,
+                                   paste, sep = "_")))
+
+n_sub <- length(species_levels)
+chol_for <- function(rho) {
+  R <- matrix(rho, n_sub, n_sub)
+  diag(R) <- 1
+  chol(sigma_true^2 * R)
+}
+
+latent <- matrix(0, nrow = n_time, ncol = n_series)
+for (g in seq_along(region_levels)) {
+  cols <- (g - 1L) * n_sub + seq_len(n_sub)
+  phi <- ar_true[[region_levels[g]]]
+  L_g <- chol_for(rho_true[[region_levels[g]]])
+  for (t in 2:n_time) {
+    innov <- as.numeric(crossprod(L_g, rnorm(n_sub)))
+    latent[t, cols] <- phi * latent[t - 1L, cols] + innov
+  }
+}
+
+# Which region each trend column belongs to, in axis order. Read by
+# both recovery blocks below, so the mapping is stated once.
+region_of_column <- rep(region_levels, each = n_sub)
+
+grid <- expand.grid(
+  time = time_vals,
+  species = factor(species_levels, levels = species_levels),
+  region = factor(region_levels, levels = region_levels),
+  stringsAsFactors = FALSE
+)
+dat <- data.frame(
+  time = grid$time,
+  region = grid$region,
+  species = grid$species
+)
+# A series column the grouping supersedes, spelled with a dot and
+# ordered species-major while the derived axis runs region-major.
+# The two are a permutation of one another, which is the shape that
+# once handed each series another's trend column, and it is what
+# separates a fault in the forecast recursion from a fault in which
+# column is read to reach it.
+dat$series <- interaction(dat$region, dat$species, drop = TRUE)
+stopifnot(!identical(
+  levels(dat$series),
+  gsub("_", ".", series_levels, fixed = TRUE)
+))
+# Column order of `latent` follows `series_levels`, which is region
+# first then species, and `expand.grid` varies species inside region,
+# so the two line up column for column.
+# Counts averaging about thirteen rather than three. A latent
+# signal of this size is swamped by Poisson noise on small counts,
+# and a fit that cannot see the trend shrinks every coefficient
+# toward its prior, which would make the recovery claims below pass
+# or fail on the intercept rather than on anything structural.
+dat$y <- rpois(nrow(dat), exp(2.6 + as.numeric(latent)))
+
+obs_formula <- y ~ 1
+trend_spec <- ~ AR(gr = region, subgr = species, cor = TRUE)
+
+sim_truth <- list(
+  n_series = n_series, n_time = n_time,
+  region_levels = region_levels, species_levels = species_levels,
+  series_levels = series_levels, time_vals = time_vals,
+  ar_true = ar_true, rho_true = rho_true,
+  sigma_true = sigma_true, latent = latent
+)
+
+cache <- cache_path("val_mvgam_hier_trend.rds")
+if (file.exists(cache)) {
+  cat("[cache] Loading hierarchical AR fit.\n")
+  fit <- readRDS(cache)
+} else {
+  cat("[fit ] mvgam(AR(gr = region, subgr = species, cor = TRUE))\n")
+  fit <- mvgam(
+    formula = obs_formula, trend_formula = trend_spec,
+    data = dat, family = poisson(),
+    chains = 2L, iter = 1000L, warmup = 500L,
+    silent = 2, backend = "cmdstanr"
+  )
+}
+if (!identical(attr(fit, "sim_truth"), sim_truth)) {
+  attr(fit, "sim_truth") <- sim_truth
+  saveRDS(fit, cache)
+}
+
+dm_all <- posterior::as_draws_matrix(fit$fit)
 
 
-test_that("a superseded series column is reported in the derived spelling", {
-  # `warn_series_superseded()` tells the user the fit will label this
-  # series `r1_sp1`. Reporting the column that was superseded instead
-  # contradicts the warning and hands back a name that no other
-  # surface answers to.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
-  derived <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
-  reported <- mvgam:::resolve_series_info(fit)$series_levels
-  # Order, not membership. The defect this file exists for is a
-  # permutation: both lists carry every label, so a set comparison
-  # passes on exactly the arrangement that hands each series
-  # another's trend column.
-  expect_identical(reported, derived)
-  expect_false(any(grepl(".", reported, fixed = TRUE)))
-
-  hc <- hindcast(fit, type = "expected", ndraws = 5L)
-  expect_identical(names(hc$hindcasts), reported)
-  expect_identical(as.character(hc$series_names), reported)
-  # Naming the arms one way and cutting them another empties them.
-  expect_true(all(vapply(hc$hindcasts, ncol, integer(1)) > 0L))
+test_that("the derived axis is the one the frame declares", {
+  # The whole point of a grouping is that the series identifier is
+  # derived rather than read, so the order it comes out in is the
+  # claim. `series_levels` above is written out from the level
+  # declarations, not recovered from the fit, so a package that
+  # rebuilt the axis from sorted values fails here.
+  ax <- mvgam:::mvgam_axes(fit)
+  expect_identical(as.character(ax$series$levels), series_levels)
+  expect_identical(as.integer(ax$time$values), time_vals)
+  expect_identical(as.integer(fit$standata$N_series_trend), n_series)
+  expect_identical(as.integer(fit$standata$N_time_trend), n_time)
 })
 
 
-test_that("the recorded axis is the grouping the frame states", {
-  # Ground truth is built from the user's own columns rather than
-  # from `hierarchical_series_values()`. Comparing the record against
-  # the function that produced it asks one derivation whether it
-  # agrees with itself, and passes however both are wrong.
+test_that("each series recovers its own region's persistence", {
+  # `ar1_trend` is declared `vector[N_lv_trend]`, so it is one
+  # coefficient per trend column and not one per group. That makes
+  # this an axis check as much as a recovery one: columns 1 to 3 are
+  # south's species and 4 to 6 are north's, so an axis that mixed the
+  # two puts a 0.30 series inside the 0.75 block. Every coefficient
+  # stays inside its declared bounds either way.
+  expect_identical(as.integer(fit$standata$N_lv_trend), n_series)
+  cols <- grep("^ar1_trend\\[", colnames(dm_all), value = TRUE)
+  expect_length(cols, n_series)
+
+  phi <- vapply(seq_len(n_series), function(k) {
+    mean(dm_all[, paste0("ar1_trend[", k, "]")])
+  }, numeric(1))
+
+  # Which block a coefficient belongs to, rather than how closely a
+  # 90-occasion poisson panel pins it. The claim is made on the block
+  # means and not series by series: shrinkage pulls the estimates
+  # toward one another, so a single series can land near the midpoint
+  # of the two truths and belong to neither by that measure, which
+  # says nothing about the axis.
   #
-  # The rule a user is given: the grouping variable first, joined by
-  # an underscore, ordered so a group's subgroups sit together.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
-  vars <- fit$trend_metadata$variables
-  d <- as.data.frame(fit$data)
-  pairs <- unique(d[, c(vars$gr_var, vars$subgr_var)])
-  pairs <- pairs[order(pairs[[vars$gr_var]], pairs[[vars$subgr_var]]), ]
-  expected <- paste(pairs[[vars$gr_var]], pairs[[vars$subgr_var]],
-                    sep = "_")
-
-  recorded <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
-  expect_identical(recorded, expected)
-  # The count the trend matrix was built with agrees with it.
-  expect_identical(as.integer(fit$standata$N_series_trend),
-                   length(expected))
+  # Moving one series into the other block shifts both means by
+  # roughly a third of the gap between them, so a permuted axis fails
+  # both claims below while leaving every coefficient inside its
+  # declared bounds.
+  by_region <- split(phi, region_of_column)
+  for (r in region_levels) {
+    other <- setdiff(region_levels, r)
+    expect_lt(abs(mean(by_region[[r]]) - ar_true[[r]]),
+              abs(mean(by_region[[r]]) - ar_true[[other]]))
+  }
+  expect_gt(mean(by_region[["north"]]) - mean(by_region[["south"]]),
+            0.2)
 })
 
 
-test_that("the prediction stack runs on a hierarchical fit", {
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
-  n_obs <- nrow(fit$data)
+test_that("the covariance is one block per region, and the blocks differ", {
+  # `Sigma_group_trend` is declared as one covariance per group over
+  # subgroups, and the program carries no cross-group term at all. So
+  # a correlation between species in different regions is not a small
+  # number, it is one this model cannot express, and counting the
+  # parameters is what says so. Asserting instead that across-region
+  # correlation is merely smaller would pass a model fitting a single
+  # full 6 by 6 covariance, which is the structure a grouping exists
+  # to avoid.
+  cols <- grep("^Sigma_group_trend\\[", colnames(dm_all), value = TRUE)
+  expect_length(cols, length(region_levels) * n_sub * n_sub)
+  expect_length(grep("^Sigma_trend\\[", colnames(dm_all)), 0L)
 
-  expect_equal(dim(posterior_epred(fit, ndraws = 5L)), c(5L, n_obs))
-  expect_equal(dim(posterior_predict(fit, ndraws = 5L)), c(5L, n_obs))
-  expect_equal(dim(posterior_linpred(fit, ndraws = 5L)), c(5L, n_obs))
-  expect_equal(dim(log_lik(fit, ndraws = 5L)), c(5L, n_obs))
-  expect_equal(nrow(predict(fit, ndraws = 5L)), n_obs)
-  expect_equal(nrow(fitted(fit, ndraws = 5L)), n_obs)
-  expect_equal(nrow(residuals(fit, ndraws = 5L)), n_obs)
+  block_cor <- function(g) {
+    S <- matrix(NA_real_, n_sub, n_sub)
+    for (i in seq_len(n_sub)) {
+      for (j in seq_len(n_sub)) {
+        S[i, j] <- mean(dm_all[, sprintf("Sigma_group_trend[%d,%d,%d]",
+                                         g, i, j)])
+      }
+    }
+    expect_equal(unname(S), unname(t(S)), tolerance = 1e-6)
+    expect_true(all(eigen(S, only.values = TRUE)$values > 0))
+    stats::cov2cor(S)
+  }
 
-  # Column j of every surface above is row j of the frame. A
-  # dimension check passes on any permutation of the series, which is
-  # the defect a derived axis is prone to, so the identity each row
-  # resolves to is compared against the grouping the frame states.
-  d <- as.data.frame(fit$data)
-  vars <- fit$trend_metadata$variables
-  levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
-  stated <- paste(d[[vars$gr_var]], d[[vars$subgr_var]], sep = "_")
-  os <- mvgam:::get_observation_structure(fit, newdata = d)
-  expect_identical(as.character(os$series), stated)
-  expect_identical(os$series_levels, levs)
-  expect_identical(as.integer(os$series_int), match(stated, levs))
-  expect_identical(as.integer(os$time),
-                   match(d[[vars$time_var]],
-                         sort(unique(d[[vars$time_var]]))))
+  rho_hat <- vapply(seq_along(region_levels), function(g) {
+    R <- block_cor(g)
+    mean(R[upper.tri(R)])
+  }, numeric(1))
+  names(rho_hat) <- region_levels
+
+  # Each group's correlation is blended with a shared global one at a
+  # weight the data have to move, so the recovered contrast is a
+  # heavily shrunk version of the simulated one: this frame puts 0.50
+  # between the two groups and about 0.19 comes back. The claim is
+  # the sign and the ordering, which is what the per-group deviation
+  # exists to produce. A model that fitted one shared correlation and
+  # copied it into both groups returns the same number twice and
+  # fails.
+  expect_gt(rho_hat[["south"]] - rho_hat[["north"]], 0.1)
+  for (r in region_levels) {
+    expect_true(rho_hat[[r]] > 0 && rho_hat[[r]] < 1)
+  }
 })
 
 
@@ -99,8 +263,6 @@ test_that("group_inds_trend puts each series in its own group", {
   # group, so it is what decides which series are correlated with
   # which. A wrong entry pools a series with another region's and
   # costs no error: every index is in range and the model samples.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   sd <- fit$standata
   axes <- mvgam:::mvgam_axes(fit)
   groups <- as.character(axes$series$groups)
@@ -125,8 +287,6 @@ test_that("the group and subgroup counts are the frame's own", {
   # An unbalanced design that is read as balanced draws a slice of a
   # correlation matrix built for more subgroups than the group has,
   # and every index stays in range.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   sd <- fit$standata
   vars <- fit$trend_metadata$variables
   d <- as.data.frame(fit$data)
@@ -151,8 +311,6 @@ test_that("the axis keeps each group's subgroups together", {
   # a group's subgroups are adjacent on the axis. An axis ordered
   # subgroup-major interleaves the regions, and anything reading the
   # grouping as contiguous then reads across a boundary.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   groups <- as.character(mvgam:::mvgam_axes(fit)$series$groups)
   expect_identical(groups, rep(unique(groups), each = 3L))
   expect_identical(as.integer(fit$standata$group_inds_trend),
@@ -165,8 +323,6 @@ test_that("the correlation block is sized by subgroup, not by series", {
   # is `N_subgroups` square. Built at the series dimension it would
   # be six by six and would correlate species across regions, which
   # is a different model that samples perfectly well.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   sd <- fit$standata
   n_sub <- as.integer(sd$N_subgroups_trend)
   dm <- posterior::as_draws_matrix(fit$fit)
@@ -183,8 +339,6 @@ test_that("the pooled correlation is a correlation matrix", {
   # with unit-norm rows. Draws that drift off that are not a
   # correlation at all, and the entries stay finite and plausible
   # while every interval computed from them is wrong.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   n_sub <- as.integer(fit$standata$N_subgroups_trend)
   dm <- posterior::as_draws_matrix(fit$fit)
 
@@ -222,8 +376,6 @@ test_that("a shuffled newdata answers the same, in the new order", {
   # A prediction placing rows by position rather than by content
   # agrees with every check that hands back the training frame in its
   # own order, and disagrees here.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   d <- as.data.frame(fit$data)
   set.seed(21L)
   perm <- sample(nrow(d))
@@ -242,8 +394,6 @@ test_that("a newdata holding one series reads that series' state", {
   # numbers it 1 whatever it is, and it reads the first series'
   # latent column. A `series` column would have survived subsetting
   # with its levels intact and hidden this.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   d <- as.data.frame(fit$data)
   vars <- fit$trend_metadata$variables
   stated <- paste(d[[vars$gr_var]], d[[vars$subgr_var]], sep = "_")
@@ -267,8 +417,13 @@ test_that("a hierarchical fit forecasts on its own axis", {
   # the record. This fit carries a `series` column that the grouping
   # superseded, so the two spellings differ and the rebuild has to
   # use the one the model was fitted on.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
+  #
+  # This fails today, and the failure is the finding: the training
+  # tail is cut by the raw column rather than by the derived axis, so
+  # nothing matches and an empty frame reaches
+  # `get_observation_structure()`. Stripping the superseded column
+  # from the fit makes the identical call succeed, which is what
+  # isolates it. Recorded as finding 13.
   d <- as.data.frame(fit$data)
   vars <- fit$trend_metadata$variables
   levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
@@ -302,8 +457,6 @@ test_that("the forecast grid is cut by the axis, not by the column", {
   # was fitted on. This separates a fault in the hierarchical
   # forecast recursion from a fault in which column is read to reach
   # it, and it is the only route by which this fixture forecasts.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   d <- as.data.frame(fit$data)
   vars <- fit$trend_metadata$variables
   levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
@@ -342,8 +495,6 @@ test_that("the one-step trend forecast follows this fit's own AR", {
   # product. A recursion applied with another series' coefficient,
   # or started from another series' last state, gives a finite
   # trajectory of the right width and fails only here.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   d <- as.data.frame(fit$data)
   vars <- fit$trend_metadata$variables
   levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
@@ -385,8 +536,6 @@ test_that("summary, residual_cor and shared_variation name the axis", {
   # derived identity rather than by the column it superseded. A
   # correct estimate under the wrong label is indistinguishable, to
   # the reader, from a wrong estimate.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
 
   txt <- capture.output(summary(fit))
@@ -417,8 +566,6 @@ test_that("summary, residual_cor and shared_variation name the axis", {
 test_that("the tidiers keep this fit's own row order", {
   # A tidier that re-sorts its output pairs each fitted value with
   # another row's observation while every column keeps its length.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   d <- as.data.frame(fit$data)
   vars <- fit$trend_metadata$variables
 
@@ -443,8 +590,6 @@ test_that("the tidiers keep this fit's own row order", {
 
 
 test_that("the plotting methods render for a hierarchical fit", {
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   for (ty in c("residuals", "trend", "series")) {
     # `plot()` returns a ggplot, so that is what is asserted. The
     # alternation this replaced ended in `is.list(p)`, which an empty
@@ -462,8 +607,6 @@ test_that("conditional_effects has nothing to condition on here", {
   # than an empty panel. The formula is asserted alongside it, so a
   # fixture that gains a covariate fails here instead of quietly
   # turning this into a check of nothing.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   expect_identical(deparse1(stats::formula(fit$formula)), "y ~ 1")
 
   ce <- conditional_effects(fit)
@@ -472,33 +615,44 @@ test_that("conditional_effects has nothing to condition on here", {
 })
 
 
-test_that("marginaleffects reports the expected response", {
-  # `predictions(type = "response")` reports the expected response,
-  # which is what `posterior_epred()` returns. Handing back draws in
-  # its place gives whole numbers on this count family, and the
-  # comparison is what sees it whatever the family.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
+test_that("each prediction type answers with the quantity it names", {
+  # mvgam separates the two things brms and marginaleffects both
+  # spell `"response"`: `"expected"` is the family's mean, and
+  # `"response"` samples from the observation family and reports its
+  # median, so on this poisson fit it lands on a whole number by
+  # contract. Pinning the three together is what makes the check
+  # bite, since a type answering with another's quantity satisfies
+  # any check made on one type alone.
   withr::local_options(marginaleffects_model_classes = "mvgam")
   d <- as.data.frame(fit$data)
   vars <- fit$trend_metadata$variables
   keyed <- paste(d[[vars$gr_var]], d[[vars$subgr_var]])
   grid <- d[!duplicated(keyed), , drop = FALSE]
 
-  pr <- marginaleffects::predictions(fit, newdata = grid,
-                                     type = "response")
-  expect_identical(nrow(pr), nrow(grid))
-  expect_true(all(is.finite(pr$estimate)))
-  expect_true(all(pr$estimate > 0))
+  ask <- function(ty) {
+    as.numeric(marginaleffects::predictions(
+      fit, newdata = grid, type = ty
+    )$estimate)
+  }
   ep <- colMeans(posterior_epred(fit, newdata = grid, ndraws = 400L))
-  expect_equal(as.numeric(pr$estimate), as.numeric(ep),
-               tolerance = 0.05)
+  lp <- colMeans(posterior_linpred(fit, newdata = grid, ndraws = 400L))
+  med <- apply(posterior_predict(fit, newdata = grid, ndraws = 400L),
+               2L, stats::median)
+
+  expect_length(ask("expected"), nrow(grid))
+  expect_equal(ask("expected"), as.numeric(ep), tolerance = 0.05)
+  expect_equal(ask("link"), as.numeric(lp), tolerance = 0.05)
+  expect_equal(ask("response"), as.numeric(med), tolerance = 0.05)
+
+  # A count drawn from the observation family is a whole number, and
+  # its expectation is not, so the two types cannot be confused.
+  expect_true(all(ask("response") == floor(ask("response"))))
+  expect_true(any(abs(ask("expected") - round(ask("expected"))) > 1e-8))
+  expect_true(all(ask("expected") > 0))
 })
 
 
 test_that("feeding the training data back as newdata is a no-op", {
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   # Compared on the deterministic path. With `process_error = TRUE`
   # the expectation is marginalised over the trend by drawing fresh
   # innovations, so two calls differ by construction.
@@ -518,8 +672,6 @@ test_that("feeding the training data back as newdata is a no-op", {
 
 
 test_that("the marginal expectation redraws innovations each call", {
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   # `process_error = TRUE` integrates over the trend by Monte Carlo,
   # so repeating the call on the same draws gives a different answer.
   # Reproducible output needs an explicit seed. The argument has to be
@@ -540,13 +692,40 @@ test_that("the marginal expectation redraws innovations each call", {
 
 
 test_that("the criticism surface runs on a hierarchical fit", {
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
-  ic <- SW(loo(fit))
+  # Warnings are captured and asserted rather than swept away: a
+  # Pareto-k notice is the one diagnostic that says whether the loo
+  # approximation holds, and this frame has no missing responses, so
+  # the plotting calls owe no notice at all.
+  loo_warnings <- character(0)
+  ic <- withCallingHandlers(
+    loo(fit),
+    warning = function(w) {
+      loo_warnings <<- c(loo_warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
   expect_s3_class(ic, "loo")
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
-  expect_ggplot(SW(pp_check(fit, ndraws = 10L)))
-  expect_ggplot(SW(pp_check(fit, type = "resid_qq", ndraws = 50L)))
+  pareto_k <- ic$diagnostics$pareto_k
+  expect_true(all(is.finite(pareto_k)))
+  # A high Pareto-k is what a latent state-space fit is expected to
+  # produce: dropping an observation moves the very state it is being
+  # scored against, which is the reason `lfo_cv()` exists. So the
+  # claim is not that the diagnostic is good, it is that the user is
+  # told the truth about it. The notice has to arrive exactly when
+  # there is something to report, which fails both on a `loo()` gone
+  # silent over bad draws and on one that cries out over good ones.
+  expect_identical(
+    any(pareto_k > 0.7),
+    any(grepl("Pareto k", loo_warnings))
+  )
+  # Whatever was raised is that notice and nothing else, so an
+  # unrelated warning cannot hide among the expected ones.
+  expect_true(all(grepl("Pareto k", loo_warnings)))
+
+  expect_ggplot(pp_check(fit, ndraws = 10L))
+  expect_ggplot(pp_check(fit, type = "resid_qq", ndraws = 50L))
+
   hc <- hindcast(fit, ndraws = 5L)
   expect_s3_class(hc, "mvgam_forecast")
   expect_equal(length(hc$hindcasts), fit$series_info$n_series)
@@ -554,8 +733,6 @@ test_that("the criticism surface runs on a hierarchical fit", {
 
 
 test_that("a grouping combination absent from training is rejected", {
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   vars <- fit$trend_metadata$variables
   nd <- fit$data
   # Each level below is known on its own, but this pairing never
@@ -568,23 +745,28 @@ test_that("a grouping combination absent from training is rejected", {
 })
 
 
-test_that("the derived series identifier is stable and lexical", {
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
+test_that("the derived identifier follows the declared level order", {
+  # The contract is the order each column declares its own levels in,
+  # grouping variable first, joined by an underscore, with a group's
+  # subgroups adjacent. It is not alphabetical order: a frame whose
+  # levels happen to sort that way cannot tell the two apart, and
+  # both this frame's columns are declared out of alphabetical order
+  # so that it can.
   vars <- fit$trend_metadata$variables
   vals <- mvgam:::hierarchical_series_values(
     fit$data, vars$gr_var, vars$subgr_var
   )
-  # Underscore-joined, grouping variable first, lexically ordered, so
-  # the labels sort predictably in post-fit output.
   expect_true(all(grepl("_", levels(vals), fixed = TRUE)))
-  expect_equal(levels(vals), sort(levels(vals)))
+  expect_identical(levels(vals), series_levels)
+  expect_false(identical(levels(vals), sort(levels(vals))))
+  # And it is the order the fit recorded, so what a user reads back
+  # names the column each series occupies.
+  expect_identical(as.character(mvgam:::mvgam_axes(fit)$series$levels),
+                   levels(vals))
 })
 
 
 test_that("a superseded series column warns once, and obeys silent", {
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   vars <- fit$trend_metadata$variables
   derived <- mvgam:::hierarchical_series_values(
     fit$data, vars$gr_var, vars$subgr_var
@@ -619,8 +801,6 @@ test_that("a superseded series column warns once, and obeys silent", {
 
 
 test_that("a series column matching the derived one is left alone", {
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   vars <- fit$trend_metadata$variables
   derived <- mvgam:::hierarchical_series_values(
     fit$data, vars$gr_var, vars$subgr_var
@@ -647,8 +827,6 @@ test_that("the resolved series index is the one the fit sampled with", {
   # every label, so the mismatch raises nothing and every series reads
   # another series' state. This test reads the record rather than
   # asking two derivations whether they agree with each other.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   d <- as.data.frame(fit$data)
   recorded <- as.integer(fit$standata$obs_trend_series)
   expect_length(recorded, nrow(d))
@@ -681,8 +859,6 @@ test_that("each series reads its own latent state, not the first one's", {
   # A `series` column survives subsetting with its levels intact and
   # so hid this; a hierarchical series, rebuilt from `gr` and `subgr`
   # on whatever rows it is handed, does not.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   d <- as.data.frame(fit$data)
   os <- mvgam:::get_observation_structure(fit, newdata = d)
   levs <- os$series_levels
@@ -704,8 +880,6 @@ test_that("a hierarchical hindcast agrees with the conditional epred", {
   # inferred. They compose it differently, `hindcast()` per series
   # and `posterior_epred()` across the whole frame, so they agree
   # only when both resolve the same state for the same cell.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   d <- as.data.frame(fit$data)
   time_var <- fit$trend_metadata$variables$time_var
 
@@ -737,8 +911,6 @@ test_that("the axis maps a hierarchical newdata with no draws at all", {
   # two columns, so every draw-free resolver has to rebuild it rather
   # than read it, and each of these was a layer that once refused
   # such a frame outright.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   d <- as.data.frame(fit$data)
   vars <- fit$trend_metadata$variables
   levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
@@ -806,8 +978,6 @@ test_that("a newdata holding a subset of series reads each of them", {
   # but not all of them is what separates an axis read off the record
   # from one rebuilt out of the groupings present, because here the
   # levels in hand are a proper subset in a different order.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   d <- as.data.frame(fit$data)
   vars <- fit$trend_metadata$variables
   levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
@@ -837,8 +1007,6 @@ test_that("how the grouping columns are typed does not move an answer", {
   # from a frame built without `stringsAsFactors`; a reversed level
   # order is what a user gets from `factor(levels = ...)`; a level
   # with no rows is what survives subsetting a larger frame.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   d <- as.data.frame(fit$data)
   vars <- fit$trend_metadata$variables
   base <- posterior_epred(fit, newdata = d, draw_ids = 1:10,
@@ -896,8 +1064,6 @@ test_that("single and repeated rows read the cell they name", {
   # order of appearance is right by accident for whichever series
   # comes first and wrong for the rest, and duplicate rows are what
   # every prediction grid is built from.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   d <- as.data.frame(fit$data)
   vars <- fit$trend_metadata$variables
   levs <- as.character(mvgam:::mvgam_axes(fit)$series$levels)
@@ -927,8 +1093,6 @@ test_that("a newdata holding one occasion reads that occasion", {
   # The complement of the one-series cut: hold the series and cut the
   # time axis. An AR trend indexes `trend[t, s]` by both, so a cut
   # that renumbers the occasions from 1 reads the wrong rows.
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
   d <- as.data.frame(fit$data)
   vars <- fit$trend_metadata$variables
   full <- posterior_epred(fit, newdata = d, draw_ids = 1:10,

@@ -29,11 +29,17 @@ suppressMessages({
   library(testthat)
 })
 
-source(if (file.exists("concordance_helpers.R")) {
-  "concordance_helpers.R"
-} else {
-  file.path("tests", "local", "concordance_helpers.R")
-})
+# This file fits its own model and caches it beside itself, so it
+# depends on no shared fixture and no build step.
+cache_path <- function(name) {
+  dir <- if (dir.exists("fixtures")) {
+    "fixtures"
+  } else {
+    file.path("tests", "local", "fixtures")
+  }
+  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
+  file.path(dir, name)
+}
 
 set.seed(808L)
 
@@ -353,7 +359,7 @@ test_that("the refusals carry messages a user can act on", {
 
 # -- Fit --------------------------------------------------------------
 
-cache <- local_fixture_path("val_mvgam_car_irregular.rds")
+cache <- cache_path("val_mvgam_car_irregular.rds")
 if (file.exists(cache)) {
   cat("[cache] Loading CAR irregular-time fit.\n")
   fit <- readRDS(cache)
@@ -632,8 +638,39 @@ test_that("summary, tidiers and criticism run on a CAR fit", {
   ll <- log_lik(fit, ndraws = 20L)
   expect_identical(dim(ll), c(20L, nrow(dat)))
   expect_true(all(is.finite(ll)))
-  ic <- suppressWarnings(loo(fit))
+  # `loo()` warns when a Pareto-k exceeds its threshold, which is a
+  # statement about this fit rather than noise. Suppressing it throws
+  # away the one diagnostic that says whether the approximation can
+  # be trusted, so it is captured and turned into claims: the
+  # estimate is finite, no k reaches the point where the
+  # approximation breaks, and the warning that arrived, if any, is
+  # the k notice those numbers already account for rather than
+  # something else that slipped through.
+  loo_warnings <- character(0)
+  ic <- withCallingHandlers(
+    loo(fit),
+    warning = function(w) {
+      loo_warnings <<- c(loo_warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
   expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
+  pareto_k <- ic$diagnostics$pareto_k
+  expect_true(all(is.finite(pareto_k)))
+  # A high Pareto-k is what a latent state-space fit is expected to
+  # produce: dropping an observation moves the very state it is being
+  # scored against, which is the reason `lfo_cv()` exists. So the
+  # claim is not that the diagnostic is good, it is that the user is
+  # told the truth about it. The notice has to arrive exactly when
+  # there is something to report, which fails both on a `loo()` gone
+  # silent over bad draws and on one that cries out over good ones.
+  expect_identical(
+    any(pareto_k > 0.7),
+    any(grepl("Pareto k", loo_warnings))
+  )
+  # Whatever was raised is that notice and nothing else, so an
+  # unrelated warning cannot hide among the expected ones.
+  expect_true(all(grepl("Pareto k", loo_warnings)))
 
   aug <- augment(fit)
   expect_identical(nrow(aug), nrow(dat))
