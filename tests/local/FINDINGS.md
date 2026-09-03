@@ -609,6 +609,42 @@ axis, since it calls this type.
 Covered in `test-pp-check-resids.R`, which asserts the two axes read
 one surface and fails on it.
 
+## CAR on a continuous time grid
+
+**25. A CAR model whose times are not whole numbers cannot be
+forecast.**
+
+`build_training_arms()` records the training times truncated to
+integers while the data frame keeps the values the user supplied.
+On `sim_mvgam(type = 6)`, which draws cumulative `Unif(1, 6)` gaps,
+the two disagree on 89 of 90 occasions:
+
+| source | first four times |
+|---|---|
+| `training$times[[lv]]` | 0, 4, 7, 11 |
+| `training$data$time` | 0, 4.590626, 7.072973, 11.73063 |
+
+Measured, `times == floor(data)` exactly. `build_training_tail_data()`
+then selects the tail with `data[[time_var]] %in% tail_ts`, matches
+nothing, and hands back a frame of no rows;
+`get_observation_structure()` asserts at least one row and stops with
+"Must have at least 1 rows, but has 0 rows".
+
+So `forecast()` raises on every CAR fit with a continuous time grid,
+which is the case CAR exists for. `mvgam()` itself is unaffected: the
+model fits, and only the forecast arm fails. Reproduced on seed 501
+with 90 training rows over times 0 to 330.13 and 30 test rows over
+335.84 to 439.71, a well-formed forward forecast with no overlap.
+
+One axis derived twice is the class this plan is written against.
+Here it stops rather than returning a wrong number, so nothing
+silently depends on the answer.
+
+`test-forecast-recovery.R` covers it. The three CAR seeds error there
+until the axis carries the times it was given. The failure was
+invisible before because the bundles were cached from a run that
+predates it, so `forecast()` was never called again.
+
 ## Gaps closed rather than found
 
 Two things the plan names as untested now have coverage, and the
