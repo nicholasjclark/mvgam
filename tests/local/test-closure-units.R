@@ -20,8 +20,12 @@
 #
 # Occasions are numbered from 3, so a rank is never a time.
 #
-# Three more fits follow the occupancy one, each answering a
-# question the first cannot. An `nmix()` fit gives the ceiling claim
+# Six fits follow the occupancy one, each answering a question the
+# first cannot. Two of them put the closure unit under a factor
+# model, which is where the trend design moves to the latent-factor
+# axis while an observation still has to read a species cell.
+#
+# The rest: An `nmix()` fit gives the ceiling claim
 # a range to be wrong across, since a population size can sit below
 # an observed count where a boolean occupancy cannot. A pair of occ
 # fits, one complete and one with every sixth visit unmade, say what
@@ -45,6 +49,16 @@ cache_path <- function(name) {
   }
   if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
   file.path(dir, name)
+}
+
+# A ggplot is returned whether or not a layer received any data, so
+# asserting the class passes on the empty panel it looks like it is
+# guarding. Building the plot is what forces the layers to resolve.
+expect_drawn <- function(p) {
+  expect_s3_class(p, "ggplot")
+  layers <- ggplot2::ggplot_build(p)$data
+  expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
+  invisible(layers)
 }
 
 with_warnings <- function(expr) {
@@ -691,4 +705,537 @@ test_that("dropping visits widens the estimate without moving it", {
   gaps_at <- which(is.na(obj$data_gappy$y))
   expect_true(all(is.finite(pp[, gaps_at])))
   expect_true(all(as.numeric(pp) %in% c(0, 1)))
+})
+
+# ----------------------------------------------------------------------
+# Closure units under a factor model
+# ----------------------------------------------------------------------
+#
+# The fits above give each series its own latent state. A `jsdgam()`
+# gives K species N_lv shared factors instead, and puts the closure
+# unit underneath: the trend design moves to the factor axis while an
+# observation still has to read a species cell. Two families reach
+# that composition, and they differ only in what the latent state is
+# -- binary occupancy for `occ()`, a population size for `nmix()` --
+# so the questions are asked once, in `closure_jsdm_battery()`, and
+# what each family recovers is written out beneath it.
+#
+# `s(env, by = lv_axis())` puts one smooth on the factor grain, which
+# is the second thing these fits carry that nothing above does: the
+# trend design has `n_sites * N_lv` rows where the observation side
+# has `n_sites * K * n_visits`.
+#
+# Sites are numbered from 3 in both, so a site identifier never
+# equals its own rank.
+
+jsdm_K <- 4L
+jsdm_N_lv <- 2L
+jsdm_visits <- 3L
+jsdm_p_true <- 0.6
+jsdm_species <- paste0("sp", seq_len(jsdm_K))
+
+# Two orthogonal smooth shapes in env, standardised, so the factor
+# model has something to tell apart on the factor axis.
+jsdm_lv_true <- function(env) {
+  lv <- cbind(sin(env), env^2 - mean(env^2))
+  scale(lv, center = TRUE, scale = apply(lv, 2L, sd))
+}
+
+
+# Verbatim from the file this replaces, seed and random calls in the
+# same order, so the cached fit stays valid.
+sim_jsdm_occ <- function() {
+  set.seed(607L)
+  n_sites <- 50L
+  env <- sort(runif(n_sites, -2, 2))
+  lv_true <- jsdm_lv_true(env)
+  Z_true <- matrix(rnorm(jsdm_K * jsdm_N_lv, sd = 1.0),
+                   nrow = jsdm_K, ncol = jsdm_N_lv)
+  Z_true <- scale(Z_true, center = TRUE, scale = FALSE)
+  attr(Z_true, "scaled:center") <- NULL
+  b_int <- rnorm(jsdm_K, mean = 0, sd = 0.5)
+
+  logit_psi <- matrix(NA_real_, nrow = jsdm_K, ncol = n_sites)
+  for (s in seq_len(jsdm_K)) {
+    for (i in seq_len(n_sites)) {
+      logit_psi[s, i] <- b_int[s] + sum(Z_true[s, ] * lv_true[i, ])
+    }
+  }
+  z_latent <- matrix(rbinom(jsdm_K * n_sites, 1L,
+                            1 / (1 + exp(-logit_psi))),
+                     nrow = jsdm_K, ncol = n_sites)
+  site_ids <- seq_len(n_sites) + 2L
+
+  rows <- list()
+  for (s in seq_len(jsdm_K)) {
+    for (i in seq_len(n_sites)) {
+      for (v in seq_len(jsdm_visits)) {
+        rows[[length(rows) + 1L]] <- data.frame(
+          species = jsdm_species[s], site = site_ids[i],
+          env = env[i], visit = v,
+          y = if (z_latent[s, i] == 1L) {
+            rbinom(1L, 1L, jsdm_p_true)
+          } else {
+            0L
+          }
+        )
+      }
+    }
+  }
+  d <- do.call(rbind, rows)
+  d$species <- factor(d$species, levels = jsdm_species)
+  sigma_true_cov <- tcrossprod(Z_true)
+  list(
+    data = d, n_sites = n_sites, K = jsdm_K, N_lv = jsdm_N_lv,
+    n_visits = jsdm_visits, species_levels = jsdm_species,
+    Z_true = Z_true, z_latent = z_latent, env = env,
+    sigma_true_cor = cov2cor(sigma_true_cov + diag(1e-8, jsdm_K))
+  )
+}
+
+
+sim_jsdm_nmix <- function() {
+  set.seed(606L)
+  n_sites <- 30L
+  env <- sort(runif(n_sites, -2, 2))
+  lv_true <- jsdm_lv_true(env)
+  Z_true <- matrix(rnorm(jsdm_K * jsdm_N_lv, sd = 0.4),
+                   nrow = jsdm_K, ncol = jsdm_N_lv)
+  Z_true <- scale(Z_true, center = TRUE, scale = FALSE)
+  attr(Z_true, "scaled:center") <- NULL
+  b_int <- rnorm(jsdm_K, mean = 0.5, sd = 0.3)
+
+  log_lambda <- matrix(NA_real_, nrow = jsdm_K, ncol = n_sites)
+  for (s in seq_len(jsdm_K)) {
+    for (i in seq_len(n_sites)) {
+      log_lambda[s, i] <- b_int[s] + sum(Z_true[s, ] * lv_true[i, ])
+    }
+  }
+  N_latent <- matrix(rpois(jsdm_K * n_sites, exp(log_lambda)),
+                     nrow = jsdm_K, ncol = n_sites)
+  cap_true <- max(N_latent) + 5L
+  site_ids <- seq_len(n_sites) + 2L
+
+  rows <- list()
+  for (s in seq_len(jsdm_K)) {
+    for (i in seq_len(n_sites)) {
+      for (v in seq_len(jsdm_visits)) {
+        rows[[length(rows) + 1L]] <- data.frame(
+          species = jsdm_species[s], site = site_ids[i],
+          env = env[i], visit = v,
+          y = rbinom(1L, N_latent[s, i], jsdm_p_true),
+          cap = cap_true
+        )
+      }
+    }
+  }
+  d <- do.call(rbind, rows)
+  d$species <- factor(d$species, levels = jsdm_species)
+  sigma_true_cov <- tcrossprod(Z_true)
+  list(
+    data = d, n_sites = n_sites, K = jsdm_K, N_lv = jsdm_N_lv,
+    n_visits = jsdm_visits, species_levels = jsdm_species,
+    Z_true = Z_true, N_latent = N_latent, cap_true = cap_true,
+    env = env,
+    sigma_true_cor = cov2cor(sigma_true_cov + diag(1e-8, jsdm_K))
+  )
+}
+
+
+fit_jsdm_closure <- function(nm, sim, family) {
+  cache <- cache_path(paste0("val_mvgam_jsdgam_mv_", nm, ".rds"))
+  if (file.exists(cache)) return(readRDS(cache))
+  fit <- jsdgam(
+    formula = y ~ species,
+    factor_formula = ~ s(env, by = lv_axis(), k = 5) - 1,
+    data = sim$data, unit = site, species = species,
+    family = family, n_lv = sim$N_lv,
+    chains = 2L, iter = 1000L, warmup = 500L,
+    silent = 2, backend = "cmdstanr"
+  )
+  saveRDS(fit, cache)
+  fit
+}
+
+
+closure_jsdm_battery <- function(nm, sim, fit, threshold_cor,
+                                 state_ok) {
+  K <- sim$K
+  N_lv <- sim$N_lv
+  lev <- sim$species_levels
+  n_sites <- sim$n_sites
+  n_visits <- sim$n_visits
+  # `unit = site` makes mvgam synthesise its own `time` and `series`
+  # columns, so the frame every prediction call is given is the one
+  # the fit kept rather than the one the simulation built. Handing
+  # over the simulation frame raises on a missing `time`, which is
+  # how the file this replaces once had its central check erroring in
+  # place of running.
+  d <- as.data.frame(fit$obs_data)
+  raw <- sim$data
+  n_unit_jsdm <- K * n_sites
+  says <- function(claim) paste0(nm, ": ", claim)
+  dm <- as_draws_matrix(fit$fit)
+  post_cor <- residual_cor(fit)$cor
+  true_off <- sim$sigma_true_cor[upper.tri(sim$sigma_true_cor)]
+  post_off <- post_cor[upper.tri(post_cor)]
+
+  test_that(says("the loadings recover the simulated covariance"), {
+    expect_gt(stats::cor(true_off, post_off), threshold_cor)
+    expect_lt(mean(abs(true_off - post_off)), 0.6)
+  })
+
+  test_that(says("the closure units are the species-site cells"), {
+    # A closure unit is a (species, site) cell with three visits. It
+    # is neither a species nor a row, and all three counts differ
+    # here, so a marginalisation taken over the wrong grouping shows
+    # in the count alone.
+    expect_identical(as.integer(fit$standata$N_unit), n_unit_jsdm)
+    expect_identical(nrow(unique(raw[, c("species", "site")])),
+                     n_unit_jsdm)
+    expect_identical(as.integer(fit$standata$N), nrow(raw))
+    expect_false(n_unit_jsdm == K)
+    expect_false(n_unit_jsdm == nrow(d))
+  })
+
+  test_that(says("the trend design is split by factor, on one basis"), {
+    # `by = lv_axis()` puts the design on the factor axis. It has to
+    # come out block-complementary across the factors and evaluated
+    # at one shared basis. Read off the data Stan is handed rather
+    # than the program text, since a design built on the species axis
+    # and relabelled has correct dimensions and wrong content.
+    sd <- fit$standata
+    expect_identical(as.integer(sd$N_trend), n_sites * N_lv)
+    expect_identical(dim(sd$times_trend), c(n_sites, N_lv))
+    r1 <- as.integer(sd$times_trend[, 1L])
+    r2 <- as.integer(sd$times_trend[, 2L])
+    expect_length(intersect(r1, r2), 0L)
+    expect_identical(sort(c(r1, r2)), seq_len(n_sites * N_lv))
+
+    X <- sd$Xs_trend
+    expect_identical(nrow(X), n_sites * N_lv)
+    expect_identical(ncol(X), N_lv)
+    expect_true(all(X[r1, 2L] == 0))
+    expect_true(all(X[r2, 1L] == 0))
+    # One smooth split two ways: the same covariate value reaches
+    # both factors, in their own columns.
+    expect_equal(unname(X[r1, 1L]), unname(X[r2, 2L]))
+
+    zs <- grep("^Zs_[0-9]+_[0-9]+_trend$", names(sd), value = TRUE)
+    expect_length(zs, N_lv)
+    Z1 <- sd$Zs_1_1_trend
+    Z2 <- sd$Zs_2_1_trend
+    expect_identical(dim(Z1), dim(Z2))
+    expect_true(all(Z1[r2, ] == 0))
+    expect_true(all(Z2[r1, ] == 0))
+    expect_equal(unname(Z1[r1, ]), unname(Z2[r2, ]))
+    expect_equal(as.integer(sd$knots_1_trend),
+                 as.integer(sd$knots_2_trend))
+  })
+
+  test_that(says("an observation reads a species cell, not a factor"), {
+    # `times_trend` moved to the factor axis, but `trend[t, s]` stays
+    # species-grained because the program folds through `Z`. Running
+    # `obs_trend_series` over factors stays in range, samples, and
+    # silently gives four species two states.
+    s_rec <- as.integer(fit$standata$obs_trend_series)
+    expect_identical(sort(unique(s_rec)), seq_len(K))
+    expect_identical(s_rec, match(as.character(d$species), lev))
+    expect_identical(as.integer(table(s_rec)),
+                     rep(n_sites * n_visits, K))
+  })
+
+  test_that(says("every prediction surface answers at the row grain"), {
+    ep <- posterior_epred(fit, draw_ids = 1:20)
+    pp <- posterior_predict(fit, draw_ids = 1:20)
+    expect_identical(dim(ep), c(20L, nrow(d)))
+    expect_identical(dim(pp), c(20L, nrow(d)))
+    expect_true(all(is.finite(ep)))
+    expect_true(all(is.finite(pp)))
+    # `fitted()` summarises the draws `posterior_epred()` returns, so
+    # its Estimate column is their column mean exactly.
+    ft <- fitted(fit, draw_ids = 1:20)
+    expect_identical(nrow(ft), nrow(d))
+    expect_equal(unname(ft[, "Estimate"]), unname(colMeans(ep)),
+                 tolerance = 1e-8)
+    # The density belongs to the unit, not the row: one term per
+    # closure unit is what the marginalisation produces.
+    ll <- log_lik(fit, draw_ids = 1:20)
+    expect_identical(ncol(ll), n_unit_jsdm)
+    expect_true(all(is.finite(ll)))
+  })
+
+  test_that(says("the closure-unit prediction types answer per unit"), {
+    # The two quantities these families exist to separate: the latent
+    # state and the detection probability. Confusing their grain is
+    # what makes a state estimate read as a detection rate, so the
+    # width is checked as well as the scale.
+    ls <- predict(fit, type = "latent_state", ndraws = 20L)
+    det <- predict(fit, type = "detection", ndraws = 20L)
+    expect_identical(nrow(ls), n_unit_jsdm)
+    expect_identical(nrow(det), nrow(d))
+    expect_true(all(det[, "Estimate"] >= 0 & det[, "Estimate"] <= 1))
+    expect_true(state_ok(as.numeric(ls[, "Estimate"])))
+  })
+
+  test_that(says("each row reads the latent cell the sampler drew"), {
+    t_rec <- as.integer(fit$standata$obs_trend_time)
+    s_rec <- as.integer(fit$standata$obs_trend_series)
+    expect_length(t_rec, nrow(d))
+    want <- vapply(paste0("trend[", t_rec, ",", s_rec, "]"),
+                   function(k) mean(dm[, k]), numeric(1))
+    got <- colMeans(
+      mvgam:::extract_trend_latent_states(fit, newdata = d,
+                                          full_draws = dm)
+    )
+    expect_equal(unname(got), unname(want))
+    expect_gt(stats::sd(want), 1e-6)
+  })
+
+  test_that(says("a shuffled frame answers the same, in the new order"), {
+    set.seed(19L)
+    perm <- sample(nrow(d))
+    base <- posterior_epred(fit, newdata = d, draw_ids = 1:10,
+                            incl_autocor = TRUE)
+    shuf <- posterior_epred(fit, newdata = d[perm, , drop = FALSE],
+                            draw_ids = 1:10, incl_autocor = TRUE)
+    expect_equal(unname(base[, perm, drop = FALSE]), unname(shuf))
+    expect_gt(stats::sd(colMeans(base)), 1e-8)
+  })
+
+  test_that(says("a frame holding whole units for some species maps"), {
+    # Closure units have to stay whole, so the cut is by species
+    # rather than by row. A frame carrying some of the species in a
+    # different order is what separates an axis read off the record
+    # from one rebuilt out of the levels the frame happens to carry.
+    base <- posterior_epred(fit, newdata = d, draw_ids = 1:10,
+                            incl_autocor = TRUE)
+    for (subset in list(lev[c(2L, 4L)], lev[c(4L, 1L, 3L)])) {
+      rows <- which(as.character(d$species) %in% subset)
+      sub <- d[rows, , drop = FALSE]
+      sub$series <- factor(as.character(sub$series), levels = subset)
+      sub$species <- factor(as.character(sub$species),
+                            levels = subset)
+      expect_true(all(table(paste(sub$species, sub$time)) == n_visits))
+      got <- posterior_epred(fit, newdata = sub, draw_ids = 1:10,
+                             incl_autocor = TRUE)
+      expect_equal(unname(got), unname(base[, rows, drop = FALSE]))
+    }
+  })
+
+  test_that(says("a frame naming an unknown species is refused"), {
+    nd <- d
+    nd$series <- factor(
+      ifelse(seq_len(nrow(nd)) == 1L, "sp_unseen",
+             as.character(nd$series)),
+      levels = c(lev, "sp_unseen")
+    )
+    err <- expect_error(
+      posterior_epred(fit, newdata = nd, draw_ids = 1:5),
+      "Series levels in newdata not found in training data"
+    )
+    expect_match(conditionMessage(err), "sp_unseen", fixed = TRUE)
+    for (s in lev) {
+      expect_match(conditionMessage(err), s, fixed = TRUE)
+    }
+  })
+
+  test_that(says("hindcast arms are the species, in order, distinct"), {
+    arms <- hindcast(fit, ndraws = 20L)$hindcasts
+    expect_identical(names(arms), lev)
+    same <- character(0)
+    for (i in seq_along(arms)) {
+      for (j in seq_along(arms)) {
+        if (j <= i) next
+        if (isTRUE(all.equal(arms[[i]], arms[[j]]))) {
+          same <- c(same, paste(names(arms)[i], names(arms)[j],
+                                sep = "="))
+        }
+      }
+    }
+    expect_identical(same, character(0))
+  })
+
+  test_that(says("residual_cor is labelled by the species axis"), {
+    expect_identical(rownames(post_cor), lev)
+    expect_identical(colnames(post_cor), lev)
+    expect_equal(unname(diag(post_cor)), rep(1, K))
+    expect_equal(unname(post_cor), unname(t(post_cor)))
+    expect_gt(max(abs(post_off)), 0.05)
+  })
+
+  test_that(says("the factor methods report the fit's own loadings"), {
+    af <- active_factors(fit)
+    expect_s3_class(af, "mvgam_active_factors")
+    expect_identical(as.integer(af$n_lv), N_lv)
+    expect_identical(nrow(af$per_factor), N_lv)
+
+    sv <- shared_variation(fit)
+    expect_identical(as.character(sv$series_names), lev)
+    expect_identical(as.integer(sv$n_series), K)
+    expect_identical(dim(sv$delta), c(K, K))
+    expect_equal(unname(sv$delta), unname(t(sv$delta)))
+    expect_true(all(diag(sv$delta) > 0))
+
+    Z_m <- apply(
+      mvgam:::extract_Z_loadings(dm, n_obs_series = K, n_lv = N_lv),
+      c(2L, 3L), mean
+    )
+    expect_identical(dim(Z_m), c(K, N_lv))
+    # `Z` is [species, factor], so a permutation of its rows gives
+    # every species another's loadings while leaving the recovery
+    # correlation above almost unchanged. Every pair, not just the
+    # opening one.
+    same <- character(0)
+    for (i in seq_len(K)) {
+      for (j in seq_len(K)) {
+        if (j <= i) next
+        if (isTRUE(all.equal(Z_m[i, ], Z_m[j, ]))) {
+          same <- c(same, paste(lev[i], lev[j], sep = "="))
+        }
+      }
+    }
+    expect_identical(same, character(0))
+    # The distinctness above holds vacuously on loadings that are all
+    # near zero, so they have to be materially non-zero. `nmix()`
+    # draws its truth at half the occupancy fit's scale and centres
+    # it, so the floor is the smaller of the two.
+    expect_gt(max(abs(Z_m)), 0.05)
+  })
+
+  test_that(says("the env smooth is drawn once per latent factor"), {
+    # `s(env, by = lv_axis())` is the only smooth, and it is indexed
+    # by latent factor rather than by species. Checking that the call
+    # returns leaves the two ways it can be wrong untouched: an empty
+    # grid, which comes back correctly named with no rows, and a grid
+    # built over the observation frame, which carries no `.trend`
+    # column and cannot separate the factors.
+    sm <- smooths(fit)
+    expect_length(sm, 1L)
+    expect_match(sm[1L], ".trend", fixed = TRUE)
+
+    ps <- posterior_smooths(fit, smooth = sm[1L], ndraws = 20L)
+    expect_identical(dim(ps), c(20L, n_sites * N_lv))
+    expect_true(all(is.finite(ps)))
+
+    cs <- conditional_smooths(fit)
+    expect_length(cs, 1L)
+    cd <- cs[[1L]]
+    expect_s3_class(cd, "data.frame")
+    expect_gt(nrow(cd), 0L)
+    expect_true(all(is.finite(cd$estimate__)))
+    expect_true(all(cd$lower__ <= cd$estimate__))
+    expect_true(all(cd$estimate__ <= cd$upper__))
+    # One curve per latent factor, and the two differ: a design that
+    # collapsed the factor axis draws one shape twice.
+    curves <- split(cd$estimate__, cd$cond__)
+    expect_length(curves, N_lv)
+    expect_false(isTRUE(all.equal(curves[[1L]], curves[[2L]])))
+    # Drawn over the covariate the trend side actually saw.
+    trend_env <- fit$trend_model$data$env
+    expect_gte(min(cd$effect1__), min(trend_env) - 1e-8)
+    expect_lte(max(cd$effect1__), max(trend_env) + 1e-8)
+  })
+
+  test_that(says("summary and the criticism methods run on this fit"), {
+    txt <- capture.output(summary(fit))
+    expect_true(any(grepl(paste0("Series:\\s*", K), txt)))
+    seen <- character(0)
+    ic <- withCallingHandlers(loo(fit), warning = function(w) {
+      seen <<- c(seen, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    })
+    expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
+    # One likelihood term per closure unit, so the diagnostic is
+    # counted on units rather than on visits.
+    expect_identical(length(ic$diagnostics$pareto_k), n_unit_jsdm)
+    expect_true(all(is.finite(ic$diagnostics$pareto_k)))
+    expect_true(all(grepl("Pareto", seen)))
+  })
+
+  test_that(says("pp_check and the plotting methods render"), {
+    expect_drawn(pp_check(fit, ndraws = 40L))
+    for (ty in c("trend", "factors")) {
+      expect_drawn(plot(fit, type = ty))
+    }
+    ce <- conditional_effects(fit)
+    expect_s3_class(ce, "mvgam_conditional_effects")
+    expect_gt(length(ce), 0L)
+    for (eff in names(ce)) {
+      cd <- ce[[eff]]$data
+      expect_true(all(is.finite(cd$estimate)))
+      expect_true(all(cd$conf.low <= cd$estimate))
+      expect_true(all(cd$estimate <= cd$conf.high))
+      expect_gt(max(cd$conf.high - cd$conf.low), 0)
+    }
+  })
+
+  invisible(NULL)
+}
+
+
+occ_jsdm <- sim_jsdm_occ()
+occ_jsdm_fit <- fit_jsdm_closure("occ", occ_jsdm, occ())
+closure_jsdm_battery(
+  "jsdgam occ", occ_jsdm, occ_jsdm_fit, threshold_cor = 0.5,
+  # Occupancy is a probability.
+  state_ok = function(x) all(x >= 0 & x <= 1)
+)
+
+nmix_jsdm <- sim_jsdm_nmix()
+nmix_jsdm_fit <- fit_jsdm_closure("nmix", nmix_jsdm, nmix())
+closure_jsdm_battery(
+  "jsdgam nmix", nmix_jsdm, nmix_jsdm_fit, threshold_cor = 0.7,
+  # A latent population is a non-negative count under the cap.
+  state_ok = function(x) {
+    all(x >= 0) && all(x <= nmix_jsdm$cap_true)
+  }
+)
+
+
+test_that("jsdgam occ: the detection probability recovers the truth", {
+  # Printed and unchecked in the file this replaces, so a detection
+  # probability that had run to 0 or 1 would have been reported
+  # without comment.
+  dm <- as_draws_matrix(occ_jsdm_fit$fit)
+  p_cols <- grep("^b_p_Intercept$|^Intercept_p$|^p$", colnames(dm),
+                 value = TRUE)
+  expect_gt(length(p_cols), 0L)
+  p_post <- as.numeric(dm[, p_cols[1L]])
+  p_resp <- if (grepl("^b_|^Intercept", p_cols[1L])) {
+    1 / (1 + exp(-p_post))
+  } else {
+    p_post
+  }
+  expect_true(all(p_resp > 0 & p_resp < 1))
+  expect_lt(abs(mean(p_resp) - jsdm_p_true), 0.2)
+})
+
+
+test_that("jsdgam nmix: detection and the identified mode both hold", {
+  dm <- as_draws_matrix(nmix_jsdm_fit$fit)
+  p_cols <- grep("^b_p_Intercept$|^Intercept_p$|^p$", colnames(dm),
+                 value = TRUE)
+  expect_gt(length(p_cols), 0L)
+  p_post <- as.numeric(dm[, p_cols[1L]])
+  p_resp <- if (grepl("^b_|^Intercept", p_cols[1L])) {
+    1 / (1 + exp(-p_post))
+  } else {
+    p_post
+  }
+  expect_lt(abs(mean(p_resp) - jsdm_p_true), 0.2)
+
+  # `nmix()` has no simplex constraint, so the loadings are not
+  # pinned to sum to zero the way the softmax families are. They do
+  # have to stay near the identified mode the Heaps QR targets: a
+  # column sum that has wandered means they are drifting along an
+  # unidentified direction, which is a claim the file this replaces
+  # made in a comment and never checked.
+  Z_m <- apply(
+    mvgam:::extract_Z_loadings(dm, n_obs_series = nmix_jsdm$K,
+                               n_lv = nmix_jsdm$N_lv),
+    c(2L, 3L), mean
+  )
+  expect_lt(max(abs(colSums(Z_m))), 0.5)
+  expect_gt(max(abs(Z_m)), 0.05)
 })
