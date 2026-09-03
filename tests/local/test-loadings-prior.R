@@ -427,23 +427,47 @@ test_that("birds: every post-fit method answers on this fit", {
 })
 
 
-test_that("birds: the loadings carry the kernel's structure", {
-  # The prior shrinks similar species toward similar loadings, so
-  # the implied species correlation should track the kernel the
-  # loadings were drawn under. Comparing against a permutation of
-  # the species is what makes this a claim about which species is
-  # which rather than about the spread of the numbers.
+test_that("birds: the loadings recover the covariance the data holds", {
+  # `Phi` is the prior covariance the loadings were drawn from, not
+  # the covariance this dataset carries. The Stan program gives each
+  # column of `Z` its own `multi_normal_cholesky(0, L_Phi_loadings)`
+  # prior, so with three factors `Z Z'` is a three-degree-of-freedom
+  # Wishart around `Phi` rather than `Phi` itself. Over 2000 fresh
+  # draws at that rank the agreement between a realised covariance
+  # and `Phi` averages 0.40 with a standard deviation of 0.20, and
+  # it climbs to 0.98 only by rank 200. So an assertion aimed at
+  # `Phi` is aimed at a quantity that varies with the simulation
+  # seed and not with the fit, which is why its threshold had to
+  # come down to a tenth. The realised covariance is what a fit can
+  # be held to, and against that one this fit reads 0.837 on a
+  # bernoulli likelihood over 25 sites.
   sim <- sim_birds()
   fit <- birds_fit()
   off <- upper.tri(sim$Phi, diag = FALSE)
   rc <- residual_cor(fit)$cor
   expect_identical(rownames(rc), sim$species_levels)
-  agree <- stats::cor(rc[off], sim$Phi[off])
-  set.seed(3L)
-  perm <- sample(sim$n_species)
-  permuted <- stats::cor(rc[off], sim$Phi[perm, perm][off])
-  expect_gt(agree, permuted)
-  expect_gt(agree, 0.1)
+  realised <- stats::cov2cor(tcrossprod(sim$Z_true))
+  agree <- stats::cor(rc[off], realised[off])
+  expect_gt(agree, 0.7)
+
+  # And it is this species ordering that is recovered, not the
+  # spread of the numbers. Against 500 permutations of the axis the
+  # agreement sits 19 standard deviations out, so a fit that loaded
+  # every species on another's factor fails here while still
+  # producing a correlation matrix of the right shape.
+  set.seed(11L)
+  null <- replicate(500L, {
+    p <- sample(sim$n_species)
+    stats::cor(rc[off], realised[p, p][off])
+  })
+  expect_lt(mean(null >= agree), 0.01)
+  expect_gt((agree - mean(null)) / stats::sd(null), 5)
+
+  # The null has to be a null: a permutation that left the matrix
+  # alone would score every replicate at the truth's own value and
+  # the comparison above would be a number against itself.
+  expect_lt(abs(mean(null)), 0.05)
+  expect_gt(stats::sd(null), 1e-3)
 })
 
 
@@ -460,13 +484,20 @@ test_that("birds: the wider prior moves the length-scales", {
     expect_true(all(as.numeric(post[, p]) > 0))
     expect_true(all(as.numeric(wide[, p]) > 0))
   }
-  # A wider prior admits a wider posterior on at least one of the
-  # two length-scales; identical spreads would mean the prior never
-  # reached the program.
-  wider <- vapply(pars, function(p) {
-    stats::sd(as.numeric(wide[, p])) > stats::sd(as.numeric(post[, p]))
-  }, logical(1))
-  expect_true(any(wider))
+  # A wider prior does not have to widen every marginal, and here it
+  # does not: the phylogenetic length-scale's spread grows by 89 per
+  # cent while the trait one's falls by 38. So "at least one got
+  # wider" is a coin flip over two parameters, and it would pass on
+  # a run where the prior reached neither. What the override has to
+  # do is move both, which an argument accepted and dropped cannot.
+  ratio <- vapply(pars, function(p) {
+    stats::sd(as.numeric(wide[, p])) / stats::sd(as.numeric(post[, p]))
+  }, numeric(1))
+  expect_true(all(abs(log(ratio)) > 0.25))
+
+  # And the direction on the parameter the override names, so a
+  # change that merely differed would not satisfy this.
+  expect_gt(ratio[["theta_dist_phylo"]], 1)
 })
 
 
@@ -553,6 +584,16 @@ test_that("phylo: the simulation really is phylogeny-dominated", {
   to_trait <- stats::cor(sim$Phi[off], sim$K_trait[off])
   expect_gt(to_phylo, to_trait)
   expect_gt(to_phylo / to_trait, 1.5)
+
+  # `Phi` is the prior the loadings were drawn from, so the two
+  # lines above restate how `Phi` was built and would hold whatever
+  # data came out of it. What the fit is shown is one draw, and the
+  # premise it needs is that the draw kept the ordering: at rank 3
+  # a realised covariance tracks its own prior at about 0.4, so
+  # this is not automatic.
+  realised <- stats::cov2cor(tcrossprod(sim$Z_true))
+  expect_gt(stats::cor(realised[off], sim$K_phylo[off]),
+            stats::cor(realised[off], sim$K_trait[off]))
 })
 
 
@@ -595,4 +636,32 @@ test_that("phylo: the recovered covariance follows the phylogeny", {
   to_phylo <- stats::cor(rc[off], K_phylo_post[off])
   to_trait <- stats::cor(rc[off], K_trait_post[off])
   expect_gt(to_phylo, to_trait)
+
+  # Both of those are small in absolute terms, 0.156 and 0.116, and
+  # a reader would take that for a poor recovery. It is not. A
+  # kernel is the covariance the loadings were drawn from, and the
+  # data carries one rank-3 draw of them rather than the kernel
+  # itself, so agreement with a kernel is capped by whatever that
+  # draw happened to be. Against the covariance the draw actually
+  # implies the fit reads 0.978, and it does so across the middle
+  # of the distribution rather than on a few extreme pairs.
+  realised <- stats::cov2cor(tcrossprod(sim$Z_true))
+  agree <- stats::cor(rc[off], realised[off])
+  expect_gt(agree, 0.9)
+  expect_gt(stats::cor(rc[off], realised[off], method = "spearman"), 0.9)
+
+  # And it is this species ordering that was recovered. Against 500
+  # permutations of the axis the agreement sits far outside the
+  # null, so a fit that loaded every species on another's factor
+  # fails here while still returning a well-formed correlation
+  # matrix and still satisfying the kernel comparison above.
+  set.seed(7L)
+  null <- replicate(500L, {
+    p <- sample(nrow(realised))
+    stats::cor(rc[off], realised[p, p][off])
+  })
+  expect_lt(mean(null >= agree), 0.01)
+  expect_gt((agree - mean(null)) / stats::sd(null), 5)
+  expect_lt(abs(mean(null)), 0.05)
+  expect_gt(stats::sd(null), 1e-3)
 })

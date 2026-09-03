@@ -1169,6 +1169,79 @@ method refuses with an explanation. Choosing between those belongs
 to the jsdm work, so `test-jsdgam-families.R` leaves it unasserted
 and this entry carries it.
 
+## The structured loadings prior
+
+**36. Three recovery claims were aimed at a target no fit can hit,
+and their thresholds had been lowered to match.**
+
+The package is right here and the assertions were wrong, so this is
+a test defect. It is recorded because the mistake is the one that
+nearly shipped a wrong answer on the ZMVN fit, in a place where the
+numbers looked reasonable rather than absurd.
+
+`test-loadings-prior.R` checked the recovered species covariance
+against `Phi`, the kernel the loadings were drawn from. Reading the
+generated Stan settles what `Phi` is:
+
+```stan
+target += multi_normal_cholesky_lpdf(Z[ : , i_z] | rep_vector(0.0,
+                    N_series_trend), L_Phi_loadings);
+```
+
+Each column of `Z` gets that prior, so with three latent factors the
+covariance a dataset carries is a Wishart around `Phi` on three
+degrees of freedom, and not `Phi` itself. `residual_cor()` estimates the
+former: it builds `Z * Latent * t(Z)` from the fitted loadings.
+
+Drawing 2000 fresh `Z` from the same `Phi` measures what agreement
+with `Phi` is even available:
+
+| n_lv | mean cor(realised, Phi) |
+|---|---|
+| 3 | 0.399, sd 0.195, 5th pct 0.086, 95th pct 0.724 |
+| 10 | 0.665 |
+| 50 | 0.913 |
+| 200 | 0.976 |
+
+At the rank these fits use, the target moves with the simulation
+seed over most of the unit interval and barely moves with the fit at
+all. That is why the assertion could only be written as
+`agree > 0.1`, and why the phylogeny check came down to a margin of
+0.04 between 0.156 and 0.116.
+
+Against the covariance the realised loadings imply, the same three
+fits read:
+
+| fit | family | pearson | spearman | middle 80% | permutation null |
+|---|---|---|---|---|---|
+| phylo | gaussian, 100 sites | 0.978 | 0.978 | 0.975 | max 0.166 |
+| birds | bernoulli, 25 sites | 0.837 | 0.839 | 0.832 | max 0.169 |
+
+So the loadings were being recovered nearly exactly while the file
+reported it as barely distinguishable from nothing. Neither number
+is carried by a few extreme pairs, and both sit more than five
+standard deviations outside a 500-permutation null of the species
+axis, which is what makes them a claim about which species loads on
+which factor rather than about the spread of the numbers.
+
+Two further pieces of the file were measuring themselves. The
+premise check compared `Phi` against its own two kernels, which
+restates how `Phi` was built and holds whatever data comes out of
+it; it now checks that the realised draw kept the ordering, which at
+rank 3 is not automatic. And the check on the wider prior asked that
+one of two length-scales widen, which over two parameters is a coin
+flip: measured, the phylogenetic scale's spread grows by 89 per cent
+while the trait one's falls by 38, so the honest claim is that both
+move.
+
+A caution found alongside it. Averaging the raw `Z` draws and
+comparing the covariance that implies gives 0.663 where the same
+comparison through `residual_cor()` gives 0.978. Raw `Z` is
+rotation-indeterminate, so its posterior mean is not a loadings
+matrix and nothing should be computed from it. Two routes are invariant to rotation, the
+QR-identified block and the covariance taken within each draw, and
+they agree.
+
 ## by = lv_axis() smooths, drawn
 
 **34. `plot(conditional_smooths())` runs the factors together into

@@ -548,13 +548,37 @@ test_that("irf and fevd describe this fit's own matrix", {
   expect_true(all(fe$fevdQ2.5 <= fe$fevdQ50))
   expect_true(all(fe$fevdQ50 <= fe$fevdQ97.5))
 
-  # At the first horizon a series' forecast error is all its own
-  # shock, which is the one value in the table that theory pins.
-  own_h1 <- fe$fevdQ50[fe$horizon == 1L &
-                         sub(" -> .*$", "", fe$shock) ==
-                           sub("^.* -> ", "", fe$shock)]
-  expect_length(own_h1, n_series)
-  expect_true(all(own_h1 > 0.5))
+  # The decomposition is orthogonalised by a Cholesky factor taken
+  # in the series axis order, so at the first horizon the response
+  # of series k draws on shocks 1 to k and on nothing after them.
+  # That makes the h = 1 table exactly triangular, and it is the one
+  # value in the output that ties the shock axis to the series axis:
+  # every entry below the diagonal is structurally zero, in every
+  # draw, only when the two axes agree.
+  h1 <- fe[fe$horizon == 1L, ]
+  sides <- strsplit(h1$shock, " -> ", fixed = TRUE)
+  from <- vapply(sides, `[`, "", 1L)
+  to <- vapply(sides, `[`, "", 2L)
+  # Keyed by the order the table emits rather than by the series
+  # names, since finding 8 has it labelling these `Process_k`. Both
+  # spellings run the axis in the same order, so the claim below
+  # survives that being fixed.
+  keys <- unique(from)
+  expect_length(keys, n_series)
+  M <- matrix(0, n_series, n_series, dimnames = list(keys, keys))
+  for (i in seq_len(nrow(h1))) {
+    M[from[i], to[i]] <- h1$fevdQ50[i]
+  }
+  expect_equal(sum(abs(M[lower.tri(M)])), 0)
+  expect_gt(sum(abs(M[upper.tri(M)])), 0.05)
+
+  # The diagonal alone cannot say this. Measured here it reads
+  # 1.000, 0.959, 0.770, so a floor under it passes for all six
+  # orderings of the axis, while the triangle fails for five.
+  for (perm in list(c(2L, 1L, 3L), c(1L, 3L, 2L), c(3L, 2L, 1L))) {
+    expect_gt(sum(abs(M[perm, perm][lower.tri(M)])), 1e-3)
+  }
+  expect_true(all(diag(M) > 0.5))
 })
 
 
@@ -926,6 +950,35 @@ test_that("orthogonal and generalized responses are different objects", {
 })
 
 
+test_that("the cumulative response is the running sum of the other", {
+  # `cumulative` is the second argument `irf()` takes and the only
+  # one nothing exercised. A cumulative response is the accumulated
+  # effect of one shock, so it is the column-wise running sum of the
+  # per-horizon response, exactly and for every draw. An argument
+  # read and dropped returns the same object; one accumulated along
+  # the response axis instead of the horizon breaks the equality
+  # while still returning something that grows.
+  ids <- 1:10
+  step <- irf(fit, h = 5L, cumulative = FALSE, draw_ids = ids,
+              summary = FALSE)
+  cum <- irf(fit, h = 5L, cumulative = TRUE, draw_ids = ids,
+             summary = FALSE)
+  expect_false(isTRUE(all.equal(step, cum)))
+  for (d in seq_along(ids)) {
+    for (r in seq_len(n_series)) {
+      expect_equal(cum[[d]][[r]], apply(step[[d]][[r]], 2L, cumsum))
+    }
+  }
+
+  # The two agree at the first horizon, since one term has been
+  # summed, and separate after it. Without this the equality above
+  # would also hold for a response that never moved.
+  expect_equal(cum[[1L]][[1L]][1L, ], step[[1L]][[1L]][1L, ])
+  expect_gt(max(abs(cum[[1L]][[1L]][5L, ] - step[[1L]][[1L]][5L, ])),
+            1e-6)
+})
+
+
 test_that("irf and fevd answer from the draws they were given", {
   # The coefficients and the innovation covariance have to come from
   # one draw: a response built from `A` at one iteration and `Sigma`
@@ -980,8 +1033,25 @@ test_that("stability reports each metric once, over the whole posterior", {
   expect_true(all(draws$prop_int >= 0 & draws$prop_int < 1))
   expect_true(all(draws$mean_return_rate >= 0 &
                     draws$mean_return_rate < 1))
-  expect_equal(max(draws$mean_return_rate),
-               max(radii_of_A()), tolerance = 0.05)
+  # The return rate is not merely near the spectral radius, it is
+  # the spectral radius, draw for draw: measured, the two agree to
+  # zero across every draw. So this is one fact reached twice, once
+  # by `stability()` and once from the `A_trend` columns, and the
+  # two have to be reading the same matrix in the same shape. A
+  # comparison of the two maxima under a tolerance passes under any
+  # permutation of the draws and under a systematic offset; the
+  # per-draw identity passes under neither.
+  expect_equal(draws$mean_return_rate, radii_of_A())
+
+  # Two of the nine metrics are the complementary shares of a third,
+  # so each pair exhausts its total in every draw. Measured, both
+  # sums are exactly one. A metric computed off a different matrix
+  # from its partner stays inside [0, 1] and fails here.
+  for (pr in list(c("prop_cov_offdiag", "prop_cov_diag"),
+                  c("prop_int_offdiag", "prop_int_diag"))) {
+    expect_equal(draws[[pr[1L]]] + draws[[pr[2L]]],
+                 rep(1, nrow(draws)))
+  }
 
   # The summary carries each metric's binned posterior, so it draws
   # the same histogram the draws do. A median and an interval alone
@@ -1077,15 +1147,29 @@ test_that("pp_check carries its grouping and its x variable through", {
 
 
 test_that("the plotting methods render for a VAR fit", {
-  expect_s3_class(pp_check(fit, ndraws = 20L), "ggplot")
-  for (ty in c("residuals", "trend", "series")) {
-    # `plot()` returns a ggplot, so that is what is asserted. The
-    # alternation this replaced ended in `is.list(p)`, which an empty
-    # list satisfies: any method returning `list()` passed it.
-    p <- plot(fit, type = ty)
+  # A ggplot comes back whether or not a layer received any data, so
+  # the class alone passes on the empty panel it looks like it is
+  # guarding. Building the plot is what forces the layers to
+  # resolve, and the row count is what says something was drawn.
+  drawn <- function(p) {
     expect_s3_class(p, "ggplot")
+    layers <- ggplot2::ggplot_build(p)$data
+    expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
+    invisible(layers)
   }
-  expect_s3_class(mcmc_plot(fit), "ggplot")
+  drawn(pp_check(fit, ndraws = 20L))
+  for (ty in c("residuals", "trend", "series", "re")) {
+    drawn(plot(fit, type = ty))
+  }
+  drawn(mcmc_plot(fit))
+  drawn(plot(conditional_effects(fit))[[1L]])
+
+  # The three types this fit cannot answer refuse it, each naming
+  # the structure it would need. A method that returned an empty
+  # panel instead would satisfy the loop above.
+  expect_error(plot(fit, type = "smooths"), "no smooth terms")
+  expect_error(plot(fit, type = "factors"), "latent dynamic factors")
+  expect_error(plot(fit, type = "latent_state"), "closure-unit family")
 })
 
 cat("\nDone.\n")
