@@ -1,5 +1,4 @@
-# Structure and post-fit coverage for a closure-unit family, fitted
-# in this file.
+# The closure-unit grain, and what happens at its edges.
 #
 # An occupancy model has two grains at once. A closure unit is a
 # (series, time) cell holding one latent state, and a visit is a row
@@ -21,12 +20,16 @@
 #
 # Occasions are numbered from 3, so a rank is never a time.
 #
-# The flocker cross-package comparison lives in
-# `test-occ-flocker-concordance.R`, which is single-season by
-# construction and is not folded in here.
+# Three more fits follow the occupancy one, each answering a
+# question the first cannot. An `nmix()` fit gives the ceiling claim
+# a range to be wrong across, since a population size can sit below
+# an observed count where a boolean occupancy cannot. A pair of occ
+# fits, one complete and one with every sixth visit unmade, say what
+# happens when the repeat-visit arrays and the likelihood disagree
+# about how many rows there are.
 #
 # Run with:
-#   testthat::test_file("tests/local/test-occ-closure-units.R")
+#   testthat::test_file("tests/local/test-closure-units.R")
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)
@@ -479,3 +482,213 @@ test_that("summary and the tidiers name the occupancy structure", {
 
 
 cat("\nDone.\n")
+
+# ----------------------------------------------------------------------
+# An abundance ceiling, and the grid the kernel numbers
+# ----------------------------------------------------------------------
+#
+# `occ()` pins its latent state at one, so the ceiling claim above is
+# about a boolean. `nmix()` estimates a population size, where the
+# same claim has a range to be wrong across: N is the population a
+# binomial count was drawn from, so it can never sit below the
+# largest count seen at that unit. A permuted unit grid puts a small
+# site's ceiling on a large one and breaks it.
+
+nmix_sim <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    set.seed(4242L)
+    n_site <- 12L
+    n_season <- 2L
+    n_visit <- 3L
+    sites <- paste0("s", sprintf("%02d", seq_len(n_site)))
+    # Time-major, so the frame's own unit order interleaves sites
+    # across occasions and differs from sorting by (series, time).
+    # Built site-major the two coincide, and the ordering claim below
+    # cannot fail -- which is what its own guard checks.
+    grid <- expand.grid(
+      visit = seq_len(n_visit), site = sites,
+      season = seq_len(n_season), stringsAsFactors = FALSE
+    )
+    # Abundance varies strongly across sites so the ceiling claim has
+    # room to fail: a grid off by one puts a site of ~2 animals
+    # against a count from a site of ~30.
+    elev <- seq(-1.5, 1.5, length.out = n_site)
+    lambda <- exp(1.4 + 1.3 * elev)
+    # Units run site-fastest within a season, matching the frame's
+    # own row order, so `rep(N_true, each = n_visit)` below lands
+    # each unit's population on its own visits.
+    N_true <- rpois(n_site * n_season, rep(lambda, times = n_season))
+    d <- data.frame(
+      series = factor(grid$site, levels = sites),
+      time = as.integer(grid$season) + 4L,
+      elev = elev[match(grid$site, sites)],
+      y = as.integer(rbinom(nrow(grid), rep(N_true, each = n_visit),
+                            0.65))
+    )
+    # `nmix()` marginalises the latent population up to a ceiling, so
+    # the frame carries one. It sits well above the largest N drawn
+    # here, since a cap that binds would truncate the very quantity
+    # the ceiling claim below is about.
+    d$cap <- as.integer(max(N_true) * 3L)
+    cached <<- list(data = d, n_unit = n_site * n_season,
+                    n_site = n_site, N_true = N_true)
+    cached
+  }
+})
+
+nmix_cache <- cache_path("val_mvgam_closure_nmix_units.rds")
+if (file.exists(nmix_cache)) {
+  nmix_fit <- readRDS(nmix_cache)
+} else {
+  nmix_fit <- with_warnings(mvgam(
+    formula = y ~ elev, family = nmix(), data = nmix_sim()$data,
+    chains = 2L, iter = 1000L, warmup = 500L,
+    silent = 2, backend = "cmdstanr"
+  ))$value
+  saveRDS(nmix_fit, nmix_cache)
+}
+
+
+test_that("no unit is given fewer animals than were counted there", {
+  # N is the population a binomial count is drawn from, so the
+  # posterior for a unit cannot sit below the largest count observed
+  # at that unit. This is the one claim an abundance model makes that
+  # holds whatever the seed or the sampler settings.
+  d <- nmix_sim()$data
+  state <- as.data.frame(hindcast(nmix_fit, type = "latent_state"))
+  observed <- stats::aggregate(y ~ series + time, data = d, FUN = max)
+  merged <- merge(state, observed, by = c("series", "time"))
+  expect_identical(nrow(merged), nrow(state))
+  expect_identical(nrow(merged), nmix_sim()$n_unit)
+  expect_true(all(merged$median >= merged$y))
+  expect_true(all(merged$upper_95 >= merged$y))
+  # The counts have to differ across units, or a single ceiling would
+  # satisfy the comparison everywhere.
+  expect_gt(stats::sd(merged$y), 1)
+})
+
+
+test_that("the unit grid keeps the kernel's own ordering", {
+  # `build_closure_unit_arrays()` numbers units by first appearance
+  # in the time-major frame and the draw matrix columns follow that,
+  # so the grid must not be re-sorted on the way out.
+  #
+  # The defect this guards is a permutation, which `expect_setequal()`
+  # cannot see: both orders hold the same labels. So the check is on
+  # the sequence, and it is paired with a claim that the frame's own
+  # order is not the sorted one -- otherwise the two coincide and the
+  # first check says nothing.
+  d <- nmix_sim()$data
+  state <- as.data.frame(hindcast(nmix_fit, type = "latent_state"))
+  units <- unique(d[, c("series", "time")])
+  expect_identical(nrow(state), nrow(units))
+  expect_identical(paste(state$series, state$time),
+                   paste(units$series, units$time))
+  expect_false(identical(
+    paste(units$series, units$time),
+    paste(units$series, units$time)[order(units$series, units$time)]
+  ))
+})
+
+
+test_that("the abundance ceiling is reported against real labels", {
+  # The same table finding 19 covers for occupancy. Here the ceiling
+  # is an estimated count rather than one, so the label is what tells
+  # a reader which site to revisit.
+  sat <- latent_N_saturation(nmix_fit)
+  expect_identical(nrow(sat), nmix_sim()$n_unit)
+  expect_true(all(sat$K_max >= 1L))
+  labs <- as.character(sat$label)
+  expect_true(any(grepl(levels(nmix_sim()$data$series)[1L], labs,
+                        fixed = TRUE)))
+  expect_false(any(grepl("^[0-9]+_[0-9]+$", labs)))
+})
+
+
+# ----------------------------------------------------------------------
+# Occasions that were never visited
+# ----------------------------------------------------------------------
+#
+# A missing response is a visit that did not happen, which is the
+# normal case in repeat-visit data. These families used to refuse it:
+# the Stan code aggregates visits per unit through `visit_idx` and
+# `n_rep`, both built from the raw frame while brms sized the
+# likelihood to the observed rows, so the indices pointed past the
+# end of the response.
+
+gappy_fits <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    complete <- dat
+    gappy <- complete
+    # Every sixth visit goes unmade, spread across sites rather than
+    # clustered, so no unit loses all of its visits.
+    gappy$y[seq(2L, nrow(gappy), by = 6L)] <- NA_integer_
+    fit_one <- function(d, nm) {
+      path <- cache_path(paste0("val_mvgam_occ_visits_", nm, ".rds"))
+      if (file.exists(path)) return(readRDS(path))
+      # brms reports the rows it dropped, once per internal pass.
+      out <- withCallingHandlers(
+        mvgam(y ~ 1, data = d, family = occ(), chains = 2L,
+              iter = 800L, warmup = 400L, silent = 2, seed = 11L,
+              backend = "cmdstanr"),
+        warning = function(w) {
+          if (grepl("Rows containing NAs", conditionMessage(w))) {
+            invokeRestart("muffleWarning")
+          }
+        }
+      )
+      saveRDS(out, path)
+      out
+    }
+    cached <<- list(complete = fit_one(complete, "complete"),
+                    gappy = fit_one(gappy, "gappy"),
+                    data_gappy = gappy)
+    cached
+  }
+})
+
+
+test_that("the unit arrays cover the visits that happened", {
+  obj <- gappy_fits()
+  sd <- obj$gappy$standata
+  n_obs <- sum(!is.na(obj$data_gappy$y))
+  expect_identical(as.integer(sd$N), n_obs)
+  # Every repeat count adds up to the observed rows, and no index
+  # reaches past the response the likelihood was given.
+  expect_identical(sum(as.integer(sd$n_rep)), n_obs)
+  expect_lte(max(as.integer(sd$visit_idx)), n_obs)
+  expect_setequal(as.integer(sd$visit_idx), seq_len(n_obs))
+  # The unit count is unchanged: a unit that lost a visit is still a
+  # unit, which is the whole point of the padded grid.
+  expect_identical(as.integer(sd$N_unit), n_unit)
+  # And the gaps are real, or this file is testing the complete fit
+  # twice.
+  expect_gt(sum(is.na(obj$data_gappy$y)), 0L)
+  expect_lt(n_obs, nrow(dat))
+})
+
+
+test_that("dropping visits widens the estimate without moving it", {
+  # Fewer detections carry less information about occupancy, so the
+  # gappy fit stays compatible with the complete one rather than
+  # drifting somewhere else.
+  obj <- gappy_fits()
+  full <- as.numeric(as.array(obj$complete, variable = "b_Intercept"))
+  gaps <- as.numeric(as.array(obj$gappy, variable = "b_Intercept"))
+  expect_lte(stats::quantile(gaps, 0.05), stats::median(full))
+  expect_gte(stats::quantile(gaps, 0.95), stats::median(full))
+  # Less data cannot sharpen the estimate.
+  expect_gte(stats::sd(gaps), stats::sd(full) * 0.9)
+
+  # Predictions still cover every row the frame supplies, including
+  # the ones the likelihood never saw.
+  pp <- posterior_predict(obj$gappy, ndraws = 20L)
+  expect_identical(ncol(pp), nrow(obj$data_gappy))
+  gaps_at <- which(is.na(obj$data_gappy$y))
+  expect_true(all(is.finite(pp[, gaps_at])))
+  expect_true(all(as.numeric(pp) %in% c(0, 1)))
+})

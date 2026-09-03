@@ -542,6 +542,14 @@ back and revisit a unit called `12_2`.
 Every other per-unit surface on the same fit is keyed properly, and
 the frame carries both columns the label would need.
 
+Reproduced on `nmix()` as well as `occ()`, so the labelling belongs
+to the table rather than to one family. It matters more for
+abundance: an occupancy ceiling is one and a reader can at least
+tell what saturation means, while an `nmix()` ceiling is an
+estimated population and the label is the only route back to the
+site whose survey effort was insufficient. `test-closure-units.R`
+asserts it for both.
+
 ## Distributional parameters
 
 **20. FIXED. `conditional_effects()` offered no covariate that

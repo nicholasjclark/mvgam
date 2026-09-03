@@ -1,14 +1,20 @@
-# Local fitting tests for the closure-unit family infrastructure.
-# Covers `nmix()` (PB / RN / PPM variants); `occ()` and the simplex
-# multi-response trio are out of scope here. Kept separate from
-# tests/testthat/test-closure-unit-families.R because each block
-# compiles a Stan model and runs short HMC chains; that is too
-# expensive for the CI test suite. The cheap constructor / predicate
-# / source-helper / standata round-trip / how_to_cite coverage
-# stays in tests/testthat/.
+# The three ways `nmix()` can be parameterised.
+#
+# One family, three likelihoods. The Poisson-binomial form draws a
+# population and then a detection per visit; Royle-Nichols works from
+# a per-individual encounter rate and needs only binary detections;
+# the Poisson-Poisson form factors the count into abundance and
+# effort. Each emits different Stan and each has to recover the
+# effect it was given, so the file fits every variant rather than
+# reading one back.
+#
+# The closure-unit grain these share is asserted in
+# `test-closure-units.R`; what is here is what separates the three.
+# The constructor, predicate and standata round-trip run without
+# Stan in tests/testthat/test-closure-unit-families.R.
 #
 # Run with:
-#   Rscript -e "devtools::load_all('.'); testthat::test_file('tests/local/closure_unit_family_fitting.R')"
+#   Rscript -e "devtools::load_all('.'); testthat::test_file('tests/local/test-nmix-variants.R')"
 #
 # Three blocks:
 #   1. PB nmix prediction surface
@@ -168,11 +174,23 @@ test_that("nmix vector-p R-side prediction recovers the detection-covariate effe
   expect_gt(stats::sd(apply(de, 2L, median)), 1e-3)
   # Detection covaries strongly with tod by construction.
   expect_gt(stats::cor(apply(de, 2L, median), d$tod), 0.8)
-  # All five surfaces should run without error.
-  expect_no_error(posterior_epred(fit))
-  expect_no_error(posterior_predict(fit))
-  expect_no_error(log_lik(fit))
-  expect_no_error(predict(fit, type = "latent_state", summary = FALSE))
+  # Running without error says nothing about what came back, so each
+  # is held to its own grain and scale instead. The expectation and
+  # the draws answer per visit, the density and the latent state per
+  # unit, and a count draw is a whole number bounded by the cap.
+  ep <- posterior_epred(fit)
+  expect_identical(ncol(ep), nrow(d))
+  expect_true(all(ep >= 0))
+  pp <- posterior_predict(fit)
+  expect_identical(ncol(pp), nrow(d))
+  expect_true(all(pp == floor(pp)))
+  expect_true(all(pp >= 0 & pp <= max(d$cap)))
+  ll <- log_lik(fit)
+  expect_identical(ncol(ll), n_unit)
+  expect_true(all(is.finite(ll)))
+  ls <- predict(fit, type = "latent_state", summary = FALSE)
+  expect_identical(ncol(ls), n_unit)
+  expect_true(all(ls >= 0))
 })
 
 test_that("nmix smooth-in-p recovers a known non-linear effect", {
