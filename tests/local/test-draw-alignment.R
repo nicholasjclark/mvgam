@@ -16,10 +16,112 @@
 # prediction also produces: subsetting draws may drop rows and reorder
 # them, but it cannot invent a combination that no single draw gives.
 #
+# Four models, because the failure needs somewhere to hide. A trend
+# carrying only fixed effects composes two reads; one carrying a
+# smooth and a random effect composes four, and misaligning any of
+# them stays finite. The ordinal fit adds thresholds, which are read
+# separately again. The plain fit is the one whose latent state can
+# be checked against a window of itself.
+#
 # Run with:
-#   Rscript -e "devtools::load_all('.'); testthat::test_file('tests/local/test-draw-alignment.R')"
+#   testthat::test_file("tests/local/test-draw-alignment.R")
 
-source("setup_tests_local.R")
+suppressMessages({
+  devtools::load_all(".", quiet = TRUE)
+  library(posterior)
+  library(testthat)
+})
+
+cache_path <- function(name) {
+  dir <- if (dir.exists("fixtures")) {
+    "fixtures"
+  } else {
+    file.path("tests", "local", "fixtures")
+  }
+  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
+  file.path(dir, name)
+}
+
+# Fits are cached because every assertion here is about which draws
+# came back, not about what the sampler found, so refitting changes
+# nothing a check reads. Written under a temporary name and moved into
+# place, so an interrupted run cannot leave a truncated file behind.
+fit_cached <- function(name, ...) {
+  # The cache is named for this file rather than shared, so the models
+  # asserted on are the ones built here. A shared name would let a
+  # differently specified fit of the same name answer instead.
+  path <- cache_path(paste0("val_align_", name, ".rds"))
+  if (file.exists(path)) {
+    cat("[cache]", name, "\n")
+    return(readRDS(path))
+  }
+  cat("[fit  ]", name, "\n")
+  fit <- mvgam(
+    ..., chains = 2L, iter = 1000L, warmup = 500L,
+    silent = 2, backend = "cmdstanr"
+  )
+  part <- paste0(path, ".part")
+  saveRDS(fit, part)
+  file.rename(part, path)
+  fit
+}
+
+sim_ar1 <- function(n, ar, sd) {
+  out <- numeric(n)
+  out[1] <- rnorm(1, 0, sd / sqrt(1 - ar^2))
+  for (t in 2:n) out[t] <- ar * out[t - 1] + rnorm(1, 0, sd)
+  out
+}
+
+set.seed(42L)
+n_time <- 30L
+latent <- sim_ar1(n_time, 0.7, 0.5)
+z <- seq(-2, 2, length.out = n_time)
+z_effect <- 0.5 * sin(z * pi)
+dat <- data.frame(
+  y = rpois(n_time, exp(2 + latent + z_effect)),
+  x = rnorm(n_time),
+  z = z,
+  time = seq_len(n_time),
+  series = factor("s1"),
+  grp = factor(rep(letters[1:6], each = 5))
+)
+
+set.seed(456L)
+n_ord <- 30L
+ord_latent <- 1.0 + 0.5 * rnorm(n_ord)
+dat_ord <- data.frame(
+  y = ordered(cut(ord_latent, breaks = c(-Inf, -0.5, 0.5, 1.5, Inf),
+                  labels = c("Low", "Med", "High", "VHigh"))),
+  x = rnorm(n_ord),
+  z = rnorm(n_ord),
+  time = seq_len(n_ord),
+  series = factor("s1")
+)
+
+
+# -- Fits -------------------------------------------------------------
+
+fit_plain <- fit_cached(
+  "ar1_fx", formula = y ~ 1 + x, trend_formula = ~ AR(p = 1),
+  data = dat, family = poisson()
+)
+fit_trend <- fit_cached(
+  "ar1_fx_trend", formula = y ~ 1, trend_formula = ~ x + AR(p = 1),
+  data = dat, family = poisson()
+)
+fit_re_smooth <- fit_cached(
+  "ar1_re_smooth_trend", formula = y ~ 1,
+  trend_formula = ~ x + (1 | grp) + s(z) + AR(p = 1),
+  data = dat, family = poisson()
+)
+fit_ord <- fit_cached(
+  "cumulative_fx", formula = y ~ 1 + x + z, trend_formula = ~ ZMVN(),
+  data = dat_ord, family = cumulative()
+)
+
+# The alignment claims need more draws than the indices they name.
+stopifnot(ndraws(fit_plain) >= 300L, ndraws(fit_trend) >= 300L)
 
 
 # Rows as comparable keys. Rounding guards against a last-bit
@@ -28,13 +130,9 @@ draw_rows <- function(x) {
   unname(apply(round(as.matrix(x), 10), 1, paste, collapse = "|"))
 }
 
-trend_fixtures <- c("val_mvgam_ar1_fx_trend",
-                    "val_mvgam_ar1_re_smooth_trend")
-
 
 test_that("a subsampled linear predictor pairs its own trend", {
-  for (nm in trend_fixtures) {
-    fit <- readRDS(file.path("fixtures", paste0(nm, ".rds")))
+  for (fit in list(fit_trend, fit_re_smooth)) {
     total <- ndraws(fit)
     # The reference: every draw, named explicitly, so each row is the
     # observation predictor and the trend predictor of one iteration.
@@ -60,7 +158,7 @@ test_that("a subsampled linear predictor pairs its own trend", {
 
 
 test_that("a count and the indices it stands for agree", {
-  fit <- readRDS(file.path("fixtures", "val_mvgam_ar1_fx_trend.rds"))
+  fit <- fit_trend
   ids <- c(3L, 11L, 47L, 300L)
   by_ids <- posterior_linpred(fit, draw_ids = ids, process_error = FALSE)
   expect_equal(nrow(by_ids), length(ids))
@@ -84,7 +182,7 @@ test_that("a count and the indices it stands for agree", {
 
 
 test_that("ordinal thresholds follow the draws of their predictor", {
-  fit <- readRDS(file.path("fixtures", "val_mvgam_cumulative_fx.rds"))
+  fit <- fit_ord
   draws <- posterior::as_draws_matrix(fit$fit)
   ids <- c(2L, 9L, 40L)
   thres <- mvgam:::extract_ordinal_thresholds(
@@ -119,7 +217,7 @@ test_that("a scored row reads the state of its own time", {
   # state of the earlier half, with the right shape and no warning.
   # Scoring a window has to agree with scoring everything and keeping
   # that window's columns.
-  fit <- readRDS(file.path("fixtures", "val_mvgam_ar1_fx.rds"))
+  fit <- fit_plain
   n <- nrow(fit$data)
   window <- seq.int(n - 9L, n)
   full <- log_lik(fit)
@@ -138,7 +236,7 @@ test_that("the trend's innovations are composed once", {
   # process variance. Drawn from one seed, the expectation has to be
   # exactly the inverse link of the predictor: a second draw anywhere
   # in the chain breaks the identity.
-  fit <- readRDS(file.path("fixtures", "val_mvgam_ar1_fx.rds"))
+  fit <- fit_plain
   set.seed(99L)
   ep <- posterior_epred(fit)
   set.seed(99L)
@@ -156,7 +254,7 @@ test_that("only a sampled trend makes a prediction differ across calls", {
   # deterministic submodel, so it repeats too. Drawing innovations is
   # what makes an answer vary, and is the documented reason a seed is
   # needed for a reproducible one.
-  fit <- readRDS(file.path("fixtures", "val_mvgam_ar1_fx.rds"))
+  fit <- fit_plain
   expect_equal(
     posterior_epred(fit, incl_autocor = TRUE),
     posterior_epred(fit, incl_autocor = TRUE)
@@ -171,3 +269,6 @@ test_that("only a sampled trend makes a prediction differ across calls", {
     posterior_epred(fit, incl_autocor = FALSE, process_error = TRUE)
   )))
 })
+
+
+cat("\nDone.\n")

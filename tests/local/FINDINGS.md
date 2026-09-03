@@ -514,10 +514,105 @@ back and revisit a unit called `12_2`.
 Every other per-unit surface on the same fit is keyed properly, and
 the frame carries both columns the label would need.
 
+## Distributional parameters
+
+**20. FIXED. `conditional_effects()` offered no covariate that
+belonged to a distributional parameter.**
+
+`detect_conditional_effects()` reached into `$pforms`, where a
+parameter's own formula lives, only when the model was non-linear. A
+distributional model puts one there too, so on
+`bf(y ~ x, hu ~ z)` the default term list was
+`x` alone and `z` appeared nowhere. What a user saw was a plot of the
+mean's covariate with no sign that a second covariate existed.
+Naming it as `effects = "z"` worked throughout, so the panel was
+never unreachable, only never offered.
+
+brms builds its default list from the whole formula:
+`get_all_effects(brmsterms(bf(y ~ x, hu ~ z, hurdle_poisson())))`
+returns `x` and `z`. mvgam now returns that same pair. Terms come
+from `$pforms` in either case, and parameter names are pruned from
+the result only when the model is non-linear, since the RHS above
+them then holds names rather than data. The multivariate branch took
+the same fix, because a response may carry a formula of its own.
+
+`test-mixture-family-density.R` covers it, and checks the panel
+against `posterior_epred()` at the same grid point rather than
+against its shape, so a panel drawn on the wrong predictor fails
+instead of merely looking odd.
+
+
+## Residuals
+
+**21. A continuous family's quantile residuals carry no posterior
+spread.**
+
+`residuals()` defaults to `type = "quantile"`. For the families with
+an analytic CDF -- gaussian, student, lognormal, Gamma, beta --
+`quantile_family_specs` evaluates it per draw, so the residual moves
+with the draw's own parameters. Every other family falls through to
+`compute_quantile_residuals_empirical()`, which pools `yrep` over all
+draws to form one `lower`/`upper` per observation and then, where the
+two coincide, repeats `qnorm(lower[i])` across every row.
+
+For a continuous response there are no ties, so they always coincide.
+On the tweedie fit 54 of 60 columns come back constant: the 6 that
+vary are the zero rows, where the atom creates ties. `Est.Error` is
+then 0 and `Q2.5 == Estimate == Q97.5` for nine observations in ten.
+`type = "ordinary"` is unaffected (0 of 60), as are hurdle and
+zero-inflated Poisson (0 of 80), whose discreteness supplies ties.
+
+The DHARMa formulation is behaving as written, since an empirical PIT
+is one number for each observation. But the roxygen promises that the
+matrix returned for each draw "carries the full posterior uncertainty
+in the residual distribution", and it is the documented input to
+`DHARMa::createDHARMa()`. Either the analytic path grows a tweedie
+entry, or the documentation says which families get spread. That is a
+choice about what the residual means, so it is recorded rather than
+taken.
+
+`test-tweedie-family.R` now asserts the documented behaviour and
+fails on it, so the sweep reports it rather than leaving it in this
+file alone. The companion assertion on `type = "ordinary"` passes,
+which places the fault in the quantile path and not in the fit.
+
+## pp_check diagnostics
+
+**24. `resid_vs_fitted` plots a conditional residual against a
+marginal fitted value.**
+
+The two axes of the panel come from different surfaces, and each
+matches its own exactly. On a poisson AR(1) fit, `draw_ids = 1:50`:
+
+| axis | is | error | other surface |
+|---|---|---|---|
+| `resids` | median of conditional residual draws | 0 | 7.97 |
+| `preds` | median of marginal `posterior_epred` | 0 | 33.36 |
+
+`pp_check()` replaces a `NULL` `newdata` with
+`mvgam_training_data(object)` early on. `diagnostic_surface_args()`
+adds `incl_autocor = TRUE` only when `newdata` is `NULL`. By the time
+the fitted values are drawn, a call on the training data therefore
+looks like a call on new data, and `posterior_epred()` keeps its own
+default of `FALSE`. The residual draws are built before that and stay
+conditional. The comment above the call says the fitted values "name
+their surface through the same helper the residuals above them used,
+so one panel plots one picture of the fit"; they do not.
+
+What it costs is the plot. The fitted axis spans 7.44 to 10.52 while
+the outcome spans 0 to 48 and the conditional fitted values span 1.83
+to 42.97. The panel is read for structure across the range of
+the fit, and every point is compressed into a band that sits nowhere
+near where the model predicts. `mvgam_resid_panel()` shows the same
+axis, since it calls this type.
+
+Covered in `test-pp-check-resids.R`, which asserts the two axes read
+one surface and fails on it.
+
 ## Gaps closed rather than found
 
 Two things the plan names as untested now have coverage, and the
-package passes both.
+package passes both. Three families that had none now have it too.
 
 The axis record carries the user's own time values rather than their
 ranks. `test-by-lv-axis-cached-fits.R` numbers its occasions from 3 and
@@ -533,6 +628,21 @@ posterior in hand. `axis_row_series()`,
 they are given include a shuffled copy of the training data and one
 naming a species the model never had. Two more probe the horizon: one
 reaching past the training grid, one wholly inside it.
+
+Tweedie is now fitted. It was the only exported family nothing in
+`tests/local` ever fitted, and the only one carrying its own Stan
+functions through `attr(family, "mvgam_stanvars")`.
+`test-tweedie-family.R` reaches `P(Y = 0) = exp(-mu^(2-p)/(phi(2-p)))`
+three ways -- the closed form, `exp(log_lik())` at the zero rows, and
+the fraction of zeros among the draws -- and all three agree, the
+first two exactly. Checking the density itself would have been
+circular, since mvgam's post-fit `log_lik` calls `mgcv::ldTweedie`.
+The prefit carries `M` as data, so `standata()$M` is 30 or 40 as
+asked while the code is byte-identical.
+
+Hurdle and zero-inflated Poisson are covered the same way, each
+against its own closed form and against the other's, so neither
+mixture can stand in for the other.
 
 ## Test defects fixed along the way
 

@@ -404,8 +404,16 @@ detect_conditional_effects <- function(x) {
   # the user might want to plot ends up in the term list.
   if (inherits(x$formula, "mvbrmsformula")) {
     per_resp <- lapply(x$formula$forms, function(bf) {
-      attr(stats::terms(bf$formula, keep.order = TRUE),
-           "term.labels")
+      # A response may carry distributional or non-linear
+      # sub-formulas of its own, whose covariates appear in no
+      # RHS above them.
+      c(
+        attr(stats::terms(bf$formula, keep.order = TRUE),
+             "term.labels"),
+        unlist(lapply(bf$pforms %||% list(), function(pf) {
+          attr(stats::terms(pf, keep.order = TRUE), "term.labels")
+        }), use.names = FALSE)
+      )
     })
     termlabs <- unique(unlist(per_resp, use.names = FALSE))
     if (!is.null(x$trend_formula)) {
@@ -424,27 +432,36 @@ detect_conditional_effects <- function(x) {
   } else {
     x$formula
   }
-  # Reason: for non-linear formulas (bf(..., nl = TRUE)) the
-  # top-level RHS only enumerates nlpar names (e.g. `a + b * env`),
-  # not the user-relevant covariates. The actual fixed-effect terms
-  # live in the per-nlpar sub-formulas under `$pforms`. Collect
-  # term labels from each sub-formula's RHS so callers see env,
-  # trait1 etc. instead of just `a` and `b`.
+  # Reason: `$pforms` holds the sub-formula of every parameter the
+  # user gave one, and its covariates never appear in the top-level
+  # RHS. That covers two cases. For `bf(..., nl = TRUE)` the RHS
+  # enumerates nlpar names (`a + b * env`) rather than covariates,
+  # so env and trait1 are only reachable through the sub-formulas.
+  # For a distributional model such as `bf(y ~ x, hu ~ z)` the RHS
+  # is the mean's own covariates, and z is reachable nowhere else.
+  # Both are collected, so the default term list matches the one
+  # brms builds from the whole formula.
   is_nl <- isTRUE(attr(obs_f, "nl"))
-  nlpar_names <- if (is_nl && inherits(x$formula, "brmsformula")) {
-    names(x$formula$pforms %||% list())
+  pforms <- if (inherits(x$formula, "brmsformula")) {
+    x$formula$pforms %||% list()
   } else {
-    character(0L)
+    list()
   }
-  termlabs <- if (length(nlpar_names) > 0L) {
-    nlpar_terms <- unlist(lapply(x$formula$pforms, function(pf) {
-      attr(stats::terms(pf, keep.order = TRUE), "term.labels")
-    }), use.names = FALSE)
-    top <- attr(stats::terms(obs_f, keep.order = TRUE), "term.labels")
-    c(nlpar_terms, top)
-  } else {
-    attr(stats::terms(obs_f, keep.order = TRUE), "term.labels")
-  }
+  # Only a non-linear RHS carries parameter names as terms, so only
+  # there do they have to be pruned from the result below.
+  nlpar_names <- if (is_nl) names(pforms) else character(0L)
+  pform_terms <- unlist(lapply(pforms, function(pf) {
+    attr(stats::terms(pf, keep.order = TRUE), "term.labels")
+  }), use.names = FALSE)
+  top <- attr(stats::terms(obs_f, keep.order = TRUE), "term.labels")
+  # brms builds its list the same way round in both cases:
+  # `get_all_effects.brmsterms` walks `dpars` before `nlpars`, so a
+  # non-linear fit leads with the covariates of the top-level RHS and
+  # a distributional fit with the mean's. Measured on
+  # `bf(y ~ a + bb * env, a ~ trait1, bb ~ 1, nl = TRUE)` brms returns
+  # `env` then `trait1`. The parameter names the RHS carries are
+  # pruned below, so leading with it costs nothing.
+  termlabs <- c(top, pform_terms)
   if (!is.null(x$trend_formula)) {
     termlabs <- c(
       termlabs,
@@ -490,8 +507,18 @@ split_term_labels <- function(lab) {
   if (grepl(":", lab, fixed = TRUE)) {
     return(list(strsplit(lab, ":", fixed = TRUE)[[1L]]))
   }
-  if (grepl("*", lab, fixed = TRUE)) {
-    return(list(strsplit(lab, "*", fixed = TRUE)[[1L]]))
+  # A `*` reaching here is part of an expression, not a separator
+  # between two effects. `terms()` expands a genuine `a * b` into its
+  # main effects and `a:b` before this is called, so the only labels
+  # still carrying one are calls such as `exp(b2 * x)`, which name a
+  # single covariate. Splitting those on the text gave `exp(b2 ` and
+  # ` x)`, neither of which is a column, so the term was dropped and
+  # the model offered no effects at all. Anything that parses falls
+  # through to `all.vars()` below, which reads `x` out of the call.
+  expr <- tryCatch(rlang::parse_expr(lab), error = function(e) NULL)
+  if (!is.null(expr) && is.call(expr) &&
+      identical(expr[[1L]], as.name("*"))) {
+    return(list(vapply(as.list(expr)[-1L], deparse, character(1L))))
   }
   smooth_starts <- c("s(", "te(", "t2(", "ti(", "gp(", "mo(")
   if (any(vapply(smooth_starts, grepl, FUN.VALUE = logical(1L),
