@@ -705,3 +705,219 @@ test_that("the plots and conditional effects render for CAR", {
 })
 
 cat("\nDone.\n")
+
+# ----------------------------------------------------------------------
+# The trend that must ignore the gaps
+# ----------------------------------------------------------------------
+#
+# `ZMVN()` is the other side of the claim this file opens with. It is
+# `MVN(0, Sigma)` with the covariance indexed by series alone, so the
+# spacing of the occasions never enters the likelihood at all. That is
+# why its `requires_regular_intervals` rule was dropped, and it makes
+# the pair worth keeping together: on one irregular grid, `CAR()` has
+# to read the gaps and `ZMVN()` has to be unmoved by them.
+#
+# The file this replaces drove the same fit through fourteen post-fit
+# calls behind a printer that emitted `[OK]` beside whatever it was
+# handed. Two of those calls were wrapped in `tryCatch`, so an error
+# printed as `[OK] plot(type = 'smooths') : ERROR: <message>`, and the
+# file closed with "All downstream helpers OK" whatever had happened.
+# It also printed the recovered and true correlation matrices side by
+# side under the heading "sanity, not strict" and compared nothing.
+
+zmvn_sim <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    set.seed(2026L)
+    n_series <- 3L
+    series_names <- paste0("s", seq_len(n_series))
+    # Drop 3, 7 and 11 from 1:15, giving gaps of 1 and 2.
+    unique_times <- setdiff(seq_len(15L), c(3L, 7L, 11L))
+    Sigma_true <- matrix(c(
+      1.0, 0.6, -0.3,
+      0.6, 1.0, 0.2,
+      -0.3, 0.2, 1.0
+    ), nrow = 3L, byrow = TRUE)
+    L_true <- chol(Sigma_true)
+
+    rows <- list()
+    for (t in unique_times) {
+      eta <- t(L_true) %*% rnorm(n_series)
+      for (s in seq_len(n_series)) {
+        rows[[length(rows) + 1L]] <- data.frame(
+          series = series_names[s], time = t,
+          y = 0.5 + eta[s] + rnorm(1L, sd = 0.4)
+        )
+      }
+    }
+    d <- do.call(rbind, rows)
+    d$series <- factor(d$series, levels = series_names)
+    cached <<- list(
+      data = d, n_series = n_series, series_names = series_names,
+      unique_times = unique_times, Sigma_true = Sigma_true,
+      cor_true = stats::cov2cor(Sigma_true)
+    )
+    cached
+  }
+})
+
+zmvn_fit <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    path <- cache_path("val_mvgam_zmvn_irregular.rds")
+    if (file.exists(path)) {
+      cached <<- readRDS(path)
+      return(cached)
+    }
+    cached <<- mvgam(
+      formula = y ~ 1, trend_formula = ~ ZMVN(cor = TRUE),
+      data = zmvn_sim()$data, family = gaussian(),
+      chains = 2L, burnin = 300L, samples = 300L,
+      silent = 2, refresh = 0
+    )
+    saveRDS(cached, path)
+    cached
+  }
+})
+
+
+test_that("ZMVN accepts the grid CAR needs the gaps of", {
+  sim <- zmvn_sim()
+  # The grid is irregular, or this file is testing a regular one
+  # twice.
+  gaps <- diff(sort(sim$unique_times))
+  expect_gt(length(unique(gaps)), 1L)
+  fit <- zmvn_fit()
+  expect_s3_class(fit, "mvgam")
+  # The occasions the fit kept are the ones the frame supplied, in
+  # their own values rather than their ranks.
+  expect_identical(
+    as.integer(mvgam:::mvgam_axes(fit)$time$values),
+    as.integer(sim$unique_times)
+  )
+})
+
+
+test_that("ZMVN recovers the cross-series correlation", {
+  # The headline surface for this trend, printed beside the truth in
+  # the file this replaces and never compared to it. Recovering the
+  # off-diagonals as a set is not enough on its own, so the labelled
+  # ordering is checked with it: a permuted axis leaves the same
+  # three numbers in a different arrangement.
+  sim <- zmvn_sim()
+  rc <- residual_cor(zmvn_fit())
+  expect_identical(rownames(rc$cor), sim$series_names)
+  expect_identical(colnames(rc$cor), sim$series_names)
+  expect_equal(unname(diag(rc$cor)), rep(1, sim$n_series))
+
+  off <- upper.tri(rc$cor)
+  # Three series give three off-diagonals, and a correlation between
+  # three numbers carries almost no information: measured here, the
+  # correct ordering scores 0.38 against the truth while permuting
+  # the axis scores 0.61. A threshold on that statistic would have
+  # preferred the wrong answer, so it is not the claim.
+  #
+  # What does separate them is the sign of each pair. The simulation
+  # runs -0.3, 0.2 and 0.6, so one pair is negative and two are
+  # positive; the fit reproduces that pattern and a permuted axis
+  # does not.
+  expect_identical(sign(rc$cor[off]) > 0, sim$cor_true[off] > 0)
+  for (perm in list(c(2L, 3L, 1L), c(3L, 1L, 2L))) {
+    shuffled <- rc$cor[perm, perm]
+    expect_false(identical(sign(shuffled[off]) > 0,
+                           sim$cor_true[off] > 0))
+  }
+  # Twelve occasions over three series is too little to pin the
+  # magnitudes, so they are bounded rather than matched: every entry
+  # stays a correlation and the matrix is not the identity.
+  expect_true(all(rc$cor[off] > -1 & rc$cor[off] < 1))
+  expect_gt(max(abs(rc$cor[off])), 0.05)
+})
+
+
+test_that("every post-fit method answers on the irregular ZMVN fit", {
+  fit <- zmvn_fit()
+  sim <- zmvn_sim()
+  n_obs <- nrow(sim$data)
+  n_time <- length(sim$unique_times)
+
+  txt <- capture.output(summary(fit))
+  expect_true(any(grepl(paste0("Series:\\s*", sim$n_series), txt)))
+  expect_gt(length(capture.output(print(fit))), 5L)
+
+  ep <- posterior_epred(fit, draw_ids = 1:30)
+  pp <- posterior_predict(fit, draw_ids = 1:30)
+  expect_identical(dim(ep), c(30L, n_obs))
+  expect_identical(dim(pp), c(30L, n_obs))
+  expect_true(all(is.finite(ep)))
+  # A gaussian draw is wider than its own expectation.
+  expect_gt(stats::sd(as.numeric(pp)), stats::sd(as.numeric(ep)))
+
+  expect_identical(nrow(predict(fit, type = "link",
+                                summary = FALSE)),
+                   as.integer(ndraws(fit)))
+  ll <- log_lik(fit, draw_ids = 1:30)
+  expect_identical(dim(ll), c(30L, n_obs))
+  expect_true(all(is.finite(ll)))
+
+  seen <- character(0)
+  ic <- withCallingHandlers(loo(fit), warning = function(w) {
+    seen <<- c(seen, conditionMessage(w))
+    invokeRestart("muffleWarning")
+  })
+  expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
+  expect_true(all(grepl("Pareto", seen)))
+
+  # A hindcast covers the occasions the frame supplied, per series.
+  hc <- hindcast(fit)
+  expect_identical(names(hc$hindcasts), sim$series_names)
+  for (s in sim$series_names) {
+    expect_identical(ncol(hc$hindcasts[[s]]), n_time)
+  }
+
+  rs <- residuals(fit)
+  expect_identical(nrow(rs), n_obs)
+  aug <- augment(fit)
+  expect_identical(nrow(aug), n_obs)
+  expect_equal(as.numeric(aug$.observed), as.numeric(sim$data$y))
+  expect_identical(nrow(glance(fit)), 1L)
+  expect_gt(nrow(tidy(fit)), 0L)
+})
+
+
+test_that("the ZMVN panels draw the occasions the frame supplied", {
+  # `plot(type = "smooths")` was one of the two calls the replaced
+  # file wrapped in `tryCatch`, so an error there printed as an
+  # `[OK]` line. This fit carries no smooth, which makes the refusal
+  # the contract rather than a failure, and it has to be a refusal
+  # rather than an empty panel.
+  fit <- zmvn_fit()
+  sim <- zmvn_sim()
+  rng <- range(sim$unique_times)
+  for (ty in c("trend", "series")) {
+    p <- plot(fit, type = ty)
+    expect_s3_class(p, "ggplot")
+    xs <- unlist(lapply(
+      ggplot2::ggplot_build(p)$data,
+      function(l) if ("x" %in% names(l)) l$x else NULL
+    ))
+    xs <- xs[is.finite(xs)]
+    expect_gt(length(xs), 0L)
+    expect_equal(range(xs), as.numeric(rng))
+  }
+  expect_error(plot(fit, type = "smooths"), "no smooth terms")
+
+  pc <- pp_check(fit, ndraws = 30L)
+  expect_s3_class(pc, "ggplot")
+  expect_gt(sum(vapply(ggplot2::ggplot_build(pc)$data, nrow,
+                       integer(1L))), 0L)
+
+  # The observation formula names no predictor, so there is nothing
+  # to condition on and the answer is no effects rather than an
+  # empty panel.
+  ce <- conditional_effects(fit)
+  expect_s3_class(ce, "mvgam_conditional_effects")
+  expect_length(ce, 0L)
+})

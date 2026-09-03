@@ -385,29 +385,27 @@ if (!run_recov) {
 
 # ----- Heaps-prior emission audit (each fit) ------------------------
 
-audit_heaps_emission <- function(fit, label) {
-  sc <- as.character(fit$stancode)
-  ok <- list(
-    theta_features    = grepl("theta_features", sc),
-    theta_dist_phylo  = grepl("theta_dist_phylo", sc),
-    gp_exp_cov        = grepl("gp_exponential_cov", sc, fixed = TRUE),
-    multi_normal_chol = grepl("multi_normal_cholesky", sc, fixed = TRUE),
-    row_features      = "row_features" %in% names(fit$standata),
-    dist_phylo        = "dist_phylo" %in% names(fit$standata)
-  )
-  cat(sprintf("\n[Heaps emission audit: %s]\n", label))
-  for (nm in names(ok)) {
-    cat(sprintf("  %-18s : %s\n", nm,
-                if (isTRUE(ok[[nm]])) "OK" else "MISSING"))
+test_that("the Heaps kernel reaches the occupancy program", {
+  # Only the single-season `occ()` branch carries the trait and
+  # phylo prior; the other two use the default iid prior on `Z` to
+  # keep warmup tractable, so the emission is asked of that one.
+  #
+  # This replaces a printer that walked the same six checks and put
+  # "OK" or "MISSING" beside each, returning the verdict invisibly
+  # to nobody.
+  sc <- as.character(fit_occ$stancode)
+  for (piece in c("theta_features", "theta_dist_phylo",
+                  "gp_exponential_cov", "multi_normal_cholesky")) {
+    expect_match(sc, piece, fixed = TRUE)
   }
-  invisible(all(unlist(ok)))
-}
+  sd <- fit_occ$standata
+  expect_true("row_features" %in% names(sd))
+  expect_true("dist_phylo" %in% names(sd))
+  # The distance matrix has to carry structure rather than be
+  # present and flat, which would leave the kernel doing nothing.
+  expect_gt(stats::sd(as.numeric(sd$dist_phylo)), 0)
+})
 
-# Only the occ() single-season branch carries the Heaps trait +
-# phylo prior. nmix() and the multi-season occ() use the default
-# iid Z prior to keep Stan warmup tractable (see fit-block comments
-# above), so the audit only runs against fit_occ.
-audit_heaps_emission(fit_occ, "occ() single-season")
 
 # ----- Nonlinear env recovery via conditional_smooths ---------------
 
@@ -436,8 +434,6 @@ recover_env_smooth <- function(fit, label, out_png) {
   cat(sprintf("  cor(truth_centred, posterior_centred) = %.4f\n",
               r_corr))
   cat(sprintf("  RMSE on logit scale                   = %.4f\n", rmse))
-  cat(sprintf("  PASS (cor > 0.90): %s\n",
-              isTRUE(r_corr > 0.90)))
   pl <- ggplot(d, aes(x = env, y = estimate__)) +
     geom_ribbon(aes(ymin = lower__, ymax = upper__),
                 fill = "steelblue", alpha = 0.25) +
@@ -455,7 +451,8 @@ recover_env_smooth <- function(fit, label, out_png) {
     theme_minimal()
   ggsave(out_png, pl, width = 6, height = 4, dpi = 100)
   cat(sprintf("  Saved plot: %s\n", out_png))
-  invisible(list(cor = r_corr, rmse = rmse))
+  invisible(list(cor = r_corr, rmse = rmse,
+                 sd_estimate = stats::sd(d$estimate__)))
 }
 
 cat("\n\n========== Nonlinear env recovery ==========\n")
@@ -471,6 +468,40 @@ r_ms <- recover_env_smooth(
   fit_ms,   "occ(multi_season = TRUE)",
   "/tmp/heaps_nonlinear_env_multi.png"
 )
+
+recovered <- list("occ" = r_occ, "nmix" = r_nmix,
+                  "occ_multi_season" = r_ms)
+
+
+test_that("every closure shape recovers the simulated env curve", {
+  # An empty list would make the loop below iterate zero times and
+  # pass, so the count is stated first.
+  expect_length(recovered, 3L)
+  # `f_true(env) = 1.5 * sin(2 * env)` has a trough and a peak, so a
+  # linear approximation cannot reach it and the smooth has
+  # something real to find. The threshold this file printed as a
+  # PASS line is now the claim: a correlation of 0.90 between the
+  # centred truth and the centred posterior curve.
+  for (nm in names(recovered)) {
+    got <- recovered[[nm]]
+    expect_false(is.null(got))
+    expect_gt(got$cor, 0.90)
+    # A curve that tracked the shape while sitting at the wrong
+    # amplitude has a high correlation and a large error, so the
+    # error is bounded too.
+    expect_lt(got$rmse, 1.5)
+  }
+})
+
+
+test_that("the recovered curve is not flat on any of the three", {
+  # A correlation is undefined against a constant, so a curve that
+  # collapsed would come back `NA` rather than failing the
+  # threshold above. Each has to move.
+  for (nm in names(recovered)) {
+    expect_gt(recovered[[nm]]$sd_estimate, 1e-8)
+  }
+})
 
 cat("\nSummary table:\n")
 tab <- data.frame(
