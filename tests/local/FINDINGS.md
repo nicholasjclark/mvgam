@@ -645,6 +645,41 @@ until the axis carries the times it was given. The failure was
 invisible before because the bundles were cached from a run that
 predates it, so `forecast()` was never called again.
 
+## Leave-future-out cross-validation
+
+**26. `lfo_cv()` cannot compute a forecast-based score.**
+
+`score = "elpd"` runs; `score = "crps"` errors, alone or beside
+`elpd`, on the same fit and the same window:
+
+```
+'newdata' must continue the training series for a 'AR' trend.
+Series 'series_1' was observed to time 30, so the next 1 times are
+31 to 31; got 32 to 32.
+```
+
+The elpd path reads the density directly, while a proper score needs
+a forecast, and the frame `scores_at_window()` builds for it starts
+one occasion late. The refusal it trips is the one added for users
+who hand `forecast()` a gapped frame, so the guard is working and the
+caller is at fault. Reproduced at `min_t = 30` on a Poisson AR(1) and
+at `min_t = 28` on a two-series AR(2), skipping one occasion each
+time.
+
+Every documented multi-score example is therefore unavailable, and
+`elpd` is the only rule `lfo_cv()` can currently report.
+
+**27. The threshold `lfo_cv()` reports is not the one it used.**
+
+`mvgam_lfo` carries both `pareto_k_threshold` and
+`pareto_k_threshold_used`. The first is `NULL`; the second held
+0.6970642 on a 800-draw fit, a threshold that moves with the number
+of draws rather than the nominal 0.7. The field a reader reaches for
+is the empty one, and `summary()` reports the run from the other.
+
+Both are covered in `test-forecast-recovery.R`, which asserts the
+documented behaviour and fails on it.
+
 ## Gaps closed rather than found
 
 Two things the plan names as untested now have coverage, and the

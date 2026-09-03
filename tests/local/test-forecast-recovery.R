@@ -17,6 +17,12 @@
 #   3. Scoring API parity: `score(fc, "crps")` against a direct call
 #      to the kernel underneath it.
 #
+#   4. Leave-future-out cross-validation, which is the same question
+#      asked one occasion at a time: refit up to `min_t`, score the
+#      next `fc_horizon`, and let PSIS carry the fit forward until
+#      the importance ratios say it cannot. It lives here because
+#      what it produces is a forecast score.
+#
 # Two things changed from the version this replaces.
 #
 # Every fit ran as `SM(SW(do.call(mvgam, ...)))`, so a warning from
@@ -669,6 +675,290 @@ test_that("Energy and variogram score the ZMVN forecast", {
     expect_true(all(is.finite(sc$all_series$score)))
     expect_true(all(sc$all_series$score >= 0))
   }
+})
+
+
+# ================================================================
+# Leave-future-out cross-validation
+# ================================================================
+#
+# `lfo_cv()` walks the training grid forward, scoring each held-out
+# occasion against a fit that has seen only what precedes it, and
+# refitting when the PSIS importance ratios degrade past
+# `pareto_k_threshold`. These tests came from a separate file that
+# built its own fits under `fixtures/lfo_cv/` and suppressed their
+# messages; the fits are kept there, and their warnings are now
+# collected into the same record the rest of this file asserts on.
+
+LFO_DIR <- file.path(dirname(CACHE_DIR), "lfo_cv")
+if (!dir.exists(LFO_DIR)) dir.create(LFO_DIR, recursive = TRUE)
+
+# A bare fit rather than a sim/fit/forecast bundle, since `lfo_cv()`
+# does its own forecasting. Cached with the warnings it raised, so a
+# stored fit can still say whether it was clean.
+cached_lfo_fit <- function(name, build_fn) {
+  path <- file.path(LFO_DIR, paste0(name, ".rds"))
+  if (file.exists(path)) {
+    cached <- readRDS(path)
+    if (!is.null(cached$warnings)) {
+      assign(paste0("lfo_", name), cached$warnings, envir = built)
+      return(cached$fit)
+    }
+  }
+  seen <- character(0)
+  fit <- withCallingHandlers(build_fn(), warning = function(w) {
+    seen <<- c(seen, conditionMessage(w))
+    invokeRestart("muffleWarning")
+  })
+  if (!inherits(fit, "mvgam")) {
+    stop(insight::format_error(c(
+      paste0("Cache build for '", name, "' did not produce a fit."),
+      i = "Investigate the build function before rerunning."
+    )))
+  }
+  out <- list(fit = fit, warnings = seen)
+  part <- paste0(path, ".part")
+  saveRDS(out, part)
+  file.rename(part, path)
+  assign(paste0("lfo_", name), seen, envir = built)
+  fit
+}
+
+lfo_ar1_poisson <- function() {
+  cached_lfo_fit("ar1_poisson_n40", function() {
+    sim <- sim_mvgam(
+      n_timepoints = 40L, n_series = 1L, trend_model = AR(p = 1L),
+      family = poisson(), proportional_train = 1.0,
+      seed = 20260605L
+    )
+    suppressMessages(mvgam(
+      formula = y ~ 1 + x, trend_formula = ~ AR(p = 1L),
+      data = sim$data_train, family = poisson(),
+      chains = 2L, parallel_chains = 2L,
+      iter_warmup = 400L, iter_sampling = 400L,
+      silent = 2L, refresh = 0L
+    ))
+  })
+}
+
+
+test_that("lfo_cv walks the grid it says it walks", {
+  fit <- lfo_ar1_poisson()
+  out <- suppressMessages(lfo_cv(fit, min_t = 30L, fc_horizon = 1L,
+                                 score = "elpd", silent = 2L))
+  expect_s3_class(out, "mvgam_lfo")
+  expect_identical(out$fc_horizon, 1L)
+  # FAILS TODAY -- finding 27. The object carries both
+  # `pareto_k_threshold` and `pareto_k_threshold_used`; the first is
+  # NULL and the second holds the value actually applied (0.697 on
+  # this run, a draw-dependent threshold rather than the nominal
+  # 0.7). The documented field is the empty one.
+  expect_false(is.null(out$pareto_k_threshold))
+  expect_equal(out$pareto_k_threshold, out$pareto_k_threshold_used)
+  # The evaluation grid is every occasion after `min_t`, named by
+  # its own time rather than its position.
+  expect_identical(length(out$eval_timepoints), 10L)
+  expect_identical(out$eval_timepoints, 31:40)
+  expect_identical(out$refits_at[1L], 30L)
+  expect_true(all(is.finite(out$elpds)))
+  expect_equal(out$sum_ELPD, sum(out$elpds))
+  # The first evaluation always follows a refit, since that is the
+  # fit at `min_t` itself.
+  expect_true(out$refit_triggered[1L])
+  expect_identical(length(out$refit_triggered),
+                   length(out$eval_timepoints))
+  # A refit at time t is what serves the evaluation at t + 1, so
+  # the two accounts of the same event have to line up that way.
+  # Measured here: refits at 30 and 36, evaluations marked at 31
+  # and 37.
+  expect_setequal(out$eval_timepoints[out$refit_triggered],
+                  out$refits_at + 1L)
+})
+
+
+test_that("the lfo summary tabulates the run it came from", {
+  fit <- lfo_ar1_poisson()
+  out <- suppressMessages(lfo_cv(fit, min_t = 30L, fc_horizon = 1L,
+                                 score = "elpd", silent = 2L))
+  tib <- summary(out)
+  expect_s3_class(tib, "tbl_df")
+  expect_identical(nrow(tib), length(out$eval_timepoints))
+  expect_true(all(c("eval_time", "refit_here", "pareto_k", "elpd")
+                  %in% names(tib)))
+  expect_true(is.logical(tib$refit_here))
+  # The table is the object, not a second computation of it.
+  expect_identical(as.integer(tib$eval_time), out$eval_timepoints)
+  expect_identical(tib$refit_here, out$refit_triggered)
+  expect_equal(tib$elpd, out$elpds)
+})
+
+
+test_that("lfo_cv reports every score it was asked for", {
+  # FAILS TODAY -- finding 26. Any forecast-based rule errors:
+  # `score = "crps"` alone errors just as `c("elpd", "crps")` does,
+  # while `score = "elpd"` on the same fit succeeds.
+  fit <- lfo_ar1_poisson()
+  out <- suppressMessages(lfo_cv(fit, min_t = 30L, fc_horizon = 1L,
+                                 score = c("elpd", "crps"),
+                                 silent = 2L))
+  expect_true(is.list(out$scores))
+  expect_true("crps" %in% names(out$scores))
+  expect_identical(length(out$elpds), 10L)
+  expect_identical(length(out$scores$crps), 10L)
+  expect_true(all(is.finite(out$elpds)))
+  expect_true(all(is.finite(out$scores$crps)))
+  # crps is a proper score on a non-negative scale; elpd is a log
+  # density and is not, which is the difference between the two
+  # columns.
+  expect_true(all(out$scores$crps >= 0))
+  expect_true(all(c("elpd", "crps") %in% names(summary(out))))
+})
+
+
+test_that("a longer horizon shortens the evaluation grid", {
+  fit <- cached_lfo_fit("rw_gauss_n40", function() {
+    set.seed(20260606L)
+    n_t <- 40L
+    drift <- cumsum(rnorm(n_t, 0, 0.5))
+    d <- data.frame(
+      y = drift + rnorm(n_t, 0, 0.2), x = rnorm(n_t),
+      time = seq_len(n_t), series = factor("s1", levels = "s1")
+    )
+    suppressMessages(mvgam(
+      formula = y ~ 1 + x, trend_formula = ~ RW(),
+      data = d, family = gaussian(),
+      chains = 2L, parallel_chains = 2L,
+      iter_warmup = 400L, iter_sampling = 400L,
+      silent = 2L, refresh = 0L
+    ))
+  })
+  out <- suppressMessages(lfo_cv(fit, min_t = 30L, fc_horizon = 3L,
+                                 score = "elpd", silent = 2L))
+  # The last fold needs `fc_horizon` occasions after it, so the grid
+  # stops three short of the end rather than one.
+  expect_identical(out$eval_timepoints, 31:38)
+  expect_true(all(is.finite(out$elpds)))
+  expect_true(is.finite(out$sum_ELPD))
+})
+
+
+test_that("lfo_cv scores a multi-series fit on every rule asked", {
+  # FAILS TODAY -- finding 26, on the multi-series path.
+  fit <- cached_lfo_fit("ar2_poisson_mv_n35", function() {
+    sim <- sim_mvgam(
+      n_timepoints = 35L, n_series = 2L, trend_model = AR(p = 2L),
+      family = poisson(), proportional_train = 1.0,
+      seed = 20260607L
+    )
+    suppressMessages(mvgam(
+      formula = y ~ 1 + x, trend_formula = ~ AR(p = 2L),
+      data = sim$data_train, family = poisson(),
+      chains = 2L, parallel_chains = 2L,
+      iter_warmup = 400L, iter_sampling = 400L,
+      silent = 2L, refresh = 0L
+    ))
+  })
+  out <- suppressMessages(lfo_cv(fit, min_t = 28L, fc_horizon = 1L,
+                                 score = c("elpd", "crps", "drps"),
+                                 silent = 2L))
+  expect_identical(out$eval_timepoints, 29:35)
+  expect_true(all(is.finite(out$elpds)))
+  expect_true(all(is.finite(out$scores$crps)))
+  expect_true(all(is.finite(out$scores$drps)))
+  expect_true(all(out$scores$crps >= 0))
+  expect_true(all(out$scores$drps >= 0))
+  expect_true(all(c("elpd", "crps", "drps") %in% names(summary(out))))
+})
+
+
+test_that("lfo_cv runs on a correlated non-autoregressive kernel", {
+  fit <- cached_lfo_fit("zmvn_gauss_mv_n35", function() {
+    sim <- sim_mvgam(
+      n_timepoints = 35L, n_series = 2L,
+      trend_model = ZMVN(cor = TRUE), family = gaussian(),
+      proportional_train = 1.0, seed = 20260608L
+    )
+    suppressMessages(mvgam(
+      formula = y ~ 1 + x, trend_formula = ~ ZMVN(cor = TRUE),
+      data = sim$data_train, family = gaussian(),
+      chains = 2L, parallel_chains = 2L,
+      iter_warmup = 400L, iter_sampling = 400L,
+      silent = 2L, refresh = 0L
+    ))
+  })
+  out <- suppressMessages(lfo_cv(fit, min_t = 28L, fc_horizon = 1L,
+                                 score = "elpd", silent = 2L))
+  expect_identical(out$eval_timepoints, 29:35)
+  expect_true(all(is.finite(out$elpds)))
+})
+
+
+test_that("a single evaluation fold runs the loop body zero times", {
+  fit <- lfo_ar1_poisson()
+  # `min_t = N - fc_horizon` leaves exactly one occasion to score.
+  out <- suppressMessages(lfo_cv(fit, min_t = 39L, fc_horizon = 1L,
+                                 score = "elpd", silent = 2L))
+  expect_identical(out$eval_timepoints, 40L)
+  expect_true(is.finite(out$elpds[1L]))
+  expect_true(out$refit_triggered[1L])
+  # No PSIS step ran, so there is no Pareto k to report rather than
+  # a zero standing in for one.
+  expect_true(is.na(out$pareto_ks[1L]))
+})
+
+
+test_that("paired ELPD compares two models on one evaluation grid", {
+  # Both models see the same data and the same folds, so their
+  # per-fold ELPDs pair. What is asserted is the arithmetic of that
+  # comparison and one directional claim that holds regardless of
+  # how decisive the data happen to be: the correctly specified
+  # AR(2) is not beaten by RW by more than two standard errors.
+  # With this many folds the comparison may be inconclusive, which
+  # is the honest outcome rather than a failure.
+  shared <- sim_mvgam(
+    n_timepoints = 50L, n_series = 1L, trend_model = AR(p = 2L),
+    family = gaussian(), proportional_train = 1.0, seed = 20260609L
+  )$data_train
+
+  build <- function(tf) {
+    function() suppressMessages(mvgam(
+      formula = y ~ 1 + x, trend_formula = tf,
+      data = shared, family = gaussian(),
+      chains = 2L, parallel_chains = 2L,
+      iter_warmup = 500L, iter_sampling = 500L,
+      silent = 2L, refresh = 0L
+    ))
+  }
+  fit_ar2 <- cached_lfo_fit("comparison_ar2_n50", build(~ AR(p = 2L)))
+  fit_rw <- cached_lfo_fit("comparison_rw_n50", build(~ RW()))
+
+  lfo_ar2 <- suppressMessages(lfo_cv(fit_ar2, min_t = 30L,
+                                     fc_horizon = 1L, score = "elpd",
+                                     silent = 2L))
+  lfo_rw <- suppressMessages(lfo_cv(fit_rw, min_t = 30L,
+                                    fc_horizon = 1L, score = "elpd",
+                                    silent = 2L))
+
+  # A paired comparison is only defined on a shared grid.
+  expect_identical(lfo_ar2$eval_timepoints, lfo_rw$eval_timepoints)
+  expect_true(all(is.finite(lfo_ar2$elpds)))
+  expect_true(all(is.finite(lfo_rw$elpds)))
+
+  # The loo_compare convention: the difference is the sum of the
+  # paired per-fold differences, and its standard error treats the
+  # folds as independent draws from the comparison noise.
+  differences <- lfo_ar2$elpds - lfo_rw$elpds
+  elpd_diff <- sum(differences)
+  se_diff <- sqrt(length(differences)) * stats::sd(differences)
+  expect_true(is.finite(elpd_diff))
+  expect_gt(se_diff, 0)
+
+  # RW must not decisively beat AR(2) on AR(2) data.
+  expect_gt(elpd_diff, -2 * se_diff)
+  # And the well-specified model should not need more refits, since
+  # tighter importance ratios are what keeps PSIS carrying a fit
+  # forward.
+  expect_lte(length(lfo_ar2$refits_at), length(lfo_rw$refits_at))
 })
 
 
