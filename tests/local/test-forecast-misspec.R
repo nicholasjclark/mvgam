@@ -17,6 +17,13 @@
 # with different sharpness.
 #
 # Cache convention: same as test-forecast-recovery.R.
+#
+# `ensemble.mvgam_forecast()` is tested here too. It needs two
+# forecasts fitted on one simulated truth, which is exactly what the
+# AR-truth pair below already builds, so the tests live beside their
+# producer rather than reading its bundles out of the cache directory
+# by name. That coupling is what the separate file used to carry: it
+# passed or failed on whether this file had run first.
 
 source("setup_tests_local.R")
 
@@ -582,4 +589,232 @@ test_that("mvgam AR(1) competitive with brms ar(1) on Gaussian truth", {
   # mvgam mean CRPS should be no worse than 1.5x brms's.
   expect_lt(mvgam_pool$mean_crps,
               1.5 * brms_pool$mean_crps)
+})
+
+
+# ----- ensemble.mvgam_forecast on the AR-truth pair --------------
+#
+# The pair above is the simplest input an ensemble can take: one
+# response, two series, matching training and test windows, and two
+# forecasts of the same truth that differ by a wide margin, since
+# AR(1) is correctly specified and RW is not.
+
+load_pair <- function(seed) {
+  sim_args <- list(
+    trend_model = AR(p = 1L), family = poisson(),
+    n_timepoints = 200L, n_series = 2L,
+    proportional_train = 0.75, seed = seed
+  )
+  correct <- prep_recovery(
+    name = paste0("pair_ar_truth_ar_fit_seed", seed),
+    sim_args = sim_args,
+    fit_args = list(
+      formula = y ~ 1, trend_formula = ~ AR(p = 1),
+      family = poisson(),
+      chains = 1L, iter = 500L, warmup = 250L,
+      refresh = 0L, silent = 2L
+    )
+  )
+  misspec <- prep_recovery(
+    name = paste0("pair_ar_truth_rw_fit_seed", seed),
+    sim_args = sim_args,
+    fit_args = list(
+      formula = y ~ 1, trend_formula = ~ RW(),
+      family = poisson(),
+      chains = 1L, iter = 500L, warmup = 250L,
+      refresh = 0L, silent = 2L
+    )
+  )
+  list(fc_a = correct$fc, fc_b = misspec$fc, sim = correct$sim)
+}
+
+
+pool_crps <- function(fc) {
+  sc <- score(fc, score = "crps")
+  vals <- numeric(0L)
+  for (nm in setdiff(names(sc), "all_series")) {
+    vals <- c(vals, sc[[nm]]$score)
+  }
+  mean(vals[is.finite(vals)])
+}
+
+
+test_that("an ensemble is a forecast of the same shape as its inputs", {
+  pair <- load_pair(1001L)
+  ens <- ensemble(pair$fc_a, pair$fc_b, ndraws = 500L, seed = 7L)
+  expect_s3_class(ens, "mvgam_forecast")
+  expect_identical(names(ens$hindcasts), names(pair$fc_a$hindcasts))
+  expect_identical(names(ens$forecasts), names(pair$fc_a$forecasts))
+  # Every series carries exactly the draws asked for, and the same
+  # number of occasions as went in.
+  expect_true(all(vapply(ens$hindcasts, NROW, integer(1L)) == 500L))
+  expect_true(all(vapply(ens$forecasts, NROW, integer(1L)) == 500L))
+  expect_identical(vapply(ens$forecasts, ncol, integer(1L)),
+                   vapply(pair$fc_a$forecasts, ncol, integer(1L)))
+  expect_identical(vapply(ens$hindcasts, ncol, integer(1L)),
+                   vapply(pair$fc_a$hindcasts, ncol, integer(1L)))
+  expect_equal(unname(attr(ens, "weights")), c(0.5, 0.5))
+  expect_equal(sum(attr(ens, "ndraws_per_model")), 500L)
+})
+
+
+test_that("an ensemble keeps the arms it is scored against", {
+  pair <- load_pair(1001L)
+  ens <- ensemble(pair$fc_a, pair$fc_b, ndraws = 200L, seed = 1L)
+  expect_identical(ens$test_observations, pair$fc_a$test_observations)
+  expect_identical(ens$test_times, pair$fc_a$test_times)
+  expect_identical(ens$train_observations, pair$fc_a$train_observations)
+  expect_identical(ens$train_times, pair$fc_a$train_times)
+  expect_identical(ens$series_names, pair$fc_a$series_names)
+})
+
+
+test_that("weights are normalised and split the draws", {
+  pair <- load_pair(1001L)
+  ens <- ensemble(pair$fc_a, pair$fc_b, weights = c(0.7, 0.3),
+                  ndraws = 1000L, seed = 2L)
+  expect_equal(unname(attr(ens, "weights")), c(0.7, 0.3))
+  # Largest-remainder rounding, so the split is exact rather than
+  # approximately the total.
+  expect_equal(sum(attr(ens, "ndraws_per_model")), 1000L)
+  expect_equal(unname(attr(ens, "ndraws_per_model")), c(700L, 300L))
+
+  # Unnormalised weights mean the same thing.
+  ens2 <- ensemble(pair$fc_a, pair$fc_b, weights = c(3, 1),
+                   ndraws = 400L, seed = 3L)
+  expect_equal(unname(attr(ens2, "weights")), c(0.75, 0.25))
+  expect_equal(sum(attr(ens2, "ndraws_per_model")), 400L)
+})
+
+
+test_that("a seed makes an ensemble reproducible", {
+  pair <- load_pair(1001L)
+  a <- ensemble(pair$fc_a, pair$fc_b, ndraws = 200L, seed = 42L)
+  b <- ensemble(pair$fc_a, pair$fc_b, ndraws = 200L, seed = 42L)
+  expect_identical(a$forecasts, b$forecasts)
+  expect_identical(a$hindcasts, b$hindcasts)
+  # A different seed resamples, so the result moves.
+  c_ <- ensemble(pair$fc_a, pair$fc_b, ndraws = 200L, seed = 43L)
+  expect_false(isTRUE(all.equal(a$forecasts, c_$forecasts)))
+})
+
+
+test_that("an ensemble scores like the forecast it is", {
+  pair <- load_pair(1001L)
+  ens <- ensemble(pair$fc_a, pair$fc_b, ndraws = 300L, seed = 9L)
+  sc <- score(ens, score = "crps")
+  horizon <- ncol(pair$fc_a$forecasts[[1L]])
+  for (nm in setdiff(names(sc), "all_series")) {
+    expect_identical(nrow(sc[[nm]]), horizon)
+    expect_true(all(is.finite(sc[[nm]]$score)))
+    expect_true(all(sc[[nm]]$score >= 0))
+  }
+})
+
+
+test_that("mismatched inputs are refused by name", {
+  pair <- load_pair(1001L)
+
+  wrong_series <- pair$fc_b
+  wrong_series$series_names <- factor(
+    paste0("other_", as.character(wrong_series$series_names)),
+    levels = paste0("other_", as.character(wrong_series$series_names))
+  )
+  expect_error(ensemble(pair$fc_a, wrong_series),
+               "Series names must match")
+
+  short_fc <- pair$fc_b
+  short_fc$forecasts <- lapply(short_fc$forecasts,
+                               function(m) m[, -1L, drop = FALSE])
+  expect_error(ensemble(pair$fc_a, short_fc),
+               "Forecast horizons must match")
+
+  short_hc <- pair$fc_b
+  short_hc$hindcasts <- lapply(short_hc$hindcasts,
+                               function(m) m[, -1L, drop = FALSE])
+  expect_error(ensemble(pair$fc_a, short_hc),
+               "Hindcast lengths must match")
+
+  moved_truth <- pair$fc_b
+  moved_truth$test_observations[[1L]][1L] <-
+    moved_truth$test_observations[[1L]][1L] + 1
+  expect_error(ensemble(pair$fc_a, moved_truth),
+               "Test observations must match")
+
+  expect_error(ensemble(pair$fc_a), "at least two")
+  expect_error(ensemble(pair$fc_a, foo = list()), "mvgam_forecast")
+  expect_error(
+    ensemble(pair$fc_a, pair$fc_b, weights = c(0.5, 0.3, 0.2)),
+    "one entry per model"
+  )
+  expect_error(ensemble(pair$fc_a, pair$fc_b, weights = c(-0.5, 1.5)),
+               "non-negative")
+  expect_error(ensemble(pair$fc_a, pair$fc_b, weights = c(0, 0)),
+               "positive total")
+})
+
+
+test_that("an ensemble scores between the models it pools", {
+  # An even-weighted mixture of a correct and a misspecified forecast
+  # has to land between them: better than the worse member is not
+  # enough, since a bug that simply returned the better member would
+  # satisfy that. CRPS is not strictly convex in the forecast
+  # distribution, so a small slack absorbs the resampling noise.
+  per_seed <- lapply(c(1001L, 1002L, 1003L), function(seed) {
+    pair <- load_pair(seed)
+    ens <- ensemble(pair$fc_a, pair$fc_b, ndraws = 1000L, seed = seed)
+    list(a = pool_crps(pair$fc_a), b = pool_crps(pair$fc_b),
+         ens = pool_crps(ens))
+  })
+  crps_a <- mean(vapply(per_seed, `[[`, numeric(1L), "a"))
+  crps_b <- mean(vapply(per_seed, `[[`, numeric(1L), "b"))
+  crps_e <- mean(vapply(per_seed, `[[`, numeric(1L), "ens"))
+  # The two members must actually differ, or the check has no power.
+  expect_gt(abs(crps_a - crps_b), 0.05)
+  lo <- min(crps_a, crps_b)
+  hi <- max(crps_a, crps_b)
+  slack <- 0.05 * (hi - lo)
+  expect_gte(crps_e, lo - slack)
+  expect_lte(crps_e, hi + slack)
+})
+
+
+test_that("weighting toward the better model scores better", {
+  per_seed <- lapply(c(1001L, 1002L, 1003L), function(seed) {
+    pair <- load_pair(seed)
+    even <- ensemble(pair$fc_a, pair$fc_b, ndraws = 1000L, seed = seed)
+    heavy <- ensemble(pair$fc_a, pair$fc_b, weights = c(0.9, 0.1),
+                      ndraws = 1000L, seed = seed)
+    list(a = pool_crps(pair$fc_a), even = pool_crps(even),
+         heavy = pool_crps(heavy))
+  })
+  crps_a <- mean(vapply(per_seed, `[[`, numeric(1L), "a"))
+  crps_even <- mean(vapply(per_seed, `[[`, numeric(1L), "even"))
+  crps_heavy <- mean(vapply(per_seed, `[[`, numeric(1L), "heavy"))
+  # `fc_a` is the correctly specified fit, so leaning on it must
+  # score better than an even split and land nearer its own score.
+  expect_lt(crps_heavy, crps_even)
+  expect_lt(abs(crps_heavy - crps_a), abs(crps_even - crps_a))
+})
+
+
+test_that("the pooled draws are a mixture of the two members", {
+  # The defining property, read off the draws rather than a score:
+  # at any threshold the ensemble's empirical CDF sits between the
+  # members' own.
+  pair <- load_pair(1001L)
+  ens <- ensemble(pair$fc_a, pair$fc_b, ndraws = 2000L, seed = 11L)
+  draws_a <- pair$fc_a$forecasts[[1L]][, 1L]
+  draws_b <- pair$fc_b$forecasts[[1L]][, 1L]
+  draws_e <- ens$forecasts[[1L]][, 1L]
+  # Checked at several thresholds, not just the median, so a
+  # coincidence at one point cannot carry it.
+  for (q in c(0.25, 0.5, 0.75)) {
+    thr <- stats::quantile(c(draws_a, draws_b), q)
+    cdf_a <- mean(draws_a <= thr)
+    cdf_b <- mean(draws_b <= thr)
+    cdf_e <- mean(draws_e <= thr)
+    expect_gte(cdf_e, min(cdf_a, cdf_b) - 0.05)
+    expect_lte(cdf_e, max(cdf_a, cdf_b) + 0.05)
+  }
 })

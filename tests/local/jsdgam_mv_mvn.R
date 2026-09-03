@@ -497,8 +497,15 @@ test_that("the factor surface reports two factors over four species", {
   ord <- ordinate(fit)
   expect_s3_class(ord, "ggplot")
 
-  cl <- compare_loadings(fit, fit)
-  expect_false(is.null(cl))
+  # Both call forms, since the facet layout is a separate branch
+  # and a plot object that is merely non-NULL says nothing.
+  cl <- compare_loadings(fit, fit, labels = c("uninformed", "informed"))
+  expect_s3_class(cl, "ggplot")
+  expect_s3_class(
+    compare_loadings(fit, fit, labels = c("uninformed", "informed"),
+                     facet = TRUE),
+    "ggplot"
+  )
 
   Z_arr <- mvgam:::extract_Z_loadings(
     posterior::as_draws_matrix(fit$fit), n_obs_series = K, n_lv = N_lv
@@ -617,5 +624,38 @@ cat(sprintf("min ess_bulk = %.0f\n",
             min(z_summary$ess_bulk, na.rm = TRUE)))
 cat(sprintf("max ess_bulk = %.0f\n",
             max(z_summary$ess_bulk, na.rm = TRUE)))
+
+test_that("the rotated loadings are what the diagnostics report", {
+  # A factor model's raw `Z` is rotation-indeterminate, so its draws
+  # do not describe anything a user should read: any rotation of the
+  # loadings with the matching counter-rotation of the factors gives
+  # the same likelihood, and the chains wander between them. Once
+  # `Z_tilde` is in the posterior it is the identified surface, and
+  # the diagnostic entry points hide the raw block rather than
+  # reporting an r-hat on a quantity that has no fixed value.
+  v <- variables(fit)
+  expect_true(any(grepl("^Z_tilde\\[", v)))
+  expect_false(any(grepl("^Z\\[", v)))
+  # The trend scale and correlation factors are absorbed into the
+  # loadings here, so they are hidden on the same grounds.
+  expect_false(any(grepl("^sigma_trend\\[", v)))
+  expect_false(any(grepl("^L_Omega_trend\\[", v)))
+
+  # Every entry point agrees, not just `variables()`. An r-hat
+  # computed on the unrotated block is the misleading number this
+  # prevents.
+  expect_false(any(grepl("^Z\\[", rownames(posterior_summary(fit)))))
+  expect_false(any(grepl("^Z\\[", names(rhat(fit)))))
+
+  # Asking for "Z" by name still answers, with the identified block
+  # rather than an empty selection.
+  cols <- posterior::variables(
+    as_draws_array(fit, variable = "Z", regex = TRUE)
+  )
+  expect_gt(length(cols), 0L)
+  expect_true(all(grepl("^Z", cols)))
+  expect_true(any(grepl("^Z_tilde\\[", cols)))
+})
+
 
 cat("\nDone.\n")

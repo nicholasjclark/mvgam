@@ -17,7 +17,7 @@
 #   no_by_lv : the same without `by = lv_axis()`
 #
 # Run with:
-#   testthat::test_file("tests/local/test-by-lv-axis-cached-fits.R")
+#   testthat::test_file("tests/local/test-by-lv-axis.R")
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)
@@ -922,8 +922,12 @@ test_that("a newdata missing a required column is refused", {
 
 test_that("the factor methods report two factors over five species", {
   af <- active_factors(fit)
+  expect_s3_class(af, "mvgam_active_factors")
   expect_identical(as.integer(af$n_lv), N_lv)
   expect_identical(nrow(af$per_factor), N_lv)
+  # The object has a plot method, and it is the one a user reaches
+  # for after reading the table.
+  expect_s3_class(plot(af), "ggplot")
 
   sv <- shared_variation(fit)
   expect_identical(as.character(sv$series_names), species_levels)
