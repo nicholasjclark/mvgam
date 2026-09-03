@@ -1168,3 +1168,63 @@ Either the factor path takes a pseudo-inverse or a ridge, or the
 method refuses with an explanation. Choosing between those belongs
 to the jsdm work, so `test-jsdgam-families.R` leaves it unasserted
 and this entry carries it.
+
+## by = lv_axis() smooths, drawn
+
+**34. `plot(conditional_smooths())` runs the factors together into
+one series.**
+
+`test-closure-units.R`, "the env smooth is drawn once per latent
+factor". `s(env, by = lv_axis())` gives one curve per latent factor,
+and `conditional_smooths()` returns them correctly blocked: 100 rows
+at `cond__ = 1`, then 100 at `cond__ = 2`. The renderer ignores the
+column. Read off the built plot:
+
+    layers = 2 ; panels = 1 ; facet = FacetNull
+    layer 1 rows = 200 ; distinct groups = 1
+    aesthetic mapping: x
+
+So both factors land in one group. The line runs the width of `env`,
+returns to the left edge and runs it again, which draws as a sawtooth
+across the whole panel rather than as two curves. The ribbon spans
+both factors' uncertainty at every x, giving a band from -8 to +5
+around estimates whose own range is -0.10 to 0.24.
+
+`conditional_effects()` facets properly on the same fit, so this is
+the smooth renderer rather than the plotting layer in general.
+Finding 2 fixed `conditional_smooths()` returning a grid with no rows
+in it; this is the half after that, where the grid is right and the
+picture is not.
+
+Reading the rendered plot is what turned it up. The assertion that
+stood here asked only that the two curves differ, which they do.
+
+**35. The second factor's smooth is identically zero.**
+
+Same file and same call, on both the occupancy and the abundance
+fit. Split by `cond__`:
+
+| factor | n | sd(estimate) | estimate range | mean interval width |
+|---|---|---|---|---|
+| 1 | 100 | 0.0558 | -0.097 to 0.238 | 7.00 |
+| 2 | 100 | 0 | 0.000 to 0.000 | 0.00 |
+
+A smooth the data did not support would shrink toward zero and keep
+its posterior width. This one has no width at all, which means no
+draw moves it: the coefficients are not reaching the grid rows that
+belong to the second factor.
+
+The design itself is right. `Xs_trend` comes out block-complementary
+across the two factors, and `Zs_2_1_trend` carries values on exactly
+the rows `times_trend[, 2]` names and zeros everywhere else. The same
+test asserts both. So the fault sits downstream of the design, where
+the grid is evaluated.
+
+The signature points at the evaluation reading factor 2's rows
+against factor 1's column, since `X[r2, 1]` is zero by construction
+and would return exactly this.
+
+Recorded rather than fixed: which of the two grids is wrong is a
+question for the smooth work. `test-closure-units.R` now requires
+each curve to move and to carry an interval, so a curve pinned at
+zero fails instead of satisfying "the two curves differ".

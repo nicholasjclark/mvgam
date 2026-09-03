@@ -789,6 +789,7 @@ sim_jsdm_occ <- function() {
     data = d, n_sites = n_sites, K = jsdm_K, N_lv = jsdm_N_lv,
     n_visits = jsdm_visits, species_levels = jsdm_species,
     Z_true = Z_true, z_latent = z_latent, env = env,
+    state_true = t(z_latent),
     sigma_true_cor = cov2cor(sigma_true_cov + diag(1e-8, jsdm_K))
   )
 }
@@ -836,7 +837,7 @@ sim_jsdm_nmix <- function() {
     data = d, n_sites = n_sites, K = jsdm_K, N_lv = jsdm_N_lv,
     n_visits = jsdm_visits, species_levels = jsdm_species,
     Z_true = Z_true, N_latent = N_latent, cap_true = cap_true,
-    env = env,
+    env = env, state_true = t(N_latent),
     sigma_true_cor = cov2cor(sigma_true_cov + diag(1e-8, jsdm_K))
   )
 }
@@ -963,6 +964,25 @@ closure_jsdm_battery <- function(nm, sim, fit, threshold_cor,
     ll <- log_lik(fit, draw_ids = 1:20)
     expect_identical(ncol(ll), n_unit_jsdm)
     expect_true(all(is.finite(ll)))
+  })
+
+  test_that(says("the latent state recovers the simulated one"), {
+    # The quantity these families exist to estimate, and the one
+    # nothing checked. It is also the sharpest axis test available
+    # here: the units are (species, site) cells, so reading them in
+    # species-major order instead of the fit's own order is a
+    # permutation that leaves every value plausible. Measured, the
+    # correct ordering agrees with the truth far better than that
+    # permutation, and requiring both is what makes this a claim
+    # about which cell is which rather than about the fit's quality.
+    ls <- predict(fit, type = "latent_state", ndraws = 200L)
+    truth <- sim$state_true
+    expect_length(as.numeric(ls[, "Estimate"]), length(truth))
+    right <- stats::cor(as.numeric(ls[, "Estimate"]), as.numeric(truth))
+    permuted <- stats::cor(as.numeric(ls[, "Estimate"]),
+                           as.numeric(t(truth)))
+    expect_gt(right, 0.8)
+    expect_gt(right - permuted, 0.3)
   })
 
   test_that(says("the closure-unit prediction types answer per unit"), {
@@ -1126,11 +1146,29 @@ closure_jsdm_battery <- function(nm, sim, fit, threshold_cor,
     expect_true(all(is.finite(cd$estimate__)))
     expect_true(all(cd$lower__ <= cd$estimate__))
     expect_true(all(cd$estimate__ <= cd$upper__))
-    # One curve per latent factor, and the two differ: a design that
-    # collapsed the factor axis draws one shape twice.
+    # One curve per latent factor. Requiring only that the two
+    # differ is satisfied by a second curve that is identically
+    # zero, so each is asked to move and to carry uncertainty of
+    # its own. A flat curve with a zero-width interval is not a
+    # shrunken smooth; it is coefficients that never reached the
+    # grid.
     curves <- split(cd$estimate__, cd$cond__)
+    widths <- split(cd$upper__ - cd$lower__, cd$cond__)
     expect_length(curves, N_lv)
     expect_false(isTRUE(all.equal(curves[[1L]], curves[[2L]])))
+    for (k in seq_len(N_lv)) {
+      expect_gt(stats::sd(curves[[k]]), 1e-8)
+      expect_gt(mean(widths[[k]]), 0)
+    }
+
+    # And the renderer has to keep them apart. Drawn as one group
+    # the line runs the width of the covariate once per factor and
+    # returns, which comes out as a sawtooth across the panel with a
+    # ribbon spanning both curves' uncertainty at once.
+    pl <- plot(cs)
+    pl <- if (inherits(pl, "ggplot")) pl else pl[[1L]]
+    pb <- ggplot2::ggplot_build(pl)$data[[1L]]
+    expect_gte(nrow(unique(pb[, c("PANEL", "group")])), N_lv)
     # Drawn over the covariate the trend side actually saw.
     trend_env <- fit$trend_model$data$env
     expect_gte(min(cd$effect1__), min(trend_env) - 1e-8)
