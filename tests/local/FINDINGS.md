@@ -104,6 +104,19 @@ units and no detection process. `is_closure_unit_family()`
 in `R/families.R:1339` is what these two paths gate on, and the
 plotting method asks for a type its own family will reject.
 
+A third symptom shows where the misclassification leads.
+`hindcast(fit, type = "latent_state")` on an mvn fit answers with a
+message written for whoever maintains the package:
+
+    Closure-unit dispatch missing for family 'mvn' method
+    'latent_state'. Add a 'mvn = switch(method_kind, ...)' branch to
+    dispatch_closure_unit_method() in R/families.R.
+
+The same call on a beta fit is refused properly, naming the family,
+the types it does offer and the families that would enable the one
+asked for. So mvn enters closure-unit dispatch, finds no branch, and
+hands the user an instruction to edit the source.
+
 **5. The mvn fixture samples poorly, and the recovery check now says so.**
 
 Same file, "Psi recovers the simulated residual scale". Psi posterior
@@ -472,6 +485,21 @@ numberings, and on a frame that starts at one the two coincide and
 nothing shows. Reading the rendered plot is what turned it up, so
 the check now measures the x values the plot draws.
 
+Reproduced on the `jsdgam()` route as well, so this belongs to the
+plotting method rather than to one trend. The multivariate-normal
+fixture numbers its sites from 3, giving occasions 3 to 32:
+
+| call | x range |
+|---|---|
+| `plot(type = "factors")` | 1 to 30 |
+| `plot(type = "trend")` | 3 to 32 |
+| `plot(type = "series")` | 3 to 32 |
+| `plot(hindcast(fit), series = 1)` | 3 to 32 |
+
+`test-jsdgam-families.R` measures the axis for every family, so the
+one frame numbered from three carries the failure and the six
+numbered from one pass.
+
 ## Closure-unit families
 
 **18. Every `occ()` and `nmix()` compile prints a Stan warning about
@@ -575,6 +603,25 @@ taken.
 fails on it, so the sweep reports it rather than leaving it in this
 file alone. The companion assertion on `type = "ordinary"` passes,
 which places the fault in the quantile path and not in the fit.
+
+Measured again across the jsdgam families, the reach is wider than
+tweedie and, where it bites, total:
+
+| family | `type = "quantile"` | `type = "ordinary"` |
+|---|---|---|
+| mvn | 120 / 120 constant | 0 / 120 |
+| mvt | 120 / 120 constant | 0 / 120 |
+| diri | 120 / 120 constant | 0 / 120 |
+| nb | 40 / 300 constant | 4 / 300 |
+| beta | 0 / 300 constant | 0 / 300 |
+
+Beta escapes through its analytic entry, the discrete families are
+partly rescued by ties, and the continuous families without an entry
+lose every column. Three of the seven return residuals carrying no
+uncertainty at all while their ordinary residuals carry full spread,
+which places the fault in the quantile path rather than in any fit.
+`test-jsdgam-families.R` asserts the documented behaviour for each
+family that reaches `residuals()` and fails on three of them.
 
 ## pp_check diagnostics
 
@@ -936,3 +983,180 @@ The remaining smoke files (`diri_smoke_fit.R`, `mvn_smoke_fit.R`,
 `mvn_preflight.R` and `mvn_smoke_fit.R` are worth doing first among
 those, since finding 4 lives in exactly the family they cover and
 neither would have caught it.
+
+## The jsdgam family sweep
+
+Found while folding the nine `jsdgam_mv_*.R` files into one
+battery. Each was reached by driving a surface the nine files
+called but never checked the value of.
+
+**28. `forecast(type = "expected")` returns the link scale on every
+softmax family.**
+
+`test-jsdgam-families.R`, "forecast is keyed by the species axis".
+The expectation of a composition is a probability, and over the
+training grid `posterior_epred()` returns one. Over the extension
+of that grid it does not:
+
+| family | `posterior_epred()` | `forecast(type = "expected")` | `type = "link"` |
+|---|---|---|---|
+| categ | 0.000 to 0.994 | -6.192 to 11.056 | -14.342 to 11.986 |
+| diri | 0.000 to 0.985 | -7.008 to 19.721 | -8.888 to 9.033 |
+| multi | 0.013 to 63.119 | -10.418 to 9.174 | -7.431 to 6.474 |
+| beta | 0.072 to 0.913 | 0.039 to 0.961 | -4.435 to 3.260 |
+| nb | 0.036 to 53.068 | 0.008 to 84.165 | -3.532 to 5.557 |
+
+Beta and the negative binomial answer correctly, so this is not the
+forecast arm in general: it is the three families whose inverse link
+needs the shared softmax normaliser. The returned values are not the
+link arm repeated either, so something is applied per species
+without the normaliser rather than nothing being applied at all.
+
+A multinomial expectation coming back negative is the clearest of
+the three, since no normalisation convention makes an expected count
+below zero.
+
+This is one quantity reached two ways, and the two disagree. It went
+unseen because the forecast test in all nine files asserted only the
+arm names, the dimensions and `is.finite()`. A link-scale value
+satisfies every one of those. The assertion now compares the arm
+against the scale `posterior_epred()` occupies for that family.
+
+**29. `tidy()` reports what the diagnostics hide and omits what they
+expose.**
+
+`test-jsdgam-families.R`, "the draws and the tidiers keep this fit's
+row order". On every jsdgam checked, `variables()`,
+`posterior_summary()` and `rhat()` agree on what a reader should
+see. They hide the raw `Z[i,j]` block and `L_Omega_trend`, because a
+factor model's loadings have no fixed value under rotation and
+neither parameter means anything on its own. They expose `Z_tilde`,
+which is the identified block. `tidy()` agrees with none of it.
+
+    variables()          Z_tilde present, L_Omega_trend hidden
+    posterior_summary()  Z_tilde present, L_Omega_trend hidden
+    rhat()               Z_tilde present, L_Omega_trend hidden
+    tidy()               Z_tilde absent,  L_Omega_trend present
+
+So the tidy table carries four `L_Omega_trend` entries, typed
+`trend_random_effect_group_level`, which is neither a random effect
+nor a group level, and no loadings at all. `?tidy.mvgam` documents
+`effects = "all"` as returning every parameter.
+
+`tidy()` is also reading raw Stan names where the other three read
+aliases: its terms include `b[1]` through `b[9]` alongside
+`b_Intercept`, and `variables()` lists none of the bracketed ones.
+One cause explains both: the tidier reads the stanfit directly
+rather than through the filter and alias pass the other three go
+through.
+
+Reproduced identically on the beta, mvn and categ fits.
+
+**30. `hindcast()` and `conditional_effects()` return a constant on
+the composition families.**
+
+`test-jsdgam-families.R`, "hindcast arms are the species, in order,
+and distinct" and "pp_check, plotting and conditional_effects
+render". Measured on the cached diri, categ and multi fits:
+
+| call | diri | categ | multi |
+|---|---|---|---|
+| `hindcast()` arm means | 1, 1, 1, 1 | -- | -- |
+| identical arm pairs | all six | -- | -- |
+| `conditional_effects()` estimate | 1 | 1 | 0 |
+| its `conf.low` / `conf.high` | 1 / 1 | 1 / 1 | 0 / 0 |
+
+Every panel is a flat line at a constant with an interval of zero
+width, across all three effects the model offers. The Dirichlet
+hindcast hands back 1 for every species at every site. Four species
+sharing a simplex average about a quarter each, and four arms that
+agree exactly leave nothing for the composition to distribute.
+
+`posterior_epred()` on the same fits is correct: it lands inside
+[0, 1] and sums to one per site, which the family blocks below
+already check. So the fault is in what the plotting and hindcast
+arms are built from rather than in the fit.
+
+The beta, negative binomial and multivariate normal fits draw
+proper panels on the same code path, which is what makes this
+specific to the shared softmax normaliser rather than general.
+
+`jsdgam_mv_diri.R` already failed the identical-arms half before
+this consolidation, at 6 failures and 91 warnings against 102
+passing. The conditional-effects half was never asserted: the file
+checked that each panel's intervals were ordered, and a constant
+satisfies `conf.low <= estimate <= conf.high`.
+
+**31. `loo()` reports a Pareto diagnostic for one row in K on a
+composition.**
+
+Same file. A composition's density is one number per site, spread
+across the K rows that site occupies, so `loo()` comes back with
+`n` equal to the row count and the other K-1 entries missing:
+
+| family | rows | non-finite pareto_k | share |
+|---|---|---|---|
+| diri | 120 | 90 | 75% |
+| multi | 120 | 90 | 75% |
+| categ | 400 | 300 | 75% |
+
+75 per cent is exactly (K-1)/K in each case. `loo()` also prints
+"Replacing NAs in `r_eff` with 1s" and then reports an ELPD off the
+remaining quarter without saying so.
+
+Whether the density belongs at the site grain is a question for the
+families. What is wrong either way is the presentation: the object
+claims `n` observations, three quarters of its diagnostics cannot
+be read, and the notice about it is about `r_eff` rather than about
+the missing k values.
+
+Distinct from finding 11, which is about the k values a trend fit
+produces being too high to trust. Here they are absent.
+
+**32. Three fixtures asked a composition a question it cannot
+answer.**
+
+The package is right here and four assertions were wrong, so this
+belongs with the test defects below.
+
+`jsdgam_mv_diri.R`, `jsdgam_mv_multi.R` and `jsdgam_mv_categ.R` each
+asserted that `posterior_epred()` on a frame holding one species
+matches the corresponding columns of the full-frame answer. It does
+not, and it should not: these families share a softmax normaliser
+across the species at a site, so a frame carrying one of them has a
+different denominator. Measured, the disagreement is total -- up to
+1.0 on a probability for categ and diri, and up to 20.5 on counts
+for multi -- while beta, nb, mvn and mvt agree to zero.
+
+The claim the fixtures were reaching for is real, and survives in a
+form every family can answer: subset whole sites instead. Half the
+sites, all species, agrees to exactly zero on all seven families,
+and still fails on a prediction that places rows by position rather
+than by content. `test-jsdgam-families.R` asks it that way.
+
+**33. `residual_cor(partial = TRUE)` cannot run on a factor model.**
+
+Found by calling it rather than by an assertion, so nothing in the
+suite reported it. On every jsdgam checked -- beta, mvn and categ --
+the call stops with a bare LAPACK message:
+
+    system is computationally singular: reciprocal condition
+    number = 1.14307e-17
+
+A partial correlation is read off the inverse of the covariance, and
+a rank-2 factor model over four or five species implies a covariance
+of rank 2. It is singular by construction, so the inverse this asks
+for does not exist for any factor fit at all, whatever the data.
+
+`residual_cor(partial = TRUE)` is documented and works elsewhere:
+the VAR fixture asserts it returns a `prec` block with a unit
+diagonal. On a factor fit it can never work, and it reports that
+through `solve()`. A reader gets a condition number where a sentence
+would have told them partial correlations need a full-rank residual
+covariance, and pointed them at `shared_variation()`, which answers
+the question they were asking.
+
+Either the factor path takes a pseudo-inverse or a ridge, or the
+method refuses with an explanation. Choosing between those belongs
+to the jsdm work, so `test-jsdgam-families.R` leaves it unasserted
+and this entry carries it.

@@ -1112,14 +1112,13 @@ recovery <- function(script, fixtures, needs = character(0)) {
 JSDM_PKGS <- c("dplyr", "tidyr", "posterior", "testthat")
 
 recovery_scripts <- list(
-  recovery("jsdgam_mv_mvn.R", "val_mvgam_jsdgam_mv_mvn.rds", JSDM_PKGS),
-  recovery("jsdgam_mv_mvt.R", "val_mvgam_jsdgam_mv_mvt.rds", JSDM_PKGS),
-  recovery("jsdgam_mv_nb.R", "val_mvgam_jsdgam_mv_nb.rds", JSDM_PKGS),
-  recovery("jsdgam_mv_beta.R", "val_mvgam_jsdgam_mv_beta.rds", JSDM_PKGS),
-  recovery("jsdgam_mv_diri.R", "val_mvgam_jsdgam_mv_diri.rds", JSDM_PKGS),
-  recovery("jsdgam_mv_categ.R", "val_mvgam_jsdgam_mv_categ.rds",
-           JSDM_PKGS),
-  recovery("jsdgam_mv_multi.R", "val_mvgam_jsdgam_mv_multi.rds",
+  # The seven long-format families are built by the file that tests
+  # them, which keeps each family's simulation next to the
+  # assertions that read it.
+  recovery("test-jsdgam-families.R",
+           paste0("val_mvgam_jsdgam_mv_",
+                  c("mvn", "mvt", "nb", "beta", "diri", "categ",
+                    "multi"), ".rds"),
            JSDM_PKGS),
   recovery("jsdgam_mv_nmix.R", "val_mvgam_jsdgam_mv_nmix.rds",
            c("dplyr", "posterior", "testthat")),
@@ -1139,10 +1138,6 @@ recovery_scripts <- list(
            c("val_mvgam_ordinate_traits.rds",
              "val_mvgam_ordinate_traits_data.rds"),
            "ggplot2"),
-  recovery("brms_concordance_diri.R",
-           c("val_brms_diri_concordance.rds",
-             "val_mvgam_diri_concordance.rds"),
-           c("dplyr", "tidyr")),
   recovery("heaps_birds_replica.R",
            c("val_mvgam_heaps_birds.rds",
              "val_mvgam_heaps_birds_wide.rds"),
@@ -1153,16 +1148,7 @@ recovery_scripts <- list(
            c("val_mvgam_heaps_nonlinear_env_occ.rds",
              "val_mvgam_heaps_nonlinear_env_nmix.rds",
              "val_mvgam_heaps_nonlinear_env_multi.rds"),
-           c("ape", "ggplot2", "posterior")),
-  recovery("jsdgam_spoccupancy_concordance.R",
-           c("val_mvgam_spocc_concordance.rds",
-             "val_spocc_lfmspgocc.rds"),
-           c("posterior", "spOccupancy")),
-  recovery("jsdgam_multi_season_concordance.R",
-           c("val_mvgam_multi_season_concordance.rds",
-             "val_spocc_tmspgocc.rds",
-             "val_flocker_multi_season.rds"),
-           c("dplyr", "posterior", "spOccupancy", "flocker"))
+           c("ape", "ggplot2", "posterior"))
 )
 
 run_recovery_script <- function(script) {
