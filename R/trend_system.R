@@ -738,7 +738,7 @@ generate_monitor_params <- function(trend_spec) {
   }
 
   # Add hierarchical correlation parameters if grouping is specified
-  hierarchical_params <- if (!is.null(trend_spec$gr) && trend_spec$gr != "NA") {
+  hierarchical_params <- if (named_var(trend_spec$gr)) {
     c("alpha_cor_trend", "L_Omega_global_trend", "L_deviation_group_trend", "sigma_group_trend")
   } else {
     character(0)
@@ -1961,7 +1961,7 @@ print.mvgam_trend <- function(x, ...) {
     cat("  Moving average: enabled\n")
   }
 
-  if (!is.null(x$gr) && x$gr != 'NA') {
+  if (named_var(x$gr)) {
     cat("  Hierarchical grouping:", x$gr, "\n")
   }
 

@@ -498,7 +498,7 @@ dpar_posterior_linpred <- function(object, dpar, transform = FALSE,
       }
     )))
   }
-  newdata <- newdata %||% object$data
+  newdata <- newdata %||% mvgam_training_data(object)
   predicted <- predicted_dpar_names(object, dpar, resp = resp)
   if (length(predicted) == 0) {
     # Sampled as a scalar, so there is nothing to transform.

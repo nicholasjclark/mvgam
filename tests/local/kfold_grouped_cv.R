@@ -3,8 +3,8 @@
 # a closure-unit (occ) fit with leave-one-site-out CV.
 #
 # Caches:
-#   /tmp/kfold_demo_gauss_fit.rds
-#   /tmp/kfold_demo_occ_fit.rds
+#   tests/local/fixtures/val_mvgam_kfold_demo_gauss.rds
+#   tests/local/fixtures/val_mvgam_kfold_demo_occ.rds
 #   /tmp/kfold_demo_results.rds
 #   /tmp/kfold_demo_plot.png
 #
@@ -16,10 +16,19 @@ suppressMessages({
   library(ggplot2)
 })
 
+# testthat sets the working directory to tests/local/ when it runs a
+# file, while Rscript runs it from the package root. Reach the shared
+# fixture helpers by whichever of the two paths exists.
+source(if (file.exists("concordance_helpers.R")) {
+  "concordance_helpers.R"
+} else {
+  file.path("tests", "local", "concordance_helpers.R")
+})
+
 # ------------------------------------------------------------
 # 1) Small Gaussian fit, leave-one-site-out kfold
 # ------------------------------------------------------------
-gauss_cache <- "/tmp/kfold_demo_gauss_fit.rds"
+gauss_cache <- local_fixture_path("val_mvgam_kfold_demo_gauss.rds")
 if (file.exists(gauss_cache)) {
   fit_gauss <- readRDS(gauss_cache)
   cat("[CACHE] reusing", gauss_cache, "\n")
@@ -42,6 +51,11 @@ if (file.exists(gauss_cache)) {
     data = dat_g, family = gaussian(),
     chains = 2L, burnin = 200L, samples = 200L,
     silent = 2, refresh = 0
+  )
+  # The generative truth rides on the saved fit so a separate test
+  # can assert recovery against it without repeating the simulation.
+  attr(fit_gauss, "sim_truth") <- list(
+    n_site = n_site, n_obs = n_obs, site_eff = site_eff
   )
   saveRDS(fit_gauss, gauss_cache)
   cat("[FIT] cached to", gauss_cache, "\n")
@@ -94,7 +108,7 @@ cat("Wrote /tmp/kfold_demo_plot.png\n")
 # ------------------------------------------------------------
 # 2) Closure-unit (occ) fit, leave-one-site-out kfold
 # ------------------------------------------------------------
-occ_cache <- "/tmp/kfold_demo_occ_fit.rds"
+occ_cache <- local_fixture_path("val_mvgam_kfold_demo_occ.rds")
 if (file.exists(occ_cache)) {
   fit_occ <- readRDS(occ_cache)
   cat("\n[CACHE] reusing", occ_cache, "\n")
@@ -125,7 +139,7 @@ if (file.exists(occ_cache)) {
     formula = y ~ 1, factor_formula = ~ -1,
     data = dat_o, unit = site, species = species,
     family = occ(), n_lv = 2L,
-    chains = 2L, parallel = TRUE,
+    chains = 2L,
     burnin = 200L, samples = 200L,
     silent = 2, refresh = 0
   )

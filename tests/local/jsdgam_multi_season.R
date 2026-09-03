@@ -46,13 +46,22 @@
 #     seasons > 0.1 on the logit scale (catches the failure mode
 #     where the site RE absorbs Z * lv variation)
 #
-# Cached at /tmp/jsdgam_multi_season_recovery_fit.rds. Delete to
-# refit. Runtime ~8-15 min on cmdstanr with 2 chains.
+# Cached at tests/local/fixtures/val_mvgam_jsdgam_multi_season.rds.
+# Delete to refit. Runtime ~8-15 min on cmdstanr with 2 chains.
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)
   library(dplyr)
   library(posterior)
+})
+
+# testthat sets the working directory to tests/local/ when it runs a
+# file, while Rscript runs it from the package root. Reach the shared
+# fixture helpers by whichever of the two paths exists.
+source(if (file.exists("concordance_helpers.R")) {
+  "concordance_helpers.R"
+} else {
+  file.path("tests", "local", "concordance_helpers.R")
 })
 
 set.seed(616L)
@@ -149,7 +158,19 @@ cat("True cor off-diag range: [",
 
 # ----- Fit -----------------------------------------------------------
 
-cache <- "/tmp/jsdgam_multi_season_recovery_fit.rds"
+# The generative truth rides on the saved fit so a separate test can
+# assert recovery against it without repeating the simulation.
+sim_truth <- list(
+  N = N, J = J, T_ = T_, K_visits = K_visits, n_lv = n_lv,
+  species_levels = species_levels,
+  Z_true = Z_true, lv_true = lv_true, rho_true = rho_true,
+  alpha_site_true = alpha_site_true,
+  sigma_site_true = sigma_site_true, p_true = p_true,
+  psi_true = psi_true, z_latent = z_latent,
+  sigma_true_cov = sigma_true_cov, sigma_true_cor = sigma_true_cor
+)
+
+cache <- local_fixture_path("val_mvgam_jsdgam_multi_season.rds")
 if (file.exists(cache)) {
   cat("[cache] Loading multi-season recovery fit.\n")
   fit <- readRDS(cache)
@@ -176,11 +197,14 @@ if (file.exists(cache)) {
     family         = occ(multi_season = TRUE),
     n_lv           = n_lv,
     prior          = site_re_prior,
-    chains         = 2L, parallel = TRUE,
+    chains         = 2L,
     burnin         = 500L, samples = 500L,
     silent         = 2,
     backend        = "cmdstanr"
   )
+}
+if (!identical(attr(fit, "sim_truth"), sim_truth)) {
+  attr(fit, "sim_truth") <- sim_truth
   saveRDS(fit, cache)
 }
 

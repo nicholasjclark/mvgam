@@ -10,13 +10,23 @@
 #      saturation < 20%. Gates are loose for the smoke pass;
 #      the full recovery fixture uses tighter thresholds.
 #
-# Cached at /tmp/mvn_smoke_fit.rds. Delete to refit. Runtime ~3-5 min.
+# Cached at tests/local/fixtures/val_mvgam_mvn_smoke.rds. Delete to
+# refit. Runtime ~3-5 min.
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)
   library(dplyr)
   library(tidyr)
   library(posterior)
+})
+
+# testthat sets the working directory to tests/local/ when it runs a
+# file, while Rscript runs it from the package root. Reach the shared
+# fixture helpers by whichever of the two paths exists.
+source(if (file.exists("concordance_helpers.R")) {
+  "concordance_helpers.R"
+} else {
+  file.path("tests", "local", "concordance_helpers.R")
 })
 
 set.seed(101L)
@@ -59,7 +69,15 @@ cat("Simulated", n_sites, "sites x", K, "species. True Sigma off-diag",
     "range: [", round(min(sigma_true[upper.tri(sigma_true)]), 3),
     ",", round(max(sigma_true[upper.tri(sigma_true)]), 3), "].\n")
 
-cache <- "/tmp/mvn_smoke_fit.rds"
+# The generative truth rides on the saved fit so a separate test can
+# assert recovery against it without repeating the simulation.
+sim_truth <- list(
+  K = K, N_lv = N_lv, species_levels = species_levels,
+  Z_true = Z_true, psi_true = psi_true, sigma_true = sigma_true,
+  mu_intercept = mu_intercept, mu_env_slope = mu_env_slope, env = env
+)
+
+cache <- local_fixture_path("val_mvgam_mvn_smoke.rds")
 if (file.exists(cache)) {
   cat("[cache] Loading mvn fit.\n")
   fit_mvn <- readRDS(cache)
@@ -72,11 +90,14 @@ if (file.exists(cache)) {
     unit = time, species = series,
     family = mvn(),
     n_lv = 2L,
-    chains = 2L, parallel = TRUE,
+    chains = 2L,
     warmup = 500L, iter = 1000L,
     silent = 2,
     backend = "cmdstanr"
   )
+}
+if (!identical(attr(fit_mvn, "sim_truth"), sim_truth)) {
+  attr(fit_mvn, "sim_truth") <- sim_truth
   saveRDS(fit_mvn, cache)
 }
 

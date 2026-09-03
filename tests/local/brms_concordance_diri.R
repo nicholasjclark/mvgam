@@ -16,14 +16,24 @@
 # Run with:
 #   Rscript tests/local/brms_concordance_diri.R
 #
-# Caches both fits at /tmp/brms_diri_concordance_*.rds. Delete to
-# refit. Total runtime ~3-5 min.
+# Caches both fits at tests/local/fixtures/val_brms_diri_concordance
+# .rds and val_mvgam_diri_concordance.rds. Delete to refit. Total
+# runtime ~3-5 min.
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)
   library(brms)
   library(tidyr)
   library(dplyr)
+})
+
+# testthat sets the working directory to tests/local/ when it runs a
+# file, while Rscript runs it from the package root. Reach the shared
+# fixture helpers by whichever of the two paths exists.
+source(if (file.exists("concordance_helpers.R")) {
+  "concordance_helpers.R"
+} else {
+  file.path("tests", "local", "concordance_helpers.R")
 })
 
 set.seed(2024L)
@@ -72,8 +82,16 @@ cat("Simulated", n_sites, "sites x", n_cats, "categories.\n")
 cat("Per-site sums (should be 1):",
     round(rowSums(Y_wide[1:3, ]), 3), "\n")
 
+# The generative truth rides on both saved fits so a separate test
+# can assert recovery against it without repeating the simulation.
+sim_truth <- list(
+  n_sites = n_sites, n_cats = n_cats, cat_names = cat_names,
+  intercept_true = intercept_true, beta_env_true = beta_env_true,
+  phi_true = phi_true, probs = probs, env = env
+)
+
 # brms-native Dirichlet fit -----------------------------------------------
-cache_brms <- "/tmp/brms_diri_concordance_brms.rds"
+cache_brms <- local_fixture_path("val_brms_diri_concordance.rds")
 if (file.exists(cache_brms)) {
   cat("\n[cache] brms-native Dirichlet fit\n")
   fit_brms <- readRDS(cache_brms)
@@ -84,6 +102,9 @@ if (file.exists(cache_brms)) {
     data = wide_dat, chains = 2L, iter = 1000L, warmup = 500L,
     refresh = 0, silent = 2
   )
+}
+if (!identical(attr(fit_brms, "sim_truth"), sim_truth)) {
+  attr(fit_brms, "sim_truth") <- sim_truth
   saveRDS(fit_brms, cache_brms)
 }
 
@@ -94,7 +115,7 @@ if (file.exists(cache_brms)) {
 # a single env slope across all K categories and the per-category
 # fixed effects collapse (cor against brms native ~ 0.4 instead of
 # the > 0.9 you'd expect; see git history).
-cache_diri <- "/tmp/brms_diri_concordance_diri.rds"
+cache_diri <- local_fixture_path("val_mvgam_diri_concordance.rds")
 if (file.exists(cache_diri)) {
   cat("[cache] diri() fit\n")
   fit_diri <- readRDS(cache_diri)
@@ -107,11 +128,14 @@ if (file.exists(cache_diri)) {
     unit = time, species = series,
     family = diri(),
     n_lv = 2L,
-    chains = 2L, parallel = TRUE,
+    chains = 2L,
     burnin = 500L, samples = 500L,
     silent = 2,
     backend = "cmdstanr"
   )
+}
+if (!identical(attr(fit_diri, "sim_truth"), sim_truth)) {
+  attr(fit_diri, "sim_truth") <- sim_truth
   saveRDS(fit_diri, cache_diri)
 }
 

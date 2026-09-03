@@ -653,6 +653,40 @@ mvgam_smooth_index <- function(formula, data, family = NULL) {
 }
 
 
+#' The frame one side of the model was fitted on
+#'
+#' A smooth is drawn over, and evaluated on, the frame its own side
+#' carries. The trend side runs on the trend grid rather than the
+#' observation one, and under `by = lv_axis()` that grid holds one
+#' row per (time, latent factor) plus the `.trend` factor the smooth
+#' is split by. The observation frame has no such column, so reading
+#' it leaves the only smooth such a model has unevaluable: the grid
+#' builder produces no rows and the evaluator is refused by brms for
+#' a variable it cannot find.
+#'
+#' The observation side is the exception, and deliberately so: its
+#' frame is the one the user supplied, which is what `object$data`
+#' already holds. Only the trend side runs on a frame of its own, so
+#' only the trend side needs to be redirected.
+#'
+#' Answering this in one place keeps the grid a smooth is drawn over
+#' and the grid it is evaluated on the same frame.
+#'
+#' @param object A fitted `mvgam` object
+#' @param side Either `"trend"` or `"obs"`
+#' @return The model frame that side was fitted on
+#' @noRd
+mvgam_side_data <- function(object, side) {
+  if (!identical(side, "trend")) {
+    return(object$data)
+  }
+  # A trend model reaches here without a stored frame only on an
+  # object assembled by hand, and the user's frame is the closest
+  # thing to a trend grid such an object has.
+  object$trend_model$data %||% object$data
+}
+
+
 # Core compute: posterior draws of one smooth term's contribution
 # to the linear predictor at the supplied prediction grid. Used by
 # both `posterior_smooths.mvgam` and `conditional_smooths.mvgam`.
@@ -660,7 +694,14 @@ mvgam_smooth_index <- function(formula, data, family = NULL) {
 mvgam_smooth_eta <- function(object, hit, newdata,
                               draw_ids = NULL) {
   side <- hit$side
-  if (is.null(newdata)) newdata <- object$data
+  side_model <- if (identical(side, "trend")) {
+    object$trend_model
+  } else {
+    object$obs_model
+  }
+  if (is.null(newdata)) {
+    newdata <- mvgam_side_data(object, side)
+  }
   side_form <- mvgam_side_formula(object, side)
   suffix <- mvgam_side_suffix(side)
   # Backfill any missing response column so brms::standata's
@@ -685,11 +726,6 @@ mvgam_smooth_eta <- function(object, hit, newdata,
   # family-specific aterm columns (e.g. `| trials(N)` for
   # binomial fits) from raising errors when the caller's grid
   # doesn't carry those columns.
-  side_model <- if (identical(side, "trend")) {
-    object$trend_model
-  } else {
-    object$obs_model
-  }
   sd_new <- brms::standata(
     side_model, newdata = newdata,
     check_response = FALSE, internal = TRUE
@@ -782,7 +818,7 @@ mvgam_smooth_eta <- function(object, hit, newdata,
 #'@noRd
 build_smooth_grid <- function(x, hit, surface, facets, resolution,
                                 int_conditions, too_far) {
-  mf <- x$data
+  mf <- mvgam_side_data(x, hit$side)
   side_form_bf <- mvgam_side_formula(x, hit$side)
   side_form <- side_form_bf$formula
   spec <- mvgam_smooth_label_spec(

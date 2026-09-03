@@ -70,7 +70,7 @@ nmix_path <- tryCatch(
       factor_formula = ~ -1,
       data = dat, unit = site, species = species,
       family = nmix(), n_lv = n_lv_true,
-      chains = 2L, parallel = TRUE,
+      chains = 2L,
       burnin = 200L, samples = 200L,
       silent = 2
     )
@@ -100,7 +100,7 @@ occ_path <- tryCatch(
       factor_formula = ~ -1,
       data = dat_occ, unit = site, species = species,
       family = occ(), n_lv = n_lv_true,
-      chains = 2L, parallel = TRUE,
+      chains = 2L,
       burnin = 200L, samples = 200L,
       silent = 2
     )

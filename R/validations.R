@@ -1142,6 +1142,56 @@ any_trend_requires_regular_intervals <- function(trend_specs) {
   }
   FALSE
 }
+#' The series a spec will give a frame, before any axis exists
+#'
+#' The two grouping validators run before the axis is resolved and
+#' both need the same answer: which series each row belongs to under
+#' this specification. They asked for it differently, and each way
+#' was wrong in its own direction. One read the specification flat
+#' and vanished silently on the nested spelling; both returned
+#' without checking whenever the frame carried no `series` column,
+#' which is exactly the frame a grouping names its series for.
+#'
+#' A `gr` that names no column of the frame is refused here rather
+#' than passed on. Left alone it reached Stan assembly, after brms
+#' setup, and was reported there against a variable the user never
+#' wrote.
+#'
+#' @param trend_spec A trend specification, in either spelling.
+#' @param data The frame being validated.
+#' @return A list with `gr_var` and the per-row `series`, or `NULL`
+#'   when the spec names no grouping.
+#' @noRd
+spec_series_values <- function(trend_spec, data) {
+  groupings <- spec_groupings(trend_spec)
+  gr_var <- groupings$gr
+  if (!named_var(gr_var)) {
+    return(NULL)
+  }
+  if (!gr_var %in% colnames(data)) {
+    stop(insight::format_error(c(
+      paste0("Grouping variable '", gr_var, "' is not in the data."),
+      x = paste0(
+        "Columns present: ", paste(colnames(data), collapse = ", "), "."
+      ),
+      i = "'gr' must name a column that says which group a series is in."
+    )), call. = FALSE)
+  }
+  subgr <- groupings$subgr
+  series_var <- trend_spec$series %||%
+    trend_spec$trend_model$series %||% "series"
+  series <- if (named_var(subgr) && !identical(subgr, series_var) &&
+                  subgr %in% colnames(data)) {
+    hierarchical_series_values(data, gr_var, subgr)
+  } else if (series_var %in% colnames(data)) {
+    data[[series_var]]
+  } else {
+    return(NULL)
+  }
+  list(gr_var = gr_var, series = series, series_var = series_var)
+}
+
+
 
 
 #' Validate Hierarchical Groups Are Balanced
@@ -1159,38 +1209,18 @@ any_trend_requires_regular_intervals <- function(trend_specs) {
 #' @return Invisibly NULL; called for its side-effect.
 #' @noRd
 validate_gr_balanced_groups <- function(trend_spec, data) {
-  # The specification arrives flat from some callers and nested
-  # under `$trend_model` from others. Reading one spelling is how a
-  # single frame acquired two series axes inside one build, and a
-  # check that silently returns on the other spelling is the same
-  # mistake with a quieter symptom.
-  groupings <- spec_groupings(trend_spec)
-  gr_var <- groupings$gr
-  subgr <- groupings$subgr
-  series_var <- trend_spec$series %||%
-    trend_spec$trend_model$series %||% "series"
-
-  if (!named_var(gr_var) || !gr_var %in% colnames(data)) {
+  resolved <- spec_series_values(trend_spec, data)
+  if (is.null(resolved)) {
     return(invisible(NULL))
   }
+  gr_var <- resolved$gr_var
+  series_var <- resolved$series_var
 
-  # The series counted here have to be the series the trend will
-  # have. A `gr` / `subgr` pair names them, whether or not the frame
-  # also carries a column, and reading the column instead counted a
-  # different set: a frame naming no series skipped the check, and a
-  # frame naming its own was checked on the spelling the grouping
-  # supersedes. Both let an unbalanced design through to a Stan
-  # program that sizes every group's blocks by the largest group,
-  # leaving the smaller groups a slice of a correlation matrix they
-  # never asked for.
-  series_vals <- if (named_var(subgr) && !identical(subgr, series_var) &&
-                       subgr %in% colnames(data)) {
-    hierarchical_series_values(data, gr_var, subgr)
-  } else if (series_var %in% colnames(data)) {
-    data[[series_var]]
-  } else {
-    return(invisible(NULL))
-  }
+  # The series counted are the series the trend will have, which is
+  # what lets an unbalanced design be caught: sized by the largest
+  # group, the smaller groups take a slice of a correlation matrix
+  # they never asked for, and every index stays in range.
+  series_vals <- resolved$series
 
   # One group value per series, taken by the helper that owns that
   # question. It reads the prepared axis when the frame carries one
@@ -1242,17 +1272,12 @@ validate_gr_balanced_groups <- function(trend_spec, data) {
 #'   inconsistent series).
 #' @noRd
 validate_gr_constant_per_series <- function(trend_spec, data) {
-  gr_var <- trend_spec$gr
-  series_var <- trend_spec$series %||% "series"
-
-  if (!series_var %in% colnames(data)) {
+  resolved <- spec_series_values(trend_spec, data)
+  if (is.null(resolved)) {
     return(invisible(NULL))
   }
-  if (!gr_var %in% colnames(data)) {
-    return(invisible(NULL))
-  }
-
-  series_vec <- data[[series_var]]
+  gr_var <- resolved$gr_var
+  series_vec <- resolved$series
   gr_vec <- data[[gr_var]]
   counts <- vapply(
     split(gr_vec, series_vec),
@@ -1334,13 +1359,23 @@ is_factor_model_spec <- function(n_lv, n_series) {
 #'   factor model.
 #' @noRd
 detect_factor_n_lv <- function(object, n_series = NULL) {
-  spec <- first_trend_spec(object)
-  if (is.null(spec)) return(NULL)
-  n_lv <- spec$n_lv
+  # Whether the user asked for latent factors, which is a different
+  # question from how many latent columns the trend has. The record
+  # answers the second: a model with no factor constructor still
+  # gets one column per series, so `axes$factor$n_lv` is populated
+  # for every fit and reading it here reported an ordinary trend as
+  # a factor model with as many factors as series, sending every
+  # caller looking for a `Z` that was never sampled.
+  n_lv <- spec_n_lv(first_trend_spec(object))
   if (is.null(n_lv) || !is.numeric(n_lv) || n_lv < 1L) {
     return(NULL)
   }
-  n_series <- n_series %||% object$standata$N_series_trend
+  # The series count has one owner, and it is the record.
+  n_series <- n_series %||% mvgam_axes(object)$series$n %||%
+    object$standata$N_series_trend
+  # A model with as many factors as series is not a factor model:
+  # every series loads on its own state and there is nothing to
+  # plot as a loading.
   if (!is.null(n_series) && !is_factor_model_spec(n_lv, n_series)) {
     return(NULL)
   }
@@ -3399,6 +3434,21 @@ warn_series_superseded <- function(data, series_var, series_values,
   )
   invisible(NULL)
 }
+#' A grouping variable's name, or `NA` where the trend names none
+#'
+#' The metadata fields spell an absent grouping `NA_character_`
+#' rather than `NULL`, and the same ternary decided that four
+#' times over. `named_var()` owns whether a name is a name; this
+#' owns what to record when it is not.
+#'
+#' @param var A grouping variable name, or a sentinel for none.
+#' @return The name, or `NA_character_`.
+#' @noRd
+named_var_or_na <- function(var) {
+  if (named_var(var)) as.character(var) else NA_character_
+}
+
+
 
 
 # Internal: TRUE when a metadata variable name points at a usable
@@ -3482,14 +3532,19 @@ validate_prediction_factor_levels <- function(data, metadata) {
   # levels. Rebuild the derived value instead: that still catches a
   # `gr` / `subgr` combination the training data never contained, even
   # though each level on its own is known.
-  if (!is.null(metadata$levels$series)) {
+  # The axis, read through the one accessor that understands both
+  # the record and the spelling a fit saved before it used. Reading
+  # `levels$series` and `series_source` here was a second account of
+  # the axis, free to disagree with the record on the same object.
+  axes <- axes_from_metadata(metadata)
+  fitted_levels <- axes$series$levels
+  if (!is.null(fitted_levels)) {
     gr_var <- metadata$variables$gr_var
     subgr_var <- metadata$variables$subgr_var
-    # `series_source` records that the column was derived, but a pair
-    # of grouping variables says the same thing, so either is enough.
-    # Relying on the field alone would let a fit whose metadata lacks
-    # it fall through and be checked against a stale column.
-    derived_hier <- identical(metadata$series_source, "hierarchical") ||
+    # A pair of grouping variables says the series was derived, and
+    # so does the recorded source; either is enough, because a fit
+    # missing one still carries the other.
+    derived_hier <- identical(axes$series$source, "hierarchical") ||
       (named_var(gr_var) && named_var(subgr_var))
     newdata_levels <- NULL
     if (derived_hier) {
@@ -3509,13 +3564,13 @@ validate_prediction_factor_levels <- function(data, metadata) {
       }
     }
     if (!is.null(newdata_levels)) {
-      invalid <- setdiff(newdata_levels, metadata$levels$series)
+      invalid <- setdiff(newdata_levels, fitted_levels)
       if (length(invalid) > 0) {
         stop(insight::format_error(c(
           "Series levels in newdata not found in training data.",
           x = cli::format_inline("Invalid: {.val {invalid}}."),
           i = cli::format_inline(
-            "Training data has levels: {.val {metadata$levels$series}}."
+            "Training data has levels: {.val {fitted_levels}}."
           )
         )), call. = FALSE)
       }
@@ -3685,7 +3740,7 @@ validate_no_factor_hierarchical <- function(trend_specs, n_series, trend_name) {
   is_factor_model <- is_factor_model_spec(n_lv, n_series)
 
   # Check if hierarchical grouping is requested
-  use_grouping <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
+  use_grouping <- named_var(trend_specs$gr)
 
   # Factor models are incompatible with hierarchical grouping
   if (use_grouping && is_factor_model) {
@@ -3980,9 +4035,7 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
       gr_var <- metadata$variables$gr_var
       subgr_var <- metadata$variables$subgr_var
 
-      if (!is.null(gr_var) && !is.null(subgr_var) &&
-          !is.na(gr_var) && !is.na(subgr_var) &&
-          gr_var != "NA" && subgr_var != "NA") {
+      if (named_var(gr_var) && named_var(subgr_var)) {
         assert_grouping_columns(data, gr_var, subgr_var)
         series_values <- hierarchical_series_values(
           data, gr_var, subgr_var
@@ -4082,26 +4135,42 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
 
   return(data)
 }
+#' The prepared time or series index a frame carries
+#'
+#' A frame read for a model carries its trend indices as attributes,
+#' and both are fetched the same way. Fetching them through two
+#' functions with one body each meant the two could answer
+#' differently the day either changed, on a question that has one
+#' answer.
+#'
+#' @param data Data frame carrying the prepared attributes.
+#' @param what Which index to fetch, `"time"` or `"series"`.
+#' @return The stored vector.
+#' @noRd
+mvgam_prepared_index <- function(data, what) {
+  checkmate::assert_data_frame(data, min.rows = 1)
+  checkmate::assert_choice(what, c("time", "series"))
+  values <- attr(data, paste0("mvgam_", what))
+  if (is.null(values)) {
+    stop(insight::format_error(c(
+      paste0("This data frame carries no ", what, " index."),
+      i = paste0(
+        "The ", what, " index is built when a frame is read for a ",
+        "model, so this frame has not been through that reading."
+      )
+    )), call. = FALSE)
+  }
+  values
+}
+
 
 #' Get time variable for grouping operations
-#'
-#' Retrieves implicit time indices from data attributes for consistent grouping
 #'
 #' @param data Data frame with mvgam time attributes
 #' @return Numeric vector of sequential time indices (1, 2, 3, ...)
 #' @noRd
 get_time_for_grouping <- function(data) {
-  checkmate::assert_data_frame(data, min.rows = 1)
-
-  time_values <- attr(data, "mvgam_time")
-  if (is.null(time_values)) {
-    stop(insight::format_error(c(
-      "No time variable attribute found.",
-      i = "Call ensure_mvgam_variables() first to create time attributes."
-    )), call. = FALSE)
-  }
-
-  return(time_values)
+  mvgam_prepared_index(data, "time")
 }
 
 #' The group each series belongs to, one entry per series
@@ -4151,26 +4220,13 @@ series_group_values <- function(data, series_var, gr_var,
   }
   groups[match(as.character(order_by), labels[first])]
 }
-
 #' Get series variable for grouping operations
-#'
-#' Retrieves series values from data attributes for consistent grouping
 #'
 #' @param data Data frame with mvgam series attributes
 #' @return Factor or character vector of series identifiers
 #' @noRd
 get_series_for_grouping <- function(data) {
-  checkmate::assert_data_frame(data, min.rows = 1)
-
-  series_values <- attr(data, "mvgam_series")
-  if (is.null(series_values)) {
-    stop(insight::format_error(c(
-      "No series variable attribute found.",
-      i = "Call ensure_mvgam_variables() first to create series attributes."
-    )), call. = FALSE)
-  }
-
-  return(series_values)
+  mvgam_prepared_index(data, "series")
 }
 
 #' The series a frame observes, in the order its axis runs
@@ -4837,10 +4893,8 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
         validation_grouping_vars <- character(0)
 
         if (!is.null(parsed_trend$trend_model)) {
-          has_gr <- !is.null(parsed_trend$trend_model$gr) &&
-                    parsed_trend$trend_model$gr != "NA"
-          has_subgr <- !is.null(parsed_trend$trend_model$subgr) &&
-                       parsed_trend$trend_model$subgr != "NA"
+          has_gr <- named_var(parsed_trend$trend_model$gr)
+          has_subgr <- named_var(parsed_trend$trend_model$subgr)
 
           if (has_gr && has_subgr) {
             validation_grouping_vars <- c(".validation_time_temp",
@@ -5000,14 +5054,8 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
       variables = list(
         time_var = time_var,
         series_var = series_var,
-        gr_var = if (!is.null(parsed_trend$trend_model$gr) &&
-                     parsed_trend$trend_model$gr != "NA") {
-                   parsed_trend$trend_model$gr
-                 } else NA_character_,
-        subgr_var = if (!is.null(parsed_trend$trend_model$subgr) &&
-                        parsed_trend$trend_model$subgr != "NA") {
-                      parsed_trend$trend_model$subgr
-                    } else NA_character_
+        gr_var = named_var_or_na(parsed_trend$trend_model$gr),
+        subgr_var = named_var_or_na(parsed_trend$trend_model$subgr)
       ),
       is_car = !is.null(parsed_trend$trend_model) &&
                identical(parsed_trend$trend_model$trend, "CAR"),
@@ -5053,22 +5101,10 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
         series = mvgam_response_axis(data) %||%
           observed_series_levels(series_vals),
         gr = extract_factor_levels(
-          data,
-          if (!is.null(parsed_trend$trend_model$gr) &&
-              parsed_trend$trend_model$gr != "NA") {
-            parsed_trend$trend_model$gr
-          } else {
-            NA_character_
-          }
+          data, named_var_or_na(parsed_trend$trend_model$gr)
         ),
         subgr = extract_factor_levels(
-          data,
-          if (!is.null(parsed_trend$trend_model$subgr) &&
-              parsed_trend$trend_model$subgr != "NA") {
-            parsed_trend$trend_model$subgr
-          } else {
-            NA_character_
-          }
+          data, named_var_or_na(parsed_trend$trend_model$subgr)
         )
       )
     )
@@ -5725,10 +5761,12 @@ warn_once_per_call <- function(expr) {
 #' @param fc_times Named list of forecast times per series.
 #' @param training The training arms, carrying `times` per series.
 #' @param trend_spec The fit's trend specification.
+#' @param step The spacing the fit's own time grid runs on,
+#'   from `axes$time$step`. `NA` where it is irregular.
 #' @return Invisibly `TRUE`; raises otherwise.
 #' @noRd
 assert_forecast_times_steppable <- function(fc_times, training,
-                                            trend_spec) {
+                                            trend_spec, step) {
   checkmate::assert_list(fc_times, null.ok = TRUE)
   checkmate::assert_list(training)
   if (!any_trend_requires_regular_intervals(trend_spec)) {
@@ -5746,9 +5784,17 @@ assert_forecast_times_steppable <- function(fc_times, training,
     training$times %||% list(), use.names = FALSE
   ))))
   if (length(past) < 2L) return(invisible(TRUE))
-  steps <- unique(diff(past))
-  if (length(steps) != 1L) return(invisible(TRUE))
-  step <- steps[1L]
+  # The spacing the fit recorded, not a second reading of it.
+  # Deriving the step here as well gave the same fact two
+  # answers, free to disagree the day either changed. `NA` is
+  # an irregular grid, which has no single step to continue,
+  # and `NULL` is a fit that recorded none: neither can say
+  # what the next occasion should be, so neither refuses one.
+  if (is.null(step) || is.na(step)) return(invisible(TRUE))
+  # Left as it was recorded. Coercing to integer turned a grid
+  # spaced by half a unit into a step of zero, which no forecast
+  # can continue.
+  step <- as.numeric(step)
   for (lv in names(fc_times)) {
     fut <- sort(as.integer(fc_times[[lv]]))
     if (!length(fut)) next

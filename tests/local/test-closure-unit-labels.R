@@ -46,12 +46,28 @@ test_that("the unit grid keeps the kernel's own ordering", {
   # The grid must not be re-sorted: `build_closure_unit_arrays()`
   # numbers units by first appearance in the time-major data, and the
   # draw matrix columns follow that.
+  #
+  # The defect this guards is a permutation -- a grid sorted
+  # series-major against a kernel numbering by first appearance --
+  # and `expect_setequal()` cannot see a permutation. Both orders
+  # hold the same twelve labels, so the check that stood here
+  # passed on precisely the arrangement it was written to catch.
   fit <- load_mvgam("closure_labels_nmix")
   state <- as.data.frame(hindcast(fit, type = "latent_state"))
   units <- unique(fit$data[, c("series", "time")])
   expect_identical(nrow(state), nrow(units))
-  expect_setequal(
+  expect_identical(
     paste(state$series, state$time),
     paste(units$series, units$time)
+  )
+
+  # And the frame is one the ordering can be read off: a fixture
+  # whose rows already arrive series-major would make the two
+  # orders coincide and the check above say nothing.
+  expect_false(
+    identical(
+      paste(units$series, units$time),
+      paste(units$series, units$time)[order(units$series, units$time)]
+    )
   )
 })

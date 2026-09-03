@@ -40,6 +40,15 @@ library(dplyr)
 library(tidyr)
 library(brms)
 
+# testthat sets the working directory to tests/local/ when it runs a
+# file, while Rscript runs it from the package root. Reach the shared
+# fixture helpers by whichever of the two paths exists.
+source(if (file.exists("concordance_helpers.R")) {
+  "concordance_helpers.R"
+} else {
+  file.path("tests", "local", "concordance_helpers.R")
+})
+
 
 # Pull the same three WDI series Savage used and reshape to the
 # long (country, outcome, time) form mvgam expects. Standardise
@@ -163,5 +172,10 @@ test_that("mvgam hierarchical VAR fits Savage's WDI panel", {
   diag <- bayesplot::rhat(mod$fit)
   expect_true(max(diag, na.rm = TRUE) < 1.1)
 
-  saveRDS(mod, "/tmp/savage_hier_var_fit.rds")
+  # The panel is a live WDI download rather than a simulation, so the
+  # fixture carries the per-outcome scaling the fit was built on.
+  attr(mod, "sim_truth") <- list(
+    outcome_scales = attr(long, "outcome_scales")
+  )
+  saveRDS(mod, local_fixture_path("val_mvgam_savage_hier_var.rds"))
 })

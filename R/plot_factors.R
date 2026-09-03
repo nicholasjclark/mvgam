@@ -234,14 +234,11 @@ plot_latent_state <- function(object, probs = c(0.5, 0.8, 0.95),
 # Internal: shared column-name lookup for tilde-aware lv_trend
 # extraction. Returns a `[n_time, n_lv]` character matrix of
 # `lv_trend[t, k]` (or `lv_trend_tilde[t, k]`) column names ordered
-# `[time, factor]`, plus the resolved parameter name. Used by both
-# `extract_lv_trend_matrices()` (which builds a per-factor list of
-# `[draws, n_time]` matrices for plotting) and
-# `extract_lv_trend_array_from_draws()` in `R/predictions.R` (which
-# stacks the same draws into a `[draws, n_time, n_lv]` array for
-# the by-lv compose path). Pattern selection delegates to
-# `factor_state_param_pattern()` so Z_tilde / Z fits stay aligned
-# in lockstep.
+# `[time, factor]`, plus the resolved parameter name. Used by
+# `extract_lv_trend_matrices()`, which builds a per-factor list of
+# `[draws, n_time]` matrices for plotting. Pattern selection
+# delegates to `factor_state_param_pattern()` so Z_tilde / Z fits
+# stay aligned in lockstep.
 #'@noRd
 collect_lv_trend_column_names <- function(par_names, n_lv) {
   pattern <- factor_state_param_pattern(par_names)
@@ -288,9 +285,8 @@ collect_lv_trend_column_names <- function(par_names, n_lv) {
 
 # Internal: extract per-factor (ndraws x n_time) matrices of
 # factor paths from the Stan posterior. Returns a named list of
-# length `n_lv`, names "Factor 1" ... "Factor n_lv". Shares
-# column resolution with `extract_lv_trend_array_from_draws()`
-# via `collect_lv_trend_column_names()`.
+# length `n_lv`, names "Factor 1" ... "Factor n_lv". Column
+# resolution comes from `collect_lv_trend_column_names()`.
 #'@noRd
 extract_lv_trend_matrices <- function(object, n_lv) {
   draws_mat <- posterior::as_draws_matrix(object$fit)

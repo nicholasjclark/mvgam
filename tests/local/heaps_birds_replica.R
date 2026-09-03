@@ -14,14 +14,24 @@
 #
 # Run with:
 #   Rscript tests/local/heaps_birds_replica.R
-# Caches the fit at /tmp/heaps_birds_replica.rds; delete to refit.
+# Caches the fit at tests/local/fixtures/val_mvgam_heaps_birds.rds;
+# delete to refit.
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)
   library(ape)
 })
 
-cache_path <- "/tmp/heaps_birds_replica.rds"
+# testthat sets the working directory to tests/local/ when it runs a
+# file, while Rscript runs it from the package root. Reach the shared
+# fixture helpers by whichever of the two paths exists.
+source(if (file.exists("concordance_helpers.R")) {
+  "concordance_helpers.R"
+} else {
+  file.path("tests", "local", "concordance_helpers.R")
+})
+
+cache_path <- local_fixture_path("val_mvgam_heaps_birds.rds")
 
 set.seed(2024L)
 
@@ -82,6 +92,16 @@ dat <- data.frame(
 cat("Simulated", n_sites, "sites x", n_species, "species. Mean presence:",
     round(mean(dat$y), 3), "\n")
 
+# The generative truth rides on the saved fits so a separate test can
+# assert recovery against it without repeating the simulation.
+sim_truth <- list(
+  n_species = n_species, n_sites = n_sites, n_lv_true = n_lv_true,
+  species_levels = species_levels, body_mass = body_mass, tree = tree,
+  theta_trait_true = theta_trait_true,
+  theta_phylo_true = theta_phylo_true,
+  Phi = Phi, Z_true = Z_true, lv_true = lv_true
+)
+
 # 4. Fit jsdgam with the trait + phylo aliases ---------------------------
 if (file.exists(cache_path)) {
   cat("Loading cached Heaps-style jsdgam fit from", cache_path, "\n")
@@ -96,10 +116,13 @@ if (file.exists(cache_path)) {
     n_lv = n_lv_true,
     traits = trait_df,
     phylo = tree,
-    chains = 2L, parallel = TRUE,
+    chains = 2L,
     burnin = 400L, samples = 400L,
     silent = 2
   )
+}
+if (!identical(attr(fit, "sim_truth"), sim_truth)) {
+  attr(fit, "sim_truth") <- sim_truth
   saveRDS(fit, cache_path)
   cat("Saved fit to", cache_path, "\n")
 }
@@ -253,7 +276,7 @@ cat("\nSummary:", sum(audit_df$ok), "/", nrow(audit_df),
 # Refit with the wider prior to give a fair length-scale comparison
 # against the published Fig. 1a posterior densities.
 
-cache_wide <- "/tmp/heaps_birds_replica_wide.rds"
+cache_wide <- local_fixture_path("val_mvgam_heaps_birds_wide.rds")
 if (file.exists(cache_wide)) {
   cat("\nLoading cached Heaps-prior fit from", cache_wide, "\n")
   fit_wide <- readRDS(cache_wide)
@@ -273,10 +296,13 @@ if (file.exists(cache_wide)) {
       brms::prior("normal(0, 3.162)",
                   class = "theta_dist_phylo")
     ),
-    chains = 2L, parallel = TRUE,
+    chains = 2L,
     burnin = 400L, samples = 400L,
     silent = 2
   )
+}
+if (!identical(attr(fit_wide, "sim_truth"), sim_truth)) {
+  attr(fit_wide, "sim_truth") <- sim_truth
   saveRDS(fit_wide, cache_wide)
 }
 

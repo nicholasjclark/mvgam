@@ -8,7 +8,7 @@
 #   3. Biplot with the same two traits at trait_arrow_scale = 0.6,
 #      to show the scaling control
 #
-# Cached fit: /tmp/jsdgam_ordinate_traits_fit.rds
+# Cached fit: tests/local/fixtures/val_mvgam_ordinate_traits.rds
 # Output PNGs: /tmp/ordinate_traits_<label>.png
 #
 # Run with:
@@ -19,8 +19,17 @@ suppressMessages({
   library(ggplot2)
 })
 
-cache <- "/tmp/jsdgam_ordinate_traits_fit.rds"
-trait_cache <- "/tmp/jsdgam_ordinate_traits_data.rds"
+# testthat sets the working directory to tests/local/ when it runs a
+# file, while Rscript runs it from the package root. Reach the shared
+# fixture helpers by whichever of the two paths exists.
+source(if (file.exists("concordance_helpers.R")) {
+  "concordance_helpers.R"
+} else {
+  file.path("tests", "local", "concordance_helpers.R")
+})
+
+cache <- local_fixture_path("val_mvgam_ordinate_traits.rds")
+trait_cache <- local_fixture_path("val_mvgam_ordinate_traits_data.rds")
 
 if (file.exists(cache) && file.exists(trait_cache)) {
   fit <- readRDS(cache)
@@ -83,11 +92,19 @@ if (file.exists(cache) && file.exists(trait_cache)) {
     factor_formula = ~ -1,
     data = dat, unit = site, species = species,
     family = nmix(), n_lv = n_lv_true,
-    chains = 2L, parallel = TRUE,
+    chains = 2L,
     burnin = 300L, samples = 300L,
     silent = 2, refresh = 0
   )
   bundle <- list(traits = traits, Z_true = Z_true)
+  # The generative truth rides on the saved fit so a separate test
+  # can assert recovery against it without repeating the simulation.
+  attr(fit, "sim_truth") <- list(
+    n_species = n_species, n_sites = n_sites, n_visits = n_visits,
+    n_lv_true = n_lv_true, species_levels = species_levels,
+    Z_true = Z_true, lv_true = lv_true, lambda = lambda,
+    N_latent = N_latent, p_det = p_det, traits = traits
+  )
   saveRDS(fit, cache)
   saveRDS(bundle, trait_cache)
   cat("[FIT] cached to", cache, "\n")

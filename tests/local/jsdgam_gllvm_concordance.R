@@ -82,7 +82,7 @@ t_beta_jsdgam <- system.time(
     factor_formula = ~ -1,
     data = dat_beta, unit = site, species = species,
     family = Beta(), n_lv = n_lv_true,
-    chains = 2L, parallel = TRUE,
+    chains = 2L,
     burnin = 200L, samples = 400L,
     silent = 2
   )

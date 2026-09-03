@@ -9,7 +9,7 @@
 source("setup_tests_local.R")
 source("concordance_helpers.R")
 
-require_fixtures("val_mvgam_var_cor.rds")
+require_fixtures("val_mvgam_var_cor.rds", "val_mvgam_ar1_int.rds")
 
 load_var_fit <- function() {
   readRDS(file.path(local_fixture_dir(), "val_mvgam_var_cor.rds"))
@@ -84,10 +84,7 @@ test_that("summary() and plot() methods dispatch on irf/fevd outputs", {
 
 test_that("irf/fevd/stability all reject non-VAR fits with a consistent message", {
   # Borrow any non-VAR fixture; AR(1) is the simplest available.
-  if (!file.exists(file.path(local_fixture_dir(), "val_mvgam_ar1.rds"))) {
-    skip("AR(1) fixture not available")
-  }
-  fit_ar <- readRDS(file.path(local_fixture_dir(), "val_mvgam_ar1.rds"))
+  fit_ar <- load_mvgam("ar1_int")
   expect_error(irf(fit_ar),       "VAR\\(1\\) latent trend")
   expect_error(fevd(fit_ar),      "VAR\\(1\\) latent trend")
   expect_error(stability(fit_ar), "VAR\\(1\\) latent trend")

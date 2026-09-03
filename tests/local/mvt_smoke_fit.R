@@ -19,13 +19,23 @@
 # gllvm parameterisation handles the lv * Z contribution to mu, so
 # the per-row residual stays scalar-Student-t at scale Psi[k].
 #
-# Cached at /tmp/mvt_smoke_fit.rds. Delete to refit. Runtime ~5-8 min.
+# Cached at tests/local/fixtures/val_mvgam_mvt_smoke.rds. Delete to
+# refit. Runtime ~5-8 min.
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)
   library(dplyr)
   library(tidyr)
   library(posterior)
+})
+
+# testthat sets the working directory to tests/local/ when it runs a
+# file, while Rscript runs it from the package root. Reach the shared
+# fixture helpers by whichever of the two paths exists.
+source(if (file.exists("concordance_helpers.R")) {
+  "concordance_helpers.R"
+} else {
+  file.path("tests", "local", "concordance_helpers.R")
 })
 
 set.seed(202L)
@@ -77,7 +87,16 @@ cat("Simulated", n_sites, "sites x", K, "species. True nu =", nu_true,
 cat("y range: [", round(min(long_dat$y), 2), ",",
     round(max(long_dat$y), 2), "]\n")
 
-cache <- "/tmp/mvt_smoke_fit.rds"
+# The generative truth rides on the saved fit so a separate test can
+# assert recovery against it without repeating the simulation.
+sim_truth <- list(
+  K = K, N_lv = N_lv, species_levels = species_levels,
+  Z_true = Z_true, psi_true = psi_true, nu_true = nu_true,
+  sigma_true = sigma_true, lv_sim = lv_sim,
+  mu_intercept = mu_intercept, mu_env_slope = mu_env_slope, env = env
+)
+
+cache <- local_fixture_path("val_mvgam_mvt_smoke.rds")
 if (file.exists(cache)) {
   cat("[cache] Loading mvt fit.\n")
   fit_mvt <- readRDS(cache)
@@ -90,11 +109,14 @@ if (file.exists(cache)) {
     unit = time, species = series,
     family = mvt(),
     n_lv = 2L,
-    chains = 2L, parallel = TRUE,
+    chains = 2L,
     burnin = 500L, samples = 500L,
     silent = 2,
     backend = "cmdstanr"
   )
+}
+if (!identical(attr(fit_mvt, "sim_truth"), sim_truth)) {
+  attr(fit_mvt, "sim_truth") <- sim_truth
   saveRDS(fit_mvt, cache)
 }
 

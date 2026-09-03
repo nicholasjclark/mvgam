@@ -21,6 +21,74 @@ test_that("standata carries the fixed Z matrix verbatim", {
 })
 
 
+test_that("each row of Z loads the series that occupies its column", {
+  # Comparing `Z` against `Z_true` says the matrix arrived intact in
+  # the order the user wrote it. It does not say row `k` belongs to
+  # the series Stan puts in trend column `k`, and a permutation
+  # between those two orders is invisible to a value-for-value
+  # check: every loading is present, every dimension agrees, and
+  # each series simply loads on another's factors.
+  #
+  # The occupant of each column is read from `obs_trend_series`,
+  # which is what the sampler indexed, and the row of `Z_true` is
+  # found by the series' own label. Neither side comes from the
+  # normaliser being checked.
+  sd <- fit$standata
+  labels <- as.character(mvgam:::training_series_labels(fit))
+  s_idx <- as.integer(sd$obs_trend_series)
+  n_series <- as.integer(sd$N_series_trend)
+
+  occupant <- vapply(seq_len(n_series), function(k) {
+    held <- unique(labels[s_idx == k])
+    if (length(held) == 1L) held else NA_character_
+  }, character(1))
+  expect_false(anyNA(occupant))
+
+  # `Z_true` was built row-per-series in the order the frame
+  # declares its series, which is the user's own statement of which
+  # loadings belong to whom.
+  declared <- levels(droplevels(as.factor(fit$data$series)))
+  expect_setequal(occupant, declared)
+  for (k in seq_len(n_series)) {
+    expect_equal(
+      unname(sd$Z[k, ]),
+      unname(Z_true[match(occupant[k], declared), ]),
+      label = paste("column", k, "carries", occupant[k], "loadings")
+    )
+  }
+})
+
+
+test_that("each series reads the latent cell the sampler gave it", {
+  # The claim every other assertion here rests on, checked against
+  # the posterior itself rather than against another derivation:
+  # the state post-fit resolves for a row is the `trend[t, s]` the
+  # sampler drew for that row's recorded cell. A wrong axis reads a
+  # real state belonging to another series, so the values are
+  # finite, the shapes agree, and only this comparison notices.
+  d <- as.data.frame(fit$data)
+  recorded_s <- as.integer(fit$standata$obs_trend_series)
+  recorded_t <- as.integer(fit$standata$obs_trend_time)
+  expect_length(recorded_s, nrow(d))
+
+  dm <- posterior::as_draws_matrix(fit$fit)
+  want <- vapply(seq_len(nrow(d)), function(j) {
+    mean(dm[, paste0("trend[", recorded_t[j], ",", recorded_s[j], "]")])
+  }, numeric(1))
+  got <- colMeans(
+    mvgam:::extract_trend_latent_states(fit, newdata = d, full_draws = dm)
+  )
+  expect_equal(unname(got), unname(want))
+
+  # And the series are not all reading one column: a fixed `Z` with
+  # distinct rows gives distinct states, so identical arms would
+  # mean the axis collapsed.
+  by_series <- split(want, recorded_s)
+  expect_gt(length(by_series), 1L)
+  expect_false(isTRUE(all.equal(by_series[[1L]], by_series[[2L]])))
+})
+
+
 test_that("Stan code declares Z in data; no Z_raw / no prior", {
   code_txt <- as.character(fit$stancode)
   expect_true(grepl(

@@ -2218,7 +2218,7 @@ methods_md_is_multi_season <- function(obj) {
 trend_grouping_var <- function(obj) {
   spec <- first_trend_spec(obj)
   gr <- spec$gr
-  if (is.null(gr) || identical(gr, "NA")) NULL else gr
+  if (!named_var(gr)) NULL else gr
 }
 
 #' @noRd

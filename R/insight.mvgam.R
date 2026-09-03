@@ -172,7 +172,7 @@ find_predictors.mvgam <- function(x, effects = "fixed",
 varying_meta_vars <- function(vars, x) {
   vars <- vars[!is.na(vars) & nzchar(vars)]
   if (!length(vars)) return(character(0))
-  dat <- x$data %||% x$obs_data
+  dat <- mvgam_training_data(x)
   if (is.null(dat)) return(vars)
   keep <- vapply(vars, function(v) {
     if (!v %in% names(dat)) return(TRUE)

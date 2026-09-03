@@ -12,10 +12,9 @@
 # species residual covariance, so the off-diagonal entries should
 # agree up to Monte Carlo error.
 #
-# Cached fits:
-#   /tmp/jsdgam_spocc_sim.rds          shared simulated data
-#   /tmp/jsdgam_spocc_mvgam.rds        mvgam jsdgam fit
-#   /tmp/jsdgam_spocc_spocc.rds        spOccupancy lfMsPGOcc fit
+# Cached fits, under tests/local/fixtures/:
+#   val_mvgam_spocc_concordance.rds   mvgam jsdgam fit
+#   val_spocc_lfmspgocc.rds           spOccupancy lfMsPGOcc fit
 #
 # Runtime: ~10-15 min per fit on a 4-core machine.
 
@@ -23,6 +22,15 @@ suppressMessages({
   devtools::load_all(".", quiet = TRUE)
   stopifnot(requireNamespace("spOccupancy", quietly = TRUE))
   library(posterior)
+})
+
+# testthat sets the working directory to tests/local/ when it runs a
+# file, while Rscript runs it from the package root. Reach the shared
+# fixture helpers by whichever of the two paths exists.
+source(if (file.exists("concordance_helpers.R")) {
+  "concordance_helpers.R"
+} else {
+  file.path("tests", "local", "concordance_helpers.R")
 })
 
 set.seed(2026L)
@@ -76,7 +84,18 @@ cat(sprintf(
 # Fit A: mvgam jsdgam(family = occ(), factor_formula = ~ env)
 # ============================================================
 
-cache_mvgam <- "/tmp/jsdgam_spocc_mvgam.rds"
+# The generative truth rides on both saved fits so a separate test
+# can assert recovery against it without repeating the simulation.
+sim_truth <- list(
+  K = K, N_lv = N_lv, n_sites = n_sites, n_visits = n_visits,
+  species_levels = species_levels, Z_true = Z_true,
+  b_occ_0 = b_occ_0, b_occ_e = b_occ_e,
+  b_det_0 = b_det_0, b_det_v = b_det_v,
+  env = env, visit_cov = visit_cov, lv_site = lv_site,
+  z_true = z_true, sigma_true = sigma_true
+)
+
+cache_mvgam <- local_fixture_path("val_mvgam_spocc_concordance.rds")
 if (file.exists(cache_mvgam)) {
   cat("[cache] mvgam jsdgam fit.\n")
   fit_mvgam <- readRDS(cache_mvgam)
@@ -124,6 +143,9 @@ if (file.exists(cache_mvgam)) {
     silent         = 2,
     backend        = "cmdstanr"
   )
+}
+if (!identical(attr(fit_mvgam, "sim_truth"), sim_truth)) {
+  attr(fit_mvgam, "sim_truth") <- sim_truth
   saveRDS(fit_mvgam, cache_mvgam)
 }
 
@@ -131,7 +153,7 @@ if (file.exists(cache_mvgam)) {
 # Fit B: spOccupancy::lfMsPGOcc on the same data
 # ============================================================
 
-cache_spocc <- "/tmp/jsdgam_spocc_spocc.rds"
+cache_spocc <- local_fixture_path("val_spocc_lfmspgocc.rds")
 if (file.exists(cache_spocc)) {
   cat("[cache] spOccupancy fit.\n")
   fit_spocc <- readRDS(cache_spocc)
@@ -157,6 +179,9 @@ if (file.exists(cache_spocc)) {
     n.chains    = 2L,
     verbose     = FALSE
   )
+}
+if (!identical(attr(fit_spocc, "sim_truth"), sim_truth)) {
+  attr(fit_spocc, "sim_truth") <- sim_truth
   saveRDS(fit_spocc, cache_spocc)
 }
 

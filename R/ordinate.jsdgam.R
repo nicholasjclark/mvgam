@@ -740,7 +740,7 @@ ordinate.mvgam <- function(
   svd_comp <- ordinate_factor_components(object, alpha, rotation)
   series_info <- resolve_series_info(object)
   species_names <- series_info$series_levels
-  data <- object$obs_data %||% object$data
+  data <- mvgam_training_data(object)
   site_names <- if (!is.null(data) && "time" %in% names(data)) {
     sort(unique(data$time))
   } else {

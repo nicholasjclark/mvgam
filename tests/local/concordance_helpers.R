@@ -19,7 +19,22 @@ local_fixture_dir <- function() {
   if (dir.exists(short)) return(short)
   long <- file.path("tests", "local", "fixtures")
   if (dir.exists(long)) return(long)
-  short
+  # Nothing is on disk to point at, so name the directory a build
+  # would create: the package-root path when the working directory
+  # holds tests/local, and the test-file path otherwise.
+  if (dir.exists(file.path("tests", "local"))) long else short
+}
+
+# Resolve a fixture file by name for a script that writes one,
+# creating the fixture directory when a clone has none yet. Callers
+# that only read a fixture use `require_fixtures()` instead, so that
+# a missing fixture skips rather than being written to.
+local_fixture_path <- function(name) {
+  fdir <- local_fixture_dir()
+  if (!dir.exists(fdir)) {
+    dir.create(fdir, recursive = TRUE)
+  }
+  file.path(fdir, name)
 }
 
 # Skip a test_that block cleanly when its fixture is not on disk.

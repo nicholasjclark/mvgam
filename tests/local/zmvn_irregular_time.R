@@ -6,7 +6,7 @@
 # this fixture confirms that every downstream surface still works
 # on a fit whose time grid has gaps.
 #
-# Cache: /tmp/mvgam_zmvn_irregular_fit.rds
+# Cache: tests/local/fixtures/val_mvgam_zmvn_irregular.rds
 #
 # Run with:
 #   Rscript tests/local/zmvn_irregular_time.R
@@ -15,7 +15,16 @@ suppressMessages({
   devtools::load_all(".", quiet = TRUE)
 })
 
-cache <- "/tmp/mvgam_zmvn_irregular_fit.rds"
+# testthat sets the working directory to tests/local/ when it runs a
+# file, while Rscript runs it from the package root. Reach the shared
+# fixture helpers by whichever of the two paths exists.
+source(if (file.exists("concordance_helpers.R")) {
+  "concordance_helpers.R"
+} else {
+  file.path("tests", "local", "concordance_helpers.R")
+})
+
+cache <- local_fixture_path("val_mvgam_zmvn_irregular.rds")
 
 if (file.exists(cache)) {
   fit <- readRDS(cache)
@@ -63,6 +72,12 @@ if (file.exists(cache)) {
     data = dat, family = gaussian(),
     chains = 2L, burnin = 300L, samples = 300L,
     silent = 2, refresh = 0
+  )
+  # The generative truth rides on the saved fit so a separate test
+  # can assert recovery against it without repeating the simulation.
+  attr(fit, "sim_truth") <- list(
+    n_series = n_series, series_names = series_names,
+    unique_times = unique_times, Sigma_true = Sigma_true
   )
   saveRDS(fit, cache)
   cat("[FIT] cached to", cache, "\n")

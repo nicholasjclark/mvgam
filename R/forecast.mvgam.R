@@ -217,7 +217,8 @@ forecast.mvgam <- function(object,
   # from a shorter horizon and would answer for the wrong one.
   if (!is.null(fc_grid)) {
     assert_forecast_times_steppable(
-      fc_grid$times, training, first_trend_spec(object)
+      fc_grid$times, training, first_trend_spec(object),
+      mvgam_axes(object)$time$step
     )
   }
 
@@ -555,13 +556,31 @@ resolve_forecast_grid <- function(object, newdata, training,
 build_training_tail_data <- function(training, max_lag) {
   if (max_lag <= 0L) return(NULL)
   series_levels <- names(training$observations)
+  time_var <- training$time_var
+  series_var <- training$series_var
+
+  # Where the responses are the series, a row belongs to all of
+  # them at once, so the tail is the last occasions of the one
+  # shared grid rather than a block per series. Cutting it by a
+  # `series` column instead compared against a column the frame
+  # does not have, which is `logical(0)`: every block came back
+  # empty, the frames were bound into nothing, and the caller was
+  # handed a tail with no rows.
+  if (is.null(training$data[[series_var]])) {
+    shared <- sort(unique(unlist(training$times, use.names = FALSE)))
+    tail_ts <- tail(shared, max_lag)
+    sub <- training$data[
+      training$data[[time_var]] %in% tail_ts, , drop = FALSE
+    ]
+    return(sub[order(sub[[time_var]]), , drop = FALSE])
+  }
+
   rows <- lapply(series_levels, function(lv) {
-    ts <- training$times[[lv]]
-    tail_ts <- tail(ts, max_lag)
-    idx <- training$data[[training$series_var]] == lv &
-      training$data[[training$time_var]] %in% tail_ts
+    tail_ts <- tail(training$times[[lv]], max_lag)
+    idx <- training$data[[series_var]] == lv &
+      training$data[[time_var]] %in% tail_ts
     sub <- training$data[idx, , drop = FALSE]
-    sub[order(sub[[training$time_var]]), , drop = FALSE]
+    sub[order(sub[[time_var]]), , drop = FALSE]
   })
   do.call(rbind, rows)
 }
@@ -973,12 +992,12 @@ build_forecast_arms <- function(object, trend_model, meta,
   # Batched obs combination + family pass.
   if (type == "trend") {
     return(slice_per_series(trend_flat, fc_grid, obs_struct_fc,
-                              ndraws_use, series_levels))
+                              ndraws_use, series_levels, resp = resp))
   }
   eta_full <- obs_full[draw_idx, , drop = FALSE] + trend_flat
   if (type == "link") {
     return(slice_per_series(eta_full, fc_grid, obs_struct_fc,
-                              ndraws_use, series_levels))
+                              ndraws_use, series_levels, resp = resp))
   }
   family_for_arm <- get_family_for_resp(object, resp)
   # `mu` is the family's own parameter, which is what
@@ -997,14 +1016,14 @@ build_forecast_arms <- function(object, trend_model, meta,
       draw_ids = draw_idx
     )
     return(slice_per_series(expected, fc_grid, obs_struct_fc,
-                              ndraws_use, series_levels))
+                              ndraws_use, series_levels, resp = resp))
   }
   resp_mat <- sample_family_batched(object, mu, fc_grid$data,
                                       ndraws_use, draw_idx,
                                       family = family_for_arm,
                                       resp = resp)
   slice_per_series(resp_mat, fc_grid, obs_struct_fc,
-                     ndraws_use, series_levels)
+                     ndraws_use, series_levels, resp = resp)
 }
 
 
@@ -1393,21 +1412,36 @@ pad_or_trim_rows <- function(grid, target_rows) {
 # right cell when the user passes future times like 41:45.
 #'@noRd
 slice_per_series <- function(mat, fc_grid, obs_struct,
-                               ndraws_use, series_levels) {
+                               ndraws_use, series_levels,
+                               resp = NULL) {
   raw_times <- as.numeric(names(obs_struct$time))
+  # Where the responses are the series, a row of the frame belongs
+  # to every one of them, so its per-row series index is a single
+  # constant. Matching cells on that index handed every column to
+  # series one and left the rest without a cell to read, so each
+  # arm past the first came back entirely `NA`. This call predicts
+  # one response, named by `resp`, so its columns are that
+  # response's arm and the other arms are not its to fill.
+  keyed <- !is.null(resp) && resp %in% series_levels &&
+    length(unique(obs_struct$series_int)) == 1L &&
+    length(series_levels) > 1L
+
   out <- vector("list", length(series_levels))
   names(out) <- series_levels
   for (s in seq_along(series_levels)) {
     lv <- series_levels[s]
     ts <- fc_grid$times[[lv]]
-    if (length(ts) == 0L) {
+    if (length(ts) == 0L || (keyed && !identical(lv, resp))) {
       out[[s]] <- matrix(NA_real_, nrow = ndraws_use, ncol = 0L)
       next
     }
     sm <- matrix(NA_real_, nrow = ndraws_use, ncol = length(ts))
     for (k in seq_along(ts)) {
-      cell_j <- which(raw_times == ts[k] &
-                         obs_struct$series_int == s)
+      cell_j <- if (keyed) {
+        which(raw_times == ts[k])
+      } else {
+        which(raw_times == ts[k] & obs_struct$series_int == s)
+      }
       if (length(cell_j) == 0L) next
       sm[, k] <- mat[, cell_j[1L]]
     }

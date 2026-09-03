@@ -9,16 +9,26 @@
 # Run with:
 #   Rscript tests/local/jsdgam_prediction_audit.R
 #
-# The cached fit is written to /tmp/chunk4_jsdgam_fit.rds and
+# The cached fit is written to
+# tests/local/fixtures/val_mvgam_jsdgam_prediction_audit.rds and
 # reloaded on subsequent runs. Delete it to force a refit.
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)
 })
 
+# testthat sets the working directory to tests/local/ when it runs a
+# file, while Rscript runs it from the package root. Reach the shared
+# fixture helpers by whichever of the two paths exists.
+source(if (file.exists("concordance_helpers.R")) {
+  "concordance_helpers.R"
+} else {
+  file.path("tests", "local", "concordance_helpers.R")
+})
+
 set.seed(11L)
 
-cache_path <- "/tmp/chunk4_jsdgam_fit.rds"
+cache_path <- local_fixture_path("val_mvgam_jsdgam_prediction_audit.rds")
 
 if (file.exists(cache_path)) {
   cat("Loading cached jsdgam fit from", cache_path, "\n")
@@ -39,7 +49,7 @@ if (file.exists(cache_path)) {
     factor_formula = ~ -1,
     data = dat, unit = time, species = species,
     family = poisson(), n_lv = 2L,
-    chains = 2L, parallel = TRUE,
+    chains = 2L,
     burnin = 200L, samples = 200L,
     silent = 2
   )

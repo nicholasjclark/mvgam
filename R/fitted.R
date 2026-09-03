@@ -246,7 +246,7 @@ fitted.mvgam <- function(object,
         i = "Pass `resp = '<name>'` to scope to one response first."
       )))
     } else {
-      nd <- newdata %||% object$data
+      nd <- newdata %||% mvgam_training_data(object)
       draws <- aggregate_closure_unit_visits(object, nd, draws)$yrep_unit
     }
   }

@@ -87,7 +87,7 @@ t_jsdgam <- system.time(
     factor_formula = ~ -1,
     data = dat, unit = site, species = species,
     family = bernoulli(), n_lv = n_lv_true,
-    chains = 2L, parallel = TRUE,
+    chains = 2L,
     burnin = 200L, samples = 400L,
     silent = 2
   )

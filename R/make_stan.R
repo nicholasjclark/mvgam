@@ -258,7 +258,7 @@ build_stan_components <- function(formula, data, family = gaussian(),
   )
 
   # Filter priors: only pass observation-related priors to observation setup
-  obs_priors <- filter_obs_priors(prior)
+  obs_priors <- filter_priors_by_side(prior, "obs")
   
   # What both submodels are built under. Named once, because the two
   # calls below differ only in their formula, data, family, priors and
@@ -301,7 +301,7 @@ build_stan_components <- function(formula, data, family = gaussian(),
     checkmate::assert_class(mv_spec$base_formula, "formula")
     
     # Filter priors: only pass trend-related priors to trend setup
-    trend_priors <- filter_trend_priors(prior)
+    trend_priors <- filter_priors_by_side(prior, "trend")
     
     # Extract response variables and time series structure for trend validation
     response_vars <- extract_response_names(obs_formula)

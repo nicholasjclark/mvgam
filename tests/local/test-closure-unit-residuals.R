@@ -24,7 +24,15 @@ mvgam_fit <- readRDS(file.path(fdir, "val_occ_mvgam.rds"))
 # rows in newdata; the per-unit residual summary should have 60.
 # ------------------------------------------------------------
 
-n_site <- length(unique(mvgam_fit$data$series))
+# A closure unit is a (series, time) cell, not a series. The two
+# coincide on this fixture, which is why counting series stood in
+# for counting units and no assertion here could tell the grain it
+# claims to check from the one it was measuring. Counted from the
+# user's own frame, so a fixture that ever carries more than one
+# occasion per series keeps these tests honest.
+closure_units <- unique(mvgam_fit$data[, c("series", "time")])
+n_unit <- NROW(closure_units)
+n_site <- n_unit
 
 test_that("residuals(fit) summary returns one row per closure unit", {
   rs <- residuals(mvgam_fit)
@@ -95,12 +103,14 @@ test_that("augment(fit) returns a per-visit tibble with recycled .resid and a .u
   # and verify the residual columns are constant across visits.
   first_unit <- out$.unit[1L]
   block <- out[out$.unit == first_unit, ]
-  if (NROW(block) > 1L) {
-    expect_equal(length(unique(block$.resid)), 1L)
-    expect_equal(length(unique(block$.resid.se)), 1L)
-    expect_equal(length(unique(block$.resid.lower)), 1L)
-    expect_equal(length(unique(block$.resid.upper)), 1L)
-  }
+  # Recycling is only observable across a unit holding more than
+  # one visit, so a fixture without one leaves the four checks
+  # below unrun and the test reads as though they passed.
+  expect_gt(NROW(block), 1L)
+  expect_equal(length(unique(block$.resid)), 1L)
+  expect_equal(length(unique(block$.resid.se)), 1L)
+  expect_equal(length(unique(block$.resid.lower)), 1L)
+  expect_equal(length(unique(block$.resid.upper)), 1L)
   # Distinct unit IDs equal the number of closure units.
   expect_identical(length(unique(out$.unit)), n_site)
   # .fitted stays per-visit (psi * p), so it varies within a unit

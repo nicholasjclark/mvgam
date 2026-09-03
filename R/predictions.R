@@ -2259,10 +2259,13 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   # compose with the posterior Z draws to produce per-(time, series)
   # linpred. The has_by_lv trend computation in Stan emits
   # `trend[t, s] = dot(Z[s, :], lv_trend[t, :] + mu_factor[t, :])`,
-  # so when `incl_latent_state = TRUE` the full per-(t, s) result is
-  # already in the trend[t, s] draws; we delegate to the latent-state
-  # path. When FALSE (the forecast.mvgam deterministic-submodel path),
-  # we keep only the dot(Z, mu_factor) contribution here.
+  # and what is composed here is the `dot(Z, mu_factor)` half. The
+  # `lv_trend` half is the conditional latent state, which the
+  # predict_* family does not read for either grain: it reaches a
+  # prediction as the marginal envelope `sample_process_errors()`
+  # adds, and per-draw as `trend[t, s]` on the hindcast and forecast
+  # paths. `incl_latent_state` therefore does not change this
+  # result, exactly as it does not for the standard kernel below.
   has_by_lv_trend <- identical(component, "trend") &&
     isTRUE(mvgam_fit$trend_metadata$has_by_lv)
   if (has_by_lv_trend) {
@@ -2383,24 +2386,23 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
 #' with the posterior loadings `Z[d, s, k]` to produce a
 #' `[draws x n_rows]` linpred matrix.
 #'
-#' Two return modes:
-#'   * `incl_latent_state = FALSE` (deterministic submodel only):
-#'     `linpred[d, i] = sum_k Z[d, series_i, k] * mu_factor[d, i, k]`.
-#'     Mirrors `brms::posterior_linpred(incl_autocor = FALSE)`.
-#'   * `incl_latent_state = TRUE` (latent state added on top): also
-#'     pulls raw `lv_trend[t, k]` draws via the tilde-aware selector,
-#'     looks up the in-grid `t` for each newdata row, and adds
-#'     `sum_k Z[d, series_i, k] * lv_trend[d, t_i, k]`. Times outside
-#'     the fit grid receive the per-factor marginal mean of
-#'     `lv_trend` across training times, matching the marginal-MC
-#'     semantic used by the standard non-by-lv path
-#'     (`extract_trend_latent_states()`). For state-aware out-of-
-#'     sample prediction, use `forecast.mvgam()`.
+#' What comes back is the deterministic submodel alone:
+#' `linpred[d, i] = sum_k Z[d, series_i, k] * mu_factor[d, i, k]`,
+#' mirroring `brms::posterior_linpred(incl_autocor = FALSE)`.
+#'
+#' `incl_latent_state` does not change that, and is carried only so
+#' this composer takes the same signature as the standard kernel.
+#' The predict_* family is time-agnostic and reads no per-draw
+#' `trend[t, s]` at either grain: the latent state reaches a
+#' prediction as the marginal envelope `sample_process_errors()`
+#' adds when `process_error = TRUE`, and per-draw through
+#' `extract_trend_latent_states()` on the hindcast and forecast
+#' paths. Use `forecast.mvgam()` for state-aware prediction beyond
+#' the training grid.
 #'
 #' Composes existing primitives rather than introducing new ones:
 #'   * `get_observation_structure()`: newdata to (time, series_int).
 #'   * `extract_Z_loadings()`: posterior Z draws as `[d, s, k]`.
-#'   * `extract_lv_trend_array_from_draws()`: posterior lv_trend
 #'     draws as `[d, t, k]` (tilde-aware, shares
 #'     `collect_lv_trend_column_names()` with
 #'     `extract_lv_trend_matrices()`).
@@ -2532,38 +2534,6 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata,
 }
 
 
-# Internal: stack the tilde-aware `lv_trend[t, k]` draws into a
-# `[draws, n_time, n_lv]` array, sourcing draws from a posterior
-# matrix that has already been row-subsetted so the rows align with
-# whatever Z extraction was done on the same matrix. Shares the
-# column-name resolution with `extract_lv_trend_matrices()` (which
-# returns a per-factor list of `[draws, n_time]` matrices for
-# plotting) via `collect_lv_trend_column_names()`.
-#'@noRd
-extract_lv_trend_array_from_draws <- function(draws_mat, n_time, n_lv) {
-  checkmate::assert_matrix(draws_mat)
-  checkmate::assert_int(n_time, lower = 1L)
-  checkmate::assert_int(n_lv, lower = 1L)
-  meta <- collect_lv_trend_column_names(colnames(draws_mat), n_lv)
-  if (nrow(meta$cols_by_tk) != n_time) {
-    stop(insight::format_error(c(
-      "Mismatch between expected and stored time count in lv_trend.",
-      x = paste0(
-        "Expected n_time = ", n_time,
-        ", max time index in posterior = ",
-        nrow(meta$cols_by_tk), "."
-      )
-    )))
-  }
-  ndraws <- nrow(draws_mat)
-  lv_arr <- array(NA_real_, dim = c(ndraws, n_time, n_lv))
-  for (k in seq_len(n_lv)) {
-    lv_arr[, , k] <- draws_mat[, meta$cols_by_tk[, k], drop = FALSE]
-  }
-  lv_arr
-}
-
-
 #' Choose the prediction surface a diagnostic should read
 #'
 #' A residual or a posterior predictive check compares a prediction
@@ -2639,7 +2609,7 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws) {
   obs_struct <- get_observation_structure(mvgam_fit, newdata = newdata)
   s_idx <- obs_struct$series_int
   time_var <- mvgam_fit$trend_metadata$variables$time_var %||% "time"
-  train_data <- mvgam_fit$obs_data %||% mvgam_fit$data
+  train_data <- mvgam_training_data(mvgam_fit)
   raw_t_idx <- if (time_var %in% names(newdata) &&
                      time_var %in% names(train_data)) {
     match(newdata[[time_var]], sort(unique(train_data[[time_var]])))

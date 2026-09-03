@@ -689,7 +689,7 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
   spec <- trend_spec_for_residcor(object)
   n_lv <- detect_factor_n_lv(object)
   is_lv <- !is.null(n_lv)
-  hierarchical <- !is.null(spec$gr) && spec$gr != "NA"
+  hierarchical <- named_var(spec$gr)
   n_obs_series <- object$series_info$n_series %||%
     object$trend_components$n_trends
   n_series <- if (is_lv) as.integer(n_lv) else

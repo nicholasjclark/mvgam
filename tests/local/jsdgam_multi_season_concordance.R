@@ -48,13 +48,23 @@
 # correlation structure (residual_cor) is what mvgam parameterises;
 # the per-species effect sizes are what all three packages share.
 #
-# Caches each fit at /tmp/jsdgam_multi_season_*.rds. Total runtime
-# ~45-60 min on first run.
+# Caches each fit under tests/local/fixtures/ as
+# val_mvgam_multi_season_concordance.rds, val_spocc_tmspgocc.rds and
+# val_flocker_multi_season.rds. Total runtime ~45-60 min on first run.
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)
   library(dplyr)
   library(posterior)
+})
+
+# testthat sets the working directory to tests/local/ when it runs a
+# file, while Rscript runs it from the package root. Reach the shared
+# fixture helpers by whichever of the two paths exists.
+source(if (file.exists("concordance_helpers.R")) {
+  "concordance_helpers.R"
+} else {
+  file.path("tests", "local", "concordance_helpers.R")
 })
 
 stopifnot(requireNamespace("spOccupancy", quietly = TRUE))
@@ -135,7 +145,21 @@ cat("Mean true psi =", round(mean(psi_true), 3),
 
 # ----- mvgam fit -----------------------------------------------------
 
-cache_mvgam <- "/tmp/jsdgam_multi_season_concordance_mvgam.rds"
+# The generative truth rides on each saved fit so a separate test can
+# assert recovery against it without repeating the simulation.
+sim_truth <- list(
+  N = N, J = J, T_ = T_, K_visits = K_visits, n_lv = n_lv,
+  species_levels = species_levels, env = env,
+  b_env_true = b_env_true, Z_true = Z_true, lv_true = lv_true,
+  alpha_site_true = alpha_site_true,
+  sigma_site_true = sigma_site_true, p_true = p_true,
+  psi_true = psi_true, psi_true_per_sp = psi_true_per_sp,
+  z_latent = z_latent
+)
+
+cache_mvgam <- local_fixture_path(
+  "val_mvgam_multi_season_concordance.rds"
+)
 if (file.exists(cache_mvgam)) {
   cat("[cache] Loading mvgam fit.\n")
   fit_mvgam <- readRDS(cache_mvgam)
@@ -157,16 +181,19 @@ if (file.exists(cache_mvgam)) {
     family         = occ(multi_season = TRUE),
     n_lv           = n_lv,
     prior          = prior(normal(0, 0.5), class = "sds"),
-    chains         = 2L, parallel = TRUE,
+    chains         = 2L,
     warmup         = 500L, iter = 1000L,
     silent         = 2L, backend = "cmdstanr"
   )
+}
+if (!identical(attr(fit_mvgam, "sim_truth"), sim_truth)) {
+  attr(fit_mvgam, "sim_truth") <- sim_truth
   saveRDS(fit_mvgam, cache_mvgam)
 }
 
 # ----- spOccupancy::tMsPGOcc fit -------------------------------------
 
-cache_spocc <- "/tmp/jsdgam_multi_season_concordance_spocc.rds"
+cache_spocc <- local_fixture_path("val_spocc_tmspgocc.rds")
 if (file.exists(cache_spocc)) {
   cat("[cache] Loading spOccupancy::tMsPGOcc fit.\n")
   fit_spocc <- readRDS(cache_spocc)
@@ -188,12 +215,15 @@ if (file.exists(cache_spocc)) {
     ar1 = TRUE,
     verbose = FALSE
   )
+}
+if (!identical(attr(fit_spocc, "sim_truth"), sim_truth)) {
+  attr(fit_spocc, "sim_truth") <- sim_truth
   saveRDS(fit_spocc, cache_spocc)
 }
 
 # ----- flocker::flock(multiseason = "colex") per species -------------
 
-cache_flocker <- "/tmp/jsdgam_multi_season_concordance_flocker.rds"
+cache_flocker <- local_fixture_path("val_flocker_multi_season.rds")
 if (file.exists(cache_flocker)) {
   cat("[cache] Loading per-species flocker fits.\n")
   fits_flocker <- readRDS(cache_flocker)
@@ -238,6 +268,9 @@ if (file.exists(cache_flocker)) {
       backend = "cmdstanr"
     )
   }
+}
+if (!identical(attr(fits_flocker, "sim_truth"), sim_truth)) {
+  attr(fits_flocker, "sim_truth") <- sim_truth
   saveRDS(fits_flocker, cache_flocker)
 }
 

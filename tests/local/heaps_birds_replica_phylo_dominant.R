@@ -28,7 +28,8 @@
 #
 # Run with:
 #   Rscript tests/local/heaps_birds_replica_phylo_dominant.R
-# Caches the fit at /tmp/heaps_birds_replica_phylo_dominant.rds;
+# Caches the fit at
+# tests/local/fixtures/val_mvgam_heaps_birds_phylo_dominant.rds;
 # delete to refit. Runtime ~10-15 minutes for two chains.
 
 suppressMessages({
@@ -36,7 +37,18 @@ suppressMessages({
   library(ape)
 })
 
-cache_path <- "/tmp/heaps_birds_replica_phylo_dominant.rds"
+# testthat sets the working directory to tests/local/ when it runs a
+# file, while Rscript runs it from the package root. Reach the shared
+# fixture helpers by whichever of the two paths exists.
+source(if (file.exists("concordance_helpers.R")) {
+  "concordance_helpers.R"
+} else {
+  file.path("tests", "local", "concordance_helpers.R")
+})
+
+cache_path <- local_fixture_path(
+  "val_mvgam_heaps_birds_phylo_dominant.rds"
+)
 
 set.seed(2024L)
 
@@ -122,6 +134,18 @@ cat("True theta_trait =", theta_trait_true,
 cat("Smaller theta = tighter kernel. theta_phylo <<",
     "theta_trait so phylo carries the row structure.\n")
 
+# The generative truth rides on the saved fit so a separate test can
+# assert recovery against it without repeating the simulation.
+sim_truth <- list(
+  n_species = n_species, n_sites = n_sites, n_lv_true = n_lv_true,
+  species_levels = species_levels, body_mass = body_mass, tree = tree,
+  theta_trait_true = theta_trait_true,
+  theta_phylo_true = theta_phylo_true,
+  K_trait_true = K_trait_true, K_phylo_true = K_phylo_true,
+  Phi = Phi, Z_true = Z_true, lv_true = lv_true,
+  sigma_obs_true = sigma_obs_true
+)
+
 # 4. Fit jsdgam with the traits + phylo aliases ---------------------------
 if (file.exists(cache_path)) {
   cat("Loading cached fit from", cache_path, "\n")
@@ -140,10 +164,13 @@ if (file.exists(cache_path)) {
       brms::prior("normal(0, 3.162)", class = "theta_features"),
       brms::prior("normal(0, 3.162)", class = "theta_dist_phylo")
     ),
-    chains = 2L, parallel = TRUE,
+    chains = 2L,
     burnin = 500L, samples = 500L,
     silent = 2
   )
+}
+if (!identical(attr(fit, "sim_truth"), sim_truth)) {
+  attr(fit, "sim_truth") <- sim_truth
   saveRDS(fit, cache_path)
   cat("Saved fit to", cache_path, "\n")
 }

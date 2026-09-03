@@ -142,7 +142,24 @@ axis_group_values <- function(data, spec, series_vals, series_axis) {
 #'   series. `$time` is `NULL` on a fit that predates the record.
 #' @noRd
 mvgam_axes <- function(object) {
-  axes_from_metadata(object$trend_metadata)
+  axes <- axes_from_metadata(object$trend_metadata)
+  if (!is.null(axes)) {
+    return(axes)
+  }
+  # An object whose metadata names no series at all: a fit saved
+  # before any of this was recorded, or one assembled by hand. The
+  # count still exists elsewhere on it, so the fallback lives here
+  # rather than at each reader, where every reader would need its
+  # own and they would drift.
+  n <- object$series_info$n_series %||%
+    object$standata$N_series_trend %||%
+    object$trend_components$n_trends
+  if (is.null(n)) {
+    return(NULL)
+  }
+  list(series = list(levels = NULL, source = NULL,
+                     n = as.integer(n), groups = NULL),
+       time = NULL)
 }
 
 #' The axes a stored metadata list describes

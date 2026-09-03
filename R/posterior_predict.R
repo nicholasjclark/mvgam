@@ -1312,7 +1312,7 @@ predicted_dpar_draws <- function(object, dpar, nobs = NULL,
                                  newdata = NULL, resp = NULL) {
   linpred <- extract_component_linpred(
     mvgam_fit = object,
-    newdata = newdata %||% object$data,
+    newdata = newdata %||% mvgam_training_data(object),
     component = dpar,
     draw_ids = draw_ids,
     resp = resp

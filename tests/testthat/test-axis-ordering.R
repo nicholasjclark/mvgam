@@ -77,10 +77,8 @@ frame_group_levels <- function(frame, gr_var) {
 # labelling is trivially the right one.
 frame_row_series <- function(frame, prefit) {
   vars <- prefit$trend_metadata$variables
-  named <- function(v) {
-    !is.null(v) && !is.na(v) && !identical(v, "NA") && v %in% names(frame)
-  }
-  if (named(vars$gr_var) && named(vars$subgr_var)) {
+  if (named_col(vars$gr_var, frame) &&
+        named_col(vars$subgr_var, frame)) {
     return(paste(
       as.character(frame[[vars$gr_var]]),
       as.character(frame[[vars$subgr_var]]),
@@ -225,6 +223,41 @@ frame_observed <- function(frame, resp_names) {
   }
   observed
 }
+
+# The column a frame names its series in, or `NULL` where the
+# responses are the series and there is none.
+#
+# A `gr` / `subgr` pair supersedes any series column the frame also
+# carries, so the grouping is what names them. Every check that has
+# to reach the naming column asks here, because getting it wrong
+# reverses the meaning of the test: a stranger planted in the
+# superseded column checks that the fit ignores what it should
+# ignore, not that it refuses what it should refuse.
+axis_naming_column <- function(frame, prefit) {
+  vars <- prefit$trend_metadata$variables
+  if (named_col(vars$gr_var, frame) &&
+        named_col(vars$subgr_var, frame)) {
+    return(vars$subgr_var)
+  }
+  series_var <- vars$series_var %||% "series"
+  if (named_col(series_var, frame)) series_var else NULL
+}
+
+# `frame` with a series the model never fitted planted in it, or
+# `NULL` where the frame names its series through its responses.
+plant_stranger <- function(frame, prefit) {
+  target <- axis_naming_column(frame, prefit)
+  if (is.null(target)) {
+    return(NULL)
+  }
+  frame[[target]] <- as.character(frame[[target]])
+  frame[[target]][1L] <- "never_fitted"
+  frame
+}
+
+# What the package says when a frame names a series it never had.
+# One condition, one message, and one place the tests spell it.
+STRANGER_REFUSAL <- "not found in training data"
 
 # When each series was last observed, from the user's own frame.
 # Not the last row it has: mvgam asks a panel whose series end at
@@ -802,35 +835,20 @@ expect_postfit_sound <- function(prefit, resp_names, lab, frame,
 # read, so it is turned away rather than mapped onto some other
 # series' column.
 expect_postfit_refuses <- function(prefit, lab, frame, frame_name) {
-  vars <- prefit$trend_metadata$variables
-  # The column that names a series is the one to corrupt. Where a
-  # grouping defines the series, the `series` column is superseded
-  # and a stranger in it is rightly ignored, so the stranger has to
-  # go into the grouping instead. Corrupting the wrong column tests
-  # that the fit ignores what it should ignore, not that it refuses
-  # what it should refuse.
-  target <- if (mvgam:::named_var(vars$subgr_var) &&
-                  vars$subgr_var %in% names(frame)) {
-    vars$subgr_var
-  } else {
-    vars$series_var %||% "series"
-  }
   # A response-keyed frame has no column to plant a stranger in:
   # its series are the responses, and a response the fit never had
   # is a different formula rather than a different frame. Saying so
   # here is the point -- a helper that returns quietly registers no
   # expectation and reads in the output exactly like one that
   # passed.
-  if (!target %in% names(frame)) {
+  stranger <- plant_stranger(frame, prefit)
+  if (is.null(stranger)) {
     expect_identical(
       frame_axis_source_of(prefit, frame), "multivariate",
       label = paste(lab, "names its series through its responses")
     )
     return(invisible(NULL))
   }
-  stranger <- frame
-  stranger[[target]] <- as.character(stranger[[target]])
-  stranger[[target]][1L] <- "never_fitted"
   # Pinned to the one message that owns this condition. `series` and
   # `level` appear in most of the package's errors, including the
   # one raised when a grouping column is absent, so a looser pattern
@@ -839,7 +857,7 @@ expect_postfit_refuses <- function(prefit, lab, frame, frame_name) {
     mvgam:::validate_prediction_factor_levels(
       stranger, prefit$trend_metadata
     ),
-    regexp = "not found in training data",
+    regexp = STRANGER_REFUSAL,
     label = paste(lab, "refuses a series it never saw")
   )
 }
@@ -1362,25 +1380,10 @@ newdata_variants <- function(frame, prefit) {
     )
   )
 
-  # A stranger has to arrive in the column that names the series. A
-  # `gr` / `subgr` pair supersedes any series column the frame also
-  # carries, so putting an unknown label there tests nothing: the
-  # fit is right to ignore a column it does not read.
-  named <- function(v) {
-    !is.null(v) && !is.na(v) && !identical(v, "NA") &&
-      v %in% names(frame)
-  }
-  axis_var <- if (named(vars$gr_var) && named(vars$subgr_var)) {
-    vars$subgr_var
-  } else {
-    vars$series_var %||% "series"
-  }
-  if (axis_var %in% names(frame)) {
-    stranger <- frame
-    stranger[[axis_var]] <- as.character(stranger[[axis_var]])
-    stranger[[axis_var]][1L] <- "never_fitted"
+  stranger <- plant_stranger(frame, prefit)
+  if (!is.null(stranger)) {
     bad[["a series never fitted"]] <- list(
-      frame = stranger, message = "not found in training data"
+      frame = stranger, message = STRANGER_REFUSAL
     )
   }
   list(good = good, bad = bad)
@@ -1447,6 +1450,51 @@ test_that("newdata is placed on the fit's axes, or refused", {
 })
 
 
+# The frame a user hands `forecast()`, and the occasions each series
+# is thereby asking for.
+#
+# A stacked frame can ask each series for a different horizon,
+# because a row belongs to one series, and ragged horizons are what
+# tell a permuted grid from the right one: give every series the
+# same three occasions and swapping two arms changes nothing
+# anything can see. A response-keyed frame cannot be ragged, since
+# every row carries every response, so there the horizon is shared
+# and the claim is that each response is given it rather than none.
+forecast_request <- function(frame, prefit, levels_expected) {
+  time_var <- time_col(prefit)
+  last <- max(frame[[time_var]])
+  last_rows <- frame[frame[[time_var]] == last, , drop = FALSE]
+
+  if (identical(frame_axis_source_of(prefit, frame), "multivariate")) {
+    horizon <- last + 1:3
+    newdata <- do.call(rbind, lapply(horizon, function(tt) {
+      row <- last_rows
+      row[[time_var]] <- tt
+      row
+    }))
+    return(list(
+      newdata = newdata,
+      wanted = stats::setNames(
+        rep(list(horizon), length(levels_expected)), levels_expected
+      )
+    ))
+  }
+
+  last_series <- frame_row_series(last_rows, prefit)
+  wanted <- stats::setNames(
+    lapply(seq_along(levels_expected), function(i) last + seq_len(i)),
+    levels_expected
+  )
+  pieces <- unlist(lapply(levels_expected, function(lv) {
+    base_row <- last_rows[last_series == lv, , drop = FALSE]
+    lapply(wanted[[lv]], function(tt) {
+      base_row[[time_var]] <- tt
+      base_row
+    })
+  }), recursive = FALSE)
+  list(newdata = do.call(rbind, pieces), wanted = wanted)
+}
+
 test_that("a frame the fit has never seen lands on the right cells", {
   # The whole point of recording the axes: given the record and a
   # frame, every row can be placed on a trend cell without going back
@@ -1454,71 +1502,83 @@ test_that("a frame the fit has never seen lands on the right cells", {
   # forecast goes through and it needs no draws, so the claim is
   # testable here rather than only after sampling.
   #
-  # The horizons are deliberately ragged, one occasion for the first
-  # series and one more for each after it. A frame that asks every
-  # series for the same three occasions cannot tell a permuted grid
-  # from the right one: each arm holds the same times, so swapping
-  # two of them changes nothing anything can see.
+  # Every route the package offers is asked, because the routes
+  # differ in exactly the thing being checked: `hier` names its
+  # series through a grouping and carries no series column, and the
+  # wide and `jsdgam()` routes name them through the responses,
+  # where a row belongs to all of them at once. Asking only the
+  # stacked routes is how every `mvbf()` fit came to return an empty
+  # horizon without complaint.
   frames <- axis_frames()
-  # `hier` carries no series column, which is the frame the forecast
-  # path asked for one anyway and refused. It belongs here more than
-  # anywhere: if the record can place a frame, the grid can too.
-  for (nm in c("long", "hier", "hier_col", "unused", "char_series")) {
-    tf <- if (nm %in% c("hier", "hier_col")) {
-      ~ AR(p = 1, gr = region, subgr = species)
-    } else {
-      ~ AR(p = 1)
-    }
-    frame <- frames[[nm]]
-    prefit <- axis_prefit(frame, tf, "uni")
-    levels_expected <- frame_axis_labels(nm)
-    training <- mvgam:::build_training_arms(prefit, levels_expected)
+  hier_tf <- ~ AR(p = 1, gr = region, subgr = species)
+  cells <- list(
+    list(nm = "long", spec = ~ AR(p = 1), route = "uni"),
+    list(nm = "hier", spec = hier_tf, route = "uni"),
+    list(nm = "hier_col", spec = hier_tf, route = "uni"),
+    list(nm = "unused", spec = ~ AR(p = 1), route = "uni"),
+    list(nm = "char_series", spec = ~ AR(p = 1), route = "uni"),
+    list(nm = "wide", spec = ~ AR(p = 1), route = "wide"),
+    list(nm = "wide_na", spec = ~ AR(p = 1), route = "wide"),
+    list(nm = "long", spec = 2L, route = "jsdgam_species"),
+    list(nm = "wide", spec = 2L, route = "jsdgam_mv")
+  )
 
-    last <- max(frame$time)
-    last_rows <- frame[frame$time == last, , drop = FALSE]
-    last_series <- frame_row_series(last_rows, prefit)
-    wanted <- stats::setNames(
-      lapply(seq_along(levels_expected), function(i) last + seq_len(i)),
-      levels_expected
+  for (cell in cells) {
+    nm <- cell$nm
+    lab <- paste(nm, cell$route)
+    frame <- frames[[nm]]
+    prefit <- withCallingHandlers(
+      axis_prefit(frame, cell$spec, cell$route),
+      warning = function(w) {
+        if (any(vapply(axis_expected_warnings(), grepl,
+                       logical(1L), conditionMessage(w)))) {
+          invokeRestart("muffleWarning")
+        }
+      }
     )
-    pieces <- unlist(lapply(levels_expected, function(lv) {
-      base_row <- last_rows[last_series == lv, , drop = FALSE]
-      lapply(wanted[[lv]], function(tt) {
-        base_row$time <- tt
-        base_row
-      })
-    }), recursive = FALSE)
-    newdata <- do.call(rbind, pieces)
+    levels_expected <- frame_axis_labels(nm) %||%
+      c("zebra", "apple", "mango")
+    training <- mvgam:::build_training_arms(prefit, levels_expected)
+    request <- forecast_request(frame, prefit, levels_expected)
 
     grid <- mvgam:::resolve_forecast_grid(
-      prefit, newdata, training, levels_expected
+      prefit, request$newdata, training, levels_expected
     )
-    expect_false(is.null(grid), label = paste(nm, "grid resolves"))
+    expect_false(is.null(grid), label = paste(lab, "grid resolves"))
 
     # Each series is asked for the occasions it was given, and no
     # others. A row placed on another series' arm shows here as a
-    # horizon of the wrong length or the wrong times.
+    # horizon of the wrong length or the wrong times, and a series
+    # left out shows as an empty one.
     for (lv in levels_expected) {
       expect_identical(
-        as.numeric(grid$times[[lv]]), as.numeric(wanted[[lv]]),
-        label = paste(nm, lv, "is forecast at the times asked for")
+        as.numeric(grid$times[[lv]]), as.numeric(request$wanted[[lv]]),
+        label = paste(lab, lv, "is forecast at the times asked for")
       )
     }
 
     # A frame naming a series the model never fitted has nowhere to
     # put those rows, so it is turned away rather than folded onto
-    # whichever column happens to be first.
-    axis_var <- if (nm %in% c("hier", "hier_col")) "species" else "series"
-    stranger <- newdata
-    stranger[[axis_var]] <- as.character(stranger[[axis_var]])
-    stranger[[axis_var]][1L] <- "never_fitted"
-    expect_error(
-      mvgam:::resolve_forecast_grid(
-        prefit, stranger, training, levels_expected
-      ),
-      regexp = "not found in training data",
-      label = paste(nm, "a stranger is refused")
-    )
+    # whichever column happens to be first. Where the responses are
+    # the series there is no column to name a stranger in: a
+    # response the fit never had is a different formula, not a
+    # different frame, and saying so is what stops this reading as
+    # a cell that quietly checked nothing.
+    stranger <- plant_stranger(request$newdata, prefit)
+    if (is.null(stranger)) {
+      expect_identical(
+        frame_axis_source_of(prefit, frame), "multivariate",
+        label = paste(lab, "names its series through its responses")
+      )
+    } else {
+      expect_error(
+        mvgam:::resolve_forecast_grid(
+          prefit, stranger, training, levels_expected
+        ),
+        regexp = "not found in training data",
+        label = paste(lab, "a stranger is refused")
+      )
+    }
   }
 })
 

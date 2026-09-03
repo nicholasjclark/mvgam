@@ -21,14 +21,24 @@
 #   E-BFMI, residual_cor recovery (cor vs truth on off-diagonals),
 #   plus active_factors() output for fit B.
 #
-# Cached at /tmp/mgp_mvn_smoke_A.rds and /tmp/mgp_mvn_smoke_B.rds.
-# Delete to refit. Runtime ~6-10 min per fit.
+# Cached at tests/local/fixtures/val_mvgam_mgp_mvn_smoke_iid.rds and
+# val_mvgam_mgp_mvn_smoke_mgp.rds. Delete to refit. Runtime ~6-10 min
+# per fit.
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)
   library(dplyr)
   library(tidyr)
   library(posterior)
+})
+
+# testthat sets the working directory to tests/local/ when it runs a
+# file, while Rscript runs it from the package root. Reach the shared
+# fixture helpers by whichever of the two paths exists.
+source(if (file.exists("concordance_helpers.R")) {
+  "concordance_helpers.R"
+} else {
+  file.path("tests", "local", "concordance_helpers.R")
 })
 
 set.seed(909L)
@@ -83,10 +93,23 @@ cat(sprintf(
   n_sites, K, true_r, N_lv
 ))
 
+# The generative truth rides on each saved fit so a separate test can
+# assert recovery against it without repeating the simulation.
+sim_truth <- list(
+  K = K, N_lv = N_lv, true_r = true_r, species_levels = species_levels,
+  Z_true = Z_true, psi_true = psi_true, sigma_true = sigma_true,
+  mu_intercept = mu_intercept, mu_env_slope = mu_env_slope, env = env
+)
+
 fit_jsdgam_panel <- function(loadings_prior_arg, cache_path, label) {
   if (file.exists(cache_path)) {
     cat(sprintf("[cache] Loading %s fit.\n", label))
-    return(readRDS(cache_path))
+    fit <- readRDS(cache_path)
+    if (!identical(attr(fit, "sim_truth"), sim_truth)) {
+      attr(fit, "sim_truth") <- sim_truth
+      saveRDS(fit, cache_path)
+    }
+    return(fit)
   }
   cat(sprintf("[fit ] %s (loadings_prior = %s)\n",
               label,
@@ -108,6 +131,7 @@ fit_jsdgam_panel <- function(loadings_prior_arg, cache_path, label) {
     silent         = 2,
     backend        = "cmdstanr"
   )
+  attr(fit, "sim_truth") <- sim_truth
   saveRDS(fit, cache_path)
   fit
 }
@@ -162,11 +186,15 @@ report_fit <- function(fit, label) {
 }
 
 cat("\n=== Fit A: default iid loadings_prior ===\n")
-fit_A <- fit_jsdgam_panel(NULL, "/tmp/mgp_mvn_smoke_A.rds", "A_iid")
+fit_A <- fit_jsdgam_panel(
+  NULL, local_fixture_path("val_mvgam_mgp_mvn_smoke_iid.rds"), "A_iid"
+)
 res_A <- report_fit(fit_A, "A_iid")
 
 cat("\n=== Fit B: MGP loadings_prior ===\n")
-fit_B <- fit_jsdgam_panel("mgp", "/tmp/mgp_mvn_smoke_B.rds", "B_mgp")
+fit_B <- fit_jsdgam_panel(
+  "mgp", local_fixture_path("val_mvgam_mgp_mvn_smoke_mgp.rds"), "B_mgp"
+)
 res_B <- report_fit(fit_B, "B_mgp")
 
 cat("\n=== active_factors() on B (MGP fit) ===\n")

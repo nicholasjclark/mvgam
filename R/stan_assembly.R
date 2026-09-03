@@ -1321,196 +1321,6 @@ inject_trend_into_linear_predictor <- function(base_stancode, trend_stanvars) {
   return(modified_stancode)
 }
 
-
-#' Convert GLM-Only Code to Standard Form for Trend Injection
-#' 
-#' @description
-#' Converts models with pure GLM functions (no explicit mu construction) to
-#' standard form with minimal mu construction. This enables use of existing proven 
-#' trend injection infrastructure via recursive preprocessing.
-#'
-#' @param code_lines Character vector of Stan code lines
-#' @param block_info List with start_idx and end_idx for model block  
-#' @param detected_glm_types Character vector of detected GLM function types
-#' @return Character vector with GLM calls converted to standard mu form
-#' @noRd
-convert_glm_to_standard_form <- function(code_lines, block_info, detected_glm_types, analysis, processed_glm_lines = integer(0)) {
-  checkmate::assert_character(code_lines, min.len = 1)
-  checkmate::assert_list(block_info)
-  checkmate::assert_names(names(block_info), must.include = c("start_idx", "end_idx"))
-  checkmate::assert_integerish(block_info$start_idx, len = 1)
-  checkmate::assert_integerish(block_info$end_idx, len = 1)
-  checkmate::assert_character(detected_glm_types, min.len = 1)
-  checkmate::assert_integerish(processed_glm_lines, null.ok = TRUE)
-  
-  # Validate required analysis object
-  checkmate::assert_class(analysis, "glm_analysis")
-  checkmate::assert_list(analysis$glm_parameters)
-  
-  # Validate block indices
-  if (block_info$start_idx > block_info$end_idx || block_info$end_idx > length(code_lines)) {
-    stop(insight::format_error(c(
-      cli::format_inline("Invalid block indices in {.field block_info}."),
-      x = cli::format_inline(
-        "start_idx: {block_info$start_idx}, end_idx: {block_info$end_idx}, code length: {length(code_lines)}"
-      )
-    )), call. = FALSE)
-  }
-  
-  # Work with a copy to avoid modifying the original
-  modified_lines <- code_lines
-  
-  # Get the first detected GLM type for preprocessing
-  glm_type <- detected_glm_types[1]
-  
-  # Use cached parameters from analysis
-  if (is.null(analysis$glm_parameters[[glm_type]])) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "GLM parameters not found in analysis for type: {.field {glm_type}}"
-      ),
-      i = "Analysis object must contain pre-parsed GLM parameters."
-    )), call. = FALSE)
-  }
-  params <- analysis$glm_parameters[[glm_type]]
-  
-  # Find GLM call line to preprocess (skip already processed lines)
-  glm_pattern <- stan_density_call_pattern(glm_type)
-  glm_line_idx <- NULL
-  for (i in block_info$start_idx:block_info$end_idx) {
-    if (grepl(glm_pattern, modified_lines[i]) && !i %in% processed_glm_lines) {
-      glm_line_idx <- i
-      break
-    }
-  }
-  
-  # If all GLM lines were already processed, return original code with tracking
-  if (is.null(glm_line_idx)) {
-    return(list(
-      code_lines = modified_lines,
-      processed_glm_lines = processed_glm_lines
-    ))
-  }
-  
-
-  # Check if mu vector already exists in the model block  
-  model_text <- paste(modified_lines[block_info$start_idx:block_info$end_idx], collapse = "\n")
-  mu_already_exists <- grepl("vector\\[N\\]\\s+mu\\s*=", model_text) || grepl("mu\\s*\\+=", model_text)
-  
-  # Create mu construction for trend injection
-  if (mu_already_exists) {
-    mu_initialization <- c("    // Add fixed effects for existing mu")
-  } else {
-    mu_initialization <- c(
-      "    // Initialize mu for trend injection",  
-      "    vector[N] mu = rep_vector(0.0, N);"
-    )
-  }
-  
-  # Add fixed effects if both design matrix and coefficients are present
-  if (!is.null(params$design_matrix) && !is.null(params$coefficients)) {
-    fixed_effects_line <- paste0("    mu += ", params$design_matrix, " * ", params$coefficients, ";")
-    mu_initialization <- c(mu_initialization, fixed_effects_line)
-    
-  } else {
-  }
-  
-  # Handle intercept (including no-intercept models)
-  if (!is.null(params$intercept) && params$intercept != "0" && params$intercept != "0.0") {
-    mu_initialization <- c(mu_initialization, paste0("    mu += ", params$intercept, ";"))
-  }
-  
-  # Insert mu construction before GLM call
-  modified_lines[glm_line_idx] <- paste0(paste(mu_initialization, collapse = "\n"), "\n", modified_lines[glm_line_idx])
-  
-  # Track this GLM line as processed
-  processed_glm_lines <- c(processed_glm_lines, glm_line_idx)
-  
-  # Return both modified code and tracking info
-  return(list(
-    code_lines = modified_lines,
-    processed_glm_lines = processed_glm_lines
-  ))
-}
-
-#' Insert Trend Injection Code After Last mu += Line in Model Block
-#'
-#' @description
-#' Uses existing block detection infrastructure to insert trend injection code
-#' after the last mu += line in the model block.
-#'
-#' @param code_lines Character vector of Stan code lines
-#' @param trend_injection_code Character vector of trend injection code lines
-#' @param processed_glm_lines Integer vector of already processed GLM line indices
-#' @return List with code_lines and processed_glm_lines for state tracking
-#' @noRd
-insert_after_mu_lines_in_model_block <- function(code_lines, trend_injection_code, processed_glm_lines = integer(0)) {
-  checkmate::assert_character(code_lines)
-  checkmate::assert_character(trend_injection_code)
-  checkmate::assert_integerish(processed_glm_lines, null.ok = TRUE)
-
-  # Use existing infrastructure to find model block
-  block_info <- find_stan_block(code_lines, "model")
-  if (is.null(block_info)) {
-    stop(insight::format_error("Model block not found in Stan code"))
-  }
-
-  # Find last mu += line within the model block
-  model_lines <- code_lines[block_info$start_idx:block_info$end_idx]
-  mu_line_indices <- which(grepl("\\s*mu\\s*\\+=", model_lines))
-
-
-  # Check for GLM calls regardless of existing mu += lines (handles hybrid cases)
-  model_block_text <- paste(model_lines, collapse = "\n")
-  detected_glm_types <- detect_glm_usage(model_block_text, skip_lines = processed_glm_lines)
-  
-  
-  # Convert GLM calls to explicit form if present (handles both pure GLM and hybrid cases)
-  if (length(detected_glm_types) > 0) {
-    
-    # Convert GLM calls to explicit form, then recurse to find new mu += lines
-    # Create GLM analysis for conversion
-    analysis <- analyze_stan(paste(code_lines, collapse = "\n"))
-    conversion_result <- convert_glm_to_standard_form(code_lines, block_info, detected_glm_types, analysis, processed_glm_lines)
-    # Recursively call with updated tracking to prevent infinite recursion
-    return(insert_after_mu_lines_in_model_block(
-      conversion_result$code_lines,
-      trend_injection_code,
-      conversion_result$processed_glm_lines
-    ))
-  }
-  
-  # Handle cases with no GLM calls
-  if (length(mu_line_indices) == 0) {
-    
-    # Handle nonlinear models: look for mu[n] = ... patterns inside for loops
-    result_code <- handle_nonlinear_trend_injection(code_lines, block_info, trend_injection_code)
-    return(list(
-      code_lines = result_code,
-      processed_glm_lines = processed_glm_lines
-    ))
-  }
-
-  # Calculate absolute position of last mu += line
-  last_mu_pos <- block_info$start_idx + mu_line_indices[length(mu_line_indices)] - 1
-  
-  # Apply the correct transformation order
-  transformation_pattern <- "^\\s*mu(_\\w+)?\\s*=\\s*\\w+\\s*\\("
-  
-  result_code <- apply_correct_transformation_order(
-    code_lines = code_lines,
-    insert_pos = last_mu_pos,
-    trend_injection_code = trend_injection_code,
-    transform_pattern = transformation_pattern,
-    block_info = block_info
-  )
-  
-  return(list(
-    code_lines = result_code,
-    processed_glm_lines = processed_glm_lines
-  ))
-}
-
 #' Handle Trend Injection with Transformation Extraction for Any Response Type
 #'
 #' @description Handler for trend injection that works with both GLM
@@ -2729,7 +2539,7 @@ extract_hierarchical_info <- function(data_info, trend_specs) {
   checkmate::assert_list(data_info, names = "named")
   checkmate::assert_list(trend_specs, names = "named")
 
-  has_groups <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
+  has_groups <- named_var(trend_specs$gr)
 
   if (!has_groups) {
     return(NULL)
@@ -4418,7 +4228,7 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
   n_series <- data_info$n_series %||% 1
   n_lv <- trend_specs$n_lv %||% n_series
   is_factor_model <- is_factor_model_spec(trend_specs$n_lv, n_series)
-  use_grouping <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
+  use_grouping <- named_var(trend_specs$gr)
 
   # Cross-cutting system validation (integration between factor models and hierarchical correlations)
   validate_no_factor_hierarchical(trend_specs, n_series, trend_type)
@@ -5122,7 +4932,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   }
 
   # Check for hierarchical grouping requirements
-  is_hierarchical <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
+  is_hierarchical <- named_var(trend_specs$gr)
   hierarchical_info <- NULL
 
   if (is_hierarchical) {
@@ -5166,7 +4976,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # without an explicit `n_lv` is not promoted to a factor model.
   is_varma <- ma_lags > 0
   is_factor_model <- is_factor_model_spec(trend_specs$n_lv, n_series)
-  use_grouping <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
+  use_grouping <- named_var(trend_specs$gr)
 
   # Additional validation for logical consistency
   checkmate::assert_logical(is_varma, len = 1)
@@ -5985,7 +5795,7 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   }
 
   # CAR does not support hierarchical correlations
-  if (!is.null(trend_specs$gr) && trend_specs$gr != 'NA') {
+  if (named_var(trend_specs$gr)) {
     rlang::warn(
       "CAR trends do not support hierarchical correlations; ignoring 'gr' parameter",
       .frequency = "once",
@@ -6157,7 +5967,7 @@ generate_zmvn_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   n_lv <- trend_specs$n_lv %||% data_info$n_lv %||% data_info$n_series %||% 1
   n_obs <- data_info$n_obs
   n_series <- data_info$n_series %||% 1
-  use_grouping <- !is.null(trend_specs$gr) && trend_specs$gr != 'NA'
+  use_grouping <- named_var(trend_specs$gr)
 
   # Validate dimensions
   checkmate::assert_int(n_obs, lower = 1)

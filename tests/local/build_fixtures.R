@@ -1,5 +1,5 @@
-# Build cached brms and mvgam fixtures used by
-# tests/local/test-predictions-brms-concordance.R.
+# Build the cached brms and mvgam fixtures that tests/local/ reads,
+# and run the recovery scripts that build their own.
 #
 # Run from the package root:
 #   Rscript tests/local/build_fixtures.R
@@ -8,8 +8,9 @@
 #         tests/local/fixtures/val_mvgam_<name>.rds for each fixture
 #         below. The directory is gitignored; rebuild after a clone.
 #
-# Expected runtime: 15-25 minutes for the full set on a workstation.
-# Re-runs after partial completion are incremental: only missing
+# Expected runtime: 15-25 minutes for the fixtures fitted here, plus a
+# few hours for the recovery scripts registered at the end of this
+# file. Re-runs after partial completion are incremental: only missing
 # fixtures are refit.
 
 suppressMessages(devtools::load_all())
@@ -904,9 +905,6 @@ fit_mvgam_cached(
   loadings_prior = list(column_shrinkage = "mgp"), seed = 11
 )
 
-cat("\n=== All fixtures present in", FIXTURE_DIR, "===\n")
-cat("Files: ", length(list.files(FIXTURE_DIR, pattern = "\\.rds$")), "\n")
-
 # ----------------------------------------------------------------------
 # [26] JSDM with one observation family per species.
 # Three species share two latent factors through known loadings, and
@@ -1082,3 +1080,134 @@ fit_mvgam_cached(
   ~ RW(),
   mv_gap_data, NULL
 )
+
+# ----------------------------------------------------------------------
+# RECOVERY SCRIPTS
+#
+# Each script registered below simulates its own data from a known
+# truth, fits one or more models and caches them in FIXTURE_DIR with
+# the generative truth attached to the fit as its `sim_truth`
+# attribute. The script is the authority on its own simulation, so the
+# registry names the fixtures it produces and runs it when any of them
+# is missing, rather than restating the simulation here.
+#
+# Each script runs in its own R process, which is the invocation its
+# own header documents (`Rscript tests/local/<script>`) and which
+# keeps its globals out of this one. A script whose packages are not
+# installed is reported and passed over. Building the whole set from
+# nothing takes a few hours; a run after a partial build fills only
+# the gaps.
+#
+# tests/local/savage_hierarchical_var.R also caches a fit but is not
+# registered here: its panel is a live WDI download rather than a
+# simulation, so building it would make a fixture rebuild depend on
+# network access.
+# ----------------------------------------------------------------------
+
+recovery <- function(script, fixtures, needs = character(0)) {
+  list(script = script, fixtures = fixtures, needs = needs)
+}
+
+# Attached by every long-format JSDM recovery script.
+JSDM_PKGS <- c("dplyr", "tidyr", "posterior", "testthat")
+
+recovery_scripts <- list(
+  recovery("jsdgam_mv_mvn.R", "val_mvgam_jsdgam_mv_mvn.rds", JSDM_PKGS),
+  recovery("jsdgam_mv_mvt.R", "val_mvgam_jsdgam_mv_mvt.rds", JSDM_PKGS),
+  recovery("jsdgam_mv_nb.R", "val_mvgam_jsdgam_mv_nb.rds", JSDM_PKGS),
+  recovery("jsdgam_mv_beta.R", "val_mvgam_jsdgam_mv_beta.rds", JSDM_PKGS),
+  recovery("jsdgam_mv_diri.R", "val_mvgam_jsdgam_mv_diri.rds", JSDM_PKGS),
+  recovery("jsdgam_mv_categ.R", "val_mvgam_jsdgam_mv_categ.rds",
+           JSDM_PKGS),
+  recovery("jsdgam_mv_multi.R", "val_mvgam_jsdgam_mv_multi.rds",
+           JSDM_PKGS),
+  recovery("jsdgam_mv_nmix.R", "val_mvgam_jsdgam_mv_nmix.rds",
+           c("dplyr", "posterior", "testthat")),
+  recovery("jsdgam_mv_occ.R", "val_mvgam_jsdgam_mv_occ.rds",
+           c("dplyr", "posterior", "testthat")),
+  recovery("jsdgam_multi_season.R", "val_mvgam_jsdgam_multi_season.rds",
+           c("dplyr", "posterior", "testthat")),
+  recovery("mvn_smoke_fit.R", "val_mvgam_mvn_smoke.rds", JSDM_PKGS),
+  recovery("mvt_smoke_fit.R", "val_mvgam_mvt_smoke.rds", JSDM_PKGS),
+  recovery("diri_smoke_fit.R", "val_mvgam_diri_smoke.rds",
+           c("dplyr", "tidyr")),
+  recovery("diri_phi_subformula_fit.R",
+           "val_mvgam_diri_phi_subformula.rds", JSDM_PKGS),
+  recovery("jsdgam_mgp_mvn_smoke.R",
+           c("val_mvgam_mgp_mvn_smoke_iid.rds",
+             "val_mvgam_mgp_mvn_smoke_mgp.rds"),
+           c(JSDM_PKGS, "bayesplot")),
+  recovery("jsdgam_prediction_audit.R",
+           "val_mvgam_jsdgam_prediction_audit.rds"),
+  recovery("zmvn_irregular_time.R", "val_mvgam_zmvn_irregular.rds",
+           "broom"),
+  recovery("kfold_grouped_cv.R",
+           c("val_mvgam_kfold_demo_gauss.rds",
+             "val_mvgam_kfold_demo_occ.rds"),
+           "ggplot2"),
+  recovery("jsdgam_ordinate_traits.R",
+           c("val_mvgam_ordinate_traits.rds",
+             "val_mvgam_ordinate_traits_data.rds"),
+           "ggplot2"),
+  recovery("brms_concordance_diri.R",
+           c("val_brms_diri_concordance.rds",
+             "val_mvgam_diri_concordance.rds"),
+           c("dplyr", "tidyr")),
+  recovery("heaps_birds_replica.R",
+           c("val_mvgam_heaps_birds.rds",
+             "val_mvgam_heaps_birds_wide.rds"),
+           "ape"),
+  recovery("heaps_birds_replica_phylo_dominant.R",
+           "val_mvgam_heaps_birds_phylo_dominant.rds", "ape"),
+  recovery("jsdgam_heaps_nonlinear_env.R",
+           c("val_mvgam_heaps_nonlinear_env_occ.rds",
+             "val_mvgam_heaps_nonlinear_env_nmix.rds",
+             "val_mvgam_heaps_nonlinear_env_multi.rds"),
+           c("ape", "ggplot2", "posterior")),
+  recovery("jsdgam_spoccupancy_concordance.R",
+           c("val_mvgam_spocc_concordance.rds",
+             "val_spocc_lfmspgocc.rds"),
+           c("posterior", "spOccupancy")),
+  recovery("jsdgam_multi_season_concordance.R",
+           c("val_mvgam_multi_season_concordance.rds",
+             "val_spocc_tmspgocc.rds",
+             "val_flocker_multi_season.rds"),
+           c("dplyr", "posterior", "spOccupancy", "flocker"))
+)
+
+run_recovery_script <- function(script) {
+  status <- system2(
+    file.path(R.home("bin"), "Rscript"),
+    args = shQuote(file.path("tests", "local", script))
+  )
+  if (!identical(status, 0L)) {
+    stop(insight::format_error(c(
+      "Recovery fixture script failed.",
+      x = paste0("'", script, "' exited with status ", status, "."),
+      i = "Run it directly to see the failure it reported."
+    )))
+  }
+  invisible(NULL)
+}
+
+cat("\n=== Recovery-script fixtures ===\n")
+for (rec in recovery_scripts) {
+  paths <- file.path(FIXTURE_DIR, rec$fixtures)
+  if (all(file.exists(paths))) {
+    cat("  cached recovery:", rec$script, "\n")
+    next
+  }
+  absent <- rec$needs[
+    !vapply(rec$needs, requireNamespace, logical(1), quietly = TRUE)
+  ]
+  if (length(absent) > 0) {
+    cat("  skipping recovery:", rec$script,
+        "- needs", paste(absent, collapse = ", "), "\n")
+    next
+  }
+  cat("  running recovery:", rec$script, "\n")
+  run_recovery_script(rec$script)
+}
+
+cat("\n=== All fixtures present in", FIXTURE_DIR, "===\n")
+cat("Files: ", length(list.files(FIXTURE_DIR, pattern = "\\.rds$")), "\n")

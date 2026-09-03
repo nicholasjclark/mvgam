@@ -25,7 +25,8 @@
 #
 # evaluated on the conditional_smooths()-returned grid.
 #
-# Caches each fit at /tmp/jsdgam_heaps_nonlinear_env_*.rds.
+# Caches each fit at
+# tests/local/fixtures/val_mvgam_heaps_nonlinear_env_*.rds.
 # Recovery plots saved to /tmp/heaps_nonlinear_env_<family>.png.
 # First-time runtime ~30-50 min total on cmdstanr with 2 chains.
 
@@ -34,6 +35,15 @@ suppressMessages({
   library(ape)
   library(ggplot2)
   library(posterior)
+})
+
+# testthat sets the working directory to tests/local/ when it runs a
+# file, while Rscript runs it from the package root. Reach the shared
+# fixture helpers by whichever of the two paths exists.
+source(if (file.exists("concordance_helpers.R")) {
+  "concordance_helpers.R"
+} else {
+  file.path("tests", "local", "concordance_helpers.R")
 })
 
 set.seed(0825L)
@@ -88,6 +98,18 @@ f_true <- function(env) 1.5 * sin(2 * env)
 env_grid_plot <- seq(-2.2, 2.2, length.out = 100)
 f_grid_plot <- f_true(env_grid_plot)
 
+# Truth shared by all three branches. Each branch adds its own
+# design and latent draws before saving, so the fixture carries the
+# whole generative story and a separate test need not re-simulate.
+sim_truth_shared <- list(
+  N = N, n_lv_true = n_lv_true, species_levels = species_levels,
+  body_mass = body_mass, trait_df = trait_df, tree = tree,
+  theta_trait_true = theta_trait_true,
+  theta_phylo_true = theta_phylo_true,
+  Phi = Phi, Z_true = Z_true,
+  alpha_species_true = alpha_species_true, f_true = f_true
+)
+
 if (run_occ) {
 # ===== Branch 1: occ() single-season ================================
 cat("\n=========================================\n")
@@ -128,7 +150,12 @@ cat("occ rows:", nrow(long_occ), "; mean true psi:",
     round(mean(psi_occ), 3),
     "; naive y rate:", round(mean(long_occ$y), 3), "\n")
 
-cache_occ <- "/tmp/jsdgam_heaps_nonlinear_env_occ.rds"
+sim_truth_occ <- c(sim_truth_shared, list(
+  J_occ = J_occ, K_occ = K_occ, p_occ = p_occ, env_occ = env_occ,
+  lv_occ = lv_occ, psi_occ = psi_occ, z_occ = z_occ
+))
+
+cache_occ <- local_fixture_path("val_mvgam_heaps_nonlinear_env_occ.rds")
 if (file.exists(cache_occ)) {
   cat("[cache] Loading occ() fit.\n")
   fit_occ <- readRDS(cache_occ)
@@ -143,10 +170,13 @@ if (file.exists(cache_occ)) {
     n_lv           = n_lv_true,
     traits         = trait_df,
     phylo          = tree,
-    chains         = 2L, parallel = TRUE,
+    chains         = 2L,
     burnin         = 500L, samples = 500L,
     silent         = 2L, backend = "cmdstanr"
   )
+}
+if (!identical(attr(fit_occ, "sim_truth"), sim_truth_occ)) {
+  attr(fit_occ, "sim_truth") <- sim_truth_occ
   saveRDS(fit_occ, cache_occ)
 }
 }  # end run_occ
@@ -199,7 +229,16 @@ cat("nmix rows:", nrow(long_nmix), "; mean true lambda:",
     round(mean(lambda_nmix), 2),
     "; mean obs y:", round(mean(long_nmix$y), 2), "\n")
 
-cache_nmix <- "/tmp/jsdgam_heaps_nonlinear_env_nmix.rds"
+sim_truth_nmix <- c(sim_truth_shared, list(
+  J_nmix = J_nmix, K_nmix = K_nmix, p_nmix = p_nmix,
+  log_lambda_base = log_lambda_base, env_nmix = env_nmix,
+  lv_nmix = lv_nmix, lambda_nmix = lambda_nmix,
+  N_latent = N_latent, cap_nmix = cap_nmix
+))
+
+cache_nmix <- local_fixture_path(
+  "val_mvgam_heaps_nonlinear_env_nmix.rds"
+)
 if (file.exists(cache_nmix)) {
   cat("[cache] Loading nmix() fit.\n")
   fit_nmix <- readRDS(cache_nmix)
@@ -222,10 +261,13 @@ if (file.exists(cache_nmix)) {
     unit           = time, species = series,
     family         = nmix(),
     n_lv           = n_lv_true,
-    chains         = 2L, parallel = TRUE,
+    chains         = 2L,
     burnin         = 500L, samples = 500L,
     silent         = 2L, backend = "cmdstanr"
   )
+}
+if (!identical(attr(fit_nmix, "sim_truth"), sim_truth_nmix)) {
+  attr(fit_nmix, "sim_truth") <- sim_truth_nmix
   saveRDS(fit_nmix, cache_nmix)
 }
 }  # end run_nmix
@@ -290,7 +332,15 @@ cat("multi-season rows:", nrow(long_ms),
     "; mean true psi:", round(mean(psi_ms), 3),
     "; naive y rate:", round(mean(long_ms$y), 3), "\n")
 
-cache_ms <- "/tmp/jsdgam_heaps_nonlinear_env_multi.rds"
+sim_truth_ms <- c(sim_truth_shared, list(
+  J_ms = J_ms, T_ms = T_ms, K_ms = K_ms, p_ms = p_ms,
+  rho_true = rho_true, env_ms = env_ms, lv_ms = lv_ms,
+  alpha_site_ms = alpha_site_ms, psi_ms = psi_ms, z_ms = z_ms
+))
+
+cache_ms <- local_fixture_path(
+  "val_mvgam_heaps_nonlinear_env_multi.rds"
+)
 if (file.exists(cache_ms)) {
   cat("[cache] Loading multi-season occ() fit.\n")
   fit_ms <- readRDS(cache_ms)
@@ -313,10 +363,13 @@ if (file.exists(cache_ms)) {
     family         = occ(multi_season = TRUE),
     n_lv           = n_lv_true,
     prior          = prior(normal(0, 0.5), class = "sds"),
-    chains         = 2L, parallel = TRUE,
+    chains         = 2L,
     burnin         = 500L, samples = 500L,
     silent         = 2L, backend = "cmdstanr"
   )
+}
+if (!identical(attr(fit_ms, "sim_truth"), sim_truth_ms)) {
+  attr(fit_ms, "sim_truth") <- sim_truth_ms
   saveRDS(fit_ms, cache_ms)
 }
 }  # end run_multi

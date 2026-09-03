@@ -672,29 +672,6 @@ compiled_model <- function(x) {
   out
 }
 
-
-# extract the elapsed time during model fitting
-# @param x brmsfit object
-elapsed_time <- function(x) {
-  stopifnot(is.mvgam(x))
-  backend <- x$backend %||% "rstan"
-  if (backend == "rstan") {
-    out <- rstan::get_elapsed_time(x$fit)
-    out <- data.frame(
-      chain_id = seq_len(nrow(out)),
-      warmup = out[, "warmup"],
-      sampling = out[, "sample"]
-    )
-    out$total <- out$warmup + out$sampling
-    rownames(out) <- NULL
-  } else if (backend == "cmdstanr") {
-    out <- attributes(x$fit)$metadata$time$chains
-  } else if (backend == "mock") {
-    stop(insight::format_error("'elapsed_time' not supported in the mock backend."), call. = FALSE)
-  }
-  out
-}
-
 #' Supported Stan Backends
 #'
 #' @description
@@ -820,29 +797,6 @@ validate_algorithm <- function(algorithm, backend) {
       "See '?mvgam' for the algorithms mvgam can pass to Stan."
     }
   )))
-}
-
-#' Require Specific Backend
-#'
-#' @description
-#' Validates that fitted model uses required backend.
-#' Adapted from brms backend system by Paul-Christian Bürkner.
-#'
-#' @param backend Character string with required backend
-#' @param x Fitted model object
-#' @return Logical TRUE if validation passes (stops with error otherwise)
-#' @noRd
-require_backend <- function(backend, x) {
-  stopifnot(is.mvgam(x))
-  backend <- match.arg(backend, backend_choices())
-  if (isTRUE(x$backend != backend)) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Backend '{backend}' is required for this method."
-      )
-    ), call. = FALSE)
-  }
-  invisible(TRUE)
 }
 
 #' Check if Object is brmsthreads
@@ -1060,20 +1014,6 @@ validate_init <- function(init, backend) {
     )))
   }
   init
-}
-
-#' Repair Variable Names for Stan Compatibility
-#' @description
-#' Converts variable names to proper Stan array syntax (e.g., b.1.1 to b\[1,1\]).
-#' Adapted from brms backend system by Paul-Christian Bürkner.
-#' @param x Character vector of variable names to repair
-#' @return Character vector with corrected Stan array syntax
-#' @noRd
-repair_variable_names <- function(x) {
-  x <- sub("\\.", "[", x)
-  x <- gsub("\\.", ",", x)
-  x[grep("\\[", x)] <- paste0(x[grep("\\[", x)], "]")
-  x
 }
 
 #' Repair Parameter Names in stanfit Objects

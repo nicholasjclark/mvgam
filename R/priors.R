@@ -770,68 +770,37 @@ normalise_prior_arg_alias <- function(dots) {
   dots$priors <- NULL
   dots
 }
-
-#' Filter Observation Priors from Combined Prior Object
+#' Split a combined prior object down the middle
 #'
-#' @description
-#' Extracts only observation model priors from a combined brmsprior object by
-#' filtering out trend parameters (those with _trend suffix). This is the
-#' complement of filter_trend_priors() and uses the established _trend suffix
-#' convention for parameter separation.
+#' brms is handed the observation-side priors and mvgam keeps the
+#' rest, so the same partition is read from both ends. Taking each
+#' end separately meant the two could stop being complements: a
+#' class added to one side and not removed from the other would be
+#' passed to brms, which has no parameter for it, and kept by
+#' mvgam as well.
 #'
-#' @param combined_priors A brmsprior object containing both observation and trend priors
-#' @return A brmsprior object with only observation model priors
+#' The split is by class rather than by the `_trend` suffix. `Z`
+#' carries no suffix and is still mvgam's.
+#'
+#' @param combined_priors A `brmsprior` holding both sides, or NULL.
+#' @param side Which half to return, `"obs"` or `"trend"`.
+#' @return A `brmsprior` with that half, or NULL when it is empty.
 #' @noRd
-filter_obs_priors <- function(combined_priors) {
+filter_priors_by_side <- function(combined_priors, side) {
   checkmate::assert_class(combined_priors, "brmsprior", null.ok = TRUE)
-  
+  checkmate::assert_choice(side, c("obs", "trend"))
   if (is.null(combined_priors)) {
     return(NULL)
   }
-  
-  # Anything mvgam manages goes to the trend side, whether or not
-  # it carries the suffix. `Z` does not, and filing it here would
-  # hand brms a class it has no parameter for.
-  obs_mask <- !is_mvgam_managed_class(combined_priors$class)
-  obs_priors <- combined_priors[obs_mask, , drop = FALSE]
-  
-  if (nrow(obs_priors) == 0) {
+  managed <- is_mvgam_managed_class(combined_priors$class)
+  keep <- if (identical(side, "trend")) managed else !managed
+  out <- combined_priors[keep, , drop = FALSE]
+  if (nrow(out) == 0) {
     return(NULL)
   }
-  
-  # Return standard brms prior object
-  structure(obs_priors, class = c("brmsprior", "data.frame"))
+  structure(out, class = c("brmsprior", "data.frame"))
 }
 
-#' Filter Trend Priors from Combined Prior Object
-#'
-#' @description
-#' Extracts only trend model priors from a combined brmsprior object by
-#' filtering for trend parameters (those with _trend suffix). This is the
-#' complement of filter_obs_priors() and uses the established _trend suffix
-#' convention for parameter separation.
-#'
-#' @param combined_priors A brmsprior object containing both observation and trend priors
-#' @return A brmsprior object with only trend model priors
-#' @noRd
-filter_trend_priors <- function(combined_priors) {
-  checkmate::assert_class(combined_priors, "brmsprior", null.ok = TRUE)
-  
-  if (is.null(combined_priors)) {
-    return(NULL)
-  }
-  
-  # The complement of the observation-side split above.
-  trend_mask <- is_mvgam_managed_class(combined_priors$class)
-  trend_priors <- combined_priors[trend_mask, , drop = FALSE]
-  
-  if (nrow(trend_priors) == 0) {
-    return(NULL)
-  }
-  
-  # Return standard brms prior object
-  structure(trend_priors, class = c("brmsprior", "data.frame"))
-}
 
 #' Get all mvgam-generated trend parameters using trend system infrastructure
 #'
@@ -1083,7 +1052,7 @@ suffix_trend_prior_classes <- function(priors) {
 #' the remaining rows can be merged back into a brms-only prior set.
 #' Used by the trend-side prior pipeline to hand off
 #' brms-managed parameters once mvgam's dynamics rows have been
-#' factored out via `filter_trend_priors()`.
+#' factored out via `filter_priors_by_side()`.
 #'
 #' @param trend_priors `brmsprior` rows scoped to the trend formula.
 #' @param trend_specs Trend specifications from `mv_spec`.
@@ -1696,7 +1665,7 @@ get_prior.mvgam <- function(object, ...) {
   # trend-side row that Stan also used.
   formula_obs <- object$formula
   trend_call <- object$trend_call
-  data <- object$data %||% object$obs_data
+  data <- mvgam_training_data(object)
   family <- object$family %||% gaussian()
 
   rederive_failed <- is.null(formula_obs) || is.null(data)

@@ -16,6 +16,37 @@ CACHE_DIR <- "fixtures"
 fit <- readRDS(file.path(CACHE_DIR, "val_mvgam_lv_factor.rds"))
 
 
+# One forecast frame, built once. Five copies of these ten lines stood
+# in this file, and each took its series from `levels(fit$data$series)`
+# -- a second reading of the fact the fit already records, and the
+# reading a permutation between the two would leave standing.
+future_frame <- function(object, h) {
+  levs <- as.character(mvgam_axes(object)$series$levels)
+  n_time <- object$standata$N_time_trend
+  out <- data.frame(
+    time = rep((n_time + 1L):(n_time + h), length(levs)),
+    series = factor(rep(levs, each = h), levels = levs)
+  )
+  # Match the fitted response's type so newdata assembly does not
+  # coerce the column into a non-NA sentinel.
+  out[[object$response_names[1L] %||% "y"]] <- NA_real_
+  out
+}
+
+
+# A forecast is keyed by the axis and in the axis's own order. Reading
+# an arm by name, which is what every forecast test here did, passes
+# on a list holding every arm under the wrong key, and that
+# permutation is the defect this file exists to catch.
+expect_axis_keyed <- function(fc, object, ndraws, h) {
+  levs <- as.character(mvgam_axes(object)$series$levels)
+  expect_identical(names(fc$forecasts), levs)
+  for (s in levs) {
+    expect_equal(dim(fc$forecasts[[s]]), c(ndraws, h))
+  }
+}
+
+
 test_that("fixture is a free-Z factor fit (sanity checks)", {
   # Guard against fixture drift: the tests below rely on the
   # posterior sampling Z, not fixing it.
@@ -26,27 +57,11 @@ test_that("fixture is a free-Z factor fit (sanity checks)", {
 })
 
 
-test_that("forecast on free-Z factor fit returns the right shape", {
-  n_series <- fit$standata$N_series_trend
-  n_time <- fit$standata$N_time_trend
+test_that("forecast on free-Z factor fit is keyed by the axis", {
   h <- 8L
-  series_levels <- levels(fit$data$series)
-  newdat <- data.frame(
-    time = rep((n_time + 1L):(n_time + h), n_series),
-    series = factor(
-      rep(series_levels, each = h),
-      levels = series_levels
-    )
-  )
-  # Match the fitted response's dtype so newdata assembly does
-  # not coerce the column into a non-NA sentinel.
-  resp <- fit$response_names[1L] %||% "y"
-  newdat[[resp]] <- NA_real_
-  fc <- forecast(fit, newdata = newdat, ndraws = 30L)
+  fc <- forecast(fit, newdata = future_frame(fit, h), ndraws = 30L)
   expect_s3_class(fc, "mvgam_forecast")
-  for (s in series_levels) {
-    expect_equal(dim(fc$forecasts[[s]]), c(30L, h))
-  }
+  expect_axis_keyed(fc, fit, ndraws = 30L, h = h)
 })
 
 
@@ -55,21 +70,11 @@ test_that("forecast on free-Z factor fit gives finite draws", {
   # trajectory once Z projection applies; NAs would indicate
   # either a missing Z column at some draw or a downstream
   # kernel producing non-finite values.
-  n_series <- fit$standata$N_series_trend
-  n_time <- fit$standata$N_time_trend
   h <- 6L
-  series_levels <- levels(fit$data$series)
-  newdat <- data.frame(
-    time = rep((n_time + 1L):(n_time + h), n_series),
-    series = factor(rep(series_levels, each = h),
-                     levels = series_levels)
-  )
-  resp <- fit$response_names[1L] %||% "y"
-  newdat[[resp]] <- NA_real_
-  fc <- forecast(fit, newdata = newdat, ndraws = 30L,
+  fc <- forecast(fit, newdata = future_frame(fit, h), ndraws = 30L,
                   type = "link")
-  for (s in series_levels) {
-    draws <- fc$forecasts[[s]]
+  expect_axis_keyed(fc, fit, ndraws = 30L, h = h)
+  for (draws in fc$forecasts) {
     expect_true(all(is.finite(draws)))
   }
 })
@@ -84,28 +89,29 @@ test_that("free-Z factor forecast draws respect Z per draw", {
   # regression where the projection accidentally applies the
   # same Z row across all series -- a silent bug that would
   # only surface here.
-  n_series <- fit$standata$N_series_trend
-  n_time <- fit$standata$N_time_trend
   h <- 6L
-  series_levels <- levels(fit$data$series)
-  newdat <- data.frame(
-    time = rep((n_time + 1L):(n_time + h), n_series),
-    series = factor(rep(series_levels, each = h),
-                     levels = series_levels)
-  )
-  resp <- fit$response_names[1L] %||% "y"
-  newdat[[resp]] <- NA_real_
-  fc <- forecast(fit, newdata = newdat, ndraws = 30L,
+  fc <- forecast(fit, newdata = future_frame(fit, h), ndraws = 30L,
                   type = "link")
-  # Compare series 1 to each of series 2, 3, 4; at least one
-  # must differ per-draw. The Heaps identification pins the
-  # upper-triangular block of Z so series 1 = trend 1 up to a
-  # scalar; other series load on both factors and are unlikely
-  # to collapse to the same draws.
-  diffs_any <- vapply(2:n_series, function(j) {
-    !isTRUE(all.equal(fc$forecasts[[1L]], fc$forecasts[[j]]))
-  }, logical(1L))
-  expect_true(any(diffs_any))
+  expect_axis_keyed(fc, fit, ndraws = 30L, h = h)
+
+  # Every pair of series must differ, not merely one pair somewhere.
+  # Asking whether any pair differs passes on an axis that collapsed
+  # three of the four series onto one latent column, which is the
+  # shape this test was written to refuse. The Heaps identification
+  # pins the upper-triangular block of Z, and no two rows of a free Z
+  # are equal, so the arms are distinct pair by pair.
+  arms <- fc$forecasts
+  pairs_same <- character(0)
+  for (i in seq_along(arms)) {
+    for (j in seq_along(arms)) {
+      if (j <= i) next
+      if (isTRUE(all.equal(arms[[i]], arms[[j]]))) {
+        pairs_same <- c(pairs_same,
+                        paste(names(arms)[i], names(arms)[j], sep = "="))
+      }
+    }
+  }
+  expect_identical(pairs_same, character(0))
 })
 
 
@@ -144,7 +150,9 @@ test_that("jsdgam ZMVN factor forecast returns finite draws", {
   n_time <- jsdgam_fit$standata$N_time_trend
   h <- 5L
   train <- jsdgam_fit$obs_data
-  series_levels <- levels(train$series)
+  # The axis as the fit recorded it, not as the training column
+  # happens to spell it.
+  series_levels <- as.character(mvgam_axes(jsdgam_fit)$series$levels)
   trait_map <- unique(train[, c("species", "trait1")])
   newdat <- expand.grid(
     time = (n_time + 1L):(n_time + h),
@@ -161,20 +169,29 @@ test_that("jsdgam ZMVN factor forecast returns finite draws", {
 
   fc <- forecast(jsdgam_fit, newdata = newdat, ndraws = 30L)
   expect_s3_class(fc, "mvgam_forecast")
+  expect_identical(names(fc$forecasts), series_levels)
   for (s in series_levels) {
     fm <- fc$forecasts[[s]]
     expect_equal(dim(fm), c(30L, h))
     expect_true(all(is.finite(fm)))
   }
-  # Z_tilde is different per series, so per-series posterior
-  # means over the forecast horizon should not collapse to a
-  # single value.
-  series_means <- vapply(
-    series_levels,
-    function(s) mean(fc$forecasts[[s]]),
-    numeric(1L)
-  )
-  expect_gt(stats::sd(series_means), 1e-4)
+
+  # No two species share a row of Z_tilde, so no two arms are the
+  # same draws. A spread in the per-series means, which is what stood
+  # here, is satisfied by an axis that gave several species one
+  # column while leaving the rest apart.
+  arms <- fc$forecasts
+  collapsed <- character(0)
+  for (i in seq_along(arms)) {
+    for (j in seq_along(arms)) {
+      if (j <= i) next
+      if (isTRUE(all.equal(arms[[i]], arms[[j]]))) {
+        collapsed <- c(collapsed,
+                       paste(names(arms)[i], names(arms)[j], sep = "="))
+      }
+    }
+  }
+  expect_identical(collapsed, character(0))
 })
 
 
@@ -219,7 +236,7 @@ test_that("VAR factor forecast preserves shared-latent invariant", {
   mod <- mvgam(
     y ~ 1, trend_formula = ~ VAR(p = 1L), trend_map = tm,
     data = dat, family = gaussian(),
-    chains = 2L, samples = 500L, burnin = 500L,
+    chains = 2L, iter = 1000L, warmup = 500L,
     silent = 2L, refresh = 0
   )
   expect_equal(mod$standata$N_lv_trend, n_lv)
@@ -313,21 +330,12 @@ test_that("last-state extraction at the ceiling reads the latent grain", {
 # produce an `[h, n_series]` block of finite draws, so this test
 # covers the path rather than discriminating the defect.
 test_that("forecast at the ceiling returns a finite series block", {
-  n_time <- mgp_fit$standata$N_time_trend
   h <- 5L
-  series_levels <- levels(mgp_fit$data$series)
-  newdat <- data.frame(
-    time = rep((n_time + 1L):(n_time + h), length(series_levels)),
-    series = factor(rep(series_levels, each = h),
-                     levels = series_levels)
-  )
-  resp <- mgp_fit$response_names[1L] %||% "y"
-  newdat[[resp]] <- NA_real_
-  fc <- forecast(mgp_fit, newdata = newdat, ndraws = 20L,
-                  type = "link")
-  for (s in series_levels) {
-    expect_equal(dim(fc$forecasts[[s]]), c(20L, h))
-    expect_true(all(is.finite(fc$forecasts[[s]])))
+  fc <- forecast(mgp_fit, newdata = future_frame(mgp_fit, h),
+                  ndraws = 20L, type = "link")
+  expect_axis_keyed(fc, mgp_fit, ndraws = 20L, h = h)
+  for (arm in fc$forecasts) {
+    expect_true(all(is.finite(arm)))
   }
   expect_false(isTRUE(all.equal(fc$forecasts[[1L]], fc$forecasts[[2L]])))
 })

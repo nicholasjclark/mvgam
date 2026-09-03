@@ -174,7 +174,7 @@ pp_check.mvgam <- function(
   if (is.null(newdata)) {
     # Fitting data lives on $data; some objects also expose $obs_data
     # as an alias and may have it empty.
-    newdata <- object$data %||% object$obs_data
+    newdata <- mvgam_training_data(object)
   }
 
   # Multi-response custom families (diri / multi / categ / mvn /
@@ -1015,7 +1015,7 @@ build_resid_vs_fitted_panel <- function(
 closure_unit_fit_stat_ppc <- function(object, newdata, stat,
                                         group, ndraws, draw_ids) {
   stat <- match.arg(stat, c("chi_squared", "freeman_tukey"))
-  if (is.null(newdata)) newdata <- object$data %||% object$obs_data
+  if (is.null(newdata)) newdata <- mvgam_training_data(object)
 
   # Per-visit yrep + epred. Both arrive as [ndraws x N_visit] so they
   # share the closure-unit aggregator below.

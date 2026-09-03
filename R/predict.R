@@ -420,7 +420,7 @@ predict_variance <- function(object, newdata, process_error,
         }
         if (identical(family_name, "multi")) {
           if (is.null(newdata)) {
-            newdata <- object$obs_data %||% object$data
+            newdata <- mvgam_training_data(object)
           }
           response_var <- closure_unit_response_var(object$formula)
           y_vec <- newdata[[response_var]]

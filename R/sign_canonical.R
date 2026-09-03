@@ -84,8 +84,13 @@ sign_canonicalise_factors <- function(object) {
     return(object)
   }
 
-  n_series <- object$series_info$n_series %||%
-    object$trend_components$n_trends
+  # The axis's own count. `series_info$n_series` is empty whenever
+  # the frame names no series column, which is every hierarchical
+  # and every response-keyed fit, and the fallback beside it is
+  # empty on most of those too. The function then returned the
+  # object untouched and the stored posterior kept its unrotated
+  # loadings, with nothing said.
+  n_series <- mvgam_axes(object)$series$n
   if (is.null(n_series) || n_series < 1L) return(object)
 
   for (chain in seq_along(samples_list)) {

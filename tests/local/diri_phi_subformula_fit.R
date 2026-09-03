@@ -7,14 +7,23 @@
 # mirror the Stan lpdf, and produce finite `[ndraws x N_obs]` outputs
 # aligned with the per-row mu linpred.
 #
-# Cached at /tmp/diri_phi_subformula_fit.rds. Delete to refit.
-# Runtime ~3-5 min.
+# Cached at tests/local/fixtures/val_mvgam_diri_phi_subformula.rds.
+# Delete to refit. Runtime ~3-5 min.
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)
   library(dplyr)
   library(tidyr)
   library(posterior)
+})
+
+# testthat sets the working directory to tests/local/ when it runs a
+# file, while Rscript runs it from the package root. Reach the shared
+# fixture helpers by whichever of the two paths exists.
+source(if (file.exists("concordance_helpers.R")) {
+  "concordance_helpers.R"
+} else {
+  file.path("tests", "local", "concordance_helpers.R")
 })
 
 set.seed(404L)
@@ -60,7 +69,16 @@ long_dat <- pivot_longer(
   ) |>
   arrange(time, series)
 
-cache <- "/tmp/diri_phi_subformula_fit.rds"
+# The generative truth rides on the saved fit so a separate test can
+# assert recovery against it without repeating the simulation.
+sim_truth <- list(
+  K = K, N_lv = N_lv, species_levels = species_levels,
+  Z_true = Z_true,
+  phi_intercept = phi_intercept, phi_env_slope = phi_env_slope,
+  mu_intercept = mu_intercept, mu_env_slope = mu_env_slope, env = env
+)
+
+cache <- local_fixture_path("val_mvgam_diri_phi_subformula.rds")
 if (file.exists(cache)) {
   cat("[cache] Loading diri phi-subformula fit.\n")
   fit <- readRDS(cache)
@@ -75,12 +93,14 @@ if (file.exists(cache)) {
     family  = diri(),
     n_lv    = 2L,
     chains  = 2L,
-    parallel = TRUE,
     warmup  = 500L,
     iter    = 1000L,
     silent  = 2,
     backend = "cmdstanr"
   )
+}
+if (!identical(attr(fit, "sim_truth"), sim_truth)) {
+  attr(fit, "sim_truth") <- sim_truth
   saveRDS(fit, cache)
 }
 
