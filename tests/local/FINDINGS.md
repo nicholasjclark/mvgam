@@ -1935,6 +1935,39 @@ or it should say that `newdata` is required, and an object that
 reports a type and carries hindcasts reads as though it did the
 former.
 
+## PW()
+
+**58. PW refuses a factor model on one route of four.**
+
+`test-trend-pw.R`. `?PW` and the assembly code both record that a
+piecewise trend does not support factor models, because each series
+needs its own changepoint structure. Asked four ways on one frame of
+two series:
+
+| route | result |
+|---|---|
+| `trend_map = matrix(NA, 2, 1)` | accepted |
+| `jsdgam(factor_formula = ~ -1 + PW(), n_lv = 1)` | accepted |
+| `PW(n_changepoints = 5, n_lv = 1)` | refused, "Factor models (n_lv) not supported for PW trends" |
+| `mvgam(trend_formula = ~ PW(...), n_lv = 1)` | accepted, `N_lv_trend` comes back 2 |
+
+The constructor holds the line and nothing else does. The last row is
+finding 6's symptom exactly: a user asks for one latent factor, is
+given one per series, and nothing on the fitted object records that
+the request was raised.
+
+Finding 6 has `CAR()` refusing on two routes of three. PW refuses on
+one of four, so the restriction is stated in the documentation, in the
+assembly comments and in the constructor, and is reachable around
+three ways.
+
+The three arguments that do work are worth recording alongside it,
+since they rule out a general fault in how PW reads its arguments:
+`changepoint_range` places its last changepoint at 24, 48 and 60 for
+0.4, 0.8 and 1.0 on a 62-occasion frame; `changepoint_scale` reaches
+Stan as `double_exponential_lpdf(to_vector(delta_trend) | 0, s)` with
+the value asked for; and `n_changepoints` emits exactly that many.
+
 ## Grouped cross-validation
 
 **48. A fold that is contiguous in time cannot be refitted, so

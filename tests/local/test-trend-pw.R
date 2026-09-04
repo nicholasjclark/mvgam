@@ -507,6 +507,75 @@ test_that("an unknown series is refused, and named", {
 })
 
 
+test_that("a factor model is refused on every route PW offers", {
+  # `?PW` and the assembly code both record that a piecewise trend
+  # cannot run a factor model, because each series carries its own
+  # changepoints. Only the constructor enforces it. The other three
+  # routes build, and the top-level one silently returns one latent
+  # dimension per series after being asked for fewer, which is
+  # finding 6's symptom on a second trend type.
+  build <- function(...) {
+    mvgam(obs_formula, data = dat, family = poisson(),
+          run_model = FALSE, silent = 2, ...)
+  }
+  # The route that works.
+  expect_error(
+    build(trend_formula = ~ PW(n_changepoints = 5, n_lv = 1L)),
+    "not supported for PW"
+  )
+  # The three that do not.
+  expect_error(
+    build(trend_formula = ~ PW(n_changepoints = 5),
+          trend_map = matrix(NA_real_, n_series, 1L)),
+    "not supported for PW"
+  )
+  expect_error(
+    build(trend_formula = ~ PW(n_changepoints = 5), n_lv = 1L),
+    "not supported for PW"
+  )
+  expect_error(
+    jsdgam(y ~ 1, factor_formula = ~ -1 + PW(n_changepoints = 5),
+           data = dat, unit = time, species = series,
+           family = poisson(), n_lv = 1L, run_model = FALSE,
+           silent = 2),
+    "not supported for PW"
+  )
+})
+
+
+test_that("the changepoint arguments reach Stan as asked", {
+  # Three arguments that decide where a piecewise trend can bend and
+  # how far. Each is the kind that can be read and dropped, leaving a
+  # model that fits and answers with someone else's changepoints.
+  build <- function(...) {
+    mvgam(obs_formula, data = dat, family = poisson(),
+          run_model = FALSE, silent = 2,
+          trend_formula = ~ PW(...))
+  }
+  for (k in c(3L, 8L, 15L)) {
+    sd_k <- build(n_changepoints = k)$standata
+    expect_length(sd_k$t_change_trend, k)
+  }
+  # `changepoint_range` confines them to the first share of the grid,
+  # so a larger range puts the last changepoint later.
+  last_at <- vapply(c(0.4, 0.8, 1.0), function(r) {
+    max(build(n_changepoints = 6L, changepoint_range = r)$standata$t_change_trend)
+  }, numeric(1))
+  expect_true(all(diff(last_at) > 0))
+  # `changepoint_scale` is the prior width on the rate adjustments and
+  # reaches the program as the double exponential's scale.
+  for (sc in c(0.05, 5)) {
+    code <- as.character(stancode(build(n_changepoints = 6L,
+                                        changepoint_scale = sc)))
+    expect_match(
+      code,
+      paste0("double_exponential_lpdf\\(to_vector\\(delta_trend\\) \\| 0, ",
+             sc, "\\)")
+    )
+  }
+})
+
+
 test_that("logistic growth is refused without a cap, and says so", {
   # The other growth form this trend offers, and it needs a carrying
   # capacity. The refusal is asserted on its own wording, and on the
