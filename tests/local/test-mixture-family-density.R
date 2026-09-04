@@ -2,10 +2,10 @@
 # closed form and against the other's.
 #
 # A mixture likelihood is where `log_lik()` goes wrong in ways a
-# finiteness check cannot see. The file this replaces asserted, for
-# five such families, that the matrix was finite and the right shape;
-# a hurdle density written with a zero-inflated branch satisfies all
-# of that and is a different distribution.
+# finiteness check cannot see. A hurdle density written with a
+# zero-inflated branch returns a matrix of the right shape holding
+# finite numbers throughout, and is a different distribution, so the
+# claims here are against the closed forms rather than the shape.
 #
 # So the claim here is the density itself. The two families differ
 # only in where a zero may come from. Under a hurdle, zeros come from
@@ -876,6 +876,83 @@ test_that("the predictor is the design times the coefficients", {
   )
   # The state is what separates the two surfaces, and it is not zero.
   expect_gt(max(abs(trend)), 0.1)
+})
+
+
+# -- The marginaleffects entry points on a mixture --------------------
+
+test_that("the entry points reach the mixture, not the count alone", {
+  # What only a mixture can be asked. That `avg_predictions` averages
+  # the draws `predictions` returned is a property of marginaleffects
+  # and is stated once, in test-draw-alignment.R; repeating it per
+  # family would test the same code again. What is family-specific is
+  # which density the estimate came off, and these two families
+  # differ from the plain Poisson in opposite directions: a hurdle
+  # conditions the count away from zero and a zero-inflated Poisson
+  # adds zeros to it.
+  library(marginaleffects)
+  options("marginaleffects_model_classes" = "mvgam")
+
+  for (m in list(fit, fit3)) {
+    pred <- predictions(m, type = "expected")
+    expect_identical(nrow(pred), nrow(m$data))
+    expect_true(all(pred$estimate >= 0))
+    # The estimate is the public method's own answer, summarised the
+    # way this backend summarises. A branch that reached the count
+    # component alone returns the right shape on the wrong density.
+    expect_equal(pred$estimate,
+                 unname(apply(t(posterior_epred(m, newdata = m$data)),
+                              1L, stats::median)),
+                 tolerance = 1e-8)
+    # And that density is not the untouched Poisson the linear
+    # predictor implies: exp(eta) is what a branch ignoring the
+    # mixture would return, and the mixture moves it.
+    eta <- posterior_linpred(m, newdata = m$data)
+    poisson_mean <- unname(apply(exp(eta), 2L, stats::median))
+    expect_false(isTRUE(all.equal(pred$estimate, poisson_mean)))
+
+    slope <- avg_slopes(m, variables = "x", type = "expected")
+    comp <- avg_comparisons(m, variables = "x", type = "expected")
+    expect_identical(nrow(slope), 1L)
+    expect_identical(as.character(slope$term), "x")
+    expect_identical(nrow(comp), 1L)
+    # `x` enters the count component of both models, and the mixture
+    # weight is constant, so its effect survives to the expectation
+    # with its sign intact. A derivative and a unit-step contrast
+    # agree on that sign; a comparison that lost the covariate
+    # returns zero.
+    expect_gt(abs(comp$estimate), 1e-8)
+    expect_identical(sign(comp$estimate), sign(slope$estimate))
+  }
+})
+
+
+test_that("a distributional covariate is offered as a term", {
+  # `hu ~ z` puts `z` in the model, and finding 20 recorded the
+  # default effect list omitting it. The claim here is the one
+  # marginaleffects acts on: `z` has to be reachable as a term with
+  # a slope of its own, and that slope has to move the zeros rather
+  # than the counts.
+  library(marginaleffects)
+  options("marginaleffects_model_classes" = "mvgam")
+  preds <- insight::find_predictors(fit2)$conditional
+  expect_true(all(c("x", "z") %in% preds))
+
+  s_z <- avg_slopes(fit2, variables = "z", type = "expected")
+  expect_identical(nrow(s_z), 1L)
+  expect_gt(abs(s_z$estimate), 1e-8)
+  # `z` enters through the hurdle alone, so a rise in it makes zeros
+  # more likely and the expectation smaller. The slope therefore has
+  # to carry the opposite sign to the hurdle coefficient, which is a
+  # claim about direction rather than about magnitude.
+  #
+  # Read through the aliased draws rather than the raw stanfit: brms
+  # writes the block as `b_hu[1]` and the alias pass is what turns it
+  # into `b_hu_z`, which is finding 29's cause reaching this file.
+  dm <- posterior::as_draws_matrix(fit2)
+  b_hu <- as.numeric(dm[, "b_hu_z"])
+  expect_gt(mean(b_hu), 0)
+  expect_lt(s_z$estimate, 0)
 })
 
 

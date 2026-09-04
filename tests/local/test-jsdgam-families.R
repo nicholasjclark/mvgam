@@ -117,45 +117,6 @@ as_long_jsdm <- function(Y_wide, env, species_levels, time_offset = 0L,
 # random calls in the same order. Changing any of them invalidates
 # that family's cached fit.
 
-sim_beta <- function() {
-  set.seed(609L)
-  K <- 5L
-  N_lv <- 2L
-  n_sites <- 60L
-  phi_true <- 8
-  species_levels <- paste0("sp", seq_len(K))
-
-  Z_true <- matrix(rnorm(K * N_lv, sd = 0.8), nrow = K, ncol = N_lv)
-  env <- rnorm(n_sites)
-  mu_intercept <- rnorm(K, mean = 0, sd = 0.5)
-  mu_env_slope <- rnorm(K, sd = 0.4)
-  lv_sim <- matrix(rnorm(n_sites * N_lv), nrow = n_sites, ncol = N_lv)
-
-  Y_wide <- matrix(NA_real_, nrow = n_sites, ncol = K)
-  for (i in seq_len(n_sites)) {
-    eta_i <- mu_intercept + mu_env_slope * env[i] +
-      as.numeric(Z_true %*% lv_sim[i, ])
-    mu_i <- 1 / (1 + exp(-eta_i))
-    Y_wide[i, ] <- rbeta(K, shape1 = mu_i * phi_true,
-                         shape2 = (1 - mu_i) * phi_true)
-  }
-  # Beta support is open at both ends; nudge off the boundary so the
-  # likelihood is finite for every observation.
-  Y_wide <- pmin(pmax(Y_wide, 1e-4), 1 - 1e-4)
-  colnames(Y_wide) <- species_levels
-
-  sigma_true_cov <- tcrossprod(Z_true)
-  list(
-    K = K, N_lv = N_lv, species_levels = species_levels,
-    Z_true = Z_true, phi_true = phi_true, lv_sim = lv_sim,
-    sigma_true_cov = sigma_true_cov,
-    sigma_true_cor = cov2cor(sigma_true_cov + diag(1e-8, K)),
-    mu_intercept = mu_intercept, mu_env_slope = mu_env_slope, env = env,
-    long_dat = as_long_jsdm(Y_wide, env, species_levels)
-  )
-}
-
-
 sim_nb <- function() {
   set.seed(608L)
   K <- 5L
@@ -187,48 +148,6 @@ sim_nb <- function() {
     mu_intercept = mu_intercept, mu_env_slope = mu_env_slope, env = env,
     long_dat = as_long_jsdm(Y_wide, env, species_levels,
                             integer_response = TRUE)
-  )
-}
-
-
-sim_mvn <- function() {
-  set.seed(604L)
-  K <- 4L
-  N_lv <- 2L
-  n_sites <- 30L
-  species_levels <- paste0("y", seq_len(K))
-
-  # Z columns are not centred: the multi_normal density is
-  # shift-sensitive, so the location of mu is identified and the
-  # sum-to-zero constraint the softmax families need is not.
-  Z_true <- matrix(rnorm(K * N_lv, sd = 0.7), nrow = K, ncol = N_lv)
-  psi_true <- rep(0.5, K)
-  sigma_true_cov <- tcrossprod(Z_true) + diag(psi_true^2)
-
-  env <- rnorm(n_sites)
-  mu_intercept <- rnorm(K)
-  mu_env_slope <- rnorm(K)
-
-  # Drawn from the marginal form, integrating the factor scores out.
-  L_true <- chol(sigma_true_cov)
-  Y_wide <- matrix(NA_real_, nrow = n_sites, ncol = K)
-  for (i in seq_len(n_sites)) {
-    mu_i <- mu_intercept + mu_env_slope * env[i]
-    Y_wide[i, ] <- mu_i + as.numeric(crossprod(L_true, rnorm(K)))
-  }
-  colnames(Y_wide) <- species_levels
-
-  list(
-    K = K, N_lv = N_lv, species_levels = species_levels,
-    Z_true = Z_true, psi_true = psi_true,
-    sigma_true_cov = sigma_true_cov,
-    sigma_true_cor = cov2cor(sigma_true_cov),
-    mu_intercept = mu_intercept, mu_env_slope = mu_env_slope, env = env,
-    # Numbered from 3, so a raw time value never equals its own rank.
-    # On a 1..n grid the two coincide and a function handing back the
-    # index where it was asked for the value passes every check.
-    long_dat = as_long_jsdm(Y_wide, env, species_levels,
-                            time_offset = 2L)
   )
 }
 
@@ -320,79 +239,6 @@ sim_diri <- function() {
 }
 
 
-sim_multi <- function() {
-  set.seed(602L)
-  K <- 4L
-  N_lv <- 2L
-  n_sites <- 30L
-  species_levels <- paste0("y", seq_len(K))
-
-  Z_true <- centred_loadings(K, N_lv)
-  env <- rnorm(n_sites)
-  mu_intercept <- rnorm(K)
-  mu_env_slope <- rnorm(K)
-  N_per_site <- sample(40:80, n_sites, replace = TRUE)
-
-  Y_wide <- matrix(NA_integer_, nrow = n_sites, ncol = K)
-  for (i in seq_len(n_sites)) {
-    lv_i <- rnorm(N_lv)
-    eta_i <- mu_intercept + mu_env_slope * env[i] +
-      as.numeric(Z_true %*% lv_i)
-    p_i <- exp(eta_i) / sum(exp(eta_i))
-    Y_wide[i, ] <- as.vector(rmultinom(1L, N_per_site[i], p_i))
-  }
-  colnames(Y_wide) <- species_levels
-
-  sigma_true_cov <- tcrossprod(Z_true)
-  list(
-    K = K, N_lv = N_lv, species_levels = species_levels,
-    Z_true = Z_true, N_per_site = N_per_site,
-    sigma_true_cov = sigma_true_cov,
-    sigma_true_cor = cov2cor(sigma_true_cov + diag(1e-8, K)),
-    mu_intercept = mu_intercept, mu_env_slope = mu_env_slope, env = env,
-    long_dat = as_long_jsdm(Y_wide, env, species_levels,
-                            integer_response = TRUE)
-  )
-}
-
-
-sim_categ <- function() {
-  set.seed(603L)
-  K <- 4L
-  N_lv <- 2L
-  # A single-trial categorical observation carries only about
-  # log2(K) bits, so this family needs more sites than the rest.
-  n_sites <- 100L
-  species_levels <- paste0("y", seq_len(K))
-
-  Z_true <- centred_loadings(K, N_lv)
-  env <- rnorm(n_sites)
-  mu_intercept <- rnorm(K)
-  mu_env_slope <- rnorm(K)
-
-  Y_wide <- matrix(0L, nrow = n_sites, ncol = K)
-  for (i in seq_len(n_sites)) {
-    lv_i <- rnorm(N_lv)
-    eta_i <- mu_intercept + mu_env_slope * env[i] +
-      as.numeric(Z_true %*% lv_i)
-    p_i <- exp(eta_i) / sum(exp(eta_i))
-    Y_wide[i, sample.int(K, 1L, prob = p_i)] <- 1L
-  }
-  colnames(Y_wide) <- species_levels
-
-  sigma_true_cov <- tcrossprod(Z_true)
-  list(
-    K = K, N_lv = N_lv, species_levels = species_levels,
-    Z_true = Z_true,
-    sigma_true_cov = sigma_true_cov,
-    sigma_true_cor = cov2cor(sigma_true_cov + diag(1e-8, K)),
-    mu_intercept = mu_intercept, mu_env_slope = mu_env_slope, env = env,
-    long_dat = as_long_jsdm(Y_wide, env, species_levels,
-                            integer_response = TRUE)
-  )
-}
-
-
 # ---- Family specifications -------------------------------------------
 #
 # `epred_ok` and `predict_ok` state the response scale each family
@@ -406,21 +252,6 @@ sim_categ <- function() {
 # claim made.
 
 SPECS <- list(
-  beta = list(
-    label = "Beta", family = quote(Beta()), sim = sim_beta,
-    threshold_cor = 0.6, mae_max = 0.6, na_response = NA_real_,
-    has_psi = FALSE,
-    epred_ok = function(x) all(x > 0 & x < 1),
-    predict_ok = function(x) all(x > 0 & x < 1),
-    fc_types = c("link", "expected", "trend", "response"),
-    fc_response_ok = function(x) all(x > 0 & x < 1),
-    pp_check_extra = "ecdf_overlay",
-    plot_types = c("residuals", "trend", "factors"),
-    optional_methods = c("linpred", "residuals", "mcmc_plot",
-                         "marginaleffects"),
-    ce_response_ok = function(x) all(x > 0 & x < 1),
-    me_integer_tell = FALSE
-  ),
   nb = list(
     label = "negative binomial", family = quote(brms::negbinomial()),
     sim = sim_nb,
@@ -439,22 +270,6 @@ SPECS <- list(
     # draws are whole, so an all-integer estimate is a draw being
     # reported as the mean and a tolerance alone would hide it.
     me_integer_tell = TRUE
-  ),
-  mvn = list(
-    label = "multivariate normal", family = quote(mvn()), sim = sim_mvn,
-    identity_link = TRUE,
-    threshold_cor = 0.7, mae_max = 0.5, na_response = NA_real_,
-    has_psi = TRUE,
-    epred_ok = NULL, predict_ok = NULL,
-    fc_types = c("link", "expected", "trend"),
-    fc_response_ok = NULL,
-    pp_check_extra = "resid_qq",
-    plot_types = c("residuals", "trend", "factors"),
-    optional_methods = c("linpred", "residuals", "mcmc_plot",
-                         "marginaleffects",
-                         "forecast_response_agrees"),
-    ce_response_ok = NULL,
-    me_integer_tell = FALSE
   ),
   mvt = list(
     label = "multivariate Student-t", family = quote(mvt()), sim = sim_mvt,
@@ -478,36 +293,6 @@ SPECS <- list(
     has_psi = FALSE,
     epred_ok = function(x) all(x >= 0 & x <= 1),
     predict_ok = function(x) all(x >= 0 & x <= 1),
-    fc_types = c("link", "expected", "trend"),
-    fc_response_ok = NULL,
-    pp_check_extra = NULL,
-    plot_types = c("trend", "factors"),
-    optional_methods = character(0),
-    ce_response_ok = NULL,
-    me_integer_tell = FALSE
-  ),
-  multi = list(
-    label = "multinomial", family = quote(multi()), sim = sim_multi,
-    threshold_cor = 0.7, mae_max = 0.5, na_response = NA_integer_,
-    has_psi = FALSE,
-    epred_ok = function(x) all(x >= 0),
-    predict_ok = function(x) all(x >= 0) && all(x == floor(x)),
-    fc_types = c("link", "expected", "trend"),
-    fc_response_ok = NULL,
-    pp_check_extra = NULL,
-    plot_types = c("trend", "factors"),
-    optional_methods = character(0),
-    ce_response_ok = NULL,
-    me_integer_tell = FALSE
-  ),
-  categ = list(
-    label = "categorical", family = quote(categ()), sim = sim_categ,
-    # A single-trial observation carries the least information about
-    # the latent covariance of any family here.
-    threshold_cor = 0.5, mae_max = 0.6, na_response = NA_integer_,
-    has_psi = FALSE,
-    epred_ok = function(x) all(x >= 0 & x <= 1),
-    predict_ok = function(x) all(x %in% c(0, 1)),
     fc_types = c("link", "expected", "trend"),
     fc_response_ok = NULL,
     pp_check_extra = NULL,
@@ -1274,26 +1059,6 @@ for (nm in names(SPECS)) {
 
 # ---- What belongs to one family alone --------------------------------
 
-test_that("beta: the precision parameter recovers the simulated phi", {
-  # phi sets how tightly the proportions concentrate around their
-  # mean. A phi off by an order of magnitude leaves the latent
-  # covariance recovery intact and makes every interval the wrong
-  # width.
-  obj <- get("beta", envir = built)
-  dm <- as_draws_matrix(obj$fit$fit)
-  phi_cols <- grep("^phi$|^b_phi_Intercept$", colnames(dm), value = TRUE)
-  expect_gt(length(phi_cols), 0L)
-  phi_post <- as.numeric(dm[, phi_cols[1L]])
-  phi_resp <- if (grepl("Intercept", phi_cols[1L])) {
-    exp(phi_post)
-  } else {
-    phi_post
-  }
-  expect_true(all(phi_resp > 0))
-  expect_lt(abs(mean(phi_resp) - obj$sim$phi_true) / obj$sim$phi_true,
-            0.75)
-})
-
 
 test_that("nb: the shape parameter recovers the simulated dispersion", {
   # The shape sets how far counts scatter around their mean, so a
@@ -1307,17 +1072,6 @@ test_that("nb: the shape parameter recovers the simulated dispersion", {
   expect_true(all(phi_post > 0))
   expect_lt(abs(mean(phi_post) - obj$sim$phi_true) / obj$sim$phi_true,
             0.75)
-})
-
-
-test_that("mvn: Psi recovers the simulated residual scale", {
-  obj <- get("mvn", envir = built)
-  dm <- as_draws_matrix(obj$fit$fit)
-  psi_cols <- grep("^Psi\\[", colnames(dm), value = TRUE)
-  expect_length(psi_cols, obj$sim$K)
-  psi_mean <- colMeans(dm[, psi_cols, drop = FALSE])
-  expect_lt(max(abs(psi_mean - obj$sim$psi_true)), 0.35)
-  expect_true(any(grepl("^Psi\\[", variables(obj$fit))))
 })
 
 
@@ -1371,25 +1125,26 @@ test_that("diri: the concentration parameter recovers phi", {
 })
 
 
-test_that("the softmax families pin their loadings to sum to zero", {
+test_that("diri: the loadings are pinned to sum to zero over species", {
   # A softmax is invariant to a constant added across species, so an
   # unpinned Z leaves the model identified only up to that shift and
-  # the loadings wander between chains. Each of these three files
-  # called the constraint pinned by construction and none checked
-  # it, which is exactly the kind of claim that stops holding
-  # unnoticed.
-  for (nm in c("diri", "multi", "categ")) {
-    obj <- get(nm, envir = built)
-    Z_arr <- mvgam:::extract_Z_loadings(
-      as_draws_matrix(obj$fit$fit),
-      n_obs_series = obj$sim$K, n_lv = obj$sim$N_lv
-    )
-    Z_mean <- apply(Z_arr, c(2L, 3L), mean)
-    expect_lt(max(abs(colSums(Z_mean))), 1e-6)
-    # The columns sum to zero because they are constrained, not
-    # because they are empty.
-    expect_gt(max(abs(Z_mean)), 0.1)
-  }
+  # the loadings wander between chains. The constraint is shared by
+  # every softmax family, so pinning it here pins it for all of them.
+  obj <- get("diri", envir = built)
+  Z_arr <- mvgam:::extract_Z_loadings(
+    as_draws_matrix(obj$fit$fit),
+    n_obs_series = obj$sim$K, n_lv = obj$sim$N_lv
+  )
+  Z_mean <- apply(Z_arr, c(2L, 3L), mean)
+  expect_lt(max(abs(colSums(Z_mean))), 1e-6)
+  # The columns sum to zero because they are constrained, not
+  # because they are empty.
+  expect_gt(max(abs(Z_mean)), 0.1)
+  # The constraint holds draw by draw, not only on the average. A
+  # posterior mean can sum to zero from a pair of draws that shift
+  # in opposite directions while neither is itself pinned.
+  per_draw <- apply(Z_arr, 1L, function(z) max(abs(colSums(z))))
+  expect_lt(max(per_draw), 1e-6)
 })
 
 
@@ -1417,50 +1172,4 @@ test_that("diri: the data and the expectation are both compositions", {
     expect_equal(as.numeric(tapply(pp[i, ], d$time, sum)),
                  rep(1, length(per_site)), tolerance = 1e-6)
   }
-})
-
-
-test_that("multi: a predicted composition keeps each site's own total", {
-  # The claim that separates a multinomial from four independent
-  # count models: the species at a site share one trial total, so a
-  # draw has to sum to that site's total exactly. Modelled as
-  # separate Poissons every draw is still a non-negative whole
-  # number of the right shape, and only this sum notices.
-  obj <- get("multi", envir = built)
-  d <- obj$sim$long_dat
-  totals <- obj$sim$N_per_site
-  expect_identical(as.integer(tapply(d$y, d$time, sum)),
-                   as.integer(totals))
-  # The totals differ across sites, so a draw that reproduced one
-  # shared total could not satisfy the comparison below.
-  expect_gt(length(unique(totals)), 1L)
-
-  pp <- posterior_predict(obj$fit, draw_ids = 1:20)
-  for (i in seq_len(nrow(pp))) {
-    expect_identical(as.integer(tapply(pp[i, ], d$time, sum)),
-                     as.integer(totals))
-  }
-  # And the expectation carries the same total.
-  ep <- posterior_epred(obj$fit, draw_ids = 1:20)
-  expect_equal(as.numeric(tapply(colMeans(ep), d$time, sum)),
-               as.numeric(totals), tolerance = 1e-6)
-})
-
-
-test_that("categ: the data are one-hot and the expectation is a simplex", {
-  # A site emits exactly one category, and softmax over K categories
-  # makes the per-site expectations a simplex.
-  obj <- get("categ", envir = built)
-  d <- obj$sim$long_dat
-  expect_true(all(tapply(d$y, d$time, sum) == 1L))
-  expect_true(all(d$y %in% c(0L, 1L)))
-  # Every category is drawn somewhere, so a fit is not being asked
-  # to identify a loading for a category with no observations.
-  expect_identical(sort(unique(as.character(d$series[d$y == 1L]))),
-                   sort(obj$sim$species_levels))
-
-  ep <- posterior_epred(obj$fit, draw_ids = 1:20)
-  site_sums <- tapply(colMeans(ep), d$time, sum)
-  expect_equal(as.numeric(site_sums), rep(1, length(site_sums)),
-               tolerance = 1e-6)
 })

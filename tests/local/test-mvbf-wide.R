@@ -774,4 +774,84 @@ test_that("feeding the training frame back as newdata is a no-op", {
 })
 
 
+# -- The marginaleffects backend on a wide frame ----------------------
+
+library(marginaleffects)
+options("marginaleffects_model_classes" = "mvgam")
+
+
+test_that("get_predict refuses a wide fit that names no response", {
+  # A wide fit has one predictive surface per response, so a call
+  # that names none has no answer to give. Returning the first arm
+  # would be well formed and silently wrong, and the refusal has to
+  # say what is missing rather than fail later on a dimension.
+  err <- expect_error(
+    get_predict(fit, newdata = dat, type = "response"),
+    regexp = "requires"
+  )
+  expect_match(conditionMessage(err), "resp", fixed = TRUE)
+})
+
+
+test_that("each arm answers on its own rows and its own draws", {
+  for (r in responses) {
+    out <- get_predict(fit, newdata = dat, type = "expected", resp = r)
+    expect_identical(nrow(out), nrow(dat))
+    draws <- attr(out, "posterior_draws")
+    # marginaleffects stores draws as [nobs x ndraws], the transpose
+    # of mvgam's layout, so both margins are the claim.
+    expect_identical(dim(draws),
+                     c(nrow(dat), as.integer(ndraws(fit))))
+    expect_equal(out$estimate, unname(apply(draws, 1L, stats::median)))
+    # The draws are this response's own, not the first arm's repeated
+    # under three names. Compared against the public method for the
+    # same arm, they agree exactly.
+    expect_equal(draws, t(posterior_epred(fit, newdata = dat, resp = r)),
+                 ignore_attr = TRUE)
+  }
+})
+
+
+test_that("each arm predicts on the support its own family has", {
+  # The three arms carry a poisson, a bernoulli and a gaussian, so
+  # their expectations occupy three different sets. An arm answered
+  # under another's family keeps every dimension and lands in the
+  # wrong one. Stated as membership rather than as a comparison
+  # between arms, so the claim does not depend on which values this
+  # particular simulation happened to draw.
+  est <- lapply(responses, function(r) {
+    predictions(fit, newdata = dat, type = "expected", resp = r)
+  })
+  names(est) <- responses
+
+  # A bernoulli expectation is a probability, bounds included. A
+  # prediction that escaped to the link scale keeps every dimension
+  # and leaves the unit interval.
+  seen <- est[["seen"]]
+  expect_true(all(seen$estimate > 0 & seen$estimate < 1))
+  expect_true(all(seen$conf.low > 0 & seen$conf.high < 1))
+  expect_true(all(seen$conf.low <= seen$estimate))
+  expect_true(all(seen$estimate <= seen$conf.high))
+  # One row of the frame is one row of the output, in order, so a
+  # prediction placed by position rather than by content fails.
+  expect_equal(as.numeric(seen$x), as.numeric(dat$x))
+
+  # A poisson expectation is a positive rate and is not confined to
+  # the unit interval on this frame, whose counts run in the tens.
+  count <- est[["count"]]
+  expect_true(all(count$estimate > 0))
+  expect_gt(max(count$estimate), 1)
+  # A gaussian expectation is bounded on neither side by the family,
+  # which is what separates it from the other two.
+  mass <- est[["mass"]]
+  expect_true(all(is.finite(mass$estimate)))
+  # And no two arms are the same numbers under different names.
+  for (pair in list(c("count", "seen"), c("count", "mass"),
+                    c("seen", "mass"))) {
+    expect_false(isTRUE(all.equal(est[[pair[1L]]]$estimate,
+                                  est[[pair[2L]]]$estimate)))
+  }
+})
+
+
 cat("\nDone.\n")

@@ -1172,4 +1172,29 @@ test_that("the plotting methods render for a VAR fit", {
   expect_error(plot(fit, type = "latent_state"), "closure-unit family")
 })
 
+test_that("find_predictors reports a series column that varies", {
+  # Three series here, so `series` carries information a slope or a
+  # contrast can be taken over and has to be offered. The
+  # single-series fits elsewhere make the complementary claim: a
+  # column holding one value is not a predictor.
+  library(marginaleffects)
+  options("marginaleffects_model_classes" = "mvgam")
+  preds <- insight::find_predictors(fit)$conditional
+  expect_true("series" %in% preds)
+  expect_gt(length(unique(fit$data$series)), 1L)
+  # The observation formula's own terms are there too, so a list
+  # built from the axis columns alone fails.
+  expect_true(all(c("elev", "region") %in% preds))
+  # And the random-effect grouping belongs under `random`, not
+  # among the conditional terms. insight splits the two so that a
+  # consumer knows which terms carry a population slope: `block`
+  # offered as conditional is offered to avg_slopes and
+  # avg_comparisons as a term to contrast over.
+  expect_false("block" %in% preds)
+  all_eff <- insight::find_predictors(fit, effects = "all")
+  expect_true("block" %in% all_eff$random)
+  expect_identical(insight::find_random(fit)$random, "block")
+})
+
+
 cat("\nDone.\n")

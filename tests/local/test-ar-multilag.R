@@ -746,4 +746,106 @@ test_that("irf, fevd and stability refuse a trend that has no A", {
 })
 
 
+# ----- conditional_effects, and the `series` argument ----------------
+#
+# Two series is what makes the `series` argument testable: on one
+# series every filtering claim below passes whether or not the filter
+# does anything.
+
+test_that("conditional_effects finds the model's own smooth term", {
+  # Each element is a built panel, and the frame behind it is what
+  # carries the effect. A panel that was never evaluated is a
+  # constant with a zero-width band and satisfies any class check.
+  ce <- suppressWarnings(conditional_effects(fit))
+  expect_s3_class(ce, "mvgam_conditional_effects")
+  expect_true("x" %in% names(ce))
+  d <- ce[["x"]]$data
+  expect_true(all(c("estimate", "conf.low", "conf.high") %in%
+                    colnames(d)))
+  expect_gt(stats::sd(d$estimate), 1e-8)
+  expect_true(all(d$conf.low <= d$estimate))
+  expect_true(all(d$estimate <= d$conf.high))
+  expect_gt(mean(d$conf.high - d$conf.low), 0)
+})
+
+
+test_that("conditional_effects type = link is the link scale", {
+  ce_resp <- suppressWarnings(conditional_effects(fit))
+  ce_link <- suppressWarnings(conditional_effects(fit, type = "link"))
+  expect_setequal(names(ce_link), names(ce_resp))
+  # This fit is gaussian, so its link is the identity and the two
+  # scales are the same numbers. Agreeing is the contract rather than
+  # a coincidence, and it has to hold on both panels: a `type` that
+  # applied some inverse link anyway would move them. The
+  # complementary claim, where the two must not agree, is made on the
+  # log-linked fits in test-draw-alignment.R and on the bernoulli arm
+  # of test-mvbf-wide.R.
+  for (nm in names(ce_resp)) {
+    expect_equal(ce_link[[nm]]$data$estimate,
+                 ce_resp[[nm]]$data$estimate, tolerance = 1e-10)
+    expect_equal(ce_link[[nm]]$data$conf.low,
+                 ce_resp[[nm]]$data$conf.low, tolerance = 1e-10)
+  }
+  # And the panels are not constant, so the agreement above is
+  # between two things that vary rather than between two flat lines.
+  expect_gt(stats::sd(ce_resp[["x"]]$data$estimate), 0.05)
+})
+
+
+test_that("conditional_effects honours a user-supplied effects list", {
+  ce <- suppressWarnings(conditional_effects(fit, effects = "x"))
+  expect_length(ce, 1L)
+  expect_identical(names(ce), "x")
+})
+
+
+test_that("plot returns the effects list invisibly and draws it", {
+  ce <- suppressWarnings(conditional_effects(fit))
+  out <- plot(ce, plot = FALSE)
+  expect_identical(out, ce)
+  # Returning its input unchanged is half the contract; the panels
+  # it would have drawn have to hold data.
+  p <- plot(ce)[[1L]]
+  layers <- ggplot2::ggplot_build(p)$data
+  expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
+})
+
+
+test_that("the series argument selects among this fit's own levels", {
+  # The levels are the fit's own, in its own order, which is the
+  # alphabetical reverse of what a rebuilt axis would give.
+  lev <- levels(fit$data$series)
+  expect_identical(lev, series_levels)
+  all_ce <- suppressWarnings(conditional_effects(fit, series = "all"))
+  d_all <- all_ce[[1L]]$data
+  expect_true("series" %in% colnames(d_all))
+  expect_setequal(as.character(unique(d_all$series)), lev)
+
+  # Naming one series filters to it. On a single-series fit this is
+  # satisfied by a filter that does nothing, which is why it is
+  # asserted here instead.
+  one <- suppressWarnings(conditional_effects(fit, series = lev[1L]))
+  d_one <- one[[1L]]$data
+  expect_lt(nrow(d_one), nrow(d_all))
+  expect_setequal(as.character(unique(d_one$series)), lev[1L])
+
+  # An index resolves to the level at that position, so it and the
+  # name give the same answer. Position, not alphabetical rank: this
+  # fit's first level is `gamma`, which sorts second.
+  by_int <- suppressWarnings(conditional_effects(fit, series = 1L))
+  expect_equal(by_int[[1L]]$data$estimate, d_one$estimate)
+})
+
+
+test_that("the series argument refuses what it cannot resolve", {
+  n_lev <- nlevels(fit$data$series)
+  expect_identical(n_lev, n_series)
+  expect_error(conditional_effects(fit, series = "not_a_series"),
+               "not one of the model's series levels")
+  expect_error(conditional_effects(fit, series = n_lev + 1L), "upper")
+  expect_error(conditional_effects(fit, series = c("a", "b")),
+               "NULL, 'all', a series name")
+})
+
+
 cat("\nDone.\n")

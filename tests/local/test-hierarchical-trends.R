@@ -591,9 +591,8 @@ test_that("the tidiers keep this fit's own row order", {
 
 test_that("the plotting methods render for a hierarchical fit", {
   for (ty in c("residuals", "trend", "series")) {
-    # `plot()` returns a ggplot, so that is what is asserted. The
-    # alternation this replaced ended in `is.list(p)`, which an empty
-    # list satisfies: any method returning `list()` passed it.
+    # `plot()` returns a ggplot, so that is the class asserted. An
+    # `is.list()` check would pass on any method returning `list()`.
     p <- plot(fit, type = ty)
     expect_s3_class(p, "ggplot")
   }
@@ -1105,4 +1104,77 @@ test_that("a newdata holding one occasion reads that occasion", {
                            draw_ids = 1:10, incl_autocor = TRUE)
     expect_equal(unname(got), unname(full[, rows, drop = FALSE]))
   }
+})
+
+
+test_that("the tidiers agree on the group covariance block", {
+  # `Sigma_group_trend` is the covariance a hierarchical trend exists
+  # to estimate: one block per region, over the species. Four methods
+  # name parameters, three of them report it, and the claim is that
+  # the fourth does too.
+  sig <- function(x) grep("^Sigma", x, value = TRUE)
+  from_vars <- sig(variables(fit))
+  # One square block per group, so the count states the shape rather
+  # than merely that something is present.
+  n_sub <- length(species_levels)
+  expect_length(from_vars, length(region_levels) * n_sub^2)
+  expect_setequal(sig(rownames(posterior_summary(fit))), from_vars)
+  expect_setequal(sig(names(rhat(fit))), from_vars)
+
+  td <- tidy(fit, effects = "all")
+  expect_setequal(sig(td$term), from_vars)
+  # The tidier does reach the trend block generally, so this is about
+  # one parameter family rather than about the trend side being
+  # invisible to it.
+  expect_true(any(grepl("^sigma_group_trend", td$term)))
+  expect_true(any(grepl("^ar1_trend", td$term)))
+})
+
+
+# ----- residual_cor on a hierarchical trend --------------------------
+#
+# The correlation block a grouping implies is over the subgroups, and
+# it is per group. Both facts are invisible to a dimension check on a
+# frame whose series count happens to match.
+
+test_that("residual_cor returns the global block by default", {
+  res <- residual_cor(fit)
+  expect_s3_class(res, "mvgam_residcor")
+  expect_true(isTRUE(res$hierarchical))
+  expect_identical(res$group_label, "_global")
+  # The matrix is over subgroups, not over series: three species, not
+  # the six series the grouping produces. A block sized by the series
+  # axis would be 6 x 6 and pass any symmetry or bounds check.
+  sp <- levels(dat$species)
+  expect_identical(dim(res$cor), c(length(sp), length(sp)))
+  expect_false(nrow(res$cor) == nlevels(dat$series))
+  expect_true(all(diag(res$cor) == 1))
+  expect_true(isSymmetric(unname(res$cor), tol = 1e-8))
+  # Labelled by the frame's own species levels, in its order.
+  expect_identical(rownames(res$cor), sp)
+  expect_identical(colnames(res$cor), sp)
+})
+
+
+test_that("residual_cor(by_group = TRUE) returns one block per region", {
+  res <- residual_cor(fit, by_group = TRUE)
+  regions <- levels(dat$region)
+  sp <- levels(dat$species)
+  expect_type(res, "list")
+  expect_setequal(names(res), c("_global", regions))
+  for (nm in names(res)) {
+    expect_s3_class(res[[nm]], "mvgam_residcor")
+    expect_identical(dim(res[[nm]]$cor), c(length(sp), length(sp)))
+    expect_identical(rownames(res[[nm]]$cor), sp)
+    expect_identical(colnames(res[[nm]]$cor), sp)
+    expect_true(all(diag(res[[nm]]$cor) == 1))
+  }
+  # The regions were given different within-region correlations, so
+  # returning the global block under each region's name would satisfy
+  # every claim above and mean no region was distinguished.
+  off <- upper.tri(res[[regions[1L]]]$cor)
+  expect_false(isTRUE(all.equal(res[[regions[1L]]]$cor[off],
+                                res[[regions[2L]]]$cor[off])))
+  expect_false(isTRUE(all.equal(res[["_global"]]$cor[off],
+                                res[[regions[1L]]]$cor[off])))
 })

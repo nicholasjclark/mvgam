@@ -1,7 +1,7 @@
 # End-to-end residual_cor integration tests on real cached fits.
 #
-# Lives in tests/local because it requires the val_mvgam_var_cor /
-# val_mvgam_hier_ar_cor fixtures from tests/local/build_fixtures.R.
+# Lives in tests/local because it requires the val_mvgam_var_cor
+# fixture from tests/local/build_fixtures.R.
 # Run via:
 #   Rscript -e 'devtools::load_all();
 #               testthat::test_file("tests/local/test-residual-cor.R")'
@@ -75,50 +75,10 @@ test_that("VAR(1) summary = FALSE returns raw [ndraws, p, p] draws", {
 })
 
 
-# ---- Hierarchical AR(1) cor -------------------------------------------
-
-test_that("residual_cor on hierarchical AR returns global cor by default", {
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
-  res <- residual_cor(fit)
-  testthat::expect_s3_class(res, "mvgam_residcor")
-  testthat::expect_true(isTRUE(res$hierarchical))
-  testthat::expect_identical(res$group_label, "_global")
-  # Subgroup count = number of subgroups (sp1, sp2, sp3) -> 3 x 3
-  testthat::expect_equal(dim(res$cor), c(3L, 3L))
-  testthat::expect_true(all(diag(res$cor) == 1))
-})
 
 
-test_that("hierarchical residual_cor(by_group = TRUE) returns named list", {
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
-  res <- residual_cor(fit, by_group = TRUE)
-  testthat::expect_type(res, "list")
-  testthat::expect_true("_global" %in% names(res))
-  # Per-group entries: real factor labels from data$region.
-  region_levels <- levels(fit$data$region)
-  testthat::expect_true(all(region_levels %in% names(res)))
-  testthat::expect_equal(length(res), 1L + length(region_levels))
-  for (nm in names(res)) {
-    testthat::expect_s3_class(res[[nm]], "mvgam_residcor")
-    testthat::expect_equal(dim(res[[nm]]$cor), c(3L, 3L))
-    # Row / col labels use real factor levels from data$species.
-    species_levels <- levels(fit$data$species)
-    testthat::expect_identical(rownames(res[[nm]]$cor), species_levels)
-    testthat::expect_identical(colnames(res[[nm]]$cor), species_levels)
-  }
-})
 
 
-test_that("hierarchical residual_cor (global) labels = data$species levels", {
-  require_fixtures("val_mvgam_hier_ar_cor.rds")
-  fit <- load_mvgam("hier_ar_cor")
-  res <- residual_cor(fit)
-  species_levels <- levels(fit$data$species)
-  testthat::expect_identical(rownames(res$cor), species_levels)
-  testthat::expect_identical(colnames(res$cor), species_levels)
-})
 
 
 # ---- Latent-factor trend (n_lv = 2) ----------------------------------

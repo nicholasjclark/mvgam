@@ -742,8 +742,9 @@ jsdm_lv_true <- function(env) {
 }
 
 
-# Verbatim from the file this replaces, seed and random calls in the
-# same order, so the cached fit stays valid.
+# The cached fit is keyed to this exact sequence of random calls, so
+# reordering or adding one invalidates it silently. Change the seed
+# and delete the cache together, or not at all.
 sim_jsdm_occ <- function() {
   set.seed(607L)
   n_sites <- 50L
@@ -868,10 +869,9 @@ closure_jsdm_battery <- function(nm, sim, fit, threshold_cor,
   n_visits <- sim$n_visits
   # `unit = site` makes mvgam synthesise its own `time` and `series`
   # columns, so the frame every prediction call is given is the one
-  # the fit kept rather than the one the simulation built. Handing
-  # over the simulation frame raises on a missing `time`, which is
-  # how the file this replaces once had its central check erroring in
-  # place of running.
+  # the fit kept rather than the one the simulation built. The
+  # simulation frame has no `time`, and passing it raises there
+  # instead of reaching the claim.
   d <- as.data.frame(fit$obs_data)
   raw <- sim$data
   n_unit_jsdm <- K * n_sites
@@ -1232,9 +1232,9 @@ closure_jsdm_battery(
 
 
 test_that("jsdgam occ: the detection probability recovers the truth", {
-  # Printed and unchecked in the file this replaces, so a detection
-  # probability that had run to 0 or 1 would have been reported
-  # without comment.
+  # A detection probability that had run to 0 or 1 is still a number
+  # in the unit interval, so the claim is against the simulated
+  # value rather than against the bounds.
   dm <- as_draws_matrix(occ_jsdm_fit$fit)
   p_cols <- grep("^b_p_Intercept$|^Intercept_p$|^p$", colnames(dm),
                  value = TRUE)
@@ -1267,8 +1267,8 @@ test_that("jsdgam nmix: detection and the identified mode both hold", {
   # pinned to sum to zero the way the softmax families are. They do
   # have to stay near the identified mode the Heaps QR targets: a
   # column sum that has wandered means they are drifting along an
-  # unidentified direction, which is a claim the file this replaces
-  # made in a comment and never checked.
+  # unidentified direction, which leaves every loading finite and the
+  # covariance they imply unchanged.
   Z_m <- apply(
     mvgam:::extract_Z_loadings(dm, n_obs_series = nmix_jsdm$K,
                                n_lv = nmix_jsdm$N_lv),
@@ -1624,4 +1624,39 @@ test_that("multi-season: the prior the call set is reported back", {
   dp <- default_prior(fit)
   expect_s3_class(dp, "brmsprior")
   expect_true(all(c("sds", "Intercept") %in% dp$class))
+})
+
+
+test_that("latent_state and latent_N are one type under two names", {
+  # marginaleffects ships mvgam's latent-state token as `latent_N`
+  # while mvgam's own user-facing token is `latent_state`.
+  # `conditional_effects()` translates one into the other so the
+  # upstream `sanitize_type()` gate passes without patching the
+  # marginaleffects namespace, and `get_predict()` accepts both.
+  # Two names for one quantity is exactly the shape that goes wrong
+  # quietly, so the claim is that they are the same numbers and not
+  # merely that both return something.
+  suppressWarnings({
+    gp_state <- marginaleffects::get_predict(
+      fit, newdata = dat, type = "latent_state"
+    )
+    gp_n <- marginaleffects::get_predict(
+      fit, newdata = dat, type = "latent_N"
+    )
+  })
+  expect_identical(nrow(gp_state), nrow(gp_n))
+  expect_equal(gp_state$estimate, gp_n$estimate)
+  # And they are the latent state rather than the response: an
+  # occupancy state is a probability, which the detection-scale
+  # answer for these data is not.
+  expect_true(all(gp_state$estimate >= 0 & gp_state$estimate <= 1))
+
+  ce <- suppressWarnings(
+    conditional_effects(fit, type = "latent_state")
+  )
+  expect_s3_class(ce, "mvgam_conditional_effects")
+  expect_gt(length(ce), 0L)
+  # A panel that received no data still returns a ggplot, so the
+  # layers are built rather than the class asserted.
+  expect_drawn(plot(ce)[[1L]])
 })

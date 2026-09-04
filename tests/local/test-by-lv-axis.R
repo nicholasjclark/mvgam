@@ -1049,9 +1049,8 @@ test_that("summary and the criticism methods run on this fit", {
 
 
 test_that("pp_check and the plotting methods render", {
-  # `plot()` returns a ggplot, so that is what is asserted. The
-  # alternation this replaced ended in `is.list(p)`, which an empty
-  # list satisfies: any method returning `list()` passed it.
+  # `plot()` returns a ggplot, so that is the class asserted. An
+  # `is.list()` check would pass on any method returning `list()`.
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
 

@@ -403,7 +403,8 @@ makes `augment()` demand a `cap` column with no meaning for it.
 The assertion asks the registry directly, so it covers every family
 at once.
 
-**14. `marginaleffects` does not know mvgam accepts `resp`.**
+**14. `marginaleffects` does not know mvgam accepts `resp` or
+`process_error`.**
 
 Same block. Naming a response raises
 
@@ -414,6 +415,15 @@ marginaleffects keeps a whitelist per model class and mvgam has not
 registered `resp` on it, so every user of a multivariate fit meets
 this on every call that names an arm. The argument is forwarded and
 honoured; only the notice is wrong.
+
+`process_error` is on the same footing, and reaches further. It is
+mvgam's own argument, it sits in the signature of
+`get_predict.mvgam()` and it decides whether a marginal prediction
+carries the trend's innovations. Every call that sets it
+raises the notice, on a univariate fit as much as a multivariate
+one. Seen in `test-draw-alignment.R`, "process_error moves a
+marginal prediction", where the two calls that establish the
+argument does something both warn that nothing is known about it.
 
 ## Multivariate log_lik
 
@@ -1237,6 +1247,92 @@ refused by. One class of parameter is unreachable while its
 neighbours in the same table are not, which points at the lookup
 rather than at the model.
 
+## Uncovered families
+
+**43. Lognormal quantile residuals are NaN in part and off-scale in
+the rest.**
+
+Found by fitting the three exported families nothing in
+`tests/local` fits: `student()`, `lognormal()` and
+`beta_binomial()`. A lognormal AR(1) over 60 positive observations
+gives, at 50 draws:
+
+| quantity | value |
+|---|---|
+| NaN cells in `residuals(type = "quantile")` | 390 of 3000, 13 per cent |
+| range of the cells that are finite | 5.84 to 8.13 |
+| NA rows in the summarised table | 4 of 60 |
+| `residuals(type = "ordinary")` | no NA at all |
+
+Two things are wrong and only one of them is visible as a warning.
+The warning is `In log(mu) : NaNs produced`, and nothing in the data
+can produce it: the response runs 0.34 to 4.56 and
+`posterior_epred()` runs 0.364 to 4.688, never reaching zero. So
+whatever is being passed to `log()` is not the mean.
+
+The second is the scale. A randomised quantile residual is
+standard normal by construction, and the cells that survive sit
+between six and eight standard deviations out. A reader
+checking a lognormal fit would see a QQ-plot of impossible values
+with a seventh of the points missing.
+
+`student()` on the same data and the same call returns 3000 finite
+cells, so this belongs to the lognormal entry rather than to the
+quantile path in general. Both families are named in the analytic
+list finding 21 describes, which is what makes the contrast
+informative: the analytic route works for one and not the other.
+
+`beta_binomial()` fits and answers on every surface driven here,
+with one constant quantile-residual column of sixty, which is the
+tie behaviour finding 21 already accounts for on discrete
+families.
+
+## The marginaleffects backend
+
+**42. `get_coef()` returns the intercept and drops every other
+population coefficient.**
+
+`test-marginaleffects.R`, "the marginaleffects backend hooks read
+this model's coefficients". On `y ~ 1 + x` the hook answers with
+`b_Intercept` alone. Every other accessor on the same fit reports
+both terms:
+
+| call | reads | answers |
+|---|---|---|
+| `coef()` | the aliased `"betas"` block | `b_x`, `b_Intercept` |
+| `vcov()` | aliased | `x`, `Intercept` |
+| `fixef()` | aliased | `x`, `Intercept` |
+| `get_coef()` | the raw stanfit | `b_Intercept` |
+
+The cause is in the last column. `get_coef.mvgam()` takes
+`posterior::as_draws_matrix(model$fit)` and selects
+`grepl("^b_", cols)`. brms writes the population block as an
+indexed array, so the raw names are `b[1]` and `b_Intercept`, and
+the pattern matches the intercept and nothing else. mvgam's alias
+pass is what turns `b[1]` into `b_x`, and this function runs before
+it.
+
+Reproduced on three fits with different right-hand sides --
+`y ~ 1 + x`, `y ~ 1 + x + (x | grp)` and
+`y ~ 1 + x + (1 | grp) + s(z)` -- all of which answer
+`b_Intercept`. A model whose only population term is the intercept
+would be reported correctly, which is why nothing noticed.
+
+This is finding 29's cause reaching a different surface. There
+`tidy()` read raw Stan names where the other tidiers read aliases,
+which showed up as `b[1]` appearing in a table. Here the same read
+loses the coefficient instead of misnaming it, and it does so in
+the hook a third-party package calls, so the omission is not
+visible from mvgam's own output at all.
+
+`set_coef.mvgam()` returning its argument unchanged is deliberate
+and documented in the source: uncertainty reaches marginaleffects
+through the `posterior_draws` attribute on `get_predict`, and a
+coefficient override is never read back. `get_vcov.mvgam()`
+returning `NULL` is deliberate for the same reason, and it warns
+when a `vcov` argument is supplied. Neither is a defect, and both
+are asserted as the contract they are.
+
 ## Introspection
 
 **40. `family()` answers "custom" on an occupancy fit while two
@@ -1410,3 +1506,139 @@ Recorded rather than fixed: which of the two grids is wrong is a
 question for the smooth work. `test-closure-units.R` now requires
 each curve to move and to carry an interval, so a curve pinned at
 zero fails instead of satisfying "the two curves differ".
+
+## The insight surface
+
+**44. A random-effect grouping factor is reported as a fixed
+predictor, and `find_random()` finds nothing.**
+
+`test-var-trend.R`, "find_predictors reports a series column that
+varies". insight splits a model's terms so that a consumer knows
+which of them carry a population slope. mvgam does not make the
+split:
+
+| call | brms `y ~ elev * region + (1 \| block)` | mvgam, same terms |
+|---|---|---|
+| `find_predictors()$conditional` | elev, region | elev, region, block, time, series |
+| `find_predictors(effects = "all")$random` | block | absent |
+| `find_random()` | block | `NULL` |
+
+`lme4::lmer` on the same formula answers as brms does, so this is
+insight's contract and not a brms convention. Reproduced on the
+random-effects fits as well, where `grp` appears among the
+conditional terms and `find_random()` is again `NULL`, so it
+belongs to the method rather than to one fit.
+
+What it costs is the term list every downstream package builds from
+it. `marginaleffects` reads `$conditional` to decide what can be
+contrasted, so it offers a grouping factor as a term to take a
+slope or a comparison over. The grouping itself stays invisible:
+nothing reading an mvgam fit through insight can discover that the
+model has a random effect at all.
+
+The `effects` argument is not honoured either. Asked for `"all"`,
+the method returns the same one-element list it returns by default,
+so a caller who asks for the split explicitly is told nothing about
+why it did not happen. `find_variables()` carries no `random`
+element for the same reason.
+
+The consequence is measurable rather than hypothetical.
+`avg_slopes()` on each of the three random-effect fits in
+`test-random-effects.R` returns five contrast rows over `grp`:
+
+| fit | grp contrasts | range of the estimates |
+|---|---|---|
+| ar1_re | b-a to f-a | -0.17 to -7.80 |
+| ar1_re_smooth | b-a to f-a | -0.03 to 1.03 |
+| ar1_cor_re | b-a to f-a | -0.18 to -7.88 |
+
+Those are group-level deviations, shrunk toward zero by the prior
+on `sd_grp`, presented as population contrasts a reader could act
+on. Nothing in the table says the levels are exchangeable draws
+rather than fixed categories. `test-random-effects.R` asserts both
+halves, so the term list and the contrasts it produces fail
+together until the split exists.
+
+**45. `tidy()` drops the group covariance a hierarchical trend
+exists to estimate.**
+
+`test-hierarchical-trends.R`, "the tidiers agree on the group
+covariance block". `Sigma_group_trend` holds one covariance per
+region over the species. Asked of the same fit four ways:
+
+| call | Sigma entries |
+|---|---|
+| `variables()` | 18 |
+| `posterior_summary()` | 18 |
+| `rhat()` | 18 |
+| `tidy(effects = "all")` | 0 |
+
+Eighteen is two regions holding a 3 x 3 block each. The tidier
+reaches the trend side perfectly well otherwise: the same table
+carries `sigma_group_trend`, `ar1_trend` and `L_Omega_global_trend`.
+It is this one family that leaves.
+
+The cause is in `split_hier_Sigma()` at `R/tidier_methods.R:419`. It
+renames the block by reading
+
+```r
+gr <- x$trend_model$gr
+subgr <- x$trend_model$subgr
+n_gr <- length(levels(x$obs_data[[gr]]))
+n_subgr <- length(levels(x$obs_data[[subgr]]))
+```
+
+None of those three reads finds anything on a fit built by
+`mvgam()`. `x$trend_model` is the trend-side brmsfit, whose elements
+run `formula`, `data`, `prior` and so on, carrying no `gr` or `subgr`
+at all. `x$obs_data` is set only by `jsdgam()`: `R/jsdgam.R:631` is
+the sole assignment in the package, and `?mvgam-class` documents the
+slot as "the data frame as `jsdgam()` prepared it". So `n_gr` and
+`n_subgr` are both zero, `index_strs` is `character(0)`, and the step
+that removes the padding drops the whole block instead of renaming
+it.
+
+This is finding 29 reaching a second surface: one fact read two
+ways, the answers disagreeing, no index out of range and nothing
+raised. Most readers of `obs_data` guard with `%||% object$data`.
+Two do not, and this is one of them.
+
+## Prefit modes
+
+**46. `chains = 0` samples anyway, and the diagnostics warn about
+the chain it ran.**
+
+`test-nmix-variants.R`, the two Stan-emission blocks. Both ask for a
+program without a posterior, spelled
+
+```r
+mvgam(y ~ elev, family = nmix("royle_nichols"), data = d,
+      algorithm = "sampling", chains = 0)
+```
+
+and both then read `stancode()` off the result. What happens in
+between is a compile and a two-iteration run:
+
+```
+Running MCMC with 1 chain...
+Chain 1 WARNING: No variance estimation is performed for
+                 num_warmup < 20
+Chain 1 Iteration: 1 / 2 [ 50%]  (Warmup)
+Chain 1 Iteration: 2 / 2 [100%]  (Sampling)
+```
+
+testthat then records a warning against each block:
+
+    E-BFMI not computed because it is undefined for posterior
+    chains of length less than 3.
+
+So a request for no chains produces one chain of two draws, and the
+sampler diagnostics run against it and report that they cannot. The
+returned object carries a posterior a user could read and summarise,
+of two iterations with no warmup behind them.
+
+`run_model = FALSE` is the mode that does what these calls were
+asking for, and `stancode()` answers on it. The two spellings should
+not both exist and disagree about whether sampling happens. The
+blocks are left as they are so the warning keeps arriving, rather
+than being spelled around in the test.

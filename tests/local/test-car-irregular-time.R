@@ -685,9 +685,8 @@ test_that("summary, tidiers and criticism run on a CAR fit", {
 test_that("the plots and conditional effects render for CAR", {
   expect_s3_class(pp_check(fit, ndraws = 20L), "ggplot")
   for (ty in c("residuals", "trend", "series")) {
-    # `plot()` returns a ggplot, so that is what is asserted. The
-    # alternation this replaced ended in `is.list(p)`, which an empty
-    # list satisfies: any method returning `list()` passed it.
+    # `plot()` returns a ggplot, so that is the class asserted. An
+    # `is.list()` check would pass on any method returning `list()`.
     p <- plot(fit, type = ty)
     expect_s3_class(p, "ggplot")
   }
@@ -704,26 +703,16 @@ test_that("the plots and conditional effects render for CAR", {
   }
 })
 
-cat("\nDone.\n")
-
 # ----------------------------------------------------------------------
 # The trend that must ignore the gaps
 # ----------------------------------------------------------------------
 #
 # `ZMVN()` is the other side of the claim this file opens with. It is
 # `MVN(0, Sigma)` with the covariance indexed by series alone, so the
-# spacing of the occasions never enters the likelihood at all. That is
-# why its `requires_regular_intervals` rule was dropped, and it makes
-# the pair worth keeping together: on one irregular grid, `CAR()` has
-# to read the gaps and `ZMVN()` has to be unmoved by them.
-#
-# The file this replaces drove the same fit through fourteen post-fit
-# calls behind a printer that emitted `[OK]` beside whatever it was
-# handed. Two of those calls were wrapped in `tryCatch`, so an error
-# printed as `[OK] plot(type = 'smooths') : ERROR: <message>`, and the
-# file closed with "All downstream helpers OK" whatever had happened.
-# It also printed the recovered and true correlation matrices side by
-# side under the heading "sanity, not strict" and compared nothing.
+# spacing of the occasions never enters the likelihood at all, and it
+# takes no `requires_regular_intervals` rule. That is what makes the
+# pair worth keeping on one grid: `CAR()` has to read the gaps and
+# `ZMVN()` has to be unmoved by them.
 
 zmvn_sim <- local({
   cached <- NULL
@@ -801,11 +790,10 @@ test_that("ZMVN accepts the grid CAR needs the gaps of", {
 
 
 test_that("ZMVN recovers the cross-series correlation", {
-  # The headline surface for this trend, printed beside the truth in
-  # the file this replaces and never compared to it. Recovering the
-  # off-diagonals as a set is not enough on its own, so the labelled
-  # ordering is checked with it: a permuted axis leaves the same
-  # three numbers in a different arrangement.
+  # The headline surface for this trend. Recovering the off-diagonals
+  # as a set is not enough on its own, so the labelled ordering is
+  # checked with it: a permuted axis leaves the same three numbers in
+  # a different arrangement.
   sim <- zmvn_sim()
   rc <- residual_cor(zmvn_fit())
   expect_identical(rownames(rc$cor), sim$series_names)
@@ -888,11 +876,9 @@ test_that("every post-fit method answers on the irregular ZMVN fit", {
 
 
 test_that("the ZMVN panels draw the occasions the frame supplied", {
-  # `plot(type = "smooths")` was one of the two calls the replaced
-  # file wrapped in `tryCatch`, so an error there printed as an
-  # `[OK]` line. This fit carries no smooth, which makes the refusal
-  # the contract rather than a failure, and it has to be a refusal
-  # rather than an empty panel.
+  # This fit carries no smooth, so `plot(type = "smooths")` has to
+  # refuse. An empty panel would satisfy any class check while
+  # telling the reader nothing.
   fit <- zmvn_fit()
   sim <- zmvn_sim()
   rng <- range(sim$unique_times)
@@ -921,3 +907,6 @@ test_that("the ZMVN panels draw the occasions the frame supplied", {
   expect_s3_class(ce, "mvgam_conditional_effects")
   expect_length(ce, 0L)
 })
+
+
+cat("\nDone.\n")

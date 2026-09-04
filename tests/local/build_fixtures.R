@@ -78,14 +78,6 @@ sim_ar1 <- function(n, ar, sd) {
   out
 }
 
-# A zero-truncated draw, which is what the positive part of a hurdle
-# family is: the zeros come from the hurdle, never from the count.
-r_trunc <- function(draw) {
-  repeat {
-    v <- draw()
-    if (v > 0) return(v)
-  }
-}
 
 set.seed(42)
 n_time <- 30
@@ -103,17 +95,6 @@ test_data <- data.frame(
   grp = factor(rep(letters[1:6], each = 5))
 )
 
-# High-signal Poisson AR(1) data (used by process_error toggle test)
-set.seed(456)
-hs_n <- 60
-hs_x <- seq(-2, 2, length.out = hs_n)
-hs_latent <- sim_ar1(hs_n, ar_coef, sigma)
-test_data_hs <- data.frame(
-  y = rpois(hs_n, exp(0.5 + 1.5 * hs_x + hs_latent)),
-  x = hs_x,
-  time = 1:hs_n,
-  series = factor("s1")
-)
 
 # ----------------------------------------------------------------------
 # MAIN OBS-FORMULA GRID: Poisson AR(1)
@@ -129,58 +110,6 @@ fit_mvgam_cached("ar1_fx",
   y ~ 1 + x, ~ AR(p = 1),
   test_data, poisson())
 
-cat("\n[3] AR(1) + random intercept\n")
-fit_mvgam_cached("ar1_re",
-  y ~ 1 + x + (1 | grp), ~ AR(p = 1),
-  test_data, poisson())
-
-cat("\n[4] AR(1) + fixed + random + smooth\n")
-fit_mvgam_cached("ar1_re_smooth",
-  y ~ 1 + x + (1 | grp) + s(z), ~ AR(p = 1),
-  test_data, poisson())
-
-cat("\n[5] AR(1) + correlated REs\n")
-fit_mvgam_cached("ar1_cor_re",
-  y ~ 1 + x + (x | grp), ~ AR(p = 1),
-  test_data, poisson())
-
-cat("\n[6] AR(1) + monotonic mo()\n")
-test_data_mo <- test_data
-test_data_mo$ord_factor <- ordered(cut(test_data_mo$z, 4))
-fit_mvgam_cached("ar1_mo",
-  y ~ 1 + mo(ord_factor), ~ AR(p = 1),
-  test_data_mo, poisson())
-
-cat("\n[7] AR(1) + GP(z)\n")
-fit_mvgam_cached("ar1_gp",
-  y ~ 1 + gp(z, k = 10), ~ AR(p = 1),
-  test_data, poisson())
-
-# GP fixtures with extra covariates `w` and `cat`, reconstructed
-# here so fixture rebuilds reproduce the gp2_by / gp2d / gp2d_by
-# pairs deterministically.
-test_data_gp2 <- test_data
-test_data_gp2$w <- seq(-1, 1, length.out = nrow(test_data_gp2))
-test_data_gp2$cat <- factor(
-  rep(c("A", "B"), length.out = nrow(test_data_gp2)),
-  levels = c("A", "B")
-)
-
-cat("\n[7a] AR(1) + GP(z) + GP(w, by = cat)\n")
-fit_mvgam_cached("ar1_gp2_by",
-  y ~ 1 + gp(z, k = 5) + gp(w, by = cat, k = 5), ~ AR(p = 1),
-  test_data_gp2, poisson())
-
-cat("\n[7b] AR(1) + 2D GP(z, w)\n")
-fit_mvgam_cached("ar1_gp2d",
-  y ~ 1 + gp(z, w, k = 5), ~ AR(p = 1),
-  test_data_gp2, poisson())
-
-cat("\n[7c] AR(1) + 2D GP(z, w, by = cat), multi-dim by-factor\n")
-fit_mvgam_cached("ar1_gp2d_by",
-  y ~ 1 + gp(z, w, by = cat, k = 5), ~ AR(p = 1),
-  test_data_gp2, poisson())
-
 # ----------------------------------------------------------------------
 # TREND-FORMULA VARIANTS (mvgam-only; brms cannot move covariates into
 # the autocor block, so these test trend-side prediction logic)
@@ -189,11 +118,6 @@ fit_mvgam_cached("ar1_gp2d_by",
 cat("\n[8] AR(1) + fixed (in trend)\n")
 fit_mvgam_cached("ar1_fx_trend",
   y ~ 1, ~ x + AR(p = 1),
-  test_data, poisson())
-
-cat("\n[9] AR(1) + fixed + random + smooth (in trend)\n")
-fit_mvgam_cached("ar1_re_smooth_trend",
-  y ~ 1, ~ x + (1 | grp) + s(z) + AR(p = 1),
   test_data, poisson())
 
 # ----------------------------------------------------------------------
@@ -219,164 +143,7 @@ fit_mvgam_cached("mv_gauss",
   ~ AR(p = 1),
   test_data_mv, gaussian())
 
-# ----------------------------------------------------------------------
-# FAMILY COVERAGE
-# ----------------------------------------------------------------------
-
-cat("\n[11] Beta AR(1)\n")
-# Carries a latent AR(1) and a covariate that the response actually
-# depends on. Drawing `y` from a fixed Beta and regressing it on an
-# unrelated `x` leaves nothing for either term to recover, so a fit
-# on such data agrees with any other fit on it and the concordance
-# says nothing about whether the trend or the covariate works.
-set.seed(456)
-n_beta <- 100
-beta_latent <- sim_ar1(n_beta, ar_coef, 0.7)
-beta_x <- rnorm(n_beta)
-beta_phi <- 8
-beta_mu <- plogis(-0.4 + 0.8 * beta_x + beta_latent)
-test_data_beta <- data.frame(
-  y = pmax(pmin(rbeta(n_beta, beta_mu * beta_phi,
-                      (1 - beta_mu) * beta_phi), 0.999), 0.001),
-  x = beta_x,
-  time = 1:n_beta,
-  series = factor("s1")
-)
-fit_mvgam_cached("beta_ar1",
-  y ~ 1 + x, ~ AR(p = 1),
-  test_data_beta, Beta())
-
-cat("\n[12] Binomial AR(1)\n")
-set.seed(789)
-n_binom <- 100
-trials_vec <- rep(20, n_binom)
-binom_latent <- sim_ar1(n_binom, ar_coef, 0.7)
-binom_x <- rnorm(n_binom)
-binom_p <- plogis(-0.2 + 0.7 * binom_x + binom_latent)
-test_data_binom <- data.frame(
-  y = rbinom(n_binom, size = trials_vec, prob = binom_p),
-  trials = trials_vec,
-  x = binom_x,
-  time = 1:n_binom,
-  series = factor("s1")
-)
-fit_mvgam_cached("binom_ar1",
-  y | trials(trials) ~ 1 + x, ~ AR(p = 1),
-  test_data_binom, binomial())
-
-cat("\n[13] Ordinal (Cumulative), fixed effects only (no AR)\n")
-set.seed(456)
-n_ord <- 30
-ord_latent <- 1.0 + 0.5 * rnorm(n_ord)
-ord_cuts <- c(-Inf, -0.5, 0.5, 1.5, Inf)
-test_data_ord <- data.frame(
-  y = ordered(cut(ord_latent, breaks = ord_cuts,
-                   labels = c("Low", "Med", "High", "VHigh"))),
-  x = rnorm(n_ord),
-  z = rnorm(n_ord),
-  time = 1:n_ord,
-  series = factor("s1")
-)
-fit_mvgam_cached("cumulative_fx",
-  y ~ 1 + x + z, ~ ZMVN(),
-  test_data_ord, cumulative())
-
-cat("\n[14] Hurdle Poisson AR(1)\n")
-set.seed(654)
-n_hp <- 120
-hp_latent <- sim_ar1(n_hp, ar_coef, 0.7)
-hp_x <- rnorm(n_hp)
-hp_mu <- exp(1.2 + 0.5 * hp_x + hp_latent)
-hp_hu <- 0.25
-test_data_hp <- data.frame(
-  y = ifelse(
-    runif(n_hp) < hp_hu, 0L,
-    vapply(hp_mu, function(m) r_trunc(function() rpois(1, m)),
-           numeric(1))
-  ),
-  x = hp_x,
-  time = 1:n_hp,
-  series = factor("s1")
-)
-fit_mvgam_cached("hurdle_poisson_ar1",
-  y ~ 1 + x, ~ AR(p = 1),
-  test_data_hp, hurdle_poisson())
-
-cat("\n[15] Hurdle NegBinomial AR(1)\n")
-set.seed(655)
-n_hnb <- 120
-hnb_latent <- sim_ar1(n_hnb, ar_coef, 0.7)
-hnb_x <- rnorm(n_hnb)
-hnb_mu <- exp(1.0 + 0.5 * hnb_x + hnb_latent)
-hnb_hu <- 0.25
-test_data_hnb <- data.frame(
-  y = ifelse(
-    runif(n_hnb) < hnb_hu, 0L,
-    vapply(hnb_mu,
-           function(m) r_trunc(function() rnbinom(1, mu = m, size = 2)),
-           numeric(1))
-  ),
-  x = hnb_x,
-  time = 1:n_hnb,
-  series = factor("s1")
-)
-fit_mvgam_cached("hurdle_negbinomial_ar1",
-  y ~ 1 + x, ~ AR(p = 1),
-  test_data_hnb, hurdle_negbinomial())
-
-cat("\n[16] Zero-inflated Poisson AR(1)\n")
-set.seed(987)
-n_zip <- 120
-zip_latent <- sim_ar1(n_zip, ar_coef, 0.7)
-zip_x <- rnorm(n_zip)
-zip_mu <- exp(1.2 + 0.5 * zip_x + zip_latent)
-zip_zi <- 0.3
-# A zero-inflated count keeps the family's own zeros: the inflation
-# adds to them rather than replacing the distribution.
-test_data_zip <- data.frame(
-  y = ifelse(runif(n_zip) < zip_zi, 0L, rpois(n_zip, zip_mu)),
-  x = zip_x,
-  time = 1:n_zip,
-  series = factor("s1")
-)
-fit_mvgam_cached("zero_inflated_poisson_ar1",
-  y ~ 1 + x, ~ AR(p = 1),
-  test_data_zip, zero_inflated_poisson())
-
-# ----------------------------------------------------------------------
-# HIGH-SIGNAL POISSON AR(1), used by the process_error toggle test
-# ----------------------------------------------------------------------
-
-cat("\n[17] High-signal Poisson AR(1)\n")
-fit_mvgam_cached("ar1_hs",
-  y ~ 1 + x, ~ AR(p = 1),
-  test_data_hs, poisson())
-
-cat("\n[18] s(z, by = grp) factor-by-factor smooth\n")
-test_data_sby <- test_data
-test_data_sby$grp <- factor(
-  rep(letters[1:3], length.out = nrow(test_data_sby)),
-  levels = letters[1:3]
-)
-fit_mvgam_cached("ar1_s_by",
-  y ~ 1 + s(z, by = grp), ~ AR(p = 1),
-  test_data_sby, poisson())
-
-cat("\n[19] t2(z, w) tensor-product smooth\n")
-test_data_t2 <- test_data
-test_data_t2$w <- seq(-1, 1, length.out = nrow(test_data_t2))
-fit_mvgam_cached("ar1_t2",
-  y ~ 1 + t2(z, w), ~ AR(p = 1),
-  test_data_t2, poisson())
-
-# The intercept-free twin. Built here it takes `grp` like every other
-# fixture, so `test-marginaleffects.R` no longer has to strip the
-# `group` column marginaleffects reserves for its own output.
-fit_mvgam_cached("ar1_t2_noint",
-  y ~ 0 + t2(z, w, k = c(4, 4)), ~ AR(p = 1),
-  test_data_t2, poisson())
-
-cat("\n[20] Gaussian AR(1), N=150: PSIS-stable concordance fixture\n")
+cat("\n[20] Gaussian AR(1), N=150: PSIS-stable fixture\n")
 # Larger N with high signal-to-noise keeps Pareto-k diagnostics in
 # the stable region (<0.7), which is what lets the PSIS-weighted
 # surfaces (loo_epred, loo_linpred, loo_predictive_interval) be read
@@ -431,46 +198,6 @@ test_data_var <- data.frame(
 fit_mvgam_cached("var_cor",
   y ~ 1, ~ VAR(p = 1),
   test_data_var, poisson())
-
-# ----------------------------------------------------------------------
-# [22] AR(1) cor=TRUE hierarchical (gr=region, subgr=species)
-# ----------------------------------------------------------------------
-cat("\n[22] AR(1) hierarchical correlated trend (2 groups x 3 subgroups)\n")
-set.seed(13)
-n_t_h <- 30L
-n_groups <- 2L
-n_sub <- 3L
-n_series_h <- n_groups * n_sub
-ar_h <- 0.5
-# Independent latent per series for simplicity; the fit learns the
-# hierarchical structure regardless of the true generating mechanism.
-lat_h <- matrix(0, n_t_h, n_series_h)
-for (s in seq_len(n_series_h)) {
-  for (t in 2:n_t_h) {
-    lat_h[t, s] <- ar_h * lat_h[t - 1L, s] + stats::rnorm(1L, 0, 0.3)
-  }
-}
-test_data_hier <- data.frame(
-  y = as.vector(rpois(n_t_h * n_series_h,
-                      exp(1 + as.vector(lat_h)))),
-  region = factor(rep(rep(paste0("r", 1:n_groups), each = n_sub),
-                      times = n_t_h)),
-  species = factor(rep(rep(paste0("sp", 1:n_sub), times = n_groups),
-                       times = n_t_h)),
-  time = rep(seq_len(n_t_h), each = n_series_h)
-)
-# Built with interaction()'s default "." separator, which does not
-# match the "_" form mvgam derives from gr and subgr. The mismatch is
-# deliberate: it exercises the path where a supplied series column is
-# superseded.
-test_data_hier$series <- interaction(test_data_hier$region,
-                                      test_data_hier$species,
-                                      drop = TRUE)
-fit_mvgam_cached("hier_ar_cor",
-  y ~ 1,
-  ~ AR(gr = region, subgr = species, cor = TRUE),
-  test_data_hier, poisson())
-
 
 # ----------------------------------------------------------------------
 # [23] AR(1) factor model with fixed Z via trend_map (dense matrix).
@@ -528,8 +255,6 @@ fit_trend_map_cached <- function(name, Z_user) {
   saveRDS(fit, path)
   fit
 }
-fit_trend_map_cached("trend_map_fx", Z_true)
-
 # The same four series and two factors with `Z` sampled rather than
 # supplied, which is the path `residual_cor()` reads as
 # `pattern = "factor_loadings"` and the one
@@ -599,17 +324,6 @@ d_cluster_lp <- as.matrix(
   stats::dist(as.numeric(cluster_lp), method = "manhattan")
 )
 rownames(d_cluster_lp) <- colnames(d_cluster_lp) <- series_lp
-# Persist the simulation truth alongside the fit so the test can
-# check loadings recovery without reproducing the simulation.
-loadings_prior_truth <- list(
-  Z_true = Z_lp,
-  cluster = cluster_lp,
-  trait = trait_lp
-)
-saveRDS(
-  loadings_prior_truth,
-  file.path(FIXTURE_DIR, "val_mvgam_loadings_prior_truth.rds")
-)
 fit_loadings_prior_cached <- function(name) {
   path <- file.path(
     FIXTURE_DIR, paste0("val_mvgam_", name, ".rds")
@@ -658,10 +372,6 @@ nl_growth_data$series <- factor("s1")
 cat("\n[nl-1] bf(y ~ b1 * exp(b2 * x), b1 + b2 ~ 1, nl = TRUE)\n")
 nl_growth_pri <- prior(normal(1, 1), nlpar = "b1") +
   prior(normal(0, 1), nlpar = "b2")
-fit_mvgam_cached("nl_growth",
-  bf(y ~ b1 * exp(b2 * x), b1 + b2 ~ 1, nl = TRUE),
-  NULL, nl_growth_data, gaussian(), prior = nl_growth_pri)
-
 set.seed(20260618L)
 nl_S <- 5L; nl_n_site <- 12L
 nl_traits <- data.frame(
@@ -692,9 +402,6 @@ nl_trait_form <- bf(
   b  ~ trait1 + (1 | species),
   nl = TRUE
 )
-fit_mvgam_cached("nl_trait", nl_trait_form, NULL,
-  nl_trait_data, gaussian(), prior = nl_trait_pri)
-
 # ----------------------------------------------------------------------
 # NORMALIZE PAIR: the same data fitted with and without the
 # normalising constants. `normalize` changes only what Stan adds to

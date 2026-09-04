@@ -114,11 +114,38 @@ smooth_recovery_cor <- function(fit, sim, sim_smooth_name) {
 }
 
 
+# Fits are cached under a prefix of this file's own, so a fit built
+# for another file cannot answer here. Delete the files to refit.
+cache_path <- function(name) {
+  dir <- if (dir.exists("fixtures")) {
+    "fixtures"
+  } else {
+    file.path("tests", "local", "fixtures")
+  }
+  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
+  file.path(dir, paste0("val_recovery_", name, ".rds"))
+}
+
+fit_recovery_cached <- function(name, ...) {
+  path <- cache_path(name)
+  if (file.exists(path)) {
+    cat("[cache]", name, "\n")
+    return(readRDS(path))
+  }
+  cat("[fit  ]", name, "\n")
+  fit <- mvgam(..., refresh = 0L, silent = 2L, backend = "cmdstanr")
+  part <- paste0(path, ".part")
+  saveRDS(fit, part)
+  file.rename(part, path)
+  fit
+}
+
+
 # Fit-time helper: builds the simulated data + fits a small mvgam.
 # `family_arg` is the actual family object the FIT uses; usually
 # the same as the sim family but parameterised for future cases
 # (e.g. fit Gamma data with a Gamma family).
-run_recovery_case <- function(type, family, family_arg,
+run_recovery_case <- function(label, type, family, family_arg,
                                 n_timepoints = 120L,
                                 seed = 42L, min_cor = 0.6) {
   trend_formula <- type_trends[[as.character(type)]]
@@ -131,11 +158,11 @@ run_recovery_case <- function(type, family, family_arg,
   formula <- adjust_formula_for_family(
     type_formulas[[as.character(type)]], family_arg
   )
-  fit <- mvgam(
+  fit <- fit_recovery_cached(
+    gsub(" ", "_", label, fixed = TRUE),
     formula = formula, trend_formula = trend_formula,
     data = sim$data_train, family = family_arg,
-    chains = 1L, iter = 1000L, warmup = 500L,
-    refresh = 0L, silent = 2L, backend = "cmdstanr"
+    chains = 1L, iter = 1000L, warmup = 500L
   )
   cors <- vapply(
     names(sim$true_smooths),
@@ -186,15 +213,20 @@ RECOVERY_GRID <- list(
 
 # ---- Per-case tests ------------------------------------------------
 
+# Each case's fit is kept so the blocks below can ask more of it than
+# a smooth correlation.
+cases <- new.env(parent = emptyenv())
+
 for (case in RECOVERY_GRID) {
   local({
     cc <- case
     test_that(paste0(cc$label, " recovers true smooths"), {
       out <- run_recovery_case(
-        type = cc$type, family = cc$family,
+        label = cc$label, type = cc$type, family = cc$family,
         family_arg = cc$family_arg,
         min_cor = cc$min_cor
       )
+      assign(cc$label, out, envir = cases)
       for (i in seq_along(out$cors)) {
         nm <- names(out$cors)[[i]]
         cor_i <- out$cors[[i]]
@@ -206,73 +238,106 @@ for (case in RECOVERY_GRID) {
 }
 
 
-# ---- Edge cases ----------------------------------------------------
+test_that("a trial count reaches a prediction through datagrid", {
+  # The binomial case is the only fit here carrying an aterm, and
+  # `trials` is data the family needs rather than a predictor. A
+  # grid built without it leaves the expectation to fall back on
+  # some other row's trial count, which is finite, bounded and
+  # wrong.
+  library(marginaleffects)
+  options("marginaleffects_model_classes" = "mvgam")
+  out <- get("type 1 binomial", envir = cases)
+  mv <- out$fit
 
-# Edge: short series (n_timepoints = 40), confirming recovery
-# degrades gracefully but doesn't error.
-test_that("short series still produces a finite fit", {
-  trend_formula <- type_trends[["1"]]
-  sim <- sim_mvgam(type = 1L, family = gaussian(),
-                    n_timepoints = 40L,
-                    trend_model = trend_model_from_formula(
-                      trend_formula
-                    ),
-                    seed = 99L)
-  fit <- mvgam(
-    formula = y ~ s(x), trend_formula = trend_formula,
-    data = sim$data_train, family = gaussian(),
-    chains = 1L, iter = 600L, warmup = 300L,
-    refresh = 0L, silent = 2L, backend = "cmdstanr"
-  )
-  expect_s3_class(fit, "mvgam")
+  grid <- datagrid(x = 0, trials = c(10, 50, 100), model = mv)
+  expect_true("trials" %in% names(grid))
+  expect_identical(nrow(grid), 3L)
+
+  p <- predictions(mv, newdata = grid, type = "expected",
+                   process_error = FALSE)
+  # A binomial expectation is p * trials, and `x` is held fixed
+  # across the grid, so the three estimates stand in the ratio of
+  # their trial counts. A prediction that dropped the aterm returns
+  # three equal numbers and satisfies any bounds check.
+  expect_lt(abs(p$estimate[2L] / p$estimate[1L] - 5), 0.05)
+  expect_lt(abs(p$estimate[3L] / p$estimate[1L] - 10), 0.05)
+  # And the implied probability is the same at every trial count,
+  # which is what says the trials entered as a denominator rather
+  # than as a covariate.
+  probs <- p$estimate / grid$trials
+  expect_lt(diff(range(probs)), 1e-6)
+  expect_true(all(probs > 0 & probs < 1))
 })
 
 
-# Edge: prop_missing > 0, ensuring NA injection does not break
-# fit.
-test_that("missing-data injection doesn't break recovery", {
+# ---- The degraded case ---------------------------------------------
+#
+# Forty occasions with fifteen per cent of the responses missing: the
+# hardest frame the simulator can put in front of a smooth, and the
+# one where the observation axis and the trend axis have most room to
+# disagree, since the rows that leave the likelihood are exactly the
+# ones the trend still has to hold a state for.
+#
+# Sparse-lag trends are covered against their own lags in
+# test-ar-multilag.R, which is a sharper claim than asking whether a
+# smooth survives one.
+
+test_that("a short, gappy series still recovers its smooth", {
   trend_formula <- type_trends[["1"]]
-  sim <- sim_mvgam(type = 1L, family = gaussian(),
-                    n_timepoints = 100L, prop_missing = 0.15,
-                    trend_model = trend_model_from_formula(
-                      trend_formula
-                    ),
-                    seed = 88L)
-  # brms announces the response rows it dropped; mvgam keeps the
-  # trend's time grid separately, so the smooth is still estimated
-  # across the full covariate range and recovery is unaffected.
-  expect_warning(
-    fit <- mvgam(
+  sim <- sim_mvgam(
+    type = 1L, family = gaussian(), n_timepoints = 40L,
+    prop_missing = 0.15,
+    trend_model = trend_model_from_formula(trend_formula),
+    seed = 88L
+  )
+  n_rows <- nrow(sim$data_train)
+  n_missing <- sum(is.na(sim$data_train$y))
+  # The premise: rows really are missing, so the claims below are
+  # about a gappy frame rather than a complete one that happens to
+  # pass.
+  expect_gt(n_missing, 0L)
+  expect_lt(n_missing, n_rows)
+
+  # brms announces the response rows it drops, and says so once.
+  dropped <- character(0)
+  fit <- withCallingHandlers(
+    fit_recovery_cached(
+      "short_gappy",
       formula = y ~ s(x), trend_formula = trend_formula,
       data = sim$data_train, family = gaussian(),
-      chains = 1L, iter = 1000L, warmup = 500L,
-      refresh = 0L, silent = 2L, backend = "cmdstanr"
+      chains = 1L, iter = 1000L, warmup = 500L
     ),
-    "Rows containing NAs"
+    warning = function(w) {
+      dropped <<- c(dropped, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
   )
+  # The notice arrives on the run that fits and not on a cached read,
+  # so its absence is not asserted; what is asserted is that nothing
+  # other than that notice was raised.
+  expect_true(all(grepl("Rows containing NAs", dropped)))
+
+  # The smooth is still recovered. The bar is lower than the
+  # full-length cases above because forty occasions is the point of
+  # this block, not an oversight.
   out <- smooth_recovery_cor(fit, sim, "s(x)")
   expect_true(out$found)
   expect_gt(out$cor, 0.5)
-})
 
-
-# Edge: AR(p = c(1, 3, 12)) sparse-lag trend override should still
-# produce recoverable s(x) (the smooth is unaffected by trend
-# spec).
-test_that("sparse-lag AR trend override doesn't break recovery", {
-  trend_formula <- ~ AR(p = c(1L, 3L, 12L))
-  sim <- sim_mvgam(
-    type = 1L, family = gaussian(),
-    trend_model = trend_model_from_formula(trend_formula),
-    n_timepoints = 120L, seed = 77L
-  )
-  fit <- mvgam(
-    formula = y ~ s(x), trend_formula = trend_formula,
-    data = sim$data_train, family = gaussian(),
-    chains = 1L, iter = 1000L, warmup = 500L,
-    refresh = 0L, silent = 2L, backend = "cmdstanr"
-  )
-  out <- smooth_recovery_cor(fit, sim, "s(x)")
-  expect_true(out$found)
-  expect_gt(out$cor, 0.5)
+  # And this is why it survives: the response rows leave the
+  # likelihood while the trend keeps its own time grid, so the latent
+  # state is still defined at every occasion the frame supplied. A
+  # trend axis rebuilt from the rows that reached brms would be
+  # shorter, and the smooth would then be evaluated against a grid
+  # that had quietly lost its gaps.
+  ax <- mvgam:::mvgam_axes(fit)
+  n_times <- length(unique(sim$data_train$time))
+  expect_identical(as.integer(fit$standata$N_time_trend), n_times)
+  expect_identical(as.integer(ax$time$values),
+                   sort(unique(as.integer(sim$data_train$time))))
+  # The two counts are the whole point, and they differ: the rows
+  # that reached the likelihood are short by the gaps, while the
+  # trend holds a state at every occasion the frame supplied.
+  expect_identical(as.integer(fit$standata$N), n_rows - n_missing)
+  expect_lt(as.integer(fit$standata$N), n_times)
 })

@@ -26,6 +26,35 @@ suppressMessages({
   library(testthat)
 })
 
+# Fits are cached under a prefix of this file's own, so a model built
+# for another file cannot answer in their place. Delete the files to
+# refit.
+#
+# Thirteen of them, because each parameterisation carries its own
+# likelihood and within each one the detection predictor is reached
+# through different machinery: a scalar, a covariate, a spline basis,
+# a group-level term, a Gaussian-process basis. Each is a route to
+# `p` that nothing else drives.
+nmix_cache <- function(name, ...) {
+  dir <- if (dir.exists("fixtures")) {
+    "fixtures"
+  } else {
+    file.path("tests", "local", "fixtures")
+  }
+  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
+  path <- file.path(dir, paste0("val_nmix_", name, ".rds"))
+  if (file.exists(path)) {
+    cat("[cache]", name, "\n")
+    return(readRDS(path))
+  }
+  cat("[fit  ]", name, "\n")
+  fit <- mvgam(...)
+  part <- paste0(path, ".part")
+  saveRDS(fit, part)
+  file.rename(part, path)
+  fit
+}
+
 # ------------------------------------------------------------
 # R-side prediction surface (PB nmix): log_lik,
 # posterior_epred, posterior_predict, predict(latent_N),
@@ -66,12 +95,12 @@ local_nmix_fit <- local({
     # `reduce_sum` per-closure-unit parallelism. Closure-unit
     # families thread independently of the brms partial-log-lik
     # path, so the brms-native threading gate is inert here.
-    fit <- mvgam(y ~ elev,
-                 family = nmix(),
-                 data = d,
-                 chains = 1, iter = 300, warmup = 150,
-                 threads = 2L,
-                 silent = 2, refresh = 0)
+    fit <- nmix_cache("pb_base", y ~ elev,
+                      family = nmix(),
+                      data = d,
+                      chains = 1, iter = 300, warmup = 150,
+                      threads = 2L,
+                      silent = 2, refresh = 0)
     cached <<- list(fit = fit, data = d, N_per = N_per, p_true = p_true)
     cached
   }
@@ -134,8 +163,9 @@ test_that("predict.mvgam(type = 'latent_N') errors on non-nmix families", {
     y      = rnorm(12L),
     elev   = rnorm(12L)
   )
-  fit <- mvgam(y ~ elev, data = d, chains = 1, iter = 100,
-               warmup = 50, silent = 2, refresh = 0)
+  fit <- nmix_cache("gaussian_control", y ~ elev, data = d,
+                    chains = 1, iter = 100, warmup = 50,
+                    silent = 2, refresh = 0)
   expect_error(
     predict(fit, type = "latent_state"),
     "not available for this family"
@@ -165,9 +195,10 @@ test_that("nmix vector-p R-side prediction recovers the detection-covariate effe
     y      = y_sim, cap = rep(30L, n_unit * n_visit),
     elev   = rep(elev, each = n_visit), tod = tod
   )
-  fit <- mvgam(brms::bf(y ~ elev, p ~ tod), family = nmix(),
-               data = d, chains = 1, iter = 400, warmup = 200,
-               silent = 2, refresh = 0)
+  fit <- nmix_cache("pb_vector_p", brms::bf(y ~ elev, p ~ tod),
+                    family = nmix(), data = d,
+                    chains = 1, iter = 400, warmup = 200,
+                    silent = 2, refresh = 0)
   de <- predict(fit, type = "detection", summary = FALSE)
   expect_equal(dim(de), c(200L, nrow(d)))
   # Vector-p must vary across visits (unlike the scalar case).
@@ -186,10 +217,10 @@ test_that("nmix vector-p R-side prediction recovers the detection-covariate effe
   expect_true(all(pp == floor(pp)))
   expect_true(all(pp >= 0 & pp <= max(d$cap)))
   ll <- log_lik(fit)
-  expect_identical(ncol(ll), n_unit)
+  expect_identical(ncol(ll), as.integer(n_unit))
   expect_true(all(is.finite(ll)))
   ls <- predict(fit, type = "latent_state", summary = FALSE)
-  expect_identical(ncol(ls), n_unit)
+  expect_identical(ncol(ls), as.integer(n_unit))
   expect_true(all(ls >= 0))
 })
 
@@ -213,10 +244,10 @@ test_that("nmix smooth-in-p recovers a known non-linear effect", {
     y      = y_sim, cap = rep(40L, n_unit * n_visit),
     elev   = rep(elev, each = n_visit), tod = tod
   )
-  fit <- mvgam(brms::bf(y ~ elev, p ~ s(tod, k = 8)),
-               family = nmix(), data = d,
-               chains = 1, iter = 400, warmup = 200,
-               silent = 2, refresh = 0)
+  fit <- nmix_cache("pb_smooth_p", brms::bf(y ~ elev, p ~ s(tod, k = 8)),
+                    family = nmix(), data = d,
+                    chains = 1, iter = 400, warmup = 200,
+                    silent = 2, refresh = 0)
   de <- predict(fit, type = "detection", summary = FALSE)
   expect_equal(dim(de), c(200L, nrow(d)))
   de_med <- apply(de, 2L, median)
@@ -246,10 +277,10 @@ test_that("nmix random-effects-in-p recovers per-observer detection", {
     y      = y_sim, cap = rep(40L, n_obs_total),
     elev   = rep(elev, each = n_visit), observer = observer
   )
-  fit <- mvgam(brms::bf(y ~ elev, p ~ (1 | observer)),
-               family = nmix(), data = d,
-               chains = 1, iter = 400, warmup = 200,
-               silent = 2, refresh = 0)
+  fit <- nmix_cache("pb_re_p", brms::bf(y ~ elev, p ~ (1 | observer)),
+                    family = nmix(), data = d,
+                    chains = 1, iter = 400, warmup = 200,
+                    silent = 2, refresh = 0)
   de <- predict(fit, type = "detection", summary = FALSE)
   de_med <- apply(de, 2L, median)
   truth <- plogis(0 + obs_effects[d$observer])
@@ -276,10 +307,11 @@ test_that("nmix gp-in-p recovers a non-linear detection effect", {
     y      = y_sim, cap = rep(40L, n_unit * n_visit),
     elev   = rep(elev, each = n_visit), tod = tod
   )
-  fit <- mvgam(brms::bf(y ~ elev, p ~ gp(tod, k = 8, c = 5/4)),
-               family = nmix(), data = d,
-               chains = 1, iter = 400, warmup = 200,
-               silent = 2, refresh = 0)
+  fit <- nmix_cache("pb_gp_p",
+                    brms::bf(y ~ elev, p ~ gp(tod, k = 8, c = 5 / 4)),
+                    family = nmix(), data = d,
+                    chains = 1, iter = 400, warmup = 200,
+                    silent = 2, refresh = 0)
   de <- predict(fit, type = "detection", summary = FALSE)
   expect_equal(dim(de), c(200L, nrow(d)))
   de_med <- apply(de, 2L, median)
@@ -346,11 +378,10 @@ test_that("nmix('royle_nichols') end-to-end fit returns correct grain for every 
     cap    = rep(15L, n_unit * n_visit),
     elev   = rep(elev, each = n_visit)
   )
-  fit <- mvgam(y ~ elev,
-               family    = nmix("royle_nichols"),
-               data      = d,
-               chains    = 1, iter = 300, warmup = 150,
-               silent    = 2, refresh = 0)
+  fit <- nmix_cache("rn_base", y ~ elev,
+                    family = nmix("royle_nichols"), data = d,
+                    chains = 1, iter = 300, warmup = 150,
+                    silent = 2, refresh = 0)
   n_total <- n_unit * n_visit
   yhat <- posterior_predict(fit)
   expect_equal(dim(yhat), c(150L, n_total))
@@ -393,11 +424,10 @@ test_that("nmix('royle_nichols') smooth-r recovers a known non-linear detection 
     elev   = rep(elev, each = n_visit),
     tod    = tod
   )
-  fit <- mvgam(brms::bf(y ~ elev, p ~ s(tod, k = 8)),
-               family    = nmix("royle_nichols"),
-               data      = d,
-               chains    = 1, iter = 400, warmup = 200,
-               silent    = 2, refresh = 0)
+  fit <- nmix_cache("rn_smooth_r", brms::bf(y ~ elev, p ~ s(tod, k = 8)),
+                    family = nmix("royle_nichols"), data = d,
+                    chains = 1, iter = 400, warmup = 200,
+                    silent = 2, refresh = 0)
   de <- predict(fit, type = "detection", summary = FALSE)
   expect_equal(dim(de), c(200L, nrow(d)))
   de_med <- apply(de, 2L, median)
@@ -433,11 +463,10 @@ test_that("nmix('royle_nichols') random-effects-r recovers per-observer detectio
     elev     = rep(elev, each = n_visit),
     observer = observer
   )
-  fit <- mvgam(brms::bf(y ~ elev, p ~ (1 | observer)),
-               family    = nmix("royle_nichols"),
-               data      = d,
-               chains    = 1, iter = 400, warmup = 200,
-               silent    = 2, refresh = 0)
+  fit <- nmix_cache("rn_re_r", brms::bf(y ~ elev, p ~ (1 | observer)),
+                    family = nmix("royle_nichols"), data = d,
+                    chains = 1, iter = 400, warmup = 200,
+                    silent = 2, refresh = 0)
   de <- predict(fit, type = "detection", summary = FALSE)
   de_med <- apply(de, 2L, median)
   truth <- plogis(0 + obs_effects[d$observer])
@@ -465,11 +494,10 @@ test_that("nmix('royle_nichols') smooth-on-state recovers a non-linear lambda ef
     cap    = rep(30L, n_unit * n_visit),
     elev   = rep(elev, each = n_visit)
   )
-  fit <- mvgam(y ~ s(elev, k = 8),
-               family    = nmix("royle_nichols"),
-               data      = d,
-               chains    = 1, iter = 400, warmup = 200,
-               silent    = 2, refresh = 0)
+  fit <- nmix_cache("rn_smooth_state", y ~ s(elev, k = 8),
+                    family = nmix("royle_nichols"), data = d,
+                    chains = 1, iter = 400, warmup = 200,
+                    silent = 2, refresh = 0)
   ehat <- posterior_epred(fit)
   ehat_med <- apply(ehat, 2L, median)
   # Truth at each visit: 1 - exp(-r * lambda(elev))
@@ -532,11 +560,10 @@ test_that("nmix('poisson_poisson') end-to-end fit returns correct grain for ever
     cap    = rep(30L, n_unit * n_visit),
     elev   = rep(elev, each = n_visit)
   )
-  fit <- mvgam(y ~ elev,
-               family    = nmix("poisson_poisson"),
-               data      = d,
-               chains    = 1, iter = 300, warmup = 150,
-               silent    = 2, refresh = 0)
+  fit <- nmix_cache("ppm_base", y ~ elev,
+                    family = nmix("poisson_poisson"), data = d,
+                    chains = 1, iter = 300, warmup = 150,
+                    silent = 2, refresh = 0)
   n_total <- n_unit * n_visit
   yhat <- posterior_predict(fit)
   expect_equal(dim(yhat), c(150L, n_total))
@@ -579,11 +606,10 @@ test_that("nmix('poisson_poisson') smooth-p recovers a known non-linear encounte
     elev   = rep(elev, each = n_visit),
     tod    = tod
   )
-  fit <- mvgam(brms::bf(y ~ elev, p ~ s(tod, k = 8)),
-               family    = nmix("poisson_poisson"),
-               data      = d,
-               chains    = 1, iter = 400, warmup = 200,
-               silent    = 2, refresh = 0)
+  fit <- nmix_cache("ppm_smooth_p", brms::bf(y ~ elev, p ~ s(tod, k = 8)),
+                    family = nmix("poisson_poisson"), data = d,
+                    chains = 1, iter = 400, warmup = 200,
+                    silent = 2, refresh = 0)
   de <- predict(fit, type = "detection", summary = FALSE)
   expect_equal(dim(de), c(200L, nrow(d)))
   de_med <- apply(de, 2L, median)

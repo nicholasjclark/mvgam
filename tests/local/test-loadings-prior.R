@@ -598,10 +598,9 @@ test_that("phylo: the simulation really is phylogeny-dominated", {
 
 
 test_that("phylo: the posterior finds the tighter kernel", {
-  # The verdict the file this replaces printed and never checked. A
-  # length-scale posterior that had collapsed, or that put the two
-  # kernels the wrong way round, would have been reported without
-  # comment.
+  # A length-scale posterior that had collapsed, or that put the two
+  # kernels the wrong way round, is still a set of finite positive
+  # numbers, so the ordering between them is what has to be claimed.
   post <- as_draws_matrix(phylo_fit()$fit)
   trait <- as.numeric(post[, "theta_features[1]"])
   phylo <- as.numeric(post[, "theta_dist_phylo"])
