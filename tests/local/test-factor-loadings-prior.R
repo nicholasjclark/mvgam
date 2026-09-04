@@ -28,14 +28,6 @@
 #              kernel is nearly flat. The question is whether the
 #              posterior finds that tilt.
 #
-# The three files this replaces computed most of these numbers and
-# checked none of them. `heaps_birds_replica.R` wrapped twelve
-# post-fit calls in `tryCatch`, turned each error into a row of a
-# table, printed how many had passed and exited clean whatever that
-# count was. `heaps_birds_replica_phylo_dominant.R` listed three checks
-# in its header, computed all three and printed them. Every printed
-# verdict below is now an expectation.
-#
 # Fits cache under fixtures/. Delete one to refit it; the birds and
 # phylo fits take roughly ten minutes each.
 #

@@ -553,9 +553,8 @@ test_that("the entry points agree with each other on these fits", {
 
 
 test_that("loo_epred and loo_linpred part at a non-identity link", {
-  # The complement of the identity-link claim in
-  # test-distributional-dpars.R. A Poisson mean is the exponential
-  # of its predictor, so these two must not agree; a method that
+  # A Poisson mean is the exponential of its predictor, so these
+  # two must not agree on a log link; a method that
   # skipped the inverse link returns the right dimensions on the
   # wrong scale and passes every shape check.
   e <- loo_epred(fit_plain, type = "mean")
@@ -574,13 +573,12 @@ test_that("loo_epred and loo_linpred part at a non-identity link", {
   ep <- colMeans(posterior_epred(fit_plain))
   expect_false(isTRUE(all.equal(as.numeric(e), unname(ep))))
   # How closely it still tracks the posterior expectation is not
-  # asserted here. Measured, the two correlate at 0.31 on this fit
-  # against better than 0.5 on the trend-free gaussian in
-  # test-distributional-dpars.R, which is finding 11: dropping an
-  # observation moves the latent state it was scored against, the
-  # importance ratios have no finite variance, and the reweighting is
-  # dominated by single draws. Pinning a number here would enshrine
-  # that regime rather than describe it.
+  # asserted here. Measured, the two correlate at 0.31 on this fit,
+  # which is finding 11: dropping an observation moves the latent
+  # state it was scored against, the importance ratios have no
+  # finite variance, and the reweighting is dominated by single
+  # draws. Pinning a number here would enshrine that regime rather
+  # than describe it.
 })
 
 

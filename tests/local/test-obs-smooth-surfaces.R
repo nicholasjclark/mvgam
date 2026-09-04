@@ -16,9 +16,9 @@
 # the files that own them, so nothing is refitted to be looked at
 # twice:
 #
-#   s(z) alone            test-random-effects.R, test-pathfinder-init.R
+#   s(z) alone            test-draws-alignment.R
 #   a two-covariate s()   test-trend-pw.R
-#   gp(x)                 test-trend-ar-multilag.R, test-forecast-recovery.R
+#   gp(x)                 test-trend-ar-multilag.R
 #   gp(x1, x2)            test-trend-arma.R
 #   a trend-side smooth   test-draws-alignment.R
 #   s(x, by = lv_axis())  test-factor-lv-axis.R, test-grain-closure-units.R
@@ -36,11 +36,83 @@ suppressMessages({
   library(marginaleffects)
 })
 
-source(if (file.exists("concordance_helpers.R")) {
-  "concordance_helpers.R"
-} else {
-  file.path("tests", "local", "concordance_helpers.R")
-})
+# A by-factor term contributes to six prediction routes, and a fit
+# that dropped it from one of them returns the right shape from all
+# six. Each route is asked for two grids differing only in the
+# by-factor level, so a route that collapsed the contrast to Monte
+# Carlo noise is the one that fails.
+assert_by_factor_variation <- function(mvgam_fit, grid_A, grid_B,
+                                       response = "y",
+                                       ndraws = 50L,
+                                       linpred_tol = 1e-3,
+                                       epred_tol = 1e-3,
+                                       fitted_tol = 1e-3,
+                                       predict_tol = 0.05,
+                                       loglik_tol = 1e-3,
+                                       me_tol = 1e-3) {
+  # Tolerances at 1e-3 sit far above MC noise at ndraws = 50 for the
+  # deterministic posterior_linpred / posterior_epred / fitted /
+  # log_lik calls; the by-factor structural contrast is on the order
+  # of the per-level basis coefficients, which exceed 1e-2 in any
+  # non-degenerate fit. posterior_predict adds family noise so its
+  # per-column mean stabilises at O(1/sqrt(ndraws)); the 0.05
+  # tolerance and bumped ndraws = 200 reflect that.
+  variation_max <- function(A, B) {
+    max(abs(colMeans(A) - colMeans(B)))
+  }
+
+  lp_A <- posterior_linpred(mvgam_fit, newdata = grid_A, ndraws = ndraws)
+  lp_B <- posterior_linpred(mvgam_fit, newdata = grid_B, ndraws = ndraws)
+  testthat::expect_gt(variation_max(lp_A, lp_B), linpred_tol)
+
+  ep_A <- posterior_epred(mvgam_fit, newdata = grid_A, ndraws = ndraws)
+  ep_B <- posterior_epred(mvgam_fit, newdata = grid_B, ndraws = ndraws)
+  testthat::expect_gt(variation_max(ep_A, ep_B), epred_tol)
+
+  # fitted() returns a matrix whose first column is named "Estimate"
+  # (mirrors brms convention; see R/fitted.R docs).
+  ft_A <- fitted(mvgam_fit, newdata = grid_A, ndraws = ndraws)
+  ft_B <- fitted(mvgam_fit, newdata = grid_B, ndraws = ndraws)
+  testthat::expect_gt(
+    max(abs(ft_A[, "Estimate"] - ft_B[, "Estimate"])), fitted_tol
+  )
+
+  pp_A <- posterior_predict(mvgam_fit, newdata = grid_A, ndraws = 200L)
+  pp_B <- posterior_predict(mvgam_fit, newdata = grid_B, ndraws = 200L)
+  testthat::expect_gt(variation_max(pp_A, pp_B), predict_tol)
+
+  # The marginaleffects entry point reaches get_predict.mvgam, which
+  # predictions(), slopes(), comparisons() and conditional_effects()
+  # all dispatch through. Stacking the two grids into one call
+  # returns one row index per grid row, so the per-level contrast is
+  # read off a single estimate vector.
+  prev_mc <- options(marginaleffects_model_classes = "mvgam")
+  on.exit(options(prev_mc), add = TRUE)
+  me_grid <- rbind(grid_A, grid_B)
+  me_preds <- suppressWarnings(marginaleffects::predictions(
+    mvgam_fit,
+    newdata = me_grid,
+    type = "response"
+  ))
+  n_A <- nrow(grid_A)
+  me_A <- me_preds$estimate[seq_len(n_A)]
+  me_B <- me_preds$estimate[-seq_len(n_A)]
+  testthat::expect_gt(max(abs(me_A - me_B)), me_tol)
+
+  # log_lik feeds loo / waic. Identical response values on both grids
+  # so any shift in the per-observation log density comes from the
+  # linear predictor moving across the by-factor level. The grids are
+  # overwritten locally, which leaves the caller's copies untouched.
+  grid_A[[response]] <- rep(1L, nrow(grid_A))
+  grid_B[[response]] <- rep(1L, nrow(grid_B))
+  ll_A <- log_lik(mvgam_fit, newdata = grid_A, ndraws = ndraws)
+  ll_B <- log_lik(mvgam_fit, newdata = grid_B, ndraws = ndraws)
+  testthat::expect_true(all(is.finite(ll_A)))
+  testthat::expect_true(all(is.finite(ll_B)))
+  testthat::expect_gt(variation_max(ll_A, ll_B), loglik_tol)
+
+  invisible(NULL)
+}
 
 cache_path <- function(name) {
   dir <- if (dir.exists("fixtures")) {

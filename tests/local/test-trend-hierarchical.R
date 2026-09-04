@@ -722,8 +722,14 @@ test_that("the criticism surface runs on a hierarchical fit", {
   # unrelated warning cannot hide among the expected ones.
   expect_true(all(grepl("Pareto k", loo_warnings)))
 
-  expect_ggplot(pp_check(fit, ndraws = 10L))
-  expect_ggplot(pp_check(fit, type = "resid_qq", ndraws = 50L))
+  # A ggplot comes back whether or not a layer received data, so the
+  # object is built and its layers required to hold rows.
+  for (p in list(pp_check(fit, ndraws = 10L),
+                 pp_check(fit, type = "resid_qq", ndraws = 50L))) {
+    expect_s3_class(p, "ggplot")
+    layers <- ggplot2::ggplot_build(p)$data
+    expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
+  }
 
   hc <- hindcast(fit, ndraws = 5L)
   expect_s3_class(hc, "mvgam_forecast")
