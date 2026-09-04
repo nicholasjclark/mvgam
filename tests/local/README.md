@@ -30,8 +30,8 @@ Occasionally, not routinely:
 - before a CRAN submission, as the last check across the whole
   post-fit surface that nothing has gone quietly wrong
 
-A cold run fits all thirty-three models and takes hours. Fits are
-cached, so a second run loads them and takes minutes.
+A cold run fits every model and takes hours. Fits are cached, so a
+second run loads them and takes minutes.
 
 ## How to run it
 
@@ -75,9 +75,8 @@ reading the wrong axis, an argument accepted and dropped, two routes to
 one number disagreeing. What differs between files is the structure
 that makes a particular defect visible, and that is what each entry
 below describes. A model earns its place here when it makes some class
-of mistake findable that the others cannot make findable, so the same
-questions asked thirty-three times are not thirty-three copies of one
-test.
+of mistake findable that the others cannot, so asking the same
+questions of each one is not asking the same test repeatedly.
 
 ### Trend kernels
 
@@ -166,6 +165,37 @@ zero-inflated Poisson at a low rate. A hurdle density written with a
 zero-inflated branch returns finite numbers of the right shape and is
 a different distribution, so each fit is checked against its own
 closed form and required to fail the other's.
+
+**test-family-com-binomial.R** fits one Conway-Maxwell binomial over
+two series and fifty occasions, under
+
+```r
+bf(y | trials(n_trials) ~ s(x, k = 5) + series + (1 | site) + mo(dose),
+   nu ~ z)
+```
+
+with an AR(1) trend. The family is a custom brms family carrying its
+own Stan code and a second distributional parameter, and it takes its
+denominator through a `trials()` aterm.
+
+The aterm is why the fit exists. A trial count is a denominator rather
+than a predictor, so `find_predictors()` leaves it out of the term
+list, and the three routes that build a frame from that list have no
+denominator to put in it: the smooth grid, the marginaleffects grid
+and the padded forecast grid. Each fails in its own way, and none of
+them is reachable from a family whose response needs no denominator.
+
+The rest of the predictor is there because each term reaches a method
+nothing else here drives. `mo(dose)` is the only monotonic effect in
+the directory, so its simplex of increments and the monotone ordering
+it imposes are checked nowhere else. `(1 | site)` is the only
+group-level effect outside the VAR fit, which makes it the only place
+`ranef()`, `VarCorr()` and `ngrps()` can be asked anything: elsewhere
+they refuse for want of a grouping. `nu ~ z` puts a sub-formula on the
+second distributional parameter of a custom family, where the only
+other dpar coverage sits on a built-in one. The same fit is the one
+place `predictive_error()`, `predictive_interval()`,
+`posterior_interval()` and `how_to_cite()` are driven at all.
 
 **test-family-jsdgam.R** fits the same latent factor structure under
 three observation families, negative binomial, multivariate Student-t
