@@ -560,3 +560,43 @@ test_that("no marginal effect is taken over the grouping factor", {
                        function(t) "grp" %in% t, logical(1L))
   expect_identical(unname(contrasted), rep(FALSE, length(re_fits)))
 })
+
+
+# -- Grouped cross-validation on a fold that is contiguous in time ----
+
+test_that("a group can be held out and the model refitted", {
+  # `grp` is laid out `rep(letters[1:6], each = 5)` against
+  # `time = 1:30`, so group `c` is times 11 to 15 and holding it out
+  # opens a hole of six in the timeline. The AR trend then refuses the
+  # refit, which makes grouped k-fold unavailable to any trend that
+  # steps once per occasion whenever the grouping runs with time --
+  # a block, a season, a year.
+  #
+  # The held-out occasions are missing responses, not missing time.
+  # `mvgam()` already draws that distinction for an `NA` response,
+  # where the likelihood shrinks and the trend grid does not, and a
+  # fold should be treated the same way.
+  mv <- fit_re("ar1_re")
+  d <- mv$data
+  # The premise: the folds really are contiguous stretches of time.
+  spans <- tapply(d$time, d$grp, function(t) diff(range(t)) + 1L)
+  expect_true(all(spans == 5L))
+  expect_identical(nlevels(d$grp), 6L)
+
+  kf <- kfold(mv, group = "grp", silent = 2L)
+  expect_s3_class(kf, "mvgam_kfold")
+  expect_identical(as.integer(kf$K), 6L)
+  # One row per group, keyed by its level, and the headline is their
+  # sum rather than a separately computed number.
+  expect_identical(rownames(kf$pointwise), levels(d$grp))
+  expect_equal(kf$elpd_kfold, sum(kf$pointwise[, 1L]))
+  # Hybrid mode refits exactly the folds whose Pareto-k exceeds the
+  # threshold it derived, and that threshold is Vehtari's, which
+  # moves with the draw count rather than sitting at the nominal 0.7.
+  thr <- kf$pareto_k_threshold_used
+  expect_equal(thr, min(1 - 1 / log10(ndraws(mv)), 0.7), tolerance = 1e-8)
+  expect_identical(sort(kf$refit_groups),
+                   sort(names(kf$pareto_k)[kf$pareto_k > thr]))
+  expect_identical(as.integer(kf$n_refits),
+                   sum(kf$pareto_k > thr))
+})

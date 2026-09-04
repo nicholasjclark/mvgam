@@ -1642,3 +1642,114 @@ asking for, and `stancode()` answers on it. The two spellings should
 not both exist and disagree about whether sampling happens. The
 blocks are left as they are so the warning keeps arriving, rather
 than being spelled around in the test.
+
+## Aterms and the prediction grid
+
+**47. `conditional_effects()` cannot run on a model with a
+`trials()` aterm.**
+
+Found by driving the model rather than by an assertion. On a plain
+`binomial()` fit of `y | trials(trials) ~ s(x)`:
+
+    Unable to compute predicted values with this model ...
+    The following variables can neither be found in 'data' nor in
+    'data2': 'trials'
+
+The column is not missing from the fit. Asked four ways, it is
+there:
+
+| call | trials present |
+|---|---|
+| `fit$data` | yes |
+| `insight::get_data()` | yes |
+| `model.frame()` | yes |
+| `find_predictors()` | no, correctly |
+| `datagrid(x = 0)` | no |
+
+The last two rows are the whole of it. A trial count is a
+denominator rather than a predictor. `find_predictors()` is right to
+leave it out, and `datagrid()` builds its grid from that list. The
+denominator therefore never reaches the grid, and brms refuses a
+prediction without it. `posterior_epred()` on the same fit answers
+normally, so the fault is in how the grid is built and not in the
+prediction.
+
+There is no way round it from the outside. Naming the column
+explicitly works -- `datagrid(x = 0, trials = c(10, 50, 100))` is
+what `test-sim-mvgam-recovery.R` does -- but that is a call the user
+has to construct. `conditional_effects()` builds its own grid, and
+supplying one is refused:
+
+    Cannot pass 'newdata' through `...`. These are set by
+    conditional_effects.mvgam; pass via the named arguments instead.
+
+So every binomial model written with the aterm brms requires loses
+`conditional_effects()` entirely. Reproduced on `com_binomial()` as
+well, so it belongs to the aterm and not to one family.
+
+The grid needs to carry aterm columns at a representative value, the
+way it carries a covariate held at its mean.
+
+**Not a defect, recorded because it was checked.**
+`predict(type = "variance")` refuses `com_binomial()` and names both
+the families it supports and what to do instead. `diri()` is
+accepted, and returns `[ndraws x nobs]`. Both families report
+`family(fit)$family` as `"custom"`, which is finding 40, so the two
+are told apart by something other than that string.
+
+## Grouped cross-validation
+
+**48. A fold that is contiguous in time cannot be refitted, so
+grouped k-fold is unavailable to most trend models.**
+
+Found by running `kfold()` on a fixture that already exists rather
+than on the one written for it. `test-random-effects.R` lays its
+grouping factor out as `rep(letters[1:6], each = 5)` against
+`time = 1:30`, so group `c` is times 11 to 15. Held out one group
+at a time:
+
+```r
+kfold(fit_re("ar1_re"), group = "grp")
+```
+
+    Irregular time intervals detected in time.
+    Some trends require regular time spacing.
+    Interval range: 1 to 6
+    Consider using CAR() for irregular intervals or interpolate data.
+
+Dropping the fold leaves times 1 to 10 and 16 to 30. The AR trend
+refuses to be refitted across the hole of six that opens up. The interval range the
+message reports is that hole.
+
+The refusal itself is correct: an AR trend does step once per
+occasion. What is wrong is where it is raised. The call path is
+
+    kfold.mvgam            R/kfold.mvgam.R:260
+    hybrid_kfold_refit
+    refit_score_one_fold   R/kfold.mvgam.R:585
+    update.mvgam           R/update.mvgam.R:212
+    build_stan_components
+    extract_time_series_dimensions
+    validate_regular_time_intervals   R/validations.R:2922
+
+so a fold is refitted by handing `update()` the subset frame. The
+axis is then rebuilt from that frame rather than inherited from the
+fit. This is the plan's own bug class arriving at a new door: one
+axis resolved twice, and the second resolution disagreeing with the
+first. The
+held-out occasions are missing responses, not missing time: this is
+the same distinction `mvgam()` already draws when a response is `NA`,
+where the likelihood shrinks and `N_time_trend` does not. A fold
+should leave the trend grid alone the way a gap does.
+
+What it costs is the method, for a whole class of models. Any grouping
+that is contiguous in time -- a block, a site visited in a season, a
+year -- makes every fold a hole, so grouped k-fold is unavailable to
+any trend that steps once per occasion. `loo()` is not the fallback,
+because finding 11 records it as unreliable on exactly these fits.
+
+`kfold_grouped_cv.R` cannot see this. It groups 8 sites that each
+carry a complete series of their own, so dropping a site removes
+whole series rather than a stretch of the timeline and the grid
+survives. The file written to exercise grouped k-fold is weaker at it
+than a fixture that was never intended for the job.

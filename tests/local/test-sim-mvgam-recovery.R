@@ -267,6 +267,20 @@ test_that("a trial count reaches a prediction through datagrid", {
   probs <- p$estimate / grid$trials
   expect_lt(diff(range(probs)), 1e-6)
   expect_true(all(probs > 0 & probs < 1))
+
+  # Naming the column is the only way through. A grid built for the
+  # user drops it, because `find_predictors()` rightly does not count
+  # a denominator as a predictor and `datagrid()` reads that list. So
+  # `conditional_effects()`, which builds its own grid, cannot run on
+  # any model carrying the aterm brms requires, and its `newdata` is
+  # refused through `...` so nothing can be supplied instead.
+  expect_false("trials" %in% insight::find_predictors(mv)$conditional)
+  expect_true("trials" %in% names(mv$data))
+  expect_true("trials" %in% names(insight::get_data(mv)))
+  expect_true("trials" %in% names(datagrid(model = mv, x = 0)))
+  ce <- conditional_effects(mv)
+  expect_s3_class(ce, "mvgam_conditional_effects")
+  expect_gt(length(ce), 0L)
 })
 
 
