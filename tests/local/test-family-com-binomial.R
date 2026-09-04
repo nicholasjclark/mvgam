@@ -42,8 +42,10 @@ suppressMessages({
 
 # Several blocks below state what the package does not yet do, and
 # testthat stops a file after ten failures by default, which would
-# leave the blocks after them unrun and looking clean.
-testthat::set_max_fails(Inf)
+# leave the blocks after them unrun and looking clean. The limit is
+# read when the reporter is built, before this file is sourced, so it
+# has to come from the environment:
+#   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
 
 SM <- suppressMessages
 
@@ -525,6 +527,27 @@ test_that("no method warns about a prior this model does not use", {
     expect_identical(grep("lower bounded prior", w, value = TRUE),
                      character(0))
   }
+})
+
+
+test_that("the marginaleffects coefficient hook reads every term", {
+  # `get_coef()` is what a third-party package calls to learn this
+  # model's coefficients, so an omission there is invisible from
+  # mvgam's own output. brms writes the population block as an indexed
+  # array, and the aliasing pass is what turns those into names, so a
+  # hook reading the raw draws sees `b_Intercept` written out in full
+  # and nothing else.
+  #
+  # This fit is the one that can show it: a model whose only
+  # population term is the intercept would be reported correctly.
+  gc <- mvgam:::get_coef.mvgam(fit)
+  expect_true(length(gc) > 1L)
+  # The named coefficients the other accessors report.
+  expect_true("b_serieslower" %in% names(gc))
+  # And the accessors that read through the alias pass agree with it.
+  fx <- rownames(fixef(fit))
+  expect_true(all(paste0("b_", fx) %in% names(gc)) ||
+                all(fx %in% names(gc)))
 })
 
 

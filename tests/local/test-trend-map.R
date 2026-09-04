@@ -42,8 +42,12 @@ suppressMessages({
 
 # Several blocks below state what the package does not yet do, and
 # testthat stops a file after ten failures by default, which would
-# leave the blocks after them unrun and looking clean.
-testthat::set_max_fails(Inf)
+# leave the blocks after them unrun and looking clean. The limit is
+# read when the reporter is built, before this file is sourced, so it
+# has to come from the environment:
+#   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
+
+SM <- suppressMessages
 
 # This file fits its own model and caches it beside itself, so it
 # depends on no shared fixture and no build step.
@@ -246,6 +250,61 @@ test_that("a matrix map keys its rows by the names the user gave", {
     ),
     "training data"
   )
+})
+
+
+test_that("every method needing draws refuses a prefit the same way", {
+  # `run_model = FALSE` returns an object whose `$fit` is `NULL`, so
+  # anything needing a posterior has to refuse. `summary()` names the
+  # state, names the argument that produced it and points at what does
+  # work. The rest fall through to `as_draws_matrix()` failing on the
+  # empty slot, which tells a reader nothing about what they did.
+  msg <- conditionMessage(expect_error(summary(prefit)))
+  expect_match(msg, "run_model", fixed = TRUE)
+
+  needs_draws <- list(
+    posterior_epred = function(x) posterior_epred(x),
+    posterior_predict = function(x) posterior_predict(x),
+    posterior_linpred = function(x) posterior_linpred(x),
+    predict = function(x) predict(x),
+    fitted = function(x) fitted(x),
+    residuals = function(x) residuals(x),
+    log_lik = function(x) log_lik(x),
+    hindcast = function(x) hindcast(x),
+    loo = function(x) loo(x),
+    variables = function(x) variables(x),
+    tidy = function(x) tidy(x),
+    augment = function(x) augment(x),
+    pp_check = function(x) pp_check(x),
+    mcmc_plot = function(x) mcmc_plot(x)
+  )
+  for (nm in names(needs_draws)) {
+    err <- expect_error(needs_draws[[nm]](prefit))
+    # Held to what `summary()` already produces: the argument that put
+    # the object in this state is named.
+    expect_match(conditionMessage(err), "run_model", fixed = TRUE)
+  }
+
+  # Reading the program and its data is why the mode exists, so both
+  # answer rather than refusing.
+  expect_true(nchar(as.character(stancode(prefit))) > 0L)
+  expect_true(is.list(standata(prefit)))
+})
+
+
+test_that("chains = 0 emits a program without sampling", {
+  # A request for no chains is a request for the program alone.
+  # Spelled this way it compiles and runs one chain of two draws, so
+  # the returned object carries a posterior of two iterations with no
+  # warmup behind it, and the sampler diagnostics then report that
+  # they cannot be computed on it.
+  built <- SM(mvgam(
+    formula = obs_formula,
+    trend_formula = ~ -1 + AR(p = 1, trend_map = Z_true),
+    data = dat, family = poisson(),
+    algorithm = "sampling", chains = 0L, silent = 2
+  ))
+  expect_null(built$fit)
 })
 
 
@@ -525,7 +584,49 @@ test_that("active_factors, shared_variation and ordinate answer here", {
 
   grDevices::pdf(NULL)
   on.exit(grDevices::dev.off(), add = TRUE)
-  expect_s3_class(ordinate(fit), "ggplot")
+  # `ordinate()` re-rotates the loadings by SVD, which on this route
+  # discards the structure the user fixed, and it says so. The notice
+  # is captured and held to naming both what it did and where the
+  # fixed loadings can still be seen, since a biplot of gradients
+  # presented as the declared factors is the one reading that would
+  # mislead.
+  ord_warnings <- character(0)
+  ord <- withCallingHandlers(ordinate(fit), warning = function(w) {
+    ord_warnings <<- c(ord_warnings, conditionMessage(w))
+    invokeRestart("muffleWarning")
+  })
+  expect_s3_class(ord, "ggplot")
+  layers <- ggplot2::ggplot_build(ord)$data
+  expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
+  expect_true(any(grepl("trend_map", ord_warnings, fixed = TRUE)))
+})
+
+
+test_that("every per-series plot panels in the model's own order", {
+  # Series declared out of alphabetical order, so a panel order taken
+  # from a sort differs from the model's. `plot(type = "series")` uses
+  # the model's; `plot(type = "trend")` sorts, so the first panel of
+  # each is a different series while every label is right on its own.
+  panel_order <- function(ty) {
+    b <- ggplot2::ggplot_build(plot(fit, type = ty))
+    lay <- b$layout$layout
+    fc <- setdiff(names(lay),
+                  c("PANEL", "ROW", "COL", "SCALE_X", "SCALE_Y"))
+    if (!length(fc)) return(character(0))
+    as.character(lay[[fc[1L]]])
+  }
+  expect_identical(panel_order("series"), series_levels)
+  expect_identical(panel_order("trend"), series_levels)
+  expect_identical(names(hindcast(fit)$hindcasts), series_levels)
+})
+
+
+test_that("print describes the model without printing a pointer", {
+  # The formula environments are emitted on every fit, two lines of
+  # address that change between sessions and describe nothing.
+  out <- capture.output(print(fit))
+  expect_identical(grep("<environment: 0x", out, value = TRUE),
+                   character(0))
 })
 
 
