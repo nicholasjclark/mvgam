@@ -29,11 +29,10 @@
 # its own seed, so the caches stay valid and a rerun loads rather
 # than samples.
 #
-# Two claims that only the multivariate-normal file used to make
-# are asked of every family here, because both are structural
-# rather than family-specific: that a frame maps to trend cells
-# with no posterior in hand, and that the rotated loadings are the
-# ones the diagnostics report.
+# Two of the shared claims are structural rather than
+# family-specific, so every family is held to them: that a frame maps
+# to trend cells with no posterior in hand, and that the rotated
+# loadings are the ones the diagnostics report.
 #
 # Three kinds of assertion are deliberately absent, because each
 # passes on the failure it appears to guard. A method is never held

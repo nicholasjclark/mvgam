@@ -454,13 +454,33 @@ test_that("process_error moves a marginal prediction", {
   # dropped leaves every dimension intact. `FALSE` is the default, so
   # its repeatability is the claim the block above already makes and
   # is not restated here.
+  #
+  # Both calls raise a marginaleffects notice saying `process_error`
+  # is not known to be supported for this class. It is mvgam's own
+  # argument and it is honoured, so the notice is wrong and the
+  # class has not been registered on that whitelist. Captured here
+  # rather than left to leak, and asserted as the absence it should
+  # be, so this reports the defect instead of the argument.
+  warned <- character(0)
+  grab <- function(expr) {
+    withCallingHandlers(expr, warning = function(w) {
+      warned <<- c(warned, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    })
+  }
   set.seed(1L)
-  p_off <- predictions(fit_plain, type = "expected",
-                       process_error = FALSE)
+  p_off <- grab(predictions(fit_plain, type = "expected",
+                            process_error = FALSE))
   set.seed(1L)
-  p_on <- predictions(fit_plain, type = "expected",
-                      process_error = TRUE)
+  p_on <- grab(predictions(fit_plain, type = "expected",
+                           process_error = TRUE))
   expect_gt(max(abs(p_off$estimate - p_on$estimate)), 1e-6)
+
+  # Nothing about a supported argument should be reported as unknown.
+  expect_identical(
+    grep("not known to be supported", warned, value = TRUE),
+    character(0)
+  )
 })
 
 
@@ -561,8 +581,22 @@ test_that("loo_epred and loo_linpred part at a non-identity link", {
   # two must not agree on a log link; a method that
   # skipped the inverse link returns the right dimensions on the
   # wrong scale and passes every shape check.
-  e <- loo_epred(fit_plain, type = "mean")
-  l <- loo_linpred(fit_plain, type = "mean")
+  # Both run PSIS, and both warn that some Pareto k are too high,
+  # which on a latent-trend fit is the truth rather than
+  # noise: dropping an observation moves the state it is scored
+  # against, so the ratios have no finite variance. The notice is
+  # captured and held to being that one, so an unrelated warning
+  # cannot pass unseen behind it.
+  psis_warnings <- character(0)
+  grab_k <- function(expr) {
+    withCallingHandlers(expr, warning = function(w) {
+      psis_warnings <<- c(psis_warnings, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    })
+  }
+  e <- grab_k(loo_epred(fit_plain, type = "mean"))
+  l <- grab_k(loo_linpred(fit_plain, type = "mean"))
+  expect_true(all(grepl("Pareto k", psis_warnings)))
   expect_identical(dim(e), c(nrow(fit_plain$data), 1L))
   expect_identical(dim(l), dim(e))
   expect_true(all(is.finite(e)))

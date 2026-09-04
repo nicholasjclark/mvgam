@@ -7,12 +7,12 @@
 # unit, a detection probability to a visit, and a method that
 # confuses them returns a plausible matrix of the wrong width.
 #
-# The three files this replaces all drove one cached fixture whose
-# frame set `time = 1L` for every row. There the closure unit *was*
-# the series, so every assertion claiming to check the unit grain was
-# comparing two identical numbers and could not have failed. Here 25
-# sites are visited over 3 occasions, so units (75), series (25) and
-# rows (300) are three different counts and each claim is separable.
+# The counts are chosen so no two of them coincide. 25 sites visited
+# over 3 occasions with 4 visits gives 75 units, 25 series and 300
+# rows, so a method answering on the wrong grain returns a number
+# that belongs to no other grain. On a frame setting `time = 1L` the
+# closure unit and the series are the same count, and every claim
+# about the unit grain compares one number with itself.
 #
 #   truth: 25 sites x 3 occasions x 4 visits, occupancy driven by
 #          elevation and detection by time of day
@@ -630,11 +630,11 @@ test_that("the abundance ceiling is reported against real labels", {
 # ----------------------------------------------------------------------
 #
 # A missing response is a visit that did not happen, which is the
-# normal case in repeat-visit data. These families used to refuse it:
-# the Stan code aggregates visits per unit through `visit_idx` and
-# `n_rep`, both built from the raw frame while brms sized the
-# likelihood to the observed rows, so the indices pointed past the
-# end of the response.
+# normal case in repeat-visit data. The Stan code aggregates visits
+# per unit through `visit_idx` and `n_rep`, and both are built from
+# the raw frame while brms sizes the likelihood to the observed rows.
+# The pair of fits below, one complete and one gappy, is what says
+# those indices stay inside the response.
 
 gappy_fits <- local({
   cached <- NULL

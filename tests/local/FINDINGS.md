@@ -214,9 +214,15 @@ belong to. An impulse response is read to decide which series drives
 which, so a label nobody can resolve makes the whole table
 unusable without knowing the internal ordering.
 
-Every other post-fit table on the same fit is labelled properly.
-`residual_cor()` carries the series names on both margins, and the
-hindcast and forecast arms are named. These two are the exception.
+`posterior_transition_matrix()` does the same, in `series_names` and
+in the dimnames of every block it returns. That one matters most of
+the three. `?posterior_transition_matrix` presents it as the direct
+route to `A`, so a reader goes there first, and what they find is
+correct values under labels that resolve to nothing.
+
+`residual_cor()` carries the series names on both margins and the
+hindcast and forecast arms are named. These three VAR summaries are
+the exception.
 
 ## PW()
 
@@ -1544,9 +1550,16 @@ so a caller who asks for the split explicitly is told nothing about
 why it did not happen. `find_variables()` carries no `random`
 element for the same reason.
 
-The consequence is measurable rather than hypothetical.
-`avg_slopes()` on each of the three random-effect fits in
-`test-random-effects.R` returns five contrast rows over `grp`:
+The consequence is measurable rather than hypothetical, and it
+reaches the plotting surface too. `conditional_effects()` on the VAR
+fit returns four panels, and one of them is `block`: six shrunk
+group deviations drawn as an effect, spanning -0.349 to 1.117, which
+is a wider range than the `elev` panel beside it. A reader is given
+no sign that those six levels are exchangeable draws rather than
+categories.
+
+`avg_slopes()` on a fit with a random effect returns one contrast row
+per non-reference level of the grouping:
 
 | fit | grp contrasts | range of the estimates |
 |---|---|---|
@@ -1791,6 +1804,32 @@ arriving through a different door: there a multi-season `hindcast()`
 returned no arms, here a backwards `forecast()` does, and in both
 cases `series_names` is populated so the object looks well formed
 until something is read out of it.
+
+## Refusals that name an internal
+
+**52. A missing covariate value stops on a checkmate assertion about
+`eta`.**
+
+`test-trend-var.R`. One `NA` in a covariate column of a `newdata`
+frame ends the prediction with
+
+    Assertion on 'eta' failed: Contains missing values (row 1, col 1).
+
+`eta` is the linear predictor mvgam builds internally. The caller
+never supplied it, cannot see it and cannot map "row 1, col 1" back
+to a row of the frame they passed, so nothing in the message says
+which column carried the gap or what to do about it.
+
+The same fit refuses other malformed frames well: an unknown series
+names the level and lists the ones the model has, and a gapped
+forecast frame names the series, the last observed time and the times
+it expected. So the standard is set within the same object.
+
+Reproduced by setting one cell of `elev` to `NA` on an otherwise
+valid frame. Whether a missing covariate should be an error at all is
+a separate question, since a missing response is handled by the
+likelihood; what is recorded here is that if it is an error, it
+should name the user's column.
 
 ## Grouped cross-validation
 

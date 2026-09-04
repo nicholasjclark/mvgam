@@ -717,24 +717,71 @@ test_that("summary, tidiers and criticism run on a multi-lag AR", {
   expect_equal(as.numeric(aug$.observed), as.numeric(dat$y))
   expect_identical(as.character(aug$series), as.character(dat$series))
 
-  # The tidier names every lag the model has, and no others.
+  # Every lag the model has is reported, and no others. Asked of
+  # `variables()` and of `tidy()`, which have to agree: a table that
+  # named a lag the program does not carry, or dropped one it does,
+  # describes another model.
   vars <- variables(fit)
+  td <- tidy(fit, effects = "all")
   for (l in lags) {
     expect_true(any(grepl(paste0("^ar", l, "_trend\\["), vars)))
+    expect_true(any(grepl(paste0("^ar", l, "_trend\\["), td$term)))
   }
   for (l in absent_lags) {
     expect_false(any(grepl(paste0("^ar", l, "_trend\\["), vars)))
+    expect_false(any(grepl(paste0("^ar", l, "_trend\\["), td$term)))
+  }
+
+  # The trend-side smooth's own basis coefficient is reported by
+  # `variables()` and by `posterior_summary()` and is absent from the
+  # tidy table. It is the parameter the smooth is, so a table without
+  # it describes a model with no `s(temp)` in it.
+  ps <- rownames(posterior_summary(fit))
+  expect_identical(sum(grepl("^bs_", ps)), sum(grepl("^bs_", vars)))
+  expect_identical(sum(grepl("^bs_", td$term)), sum(grepl("^bs_", vars)))
+
+  # One intercept, under one name. The table carries `Intercept` and
+  # `b_Intercept` as separate terms for the same coefficient.
+  expect_lte(sum(td$term %in% c("Intercept", "b_Intercept")), 1L)
+})
+
+
+test_that("hypothesis reaches the smooth's own coefficient", {
+  # Every other parameter on this fit is reachable by the name
+  # `variables()` gives it, including the lag coefficients, the
+  # Gaussian process scale and length-scale and the smooth's variance
+  # component. The basis coefficient is refused under that same name.
+  vars <- variables(fit)
+  reachable <- c(grep("^ar1_trend", vars, value = TRUE)[1],
+                 grep("^sdgp", vars, value = TRUE)[1],
+                 grep("^lscale", vars, value = TRUE)[1],
+                 grep("^sds_", vars, value = TRUE)[1])
+  for (nm in reachable) {
+    expect_no_error(hypothesis(fit, paste0(nm, " = 0")))
+  }
+  bs <- grep("^bs_", vars, value = TRUE)
+  expect_gt(length(bs), 0L)
+  for (nm in bs) {
+    expect_no_error(hypothesis(fit, paste0(nm, " = 0")))
   }
 })
 
 
-test_that("pp_check and the plotting methods render", {
-  expect_s3_class(pp_check(fit, ndraws = 20L), "ggplot")
-  for (ty in c("residuals", "trend", "series")) {
-    p <- plot(fit, type = ty)
+test_that("pp_check and the plotting methods draw something", {
+  # A ggplot is returned whether or not a layer received any data, so
+  # the class alone passes on the empty panel it looks like it is
+  # guarding. Building the object forces the layers to resolve, and
+  # the row count is what says something was drawn.
+  drawn <- function(p) {
     expect_s3_class(p, "ggplot")
+    layers <- ggplot2::ggplot_build(p)$data
+    expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
   }
-  expect_s3_class(mcmc_plot(fit), "ggplot")
+  drawn(pp_check(fit, ndraws = 20L))
+  for (ty in c("residuals", "trend", "series")) {
+    drawn(plot(fit, type = ty))
+  }
+  drawn(mcmc_plot(fit))
 })
 
 test_that("irf, fevd and stability refuse a trend that has no A", {
