@@ -714,11 +714,44 @@ One axis derived twice is the class this plan is written against.
 Here it stops rather than returning a wrong number, so nothing
 silently depends on the answer.
 
-No test now fails on it. The witness was a set of CAR seeds in a
-forecast recovery file that has since been removed, so the defect
-stands recorded here alone. `test-trend-car-irregular.R` fits the only
-continuous time grid left in this directory and is where the claim
-belongs.
+The reach is wider than a forecast arm. Three post-fit answers are
+cut against `build_training_arms()`, and each takes the truncation
+with it:
+
+| surface | on a grid running 0.5 to 91.953 |
+|---|---|
+| `forecast()` | refuses, zero-row assertion |
+| `plot(type = "trend")` | draws 0 to 91 |
+| `plot(hindcast(fit), series = 1)` | draws 0 to 91 |
+| `plot(type = "series")` | draws 0.5 to 91.953 |
+
+So the two panels a reader sets side by side are drawn on different
+axes. Both are labelled `Time` and the trend panel is the one that
+moved. This is finding 17 arriving through a truncation rather than
+through a rank, and neither picture shows it alone.
+
+`?forecast.mvgam` exempts this trend by name, saying `CAR()` and
+`ZMVN()` need not continue the training grid without a gap because
+`CAR()` carries the elapsed gap into its kernel. The exemption is
+unreachable on the grid it was written for.
+
+The package's own documented example is the case. `?CAR` fits
+`sim_mvgam(type = 6)`, whose gaps are drawn U(1, 6). The example
+stops at `mcmc_plot()`. Carried two steps further, every route to a
+forecast fails, including the spelling `?forecast.mvgam` recommends:
+
+| call | result |
+|---|---|
+| `forecast(mod, newdata = simdat_car$data_test)` | zero-row assertion |
+| `forecast(mod, newdata = mod$test_data)` | zero-row assertion |
+| `mvgam(..., newdata = te)` then forecast | zero-row assertion |
+| `score(forecast(...))` | zero-row assertion |
+
+`test-trend-car-irregular.R` now fits a second model on a grid whose
+occasions are never whole. It asserts three things of that fit: the
+training arms keep the times the fit was given, the fit forecasts its
+own grid and every panel draws the occasions the frame supplied. All
+four assertions fail.
 
 ## Leave-future-out cross-validation
 
@@ -1900,6 +1933,364 @@ every class it can be set on: `b`, `Intercept`, `sd`, `sds`,
 constant. `get_prior()` on an `mvgam_formula()` lists the trend
 classes alongside the observation ones and reports the same `nu`
 prior the program uses.
+
+## CAR and the leave-future-out window
+
+**62. `lfo_cv()` accepts occasions the fit never held and refuses
+every one it did.**
+
+`test-trend-car-irregular.R`, "lfo_cv admits the occasions the fit was
+given". The window boundary is named by a time, so the times the fit
+holds are the values that can name one. The set it accepts is their
+truncation instead.
+
+Measured on a CAR fit whose 30 occasions run 0.5 to 91.953 and none of
+which is whole:
+
+| `min_t` | in `floor(times)` | result |
+|---|---|---|
+| 15, 20, 30, 40 | no | refused, "is not an observed time" |
+| 25, 50 | yes | accepted, though neither was observed |
+| 62.481, an observed time | n/a | refused, "not 'double'" |
+
+So the refusal tells the user to pass a value that appears in the
+data, and the type assertion above it then rejects every value that
+does appear, because none of them is whole. The range the message
+prints, `{0..91}`, is the truncated axis rather than the grid the user
+supplied. Every value the method does accept names an occasion that
+was never observed.
+
+This is finding 9's shape at a second method: a refusal naming a
+remedy that cannot be followed. It shares finding 25's cause, and the
+integer-grid CAR fit in the same file is unaffected, which places the
+fault on the truncation rather than on this method's own logic.
+
+Left to its own default the method does not refuse at all, and that is
+the worse half. `lfo_cv(fit)` runs and reports where it scored:
+
+    eval_timepoints   62, 66, 69, 74, 77, 79, 81, 83, 86, 88
+
+None of the eleven is an occasion this fit holds. All eleven are
+floors. 62 stands for 62.481 and 66 for 66.959. `eval_timepoints` is
+what a reader consults to learn which occasions the model was scored
+at, and every value in it names one that was never observed.
+The elpd figures beside them are computed at the real occasions, so
+the numbers are sound and only their labels are wrong, which is why
+nothing about the object looks amiss.
+
+Two further readings on the same call. `pareto_k_threshold` is `NULL`
+while `pareto_k_threshold_used` holds 0.667, which is finding 27 on
+this fit. And `score = "crps"` ends on the zero-row assertion of
+finding 25 rather than on the window arithmetic of finding 26, so on a
+continuous grid the two known `lfo_cv()` faults are reached through a
+third.
+
+## A forecast horizon that runs backwards
+
+**63. An occasion inside the training grid is treated as a horizon.**
+
+`test-trend-car-irregular.R`, "an occasion inside the grid is not a
+forecast horizon". `?forecast.mvgam` says rows with time values
+"beyond the training grid drive the forecast horizon".
+`resolve_forecast_grid()` implements a different rule at
+`R/forecast.mvgam.R:498`:
+
+```r
+nt <- sort(unique(as.integer(newdata[[time_var]][idx])))
+setdiff(nt, training$times[[lv]])
+```
+
+`setdiff` asks whether an occasion is in the training grid, not
+whether it lies beyond it. The two agree on every frame whose times
+run past the end and part company on an occasion that sits inside the
+grid without having been observed. On a fit trained over 3 to 61 with
+no occasion at 6, a frame naming time 6 is carried into the horizon,
+where the step count becomes 6 minus 61 and the call ends on
+
+    Assertion on 'time' failed: Element 1 is not >= 0.
+
+`time` here is internal. The caller supplied a column of that name
+holding 6, which is positive, so the message names something the user
+can see and reports it doing something it does not do.
+
+The split itself works. A frame mixing observed occasions with future
+ones forecasts the future ones alone and hindcasts the rest, which is
+the documented behaviour:
+
+| newdata against a grid of 3 to 61 | forecast arms |
+|---|---|
+| 65, 70 | 2 columns |
+| 60, 61 observed, plus 65, 70 | 2 columns, `test_times` 65 and 70 |
+| 30, 31, both observed | 0 arms, nothing raised |
+| 6, never observed | the assertion above |
+
+Row three is finding 51 on this fit. Rows two and four share one
+cause, so the rule that fixes the horizon also settles what an
+all-interior frame should do.
+
+## Introspection
+
+**64. `terms()` has no method, on any fit.**
+
+Every other frame accessor answers. `model.frame()` returns the
+78-row training frame, `formula()` the formula and
+`insight::get_data()` the data. `terms()` raises R's own
+
+    no terms component nor attribute
+
+`terms()` is how a caller discovers a model's structure without
+knowing the class, so a package that answers `model.frame()` and not
+`terms()` breaks the pair. Seen on the CAR fit and on the ARMA fit, so
+it belongs to the class rather than to one model.
+
+## A wide fit describing itself
+
+**65. `family()` reports one arm of three, and ignores `resp`.**
+
+`test-grain-mvbf-wide.R`, "the fit reports the family of every arm it
+was given". The fit carries a poisson, a bernoulli and a gaussian
+response. Asked which family it has:
+
+| call | answer |
+|---|---|
+| `family(fit)` | gaussian |
+| `family(fit, resp = "count")` | gaussian |
+| `family(fit, resp = "seen")` | gaussian |
+| `glance(fit)$family` | poisson, bernoulli, gaussian |
+
+`family.mvgam()` already holds the right behaviour and cannot reach
+it. `R/print.mvgam.R:181` returns `object$family` when that is set,
+and falls through to a branch that reads one family per response off
+`object$formula$forms` otherwise. Its comment says a model written
+with `brms::mvbf()` has no single family so none is stored. One is
+stored. `fit$family` holds the gaussian, being the last arm, so the
+branch written for this case is unreachable and the comment above it
+describes something that does not happen.
+
+`resp` is the second half. `family.mvgam(object, ...)` takes no such
+argument. Naming a response lands it in `...` where nothing reads it,
+so the caller is answered about a different response without being
+told. Findings 6, 49 and 58 record the same shape, an argument taken
+and then dropped, on a constructor rather than on an accessor.
+
+`glance()` reads the formula and gets all three, so the information is
+on the object and only this accessor loses it. `family()` is what
+other packages call, which is what makes it the one of the two that
+matters.
+
+**66. `model.frame()` returns a wide fit's predictors and none of its
+responses.**
+
+Same file. The frame comes back 60 by 2, holding `x` and `time`. The
+three responses are absent, while `fit$data` and
+`insight::get_data()` each return all five columns.
+
+`model.frame.mvgam()` at `R/insight.mvgam.R:230` builds its column
+list as the response plus the predictors:
+
+```r
+response <- all.vars(mvgam_obs_formula(formula)[[2L]])
+```
+
+On an `mvbrmsformula` that subscript is not a language object. It is
+the character vector `c(count = "count", seen = "seen", "mass")`, and
+`all.vars()` of a character vector is `character(0)`. So the responses
+are dropped and the intersection keeps the predictors alone.
+
+`names(formula$formula$forms)` holds the three names, so the answer is
+on the object. A univariate fit is unaffected, since there the
+subscript is a symbol and `all.vars()` reads it.
+
+`model.frame()` is the standard route to a fitted model's data, and a
+frame with no response cannot be used for anything it is normally
+reached for. Finding 64 records `terms()` raising on the same object,
+so the two accessors a caller pairs are broken together.
+
+## A wide fit, drawn
+
+**70. `plot(type = "trend")` draws one response's latent state in
+every panel.**
+
+`test-grain-mvbf-wide.R`, "each trend panel draws its own response's
+latent state". The fit holds three responses with three latent
+columns. The sampler separates them: the posterior means of
+`trend[, 1]`, `trend[, 2]` and `trend[, 3]` differ by up to 1.73 and
+carry standard deviations of 0.504, 0.161 and 0.270.
+
+The plot draws three panels whose strips read `count`, `mass` and
+`seen`. Reading the line layers off the built object, on every x the
+three panels share:
+
+| pair | shared x | max abs difference |
+|---|---|---|
+| count vs seen | 55 | 0 |
+| count vs mass | 52 | 0 |
+| seen vs mass | 53 | 0 |
+
+One trajectory, drawn three times. The first five drawn values are
+0.1714, -0.0227, -0.0454 in all three panels, against the sampler's
+own 0.1333, 0.0868, 0.1441 for `seen` and -0.1149, 0.1097, 0.0639 for
+`mass`.
+
+The fault hides because the panels are otherwise right. Each is
+truncated to its own response's observed length, 57, 58 and 55, so the
+three pictures are different widths and no two are pixel identical.
+The strips are correct, the counts are correct and the content is one
+series repeated.
+
+The panel order is wrong in the same picture. The responses are
+declared `count, seen, mass` and the strips read `count, mass, seen`,
+which is finding 55 on a fourth fit.
+
+`plot(type = "series")` on the same object is the other half. It draws
+a single panel whose strip reads `NA`. Its one layer holds 60 rows and
+its y axis is labelled `count`. Two of the three responses are not
+drawn at all and the one that is carries no name. Every other
+per-response surface on this fit answers correctly, `glance()` and
+`augment()` included, which places both faults in the plotting layer
+rather than in the fit.
+
+**71. A gaussian arm's quantile residuals are three times too wide
+inside a wide fit.**
+
+Same fit, and the control is what makes it a claim about `mvbf()`
+rather than about the data. A randomised quantile residual is standard
+normal by construction. Each response was refitted on its own, same
+rows, same covariate, same AR(1) trend:
+
+| arm | family | in the wide fit | fitted alone |
+|---|---|---|---|
+| count | poisson | sd 0.500 | sd 0.453 |
+| seen | bernoulli | sd 1.005 | sd 0.963 |
+| mass | gaussian | **sd 2.699** | **sd 0.984** |
+
+The gaussian arm alone answers correctly on its own, at 0.27 per cent
+beyond three standard deviations, which is what the normal gives. The
+same response inside the wide fit reads 26 per cent beyond three and 6
+per cent beyond five, with every value pinned between -8.13 and 8.13.
+The bernoulli arm reads the same either way, so the distortion picks
+out the gaussian arm rather than reaching all of them.
+
+What it costs is the diagnostic that a gaussian arm is read through. A
+QQ plot of `mass` shows a model failing badly while the identical
+model fitted alone shows nothing wrong.
+
+The bound at 8.13 is worth recording alongside it. The extreme values
+sit exactly on it rather than trailing away from it, which is the
+signature of a PIT evaluated against a pooled predictive in place of
+the arm's own.
+
+**72. Poisson quantile residuals are half as wide as they should be,
+on any fit.**
+
+Found by the control above. The poisson arm reads sd 0.500 in the wide
+fit and 0.453 fitted alone, and no value in either reaches three
+standard deviations. A standard normal puts 0.27 per cent beyond
+three.
+
+Both numbers are near half. The failure follows the family rather than
+the fit, which places it with finding 21. That entry records
+`compute_quantile_residuals_empirical()` forming one `lower` and
+`upper` per observation from the pooled `yrep`, then returning
+`qnorm(lower[i])` wherever the two coincide. Taking the lower edge in
+place of a draw from between the edges compresses a discrete family's
+residuals toward zero. The bernoulli arm escapes because its two
+outcomes put the edges far apart.
+
+So a poisson fit's residual QQ plot is too narrow to show a departure
+that is really there. Finding 21 records the same routine returning no
+spread at all on a continuous family; this is the discrete half of it.
+
+**73. Some methods class the list they fan out, and some leave it
+bare.**
+
+Same fit. Every method that answers per response returns a list keyed
+by the response name. Three of them class that list and three leave it
+bare:
+
+| call | class of the fan-out |
+|---|---|
+| `hindcast()`, `forecast()` | `mvgam_forecast` |
+| `conditional_effects()` | `mvgam_conditional_effects` |
+| `plot()`, `pp_check()`, `predict()` | `list` |
+
+The consequence is visible at the console. `pp_check(fit)` holds three
+ggplots and prints as a list, so the reader gets `$count`, a plot,
+`$seen`, a plot, `$mass`, a plot, rather than one figure. `plot(fit)`
+does the same. On a univariate fit both return a single object that
+renders, so the wide fit is where the two behaviours part.
+
+Naming a response sidesteps it, since `pp_check(fit, resp = "count")`
+returns a plain ggplot. Recorded because the default call is the one a
+reader makes first.
+
+**Checked and correct.** `pp_check(fit, resp = )` draws the right data
+for each arm: the plotted x range covers 2 to 47 for the poisson arm,
+0 to 1 for the bernoulli and 0.05 to 3.34 for the gaussian, matching
+each response's own observations.
+
+## A wide fit and the evaluation surface
+
+**67. `score()` refuses the object `forecast()` gave it.**
+
+`test-grain-mvbf-wide.R`, "a wide forecast can be scored". A wide fit
+fans out per response, so `forecast()` returns an `mvgam_forecast`
+carrying one element per response rather than the arms directly. Each
+element is complete: for `count` the `count` arm holds a 50 by 5
+matrix of finite draws and `test_times` names the five held-out
+occasions.
+
+`score()` on that object answers
+
+    'object' contains no held-out forecasts to score.
+    Pass 'newdata' covering held-out times to 'forecast()'.
+
+which is what produced the object. Indexing the wrapper first works,
+so `score(fc[["count"]])` returns a scored list and the forecasts were
+there throughout. The method reads `$forecasts` off the outer object.
+A fan-out wrapper keeps nothing there, so the absence is reported as
+the user's mistake.
+
+This is finding 9's shape a third time, a refusal whose stated remedy
+has already been followed. It reaches every multivariate fit, since
+the fan-out is how `mvbf()` and `jsdgam()` both answer.
+
+**68. `lfo_cv()` demands a column a wide frame cannot have.**
+
+Same fit. `lfo_cv(fit, min_t = 45)` stops with
+
+    'newdata' must contain 'time' and 'series' columns.
+    Got columns: time, x, count, seen, mass.
+
+A wide frame has no series column by construction. The series is the
+response. That is why the axis record answers `multivariate` for
+`axes$series$source` and lists `count, seen, mass` as the levels. The
+guard asks the frame for something the record already holds, then
+lists the five columns present without saying that three of them are
+the series it was looking for.
+
+`resolve_forecast_grid()` was taught this and carries a branch for a
+response-keyed axis. This layer was not, so no wide fit can be scored
+by leaving future occasions out.
+
+**69. `kfold()` on a wide fit fails on a count that finding 15
+produces.**
+
+Same fit. `kfold(fit, K = 2)` stops with
+
+    Could not align log-lik columns with rows of data.
+    log_lik has 50 cols; data has 60 rows.
+
+The frame holds 60 occasions and each response is missing on a
+different handful, ten rows in total carrying at least one gap.
+`log_lik()` returns 60 columns of which those ten are entirely `NA`,
+which is finding 15: a joint density that drops every response at an
+occasion where any one of them is missing. Fifty is what survives.
+
+So the alignment guard is reading a symptom rather than a cause, and
+its message describes an arithmetic mismatch instead of the missing
+data behind it. Finding 15 records the wrong likelihood; this records
+that the same defect also removes `kfold()` from a wide fit.
 
 ## Grouped cross-validation
 

@@ -35,8 +35,10 @@ suppressMessages({
 
 # Several blocks below state what the package does not yet do, and
 # testthat stops a file after ten failures by default, which would
-# leave the blocks after them unrun and looking clean.
-testthat::set_max_fails(Inf)
+# leave the blocks after them unrun and looking clean. The limit is
+# read when the reporter is built, before this file is sourced, so it
+# has to come from the environment:
+#   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
 
 # This file fits its own models and caches them beside itself, so it
 # depends on no shared fixture and no build step.
@@ -599,6 +601,50 @@ test_that("pp_check names the response it is asked for", {
 })
 
 
+test_that("the fit reports the family of every arm it was given", {
+  # Three responses, three likelihoods. `family()` is what other
+  # packages call to decide how to treat a fit, so one answer for
+  # three arms sends every one of them down the same path.
+  fams <- family(fit)
+  reported <- if (is.list(fams) && !inherits(fams, "family")) {
+    vapply(fams, function(f) f$family, character(1L))
+  } else {
+    fams$family
+  }
+  expect_length(reported, n_resp)
+  expect_setequal(as.character(reported),
+                  c("poisson", "bernoulli", "gaussian"))
+
+  # `glance()` reads the formula and gets all three, so the answer is
+  # on the object and this is the accessor that loses it.
+  expect_setequal(as.character(glance(fit)$family),
+                  c("poisson", "bernoulli", "gaussian"))
+
+  # Naming a response has to answer about that response. The argument
+  # is not in the signature, so it reaches `...` and nothing reads it.
+  per_resp <- vapply(responses, function(r) {
+    f <- family(fit, resp = r)
+    if (is.list(f) && !inherits(f, "family")) NA_character_ else f$family
+  }, character(1L))
+  expect_identical(unname(per_resp),
+                   c("poisson", "bernoulli", "gaussian"))
+})
+
+
+test_that("model.frame carries the responses as well as the terms", {
+  # `model.frame()` is the standard route to a fitted model's data. A
+  # frame holding the predictors and none of the responses cannot be
+  # used for anything it is normally reached for, and the response
+  # names are on the formula the whole time.
+  mf <- model.frame(fit)
+  expect_true(all(responses %in% names(mf)))
+  expect_true(all(c("x", "time") %in% names(mf)))
+
+  # The two accessors a caller pairs. `terms()` has no method at all.
+  expect_true(inherits(terms(fit), "terms"))
+})
+
+
 test_that("the summary and tidiers name every response", {
   txt <- capture.output(summary(fit))
   expect_gt(length(txt), 10L)
@@ -677,6 +723,99 @@ test_that("the criticism surface runs on a wide fit", {
     any(grepl("Pareto k", loo_warnings))
   )
   expect_true(all(grepl("Pareto k", loo_warnings)))
+})
+
+
+test_that("quantile residuals sit on the scale they are defined on", {
+  # A randomised quantile residual is standard normal by construction,
+  # so the claim is about a known distribution rather than about this
+  # fit. Each arm is checked on its own family, since a scale error
+  # that reached every arm equally would be a different fault.
+  rq <- residuals(fit, type = "quantile", ndraws = 200L,
+                  summary = FALSE)
+  for (r in responses) {
+    v <- as.numeric(rq[[r]])
+    v <- v[is.finite(v)]
+    expect_gt(length(v), 0L)
+    # Half again either way is generous for 200 draws over ~57 rows.
+    expect_gt(stats::sd(v), 0.6)
+    expect_lt(stats::sd(v), 1.6)
+    # A standard normal puts 0.27 per cent beyond three.
+    expect_lt(mean(abs(v) > 3), 0.02)
+  }
+})
+
+
+test_that("each trend panel draws its own response's latent state", {
+  # The sampler holds one latent column per response and they differ.
+  # Three panels drawn from one of them is the failure this file
+  # exists for: every strip correct, every panel the right width, one
+  # trajectory repeated three times.
+  dm <- posterior::as_draws_matrix(fit$fit)
+  n_t <- fit$standata$N_time_trend
+  drawn_state <- lapply(seq_len(n_resp), function(k) {
+    vapply(seq_len(n_t),
+           function(t) mean(dm[, paste0("trend[", t, ",", k, "]")]),
+           numeric(1L))
+  })
+  # The premise: the states the sampler drew are not one state.
+  for (i in seq_len(n_resp)) {
+    for (j in seq_len(n_resp)) {
+      if (j <= i) next
+      expect_gt(max(abs(drawn_state[[i]] - drawn_state[[j]])), 1e-6)
+    }
+  }
+
+  p <- plot(fit, type = "trend")
+  b <- ggplot2::ggplot_build(p)
+  lay <- b$layout$layout
+  strip_col <- intersect(c("series", "trend"), names(lay))[1L]
+  expect_false(is.na(strip_col))
+
+  # Panels follow the order the responses were declared in.
+  expect_identical(as.character(lay[[strip_col]]), responses)
+
+  # The line each panel draws, keyed by the occasion it sits at.
+  line_layers <- which(vapply(
+    p$layers, function(l) inherits(l$geom, "GeomLine"), logical(1L)
+  ))
+  expect_gt(length(line_layers), 0L)
+  per_panel <- list()
+  for (i in line_layers) {
+    dd <- b$data[[i]]
+    for (pn in unique(as.integer(dd$PANEL))) {
+      v <- dd[as.integer(dd$PANEL) == pn, c("x", "y"), drop = FALSE]
+      key <- as.character(pn)
+      per_panel[[key]] <- rbind(per_panel[[key]], v)
+    }
+  }
+  expect_identical(length(per_panel), as.integer(n_resp))
+
+  # Two panels drawing one series agree wherever they overlap, so the
+  # claim is that they disagree somewhere.
+  keys <- names(per_panel)
+  for (i in seq_along(keys)) {
+    for (j in seq_along(keys)) {
+      if (j <= i) next
+      shared <- merge(per_panel[[keys[i]]], per_panel[[keys[j]]],
+                      by = "x")
+      expect_gt(nrow(shared), 0L)
+      expect_gt(max(abs(shared$y.x - shared$y.y)), 1e-6)
+    }
+  }
+})
+
+
+test_that("the series plot draws every response, and names them", {
+  # One panel labelled NA leaves two responses undrawn and the third
+  # unnamed.
+  p <- plot(fit, type = "series")
+  b <- ggplot2::ggplot_build(p)
+  lay <- b$layout$layout
+  strip_col <- intersect(c("series", "trend"), names(lay))[1L]
+  expect_identical(nrow(lay), as.integer(n_resp))
+  expect_false(any(is.na(as.character(lay[[strip_col]]))))
+  expect_setequal(as.character(lay[[strip_col]]), responses)
 })
 
 

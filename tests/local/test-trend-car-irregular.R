@@ -31,8 +31,10 @@ suppressMessages({
 
 # Several blocks below state what the package does not yet do, and
 # testthat stops a file after ten failures by default, which would
-# leave the blocks after them unrun and looking clean.
-testthat::set_max_fails(Inf)
+# leave the blocks after them unrun and looking clean. The limit is
+# read when the reporter is built, before this file is sourced, so it
+# has to come from the environment:
+#   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
 
 # This file fits its own model and caches it beside itself, so it
 # depends on no shared fixture and no build step.
@@ -271,6 +273,39 @@ test_that("n_lv is the third route to a factor CAR, and refuses too", {
     ),
     "do not support factor models"
   )
+})
+
+
+test_that("df reaches the program as the value it was given", {
+  # `df` is the one CAR argument that changes the innovation
+  # distribution, and an argument accepted and dropped is a mistake
+  # this package makes elsewhere. The contrast is the claim: the
+  # default draws gaussian innovations, a finite `df` draws
+  # student-t ones, and the number written into the program is the
+  # number asked for rather than a fixed one.
+  code_of <- function(...) {
+    as.character(stancode(mvgam(
+      formula = y ~ temp, data = dat, family = poisson(),
+      run_model = FALSE, silent = 2, ...
+    )))
+  }
+  gauss <- code_of(trend_formula = ~ CAR())
+  t4 <- code_of(trend_formula = ~ CAR(df = 4))
+  t8 <- code_of(trend_formula = ~ CAR(df = 8))
+
+  expect_match(gauss, "std_normal_lpdf(to_vector(innovations_trend))",
+               fixed = TRUE)
+  expect_false(grepl("multi_student_t", gauss, fixed = TRUE))
+  # The value itself, so a df read and then defaulted fails here.
+  expect_match(t4, "multi_student_t_cholesky_lpdf", fixed = TRUE)
+  expect_match(t4, "innovations_trend[t_inn]' | 4", fixed = TRUE)
+  expect_match(t8, "innovations_trend[t_inn]' | 8", fixed = TRUE)
+
+  # Below 3 the innovations have no finite variance, so the
+  # stationary initialisation is undefined and the refusal says so.
+  err <- expect_error(code_of(trend_formula = ~ CAR(df = 2)),
+                      "must be greater than 2")
+  expect_match(conditionMessage(err), "finite variance", fixed = TRUE)
 })
 
 
@@ -711,6 +746,333 @@ test_that("the plots and conditional effects render for CAR", {
     expect_true(all(dd$estimate <= dd$conf.high))
   }
 })
+
+test_that("forecast splits a frame by what lies beyond the grid", {
+  # `newdata` may hold occasions the fit already saw and occasions
+  # past its end. Only the second kind is a forecast, so the frame is
+  # split rather than refused, and the hindcast arms still cover the
+  # whole training grid.
+  mk <- function(times) data.frame(
+    time = rep(times, times = n_series),
+    series = factor(rep(series_levels, each = length(times)),
+                    levels = series_levels),
+    temp = 0, y = NA_integer_
+  )
+  last_t <- max(time_vals)
+
+  beyond <- forecast(fit, newdata = mk(c(65L, 70L)), ndraws = 20L)
+  expect_identical(names(beyond$forecasts), series_levels)
+  expect_identical(ncol(beyond$forecasts[[1L]]), 2L)
+  expect_identical(ncol(beyond$hindcasts[[1L]]), n_time)
+
+  # An occasion the fit already holds contributes a hindcast and not
+  # a horizon, so the mixed frame forecasts the two future occasions
+  # alone.
+  mixed <- forecast(fit, newdata = mk(c(60L, 61L, 65L, 70L)),
+                    ndraws = 20L)
+  expect_identical(ncol(mixed$forecasts[[1L]]), 2L)
+  expect_identical(as.integer(mixed$test_times[[1L]]), c(65L, 70L))
+  expect_identical(ncol(mixed$hindcasts[[1L]]), n_time)
+
+  # The horizon is measured in the user's own time, not in steps, so
+  # a single occasion nine units out is one column and damps by nine.
+  far <- forecast(fit, newdata = mk(70L), ndraws = 20L)
+  expect_identical(ncol(far$forecasts[[1L]]), 1L)
+  expect_identical(as.integer(far$test_times[[1L]]), 70L)
+})
+
+
+test_that("an occasion inside the grid is not a forecast horizon", {
+  # `?forecast.mvgam` says rows beyond the training grid drive the
+  # horizon. An occasion the fit never observed but which lies inside
+  # the grid is not beyond it, so it cannot be a horizon: 6 sits
+  # between the observed 5 and 7. The horizon it produces is
+  # negative, and the refusal names 'eta' or 'time', neither of which
+  # the caller supplied.
+  mk <- function(times) data.frame(
+    time = rep(times, times = n_series),
+    series = factor(rep(series_levels, each = length(times)),
+                    levels = series_levels),
+    temp = 0, y = NA_integer_
+  )
+  interior <- 6L
+  expect_false(interior %in% time_vals)
+  expect_gt(max(time_vals), interior)
+
+  err <- expect_error(forecast(fit, newdata = mk(interior),
+                               ndraws = 20L))
+  msg <- conditionMessage(err)
+  # The message has to name the user's own column and the grid it
+  # was measured against, the way the gapped-frame refusal does.
+  expect_match(msg, "time", fixed = TRUE)
+  expect_false(grepl("eta", msg, fixed = TRUE))
+  expect_match(msg, as.character(max(time_vals)), fixed = TRUE)
+})
+
+
+test_that("a frame wholly inside the grid is refused, not emptied", {
+  # Every occasion here is one the fit already holds, so there is no
+  # horizon to forecast. An object carrying named series, a type and
+  # a full set of hindcasts reads as though it forecast something,
+  # and any claim written as a loop over the arms passes on it.
+  mk <- function(times) data.frame(
+    time = rep(times, times = n_series),
+    series = factor(rep(series_levels, each = length(times)),
+                    levels = series_levels),
+    temp = 0, y = NA_integer_
+  )
+  fc <- forecast(fit, newdata = mk(c(30L, 31L)), ndraws = 20L)
+  # `?forecast.mvgam` documents the empty case as NULL slots.
+  expect_null(fc$forecasts)
+  expect_null(fc$test_times)
+})
+
+
+test_that("the fit answers the standard model accessors", {
+  # `terms()` is how a caller discovers a model's structure without
+  # knowing its class, and it is the one member of this group that
+  # has no method.
+  expect_s3_class(model.frame(fit), "data.frame")
+  expect_s3_class(formula(fit), "formula")
+  expect_s3_class(insight::get_data(fit), "data.frame")
+  expect_true(inherits(terms(fit), "terms"))
+})
+
+
+test_that("the index columns are not reported as model predictors", {
+  # insight builds the term list every downstream package reads.
+  # `temp` is the only predictor this model has; `time` and `series`
+  # are the axis it is indexed by, and a consumer offered them will
+  # take a slope over an occasion number.
+  preds <- insight::find_predictors(fit)$conditional
+  expect_true("temp" %in% preds)
+  expect_false("time" %in% preds)
+  expect_false("series" %in% preds)
+})
+
+
+test_that("hypothesis reaches every name variables() lists", {
+  # `hypothesis()` reads the stanfit directly, so a name mvgam's
+  # alias pass created is unreachable while its unaliased neighbours
+  # are not. Both are listed by `variables()`.
+  vars <- variables(fit)
+  expect_true("b_temp" %in% vars)
+  expect_true(any(grepl("^ar1_trend\\[", vars)))
+
+  expect_s3_class(hypothesis(fit, "ar1_trend[1] > 0"), "brmshypothesis")
+  expect_s3_class(hypothesis(fit, "b_temp > 0"), "brmshypothesis")
+})
+
+
+# ----------------------------------------------------------------------
+# A grid that is continuous, not merely irregular
+# ----------------------------------------------------------------------
+#
+# The grid above is irregular but whole-numbered, so a value and its
+# truncation coincide and a derivation that floored the times would
+# still answer correctly. `CAR()` places no such restriction: the
+# damping is raised to the elapsed gap, and the gap may be any
+# positive real. `?CAR` fits its own example on exactly this shape,
+# `sim_mvgam(type = 6)` drawing U(1, 6) gaps.
+#
+# So this is the grid CAR exists for, and the one where a time read
+# as an integer is a different occasion rather than the same one.
+
+cont_sim <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    set.seed(717L)
+    series_names <- c("north", "east")
+    n_s <- length(series_names)
+    gaps <- round(stats::runif(29L, 1.2, 4.8), 3L)
+    tv <- cumsum(c(0.5, gaps))
+    n_t <- length(tv)
+    phi <- 0.8
+    lat <- matrix(0, n_t, n_s)
+    for (s in seq_len(n_s)) {
+      for (t in 2:n_t) {
+        d <- tv[t] - tv[t - 1L]
+        lat[t, s] <- phi^d * lat[t - 1L, s] +
+          stats::rnorm(1L, 0, 0.3 * sqrt(d))
+      }
+    }
+    d <- data.frame(
+      time = rep(tv, times = n_s),
+      series = factor(rep(series_names, each = n_t),
+                      levels = series_names),
+      temp = rep(as.numeric(scale(cos(seq_len(n_t) / 3))), n_s)
+    )
+    d$y <- stats::rpois(nrow(d), exp(1.1 + 0.4 * d$temp +
+                                       as.vector(lat)))
+    cached <<- list(data = d, times = tv, series_names = series_names,
+                    n_series = n_s, phi = phi)
+    cached
+  }
+})
+
+cont_fit <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    path <- cache_path("val_mvgam_car_continuous.rds")
+    if (file.exists(path)) {
+      cached <<- readRDS(path)
+      return(cached)
+    }
+    cat("[fit ] mvgam(CAR(), continuous time grid)\n")
+    cached <<- mvgam(
+      formula = y ~ temp, trend_formula = ~ CAR(),
+      data = cont_sim()$data, family = poisson(),
+      chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    )
+    saveRDS(cached, path)
+    cached
+  }
+})
+
+
+test_that("the continuous grid reaches the record as the user gave it", {
+  sim <- cont_sim()
+  # The premise. Not one occasion is a whole number, so anything
+  # reading these times as integers reads a different grid.
+  expect_false(any(sim$times == floor(sim$times)))
+  expect_gt(length(unique(round(diff(sim$times), 3L))), 1L)
+
+  fit_c <- cont_fit()
+  expect_equal(as.numeric(mvgam_axes(fit_c)$time$values),
+               as.numeric(sim$times))
+  # The damping is raised to these, so they are the measured gaps.
+  expect_equal(as.numeric(fit_c$standata$time_dis[, 1L]),
+               as.numeric(c(1, diff(sim$times))))
+})
+
+
+test_that("the training arms keep the times the fit was given", {
+  # `build_training_arms()` is what every forecast arm is cut
+  # against. It records the training times as integers while the
+  # frame keeps the values the user supplied, so on this grid the
+  # two describe different occasions and nothing downstream can
+  # match a row against them.
+  sim <- cont_sim()
+  fit_c <- cont_fit()
+  training <- mvgam:::build_training_arms(fit_c, sim$series_names)
+  for (s in sim$series_names) {
+    expect_equal(as.numeric(training$times[[s]]),
+                 as.numeric(sim$times))
+  }
+})
+
+
+test_that("a continuous-time CAR forecasts its own grid", {
+  # `?forecast.mvgam` exempts CAR from the contiguity every other
+  # trend obeys, because it carries the elapsed gap into its kernel.
+  # This is the grid that exemption exists for.
+  sim <- cont_sim()
+  fit_c <- cont_fit()
+  h <- 4L
+  future_times <- max(sim$times) + cumsum(c(2.3, 3.1, 1.7, 4.2))
+  future <- data.frame(
+    time = rep(future_times, times = sim$n_series),
+    series = factor(rep(sim$series_names, each = h),
+                    levels = sim$series_names),
+    temp = 0, y = NA_integer_
+  )
+  fc <- forecast(fit_c, newdata = future, ndraws = 50L)
+  expect_s3_class(fc, "mvgam_forecast")
+  expect_identical(names(fc$forecasts), sim$series_names)
+  for (s in sim$series_names) {
+    expect_identical(dim(fc$forecasts[[s]]), c(50L, h))
+    expect_true(all(is.finite(fc$forecasts[[s]])))
+  }
+})
+
+
+test_that("lfo_cv admits the occasions the fit was given", {
+  # The window is named by a time, so the times the fit holds are the
+  # values that can name one. Measured here, the accepted set is
+  # their truncation instead: an occasion the user never observed is
+  # taken, and every occasion they did observe is refused for not
+  # being whole.
+  sim <- cont_sim()
+  fit_c <- cont_fit()
+  observed <- sim$times[20L]
+  fabricated <- 50L
+
+  expect_false(fabricated %in% sim$times)
+  expect_true(fabricated %in% floor(sim$times))
+
+  # An occasion the fit holds is a legitimate window boundary.
+  expect_s3_class(lfo_cv(fit_c, min_t = observed), "mvgam_lfo")
+  # One it does not hold is not, whatever its truncation matches.
+  expect_error(lfo_cv(fit_c, min_t = fabricated),
+               "not an observed time")
+})
+
+
+test_that("lfo_cv reports the occasions it scored at", {
+  # The default call raises nothing, so the labels are the only place
+  # the grid it used is visible. `eval_timepoints` is what a reader
+  # consults to learn where the model was scored, and each entry has
+  # to name an occasion the fit holds.
+  sim <- cont_sim()
+  fit_c <- cont_fit()
+  seen <- character(0)
+  lfo <- withCallingHandlers(
+    lfo_cv(fit_c),
+    warning = function(w) {
+      seen <<- c(seen, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  ev <- lfo$eval_timepoints
+  expect_gt(length(ev), 0L)
+  expect_true(all(ev %in% sim$times))
+})
+
+
+test_that("every panel draws the occasions the frame supplied", {
+  # The series panel draws the user's times. The trend panel and the
+  # hindcast draw their truncation, so the three cannot be read
+  # against one another and each is labelled `Time`.
+  sim <- cont_sim()
+  fit_c <- cont_fit()
+  want <- range(sim$times)
+  drawn_x <- function(p) {
+    xs <- unlist(lapply(
+      ggplot2::ggplot_build(p)$data,
+      function(l) if ("x" %in% names(l)) l$x else NULL
+    ))
+    xs <- xs[is.finite(xs)]
+    expect_gt(length(xs), 0L)
+    range(xs)
+  }
+  for (ty in c("series", "trend")) {
+    expect_equal(drawn_x(plot(fit_c, type = ty)), as.numeric(want))
+  }
+  expect_equal(drawn_x(plot(hindcast(fit_c, ndraws = 50L), series = 1)),
+               as.numeric(want))
+})
+
+
+test_that("the trend panels follow the model's series order", {
+  # Declared north, east. Every other per-series surface keeps that
+  # order, so a trend panel placed beside a series panel has to hold
+  # the same series in the same position.
+  sim <- cont_sim()
+  fit_c <- cont_fit()
+  panel_order <- function(p) {
+    lay <- ggplot2::ggplot_build(p)$layout$layout
+    col <- intersect(c("series", "trend"), names(lay))
+    as.character(lay[[if (length(col)) col[1L] else 1L]])
+  }
+  expect_identical(panel_order(plot(fit_c, type = "series")),
+                   sim$series_names)
+  expect_identical(panel_order(plot(fit_c, type = "trend")),
+                   sim$series_names)
+})
+
 
 # ----------------------------------------------------------------------
 # The trend that must ignore the gaps
