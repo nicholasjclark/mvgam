@@ -53,10 +53,12 @@ cache_path <- function(name) {
 
 SM <- suppressMessages
 
-# This file states several claims the package does not yet meet, and
+# Several blocks below state what the package does not yet do, and
 # testthat stops a file after ten failures by default, which would
-# leave the blocks after them unrun and looking clean.
-testthat::set_max_fails(Inf)
+# leave the blocks after them unrun and looking clean. The limit is
+# read when the reporter is built, before this file is sourced, so it
+# has to come from the environment:
+#   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
 
 set.seed(911L)
 

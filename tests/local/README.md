@@ -37,8 +37,9 @@ second run loads them and takes minutes.
 
 One file:
 
-```r
-Rscript -e "devtools::load_all('.'); testthat::test_file('tests/local/test-trend-var.R')"
+```bash
+TESTTHAT_MAX_FAILS=1000 Rscript -e \
+  "devtools::load_all('.'); testthat::test_file('tests/local/test-trend-var.R')"
 ```
 
 Everything, writing each result to its own log rather than to the
@@ -47,10 +48,17 @@ what failed:
 
 ```bash
 for f in tests/local/test-*.R; do
-  Rscript -e "devtools::load_all('.'); testthat::test_file('$f')" \
+  TESTTHAT_MAX_FAILS=1000 Rscript -e \
+    "devtools::load_all('.'); testthat::test_file('$f')" \
     > "/tmp/$(basename $f .R).log" 2>&1
 done
 ```
+
+`TESTTHAT_MAX_FAILS` is not optional here. Files in this directory are
+expected to fail, and testthat abandons a file after ten failures,
+which leaves every block below the tenth unrun and reported as
+nothing. The limit is read when the reporter is built, before a file
+is sourced, so it cannot be set from inside one.
 
 Fits cache under `tests/local/fixtures/`, which is gitignored and
 created on demand. Delete a file there to refit that model; delete the

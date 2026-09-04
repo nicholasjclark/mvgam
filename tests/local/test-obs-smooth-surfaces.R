@@ -38,8 +38,10 @@ suppressMessages({
 
 # Several blocks below state what the package does not yet do, and
 # testthat stops a file after ten failures by default, which would
-# leave the blocks after them unrun and looking clean.
-testthat::set_max_fails(Inf)
+# leave the blocks after them unrun and looking clean. The limit is
+# read when the reporter is built, before this file is sourced, so it
+# has to come from the environment:
+#   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
 
 # A by-factor term contributes to six prediction routes, and a fit
 # that dropped it from one of them returns the right shape from all

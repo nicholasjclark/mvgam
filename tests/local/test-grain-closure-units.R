@@ -43,8 +43,10 @@ suppressMessages({
 
 # Several blocks below state what the package does not yet do, and
 # testthat stops a file after ten failures by default, which would
-# leave the blocks after them unrun and looking clean.
-testthat::set_max_fails(Inf)
+# leave the blocks after them unrun and looking clean. The limit is
+# read when the reporter is built, before this file is sourced, so it
+# has to come from the environment:
+#   TESTTHAT_MAX_FAILS=1000 Rscript -e "..."
 
 # Resolved from where this file is running rather than from what is
 # already on disk. testthat sets the working directory to the test
