@@ -36,6 +36,11 @@ suppressMessages({
   library(marginaleffects)
 })
 
+# Several blocks below state what the package does not yet do, and
+# testthat stops a file after ten failures by default, which would
+# leave the blocks after them unrun and looking clean.
+testthat::set_max_fails(Inf)
+
 # A by-factor term contributes to six prediction routes, and a fit
 # that dropped it from one of them returns the right shape from all
 # six. Each route is asked for two grids differing only in the

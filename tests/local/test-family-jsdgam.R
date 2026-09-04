@@ -64,6 +64,11 @@ suppressMessages({
   library(testthat)
 })
 
+# Several blocks below state what the package does not yet do, and
+# testthat stops a file after ten failures by default, which would
+# leave the blocks after them unrun and looking clean.
+testthat::set_max_fails(Inf)
+
 
 # testthat runs from tests/local/ and Rscript from the package root,
 # so the branch asks which of those this is rather than whether a

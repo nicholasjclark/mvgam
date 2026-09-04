@@ -1867,6 +1867,74 @@ the failure is a missing column rather than a message.
 Neither spelling is documented as the contract, so the assertions
 resolve whichever is present rather than fixing one.
 
+## Plotted output
+
+**55. `plot(type = "trend")` orders its panels alphabetically while
+every other per-series surface uses the model's order.**
+
+Found by rendering the plots and looking at them. Two fits whose
+series are declared out of alphabetical order:
+
+| surface | arma, declared `kappa, beta` | var, declared `willow, ash, rowan` |
+|---|---|---|
+| `plot(type = "trend")` | beta, kappa | ash, rowan, willow |
+| `plot(type = "series")` | kappa, beta | willow, ash, rowan |
+| `hindcast()` arms | kappa, beta | willow, ash, rowan |
+| `plot(hindcast(), series = 1)` | kappa | willow |
+
+So the trend plot is the one that sorts. Placed beside the series
+plot, which is the obvious comparison to make, its first panel holds
+a different series, and both are labelled only by name so nothing on
+either picture says the order changed. `series = 1` agrees with the
+series plot and disagrees with the trend plot.
+
+This is the plan's own class reaching the output a reader looks at
+rather than a number they compute: one axis, two orders, every label
+correct in isolation.
+
+**56. `print()` shows an environment address and names an ARMA as an
+AR.**
+
+Two problems in the first thing a user calls. Printing any fit emits
+the formula environments:
+
+```
+GAM observation formula:
+y ~ gp(x1, x2, k = 8)
+<environment: 0x6352aee840d0>
+```
+
+Two such lines per fit, on every fit checked, carrying a pointer that
+changes between sessions and means nothing to a reader.
+
+The same output reports the trend as
+
+```
+Trend model:
+AR
+```
+
+on a fit whose call is `~ AR(p = 1, ma = TRUE)`. The lag order and
+the moving-average term are both dropped, so the two models this file
+exists to tell apart print identically. `summary()` reports
+`theta1_trend` and does distinguish them, so the information is
+available to the method that omits it.
+
+**57. `forecast()` with no `newdata` returns an object with no
+forecasts.**
+
+The call a user makes first. `forecast(fit)` returns an
+`mvgam_forecast` whose `forecasts` list is empty and whose
+`test_times` is empty, while `hindcasts` holds two arms and `type` is
+`"response"`. Nothing is raised.
+
+Distinct from finding 51 only in how it is reached: there a frame of
+already-observed times produced the empty object, here the default
+call does. Either the method should forecast some horizon by default
+or it should say that `newdata` is required, and an object that
+reports a type and carries hindcasts reads as though it did the
+former.
+
 ## Grouped cross-validation
 
 **48. A fold that is contiguous in time cannot be refitted, so

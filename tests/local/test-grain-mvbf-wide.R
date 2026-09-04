@@ -33,6 +33,11 @@ suppressMessages({
   library(testthat)
 })
 
+# Several blocks below state what the package does not yet do, and
+# testthat stops a file after ten failures by default, which would
+# leave the blocks after them unrun and looking clean.
+testthat::set_max_fails(Inf)
+
 # This file fits its own models and caches them beside itself, so it
 # depends on no shared fixture and no build step.
 # Resolved from where this file is running rather than from what is

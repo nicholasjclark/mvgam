@@ -32,6 +32,10 @@ suppressMessages({
   library(testthat)
 })
 
+# Several blocks state what the package does not yet do, and
+# testthat stops a file after ten failures by default.
+testthat::set_max_fails(Inf)
+
 # This file fits its own model and caches it beside itself, so it
 # depends on no shared fixture and no build step.
 # Resolved from where this file is running rather than from what is
@@ -530,13 +534,69 @@ test_that("summary, tidiers and criticism run on an ARMA fit", {
 })
 
 
-test_that("pp_check and the plotting methods render", {
-  expect_s3_class(pp_check(fit, ndraws = 20L), "ggplot")
-  for (ty in c("residuals", "trend", "series")) {
-    p <- plot(fit, type = ty)
+test_that("pp_check and the plotting methods draw something", {
+  # A ggplot comes back whether or not a layer received data, so the
+  # class alone passes on an empty panel. Building it forces the
+  # layers to resolve and the row count says something was drawn.
+  drawn <- function(p) {
     expect_s3_class(p, "ggplot")
+    layers <- ggplot2::ggplot_build(p)$data
+    expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
+    invisible(p)
   }
-  expect_s3_class(mcmc_plot(fit), "ggplot")
+  drawn(pp_check(fit, ndraws = 20L))
+  for (ty in c("residuals", "trend", "series")) {
+    drawn(plot(fit, type = ty))
+  }
+  drawn(mcmc_plot(fit))
+})
+
+
+test_that("every per-series plot panels in the model's own order", {
+  # The series are declared out of alphabetical order, so a panel
+  # order taken from a sort differs from the one the model holds.
+  # `plot(type = "series")` and the hindcast arms use the model's
+  # order; `plot(type = "trend")` sorts, so the two pictures a reader
+  # is most likely to compare put a different series first while
+  # labelling every panel correctly.
+  panel_order <- function(ty) {
+    b <- ggplot2::ggplot_build(plot(fit, type = ty))
+    lay <- b$layout$layout
+    fc <- setdiff(names(lay),
+                  c("PANEL", "ROW", "COL", "SCALE_X", "SCALE_Y"))
+    if (!length(fc)) return(character(0))
+    as.character(lay[[fc[1L]]])
+  }
+  expect_identical(panel_order("series"), series_levels)
+  expect_identical(panel_order("trend"), series_levels)
+  expect_identical(names(hindcast(fit)$hindcasts), series_levels)
+})
+
+
+test_that("print names the trend the fit was given", {
+  # The first thing a user calls. This file exists to tell an ARMA
+  # from an AR, and `print()` reports both as `AR`: the lag order and
+  # the moving-average term are dropped, so the two models are
+  # indistinguishable in the output. `summary()` carries
+  # `theta1_trend`, so the information is there to report.
+  out <- capture.output(print(fit))
+  trend_line <- out[which(grepl("^Trend model", out)) + 1L]
+  expect_match(trend_line, "ma", ignore.case = TRUE)
+
+  # And it prints the formula environments, two lines of pointer that
+  # change between sessions and describe nothing about the model.
+  expect_identical(grep("<environment: 0x", out, value = TRUE),
+                   character(0))
+})
+
+
+test_that("forecast with no newdata says what it needs", {
+  # The default call. It returns an `mvgam_forecast` carrying two
+  # hindcast arms, a type, and an empty `forecasts` list, so an
+  # object that looks complete holds no forecast at all. Either a
+  # horizon is forecast or the requirement is named.
+  fc <- forecast(fit)
+  expect_length(fc$forecasts, n_series)
 })
 
 cat("\nDone.\n")
