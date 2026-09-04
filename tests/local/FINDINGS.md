@@ -1831,6 +1831,42 @@ a separate question, since a missing response is handled by the
 likelihood; what is recorded here is that if it is an error, it
 should name the user's column.
 
+## Documentation that contradicts the code
+
+**53. The Royle-Nichols detection predictor is documented on the log
+scale and built on the logit scale.**
+
+`?sim_closure_unit_data` describes the detection predictor for
+`royle_nichols` as being on the log scale. Both the family and the
+simulator disagree: `nmix()` declares `links = c("log", "logit")`, so
+detection takes the logit, and `R/sim_closure_unit_data.R:512` builds
+the probability with `plogis(det_lp)`.
+
+A reader following the documentation sets a detection intercept on the
+wrong scale, and the value they choose is silently a different
+probability from the one they meant. Found while enabling the
+`royle_nichols` chunk of `vignettes/articles/nmix.Rmd`, whose own
+table repeated the documented scale.
+
+**54. `conditional_effects()` and `conditional_smooths()` answer in
+different column spellings.**
+
+`test-trend-ar-multilag.R`. Both are drawn views of a fitted term and
+they name their columns differently:
+
+| method | estimate | interval |
+|---|---|---|
+| `conditional_effects()` | `estimate` | `conf.low`, `conf.high` |
+| `conditional_smooths()` | `estimate__` | `lower__`, `upper__` |
+
+brms uses the trailing-underscore spelling for both. mvgam renames one
+and not the other, so code written against a `conditional_effects()`
+frame fails on a `conditional_smooths()` frame from the same fit, and
+the failure is a missing column rather than a message.
+
+Neither spelling is documented as the contract, so the assertions
+resolve whichever is present rather than fixing one.
+
 ## Grouped cross-validation
 
 **48. A fold that is contiguous in time cannot be refitted, so

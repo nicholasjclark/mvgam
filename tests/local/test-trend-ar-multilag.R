@@ -29,6 +29,10 @@ suppressMessages({
   library(testthat)
 })
 
+# Several claims below state what the package does not yet do, and
+# testthat stops a file after ten failures by default.
+testthat::set_max_fails(Inf)
+
 # This file fits its own model and caches it beside itself, so it
 # depends on no shared fixture and no build step.
 # Resolved from where this file is running rather than from what is
@@ -764,6 +768,41 @@ test_that("hypothesis reaches the smooth's own coefficient", {
   for (nm in bs) {
     expect_no_error(hypothesis(fit, paste0(nm, " = 0")))
   }
+})
+
+
+test_that("the trend-side smooth is drawn as a curve that moves", {
+  # `conditional_smooths()` is the drawn view of the same term
+  # `posterior_smooths()` evaluates. A smooth the data did not
+  # support shrinks toward zero and keeps its posterior width; one
+  # whose coefficients never reach the grid has no width at all,
+  # which is the signature finding 35 records on a factor-grain
+  # smooth. Measured here the curve has sd 0.75 and spans -1.06 to
+  # 0.91, so a curve pinned flat fails.
+  cs <- conditional_smooths(fit)
+  expect_length(cs, 1L)
+  expect_match(names(cs)[1L], "temp", fixed = TRUE)
+  d <- cs[[1L]]
+  expect_s3_class(d, "data.frame")
+  expect_gt(nrow(d), 0L)
+
+  # brms names these columns with trailing underscores and mvgam's
+  # own `conditional_effects()` renames them to `estimate`,
+  # `conf.low` and `conf.high`, so the two sibling methods answer in
+  # different spellings and code written against one breaks on the
+  # other. The column is resolved rather than assumed so this states
+  # the curve's shape either way.
+  ecol <- intersect(c("estimate__", "estimate"), names(d))
+  lo <- intersect(c("lower__", "conf.low"), names(d))
+  hi <- intersect(c("upper__", "conf.high"), names(d))
+  expect_length(ecol, 1L)
+  expect_gt(stats::sd(d[[ecol]]), 1e-6)
+  expect_true(all(d[[lo]] <= d[[ecol]]))
+  expect_true(all(d[[ecol]] <= d[[hi]]))
+  expect_gt(min(d[[hi]] - d[[lo]]), 0)
+  # Drawn over the covariate's own range rather than over its rank.
+  expect_true(all(d$temp >= min(dat$temp) - 1e-8))
+  expect_true(all(d$temp <= max(dat$temp) + 1e-8))
 })
 
 
