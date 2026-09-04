@@ -265,17 +265,35 @@ have done above works unchanged.
 | Variant | Constructor | Detection scale | When to prefer |
 |---------|-------------|-----------------|----------------|
 | Poisson-binomial | `nmix()` | logit $p$ per visit | Default. Direct Royle (2004) parameterisation; cleanest when individuals are independently detectable. |
-| Royle-Nichols | `nmix("royle_nichols")` | log $r$ per individual | Repeated presence-absence rather than counts. Heterogeneous detection collapses into a per-individual hazard $r$, and the binary observation arises from $1 - (1 - r)^N$. |
+| Royle-Nichols | `nmix("royle_nichols")` | logit $r$ per individual | Repeated presence-absence rather than counts. Heterogeneous detection collapses into a per-individual hazard $r$, and the binary observation arises from $1 - (1 - r)^N$. |
 | Poisson-Poisson | `nmix("poisson_poisson")` | log $\rho$ per visit | Encounter-rate data, where the count is a noisy Poisson realisation of an underlying encounter rate with no detection ceiling. |
 
-Switching between them only requires changing the `family` argument;
-the data and the formula stay the same.
+The formula carries over unchanged across the three variants, and
+so does the data for the two that read counts. Royle-Nichols is the
+exception. It sees only whether a species was detected on a visit,
+with the per-individual hazard $r$ driving $1 - (1 - r)^N$, so the
+response has to arrive as zeros and ones. Simulating the same two
+populations again on that scale, with a hazard low enough that zeros
+actually occur, gives the variant something to work with:
 
-```{r variant-switch, eval = FALSE}
+```{r variant-switch, results = "hide"}
+set.seed(1001)
+hazard <- c(sp_1 = 0.06, sp_2 = 0.10)
+
+dat_rn <- dat
+dat_rn$y <- rbinom(
+  nrow(dat_rn), 1L,
+  1 - (1 - hazard[as.character(dat_rn$series)])^dat_rn$truth
+)
+# Cap the latent abundance above the largest simulated population
+# so the marginalisation is not truncated.
+dat_rn$cap <- 60L
+
 mod_rn <- mvgam(
   formula = bf(y ~ s(time, k = 4, by = series) + series, p ~ series),
-  data = dat, family = nmix("royle_nichols"),
-  chains = 4L, iter = 4000L, warmup = 2000L, silent = 2L
+  data = dat_rn, family = nmix("royle_nichols"),
+  chains = 4L, iter = 4000L, warmup = 2000L,
+  control = list(adapt_delta = 0.95), silent = 2L
 )
 ```
 

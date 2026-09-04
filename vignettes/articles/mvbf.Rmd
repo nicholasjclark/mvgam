@@ -27,11 +27,6 @@ library(brms)
 library(ggplot2)
 library(patchwork)
 theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
-
-cache_dir <- file.path("pkgdown", "mvbf_cache")
-read_cache <- function(name) {
-  readRDS(file.path(cache_dir, paste0(name, ".rds")))
-}
 ```
 
 Field monitoring rarely produces a single response variable. An
@@ -73,9 +68,55 @@ keeps the camera outcome on its own non-NA rows so the shared
 latent state is still informed during the 20 months without a
 camera by counts and biomass alone.
 
-```{r data-load}
-mv_data <- read_cache("mv_data")
-truth   <- read_cache("truth")
+```{r simulate}
+set.seed(2024)
+
+T_ <- 80L
+phi <- 0.7
+sigma_proc <- 0.4
+
+# One latent abundance trajectory under a stationary AR(1).
+x <- numeric(T_)
+x[1L] <- rnorm(1L, mean = 0, sd = sigma_proc / sqrt(1 - phi^2))
+for (t in 2L:T_) {
+  x[t] <- phi * x[t - 1L] + rnorm(1L, 0, sigma_proc)
+}
+
+# Per-arm intercepts, covariate effects and the Gamma shape.
+a_count <- 1.5
+a_biomass <- 0.5
+a_camera <- -0.5
+b_deploy <- 0.05
+nu <- 2.0
+
+month_idx <- ((seq_len(T_) - 1L) %% 12L) + 1L
+log_effort_count <- log(runif(T_, min = 0.8, max = 1.2))
+deploy_days <- runif(T_, min = 5, max = 20)
+f_season <- sin(2 * pi * month_idx / 12)
+
+count <- rpois(T_, exp(a_count + log_effort_count + x))
+mu_biomass <- exp(a_biomass + f_season + x)
+biomass <- rgamma(T_, shape = nu, rate = nu / mu_biomass)
+p_camera <- plogis(a_camera + b_deploy * deploy_days + x)
+camera_full <- rbinom(T_, size = 1L, prob = p_camera)
+
+# The camera runs on a sparser schedule, missing at random with
+# respect to the latent state.
+camera <- rep(NA_integer_, T_)
+camera_keep <- sort(sample.int(T_, size = 60L))
+camera[camera_keep] <- camera_full[camera_keep]
+
+mv_data <- data.frame(
+  time = seq_len(T_),
+  series = factor(rep("pop1", T_)),
+  month = month_idx,
+  log_effort = log_effort_count,
+  deploy_days = deploy_days,
+  count = count,
+  biomass = biomass,
+  camera = camera
+)
+truth <- list(x = x, phi = phi, sigma = sigma_proc, nu = nu)
 str(mv_data, give.attr = FALSE)
 ```
 
@@ -108,7 +149,7 @@ To see how much the shared-process model gains over the
 default that fits each method alone, we first run three
 independent fits with the same AR(1) latent dynamics.
 
-```{r uni-fits, eval = FALSE}
+```{r uni-fits}
 mod_uni_count <- mvgam(
   count ~ 1 + offset(log_effort),
   trend_formula = ~ AR(p = 1),
@@ -130,12 +171,6 @@ mod_uni_camera <- mvgam(
 )
 ```
 
-```{r uni-load, include = FALSE}
-mod_uni_count   <- read_cache("mod_uni_count")
-mod_uni_biomass <- read_cache("mod_uni_biomass")
-mod_uni_camera  <- read_cache("mod_uni_camera")
-```
-
 Each fit converges (max R-hat below 1.05) but the camera outcome
 carries very little information by itself. The Bernoulli observations
 above provide only one bit per time point, so its AR(1) estimate
@@ -149,7 +184,7 @@ Each outcome gets its own family and its own predictors. Every
 outcome shares the same `trend_formula = ~ AR(p = 1)`: one latent
 state feeding three observation models.
 
-```{r joint-fit, eval = FALSE}
+```{r joint-fit}
 joint_formula <-
   bf(count   ~ 1 + offset(log_effort), family = poisson()) +
   bf(biomass ~ 1 + s(month, bs = "cc", k = 8),
@@ -164,10 +199,6 @@ mod_joint <- mvgam(
   knots = list(month = c(0.5, 12.5)),
   chains = 2L, iter = 2000L, warmup = 1000L, silent = 2L
 )
-```
-
-```{r joint-load, include = FALSE}
-mod_joint <- read_cache("mod_joint")
 ```
 
 mvgam handles the bookkeeping. brms's default `mvbf` would

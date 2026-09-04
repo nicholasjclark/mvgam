@@ -401,7 +401,7 @@ through `unit = ` and `species = `. A `birdsong`-style fit can
 run directly off the `week` and `species` columns without
 renaming:
 
-```{r custom-names, results = "hide", eval = FALSE}
+```{r custom-names, results = "hide"}
 # Equivalent to a `time` / `series` setup, no renaming required:
 mvgam(
   y ~ s(week_in_year, bs = "cc", k = 10),

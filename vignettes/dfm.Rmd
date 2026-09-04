@@ -340,21 +340,14 @@ scores_tbl <- rbind(
 round(scores_tbl, 2)
 ```
 
-```{r score-summary, echo = FALSE}
-free_worst <- names(which(vapply(colnames(scores_tbl), function(m) {
-  unname(rank(scores_tbl[, m])["free"]) == 3
-}, logical(1))))
-```
-
 Knowing the sharing structure wins on all three scores. Pooling
 every series onto one trend costs most on the log score, and most of
 that cost falls on series 4-6, whose dynamics are washed out by the
 dominant long-memory trend. Letting the model learn $Z$ instead is
-not a free substitute, and here it comes last on
-`r paste(free_worst, collapse = " and ")`. Estimating the loadings
-and the trend parameters together costs precision, and the QR
-rotation does not have to land on the structure that generated the
-data.
+no free substitute: estimating the loadings and the trend parameters
+together costs precision, and the QR rotation does not have to land
+on the structure that generated the data. The table above shows
+where each of those choices lands on each score.
 
 The practical takeaway is that a held-out forecast score is a
 useful diagnostic on the sharing structure itself. When two

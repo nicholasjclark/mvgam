@@ -31,16 +31,6 @@ library(mvabund)
 library(ggplot2)
 library(patchwork)
 theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
-
-# Cached jsdgam fits live under pkgdown/, which is excluded from
-# the CRAN tarball by .Rbuildignore. pkgdown runs articles from
-# the project root, so the relative path resolves at build time.
-# The visible fit chunks remain as documentation of what produced
-# each object.
-cache_dir <- file.path("pkgdown", "jsdgam_cache")
-read_cache <- function(name) {
-  readRDS(file.path(cache_dir, paste0(name, ".rds")))
-}
 ```
 
 A community of species rarely behaves as a collection of
@@ -167,7 +157,7 @@ asks for no smooths on the factors themselves. Counts get
 the `negbinomial()` family to absorb dispersion beyond a
 Poisson mean.
 
-```{r mod_baseline_show, eval = FALSE}
+```{r mod_baseline}
 mod_baseline <- jsdgam(
   formula = counts ~ Bare.ground + Canopy.cover + Shrub.cover +
     Volume.lying.CWD + Feral.mammal.dung,
@@ -179,10 +169,6 @@ mod_baseline <- jsdgam(
   species = species,
   chains  = 2L, iter = 1600L, warmup = 1000L, silent = 2L
 )
-```
-
-```{r mod_baseline_load, include = FALSE}
-mod_baseline <- read_cache("mod_baseline")
 ```
 
 The summary prints the observation-model intercept, the
@@ -248,7 +234,7 @@ other in latent space, before seeing the counts."
 Passing the trait table through the `traits` argument is the
 only change to the call.
 
-```{r mod_traits_show, eval = FALSE}
+```{r mod_traits}
 mod_traits <- jsdgam(
   formula = counts ~ Bare.ground + Canopy.cover + Shrub.cover +
     Volume.lying.CWD + Feral.mammal.dung,
@@ -260,12 +246,8 @@ mod_traits <- jsdgam(
   unit    = time,
   species = species,
   chains  = 2L, iter = 1600L, warmup = 1000L,
-  adapt_delta = 0.95, silent = 2L
+  control = list(adapt_delta = 0.95), silent = 2L
 )
-```
-
-```{r mod_traits_load, include = FALSE}
-mod_traits <- read_cache("mod_traits")
 ```
 
 We bump `adapt_delta` from the Stan default of 0.8 to 0.95.
@@ -455,7 +437,7 @@ with the trait kernel. Traits supply the ARD covariance across
 species within each column; MGP supplies the shrinkage across
 columns.
 
-```{r mod_mgp_show, eval = FALSE}
+```{r mod_mgp}
 mod_mgp <- jsdgam(
   formula = counts ~ Bare.ground + Canopy.cover + Shrub.cover +
     Volume.lying.CWD + Feral.mammal.dung,
@@ -468,10 +450,6 @@ mod_mgp <- jsdgam(
   species = species,
   chains  = 2L, iter = 1600L, warmup = 1000L, silent = 2L
 )
-```
-
-```{r mod_mgp_load, include = FALSE}
-mod_mgp <- read_cache("mod_mgp")
 ```
 
 `active_factors()` summarises the posterior distribution of how

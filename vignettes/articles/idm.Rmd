@@ -36,14 +36,6 @@ theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
 bayesplot::color_scheme_set("red")
 red_pal <- bayesplot::color_scheme_get("red")
 
-cache_dir <- if (dir.exists("pkgdown")) {
-  file.path("pkgdown", "idm_cache")
-} else {
-  file.path("..", "..", "pkgdown", "idm_cache")
-}
-read_cache <- function(name) {
-  readRDS(file.path(cache_dir, paste0(name, ".rds")))
-}
 ```
 
 Ecologists studying a single species rarely see it through a
@@ -201,7 +193,7 @@ reads off the same latent process $\log \lambda_t$, so
 from the pooled information in all three streams rather than
 three times from three narrower views of it.
 
-```{r joint-fit, eval = FALSE}
+```{r joint-fit}
 joint_formula <-
   bf(count ~ 1 + offset(log_effort), family = poisson()) +
   bf(pa    ~ 1, family = bernoulli(link = "cloglog")) +
@@ -216,10 +208,6 @@ mod_joint <- mvgam(
   control = list(adapt_delta = 0.95),
   silent = 2L
 )
-```
-
-```{r joint-load, include = FALSE}
-mod_joint <- read_cache("mod_joint")
 ```
 
 `trend_map = "shared"` collapses every measurement onto a
@@ -394,7 +382,7 @@ Each stream can be fit alone with the same trend specification.
 That yields one posterior per stream over the environmental
 response, ready for direct comparison against the joint fit.
 
-```{r baselines-fit, eval = FALSE}
+```{r baselines-fit}
 tf <- ~ s(env, k = 8) + AR(p = c(1, 12))
 
 mod_count <- mvgam(
@@ -421,12 +409,6 @@ mod_po <- mvgam(
   control = list(adapt_delta = 0.95),
   silent = 2L
 )
-```
-
-```{r baselines-load, include = FALSE}
-mod_count <- read_cache("mod_count")
-mod_pa    <- read_cache("mod_pa")
-mod_po    <- read_cache("mod_po")
 ```
 
 To compare recovered smooths on a common footing, we evaluate
@@ -533,7 +515,7 @@ the lag-12 term is a common enough shortcut that we can measure
 what it costs. `AR(p = 1)` in place of `AR(p = c(1, 12))`
 leaves everything else untouched:
 
-```{r wrong-trend-fit, eval = FALSE}
+```{r wrong-trend-fit}
 mod_wrong_trend <- mvgam(
   bf(count ~ 1 + offset(log_effort), family = poisson()) +
     bf(pa ~ 1, family = bernoulli(link = "cloglog")) +
@@ -545,10 +527,6 @@ mod_wrong_trend <- mvgam(
   control = list(adapt_delta = 0.95),
   silent = 2L
 )
-```
-
-```{r wrong-trend-load, include = FALSE}
-mod_wrong_trend <- read_cache("mod_wrong_trend")
 ```
 
 The annual recurrence has to go somewhere. With no lag-12
@@ -589,7 +567,7 @@ the reason to the shared latent state between neighbouring time
 points: the pointwise density is not really out of sample. On
 the two candidates here:
 
-```{r loo-compare, cache = TRUE}
+```{r loo-compare}
 loo::loo_compare(
   loo::loo(mod_joint),
   loo::loo(mod_wrong_trend)
@@ -614,7 +592,7 @@ approximate the correct model's next-step prediction, and LFO
 cannot separate them. At $h = 12$, a full seasonal period, the
 missing lag-12 term is exactly what the score measures.
 
-```{r lfo-fit, eval = FALSE}
+```{r lfo-fit}
 lfo_j_h1  <- lfo_cv(mod_joint,       min_t = 60L, fc_horizon = 1L)
 lfo_wt_h1 <- lfo_cv(mod_wrong_trend, min_t = 60L, fc_horizon = 1L)
 
@@ -623,15 +601,6 @@ lfo_wt_h6 <- lfo_cv(mod_wrong_trend, min_t = 60L, fc_horizon = 6L)
 
 lfo_j_h12  <- lfo_cv(mod_joint,       min_t = 60L, fc_horizon = 12L)
 lfo_wt_h12 <- lfo_cv(mod_wrong_trend, min_t = 60L, fc_horizon = 12L)
-```
-
-```{r lfo-load, include = FALSE}
-lfo_j_h1   <- read_cache("lfo_joint_h1")
-lfo_wt_h1  <- read_cache("lfo_wrong_trend_h1")
-lfo_j_h6   <- read_cache("lfo_joint_h6")
-lfo_wt_h6  <- read_cache("lfo_wrong_trend_h6")
-lfo_j_h12  <- read_cache("lfo_joint_h12")
-lfo_wt_h12 <- read_cache("lfo_wrong_trend_h12")
 ```
 
 Rolling from time 60 onwards over 96 monthly observations, the

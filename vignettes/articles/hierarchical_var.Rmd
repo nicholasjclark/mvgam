@@ -28,15 +28,6 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
-
-cache_dir <- if (dir.exists("pkgdown")) {
-  file.path("pkgdown", "hierarchical_var_cache")
-} else {
-  file.path("..", "..", "pkgdown", "hierarchical_var_cache")
-}
-read_cache <- function(name) {
-  readRDS(file.path(cache_dir, paste0(name, ".rds")))
-}
 ```
 
 When several units are each observed over time on the same set
@@ -110,11 +101,45 @@ South Africa, the United Kingdom and the United States). The
 WDI package pulls the raw levels; a log-difference gives growth
 rates.
 
-```{r data-fetch, eval = FALSE}
+```{r data-fetch}
 raw <- WDI::WDI(
   indicator = c("NY.GDP.MKTP.KN", "NE.CON.TOTL.KN", "NE.GDI.FTOT.KN"),
   start = 1970
 )
+```
+
+Keep the years where all three indicators are populated, take the
+annual log-difference within each country and restrict the panel
+to Savage's eight economies.
+
+```{r growth-rates}
+wide <- raw |>
+  dplyr::filter(stats::complete.cases(raw)) |>
+  dplyr::rename(
+    GDP  = NY.GDP.MKTP.KN,
+    CONS = NE.CON.TOTL.KN,
+    GFCF = NE.GDI.FTOT.KN
+  ) |>
+  dplyr::filter(GDP > 0, CONS > 0, GFCF > 0) |>
+  dplyr::group_by(country) |>
+  dplyr::arrange(year) |>
+  dplyr::mutate(
+    dl_gdp  = c(NA, diff(log(GDP))),
+    dl_cons = c(NA, diff(log(CONS))),
+    dl_gfcf = c(NA, diff(log(GFCF)))
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::filter(stats::complete.cases(dplyr::across(
+    c(dl_gdp, dl_cons, dl_gfcf)
+  ))) |>
+  dplyr::filter(country %in% c(
+    "United States", "United Kingdom", "Australia",
+    "New Zealand", "Chile", "Canada", "Ireland", "South Africa"
+  )) |>
+  dplyr::group_by(country) |>
+  dplyr::arrange(year) |>
+  dplyr::mutate(time = seq_len(dplyr::n())) |>
+  dplyr::ungroup()
 ```
 
 Growth rates then get standardised per outcome. The three
@@ -126,6 +151,32 @@ equally informative for each outcome. Countries and outcomes
 become factors, and every `(country, outcome)` pair gets a
 unique `series` label that mvgam uses to identify the 24
 outcome-series inside the panel.
+
+```{r reshape}
+long <- wide |>
+  tidyr::pivot_longer(
+    cols = c(dl_gdp, dl_cons, dl_gfcf),
+    names_to = "outcome",
+    values_to = "y"
+  ) |>
+  dplyr::mutate(
+    country = factor(country),
+    outcome = factor(outcome),
+    series  = factor(paste(country, outcome, sep = "."))
+  )
+
+scales <- long |>
+  dplyr::group_by(outcome) |>
+  dplyr::summarise(
+    mean = mean(y, na.rm = TRUE),
+    sd   = stats::sd(y, na.rm = TRUE),
+    .groups = "drop"
+  )
+long <- long |>
+  dplyr::left_join(scales, by = "outcome") |>
+  dplyr::mutate(y = (y - mean) / sd) |>
+  dplyr::select(-mean, -sd)
+```
 
 ### Padding ragged tails
 
@@ -142,7 +193,7 @@ common data-prep gotcha for hierarchical panel fits. Doing it
 with `tidyr::expand_grid()` and `dplyr::left_join()` makes the
 intent explicit.
 
-```{r padding-example, eval = FALSE}
+```{r padding-example}
 full_grid <- tidyr::expand_grid(
   country = levels(long$country),
   outcome = levels(long$outcome),
@@ -167,10 +218,6 @@ with `y = NA` at the six cells (two countries × three outcomes)
 where WDI stopped early. mvgam validates this rectangle at fit
 time; if you skip the pad you will see a data-shape error naming
 the mismatched counts.
-
-```{r load-panel, include = FALSE}
-long <- read_cache("wdi_panel")
-```
 
 ```{r data-glimpse}
 head(long)
@@ -225,7 +272,7 @@ default `normal(0, sqrt(0.455))`), the global correlation Cholesky
 standardised data). The rest of the priors are the mvgam
 defaults.
 
-```{r fit-code, eval = FALSE}
+```{r fit-code}
 custom_priors <- c(
   prior(normal(0, 0.15),         class = "Amu_trend"),
   prior(lkj_corr_cholesky(2),    class = "L_Omega_global_trend"),
@@ -243,8 +290,7 @@ mod_hier <- mvgam(
   cores         = 4,
   iter          = 700,
   warmup        = 500,
-  adapt_delta   = 0.95,
-  max_treedepth = 15,
+  control       = list(adapt_delta = 0.95, max_treedepth = 15),
   silent        = 2
 )
 ```
@@ -258,10 +304,6 @@ The sampler needs `adapt_delta = 0.95` and
 panel; the tight `Amu_trend` prior at `normal(0, 0.15)` reflects
 that macro AR(1) coefficients on log-difference growth rates
 concentrate near zero.
-
-```{r fit-load, include = FALSE}
-mod_hier <- read_cache("mod_hier")
-```
 
 ## Model summary
 

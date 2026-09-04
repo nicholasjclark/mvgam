@@ -29,16 +29,6 @@ knitr::opts_chunk$set(
 library(mvgam)
 library(ggplot2)
 theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
-
-# Cached fits + LFO objects live under pkgdown/, which is
-# excluded from the CRAN tarball by .Rbuildignore. pkgdown runs
-# articles from the project root, so the relative path resolves
-# at build time. The visible fit chunks remain as documentation
-# of what produced each object.
-cache_dir <- file.path("pkgdown", "forecast_eval_cache")
-read_cache <- function(name) {
-  readRDS(file.path(cache_dir, paste0(name, ".rds")))
-}
 ```
 
 A forecast is only as useful as the score that judges it. The
@@ -131,7 +121,7 @@ per-species temporal smooths. No state-space dynamics; the
 forecast extrapolates the spline trajectories, which often misses
 on count data because splines were not designed for forecasting.
 
-```{r mod_spline_show, eval = FALSE}
+```{r mod_spline}
 mod_spline <- mvgam(
   captures ~ s(mintemp, k = 6) + s(ndvi_ma12, k = 6) +
     s(time, by = series, k = 8) + series,
@@ -141,17 +131,13 @@ mod_spline <- mvgam(
 )
 ```
 
-```{r mod_spline_load, include = FALSE}
-mod_spline <- read_cache("mod_spline")
-```
-
 Model 2, per-species AR(1) (`mod_ar`), replaces the temporal
 spline with an independent AR(1) state-space process for each
 species. Each species' latent state evolves with its own
 auto-correlation; the obs-side smooths handle the covariate
 response.
 
-```{r mod_ar_show, eval = FALSE}
+```{r mod_ar}
 mod_ar <- mvgam(
   captures ~ s(mintemp, k = 6) + s(ndvi_ma12, k = 6) + series,
   trend_formula = ~ AR(),
@@ -161,17 +147,13 @@ mod_ar <- mvgam(
 )
 ```
 
-```{r mod_ar_load, include = FALSE}
-mod_ar <- read_cache("mod_ar")
-```
-
 Model 3, correlated VAR(1) (`mod_var`), is a vector
 autoregression with `cor = TRUE`, allowing latent states for the
 four species to be cross-correlated. If one species' deviation
 predicts another's, this model can use that information to
 sharpen multi-species forecasts.
 
-```{r mod_var_show, eval = FALSE}
+```{r mod_var}
 mod_var <- mvgam(
   captures ~ s(mintemp, k = 6) + s(ndvi_ma12, k = 6) + series,
   trend_formula = ~ VAR(cor = TRUE),
@@ -179,10 +161,6 @@ mod_var <- mvgam(
   data   = train,
   chains = 2L, iter = 1600L, warmup = 1000L, silent = 2L
 )
-```
-
-```{r mod_var_load, include = FALSE}
-mod_var <- read_cache("mod_var")
 ```
 
 The VAR fit's `summary()` shows the joint parameters that
@@ -557,19 +535,19 @@ with few draws and clamps at 0.7 once PSIS is on firm ground.
 That hybrid scheme gives near-exact LFO ELPD at a fraction of
 the cost of refitting everywhere.
 
-```{r lfo_show, eval = FALSE}
-lfo_spline <- lfo_cv(mod_spline, min_t = 60L, fc_horizon = 4L,
-                      silent = 2L)
-lfo_ar     <- lfo_cv(mod_ar,     min_t = 60L, fc_horizon = 4L,
-                      silent = 2L)
-lfo_var    <- lfo_cv(mod_var,    min_t = 60L, fc_horizon = 4L,
-                      silent = 2L)
-```
+`save_log_lik = TRUE` keeps the matrix of pointwise log
+densities at every evaluation point. The argument is off by
+default because that matrix can run to many megabytes, but the
+stacking weights built later in this article cannot be computed
+without it.
 
-```{r lfo_load, include = FALSE}
-lfo_spline <- read_cache("lfo_spline")
-lfo_ar     <- read_cache("lfo_ar")
-lfo_var    <- read_cache("lfo_var")
+```{r lfo}
+lfo_spline <- lfo_cv(mod_spline, min_t = 60L, fc_horizon = 4L,
+                      save_log_lik = TRUE, silent = 2L)
+lfo_ar     <- lfo_cv(mod_ar,     min_t = 60L, fc_horizon = 4L,
+                      save_log_lik = TRUE, silent = 2L)
+lfo_var    <- lfo_cv(mod_var,    min_t = 60L, fc_horizon = 4L,
+                      save_log_lik = TRUE, silent = 2L)
 ```
 
 `lfo_cv()` returns an `mvgam_lfo` object whose `refits_at` slot

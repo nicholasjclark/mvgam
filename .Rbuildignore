@@ -46,4 +46,3 @@
 ^architecture$
 ^claude\.exe$
 ^scratchpad_figs$
-^vignettes/articles/.*_cache$

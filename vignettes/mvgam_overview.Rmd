@@ -512,11 +512,10 @@ mvgam_data(train, family = gaussian(), newdata = test)
 ```
 
 The ACF panel shows the lag 1 and lag 12 spikes the latent state
-puts there. A model of the covariate alone has nowhere to put
-them, and the realised state ranges over about
-`r round(diff(range(sim$true_trend)))` units, so that structure is
-not small. The next two sections fit the covariate-only model and
-then add the latent state.
+puts there, and they are why a model of the covariate alone will
+not do: it has nowhere to put them. The next two sections fit that
+model and then add the latent state, so what separates the two is
+the state itself.
 
 ## Model 1: smooth only, no latent state
 
@@ -603,18 +602,10 @@ step2 <- mvgam(
 summary(step2, include_betas = FALSE)
 ```
 
-```{r sigma-drop, echo = FALSE}
-sig <- function(m) {
-  d <- posterior::summarise_draws(as_draws_df(m), "median")
-  d$median[d$variable == "sigma"]
-}
-sigma_drop <- round(100 * (1 - sig(step2) / sig(step1)))
-```
-
-`sigma` falls by about `r sigma_drop`% against model 1. The dynamic
-signal has moved out of the observation noise and into the latent
-state. The trend block reports `ar1_trend` and `ar12_trend`, which
-we can check against the values the simulator used:
+`sigma` falls against model 1, because the dynamic signal has moved
+out of the observation noise and into the latent state. The trend
+block reports `ar1_trend` and `ar12_trend`, which we can check
+against the values the simulator used:
 
 ```{r step2-ar-recovery}
 ar1  <- as.numeric(as.array(step2, variable = "ar1_trend[1]"))

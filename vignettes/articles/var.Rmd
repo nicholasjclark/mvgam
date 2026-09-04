@@ -27,15 +27,6 @@ library(brms)
 library(dplyr)
 library(ggplot2)
 theme_set(mvgam_theme(base_size = 12, base_family = "serif"))
-
-cache_dir <- if (dir.exists("pkgdown")) {
-  file.path("pkgdown", "var_cache")
-} else {
-  file.path("..", "..", "pkgdown", "var_cache")
-}
-read_cache <- function(name) {
-  readRDS(file.path(cache_dir, paste0(name, ".rds")))
-}
 ```
 
 Vector autoregressions describe how a small collection of time
@@ -125,10 +116,9 @@ state per region per year is a lot of correlated parameters for
 a series this short, so the fit runs four chains at
 `adapt_delta = 0.99` rather than the defaults; at two chains and
 a looser target the individual states mix too poorly to support
-the intervals reported below. The fit is cached to avoid
-re-running it at render time.
+the intervals reported below.
 
-```{r fit-code, eval = FALSE}
+```{r fit-code}
 varmod <- mvgam(
   formula       = adj_count ~ -1,
   trend_formula = ~ region + VAR(cor = TRUE),
@@ -139,7 +129,7 @@ varmod <- mvgam(
   data          = train,
   newdata       = test,
   family        = Gamma(),
-  adapt_delta   = 0.99,
+  control       = list(adapt_delta = 0.99),
   chains        = 4,
   iter          = 3000,
   warmup        = 1500,
@@ -154,10 +144,7 @@ observation side, so `bf(adj_count ~ 0, shape ~ series - 1)`
 would give one shape per region, at the cost of tying up more
 parameters on a modest dataset.
 
-```{r fit-load, include = FALSE}
-varmod <- read_cache("kestrel_fit")$varmod
-train  <- read_cache("kestrel_fit")$train
-test   <- read_cache("kestrel_fit")$test
+```{r region-order, include = FALSE}
 # The latent processes are ordered by the levels of the series
 # factor, which is alphabetical and not the order the regions were
 # assembled in. Everything downstream labels itself from this.
@@ -306,7 +293,7 @@ year's shocks barely share anything. Which of the two matrices
 answers your question is worth settling before reading either.
 Neither restores the geography.
 
-## Forecasts## Forecasts
+## Forecasts
 
 Passing `newdata = test` at fit time stored the held-out slice
 on the fitted object, so `forecast()` extends the VAR five years

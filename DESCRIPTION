@@ -67,15 +67,16 @@ Suggests:
     rmarkdown,
     scoringRules,
     testthat,
+    tidyr,
     tweedie,
     usethis,
     V8,
+    WDI,
     withr,
     wrswoR,
     xts
 Enhances:
-    gratia (>= 0.9.0),
-    tidyr
+    gratia (>= 0.9.0)
 SystemRequirements: Stan (>= 2.36.0 for simplex multi-response
   families `diri()`, `multi()`, `categ()`; >= 2.26.0 otherwise).
   Install via `cmdstanr::install_cmdstan()` or rstan from
