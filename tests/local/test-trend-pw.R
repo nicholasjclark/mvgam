@@ -632,13 +632,67 @@ test_that("summary, tidiers and criticism run on a PW fit", {
 })
 
 
-test_that("pp_check and the plotting methods render for PW", {
-  expect_s3_class(pp_check(fit, ndraws = 20L), "ggplot")
-  for (ty in c("residuals", "trend", "series")) {
-    p <- plot(fit, type = ty)
-    expect_s3_class(p, "ggplot")
+test_that("every per-series plot panels in the model's own order", {
+  # Series declared out of alphabetical order, so a panel order taken
+  # from a sort differs from the model's. `plot(type = "series")` and
+  # the hindcast arms use the model's order; `plot(type = "trend")`
+  # sorts, so the first panel of one is a different series from the
+  # first panel of the other while every label is right on its own.
+  panel_order <- function(ty) {
+    b <- ggplot2::ggplot_build(plot(fit, type = ty))
+    lay <- b$layout$layout
+    fc <- setdiff(names(lay),
+                  c("PANEL", "ROW", "COL", "SCALE_X", "SCALE_Y"))
+    if (!length(fc)) return(character(0))
+    as.character(lay[[fc[1L]]])
   }
-  expect_s3_class(mcmc_plot(fit), "ggplot")
+  expect_identical(panel_order("series"), series_levels)
+  expect_identical(panel_order("trend"), series_levels)
+  expect_identical(names(hindcast(fit)$hindcasts), series_levels)
+})
+
+
+test_that("print describes the model without printing a pointer", {
+  # The formula environments are emitted on every fit, two lines of
+  # address that change between sessions and say nothing about the
+  # model.
+  out <- capture.output(print(fit))
+  expect_identical(grep("<environment: 0x", out, value = TRUE),
+                   character(0))
+})
+
+
+test_that("the tidy table carries the smooth this model is built on", {
+  # The two-dimensional smooth's basis coefficients are reported by
+  # `variables()` and by `posterior_summary()` and are absent from
+  # `tidy()`, so the table describes a model with no `s(x1, x2)` in
+  # it while carrying the changepoint block in full.
+  vars <- variables(fit)
+  ps <- rownames(posterior_summary(fit))
+  td <- tidy(fit, effects = "all")
+  expect_gt(sum(grepl("^bs_", vars)), 0L)
+  expect_identical(sum(grepl("^bs_", ps)), sum(grepl("^bs_", vars)))
+  expect_identical(sum(grepl("^bs_", td$term)), sum(grepl("^bs_", vars)))
+  # The changepoint adjustments are carried, which is what makes the
+  # omission specific rather than the tidier failing on this fit.
+  expect_identical(sum(grepl("^delta_trend", td$term)),
+                   sum(grepl("^delta_trend", vars)))
+})
+
+
+test_that("pp_check and the plotting methods draw something for PW", {
+  # A ggplot is returned whether or not a layer received data, so the
+  # class alone passes on an empty panel.
+  drawn <- function(p) {
+    expect_s3_class(p, "ggplot")
+    layers <- ggplot2::ggplot_build(p)$data
+    expect_gt(sum(vapply(layers, nrow, integer(1L))), 0L)
+  }
+  drawn(pp_check(fit, ndraws = 20L))
+  for (ty in c("residuals", "trend", "series")) {
+    drawn(plot(fit, type = ty))
+  }
+  drawn(mcmc_plot(fit))
 })
 
 cat("\nDone.\n")
