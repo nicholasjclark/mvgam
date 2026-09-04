@@ -29,7 +29,7 @@
 # never reads, which is what these already are.
 #
 # Run with:
-#   testthat::test_file("tests/local/test-draw-alignment.R")
+#   testthat::test_file("tests/local/test-draws-alignment.R")
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)

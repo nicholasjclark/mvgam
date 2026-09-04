@@ -21,7 +21,7 @@
 # Cached at tests/local/fixtures/val_mvgam_ar_multilag.rds.
 #
 # Run with:
-#   testthat::test_file("tests/local/test-ar-multilag.R")
+#   testthat::test_file("tests/local/test-trend-ar-multilag.R")
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)
@@ -778,8 +778,8 @@ test_that("conditional_effects type = link is the link scale", {
   # a coincidence, and it has to hold on both panels: a `type` that
   # applied some inverse link anyway would move them. The
   # complementary claim, where the two must not agree, is made on the
-  # log-linked fits in test-draw-alignment.R and on the bernoulli arm
-  # of test-mvbf-wide.R.
+  # log-linked fits in test-draws-alignment.R and on the bernoulli arm
+  # of test-grain-mvbf-wide.R.
   for (nm in names(ce_resp)) {
     expect_equal(ce_link[[nm]]$data$estimate,
                  ce_resp[[nm]]$data$estimate, tolerance = 1e-10)

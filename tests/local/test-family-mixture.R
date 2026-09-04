@@ -48,7 +48,7 @@
 #      contributes zeros of its own
 #
 # Run with:
-#   testthat::test_file("tests/local/test-mixture-family-density.R")
+#   testthat::test_file("tests/local/test-family-mixture.R")
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)
@@ -884,7 +884,7 @@ test_that("the predictor is the design times the coefficients", {
 test_that("the entry points reach the mixture, not the count alone", {
   # What only a mixture can be asked. That `avg_predictions` averages
   # the draws `predictions` returned is a property of marginaleffects
-  # and is stated once, in test-draw-alignment.R; repeating it per
+  # and is stated once, in test-draws-alignment.R; repeating it per
   # family would test the same code again. What is family-specific is
   # which density the estimate came off, and these two families
   # differ from the plain Poisson in opposite directions: a hurdle

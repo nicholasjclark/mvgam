@@ -705,10 +705,11 @@ One axis derived twice is the class this plan is written against.
 Here it stops rather than returning a wrong number, so nothing
 silently depends on the answer.
 
-`test-forecast-recovery.R` covers it. The three CAR seeds error there
-until the axis carries the times it was given. The failure was
-invisible before because the bundles were cached from a run that
-predates it, so `forecast()` was never called again.
+No test now fails on it. The witness was a set of CAR seeds in a
+forecast recovery file that has since been removed, so the defect
+stands recorded here alone. `test-car-irregular-time.R` fits the only
+continuous time grid left in this directory and is where the claim
+belongs.
 
 ## Leave-future-out cross-validation
 
@@ -742,8 +743,9 @@ Every documented multi-score example is therefore unavailable, and
 of draws rather than the nominal 0.7. The field a reader reaches for
 is the empty one, and `summary()` reports the run from the other.
 
-Both are covered in `test-forecast-recovery.R`, which asserts the
-documented behaviour and fails on it.
+Neither is covered. Both were asserted in a forecast recovery file
+that has since been removed, and no local file calls `lfo_cv()` any
+more.
 
 ## Gaps closed rather than found
 

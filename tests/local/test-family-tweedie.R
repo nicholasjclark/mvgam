@@ -41,7 +41,7 @@
 #   model: y ~ x, trend_formula = ~ AR(p = 1), tweedie()
 #
 # Run with:
-#   testthat::test_file("tests/local/test-tweedie-family.R")
+#   testthat::test_file("tests/local/test-family-tweedie.R")
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)

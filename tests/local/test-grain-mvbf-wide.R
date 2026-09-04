@@ -25,7 +25,7 @@
 # recovered by sorting.
 #
 # Run with:
-#   testthat::test_file("tests/local/test-mvbf-wide.R")
+#   testthat::test_file("tests/local/test-grain-mvbf-wide.R")
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)

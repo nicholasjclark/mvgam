@@ -55,7 +55,7 @@
 # Delete one to refit it. Full cold run ~30-45 min.
 #
 # Run with:
-#   Rscript -e "devtools::load_all('.'); testthat::test_file('tests/local/test-jsdgam-families.R')"
+#   Rscript -e "devtools::load_all('.'); testthat::test_file('tests/local/test-family-jsdgam.R')"
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)

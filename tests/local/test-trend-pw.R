@@ -28,7 +28,7 @@
 # Cached at tests/local/fixtures/val_mvgam_pw_trend.rds.
 #
 # Run with:
-#   testthat::test_file("tests/local/test-pw-trend.R")
+#   testthat::test_file("tests/local/test-trend-pw.R")
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)

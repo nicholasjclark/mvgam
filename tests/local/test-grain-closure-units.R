@@ -33,7 +33,7 @@
 # about how many rows there are.
 #
 # Run with:
-#   testthat::test_file("tests/local/test-closure-units.R")
+#   testthat::test_file("tests/local/test-grain-closure-units.R")
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)

@@ -27,7 +27,7 @@
 # refit.
 #
 # Run with:
-#   testthat::test_file("tests/local/test-var-trend.R")
+#   testthat::test_file("tests/local/test-trend-var.R")
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)

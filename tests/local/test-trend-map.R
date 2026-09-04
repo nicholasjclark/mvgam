@@ -32,7 +32,7 @@
 # series loads on another's factors and nothing raises.
 #
 # Run with:
-#   testthat::test_file("tests/local/test-trend-map-fit.R")
+#   testthat::test_file("tests/local/test-trend-map.R")
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)

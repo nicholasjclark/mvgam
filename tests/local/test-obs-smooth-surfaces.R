@@ -17,11 +17,11 @@
 # twice:
 #
 #   s(z) alone            test-random-effects.R, test-pathfinder-init.R
-#   a two-covariate s()   test-pw-trend.R
-#   gp(x)                 test-ar-multilag.R, test-forecast-recovery.R
-#   gp(x1, x2)            test-arma-trend.R
-#   a trend-side smooth   test-draw-alignment.R
-#   s(x, by = lv_axis())  test-by-lv-axis.R, test-closure-units.R
+#   a two-covariate s()   test-trend-pw.R
+#   gp(x)                 test-trend-ar-multilag.R, test-forecast-recovery.R
+#   gp(x1, x2)            test-trend-arma.R
+#   a trend-side smooth   test-draws-alignment.R
+#   s(x, by = lv_axis())  test-factor-lv-axis.R, test-grain-closure-units.R
 #
 # `assert_by_factor_variation()` is the reason the by-factor terms
 # are here at all. A by-factor contribution can be carried by one

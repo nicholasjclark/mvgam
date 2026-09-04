@@ -19,7 +19,7 @@
 # rank never equals a time.
 #
 # Run with:
-#   testthat::test_file("tests/local/test-hierarchical-trends.R")
+#   testthat::test_file("tests/local/test-trend-hierarchical.R")
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)

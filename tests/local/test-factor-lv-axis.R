@@ -17,7 +17,7 @@
 #   no_by_lv : the same without `by = lv_axis()`
 #
 # Run with:
-#   testthat::test_file("tests/local/test-by-lv-axis.R")
+#   testthat::test_file("tests/local/test-factor-lv-axis.R")
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)

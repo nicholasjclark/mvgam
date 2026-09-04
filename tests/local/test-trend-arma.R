@@ -24,7 +24,7 @@
 # Cached at tests/local/fixtures/val_mvgam_arma_trend.rds.
 #
 # Run with:
-#   testthat::test_file("tests/local/test-arma-trend.R")
+#   testthat::test_file("tests/local/test-trend-arma.R")
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)

@@ -40,7 +40,7 @@
 # phylo fits take roughly ten minutes each.
 #
 # Run with:
-#   Rscript -e "devtools::load_all('.'); testthat::test_file('tests/local/test-loadings-prior.R')"
+#   Rscript -e "devtools::load_all('.'); testthat::test_file('tests/local/test-factor-loadings-prior.R')"
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)

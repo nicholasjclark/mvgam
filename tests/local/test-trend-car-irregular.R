@@ -21,7 +21,7 @@
 #   times: 3, 4, 5, 7, 10, 11, 15, ... (gaps of 1, 2, 3, 4)
 #
 # Run with:
-#   testthat::test_file("tests/local/test-car-irregular-time.R")
+#   testthat::test_file("tests/local/test-trend-car-irregular.R")
 
 suppressMessages({
   devtools::load_all(".", quiet = TRUE)
