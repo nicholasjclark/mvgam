@@ -828,10 +828,27 @@ test_that("each arm predicts on the support its own family has", {
   # wrong one. Stated as membership rather than as a comparison
   # between arms, so the claim does not depend on which values this
   # particular simulation happened to draw.
+  #
+  # Naming an arm raises a marginaleffects notice saying `resp` is
+  # not known to be supported for this class, once per arm. mvgam
+  # forwards and honours it, so the notice is wrong and the class has
+  # not been registered on that whitelist. Captured here rather than
+  # left to leak, and asserted as the absence it should be.
+  resp_warnings <- character(0)
   est <- lapply(responses, function(r) {
-    predictions(fit, newdata = dat, type = "expected", resp = r)
+    withCallingHandlers(
+      predictions(fit, newdata = dat, type = "expected", resp = r),
+      warning = function(w) {
+        resp_warnings <<- c(resp_warnings, conditionMessage(w))
+        invokeRestart("muffleWarning")
+      }
+    )
   })
   names(est) <- responses
+  expect_identical(
+    grep("not known to be supported", resp_warnings, value = TRUE),
+    character(0)
+  )
 
   # A bernoulli expectation is a probability, bounds included. A
   # prediction that escaped to the link scale keeps every dimension
