@@ -307,6 +307,9 @@ test_that("a padded forecast grid does not break the post-fit methods", {
     time = rep(max(time_vals) + seq_len(h), times = n_series),
     series = factor(rep(series_levels, each = h), levels = series_levels),
     x = 0,
+    z = 0,
+    site = factor(site_levels[1L], levels = site_levels),
+    dose = factor(dose_levels[1L], levels = dose_levels, ordered = TRUE),
     n_trials = 0L,
     y = NA_integer_
   )
@@ -348,7 +351,13 @@ test_that("the monotonic effect orders its categories", {
   # simplex of increments and one scale. Nothing else in this
   # directory fits one.
   vars <- variables(fit)
-  expect_true(any(grepl("^bsp_", vars)))
+  # The coefficient is reported as `bsp[1]`, carrying no term name,
+  # while every other population coefficient on this fit is aliased
+  # and `prior_summary()` knows the term as `modose`. With one
+  # monotonic term the index is readable; with two it is the only
+  # handle a reader has.
+  expect_true(any(grepl("^bsp", vars)))
+  expect_true(any(grepl("dose", vars, fixed = TRUE)))
   simo <- grep("^simo_", vars, value = TRUE)
   # One increment per step between the four levels.
   expect_length(simo, length(dose_levels) - 1L)
@@ -448,6 +457,74 @@ test_that("how_to_cite reports the sampler settings this fit used", {
   ctl <- fit$fit@stan_args[[1L]]$control
   expect_identical(as.numeric(ctl$adapt_delta), 0.8)
   expect_identical(as.integer(ctl$max_treedepth), 10L)
+})
+
+
+test_that("a user prior reaches the program on every class it fits", {
+  # Two accounts of one fact: what `prior_summary()` reports and what
+  # the generated program contains. mvgam injects defaults of its own
+  # for classes brms would get wrong, so a merge that dropped or
+  # reordered the user's rows would leave the report and the program
+  # disagreeing while both stayed well formed.
+  cases <- list(
+    list(prior(normal(0, 0.123), class = "b"), "0.123"),
+    list(prior(normal(3, 0.456), class = "Intercept"), "0.456"),
+    list(prior(exponential(3.21), class = "sd"), "3.21"),
+    list(prior(exponential(4.32), class = "sds"), "4.32"),
+    list(prior(exponential(5.43), class = "sigma_trend"), "5.43"),
+    list(prior(normal(0, 0.321), class = "ar1_trend"), "0.321")
+  )
+  for (cs in cases) {
+    built <- SM(mvgam(
+      obs_formula, trend_formula = ~ AR(p = 1), data = dat,
+      family = com_binomial(), prior = cs[[1L]],
+      run_model = FALSE, silent = 2
+    ))
+    code <- paste(as.character(stancode(built)), collapse = "\n")
+    expect_true(grepl(cs[[2L]], code, fixed = TRUE))
+  }
+
+  # The classes a user can set are the ones `get_prior()` advertises,
+  # and the trend's own belong among them.
+  gp <- as.data.frame(get_prior(
+    mvgam_formula(obs_formula, trend_formula = ~ AR(p = 1)),
+    data = dat, family = com_binomial()
+  ))
+  expect_true(all(c("sigma_trend", "ar1_trend") %in% gp$class))
+  # And what it advertises for the modelled dpar is what the program
+  # uses, rather than the positive-only default brms reaches for when
+  # it sees a parameter named `nu`.
+  nu_row <- gp[gp$class == "Intercept" &
+                 !is.na(gp$dpar) & gp$dpar == "nu", "prior"]
+  expect_identical(as.character(nu_row), "normal(1, 1)")
+})
+
+
+test_that("no method warns about a prior this model does not use", {
+  # `prior_summary()` and the program agree on `normal(1, 1)` for the
+  # dpar intercept. The methods that delegate to the stored brms
+  # model re-derive brms's own default set and warn about the
+  # positive-only prior mvgam replaced, which reaches a reader on the
+  # two calls they are most likely to make.
+  grab <- function(expr) {
+    w <- character(0)
+    withCallingHandlers(expr, warning = function(x) {
+      w <<- c(w, conditionMessage(x))
+      invokeRestart("muffleWarning")
+    })
+    w
+  }
+  for (call in list(
+    function() variables(fit),
+    function() capture.output(summary(fit)),
+    function() ranef(fit),
+    function() VarCorr(fit),
+    function() ngrps(fit)
+  )) {
+    w <- grab(call())
+    expect_identical(grep("lower bounded prior", w, value = TRUE),
+                     character(0))
+  }
 })
 
 

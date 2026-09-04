@@ -36,8 +36,8 @@ that owns it.
 **2. FIXED. A factor-grain smooth could not be evaluated or drawn.**
 
 Seen on two fixtures, so this is not particular to one route. One is
-`test-by-lv-axis-cached-fits.R`, a gaussian fit built through
-`mvgam()` with `ZMVN()`. The other is `jsdgam_mv_occ.R`, an occupancy
+`test-factor-lv-axis.R`, a gaussian fit built through
+`mvgam()` with `ZMVN()`. The other is `test-grain-closure-units.R`, an occupancy
 fit built through `jsdgam()`. In both, `smooths(fit)`
 names the smooth and passing that name straight back to
 `posterior_smooths()` reaches brms with a frame that carries no
@@ -81,7 +81,8 @@ ones that were there could not have caught either symptom.
 
 **3. `forecast(type = "response")` refuses a family `hindcast()` draws.**
 
-`jsdgam_mv_mvn.R`, "forecast is keyed by the species axis".
+No file fits `mvn()` any more, so nothing covers this. The claim
+belongs wherever that family is next fitted.
 `hindcast(fit, type = "response")` returns draws; `forecast(fit,
 newdata, type = "response")` raises "Posterior predictive sampling is
 unavailable for family mvn". These are one quantity reached over the
@@ -91,7 +92,8 @@ than enshrining either answer.
 
 **4. The post-fit methods treat `mvn` as an occupancy family.**
 
-Same file. Two symptoms, one classification:
+Seen on the same `mvn()` fit, which no file now holds. Two symptoms,
+one classification:
 
 - `plot(fit, type = "residuals")` routes to
   `pp_check(type = "resid_vs_fitted")`, which then refuses the call:
@@ -117,9 +119,10 @@ the types it does offer and the families that would enable the one
 asked for. So mvn enters closure-unit dispatch, finds no branch, and
 hands the user an instruction to edit the source.
 
-**5. The mvn fixture samples poorly, and the recovery check now says so.**
+**5. The mvn fixture samples poorly.**
 
-Same file, "Psi recovers the simulated residual scale". Psi posterior
+On the `mvn()` fit no file now holds, "Psi recovers the simulated
+residual scale". Psi posterior
 means come back at 0.556, 1.194, 0.448 and 0.475 against a truth of 0.5
 throughout, putting species 2 out by 0.69. The same run reports 130
 divergent transitions in 1000 (13 per cent). The residual correlation
@@ -136,7 +139,7 @@ numbers the file reports off it.
 
 **6. A factor CAR is refused by two routes and granted by a third.**
 
-`test-car-irregular-time.R`, "a CAR asked for fewer factors than
+`test-trend-car-irregular.R`, "a CAR asked for fewer factors than
 series gets n_series". A continuous-time trend evolves per series and
 has no factor decomposition, which the trend registry records against
 the type. Two of the three ways to ask for one meet that refusal:
@@ -163,7 +166,7 @@ anyone.
 
 **7. One post-fit method guards against a prefit. Seventeen do not.**
 
-`test-prefit-guard.R`. `run_model = FALSE` returns an object of class
+No file covers this. `run_model = FALSE` returns an object of class
 `mvgam_prefit` whose `$fit` is `NULL`, so anything needing a posterior
 has to refuse. `summary()` does it properly:
 
@@ -202,7 +205,7 @@ and proved nothing.
 
 **8. `irf()` and `fevd()` label their shocks `Process_k`.**
 
-`test-var-trend.R`, "irf and fevd name the series, not Process_k". Both
+`test-trend-var.R`, "irf and fevd name the series, not Process_k". Both
 tables come back keyed by strings of the form `Process_1 -> Process_2`
 on a fit whose series are `willow`, `ash` and `rowan`. The mapping from
 `Process_2` to a series is positional and appears nowhere in the
@@ -228,7 +231,7 @@ the exception.
 
 **9. The logistic-growth refusal names a remedy that does not work.**
 
-`test-pw-trend.R`, "the cap the refusal names as sufficient is
+`test-trend-pw.R`, "the cap the refusal names as sufficient is
 sufficient". Asking for `PW(growth = "logistic")` without a carrying
 capacity raises
 
@@ -267,7 +270,7 @@ These two are the only types that take one: the third,
 `error_scatter_avg_vs_x`, is deprecated inside bayesplot itself.
 Reaching an assertion means silencing a notice every user receives,
 which is a worse trade than leaving the argument uncovered, so
-`test-var-trend.R` covers `group` and states why it stops there.
+`test-trend-var.R` covers `group` and states why it stops there.
 
 A lifecycle notice is also raised once per session, so an
 `expect_warning()` on it passes or fails on what ran before the file
@@ -276,7 +279,7 @@ rather than on anything the package did.
 ## Test defects fixed along the way
 
 **A vacuous assertion that became false the moment it was tested.**
-`test-hierarchical-trends.R` claimed the derived series identifier
+`test-trend-hierarchical.R` claimed the derived series identifier
 was "lexically ordered" and checked it with
 
     expect_equal(levels(vals), sort(levels(vals)))
@@ -323,9 +326,9 @@ crosses the thresholds:
 This is the expected behaviour of a state-space model rather than a
 defect: dropping an observation moves the latent state it is being
 scored against, so the importance ratios have no finite variance.
-`com_binomial_fitting.R` fits the same family with no trend and
-satisfies `all(k < 1)` on the same assertion, which is what makes the
-table above read as a property of the trend.
+A fit of the same family with no trend satisfies `all(k < 1)` on the
+same assertion, which is what makes the table above read as a
+property of the trend rather than of the family.
 
 It is recorded because it bears on how `loo()` should be read on
 these models, and because two of the three published comparisons in
@@ -367,7 +370,7 @@ that quietly answered with another's quantity fails.
 **13. `forecast()` fails outright when the frame carries a superseded
 `series` column.**
 
-`test-hierarchical-trends.R`, "a hierarchical fit forecasts on its
+`test-trend-hierarchical.R`, "a hierarchical fit forecasts on its
 own axis". A `gr` / `subgr` model derives its own series identifier,
 and that spelling differs from any `series` column the frame also
 holds. The grouping gives `south_sp_c`, joined by an underscore and
@@ -393,7 +396,7 @@ number.
 
 **4a. Three families are classified as closure-unit, not one.**
 
-`test-mvbf-wide.R`, "only the closure-unit families are classified as
+`test-grain-mvbf-wide.R`, "only the closure-unit families are classified as
 such". Finding 4 recorded `mvn()` reaching an occupancy-only code
 path. Asked of the family table rather than of one fit,
 `is_closure_unit_family()` answers `TRUE` for `mvn()`, `mvt()` and
@@ -427,7 +430,7 @@ mvgam's own argument, it sits in the signature of
 `get_predict.mvgam()` and it decides whether a marginal prediction
 carries the trend's innovations. Every call that sets it
 raises the notice, on a univariate fit as much as a multivariate
-one. Seen in `test-draw-alignment.R`, "process_error moves a
+one. Seen in `test-draws-alignment.R`, "process_error moves a
 marginal prediction", where the two calls that establish the
 argument does something both warn that nothing is known about it.
 
@@ -436,7 +439,7 @@ argument does something both warn that nothing is known about it.
 **15. The joint density drops every response at an occasion where any
 one of them is missing.**
 
-`test-mvbf-wide.R`, "log_lik is per response, and the joint is their
+`test-grain-mvbf-wide.R`, "log_lik is per response, and the joint is their
 sum". The frame gives each of three responses its own gaps: three
 occasions for `count`, two for `seen`, five for `mass`, disjoint, so
 no occasion is missing from all three.
@@ -457,7 +460,7 @@ gives the same answer either way.
 **16. A matrix `trend_map` ignores its rownames, then writes the
 declared ones over them.**
 
-`test-trend-map-fit.R`, "a matrix map keys its rows by the names the
+`test-trend-map.R`, "a matrix map keys its rows by the names the
 user gave". A matrix carries rownames, and a user who supplies them
 is saying which series each row of loadings belongs to. They are
 dropped: rows are taken in position order against the frame's
@@ -482,7 +485,7 @@ and a stranger there is refused.
 **17. The factor plot draws the occasion's rank where every other
 plot draws its time.**
 
-`test-trend-map-fit.R`, "every plot draws the occasions the user
+`test-trend-map.R`, "every plot draws the occasions the user
 supplied". The fit is numbered from three, so its occasions run 3 to
 52 and their ranks run 1 to 50. Measured off the built plots:
 
@@ -512,7 +515,7 @@ fixture numbers its sites from 3, giving occasions 3 to 32:
 | `plot(type = "series")` | 3 to 32 |
 | `plot(hindcast(fit), series = 1)` | 3 to 32 |
 
-`test-jsdgam-families.R` measures the axis for every family, so the
+`test-family-jsdgam.R` measures the axis for every family, so the
 one frame numbered from three carries the failure and the six
 numbered from one pass.
 
@@ -543,7 +546,7 @@ what the line means and silences it.
 
 **19. `latent_N_saturation()` names its units by index.**
 
-`test-occ-closure-units.R`, "the saturation table names its units".
+`test-grain-closure-units.R`, "the saturation table names its units".
 The table comes back with a `label` column reading `1_1`, `1_2`,
 `1_3`, which is the series index joined to the occasion index. The
 units it describes are `site_01` at times 3, 4 and 5.
@@ -563,7 +566,7 @@ to the table rather than to one family. It matters more for
 abundance: an occupancy ceiling is one and a reader can at least
 tell what saturation means, while an `nmix()` ceiling is an
 estimated population and the label is the only route back to the
-site whose survey effort was insufficient. `test-closure-units.R`
+site whose survey effort was insufficient. `test-grain-closure-units.R`
 asserts it for both.
 
 ## Distributional parameters
@@ -588,7 +591,7 @@ the result only when the model is non-linear, since the RHS above
 them then holds names rather than data. The multivariate branch took
 the same fix, because a response may carry a formula of its own.
 
-`test-mixture-family-density.R` covers it, and checks the panel
+`test-family-mixture.R` covers it, and checks the panel
 against `posterior_epred()` at the same grid point rather than
 against its shape, so a panel drawn on the wrong predictor fails
 instead of merely looking odd.
@@ -623,7 +626,7 @@ entry, or the documentation says which families get spread. That is a
 choice about what the residual means, so it is recorded rather than
 taken.
 
-`test-tweedie-family.R` now asserts the documented behaviour and
+`test-family-tweedie.R` now asserts the documented behaviour and
 fails on it, so the sweep reports it rather than leaving it in this
 file alone. The companion assertion on `type = "ordinary"` passes,
 which places the fault in the quantile path and not in the fit.
@@ -644,7 +647,7 @@ partly rescued by ties, and the continuous families without an entry
 lose every column. Three of the seven return residuals carrying no
 uncertainty at all while their ordinary residuals carry full spread,
 which places the fault in the quantile path rather than in any fit.
-`test-jsdgam-families.R` asserts the documented behaviour for each
+`test-family-jsdgam.R` asserts the documented behaviour for each
 family that reaches `residuals()` and fails on three of them.
 
 ## pp_check diagnostics
@@ -713,7 +716,7 @@ silently depends on the answer.
 
 No test now fails on it. The witness was a set of CAR seeds in a
 forecast recovery file that has since been removed, so the defect
-stands recorded here alone. `test-car-irregular-time.R` fits the only
+stands recorded here alone. `test-trend-car-irregular.R` fits the only
 continuous time grid left in this directory and is where the claim
 belongs.
 
@@ -741,6 +744,10 @@ time.
 Every documented multi-score example is therefore unavailable, and
 `elpd` is the only rule `lfo_cv()` can currently report.
 
+Reproduced on a VAR in `test-trend-var.R`, where the window at
+`min_t = 55` wants times 56 and is handed 57, so the arithmetic
+belongs to the window rather than to one trend.
+
 **27. The threshold `lfo_cv()` reports is not the one it used.**
 
 `mvgam_lfo` carries both `pareto_k_threshold` and
@@ -749,9 +756,11 @@ Every documented multi-score example is therefore unavailable, and
 of draws rather than the nominal 0.7. The field a reader reaches for
 is the empty one, and `summary()` reports the run from the other.
 
-Neither is covered. Both were asserted in a forecast recovery file
-that has since been removed, and no local file calls `lfo_cv()` any
-more.
+`test-trend-var.R` covers both, on a VAR at `min_t = 55`. Measured
+there, `pareto_k_threshold` is `NULL` while
+`pareto_k_threshold_used` holds 0.6666667, which is
+`min(1 - 1/log10(S), 0.7)` at 1000 draws rather than the documented
+0.7.
 
 ## Gaps closed rather than found
 
@@ -759,8 +768,8 @@ Two things the plan names as untested now have coverage, and the
 package passes both. Three families that had none now have it too.
 
 The axis record carries the user's own time values rather than their
-ranks. `test-by-lv-axis-cached-fits.R` numbers its occasions from 3 and
-`jsdgam_mv_mvn.R` numbers its sites from 3, so a function returning the
+ranks. `test-factor-lv-axis.R` numbers its occasions from 3 and
+a jsdgam fit numbering its sites from 3, so a function returning the
 index where it was asked for the value becomes visible. Substituting
 ranks for values inside `build_training_arms()` fails the assertion, so
 it bites.
@@ -776,7 +785,7 @@ reaching past the training grid, one wholly inside it.
 Tweedie is now fitted. It was the only exported family nothing in
 `tests/local` ever fitted, and the only one carrying its own Stan
 functions through `attr(family, "mvgam_stanvars")`.
-`test-tweedie-family.R` reaches `P(Y = 0) = exp(-mu^(2-p)/(phi(2-p)))`
+`test-family-tweedie.R` reaches `P(Y = 0) = exp(-mu^(2-p)/(phi(2-p)))`
 three ways -- the closed form, `exp(log_lik())` at the zero rows, and
 the fraction of zeros among the draws -- and all three agree, the
 first two exactly. Checking the density itself would have been
@@ -793,7 +802,7 @@ mixture can stand in for the other.
 These are faults in the fixture files themselves, so they were
 repaired in place.
 
-`jsdgam_mv_occ.R`, "each row reads the latent cell the sampler drew
+`test-grain-closure-units.R`, "each row reads the latent cell the sampler drew
 for it", passed the frame the simulation built instead of the one the
 fit kept. `unit = site` makes mvgam synthesise its own `time` column,
 so the call raised on a missing `time` rather than comparing anything.
@@ -801,214 +810,55 @@ The check that carries the most weight in the file was erroring in
 place of running, and the surrounding tests already used
 `fit$obs_data` for exactly this reason.
 
-## Six local fits still worth adding
+## Fits still worth adding
 
-Chosen against the defect classes above, which show which mistakes
-this package actually makes, and against the parts of the plan that
-still have no fit behind them. Each is one self-contained file, built
-in the shape the recent files use: simulate, fit, then assert.
+The wide `mvbf()` frame, the fixed-loading `trend_map`, `lfo_cv()` on
+a trend fit and `update()` are all fitted now, so what remains is two
+shapes and one family argument.
 
-Three of the defects found are `jsdgam` faults rather than trend
-faults, and they shape what these fits have to check. Finding 4 has
-`mvn` classified as a closure-unit family, which is a question about
-the family table and not about that one fit. The marginaleffects fault
-returns a predictive median where the expectation was asked for, which
-is family-independent and was reproduced on three separate fixtures.
-Finding 3 has `forecast()` and `hindcast()` disagreeing about whether
-`mvn` can be drawn from at all. All three are properties of a family,
-so a fit that spans several families in one model is the efficient
-place to pin them, which is why the first sketch below carries that
-weight rather than being only about the wide frame.
-
-### 1. A wide `mvbf()` frame, with a different family per response
-
-    mvbf(count ~ x, presence ~ x, gauge ~ x)
-    families: poisson(), bernoulli(), gaussian()
-    trend_formula = ~ VAR(cor = TRUE)
-
-The plan opens with this defect: a wide frame cut into a row-block per
-response, so each response owned a stretch of the timeline instead of a
-series. Nothing among the recent files covers it. A wide frame is the
-one shape where the series is a property of the (row, response) pair
-rather than of the row, so `axis_row_series()` answers `NULL` here by
-design and the response axis is read instead. That branch has no fit
-exercising it.
-
-What it should assert: the record's series source is the response
-keying rather than a column, and each response's `train_observations`
-come from its own column instead of a stretch of rows. A forecast has
-to cover every response at every occasion the frame supplies.
-`posterior_predict` has to respect each response's own family. The
-bernoulli arm should land in `{0, 1}`, which the gaussian arm will
-not. The row-block defect puts one response's observations against
-another's occasions, and every shape check passes on it.
-
-It is also the cheapest place to close three `jsdgam` defects at once,
-because one fit here holds several families side by side.
-
-Finding 4 becomes a table check rather than an anecdote. Assert that
-`is_closure_unit_family()` answers `TRUE` for `occ()` and `nmix()` and
-`FALSE` for every other family the package offers, `mvn()` included.
-That is one assertion over the family registry, and it catches the
-whole class rather than the one member that happened to be noticed.
-Then assert what the misclassification broke: `augment()` returns a
-frame without demanding a `cap` column, and `plot(type = "residuals")`
-renders instead of routing to a `pp_check` type its own family
-refuses.
-
-Finding 3 becomes a per-response claim. For each response, `forecast()`
-and `hindcast()` at `type = "response"` have to agree about whether
-drawing is possible. One refusing while the other returns draws is the
-disagreement recorded there, and a frame with three families makes it
-three checks for the price of one fit.
-
-The marginaleffects fault is the same shape. `predictions(type =
-"response")` has to equal `colMeans(posterior_epred())` for every
-response, and on the poisson and bernoulli arms the estimates must not
-all be whole numbers, which is what a predictive median returns.
-
-A fixture named `val_mvgam_mv_multiseries.rds` already exists with no
-file reading it.
-
-### 2. A hierarchical VAR
+### A hierarchical VAR
 
     trend_formula = ~ VAR(gr = region, subgr = species, cor = TRUE)
 
-Two structures meet here that are only tested apart. `A_trend` comes
-back as `[N_groups, N_subgroups, N_subgroups]`, so the transition
-matrix is per group over subgroups rather than over all series, which
-is the same claim the hierarchical file already makes about the
-correlation block and has never made about `A`.
+Two structures that are only tested apart. `A_trend` comes back as
+`[N_groups, N_subgroups, N_subgroups]`, so the transition matrix is
+per group over subgroups rather than over all series, which is the
+claim `test-trend-hierarchical.R` already makes about the correlation
+block and has never made about `A`.
 
 It is also the worst case for finding 8. `irf()` labels its shocks
-`Process_k`, and on a derived `gr` / `subgr` axis a reader has no way
-back to a series at all: there is no column to compare against.
+`Process_k`, and on a derived `gr` / `subgr` axis there is no column
+to compare those labels against at all.
 
-Fit it twice, once on a frame carrying a superseded `series` column and
-once on a frame with no series column whatever. The plan records that
-such a frame was refused at four separate layers, and no fit currently
-starts from one.
+Fit it twice, once on a frame carrying a superseded `series` column
+and once on a frame with no series column whatever, since a frame of
+the second kind is refused at four separate layers and no fit starts
+from one.
 
-### 3. A `trend_map` that fixes some loadings
-
-    trend_map: a matrix mixing fixed values with NA cells
-
-The plan's step 1 says `trend_map` has no coverage and calls it the
-only path where `Z` reaches Stan as data rather than as a parameter.
-That makes it the only place the loadings' row order can be checked on
-values instead of on declaration text. `R/validations.R:1084` reorders
-the map by the series levels, and whether those are the levels
-`obs_trend_series` indexes decides whether every series loads on the
-right factor.
-
-The by-lv file passes a map of all NA cells. That leaves `Z` free, so
-it never reaches this path.
-
-Assert that `Z` appears in `standata` at `[n_series, n_lv]` and that
-the fixed cells arrive at the positions the user wrote them. Then
-permute the map's rows and require a different `Z`, since a fit that
-merely relabelled the same matrix would load every series on another's
-factor.
-
-### 4. A univariate CAR carrying trend covariates, scored by `lfo_cv()`
-
-    single series, irregular times, trend_formula = ~ s(temp) + CAR()
-
-`test-car-irregular-time.R` establishes that a multivariate CAR refuses
-every trend covariate, so the covariate path for this trend is only
-reachable with one series. That case is asserted to build and is never
-fitted.
-
-It is also the natural home for `lfo_cv()`, which the plan singles out
-as the case separating the two axis questions. Its evaluation frame
-reaches past the training grid, so its time grid is the union and not
-the fit's, while its series split is the fit's. Re-pointing the time
-read there once produced a grid one short of the frame. Nothing in the
-recent files calls `lfo_cv()` at all.
-
-### 5. The two `AR()` arguments nothing exercises
+### The `AR()` arguments nothing exercises
 
     AR(p = 2, coef_sharing = ..., df = 4)
 
-`coef_sharing` appears in no local file anywhere. `df` appears only in
-files about heavy-tailed observation families, never on the trend.
+`coef_sharing` appears in no local file. `df` appears only on
+observation families, never on the trend.
 
-Finding 6 is the reason to care. A CAR asked for fewer factors than
-series is accepted and silently given `n_series`, so an argument that
-is read and dropped is a mistake this package demonstrably makes. Both
-of these are prime candidates, and the test that settles it is the
-contrast the ARMA file uses for `ma`: build with and without, and
-require the programs to differ by the machinery the argument names.
+Finding 6 and finding 58 are the reason to care: a factor request is
+accepted and silently saturated on two trend types, so an argument
+read and dropped is a mistake this package makes. The test that
+settles it is the contrast `test-trend-arma.R` uses for `ma`: build
+with and without, and require the programs to differ by the machinery
+the argument names.
 
-Student-t innovations also give the trend a tail, so a fit with `df`
-small should absorb an outlying occasion into the innovation rather
-than into the level, which is a value claim and not a shape one.
+Student-t innovations also give the trend a tail, so a fit with a
+small `df` should absorb an outlying occasion into the innovation
+rather than into the level. That is a claim about a value.
 
-### 6. Two fits compared, and one refitted
+### `score()` and `ensemble()` over two fits
 
-    score(), ensemble(), loo_compare(), update()
-
-No file written in this pass calls `score()`, `ensemble()` or
-`update()`. The plan lists them as untouched, and they still are.
-
-`update()` matters most. A refit rebuilds the object, so it is exactly
-where an axis can be resolved a second time and disagree with the
-first. Fit a model, update it with a changed prior or an added term,
-then assert the series levels, the time values and the recorded grain
-come back identical, and that a prediction from the updated fit still
-reads the cell its own `obs_trend_series` names.
-
-`score()` and `ensemble()` need two fits over one frame, which also
-gives `loo_compare()` something to rank. Assert the scores are keyed by
-the series axis, since a per-series score under permuted names is the
-same defect as finding 8 in a place a user is more likely to act on.
-
-
-## Existing local files that assert nothing
-
-Separate from the fits above. Forty-three files in `tests/local/`
-carry fewer than a dozen expectations. Twenty-eight hold no
-`test_that()` block at all. They fall into four groups, and only the
-first is fine as it stands.
-
-**Artefact builders, correctly assertion-free.** `var_vignette_fits.R`,
-`hierarchical_var_vignette_fits.R`, `forecast_eval_vignette_fits.R`,
-`jsdgam_vignette_fits.R`, `mvbf_vignette_fits.R` and
-`test-methods-md-pdf-gallery.R` exist to write caches and figures for
-articles. Several download data. Assertions do not belong in them.
-
-**The sweep the plan treats as a gate.** `postfit_sweep.R` is 996
-lines with no `test_that()` in it. The plan's verification section
-requires it green "including the two invariants that compare what
-post-fit derives against what `standata` recorded", but green is not a
-state this file can be in: it prints and returns. Whatever those
-invariants are, nothing enforces them. This is the single largest
-gap in the directory, and the plan's verification relies on it.
-
-**Concordance files that compare and never check.** These compare
-mvgam against another implementation, which is the one thing they
-exist for, and then assert nothing about the comparison:
-`brms_concordance_diri.R` (261 lines), `jsdgam_gllvm_concordance.R`,
-`jsdgam_hmsc_concordance.R`, `jsdgam_hmsc_trait_concordance.R`,
-`jsdgam_spoccupancy_concordance.R` and
-`jsdgam_multi_season_concordance.R` (515 lines). A concordance that
-silently degrades is worse than none, because the file's existence
-implies the check is being made. Each needs its agreement threshold
-written down as an expectation.
-
-**Fits that only prove they ran.** `jsdgam_prediction_audit.R` is
-named for an audit and performs none. `zmvn_irregular_time.R` covers
-ZMVN on an irregular grid, which is the structure
-`test-car-irregular-time.R` shows is worth real assertions.
-`kfold_grouped_cv.R` is the only file touching grouped k-fold.
-`smoke_check_apis.R` is 323 lines of API surface with nothing checked.
-The remaining smoke files (`diri_smoke_fit.R`, `mvn_smoke_fit.R`,
-`mvt_smoke_fit.R`, `jsdgam_nmix_smoke.R`, `jsdgam_mgp_mvn_smoke.R`,
-`mvn_preflight.R`) each fit a model and print.
-
-`mvn_preflight.R` and `mvn_smoke_fit.R` are worth doing first among
-those, since finding 4 lives in exactly the family they cover and
-neither would have caught it.
+Both need two fits on one frame, which also gives `loo_compare()`
+something to rank. Assert the scores are keyed by the series axis,
+since a per-series score under permuted names is finding 8 in a place
+a user acts on.
 
 ## The jsdgam family sweep
 
@@ -1019,7 +869,7 @@ called but never checked the value of.
 **28. `forecast(type = "expected")` returns the link scale on every
 softmax family.**
 
-`test-jsdgam-families.R`, "forecast is keyed by the species axis".
+`test-family-jsdgam.R`, "forecast is keyed by the species axis".
 The expectation of a composition is a probability, and over the
 training grid `posterior_epred()` returns one. Over the extension
 of that grid it does not:
@@ -1051,7 +901,7 @@ against the scale `posterior_epred()` occupies for that family.
 **29. `tidy()` reports what the diagnostics hide and omits what they
 expose.**
 
-`test-jsdgam-families.R`, "the draws and the tidiers keep this fit's
+`test-family-jsdgam.R`, "the draws and the tidiers keep this fit's
 row order". On every jsdgam checked, `variables()`,
 `posterior_summary()` and `rhat()` agree on what a reader should
 see. They hide the raw `Z[i,j]` block and `L_Omega_trend`, because a
@@ -1081,7 +931,7 @@ Reproduced identically on the beta, mvn and categ fits.
 **30. `hindcast()` and `conditional_effects()` return a constant on
 the composition families.**
 
-`test-jsdgam-families.R`, "hindcast arms are the species, in order,
+`test-family-jsdgam.R`, "hindcast arms are the species, in order,
 and distinct" and "pp_check, plotting and conditional_effects
 render". Measured on the cached diri, categ and multi fits:
 
@@ -1107,11 +957,9 @@ The beta, negative binomial and multivariate normal fits draw
 proper panels on the same code path, which is what makes this
 specific to the shared softmax normaliser rather than general.
 
-`jsdgam_mv_diri.R` already failed the identical-arms half before
-this consolidation, at 6 failures and 91 warnings against 102
-passing. The conditional-effects half was never asserted: the file
-checked that each panel's intervals were ordered, and a constant
-satisfies `conf.low <= estimate <= conf.high`.
+The conditional-effects half is what an ordering check cannot see: a
+constant satisfies `conf.low <= estimate <= conf.high`, so the panel
+has to be required to move.
 
 **31. `loo()` reports a Pareto diagnostic for one row in K on a
 composition.**
@@ -1145,7 +993,7 @@ answer.**
 The package is right here and four assertions were wrong, so this
 belongs with the test defects below.
 
-`jsdgam_mv_diri.R`, `jsdgam_mv_multi.R` and `jsdgam_mv_categ.R` each
+The Dirichlet, multinomial and categorical fits each
 asserted that `posterior_epred()` on a frame holding one species
 matches the corresponding columns of the full-frame answer. It does
 not, and it should not: these families share a softmax normaliser
@@ -1158,7 +1006,7 @@ The claim the fixtures were reaching for is real, and survives in a
 form every family can answer: subset whole sites instead. Half the
 sites, all species, agrees to exactly zero on all seven families,
 and still fails on a prediction that places rows by position rather
-than by content. `test-jsdgam-families.R` asks it that way.
+than by content. `test-family-jsdgam.R` asks it that way.
 
 **33. `residual_cor(partial = TRUE)` cannot run on a factor model.**
 
@@ -1184,7 +1032,7 @@ the question they were asking.
 
 Either the factor path takes a pseudo-inverse or a ridge, or the
 method refuses with an explanation. Choosing between those belongs
-to the jsdm work, so `test-jsdgam-families.R` leaves it unasserted
+to the jsdm work, so `test-family-jsdgam.R` leaves it unasserted
 and this entry carries it.
 
 ## Multi-season closure units
@@ -1192,7 +1040,7 @@ and this entry carries it.
 **37. The likelihood groups by three axes and three of the methods
 reporting one value per unit group by two.**
 
-In `test-closure-units.R`, under the claim that every surface
+In `test-grain-closure-units.R`, under the claim that every surface
 reporting one value per unit uses the unit axis. Calling
 `pivot_detection_array(multi_season = "hierarchical")` keeps `time`
 as the season and hands `site` over as a covariate.
@@ -1300,8 +1148,7 @@ families.
 **42. `get_coef()` returns the intercept and drops every other
 population coefficient.**
 
-`test-marginaleffects.R`, "the marginaleffects backend hooks read
-this model's coefficients". On `y ~ 1 + x` the hook answers with
+No file covers this. On `y ~ 1 + x` the hook answers with
 `b_Intercept` alone. Every other accessor on the same fit reports
 both terms:
 
@@ -1346,7 +1193,7 @@ are asserted as the contract they are.
 **40. `family()` answers "custom" on an occupancy fit while two
 other methods answer "occ".**
 
-`test-closure-units.R`, "multi-season: the fit describes its own
+`test-grain-closure-units.R`, "multi-season: the fit describes its own
 specification". Asked of the same fit three ways:
 
 | call | answer |
@@ -1392,7 +1239,7 @@ a test defect. It is recorded because the mistake is the one that
 nearly shipped a wrong answer on the ZMVN fit, in a place where the
 numbers looked reasonable rather than absurd.
 
-`test-loadings-prior.R` checked the recovered species covariance
+`test-factor-loadings-prior.R` checked the recovered species covariance
 against `Phi`, the kernel the loadings were drawn from. Reading the
 generated Stan settles what `Phi` is:
 
@@ -1460,7 +1307,7 @@ they agree.
 **34. `plot(conditional_smooths())` runs the factors together into
 one series.**
 
-`test-closure-units.R`, "the env smooth is drawn once per latent
+`test-grain-closure-units.R`, "the env smooth is drawn once per latent
 factor". `s(env, by = lv_axis())` gives one curve per latent factor,
 and `conditional_smooths()` returns them correctly blocked: 100 rows
 at `cond__ = 1`, then 100 at `cond__ = 2`. The renderer ignores the
@@ -1511,7 +1358,7 @@ against factor 1's column, since `X[r2, 1]` is zero by construction
 and would return exactly this.
 
 Recorded rather than fixed: which of the two grids is wrong is a
-question for the smooth work. `test-closure-units.R` now requires
+question for the smooth work. `test-grain-closure-units.R` now requires
 each curve to move and to carry an interval, so a curve pinned at
 zero fails instead of satisfying "the two curves differ".
 
@@ -1520,7 +1367,7 @@ zero fails instead of satisfying "the two curves differ".
 **44. A random-effect grouping factor is reported as a fixed
 predictor, and `find_random()` finds nothing.**
 
-`test-var-trend.R`, "find_predictors reports a series column that
+`test-trend-var.R`, "find_predictors reports a series column that
 varies". insight splits a model's terms so that a consumer knows
 which of them carry a population slope. mvgam does not make the
 split:
@@ -1570,14 +1417,14 @@ per non-reference level of the grouping:
 Those are group-level deviations, shrunk toward zero by the prior
 on `sd_grp`, presented as population contrasts a reader could act
 on. Nothing in the table says the levels are exchangeable draws
-rather than fixed categories. `test-random-effects.R` asserts both
-halves, so the term list and the contrasts it produces fail
-together until the split exists.
+rather than fixed categories. `test-trend-var.R` and
+`test-family-com-binomial.R` each assert the term list on a fit with
+a grouping, so both fail until the split exists.
 
 **45. `tidy()` drops the group covariance a hierarchical trend
 exists to estimate.**
 
-`test-hierarchical-trends.R`, "the tidiers agree on the group
+`test-trend-hierarchical.R`, "the tidiers agree on the group
 covariance block". `Sigma_group_trend` holds one covariance per
 region over the species. Asked of the same fit four ways:
 
@@ -1623,7 +1470,7 @@ Two do not, and this is one of them.
 **46. `chains = 0` samples anyway, and the diagnostics warn about
 the chain it ran.**
 
-`test-nmix-variants.R`, the two Stan-emission blocks. Both ask for a
+No file covers this. Two Stan-emission blocks reached it, each Both ask for a
 program without a posterior, spelled
 
 ```r
@@ -1690,9 +1537,8 @@ normally, so the fault is in how the grid is built and not in the
 prediction.
 
 There is no way round it from the outside. Naming the column
-explicitly works -- `datagrid(x = 0, trials = c(10, 50, 100))` is
-what `test-sim-mvgam-recovery.R` does -- but that is a call the user
-has to construct. `conditional_effects()` builds its own grid, and
+explicitly works, as `datagrid(x = 0, trials = c(10, 50, 100))`
+does, but that is a call the user has to construct. `conditional_effects()` builds its own grid, and
 supplying one is refused:
 
     Cannot pass 'newdata' through `...`. These are set by
@@ -1968,16 +1814,101 @@ since they rule out a general fault in how PW reads its arguments:
 Stan as `double_exponential_lpdf(to_vector(delta_trend) | 0, s)` with
 the value asked for; and `n_changepoints` emits exactly that many.
 
+## com_binomial and the trials aterm
+
+**59. `summary()` and `variables()` warn about a prior the model does
+not use.**
+
+`test-family-com-binomial.R`. On a `com_binomial()` fit whose `nu`
+carries a sub-formula, five methods raise
+
+    It appears as if you have specified a lower bounded prior on a
+    parameter that has no natural lower bound.
+    Warning occurred for prior
+    Intercept_nu ~ gamma(2, 0.1)
+
+The model does not use that prior. `prior_summary()` reports
+`normal(1, 1)` and the program agrees, carrying
+`lprior += normal_lpdf(Intercept_nu | 1, 1)`. mvgam injects that
+default precisely because brms would otherwise reach for the
+Student-t `nu`'s `gamma(2, 0.1)`, which is positive-only on a
+parameter free to go negative, and `adjust_modelled_dpar_priors()`
+re-aims it to the dpar intercept under an identity link.
+
+The split across methods says where it comes from:
+
+| raises it | quiet |
+|---|---|
+| `variables()`, `summary()`, `ranef()`, `VarCorr()`, `ngrps()` | `posterior_epred()`, `posterior_linpred()`, `predictive_error()`, `prior_summary()`, `find_random()` |
+
+The five that warn are the ones that delegate to the stored brms
+model, which re-derives brms's own default set and validates it. The
+ones that stay inside mvgam see the prior mvgam actually built.
+
+Nothing warns at build time: `nu` scalar, `nu ~ z` and `nu ~ 1` are
+all silent through `mvgam()`, and `get_prior()` on an
+`mvgam_formula()` reports `normal(1, 1)` with no warning. So this
+reaches a user only after fitting, on the two calls they are most
+likely to make.
+
+**60. `variables()` reports a monotonic effect as `bsp[1]`.**
+
+Same fit. `mo(dose)` reaches the model correctly: `standata` carries
+`Ksp`, `Imo`, `Xmo_1`, `Jmo` and `con_simo_1`, and the simplex
+`simo_1[1]` to `simo_1[3]` holds one increment per step between the
+four ordered levels. The coefficient is reported as `bsp[1]`, and no
+name in `variables()` contains `dose`.
+
+Every other population coefficient on the same fit is aliased:
+`b_serieslower`, `b_nu_z`, `b_Intercept`. `prior_summary()` knows the
+term as `modose`, and `summary()` prints a labelled row for it. So
+the name exists and `variables()` is the surface that loses it, which
+puts it with findings 29, 42 and 50 rather than with the monotonic
+machinery.
+
+A model with one monotonic term is readable anyway. With two, `bsp[1]`
+and `bsp[2]` are the only handles a reader has, and nothing in the
+output says which is which.
+
+**61. The smooth grid omits a distributional parameter's covariate.**
+
+Same fit. `plot(type = "smooths")` stops with
+
+    The following variables can neither be found in 'data' nor in
+    'data2': 'z'
+
+`z` is the predictor of `nu`, not of the mean. The grid the smooth is
+drawn over backfills the columns the mean's formula names and holds
+them at representative values, and a covariate that appears only in a
+dpar sub-formula is not among them, so brms is handed a frame missing
+a variable the model needs.
+
+The denominator reaches the same grid correctly, so the backfill
+handles aterm columns and not dpar ones.
+
+**A difference worth recording, for the family work to settle.** The
+lower bound on `nu` differs between the two spellings: scalar `nu` is
+truncated, reaching Stan as
+`normal_lpdf(nu | 1, 1) - normal_lccdf(-5 | 1, 1)`, while a modelled
+`nu` gets a plain `normal_lpdf(Intercept_nu | 1, 1)`. Whether an
+intercept on the identity scale should carry the scalar's bound is a
+question for the family rather than for the axis work.
+
+**Also checked and correct.** A user prior reaches the program on
+every class it can be set on: `b`, `Intercept`, `sd`, `sds`,
+`sigma_trend` and `ar1_trend` each arrive carrying the user's own
+constant. `get_prior()` on an `mvgam_formula()` lists the trend
+classes alongside the observation ones and reports the same `nu`
+prior the program uses.
+
 ## Grouped cross-validation
 
 **48. A fold that is contiguous in time cannot be refitted, so
 grouped k-fold is unavailable to most trend models.**
 
-Found by running `kfold()` on a fixture that already exists rather
-than on the one written for it. `test-random-effects.R` lays its
-grouping factor out as `rep(letters[1:6], each = 5)` against
-`time = 1:30`, so group `c` is times 11 to 15. Held out one group
-at a time:
+Found by running `kfold()` on a grouping laid out as
+`rep(letters[1:6], each = 5)` against `time = 1:30`, which puts
+group `c` at times 11 to 15. Held out one group at a time:
 
 ```r
 kfold(fit_re("ar1_re"), group = "grp")
@@ -2019,8 +1950,7 @@ year -- makes every fold a hole, so grouped k-fold is unavailable to
 any trend that steps once per occasion. `loo()` is not the fallback,
 because finding 11 records it as unreliable on exactly these fits.
 
-`kfold_grouped_cv.R` cannot see this. It groups 8 sites that each
-carry a complete series of their own, so dropping a site removes
-whole series rather than a stretch of the timeline and the grid
-survives. The file written to exercise grouped k-fold is weaker at it
-than a fixture that was never intended for the job.
+A grouping of sites that each carry a complete series of their own
+hides it, since dropping a site removes whole series rather than a
+stretch of the timeline and the grid survives. Nothing covers this
+now.
