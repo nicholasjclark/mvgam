@@ -35,11 +35,15 @@ suppressMessages({
 
 # This file fits its own models and caches them beside itself, so it
 # depends on no shared fixture and no build step.
+# Resolved from where this file is running rather than from what is
+# already on disk. testthat sets the working directory to the test
+# file's own, so asking whether `fixtures` exists picks the wrong
+# branch on a clean tree and writes tests/local/tests/local/fixtures.
 cache_path <- function(name) {
-  dir <- if (dir.exists("fixtures")) {
-    "fixtures"
-  } else {
+  dir <- if (dir.exists(file.path("tests", "local"))) {
     file.path("tests", "local", "fixtures")
+  } else {
+    "fixtures"
   }
   if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
   file.path(dir, name)

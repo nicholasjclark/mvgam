@@ -1699,6 +1699,99 @@ accepted, and returns `[ndraws x nobs]`. Both families report
 `family(fit)$family` as `"custom"`, which is finding 40, so the two
 are told apart by something other than that string.
 
+## Sampler settings
+
+**49. A bare `adapt_delta` or `max_treedepth` is accepted and
+discarded.**
+
+Found by reading a vignette that asks for one and checking whether it
+arrived. `mvgam()` takes both through `...` and never reads them.
+`R/mvgam_core.R:889` reads `control <- dots$control %||% NULL`, and
+nothing anywhere in `R/` lifts a top-level `adapt_delta` into it.
+
+Asked for `adapt_delta = 0.99, max_treedepth = 15` on one frame,
+reading back `fit$fit@stan_args[[1]]$control`:
+
+| call | recorded | warning |
+|---|---|---|
+| `mvgam(..., adapt_delta = 0.99, max_treedepth = 15)` | 0.8, 10 | none |
+| `mvgam(..., control = list(adapt_delta = 0.99, max_treedepth = 15))` | 0.99, 15 | none |
+| neither argument | 0.8, 10 | none |
+
+So the bare spelling runs at Stan's defaults and says nothing. This is
+finding 6's shape on an argument every user reaches for: a divergent
+fit is the usual reason to raise `adapt_delta`, and the raise is what
+gets dropped, so the sampler keeps diverging and the call looks like
+it addressed the problem.
+
+Three articles on this branch were written with the bare spelling and
+their prose states the tighter setting was used. `idm.Rmd` uses
+`control = list(...)` and is the only one that got what it asked for.
+
+`jsdgam()` forwards to `mvgam()`, so it behaves the same way.
+
+## hypothesis()
+
+**50. `hypothesis()` refuses parameters that `variables()` lists.**
+
+`test-trend-var.R`. Every trend parameter is reachable and half the
+observation side is not:
+
+| name | in `variables()` | `hypothesis()` |
+|---|---|---|
+| `A_trend[1,1,2]` | yes | accepted |
+| `sigma_trend[1]` | yes | accepted |
+| `b_Intercept` | yes | accepted |
+| `sigma` | yes | accepted |
+| `b_elev` | yes | refused |
+| `sd_block__Intercept` | yes | refused |
+
+The refusal reads "Some parameters cannot be found in the model:
+'b_elev'", naming a parameter `variables()` had just listed.
+
+The split is the tell. brms writes the population block as an indexed
+array, so `b_elev` is `b[1]` in the raw draws and `b_Intercept` is
+written out in full; `sd_block__Intercept` is `sd_1[1]`. Everything
+`hypothesis()` accepts is a name that survives unaliased, and
+everything it refuses is one mvgam's alias pass creates. So this reads
+the stanfit directly rather than through the aliasing the other
+methods go through.
+
+That makes it finding 42's cause at a third surface, after `tidy()`
+in finding 29 and `get_coef()` in finding 42. Finding 39 recorded the
+same refusal for a smooth coefficient, `bs_senv_1`, and read as a
+lookup fault specific to smooths. It is not: any aliased name is
+unreachable, which covers the population slopes, the group-level
+standard deviations and the smooth coefficients together.
+
+## Forecasting backwards
+
+**51. A forecast over occasions already observed returns an empty
+object rather than a refusal.**
+
+`test-trend-var.R`. Handed a `newdata` whose times lie entirely inside
+the training grid, `forecast()` returns an `mvgam_forecast` holding
+nothing:
+
+| slot | value |
+|---|---|
+| `length(forecasts)` | 0 |
+| `names(forecasts)` | empty |
+| `length(test_times)` | 0 |
+| `series_names` | willow, ash, rowan |
+| warnings raised | none |
+
+The same call one occasion past the end of the grid is refused
+properly, naming the series, the last observed time and the times it
+expected. So the guard exists and does not cover this direction.
+
+An empty forecast satisfies any assertion written as a loop over the
+arms, which is how it stayed invisible. It is finding 38's shape
+arriving through a different door: there a multi-season `hindcast()`
+returned no arms, here a backwards `forecast()` does, and in both
+cases `series_names` is populated so the object looks well formed
+until something is read out of it.
+
 ## Grouped cross-validation
 
 **48. A fold that is contiguous in time cannot be refitted, so

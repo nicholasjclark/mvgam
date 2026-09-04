@@ -66,12 +66,15 @@ suppressMessages({
 })
 
 
-# testthat runs from tests/local/ and Rscript from the package root.
+# testthat runs from tests/local/ and Rscript from the package root,
+# so the branch asks which of those this is rather than whether a
+# cache is already there: on a clean tree the latter picks the root
+# path while already inside tests/local.
 jsdm_cache <- function(name) {
-  dir <- if (dir.exists("fixtures")) {
-    "fixtures"
-  } else {
+  dir <- if (dir.exists(file.path("tests", "local"))) {
     file.path("tests", "local", "fixtures")
+  } else {
+    "fixtures"
   }
   if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
   file.path(dir, paste0("val_mvgam_jsdgam_mv_", name, ".rds"))
