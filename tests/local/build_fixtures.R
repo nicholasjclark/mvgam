@@ -1,11 +1,10 @@
-# Build the cached brms and mvgam fixtures that tests/local/ reads,
-# and run the recovery scripts that build their own.
+# Build the cached mvgam fixtures that tests/local/ reads, and run
+# the recovery scripts that build their own.
 #
 # Run from the package root:
 #   Rscript tests/local/build_fixtures.R
 #
-# Output: tests/local/fixtures/val_brms_<name>.rds and
-#         tests/local/fixtures/val_mvgam_<name>.rds for each fixture
+# Output: tests/local/fixtures/val_mvgam_<name>.rds for each fixture
 #         below. The directory is gitignored; rebuild after a clone.
 #
 # Expected runtime: 15-25 minutes for the fixtures fitted here, plus a
@@ -26,21 +25,6 @@ if (!dir.exists(FIXTURE_DIR)) {
   dir.create(FIXTURE_DIR, recursive = TRUE)
 }
 
-fit_brms_cached <- function(name, formula, data, family, ...) {
-  path <- file.path(FIXTURE_DIR, paste0("val_brms_", name, ".rds"))
-  if (file.exists(path)) {
-    cat("  cached brms:", name, "\n")
-    return(readRDS(path))
-  }
-  cat("  fitting brms:", name, "\n")
-  fit <- brm(
-    formula = formula, data = data, family = family,
-    chains = CHAINS, iter = ITER, warmup = WARMUP,
-    refresh = REFRESH, silent = 2, backend = "cmdstanr", ...
-  )
-  saveRDS(fit, path)
-  fit
-}
 
 fit_mvgam_cached <- function(name, formula, trend_formula, data, family, ...) {
   path <- file.path(FIXTURE_DIR, paste0("val_mvgam_", name, ".rds"))
@@ -136,41 +120,26 @@ test_data_hs <- data.frame(
 # ----------------------------------------------------------------------
 
 cat("\n[1] Intercept-only AR(1)\n")
-fit_brms_cached("ar1_int",
-  y ~ 1 + ar(time = time, p = 1, cov = TRUE),
-  test_data, poisson())
 fit_mvgam_cached("ar1_int",
   y ~ 1, ~ AR(p = 1),
   test_data, poisson())
 
 cat("\n[2] AR(1) + fixed effect\n")
-fit_brms_cached("ar1_fx",
-  y ~ 1 + x + ar(time = time, p = 1, cov = TRUE),
-  test_data, poisson())
 fit_mvgam_cached("ar1_fx",
   y ~ 1 + x, ~ AR(p = 1),
   test_data, poisson())
 
 cat("\n[3] AR(1) + random intercept\n")
-fit_brms_cached("ar1_re",
-  y ~ 1 + x + (1 | grp) + ar(time = time, p = 1, cov = TRUE),
-  test_data, poisson())
 fit_mvgam_cached("ar1_re",
   y ~ 1 + x + (1 | grp), ~ AR(p = 1),
   test_data, poisson())
 
 cat("\n[4] AR(1) + fixed + random + smooth\n")
-fit_brms_cached("ar1_re_smooth",
-  y ~ 1 + x + (1 | grp) + s(z) + ar(time = time, p = 1, cov = TRUE),
-  test_data, poisson())
 fit_mvgam_cached("ar1_re_smooth",
   y ~ 1 + x + (1 | grp) + s(z), ~ AR(p = 1),
   test_data, poisson())
 
 cat("\n[5] AR(1) + correlated REs\n")
-fit_brms_cached("ar1_cor_re",
-  y ~ 1 + x + (x | grp) + ar(time = time, p = 1, cov = TRUE),
-  test_data, poisson())
 fit_mvgam_cached("ar1_cor_re",
   y ~ 1 + x + (x | grp), ~ AR(p = 1),
   test_data, poisson())
@@ -178,17 +147,11 @@ fit_mvgam_cached("ar1_cor_re",
 cat("\n[6] AR(1) + monotonic mo()\n")
 test_data_mo <- test_data
 test_data_mo$ord_factor <- ordered(cut(test_data_mo$z, 4))
-fit_brms_cached("ar1_mo",
-  y ~ 1 + mo(ord_factor) + ar(time = time, p = 1, cov = TRUE),
-  test_data_mo, poisson())
 fit_mvgam_cached("ar1_mo",
   y ~ 1 + mo(ord_factor), ~ AR(p = 1),
   test_data_mo, poisson())
 
 cat("\n[7] AR(1) + GP(z)\n")
-fit_brms_cached("ar1_gp",
-  y ~ 1 + gp(z, k = 10) + ar(time = time, p = 1, cov = TRUE),
-  test_data, poisson())
 fit_mvgam_cached("ar1_gp",
   y ~ 1 + gp(z, k = 10), ~ AR(p = 1),
   test_data, poisson())
@@ -204,27 +167,16 @@ test_data_gp2$cat <- factor(
 )
 
 cat("\n[7a] AR(1) + GP(z) + GP(w, by = cat)\n")
-fit_brms_cached("ar1_gp2_by",
-  y ~ 1 + gp(z, k = 5) + gp(w, by = cat, k = 5) +
-    ar(time = time, p = 1, cov = TRUE),
-  test_data_gp2, poisson())
 fit_mvgam_cached("ar1_gp2_by",
   y ~ 1 + gp(z, k = 5) + gp(w, by = cat, k = 5), ~ AR(p = 1),
   test_data_gp2, poisson())
 
 cat("\n[7b] AR(1) + 2D GP(z, w)\n")
-fit_brms_cached("ar1_gp2d",
-  y ~ 1 + gp(z, w, k = 5) + ar(time = time, p = 1, cov = TRUE),
-  test_data_gp2, poisson())
 fit_mvgam_cached("ar1_gp2d",
   y ~ 1 + gp(z, w, k = 5), ~ AR(p = 1),
   test_data_gp2, poisson())
 
 cat("\n[7c] AR(1) + 2D GP(z, w, by = cat), multi-dim by-factor\n")
-fit_brms_cached("ar1_gp2d_by",
-  y ~ 1 + gp(z, w, by = cat, k = 5) +
-    ar(time = time, p = 1, cov = TRUE),
-  test_data_gp2, poisson())
 fit_mvgam_cached("ar1_gp2d_by",
   y ~ 1 + gp(z, w, by = cat, k = 5), ~ AR(p = 1),
   test_data_gp2, poisson())
@@ -262,10 +214,6 @@ test_data_mv <- data.frame(
   time = 1:n_time,
   series = factor("s1")
 )
-fit_brms_cached("mv_gauss",
-  bf(mvbind(y1, y2) ~ 1 + x + ar(time = time, p = 1, cov = TRUE)) +
-    set_rescor(FALSE),
-  test_data_mv, gaussian())
 fit_mvgam_cached("mv_gauss",
   bf(mvbind(y1, y2) ~ 1 + x) + set_rescor(FALSE),
   ~ AR(p = 1),
@@ -294,9 +242,6 @@ test_data_beta <- data.frame(
   time = 1:n_beta,
   series = factor("s1")
 )
-fit_brms_cached("beta_ar1",
-  y ~ 1 + x + ar(time = time, p = 1, cov = TRUE),
-  test_data_beta, Beta())
 fit_mvgam_cached("beta_ar1",
   y ~ 1 + x, ~ AR(p = 1),
   test_data_beta, Beta())
@@ -315,9 +260,6 @@ test_data_binom <- data.frame(
   time = 1:n_binom,
   series = factor("s1")
 )
-fit_brms_cached("binom_ar1",
-  y | trials(trials) ~ 1 + x + ar(time = time, p = 1, cov = TRUE),
-  test_data_binom, binomial())
 fit_mvgam_cached("binom_ar1",
   y | trials(trials) ~ 1 + x, ~ AR(p = 1),
   test_data_binom, binomial())
@@ -335,9 +277,6 @@ test_data_ord <- data.frame(
   time = 1:n_ord,
   series = factor("s1")
 )
-fit_brms_cached("cumulative_fx",
-  y ~ 1 + x + z,
-  test_data_ord, cumulative())
 fit_mvgam_cached("cumulative_fx",
   y ~ 1 + x + z, ~ ZMVN(),
   test_data_ord, cumulative())
@@ -359,9 +298,6 @@ test_data_hp <- data.frame(
   time = 1:n_hp,
   series = factor("s1")
 )
-fit_brms_cached("hurdle_poisson_ar1",
-  y ~ 1 + x + ar(time = time, p = 1, cov = TRUE),
-  test_data_hp, hurdle_poisson())
 fit_mvgam_cached("hurdle_poisson_ar1",
   y ~ 1 + x, ~ AR(p = 1),
   test_data_hp, hurdle_poisson())
@@ -384,9 +320,6 @@ test_data_hnb <- data.frame(
   time = 1:n_hnb,
   series = factor("s1")
 )
-fit_brms_cached("hurdle_negbinomial_ar1",
-  y ~ 1 + x + ar(time = time, p = 1, cov = TRUE),
-  test_data_hnb, hurdle_negbinomial())
 fit_mvgam_cached("hurdle_negbinomial_ar1",
   y ~ 1 + x, ~ AR(p = 1),
   test_data_hnb, hurdle_negbinomial())
@@ -406,9 +339,6 @@ test_data_zip <- data.frame(
   time = 1:n_zip,
   series = factor("s1")
 )
-fit_brms_cached("zero_inflated_poisson_ar1",
-  y ~ 1 + x + ar(time = time, p = 1, cov = TRUE),
-  test_data_zip, zero_inflated_poisson())
 fit_mvgam_cached("zero_inflated_poisson_ar1",
   y ~ 1 + x, ~ AR(p = 1),
   test_data_zip, zero_inflated_poisson())
@@ -428,9 +358,6 @@ test_data_sby$grp <- factor(
   rep(letters[1:3], length.out = nrow(test_data_sby)),
   levels = letters[1:3]
 )
-fit_brms_cached("ar1_s_by",
-  y ~ 1 + s(z, by = grp) + ar(time = time, p = 1, cov = TRUE),
-  test_data_sby, poisson())
 fit_mvgam_cached("ar1_s_by",
   y ~ 1 + s(z, by = grp), ~ AR(p = 1),
   test_data_sby, poisson())
@@ -438,30 +365,22 @@ fit_mvgam_cached("ar1_s_by",
 cat("\n[19] t2(z, w) tensor-product smooth\n")
 test_data_t2 <- test_data
 test_data_t2$w <- seq(-1, 1, length.out = nrow(test_data_t2))
-fit_brms_cached("ar1_t2",
-  y ~ 1 + t2(z, w) + ar(time = time, p = 1, cov = TRUE),
-  test_data_t2, poisson())
 fit_mvgam_cached("ar1_t2",
   y ~ 1 + t2(z, w), ~ AR(p = 1),
   test_data_t2, poisson())
 
-# The intercept-free twin. `val_brms_ar1_t2_noint` was built outside
-# this script and its mvgam counterpart never was, so
-# `tests/local/test-marginaleffects-concordance.R` skipped every run.
-# Built here, it takes `grp` like every other fixture, so the test no
-# longer has to strip a `group` column marginaleffects reserves.
-fit_brms_cached("ar1_t2_noint",
-  y ~ 0 + t2(z, w, k = c(4, 4)) + ar(time = time, p = 1, cov = TRUE),
-  test_data_t2, poisson())
+# The intercept-free twin. Built here it takes `grp` like every other
+# fixture, so `test-marginaleffects.R` no longer has to strip the
+# `group` column marginaleffects reserves for its own output.
 fit_mvgam_cached("ar1_t2_noint",
   y ~ 0 + t2(z, w, k = c(4, 4)), ~ AR(p = 1),
   test_data_t2, poisson())
 
 cat("\n[20] Gaussian AR(1), N=150: PSIS-stable concordance fixture\n")
 # Larger N with high signal-to-noise keeps Pareto-k diagnostics in
-# the stable region (<0.7), so cross-package PSIS-weighted
-# predictions (loo_epred / loo_linpred / loo_predictive_interval)
-# can be compared bit-for-bit between mvgam and brms.
+# the stable region (<0.7), which is what lets the PSIS-weighted
+# surfaces (loo_epred, loo_linpred, loo_predictive_interval) be read
+# for their own values rather than for their diagnostics.
 set.seed(7)
 gauss_n <- 150L
 gauss_ar <- 0.5
@@ -482,9 +401,6 @@ test_data_gauss <- data.frame(
   time = seq_len(gauss_n),
   series = factor("s1")
 )
-fit_brms_cached("gauss_ar1_n150",
-  y ~ 1 + x + ar(time = time, p = 1, cov = TRUE),
-  test_data_gauss, gaussian())
 fit_mvgam_cached("gauss_ar1_n150",
   y ~ 1 + x, ~ AR(p = 1),
   test_data_gauss, gaussian())
@@ -724,7 +640,7 @@ fit_loadings_prior_cached("loadings_prior")
 # ----------------------------------------------------------------------
 # NON-LINEAR FORMULAS (bf(..., nl = TRUE))
 # Every downstream prediction surface (linpred, epred, predict) on
-# an nl fit must match a brms-direct fit on the same data + priors.
+# an nl fit carries its own non-linear parameters through to Stan.
 # Two shapes covered: an intercept-only nl growth model and a
 # trait-mediated fourth-corner model with per-species random
 # effects.
@@ -742,9 +658,6 @@ nl_growth_data$series <- factor("s1")
 cat("\n[nl-1] bf(y ~ b1 * exp(b2 * x), b1 + b2 ~ 1, nl = TRUE)\n")
 nl_growth_pri <- prior(normal(1, 1), nlpar = "b1") +
   prior(normal(0, 1), nlpar = "b2")
-fit_brms_cached("nl_growth",
-  bf(y ~ b1 * exp(b2 * x), b1 + b2 ~ 1, nl = TRUE),
-  nl_growth_data, gaussian(), prior = nl_growth_pri)
 fit_mvgam_cached("nl_growth",
   bf(y ~ b1 * exp(b2 * x), b1 + b2 ~ 1, nl = TRUE),
   NULL, nl_growth_data, gaussian(), prior = nl_growth_pri)
@@ -779,8 +692,6 @@ nl_trait_form <- bf(
   b  ~ trait1 + (1 | species),
   nl = TRUE
 )
-fit_brms_cached("nl_trait", nl_trait_form,
-  nl_trait_data, gaussian(), prior = nl_trait_pri)
 fit_mvgam_cached("nl_trait", nl_trait_form, NULL,
   nl_trait_data, gaussian(), prior = nl_trait_pri)
 

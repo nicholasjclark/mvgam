@@ -65,12 +65,6 @@ require_fixtures <- function(...) {
   invisible(TRUE)
 }
 
-# Load a brms fixture by short name. Names follow the
-# val_brms_<name>.rds convention from build_fixtures.R.
-load_brms <- function(name) {
-  readRDS(file.path(local_fixture_dir(), paste0("val_brms_", name, ".rds")))
-}
-
 # Load an mvgam fixture by short name.
 load_mvgam <- function(name) {
   readRDS(file.path(local_fixture_dir(), paste0("val_mvgam_", name, ".rds")))
@@ -86,75 +80,6 @@ summarize_pred <- function(pred_matrix) {
     q975   = apply(pred_matrix, 2, stats::quantile, probs = 0.975),
     sd     = apply(pred_matrix, 2, stats::sd)
   )
-}
-
-# Compare two vectors of summary statistics. Returns a list with
-# `cor`, `rmse` and a `constant` / `mismatch` flag for the
-# zero-variance cases.
-compare_vectors <- function(v1, v2) {
-  sd1 <- stats::sd(v1)
-  sd2 <- stats::sd(v2)
-  if (sd1 < 1e-10 && sd2 < 1e-10) {
-    return(list(cor = NA_real_,
-                rmse = abs(mean(v1) - mean(v2)),
-                constant = TRUE))
-  }
-  if (sd1 < 1e-10 || sd2 < 1e-10) {
-    return(list(cor = NA_real_, rmse = NA_real_,
-                constant = FALSE, mismatch = TRUE))
-  }
-  list(cor = stats::cor(v1, v2),
-       rmse = sqrt(mean((v1 - v2)^2)),
-       constant = FALSE)
-}
-
-# Headline assertion: posterior_linpred(brms_fit) and
-# extract_component_linpred(mvgam_fit, component = "obs") have the
-# same shape and their per-observation mean concords above
-# `threshold`. Returns the realised correlation invisibly.
-assert_linpred_concordance <- function(brms_fit, mvgam_fit, newdata,
-                                       threshold = 0.88,
-                                       incl_autocor = FALSE,
-                                       component = "obs") {
-  brms_pred <- brms::posterior_linpred(
-    brms_fit, newdata = newdata, incl_autocor = incl_autocor
-  )
-  mvgam_pred <- extract_component_linpred(
-    mvgam_fit, newdata, component = component
-  )
-  testthat::expect_equal(dim(brms_pred), dim(mvgam_pred))
-
-  brms_mean <- colMeans(brms_pred)
-  mvgam_mean <- colMeans(mvgam_pred)
-  comp <- compare_vectors(brms_mean, mvgam_mean)
-  if (isTRUE(comp$constant)) {
-    # Intercept-only fits collapse to a near-constant linpred. cor()
-    # is undefined; accept tight rmse instead.
-    testthat::expect_lt(comp$rmse, 0.5)
-  } else if (isTRUE(comp$mismatch)) {
-    testthat::fail("One linpred is constant, the other is not.")
-  } else {
-    testthat::expect_gte(comp$cor, threshold)
-  }
-  invisible(comp$cor)
-}
-
-# Concordance on posterior_epred (response scale). The Jensen
-# amplification through inverse links pushes typical cor down vs
-# linpred-scale comparison, so the default threshold is laxer.
-assert_epred_concordance <- function(brms_fit, mvgam_fit, newdata,
-                                     threshold = 0.85) {
-  brms_pred <- brms::posterior_epred(brms_fit, newdata = newdata)
-  mvgam_pred <- posterior_epred(mvgam_fit, newdata = newdata)
-  testthat::expect_equal(dim(brms_pred), dim(mvgam_pred))
-
-  comp <- compare_vectors(colMeans(brms_pred), colMeans(mvgam_pred))
-  if (isTRUE(comp$constant)) {
-    testthat::expect_lt(comp$rmse, 1.0)
-  } else {
-    testthat::expect_gte(comp$cor, threshold)
-  }
-  invisible(comp$cor)
 }
 
 # Guards by-factor GP / smooth-by handling across every public

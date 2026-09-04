@@ -1,21 +1,29 @@
-# marginaleffects integration tests for mvgam.
+# The marginaleffects and insight surface, and the extractors that
+# sit beside it.
 #
-# Lives in tests/local because the round-trip through
+# Lives in tests/local because the round trip through
 # marginaleffects -> insight -> get_predict -> posterior_epred is
-# fixture-driven and too heavy for CI. Covers the full user surface:
-# predictions / avg_predictions / avg_slopes / avg_comparisons.
+# fixture-driven and too heavy for CI. Covers the user-facing entry
+# points -- predictions, avg_predictions, avg_slopes,
+# avg_comparisons -- together with the group-level extractors and
+# the smooth surfaces, which have no executable coverage elsewhere.
 #
 # marginaleffects forbids any column literally named 'group' in the
-# fit's training data (it reserves that name for its own output).
-# Fixtures built by build_fixtures.R use 'grp' for the random-effects
-# grouping variable to avoid that collision. The orphan ar1_t2_noint
-# fixture (built outside build_fixtures.R) still carries 'group' and
-# the affected test below strips it before dispatching.
+# fit's training data, since it reserves that name for its own
+# output. Fixtures built by build_fixtures.R use 'grp' for the
+# random-effects grouping variable to avoid the collision. The
+# orphan ar1_t2_noint fixture still carries 'group' and the affected
+# test below strips it before dispatching.
 #
-# Concordance bar: predictions(mvgam_fit) and predictions(brms_fit)
-# at observed time points should agree on the deterministic submodel
-# (obs + trend covariates, no AR contribution) within a tolerance
-# that captures the state-space / residual-AR architectural gap.
+# Every claim here is about mvgam's own output. An earlier version
+# asked instead whether a matched brms fit produced the same shape,
+# which needed a second fit for each of twenty-two fixtures and
+# could not distinguish a table keyed correctly from one keyed by
+# the wrong column. Where a brms comparison stood, the direct claim
+# that replaced it is the stronger one: ranef is keyed by the
+# frame's own factor levels, VarCorr's three blocks agree with each
+# other, and loo_epred parts from loo_linpred exactly where the link
+# is not the identity.
 
 source("setup_tests_local.R")
 source("concordance_helpers.R")
@@ -167,24 +175,25 @@ test_that("marginaleffects entry points run on supported families", {
 })
 
 
-# -- brms-concordance on the deterministic submodel --------------------
+# -- Response-scale claims on a bounded family -------------------------
 
-test_that("predictions(mvgam) tracks predictions(brms) on Beta AR(1)", {
-  require_fixtures("val_mvgam_beta_ar1.rds", "val_brms_beta_ar1.rds")
+test_that("predictions on a Beta fit stay on the Beta scale", {
+  require_fixtures("val_mvgam_beta_ar1.rds")
   mv <- load_mvgam("beta_ar1")
-  bf <- load_brms("beta_ar1")
-  # Restrict comparison to a fresh datagrid so brms's AR-residual
-  # draws don't dominate.
   nd <- mv$data
-  mv_p  <- suppressWarnings(predictions(mv, newdata = nd))
-  bf_p  <- suppressWarnings(predictions(bf, newdata = nd))
-  # Both estimates are on the response scale and bounded (0, 1)
-  testthat::expect_true(all(mv_p$estimate > 0 & mv_p$estimate < 1))
-  testthat::expect_true(all(bf_p$estimate > 0 & bf_p$estimate < 1))
-  # Loose cor bound: state-space vs residual-AR diverge per-obs but
-  # share the X * beta deterministic signal.
-  comp <- compare_vectors(bf_p$estimate, mv_p$estimate)
-  testthat::expect_gte(comp$cor, 0.40)
+  p <- suppressWarnings(predictions(mv, newdata = nd))
+  # A Beta mean is a proportion, and so are its interval bounds. A
+  # prediction that escaped to the link scale keeps every dimension
+  # and fails here, which is the shape finding 28 takes on the
+  # forecast arm of the softmax families.
+  expect_identical(nrow(p), nrow(nd))
+  expect_true(all(p$estimate > 0 & p$estimate < 1))
+  expect_true(all(p$conf.low > 0 & p$conf.high < 1))
+  expect_true(all(p$conf.low <= p$estimate))
+  expect_true(all(p$estimate <= p$conf.high))
+  # One row of the frame is one row of the output, in order, so a
+  # prediction placed by position rather than by content fails.
+  expect_equal(as.numeric(p$z), as.numeric(nd$z))
 })
 
 
@@ -227,8 +236,8 @@ test_that("type='response' on Poisson returns non-negative count samples", {
   # even number of draws can fall on a half-integer (e.g. 7.5), so
   # test the underlying draws rather than the reported point estimate.
   # marginaleffects strips the `posterior_draws` attribute from the
-  # data.frame and stores it on an internal slot — use
-  # marginaleffects::posterior_draws() to retrieve it.
+  # data.frame and stores it on an internal slot, so it is read
+  # back with marginaleffects::posterior_draws().
   draws <- marginaleffects::posterior_draws(p, shape = "DxP")
   testthat::expect_true(all(draws == round(draws)))
   testthat::expect_true(all(p$estimate >= 0))
@@ -443,50 +452,65 @@ test_that("binomial trials carry through datagrid + predictions", {
 
 
 # ====================================================================
-# Tier-3 brms-parity batch: vcov, loo_R2, loo_predict, loo_model_weights
+# vcov, loo_R2, loo_predict and loo_model_weights
 # ====================================================================
-# Numerical sanity vs brms on a shared fixed-effects fixture. These
-# tests live in `local/` because they instantiate full MCMC fits via
-# the fixture pair and run on the full posterior — too heavy for CI.
+# Each is held to its own definition on a fixed-effects fixture: a
+# covariance against its own correlation, a summary against the
+# draws it summarised. They live in `local/` because they run on a
+# full posterior, which is too heavy for CI.
 
 
-test_that("vcov(mvgam) shares fixed effects with vcov(brms)", {
-  require_fixtures("val_mvgam_ar1_fx.rds", "val_brms_ar1_fx.rds")
+test_that("vcov carries the model's own fixed effects", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
   mv <- load_mvgam("ar1_fx")
-  bm <- load_brms("ar1_fx")
   vm <- vcov(mv)
-  vb <- vcov(bm)
-  # mvgam now aliases b[k] to b_<term>; both should carry x + Intercept.
+  # The columns are this model's terms, taken from its own formula
+  # rather than from a second fit that happens to agree. `b[k]` is
+  # aliased to `b_<term>`, so a failure of that aliasing shows here.
   expect_setequal(colnames(vm), c("Intercept", "x"))
-  expect_setequal(colnames(vb), c("Intercept", "x"))
-  # Symmetric and PSD (variances on diag > 0).
+  expect_identical(colnames(vm), rownames(vm))
+  # Symmetric and positive definite, which a covariance must be.
   expect_equal(vm, t(vm), tolerance = 1e-12)
   expect_true(all(diag(vm) > 0))
-  # correlation = TRUE produces unit diagonal.
+  expect_true(all(eigen(vm, only.values = TRUE)$values > 0))
+  # correlation = TRUE rescales the same matrix, so the diagonal
+  # goes to one and the off-diagonal stays inside [-1, 1].
   cm <- vcov(mv, correlation = TRUE)
   expect_equal(unname(diag(cm)), c(1, 1), tolerance = 1e-12)
+  expect_true(all(abs(cm[upper.tri(cm)]) <= 1))
+  expect_equal(cm[1L, 2L],
+               vm[1L, 2L] / sqrt(vm[1L, 1L] * vm[2L, 2L]),
+               tolerance = 1e-10)
 })
 
 
-test_that("loo_R2(mvgam) returns finite R^2 with overlapping CI vs brms", {
-  require_fixtures("val_mvgam_ar1_fx.rds", "val_brms_ar1_fx.rds")
+test_that("loo_R2 summarises the draws it computed", {
+  require_fixtures("val_mvgam_ar1_fx.rds")
   mv <- load_mvgam("ar1_fx")
-  bm <- load_brms("ar1_fx")
   set.seed(1L)
-  r2_mv <- suppressWarnings(loo_R2(mv))
+  r2 <- suppressWarnings(loo_R2(mv))
+  expect_setequal(colnames(r2),
+                  c("Estimate", "Est.Error", "Q2.5", "Q97.5"))
+  # A proportion of variance explained, clamped above at one.
+  expect_true(is.finite(r2[, "Estimate"]))
+  expect_lte(r2[, "Estimate"], 1)
+  expect_true(r2[, "Q2.5"] <= r2[, "Estimate"])
+  expect_true(r2[, "Estimate"] <= r2[, "Q97.5"])
+
+  # The summary has to be the summary of its own draws. Comparing a
+  # point estimate against a second package's tells you the two
+  # agree; comparing it against the vector it came from is what
+  # catches a summary taken over the wrong margin.
   set.seed(1L)
-  r2_bm <- suppressWarnings(loo_R2(bm))
-  # brms-shape summary: Estimate, Est.Error, Q2.5, Q97.5.
-  expect_setequal(colnames(r2_mv),
-                   c("Estimate", "Est.Error", "Q2.5", "Q97.5"))
-  # Estimate finite + in (-1, 1] (clamped per Gelman 2019).
-  expect_true(is.finite(r2_mv[, "Estimate"]))
-  expect_lte(r2_mv[, "Estimate"], 1)
-  # Credible intervals overlap (different latent structures give
-  # different point estimates but the intervals should agree).
-  expect_true(
-    r2_mv[, "Q2.5"] <= r2_bm[, "Q97.5"] &&
-      r2_bm[, "Q2.5"] <= r2_mv[, "Q97.5"]
+  draws <- suppressWarnings(loo_R2(mv, summary = FALSE))
+  expect_equal(unname(r2[, "Estimate"]), mean(draws[, 1L]),
+               tolerance = 1e-8)
+  expect_equal(unname(r2[, "Est.Error"]), stats::sd(draws[, 1L]),
+               tolerance = 1e-8)
+  expect_equal(
+    unname(r2[, c("Q2.5", "Q97.5")]),
+    unname(stats::quantile(draws[, 1L], c(0.025, 0.975))),
+    tolerance = 1e-8
   )
 })
 
@@ -578,7 +602,7 @@ test_that("loo_subsample.mvgam errors informatively", {
 
 
 # ====================================================================
-# Tier-4 brms-parity batch: update.mvgam
+# update.mvgam
 # ====================================================================
 # Numerical refit checks vs the cached fit. These live in `local/`
 # because they instantiate full MCMC fits via cmdstanr. The backend
@@ -668,77 +692,67 @@ test_that("update(recompile = FALSE, family = new_family) errors", {
 
 
 # ---------------------------------------------------------------------
-# Tier-5 brms-parity batch: ranef + VarCorr
+# ranef and VarCorr
 # ---------------------------------------------------------------------
 #
-# Concordance against brms's own random-effect accessors on the three
-# RE fixtures (intercept-only, intercept+smooth, correlated slope).
-# Numerical tolerance reflects mvgam's state-space architecture: the
-# AR(1) trend lives in the linear predictor rather than as residual
-# autocorrelation, so per-level posterior medians shift relative to
-# brms. Shape parity is exact; per-level Estimate / SD comparisons are
-# loose enough to absorb the architectural difference but tight
-# enough to catch a structural bug.
+# Three random-effect fixtures: intercept only, intercept beside a
+# smooth, and a correlated slope. Each table is held to the levels of
+# the grouping factor in the frame that built it, and to its own
+# internal agreement, rather than to what another package returns.
+# One helper for the claim all three random-effect fixtures make.
+# A group-level table is keyed by the levels of the grouping factor
+# in the frame's own order, and asking a second package whether it
+# produced the same dimnames cannot catch a table keyed correctly but
+# by the wrong column.
+expect_ranef_keyed <- function(mv, coefs) {
+  re <- ranef(mv)
+  lev <- levels(mv$data$grp)
+  expect_named(re, "grp")
+  expect_identical(dim(re$grp),
+                   c(length(lev), 4L, length(coefs)))
+  expect_identical(dimnames(re$grp)[[1L]], lev)
+  expect_identical(dimnames(re$grp)[[2L]],
+                   c("Estimate", "Est.Error", "Q2.5", "Q97.5"))
+  expect_identical(dimnames(re$grp)[[3L]], coefs)
+  for (cf in coefs) {
+    est <- re$grp[, "Estimate", cf]
+    expect_true(all(is.finite(est)))
+    # Group-level effects are deviations from the population term,
+    # so they are centred and they vary. A block of zeros, or one
+    # constant repeated down the levels, satisfies every shape
+    # claim above and means no level was distinguished.
+    expect_lt(abs(mean(est)), 0.5)
+    expect_gt(stats::sd(est), 1e-6)
+    expect_true(all(re$grp[, "Est.Error", cf] > 0))
+    expect_true(all(re$grp[, "Q2.5", cf] <= est))
+    expect_true(all(est <= re$grp[, "Q97.5", cf]))
+  }
+  invisible(re)
+}
 
 
-re_concordance_threshold_sd <- 0.5
-re_concordance_threshold_estimate <- 1.0
-
-
-test_that("ranef(mvgam) matches brms shape on val_mvgam_ar1_re", {
-  require_fixtures("val_mvgam_ar1_re.rds", "val_brms_ar1_re.rds")
-  mv <- load_mvgam("ar1_re")
-  br <- load_brms("ar1_re")
-  mv_re <- ranef(mv)
-  br_re <- brms::ranef(br)
-  expect_named(mv_re, names(br_re))
-  expect_identical(dim(mv_re$grp), dim(br_re$grp))
-  expect_identical(dimnames(mv_re$grp), dimnames(br_re$grp))
-  expect_lt(
-    max(abs(mv_re$grp[, "Estimate", "Intercept"] -
-              br_re$grp[, "Estimate", "Intercept"])),
-    re_concordance_threshold_estimate
-  )
+test_that("ranef is keyed by the grouping factor's own levels", {
+  require_fixtures("val_mvgam_ar1_re.rds")
+  expect_ranef_keyed(load_mvgam("ar1_re"), "Intercept")
 })
 
 
-test_that("ranef(mvgam) matches brms shape on val_mvgam_ar1_re_smooth", {
-  require_fixtures(
-    "val_mvgam_ar1_re_smooth.rds", "val_brms_ar1_re_smooth.rds"
-  )
-  mv <- load_mvgam("ar1_re_smooth")
-  br <- load_brms("ar1_re_smooth")
-  mv_re <- ranef(mv)
-  br_re <- brms::ranef(br)
-  expect_named(mv_re, names(br_re))
-  expect_identical(dim(mv_re$grp), dim(br_re$grp))
-  expect_identical(dimnames(mv_re$grp), dimnames(br_re$grp))
+test_that("ranef keeps that keying beside a smooth", {
+  require_fixtures("val_mvgam_ar1_re_smooth.rds")
+  expect_ranef_keyed(load_mvgam("ar1_re_smooth"), "Intercept")
 })
 
 
-test_that("ranef(mvgam) matches brms shape on val_mvgam_ar1_cor_re", {
-  require_fixtures(
-    "val_mvgam_ar1_cor_re.rds", "val_brms_ar1_cor_re.rds"
-  )
+test_that("ranef carries both coefficients when the slope varies", {
+  require_fixtures("val_mvgam_ar1_cor_re.rds")
   mv <- load_mvgam("ar1_cor_re")
-  br <- load_brms("ar1_cor_re")
-  mv_re <- ranef(mv)
-  br_re <- brms::ranef(br)
-  expect_named(mv_re, names(br_re))
-  expect_identical(dim(mv_re$grp), dim(br_re$grp))
-  expect_identical(dimnames(mv_re$grp), dimnames(br_re$grp))
-  # Correlated slope: both Intercept and x dimensions should be
-  # populated with sensible numerical agreement.
-  expect_lt(
-    max(abs(mv_re$grp[, "Estimate", "Intercept"] -
-              br_re$grp[, "Estimate", "Intercept"])),
-    re_concordance_threshold_estimate
-  )
-  expect_lt(
-    max(abs(mv_re$grp[, "Estimate", "x"] -
-              br_re$grp[, "Estimate", "x"])),
-    re_concordance_threshold_estimate
-  )
+  re <- expect_ranef_keyed(mv, c("Intercept", "x"))
+  # The two coefficients have to be told apart. A correlated slope
+  # model that returned the intercept deviations twice would pass
+  # every claim in the helper.
+  expect_false(isTRUE(all.equal(re$grp[, "Estimate", "Intercept"],
+                                re$grp[, "Estimate", "x"],
+                                check.attributes = FALSE)))
 })
 
 
@@ -769,29 +783,50 @@ test_that("VarCorr(mvgam) returns sd-only structure for M = 1", {
 })
 
 
-test_that("VarCorr(mvgam) matches brms shape on val_mvgam_ar1_cor_re", {
-  require_fixtures(
-    "val_mvgam_ar1_cor_re.rds", "val_brms_ar1_cor_re.rds"
-  )
+test_that("VarCorr's three blocks describe one covariance", {
+  require_fixtures("val_mvgam_ar1_cor_re.rds")
   mv <- load_mvgam("ar1_cor_re")
-  br <- load_brms("ar1_cor_re")
-  mv_vc <- VarCorr(mv)
-  br_vc <- brms::VarCorr(br)
-  expect_named(mv_vc, names(br_vc))
-  expect_named(mv_vc$grp, names(br_vc$grp))
-  for (slot in c("sd", "cor", "cov")) {
-    expect_identical(dim(mv_vc$grp[[slot]]), dim(br_vc$grp[[slot]]))
-    expect_identical(
-      dimnames(mv_vc$grp[[slot]]), dimnames(br_vc$grp[[slot]])
-    )
-  }
-  # SD estimates per coef should agree within a state-space
-  # tolerance — the AR(1) absorbs some shrinkage, but the
-  # group-level SD is largely structural and should not diverge
-  # dramatically.
-  expect_lt(
-    max(abs(mv_vc$grp$sd[, "Estimate"] - br_vc$grp$sd[, "Estimate"])),
-    re_concordance_threshold_sd
+  vc <- VarCorr(mv)
+  coefs <- c("Intercept", "x")
+  expect_named(vc, "grp")
+  expect_true(all(c("sd", "cor", "cov") %in% names(vc$grp)))
+  expect_identical(dimnames(vc$grp$sd)[[1L]], coefs)
+  expect_identical(dim(vc$grp$cor)[1L], 2L)
+  expect_identical(dim(vc$grp$cov)[1L], 2L)
+
+  # `sd`, `cor` and `cov` are three views of one matrix, so within a
+  # draw the covariance diagonal is the squared scale and the
+  # correlation is the covariance rescaled by it. The identity holds
+  # per draw and not on the summaries, because a posterior mean of a
+  # square is not the square of a posterior mean: measured here,
+  # E[cov_11] is 0.774 against (E[sd_1])^2 of 0.525, and the gap is
+  # Var(sd_1) to three decimals. So the claim is made where it is
+  # true, and exactly rather than under a tolerance.
+  raw <- VarCorr(mv, summary = FALSE)
+  sd_d <- raw$grp$sd
+  cov_d <- raw$grp$cov
+  cor_d <- raw$grp$cor
+  expect_identical(dim(sd_d), c(as.integer(ndraws(mv)), 2L))
+  expect_identical(dim(cov_d), c(as.integer(ndraws(mv)), 2L, 2L))
+  expect_equal(as.numeric(cbind(cov_d[, 1L, 1L], cov_d[, 2L, 2L])),
+               as.numeric(sd_d^2))
+  expect_equal(as.numeric(cor_d[, 1L, 2L]),
+               as.numeric(cov_d[, 1L, 2L] /
+                            (sd_d[, 1L] * sd_d[, 2L])))
+  expect_equal(as.numeric(cor_d[, 1L, 1L]), rep(1, nrow(cor_d)))
+  expect_true(all(sd_d > 0))
+  expect_true(all(abs(cor_d[, 1L, 2L]) <= 1))
+
+  # And the summary is the summary of those draws, which ties the
+  # two levels together: the gap the means show is the variance the
+  # draws carry, so a summary taken over the wrong margin fails.
+  expect_equal(vc$grp$sd[, "Estimate"], colMeans(sd_d),
+               tolerance = 1e-8, ignore_attr = TRUE)
+  expect_equal(
+    unname(vc$grp$cov[1L, "Estimate", 1L] -
+             vc$grp$sd[1L, "Estimate"]^2),
+    stats::var(sd_d[, 1L]) * (nrow(sd_d) - 1L) / nrow(sd_d),
+    tolerance = 1e-6
   )
 })
 
@@ -832,52 +867,58 @@ test_that("update(mvgam) round-trips RE structure cleanly", {
 
 
 # ---------------------------------------------------------------------
-# Tier-6 brms-parity batch: posterior_smooths + conditional_smooths
+# posterior_smooths and conditional_smooths
 # ---------------------------------------------------------------------
 #
-# Shape concordance against brms's own smooth methods on the
-# ar1_re_smooth fixture (single 1D smooth) and ar1_re_smooth_trend
-# (trend-side smooth). The numerical tolerance reflects mvgam's
-# state-space architecture (AR(1) trend in the linear predictor vs
-# brms residual-AR) but is still tight enough to catch a structural
-# bug in the basis-matrix / coefficient pairing.
-
-
-smooths_concordance_threshold <- 0.5
-
-
-test_that("smooths(mvgam) enumerates the same s() terms as brms", {
-  require_fixtures(
-    "val_mvgam_ar1_re_smooth.rds", "val_brms_ar1_re_smooth.rds"
-  )
+# Four smooth shapes: a plain s(z), a trend-side smooth, a by-factor
+# expansion and a two-dimensional tensor. Each is asked whether it
+# was evaluated over the covariates it names, which is what
+# separates a tensor from a curve and a by-factor from one shared
+# curve.
+test_that("smooths names the terms this model's own formula holds", {
+  require_fixtures("val_mvgam_ar1_re_smooth.rds")
   mv <- load_mvgam("ar1_re_smooth")
-  br <- load_brms("ar1_re_smooth")
-  mv_terms <- smooths(mv)
-  br_terms <- attr(
-    terms(brms::brmsterms(br$formula)$dpars$mu$sm),
-    "term.labels"
+  # The expected list comes from the fit's own formula rather than
+  # from a second fit that was given the same one. Parsing the
+  # formula answers what the model was asked for; `smooths()` has to
+  # answer the same thing.
+  expected <- attr(
+    terms(brms::brmsterms(mv$formula)$dpars$mu$sm), "term.labels"
   )
-  expect_identical(mv_terms, br_terms)
+  expect_identical(smooths(mv), expected)
+  expect_identical(smooths(mv), "s(z)")
 })
 
 
-test_that("posterior_smooths(mvgam) matches brms shape on ar1_re_smooth", {
-  require_fixtures(
-    "val_mvgam_ar1_re_smooth.rds", "val_brms_ar1_re_smooth.rds"
-  )
+test_that("posterior_smooths returns one column per row it was given", {
+  require_fixtures("val_mvgam_ar1_re_smooth.rds")
   mv <- load_mvgam("ar1_re_smooth")
-  br <- load_brms("ar1_re_smooth")
-  mv_eta <- posterior_smooths(mv, smooth = "s(z)")
-  br_eta <- brms::posterior_smooths(br, smooth = "s(z)")
-  expect_identical(dim(mv_eta), dim(br_eta))
-  # Per-grid-point posterior median should track brms within the
-  # state-space tolerance — this catches a structural index or
-  # basis-matrix mismatch even when the AR architectural gap
-  # shifts the absolute values.
-  expect_lt(
-    max(abs(apply(mv_eta, 2, median) - apply(br_eta, 2, median))),
-    smooths_concordance_threshold
-  )
+  eta <- posterior_smooths(mv, smooth = "s(z)")
+  expect_identical(dim(eta),
+                   c(as.integer(ndraws(mv)), nrow(mv$data)))
+  expect_true(all(is.finite(eta)))
+
+  # A smooth is centred and it bends. A basis that failed to reach
+  # the draws returns zeros, and a linear term returns something
+  # that a straight line fits exactly; both keep the dimensions
+  # above, and asking a second package for its dimensions catches
+  # neither.
+  med <- apply(eta, 2L, stats::median)
+  expect_gt(stats::sd(med), 1e-6)
+  expect_lt(abs(mean(med)), 1)
+  fit_lin <- stats::lm(med ~ mv$data$z)
+  expect_gt(summary(fit_lin)$sigma, 1e-6)
+
+  # The columns follow the frame's own row order, which a shuffled
+  # frame is what tests. A smooth evaluated by position rather than
+  # by content answers the same numbers in the original order and
+  # fails here while keeping every dimension.
+  perm <- c(seq(2L, nrow(mv$data)), 1L)
+  shuffled <- mv$data[perm, , drop = FALSE]
+  eta_s <- posterior_smooths(mv, smooth = "s(z)", newdata = shuffled)
+  expect_identical(dim(eta_s), dim(eta))
+  expect_equal(apply(eta_s, 2L, stats::median), med[perm],
+               tolerance = 1e-8)
 })
 
 
@@ -909,23 +950,33 @@ test_that("posterior_smooths(mvgam) accepts user-supplied newdata", {
 })
 
 
-test_that("conditional_smooths(mvgam) matches brms shape", {
-  require_fixtures(
-    "val_mvgam_ar1_re_smooth.rds", "val_brms_ar1_re_smooth.rds"
-  )
+test_that("conditional_smooths returns an evaluated curve", {
+  require_fixtures("val_mvgam_ar1_re_smooth.rds")
   mv <- load_mvgam("ar1_re_smooth")
-  br <- load_brms("ar1_re_smooth")
-  mv_cs <- conditional_smooths(mv)
-  br_cs <- brms::conditional_smooths(br)
-  # mvgam returns its own class so that plot() picks up the house
-  # theme; the per-smooth data frames still match brms column for
-  # column, which is what downstream code reads.
-  expect_s3_class(mv_cs, "mvgam_conditional_smooths")
-  expect_identical(length(mv_cs), length(br_cs))
-  expect_identical(
-    sort(colnames(mv_cs[[1L]])), sort(colnames(br_cs[[1L]]))
-  )
-  expect_identical(nrow(mv_cs[[1L]]), nrow(br_cs[[1L]]))
+  cs <- conditional_smooths(mv)
+  # mvgam returns its own class so `plot()` picks up the house
+  # theme. What downstream code reads is the frame inside it, and
+  # these are the columns brms's own renderer requires.
+  expect_s3_class(cs, "mvgam_conditional_smooths")
+  expect_length(cs, 1L)
+  d <- cs[[1L]]
+  expect_true(all(c("z", "effect1__", "estimate__", "se__",
+                    "lower__", "upper__") %in% colnames(d)))
+  expect_identical(nrow(d), 100L)
+
+  # The curve has to be a curve. Finding 34 is what happens when
+  # this frame is right and nothing checks that it was evaluated:
+  # a constant estimate with a zero-width band satisfies the column
+  # list and the row count.
+  expect_gt(stats::sd(d$estimate__), 1e-6)
+  expect_true(all(d$se__ > 0))
+  expect_true(all(d$lower__ <= d$estimate__))
+  expect_true(all(d$estimate__ <= d$upper__))
+  expect_gt(mean(d$upper__ - d$lower__), 0)
+  # The grid spans the covariate it was built from and is ordered.
+  expect_identical(d$z, sort(d$z))
+  expect_gte(min(d$z), min(mv$data$z))
+  expect_lte(max(d$z), max(mv$data$z))
 })
 
 
@@ -953,18 +1004,31 @@ test_that("posterior_smooths(mvgam) works on trend-side smooths", {
 })
 
 
-test_that("posterior_smooths(mvgam) handles s(z, by = grp) factor expansion", {
-  require_fixtures(
-    "val_mvgam_ar1_s_by.rds", "val_brms_ar1_s_by.rds"
-  )
+test_that("s(z, by = grp) gives every level its own curve", {
+  require_fixtures("val_mvgam_ar1_s_by.rds")
   mv <- load_mvgam("ar1_s_by")
-  br <- load_brms("ar1_s_by")
-  # By-factor expansion: brms enumerates one user-facing smooth
-  # but emits per-level basis blocks; the eta matrix concatenates
-  # all by-levels into the grid.
-  mv_eta <- posterior_smooths(mv, smooth = "s(z, by = grp)")
-  br_eta <- brms::posterior_smooths(br, smooth = "s(z, by = grp)")
-  expect_identical(dim(mv_eta), dim(br_eta))
+  lev <- levels(mv$data$grp)
+  eta <- posterior_smooths(mv, smooth = "s(z, by = grp)")
+  expect_identical(dim(eta),
+                   c(as.integer(ndraws(mv)), nrow(mv$data)))
+
+  # A by-factor smooth emits one basis block per level, so the
+  # conditional grid carries a curve for each. Comparing the eta
+  # matrix's dimensions against another package's says nothing
+  # about whether the levels were separated at all: a model that
+  # fitted one shared curve returns exactly this shape.
+  cs <- conditional_smooths(mv)[[1L]]
+  expect_true("grp" %in% colnames(cs))
+  expect_setequal(as.character(unique(cs$grp)), lev)
+  expect_identical(nrow(cs), 100L * length(lev))
+  curves <- split(cs$estimate__, cs$grp)
+  expect_length(curves, length(lev))
+  for (k in seq_along(curves)) {
+    expect_gt(stats::sd(curves[[k]]), 1e-6)
+  }
+  # The levels have to differ from one another, which is the whole
+  # point of writing `by =`.
+  expect_false(isTRUE(all.equal(curves[[1L]], curves[[2L]])))
 })
 
 
@@ -981,13 +1045,33 @@ test_that("conditional_smooths(mvgam) facets by-factor on real fit", {
 })
 
 
-test_that("posterior_smooths(mvgam) handles 2D t2(z, w) tensor smooth", {
-  require_fixtures("val_mvgam_ar1_t2.rds", "val_brms_ar1_t2.rds")
+test_that("t2(z, w) is evaluated over two covariates, not one", {
+  require_fixtures("val_mvgam_ar1_t2.rds")
   mv <- load_mvgam("ar1_t2")
-  br <- load_brms("ar1_t2")
-  mv_eta <- posterior_smooths(mv, smooth = "t2(z, w)")
-  br_eta <- brms::posterior_smooths(br, smooth = "t2(z, w)")
-  expect_identical(dim(mv_eta), dim(br_eta))
+  eta <- posterior_smooths(mv, smooth = "t2(z, w)")
+  expect_identical(dim(eta),
+                   c(as.integer(ndraws(mv)), nrow(mv$data)))
+  expect_true(all(is.finite(eta)))
+
+  # A tensor smooth is a surface, so its conditional grid is a grid:
+  # both margins appear, and the row count is their product rather
+  # than either margin alone. A tensor collapsed to one covariate
+  # returns the same eta dimensions as this and a grid of 100.
+  cs <- conditional_smooths(mv)[[1L]]
+  expect_true(all(c("z", "w", "effect1__", "effect2__") %in%
+                    colnames(cs)))
+  expect_identical(nrow(cs), 100L * 100L)
+  expect_identical(length(unique(cs$z)), 100L)
+  expect_identical(length(unique(cs$w)), 100L)
+
+  # The surface has to vary along both margins. One that moved with
+  # `z` alone would be a `s(z)` wearing a tensor's shape.
+  along_w <- vapply(split(cs$estimate__, cs$z),
+                    stats::sd, numeric(1L))
+  along_z <- vapply(split(cs$estimate__, cs$w),
+                    stats::sd, numeric(1L))
+  expect_gt(mean(along_w), 1e-6)
+  expect_gt(mean(along_z), 1e-6)
 })
 
 
@@ -1064,21 +1148,36 @@ test_that("conditional_smooths(mvgam) restricts via smooths argument", {
 
 
 # ---------------------------------------------------------------------
-# Tier-7 brms-parity batch: posterior_interval + predictive_interval
-# + ngrps + predictive_error + deprecated aliases
+# posterior_interval, predictive_interval, ngrps, predictive_error
+# and the deprecated aliases
 # ---------------------------------------------------------------------
 
 
-test_that("posterior_interval(mvgam) matches brms shape on a real fit", {
-  require_fixtures(
-    "val_mvgam_ar1_re_smooth.rds", "val_brms_ar1_re_smooth.rds"
-  )
+test_that("posterior_interval quantiles the draws it names", {
+  require_fixtures("val_mvgam_ar1_re_smooth.rds")
   mv <- load_mvgam("ar1_re_smooth")
-  br <- load_brms("ar1_re_smooth")
-  mv_pi <- posterior_interval(mv)
-  br_pi <- posterior_interval(br)
-  expect_identical(ncol(mv_pi), ncol(br_pi))
-  expect_identical(colnames(mv_pi), colnames(br_pi))
+  pi <- posterior_interval(mv)
+  expect_identical(ncol(pi), 2L)
+  expect_identical(colnames(pi), c("2.5%", "97.5%"))
+  expect_true(all(pi[, 1L] <= pi[, 2L]))
+
+  # The interval has to be the interval of this fit's own draws.
+  # Matching a second package's column names says nothing about
+  # which parameter each row describes.
+  dm <- as_draws_matrix(mv)
+  shared <- intersect(rownames(pi), colnames(dm))
+  expect_gt(length(shared), 0L)
+  for (v in utils::head(shared, 5L)) {
+    expect_equal(
+      unname(pi[v, ]),
+      unname(stats::quantile(as.numeric(dm[, v]), c(0.025, 0.975))),
+      tolerance = 1e-8
+    )
+  }
+  # A different probability moves the bounds the right way.
+  narrow <- posterior_interval(mv, prob = 0.5)
+  expect_true(all(narrow[shared, 1L] >= pi[shared, 1L]))
+  expect_true(all(narrow[shared, 2L] <= pi[shared, 2L]))
 })
 
 
@@ -1092,13 +1191,19 @@ test_that("predictive_interval(mvgam) returns [nobs x 2] with brms cols", {
 })
 
 
-test_that("ngrps(mvgam) matches brms on a real RE fit", {
-  require_fixtures(
-    "val_mvgam_ar1_re_smooth.rds", "val_brms_ar1_re_smooth.rds"
-  )
+test_that("ngrps counts the levels the frame actually holds", {
+  require_fixtures("val_mvgam_ar1_re_smooth.rds")
   mv <- load_mvgam("ar1_re_smooth")
-  br <- load_brms("ar1_re_smooth")
-  expect_identical(ngrps(mv), ngrps(br))
+  # The frame is the authority on how many groups there are, so
+  # that is what this is held to. Two packages agreeing on a count
+  # taken from the same design cannot catch a count taken from the
+  # wrong column.
+  ng <- ngrps(mv)
+  expect_named(ng, "grp")
+  expect_identical(as.integer(ng$grp), nlevels(mv$data$grp))
+  # And it agrees with the table keyed by those same levels.
+  expect_identical(as.integer(ng$grp),
+                   dim(ranef(mv)$grp)[1L])
 })
 
 
@@ -1131,100 +1236,25 @@ test_that("deprecated brms aliases dispatch to current methods", {
 
 
 # ------------------------------------------------------------------
-# Tier-8 brms-parity batch: PSIS-weighted predictions + model
-# averaging (loo_epred / loo_linpred / loo_predictive_interval /
-# posterior_average / pp_average)
+# PSIS-weighted prediction and model averaging: loo_epred,
+# loo_linpred, loo_predictive_interval, posterior_average and
+# pp_average
 # ------------------------------------------------------------------
 
 
-# Tier-8 strict numerical concordance is exercised on two
-# fixture pairs designed for PSIS stability:
-#   * binom_ar1       — Binomial AR(1), N=30, max Pareto-k 0.68
-#   * gauss_ar1_n150  — Gaussian AR(1), N=150, smooth posterior
-# Both produce loo_epred / loo_linpred / loo_predictive_interval
-# values that correlate >=0.95 with the brms equivalents.
-
-test_that("loo_epred.mvgam matches brms on PSIS-stable fixtures", {
-  for (name in c("binom_ar1", "gauss_ar1_n150")) {
-    require_fixtures(paste0("val_mvgam_", name, ".rds"),
-                      paste0("val_brms_", name, ".rds"))
-    mv <- load_mvgam(name)
-    br <- load_brms(name)
-    mv_e <- suppressMessages(suppressWarnings(
-      loo_epred(mv, type = "mean")
-    ))
-    br_e <- suppressMessages(suppressWarnings(
-      loo_epred(br, type = "mean")
-    ))
-    # Shape, dimnames, and per-observation numerical agreement.
-    expect_identical(dim(mv_e), dim(br_e))
-    expect_identical(colnames(mv_e), colnames(br_e))
-    expect_gt(
-      stats::cor(as.numeric(mv_e), as.numeric(br_e)), 0.95
-    )
-  }
-})
+# The leave-one-out surfaces are driven on two fixtures chosen for
+# PSIS stability: binom_ar1, a Binomial AR(1) over 30 observations
+# whose largest Pareto-k is 0.68, and gauss_ar1_n150, a Gaussian
+# AR(1) over 150 with a smooth posterior. The two carry different
+# links, which is what lets loo_epred and loo_linpred be told
+# apart.
 
 
-test_that("loo_linpred.mvgam matches brms on PSIS-stable fixtures", {
-  for (name in c("binom_ar1", "gauss_ar1_n150")) {
-    require_fixtures(paste0("val_mvgam_", name, ".rds"),
-                      paste0("val_brms_", name, ".rds"))
-    mv <- load_mvgam(name)
-    br <- load_brms(name)
-    mv_l <- suppressMessages(suppressWarnings(
-      loo_linpred(mv, type = "mean")
-    ))
-    br_l <- suppressMessages(suppressWarnings(
-      loo_linpred(br, type = "mean")
-    ))
-    expect_identical(dim(mv_l), dim(br_l))
-    expect_identical(colnames(mv_l), colnames(br_l))
-    expect_gt(
-      stats::cor(as.numeric(mv_l), as.numeric(br_l)), 0.95
-    )
-  }
-})
 
 
-test_that("loo_predictive_interval.mvgam matches brms on Gaussian fixture", {
-  # Gaussian: continuous response, no PI quantisation noise.
-  require_fixtures("val_mvgam_gauss_ar1_n150.rds",
-                    "val_brms_gauss_ar1_n150.rds")
-  mv <- load_mvgam("gauss_ar1_n150")
-  br <- load_brms("gauss_ar1_n150")
-  mv_pi <- suppressMessages(suppressWarnings(
-    loo_predictive_interval(mv, prob = 0.9)
-  ))
-  br_pi <- suppressMessages(suppressWarnings(
-    loo_predictive_interval(br, prob = 0.9)
-  ))
-  expect_identical(dim(mv_pi), dim(br_pi))
-  expect_identical(colnames(mv_pi), colnames(br_pi))
-  expect_true(all(mv_pi[, 2L] >= mv_pi[, 1L]))
-  # Per-quantile column-wise correlation must be high.
-  expect_gt(stats::cor(mv_pi[, 1L], br_pi[, 1L]), 0.95)
-  expect_gt(stats::cor(mv_pi[, 2L], br_pi[, 2L]), 0.95)
-})
 
 
-test_that("loo_predictive_interval.mvgam shape parity on binom fixture", {
-  require_fixtures("val_mvgam_binom_ar1.rds",
-                    "val_brms_binom_ar1.rds")
-  mv <- load_mvgam("binom_ar1")
-  br <- load_brms("binom_ar1")
-  mv_pi <- suppressMessages(suppressWarnings(
-    loo_predictive_interval(mv, prob = 0.9)
-  ))
-  br_pi <- suppressMessages(suppressWarnings(
-    loo_predictive_interval(br, prob = 0.9)
-  ))
-  # Binomial response is integer-valued, so quantile-rounding
-  # softens cross-package agreement; lock in shape + ordering.
-  expect_identical(dim(mv_pi), dim(br_pi))
-  expect_identical(colnames(mv_pi), colnames(br_pi))
-  expect_true(all(mv_pi[, 2L] >= mv_pi[, 1L]))
-})
+
 
 
 test_that("posterior_average.mvgam returns shape + attrs (brms-parity)", {
@@ -1285,4 +1315,78 @@ test_that("pp_average.mvgam errors on mismatched response variables", {
     pp_average(mv_g, mv_b, weights = c(0.5, 0.5)),
     "same response"
   )
+})
+
+
+test_that("loo_epred and loo_linpred separate exactly at the link", {
+  # Two fixtures whose links differ. The gaussian carries the
+  # identity link, so its expectation and its linear predictor are
+  # the same numbers and agreeing is the contract; the binomial
+  # carries a logit, so they must not agree. Holding both at once
+  # is what a comparison against another package's dimensions
+  # cannot do: a method that skipped the inverse link entirely
+  # passes on the gaussian and returns the wrong scale here.
+  scales <- list(
+    binom_ar1 = list(identity_link = FALSE, lower = 0),
+    gauss_ar1_n150 = list(identity_link = TRUE, lower = -Inf)
+  )
+  for (name in names(scales)) {
+    require_fixtures(paste0("val_mvgam_", name, ".rds"))
+    mv <- load_mvgam(name)
+    spec <- scales[[name]]
+    e <- suppressMessages(suppressWarnings(loo_epred(mv, type = "mean")))
+    l <- suppressMessages(suppressWarnings(loo_linpred(mv, type = "mean")))
+    expect_identical(dim(e), c(nrow(mv$data), 1L))
+    expect_identical(dim(l), dim(e))
+    expect_true(all(is.finite(e)))
+    expect_true(all(is.finite(l)))
+    expect_true(all(e >= spec$lower))
+    if (isTRUE(spec$identity_link)) {
+      expect_equal(as.numeric(e), as.numeric(l), tolerance = 1e-8)
+    } else {
+      expect_false(isTRUE(all.equal(as.numeric(e), as.numeric(l))))
+    }
+
+    # A leave-one-out expectation is a reweighting of the posterior
+    # one, so it tracks it without reproducing it. Equality would
+    # mean no weights were applied.
+    ep <- colMeans(posterior_epred(mv))
+    expect_gt(stats::cor(as.numeric(e), ep), 0.5)
+    expect_false(isTRUE(all.equal(as.numeric(e), unname(ep))))
+  }
+})
+
+
+test_that("loo_predictive_interval brackets the data it left out", {
+  # An interval is read for its coverage, so that is what it is
+  # held to here rather than to another package's column names. The
+  # nominal 90 per cent has to be approached from a small sample of
+  # observations without collapsing or spanning everything.
+  for (name in c("gauss_ar1_n150", "binom_ar1")) {
+    require_fixtures(paste0("val_mvgam_", name, ".rds"))
+    mv <- load_mvgam(name)
+    pi <- suppressMessages(suppressWarnings(
+      loo_predictive_interval(mv, prob = 0.9)
+    ))
+    expect_identical(dim(pi), c(nrow(mv$data), 2L))
+    expect_identical(colnames(pi), c("q5", "q95"))
+    expect_true(all(pi[, 2L] >= pi[, 1L]))
+    expect_true(all(is.finite(pi)))
+
+    covered <- mean(mv$data$y >= pi[, 1L] & mv$data$y <= pi[, 2L])
+    expect_gt(covered, 0.75)
+    expect_lte(covered, 1)
+    # A band wide enough to hold everything would also satisfy the
+    # coverage floor, so the width is bounded against the spread of
+    # the response it is predicting.
+    expect_lt(mean(pi[, 2L] - pi[, 1L]),
+              8 * stats::sd(as.numeric(mv$data$y)))
+
+    # A narrower request has to nest inside the wider one.
+    tight <- suppressMessages(suppressWarnings(
+      loo_predictive_interval(mv, prob = 0.5)
+    ))
+    expect_true(all(tight[, 1L] >= pi[, 1L]))
+    expect_true(all(tight[, 2L] <= pi[, 2L]))
+  }
 })
