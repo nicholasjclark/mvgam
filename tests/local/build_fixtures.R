@@ -953,16 +953,15 @@ recovery_scripts <- list(
                   c("mvn", "mvt", "nb", "beta", "diri", "categ",
                     "multi"), ".rds"),
            JSDM_PKGS),
-  recovery("jsdgam_mv_nmix.R", "val_mvgam_jsdgam_mv_nmix.rds",
-           c("dplyr", "posterior", "testthat")),
-  recovery("jsdgam_mv_occ.R", "val_mvgam_jsdgam_mv_occ.rds",
-           c("dplyr", "posterior", "testthat")),
-  recovery("jsdgam_multi_season.R", "val_mvgam_jsdgam_multi_season.rds",
+  # The two closure-unit factor fits and the multi-season one are
+  # built and cached by the file that asserts on them.
+  recovery("test-closure-units.R",
+           c("val_mvgam_jsdgam_mv_nmix.rds",
+             "val_mvgam_jsdgam_mv_occ.rds",
+             "val_mvgam_occ_multi_season.rds"),
            c("dplyr", "posterior", "testthat")),
   recovery("diri_phi_subformula_fit.R",
            "val_mvgam_diri_phi_subformula.rds", JSDM_PKGS),
-  recovery("zmvn_irregular_time.R", "val_mvgam_zmvn_irregular.rds",
-           "broom"),
   recovery("kfold_grouped_cv.R",
            c("val_mvgam_kfold_demo_gauss.rds",
              "val_mvgam_kfold_demo_occ.rds"),
@@ -971,17 +970,13 @@ recovery_scripts <- list(
            c("val_mvgam_ordinate_traits.rds",
              "val_mvgam_ordinate_traits_data.rds"),
            "ggplot2"),
-  recovery("heaps_birds_replica.R",
+  # The three structured-prior fits live in one file, which builds
+  # and caches each of them itself.
+  recovery("test-loadings-prior.R",
            c("val_mvgam_heaps_birds.rds",
-             "val_mvgam_heaps_birds_wide.rds"),
-           "ape"),
-  recovery("heaps_birds_replica_phylo_dominant.R",
-           "val_mvgam_heaps_birds_phylo_dominant.rds", "ape"),
-  recovery("jsdgam_heaps_nonlinear_env.R",
-           c("val_mvgam_heaps_nonlinear_env_occ.rds",
-             "val_mvgam_heaps_nonlinear_env_nmix.rds",
-             "val_mvgam_heaps_nonlinear_env_multi.rds"),
-           c("ape", "ggplot2", "posterior"))
+             "val_mvgam_heaps_birds_wide.rds",
+             "val_mvgam_heaps_birds_phylo_dominant.rds"),
+           "ape")
 )
 
 run_recovery_script <- function(script) {

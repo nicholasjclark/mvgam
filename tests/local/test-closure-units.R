@@ -1277,3 +1277,351 @@ test_that("jsdgam nmix: detection and the identified mode both hold", {
   expect_lt(max(abs(colSums(Z_m))), 0.5)
   expect_gt(max(abs(Z_m)), 0.05)
 })
+
+
+# ----- A multi-season occupancy fit, and the surfaces it reaches ----
+#
+# `pivot_detection_array(multi_season = "hierarchical")` keeps
+# `time = season` and hands `site` over as a covariate, and
+# `occ(multi_season = TRUE)` is documented to activate the three-axis
+# closure-unit grouping `(series, site, time)` in response. So the
+# unit count here is 6 species x 10 sites x 8 seasons = 480 while the
+# pair `(series, time)` numbers only 48. Every count in the design is
+# distinct -- 6 species, 10 sites, 8 seasons, 3 visits, 480 units,
+# 1440 rows -- so no grain claim below can hold by coincidence.
+
+sim_multi_season <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    set.seed(4181L)
+    K_sp <- 6L; J <- 10L; T_s <- 8L; V <- 3L; N_lv <- 2L
+    lev <- paste0("sp", seq_len(K_sp))
+    rho_true <- 0.7
+    p_true <- 0.55
+    f_true <- function(e) 1.5 * sin(2 * e)
+
+    Z_true <- matrix(rnorm(K_sp * N_lv, 0, 0.9), K_sp, N_lv,
+                     dimnames = list(lev, NULL))
+    lv_true <- matrix(NA_real_, T_s, N_lv)
+    for (l in seq_len(N_lv)) {
+      lv_true[1L, l] <- rnorm(1L)
+      for (t in 2L:T_s) {
+        lv_true[t, l] <- rho_true * lv_true[t - 1L, l] +
+          sqrt(1 - rho_true^2) * rnorm(1L)
+      }
+    }
+    env <- as.numeric(scale(runif(J, -2, 2)))
+    alpha_site <- rnorm(J, 0, 0.4)
+    alpha_sp <- rnorm(K_sp, 0, 0.4)
+
+    logit_psi <- array(NA_real_, c(K_sp, J, T_s))
+    for (s in seq_len(K_sp)) {
+      for (i in seq_len(J)) {
+        for (t in seq_len(T_s)) {
+          logit_psi[s, i, t] <- alpha_sp[s] + f_true(env[i]) +
+            alpha_site[i] + sum(Z_true[s, ] * lv_true[t, ])
+        }
+      }
+    }
+    psi <- plogis(logit_psi)
+    z <- array(rbinom(length(psi), 1L, psi), dim = dim(psi))
+    yarr <- array(0L, c(K_sp, J, T_s, V))
+    for (s in seq_len(K_sp)) {
+      for (i in seq_len(J)) {
+        for (t in seq_len(T_s)) {
+          if (z[s, i, t] == 1L) yarr[s, i, t, ] <- rbinom(V, 1L, p_true)
+        }
+      }
+    }
+    d <- pivot_detection_array(
+      yarr, site_covs = data.frame(env = env),
+      species = lev, multi_season = "hierarchical"
+    )
+    d$site <- factor(d$site)
+    cached <<- list(
+      data = d, K = K_sp, J = J, T_s = T_s, V = V, N_lv = N_lv,
+      species_levels = lev, rho_true = rho_true, p_true = p_true,
+      Z_true = Z_true, lv_true = lv_true, env = env,
+      alpha_site = alpha_site, alpha_sp = alpha_sp, psi = psi, z = z,
+      n_unit = K_sp * J * T_s, n_row = K_sp * J * T_s * V
+    )
+    cached
+  }
+})
+
+fit_multi_season <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    path <- cache_path("val_mvgam_occ_multi_season.rds")
+    if (file.exists(path)) {
+      cached <<- readRDS(path)
+      return(cached)
+    }
+    sim <- sim_multi_season()
+    cached <<- jsdgam(
+      formula = y ~ s(env, k = 6) + s(site, bs = "re"),
+      factor_formula = ~ AR(time = time) - 1,
+      data = sim$data, unit = time, species = series,
+      family = occ(multi_season = TRUE), n_lv = sim$N_lv,
+      prior = prior(normal(0, 0.5), class = "sds"),
+      chains = 2L, iter = 1000L, warmup = 500L,
+      silent = 2, backend = "cmdstanr"
+    )
+    saveRDS(cached, path)
+    cached
+  }
+})
+
+
+test_that("multi-season: the frame separates all four axes", {
+  sim <- sim_multi_season()
+  d <- sim$data
+  # The premise every claim below rests on. If any two of these
+  # coincided a surface answering on the wrong one would still be
+  # counted correct.
+  expect_identical(nrow(d), sim$n_row)
+  expect_identical(nrow(unique(d[, c("series", "time")])),
+                   sim$K * sim$T_s)
+  expect_identical(nrow(unique(d[, c("series", "site", "time")])),
+                   sim$n_unit)
+  expect_false(sim$K * sim$T_s == sim$n_unit)
+  expect_setequal(as.character(unique(d$series)), sim$species_levels)
+  # `"hierarchical"` keeps `time` as the season rather than fusing
+  # site into it, which is what leaves site free to be a covariate.
+  expect_identical(sort(unique(d$time)), seq_len(sim$T_s))
+})
+
+
+test_that("multi-season: every per-unit surface uses the unit axis", {
+  sim <- sim_multi_season()
+  fit <- fit_multi_season()
+  # `occ(multi_season = TRUE)` is documented to activate the
+  # three-axis grouping, and Stan does: `N_unit` is 480, the count
+  # of (series, site, season) cells, not the 48 that (series,
+  # season) gives. Everything reported per unit has to agree with
+  # it. Measured, `log_lik()` does and three others do not, each
+  # returning 48 and so describing one site in ten while naming no
+  # site at all. The single-season fits above agree across all five,
+  # which is what places this on the multi-season path.
+  expect_identical(as.integer(standata(fit)$N_unit), sim$n_unit)
+  expect_identical(ncol(log_lik(fit, ndraws = 5L)), sim$n_unit)
+  expect_identical(
+    ncol(predict(fit, type = "latent_state", ndraws = 5L,
+                 summary = FALSE)),
+    sim$n_unit
+  )
+  expect_identical(nrow(residuals(fit, ndraws = 5L)), sim$n_unit)
+  expect_identical(nrow(latent_N_saturation(fit)), sim$n_unit)
+
+  # The per-visit surfaces answer on rows, which is the other grain
+  # and is correct on this fit. Stating both is what makes the
+  # failures above a confusion between two axes rather than a
+  # method that is simply short.
+  expect_identical(ncol(posterior_epred(fit, ndraws = 5L)), sim$n_row)
+  expect_identical(ncol(posterior_predict(fit, ndraws = 5L)), sim$n_row)
+  expect_identical(nrow(fitted(fit, ndraws = 5L)), sim$n_row)
+  expect_identical(nrow(augment(fit)), sim$n_row)
+})
+
+
+test_that("multi-season: the saturation table names its units", {
+  sim <- sim_multi_season()
+  fit <- fit_multi_season()
+  sat <- latent_N_saturation(fit)
+  # Finding 19 on the three-axis grouping. A label has to reach a
+  # site and a season, and a unit here is a (species, site, season)
+  # triple, so a two-part index cannot identify one even in
+  # principle.
+  expect_true(all(c("unit", "label") %in% names(sat)))
+  expect_identical(length(unique(sat$label)), sim$n_unit)
+  expect_true(any(grepl(paste(sim$species_levels, collapse = "|"),
+                        sat$label)))
+})
+
+
+test_that("multi-season: hindcast returns one arm per species", {
+  sim <- sim_multi_season()
+  fit <- fit_multi_season()
+  hc <- hindcast(fit, ndraws = 10L)
+  expect_s3_class(hc, "mvgam_forecast")
+  # Measured, this comes back with no arms at all: a named list of
+  # length zero, raising nothing. An empty result satisfies every
+  # claim of the form "each arm has the right width", so the count
+  # is stated before anything is read out of it.
+  expect_length(hc$forecasts, sim$K)
+  # `names()` of an empty list is NULL, and a set comparison against
+  # NULL raises instead of failing, which would leave this block
+  # reporting an error where it has a result to report. Coercing
+  # first keeps the failure a failure.
+  expect_identical(sort(as.character(names(hc$forecasts))),
+                   sort(sim$species_levels))
+  for (s in names(hc$forecasts)) {
+    expect_identical(nrow(hc$forecasts[[s]]), 10L)
+    expect_true(all(is.finite(hc$forecasts[[s]])))
+  }
+})
+
+
+test_that("multi-season: the fit reports its own dimensions", {
+  sim <- sim_multi_season()
+  fit <- fit_multi_season()
+  # Six counters that have to agree with each other and with the
+  # frame. None of them is driven anywhere else in this directory,
+  # and each is the kind of number a caller trusts without checking.
+  expect_identical(as.integer(ndraws(fit)),
+                   as.integer(nchains(fit) * niterations(fit)))
+  expect_identical(as.integer(nobs(fit)), sim$n_row)
+  expect_identical(as.integer(nsamples(fit)), as.integer(ndraws(fit)))
+  expect_identical(as.integer(nvariables(fit)),
+                   ncol(as_draws_matrix(fit)))
+
+  # `variables()` filters the draws it reports and the diagnostics
+  # do not, so the two differ by exactly Stan's own bookkeeping
+  # columns. Naming them is what makes this a claim: a real
+  # parameter that started being hidden, or a raw block that started
+  # being exposed, changes this set rather than the counts.
+  extra <- setdiff(colnames(as_draws_matrix(fit)), variables(fit))
+  expect_setequal(extra, c("lprior", "lp__"))
+  expect_identical(setdiff(variables(fit),
+                           colnames(as_draws_matrix(fit))),
+                   character(0))
+  expect_setequal(names(rhat(fit)), colnames(as_draws_matrix(fit)))
+  expect_setequal(names(neff_ratio(fit)), names(rhat(fit)))
+
+  # An effective sample size is undefined for a parameter that never
+  # moves, and this trend carries no design, so its 48 `mu_trend`
+  # entries are structurally zero and come back `NA`. The claim is
+  # that the two sets coincide: an `NA` against a parameter that
+  # does move would be a diagnostic failing silently, and the
+  # single-season fit has neither.
+  nr <- neff_ratio(fit)
+  dm <- as_draws_matrix(fit)
+  moves <- apply(dm[, names(nr), drop = FALSE], 2L, stats::sd) > 0
+  expect_identical(unname(is.na(nr)), unname(!moves))
+  expect_true(all(nr[moves] > 0))
+})
+
+
+test_that("multi-season: the five draws formats hold one posterior", {
+  fit <- fit_multi_season()
+  # Six containers for the same numbers. Converting between them is
+  # where a chain-major and a draw-major layout get confused, and a
+  # container that transposed its contents keeps every dimension.
+  dm <- as_draws_matrix(fit)
+  da <- as_draws_array(fit)
+  dd <- as_draws_df(fit)
+  dl <- as_draws_list(fit)
+  dr <- as_draws_rvars(fit)
+  expect_identical(dim(da),
+                   c(as.integer(niterations(fit)),
+                     as.integer(nchains(fit)), ncol(dm)))
+  expect_length(dl, as.integer(nchains(fit)))
+  expect_true(all(vapply(dl, length, integer(1L)) == ncol(dm)))
+
+  # The values agree, not merely the shapes. A single parameter is
+  # read out of each container and required to be the same vector.
+  v <- "Intercept"
+  ref <- as.numeric(dm[, v])
+  expect_equal(as.numeric(dd[[v]]), ref)
+  expect_equal(as.numeric(posterior::draws_of(dr[[v]])), ref)
+  expect_equal(as.numeric(da[, , v]), ref)
+  # `unlist()` labels its result from the list it flattens, so the
+  # names are dropped before comparing values with values.
+  expect_equal(sort(unname(unlist(lapply(dl, `[[`, v))), method = "radix"),
+               sort(ref, method = "radix"))
+})
+
+
+test_that("multi-season: the fit describes its own specification", {
+  sim <- sim_multi_season()
+  fit <- fit_multi_season()
+  # The introspection hooks other packages read. `family()` is the
+  # one finding 4 turns on: a family misreported here is what sends
+  # a fit down a code path written for another.
+  # Measured, `family()` answers "custom" here while `summary()`
+  # prints "Family: occ" and `glance()` reports "occ". The accessor
+  # every downstream package reaches for is the one that does not
+  # name the family, and the gaussian VAR fit answers "gaussian" on
+  # the same method, so this belongs to the closure-unit families
+  # rather than to the method in general.
+  fam <- family(fit)
+  expect_identical(fam$family, "occ")
+  expect_identical(as.character(glance(fit)$family), fam$family)
+  expect_true(any(grepl("Family:\\s*occ",
+                        capture.output(summary(fit)))))
+
+  # `insight` reads these to build a data grid, so a wrong response
+  # or a missing predictor is a wrong plot rather than an error.
+  expect_identical(find_response(fit), "y")
+  preds <- unlist(find_predictors(fit), use.names = FALSE)
+  expect_true(all(c("env", "site") %in% preds))
+  expect_identical(nrow(get_data(fit)), sim$n_row)
+  expect_true(all(c("conditional", "trend") %in% names(find_formula(fit))))
+
+  # The sampler settings the call asked for come back as asked.
+  ctrl <- control_params(fit)
+  expect_true(all(c("adapt_delta", "max_treedepth") %in% names(ctrl)))
+  expect_true(ctrl$adapt_delta > 0 && ctrl$adapt_delta < 1)
+
+  # `getCall()` has to name the function that built this, since it
+  # is what `update()` re-evaluates and what a user prints to see
+  # how a fit was made. Measured, element one is the `jsdgam`
+  # closure rather than the symbol `jsdgam`, so deparsing the call
+  # prints the whole function source instead of the call. Asking
+  # whether it is a name fails; coercing it raises, which would
+  # report an error where there is a result.
+  cl <- getCall(fit)
+  expect_true(is.name(cl[[1L]]))
+  # The call's own arguments are well formed, which is what makes
+  # the head position the single thing wrong with it.
+  expect_true(all(c("formula", "data", "family") %in% names(cl)))
+  expect_identical(nrow(model.frame(fit)), sim$n_row)
+})
+
+
+test_that("multi-season: every listed parameter is reachable", {
+  fit <- fit_multi_season()
+  # `hypothesis()` is the documented route to a posterior statement
+  # about one parameter. A parameter that `variables()` lists and
+  # the draws carry has to be reachable by the name both of them
+  # use. Measured, `sds_1[1]`, `p` and `ar1_trend[1]` are, and
+  # `bs_senv_1` is refused under the name it is listed by.
+  vars <- variables(fit)
+  targets <- c("Intercept", "sds_1[1]", "ar1_trend[1]", "bs_senv_1")
+  expect_true(all(targets %in% vars))
+  for (v in targets) {
+    # `bs_senv_1` raises here, so reachability is asserted before the
+    # value is read. Without that the block reports an error and
+    # says nothing about the three parameters that do work.
+    expect_no_error(hypothesis(fit, paste(v, "> 0")))
+  }
+  for (v in setdiff(targets, "bs_senv_1")) {
+    h <- hypothesis(fit, paste(v, "> 0"))
+    expect_s3_class(h, "brmshypothesis")
+    expect_true(is.finite(h$hypothesis$Estimate))
+    expect_true(h$hypothesis$Post.Prob >= 0 &&
+                  h$hypothesis$Post.Prob <= 1)
+  }
+})
+
+
+test_that("multi-season: the prior the call set is reported back", {
+  fit <- fit_multi_season()
+  # The fit was built with `prior(normal(0, 0.5), class = "sds")`,
+  # so a prior summary that does not carry it is not describing this
+  # model. Neither this nor `default_prior()` is driven anywhere
+  # else in the directory.
+  ps <- prior_summary(fit)
+  expect_s3_class(ps, "brmsprior")
+  expect_true("sds" %in% ps$class)
+  set_sds <- ps$prior[ps$class == "sds" & nzchar(ps$prior)]
+  expect_true(any(grepl("normal(0, 0.5)", set_sds, fixed = TRUE)))
+
+  # A default prior list is available for the same specification and
+  # names the classes this model actually has.
+  dp <- default_prior(fit)
+  expect_s3_class(dp, "brmsprior")
+  expect_true(all(c("sds", "Intercept") %in% dp$class))
+})

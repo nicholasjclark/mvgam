@@ -1169,6 +1169,115 @@ method refuses with an explanation. Choosing between those belongs
 to the jsdm work, so `test-jsdgam-families.R` leaves it unasserted
 and this entry carries it.
 
+## Multi-season closure units
+
+**37. The likelihood groups by three axes and three of the methods
+reporting one value per unit group by two.**
+
+In `test-closure-units.R`, under the claim that every surface
+reporting one value per unit uses the unit axis. Calling
+`pivot_detection_array(multi_season = "hierarchical")` keeps `time`
+as the season and hands `site` over as a covariate.
+`?pivot_detection_array` says to pair that with
+`occ(multi_season = TRUE)` "so the 3-axis closure-unit grouping
+`(series, site, time)` is activated". Stan does exactly that. The
+post-fit methods do not all follow.
+
+Measured on a fit with 6 species, 10 sites, 8 seasons and 3 visits,
+against the two single-season fits in the same file as controls:
+
+| surface | occ single | nmix single | occ multi-season |
+|---|---|---|---|
+| `standata$N_unit` | 75 | 24 | 480 |
+| `log_lik()` | 75 | 24 | 480 |
+| `predict("latent_state")` | 75 | 24 | 48 |
+| `residuals()` | 75 | 24 | 48 |
+| `latent_N_saturation()` | 75 | 24 | 48 |
+
+480 is the count of `(series, site, season)` cells and 48 is the
+count of `(series, season)` pairs, so the three that disagree have
+dropped the site axis. They return one unit in ten, name no site,
+and raise nothing. The per-visit methods are unaffected:
+`posterior_epred()`, `posterior_predict()`, `fitted()` and
+`augment()` all answer on the 1440 rows.
+
+Across all five rows the controls agree, which places the fault on
+the path taken when seasons are present rather than on any one
+method. It is the plan's own bug class at full size: one axis
+resolved twice, the answers differ by a factor of the site count,
+every index stays in range and nothing errors.
+
+The design that makes it visible is a frame where no two counts
+coincide. Species, sites, seasons, visits, units and rows are 6, 10,
+8, 3, 480 and 1440, so a method answering on the wrong axis cannot
+be scored correct by accident.
+
+**38. `hindcast()` returns no arms at all on a multi-season fit.**
+
+Same file, "multi-season: hindcast returns one arm per species".
+`hindcast(fit)` comes back as an `mvgam_forecast` whose `forecasts`
+list has length zero, with no warning and no error. Every other fit
+in this suite returns one arm per series, named.
+
+An empty list satisfies any claim written as a loop over the arms,
+which is why the assertion states the count before reading anything
+out of it. Distinct from finding 30, where the composition families
+return arms that are constant: here there is nothing to be constant.
+
+**39. `hypothesis()` cannot reach a smooth's own coefficient.**
+
+Same fit. `hypothesis()` accepts `sds_1[1]`, `p` and
+`ar1_trend[1]`, and refuses `bs_senv_1`:
+
+    Some parameters cannot be found in the model: 'bs_senv_1'
+
+`bs_senv_1` is present in `as_draws_matrix()` and listed by
+`variables()`, so the parameter exists under the name it was
+refused by. One class of parameter is unreachable while its
+neighbours in the same table are not, which points at the lookup
+rather than at the model.
+
+## Introspection
+
+**40. `family()` answers "custom" on an occupancy fit while two
+other methods answer "occ".**
+
+`test-closure-units.R`, "multi-season: the fit describes its own
+specification". Asked of the same fit three ways:
+
+| call | answer |
+|---|---|
+| `family(fit)$family` | `custom` |
+| `summary(fit)` | `Family: occ` |
+| `glance(fit)$family` | `occ` |
+
+The fit with one season reproduces it, so this belongs to the
+family and not to the path that seasons take. On the same method the
+gaussian VAR fixture answers `gaussian`, which places the fault with
+the closure-unit families rather than with `family()` at large.
+
+`family()` is the accessor other packages reach for, so this is the
+one of the three that matters most. A closure-unit family is
+implemented through a custom brms family, and the implementation
+detail is reaching the surface where the name should be. It is
+finding 4 seen from the other side. There a family was sorted into
+the closure-unit group when it did not belong; here a family that
+does belong will not give its name.
+
+**41. `getCall()` returns the function itself where a call names
+it.**
+
+Same block. `getCall(fit)[[1]]` is the `jsdgam` closure rather than
+the symbol `jsdgam`, so `deparse(getCall(fit))` prints the whole of
+`jsdgam`'s source in place of the call that made the fit. The rest
+of the call is well formed: its names run `formula`,
+`trend_formula`, `data`, `backend`, `family` and so on.
+
+Seen on the single-season fit too. `?getCall` describes the return
+as a call suitable for `update()` to modify and re-evaluate, and a
+user prints it to see how a fit was made, so a closure in the head
+position defeats both readings of it.
+
 ## The structured loadings prior
 
 **36. Three recovery claims were aimed at a target no fit can hit,
