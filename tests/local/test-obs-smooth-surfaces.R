@@ -202,7 +202,7 @@ test_that("the frame separates the two grouping factors", {
 })
 
 
-test_that("smooths names all three terms, and only those", {
+test_that("smooths names the two mgcv terms, and not the GP", {
   mv <- sm_fit()
   # The expected list comes from the fit's own formula, so this
   # asks whether `smooths()` reports what the model was given
@@ -372,6 +372,72 @@ test_that("gp(w, by = cat) reaches every prediction route", {
   # two levels apart. A by-factor contribution dropped from any one
   # of them fails here and nowhere else.
   assert_by_factor_variation(mv, grid_A, grid_B)
+})
+
+
+test_that("the layout arguments reach the drawn smooth", {
+  # `surface` and `facets` decide how a two-dimensional smooth is
+  # rendered, and an argument of that kind is the sort that goes
+  # inert without anyone noticing: the call still returns a frame of
+  # the right shape under either value. The tensor term is what makes
+  # the two distinguishable, so the claim is that they differ.
+  mv <- sm_fit()
+  tensor <- conditional_smooths(mv)
+  flat <- conditional_smooths(mv, surface = FALSE)
+  two_d <- grep("^mu: t2", names(tensor), value = TRUE)
+  expect_length(two_d, 1L)
+
+  # The grid a surface is drawn over is far denser than a set of
+  # faceted lines, and the attribute records which was built.
+  expect_true(isTRUE(attr(tensor[[two_d]], "surface")))
+  expect_false(isTRUE(attr(flat[[two_d]], "surface")))
+  expect_gt(nrow(tensor[[two_d]]), nrow(flat[[two_d]]))
+
+  # And the geometry follows it: contours for the surface, lines for
+  # the faceted form.
+  geom_of <- function(cs) {
+    pl <- plot(cs)
+    idx <- which(names(cs) == two_d)
+    vapply(pl[[idx]]$layers, function(l) class(l$geom)[1L],
+           character(1L))
+  }
+  expect_true(any(grepl("Contour", geom_of(tensor))))
+  expect_false(any(grepl("Contour", geom_of(flat))))
+
+  # `facets` only means anything once the surface is off, and it
+  # decides how many slices of the second covariate are drawn.
+  expect_identical(
+    nrow(conditional_smooths(mv, surface = FALSE, facets = 2L)[[two_d]]),
+    nrow(flat[[two_d]]) %/% 3L * 2L
+  )
+})
+
+
+test_that("the general surface answers on a smooth-carrying fit", {
+  # Nine blocks above ask what this file was written for, and none of
+  # them leaves the smooth machinery. These are the calls a reader
+  # makes around it.
+  mv <- sm_fit()
+
+  expect_s3_class(model.frame(mv), "data.frame")
+
+  # The model's predictors are the covariates its smooths are built
+  # on. `time` is the axis the trend is indexed by, and a consumer
+  # offered it will take a slope over an occasion number.
+  preds <- insight::find_predictors(mv)$conditional
+  expect_setequal(preds, c("z", "w", "grp", "cat"))
+
+  # An argument nothing reads leaves the method running on the
+  # default it was asked to override.
+  expect_error(posterior_smooths(mv, smooth = smooths(mv)[1L],
+                                 zzz_unknown = 1))
+  expect_error(conditional_smooths(mv, zzz_unknown = 1))
+
+  # Last, because it raises rather than returning: `terms()` is how a
+  # caller discovers a model's structure without knowing the class,
+  # and it has no method, so anything after it in this block would go
+  # unrun.
+  expect_true(inherits(terms(mv), "terms"))
 })
 
 
