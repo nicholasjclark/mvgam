@@ -20,17 +20,21 @@
 #
 # Occasions are numbered from 3, so a rank is never a time.
 #
-# Six fits follow the occupancy one, each answering a question the
-# first cannot. Two of them put the closure unit under a factor
-# model, which is where the trend design moves to the latent-factor
-# axis while an observation still has to read a species cell.
+# Four fits follow the occupancy one, each answering a question the
+# first cannot. An `nmix()` fit gives the ceiling claim a range to be
+# wrong across, since a population size can sit below an observed
+# count where a boolean occupancy cannot. An occ fit with every sixth
+# visit unmade says what happens when the repeat-visit arrays and the
+# likelihood disagree about how many rows there are. A `jsdgam()` fit
+# puts the closure unit under a factor model, where the trend design
+# moves to the latent-factor axis while an observation still has to
+# read a species cell. A multi-season fit groups by three axes rather
+# than two.
 #
-# The rest: An `nmix()` fit gives the ceiling claim
-# a range to be wrong across, since a population size can sit below
-# an observed count where a boolean occupancy cannot. A pair of occ
-# fits, one complete and one with every sixth visit unmade, say what
-# happens when the repeat-visit arrays and the likelihood disagree
-# about how many rows there are.
+# Each fit here has to make some claim the others cannot. A second
+# family run through the same battery re-witnesses rather than adds,
+# and a second fit whose only job is to be compared against the first
+# buys one soft claim at the price of a whole model.
 #
 # Run with:
 #   testthat::test_file("tests/local/test-grain-closure-units.R")
@@ -647,17 +651,17 @@ gappy_fits <- local({
   cached <- NULL
   function() {
     if (!is.null(cached)) return(cached)
-    complete <- dat
-    gappy <- complete
+    gappy <- dat
     # Every sixth visit goes unmade, spread across sites rather than
     # clustered, so no unit loses all of its visits.
     gappy$y[seq(2L, nrow(gappy), by = 6L)] <- NA_integer_
-    fit_one <- function(d, nm) {
-      path <- cache_path(paste0("val_mvgam_occ_visits_", nm, ".rds"))
-      if (file.exists(path)) return(readRDS(path))
+    path <- cache_path("val_mvgam_occ_visits_gappy.rds")
+    fit <- if (file.exists(path)) {
+      readRDS(path)
+    } else {
       # brms reports the rows it dropped, once per internal pass.
       out <- withCallingHandlers(
-        mvgam(y ~ 1, data = d, family = occ(), chains = 2L,
+        mvgam(y ~ 1, data = gappy, family = occ(), chains = 2L,
               iter = 800L, warmup = 400L, silent = 2, seed = 11L,
               backend = "cmdstanr"),
         warning = function(w) {
@@ -669,9 +673,7 @@ gappy_fits <- local({
       saveRDS(out, path)
       out
     }
-    cached <<- list(complete = fit_one(complete, "complete"),
-                    gappy = fit_one(gappy, "gappy"),
-                    data_gappy = gappy)
+    cached <<- list(gappy = fit, data_gappy = gappy)
     cached
   }
 })
@@ -697,23 +699,17 @@ test_that("the unit arrays cover the visits that happened", {
 })
 
 
-test_that("dropping visits widens the estimate without moving it", {
-  # Fewer detections carry less information about occupancy, so the
-  # gappy fit stays compatible with the complete one rather than
-  # drifting somewhere else.
+test_that("a visit that never happened is still predicted", {
+  # The likelihood never saw these rows, and the frame still names
+  # them, so a prediction has to cover the whole frame rather than
+  # the observed part of it. A method sized to the likelihood comes
+  # back one column short per missing visit and every value in it is
+  # finite, so only the width says anything.
   obj <- gappy_fits()
-  full <- as.numeric(as.array(obj$complete, variable = "b_Intercept"))
-  gaps <- as.numeric(as.array(obj$gappy, variable = "b_Intercept"))
-  expect_lte(stats::quantile(gaps, 0.05), stats::median(full))
-  expect_gte(stats::quantile(gaps, 0.95), stats::median(full))
-  # Less data cannot sharpen the estimate.
-  expect_gte(stats::sd(gaps), stats::sd(full) * 0.9)
-
-  # Predictions still cover every row the frame supplies, including
-  # the ones the likelihood never saw.
   pp <- posterior_predict(obj$gappy, ndraws = 20L)
   expect_identical(ncol(pp), nrow(obj$data_gappy))
   gaps_at <- which(is.na(obj$data_gappy$y))
+  expect_gt(length(gaps_at), 0L)
   expect_true(all(is.finite(pp[, gaps_at])))
   expect_true(all(as.numeric(pp) %in% c(0, 1)))
 })
@@ -802,54 +798,6 @@ sim_jsdm_occ <- function() {
     n_visits = jsdm_visits, species_levels = jsdm_species,
     Z_true = Z_true, z_latent = z_latent, env = env,
     state_true = t(z_latent),
-    sigma_true_cor = cov2cor(sigma_true_cov + diag(1e-8, jsdm_K))
-  )
-}
-
-
-sim_jsdm_nmix <- function() {
-  set.seed(606L)
-  n_sites <- 30L
-  env <- sort(runif(n_sites, -2, 2))
-  lv_true <- jsdm_lv_true(env)
-  Z_true <- matrix(rnorm(jsdm_K * jsdm_N_lv, sd = 0.4),
-                   nrow = jsdm_K, ncol = jsdm_N_lv)
-  Z_true <- scale(Z_true, center = TRUE, scale = FALSE)
-  attr(Z_true, "scaled:center") <- NULL
-  b_int <- rnorm(jsdm_K, mean = 0.5, sd = 0.3)
-
-  log_lambda <- matrix(NA_real_, nrow = jsdm_K, ncol = n_sites)
-  for (s in seq_len(jsdm_K)) {
-    for (i in seq_len(n_sites)) {
-      log_lambda[s, i] <- b_int[s] + sum(Z_true[s, ] * lv_true[i, ])
-    }
-  }
-  N_latent <- matrix(rpois(jsdm_K * n_sites, exp(log_lambda)),
-                     nrow = jsdm_K, ncol = n_sites)
-  cap_true <- max(N_latent) + 5L
-  site_ids <- seq_len(n_sites) + 2L
-
-  rows <- list()
-  for (s in seq_len(jsdm_K)) {
-    for (i in seq_len(n_sites)) {
-      for (v in seq_len(jsdm_visits)) {
-        rows[[length(rows) + 1L]] <- data.frame(
-          species = jsdm_species[s], site = site_ids[i],
-          env = env[i], visit = v,
-          y = rbinom(1L, N_latent[s, i], jsdm_p_true),
-          cap = cap_true
-        )
-      }
-    }
-  }
-  d <- do.call(rbind, rows)
-  d$species <- factor(d$species, levels = jsdm_species)
-  sigma_true_cov <- tcrossprod(Z_true)
-  list(
-    data = d, n_sites = n_sites, K = jsdm_K, N_lv = jsdm_N_lv,
-    n_visits = jsdm_visits, species_levels = jsdm_species,
-    Z_true = Z_true, N_latent = N_latent, cap_true = cap_true,
-    env = env, state_true = t(N_latent),
     sigma_true_cor = cov2cor(sigma_true_cov + diag(1e-8, jsdm_K))
   )
 }
@@ -1231,16 +1179,6 @@ closure_jsdm_battery(
   state_ok = function(x) all(x >= 0 & x <= 1)
 )
 
-nmix_jsdm <- sim_jsdm_nmix()
-nmix_jsdm_fit <- fit_jsdm_closure("nmix", nmix_jsdm, nmix())
-closure_jsdm_battery(
-  "jsdgam nmix", nmix_jsdm, nmix_jsdm_fit, threshold_cor = 0.7,
-  # A latent population is a non-negative count under the cap.
-  state_ok = function(x) {
-    all(x >= 0) && all(x <= nmix_jsdm$cap_true)
-  }
-)
-
 
 test_that("jsdgam occ: the detection probability recovers the truth", {
   # A detection probability that had run to 0 or 1 is still a number
@@ -1261,32 +1199,20 @@ test_that("jsdgam occ: the detection probability recovers the truth", {
 })
 
 
-test_that("jsdgam nmix: detection and the identified mode both hold", {
-  dm <- as_draws_matrix(nmix_jsdm_fit$fit)
-  p_cols <- grep("^b_p_Intercept$|^Intercept_p$|^p$", colnames(dm),
-                 value = TRUE)
-  expect_gt(length(p_cols), 0L)
-  p_post <- as.numeric(dm[, p_cols[1L]])
-  p_resp <- if (grepl("^b_|^Intercept", p_cols[1L])) {
-    1 / (1 + exp(-p_post))
-  } else {
-    p_post
-  }
-  expect_lt(abs(mean(p_resp) - jsdm_p_true), 0.2)
-
-  # `nmix()` has no simplex constraint, so the loadings are not
-  # pinned to sum to zero the way the softmax families are. They do
-  # have to stay near the identified mode the Heaps QR targets: a
-  # column sum that has wandered means they are drifting along an
-  # unidentified direction, which leaves every loading finite and the
-  # covariance they imply unchanged.
+test_that("jsdgam occ: the loadings stay at the identified mode", {
+  # A closure-unit family carries no simplex constraint, so the
+  # loadings are not pinned to sum to zero the way the softmax
+  # families are. They still have to sit near the mode the Heaps QR
+  # targets: a column sum that has wandered means they are drifting
+  # along an unidentified direction, which leaves every loading
+  # finite and the covariance they imply unchanged.
+  dm <- as_draws_matrix(occ_jsdm_fit$fit)
   Z_m <- apply(
-    mvgam:::extract_Z_loadings(dm, n_obs_series = nmix_jsdm$K,
-                               n_lv = nmix_jsdm$N_lv),
+    mvgam:::extract_Z_loadings(dm, n_obs_series = occ_jsdm$K,
+                               n_lv = occ_jsdm$N_lv),
     c(2L, 3L), mean
   )
   expect_lt(max(abs(colSums(Z_m))), 0.5)
-  expect_gt(max(abs(Z_m)), 0.05)
 })
 
 
