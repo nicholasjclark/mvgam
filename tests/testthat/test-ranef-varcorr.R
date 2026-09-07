@@ -250,8 +250,8 @@ test_that("mvgam_ranef_aliases reads nlpar per row under shared-ID syntax", {
     class = "mvgam"
   )
   alias <- mvgam_ranef_aliases(stub)
-  # Both nlpar surfaces must emit their species random-deviation
-  # aliases, not just the first one.
+  # Both non-linear parameters carry their own species deviations,
+  # so both must appear in the map rather than the first alone.
   expect_true(any(grepl("^r_species__a\\[",  names(alias))))
   expect_true(any(grepl("^r_species__b1\\[", names(alias))))
   # Each nlpar gets its own sd entry.
@@ -392,9 +392,9 @@ test_that("VarCorr.mvgam matches brms::VarCorr.brmsfit signature", {
 })
 
 
-test_that("ranef.mvgam errors on a no-RE fit with an actionable hint", {
-  # Stub: no `M_<id>` keys, so the gate fires and we never call
-  # brm(empty=TRUE).
+test_that("ranef.mvgam names what to do on a fit with no REs", {
+  # Stub carrying no `M_<id>` keys, so the cheap gate short-circuits
+  # and brm(empty = TRUE) is never reached.
   stub <- structure(
     list(standata = list(N = 10L), formula = brms::bf(y ~ 1),
          data = data.frame(y = rnorm(10)),
@@ -464,6 +464,49 @@ test_that("mvgam_ranef_aliases gate excludes trend-only standata blocks", {
     class = "mvgam"
   )
   expect_identical(mvgam_ranef_aliases(stub), character(0L))
+})
+
+
+# ---- both sides of the group-level block --------------------------
+
+test_that("a trend-side random effect is named, not numbered", {
+  # The observation and trend blocks reach Stan under the same
+  # positional names, the trend's carrying `_trend` after the id.
+  # Only the observation side was aliased, so a random effect
+  # declared in `trend_formula` was reported as `sd_1_trend[1]`
+  # while the same effect on the observation side was reported as
+  # `sd_grp__Intercept`. Nothing told a reader why they differed.
+  fit <- structure(
+    list(
+      obs_model = structure(list(ranef = data.frame()), class = "brmsfit"),
+      trend_model = structure(
+        list(ranef = structure(
+          data.frame(
+            id = 1L, group = "grp", coef = "Intercept",
+            cor = TRUE, nlpar = "", dpar = "", resp = "",
+            stringsAsFactors = FALSE
+          ),
+          levels = list(grp = c("a", "b"))
+        )),
+        class = "brmsfit"
+      )
+    ),
+    class = "mvgam"
+  )
+  map <- mvgam_ranef_aliases(fit)
+
+  # The alias carries the suffix; the positional name it replaces
+  # carries `_trend` after the id, which is where brms puts it.
+  expect_true("sd_grp__Intercept_trend" %in% names(map))
+  expect_identical(unname(map["sd_grp__Intercept_trend"]),
+                     "sd_1_trend[1]")
+
+  # `posterior` reads a name as `variable[element]`, so the suffix
+  # belongs on the variable and the index stays last. Written the
+  # other way round, `r_grp[a,Intercept]_trend` would never select
+  # as an element of `r_grp_trend`.
+  expect_true("r_grp_trend[a,Intercept]" %in% names(map))
+  expect_false(any(grepl("\\]_trend$", names(map))))
 })
 
 

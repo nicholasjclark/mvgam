@@ -176,10 +176,10 @@ mvgam_beta_aliases <- function(x) {
     old <- paste0(pos_prefix, "[", seq_along(cn), "]")
     stats::setNames(old, new)
   }
-  # Non-linear sub-formulas surface via brmsformula$pforms keyed by
-  # the nlpar name, but only when the top-level formula is flagged
-  # with attr(., "nl") = TRUE. Capture once at the top of the
-  # sweep so the per-block branch can decide whether to strip.
+  # A non-linear sub-formula sits in brmsformula$pforms under its
+  # nlpar name, but only counts as one when the top-level formula
+  # carries attr(., "nl") = TRUE. Read once at the top of the sweep
+  # so the per-block branch can decide whether to strip.
   obs_form <- x$formula
   is_nl <- isTRUE(attr(
     if (inherits(obs_form, "brmsformula")) obs_form$formula else obs_form,
@@ -334,29 +334,38 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
 # (the named list of levels per grouping factor), or NULL when the
 # fit has no group-level effects.
 #
-# The observation-side brmsfit stored on the fit already carries
-# this table, built when the model was set up, so it is read rather
-# than rebuilt. Rebuilding it meant a `brm(empty = TRUE)` call on
-# every draws extraction of any fit with group-level effects, which
-# is every `variables()`, `coef()`, `fixef()`, `vcov()`, `rhat()`,
+# Each side stores a lightweight brmsfit that already carries this
+# table, built when the model was set up, so it is read rather than
+# rebuilt. Rebuilding it meant a `brm(empty = TRUE)` call on every
+# draws extraction of any fit with group-level effects, which is
+# every `variables()`, `coef()`, `fixef()`, `vcov()`, `rhat()`,
 # `posterior_summary()`, `tidy()`, `hypothesis()` and `get_coef()`
 # call on such a fit. Passing no prior to that call also made brms
 # derive and validate its own defaults, so it warned about priors
 # the fitted program does not contain.
 #
-# A fit saved before `obs_model` was stored still has to be
-# readable, so the rebuild remains as the fallback. Its `^M_<id>$`
-# gate short-circuits no-RE fits without paying the setup cost;
-# trend-side blocks carry the suffixed key `M_<id>_trend` and are
-# deliberately excluded.
+# A fit saved before those brmsfits were stored still has to be
+# readable, so the rebuild remains as the fallback on the
+# observation side. Its `^M_<id>$` gate short-circuits no-RE fits
+# without paying the setup cost, and trend-side blocks carry the
+# suffixed key `M_<id>_trend`, so they do not satisfy it. Such a
+# fit gets no trend-side aliasing rather than a guessed map, which
+# leaves its trend group-level parameters under positional names
+# and is the safe failure.
 #
 # Both `mvgam_ranef_aliases` and the user-facing `ranef.mvgam` /
 # `VarCorr.mvgam` methods read this, so the table is resolved once.
 #'@noRd
-mvgam_ranef_metadata <- function(x) {
+mvgam_ranef_metadata <- function(x,
+                                 side = c("observation", "trend")) {
   checkmate::assert_class(x, "mvgam")
-  reframe <- x$obs_model$ranef
-  if (is.null(reframe)) {
+  side <- match.arg(side)
+  reframe <- if (identical(side, "trend")) {
+    x$trend_model$ranef
+  } else {
+    x$obs_model$ranef
+  }
+  if (is.null(reframe) && identical(side, "observation")) {
     # If brms ever changes the obs-side key naming, the gate falls
     # closed (no aliasing) rather than producing an incorrect map,
     # which is the safe failure mode.
@@ -400,31 +409,42 @@ mvgam_ranef_metadata <- function(x) {
 # walks pairs in the same order so the alias index matches brms
 # byte-for-byte at any M.
 #
-# Aliasing covers the observation-side group structure. A random
-# effect declared in `trend_formula` keeps its positional Stan
-# name, which addresses the same draws under a different label.
-# Extending here:
-# iterate over the trend brmsterms via
-# `brms::brm(formula = x$trend_formula, ..., empty = TRUE)`,
-# build the same r_/sd_/cor_ maps, and append a `_trend` suffix
-# to each alias name (mirrors the `_trend` suffix the beta
-# aliaser already applies for the `b_trend[k]` block).
+# Both sides are aliased. The observation and trend blocks reach
+# Stan under the same positional names, the trend's carrying
+# `_trend` after the id, and each side's table is read off the
+# lightweight brmsfit stored for it.
 #
-# Other brms RE patterns the helper inherits from `brm(empty=TRUE)`:
-# multivariate response (`bf(mvbind(y1, y2) ~ (1 | g))`),
-# distributional-parameter REs (`bf(y ~ ..., sigma ~ (1 | g))`),
-# nested REs (`(1 | g1/g2)` expanded to `(1|g1) + (1|g1:g2)`),
-# by-factor REs (`gr(g, by = f)`). brms's metadata for these
-# scenarios is exposed via the same `empty$ranef` table, so the
-# aliaser produces correct maps without special-casing. No test
-# fixtures exist for them yet; add concordance coverage when
-# user demand surfaces.
+# The other brms group-level patterns come through the same
+# `$ranef` table and so need no special case here: multivariate
+# response (`bf(mvbind(y1, y2) ~ (1 | g))`), distributional
+# parameters (`bf(y ~ ..., sigma ~ (1 | g))`), nesting
+# (`(1 | g1/g2)`, expanded to `(1|g1) + (1|g1:g2)`) and by-factor
+# grouping (`gr(g, by = f)`).
 #'@noRd
 mvgam_ranef_aliases <- function(x) {
-  meta <- mvgam_ranef_metadata(x)
+  c(mvgam_ranef_aliases_side(x, "observation"),
+    mvgam_ranef_aliases_side(x, "trend"))
+}
+
+
+# Internal: the alias map for one side's group-level block.
+#
+# A random effect declared in `trend_formula` reaches Stan under the
+# same positional names the observation side uses, with `_trend`
+# after the id: `sd_1_trend[1]` where the observation side has
+# `sd_1[1]`. Its alias takes the `_trend` suffix the beta aliaser
+# already applies to `b_trend[k]`, so `sd_grp__Intercept_trend`
+# rather than a positional name no reader can act on.
+#'@noRd
+mvgam_ranef_aliases_side <- function(x,
+                                     side = c("observation", "trend")) {
+  side <- match.arg(side)
+  meta <- mvgam_ranef_metadata(x, side)
   if (is.null(meta)) {
     return(character(0L))
   }
+  pos_sfx <- if (identical(side, "trend")) "_trend" else ""
+  alias_sfx <- pos_sfx
   reframe <- meta$reframe
   group_levels <- meta$group_levels
   ids <- unique(reframe$id)
@@ -481,16 +501,21 @@ mvgam_ranef_aliases <- function(x) {
     coef_infix <- ifelse(nzchar(pfx_per_coef),
                           paste0("_", pfx_per_coef), "")
     r_old <- if (has_cor) {
-      sprintf("r_%d%s[%d,%d]", id, coef_infix[grid$coef_idx],
-              grid$level_idx, grid$coef_idx)
+      sprintf("r_%d%s%s[%d,%d]", id, coef_infix[grid$coef_idx],
+              pos_sfx, grid$level_idx, grid$coef_idx)
     } else {
-      sprintf("r_%d%s_%d[%d]", id,
+      sprintf("r_%d%s_%d%s[%d]", id,
               coef_infix[grid$coef_idx],
-              grid$coef_idx, grid$level_idx)
+              grid$coef_idx, pos_sfx, grid$level_idx)
     }
+    # The suffix belongs on the variable name, before the index.
+    # `posterior` parses a name as `variable[element]`, so
+    # `r_grp[a,Intercept]_trend` would not select as an element of
+    # `r_grp_trend` and `subset_draws(variable = "r_grp_trend")`
+    # would find nothing.
     r_new <- sprintf(
-      "r_%s[%s,%s]", group_token_per_coef[grid$coef_idx],
-      levels[grid$level_idx], coefs[grid$coef_idx]
+      "r_%s%s[%s,%s]", group_token_per_coef[grid$coef_idx],
+      alias_sfx, levels[grid$level_idx], coefs[grid$coef_idx]
     )
     r_map <- stats::setNames(r_old, r_new)
     # sd_<id>[<coef_idx>] -> sd_<group>__[<nlpar>_]<coef>
@@ -498,8 +523,8 @@ mvgam_ranef_aliases <- function(x) {
     # nlpar / dpar / response infix because `id` already
     # distinguishes per-response (mv) and per-nlpar/dpar
     # grouping blocks (each gets its own id).
-    sd_old <- sprintf("sd_%d[%d]", id, seq_len(n_coef))
-    sd_new <- sprintf("sd_%s__%s", group, coef_alias)
+    sd_old <- sprintf("sd_%d%s[%d]", id, pos_sfx, seq_len(n_coef))
+    sd_new <- sprintf("sd_%s__%s%s", group, coef_alias, alias_sfx)
     sd_map <- stats::setNames(sd_old, sd_new)
     # cor_<id>[<k>] -> cor_<group>__[<nlpar>_]<coef_j>__[<nlpar>_]<coef_k>
     # Pair order follows brms's column-major upper-triangle packing
@@ -508,10 +533,10 @@ mvgam_ranef_aliases <- function(x) {
     if (has_cor) {
       ks <- rep(2:n_coef, times = seq_len(n_coef - 1L))
       js <- unlist(lapply(2:n_coef, function(k) seq_len(k - 1L)))
-      cor_old <- sprintf("cor_%d[%d]", id, seq_along(js))
+      cor_old <- sprintf("cor_%d%s[%d]", id, pos_sfx, seq_along(js))
       cor_new <- sprintf(
-        "cor_%s__%s__%s", group,
-        coef_alias[js], coef_alias[ks]
+        "cor_%s__%s__%s%s", group,
+        coef_alias[js], coef_alias[ks], alias_sfx
       )
       cor_map <- stats::setNames(cor_old, cor_new)
     }
