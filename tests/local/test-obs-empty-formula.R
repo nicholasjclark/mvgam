@@ -162,6 +162,84 @@ test_that("the frame handed back is the frame that was given", {
 })
 
 
+# The stacked design, and why it belongs on a prefit
+#
+# The linear predictor is `X %*% b` plus the trend, and the trend's
+# own mean is `X_trend %*% b_trend` read at that row's cell. So the
+# matrix deciding whether the two sides are separately identified is
+# the pair stacked side by side, and it is fully determined before
+# any sampling.
+
+stacked_design <- function(fit) {
+  sd <- standata(fit)
+  X <- sd$X
+  Xt <- sd$X_trend
+  if (is.null(Xt)) {
+    return(X)
+  }
+  # `X_trend` runs on the trend grid, so each observation row is
+  # mapped through the same index Stan uses.
+  idx <- vapply(
+    seq_along(sd$obs_trend_time),
+    function(i) {
+      sd$times_trend[sd$obs_trend_time[i], sd$obs_trend_series[i]]
+    },
+    numeric(1)
+  )
+  cbind(X, Xt[idx, , drop = FALSE])
+}
+
+
+test_that("the mapping onto the trend grid is the one Stan uses", {
+  # The block below is only worth anything if this index is right, so
+  # it is checked on a fit where the same covariate sits on both
+  # sides: the mapped trend column has to be the frame's own values.
+  pre_both <- mvgam(
+    y ~ elev, trend_formula = ~ elev + AR(p = 1),
+    data = dat, family = gaussian(), run_model = FALSE
+  )
+  sd <- standata(pre_both)
+  idx <- vapply(
+    seq_along(sd$obs_trend_time),
+    function(i) {
+      sd$times_trend[sd$obs_trend_time[i], sd$obs_trend_series[i]]
+    },
+    numeric(1)
+  )
+  expect_equal(as.numeric(sd$X_trend[idx, "elev"]), dat$elev)
+  expect_equal(as.numeric(sd$X[, "elev"]), dat$elev)
+})
+
+
+test_that("the two designs do not span a direction twice", {
+  # FAILS TODAY on four of the six pairings below. A rank below the
+  # column count is a flat direction in the likelihood, which is the
+  # ridge finding 83 measures: the sampler wanders it, R-hat rises
+  # above 2 and the reported values are whatever the prior allowed.
+  #
+  # `y ~ 1` against `~ 1 + AR` is the pairing that works, so the
+  # reconciliation exists somewhere and does not run for a factor or
+  # for a shared covariate.
+  pairs <- list(
+    list(y ~ -1, ~ elev + AR(p = 1)),
+    list(y ~ -1, ~ series + AR(p = 1)),
+    list(y ~ 1, ~ elev + AR(p = 1)),
+    list(y ~ 1, ~ series + AR(p = 1)),
+    list(y ~ 1, ~ 1 + AR(p = 1)),
+    list(y ~ elev, ~ series + AR(p = 1)),
+    list(y ~ elev, ~ elev + AR(p = 1))
+  )
+  for (pr in pairs) {
+    pre_i <- mvgam(
+      pr[[1L]], trend_formula = pr[[2L]], data = dat,
+      family = gaussian(), run_model = FALSE
+    )
+    M <- stacked_design(pre_i)
+    expect_identical(qr(M)$rank, ncol(M))
+  }
+})
+
+
 # -- Fits -------------------------------------------------------------
 #
 # Two, and the pair is what separates a cosmetic name from a

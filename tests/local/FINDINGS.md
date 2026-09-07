@@ -2990,3 +2990,59 @@ told a constant is something to take a slope over. And the stored
 frame gains the column: `names(fit$data)` returns the user's four
 columns plus the placeholder, so `insight::get_data()` hands back a
 frame that is not the one supplied.
+
+**84. The observation and trend designs are not checked against each
+other, and four common pairings are rank deficient.**
+
+Finding 83 is one case of this. The linear predictor is
+`X %*% b` plus the trend, and the trend's own mean is
+`X_trend %*% b_trend` read at that row's cell. The matrix that
+decides identification is therefore the two designs stacked side by
+side. It is available on a prefit. Nothing computes it.
+
+Stacked and ranked on 30 occasions of three series, mapping each
+observation row to its trend row through `times_trend[obs_trend_time,
+obs_trend_series]`:
+
+| observation formula | trend formula | cols | rank |
+|---|---|---|---|
+| `y ~ -1` | `~ elev + AR(p = 1)` | 2 | 2 |
+| `y ~ -1` | `~ series + AR(p = 1)` | 4 | **3** |
+| `y ~ 1` | `~ elev + AR(p = 1)` | 2 | 2 |
+| `y ~ 1` | `~ series + AR(p = 1)` | 4 | **3** |
+| `y ~ 1` | `~ 1 + AR(p = 1)` | 1 | 1 |
+| `y ~ elev` | `~ series + AR(p = 1)` | 5 | **4** |
+| `y ~ elev` | `~ elev + AR(p = 1)` | 3 | **2** |
+
+The mapping was checked rather than assumed. On the last row,
+`max|X[, "elev"] - X_trend[idx, "elev"]|` is exactly 0 and the mapped
+column equals the frame's own `elev`, so the same covariate really is
+entering both sides at every row. On the `series` rows the mapped
+trend dummies sum to 1 at every row and `X` is a column of ones, so
+the observation intercept is the sum of the trend's series levels.
+
+Two of these reach past the empty-formula idiom that finding 83 is
+about.
+
+`y ~ 1` with `~ series` on the trend is the ordinary way to ask for a
+per-series latent level. Its intercept is confounded with those
+levels. `y ~ elev` with `~ elev` on the trend puts one covariate on both
+sides. A user might write that to ask whether a gradient acts on the
+observation or on the process. The likelihood cannot tell the two
+apart, and mvgam builds the model without a word.
+
+The row that works is the one to copy. `y ~ 1` against `~ 1 + AR`
+comes back with a single column, so the two intercepts were already
+reconciled somewhere. Whatever does that for a bare intercept does
+not run for a factor or a shared covariate.
+
+What this costs is finding 83's table. An exact ridge, R-hat above
+2, a bulk ESS of single digits and reported values two orders of
+magnitude from the truth, on a model the package agreed to fit. A
+prior can still make the posterior proper. The parts are then the
+prior's, which is the state `var.Rmd` ships in.
+
+The check is cheap and needs no posterior. Stacking the two designs
+and comparing `qr()$rank` against `ncol()` takes four lines and runs
+on a prefit. It would name the pairing rather than leaving a user to
+read it out of an R-hat column.
