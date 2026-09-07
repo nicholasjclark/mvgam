@@ -1461,16 +1461,29 @@ hidden_unrotated_factor_pars <- function(pars) {
   paste(patterns, collapse = "|")
 }
 
-# Return the input vector with rotation- / sign-indeterminate raw
-# factor-model parameter names dropped, using the regex from
-# `hidden_unrotated_factor_pars()`. Centralises the filter used by
-# `variables.mvgam()`, `extract_mvgam_draws()` and `summary.mvgam()`
-# so name-side filtering lives in one place.
+# Which of `pars` are rotation- / sign-indeterminate raw
+# factor-model parameters, as a logical mask. Callers want the
+# answer in two shapes -- a mask to combine with other conditions,
+# and a filtered vector -- so the regex from
+# `hidden_unrotated_factor_pars()` is applied here once and
+# `filter_hidden_unrotated()` is defined in terms of it. Four
+# places used to rebuild the mask inline, and they had drifted:
+# one applied it to a single parameter bucket rather than to all
+# of them, which is how `L_Omega_trend` reached `tidy()` while
+# every other accessor hid it.
+#'@noRd
+is_hidden_unrotated <- function(pars) {
+  hide_pat <- hidden_unrotated_factor_pars(pars)
+  if (is.null(hide_pat)) return(rep(FALSE, length(pars)))
+  grepl(hide_pat, pars)
+}
+
+# Return the input vector with the parameters `is_hidden_unrotated()`
+# names dropped. Used by `variables.mvgam()`,
+# `extract_mvgam_draws()` and `summary.mvgam()`.
 #'@noRd
 filter_hidden_unrotated <- function(pars) {
-  hide_pat <- hidden_unrotated_factor_pars(pars)
-  if (is.null(hide_pat)) return(pars)
-  pars[!grepl(hide_pat, pars)]
+  pars[!is_hidden_unrotated(pars)]
 }
 
 # Internal: return a `[ndraws, n_series, n_lv]` loading array

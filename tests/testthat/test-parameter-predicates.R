@@ -36,10 +36,67 @@ test_that("the trend suffix decides which block a parameter prints in", {
     c("b_Intercept", "b_x", "b_pre_trend_score", "b_trending")
   )
   # The trend block holds only what the trend model emitted.
+  is_trend_block <- mvgam_par_side(pars) == "trend" &
+    mvgam_par_kind(pars) != "state"
   expect_setequal(
-    pars[match_trend_pars(pars)],
+    pars[is_trend_block],
     c("sigma_trend[1]", "ar1_trend[1]", "b_x_trend")
   )
+})
+
+
+test_that("one taxonomy answers for every consumer of a name", {
+  # The kind and the side are decided once. Three places used to
+  # decide them separately and had drifted: the smooth set differed
+  # between the `variable =` keyword resolver and the bucket builder,
+  # and the trend block counted three state names where the other two
+  # counted six.
+  pars <- c(
+    "b_Intercept", "b_x", "sigma", "shape",
+    "sds_1[1]", "s_1_1[1]", "sd_grp__Intercept", "r_grp[1,1]",
+    "b_x_trend", "Intercept_trend", "sigma_trend[1]", "ar1_trend[1]",
+    "sds_1_trend[1]", "sd_g__Intercept_trend",
+    "trend[1,1]", "lv_trend[1,1]", "mu_trend[1]",
+    "innovations_trend[1,1]", "scaled_innovations_trend[1,1]",
+    "lscale_1[1]", "zs_1_1[1]", "Z[1,1]", "Z_tilde[1,1]"
+  )
+  kind <- mvgam_par_kind(pars)
+  side <- mvgam_par_side(pars)
+  names(kind) <- pars
+
+  # Every state spelling the generated Stan emits is a state, on the
+  # one account rather than on three that disagreed.
+  expect_setequal(
+    pars[kind == "state"],
+    c("trend[1,1]", "lv_trend[1,1]", "mu_trend[1]",
+      "innovations_trend[1,1]", "scaled_innovations_trend[1,1]")
+  )
+  # The same prefix means different things on the two sides.
+  expect_identical(unname(kind["sigma"]), "family")
+  expect_identical(unname(kind["sigma_trend[1]"]), "dynamics")
+  # The smooth block is three kinds, because its consumers want
+  # three different combinations. `?mvgam_draws` documents the
+  # `smooth_params` keyword as the smoothing standard deviations
+  # alone, `summary()` reports those with the basis coefficients,
+  # and the parameter buckets add the Gaussian-process
+  # hyperparameters. Stating the split here is what stops each
+  # caller encoding it in a regex of its own.
+  expect_setequal(
+    pars[kind == "smooth_sd"],
+    c("sds_1[1]", "sds_1_trend[1]")
+  )
+  expect_identical(unname(kind["s_1_1[1]"]), "smooth_coef")
+  expect_identical(unname(kind["lscale_1[1]"]), "gp")
+  expect_identical(unname(kind["zs_1_1[1]"]), "smooth_coef")
+  # A rotated fit carries both loading bases and both are loadings;
+  # which one a reader sees is settled by the hide filter.
+  expect_identical(unname(kind["Z_tilde[1,1]"]), "loading")
+  # Loadings bridge the two sides and carry no suffix, so they are
+  # named before the side is consulted.
+  expect_identical(unname(kind["Z[1,1]"]), "loading")
+  expect_identical(unname(side[pars == "Z[1,1]"]), "observation")
+  # Nothing falls through unclassified.
+  expect_false(any(kind == "other"))
 })
 
 

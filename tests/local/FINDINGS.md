@@ -1920,9 +1920,30 @@ The split across methods says where it comes from:
 |---|---|
 | `variables()`, `summary()`, `ranef()`, `VarCorr()`, `ngrps()` | `posterior_epred()`, `posterior_linpred()`, `predictive_error()`, `prior_summary()`, `find_random()` |
 
-The five that warn are the ones that delegate to the stored brms
-model, which re-derives brms's own default set and validates it. The
-ones that stay inside mvgam see the prior mvgam actually built.
+**The cause, traced.** The first reading of this entry was that the
+five delegate to the stored brms model. They do not. Every one of
+them reaches `mvgam_ranef_metadata()`
+(`R/as.data.frame.mvgam.R:336`), which recovers the group-level
+table by calling
+
+```r
+empty <- brms::brm(formula = x$formula, data = x$data,
+                   family = x$family, empty = TRUE, silent = 2)
+```
+
+Passing no prior makes brms derive its own defaults and validate
+them, so it reaches for the Student-t `nu`'s `gamma(2, 0.1)` and
+warns about a prior the fitted program does not contain. The
+quiet methods are simply the ones that never need the alias map.
+
+Two things follow. The warning is mvgam's own call, so it is fixable
+here rather than upstream. And the table is rebuilt on every draws
+extraction of any fit with observation-side random effects, which is
+every `variables()`, `coef()`, `fixef()`, `vcov()`, `rhat()`,
+`neff_ratio()`, `posterior_summary()`, `tidy()`, `hypothesis()` and
+`get_coef()` call on such a fit. It cannot change after fitting, so
+computing it once and carrying it removes both the warning and the
+cost.
 
 Nothing warns at build time: `nu` scalar, `nu ~ z` and `nu ~ 1` are
 all silent through `mvgam()`, and `get_prior()` on an
@@ -2557,7 +2578,7 @@ carries the reasoning and the cure:
 |---|---|
 | refuses | `forecast()`, `hindcast()` |
 | warns, from bayesplot rather than mvgam | `pp_check()` |
-| accepts in silence | `ordinate()`, `residual_cor()`, `shared_variation()`, `active_factors()`, `summary()`, `posterior_epred()`, `posterior_predict()`, `predict()`, `fitted()`, `residuals()`, `log_lik()`, `plot()` |
+| accepts in silence | `ordinate()`, `residual_cor()`, `shared_variation()`, `active_factors()`, `summary()`, `posterior_epred()`, `posterior_predict()`, `predict()`, `fitted()`, `residuals()`, `log_lik()`, `plot()`, `posterior_smooths()`, `conditional_smooths()` |
 
 The cost is measured rather than imagined. Writing `axes` for
 `which_lvs` produced a picture that looked like an answer to the
@@ -2605,8 +2626,12 @@ error there, so the one call on this surface that speaks cannot go
 quiet unnoticed.
 
 One method per release is not the way out. The two that guard were
-fixed because a specific bug was traced to them, and eleven more carry
-the same hole today.
+fixed because a specific bug was traced to them, and thirteen more
+carry the same hole today.
+
+A baseline run of `tests/local` is what added the two smooth methods
+to the table. This entry was first written from the methods that came
+to mind. Every fixture file added since has turned up another.
 
 ## Visits that never happened
 

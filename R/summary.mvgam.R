@@ -410,204 +410,116 @@ rename_summary_cols <- function(col_names, probs, robust) {
 # PARAMETER MATCHING FUNCTIONS (Pattern-Based)
 # ==============================================================================
 
-#' Match fixed effect parameter names
-#'
-#' @description
-#' Identifies fixed effect parameters (b_*) excluding trend formula effects.
+#' Population coefficients of the observation model
 #'
 #' @param pars Character vector of all parameter names
-#' @param dpars Character vector of distributional parameters that carry
-#'   their own formula; their coefficients get their own block
-#' @return Logical vector indicating which parameters are fixed effects
+#' @param dpars Distributional parameters carrying their own formula;
+#'   their coefficients form their own block
+#' @return Logical vector
 #'
 #' @noRd
 match_fixed_pars <- function(pars, dpars = character()) {
-  # Get all b_ parameters
-  is_b_par <- grepl("^b_", pars)
-  # Exclude trend formula parameters
-  is_trend <- is_trend_parameter(pars)
-
-  is_b_par & !is_trend & !match_dpar_fixed_pars(pars, dpars)
+  mvgam_par_kind(pars, dpars) == "beta" &
+    mvgam_par_side(pars) == "observation"
 }
 
-#' Match smooth parameter names
-#'
-#' @description
-#' Identifies GAM smooth parameters (s_* and sds_*).
+#' Smooth parameters of the observation model
 #'
 #' @param pars Character vector of all parameter names
-#' @return Logical vector indicating which parameters are smooth terms
+#' @param dpars Distributional parameters carrying their own formula
+#' @return Logical vector
 #'
 #' @noRd
 match_smooth_pars <- function(pars, dpars = character()) {
-  grepl("^s(ds)?_", pars) & !match_dpar_smooth_pars(pars, dpars)
+  mvgam_par_kind(pars, dpars) %in% c("smooth_sd", "smooth_coef") &
+    mvgam_par_side(pars) == "observation"
 }
 
-#' Match random effect parameter names
-#'
-#' @description
-#' Identifies random effect SDs (sd_*) and individual effects (r_*).
+#' Group-level parameters of the observation model
 #'
 #' @param pars Character vector of all parameter names
-#' @return Logical vector indicating which parameters are random effects
+#' @return Logical vector
 #'
 #' @noRd
 match_random_pars <- function(pars) {
-  grepl("^(sd_|r_)", pars)
+  mvgam_par_kind(pars) == "ranef" &
+    mvgam_par_side(pars) == "observation"
 }
 
-#' Match family parameter names (observation model only)
+#' Observation-family parameters
 #'
-#' @description
-#' Identifies family-specific parameters (sigma, shape, nu, phi, zi, hu)
-#' excluding trend model parameters and distributional parameters that have
-#' formulas (e.g., if sigma ~ x exists, exclude sigma\[1\]).
+#' Excludes any distributional parameter that carries its own
+#' formula: its coefficients are reported as a block of their own.
 #'
 #' @param pars Character vector of all parameter names
-#' @param has_dpar_formulas Character vector of distributional parameter names
-#'   that have formulas (from get_dpar_names())
-#' @return Logical vector indicating which parameters are family parameters
+#' @param has_dpar_formulas Distributional parameters with formulas
+#' @return Logical vector
 #'
 #' @noRd
 match_family_pars <- function(pars, has_dpar_formulas = character()) {
-  checkmate::assert_character(pars)
   checkmate::assert_character(has_dpar_formulas)
-
-  # Match family parameter patterns. `mphi` / `mtheta` are the
-  # Tweedie custom-family dispersion and power parameters; they
-  # follow the same name convention as other observation-side
-  # dpars and should appear in the Observation Model block.
-  is_family <- grepl(
-    "^(sigma|shape|nu|phi|zi|hu|mphi|mtheta|mtail)(_|\\[|$)", pars
-  )
-  # Exclude trend parameters
-  is_trend <- is_trend_parameter(pars)
-
-  # Exclude distributional parameters that have formulas
-  is_dpar_with_formula <- FALSE
-  if (length(has_dpar_formulas) > 0) {
-    # If sigma has a formula (b_sigma_*), exclude sigma[1], sigma[2], etc.
-    pattern <- paste0("^(", paste(has_dpar_formulas, collapse = "|"), ")(\\[|$)")
-    is_dpar_with_formula <- grepl(pattern, pars)
+  keep <- mvgam_par_kind(pars) == "family"
+  if (length(has_dpar_formulas) > 0L) {
+    modelled <- grepl(
+      paste0("^(", paste(has_dpar_formulas, collapse = "|"), ")(\\[|$)"),
+      pars
+    )
+    keep <- keep & !modelled
   }
-
-  is_family & !is_trend & !is_dpar_with_formula
+  keep
 }
 
-#' Match trend parameter names
+
+#' Population coefficients of the trend model
 #'
-#' @description
-#' Identifies all trend model parameters (those with _trend suffix),
-#' excluding latent states which are too numerous for default display.
+#' brms reports only the centred intercept, so the uncentred
+#' `b_Intercept_trend` stays out.
 #'
 #' @param pars Character vector of all parameter names
-#' @return Logical vector indicating which parameters are trend parameters
-#'
-#' @noRd
-match_trend_pars <- function(pars) {
-  # Get all parameters with _trend suffix
-  is_trend <- is_trend_parameter(pars)
-  # Exclude the trend's own states; no summary slot claims them.
-  # Both `lv_trend[t, k]` (partial-Z fits) and `lv_trend_tilde[t, k]`
-  # (QR-identified factor paths) qualify.
-  is_state <- grepl("^(trend|lv_trend|lv_trend_tilde)\\[", pars)
-
-  is_trend & !is_state
-}
-
-#' Match trend fixed effect parameter names
-#'
-#' @description
-#' Identifies population-level effects for trend formula, following brms
-#' convention of showing only centered Intercept_trend (not b_Intercept_trend).
-#'
-#' @param pars Character vector of all parameter names
-#' @return Logical vector indicating which parameters are trend fixed effects
+#' @return Logical vector
 #'
 #' @noRd
 match_trend_fixed_pars <- function(pars) {
-  checkmate::assert_character(pars)
-  if (length(pars) == 0) return(logical(0))
-
-  # Match centered Intercept_trend (brms shows only centered, not b_Intercept_trend)
-  is_intercept <- pars == "Intercept_trend"
-
-  # Match b_trend[i] array elements (coefficients for predictors)
-  is_coef <- grepl("^b_trend\\[", pars)
-
-  is_intercept | is_coef
+  mvgam_par_kind(pars) %in% c("beta", "intercept") &
+    mvgam_par_side(pars) == "trend" &
+    pars != "b_Intercept_trend"
 }
 
-#' Match trend smooth parameter names
-#'
-#' @description
-#' Identifies smooth terms (GAM splines) in trend formula.
+#' Smooth parameters of the trend model
 #'
 #' @param pars Character vector of all parameter names
-#' @return Logical vector indicating which parameters are trend smooths
+#' @return Logical vector
 #'
 #' @noRd
 match_trend_smooth_pars <- function(pars) {
-  checkmate::assert_character(pars)
-  if (length(pars) == 0) return(logical(0))
-  grepl("^s(ds)?_.*_trend", pars)
+  mvgam_par_kind(pars) %in% c("smooth_sd", "smooth_coef") &
+    mvgam_par_side(pars) == "trend"
 }
 
-#' Match trend random effect parameter names
-#'
-#' @description
-#' Identifies group-level effects (random effects) in trend formula.
+#' Group-level parameters of the trend model
 #'
 #' @param pars Character vector of all parameter names
-#' @return Logical vector indicating which parameters are trend random effects
+#' @return Logical vector
 #'
 #' @noRd
 match_trend_random_pars <- function(pars) {
-  checkmate::assert_character(pars)
-  if (length(pars) == 0) return(logical(0))
-  grepl("^(sd_|r_).*_trend", pars)
+  mvgam_par_kind(pars) == "ranef" & mvgam_par_side(pars) == "trend"
 }
 
-#' Match trend-specific parameter names
+#' Latent-dynamics parameters of the trend model
 #'
-#' @description
-#' Identifies trend dynamics parameters (sigma_trend, ar1_trend, etc.) that
-#' aren't fixed/smooth/random effects.
+#' What is left on the trend side once the formula effects and the
+#' states are accounted for: the innovation scales, the
+#' autoregressive coefficients and the correlation blocks. The
+#' rotation-indeterminate draws are hidden when their identified
+#' counterparts are present.
 #'
 #' @param pars Character vector of all parameter names
-#' @return Logical vector indicating which parameters are trend-specific
+#' @return Logical vector
 #'
 #' @noRd
 match_trend_specific_pars <- function(pars) {
-  checkmate::assert_character(pars)
-  if (length(pars) == 0) return(logical(0))
-
-  # Parameters with _trend that aren't formula effects or states
-  is_trend <- is_trend_parameter(pars)
-
-  # Not fixed effects (not Intercept_trend or b_trend[i])
-  is_not_fixed <- pars != "Intercept_trend" & !grepl("^b_trend\\[", pars)
-
-  # Not smooths (not s_*_trend or sds_*_trend)
-  is_not_smooth <- !grepl("^s(ds)?_.*_trend", pars)
-
-  # Not random effects (not sd_*_trend or r_*_trend)
-  is_not_random <- !grepl("^(sd_|r_).*_trend", pars)
-
-  # Not latent states
-  is_not_state <- !is_trend_state_param(pars)
-
-  # Hide unrotated dynamics draws (e.g. `A_trend[lag][i, j]`)
-  # when the QR-rotated counterpart is also in the posterior.
-  hide_pat <- hidden_unrotated_factor_pars(pars)
-  is_not_hidden <- if (is.null(hide_pat)) {
-    rep(TRUE, length(pars))
-  } else {
-    !grepl(hide_pat, pars)
-  }
-
-  is_trend & is_not_fixed & is_not_smooth & is_not_random &
-    is_not_state & is_not_hidden
+  mvgam_par_kind(pars) == "dynamics" & !is_hidden_unrotated(pars)
 }
 
 #' Match factor loading parameter names
@@ -730,46 +642,18 @@ match_dpar_smooth_pars <- function(pars, dpars) {
   grepl(paste0("^s(ds)?_", alt, "_"), pars)
 }
 
-#' Identify trend state parameters
+#' The trend's own time-indexed states
 #'
-#' @description
-#' Helper to identify the time-indexed states of the latent trend, which
-#' are excluded from summary output by default: they are numerous and
-#' typically not of direct interest. Excludes the trend hyperparameters
-#' (sigma_trend, ar1_trend) and trend formula effects (Intercept_trend,
-#' b_*_trend), which are summarised separately.
-#'
-#' `latent_state` names the closure-unit quantity elsewhere in the
-#' package, the abundance or occupancy an `nmix()` or `occ()` fit
-#' infers, so the trend's own states take `trend_state` here.
+#' Numerous by construction and excluded from summary output by
+#' default. `latent_state` names the closure-unit quantity elsewhere
+#' in the package, so the trend's own states take `trend_state` here.
 #'
 #' @param pars Character vector of parameter names
-#' @return Logical vector indicating which parameters are trend states
-#'
-#' @details
-#' Matches the following array-indexed parameters:
-#' \describe{
-#'   \item{\code{trend\[i,s\]}}{Main state matrix for each series}
-#'   \item{\code{lv_trend\[i,k\]}}{Latent variable states}
-#'   \item{\code{innovations_trend\[i,s\]}}{Raw innovations}
-#'   \item{\code{mu_trend\[i\]}}{Trend formula linear predictor}
-#'   \item{\code{scaled_innovations_trend\[i,s\]}}{Scaled innovations}
-#' }
+#' @return Logical vector
 #'
 #' @noRd
 is_trend_state_param <- function(pars) {
-  checkmate::assert_character(pars)
-
-  # `lv_trend_tilde[t, k]` is the rotated factor path saved by
-  # QR-identified factor fits; include it alongside `lv_trend`
-  # so default summary print stays clean.
-  grepl(
-    paste0(
-      "^(trend|lv_trend|lv_trend_tilde|innovations_trend|",
-      "mu_trend|scaled_innovations_trend)\\["
-    ),
-    pars
-  )
+  mvgam_par_kind(pars) == "state"
 }
 
 # ==============================================================================

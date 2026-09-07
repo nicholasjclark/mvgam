@@ -147,7 +147,13 @@ hypothesis.mvgam <- function(x, hypothesis, alpha = 0.05,
                                 any.missing = FALSE)
   checkmate::assert_number(alpha, lower = 0, upper = 1)
   checkmate::assert_flag(robust)
-  draws <- as.data.frame(posterior::as_draws_df(x$fit))
+  # Under the raw stanfit names every parameter mvgam aliases is
+  # unreachable: `b_elev` is `b[1]` there, `sd_block__Intercept` is
+  # `sd_1[1]`, and a hypothesis naming either was refused as a
+  # parameter the model does not have.
+  draws <- as.data.frame(
+    posterior::as_draws_df(extract_mvgam_draws(x))
+  )
   brms::hypothesis(draws, hypothesis = hypothesis,
                     alpha = alpha, robust = robust, ...)
 }

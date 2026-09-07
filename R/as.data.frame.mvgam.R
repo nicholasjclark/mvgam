@@ -95,47 +95,31 @@ mvgam_keyword_shortcuts <- c(
 # otherwise they sit at the top level.
 #'@noRd
 resolve_mvgam_keyword <- function(keyword, x, all_vars) {
-  has_trend_f <- !is.null(x$trend_formula)
-  pick <- function(re, ignore_case = FALSE) {
-    grep(re, all_vars, value = TRUE, ignore.case = ignore_case)
-  }
-  drop <- function(set, re) {
-    if (length(set) == 0L) return(set)
-    set[!grepl(re, set)]
-  }
+  # The keywords are (side, kind) pairs from the one taxonomy rather
+  # than a private set of regexes. `smooth_params` is deliberately
+  # narrower than the smooth bucket `tidy()` reads: `?mvgam_draws`
+  # documents it as the smoothing standard deviations, so the
+  # taxonomy separates those from the basis coefficients and the
+  # Gaussian-process hyperparameters instead of forcing one answer.
+  kind <- mvgam_par_kind(all_vars)
+  side <- mvgam_par_side(all_vars)
+  pick <- function(k, sd) all_vars[kind %in% k & side == sd]
   switch(keyword,
-    "betas" = drop(
-      pick("^b_"),
-      "(^b_trend\\[|^b_.*_trend$)"
-    ),
-    "trend_betas" = pick("^(b_trend\\[|b_.*_trend$)"),
-    "obs_params" = drop(
-      pick(paste0(
-        "^(sigma|sigmay|phi|shape|nu|hu|zi|kappa|alpha|delta|",
-        "disc|tail_df)(\\[|$)"
-      ), ignore_case = TRUE),
-      "_trend"
-    ),
-    "smooth_params" = drop(pick("^sds_"), "_trend"),
-    "trend_smooth_params" = pick("^sds_.*_trend"),
-    "trend_params" = if (has_trend_f) {
-      # Latent-dynamics params only: drop trend-side regression
-      # coefficients (positional `b_trend[k]`, brms-aliased
-      # `b_<term>_trend`, centred `Intercept_trend`), smooth SDs,
-      # and the bulk per-obs / per-state arrays.
-      cands <- pick("_trend")
-      drop(cands, paste0(
-        "^(b_trend\\[|b_.*_trend|Intercept_trend$|",
-        "sds_.*_trend|innovations_trend\\[|",
-        "scaled_innovations_trend\\[|lv_trend\\[|mu_trend\\[|",
-        "trend\\[|trend_states\\[|Y_pred_trend\\[)"
-      ))
+    "betas" = pick("beta", "observation"),
+    "trend_betas" = pick("beta", "trend"),
+    "obs_params" = pick("family", "observation"),
+    "smooth_params" = pick("smooth_sd", "observation"),
+    "trend_smooth_params" = pick("smooth_sd", "trend"),
+    # An observation-only fit keeps its trend dynamics at the top
+    # level rather than under the suffix, so the side is where the
+    # two spellings part company; the kind is the same either way.
+    "trend_params" = if (!is.null(x$trend_formula)) {
+      pick("dynamics", "trend")
     } else {
-      # Obs-only fits keep trend-dynamics parameters at the top level.
-      cands <- pick(paste0(
-        "^(ar\\d|alpha_gp|rho_gp|sdgp|lscale|sigma|tau)(\\[|$|_)"
-      ))
-      drop(cands, "^(trend\\[|innovations\\[|lv\\[|mu\\[)")
+      all_vars[grepl(
+        "^(ar\\d|alpha_gp|rho_gp|sdgp|lscale|sigma|tau)(\\[|$|_)",
+        all_vars
+      ) & kind != "state"]
     }
   )
 }
@@ -245,7 +229,32 @@ mvgam_beta_aliases <- function(x) {
     build_bs(x$standata$Xs, "bs", ""),
     build_bs(x$standata$Xs_trend, "bs_trend", "_trend")
   )
-  c(unlist(parts), bs_parts)
+  # Special terms (`mo()`, `me()`, `mi()`, `cs()`) come back as the
+  # indexed array `bsp[k]`, in the order they appear in the formula,
+  # which is the order `Ksp` counts. brms spells the same
+  # coefficient `bsp_<term>` with the punctuation removed, and that
+  # is the name its prior table and `summary()` already use, so
+  # without this a monotonic effect was the one population
+  # coefficient reachable only by its position.
+  build_sp <- function(form, pos_name, alias_suffix) {
+    ff <- if (inherits(form, "brmsformula")) form$formula else form
+    if (!inherits(ff, "formula") || length(ff) < 2L) {
+      return(character(0L))
+    }
+    labs <- attr(stats::terms(ff), "term.labels")
+    sp <- grep("^(mo|me|mi|cs)\\(", labs, value = TRUE)
+    if (length(sp) == 0L) {
+      return(character(0L))
+    }
+    new <- paste0("bsp_", gsub("[[:space:](),]", "", sp), alias_suffix)
+    old <- paste0(pos_name, "[", seq_along(sp), "]")
+    stats::setNames(old, new)
+  }
+  sp_parts <- c(
+    build_sp(x$formula, "bsp", ""),
+    build_sp(x$trend_formula, "bsp_trend", "_trend")
+  )
+  c(unlist(parts), bs_parts, sp_parts)
 }
 
 
@@ -270,38 +279,91 @@ apply_mvgam_beta_aliases <- function(vars, alias_map) {
 }
 
 
-# Internal: reconstruct brms group-level metadata for a fitted
-# mvgam object. Returns a list with `reframe` (the brmsfit
-# `$ranef` data.frame: one row per (group, coef) pair) and
-# `group_levels` (the named list of levels per grouping factor),
-# or NULL when the fit has no group-level effects.
+# Internal: the user-facing projection of a fit's parameter names.
+# Returns a named character vector whose names are the names a user
+# sees and whose values are the raw Stan names behind them, after
+# dropping excluded parameters, the empty-observation placeholder
+# and (unless `hidden`) the rotation-indeterminate factor block.
 #
-# The cheap gate `^M_<id>$` on `x$standata` short-circuits no-RE
-# fits without paying the brms-setup cost. Trend-side blocks have
-# the suffixed key `M_<id>_trend` and are deliberately excluded.
+# `variables.mvgam()`, `extract_mvgam_draws()` and `tidy.mvgam()`
+# all read this, so the three cannot disagree about which
+# parameters exist or what they are called. Before it existed each
+# built its own answer and they diverged: `tidy()` reported `b[1]`
+# where the others reported `b_x`, listed `L_Omega_trend` where the
+# others hid it, and omitted the identified loadings the others
+# expose.
+#
+# @param x A fitted `mvgam` object.
+# @param pars Optional raw Stan names to project. Defaults to every
+#   name in the posterior.
+# @param all Return every parameter under its user-facing name,
+#   skipping the exclusion list and the rotation-indeterminate
+#   filter. Only a caller that named a parameter explicitly should
+#   set this, since asking for one by name is how a user reaches a
+#   parameter the default view hides.
+#'@noRd
+mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
+  checkmate::assert_class(x, "mvgam")
+  checkmate::assert_flag(all)
+  raw <- pars %||% posterior::variables(posterior::as_draws(x$fit))
+  if (!all && !is.null(x$exclude) && length(x$exclude) > 0L) {
+    raw <- setdiff(raw, x$exclude)
+  }
+  user <- apply_mvgam_beta_aliases(
+    raw, c(mvgam_beta_aliases(x), mvgam_ranef_aliases(x))
+  )
+  # The empty-observation placeholder is a structural column that
+  # stands in for a design brms cannot build, never a parameter the
+  # user asked for.
+  keep <- !startsWith(user, paste0("b_", MVGAM_EMPTY_OBS_PLACEHOLDER))
+  if (!all) {
+    keep <- keep & !is_hidden_unrotated(user)
+  }
+  stats::setNames(raw[keep], user[keep])
+}
+
+
+# Internal: the brms group-level metadata for a fitted mvgam
+# object. Returns a list with `reframe` (the brmsfit `$ranef`
+# data.frame: one row per (group, coef) pair) and `group_levels`
+# (the named list of levels per grouping factor), or NULL when the
+# fit has no group-level effects.
+#
+# The observation-side brmsfit stored on the fit already carries
+# this table, built when the model was set up, so it is read rather
+# than rebuilt. Rebuilding it meant a `brm(empty = TRUE)` call on
+# every draws extraction of any fit with group-level effects, which
+# is every `variables()`, `coef()`, `fixef()`, `vcov()`, `rhat()`,
+# `posterior_summary()`, `tidy()`, `hypothesis()` and `get_coef()`
+# call on such a fit. Passing no prior to that call also made brms
+# derive and validate its own defaults, so it warned about priors
+# the fitted program does not contain.
+#
+# A fit saved before `obs_model` was stored still has to be
+# readable, so the rebuild remains as the fallback. Its `^M_<id>$`
+# gate short-circuits no-RE fits without paying the setup cost;
+# trend-side blocks carry the suffixed key `M_<id>_trend` and are
+# deliberately excluded.
 #
 # Both `mvgam_ranef_aliases` and the user-facing `ranef.mvgam` /
-# `VarCorr.mvgam` methods consume this metadata so the
-# `brm(empty = TRUE)` setup happens via one entry point.
+# `VarCorr.mvgam` methods read this, so the table is resolved once.
 #'@noRd
 mvgam_ranef_metadata <- function(x) {
   checkmate::assert_class(x, "mvgam")
-  # brms's standata convention: obs-side group blocks are exactly
-  # `M_<id>` (integer suffix only). Trend-side blocks carry the
-  # `_trend` suffix (`M_<id>_trend`) and are intentionally
-  # excluded from this gate. If brms ever changes the obs-side
-  # key naming, the gate falls closed (no aliasing) rather than
-  # producing an incorrect map, which is the safe failure mode.
-  std_names <- names(x$standata)
-  has_obs_re <- any(grepl("^M_\\d+$", std_names))
-  if (!has_obs_re) {
-    return(NULL)
+  reframe <- x$obs_model$ranef
+  if (is.null(reframe)) {
+    # If brms ever changes the obs-side key naming, the gate falls
+    # closed (no aliasing) rather than producing an incorrect map,
+    # which is the safe failure mode.
+    if (!any(grepl("^M_\\d+$", names(x$standata)))) {
+      return(NULL)
+    }
+    empty <- brms::brm(
+      formula = x$formula, data = x$data, family = x$family,
+      empty = TRUE, silent = 2
+    )
+    reframe <- empty$ranef
   }
-  empty <- brms::brm(
-    formula = x$formula, data = x$data, family = x$family,
-    empty = TRUE, silent = 2
-  )
-  reframe <- empty$ranef
   if (is.null(reframe) || nrow(reframe) == 0L) {
     return(NULL)
   }
@@ -464,35 +526,24 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
   checkmate::assert_logical(regex, len = 1L)
   checkmate::assert_logical(inc_warmup, len = 1L)
   drws <- posterior::as_draws_array(x$fit, inc_warmup = inc_warmup)
-  alias_map <- c(mvgam_beta_aliases(x), mvgam_ranef_aliases(x))
-  if (length(alias_map) > 0L) {
-    # Only rename entries whose positional name is actually present
-    # in the draws. brms's rename_pars is similarly tolerant: a fit
-    # that pre-aliased itself (e.g. test stubs) becomes a no-op.
-    have <- alias_map %in% posterior::variables(drws)
-    if (any(have)) {
-      drws <- do.call(
-        posterior::rename_variables,
-        c(list(drws), as.list(alias_map[have]))
-      )
-    }
+  # One projection decides which parameters exist and what they are
+  # called. When the user did not name a `variable`, the
+  # rotation-indeterminate raw factor block is hidden as well: those
+  # have arbitrary Rhat and ESS because no rotation is fixed under
+  # the prior, and their QR-identified counterparts are in the same
+  # posterior. Naming one explicitly keeps it.
+  user_map <- mvgam_user_pars(
+    x, pars = posterior::variables(drws), all = !is.null(variable)
+  )
+  renames <- user_map[names(user_map) != user_map]
+  if (length(renames) > 0L) {
+    drws <- do.call(
+      posterior::rename_variables,
+      c(list(drws), as.list(renames))
+    )
   }
-  # When the user did not supply a `variable` argument, hide
-  # rotation- / sign-indeterminate raw factor-model params whose
-  # QR-identified counterparts (Z_tilde, lv_trend_tilde,
-  # A_trend_tilde) are also in the posterior; see
-  # hidden_unrotated_factor_pars(). The raw versions have arbitrary
-  # Rhat / ESS because there is no fixed rotation under the prior,
-  # so they should not surface through the default
-  # as_draws_*() / posterior_summary() / rhat() / neff_ratio() paths.
-  # Users who want them can request them explicitly via the variable
-  # arg, which keeps the unfiltered draws in scope below.
+  drws <- posterior::subset_draws(drws, variable = names(user_map))
   if (is.null(variable)) {
-    all_vars <- posterior::variables(drws)
-    keep_vars <- filter_hidden_unrotated(all_vars)
-    if (length(keep_vars) < length(all_vars)) {
-      drws <- posterior::subset_draws(drws, variable = keep_vars)
-    }
     return(drws)
   }
   checkmate::assert_character(variable, min.len = 1L)

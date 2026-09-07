@@ -113,18 +113,21 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
 
   obj_vars <- categorize_mvgam_parameters(x)
   draws <- posterior::as_draws_array(x$fit)
-  obs_var_names <- variables(x)
-  alias_map <- c(mvgam_beta_aliases(x), mvgam_ranef_aliases(x))
 
-  # Resolve mvgam beta aliases for a vector of raw Stan names.
-  # Falls back to the raw name when no alias exists.
+  # `categorize_mvgam_parameters()` works in raw Stan names because
+  # the internal prediction pipeline subsets the stanfit by them.
+  # The table a user reads must carry the names `variables()` lists
+  # and hold the same parameters, so both the labelling and the
+  # visibility come from the one projection rather than from a
+  # second answer built here.
+  user_map <- mvgam_user_pars(x)
   apply_alias <- function(raw) {
-    out <- alias_map[raw]
+    out <- names(user_map)[match(raw, user_map)]
     out[is.na(out)] <- raw[is.na(out)]
-    unname(out)
+    out
   }
 
-  spec <- tidy_spec(x, obj_vars)
+  spec <- tidy_spec(x, obj_vars, user_map)
   spec <- dplyr::filter(spec, .effects_filter(effect, effects))
 
   out <- purrr::map_dfr(
@@ -146,10 +149,6 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
     }
   )
 
-  if (length(grep("alpha_cor", out$term, fixed = TRUE)) > 0L &&
-        !is.null(x$trend_model$gr)) {
-    out <- split_hier_Sigma(x, out)
-  }
   out
 }
 
@@ -160,32 +159,23 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
 # this as a single tibble removes the 8+ near-identical blocks
 # the original implementation carried around.
 #'@noRd
-tidy_spec <- function(x, obj_vars) {
+tidy_spec <- function(x, obj_vars, user_map) {
   # `enrich_trend_metadata` records the trend type as a single string
   # ("AR", "VAR", "PW", ...); `$trend_model` is read only when that
   # slot is unset.
-  meta <- get_enriched_trend_metadata(x)
-  trend_model_name <- meta$trend_type %||%
-    (if (inherits(x$trend_model, "mvgam_trend"))
-       x$trend_model$trend_model else
-       as.character(x$trend_model %||% "None"))
-  trend_dynamic_pattern <- trend_dynamic_pattern_for(
-    x, trend_model_name
-  )
+  # Every bucket is narrowed to the parameters the fit shows a user.
+  # `tidy()` previously selected its trend block with a hand-written
+  # allow-list of name prefixes per trend type, which had to be
+  # extended whenever a trend gained a parameter and diverged from
+  # the deny-list `variables()` uses: the identified loadings were
+  # dropped and the rotation-indeterminate Cholesky factor was
+  # reported in their place.
+  visible <- function(pars) intersect(pars %||% character(0L), user_map)
 
-  obs_family <- obj_vars$observation_pars$orig_name %||% character(0L)
+  obs_family <- visible(obj_vars$observation_pars$orig_name)
   obs_family <- grep("vec", obs_family, value = TRUE, invert = TRUE)
 
-  trend_pars_all <- obj_vars$trend_pars$orig_name %||% character(0L)
-  trend_dynamic <- if (nzchar(trend_dynamic_pattern)) {
-    grep(trend_dynamic_pattern, trend_pars_all, value = TRUE)
-  } else if (identical(trend_model_name, "None") &&
-              !is.null(x$trend_call)) {
-    # 'None' trend with a trend_formula -> only sigma_trend
-    grep("sigma", trend_pars_all, value = TRUE)
-  } else {
-    character(0L)
-  }
+  trend_dynamic <- visible(obj_vars$trend_pars$orig_name)
 
   obs_beta <- head_betas(x$mgcv_model, obj_vars$observation_betas)
   trend_beta <- if (!is.null(x$trend_call)) {
@@ -196,20 +186,16 @@ tidy_spec <- function(x, obj_vars) {
   # per-smooth variance components); the individual basis-coefficient
   # draws (`s_*` / `zs_*`) are `ran_vals`. Matches brms's
   # `tidy.brmsfit` convention so users get a familiar view.
-  obs_smooth_all <- obj_vars$observation_smoothpars$orig_name %||%
-    character(0L)
+  obs_smooth_all <- visible(obj_vars$observation_smoothpars$orig_name)
   obs_smooth_sds <- grep("^sds_", obs_smooth_all, value = TRUE)
   obs_smooth_vals <- setdiff(obs_smooth_all, obs_smooth_sds)
-  trend_smooth_all <- obj_vars$trend_smoothpars$orig_name %||%
-    character(0L)
+  trend_smooth_all <- visible(obj_vars$trend_smoothpars$orig_name)
   trend_smooth_sds <- grep("^sds_", trend_smooth_all, value = TRUE)
   trend_smooth_vals <- setdiff(trend_smooth_all, trend_smooth_sds)
 
-  re_pars <- obj_vars$observation_re_params$orig_name %||%
-    character(0L)
+  re_pars <- visible(obj_vars$observation_re_params$orig_name)
   re_beta <- random_effect_beta_names(x, obj_vars)
-  trend_re_pars <- obj_vars$trend_re_params$orig_name %||%
-    character(0L)
+  trend_re_pars <- visible(obj_vars$trend_re_params$orig_name)
   trend_re_beta <- random_effect_beta_names(x, obj_vars,
                                               which = "trend")
 
@@ -257,34 +243,6 @@ tidy_spec <- function(x, obj_vars) {
       trend_re_beta
     )
   )
-}
-
-
-# Internal: regex of parameter prefixes for the trend dynamics
-# parameters of `trend_model_name`. Returns a single regex
-# string (alternation-separated) suitable for grep().
-#'@noRd
-trend_dynamic_pattern_for <- function(x, trend_model_name) {
-  has_cor <- inherits(x$trend_model, "mvgam_trend") &&
-    isTRUE(x$trend_model$cor)
-  if (grepl("^VAR", trend_model_name)) {
-    return("^A\\[|^alpha_cor|^theta|^Sigma")
-  }
-  if (grepl("^CAR|^AR|^RW", trend_model_name)) {
-    sigma_name <- if (has_cor) "^Sigma" else "^sigma"
-    return(paste(
-      c("^ar", "^alpha_cor", "^theta", sigma_name),
-      collapse = "|"
-    ))
-  }
-  if (grepl("^ZMVN", trend_model_name)) {
-    return("^alpha_cor|^Sigma")
-  }
-  if (grepl("^PW", trend_model_name)) {
-    return("^k_trend|^m_trend|^delta_trend")
-  }
-  # GP-only / unknown -> nothing here; sigma fallback applies.
-  ""
 }
 
 
@@ -401,36 +359,6 @@ broom_summary_fns <- function(robust = FALSE,
   if (rhat) fns$rhat <- posterior::rhat
   if (ess) fns$ess_bulk <- posterior::ess_bulk
   fns
-}
-
-
-# Internal: in hierarchical residual-correlation models the
-# Stan `Sigma` block contains dummy entries that pad it to an
-# (n_subgr * n_gr)^2 block-diagonal. This drops the zero
-# entries and renames the remaining sub-matrix entries with a
-# leading group index `Sigma_<g><i><j>`.
-#'@noRd
-split_hier_Sigma <- function(x, params) {
-  is_sigma <- grepl("^Sigma", params$term)
-  if (!any(is_sigma)) return(params)
-  non_sigma <- params[!is_sigma, ]
-  sigma <- params[is_sigma, ]
-
-  gr <- x$trend_model$gr
-  subgr <- x$trend_model$subgr
-  n_gr <- length(levels(x$obs_data[[gr]]))
-  n_subgr <- length(levels(x$obs_data[[subgr]]))
-
-  # Drop dummy entries (mean and std.error both exactly zero)
-  sigma <- sigma[sigma$estimate != 0 | sigma$std.error != 0, ]
-  if (nrow(sigma) == 0L) return(non_sigma)
-  index_strs <- sub("Sigma", "", sigma$term)[seq_len(n_subgr^2)]
-  sigma$term <- paste0(
-    "Sigma_",
-    rep(seq_len(n_gr), each = n_subgr^2),
-    index_strs
-  )
-  dplyr::bind_rows(non_sigma, sigma)
 }
 
 

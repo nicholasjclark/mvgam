@@ -30,36 +30,11 @@ variables.mvgam <- function(x, ...) {
   # Validate input
   checkmate::assert_class(x, "mvgam")
 
-  # Extract parameter names via draws object for backend compatibility
-  # Posterior package handles both rstan and cmdstanr stanfit objects
-  all_vars <- variables(posterior::as_draws(x$fit), ...)
-
-  # Apply parameter exclusions
-  if (!is.null(x$exclude) && length(x$exclude) > 0) {
-    all_vars <- setdiff(all_vars, x$exclude)
-  }
-
-  # Apply the brms-style `b_<term>` / `r_<group>[...]` etc.
-  # renames in place of positional Stan slots. Mirrors the
-  # rename applied in `extract_mvgam_draws` so character-vector
-  # and draws-array consumers see identical names.
-  alias_map <- c(mvgam_beta_aliases(x), mvgam_ranef_aliases(x))
-  all_vars <- apply_mvgam_beta_aliases(all_vars, alias_map)
-
-  # Drop the empty-obs-formula placeholder coefficient from the
-  # user-facing parameter list. The pinned `constant(0)` prior
-  # means there is no posterior sample for it; returning the name
-  # would leak the workaround. Filter after the alias rename
-  # because the alias map renames positional `b[k]` to
-  # `b_<colname>`, which would reintroduce the placeholder name.
-  ph_prefix <- paste0("b_", MVGAM_EMPTY_OBS_PLACEHOLDER)
-  all_vars <- all_vars[!startsWith(all_vars, ph_prefix)]
-
-  # Drop rotation- / sign-indeterminate raw factor-model parameters
-  # when their QR-identified counterparts exist. Keeps `variables(x)`
-  # listing in lockstep with what `as_draws_*()`, `posterior_summary()`,
-  # `rhat()` and `neff_ratio()` return by default.
-  filter_hidden_unrotated(all_vars)
+  # The exclusion list, the brms-style renames, the empty-observation
+  # placeholder and the rotation-indeterminate factor block are all
+  # settled by `mvgam_user_pars()`, which every other user-facing
+  # reader of the posterior goes through.
+  names(mvgam_user_pars(x))
 }
 
 
@@ -124,138 +99,51 @@ categorize_mvgam_parameters <- function(x) {
     }
   }
 
-  # Observation family parameters (not from linear predictor).
-  # `mphi` / `mtheta` are the Tweedie custom-family dispersion
-  # and power parameters; they belong here so `tidy()`,
-  # `coef()` and the family-extras section of `summary.mvgam()`
-  # surface them alongside standard dpars.
-  obs_family_pattern <- "^(sigma|shape|nu|phi|zi|hu|mphi|mtheta|mtail)(_|\\[|$)"
-  obs_family_pars <- all_pars[
-    grepl(obs_family_pattern, all_pars) &
-      !is_trend_parameter(all_pars)
-  ]
-  observation_pars <- create_component(obs_family_pars)
-
-  # Fixed effects from observation formula only
-  # b_ = standard fixed effects, b[ = indexed (multivariate)
-  # bs_ = basis spline coefficients (brms), bs[ = basis spline coefficients (mvgam)
-  # bsp_ = monotonic coefficients (brms), bsp[ = monotonic coefficients (mvgam)
-  # simo_ = simplex parameters for monotonic effects (brms/mvgam)
-  # Intercept = intercepts (all variants)
-  obs_beta_pattern <- "^(b_|b\\[|bs_|bs\\[|bsp_|bsp\\[|simo_|Intercept)"
-  obs_beta_pars <- all_pars[
-    grepl(obs_beta_pattern, all_pars) &
-      !is_trend_parameter(all_pars) &
-      all_pars != "Intercept_trend"
-  ]
-  observation_betas <- create_component(obs_beta_pars)
-
-  # Smooth parameters from observation formula only
-  # sds_ = smooth SDs, s_ = smooth coefficients, zs_ = standardized smooths
-  # sdgp_ = GP SDs, lscale_ = GP length-scales, zgp_ = GP standardized
-  obs_smooth_pattern <- "^(sds_|s_|zs_|sdgp_|lscale_|zgp_)"
-  obs_smooth_pars <- all_pars[
-    grepl(obs_smooth_pattern, all_pars) &
-      !is_trend_parameter(all_pars)
-  ]
-  observation_smoothpars <- create_component(obs_smooth_pars)
-
-  # Random effect parameters from observation formula only
-  # sd_ = RE SDs, r_ = RE correlations, cor_ = correlation parameters
-  # L_ = Cholesky factors, z_ = standardized RE deviations
-  obs_re_pattern <- "^(sd_|r_|cor_|L_|z_)"
-  obs_re_pars <- all_pars[
-    grepl(obs_re_pattern, all_pars) &
-      !is_trend_parameter(all_pars) &
-      !grepl("L_Omega_trend", all_pars)
-  ]
-  observation_re_params <- create_component(obs_re_pars)
-
-  # Trend dynamics parameters (AR coefficients, innovation SDs, correlations).
-  # Excludes computed arrays, intercepts, fixed effects, and b_Intercept_trend
-  # (uncentered generated quantity already filtered via variables.mvgam).
-  # The factor-loading matrix bridges observations and latent trends and
-  # lacks the `_trend` suffix; the loading regex (`Z_tilde` or `Z`) and the
-  # state regex (`lv_trend` plus `lv_trend_tilde`) delegate pattern choice
-  # to the shared selectors so other accessors stay in lockstep.
-  loading_pattern <- factor_loading_param_pattern(all_pars)
-  hide_pattern <- hidden_unrotated_factor_pars(all_pars)
-  state_pattern <- paste0(
-    "^(trend|lv_trend|lv_trend_tilde|innovations_trend|",
-    "scaled_innovations_trend|mu_trend)\\["
-  )
-  hide_match <- if (is.null(hide_pattern)) {
-    rep(FALSE, length(all_pars))
-  } else {
-    grepl(hide_pattern, all_pars)
+  # Every bucket is a (side, kind) pair from the one taxonomy.
+  # Each used to carry its own regexes, which is how the smooth set
+  # here came to differ from the one the `variable =` keyword
+  # resolver reports for the same fit.
+  kind <- mvgam_par_kind(all_pars)
+  side <- mvgam_par_side(all_pars)
+  pick <- function(k, sd = NULL) {
+    keep <- kind %in% k
+    if (!is.null(sd)) keep <- keep & side == sd
+    create_component(all_pars[keep])
   }
+
+  observation_pars <- pick("family", "observation")
+  observation_betas <- pick(
+    c("beta", "basis", "intercept"), "observation"
+  )
+  observation_smoothpars <- pick(
+    c("smooth_sd", "smooth_coef", "gp"), "observation"
+  )
+  observation_re_params <- pick("ranef", "observation")
+
+  # The latent-dynamics block, plus the loadings that bridge the two
+  # sides. The rotation-indeterminate draws are dropped here for the
+  # same reason `variables()` drops them: their identified
+  # counterparts are in the same posterior and these have arbitrary
+  # convergence diagnostics.
   trend_dynamic_pars <- all_pars[
-    (is_trend_parameter(all_pars) |
-       grepl(loading_pattern, all_pars)) &
-      !grepl(state_pattern, all_pars) &
-      !hide_match &
-      all_pars != "b_Intercept_trend" &
-      all_pars != "Intercept_trend" &
-      !grepl("^b_.*_trend", all_pars) &
-      # Exclude smooth params (must mirror the obs-side smooth
-      # regex so trend-side GPs and standardised bases land in
-      # `trend_smoothpars` instead of leaking into `trend_pars`).
-      !grepl(
-        paste0(
-          "^(sds_|s_|zs_|sdgp_|lscale_|zgp_).*_trend"
-        ),
-        all_pars
-      ) &
-      # Exclude RE params (mirror obs-side, which covers
-      # `sd_`, `r_`, `cor_`, `L_` and the standardised `z_` raw
-      # deviations). Asymmetry here was leaking `L_*_trend` /
-      # `z_*_trend` into `trend_pars`.
-      !grepl(
-        "^(sd_|r_|cor_|L_|z_).*_trend",
-        all_pars
-      )
+    kind %in% c("dynamics", "loading") & !is_hidden_unrotated(all_pars)
   ]
   trend_pars <- create_component(trend_dynamic_pars)
 
-  # Fixed effects from trend formula only
+  # brms reports only the centred intercept.
   trend_beta_pars <- all_pars[
-    (grepl("^b_.*_trend", all_pars) | all_pars == "Intercept_trend") &
+    kind %in% c("beta", "basis", "intercept") & side == "trend" &
       all_pars != "b_Intercept_trend"
   ]
   trend_betas <- create_component(trend_beta_pars)
+  trend_smoothpars <- pick(
+    c("smooth_sd", "smooth_coef", "gp"), "trend"
+  )
+  trend_re_params <- pick("ranef", "trend")
 
-  # Smooth parameters from trend formula only. Mirrors the obs-side
-  # pattern so trend-side GP marginal SDs (`sdgp_*_trend`), GP
-  # length-scales (`lscale_*_trend`), GP standardised draws
-  # (`zgp_*_trend`) and standardised smooth-basis coefficients
-  # (`zs_*_trend`) all land in `trend_smoothpars` rather than
-  # leaking into `trend_pars`.
-  trend_smooth_pars <- all_pars[
-    grepl(
-      paste0(
-        "^(sds_|s_|zs_|sdgp_|lscale_|zgp_).*_trend"
-      ),
-      all_pars
-    )
-  ]
-  trend_smoothpars <- create_component(trend_smooth_pars)
-
-  # Random effect parameters from trend formula only. Mirrors the
-  # obs-side regex so trend-side Cholesky factors (`L_*_trend`) and
-  # standardised raw deviations (`z_*_trend`) land here instead of
-  # leaking into `trend_pars`.
-  trend_re_pars <- all_pars[
-    grepl("^(sd_|r_|cor_|L_|z_).*_trend", all_pars)
-  ]
-  trend_re_params <- create_component(trend_re_pars)
-
-  # Computed trend state arrays. Uses the same `state_pattern` the
-  # trend-dynamic filter uses to exclude these from `trend_pars`,
-  # so every Stan state array (lv_trend, innovations_trend,
-  # scaled_innovations_trend, mu_trend, trend) lands in exactly
-  # one bucket and is reachable via `obj_vars$trends`.
-  trend_state_pars <- all_pars[grepl(state_pattern, all_pars)]
-  trends <- create_component(trend_state_pars)
+  # Every Stan state array lands in exactly one bucket and is
+  # reachable via `obj_vars$trends`.
+  trends <- pick("state")
 
   # Return structured list
   list(
