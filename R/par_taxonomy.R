@@ -65,6 +65,7 @@ mvgam_par_side <- function(pars) {
 #' | `ranef` | `sd_*`, `r_*`, `cor_*`, `L_*`, `z_*` | every caller |
 #' | `family` | `sigma`, `shape`, `nu`, ... | `obs_params` |
 #' | `dynamics` | trend-side leftovers | `trend_params` |
+#' | `internal` | Stan working arrays | nothing; hidden everywhere |
 #'
 #' Collapsing any of these would force the caller that wants the
 #' narrower set to write a regex of its own, which is the state this
@@ -91,6 +92,12 @@ mvgam_par_kind <- function(pars, dpars = character()) {
     out[hit] <<- label
     free[hit] <<- FALSE
   }
+
+  # Working arrays the generated Stan declares at the top level of
+  # transformed parameters, which is where Stan saves everything it
+  # sees. They carry no meaning outside the transformation that
+  # produced them.
+  take(grepl(MVGAM_PAR_INTERNAL_PATTERN, pars), "internal")
 
   # The trend's own time-indexed states, in every spelling the
   # generated Stan emits. Numerous by construction, so no summary
@@ -143,6 +150,14 @@ mvgam_par_kind <- function(pars, dpars = character()) {
 # same pattern as its observation-side counterpart, and the side is
 # what tells the two apart. Writing a second `.*_trend` variant of
 # each pattern is what let the two accounts drift.
+# The intermediates of the VAR stationarity transformation. Stan
+# saves every variable declared at the top level of transformed
+# parameters, so these reach the posterior of any VAR or VARMA fit
+# and would otherwise be offered to a reader as parameters.
+#'@noRd
+MVGAM_PAR_INTERNAL_PATTERN <-
+  "^(P_var|result_var|P_ma|result_ma|empty_theta|Q_tilde)\\["
+
 #'@noRd
 MVGAM_PAR_STATE_PATTERN <- paste0(
   "^(trend|lv_trend|lv_trend_tilde|innovations_trend|",

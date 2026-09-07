@@ -427,7 +427,7 @@ predict_variance <- function(object, newdata, process_error,
           total_row <- numeric(comp$N_obs)
           for (g in seq_len(comp$N_unit)) {
             Kg <- comp$arrays$n_rep[g]
-            idx <- comp$arrays$visit_idx[g, seq_len(Kg)]
+            idx <- comp$arrays$visit_row[g, seq_len(Kg)]
             total_row[idx] <- sum(y_vec[idx])
           }
           total_mat <- matrix(total_row, nrow = comp$ndraws,

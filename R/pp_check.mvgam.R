@@ -742,7 +742,7 @@ pp_check.mvgam <- function(
 #
 # Simplex families (diri / multi / categ): every closure unit
 # packs K rows into the long layout via
-# `build_closure_unit_arrays()$visit_idx`. The within-unit
+# `build_closure_unit_arrays()$visit_row`. The within-unit
 # position 1..K of each row is its category label.
 #
 # mv-normal / mv-T: one row per (site, species); the `series`
@@ -756,16 +756,11 @@ pp_check_mv_category <- function(object, newdata) {
     # fit time (R/families.R:3534 in prepare_closure_unit_family).
     # Mirror that fallback here so the category vector matches the
     # per-unit K-row layout that posterior_predict actually emits.
-    arrs <- build_closure_unit_arrays(
-      newdata,
-      response_var = closure_unit_response_var(object$formula),
-      compute_y_max = FALSE,
-      unit_grouping_vars = closure_unit_grouping(fam) %||% "time"
-    )
+    arrs <- closure_unit_arrays_for(object, newdata)
     cat_int <- integer(nrow(newdata))
     for (g in seq_len(arrs$N_unit)) {
       Kg <- arrs$n_rep[g]
-      idx <- arrs$visit_idx[g, seq_len(Kg)]
+      idx <- arrs$visit_row[g, seq_len(Kg)]
       cat_int[idx] <- seq_len(Kg)
     }
     levels_int <- sort(unique(cat_int))
@@ -790,15 +785,10 @@ pp_check_mv_category <- function(object, newdata) {
 #'@noRd
 closure_unit_pp_check_setup <- function(object, newdata, y, yrep,
                                           type) {
-  resp_var <- closure_unit_response_var(object$formula)
-  default_cap <- closure_unit_default_cap(object$family)
   # Multi-season families return `c("series", "site", "time")` here;
   # single-season families return NULL and fall back to the 2-axis
   # default inside `build_closure_unit_arrays()`.
-  arrays <- build_closure_unit_arrays(
-    newdata, response_var = resp_var, default_cap = default_cap,
-    unit_grouping_vars = closure_unit_grouping(object$family)
-  )
+  arrays <- closure_unit_arrays_for(object, newdata)
   if (grepl("resid", type)) {
     # `yrep` is already `[ndraws x N_unit]` (per-unit residuals);
     # `y` is set to zeros downstream for resid_* types so only
@@ -814,7 +804,7 @@ closure_unit_pp_check_setup <- function(object, newdata, y, yrep,
   }
   list(
     y = y_unit, yrep = yrep_unit, arrays = arrays,
-    first_visits = arrays$visit_idx[, 1L]
+    first_visits = arrays$visit_row[, 1L]
   )
 }
 
@@ -827,7 +817,7 @@ closure_unit_pp_check_setup <- function(object, newdata, y, yrep,
 check_closure_unit_var_unit_constant <- function(values, arrays,
                                                    var_name) {
   for (g in seq_len(arrays$N_unit)) {
-    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
     if (length(unique(values[idx])) > 1L) {
       stop(insight::format_error(c(
         paste0(
@@ -1056,7 +1046,7 @@ closure_unit_fit_stat_ppc <- function(object, newdata, stat,
         x = paste0(paste(bad, collapse = ", "), " missing.")
       )))
     }
-    first_visits <- arrays$visit_idx[, 1L]
+    first_visits <- arrays$visit_row[, 1L]
     for (g in group) {
       check_closure_unit_var_unit_constant(
         as.character(newdata[[g]]), arrays, g

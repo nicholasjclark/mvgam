@@ -282,7 +282,7 @@ make_by_series_stub <- function() {
 
 test_that("per_obs_series_labels maps log_lik columns to series", {
   stub <- make_by_series_stub()
-  labels <- mvgam:::per_obs_series_labels(stub, n_cols = 8L)
+  labels <- mvgam:::per_obs_series_labels(stub)
   expect_identical(
     labels,
     c("a", "a", "a", "a", "b", "b", "b", "b")
@@ -293,7 +293,7 @@ test_that("per_obs_series_labels rejects fits without a series column", {
   stub <- make_by_series_stub()
   stub$data$series <- NULL
   expect_error(
-    mvgam:::per_obs_series_labels(stub, n_cols = 8L),
+    mvgam:::per_obs_series_labels(stub),
     "requires a 'series' column"
   )
 })
@@ -311,7 +311,7 @@ test_that("per_obs_series_labels rejects mv-custom families", {
     mvgam_multi_response = TRUE
   )
   expect_error(
-    mvgam:::per_obs_series_labels(stub, n_cols = 8L),
+    mvgam:::per_obs_series_labels(stub),
     "not meaningful for multi-response families"
   )
 })

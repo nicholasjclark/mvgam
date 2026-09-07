@@ -187,7 +187,16 @@ log_lik.mvgam <- function(object,
       if (length(per_resp) == 1L) {
         return(per_resp[[1L]])
       }
-      return(Reduce(`+`, per_resp))
+      # A response that was not measured at this occasion has no
+      # density, and `.apply_log_density()` leaves its column `NA`
+      # so `clean_ll()` can drop it. That contract holds for one
+      # response and breaks the moment the arms are summed: a plain
+      # `Reduce("+")` propagates one arm's `NA` across the whole
+      # occasion, so a frame whose responses have disjoint gaps
+      # loses the densities it did measure. Sum the arms that were
+      # measured, and keep the occasion missing only when none of
+      # them was.
+      return(sum_measured_arms(per_resp))
     }
   }
 
@@ -306,11 +315,7 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
     # default 2-axis path inside `build_closure_unit_arrays()`.
     # `default_cap` makes the `cap` data column optional for
     # binary-response families (`occ()` defaults to 1).
-    arrays <- build_closure_unit_arrays(
-      newdata, response_var = closure_unit_response_var(object$formula),
-      default_cap = closure_unit_default_cap(object$family),
-      unit_grouping_vars = closure_unit_grouping(object$family)
-    )
+    arrays <- closure_unit_arrays_for(object, newdata)
     # extract_p_for_closure_unit() handles both scalar (no
     # detection sub-formula) and vector (with `bf(p ~ ...)`) cases
     # by routing the vector case through brms's dpar linpred via
@@ -505,6 +510,25 @@ dispatch_log_lik <- function(family_name, link, linpred, y,
     ))
   )
 }
+
+# Internal: the joint density of several responses measured at the
+# same occasions. Each element is `[ndraws x nobs]` at one grain,
+# with an all-`NA` column wherever that response was not measured.
+# The joint is the sum over the responses that were, and is missing
+# only at an occasion where none of them was.
+#'@noRd
+sum_measured_arms <- function(per_resp) {
+  measured <- lapply(per_resp, function(m) !is.na(m))
+  n_measured <- Reduce(`+`, measured)
+  filled <- Map(function(m, ok) {
+    m[!ok] <- 0
+    m
+  }, per_resp, measured)
+  out <- Reduce(`+`, filled)
+  out[n_measured == 0L] <- NA_real_
+  out
+}
+
 
 # Wrap a per-observation function call to keep return shape [ndraws x nobs]
 # regardless of the underlying density signature.

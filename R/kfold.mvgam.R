@@ -183,20 +183,26 @@ kfold.mvgam <- function(x,
   )
   K_actual <- length(unique(fold_ids))
 
-  # log_lik(x) on the full data: one matrix at the family's
-  # natural grain (per-row or per-closure-unit). Reused for both
-  # the PSIS path and as the diagnostic baseline.
+  # log_lik(x) on the full data: one matrix at the family's natural
+  # grain (per-row or per-closure-unit). Reused for both the PSIS
+  # path and as the diagnostic baseline. Each column is mapped to
+  # its group and fold at that full width, before any narrowing, so
+  # the mapping is grain-aware.
   loglik_full <- log_lik(x)
-  loglik_full <- clean_ll(x, loglik_full)
-
-  # Map each log-lik column to its group + fold so the
-  # aggregation is grain-aware (closure-unit fits already produce
-  # per-unit log-lik; standard fits produce per-row).
   col_meta <- map_loglik_cols_to_groups(
     object = x, data = data,
     group_key = group_key, fold_ids = fold_ids,
     loglik_ncol = NCOL(loglik_full)
   )
+
+  # `clean_ll()` then drops the columns with no density and records
+  # which survived. The mapping is narrowed to match, because
+  # pairing a scored matrix with the frame's full width makes the
+  # two describe different observations.
+  loglik_full <- clean_ll(x, loglik_full)
+  col_meta <- lapply(col_meta, function(v) {
+    narrow_to_scored(v, loglik_full)
+  })
 
   # Aggregate per-column log-lik into per-group log-lik
   # [draws x n_groups]. Sum log-lik across rows belonging to each
@@ -413,18 +419,13 @@ map_loglik_cols_to_groups <- function(object, data, group_key,
         )))
       }
     }
-    # Mirror build_closure_unit_arrays() ordering: per-row unit
-    # key, unique in first-appearance order. Each unit's group
-    # key is read from the first row matching that unit, leaning
-    # on closure_unit_grouping's invariance within a unit.
-    row_unit_key <- do.call(paste, c(
-      lapply(closure_cols,
-             function(c) as.character(data[[c]])),
-      list(sep = "_")
-    ))
-    unit_levels <- unique(row_unit_key)
-    first_row_per_unit <- match(unit_levels, row_unit_key)
-    col_group <- group_key[first_row_per_unit]
+    # Read the unit layout from the builder that owns it rather
+    # than reconstructing it here. Rebuilding the key meant a
+    # second derivation of the same fact, kept in step with the
+    # first by a comment; each unit's group is read from its first
+    # row, leaning on the grouping's invariance within a unit.
+    arrays <- closure_unit_arrays_for(object, data)
+    col_group <- group_key[arrays$visit_row[, 1L]]
     if (length(col_group) != loglik_ncol) {
       stop(insight::format_error(c(
         "Closure-unit alignment count mismatch.",

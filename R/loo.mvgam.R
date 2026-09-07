@@ -329,15 +329,24 @@ named_list = function(names, values = NULL) {
 per_series_ic <- function(x, logliks,
                             criterion = c("loo", "waic")) {
   criterion <- match.arg(criterion)
-  col_series <- per_obs_series_labels(x, ncol(logliks))
+  col_series <- per_obs_series_labels(x)
+  # `clean_ll()` drops the columns with no density and records
+  # which survived. Narrow the labels the same way rather than
+  # pairing them with the frame's full width: an observation with
+  # no response contributes nothing to score and is not an
+  # arithmetic mismatch to report to the user.
+  col_series <- narrow_to_scored(col_series, logliks)
   if (length(col_series) != ncol(logliks)) {
     stop(insight::format_error(c(
-      "Cannot split log_lik by series: column count mismatch.",
+      "Cannot split log_lik by series.",
       x = paste0(
-        "log_lik has ", ncol(logliks), " columns but the data ",
-        "implies ", length(col_series), " observations."
+        "log_lik has ", ncol(logliks), " scored columns but the ",
+        "data implies ", length(col_series), " observations."
       ),
-      i = "by_series = TRUE assumes clean_ll() did not drop any columns."
+      i = paste0(
+        "The fit's stored data may not match the layout the model ",
+        "was fitted with."
+      )
     )))
   }
   by_idx <- split(seq_along(col_series),
@@ -375,8 +384,9 @@ per_series_ic <- function(x, logliks,
 # / multi / categ) put species on the K-vector axis WITHIN a unit
 # rather than across units; by_series is not meaningful there
 # and is rejected up front.
+
 #'@noRd
-per_obs_series_labels <- function(x, n_cols) {
+per_obs_series_labels <- function(x) {
   if (is_multi_response_family(x$family)) {
     stop(insight::format_error(c(
       "by_series = TRUE is not meaningful for multi-response families.",
@@ -397,13 +407,8 @@ per_obs_series_labels <- function(x, n_cols) {
   }
   series_col <- as.character(data$series)
   if (is_closure_unit_family(x$family)) {
-    arrs <- build_closure_unit_arrays(
-      data,
-      response_var = closure_unit_response_var(x$formula),
-      default_cap = closure_unit_default_cap(x$family),
-      unit_grouping_vars = closure_unit_grouping(x$family)
-    )
-    series_col[arrs$visit_idx[, 1L]]
+    arrs <- closure_unit_arrays_for(x, data)
+    series_col[arrs$visit_row[, 1L]]
   } else {
     series_col
   }

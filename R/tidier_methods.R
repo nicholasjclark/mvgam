@@ -509,21 +509,14 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
   # unit grain via `dplyr::distinct(out, .unit, .keep_all = TRUE)`.
   unit_id <- NULL
   if (is_closure_unit_family(x$family)) {
-    default_cap <- closure_unit_default_cap(x$family)
     # Multi-season families return `c("series", "site", "time")`;
     # single-season families return NULL and use the 2-axis default.
-    arrays <- build_closure_unit_arrays(
-      obs_data, response_var = resp,
-      default_cap = default_cap,
-      unit_grouping_vars = closure_unit_grouping(x$family)
-    )
-    # `visit_idx[g, 1:n_rep[g]]` gives the obs_data row indices
-    # for unit g; invert to a row -> unit map.
-    unit_of_visit <- integer(NROW(obs_data))
-    for (g in seq_len(arrays$N_unit)) {
-      idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
-      unit_of_visit[idx] <- g
-    }
+    arrays <- closure_unit_arrays_for(x, obs_data)
+    # Which unit each row belongs to, read from the array builder
+    # rather than inverted here. Rows whose unit carried no observed
+    # visit are `NA`, which is what recycling a per-unit residual
+    # back to them should say.
+    unit_of_visit <- arrays$row_unit
     resid_summ <- resid_summ[unit_of_visit, , drop = FALSE]
     unit_id <- arrays$unit_labels[unit_of_visit]
   }

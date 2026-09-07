@@ -17,12 +17,20 @@
 
 
 # The closure-unit arrays these kernels index by: `N_unit` sites, each
-# with `n_rep` rows, `visit_idx` giving the row numbers per site.
+# with `n_rep` rows. `visit_row` gives the frame row numbers per site,
+# which is the coordinate system every post-fit path works in;
+# `visit_idx` numbers the rows brms retained and is what the Stan
+# data indexes. With no missing response the two coincide, and this
+# stub mirrors the real arrays in supplying both plus the row-to-unit
+# map derived from them.
 unit_arrays <- function(n_unit, k) {
+  rows <- matrix(seq_len(n_unit * k), nrow = n_unit, byrow = TRUE)
   list(
     N_unit = n_unit,
     n_rep = rep(k, n_unit),
-    visit_idx = matrix(seq_len(n_unit * k), nrow = n_unit, byrow = TRUE)
+    visit_idx = rows,
+    visit_row = rows,
+    row_unit = rep(seq_len(n_unit), each = k)
   )
 }
 

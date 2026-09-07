@@ -234,43 +234,58 @@ assert_resp_for_mv <- function(object, resp, fn_name) {
 }
 
 
-#' Narrow predictions to the observations the weights cover
+#' Narrow anything paired with a scored log-likelihood
 #'
 #' `clean_ll()` drops the columns a missing response left unscorable
-#' and records which survived, so the importance weights built from it
-#' describe fewer observations than a prediction does. Selecting the
-#' same columns is what keeps the two talking about the same rows.
-#' Predictions that already match are returned untouched, so a fit with
-#' no missing responses pays nothing.
+#' and records which survived, so anything built alongside the full
+#' frame describes more observations than the scored matrix does.
+#' Selecting the same columns is what keeps the two talking about the
+#' same rows, and is the contract the `scored_columns` attribute
+#' exists to make keepable. Inputs that already match are returned
+#' untouched, so a fit with no missing response pays nothing.
 #'
-#' @param preds Matrix `[ndraws x nobs]` or array `[ndraws x nobs x k]`
-#' @param psis_object The PSIS object the weights come from
-#' @return `preds` restricted to the scored observations
+#' Three shapes reach this: a prediction matrix
+#' `[ndraws x nobs]`, an array `[ndraws x nobs x k]`, and a plain
+#' per-observation vector such as the series label of each column.
+#' The observation axis is the second dimension for the first two
+#' and the length for the third.
+#'
+#' @param x Matrix, array, or per-observation vector
+#' @param scored_from The object carrying the record: a PSIS object,
+#'   or the narrowed log-likelihood matrix itself
+#' @return `x` restricted to the scored observations
 #'
 #' @noRd
-narrow_to_scored <- function(preds, psis_object) {
-  scored <- attr(psis_object, "scored_columns")
-  n_weighted <- dim(psis_object)[2L]
-  n_pred <- dim(preds)[2L]
-  if (is.null(n_pred) || is.null(n_weighted) || n_pred == n_weighted) {
-    return(preds)
+narrow_to_scored <- function(x, scored_from) {
+  obs_axis <- function(z) {
+    d <- dim(z)
+    if (is.null(d)) length(z) else d[2L]
   }
-  if (is.null(scored) || length(scored) != n_weighted ||
-      max(scored) > n_pred) {
+  n_scored <- obs_axis(scored_from)
+  n_x <- obs_axis(x)
+  if (is.null(n_x) || is.null(n_scored) || n_x == n_scored) {
+    return(x)
+  }
+  scored <- attr(scored_from, "scored_columns")
+  if (is.null(scored) || length(scored) != n_scored ||
+      max(scored) > n_x) {
     stop(insight::format_error(c(
-      "Predictions and importance weights cover different observations.",
-      x = paste0("Predicted ", n_pred, " observations; weighted ",
-                 n_weighted, "."),
+      "Paired quantities cover different observations.",
+      x = paste0("Supplied ", n_x, " observations; scored ",
+                 n_scored, "."),
       i = paste0(
-        "This happens when a 'psis_object' was built from a different ",
-        "model or response. Leave it unset to have it computed here."
+        "A 'psis_object' built from a different model or response ",
+        "does this; leave it unset to have it computed here."
       )
     )))
   }
-  if (length(dim(preds)) == 3L) {
-    return(preds[, scored, , drop = FALSE])
+  if (is.null(dim(x))) {
+    return(x[scored])
   }
-  preds[, scored, drop = FALSE]
+  if (length(dim(x)) == 3L) {
+    return(x[, scored, , drop = FALSE])
+  }
+  x[, scored, drop = FALSE]
 }
 
 
@@ -440,9 +455,8 @@ loo_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   # them have to lose the same ones, or the three describe different
   # observations.
   ll <- clean_ll(object, ll)
-  scored <- attr(ll, "scored_columns")
-  y <- y[scored]
-  epred <- epred[, scored, drop = FALSE]
+  y <- narrow_to_scored(y, ll)
+  epred <- narrow_to_scored(epred, ll)
   r_eff <- mvgam_r_eff_log_lik(object, ll)
   r2 <- mvgam_loo_R2(y, epred, ll, r_eff)
   colnames(r2) <- "R2"

@@ -316,6 +316,11 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
   # stands in for a design brms cannot build, never a parameter the
   # user asked for.
   keep <- !startsWith(user, paste0("b_", MVGAM_EMPTY_OBS_PLACEHOLDER))
+  # Stan's own working arrays are never a parameter a reader asked
+  # for, whatever they asked for. Dropping them here rather than
+  # through the fit's `exclude` list covers a fit saved before the
+  # names were known to be internal.
+  keep <- keep & mvgam_par_kind(user) != "internal"
   if (!all) {
     keep <- keep & !is_hidden_unrotated(user)
   }

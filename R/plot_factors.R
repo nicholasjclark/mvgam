@@ -171,13 +171,8 @@ plot_latent_state <- function(object, probs = c(0.5, 0.8, 0.95),
   # the fit used. Multi-season families include a `site` axis but
   # we pool across sites for the ribbon.
   data <- object$data
-  resp_var <- closure_unit_response_var(object$formula)
-  arrays <- build_closure_unit_arrays(
-    data, response_var = resp_var,
-    default_cap = closure_unit_default_cap(object$family),
-    unit_grouping_vars = closure_unit_grouping(object$family)
-  )
-  first_rows <- arrays$visit_idx[, 1L]
+  arrays <- closure_unit_arrays_for(object, data)
+  first_rows <- arrays$visit_row[, 1L]
   unit_meta <- data.frame(
     series = as.factor(data[["series"]][first_rows]),
     time   = as.integer(data[["time"]][first_rows])

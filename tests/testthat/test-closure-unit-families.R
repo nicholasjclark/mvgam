@@ -729,8 +729,24 @@ test_that("build_closure_unit_arrays() returns correctly shaped arrays", {
   arrs <- build_closure_unit_arrays(d, response_var = "y")
   expect_named(arrs, c(
     "N_unit", "n_rep", "K_max", "Y_max",
-    "visit_idx", "max_rep", "unit_labels", "unit_grid"
+    "visit_idx", "visit_row", "row_unit", "max_rep",
+    "unit_labels", "unit_grid"
   ))
+
+  # Two coordinate systems, and they are not interchangeable.
+  # `visit_idx` numbers the rows brms retained, which is what the
+  # Stan data indexes because brms drops a row whose response is
+  # missing; `visit_row` numbers the rows of the frame as supplied,
+  # which is what every post-fit path needs. With nothing missing
+  # the two coincide, which is why indexing one against the other
+  # went unnoticed until a frame arrived with unmade visits.
+  expect_identical(arrs$visit_idx, arrs$visit_row)
+
+  # `row_unit` answers for every row, not only the observed ones:
+  # a visit that never happened has no density but still has an
+  # expected value, so it still belongs to its unit.
+  expect_identical(length(arrs$row_unit), nrow(d))
+  expect_identical(arrs$row_unit, rep(seq_len(4L), each = 3L))
 
   # `unit_grid` carries the grouping values for each unit in unit
   # order, so a caller labelling units reads it instead of rebuilding

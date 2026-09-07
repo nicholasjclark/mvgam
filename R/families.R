@@ -1301,7 +1301,8 @@ com_binomial_stan_funs <- function() {
 #      bypasses (duplicate-time validation skip, prediction-type
 #      routing, etc).
 #   2. `build_closure_unit_arrays()`: long-format data to unit
-#      arrays (N_unit, n_rep, K_max, Y_max, visit_idx). Called
+#      arrays (N_unit, n_rep, K_max, Y_max, visit_idx,
+#      visit_row, row_unit). Called
 #      both at fit time and at predict time with newdata so the
 #      cap column can vary per-call.
 #   3. `validate_closure_unit_data()`: cap column, integer
@@ -1555,11 +1556,22 @@ closure_unit_default_cap_buffer <- function(family) {
 #'   with repeated visits). Multi-response families set this to
 #'   `time_var` only: one closure unit per site, with the K species
 #'   rows treated as the "visits" within that unit. The
-#'   `visit_idx` matrix then maps each (unit, k) pair to the row
+#'   `visit_row` matrix then maps each (unit, k) pair to the row
 #'   index of the k-th species row at that site.
 #' @return Named list with elements `N_unit`, `n_rep`, `K_max`,
-#'   `Y_max`, `visit_idx`, `max_rep`, `unit_labels`. `K_max` and
-#'   `Y_max` are `NA` when `compute_y_max = FALSE`.
+#'   `Y_max`, `visit_idx`, `visit_row`, `row_unit`, `max_rep`,
+#'   `unit_labels` and `unit_grid`. `K_max` and `Y_max` are `NA`
+#'   when `compute_y_max = FALSE`.
+#'
+#'   `visit_idx` and `visit_row` index the same visits in two
+#'   coordinate systems and are not interchangeable. `visit_idx`
+#'   numbers the rows brms retained, which is what the Stan data
+#'   indexes because brms drops a row whose response is missing.
+#'   `visit_row` numbers the rows of the frame as supplied, which
+#'   is what every post-fit path needs, since `posterior_linpred()`
+#'   answers once per row of `newdata`. `row_unit` gives the unit
+#'   of every row, including a visit that never happened: that
+#'   visit has no density but still has an expected value.
 #' @noRd
 # Fill missing closure-unit identifier columns on an incoming
 # newdata so synthetic prediction grids (e.g. those built by
@@ -1749,11 +1761,32 @@ build_closure_unit_arrays <- function(data,
   n_unit       <- length(unit_levels)
   rep_counts   <- lengths(rows_by_unit)
   max_rep <- max(rep_counts)
+  # Two coordinate systems, and they are not interchangeable.
+  # `visit_idx` numbers the visits brms retained, which is what the
+  # Stan data indexes because brms drops a row whose response is
+  # missing. `visit_row` numbers the rows of the frame as supplied,
+  # which is what every post-fit path needs: `posterior_linpred()`
+  # answers for each row of `newdata`, and the response column is
+  # read from that frame too. Mixing them shifts a unit's visits by
+  # the number of missing responses before it, so both are returned
+  # and each caller names the one it means.
   visit_idx <- matrix(1L, nrow = n_unit, ncol = max_rep)
+  visit_row <- matrix(NA_integer_, nrow = n_unit, ncol = max_rep)
   for (g in seq_len(n_unit)) {
     visit_idx[g, seq_len(rep_counts[g])] <-
       as.integer(retained_pos[rows_by_unit[[g]]])
+    visit_row[g, seq_len(rep_counts[g])] <-
+      as.integer(rows_by_unit[[g]])
   }
+  # Which unit each row of the frame belongs to, over every row
+  # rather than the observed ones alone. A visit that never happened
+  # still has a linear predictor and so still has an expected value;
+  # only its density is absent. Deriving this here, where the units
+  # are formed, is what lets a per-visit surface be broadcast from a
+  # per-unit quantity without reconstructing the grouping. `NA`
+  # marks a row whose unit carried no observed visit at all and was
+  # dropped above.
+  row_unit <- match(unit_int, which(visited))
   if (!compute_y_max) {
     # Multi-response path: count families need Y_max + cap-driven
     # K_max for their per-unit truncation, but dirichlet /
@@ -1767,6 +1800,8 @@ build_closure_unit_arrays <- function(data,
       K_max       = NA_integer_,
       Y_max       = NA_integer_,
       visit_idx   = visit_idx,
+      visit_row   = visit_row,
+      row_unit    = row_unit,
       max_rep     = as.integer(max_rep),
       unit_labels = unit_levels,
       unit_grid   = unit_grid
@@ -1857,6 +1892,8 @@ build_closure_unit_arrays <- function(data,
     K_max       = K_max,
     Y_max       = Y_max,
     visit_idx   = visit_idx,
+    visit_row   = visit_row,
+    row_unit    = row_unit,
     max_rep     = as.integer(max_rep),
     unit_labels = unit_levels,
     unit_grid   = unit_grid
@@ -5020,8 +5057,18 @@ rcmb_vec <- function(mu, nu, T) {
 #'
 #' Returns one residual per observation per draw on the
 #' standard-normal scale (`qnorm` transform of the
-#' `runif(F(y - 1), F(y))` random quantile). Used by
-#' `pp_check(type = "resid_*")` and the residuals surface.
+#' `runif(F(y - 1), F(y))` random quantile).
+#'
+#' Nothing calls this yet. `compute_quantile_residuals()` offers two
+#' branches, an analytic one whose specs are continuous CDFs of the
+#' form `spec(y, mu, dpars)` and an empirical one that pools `yrep`
+#' across draws, and this fits neither: it is discrete, so it needs
+#' the randomisation between `F(y - 1)` and `F(y)` that a continuous
+#' spec never performs, and it needs the trials aterm that the spec
+#' signature does not carry. `com_binomial()` therefore takes the
+#' empirical branch, which returns one pooled value per observation
+#' and no posterior spread. Wiring this in means giving the analytic
+#' branch a discrete form.
 #'
 #' @param truth Numeric / integer vector of observed counts.
 #' @param fitted Numeric vector of fitted probabilities for this
@@ -5407,6 +5454,44 @@ extract_p_via_dpar_linpred <- function(object, newdata, draw_ids) {
   )
 }
 
+#' The closure-unit arrays for a fit, over a frame
+#'
+#' Every post-fit path that needs the unit layout rebuilds it from
+#' the fit's own family and formula. Assembling those arguments at
+#' each call site is what let two of them leave out
+#' `unit_grouping_vars`: a multi-season fit then grouped on
+#' `(series, time)` and dropped the site axis, answering on 48
+#' units where its likelihood has 480. Deriving them in one place
+#' means a caller cannot leave one out.
+#'
+#' The multi-response families take the other branch, where the
+#' K response components of a site are its "visits", so there is no
+#' per-unit truncation and no cap column to require.
+#'
+#' @param object A fitted `mvgam` with a closure-unit family.
+#' @param newdata Frame to build over; defaults to the fit's data.
+#' @return The list `build_closure_unit_arrays()` returns.
+#' @noRd
+closure_unit_arrays_for <- function(object, newdata = NULL) {
+  checkmate::assert_class(object, "mvgam")
+  newdata <- newdata %||% object$data
+  fam <- object$family
+  resp <- closure_unit_response_var(object$formula)
+  grouping <- closure_unit_grouping(fam)
+  if (is_multi_response_family(fam)) {
+    return(build_closure_unit_arrays(
+      newdata, response_var = resp, compute_y_max = FALSE,
+      unit_grouping_vars = grouping %||% "time"
+    ))
+  }
+  build_closure_unit_arrays(
+    newdata, response_var = resp,
+    default_cap = closure_unit_default_cap(fam),
+    unit_grouping_vars = grouping
+  )
+}
+
+
 #' Extract state, detection-probability and closure-unit arrays
 #'
 #' Single-pass extractor used by every closure-unit family's
@@ -5483,10 +5568,7 @@ extract_closure_unit_components <- function(object, newdata = NULL,
     binary_y_check     = binary_y_check && aggregates,
     cap_required       = is.null(default_cap) && aggregates
   )
-  arrays <- build_closure_unit_arrays(
-    newdata, response_var = response_var,
-    default_cap = default_cap
-  )
+  arrays <- closure_unit_arrays_for(object, newdata)
   # Per-visit linpred for the state quantity. The linpred is
   # constant within a closure unit because the formula is on
   # site-level covariates; drop the redundant columns to one per
@@ -5505,8 +5587,11 @@ extract_closure_unit_components <- function(object, newdata = NULL,
   ndraws   <- nrow(state_visit)
   n_visit  <- ncol(state_visit)
   n_unit   <- arrays$N_unit
-  first_visit_idx <- arrays$visit_idx[, 1L]
-  state <- state_visit[, first_visit_idx, drop = FALSE]
+  # The frame's own row, because `state_visit` has one column per
+  # row of `newdata`. Reading `visit_idx` here shifted a unit's
+  # first visit by the number of missing responses before it.
+  first_visit_row <- arrays$visit_row[, 1L]
+  state <- state_visit[, first_visit_row, drop = FALSE]
   # p extraction. brms emits the scalar `p` in the posterior when
   # there is no detection sub-formula; with a sub-formula
   # (`bf(y ~ x, p ~ tod)`) `p` is transient in the model block
@@ -5543,23 +5628,36 @@ posterior_epred_nmix <- function(object, newdata = NULL,
                                   draw_ids = NULL) {
   comp <- extract_closure_unit_components(object, newdata, draw_ids)
   # Broadcast unit-grain lambda back to per-visit length via the
-  # visit-to-unit lookup encoded in `arrays$visit_idx`. The
+  # visit-to-unit lookup `arrays$row_unit` records. The
   # first-visit column is shared by every visit of a unit, so the
   # inverse mapping is straightforward.
   unit_of_visit <- visit_to_unit_lookup(comp$arrays, comp$n_visit)
   comp$state[, unit_of_visit, drop = FALSE] * comp$p
 }
 
-#' Inverse of arrays$visit_idx: for each visit row, the unit g
+#' Inverse of arrays$visit_row: for each row of the frame, the unit
 #' that contains it. Used to broadcast unit-grain quantities
 #' (lambda, latent N) back to the visit grain without copying
 #' the lambda matrix.
 #' @noRd
 visit_to_unit_lookup <- function(arrays, n_visit) {
-  out <- integer(n_visit)
-  for (g in seq_len(arrays$N_unit)) {
-    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
-    out[idx] <- g
+  # `row_unit` already answers this, over every row of the frame
+  # rather than the observed visits alone, so the mapping is read
+  # rather than rebuilt. Walking `visit_row` instead left an unmade
+  # visit unassigned, and a zero fill for it dropped the column
+  # silently, since R reads a zero index as "omit this one"; the two
+  # matrices then failed to conform with nothing said about the
+  # unmade visit behind it.
+  checkmate::assert_count(n_visit)
+  out <- arrays$row_unit
+  if (length(out) != n_visit) {
+    stop(insight::format_error(c(
+      "Closure-unit row map does not cover the prediction frame.",
+      x = paste0("Rows mapped: ", length(out),
+                 "; visits predicted: ", n_visit, "."),
+      i = paste0("The frame passed to the prediction differs from ",
+                 "the one the unit arrays were built on.")
+    )))
   }
   out
 }
@@ -5585,7 +5683,7 @@ posterior_predict_nmix <- function(object, newdata = NULL,
   ndraws <- comp$ndraws
   out <- matrix(0L, nrow = ndraws, ncol = comp$n_visit)
   for (g in seq_len(arrays$N_unit)) {
-    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
     lam_g <- comp$state[, g]
     N_draws <- stats::rpois(ndraws, lambda = lam_g)
     for (j in idx) {
@@ -5660,7 +5758,7 @@ posterior_detection <- function(object, newdata = NULL,
 #'     closure unit, columns named by `arrays$unit_labels`).
 #'   * `arrays` -- the closure-unit array list produced by
 #'     `build_closure_unit_arrays()` (carries `N_unit`, `n_rep`,
-#'     `visit_idx`, `Y_max`, `unit_labels`).
+#'     `visit_row`, `row_unit`, `Y_max`, `unit_labels`).
 #' @noRd
 aggregate_closure_unit_visits <- function(object,
                                            newdata,
@@ -5673,11 +5771,7 @@ aggregate_closure_unit_visits <- function(object,
   # state), NULL otherwise. Threading it through to the array
   # builder mirrors prepare_closure_unit_family() so users do not
   # need to carry a `cap` column through to newdata for occ() fits.
-  default_cap <- closure_unit_default_cap(object$family)
-  arrays <- build_closure_unit_arrays(
-    newdata, response_var = response_var,
-    default_cap = default_cap
-  )
+  arrays <- closure_unit_arrays_for(object, newdata)
   if (ncol(yrep_visit) != nrow(newdata)) {
     stop(insight::format_error(c(
       "Posterior predictive matrix column count does not match 'newdata'.",
@@ -5693,7 +5787,7 @@ aggregate_closure_unit_visits <- function(object,
   y_unit <- numeric(N_unit)
   yrep_unit <- matrix(0, nrow = ndraws, ncol = N_unit)
   for (g in seq_len(N_unit)) {
-    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
     y_unit[g] <- sum(y_visit[idx])
     # Single-visit units short-circuit the apply call. Multi-visit
     # units sum across the chosen visit columns; rowSums is the
@@ -5872,7 +5966,7 @@ posterior_latent_N_pb <- function(object, newdata = NULL,
   y_vals <- as.integer(newdata[[response_var]])
   out <- matrix(0L, nrow = ndraws, ncol = N_unit)
   for (g in seq_len(N_unit)) {
-    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
     lam_g <- comp$state[, g]
     if (!conditional) {
       out[, g] <- stats::rpois(ndraws, lambda = lam_g)
@@ -5967,7 +6061,7 @@ log_lik_nmix <- function(linpred, link, y, family_pars, trials) {
   y_int  <- as.integer(y)
   out <- matrix(NA_real_, nrow = ndraws, ncol = N_unit)
   for (g in seq_len(N_unit)) {
-    idx  <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    idx  <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
     lam  <- lambda_visit[, idx[1L]]
     y_g  <- y_int[idx]
     p_g  <- p_mat[, idx, drop = FALSE]
@@ -6399,12 +6493,7 @@ extract_simplex_response_components <- function(object,
       ))
     }
   }
-  response_var <- closure_unit_response_var(object$formula)
-  arrays <- build_closure_unit_arrays(
-    newdata, response_var = response_var,
-    compute_y_max      = FALSE,
-    unit_grouping_vars = "time"
-  )
+  arrays <- closure_unit_arrays_for(object, newdata)
 
   # Resolve draw_ids up front so the mu linpred and the per-row phi
   # (when sourced from a sub-formula) use the same posterior rows.
@@ -6422,7 +6511,7 @@ extract_simplex_response_components <- function(object,
   ndraws_actual <- nrow(mu)
   N_obs <- ncol(mu)
   N_unit <- arrays$N_unit
-  visit_idx <- arrays$visit_idx
+  visit_row <- arrays$visit_row
   n_rep <- arrays$n_rep
 
   # Build per-row softmax probabilities by walking units. Each unit
@@ -6431,7 +6520,7 @@ extract_simplex_response_components <- function(object,
   prob_row <- matrix(0, nrow = ndraws_actual, ncol = N_obs)
   for (g in seq_len(N_unit)) {
     Kg <- n_rep[g]
-    idx <- visit_idx[g, seq_len(Kg)]
+    idx <- visit_row[g, seq_len(Kg)]
     mu_unit <- mu[, idx, drop = FALSE]
     # Mirror Stan's `mu_unit = mu[idx] - mu[idx[1]]` reference shift.
     # softmax is shift-invariant so the resulting probabilities are
@@ -6482,7 +6571,7 @@ extract_simplex_response_components <- function(object,
 #'
 #' After extraction the per-unit collapse is applied: each closure
 #' unit's K rows are set to the value at the unit's first row
-#' (`visit_idx[g, 1]`), mirroring Stan's `phi[idx[1]]` semantics in
+#' (`visit_row[g, 1]`), mirroring Stan's `phi[idx[1]]` semantics in
 #' `diri_lpdf()`. Per-row phi only enters the joint Dirichlet
 #' density once per unit, so any cross-row variation in the unit
 #' would be ignored by the likelihood and is removed here to keep
@@ -6537,7 +6626,7 @@ extract_phi_per_row <- function(object, newdata, draw_ids,
   # Stan likelihood never sees.
   for (g in seq_len(arrays$N_unit)) {
     Kg <- arrays$n_rep[g]
-    idx <- arrays$visit_idx[g, seq_len(Kg)]
+    idx <- arrays$visit_row[g, seq_len(Kg)]
     phi_mat[, idx] <- phi_mat[, idx[1L]]
   }
   phi_mat
@@ -6546,7 +6635,7 @@ extract_phi_per_row <- function(object, newdata, draw_ids,
 #' Per-row expected value for a `diri()` fit
 #'
 #' Each (site, species) row receives its softmax probability,
-#' broadcast from the per-site K-vector via `arrays$visit_idx`.
+#' broadcast from the per-site K-vector via `arrays$visit_row`.
 #' Compositional responses sum to 1 across the K rows of a site,
 #' so `E[y_{i,k}] = softmax(mu_unit_i)[k]`.
 #'
@@ -6577,7 +6666,7 @@ posterior_predict_diri <- function(object, newdata = NULL,
   out <- matrix(0, nrow = comp$ndraws, ncol = comp$N_obs)
   for (g in seq_len(comp$N_unit)) {
     Kg <- comp$arrays$n_rep[g]
-    idx <- comp$arrays$visit_idx[g, seq_len(Kg)]
+    idx <- comp$arrays$visit_row[g, seq_len(Kg)]
     prob_g <- comp$prob_row[, idx, drop = FALSE]
     # alpha[s, k] = prob_g[s, k] * phi[s, idx[1]]. `comp$phi` is a
     # `[ndraws x N_obs]` matrix whose Kg-row block is constant within
@@ -6599,7 +6688,7 @@ posterior_predict_diri <- function(object, newdata = NULL,
 #'
 #' Per-unit Dirichlet density `dirichlet_lpdf(y_unit |
 #' softmax(mu_unit) * phi)`. The per-unit log-density is assigned to
-#' the first row of each unit (`visit_idx[g, 1]`) and zero for the
+#' the first row of each unit (`visit_row[g, 1]`) and zero for the
 #' remaining K-1 rows, so the sum across rows recovers the joint
 #' log-likelihood and loo / waic naturally score at the site grain.
 #'
@@ -6619,7 +6708,7 @@ log_lik_diri <- function(linpred, link, y, family_pars, trials) {
   out <- matrix(0, nrow = ndraws, ncol = N_obs)
   for (g in seq_len(arrays$N_unit)) {
     Kg <- arrays$n_rep[g]
-    idx <- arrays$visit_idx[g, seq_len(Kg)]
+    idx <- arrays$visit_row[g, seq_len(Kg)]
     y_unit <- y[idx]
     prob_g <- prob_row[, idx, drop = FALSE]
     alpha <- prob_g * phi[, idx, drop = FALSE]
@@ -6656,7 +6745,7 @@ posterior_epred_multi <- function(object, newdata = NULL,
   total_row <- numeric(comp$N_obs)
   for (g in seq_len(comp$N_unit)) {
     Kg <- comp$arrays$n_rep[g]
-    idx <- comp$arrays$visit_idx[g, seq_len(Kg)]
+    idx <- comp$arrays$visit_row[g, seq_len(Kg)]
     total_row[idx] <- sum(y_vec[idx])
   }
   total_mat <- matrix(total_row, nrow = comp$ndraws,
@@ -6688,7 +6777,7 @@ posterior_predict_multi <- function(object, newdata = NULL,
   out <- matrix(0L, nrow = comp$ndraws, ncol = comp$N_obs)
   for (g in seq_len(comp$N_unit)) {
     Kg <- comp$arrays$n_rep[g]
-    idx <- comp$arrays$visit_idx[g, seq_len(Kg)]
+    idx <- comp$arrays$visit_row[g, seq_len(Kg)]
     n_g <- sum(y_vec[idx])
     prob_g <- comp$prob_row[, idx, drop = FALSE]
     for (s in seq_len(comp$ndraws)) {
@@ -6716,7 +6805,7 @@ log_lik_multi <- function(linpred, link, y, family_pars, trials) {
   out <- matrix(0, nrow = ndraws, ncol = N_obs)
   for (g in seq_len(arrays$N_unit)) {
     Kg <- arrays$n_rep[g]
-    idx <- arrays$visit_idx[g, seq_len(Kg)]
+    idx <- arrays$visit_row[g, seq_len(Kg)]
     y_unit <- as.integer(y[idx])
     n_g <- sum(y_unit)
     prob_g <- prob_row[, idx, drop = FALSE]
@@ -6765,7 +6854,7 @@ posterior_predict_categ <- function(object, newdata = NULL,
   out <- matrix(0L, nrow = comp$ndraws, ncol = comp$N_obs)
   for (g in seq_len(comp$N_unit)) {
     Kg <- comp$arrays$n_rep[g]
-    idx <- comp$arrays$visit_idx[g, seq_len(Kg)]
+    idx <- comp$arrays$visit_row[g, seq_len(Kg)]
     prob_g <- comp$prob_row[, idx, drop = FALSE]
     for (s in seq_len(comp$ndraws)) {
       cat_code <- sample.int(Kg, size = 1L, prob = prob_g[s, ])
@@ -6791,7 +6880,7 @@ log_lik_categ <- function(linpred, link, y, family_pars, trials) {
   out <- matrix(0, nrow = ndraws, ncol = N_obs)
   for (g in seq_len(arrays$N_unit)) {
     Kg <- arrays$n_rep[g]
-    idx <- arrays$visit_idx[g, seq_len(Kg)]
+    idx <- arrays$visit_row[g, seq_len(Kg)]
     y_unit <- as.integer(y[idx])
     # Observed category code: the index where y_unit == 1.
     cat_code <- which(y_unit == 1L)
@@ -6855,7 +6944,7 @@ posterior_predict_nmix_royle_nichols <- function(object,
   ndraws <- comp$ndraws
   out <- matrix(0L, nrow = ndraws, ncol = comp$n_visit)
   for (g in seq_len(arrays$N_unit)) {
-    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
     lam_g <- comp$state[, g]
     N_draws <- stats::rpois(ndraws, lambda = lam_g)
     for (j in idx) {
@@ -6903,7 +6992,7 @@ posterior_latent_N_royle_nichols <- function(object,
   y_vals <- as.integer(newdata[[response_var]])
   out <- matrix(0L, nrow = ndraws, ncol = N_unit)
   for (g in seq_len(N_unit)) {
-    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
     lam_g <- comp$state[, g]
     if (!conditional) {
       out[, g] <- stats::rpois(ndraws, lambda = lam_g)
@@ -6989,7 +7078,7 @@ log_lik_nmix_royle_nichols <- function(linpred, link, y,
   y_int  <- as.integer(y)
   out <- matrix(NA_real_, nrow = ndraws, ncol = N_unit)
   for (g in seq_len(N_unit)) {
-    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
     lam <- lambda_visit[, idx[1L]]
     y_g <- y_int[idx]
     log_1m_r_g <- log1p(-p_mat[, idx, drop = FALSE])
@@ -7074,7 +7163,7 @@ posterior_predict_nmix_poisson_poisson <- function(object,
   ndraws <- comp$ndraws
   out <- matrix(0L, nrow = ndraws, ncol = comp$n_visit)
   for (g in seq_len(arrays$N_unit)) {
-    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
     lam_g <- comp$state[, g]
     N_draws <- stats::rpois(ndraws, lambda = lam_g)
     for (j in idx) {
@@ -7114,7 +7203,7 @@ posterior_latent_N_poisson_poisson <- function(object,
   y_vals <- as.integer(newdata[[response_var]])
   out <- matrix(0L, nrow = ndraws, ncol = N_unit)
   for (g in seq_len(N_unit)) {
-    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
     lam_g <- comp$state[, g]
     if (!conditional) {
       out[, g] <- stats::rpois(ndraws, lambda = lam_g)
@@ -7204,7 +7293,7 @@ log_lik_nmix_poisson_poisson <- function(linpred, link, y,
   y_int  <- as.integer(y)
   out <- matrix(NA_real_, nrow = ndraws, ncol = N_unit)
   for (g in seq_len(N_unit)) {
-    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
     lam <- lambda_visit[, idx[1L]]
     y_g <- y_int[idx]
     p_g <- p_mat[, idx, drop = FALSE]
@@ -7266,7 +7355,7 @@ posterior_epred_occ <- function(object, newdata = NULL,
                                  draw_ids = NULL) {
   comp <- extract_closure_unit_components(object, newdata, draw_ids)
   # Broadcast unit-grain psi back to per-visit length via the
-  # visit-to-unit lookup encoded in `arrays$visit_idx`. The
+  # visit-to-unit lookup `arrays$row_unit` records. The
   # first-visit column is shared by every visit of a unit, so
   # the inverse mapping is straightforward.
   unit_of_visit <- visit_to_unit_lookup(comp$arrays, comp$n_visit)
@@ -7294,7 +7383,7 @@ posterior_predict_occ <- function(object, newdata = NULL,
   ndraws <- comp$ndraws
   out <- matrix(0L, nrow = ndraws, ncol = comp$n_visit)
   for (g in seq_len(arrays$N_unit)) {
-    idx <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
     psi_g <- comp$state[, g]
     z_draws <- stats::rbinom(ndraws, size = 1L, prob = psi_g)
     for (j in idx) {
@@ -7356,14 +7445,10 @@ posterior_occupancy <- function(object, newdata = NULL,
     # Marginal psi at the unit grain. No use of observed y.
     probs <- comp$state
   } else {
-    if (is.null(newdata)) newdata <- object$data
-    response_var <- closure_unit_response_var(object$formula)
-    y_vals <- as.integer(newdata[[response_var]])
     probs <- matrix(NA_real_, nrow = ndraws, ncol = N_unit)
     for (g in seq_len(N_unit)) {
-      idx   <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+      idx   <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
       psi_g <- comp$state[, g]
-      y_g   <- y_vals[idx]
       if (arrays$Y_max[g] >= 1L) {
         # Detected at least once: z = 1 with probability 1.
         probs[, g] <- 1
@@ -7428,7 +7513,7 @@ log_lik_occ <- function(linpred, link, y, family_pars, trials) {
   y_int  <- as.integer(y)
   out <- matrix(NA_real_, nrow = ndraws, ncol = N_unit)
   for (g in seq_len(N_unit)) {
-    idx   <- arrays$visit_idx[g, seq_len(arrays$n_rep[g])]
+    idx   <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
     psi   <- psi_visit[, idx[1L]]
     y_g   <- y_int[idx]
     p_g   <- p_mat[, idx, drop = FALSE]
