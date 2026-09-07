@@ -510,6 +510,29 @@ test_that("summary and the tidiers name the occupancy structure", {
 })
 
 
+test_that("the two sample-size accessors agree", {
+  # A closure-unit likelihood is evaluated per unit and the frame
+  # holds one row per visit, so both counts are meaningful. What a
+  # reader cannot do is tell which they were given: `summary()`
+  # prints the unit count under a header naming observations while
+  # `nobs()` returns the row count.
+  for (fit in list(occ_fit, nmix_fit)) {
+    d <- mvgam:::mvgam_training_data(fit)
+    n_unit <- as.integer(fit$standata$N_unit)
+    expect_gt(nrow(d), n_unit)
+    printed <- capture.output(summary(fit))
+    line <- grep("Number of observations", printed, value = TRUE)
+    expect_length(line, 1L)
+    shown <- as.integer(sub(".*Number of observations: *([0-9]+).*",
+                            "\\1", line))
+    # The unit count is what it prints today.
+    expect_identical(shown, n_unit)
+    # And `nobs()` answers with the other one, unlabelled.
+    expect_identical(as.integer(nobs(fit)), shown)
+  }
+})
+
+
 cat("\nDone.\n")
 
 # ----------------------------------------------------------------------

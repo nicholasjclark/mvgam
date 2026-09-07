@@ -2811,10 +2811,17 @@ nonetheless carries
 
     .mvgam_empty_obs   0.53   0.58   -0.57   1.71   1.01
 
-A reader is shown an estimate and an interval for a name they never
-wrote and cannot look up. It is finding 52's shape on the output
-surface rather than in an error: `eta` there, `.mvgam_empty_obs`
-here, both internal names presented to a user as if they were theirs.
+"Cannot look up" is literal. Refitting `y ~ -1` with everything on
+the trend side leaves the placeholder as the only row in that table.
+Neither `variables()` nor `tidy()` lists it. So the one parameter the
+first output shows is absent from every accessor a reader would reach
+for next.
+
+It is finding 52's shape on the output surface rather than in an
+error: `eta` there, `.mvgam_empty_obs` here, both internal names
+presented to a user as if they were theirs. No fixture in this
+directory carries it, since none puts the whole model on the trend
+side, which is why it took an article to surface.
 
 **A citation disagrees with its own reference list.** The text cites
 Heaps [2022] twice, at `var.Rmd:38` and `var.Rmd:172`. The reference
@@ -2915,3 +2922,71 @@ What it does instead is guarantee a non-negative correlation with
 the truth for every fit in the table, which can only move RMSE
 downward. The comparison it feeds is the article's headline claim
 that the joint fit recovers the state best.
+
+## An observation formula with no terms
+
+**83. `y ~ -1` is fitted with an intercept, and against a trend
+intercept the model is not identified.**
+
+`test-obs-empty-formula.R`. An empty observation formula says the
+observation side contributes nothing and every covariate belongs to
+the latent process. It is the idiom `vignettes/articles/var.Rmd` is
+written in, and nothing else in `tests/local` fits it, because every
+other fixture puts at least an intercept on the observation side.
+
+mvgam cannot hand brms a design with no columns, so it substitutes
+one. Read off the prefit, that column is
+
+    dim(X)      150 x 1
+    colnames(X) .mvgam_empty_obs
+    unique(X)   1
+
+A constant column in a linear predictor is an intercept whatever it
+is called. So a formula that explicitly declined an intercept is
+fitted with a free parameter on the observation scale, and the user
+is never told. A column of zeros would give brms the column it needs
+and contribute nothing.
+
+**Where it stops being cosmetic.** Give the trend side an intercept
+and its span already contains that constant. Fitted on 40 occasions
+of three series with `trend_formula = ~ series + AR(p = 1)`, true
+levels 1.0, 2.0 and -0.5:
+
+| quantity | value |
+|---|---|
+| `cor(.mvgam_empty_obs, b_seriesnorth_trend)` | -1.000 |
+| the same for east and west | -1.000, -1.000 |
+| posterior SD of each of the four | about 233 |
+| posterior SD of each pairwise sum | 0.113 to 0.135 |
+| R-hat on all four | 2.14 |
+| bulk ESS on all four, of 1000 draws | 2.63 |
+| reported series levels | 110.12, 110.25, 110.23 |
+
+The four parameters lie on an exact ridge. Their sums are pinned and
+their individual values are not, so the sampler wanders to plus and
+minus 700 and the chains never mix. `mvgam()` builds the model, runs
+it and returns it. The only sign a user gets is the R-hat column of a
+table whose estimates are already meaningless.
+
+**The article is the case. Its prior is what hides this.**
+`var.Rmd` fits `adj_count ~ -1` with `trend_formula = ~ region +
+VAR(cor = TRUE)`. That is this shape exactly, and it samples cleanly
+at R-hat 1.01, because the article sets
+`prior(std_normal(), class = b_trend)`. A standard normal on the
+trend coefficients pins the ridge. It buys a proper posterior for
+the sum and prior-determined values for the parts. The article then
+reads the parts: "the three region intercepts sit close to zero on
+the inverse link scale". They sit close to zero because the prior
+put them there. The placeholder beside them carries 0.53 with an
+interval of -0.57 to 1.71, on a parameter the formula declined.
+
+Finding 80 records the same placeholder reaching the printed summary
+under a name no accessor lists. This is what that name is doing.
+
+**Also on the prefit, and needing no draws.**
+`find_predictors(effects = "all")` offers `.mvgam_empty_obs` as a
+predictor, so every consumer reading a term list through insight is
+told a constant is something to take a slope over. And the stored
+frame gains the column: `names(fit$data)` returns the user's four
+columns plus the placeholder, so `insight::get_data()` hands back a
+frame that is not the one supplied.
