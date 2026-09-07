@@ -600,6 +600,46 @@ test_that("the tidiers keep this fit's own row order", {
 })
 
 
+test_that("every series gets a panel, and the panels are named", {
+  # Six series on a derived axis. The trend plot draws all six and
+  # names them, so the frame carries everything the series plot needs.
+  p <- plot(fit, type = "series")
+  b <- ggplot2::ggplot_build(p)
+  lay <- b$layout$layout
+  strip_col <- intersect(c("series", "trend"), names(lay))[1L]
+  labs <- as.character(lay[[strip_col]])
+  expect_identical(nrow(lay), as.integer(n_series))
+  expect_false(any(is.na(labs)))
+  expect_setequal(labs, series_levels)
+})
+
+
+test_that("the trend panels follow the axis the fit was built on", {
+  # Placed beside the series plot, a trend panel has to hold the same
+  # series in the same position. The axis is derived here, so its
+  # order is the grouping's rather than the alphabet's.
+  p <- plot(fit, type = "trend")
+  lay <- ggplot2::ggplot_build(p)$layout$layout
+  strip_col <- intersect(c("series", "trend"), names(lay))[1L]
+  expect_identical(as.character(lay[[strip_col]]), series_levels)
+})
+
+
+test_that("insight reports the terms this model actually has", {
+  # The observation formula is `y ~ 1`, so there is no predictor to
+  # report. `region` and `species` are the grouping the trend is
+  # built on and `time` and `series` are the axis, and a consumer
+  # handed any of them will offer a slope over an occasion number or
+  # a contrast between two regions.
+  preds <- insight::find_predictors(fit)$conditional
+  expect_null(preds)
+
+  # The pair a caller reaches for together.
+  expect_s3_class(model.frame(fit), "data.frame")
+  expect_true(inherits(terms(fit), "terms"))
+})
+
+
 test_that("the plotting methods render for a hierarchical fit", {
   for (ty in c("residuals", "trend", "series")) {
     # `plot()` returns a ggplot, so that is the class asserted. An
@@ -698,6 +738,18 @@ test_that("the marginal expectation redraws innovations each call", {
     posterior_epred(fit, draw_ids = 1:5),
     posterior_epred(fit, draw_ids = 1:5)
   )
+})
+
+
+test_that("kfold refits a fold without rebuilding the time grid", {
+  # A fold holds rows out, and a held-out row is a missing response
+  # rather than a missing occasion. `mvgam()` already draws that
+  # distinction: an `NA` response shrinks the likelihood and leaves
+  # `N_time_trend` alone. The refit rebuilds the axis from the subset
+  # frame instead, so the trend meets a grid with holes in it and
+  # refuses the fold it was asked to fit.
+  kf <- kfold(fit, K = 2L)
+  expect_true(is.finite(kf$estimates["elpd_kfold", "Estimate"]))
 })
 
 

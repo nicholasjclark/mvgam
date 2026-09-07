@@ -1430,6 +1430,14 @@ so a caller who asks for the split explicitly is told nothing about
 why it did not happen. `find_variables()` carries no `random`
 element for the same reason.
 
+The hierarchical fit shows the same fault with nothing left to be
+right about. Its observation formula is `y ~ 1`. The model has no
+predictor whatever. `find_predictors()$conditional` answers
+`time, series, region, species`. Two of these name the axis. The other
+two name the grouping the trend is built on. Every term offered to a consumer is
+one no user can take a meaningful slope over, and the model's real
+term list is empty.
+
 The consequence is measurable rather than hypothetical, and it
 reaches the plotting surface too. `conditional_effects()` on the VAR
 fit returns four panels, and one of them is `block`: six shrunk
@@ -1771,6 +1779,13 @@ This is the plan's own class reaching the output a reader looks at
 rather than a number they compute: one axis, two orders, every label
 correct in isolation.
 
+The hierarchical fit is the worst case, because its axis is derived
+and cannot be recovered by sorting anything. Declared `south_sp_c,
+south_sp_a, south_sp_b, north_sp_c, north_sp_a, north_sp_b`, the trend
+panels come back `north_sp_a, north_sp_b, north_sp_c, south_sp_a,
+south_sp_b, south_sp_c`. All six positions differ, so no panel in the
+trend plot holds the series the series plot puts in the same place.
+
 **56. `print()` shows an environment address and names an ARMA as an
 AR.**
 
@@ -2040,8 +2055,10 @@ Every other frame accessor answers. `model.frame()` returns the
 
 `terms()` is how a caller discovers a model's structure without
 knowing the class, so a package that answers `model.frame()` and not
-`terms()` breaks the pair. Seen on the CAR fit and on the ARMA fit, so
-it belongs to the class rather than to one model.
+`terms()` breaks the pair. Seen on the CAR, ARMA, wide and
+hierarchical fits, which between them cover a univariate trend, a
+multivariate one, a response-keyed axis and a derived one, so it
+belongs to the class rather than to any model.
 
 ## A wide fit describing itself
 
@@ -2149,6 +2166,22 @@ drawn at all and the one that is carries no name. Every other
 per-response surface on this fit answers correctly, `glance()` and
 `augment()` included, which places both faults in the plotting layer
 rather than in the fit.
+
+The two halves have different reach, and the hierarchical fit settles
+which is which. `test-trend-hierarchical.R` draws six series on a
+derived axis:
+
+| call | on the hierarchical fit |
+|---|---|
+| `plot(type = "trend")` | six panels, six distinct trajectories, named |
+| `plot(type = "series")` | one panel, strip `NA`, all six overplotted |
+
+So the trend panels are drawn correctly wherever the axis is a series,
+and the repetition in the wide fit belongs to the response-keyed axis
+alone. The series panel collapses on both, which makes it a property
+of any axis the frame has no column for, derived or response-keyed.
+Six series drawn over one another read as noise rather than as a
+series, so nothing about the picture invites a second look.
 
 **71. A gaussian arm's quantile residuals are three times too wide
 inside a wide fit.**
@@ -2345,3 +2378,42 @@ A grouping of sites that each carry a complete series of their own
 hides it, since dropping a site removes whole series rather than a
 stretch of the timeline and the grid survives. Nothing covers this
 now.
+
+**74. Ordinary K-fold is unavailable too, on every fit in this
+directory.**
+
+Finding 48 reports grouped k-fold failing where a group is contiguous
+in time. Asked the simpler question, `kfold(fit, K = 2)` with no
+grouping at all, every cached fit refuses:
+
+| fit | trend | refusal |
+|---|---|---|
+| hier | AR(gr, subgr) | Fitting failed. Unable to retrieve the metadata. |
+| car | CAR | Series in 'data' do not share the same time grid |
+| var | VAR | Irregular time intervals detected in time |
+| arma | AR(ma) | Irregular time intervals detected in time |
+| pw | PW | Irregular time intervals detected in time |
+| zmvn | ZMVN | Series in 'data' do not share the same time grid |
+
+Six of six, by three different routes. A random fold takes half the
+rows, so occasions lose some of their series and the timeline loses
+some of its occasions. The refit is handed that subset frame and
+rebuilds the axis from it. Depending on which guard the trend reads,
+it then meets the one demanding regular spacing or the one demanding a
+shared grid.
+
+The held-out rows are missing responses rather than missing time,
+which is the distinction `mvgam()` already draws when a response is
+`NA`: the likelihood shrinks and `N_time_trend` does not. A fold
+should leave the trend grid alone the way a gap does, so finding 48's
+diagnosis applies unchanged. What is new is the scope. This is not a
+restriction on how a grouping may be laid out. It is `kfold()` being
+unavailable to every state-space fit the package produces.
+
+Which guard a fit meets is not fixed, because the fold split is
+random. The hierarchical fit answered "Fitting failed. Unable to
+retrieve the metadata." on one split and "Irregular time intervals
+detected in time. Interval range: 1 to 2" on another. The second names
+the condition. The first names no column, no guard and no remedy, so
+the same call can hand a user a refusal they cannot act on depending
+on how the rows fell.
