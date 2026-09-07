@@ -2395,9 +2395,16 @@ grouping at all, every cached fit refuses:
 | pw | PW | Irregular time intervals detected in time |
 | zmvn | ZMVN | Series in 'data' do not share the same time grid |
 
-Six of six, by three different routes. A random fold takes half the
-rows, so occasions lose some of their series and the timeline loses
-some of its occasions. The refit is handed that subset frame and
+Six of six, by three different routes. Every one of them carries a
+latent trend. That qualifier is the scope: the trendless closure-unit fits in
+`test-grain-closure-units.R` run `kfold(K = 2)` without complaint,
+which is what confirms the trend grid is the thing being rebuilt. A
+`jsdgam()` fit refuses for a different reason again, that `update()`
+cannot rebuild a factor structure, so cross-validation there is
+unavailable by design rather than by accident.
+
+A random fold takes half the rows, so occasions lose some of their
+series and the timeline loses some of its occasions. The refit is handed that subset frame and
 rebuilds the axis from it. Depending on which guard the trend reads,
 it then meets the one demanding regular spacing or the one demanding a
 shared grid.
@@ -2550,3 +2557,81 @@ quiet unnoticed.
 One method per release is not the way out. The two that guard were
 fixed because a specific bug was traced to them, and eleven more carry
 the same hole today.
+
+## Visits that never happened
+
+**77. A closure-unit fit with unmade visits loses two prediction
+methods and half its likelihood.**
+
+`test-grain-closure-units.R`, "a visit that never happened is still
+predicted" and "the unit arrays cover the visits that happened". The
+file fits one occupancy model on a complete visit schedule and one
+with every sixth visit unmade, spread so that no unit loses all of
+its visits. 300 rows, 250 of them observed, 75 units throughout.
+
+The Stan data is right. `N` is 250, `sum(n_rep)` is 250 and
+`max(visit_idx)` is 250, so every index stays inside the response and
+the unit count is unchanged. What the fit is given is correct and
+what comes back is not:
+
+| call | complete schedule | every sixth visit unmade |
+|---|---|---|
+| `posterior_epred()` | 10 x 300 | error, "non-conformable arrays" |
+| `fitted()` | 300 x 4 | error, "non-conformable arrays" |
+| `posterior_predict()` | 10 x 300 | 10 x 300 |
+| `residuals()` | 75 x 4 | 75 x 4 |
+| `log_lik()` | 10 x 75 | 10 x 75, 42 columns entirely `NA` |
+| `kfold(K = 2)` | runs | error, alignment mismatch |
+
+Three things follow from one cause. `posterior_epred()` and `fitted()`
+stop on a message naming neither a column nor a row, and they are the
+two a reader reaches for first. `log_lik()` answers at the right width
+and empties 42 of its 75 units, which is 56 per cent of the
+likelihood on a frame where no unit lost all of its visits. `kfold()`
+then reports "log_lik has 33 columns". Since 75 minus 42 is 33, the
+cross-validation failure is those missing densities arriving one layer
+down.
+
+`posterior_predict()` and `residuals()` answer correctly on the same
+fit. That places the fault in how the two grains are reconciled, a
+visit against a unit, rather than in the fit or in the Stan data. A frame
+with no missing visits hides all of it, which is why the pair of
+schedules is what the file needs.
+
+Finding 15 is the same shape on a wide frame, where an occasion
+missing one response drops the density for all of them. Here a unit
+missing one visit drops the density for the whole unit.
+
+**78. A warning is raised on a computation that was right.**
+
+Found while chasing it as a suspected wrong answer. Predicting from a
+gaussian fit with a factor trend raises
+
+    Parameter 'sigma' has 2 columns but 600 observations.
+    Using first column (scalar behavior).
+
+The fit carries an observation `sigma` of one column and a
+`sigma_trend` of two, one per latent factor, so a two-column sigma is
+the trend's. The notice says the first column was taken, which on a
+gaussian would put the trend's innovation scale where the residual
+scale belongs and make every predictive interval too narrow.
+
+It does not. For a gaussian, a draw is the expectation plus
+`Normal(0, sigma)`, so the spread between the two says which parameter
+was used:
+
+| quantity | value | ratio to the observed spread |
+|---|---|---|
+| `sd(posterior_predict - posterior_epred)` | 0.3061 | |
+| observation `sigma` | 0.2859 | 1.07 |
+| `sigma_trend[1]` | 0.1600 | 1.91 |
+| `sigma_trend[2]` | 0.1603 | 1.91 |
+
+The draws were made with the observation sigma. The prediction is
+correct and the warning describes something that did not happen.
+
+Recorded because of what it costs rather than what it breaks. It
+reaches the ordinary prediction path of a gaussian factor model. It
+names a parameter the user never set and asserts a fallback that was
+not taken. A reader who checks it finds nothing wrong, and the next
+warning on the same surface is the one they will skip.

@@ -699,6 +699,44 @@ test_that("the unit arrays cover the visits that happened", {
 })
 
 
+test_that("an unmade visit does not cost a unit its density", {
+  # 300 rows, 250 observed, 75 units, and the gaps are spread so no
+  # unit loses all of its visits. The Stan data agrees: N is the
+  # observed count, n_rep sums to it and visit_idx stays inside it.
+  # So every unit still has visits to contribute a density, and the
+  # likelihood has to carry one term per unit.
+  obj <- gappy_fits()
+  ll <- log_lik(obj$gappy, ndraws = 10L)
+  expect_identical(ncol(ll), n_unit)
+  empty <- sum(apply(ll, 2L, function(v) all(is.na(v))))
+  expect_identical(empty, 0L)
+})
+
+
+test_that("the prediction methods survive an unmade visit", {
+  # `posterior_predict()` and `residuals()` answer on this fit, so the
+  # draws and the unit grain are both reachable. These two stop on
+  # "non-conformable arrays", which names neither a row nor a column
+  # the caller supplied.
+  obj <- gappy_fits()
+  n_row <- nrow(obj$data_gappy)
+  ep <- posterior_epred(obj$gappy, ndraws = 10L)
+  expect_identical(ncol(ep), n_row)
+  ft <- fitted(obj$gappy, ndraws = 10L)
+  expect_identical(nrow(ft), n_row)
+})
+
+
+test_that("a fold survives an unmade visit", {
+  # `kfold()` reads the likelihood, so it inherits whatever the units
+  # above lost: it reports the count that survives rather than the
+  # count the fit holds.
+  obj <- gappy_fits()
+  kf <- suppressWarnings(kfold(obj$gappy, K = 2L))
+  expect_true(is.finite(kf$estimates["elpd_kfold", "Estimate"]))
+})
+
+
 test_that("a visit that never happened is still predicted", {
   # The likelihood never saw these rows, and the frame still names
   # them, so a prediction has to cover the whole frame rather than
