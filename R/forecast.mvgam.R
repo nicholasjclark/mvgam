@@ -363,10 +363,16 @@ build_training_arms <- function(object, series_levels, resp = NULL) {
     as.numeric(d[[if (response_keyed) lv else resp]][rows])
   })
   names(observations) <- series_levels
+  # The occasions as the user supplied them. Truncating to an
+  # integer here is what left every continuous grid unforecastable:
+  # a fit trained at 4.590626 reported a training time of 4, so the
+  # frame beside it matched nothing and the horizon came back empty,
+  # while the panels drew one axis to 91 and its neighbour to 91.953
+  # under the same label.
   times <- lapply(series_levels, function(lv) {
     rows <- series_rows[[lv]]
-    if (!length(rows)) return(integer(0L))
-    sort(unique(as.integer(d[[time_var]][rows])))
+    if (!length(rows)) return(d[[time_var]][0L])
+    sort(unique(d[[time_var]][rows]))
   })
   names(times) <- series_levels
 
@@ -383,10 +389,100 @@ build_training_arms <- function(object, series_levels, resp = NULL) {
 }
 
 
+# Internal: the occasions of `candidate` a series has yet to reach.
+#
+# A horizon is what lies beyond the last occasion a series was
+# observed at. Asking instead which occasions are absent from the
+# training grid -- `setdiff(candidate, training_times)` -- answers
+# the same on a frame that runs past the end and differently on an
+# occasion sitting inside the grid unobserved, which was then
+# forecast backwards: the step count went negative and the call
+# ended on an assertion naming an internal vector.
+#
+# `last_time` is `NA` for a series the fit never observed, which has
+# no origin to forecast from and so contributes no horizon.
+#'@noRd
+horizon_beyond <- function(candidate, last_time) {
+  if (is.na(last_time)) return(candidate[0L])
+  sort(unique(candidate[candidate > last_time]))
+}
+
+
+# Internal: refuse a frame that names no occasion any series has yet
+# to reach.
+#
+# An all-interior frame used to return an `mvgam_forecast` of the
+# right class holding nothing, so a caller looping over the arms
+# saw a result and read no numbers out of it. The occasions the
+# frame supplied and the last one each series was seen at are what
+# a caller needs to fix the call, so both are named.
+#'@noRd
+refuse_empty_horizon <- function(newdata, candidate, last_times,
+                                 time_var) {
+  origin <- last_times[!is.na(last_times)]
+  # A series the fit never observed has no origin to name, and where
+  # that is true of every series the sentence would read "Last
+  # observed: at ." Saying nothing beats naming nothing.
+  observed_line <- if (length(origin)) {
+    paste0(
+      "Last observed: ",
+      paste0(names(origin), " at ",
+             format(unname(origin), trim = TRUE), collapse = ", "),
+      "."
+    )
+  } else {
+    "No series records an occasion it was last observed at."
+  }
+  stop(insight::format_error(c(
+    "'newdata' names no occasion beyond the training grid.",
+    x = paste0(
+      "Supplied '", time_var, "' values: ",
+      paste(format(candidate, trim = TRUE), collapse = ", "), "."
+    ),
+    x = observed_line,
+    i = paste0(
+      "A forecast extends the grid, so 'newdata' has to reach past ",
+      "it. To predict at occasions the model was fitted on, use ",
+      "'hindcast()' or 'posterior_predict()'."
+    )
+  )), call. = FALSE)
+}
+
+
+# Internal: the last observed occasion of each series, named by the
+# axis. The record holds it in the units the user supplied, so a
+# continuous grid keeps its fractions and a padded series is dated
+# from its last observation rather than from its last row.
+#
+# An object carrying no record, or one whose record says nothing
+# about a series, falls back to the training arms, where the
+# occasions of each series were already gathered. That is the same
+# question asked of the frame instead of the fit, and it is the only
+# answer available to a model saved before the axes were recorded.
+#'@noRd
+series_last_times <- function(object, series_levels, training) {
+  recorded <- if (is.null(object)) {
+    rep(NA_real_, length(series_levels))
+  } else {
+    extract_last_observed_times(object, length(series_levels))
+  }
+  out <- stats::setNames(as.numeric(recorded), series_levels)
+  unknown <- is.na(out)
+  if (any(unknown)) {
+    out[unknown] <- vapply(series_levels[unknown], function(lv) {
+      ts <- training$times[[lv]]
+      if (!length(ts)) NA_real_ else max(as.numeric(ts))
+    }, numeric(1L))
+  }
+  out
+}
+
+
 # Internal: forecast horizon resolved from newdata. Returns NULL
-# when newdata is NULL or has no times beyond training. Otherwise
-# returns the per-series forecast times / observations and the
-# forecast-only subset of newdata for downstream linpred calls.
+# when newdata is NULL. Otherwise returns the per-series forecast
+# times / observations and the forecast-only subset of newdata for
+# downstream linpred calls, refusing a frame that reaches past
+# nothing.
 #'@noRd
 resolve_forecast_grid <- function(object, newdata, training,
                                     series_levels) {
@@ -437,28 +533,30 @@ resolve_forecast_grid <- function(object, newdata, training,
   # supplies. Asking for a per-row series here is asking a question
   # the frame cannot answer, and demanding a `series` column left
   # every `mvbf()` and `jsdgam()` fit unable to forecast at all.
+  last_times <- series_last_times(object, series_levels, training)
+
   if (is.null(series_ids) &&
         identical(mvgam_axes(object)$series$source, "multivariate")) {
-    nt <- sort(unique(as.integer(newdata[[time_var]])))
+    nt <- sort(unique(newdata[[time_var]]))
     fc_times <- stats::setNames(lapply(series_levels, function(lv) {
-      setdiff(nt, as.integer(training$times[[lv]]))
+      horizon_beyond(nt, last_times[[lv]])
     }), series_levels)
-    if (all(lengths(fc_times) == 0L)) return(NULL)
+    if (all(lengths(fc_times) == 0L)) {
+      refuse_empty_horizon(newdata, nt, last_times, time_var)
+    }
     # Each response's truths come from its own column, so a frame
     # supplying some of them and not others scores what it can.
     fc_observations <- stats::setNames(lapply(series_levels, function(lv) {
       if (!lv %in% names(newdata)) return(NULL)
-      idx <- as.integer(newdata[[time_var]]) %in% fc_times[[lv]]
+      idx <- newdata[[time_var]] %in% fc_times[[lv]]
       if (!any(idx)) return(NULL)
-      as.numeric(newdata[[lv]][idx])[order(
-        as.integer(newdata[[time_var]][idx])
-      )]
+      as.numeric(newdata[[lv]][idx])[order(newdata[[time_var]][idx])]
     }), series_levels)
-    keep <- as.integer(newdata[[time_var]]) %in%
+    keep <- newdata[[time_var]] %in%
       unique(unlist(fc_times, use.names = FALSE))
     fc_data <- newdata[keep, , drop = FALSE]
     fc_data <- fc_data[
-      order(as.integer(fc_data[[time_var]])), , drop = FALSE
+      order(fc_data[[time_var]]), , drop = FALSE
     ]
     return(list(data = fc_data, times = fc_times,
                 observations = fc_observations))
@@ -496,13 +594,15 @@ resolve_forecast_grid <- function(object, newdata, training,
 
   fc_times <- lapply(series_levels, function(lv) {
     idx <- series_fac == lv
-    if (!any(idx)) return(integer(0L))
-    nt <- sort(unique(as.integer(newdata[[time_var]][idx])))
-    setdiff(nt, training$times[[lv]])
+    if (!any(idx)) return(newdata[[time_var]][0L])
+    horizon_beyond(newdata[[time_var]][idx], last_times[[lv]])
   })
   names(fc_times) <- series_levels
 
-  if (all(lengths(fc_times) == 0L)) return(NULL)
+  if (all(lengths(fc_times) == 0L)) {
+    refuse_empty_horizon(newdata, sort(unique(newdata[[time_var]])),
+                         last_times, time_var)
+  }
 
   # `fc_times` is sorted, so the truths and the rows the linear
   # predictor is built from have to be sorted the same way. Taking
@@ -515,7 +615,7 @@ resolve_forecast_grid <- function(object, newdata, training,
     idx <- series_fac == lv &
       newdata[[time_var]] %in% fc_times[[lv]]
     if (!any(idx) || !(resp %in% names(newdata))) return(NULL)
-    times_lv <- as.integer(newdata[[time_var]][idx])
+    times_lv <- newdata[[time_var]][idx]
     as.numeric(newdata[[resp]][idx])[order(times_lv)]
   })
   names(fc_observations) <- series_levels
@@ -523,13 +623,13 @@ resolve_forecast_grid <- function(object, newdata, training,
   keep <- vapply(seq_len(nrow(newdata)), function(i) {
     lv <- as.character(series_fac[i])
     if (is.na(lv)) return(FALSE)
-    as.integer(newdata[[time_var]][i]) %in% fc_times[[lv]]
+    newdata[[time_var]][i] %in% fc_times[[lv]]
   }, logical(1L))
   fc_data <- newdata[keep, , drop = FALSE]
   fc_data <- fc_data[
     order(
       match(as.character(series_fac[keep]), series_levels),
-      as.integer(fc_data[[time_var]])
+      fc_data[[time_var]]
     ), ,
     drop = FALSE
   ]
@@ -575,11 +675,17 @@ build_training_tail_data <- function(training, max_lag) {
     return(sub[order(sub[[time_var]]), , drop = FALSE])
   }
 
+  # Which rows belong to a series is settled once, where the arms
+  # were built, and read here. Re-cutting the frame by its `series`
+  # column asked a different question of a hierarchical fit, whose
+  # column was superseded by the grouping: the comparison matched
+  # nothing and the tail arrived empty. `build_training_arms()` and
+  # `build_hindcast_arms()` already read `series_rows`; this was the
+  # one that was not brought along.
   rows <- lapply(series_levels, function(lv) {
     tail_ts <- tail(training$times[[lv]], max_lag)
-    idx <- training$data[[series_var]] == lv &
-      training$data[[time_var]] %in% tail_ts
-    sub <- training$data[idx, , drop = FALSE]
+    block <- training$data[training$series_rows[[lv]], , drop = FALSE]
+    sub <- block[block[[time_var]] %in% tail_ts, , drop = FALSE]
     sub[order(sub[[time_var]]), , drop = FALSE]
   })
   do.call(rbind, rows)
@@ -775,8 +881,6 @@ build_trendless_forecast_arms <- function(object, fc_grid, type,
   # before any work runs; the switch below is total over the
   # remaining three types.
   fc_data <- fc_grid$data
-  series_var <- object$trend_metadata$variables$series_var %||%
-    "series"
   predictor <- switch(
     type,
     "link"     = posterior_linpred,
@@ -789,7 +893,15 @@ build_trendless_forecast_arms <- function(object, fc_grid, type,
   )
   full <- predictor(object, newdata = fc_data, draw_ids = draw_idx)
 
-  series_fac <- factor(fc_data[[series_var]], levels = series_levels)
+  # Placed the way the fit places a row, so a frame whose `series`
+  # column was superseded by a grouping is cut into the series the
+  # model has. Reading the column matched nothing there and handed
+  # back an arm of zero columns per series.
+  series_fac <- axis_row_series(object, fc_data) %||%
+    factor(
+      fc_data[[object$trend_metadata$variables$series_var %||% "series"]],
+      levels = series_levels
+    )
   out <- vector("list", length(series_levels))
   names(out) <- series_levels
   for (s in seq_along(series_levels)) {

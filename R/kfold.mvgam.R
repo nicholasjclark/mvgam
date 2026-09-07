@@ -86,8 +86,10 @@
 #'     \item `n_refits` --- number of folds refit.
 #'     \item `refit_groups` --- character vector of refit fold
 #'       labels.
-#'     \item `K`, `group`, `pareto_k_threshold`, `exact` ---
-#'       echoed call arguments.
+#'     \item `K`, `group`, `exact` --- echoed call arguments.
+#'     \item `pareto_k_threshold` --- the numeric threshold the
+#'       refit gate applied, and `pareto_k_threshold_adaptive`,
+#'       `TRUE` when the adaptive rule chose it.
 #'   }
 #'   The `loo` parent class lets [loo::loo_compare()] and
 #'   `print.loo()` consume the result directly.
@@ -212,15 +214,11 @@ kfold.mvgam <- function(x,
   )
   group_labels <- colnames(loglik_grouped)
 
-  # Resolve the numeric refit threshold. When the caller left
-  # `pareto_k_threshold = NULL` (the default) apply the Vehtari
-  # et al. (2024) adaptive rule from `S` posterior draws. See the
-  # sibling logic in `lfo_cv.mvgam()` for the argument contract.
-  pareto_k_threshold_used <- if (is.null(pareto_k_threshold)) {
-    mvgam_ps_khat_threshold(nrow(loglik_grouped))
-  } else {
-    pareto_k_threshold
-  }
+  # The number the refit gate compares against, resolved by the
+  # same rule `lfo_cv()` applies.
+  pareto_k_threshold_used <- resolve_pareto_k_threshold(
+    pareto_k_threshold, nrow(loglik_grouped)
+  )
 
   # Build the per-fold -> groups mapping (which group labels live
   # in which fold). Used for both the PSIS refit-trigger loop and
@@ -281,8 +279,8 @@ kfold.mvgam <- function(x,
     pareto_k = pareto_k,
     refit_groups = refit_groups, K = K_actual,
     group = group_info$group_names,
-    pareto_k_threshold = pareto_k_threshold,
-    pareto_k_threshold_used = pareto_k_threshold_used,
+    pareto_k_threshold = pareto_k_threshold_used,
+    pareto_k_threshold_adaptive = is.null(pareto_k_threshold),
     exact = exact
   )
 }
@@ -638,12 +636,8 @@ print.mvgam_kfold <- function(x, digits = 2L, ...) {
   ))
   psis_k <- x$pareto_k[!is.na(x$pareto_k)]
   if (length(psis_k) > 0L) {
-    # Adaptive-default fits stash the effective threshold on
-    # `pareto_k_threshold_used`; older fits fall back to the
-    # user-supplied `pareto_k_threshold`.
-    threshold_val <- x$pareto_k_threshold_used %||%
-      x$pareto_k_threshold
-    threshold_lbl <- if (is.null(x$pareto_k_threshold)) {
+    threshold_val <- pareto_k_threshold_of(x)
+    threshold_lbl <- if (pareto_k_threshold_is_adaptive(x)) {
       paste0(formatC(threshold_val, digits = digits, format = "f"),
              " (adaptive)")
     } else {
@@ -813,11 +807,7 @@ plot.mvgam_kfold <- function(x, ...) {
     threshold = as.numeric(elpd_threshold),
     facet = "ELPD"
   )
-  # Read the numeric threshold applied at the refit gate. Adaptive
-  # fits carry it on `pareto_k_threshold_used`; older fits fall
-  # back to `pareto_k_threshold`.
-  threshold_val <- x$pareto_k_threshold_used %||%
-    x$pareto_k_threshold
+  threshold_val <- pareto_k_threshold_of(x)
   k_dat <- data.frame(
     group = group,
     value = as.numeric(x$pareto_k),
@@ -879,7 +869,7 @@ plot.mvgam_kfold <- function(x, ...) {
 build_mvgam_kfold <- function(pointwise, pointwise_psis = NULL,
                               pareto_k, refit_groups,
                               K, group, pareto_k_threshold,
-                              pareto_k_threshold_used = pareto_k_threshold,
+                              pareto_k_threshold_adaptive = FALSE,
                               exact) {
   elpd <- sum(pointwise)
   se_elpd <- sqrt(length(pointwise) * stats::var(pointwise))
@@ -907,7 +897,7 @@ build_mvgam_kfold <- function(pointwise, pointwise_psis = NULL,
     K = K,
     group = group,
     pareto_k_threshold = pareto_k_threshold,
-    pareto_k_threshold_used = pareto_k_threshold_used,
+    pareto_k_threshold_adaptive = pareto_k_threshold_adaptive,
     exact = exact
   )
   class(out) <- c("mvgam_kfold", "kfold", "loo")

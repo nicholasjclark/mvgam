@@ -1378,15 +1378,21 @@ test_that("lfo_cv scores this fit on its own time axis", {
   # A refit happened at the window it started from.
   expect_true(all(lfo$refits_at %in% time_vals))
 
-  # The Pareto diagnostic that decides when to refit is reported.
-  # `pareto_k_threshold` is the field named in the object and in the
-  # documentation; `pareto_k_threshold_used` is the one that holds a
-  # number. Measured, the first is NULL and the second is 0.6667,
-  # which is `min(1 - 1/log10(S), 0.7)` at 1000 draws rather than the
-  # documented 0.7. This is finding 27: the field a reader reaches
-  # for is the empty one.
+  # The threshold that decided when to refit is reported under the
+  # documented name. It used to be split in two, with
+  # `pareto_k_threshold` holding whatever the caller passed and a
+  # second field holding the number, so a default call left the
+  # field a reader reaches for empty.
+  #
+  # The number is the adaptive one, `min(1 - 1/log10(S), 0.7)`,
+  # which is 2/3 at 1000 draws. 0.7 is the value that rule clamps
+  # to once the draw count is large enough, not the default here.
   expect_false(is.null(lfo$pareto_k_threshold))
-  expect_equal(lfo$pareto_k_threshold, 0.7)
+  expect_equal(lfo$pareto_k_threshold,
+               mvgam:::mvgam_ps_khat_threshold(
+                 as.integer(posterior::ndraws(fit))
+               ))
+  expect_true(lfo$pareto_k_threshold_adaptive)
 })
 
 

@@ -21,6 +21,49 @@ mvgam_ps_khat_threshold <- function(S) {
 }
 
 
+# The threshold a refit gate will apply, given what the caller asked
+# for and how many draws the posterior holds. `NULL` means the
+# caller left the choice to the adaptive rule above.
+#
+# `lfo_cv()` and `kfold()` both gate their refits on this and each
+# resolved it for itself, so the rule was written twice in two files
+# and had to be kept in step by hand.
+#'@noRd
+resolve_pareto_k_threshold <- function(pareto_k_threshold, n_draws) {
+  if (is.null(pareto_k_threshold)) {
+    mvgam_ps_khat_threshold(n_draws)
+  } else {
+    pareto_k_threshold
+  }
+}
+
+
+# The threshold a result was produced under.
+#
+# A result records the number its gate applied, so this reads it.
+# It carried two fields instead: `pareto_k_threshold` held whatever
+# the caller passed, which is `NULL` whenever the adaptive rule
+# chose, and `pareto_k_threshold_used` held the number. A reader
+# reaching for the documented name got the empty one. The pair is
+# now one field holding the applied number, with
+# `pareto_k_threshold_adaptive` saying who chose it; the older
+# spelling is understood here so a result saved before the change
+# still reads.
+#'@noRd
+pareto_k_threshold_of <- function(x) {
+  x$pareto_k_threshold %||% x$pareto_k_threshold_used
+}
+
+
+# Whether the adaptive rule chose the threshold rather than the
+# caller. An older result says so by leaving `pareto_k_threshold`
+# empty, which is the spelling this replaces.
+#'@noRd
+pareto_k_threshold_is_adaptive <- function(x) {
+  x$pareto_k_threshold_adaptive %||% is.null(x$pareto_k_threshold)
+}
+
+
 # Diagnostic columns for a paired ELPD comparison table,
 # following Sivula, Magnusson, Matamoros & Vehtari (2025,
 # Bayesian Analysis, DOI 10.1214/25-BA1569). The paper is

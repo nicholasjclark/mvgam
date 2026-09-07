@@ -89,12 +89,11 @@
 #'   * `eval_timepoints`: integer vector of the times evaluated.
 #'   * `refits_at`: integer vector of time points where the model
 #'     was refit.
-#'   * `pareto_k_threshold`: the threshold argument as supplied
-#'     (numeric, or `NULL` when the adaptive default was used).
-#'   * `pareto_k_threshold_used`: the effective numeric threshold
-#'     actually applied inside the refit gate (equal to
-#'     `pareto_k_threshold` when a numeric was supplied, or the
-#'     adaptive value when `NULL` was supplied).
+#'   * `pareto_k_threshold`: the numeric threshold the refit gate
+#'     applied, whether it came from the argument or from the
+#'     adaptive rule.
+#'   * `pareto_k_threshold_adaptive`: `TRUE` when the adaptive rule
+#'     chose that number because `pareto_k_threshold` was `NULL`.
 #'   * `fc_horizon`: the horizon used at each fold.
 #'
 #' @references
@@ -205,10 +204,17 @@ lfo_cv.mvgam <- function(object,
   time_var <- object$trend_metadata$variables$time_var %||% "time"
   series_var <- object$trend_metadata$variables$series_var %||%
     "series"
-  if (!all(c(time_var, series_var) %in% names(all_data))) {
+  # Only the time is demanded. Which rows belong to which series is
+  # answered two lines below by `axis_row_series()`, from the record
+  # rather than from a column, so a hierarchical frame whose series
+  # is derived and a wide frame that cannot carry one both pass. The
+  # same guard was reasoned out of `resolve_forecast_grid()` and its
+  # comment says why; asking for the column here refused every
+  # `mvbf()` fit the frame it was fitted on.
+  if (!time_var %in% names(all_data)) {
     stop(insight::format_error(c(
-      paste0("'newdata' must contain '", time_var,
-             "' and '", series_var, "' columns."),
+      paste0("'newdata' must contain the time column '", time_var,
+             "'."),
       i = paste0("Got columns: ",
                  paste(names(all_data), collapse = ", "), ".")
     )))
@@ -223,7 +229,7 @@ lfo_cv.mvgam <- function(object,
     factor(all_data[[series_var]])
   series_fac <- droplevels(series_fac)
   series_time_sets <- lapply(
-    split(as.integer(all_data[[time_var]]), series_fac),
+    split(all_data[[time_var]], series_fac),
     function(t) sort(unique(t))
   )
   if (length(series_time_sets) > 1L) {
@@ -250,7 +256,7 @@ lfo_cv.mvgam <- function(object,
   # union and not the fit's axis. The series identity above still
   # comes from the fit, because who a row belongs to is a question
   # about the model; when a row was observed is not.
-  all_unique_times <- sort(unique(as.integer(all_data[[time_var]])))
+  all_unique_times <- sort(unique(all_data[[time_var]]))
   n_times <- length(all_unique_times)
 
   # fc_horizon must leave at least one training observation.
@@ -359,19 +365,13 @@ lfo_cv.mvgam <- function(object,
   loglik_past <- log_lik(fit_past, newdata = all_data)
   idx_refit <- idx_min_t
 
-  # Resolve the numeric threshold applied inside the refit gate.
-  # The adaptive rule from Vehtari et al. (2024) tightens the
-  # threshold when the posterior draw count `S` is small and
-  # clamps at 0.7 once `S` is large enough for the classical
-  # guarantee to hold. `pareto_k_threshold` on the return object
-  # preserves whatever the user passed (numeric or NULL);
-  # `pareto_k_threshold_used` is the effective value read by the
-  # refit gate below and by print / plot methods for display.
-  pareto_k_threshold_used <- if (is.null(pareto_k_threshold)) {
-    mvgam_ps_khat_threshold(nrow(loglik_past))
-  } else {
-    pareto_k_threshold
-  }
+  # The number the refit gate below compares against, and the one
+  # the result reports. The adaptive rule from Vehtari et al. (2024)
+  # tightens it when the posterior draw count is small and clamps at
+  # 0.7 once the classical guarantee holds.
+  pareto_k_threshold_used <- resolve_pareto_k_threshold(
+    pareto_k_threshold, nrow(loglik_past)
+  )
 
   # Compute scores at the very first evaluation window.
   first_window_times <- all_unique_times[
@@ -427,9 +427,8 @@ lfo_cv.mvgam <- function(object,
       pareto_ks[k_eval] <- NA_real_
     } else {
       last_obs_times <- all_unique_times[last_obs_positions]
-      last_obs_idx <- which(
-        as.integer(all_data[[time_var]]) %in% last_obs_times
-      )
+      last_obs_idx <- rows_at_times(all_data, time_var,
+                                    last_obs_times)
       logratio <- lfo_sum_rows(
         loglik_past[, last_obs_idx, drop = FALSE]
       )
@@ -496,8 +495,8 @@ lfo_cv.mvgam <- function(object,
       eval_timepoints = eval_timepoints,
       refits_at = refits_at,
       refit_triggered = refit_triggered,
-      pareto_k_threshold = pareto_k_threshold,
-      pareto_k_threshold_used = pareto_k_threshold_used,
+      pareto_k_threshold = pareto_k_threshold_used,
+      pareto_k_threshold_adaptive = is.null(pareto_k_threshold),
       fc_horizon = fc_horizon,
       log_lik = log_lik_acc
     ),
@@ -521,9 +520,7 @@ lfo_cv.mvgam <- function(object,
 lfo_collect_fold_loglik <- function(loglik, all_data, time_var,
                                       window_times,
                                       psis_log_weights) {
-  fc_idx <- which(
-    as.integer(all_data[[time_var]]) %in% window_times
-  )
+  fc_idx <- rows_at_times(all_data, time_var, window_times)
   if (length(fc_idx) == 0L) {
     return(matrix(NA_real_, nrow = nrow(loglik), ncol = 0L))
   }
@@ -569,9 +566,7 @@ scores_at_window <- function(fit, all_data, time_var, series_var,
                               elpds, score_arrays, eval_idx,
                               loglik, psis_log_weights,
                               silent) {
-  fc_idx <- which(
-    as.integer(all_data[[time_var]]) %in% window_times
-  )
+  fc_idx <- rows_at_times(all_data, time_var, window_times)
   if (length(fc_idx) == 0L) {
     return(list(elpds = elpds, score_arrays = score_arrays))
   }
@@ -659,7 +654,7 @@ lfo_aggregate_score <- function(s_out, sc) {
 #'@noRd
 lfo_cv_split <- function(data, last_train, fc_horizon,
                           time_var = "time") {
-  t_vec <- as.integer(data[[time_var]])
+  t_vec <- data[[time_var]]
   unique_times <- sort(unique(t_vec))
   idx_last <- match(last_train, unique_times)
   if (is.na(idx_last)) {
@@ -698,15 +693,38 @@ lfo_log_mean_exp <- function(x) {
 }
 
 
-# Internal: per-draw sum across observations. For a single-column
-# input, returns the column with NAs stripped.
+# Internal: the rows of `data` observed at any of `times`.
+#
+# Written once because three places asked it and each truncated the
+# column to an integer first, which on a continuous grid matched
+# 4.590626 against 4 and selected rows belonging to another
+# occasion. The window times come from the frame's own column, so
+# the comparison is between values of one kind.
+#'@noRd
+rows_at_times <- function(data, time_var, times) {
+  which(data[[time_var]] %in% times)
+}
+
+
+# Internal: per-draw sum across observations. One entry per draw,
+# whatever the window holds.
+#
+# The single-column case used to strip its `NA` draws, which changes
+# the length rather than the values. The caller then added a
+# 1000-draw weight vector to a 998-draw density and R recycled, so
+# every draw was paired with another draw's weight. A gap in the
+# response is exactly when that happens, and a one-column window is
+# what `fc_horizon = 1` on a single series gives.
+#
+# A window whose every draw is missing has no density to report,
+# which is `NA`. Summing it to zero would read as a log-density of
+# zero, meaning probability one.
 #'@noRd
 lfo_sum_rows <- function(x) {
-  if (NCOL(x) > 1L) {
-    rowSums(x, na.rm = TRUE)
-  } else {
-    as.numeric(x)[!is.na(x)]
-  }
+  x <- as.matrix(x)
+  out <- rowSums(x, na.rm = TRUE)
+  out[rowSums(!is.na(x)) == 0L] <- NA_real_
+  out
 }
 
 
@@ -734,12 +752,7 @@ plot.mvgam_lfo <- function(x, ...) {
   ks[is.infinite(ks)] <-
     suppressWarnings(max(ks[!is.infinite(ks)], na.rm = TRUE))
 
-  # Read the effective (numeric) threshold. Adaptive-default fits
-  # (`pareto_k_threshold = NULL`) carry the applied value on
-  # `pareto_k_threshold_used`; fits fitted before that slot
-  # existed fall back to `pareto_k_threshold`.
-  threshold_val <- obj$pareto_k_threshold_used %||%
-    obj$pareto_k_threshold
+  threshold_val <- pareto_k_threshold_of(obj)
   panels <- list()
   panels$pareto_ks <- data.frame(
     eval = obj$eval_timepoints,
@@ -1157,12 +1170,12 @@ stack_mvgam_lfo <- function(models, model_names) {
 #' @method print mvgam_lfo
 #' @export
 print.mvgam_lfo <- function(x, ...) {
-  # Report the numeric threshold actually used at the refit gate.
-  # Adaptive-default fits stash it on `pareto_k_threshold_used`;
-  # older fits (before that slot existed) fall back to the
-  # user-supplied `pareto_k_threshold`.
-  threshold_val <- x$pareto_k_threshold_used %||% x$pareto_k_threshold
-  adaptive_label <- if (is.null(x$pareto_k_threshold)) " (adaptive)" else ""
+  threshold_val <- pareto_k_threshold_of(x)
+  adaptive_label <- if (pareto_k_threshold_is_adaptive(x)) {
+    " (adaptive)"
+  } else {
+    ""
+  }
   cat("Approximate leave-future-out cross-validation\n")
   cat("  fc_horizon         :", x$fc_horizon, "\n")
   cat("  pareto_k_threshold :", threshold_val,

@@ -86,12 +86,11 @@ score (\code{NULL} if no non-ELPD score requested).
 \item \code{eval_timepoints}: integer vector of the times evaluated.
 \item \code{refits_at}: integer vector of time points where the model
 was refit.
-\item \code{pareto_k_threshold}: the threshold argument as supplied
-(numeric, or \code{NULL} when the adaptive default was used).
-\item \code{pareto_k_threshold_used}: the effective numeric threshold
-actually applied inside the refit gate (equal to
-\code{pareto_k_threshold} when a numeric was supplied, or the
-adaptive value when \code{NULL} was supplied).
+\item \code{pareto_k_threshold}: the numeric threshold the refit gate
+applied, whether it came from the argument or from the
+adaptive rule.
+\item \code{pareto_k_threshold_adaptive}: \code{TRUE} when the adaptive rule
+chose that number because \code{pareto_k_threshold} was \code{NULL}.
 \item \code{fc_horizon}: the horizon used at each fold.
 }
 }

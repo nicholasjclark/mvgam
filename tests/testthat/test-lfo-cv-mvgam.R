@@ -166,15 +166,16 @@ test_that("Return object has all documented mvgam_lfo slots", {
   required <- c("elpds", "sum_ELPD", "scores", "pareto_ks",
                 "eval_timepoints", "refits_at",
                 "pareto_k_threshold",
-                "pareto_k_threshold_used", "fc_horizon")
+                "pareto_k_threshold_adaptive", "fc_horizon")
   expect_true(all(required %in% names(out)))
   expect_identical(out$fc_horizon, 1L)
-  # Default fit uses the adaptive threshold: the user-supplied
-  # slot stays NULL, and `pareto_k_threshold_used` carries the
-  # numeric value that the refit gate actually applied.
-  expect_null(out$pareto_k_threshold)
-  expect_type(out$pareto_k_threshold_used, "double")
-  expect_lte(out$pareto_k_threshold_used, 0.7)
+  # One field holds the threshold, and it is the number the refit
+  # gate applied. It used to hold whatever the caller passed, so on
+  # a default call the documented name was empty and the number sat
+  # under a second one.
+  expect_type(out$pareto_k_threshold, "double")
+  expect_lte(out$pareto_k_threshold, 0.7)
+  expect_true(out$pareto_k_threshold_adaptive)
   expect_true(min_t_in_refits <- 30L %in% out$refits_at)
   # eval window is (min_t + 1):(N - fc_horizon + 1) = 31:35,
   # so 5 evaluations on a 35-step series with fc_horizon = 1.

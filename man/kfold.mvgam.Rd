@@ -71,8 +71,10 @@ diagnostic slots:
 \item \code{n_refits} --- number of folds refit.
 \item \code{refit_groups} --- character vector of refit fold
 labels.
-\item \code{K}, \code{group}, \code{pareto_k_threshold}, \code{exact} ---
-echoed call arguments.
+\item \code{K}, \code{group}, \code{exact} --- echoed call arguments.
+\item \code{pareto_k_threshold} --- the numeric threshold the
+refit gate applied, and \code{pareto_k_threshold_adaptive},
+\code{TRUE} when the adaptive rule chose it.
 }
 The \code{loo} parent class lets \code{\link[loo:loo_compare]{loo::loo_compare()}} and
 \code{print.loo()} consume the result directly.
