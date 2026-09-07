@@ -519,56 +519,6 @@ fixture numbers its sites from 3, giving occasions 3 to 32:
 one frame numbered from three carries the failure and the six
 numbered from one pass.
 
-## Closure-unit families
-
-**18. Every `occ()` and `nmix()` compile prints a Stan warning about
-integer division.**
-
-mvgam writes its own threading block for closure units, and the
-grainsize line in it reads
-
-    int grainsize = N_unit >= 8 ? N_unit / 8 : 1;
-
-`grainsize` is an `int`, so rounding is what is wanted, but `/`
-between two integers makes stanc say so at every compile:
-
-    Found int division:
-        N_unit / 8
-    Values will be rounded towards zero. If rounding is not desired
-    you can write the division as N_unit / 8.0
-    If rounding is intended please use the integer division operator
-    %/%.
-
-The arithmetic is right and the notice is cosmetic, but it reaches
-every user who fits a closure-unit model, and it is the kind of
-notice that teaches people to read past compiler output. `%/%` says
-what the line means and silences it.
-
-**19. `latent_N_saturation()` names its units by index.**
-
-`test-grain-closure-units.R`, "the saturation table names its units".
-The table comes back with a `label` column reading `1_1`, `1_2`,
-`1_3`, which is the series index joined to the occasion index. The
-units it describes are `site_01` at times 3, 4 and 5.
-
-So a reader has no way from the table back to a site or a date, and
-the mapping is positional and undocumented. It is the fault behind
-finding 8 in a place a reader is more likely to act on: a saturated
-unit is one whose latent state is pinned at the ceiling, which is
-what says the survey effort there was insufficient. Nobody can go
-back and revisit a unit called `12_2`.
-
-Every other per-unit surface on the same fit is keyed properly, and
-the frame carries both columns the label would need.
-
-Reproduced on `nmix()` as well as `occ()`, so the labelling belongs
-to the table rather than to one family. It matters more for
-abundance: an occupancy ceiling is one and a reader can at least
-tell what saturation means, while an `nmix()` ceiling is an
-estimated population and the label is the only route back to the
-site whose survey effort was insufficient. `test-grain-closure-units.R`
-asserts it for both.
-
 ## Distributional parameters
 
 **20. FIXED. `conditional_effects()` offered no covariate that
@@ -1044,61 +994,6 @@ Either the factor path takes a pseudo-inverse or a ridge, or the
 method refuses with an explanation. Choosing between those belongs
 to the jsdm work, so `test-family-jsdgam.R` leaves it unasserted
 and this entry carries it.
-
-## Multi-season closure units
-
-**37. The likelihood groups by three axes and three of the methods
-reporting one value per unit group by two.**
-
-In `test-grain-closure-units.R`, under the claim that every surface
-reporting one value per unit uses the unit axis. Calling
-`pivot_detection_array(multi_season = "hierarchical")` keeps `time`
-as the season and hands `site` over as a covariate.
-`?pivot_detection_array` says to pair that with
-`occ(multi_season = TRUE)` "so the 3-axis closure-unit grouping
-`(series, site, time)` is activated". Stan does exactly that. The
-post-fit methods do not all follow.
-
-Measured on a fit with 6 species, 10 sites, 8 seasons and 3 visits,
-against the two single-season fits in the same file as controls:
-
-| surface | occ single | nmix single | occ multi-season |
-|---|---|---|---|
-| `standata$N_unit` | 75 | 24 | 480 |
-| `log_lik()` | 75 | 24 | 480 |
-| `predict("latent_state")` | 75 | 24 | 48 |
-| `residuals()` | 75 | 24 | 48 |
-| `latent_N_saturation()` | 75 | 24 | 48 |
-
-480 is the count of `(series, site, season)` cells and 48 is the
-count of `(series, season)` pairs, so the three that disagree have
-dropped the site axis. They return one unit in ten, name no site,
-and raise nothing. The per-visit methods are unaffected:
-`posterior_epred()`, `posterior_predict()`, `fitted()` and
-`augment()` all answer on the 1440 rows.
-
-Across all five rows the controls agree, which places the fault on
-the path taken when seasons are present rather than on any one
-method. It is the plan's own bug class at full size: one axis
-resolved twice, the answers differ by a factor of the site count,
-every index stays in range and nothing errors.
-
-The design that makes it visible is a frame where no two counts
-coincide. Species, sites, seasons, visits, units and rows are 6, 10,
-8, 3, 480 and 1440, so a method answering on the wrong axis cannot
-be scored correct by accident.
-
-**38. `hindcast()` returns no arms at all on a multi-season fit.**
-
-Same file, "multi-season: hindcast returns one arm per species".
-`hindcast(fit)` comes back as an `mvgam_forecast` whose `forecasts`
-list has length zero, with no warning and no error. Every other fit
-in this suite returns one arm per series, named.
-
-An empty list satisfies any claim written as a loop over the arms,
-which is why the assertion states the count before reading anything
-out of it. Distinct from finding 30, where the composition families
-return arms that are constant: here there is nothing to be constant.
 
 ## Uncovered families
 
@@ -2596,44 +2491,6 @@ side, which is why it took an article to surface.
 Heaps [2022] twice, at `var.Rmd:38` and `var.Rmd:172`. The reference
 list gives Heaps SE (2023), JCGS 32(1), 74-83, under the same DOI.
 The list is right.
-
-**81. `summary()` and `nobs()` disagree about how large a
-closure-unit dataset is.**
-
-Found by reading `vignettes/articles/nmix.md`, whose printed summary
-says "Number of observations: 12" on a frame of 60 rows while the
-prose two paragraphs earlier says thirty visits per species. Asked of
-four cached fits:
-
-| fit | rows | `nobs()` | `summary()` says |
-|---|---|---|---|
-| occ_units | 300 | 300 | 75 |
-| closure_nmix_units | 72 | 72 | 24 |
-| var_trend | 180 | 180 | 180 |
-| tweedie | 60 | 60 | 60 |
-
-The two non-closure fits agree. `summary()` is therefore not
-counting wrongly in general. On a closure-unit family it prints the
-unit count under a label naming observations while `nobs()` prints
-the row count, so a reader gets 75 from one standard accessor and 300
-from the other with nothing to say why.
-
-Both numbers are meaningful. The likelihood is evaluated per unit.
-75 is the count the density has. 300 is the count the frame holds.
-Neither output says which it is reporting. The header reads
-"Number of observations" in both cases, and `nobs()` is what a
-generic consumer calls to learn a model's sample size.
-
-Finding 37 records three post-fit methods answering on the wrong one
-of these two axes. This is the same pair of counts reaching the first
-thing a user reads.
-
-**Also in that article, a fit nothing uses.** `mod_rn`, the
-Royle-Nichols variant, is fitted with four chains and 4000 iterations
-and then never summarised, plotted or checked. The section presents
-the variant as working and shows no output from it, so a reader is
-asked to take on trust the one variant whose response scale finding
-53 records the documentation getting wrong.
 
 **82. `vignettes/articles/mvbf.Rmd` reports one intercept twice and
 promises a call that is refused.**
