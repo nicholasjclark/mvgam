@@ -3046,3 +3046,68 @@ The check is cheap and needs no posterior. Stacking the two designs
 and comparing `qr()$rank` against `ncol()` takes four lines and runs
 on a prefit. It would name the pairing rather than leaving a user to
 read it out of an R-hat column.
+
+## An article that does not build
+
+**85. `plot()` on an `fevd()` refuses one documented argument and
+ignores the other, and the hierarchical VAR article fails on it.**
+
+`vignettes/articles/hierarchical_var.Rmd` stops after 29.5 minutes at
+its `fevd` chunk:
+
+    Quitting from hierarchical_var.Rmd:459-462 [fevd]
+    Assertion on 'series' failed: Must have length 1.
+
+The call is `plot(fevds, series = 1:3, contributing = 1:3)`, and the
+prose above it explains why: a 24-dimensional hierarchical VAR would
+otherwise draw 24 target panels over 24 sources, so the article keeps
+the display to Australia. Both arguments are documented and neither
+works.
+
+`fevd()` and `irf()` return objects that both inherit
+`mvgam_var_surface_summary`, so both dispatch to one plot method.
+Three roxygen blocks describe its `series` argument and no two agree:
+
+| source | says |
+|---|---|
+| `R/mvgam_fevd-class.R:129` | "Optional integer vector selecting which target processes should be shown as facets" |
+| `R/mvgam_irf-class.R:142` | "`integer` specifying which process series should be given the shock" |
+| `R/var_surface_summary.R:61` | "Optional integer naming the process the shock originates in" |
+
+The third is the one that runs, and it asserts
+`checkmate::assert_int(series, lower = 1L, null.ok = TRUE)`. So a
+vector is refused, on the argument whose own documentation offers a
+vector and names the hierarchical VAR as the reason to want one.
+
+Measured on the three-series VAR fixture:
+
+| call | result |
+|---|---|
+| `plot(fv, series = 1)` | draws |
+| `plot(fv, series = 1:2)` | refused, "Must have length 1" |
+| `plot(ir, series = 1:2)` | refused, the same |
+| `plot(fv, contributing = 1:2)` | draws, unchanged |
+
+The scalar that is accepted keeps the wrong end of the pair.
+`plot(fv, series = 1)` retains the three pairs whose left end is
+`Process_1`. That is the shock's source. `?plot.mvgam_fevd` says `series` selects the target
+processes shown as facets. The method filters `from == series`
+because that is what the shock-origin reading means, and the fevd
+documentation describes the opposite end.
+
+`contributing` is worse, because it does not fail. It is absent from
+the signature of the method that runs, so it lands in `...`, which
+that method documents as ignored. Passing `contributing = 1` on a
+nine-pair fevd leaves all nine pairs. The article's renormalisation
+claim, that "the retained shares get renormalised per (target,
+horizon)", describes something no code performs.
+
+`responses` is the spelling the running method does read, and it
+takes a vector. So the vector selection exists and is reachable under
+another name at the other end of the pair.
+
+This is finding 76 with a shipped article as the evidence: an
+argument accepted and dropped, silent by construction. The difference
+is that `contributing` is not a misspelling a user invented. It is
+documented. It is motivated by a named use case. The package's own
+vignette calls it.

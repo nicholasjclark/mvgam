@@ -1486,4 +1486,75 @@ test_that("a forecast over observed occasions is refused, not emptied", {
 })
 
 
+test_that("the fevd plot honours both arguments it documents", {
+  # `hierarchical_var.Rmd` stops on this after 29.5 minutes of
+  # sampling. Its `fevd` chunk asks for
+  # `plot(fevds, series = 1:3, contributing = 1:3)`, which is how the
+  # article keeps a 24-dimensional panel readable.
+  #
+  # `fevd()` and `irf()` both inherit `mvgam_var_surface_summary` and
+  # share one plot method, whose `series` is asserted scalar. So a
+  # vector is refused on the argument whose own documentation offers
+  # a vector and names the hierarchical VAR as the reason to want it.
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  fv <- fevd(fit, h = 4L)
+
+  # A scalar is accepted, so the selection machinery exists.
+  expect_s3_class(plot(fv, series = 1L), "ggplot")
+  # The documented vector form is not.
+  expect_s3_class(plot(fv, series = 1:2), "ggplot")
+})
+
+
+test_that("the irf plot takes the same vector its sibling refuses", {
+  # A separate block because the refusal above raises, and an error
+  # ends the block it sits in. Both objects inherit
+  # `mvgam_var_surface_summary` and reach one method, so this says
+  # the fault is the shared method rather than the fevd wrapper.
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  ir <- irf(fit, h = 4L)
+  expect_s3_class(plot(ir, series = 1L), "ggplot")
+  expect_s3_class(plot(ir, series = 1:2), "ggplot")
+})
+
+
+test_that("series selects the end of the pair its help names", {
+  # `?plot.mvgam_fevd` documents `series` as choosing the target
+  # processes drawn as facets. The running method filters on the
+  # source, because its own roxygen reads `series` as the process a
+  # shock originates in. One name, two ends, one implementation.
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  fv <- fevd(fit, h = 4L)
+  drawn <- as.character(ggplot2::ggplot_build(
+    plot(fv, series = 1L)
+  )$plot$data$shock)
+  ends <- strsplit(unique(drawn), " -> ", fixed = TRUE)
+  targets <- unique(vapply(ends, `[`, character(1L), 2L))
+  # Selecting one target should leave one target.
+  expect_length(targets, 1L)
+})
+
+
+test_that("contributing changes what the fevd plot draws", {
+  # It is absent from the signature of the method that runs, so it
+  # lands in `...`, which that method documents as ignored. Passing
+  # it leaves every pair in place, and the article's claim that "the
+  # retained shares get renormalised per (target, horizon)" describes
+  # something no code performs.
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  fv <- fevd(fit, h = 4L)
+  all_pairs <- unique(as.character(ggplot2::ggplot_build(
+    plot(fv)
+  )$plot$data$shock))
+  one_source <- unique(as.character(ggplot2::ggplot_build(
+    plot(fv, contributing = 1L)
+  )$plot$data$shock))
+  expect_lt(length(one_source), length(all_pairs))
+})
+
+
 cat("\nDone.\n")
