@@ -287,6 +287,66 @@ test_that("only a sampled trend makes a prediction differ across calls", {
 })
 
 
+test_that("a misspelt argument does not pass for the default", {
+  # This file exists because a prediction assembled from mismatched
+  # reads is finite, plausible and wrong. An argument that lands in
+  # `...` is the same failure reached by a typo: every method below
+  # names each of its arguments and forwards none of them onward, so
+  # anything left over is dead and can be refused.
+  #
+  # The cost is measured rather than assumed. On this fit the
+  # conditional expectation spans 0.17 to 70.17 and the marginal one
+  # 1.66 to 103.80, so the two answers differ by up to 102.6 counts.
+  # Writing `incl_autoccor` returns the marginal one exactly.
+  set.seed(7L)
+  asked <- posterior_epred(fit_plain, incl_autocor = TRUE)
+  set.seed(7L)
+  typo <- posterior_epred(fit_plain, incl_autoccor = TRUE)
+  set.seed(7L)
+  default <- posterior_epred(fit_plain)
+  expect_gt(max(abs(asked - default)), 1)
+  # The typo is the default, to the last bit, and nothing said so.
+  expect_equal(unname(as.matrix(typo)), unname(as.matrix(default)))
+
+  for (m in c("posterior_epred", "posterior_linpred", "posterior_predict",
+              "log_lik", "residuals", "predict", "fitted")) {
+    expect_error(
+      do.call(m, list(fit_plain, ndraws = 5L, zzz_unknown = 1)),
+      "zzz_unknown"
+    )
+  }
+})
+
+
+test_that("quantile residuals are standard normal on both families", {
+  # A randomised quantile residual is standard normal by
+  # construction, whatever the family, which is what makes it the
+  # residual to read a fit through. The ordinal fit is the control:
+  # its four categories supply enough ties for the empirical PIT to
+  # spread properly, and it answers at 0.908 with 0.22 per cent
+  # beyond three standard deviations.
+  #
+  # The poisson arm does not. It reads 0.454 with 0.05 per cent
+  # beyond three, so a QQ plot of this fit is too narrow to show a
+  # departure that is really there. The control is asserted first so
+  # that it runs.
+  scale_of <- function(fit) {
+    r <- suppressWarnings(
+      residuals(fit, type = "quantile", summary = FALSE, ndraws = 200L)
+    )
+    c(sd = stats::sd(r, na.rm = TRUE),
+      tail = mean(abs(r) > 3, na.rm = TRUE))
+  }
+  ord_scale <- scale_of(fit_ord)
+  expect_gt(ord_scale[["sd"]], 0.8)
+  expect_lt(abs(ord_scale[["sd"]] - 1), 0.25)
+
+  pois_scale <- scale_of(fit_plain)
+  expect_lt(abs(pois_scale[["sd"]] - 1), 0.25)
+  expect_gt(pois_scale[["tail"]], 0.001)
+})
+
+
 # -- The marginaleffects and insight surface --------------------------
 #
 # These four fits are what that surface needs to be told apart: an

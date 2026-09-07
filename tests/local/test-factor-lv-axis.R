@@ -1059,6 +1059,86 @@ test_that("summary and the criticism methods run on this fit", {
 
 
 
+test_that("every panel draws the occasions the frame supplied", {
+  # The frame numbers its occasions from 3, so a rank and a time are
+  # different vectors and a plot drawing one where it means the other
+  # is visible. The series and trend panels draw the times; the
+  # factor panel is the one that draws ranks, and its axis is
+  # labelled the same as the others.
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+
+  drawn_x <- function(p) {
+    b <- ggplot2::ggplot_build(p)
+    xs <- unlist(lapply(
+      b$data, function(l) if ("x" %in% names(l)) l$x else NULL
+    ))
+    xs <- xs[is.finite(xs)]
+    expect_gt(length(xs), 0L)
+    range(xs)
+  }
+  want <- as.numeric(range(time_vals))
+  for (ty in c("series", "trend", "factors")) {
+    expect_equal(drawn_x(plot(fit, type = ty)), want)
+  }
+})
+
+
+test_that("a narrowed likelihood is paired with the rows it kept", {
+  # The frame is unbalanced on purpose, so some cells carry no
+  # response. A missing response is a row the density cannot be
+  # evaluated at rather than a row that leaves the model, so
+  # `log_lik()` answers at the full width and empties those columns,
+  # and `clean_ll()` drops them and records which survived.
+  #
+  # The claim is that a consumer narrows to the same columns.
+  # `clean_ll()` sets `scored_columns` for exactly that, and its own
+  # roxygen says a matrix paired with the frame afterwards has to be
+  # narrowed with it.
+  d <- mvgam:::mvgam_training_data(fit)
+  y <- insight::find_response(fit)
+  n_missing <- sum(is.na(d[[y]]))
+  expect_gt(n_missing, 0L)
+
+  ll <- log_lik(fit, ndraws = 20L)
+  expect_identical(ncol(ll), nrow(d))
+  expect_identical(sum(apply(ll, 2L, function(z) all(is.na(z)))),
+                   n_missing)
+  cleaned <- mvgam:::clean_ll(fit, ll)
+  expect_identical(ncol(cleaned), nrow(d) - n_missing)
+  expect_length(attr(cleaned, "scored_columns"), ncol(cleaned))
+
+  # `loo()` and `waic()` read the narrowed matrix and answer, which
+  # is what places the fault below in the pairing rather than in the
+  # narrowing. Asserted first so that they run.
+  expect_true(is.finite(
+    suppressWarnings(loo(fit))$estimates["elpd_loo", "Estimate"]
+  ))
+  expect_true(is.finite(
+    suppressWarnings(waic(fit))$estimates["elpd_waic", "Estimate"]
+  ))
+
+})
+
+
+# The two consumers that pair the narrowed matrix against the whole
+# frame sit in blocks of their own. Both raise rather than fail, and
+# an error ends the block it is in, so together in one block the
+# first would hide the second.
+
+test_that("loo splits the likelihood it was given", {
+  by_series <- suppressWarnings(loo(fit, by_series = TRUE))
+  expect_s3_class(by_series, "data.frame")
+  expect_true(all(is.finite(by_series$elpd_loo)))
+})
+
+
+test_that("kfold partitions the rows the likelihood scored", {
+  kf <- suppressWarnings(kfold(fit, K = 2L))
+  expect_true(is.finite(kf$estimates["elpd_kfold", "Estimate"]))
+})
+
+
 test_that("pp_check and the plotting methods render", {
   # `plot()` returns a ggplot, so that is the class asserted. An
   # `is.list()` check would pass on any method returning `list()`.

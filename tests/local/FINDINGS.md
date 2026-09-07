@@ -960,6 +960,14 @@ rather than through the filter and alias pass the other three go
 through.
 
 Reproduced identically on the beta, mvn and categ fits.
+It also reaches `mvgam()` fits that never touch `jsdgam()`.
+On the tweedie and poisson AR(1) fixtures the raw stanfit holds `b[1]`, `Intercept` and
+`b_Intercept`; `variables()`, `posterior_summary()` and `rhat()` all
+report `b_x` for the first, and `tidy()` alone reports `b[1]`. The
+bare `Intercept` beside it is brms's own centred parameter and appears
+in all four, which `brms::variables.brmsfit` confirms by returning the
+stanfit's names unaltered. So the aliasing is mvgam's and the one
+method that skips it is `tidy()`.
 
 **30. `hindcast()` and `conditional_effects()` return a constant on
 the composition families.**
@@ -1236,17 +1244,24 @@ specification". Asked of the same fit three ways:
 | `glance(fit)$family` | `occ` |
 
 The fit with one season reproduces it, so this belongs to the
-family and not to the path that seasons take. On the same method the
-gaussian VAR fixture answers `gaussian`, which places the fault with
-the closure-unit families rather than with `family()` at large.
+family and not to the path that seasons take. The gaussian VAR fixture
+answers `gaussian` on the same method. `family()` is therefore not
+broken at large, and what the two groups share is narrower and wider
+than occupancy: `test-family-tweedie.R` answers `custom` for
+`family(fit)$family` and `tweedie` for `glance()$family`, and tweedie
+models no closure unit at all. `com_binomial()` and `diri()` do the
+same. Every one of them is built through `brms::custom_family()`, which
+is the route rather than the subject matter.
 
 `family()` is the accessor other packages reach for, so this is the
-one of the three that matters most. A closure-unit family is
-implemented through a custom brms family, and the implementation
-detail is reaching the surface where the name should be. It is
-finding 4 seen from the other side. There a family was sorted into
-the closure-unit group when it did not belong; here a family that
-does belong will not give its name.
+one of the three that matters most. A custom brms family carries
+`custom` as its `$family` element, and mvgam stores that object
+whole, so the implementation detail reaches the surface where the name
+should be. `glance()` reads the name mvgam recorded alongside it and
+answers correctly, which is what says the name is on the object. It is
+finding 4 seen from the other side: there a family was sorted into the
+closure-unit group when it did not belong, and here a family will not
+give its name at all.
 
 **41. `getCall()` returns the function itself where a call names
 it.**
@@ -1257,10 +1272,12 @@ the symbol `jsdgam`, so `deparse(getCall(fit))` prints the whole of
 of the call is well formed: its names run `formula`,
 `trend_formula`, `data`, `backend`, `family` and so on.
 
-Seen on the single-season fit too. `?getCall` describes the return
-as a call suitable for `update()` to modify and re-evaluate, and a
-user prints it to see how a fit was made, so a closure in the head
-position defeats both readings of it.
+Seen on the single-season fit too. It reaches `mvgam()` fits
+as well: the tweedie fixture's `getCall(fit)[[1]]` is the `mvgam` closure, so the
+head position holds a function on both constructors rather than on
+`jsdgam()` alone. `?getCall` describes the return as a call
+`update()` can modify and re-evaluate. A user also prints it to see
+how a fit was made. A closure there defeats both readings.
 
 ## The structured loadings prior
 
@@ -1656,6 +1673,13 @@ written out in full; `sd_block__Intercept` is `sd_1[1]`. Everything
 everything it refuses is one mvgam's alias pass creates. So this reads
 the stanfit directly rather than through the aliasing the other
 methods go through.
+
+`test-family-tweedie.R` supplies the cleanest instance of the split.
+`hypothesis(fit, "mphi = 1")` is accepted, because a custom family's
+parameters are written out under their own names and survive
+unaliased, while `hypothesis(fit, "b_x = 0")` is refused on the same
+fit. Two parameters of one model, one reachable and one not, told
+apart by nothing a user can see.
 
 That makes it finding 42's cause at a third surface, after `tidy()`
 in finding 29 and `get_coef()` in finding 42. Finding 39 recorded the
@@ -2633,5 +2657,72 @@ correct and the warning describes something that did not happen.
 Recorded because of what it costs rather than what it breaks. It
 reaches the ordinary prediction path of a gaussian factor model. It
 names a parameter the user never set and asserts a fallback that was
-not taken. A reader who checks it finds nothing wrong, and the next
-warning on the same surface is the one they will skip.
+not taken.
+
+It cannot be asserted where it appears. The notice carries "displayed
+once per session". A block written against it therefore reports what
+ran before it rather than anything the package did, which is the trap
+finding 10 records for the ggplot2 lifecycle notice. A reader who
+checks this one finds nothing wrong. The next warning on the same
+surface is the one they will skip.
+
+## A narrowed likelihood paired with the whole frame
+
+**79. A missing response removes `kfold()` and `loo(by_series = TRUE)`
+from a fit, and the attribute that would prevent it is already set.**
+
+`test-factor-lv-axis.R`, "the likelihood covers the rows the frame
+holds". The gaussian factor fit holds 300 rows of which 24 carry no
+response. `log_lik()` answers at the full width and empties those 24
+columns, which is correct: a row with no response contributes no
+density.
+
+`clean_ll()` then drops them, and records what it dropped. Its own
+roxygen at `R/loo.mvgam.R:412` states the contract:
+
+> Which columns survived is recorded on the result: anything paired
+> with the scored matrix afterwards ... has to be narrowed to the same
+> columns or the two describe different observations.
+
+Two consumers pair it with the unnarrowed frame anyway:
+
+| call | on 300 rows, 24 unobserved | on 30 rows, none unobserved |
+|---|---|---|
+| `log_lik()` | 300 columns, 24 all `NA` | 30 columns |
+| `clean_ll()` | 276, `scored_columns` 276 | 30 |
+| `loo()` | answers on 276 | answers on 30 |
+| `waic()` | answers on 276 | answers on 30 |
+| `kfold(K = 2)` | refuses, 276 against 300 | refuses, finding 74 |
+| `loo(by_series = TRUE)` | refuses, 276 against 300 | answers |
+
+`kfold.mvgam()` calls `clean_ll()` at `R/kfold.mvgam.R:190` and hands
+`NCOL(loglik_full)` to `map_loglik_cols_to_groups()` two lines later
+alongside the full `data`, never reading `scored_columns`.
+`per_series_ic()` at `R/loo.mvgam.R:330` does the same and says so in
+its own message: "by_series = TRUE assumes clean_ll() did not drop any
+columns." So one of the two knows the assumption it is making and
+neither acts on it.
+
+`loo()` and `waic()` are the control. They read the same narrowed
+matrix and answer, which places the fault in the pairing rather than
+in the narrowing. The second column is the other control: with no
+missing response the widths coincide and `loo(by_series = TRUE)`
+answers, so this follows the gap and not the fit.
+
+The refusals are also miscast. Both report an arithmetic mismatch and
+neither names the 24 unobserved rows behind it, so a user is told the
+counts disagree without being told why or that the answer they wanted
+is available on the rows that were observed.
+
+This is the plan's own class in its plainest form. How many columns
+the likelihood has is derived twice within four lines, then the two
+answers are compared without either being converted to the other. Finding 15 is the same defect one layer up, where the
+likelihood loses columns it should have kept; here the columns are
+dropped correctly and the count is not carried.
+
+**Finding 74 takes a seventh fit.** `kfold(K = 2)` on the
+single-series poisson AR(1) of `test-draws-alignment.R` refuses with
+"Irregular time intervals detected in time. Interval range: 1 to 5".
+The frame is 30 consecutive occasions on one series with no gaps at
+all, so the irregularity is entirely the fold split's, which is
+finding 74's diagnosis on the simplest frame in the directory.

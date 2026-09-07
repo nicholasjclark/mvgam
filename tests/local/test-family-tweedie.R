@@ -401,4 +401,80 @@ test_that("quantile residuals carry posterior spread", {
 })
 
 
+# -- What the fit says about itself -----------------------------------
+#
+# Tweedie is built through `brms::custom_family()`, which is the route
+# the closure-unit families take too. That shared route is what these
+# blocks pin: a family named by its implementation rather than by
+# itself, and a parameter block half of whose names survive the read.
+
+test_that("the fit names its own family", {
+  # `glance()` reads the name mvgam recorded and answers `tweedie`,
+  # so the name is on the object. `family()` returns the brms family
+  # object whole, whose own `$family` element is the string
+  # `custom_family()` wrote. `family()` is the accessor other
+  # packages call, so it is the one that has to answer.
+  expect_identical(as.character(glance(fit)$family), "tweedie")
+  expect_identical(family(fit)$family, "tweedie")
+})
+
+
+test_that("the frame accessors a caller pairs both answer", {
+  # `model.frame()` answers with the 60-row training frame. `terms()`
+  # raises R's own "no terms component nor attribute", so a caller
+  # discovering the model's structure without knowing the class gets
+  # half of the pair. Ordered so the failing half is last.
+  mf <- model.frame(fit)
+  expect_identical(nrow(mf), nrow(dat))
+  expect_true(all(c("y", "x") %in% names(mf)))
+  expect_s3_class(terms(fit), "terms")
+})
+
+
+test_that("one parameter block reads the same way through every method", {
+  # The raw stanfit writes the population slope as `b[1]`, and mvgam
+  # aliases it to `b_x` on the way out. Three methods do that and
+  # `tidy()` does not, so a reader moving between two tables of the
+  # same fit meets two names for one parameter.
+  #
+  # The custom parameters are the control. `mphi` and `mtheta` are
+  # written out under their own names and need no alias, and every
+  # method below reports them identically.
+  aliased <- function(z) grep("^b\\[|^b_x$", z, value = TRUE)
+  for (nm in c("variables", "posterior_summary", "rhat")) {
+    got <- switch(nm,
+      variables = variables(fit),
+      posterior_summary = rownames(posterior_summary(fit)),
+      rhat = names(rhat(fit))
+    )
+    expect_true(all(c("mphi", "mtheta") %in% got))
+    expect_identical(aliased(got), "b_x")
+  }
+  expect_identical(aliased(tidy(fit, effects = "all")$term), "b_x")
+})
+
+
+test_that("hypothesis reaches every parameter variables lists", {
+  # `mphi` survives unaliased and is accepted. `b_x` exists only as
+  # the alias, and `hypothesis()` reads the stanfit rather than the
+  # aliased list, so it refuses a name the line above just listed.
+  # Two parameters of one model, told apart by nothing a user sees.
+  expect_true(all(c("mphi", "b_x") %in% variables(fit)))
+  expect_s3_class(hypothesis(fit, "mphi = 1"), "brmshypothesis")
+  expect_s3_class(hypothesis(fit, "b_x = 0"), "brmshypothesis")
+})
+
+
+test_that("an argument this family's methods cannot read is refused", {
+  # Every method below names each of its arguments and forwards none
+  # onward, so anything left in `...` is dead. `M` is the argument
+  # that makes this concrete here: a reader who writes it on a
+  # post-fit call rather than on `tweedie()` is silently answered at
+  # whatever the fit was built with.
+  for (m in c("posterior_epred", "residuals", "predict", "summary")) {
+    expect_error(do.call(m, list(fit, zzz_unknown = 1)), "zzz_unknown")
+  }
+})
+
+
 cat("\nDone.\n")
