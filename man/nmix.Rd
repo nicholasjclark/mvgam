@@ -330,7 +330,7 @@ With \code{mvgam(threads = N)} for \code{N > 1} the model is
 compiled with \code{stan_threads = TRUE} and TBB splits the
 closure-unit slice across \code{N} threads. Without
 \code{threads}, \code{reduce_sum} falls back to a serial loop.
-Grainsize is set to \code{max(1, N_unit / 8)} so single-
+Grainsize is set to \code{max(1, N_unit \%/\% 8)} so single-
 threaded fits pay only ~8 dispatch calls per leapfrog
 and multi-threaded fits see ~8 chunks across cores.
 }

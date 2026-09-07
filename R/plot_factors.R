@@ -167,15 +167,19 @@ plot_latent_state <- function(object, probs = c(0.5, 0.8, 0.95),
   }
   checkmate::assert_matrix(state)
 
-  # Recover per-unit (series, time) labels via the same grouping
-  # the fit used. Multi-season families include a `site` axis but
-  # we pool across sites for the ribbon.
+  # Per-unit labels come off the unit grid the arrays carry, one row
+  # per unit in unit order, rather than from the frame's own columns:
+  # the grid holds the values the grouping was built on, so a fit
+  # whose closure unit is keyed by something other than `series` and
+  # `time` is labelled by what it was actually grouped on. The
+  # grouping runs series-first and time-last, and a multi-season fit
+  # carries a `site` axis between them that the ribbon pools over.
   data <- object$data
   arrays <- closure_unit_arrays_for(object, data)
-  first_rows <- arrays$visit_row[, 1L]
+  unit_vars <- arrays$unit_vars
   unit_meta <- data.frame(
-    series = as.factor(data[["series"]][first_rows]),
-    time   = as.integer(data[["time"]][first_rows])
+    series = as.factor(arrays$unit_grid[[unit_vars[1L]]]),
+    time   = arrays$unit_grid[[unit_vars[length(unit_vars)]]]
   )
   if (ncol(state) != nrow(unit_meta)) {
     stop(insight::format_error(c(

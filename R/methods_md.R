@@ -1183,7 +1183,7 @@ closure_unit_likelihood_rows <- function(obj, notation) {
   # Multi-season fits index closure units by `(series, site,
   # season)`, so the latent state and state probability carry a
   # `_{i,t}` (season) subscript. Single-season uses bare `_i`.
-  unit_idx <- if (methods_md_is_multi_season(obj)) "{i,t}" else "{i}"
+  unit_idx <- if (is_multi_season_family(obj$family)) "{i,t}" else "{i}"
   state_sym <- paste0(
     closure_unit_state_symbol(kind), "_", unit_idx
   )
@@ -1453,8 +1453,8 @@ closure_unit_glossary <- function(obj) {
   kind <- closure_unit_family_kind(obj)
   if (is.null(kind)) return(character(0L))
   det_sym <- closure_unit_detection_symbol(kind)
-  unit_idx <- if (methods_md_is_multi_season(obj)) "{i,t}" else "{i}"
-  multi_season <- methods_md_is_multi_season(obj)
+  unit_idx <- if (is_multi_season_family(obj$family)) "{i,t}" else "{i}"
+  multi_season <- is_multi_season_family(obj$family)
   defs <- c(
     "- $j$ indexes visits within closure unit $i$"
   )
@@ -2183,10 +2183,9 @@ methods_md_has_latent_trend <- function(obj) {
 #                        Dirichlet / Multinomial / Categorical
 #                        per unit.
 #
-# `is_multi_season`: detected via the closure-unit grouping arity
-# (`length(attr(family, "mvgam_unit_grouping")) == 3L` -- three
-# columns `(series, site, time)` instead of the default
-# `(series, time)`).
+# Whether the fit indexes seasons is asked of
+# `is_multi_season_family()`, which reads the closure-unit grouping
+# the likelihood was built on.
 
 #' @noRd
 methods_md_is_closure_unit <- function(obj) {
@@ -2204,10 +2203,6 @@ methods_md_is_mv_custom_family <- function(obj) {
   is_multi_response_family(obj$family)
 }
 
-#' @noRd
-methods_md_is_multi_season <- function(obj) {
-  length(closure_unit_grouping(obj$family)) >= 3L
-}
 
 
 # ---------------------------------------------------------------

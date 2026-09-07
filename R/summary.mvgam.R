@@ -291,6 +291,14 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   out$n_series <- counts$n_series
   out$n_timepoints <- counts$n_timepoints
 
+  # How many rows the model was fitted to, which is what `nobs()`
+  # answers and what a reader takes "Number of observations" to
+  # mean. The product of the two axes above is neither: on a ragged
+  # design it exceeds the frame, and on a closure-unit family it
+  # printed the unit count, so the two standard accessors gave a
+  # reader 75 and 300 for one model with nothing to say why.
+  out$nobs <- nobs(object)
+
   # Store data name (captured at top-level mvgam() call)
   out$data_name <- object$data.name
 
@@ -773,7 +781,7 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
       sep = "")
 
   # Section 3: Data and dimensions (brms style)
-  nobs <- x$n_series * x$n_timepoints
+  nobs <- x$nobs
   if (!is.null(x$data_name)) {
     cat("   Data: ", x$data_name, " (Number of observations: ", nobs, ") \n",
         sep = "")

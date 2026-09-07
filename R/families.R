@@ -1486,6 +1486,23 @@ closure_unit_grouping <- function(family) {
   attr(family, "mvgam_unit_grouping", exact = TRUE)
 }
 
+#' Does a closure-unit family treat `time` as a season?
+#'
+#' `occ(multi_season = TRUE)` and `nmix(multi_season = TRUE)` widen
+#' the closure-unit key to `(series, site, time)`, so `time` becomes
+#' a season the latent state is indexed by rather than the unit
+#' identifier it is in a single-season design. The grouping's arity
+#' is what records that, since it is the same fact the likelihood is
+#' built on; asking the family for a `multi_season` attribute reads
+#' something the constructors never set and is always false.
+#'
+#' @param family A `brmsfamily` (or family-like list).
+#' @return `TRUE` when the closure-unit key names three columns.
+#' @noRd
+is_multi_season_family <- function(family) {
+  length(closure_unit_grouping(family)) >= 3L
+}
+
 
 #' Per-unit K_max buffer for count closure-unit families
 #'
@@ -1560,8 +1577,10 @@ closure_unit_default_cap_buffer <- function(family) {
 #'   index of the k-th species row at that site.
 #' @return Named list with elements `N_unit`, `n_rep`, `K_max`,
 #'   `Y_max`, `visit_idx`, `visit_row`, `row_unit`, `max_rep`,
-#'   `unit_labels` and `unit_grid`. `K_max` and `Y_max` are `NA`
-#'   when `compute_y_max = FALSE`.
+#'   `unit_labels`, `unit_grid` and `unit_vars`. `K_max` and `Y_max`
+#'   are `NA` when `compute_y_max = FALSE`. `unit_vars` is the
+#'   grouping this call resolved, so a consumer reads the axis the
+#'   arrays were built on rather than repeating the default.
 #'
 #'   `visit_idx` and `visit_row` index the same visits in two
 #'   coordinate systems and are not interchangeable. `visit_idx`
@@ -1759,6 +1778,15 @@ build_closure_unit_arrays <- function(data,
   unit_grid    <- unit_grid[visited, , drop = FALSE]
   rownames(unit_grid) <- NULL
   n_unit       <- length(unit_levels)
+  # The key above is integer-coded so that grouping columns of any
+  # type can be pasted together, which makes it useless as a label:
+  # a reader given `1_1` cannot get back to the site whose survey
+  # effort it describes. The label pastes the values the user
+  # supplied instead, one per unit in unit order, and is what every
+  # surface reporting one row per unit prints.
+  unit_labels <- do.call(
+    paste, c(lapply(unit_grid, as.character), list(sep = "_"))
+  )
   rep_counts   <- lengths(rows_by_unit)
   max_rep <- max(rep_counts)
   # Two coordinate systems, and they are not interchangeable.
@@ -1803,8 +1831,9 @@ build_closure_unit_arrays <- function(data,
       visit_row   = visit_row,
       row_unit    = row_unit,
       max_rep     = as.integer(max_rep),
-      unit_labels = unit_levels,
-      unit_grid   = unit_grid
+      unit_labels = unit_labels,
+      unit_grid   = unit_grid,
+      unit_vars   = unit_grouping_vars
     ))
   }
   # Missing entries stay in `y_vals` but are never indexed: every
@@ -1895,8 +1924,9 @@ build_closure_unit_arrays <- function(data,
     visit_row   = visit_row,
     row_unit    = row_unit,
     max_rep     = as.integer(max_rep),
-    unit_labels = unit_levels,
-    unit_grid   = unit_grid
+    unit_labels = unit_labels,
+    unit_grid   = unit_grid,
+    unit_vars   = unit_grouping_vars
   )
 }
 
@@ -2224,7 +2254,7 @@ build_closure_unit_arrays <- function(data,
 #'     compiled with `stan_threads = TRUE` and TBB splits the
 #'     closure-unit slice across `N` threads. Without
 #'     `threads`, `reduce_sum` falls back to a serial loop.
-#'     Grainsize is set to `max(1, N_unit / 8)` so single-
+#'     Grainsize is set to `max(1, N_unit %/% 8)` so single-
 #'     threaded fits pay only ~8 dispatch calls per leapfrog
 #'     and multi-threaded fits see ~8 chunks across cores.
 #' }
@@ -2785,7 +2815,7 @@ occ_stan_funs <- function(max_rep) {
     "    for (g in 1 : N_unit) g_seq[g] = g;",
     "    // grainsize heuristic targets ~8 chunks; matches the",
     "    // nmix wrapper. See ?nmix_stan_funs for the rationale.",
-    "    int grainsize = N_unit >= 8 ? N_unit / 8 : 1;",
+    "    int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
     "    return reduce_sum(",
     "      partial_sum_occ_lpmf, g_seq, grainsize,",
     "      y, logit_psi, logit_p, n_rep, Y_max, visit_idx",
@@ -4080,7 +4110,7 @@ nmix_stan_funs <- function(max_rep) {
     "    // chunks bound parallelism but per-chunk work amortises",
     "    // the synchronisation overhead. Users can override at",
     "    // fit time by passing a custom stanvar.",
-    "    int grainsize = N_unit >= 8 ? N_unit / 8 : 1;",
+    "    int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
     "    return reduce_sum(",
     "      partial_sum_nmix_lpmf, g_seq, grainsize,",
     "      y, log_mu, logit_p, log1m_p, n_rep,",
@@ -4219,7 +4249,7 @@ nmix_royle_nichols_stan_funs <- function(max_rep) {
     "    vector[num_elements(p)]  log_1m_r = log1m(p);",
     "    array[N_unit] int g_seq;",
     "    for (g in 1 : N_unit) g_seq[g] = g;",
-    "    int grainsize = N_unit >= 8 ? N_unit / 8 : 1;",
+    "    int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
     "    return reduce_sum(",
     "      partial_sum_nmix_royle_nichols_lpmf, g_seq, grainsize,",
     "      y, log_mu, log_1m_r, n_rep, K_max, Y_max, visit_idx",
@@ -4361,7 +4391,7 @@ nmix_poisson_poisson_stan_funs <- function(max_rep) {
     "    vector[num_elements(p)]  log_p  = log(p);",
     "    array[N_unit] int g_seq;",
     "    for (g in 1 : N_unit) g_seq[g] = g;",
-    "    int grainsize = N_unit >= 8 ? N_unit / 8 : 1;",
+    "    int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
     "    return reduce_sum(",
     "      partial_sum_nmix_poisson_poisson_lpmf, g_seq, grainsize,",
     "      y, log_mu, log_p, p, n_rep, K_max, Y_max, visit_idx,",

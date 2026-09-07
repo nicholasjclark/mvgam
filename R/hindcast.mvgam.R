@@ -278,14 +278,11 @@ hindcast_latent_state <- function(object, ndraws = NULL,
   }
   state_short <- if (is_nmix) "N" else "psi"
 
-  # Multi-season detection: closure-unit families expose
-  # `multi_season` on the family attribute when the fit treats
-  # `time` as a true seasonal index. For single-season fits
-  # `time` is just the closure-unit identifier and the axis
-  # labelling switches to "Closure-unit index" via `has_time`.
-  multi_season_attr <- attr(object$family, "multi_season",
-                              exact = TRUE)
-  has_time <- isTRUE(multi_season_attr)
+  # A multi-season fit indexes `time` as a season, so the plotted
+  # axis is a time axis. For a single-season fit `time` is only the
+  # closure-unit identifier and the axis labelling switches to
+  # "Closure-unit index" via `has_time`.
+  has_time <- is_multi_season_family(object$family)
 
   new_mvgam_latent_state(
     draws       = draws,

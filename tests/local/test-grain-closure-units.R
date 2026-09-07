@@ -182,10 +182,20 @@ test_that("the generated program divides its grainsize as an integer", {
   # `grainsize` is an `int`, so rounding is what is wanted, but a `/`
   # between two integers makes stanc say so at every compile of a
   # closure-unit model. `%/%` states the intent and silences it.
-  # Fails today; recorded as finding 18.
-  code <- paste(as.character(stancode(fit)), collapse = "\n")
+  #
+  # Asked of a prefit rather than of the cached fit, because the
+  # question is what mvgam writes now: a fit carries the program it
+  # was compiled from, so reading the code off one answers for the
+  # day it was sampled. The two spellings divide identically for a
+  # non-negative count, so the cached posterior is unaffected.
+  prefit <- mvgam(
+    formula = obs_formula, family = occ(), data = dat,
+    run_model = FALSE, silent = 2
+  )
+  code <- paste(as.character(stancode(prefit)), collapse = "\n")
   expect_true(grepl("grainsize", code, fixed = TRUE))
   expect_false(grepl("N_unit / 8", code, fixed = TRUE))
+  expect_true(grepl("N_unit %/% 8", code, fixed = TRUE))
 })
 
 
@@ -510,29 +520,6 @@ test_that("summary and the tidiers name the occupancy structure", {
 })
 
 
-test_that("the two sample-size accessors agree", {
-  # A closure-unit likelihood is evaluated per unit and the frame
-  # holds one row per visit, so both counts are meaningful. What a
-  # reader cannot do is tell which they were given: `summary()`
-  # prints the unit count under a header naming observations while
-  # `nobs()` returns the row count.
-  for (fit in list(occ_fit, nmix_fit)) {
-    d <- mvgam:::mvgam_training_data(fit)
-    n_unit <- as.integer(fit$standata$N_unit)
-    expect_gt(nrow(d), n_unit)
-    printed <- capture.output(summary(fit))
-    line <- grep("Number of observations", printed, value = TRUE)
-    expect_length(line, 1L)
-    shown <- as.integer(sub(".*Number of observations: *([0-9]+).*",
-                            "\\1", line))
-    # The unit count is what it prints today.
-    expect_identical(shown, n_unit)
-    # And `nobs()` answers with the other one, unlabelled.
-    expect_identical(as.integer(nobs(fit)), shown)
-  }
-})
-
-
 cat("\nDone.\n")
 
 # ----------------------------------------------------------------------
@@ -601,6 +588,32 @@ if (file.exists(nmix_cache)) {
   ))$value
   saveRDS(nmix_fit, nmix_cache)
 }
+
+
+test_that("the two sample-size accessors agree", {
+  # A closure-unit likelihood is evaluated per unit and the frame
+  # holds one row per visit, so both counts are meaningful. What a
+  # reader could not do is tell which they were given: `summary()`
+  # printed the unit count under a header naming observations while
+  # `nobs()` returns the row count. The block named an `occ_fit`
+  # that no line of this file defines, so it errored before it
+  # compared anything; the occupancy fit here is `fit`, and it runs
+  # below the nmix fit because that is where both exist.
+  for (f in list(fit, nmix_fit)) {
+    d <- mvgam:::mvgam_training_data(f)
+    n_unit <- as.integer(f$standata$N_unit)
+    expect_gt(nrow(d), n_unit)
+    printed <- capture.output(summary(f))
+    line <- grep("Number of observations", printed, value = TRUE)
+    expect_length(line, 1L)
+    shown <- as.integer(sub(".*Number of observations: *([0-9]+).*",
+                            "\\1", line))
+    # The header names observations, so the number under it is the
+    # row count, and the two accessors now answer alike.
+    expect_identical(shown, as.integer(nrow(d)))
+    expect_identical(as.integer(nobs(f)), shown)
+  }
+})
 
 
 test_that("no unit is given fewer animals than were counted there", {
@@ -1444,20 +1457,22 @@ test_that("multi-season: hindcast returns one arm per species", {
   fit <- fit_multi_season()
   hc <- hindcast(fit, ndraws = 10L)
   expect_s3_class(hc, "mvgam_forecast")
-  # Measured, this comes back with no arms at all: a named list of
-  # length zero, raising nothing. An empty result satisfies every
-  # claim of the form "each arm has the right width", so the count
-  # is stated before anything is read out of it.
-  expect_length(hc$forecasts, sim$K)
+  # A hindcast fills `hindcasts` and leaves `forecasts` and the
+  # `test_*` slots empty, which is the documented contract: it
+  # predicts at the training times and extends nothing. Reading
+  # `forecasts` here reported no arms at all, and an empty list
+  # satisfies every claim of the form "each arm has the right
+  # width", so the count is stated before anything is read out.
+  expect_length(hc$hindcasts, sim$K)
   # `names()` of an empty list is NULL, and a set comparison against
   # NULL raises instead of failing, which would leave this block
   # reporting an error where it has a result to report. Coercing
   # first keeps the failure a failure.
-  expect_identical(sort(as.character(names(hc$forecasts))),
+  expect_identical(sort(as.character(names(hc$hindcasts))),
                    sort(sim$species_levels))
-  for (s in names(hc$forecasts)) {
-    expect_identical(nrow(hc$forecasts[[s]]), 10L)
-    expect_true(all(is.finite(hc$forecasts[[s]])))
+  for (s in names(hc$hindcasts)) {
+    expect_identical(nrow(hc$hindcasts[[s]]), 10L)
+    expect_true(all(is.finite(hc$hindcasts[[s]])))
   }
 })
 
@@ -1475,15 +1490,18 @@ test_that("multi-season: the fit reports its own dimensions", {
   expect_identical(as.integer(nvariables(fit)),
                    ncol(as_draws_matrix(fit)))
 
-  # `variables()` filters the draws it reports and the diagnostics
-  # do not, so the two differ by exactly Stan's own bookkeeping
-  # columns. Naming them is what makes this a claim: a real
-  # parameter that started being hidden, or a raw block that started
-  # being exposed, changes this set rather than the counts.
-  extra <- setdiff(colnames(as_draws_matrix(fit)), variables(fit))
-  expect_setequal(extra, c("lprior", "lp__"))
-  expect_identical(setdiff(variables(fit),
-                           colnames(as_draws_matrix(fit))),
+  # Every user-facing accessor answers on one parameter set, so the
+  # draws a caller is handed and the names they are given for them
+  # agree exactly. Naming Stan's own bookkeeping columns is what
+  # makes this a claim rather than a count: they live on the raw
+  # `$fit` and reach neither surface, so a real parameter that
+  # started being hidden, or a raw block that started being exposed,
+  # changes one of these sets.
+  expect_setequal(colnames(as_draws_matrix(fit)), variables(fit))
+  bookkeeping <- c("lprior", "lp__")
+  expect_true(all(bookkeeping %in%
+                    posterior::variables(as_draws_matrix(fit$fit))))
+  expect_identical(intersect(variables(fit), bookkeeping),
                    character(0))
   expect_setequal(names(rhat(fit)), colnames(as_draws_matrix(fit)))
   expect_setequal(names(neff_ratio(fit)), names(rhat(fit)))

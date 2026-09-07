@@ -62,7 +62,7 @@ mvgam_par_side <- function(pars) {
 #' | `smooth_sd` | `sds_*` | the `smooth_params` keyword |
 #' | `smooth_coef` | `s_*`, `zs_*` | `summary()`, with `smooth_sd` |
 #' | `gp` | `sdgp_*`, `lscale_*`, `zgp_*` | the parameter buckets |
-#' | `ranef` | `sd_*`, `r_*`, `cor_*`, `L_*`, `z_*` | every caller |
+#' | `ranef` | `sd_*`, `r_*`, `cor_*` | every caller |
 #' | `family` | `sigma`, `shape`, `nu`, ... | `obs_params` |
 #' | `dynamics` | trend-side leftovers | `trend_params` |
 #' | `internal` | Stan working arrays | nothing; hidden everywhere |
@@ -154,9 +154,22 @@ mvgam_par_kind <- function(pars, dpars = character()) {
 # saves every variable declared at the top level of transformed
 # parameters, so these reach the posterior of any VAR or VARMA fit
 # and would otherwise be offered to a reader as parameters.
+#
+# The second alternation is brms's own group-level workspace, kept
+# in step with `brms:::exclude_pars_re()`: the standardised
+# deviates `z_<id>`, the correlation Cholesky `L_<id>` and the
+# correlation matrix `Cor_<id>` are what the scaled effects are
+# built from, and brms drops all three unless the user asks for
+# them with `save_pars(all = TRUE)`. mvgam writes its own Stan and
+# so never ran that exclusion, which left `z_1[1,1]` beside the
+# `r_grp[a,Intercept]` it produces. The trend side spells the same
+# names with `_trend` after the id. The lower-case `cor_<id>`
+# vector is a different parameter, aliased rather than dropped.
 #'@noRd
-MVGAM_PAR_INTERNAL_PATTERN <-
-  "^(P_var|result_var|P_ma|result_ma|empty_theta|Q_tilde)\\["
+MVGAM_PAR_INTERNAL_PATTERN <- paste0(
+  "^(P_var|result_var|P_ma|result_ma|empty_theta|Q_tilde)\\[",
+  "|^(z|L|Cor)_[0-9]+(_[0-9]+)*(_trend)?\\["
+)
 
 #'@noRd
 MVGAM_PAR_STATE_PATTERN <- paste0(
@@ -196,8 +209,15 @@ MVGAM_PAR_SMOOTH_COEF_PATTERN <- "^(s_|zs_)"
 #'@noRd
 MVGAM_PAR_GP_PATTERN <- "^(sdgp_|lscale_|zgp_)"
 
+# The group-level block as brms spells it after renaming: the
+# standard deviations, the scaled effects and the correlation
+# vector. The workspace those are built from carries a bare `L_` or
+# `z_` prefix and is claimed by the internal pattern above, so
+# matching either prefix here would have taken the trend's own
+# innovation Cholesky (`L_Omega_trend`) as a group-level effect and
+# reported it under `summary()`'s random-effects heading.
 #'@noRd
-MVGAM_PAR_RANEF_PATTERN <- "^(sd_|r_|cor_|L_|z_)"
+MVGAM_PAR_RANEF_PATTERN <- "^(sd_|r_|cor_)"
 
 # `mphi` / `mtheta` / `mtail` are the Tweedie custom family's
 # dispersion, power and tail parameters, which follow the same

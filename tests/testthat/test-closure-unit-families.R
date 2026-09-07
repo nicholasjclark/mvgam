@@ -730,7 +730,7 @@ test_that("build_closure_unit_arrays() returns correctly shaped arrays", {
   expect_named(arrs, c(
     "N_unit", "n_rep", "K_max", "Y_max",
     "visit_idx", "visit_row", "row_unit", "max_rep",
-    "unit_labels", "unit_grid"
+    "unit_labels", "unit_grid", "unit_vars"
   ))
 
   # Two coordinate systems, and they are not interchangeable.
@@ -753,6 +753,16 @@ test_that("build_closure_unit_arrays() returns correctly shaped arrays", {
   # the grid and risking a different ordering.
   expect_identical(nrow(arrs$unit_grid), 4L)
   expect_true(all(c("series", "time") %in% names(arrs$unit_grid)))
+  # `unit_vars` names the grouping this call resolved, so a consumer
+  # reads the axis the arrays were built on rather than repeating the
+  # default and drifting from it.
+  expect_identical(arrs$unit_vars, c("series", "time"))
+  # The label is the values the caller supplied, not the integer key
+  # the grouping is matched on: a reader has to be able to get from a
+  # row of a per-unit table back to the unit it describes.
+  expect_identical(arrs$unit_labels,
+                   paste(arrs$unit_grid$series, arrs$unit_grid$time,
+                         sep = "_"))
   expect_identical(arrs$N_unit, 4L)
   expect_identical(arrs$n_rep, rep(3L, 4))
   expect_identical(arrs$K_max, rep(20L, 4))
@@ -1012,10 +1022,12 @@ test_that("stancode under nmix() includes the lpdf signature and data declaratio
   # lines, so assert on the two pieces independently.
   expect_match(sc, "array[N_unit] int g_seq;", fixed = TRUE)
   expect_match(sc, "g_seq[g] = g;", fixed = TRUE)
-  # grainsize heuristic targets ~8 chunks (N_unit / 8 with a 1
+  # grainsize heuristic targets ~8 chunks (N_unit %/% 8 with a 1
   # floor) so single-threaded fits pay minimal dispatch overhead
-  # AND multi-threaded fits see ~8 chunks across cores.
-  expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit / 8 : 1;",
+  # and multi-threaded fits see ~8 chunks across cores. Rounding is
+  # what is wanted, and `%/%` says so, where `/` between two ints
+  # made stanc report the rounding at every closure-unit compile.
+  expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
                fixed = TRUE)
   # No remnants of the naive vectorised log-sum-exp loop.
   expect_false(grepl("component_lps", sc, fixed = TRUE))
@@ -1068,7 +1080,7 @@ test_that("stancode under occ() emits partial_sum + reduce_sum scaffold", {
   expect_match(sc, "reduce_sum(partial_sum_occ_lpmf,", fixed = TRUE)
   expect_match(sc, "array[N_unit] int g_seq;", fixed = TRUE)
   expect_match(sc, "g_seq[g] = g;", fixed = TRUE)
-  expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit / 8 : 1;",
+  expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
                fixed = TRUE)
   # All four signature overloads (vec/vec, vec/scalar, scalar/vec,
   # scalar/scalar) must land so the brms emission resolves regardless
@@ -1121,7 +1133,7 @@ test_that("stancode under nmix('royle_nichols') emits partial_sum + reduce_sum s
   # Threading: reduce_sum + grainsize heuristic.
   expect_match(sc, "reduce_sum(partial_sum_nmix_royle_nichols_lpmf,",
                fixed = TRUE)
-  expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit / 8 : 1;",
+  expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
                fixed = TRUE)
   # Likelihood call.
   expect_match(
@@ -1209,7 +1221,7 @@ test_that("stancode under nmix('poisson_poisson') emits partial_sum + log_n_look
   # tail-position argument matching the partial_sum signature.
   expect_match(sc, "reduce_sum(partial_sum_nmix_poisson_poisson_lpmf,",
                fixed = TRUE)
-  expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit / 8 : 1;",
+  expect_match(sc, "int grainsize = N_unit >= 8 ? N_unit %/% 8 : 1;",
                fixed = TRUE)
   # Transformed data: log_n_lookup built once over K_max_global so
   # the lpmf indexes a cached vector instead of recomputing log(k).
