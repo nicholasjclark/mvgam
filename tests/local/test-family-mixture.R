@@ -967,4 +967,71 @@ test_that("a distributional covariate is offered as a term", {
 })
 
 
+# -- What these two families settle about the residual path ----------
+
+test_that("a mixture's quantile residuals are standard normal", {
+  # `quantile_family_specs` holds five entries, all continuous, so
+  # every count family falls through to the empirical PIT. Finding 72
+  # records a plain poisson reading sd 0.454 on that route, which
+  # would make the route itself the fault.
+  #
+  # These two take the same route and answer correctly, at 0.947 and
+  # 0.954 with roughly the 0.27 per cent a standard normal puts
+  # beyond three standard deviations. So the route is not sufficient
+  # to explain the compression, and this block is the evidence that
+  # says so rather than a claim about these fits.
+  for (f in list(fit, fit3)) {
+    r <- suppressWarnings(
+      residuals(f, type = "quantile", summary = FALSE, ndraws = 200L)
+    )
+    expect_lt(abs(stats::sd(r, na.rm = TRUE) - 1), 0.25)
+    # And no column is pinned, which is finding 21's continuous half.
+    constant <- apply(r, 2L, function(z) {
+      length(unique(z[!is.na(z)])) <= 1L
+    })
+    expect_false(any(constant))
+  }
+})
+
+
+test_that("the fit describes itself through the standard accessors", {
+  # `family()` answers correctly on both, because a hurdle and a
+  # zero-inflated Poisson are brms families rather than
+  # `custom_family()` constructions. That is the control for finding
+  # 40, which is about the custom route and not about mixtures.
+  expect_identical(family(fit)$family, "hurdle_poisson")
+  expect_identical(family(fit3)$family, "zero_inflated_poisson")
+  expect_identical(as.character(glance(fit)$family), "hurdle_poisson")
+
+  # `getCall()` is meant to return a call `update()` can re-evaluate.
+  # The head position holds the `mvgam` closure, so printing it emits
+  # the function's source in place of the call that made the fit.
+  expect_identical(class(getCall(fit)[[1L]]), "name")
+  # `model.frame()` answers and `terms()` does not, so the pair a
+  # caller reaches for is half available. Asserted last.
+  expect_identical(nrow(model.frame(fit)), nrow(dat))
+  expect_s3_class(terms(fit), "terms")
+})
+
+
+test_that("k-fold partitions a frame with no gaps in it", {
+  # 80 consecutive occasions on one series, no missing time and no
+  # missing response. A fold takes half the rows, `update()` is
+  # handed that subset and rebuilds the trend grid from it, so the
+  # holes the split makes are read as irregular spacing. The
+  # held-out rows are missing responses rather than missing time,
+  # which is the distinction the fit itself already draws.
+  expect_identical(sort(unique(diff(sort(dat$time)))), 1L)
+  kf <- suppressWarnings(kfold(fit, K = 2L))
+  expect_true(is.finite(kf$estimates["elpd_kfold", "Estimate"]))
+})
+
+
+test_that("an argument these methods cannot read is refused", {
+  for (m in c("posterior_epred", "residuals", "predict", "summary")) {
+    expect_error(do.call(m, list(fit3, zzz_unknown = 1)), "zzz_unknown")
+  }
+})
+
+
 cat("\nDone.\n")

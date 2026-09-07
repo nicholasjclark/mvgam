@@ -830,6 +830,13 @@ Hurdle and zero-inflated Poisson are covered the same way, each
 against its own closed form and against the other's, so neither
 mixture can stand in for the other.
 
+Every `\seealso` link in the package resolves. Resolved across all
+195 man pages, against the package's own aliases for a bare
+`\link{}` and against the named package for a `\link[pkg]{}`, none
+is broken. Every function `?jsdgam` lists was separately called and
+each one answers, which finding 75 records. On that route a reader
+following the documentation reaches working code.
+
 ## Test defects fixed along the way
 
 These are faults in the fixture files themselves, so they were
@@ -2243,20 +2250,39 @@ on any fit.**
 Found by the control above. The poisson arm reads sd 0.500 in the wide
 fit and 0.453 fitted alone, and no value in either reaches three
 standard deviations. A standard normal puts 0.27 per cent beyond
-three.
+three. A third poisson AR(1) on unrelated data, the one
+`test-draws-alignment.R` fits, reads 0.454 with 0.05 per cent beyond
+three, so the number is the family's rather than any one design's.
 
-Both numbers are near half. The failure follows the family rather than
-the fit, which places it with finding 21. That entry records
-`compute_quantile_residuals_empirical()` forming one `lower` and
-`upper` per observation from the pooled `yrep`, then returning
-`qnorm(lower[i])` wherever the two coincide. Taking the lower edge in
-place of a draw from between the edges compresses a discrete family's
-residuals toward zero. The bernoulli arm escapes because its two
-outcomes put the edges far apart.
+What it is not is the empirical path as such. `quantile_family_specs`
+at `R/residuals.mvgam.R:396` holds five entries, all continuous, so
+every count family in this directory falls through to
+`compute_quantile_residuals_empirical()`. Measured across four of
+them, the ones that fall through do not agree:
+
+| family | quantile sd | beyond three | constant columns |
+|---|---|---|---|
+| poisson | 0.454 | 0.05% | 0 of 30 |
+| bernoulli | 1.005 | -- | -- |
+| hurdle_poisson | 0.947 | 0.19% | 0 of 80 |
+| zero_inflated_poisson | 0.954 | 0.16% | 0 of 80 |
+
+Two count families with a large atom at zero answer correctly on the
+route poisson takes. The shared machinery is therefore not enough to
+explain the compression. Finding 21 attributes the fault to
+`qnorm(lower[i])` being returned wherever the pooled `lower` and
+`upper` coincide. That mechanism accounts for a continuous family,
+where the two always coincide. It does not separate these four. All
+four are discrete and only poisson is compressed. Which step
+of the empirical PIT treats poisson differently is not resolved here.
+Guessing at it would put a mechanism in this file that nothing
+measured.
 
 So a poisson fit's residual QQ plot is too narrow to show a departure
-that is really there. Finding 21 records the same routine returning no
-spread at all on a continuous family; this is the discrete half of it.
+that is really there, and a hurdle or zero-inflated fit of the same
+counts is not. Which of the two the empirical PIT should be made to
+match is a question for the residual work; what is recorded here is
+that they disagree and only one can be right.
 
 **73. Some methods class the list they fan out, and some leave it
 bare.**
