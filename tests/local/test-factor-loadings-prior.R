@@ -281,6 +281,28 @@ test_that("cluster: the dominant contrast survives the rotation", {
 })
 
 
+test_that("cluster: the fit describes itself to a caller", {
+  # Every block in this file asks about the loadings prior. These are
+  # the calls a reader makes around it, and none of them is asked
+  # anywhere else on a structured-prior fit.
+  mv <- cluster_fit()
+  expect_s3_class(model.frame(mv), "data.frame")
+
+  # The observation formula is `y ~ 1`, so this model has no
+  # predictor. Both names reported are the axis it is indexed by.
+  preds <- insight::find_predictors(mv)$conditional
+  expect_null(preds)
+
+  # An argument nothing reads leaves the method on the default it was
+  # asked to override.
+  expect_error(residual_cor(mv, zzz_unknown = 1))
+  expect_error(shared_variation(mv, zzz_unknown = 1))
+
+  # Last, because it raises rather than returning.
+  expect_true(inherits(terms(mv), "terms"))
+})
+
+
 test_that("cluster: summary reports the prior's own block", {
   s <- summary(cluster_fit())
   expect_false(is.null(s$loadings_prior))
