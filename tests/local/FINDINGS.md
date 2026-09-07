@@ -938,44 +938,6 @@ arm names, the dimensions and `is.finite()`. A link-scale value
 satisfies every one of those. The assertion now compares the arm
 against the scale `posterior_epred()` occupies for that family.
 
-**29. `tidy()` reports what the diagnostics hide and omits what they
-expose.**
-
-`test-family-jsdgam.R`, "the draws and the tidiers keep this fit's
-row order". On every jsdgam checked, `variables()`,
-`posterior_summary()` and `rhat()` agree on what a reader should
-see. They hide the raw `Z[i,j]` block and `L_Omega_trend`, because a
-factor model's loadings have no fixed value under rotation and
-neither parameter means anything on its own. They expose `Z_tilde`,
-which is the identified block. `tidy()` agrees with none of it.
-
-    variables()          Z_tilde present, L_Omega_trend hidden
-    posterior_summary()  Z_tilde present, L_Omega_trend hidden
-    rhat()               Z_tilde present, L_Omega_trend hidden
-    tidy()               Z_tilde absent,  L_Omega_trend present
-
-So the tidy table carries four `L_Omega_trend` entries, typed
-`trend_random_effect_group_level`, which is neither a random effect
-nor a group level, and no loadings at all. `?tidy.mvgam` documents
-`effects = "all"` as returning every parameter.
-
-`tidy()` is also reading raw Stan names where the other three read
-aliases: its terms include `b[1]` through `b[9]` alongside
-`b_Intercept`, and `variables()` lists none of the bracketed ones.
-One cause explains both: the tidier reads the stanfit directly
-rather than through the filter and alias pass the other three go
-through.
-
-Reproduced identically on the beta, mvn and categ fits.
-It also reaches `mvgam()` fits that never touch `jsdgam()`.
-On the tweedie and poisson AR(1) fixtures the raw stanfit holds `b[1]`, `Intercept` and
-`b_Intercept`; `variables()`, `posterior_summary()` and `rhat()` all
-report `b_x` for the first, and `tidy()` alone reports `b[1]`. The
-bare `Intercept` beside it is brms's own centred parameter and appears
-in all four, which `brms::variables.brmsfit` confirms by returning the
-stanfit's names unaltered. So the aliasing is mvgam's and the one
-method that skips it is `tidy()`.
-
 **30. `hindcast()` and `conditional_effects()` return a constant on
 the composition families.**
 
@@ -1138,19 +1100,6 @@ which is why the assertion states the count before reading anything
 out of it. Distinct from finding 30, where the composition families
 return arms that are constant: here there is nothing to be constant.
 
-**39. `hypothesis()` cannot reach a smooth's own coefficient.**
-
-Same fit. `hypothesis()` accepts `sds_1[1]`, `p` and
-`ar1_trend[1]`, and refuses `bs_senv_1`:
-
-    Some parameters cannot be found in the model: 'bs_senv_1'
-
-`bs_senv_1` is present in `as_draws_matrix()` and listed by
-`variables()`, so the parameter exists under the name it was
-refused by. One class of parameter is unreachable while its
-neighbours in the same table are not, which points at the lookup
-rather than at the model.
-
 ## Uncovered families
 
 **43. Lognormal quantile residuals are NaN in part and off-scale in
@@ -1190,51 +1139,6 @@ informative: the analytic route works for one and not the other.
 with one constant quantile-residual column of sixty, which is the
 tie behaviour finding 21 already accounts for on discrete
 families.
-
-## The marginaleffects backend
-
-**42. `get_coef()` returns the intercept and drops every other
-population coefficient.**
-
-No file covers this. On `y ~ 1 + x` the hook answers with
-`b_Intercept` alone. Every other accessor on the same fit reports
-both terms:
-
-| call | reads | answers |
-|---|---|---|
-| `coef()` | the aliased `"betas"` block | `b_x`, `b_Intercept` |
-| `vcov()` | aliased | `x`, `Intercept` |
-| `fixef()` | aliased | `x`, `Intercept` |
-| `get_coef()` | the raw stanfit | `b_Intercept` |
-
-The cause is in the last column. `get_coef.mvgam()` takes
-`posterior::as_draws_matrix(model$fit)` and selects
-`grepl("^b_", cols)`. brms writes the population block as an
-indexed array, so the raw names are `b[1]` and `b_Intercept`, and
-the pattern matches the intercept and nothing else. mvgam's alias
-pass is what turns `b[1]` into `b_x`, and this function runs before
-it.
-
-Reproduced on three fits with different right-hand sides --
-`y ~ 1 + x`, `y ~ 1 + x + (x | grp)` and
-`y ~ 1 + x + (1 | grp) + s(z)` -- all of which answer
-`b_Intercept`. A model whose only population term is the intercept
-would be reported correctly, which is why nothing noticed.
-
-This is finding 29's cause reaching a different surface. There
-`tidy()` read raw Stan names where the other tidiers read aliases,
-which showed up as `b[1]` appearing in a table. Here the same read
-loses the coefficient instead of misnaming it, and it does so in
-the hook a third-party package calls, so the omission is not
-visible from mvgam's own output at all.
-
-`set_coef.mvgam()` returning its argument unchanged is deliberate
-and documented in the source: uncertainty reaches marginaleffects
-through the `posterior_draws` attribute on `get_predict`, and a
-coefficient override is never read back. `get_vcov.mvgam()`
-returning `NULL` is deliberate for the same reason, and it warns
-when a `vcov` argument is supplied. Neither is a defect, and both
-are asserted as the contract they are.
 
 ## Introspection
 
@@ -1486,50 +1390,6 @@ rather than fixed categories. `test-trend-var.R` and
 `test-family-com-binomial.R` each assert the term list on a fit with
 a grouping, so both fail until the split exists.
 
-**45. `tidy()` drops the group covariance a hierarchical trend
-exists to estimate.**
-
-`test-trend-hierarchical.R`, "the tidiers agree on the group
-covariance block". `Sigma_group_trend` holds one covariance per
-region over the species. Asked of the same fit four ways:
-
-| call | Sigma entries |
-|---|---|
-| `variables()` | 18 |
-| `posterior_summary()` | 18 |
-| `rhat()` | 18 |
-| `tidy(effects = "all")` | 0 |
-
-Eighteen is two regions holding a 3 x 3 block each. The tidier
-reaches the trend side perfectly well otherwise: the same table
-carries `sigma_group_trend`, `ar1_trend` and `L_Omega_global_trend`.
-It is this one family that leaves.
-
-The cause is in `split_hier_Sigma()` at `R/tidier_methods.R:419`. It
-renames the block by reading
-
-```r
-gr <- x$trend_model$gr
-subgr <- x$trend_model$subgr
-n_gr <- length(levels(x$obs_data[[gr]]))
-n_subgr <- length(levels(x$obs_data[[subgr]]))
-```
-
-None of those three reads finds anything on a fit built by
-`mvgam()`. `x$trend_model` is the trend-side brmsfit, whose elements
-run `formula`, `data`, `prior` and so on, carrying no `gr` or `subgr`
-at all. `x$obs_data` is set only by `jsdgam()`: `R/jsdgam.R:631` is
-the sole assignment in the package, and `?mvgam-class` documents the
-slot as "the data frame as `jsdgam()` prepared it". So `n_gr` and
-`n_subgr` are both zero, `index_strs` is `character(0)`, and the step
-that removes the padding drops the whole block instead of renaming
-it.
-
-This is finding 29 reaching a second surface: one fact read two
-ways, the answers disagreeing, no index out of range and nothing
-raised. Most readers of `obs_data` guard with `%||% object$data`.
-Two do not, and this is one of them.
-
 ## Prefit modes
 
 **46. `chains = 0` samples anyway, and the diagnostics warn about
@@ -1653,47 +1513,6 @@ their prose states the tighter setting was used. `idm.Rmd` uses
 `control = list(...)` and is the only one that got what it asked for.
 
 `jsdgam()` forwards to `mvgam()`, so it behaves the same way.
-
-## hypothesis()
-
-**50. `hypothesis()` refuses parameters that `variables()` lists.**
-
-`test-trend-var.R`. Every trend parameter is reachable and half the
-observation side is not:
-
-| name | in `variables()` | `hypothesis()` |
-|---|---|---|
-| `A_trend[1,1,2]` | yes | accepted |
-| `sigma_trend[1]` | yes | accepted |
-| `b_Intercept` | yes | accepted |
-| `sigma` | yes | accepted |
-| `b_elev` | yes | refused |
-| `sd_block__Intercept` | yes | refused |
-
-The refusal reads "Some parameters cannot be found in the model:
-'b_elev'", naming a parameter `variables()` had just listed.
-
-The split is the tell. brms writes the population block as an indexed
-array, so `b_elev` is `b[1]` in the raw draws and `b_Intercept` is
-written out in full; `sd_block__Intercept` is `sd_1[1]`. Everything
-`hypothesis()` accepts is a name that survives unaliased, and
-everything it refuses is one mvgam's alias pass creates. So this reads
-the stanfit directly rather than through the aliasing the other
-methods go through.
-
-`test-family-tweedie.R` supplies the cleanest instance of the split.
-`hypothesis(fit, "mphi = 1")` is accepted, because a custom family's
-parameters are written out under their own names and survive
-unaliased, while `hypothesis(fit, "b_x = 0")` is refused on the same
-fit. Two parameters of one model, one reachable and one not, told
-apart by nothing a user can see.
-
-That makes it finding 42's cause at a third surface, after `tidy()`
-in finding 29 and `get_coef()` in finding 42. Finding 39 recorded the
-same refusal for a smooth coefficient, `bs_senv_1`, and read as a
-lookup fault specific to smooths. It is not: any aliased name is
-unreachable, which covers the population slopes, the group-level
-standard deviations and the smooth coefficients together.
 
 ## Forecasting backwards
 
@@ -1894,81 +1713,6 @@ Stan as `double_exponential_lpdf(to_vector(delta_trend) | 0, s)` with
 the value asked for; and `n_changepoints` emits exactly that many.
 
 ## com_binomial and the trials aterm
-
-**59. `summary()` and `variables()` warn about a prior the model does
-not use.**
-
-`test-family-com-binomial.R`. On a `com_binomial()` fit whose `nu`
-carries a sub-formula, five methods raise
-
-    It appears as if you have specified a lower bounded prior on a
-    parameter that has no natural lower bound.
-    Warning occurred for prior
-    Intercept_nu ~ gamma(2, 0.1)
-
-The model does not use that prior. `prior_summary()` reports
-`normal(1, 1)` and the program agrees, carrying
-`lprior += normal_lpdf(Intercept_nu | 1, 1)`. mvgam injects that
-default precisely because brms would otherwise reach for the
-Student-t `nu`'s `gamma(2, 0.1)`, which is positive-only on a
-parameter free to go negative, and `adjust_modelled_dpar_priors()`
-re-aims it to the dpar intercept under an identity link.
-
-The split across methods says where it comes from:
-
-| raises it | quiet |
-|---|---|
-| `variables()`, `summary()`, `ranef()`, `VarCorr()`, `ngrps()` | `posterior_epred()`, `posterior_linpred()`, `predictive_error()`, `prior_summary()`, `find_random()` |
-
-**The cause, traced.** The first reading of this entry was that the
-five delegate to the stored brms model. They do not. Every one of
-them reaches `mvgam_ranef_metadata()`
-(`R/as.data.frame.mvgam.R:336`), which recovers the group-level
-table by calling
-
-```r
-empty <- brms::brm(formula = x$formula, data = x$data,
-                   family = x$family, empty = TRUE, silent = 2)
-```
-
-Passing no prior makes brms derive its own defaults and validate
-them, so it reaches for the Student-t `nu`'s `gamma(2, 0.1)` and
-warns about a prior the fitted program does not contain. The
-quiet methods are simply the ones that never need the alias map.
-
-Two things follow. The warning is mvgam's own call, so it is fixable
-here rather than upstream. And the table is rebuilt on every draws
-extraction of any fit with observation-side random effects, which is
-every `variables()`, `coef()`, `fixef()`, `vcov()`, `rhat()`,
-`neff_ratio()`, `posterior_summary()`, `tidy()`, `hypothesis()` and
-`get_coef()` call on such a fit. It cannot change after fitting, so
-computing it once and carrying it removes both the warning and the
-cost.
-
-Nothing warns at build time: `nu` scalar, `nu ~ z` and `nu ~ 1` are
-all silent through `mvgam()`, and `get_prior()` on an
-`mvgam_formula()` reports `normal(1, 1)` with no warning. So this
-reaches a user only after fitting, on the two calls they are most
-likely to make.
-
-**60. `variables()` reports a monotonic effect as `bsp[1]`.**
-
-Same fit. `mo(dose)` reaches the model correctly: `standata` carries
-`Ksp`, `Imo`, `Xmo_1`, `Jmo` and `con_simo_1`, and the simplex
-`simo_1[1]` to `simo_1[3]` holds one increment per step between the
-four ordered levels. The coefficient is reported as `bsp[1]`, and no
-name in `variables()` contains `dose`.
-
-Every other population coefficient on the same fit is aliased:
-`b_serieslower`, `b_nu_z`, `b_Intercept`. `prior_summary()` knows the
-term as `modose`, and `summary()` prints a labelled row for it. So
-the name exists and `variables()` is the surface that loses it, which
-puts it with findings 29, 42 and 50 rather than with the monotonic
-machinery.
-
-A model with one monotonic term is readable anyway. With two, `bsp[1]`
-and `bsp[2]` are the only handles a reader has, and nothing in the
-output says which is which.
 
 **61. The smooth grid omits a distributional parameter's covariate.**
 
