@@ -3111,3 +3111,34 @@ argument accepted and dropped, silent by construction. The difference
 is that `contributing` is not a misspelling a user invented. It is
 documented. It is motivated by a named use case. The package's own
 vignette calls it.
+
+## Which documents have actually been built
+
+Recorded because a knit that skips every chunk reports success. The
+three package vignettes gate their chunks on `params$EVAL`, and only
+`rmarkdown::render()` supplies `params`, so `knitr::knit()` runs none
+of them and returns in seconds. Everything below was built with
+`render()` under `NOT_CRAN=true`, one document per R session.
+
+| document | result |
+|---|---|
+| `vignettes/data.Rmd` | OK, 1.4 min |
+| `vignettes/dfm.Rmd` | OK, 2.5 min |
+| `vignettes/mvgam_overview.Rmd` | OK, 3.4 min |
+| `articles/nmix.Rmd` | OK, 5.3 min |
+| `articles/jsdgam.Rmd` | OK, 7.4 min |
+| `articles/mvbf.Rmd` | OK, 4.2 min |
+| `articles/var.Rmd` | OK, 14.1 min |
+| `articles/idm.Rmd` | OK, 6.5 min |
+| `articles/hierarchical_var.Rmd` | ERROR at 29.5 min, finding 85 |
+| `articles/forecast_evaluation.Rmd` | not built |
+
+`forecast_evaluation.Rmd` is the one gap, and it is the longest of
+the articles. Nothing here has run it to completion, so its row is
+blank rather than green.
+
+Three of the eight that build carry a defect the build cannot see.
+`var.Rmd` and `mvbf.Rmd` under findings 80 and 82, and `jsdgam.Rmd`
+under a paragraph of stale numbers. All three are repaired. A knit
+reports whether the code ran. The faults reading found sat in what
+the code printed and in the prose beside it.
