@@ -472,15 +472,13 @@ subtitle.
 plot(af)
 ```
 
-Factors 1-3 sit at probability 1, factors 4-6 cross the
-cutoff with diminishing posterior support, factor 7 sits right
-at the cutoff, and factors 8-10 are essentially shrunk to
-zero. The posterior median active count is 6, with a 95%
-interval of 4 to 9. Where the right `n_lv` is not known a
-priori, this is the specification to reach for first: set a
-generous ceiling, let the shrinkage prior decide and read the
-answer off `active_factors()` instead of refitting at a
-sequence of candidate dimensions. The `fraction` and
+The shrinkage does what it was put there for. The leading
+columns hold their mass, support falls away down the table and
+the trailing columns are pinned at zero. Where the right `n_lv`
+is not known a priori, this is the specification to reach for
+first: set a generous ceiling, let the shrinkage prior decide
+and read the count off `active_factors()` rather than refitting
+at a sequence of candidate dimensions. The `fraction` and
 `prob_threshold` arguments move the activity cutoff when the
 defaults, which follow Legramanti et al., prove too permissive
 for the question at hand.

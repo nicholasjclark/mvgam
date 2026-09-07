@@ -223,16 +223,21 @@ print(s$spec)
 
 ```{r joint-pars}
 ps <- posterior_summary(mod_joint)
-keep <- grep("Intercept|deploy_days|shape|ar1|sigma_trend",
+# `Intercept_<resp>` is the intercept at the covariate mean and
+# `b_<resp>_Intercept` the intercept at zero, so the two part
+# company on any arm whose covariate is not centred. The
+# simulation defines each arm's intercept at zero, so that is the
+# spelling to read against it.
+keep <- grep("^b_.*_Intercept$|deploy_days|shape_|ar1|sigma_trend",
               rownames(ps))
 round(ps[keep, c("Estimate", "Q2.5", "Q97.5")], 3)
 ```
 
-Recovery against the truth (`phi = 0.7`, `sigma = 0.4`,
-`a_count = 1.5`, `a_biomass = 0.5`, `a_camera = -0.5`,
-`b_deploy = 0.05`, `nu = 2.0`) is clean: every intercept, the AR
-coefficient, the innovation SD and the Gamma shape sit close to
-their generating values with 95% intervals that cover.
+Every generating value defined at the top of this article falls
+inside its own 95% interval: the three arm intercepts, the
+deployment slope, the AR coefficient, the innovation SD and the
+Gamma shape. The camera arm is the loosest of them, which is
+what one bit of information per month buys.
 
 ## Posterior-predictive checks
 

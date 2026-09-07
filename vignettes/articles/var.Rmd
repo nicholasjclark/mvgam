@@ -344,7 +344,7 @@ fe_self_pk <- sprintf("%.2f", self_pk)
 fe_cross_pk <- sprintf("%.2f", cross_pk)
 ```
 
-```{r plot-irf1, fig.cap = "Generalized impulse responses to a positive shock in region 1 (British Columbia). Each panel shows how the process for the target region is expected to respond over the next 12 years."}
+```{r plot-irf1, fig.cap = "Generalized impulse responses to a positive shock in the first region of `region_order`. Each panel shows how the process for the target region is expected to respond over the next 12 years."}
 plot(irfs, series = 1)
 ```
 
@@ -354,7 +354,7 @@ The self-response is the one that shows. A shock to
 decays from there; the responses in the other two regions peak in
 year two at a fraction of that.
 
-```{r plot-irf2, fig.cap = "Impulse responses to a shock in region 2 (Alberta). The self-response decays smoothly; British Columbia responds in the same direction as Alberta, and Saskatchewan shows a delayed positive response consistent with the adjacent-region correlation seen in Sigma."}
+```{r plot-irf2, fig.cap = "Impulse responses to a shock in the second region of `region_order`. The self-response decays smoothly and the two cross-region responses peak a year later at a fraction of its size."}
 plot(irfs, series = 2)
 ```
 
@@ -362,18 +362,18 @@ The same shape repeats for a shock to `r region_order[2]`: a
 first-year self-response, then small positive movements
 elsewhere that peak a year later.
 
-```{r plot-irf3, fig.cap = "Impulse responses to a shock in region 3 (Saskatchewan). The self-response is the sharpest of the three, and the effect on Alberta persists longer than the effect on British Columbia."}
+```{r plot-irf3, fig.cap = "Impulse responses to a shock in the third region of `region_order`. The self-response dominates the panel and the cross-region responses stay close to zero throughout."}
 plot(irfs, series = 3)
 ```
 
 Across all three panels the largest cross-region response is
-`r fe_cross_pk`, roughly a third of the largest self-response,
-and `r cross_resolved` of the cross-region responses have a
-credible interval excluding zero at any horizon. The medians
-trace a tidy story of shocks spreading between provinces; the
-intervals do not support telling it. What the figures establish
-is that each region responds to its own shocks and that any
-spillover is too small for this series to pin down.
+`r fe_cross_pk` against a largest self-response of
+`r fe_self_pk`. The number of cross-region responses with an
+interval clear of zero at any horizon is `r cross_resolved`.
+Read the medians and the intervals together. The medians trace
+a tidy story of shocks spreading between provinces, and the
+magnitudes say that whatever spreads is a small fraction of
+what each region does to itself.
 
 ## Forecast error variance decomposition
 
