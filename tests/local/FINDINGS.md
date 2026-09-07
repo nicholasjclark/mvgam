@@ -2752,3 +2752,166 @@ single-series poisson AR(1) of `test-draws-alignment.R` refuses with
 The frame is 30 consecutive occasions on one series with no gaps at
 all, so the irregularity is entirely the fold split's, which is
 finding 74's diagnosis on the simplest frame in the directory.
+
+## What reading a rendered article shows
+
+**80. `vignettes/articles/var.Rmd` publishes four faults that a
+successful knit cannot see.**
+
+Found by reading the rendered output rather than by checking that it
+rendered. The article knits in 14.1 minutes with no error and no
+warning, and every one of these is in the page a reader gets.
+
+**The figure captions name the wrong regions.** The frame declares
+`regions <- c("BC", "Alb", "Sask")` and then builds the series axis
+with `as.factor(region)`, so the levels sort to `Alb, BC, Sask` and
+`region_order <- levels(train$series)` is that order. The inline text
+is computed from `region_order` and is right. The captions were
+written by hand from the declaration order and are not:
+
+| call | caption says | the text below it says |
+|---|---|---|
+| `plot(irfs, series = 1)` | region 1 (British Columbia) | "A shock to Alb" |
+| `plot(irfs, series = 2)` | region 2 (Alberta) | "a shock to BC" |
+| `plot(irfs, series = 3)` | region 3 (Saskatchewan) | Saskatchewan |
+
+Two of the three contradict the sentence directly beneath them, and
+the third agrees only because `Sask` is third in both orders. This is
+finding 55's permutation, alphabetical against declared, reaching a
+published page. Finding 8 is why it happened: `irf()` labels its
+shocks `Process_k`. The article therefore maps them back by hand at
+`var.Rmd:336`. A positional mapping written out twice is one that can
+be inverted once. The entry predicted that a label nobody
+can resolve makes the table unusable without knowing the internal
+ordering. Here the package's own article got it wrong.
+
+**A computed value contradicts the prose around it.**
+`cross_resolved` counts the cross-region impulse responses whose 95%
+interval excludes zero. It renders as 2. The sentence it sits in
+continues "the intervals do not support telling it", and the
+paragraph closes "any spillover is too small for this series to pin
+down". The prose was written for a zero that the fit did not produce,
+so the article states a conclusion its own number refutes.
+
+**The fit asks for four chains and reports three.** The chunk at
+`var.Rmd:133` reads `chains = 4`, and the `summary()` printed
+underneath it says "Draws: 3 chains" with 4500 post-warmup draws,
+which is 3 x 1500 exactly. So three chains are what the numbers rely
+on. `summary()` is not miscounting: fitted at 2, 3 and 4 chains it
+reports 2, 3 and 4 and `ndraws()` agrees each time. A chain was
+therefore lost during this fit and nothing said so, with `silent = 2`
+covering whatever was raised. A quarter of a posterior leaving
+without a word is worth a message the caller cannot suppress by
+asking for a quiet fit.
+
+**An internal placeholder is printed as a parameter.** The
+observation formula is `adj_count ~ -1`. The model therefore has no
+terms on that side. The summary's Population-Level Effects table
+nonetheless carries
+
+    .mvgam_empty_obs   0.53   0.58   -0.57   1.71   1.01
+
+A reader is shown an estimate and an interval for a name they never
+wrote and cannot look up. It is finding 52's shape on the output
+surface rather than in an error: `eta` there, `.mvgam_empty_obs`
+here, both internal names presented to a user as if they were theirs.
+
+**A citation disagrees with its own reference list.** The text cites
+Heaps [2022] twice, at `var.Rmd:38` and `var.Rmd:172`. The reference
+list gives Heaps SE (2023), JCGS 32(1), 74-83, under the same DOI.
+The list is right.
+
+**81. `summary()` and `nobs()` disagree about how large a
+closure-unit dataset is.**
+
+Found by reading `vignettes/articles/nmix.md`, whose printed summary
+says "Number of observations: 12" on a frame of 60 rows while the
+prose two paragraphs earlier says thirty visits per species. Asked of
+four cached fits:
+
+| fit | rows | `nobs()` | `summary()` says |
+|---|---|---|---|
+| occ_units | 300 | 300 | 75 |
+| closure_nmix_units | 72 | 72 | 24 |
+| var_trend | 180 | 180 | 180 |
+| tweedie | 60 | 60 | 60 |
+
+The two non-closure fits agree. `summary()` is therefore not
+counting wrongly in general. On a closure-unit family it prints the
+unit count under a label naming observations while `nobs()` prints
+the row count, so a reader gets 75 from one standard accessor and 300
+from the other with nothing to say why.
+
+Both numbers are meaningful. The likelihood is evaluated per unit.
+75 is the count the density has. 300 is the count the frame holds.
+Neither output says which it is reporting. The header reads
+"Number of observations" in both cases, and `nobs()` is what a
+generic consumer calls to learn a model's sample size.
+
+Finding 37 records three post-fit methods answering on the wrong one
+of these two axes. This is the same pair of counts reaching the first
+thing a user reads.
+
+**Also in that article, a fit nothing uses.** `mod_rn`, the
+Royle-Nichols variant, is fitted with four chains and 4000 iterations
+and then never summarised, plotted or checked. The section presents
+the variant as working and shows no output from it, so a reader is
+asked to take on trust the one variant whose response scale finding
+53 records the documentation getting wrong.
+
+**82. `vignettes/articles/mvbf.Rmd` reports one intercept twice and
+promises a call that is refused.**
+
+Found the same way as finding 80, by reading the rendered page.
+
+**The recovery table gives the camera arm two intercepts.** The
+printed table carries both spellings of every arm's intercept:
+
+| name | Estimate | truth |
+|---|---|---|
+| `Intercept_count` | 1.559 | 1.5 |
+| `b_count_Intercept` | 1.559 | 1.5 |
+| `Intercept_biomass` | 0.580 | 0.5 |
+| `b_biomass_Intercept` | 0.580 | 0.5 |
+| `Intercept_camera` | 0.007 | -0.5 |
+| `b_camera_Intercept` | -0.882 | -0.5 |
+
+The prose beneath says "every intercept ... sit close to their
+generating values". Two of the six do not, and a reader has no way
+to tell which of the two camera rows to read against `a_camera`.
+
+The mechanism is brms's centred parameterisation rather than an
+mvgam fault. `Intercept_<r>` is the intercept at the covariate mean
+and `b_<r>_Intercept` the intercept at zero. The two therefore part
+company by the slope times the covariate mean. Only the camera arm
+carries an uncentred covariate: `deploy_days` is drawn
+`Unif(5, 20)`, and 0.077 x 12.5 is 0.96, which is the gap. Checked on the wide fixture,
+where `x` is drawn `rnorm` and centred already, the two spellings
+agree to 0.008 on all three arms, which is what confirms the
+mechanism.
+
+So the package is behaving as brms does and the article is reading
+it wrongly. It is recorded for two reasons. The table is a recovery
+check, which is the one thing a reader of a simulation study acts on.
+And `posterior_summary()` prints both names with nothing to say that
+they sit on different scales.
+
+**A promise the package refuses.** The article closes the forecast
+section with "The same forecast objects feed straight into
+`score()`". Finding 67 records what `score()` answers on the forecast of a wide
+fit: "'object' contains no held-out forecasts to score". The fan-out
+wrapper keeps nothing in `$forecasts` and the method reads that slot.
+The article never runs the call, so the knit cannot catch it. A
+reader who follows the sentence meets a refusal telling them to do
+what they already did.
+
+**A sign flip applied where nothing is indeterminate.**
+`recovery_summary()` multiplies each posterior by
+`sign(cor(med, truth$x))`, explaining that "latent factor models
+identify the trend only up to sign". None of the four fits is a
+factor model. Each is an AR(1) state with an identified intercept,
+so the sign is identified and the correction has nothing to fix.
+What it does instead is guarantee a non-negative correlation with
+the truth for every fit in the table, which can only move RMSE
+downward. The comparison it feeds is the article's headline claim
+that the joint fit recovers the state best.
