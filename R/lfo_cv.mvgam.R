@@ -42,10 +42,12 @@
 #'   (`object$obs_data` or `object$data`) is used. All series must
 #'   share the same set of observed time values.
 #' @param data Deprecated. Use `newdata` instead.
-#' @param min_t Integer; the time *value* at which the initial
-#'   training window ends. Must be a time value present in the
-#'   data. The first forecast window covers the next `fc_horizon`
-#'   observed times. When `NULL`, defaults to the time value at
+#' @param min_t Numeric; the time *value* at which the initial
+#'   training window ends. Must be one of the times present in the
+#'   data, which need not be whole: an irregular `CAR()` grid is
+#'   named by its own occasions. The first forecast window covers
+#'   the next `fc_horizon` observed times. When `NULL`, defaults to
+#'   the time value at
 #'   the 30th observed time point (ratcheted down for shorter
 #'   series) and adjusted to leave at least 10 evaluation folds
 #'   when possible.
@@ -170,7 +172,12 @@ lfo_cv.mvgam <- function(object,
   checkmate::assert_number(pareto_k_threshold,
                             lower = 0, upper = 1,
                             null.ok = TRUE)
-  checkmate::assert_int(min_t, lower = 1L, null.ok = TRUE)
+  # A time value, not a position. A CAR grid's occasions are rarely
+  # whole, so demanding an integer refused every occasion such a fit
+  # holds while admitting whole numbers it never had; membership in
+  # the observed grid is the check that means anything, and it is
+  # made below.
+  checkmate::assert_number(min_t, null.ok = TRUE, finite = TRUE)
   checkmate::assert_flag(save_log_lik)
   checkmate::assert_int(silent, lower = 0L, upper = 2L)
   allowed_scores <- c("elpd", "crps", "drps", "sis", "brier",
@@ -285,13 +292,21 @@ lfo_cv.mvgam <- function(object,
   }
 
   if (!min_t %in% all_unique_times) {
+    # Naming the range invited a value from inside it, which on an
+    # irregular grid is almost never an occasion the fit holds. The
+    # occasions themselves are what can be passed, so a few of them
+    # are shown.
+    shown <- utils::head(all_unique_times, 6L)
     stop(insight::format_error(c(
-      paste0("'min_t' = ", min_t,
-             " is not an observed time."),
-      i = paste0("Pass a value in {",
-                 min(all_unique_times), "..",
-                 max(all_unique_times),
-                 "} that appears in the data.")
+      paste0("'min_t' = ", min_t, " is not an observed time."),
+      x = paste0(
+        "The fit holds ", n_times, " occasions, beginning ",
+        paste(format(shown, trim = TRUE), collapse = ", "),
+        if (n_times > length(shown)) ", ..." else "",
+        " and ending ", format(max(all_unique_times), trim = TRUE),
+        "."
+      ),
+      i = "Pass one of those values."
     )))
   }
 

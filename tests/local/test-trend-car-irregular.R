@@ -509,8 +509,11 @@ test_that("the draw-free resolvers answer on this grid", {
   for (s in series_levels) {
     expect_identical(as.integer(grid$times[[s]]), future_times)
   }
-  expect_null(
-    mvgam:::resolve_forecast_grid(fit, dat, training, series_levels)
+  # The training frame itself names no occasion beyond the grid, so
+  # there is no horizon in it to resolve.
+  expect_error(
+    mvgam:::resolve_forecast_grid(fit, dat, training, series_levels),
+    "no occasion beyond the training grid"
   )
 })
 
@@ -831,10 +834,19 @@ test_that("a frame wholly inside the grid is refused, not emptied", {
                     levels = series_levels),
     temp = 0, y = NA_integer_
   )
-  fc <- forecast(fit, newdata = mk(c(30L, 31L)), ndraws = 20L)
-  # `?forecast.mvgam` documents the empty case as NULL slots.
-  expect_null(fc$forecasts)
-  expect_null(fc$test_times)
+  # The refusal names the occasions supplied and the last one each
+  # series was seen at, so the caller can tell which of the two they
+  # got wrong.
+  expect_error(
+    forecast(fit, newdata = mk(c(30L, 31L)), ndraws = 20L),
+    "no occasion beyond the training grid"
+  )
+  msg <- tryCatch(
+    forecast(fit, newdata = mk(c(30L, 31L)), ndraws = 20L),
+    error = conditionMessage
+  )
+  expect_true(grepl("30", msg, fixed = TRUE))
+  expect_true(grepl(as.character(max(time_vals)), msg, fixed = TRUE))
 })
 
 

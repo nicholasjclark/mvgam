@@ -396,26 +396,19 @@ map_loglik_cols_to_groups <- function(object, data, group_key,
   if (loglik_ncol == NROW(data)) {
     col_group <- group_key
   } else {
-    # closure_unit_grouping() returns the explicit grouping when
-    # set (e.g. multi-season c("series","site","time")) and NULL
-    # for default-mode closure-unit families. The default key in
-    # build_closure_unit_arrays() is c("series", "time"); fall
-    # back to that when the family is closure-unit but the attr
-    # is unset.
-    closure_cols <- closure_unit_grouping(object$family)
+    # `NULL` here means the family has no closure unit, so there is
+    # no grain other than the row and the counts should have
+    # matched.
+    closure_cols <- closure_unit_key_vars(object$family)
     if (is.null(closure_cols)) {
-      if (is_closure_unit_family(object$family)) {
-        closure_cols <- c("series", "time")
-      } else {
-        stop(insight::format_error(c(
-          "Could not align log-lik columns with rows of data.",
-          x = paste0("log_lik has ", loglik_ncol,
-                     " cols; data has ", NROW(data), " rows."),
-          i = paste0("Expected per-row or per-closure-unit log-",
-                     "lik; the family is not closure-unit so the ",
-                     "two should match.")
-        )))
-      }
+      stop(insight::format_error(c(
+        "Could not align log-lik columns with rows of data.",
+        x = paste0("log_lik has ", loglik_ncol,
+                   " cols; data has ", NROW(data), " rows."),
+        i = paste0("Expected per-row or per-closure-unit log-",
+                   "lik; the family is not closure-unit so the ",
+                   "two should match.")
+      )))
     }
     # Read the unit layout from the builder that owns it rather
     # than reconstructing it here. Rebuilding the key meant a
@@ -516,20 +509,15 @@ refit_score_one_fold <- function(object, data, fold_ids,
   if (NCOL(held_loglik) == NROW(held_data)) {
     held_col_group <- group_key[held_rows]
   } else {
-    # See map_loglik_cols_to_groups() for the rationale.
-    closure_cols <- closure_unit_grouping(object$family)
+    closure_cols <- closure_unit_key_vars(object$family)
     if (is.null(closure_cols)) {
-      if (is_closure_unit_family(object$family)) {
-        closure_cols <- c("series", "time")
-      } else {
-        stop(insight::format_error(c(
-          "Held log-lik shape does not match held data row count.",
-          x = paste0(
-            "log_lik returned ", NCOL(held_loglik),
-            " cols for ", NROW(held_data), " held rows."
-          )
-        )))
-      }
+      stop(insight::format_error(c(
+        "Held log-lik shape does not match held data row count.",
+        x = paste0(
+          "log_lik returned ", NCOL(held_loglik),
+          " cols for ", NROW(held_data), " held rows."
+        )
+      )))
     }
     # Closure-unit grain: held units appear in first-appearance
     # order over held_data rows (matches build_closure_unit_arrays).

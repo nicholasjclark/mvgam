@@ -1503,6 +1503,35 @@ is_multi_season_family <- function(family) {
   length(closure_unit_grouping(family)) >= 3L
 }
 
+#' The columns that key a closure unit, default included
+#'
+#' `closure_unit_grouping()` reports what the family declares, which
+#' is `NULL` for a family that takes the default. The default is
+#' `(series, time)`, and writing it out at each caller is how three
+#' places came to state it separately: one array builder and two
+#' log-lik alignment paths, each free to drift from the others.
+#'
+#' Answers `NULL` for a family that has no closure unit at all, so a
+#' caller can tell "not a closure-unit family" from "the default
+#' key" and word its own refusal.
+#'
+#' @param family A `brmsfamily` (or family-like list).
+#' @param series_var,time_var The column names the default is built
+#'   from.
+#' @return Character vector of column names, or `NULL`.
+#' @noRd
+closure_unit_key_vars <- function(family, series_var = "series",
+                                  time_var = "time") {
+  declared <- closure_unit_grouping(family)
+  if (!is.null(declared)) {
+    return(declared)
+  }
+  if (!is_closure_unit_family(family)) {
+    return(NULL)
+  }
+  c(series_var, time_var)
+}
+
 
 #' Per-unit K_max buffer for count closure-unit families
 #'
@@ -1697,6 +1726,8 @@ build_closure_unit_arrays <- function(data,
   checkmate::assert_flag(compute_y_max)
   if (is.null(unit_grouping_vars)) {
     unit_grouping_vars <- c(series_var, time_var)
+    # Kept identical to `closure_unit_key_vars()`, which is what
+    # every caller outside this file asks.
   }
   checkmate::assert_character(unit_grouping_vars, min.len = 1L,
                               any.missing = FALSE)

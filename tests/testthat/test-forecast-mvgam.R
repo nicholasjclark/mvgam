@@ -81,6 +81,18 @@ make_draws_mat <- function(ndraws = 5L,
 
 # Build a fake obs_struct that mirrors the real fields. Raw
 # times live on `names(time)` per `ensure_mvgam_variables`.
+# The grid a `slice_per_series()` caller supplies, carrying the
+# occasions as numbers rather than as labels: that is what the
+# function reads, because a label round trip moved an occasion by
+# 1.4e-14 and lost a whole horizon of a continuous grid.
+make_fc_grid_for_slice <- function(times, fc_times) {
+  list(
+    times = fc_times,
+    data = data.frame(time = times),
+    time_var = "time"
+  )
+}
+
 make_obs_struct_for_grid <- function(times, series_int,
                                        series_levels) {
   unique_times <- sort(unique(times))
@@ -698,8 +710,10 @@ test_that("slice_per_series picks the right cells per raw time", {
     c(411, 412, 421, 422, 431, 432),
     nrow = 1L
   )
-  fc_grid <- list(times = list(a = c(41, 42, 43),
-                                  b = c(41, 42, 43)))
+  fc_grid <- make_fc_grid_for_slice(
+    times = c(41, 41, 42, 42, 43, 43),
+    fc_times = list(a = c(41, 42, 43), b = c(41, 42, 43))
+  )
   out <- slice_per_series(mat, fc_grid, obs_struct,
                             ndraws_use = 1L,
                             series_levels = c("a", "b"))
@@ -716,8 +730,10 @@ test_that("slice_per_series handles per-series horizon differences", {
     series_levels = c("a", "b")
   )
   mat <- matrix(c(411, 412, 421, 422, 431), nrow = 1L)
-  fc_grid <- list(times = list(a = c(41, 42, 43),
-                                  b = c(41, 42)))
+  fc_grid <- make_fc_grid_for_slice(
+    times = c(41, 41, 42, 42, 43),
+    fc_times = list(a = c(41, 42, 43), b = c(41, 42))
+  )
   out <- slice_per_series(mat, fc_grid, obs_struct,
                             ndraws_use = 1L,
                             series_levels = c("a", "b"))

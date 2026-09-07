@@ -70,9 +70,9 @@
 #'   `"trend"`. `"response"` samples from the observation family
 #'   (the default); `"expected"` returns the family's mean, which
 #'   carries any further parameter the expectation needs (a binomial
-#'   mean is `trials * p`, a zero-inflated mean `(1 - zi) * mu`); `"link"` returns the link-scale linpred;
-#'   `"trend"` returns the latent-trend trajectory on the link
-#'   scale.
+#'   mean is `trials * p`, a zero-inflated mean `(1 - zi) * mu`);
+#'   `"link"` returns the link-scale linear predictor; `"trend"`
+#'   returns the latent-trend trajectory on the link scale.
 #' @param ndraws Optional integer; the number of posterior draws
 #'   to use. Defaults to all available draws.
 #' @param coef_uncertainty Logical. When `FALSE`, every forecast
@@ -559,7 +559,8 @@ resolve_forecast_grid <- function(object, newdata, training,
       order(fc_data[[time_var]]), , drop = FALSE
     ]
     return(list(data = fc_data, times = fc_times,
-                observations = fc_observations))
+                observations = fc_observations,
+                time_var = time_var))
   }
 
   row_ids <- series_ids %||% newdata[[series_var]]
@@ -637,7 +638,8 @@ resolve_forecast_grid <- function(object, newdata, training,
   list(
     data = fc_data,
     times = fc_times,
-    observations = fc_observations
+    observations = fc_observations,
+    time_var = time_var
   )
 }
 
@@ -1379,7 +1381,7 @@ compute_pw_forecast_extras <- function(object, training,
   }
   growth <- spec$growth %||% "linear"
   cap <- if (identical(growth, "logistic")) {
-    extract_pw_cap_matrix(fc_grid, spec, fc_times,
+    extract_pw_cap_matrix(object, fc_grid, spec, fc_times,
                             series_levels,
                             family = object$family)
   } else {
@@ -1409,7 +1411,7 @@ compute_pw_forecast_extras <- function(object, training,
 # substituting -- propagating an unknown cap into the
 # inverse-logit would produce a meaningless forecast.
 #'@noRd
-extract_pw_cap_matrix <- function(fc_grid, spec, fc_times,
+extract_pw_cap_matrix <- function(object, fc_grid, spec, fc_times,
                                     series_levels, family) {
   cap_var <- spec$cap %||% "cap"
   d <- fc_grid$data
@@ -1424,15 +1426,30 @@ extract_pw_cap_matrix <- function(fc_grid, spec, fc_times,
       )
     )))
   }
-  series_var <- attr(d, "series_var") %||% "series"
-  time_var <- attr(d, "time_var") %||% "time"
+  # The grid names the column its horizon was cut from, so the
+  # occasions compared below are the same doubles rather than two
+  # readings of one. Reading `attr(d, "time_var")` asked a frame
+  # that had just been subset, and a subset does not carry the
+  # attribute reliably; the fallback then read a column named
+  # "time" on a fit whose time column is called something else.
+  time_var <- fc_grid$time_var
+  # Placed the way the fit places a row, so a hierarchical frame
+  # whose `series` column was superseded by its grouping is cut
+  # into the series the model has. Comparing the raw column there
+  # matched nothing and refused a cap the user did supply.
+  series_ids <- axis_row_series(object, d)
+  row_series <- if (is.null(series_ids)) {
+    as.character(d[[object$trend_metadata$variables$series_var %||%
+                      "series"]])
+  } else {
+    as.character(series_ids)
+  }
   cap_mat <- matrix(NA_real_, nrow = length(fc_times),
                       ncol = length(series_levels))
   for (s in seq_along(series_levels)) {
     lv <- series_levels[s]
     for (k in seq_along(fc_times)) {
-      ix <- which(d[[series_var]] == lv &
-                    as.numeric(d[[time_var]]) == fc_times[k])
+      ix <- which(row_series == lv & d[[time_var]] == fc_times[k])
       if (length(ix) == 0L) next
       cap_mat[k, s] <- as.numeric(d[[cap_var]][ix[1L]])
     }
@@ -1526,7 +1543,16 @@ pad_or_trim_rows <- function(grid, target_rows) {
 slice_per_series <- function(mat, fc_grid, obs_struct,
                                ndraws_use, series_levels,
                                resp = NULL) {
-  raw_times <- as.numeric(names(obs_struct$time))
+  # The occasions as the frame holds them, not as they print.
+  # `names(obs_struct$time)` are labels, so reading them back with
+  # `as.numeric()` is a round trip through a decimal rendering: an
+  # occasion computed as 91.953 + 2.3 + 3.1 came back 1.4e-14 away
+  # from itself and the exact comparison below missed. That column
+  # of the forecast was then left as it was initialised, so one
+  # horizon of a continuous grid returned `NA` for every draw while
+  # its neighbours returned numbers. Both sides now come from the
+  # one column, so they are the same doubles.
+  raw_times <- as.numeric(fc_grid$data[[fc_grid$time_var]])
   # Where the responses are the series, a row of the frame belongs
   # to every one of them, so its per-row series index is a single
   # constant. Matching cells on that index handed every column to
@@ -1554,7 +1580,19 @@ slice_per_series <- function(mat, fc_grid, obs_struct,
       } else {
         which(raw_times == ts[k] & obs_struct$series_int == s)
       }
-      if (length(cell_j) == 0L) next
+      if (length(cell_j) == 0L) {
+        stop(insight::format_error(c(
+          "A forecast occasion has no row in the forecast grid.",
+          x = paste0("Series '", lv, "' at ", format(ts[k],
+                                                     trim = TRUE),
+                     " matched no row."),
+          i = paste0(
+            "The horizon and the rows it was cut from are built ",
+            "from one column, so these cannot disagree on a grid ",
+            "this version produced."
+          )
+        )), call. = FALSE)
+      }
       sm[, k] <- mat[, cell_j[1L]]
     }
     out[[s]] <- sm

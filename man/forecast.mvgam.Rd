@@ -49,9 +49,9 @@ to step through.}
 \code{"trend"}. \code{"response"} samples from the observation family
 (the default); \code{"expected"} returns the family's mean, which
 carries any further parameter the expectation needs (a binomial
-mean is \code{trials * p}, a zero-inflated mean \code{(1 - zi) * mu}); \code{"link"} returns the link-scale linpred;
-\code{"trend"} returns the latent-trend trajectory on the link
-scale.}
+mean is \code{trials * p}, a zero-inflated mean \code{(1 - zi) * mu});
+\code{"link"} returns the link-scale linear predictor; \code{"trend"}
+returns the latent-trend trajectory on the link scale.}
 
 \item{ndraws}{Optional integer; the number of posterior draws
 to use. Defaults to all available draws.}

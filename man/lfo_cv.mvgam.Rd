@@ -32,10 +32,12 @@ formula. When \code{NULL}, the original training data
 (\code{object$obs_data} or \code{object$data}) is used. All series must
 share the same set of observed time values.}
 
-\item{min_t}{Integer; the time \emph{value} at which the initial
-training window ends. Must be a time value present in the
-data. The first forecast window covers the next \code{fc_horizon}
-observed times. When \code{NULL}, defaults to the time value at
+\item{min_t}{Numeric; the time \emph{value} at which the initial
+training window ends. Must be one of the times present in the
+data, which need not be whole: an irregular \code{CAR()} grid is
+named by its own occasions. The first forecast window covers
+the next \code{fc_horizon} observed times. When \code{NULL}, defaults to
+the time value at
 the 30th observed time point (ratcheted down for shorter
 series) and adjusted to leave at least 10 evaluation folds
 when possible.}

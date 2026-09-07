@@ -5780,7 +5780,7 @@ assert_forecast_times_steppable <- function(fc_times, training,
   # gap that the latent state does not have. mvgam asks users to
   # pad exactly that way, so it is a common shape rather than an
   # odd one.
-  past <- sort(unique(as.integer(unlist(
+  past <- sort(unique(as.numeric(unlist(
     training$times %||% list(), use.names = FALSE
   ))))
   if (length(past) < 2L) return(invisible(TRUE))
@@ -5796,10 +5796,18 @@ assert_forecast_times_steppable <- function(fc_times, training,
   # can continue.
   step <- as.numeric(step)
   for (lv in names(fc_times)) {
-    fut <- sort(as.integer(fc_times[[lv]]))
+    # Compared as the occasions the user supplied. Truncating both
+    # sides to an integer first made every grid spaced by less than
+    # one unit compare equal to itself shifted, and a grid spaced by
+    # more than one compare unequal when it was right. The
+    # comparison is a tolerance rather than an identity because the
+    # expected occasions are arithmetic on a recorded step, so they
+    # land within floating-point noise of the values the frame
+    # holds rather than on them exactly.
+    fut <- sort(as.numeric(fc_times[[lv]]))
     if (!length(fut)) next
     expected <- past[length(past)] + step * seq_along(fut)
-    if (!identical(fut, as.integer(expected))) {
+    if (!isTRUE(all.equal(fut, expected))) {
       stop(insight::format_error(c(
         paste0(
           "'newdata' must continue the training series for a '",

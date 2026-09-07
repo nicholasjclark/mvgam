@@ -303,12 +303,11 @@ closure_unit_data_dimensions <- function(obj) {
   if (!methods_md_is_detection_family(obj)) return(character(0L))
   data <- obj$data %||% data.frame()
   if (nrow(data) == 0L) return(character(0L))
-  # Closure-unit grouping is (series, time) by default and
-  # (series, site, time) under multi_season -- delegate to the
-  # shared accessor in R/families.R.
-  ug <- closure_unit_grouping(obj$family) %||%
-    c("series", "time")
-  ug <- intersect(ug, names(data))
+  # The columns that key a closure unit, default included. The
+  # guard above establishes that this family has one, so the
+  # accessor answers rather than returning NULL.
+  ug <- closure_unit_key_vars(obj$family)
+  ug <- intersect(ug %||% character(0L), names(data))
   if (!length(ug)) return(character(0L))
   units_df <- unique(data[, ug, drop = FALSE])
   n_unit <- nrow(units_df)
