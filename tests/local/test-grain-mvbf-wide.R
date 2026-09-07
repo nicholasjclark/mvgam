@@ -563,6 +563,37 @@ test_that("each prediction type answers with the quantity it names", {
 })
 
 
+test_that("a wide fit refuses an argument nothing reads", {
+  # `resp` is the argument these methods do take, so a neighbour of it
+  # that nothing reads is the one most likely to be mistyped here.
+  expect_error(posterior_epred(fit, zzz_unknown = 1))
+  expect_error(posterior_predict(fit, zzz_unknown = 1))
+  expect_error(fitted(fit, zzz_unknown = 1))
+  expect_error(log_lik(fit, zzz_unknown = 1))
+})
+
+
+test_that("pp_check says which argument it ignored", {
+  # This one already tells the user, and the notice comes from
+  # bayesplot checking its own dots rather than from mvgam. It is the
+  # weaker half of what `forecast()` does, since a plot is still
+  # returned on the default the caller was overriding, but it names
+  # the argument and so cannot be missed silently. Pinned here
+  # because it is the only call on this surface that says anything,
+  # and it would go if the route to bayesplot changed.
+  seen <- character(0)
+  suppressWarnings(withCallingHandlers(
+    pp_check(fit, resp = "count", ndraws = 10L, zzz_unknown = 1),
+    warning = function(w) {
+      seen <<- c(seen, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  ))
+  expect_true(any(grepl("zzz_unknown", seen, fixed = TRUE)))
+  expect_true(any(grepl("unrecognized|ignored", seen)))
+})
+
+
 test_that("pp_check names the response it is asked for", {
   # A wide fit has one set of observations per response, so a check
   # of observed against replicated has to be told which. Answering

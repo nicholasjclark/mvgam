@@ -657,6 +657,16 @@ test_that("a CAR forecast continues the grid it was given", {
 })
 
 
+test_that("the criticism surface refuses an argument nothing reads", {
+  # Same claim as the prediction methods, on the ones a reader
+  # reaches for after them.
+  expect_error(fitted(fit, zzz_unknown = 1))
+  expect_error(log_lik(fit, zzz_unknown = 1))
+  expect_error(plot(fit, zzz_unknown = 1))
+  expect_error(posterior_linpred(fit, zzz_unknown = 1))
+})
+
+
 test_that("hindcast arms are the series, in order, and distinct", {
   arms <- hindcast(fit, ndraws = 20L)$hindcasts
   expect_identical(names(arms), series_levels)

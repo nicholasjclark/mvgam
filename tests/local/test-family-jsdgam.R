@@ -1182,3 +1182,72 @@ test_that("diri: the data and the expectation are both compositions", {
                  rep(1, length(per_site)), tolerance = 1e-6)
   }
 })
+
+
+# ----------------------------------------------------------------------
+# The factor-count ceiling
+# ----------------------------------------------------------------------
+
+test_that("n_lv reaches the ceiling the validator sets", {
+  # `validate_n_lv_ceiling()` admits `n_lv = n_species` on purpose:
+  # the loadings prior decides whether that boundary samples, and
+  # refusing it here would turn away a model the prior makes
+  # admissible. `?jsdgam` describes a stricter rule for every prior
+  # but the MGP one, so this pins the behaviour rather than the
+  # sentence, and fails if a reader ever implements the sentence.
+  set.seed(99L)
+  n_sp <- 4L
+  sp <- paste0("sp", seq_len(n_sp))
+  d_lv <- expand.grid(site = seq_len(30L),
+                      species = factor(sp, levels = sp))
+  d_lv$env <- stats::rnorm(nrow(d_lv))
+  d_lv$y <- stats::rpois(nrow(d_lv), exp(1 + 0.3 * d_lv$env))
+  build <- function(...) {
+    jsdgam(formula = y ~ env, factor_formula = ~ -1, data = d_lv,
+           unit = site, species = species, family = poisson(),
+           run_model = FALSE, silent = 2, ...)
+  }
+
+  # The saturated model is admissible under every prior.
+  for (extra in list(list(), list(loadings_prior = "mgp"))) {
+    m <- do.call(build, c(list(n_lv = n_sp), extra))
+    expect_identical(as.integer(m$standata$N_lv_trend), n_sp)
+  }
+
+  # One factor past the species count adds no rank, and is refused
+  # with the reason and a remedy.
+  err <- expect_error(build(n_lv = n_sp + 1L),
+                      "cannot exceed the number of species")
+  msg <- conditionMessage(err)
+  expect_match(msg, "rank at most", fixed = TRUE)
+  expect_match(msg, "mgp_a2", fixed = TRUE)
+})
+
+
+test_that("the jsdm methods refuse an argument nothing reads", {
+  # Each of these names every argument it takes and forwards none of
+  # them onward, so a name left in `...` is read by no one. A
+  # misspelling then returns a plot or a table built on the default
+  # the caller was trying to override. `forecast()` and `hindcast()`
+  # already refuse this through `rlang::check_dots_empty()`; the
+  # claim is that the rest of the closed-argument surface does too.
+  obj <- get("nb", envir = built)$fit
+  expect_error(ordinate(obj, zzz_unknown = 1))
+  expect_error(residual_cor(obj, zzz_unknown = 1))
+  expect_error(shared_variation(obj, zzz_unknown = 1))
+  expect_error(active_factors(obj, zzz_unknown = 1))
+})
+
+
+test_that("every surface the help page sends a reader to answers", {
+  # `?jsdgam` lists these under seealso, so each is a promise made to
+  # someone who has just fitted a joint species model.
+  obj <- get("nb", envir = built)$fit
+  expect_s3_class(residual_cor(obj), "mvgam_residcor")
+  expect_s3_class(ordinate(obj), "ggplot")
+  expect_s3_class(shared_variation(obj), "mvgam_shared_variation")
+  expect_s3_class(active_factors(obj), "mvgam_active_factors")
+  expect_s3_class(compare_loadings(obj, obj), "ggplot")
+  expect_s3_class(methods_md(obj), "mvgam_methods_md")
+  expect_s3_class(how_to_cite(obj), "how_to_cite")
+})

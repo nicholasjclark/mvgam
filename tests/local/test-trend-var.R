@@ -657,6 +657,18 @@ test_that("posterior_transition_matrix answers for this fit's own A", {
 })
 
 
+test_that("the prediction surface refuses an argument nothing reads", {
+  # A misspelled argument reaching `...` leaves the method running on
+  # the default it was asked to override, and the answer is finite and
+  # plausible either way. `forecast()` refuses this already, so the
+  # behaviour is set within the same object.
+  expect_error(posterior_epred(fit, zzz_unknown = 1))
+  expect_error(posterior_predict(fit, zzz_unknown = 1))
+  expect_error(predict(fit, zzz_unknown = 1))
+  expect_error(residuals(fit, zzz_unknown = 1))
+})
+
+
 test_that("irf and fevd name the series, not Process_k", {
   # Both tables label their shocks `Process_1 -> Process_2` while
   # this fit's series are named. A correct decomposition under a

@@ -2417,3 +2417,136 @@ detected in time. Interval range: 1 to 2" on another. The second names
 the condition. The first names no column, no guard and no remedy, so
 the same call can hand a user a refusal they cannot act on depending
 on how the rows fell.
+
+## Two documents, two contracts
+
+**75. `?jsdgam` states an `n_lv` constraint the package does not
+have, and does not want.**
+
+`test-family-jsdgam.R`, "n_lv reaches the ceiling the validator sets".
+`?jsdgam` documents the bound on the number of latent factors as
+depending on the loadings prior. Two branches share one rule there:
+the default iid prior, and any structured prior whose kernel comes
+from `traits` or `phylo`. For both, `n_lv` "must be strictly less than
+the number of species". The man page gives the reason. At
+`n_lv = n_species` the matrix `Z Z'` saturates the
+residual covariance, per-species residual variance loses
+identifiability under HMC and the sampler meets a heavy funnel.
+
+Measured on four species, that bound is enforced nowhere:
+
+| prior | `n_lv = 4` on 4 species | `n_lv = 5` |
+|---|---|---|
+| default iid | accepted, `N_lv_trend` 4 | refused |
+| `traits` | accepted, `N_lv_trend` 4 | refused |
+| `phylo` | accepted, `N_lv_trend` 4 | refused |
+| `"mgp"` | accepted, `N_lv_trend` 4 | refused |
+
+Only the MGP rule is implemented, and it is applied to every prior.
+`validate_n_lv_ceiling()` at `R/validations.R:1396` refuses
+`n_lv > n_species` and nothing else.
+
+The code is right and the man page is wrong, which is what makes this
+worth recording rather than fixing with a guard. The validator's own
+roxygen says so deliberately, four lines above the function:
+
+> `n_lv = n_series` is allowed: the loadings prior is what decides
+> whether that boundary samples well, and saying so here would refuse
+> a model the prior makes admissible.
+
+So one package documents two contradictory contracts for one argument,
+and the one a user reads is the one that is not true. Sampling the
+saturated model settles which is right on the evidence: fitted at
+`n_lv = n_species = 4`, it returns max r-hat 1.021 with 0 of 255
+parameters above 1.05. The funnel `?jsdgam` warns of does not appear,
+so refusing the model would have cost a user a fit that works.
+
+`test-family-jsdgam.R` pins the behaviour the validator intends. A
+later reader following `?jsdgam` would otherwise add the guard and
+break a model that samples.
+
+**Checked and correct.** Every surface `?jsdgam` lists under
+`seealso` answers on a fitted jsdgam: `residual_cor()`, `ordinate()`,
+`shared_variation()`, `active_factors()`, `compare_loadings()`,
+`methods_md()` and `how_to_cite()`. The `traits` and `phylo` aliases
+are refused alongside an explicit `loadings_prior`, as documented.
+
+## Arguments nothing reads
+
+**76. Two methods of fifteen refuse an argument that reaches no
+one.**
+
+Found by misspelling one. `ordinate()` selects its ordination axes
+with `which_lvs`, and a call written `ordinate(fit, axes = c(1, 5))`
+returns a plot. The plot is of factors 1 and 2, labelled 1 and 2,
+because `axes` reached `...` where nothing reads it. `which_lvs` is
+faultless. Passing `c(2, 1)` transposes the picture and relabels it,
+and a factor past `n_lv` is refused with the constraint named.
+
+mvgam has already decided this is a defect. `R/forecast.mvgam.R:172`
+carries the reasoning and the cure:
+
+> Both methods take every argument by name after `...`, so a
+> misspelling lands in `...` and the method proceeds on the default it
+> was trying to override. That is how `incl_autocor` went unnoticed on
+> `posterior_predict()`, and it is silent by construction, so refuse
+> what nothing reads.
+
+`rlang::check_dots_empty()` appears twice in the whole of `R/`, in
+`forecast.mvgam.R` and `hindcast.mvgam.R`. Probed with
+`zzz_unknown = 1`:
+
+| behaviour | methods |
+|---|---|
+| refuses | `forecast()`, `hindcast()` |
+| warns, from bayesplot rather than mvgam | `pp_check()` |
+| accepts in silence | `ordinate()`, `residual_cor()`, `shared_variation()`, `active_factors()`, `summary()`, `posterior_epred()`, `posterior_predict()`, `predict()`, `fitted()`, `residuals()`, `log_lik()`, `plot()` |
+
+The cost is measured rather than imagined. Writing `axes` for
+`which_lvs` produced a picture that looked like an answer to the
+question asked. Reading it as one is how a wrong axis pair reaches a
+paper. The same shape reaches values as readily as pictures:
+`incl_autocor` misspelled on `posterior_predict()` returns a marginal
+prediction where a conditional one was asked for, every number finite
+and plausible.
+
+**What a unified check would have to respect.** The guard cannot be
+applied everywhere, because `...` on this package's surface carries
+two different meanings.
+
+- Arguments that stop at mvgam. Every post-fit method above names
+  each of its arguments and forwards none of them onward, so anything
+  left in `...` is dead by definition and can be refused outright.
+  This is the whole of the table above.
+- Arguments that pass through. `mvgam()` and `jsdgam()` document `...`
+  as the route to `data2`, `algorithm`, `chains`, `silent` and the
+  rest of the brms and Stan surface. `jsdgam()` forwards to `mvgam()`
+  in turn. A blanket refusal here would reject legitimate calls, and
+  the set to allow belongs to brms rather than to mvgam.
+
+So the check belongs where a method's argument list is closed and
+known, which is the whole post-fit surface. The forwarding layer needs
+a different treatment: an allowed set drawn from the callee's own
+formals, or no check at all. Finding 49 is the pass-through half of this and shows
+the cost of leaving it alone, since `adapt_delta` is read by neither
+mvgam nor Stan when spelled bare and the sampler runs at its default
+while the call looks like it addressed the problem.
+
+`pp_check()` is the useful exception, and it is worth being precise
+about what it does and does not settle. It says "The following
+arguments were unrecognized and ignored: zzz_unknown", which names the
+argument and is the behaviour this entry asks for. Two caveats sit on
+it. The notice comes from bayesplot checking its own dots, so mvgam
+contributes nothing and the notice leaves if the route to bayesplot
+changes. And a warning is the weaker half of what `forecast()` does.
+The plot is still returned, built on the default the caller was
+overriding. A warning inside a loop or a knitted document is easily
+missed.
+
+`test-grain-mvbf-wide.R` pins the notice rather than demanding an
+error there, so the one call on this surface that speaks cannot go
+quiet unnoticed.
+
+One method per release is not the way out. The two that guard were
+fixed because a specific bug was traced to them, and eleven more carry
+the same hole today.
