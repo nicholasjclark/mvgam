@@ -520,8 +520,21 @@ predict_variance <- function(object, newdata, process_error,
   ndraws_mu <- nrow(mu)
   nobs_mu <- ncol(mu)
 
-  fpars <- extract_family_pars_for_draws(object, draws_mat, draw_idx,
-                                         resp = resp)
+  # A distributional parameter can be written with a formula of its
+  # own, as `bf(y ~ x, sigma ~ z)`. Read off the stanfit by name it is
+  # not there at all, because it is computed per observation rather
+  # than sampled, and the variance then refused a gaussian fit for
+  # want of a `sigma` the model certainly has. This resolver answers
+  # for both spellings.
+  fpars <- resolve_family_pars(
+    object,
+    dpar_names = get_family_dpars(resolve_family_name(family)),
+    ndraws = ndraws_mu,
+    nobs = nobs_mu,
+    draw_ids = draw_idx,
+    newdata = newdata,
+    resp = resp
+  )
 
   # broadcast: dpar matrices arrive as [ndraws x n_series] for
   # multivariate (already errored above) or [ndraws x 1] / [ndraws x
