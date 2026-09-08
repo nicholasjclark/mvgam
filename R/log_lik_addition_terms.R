@@ -100,7 +100,7 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
 # extraDistr and `cmb` from the package's own COM-binomial kernels,
 # so the lookup is written once rather than branched in both callers.
 #' @noRd
-dist_fun <- function(dist, kind = c("d", "p")) {
+dist_fun <- function(dist, kind = c("d", "p", "q")) {
   kind <- match.arg(kind)
   switch(
     dist,
@@ -112,10 +112,15 @@ dist_fun <- function(dist, kind = c("d", "p")) {
           "likelihoods"
         )
       )
-      if (kind == "d") extraDistr::dbbinom else extraDistr::pbbinom
+      switch(kind, d = extraDistr::dbbinom, p = extraDistr::pbbinom,
+             q = extraDistr::qbbinom)
     },
-    cmb = if (kind == "d") dcmb else pcmb,
-    tweedie = if (kind == "d") dtweedie_cpg else ptweedie_cpg,
+    # A COM-binomial and a Tweedie have no quantile function here, so
+    # a caller asking for one is told rather than handed a base R
+    # function that does not exist.
+    cmb = switch(kind, d = dcmb, p = pcmb, q = NULL),
+    tweedie = switch(kind, d = dtweedie_cpg, p = ptweedie_cpg,
+                     q = NULL),
     get(paste0(kind, dist), mode = "function",
         envir = asNamespace("stats"))
   )
@@ -137,6 +142,23 @@ family_has_dist_spec <- function(family_name, link) {
 }
 
 
+# Internal: a location-scale family is evaluated on its standardised
+# variate, because the base distribution takes neither a location nor
+# a scale. Standardises the value, drops those two entries from the
+# argument list, and returns the scale a density needs to correct by
+# and a sampler needs to undo.
+#' @noRd
+standardise_for_dist <- function(value, args) {
+  scale <- args$.scale
+  if (!is.null(args$.shift)) {
+    value <- (value - args$.shift) / scale
+    args$.shift <- NULL
+    args$.scale <- NULL
+  }
+  list(value = value, args = args, scale = scale)
+}
+
+
 # Internal: `P(Y <= q)` for every draw and observation, as an
 # `[ndraws x nobs]` matrix.
 #
@@ -151,19 +173,60 @@ dist_cdf <- function(spec, linpred, q, lower.tail = TRUE,
   pfun <- dist_fun(spec$dist, "p")
   out <- matrix(NA_real_, nrow = nrow(linpred), ncol = n)
   for (j in seq_len(n)) {
-    args <- spec$args(j)
-    qj <- q[j]
-    # The Student t spec carries its location and scale separately
-    # because `pt` takes neither.
-    if (!is.null(args$.shift)) {
-      qj <- (qj - args$.shift) / args$.scale
-      args$.shift <- NULL
-      args$.scale <- NULL
-    }
+    std <- standardise_for_dist(q[j], spec$args(j))
     out[, j] <- do.call(
       pfun,
-      c(list(qj), args, list(lower.tail = lower.tail, log.p = log.p))
+      c(list(std$value), std$args,
+        list(lower.tail = lower.tail, log.p = log.p))
     )
+  }
+  out
+}
+
+
+# Internal: draws from a family restricted to `[lb, ub]`, by the
+# inverse-transform method: a uniform on `[F(lb), F(ub)]` mapped back
+# through the quantile function lands inside the bounds by
+# construction. One pass and exact, where rejecting and redrawing
+# costs a draw per attempt and still leaves whatever it could not
+# place, which then has to be clamped onto the bound and shows up as
+# a spike of mass sitting on it.
+#
+# `cells` is a logical matrix marking which of the `[ndraws x nobs]`
+# cells to redraw. A discrete family opens the interval at
+# `F(lb - 1)` so that `lb` itself remains attainable. Returns NULL
+# when the family has no quantile function, which is what sends the
+# caller to rejection sampling.
+#' @noRd
+truncated_dist_draws <- function(spec, cells, lb, ub, discrete) {
+  qfun <- dist_fun(spec$dist, "q")
+  if (is.null(qfun)) return(NULL)
+  pfun <- dist_fun(spec$dist, "p")
+  out <- matrix(NA_real_, nrow = nrow(cells), ncol = ncol(cells))
+  for (j in seq_len(ncol(cells))) {
+    rows <- which(cells[, j])
+    if (!length(rows)) next
+    args <- spec$args(j)
+    shift <- args$.shift
+    scale <- args$.scale
+    args$.shift <- NULL
+    args$.scale <- NULL
+    args <- lapply(args, function(v) {
+      if (length(v) <= 1L) v else v[rows]
+    })
+    bound <- function(x) {
+      if (is.null(shift)) x else (x - shift[rows]) / scale[rows]
+    }
+    lo <- if (discrete) lb[j] - 1 else lb[j]
+    p_lo <- do.call(pfun, c(list(bound(lo)), args))
+    p_hi <- do.call(pfun, c(list(bound(ub[j])), args))
+    u <- stats::runif(length(rows), pmin(p_lo, p_hi), pmax(p_lo, p_hi))
+    z <- do.call(qfun, c(list(u), args))
+    out[rows, j] <- if (is.null(shift)) {
+      z
+    } else {
+      z * scale[rows] + shift[rows]
+    }
   }
   out
 }
@@ -178,19 +241,10 @@ dist_log_density <- function(spec, linpred, y) {
   dfun <- dist_fun(spec$dist, "d")
   out <- matrix(NA_real_, nrow = nrow(linpred), ncol = n)
   for (j in seq_len(n)) {
-    args <- spec$args(j)
-    yj <- y[j]
-    scale <- NULL
-    # A location-scale family is standardised before the base
-    # distribution sees it, so its density picks up -log(scale).
-    if (!is.null(args$.shift)) {
-      scale <- args$.scale
-      yj <- (yj - args$.shift) / scale
-      args$.shift <- NULL
-      args$.scale <- NULL
-    }
-    val <- do.call(dfun, c(list(yj), args, list(log = TRUE)))
-    out[, j] <- if (is.null(scale)) val else val - log(scale)
+    std <- standardise_for_dist(y[j], spec$args(j))
+    val <- do.call(dfun, c(list(std$value), std$args, list(log = TRUE)))
+    # Standardising divides by the scale, which a density pays for.
+    out[, j] <- if (is.null(std$scale)) val else val - log(std$scale)
   }
   out
 }

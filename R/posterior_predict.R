@@ -164,126 +164,6 @@ extract_truncation_bounds <- function(object, nobs) {
 }
 
 
-#' Sample from Truncated Continuous Distribution
-#'
-#' Uses inverse CDF transformation for truncated sampling from continuous
-#' distributions. Falls back to rejection sampling if CDF/quantile functions
-#' are unavailable.
-#'
-#' @param n Integer; number of samples
-#' @param dist Character; distribution name (e.g., "norm", "gamma")
-#' @param lb Numeric; lower truncation bound
-#' @param ub Numeric; upper truncation bound
-#' @param ntrys Integer; rejection sampling attempts if CDF unavailable
-#' @param ... Additional arguments passed to distribution functions
-#'
-#' @return Numeric vector of n samples from the truncated distribution.
-#'   NA values indicate samples that could not be generated within bounds.
-#'
-#' @noRd
-sample_continuous_truncated <- function(n, dist, lb = -Inf, ub = Inf,
-                                        ntrys = 5, ...) {
-  checkmate::assert_int(n, lower = 1)
-  checkmate::assert_string(dist)
-  checkmate::assert_number(lb)
-  checkmate::assert_number(ub)
-  checkmate::assert_int(ntrys, lower = 1)
-
-  if (is.finite(lb) && is.finite(ub) && lb >= ub) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        paste0(
-          "Invalid truncation bounds: {.field lb} (", lb,
-          ") must be less than {.field ub} (", ub, ")."
-        )
-      ),
-      i = "Truncation requires lb < ub to define a valid bounded region."
-    )))
-  }
-
-  args <- list(...)
-  pdist <- paste0("p", dist)
-  qdist <- paste0("q", dist)
-
-  if (exists(pdist, mode = "function") && exists(qdist, mode = "function")) {
-    # Inverse CDF transformation method
-    plb <- do.call(pdist, c(list(lb), args))
-    pub <- do.call(pdist, c(list(ub), args))
-    u <- stats::runif(n, min = plb, max = pub)
-    out <- do.call(qdist, c(list(u), args))
-    # Handle numerical imprecision at boundaries
-    out[out %in% c(-Inf, Inf)] <- NA_real_
-  } else {
-    # Fall back to rejection sampling
-    out <- sample_truncated_rejection(
-      n, dist, lb = lb, ub = ub, ntrys = ntrys, ...
-    )
-  }
-
-  out
-}
-
-
-#' Sample from Truncated Distribution via Rejection Sampling
-#'
-#' General-purpose rejection sampler for truncated distributions. Samples
-#' ntrys times and selects first valid value within bounds.
-#'
-#' @param n Integer; number of samples
-#' @param dist Character; distribution name (e.g., "pois", "norm")
-#' @param lb Numeric; lower truncation bound
-#' @param ub Numeric; upper truncation bound
-#' @param ntrys Integer; number of rejection sampling attempts
-#' @param ... Additional arguments passed to distribution functions
-#'
-#' @return Numeric vector of n samples. NA_real_ where no valid sample found
-#'   after ntrys attempts.
-#'
-#' @noRd
-sample_truncated_rejection <- function(n, dist, lb = -Inf, ub = Inf,
-                                       ntrys = 5, ...) {
-  checkmate::assert_int(n, lower = 1)
-  checkmate::assert_string(dist)
-  checkmate::assert_number(lb)
-  checkmate::assert_number(ub)
-  checkmate::assert_int(ntrys, lower = 1)
-
-  if (is.finite(lb) && is.finite(ub) && lb >= ub) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        paste0(
-          "Invalid truncation bounds: {.field lb} (", lb,
-          ") must be less than {.field ub} (", ub, ")."
-        )
-      ),
-      i = "Truncation requires lb < ub to define a valid bounded region."
-    )))
-  }
-
-  args <- list(...)
-  rdist <- paste0("r", dist)
-
-  # Sample ntrys times
-  samples <- vector("list", ntrys)
-  for (i in seq_along(samples)) {
-    samples[[i]] <- as.vector(do.call(rdist, c(list(n), args)))
-  }
-  samples <- do.call(cbind, samples)
-
-  # For each row, find first valid sample within bounds
-  out <- apply(samples, 1, function(x) {
-    valid <- which(x >= lb & x <= ub)
-    if (length(valid) > 0) {
-      x[valid[1]]
-    } else {
-      NA_real_
-    }
-  })
-
-  out
-}
-
-
 #' Determine if Family Uses Integer Values
 #'
 #' Returns TRUE for count/discrete families that produce integer samples.
@@ -306,45 +186,6 @@ family_uses_integers <- function(family_name) {
   )
 
   family_name %in% integer_families
-}
-
-
-#' Map Family Name to R Distribution Abbreviation
-#'
-#' Maps brms/mvgam family names to base R distribution abbreviations
-#' (e.g., "gaussian" -> "norm", "poisson" -> "pois") for use with
-#' truncation sampling functions.
-#'
-#' @param family_name Character; family name (e.g., "gaussian", "poisson")
-#'
-#' @return Character; R distribution abbreviation (e.g., "norm", "pois"),
-#'   or NA_character_ if family has no simple R distribution mapping.
-#'
-#' @noRd
-family_to_dist <- function(family_name) {
-  checkmate::assert_string(family_name)
-
-  dist_map <- c(
-    "gaussian" = "norm",
-    "student" = "lst",
-    "exponential" = "exp",
-    "gamma" = "gamma",
-    "weibull" = "weibull",
-    "lognormal" = "lnorm",
-    "beta" = "beta",
-    "poisson" = "pois",
-    "negbinomial" = "nbinom",
-    "negbinomial2" = "nbinom",
-    "geometric" = "geom",
-    "binomial" = "binom",
-    "bernoulli" = "binom"
-  )
-
-  if (family_name %in% names(dist_map)) {
-    return(dist_map[[family_name]])
-  }
-
-  NA_character_
 }
 
 
@@ -374,15 +215,14 @@ family_to_dist <- function(family_name) {
 #' to bounds with a warning if >1% of samples were clamped.
 #'
 #' @noRd
-apply_truncation <- function(samples, family_name, lb, ub, ntrys,
-                             ndraws, nobs) {
-  checkmate::assert_string(family_name)
+apply_truncation <- function(samples, lb, ub, ntrys, ndraws, nobs,
+                             redraw, spec = NULL, discrete = FALSE) {
   checkmate::assert_numeric(lb, null.ok = TRUE)
   checkmate::assert_numeric(ub, null.ok = TRUE)
   checkmate::assert_int(ntrys, lower = 1)
   checkmate::assert_int(ndraws, lower = 1)
-
   checkmate::assert_int(nobs, lower = 1)
+  checkmate::assert_function(redraw)
 
   # Convert vector to matrix for consistent handling
   is_vector <- !is.matrix(samples)
@@ -397,78 +237,56 @@ apply_truncation <- function(samples, family_name, lb, ub, ntrys,
   if (is.null(ub) || all(is.infinite(ub) & ub > 0)) {
     ub <- rep(Inf, nobs)
   }
-
-  # Expand scalar bounds to vector
   if (length(lb) == 1) lb <- rep(lb, nobs)
   if (length(ub) == 1) ub <- rep(ub, nobs)
 
-  # Get distribution abbreviation for resampling
-  dist <- family_to_dist(family_name)
-  is_discrete <- family_uses_integers(family_name)
+  lb_mat <- matrix(lb, nrow = nrow(samples), ncol = nobs, byrow = TRUE)
+  ub_mat <- matrix(ub, nrow = nrow(samples), ncol = nobs, byrow = TRUE)
+  outside <- function(x) !is.na(x) & (x < lb_mat | x > ub_mat)
 
-  # Track clamping for warning
-  n_clamped <- 0
+  invalid <- outside(samples)
   total_samples <- ndraws * nobs
 
-  # Process each column (observation)
-  for (j in seq_len(nobs)) {
-    col_lb <- lb[j]
-    col_ub <- ub[j]
-
-    # Skip if no effective truncation
-    if (is.infinite(col_lb) && col_lb < 0 &&
-        is.infinite(col_ub) && col_ub > 0) {
-      next
+  # Where the family's own quantile function is known, an
+  # out-of-bounds draw is replaced exactly, by inverting the
+  # distribution restricted to the bounds. Nothing is rejected and
+  # nothing needs clamping.
+  #
+  # An earlier version resolved the distribution by name and called
+  # it with no parameters at all, so a replacement came from the
+  # standard member of the family rather than from the observation's
+  # own predictive: on a gaussian centred at 50 truncated below at
+  # zero, every replaced draw landed inside [0, 2].
+  if (any(invalid) && !is.null(spec)) {
+    exact <- truncated_dist_draws(spec, invalid, lb, ub, discrete)
+    if (!is.null(exact)) {
+      usable <- invalid & is.finite(exact)
+      samples[usable] <- exact[usable]
+      invalid <- invalid & !usable
     }
+  }
 
-    # Find invalid samples
-    invalid <- !is.na(samples[, j]) &
-      (samples[, j] < col_lb | samples[, j] > col_ub)
-    n_invalid <- sum(invalid)
-
-    if (n_invalid == 0) next
-
-    # Attempt resampling if we have a known distribution
-    if (!is.na(dist)) {
-      if (is_discrete) {
-        new_samples <- sample_truncated_rejection(
-          n = n_invalid,
-          dist = dist,
-          lb = col_lb,
-          ub = col_ub,
-          ntrys = ntrys
-        )
-      } else {
-        new_samples <- sample_continuous_truncated(
-          n = n_invalid,
-          dist = dist,
-          lb = col_lb,
-          ub = col_ub,
-          ntrys = ntrys
-        )
-      }
-
-      # Replace valid resampled values
-      valid_new <- !is.na(new_samples)
-      samples[which(invalid)[valid_new], j] <- new_samples[valid_new]
-
-      # Check for remaining invalid samples after resampling
-      still_invalid <- invalid &
-        (samples[, j] < col_lb | samples[, j] > col_ub)
-      n_still_invalid <- sum(still_invalid)
-    } else {
-      # No known distribution - just clamp
-      still_invalid <- invalid
-      n_still_invalid <- n_invalid
+  # A family with no quantile function, such as a Tweedie or a
+  # COM-binomial, is redrawn from itself instead, and whatever will
+  # not fall inside the bounds is clamped onto them.
+  for (i in seq_len(ntrys)) {
+    if (!any(invalid)) break
+    fresh <- redraw()
+    if (!is.matrix(fresh)) {
+      fresh <- matrix(fresh, nrow = nrow(samples), ncol = nobs)
     }
+    usable <- invalid & !is.na(fresh) & !outside(fresh)
+    samples[usable] <- fresh[usable]
+    invalid <- invalid & !usable
+  }
 
-    # Clamp remaining out-of-bounds samples
-    if (n_still_invalid > 0) {
-      n_clamped <- n_clamped + n_still_invalid
-      clamp_idx <- which(still_invalid)
-      samples[clamp_idx[samples[clamp_idx, j] < col_lb], j] <- col_lb
-      samples[clamp_idx[samples[clamp_idx, j] > col_ub], j] <- col_ub
-    }
+  # Clamp whatever no redraw could place inside the bounds.
+  n_clamped <- sum(invalid)
+  if (n_clamped > 0) {
+    too_low <- invalid & samples < lb_mat
+    too_high <- invalid & samples > ub_mat
+    samples[too_low] <- lb_mat[too_low]
+    samples[too_high] <- ub_mat[too_high]
   }
 
   # Warn if significant clamping occurred (>1% matches brms threshold)
@@ -655,7 +473,9 @@ sample_from_family <- function(family_name, ndraws, epred,
   has_truncation <- !is.null(lb) || !is.null(ub)
   nobs <- ncol(epred)
 
-  samples <- switch(
+  # Named so truncation can ask the same family for another draw
+  # rather than reaching for a second account of what the family is.
+  draw_once <- function() switch(
     family_name,
 
     # ============ Continuous families ============
@@ -1056,16 +876,28 @@ sample_from_family <- function(family_name, ndraws, epred,
     )))
   )
 
+  samples <- draw_once()
+
   # Apply truncation if bounds are specified
   if (has_truncation) {
+    # `epred` is already on the parameter's own scale, which is what
+    # the spec calls `mu`, so the identity link is the honest one to
+    # name here.
     samples <- apply_truncation(
       samples = samples,
-      family_name = family_name,
       lb = lb,
       ub = ub,
       ntrys = ntrys,
       ndraws = ndraws,
-      nobs = nobs
+      nobs = nobs,
+      redraw = draw_once,
+      spec = family_dist_spec(
+        family_name, "identity", epred,
+        list(sigma = sigma, shape = shape, phi = phi, nu = nu,
+             mphi = mphi, mtheta = mtheta),
+        trials
+      ),
+      discrete = family_uses_integers(family_name)
     )
   }
 

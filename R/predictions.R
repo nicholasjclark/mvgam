@@ -2718,21 +2718,33 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws,
 
   ndraws <- nrow(full_draws)
   nobs <- length(t_idx)
+  # Every cell is named and located in one pass. Naming and locating
+  # them one row at a time scanned the whole parameter vector per
+  # observation, so the work grew with the product of the two rather
+  # than with their sum.
+  seen <- !is.na(t_idx)
+  wanted <- paste0("trend[", t_idx, ",", s_idx, "]")
+  col <- match(wanted, par_names)
+  absent <- seen & is.na(col)
+  if (any(absent)) {
+    stop(insight::format_error(c(
+      "Latent trend state column missing from posterior draws.",
+      x = cli::format_inline(
+        "Missing: {.val {wanted[which(absent)[1L]]}}."
+      ),
+      i = paste0(
+        "Stan output should contain trend[t, s] for every (t, s) ",
+        "pair covered by the fit."
+      )
+    )))
+  }
+
   latent_mat <- matrix(NA_real_, nrow = ndraws, ncol = nobs)
-  for (j in seq_len(nobs)) {
-    if (is.na(t_idx[j])) {
-      latent_mat[, j] <- series_marginal[, s_idx[j]]
-    } else {
-      nm <- paste0("trend[", t_idx[j], ",", s_idx[j], "]")
-      if (!nm %in% par_names) {
-        stop(insight::format_error(c(
-          "Latent trend state column missing from posterior draws.",
-          x = cli::format_inline("Missing: {.val {nm}}."),
-          i = "Stan output should contain trend[t, s] for every (t, s) pair covered by the fit."
-        )))
-      }
-      latent_mat[, j] <- full_draws[, nm]
-    }
+  if (any(seen)) {
+    latent_mat[, seen] <- full_draws[, col[seen], drop = FALSE]
+  }
+  if (any(!seen)) {
+    latent_mat[, !seen] <- series_marginal[, s_idx[!seen], drop = FALSE]
   }
   latent_mat
 }

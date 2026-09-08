@@ -1079,17 +1079,6 @@ test_that("extract_truncation_bounds handles NULL and constant bounds", {
   expect_equal(result_const$ub, rep(100, 5))
 })
 
-test_that("family_to_dist maps family names to R distribution abbreviations", {
-  # Maps family names to their R distribution abbreviations
-  expect_equal(family_to_dist("gaussian"), "norm")
-  expect_equal(family_to_dist("gamma"), "gamma")
-  expect_equal(family_to_dist("poisson"), "pois")
-  expect_equal(family_to_dist("negbinomial"), "nbinom")
-
-  # Unknown families return NA_character_
-  expect_true(is.na(family_to_dist("unknown_family")))
-})
-
 test_that("apply_truncation clamps samples to specified bounds", {
   set.seed(42)
   ndraws <- 50
@@ -1102,21 +1091,120 @@ test_that("apply_truncation clamps samples to specified bounds", {
     ncol = nobs
   )
 
-  # Apply truncation with lb=0, ub=10
   result <- apply_truncation(
     samples = samples,
-    family_name = "gaussian",
     lb = 0,
     ub = 10,
     ntrys = 5,
     ndraws = ndraws,
-    nobs = nobs
+    nobs = nobs,
+    redraw = function() matrix(rnorm(ndraws * nobs, mean = 5, sd = 3),
+                                nrow = ndraws, ncol = nobs)
   )
 
   # All values should be within [0, 10] after truncation
   expect_true(all(result >= 0))
   expect_true(all(result <= 10))
   expect_equal(dim(result), c(ndraws, nobs))
+})
+
+test_that("truncation reaches sample_from_family without erroring", {
+  # The unit tests below drive `apply_truncation()` directly, which
+  # left the wiring between it and the family sampler uncovered: a
+  # signature change to one passed every test while any truncated
+  # model errored. This drives the entry point instead.
+  set.seed(3)
+  ndraws <- 40L
+  epred <- matrix(5, nrow = ndraws, ncol = 3L)
+  out <- sample_from_family(
+    family_name = "gaussian", ndraws = ndraws, epred = epred,
+    sigma = matrix(3, nrow = ndraws, ncol = 3L),
+    lb = 0, ub = 10, ntrys = 5
+  )
+  # The family samplers answer with a vector the callers reshape, so
+  # the length is what this checks rather than a dimension.
+  expect_length(out, ndraws * 3L)
+  expect_true(all(out >= 0 & out <= 10))
+
+  # A count family takes the same route and must keep the lower bound
+  # attainable rather than excluding it.
+  counts <- sample_from_family(
+    family_name = "poisson", ndraws = ndraws,
+    epred = matrix(2, nrow = ndraws, ncol = 3L),
+    lb = 1, ub = Inf, ntrys = 5
+  )
+  expect_true(all(counts >= 1))
+  expect_true(any(counts == 1))
+})
+
+
+test_that("a truncated draw follows the truncated distribution", {
+  # Replacing an out-of-bounds draw by inverting the distribution
+  # restricted to the bounds is exact, so the result is the truncated
+  # law itself rather than something merely inside the bounds. The
+  # earlier rejection sampler could not place every draw and clamped
+  # the remainder onto the bound, which piles mass there.
+  set.seed(8)
+  ndraws <- 20000L
+  nobs <- 2L
+  mu <- matrix(5, ndraws, nobs)
+  spec <- family_dist_spec("gaussian", "identity", mu,
+                           list(sigma = matrix(3, ndraws, nobs)), NULL)
+  draw <- function() matrix(rnorm(ndraws * nobs, 5, 3), nrow = ndraws)
+  out <- apply_truncation(
+    draw(), lb = 0, ub = Inf, ntrys = 5, ndraws = ndraws,
+    nobs = nobs, redraw = draw, spec = spec, discrete = FALSE
+  )
+  v <- as.numeric(out[, 1L])
+  expect_true(all(v >= 0))
+  # Nothing sits exactly on the bound, which is the clamping tell.
+  expect_identical(sum(v == 0), 0L)
+  probs <- c(0.1, 0.25, 0.5, 0.75, 0.9)
+  p0 <- stats::pnorm(0, 5, 3)
+  truth <- stats::qnorm(p0 + probs * (1 - p0), 5, 3)
+  expect_lt(max(abs(stats::quantile(v, probs) - truth)), 0.15)
+})
+
+
+test_that("a replaced draw comes from the fit's own predictive", {
+  # The replacement for an out-of-bounds draw has to be drawn from
+  # the observation's own predictive. Resolving the distribution by
+  # name and calling it separately meant calling it with no
+  # parameters, so every replacement came from the standard member of
+  # the family. Here the predictive sits near 50 and the bound is at
+  # zero, so a replacement from a standard normal is unmissable: it
+  # lands within a few units of zero rather than near 50.
+  set.seed(11)
+  ndraws <- 200
+  nobs <- 3
+  centre <- 50
+  samples <- matrix(rnorm(ndraws * nobs, mean = centre, sd = 5),
+                    nrow = ndraws, ncol = nobs)
+  planted <- 1:20
+  samples[planted, ] <- -3
+
+  result <- apply_truncation(
+    samples = samples,
+    lb = 0,
+    ub = Inf,
+    ntrys = 5,
+    ndraws = ndraws,
+    nobs = nobs,
+    redraw = function() matrix(rnorm(ndraws * nobs, mean = centre,
+                                      sd = 5),
+                                nrow = ndraws, ncol = nobs)
+  )
+
+  replaced <- result[planted, ]
+  expect_true(all(replaced >= 0))
+  # Six standard deviations of the predictive still leaves a wide
+  # gap between it and the standard normal the fault drew from.
+  expect_true(all(replaced > centre - 30))
+  expect_gt(min(replaced), 5)
+
+  # The draws that were already inside the bounds are untouched.
+  kept <- setdiff(seq_len(ndraws), planted)
+  expect_identical(result[kept, ], samples[kept, ])
 })
 
 # Tests for summarize_predictions() ------------------------------------------
