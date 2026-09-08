@@ -633,76 +633,6 @@ axis, since it calls this type.
 Covered in `test-pp-check-resids.R`, which asserts the two axes read
 one surface and fails on it.
 
-## CAR on a continuous time grid
-
-**25. A CAR model whose times are not whole numbers cannot be
-forecast.**
-
-`build_training_arms()` records the training times truncated to
-integers while the data frame keeps the values the user supplied.
-On `sim_mvgam(type = 6)`, which draws cumulative `Unif(1, 6)` gaps,
-the two disagree on 89 of 90 occasions:
-
-| source | first four times |
-|---|---|
-| `training$times[[lv]]` | 0, 4, 7, 11 |
-| `training$data$time` | 0, 4.590626, 7.072973, 11.73063 |
-
-Measured, `times == floor(data)` exactly. `build_training_tail_data()`
-then selects the tail with `data[[time_var]] %in% tail_ts`, matches
-nothing, and hands back a frame of no rows;
-`get_observation_structure()` asserts at least one row and stops with
-"Must have at least 1 rows, but has 0 rows".
-
-So `forecast()` raises on every CAR fit with a continuous time grid,
-which is the case CAR exists for. `mvgam()` itself is unaffected: the
-model fits, and only the forecast arm fails. Reproduced on seed 501
-with 90 training rows over times 0 to 330.13 and 30 test rows over
-335.84 to 439.71, a well-formed forward forecast with no overlap.
-
-One axis derived twice is the class this plan is written against.
-Here it stops rather than returning a wrong number, so nothing
-silently depends on the answer.
-
-The reach is wider than a forecast arm. Three post-fit answers are
-cut against `build_training_arms()`, and each takes the truncation
-with it:
-
-| surface | on a grid running 0.5 to 91.953 |
-|---|---|
-| `forecast()` | refuses, zero-row assertion |
-| `plot(type = "trend")` | draws 0 to 91 |
-| `plot(hindcast(fit), series = 1)` | draws 0 to 91 |
-| `plot(type = "series")` | draws 0.5 to 91.953 |
-
-So the two panels a reader sets side by side are drawn on different
-axes. Both are labelled `Time` and the trend panel is the one that
-moved. This is finding 17 arriving through a truncation rather than
-through a rank, and neither picture shows it alone.
-
-`?forecast.mvgam` exempts this trend by name, saying `CAR()` and
-`ZMVN()` need not continue the training grid without a gap because
-`CAR()` carries the elapsed gap into its kernel. The exemption is
-unreachable on the grid it was written for.
-
-The package's own documented example is the case. `?CAR` fits
-`sim_mvgam(type = 6)`, whose gaps are drawn U(1, 6). The example
-stops at `mcmc_plot()`. Carried two steps further, every route to a
-forecast fails, including the spelling `?forecast.mvgam` recommends:
-
-| call | result |
-|---|---|
-| `forecast(mod, newdata = simdat_car$data_test)` | zero-row assertion |
-| `forecast(mod, newdata = mod$test_data)` | zero-row assertion |
-| `mvgam(..., newdata = te)` then forecast | zero-row assertion |
-| `score(forecast(...))` | zero-row assertion |
-
-`test-trend-car-irregular.R` now fits a second model on a grid whose
-occasions are never whole. It asserts three things of that fit: the
-training arms keep the times the fit was given, the fit forecasts its
-own grid and every panel draws the occasions the frame supplied. All
-four assertions fail.
-
 ## Leave-future-out cross-validation
 
 **26. `lfo_cv()` cannot compute a forecast-based score.**
@@ -730,20 +660,6 @@ Every documented multi-score example is therefore unavailable, and
 Reproduced on a VAR in `test-trend-var.R`, where the window at
 `min_t = 55` wants times 56 and is handed 57, so the arithmetic
 belongs to the window rather than to one trend.
-
-**27. The threshold `lfo_cv()` reports is not the one it used.**
-
-`mvgam_lfo` carries both `pareto_k_threshold` and
-`pareto_k_threshold_used`. The first is `NULL`; the second held
-0.6970642 on a 800-draw fit, a threshold that moves with the number
-of draws rather than the nominal 0.7. The field a reader reaches for
-is the empty one, and `summary()` reports the run from the other.
-
-`test-trend-var.R` covers both, on a VAR at `min_t = 55`. Measured
-there, `pareto_k_threshold` is `NULL` while
-`pareto_k_threshold_used` holds 0.6666667, which is
-`min(1 - 1/log10(S), 0.7)` at 1000 draws rather than the documented
-0.7.
 
 ## Gaps closed rather than found
 
@@ -1409,34 +1325,6 @@ their prose states the tighter setting was used. `idm.Rmd` uses
 
 `jsdgam()` forwards to `mvgam()`, so it behaves the same way.
 
-## Forecasting backwards
-
-**51. A forecast over occasions already observed returns an empty
-object rather than a refusal.**
-
-`test-trend-var.R`. Handed a `newdata` whose times lie entirely inside
-the training grid, `forecast()` returns an `mvgam_forecast` holding
-nothing:
-
-| slot | value |
-|---|---|
-| `length(forecasts)` | 0 |
-| `names(forecasts)` | empty |
-| `length(test_times)` | 0 |
-| `series_names` | willow, ash, rowan |
-| warnings raised | none |
-
-The same call one occasion past the end of the grid is refused
-properly, naming the series, the last observed time and the times it
-expected. So the guard exists and does not cover this direction.
-
-An empty forecast satisfies any assertion written as a loop over the
-arms, which is how it stayed invisible. It is finding 38's shape
-arriving through a different door: there a multi-season `hindcast()`
-returned no arms, here a backwards `forecast()` does, and in both
-cases `series_names` is populated so the object looks well formed
-until something is read out of it.
-
 ## Refusals that name an internal
 
 **52. A missing covariate value stops on a checkmate assertion about
@@ -1639,100 +1527,6 @@ every class it can be set on: `b`, `Intercept`, `sd`, `sds`,
 constant. `get_prior()` on an `mvgam_formula()` lists the trend
 classes alongside the observation ones and reports the same `nu`
 prior the program uses.
-
-## CAR and the leave-future-out window
-
-**62. `lfo_cv()` accepts occasions the fit never held and refuses
-every one it did.**
-
-`test-trend-car-irregular.R`, "lfo_cv admits the occasions the fit was
-given". The window boundary is named by a time, so the times the fit
-holds are the values that can name one. The set it accepts is their
-truncation instead.
-
-Measured on a CAR fit whose 30 occasions run 0.5 to 91.953 and none of
-which is whole:
-
-| `min_t` | in `floor(times)` | result |
-|---|---|---|
-| 15, 20, 30, 40 | no | refused, "is not an observed time" |
-| 25, 50 | yes | accepted, though neither was observed |
-| 62.481, an observed time | n/a | refused, "not 'double'" |
-
-So the refusal tells the user to pass a value that appears in the
-data, and the type assertion above it then rejects every value that
-does appear, because none of them is whole. The range the message
-prints, `{0..91}`, is the truncated axis rather than the grid the user
-supplied. Every value the method does accept names an occasion that
-was never observed.
-
-This is finding 9's shape at a second method: a refusal naming a
-remedy that cannot be followed. It shares finding 25's cause, and the
-integer-grid CAR fit in the same file is unaffected, which places the
-fault on the truncation rather than on this method's own logic.
-
-Left to its own default the method does not refuse at all, and that is
-the worse half. `lfo_cv(fit)` runs and reports where it scored:
-
-    eval_timepoints   62, 66, 69, 74, 77, 79, 81, 83, 86, 88
-
-None of the eleven is an occasion this fit holds. All eleven are
-floors. 62 stands for 62.481 and 66 for 66.959. `eval_timepoints` is
-what a reader consults to learn which occasions the model was scored
-at, and every value in it names one that was never observed.
-The elpd figures beside them are computed at the real occasions, so
-the numbers are sound and only their labels are wrong, which is why
-nothing about the object looks amiss.
-
-Two further readings on the same call. `pareto_k_threshold` is `NULL`
-while `pareto_k_threshold_used` holds 0.667, which is finding 27 on
-this fit. And `score = "crps"` ends on the zero-row assertion of
-finding 25 rather than on the window arithmetic of finding 26, so on a
-continuous grid the two known `lfo_cv()` faults are reached through a
-third.
-
-## A forecast horizon that runs backwards
-
-**63. An occasion inside the training grid is treated as a horizon.**
-
-`test-trend-car-irregular.R`, "an occasion inside the grid is not a
-forecast horizon". `?forecast.mvgam` says rows with time values
-"beyond the training grid drive the forecast horizon".
-`resolve_forecast_grid()` implements a different rule at
-`R/forecast.mvgam.R:498`:
-
-```r
-nt <- sort(unique(as.integer(newdata[[time_var]][idx])))
-setdiff(nt, training$times[[lv]])
-```
-
-`setdiff` asks whether an occasion is in the training grid, not
-whether it lies beyond it. The two agree on every frame whose times
-run past the end and part company on an occasion that sits inside the
-grid without having been observed. On a fit trained over 3 to 61 with
-no occasion at 6, a frame naming time 6 is carried into the horizon,
-where the step count becomes 6 minus 61 and the call ends on
-
-    Assertion on 'time' failed: Element 1 is not >= 0.
-
-`time` here is internal. The caller supplied a column of that name
-holding 6, which is positive, so the message names something the user
-can see and reports it doing something it does not do.
-
-The split itself works. A frame mixing observed occasions with future
-ones forecasts the future ones alone and hindcasts the rest, which is
-the documented behaviour:
-
-| newdata against a grid of 3 to 61 | forecast arms |
-|---|---|
-| 65, 70 | 2 columns |
-| 60, 61 observed, plus 65, 70 | 2 columns, `test_times` 65 and 70 |
-| 30, 31, both observed | 0 arms, nothing raised |
-| 6, never observed | the assertion above |
-
-Row three is finding 51 on this fit. Rows two and four share one
-cause, so the rule that fixes the horizon also settles what an
-all-interior frame should do.
 
 ## Introspection
 
@@ -2034,106 +1828,6 @@ So the alignment guard is reading a symptom rather than a cause, and
 its message describes an arithmetic mismatch instead of the missing
 data behind it. Finding 15 records the wrong likelihood; this records
 that the same defect also removes `kfold()` from a wide fit.
-
-## Grouped cross-validation
-
-**48. A fold that is contiguous in time cannot be refitted, so
-grouped k-fold is unavailable to most trend models.**
-
-Found by running `kfold()` on a grouping laid out as
-`rep(letters[1:6], each = 5)` against `time = 1:30`, which puts
-group `c` at times 11 to 15. Held out one group at a time:
-
-```r
-kfold(fit_re("ar1_re"), group = "grp")
-```
-
-    Irregular time intervals detected in time.
-    Some trends require regular time spacing.
-    Interval range: 1 to 6
-    Consider using CAR() for irregular intervals or interpolate data.
-
-Dropping the fold leaves times 1 to 10 and 16 to 30. The AR trend
-refuses to be refitted across the hole of six that opens up. The interval range the
-message reports is that hole.
-
-The refusal itself is correct: an AR trend does step once per
-occasion. What is wrong is where it is raised. The call path is
-
-    kfold.mvgam            R/kfold.mvgam.R:260
-    hybrid_kfold_refit
-    refit_score_one_fold   R/kfold.mvgam.R:585
-    update.mvgam           R/update.mvgam.R:212
-    build_stan_components
-    extract_time_series_dimensions
-    validate_regular_time_intervals   R/validations.R:2922
-
-so a fold is refitted by handing `update()` the subset frame. The
-axis is then rebuilt from that frame rather than inherited from the
-fit. This is the plan's own bug class arriving at a new door: one
-axis resolved twice, and the second resolution disagreeing with the
-first. The
-held-out occasions are missing responses, not missing time: this is
-the same distinction `mvgam()` already draws when a response is `NA`,
-where the likelihood shrinks and `N_time_trend` does not. A fold
-should leave the trend grid alone the way a gap does.
-
-What it costs is the method, for a whole class of models. Any grouping
-that is contiguous in time -- a block, a site visited in a season, a
-year -- makes every fold a hole, so grouped k-fold is unavailable to
-any trend that steps once per occasion. `loo()` is not the fallback,
-because finding 11 records it as unreliable on exactly these fits.
-
-A grouping of sites that each carry a complete series of their own
-hides it, since dropping a site removes whole series rather than a
-stretch of the timeline and the grid survives. Nothing covers this
-now.
-
-**74. Ordinary K-fold is unavailable too, on every fit in this
-directory.**
-
-Finding 48 reports grouped k-fold failing where a group is contiguous
-in time. Asked the simpler question, `kfold(fit, K = 2)` with no
-grouping at all, every cached fit refuses:
-
-| fit | trend | refusal |
-|---|---|---|
-| hier | AR(gr, subgr) | Fitting failed. Unable to retrieve the metadata. |
-| car | CAR | Series in 'data' do not share the same time grid |
-| var | VAR | Irregular time intervals detected in time |
-| arma | AR(ma) | Irregular time intervals detected in time |
-| pw | PW | Irregular time intervals detected in time |
-| zmvn | ZMVN | Series in 'data' do not share the same time grid |
-
-Six of six, by three different routes. Every one of them carries a
-latent trend. That qualifier is the scope: the trendless closure-unit fits in
-`test-grain-closure-units.R` run `kfold(K = 2)` without complaint,
-which is what confirms the trend grid is the thing being rebuilt. A
-`jsdgam()` fit refuses for a different reason again, that `update()`
-cannot rebuild a factor structure, so cross-validation there is
-unavailable by design rather than by accident.
-
-A random fold takes half the rows, so occasions lose some of their
-series and the timeline loses some of its occasions. The refit is handed that subset frame and
-rebuilds the axis from it. Depending on which guard the trend reads,
-it then meets the one demanding regular spacing or the one demanding a
-shared grid.
-
-The held-out rows are missing responses rather than missing time,
-which is the distinction `mvgam()` already draws when a response is
-`NA`: the likelihood shrinks and `N_time_trend` does not. A fold
-should leave the trend grid alone the way a gap does, so finding 48's
-diagnosis applies unchanged. What is new is the scope. This is not a
-restriction on how a grouping may be laid out. It is `kfold()` being
-unavailable to every state-space fit the package produces.
-
-Which guard a fit meets is not fixed, because the fold split is
-random. The hierarchical fit answered "Fitting failed. Unable to
-retrieve the metadata." on one split and "Irregular time intervals
-detected in time. Interval range: 1 to 2" on another. The second names
-the condition. The first names no column, no guard and no remedy, so
-the same call can hand a user a refusal they cannot act on depending
-on how the rows fell.
 
 ## Two documents, two contracts
 

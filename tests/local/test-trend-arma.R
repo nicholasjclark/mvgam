@@ -594,12 +594,14 @@ test_that("print names the trend the fit was given", {
 
 
 test_that("forecast with no newdata says what it needs", {
-  # The default call. It returns an `mvgam_forecast` carrying two
-  # hindcast arms, a type, and an empty `forecasts` list, so an
-  # object that looks complete holds no forecast at all. Either a
-  # horizon is forecast or the requirement is named.
-  fc <- forecast(fit)
-  expect_length(fc$forecasts, n_series)
+  # The default call. It used to return an `mvgam_forecast` carrying
+  # hindcast arms, a type and an empty `forecasts` list, so an object
+  # that looks complete held no forecast at all. A fit cannot invent
+  # the occasions to forecast at, nor the covariates the model reads
+  # there, so the requirement is named.
+  expect_error(forecast(fit), "'newdata' is required to forecast")
+  msg <- tryCatch(forecast(fit), error = conditionMessage)
+  expect_true(grepl("hindcast", msg, fixed = TRUE))
 })
 
 cat("\nDone.\n")

@@ -101,7 +101,7 @@ test_that("build_mvgam_kfold() returns correctly-classed loo object", {
   pareto_k <- c(g1 = 0.3, g2 = NA, g3 = 0.5)
   out <- mvgam:::build_mvgam_kfold(
     pointwise = pointwise, pareto_k = pareto_k,
-    refit_groups = "g2", K = 3L, group = "site",
+    refit_groups = "g2", n_refit_folds = 1L, K = 3L, group = "site",
     pareto_k_threshold = 0.7, exact = FALSE
   )
   expect_s3_class(out, c("mvgam_kfold", "kfold", "loo"),
@@ -120,7 +120,7 @@ test_that("print.mvgam_kfold() emits headline elpd + refit info", {
   pareto_k <- c(g1 = 0.3, g2 = NA)
   out <- mvgam:::build_mvgam_kfold(
     pointwise = pointwise, pareto_k = pareto_k,
-    refit_groups = "g2", K = 2L, group = "site",
+    refit_groups = "g2", n_refit_folds = 1L, K = 2L, group = "site",
     pareto_k_threshold = 0.7, exact = FALSE
   )
   printed <- utils::capture.output(print(out))
@@ -135,7 +135,7 @@ test_that("summary.mvgam_kfold() returns per-group tibble with diagnostics", {
   pareto_k <- c(g1 = 0.3, g2 = 0.85, g3 = 0.5)
   out <- mvgam:::build_mvgam_kfold(
     pointwise = pointwise, pointwise_psis = pointwise_psis,
-    pareto_k = pareto_k, refit_groups = "g2",
+    pareto_k = pareto_k, refit_groups = "g2", n_refit_folds = 1L,
     K = 3L, group = "site",
     pareto_k_threshold = 0.7, exact = FALSE
   )
@@ -155,7 +155,7 @@ test_that("plot.mvgam_kfold() returns a ggplot with two facets", {
   pareto_k <- c(g1 = 0.3, g2 = NA, g3 = 0.5)
   out <- mvgam:::build_mvgam_kfold(
     pointwise = pointwise, pareto_k = pareto_k,
-    refit_groups = "g2", K = 3L, group = "site",
+    refit_groups = "g2", n_refit_folds = 1L, K = 3L, group = "site",
     pareto_k_threshold = 0.7, exact = FALSE
   )
   p <- plot(out)

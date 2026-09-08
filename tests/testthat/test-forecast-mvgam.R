@@ -68,6 +68,22 @@ make_mock_mvgam <- function(series_levels = "s1", n_time = 10L,
 }
 
 
+# A frame reaching one occasion past the mock fit's grid, for the
+# calls whose subject is something other than the horizon. Built
+# from the fit's own data so the series levels and the columns
+# match whatever `make_mock_mvgam()` was given.
+mock_future_data <- function(fit, h = 1L) {
+  d <- fit$data
+  levs <- levels(d$series)
+  nxt <- max(d$time) + seq_len(h)
+  data.frame(
+    time = rep(nxt, times = length(levs)),
+    series = factor(rep(levs, each = h), levels = levs),
+    y = NA_integer_
+  )
+}
+
+
 # Stub `posterior::as_draws_matrix` so `forecast.mvgam` sees a
 # named numeric matrix without touching the fake stanfit.
 make_draws_mat <- function(ndraws = 5L,
@@ -202,11 +218,16 @@ test_that("newdata = NULL returns hindcasts only, no forecasts", {
       matrix(2L, nrow = length(draw_ids), ncol = nrow(newdata))
     }
   )
-  fc <- forecast(fit, newdata = NULL, type = "response")
-  expect_null(fc$forecasts)
-  expect_null(fc$test_times)
-  expect_null(fc$test_observations)
-  expect_identical(dim(fc$hindcasts[["s1"]]), c(3L, 10L))
+  # Without `newdata` there are no occasions to forecast at, and a
+  # fit cannot invent them. This returned an `mvgam_forecast`
+  # carrying hindcasts, a type and an empty `forecasts` list, which
+  # reads as though it forecast something; `hindcast()` is the call
+  # that answers at the training occasions.
+  expect_error(
+    forecast(fit, newdata = NULL, type = "response"),
+    "'newdata' is required to forecast"
+  )
+  expect_identical(dim(hindcast(fit)$hindcasts[["s1"]]), c(3L, 10L))
 })
 
 
@@ -268,8 +289,11 @@ test_that("ndraws beyond available draws errors informatively", {
     `as_draws_matrix` = function(...) draws,
     .package = "posterior"
   )
+  # `ndraws` is still checked against the posterior, on a call that
+  # supplies the occasions to forecast at.
   expect_error(
-    forecast(fit, newdata = NULL, type = "response", ndraws = 50L),
+    forecast(fit, newdata = mock_future_data(fit), type = "response",
+              ndraws = 50L),
     "more draws than the posterior holds"
   )
 })
@@ -300,13 +324,14 @@ test_that("All multivariate / PW trend types flow through dispatch", {
       matrix(1L, nrow = length(draw_ids), ncol = nrow(newdata))
     }
   )
+  # Asked of `hindcast()`, which is the surface this block's stubs
+  # cover and the one its claim names. It used to ask `forecast()`
+  # with no `newdata`, which returned before reaching any trend
+  # dispatch at all, so every type passed without being tried.
   for (tt in c("VAR", "CAR", "PW")) {
     fit_tt <- make_mock_mvgam(trend_type = tt)
     fit_tt$mv_spec$trend_specs$trend <- tt
-    expect_no_error(
-      forecast(fit_tt, newdata = NULL, type = "response",
-                ndraws = 2L)
-    )
+    expect_no_error(hindcast(fit_tt, ndraws = 2L))
   }
 })
 

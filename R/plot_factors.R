@@ -84,7 +84,19 @@ plot_factors <- function(
 
   per_lv <- extract_lv_trend_matrices(object, n_lv)
   n_time <- ncol(per_lv[[1L]])
-  times <- seq_len(n_time)
+  # The occasions the model was given, not their ranks. Every other
+  # panel draws the user's own times under this same "Time" label,
+  # so a reader setting a factor trajectory beside a series one was
+  # off by the offset between the two numberings; on a frame that
+  # starts at one the two coincide and nothing shows. A fit that
+  # recorded no times, or whose factor grid is some other length,
+  # keeps the positions rather than a guess at what they mean.
+  recorded <- mvgam_axes(object)$time$values
+  times <- if (length(recorded) == n_time) {
+    as.numeric(recorded)
+  } else {
+    seq_len(n_time)
+  }
   Z_arr <- extract_factor_loadings_array(object, n_lv)
   contrib <- lv_contribution_table(per_lv, Z_arr = Z_arr)
 

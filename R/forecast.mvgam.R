@@ -199,6 +199,28 @@ forecast.mvgam <- function(object,
   }
   meta <- if (is_trendless) NULL else get_enriched_trend_metadata(object)
 
+  # A forecast needs occasions to forecast at, and a fit cannot
+  # invent them: the horizon is whatever the caller's frame reaches
+  # past the training grid, and any covariate the model reads has
+  # to be supplied there too. Without `newdata` the method used to
+  # return an `mvgam_forecast` carrying hindcasts, a type and an
+  # empty `forecasts` list, which reads as though it forecast
+  # something.
+  if (is.null(newdata)) {
+    stop(insight::format_error(c(
+      "'newdata' is required to forecast.",
+      x = paste0(
+        "A forecast extends the training grid, so the occasions to ",
+        "forecast at have to be supplied."
+      ),
+      i = paste0(
+        "Pass a frame whose times reach past the grid, with any ",
+        "covariate the model reads. For the training occasions ",
+        "themselves, use 'hindcast()'."
+      )
+    )), call. = FALSE)
+  }
+
   series_info <- resolve_series_info(object)
   series_levels <- series_info$series_levels
   n_series <- length(series_levels)

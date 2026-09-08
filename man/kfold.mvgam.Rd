@@ -107,9 +107,6 @@ refit cost. Both extensions sit cleanly on top of the existing
 }
 \examples{
 \dontrun{
-# Use CAR() so the refit on fold-deleted rows still has a
-# well-defined trend (AR refits would error on the resulting
-# irregular time spacing).
 set.seed(13)
 simdat <- sim_mvgam(family = gaussian(), n_series = 1L,
                      n_timepoints = 120L, type = 6L)

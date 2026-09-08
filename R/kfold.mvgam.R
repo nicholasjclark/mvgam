@@ -110,9 +110,6 @@
 #'
 #' @examples
 #' \dontrun{
-#' # Use CAR() so the refit on fold-deleted rows still has a
-#' # well-defined trend (AR refits would error on the resulting
-#' # irregular time spacing).
 #' set.seed(13)
 #' simdat <- sim_mvgam(family = gaussian(), n_series = 1L,
 #'                      n_timepoints = 120L, type = 6L)
@@ -232,11 +229,13 @@ kfold.mvgam <- function(x,
     pareto_k <- rep(NA_real_, length(group_labels))
     names(pareto_k) <- group_labels
     refit_groups <- group_labels
+    refit_folds <- sort(unique(fold_ids))
     pointwise_psis <- NULL
-    pointwise <- exact_kfold_refit(
+    pointwise <- kfold_refit_folds(
       object = x, data = data, fold_ids = fold_ids,
-      group_key = group_key, pointwise = pointwise,
-      silent = silent
+      group_key = group_key,
+      refit_fold_ids = refit_folds,
+      pointwise = pointwise, silent = silent
     )
   } else {
     # Hybrid mode: PSIS-LOO on the aggregated matrix gives a
@@ -261,7 +260,7 @@ kfold.mvgam <- function(x,
     # and surface which folds the PSIS approximation got most wrong.
     pointwise_psis <- pointwise
     if (length(refit_folds) > 0L) {
-      pointwise <- hybrid_kfold_refit(
+      pointwise <- kfold_refit_folds(
         object = x, data = data, fold_ids = fold_ids,
         group_key = group_key, refit_fold_ids = refit_folds,
         pointwise = pointwise, silent = silent
@@ -279,6 +278,7 @@ kfold.mvgam <- function(x,
     pareto_k = pareto_k,
     refit_groups = refit_groups, K = K_actual,
     group = group_info$group_names,
+    n_refit_folds = length(refit_folds),
     pareto_k_threshold = pareto_k_threshold_used,
     pareto_k_threshold_adaptive = is.null(pareto_k_threshold),
     exact = exact
@@ -473,9 +473,8 @@ aggregate_loglik_by_group <- function(loglik, col_group) {
 # @noRd
 refit_score_one_fold <- function(object, data, fold_ids,
                                  group_key, fold_id, silent) {
-  train_rows <- which(fold_ids != fold_id)
   held_rows <- which(fold_ids == fold_id)
-  train_data <- data[train_rows, , drop = FALSE]
+  train_data <- mask_heldout_response(object, data, held_rows)
   held_data <- data[held_rows, , drop = FALSE]
 
   if (silent < 1L) {
@@ -483,8 +482,22 @@ refit_score_one_fold <- function(object, data, fold_ids,
         "(", length(held_rows), "rows held out) ...\n")
   }
 
-  refit <- update(object, newdata = train_data,
-                  silent = max(silent, 1L))
+  # brms warns whenever it drops rows whose response is missing.
+  # Those rows are the fold: masking the response is how a fold is
+  # held out, so the notice describes the method working and names
+  # nothing the caller can act on. Muffled by its own text rather
+  # than by silencing the refit, so any other warning the refit
+  # raises still reaches the caller.
+  refit <- withCallingHandlers(
+    update(object, newdata = train_data,
+           silent = max(silent, 1L)),
+    warning = function(w) {
+      if (grepl("Rows containing NAs", conditionMessage(w),
+                fixed = TRUE)) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
 
   # Held data may contain factor levels the refit never saw (the
   # whole point of leave-one-group-out is that the group was
@@ -540,33 +553,65 @@ refit_score_one_fold <- function(object, data, fold_ids,
 }
 
 
-# Internal: exact-mode wrapper. Refit every fold in fold_ids and
-# splice the held-out ELPDs into `pointwise` keyed by group label.
+# Internal: the training frame for one fold.
+#
+# A held-out observation is a missing response, not a missing
+# occasion. Deleting its row instead handed `update()` a frame with
+# a hole in the timeline, and the refit rebuilt the trend axis from
+# that frame rather than inheriting the parent's: an AR trend then
+# refused the gap it saw, a CAR trend refused a grid its series no
+# longer shared, and which of the two a caller met depended on
+# where the random split happened to fall. Every state-space fit in
+# the package was unable to be cross-validated for that reason.
+#
+# Masking the response is the distinction `mvgam()` already draws
+# for a gap: `generate_obs_trend_mapping()` builds the likelihood
+# over non-missing rows while `N_time_trend` comes from the full
+# frame, so the density shrinks by exactly the fold and the grid
+# does not move.
 #
 # @noRd
-exact_kfold_refit <- function(object, data, fold_ids, group_key,
-                              pointwise, silent) {
-  for (f in sort(unique(fold_ids))) {
-    fold_elpds <- refit_score_one_fold(
-      object = object, data = data, fold_ids = fold_ids,
-      group_key = group_key, fold_id = f, silent = silent
-    )
-    pointwise[names(fold_elpds)] <- fold_elpds
+mask_heldout_response <- function(object, data, held_rows) {
+  if (!length(held_rows)) {
+    return(data)
   }
-  pointwise
+  resp <- insight::find_response(object)
+  present <- intersect(resp, names(data))
+  if (!length(present)) {
+    stop(insight::format_error(c(
+      "Could not find the response column to hold a fold out on.",
+      x = paste0("The model's response is ",
+                 paste(resp, collapse = ", "),
+                 "; the training frame holds ",
+                 paste(names(data), collapse = ", "), "."),
+      i = paste0(
+        "A fold is held out by masking its response, so the ",
+        "column has to be present."
+      )
+    )))
+  }
+  for (r in present) {
+    data[[r]][held_rows] <- NA
+  }
+  data
 }
 
 
-# Internal: hybrid-mode wrapper. Refit only the folds flagged by
-# the PSIS Pareto-k pre-pass, splicing the exact ELPDs over the
-# PSIS estimates for those folds' groups.
+# Internal: refit the named folds and splice their held-out ELPDs
+# into `pointwise`, keyed by group label.
+#
+# Exact mode passes every fold and hybrid mode passes the ones whose
+# Pareto-k crossed the threshold, which is the only thing that ever
+# differed between them: the two wrappers this replaces held the
+# same loop and the same splice, and a change to one would have
+# left the other behind.
 #
 # @noRd
-hybrid_kfold_refit <- function(object, data, fold_ids, group_key,
-                               refit_fold_ids, pointwise, silent) {
+kfold_refit_folds <- function(object, data, fold_ids, group_key,
+                              refit_fold_ids, pointwise, silent) {
   if (silent < 2L) {
     cat("kfold: refitting", length(refit_fold_ids),
-        "fold(s) with Pareto-k above threshold ...\n")
+        "fold(s) ...\n")
   }
   for (f in refit_fold_ids) {
     fold_elpds <- refit_score_one_fold(
@@ -856,7 +901,8 @@ plot.mvgam_kfold <- function(x, ...) {
 # @noRd
 build_mvgam_kfold <- function(pointwise, pointwise_psis = NULL,
                               pareto_k, refit_groups,
-                              K, group, pareto_k_threshold,
+                              K, group, n_refit_folds,
+                              pareto_k_threshold,
                               pareto_k_threshold_adaptive = FALSE,
                               exact) {
   elpd <- sum(pointwise)
@@ -880,7 +926,11 @@ build_mvgam_kfold <- function(pointwise, pointwise_psis = NULL,
     elpd_kfold = elpd,
     se_elpd_kfold = se_elpd,
     pareto_k = pareto_k,
-    n_refits = length(refit_groups),
+    # How many folds were refit, which is what `print()` reports
+    # against `K`. Counting `refit_groups` instead counted the
+    # groups inside those folds, so a two-fold run over 180 rows
+    # printed "180 of 2 folds".
+    n_refits = n_refit_folds,
     refit_groups = refit_groups,
     K = K,
     group = group,
