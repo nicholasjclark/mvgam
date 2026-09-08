@@ -206,6 +206,19 @@ build_stan_components <- function(formula, data, family = gaussian(),
     )
   }
 
+  # `n_lv` belongs to the trend that carries the factors, so it is
+  # written on the constructor inside `trend_formula`. Passed to
+  # `mvgam()` itself it lands in `...`, which is the pass-through to
+  # brms and Stan, and nothing there reads it: asked for one factor
+  # on two series, the fit came back with two and said nothing.
+  refuse_top_level_n_lv(list(...)$n_lv)
+
+  # Whether this trend has a factor form at all, read from the
+  # registry that records it. Asked here because every route a
+  # factor can be requested by has landed by now: the constructor's
+  # `n_lv` and a `trend_map` normalised to a fixed `Z`.
+  enforce_factor_support_against_specs(mv_spec$trend_specs)
+
   # The `n_lv` ceiling, shared with `jsdgam()` so more factors than
   # series is refused in one place. Reads `n_lv` from the possibly
   # nested trend spec list.

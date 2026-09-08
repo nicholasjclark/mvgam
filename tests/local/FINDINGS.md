@@ -68,35 +68,6 @@ the mvn work rather than the axis work. It is recorded here because a
 posterior with 13 per cent divergences will not support the recovery
 numbers the file reports off it.
 
-## CAR()
-
-**6. A factor CAR is refused by two routes and granted by a third.**
-
-`test-trend-car-irregular.R`, "a CAR asked for fewer factors than
-series gets n_series". A continuous-time trend evolves per series and
-has no factor decomposition, which the trend registry records against
-the type. Two of the three ways to ask for one meet that refusal:
-
-    mvgam(trend_map = matrix(NA, 3, 2), trend_formula = ~ CAR())
-    jsdgam(factor_formula = ~ -1 + CAR(), n_lv = 2)
-
-both raise "CAR trends do not support factor models (n_lv <
-n_series)". The third does not. Written as
-
-    mvgam(trend_formula = ~ CAR(), n_lv = 2)
-
-the model is accepted. `N_lv_trend` then comes back as 3, the series
-count. A
-user who asked for two latent factors is handed a saturated trend and
-told nothing. Nothing in the fitted object records that the request
-was raised, so the only way to notice is to read `N_lv_trend` back and
-compare it against what was asked for.
-
-All three routes are asserted against the same refusal, so the test
-fails on the third until it behaves like the other two. The first version of this test pinned it to what it currently does.
-That version passed while the defect stood, which is no use to
-anyone.
-
 **7. One post-fit method guards against a prefit. Seventeen do not.**
 
 No file covers this. `run_model = FALSE` returns an object of class
@@ -159,27 +130,6 @@ correct values under labels that resolve to nothing.
 `residual_cor()` carries the series names on both margins and the
 hindcast and forecast arms are named. These three VAR summaries are
 the exception.
-
-## PW()
-
-**9. The logistic-growth refusal names a remedy that does not work.**
-
-`test-trend-pw.R`, "the cap the refusal names as sufficient is
-sufficient". Asking for `PW(growth = "logistic")` without a carrying
-capacity raises
-
-    Logistic growth models require a cap variable.
-    Either provide cap argument or ensure 'cap' column exists in data.
-    Example: PW(cap = carrying_capacity, growth = 'logistic')
-
-Adding a column called `cap` to the data does not satisfy it. The same
-error is raised again, so a user following the second clause is sent
-in a circle. Only `PW(cap = <column>)` builds, which is what the
-example line shows and what the first clause says.
-
-Either the column route should work, or the message should stop
-offering it. The test asserts the message's own promise, so it fails
-until the two agree.
 
 ## pp_check
 
@@ -1189,39 +1139,6 @@ the moving-average term are both dropped, so the two models this file
 exists to tell apart print identically. `summary()` reports
 `theta1_trend` and does distinguish them, so the information is
 available to the method that omits it.
-
-## PW()
-
-**58. PW refuses a factor model on one route of four.**
-
-`test-trend-pw.R`. `?PW` and the assembly code both record that a
-piecewise trend does not support factor models, because each series
-needs its own changepoint structure. Asked four ways on one frame of
-two series:
-
-| route | result |
-|---|---|
-| `trend_map = matrix(NA, 2, 1)` | accepted |
-| `jsdgam(factor_formula = ~ -1 + PW(), n_lv = 1)` | accepted |
-| `PW(n_changepoints = 5, n_lv = 1)` | refused, "Factor models (n_lv) not supported for PW trends" |
-| `mvgam(trend_formula = ~ PW(...), n_lv = 1)` | accepted, `N_lv_trend` comes back 2 |
-
-The constructor holds the line and nothing else does. The last row is
-finding 6's symptom exactly: a user asks for one latent factor, is
-given one per series, and nothing on the fitted object records that
-the request was raised.
-
-Finding 6 has `CAR()` refusing on two routes of three. PW refuses on
-one of four, so the restriction is stated in the documentation, in the
-assembly comments and in the constructor, and is reachable around
-three ways.
-
-The three arguments that do work are worth recording alongside it,
-since they rule out a general fault in how PW reads its arguments:
-`changepoint_range` places its last changepoint at 24, 48 and 60 for
-0.4, 0.8 and 1.0 on a 62-occasion frame; `changepoint_scale` reaches
-Stan as `double_exponential_lpdf(to_vector(delta_trend) | 0, s)` with
-the value asked for; and `n_changepoints` emits exactly that many.
 
 ## com_binomial and the trials aterm
 

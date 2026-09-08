@@ -70,7 +70,7 @@ test_that("PW constructor rejects factor models correctly", {
   expect_error(PW(n_lv = 3),
                "changepoint modeling")
   expect_error(PW(n_lv = 3),
-               "Remove.*n_lv.*parameter")
+               "Drop 'n_lv' and 'trend_map'")
 
   # PW without n_lv should work
   suppressWarnings({
@@ -146,7 +146,7 @@ test_that("Factor validation error messages are consistent", {
   expect_error(PW(n_lv = 1), "Factor models.*not supported")
 
   # Check they mention specific alternatives (AR is factor-compatible)
-  expect_error(PW(n_lv = 1), "factor-compatible trends.*AR.*RW.*VAR")
+  expect_error(PW(n_lv = 1), "AR, RW, VAR, ZMVN")
 
   # Check they have specific reasons
   expect_error(PW(n_lv = 1), "changepoint")

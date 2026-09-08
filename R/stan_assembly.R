@@ -5794,14 +5794,10 @@ generate_car_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   checkmate::assert_int(n_series, lower = 1)
   checkmate::assert_int(n_obs, lower = 1)
 
-  # CAR does not support factor models (continuous-time AR requires
-  # series-specific temporal evolution)
-  if (!is.null(trend_specs$n_lv) && trend_specs$n_lv < n_series) {
-    stop(insight::format_error(c(
-      "CAR trends do not support factor models (n_lv < n_series).",
-      i = "Continuous-time AR requires series-specific temporal evolution modeling."
-    )))
-  }
+  # A factor request against CAR is refused by the registry check in
+  # `build_stan_components()`, which reads `supports_factors` and so
+  # answers every route a user can ask by. Assembly is downstream of
+  # it and takes the spec as settled.
 
   # CAR does not support hierarchical correlations
   if (named_var(trend_specs$gr)) {

@@ -750,18 +750,27 @@ test_that("the ma parameter table names every trend that accepts one", {
 
 
 test_that("a trend that cannot take factors refuses them", {
-  # The registry records `supports_factors`, but the refusal a user
-  # meets comes from the constructor, which is the only surface that
-  # sees the argument. These assert the live path rather than the
-  # registry field, and they use real constructor calls rather than a
-  # hand-built spec list.
+  # The registry records `supports_factors` and the reason beside
+  # it, and the refusal a user meets is composed from both. These
+  # assert the live path rather than the registry field, and they
+  # use real constructor calls rather than a hand-built spec list.
   expect_error(
     PW(n_lv = 2),
-    "Factor models.*not supported for PW"
+    "Factor models are not supported for PW trends"
   )
   expect_error(
     PW(trend_map = data.frame(series = factor("a"), trend = 1L)),
-    "trend_map.*not supported for PW"
+    "Factor models are not supported for PW trends"
+  )
+  # The reason travels with the refusal, so a user is told why a
+  # piecewise trend has no factor form rather than only that it has
+  # none.
+  # insight wraps the reason across lines, so the assertion takes a
+  # fragment of the registered text rather than the whole sentence.
+  expect_match(
+    conditionMessage(expect_error(PW(n_lv = 2))),
+    "series-specific changepoint modeling",
+    fixed = TRUE
   )
   # CAR carries no `n_lv` argument at all, so the refusal is R's.
   expect_error(CAR(n_lv = 2), "unused argument")

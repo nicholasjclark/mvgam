@@ -2726,45 +2726,23 @@ PW = function(time = NA, series = NA, cap = NA, n_changepoints = 10,
   checkmate::assert_int(n_changepoints, lower = 1)
   checkmate::assert_number(changepoint_scale, lower = 0)
 
-  # PW doesn't support factor models. Reject n_lv and the
-  # user-facing fixed-loadings surface (trend_map) separately so
-  # the error names exactly what the user supplied.
-  if (!is.null(n_lv)) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Factor models ({.field n_lv}) not supported for PW trends."
-      ),
-      x = "Piecewise trends require series-specific changepoint modeling.",
-      i = cli::format_inline(
-        "Remove {.field n_lv} parameter or use factor-compatible trends: AR, RW, VAR, ZMVN"
-      )
-    )), call. = FALSE)
-  }
-  if (!is.null(trend_map)) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Factor-loading specification {.field trend_map} not supported for PW trends."
-      ),
-      x = "Piecewise trends define series-specific changepoint dynamics.",
-      i = cli::format_inline(
-        "Drop {.field trend_map} or use a factor-compatible trend: AR, RW, VAR, ZMVN."
-      )
-    )), call. = FALSE)
+  # A factor request written on the constructor is answered here so
+  # the user hears it before any data is read; the same refusal
+  # meets the routes that reach a spec without passing through this
+  # constructor, and both compose it from the registry entry.
+  if (!is.null(n_lv) || !is.null(trend_map)) {
+    refuse_factor_request_for_trend("PW")
   }
 
-  # Check for required cap variable in logistic models
+  # A logistic PW needs a carrying capacity, and an unsupplied `cap`
+  # falls back to a column of that name further down. Whether the
+  # frame carries one is a question about the data, which this
+  # constructor is evaluated too early to see: it runs while the
+  # trend formula is parsed, so refusing here refused the column
+  # route the rest of the machinery supports and the message named
+  # it as a remedy. `build_pw_cap_matrix()` owns the fact and names
+  # the column it could not find.
   cap_expr <- substitute(cap)
-  if (growth == 'logistic' && identical(cap_expr, quote(NA))) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Logistic growth models require a {.field cap} variable."
-      ),
-      x = cli::format_inline(
-        "Either provide {.field cap} argument or ensure 'cap' column exists in data."
-      ),
-      i = "Example: PW(cap = carrying_capacity, growth = 'logistic')"
-    )), call. = FALSE)
-  }
 
   trend_obj <- create_mvgam_trend(
     "PW",  # Base trend type used for ALL dispatch

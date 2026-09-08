@@ -190,11 +190,18 @@ test_that("the changepoints ignore occasions carrying no response", {
 
   for (h in c(1L, 5L, 25L)) {
     padded <- rbind(dat, make_future(h))
-    grown <- mvgam(
-      formula = obs_formula,
-      trend_formula = ~ PW(n_changepoints = n_change),
-      data = padded, family = poisson(), run_model = FALSE,
-      silent = 2
+    # brms reports the padding rows it drops from the observation
+    # likelihood, which is the frame doing what it was built to do.
+    # Asserted rather than muffled, so the day it stops arriving is
+    # the day this block says so.
+    expect_warning(
+      grown <- mvgam(
+        formula = obs_formula,
+        trend_formula = ~ PW(n_changepoints = n_change),
+        data = padded, family = poisson(), run_model = FALSE,
+        silent = 2
+      ),
+      "Rows containing NAs"
     )
     sd_grown <- grown$standata
     # The grid did grow, so the two frames differ where it counts.
@@ -548,38 +555,72 @@ test_that("an unknown series is refused, and named", {
 
 
 test_that("a factor model is refused on every route PW offers", {
-  # `?PW` and the assembly code both record that a piecewise trend
-  # cannot run a factor model, because each series carries its own
-  # changepoints. Only the constructor enforces it. The other three
-  # routes build, and the top-level one silently returns one latent
-  # dimension per series after being asked for fewer, which is
-  # finding 6's symptom on a second trend type.
+  # A piecewise trend cannot run a factor model, because each series
+  # carries its own changepoints. The registry records that against
+  # the trend type, as `supports_factors` and the reason beside it,
+  # and every route a factor can be asked for is answered from that
+  # one record. Each constructor used to restate the rule instead,
+  # so the rule held only where a constructor stood: asked four
+  # ways, one route refused and three built a factor model.
   build <- function(...) {
     mvgam(obs_formula, data = dat, family = poisson(),
           run_model = FALSE, silent = 2, ...)
   }
-  # The route that works.
-  expect_error(
+  by_arg <- expect_error(
     build(trend_formula = ~ PW(n_changepoints = 5, n_lv = 1L)),
-    "not supported for PW"
+    "Factor models are not supported for PW trends"
   )
-  # The three that do not.
-  expect_error(
+  by_map <- expect_error(
     build(trend_formula = ~ PW(n_changepoints = 5),
           trend_map = matrix(NA_real_, n_series, 1L)),
-    "not supported for PW"
+    "Factor models are not supported for PW trends"
   )
-  expect_error(
-    build(trend_formula = ~ PW(n_changepoints = 5), n_lv = 1L),
-    "not supported for PW"
-  )
-  expect_error(
+  by_jsdgam <- expect_error(
     jsdgam(y ~ 1, factor_formula = ~ -1 + PW(n_changepoints = 5),
            data = dat, unit = time, species = series,
            family = poisson(), n_lv = 1L, run_model = FALSE,
            silent = 2),
-    "not supported for PW"
+    "Factor models are not supported for PW trends"
   )
+  # One rule, so one message, whichever route asked.
+  expect_identical(conditionMessage(by_map), conditionMessage(by_arg))
+  expect_identical(conditionMessage(by_jsdgam), conditionMessage(by_arg))
+  # The fourth route never reached a trend at all. `n_lv` on
+  # `mvgam()` lands among the arguments forwarded to brms and Stan,
+  # where no factor count is read, so the request was dropped and
+  # the fit came back with one latent state per series. It is
+  # refused on where it was written rather than on the trend, since
+  # it is misplaced whatever the trend turns out to be.
+  err <- expect_error(
+    build(trend_formula = ~ PW(n_changepoints = 5), n_lv = 1L),
+    "not read by 'mvgam\\(\\)'"
+  )
+  expect_match(conditionMessage(err), "n_lv = 1", fixed = TRUE)
+})
+
+
+test_that("a factor-capable trend still takes every factor route", {
+  # The control for the block above. A refusal read off the registry
+  # has to leave the trends that do decompose alone, or it would
+  # trade one silent wrong answer for a loud wrong refusal.
+  build <- function(...) {
+    mvgam(obs_formula, data = dat, family = poisson(),
+          run_model = FALSE, silent = 2, ...)
+  }
+  on_constructor <- build(trend_formula = ~ AR(p = 1, n_lv = 1L))
+  expect_identical(
+    as.integer(on_constructor$standata$N_lv_trend), 1L
+  )
+  by_trend_map <- build(
+    trend_formula = ~ AR(p = 1),
+    trend_map = matrix(NA_real_, n_series, 1L)
+  )
+  expect_identical(as.integer(by_trend_map$standata$N_lv_trend), 1L)
+  # And a piecewise trend with no factor asked for is untouched: it
+  # keeps one state per series, which is what it has always had.
+  plain_pw <- build(trend_formula = ~ PW(n_changepoints = 5))
+  expect_identical(as.integer(plain_pw$standata$N_lv_trend),
+                   as.integer(n_series))
 })
 
 
@@ -618,19 +659,22 @@ test_that("the changepoint arguments reach Stan as asked", {
 
 test_that("logistic growth is refused without a cap, and says so", {
   # The other growth form this trend offers, and it needs a carrying
-  # capacity. The refusal is asserted on its own wording, and on the
-  # two remedies it offers, because both are claims to the user.
+  # capacity. Whether the frame carries one is a question about the
+  # data, so it is answered where the data is in hand rather than in
+  # the constructor, which is evaluated while the trend formula is
+  # parsed and cannot see it. The refusal names the column it looked
+  # for and the growth form that would not need it.
   err <- expect_error(
     mvgam(
       formula = obs_formula,
       trend_formula = ~ PW(growth = "logistic"),
       data = dat, family = poisson(), run_model = FALSE, silent = 2
     ),
-    "Logistic growth models require a cap"
+    "requires a 'cap' column"
   )
   msg <- conditionMessage(err)
   expect_match(msg, "cap", fixed = TRUE)
-  expect_match(msg, "growth = 'logistic'", fixed = TRUE)
+  expect_match(msg, "growth = 'linear'", fixed = TRUE)
 })
 
 

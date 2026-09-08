@@ -1,4 +1,4 @@
-# Unit tests for `normalise_trend_map()` — the single entry
+# Unit tests for `normalise_trend_map()`: the single entry
 # point that converts every accepted `trend_map` input shape
 # (matrix, data.frame, character code) to a canonical numeric
 # `Z` matrix.
@@ -294,16 +294,20 @@ test_that("trend_map = NULL stashes NULL (default)", {
   expect_null(spec$trend_map)
 })
 
-test_that("PW rejects trend_map with a targeted error", {
-  expect_error(
+test_that("PW refuses a factor request by either argument", {
+  # Both arguments raise one request, so both meet one refusal,
+  # composed from the reason the registry records against PW.
+  by_map <- expect_error(
     PW(trend_map = "identity"),
-    "trend_map.*not supported for PW"
+    "Factor models are not supported for PW trends"
   )
-  # The n_lv branch must still error with its own message (does
-  # not mention trend_map) so the user sees exactly which arg
-  # they supplied.
-  expect_error(PW(n_lv = 2), "Factor models.*not supported for PW")
-  expect_error(PW(n_lv = 2), "Remove.*n_lv.*parameter")
+  by_n_lv <- expect_error(
+    PW(n_lv = 2),
+    "Factor models are not supported for PW trends"
+  )
+  expect_identical(conditionMessage(by_map), conditionMessage(by_n_lv))
+  expect_match(conditionMessage(by_n_lv), "changepoint modeling",
+               fixed = TRUE)
 })
 
 test_that("constructors fail-fast on malformed trend_map shapes", {

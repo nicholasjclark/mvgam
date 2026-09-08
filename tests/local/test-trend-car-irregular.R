@@ -233,9 +233,14 @@ test_that("CAR refuses a factor decomposition, by both routes", {
       trend_map = matrix(NA_real_, nrow = n_series, ncol = 2L),
       data = dat, family = poisson(), run_model = FALSE, silent = 2
     ),
-    "do not support factor models"
+    "Factor models are not supported for CAR trends"
   )
-  expect_match(conditionMessage(map_err), "n_lv < n_series",
+  # The refusal carries the reason the registry records against CAR,
+  # and names trends that do decompose, so the user has somewhere to
+  # go rather than only a closed door.
+  expect_match(conditionMessage(map_err), "irregular time intervals",
+               fixed = TRUE)
+  expect_match(conditionMessage(map_err), "AR, RW, VAR, ZMVN",
                fixed = TRUE)
 
   jsd_err <- expect_error(
@@ -244,7 +249,7 @@ test_that("CAR refuses a factor decomposition, by both routes", {
       data = dat, unit = time, species = series,
       family = poisson(), n_lv = 2L, run_model = FALSE, silent = 2
     ),
-    "do not support factor models"
+    "Factor models are not supported for CAR trends"
   )
   # One rule, so one message, whichever route asked.
   expect_identical(conditionMessage(jsd_err),
@@ -254,24 +259,23 @@ test_that("CAR refuses a factor decomposition, by both routes", {
 
 test_that("n_lv is the third route to a factor CAR, and refuses too", {
   # The same request as the two above, written the third way a user
-  # can write it. It has to meet the same refusal: `n_lv` below the
-  # series count asks for a factor decomposition, and CAR has none to
-  # give.
+  # can write it. It was accepted and `n_lv` raised to the series
+  # count, so a user who asked for two factors was handed a
+  # saturated trend and reading `N_lv_trend` back was the only way
+  # to notice.
   #
-  # What happens instead is that the model is accepted and `n_lv` is
-  # raised to the series count, so a user who asked for two factors
-  # is handed a saturated trend with nothing in the output saying the
-  # request was not honoured. Reading `N_lv_trend` back is the only
-  # way to notice.
-  # One expectation, so the failure reads as the single fact it is.
-  # A follow-up check on the message would raise a second, confusing
-  # error of its own whenever no error was thrown at all.
+  # This route is refused on where the argument was written rather
+  # than on the trend: `n_lv` passed to `mvgam()` reaches the
+  # arguments forwarded to brms and Stan, which read no factor
+  # count, so it is misplaced whatever trend it was paired with.
+  # The two routes above carry the request as far as a trend and are
+  # answered by the trend registry.
   expect_error(
     mvgam(
       formula = y ~ temp, trend_formula = ~ CAR(), n_lv = 2L,
       data = dat, family = poisson(), run_model = FALSE, silent = 2
     ),
-    "do not support factor models"
+    "not read by 'mvgam\\(\\)'"
   )
 })
 

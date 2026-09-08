@@ -1422,6 +1422,107 @@ validate_n_lv_ceiling <- function(n_lv, n_species,
   invisible(TRUE)
 }
 
+#' Refuse an `n_lv` written where nothing reads it
+#'
+#' The factor count belongs to the trend that carries the factors,
+#' so it is written on the constructor inside `trend_formula`, as
+#' `AR(p = 1, n_lv = 2)`. Passed to `mvgam()` itself it lands in
+#' `...`, which forwards to brms and Stan, and nothing there reads
+#' it: a two-series frame asked for one factor came back with two
+#' and nothing recorded that the request had been raised.
+#'
+#' @param requested_n_lv Whatever arrived as a top-level `n_lv`.
+#' @return `invisible(TRUE)`.
+#' @noRd
+refuse_top_level_n_lv <- function(requested_n_lv) {
+  if (is.null(requested_n_lv)) return(invisible(TRUE))
+  stop(insight::format_error(c(
+    "Argument 'n_lv' is not read by 'mvgam()'.",
+    x = paste0(
+      "It reached the arguments forwarded to brms and Stan, where ",
+      "no factor count is read, so the trend would have been given ",
+      "one latent state per series."
+    ),
+    i = paste0(
+      "Write it on the trend instead, as ",
+      "'trend_formula = ~ AR(p = 1, n_lv = ", requested_n_lv,
+      ")', or use 'jsdgam(n_lv = ", requested_n_lv, ")'."
+    )
+  )), call. = FALSE)
+}
+
+
+#' Refuse a factor model on one named trend
+#'
+#' The registry records whether a trend decomposes into latent
+#' factors, and the reason it does not, so the refusal is composed
+#' from what is registered rather than restated wherever a factor
+#' request can arrive. Both remedies are named whichever argument
+#' raised the request, so the four routes to a factor trend give a
+#' user one sentence to act on.
+#'
+#' @param trend_name Registered trend name, such as `"PW"`.
+#' @return `invisible(TRUE)` when the trend takes factors.
+#' @noRd
+refuse_factor_request_for_trend <- function(trend_name) {
+  ensure_registry_initialized()
+  info <- get_trend_info(trend_name)
+  if (isTRUE(info$supports_factors)) return(invisible(TRUE))
+  stop(insight::format_error(c(
+    paste0("Factor models are not supported for ", trend_name,
+           " trends."),
+    x = info$incompatibility_reason %||%
+      paste0(trend_name, " has no latent-factor form."),
+    i = paste0(
+      "Drop 'n_lv' and 'trend_map', or use a trend that ",
+      "decomposes into factors: AR, RW, VAR, ZMVN."
+    )
+  )), call. = FALSE)
+}
+
+
+#' Refuse a factor model on a trend that has no factor form
+#'
+#' Whether a trend decomposes into latent factors is recorded on the
+#' registry, as `supports_factors` alongside the reason it does not.
+#' Nothing read it: each constructor refused on its own, so the rule
+#' held only for the one route that goes through the constructor.
+#' Asked four ways of a piecewise trend, `PW(n_lv = 1)` was refused
+#' while `trend_map = matrix(NA, 2, 1)` and a `jsdgam()`
+#' `factor_formula` each built a one-factor model, and a top-level
+#' `n_lv` was dropped so silently that `N_lv_trend` came back at the
+#' series count.
+#'
+#' This is the one place a factor request meets the trend it was
+#' asked of, so it reads the registry rather than restating the
+#' rule. A request reaches a spec two ways and both are counted:
+#' `n_lv` on the spec, and a `trend_map` normalised to a fixed `Z`.
+#' The third spelling, `n_lv` passed to `mvgam()` itself, reaches no
+#' spec at all and is refused by `refuse_top_level_n_lv()` before
+#' this runs.
+#'
+#' @param trend_specs Parsed trend specifications, one spec or a
+#'   per-response list.
+#' @return `invisible(TRUE)`.
+#' @noRd
+enforce_factor_support_against_specs <- function(trend_specs) {
+  if (is.null(trend_specs)) return(invisible(TRUE))
+  ensure_registry_initialized()
+  specs <- if (is_multivariate_trend_specs(trend_specs)) {
+    trend_specs
+  } else {
+    list(trend_specs)
+  }
+  for (spec in specs) {
+    if (is.null(spec$n_lv) && is.null(spec$fixed_Z)) next
+    trend_name <- get_trend_name(spec)
+    if (is.null(trend_name) || !nzchar(trend_name)) next
+    refuse_factor_request_for_trend(trend_name)
+  }
+  invisible(TRUE)
+}
+
+
 #' Walk trend specs to find `n_lv` and apply the ceiling gate
 #'
 #' Wrapper-layer hook called once from
