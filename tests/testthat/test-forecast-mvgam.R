@@ -829,3 +829,48 @@ test_that("an argument neither method reads is refused, not swallowed", {
   # The offending name is reported, so the caller can see which one.
   expect_error(hindcast(fit, incl_autcor = TRUE), "incl_autcor")
 })
+
+
+test_that("the step check names the grid, not an observation", {
+  # `assert_forecast_times_steppable()` reads the training *grid*,
+  # and its own comment says why: the latent state runs on one grid
+  # shared by every series, and reading each series' observed times
+  # instead would refuse a legitimate forecast on a frame padded with
+  # unobserved rows, which is the shape mvgam asks users to supply.
+  #
+  # The horizon rule answers a different question from the axis
+  # record, which counts an occasion observed only where a response
+  # was seen. On a padded frame the two part company over the
+  # occasions between the last response and the end of the grid, so
+  # the refusal must not call the grid's last position an
+  # observation: it named a time the series was never seen at and
+  # then offered a horizon starting past it.
+  training <- list(times = list(s1 = 1:40))
+  spec <- structure(
+    list(trend = "AR",
+         validation_rules = "requires_regular_intervals"),
+    class = "mvgam_trend"
+  )
+  err <- tryCatch(
+    mvgam:::assert_forecast_times_steppable(
+      fc_times = list(s1 = 31), training = training,
+      trend_spec = spec, step = 1
+    ),
+    error = function(e) conditionMessage(e)
+  )
+  expect_type(err, "character")
+  expect_match(err, "training grid runs to time 40", fixed = TRUE)
+  # The word that was wrong. The series was last seen at 30 here, so
+  # nothing may claim it was observed at 40.
+  expect_false(grepl("observed to time", err, fixed = TRUE))
+  # And the reader is pointed at the surface that does read an
+  # occasion sitting inside the grid.
+  expect_match(err, "hindcast()", fixed = TRUE)
+
+  # The control: a frame that does continue the grid is accepted, so
+  # this is not a check that refuses everything.
+  expect_true(mvgam:::assert_forecast_times_steppable(
+    fc_times = list(s1 = 41), training = training,
+    trend_spec = spec, step = 1
+  ))
+})

@@ -1,81 +1,14 @@
 # Defects the local fixture assertions found
 
-Fixed entries keep their description so the assertion that caught them
-stays legible. Open entries are the ones still to act on.
+Every entry here is still open. A finding is deleted once its fix is
+verified by the assertion that caught it, so the file shrinks as the
+work lands rather than accumulating a record of what used to be
+wrong.
 
 Each entry names the failing file and line. It then states what the
 assertion claims, against what the package does instead. Line numbers
 move as the files grow, so each entry also names the test by its
 description.
-
-## by = lv_axis()
-
-**1. FIXED (documentation). `incl_latent_state` documented a mode it
-does not have.**
-
-`extract_component_linpred(component = "trend")` returns identical
-values for `incl_latent_state = TRUE` and `FALSE`: the mean absolute
-difference is exactly zero over 20 draws and 300 rows.
-
-The behaviour turns out to be right and the documentation wrong.
-`predict_*` reads no time index, and marginalises over the trend. A
-latent state reaches a prediction as the envelope that
-`sample_process_errors()` adds, and one draw at a time only through
-`extract_trend_latent_states()`, which the hindcast and forecast
-paths call. The standard kernel treats the argument the same way, so
-the two grains agree with each other.
-
-What was wrong was the roxygen on `compose_by_lv_trend_linpred()`. It
-described two return modes in detail and promised that `TRUE` adds
-`sum_k Z * lv_trend`. A comment nearby claimed the branch hands over
-to the conditional path. It never does. Both are corrected in
-`R/predictions.R`. The assertion now states the real contract: the
-two agree here, and the conditional state is reached by the route
-that owns it.
-
-**2. FIXED. A factor-grain smooth could not be evaluated or drawn.**
-
-Seen on two fixtures, so this is not particular to one route. One is
-`test-factor-lv-axis.R`, a gaussian fit built through
-`mvgam()` with `ZMVN()`. The other is `test-grain-closure-units.R`, an occupancy
-fit built through `jsdgam()`. In both, `smooths(fit)`
-names the smooth and passing that name straight back to
-`posterior_smooths()` reaches brms with a frame that carries no
-`.trend` column:
-
-```
-The following variables can neither be found in 'data' nor in 'data2':
-'.trend'
-```
-
-Root cause: both places that needed a frame reached for the
-observation one. A smooth was evaluated over it and drawn over it.
-`mvgam_smooth_eta()` defaulted `newdata` to `object$data`, and
-`build_smooth_grid()` took `mf <- x$data`. The trend side runs on its
-own grid, which under `by = lv_axis()` is one row per
-(time, latent factor) and carries the `.trend` factor the smooth is
-split by; the observation frame has neither. So `posterior_smooths()`
-was refused by brms for a variable it could not find, and
-`conditional_smooths()` built a grid with no rows.
-
-The second symptom was hidden. `conditional_smooths()` sits on the
-line after `posterior_smooths()` in the fixture files, so it never ran
-while that errored. The test asserted only that its result was not
-`NULL`. A result with the right name and an empty frame
-passes that.
-
-Fixed in `R/posterior_smooths.mvgam.R` by `mvgam_side_data()`. It answers
-which frame a side was fitted on in one place, and both call sites
-read it. The observation side keeps `object$data`, which is
-its own frame; only the trend side is redirected. Verified on
-the three `by = lv_axis()` fixtures. `posterior_smooths()` returns one
-column per trend-grid row. `conditional_smooths()` returns two
-distinct curves, one per latent factor. Their intervals are ordered
-and lie inside the covariate range. `tests/testthat/test-posterior-smooths.R` goes
-from 82 passing with 2 errors to 86 passing.
-
-The fixture assertions were rewritten at the same time, since the
-ones that were there could not have caught either symptom.
 
 ## mvn()
 
@@ -276,34 +209,6 @@ A lifecycle notice is also raised once per session, so an
 `expect_warning()` on it passes or fails on what ran before the file
 rather than on anything the package did.
 
-## Test defects fixed along the way
-
-**A vacuous assertion that became false the moment it was tested.**
-`test-trend-hierarchical.R` claimed the derived series identifier
-was "lexically ordered" and checked it with
-
-    expect_equal(levels(vals), sort(levels(vals)))
-
-The fixture it ran against named its regions `r1`, `r2` and its
-species `sp1`, `sp2`, `sp3`, so the levels were already alphabetical
-and `sort()` was the identity. The expectation held without
-constraining anything. Refitting the file on regions `south`, `north`
-and species `sp_c`, `sp_a`, `sp_b` shows the real contract is the
-order each column declares, grouping first, a group's subgroups
-adjacent, which `test-axis-ordering.R` states for its `hier3` cell
-and which the fitted axis confirms. The assertion now says that, and
-adds that the order is not the sorted one, so a frame whose levels
-happen to sort correctly can no longer satisfy it.
-
-**Six suppressed Pareto-k warnings.** `suppressWarnings(loo(fit))`
-appeared in every file written in this pass. `loo()` warns when a
-Pareto-k crosses its threshold, which is the one diagnostic saying
-whether the approximation can be trusted; suppressing it discards
-exactly the signal a test exists to catch. Each is now captured and
-turned into claims: the estimate is finite, every k is below one, and
-any warning raised has to be the k notice those numbers account for,
-so an unrelated warning fails rather than passing unseen.
-
 ## loo()
 
 **11. Every fit with a latent trend breaks PSIS-loo, and the numbers
@@ -335,35 +240,6 @@ these models, and because two of the three published comparisons in
 the package rank trend models by `elpd_loo`. `lfo_cv()` is the tool
 that answers the question these fits are being asked, and nothing in
 `loo()`'s output on a trend fit says so.
-
-**12. WITHDRAWN. `type = "response"` is the outcome scale, and was
-behaving correctly.**
-
-Recorded here as a claim that `predictions(type = "response")`
-handed back a predictive median where an expectation was asked for,
-seen on three fixtures and then a fourth. It does return a predictive
-median, and that is the documented contract: `?forecast.mvgam` says
-`"response"` samples from the observation family while `"expected"`
-returns the family's mean. Checked across the three types on one
-poisson fit:
-
-| call | value |
-|---|---|
-| `predictions(type = "expected")` | 14.202 |
-| `colMeans(posterior_epred())` | 14.213 |
-| `predictions(type = "response")` | 14.000 |
-| `median(posterior_predict())` | 14.000 |
-| `predictions(type = "link")` | 2.653 = log(14.2) |
-
-Every type answers with what it names. The assertion was what was
-wrong: it compared `"response"` against `posterior_epred()`, which
-are different quantities, so a whole number read as a symptom when it
-was the contract. The assumption came from brms and marginaleffects,
-which both spell the expectation `"response"`. mvgam parts company
-from them deliberately by carrying a separate `"expected"`.
-
-The tests now pin all three types to their own meanings, so a type
-that quietly answered with another's quantity fails.
 
 ## Families
 
@@ -455,34 +331,6 @@ which is what makes the silence costly.
 The data-frame form is unaffected: it names its series in a column
 and a stranger there is refused.
 
-## Distributional parameters
-
-**20. FIXED. `conditional_effects()` offered no covariate that
-belonged to a distributional parameter.**
-
-`detect_conditional_effects()` reached into `$pforms`, where a
-parameter's own formula lives, only when the model was non-linear. A
-distributional model puts one there too, so on
-`bf(y ~ x, hu ~ z)` the default term list was
-`x` alone and `z` appeared nowhere. What a user saw was a plot of the
-mean's covariate with no sign that a second covariate existed.
-Naming it as `effects = "z"` worked throughout, so the panel was
-never unreachable, only never offered.
-
-brms builds its default list from the whole formula:
-`get_all_effects(brmsterms(bf(y ~ x, hu ~ z, hurdle_poisson())))`
-returns `x` and `z`. mvgam now returns that same pair. Terms come
-from `$pforms` in either case, and parameter names are pruned from
-the result only when the model is non-linear, since the RHS above
-them then holds names rather than data. The multivariate branch took
-the same fix, because a response may carry a formula of its own.
-
-`test-family-mixture.R` covers it, and checks the panel
-against `posterior_epred()` at the same grid point rather than
-against its shape, so a panel drawn on the wrong predictor fails
-instead of merely looking odd.
-
-
 ## Residuals
 
 **21. A continuous family's quantile residuals carry no posterior
@@ -569,34 +417,6 @@ axis, since it calls this type.
 Covered in `test-pp-check-resids.R`, which asserts the two axes read
 one surface and fails on it.
 
-## Leave-future-out cross-validation
-
-**26. `lfo_cv()` cannot compute a forecast-based score.**
-
-`score = "elpd"` runs; `score = "crps"` errors, alone or beside
-`elpd`, on the same fit and the same window:
-
-```
-'newdata' must continue the training series for a 'AR' trend.
-Series 'series_1' was observed to time 30, so the next 1 times are
-31 to 31; got 32 to 32.
-```
-
-The elpd path reads the density directly, while a proper score needs
-a forecast, and the frame `scores_at_window()` builds for it starts
-one occasion late. The refusal it trips is the one added for users
-who hand `forecast()` a gapped frame, so the guard is working and the
-caller is at fault. Reproduced at `min_t = 30` on a Poisson AR(1) and
-at `min_t = 28` on a two-series AR(2), skipping one occasion each
-time.
-
-Every documented multi-score example is therefore unavailable, and
-`elpd` is the only rule `lfo_cv()` can currently report.
-
-Reproduced on a VAR in `test-trend-var.R`, where the window at
-`min_t = 55` wants times 56 and is handed 57, so the arithmetic
-belongs to the window rather than to one trend.
-
 ## Gaps closed rather than found
 
 Two things the plan names as untested now have coverage, and the
@@ -638,19 +458,6 @@ Every `\seealso` link in the package resolves. Resolved across all
 is broken. Every function `?jsdgam` lists was separately called and
 each one answers, which finding 75 records. On that route a reader
 following the documentation reaches working code.
-
-## Test defects fixed along the way
-
-These are faults in the fixture files themselves, so they were
-repaired in place.
-
-`test-grain-closure-units.R`, "each row reads the latent cell the sampler drew
-for it", passed the frame the simulation built instead of the one the
-fit kept. `unit = site` makes mvgam synthesise its own `time` column,
-so the call raised on a missing `time` rather than comparing anything.
-The check that carries the most weight in the file was erroring in
-place of running, and the surrounding tests already used
-`fit$obs_data` for exactly this reason.
 
 ## Fits still worth adding
 

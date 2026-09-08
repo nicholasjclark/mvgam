@@ -808,6 +808,15 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
       n_series = dimensions$n_series,
       n_lv = trend_specs$n_lv,
       n_time = n_time,
+      # The occasions a response was actually seen at. The trend grid
+      # runs past them on a padded frame or one given `newdata`, and
+      # anything placed over the history rather than over the grid
+      # has to count these instead.
+      n_time_observed = count_observed_times(
+        data = obs_setup$data %||% trend_setup$data,
+        time_var = dimensions$time_var,
+        response_vars = extract_response_names(obs_setup$formula)
+      ),
       time_var = dimensions$time_var,
       series_var = dimensions$series_var,
       unique_times = dimensions$unique_times,
@@ -6329,7 +6338,18 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
       x = paste0("Got n_time = ", n_time_trend %||% "NULL", ".")
     )))
   }
-  hist_size <- floor(n_time_trend * changepoint_range)
+  # The history is the occasions carrying a response, not the length
+  # of the trend grid. The grid reaches past the last response
+  # whenever the frame is padded with unobserved rows or a `newdata`
+  # was supplied, and placing changepoints over it put them at
+  # occasions the model has nothing to fit them to: on 30 observed
+  # occasions they sat at 6, 10, 15, 19 and 24 with one further row
+  # in the frame and at 12, 23, 34, 45 and 56 with forty. `?PW`
+  # documents `changepoint_range` as a proportion of the history,
+  # which is what this now is.
+  history_size <- data_info$n_time_observed %||% n_time_trend
+  if (history_size < 2L) history_size <- n_time_trend
+  hist_size <- floor(history_size * changepoint_range)
   if (hist_size < 1L) hist_size <- 1L
   t_change_values <- unique(round(
     seq.int(1, hist_size, length.out = n_changepoints + 1L)[-1L]
@@ -8799,4 +8819,39 @@ replace_stan_functions_block <- function(stan_code, new_functions_content) {
   }
 
   return(paste(new_lines, collapse = "\n"))
+}
+
+
+#' How many occasions carry a response
+#'
+#' The trend grid is sized from every row of the frame, so it reaches
+#' past the last response whenever a panel is padded with `NA` or a
+#' `newdata` extends it. Anything documented as a proportion of the
+#' history has to count the occasions a response was seen at instead.
+#'
+#' An occasion counts as observed when any response was measured
+#' there, since the history is a property of the time axis rather
+#' than of one series.
+#'
+#' @param data The observation frame.
+#' @param time_var Name of the time column.
+#' @param response_vars Response column names.
+#' @return The count, or `NULL` where the frame cannot answer.
+#' @noRd
+count_observed_times <- function(data, time_var, response_vars) {
+  if (!is.data.frame(data) || is.null(data[[time_var]])) {
+    return(NULL)
+  }
+  present <- intersect(response_vars, names(data))
+  if (!length(present)) {
+    return(NULL)
+  }
+  observed <- rep(FALSE, nrow(data))
+  for (resp in present) {
+    observed <- observed | !is.na(data[[resp]])
+  }
+  if (!any(observed)) {
+    return(NULL)
+  }
+  length(unique(data[[time_var]][observed]))
 }

@@ -209,7 +209,6 @@ lfo_cv.mvgam <- function(object,
   }
 
   time_var <- object$trend_metadata$variables$time_var %||% "time"
-  warn_grid_dependent_trend_data(object)
   # Only the time is demanded. Which rows belong to which series is
   # answered two lines below by `axis_row_series()`, from the record
   # rather than from a column, so a hierarchical frame whose series
@@ -1257,62 +1256,6 @@ print.mvgam_lfo <- function(x, ...) {
     }
   }
   invisible(x)
-}
-
-
-#' Warn where a refit's trend data is fixed by the grid's length
-#'
-#' A fold is held out by masking its response, which keeps the trend
-#' grid whole so the latent state carries forward. Two pieces of trend
-#' data are sized from that grid rather than from the occasions a
-#' response was seen at, so they answer to the frame's extent:
-#' piecewise changepoints, placed at
-#' `floor(N_time_trend * changepoint_range)`, and a trend-side smooth,
-#' whose basis and centring are built over every row because the trend
-#' submodel carries a synthetic response and so has no missing rows to
-#' drop.
-#'
-#' Measured on 30 observed occasions, the changepoints sit at 6, 10,
-#' 15, 19 and 24 with one further occasion in the frame and at 12, 23,
-#' 34, 45 and 56 with forty. A trend-side smooth's `Xs_trend` differs
-#' by up to 0.75 on the rows the two frames share.
-#'
-#' Every fold is refit on one frame, so the folds agree with each
-#' other and a comparison across models scored on the same frame
-#' holds. What does not hold is that the score equals the one a fit
-#' truncated at each origin would give, so the caller is told rather
-#' than left to find it.
-#'
-#' @param object The fitted model being cross-validated.
-#' @return `invisible(TRUE)`.
-#' @noRd
-warn_grid_dependent_trend_data <- function(object) {
-  sdata <- object$standata %||% list()
-  grid_bound <- c(
-    "piecewise changepoints" = "t_change_trend" %in% names(sdata),
-    "a trend-side smooth" = "Xs_trend" %in% names(sdata)
-  )
-  if (!any(grid_bound)) {
-    return(invisible(TRUE))
-  }
-  rlang::warn(insight::format_warning(c(
-    "This model's trend data is sized by the time grid.",
-    x = paste0(
-      "Sized from the grid rather than from the observed occasions: ",
-      paste(names(grid_bound)[grid_bound], collapse = ", "), "."
-    ),
-    i = paste0(
-      "A fold is held out by masking its response, so the grid keeps ",
-      "its full length and these are placed over it. Every fold is ",
-      "scored under the same trend data, so folds and models scored ",
-      "on one frame stay comparable."
-    ),
-    i = paste0(
-      "They are not the values a fit truncated at each origin would ",
-      "use, so scores from frames of different extent are not."
-    )
-  )))
-  invisible(TRUE)
 }
 
 

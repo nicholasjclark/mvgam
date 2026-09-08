@@ -5780,6 +5780,14 @@ assert_forecast_times_steppable <- function(fc_times, training,
   # gap that the latent state does not have. mvgam asks users to
   # pad exactly that way, so it is a common shape rather than an
   # odd one.
+  #
+  # The horizon is resolved from the last *observed* occasion, which
+  # is a different question and rightly answered differently: a
+  # padded series must not be forecast from an occasion it was never
+  # seen at. So on a padded frame the two disagree about the
+  # occasions between the last response and the end of the grid, and
+  # the message below has to name the grid rather than call its last
+  # position an observation.
   past <- sort(unique(as.numeric(unlist(
     training$times %||% list(), use.names = FALSE
   ))))
@@ -5814,9 +5822,9 @@ assert_forecast_times_steppable <- function(fc_times, training,
           get_trend_name(trend_spec), "' trend."
         ),
         x = paste0(
-          "Series '", lv, "' was observed to time ",
-          past[length(past)], ", so the next ", length(fut),
-          " times are ", expected[1L], " to ",
+          "The training grid runs to time ", past[length(past)],
+          ", so the next ", length(fut), " times for series '", lv,
+          "' are ", expected[1L], " to ",
           expected[length(expected)], "; got ", fut[1L], " to ",
           fut[length(fut)], "."
         ),
@@ -5825,6 +5833,12 @@ assert_forecast_times_steppable <- function(fc_times, training,
           "would be forecast as though it were not there. Supply ",
           "every intervening time, or use 'CAR()', which carries ",
           "the elapsed gap."
+        ),
+        i = paste0(
+          "The grid is where the latent state runs, which on a frame ",
+          "padded with unobserved rows reaches past the last ",
+          "response. Occasions inside it already carry a state, so ",
+          "'hindcast()' is what reads them."
         )
       )))
     }

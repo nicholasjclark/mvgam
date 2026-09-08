@@ -172,6 +172,44 @@ test_that("the changepoints are ordered and in the user's time units", {
 })
 
 
+test_that("the changepoints ignore occasions carrying no response", {
+  # A changepoint grid is a proportion of the *history*, which `?PW`
+  # says and which the placement did not do: it was
+  # `floor(N_time_trend * changepoint_range)`, and the trend grid
+  # reaches past the last response whenever a frame is padded with
+  # unobserved rows or a `newdata` extends it. On 30 observed
+  # occasions the breaks sat at 6, 10, 15, 19 and 24 with one further
+  # row in the frame and at 12, 23, 34, 45 and 56 with forty, so the
+  # model a user got depended on how much future they happened to
+  # carry alongside it.
+  #
+  # Padding is the shape that shows it, because mvgam asks for a
+  # ragged panel to be padded and because a `newdata` does the same
+  # thing to the grid.
+  baseline <- as.numeric(prefit$standata$t_change_trend)
+
+  for (h in c(1L, 5L, 25L)) {
+    padded <- rbind(dat, make_future(h))
+    grown <- mvgam(
+      formula = obs_formula,
+      trend_formula = ~ PW(n_changepoints = n_change),
+      data = padded, family = poisson(), run_model = FALSE,
+      silent = 2
+    )
+    sd_grown <- grown$standata
+    # The grid did grow, so the two frames differ where it counts.
+    expect_gt(as.integer(sd_grown$N_time_trend), n_time)
+    # And the breaks did not move with it.
+    expect_equal(as.numeric(sd_grown$t_change_trend), baseline)
+    expect_identical(as.integer(sd_grown$N_change_trend), n_change)
+    # Still inside the observed span rather than out among the
+    # occasions that carry no response.
+    expect_lte(max(as.numeric(sd_grown$t_change_trend)),
+               max(time_vals))
+  }
+})
+
+
 test_that("the trend runs on the series axis, one rate per series", {
   sd <- prefit$standata
   ax <- mvgam:::mvgam_axes(prefit)
