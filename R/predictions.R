@@ -2167,7 +2167,7 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   # Stamp the empty-obs placeholder onto user-supplied newdata
   # when the fit needed one. brms's `validate_data()` would
   # otherwise reject the frame for missing the column.
-  newdata <- ensure_obs_placeholder_in_newdata(newdata, mvgam_fit$data)
+  newdata <- ensure_obs_placeholder(newdata, mvgam_fit)
   checkmate::assert_string(component)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,
                                 any.missing = FALSE)

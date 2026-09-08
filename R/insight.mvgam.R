@@ -73,12 +73,18 @@ mvgam_formula_predictors <- function(f) {
 
 
 # Drop tokens that are not actual columns of the fit's data frame.
-# brms RE syntax surfaces correlation IDs (`(1 | sp | series)`) and
+# brms RE syntax carries correlation IDs (`(1 | sp | series)`) and
 # nested-group separators as if they were variables; this filter
 # enforces "predictor names are addressable in the model data".
 # Skips the filter when data is unavailable (mock objects in unit
 # tests) so the helper composes with stub fixtures.
+#
+# The empty-obs placeholder is dropped here as well. It is absent
+# from `x$data`, so the filter below removes it on a fit, but the
+# rewritten formula still names it and mock objects carry no frame
+# for the filter to work from.
 mvgam_keep_data_columns <- function(vars, x) {
+  vars <- setdiff(vars, MVGAM_EMPTY_OBS_PLACEHOLDER)
   if (is.null(x$data)) {
     return(vars)
   }

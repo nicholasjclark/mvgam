@@ -1008,11 +1008,14 @@ axis_expected_warnings <- function() {
   "Rows containing NAs"
 }
 
-# The multivariate formula the wide frames are read with.
+# The multivariate formula the wide frames are read with. Each arm
+# carries an intercept alone, for the reason `axis_prefit()` gives:
+# several cells put `env` on the trend side, and the same covariate on
+# both sides of one arm is a pairing the likelihood cannot separate.
 axis_wide_formula <- function() {
-  bf(zebra ~ env, family = poisson()) +
-    bf(apple ~ env, family = bernoulli()) +
-    bf(mango ~ env, family = gaussian()) +
+  bf(zebra ~ 1, family = poisson()) +
+    bf(apple ~ 1, family = bernoulli()) +
+    bf(mango ~ 1, family = gaussian()) +
     set_rescor(FALSE)
 }
 
@@ -1030,11 +1033,17 @@ axis_jsdgam_formula <- function() {
 # `stancode`, the training frame and the trend metadata, which is
 # every record a later method reads. `spec` is a trend formula for
 # the mvgam routes and a latent-factor count for the jsdgam ones.
+#
+# The observation side carries an intercept and nothing else. Several
+# cells put `env` on the trend side, and the same covariate on both
+# sides is a pairing the likelihood cannot separate, so writing it
+# here would have every one of those cells build a model no user
+# should be shown. Nothing in this file reads the observation design.
 axis_prefit <- function(frame, spec, route) {
   switch(
     route,
     uni = mvgam(
-      y ~ env, trend_formula = spec, data = frame,
+      y ~ 1, trend_formula = spec, data = frame,
       family = poisson(), run_model = FALSE, silent = 2
     ),
     wide = mvgam(

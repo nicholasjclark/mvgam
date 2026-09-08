@@ -853,6 +853,15 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     )
   )
 
+  # Whether the two sides are separately identified is settled by the
+  # designs alone, so it is asked here rather than left to a reader of
+  # the R-hat column. Both the prefit and the fitted path pass through
+  # this point.
+  warn_confounded_obs_trend_design(
+    standata = stan_components$combined_components$standata,
+    prior = stan_components$obs_setup$prior
+  )
+
   # `run_model = FALSE`: stop before parse, compile and fit so a
   # caller can read the generated stancode and standata without
   # paying for Stan codegen and sampling.
@@ -865,7 +874,8 @@ mvgam_single <- function(formula, trend_formula, data, backend,
       data = data,
       data_name = data_name,
       newdata = newdata,
-      backend = backend
+      backend = backend,
+      user_prior = forward_dots$prior
     ))
   }
 
@@ -1132,7 +1142,12 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
         user_prior      = user_prior,
         combined_stancode = combined_stancode %||% obs_setup$stancode
       ),
-      data = obs_setup$data,
+      # The frame the user supplied. `mvgam()` adds a placeholder
+      # column when the observation formula has no terms, and brms
+      # was given that; the column is taken back out here so a
+      # reader of `fit$data` sees their own frame, and stamped back
+      # on by `ensure_obs_placeholder()` wherever one reaches brms.
+      data = drop_obs_placeholder(obs_setup$data),
       test_data = newdata,
       data.name = data_name,
       # The brms code-generation options the fit was built under, kept
@@ -1201,7 +1216,8 @@ create_mvgam_stub_from_stan_components <- function(stan_components,
                                                    data,
                                                    data_name,
                                                    newdata,
-                                                   backend) {
+                                                   backend,
+                                                   user_prior = NULL) {
   obs_setup <- stan_components$obs_setup
   trend_setup <- stan_components$trend_setup
   mv_spec <- stan_components$mv_spec
@@ -1216,10 +1232,18 @@ create_mvgam_stub_from_stan_components <- function(stan_components,
       trend_formula = if (!is.null(trend_setup)) trend_setup$formula else NULL,
       trend_call = trend_formula,
       family = obs_setup$family %||% family,
-      prior = lift_mvgam_stanvar_priors(
-        obs_setup$prior, stan_components$combined_components$stancode
+      # The same table a fitted object stores, built by the same
+      # assembler: the stub is read for what the model will be, so a
+      # prior table missing the trend rows, the user's overrides or
+      # the placeholder filter would describe a different model from
+      # the one `run_model = TRUE` produces.
+      prior = assemble_stored_prior_table(
+        obs_priors      = obs_setup$prior,
+        trend_priors    = if (!is.null(trend_setup)) trend_setup$prior else NULL,
+        user_prior      = user_prior,
+        combined_stancode = stan_components$combined_components$stancode
       ),
-      data = obs_setup$data %||% data,
+      data = drop_obs_placeholder(obs_setup$data %||% data),
       test_data = newdata,
       data.name = data_name,
       stancode = stan_components$combined_components$stancode,

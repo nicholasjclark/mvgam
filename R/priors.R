@@ -991,7 +991,68 @@ assemble_stored_prior_table <- function(obs_priors, trend_priors,
   if (!is.null(user_prior) && nrow(user_prior) > 0L) {
     lifted <- merge_user_priors(lifted, user_prior)$priors
   }
+  # The empty-obs placeholder's pin is structural: it holds a column
+  # mvgam had to invent at zero, and names no parameter the user
+  # wrote. It is dropped here, on the table the fit stores and
+  # `prior_summary()` returns, rather than on the one the code
+  # generator reads.
+  if (is.data.frame(lifted) && nrow(lifted) > 0L &&
+        "coef" %in% names(lifted)) {
+    lifted <- lifted[
+      lifted$coef != MVGAM_EMPTY_OBS_PLACEHOLDER, , drop = FALSE
+    ]
+  }
   lifted
+}
+
+
+#' Does this prior string hold its parameter at a constant?
+#'
+#' `constant()` names no distribution. brms implements it by moving the
+#' parameter out of the `parameters` block and assigning the value, so
+#' a coefficient carrying one has no free parameter behind it. Two
+#' consequences follow, and both are read off this predicate: mvgam's
+#' own prior emitters cannot write a constant as a sampling statement
+#' and refuse it, and the identification check leaves a pinned column
+#' out of the design it ranks.
+#'
+#' @param x Character vector of prior strings.
+#' @return Logical vector, `TRUE` where the string is a `constant()`.
+#' @noRd
+is_constant_prior <- function(x) {
+  if (length(x) == 0L) return(logical(0))
+  grepl("^\\s*constant\\s*\\(", as.character(x))
+}
+
+
+#' Which coefficients a constant prior pins
+#'
+#' A coefficient held at a constant carries no free parameter in the
+#' generated program: brms declares it in `transformed parameters` and
+#' assigns the value. Its design column therefore adds no direction the
+#' likelihood has to identify, so anything asking whether two designs
+#' are separately identified has to leave those columns out.
+#'
+#' @param prior A `brmsprior` table, or `NULL`.
+#' @param resp Response the design belongs to, `""` on a univariate
+#'   model. A row scoped to another response pins nothing here.
+#' @return Character vector of coefficient names, possibly empty.
+#' @noRd
+pinned_prior_coefs <- function(prior, resp = "") {
+  if (is.null(prior) || !is.data.frame(prior) || nrow(prior) == 0L) {
+    return(character())
+  }
+  if (!all(c("prior", "class", "coef") %in% names(prior))) {
+    return(character())
+  }
+  keep <- prior$class == "b" &
+    nzchar(prior$coef) &
+    is_constant_prior(prior$prior)
+  if ("resp" %in% names(prior)) {
+    scoped <- as.character(prior$resp)
+    keep <- keep & (!nzchar(scoped) | scoped == resp)
+  }
+  unique(as.character(prior$coef[keep]))
 }
 
 
@@ -1338,7 +1399,7 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
       # model fails to compile with the class name nowhere in the
       # message. Refusing beats emitting a program that cannot
       # build.
-      if (grepl("^\\s*constant\\s*\\(", user_prior)) {
+      if (is_constant_prior(user_prior)) {
         stop(insight::format_error(c(
           paste0("A 'constant()' prior is not supported for '",
                  param_name, "'."),

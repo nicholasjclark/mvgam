@@ -482,15 +482,10 @@ detect_conditional_effects <- function(x) {
   # Drop brms `|id|` correlation-tag tokens and other non-data
   # names so marginaleffects only sees addressable columns. Shares
   # the filter with find_predictors.mvgam via mvgam_keep_data_columns().
+  # `mvgam_keep_data_columns()` drops the empty-obs placeholder along
+  # with every other token that names no covariate a reader wrote, so
+  # the workaround cannot reach a figure as though it were one.
   cond <- lapply(cond, function(g) mvgam_keep_data_columns(g, x))
-  cond <- cond[lengths(cond) > 0L]
-  # Drop the empty-obs-formula placeholder column from
-  # user-visible effect groupings. The pinned `constant(0)`
-  # coefficient contributes zero to the linear predictor; plotting
-  # it as a covariate leaks the workaround into the figure.
-  cond <- lapply(cond, function(g) {
-    setdiff(g, MVGAM_EMPTY_OBS_PLACEHOLDER)
-  })
   cond <- cond[lengths(cond) > 0L]
   # Drop duplicates while preserving order
   keys <- vapply(cond, paste, FUN.VALUE = character(1L), collapse = ":")

@@ -165,7 +165,7 @@ forecast.mvgam <- function(object,
     attr(fan, "mv_wrapper") <- TRUE
     return(fan)
   }
-  newdata <- ensure_obs_placeholder_in_newdata(newdata, object$data)
+  newdata <- ensure_obs_placeholder(newdata, object)
 
   trend_specs <- object$mv_spec$trend_specs
   # Trendless fits forecast by projecting the obs-side linear

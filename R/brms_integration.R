@@ -277,8 +277,8 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   # formula (its prior pipeline trips on a 0-row brmsprior).
   # Inject a constant placeholder column with a `constant(0)`
   # prior so the contribution to the linear predictor stays
-  # exactly zero, no parameter enters the Stan parameters block,
-  # and the user-visible model is unchanged. Only applied to the
+  # exactly zero, no free parameter enters the Stan parameters
+  # block, and the user-visible model is unchanged. Only applied to the
   # obs side; the trend side goes through mvgam's own stancode
   # rewriter, which strips brms's parameters declarations and
   # would leave the placeholder's pin assignment orphaned.
@@ -349,13 +349,14 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   # `mock_setup$data`) because mvgam's stancode regenerator,
   # brms's prediction helpers and any post-fit code that re-runs
   # `validate_data()` against the rewritten formula need the
-  # column to satisfy the formula. Hiding the placeholder from
-  # the user happens through three targeted filters downstream:
-  # the prior table (`extract_prior_from_setup()`), the variables
-  # list (`variables.mvgam()`), and the displayed formula in
-  # `summary.mvgam()`. `names(mod$data)` will still contain
-  # `.mvgam_empty_obs`; that is the price of the workaround for
-  # a brms limitation.
+  # column to satisfy the formula. Hiding the placeholder from the
+  # user happens downstream, where a reader meets it: the
+  # stored prior table (`assemble_stored_prior_table()`), the
+  # variables list (`variables.mvgam()`), the term list
+  # (`insight::find_predictors()`) and the displayed formula in
+  # `summary.mvgam()`. None of those filters may run on a table the
+  # code generator reads, or the pin holding the placeholder at
+  # zero leaves the program with them.
 
   # Extract key components for mvgam integration. `data2` is retained
   # on the setup so downstream Stan-code regenerators
@@ -416,15 +417,14 @@ extract_prior_from_setup <- function(setup_object, codegen = NULL) {
     ),
     codegen_args_for(codegen, mvgam_codegen_standata_options)
   )))
-  # Drop the empty-obs-formula placeholder row from the merged
-  # prior table so users do not see it in `prior_summary()` or
-  # `mod$prior`. The pin row is structural only.
-  if (is.data.frame(prior) && nrow(prior) > 0L &&
-        "coef" %in% names(prior)) {
-    prior <- prior[
-      prior$coef != MVGAM_EMPTY_OBS_PLACEHOLDER, , drop = FALSE
-    ]
-  }
+  # The placeholder's `constant(0)` row stays in this table. It is
+  # read again by `generate_base_stancode_with_stanvars()`, which
+  # regenerates the program mvgam actually compiles, so dropping it
+  # here dropped the pin from the model rather than from the
+  # display: a formula that declined an intercept was fitted with a
+  # free one, lying on an exact ridge against any trend intercept.
+  # `assemble_stored_prior_table()` hides the row where the user
+  # reads it.
   prior
 }
 
@@ -463,22 +463,51 @@ safe_brms_prior_call <- function(expr) {
 MVGAM_EMPTY_OBS_PLACEHOLDER <- ".mvgam_empty_obs"
 
 
-# Internal: stamp the placeholder column on a user-supplied
-# `newdata` frame when the fit's training `data` had it. Without
-# this, brms's `validate_data()` rejects predict / forecast /
-# posterior_predict / pp_check newdata that the user assembled
-# from the visible model.
+# Internal: does this observation formula name the placeholder?
+# The rewritten formula is what demands the column, so it is what
+# decides whether a frame needs one, and the stored frame does not
+# have to carry it for a reader to trip over.
 #'@noRd
-ensure_obs_placeholder_in_newdata <- function(newdata, fit_data) {
-  if (is.null(newdata)) return(newdata)
-  if (is.null(fit_data) ||
-        !MVGAM_EMPTY_OBS_PLACEHOLDER %in% names(fit_data)) {
-    return(newdata)
+obs_formula_needs_placeholder <- function(formula) {
+  if (is.null(formula)) return(FALSE)
+  # A rewritten formula is stored as a plain formula, which
+  # `mvgam_obs_formula()` answers `NULL` for: it reaches into the
+  # observation slot of an `mvgam_formula` or a `brmsformula`, and a
+  # plain formula has no slots to reach into.
+  obs <- tryCatch(mvgam_obs_formula(formula), error = function(e) NULL)
+  if (is.null(obs) && inherits(formula, "formula")) {
+    obs <- formula
   }
-  if (!MVGAM_EMPTY_OBS_PLACEHOLDER %in% names(newdata)) {
-    newdata[[MVGAM_EMPTY_OBS_PLACEHOLDER]] <- 1
-  }
-  newdata
+  if (is.null(obs)) return(FALSE)
+  MVGAM_EMPTY_OBS_PLACEHOLDER %in% all.vars(obs)
+}
+
+
+# Internal: stamp the placeholder column on a frame that is about
+# to reach brms, when the fit's rewritten formula names it.
+# Without this, brms's `validate_data()` rejects predict / forecast
+# / posterior_predict / pp_check frames, whether the user assembled
+# them or mvgam resolved them from its own training data.
+#'@noRd
+ensure_obs_placeholder <- function(data, object) {
+  if (is.null(data)) return(data)
+  if (MVGAM_EMPTY_OBS_PLACEHOLDER %in% names(data)) return(data)
+  if (!obs_formula_needs_placeholder(object$formula)) return(data)
+  data[[MVGAM_EMPTY_OBS_PLACEHOLDER]] <- 0
+  data
+}
+
+
+# Internal: take the placeholder back out of a frame the user
+# reads. `mvgam()` writes it into the frame brms is given, and the
+# fit stores that frame, so the column would otherwise sit beside
+# the user's own columns in `fit$data` and everything drawn from
+# it.
+#'@noRd
+drop_obs_placeholder <- function(data) {
+  if (!is.data.frame(data)) return(data)
+  keep <- setdiff(names(data), MVGAM_EMPTY_OBS_PLACEHOLDER)
+  data[, keep, drop = FALSE]
 }
 
 
@@ -560,10 +589,17 @@ format_family_links <- function(family) {
 # rewrite the formula to `y ~ 0 + <placeholder>`. Pin the
 # placeholder's coefficient to zero via `prior(constant(0), class
 # = "b", coef = <placeholder>)` so brms's compiled Stan code
-# emits no parameter for it (verified empirically: the
-# `parameters {}` block stays empty). The contribution to the
-# linear predictor is `1 * 0 = 0` everywhere, semantically
-# identical to the user's original `y ~ 0`.
+# emits no free parameter for it: `b` is declared in
+# `transformed parameters` and assigned `b[1] = 0`, leaving the
+# `parameters` block with only the family's own scale. The
+# contribution to the linear predictor is `1 * 0 = 0` everywhere,
+# semantically identical to the user's original `y ~ 0`.
+#
+# The pin only holds if it survives to the table
+# `generate_base_stancode_with_stanvars()` regenerates the
+# compiled program from. Filtering the row anywhere upstream of
+# that leaves the placeholder free, and against a trend intercept
+# the two lie on an exact ridge.
 #
 # Detection is strict: only when the formula's RHS has zero term
 # labels and zero intercept (empty model matrix). Formulas with
@@ -601,7 +637,11 @@ inject_obs_zero_placeholder <- function(formula, data, prior) {
   }
 
   ph <- MVGAM_EMPTY_OBS_PLACEHOLDER
-  data[[ph]] <- 1
+  # Zero, not one. The pin already holds the coefficient at zero, so
+  # the contribution is nil either way, but a column of ones is an
+  # intercept a reader of `standata()$X` would take at face value on a
+  # formula that declined one.
+  data[[ph]] <- 0
   new_formula <- stats::reformulate(
     termlabels = c("0", ph),
     response   = formula[[2L]]

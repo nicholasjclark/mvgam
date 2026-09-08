@@ -7,11 +7,11 @@
 # side, so the branch that handles an empty design is never reached.
 #
 # mvgam cannot hand brms a design with no columns, so it substitutes
-# a placeholder. What that placeholder is decides two things a user
-# can see. It is a column of ones, which is an intercept whatever it
-# is called, so a formula that declined an intercept is fitted with
-# one. And it is named `.mvgam_empty_obs`, which reaches the frame,
-# the term list and the printed summary.
+# a placeholder named `.mvgam_empty_obs`. Two things about it are
+# visible to a user. What the column contributes to the linear
+# predictor decides whether the formula was honoured, and the name
+# itself reaches the frame, the term list and the printed summary
+# unless every one of those filters it.
 #
 # The prefit settles all of the structure. `standata()` and
 # `stancode()` need no posterior, and the questions here are about
@@ -90,29 +90,34 @@ prefit <- mvgam(
 )
 
 
-test_that("an empty observation design is a column of ones", {
+test_that("the empty observation design is one substituted column", {
   # The substitution itself, stated plainly. mvgam cannot pass brms a
-  # design with no columns, so it makes one. What it makes is a
-  # constant, and a constant column in a linear predictor is an
-  # intercept whatever the column is called.
+  # design with no columns, so it makes one, and the whole of what
+  # follows turns on what that column carries.
   sd <- standata(prefit)
   expect_identical(as.integer(sd$K), 1L)
   expect_identical(dim(sd$X), c(nrow(dat), 1L))
   expect_identical(colnames(sd$X), ".mvgam_empty_obs")
-  # Every entry is one, which is the whole claim.
-  expect_identical(unique(as.numeric(sd$X)), 1)
 })
 
 
 test_that("a formula that declines an intercept is fitted without one", {
-  # FAILS TODAY. `y ~ -1` is the user saying the observation side
-  # contributes no term. The design above contributes a constant, so
-  # the model carries a free parameter on the observation scale that
-  # the formula refused. Whether the placeholder should be a column
-  # of ones or a column of zeros is the choice this states: zeros
-  # give brms its column and add nothing to the linear predictor.
+  # `y ~ -1` is the user saying the observation side contributes no
+  # term, so the column mvgam substitutes has to contribute nothing.
+  # It does so twice over: the column is zero, and the coefficient is
+  # held at zero by a constant prior, so no free parameter enters the
+  # program.
   sd <- standata(prefit)
   expect_identical(unique(as.numeric(sd$X)), 0)
+  code <- stancode(prefit)
+  lines <- strsplit(code, "\n")[[1L]]
+  par_start <- grep("^parameters \\{", lines)
+  par_end <- grep("^transformed parameters \\{", lines)
+  expect_length(par_start, 1L)
+  expect_length(par_end, 1L)
+  par_block <- lines[seq(par_start, par_end)]
+  expect_false(any(grepl("vector[K] b;", par_block, fixed = TRUE)))
+  expect_true(any(grepl("b[1] = 0;", lines, fixed = TRUE)))
 })
 
 
@@ -142,7 +147,7 @@ test_that("the axis is the one the frame declared", {
 
 
 test_that("the placeholder is not offered as a predictor", {
-  # FAILS TODAY. `find_predictors()` is what marginaleffects and the
+  # `find_predictors()` is what marginaleffects and the
   # rest of the easystats surface read to decide what a user may take
   # a slope or a contrast over. `.mvgam_empty_obs` is constant, so no
   # slope over it exists, and it is an internal name besides.
@@ -155,9 +160,9 @@ test_that("the placeholder is not offered as a predictor", {
 
 
 test_that("the frame handed back is the frame that was given", {
-  # FAILS TODAY. The placeholder is written into the stored data, so
-  # a user reading `insight::get_data()` or `fit$data` finds a column
-  # they did not supply sitting beside their own.
+  # The placeholder is written into the frame brms is given, so a
+  # user reading `insight::get_data()` or `fit$data` must not find a
+  # column they did not supply sitting beside their own.
   expect_setequal(names(prefit$data), names(dat))
 })
 
@@ -170,72 +175,84 @@ test_that("the frame handed back is the frame that was given", {
 # the pair stacked side by side, and it is fully determined before
 # any sampling.
 
+# The mapping is checked against the frame below rather than being
+# taken on trust, and the package's own resolver is what is driven, so
+# a second derivation cannot drift from the one that runs.
 stacked_design <- function(fit) {
-  sd <- standata(fit)
-  X <- sd$X
-  Xt <- sd$X_trend
-  if (is.null(Xt)) {
-    return(X)
-  }
-  # `X_trend` runs on the trend grid, so each observation row is
-  # mapped through the same index Stan uses.
-  idx <- vapply(
-    seq_along(sd$obs_trend_time),
-    function(i) {
-      sd$times_trend[sd$obs_trend_time[i], sd$obs_trend_series[i]]
-    },
-    numeric(1)
+  mvgam:::stacked_obs_trend_design(
+    standata(fit), mvgam:::MVGAM_EMPTY_OBS_PLACEHOLDER
   )
-  cbind(X, Xt[idx, , drop = FALSE])
 }
 
 
 test_that("the mapping onto the trend grid is the one Stan uses", {
   # The block below is only worth anything if this index is right, so
-  # it is checked on a fit where the same covariate sits on both
-  # sides: the mapped trend column has to be the frame's own values.
-  pre_both <- mvgam(
-    y ~ elev, trend_formula = ~ elev + AR(p = 1),
-    data = dat, family = gaussian(), run_model = FALSE
+  # it is checked against the frame on a fit where the same covariate
+  # sits on both sides: read through the map, the trend column has to
+  # come back as the frame's own values. Putting `elev` on both sides
+  # is what makes that comparison possible, and it is also the
+  # pairing the likelihood cannot separate, so the notice is expected
+  # here rather than silenced.
+  expect_warning(
+    pre_both <- mvgam(
+      y ~ elev, trend_formula = ~ elev + AR(p = 1),
+      data = dat, family = gaussian(), run_model = FALSE
+    ),
+    "not separately identified"
   )
   sd <- standata(pre_both)
-  idx <- vapply(
-    seq_along(sd$obs_trend_time),
-    function(i) {
-      sd$times_trend[sd$obs_trend_time[i], sd$obs_trend_series[i]]
-    },
-    numeric(1)
-  )
+  idx <- mvgam:::obs_rows_to_trend_rows(sd)
   expect_equal(as.numeric(sd$X_trend[idx, "elev"]), dat$elev)
   expect_equal(as.numeric(sd$X[, "elev"]), dat$elev)
 })
 
 
-test_that("the two designs do not span a direction twice", {
-  # FAILS TODAY on four of the six pairings below. A rank below the
-  # column count is a flat direction in the likelihood, which is the
-  # ridge finding 83 measures: the sampler wanders it, R-hat rises
-  # above 2 and the reported values are whatever the prior allowed.
-  #
-  # `y ~ 1` against `~ 1 + AR` is the pairing that works, so the
-  # reconciliation exists somewhere and does not run for a factor or
-  # for a shared covariate.
-  pairs <- list(
-    list(y ~ -1, ~ elev + AR(p = 1)),
-    list(y ~ -1, ~ series + AR(p = 1)),
-    list(y ~ 1, ~ elev + AR(p = 1)),
-    list(y ~ 1, ~ series + AR(p = 1)),
-    list(y ~ 1, ~ 1 + AR(p = 1)),
-    list(y ~ elev, ~ series + AR(p = 1)),
-    list(y ~ elev, ~ elev + AR(p = 1))
-  )
-  for (pr in pairs) {
-    pre_i <- mvgam(
-      pr[[1L]], trend_formula = pr[[2L]], data = dat,
-      family = gaussian(), run_model = FALSE
-    )
+# Which of the seven pairings is identified, and what each one is
+# told. A column pinned at a constant carries no free parameter, so
+# the placeholder is dropped before the rank is taken: what is asked
+# is whether the free coefficients are separately identified.
+#
+# The three deficient rows are not refused. Fitting `y ~ 1` against
+# `~ series + AR(p = 1)` three ways settles why: under the default
+# priors each part carries a posterior SD of 4.26 while their sums
+# hold at 0.11 to 0.36; under `std_normal()` on the trend
+# coefficients the fit is proper at R-hat 1.02 and the parts are
+# still displaced by the intercept; and `y ~ -1` recovers the levels.
+# The sums, the fitted values and the forecasts are identified
+# throughout, so a refusal would reject a model that samples and
+# predicts. The notice names the columns instead.
+identification_cases <- list(
+  list(obs = y ~ -1, trend = ~ elev + AR(p = 1), deficient = FALSE),
+  list(obs = y ~ -1, trend = ~ series + AR(p = 1), deficient = FALSE),
+  list(obs = y ~ 1, trend = ~ elev + AR(p = 1), deficient = FALSE),
+  list(obs = y ~ 1, trend = ~ series + AR(p = 1), deficient = TRUE),
+  list(obs = y ~ 1, trend = ~ 1 + AR(p = 1), deficient = FALSE),
+  list(obs = y ~ elev, trend = ~ series + AR(p = 1), deficient = TRUE),
+  list(obs = y ~ elev, trend = ~ elev + AR(p = 1), deficient = TRUE)
+)
+
+
+test_that("a confounded pairing is named where it is built", {
+  for (case in identification_cases) {
+    build <- function() {
+      mvgam(
+        case$obs, trend_formula = case$trend, data = dat,
+        family = gaussian(), run_model = FALSE
+      )
+    }
+    if (case$deficient) {
+      expect_warning(pre_i <- build(), "not separately identified")
+    } else {
+      pre_i <- build()
+    }
     M <- stacked_design(pre_i)
-    expect_identical(qr(M)$rank, ncol(M))
+    # `~ 1 + AR` carries no trend design at all, so there is nothing
+    # to stack and nothing that could be confounded.
+    if (is.null(M)) {
+      expect_false(case$deficient)
+      next
+    }
+    expect_identical(qr(M)$rank < ncol(M), case$deficient)
   }
 })
 
@@ -244,10 +261,10 @@ test_that("the two designs do not span a direction twice", {
 #
 # Two, and the pair is what separates a cosmetic name from a
 # modelling consequence. The first puts no constant on the trend
-# side, so the placeholder is the model's only intercept and is
-# identified. The second gives the trend a per-series intercept,
-# whose span already contains the constant, which is the shape the
-# VAR article is written in.
+# side; the second gives the trend a per-series intercept, whose span
+# would contain any constant the observation side added. That second
+# shape is the one the VAR article is written in, and it is where a
+# free placeholder would have cost the fit its identification.
 
 fit_cached <- function(name, trend) {
   path <- cache_path(paste0("val_mvgam_empty_obs_", name, ".rds"))
@@ -272,11 +289,11 @@ fit_conf <- fit_cached("conf", ~ series + AR(p = 1))
 
 
 test_that("the summary shows no name the user cannot look up", {
-  # FAILS TODAY. `summary()` prints the placeholder as the sole
-  # Population-Level Effect, with an estimate and an interval, and
-  # neither `variables()` nor `tidy()` lists it. So the one parameter
-  # in the first output a reader sees has no entry in any accessor
-  # they would reach for next.
+  # `summary()` used to print the placeholder as the sole
+  # Population-Level Effect, with an estimate and an interval, while
+  # neither `variables()` nor `tidy()` listed it. The pin is what
+  # settles it: a coefficient held at a constant has no draws to
+  # summarise.
   printed <- capture.output(summary(fit_free))
   expect_false(any(grepl(".mvgam_empty_obs", printed, fixed = TRUE)))
 })
@@ -333,32 +350,26 @@ test_that("prediction and forecasting run on an empty design", {
 
 
 test_that("the constant mvgam adds is identified against the trend", {
-  # FAILS TODAY, and this is the block the file exists for.
+  # The block the file exists for. `~ series + AR(p = 1)` gives the
+  # trend one intercept per series, whose span already contains any
+  # constant. A free placeholder beside them was an exact ridge: it
+  # correlated at -1.000 with every trend intercept, each carried a
+  # posterior SD near 233 against sums near 0.13, and the sampler
+  # returned R-hat 2.14 at a bulk ESS of 2.63 from 1000 draws, with
+  # the series levels reported at about 110 against a truth of 1.0,
+  # 2.0 and -0.5.
   #
-  # `~ series + AR(p = 1)` gives the trend one intercept per series.
-  # Their span already contains the constant, so the column of ones
-  # mvgam substitutes for the empty observation design adds a
-  # direction the likelihood cannot see. The model is not identified,
-  # and nothing in `mvgam()` says so.
-  #
-  # Measured on this fit: the observation constant correlates at
-  # -1.000 with every trend intercept, each has a posterior SD near
-  # 233 while their sums have SDs near 0.13, and the sampler returns
-  # R-hat 2.14 at a bulk ESS of 2.63 from 1000 draws. The true series
-  # levels are 1.0, 2.0 and -0.5; the fit reports about 110 for each.
+  # The pin removes the direction rather than shrinking it, so what
+  # is asserted is its absence: no such coefficient is sampled, and
+  # the trend intercepts are the only levels in the model.
   dm <- posterior::as_draws_matrix(fit_conf)
-  obs <- grep("empty_obs", colnames(dm), value = TRUE)
-  expect_length(obs, 1L)
+  expect_length(grep("empty_obs", colnames(dm), value = TRUE), 0L)
   tr <- grep("^b_series.*_trend$", colnames(dm), value = TRUE)
   expect_length(tr, n_series)
-
-  o <- as.numeric(dm[, obs])
+  # On a ridge each part wanders far beyond the spread of their
+  # sums. With nothing to trade against, each level stands alone.
   for (nm in tr) {
-    t_j <- as.numeric(dm[, nm])
-    # A ridge shows as a correlation at the boundary and as a sum
-    # far tighter than either part.
-    expect_lt(abs(stats::cor(o, t_j)), 0.95)
-    expect_lt(stats::sd(o), 10 * stats::sd(o + t_j))
+    expect_lt(stats::sd(as.numeric(dm[, nm])), 1)
   }
 })
 
@@ -366,7 +377,7 @@ test_that("the constant mvgam adds is identified against the trend", {
 test_that("a model mvgam agrees to build converges", {
   # The consequence of the block above, stated where a user would
   # meet it. A fit whose R-hat is 2.14 has told us nothing, and the
-  # only sign of that is a column of the summary table.
+  # only sign of that was a column of the summary table.
   rh <- rhat(fit_conf)
   rh <- rh[is.finite(rh)]
   expect_lt(max(rh), 1.05)
@@ -374,10 +385,10 @@ test_that("a model mvgam agrees to build converges", {
 
 
 test_that("the series levels are recovered, not their ridge", {
-  # The same defect read on the quantity a user came for. Truth is
-  # 1.0, 2.0 and -0.5. Differences between series are identified even
-  # on the ridge, so this asks for the levels themselves, which are
-  # what the summary reports and what a reader would quote.
+  # The same claim read on the quantity a user came for. Truth is
+  # 1.0, 2.0 and -0.5. Differences between series stay identified
+  # even on a ridge, so this asks for the levels themselves, which
+  # are what the summary reports and what a reader would quote.
   dm <- posterior::as_draws_matrix(fit_conf)
   for (i in seq_along(series_names)) {
     nm <- paste0("b_series", series_names[i], "_trend")
