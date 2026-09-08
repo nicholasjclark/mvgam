@@ -1050,4 +1050,61 @@ test_that("each arm predicts on the support its own family has", {
 })
 
 
+test_that("a wide fit can be scored by leaving future occasions out", {
+  # A wide frame has no series column: the series is the response,
+  # which is why the axis record answers `multivariate` and lists
+  # the three names. `lfo_cv()` asked the frame for a column it
+  # cannot have, and once that demand went it split the frame by a
+  # row-series that a response-keyed axis has no answer for, leaving
+  # a factor of no rows.
+  #
+  # Every row of a wide frame carries every response, so the
+  # responses cannot disagree about the time grid and there is
+  # nothing to split. What the call has to produce is a score at
+  # each occasion it rolled over.
+  lfo <- lfo_cv(fit, min_t = 45, silent = 2)
+  expect_s3_class(lfo, "mvgam_lfo")
+  expect_gt(length(lfo$eval_timepoints), 0L)
+  # The occasions evaluated are occasions the frame holds, not ranks
+  # standing in for them.
+  expect_true(all(lfo$eval_timepoints %in% sort(unique(dat$time))))
+  expect_true(all(lfo$eval_timepoints > 45))
+  expect_identical(length(lfo$elpds), length(lfo$eval_timepoints))
+  expect_true(all(is.finite(lfo$elpds)))
+  # A log density is negative, and a sum of them over seventeen
+  # occasions of three responses is well away from zero.
+  expect_lt(sum(lfo$elpds), 0)
+})
+
+
+test_that("a proper score runs beside the elpd", {
+  # `elpd` used to be the only rule `lfo_cv()` could report. Every
+  # other score needs predictive draws rather than a density, and
+  # those were fetched with `forecast()`, which extends the grid past
+  # the last observed occasion. A fold is held out by masking, so the
+  # window sits inside the grid and the call was refused; a
+  # `tryCatch()` turned the refusal into a silent `NA`.
+  #
+  # The draws now come from the state the fold was scored on, so the
+  # two scores describe one predictive.
+  lfo <- lfo_cv(fit, min_t = 45, score = c("elpd", "crps"),
+                silent = 2)
+  expect_true("crps" %in% names(lfo$scores))
+  expect_identical(length(lfo$scores$crps),
+                   length(lfo$eval_timepoints))
+  # A CRPS is a non-negative loss, and one that came back as `NA`
+  # per fold is what the swallowed refusal looked like.
+  expect_false(anyNA(lfo$scores$crps))
+  expect_true(all(lfo$scores$crps >= 0))
+  expect_true(all(is.finite(lfo$scores$crps)))
+  # The two rules are scored on one predictive, so a fold the model
+  # found surprising should cost on both. Rank agreement is the
+  # claim that survives their different scales.
+  expect_gt(
+    stats::cor(lfo$elpds, -lfo$scores$crps, method = "spearman"),
+    0
+  )
+})
+
+
 cat("\nDone.\n")

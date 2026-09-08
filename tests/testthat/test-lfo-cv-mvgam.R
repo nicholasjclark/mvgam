@@ -1,6 +1,6 @@
 # Unit tests for `lfo_cv.mvgam()` in `R/lfo_cv.mvgam.R`. The
 # method orchestrates a sequence of `update.mvgam` refits and
-# `log_lik.mvgam` / `forecast.mvgam` / `score.mvgam_forecast`
+# `log_lik.mvgam` / `window_predictive` / `score.mvgam_forecast`
 # calls; the algorithmic primitives are exercised by their own
 # test files. These tests stub the primitives via
 # `local_mocked_bindings()` and assert:
@@ -194,10 +194,21 @@ test_that("Non-ELPD score adds named entries to scores list", {
     log_lik = function(object, ...) {
       matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
     },
-    forecast = function(object, ..., newdata = NULL) {
-      n_h <- if (is.null(newdata)) 1L else
-        length(unique(newdata$time))
-      list(forecasts = list(s1 = matrix(0, ndraws, n_h)))
+    # The window's predictive draws. Stubbed because a mock fit
+    # carries no posterior to draw from; the value it returns is
+    # never asserted, only the shape of what `lfo_cv()` builds
+    # around it.
+    window_predictive = function(fit, fc_data) {
+      n_h <- length(unique(fc_data$time))
+      structure(
+        list(
+          forecasts = list(s1 = matrix(0, ndraws, n_h)),
+          test_observations = list(s1 = rep(0, n_h)),
+          series_names = "s1",
+          type = "response"
+        ),
+        class = "mvgam_forecast"
+      )
     },
     score = function(object, score, ...) {
       list(all_series = data.frame(score = 0.5))
@@ -207,9 +218,13 @@ test_that("Non-ELPD score adds named entries to scores list", {
                  score = c("elpd", "crps"), silent = 2L)
   expect_true(is.list(out$scores))
   expect_true("crps" %in% names(out$scores))
-  expect_identical(length(out$scores$crps), 5L)
-  # All forecast() calls stubbed to score = 0.5 per window.
-  expect_true(all(out$scores$crps == 0.5))
+  # One score per evaluation point, which is the contract this mock
+  # can speak to. `score()` is stubbed here, so its value says
+  # nothing about the package; the number a real fit produces is
+  # asserted in `tests/local/test-grain-mvbf-wide.R`.
+  expect_identical(length(out$scores$crps),
+                   length(out$eval_timepoints))
+  expect_false(anyNA(out$scores$crps))
 })
 
 
@@ -224,10 +239,21 @@ test_that("summary.mvgam_lfo returns a tibble with one row per fold", {
     log_lik = function(object, ...) {
       matrix(-1.0, nrow = ndraws, ncol = nrow(newdat))
     },
-    forecast = function(object, ..., newdata = NULL) {
-      n_h <- if (is.null(newdata)) 1L else
-        length(unique(newdata$time))
-      list(forecasts = list(s1 = matrix(0, ndraws, n_h)))
+    # The window's predictive draws. Stubbed because a mock fit
+    # carries no posterior to draw from; the value it returns is
+    # never asserted, only the shape of what `lfo_cv()` builds
+    # around it.
+    window_predictive = function(fit, fc_data) {
+      n_h <- length(unique(fc_data$time))
+      structure(
+        list(
+          forecasts = list(s1 = matrix(0, ndraws, n_h)),
+          test_observations = list(s1 = rep(0, n_h)),
+          series_names = "s1",
+          type = "response"
+        ),
+        class = "mvgam_forecast"
+      )
     },
     score = function(object, score, ...) {
       list(all_series = data.frame(score = 0.5))

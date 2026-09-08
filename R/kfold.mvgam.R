@@ -482,22 +482,7 @@ refit_score_one_fold <- function(object, data, fold_ids,
         "(", length(held_rows), "rows held out) ...\n")
   }
 
-  # brms warns whenever it drops rows whose response is missing.
-  # Those rows are the fold: masking the response is how a fold is
-  # held out, so the notice describes the method working and names
-  # nothing the caller can act on. Muffled by its own text rather
-  # than by silencing the refit, so any other warning the refit
-  # raises still reaches the caller.
-  refit <- withCallingHandlers(
-    update(object, newdata = train_data,
-           silent = max(silent, 1L)),
-    warning = function(w) {
-      if (grepl("Rows containing NAs", conditionMessage(w),
-                fixed = TRUE)) {
-        invokeRestart("muffleWarning")
-      }
-    }
-  )
+  refit <- refit_on_held_out(object, train_data, max(silent, 1L))
 
   # Held data may contain factor levels the refit never saw (the
   # whole point of leave-one-group-out is that the group was
@@ -940,4 +925,33 @@ build_mvgam_kfold <- function(pointwise, pointwise_psis = NULL,
   )
   class(out) <- c("mvgam_kfold", "kfold", "loo")
   out
+}
+
+
+#' Refit a model on a training window whose held-out rows are masked
+#'
+#' Every cross-validation method here holds a fold out by setting its
+#' response to `NA` rather than by deleting rows, so the trend grid
+#' the refit is built on matches the parent's. brms warns whenever it
+#' drops rows whose response is missing, and those rows are the fold:
+#' the notice describes the method working and names nothing the
+#' caller can act on. It is muffled by its own text rather than by
+#' silencing the refit, so anything else the refit raises still
+#' reaches the caller.
+#'
+#' @param object The fitted model to refit.
+#' @param train_data The training frame, held-out responses masked.
+#' @param silent Verbosity passed to [update()].
+#' @return The refitted model.
+#' @noRd
+refit_on_held_out <- function(object, train_data, silent = 1L) {
+  withCallingHandlers(
+    update(object, newdata = train_data, silent = silent),
+    warning = function(w) {
+      if (grepl("Rows containing NAs", conditionMessage(w),
+                fixed = TRUE)) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
 }

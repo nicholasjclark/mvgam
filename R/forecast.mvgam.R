@@ -331,8 +331,12 @@ resolve_series_info <- function(object) {
 # plus the cached time / series variable names and the obs data
 # frame the downstream linpred calls subset.
 #'@noRd
-build_training_arms <- function(object, series_levels, resp = NULL) {
-  d <- mvgam_training_data(object)
+build_training_arms <- function(object, series_levels, resp = NULL,
+                                  data = NULL) {
+  # The fit's own frame by default. `lfo_cv()` passes a window of it
+  # instead, so the arms it scores are cut by the same rule the
+  # hindcast arms are, rather than by a second one written beside it.
+  d <- data %||% mvgam_training_data(object)
   meta_vars <- object$trend_metadata$variables %||%
     list(time_var = "time", series_var = "series")
   time_var <- meta_vars$time_var

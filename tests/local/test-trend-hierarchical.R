@@ -1022,7 +1022,10 @@ test_that("the axis maps a hierarchical newdata with no draws at all", {
   }
 
   # A frame past the training grid yields the new occasions per
-  # series; one inside it yields none.
+  # series; one wholly inside it is refused, naming the last
+  # occasion each series was observed at. Returning nothing there
+  # handed back a class-correct forecast object carrying no
+  # forecasts.
   h <- 4L
   future_times <- max(user_times) + seq_len(h)
   future <- do.call(rbind, lapply(levs, function(s) {
@@ -1037,7 +1040,10 @@ test_that("the axis maps a hierarchical newdata with no draws at all", {
   for (s in levs) {
     expect_identical(as.integer(grid$times[[s]]), future_times)
   }
-  expect_null(mvgam:::resolve_forecast_grid(fit, d, training, levs))
+  expect_error(
+    mvgam:::resolve_forecast_grid(fit, d, training, levs),
+    "no occasion beyond the training grid"
+  )
 })
 
 

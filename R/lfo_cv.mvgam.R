@@ -209,8 +209,7 @@ lfo_cv.mvgam <- function(object,
   }
 
   time_var <- object$trend_metadata$variables$time_var %||% "time"
-  series_var <- object$trend_metadata$variables$series_var %||%
-    "series"
+  warn_grid_dependent_trend_data(object)
   # Only the time is demanded. Which rows belong to which series is
   # answered two lines below by `axis_row_series()`, from the record
   # rather than from a column, so a hierarchical frame whose series
@@ -232,13 +231,21 @@ lfo_cv.mvgam <- function(object,
   # Identified the way the fit identified them, so a frame whose
   # series column was superseded by a grouping is split into the
   # series the model has rather than the ones the column names.
-  series_fac <- axis_row_series(object, all_data) %||%
-    factor(all_data[[series_var]])
-  series_fac <- droplevels(series_fac)
-  series_time_sets <- lapply(
-    split(all_data[[time_var]], series_fac),
-    function(t) sort(unique(t))
-  )
+  #
+  # The record answers `NULL` where a row belongs to no one series:
+  # a response-keyed frame carries every response on every row, so
+  # the responses cannot disagree about the grid and there is
+  # nothing here to compare. Reading a `series` column instead
+  # returned a factor of no rows and split the frame into nothing.
+  series_fac <- axis_row_series(object, all_data)
+  series_time_sets <- if (is.null(series_fac)) {
+    list(sort(unique(all_data[[time_var]])))
+  } else {
+    lapply(
+      split(all_data[[time_var]], droplevels(series_fac)),
+      function(t) sort(unique(t))
+    )
+  }
   if (length(series_time_sets) > 1L) {
     ref_times <- series_time_sets[[1L]]
     mismatched <- vapply(
@@ -365,11 +372,10 @@ lfo_cv.mvgam <- function(object,
   if (silent < 1L) {
     cat("LFO refit at training time", min_t, "...\n")
   }
-  splits <- lfo_cv_split(all_data, last_train = min_t,
-                          fc_horizon = fc_horizon,
-                          time_var = time_var)
-  fit_past <- update(object, newdata = splits$data_train,
-                      silent = silent)
+  train_frame <- lfo_training_frame(object, all_data,
+                                     last_train = min_t,
+                                     time_var = time_var)
+  fit_past <- refit_on_held_out(object, train_frame, silent)
   refits_at <- c(refits_at, min_t)
 
   # log_lik on the FULL data so we can index into it at any
@@ -394,13 +400,12 @@ lfo_cv.mvgam <- function(object,
   ]
   updates <- scores_at_window(
     fit = fit_past, all_data = all_data,
-    time_var = time_var, series_var = series_var,
+    time_var = time_var,
     window_times = first_window_times,
     score_names = score,
     elpds = elpds, score_arrays = score_arrays,
     eval_idx = 1L, loglik = loglik_past,
-    psis_log_weights = NULL,
-    silent = silent
+    psis_log_weights = NULL
   )
   elpds <- updates$elpds
   score_arrays <- updates$score_arrays
@@ -436,7 +441,16 @@ lfo_cv.mvgam <- function(object,
     # to one trained through position k - 1. The log-ratio is
     # the cumulative log density of observations at positions
     # (idx_refit + 1):(k - 1).
-    last_obs_positions <- seq.int(idx_refit + 1L, k - 1L)
+    # Guarded on the bound rather than on the length of the
+    # sequence: `seq.int(6, 5)` counts down and returns two
+    # elements, so a window with nothing between the last refit and
+    # the evaluation point would have indexed observations in
+    # reverse instead of skipping them.
+    if (k - 1L < idx_refit + 1L) {
+      last_obs_positions <- integer(0)
+    } else {
+      last_obs_positions <- seq.int(idx_refit + 1L, k - 1L)
+    }
     if (length(last_obs_positions) == 0L) {
       psis_lw <- NULL
       pareto_ks[k_eval] <- NA_real_
@@ -463,11 +477,10 @@ lfo_cv.mvgam <- function(object,
             "> threshold; refitting through time",
             refit_time, "\n")
       }
-      splits <- lfo_cv_split(all_data, last_train = refit_time,
-                              fc_horizon = fc_horizon,
-                              time_var = time_var)
-      fit_past <- update(fit_past, newdata = splits$data_train,
-                          silent = silent)
+      train_frame <- lfo_training_frame(object, all_data,
+                                         last_train = refit_time,
+                                         time_var = time_var)
+      fit_past <- refit_on_held_out(fit_past, train_frame, silent)
       refits_at <- c(refits_at, refit_time)
       refit_triggered[k_eval] <- TRUE
       loglik_past <- log_lik(fit_past, newdata = all_data)
@@ -477,13 +490,12 @@ lfo_cv.mvgam <- function(object,
     window_times <- all_unique_times[k:(k + fc_horizon - 1L)]
     updates <- scores_at_window(
       fit = fit_past, all_data = all_data,
-      time_var = time_var, series_var = series_var,
+      time_var = time_var,
       window_times = window_times,
       score_names = score,
       elpds = elpds, score_arrays = score_arrays,
       eval_idx = k_eval, loglik = loglik_past,
-      psis_log_weights = psis_lw,
-      silent = silent
+      psis_log_weights = psis_lw
     )
     elpds <- updates$elpds
     score_arrays <- updates$score_arrays
@@ -575,12 +587,11 @@ lfo_collect_fold_loglik <- function(loglik, all_data, time_var,
 # produce a forecast distribution under the PSIS-weighted
 # posterior.
 #'@noRd
-scores_at_window <- function(fit, all_data, time_var, series_var,
+scores_at_window <- function(fit, all_data, time_var,
                               window_times,
                               score_names,
                               elpds, score_arrays, eval_idx,
-                              loglik, psis_log_weights,
-                              silent) {
+                              loglik, psis_log_weights) {
   fc_idx <- rows_at_times(all_data, time_var, window_times)
   if (length(fc_idx) == 0L) {
     return(list(elpds = elpds, score_arrays = score_arrays))
@@ -600,13 +611,21 @@ scores_at_window <- function(fit, all_data, time_var, series_var,
     }
   }
 
-  # Other scores: compute via forecast() + score().
+  # Every other score needs predictive draws rather than a density,
+  # and it has to be the same state the ELPD above read. The window's
+  # occasions sit inside the refit's own grid, because the fold is
+  # held out by masking its response rather than by deleting its
+  # rows, so those draws are a hindcast of an unobserved stretch and
+  # not a forecast beyond the grid. Reaching for `forecast()` here
+  # asked the trend kernel to extend a grid the window is already
+  # inside, which is a second state derived a second way, and the
+  # horizon guard refused it besides.
   other_scores <- setdiff(score_names, "elpd")
   if (length(other_scores) > 0L) {
-    fc_data <- all_data[fc_idx, , drop = FALSE]
-    fc <- forecast(fit, newdata = fc_data, type = "response")
+    fc <- window_predictive(fit, all_data[fc_idx, , drop = FALSE])
     if (!is.null(psis_log_weights)) {
-      # Resample forecast draw rows under PSIS weights.
+      # Resample draw rows under the PSIS weights, so the scored
+      # draws come from the reweighted posterior the ELPD used.
       n_draws <- nrow(fc$forecasts[[1L]])
       probs <- exp(psis_log_weights -
                      lfo_log_sum_exp(psis_log_weights))
@@ -617,17 +636,9 @@ scores_at_window <- function(fit, all_data, time_var, series_var,
       })
     }
     for (sc in other_scores) {
-      s_out <- tryCatch(
-        score(fc, score = sc),
-        error = function(e) {
-          if (silent < 2L) {
-            cat("  score = ", sc, " failed at eval ", eval_idx,
-                ": ", conditionMessage(e), "\n", sep = "")
-          }
-          NULL
-        }
+      score_arrays[[sc]][eval_idx] <- lfo_aggregate_score(
+        score(fc, score = sc), sc
       )
-      score_arrays[[sc]][eval_idx] <- lfo_aggregate_score(s_out, sc)
     }
   }
 
@@ -661,34 +672,66 @@ lfo_aggregate_score <- function(s_out, sc) {
 }
 
 
-# Internal: split `data` into (train, test) on time <= last_train
-# vs time in the next fc_horizon observed times after last_train.
-# `last_train` is a time VALUE (must be present in the data).
-# Comparisons use <= and ordered set membership so the function
-# is correct for both regular and irregular CAR grids.
+# Internal: the frame a window ending at `last_train` is refit on.
+# Every occasion after it is held out by masking its response rather
+# than by deleting its rows, which is what makes the score an LFO
+# score at all.
+#
+# Deleting the rows shortens the trend grid, so the refit estimates
+# no latent state past `last_train` and `log_lik()` falls back on the
+# per-series training mean for every held-out row. The density that
+# comes back is then `p(y_k | z_bar)` rather than
+# `p(y_k | y_{1:k-1})`, and the same columns build the PSIS ratios,
+# so the estimate and the refit gate share the fault.
+#
+# Masking keeps `N_time_trend` at the full grid, so a held-out
+# occasion carries a state driven only by the kernel running forward
+# from the last observed one. What a refit at `m` delivers is
+# `p(z_{m+h} | y_{1:m})`, the h-step-ahead state; only `h = 1` is a
+# one-step density, and the sequential conditioning that turns the
+# rest into `p(y_k | y_{1:k-1})` comes from the PSIS weights rather
+# than from the fit, which is what the refit gate is for. Measured on
+# an AR(1) of 30 observed and 10 held-out occasions, the state decays
+# toward the process level (-0.301, -0.183, -0.113, -0.072 at
+# horizons 1, 3, 5 and 10) while its SD grows (0.706, 0.846, 0.876,
+# 0.931), which is the kernel running forward rather than a level
+# standing still.
+#
+# The deletion path is what that replaces, and its signature was a
+# predictive far too narrow: at horizon 10 it returned a log density
+# of +0.49, which for a gaussian needs a predictive SD no wider than
+# 0.244 against a state SD of 0.93 before observation noise.
+#
+# The loo vignette this algorithm comes from deletes the rows
+# instead (`df_past <- df[past, ]`), and is right to: every model it
+# demonstrates is observation-driven, `y_i = eta_i + sum phi_k
+# y_{i-k} + e_i`, so what a future point is conditioned on sits in
+# the data and brms marks the held-out rows with its own `oos`
+# argument. Here the conditioning information is a parameter rather
+# than a column, so deleting the rows deletes it. Masking is the
+# state-space reading of the same step: the held-out responses
+# contribute no likelihood term, and the posterior for the
+# parameters is unmoved by it. Measured on the frame above,
+# `sigma_trend` reads 0.525 masked against 0.535 deleted, `ar1` 0.757
+# against 0.755 and the intercept 2.724 against 2.702, each well
+# inside its own posterior SD.
+#
+# `last_train` is a time VALUE and must be present in the data.
+# Membership is tested against the ordered unique times so the
+# function is correct on an irregular CAR grid as well as a regular
+# one.
 #'@noRd
-lfo_cv_split <- function(data, last_train, fc_horizon,
-                          time_var = "time") {
+lfo_training_frame <- function(object, data, last_train,
+                                time_var = "time") {
   t_vec <- data[[time_var]]
   unique_times <- sort(unique(t_vec))
   idx_last <- match(last_train, unique_times)
-  if (is.na(idx_last)) {
-    # Caller should have validated; defensive fallback uses <=.
-    train_idx <- which(t_vec <= last_train)
-    test_idx <- which(t_vec > last_train)
+  held_rows <- if (is.na(idx_last)) {
+    which(t_vec > last_train)
   } else {
-    train_times <- unique_times[seq_len(idx_last)]
-    test_upper <- min(idx_last + fc_horizon, length(unique_times))
-    test_times <- unique_times[
-      seq.int(idx_last + 1L, test_upper)
-    ]
-    train_idx <- which(t_vec %in% train_times)
-    test_idx <- which(t_vec %in% test_times)
+    which(t_vec %in% unique_times[-seq_len(idx_last)])
   }
-  list(
-    data_train = data[train_idx, , drop = FALSE],
-    data_test  = data[test_idx, , drop = FALSE]
-  )
+  mask_heldout_response(object, data, held_rows)
 }
 
 
@@ -1214,4 +1257,99 @@ print.mvgam_lfo <- function(x, ...) {
     }
   }
   invisible(x)
+}
+
+
+#' Warn where a refit's trend data is fixed by the grid's length
+#'
+#' A fold is held out by masking its response, which keeps the trend
+#' grid whole so the latent state carries forward. Two pieces of trend
+#' data are sized from that grid rather than from the occasions a
+#' response was seen at, so they answer to the frame's extent:
+#' piecewise changepoints, placed at
+#' `floor(N_time_trend * changepoint_range)`, and a trend-side smooth,
+#' whose basis and centring are built over every row because the trend
+#' submodel carries a synthetic response and so has no missing rows to
+#' drop.
+#'
+#' Measured on 30 observed occasions, the changepoints sit at 6, 10,
+#' 15, 19 and 24 with one further occasion in the frame and at 12, 23,
+#' 34, 45 and 56 with forty. A trend-side smooth's `Xs_trend` differs
+#' by up to 0.75 on the rows the two frames share.
+#'
+#' Every fold is refit on one frame, so the folds agree with each
+#' other and a comparison across models scored on the same frame
+#' holds. What does not hold is that the score equals the one a fit
+#' truncated at each origin would give, so the caller is told rather
+#' than left to find it.
+#'
+#' @param object The fitted model being cross-validated.
+#' @return `invisible(TRUE)`.
+#' @noRd
+warn_grid_dependent_trend_data <- function(object) {
+  sdata <- object$standata %||% list()
+  grid_bound <- c(
+    "piecewise changepoints" = "t_change_trend" %in% names(sdata),
+    "a trend-side smooth" = "Xs_trend" %in% names(sdata)
+  )
+  if (!any(grid_bound)) {
+    return(invisible(TRUE))
+  }
+  rlang::warn(insight::format_warning(c(
+    "This model's trend data is sized by the time grid.",
+    x = paste0(
+      "Sized from the grid rather than from the observed occasions: ",
+      paste(names(grid_bound)[grid_bound], collapse = ", "), "."
+    ),
+    i = paste0(
+      "A fold is held out by masking its response, so the grid keeps ",
+      "its full length and these are placed over it. Every fold is ",
+      "scored under the same trend data, so folds and models scored ",
+      "on one frame stay comparable."
+    ),
+    i = paste0(
+      "They are not the values a fit truncated at each origin would ",
+      "use, so scores from frames of different extent are not."
+    )
+  )))
+  invisible(TRUE)
+}
+
+
+#' The predictive draws for one evaluation window
+#'
+#' A fold is held out by masking its response, so the window's
+#' occasions sit inside the refit's own grid and its states were drawn
+#' with the parameters. What every non-ELPD score needs is a sample
+#' from that same predictive, shaped the way [score.mvgam_forecast()]
+#' reads it, so the arms come from the pair `hindcast()` uses rather
+#' than from a second derivation written here.
+#'
+#' `forecast()` is the wrong instrument: it extends the grid beyond
+#' the last observed occasion, and this window is already inside it.
+#'
+#' @param fit The refit for the current window.
+#' @param fc_data The window's rows of the evaluation frame, carrying
+#'   the responses actually observed there.
+#' @return An `mvgam_forecast` holding one draw matrix and one vector
+#'   of held-out observations per series.
+#' @noRd
+window_predictive <- function(fit, fc_data) {
+  series_levels <- resolve_series_info(fit)$series_levels
+  draws_mat <- posterior::as_draws_matrix(fit$fit)
+  window <- build_training_arms(fit, series_levels, data = fc_data)
+  arms <- build_hindcast_arms(
+    fit, window, type = "response",
+    draw_idx = seq_len(nrow(draws_mat)),
+    obs_uncertainty = TRUE
+  )
+  structure(
+    list(
+      forecasts = arms,
+      test_observations = window$observations,
+      series_names = series_levels,
+      type = "response"
+    ),
+    class = "mvgam_forecast"
+  )
 }

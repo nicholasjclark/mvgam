@@ -469,14 +469,18 @@ MVGAM_EMPTY_OBS_PLACEHOLDER <- ".mvgam_empty_obs"
 # have to carry it for a reader to trip over.
 #'@noRd
 obs_formula_needs_placeholder <- function(formula) {
-  if (is.null(formula)) return(FALSE)
-  # A rewritten formula is stored as a plain formula, which
-  # `mvgam_obs_formula()` answers `NULL` for: it reaches into the
-  # observation slot of an `mvgam_formula` or a `brmsformula`, and a
-  # plain formula has no slots to reach into.
-  obs <- tryCatch(mvgam_obs_formula(formula), error = function(e) NULL)
-  if (is.null(obs) && inherits(formula, "formula")) {
-    obs <- formula
+  # `mvgam_obs_formula()` reaches into the observation slot of an
+  # `mvgam_formula` or a `brmsformula`. A rewritten formula is stored
+  # as a plain formula, which has no slot to reach into and is
+  # already the observation side, so the two shapes are told apart
+  # here rather than asked and repaired.
+  obs <- if (inherits(formula, c("mvgam_formula", "brmsformula",
+                                 "mvbrmsformula", "bform"))) {
+    mvgam_obs_formula(formula)
+  } else if (inherits(formula, "formula")) {
+    formula
+  } else {
+    NULL
   }
   if (is.null(obs)) return(FALSE)
   MVGAM_EMPTY_OBS_PLACEHOLDER %in% all.vars(obs)

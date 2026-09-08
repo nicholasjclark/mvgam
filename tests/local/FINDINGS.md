@@ -365,33 +365,6 @@ from them deliberately by carrying a separate `"expected"`.
 The tests now pin all three types to their own meanings, so a type
 that quietly answered with another's quantity fails.
 
-## Hierarchical trends
-
-**13. `forecast()` fails outright when the frame carries a superseded
-`series` column.**
-
-`test-trend-hierarchical.R`, "a hierarchical fit forecasts on its
-own axis". A `gr` / `subgr` model derives its own series identifier,
-and that spelling differs from any `series` column the frame also
-holds. The grouping gives `south_sp_c`, joined by an underscore and
-ordered region first. `interaction()` gives `south.sp_c`, joined by
-a dot and ordered species first. So the two disagree on the
-separator and on the order.
-
-`build_forecast_arms()` cuts the training tail by the raw column, so
-nothing matches a derived label, and an empty frame reaches
-`get_observation_structure()`:
-
-    Assertion on 'newdata' failed: Must have at least 1 rows,
-    but has 0 rows.
-
-Isolated by removing the column from the fit and repeating the
-identical call, which succeeds. The failure therefore follows the
-column's presence and has nothing to do with the newdata: any
-hierarchical model whose frame happens to carry a `series` column
-cannot be forecast. It at least stops rather than returning a
-number.
-
 ## Families
 
 **4a. Three families are classified as closure-unit, not one.**
@@ -481,43 +454,6 @@ which is what makes the silence costly.
 
 The data-frame form is unaffected: it names its series in a column
 and a stranger there is refused.
-
-**17. The factor plot draws the occasion's rank where every other
-plot draws its time.**
-
-`test-trend-map.R`, "every plot draws the occasions the user
-supplied". The fit is numbered from three, so its occasions run 3 to
-52 and their ranks run 1 to 50. Measured off the built plots:
-
-| call | x range |
-|---|---|
-| `plot(type = "factors")` | 1 to 50 |
-| `plot(type = "trend")` | 3 to 52 |
-| `plot(type = "series")` | 3 to 52 |
-| `plot(hindcast(fit), series = 1)` | 3 to 52 |
-
-The axis is labelled `Time` in all four. Three of them mean it.
-
-A reader comparing a factor trajectory against a series trajectory,
-or against anything dated, is off by the offset between the two
-numberings, and on a frame that starts at one the two coincide and
-nothing shows. Reading the rendered plot is what turned it up, so
-the check now measures the x values the plot draws.
-
-Reproduced on the `jsdgam()` route as well, so this belongs to the
-plotting method rather than to one trend. The multivariate-normal
-fixture numbers its sites from 3, giving occasions 3 to 32:
-
-| call | x range |
-|---|---|
-| `plot(type = "factors")` | 1 to 30 |
-| `plot(type = "trend")` | 3 to 32 |
-| `plot(type = "series")` | 3 to 32 |
-| `plot(hindcast(fit), series = 1)` | 3 to 32 |
-
-`test-family-jsdgam.R` measures the axis for every family, so the
-one frame numbered from three carries the failure and the six
-numbered from one pass.
 
 ## Distributional parameters
 
@@ -1447,21 +1383,6 @@ exists to tell apart print identically. `summary()` reports
 `theta1_trend` and does distinguish them, so the information is
 available to the method that omits it.
 
-**57. `forecast()` with no `newdata` returns an object with no
-forecasts.**
-
-The call a user makes first. `forecast(fit)` returns an
-`mvgam_forecast` whose `forecasts` list is empty and whose
-`test_times` is empty, while `hindcasts` holds two arms and `type` is
-`"response"`. Nothing is raised.
-
-Distinct from finding 51 only in how it is reached: there a frame of
-already-observed times produced the empty object, here the default
-call does. Either the method should forecast some horizon by default
-or it should say that `newdata` is required, and an object that
-reports a type and carries hindcasts reads as though it did the
-former.
-
 ## PW()
 
 **58. PW refuses a factor model on one route of four.**
@@ -1791,24 +1712,6 @@ the user's mistake.
 This is finding 9's shape a third time, a refusal whose stated remedy
 has already been followed. It reaches every multivariate fit, since
 the fan-out is how `mvbf()` and `jsdgam()` both answer.
-
-**68. `lfo_cv()` demands a column a wide frame cannot have.**
-
-Same fit. `lfo_cv(fit, min_t = 45)` stops with
-
-    'newdata' must contain 'time' and 'series' columns.
-    Got columns: time, x, count, seen, mass.
-
-A wide frame has no series column by construction. The series is the
-response. That is why the axis record answers `multivariate` for
-`axes$series$source` and lists `count, seen, mass` as the levels. The
-guard asks the frame for something the record already holds, then
-lists the five columns present without saying that three of them are
-the series it was looking for.
-
-`resolve_forecast_grid()` was taught this and carries a branch for a
-response-keyed axis. This layer was not, so no wide fit can be scored
-by leaving future occasions out.
 
 **69. `kfold()` on a wide fit fails on a count that finding 15
 produces.**
@@ -2162,25 +2065,6 @@ covering whatever was raised. A quarter of a posterior leaving
 without a word is worth a message the caller cannot suppress by
 asking for a quiet fit.
 
-**An internal placeholder is printed as a parameter.** The
-observation formula is `adj_count ~ -1`. The model therefore has no
-terms on that side. The summary's Population-Level Effects table
-nonetheless carries
-
-    .mvgam_empty_obs   0.53   0.58   -0.57   1.71   1.01
-
-"Cannot look up" is literal. Refitting `y ~ -1` with everything on
-the trend side leaves the placeholder as the only row in that table.
-Neither `variables()` nor `tidy()` lists it. So the one parameter the
-first output shows is absent from every accessor a reader would reach
-for next.
-
-It is finding 52's shape on the output surface rather than in an
-error: `eta` there, `.mvgam_empty_obs` here, both internal names
-presented to a user as if they were theirs. No fixture in this
-directory carries it, since none puts the whole model on the trend
-side, which is why it took an article to surface.
-
 **A citation disagrees with its own reference list.** The text cites
 Heaps [2022] twice, at `var.Rmd:38` and `var.Rmd:172`. The reference
 list gives Heaps SE (2023), JCGS 32(1), 74-83, under the same DOI.
@@ -2242,130 +2126,6 @@ What it does instead is guarantee a non-negative correlation with
 the truth for every fit in the table, which can only move RMSE
 downward. The comparison it feeds is the article's headline claim
 that the joint fit recovers the state best.
-
-## An observation formula with no terms
-
-**83. `y ~ -1` is fitted with an intercept, and against a trend
-intercept the model is not identified.**
-
-`test-obs-empty-formula.R`. An empty observation formula says the
-observation side contributes nothing and every covariate belongs to
-the latent process. It is the idiom `vignettes/articles/var.Rmd` is
-written in, and nothing else in `tests/local` fits it, because every
-other fixture puts at least an intercept on the observation side.
-
-mvgam cannot hand brms a design with no columns, so it substitutes
-one. Read off the prefit, that column is
-
-    dim(X)      150 x 1
-    colnames(X) .mvgam_empty_obs
-    unique(X)   1
-
-A constant column in a linear predictor is an intercept whatever it
-is called. So a formula that explicitly declined an intercept is
-fitted with a free parameter on the observation scale, and the user
-is never told. A column of zeros would give brms the column it needs
-and contribute nothing.
-
-**Where it stops being cosmetic.** Give the trend side an intercept
-and its span already contains that constant. Fitted on 40 occasions
-of three series with `trend_formula = ~ series + AR(p = 1)`, true
-levels 1.0, 2.0 and -0.5:
-
-| quantity | value |
-|---|---|
-| `cor(.mvgam_empty_obs, b_seriesnorth_trend)` | -1.000 |
-| the same for east and west | -1.000, -1.000 |
-| posterior SD of each of the four | about 233 |
-| posterior SD of each pairwise sum | 0.113 to 0.135 |
-| R-hat on all four | 2.14 |
-| bulk ESS on all four, of 1000 draws | 2.63 |
-| reported series levels | 110.12, 110.25, 110.23 |
-
-The four parameters lie on an exact ridge. Their sums are pinned and
-their individual values are not, so the sampler wanders to plus and
-minus 700 and the chains never mix. `mvgam()` builds the model, runs
-it and returns it. The only sign a user gets is the R-hat column of a
-table whose estimates are already meaningless.
-
-**The article is the case. Its prior is what hides this.**
-`var.Rmd` fits `adj_count ~ -1` with `trend_formula = ~ region +
-VAR(cor = TRUE)`. That is this shape exactly, and it samples cleanly
-at R-hat 1.01, because the article sets
-`prior(std_normal(), class = b_trend)`. A standard normal on the
-trend coefficients pins the ridge. It buys a proper posterior for
-the sum and prior-determined values for the parts. The article then
-reads the parts: "the three region intercepts sit close to zero on
-the inverse link scale". They sit close to zero because the prior
-put them there. The placeholder beside them carries 0.53 with an
-interval of -0.57 to 1.71, on a parameter the formula declined.
-
-Finding 80 records the same placeholder reaching the printed summary
-under a name no accessor lists. This is what that name is doing.
-
-**Also on the prefit, and needing no draws.**
-`find_predictors(effects = "all")` offers `.mvgam_empty_obs` as a
-predictor, so every consumer reading a term list through insight is
-told a constant is something to take a slope over. And the stored
-frame gains the column: `names(fit$data)` returns the user's four
-columns plus the placeholder, so `insight::get_data()` hands back a
-frame that is not the one supplied.
-
-**84. The observation and trend designs are not checked against each
-other, and four common pairings are rank deficient.**
-
-Finding 83 is one case of this. The linear predictor is
-`X %*% b` plus the trend, and the trend's own mean is
-`X_trend %*% b_trend` read at that row's cell. The matrix that
-decides identification is therefore the two designs stacked side by
-side. It is available on a prefit. Nothing computes it.
-
-Stacked and ranked on 30 occasions of three series, mapping each
-observation row to its trend row through `times_trend[obs_trend_time,
-obs_trend_series]`:
-
-| observation formula | trend formula | cols | rank |
-|---|---|---|---|
-| `y ~ -1` | `~ elev + AR(p = 1)` | 2 | 2 |
-| `y ~ -1` | `~ series + AR(p = 1)` | 4 | **3** |
-| `y ~ 1` | `~ elev + AR(p = 1)` | 2 | 2 |
-| `y ~ 1` | `~ series + AR(p = 1)` | 4 | **3** |
-| `y ~ 1` | `~ 1 + AR(p = 1)` | 1 | 1 |
-| `y ~ elev` | `~ series + AR(p = 1)` | 5 | **4** |
-| `y ~ elev` | `~ elev + AR(p = 1)` | 3 | **2** |
-
-The mapping was checked rather than assumed. On the last row,
-`max|X[, "elev"] - X_trend[idx, "elev"]|` is exactly 0 and the mapped
-column equals the frame's own `elev`, so the same covariate really is
-entering both sides at every row. On the `series` rows the mapped
-trend dummies sum to 1 at every row and `X` is a column of ones, so
-the observation intercept is the sum of the trend's series levels.
-
-Two of these reach past the empty-formula idiom that finding 83 is
-about.
-
-`y ~ 1` with `~ series` on the trend is the ordinary way to ask for a
-per-series latent level. Its intercept is confounded with those
-levels. `y ~ elev` with `~ elev` on the trend puts one covariate on both
-sides. A user might write that to ask whether a gradient acts on the
-observation or on the process. The likelihood cannot tell the two
-apart, and mvgam builds the model without a word.
-
-The row that works is the one to copy. `y ~ 1` against `~ 1 + AR`
-comes back with a single column, so the two intercepts were already
-reconciled somewhere. Whatever does that for a bare intercept does
-not run for a factor or a shared covariate.
-
-What this costs is finding 83's table. An exact ridge, R-hat above
-2, a bulk ESS of single digits and reported values two orders of
-magnitude from the truth, on a model the package agreed to fit. A
-prior can still make the posterior proper. The parts are then the
-prior's, which is the state `var.Rmd` ships in.
-
-The check is cheap and needs no posterior. Stacking the two designs
-and comparing `qr()$rank` against `ncol()` takes four lines and runs
-on a prefit. It would name the pairing rather than leaving a user to
-read it out of an R-hat column.
 
 ## An article that does not build
 
