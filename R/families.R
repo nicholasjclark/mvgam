@@ -5113,56 +5113,101 @@ rcmb_vec <- function(mu, nu, T) {
 }
 
 
-#' Per-draw Dunn-Smyth randomised quantile residuals for
-#' `com_binomial()`
+#' Compound Poisson-gamma distribution and density for `tweedie()`
 #'
-#' Returns one residual per observation per draw on the
-#' standard-normal scale (`qnorm` transform of the
-#' `runif(F(y - 1), F(y))` random quantile).
+#' A Tweedie with `1 < p < 2` is a Poisson sum of gamma variates, so
+#' its distribution function is the Poisson-weighted sum of gamma
+#' distribution functions plus a point mass at zero. The series is
+#' truncated where the Poisson tail is negligible, which is the same
+#' construction the Stan-side log-density uses.
 #'
-#' Nothing calls this yet. `compute_quantile_residuals()` offers two
-#' branches, an analytic one whose specs are continuous CDFs of the
-#' form `spec(y, mu, dpars)` and an empirical one that pools `yrep`
-#' across draws, and this fits neither: it is discrete, so it needs
-#' the randomisation between `F(y - 1)` and `F(y)` that a continuous
-#' spec never performs, and it needs the trials aterm that the spec
-#' signature does not carry. `com_binomial()` therefore takes the
-#' empirical branch, which returns one pooled value per observation
-#' and no posterior spread. Wiring this in means giving the analytic
-#' branch a discrete form.
+#' `tweedie::ptweedie()` computes the same quantity and agrees with
+#' this to 1.5e-11 across a grid of `mu`, `phi` and `p`, but it takes
+#' the index parameter as a single value. mvgam samples the index, so
+#' a per-draw distribution function through that route needs one call
+#' per draw and costs about 190 seconds where the series costs one.
 #'
-#' @param truth Numeric / integer vector of observed counts.
-#' @param fitted Numeric vector of fitted probabilities for this
-#'   draw.
-#' @param draw Ignored for CMB; kept for interface parity with
-#'   the brms randomised-quantile signatures.
-#' @param N Integer vector of trials.
-#' @param nu Numeric vector of dispersion for this draw.
-#' @return Numeric vector of residuals; NA where `truth` is NA.
+#' The density is `mgcv::ldTweedie()`, which is what `log_lik()`
+#' already reads, so a Tweedie has one density rather than two.
+#'
+#' @param q,x Quantile, recycled against the parameters.
+#' @param power Numeric vector of Tweedie index parameters in (1, 2).
+#' @param mu Numeric vector of means.
+#' @param phi Numeric vector of dispersions.
+#' @param lower.tail,log.p,log As for any distribution function.
+#' @return Numeric vector the length of the recycled arguments.
 #' @noRd
-ds_resids_com_binomial <- function(truth, fitted, draw, N, nu) {
-  na_obs <- is.na(truth)
-  a_obs <- .cmb_cdf(
-    as.vector(truth[!na_obs]) - 1L,
-    mu = fitted[!na_obs],
-    nu = nu[!na_obs],
-    size = N[!na_obs]
-  )
-  b_obs <- .cmb_cdf(
-    as.vector(truth[!na_obs]),
-    mu = fitted[!na_obs],
-    nu = nu[!na_obs],
-    size = N[!na_obs]
-  )
-  # pmin / pmax guards: when the CMB collapses to a point mass
-  # (nu >> 1) the upper and lower CDF can coincide; runif on a
-  # degenerate interval returns NaN otherwise.
-  u <- stats::runif(length(a_obs),
-                     pmin(a_obs, b_obs),
-                     pmax(a_obs, b_obs))
-  out <- rep(NA_real_, length(truth))
-  out[!na_obs] <- stats::qnorm(u)
-  out
+ptweedie_cpg <- function(q, power, mu, phi, lower.tail = TRUE,
+                         log.p = FALSE) {
+  n <- max(length(q), length(power), length(mu), length(phi))
+  q <- rep_len(q, n)
+  power <- rep_len(power, n)
+  mu <- rep_len(mu, n)
+  phi <- rep_len(phi, n)
+  lambda <- mu^(2 - power) / (phi * (2 - power))
+  alpha <- (2 - power) / (power - 1)
+  rate <- 1 / (phi * (power - 1) * mu^(power - 1))
+  # The k = 0 term is the mass at zero, which every quantile from
+  # zero upwards carries.
+  out <- exp(-lambda)
+  n_terms <- max(stats::qpois(1 - 1e-12, max(lambda, na.rm = TRUE)), 5L)
+  for (k in seq_len(n_terms)) {
+    out <- out + stats::dpois(k, lambda) *
+      stats::pgamma(q, shape = k * alpha, rate = rate)
+  }
+  out[!is.na(q) & q < 0] <- 0
+  out <- pmin(pmax(out, 0), 1)
+  if (!lower.tail) out <- 1 - out
+  if (log.p) log(out) else out
+}
+
+
+#' @rdname ptweedie_cpg
+#' @noRd
+dtweedie_cpg <- function(x, power, mu, phi, log = FALSE) {
+  n <- max(length(x), length(power), length(mu), length(phi))
+  ld <- mgcv::ldTweedie(
+    y = rep_len(x, n), mu = rep_len(mu, n),
+    p = rep_len(power, n), phi = rep_len(phi, n)
+  )[, 1L]
+  if (log) ld else exp(ld)
+}
+
+
+#' COM-Binomial distribution and density functions
+#'
+#' `family_dist_spec()` names one R distribution per family and hands
+#' its callers a `p` and a `d` for it. COM-binomial has neither in
+#' base R, so the two vectorised kernels the package already carries
+#' are given those signatures here: `.cmb_cdf()` for the
+#' distribution and `cmb_lpmf_vec()` for the density. That makes
+#' `com_binomial()` reachable from everything reading a family
+#' through the spec, which is the randomised quantile residual and
+#' the `cens()` and `trunc()` terms.
+#'
+#' @param q,x Quantile, recycled against the parameters.
+#' @param mu Numeric vector on the probability scale.
+#' @param nu Numeric vector of dispersion exponents.
+#' @param size Integer vector of trial counts.
+#' @param lower.tail,log.p,log As for any distribution function.
+#' @return Numeric vector the length of the recycled arguments.
+#' @noRd
+pcmb <- function(q, mu, nu, size, lower.tail = TRUE, log.p = FALSE) {
+  n <- max(length(q), length(mu), length(nu), length(size))
+  p <- .cmb_cdf(rep_len(q, n), mu = rep_len(mu, n),
+                nu = rep_len(nu, n), size = rep_len(size, n))
+  if (!lower.tail) p <- 1 - p
+  if (log.p) log(p) else p
+}
+
+
+#' @rdname pcmb
+#' @noRd
+dcmb <- function(x, mu, nu, size, log = FALSE) {
+  n <- max(length(x), length(mu), length(nu), length(size))
+  ld <- cmb_lpmf_vec(rep_len(x, n), mu = rep_len(mu, n),
+                     nu = rep_len(nu, n), T = rep_len(size, n))
+  if (log) ld else exp(ld)
 }
 
 

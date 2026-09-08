@@ -76,7 +76,48 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
     geometric = spec("nbinom", function(j) {
       list(mu = mu[, j], size = 1)
     }),
+    com_binomial = spec("cmb", function(j) {
+      list(mu = mu[, j], nu = nu[, j], size = trials[j])
+    }),
+    # A Tweedie puts a point mass at zero and is continuous above it,
+    # so the spec records where that mass sits; a caller forming a
+    # probability-integral transform needs to know the interval an
+    # observation of zero occupies.
+    tweedie = c(
+      spec("tweedie", function(j) {
+        list(power = family_pars$mtheta[, j], mu = mu[, j],
+             phi = family_pars$mphi[, j])
+      }),
+      list(atom = 0)
+    ),
     NULL
+  )
+}
+
+
+# Internal: the density or distribution function a spec's
+# distribution is served by. Most are base R's; `bbinom` comes from
+# extraDistr and `cmb` from the package's own COM-binomial kernels,
+# so the lookup is written once rather than branched in both callers.
+#' @noRd
+dist_fun <- function(dist, kind = c("d", "p")) {
+  kind <- match.arg(kind)
+  switch(
+    dist,
+    bbinom = {
+      insight::check_if_installed(
+        "extraDistr",
+        reason = paste0(
+          "to compute censored or truncated beta_binomial ",
+          "likelihoods"
+        )
+      )
+      if (kind == "d") extraDistr::dbbinom else extraDistr::pbbinom
+    },
+    cmb = if (kind == "d") dcmb else pcmb,
+    tweedie = if (kind == "d") dtweedie_cpg else ptweedie_cpg,
+    get(paste0(kind, dist), mode = "function",
+        envir = asNamespace("stats"))
   )
 }
 
@@ -107,16 +148,7 @@ dist_cdf <- function(spec, linpred, q, lower.tail = TRUE,
                      log.p = FALSE) {
   n <- ncol(linpred)
   q <- if (length(q) == 1L) rep(q, n) else q
-  if (identical(spec$dist, "bbinom")) {
-    insight::check_if_installed(
-      "extraDistr",
-      reason = "to compute censored or truncated beta_binomial likelihoods"
-    )
-    pfun <- extraDistr::pbbinom
-  } else {
-    pfun <- get(paste0("p", spec$dist), mode = "function",
-                envir = asNamespace("stats"))
-  }
+  pfun <- dist_fun(spec$dist, "p")
   out <- matrix(NA_real_, nrow = nrow(linpred), ncol = n)
   for (j in seq_len(n)) {
     args <- spec$args(j)
@@ -143,16 +175,7 @@ dist_cdf <- function(spec, linpred, q, lower.tail = TRUE,
 dist_log_density <- function(spec, linpred, y) {
   n <- ncol(linpred)
   y <- if (length(y) == 1L) rep(y, n) else y
-  dfun <- if (identical(spec$dist, "bbinom")) {
-    insight::check_if_installed(
-      "extraDistr",
-      reason = "to compute the log-likelihood for the beta_binomial family"
-    )
-    extraDistr::dbbinom
-  } else {
-    get(paste0("d", spec$dist), mode = "function",
-        envir = asNamespace("stats"))
-  }
+  dfun <- dist_fun(spec$dist, "d")
   out <- matrix(NA_real_, nrow = nrow(linpred), ncol = n)
   for (j in seq_len(n)) {
     args <- spec$args(j)

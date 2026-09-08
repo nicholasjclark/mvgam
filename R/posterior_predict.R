@@ -302,7 +302,7 @@ family_uses_integers <- function(family_name) {
     "zero_inflated_poisson", "zero_inflated_negbinomial",
     "zero_inflated_binomial", "zero_inflated_beta_binomial",
     "hurdle_poisson", "hurdle_negbinomial", "hurdle_cumulative",
-    "discrete_weibull", "com_poisson", "beta_nb"
+    "discrete_weibull", "com_poisson", "beta_nb", "com_binomial"
   )
 
   family_name %in% integer_families

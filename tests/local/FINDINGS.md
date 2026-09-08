@@ -283,89 +283,44 @@ and a stranger there is refused.
 
 ## Residuals
 
-**21. A continuous family's quantile residuals carry no posterior
-spread.**
+**21. The compositional families' quantile residuals carry no
+posterior spread.**
 
-`residuals()` defaults to `type = "quantile"`. For the families with
-an analytic CDF -- gaussian, student, lognormal, Gamma, beta --
-`quantile_family_specs` evaluates it per draw, so the residual moves
-with the draw's own parameters. Every other family falls through to
-`compute_quantile_residuals_empirical()`, which pools `yrep` over all
-draws to form one `lower`/`upper` per observation and then, where the
-two coincide, repeats `qnorm(lower[i])` across every row.
+`residuals()` defaults to `type = "quantile"`. The transform is now
+taken per draw for every family `family_dist_spec()` names, which
+left three that it does not:
 
-For a continuous response there are no ties, so they always coincide.
-On the tweedie fit 54 of 60 columns come back constant: the 6 that
-vary are the zero rows, where the atom creates ties. `Est.Error` is
-then 0 and `Q2.5 == Estimate == Q97.5` for nine observations in ten.
-`type = "ordinary"` is unaffected (0 of 60), as are hurdle and
-zero-inflated Poisson (0 of 80), whose discreteness supplies ties.
-
-The DHARMa formulation is behaving as written, since an empirical PIT
-is one number for each observation. But the roxygen promises that the
-matrix returned for each draw "carries the full posterior uncertainty
-in the residual distribution", and it is the documented input to
-`DHARMa::createDHARMa()`. Either the analytic path grows a tweedie
-entry, or the documentation says which families get spread. That is a
-choice about what the residual means, so it is recorded rather than
-taken.
-
-`test-family-tweedie.R` now asserts the documented behaviour and
-fails on it, so the sweep reports it rather than leaving it in this
-file alone. The companion assertion on `type = "ordinary"` passes,
-which places the fault in the quantile path and not in the fit.
-
-Measured again across the jsdgam families, the reach is wider than
-tweedie and, where it bites, total:
-
-| family | `type = "quantile"` | `type = "ordinary"` |
-|---|---|---|
-| mvn | 120 / 120 constant | 0 / 120 |
-| mvt | 120 / 120 constant | 0 / 120 |
-| diri | 120 / 120 constant | 0 / 120 |
-| nb | 40 / 300 constant | 4 / 300 |
-| beta | 0 / 300 constant | 0 / 300 |
-
-Beta escapes through its analytic entry, the discrete families are
-partly rescued by ties, and the continuous families without an entry
-lose every column. Three of the seven return residuals carrying no
-uncertainty at all while their ordinary residuals carry full spread,
-which places the fault in the quantile path rather than in any fit.
-`test-family-jsdgam.R` asserts the documented behaviour for each
-family that reaches `residuals()` and fails on three of them.
-
-## pp_check diagnostics
-
-**24. `resid_vs_fitted` plots a conditional residual against a
-marginal fitted value.**
-
-The two axes of the panel come from different surfaces, and each
-matches its own exactly. On a poisson AR(1) fit, `draw_ids = 1:50`:
-
-| axis | is | error | other surface |
+| family | `type = "quantile"` | sd | `type = "ordinary"` |
 |---|---|---|---|
-| `resids` | median of conditional residual draws | 0 | 7.97 |
-| `preds` | median of marginal `posterior_epred` | 0 | 33.36 |
+| mvn | 120 / 120 constant | -- | 0 / 120 |
+| mvt | 120 / 120 constant | 2.099 | 0 / 120 |
+| diri | 120 / 120 constant | 2.603 | 0 / 120 |
 
-`pp_check()` replaces a `NULL` `newdata` with
-`mvgam_training_data(object)` early on. `diagnostic_surface_args()`
-adds `incl_autocor = TRUE` only when `newdata` is `NULL`. By the time
-the fitted values are drawn, a call on the training data therefore
-looks like a call on new data, and `posterior_epred()` keeps its own
-default of `FALSE`. The residual draws are built before that and stay
-conditional. The comment above the call says the fitted values "name
-their surface through the same helper the residuals above them used,
-so one panel plots one picture of the fit"; they do not.
+Each falls through to the pooled empirical PIT, which forms one
+interval per observation and repeats it down every row, so
+`Est.Error` is 0 and `Q2.5 == Estimate == Q97.5` on every cell. A
+randomised quantile residual is standard normal by construction and
+these read 2.1 and 2.6, so the columns are not merely narrow, they
+are on the wrong scale.
 
-What it costs is the plot. The fitted axis spans 7.44 to 10.52 while
-the outcome spans 0 to 48 and the conditional fitted values span 1.83
-to 42.97. The panel is read for structure across the range of
-the fit, and every point is compressed into a band that sits nowhere
-near where the model predicts. `mvgam_resid_panel()` shows the same
-axis, since it calls this type.
+The controls say the fault is theirs alone rather than the quantile
+path's: on the same sweep poisson reads 1.017, tweedie 0.990,
+com_binomial 0.999, cumulative 0.902 and the jsdgam negative binomial
+1.002, with no constant column among them.
 
-Covered in `test-pp-check-resids.R`, which asserts the two axes read
-one surface and fails on it.
+Their marginal distribution functions are closed form -- a Student t
+on the per-row `Psi` diagonal for `mvt`, a beta on
+`(alpha_j, alpha_0 - alpha_j)` for `diri` -- so what stops them is
+not the mathematics. It is that `family_dist_spec()` takes
+`(family_name, link, linpred, family_pars, trials)` while these
+families draw their parameters from
+`extract_mv_response_components()` and
+`extract_simplex_response_components()`, which the signature has no
+room for. Widening it is the work, and the entry stays open until
+that is done.
+
+`test-family-jsdgam.R` asserts the documented behaviour for each
+family that reaches `residuals()` and fails on these three.
 
 ## Gaps closed rather than found
 
@@ -603,46 +558,6 @@ Either the factor path takes a pseudo-inverse or a ridge, or the
 method refuses with an explanation. Choosing between those belongs
 to the jsdm work, so `test-family-jsdgam.R` leaves it unasserted
 and this entry carries it.
-
-## Uncovered families
-
-**43. Lognormal quantile residuals are NaN in part and off-scale in
-the rest.**
-
-Found by fitting the three exported families nothing in
-`tests/local` fits: `student()`, `lognormal()` and
-`beta_binomial()`. A lognormal AR(1) over 60 positive observations
-gives, at 50 draws:
-
-| quantity | value |
-|---|---|
-| NaN cells in `residuals(type = "quantile")` | 390 of 3000, 13 per cent |
-| range of the cells that are finite | 5.84 to 8.13 |
-| NA rows in the summarised table | 4 of 60 |
-| `residuals(type = "ordinary")` | no NA at all |
-
-Two things are wrong and only one of them is visible as a warning.
-The warning is `In log(mu) : NaNs produced`, and nothing in the data
-can produce it: the response runs 0.34 to 4.56 and
-`posterior_epred()` runs 0.364 to 4.688, never reaching zero. So
-whatever is being passed to `log()` is not the mean.
-
-The second is the scale. A randomised quantile residual is
-standard normal by construction, and the cells that survive sit
-between six and eight standard deviations out. A reader
-checking a lognormal fit would see a QQ-plot of impossible values
-with a seventh of the points missing.
-
-`student()` on the same data and the same call returns 3000 finite
-cells, so this belongs to the lognormal entry rather than to the
-quantile path in general. Both families are named in the analytic
-list finding 21 describes, which is what makes the contrast
-informative: the analytic route works for one and not the other.
-
-`beta_binomial()` fits and answers on every surface driven here,
-with one constant quantile-residual column of sixty, which is the
-tie behaviour finding 21 already accounts for on discrete
-families.
 
 ## Introspection
 
@@ -1329,92 +1244,6 @@ alone. The series panel collapses on both, which makes it a property
 of any axis the frame has no column for, derived or response-keyed.
 Six series drawn over one another read as noise rather than as a
 series, so nothing about the picture invites a second look.
-
-**71. A gaussian arm reads another response's latent state.**
-
-Same fit, and the control is what makes it a claim about `mvbf()`
-rather than about the data. A randomised quantile residual is standard
-normal by construction. Each response was refitted on its own, same
-rows, same covariate, same AR(1) trend:
-
-| arm | family | in the wide fit | fitted alone |
-|---|---|---|---|
-| count | poisson | sd 0.500 | sd 0.453 |
-| seen | bernoulli | sd 1.005 | sd 0.963 |
-| mass | gaussian | **sd 2.699** | **sd 0.984** |
-
-This entry originally read the 8.13 bound as the signature of a PIT
-taken against a pooled predictive. That was wrong, and driving it
-settles what is really happening. Making the PIT per-draw moved the
-poisson arm from 0.500 to 0.998 and the bernoulli arm from 1.005 to
-1.033, and left the gaussian arm at 2.849. So the pooled PIT was one
-fault and it was not this one.
-
-Measured on the wide fit, each arm's conditional linear predictor
-minus its marginal one is the latent state that arm read:
-
-| pair | max absolute difference |
-|---|---|
-| count against mass | 4.4e-16 |
-| count against seen | 6.7e-16 |
-| sampler's series 1 against series 3 | 3.436 |
-
-All three arms read one state while the sampler holds three. The
-reason is one line: `extract_trend_latent_states()` takes the series
-index from `get_observation_structure()$series_int`, which on a wide
-frame is 1 for all sixty rows, because a row of a wide frame is a time
-and not a series. Every arm therefore reads `trend[t, 1]`. The
-residual code is faultless; `sd(y - colMeans(mu))` is 0.896 against a
-fitted `sigma` of 0.370, which is what a predictor built from another
-response's trajectory gives.
-
-That places this entry with finding 65, which records the same
-substitution reaching `plot(type = "trend")`. It is wider than a plot:
-the conditional read is what `fitted()`, `posterior_epred()`,
-`log_lik()` and every information criterion take on a wide fit. The
-poisson and bernoulli arms survive it because a count PIT and a binary
-PIT are coarse enough to absorb a wrong mean; the gaussian arm is the
-one that shows it.
-
-**72. Poisson quantile residuals are half as wide as they should be,
-on any fit.**
-
-Found by the control above. The poisson arm reads sd 0.500 in the wide
-fit and 0.453 fitted alone, and no value in either reaches three
-standard deviations. A standard normal puts 0.27 per cent beyond
-three. A third poisson AR(1) on unrelated data, the one
-`test-draws-alignment.R` fits, reads 0.454 with 0.05 per cent beyond
-three, so the number is the family's rather than any one design's.
-
-What it is not is the empirical path as such. `quantile_family_specs`
-at `R/residuals.mvgam.R:396` holds five entries, all continuous, so
-every count family in this directory falls through to
-`compute_quantile_residuals_empirical()`. Measured across four of
-them, the ones that fall through do not agree:
-
-| family | quantile sd | beyond three | constant columns |
-|---|---|---|---|
-| poisson | 0.454 | 0.05% | 0 of 30 |
-| bernoulli | 1.005 | -- | -- |
-| hurdle_poisson | 0.947 | 0.19% | 0 of 80 |
-| zero_inflated_poisson | 0.954 | 0.16% | 0 of 80 |
-
-Two count families with a large atom at zero answer correctly on the
-route poisson takes. The shared machinery is therefore not enough to
-explain the compression. Finding 21 attributes the fault to
-`qnorm(lower[i])` being returned wherever the pooled `lower` and
-`upper` coincide. That mechanism accounts for a continuous family,
-where the two always coincide. It does not separate these four. All
-four are discrete and only poisson is compressed. Which step
-of the empirical PIT treats poisson differently is not resolved here.
-Guessing at it would put a mechanism in this file that nothing
-measured.
-
-So a poisson fit's residual QQ plot is too narrow to show a departure
-that is really there, and a hurdle or zero-inflated fit of the same
-counts is not. Which of the two the empirical PIT should be made to
-match is a question for the residual work; what is recorded here is
-that they disagree and only one can be right.
 
 **73. Some methods class the list they fan out, and some leave it
 bare.**

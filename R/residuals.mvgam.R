@@ -466,6 +466,15 @@ analytic_pit_bounds <- function(object, y, pp_args, d,
   } else {
     upper
   }
+  # A family that is continuous except for a point mass, as a Tweedie
+  # is at zero, needs the interval that mass occupies wherever an
+  # observation lands on it. Treated as continuous there, every such
+  # observation sits at the top of its own interval rather than
+  # spread across it.
+  if (!is.null(spec$atom)) {
+    on_atom <- !is.na(y) & y == spec$atom
+    if (any(on_atom)) lower[, on_atom] <- 0
+  }
   list(lower = lower, upper = upper)
 }
 

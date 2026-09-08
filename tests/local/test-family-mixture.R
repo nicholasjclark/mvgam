@@ -970,16 +970,18 @@ test_that("a distributional covariate is offered as a term", {
 # -- What these two families settle about the residual path ----------
 
 test_that("a mixture's quantile residuals are standard normal", {
-  # `quantile_family_specs` holds five entries, all continuous, so
-  # every count family falls through to the empirical PIT. Finding 72
-  # records a plain poisson reading sd 0.454 on that route, which
-  # would make the route itself the fault.
+  # These two read 0.947 and 0.954 on the pooled empirical PIT while
+  # a plain poisson read 0.454 on the same route, which is what made
+  # the route look innocent. It was not: pooling the draws folds the
+  # posterior uncertainty in the latent state into the predictive, so
+  # the interval sits closer to 0.5 than the conditional one. A
+  # hurdle and a zero-inflated poisson escape because the atom at
+  # zero makes their observation noise large beside that state
+  # uncertainty, not because the pooling is harmless.
   #
-  # These two take the same route and answer correctly, at 0.947 and
-  # 0.954 with roughly the 0.27 per cent a standard normal puts
-  # beyond three standard deviations. So the route is not sufficient
-  # to explain the compression, and this block is the evidence that
-  # says so rather than a claim about these fits.
+  # Both now take the per-draw route, so this block holds them to the
+  # scale the construction guarantees rather than to what the pooled
+  # route happened to give.
   for (f in list(fit, fit3)) {
     r <- suppressWarnings(
       residuals(f, type = "quantile", summary = FALSE, ndraws = 200L)
