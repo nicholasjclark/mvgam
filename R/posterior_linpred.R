@@ -109,21 +109,44 @@ get_combined_linpred <- function(mvgam_fit, newdata,
   # and adding the deterministic submodel on top would count it twice.
   # A row whose time falls outside the fitted grid has no such state
   # and receives the per-series marginal instead.
+  #
+  # On a response-keyed fit the state is read once per response, since
+  # each response is its own series and holds its own `trend[t, s]`
+  # column. Reading it once and sharing it gave every response the
+  # first one's trajectory.
   conditional_state <- if (identical(trend_state, "conditional")) {
     draws_mat <- posterior::as_draws_matrix(mvgam_fit$fit)
     if (!is.null(draw_ids)) {
       draws_mat <- draws_mat[draw_ids, , drop = FALSE]
     }
-    extract_trend_latent_states(
-      mvgam_fit = mvgam_fit, newdata = newdata, full_draws = draws_mat
+    state_for <- function(r) {
+      extract_trend_latent_states(
+        mvgam_fit = mvgam_fit, newdata = newdata,
+        full_draws = draws_mat, resp = r
+      )
+    }
+    # Only a response-keyed axis needs one state per response. A
+    # multivariate fit whose series axis is a column of the frame
+    # holds one state that every response reads, so it is built once
+    # rather than once per response with the same answer.
+    resp_keyed <- identical(
+      mvgam_axes(mvgam_fit)$series$source, "multivariate"
     )
+    if (resp_keyed && is.list(obs_linpred) && !is.matrix(obs_linpred)) {
+      stats::setNames(
+        lapply(names(obs_linpred), state_for), names(obs_linpred)
+      )
+    } else {
+      state_for(resp)
+    }
   } else {
     NULL
   }
 
   if (!is.null(conditional_state)) {
-    # Shape of a shared trend, so the multivariate branch below
-    # composes it against each response the same way.
+    # Either one matrix or one per response; the multivariate branch
+    # below reads both shapes, and a state already carries the trend
+    # formula's contribution so there is no noise to add on top.
     trend_linpred <- conditional_state
     trend_noise <- NULL
   } else {
@@ -160,17 +183,13 @@ get_combined_linpred <- function(mvgam_fit, newdata,
     combined <- lapply(names(obs_linpred), function(resp_name) {
       obs_mat <- obs_linpred[[resp_name]]
 
-      # Trend may be shared (matrix) or response-specific (list)
-      # Shared trend means same latent process affects all responses.
-      #
-      # The list (per-response) branch is defensive plumbing: no
-      # current mvgam codegen path emits a multi-response trend model
-      # because mixed trend types per response are an explicit
-      # non-goal (see architecture/architecture-decisions.md). The
-      # branch is covered only by mock-based tests in
-      # tests/testthat/test-posterior-linpred.R and exists so the
-      # combination math is ready if per-response trends are ever
-      # added.
+      # The trend arrives as one matrix or as one per response. A
+      # matrix is a state every response shares, which is what a
+      # marginal read of a wide fit gives: the trend design of a wide
+      # frame runs at time grain, since a covariate column there holds
+      # one value per time and cannot name a response. A list is the
+      # conditional read, where each response has its own
+      # `trend[t, s]` column and must be paired with it.
       if (is.list(trend_linpred) && !is.matrix(trend_linpred)) {
         trend_mat <- trend_linpred[[resp_name]]
       } else {

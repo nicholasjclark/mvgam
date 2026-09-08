@@ -2549,24 +2549,78 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata,
 #' conditional, so the draws they reweight have to be conditional too
 #' whatever data they cover.
 #'
+#' The caller states whether the rows are the ones the fit saw, rather
+#' than handing over a frame to be tested for emptiness. A caller that
+#' has already substituted the training frame for a `NULL` `newdata`
+#' would otherwise ask for the marginal surface while describing the
+#' data the model was fitted to, which is how one panel came to plot a
+#' conditional residual against a marginal fitted value.
+#'
 #' @param args Argument list destined for a `posterior_*` method
-#' @param newdata The `newdata` the caller was given, or `NULL`
+#' @param in_sample Whether the rows are the ones the fit was given
 #' @param weighted Whether the result will be reweighted by importance
 #'   ratios
 #' @return `args`, with `incl_autocor` stamped on when the conditional
 #'   surface applies and the caller has not named it already
 #'
 #' @noRd
-diagnostic_surface_args <- function(args, newdata, weighted = FALSE) {
+diagnostic_surface_args <- function(args, in_sample, weighted = FALSE) {
   checkmate::assert_list(args)
-  checkmate::assert_logical(weighted, len = 1L)
+  checkmate::assert_flag(in_sample)
+  checkmate::assert_flag(weighted)
   if ("incl_autocor" %in% names(args)) {
     return(args)
   }
-  if (is.null(newdata) || isTRUE(weighted)) {
+  if (in_sample || weighted) {
     args$incl_autocor <- TRUE
   }
   args
+}
+
+
+#' Which trend column each prediction row reads
+#'
+#' Ordinarily a row names its own series and the observation
+#' structure numbers it. A wide `mvbf()` frame cannot: a row there is
+#' one occasion carrying every response, so its series column is a
+#' single constant and numbering it puts all sixty rows on series one.
+#' The series is a property of the `(row, response)` pair, and the
+#' axis record holds the response half of it, so the response the
+#' caller was scoped to picks the column and the row supplies the
+#' time.
+#'
+#' @param mvgam_fit A fitted `mvgam` object
+#' @param obs_struct The observation structure for the prediction rows
+#' @param resp The response this prediction is scoped to, or `NULL`
+#' @return An integer, one per prediction row, indexing the columns of
+#'   `trend[t, s]`
+#'
+#' @noRd
+trend_series_index <- function(mvgam_fit, obs_struct, resp) {
+  levs <- mvgam_axes(mvgam_fit)$series$levels
+  if (!identical(mvgam_axes(mvgam_fit)$series$source, "multivariate")) {
+    return(obs_struct$series_int)
+  }
+  if (is.null(resp) || !nzchar(resp)) {
+    stop(insight::format_error(c(
+      "A response-keyed fit needs a response to read its trend by.",
+      x = paste0(
+        "Each response carries its own latent state, and a row of a ",
+        "wide frame names no response."
+      ),
+      i = paste0("Pass resp = one of '",
+                 paste(levs, collapse = "', '"), "'.")
+    )))
+  }
+  col <- match(resp, levs)
+  if (is.na(col)) {
+    stop(insight::format_error(c(
+      paste0("Response '", resp, "' is not on the fitted series axis."),
+      i = paste0("The fit records '", paste(levs, collapse = "', '"),
+                 "'.")
+    )))
+  }
+  rep(col, length(obs_struct$series_int))
 }
 
 
@@ -2578,10 +2632,12 @@ diagnostic_surface_args <- function(args, newdata, weighted = FALSE) {
 #' state.
 #'
 #' @noRd
-extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws) {
+extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws,
+                                        resp = NULL) {
   checkmate::assert_class(mvgam_fit, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1)
   checkmate::assert_matrix(full_draws, min.rows = 1)
+  checkmate::assert_string(resp, null.ok = TRUE)
 
   par_names <- colnames(full_draws)
   trend_cols <- grep("^trend\\[", par_names, value = TRUE)
@@ -2607,7 +2663,7 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws) {
   # values also makes a time the fit never saw fall out as `NA`, which
   # is what the marginal substitution below keys on.
   obs_struct <- get_observation_structure(mvgam_fit, newdata = newdata)
-  s_idx <- obs_struct$series_int
+  s_idx <- trend_series_index(mvgam_fit, obs_struct, resp)
   time_var <- mvgam_fit$trend_metadata$variables$time_var %||% "time"
   train_data <- mvgam_training_data(mvgam_fit)
   raw_t_idx <- if (time_var %in% names(newdata) &&

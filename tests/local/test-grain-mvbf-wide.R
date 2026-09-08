@@ -531,16 +531,23 @@ test_that("each prediction type answers with the quantity it names", {
       as.numeric(got$value$estimate)
     }
 
-    ep <- colMeans(posterior_epred(fit, newdata = grid, resp = r,
-                                   ndraws = 400L))
-    lp <- colMeans(posterior_linpred(fit, newdata = grid, resp = r,
-                                     ndraws = 400L))
+    # marginaleffects summarises a Bayesian posterior by its median,
+    # so the comparison is made against the median of the same draws
+    # rather than their mean. Against the mean the two agree only to
+    # about 0.04 on the bernoulli arm, whose logit-scale posterior is
+    # the most skewed of the three, and a tolerance wide enough to
+    # absorb that is wide enough to hide a wrong arm.
+    ep <- apply(posterior_epred(fit, newdata = grid, resp = r),
+                2L, stats::median)
+    lp <- apply(posterior_linpred(fit, newdata = grid, resp = r),
+                2L, stats::median)
     pp <- posterior_predict(fit, newdata = grid, resp = r,
                             ndraws = 400L)
     med <- apply(pp, 2L, stats::median)
 
-    expect_equal(ask("expected"), as.numeric(ep), tolerance = 0.05)
-    expect_equal(ask("link"), as.numeric(lp), tolerance = 0.05)
+    # Every draw is shared, so these are the same number twice.
+    expect_equal(ask("expected"), as.numeric(ep), tolerance = 1e-8)
+    expect_equal(ask("link"), as.numeric(lp), tolerance = 1e-8)
     # A median of draws from a discrete family moves in whole units,
     # so two estimates of it from different draws differ by one at
     # the granularity of the family rather than by a small fraction.

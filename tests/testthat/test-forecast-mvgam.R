@@ -205,7 +205,8 @@ test_that("newdata = NULL returns hindcasts only, no forecasts", {
   # predict_single_response.
   testthat::local_mocked_bindings(
     extract_trend_latent_states = function(mvgam_fit, newdata,
-                                             full_draws) {
+                                             full_draws,
+                                             resp = NULL) {
       matrix(0, nrow = 3L, ncol = nrow(newdata))
     },
     extract_component_linpred = function(mvgam_fit, newdata,
@@ -311,7 +312,8 @@ test_that("All multivariate / PW trend types flow through dispatch", {
   )
   testthat::local_mocked_bindings(
     extract_trend_latent_states = function(mvgam_fit, newdata,
-                                             full_draws) {
+                                             full_draws,
+                                             resp = NULL) {
       matrix(0, nrow = 2L, ncol = nrow(newdata))
     },
     extract_component_linpred = function(mvgam_fit, newdata,

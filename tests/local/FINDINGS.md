@@ -1289,6 +1289,23 @@ The panel order is wrong in the same picture. The responses are
 declared `count, seen, mass` and the strips read `count, mass, seen`,
 which is finding 55 on a fourth fit.
 
+Driven again after the conditional read was fixed, the panels are
+still identical on every shared x, and the reason is now located. The
+hindcast arms the plot is built from do differ once each response
+reads its own `trend[t, s]` column: across the three elements of the
+fan-out they separate by 1.19, 1.73 and 0.95. Within any one element
+they do not. `build_hindcast_arms()` (`R/forecast.mvgam.R:740`) loops
+the series levels, which on a response-keyed fit are the responses,
+and hands `hindcast_one_series()` the caller's single `resp` for every
+one of them, so all three arms of an element read that response's
+state. The plot then draws one element's three arms.
+
+So the fault is not in the plotting layer, and looking for it there
+will not find it. It is that a response-keyed fit fans out twice: once
+in `hindcast.mvgam()` through `mv_resp_fan_out()` and again in the
+series loop, which is already a loop over the responses. Reconciling
+those two removes a loop rather than adding an argument.
+
 `plot(type = "series")` on the same object is the other half. It draws
 a single panel whose strip reads `NA`. Its one layer holds 60 rows and
 its y axis is labelled `count`. Two of the three responses are not
@@ -1313,8 +1330,7 @@ of any axis the frame has no column for, derived or response-keyed.
 Six series drawn over one another read as noise rather than as a
 series, so nothing about the picture invites a second look.
 
-**71. A gaussian arm's quantile residuals are three times too wide
-inside a wide fit.**
+**71. A gaussian arm reads another response's latent state.**
 
 Same fit, and the control is what makes it a claim about `mvbf()`
 rather than about the data. A randomised quantile residual is standard
@@ -1327,21 +1343,38 @@ rows, same covariate, same AR(1) trend:
 | seen | bernoulli | sd 1.005 | sd 0.963 |
 | mass | gaussian | **sd 2.699** | **sd 0.984** |
 
-The gaussian arm alone answers correctly on its own, at 0.27 per cent
-beyond three standard deviations, which is what the normal gives. The
-same response inside the wide fit reads 26 per cent beyond three and 6
-per cent beyond five, with every value pinned between -8.13 and 8.13.
-The bernoulli arm reads the same either way, so the distortion picks
-out the gaussian arm rather than reaching all of them.
+This entry originally read the 8.13 bound as the signature of a PIT
+taken against a pooled predictive. That was wrong, and driving it
+settles what is really happening. Making the PIT per-draw moved the
+poisson arm from 0.500 to 0.998 and the bernoulli arm from 1.005 to
+1.033, and left the gaussian arm at 2.849. So the pooled PIT was one
+fault and it was not this one.
 
-What it costs is the diagnostic that a gaussian arm is read through. A
-QQ plot of `mass` shows a model failing badly while the identical
-model fitted alone shows nothing wrong.
+Measured on the wide fit, each arm's conditional linear predictor
+minus its marginal one is the latent state that arm read:
 
-The bound at 8.13 is worth recording alongside it. The extreme values
-sit exactly on it rather than trailing away from it, which is the
-signature of a PIT evaluated against a pooled predictive in place of
-the arm's own.
+| pair | max absolute difference |
+|---|---|
+| count against mass | 4.4e-16 |
+| count against seen | 6.7e-16 |
+| sampler's series 1 against series 3 | 3.436 |
+
+All three arms read one state while the sampler holds three. The
+reason is one line: `extract_trend_latent_states()` takes the series
+index from `get_observation_structure()$series_int`, which on a wide
+frame is 1 for all sixty rows, because a row of a wide frame is a time
+and not a series. Every arm therefore reads `trend[t, 1]`. The
+residual code is faultless; `sd(y - colMeans(mu))` is 0.896 against a
+fitted `sigma` of 0.370, which is what a predictor built from another
+response's trajectory gives.
+
+That places this entry with finding 65, which records the same
+substitution reaching `plot(type = "trend")`. It is wider than a plot:
+the conditional read is what `fitted()`, `posterior_epred()`,
+`log_lik()` and every information criterion take on a wide fit. The
+poisson and bernoulli arms survive it because a count PIT and a binary
+PIT are coarse enough to absorb a wrong mean; the gaussian arm is the
+one that shows it.
 
 **72. Poisson quantile residuals are half as wide as they should be,
 on any fit.**

@@ -836,7 +836,8 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
     # which case the trend contribution is the zero matrix.
     draws_mat <- posterior::as_draws_matrix(object$fit)
     fitted_states <- extract_trend_latent_states(
-      mvgam_fit = object, newdata = sub_data, full_draws = draws_mat
+      mvgam_fit = object, newdata = sub_data, full_draws = draws_mat,
+      resp = resp
     )
     if (is.null(fitted_states)) {
       fitted_states <- matrix(0, nrow = nrow(draws_mat),

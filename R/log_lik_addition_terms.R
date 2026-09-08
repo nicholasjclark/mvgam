@@ -81,6 +81,21 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
 }
 
 
+# Internal: whether a family is one `family_dist_spec()` names.
+#
+# Asked before a predictor is computed, so a family with no spec does
+# not pay for a prediction only the spec would use. It answers by
+# building the spec against an empty predictor rather than by keeping
+# a second list of family names beside the switch, which would be the
+# duplication the spec exists to remove.
+#' @noRd
+family_has_dist_spec <- function(family_name, link) {
+  !is.null(
+    family_dist_spec(family_name, link, matrix(0), list(), NULL)
+  )
+}
+
+
 # Internal: `P(Y <= q)` for every draw and observation, as an
 # `[ndraws x nobs]` matrix.
 #

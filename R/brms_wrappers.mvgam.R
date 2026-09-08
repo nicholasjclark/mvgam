@@ -412,7 +412,7 @@ predictive_error.mvgam <- function(object, newdata = NULL,
   preds <- do.call(pred_fun, diagnostic_surface_args(
     list(object, newdata = newdata, re_formula = re_formula,
          resp = resp, ndraws = ndraws, draw_ids = draw_ids, ...),
-    newdata
+    is.null(newdata)
   ))
   y <- as.numeric(data[[resp_name]])
   if (ncol(preds) != length(y)) {

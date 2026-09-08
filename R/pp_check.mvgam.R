@@ -171,7 +171,13 @@ pp_check.mvgam <- function(
   prefix <- match.arg(prefix)
   ndraws_given <- "ndraws" %in% names(match.call())
 
-  if (is.null(newdata)) {
+  # Whether the fit saw these rows decides which surface every panel
+  # reads, and it has to be settled before the training frame is
+  # substituted below: afterwards a test on `newdata` answers as
+  # though the user had supplied new data, which is what left the
+  # residual axis conditional and the fitted axis marginal.
+  in_sample <- is.null(newdata)
+  if (in_sample) {
     # Fitting data lives on $data; some objects also expose $obs_data
     # as an alias and may have it empty.
     newdata <- mvgam_training_data(object)
@@ -536,7 +542,7 @@ pp_check.mvgam <- function(
       ...
     )
     pred_args <- diagnostic_surface_args(
-      pred_args, newdata, weighted = psis_weighted
+      pred_args, in_sample, weighted = psis_weighted
     )
     yrep <- do_call(method, pred_args)
   }
@@ -614,7 +620,7 @@ pp_check.mvgam <- function(
           ndraws = NULL, draw_ids = draw_ids,
           resp = resp
         ),
-        newdata
+        in_sample
       ))
       if (!is.null(take)) {
         fitted_draws <- fitted_draws[, take, drop = FALSE]

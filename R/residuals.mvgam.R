@@ -10,17 +10,26 @@
 #'   distribution and then through the standard-normal quantile,
 #'   so under a correctly-specified model the residuals are
 #'   independent N(0, 1) draws regardless of the response
-#'   family. For the standard continuous families
-#'   (`gaussian`, `student`, `lognormal`, `Gamma`, `beta`)
-#'   the per-draw analytic CDF is used so each posterior
-#'   parameter draw produces its own residual realisation,
-#'   which preserves the parameter uncertainty in the per-draw
-#'   matrix. For every other family -- including discrete,
-#'   zero-inflated, hurdle, ordinal, beta-binomial and custom
-#'   families -- the residuals are computed via the empirical
-#'   PIT over [posterior_predict.mvgam()] draws (the DHARMa /
-#'   Hartig 2024 approach), which inherits family coverage
-#'   from `posterior_predict`.
+#'   family. The transform is evaluated **per draw**, against
+#'   that draw's own parameters, which is what makes the result
+#'   standard normal: a PIT taken against the posterior
+#'   predictive pooled over draws absorbs the uncertainty in the
+#'   latent state and comes back too narrow.
+#'
+#'   The families whose distribution function \pkg{mvgam} names
+#'   analytically -- `gaussian`, `student`, `lognormal`, `Gamma`,
+#'   `weibull`, `exponential`, `beta`, `bernoulli`, `binomial`,
+#'   `beta_binomial`, `poisson`, `negbinomial` and `geometric` --
+#'   take that route. A discrete family randomises within the
+#'   interval its atom occupies, `[F(y - 1), F(y)]`; a continuous
+#'   one has no atom and the interval collapses to `F(y)`.
+#'
+#'   Every other family -- including zero-inflated, hurdle,
+#'   ordinal, compositional and custom families -- is computed
+#'   via the empirical PIT over [posterior_predict.mvgam()]
+#'   draws (the DHARMa / Hartig 2024 approach), which inherits
+#'   family coverage from `posterior_predict` at the cost of
+#'   pooling the draws.
 #'
 #' * `"ordinary"` -- the predictive error `y - posterior_predict(y)`
 #'   per draw. Matches `type = "ordinary"` in
@@ -112,20 +121,29 @@
 #' @param ... Additional arguments forwarded to
 #'   [posterior_predict.mvgam()].
 #'
-#' @details The empirical-PIT path follows the DHARMa approach
-#'   (Hartig 2024) of computing residuals directly from the
-#'   posterior predictive draws:
+#' @details Both routes end at the same construction. Each draw
+#'   places the observation in a PIT interval, the residual is
+#'   `qnorm(Uniform(lower, upper))` over that interval, and a
+#'   degenerate interval returns its endpoint. What separates
+#'   them is where the interval comes from.
 #'
-#'   * `lower = mean(yrep < y_i)`, `upper = mean(yrep <= y_i)`.
-#'   * If `lower == upper` (continuous response, no ties) the
-#'     residual is `qnorm(lower)`; otherwise it is
-#'     `qnorm(Uniform(lower, upper))`.
+#'   The analytic route reads the family's own distribution
+#'   function at that draw's parameters, so the interval is
+#'   `[F(y_i - 1 | theta_d), F(y_i | theta_d)]` for a discrete
+#'   family and the point `F(y_i | theta_d)` for a continuous
+#'   one. The same parameterisation supplies the density
+#'   [log_lik.mvgam()] reads, so the residual and the likelihood
+#'   cannot disagree about what a family is.
 #'
-#'   This formulation needs no analytic family CDF, so it
-#'   inherits the family coverage of
-#'   [posterior_predict.mvgam()] -- mixture families
-#'   (zero-inflated, hurdle), beta-binomial, tweedie, ordinal
-#'   families and custom families are all supported.
+#'   The empirical route follows DHARMa (Hartig 2024): `lower`
+#'   and `upper` are `mean(yrep < y_i)` and `mean(yrep <= y_i)`
+#'   over the pooled draws. Pooling is what makes it work
+#'   without a family CDF, and also what costs it: the pooled
+#'   predictive carries the posterior uncertainty in the latent
+#'   state, so the interval sits closer to 0.5 than the
+#'   conditional one and the residuals come back narrower than
+#'   standard normal. Read a QQ-plot from this route as
+#'   conservative.
 #'
 #'   The PIT u is clamped to `[.Machine$double.eps,
 #'   1 - .Machine$double.eps]` before `qnorm` so the residual
@@ -133,10 +151,10 @@
 #'   floating-point tail of the predictive distribution. This
 #'   bound corresponds to `|qnorm(u)| ≈ 8.13`.
 #'
-#'   *ndraws sensitivity.* The two paths react differently to
+#'   *ndraws sensitivity.* The two routes react differently to
 #'   the posterior draw count:
 #'
-#'   * The analytic-CDF path can produce isolated clamp events
+#'   * The analytic route can produce isolated clamp events
 #'     on individual posterior draws whose `(mu_d, dpar_d)`
 #'     happen to place the observed `y_i` more than ~38 SDs
 #'     from the predictive mean -- `pnorm` underflows to exactly
@@ -145,7 +163,7 @@
 #'     property of the posterior, not a misfit signal. They get
 #'     proportionally rarer with more draws but never vanish.
 #'
-#'   * The empirical-PIT path needs enough simulations for the
+#'   * The empirical route needs enough simulations for the
 #'     empirical predictive CDF to cover the data. With small
 #'     `ndraws` many observations land outside the simulated
 #'     range entirely, so `u` is exactly 0 or 1 deterministically
@@ -162,11 +180,13 @@
 #'
 #'   * `summary = FALSE`: an `ndraws x nobs` numeric matrix of
 #'     per-draw residuals (the same shape as
-#'     [posterior_predict.mvgam()] output). For continuous
-#'     responses (where the empirical PIT does not need
-#'     randomization) every row is identical and the matrix
+#'     [posterior_predict.mvgam()] output). A continuous family
+#'     on the empirical route has one pooled interval per
+#'     observation, so every row is identical and the matrix
 #'     reduces to a single deterministic residual per
-#'     observation.
+#'     observation; on the analytic route the interval moves
+#'     with the draw and the column carries the posterior
+#'     spread.
 #'   * `summary = TRUE`: an `nobs x E` numeric matrix where
 #'     `E = 2 + length(probs)`. Column `Estimate` is the mean
 #'     (or median when `robust = TRUE`); column `Est.Error` is
@@ -298,7 +318,7 @@ residuals.mvgam <- function(object,
     "ordinary" = {
       yrep <- do.call(
         posterior_predict,
-        diagnostic_surface_args(pp_args, newdata)
+        diagnostic_surface_args(pp_args, is.null(newdata))
       )
       sweep(yrep, 2L, y, FUN = function(yh, yi) yi - yh)
     }
@@ -322,6 +342,10 @@ residuals.mvgam <- function(object,
 #'@noRd
 compute_closure_unit_residuals <- function(object, newdata, type,
                                              draw_ids, ndraws, ...) {
+  # Whether the fit saw these rows is settled before the training
+  # frame is substituted for them, since afterwards every test on
+  # `newdata` answers as though the user had supplied new data.
+  in_sample <- is.null(newdata)
   newdata <- newdata %||% mvgam_training_data(object)
   pp_args <- c(
     list(object = object, newdata = newdata,
@@ -330,7 +354,7 @@ compute_closure_unit_residuals <- function(object, newdata, type,
   )
   yrep_visit <- do.call(
     posterior_predict,
-    diagnostic_surface_args(pp_args, newdata)
+    diagnostic_surface_args(pp_args, in_sample)
   )
   agg <- aggregate_closure_unit_visits(
     object, newdata = newdata, yrep_visit = yrep_visit
@@ -370,22 +394,12 @@ compute_closure_unit_residuals <- function(object, newdata, type,
 }
 
 
-# Internal: continuous-family CDF dispatch table for per-draw
-# analytic quantile residuals. Each entry maps a brms family
-# string to `function(y_mat, mu_mat, dpars) -> [ndraws x nobs]
-# PIT matrix`, where `y_mat` is `y` recycled across draws and
-# `dpars` is the list of per-draw distribution parameters
-# returned by `compute_family_variance_for_residuals` (we reuse
-# the same dpar broadcasting). All other families fall through
-# to the empirical-PIT path (Hartig 2024 / DHARMa convention),
-# which inherits coverage from `posterior_predict.mvgam`.
-#'@noRd
 # Internal: prediction arguments for a residual. Names the surface
 # through the shared rule, and carries the response the mv fan-out
 # scoped this call to; the marginal branch must not drop it.
 #'@noRd
 residuals_pred_args <- function(pp_args, resp) {
-  args <- diagnostic_surface_args(pp_args, pp_args$newdata)
+  args <- diagnostic_surface_args(pp_args, is.null(pp_args$newdata))
   if (!"resp" %in% names(args)) {
     args$resp <- resp
   }
@@ -393,56 +407,87 @@ residuals_pred_args <- function(pp_args, resp) {
 }
 
 
-quantile_family_specs <- list(
-  gaussian = function(y, mu, dpars) {
-    stats::pnorm(y, mean = mu, sd = dpars$sigma)
-  },
-  student = function(y, mu, dpars) {
-    stats::pt((y - mu) / dpars$sigma, df = dpars$nu)
-  },
-  lognormal = function(y, mu, dpars) {
-    stats::plnorm(y, meanlog = log(mu), sdlog = dpars$sigma)
-  },
-  Gamma = function(y, mu, dpars) {
-    stats::pgamma(y, shape = dpars$shape,
-                    rate = dpars$shape / mu)
-  },
-  beta = function(y, mu, dpars) {
-    stats::pbeta(y, shape1 = mu * dpars$phi,
-                   shape2 = (1 - mu) * dpars$phi)
+# Internal: the per-draw PIT bounds an analytic family supplies.
+#
+# `family_dist_spec()` is the package's one account of how a family
+# is parameterised: `log_lik()` reads it for the density and the
+# `cens()` / `trunc()` terms read it for the distribution function,
+# so a residual reads it too rather than keeping a second table of
+# CDFs that can drift from it.
+#
+# A discrete family carries an atom at each observed value, so the
+# Dunn-Smyth construction randomises over `[F(y - 1), F(y)]`. A
+# continuous one has no atom, both bounds are `F(y)`, and the
+# residual is a deterministic function of the draw. Returns NULL for
+# a family the spec does not name, which is what sends that family
+# to the empirical PIT.
+#'@noRd
+analytic_pit_bounds <- function(object, y, pp_args, d,
+                                draw_ids = NULL, resp = NULL) {
+  family_obj <- get_family_for_resp(object, resp)
+  family_name <- resolve_family_name(family_obj)
+  # Whether a family has a spec depends on its name alone, so it is
+  # settled before the predictor is computed: a family without one
+  # takes the empirical route and must not pay for a prediction it
+  # will not use.
+  if (!family_has_dist_spec(family_name, family_obj$link)) {
+    return(NULL)
   }
-)
+  # The spec applies the family's own inverse link, so it takes the
+  # predictor on the link scale, which is the scale `log_lik()`
+  # hands it.
+  linpred <- do.call(
+    posterior_linpred,
+    c(residuals_pred_args(pp_args, resp), list(transform = FALSE))
+  )
+  # `residuals.mvgam()` fans a multivariate fit out before reaching
+  # here, so the response is always named and the prediction is one
+  # arm's matrix. Stating that is enough; a second code path to
+  # narrow a list would be a branch nothing takes.
+  checkmate::assert_matrix(linpred)
+  spec <- family_dist_spec(
+    family_name,
+    family_obj$link,
+    linpred,
+    resolve_family_pars(
+      object,
+      dpar_names = get_family_dpars(family_name),
+      ndraws = nrow(linpred),
+      nobs = ncol(linpred),
+      draw_ids = draw_ids,
+      newdata = d,
+      resp = resp
+    ),
+    extract_trials_for_family(object, family_obj, d)
+  )
+  upper <- dist_cdf(spec, linpred, y)
+  lower <- if (family_uses_integers(family_name)) {
+    dist_cdf(spec, linpred, y - 1)
+  } else {
+    upper
+  }
+  list(lower = lower, upper = upper)
+}
 
 
-# Internal: top-level dispatcher for `type = "quantile"`.
-# Continuous standard families use the analytic per-draw CDF
-# (Dunn & Smyth 1996 in its original form); all other families
-# use the empirical PIT over `posterior_predict` draws. Both read
-# the surface `diagnostic_surface_args()` names, which in sample is
-# the per-draw `trend[t, s]` the model inferred. Against
-# marginal-MC predictions on a strong-trend fit the PIT saturates
-# at the qnorm clamping bounds and says nothing.
+# Internal: top-level dispatcher for `type = "quantile"`. A family
+# the distribution spec names gets its PIT evaluated per draw, from
+# that draw's own parameters, which is the Dunn-Smyth construction.
+# Every other family falls through to the empirical PIT over
+# `posterior_predict` draws. Both read the surface
+# `diagnostic_surface_args()` names, which in sample is the per-draw
+# `trend[t, s]` the model inferred.
 #'@noRd
 compute_quantile_residuals <- function(object, y, pp_args,
                                          d, draw_ids = NULL,
                                          resp = NULL) {
-  # For multi-response fits, `object$family` is the (gaussian)
-  # placeholder mvbf top-level family; the per-arm family lives
-  # on `object$formula$forms[[resp]]$family`. Use the per-arm
-  # family when `resp` is supplied and the formula is mv.
-  fam <- resolve_resp_family(object, resp)
-  # brms's mvbf normalises family names to lowercase
-  # (e.g. `Gamma` -> `gamma`), which misses the spec keys that
-  # mirror R's family() constructor casing. Match case-insensitively
-  # so per-response Gamma / Gaussian arms hit the analytic path
-  # instead of falling through to the empirical-PIT branch.
-  spec_idx <- match(tolower(fam), tolower(names(quantile_family_specs)))
-  spec <- if (is.na(spec_idx)) NULL else quantile_family_specs[[spec_idx]]
-  if (!is.null(spec)) {
-    return(compute_quantile_residuals_analytic(
-      object = object, y = y, spec = spec,
-      pp_args = pp_args, d = d, draw_ids = draw_ids,
-      resp = resp
+  bounds <- analytic_pit_bounds(
+    object = object, y = y, pp_args = pp_args, d = d,
+    draw_ids = draw_ids, resp = resp
+  )
+  if (!is.null(bounds)) {
+    return(randomised_quantile_residuals(
+      bounds$lower, bounds$upper, y
     ))
   }
   yrep <- do.call(
@@ -452,36 +497,26 @@ compute_quantile_residuals <- function(object, y, pp_args,
 }
 
 
-# Internal: per-draw analytic quantile residuals for continuous
-# standard families. `spec(y_mat, mu_mat, dpars) -> PIT matrix`.
-# `y` is broadcast across draws; `dpars` are reused from the
-# pearson path's helper so the dpar broadcasting logic is shared.
-# Each spec wants the family's own `mu`, not the mean of the
-# response: a lognormal PIT takes `log(mu)` as its meanlog, and
-# `E[Y]` there carries a dispersion term the CDF must not see. The
-# predictor's inverse link is what supplies it. The dpar broadcast
-# is unchanged, since observation-family scale parameters do not
-# depend on the latent state.
+# Internal: the randomised quantile residual itself, given the PIT
+# interval each draw places the observation in. Both the analytic
+# and the empirical route end here, so the randomisation and the
+# clamp that keeps `qnorm` finite are written once.
+#
+# `runif` on a degenerate interval returns its endpoint, which is
+# what makes a continuous family the special case of the discrete
+# one rather than a separate path.
 #'@noRd
-compute_quantile_residuals_analytic <- function(object, y, spec,
-                                                  pp_args, d,
-                                                  draw_ids = NULL,
-                                                  resp = NULL) {
-  mu <- do.call(
-    posterior_linpred,
-    c(residuals_pred_args(pp_args, resp), list(transform = TRUE))
-  )
-  dpars <- residuals_dpars(object, draw_ids = draw_ids,
-                            d = d, n_obs = length(y),
-                            resp = resp)
-  y_mat <- matrix(rep(y, nrow(mu)), nrow = nrow(mu), byrow = TRUE)
-  u <- spec(y_mat, mu, dpars)
-  # Clip u away from {0, 1} so qnorm never returns +/-Inf for
-  # observations deep in the predictive tail. Matches the
-  # continuity-corrected empirical-PIT path.
+randomised_quantile_residuals <- function(lower, upper, y) {
+  lo <- pmin(lower, upper)
+  hi <- pmax(lower, upper)
+  ok <- is.finite(lo) & is.finite(hi)
+  u <- rep(NA_real_, length(lo))
+  u[ok] <- stats::runif(sum(ok), min = lo[ok], max = hi[ok])
   eps <- .Machine$double.eps
-  u <- pmin(pmax(u, eps), 1 - eps)
-  resids <- stats::qnorm(u)
+  resids <- matrix(
+    stats::qnorm(pmin(pmax(u, eps), 1 - eps)),
+    nrow = nrow(lower)
+  )
   na_obs <- is.na(y)
   if (any(na_obs)) resids[, na_obs] <- NA_real_
   resids
@@ -490,74 +525,32 @@ compute_quantile_residuals_analytic <- function(object, y, spec,
 
 # Internal: empirical-PIT quantile residuals (DHARMa / Hartig
 # 2024 helper.R::getQuantile convention). Per obs the lower /
-# upper PIT bounds are `mean(yrep < y)` and `mean(yrep <= y)`.
-# When they coincide (continuous response, no ties) the
-# residual is deterministic; otherwise it is randomized
-# per draw between the bounds. `qnorm` -> N(0, 1).
+# upper PIT bounds are `mean(yrep < y)` and `mean(yrep <= y)`,
+# pooled over draws, so one interval serves every draw. This is
+# the route for a family with no analytic distribution function,
+# and it is why such a family's residuals carry less spread than
+# the per-draw construction: the pooled predictive absorbs the
+# posterior uncertainty in the latent state that the conditional
+# CDF holds fixed.
 #'@noRd
 compute_quantile_residuals_empirical <- function(y, yrep,
                                                    ndraws_used) {
   nobs <- length(y)
-  # DHARMa::getQuantile formulation: lower / upper are the
-  # empirical CDF bounds `mean(yrep < y)` / `mean(yrep <= y)`.
-  # When they coincide (continuous response, no ties) the
-  # residual is deterministic; otherwise it is randomized per
-  # draw between the bounds. Clamping below keeps `qnorm` finite
-  # for boundary observations.
-  lower <- vapply(seq_len(nobs), function(i) {
-    if (is.na(y[i])) return(NA_real_)
-    mean(yrep[, i] < y[i], na.rm = TRUE)
-  }, numeric(1L))
-  upper <- vapply(seq_len(nobs), function(i) {
-    if (is.na(y[i])) return(NA_real_)
-    mean(yrep[, i] <= y[i], na.rm = TRUE)
-  }, numeric(1L))
-  needs_rand <- !is.na(lower) & lower != upper
-  eps <- .Machine$double.eps
-  resids <- matrix(NA_real_, nrow = ndraws_used, ncol = nobs)
-  for (i in seq_len(nobs)) {
-    if (is.na(lower[i])) next
-    u <- if (needs_rand[i]) {
-      stats::runif(ndraws_used, min = lower[i], max = upper[i])
-    } else {
-      rep(lower[i], ndraws_used)
-    }
-    u <- pmin(pmax(u, eps), 1 - eps)
-    resids[, i] <- stats::qnorm(u)
+  bound <- function(cmp) {
+    vapply(seq_len(nobs), function(i) {
+      if (is.na(y[i])) return(NA_real_)
+      mean(cmp(yrep[, i], y[i]), na.rm = TRUE)
+    }, numeric(1L))
   }
-  resids
-}
-
-
-# Internal: shared per-draw dpar extraction + obs-level
-# broadcasting. Used by both the analytic-quantile path and
-# the pearson path so dpar shape logic stays in one place.
-#'@noRd
-residuals_dpars <- function(object, ndraws = NULL, draw_ids = NULL,
-                            d, n_obs, resp = NULL) {
-  draws_mat <- posterior::as_draws_matrix(object$fit)
-  # The parameters standardising a residual have to come from the same
-  # iterations as the fitted value it is standardising, so a count is
-  # turned into indices rather than subsampled again here.
-  draw_idx <- resolve_draw_ids(object, ndraws, draw_ids) %||%
-    seq_len(nrow(draws_mat))
-  per_series <- extract_family_pars_for_draws(
-    object, draws_mat, draw_idx, resp = resp
+  as_draw_matrix <- function(v) {
+    matrix(rep(v, each = ndraws_used), nrow = ndraws_used)
+  }
+  randomised_quantile_residuals(
+    as_draw_matrix(bound(`<`)),
+    as_draw_matrix(bound(`<=`)),
+    y
   )
-  lapply(per_series, function(mat) {
-    nc <- ncol(mat)
-    if (nc == 1L) {
-      matrix(rep(as.numeric(mat), n_obs),
-              nrow = nrow(mat), byrow = FALSE)
-    } else if (nc == n_obs) {
-      mat
-    } else {
-      reps <- n_obs %/% nc
-      mat[, rep(seq_len(nc), each = reps), drop = FALSE]
-    }
-  })
 }
-
 
 
 

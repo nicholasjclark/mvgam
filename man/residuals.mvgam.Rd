@@ -50,11 +50,13 @@ An array of residuals.
 \itemize{
 \item \code{summary = FALSE}: an \verb{ndraws x nobs} numeric matrix of
 per-draw residuals (the same shape as
-\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} output). For continuous
-responses (where the empirical PIT does not need
-randomization) every row is identical and the matrix
+\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} output). A continuous family
+on the empirical route has one pooled interval per
+observation, so every row is identical and the matrix
 reduces to a single deterministic residual per
-observation.
+observation; on the analytic route the interval moves
+with the draw and the column carries the posterior
+spread.
 \item \code{summary = TRUE}: an \verb{nobs x E} numeric matrix where
 \code{E = 2 + length(probs)}. Column \code{Estimate} is the mean
 (or median when \code{robust = TRUE}); column \code{Est.Error} is
@@ -76,17 +78,26 @@ cumulative distribution function of its predictive
 distribution and then through the standard-normal quantile,
 so under a correctly-specified model the residuals are
 independent N(0, 1) draws regardless of the response
-family. For the standard continuous families
-(\code{gaussian}, \code{student}, \code{lognormal}, \code{Gamma}, \code{beta})
-the per-draw analytic CDF is used so each posterior
-parameter draw produces its own residual realisation,
-which preserves the parameter uncertainty in the per-draw
-matrix. For every other family -- including discrete,
-zero-inflated, hurdle, ordinal, beta-binomial and custom
-families -- the residuals are computed via the empirical
-PIT over \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} draws (the DHARMa /
-Hartig 2024 approach), which inherits family coverage
-from \code{posterior_predict}.
+family. The transform is evaluated \strong{per draw}, against
+that draw's own parameters, which is what makes the result
+standard normal: a PIT taken against the posterior
+predictive pooled over draws absorbs the uncertainty in the
+latent state and comes back too narrow.
+
+The families whose distribution function \pkg{mvgam} names
+analytically -- \code{gaussian}, \code{student}, \code{lognormal}, \code{Gamma},
+\code{weibull}, \code{exponential}, \code{beta}, \code{bernoulli}, \code{binomial},
+\code{beta_binomial}, \code{poisson}, \code{negbinomial} and \code{geometric} --
+take that route. A discrete family randomises within the
+interval its atom occupies, \verb{[F(y - 1), F(y)]}; a continuous
+one has no atom and the interval collapses to \code{F(y)}.
+
+Every other family -- including zero-inflated, hurdle,
+ordinal, compositional and custom families -- is computed
+via the empirical PIT over \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}
+draws (the DHARMa / Hartig 2024 approach), which inherits
+family coverage from \code{posterior_predict} at the cost of
+pooling the draws.
 \item \code{"ordinary"} -- the predictive error \code{y - posterior_predict(y)}
 per draw. Matches \code{type = "ordinary"} in
 \code{\link[brms:residuals.brmsfit]{brms::residuals.brmsfit()}}.
@@ -113,31 +124,39 @@ tight. Use \code{"quantile"} instead -- it is the correct
 diagnostic for this model class and is N(0, 1) under a
 correctly-specified model regardless of family.
 
-The empirical-PIT path follows the DHARMa approach
-(Hartig 2024) of computing residuals directly from the
-posterior predictive draws:
-\itemize{
-\item \code{lower = mean(yrep < y_i)}, \code{upper = mean(yrep <= y_i)}.
-\item If \code{lower == upper} (continuous response, no ties) the
-residual is \code{qnorm(lower)}; otherwise it is
-\code{qnorm(Uniform(lower, upper))}.
-}
+Both routes end at the same construction. Each draw
+places the observation in a PIT interval, the residual is
+\code{qnorm(Uniform(lower, upper))} over that interval, and a
+degenerate interval returns its endpoint. What separates
+them is where the interval comes from.
 
-This formulation needs no analytic family CDF, so it
-inherits the family coverage of
-\code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} -- mixture families
-(zero-inflated, hurdle), beta-binomial, tweedie, ordinal
-families and custom families are all supported.
+The analytic route reads the family's own distribution
+function at that draw's parameters, so the interval is
+\verb{[F(y_i - 1 | theta_d), F(y_i | theta_d)]} for a discrete
+family and the point \code{F(y_i | theta_d)} for a continuous
+one. The same parameterisation supplies the density
+\code{\link[=log_lik.mvgam]{log_lik.mvgam()}} reads, so the residual and the likelihood
+cannot disagree about what a family is.
+
+The empirical route follows DHARMa (Hartig 2024): \code{lower}
+and \code{upper} are \code{mean(yrep < y_i)} and \code{mean(yrep <= y_i)}
+over the pooled draws. Pooling is what makes it work
+without a family CDF, and also what costs it: the pooled
+predictive carries the posterior uncertainty in the latent
+state, so the interval sits closer to 0.5 than the
+conditional one and the residuals come back narrower than
+standard normal. Read a QQ-plot from this route as
+conservative.
 
 The PIT u is clamped to \verb{[.Machine$double.eps, 1 - .Machine$double.eps]} before \code{qnorm} so the residual
 stays finite even when an observation lies in the extreme
 floating-point tail of the predictive distribution. This
 bound corresponds to \verb{|qnorm(u)| ≈ 8.13}.
 
-\emph{ndraws sensitivity.} The two paths react differently to
+\emph{ndraws sensitivity.} The two routes react differently to
 the posterior draw count:
 \itemize{
-\item The analytic-CDF path can produce isolated clamp events
+\item The analytic route can produce isolated clamp events
 on individual posterior draws whose \verb{(mu_d, dpar_d)}
 happen to place the observed \code{y_i} more than ~38 SDs
 from the predictive mean -- \code{pnorm} underflows to exactly
@@ -145,7 +164,7 @@ from the predictive mean -- \code{pnorm} underflows to exactly
 \verb{±8.13} residuals in the per-draw matrix but are a
 property of the posterior, not a misfit signal. They get
 proportionally rarer with more draws but never vanish.
-\item The empirical-PIT path needs enough simulations for the
+\item The empirical route needs enough simulations for the
 empirical predictive CDF to cover the data. With small
 \code{ndraws} many observations land outside the simulated
 range entirely, so \code{u} is exactly 0 or 1 deterministically

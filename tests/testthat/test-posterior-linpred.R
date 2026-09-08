@@ -9,9 +9,9 @@
 #'     shared trend across responses; the most common multivariate
 #'     case in mvgam, exercised by tests/local fit2)
 #'   - obs as named list, trend as named list (multivariate obs with
-#'     per-response trend output; not produced by any current mvgam
-#'     codegen path, but the combination branch must still be correct
-#'     because the prediction-system contract supports it)
+#'     one trend per response, which is what a conditional read of a
+#'     response-keyed fit gives: there each response is its own series
+#'     and holds its own `trend[t, s]` column)
 #'
 #' Tests use testthat::local_mocked_bindings() to feed deterministic
 #' inputs through the combination, avoiding the need for fitted Stan
@@ -77,9 +77,9 @@ test_that("get_combined_linpred handles list obs + matrix shared trend", {
 
 
 test_that("get_combined_linpred handles list obs + list per-response trend", {
-  # The per-response trend list shape isn't produced by current mvgam
-  # codegen (single trend type per fit; see architecture decisions),
-  # but the combination logic supports it for completeness.
+  # A conditional read of a response-keyed fit takes this shape: the
+  # series axis there is the responses, so each one has its own
+  # latent state and they are composed against their own arm.
   testthat::local_mocked_bindings(
     extract_component_linpred = function(mvgam_fit, newdata, component, ...) {
       if (component == "obs") {
@@ -490,7 +490,8 @@ test_that("trend_state = 'conditional' reads the fitted state", {
         matrix(100, nrow = 4, ncol = 3)
       }
     },
-    extract_trend_latent_states = function(mvgam_fit, newdata, full_draws) {
+    extract_trend_latent_states = function(mvgam_fit, newdata,
+                                           full_draws, resp = NULL) {
       matrix(0.25, nrow = 4, ncol = 3)
     },
     has_stochastic_trend = function(object) TRUE,
@@ -535,7 +536,8 @@ test_that("a conditional read ignores process_error", {
     extract_component_linpred = function(mvgam_fit, newdata, component, ...) {
       matrix(0, nrow = 4, ncol = 3)
     },
-    extract_trend_latent_states = function(mvgam_fit, newdata, full_draws) {
+    extract_trend_latent_states = function(mvgam_fit, newdata,
+                                           full_draws, resp = NULL) {
       matrix(3, nrow = 4, ncol = 3)
     },
     has_stochastic_trend = function(object) TRUE,
@@ -560,7 +562,8 @@ test_that("a fit with no latent state falls back to the submodel", {
     extract_component_linpred = function(mvgam_fit, newdata, component, ...) {
       if (component == "obs") matrix(1, 4, 3) else matrix(0.5, 4, 3)
     },
-    extract_trend_latent_states = function(mvgam_fit, newdata, full_draws) {
+    extract_trend_latent_states = function(mvgam_fit, newdata,
+                                           full_draws, resp = NULL) {
       NULL
     },
     has_stochastic_trend = function(object) FALSE,
@@ -677,25 +680,29 @@ test_that("diagnostic_surface_args names the surface as incl_autocor", {
   # In sample the conditional state, out of sample the marginal, and
   # the conditional state whenever importance weights are involved.
   expect_identical(
-    diagnostic_surface_args(list(), newdata = NULL)$incl_autocor, TRUE
+    diagnostic_surface_args(list(), in_sample = TRUE)$incl_autocor, TRUE
   )
   expect_null(
-    diagnostic_surface_args(
-      list(), newdata = data.frame(x = 1)
-    )$incl_autocor
+    diagnostic_surface_args(list(), in_sample = FALSE)$incl_autocor
   )
   expect_identical(
     diagnostic_surface_args(
-      list(), newdata = data.frame(x = 1), weighted = TRUE
+      list(), in_sample = FALSE, weighted = TRUE
     )$incl_autocor,
     TRUE
   )
   # A caller that named the surface keeps it.
   expect_identical(
     diagnostic_surface_args(
-      list(incl_autocor = FALSE), newdata = NULL
+      list(incl_autocor = FALSE), in_sample = TRUE
     )$incl_autocor,
     FALSE
+  )
+  # The caller states the fact rather than handing over a frame, so a
+  # frame cannot be mistaken for an answer to it.
+  expect_error(
+    diagnostic_surface_args(list(), data.frame(x = 1)),
+    "in_sample"
   )
 })
 
