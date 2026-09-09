@@ -608,28 +608,17 @@ compute_quantile_residuals_empirical <- function(y, yrep,
 #'@noRd
 residuals_finalise <- function(resids, summary, robust, probs) {
   if (!summary) return(resids)
-  Qlower <- apply(resids, 2L, stats::quantile,
-                    probs = min(probs), na.rm = TRUE)
-  Qupper <- apply(resids, 2L, stats::quantile,
-                    probs = max(probs), na.rm = TRUE)
-  if (robust) {
-    estimates <- apply(resids, 2L, stats::median, na.rm = TRUE)
-    errors <- apply(
-      resids, 2L,
-      function(col) {
-        m <- stats::median(col, na.rm = TRUE)
-        stats::median(abs(col - m), na.rm = TRUE)
-      }
-    )
-  } else {
-    estimates <- apply(resids, 2L, mean, na.rm = TRUE)
-    errors <- apply(resids, 2L, stats::sd, na.rm = TRUE)
-  }
-  out <- cbind(estimates, errors, Qlower, Qupper)
-  colnames(out) <- c(
-    "Estimate", "Est.Error",
-    paste0("Q", 100 * min(probs)),
-    paste0("Q", 100 * max(probs))
-  )
-  out
+  # The summary every other accessor reports, so a residual and a
+  # prediction describe their spread the same way. Written out
+  # separately here, it had drifted: the robust `Est.Error` was
+  # `median(|x - median(x)|)`, where `stats::mad()` scales that by
+  # 1.4826, so `residuals()` and `predict()` reported the same
+  # quantity on scales differing by half again.
+  #
+  # The local copy also read `na.rm = TRUE` where the shared rule
+  # calls a column with any missing draw missing. Measured across
+  # every cached fixture, no residual column is partly missing -- 24
+  # are missing entirely and none in part -- so the two rules differ
+  # only where neither is reached.
+  mvgam_post_summary(resids, robust = robust, probs = probs)
 }

@@ -872,3 +872,21 @@ test_that("an off-centre asymmetric Laplace reports its own mean", {
   expect_lt(abs(mean(ep) - mean(yrep)), 0.2)
   expect_gt(abs(mean(lp) - mean(yrep)), 1)
 })
+
+
+test_that("a fold splits the simplest frame there is", {
+  # 30 consecutive occasions on one series, no gaps at all. A fold
+  # used to be held out by deleting its rows, so the refit was handed
+  # a frame whose occasions jumped and the guard demanding a regular
+  # grid refused it: the irregularity was the split's own, and the
+  # message named the user's `time` column for it.
+  #
+  # This frame is the control that says so, because there is nothing
+  # about it a guard could legitimately object to.
+  d <- mvgam:::mvgam_training_data(fit_plain)
+  expect_identical(length(unique(d$series)), 1L)
+  expect_false(any(diff(sort(unique(d$time))) != 1L))
+
+  kf <- suppressWarnings(kfold(fit_plain, K = 2L, silent = 2L))
+  expect_true(is.finite(kf$estimates["elpd_kfold", "Estimate"]))
+})

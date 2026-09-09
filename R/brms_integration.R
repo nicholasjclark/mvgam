@@ -650,10 +650,43 @@ inject_obs_zero_placeholder <- function(formula, data, prior) {
     termlabels = c("0", ph),
     response   = formula[[2L]]
   )
-  pin <- brms::set_prior("constant(0)", class = "b", coef = ph)
+  pin <- obs_placeholder_pin()
   new_prior <- if (is.null(prior)) pin else rbind(prior, pin)
 
   list(formula = new_formula, data = data, prior = new_prior)
+}
+
+
+# Internal: the prior that holds the injected placeholder's
+# coefficient at zero, so the column contributes `1 * 0 = 0` and the
+# formula means what the user wrote. Written here rather than at the
+# injection because a refit needs the same row and cannot get it from
+# the injection: the stored formula already names the placeholder, so
+# the injection does not fire a second time.
+#'@noRd
+obs_placeholder_pin <- function() {
+  brms::set_prior("constant(0)", class = "b",
+                  coef = MVGAM_EMPTY_OBS_PLACEHOLDER)
+}
+
+
+# Internal: put the placeholder's pin back into a prior table that
+# lost it. `mvgam()` filters the row out of the table it stores, so
+# the user never reads a prior for a column they did not write; a
+# refit inheriting that table would then sample the placeholder free,
+# and against a trend intercept the two lie on an exact ridge. The
+# sibling of `ensure_obs_placeholder()`, which does the same for the
+# column itself.
+#'@noRd
+ensure_obs_placeholder_pin <- function(prior, object) {
+  if (!obs_formula_needs_placeholder(object$formula)) return(prior)
+  ph <- MVGAM_EMPTY_OBS_PLACEHOLDER
+  if (!is.null(prior) && nrow(prior) > 0L &&
+        any(prior$coef == ph, na.rm = TRUE)) {
+    return(prior)
+  }
+  pin <- obs_placeholder_pin()
+  if (is.null(prior) || nrow(prior) == 0L) pin else rbind(prior, pin)
 }
 
 # Parameters mvgam injects that do not carry the `_trend` suffix.

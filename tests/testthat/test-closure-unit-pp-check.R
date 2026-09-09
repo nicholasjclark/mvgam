@@ -40,8 +40,7 @@ test_that("closure_unit_pp_check_setup() collapses non-resid yrep to the per-uni
     nrow = 5L, ncol = nrow(d)
   )
   res <- closure_unit_pp_check_setup(
-    obj, newdata = d,
-    y = as.numeric(d$y), yrep = yrep, type = "bars"
+    obj, newdata = d, yrep = yrep, type = "bars"
   )
   expect_identical(length(res$y), 4L)
   expect_identical(dim(res$yrep), c(5L, 4L))
@@ -60,7 +59,7 @@ test_that("closure_unit_pp_check_setup() preserves the per-unit yrep grain on re
   # residuals.mvgam returns [ndraws x N_unit]; mimic that shape.
   per_unit_resid <- matrix(rnorm(7L * 4L), nrow = 7L, ncol = 4L)
   res <- closure_unit_pp_check_setup(
-    obj, newdata = d, y = as.numeric(d$y),
+    obj, newdata = d,
     yrep = per_unit_resid, type = "resid_hist"
   )
   expect_identical(dim(res$yrep), c(7L, 4L))

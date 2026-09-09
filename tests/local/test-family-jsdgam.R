@@ -552,7 +552,14 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     for (s in lev) {
       expect_identical(as.integer(grid$times[[s]]), future_times)
     }
-    expect_null(mvgam:::resolve_forecast_grid(fit, d, training, lev))
+    # The training frame itself names no occasion beyond the grid, so
+    # there is no horizon in it to resolve. An empty grid used to be
+    # returned, which handed a caller a forecast object holding
+    # nothing.
+    expect_error(
+      mvgam:::resolve_forecast_grid(fit, d, training, lev),
+      "no occasion beyond the training grid"
+    )
   })
 
   test_that(says("each row reads the latent cell the sampler drew"), {
@@ -903,6 +910,48 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     expect_true(all(grepl("Pareto", seen)))
   })
 
+  test_that(says("the three routes to a latent state give one answer"), {
+    # Sharing the closure-unit data pipeline is not the same as
+    # having a latent state to report. `occ()` and `nmix()` do;
+    # `mvn()`, `mvt()` and `diri()` reuse the pipeline and do not.
+    #
+    # Asserted as agreement between the three routes rather than
+    # against the registry that decides, so the claim is not the
+    # decision restated. Two of them checked only whether the family
+    # was closure-unit, let these families through to a dispatcher
+    # with no branch, and answered with a source file to edit.
+    routes <- list(
+      hindcast = function() hindcast(fit, type = "latent_state"),
+      predict = function() predict(fit, type = "latent_state",
+                                   ndraws = 5L),
+      conditional_effects = function()
+        conditional_effects(fit, type = "latent_state")
+    )
+    refused <- vapply(routes, function(f) {
+      inherits(try(suppressWarnings(f()), silent = TRUE), "try-error")
+    }, logical(1L))
+    expect_true(length(unique(refused)) == 1L)
+    # And where it is refused, the refusal names the family and what
+    # it does offer, rather than naming the package's own internals.
+    if (all(refused)) {
+      for (r in names(routes)) {
+        expect_error(suppressWarnings(routes[[r]]()),
+                     "is not available for this family")
+      }
+    }
+
+    # `summary()` closes with a list of next steps, and it must not
+    # send a reader to a call these routes refuse. Tied to what the
+    # routes actually do rather than to the registry that decides, so
+    # the two cannot part company.
+    txt <- paste(
+      utils::capture.output(suppressWarnings(summary(fit))),
+      collapse = " "
+    )
+    expect_identical(grepl("latent_state", txt, fixed = TRUE),
+                     !all(refused))
+  })
+
   test_that(says("pp_check, plotting and conditional_effects render"), {
     expect_drawn(pp_check(fit, ndraws = 20L))
     if (!is.null(spec$pp_check_extra)) {
@@ -1007,6 +1056,34 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     expect_identical(as.character(aug$series), as.character(d$series))
     expect_equal(as.numeric(aug$time), as.numeric(d$time))
     expect_equal(as.numeric(aug$.observed), as.numeric(d$y))
+
+    # `augment()` has to carry the residual at the grain
+    # `residuals()` computed it on. Which grain that is comes from
+    # `residuals()` itself rather than from the predicate deciding
+    # it, so the claim is that the two agree rather than that either
+    # matches a name.
+    #
+    # Recycling is invisible in every check above: the column is the
+    # right length, in the frame's order, and finite. What separates
+    # them is whether the species at one site share a value. A
+    # randomised quantile residual is continuous, so rows that agree
+    # exactly were copied rather than drawn.
+    resid_cols <- ncol(residuals(fit, summary = FALSE, ndraws = 5L))
+    per_row <- identical(as.integer(resid_cols), as.integer(n_obs))
+    distinct_per_site <- tapply(aug$.resid, as.character(aug$site),
+                                function(z) length(unique(z)))
+    if (per_row) {
+      # Each species at a site was scored on its own row.
+      expect_true(all(distinct_per_site > 1L))
+      # `.unit` states that rows sharing it share a residual, which
+      # is not true of a per-row family.
+      expect_false(".unit" %in% names(aug))
+    } else {
+      # A unit-grain residual is recycled across the unit's rows, and
+      # `.unit` is what makes that legible.
+      expect_true(all(distinct_per_site == 1L))
+      expect_true(".unit" %in% names(aug))
+    }
   })
 
   if ("marginaleffects" %in% spec$optional_methods) {

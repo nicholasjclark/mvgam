@@ -605,3 +605,80 @@ test_that("an updated fit reports the model call it now describes", {
   expect_identical(renamed$data, as.name("d2"))
   expect_false(any(c("formula.", "newdata") %in% names(renamed)))
 })
+
+
+test_that("a refit states an n_lv the trend formula does not name", {
+  # A factor count set by a top-level `trend_map` is on the fit and
+  # nowhere in the expression the user wrote, so re-evaluating that
+  # expression alone builds a different model: `by = lv_axis()` reads
+  # the series axis rather than the factor axis. The refit has to say
+  # what the fit resolved.
+  trend_call <- ~ s(elev, k = 5, by = lv_axis()) - 1 + ZMVN(cor = TRUE)
+  out <- state_resolved_trend_args(trend_call, list(n_lv = 2L))
+  expect_true(trend_call_names_arg(out, "n_lv"))
+  # Stated on the constructor that owns it, leaving the rest of the
+  # expression as the user wrote it.
+  expect_identical(
+    deparse1(rlang::f_rhs(out)),
+    "s(elev, k = 5, by = lv_axis()) - 1 + ZMVN(cor = TRUE, n_lv = 2L)"
+  )
+})
+
+
+test_that("an n_lv the call already names is left as the user wrote it", {
+  # The expression settles it, so there is nothing to restate; the
+  # symbol is `restore_trend_call_env()`'s job, not this one's.
+  trend_call <- ~ AR(p = 1, n_lv = k)
+  out <- state_resolved_trend_args(trend_call, list(n_lv = 2L))
+  expect_identical(deparse1(rlang::f_rhs(out)), "AR(p = 1, n_lv = k)")
+})
+
+
+test_that("a fit that resolved no n_lv is rebuilt unchanged", {
+  # Every non-factor fit takes this path, so a value invented here
+  # would turn an ordinary trend into a factor model.
+  trend_call <- ~ AR(p = 1)
+  expect_identical(
+    state_resolved_trend_args(trend_call, list(n_lv = NULL)),
+    trend_call
+  )
+  expect_identical(
+    state_resolved_trend_args(trend_call, NULL),
+    trend_call
+  )
+})
+
+
+test_that("every trend constructor is told, not just the first", {
+  # A trend formula may carry one constructor per response. Stating
+  # the count on one of them would leave the others building a
+  # different model, which is the fault this whole path exists to
+  # prevent.
+  out <- state_resolved_trend_args(
+    ~ AR(p = 1) + VAR(cor = TRUE), list(n_lv = 2L)
+  )
+  txt <- deparse1(rlang::f_rhs(out))
+  expect_match(txt, "AR(p = 1, n_lv = 2L)", fixed = TRUE)
+  expect_match(txt, "VAR(cor = TRUE, n_lv = 2L)", fixed = TRUE)
+})
+
+
+test_that("a resolved count with nowhere to be stated is refused", {
+  # Silently rebuilding a different model is what `update()` already
+  # declines to do for a `jsdgam` fit, so the same answer is given
+  # here rather than a refit the caller cannot tell apart.
+  expect_error(
+    state_resolved_trend_args(~ s(env, by = lv_axis()) - 1,
+                              list(n_lv = 2L)),
+    "no trend constructor"
+  )
+})
+
+
+test_that("the arguments a refit states are ones the map knows", {
+  # Two tables naming the same argument would drift. The slot each
+  # one is read from lives in `trend_arg_metadata` alone.
+  expect_true(
+    all(trend_args_stated_on_rebuild %in% names(trend_arg_metadata))
+  )
+})

@@ -128,9 +128,8 @@ conditional_effects.mvgam <- function(x,
   # listing the family's exposed types), but reject the
   # non-closure-unit case here so the user gets the error early
   # rather than via a generic marginaleffects failure.
-  if (type %in% c("latent_state", "detection") &&
-        !is_closure_unit_family(x$family)) {
-    refuse_unsupported_predict_type(x$family, type)
+  if (type %in% c("latent_state", "detection")) {
+    require_closure_unit_predict_type(x$family, type)
   }
   # `series` is polymorphic (NULL / "all" / character / integer) so a
   # single checkmate::assert_* call cannot validate it; the resolver

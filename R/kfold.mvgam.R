@@ -387,11 +387,9 @@ build_kfold_partition <- function(group_key, K = NULL,
 
 
 # Internal: map each log-lik column to its group label + fold ID.
-# Standard families produce one log-lik column per row; closure-
-# unit families produce one column per closure unit. The per-unit
-# ordering is reproduced directly from `closure_unit_grouping`
-# (first-appearance order over `data`), matching what
-# `build_closure_unit_arrays()` does inside `log_lik.mvgam`.
+# The grain the columns are on is the family's, and
+# `loglik_col_values()` is what reads it, so this function is left
+# with the fold lookup alone.
 #
 # Returns:
 #   col_group     - character vector of length `loglik_ncol`,
@@ -402,41 +400,7 @@ build_kfold_partition <- function(group_key, K = NULL,
 # @noRd
 map_loglik_cols_to_groups <- function(object, data, group_key,
                                        fold_ids, loglik_ncol) {
-  if (loglik_ncol == NROW(data)) {
-    col_group <- group_key
-  } else {
-    # `NULL` here means the family has no closure unit, so there is
-    # no grain other than the row and the counts should have
-    # matched.
-    closure_cols <- closure_unit_key_vars(object$family)
-    if (is.null(closure_cols)) {
-      stop(insight::format_error(c(
-        "Could not align log-lik columns with rows of data.",
-        x = paste0("log_lik has ", loglik_ncol,
-                   " cols; data has ", NROW(data), " rows."),
-        i = paste0("Expected per-row or per-closure-unit log-",
-                   "lik; the family is not closure-unit so the ",
-                   "two should match.")
-      )))
-    }
-    # Read the unit layout from the builder that owns it rather
-    # than reconstructing it here. Rebuilding the key meant a
-    # second derivation of the same fact, kept in step with the
-    # first by a comment; each unit's group is read from its first
-    # row, leaning on the grouping's invariance within a unit.
-    arrays <- closure_unit_arrays_for(object, data)
-    col_group <- group_key[arrays$visit_row[, 1L]]
-    if (length(col_group) != loglik_ncol) {
-      stop(insight::format_error(c(
-        "Closure-unit alignment count mismatch.",
-        x = paste0("Reconstructed ", length(col_group),
-                   " units from data; log_lik has ", loglik_ncol,
-                   " columns."),
-        i = paste0("The fit's training data may not match the ",
-                   "closure-unit layout the model was fit with.")
-      )))
-    }
-  }
+  col_group <- loglik_col_values(object, data, group_key, loglik_ncol)
   unique_groups <- unique(col_group)
   # For each unique group, look up its fold via the first row
   # carrying that group key. Group integrity (all rows of a group
@@ -508,43 +472,17 @@ refit_score_one_fold <- function(object, data, fold_ids,
     re_formula = NA,
     allow_new_levels = TRUE
   )
+  # Mapped at the width `log_lik()` answered on, then narrowed with
+  # the matrix, exactly as the full-data path above does. Narrowing
+  # first and mapping afterwards pairs a matrix that has dropped its
+  # unscorable columns against a frame that still holds every row, so
+  # a fold carrying a missing response reported the two counts as a
+  # mismatch rather than scoring the rows it did observe.
+  held_col_group <- loglik_col_values(
+    object, held_data, group_key[held_rows], NCOL(held_loglik)
+  )
   held_loglik <- clean_ll(refit, held_loglik)
-
-  # Align held log-lik columns to per-column group keys. Two
-  # cases: log_lik columns map one-to-one to held rows (standard
-  # families), OR one-to-one to held closure units (occ / nmix).
-  if (NCOL(held_loglik) == NROW(held_data)) {
-    held_col_group <- group_key[held_rows]
-  } else {
-    closure_cols <- closure_unit_key_vars(object$family)
-    if (is.null(closure_cols)) {
-      stop(insight::format_error(c(
-        "Held log-lik shape does not match held data row count.",
-        x = paste0(
-          "log_lik returned ", NCOL(held_loglik),
-          " cols for ", NROW(held_data), " held rows."
-        )
-      )))
-    }
-    # Read the unit layout from the builder that owns it, the way
-    # `map_loglik_cols_to_groups()` above does. Pasting the key
-    # columns here instead was a second derivation of the same
-    # fact, and it differed twice: the separator could collide
-    # (`series = "sp_1", time = "1"` and `series = "sp", time =
-    # "1_1"` give one key), and a unit whose every row is missing
-    # was still counted, which the builder drops.
-    arrays <- closure_unit_arrays_for(object, held_data)
-    held_col_group <- group_key[held_rows[arrays$visit_row[, 1L]]]
-    if (length(held_col_group) != NCOL(held_loglik)) {
-      stop(insight::format_error(c(
-        "Closure-unit alignment count mismatch on the held fold.",
-        x = paste0(
-          "Reconstructed ", length(held_col_group),
-          " units; log_lik returned ", NCOL(held_loglik), " columns."
-        )
-      )))
-    }
-  }
+  held_col_group <- narrow_to_scored(held_col_group, held_loglik)
 
   held_grouped <- aggregate_loglik_by_group(
     held_loglik, held_col_group

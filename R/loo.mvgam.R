@@ -414,12 +414,12 @@ per_obs_series_labels <- function(x) {
     )))
   }
   series_col <- as.character(data$series)
-  if (is_closure_unit_family(x$family)) {
-    arrs <- closure_unit_arrays_for(x, data)
-    series_col[arrs$visit_row[, 1L]]
-  } else {
-    series_col
-  }
+  # The grain is the same question `kfold()` asks of its fold keys,
+  # so it is answered in the one place. Reading
+  # `is_closure_unit_family()` here was right only because the
+  # multi-response families are refused above; the predicate that
+  # names the grain does not lean on that.
+  loglik_col_values(x, data, series_col)
 }
 
 #' Drop unscorable columns from a log-likelihood matrix

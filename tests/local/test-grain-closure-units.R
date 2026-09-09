@@ -763,6 +763,36 @@ test_that("the prediction methods survive an unmade visit", {
 })
 
 
+test_that("the checks read a unit that lost a visit", {
+  # `pp_check()` narrows the plot to the observations it can show. A
+  # closure-unit family answers per unit, and a unit keeps its place
+  # when one of its visits was never made, so the narrowing has to
+  # happen at the unit grain. Dropping visits first handed the
+  # aggregator a replicate matrix 250 wide and a frame 300 long, and
+  # every type refused with a count the caller cannot act on.
+  obj <- gappy_fits()
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  # One type per shape: a density over the units, an interval per
+  # unit, a scalar statistic, a PSIS-weighted check and a residual
+  # panel, since they narrow different quantities.
+  for (ty in c("dens_overlay", "intervals", "stat",
+               "loo_pit_overlay", "resid_hist")) {
+    expect_s3_class(
+      suppressWarnings(pp_check(obj$gappy, type = ty, ndraws = 20L)),
+      "ggplot"
+    )
+  }
+  # `group` travels the same narrowing by a different route, mapped
+  # to one value per unit before it is narrowed rather than after.
+  expect_s3_class(
+    suppressWarnings(pp_check(obj$gappy, type = "stat_grouped",
+                              group = "series", ndraws = 20L)),
+    "ggplot"
+  )
+})
+
+
 test_that("a fold holds out whole closure units", {
   # A closure unit is the block the likelihood is written over: its
   # visits share the latent state, so holding out one visit while

@@ -923,6 +923,12 @@ build_next_steps <- function(x) {
     nrow(x$fixed) > 1L
   forecastable <- !grepl("^ZMVN", trend_model)
   is_cu <- !is.null(x$family) && is_closure_unit_family(x$family)
+  # Sharing the closure-unit pipeline is not the same as having a
+  # latent state to report: `mvn()`, `mvt()` and `diri()` share it and
+  # have none, so `is_cu` sent readers of those summaries to a call
+  # that refuses. The registry answers, and both suggestions below
+  # read the one answer.
+  has_latent_state <- "latent_state" %in% family_predict_types(x$family)
   # Candidates in priority order; first five matching entries
   # populate the printed list. Closure-unit (occ / nmix) fits get
   # routed to the family-aware GOF + latent-state surfaces
@@ -937,7 +943,7 @@ build_next_steps <- function(x) {
   }
   candidates <- list(
     list(when = TRUE, text = pp_text),
-    list(when = is_cu,
+    list(when = has_latent_state,
          text = paste0(
            "`hindcast(fit, type = \"latent_state\")`: ",
            "psi (occ) or N (nmix)"
@@ -955,7 +961,8 @@ build_next_steps <- function(x) {
          text = "`loo(fit)` / `loo_compare(...)`: model fit + comparison"),
     list(when = has_covariates,
          text = "`conditional_effects(fit)`: covariate effects"),
-    list(when = is_cu,
+    # The drawn form of the same call, offered on the same terms.
+    list(when = has_latent_state,
          text = "`plot(hindcast(fit, type = \"latent_state\"))`: state ribbon")
   )
   texts <- vapply(

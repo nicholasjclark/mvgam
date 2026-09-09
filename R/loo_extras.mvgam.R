@@ -234,6 +234,57 @@ assert_resp_for_mv <- function(object, resp, fn_name) {
 }
 
 
+#' Carry a per-row value onto the columns of `log_lik()`
+#'
+#' `log_lik()` answers at one column per row of the frame for most
+#' families and at one column per closure unit for the families that
+#' marginalise a latent state over a unit's visits. Anything built
+#' beside the frame -- a fold key, a series label -- is per row, so it
+#' has to be reduced to the same grain before the two are paired.
+#'
+#' The grain is read from the family, which owns it, rather than
+#' inferred from whether the two counts happen to agree. A count
+#' standing in for an identity is silent exactly when it is wrong: two
+#' different groupings of the same rows can share a total.
+#'
+#' A unit's rows all carry the same value for any grouping a unit is
+#' defined within, so the unit's first row answers for it, and
+#' `visit_row` is where the array builder records which row that is.
+#'
+#' @param object The fitted model, read for its family and unit layout
+#' @param data The frame `x` was built alongside
+#' @param x A value per row of `data`
+#' @param n_cols Columns the log-likelihood returned, checked against
+#'   the reduction so a mismatch is reported as itself. `NULL` where
+#'   the caller has not read the matrix yet and guards it in its own
+#'   terms.
+#' @return `x` at the grain `log_lik()` answers on
+#'
+#' @noRd
+loglik_col_values <- function(object, data, x, n_cols = NULL) {
+  if (needs_closure_unit_aggregation(object$family)) {
+    arrays <- closure_unit_arrays_for(object, data)
+    out <- x[arrays$visit_row[, 1L]]
+    label <- "closure units"
+  } else {
+    out <- x
+    label <- "rows"
+  }
+  if (!is.null(n_cols) && length(out) != n_cols) {
+    stop(insight::format_error(c(
+      "The log-likelihood and the frame cover different observations.",
+      x = paste0("log_lik returned ", n_cols, " columns; the frame ",
+                 "gives ", length(out), " ", label, "."),
+      i = paste0(
+        "The frame passed here differs from the one the model was ",
+        "fitted on."
+      )
+    )), call. = FALSE)
+  }
+  out
+}
+
+
 #' Narrow anything paired with a scored log-likelihood
 #'
 #' `clean_ll()` drops the columns a missing response left unscorable

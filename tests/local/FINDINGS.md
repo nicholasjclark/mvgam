@@ -233,27 +233,6 @@ one. Seen in `test-draws-alignment.R`, "process_error moves a
 marginal prediction", where the two calls that establish the
 argument does something both warn that nothing is known about it.
 
-## Multivariate log_lik
-
-**15. The joint density drops every response at an occasion where any
-one of them is missing.**
-
-`test-grain-mvbf-wide.R`, "log_lik is per response, and the joint is their
-sum". The frame gives each of three responses its own gaps: three
-occasions for `count`, two for `seen`, five for `mass`, disjoint, so
-no occasion is missing from all three.
-
-`log_lik(fit)` nonetheless returns ten columns of `NA`, which is the
-union of the three gap sets. An occasion where `mass` was not
-recorded loses the `count` and `seen` densities along with it. Summed
-over draws the joint reads -302.6 where the arms add to -330.3.
-
-`loo()` is computed from these numbers, so a wide fit whose responses
-were not all measured on the same occasions is being compared on a
-likelihood that omits observations it holds. The disjoint gaps are
-what make it visible: a frame whose responses go missing together
-gives the same answer either way.
-
 ## trend_map
 
 **16. A matrix `trend_map` ignores its rownames, then writes the
@@ -620,8 +599,6 @@ rotation-indeterminate, so its posterior mean is not a loadings
 matrix and nothing should be computed from it. Two routes are invariant to rotation, the
 QR-identified block and the covariance taken within each draw, and
 they agree.
-
-## by = lv_axis() smooths, drawn
 
 ## The insight surface
 
@@ -1152,25 +1129,6 @@ This is finding 9's shape a third time, a refusal whose stated remedy
 has already been followed. It reaches every multivariate fit, since
 the fan-out is how `mvbf()` and `jsdgam()` both answer.
 
-**69. `kfold()` on a wide fit fails on a count that finding 15
-produces.**
-
-Same fit. `kfold(fit, K = 2)` stops with
-
-    Could not align log-lik columns with rows of data.
-    log_lik has 50 cols; data has 60 rows.
-
-The frame holds 60 occasions and each response is missing on a
-different handful, ten rows in total carrying at least one gap.
-`log_lik()` returns 60 columns of which those ten are entirely `NA`,
-which is finding 15: a joint density that drops every response at an
-occasion where any one of them is missing. Fifty is what survives.
-
-So the alignment guard is reading a symptom rather than a cause, and
-its message describes an arithmetic mismatch instead of the missing
-data behind it. Finding 15 records the wrong likelihood; this records
-that the same defect also removes `kfold()` from a wide fit.
-
 ## Two documents, two contracts
 
 **75. `?jsdgam` states an `n_lv` constraint the package does not
@@ -1308,49 +1266,7 @@ A baseline run of `tests/local` is what added the two smooth methods
 to the table. This entry was first written from the methods that came
 to mind. Every fixture file added since has turned up another.
 
-## Visits that never happened
-
-**77. A closure-unit fit with unmade visits loses two prediction
-methods and half its likelihood.**
-
-`test-grain-closure-units.R`, "a visit that never happened is still
-predicted" and "the unit arrays cover the visits that happened". The
-file fits one occupancy model on a complete visit schedule and one
-with every sixth visit unmade, spread so that no unit loses all of
-its visits. 300 rows, 250 of them observed, 75 units throughout.
-
-The Stan data is right. `N` is 250, `sum(n_rep)` is 250 and
-`max(visit_idx)` is 250, so every index stays inside the response and
-the unit count is unchanged. What the fit is given is correct and
-what comes back is not:
-
-| call | complete schedule | every sixth visit unmade |
-|---|---|---|
-| `posterior_epred()` | 10 x 300 | error, "non-conformable arrays" |
-| `fitted()` | 300 x 4 | error, "non-conformable arrays" |
-| `posterior_predict()` | 10 x 300 | 10 x 300 |
-| `residuals()` | 75 x 4 | 75 x 4 |
-| `log_lik()` | 10 x 75 | 10 x 75, 42 columns entirely `NA` |
-| `kfold(K = 2)` | runs | error, alignment mismatch |
-
-Three things follow from one cause. `posterior_epred()` and `fitted()`
-stop on a message naming neither a column nor a row, and they are the
-two a reader reaches for first. `log_lik()` answers at the right width
-and empties 42 of its 75 units, which is 56 per cent of the
-likelihood on a frame where no unit lost all of its visits. `kfold()`
-then reports "log_lik has 33 columns". Since 75 minus 42 is 33, the
-cross-validation failure is those missing densities arriving one layer
-down.
-
-`posterior_predict()` and `residuals()` answer correctly on the same
-fit. That places the fault in how the two grains are reconciled, a
-visit against a unit, rather than in the fit or in the Stan data. A frame
-with no missing visits hides all of it, which is why the pair of
-schedules is what the file needs.
-
-Finding 15 is the same shape on a wide frame, where an occasion
-missing one response drops the density for all of them. Here a unit
-missing one visit drops the density for the whole unit.
+## A notice about a parameter that was not used
 
 **78. A warning is raised on a computation that was right.**
 
@@ -1392,66 +1308,43 @@ finding 10 records for the ggplot2 lifecycle notice. A reader who
 checks this one finds nothing wrong. The next warning on the same
 surface is the one they will skip.
 
-## A narrowed likelihood paired with the whole frame
+## One model, two observation counts
 
-**79. A missing response removes `kfold()` and `loo(by_series = TRUE)`
-from a fit, and the attribute that would prevent it is already set.**
+**87. `nobs()` counts the rows supplied rather than the rows fitted,
+and its two branches disagree.**
 
-`test-factor-lv-axis.R`, "the likelihood covers the rows the frame
-holds". The gaussian factor fit holds 300 rows of which 24 carry no
-response. `log_lik()` answers at the full width and empties those 24
-columns, which is correct: a row with no response contributes no
-density.
+Found while checking what `summary()` prints against what the model
+was given. `nobs.mvgam()` returns `nrow(object$data)` and falls back
+to `standata$N` when the frame is absent, so the same function
+answers with either quantity depending on which slot the object
+happens to carry. On a frame with no unobserved cell the two
+coincide, which is why this went unseen.
 
-`clean_ll()` then drops them, and records what it dropped. Its own
-roxygen at `R/loo.mvgam.R:412` states the contract:
+Measured on the two cached fits whose frames carry unobserved cells:
 
-> Which columns survived is recorded on the result: anything paired
-> with the scored matrix afterwards ... has to be narrowed to the same
-> columns or the two describe different observations.
+| fit | rows | fitted (`standata$N`) | `nobs()` | `summary()` prints |
+|---|---|---|---|---|
+| by_lv_axis | 300 | 276 | 300 | 300 |
+| occ_visits_gappy | 300 | 250 | 300 | 300 |
 
-Two consumers pair it with the unnarrowed frame anyway:
+`summary.mvgam()` reads `nobs()` for the line a reader takes to be
+the size of the analysis, and the comment above that call states the
+intent the code does not meet: "How many rows the model was fitted
+to, which is what `nobs()` answers". It answers the other one.
 
-| call | on 300 rows, 24 unobserved | on 30 rows, none unobserved |
-|---|---|---|
-| `log_lik()` | 300 columns, 24 all `NA` | 30 columns |
-| `clean_ll()` | 276, `scored_columns` 276 | 30 |
-| `loo()` | answers on 276 | answers on 30 |
-| `waic()` | answers on 276 | answers on 30 |
-| `kfold(K = 2)` | refuses, 276 against 300 | refuses, finding 74 |
-| `loo(by_series = TRUE)` | refuses, 276 against 300 | answers |
+brms is the convention mvgam mirrors elsewhere and it counts the
+fitted rows: `nobs.brmsfit` is `nrow(model.frame(object))`, and brms
+drops the rows whose response is missing. Its signature also takes
+`resp`, which mvgam's does not, so a wide fit cannot be asked for one
+arm's count.
 
-`kfold.mvgam()` calls `clean_ll()` at `R/kfold.mvgam.R:190` and hands
-`NCOL(loglik_full)` to `map_loglik_cols_to_groups()` two lines later
-alongside the full `data`, never reading `scored_columns`.
-`per_series_ic()` at `R/loo.mvgam.R:330` does the same and says so in
-its own message: "by_series = TRUE assumes clean_ll() did not drop any
-columns." So one of the two knows the assumption it is making and
-neither acts on it.
-
-`loo()` and `waic()` are the control. They read the same narrowed
-matrix and answer, which places the fault in the pairing rather than
-in the narrowing. The second column is the other control: with no
-missing response the widths coincide and `loo(by_series = TRUE)`
-answers, so this follows the gap and not the fit.
-
-The refusals are also miscast. Both report an arithmetic mismatch and
-neither names the 24 unobserved rows behind it, so a user is told the
-counts disagree without being told why or that the answer they wanted
-is available on the rows that were observed.
-
-This is the plan's own class in its plainest form. How many columns
-the likelihood has is derived twice within four lines, then the two
-answers are compared without either being converted to the other. Finding 15 is the same defect one layer up, where the
-likelihood loses columns it should have kept; here the columns are
-dropped correctly and the count is not carried.
-
-**Finding 74 takes a seventh fit.** `kfold(K = 2)` on the
-single-series poisson AR(1) of `test-draws-alignment.R` refuses with
-"Irregular time intervals detected in time. Interval range: 1 to 5".
-The frame is 30 consecutive occasions on one series with no gaps at
-all, so the irregularity is entirely the fold split's, which is
-finding 74's diagnosis on the simplest frame in the directory.
+What is not settled, and is why this is recorded rather than changed:
+mvgam requires the frame to be rectangular so the trend grid is
+complete, so an unobserved cell is part of the design in a way it is
+not for brms. Whether "Number of observations" should name the design
+or the likelihood is a decision for whoever owns the printed summary.
+What is wrong either way is that one function gives both answers and
+its own comment claims the one it does not give.
 
 ## What reading a rendered article shows
 

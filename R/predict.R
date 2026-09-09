@@ -206,10 +206,7 @@ predict.mvgam <- function(object,
   # posterior `N`; `posterior_occupancy()` for occ returning
   # posterior `psi`.
   if (type %in% c("latent_state", "detection")) {
-    if (!is_closure_unit_family(object$family) ||
-        !(type %in% family_predict_types(object$family))) {
-      refuse_unsupported_predict_type(object$family, type)
-    }
+    require_closure_unit_predict_type(object$family, type)
     pred <- if (identical(type, "latent_state")) {
       kernel <- dispatch_closure_unit_method(
         object$family, "latent_state"
@@ -616,33 +613,10 @@ summarize_predictions <- function(draws, probs, robust) {
     min.cols = 1
   )
 
-  # Compute point estimates and uncertainty
-  if (robust) {
-    estimate <- apply(draws, 2, stats::median)
-    est_error <- apply(draws, 2, stats::mad)
-  } else {
-    estimate <- colMeans(draws)
-    est_error <- apply(draws, 2, stats::sd)
-  }
-
-  # Compute quantiles
-  quantiles <- apply(draws, 2, stats::quantile, probs = probs)
-
-  # Reshape vector to matrix when single quantile requested
-  if (length(probs) == 1) {
-    quantiles <- matrix(quantiles, nrow = 1)
-  }
-
-  # Create quantile column names following brms convention (Q2.5, Q97.5)
-  quantile_names <- paste0("Q", probs * 100)
-
-  # Combine into output matrix
-  out <- cbind(
-    Estimate = estimate,
-    Est.Error = est_error,
-    t(quantiles)
-  )
-  colnames(out)[3:ncol(out)] <- quantile_names
-
-  out
+  # The same summary `mvgam_post_summary()` builds: the robust and
+  # mean branches, the quantiles and brms's own column names were
+  # written out a second time here, so a column the two treated
+  # differently gave one answer through `predict()` and another
+  # through every other accessor.
+  mvgam_post_summary(draws, robust = robust, probs = probs)
 }

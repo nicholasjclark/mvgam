@@ -574,6 +574,112 @@ restore_trend_call_env <- function(trend_call, metadata) {
 }
 
 
+# Of the arguments `trend_arg_metadata` maps, those a refit has to
+# state outright rather than merely bring back into scope. The slot
+# each one is read from stays in that table, so the two cannot drift.
+#
+# `n_lv` is the case: a top-level `trend_map` sets the factor count
+# just as a constructor argument does, and `mvgam()` has no top-level
+# `n_lv` for it to travel back on. `trend_map` itself is absent here
+# because it does travel that way, through `mvgam_update_inheritance`.
+trend_args_stated_on_rebuild <- "n_lv"
+
+
+#' State a resolved trend argument the user's own expression omits
+#'
+#' A refit rebuilds the trend side by re-evaluating the expression the
+#' user wrote, which is right for everything that expression settles.
+#' It is wrong for a value the fit resolved from somewhere else. A
+#' factor count set by a top-level `trend_map` lives only on the fit,
+#' and rebuilding without it changes the model rather than failing:
+#' `by = lv_axis()` reads the series axis instead of the factor axis,
+#' so a fit with two per-factor smooths comes back with one smooth per
+#' series. Measured on a five-series, two-factor fit, that is
+#' `N_lv_trend` 5 against 2 and `N_trend` 300 against 120.
+#'
+#' @param trend_call The `trend_call` slot, or NULL.
+#' @param metadata The `trend_metadata` slot, or NULL.
+#' @return `trend_call`, with each resolved argument stated on the
+#'   constructor that owns it.
+#' @noRd
+state_resolved_trend_args <- function(trend_call, metadata) {
+  if (!inherits(trend_call, "formula") || is.null(metadata)) {
+    return(trend_call)
+  }
+  stated <- list()
+  for (arg in trend_args_stated_on_rebuild) {
+    if (trend_call_names_arg(trend_call, arg)) next
+    value <- metadata[[trend_arg_metadata[[arg]]]]
+    if (!is.null(value)) stated[[arg]] <- value
+  }
+  if (length(stated) == 0L) return(trend_call)
+
+  state <- new.env(parent = emptyenv())
+  state$n <- 0L
+  rhs <- state_args_on_trend_constructor(
+    rlang::f_rhs(trend_call), stated, state
+  )
+  # No constructor to state them on. Rebuilding regardless would give
+  # back a different model in silence, which is what `update()`
+  # already refuses to do for a `jsdgam` fit.
+  if (state$n == 0L) {
+    stop(insight::format_error(c(
+      "Cannot rebuild this fit's trend structure for a refit.",
+      x = paste0(
+        "The fit resolved ",
+        paste0("'", names(stated), "'", collapse = ", "),
+        " from outside 'trend_formula', and that formula holds no ",
+        "trend constructor to state it on."
+      ),
+      i = paste0(
+        "Pass 'trend_formula = ...' naming ",
+        paste0("'", names(stated), "'", collapse = ", "),
+        " explicitly, so the refit builds the model this fit had."
+      )
+    )))
+  }
+  rlang::new_formula(
+    lhs = rlang::f_lhs(trend_call), rhs = rhs,
+    env = environment(trend_call)
+  )
+}
+
+
+#' Add named arguments to every trend constructor in an expression
+#'
+#' The registry is what decides which calls those are, so a newly
+#' registered trend needs no change here. Every one of them is
+#' rewritten rather than the first, because a trend formula may carry
+#' one constructor per response and stating the value on one of them
+#' would leave the others describing a different model.
+#'
+#' @param expr Current expression node.
+#' @param values Named list of argument values to state.
+#' @param state Environment counting the constructors rewritten.
+#' @param depth Recursion depth guard.
+#' @return The rewritten expression. `state$n` is zero when the
+#'   expression held no trend constructor.
+#' @noRd
+state_args_on_trend_constructor <- function(expr, values, state,
+                                            depth = 0L) {
+  if (depth > 50L || !rlang::is_call(expr)) {
+    return(expr)
+  }
+  fn_name <- rlang::call_name(expr)
+  if (!is.null(fn_name) && fn_name %in% mvgam_trend_registry()) {
+    args <- rlang::call_args(expr)
+    args[names(values)] <- values
+    state$n <- state$n + 1L
+    return(rlang::call2(fn_name, !!!args))
+  }
+  parts <- as.list(expr)
+  rewritten <- lapply(parts[-1L], state_args_on_trend_constructor,
+                      values = values, state = state,
+                      depth = depth + 1L)
+  rlang::call2(parts[[1L]], !!!rewritten)
+}
+
+
 #'@noRd
 mvgam_update_call <- function(object, formula., newdata, dots) {
   resolved <- list()
@@ -583,6 +689,12 @@ mvgam_update_call <- function(object, formula., newdata, dots) {
     stats::update.formula(object$formula, formula.)
   }
   resolved$data <- if (is.null(newdata)) object$data else newdata
+  # A refit reaches brms like any prediction does, and an empty
+  # observation formula names a placeholder column that `mvgam()`
+  # strips from the frame it stores. Stamping it back is what the two
+  # prediction paths already do; without it brms refuses the refit for
+  # a variable the user never wrote and cannot supply.
+  resolved$data <- ensure_obs_placeholder(resolved$data, object)
   inheritance <- update_inheritance_table()
   for (arg_name in names(inheritance)) {
     if (arg_name %in% names(dots)) {
@@ -604,11 +716,27 @@ mvgam_update_call <- function(object, formula., newdata, dots) {
     if (is.null(value) && !is.null(entry$getter)) next
     resolved[[arg_name]] <- value
   }
+  # The held-out frame reaches brms alongside the training one, so it
+  # carries the placeholder on the same terms.
+  resolved$newdata <- ensure_obs_placeholder(resolved$newdata, object)
+  # The column alone is not the whole of what the injection produced.
+  # Its pin holds the coefficient at zero, and the stored table does
+  # not carry it, so a refit would sample free what the fit held
+  # fixed.
+  resolved$prior <- ensure_obs_placeholder_pin(resolved$prior, object)
   # The trend call came back as the user wrote it, which may name a
   # matrix or a count that is no longer in scope.
   resolved$trend_formula <- restore_trend_call_env(
     resolved$trend_formula, object$trend_metadata
   )
+  # A trend formula the caller supplied states its own structure, and
+  # the fit's resolved values describe the model being replaced. Only
+  # the inherited call needs what the fit settled outside it.
+  if (!"trend_formula" %in% names(dots)) {
+    resolved$trend_formula <- state_resolved_trend_args(
+      resolved$trend_formula, object$trend_metadata
+    )
+  }
 
   # Inherit sampler dimensions from the original stanfit unless
   # the user explicitly overrides. `warmup` cannot be inherited on its

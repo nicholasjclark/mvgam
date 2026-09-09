@@ -1451,6 +1451,26 @@ family_predict_types <- function(family) {
 # message, so the two cannot drift into describing the same family
 # differently.
 #' @noRd
+# Internal: refuse a closure-unit predict type the family does not
+# offer.
+#
+# Being a closure-unit family is the wire-format question and does
+# not settle this one: `mvn()`, `mvt()` and `diri()` share that
+# pipeline and expose no latent state. The registry is what knows,
+# and asking it here is what keeps three callers to one answer. The
+# two that asked only whether the family was closure-unit let those
+# three through to a dispatcher with no branch for them, which
+# replied by naming a source file for the user to edit.
+#'@noRd
+require_closure_unit_predict_type <- function(family, type) {
+  if (!is_closure_unit_family(family) ||
+        !(type %in% family_predict_types(family))) {
+    refuse_unsupported_predict_type(family, type)
+  }
+  invisible(TRUE)
+}
+
+
 refuse_unsupported_predict_type <- function(family, type) {
   types <- family_predict_types(family)
   stop(insight::format_error(c(

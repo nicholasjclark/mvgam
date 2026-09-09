@@ -201,20 +201,11 @@ hindcast_latent_state <- function(object, ndraws = NULL,
                                     resp = NULL) {
   checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
   checkmate::assert_string(resp, null.ok = TRUE)
-  if (!is_closure_unit_family(object$family)) {
-    fam_nm <- resolve_family_name(object$family) %||% "?"
-    stop(insight::format_error(c(
-      "type = 'latent_state' is only valid for closure-unit fits.",
-      x = paste0("Family '", fam_nm,
-                  "' is not a closure-unit family."),
-      i = paste0(
-        "Refit with family = occ() or family = nmix() / ",
-        "nmix('royle_nichols') / nmix('poisson_poisson'), or call ",
-        "hindcast() with type = 'response' / 'link' / 'expected' / ",
-        "'trend' instead."
-      )
-    )))
-  }
+  # Sharing the closure-unit pipeline is not the same as having a
+  # latent state to report, and this asked only the first. `mvn()`,
+  # `mvt()` and `diri()` passed it and met the dispatcher, which
+  # answered with a source file to edit.
+  require_closure_unit_predict_type(object$family, "latent_state")
 
   total_draws <- nrow(posterior::as_draws_matrix(object$fit))
   draw_idx <- resolve_draw_indices(total_draws, ndraws, NULL)

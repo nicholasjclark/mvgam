@@ -547,17 +547,6 @@ pp_check.mvgam <- function(
     yrep <- do_call(method, pred_args)
   }
 
-  if (anyNA(y)) {
-    warning(insight::format_message(
-      "Observations with a missing response are omitted from the plot."
-    ))
-    take <- !is.na(y)
-    y <- y[take]
-    yrep <- yrep[, take, drop = FALSE]
-  } else {
-    take <- NULL
-  }
-
   # Closure-unit families: collapse y and yrep to the per-unit
   # grain via the shared aggregator. For resid_* types yrep is
   # already per-unit (residuals.mvgam aggregates internally) so
@@ -575,7 +564,6 @@ pp_check.mvgam <- function(
     cu <- closure_unit_pp_check_setup(
       object  = object,
       newdata = newdata,
-      y       = y,
       yrep    = yrep,
       type    = type
     )
@@ -592,6 +580,23 @@ pp_check.mvgam <- function(
         newdata[[x]], cu$arrays, var_name = x
       )
     }
+  }
+
+  # Narrowed once, at the grain everything is now on. A closure-unit
+  # family answers per unit, and a unit keeps its place when one of
+  # its visits was never made, so dropping visits before the
+  # aggregation left it a matrix one width and a frame another. For
+  # every other family the grain is still the row and this is the
+  # same narrowing it always was.
+  if (anyNA(y)) {
+    warning(insight::format_message(
+      "Observations with a missing response are omitted from the plot."
+    ))
+    take <- !is.na(y)
+    y <- y[take]
+    yrep <- yrep[, take, drop = FALSE]
+  } else {
+    take <- NULL
   }
 
   # Diagnostic resid types build their plot directly from the
@@ -651,12 +656,14 @@ pp_check.mvgam <- function(
     }
     ppc_args$group <- newdata[[group]]
 
-    if (!is.null(take)) {
-      ppc_args$group <- ppc_args$group[take]
-    }
     # Closure-unit: select one value per unit (first-visit row).
+    # `closure_unit_lookup` indexes the whole frame, so it is read
+    # before any narrowing, and `take` is at the grain it produces.
     if (!is.null(closure_unit_lookup)) {
       ppc_args$group <- ppc_args$group[closure_unit_lookup]
+    }
+    if (!is.null(take)) {
+      ppc_args$group <- ppc_args$group[take]
     }
   }
 
@@ -670,11 +677,11 @@ pp_check.mvgam <- function(
       ppc_args$x <- as.numeric(ppc_args$x)
     }
 
-    if (!is.null(take)) {
-      ppc_args$x <- ppc_args$x[take]
-    }
     if (!is.null(closure_unit_lookup)) {
       ppc_args$x <- ppc_args$x[closure_unit_lookup]
+    }
+    if (!is.null(take)) {
+      ppc_args$x <- ppc_args$x[take]
     }
   }
 
@@ -782,23 +789,35 @@ pp_check_mv_category <- function(object, newdata) {
 }
 
 
-# by the caller for the residual histograms).
+# Internal: collapse a closure-unit fit's observations and
+# replicates from the visit grain to the unit grain.
+#
+# A closure unit's visits share one latent state, so the unit is
+# what a posterior predictive check compares. The observed value of
+# a unit is the sum over the visits that were made, which is the
+# sufficient statistic for that state.
+#
+# The residual types are the exception: `residuals.mvgam()` has
+# already aggregated, so the replicates arrive per unit and only the
+# observed side needs a length to match. Those plots put the
+# residual on the x axis and read `y` as zero, so zeros of the right
+# length are what they need.
 #
 # Returns a list `(y, yrep, arrays, first_visits)`. The
 # `first_visits` lookup is used by the caller to dedup any
 # `group` / `x` covariate the user supplied so bayesplot sees
 # one covariate value per closure unit.
 #'@noRd
-closure_unit_pp_check_setup <- function(object, newdata, y, yrep,
+closure_unit_pp_check_setup <- function(object, newdata, yrep,
                                           type) {
   # Multi-season families return `c("series", "site", "time")` here;
   # single-season families return NULL and fall back to the 2-axis
   # default inside `build_closure_unit_arrays()`.
   arrays <- closure_unit_arrays_for(object, newdata)
   if (grepl("resid", type)) {
-    # `yrep` is already `[ndraws x N_unit]` (per-unit residuals);
-    # `y` is set to zeros downstream for resid_* types so only
-    # the length matters here.
+    # `yrep` is already `[ndraws x N_unit]` (per-unit residuals),
+    # and these plots read the observed side as zero, so its length
+    # is all that is being supplied here.
     y_unit <- rep(0, arrays$N_unit)
     yrep_unit <- yrep
   } else {

@@ -407,3 +407,55 @@ test_that("an argument nothing reads is refused on this fit too", {
     expect_error(do.call(m, list(fit_free, zzz_unknown = 1)), "zzz_unknown")
   }
 })
+
+
+test_that("a refit runs on a design mvgam wrote a column for", {
+  # `mvgam()` strips the placeholder from the frame it stores, and
+  # stamps it back wherever a frame reaches brms. A refit is such a
+  # place: `kfold()` and `lfo_cv()` both hold their fold out by
+  # refitting through `update()`. Without the stamp brms refuses the
+  # refit for a variable the user never wrote and cannot supply, so
+  # both methods are unavailable on any fit with an empty observation
+  # formula.
+  #
+  # Both fits are driven because they differ in what the trend side
+  # carries, and the placeholder belongs to the observation side.
+  for (fit in list(fit_free, fit_conf)) {
+    refit <- suppressWarnings(update(
+      fit, newdata = mvgam:::mvgam_training_data(fit),
+      chains = 1L, iter = 2L, silent = 2L, refresh = 0
+    ))
+    expect_s3_class(refit, "mvgam")
+    # The refit is the same program, not merely a program.
+    expect_identical(
+      mvgam:::mvgam_normalise_stancode(stancode(refit)),
+      mvgam:::mvgam_normalise_stancode(stancode(fit))
+    )
+    # Named separately because it is the half a whole-program check
+    # would stop reporting if it were ever loosened, and it is the
+    # half that decides whether the model is identified. `mvgam()`
+    # filters the pin out of the table it stores, so a refit
+    # inheriting that table samples free what the fit held at zero,
+    # and against a trend intercept the two lie on an exact ridge.
+    for (code in list(stancode(fit), stancode(refit))) {
+      expect_match(as.character(code), "b[1] = 0;", fixed = TRUE)
+    }
+    # The column mvgam adds stays out of the frame the refit hands
+    # back, so a user reading it still sees only their own columns.
+    expect_false(
+      mvgam:::MVGAM_EMPTY_OBS_PLACEHOLDER %in% names(refit$data)
+    )
+  }
+})
+
+
+test_that("cross-validation reaches a fit with no observation terms", {
+  # `update()` above is the mechanism; this is what a user does with
+  # it. Both methods hold a fold out by refitting, so neither was
+  # available on any fit written `y ~ -1` -- which is the idiom the
+  # VAR article uses. `lfo_cv()` takes the same route, so one of the
+  # two is driven here and the other is left to the fixtures that
+  # exercise it on a longer grid.
+  kf <- suppressWarnings(kfold(fit_free, K = 2L, silent = 2L))
+  expect_true(is.finite(kf$estimates["elpd_kfold", "Estimate"]))
+})

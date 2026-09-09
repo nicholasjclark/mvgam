@@ -311,21 +311,19 @@ summary.mvgam_stability <- function(object, probs = c(0.025, 0.975),
                             any.missing = FALSE, sorted = TRUE)
   checkmate::assert_flag(robust)
   checkmate::assert_int(bins, lower = 5L)
+  # The same summary every other accessor reports, so a stability
+  # metric and a prediction describe their spread the same way. It
+  # was written out a fifth time here; the shared one also answers
+  # `NA` for a metric that carries one, where computing the quantile
+  # in place raised.
   metrics <- colnames(object)
-  out <- do.call(rbind, lapply(metrics, function(v) {
-    draws <- object[[v]]
-    data.frame(
-      metric = v,
-      estimate = if (robust) stats::median(draws) else mean(draws),
-      est_error = if (robust) stats::mad(draws) else stats::sd(draws),
-      lower = unname(stats::quantile(draws, min(probs))),
-      upper = unname(stats::quantile(draws, max(probs))),
-      stringsAsFactors = FALSE
-    )
-  }))
-  colnames(out) <- c("metric", "Estimate", "Est.Error",
-                     paste0("Q", 100 * min(probs)),
-                     paste0("Q", 100 * max(probs)))
+  draws <- as.matrix(as.data.frame(object)[, metrics, drop = FALSE])
+  out <- data.frame(
+    metric = metrics,
+    mvgam_post_summary(draws, robust = robust, probs = probs),
+    check.names = FALSE, stringsAsFactors = FALSE,
+    row.names = NULL
+  )
   # A median and an interval say where a metric sits but not what
   # shape it has, and the shape is often why the metric was asked for:
   # reactivity is read for whether its mass crosses zero, not for its

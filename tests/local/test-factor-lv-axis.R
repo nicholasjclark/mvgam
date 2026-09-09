@@ -356,10 +356,24 @@ test_that("a prefit maps a newdata frame with no posterior at all", {
   for (s in species_levels) {
     expect_identical(as.integer(grid$times[[s]]), future_times)
   }
-  # A frame entirely inside the training grid extends nothing.
-  expect_null(
+  # A frame entirely inside the training grid extends nothing, and
+  # that is refused rather than answered. Returning an empty grid gave
+  # back a class-correct forecast holding no draws, so a caller
+  # looping over the arms saw a result and read no numbers out of it.
+  # The refusal names the occasions supplied and the last one observed,
+  # which is what a caller needs to correct the call.
+  expect_error(
     mvgam:::resolve_forecast_grid(prefit_by_lv, dat, training,
-                                  species_levels)
+                                  species_levels),
+    "names no occasion beyond the training grid"
+  )
+  # The last observed occasion is named in the user's own numbering,
+  # so a rank standing in for a value would not satisfy this.
+  expect_error(
+    mvgam:::resolve_forecast_grid(prefit_by_lv, dat, training,
+                                  species_levels),
+    as.character(max(time_vals)),
+    fixed = TRUE
   )
 })
 
@@ -1162,6 +1176,44 @@ test_that("loo splits the likelihood it was given", {
   by_series <- suppressWarnings(loo(fit, by_series = TRUE))
   expect_s3_class(by_series, "data.frame")
   expect_true(all(is.finite(by_series$elpd_loo)))
+})
+
+
+test_that("a refit rebuilds the model that was fitted", {
+  # Every cross-validation method here refits through `update()`, so
+  # what `update()` rebuilds is what `kfold()` and `lfo_cv()` score
+  # against. This fit's factor count came from a top-level
+  # `trend_map`, which the trend formula does not name: re-evaluating
+  # that formula alone loses it, `by = lv_axis()` then reads the
+  # series axis instead of the factor axis, and the refit carries one
+  # smooth per series where the fit has one per factor.
+  #
+  # Asserted on the program rather than on the call, because a call
+  # that names `n_lv` is not the claim; a refit that builds the same
+  # model is.
+  refit <- suppressWarnings(update(
+    fit, newdata = mvgam:::mvgam_training_data(fit),
+    chains = 1L, iter = 2L, silent = 2L, refresh = 0
+  ))
+  parent_sd <- standata(fit)
+  refit_sd <- standata(refit)
+  # Compared by value: the two paths agree on the count while
+  # differing in whether they store it as integer or double, and the
+  # claim here is the count.
+  expect_equal(as.integer(refit_sd$N_lv_trend),
+               as.integer(parent_sd$N_lv_trend))
+  expect_equal(as.integer(refit_sd$N_trend),
+               as.integer(parent_sd$N_trend))
+  # The factor axis is narrower than the series axis here, so a fit
+  # that fell back to the series would be caught by the line above.
+  expect_lt(as.integer(parent_sd$N_lv_trend),
+            as.integer(parent_sd$N_series_trend))
+  # The whole program, so a difference in any design block bites and
+  # not only in the two counts named above.
+  expect_identical(
+    mvgam:::mvgam_normalise_stancode(stancode(refit)),
+    mvgam:::mvgam_normalise_stancode(stancode(fit))
+  )
 })
 
 

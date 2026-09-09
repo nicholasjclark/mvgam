@@ -508,7 +508,13 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
   # the same `.resid*` columns and a user can deduplicate to the
   # unit grain via `dplyr::distinct(out, .unit, .keep_all = TRUE)`.
   unit_id <- NULL
-  if (is_closure_unit_family(x$family)) {
+  # The grain `residuals()` answered on, asked with the predicate that
+  # names it. `is_closure_unit_family()` is the wire-format question
+  # and is TRUE for the multi-response families too, whose residual is
+  # per row: recycling those by unit gave every species at a site one
+  # another's residual, and the `.unit` column this branch adds says
+  # rows sharing a unit share a residual, which was then false.
+  if (needs_closure_unit_aggregation(x$family)) {
     # Multi-season families return `c("series", "site", "time")`;
     # single-season families return NULL and use the 2-axis default.
     arrays <- closure_unit_arrays_for(x, obs_data)

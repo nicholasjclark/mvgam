@@ -83,7 +83,32 @@ mvgam_post_summary <- function(draws, robust = FALSE,
     centre <- colMeans(draws)
     spread <- apply(draws, 2L, stats::sd)
   }
-  q <- t(apply(draws, 2L, stats::quantile, probs = probs))
+  # A column with no value to summarise gives NA, which is what
+  # `colMeans()` and `sd()` above already answer for one. `quantile()`
+  # raises instead, so the four statistics on one row disagreed about
+  # the same column: a closure unit that lost every visit leaves rows
+  # belonging to no unit, and `fitted()` and `augment()` stopped on a
+  # message naming neither the row nor the column.
+  #
+  # Built column by column at a fixed width so one probability gives
+  # a one-column matrix rather than a vector. `apply()` drops that
+  # dimension, and the `cbind()` below then recycled the estimates
+  # against it and failed on the dimnames.
+  q <- matrix(
+    vapply(
+      seq_len(ncol(draws)),
+      function(j) {
+        col <- draws[, j]
+        if (anyNA(col)) {
+          rep(NA_real_, length(probs))
+        } else {
+          unname(stats::quantile(col, probs = probs))
+        }
+      },
+      numeric(length(probs))
+    ),
+    nrow = ncol(draws), byrow = TRUE
+  )
   out <- cbind(Estimate = centre, Est.Error = spread, q)
   colnames(out) <- c("Estimate", "Est.Error",
                      paste0("Q", probs * 100))
