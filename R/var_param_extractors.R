@@ -63,6 +63,30 @@ assert_var_trend <- function(object, surface) {
   trend_type
 }
 
+# Internal: walk a VAR posterior one draw at a time.
+#
+# `irf()` and `fevd()` ask different questions of the same object.
+# Each draw is one companion matrix and one innovation covariance,
+# assembled the same way, and only the kernel reading them differs.
+# Assembling the draw in both places let the two surfaces drift into
+# describing different draws by the same index.
+#' @noRd
+var_draw_surfaces <- function(var_post, kernel, future) {
+  mvgam_maybe_future_lapply(
+    var_post$ndraws,
+    function(draw) {
+      kernel(list(
+        K = var_post$K,
+        A = var_post$A[draw, , , drop = TRUE],
+        Sigma = var_post$Sigma[draw, , , drop = TRUE],
+        p = 1L
+      ))
+    },
+    future = future
+  )
+}
+
+
 #' Extract VAR(1) posterior draws of (A, Sigma) from a fitted mvgam
 #'
 #' Pulls the per-draw coefficient matrix `A_trend[1, , ]` and

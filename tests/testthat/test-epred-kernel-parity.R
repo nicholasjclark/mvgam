@@ -197,3 +197,59 @@ test_that("the com_binomial mean sums the CMB support, not mu * trials", {
     got, mu * matrix(trials, ndraws, nobs, byrow = TRUE)
   )))
 })
+
+
+test_that("a kernel is given every parameter its own mean formula names", {
+  # `epred_extra_dpars_for()` decides which distributional parameters
+  # the epred path extracts, and the kernel is what consumes them.
+  # Neither reads the other, so a kernel whose family was never added
+  # to that registry is simply not reached: `posterior_epred()` falls
+  # through to the inverse link and returns a finite, plausible,
+  # wrong mean. An asymmetric Laplace fitted at `quantile = 0.25`
+  # read 1.98 that way where its mean is 4.29.
+  #
+  # The prep built here carries exactly what the registry names and
+  # nothing else, which is what turns that silence into an error: a
+  # kernel reaching for a parameter the registry did not list cannot
+  # find it. `mk_prep()`'s fixed superset hands every kernel every
+  # parameter, so it passes whether or not the registry is right.
+  ns <- asNamespace("mvgam")
+  extra_for <- get("epred_extra_dpars_for", envir = ns)
+  # A `prep` is what this registry hands a kernel, so the kernels it
+  # can reach are exactly those taking one. The closure-unit and
+  # simplex means take the fit itself and are driven on fixtures.
+  kernels <- sort(Filter(function(k) {
+    identical(names(formals(get(k, envir = ns))), "prep")
+  }, Filter(kernel_is_pointwise, epred_kernel_names("mvgam"))))
+  expect_gt(length(kernels), 20L)
+
+  set.seed(3L)
+  # One value per parameter, chosen so no kernel divides by zero or
+  # leaves the unit interval: probabilities well inside it, scales
+  # positive, and a shape above the Frechet and GEV poles.
+  value_for <- function(nm) {
+    switch(nm,
+      zi = , hu = , zoi = , coi = , quantile = , bias = 0.3,
+      xi = 0.2,
+      shape = , nu = , bs = 2.5,
+      1.2
+    )
+  }
+  for (k in kernels) {
+    fam <- sub("^posterior_epred_", "", k)
+    extra <- extra_for(fam)
+    dpars <- c(
+      list(mu = matrix(0.6, 2L, 2L)),
+      stats::setNames(
+        lapply(extra, function(nm) matrix(value_for(nm), 2L, 2L)),
+        extra
+      )
+    )
+    prep <- list(
+      dpars = dpars, ndraws = 2L, nobs = 2L,
+      data = list(trials = c(4L, 6L))
+    )
+    got <- get(k, envir = ns)(prep)
+    expect_true(all(is.finite(as.matrix(got))))
+  }
+})

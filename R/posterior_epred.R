@@ -817,6 +817,11 @@ epred_extra_dpars_for <- function(family_name) {
     "shifted_lognormal" = c("sigma", "ndt"),
     "gen_extreme_value" = c("sigma", "xi"),
     "com_binomial" = "nu",
+    "asym_laplace" = c("sigma", "quantile"),
+    "zero_inflated_asym_laplace" = c("zi", "sigma", "quantile"),
+    "com_poisson" = ,
+    "discrete_weibull" = "shape",
+    "wiener" = c("bs", "ndt", "bias"),
     character(0)
   )
 }

@@ -451,6 +451,38 @@ test_that("the trend design is split by factor, on one shared basis", {
 })
 
 
+test_that("the smooth record names the rows Stan emitted", {
+  # The design above is right, and the block before it proves so.
+  # What broke was the record `posterior_smooths()` and
+  # `conditional_smooths()` walk to find a smooth's coefficients:
+  # it indexed the trend side against the observation frame, where
+  # `.trend` does not exist, so the term was never expanded per
+  # by-level. Only the first level was ever evaluated and the
+  # second came back a flat curve with no posterior width.
+  #
+  # Stan emits one `Zs_<row>_<term>_trend` block per by-level, so
+  # the record is checked against those rather than against a
+  # count written here.
+  hits <- mvgam:::mvgam_smooth_terms(prefit_by_lv)
+  expect_length(hits, 1L)
+  expect_identical(hits[[1L]]$side, "trend")
+  expect_identical(hits[[1L]]$by_var, ".trend")
+
+  zs <- grep("^Zs_[0-9]+_1_trend$", names(prefit_by_lv$standata),
+             value = TRUE)
+  expect_length(zs, N_lv)
+  expect_identical(as.integer(hits[[1L]]$rows), seq_along(zs))
+
+  # The control: the plain model's smooth carries no `by`, emits one
+  # block, and stays one row. Without it the check above passes on a
+  # record that expanded everything.
+  plain <- mvgam:::mvgam_smooth_terms(prefit_plain)
+  expect_length(plain, 1L)
+  expect_true(is.na(plain[[1L]]$by_var))
+  expect_identical(as.integer(plain[[1L]]$rows), 1L)
+})
+
+
 test_that("an observation still reads a series cell, not a factor", {
   # The distinction the whole design turns on. `times_trend` moved to
   # the factor axis, but `trend[t, s]` is still series-grained

@@ -289,6 +289,11 @@ validate_supported_family <- function(family) {
 #' @param binary_y_check Logical; TRUE when the family restricts
 #'   the response to {0, 1} (e.g. `occ()`,
 #'   `nmix("royle_nichols")`). Triggers the y-range check.
+#' @param default_cap Integer scalar, or `NULL`. The fixed bound the
+#'   family supplies when the frame carries no `cap` column. `NULL`
+#'   means the family either requires the column or derives the
+#'   bound per unit from the data, and in both cases there is no
+#'   fabricated cap to check.
 #' @param cap_required Logical; TRUE when the family requires the
 #'   `cap` data column to be present. FALSE for families that
 #'   default the per-unit upper truncation (e.g. `occ()` defaults
@@ -316,6 +321,7 @@ validate_closure_unit_data <- function(data,
                                         has_det_covariates  = FALSE,
                                         binary_y_check      = FALSE,
                                         cap_required        = TRUE,
+                                        default_cap         = NULL,
                                         unit_grouping_vars  = NULL) {
   checkmate::assert_data_frame(data, min.rows = 1L)
   checkmate::assert_string(response_var)
@@ -326,6 +332,7 @@ validate_closure_unit_data <- function(data,
   checkmate::assert_flag(has_det_covariates)
   checkmate::assert_flag(binary_y_check)
   checkmate::assert_flag(cap_required)
+  checkmate::assert_int(default_cap, lower = 1L, null.ok = TRUE)
   if (is.null(unit_grouping_vars)) {
     unit_grouping_vars <- c(series_var, time_var)
   }
@@ -361,14 +368,22 @@ validate_closure_unit_data <- function(data,
   }
 
   y_vals   <- data[[response_var]]
-  # Binary families default `cap` to 1 when the column is absent;
-  # users may still supply `cap` explicitly (any positive integer
-  # >= y), in which case it flows through the same checks as
-  # count families.
+  # A `cap` column the user supplied is checked below whatever the
+  # family. Where there is none, the family supplies the bound
+  # instead: a fixed default -- `occ()`'s one, the Royle-Nichols
+  # `nmix()`'s static ceiling -- is checked the same way, while a
+  # data-driven buffer is by construction at least the largest count
+  # in its unit and leaves nothing to check.
+  #
+  # Fabricating a cap of one here instead refused every count family
+  # that declared a buffer, and did it on a message naming a column
+  # the frame never had.
   cap_vals <- if (cap_var %in% colnames(data)) {
     data[[cap_var]]
+  } else if (!is.null(default_cap)) {
+    rep(as.integer(default_cap), nrow(data))
   } else {
-    rep(1L, nrow(data))
+    NULL
   }
 
   # A missing response is a visit that did not happen, which is
@@ -431,7 +446,8 @@ validate_closure_unit_data <- function(data,
     )))
   }
 
-  if (any(!is.finite(suppressWarnings(as.numeric(cap_vals))))) {
+  if (!is.null(cap_vals) &&
+        any(!is.finite(suppressWarnings(as.numeric(cap_vals))))) {
     stop(insight::format_error(
       paste0(
         "Non-finite or non-numeric values found in '",
@@ -439,13 +455,16 @@ validate_closure_unit_data <- function(data,
       )
     ))
   }
-  cap_int <- as.integer(cap_vals)
-  if (any(cap_int < 1L)) {
+  # Without a cap there is nothing to check; a zero-length vector
+  # would make each test below pass by arithmetic rather than by
+  # decision, which reads the same and means something else.
+  cap_int <- if (is.null(cap_vals)) NULL else as.integer(cap_vals)
+  if (!is.null(cap_int) && any(cap_int < 1L)) {
     stop(insight::format_error(
       paste0("'", cap_var, "' must be a positive integer.")
     ))
   }
-  if (any(cap_int < y_int, na.rm = TRUE)) {
+  if (!is.null(cap_int) && any(cap_int < y_int, na.rm = TRUE)) {
     bad <- which(!is.na(y_int) & cap_int < y_int)[1L]
     stop(insight::format_error(c(
       paste0(
@@ -469,18 +488,26 @@ validate_closure_unit_data <- function(data,
   # time rather than mid-array-build. The grouping is polymorphic
   # over the cardinality of `unit_grouping_vars`: each column is
   # coerced to a factor-integer code and concatenated.
-  grouping_vals <- lapply(unit_grouping_vars, function(col) {
-    as.integer(as.factor(data[[col]]))
-  })
-  unit_label <- do.call(paste, c(grouping_vals, list(sep = "_")))
-  unit_int   <- match(unit_label, unique(unit_label))
-  rep_counts <- tabulate(unit_int)
-
+  # Read the unit layout from the builder's own derivation rather
+  # than repeating it, and read it over the visits that happened.
+  # Counting every row instead let both guards below pass on frames
+  # whose fitted model is the case they exist to refuse: a unit
+  # whose rows are all missing was still counted as a unit, and a
+  # unit left with one observed visit still counted as two.
+  idx        <- closure_unit_index(data, unit_grouping_vars,
+                                   response_var)
+  unit_int   <- idx$unit
+  # Every unit the frame names, which is the axis the cap check
+  # below walks; a unit that lost its response still has a cap.
+  n_unit_named <- length(idx$levels)
+  # And the units the likelihood will actually hold, with their
+  # observed visit counts, which is what the guards read.
+  rep_counts <- idx$n_rep[idx$n_rep > 0L]
   n_unit <- length(rep_counts)
-  for (g in seq_len(n_unit)) {
+  for (g in seq_len(n_unit_named)) {
     rows_g <- which(unit_int == g)
     cap_g  <- cap_int[rows_g]
-    if (length(unique(cap_g)) > 1L) {
+    if (!is.null(cap_int) && length(unique(cap_g)) > 1L) {
       bad_row <- rows_g[1L]
       # Build a (col=value, ...) tuple description of the bad unit
       # for the diagnostic.
@@ -1672,7 +1699,8 @@ mvgam_response_support <- local({
                    integer = FALSE)
   unit_open <- list(bounds = c(0, 1), closed = c(FALSE, FALSE),
                     integer = FALSE)
-  counts <- c("poisson", "negbinomial", "geometric", "binomial",
+  counts <- c("poisson", "negbinomial", "negbinomial2",
+              "geometric", "binomial",
               "beta_binomial", "com_poisson", "discrete_weibull",
               "hurdle_poisson", "hurdle_negbinomial",
               "zero_inflated_poisson", "zero_inflated_negbinomial",

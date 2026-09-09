@@ -890,10 +890,14 @@ model_glossary <- function(obj) {
         "SD $\\sigma_\\eta$"
       ))
     }
-    if (identical(tt, "AR") || identical(tt, "VAR") ||
-        identical(tt, "ARMA")) {
+    if (identical(tt, "AR") || identical(tt, "VAR")) {
       defs <- c(defs, paste0(
         "- $\\phi_l$: autoregressive coefficient at lag $l$"
+      ))
+    }
+    if (trend_has_ma(obj)) {
+      defs <- c(defs, paste0(
+        "- $\\theta_l$: moving-average coefficient at lag $l$"
       ))
     }
     if (identical(tt, "CAR")) {
@@ -917,21 +921,39 @@ model_glossary <- function(obj) {
   paste(c("where:", "", defs), collapse = "\n")
 }
 
+# Internal: whether a trend carries a moving-average part.
+#
+# `AR(ma = TRUE)` and `VAR(ma = TRUE)` are recorded under their base
+# trend type, so nothing ever stores the spelling "ARMA". The MA
+# lags are what say one is present, and asking for the spelling
+# instead meant an ARMA model was described as the AR model it is
+# built on, with its order and its coefficient both dropped.
+#' @noRd
+trend_has_ma <- function(obj) {
+  length(obj$trend_metadata$ma_lags %||% integer(0L)) > 0L
+}
+
+
 #' @noRd
 trend_order_label <- function(obj) {
   tt <- obj$trend_metadata$trend_type
   if (is.null(tt)) return("")
   ar_lags <- obj$trend_metadata$ar_lags %||% integer(0L)
   ma_lags <- obj$trend_metadata$ma_lags %||% integer(0L)
+  arma_label <- function(prefix) {
+    if (!length(ma_lags)) {
+      return(paste0(prefix, "(", paste(ar_lags, collapse = ", "), ")"))
+    }
+    paste0(
+      prefix, "MA(", paste(ar_lags, collapse = ", "), ", ",
+      paste(ma_lags, collapse = ", "), ")"
+    )
+  }
   switch(
     tt,
     "RW"   = "RW",
-    "AR"   = paste0("AR(", paste(ar_lags, collapse = ", "), ")"),
-    "VAR"  = paste0("VAR(", paste(ar_lags, collapse = ", "), ")"),
-    "ARMA" = paste0(
-      "ARMA(", paste(ar_lags, collapse = ", "), ", ",
-      paste(ma_lags, collapse = ", "), ")"
-    ),
+    "AR"   = arma_label("AR"),
+    "VAR"  = arma_label("VAR"),
     "CAR"  = "CAR",
     "ZMVN" = "ZMVN",
     "PW"   = paste0(
@@ -2193,8 +2215,7 @@ methods_md_is_closure_unit <- function(obj) {
 
 #' @noRd
 methods_md_is_detection_family <- function(obj) {
-  pt <- attr(obj$family, "mvgam_predict_types")
-  !is.null(pt) && "detection" %in% pt
+  "detection" %in% family_predict_types(obj$family)
 }
 
 #' @noRd

@@ -876,3 +876,38 @@ test_that("mvn() emits MVNormal + Sigma decomposition + LKJCholesky", {
   # table reports it and the write-up renders it.
   expect_true(grepl("LKJCholesky", out))
 })
+
+
+test_that("a moving-average trend is named as one", {
+  # `AR(ma = TRUE)` is recorded under trend type "AR", so nothing
+  # ever stores the spelling "ARMA". Keying on that spelling meant
+  # the order label and the coefficient definition both described
+  # the AR model underneath, and an ARMA fit printed identically to
+  # the plain AR fit beside it.
+  fake <- function(tt, ar, ma) {
+    structure(
+      list(trend_metadata = list(trend_type = tt, ar_lags = ar,
+                                 ma_lags = ma)),
+      class = "mvgam"
+    )
+  }
+  expect_identical(
+    mvgam:::trend_order_label(fake("AR", 1L, integer(0))), "AR(1)"
+  )
+  expect_identical(
+    mvgam:::trend_order_label(fake("AR", 1L, 1L)), "ARMA(1, 1)"
+  )
+  expect_identical(
+    mvgam:::trend_order_label(fake("VAR", 1L, integer(0))), "VAR(1)"
+  )
+  expect_identical(
+    mvgam:::trend_order_label(fake("VAR", 1L, 1L)), "VARMA(1, 1)"
+  )
+  # The two the label has to tell apart do not collide.
+  expect_false(identical(
+    mvgam:::trend_order_label(fake("AR", 1L, integer(0))),
+    mvgam:::trend_order_label(fake("AR", 1L, 1L))
+  ))
+  expect_true(mvgam:::trend_has_ma(fake("AR", 1L, 1L)))
+  expect_false(mvgam:::trend_has_ma(fake("AR", 1L, integer(0))))
+})

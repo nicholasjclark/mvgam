@@ -365,7 +365,18 @@ posterior_summary.mvgam <- function(x, pars = NULL,
 #' @export
 getCall.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
-  x$call
+  call <- x$call
+  # A fit saved before the call was captured at the user-facing
+  # entry point carries the `do.call()` frame's version, whose head
+  # is the function object rather than its name. Left as it is,
+  # `deparse()` prints the whole of mvgam's source instead of the
+  # call, so the head is named here for a fit that can no longer be
+  # re-stamped. The arguments such a call inlined are not
+  # recoverable; refit to record them as written.
+  if (is.call(call) && is.function(call[[1L]])) {
+    call[[1L]] <- as.name("mvgam")
+  }
+  call
 }
 
 

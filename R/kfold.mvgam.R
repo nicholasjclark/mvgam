@@ -287,14 +287,23 @@ kfold.mvgam <- function(x,
 
 
 # Internal: resolve user-supplied `group` arg into a per-row
-# character key. Closure-unit families default to the family's
-# `closure_unit_grouping()` attr; otherwise each row gets a unique
-# key (= row index) for pure k-fold by row.
+# character key. A closure-unit family keys by the unit its
+# likelihood is written over, so a fold holds out whole units;
+# otherwise each row gets a unique key (= row index) for pure
+# k-fold by row.
+#
+# The unit is read through `closure_unit_key_vars()` rather than
+# `closure_unit_grouping()`, which returns the raw attribute and so
+# answers `NULL` for every family that did not opt into
+# `multi_season`. Keying on that gave each visit its own fold, which
+# left every unit represented in the training data by its other
+# visits and made the score optimistic without saying so. The two
+# sibling call sites in this file already read the filled form.
 #
 # @noRd
 resolve_kfold_group <- function(object, group, data) {
   if (is.null(group)) {
-    closure_cols <- closure_unit_grouping(object$family)
+    closure_cols <- closure_unit_key_vars(object$family)
     if (!is.null(closure_cols)) {
       group <- closure_cols
     } else {
@@ -517,16 +526,24 @@ refit_score_one_fold <- function(object, data, fold_ids,
         )
       )))
     }
-    # Closure-unit grain: held units appear in first-appearance
-    # order over held_data rows (matches build_closure_unit_arrays).
-    held_unit_key <- do.call(paste, c(
-      lapply(closure_cols,
-             function(c) as.character(held_data[[c]])),
-      list(sep = "_")
-    ))
-    unit_levels <- unique(held_unit_key)
-    first_row_per_unit <- match(unit_levels, held_unit_key)
-    held_col_group <- group_key[held_rows[first_row_per_unit]]
+    # Read the unit layout from the builder that owns it, the way
+    # `map_loglik_cols_to_groups()` above does. Pasting the key
+    # columns here instead was a second derivation of the same
+    # fact, and it differed twice: the separator could collide
+    # (`series = "sp_1", time = "1"` and `series = "sp", time =
+    # "1_1"` give one key), and a unit whose every row is missing
+    # was still counted, which the builder drops.
+    arrays <- closure_unit_arrays_for(object, held_data)
+    held_col_group <- group_key[held_rows[arrays$visit_row[, 1L]]]
+    if (length(held_col_group) != NCOL(held_loglik)) {
+      stop(insight::format_error(c(
+        "Closure-unit alignment count mismatch on the held fold.",
+        x = paste0(
+          "Reconstructed ", length(held_col_group),
+          " units; log_lik returned ", NCOL(held_loglik), " columns."
+        )
+      )))
+    }
   }
 
   held_grouped <- aggregate_loglik_by_group(

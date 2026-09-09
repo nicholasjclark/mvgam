@@ -337,3 +337,51 @@ test_that("a single-series ZMVN is flagged only when it is confounded", {
   expect_false(flagged(~ AR(p = 1), 1L, gaussian()))
   expect_false(flagged(~ RW(), 1L, gaussian()))
 })
+
+
+test_that("every integer family has a response support to check against", {
+  # `mvgam_response_support` is what refuses a negative count or a
+  # fractional one, and a family absent from it is validated against
+  # nothing: the response passes whatever it holds. The integer
+  # families are enumerated once, by `family_uses_integers()`, so the
+  # table is checked against that rather than against a second list.
+  #
+  # Ordinal responses are levels rather than points on an interval,
+  # and brms checks them against the category count it derives from
+  # the data, so they are excluded here for the reason the table's
+  # own comment gives.
+  ordinal_like <- c("hurdle_cumulative", "cumulative", "sratio",
+                    "cratio", "acat")
+  candidates <- setdiff(
+    Filter(mvgam:::family_uses_integers, c(
+      "poisson", "negbinomial", "negbinomial2", "geometric",
+      "binomial", "beta_binomial", "bernoulli",
+      "zero_inflated_poisson", "zero_inflated_negbinomial",
+      "zero_inflated_binomial", "zero_inflated_beta_binomial",
+      "hurdle_poisson", "hurdle_negbinomial", "hurdle_cumulative",
+      "discrete_weibull", "com_poisson", "beta_nb", "com_binomial"
+    )),
+    ordinal_like
+  )
+  # An empty set would satisfy the comparison without checking one.
+  expect_gt(length(candidates), 10L)
+  expect_identical(
+    setdiff(candidates, names(mvgam:::mvgam_response_support)),
+    character(0)
+  )
+})
+
+
+test_that("the support table and the integer predicate agree", {
+  # Two records of the same fact, so they are compared rather than
+  # trusted: a family the table calls integer that the predicate
+  # does not is a family whose truncation bounds and whose response
+  # check disagree about what its support is.
+  tbl <- mvgam:::mvgam_response_support
+  disagreed <- Filter(function(nm) {
+    !identical(isTRUE(tbl[[nm]]$integer),
+               mvgam:::family_uses_integers(nm))
+  }, names(tbl))
+  expect_identical(disagreed, character(0))
+  expect_gt(length(tbl), 30L)
+})

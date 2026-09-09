@@ -130,24 +130,7 @@ conditional_effects.mvgam <- function(x,
   # rather than via a generic marginaleffects failure.
   if (type %in% c("latent_state", "detection") &&
         !is_closure_unit_family(x$family)) {
-    family_types <- attr(x$family, "mvgam_predict_types",
-                          exact = TRUE) %||% character(0)
-    stop(insight::format_error(c(
-      paste0(
-        "type = '", type, "' is not available for this family."
-      ),
-      x = paste0(
-        "Family '", resolve_family_name(x$family),
-        "' exposes types: ",
-        if (length(family_types) > 0L) {
-          paste(paste0("'", family_types, "'"), collapse = ", ")
-        } else {
-          "none (not a closure-unit family)"
-        },
-        "."
-      ),
-      i = "Refit with family = nmix() or family = occ() to enable closure-unit predict types."
-    )))
+    refuse_unsupported_predict_type(x$family, type)
   }
   # `series` is polymorphic (NULL / "all" / character / integer) so a
   # single checkmate::assert_* call cannot validate it; the resolver
@@ -179,7 +162,10 @@ conditional_effects.mvgam <- function(x,
   if (any(lengths(cond_labs) > 3L)) {
     stop(insight::format_error(c(
       "Effects of order higher than 3 are not supported by conditional_effects.",
-      i = "Use {.fn marginaleffects::plot_predictions} directly to build the higher-order plot."
+      i = cli::format_inline(paste0(
+        "Use {.fn marginaleffects::plot_predictions} directly to ",
+        "build the higher-order plot."
+      ))
     )))
   }
 
@@ -427,11 +413,7 @@ detect_conditional_effects <- function(x) {
                    recursive = FALSE)
     return(unique(cond))
   }
-  obs_f <- if (inherits(x$formula, "brmsformula")) {
-    x$formula$formula
-  } else {
-    x$formula
-  }
+  obs_f <- mvgam_obs_formula(x)
   # Reason: `$pforms` holds the sub-formula of every parameter the
   # user gave one, and its covariates never appear in the top-level
   # RHS. That covers two cases. For `bf(..., nl = TRUE)` the RHS

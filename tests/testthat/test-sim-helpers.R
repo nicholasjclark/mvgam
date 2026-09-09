@@ -198,3 +198,60 @@ test_that("gam_test_f0..f3 return finite numeric vectors", {
     expect_true(all(is.finite(out)))
   }
 })
+
+
+# A family reaches `sim_mvgam()` through four separate switches: an
+# intercept, a link-scale budget, a parameter list and the sampler
+# that finally draws it. Nothing ties them together, so a family
+# added to the first three and forgotten in the fourth is accepted
+# all the way to the draw and then refused, which is how
+# `sim_mvgam(family = bernoulli())` came to error.
+switch_labels <- function(fn) {
+  found <- character(0)
+  walk <- function(e) {
+    if (!is.call(e)) return(invisible(NULL))
+    parts <- as.list(e)
+    if (identical(parts[[1L]], as.name("switch"))) {
+      nms <- names(parts)[-(1:2)]
+      found <<- c(found, nms[!is.na(nms) & nzchar(nms)])
+    }
+    for (p in parts) walk(p)
+    invisible(NULL)
+  }
+  walk(body(fn))
+  unique(found)
+}
+
+
+test_that("every family the simulator parameterises can be drawn from", {
+  ns <- asNamespace("mvgam")
+  # The three tables that describe a family, against the one that
+  # emits it.
+  described <- unique(unlist(lapply(
+    c("intercept_for_family", "link_scale_budget", "sim_family_pars"),
+    function(f) switch_labels(get(f, envir = ns))
+  )))
+  drawable <- switch_labels(get("sim_family_rng", envir = ns))
+
+  # An empty set on either side would satisfy the comparison while
+  # comparing nothing.
+  expect_gt(length(described), 8L)
+  expect_gt(length(drawable), 8L)
+  expect_identical(setdiff(described, drawable), character(0))
+})
+
+
+test_that("a bernoulli response simulates as a one-trial binomial", {
+  set.seed(5L)
+  eta <- stats::qlogis(rep(c(0.2, 0.8), each = 500L))
+  y <- mvgam:::sim_family_rng(eta, bernoulli())
+  expect_length(y, length(eta))
+  expect_true(all(y %in% c(0L, 1L)))
+  # The draws follow the probability the predictor names, so a
+  # sampler ignoring `eta` would fail here rather than only on shape.
+  expect_lt(abs(mean(y[1:500]) - 0.2), 0.06)
+  expect_lt(abs(mean(y[501:1000]) - 0.8), 0.06)
+  # And a trial count offered by mistake cannot turn it binomial.
+  y2 <- mvgam:::sim_family_rng(eta, bernoulli(), list(trials = 10L))
+  expect_true(all(y2 %in% c(0L, 1L)))
+})

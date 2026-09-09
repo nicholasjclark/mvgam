@@ -680,7 +680,13 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   # full expansion, which then bleeds into summary() output. Collapse
   # any multi-line deparse and fall back to a short placeholder when
   # the captured name is longer than a typical symbol identifier.
-  data_name <- paste(deparse(match.call()$data), collapse = " ")
+  # The call the user wrote, captured here because this is the last
+  # frame that still holds their symbols: every step below reaches
+  # the pipeline through `do.call()`, which substitutes each
+  # argument's value, so a call captured deeper inlines the whole
+  # data frame and the family object.
+  user_call <- match.call()
+  data_name <- paste(deparse(user_call$data), collapse = " ")
   if (nchar(data_name) > 80L) {
     data_name <- "<inline data>"
   }
@@ -729,6 +735,9 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
     mvgam_single_args$threads <- threads
   }
   mvgam_object <- do.call(mvgam_single, c(mvgam_single_args, list(...)))
+  if (inherits(mvgam_object, "mvgam")) {
+    mvgam_object$call <- user_call
+  }
 
   # Post-fit advisor: a by_lv factor model at the full-rank boundary
   # with the default iid Z prior is rotationally unidentified. When
@@ -1182,8 +1191,11 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
   )
 
   mvgam_object$criteria <- list()
-  mvgam_object$call <- match.call(sys.function(sys.parent()),
-                                 sys.call(sys.parent()))
+  # `$call` is stamped by the user-facing entry point that built
+  # this, which is the only frame holding the symbols the user
+  # typed. Recording it here instead captured a `do.call()` frame:
+  # the head was the function object rather than its name, and
+  # every argument had already resolved to its value.
 
   # Defensive sign-canonical pass on saved Z / lv_trend draws.
   # Free-Z factor models save `Z_tilde` and `lv_trend_tilde`

@@ -445,7 +445,8 @@ ordinal_sample <- function(eta, thres, disc = 1, link = "logit") {
 #'
 #' @noRd
 rbeta_binomial_draws <- function(n, size, mu, phi) {
-  probs <- stats::rbeta(n, mu * phi, (1 - mu) * phi)
+  shapes <- beta_shapes(mu, phi)
+  probs <- stats::rbeta(n, shapes$shape1, shapes$shape2)
   stats::rbinom(n, size = size, prob = probs)
 }
 
@@ -621,9 +622,9 @@ sample_from_family <- function(family_name, ndraws, epred,
 
     "beta" = {
       checkmate::assert_matrix(phi, nrows = ndraws, ncols = ncol(epred))
-      # mu and phi (precision) -> shape1, shape2
-      shape1 <- epred * phi
-      shape2 <- (1 - epred) * phi
+      shapes <- beta_shapes(epred, phi)
+      shape1 <- shapes$shape1
+      shape2 <- shapes$shape2
       stats::rbeta(length(epred), shape1 = shape1, shape2 = shape2)
     },
 
@@ -750,8 +751,9 @@ sample_from_family <- function(family_name, ndraws, epred,
     "zero_inflated_beta" = {
       checkmate::assert_matrix(zi, nrows = ndraws, ncols = ncol(epred))
       checkmate::assert_matrix(phi, nrows = ndraws, ncols = ncol(epred))
-      shape1 <- epred * phi
-      shape2 <- (1 - epred) * phi
+      shapes <- beta_shapes(epred, phi)
+      shape1 <- shapes$shape1
+      shape2 <- shapes$shape2
       tmp <- stats::runif(length(epred))
       ifelse(tmp < zi, 0, stats::rbeta(length(epred), shape1 = shape1,
                                         shape2 = shape2))
@@ -764,8 +766,9 @@ sample_from_family <- function(family_name, ndraws, epred,
       # zoi = P(Y in {0,1}), coi = P(Y=1 | Y in {0,1})
       tmp <- stats::runif(length(epred))
       one_or_zero <- stats::runif(length(epred))
-      shape1 <- epred * phi
-      shape2 <- (1 - epred) * phi
+      shapes <- beta_shapes(epred, phi)
+      shape1 <- shapes$shape1
+      shape2 <- shapes$shape2
       ifelse(
         tmp < zoi,
         ifelse(one_or_zero < coi, 1, 0),
@@ -857,18 +860,20 @@ sample_from_family <- function(family_name, ndraws, epred,
     "cratio" = ,
     "acat" = stop(insight::format_error(c(
       cli::format_inline(
-        "Posterior predictive sampling is unavailable for family
-         {.val {family_name}}."
+        paste0("Posterior predictive sampling is unavailable for ",
+               "family {.val {family_name}}.")
       ),
-      i = "The supported ordinal family is {.val cumulative}."
+      i = cli::format_inline(
+        "The supported ordinal family is {.val cumulative}."
+      )
     ))),
 
     # ============ Unsupported families ============
 
     stop(insight::format_error(c(
       cli::format_inline(
-        "Posterior predictive sampling is unavailable for family
-         {.val {family_name}}."
+        paste0("Posterior predictive sampling is unavailable for ",
+               "family {.val {family_name}}.")
       ),
       i = paste0(
         "See ?mvgam_families for the families mvgam can draw from."

@@ -370,7 +370,7 @@ test_that("update() refuses a jsdgam rather than dropping its structure", {
   # of `factor_formula`, `n_lv`, `species`, `unit`, `traits`,
   # `trait_slopes` or `phylo`; the refit carried none of them and said
   # nothing. The arguments cannot be recovered either, because
-  # `jsdgam_call` holds the symbols the user wrote rather than their
+  # `$call` holds the symbols the user wrote rather than their
   # values.
   stub <- structure(
     list(formula = y ~ x, trend_call = ~ -1),
@@ -547,4 +547,61 @@ test_that("walk_trend_call_args visits every named argument once", {
 
   # A missing call visits nothing rather than erroring.
   expect_silent(walk_trend_call_args(NULL, function(...) stop("unreached")))
+})
+
+
+test_that("getCall reports the call the user wrote", {
+  # Every entry point reaches the fitting pipeline through
+  # `do.call()`, which substitutes each argument's value for the
+  # symbol. A call captured inside the pipeline therefore had the
+  # function object in its head and the whole data frame in its
+  # `data` slot, so `deparse(getCall(fit))` ran to 50 lines and
+  # printed the training data instead of the call.
+  set.seed(1L)
+  d <- data.frame(time = 1:30, series = factor("s1"), x = rnorm(30))
+  d$y <- rpois(30, 3)
+  fit <- mvgam(y ~ x, data = d, family = poisson(), run_model = FALSE)
+
+  cl <- getCall(fit)
+  expect_true(is.name(cl[[1L]]))
+  expect_identical(as.character(cl[[1L]]), "mvgam")
+  # The arguments are the symbols and calls that were typed, not the
+  # objects they evaluate to, which is what keeps the deparse short
+  # and re-evaluable.
+  expect_identical(cl$data, as.name("d"))
+  expect_identical(cl$family, quote(poisson()))
+  expect_lt(length(deparse(cl)), 5L)
+})
+
+
+test_that("an updated fit reports the model call it now describes", {
+  # `update()` refits through `do.call(mvgam, ...)`, so the call the
+  # refit captures is that frame's resolved arguments. The call an
+  # updated fit reports is the original with the arguments this
+  # `update()` named written over it.
+  original <- quote(
+    mvgam(formula = y ~ x, data = d, family = poisson(), chains = 2L)
+  )
+  restated <- mvgam:::restate_updated_call(
+    original,
+    quote(update(object = fit, chains = 4L, recompile = TRUE))
+  )
+  expect_identical(restated$chains, 4L)
+  # `recompile` steers the refit, not the model, so it is not part
+  # of the call the model was built from; nor is `object`.
+  expect_false("recompile" %in% names(restated))
+  expect_false("object" %in% names(restated))
+  # Everything the update did not name survives as written.
+  expect_identical(restated$data, as.name("d"))
+  expect_identical(restated$family, quote(poisson()))
+
+  # The two arguments spelled differently on the two sides land on
+  # the names `mvgam()` reads.
+  renamed <- mvgam:::restate_updated_call(
+    original,
+    quote(update(object = fit, formula. = z ~ w, newdata = d2))
+  )
+  expect_identical(renamed$formula, quote(z ~ w))
+  expect_identical(renamed$data, as.name("d2"))
+  expect_false(any(c("formula.", "newdata") %in% names(renamed)))
 })

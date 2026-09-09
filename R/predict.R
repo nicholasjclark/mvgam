@@ -206,28 +206,9 @@ predict.mvgam <- function(object,
   # posterior `N`; `posterior_occupancy()` for occ returning
   # posterior `psi`.
   if (type %in% c("latent_state", "detection")) {
-    family_types <- attr(object$family, "mvgam_predict_types",
-                          exact = TRUE) %||% character(0)
     if (!is_closure_unit_family(object$family) ||
-        !(type %in% family_types)) {
-      stop(insight::format_error(c(
-        paste0("type = '", type,
-               "' is not available for this family."),
-        x = paste0(
-          "Family '", resolve_family_name(object$family),
-          "' exposes types: ",
-          if (length(family_types) > 0L) {
-            paste(paste0("'", family_types, "'"), collapse = ", ")
-          } else {
-            "none (not a closure-unit family)"
-          },
-          "."
-        ),
-        i = paste(
-          "Refit with family = nmix() or family = occ() to enable",
-          "closure-unit predict types."
-        )
-      )))
+        !(type %in% family_predict_types(object$family))) {
+      refuse_unsupported_predict_type(object$family, type)
     }
     pred <- if (identical(type, "latent_state")) {
       kernel <- dispatch_closure_unit_method(
@@ -400,17 +381,16 @@ predict_variance <- function(object, newdata, process_error,
     # the latter is row-constant given the design, so the residual
     # term carries the per-row variability.
     if (is_multi_response_family(family)) {
-      # Simplex families: per-cell variance follows from the
-      # softmax probability and the family's dispersion. Dirichlet:
-      # Var[X_k] = p_k (1 - p_k) / (phi + 1). Multinomial:
-      # Var[Y_k] = N * p_k (1 - p_k). Categorical: Bernoulli per
-      # cell, Var = p_k (1 - p_k).
+      comp <- mv_response_family_pars(
+        object, newdata, linpred = NULL, family_obj = family,
+        family_name = family_name, draw_ids = draw_ids, ndraws = ndraws
+      )
       if (is_simplex_response_family(family)) {
-        needs_phi <- identical(family_name, "diri")
-        comp <- extract_simplex_response_components(
-          object, newdata = newdata, draw_ids = draw_ids,
-          ndraws = ndraws, needs_phi = needs_phi
-        )
+        # Per-cell variance follows from the softmax probability and
+        # the family's dispersion. Dirichlet:
+        # Var[X_k] = p_k (1 - p_k) / (phi + 1). Multinomial:
+        # Var[Y_k] = N * p_k (1 - p_k). Categorical: Bernoulli per
+        # cell, Var = p_k (1 - p_k).
         prob <- comp$prob_row
         base_var <- prob * (1 - prob)
         if (identical(family_name, "diri")) {
@@ -437,13 +417,8 @@ predict_variance <- function(object, newdata, process_error,
         # categ
         return(base_var)
       }
-      needs_nu <- identical(family_name, "mvt")
-      comp <- extract_mv_response_components(
-        object, newdata = newdata, draw_ids = draw_ids,
-        ndraws = ndraws, needs_nu = needs_nu
-      )
       base_var <- comp$Psi_row^2
-      if (needs_nu) {
+      if (identical(family_name, "mvt")) {
         nu_mat <- matrix(comp$nu, nrow = comp$ndraws,
                           ncol = comp$N_obs)
         return(base_var * nu_mat / (nu_mat - 2))

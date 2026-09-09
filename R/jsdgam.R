@@ -630,7 +630,11 @@ jsdgam <- function(formula,
   )
   fit$obs_data <- data_train
   fit$model_spec <- c(fit$model_spec %||% list(), list(is_jsdgam = TRUE))
-  fit$jsdgam_call <- call
+  # `mvgam()` stamped its own frame's call, which for a forwarded
+  # fit is `do.call()`'s resolved arguments. A `jsdgam` fit was
+  # built by `jsdgam()`, so that is the call it reports, and it is
+  # the one holding the symbols the user wrote.
+  fit$call <- call
 
   # Preserve `mvgam_prefit` if mvgam returned a stub via
   # `run_model = FALSE`, otherwise plain c("mvgam", "jsdgam").

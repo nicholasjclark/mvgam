@@ -101,15 +101,6 @@ sim_re <- function(grp, sigma = 1) {
 }
 
 
-# Internal: Convert beta-distribution mean / precision (`mu`,
-# `phi`) to (`shape1`, `shape2`) for `stats::rbeta`. Matches
-# brms's parametrisation.
-#'@noRd
-beta_shapes <- function(mu, phi) {
-  list(shape1 = mu * phi, shape2 = (1 - mu) * phi)
-}
-
-
 # Internal: Family-specific RNG dispatcher. Given an `eta` linear
 # predictor (link scale) and any auxiliary parameters in `pars`,
 # return a vector of length(eta) of simulated response values
@@ -166,6 +157,10 @@ sim_family_rng <- function(eta, family, pars = list()) {
       stats::rt(length(eta), df = pars$nu %||% 4),
     "poisson" = stats::rpois(length(eta), lambda = mu),
     "negbinomial" = sim_negbinom(mu, pars$size %||% 5),
+    # A Bernoulli is the binomial at one trial, and takes no trial
+    # count of its own, so the size is fixed here rather than read
+    # from `pars`.
+    "bernoulli" = stats::rbinom(length(eta), size = 1L, prob = mu),
     "binomial" = stats::rbinom(
       length(eta), size = pars$trials %||% 1L, prob = mu
     ),
@@ -200,7 +195,8 @@ sim_family_rng <- function(eta, family, pars = list()) {
       x = paste0("Got: '", fam_name, "'."),
       i = paste0(
         "Supported: gaussian, student, poisson, negbinomial, ",
-        "binomial, beta, gamma, tweedie, beta_nb, com_binomial."
+        "bernoulli, binomial, beta, gamma, tweedie, beta_nb, ",
+        "com_binomial."
       )
     )))
   )

@@ -17,12 +17,12 @@ print.mvgam <- function(x, digits = 2, ...) {
   # Section 1: Formulas (distinguish observation vs process)
   if (!is.null(x$trend_formula)) {
     cat("GAM observation formula:\n")
-    print(formula(x))
+    print_model_formula(formula(x))
     cat("\nGAM process formula:\n")
-    print(x$trend_formula)
+    print_model_formula(x$trend_formula)
   } else {
     cat("GAM formula:\n")
-    print(formula(x))
+    print_model_formula(formula(x))
   }
 
   # Section 2: Family and link. A model written with `brms::mvbf()`
@@ -45,12 +45,7 @@ print.mvgam <- function(x, digits = 2, ...) {
   # Section 3: Trend model (if present)
   if (!is.null(x$trend_formula)) {
     cat("\n\nTrend model:\n")
-    trend_comps <- x$trend_components
-    if (!is.null(trend_comps) && !is.null(trend_comps$types)) {
-      cat(trend_comps$types[[1]], '\n')
-    } else {
-      cat("None\n")
-    }
+    cat(printed_trend_label(x), "\n")
   }
 
   # Section 4: N series
@@ -84,10 +79,10 @@ print.mvgam <- function(x, digits = 2, ...) {
 print.mvgam_formula <- function(x, ...) {
   cat("mvgam_formula object\n")
   cat("Observation formula: ")
-  print(x$formula)
+  print_model_formula(x$formula)
   if (!is.null(x$trend_formula)) {
     cat("Trend formula: ")
-    print(x$trend_formula)
+    print_model_formula(x$trend_formula)
   } else {
     cat("Trend formula: NULL (no trend component)\n")
   }
@@ -105,12 +100,12 @@ print.mvgam_prefit <- function(x, ...) {
   # Formulas (distinguish observation vs process)
   if (!is.null(x$trend_formula)) {
     cat("GAM observation formula:\n")
-    print(x$formula)
+    print_model_formula(x$formula)
     cat("\nGAM process formula:\n")
-    print(x$trend_formula)
+    print_model_formula(x$trend_formula)
   } else {
     cat("GAM formula:\n")
-    print(x$formula)
+    print_model_formula(x$formula)
   }
 
   # Family and link
@@ -124,12 +119,7 @@ print.mvgam_prefit <- function(x, ...) {
   # Trend model (if present)
   if (!is.null(x$trend_formula)) {
     cat("\n\nTrend model:\n")
-    trend_comps <- x$trend_components
-    if (!is.null(trend_comps) && !is.null(trend_comps$types)) {
-      cat(trend_comps$types[[1]], "\n")
-    } else {
-      cat("None\n")
-    }
+    cat(printed_trend_label(x), "\n")
   }
 
   # N series
@@ -152,6 +142,46 @@ print.mvgam_prefit <- function(x, ...) {
   invisible(x)
 }
 
+# Internal: print a model formula without its environment.
+#
+# `print.formula()` appends `<environment: 0x...>` for any formula
+# not built in the global environment, which is every formula that
+# reaches a fit. The address changes between sessions and says
+# nothing about the model, so no formula this package prints carries
+# one.
+#' @noRd
+print_model_formula <- function(f) {
+  print(f, showEnv = FALSE)
+  invisible(f)
+}
+
+
+# Internal: the trend line `print()` shows.
+#
+# `trend_order_label()` already renders the order a trend was fitted
+# at: `ARMA(1, 1)` where an AR carries moving-average lags, `AR(3)`
+# where it carries three, `PW(logistic)` where a piecewise trend is
+# not the default one. Printing `trend_components$types` instead
+# dropped every one of them, so an `AR(p = 3)` and an
+# `AR(p = 1, ma = TRUE)` printed as the same bare `AR` as a plain
+# AR(1) -- the two models a whole fixture file exists to tell apart.
+#
+# The bare type is the fallback for an object carrying no trend
+# metadata, which is the only case the label cannot render.
+#' @noRd
+printed_trend_label <- function(x) {
+  label <- trend_order_label(x)
+  if (nzchar(label %||% "")) {
+    return(label)
+  }
+  types <- x$trend_components$types
+  if (!is.null(types)) {
+    return(types[[1L]])
+  }
+  "None"
+}
+
+
 #' How many series and time points a model was built on
 #'
 #' Read from the axes the fit records, which a prefit carries as well
@@ -171,6 +201,23 @@ printed_axis_counts <- function(x) {
   )
 }
 
+# Internal: a family whose `$family` is the name mvgam records.
+#
+# `brms::custom_family()` writes the placeholder "custom" there, so
+# `family(fit)$family` answered "custom" for `occ()`, `nmix()`,
+# `tweedie()`, `com_binomial()` and `diri()` while `glance()`, which
+# runs the same object through `resolve_family_name()`, answered the
+# family's own name. `family()` is the accessor other packages call,
+# so it is the one that has to be right; the stored object keeps the
+# placeholder, which is what brms reads.
+#' @noRd
+named_family <- function(fam) {
+  if (is.null(fam)) return(fam)
+  fam$family <- resolve_family_name(fam)
+  fam
+}
+
+
 #' Extract family from mvgam object
 #'
 #' @param object mvgam object
@@ -182,7 +229,7 @@ family.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
 
   if (!is.null(object$family)) {
-    return(object$family)
+    return(named_family(object$family))
   }
 
   # A model written with `brms::mvbf()` gives each response its own
@@ -193,7 +240,7 @@ family.mvgam <- function(object, ...) {
   if (!is.null(forms)) {
     fams <- lapply(forms, function(form) form$family)
     if (!any(vapply(fams, is.null, logical(1)))) {
-      return(fams)
+      return(lapply(fams, named_family))
     }
   }
 

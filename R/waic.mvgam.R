@@ -70,8 +70,12 @@ waic.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
   )
   if (isTRUE(pointwise)) {
     stop(insight::format_error(c(
-      "{.field pointwise = TRUE} is not yet supported on mvgam waic.",
-      i = "Compute WAIC in-memory by leaving {.field pointwise = FALSE}."
+      cli::format_inline(
+        "{.field pointwise = TRUE} is not yet supported on mvgam waic."
+      ),
+      i = cli::format_inline(
+        "Compute WAIC in-memory by leaving {.field pointwise = FALSE}."
+      )
     )))
   }
   logliks <- log_lik(

@@ -183,8 +183,7 @@ mvgam_data <- function(data,
     # columns (response + visit + cap when needed), integer /
     # non-negative / binary checks, cap >= y, cap-constant-within-
     # unit, and the >= 2 closure-unit minimum.
-    binary <- isTRUE(attr(family, "mvgam_binary_response",
-                           exact = TRUE))
+    binary <- is_binary_response_family(family)
     cap_required <- is.null(closure_unit_default_cap(family))
     validate_closure_unit_data(
       data           = data,

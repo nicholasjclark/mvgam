@@ -210,6 +210,39 @@ log_lik.mvgam <- function(object,
 }
 
 
+# Internal: the distributional parameters a multi-response family
+# reads, whichever of the two shapes it takes.
+#
+# `mvn` and `mvt` carry a per-row scale and, for the latter, degrees
+# of freedom; the simplex families carry a per-row softmax
+# probability, the closure-unit arrays naming which rows share a
+# unit, and a precision for `diri`. Which extractor answers, and
+# which optional parameter it is asked for, is the same decision for
+# the likelihood, the quantile residual and the predicted variance,
+# so it is taken here once. Reading them in one place is also what
+# keeps the residual describing the density `log_lik()` evaluates.
+#
+# The extractor's own list is returned whole rather than narrowed,
+# because the three callers want different parts of it and a
+# narrowing that suited one would send the next back to the
+# extractor.
+#'@noRd
+mv_response_family_pars <- function(object, newdata, linpred,
+                                    family_obj, family_name,
+                                    draw_ids, ndraws = NULL) {
+  if (is_simplex_response_family(family_obj)) {
+    return(extract_simplex_response_components(
+      object, newdata, draw_ids, ndraws = ndraws,
+      needs_phi = identical(family_name, "diri"), linpred = linpred
+    ))
+  }
+  extract_mv_response_components(
+    object, newdata, draw_ids, ndraws = ndraws,
+    needs_nu = identical(family_name, "mvt"), linpred = linpred
+  )
+}
+
+
 # Univariate log-lik path. Pulled out so the multivariate branch can
 # loop over responses and stitch the [ndraws x sum(nobs)] matrix back
 # together.
@@ -244,15 +277,8 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
       # simplex families pull the per-row softmax probability +
       # closure-unit arrays (and phi for diri).
       if (is_simplex_response_family(family_obj)) {
-        needs_phi <- identical(family_name, "diri")
-        comp <- extract_simplex_response_components(
-          object, newdata, draw_ids, needs_phi = needs_phi,
-          linpred = linpred
-        )
-        family_pars_simplex <- list(
-          prob_row = comp$prob_row,
-          phi      = comp$phi,
-          arrays   = comp$arrays
+        family_pars_simplex <- mv_response_family_pars(
+          object, newdata, linpred, family_obj, family_name, draw_ids
         )
         log_lik_fn <- switch(
           family_name,
@@ -278,14 +304,8 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
           trials      = NULL
         ))
       }
-      needs_nu <- identical(family_name, "mvt")
-      comp <- extract_mv_response_components(
-        object, newdata, draw_ids, needs_nu = needs_nu,
-        linpred = linpred
-      )
-      family_pars_mv <- list(
-        Psi_row = comp$Psi_row,
-        nu      = comp$nu
+      family_pars_mv <- mv_response_family_pars(
+        object, newdata, linpred, family_obj, family_name, draw_ids
       )
       log_lik_fn <- switch(
         family_name,
@@ -770,8 +790,9 @@ log_lik_zero_inflated_beta <- function(linpred, link, y,
     if (yj == 0) {
       log(zi[, j])
     } else {
-      a <- mu[, j] * phi[, j]
-      b <- (1 - mu[, j]) * phi[, j]
+      shapes <- beta_shapes(mu[, j], phi[, j])
+      a <- shapes$shape1
+      b <- shapes$shape2
       log1p(-zi[, j]) + stats::dbeta(yj, shape1 = a, shape2 = b, log = TRUE)
     }
   })
@@ -783,7 +804,9 @@ log_lik_zero_inflated_beta <- function(linpred, link, y,
 log_lik_cumulative <- function(linpred, link, y, family_pars, trials) {
   if (is.null(family_pars$thres) || is.null(family_pars$disc)) {
     stop(insight::format_error(
-      "Ordinal log_lik requires {.field thres} and {.field disc} draws."
+      cli::format_inline(
+        "Ordinal log_lik requires {.field thres} and {.field disc} draws."
+      )
     ))
   }
   thres <- family_pars$thres  # [ndraws x ncat-1]

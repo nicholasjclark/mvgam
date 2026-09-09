@@ -147,13 +147,21 @@ loo.mvgam <- function(x, ...,
   # them to do something.
   if (isTRUE(pointwise)) {
     stop(insight::format_error(c(
-      "{.field pointwise = TRUE} streaming log-likelihood is not yet supported on mvgam.",
-      i = "Compute LOO in-memory by leaving {.field pointwise = FALSE}."
+      cli::format_inline(paste0(
+        "{.field pointwise = TRUE} streaming log-likelihood is not ",
+        "yet supported on mvgam."
+      )),
+      i = cli::format_inline(
+        "Compute LOO in-memory by leaving {.field pointwise = FALSE}."
+      )
     )))
   }
   if (isTRUE(moment_match) || isTRUE(reloo)) {
     stop(insight::format_error(c(
-      "{.field moment_match} and {.field reloo} are not yet supported on mvgam.",
+      cli::format_inline(paste0(
+        "{.field moment_match} and {.field reloo} are not yet ",
+        "supported on mvgam."
+      )),
       i = "These require model refits; revisit once the C++ trend extrapolator lands."
     )))
   }

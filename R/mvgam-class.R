@@ -152,7 +152,6 @@
 #'
 #'   - `model_spec` A `list` whose `is_jsdgam` element marks the fit
 #'
-#'   - `jsdgam_call` The `jsdgam()` call
 #'
 #' @seealso [mvgam], [jsdgam], [mvgam_forecast-class]
 #'

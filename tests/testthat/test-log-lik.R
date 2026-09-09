@@ -464,3 +464,99 @@ test_that("resolve_incl_autocor rejects a non-logical", {
     "missing"
   )
 })
+
+
+# ------------------------------------------------------------------
+# The multi-response families' distribution functions.
+#
+# These three are what a randomised quantile residual is built from,
+# and a residual on the wrong scale is not visibly wrong: it is
+# finite, it moves with the draw and it fills every column. So each
+# spec is pinned here against its closed form, computed from the same
+# parameters but written out rather than looked up, and each check is
+# one a plausible mistake would fail -- reading `nu` without the
+# location and scale, or taking a Dirichlet component's second shape
+# to be the whole concentration rather than its complement.
+# ------------------------------------------------------------------
+
+mv_spec_fixture <- function(S = 4L, N = 6L) {
+  set.seed(17)
+  list(
+    S = S, N = N,
+    linpred = matrix(rnorm(S * N), S, N),
+    Psi = matrix(runif(S * N, 0.3, 1.1), S, N),
+    nu = runif(S, 3, 12),
+    prob = matrix(runif(S * N, 0.1, 0.6), S, N),
+    phi = matrix(runif(S * N, 5, 40), S, N),
+    y = seq(-1, 1, length.out = N)
+  )
+}
+
+
+test_that("the mvn distribution function is normal on the row scale", {
+  f <- mv_spec_fixture()
+  spec <- mvgam:::family_dist_spec(
+    "mvn", "identity", f$linpred, list(Psi_row = f$Psi), NULL
+  )
+  got <- mvgam:::dist_cdf(spec, f$linpred, f$y)
+  want <- vapply(seq_len(f$N), function(j) {
+    stats::pnorm(f$y[j], mean = f$linpred[, j], sd = f$Psi[, j])
+  }, numeric(f$S))
+  expect_equal(got, want)
+})
+
+
+test_that("the mvt distribution function carries location and scale", {
+  f <- mv_spec_fixture()
+  spec <- mvgam:::family_dist_spec(
+    "mvt", "identity", f$linpred, list(Psi_row = f$Psi, nu = f$nu), NULL
+  )
+  got <- mvgam:::dist_cdf(spec, f$linpred, f$y)
+  want <- vapply(seq_len(f$N), function(j) {
+    stats::pt((f$y[j] - f$linpred[, j]) / f$Psi[, j], df = f$nu)
+  }, numeric(f$S))
+  expect_equal(got, want)
+  # A scale of one everywhere is the only case where dropping the
+  # standardisation agrees, so the two must differ here.
+  bare <- vapply(seq_len(f$N), function(j) stats::pt(f$y[j], df = f$nu),
+                 numeric(f$S))
+  expect_false(isTRUE(all.equal(got, bare)))
+})
+
+
+test_that("a Dirichlet component's second shape is the complement", {
+  f <- mv_spec_fixture()
+  y <- seq(0.1, 0.6, length.out = f$N)
+  spec <- mvgam:::family_dist_spec(
+    "diri", "identity", f$linpred,
+    list(prob_row = f$prob, phi = f$phi), NULL
+  )
+  got <- mvgam:::dist_cdf(spec, f$linpred, y)
+  want <- vapply(seq_len(f$N), function(j) {
+    stats::pbeta(y[j], f$prob[, j] * f$phi[, j],
+                 (1 - f$prob[, j]) * f$phi[, j])
+  }, numeric(f$S))
+  expect_equal(got, want)
+  # Taking alpha_0 itself as the second shape rather than the
+  # complement is the mistake this pins, and it is not a small one.
+  wrong <- vapply(seq_len(f$N), function(j) {
+    stats::pbeta(y[j], f$prob[, j] * f$phi[, j], f$phi[, j])
+  }, numeric(f$S))
+  expect_gt(max(abs(got - wrong)), 0.05)
+})
+
+
+test_that("a beta mean at the boundary has no transform to take", {
+  # A share of one leaves the second shape at zero, where every
+  # probability is a boundary and `qnorm` would report the clamp as
+  # an eight-sigma residual. NA is the honest answer.
+  guarded <- mvgam:::beta_shapes(c(0.4, 1, 0, NA), rep(10, 4L),
+                                 boundary_na = TRUE)
+  expect_equal(guarded$shape1, c(4, NA, NA, NA))
+  expect_equal(guarded$shape2, c(6, NA, NA, NA))
+  # A simulator draws a degenerate beta happily, so it keeps the
+  # shapes it was given and the guard is off by default.
+  bare <- mvgam:::beta_shapes(c(0.4, 1, 0, NA), rep(10, 4L))
+  expect_equal(bare$shape1, c(4, 10, 0, NA))
+  expect_equal(bare$shape2, c(6, 0, 10, NA))
+})

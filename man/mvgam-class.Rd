@@ -135,7 +135,6 @@ the \code{print} method read:
 \item \code{model_data} The same frame, carrying a \code{prepped_trend_model}
 attribute that records the \code{unit} and \code{species} column names
 \item \code{model_spec} A \code{list} whose \code{is_jsdgam} element marks the fit
-\item \code{jsdgam_call} The \code{jsdgam()} call
 }
 }
 \seealso{

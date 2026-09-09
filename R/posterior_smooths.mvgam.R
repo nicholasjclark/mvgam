@@ -321,6 +321,28 @@ plot.mvgam_conditional_smooths <- function(x, plot = TRUE,
 print.mvgam_conditional_smooths <- function(x, ...) plot(x, ...)
 
 
+# Internal: split a smooth's panel by condition when it has more
+# than one.
+#
+# A `by`-factor smooth returns one curve per level, stacked in a
+# single frame and told apart by `cond__`. Drawn as one group the
+# line runs the width of the covariate once per level and returns,
+# which comes out as a sawtooth under a ribbon spanning every
+# curve's uncertainty at once. brms facets its own
+# conditional-effects panels on `cond__`, so the same split is used
+# here and the two renderers agree about what a condition is.
+#
+# Returns NULL for a smooth with one condition, which adds nothing
+# to the plot.
+#' @noRd
+smooth_condition_facet <- function(df) {
+  if (!"cond__" %in% names(df) || length(unique(df$cond__)) < 2L) {
+    return(NULL)
+  }
+  ggplot2::facet_wrap(ggplot2::vars(.data[["cond__"]]))
+}
+
+
 # Build one mvgam-themed ggplot from a single smooth's summary
 # data.frame. Handles the common 1D case directly with a
 # geom_ribbon + geom_line (+ optional spaghetti / points rug);
@@ -363,6 +385,7 @@ build_mvgam_smooth_plot <- function(df, label) {
           ggplot2::aes(y = estimate__, ymin = lower__, ymax = upper__),
           colour = pal[5L], linewidth = 0.8, size = 0.4
         ) +
+        smooth_condition_facet(df) +
         ggplot2::labs(x = x_var, y = label) +
         mvgam_theme()
     )
@@ -391,6 +414,7 @@ build_mvgam_smooth_plot <- function(df, label) {
       ggplot2::aes(y = estimate__),
       colour = pal[5L], linewidth = 1
     ) +
+    smooth_condition_facet(df) +
     ggplot2::labs(x = x_var, y = label) +
     mvgam_theme()
 }
@@ -570,7 +594,8 @@ mvgam_smooth_terms <- function(x) {
   checkmate::assert_class(x, "mvgam")
   out <- list()
   obs_idx <- mvgam_smooth_index(
-    x$formula, x$data, family = mvgam_side_family(x, "obs")
+    x$formula, mvgam_side_data(x, "obs"),
+    family = mvgam_side_family(x, "obs")
   )
   if (!is.null(obs_idx)) {
     for (term in unique(obs_idx$term)) {
@@ -584,8 +609,16 @@ mvgam_smooth_terms <- function(x) {
   }
   trend_bf <- mvgam_side_formula(x, "trend")
   if (!is.null(trend_bf)) {
+    # The trend side is read on its own grid, not the observation
+    # frame. A `by` variable the trend design carries -- `.trend`
+    # under `by = lv_axis()` -- is absent from the observation
+    # frame, so looking for it there found nothing, the term was
+    # never expanded per by-level, and only the first level's
+    # smooth was ever evaluated. The other level came back as a
+    # flat curve with no posterior width.
     trend_idx <- mvgam_smooth_index(
-      trend_bf, x$data, family = mvgam_side_family(x, "trend")
+      trend_bf, mvgam_side_data(x, "trend"),
+      family = mvgam_side_family(x, "trend")
     )
     if (!is.null(trend_idx)) {
       for (term in unique(trend_idx$term)) {

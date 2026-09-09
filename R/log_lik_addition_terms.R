@@ -13,6 +13,29 @@
 # builds its arguments once and the two callers share it.
 
 
+# Internal: a beta's two shapes from a mean and a precision, in the
+# parameterisation brms uses.
+#
+# Four callers share it: the univariate beta family, the
+# beta-binomial's mixing law, one component of a Dirichlet, and the
+# simulator that draws a beta response.
+#
+# `boundary_na` is for the one caller whose spec is read only as a
+# distribution function. At a mean of zero or one a shape reaches
+# zero and the transform has no interior: every value returns a
+# boundary, which `qnorm` reports as an eight-sigma residual rather
+# than as the undefined quantity it is. A density and a draw are
+# both well defined there -- degenerate, but not undefined -- so
+# they keep the shapes they were given.
+#' @noRd
+beta_shapes <- function(mu, phi, boundary_na = FALSE) {
+  if (boundary_na) {
+    mu[!is.na(mu) & (mu <= 0 | mu >= 1)] <- NA_real_
+  }
+  list(shape1 = mu * phi, shape2 = (1 - mu) * phi)
+}
+
+
 # Internal: the R distribution a family maps onto, with a builder that
 # returns that distribution's arguments for one column of draws.
 #
@@ -53,8 +76,7 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
       list(rate = 1 / mu[, j])
     }),
     beta = spec("beta", function(j) {
-      list(shape1 = mu[, j] * phi[, j],
-           shape2 = (1 - mu[, j]) * phi[, j])
+      beta_shapes(mu[, j], phi[, j])
     }),
     bernoulli = spec("binom", function(j) {
       list(size = 1L, prob = mu[, j])
@@ -63,9 +85,9 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
       list(size = trials[j], prob = mu[, j])
     }),
     beta_binomial = spec("bbinom", function(j) {
+      shapes <- beta_shapes(mu[, j], phi[, j])
       list(size = trials[j],
-           alpha = mu[, j] * phi[, j],
-           beta = (1 - mu[, j]) * phi[, j])
+           alpha = shapes$shape1, beta = shapes$shape2)
     }),
     poisson = spec("pois", function(j) {
       list(lambda = mu[, j])
@@ -78,6 +100,34 @@ family_dist_spec <- function(family_name, link, linpred, family_pars,
     }),
     com_binomial = spec("cmb", function(j) {
       list(mu = mu[, j], nu = nu[, j], size = trials[j])
+    }),
+    # `mvn` and `mvt` are written row-wise: conditional on the latent
+    # state a row is normal or location-scale Student t, which is the
+    # density `log_lik()` evaluates, so the distribution function is
+    # that row's own.
+    mvn = spec("norm", function(j) {
+      list(mean = mu[, j], sd = family_pars$Psi_row[, j])
+    }),
+    mvt = spec("t", function(j) {
+      list(df = family_pars$nu, .shift = mu[, j],
+           .scale = family_pars$Psi_row[, j])
+    }),
+    # A Dirichlet is a joint over the rows of a unit, and the
+    # marginal of one component is Beta(alpha_j, alpha_0 - alpha_j).
+    # The softmax makes a unit's probabilities sum to one and `phi`
+    # is constant across it, so alpha_0 is `phi` and the row's mean
+    # is its softmax probability: the beta family's own two
+    # arguments, read at the row grain.
+    #
+    # Being a marginal, it answers a per-row question such as a
+    # residual exactly and says nothing about what bounding one row
+    # does to the density of the unit that row belongs to. Only the
+    # residual asks: `cens()` and `trunc()` reach the univariate
+    # path alone, since a closure-unit fit refuses an addition term
+    # before one is parsed.
+    diri = spec("beta", function(j) {
+      beta_shapes(family_pars$prob_row[, j], family_pars$phi[, j],
+                  boundary_na = TRUE)
     }),
     # A Tweedie puts a point mass at zero and is continuous above it,
     # so the spec records where that mass sits; a caller forming a

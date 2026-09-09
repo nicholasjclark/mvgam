@@ -155,8 +155,6 @@ list_trend_types <- function() {
 get_default_incompatibility_reason <- function(name) {
   default_reasons <- list(
     "PW" = "Piecewise trends require series-specific changepoint modeling",
-    "PWlinear" = "Piecewise linear trends require series-specific changepoint modeling",
-    "PWlogistic" = "Piecewise logistic trends require series-specific changepoint modeling",
     "CAR" = "Continuous-time AR requires series-specific irregular time intervals"
   )
 

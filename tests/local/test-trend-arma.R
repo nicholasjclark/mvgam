@@ -242,6 +242,26 @@ if (!identical(attr(fit, "sim_truth"), sim_truth)) {
 dm <- posterior::as_draws_matrix(fit$fit)
 
 
+test_that("print names the ARMA, and leaves out the environment", {
+  # `print()` is the first thing a user calls, and it reported this
+  # fit as a bare `AR`: the lag order and the moving-average term
+  # both dropped, so this fit and a plain AR(1) printed identically
+  # -- the two models this file exists to tell apart.
+  # `trend_order_label()` already rendered the order for the methods
+  # description; `print()` read `trend_components$types` instead.
+  txt <- capture.output(print(fit))
+  i <- grep("^Trend model", txt)
+  expect_length(i, 1L)
+  expect_identical(trimws(txt[i + 1L]), "ARMA(1, 1)")
+
+  # And a formula prints its terms without the address of the
+  # environment it was built in, which changes between sessions and
+  # says nothing about the model.
+  expect_false(any(grepl("<environment:", txt, fixed = TRUE)))
+  expect_true(any(grepl("~", txt, fixed = TRUE)))
+})
+
+
 test_that("both halves of the ARMA are estimated, one per series", {
   ar_cols <- grep("^ar1_trend\\[", colnames(dm), value = TRUE)
   ma_cols <- grep("^theta1_trend\\[", colnames(dm), value = TRUE)

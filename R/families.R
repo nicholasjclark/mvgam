@@ -1416,6 +1416,61 @@ is_simplex_response_family <- function(family) {
   isTRUE(attr(family, "mvgam_simplex_response", exact = TRUE))
 }
 
+
+# Internal: whether a family's response is 0/1 rather than a count.
+#
+# `occ()` and the Royle-Nichols `nmix()` score detections, so their
+# response is binary while the latent state is not. Read through an
+# accessor for the same reason its five sibling attributes are: a
+# bare `attr()` without `exact = TRUE` is a prefix match, and a
+# reader cannot tell a family's own record from an incidental
+# attribute.
+#' @noRd
+is_binary_response_family <- function(family) {
+  if (is.null(family)) return(FALSE)
+  isTRUE(attr(family, "mvgam_binary_response", exact = TRUE))
+}
+
+
+# Internal: the `type` strings a family adds to `predict()` and
+# `conditional_effects()` beyond the shared set.
+#
+# Empty for a family that adds none, so a caller can bind the result
+# without checking for NULL first.
+#' @noRd
+family_predict_types <- function(family) {
+  if (is.null(family)) return(character(0L))
+  attr(family, "mvgam_predict_types", exact = TRUE) %||% character(0L)
+}
+
+
+# Internal: refuse a prediction `type` the family does not expose.
+#
+# `predict()` and `conditional_effects()` both gate the closure-unit
+# types, and both explained the refusal in the same three lines. One
+# message, so the two cannot drift into describing the same family
+# differently.
+#' @noRd
+refuse_unsupported_predict_type <- function(family, type) {
+  types <- family_predict_types(family)
+  stop(insight::format_error(c(
+    paste0("type = '", type, "' is not available for this family."),
+    x = paste0(
+      "Family '", resolve_family_name(family), "' exposes types: ",
+      if (length(types) > 0L) {
+        paste(paste0("'", types, "'"), collapse = ", ")
+      } else {
+        "none (not a closure-unit family)"
+      },
+      "."
+    ),
+    i = paste0(
+      "Refit with family = nmix() or family = occ() to enable ",
+      "closure-unit predict types."
+    )
+  )), call. = FALSE)
+}
+
 #' Default `brms::prior()` set for simplex multi-response families
 #'
 #' brms `custom_family()` does not trigger the family-specific prior
@@ -1705,6 +1760,43 @@ complete_closure_unit_newdata <- function(object, newdata) {
 }
 
 
+# Internal: which closure unit each row belongs to.
+#
+# The grouping columns are integer-coded before they are pasted, so
+# columns of any type combine and the separator cannot collide: an
+# integer code never contains an underscore, while the values behind
+# it can.
+#
+# `response_var` is what separates a guard from a description. A
+# missing response is a visit that did not happen, and brms drops
+# those rows from the likelihood, so counts taken over the raw frame
+# describe a model that was never fitted. Naming the response makes
+# `n_rep` the observed visit count and leaves a unit with none at
+# zero.
+#' @noRd
+closure_unit_index <- function(data, unit_grouping_vars,
+                               response_var = NULL) {
+  codes <- lapply(unit_grouping_vars, function(col) {
+    as.integer(as.factor(data[[col]]))
+  })
+  label <- do.call(paste, c(codes, list(sep = "_")))
+  levels <- unique(label)
+  unit <- match(label, levels)
+  observed <- if (is.null(response_var)) {
+    rep(TRUE, NROW(data))
+  } else {
+    !is.na(data[[response_var]])
+  }
+  list(
+    unit = unit,
+    label = label,
+    levels = levels,
+    observed = observed,
+    n_rep = tabulate(unit[observed], nbins = length(levels))
+  )
+}
+
+
 build_closure_unit_arrays <- function(data,
                                        response_var,
                                        series_var  = "series",
@@ -1761,14 +1853,11 @@ build_closure_unit_arrays <- function(data,
   # multi-response families it is "time" alone so each site is one
   # closure unit and the K species rows are the per-unit
   # contributions.
-  grouping_vals <- lapply(unit_grouping_vars, function(col) {
-    as.integer(as.factor(data[[col]]))
-  })
-  unit_label  <- do.call(
-    paste, c(grouping_vals, list(sep = "_"))
-  )
-  unit_levels <- unique(unit_label)
-  unit_int    <- match(unit_label, unit_levels)
+  idx         <- closure_unit_index(data, unit_grouping_vars,
+                                    response_var)
+  unit_label  <- idx$label
+  unit_levels <- idx$levels
+  unit_int    <- idx$unit
   n_unit      <- length(unit_levels)
   # The grouping values behind each unit, one row per unit in unit
   # order. Callers that label units, such as
@@ -1789,7 +1878,7 @@ build_closure_unit_arrays <- function(data,
   # left with no observed visit carry no information about
   # detection and are dropped; their timepoints still appear in
   # the latent process, which spans the full grid regardless.
-  observed <- !is.na(data[[response_var]])
+  observed <- idx$observed
   retained_pos <- cumsum(observed)
   rows_by_unit <- lapply(
     seq_len(n_unit), function(g) which(unit_int == g & observed)
@@ -4739,6 +4828,7 @@ prepare_closure_unit_family <- function(family, data, response_var,
       binary_y_check     = binary_y_check,
       cap_required       = is.null(default_cap) &&
                             is.null(default_cap_buffer),
+      default_cap        = default_cap,
       unit_grouping_vars = unit_grouping_vars
     )
     arrays <- build_closure_unit_arrays(
@@ -5590,9 +5680,15 @@ closure_unit_arrays_for <- function(object, newdata = NULL) {
       unit_grouping_vars = grouping %||% "time"
     ))
   }
+  # Both of the family's cap declarations are passed, not one. A
+  # count family carries a data-driven buffer rather than a fixed
+  # cap, so handing over only the fixed one left the rebuild here
+  # with neither and it demanded a `cap` column the fit never
+  # needed.
   build_closure_unit_arrays(
     newdata, response_var = resp,
     default_cap = closure_unit_default_cap(fam),
+    default_cap_buffer = closure_unit_default_cap_buffer(fam),
     unit_grouping_vars = grouping
   )
 }
@@ -5653,9 +5749,9 @@ extract_closure_unit_components <- function(object, newdata = NULL,
     }
   }
   response_var <- closure_unit_response_var(object$formula)
-  binary_y_check <- isTRUE(attr(object$family, "mvgam_binary_response",
-                                  exact = TRUE))
+  binary_y_check <- is_binary_response_family(object$family)
   default_cap <- closure_unit_default_cap(object$family)
+  default_cap_buffer <- closure_unit_default_cap_buffer(object$family)
   # Re-run validation on newdata so cap edits (nmix) or non-binary
   # y (occ, royle_nichols) raise the friendly error rather than
   # producing silent garbage in downstream sampling. Identifiability
@@ -5672,7 +5768,12 @@ extract_closure_unit_components <- function(object, newdata = NULL,
     has_obs_covariates = TRUE,
     has_det_covariates = TRUE,
     binary_y_check     = binary_y_check && aggregates,
-    cap_required       = is.null(default_cap) && aggregates
+    # A family declaring a data-driven buffer needs no `cap` column
+    # here for the same reason it needed none at fit time, so both
+    # declarations are read rather than only the fixed one.
+    cap_required       = is.null(default_cap) &&
+                           is.null(default_cap_buffer) && aggregates,
+    default_cap        = default_cap
   )
   arrays <- closure_unit_arrays_for(object, newdata)
   # Per-visit linpred for the state quantity. The linpred is
@@ -5730,15 +5831,25 @@ extract_closure_unit_components <- function(object, newdata = NULL,
 #' @param draw_ids Optional vector of posterior draw indices.
 #' @return `[S x N_visit]` matrix of expected counts.
 #' @noRd
-posterior_epred_nmix <- function(object, newdata = NULL,
-                                  draw_ids = NULL) {
+# Internal: a closure unit's expectation, read at the visit grain.
+#
+# The unit carries one latent state -- an abundance for `nmix()`, an
+# occupancy for `occ()` -- and every visit of that unit reads the
+# same one, thinned by that visit's detection probability. The two
+# families differ in what the state means, not in how a visit reads
+# it, so the broadcast is written once. `visit_to_unit_lookup()`
+# inverts the first-visit column `arrays$row_unit` records.
+#' @noRd
+closure_unit_visit_epred <- function(object, newdata, draw_ids) {
   comp <- extract_closure_unit_components(object, newdata, draw_ids)
-  # Broadcast unit-grain lambda back to per-visit length via the
-  # visit-to-unit lookup `arrays$row_unit` records. The
-  # first-visit column is shared by every visit of a unit, so the
-  # inverse mapping is straightforward.
   unit_of_visit <- visit_to_unit_lookup(comp$arrays, comp$n_visit)
   comp$state[, unit_of_visit, drop = FALSE] * comp$p
+}
+
+
+posterior_epred_nmix <- function(object, newdata = NULL,
+                                  draw_ids = NULL) {
+  closure_unit_visit_epred(object, newdata, draw_ids)
 }
 
 #' Inverse of arrays$visit_row: for each row of the frame, the unit
@@ -5768,6 +5879,43 @@ visit_to_unit_lookup <- function(arrays, n_visit) {
   out
 }
 
+# Internal: draw a closure-unit family's per-visit response.
+#
+# Four families walk the same way: a unit draws one latent state,
+# and every visit of that unit is an observation of that state
+# thinned by the visit's own detection probability. Only the two
+# draws differ, so they are the arguments and the walk is written
+# once.
+#
+# The RNG calls keep the order they always had -- a unit's state,
+# then its visits in `visit_row` order -- so a seeded draw is
+# unchanged by the folding.
+#' @noRd
+closure_unit_visit_draws <- function(object, newdata, draw_ids,
+                                     draw_state, draw_visit) {
+  comp <- extract_closure_unit_components(object, newdata, draw_ids)
+  arrays <- comp$arrays
+  ndraws <- comp$ndraws
+  out <- matrix(0L, nrow = ndraws, ncol = comp$n_visit)
+  for (g in seq_len(arrays$N_unit)) {
+    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
+    state_g <- draw_state(comp$state[, g], ndraws)
+    for (j in idx) {
+      out[, j] <- draw_visit(state_g, comp$p[, j], ndraws)
+    }
+  }
+  out
+}
+
+
+# Internal: the latent abundance a unit draws under a Poisson state,
+# which all three `nmix()` parameterisations share.
+#' @noRd
+draw_poisson_abundance <- function(lambda_g, ndraws) {
+  stats::rpois(ndraws, lambda = lambda_g)
+}
+
+
 #' Per-visit response draws for an nmix() fit (unconditional)
 #'
 #' Draws latent abundances unconditionally from the Poisson prior
@@ -5784,20 +5932,12 @@ visit_to_unit_lookup <- function(arrays, n_visit) {
 #' @noRd
 posterior_predict_nmix <- function(object, newdata = NULL,
                                     draw_ids = NULL) {
-  comp <- extract_closure_unit_components(object, newdata, draw_ids)
-  arrays <- comp$arrays
-  ndraws <- comp$ndraws
-  out <- matrix(0L, nrow = ndraws, ncol = comp$n_visit)
-  for (g in seq_len(arrays$N_unit)) {
-    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
-    lam_g <- comp$state[, g]
-    N_draws <- stats::rpois(ndraws, lambda = lam_g)
-    for (j in idx) {
-      out[, j] <- stats::rbinom(ndraws, size = N_draws,
-                                prob = comp$p[, j])
+  closure_unit_visit_draws(
+    object, newdata, draw_ids, draw_poisson_abundance,
+    function(N_draws, p_j, ndraws) {
+      stats::rbinom(ndraws, size = N_draws, prob = p_j)
     }
-  }
-  out
+  )
 }
 
 #' Per-visit detection-probability draws for a closure-unit fit
@@ -6269,15 +6409,25 @@ extract_mv_response_components <- function(object, newdata = NULL,
       ))
     }
   }
-  if (!"series" %in% colnames(newdata)) {
+  # `Psi` is one entry per species in the order the fit numbered
+  # them, so which entry a row reads is a question about the model
+  # rather than about the frame. Re-factoring the frame's own column
+  # answers it only while the frame carries every species, spelled
+  # the same way and in the same order; the axis answers it whatever
+  # subset or spelling arrives.
+  series_fac <- axis_row_series(object, newdata)
+  if (is.null(series_fac)) {
     stop(insight::format_error(c(
       "mv-response families require a 'series' factor column in 'data'.",
       i = "Each row of 'data' is one (site, species) observation."
     )))
   }
-  series_fac <- as.factor(newdata$series)
+  # A row naming a species the fit never saw is refused by
+  # `validate_prediction_factor_levels()`, which owns that condition
+  # for every family and names both the stranger and the levels that
+  # would have worked. It is not re-asked here.
   species_idx <- as.integer(series_fac)
-  K <- length(levels(series_fac))
+  K <- nlevels(series_fac)
 
   # mu enters with the latent factor contribution Z[k, :] * lv[i, :]
   # already added via the trend pipeline. process_error = FALSE
@@ -7045,24 +7195,15 @@ posterior_epred_nmix_royle_nichols <- function(object,
 posterior_predict_nmix_royle_nichols <- function(object,
                                                   newdata = NULL,
                                                   draw_ids = NULL) {
-  comp <- extract_closure_unit_components(object, newdata, draw_ids)
-  arrays <- comp$arrays
-  ndraws <- comp$ndraws
-  out <- matrix(0L, nrow = ndraws, ncol = comp$n_visit)
-  for (g in seq_len(arrays$N_unit)) {
-    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
-    lam_g <- comp$state[, g]
-    N_draws <- stats::rpois(ndraws, lambda = lam_g)
-    for (j in idx) {
-      r_j <- comp$p[, j]
+  closure_unit_visit_draws(
+    object, newdata, draw_ids, draw_poisson_abundance,
+    function(N_draws, r_j, ndraws) {
       # 1 - (1 - r_j)^N_draws via log space avoids the catastrophic
       # cancellation that hits for small r and small N_draws.
-      log_1m_r <- log1p(-r_j)
-      p_visit <- 1 - exp(N_draws * log_1m_r)
-      out[, j] <- stats::rbinom(ndraws, size = 1L, prob = p_visit)
+      p_visit <- 1 - exp(N_draws * log1p(-r_j))
+      stats::rbinom(ndraws, size = 1L, prob = p_visit)
     }
-  }
-  out
+  )
 }
 
 #' Per-closure-unit latent-abundance draws for an
@@ -7264,20 +7405,12 @@ posterior_epred_nmix_poisson_poisson <- function(object,
 posterior_predict_nmix_poisson_poisson <- function(object,
                                                     newdata = NULL,
                                                     draw_ids = NULL) {
-  comp <- extract_closure_unit_components(object, newdata, draw_ids)
-  arrays <- comp$arrays
-  ndraws <- comp$ndraws
-  out <- matrix(0L, nrow = ndraws, ncol = comp$n_visit)
-  for (g in seq_len(arrays$N_unit)) {
-    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
-    lam_g <- comp$state[, g]
-    N_draws <- stats::rpois(ndraws, lambda = lam_g)
-    for (j in idx) {
-      p_j <- comp$p[, j]
-      out[, j] <- stats::rpois(ndraws, lambda = N_draws * p_j)
+  closure_unit_visit_draws(
+    object, newdata, draw_ids, draw_poisson_abundance,
+    function(N_draws, p_j, ndraws) {
+      stats::rpois(ndraws, lambda = N_draws * p_j)
     }
-  }
-  out
+  )
 }
 
 #' Per-closure-unit latent-abundance draws for an
@@ -7459,13 +7592,7 @@ log_lik_nmix_poisson_poisson <- function(linpred, link, y,
 #' @noRd
 posterior_epred_occ <- function(object, newdata = NULL,
                                  draw_ids = NULL) {
-  comp <- extract_closure_unit_components(object, newdata, draw_ids)
-  # Broadcast unit-grain psi back to per-visit length via the
-  # visit-to-unit lookup `arrays$row_unit` records. The
-  # first-visit column is shared by every visit of a unit, so
-  # the inverse mapping is straightforward.
-  unit_of_visit <- visit_to_unit_lookup(comp$arrays, comp$n_visit)
-  comp$state[, unit_of_visit, drop = FALSE] * comp$p
+  closure_unit_visit_epred(object, newdata, draw_ids)
 }
 
 #' Per-visit response draws for an occ() fit (unconditional)
@@ -7484,20 +7611,15 @@ posterior_epred_occ <- function(object, newdata = NULL,
 #' @noRd
 posterior_predict_occ <- function(object, newdata = NULL,
                                    draw_ids = NULL) {
-  comp <- extract_closure_unit_components(object, newdata, draw_ids)
-  arrays <- comp$arrays
-  ndraws <- comp$ndraws
-  out <- matrix(0L, nrow = ndraws, ncol = comp$n_visit)
-  for (g in seq_len(arrays$N_unit)) {
-    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
-    psi_g <- comp$state[, g]
-    z_draws <- stats::rbinom(ndraws, size = 1L, prob = psi_g)
-    for (j in idx) {
-      out[, j] <- stats::rbinom(ndraws, size = 1L,
-                                prob = z_draws * comp$p[, j])
+  closure_unit_visit_draws(
+    object, newdata, draw_ids,
+    function(psi_g, ndraws) {
+      stats::rbinom(ndraws, size = 1L, prob = psi_g)
+    },
+    function(z_draws, p_j, ndraws) {
+      stats::rbinom(ndraws, size = 1L, prob = z_draws * p_j)
     }
-  }
-  out
+  )
 }
 
 #' Per-site posterior occupancy for an occ() fit

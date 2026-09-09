@@ -123,7 +123,10 @@ get_predict.mvgam <- function(model,
   # the `...` of `predictions()` etc. to evaluate one response.
   if (is.list(draws) && !is.matrix(draws)) {
     stop(insight::format_error(c(
-      "marginaleffects for multivariate mvgam fits requires {.field resp}.",
+      cli::format_inline(paste0(
+        "marginaleffects for multivariate mvgam fits requires ",
+        "{.field resp}."
+      )),
       i = paste0(
         "Pass `resp = '<response-name>'` (one of ",
         paste(shQuote(names(draws)), collapse = ", "),

@@ -281,46 +281,35 @@ which is what makes the silence costly.
 The data-frame form is unaffected: it names its series in a column
 and a stranger there is refused.
 
-## Residuals
+## Compositions scored without their components
 
-**21. The compositional families' quantile residuals carry no
-posterior spread.**
+**86. A `diri()` unit that lost a component is scored anyway.**
 
-`residuals()` defaults to `type = "quantile"`. The transform is now
-taken per draw for every family `family_dist_spec()` names, which
-left three that it does not:
+Set one species' response to `NA` at one site of
+`val_mvgam_jsdgam_mv_diri.rds`. The rows that remain still
+renormalise, because `extract_simplex_response_components()` builds
+the softmax over a unit's *observed* rows alone, so `prob_row` sums
+to one across the three survivors while their observed shares sum
+to 0.9459679. `log_lik()` reports 600 finite cells of 600 on that
+pair and the quantile residual follows it. Stan's own
+`dirichlet_lpdf` validates its simplex argument and rejects the
+same pair, so the R side and the sampled model disagree exactly
+where a held-out fold or a missing observation puts them.
 
-| family | `type = "quantile"` | sd | `type = "ordinary"` |
-|---|---|---|---|
-| mvn | 120 / 120 constant | -- | 0 / 120 |
-| mvt | 120 / 120 constant | 2.099 | 0 / 120 |
-| diri | 120 / 120 constant | 2.603 | 0 / 120 |
+The obvious guard is wrong, and was tried: emptying any unit whose
+`n_rep` falls short of the species count also empties every arm
+`hindcast()` builds, since those arms are deliberately one series
+wide. It turns the constant 1 recorded above into 240
+`rgamma(shape = NA)` warnings and ten further failures.
 
-Each falls through to the pooled empirical PIT, which forms one
-interval per observation and repeats it down every row, so
-`Est.Error` is 0 and `Q2.5 == Estimate == Q97.5` on every cell. A
-randomised quantile residual is standard normal by construction and
-these read 2.1 and 2.6, so the columns are not merely narrow, they
-are on the wrong scale.
+Telling the two apart needs to know whether the caller is scoring
+a composition or fanning one out per species, which is the same
+question the softmax normaliser answers. So the guard belongs with
+the composition surface that the training grid, the forecast arm
+and the hindcast arm all read, rather than in the extractor.
 
-The controls say the fault is theirs alone rather than the quantile
-path's: on the same sweep poisson reads 1.017, tweedie 0.990,
-com_binomial 0.999, cumulative 0.902 and the jsdgam negative binomial
-1.002, with no constant column among them.
-
-Their marginal distribution functions are closed form -- a Student t
-on the per-row `Psi` diagonal for `mvt`, a beta on
-`(alpha_j, alpha_0 - alpha_j)` for `diri` -- so what stops them is
-not the mathematics. It is that `family_dist_spec()` takes
-`(family_name, link, linpred, family_pars, trials)` while these
-families draw their parameters from
-`extract_mv_response_components()` and
-`extract_simplex_response_components()`, which the signature has no
-room for. Widening it is the work, and the entry stays open until
-that is done.
-
-`test-family-jsdgam.R` asserts the documented behaviour for each
-family that reaches `residuals()` and fails on these three.
+`test-family-jsdgam.R` asserts that such a unit is not scored, and
+fails.
 
 ## Gaps closed rather than found
 
@@ -559,56 +548,6 @@ method refuses with an explanation. Choosing between those belongs
 to the jsdm work, so `test-family-jsdgam.R` leaves it unasserted
 and this entry carries it.
 
-## Introspection
-
-**40. `family()` answers "custom" on an occupancy fit while two
-other methods answer "occ".**
-
-`test-grain-closure-units.R`, "multi-season: the fit describes its own
-specification". Asked of the same fit three ways:
-
-| call | answer |
-|---|---|
-| `family(fit)$family` | `custom` |
-| `summary(fit)` | `Family: occ` |
-| `glance(fit)$family` | `occ` |
-
-The fit with one season reproduces it, so this belongs to the
-family and not to the path that seasons take. The gaussian VAR fixture
-answers `gaussian` on the same method. `family()` is therefore not
-broken at large, and what the two groups share is narrower and wider
-than occupancy: `test-family-tweedie.R` answers `custom` for
-`family(fit)$family` and `tweedie` for `glance()$family`, and tweedie
-models no closure unit at all. `com_binomial()` and `diri()` do the
-same. Every one of them is built through `brms::custom_family()`, which
-is the route rather than the subject matter.
-
-`family()` is the accessor other packages reach for, so this is the
-one of the three that matters most. A custom brms family carries
-`custom` as its `$family` element, and mvgam stores that object
-whole, so the implementation detail reaches the surface where the name
-should be. `glance()` reads the name mvgam recorded alongside it and
-answers correctly, which is what says the name is on the object. It is
-finding 4 seen from the other side: there a family was sorted into the
-closure-unit group when it did not belong, and here a family will not
-give its name at all.
-
-**41. `getCall()` returns the function itself where a call names
-it.**
-
-Same block. `getCall(fit)[[1]]` is the `jsdgam` closure rather than
-the symbol `jsdgam`, so `deparse(getCall(fit))` prints the whole of
-`jsdgam`'s source in place of the call that made the fit. The rest
-of the call is well formed: its names run `formula`,
-`trend_formula`, `data`, `backend`, `family` and so on.
-
-Seen on the single-season fit too. It reaches `mvgam()` fits
-as well: the tweedie fixture's `getCall(fit)[[1]]` is the `mvgam` closure, so the
-head position holds a function on both constructors rather than on
-`jsdgam()` alone. `?getCall` describes the return as a call
-`update()` can modify and re-evaluate. A user also prints it to see
-how a fit was made. A closure there defeats both readings.
-
 ## The structured loadings prior
 
 **36. Three recovery claims were aimed at a target no fit can hit,
@@ -683,64 +622,6 @@ QR-identified block and the covariance taken within each draw, and
 they agree.
 
 ## by = lv_axis() smooths, drawn
-
-**34. `plot(conditional_smooths())` runs the factors together into
-one series.**
-
-`test-grain-closure-units.R`, "the env smooth is drawn once per latent
-factor". `s(env, by = lv_axis())` gives one curve per latent factor,
-and `conditional_smooths()` returns them correctly blocked: 100 rows
-at `cond__ = 1`, then 100 at `cond__ = 2`. The renderer ignores the
-column. Read off the built plot:
-
-    layers = 2 ; panels = 1 ; facet = FacetNull
-    layer 1 rows = 200 ; distinct groups = 1
-    aesthetic mapping: x
-
-So both factors land in one group. The line runs the width of `env`,
-returns to the left edge and runs it again, which draws as a sawtooth
-across the whole panel rather than as two curves. The ribbon spans
-both factors' uncertainty at every x, giving a band from -8 to +5
-around estimates whose own range is -0.10 to 0.24.
-
-`conditional_effects()` facets properly on the same fit, so this is
-the smooth renderer rather than the plotting layer in general.
-Finding 2 fixed `conditional_smooths()` returning a grid with no rows
-in it; this is the half after that, where the grid is right and the
-picture is not.
-
-Reading the rendered plot is what turned it up. The assertion that
-stood here asked only that the two curves differ, which they do.
-
-**35. The second factor's smooth is identically zero.**
-
-Same file and same call, on both the occupancy and the abundance
-fit. Split by `cond__`:
-
-| factor | n | sd(estimate) | estimate range | mean interval width |
-|---|---|---|---|---|
-| 1 | 100 | 0.0558 | -0.097 to 0.238 | 7.00 |
-| 2 | 100 | 0 | 0.000 to 0.000 | 0.00 |
-
-A smooth the data did not support would shrink toward zero and keep
-its posterior width. This one has no width at all, which means no
-draw moves it: the coefficients are not reaching the grid rows that
-belong to the second factor.
-
-The design itself is right. `Xs_trend` comes out block-complementary
-across the two factors, and `Zs_2_1_trend` carries values on exactly
-the rows `times_trend[, 2]` names and zeros everywhere else. The same
-test asserts both. So the fault sits downstream of the design, where
-the grid is evaluated.
-
-The signature points at the evaluation reading factor 2's rows
-against factor 1's column, since `X[r2, 1]` is zero by construction
-and would return exactly this.
-
-Recorded rather than fixed: which of the two grids is wrong is a
-question for the smooth work. `test-grain-closure-units.R` now requires
-each curve to move and to carry an interval, so a curve pinned at
-zero fails instead of satisfying "the two curves differ".
 
 ## The insight surface
 
@@ -898,9 +779,9 @@ way it carries a covariate held at its mean.
 **Not a defect, recorded because it was checked.**
 `predict(type = "variance")` refuses `com_binomial()` and names both
 the families it supports and what to do instead. `diri()` is
-accepted, and returns `[ndraws x nobs]`. Both families report
-`family(fit)$family` as `"custom"`, which is finding 40, so the two
-are told apart by something other than that string.
+accepted, and returns `[ndraws x nobs]`. Both are built through
+`brms::custom_family()`, and the dispatch that separates them reads
+the name mvgam records alongside the family object.
 
 ## Sampler settings
 
@@ -1026,34 +907,6 @@ south_sp_a, south_sp_b, north_sp_c, north_sp_a, north_sp_b`, the trend
 panels come back `north_sp_a, north_sp_b, north_sp_c, south_sp_a,
 south_sp_b, south_sp_c`. All six positions differ, so no panel in the
 trend plot holds the series the series plot puts in the same place.
-
-**56. `print()` shows an environment address and names an ARMA as an
-AR.**
-
-Two problems in the first thing a user calls. Printing any fit emits
-the formula environments:
-
-```
-GAM observation formula:
-y ~ gp(x1, x2, k = 8)
-<environment: 0x6352aee840d0>
-```
-
-Two such lines per fit, on every fit checked, carrying a pointer that
-changes between sessions and means nothing to a reader.
-
-The same output reports the trend as
-
-```
-Trend model:
-AR
-```
-
-on a fit whose call is `~ AR(p = 1, ma = TRUE)`. The lag order and
-the moving-average term are both dropped, so the two models this file
-exists to tell apart print identically. `summary()` reports
-`theta1_trend` and does distinguish them, so the information is
-available to the method that omits it.
 
 ## com_binomial and the trials aterm
 

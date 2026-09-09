@@ -311,6 +311,24 @@ if (!identical(attr(fit, "sim_truth"), sim_truth)) {
 dm <- posterior::as_draws_matrix(fit$fit)
 
 
+test_that("print names every lag the model carries", {
+  # A bare `AR` is what `print()` reported for this fit, so all
+  # three lags this file exists to exercise were invisible in the
+  # first summary a user sees. The label is checked against the lags
+  # the fit recorded rather than against a string written here.
+  lags <- fit$trend_metadata$ar_lags
+  expect_gt(length(lags), 1L)
+  txt <- capture.output(print(fit))
+  i <- grep("^Trend model", txt)
+  expect_length(i, 1L)
+  expect_identical(
+    trimws(txt[i + 1L]),
+    paste0("AR(", paste(lags, collapse = ", "), ")")
+  )
+  expect_false(any(grepl("<environment:", txt, fixed = TRUE)))
+})
+
+
 test_that("the posterior carries exactly the three lag coefficients", {
   for (l in lags) {
     cols <- grep(paste0("^ar", l, "_trend\\["), colnames(dm),

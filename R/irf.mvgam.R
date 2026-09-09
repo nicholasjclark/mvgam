@@ -87,18 +87,13 @@ irf.mvgam <- function(
   assert_var_trend(object, surface = "irf()")
   var_post <- extract_var_posterior(object, ndraws, draw_ids)
 
-  all_irfs <- mvgam_maybe_future_lapply(
-    var_post$ndraws,
-    function(draw) {
-      x <- list(
-        K = var_post$K,
-        A = var_post$A[draw, , , drop = TRUE],
-        Sigma = var_post$Sigma[draw, , , drop = TRUE],
-        p = 1L
-      )
-      gen_irf(x, h = h, cumulative = cumulative, orthogonal = orthogonal)
+  all_irfs <- var_draw_surfaces(
+    var_post,
+    function(x) {
+      gen_irf(x, h = h, cumulative = cumulative,
+              orthogonal = orthogonal)
     },
-    future = future
+    future
   )
   class(all_irfs) <- "mvgam_irf"
   attr(all_irfs, "irf_type") <- ifelse(

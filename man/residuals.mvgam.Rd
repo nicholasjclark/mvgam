@@ -84,20 +84,21 @@ standard normal: a PIT taken against the posterior
 predictive pooled over draws absorbs the uncertainty in the
 latent state and comes back too narrow.
 
-The families whose distribution function \pkg{mvgam} names
-analytically -- \code{gaussian}, \code{student}, \code{lognormal}, \code{Gamma},
-\code{weibull}, \code{exponential}, \code{beta}, \code{bernoulli}, \code{binomial},
-\code{beta_binomial}, \code{poisson}, \code{negbinomial} and \code{geometric} --
-take that route. A discrete family randomises within the
-interval its atom occupies, \verb{[F(y - 1), F(y)]}; a continuous
-one has no atom and the interval collapses to \code{F(y)}.
+A family \pkg{mvgam} holds a distribution function for is
+transformed through that function directly. This covers the
+single-parameter and location-scale families, the counts,
+\code{beta} and \code{beta_binomial}, \code{com_binomial()} and \code{tweedie()},
+and the multivariate \code{mvn()}, \code{mvt()} and \code{diri()}. A discrete
+family randomises within the interval its atom occupies,
+\verb{[F(y - 1), F(y)]}; a continuous one has no atom and the
+interval collapses to \code{F(y)}.
 
-Every other family -- including zero-inflated, hurdle,
-ordinal, compositional and custom families -- is computed
-via the empirical PIT over \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}}
-draws (the DHARMa / Hartig 2024 approach), which inherits
-family coverage from \code{posterior_predict} at the cost of
-pooling the draws.
+The mixtures and the closure-unit families -- zero-inflated,
+hurdle, ordinal, \code{mixture()}, \code{occ()}, \code{nmix()}, \code{multi()} and
+\code{categ()} -- have no single distribution function to name, and
+take an empirical PIT over \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} draws
+instead (the DHARMa / Hartig 2024 approach). The \code{Details}
+below give what that route costs.
 \item \code{"ordinary"} -- the predictive error \code{y - posterior_predict(y)}
 per draw. Matches \code{type = "ordinary"} in
 \code{\link[brms:residuals.brmsfit]{brms::residuals.brmsfit()}}.
@@ -178,6 +179,33 @@ For diagnostic plotting via \code{\link[=pp_check.mvgam]{pp_check.mvgam()}} with
 \code{type = "resid_*"}, use \code{ndraws >= 500} (the default for
 those types).
 }
+\section{Multivariate families (\code{mvn()}, \code{mvt()}, \code{diri()})}{
+
+These share the closure-unit data layout but not its grain:
+each row of a unit gets its own residual, because each row
+has its own distribution function. What that residual can be
+asked differs by family.
+
+\code{mvn()} and \code{mvt()} are row-wise conditional on the latent
+factor scores, so their residuals test the observation model
+rather than the factor structure. Too few factors still
+leaves them N(0, 1), because the fitted scores absorb the
+cross-species correlation a residual diagnostic would
+otherwise reveal; use \code{\link[=residual_cor.mvgam]{residual_cor.mvgam()}} to ask whether
+the factor dimension is adequate.
+
+\code{diri()}'s residual is the exact marginal of one component,
+\code{Beta(alpha_j, alpha_0 - alpha_j)}, so it answers how
+surprising that species' share is at that site. Each is
+standard normal on its own, but a unit's shares sum to one,
+so the rows of a unit are negatively dependent by
+construction and a unit of \code{K} species carries \code{K - 1}
+degrees of freedom. With \code{K = 2} the two residuals are
+exactly antithetic. Read a QQ-plot or an ACF at the unit
+grain rather than treating the rows of a unit as independent
+draws.
+}
+
 \section{Closure-unit families (\code{nmix()}, \code{occ()})}{
 
 Closure-unit observation families treat the closure unit

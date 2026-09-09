@@ -1,10 +1,10 @@
-# One factor model, seven observation families.
+# One factor model, three observation families.
 #
 # A `jsdgam` puts the same latent structure under every family it
 # supports: K species load on N_lv factors through Z, each site
 # draws its own factor scores, and the observation family is the
 # only thing that changes. So the questions worth asking of such a
-# fit are the same seven times over -- is the species axis the one
+# fit are the same each time over -- is the species axis the one
 # the user declared, does each row read the latent cell the sampler
 # gave it, do the hindcast arms and the loadings and the residual
 # correlation all agree about which species is which -- and only
@@ -13,21 +13,21 @@
 #
 # Those shared questions live in `jsdgam_battery()` and are asked
 # once per family. What belongs to one family alone is written out
-# below it: Beta's precision, the negative binomial's shape, the
-# multivariate normal and Student-t scale and tail, the sum-to-zero
-# constraint the softmax families need, and the simplex or trial
-# total each composition has to respect.
+# below it: the negative binomial's shape, the multivariate
+# Student-t's scale and tail, and the sum-to-zero constraint and
+# unit simplex a Dirichlet composition has to respect. The three
+# families here span the three shapes a jsdgam response takes -- a
+# count, an unbounded continuous vector, and a composition -- so a
+# fault in the shared machinery cannot hide behind one of them.
 #
 # The simulations are not shared. Each family draws its truth in
-# its own order -- the negative binomial takes its intercepts from
-# `runif` where the others take theirs from `rnorm`, the
-# multinomial draws its per-site totals before the loop, the
-# multivariate normal never draws latent scores at all because it
-# uses the marginal form -- so one simulator parameterised over
-# seven families would put every family on a different draw from
-# the one its cached fit was built on. Each is kept verbatim, under
-# its own seed, so the caches stay valid and a rerun loads rather
-# than samples.
+# its own order: the negative binomial takes its intercepts from
+# `runif` where the other two take theirs from `rnorm`, and the
+# Dirichlet centres its loadings before emitting from a softmax.
+# One simulator parameterised over all three would therefore put
+# every family on a different draw from the one its cached fit was
+# built on. Each is kept verbatim, under its own seed, so the
+# caches stay valid and a rerun loads rather than samples.
 #
 # Two of the shared claims are structural rather than
 # family-specific, so every family is held to them: that a frame maps
@@ -46,9 +46,9 @@
 # fails rather than returning the right rectangle of wrong numbers.
 #
 # Not asserted, and deliberately: `forecast(type = "response")` on
-# the three softmax families. A composition drawn one species at a
-# time is not a composition, and what such an arm should return is
-# a question for the families rather than for the axis.
+# a softmax family. A composition drawn one species at a time is
+# not a composition, and what such an arm should return is a
+# question for the families rather than for the axis.
 #
 # Fits cache under fixtures/val_mvgam_jsdgam_mv_<family>.rds.
 # Delete one to refit it. Full cold run ~30-45 min.
@@ -306,7 +306,7 @@ SPECS <- list(
     fc_response_ok = NULL,
     pp_check_extra = NULL,
     plot_types = c("trend", "factors"),
-    optional_methods = character(0),
+    optional_methods = "residuals",
     ce_response_ok = NULL,
     me_integer_tell = FALSE
   )
@@ -468,6 +468,19 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
       # not move with the draw it came from, and the interval check
       # above is satisfied by a constant.
       expect_gt(min(rs[, "Est.Error"]), 0)
+      # A randomised quantile residual is standard normal by
+      # construction, so its location and scale are a claim about
+      # the family's distribution function rather than about this
+      # fit. That makes them the checks a wrongly parameterised
+      # transform fails: reading the frame's pooled predictive
+      # instead of each draw's own gives a spread of 2.1 for `mvt`
+      # and 2.6 for `diri`, and every check above is satisfied by
+      # both.
+      dr <- as.numeric(residuals(fit, summary = FALSE))
+      fin <- dr[is.finite(dr)]
+      expect_gt(length(fin), 0.99 * length(dr))
+      expect_lt(abs(mean(fin)), 0.25)
+      expect_lt(abs(stats::sd(fin) - 1), 0.25)
     }
 
     # Column j of every surface above is row j of the frame, so the
@@ -1181,6 +1194,37 @@ test_that("diri: the data and the expectation are both compositions", {
     expect_equal(as.numeric(tapply(pp[i, ], d$time, sum)),
                  rep(1, length(per_site)), tolerance = 1e-6)
   }
+})
+
+
+test_that("diri: a unit missing a component is not scored", {
+  # Drop one species from one site. The rows that remain still
+  # renormalise to a softmax summing to one, so the density and the
+  # quantile residual both have something finite to compute -- and
+  # it would be a statement about a composition the data never
+  # observed, since the shares left behind sum to less than one.
+  # Stan's `dirichlet_lpdf` rejects that pair outright, so nothing
+  # here may quietly score it.
+  obj <- get("diri", envir = built)
+  d <- obj$sim$long_dat
+  gap <- d
+  gap$y[1L] <- NA_real_
+  hit <- d$time == d$time[1L]
+
+  ll <- log_lik(obj$fit, newdata = gap, draw_ids = 1:5)
+  # One unit's density is parked on its first row, so exactly that
+  # unit's column empties and every other one stays finite.
+  expect_true(all(is.na(ll[, hit & seq_along(hit) == 1L])))
+  expect_true(all(is.finite(ll[, !hit])))
+
+  rs <- residuals(obj$fit, newdata = gap, draw_ids = 1:5,
+                  summary = FALSE)
+  expect_true(all(is.na(rs[, hit])))
+  expect_true(all(is.finite(rs[, !hit])))
+
+  # The control: with every component present nothing is dropped.
+  ll_full <- log_lik(obj$fit, newdata = d, draw_ids = 1:5)
+  expect_false(anyNA(ll_full))
 })
 
 

@@ -76,18 +76,8 @@ fevd.mvgam <- function(object, h = 10, ndraws = NULL, draw_ids = NULL,
   assert_var_trend(object, surface = "fevd()")
   var_post <- extract_var_posterior(object, ndraws, draw_ids)
 
-  all_fevds <- mvgam_maybe_future_lapply(
-    var_post$ndraws,
-    function(draw) {
-      x <- list(
-        K = var_post$K,
-        A = var_post$A[draw, , , drop = TRUE],
-        Sigma = var_post$Sigma[draw, , , drop = TRUE],
-        p = 1L
-      )
-      gen_fevd(x, h = h)
-    },
-    future = future
+  all_fevds <- var_draw_surfaces(
+    var_post, function(x) gen_fevd(x, h = h), future
   )
   class(all_fevds) <- "mvgam_fevd"
   if (!summary) {

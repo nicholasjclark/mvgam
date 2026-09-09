@@ -1706,3 +1706,122 @@ test_that("occ(multi_season = TRUE) rejects data without a 'site' column", {
     "'site'"
   )
 })
+
+
+test_that("the identifiability guards count the visits that happened", {
+  # A missing response is a visit that did not happen, and brms drops
+  # those rows from the likelihood. So the model that gets fitted has
+  # the observed counts, not the frame's, and a guard reading the
+  # frame describes a model nobody fitted.
+  #
+  # Both guards below were defeated that way: a unit whose rows were
+  # all missing still counted toward `n_unit`, and a unit left with
+  # one observed visit still counted as two. `closure_unit_index()`
+  # is now the one derivation, and it is the builder's.
+  mk <- function(y) {
+    data.frame(
+      series = factor(rep(c("s1", "s2"), each = 2L)),
+      time = rep(1L, 4L), visit = rep(1:2, 2L),
+      cap = 5L, y = y
+    )
+  }
+
+  # The control: two units, two visits each, nothing missing.
+  sound <- mk(c(1L, 0L, 1L, 1L))
+  expect_s3_class(
+    mvgam(y ~ 1, data = sound, family = nmix(), run_model = FALSE),
+    "mvgam_prefit"
+  )
+
+  # One unit loses every visit, so the fitted model holds one unit
+  # and cannot identify the state distribution from it.
+  one_unit <- mk(c(1L, 0L, NA, NA))
+  expect_identical(
+    mvgam:::build_closure_unit_arrays(
+      one_unit, response_var = "y",
+      unit_grouping_vars = c("series", "time")
+    )$N_unit,
+    1L
+  )
+  expect_error(
+    mvgam(y ~ 1, data = one_unit, family = nmix(), run_model = FALSE),
+    "at least two closure units"
+  )
+
+  # Each unit keeps one visit, which puts lambda and p on the
+  # product isocurve with nothing to separate them.
+  single_visit <- mk(c(1L, NA, 1L, NA))
+  expect_identical(
+    mvgam:::build_closure_unit_arrays(
+      single_visit, response_var = "y",
+      unit_grouping_vars = c("series", "time")
+    )$n_rep,
+    c(1L, 1L)
+  )
+  expect_error(
+    mvgam(y ~ 1, data = single_visit, family = nmix(),
+          run_model = FALSE),
+    "non-identified"
+  )
+})
+
+
+test_that("the closure-unit key survives a separator in its values", {
+  # The columns are integer-coded before they are pasted, so a value
+  # carrying the separator cannot merge two units. Pasting the values
+  # themselves gives `series = "sp_1", time = "1"` and
+  # `series = "sp", time = "1_1"` the single key "sp_1_1".
+  d <- data.frame(
+    series = c("sp_1", "sp_1", "sp", "sp"),
+    time = c("1", "1", "1_1", "1_1"),
+    y = c(1L, 0L, 1L, 1L)
+  )
+  idx <- mvgam:::closure_unit_index(d, c("series", "time"), "y")
+  expect_length(idx$levels, 2L)
+  expect_identical(idx$n_rep, c(2L, 2L))
+
+  # And the naive spelling really does collide, so the check above
+  # is not passing on a distinction that never existed.
+  naive <- paste(d$series, d$time, sep = "_")
+  expect_length(unique(naive), 1L)
+})
+
+
+test_that("a count family with a cap buffer needs no cap column", {
+  # `nmix()` declares `mvgam_default_cap_buffer` rather than a fixed
+  # cap, so the bound is derived per unit as `max(y) + buffer` and a
+  # `cap` column is optional. Three places had to agree for that to
+  # hold and only one did: the validator fabricated a cap of 1 and
+  # refused any count above it, naming a column the frame never had,
+  # and the post-fit rebuild passed the fixed default alone so it
+  # demanded the column back after fitting.
+  set.seed(4L)
+  d <- expand.grid(visit = 1:3, series = factor(paste0("s", 1:4)))
+  d$time <- 1L
+  d$y <- rpois(nrow(d), 6)
+  expect_false("cap" %in% names(d))
+
+  expect_s3_class(
+    mvgam(y ~ 1, data = d, family = nmix(), run_model = FALSE),
+    "mvgam_prefit"
+  )
+
+  # The bound the buffer gives, per unit, is the unit's own largest
+  # count plus the buffer -- not a constant, and not one.
+  buffer <- mvgam:::closure_unit_default_cap_buffer(nmix())
+  expect_identical(buffer, 100L)
+  arrays <- mvgam:::build_closure_unit_arrays(
+    d, response_var = "y", default_cap_buffer = buffer,
+    unit_grouping_vars = c("series", "time")
+  )
+  expect_identical(arrays$K_max, arrays$Y_max + buffer)
+  expect_gt(length(unique(arrays$Y_max)), 1L)
+
+  # A cap column the user does supply is still checked.
+  bad <- d
+  bad$cap <- 2L
+  expect_error(
+    mvgam(y ~ 1, data = bad, family = nmix(), run_model = FALSE),
+    "below the observed counts"
+  )
+})

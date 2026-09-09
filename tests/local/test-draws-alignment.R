@@ -820,3 +820,55 @@ test_that("both prior accessors report the support Stan declares", {
     expect_gt(checked, 0L)
   }
 })
+
+
+test_that("an off-centre asymmetric Laplace reports its own mean", {
+  # `posterior_epred()` routes a family through its mean kernel only
+  # when `epred_extra_dpars_for()` names that family, and a family
+  # missing from that registry falls through to the inverse link
+  # instead. Nothing about the result says so: it is finite, it has
+  # the right shape, and for a symmetric family it is even correct.
+  #
+  # An asymmetric Laplace is the case that separates them. Its mean
+  # is `mu + sigma (1 - 2q) / (q (1 - q))`, which equals `mu` only at
+  # `q = 0.5`, so fitting at `q = 0.25` makes the two answers differ
+  # by a wide margin -- 1.98 against 4.29 when this was found. The
+  # data's own mean is the third opinion, and it sides with the
+  # kernel.
+  set.seed(7L)
+  n <- 120L
+  d <- data.frame(
+    time = seq_len(n), series = factor("s1"), x = rnorm(n)
+  )
+  q <- 0.25
+  d$y <- 1.5 + 0.8 * d$x +
+    brms::rasym_laplace(n, mu = 0, sigma = 1, quantile = q)
+
+  fit <- fit_cached(
+    "asym_laplace_q25",
+    formula = bf(y ~ x, quantile = q),
+    data = d, family = brms::asym_laplace()
+  )
+
+  ids <- 1:200
+  ep <- posterior_epred(fit, draw_ids = ids)
+  lp <- posterior_linpred(fit, draw_ids = ids, transform = TRUE)
+  pars <- mvgam:::resolve_family_pars(
+    fit, dpar_names = mvgam:::get_family_dpars("asym_laplace"),
+    ndraws = nrow(lp), nobs = ncol(lp), draw_ids = ids,
+    newdata = NULL, resp = NULL
+  )
+
+  # The mean the family defines, at the same draws.
+  expect_equal(
+    ep, lp + pars$sigma * (1 - 2 * q) / (q * (1 - q))
+  )
+  # And it is not the linear predictor, which is what a fall-through
+  # returns and what every shape check would accept.
+  expect_false(isTRUE(all.equal(unname(ep), unname(lp))))
+  # The predictive draws are the independent opinion: their mean
+  # tracks the expectation, not the predictor.
+  yrep <- posterior_predict(fit, draw_ids = ids)
+  expect_lt(abs(mean(ep) - mean(yrep)), 0.2)
+  expect_gt(abs(mean(lp) - mean(yrep)), 1)
+})

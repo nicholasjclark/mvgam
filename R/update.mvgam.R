@@ -134,7 +134,7 @@ update.mvgam <- function(object, formula. = NULL, newdata = NULL,
   # nothing of `factor_formula`, `n_lv`, `species`, `unit`, `traits`,
   # `trait_slopes` or `phylo`, and the refit would carry none of them:
   # a joint model rebuilt as an ordinary one, with nothing said. The
-  # arguments cannot be recovered either, since `jsdgam_call` records
+  # arguments cannot be recovered from `$call` either: it records
   # them as the symbols the user wrote rather than their values.
   if (inherits(object, "jsdgam")) {
     stop(insight::format_error(c(
@@ -209,7 +209,42 @@ update.mvgam <- function(object, formula. = NULL, newdata = NULL,
       )))
     }
   }
-  do.call(mvgam, call_args)
+  fit <- do.call(mvgam, call_args)
+  # `mvgam()` stamps the call of the frame that reached it, and this
+  # one is `do.call()`'s: every argument has already resolved to its
+  # value, so the recorded call would inline the whole data frame.
+  # The refit's call is the original with the arguments the user
+  # changed written over it, which keeps every symbol they typed and
+  # is a call `update()` can be handed again.
+  fit$call <- restate_updated_call(getCall(object), match.call())
+  fit
+}
+
+
+# Internal: the model call an `update()` produced.
+#
+# Takes the call that built the original fit and overwrites the
+# arguments this `update()` names. Two of them are spelled
+# differently on the two sides -- `formula.` sets `formula` and
+# `newdata` sets `data` -- and `recompile` steers the refit rather
+# than the model, so it is not part of the call the model was built
+# from.
+#' @noRd
+restate_updated_call <- function(original, update_call) {
+  if (is.null(original)) {
+    return(update_call)
+  }
+  changed <- as.list(update_call)[-1L]
+  changed[c("object", "recompile")] <- NULL
+  renamed <- c(formula. = "formula", newdata = "data")
+  for (from in intersect(names(renamed), names(changed))) {
+    changed[[renamed[[from]]]] <- changed[[from]]
+    changed[[from]] <- NULL
+  }
+  for (nm in names(changed)) {
+    original[[nm]] <- changed[[nm]]
+  }
+  original
 }
 
 

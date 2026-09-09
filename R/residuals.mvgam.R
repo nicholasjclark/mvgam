@@ -16,20 +16,21 @@
 #'   predictive pooled over draws absorbs the uncertainty in the
 #'   latent state and comes back too narrow.
 #'
-#'   The families whose distribution function \pkg{mvgam} names
-#'   analytically -- `gaussian`, `student`, `lognormal`, `Gamma`,
-#'   `weibull`, `exponential`, `beta`, `bernoulli`, `binomial`,
-#'   `beta_binomial`, `poisson`, `negbinomial` and `geometric` --
-#'   take that route. A discrete family randomises within the
-#'   interval its atom occupies, `[F(y - 1), F(y)]`; a continuous
-#'   one has no atom and the interval collapses to `F(y)`.
+#'   A family \pkg{mvgam} holds a distribution function for is
+#'   transformed through that function directly. This covers the
+#'   single-parameter and location-scale families, the counts,
+#'   `beta` and `beta_binomial`, `com_binomial()` and `tweedie()`,
+#'   and the multivariate `mvn()`, `mvt()` and `diri()`. A discrete
+#'   family randomises within the interval its atom occupies,
+#'   `[F(y - 1), F(y)]`; a continuous one has no atom and the
+#'   interval collapses to `F(y)`.
 #'
-#'   Every other family -- including zero-inflated, hurdle,
-#'   ordinal, compositional and custom families -- is computed
-#'   via the empirical PIT over [posterior_predict.mvgam()]
-#'   draws (the DHARMa / Hartig 2024 approach), which inherits
-#'   family coverage from `posterior_predict` at the cost of
-#'   pooling the draws.
+#'   The mixtures and the closure-unit families -- zero-inflated,
+#'   hurdle, ordinal, `mixture()`, `occ()`, `nmix()`, `multi()` and
+#'   `categ()` -- have no single distribution function to name, and
+#'   take an empirical PIT over [posterior_predict.mvgam()] draws
+#'   instead (the DHARMa / Hartig 2024 approach). The `Details`
+#'   below give what that route costs.
 #'
 #' * `"ordinary"` -- the predictive error `y - posterior_predict(y)`
 #'   per draw. Matches `type = "ordinary"` in
@@ -55,6 +56,31 @@
 #' tight. Use `"quantile"` instead -- it is the correct
 #' diagnostic for this model class and is N(0, 1) under a
 #' correctly-specified model regardless of family.
+#'
+#' @section Multivariate families (`mvn()`, `mvt()`, `diri()`):
+#'   These share the closure-unit data layout but not its grain:
+#'   each row of a unit gets its own residual, because each row
+#'   has its own distribution function. What that residual can be
+#'   asked differs by family.
+#'
+#'   `mvn()` and `mvt()` are row-wise conditional on the latent
+#'   factor scores, so their residuals test the observation model
+#'   rather than the factor structure. Too few factors still
+#'   leaves them N(0, 1), because the fitted scores absorb the
+#'   cross-species correlation a residual diagnostic would
+#'   otherwise reveal; use [residual_cor.mvgam()] to ask whether
+#'   the factor dimension is adequate.
+#'
+#'   `diri()`'s residual is the exact marginal of one component,
+#'   `Beta(alpha_j, alpha_0 - alpha_j)`, so it answers how
+#'   surprising that species' share is at that site. Each is
+#'   standard normal on its own, but a unit's shares sum to one,
+#'   so the rows of a unit are negatively dependent by
+#'   construction and a unit of `K` species carries `K - 1`
+#'   degrees of freedom. With `K = 2` the two residuals are
+#'   exactly antithetic. Read a QQ-plot or an ACF at the unit
+#'   grain rather than treating the rows of a unit as independent
+#'   draws.
 #'
 #' @section Closure-unit families (`nmix()`, `occ()`):
 #'   Closure-unit observation families treat the closure unit
@@ -445,10 +471,16 @@ analytic_pit_bounds <- function(object, y, pp_args, d,
   # arm's matrix. Stating that is enough; a second code path to
   # narrow a list would be a branch nothing takes.
   checkmate::assert_matrix(linpred)
-  spec <- family_dist_spec(
-    family_name,
-    family_obj$link,
-    linpred,
+  # A multi-response family keeps its parameters somewhere else: a
+  # per-row scale and degrees of freedom, or a softmax probability
+  # and the units its rows are grouped into. `log_lik()` reads them
+  # through the same helper, so the residual and the density it is
+  # standardising cannot describe different models.
+  family_pars <- if (is_multi_response_family(family_obj)) {
+    mv_response_family_pars(
+      object, d, linpred, family_obj, family_name, draw_ids
+    )
+  } else {
     resolve_family_pars(
       object,
       dpar_names = get_family_dpars(family_name),
@@ -457,7 +489,13 @@ analytic_pit_bounds <- function(object, y, pp_args, d,
       draw_ids = draw_ids,
       newdata = d,
       resp = resp
-    ),
+    )
+  }
+  spec <- family_dist_spec(
+    family_name,
+    family_obj$link,
+    linpred,
+    family_pars,
     extract_trials_for_family(object, family_obj, d)
   )
   upper <- dist_cdf(spec, linpred, y)

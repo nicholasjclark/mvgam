@@ -227,7 +227,7 @@ pp_check.mvgam <- function(
     resp_names <- object$formula$responses
     if (length(resp) != 1L) {
       stop(insight::format_error(c(
-        "{.field resp} must be a single response name.",
+        cli::format_inline("{.field resp} must be a single response name."),
         i = cli::format_inline(
           "Available responses: {.val {resp_names}}."
         )

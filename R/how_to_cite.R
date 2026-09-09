@@ -873,7 +873,7 @@ how_to_cite.mvgam <- function(object, ...) {
       refs = "riutort_gp"
     ),
     list(
-      detect = trend_model %in% c("PWlogistic", "PWlinear"),
+      detect = grepl("^PW", trend_model),
       text = " Piecewise dynamic trends were parameterised following Taylor and Letham (2018).",
       refs = "taylor_pw"
     ),

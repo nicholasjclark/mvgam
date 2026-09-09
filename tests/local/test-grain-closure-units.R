@@ -763,6 +763,37 @@ test_that("the prediction methods survive an unmade visit", {
 })
 
 
+test_that("a fold holds out whole closure units", {
+  # A closure unit is the block the likelihood is written over: its
+  # visits share the latent state, so holding out one visit while
+  # keeping its siblings leaves the state in the training data and
+  # the score is optimistic. Nothing in `kfold()`'s output says which
+  # grain it split on, and the ELPD it returns is finite either way,
+  # so the fold keys are checked against the unit arrays directly.
+  #
+  # This read `closure_unit_grouping()`, which returns the raw
+  # attribute and is set only for `multi_season = TRUE`. On a plain
+  # `occ()` fit it answered NULL, every visit became its own fold,
+  # and all 75 units were split.
+  obj <- gappy_fits()
+  d <- obj$gappy$obs_data %||% obj$gappy$data
+  arrays <- mvgam:::closure_unit_arrays_for(obj$gappy, d)
+  keys <- mvgam:::resolve_kfold_group(obj$gappy, NULL, d)
+
+  # One fold key per unit, not one per visit.
+  expect_identical(keys$n_groups, as.integer(arrays$N_unit))
+  expect_lt(keys$n_groups, nrow(d))
+
+  # And each unit's visits carry the same key, so no split can put
+  # them in different folds.
+  per_unit <- vapply(seq_len(arrays$N_unit), function(u) {
+    idx <- arrays$visit_row[u, seq_len(arrays$n_rep[u])]
+    length(unique(keys$key[idx]))
+  }, integer(1L))
+  expect_identical(unique(per_unit), 1L)
+})
+
+
 test_that("a fold survives an unmade visit", {
   # `kfold()` reads the likelihood, so it inherits whatever the units
   # above lost: it reports the count that survives rather than the
