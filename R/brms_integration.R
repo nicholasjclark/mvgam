@@ -721,6 +721,42 @@ mvgam_state_params <- c(
 )
 
 
+#' The bounds each parameter is declared with, keyed by name
+#'
+#' A Stan declaration carries the parameter's support in the same
+#' line that names it, as `vector<lower=-1, upper=1>[N] ar1_trend;`.
+#' Reading it here keeps the prior table describing the program that
+#' was compiled rather than a second opinion about it.
+#'
+#' @param sc The generated Stan code, as one string.
+#' @return A named list of `list(lb, ub)`, both character and empty
+#'   where the declaration names no bound.
+#' @noRd
+stancode_declared_bounds <- function(sc) {
+  decl_re <- paste0(
+    "(?:real|int|vector|row_vector|matrix|simplex|ordered|",
+    "positive_ordered|unit_vector|cholesky_factor_corr|",
+    "cholesky_factor_cov|corr_matrix|cov_matrix)",
+    "[[:space:]]*(<[^>]*>)?",
+    "[[:space:]]*(?:\\[[^]]*\\])?",
+    "[[:space:]]+([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*;"
+  )
+  out <- list()
+  for (hit in regmatches(sc, gregexpr(decl_re, sc))[[1L]]) {
+    m <- regmatches(hit, regexec(decl_re, hit))[[1L]]
+    if (length(m) < 3L) next
+    spec <- m[2L]
+    one <- function(which) {
+      pat <- paste0(which, "[[:space:]]*=[[:space:]]*")
+      if (!grepl(pat, spec)) return("")
+      trimws(sub(paste0(".*", pat, "([^,>]+).*"), "\\1", spec))
+    }
+    out[[m[3L]]] <- list(lb = one("lower"), ub = one("upper"))
+  }
+  out
+}
+
+
 #' Read every mvgam prior statement out of an assembled Stan model
 #'
 #' The compiled code is what the sampler ran, so a prior table read
@@ -747,15 +783,31 @@ mvgam_stancode_prior_rows <- function(sc) {
   is_mvgam_param <- function(nm) {
     is_mvgam_managed_class(nm) & !nm %in% mvgam_state_params
   }
+  # The support a parameter is sampled on is declared in the same
+  # program as its prior, a line or two above it. Reading the prior
+  # and leaving the bounds behind reported `normal(0, 0.5)` for an
+  # autoregressive coefficient held inside (-1, 1), and for a
+  # continuous-time one held inside (0.001, 0.999), as though half
+  # the mass of each sat outside the model's own support.
+  declared <- stancode_declared_bounds(sc)
+
   rows <- list()
   seen <- character(0L)
   add <- function(class, coef, prior) {
     key <- paste0(class, "|", coef)
     if (key %in% seen) return(invisible(NULL))
     seen[[length(seen) + 1L]] <<- key
-    rows[[length(rows) + 1L]] <<- brms::prior_string(
-      prior, class = class, coef = coef
+    bound <- declared[[class]] %||% list(lb = "", ub = "")
+    row <- brms::prior_string(
+      prior, class = class, coef = coef,
+      lb = if (nzchar(bound$lb)) bound$lb else NA,
+      ub = if (nzchar(bound$ub)) bound$ub else NA
     )
+    # brms returns NA for an unbounded parameter and `get_prior()`
+    # returns "", so the two sides of the table compare equal.
+    if (is.na(row$lb)) row$lb <- ""
+    if (is.na(row$ub)) row$ub <- ""
+    rows[[length(rows) + 1L]] <<- row
     invisible(NULL)
   }
 

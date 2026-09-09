@@ -266,7 +266,39 @@ prior_summary.mvgam <- function(object, ...) {
       "Fit was not stored with a prior table (object$prior is NULL)."
     ))
   }
-  object$prior
+  backfill_declared_bounds(object$prior, object$stancode)
+}
+
+
+#' Fill in a stored prior table's missing bounds from the program
+#'
+#' A fit saved before the table carried bounds has them as `NA`,
+#' which reads as though a parameter were sampled unbounded when the
+#' program declares otherwise. The declaration is stored on the fit
+#' alongside the table, so the support can be recovered rather than
+#' requiring the model to be fitted again. Rows that already name a
+#' bound are left alone, so this only ever supplies what is absent.
+#'
+#' @param prior The stored prior table.
+#' @param stancode The stored Stan program, or `NULL`.
+#' @return The table, with absent bounds filled in where the program
+#'   declares one.
+#' @noRd
+backfill_declared_bounds <- function(prior, stancode) {
+  if (!is.data.frame(prior) || nrow(prior) == 0L) return(prior)
+  if (!all(c("class", "lb", "ub") %in% names(prior))) return(prior)
+  if (is.null(stancode)) return(prior)
+  sc <- paste(as.character(stancode), collapse = "\n")
+  if (!nzchar(sc)) return(prior)
+  declared <- stancode_declared_bounds(sc)
+  if (!length(declared)) return(prior)
+  for (i in seq_len(nrow(prior))) {
+    bound <- declared[[prior$class[i]]]
+    if (is.null(bound)) next
+    if (is.na(prior$lb[i])) prior$lb[i] <- bound$lb
+    if (is.na(prior$ub[i])) prior$ub[i] <- bound$ub
+  }
+  prior
 }
 
 

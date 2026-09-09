@@ -136,6 +136,41 @@ fit_ord <- fit_cached(
   data = dat_ord, family = cumulative()
 )
 
+# A scale with a formula of its own, and a response bounded below.
+# Both are ordinary brms spellings that nothing here drove, and each
+# reaches a surface through machinery the other fits never exercise:
+# a distributional parameter is computed per observation rather than
+# sampled under its own name, and a truncated response has to be
+# drawn from the truncated law rather than merely inside it.
+set.seed(202L)
+dat_dpar <- data.frame(
+  x = rnorm(n_time), z = seq(-2, 2, length.out = n_time),
+  time = seq_len(n_time), series = factor("s1")
+)
+# sigma spans an order of magnitude across the frame, so a prediction
+# that ignored the sub-formula cannot land on the right answer by
+# accident.
+dat_dpar$y <- rnorm(n_time, 1 + 0.5 * dat_dpar$x,
+                    exp(-0.5 + 0.9 * dat_dpar$z))
+
+set.seed(303L)
+dat_trunc <- data.frame(
+  x = rnorm(n_time), time = seq_len(n_time), series = factor("s1")
+)
+# The untruncated predictive puts real mass below zero, so the bound
+# does work rather than sitting decoratively outside the data.
+dat_trunc$y <- pmax(rnorm(n_time, 2 + 0.6 * dat_trunc$x, 1.5), 0.01)
+
+fit_dpar <- fit_cached(
+  "gaussian_sigma_dpar", formula = brms::bf(y ~ x, sigma ~ z),
+  trend_formula = ~ AR(p = 1), data = dat_dpar, family = gaussian()
+)
+fit_trunc <- fit_cached(
+  "gaussian_trunc", formula = y | trunc(lb = 0) ~ x,
+  trend_formula = ~ AR(p = 1), data = dat_trunc, family = gaussian()
+)
+
+
 # The alignment claims need more draws than the indices they name.
 stopifnot(ndraws(fit_plain) >= 300L, ndraws(fit_trend) >= 300L)
 
@@ -688,3 +723,100 @@ test_that("loo_epred and loo_linpred part at a non-identity link", {
 
 
 cat("\nDone.\n")
+
+
+test_that("a variance reads a scale written with its own formula", {
+  # `sigma ~ z` is computed per observation rather than sampled under
+  # that name, so a reader that matched names in the stanfit found
+  # nothing and the method refused a gaussian fit for want of a
+  # `sigma` the model has. Asserting only that the answer is finite
+  # would not have caught it, and asserting only that it runs would
+  # not catch a scale read from the wrong observation.
+  d <- mvgam:::mvgam_training_data(fit_dpar)
+  ids <- 1:100
+  sigma <- mvgam:::resolve_family_pars(
+    fit_dpar, dpar_names = "sigma", ndraws = length(ids),
+    nobs = nrow(d), draw_ids = ids, newdata = d, resp = NULL
+  )$sigma
+
+  # The scale has to vary across the frame for the claim below to
+  # discriminate; a constant one would be matched by any broadcast.
+  expect_gt(max(colMeans(sigma)) / min(colMeans(sigma)), 5)
+
+  v <- predict(fit_dpar, type = "variance", incl_autocor = TRUE,
+               summary = FALSE, draw_ids = ids)
+  expect_identical(dim(v), dim(sigma))
+  # A gaussian variance is that draw's own sigma squared, cell for
+  # cell, so this is an identity rather than a tolerance.
+  expect_equal(v, sigma^2, tolerance = 1e-12)
+})
+
+
+test_that("a truncated prediction follows the truncated law", {
+  # A draw outside the bound is replaced, and the replacement has to
+  # come from this observation's own predictive restricted to the
+  # bound. Resolving the distribution by name and calling it with no
+  # parameters drew from the standard member of the family instead,
+  # and rejecting-then-clamping piled mass exactly on the bound.
+  # Both are invisible to `all(y >= lb)`, which is why the check is
+  # made against the truncated distribution itself.
+  d <- mvgam:::mvgam_training_data(fit_trunc)
+  yrep <- posterior_predict(fit_trunc, incl_autocor = TRUE)
+  expect_true(all(yrep >= 0))
+
+  # Clamping is the tell: it puts a spike of mass on the bound.
+  expect_lt(mean(yrep == 0), 1e-8)
+
+  mu <- posterior_linpred(fit_trunc, transform = TRUE,
+                          incl_autocor = TRUE)
+  sigma <- mvgam:::resolve_family_pars(
+    fit_trunc, dpar_names = "sigma", ndraws = nrow(mu),
+    nobs = ncol(mu), draw_ids = NULL, newdata = d, resp = NULL
+  )$sigma
+
+  # The probability-integral transform of a draw against the law it
+  # is supposed to follow is uniform. A replacement drawn from a
+  # standard normal, where this predictive sits near 2, would pile
+  # this statistic against zero.
+  p_lb <- stats::pnorm(0, mu, sigma)
+  u <- (stats::pnorm(yrep, mu, sigma) - p_lb) / (1 - p_lb)
+  expect_true(all(u >= -1e-8 & u <= 1 + 1e-8))
+  expect_equal(mean(u), 0.5, tolerance = 0.02)
+  expect_equal(stats::sd(u), 1 / sqrt(12), tolerance = 0.02)
+})
+
+
+test_that("both prior accessors report the support Stan declares", {
+  # `get_prior()` carried each trend parameter's bounds and
+  # `prior_summary()` reported them as NA, because the stored table is
+  # rebuilt by reading the emitted Stan code and the reader took the
+  # sampling statement while ignoring the declaration beside it. A
+  # reader of the summary saw `normal(0, 0.5)` unbounded for a
+  # coefficient the sampler holds inside (-1, 1).
+  declared <- function(sc, par) {
+    line <- grep(paste0("[ ]", par, ";"), strsplit(sc, "\n")[[1]],
+                 value = TRUE)[1]
+    c(if (grepl("lower", line)) {
+        trimws(sub(".*lower[ ]*=[ ]*([^,>]+).*", "\\1", line))
+      } else "",
+      if (grepl("upper", line)) {
+        trimws(sub(".*upper[ ]*=[ ]*([^,>]+).*", "\\1", line))
+      } else "")
+  }
+  for (fit in list(fit_plain, fit_trend, fit_dpar, fit_trunc)) {
+    sc <- as.character(stancode(fit))
+    tab <- as.data.frame(prior_summary(fit))
+    checked <- 0L
+    for (par in c("ar1_trend", "sigma_trend")) {
+      row <- tab[tab$class == par, , drop = FALSE]
+      if (!nrow(row)) next
+      reported <- c(row$lb[1], row$ub[1])
+      reported[is.na(reported)] <- NA_character_
+      expect_identical(reported, declared(sc, par))
+      checked <- checked + 1L
+    }
+    # The loop has to have asserted something, or a table that lost
+    # its trend rows entirely would pass in silence.
+    expect_gt(checked, 0L)
+  }
+})
