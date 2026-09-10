@@ -150,6 +150,11 @@ get_predict.mvgam <- function(model,
     )))
   }
 
+  # A closure unit's latent state is one value the unit's rows share,
+  # so it is read at the grain this method pairs with `newdata`.
+  # Applied before the slice below, which indexes rows of the grid.
+  draws <- closure_unit_draws_to_rows(model, newdata, draws)
+
   # Back to the grid the caller asked about, now that the whole-site
   # prediction has been made over the completed one.
   if (!is.null(asked)) {

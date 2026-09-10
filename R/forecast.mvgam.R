@@ -1168,11 +1168,6 @@ build_forecast_arms <- function(object, trend_model, meta,
                               ndraws_use, series_levels, resp = resp))
   }
   family_for_arm <- get_family_for_resp(object, resp)
-  # `mu` is the family's own parameter, which is what
-  # `sample_family_batched()` draws from below. The expectation is a
-  # separate quantity wherever a family carries more in its mean than
-  # its predictor.
-  mu <- family_for_arm$linkinv(eta_full)
   if (type == "expected" || isTRUE(!obs_uncertainty)) {
     # `eta_full` is already sliced to `draw_idx`, so the extra
     # parameters a family's mean needs are read at those same
@@ -1186,7 +1181,7 @@ build_forecast_arms <- function(object, trend_model, meta,
     return(slice_per_series(expected, fc_grid, obs_struct_fc,
                               ndraws_use, series_levels, resp = resp))
   }
-  resp_mat <- sample_family_batched(object, mu, fc_grid$data,
+  resp_mat <- sample_family_batched(object, eta_full, fc_grid$data,
                                       ndraws_use, draw_idx,
                                       family = family_for_arm,
                                       resp = resp)
@@ -1660,10 +1655,24 @@ slice_per_series <- function(mat, fc_grid, obs_struct,
 # matrix; draws dpars / trials / truncation bounds with the
 # matching `draw_ids` so they line up element-wise.
 #'@noRd
-sample_family_batched <- function(object, mu, fc_data, ndraws_use,
-                                    draw_idx, family = NULL,
-                                    resp = NULL) {
+sample_family_batched <- function(object, linpred, fc_data,
+                                    ndraws_use, draw_idx,
+                                    family = NULL, resp = NULL) {
   family <- family %||% object$family
+  # A closure-unit family's draw reads sibling rows: a visit is a
+  # detection of its unit's one latent state, and a composition is
+  # drawn for the whole site at once. Each has a kernel that says how,
+  # and the family-name switch below has no branch for any of them, so
+  # every such forecast arm was refused as an unsupported family. The
+  # predictor is passed on rather than recomputed because a forecast
+  # propagates the latent state past the grid any frame describes.
+  if (is_closure_unit_family(family)) {
+    predict_fn <- dispatch_closure_unit_method(family, "predict")
+    return(predict_fn(
+      object, newdata = fc_data, draw_ids = draw_idx,
+      linpred = linpred
+    ))
+  }
   # `get_family_dpars` only matches lowercase keys; R's `Gamma()`
   # constructor stores `family$family = "Gamma"` and brms's mvbf
   # normalises to `"gamma"` -- both must resolve to the `shape`
@@ -1672,6 +1681,11 @@ sample_family_batched <- function(object, mu, fc_data, ndraws_use,
   # literal "custom" and which would otherwise resolve to no dpars at
   # all, dropping `mphi` / `mtheta` and friends from the forecast.
   family_name <- tolower(resolve_family_name(family))
+  # The family's own parameter, which is what the draw below is taken
+  # at. Applied here rather than by the caller so a caller reaching
+  # the closure-unit branch above cannot have flattened the predictor
+  # those kernels need.
+  mu <- family$linkinv(linpred)
   nobs <- ncol(mu)
   dpar_names <- get_family_dpars(family_name)
   dpars <- resolve_family_pars(

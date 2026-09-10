@@ -221,40 +221,38 @@ make_simplex_long <- function() {
   )
 }
 
-test_that("pp_check_mv_category() maps simplex rows to within-unit position", {
-  fam <- make_mv_family_stub("mvgam_dirichlet")
-  obj <- structure(
-    list(family = fam,
-         formula = y ~ 1,
-         data = make_simplex_long()),
-    class = "mvgam"
-  )
-  cats <- mvgam:::pp_check_mv_category(obj, obj$data)
-  expect_s3_class(cats, "factor")
-  expect_identical(levels(cats),
-                   c("cat_1", "cat_2", "cat_3"))
-  # Each site fills positions 1..3 in row order, so the vector is
-  # rep(1:3, 2) wrapped as cat_<int>.
-  expect_identical(as.integer(cats),
-                   rep(1:3, times = 2L))
-})
+# A composition's categories are its species and a multivariate
+# normal's responses are its species, so both read the same axis and
+# are held to the same claim here.
+for (fam_name in c("mvgam_dirichlet", "mvgam_mvnormal")) {
+  test_that(paste0("pp_check_mv_category() names the species for ",
+                   fam_name), {
+    obj <- structure(
+      list(family = make_mv_family_stub(
+             fam_name,
+             simplex = identical(fam_name, "mvgam_dirichlet")
+           ),
+           formula = y ~ 1,
+           data = make_simplex_long()),
+      class = "mvgam"
+    )
+    cats <- mvgam:::pp_check_mv_category(obj, obj$data)
+    expect_s3_class(cats, "factor")
+    expect_identical(levels(cats), paste0("y", 1:3))
+    expect_identical(as.character(cats),
+                     as.character(obj$data$series))
 
-test_that("pp_check_mv_category() uses series column for mvn / mvt", {
-  fam <- make_mv_family_stub("mvgam_mvnormal", simplex = FALSE)
-  obj <- structure(
-    list(family = fam,
-         formula = y ~ 1,
-         data = data.frame(
-           series = factor(c("a", "b", "a", "b")),
-           y      = rnorm(4L)
-         )),
-    class = "mvgam"
-  )
-  cats <- mvgam:::pp_check_mv_category(obj, obj$data)
-  expect_s3_class(cats, "factor")
-  expect_identical(levels(cats), c("a", "b"))
-  expect_identical(as.character(cats), c("a", "b", "a", "b"))
-})
+    # A site that lost a species must not relabel the ones after it.
+    # Numbering each unit's rows 1..K did: with the second site's
+    # `y2` gone, its `y3` sat in position two and was drawn in the
+    # panel `y2`'s observations belong to.
+    gapped <- obj$data[-5L, , drop = FALSE]
+    expect_identical(
+      as.character(mvgam:::pp_check_mv_category(obj, gapped)),
+      as.character(gapped$series)
+    )
+  })
+}
 
 test_that("pp_check_mv_category() returns NULL for non-multi-response families", {
   obj <- structure(

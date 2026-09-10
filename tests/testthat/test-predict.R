@@ -377,15 +377,17 @@ test_that("compute_family_epred rejects unsupported families", {
     family = "nmix",
     linkinv = exp
   )
+  # The refusal names the family the dispatch was asked about, so a
+  # caller can tell which one it reached this branch with.
   expect_error(
     compute_family_epred(linpred, nmix_family),
-    "must be routed through posterior_epred.mvgam"
+    "no mean this dispatch can compute"
   )
+  expect_error(compute_family_epred(linpred, nmix_family), "'nmix'")
 
   # `tweedie` has an analytic epred branch (linkinv(linpred)), so
   # it routes through compute_family_epred without erroring; only
-  # families with state-space identification gaps (nmix, occ)
-  # raise here.
+  # families whose mean reads a unit's other visits raise here.
 })
 
 test_that("compute_family_epred validates inputs", {

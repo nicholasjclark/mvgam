@@ -762,40 +762,25 @@ pp_check.mvgam <- function(
 # exists, in which case pp_check falls through to its default
 # pooled behaviour.
 #
-# Simplex families (diri / multi / categ): every closure unit
-# packs K rows into the long layout via
-# `build_closure_unit_arrays()$visit_row`. The within-unit
-# position 1..K of each row is its category label.
+# Which category a row of a multi-response frame carries, for the
+# panel a posterior predictive check draws one of per category.
 #
-# mv-normal / mv-T: one row per (site, species); the `series`
-# column on the fit's data is the natural category axis.
+# One question for all five families, so one answer. A composition's
+# categories are its species and a multivariate normal's responses
+# are its species, and the axis names both. Numbering each unit's
+# rows 1..K instead read a position for an identity: a site missing
+# one species shifted every later species onto another's label, and
+# the panel then read `cat_2` where the fit's second species was not.
+#
+# The species axis, not the frame's own column. `as.factor()` on the
+# column orders the groups alphabetically over the values that frame
+# happens to hold, so a fit whose species are declared in another
+# order, or a frame missing one of them, labels the panels against a
+# different axis from the one the draws were made on.
 #'@noRd
 pp_check_mv_category <- function(object, newdata) {
   fam <- object$family
   if (!is_multi_response_family(fam)) return(NULL)
-  if (is_simplex_response_family(fam)) {
-    # The unit key comes from `closure_unit_arrays_for()`, which is
-    # the same key `prepare_closure_unit_family()` gave the fit, so
-    # the category vector matches the per-unit K-row layout
-    # `posterior_predict()` emits rather than a second reading of it.
-    arrs <- closure_unit_arrays_for(object, newdata)
-    cat_int <- integer(nrow(newdata))
-    for (g in seq_len(arrs$N_unit)) {
-      Kg <- arrs$n_rep[g]
-      idx <- arrs$visit_row[g, seq_len(Kg)]
-      cat_int[idx] <- seq_len(Kg)
-    }
-    levels_int <- sort(unique(cat_int))
-    return(factor(
-      paste0("cat_", cat_int),
-      levels = paste0("cat_", levels_int)
-    ))
-  }
-  # The species axis, not the frame's own column. `as.factor()` on
-  # the column orders the groups alphabetically over the values that
-  # frame happens to hold, so a fit whose species are declared in
-  # another order, or a frame missing one of them, labels the panels
-  # against a different axis from the one the draws were made on.
   series <- axis_row_series(object, newdata)
   if (is.null(series)) {
     return(NULL)
@@ -846,7 +831,7 @@ closure_unit_pp_check_setup <- function(object, newdata, yrep,
   }
   list(
     y = y_unit, yrep = yrep_unit, arrays = arrays,
-    first_visits = arrays$visit_row[, 1L]
+    first_visits = closure_unit_first_rows(arrays)
   )
 }
 
@@ -1088,7 +1073,7 @@ closure_unit_fit_stat_ppc <- function(object, newdata, stat,
         x = paste0(paste(bad, collapse = ", "), " missing.")
       )))
     }
-    first_visits <- arrays$visit_row[, 1L]
+    first_visits <- closure_unit_first_rows(arrays)
     for (g in group) {
       check_closure_unit_var_unit_constant(
         as.character(newdata[[g]]), arrays, g

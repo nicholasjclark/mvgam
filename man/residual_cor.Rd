@@ -34,7 +34,11 @@ group's correlation is reconstructed as
 partial correlation matrix per draw via the inverse-correlation
 identity \verb{P_ij = -inv(R)_ij / sqrt(inv(R)_ii * inv(R)_jj)}. This
 is \code{O(p^3)} per draw and is omitted by default. Required if you
-want the \verb{prec*} fields populated.}
+want the \verb{prec*} fields populated. A factor fit with fewer
+factors than series implies a covariance of rank \code{n_lv}, which
+has no inverse, and the call is refused with that stated;
+\code{\link[=shared_variation]{shared_variation()}} answers what such a fit has to say about
+what the series share.}
 
 \item{summary}{Logical. When \code{TRUE} (default) per-element summaries
 (point estimate, posterior SD, quantile CI, posterior probability
@@ -67,11 +71,14 @@ three supported sources for the per-series covariance are:
 \details{
 \itemize{
 \item Latent-factor trends (\code{n_lv} on the trend constructor). The
-implied per-series covariance is \verb{Sigma = Z Z^T} per draw,
+implied per-series covariance is \verb{Sigma = Z Omega Z^T} per
+draw, where \code{Omega} is the covariance of the latent states,
 using the posterior loadings \code{Z} for the default sampled-Z
 factor model, or the user-supplied loadings broadcast across
 draws when \code{trend_map = ...} fixes Z (see \code{\link[=mvgam]{mvgam()}} /
-\code{\link[=AR]{AR()}} / \code{\link[=VAR]{VAR()}} / \code{\link[=RW]{RW()}} / \code{\link[=ZMVN]{ZMVN()}}).
+\code{\link[=AR]{AR()}} / \code{\link[=VAR]{VAR()}} / \code{\link[=RW]{RW()}} / \code{\link[=ZMVN]{ZMVN()}}). Taking \verb{Z Z^T} instead
+would drop whatever scale the latent columns carry, which
+under multiplicative gamma shrinkage is the entire shrinkage.
 \item Correlated process-error trends (\code{cor = TRUE} on \code{RW()} /
 \code{AR()} / \code{ZMVN()}, or any \code{VAR()} / \code{VARMA()} trend).
 \item Hierarchical correlation structures (grouping variable on

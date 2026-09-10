@@ -2009,6 +2009,15 @@ closure_unit_index <- function(data, unit_grouping_vars,
 #'   their per-unit likelihood reads the response vector directly
 #'   without a per-unit truncation bound. When FALSE the
 #'   `Y_max`, `K_max`, and `cap_vals` slots are returned as `NA`.
+#' @param drop_unobserved_units Logical. A unit whose every response
+#'   is missing contributes no density, and Stan declares `n_rep` with
+#'   a lower bound of one, so the fit-time call drops such units and
+#'   refuses a frame that has nothing else. A prediction frame is the
+#'   opposite case: a forecast grid carries no response at all, and
+#'   every one of its rows still has a linear predictor and so still
+#'   has an expected value. `closure_unit_arrays_for()` therefore
+#'   passes `FALSE` and keeps every unit, leaving `n_rep` at zero for
+#'   the ones nothing was recorded in.
 #' @param unit_grouping_vars Character vector of column names that
 #'   jointly identify a closure unit. Defaults to
 #'   `c(series_var, time_var)` for the count-based detection-error
@@ -2043,7 +2052,8 @@ build_closure_unit_arrays <- function(data,
                                        default_cap = NULL,
                                        default_cap_buffer = NULL,
                                        compute_y_max = TRUE,
-                                       unit_grouping_vars = NULL) {
+                                       unit_grouping_vars = NULL,
+                                       drop_unobserved_units = TRUE) {
   checkmate::assert_data_frame(data, min.rows = 1L)
   checkmate::assert_string(response_var)
   checkmate::assert_string(series_var)
@@ -2054,6 +2064,7 @@ build_closure_unit_arrays <- function(data,
   checkmate::assert_integerish(default_cap_buffer, lower = 0L,
                                len = 1L, null.ok = TRUE)
   checkmate::assert_flag(compute_y_max)
+  checkmate::assert_flag(drop_unobserved_units)
   if (is.null(unit_grouping_vars)) {
     # No family is in scope here, so the accessor is asked for the
     # default key alone. Restating it produced a copy that never
@@ -2125,20 +2136,24 @@ build_closure_unit_arrays <- function(data,
     seq_len(n_unit), function(g) which(unit_int == g & observed)
   )
   visited <- lengths(rows_by_unit) > 0L
-  if (!any(visited)) {
-    stop(insight::format_error(c(
-      "Every closure unit has only missing responses.",
-      i = paste0(
-        "Closure-unit families need at least one observed visit ",
-        "in at least one unit."
-      )
-    )))
+  if (drop_unobserved_units) {
+    if (!any(visited)) {
+      stop(insight::format_error(c(
+        "Every closure unit has only missing responses.",
+        i = paste0(
+          "Closure-unit families need at least one observed visit ",
+          "in at least one unit."
+        )
+      )))
+    }
+    rows_by_unit <- rows_by_unit[visited]
+    unit_levels  <- unit_levels[visited]
+    unit_grid    <- unit_grid[visited, , drop = FALSE]
+    rownames(unit_grid) <- NULL
+    n_unit       <- length(unit_levels)
+  } else {
+    visited <- rep(TRUE, n_unit)
   }
-  rows_by_unit <- rows_by_unit[visited]
-  unit_levels  <- unit_levels[visited]
-  unit_grid    <- unit_grid[visited, , drop = FALSE]
-  rownames(unit_grid) <- NULL
-  n_unit       <- length(unit_levels)
   # The key above is integer-coded so that grouping columns of any
   # type can be pasted together, which makes it useless as a label:
   # a reader given `1_1` cannot get back to the site whose survey
@@ -2149,7 +2164,11 @@ build_closure_unit_arrays <- function(data,
     paste, c(lapply(unit_grid, as.character), list(sep = "_"))
   )
   rep_counts   <- lengths(rows_by_unit)
-  max_rep <- max(rep_counts)
+  # At least one padding column, so a frame carrying no response at
+  # all still returns matrices of the documented shape rather than
+  # zero-column ones. A fit-time frame always has an observed unit,
+  # so this changes nothing there.
+  max_rep <- max(rep_counts, 1L)
   # Two coordinate systems, and they are not interchangeable.
   # `visit_idx` numbers the visits brms retained, which is what the
   # Stan data indexes because brms drops a row whose response is
@@ -2224,6 +2243,14 @@ build_closure_unit_arrays <- function(data,
   # per-unit lookup below runs over `rows_by_unit`, which holds
   # observed visits only.
   y_vals <- as.integer(data[[response_var]])
+  # The floor the closure-unit lpmf marginalises N up from. Computed
+  # once for all three cap branches below, which differ only in the
+  # ceiling. A unit with no observed visit has no floor, which
+  # `max()` of nothing reports as `-Inf` with a warning; zero is what
+  # "nothing was recorded" means here.
+  Y_max <- vapply(rows_by_unit, function(rows_g) {
+    if (length(rows_g)) max(y_vals[rows_g]) else 0L
+  }, integer(1L))
   # Three cap branches in order of precedence:
   #   1. User-supplied `cap` column -> broadcast per row, then
   #      assert constant within a closure unit.
@@ -2236,7 +2263,6 @@ build_closure_unit_arrays <- function(data,
   #   3. Scalar `default_cap` (e.g. RN's static K_max = 25):
   #      broadcast to every unit.
   cap_in_data <- cap_var %in% colnames(data)
-  Y_max <- integer(n_unit)
   K_max <- integer(n_unit)
   if (cap_in_data) {
     cap_vals <- as.integer(data[[cap_var]])
@@ -2248,9 +2274,16 @@ build_closure_unit_arrays <- function(data,
         )
       ))
     }
+    # The cap bounds a unit's latent state, so it is a property of the
+    # unit and is carried on every one of its rows. Read over the
+    # observed rows alone it was empty for a unit nothing was recorded
+    # in, and `K_max[g]` became `NA`, which the comparison below then
+    # met as a missing condition rather than as a number.
+    rows_of_unit <- closure_unit_row_split(
+      list(row_unit = row_unit, N_unit = n_unit)
+    )
     for (g in seq_len(n_unit)) {
-      rows_g <- rows_by_unit[[g]]
-      Y_max[g] <- max(y_vals[rows_g])
+      rows_g <- rows_of_unit[[g]]
       cap_g <- cap_vals[rows_g]
       if (length(unique(cap_g)) > 1L) {
         stop(insight::format_error(
@@ -2284,20 +2317,11 @@ build_closure_unit_arrays <- function(data,
       }
     }
   } else if (!is.null(default_cap_buffer)) {
-    for (g in seq_len(n_unit)) {
-      rows_g <- rows_by_unit[[g]]
-      Y_max[g] <- max(y_vals[rows_g])
-      K_max[g] <- Y_max[g] + as.integer(default_cap_buffer)
-    }
+    K_max <- Y_max + as.integer(default_cap_buffer)
   } else {
     # Falls back to the scalar default_cap; NULL here means the
     # validator should have refused the call upstream.
-    cap_scalar <- as.integer(default_cap)
-    for (g in seq_len(n_unit)) {
-      rows_g <- rows_by_unit[[g]]
-      Y_max[g] <- max(y_vals[rows_g])
-      K_max[g] <- cap_scalar
-    }
+    K_max <- rep(as.integer(default_cap), n_unit)
   }
   list(
     N_unit      = n_unit,
@@ -6051,7 +6075,8 @@ closure_unit_arrays_for <- function(object, newdata = NULL) {
     default_cap = closure_unit_default_cap(fam),
     default_cap_buffer = closure_unit_default_cap_buffer(fam),
     compute_y_max = !is_multi_response_family(fam),
-    unit_grouping_vars = closure_unit_key_vars(fam)
+    unit_grouping_vars = closure_unit_key_vars(fam),
+    drop_unobserved_units = FALSE
   )
 }
 
@@ -6094,7 +6119,8 @@ closure_unit_arrays_for <- function(object, newdata = NULL) {
 #'   (`[S x N_visit]`), `arrays`, `ndraws`, `n_unit`, `n_visit`.
 #' @noRd
 extract_closure_unit_components <- function(object, newdata = NULL,
-                                             draw_ids = NULL) {
+                                             draw_ids = NULL,
+                                             linpred = NULL) {
   checkmate::assert_class(object, "mvgam")
   if (!is_closure_unit_family(object$family)) {
     stop(insight::format_error(c(
@@ -6114,9 +6140,12 @@ extract_closure_unit_components <- function(object, newdata = NULL,
   default_cap_buffer <- closure_unit_default_cap_buffer(object$family)
   # Re-run validation on newdata so cap edits (nmix) or non-binary
   # y (occ, royle_nichols) raise the friendly error rather than
-  # producing silent garbage in downstream sampling. Identifiability
-  # flags are TRUE at predict time because we do not re-examine the
-  # formula here; those warnings are only informative at fit time.
+  # producing silent garbage in downstream sampling. The
+  # identifiability checks are switched off rather than talked out of:
+  # they ask whether a design can separate state from detection, which
+  # is a question about a fit, and claiming covariates the frame was
+  # never asked about silenced two of the three while leaving the
+  # third to refuse a caller predicting at one site.
   # Mv-response families (mvn / mvt) read continuous responses
   # without a per-unit truncation; they share the closure-unit
   # data layout (long format, K rows per site) but neither
@@ -6125,8 +6154,7 @@ extract_closure_unit_components <- function(object, newdata = NULL,
   validate_closure_unit_data(
     newdata,
     response_var       = response_var,
-    has_obs_covariates = TRUE,
-    has_det_covariates = TRUE,
+    identifiability    = FALSE,
     binary_y_check     = binary_y_check && aggregates,
     # A family declaring a data-driven buffer needs no `cap` column
     # here for the same reason it needed none at fit time, so both
@@ -6143,13 +6171,18 @@ extract_closure_unit_components <- function(object, newdata = NULL,
   # Per-visit broadcasting happens only at the response sampling
   # step, where it is unavoidable.
   #
-  # process_error = FALSE because closure-unit families have no
-  # stochastic trend layer (trend_type = "None"); a family with a
-  # trend layer would pass the caller's request through instead.
-  linpred <- posterior_linpred(
-    object, newdata = newdata, draw_ids = draw_ids,
-    process_error = FALSE
-  )
+  # A caller holding its own predictor supplies it. A forecast arm
+  # propagates the latent state forward and holds a predictor no
+  # frame reproduces, so recomputing one here would answer for a
+  # different quantity. `process_error = FALSE` on the recomputed
+  # path reads the state the sampler fitted, which is what every
+  # training-grid surface wants.
+  if (is.null(linpred)) {
+    linpred <- posterior_linpred(
+      object, newdata = newdata, draw_ids = draw_ids,
+      process_error = FALSE
+    )
+  }
   state_visit <- object$family$linkinv(linpred)
   ndraws   <- nrow(state_visit)
   n_visit  <- ncol(state_visit)
@@ -6157,8 +6190,7 @@ extract_closure_unit_components <- function(object, newdata = NULL,
   # The frame's own row, because `state_visit` has one column per
   # row of `newdata`. Reading `visit_idx` here shifted a unit's
   # first visit by the number of missing responses before it.
-  first_visit_row <- arrays$visit_row[, 1L]
-  state <- state_visit[, first_visit_row, drop = FALSE]
+  state <- state_visit[, closure_unit_first_rows(arrays), drop = FALSE]
   # p extraction. brms emits the scalar `p` in the posterior when
   # there is no detection sub-formula; with a sub-formula
   # (`bf(y ~ x, p ~ tod)`) `p` is transient in the model block
@@ -6200,17 +6232,52 @@ extract_closure_unit_components <- function(object, newdata = NULL,
 # it, so the broadcast is written once. `visit_to_unit_lookup()`
 # inverts the first-visit column `arrays$row_unit` records.
 #' @noRd
-closure_unit_visit_epred <- function(object, newdata, draw_ids) {
-  comp <- extract_closure_unit_components(object, newdata, draw_ids)
+closure_unit_visit_epred <- function(object, newdata, draw_ids,
+                                     linpred = NULL) {
+  comp <- extract_closure_unit_components(object, newdata, draw_ids,
+                                          linpred = linpred)
   unit_of_visit <- visit_to_unit_lookup(comp$arrays, comp$n_visit)
   comp$state[, unit_of_visit, drop = FALSE] * comp$p
 }
 
 
 posterior_epred_nmix <- function(object, newdata = NULL,
-                                  draw_ids = NULL) {
-  closure_unit_visit_epred(object, newdata, draw_ids)
+                                  draw_ids = NULL, linpred = NULL) {
+  closure_unit_visit_epred(object, newdata, draw_ids, linpred)
 }
+
+#' Read a per-unit quantity at the grain of the frame's rows
+#'
+#' `predict(type = "latent_state")` answers once per closure unit,
+#' which is the grain an abundance or an occupancy lives on. A caller
+#' that pairs a column of draws with a row of `newdata` needs one
+#' column per row, and every row of a unit reads that unit's one
+#' state. `marginaleffects` is such a caller, and met a refusal
+#' comparing 75 columns against 300 rows.
+#'
+#' Left alone when the draws already run at row grain, which
+#' `type = "detection"` and every non-closure family do, and when the
+#' column count matches neither grain, so the caller's own dimension
+#' check reports that rather than a second one here.
+#'
+#' @param object A fitted `mvgam` object.
+#' @param newdata The frame the draws were made for.
+#' @param draws `[ndraws x N]` matrix, or anything else unchanged.
+#' @return The draws, with one column per row of `newdata`.
+#' @noRd
+closure_unit_draws_to_rows <- function(object, newdata, draws) {
+  if (!is.matrix(draws) || is.null(newdata) ||
+        !is_closure_unit_family(object$family) ||
+        ncol(draws) == nrow(newdata)) {
+    return(draws)
+  }
+  arrays <- closure_unit_arrays_for(object, newdata)
+  if (ncol(draws) != arrays$N_unit) {
+    return(draws)
+  }
+  draws[, visit_to_unit_lookup(arrays, nrow(newdata)), drop = FALSE]
+}
+
 
 #' Inverse of arrays$visit_row: for each row of the frame, the unit
 #' that contains it. Used to broadcast unit-grain quantities
@@ -6247,18 +6314,27 @@ visit_to_unit_lookup <- function(arrays, n_visit) {
 # draws differ, so they are the arguments and the walk is written
 # once.
 #
-# The RNG calls keep the order they always had -- a unit's state,
-# then its visits in `visit_row` order -- so a seeded draw is
-# unchanged by the folding.
+# The RNG calls run in one order -- a unit's state, then its rows in
+# frame order -- which on a frame whose responses are all present is
+# the order the per-family versions of this walk used, so a seeded
+# draw from such a frame is unchanged.
 #' @noRd
 closure_unit_visit_draws <- function(object, newdata, draw_ids,
-                                     draw_state, draw_visit) {
-  comp <- extract_closure_unit_components(object, newdata, draw_ids)
+                                     draw_state, draw_visit,
+                                     linpred = NULL) {
+  comp <- extract_closure_unit_components(object, newdata, draw_ids,
+                                          linpred = linpred)
   arrays <- comp$arrays
   ndraws <- comp$ndraws
   out <- matrix(0L, nrow = ndraws, ncol = comp$n_visit)
+  # Every row of the unit, not its observed rows alone: a visit whose
+  # response was not recorded still has a detection probability and so
+  # still has a predictive draw. On a forecast grid no row carries a
+  # response at all, and walking the observed ones left every column
+  # of the arm at its zero fill.
+  unit_rows <- closure_unit_row_split(arrays)
   for (g in seq_len(arrays$N_unit)) {
-    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
+    idx <- unit_rows[[g]]
     state_g <- draw_state(comp$state[, g], ndraws)
     for (j in idx) {
       out[, j] <- draw_visit(state_g, comp$p[, j], ndraws)
@@ -6291,12 +6367,13 @@ draw_poisson_abundance <- function(lambda_g, ndraws) {
 #' @return `[S x N_visit]` integer matrix of visit counts.
 #' @noRd
 posterior_predict_nmix <- function(object, newdata = NULL,
-                                    draw_ids = NULL) {
+                                    draw_ids = NULL, linpred = NULL) {
   closure_unit_visit_draws(
     object, newdata, draw_ids, draw_poisson_abundance,
     function(N_draws, p_j, ndraws) {
       stats::rbinom(ndraws, size = N_draws, prob = p_j)
-    }
+    },
+    linpred = linpred
   )
 }
 
@@ -6410,6 +6487,29 @@ aggregate_closure_unit_visits <- function(object,
 multinomial_unit_totals <- function(object, newdata, arrays) {
   newdata <- newdata %||% mvgam_training_data(object)
   y <- as.numeric(newdata[[closure_unit_response_var(object$formula)]])
+  # `N_site` is the multinomial's sample size, and it is data rather
+  # than a parameter: a site's counts sum to it. A site with no counts
+  # supplies none, and summing nothing reports a total of zero, which
+  # gives every category an expected count of zero and draws no
+  # individuals. That is a forecast grid, so say what it is missing.
+  unseen <- which(arrays$n_rep == 0L)
+  if (length(unseen)) {
+    stop(insight::format_error(c(
+      "A multinomial site carries no counts, so its total is unknown.",
+      x = paste0(
+        "Sites with no observed category: ",
+        paste(utils::head(arrays$unit_labels[unseen], 5L),
+              collapse = ", "),
+        if (length(unseen) > 5L) ", ..." else "", "."
+      ),
+      i = paste0(
+        "'multi()' reads each site's trial total from its own ",
+        "counts, so a site can be predicted at only where they are ",
+        "supplied. Use 'diri()' or 'categ()' to predict a ",
+        "composition with no total."
+      )
+    )))
+  }
   # Reduce to one total per unit, then read it back at row grain
   # through the row-to-unit map the arrays already carry.
   sum_within_closure_units(arrays, y)[arrays$row_unit]
@@ -6436,6 +6536,78 @@ multinomial_unit_totals <- function(object, newdata, arrays) {
 #' @noRd
 empty_unit_loglik <- function(ndraws, N_obs) {
   matrix(NA_real_, nrow = ndraws, ncol = N_obs)
+}
+
+
+#' Every row a closure unit holds, observed or not
+#'
+#' `visit_row` names a unit's observed rows alone, which is the right
+#' axis for a density: a visit that did not happen contributes none.
+#' It is the wrong axis for any quantity normalised across the unit.
+#' A composition's softmax spans the K components of a site, so taken
+#' over the survivors it renormalises the site to the components that
+#' were recorded: the probabilities sum to one while the observed
+#' shares they are scored against sum to less than one. Stan's own
+#' `dirichlet_lpdf` validates its simplex argument and rejects that
+#' pair, so the R side and the sampled model parted company exactly
+#' where a held-out fold or a missing observation put them.
+#'
+#' `row_unit` already answers this over every row of the frame, so
+#' the split is read rather than rebuilt from the grouping columns.
+#'
+#' @param arrays The list `build_closure_unit_arrays()` returns, or
+#'   any list carrying its `row_unit` and `N_unit` fields, which is
+#'   what the builder itself has to hand before the list is assembled.
+#' @return A list of length `N_unit`, each element the frame rows of
+#'   that unit in row order.
+#' @noRd
+closure_unit_row_split <- function(arrays) {
+  row_unit <- arrays$row_unit
+  out <- split(
+    seq_along(row_unit),
+    factor(row_unit, levels = seq_len(arrays$N_unit))
+  )
+  names(out) <- NULL
+  out
+}
+
+
+#' The first frame row of each closure unit
+#'
+#' A per-unit quantity is carried on one of the unit's rows, and four
+#' callers pick it: the unit-grain state, the per-unit log-density,
+#' and two `pp_check()` reductions. `visit_row[, 1]` answered this by
+#' naming the first *observed* row, which is `NA` for a unit nothing
+#' was recorded in, and an `NA` column index silently produces an `NA`
+#' column rather than an error. The first row of the unit exists
+#' whether or not its response does.
+#'
+#' @param arrays The list `build_closure_unit_arrays()` returns.
+#' @param unit_rows The split `closure_unit_row_split()` returns.
+#' @return Integer vector of length `N_unit`.
+#' @noRd
+closure_unit_first_rows <- function(arrays,
+                                    unit_rows =
+                                      closure_unit_row_split(arrays)) {
+  vapply(unit_rows, `[`, integer(1L), 1L)
+}
+
+
+#' The closure units whose components were all observed
+#'
+#' A composition has a density only where every component of the unit
+#' was recorded, since the observed shares are a simplex only then.
+#' The units this omits are left missing by the density kernels, which
+#' is what `clean_ll()` reads to drop them from `loo()` and `waic()`.
+#'
+#' @param arrays The list `build_closure_unit_arrays()` returns.
+#' @param unit_rows The split `closure_unit_row_split()` returns.
+#' @return Integer vector of unit indices.
+#' @noRd
+complete_closure_units <- function(arrays,
+                                   unit_rows =
+                                     closure_unit_row_split(arrays)) {
+  which(lengths(unit_rows) == arrays$n_rep)
 }
 
 
@@ -6951,9 +7123,11 @@ extract_mv_response_components <- function(object, newdata = NULL,
 #' @return `[ndraws x N_obs]` matrix of expected values.
 #' @noRd
 posterior_epred_mvn <- function(object, newdata = NULL,
-                                 draw_ids = NULL, ndraws = NULL) {
+                                 draw_ids = NULL, ndraws = NULL,
+                                 linpred = NULL) {
   extract_mv_response_components(
-    object, newdata, draw_ids, ndraws = ndraws, needs_nu = FALSE
+    object, newdata, draw_ids, ndraws = ndraws, needs_nu = FALSE,
+    linpred = linpred
   )$mu
 }
 
@@ -6969,9 +7143,11 @@ posterior_epred_mvn <- function(object, newdata = NULL,
 #' @return `[ndraws x N_obs]` numeric matrix of response draws.
 #' @noRd
 posterior_predict_mvn <- function(object, newdata = NULL,
-                                   draw_ids = NULL, ndraws = NULL) {
+                                   draw_ids = NULL, ndraws = NULL,
+                                   linpred = NULL) {
   comp <- extract_mv_response_components(
-    object, newdata, draw_ids, ndraws = ndraws, needs_nu = FALSE
+    object, newdata, draw_ids, ndraws = ndraws, needs_nu = FALSE,
+    linpred = linpred
   )
   matrix(
     stats::rnorm(
@@ -7049,9 +7225,11 @@ log_lik_mvn <- function(linpred, link, y, family_pars, trials) {
 #' @return `[ndraws x N_obs]` matrix.
 #' @noRd
 posterior_epred_mvt <- function(object, newdata = NULL,
-                                 draw_ids = NULL, ndraws = NULL) {
+                                 draw_ids = NULL, ndraws = NULL,
+                                 linpred = NULL) {
   extract_mv_response_components(
-    object, newdata, draw_ids, ndraws = ndraws, needs_nu = TRUE
+    object, newdata, draw_ids, ndraws = ndraws, needs_nu = TRUE,
+    linpred = linpred
   )$mu
 }
 
@@ -7067,9 +7245,11 @@ posterior_epred_mvt <- function(object, newdata = NULL,
 #' @return `[ndraws x N_obs]` numeric matrix.
 #' @noRd
 posterior_predict_mvt <- function(object, newdata = NULL,
-                                   draw_ids = NULL, ndraws = NULL) {
+                                   draw_ids = NULL, ndraws = NULL,
+                                   linpred = NULL) {
   comp <- extract_mv_response_components(
-    object, newdata, draw_ids, ndraws = ndraws, needs_nu = TRUE
+    object, newdata, draw_ids, ndraws = ndraws, needs_nu = TRUE,
+    linpred = linpred
   )
   # nu is per-draw; broadcast to per-cell with matrix() recycling.
   nu_row <- matrix(comp$nu, nrow = comp$ndraws, ncol = comp$N_obs)
@@ -7201,16 +7381,17 @@ extract_simplex_response_components <- function(object,
   ndraws_actual <- nrow(mu)
   N_obs <- ncol(mu)
   N_unit <- arrays$N_unit
-  visit_row <- arrays$visit_row
-  n_rep <- arrays$n_rep
 
   # Build per-row softmax probabilities by walking units. Each unit
-  # contributes Kg rows whose probabilities sum to 1 along the draw
-  # axis.
+  # contributes its K component rows, whose probabilities sum to 1
+  # along the draw axis. Every row of the unit is taken, whether or
+  # not its response was recorded: a row that lost its response still
+  # carries a linear predictor, so the normaliser is over the site the
+  # model has rather than over the components that came back.
+  unit_rows <- closure_unit_row_split(arrays)
   prob_row <- matrix(0, nrow = ndraws_actual, ncol = N_obs)
   for (g in seq_len(N_unit)) {
-    Kg <- n_rep[g]
-    idx <- visit_row[g, seq_len(Kg)]
+    idx <- unit_rows[[g]]
     mu_unit <- mu[, idx, drop = FALSE]
     # Mirror Stan's `mu_unit = mu[idx] - mu[idx[1]]` reference shift.
     # softmax is shift-invariant so the resulting probabilities are
@@ -7260,8 +7441,8 @@ extract_simplex_response_components <- function(object,
 #'   response scale.
 #'
 #' After extraction the per-unit collapse is applied: each closure
-#' unit's K rows are set to the value at the unit's first row
-#' (`visit_row[g, 1]`), mirroring Stan's `phi[idx[1]]` semantics in
+#' unit's K rows are set to the value at the unit's first row,
+#' mirroring Stan's `phi[idx[1]]` semantics in
 #' `diri_lpdf()`. Per-row phi only enters the joint Dirichlet
 #' density once per unit, so any cross-row variation in the unit
 #' would be ignored by the likelihood and is removed here to keep
@@ -7310,13 +7491,15 @@ extract_phi_per_row <- function(object, newdata, draw_ids,
     ))
   }
 
-  # Per-unit collapse: each closure unit's Kg rows share `phi[idx[1]]`
+  # Per-unit collapse: each closure unit's rows share `phi[idx[1]]`
   # (Stan parameterisation). Without this collapse a covariate that
   # varies WITHIN a unit would introduce per-row variation that the
-  # Stan likelihood never sees.
+  # Stan likelihood never sees. Taken over the unit's whole set of
+  # rows, so a row whose response was not recorded still carries its
+  # site's concentration and can be drawn from.
+  unit_rows <- closure_unit_row_split(arrays)
   for (g in seq_len(arrays$N_unit)) {
-    Kg <- arrays$n_rep[g]
-    idx <- arrays$visit_row[g, seq_len(Kg)]
+    idx <- unit_rows[[g]]
     phi_mat[, idx] <- phi_mat[, idx[1L]]
   }
   phi_mat
@@ -7324,18 +7507,19 @@ extract_phi_per_row <- function(object, newdata, draw_ids,
 
 #' Per-row expected value for a `diri()` fit
 #'
-#' Each (site, species) row receives its softmax probability,
-#' broadcast from the per-site K-vector via `arrays$visit_row`.
-#' Compositional responses sum to 1 across the K rows of a site,
-#' so `E[y_{i,k}] = softmax(mu_unit_i)[k]`.
+#' Each (site, species) row receives its softmax probability from the
+#' per-site K-vector. Compositional responses sum to 1 across the K
+#' rows of a site, so `E[y_{i,k}] = softmax(mu_unit_i)[k]`.
 #'
 #' @inheritParams extract_simplex_response_components
 #' @return `[ndraws x N_obs]` matrix of expected proportions.
 #' @noRd
 posterior_epred_diri <- function(object, newdata = NULL,
-                                  draw_ids = NULL, ndraws = NULL) {
+                                  draw_ids = NULL, ndraws = NULL,
+                                  linpred = NULL) {
   extract_simplex_response_components(
-    object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE
+    object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE,
+    linpred = linpred
   )$prob_row
 }
 
@@ -7349,14 +7533,17 @@ posterior_epred_diri <- function(object, newdata = NULL,
 #' @return `[ndraws x N_obs]` matrix of simplex draws.
 #' @noRd
 posterior_predict_diri <- function(object, newdata = NULL,
-                                    draw_ids = NULL, ndraws = NULL) {
+                                    draw_ids = NULL, ndraws = NULL,
+                                    linpred = NULL) {
   comp <- extract_simplex_response_components(
-    object, newdata, draw_ids, ndraws = ndraws, needs_phi = TRUE
+    object, newdata, draw_ids, ndraws = ndraws, needs_phi = TRUE,
+    linpred = linpred
   )
   out <- matrix(0, nrow = comp$ndraws, ncol = comp$N_obs)
+  unit_rows <- closure_unit_row_split(comp$arrays)
   for (g in seq_len(comp$N_unit)) {
-    Kg <- comp$arrays$n_rep[g]
-    idx <- comp$arrays$visit_row[g, seq_len(Kg)]
+    idx <- unit_rows[[g]]
+    Kg <- length(idx)
     prob_g <- comp$prob_row[, idx, drop = FALSE]
     # alpha[s, k] = prob_g[s, k] * phi[s, idx[1]]. `comp$phi` is a
     # `[ndraws x N_obs]` matrix whose Kg-row block is constant within
@@ -7378,9 +7565,11 @@ posterior_predict_diri <- function(object, newdata = NULL,
 #'
 #' Per-unit Dirichlet density `dirichlet_lpdf(y_unit |
 #' softmax(mu_unit) * phi)`. The per-unit log-density is assigned to
-#' the first row of each unit (`visit_row[g, 1]`) and zero for the
-#' remaining K-1 rows, so the sum across rows recovers the joint
-#' log-likelihood and loo / waic naturally score at the site grain.
+#' the first row of each unit and left missing on the remaining K-1,
+#' so the sum across rows recovers the joint log-likelihood and loo /
+#' waic score at the site grain. A unit that lost a component is left
+#' missing entirely: its observed shares no longer sum to one, so it
+#' has no Dirichlet density to give.
 #'
 #' @param linpred `[ndraws x N_obs]` linpred on identity scale.
 #' @param link Family link ("identity").
@@ -7396,9 +7585,10 @@ log_lik_diri <- function(linpred, link, y, family_pars, trials) {
   ndraws <- nrow(linpred)
   N_obs <- ncol(linpred)
   out <- empty_unit_loglik(ndraws, N_obs)
-  for (g in seq_len(arrays$N_unit)) {
-    Kg <- arrays$n_rep[g]
-    idx <- arrays$visit_row[g, seq_len(Kg)]
+  unit_rows <- closure_unit_row_split(arrays)
+  for (g in complete_closure_units(arrays, unit_rows)) {
+    idx <- unit_rows[[g]]
+    Kg <- length(idx)
     y_unit <- y[idx]
     prob_g <- prob_row[, idx, drop = FALSE]
     alpha <- prob_g * phi[, idx, drop = FALSE]
@@ -7423,9 +7613,11 @@ log_lik_diri <- function(linpred, link, y, family_pars, trials) {
 #' @return `[ndraws x N_obs]` matrix of expected counts.
 #' @noRd
 posterior_epred_multi <- function(object, newdata = NULL,
-                                   draw_ids = NULL, ndraws = NULL) {
+                                   draw_ids = NULL, ndraws = NULL,
+                                   linpred = NULL) {
   comp <- extract_simplex_response_components(
-    object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE
+    object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE,
+    linpred = linpred
   )
   total_mat <- matrix(
     multinomial_unit_totals(object, newdata, comp$arrays),
@@ -7446,17 +7638,19 @@ posterior_epred_multi <- function(object, newdata = NULL,
 #' @return `[ndraws x N_obs]` integer matrix of counts.
 #' @noRd
 posterior_predict_multi <- function(object, newdata = NULL,
-                                     draw_ids = NULL, ndraws = NULL) {
+                                     draw_ids = NULL, ndraws = NULL,
+                                     linpred = NULL) {
   comp <- extract_simplex_response_components(
-    object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE
+    object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE,
+    linpred = linpred
   )
   # The trial total is carried on every row of a unit, so reading it
   # off the unit's first row gives `N_site` without a second sum.
   totals <- multinomial_unit_totals(object, newdata, comp$arrays)
   out <- matrix(0L, nrow = comp$ndraws, ncol = comp$N_obs)
+  unit_rows <- closure_unit_row_split(comp$arrays)
   for (g in seq_len(comp$N_unit)) {
-    Kg <- comp$arrays$n_rep[g]
-    idx <- comp$arrays$visit_row[g, seq_len(Kg)]
+    idx <- unit_rows[[g]]
     n_g <- totals[idx[1L]]
     prob_g <- comp$prob_row[, idx, drop = FALSE]
     for (s in seq_len(comp$ndraws)) {
@@ -7482,9 +7676,10 @@ log_lik_multi <- function(linpred, link, y, family_pars, trials) {
   ndraws <- nrow(linpred)
   N_obs <- ncol(linpred)
   out <- empty_unit_loglik(ndraws, N_obs)
-  for (g in seq_len(arrays$N_unit)) {
-    Kg <- arrays$n_rep[g]
-    idx <- arrays$visit_row[g, seq_len(Kg)]
+  unit_rows <- closure_unit_row_split(arrays)
+  for (g in complete_closure_units(arrays, unit_rows)) {
+    idx <- unit_rows[[g]]
+    Kg <- length(idx)
     y_unit <- as.integer(y[idx])
     n_g <- sum(y_unit)
     prob_g <- prob_row[, idx, drop = FALSE]
@@ -7509,9 +7704,11 @@ log_lik_multi <- function(linpred, link, y, family_pars, trials) {
 #' @return `[ndraws x N_obs]` matrix of probabilities.
 #' @noRd
 posterior_epred_categ <- function(object, newdata = NULL,
-                                   draw_ids = NULL, ndraws = NULL) {
+                                   draw_ids = NULL, ndraws = NULL,
+                                   linpred = NULL) {
   extract_simplex_response_components(
-    object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE
+    object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE,
+    linpred = linpred
   )$prob_row
 }
 
@@ -7526,14 +7723,17 @@ posterior_epred_categ <- function(object, newdata = NULL,
 #' @return `[ndraws x N_obs]` integer matrix of 0 / 1 values.
 #' @noRd
 posterior_predict_categ <- function(object, newdata = NULL,
-                                     draw_ids = NULL, ndraws = NULL) {
+                                     draw_ids = NULL, ndraws = NULL,
+                                     linpred = NULL) {
   comp <- extract_simplex_response_components(
-    object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE
+    object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE,
+    linpred = linpred
   )
   out <- matrix(0L, nrow = comp$ndraws, ncol = comp$N_obs)
+  unit_rows <- closure_unit_row_split(comp$arrays)
   for (g in seq_len(comp$N_unit)) {
-    Kg <- comp$arrays$n_rep[g]
-    idx <- comp$arrays$visit_row[g, seq_len(Kg)]
+    idx <- unit_rows[[g]]
+    Kg <- length(idx)
     prob_g <- comp$prob_row[, idx, drop = FALSE]
     for (s in seq_len(comp$ndraws)) {
       cat_code <- sample.int(Kg, size = 1L, prob = prob_g[s, ])
@@ -7557,9 +7757,10 @@ log_lik_categ <- function(linpred, link, y, family_pars, trials) {
   ndraws <- nrow(linpred)
   N_obs <- ncol(linpred)
   out <- empty_unit_loglik(ndraws, N_obs)
-  for (g in seq_len(arrays$N_unit)) {
-    Kg <- arrays$n_rep[g]
-    idx <- arrays$visit_row[g, seq_len(Kg)]
+  unit_rows <- closure_unit_row_split(arrays)
+  for (g in complete_closure_units(arrays, unit_rows)) {
+    idx <- unit_rows[[g]]
+    Kg <- length(idx)
     y_unit <- as.integer(y[idx])
     # Observed category code: the index where y_unit == 1.
     cat_code <- which(y_unit == 1L)
@@ -7594,8 +7795,10 @@ log_lik_categ <- function(linpred, link, y, family_pars, trials) {
 #' @noRd
 posterior_epred_nmix_royle_nichols <- function(object,
                                                 newdata = NULL,
-                                                draw_ids = NULL) {
-  comp <- extract_closure_unit_components(object, newdata, draw_ids)
+                                                draw_ids = NULL,
+                                                linpred = NULL) {
+  comp <- extract_closure_unit_components(object, newdata, draw_ids,
+                                          linpred = linpred)
   unit_of_visit <- visit_to_unit_lookup(comp$arrays, comp$n_visit)
   lambda_visit <- comp$state[, unit_of_visit, drop = FALSE]
   r_visit <- comp$p
@@ -7617,7 +7820,8 @@ posterior_epred_nmix_royle_nichols <- function(object,
 #' @noRd
 posterior_predict_nmix_royle_nichols <- function(object,
                                                   newdata = NULL,
-                                                  draw_ids = NULL) {
+                                                  draw_ids = NULL,
+                                                  linpred = NULL) {
   closure_unit_visit_draws(
     object, newdata, draw_ids, draw_poisson_abundance,
     function(N_draws, r_j, ndraws) {
@@ -7625,7 +7829,8 @@ posterior_predict_nmix_royle_nichols <- function(object,
       # cancellation that hits for small r and small N_draws.
       p_visit <- 1 - exp(N_draws * log1p(-r_j))
       stats::rbinom(ndraws, size = 1L, prob = p_visit)
-    }
+    },
+    linpred = linpred
   )
 }
 
@@ -7808,8 +8013,10 @@ log_lik_nmix_royle_nichols <- function(linpred, link, y,
 #' @noRd
 posterior_epred_nmix_poisson_poisson <- function(object,
                                                   newdata = NULL,
-                                                  draw_ids = NULL) {
-  comp <- extract_closure_unit_components(object, newdata, draw_ids)
+                                                  draw_ids = NULL,
+                                                  linpred = NULL) {
+  comp <- extract_closure_unit_components(object, newdata, draw_ids,
+                                          linpred = linpred)
   unit_of_visit <- visit_to_unit_lookup(comp$arrays, comp$n_visit)
   lambda_visit <- comp$state[, unit_of_visit, drop = FALSE]
   lambda_visit * comp$p
@@ -7827,12 +8034,14 @@ posterior_epred_nmix_poisson_poisson <- function(object,
 #' @noRd
 posterior_predict_nmix_poisson_poisson <- function(object,
                                                     newdata = NULL,
-                                                    draw_ids = NULL) {
+                                                    draw_ids = NULL,
+                                                    linpred = NULL) {
   closure_unit_visit_draws(
     object, newdata, draw_ids, draw_poisson_abundance,
     function(N_draws, p_j, ndraws) {
       stats::rpois(ndraws, lambda = N_draws * p_j)
-    }
+    },
+    linpred = linpred
   )
 }
 
@@ -8014,8 +8223,8 @@ log_lik_nmix_poisson_poisson <- function(linpred, link, y,
 #'   in (0, 1).
 #' @noRd
 posterior_epred_occ <- function(object, newdata = NULL,
-                                 draw_ids = NULL) {
-  closure_unit_visit_epred(object, newdata, draw_ids)
+                                 draw_ids = NULL, linpred = NULL) {
+  closure_unit_visit_epred(object, newdata, draw_ids, linpred)
 }
 
 #' Per-visit response draws for an occ() fit (unconditional)
@@ -8033,7 +8242,7 @@ posterior_epred_occ <- function(object, newdata = NULL,
 #' @return `[S x N_visit]` integer matrix of 0/1 detections.
 #' @noRd
 posterior_predict_occ <- function(object, newdata = NULL,
-                                   draw_ids = NULL) {
+                                   draw_ids = NULL, linpred = NULL) {
   closure_unit_visit_draws(
     object, newdata, draw_ids,
     function(psi_g, ndraws) {
@@ -8041,7 +8250,8 @@ posterior_predict_occ <- function(object, newdata = NULL,
     },
     function(z_draws, p_j, ndraws) {
       stats::rbinom(ndraws, size = 1L, prob = z_draws * p_j)
-    }
+    },
+    linpred = linpred
   )
 }
 

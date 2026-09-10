@@ -161,21 +161,20 @@ compute_family_epred <- function(linpred, family, trials = NULL,
     },
 
 
-    # nmix() and its variants are intercepted upstream in
-    # posterior_epred.mvgam(); these branches are defensive (e.g.
-    # callers that reach compute_family_epred directly).
+    # Both routes to a family's mean intercept these upstream:
+    # `posterior_epred.mvgam()` and `expected_from_linpred()`. The
+    # branch is what a caller reaching this dispatch directly meets.
     "nmix" = ,
     "nmix_royle_nichols" = ,
     "nmix_poisson_poisson" = stop(insight::format_error(c(
       paste0(
-        "Family '", family$name,
-        "' must be routed through posterior_epred.mvgam()."
+        "Family '", family_name,
+        "' has no mean this dispatch can compute."
       ),
       i = paste0(
-        "compute_family_epred() is the generic dispatch; closure-",
-        "unit families need the per-fit `p` draws and arrays, which ",
-        "posterior_epred.mvgam supplies via the per-family kernels ",
-        "registered in dispatch_closure_unit_method()."
+        "A closure-unit family's mean reads the unit's other visits, ",
+        "so it needs the per-fit `p` draws and arrays that the ",
+        "kernels in dispatch_closure_unit_method() supply."
       )
     ))),
 
@@ -704,6 +703,14 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
 #' draws are resolved against the same iterations the predictor came
 #' from.
 #'
+#' A closure-unit family's mean reads sibling rows: an occupancy is
+#' thinned by the visit's detection probability, and a composition
+#' normalises across the K rows of its site. Neither is a function of
+#' one row's predictor, so each has a kernel that says what it is,
+#' and this routes to that kernel with the predictor it was handed.
+#' Applying the inverse link instead returned the raw predictor for
+#' a composition and the occupancy without its detection.
+#'
 #' @param object A fitted `mvgam` object.
 #' @param linpred `[ndraws x nobs]` link-scale predictor, or a named
 #'   list of them for a multivariate fit.
@@ -716,6 +723,16 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
 #' @noRd
 expected_from_linpred <- function(object, linpred, family,
                                   newdata = NULL, draw_ids = NULL) {
+  # A multivariate fit arrives as a named list of predictors and is
+  # recursed on below; a matrix is the single-response case, which is
+  # the only one a closure-unit family takes.
+  if (is.matrix(linpred) && is_closure_unit_family(family)) {
+    epred_fn <- dispatch_closure_unit_method(family, "epred")
+    return(epred_fn(
+      object, newdata = newdata, draw_ids = draw_ids,
+      linpred = linpred
+    ))
+  }
   trials <- extract_trials_for_family(object, family, newdata)
   family_pars <- resolve_epred_family_pars(
     object, family, linpred, draw_ids = draw_ids, newdata = newdata

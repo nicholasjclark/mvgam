@@ -268,6 +268,7 @@ SPECS <- list(
     has_psi = FALSE,
     epred_ok = function(x) all(x > 0),
     predict_ok = function(x) all(x >= 0) && all(x == floor(x)),
+    has_latent_state = FALSE,
     fc_types = c("link", "expected", "trend", "response"),
     fc_response_ok = function(x) all(x >= 0) && all(x == floor(x)),
     pp_check_extra = "rootogram",
@@ -286,7 +287,8 @@ SPECS <- list(
     threshold_cor = 0.7, mae_max = 0.5, na_response = NA_real_,
     has_psi = TRUE,
     epred_ok = NULL, predict_ok = NULL,
-    fc_types = c("link", "expected", "trend"),
+    has_latent_state = FALSE,
+    fc_types = c("link", "expected", "trend", "response"),
     fc_response_ok = NULL,
     pp_check_extra = "resid_qq",
     plot_types = c("residuals", "trend", "factors"),
@@ -302,11 +304,12 @@ SPECS <- list(
     has_psi = FALSE,
     epred_ok = function(x) all(x >= 0 & x <= 1),
     predict_ok = function(x) all(x >= 0 & x <= 1),
-    fc_types = c("link", "expected", "trend"),
-    fc_response_ok = NULL,
+    has_latent_state = FALSE,
+    fc_types = c("link", "expected", "trend", "response"),
+    fc_response_ok = function(x) all(x >= 0 & x <= 1),
     pp_check_extra = NULL,
     plot_types = c("trend", "factors"),
-    optional_methods = "residuals",
+    optional_methods = c("residuals", "forecast_response_agrees"),
     ce_response_ok = NULL,
     me_integer_tell = FALSE
   )
@@ -770,6 +773,26 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     expect_gt(max(abs(post_off)), 0.05)
   })
 
+  test_that(says("a partial correlation says why it cannot be taken"), {
+    # `Z Sigma Z'` over K species and N_lv factors has rank N_lv, so
+    # below K it has no inverse and the identity a partial
+    # correlation is read off does not exist for this fit at any
+    # data. `solve()` reported that as a LAPACK reciprocal condition
+    # number, which says nothing about the model that produced it.
+    # Every fit in this battery carries fewer factors than species.
+    expect_lt(N_lv, K)
+    expect_error(
+      residual_cor(fit, partial = TRUE),
+      "full-rank residual covariance"
+    )
+    # The message carries the two numbers a reader needs and the
+    # method that answers the question they were asking.
+    expect_error(residual_cor(fit, partial = TRUE), as.character(K))
+    expect_error(residual_cor(fit, partial = TRUE), "shared_variation")
+    # The default path is untouched: only the inverse is unavailable.
+    expect_s3_class(residual_cor(fit), "mvgam_residcor")
+  })
+
   test_that(says("the factor methods report the fit's own loadings"), {
     # These are the methods a jsdgam exists for, and each reads the
     # loadings against the species axis. A wrong axis gives every one
@@ -936,11 +959,13 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     # having a latent state to report. `occ()` and `nmix()` do;
     # `mvn()`, `mvt()` and `diri()` reuse the pipeline and do not.
     #
-    # Asserted as agreement between the three routes rather than
-    # against the registry that decides, so the claim is not the
-    # decision restated. Two of them checked only whether the family
-    # was closure-unit, let these families through to a dispatcher
-    # with no branch, and answered with a source file to edit.
+    # Which families have one is declared per family above rather
+    # than read from the registry that decides, so the claim is not
+    # the decision restated. Two of these routes checked only whether
+    # the family was closure-unit, let these families through to a
+    # dispatcher with no branch, and answered with a source file to
+    # edit, so all three are held to the same answer.
+    expect_false(spec$has_latent_state)
     routes <- list(
       hindcast = function() hindcast(fit, type = "latent_state"),
       predict = function() predict(fit, type = "latent_state",
@@ -948,17 +973,11 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
       conditional_effects = function()
         conditional_effects(fit, type = "latent_state")
     )
-    refused <- vapply(routes, function(f) {
-      inherits(try(suppressWarnings(f()), silent = TRUE), "try-error")
-    }, logical(1L))
-    expect_true(length(unique(refused)) == 1L)
-    # And where it is refused, the refusal names the family and what
-    # it does offer, rather than naming the package's own internals.
-    if (all(refused)) {
-      for (r in names(routes)) {
-        expect_error(suppressWarnings(routes[[r]]()),
-                     "is not available for this family")
-      }
+    # The refusal names the family and what it does offer, rather
+    # than naming the package's own internals.
+    for (r in names(routes)) {
+      expect_error(suppressWarnings(routes[[r]]()),
+                   "is not available for this family")
     }
 
     # `summary()` closes with a list of next steps, and it must not
@@ -1299,6 +1318,45 @@ test_that("diri: the data and the expectation are both compositions", {
 })
 
 
+test_that("diri: the forecast expectation is a composition", {
+  # `posterior_epred()` over the training grid and
+  # `forecast(type = "expected")` over its extension are one
+  # quantity, so they occupy one scale. A softmax normalises across
+  # the site's species, which no per-row inverse link can do, and
+  # skipping it returned the linear predictor itself: negative
+  # numbers where a probability was asked for. A bound alone would
+  # pass on a link arm that happened to be small, so the claim is
+  # that the species shares sum to one at every forecast site.
+  obj <- get("diri", envir = built)
+  d <- obj$sim$long_dat
+  lev <- levels(d$series)
+  h <- 3L
+  nd <- expand.grid(
+    time = max(d$time) + seq_len(h),
+    series = factor(lev, levels = lev),
+    stringsAsFactors = FALSE
+  )
+  nd$env <- 0
+  nd$y <- NA_real_
+
+  arms <- forecast(obj$fit, newdata = nd, ndraws = 20L,
+                   type = "expected")$forecasts
+  expect_identical(names(arms), lev)
+  site_sums <- Reduce(`+`, arms)
+  expect_equal(as.numeric(site_sums), rep(1, 20L * h),
+               tolerance = 1e-10)
+
+  # A drawn composition is a composition too, which the expectation
+  # under another name would also satisfy, so the draws are required
+  # to differ from the arm above rather than only to sum to one.
+  drawn <- forecast(obj$fit, newdata = nd, ndraws = 20L,
+                    type = "response")$forecasts
+  expect_equal(as.numeric(Reduce(`+`, drawn)), rep(1, 20L * h),
+               tolerance = 1e-10)
+  expect_gt(max(abs(do.call(cbind, drawn) - do.call(cbind, arms))), 0)
+})
+
+
 test_that("diri: a unit missing a component is not scored", {
   # Drop one species from one site. The rows that remain still
   # renormalise to a softmax summing to one, so the density and the
@@ -1311,22 +1369,45 @@ test_that("diri: a unit missing a component is not scored", {
   d <- obj$sim$long_dat
   gap <- d
   gap$y[1L] <- NA_real_
-  hit <- d$time == d$time[1L]
+  # A composition scores one joint density per site and parks it on
+  # that site's first row, which is why `loo()` reports one
+  # observation per site rather than one per species. Both facts are
+  # read off the user's own frame: the sites are its times, and each
+  # site's first row is the first the frame gives that time.
+  parked <- !duplicated(d$time)
+  gapped <- d$time == d$time[1L]
 
   ll <- log_lik(obj$fit, newdata = gap, draw_ids = 1:5)
-  # One unit's density is parked on its first row, so exactly that
-  # unit's column empties and every other one stays finite.
-  expect_true(all(is.na(ll[, hit & seq_along(hit) == 1L])))
-  expect_true(all(is.finite(ll[, !hit])))
+  # The gapped site keeps no density on any of its rows, and every
+  # other site keeps exactly the one on its parked row.
+  expect_true(all(is.na(ll[, gapped])))
+  expect_true(all(is.finite(ll[, parked & !gapped])))
+  expect_true(all(is.na(ll[, !parked])))
 
+  # A per-row quantile residual is the marginal of one component and
+  # does not condition on the siblings, so the rows that kept their
+  # response keep a residual and only the emptied row loses one.
   rs <- residuals(obj$fit, newdata = gap, draw_ids = 1:5,
                   summary = FALSE)
-  expect_true(all(is.na(rs[, hit])))
-  expect_true(all(is.finite(rs[, !hit])))
+  expect_true(all(is.na(rs[, 1L])))
+  expect_true(all(is.finite(rs[, -1L])))
 
-  # The control: with every component present nothing is dropped.
+  # The control: with every component present every site is scored.
   ll_full <- log_lik(obj$fit, newdata = d, draw_ids = 1:5)
-  expect_false(anyNA(ll_full))
+  expect_true(all(is.finite(ll_full[, parked])))
+  expect_true(all(is.na(ll_full[, !parked])))
+
+  # The softmax the density is taken against spans the site's
+  # components rather than the ones that came back. Over the
+  # survivors alone it would renormalise to one, and the observed
+  # shares it is scored against sum to less than one.
+  comp <- mvgam:::extract_simplex_response_components(
+    obj$fit, newdata = gap, draw_ids = 1:5
+  )
+  site_1 <- which(gapped)
+  expect_equal(sum(comp$prob_row[1L, site_1]), 1, tolerance = 1e-10)
+  expect_lt(sum(comp$prob_row[1L, site_1[-1L]]), 1)
+  expect_lt(sum(gap$y[site_1[-1L]]), 1)
 })
 
 

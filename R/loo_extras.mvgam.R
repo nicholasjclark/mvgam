@@ -299,7 +299,7 @@ assert_resp_for_mv <- function(object, resp, fn_name) {
 loglik_col_values <- function(object, data, x, n_cols = NULL) {
   if (needs_closure_unit_aggregation(object$family)) {
     arrays <- closure_unit_arrays_for(object, data)
-    out <- x[arrays$visit_row[, 1L]]
+    out <- x[closure_unit_first_rows(arrays)]
     label <- "closure units"
   } else {
     out <- x

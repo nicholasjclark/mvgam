@@ -6,11 +6,14 @@
 #'
 #' \itemize{
 #'   \item Latent-factor trends (`n_lv` on the trend constructor). The
-#'     implied per-series covariance is `Sigma = Z Z^T` per draw,
+#'     implied per-series covariance is `Sigma = Z Omega Z^T` per
+#'     draw, where `Omega` is the covariance of the latent states,
 #'     using the posterior loadings `Z` for the default sampled-Z
 #'     factor model, or the user-supplied loadings broadcast across
 #'     draws when `trend_map = ...` fixes Z (see [mvgam()] /
-#'     [AR()] / [VAR()] / [RW()] / [ZMVN()]).
+#'     [AR()] / [VAR()] / [RW()] / [ZMVN()]). Taking `Z Z^T` instead
+#'     would drop whatever scale the latent columns carry, which
+#'     under multiplicative gamma shrinkage is the entire shrinkage.
 #'   \item Correlated process-error trends (`cor = TRUE` on `RW()` /
 #'     `AR()` / `ZMVN()`, or any `VAR()` / `VARMA()` trend).
 #'   \item Hierarchical correlation structures (grouping variable on
@@ -29,7 +32,11 @@
 #'   partial correlation matrix per draw via the inverse-correlation
 #'   identity `P_ij = -inv(R)_ij / sqrt(inv(R)_ii * inv(R)_jj)`. This
 #'   is `O(p^3)` per draw and is omitted by default. Required if you
-#'   want the `prec*` fields populated.
+#'   want the `prec*` fields populated. A factor fit with fewer
+#'   factors than series implies a covariance of rank `n_lv`, which
+#'   has no inverse, and the call is refused with that stated;
+#'   [shared_variation()] answers what such a fit has to say about
+#'   what the series share.
 #' @param summary Logical. When `TRUE` (default) per-element summaries
 #'   (point estimate, posterior SD, quantile CI, posterior probability
 #'   mass) are returned. When `FALSE` the full per-draw arrays are
@@ -225,6 +232,8 @@ compute_residual_cor <- function(object, by_group, partial, summary,
   n_lv <- detect_factor_n_lv(object)
   if (!is.null(n_lv)) {
     series_names <- resolve_series_info(object)$series_levels
+    refuse_partial_on_rank_deficient(partial, n_lv,
+                                     length(series_names))
     cov_draws <- factor_implied_cov_draws(object, n_lv,
                                           length(series_names))
     return(finalise_residcor(
@@ -335,6 +344,46 @@ factor_implied_cov_draws <- function(object, n_lv, n_series) {
     basis = "model"
   )
   project_cov_through_loadings(latent, Z_arr)
+}
+
+
+#' Refuse a partial correlation the covariance cannot supply
+#'
+#' A factor model writes each series' trend as a combination of `n_lv`
+#' latent columns, so the covariance it implies has rank `n_lv`. Below
+#' `n_series` that matrix is singular by construction, whatever the
+#' data, and the inverse a partial correlation is read off does not
+#' exist. `solve()` reported that as a LAPACK reciprocal condition
+#' number, which tells a reader nothing about their model.
+#'
+#' The quantity is not merely hard to compute there, it is empty:
+#' conditioning on the other `n_series - 1` series determines the
+#' remaining one exactly, so every partial correlation is `+/- 1` by
+#' construction. `shared_variation()` answers the question a reader
+#' brings to this argument.
+#'
+#' @param partial Whether partial correlations were asked for.
+#' @param n_lv Latent factors the fit carries.
+#' @param n_series Series the loadings project onto.
+#' @return `invisible(NULL)`, or an error.
+#' @noRd
+refuse_partial_on_rank_deficient <- function(partial, n_lv, n_series) {
+  if (!isTRUE(partial) || n_lv >= n_series) {
+    return(invisible(NULL))
+  }
+  stop(insight::format_error(c(
+    "Partial correlations need a full-rank residual covariance.",
+    x = paste0(
+      "This fit projects ", n_series, " series onto ", n_lv,
+      " latent factor", if (n_lv == 1L) "" else "s",
+      ", so the implied covariance has rank ", n_lv, " and no inverse."
+    ),
+    i = paste0(
+      "Use 'shared_variation()' for what the factors say the series ",
+      "share, or refit with n_lv = ", n_series, " for a covariance ",
+      "a partial correlation can be read off."
+    )
+  )))
 }
 
 

@@ -482,6 +482,47 @@ test_that("a detection draw is a detection, and an epred a probability", {
 })
 
 
+test_that("a frame carrying no responses can still be predicted at", {
+  # A prediction frame reaching past the training grid has no response
+  # by construction. Two fit-time requirements were being asked of it
+  # anyway -- that some visit was observed, and that the design could
+  # separate state from detection -- and between them they refused
+  # every such frame, one with a message about estimating detection
+  # and one about needing two closure units.
+  future <- dat[dat$time == max(dat$time), , drop = FALSE]
+  future$time <- max(dat$time) + 1L
+  future$y <- NA_integer_
+  expect_gt(length(unique(paste(future$series, future$time))), 1L)
+
+  ep <- posterior_epred(fit, newdata = future, draw_ids = 1:20)
+  expect_identical(ncol(ep), nrow(future))
+  expect_true(all(is.finite(ep)))
+  expect_true(all(ep > 0 & ep < 1))
+
+  # A visit's expectation is its unit's occupancy times that visit's
+  # own detection, so dividing one out leaves the other: a value
+  # constant across the unit's visits, because occupancy is a
+  # property of the unit. Returning the occupancy alone is in (0, 1)
+  # and correctly shaped, and leaves a ratio that moves with `tod_c`
+  # within the unit.
+  det <- predict(fit, newdata = future, type = "detection",
+                 summary = FALSE, draw_ids = 1:20)
+  ratio <- ep / det
+  expect_true(all(ratio > 0 & ratio <= 1 + 1e-8))
+  unit_of_row <- paste(future$series, future$time)
+  spread <- vapply(split(seq_len(ncol(ratio)), unit_of_row), function(j) {
+    max(apply(ratio[, j, drop = FALSE], 1L, function(r) diff(range(r))))
+  }, numeric(1L))
+  expect_true(all(spread < 1e-8))
+  # The premise: detection does move within a unit, so the check
+  # above could have failed.
+  det_spread <- vapply(split(seq_len(ncol(det)), unit_of_row), function(j) {
+    max(apply(det[, j, drop = FALSE], 1L, function(r) diff(range(r))))
+  }, numeric(1L))
+  expect_gt(max(det_spread), 1e-3)
+})
+
+
 test_that("the criticism surface runs on a closure-unit fit", {
   loo_warnings <- character(0)
   ic <- withCallingHandlers(
@@ -669,6 +710,30 @@ test_that("the abundance ceiling is reported against real labels", {
   expect_true(any(grepl(levels(nmix_sim()$data$series)[1L], labs,
                         fixed = TRUE)))
   expect_false(any(grepl("^[0-9]+_[0-9]+$", labs)))
+})
+
+
+test_that("a cap column survives a unit whose responses are absent", {
+  # The cap bounds a unit's latent state, so it is a property of the
+  # unit and every one of its rows carries it. Read over the observed
+  # rows alone it was empty for a unit nothing was recorded in, and
+  # the ceiling became `NA`; the comparison against the unit's
+  # largest count then met a missing condition and stopped on R's own
+  # "missing value where TRUE/FALSE needed", naming nothing a caller
+  # supplied. Only `nmix()` takes a cap column, which is why the
+  # occupancy fit above cannot stand in for this.
+  sim <- nmix_sim()
+  future <- sim$data[sim$data$time == max(sim$data$time), , drop = FALSE]
+  future$time <- max(sim$data$time) + 1L
+  future$y <- NA_integer_
+  expect_true("cap" %in% names(future))
+
+  ep <- posterior_epred(nmix_fit, newdata = future, draw_ids = 1:20)
+  expect_identical(ncol(ep), nrow(future))
+  expect_true(all(is.finite(ep) & ep > 0))
+  # An expected count is abundance times detection, so it stays under
+  # the ceiling the frame declared.
+  expect_true(all(ep < future$cap[1L]))
 })
 
 

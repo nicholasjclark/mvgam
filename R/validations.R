@@ -309,6 +309,13 @@ validate_supported_family <- function(family) {
 #'   forms one closure unit with replicate visits inside. The cap-
 #'   constancy and single-visit identifiability checks all generalise
 #'   over the supplied grouping cardinality.
+#' @param identifiability Logical. Whether to run the checks that ask
+#'   whether the design can separate state from detection: two units
+#'   at minimum, and the single-visit tests below it. Those are
+#'   questions about a design being fitted. A prediction frame is not
+#'   being fitted, so the predict-time caller passes `FALSE`. Asked of
+#'   one, they refused a forecast grid, which carries no response by
+#'   construction, and a caller predicting at a single site.
 #' @return Invisible `TRUE` on success; stops on hard
 #'   identifiability failure.
 #' @noRd
@@ -322,7 +329,8 @@ validate_closure_unit_data <- function(data,
                                         binary_y_check      = FALSE,
                                         cap_required        = TRUE,
                                         default_cap         = NULL,
-                                        unit_grouping_vars  = NULL) {
+                                        unit_grouping_vars  = NULL,
+                                        identifiability     = TRUE) {
   checkmate::assert_data_frame(data, min.rows = 1L)
   checkmate::assert_string(response_var)
   checkmate::assert_string(series_var)
@@ -333,6 +341,7 @@ validate_closure_unit_data <- function(data,
   checkmate::assert_flag(binary_y_check)
   checkmate::assert_flag(cap_required)
   checkmate::assert_int(default_cap, lower = 1L, null.ok = TRUE)
+  checkmate::assert_flag(identifiability)
   if (is.null(unit_grouping_vars)) {
     unit_grouping_vars <- closure_unit_key_vars(
       NULL, series_var = series_var, time_var = time_var
@@ -392,16 +401,13 @@ validate_closure_unit_data <- function(data,
   # routine in repeat-visit designs. Those rows carry no count to
   # check, so every response check below runs over the observed
   # visits and the unit arrays skip the rest.
+  #
+  # A frame with nothing observed anywhere is refused where the units
+  # are formed, which is the layer that owns the condition and the
+  # only one a fit-time call cannot bypass. Refusing it a second time
+  # here also refused a forecast grid, where no row carries a response
+  # by construction and every check below is vacuous.
   observed <- !is.na(y_vals)
-  if (!any(observed)) {
-    stop(insight::format_error(c(
-      paste0("All values of '", response_var, "' are missing."),
-      i = paste0(
-        "Closure-unit families need at least one observed visit to ",
-        "estimate detection."
-      )
-    )))
-  }
   y_obs <- suppressWarnings(as.numeric(y_vals[observed]))
   if (any(!is.finite(y_obs))) {
     stop(insight::format_error(
@@ -534,6 +540,10 @@ validate_closure_unit_data <- function(data,
         )
       )))
     }
+  }
+
+  if (!identifiability) {
+    return(invisible(TRUE))
   }
 
   # Structurally degenerate input: a single closure unit is one

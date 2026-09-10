@@ -12,61 +12,46 @@ description.
 
 ## mvn()
 
-**3. `forecast(type = "response")` refuses a family `hindcast()` draws.**
+**5. The mvn fixture asks for a split the data cannot identify.**
 
-No file fits `mvn()` any more, so nothing covers this. The claim
-belongs wherever that family is next fitted.
-`hindcast(fit, type = "response")` returns draws; `forecast(fit,
-newdata, type = "response")` raises "Posterior predictive sampling is
-unavailable for family mvn". These are one quantity reached over the
-training grid and over its extension, so exactly one of the two is
-wrong. The assertion claims they agree and fails until they do, rather
-than enshrining either answer.
+The fixture declares four species and two latent factors. A factor
+model separates a per-species residual scale from the factor
+covariance only when `(K - m)^2 >= K + m`, which at `K = 4, m = 2`
+reads `4 >= 6` and fails. `Psi` and the diagonal of `Z Sigma Z'`
+therefore trade against each other along a ridge, and the file's "Psi
+recovers the simulated residual scale" assertion reads one arbitrary
+point on it. Psi posterior means came back at 0.556, 1.194, 0.448 and
+0.475 against a truth of 0.5 throughout.
 
-**4. The post-fit methods treat `mvn` as an occupancy family.**
+Diagnosing this separated three mechanisms, and only the first is what
+the recovery assertion meets.
 
-Seen on the same `mvn()` fit, which no file now holds. Two symptoms,
-one classification:
+- The bound above. `jsdgam()` defaults to `n_lv = 2`, so three and
+  four species fail it by default. `mvgam()` now warns at fit time and
+  names the largest `n_lv` the species count admits.
+- The divergences are a funnel at small `Psi` rather than the scale
+  ridge. Locating the divergent draws in the geometry puts them at log
+  min `Psi` -1.44 sd, against +0.44 sd along the ridge direction.
+- `Z` and `sigma_trend` enter the trend only as a product, verified to
+  4e-16 on a posterior draw. That redundancy is exact and is not what
+  either diagnostic above measures.
 
-- `plot(fit, type = "residuals")` routes to
-  `pp_check(type = "resid_vs_fitted")`, which then refuses the call:
-  "not available for closure-unit family 'mvn'".
-- `augment(fit)` raises "Closure-unit families require column 'cap' to
-  be present in 'data'".
+The "13 per cent divergences" this entry first recorded belong to an
+`mvn()` fit no file holds; the cached `mvt` fixture has none.
 
-`mvn()` is a multivariate normal observation model. It has no closure
-units and no detection process. `is_closure_unit_family()`
-in `R/families.R:1339` is what these two paths gate on, and the
-plotting method asks for a type its own family will reject.
-
-A third symptom shows where the misclassification leads.
-`hindcast(fit, type = "latent_state")` on an mvn fit answers with a
-message written for whoever maintains the package:
-
-    Closure-unit dispatch missing for family 'mvn' method
-    'latent_state'. Add a 'mvn = switch(method_kind, ...)' branch to
-    dispatch_closure_unit_method() in R/families.R.
-
-The same call on a beta fit is refused properly, naming the family,
-the types it does offer and the families that would enable the one
-asked for. So mvn enters closure-unit dispatch, finds no branch, and
-hands the user an instruction to edit the source.
-
-**5. The mvn fixture samples poorly.**
-
-On the `mvn()` fit no file now holds, "Psi recovers the simulated
-residual scale". Psi posterior
-means come back at 0.556, 1.194, 0.448 and 0.475 against a truth of 0.5
-throughout, putting species 2 out by 0.69. The same run reports 130
-divergent transitions in 1000 (13 per cent). The residual correlation
-still recovers well (cor 0.947), which is why this went unremarked
-while the file only printed its numbers: a correlation between
-off-diagonals is insensitive to a species scale that has drifted.
-
-Whether the threshold or the fixture wants changing is a judgment for
-the mvn work rather than the axis work. It is recorded here because a
-posterior with 13 per cent divergences will not support the recovery
-numbers the file reports off it.
+Three things remain. Respecify the fixture at a `(K, m)` pair the
+bound admits, so its recovery assertions test an identified quantity.
+Give `Psi` a prior class, since it is hard-coded in a stanvar today
+and a user who knows their response scale cannot set the one thing
+that moves the posterior. On a truth of 2.0, `gamma(4, 2)` gives 34
+divergences at Psi rhat 1.009; `exponential(1)` gives 225 at 1.084;
+`gamma(4, 8)` gives 335 at 1.396, with two species pulled to 0.9 by a
+prior centred on 0.5. No fixed
+constant suits every response scale, so a new default needs
+calibrating over a grid of true `Psi` and factor share before it is
+chosen. And give the parameter an interpretable home, the variance
+decomposition `Psi_i^2 / (Psi_i^2 + (Z Sigma Z')_ii)`, so the raw
+scale is not what a reader acts on.
 
 **7. One post-fit method guards against a prefit. Seventeen do not.**
 
@@ -267,38 +252,6 @@ which is what makes the silence costly.
 The data-frame form is unaffected: it names its series in a column
 and a stranger there is refused.
 
-## Compositions scored without their components
-
-**86. A `diri()` unit that lost a component is scored anyway.**
-
-Set one species' response to `NA` at one site of
-`val_mvgam_jsdgam_mv_diri.rds`. That site's `n_rep` falls to three
-where every other site has four, and the rows that remain still
-renormalise, because `extract_simplex_response_components()` builds
-the softmax over a unit's *observed* rows alone: `prob_row` sums to
-1.0000000 across the three survivors while their observed shares sum
-to 0.9459679. The unit is scored on that pair regardless.
-`clean_ll()` keeps all thirty columns including the incomplete one,
-and the quantile residual follows it. Stan's own
-`dirichlet_lpdf` validates its simplex argument and rejects the same
-pair, so the R side and the sampled model disagree exactly where a
-held-out fold or a missing observation puts them.
-
-The two sides want different things from the same unit. A density
-has none to give when a component is missing, since the observed
-shares no longer sum to one. A prediction still has one: every row
-of the site carries a linear predictor whether or not its response
-was recorded, so the softmax belongs over all K of them rather than
-over the survivors.
-
-So the fix is not one guard. The extractor should build `prob_row`
-over the site's full set of rows, and the three log-density kernels
-should leave a unit missing when its components are incomplete,
-which is what `clean_ll()` then drops.
-
-`test-family-jsdgam.R` asserts that such a unit is not scored, and
-fails.
-
 ## Gaps closed rather than found
 
 Two things the plan names as untested now have coverage, and the
@@ -342,6 +295,28 @@ each one answers, which finding 75 records. On that route a reader
 following the documentation reaches working code.
 
 ## Fits still worth adding
+
+### An `mvn()` fit
+
+Nothing in `tests/local` fits one, and the four findings that named
+that family were all settled on a throwaway fit rather than on a
+cached one. Five species on two factors satisfies `(K - m)^2 >= K + m`,
+so the residual scale is separable there and the recovery assertions
+finding 5 records as untestable at four species become testable.
+
+Driven on such a fit, `forecast(type = "expected")` lands on the scale
+`posterior_epred()` occupies and `forecast(type = "response")` draws
+rather than refusing. `plot(type = "residuals")` and `augment()` both
+answer, and `hindcast(type = "latent_state")` refuses by naming the
+family instead of naming a source file to edit. None of that is under
+an assertion until the fixture exists.
+
+The same fit carried 104 divergences in 1000 at a true `Psi` of 0.5,
+which is finding 5's funnel appearing at a `(K, m)` pair the
+identification bound admits. That pair is what separates the two
+mechanisms, so the fixture is also the evidence for that entry.
+
+### The remaining shapes
 
 The wide `mvbf()` frame, the fixed-loading `trend_map`, `lfo_cv()` on
 a trend fit and `update()` are all fitted now, so what remains is two
@@ -390,71 +365,6 @@ Both need two fits on one frame, which also gives `loo_compare()`
 something to rank. Assert the scores are keyed by the series axis,
 since a per-series score under permuted names is finding 8 in a place
 a user acts on.
-
-## The jsdgam family sweep
-
-Found while folding the nine `jsdgam_mv_*.R` files into one
-battery. Each was reached by driving a surface the nine files
-called but never checked the value of.
-
-**28. `forecast(type = "expected")` returns the link scale on every
-softmax family.**
-
-`test-family-jsdgam.R`, "forecast is keyed by the species axis".
-The expectation of a composition is a probability, and over the
-training grid `posterior_epred()` returns one. Over the extension
-of that grid it does not:
-
-| family | `posterior_epred()` | `forecast(type = "expected")` | `type = "link"` |
-|---|---|---|---|
-| categ | 0.000 to 0.994 | -6.192 to 11.056 | -14.342 to 11.986 |
-| diri | 0.000 to 0.985 | -7.008 to 19.721 | -8.888 to 9.033 |
-| multi | 0.013 to 63.119 | -10.418 to 9.174 | -7.431 to 6.474 |
-| beta | 0.072 to 0.913 | 0.039 to 0.961 | -4.435 to 3.260 |
-| nb | 0.036 to 53.068 | 0.008 to 84.165 | -3.532 to 5.557 |
-
-Beta and the negative binomial answer correctly, so this is not the
-forecast arm in general: it is the three families whose inverse link
-needs the shared softmax normaliser. The returned values are not the
-link arm repeated either, so something is applied per species
-without the normaliser rather than nothing being applied at all.
-
-A multinomial expectation coming back negative is the clearest of
-the three, since no normalisation convention makes an expected count
-below zero.
-
-This is one quantity reached two ways, and the two disagree. It went
-unseen because the forecast test in all nine files asserted only the
-arm names, the dimensions and `is.finite()`. A link-scale value
-satisfies every one of those. The assertion now compares the arm
-against the scale `posterior_epred()` occupies for that family.
-
-**33. `residual_cor(partial = TRUE)` cannot run on a factor model.**
-
-Found by calling it rather than by an assertion, so nothing in the
-suite reported it. On every jsdgam checked -- beta, mvn and categ --
-the call stops with a bare LAPACK message:
-
-    system is computationally singular: reciprocal condition
-    number = 1.14307e-17
-
-A partial correlation is read off the inverse of the covariance, and
-a rank-2 factor model over four or five species implies a covariance
-of rank 2. It is singular by construction, so the inverse this asks
-for does not exist for any factor fit at all, whatever the data.
-
-`residual_cor(partial = TRUE)` is documented and works elsewhere:
-the VAR fixture asserts it returns a `prec` block with a unit
-diagonal. On a factor fit it can never work, and it reports that
-through `solve()`. A reader gets a condition number where a sentence
-would have told them partial correlations need a full-rank residual
-covariance, and pointed them at `shared_variation()`, which answers
-the question they were asking.
-
-Either the factor path takes a pseudo-inverse or a ridge, or the
-method refuses with an explanation. Choosing between those belongs
-to the jsdm work, so `test-family-jsdgam.R` leaves it unasserted
-and this entry carries it.
 
 ## The insight surface
 
