@@ -951,7 +951,7 @@ build_next_steps <- function(x) {
     list(when = has_factors,
          text = paste0(
            "`shared_variation(fit)`: ",
-           "factor-implied Delta = Z Z' (rotation-invariant)"
+           "factor-implied Delta = Z Sigma Z' (rotation-invariant)"
          )),
     list(when = has_cor_trend,
          text = "`residual_cor(fit)`: implied cross-series correlations"),

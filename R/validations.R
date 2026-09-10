@@ -1561,11 +1561,15 @@ enforce_factor_support_against_specs <- function(trend_specs) {
 #' per-response list, but mvgam currently fits one shared trend
 #' so the first hit is the authoritative one), counts unique
 #' series from `data`, and dispatches to
-#' `validate_n_lv_ceiling()`. No-ops when no spec carries `n_lv`.
+#' `validate_n_lv_ceiling()` for the capacity ceiling and to
+#' `warn_unidentified_component_scale()` for the identification
+#' bound the mv-response families carry. No-ops when no spec
+#' carries `n_lv`.
 #'
 #' @noRd
 enforce_n_lv_ceiling_against_data <- function(trend_specs, data,
-                                              fit_function = "mvgam") {
+                                              fit_function = "mvgam",
+                                              family = NULL) {
   if (is.null(trend_specs)) return(invisible(TRUE))
   specs <- if (is_multivariate_trend_specs(trend_specs)) {
     trend_specs
@@ -1588,6 +1592,15 @@ enforce_n_lv_ceiling_against_data <- function(trend_specs, data,
       n_lv         = as.integer(n_lv),
       n_species    = as.integer(n_series),
       fit_function = fit_function
+    )
+    # The ceiling above is about capacity: more factors than series
+    # buys nothing. This is about identification, and it bites well
+    # below that ceiling for a family carrying a residual scale per
+    # component. Both read the same `n_lv` and the same series
+    # count, so they are asked together.
+    warn_unidentified_component_scale(
+      n_lv = as.integer(n_lv), n_species = as.integer(n_series),
+      family = family
     )
     break
   }

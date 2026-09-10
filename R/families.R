@@ -4097,6 +4097,110 @@ mvn_stan_funs <- function() {
   )
 }
 
+#' Does this family estimate a residual scale per response component?
+#'
+#' TRUE for `mvn()` and `mvt()`, which declare
+#' `vector<lower=0>[K] Psi` alongside the loadings, so a unit's
+#' covariance is `Z Sigma Z' + diag(Psi^2)`. FALSE for the simplex
+#' families, whose spread is carried by the softmax and, for
+#' `diri()`, by a single concentration; and FALSE for the detection
+#' families, which have no continuous residual at all.
+#'
+#' Asked wherever the split between the factor part and the
+#' idiosyncratic part matters, which is why it is composed from the
+#' two grain predicates rather than listing the families again.
+#'
+#' @param family A family / brmsfamily / customfamily object.
+#' @return TRUE or FALSE.
+#' @noRd
+family_has_component_scale <- function(family) {
+  is_multi_response_family(family) &&
+    !is_simplex_response_family(family)
+}
+
+
+#' The largest factor count whose idiosyncratic split is identified
+#'
+#' A rank-`m` covariance over `K` components carries
+#' `K m - m (m - 1) / 2` free values, and one residual scale per
+#' component adds another `K`. The observed covariance has
+#' `K (K + 1) / 2` distinct entries, so the split into a factor part
+#' and an idiosyncratic part is identified only when
+#'
+#'   `K m - m (m - 1) / 2 + K <= K (K + 1) / 2`,
+#'
+#' which rearranges to `(K - m)^2 >= K + m`. This is the counting
+#' condition, so meeting it does not guarantee the posterior is
+#' well behaved; failing it does guarantee a direction the
+#' likelihood cannot see.
+#'
+#' @param n_species Number of response components.
+#' @return The largest admissible factor count, or 0 when even one
+#'   factor is too many.
+#' @noRd
+identified_factor_ceiling <- function(n_species) {
+  m <- seq_len(max(n_species, 1L))
+  ok <- (n_species - m)^2 >= n_species + m
+  if (!any(ok)) return(0L)
+  as.integer(max(m[ok]))
+}
+
+
+#' Warn when the idiosyncratic split is not identified
+#'
+#' `mvn()` and `mvt()` estimate a residual scale per component
+#' beside the loadings. Where `identified_factor_ceiling()` says the
+#' requested factor count is too high, the data cannot separate the
+#' two, and the posterior for `Psi` is whatever the prior says along
+#' that direction however much data arrives.
+#'
+#' A warning rather than a refusal: the covariance the model
+#' reports, which is what `residual_cor()` and `shared_variation()`
+#' summarise, is estimated well in that regime and can be estimated
+#' better than at a factor count the bound admits. What cannot be
+#' read is the per-component split.
+#'
+#' @param n_lv Requested factor count.
+#' @param n_species Number of response components.
+#' @param family The observation family.
+#' @return `invisible(NULL)`.
+#' @noRd
+warn_unidentified_component_scale <- function(n_lv, n_species,
+                                              family) {
+  if (!family_has_component_scale(family)) return(invisible(NULL))
+  n_lv <- as.integer(n_lv)
+  n_species <- as.integer(n_species)
+  if ((n_species - n_lv)^2 >= n_species + n_lv) return(invisible(NULL))
+  ceiling_lv <- identified_factor_ceiling(n_species)
+  advice <- if (ceiling_lv >= 1L) {
+    paste0("Use 'n_lv = ", ceiling_lv, "' or fewer to estimate ",
+           "the residual scales, or add species.")
+  } else {
+    paste0("No factor count separates the two at ", n_species,
+           " species; add species to estimate the residual scales.")
+  }
+  rlang::warn(insight::format_warning(c(
+    paste0(
+      "The per-species residual scale is not identified at 'n_lv = ",
+      n_lv, "' with ", n_species, " species."
+    ),
+    x = paste0(
+      "Family '", resolve_family_name(family), "' splits each site's ",
+      "covariance into a factor part and a per-species part, and ",
+      "that split needs (n_species - n_lv)^2 >= n_species + n_lv."
+    ),
+    i = paste0(
+      "'residual_cor()', 'shared_variation()' and the predictions ",
+      "read the combined covariance and are unaffected. 'Psi' is ",
+      "not estimable per species here, so poor Rhat on it reports ",
+      "the design rather than the sampler."
+    ),
+    i = advice
+  )))
+  invisible(NULL)
+}
+
+
 #' The residual scale shared by the mvn and mvt families
 #'
 #' Both declare one positive scale per response component and give

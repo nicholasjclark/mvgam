@@ -1882,3 +1882,74 @@ test_that("a count family with a cap buffer needs no cap column", {
     "below the observed counts"
   )
 })
+
+# ------------------------------------------------------------
+# The idiosyncratic split mvn() and mvt() ask the data to make.
+# ------------------------------------------------------------
+
+test_that("identified_factor_ceiling counts the split the data can make", {
+  # `(K - m)^2 >= K + m`, evaluated directly rather than through the
+  # closed form, so the helper is checked against the condition it
+  # claims to implement rather than against a rearrangement of it.
+  for (K in 2:12) {
+    m <- seq_len(K)
+    ok <- (K - m)^2 >= K + m
+    expected <- if (any(ok)) max(m[ok]) else 0L
+    expect_identical(
+      mvgam:::identified_factor_ceiling(K), as.integer(expected)
+    )
+  }
+  # Four species admit one factor beside a per-species scale, five
+  # admit two. Two factors on four species is `jsdgam()`'s default.
+  expect_identical(mvgam:::identified_factor_ceiling(4L), 1L)
+  expect_identical(mvgam:::identified_factor_ceiling(5L), 2L)
+})
+
+test_that("only mvn and mvt carry a per-component residual scale", {
+  carries <- vapply(
+    list(mvn(), mvt()), mvgam:::family_has_component_scale, logical(1L)
+  )
+  expect_true(all(carries))
+  # A simplex family's spread is in the softmax, and a detection
+  # family has no continuous residual to scale.
+  others <- vapply(
+    list(diri(), multi(), categ(), occ(), nmix(), poisson(), Beta()),
+    mvgam:::family_has_component_scale, logical(1L)
+  )
+  expect_false(any(others))
+})
+
+test_that("a factor count past the identification bound warns, not refuses", {
+  set.seed(11L)
+  mv_frame <- function(K, n_sites = 20L) {
+    sp <- paste0("y", seq_len(K))
+    d <- expand.grid(series = factor(sp, levels = sp),
+                     time = seq_len(n_sites))
+    d$y <- rnorm(nrow(d))
+    d$env <- rnorm(nrow(d))
+    d[order(d$time, d$series), , drop = FALSE]
+  }
+  # Four species with two factors is over the bound, and it is what
+  # `jsdgam()` supplies by default.
+  expect_warning(
+    fit <- mvgam(y ~ env, data = mv_frame(4L), family = mvn(),
+                 trend_formula = ~ ZMVN(n_lv = 2), run_model = FALSE,
+                 silent = 2),
+    "not identified"
+  )
+  # Warned about, not refused: the covariance the model reports
+  # is estimable there even though its split is not.
+  expect_s3_class(fit, "mvgam_prefit")
+  # Five species carry the same two factors, and say nothing.
+  expect_no_warning(
+    mvgam(y ~ env, data = mv_frame(5L), family = mvn(),
+          trend_formula = ~ ZMVN(n_lv = 2), run_model = FALSE,
+          silent = 2)
+  )
+  # Neither does one factor on four species.
+  expect_no_warning(
+    mvgam(y ~ env, data = mv_frame(4L), family = mvn(),
+          trend_formula = ~ ZMVN(n_lv = 1), run_model = FALSE,
+          silent = 2)
+  )
+})

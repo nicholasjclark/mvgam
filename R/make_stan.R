@@ -222,7 +222,9 @@ build_stan_components <- function(formula, data, family = gaussian(),
   # The `n_lv` ceiling, shared with `jsdgam()` so more factors than
   # series is refused in one place. Reads `n_lv` from the possibly
   # nested trend spec list.
-  enforce_n_lv_ceiling_against_data(mv_spec$trend_specs, data)
+  enforce_n_lv_ceiling_against_data(
+    mv_spec$trend_specs, data, family = family
+  )
 
   # PW trends define their own intercept via `m_trend`. An
   # observation-side intercept competes with it for the same
