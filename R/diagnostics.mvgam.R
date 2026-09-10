@@ -470,9 +470,17 @@ flag_by_lv_full_rank_funnel <- function(mvgam_fit) {
   # only applies when this helper returns FALSE.
   if (isTRUE(uses_loadings_prior(mvgam_fit))) return(FALSE)
 
+  # Both signals below are properties of an MCMC run. An
+  # approximation carries neither, and a stub carries no draws at
+  # all, so the state is tested rather than the failure caught: the
+  # advisor has nothing to read and says nothing.
+  algorithm <- mvgam_fit$algorithm %||% "sampling"
+  if (is.null(mvgam_fit$fit) || !identical(algorithm, "sampling")) {
+    return(FALSE)
+  }
+
   # Divergent-transition early signal.
-  np <- tryCatch(bayesplot::nuts_params(mvgam_fit$fit),
-                  error = function(e) NULL)
+  np <- bayesplot::nuts_params(mvgam_fit$fit)
   if (!is.null(np) && "Parameter" %in% names(np)) {
     div_rows <- np[np$Parameter == "divergent__", , drop = FALSE]
     if (nrow(div_rows) > 0L && any(div_rows$Value > 0, na.rm = TRUE)) {
@@ -480,8 +488,7 @@ flag_by_lv_full_rank_funnel <- function(mvgam_fit) {
     }
   }
 
-  rh <- tryCatch(bayesplot::rhat(mvgam_fit$fit),
-                  error = function(e) numeric())
+  rh <- bayesplot::rhat(mvgam_fit$fit)
   if (length(rh) == 0L) return(FALSE)
   watched <- grep(
     paste0(
