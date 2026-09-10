@@ -204,9 +204,16 @@ path. Asked of the family table rather than of one fit,
 None of the three models a detection process over repeat visits to a
 closed unit. `mvn()` and `mvt()` are multivariate observation models
 and `diri()` is a composition, so every path this predicate guards is
-reached by three families it was never written for. That is what
-sends an `mvn` fit into a `pp_check` type its own family refuses and
-makes `augment()` demand a `cap` column with no meaning for it.
+reached by three families it was never written for.
+
+One attribute answers two questions. A caller may mean "does this
+family run through the same data preparation". It may instead mean
+"does this family model detection over a closed unit", which is true
+of `occ()` and `nmix()` alone. Both are spelled the same way, so
+each of the thirty-odd call sites has to be read to learn which it
+asks. `needs_closure_unit_aggregation()` and
+`is_simplex_response_family()` each name a piece of the difference.
+The wire format has no name of its own and borrows this one.
 
 The assertion asks the registry directly, so it covers every family
 at once.
@@ -265,15 +272,17 @@ and a stranger there is refused.
 **86. A `diri()` unit that lost a component is scored anyway.**
 
 Set one species' response to `NA` at one site of
-`val_mvgam_jsdgam_mv_diri.rds`. The rows that remain still
+`val_mvgam_jsdgam_mv_diri.rds`. That site's `n_rep` falls to three
+where every other site has four, and the rows that remain still
 renormalise, because `extract_simplex_response_components()` builds
-the softmax over a unit's *observed* rows alone, so `prob_row` sums
-to one across the three survivors while their observed shares sum
-to 0.9459679. `log_lik()` reports 600 finite cells of 600 on that
-pair and the quantile residual follows it. Stan's own
-`dirichlet_lpdf` validates its simplex argument and rejects the
-same pair, so the R side and the sampled model disagree exactly
-where a held-out fold or a missing observation puts them.
+the softmax over a unit's *observed* rows alone: `prob_row` sums to
+1.0000000 across the three survivors while their observed shares sum
+to 0.9459679. The unit is scored on that pair regardless.
+`clean_ll()` keeps all thirty columns including the incomplete one,
+and the quantile residual follows it. Stan's own
+`dirichlet_lpdf` validates its simplex argument and rejects the same
+pair, so the R side and the sampled model disagree exactly where a
+held-out fold or a missing observation puts them.
 
 The two sides want different things from the same unit. A density
 has none to give when a component is missing, since the observed
@@ -419,39 +428,6 @@ unseen because the forecast test in all nine files asserted only the
 arm names, the dimensions and `is.finite()`. A link-scale value
 satisfies every one of those. The assertion now compares the arm
 against the scale `posterior_epred()` occupies for that family.
-
-**30. `conditional_effects()` returns a constant on the composition
-families.**
-
-`test-family-jsdgam.R`, "pp_check, plotting and conditional_effects
-render". Measured on the cached diri fit, reading the drawn layer of
-each returned panel:
-
-| effect | grid rows | estimate | widest interval |
-|---|---|---|---|
-| `env` | 50 | 1.00000 to 1.00000 | 0 |
-| `series` | 4 | 1.00000 to 1.00000 | 0 |
-| `env:series` | 200 | 1.00000 to 1.00000 | 0 |
-
-Every panel is a flat line at one with an interval of zero width,
-across all three effects the model offers. The mvt and negative
-binomial fits move properly on the same call, which places this at
-the shared softmax normaliser rather than at the plotting layer.
-
-The cause is the prediction grid. `complete_closure_unit_newdata()`
-stamps `time <- seq_len(nrow(newdata))` so that each grid row is its
-own closure unit, which is what a detection family wants and is
-wrong for a composition: a unit of one row is a simplex of width
-one, whose only probability is 1 whatever the linear predictor
-holds. A composition's grid needs the K species of a site present
-together, then returns the row the grid asked about.
-
-`posterior_epred()` on the same fit is correct, landing inside
-[0, 1] and summing to one per site.
-
-An ordering check cannot see this: a constant satisfies
-`conf.low <= estimate <= conf.high`, so the panel has to be required
-to move.
 
 **32. Three fixtures asked a composition a question it cannot
 answer.**
