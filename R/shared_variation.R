@@ -2,35 +2,49 @@
 #'
 #' For a latent-factor `mvgam` fit, returns the posterior
 #' distribution of the shared variation matrix
-#' \eqn{\Delta = Z Z^\top}, where `Z` is the `n_series x n_lv`
-#' loadings matrix. `Delta` is the cross-series covariance
-#' pattern that the latent factors induce on the trends; its
-#' diagonal entries `Delta_ii = sum(Z[i, ]^2)` describe how
-#' strongly each series is captured by the factor structure,
-#' and the off-diagonal entries describe pairwise factor-driven
-#' coupling between series.
+#' \eqn{\Delta = Z \Sigma Z^\top}, where `Z` is the
+#' `n_series x n_lv` loadings matrix and \eqn{\Sigma} is the
+#' covariance of the latent states. `Delta` is the cross-series
+#' covariance pattern the latent factors induce on the trends; its
+#' diagonal entries describe how strongly each series is captured
+#' by the factor structure, and the off-diagonal entries describe
+#' pairwise factor-driven coupling between series.
 #'
-#' `Delta` is rotation-invariant: any orthogonal rotation
-#' `Z* = Z Q` leaves `Z* Z*' = Z Q Q' Z' = Z Z'` unchanged.
-#' This means the posterior summary returned by
-#' `shared_variation()` is the same whether computed from the
-#' raw sampled `Z` or from the QR-identified `Z_tilde` (Heaps &
-#' Jermyn 2024). For fully-fixed-Z fits (`trend_map` with no
-#' NAs) the function returns a degenerate summary built from the
-#' user-supplied loadings (zero posterior spread).
+#' The latent covariance belongs between the loadings, not beside
+#' them. A factor column enters the trend as
+#' `sigma_trend[k] * Z[, k]`, so `Z Z'` alone reports a coupling
+#' pattern that weights every column equally when the model does
+#' not: under multiplicative gamma process shrinkage the column
+#' scales carry the whole of the shrinkage. For an autoregressive
+#' trend \eqn{\Sigma} is the stationary covariance of the latent
+#' states rather than the innovation covariance, which is the same
+#' convention [residual_cor()] reports.
+#'
+#' `Delta` is rotation-invariant: an orthogonal `Z* = Z Q` with
+#' `Sigma* = Q' Sigma Q` leaves `Z* Sigma* Z*'` unchanged. The
+#' posterior summary is therefore the same whether it is computed
+#' from the raw sampled `Z` or from the QR-identified `Z_tilde`
+#' (Heaps & Jermyn 2024), and the sampled basis is used because
+#' that is the one \eqn{\Sigma} is stated in. For fully-fixed-Z
+#' fits (`trend_map` with no NAs) the loadings contribute no
+#' posterior spread of their own.
 #'
 #' @section Key inferential property:
 #' Heaps & Jermyn (2024) Sect. 3 show that under the structured
-#' matrix-normal prior `Z | Phi, Psi ~ MN(0, Phi, Psi)`,
-#'   `E(Delta) = tr(Psi^2) * Phi`.
-#' The among-row scale matrix `Phi` is therefore proportional
-#' to the **prior expectation** of `Delta` (an observable
-#' quantity), not the prior expectation of `Z` (a
-#' rotation-arbitrary latent matrix). Encoding domain knowledge
-#' into `Phi` via `loadings_prior` shapes the prior on the
-#' observable pattern. Inspecting `shared_variation(fit)` after
-#' fitting is the natural way to read off the
-#' factor-implied covariance posterior.
+#' matrix-normal prior `Z | Phi, Psi ~ MN(0, Phi, Psi)`, the
+#' expectation of the loadings' own second moment `Z Z'` is
+#' proportional to the among-row scale matrix `Phi`. `Phi` is
+#' therefore a statement about the **prior expectation** of an
+#' observable coupling pattern, not about the prior expectation
+#' of `Z` itself, which is rotation-arbitrary. Encoding domain
+#' knowledge into `Phi` via `loadings_prior` shapes the prior on
+#' that pattern.
+#'
+#' The matrix returned here carries the latent covariance as well,
+#' so it is proportional to `Phi` only up to the scale the latent
+#' states contribute. Read it as the factor-implied covariance the
+#' fitted model asserts, and calibrate `Phi` against the pattern
+#' rather than against these values entry for entry.
 #'
 #' @param object A fitted `mvgam` object whose trend model
 #'   includes latent factors (`n_lv < n_series`).
@@ -89,7 +103,7 @@
 #'   silent         = 2
 #' )
 #'
-#' # Posterior summary of the Z Z' shared-variation matrix
+#' # Posterior summary of the shared-variation matrix
 #' # (the implied species-by-species residual covariance).
 #' shared_variation(mod)
 #' }
@@ -126,10 +140,10 @@ shared_variation.mvgam <- function(object,
   }
 
   series_names <- resolve_series_info(object)$series_levels
-  # Delegate the per-draw Z Z' computation to the existing
-  # `factor_implied_cov_draws()` helper, which already routes
-  # through `resolve_factor_loadings()` for the fixed-vs-
-  # sampled-Z decision.
+  # `factor_implied_cov_draws()` owns the per-draw `Z Sigma Z'`,
+  # so `residual_cor()` and this summary cannot answer
+  # differently. It routes through `resolve_factor_loadings()`
+  # for the fixed-versus-sampled-Z decision.
   delta_draws <- factor_implied_cov_draws(
     object, n_lv = n_lv, n_series = length(series_names)
   )
@@ -157,7 +171,7 @@ shared_variation.mvgam <- function(object,
 
 #' @export
 print.mvgam_shared_variation <- function(x, digits = 3L, ...) {
-  cat("Factor-implied shared variation matrix (Delta = Z Z')\n")
+  cat("Factor-implied shared variation matrix (Delta = Z Sigma Z')\n")
   cat(
     "  ", x$n_series, " series x ", x$n_lv,
     " latent factors", sep = ""
@@ -190,7 +204,7 @@ print.mvgam_shared_variation <- function(x, digits = 3L, ...) {
 #' Plot the factor-implied shared variation matrix
 #'
 #' Heatmap of the posterior point estimate of
-#' \eqn{\Delta = Z Z^\top}. Diagonal cells show the per-series
+#' \eqn{\Delta = Z \Sigma Z^\top}. Diagonal cells show the per-series
 #' captured variance (always positive); off-diagonal cells show
 #' factor-driven cross-series covariance, which can be positive
 #' or negative. The diverging fill scale is symmetric around

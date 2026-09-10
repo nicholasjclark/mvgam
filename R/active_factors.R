@@ -44,16 +44,22 @@ resolve_column_scales <- function(object, draws_mat, n_lv) {
 #'
 #' Criterion (Legramanti, Durante and Dunson 2020). For each
 #' posterior draw `s`, compute the per-column squared norms
-#' \deqn{c_h^{(s)} = \|Z[, h]^{(s)}\|^2,} where `Z` is the
-#' loadings matrix the model sampled, which is the basis the
-#' column scales are stated in. The reference
-#' scale is the posterior mean of the leading-column norm
+#' \deqn{c_h^{(s)} = \sigma_h^{2(s)} \|Z[, h]^{(s)}\|^2,} where
+#' `Z` is the loadings matrix the model sampled and
+#' \eqn{\sigma_h} that column's own latent scale. Both halves
+#' belong: a column enters the trend as `sigma_trend[h] * Z[, h]`,
+#' and under multiplicative gamma process shrinkage the scale is
+#' where the shrinkage lives, so a criterion reading the loadings
+#' alone calls every column active. The reference scale is the
+#' posterior mean of the leading-column norm
 #' `ref = mean_s c_1^{(s)}`, and the activity threshold is
 #' `eps = fraction * ref`. Factor `h` is **active** iff
 #' \deqn{P(c_h^{(s)} < \text{eps}) \le \text{prob\_threshold},}
 #' i.e. the column is unlikely to be shrunk near zero. The
-#' posterior median of the per-draw active count is reported as
-#' the headline summary.
+#' returned `prob_active` is the complement,
+#' \eqn{P(c_h^{(s)} \ge \text{eps})}. The posterior median of
+#' the per-draw active count is reported as the headline
+#' summary.
 #'
 #' The column scales matter here, so the criterion reads the
 #' sampled `Z` rather than the QR-identified `Z_tilde`: the MGP
@@ -66,21 +72,23 @@ resolve_column_scales <- function(object, draws_mat, n_lv) {
 #' @param object A fitted `mvgam` object whose trend includes
 #'   latent factors (`n_lv > 0`).
 #' @param fraction Numeric in `(0, 1]`. The activity threshold is
-#'   `fraction * mean(||Z_tilde[, 1]||^2)`. Defaults to `0.01`
+#'   `fraction * ref`, where `ref` is the posterior mean of the
+#'   leading column's scaled squared norm. Defaults to `0.01`
 #'   (each active column carries at least 1 percent of the
-#'   leading column's squared norm in posterior mean).
+#'   leading column's scaled squared norm in posterior mean).
 #' @param prob_threshold Numeric in `(0, 1)`. Factor `h` is
-#'   inactive iff `P(||Z_tilde[, h]||^2 < eps)` exceeds this.
-#'   Defaults to `0.5`.
+#'   inactive iff `P(c_h < eps)` exceeds this. Defaults to
+#'   `0.5`.
 #' @param ... Additional arguments for S3 dispatch (unused).
 #'
 #' @return A list with class `mvgam_active_factors` containing:
 #'   \itemize{
 #'     \item `count`: per-draw active count summary
 #'       (`median`, `q025`, `q975`).
-#'     \item `per_factor`: data frame with one row per column of
-#'       `Z_tilde` giving `factor` index, posterior `prob_active`,
-#'       posterior `median_norm_sq`, and `is_active` (TRUE iff the
+#'     \item `per_factor`: data frame with one row per sampled
+#'       column of `Z`, giving `factor` index, posterior
+#'       `prob_active`, posterior `median_norm_sq` (the scaled
+#'       squared norm `c_h`), and `is_active` (TRUE iff the
 #'       prob_active threshold is met).
 #'     \item `threshold`: list with `fraction`, `prob_threshold`,
 #'       resolved `epsilon`.
@@ -107,12 +115,15 @@ resolve_column_scales <- function(object, draws_mat, n_lv) {
 #'   n_visits  = 4L,
 #'   type      = 2L
 #' )
+#' # The multiplicative gamma process prior is what makes `n_lv` a
+#' # truncation ceiling, so it is the prior this summary reads.
 #' mod <- jsdgam(
 #'   formula        = bf(y ~ env, p ~ tod_c),
 #'   factor_formula = ~ -1,
 #'   data           = simdat$data_train,
 #'   family         = occ(),
-#'   n_lv           = 2L,
+#'   n_lv           = 3L,
+#'   loadings_prior = "mgp",
 #'   chains         = 2,
 #'   silent         = 2
 #' )

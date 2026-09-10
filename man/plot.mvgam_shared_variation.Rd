@@ -21,7 +21,7 @@ A \code{ggplot} object.
 }
 \description{
 Heatmap of the posterior point estimate of
-\eqn{\Delta = Z Z^\top}. Diagonal cells show the per-series
+\eqn{\Delta = Z \Sigma Z^\top}. Diagonal cells show the per-series
 captured variance (always positive); off-diagonal cells show
 factor-driven cross-series covariance, which can be positive
 or negative. The diverging fill scale is symmetric around

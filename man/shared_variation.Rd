@@ -43,37 +43,51 @@ dimensions and series labels.
 \description{
 For a latent-factor \code{mvgam} fit, returns the posterior
 distribution of the shared variation matrix
-\eqn{\Delta = Z Z^\top}, where \code{Z} is the \verb{n_series x n_lv}
-loadings matrix. \code{Delta} is the cross-series covariance
-pattern that the latent factors induce on the trends; its
-diagonal entries \code{Delta_ii = sum(Z[i, ]^2)} describe how
-strongly each series is captured by the factor structure,
-and the off-diagonal entries describe pairwise factor-driven
-coupling between series.
+\eqn{\Delta = Z \Sigma Z^\top}, where \code{Z} is the
+\verb{n_series x n_lv} loadings matrix and \eqn{\Sigma} is the
+covariance of the latent states. \code{Delta} is the cross-series
+covariance pattern the latent factors induce on the trends; its
+diagonal entries describe how strongly each series is captured
+by the factor structure, and the off-diagonal entries describe
+pairwise factor-driven coupling between series.
 }
 \details{
-\code{Delta} is rotation-invariant: any orthogonal rotation
-\verb{Z* = Z Q} leaves \verb{Z* Z*' = Z Q Q' Z' = Z Z'} unchanged.
-This means the posterior summary returned by
-\code{shared_variation()} is the same whether computed from the
-raw sampled \code{Z} or from the QR-identified \code{Z_tilde} (Heaps &
-Jermyn 2024). For fully-fixed-Z fits (\code{trend_map} with no
-NAs) the function returns a degenerate summary built from the
-user-supplied loadings (zero posterior spread).
+The latent covariance belongs between the loadings, not beside
+them. A factor column enters the trend as
+\code{sigma_trend[k] * Z[, k]}, so \verb{Z Z'} alone reports a coupling
+pattern that weights every column equally when the model does
+not: under multiplicative gamma process shrinkage the column
+scales carry the whole of the shrinkage. For an autoregressive
+trend \eqn{\Sigma} is the stationary covariance of the latent
+states rather than the innovation covariance, which is the same
+convention \code{\link[=residual_cor]{residual_cor()}} reports.
+
+\code{Delta} is rotation-invariant: an orthogonal \verb{Z* = Z Q} with
+\verb{Sigma* = Q' Sigma Q} leaves \verb{Z* Sigma* Z*'} unchanged. The
+posterior summary is therefore the same whether it is computed
+from the raw sampled \code{Z} or from the QR-identified \code{Z_tilde}
+(Heaps & Jermyn 2024), and the sampled basis is used because
+that is the one \eqn{\Sigma} is stated in. For fully-fixed-Z
+fits (\code{trend_map} with no NAs) the loadings contribute no
+posterior spread of their own.
 }
 \section{Key inferential property}{
 
 Heaps & Jermyn (2024) Sect. 3 show that under the structured
-matrix-normal prior \verb{Z | Phi, Psi ~ MN(0, Phi, Psi)},
-\code{E(Delta) = tr(Psi^2) * Phi}.
-The among-row scale matrix \code{Phi} is therefore proportional
-to the \strong{prior expectation} of \code{Delta} (an observable
-quantity), not the prior expectation of \code{Z} (a
-rotation-arbitrary latent matrix). Encoding domain knowledge
-into \code{Phi} via \code{loadings_prior} shapes the prior on the
-observable pattern. Inspecting \code{shared_variation(fit)} after
-fitting is the natural way to read off the
-factor-implied covariance posterior.
+matrix-normal prior \verb{Z | Phi, Psi ~ MN(0, Phi, Psi)}, the
+expectation of the loadings' own second moment \verb{Z Z'} is
+proportional to the among-row scale matrix \code{Phi}. \code{Phi} is
+therefore a statement about the \strong{prior expectation} of an
+observable coupling pattern, not about the prior expectation
+of \code{Z} itself, which is rotation-arbitrary. Encoding domain
+knowledge into \code{Phi} via \code{loadings_prior} shapes the prior on
+that pattern.
+
+The matrix returned here carries the latent covariance as well,
+so it is proportional to \code{Phi} only up to the scale the latent
+states contribute. Read it as the factor-implied covariance the
+fitted model asserts, and calibrate \code{Phi} against the pattern
+rather than against these values entry for entry.
 }
 
 \examples{
@@ -96,7 +110,7 @@ mod <- jsdgam(
   silent         = 2
 )
 
-# Posterior summary of the Z Z' shared-variation matrix
+# Posterior summary of the shared-variation matrix
 # (the implied species-by-species residual covariance).
 shared_variation(mod)
 }
