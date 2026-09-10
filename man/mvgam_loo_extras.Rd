@@ -185,6 +185,30 @@ and log-likelihood primitives (\code{\link{log_lik.mvgam}}, \code{\link{loo.mvga
 \code{\link{posterior_linpred.mvgam}}, \code{\link{posterior_predict.mvgam}}) with
 helpers from the \pkg{loo} package.
 }
+\section{Which observation these answer for}{
+
+Every method here pairs a prediction with importance weights, so
+both describe the observation the likelihood scored. For most
+families that is a row of the data. The detection families
+(\code{\link[=occ]{occ()}}, \code{\link[=nmix]{nmix()}}) write their likelihood over a closure unit
+instead, marginalising the repeat visits within it, so
+\code{loo_predict()}, \code{loo_epred()}, \code{loo_predictive_interval()} and
+\code{loo_R2()} answer once per closure unit and a unit's visits are
+summed to reach that grain. A frame of 300 visits across 75 units
+gives 75 values, ordered as \code{\link[=log_lik.mvgam]{log_lik.mvgam()}} orders its columns.
+
+\code{loo_linpred()} is refused for those families rather than
+answered: summing a linear predictor across a unit's visits names
+no quantity, and the per-visit predictor has no weights of its
+own.
+
+\code{\link[=mvn]{mvn()}} and \code{\link[=mvt]{mvt()}} keep the per-row grain, since their density
+is written per row. The composition families (\code{\link[=diri]{diri()}},
+\code{\link[=multi]{multi()}}, \code{\link[=categ]{categ()}}) write one joint density per site and carry
+it on the site's first row, so their answers stay at row grain
+and only one row in K holds a density.
+}
+
 \examples{
 \dontrun{
 set.seed(13)

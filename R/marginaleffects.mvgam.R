@@ -72,6 +72,17 @@ get_predict.mvgam <- function(model,
   # single-visit closure unit). No-op for non-closure-unit
   # families and for newdata that already carries the columns.
   newdata <- complete_closure_unit_newdata(model, newdata)
+  # A composition is a property of a whole site, so its grid is
+  # completed to whole sites, predicted, and the asked-for rows
+  # taken back. `asked` stays NULL for every other family, and the
+  # grid the caller supplied is what the result is reported against.
+  asked <- NULL
+  grid <- newdata
+  completed <- complete_simplex_grid(model, newdata)
+  if (!is.null(completed)) {
+    newdata <- completed$data
+    asked <- completed$take
+  }
   # Type vocabulary at the marginaleffects boundary. marginaleffects
   # validates `type` against its shipped per-class `type_dictionary`
   # (upstream of this method), which for the mvgam class permits
@@ -133,6 +144,17 @@ get_predict.mvgam <- function(model,
         ") to evaluate a single response."
       )
     )))
+  }
+
+  # Back to the grid the caller asked about, now that the whole-site
+  # prediction has been made over the completed one.
+  if (!is.null(asked)) {
+    draws <- if (length(dim(draws)) == 3L) {
+      draws[, asked, , drop = FALSE]
+    } else {
+      draws[, asked, drop = FALSE]
+    }
+    newdata <- grid
   }
 
   rowid <- newdata[["rowid"]] %||% seq_len(nrow(newdata))

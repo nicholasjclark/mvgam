@@ -1636,35 +1636,64 @@ test_that("uses_threading() detects reduce_sum in stancode", {
 # so the closure unit is keyed on the 3-axis tuple.
 # ----------------------------------------------------------------
 
-test_that("occ() default has no mvgam_unit_grouping attr", {
-  expect_null(closure_unit_grouping(occ()))
+test_that("only a multi_season opt-in declares a unit grouping", {
+  # The attribute records an opt-in, so every constructor that did
+  # not opt in must leave it unset and fall through to a default.
+  declared <- list(
+    occ(), nmix(), nmix("royle_nichols"), nmix("poisson_poisson"),
+    diri(), multi(), categ(), mvn(), mvt()
+  )
+  for (fam in declared) {
+    expect_null(closure_unit_grouping(fam))
+  }
+  for (fam in list(occ(multi_season = TRUE),
+                   nmix(multi_season = TRUE),
+                   nmix("royle_nichols", multi_season = TRUE),
+                   nmix("poisson_poisson", multi_season = TRUE))) {
+    expect_identical(
+      closure_unit_grouping(fam),
+      c("series", "site", "time")
+    )
+  }
 })
 
-test_that("occ(multi_season = TRUE) sets mvgam_unit_grouping = c('series','site','time')", {
+test_that("closure_unit_key_vars() keys a multi-response unit on time alone", {
+  # This is the accessor every consumer reads, and the two defaults
+  # behind it are not the same. A detection unit is one series
+  # visited repeatedly, so it keys on (series, time) and a
+  # per-series cut of a frame keeps its units whole. A
+  # multi-response unit is a site whose rows are the K response
+  # components, so it keys on time alone and a per-series cut
+  # leaves one row per unit -- for a composition, a simplex of
+  # width one whose only probability is 1 by construction.
+  #
+  # Testing the raw attribute instead of this accessor is how the
+  # multi-response default came to be missing here while the array
+  # builder had it: `kfold()` then keyed folds on (series, time)
+  # and split every composition unit across folds, scoring each
+  # species against a site the training data still held.
+  for (fam in list(diri(), multi(), categ(), mvn(), mvt())) {
+    expect_identical(closure_unit_key_vars(fam), "time")
+  }
+  for (fam in list(occ(), nmix(), nmix("royle_nichols"),
+                   nmix("poisson_poisson"))) {
+    expect_identical(closure_unit_key_vars(fam), c("series", "time"))
+  }
+  # A declared grouping wins over both defaults.
   expect_identical(
-    closure_unit_grouping(occ(multi_season = TRUE)),
+    closure_unit_key_vars(occ(multi_season = TRUE)),
     c("series", "site", "time")
   )
-})
-
-test_that("nmix() default has no mvgam_unit_grouping attr (all variants)", {
-  expect_null(closure_unit_grouping(nmix()))
-  expect_null(closure_unit_grouping(nmix("royle_nichols")))
-  expect_null(closure_unit_grouping(nmix("poisson_poisson")))
-})
-
-test_that("nmix(multi_season = TRUE) sets the 3-axis grouping (all variants)", {
+  # A family with no closure unit is distinguishable from one
+  # taking the default, so a caller can word its own refusal.
+  expect_null(closure_unit_key_vars(brms::negbinomial()))
+  # No family to consult yields the detection default, which is
+  # what the builder and the validator ask for, and it honours
+  # renamed columns rather than hard-coding them.
+  expect_identical(closure_unit_key_vars(NULL), c("series", "time"))
   expect_identical(
-    closure_unit_grouping(nmix(multi_season = TRUE)),
-    c("series", "site", "time")
-  )
-  expect_identical(
-    closure_unit_grouping(nmix("royle_nichols", multi_season = TRUE)),
-    c("series", "site", "time")
-  )
-  expect_identical(
-    closure_unit_grouping(nmix("poisson_poisson", multi_season = TRUE)),
-    c("series", "site", "time")
+    closure_unit_key_vars(NULL, series_var = "sp", time_var = "yr"),
+    c("sp", "yr")
   )
 })
 

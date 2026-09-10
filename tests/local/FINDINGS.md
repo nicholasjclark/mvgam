@@ -275,17 +275,17 @@ pair and the quantile residual follows it. Stan's own
 same pair, so the R side and the sampled model disagree exactly
 where a held-out fold or a missing observation puts them.
 
-The obvious guard is wrong, and was tried: emptying any unit whose
-`n_rep` falls short of the species count also empties every arm
-`hindcast()` builds, since those arms are deliberately one series
-wide. It turns the constant 1 recorded above into 240
-`rgamma(shape = NA)` warnings and ten further failures.
+The two sides want different things from the same unit. A density
+has none to give when a component is missing, since the observed
+shares no longer sum to one. A prediction still has one: every row
+of the site carries a linear predictor whether or not its response
+was recorded, so the softmax belongs over all K of them rather than
+over the survivors.
 
-Telling the two apart needs to know whether the caller is scoring
-a composition or fanning one out per species, which is the same
-question the softmax normaliser answers. So the guard belongs with
-the composition surface that the training grid, the forecast arm
-and the hindcast arm all read, rather than in the extractor.
+So the fix is not one guard. The extractor should build `prob_row`
+over the site's full set of rows, and the three log-density kernels
+should leave a unit missing when its components are incomplete,
+which is what `clean_ll()` then drops.
 
 `test-family-jsdgam.R` asserts that such a unit is not scored, and
 fails.
@@ -420,64 +420,38 @@ arm names, the dimensions and `is.finite()`. A link-scale value
 satisfies every one of those. The assertion now compares the arm
 against the scale `posterior_epred()` occupies for that family.
 
-**30. `hindcast()` and `conditional_effects()` return a constant on
-the composition families.**
+**30. `conditional_effects()` returns a constant on the composition
+families.**
 
-`test-family-jsdgam.R`, "hindcast arms are the species, in order,
-and distinct" and "pp_check, plotting and conditional_effects
-render". Measured on the cached diri, categ and multi fits:
+`test-family-jsdgam.R`, "pp_check, plotting and conditional_effects
+render". Measured on the cached diri fit, reading the drawn layer of
+each returned panel:
 
-| call | diri | categ | multi |
+| effect | grid rows | estimate | widest interval |
 |---|---|---|---|
-| `hindcast()` arm means | 1, 1, 1, 1 | -- | -- |
-| identical arm pairs | all six | -- | -- |
-| `conditional_effects()` estimate | 1 | 1 | 0 |
-| its `conf.low` / `conf.high` | 1 / 1 | 1 / 1 | 0 / 0 |
+| `env` | 50 | 1.00000 to 1.00000 | 0 |
+| `series` | 4 | 1.00000 to 1.00000 | 0 |
+| `env:series` | 200 | 1.00000 to 1.00000 | 0 |
 
-Every panel is a flat line at a constant with an interval of zero
-width, across all three effects the model offers. The Dirichlet
-hindcast hands back 1 for every species at every site. Four species
-sharing a simplex average about a quarter each, and four arms that
-agree exactly leave nothing for the composition to distribute.
+Every panel is a flat line at one with an interval of zero width,
+across all three effects the model offers. The mvt and negative
+binomial fits move properly on the same call, which places this at
+the shared softmax normaliser rather than at the plotting layer.
 
-`posterior_epred()` on the same fits is correct: it lands inside
-[0, 1] and sums to one per site, which the family blocks below
-already check. So the fault is in what the plotting and hindcast
-arms are built from rather than in the fit.
+The cause is the prediction grid. `complete_closure_unit_newdata()`
+stamps `time <- seq_len(nrow(newdata))` so that each grid row is its
+own closure unit, which is what a detection family wants and is
+wrong for a composition: a unit of one row is a simplex of width
+one, whose only probability is 1 whatever the linear predictor
+holds. A composition's grid needs the K species of a site present
+together, then returns the row the grid asked about.
 
-The beta, negative binomial and multivariate normal fits draw
-proper panels on the same code path, which is what makes this
-specific to the shared softmax normaliser rather than general.
+`posterior_epred()` on the same fit is correct, landing inside
+[0, 1] and summing to one per site.
 
-The conditional-effects half is what an ordering check cannot see: a
-constant satisfies `conf.low <= estimate <= conf.high`, so the panel
-has to be required to move.
-
-**31. `loo()` reports a Pareto diagnostic for one row in K on a
-composition.**
-
-Same file. A composition's density is one number per site, spread
-across the K rows that site occupies, so `loo()` comes back with
-`n` equal to the row count and the other K-1 entries missing:
-
-| family | rows | non-finite pareto_k | share |
-|---|---|---|---|
-| diri | 120 | 90 | 75% |
-| multi | 120 | 90 | 75% |
-| categ | 400 | 300 | 75% |
-
-75 per cent is exactly (K-1)/K in each case. `loo()` also prints
-"Replacing NAs in `r_eff` with 1s" and then reports an ELPD off the
-remaining quarter without saying so.
-
-Whether the density belongs at the site grain is a question for the
-families. What is wrong either way is the presentation: the object
-claims `n` observations, three quarters of its diagnostics cannot
-be read, and the notice about it is about `r_eff` rather than about
-the missing k values.
-
-Distinct from finding 11, which is about the k values a trend fit
-produces being too high to trust. Here they are absent.
+An ordering check cannot see this: a constant satisfies
+`conf.low <= estimate <= conf.high`, so the panel has to be required
+to move.
 
 **32. Three fixtures asked a composition a question it cannot
 answer.**

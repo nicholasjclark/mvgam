@@ -742,18 +742,49 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
                                   process_error = FALSE,
                                   resp = NULL) {
   series_levels <- names(training$observations)
+  time_var <- training$time_var
+
+  # Which rows an arm covers, and in what order, said once and read
+  # by both paths below. Membership is settled where the arms were
+  # built; the ordering is by the occasion the user supplied.
+  arm_rows <- lapply(series_levels, function(lv) {
+    rows <- training$series_rows[[lv]]
+    rows[order(training$data[[time_var]][rows])]
+  })
+  names(arm_rows) <- series_levels
+
+  # A simplex family's expectation is a softmax across the K rows of
+  # a closure unit, and its unit is a site whose rows are the series
+  # (`closure_unit_key_vars()` keys it on the time alone). Cutting
+  # the frame to one series before predicting therefore leaves one
+  # row per unit, and a softmax of width one is 1 whatever the
+  # linear predictor held: every arm came back a flat vector of ones,
+  # identical to every other arm. Those two surfaces are predicted
+  # once over the whole frame and sliced afterwards, which is also
+  # one linpred call in place of K.
+  #
+  # `trend` and `link` are per-row linear predictors that read no
+  # sibling row, so they take the per-series cut like any other
+  # family.
+  if (type %in% c("expected", "response") &&
+        is_simplex_response_family(get_family_for_resp(object, resp))) {
+    full <- hindcast_one_series(
+      object, training$data, type, draw_idx, obs_uncertainty,
+      process_error, resp = resp
+    )
+    return(lapply(arm_rows, function(rows) full[, rows, drop = FALSE]))
+  }
+
   out <- vector("list", length(series_levels))
   names(out) <- series_levels
   for (s in seq_along(series_levels)) {
     lv <- series_levels[s]
-    ts <- training$times[[lv]]
-    if (length(ts) == 0L) {
+    if (length(training$times[[lv]]) == 0L) {
       out[[s]] <- matrix(NA_real_, nrow = length(draw_idx),
                            ncol = 0L)
       next
     }
-    sub <- training$data[training$series_rows[[lv]], , drop = FALSE]
-    sub <- sub[order(sub[[training$time_var]]), , drop = FALSE]
+    sub <- training$data[arm_rows[[lv]], , drop = FALSE]
     # Closure-unit families ship multiple rows per (series, time)
     # for the per-visit detection grain. The `"trend"` and `"link"`
     # surfaces live at the (time, series) grain of the trend matrix,
@@ -763,14 +794,10 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
     # latent state varies per closure unit.
     if (type %in% c("trend", "link") &&
           is_closure_unit_family(object$family)) {
-      sub_for_linpred <- sub[
-        !duplicated(sub[[training$time_var]]), , drop = FALSE
-      ]
-    } else {
-      sub_for_linpred <- sub
+      sub <- sub[!duplicated(sub[[time_var]]), , drop = FALSE]
     }
     out[[s]] <- hindcast_one_series(
-      object, sub_for_linpred, type, draw_idx, obs_uncertainty,
+      object, sub, type, draw_idx, obs_uncertainty,
       process_error, resp = resp
     )
   }

@@ -840,11 +840,13 @@ epred_extra_dpars_for <- function(family_name) {
 #'
 #' @noRd
 epred_kernel <- function(family_name) {
-  tryCatch(
-    get(paste0("posterior_epred_", family_name), mode = "function",
-        envir = asNamespace("mvgam")),
-    error = function(e) NULL
-  )
+  # Asked rather than attempted, so a family with no kernel is
+  # answered `NULL` while a kernel that fails to load still raises.
+  nm <- paste0("posterior_epred_", family_name)
+  if (!exists(nm, mode = "function", envir = asNamespace("mvgam"))) {
+    return(NULL)
+  }
+  get(nm, mode = "function", envir = asNamespace("mvgam"))
 }
 
 

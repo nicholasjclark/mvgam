@@ -334,7 +334,9 @@ validate_closure_unit_data <- function(data,
   checkmate::assert_flag(cap_required)
   checkmate::assert_int(default_cap, lower = 1L, null.ok = TRUE)
   if (is.null(unit_grouping_vars)) {
-    unit_grouping_vars <- c(series_var, time_var)
+    unit_grouping_vars <- closure_unit_key_vars(
+      NULL, series_var = series_var, time_var = time_var
+    )
   }
   checkmate::assert_character(unit_grouping_vars, min.len = 1L,
                                any.missing = FALSE, unique = TRUE)

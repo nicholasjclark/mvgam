@@ -280,9 +280,22 @@ pp_check.mvgam <- function(
   # returns a dedicated `mvgam_ppc_fit_stat` object, so it bypasses
   # the bayesplot dispatch entirely.
   if (identical(type, "fit_stat")) {
-    if (!is_closure_unit_family(object$family)) {
+    # The discrepancy is computed on a unit's aggregated visits, so
+    # the families it applies to are the ones that aggregate, which
+    # is what this refusal's own hint already names. Asking the
+    # wire-format question instead admitted the composition
+    # families, whose unit sums to one whatever the fit says, and
+    # returned a Bayesian p-value near 0.5 for every model.
+    if (!needs_closure_unit_aggregation(object$family)) {
       stop(insight::format_error(c(
-        "pp_check(type = 'fit_stat') is only available for closure-unit families.",
+        paste0(
+          "pp_check(type = 'fit_stat') is only available for the ",
+          "detection families."
+        ),
+        x = paste0(
+          "Family '", resolve_family_name(object$family),
+          "' does not aggregate repeat visits within a unit."
+        ),
         i = "Use family = occ() or family = nmix() to enable this discrepancy GOF."
       )))
     }
@@ -323,13 +336,20 @@ pp_check.mvgam <- function(
     get(paste0(prefix, "_", bptype), asNamespace("bayesplot"))
   }
 
-  # Closure-unit families (nmix, occ) operate at the closure-unit
-  # grain (one per site x season). Per-row PPC types that assume
-  # exchangeable observations or a per-row time axis do not match
-  # that grain and are blocked up front; the rest of the ppc_*
-  # surface routes through a per-unit aggregation injected below
-  # (see closure_unit_pp_check_setup()).
-  if (is_closure_unit_family(object$family)) {
+  # The detection families plot at the closure-unit grain, because
+  # the aggregation injected below collapses a unit's visits (see
+  # `closure_unit_pp_check_setup()`). Per-row types that assume
+  # exchangeable observations or a per-row time axis do not describe
+  # that grain and are blocked.
+  #
+  # The gate reads the aggregation predicate rather than the
+  # wire-format one, because it is the aggregation that creates the
+  # mismatch. `mvn()`, `mvt()`, `diri()`, `multi()` and `categ()`
+  # share the closure-unit pipeline but are never aggregated here,
+  # so their plots are per-row already and these ten types describe
+  # them correctly; the wire-format spelling refused all ten for a
+  # reason that did not hold.
+  if (needs_closure_unit_aggregation(object$family)) {
     closure_unit_blocked <- c(
       "scatter_avg", "scatter_avg_grouped",
       "error_scatter_avg", "error_scatter_avg_vs_x",

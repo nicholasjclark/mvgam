@@ -358,18 +358,6 @@ predict_variance <- function(object, newdata, process_error,
   # Both route through posterior_epred and apply the
   # family-specific variance formula; no dpar broadcasting needed.
   if (is_closure_unit_family(family)) {
-    epred <- posterior_epred(
-      object,
-      newdata           = newdata,
-      process_error     = process_error,
-      incl_autocor      = incl_autocor,
-      ndraws            = ndraws,
-      draw_ids          = draw_ids,
-      re_formula        = re_formula,
-      allow_new_levels  = allow_new_levels,
-      sample_new_levels = sample_new_levels,
-      resp              = resp
-    )
     family_name <- resolve_family_name(family)
     # mv-response families (mvn, mvt) carry per-row residual scale
     # in Psi (and df in nu for mvt). The marginal per-row variance
@@ -396,19 +384,10 @@ predict_variance <- function(object, newdata, process_error,
           return(base_var / (comp$phi + 1))
         }
         if (identical(family_name, "multi")) {
-          if (is.null(newdata)) {
-            newdata <- mvgam_training_data(object)
-          }
-          response_var <- closure_unit_response_var(object$formula)
-          y_vec <- newdata[[response_var]]
-          total_row <- numeric(comp$N_obs)
-          for (g in seq_len(comp$N_unit)) {
-            Kg <- comp$arrays$n_rep[g]
-            idx <- comp$arrays$visit_row[g, seq_len(Kg)]
-            total_row[idx] <- sum(y_vec[idx])
-          }
-          total_mat <- matrix(total_row, nrow = comp$ndraws,
-                               ncol = comp$N_obs, byrow = TRUE)
+          total_mat <- matrix(
+            multinomial_unit_totals(object, newdata, comp$arrays),
+            nrow = comp$ndraws, ncol = comp$N_obs, byrow = TRUE
+          )
           return(base_var * total_mat)
         }
         # categ
@@ -422,18 +401,29 @@ predict_variance <- function(object, newdata, process_error,
       }
       return(base_var)
     }
-    return(switch(
-      family_name,
-      nmix = epred,                  # Poisson thinned variance
-      occ  = epred * (1 - epred),    # Bernoulli variance
-      stop(insight::format_error(c(
-        paste0(
-          "predict(type = 'variance') closure-unit dispatch ",
-          "missing for family '", family_name, "'."
-        ),
-        i = "Add a branch with the family's mean-variance formula."
-      )))
-    ))
+    # Only the detection families reach here, and their per-visit
+    # variance follows from the response support rather than from the
+    # family's name: a detection is Bernoulli, so Var = E(1 - E),
+    # while a thinned Poisson count has Var = E. The registry records
+    # which support a family has, so naming the families instead left
+    # `nmix("royle_nichols")` and `nmix("poisson_poisson")` with no
+    # branch and a refusal that asked the user to edit mvgam's source.
+    epred <- posterior_epred(
+      object,
+      newdata           = newdata,
+      process_error     = process_error,
+      incl_autocor      = incl_autocor,
+      ndraws            = ndraws,
+      draw_ids          = draw_ids,
+      re_formula        = re_formula,
+      allow_new_levels  = allow_new_levels,
+      sample_new_levels = sample_new_levels,
+      resp              = resp
+    )
+    if (is_binary_response_family(family)) {
+      return(epred * (1 - epred))
+    }
+    return(epred)
   }
   # Compute mu over the full posterior so row i of mu_full corresponds
   # to draws_mat row i. Without this, posterior_epred(ndraws=K) would

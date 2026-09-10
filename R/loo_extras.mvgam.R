@@ -6,6 +6,28 @@
 #' [`posterior_linpred.mvgam`], [`posterior_predict.mvgam`]) with
 #' helpers from the \pkg{loo} package.
 #'
+#' @section Which observation these answer for:
+#' Every method here pairs a prediction with importance weights, so
+#' both describe the observation the likelihood scored. For most
+#' families that is a row of the data. The detection families
+#' ([occ()], [nmix()]) write their likelihood over a closure unit
+#' instead, marginalising the repeat visits within it, so
+#' `loo_predict()`, `loo_epred()`, `loo_predictive_interval()` and
+#' `loo_R2()` answer once per closure unit and a unit's visits are
+#' summed to reach that grain. A frame of 300 visits across 75 units
+#' gives 75 values, ordered as [log_lik.mvgam()] orders its columns.
+#'
+#' `loo_linpred()` is refused for those families rather than
+#' answered: summing a linear predictor across a unit's visits names
+#' no quantity, and the per-visit predictor has no weights of its
+#' own.
+#'
+#' [mvn()] and [mvt()] keep the per-row grain, since their density
+#' is written per row. The composition families ([diri()],
+#' [multi()], [categ()]) write one joint density per site and carry
+#' it on the site's first row, so their answers stay at row grain
+#' and only one row in K holds a density.
+#'
 #' @name mvgam_loo_extras
 #' @aliases LOO.mvgam WAIC.mvgam loo_R2.mvgam loo_predict.mvgam
 #'   loo_epred.mvgam loo_linpred.mvgam loo_predictive_interval.mvgam
@@ -117,13 +139,10 @@ NULL
 # independent, so the assumption costs little.
 #'@noRd
 mvgam_r_eff_log_lik <- function(x, ll, draw_ids = NULL) {
-  n_draws <- NROW(ll)
   n_obs <- NCOL(ll)
-  chains <- tryCatch(
-    posterior::nchains(posterior::as_draws_array(x$fit)),
-    error = function(e) 1L
+  chain_id <- mvgam_chain_id(
+    posterior_chain_layout(x), NROW(ll), draw_ids
   )
-  chain_id <- mvgam_chain_id(chains, n_draws, draw_ids, x)
   if (is.null(chain_id)) {
     return(rep(1, n_obs))
   }
@@ -131,10 +150,29 @@ mvgam_r_eff_log_lik <- function(x, ll, draw_ids = NULL) {
 }
 
 
+# Internal: how a fit's posterior divides into chains, or NULL when
+# it has none to divide.
+#
+# Both facts come from one conversion, which is the expensive part,
+# so it is done once instead of once per fact. A `run_model = FALSE`
+# stub carries no posterior and is recognised by asking, rather than
+# by catching the error its conversion raises: catching would report
+# a broken posterior as a single-chain one.
+#'@noRd
+posterior_chain_layout <- function(x) {
+  if (is.null(x$fit)) {
+    return(NULL)
+  }
+  arr <- posterior::as_draws_array(x$fit)
+  list(chains = posterior::nchains(arr), total = posterior::ndraws(arr))
+}
+
+
 # Internal: chain membership for each retained draw, or NULL when a
 # balanced chain layout cannot be recovered.
 #'@noRd
-mvgam_chain_id <- function(chains, n_draws, draw_ids = NULL, x = NULL) {
+mvgam_chain_id <- function(layout, n_draws, draw_ids = NULL) {
+  chains <- layout$chains
   if (!isTRUE(chains > 1L)) {
     return(NULL)
   }
@@ -144,11 +182,8 @@ mvgam_chain_id <- function(chains, n_draws, draw_ids = NULL, x = NULL) {
     }
     return(rep(seq_len(chains), each = n_draws %/% chains))
   }
-  total <- tryCatch(
-    posterior::ndraws(posterior::as_draws_array(x$fit)),
-    error = function(e) NA_integer_
-  )
-  if (is.na(total) || total %% chains != 0L) {
+  total <- layout$total
+  if (is.null(total) || is.na(total) || total %% chains != 0L) {
     return(NULL)
   }
   per_chain <- total %/% chains
@@ -285,6 +320,96 @@ loglik_col_values <- function(object, data, x, n_cols = NULL) {
 }
 
 
+#' Put a per-row quantity on the grain `log_lik()` answers
+#'
+#' A prediction always answers once per row of the frame, while the
+#' detection families' likelihood answers once per closure unit. The
+#' two are paired by importance weights, so a prediction has to reach
+#' the unit grain before `narrow_to_scored()` selects columns from
+#' it. Letting the counts decide instead is what
+#' `loglik_col_values()` already warns against, and it failed
+#' silently in exactly the way that note describes: on a 300-row
+#' occupancy fit with 75 units, `narrow_to_scored()` found 75 scored
+#' columns inside 300 supplied ones, took the first 75 visits and
+#' paired them with the weights of the units they do not correspond
+#' to. `loo_predict()` and `loo_R2()` both answered.
+#'
+#' The reduction is the sum within a unit, which is what the package
+#' aggregates a unit's visits with everywhere else.
+#'
+#' @param object Fitted `mvgam` object.
+#' @param data The frame `x` was built alongside.
+#' @param x Per-row vector, or `[ndraws x nobs]` matrix.
+#' @return `x` at the grain `log_lik()` answers on.
+#'
+#' @noRd
+at_loglik_grain <- function(object, data, x) {
+  if (!needs_closure_unit_aggregation(object$family)) {
+    return(x)
+  }
+  sum_within_closure_units(closure_unit_arrays_for(object, data), x)
+}
+
+
+#' Refuse a LOO pairing this family's grain cannot carry
+#'
+#' Each of these methods reweights a per-observation prediction by
+#' importance weights taken from the density of that same
+#' observation, so a family whose density and prediction sit on
+#' different grains has no pairing to make. Two do, for different
+#' reasons, and both used to answer with a plausible number.
+#'
+#' A detection family scores one density per closure unit. Its
+#' expectation and its predictive draws aggregate a unit's visits
+#' the way that density does, so those pair; a linear predictor does
+#' not, because summing log-odds across visits names no quantity.
+#'
+#' A composition scores one joint density per site across the K
+#' categories measured there. No scalar summarises that site, so
+#' none of these methods has anything to reweight.
+#'
+#' @param object Fitted `mvgam` object.
+#' @param fn_name The user-facing method name, from `loo_fn_name()`.
+#' @return Invisible `TRUE`, or an error.
+#'
+#' @noRd
+require_loo_pairing <- function(object, fn_name) {
+  family <- object$family
+  if (is_simplex_response_family(family)) {
+    stop(insight::format_error(c(
+      paste0("'", fn_name, "' is not available for family '",
+             resolve_family_name(family), "'."),
+      x = paste0(
+        "This family scores one joint density per site across the ",
+        "categories measured there, so a site has no single ",
+        "observation to predict and reweight."
+      ),
+      i = paste0(
+        "Use 'loo()' for the per-site scores, or 'posterior_epred()' ",
+        "for the per-category probabilities."
+      )
+    )), call. = FALSE)
+  }
+  if (needs_closure_unit_aggregation(family) &&
+        identical(fn_name, "loo_linpred")) {
+    stop(insight::format_error(c(
+      paste0("'", fn_name, "' is not available for family '",
+             resolve_family_name(family), "'."),
+      x = paste0(
+        "The likelihood is scored once per closure unit, while a ",
+        "linear predictor is one per visit, and summing log-odds ",
+        "across the visits of a unit names no quantity."
+      ),
+      i = paste0(
+        "Use 'loo_epred' or 'loo_predict', which aggregate a unit's ",
+        "visits the way the per-unit density does."
+      )
+    )), call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
+
 #' Narrow anything paired with a scored log-likelihood
 #'
 #' `clean_ll()` drops the columns a missing response left unscorable
@@ -346,7 +471,12 @@ mvgam_loo_E_loo <- function(object, posterior_fn,
                              resp = NULL, ...) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_function(posterior_fn)
-  assert_resp_for_mv(object, resp, loo_fn_name(posterior_fn))
+  fn_name <- loo_fn_name(posterior_fn)
+  assert_resp_for_mv(object, resp, fn_name)
+  # Refused before the weights are computed, not after: running PSIS
+  # over the whole posterior to then reject the pairing spends
+  # minutes to reach an answer already known from the family.
+  require_loo_pairing(object, fn_name)
   type <- match.arg(type)
   # `local_seed()` takes responsibility for putting the caller's
   # stream back. The two `set.seed(aligned_seed)` calls below are
@@ -380,8 +510,12 @@ mvgam_loo_E_loo <- function(object, posterior_fn,
     c(list(object, resp = resp),
       list(incl_autocor = surface %||% TRUE), dots)
   )
-  # A prediction covers every row of the data; the weights cover only
-  # the rows the likelihood could score. Narrow the prediction to those
+  # The weights are one per observation the likelihood scored, which
+  # is a closure unit for the detection families and a row for
+  # everything else, so the prediction reaches that grain first.
+  preds <- at_loglik_grain(object, mvgam_training_data(object), preds)
+  # A prediction covers every observation; the weights cover only
+  # those the likelihood could score. Narrow the prediction to those
   # before pairing the two, or a fit with any missing response asks
   # `loo::E_loo()` to weight observations it has no weights for.
   preds <- narrow_to_scored(preds, psis_object)
@@ -476,6 +610,7 @@ loo_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   checkmate::assert_list(args_loglik)
   is_mv <- brms::is.mvbrmsformula(object$formula)
   assert_resp_for_mv(object, resp, "loo_R2")
+  require_loo_pairing(object, "loo_R2")
   local_seed(seed)
   resp_use <- scored_response_name(object, resp)
   y <- object$data[[resp_use]]
@@ -506,6 +641,13 @@ loo_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   # them have to lose the same ones, or the three describe different
   # observations.
   ll <- clean_ll(object, ll)
+  # The response and the expectation are per row; `ll` is per closure
+  # unit on a detection family. Both reach the likelihood's grain
+  # before the scored columns are selected from them, or the
+  # selection takes a unit's index out of a visit-indexed vector.
+  data_used <- mvgam_training_data(object)
+  y <- at_loglik_grain(object, data_used, y)
+  epred <- at_loglik_grain(object, data_used, epred)
   y <- narrow_to_scored(y, ll)
   epred <- narrow_to_scored(epred, ll)
   r_eff <- mvgam_r_eff_log_lik(object, ll)

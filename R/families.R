@@ -1444,22 +1444,15 @@ family_predict_types <- function(family) {
 }
 
 
-# Internal: refuse a prediction `type` the family does not expose.
-#
-# `predict()` and `conditional_effects()` both gate the closure-unit
-# types, and both explained the refusal in the same three lines. One
-# message, so the two cannot drift into describing the same family
-# differently.
-#' @noRd
 # Internal: refuse a closure-unit predict type the family does not
 # offer.
 #
 # Being a closure-unit family is the wire-format question and does
 # not settle this one: `mvn()`, `mvt()` and `diri()` share that
 # pipeline and expose no latent state. The registry is what knows,
-# and asking it here is what keeps three callers to one answer. The
-# two that asked only whether the family was closure-unit let those
-# three through to a dispatcher with no branch for them, which
+# and asking it here is what keeps every caller to one answer. A
+# caller that asked only whether the family was closure-unit let
+# those three through to a dispatcher with no branch for them, which
 # replied by naming a source file for the user to edit.
 #'@noRd
 require_closure_unit_predict_type <- function(family, type) {
@@ -1471,22 +1464,66 @@ require_closure_unit_predict_type <- function(family, type) {
 }
 
 
-refuse_unsupported_predict_type <- function(family, type) {
-  types <- family_predict_types(family)
+# Internal: refuse a family the internal dispatch has no kernel for.
+#
+# Reaching one of these means a family was registered without a
+# kernel some method needs, which is a fault in mvgam rather than
+# anything the caller wrote. Five copies of this refusal each told
+# the reader to add a branch to a named function in a named source
+# file, which is not an action a user of the package can take and
+# reads as an internal note escaping into the console. One message,
+# so a new dispatch table cannot reintroduce that.
+#'@noRd
+refuse_missing_family_dispatch <- function(family_name, what) {
   stop(insight::format_error(c(
-    paste0("type = '", type, "' is not available for this family."),
+    paste0(
+      "mvgam cannot compute ", what, " for family '",
+      family_name, "'."
+    ),
     x = paste0(
-      "Family '", resolve_family_name(family), "' exposes types: ",
-      if (length(types) > 0L) {
-        paste(paste0("'", types, "'"), collapse = ", ")
-      } else {
-        "none (not a closure-unit family)"
-      },
-      "."
+      "This family is registered without the internal kernel that ",
+      "step requires."
     ),
     i = paste0(
-      "Refit with family = nmix() or family = occ() to enable ",
-      "closure-unit predict types."
+      "This is a fault in mvgam rather than in your model. Please ",
+      "report it at https://github.com/nicholasjclark/mvgam/issues, ",
+      "quoting the family name above."
+    )
+  )), call. = FALSE)
+}
+
+
+refuse_unsupported_predict_type <- function(family, type) {
+  types <- family_predict_types(family)
+  # Two different families reach here and they need different
+  # sentences. One has no closure unit at all; the other shares the
+  # closure-unit pipeline and still models no latent state, which is
+  # true of every multi-response family. Reporting both as "not a
+  # closure-unit family" told a `diri()` user something false about
+  # their own model.
+  detail <- if (length(types) > 0L) {
+    paste0(
+      "Family '", resolve_family_name(family), "' exposes types: ",
+      paste(paste0("'", types, "'"), collapse = ", "), "."
+    )
+  } else if (is_closure_unit_family(family)) {
+    paste0(
+      "Family '", resolve_family_name(family), "' groups its ",
+      "observations into closure units but models no latent state ",
+      "over them, so it exposes no prediction types of this kind."
+    )
+  } else {
+    paste0(
+      "Family '", resolve_family_name(family),
+      "' has no closure units, so it exposes no types of this kind."
+    )
+  }
+  stop(insight::format_error(c(
+    paste0("type = '", type, "' is not available for this family."),
+    x = detail,
+    i = paste0(
+      "Refit with family = nmix() or family = occ() to model a ",
+      "latent abundance or occupancy state."
     )
   )), call. = FALSE)
 }
@@ -1581,18 +1618,31 @@ is_multi_season_family <- function(family) {
 #' The columns that key a closure unit, default included
 #'
 #' `closure_unit_grouping()` reports what the family declares, which
-#' is `NULL` for a family that takes the default. The default is
-#' `(series, time)`, and writing it out at each caller is how three
-#' places came to state it separately: one array builder and two
-#' log-lik alignment paths, each free to drift from the others.
+#' is `NULL` for a family that takes a default. There are two
+#' defaults, and stating them at each caller is how five places came
+#' to hold the same fact: an array builder, a validator, two array
+#' rebuilds and this accessor, each free to drift from the others.
+#' This is where the fact lives; everything else asks.
+#'
+#' A detection family keys on `(series, time)`, so a unit's rows are
+#' the repeat visits to one series. A multi-response family keys on
+#' the time alone, so a unit is a site and its rows are the K
+#' response components measured there. The difference decides
+#' whether a per-series cut of a frame preserves units or destroys
+#' them: it preserves them for the detection families, and for a
+#' composition it leaves one row per unit, which is a simplex of
+#' width one whose single probability is 1 by construction.
 #'
 #' Answers `NULL` for a family that has no closure unit at all, so a
 #' caller can tell "not a closure-unit family" from "the default
-#' key" and word its own refusal.
+#' key" and word its own refusal. `family = NULL` asks for the
+#' detection default without a family to consult, which is what the
+#' builder and the validator need when a caller names no grouping.
 #'
-#' @param family A `brmsfamily` (or family-like list).
-#' @param series_var,time_var The column names the default is built
-#'   from.
+#' @param family A `brmsfamily` (or family-like list), or `NULL` to
+#'   ask for the default key alone.
+#' @param series_var,time_var The column names the defaults are
+#'   built from.
 #' @return Character vector of column names, or `NULL`.
 #' @noRd
 closure_unit_key_vars <- function(family, series_var = "series",
@@ -1601,8 +1651,13 @@ closure_unit_key_vars <- function(family, series_var = "series",
   if (!is.null(declared)) {
     return(declared)
   }
-  if (!is_closure_unit_family(family)) {
-    return(NULL)
+  if (!is.null(family)) {
+    if (!is_closure_unit_family(family)) {
+      return(NULL)
+    }
+    if (is_multi_response_family(family)) {
+      return(time_var)
+    }
   }
   c(series_var, time_var)
 }
@@ -1731,6 +1786,80 @@ closure_unit_default_cap_buffer <- function(family) {
 # `conditional_effects`) works on closure-unit fits out of the
 # box.
 #'@noRd
+# Internal: complete a composition's prediction grid to whole sites.
+#
+# A softmax spans the K categories of a site, so a grid row carrying
+# one category is a simplex of width one, whose only probability is
+# 1 whatever the linear predictor holds. Every panel a composition
+# drew was therefore a flat line at one with a zero-width interval.
+# Each distinct covariate setting in the grid is completed to the K
+# category rows of one synthetic site, and the caller takes back the
+# rows the grid asked about.
+#
+# Grouping the grid's own rows into units is not enough, though it
+# looks like it should be. A main-effect grid holds the categories
+# together at its first covariate value and then one category across
+# the remaining values, so grouping leaves every later setting a
+# unit of one.
+#
+# Only a synthetic grid reaches here, never a user's own frame, so
+# the K-fold widening is paid on a few hundred rows at most.
+#
+# @return `NULL` when the family needs no completion; otherwise a
+#   list with `data`, the completed grid, and `take`, one index per
+#   row of `newdata` into `data`.
+#'@noRd
+complete_simplex_grid <- function(object, newdata) {
+  if (!is_simplex_response_family(object$family)) {
+    return(NULL)
+  }
+  levs <- levels(factor(mvgam_training_data(object)$series))
+  if (length(levs) < 2L) {
+    return(NULL)
+  }
+  resp <- closure_unit_response_var(object$formula)
+  # The covariate setting of a row is everything that is not the
+  # category axis, the unit identifiers, or the response.
+  held <- setdiff(names(newdata),
+                  c("series", "time", "visit", "cap", "rowid", resp))
+  key <- if (length(held)) {
+    do.call(paste, c(lapply(held, function(v) {
+      as.character(newdata[[v]])
+    }), list(sep = "\r")))
+  } else {
+    rep("1", nrow(newdata))
+  }
+  settings <- unique(key)
+  first_row <- match(settings, key)
+  n_set <- length(settings)
+  K <- length(levs)
+  # One block of K rows per setting, carrying that setting's
+  # covariates and sharing a unit identifier.
+  out <- newdata[rep(first_row, each = K), , drop = FALSE]
+  out$series <- factor(rep(levs, times = n_set), levels = levs)
+  out$time <- rep(seq_len(n_set), each = K)
+  out$visit <- 1L
+  out[[resp]] <- 1 / K
+  rownames(out) <- NULL
+  # Which completed row each original row asked about.
+  asked <- match(as.character(newdata$series), levs)
+  take <- (match(key, settings) - 1L) * K + asked
+  if (anyNA(take)) {
+    stop(insight::format_error(c(
+      "A prediction grid names a category the model does not have.",
+      x = paste0(
+        "Unknown: ",
+        paste(unique(setdiff(as.character(newdata$series), levs)),
+              collapse = ", "), "."
+      ),
+      i = paste0("The model's categories are: ",
+                 paste(levs, collapse = ", "), ".")
+    )), call. = FALSE)
+  }
+  list(data = out, take = take)
+}
+
+
 complete_closure_unit_newdata <- function(object, newdata) {
   if (is.null(newdata)) return(newdata)
   if (!is_closure_unit_family(object$family)) return(newdata)
@@ -1769,13 +1898,13 @@ complete_closure_unit_newdata <- function(object, newdata) {
   # do not consume the response column for closure-unit families,
   # so overwriting present values or filling a missing column has
   # the same downstream effect.
-  response_var <- tryCatch(
-    closure_unit_response_var(object$formula),
-    error = function(e) NULL
-  )
-  if (!is.null(response_var)) {
-    newdata[[response_var]] <- rep(0L, nrow(newdata))
-  }
+  #
+  # The response is resolved unguarded, as it is at every other
+  # post-fit closure-unit site: a fit of this family reached here
+  # only by resolving a single response at fit time, so a failure
+  # would be a broken object rather than a case to fall back on.
+  newdata[[closure_unit_response_var(object$formula)]] <-
+    rep(0L, nrow(newdata))
   newdata
 }
 
@@ -1837,9 +1966,12 @@ build_closure_unit_arrays <- function(data,
                                len = 1L, null.ok = TRUE)
   checkmate::assert_flag(compute_y_max)
   if (is.null(unit_grouping_vars)) {
-    unit_grouping_vars <- c(series_var, time_var)
-    # Kept identical to `closure_unit_key_vars()`, which is what
-    # every caller outside this file asks.
+    # No family is in scope here, so the accessor is asked for the
+    # default key alone. Restating it produced a copy that never
+    # learned the multi-response key.
+    unit_grouping_vars <- closure_unit_key_vars(
+      NULL, series_var = series_var, time_var = time_var
+    )
   }
   checkmate::assert_character(unit_grouping_vars, min.len = 1L,
                               any.missing = FALSE)
@@ -4814,32 +4946,20 @@ prepare_closure_unit_family <- function(family, data, response_var,
   default_cap <- closure_unit_default_cap(family)
   default_cap_buffer <- closure_unit_default_cap_buffer(family)
   multi_response <- is_multi_response_family(family)
-  if (multi_response) {
-    # Multi-response families (diri / multinomial /
-    # categorical / mvnormal / mvt) skip the integer-y / cap
-    # validation: their per-unit likelihoods read the K response
-    # components directly, without per-unit truncation. The closure
-    # unit groups by `time` (site) only -- the K species rows at
-    # each site form the per-unit contributions, in contrast to the
-    # count-based families where each (species, site) pair is its
-    # own closure unit with replicate visits. The "time" default is
-    # overridden when the family carries an `mvgam_unit_grouping`
-    # attribute (e.g. a future spatial multi-response variant could
-    # opt in to (site, time) without further plumbing here).
-    arrays <- build_closure_unit_arrays(
-      data, response_var = response_var,
-      compute_y_max = FALSE,
-      unit_grouping_vars = closure_unit_grouping(family) %||% "time"
-    )
-  } else {
+  # Which columns key a unit is the family's own fact, so it is read
+  # rather than restated. The accessor knows that a multi-response
+  # unit is a site keyed by `time` alone, its rows being the K
+  # response components, while a detection unit is keyed by
+  # `(series, time)` with replicate visits inside.
+  unit_grouping_vars <- closure_unit_key_vars(family)
+  if (!multi_response) {
     # cap is required only when neither a scalar default nor a
     # data-driven buffer is configured. Count families (PB / PPM)
     # carry `mvgam_default_cap_buffer = 100L` so the validator
-    # accepts data without an explicit cap column. Multi-season
-    # families carry an `mvgam_unit_grouping` attr that the
-    # accessor returns; otherwise the validator + builder default
-    # to (series, time).
-    unit_grouping_vars <- closure_unit_grouping(family)
+    # accepts data without an explicit cap column. A multi-response
+    # family skips the integer-y / cap validation entirely: its
+    # per-unit likelihood reads the K response components directly,
+    # without per-unit truncation.
     validate_closure_unit_data(
       data,
       response_var       = response_var,
@@ -4851,13 +4971,14 @@ prepare_closure_unit_family <- function(family, data, response_var,
       default_cap        = default_cap,
       unit_grouping_vars = unit_grouping_vars
     )
-    arrays <- build_closure_unit_arrays(
-      data, response_var = response_var,
-      default_cap        = default_cap,
-      default_cap_buffer = default_cap_buffer,
-      unit_grouping_vars = unit_grouping_vars
-    )
   }
+  arrays <- build_closure_unit_arrays(
+    data, response_var = response_var,
+    default_cap        = default_cap,
+    default_cap_buffer = default_cap_buffer,
+    compute_y_max      = !multi_response,
+    unit_grouping_vars = unit_grouping_vars
+  )
   family_stanvars <- switch(
     family_name,
     nmix                 = make_nmix_stanvars(arrays),
@@ -4869,18 +4990,7 @@ prepare_closure_unit_family <- function(family, data, response_var,
     categ                = make_categ_stanvars(arrays),
     mvn                  = make_mvn_stanvars(arrays),
     mvt                  = make_mvt_stanvars(arrays),
-    stop(insight::format_error(c(
-      paste0(
-        "Closure-unit dispatch missing for family '",
-        family_name, "'."
-      ),
-      i = paste0(
-        "Add a '", family_name, " = make_",
-        family_name,
-        "_stanvars(arrays)' branch to the switch() in ",
-        "prepare_closure_unit_family()."
-      )
-    )))
+    refuse_missing_family_dispatch(family_name, "its Stan code")
   )
   attr(family, "mvgam_stanvars") <- family_stanvars
   family_vars <- attr(family, "mvgam_vars", exact = TRUE)
@@ -5507,16 +5617,9 @@ dispatch_closure_unit_method <- function(family, method_kind) {
                    latent_state = NULL)
   )
   if (is.null(fn)) {
-    stop(insight::format_error(c(
-      paste0(
-        "Closure-unit dispatch missing for family '",
-        family_name, "' method '", method_kind, "'."
-      ),
-      i = paste0(
-        "Add a '", family_name, " = switch(method_kind, ...)' ",
-        "branch to dispatch_closure_unit_method() in R/families.R."
-      )
-    )))
+    refuse_missing_family_dispatch(
+      family_name, paste0("a '", method_kind, "' surface")
+    )
   }
   fn
 }
@@ -5680,9 +5783,15 @@ extract_p_via_dpar_linpred <- function(object, newdata, draw_ids) {
 #' units where its likelihood has 480. Deriving them in one place
 #' means a caller cannot leave one out.
 #'
-#' The multi-response families take the other branch, where the
-#' K response components of a site are its "visits", so there is no
-#' per-unit truncation and no cap column to require.
+#' For a multi-response family the K response components of a site
+#' are its "visits", so `compute_y_max` is FALSE: there is no
+#' per-unit truncation, which is also what makes the two cap
+#' declarations inert rather than needing a branch of their own.
+#'
+#' Both of the family's cap declarations are passed, not one. A
+#' count family carries a data-driven buffer rather than a fixed
+#' cap, so handing over only the fixed one left the rebuild here
+#' with neither and it demanded a `cap` column the fit never needed.
 #'
 #' @param object A fitted `mvgam` with a closure-unit family.
 #' @param newdata Frame to build over; defaults to the fit's data.
@@ -5690,26 +5799,17 @@ extract_p_via_dpar_linpred <- function(object, newdata, draw_ids) {
 #' @noRd
 closure_unit_arrays_for <- function(object, newdata = NULL) {
   checkmate::assert_class(object, "mvgam")
-  newdata <- newdata %||% object$data
+  # The frame the model was fitted on, through the accessor that
+  # owns that question rather than one of its two spellings.
+  newdata <- newdata %||% mvgam_training_data(object)
   fam <- object$family
-  resp <- closure_unit_response_var(object$formula)
-  grouping <- closure_unit_grouping(fam)
-  if (is_multi_response_family(fam)) {
-    return(build_closure_unit_arrays(
-      newdata, response_var = resp, compute_y_max = FALSE,
-      unit_grouping_vars = grouping %||% "time"
-    ))
-  }
-  # Both of the family's cap declarations are passed, not one. A
-  # count family carries a data-driven buffer rather than a fixed
-  # cap, so handing over only the fixed one left the rebuild here
-  # with neither and it demanded a `cap` column the fit never
-  # needed.
   build_closure_unit_arrays(
-    newdata, response_var = resp,
+    newdata,
+    response_var = closure_unit_response_var(object$formula),
     default_cap = closure_unit_default_cap(fam),
     default_cap_buffer = closure_unit_default_cap_buffer(fam),
-    unit_grouping_vars = grouping
+    compute_y_max = !is_multi_response_family(fam),
+    unit_grouping_vars = closure_unit_key_vars(fam)
   )
 }
 
@@ -6033,10 +6133,6 @@ aggregate_closure_unit_visits <- function(object,
   checkmate::assert_matrix(yrep_visit)
   if (is.null(newdata)) newdata <- object$data
   response_var <- closure_unit_response_var(object$formula)
-  # closure_unit_default_cap() returns 1L for occ() (binary latent
-  # state), NULL otherwise. Threading it through to the array
-  # builder mirrors prepare_closure_unit_family() so users do not
-  # need to carry a `cap` column through to newdata for occ() fits.
   arrays <- closure_unit_arrays_for(object, newdata)
   if (ncol(yrep_visit) != nrow(newdata)) {
     stop(insight::format_error(c(
@@ -6047,27 +6143,101 @@ aggregate_closure_unit_visits <- function(object,
       )
     )))
   }
-  y_visit <- as.numeric(newdata[[response_var]])
-  N_unit <- arrays$N_unit
-  ndraws <- nrow(yrep_visit)
-  y_unit <- numeric(N_unit)
-  yrep_unit <- matrix(0, nrow = ndraws, ncol = N_unit)
-  for (g in seq_len(N_unit)) {
-    idx <- arrays$visit_row[g, seq_len(arrays$n_rep[g])]
-    y_unit[g] <- sum(y_visit[idx])
-    # Single-visit units short-circuit the apply call. Multi-visit
-    # units sum across the chosen visit columns; rowSums is the
-    # vectorised form and is materially faster than apply on the
-    # wide N_visit grain.
-    yrep_unit[, g] <- if (length(idx) == 1L) {
-      yrep_visit[, idx]
-    } else {
-      rowSums(yrep_visit[, idx, drop = FALSE])
-    }
-  }
+  y_unit <- sum_within_closure_units(
+    arrays, as.numeric(newdata[[response_var]])
+  )
+  yrep_unit <- sum_within_closure_units(arrays, yrep_visit)
   colnames(yrep_unit) <- arrays$unit_labels
   names(y_unit) <- arrays$unit_labels
   list(y_unit = y_unit, yrep_unit = yrep_unit, arrays = arrays)
+}
+
+
+#' The multinomial trial total of each row's closure unit
+#'
+#' `multi()` scores a site's K category counts against the site's
+#' own total, so `N_site` is the sum of the response over a unit's
+#' rows, carried back to every row of that unit. Three places built
+#' it with the same loop -- the epred kernel, the predict kernel and
+#' `predict(type = "variance")` -- and a fourth would have been
+#' written next.
+#'
+#' @param object Fitted `mvgam` object with a `multi()` family.
+#' @param newdata Long-format frame; the fit's own when `NULL`.
+#' @param arrays The list `build_closure_unit_arrays()` returns.
+#' @return Numeric vector, one trial total per row of `newdata`.
+#' @noRd
+multinomial_unit_totals <- function(object, newdata, arrays) {
+  newdata <- newdata %||% mvgam_training_data(object)
+  y <- as.numeric(newdata[[closure_unit_response_var(object$formula)]])
+  # Reduce to one total per unit, then read it back at row grain
+  # through the row-to-unit map the arrays already carry.
+  sum_within_closure_units(arrays, y)[arrays$row_unit]
+}
+
+
+#' An empty per-unit log-density matrix for a composition family
+#'
+#' `diri()`, `multi()` and `categ()` score one joint density per
+#' closure unit and carry it on the unit's first row. The unit's
+#' other rows hold no density of their own, which is not the same as
+#' a density of zero: `log p = 0` asserts certainty, and `clean_ll()`
+#' reads such a column as perfectly scorable because it is finite.
+#' `loo()` then counted a site once per category, reporting 120
+#' observations and 120 Pareto diagnostics for a fit with 30
+#' independent densities.
+#'
+#' Starting from `NA_real_` says what is true -- these rows carry no
+#' density -- and lets the one place that drops unscorable columns
+#' do its job.
+#'
+#' @param ndraws,N_obs Dimensions of the matrix to allocate.
+#' @return `[ndraws x N_obs]` matrix of `NA_real_`.
+#' @noRd
+empty_unit_loglik <- function(ndraws, N_obs) {
+  matrix(NA_real_, nrow = ndraws, ncol = N_obs)
+}
+
+
+#' Sum a per-visit quantity within each closure unit
+#'
+#' The one reduction from the visit grain to the unit grain, which
+#' is the grain the detection families' likelihood is written on. A
+#' per-visit vector reduces to length `N_unit`; a
+#' `[ndraws x N_visit]` matrix reduces to `[ndraws x N_unit]`.
+#'
+#' Reading the unit's rows from `visit_row` rather than from a
+#' recomputed key is what keeps the reduction on the same unit
+#' ordering the arrays were built with, which is first appearance
+#' and not sorted.
+#'
+#' @param arrays The list `build_closure_unit_arrays()` returns.
+#' @param x Per-visit vector, or `[ndraws x N_visit]` matrix, whose
+#'   observation axis is in `newdata` row order.
+#' @return `x` summed within units, keeping its shape.
+#' @noRd
+sum_within_closure_units <- function(arrays, x) {
+  unit_rows <- function(g) arrays$visit_row[g, seq_len(arrays$n_rep[g])]
+  n_unit <- arrays$N_unit
+  if (is.null(dim(x))) {
+    return(vapply(
+      seq_len(n_unit), function(g) sum(x[unit_rows(g)]), numeric(1L)
+    ))
+  }
+  out <- matrix(0, nrow = nrow(x), ncol = n_unit)
+  for (g in seq_len(n_unit)) {
+    idx <- unit_rows(g)
+    # Single-visit units short-circuit the row sum. Multi-visit
+    # units sum across the chosen columns; rowSums is the vectorised
+    # form and is materially faster than apply on the wide N_visit
+    # grain.
+    out[, g] <- if (length(idx) == 1L) {
+      x[, idx]
+    } else {
+      rowSums(x[, idx, drop = FALSE])
+    }
+  }
+  out
 }
 
 #' Per-closure-unit latent-abundance draws for an nmix() fit
@@ -6093,11 +6263,9 @@ aggregate_closure_unit_visits <- function(object,
 posterior_latent_N <- function(object, newdata = NULL,
                                 draw_ids = NULL,
                                 conditional = TRUE) {
-  if (!is_closure_unit_family(object$family)) {
-    stop(insight::format_error(
-      "posterior_latent_N() requires a closure-unit family."
-    ))
-  }
+  # Sharing the closure-unit pipeline is not the same as exposing a
+  # latent state; the registry is what records which families do.
+  require_closure_unit_predict_type(object$family, "latent_state")
   kernel <- dispatch_closure_unit_method(object$family, "latent_state")
   kernel(
     object, newdata = newdata,
@@ -6981,7 +7149,7 @@ log_lik_diri <- function(linpred, link, y, family_pars, trials) {
   arrays   <- family_pars$arrays
   ndraws <- nrow(linpred)
   N_obs <- ncol(linpred)
-  out <- matrix(0, nrow = ndraws, ncol = N_obs)
+  out <- empty_unit_loglik(ndraws, N_obs)
   for (g in seq_len(arrays$N_unit)) {
     Kg <- arrays$n_rep[g]
     idx <- arrays$visit_row[g, seq_len(Kg)]
@@ -7013,19 +7181,10 @@ posterior_epred_multi <- function(object, newdata = NULL,
   comp <- extract_simplex_response_components(
     object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE
   )
-  if (is.null(newdata)) {
-    newdata <- object$obs_data %||% object$data
-  }
-  response_var <- closure_unit_response_var(object$formula)
-  y_vec <- newdata[[response_var]]
-  total_row <- numeric(comp$N_obs)
-  for (g in seq_len(comp$N_unit)) {
-    Kg <- comp$arrays$n_rep[g]
-    idx <- comp$arrays$visit_row[g, seq_len(Kg)]
-    total_row[idx] <- sum(y_vec[idx])
-  }
-  total_mat <- matrix(total_row, nrow = comp$ndraws,
-                       ncol = comp$N_obs, byrow = TRUE)
+  total_mat <- matrix(
+    multinomial_unit_totals(object, newdata, comp$arrays),
+    nrow = comp$ndraws, ncol = comp$N_obs, byrow = TRUE
+  )
   comp$prob_row * total_mat
 }
 
@@ -7045,16 +7204,14 @@ posterior_predict_multi <- function(object, newdata = NULL,
   comp <- extract_simplex_response_components(
     object, newdata, draw_ids, ndraws = ndraws, needs_phi = FALSE
   )
-  if (is.null(newdata)) {
-    newdata <- object$obs_data %||% object$data
-  }
-  response_var <- closure_unit_response_var(object$formula)
-  y_vec <- newdata[[response_var]]
+  # The trial total is carried on every row of a unit, so reading it
+  # off the unit's first row gives `N_site` without a second sum.
+  totals <- multinomial_unit_totals(object, newdata, comp$arrays)
   out <- matrix(0L, nrow = comp$ndraws, ncol = comp$N_obs)
   for (g in seq_len(comp$N_unit)) {
     Kg <- comp$arrays$n_rep[g]
     idx <- comp$arrays$visit_row[g, seq_len(Kg)]
-    n_g <- sum(y_vec[idx])
+    n_g <- totals[idx[1L]]
     prob_g <- comp$prob_row[, idx, drop = FALSE]
     for (s in seq_len(comp$ndraws)) {
       out[s, idx] <- as.integer(
@@ -7078,7 +7235,7 @@ log_lik_multi <- function(linpred, link, y, family_pars, trials) {
   arrays   <- family_pars$arrays
   ndraws <- nrow(linpred)
   N_obs <- ncol(linpred)
-  out <- matrix(0, nrow = ndraws, ncol = N_obs)
+  out <- empty_unit_loglik(ndraws, N_obs)
   for (g in seq_len(arrays$N_unit)) {
     Kg <- arrays$n_rep[g]
     idx <- arrays$visit_row[g, seq_len(Kg)]
@@ -7153,7 +7310,7 @@ log_lik_categ <- function(linpred, link, y, family_pars, trials) {
   arrays   <- family_pars$arrays
   ndraws <- nrow(linpred)
   N_obs <- ncol(linpred)
-  out <- matrix(0, nrow = ndraws, ncol = N_obs)
+  out <- empty_unit_loglik(ndraws, N_obs)
   for (g in seq_len(arrays$N_unit)) {
     Kg <- arrays$n_rep[g]
     idx <- arrays$visit_row[g, seq_len(Kg)]

@@ -410,7 +410,7 @@ compute_closure_unit_residuals <- function(object, newdata, type,
   switch(
     type,
     "quantile" = compute_quantile_residuals_empirical(
-      agg$y_unit, agg$yrep_unit, nrow(agg$yrep_unit)
+      agg$y_unit, agg$yrep_unit
     ),
     "ordinary" = sweep(
       agg$yrep_unit, 2L, agg$y_unit,
@@ -540,7 +540,7 @@ compute_quantile_residuals <- function(object, y, pp_args,
   yrep <- do.call(
     posterior_predict, residuals_pred_args(pp_args, resp)
   )
-  compute_quantile_residuals_empirical(y, yrep, nrow(yrep))
+  compute_quantile_residuals_empirical(y, yrep)
 }
 
 
@@ -579,9 +579,14 @@ randomised_quantile_residuals <- function(lower, upper, y) {
 # the per-draw construction: the pooled predictive absorbs the
 # posterior uncertainty in the latent state that the conditional
 # CDF holds fixed.
+#
+# The draw count is read from `yrep` rather than taken as an
+# argument: both callers passed `nrow()` of the matrix they were
+# already passing, so the argument could only ever agree with it or
+# be wrong.
 #'@noRd
-compute_quantile_residuals_empirical <- function(y, yrep,
-                                                   ndraws_used) {
+compute_quantile_residuals_empirical <- function(y, yrep) {
+  ndraws_used <- nrow(yrep)
   nobs <- length(y)
   bound <- function(cmp) {
     vapply(seq_len(nobs), function(i) {
@@ -609,16 +614,10 @@ compute_quantile_residuals_empirical <- function(y, yrep,
 residuals_finalise <- function(resids, summary, robust, probs) {
   if (!summary) return(resids)
   # The summary every other accessor reports, so a residual and a
-  # prediction describe their spread the same way. Written out
-  # separately here, it had drifted: the robust `Est.Error` was
-  # `median(|x - median(x)|)`, where `stats::mad()` scales that by
-  # 1.4826, so `residuals()` and `predict()` reported the same
-  # quantity on scales differing by half again.
-  #
-  # The local copy also read `na.rm = TRUE` where the shared rule
-  # calls a column with any missing draw missing. Measured across
-  # every cached fixture, no residual column is partly missing -- 24
-  # are missing entirely and none in part -- so the two rules differ
-  # only where neither is reached.
+  # prediction describe their spread the same way. Under
+  # `robust = TRUE` that means `stats::mad()`, which carries the
+  # 1.4826 consistency constant a bare median absolute deviation
+  # does not, and it calls a column with any missing draw missing
+  # rather than summarising the draws that remain.
   mvgam_post_summary(resids, robust = robust, probs = probs)
 }

@@ -271,58 +271,16 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
     # are pulled from the posterior and broadcast to per-row level
     # via `extract_mv_response_components()`.
     if (is_multi_response_family(family_obj)) {
-      # mv-response continuous (mvn, mvt) and simplex (diri,
-      # multi, categ) families share the multi-response gate but
-      # need different dpar extraction. mvn/mvt pull Psi/nu; the
-      # simplex families pull the per-row softmax probability +
-      # closure-unit arrays (and phi for diri).
-      if (is_simplex_response_family(family_obj)) {
-        family_pars_simplex <- mv_response_family_pars(
-          object, newdata, linpred, family_obj, family_name, draw_ids
-        )
-        log_lik_fn <- switch(
-          family_name,
-          diri  = log_lik_diri,
-          multi = log_lik_multi,
-          categ = log_lik_categ,
-          stop(insight::format_error(c(
-            paste0(
-              "Simplex log_lik dispatch missing for family '",
-              family_name, "'."
-            ),
-            i = paste0(
-              "Add a '", family_name, " = log_lik_",
-              family_name, "' branch."
-            )
-          )))
-        )
-        return(log_lik_fn(
-          linpred     = linpred,
-          link        = family_link,
-          y           = y,
-          family_pars = family_pars_simplex,
-          trials      = NULL
-        ))
-      }
+      # `mvn` and `mvt` score a per-row density; `diri`, `multi` and
+      # `categ` score one joint density per unit and carry it on the
+      # unit's first row. The two used to be separated here, but
+      # both read their parameters from the same extractor with the
+      # same arguments, so the split bought only a second copy of
+      # the kernel table the registry already holds.
       family_pars_mv <- mv_response_family_pars(
         object, newdata, linpred, family_obj, family_name, draw_ids
       )
-      log_lik_fn <- switch(
-        family_name,
-        mvn = log_lik_mvn,
-        mvt = log_lik_mvt,
-        stop(insight::format_error(c(
-          paste0(
-            "Mv-response log_lik dispatch missing for family '",
-            family_name, "'."
-          ),
-          i = paste0(
-            "Add a '", family_name, " = log_lik_",
-            family_name, "' branch."
-          )
-        )))
-      )
-      return(log_lik_fn(
+      return(dispatch_closure_unit_method(family_obj, "log_lik")(
         linpred     = linpred,
         link        = family_link,
         y           = y,
@@ -330,11 +288,8 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
         trials      = NULL
       ))
     }
-    # `closure_unit_grouping()` returns the multi-season opt-in
-    # `c("series", "site", "time")` when set; NULL keeps the
-    # default 2-axis path inside `build_closure_unit_arrays()`.
-    # `default_cap` makes the `cap` data column optional for
-    # binary-response families (`occ()` defaults to 1).
+    # The unit key and the family's cap declarations are resolved by
+    # the accessor, so this call cannot leave one of them out.
     arrays <- closure_unit_arrays_for(object, newdata)
     # extract_p_for_closure_unit() handles both scalar (no
     # detection sub-formula) and vector (with `bf(p ~ ...)`) cases
@@ -348,25 +303,7 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
       ndraws   = nrow(linpred)
     )
     family_pars_cu <- list(closure_arrays = arrays, p = p_mat)
-    log_lik_fn <- switch(
-      family_name,
-      nmix                 = log_lik_nmix,
-      nmix_royle_nichols   = log_lik_nmix_royle_nichols,
-      nmix_poisson_poisson = log_lik_nmix_poisson_poisson,
-      occ                  = log_lik_occ,
-      stop(insight::format_error(c(
-        paste0(
-          "Closure-unit log_lik dispatch missing for family '",
-          family_name, "'."
-        ),
-        i = paste0(
-          "Add a '", family_name, " = log_lik_",
-          family_name, "' branch to the switch() in ",
-          "log_lik_single_response()."
-        )
-      )))
-    )
-    return(log_lik_fn(
+    return(dispatch_closure_unit_method(family_obj, "log_lik")(
       linpred     = linpred,
       link        = family_link,
       y           = y,
@@ -484,17 +421,13 @@ extract_response_for_log_lik <- function(object, newdata, resp) {
 dispatch_log_lik <- function(family_name, link, linpred, y,
                              family_pars, trials) {
   fn_name <- paste0("log_lik_", family_name)
-  fn <- tryCatch(
-    get(fn_name, mode = "function", envir = asNamespace("mvgam")),
-    error = function(e) NULL
-  )
-  if (is.null(fn)) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Family {.val {family_name}} is not yet supported by log_lik.mvgam."
-      )
-    ))
+  # Asked rather than attempted: `exists()` answers the question the
+  # caller has, where catching the error of a failed `get()` treats a
+  # missing kernel and a broken one alike.
+  if (!exists(fn_name, mode = "function", envir = asNamespace("mvgam"))) {
+    refuse_missing_family_dispatch(family_name, "a log-likelihood")
   }
+  fn <- get(fn_name, mode = "function", envir = asNamespace("mvgam"))
   fn(
     linpred = linpred,
     link = link,

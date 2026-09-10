@@ -106,7 +106,7 @@ test_that("log_lik_zero_inflated_poisson splits cleanly at y = 0", {
 
 test_that("dispatch_log_lik errors clearly for unknown family", {
   s <- .make_synthetic()
-  expect_error(
+  refuse <- function() {
     dispatch_log_lik(
       family_name = "definitely_not_a_family",
       link = "identity",
@@ -114,9 +114,19 @@ test_that("dispatch_log_lik errors clearly for unknown family", {
       y = rnorm(8),
       family_pars = list(),
       trials = NULL
-    ),
-    regexp = "not yet supported"
-  )
+    )
+  }
+  # Names the family the caller's model carries, says the fault is
+  # mvgam's, and gives somewhere to report it.
+  err <- expect_error(refuse(), regexp = "definitely_not_a_family")
+  msg <- conditionMessage(err)
+  expect_match(msg, "fault in mvgam")
+  expect_match(msg, "mvgam/issues")
+  # A reader of this message is running the package, not maintaining
+  # it, so it must not hand them an edit to make in mvgam's source.
+  expect_false(grepl("Add a ", msg, fixed = TRUE))
+  expect_false(grepl("branch", msg, fixed = TRUE))
+  expect_false(grepl("R/", msg, fixed = TRUE))
 })
 
 test_that("log_lik.mvgam method is registered as S3", {

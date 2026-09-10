@@ -119,26 +119,45 @@ test_that("check_closure_unit_var_unit_constant() accepts unit-constant covariat
 
 # ------------------------------------------------------------
 # pp_check(type = "fit_stat"): chi-squared / Freeman-Tukey
-# discrepancy GOF (Gelman et al. 1996). The dispatch is gated on
-# closure-unit families; non-closure-unit fits get a typed error
-# pointing to occ() / nmix(). The math itself is small and tested
-# directly: chi-squared at y == E[y] is zero, and the F-T form is
-# scale-equivariant under shared sqrt.
+# discrepancy GOF (Gelman et al. 1996). The discrepancy compares a
+# unit's aggregated visits against their aggregated expectation, so
+# it is offered to the families that aggregate rather than to every
+# family sharing the closure-unit pipeline. The math is small and
+# tested directly: chi-squared at y == E[y] is zero, and the F-T
+# form is scale-equivariant under shared sqrt.
 # ------------------------------------------------------------
 
-test_that("pp_check(type = 'fit_stat') errors on non-closure-unit family", {
-  # gaussian mvgam stub: family is gaussian(), not closure-unit
-  d <- data.frame(y = rnorm(10L), x = rnorm(10L),
-                  series = factor(rep(1L, 10L)),
-                  time = seq_len(10L))
-  obj <- structure(
-    list(data = d, formula = y ~ x, family = gaussian()),
-    class = "mvgam"
-  )
+test_that("pp_check(type = 'fit_stat') is refused where no unit aggregates", {
+  stub <- function(fam) {
+    d <- data.frame(y = rnorm(10L), x = rnorm(10L),
+                    series = factor(rep(1L, 10L)),
+                    time = seq_len(10L))
+    structure(list(data = d, formula = y ~ x, family = fam),
+              class = "mvgam")
+  }
+  # A family with no closure unit at all. The pattern stops short of
+  # "families" because insight wraps the line there.
   expect_error(
-    pp_check(obj, type = "fit_stat"),
-    "only available for closure-unit families"
+    pp_check(stub(gaussian()), type = "fit_stat"),
+    "only available for the detection"
   )
+  # The case the gaussian stub alone could not reach: these five
+  # carry `mvgam_closure_unit = TRUE` but never aggregate a unit's
+  # rows, so the discrepancy has nothing to sum. Asking the
+  # wire-format question admitted them, and a composition's rows
+  # sum to one whatever the fit says, so the Bayesian p-value came
+  # back near 0.5 for every model.
+  for (fam in list(diri(), multi(), categ(), mvn(), mvt())) {
+    expect_false(needs_closure_unit_aggregation(fam))
+    expect_error(
+      pp_check(stub(fam), type = "fit_stat"),
+      "does not aggregate repeat visits"
+    )
+  }
+  # The two that do aggregate must not be caught by the same gate.
+  for (fam in list(occ(), nmix())) {
+    expect_true(needs_closure_unit_aggregation(fam))
+  }
 })
 
 test_that("mvgam_ppc_fit_stat print + plot methods produce expected output", {

@@ -147,28 +147,15 @@ plot_factors <- function(
 # @noRd
 plot_latent_state <- function(object, probs = c(0.5, 0.8, 0.95),
                                 ndraws = NULL, ...) {
-  if (!is_closure_unit_family(object$family)) {
-    stop(insight::format_error(c(
-      "plot(type = 'latent_state') requires a closure-unit family.",
-      i = paste0(
-        "Use family = nmix() or family = occ() to fit a model with ",
-        "a latent abundance or occupancy state."
-      )
-    )))
-  }
+  # Sharing the closure-unit pipeline does not mean exposing a
+  # latent state, and asking only that admitted `mvn()`, `mvt()`,
+  # `diri()`, `multi()` and `categ()` as far as a dispatcher with no
+  # branch for them, which answered by naming a source file for the
+  # user to edit. The guard that would have caught it sat below,
+  # testing a NULL the dispatcher raises rather than returns, so it
+  # could never fire. The registry is asked instead.
+  require_closure_unit_predict_type(object$family, "latent_state")
   state_fn <- dispatch_closure_unit_method(object$family, "latent_state")
-  if (is.null(state_fn)) {
-    stop(insight::format_error(c(
-      paste0(
-        "Family '", resolve_family_name(object$family),
-        "' does not expose a latent-state surface."
-      ),
-      i = paste0(
-        "Multi-response closure-unit families (mvn / mvt / diri / ",
-        "multi / categ) have no per-unit latent state."
-      )
-    )))
-  }
   # Marginal latent state (no conditioning on observed detections);
   # this is the surface comparable to flocker's `get_Z(history_",
   # "condition = FALSE)` and spOccupancy's `psi.samples`.
