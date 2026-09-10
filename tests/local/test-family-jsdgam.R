@@ -201,6 +201,49 @@ sim_mvt <- function() {
 }
 
 
+# Five species on two factors, where `mvt` above takes four. That is
+# deliberate: a factor model separates a per-species residual scale
+# from the factor covariance only when `(K - m)^2 >= K + m`, which
+# four species on two factors fails and five satisfies. The `Psi`
+# recovery claim below is therefore about an identified quantity,
+# which the same claim on the `mvt` fixture is not.
+sim_mvn <- function() {
+  set.seed(907L)
+  K <- 5L
+  N_lv <- 2L
+  n_sites <- 40L
+  species_levels <- paste0("y", seq_len(K))
+
+  Z_true <- matrix(rnorm(K * N_lv, sd = 0.7), nrow = K, ncol = N_lv)
+  psi_true <- rep(0.5, K)
+  sigma_true_cov <- tcrossprod(Z_true) + diag(psi_true^2)
+
+  env <- rnorm(n_sites)
+  mu_intercept <- rnorm(K)
+  mu_env_slope <- rnorm(K)
+
+  # Conditional form: each site draws its latent scores, then the
+  # per-row residual is normal at scale psi[k].
+  lv_sim <- matrix(rnorm(n_sites * N_lv), nrow = n_sites, ncol = N_lv)
+  Y_wide <- matrix(NA_real_, nrow = n_sites, ncol = K)
+  for (i in seq_len(n_sites)) {
+    mu_i <- mu_intercept + mu_env_slope * env[i] +
+      as.numeric(Z_true %*% lv_sim[i, ])
+    Y_wide[i, ] <- mu_i + rnorm(K, sd = psi_true)
+  }
+  colnames(Y_wide) <- species_levels
+
+  list(
+    K = K, N_lv = N_lv, species_levels = species_levels,
+    Z_true = Z_true, psi_true = psi_true,
+    lv_sim = lv_sim, sigma_true_cov = sigma_true_cov,
+    sigma_true_cor = cov2cor(sigma_true_cov),
+    mu_intercept = mu_intercept, mu_env_slope = mu_env_slope, env = env,
+    long_dat = as_long_jsdm(Y_wide, env, species_levels)
+  )
+}
+
+
 # The three softmax families share a shape: centre the true
 # loadings into the identified subspace the sum_to_zero_vector
 # parameterisation explores, then emit from softmax(eta).
@@ -283,6 +326,23 @@ SPECS <- list(
   ),
   mvt = list(
     label = "multivariate Student-t", family = quote(mvt()), sim = sim_mvt,
+    identity_link = TRUE,
+    threshold_cor = 0.7, mae_max = 0.5, na_response = NA_real_,
+    has_psi = TRUE,
+    epred_ok = NULL, predict_ok = NULL,
+    has_latent_state = FALSE,
+    fc_types = c("link", "expected", "trend", "response"),
+    fc_response_ok = NULL,
+    pp_check_extra = "resid_qq",
+    plot_types = c("residuals", "trend", "factors"),
+    optional_methods = c("linpred", "residuals", "mcmc_plot",
+                         "marginaleffects",
+                         "forecast_response_agrees"),
+    ce_response_ok = NULL,
+    me_integer_tell = FALSE
+  ),
+  mvn = list(
+    label = "multivariate normal", family = quote(mvn()), sim = sim_mvn,
     identity_link = TRUE,
     threshold_cor = 0.7, mae_max = 0.5, na_response = NA_real_,
     has_psi = TRUE,
@@ -981,15 +1041,12 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     }
 
     # `summary()` closes with a list of next steps, and it must not
-    # send a reader to a call these routes refuse. Tied to what the
-    # routes actually do rather than to the registry that decides, so
-    # the two cannot part company.
+    # send a reader to a call every one of those routes refuses.
     txt <- paste(
       utils::capture.output(suppressWarnings(summary(fit))),
       collapse = " "
     )
-    expect_identical(grepl("latent_state", txt, fixed = TRUE),
-                     !all(refused))
+    expect_false(grepl("latent_state", txt, fixed = TRUE))
   })
 
   test_that(says("pp_check, plotting and conditional_effects render"), {
@@ -1243,6 +1300,88 @@ test_that("mvt: Psi and nu recover the simulated residual law", {
   expect_lt(abs(mean(nu_draws) - obj$sim$nu_true), 2 * sd(nu_draws))
   expect_lt(sd(nu_draws), sqrt(2) / 0.1)
   expect_true("nu" %in% variables(obj$fit))
+})
+
+
+test_that("mvn: Psi recovers the simulated residual scale", {
+  # Five species on two factors satisfies `(K - m)^2 >= K + m`, so the
+  # per-species residual scale is separable from the factor covariance
+  # here and this is a claim about a number the data identify. The
+  # same claim at four species is a claim about one arbitrary point on
+  # a ridge, which is why it is made on this fixture and not on `mvt`.
+  obj <- get("mvn", envir = built)
+  expect_gte((obj$sim$K - obj$sim$N_lv)^2, obj$sim$K + obj$sim$N_lv)
+  dm <- as_draws_matrix(obj$fit$fit)
+  psi_cols <- grep("^Psi\\[", colnames(dm), value = TRUE)
+  expect_length(psi_cols, obj$sim$K)
+  expect_lt(
+    max(abs(colMeans(dm[, psi_cols, drop = FALSE]) - obj$sim$psi_true)),
+    0.35
+  )
+  # A residual scale is positive, and a posterior that has wandered
+  # onto the factor covariance's share of the variance shows up here
+  # before it shows up in the mean.
+  expect_true(all(dm[, psi_cols] > 0))
+})
+
+
+test_that("mvn: the post-fit surface treats it as what it is", {
+  # `mvn()` shares the closure-unit data pipeline with `occ()` and
+  # `nmix()` and models nothing about detection over a closed unit.
+  # Every path that branched on the shared spelling reached this family
+  # with code written for the other one: the residual plot asked for
+  # a check its own family refuses, `augment()` demanded a `cap`
+  # column, and the latent-state route fell into a dispatcher with no
+  # branch and answered with a source file for the user to edit.
+  obj <- get("mvn", envir = built)
+  fit <- obj$fit
+
+  expect_drawn(plot(fit, type = "residuals"))
+  aug <- augment(fit)
+  expect_s3_class(aug, "data.frame")
+  expect_identical(nrow(aug), nrow(obj$sim$long_dat))
+  expect_false("cap" %in% names(aug))
+
+  # Refused, but by naming the family and what it does offer rather
+  # than by naming the package's own internals.
+  expect_error(hindcast(fit, type = "latent_state"),
+               "is not available for this family")
+  expect_error(hindcast(fit, type = "latent_state"), "mvn")
+})
+
+
+test_that("mvn: one quantity over the grid and over its extension", {
+  # `hindcast(type = "response")` and `forecast(type = "response")`
+  # are one quantity reached two ways, so a family one of them can
+  # draw from is a family the other must not refuse. The forecast arm
+  # refused every closure-unit family outright, which reached this
+  # one because it shares their data pipeline.
+  obj <- get("mvn", envir = built)
+  fit <- obj$fit
+  d <- obj$sim$long_dat
+  lev <- obj$sim$species_levels
+  h <- 3L
+  nd <- expand.grid(
+    time = max(d$time) + seq_len(h),
+    series = factor(lev, levels = lev),
+    stringsAsFactors = FALSE
+  )
+  nd$env <- 0
+  nd$y <- NA_real_
+
+  hc <- hindcast(fit, ndraws = 20L, type = "response")
+  expect_s3_class(hc, "mvgam_forecast")
+  fc_resp <- forecast(fit, newdata = nd, ndraws = 20L, type = "response")
+  expect_identical(names(fc_resp$forecasts), lev)
+
+  # An mvn expectation is its linear predictor, so the expected arm
+  # sits inside the drawn arm's spread rather than beside it: the
+  # draws are the expectation plus a Normal(0, Psi) residual.
+  fc_exp <- forecast(fit, newdata = nd, ndraws = 20L, type = "expected")
+  drawn <- do.call(cbind, fc_resp$forecasts)
+  expected <- do.call(cbind, fc_exp$forecasts)
+  expect_true(all(is.finite(drawn)) && all(is.finite(expected)))
+  expect_gt(sd(as.numeric(drawn)), sd(as.numeric(expected)))
 })
 
 
