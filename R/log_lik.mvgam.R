@@ -794,8 +794,12 @@ log_lik_cumulative <- function(linpred, link, y, family_pars, trials) {
 #'   \[ndraws x nobs\] numeric matrix of pointwise log densities.
 #'
 #' @details
-#' The scalar returned is the posterior mean of `rowSums(log_lik(object))`
-#' across draws. For Bayesian state-space models AIC and BIC are coarse
+#' The scalar returned is the posterior mean, across draws, of the
+#' summed pointwise log-likelihood over the observations that carry a
+#' density. Those are every row for most families, and one row per
+#' closure unit for the detection and composition families, whose
+#' likelihood is written per unit.
+#' For Bayesian state-space models AIC and BIC are coarse
 #' instruments because every latent state inflates the parameter count;
 #' [loo()] / [waic()] are usually the better model-selection tools and
 #' are recommended in preference.
@@ -814,7 +818,14 @@ logLik.mvgam <- function(object, pointwise = FALSE, ...) {
     return(ll_mat)
   }
 
-  per_draw_sum <- rowSums(ll_mat)
+  # Summed over the columns that carry a density, which is what
+  # `clean_ll()` selects and what `loo()` and `waic()` score. A
+  # column with none is missing rather than zero -- a composition
+  # scores one joint density per site and carries it on the site's
+  # first row -- so summing the raw matrix returned `NA` for every
+  # `diri()`, `multi()` and `categ()` fit, and `AIC()` and `BIC()`
+  # with it.
+  per_draw_sum <- rowSums(clean_ll(object, ll_mat))
   ll_scalar <- mean(per_draw_sum)
 
   diag_pars <- c(

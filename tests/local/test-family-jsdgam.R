@@ -886,10 +886,27 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
 
     ll <- log_lik(fit, draw_ids = 1:20)
     expect_identical(dim(ll), c(20L, n_obs))
-    expect_true(all(is.finite(ll)))
+    # Which columns carry a density is the family's own grain, and
+    # there are two here. The per-row families score every row. A
+    # composition scores one joint density per site and carries it
+    # on the site's first row, so the site's other rows hold no
+    # density of their own. Requiring every cell to be finite would
+    # demand the second kind report a certainty it does not have,
+    # which is what filling those cells with zero used to do.
+    scored <- which(colSums(is.finite(ll)) > 0L)
+    expect_gt(length(scored), 0L)
+    expect_true(all(is.finite(ll[, scored, drop = FALSE])))
+    expect_identical(
+      length(scored),
+      if (mvgam:::is_simplex_response_family(fit$family)) {
+        mvgam:::closure_unit_arrays_for(fit)$N_unit
+      } else {
+        n_obs
+      }
+    )
     # A density that came back constant across rows is not this
     # model's, whatever its shape.
-    expect_gt(stats::sd(colMeans(ll)), 1e-8)
+    expect_gt(stats::sd(colMeans(ll[, scored, drop = FALSE])), 1e-8)
 
     # `loo()` warns when a Pareto-k crosses its threshold, which is
     # the one diagnostic saying whether the approximation can be
@@ -904,8 +921,12 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
     expect_true(is.finite(ic$estimates["elpd_loo", "Estimate"]))
     # The diagnostics have to be there and cover every observation
     # the density answered for, or the estimate above is summarising
-    # a different set of points.
-    expect_identical(length(ic$diagnostics$pareto_k), ncol(ll))
+    # a different set of points. That is the scored columns rather
+    # than the frame's width: holding it to `ncol(ll)` demanded one
+    # diagnostic per row from a family whose density is per site,
+    # and so required the padding that made `loo()` report 120
+    # observations for thirty independent densities.
+    expect_identical(length(ic$diagnostics$pareto_k), length(scored))
     expect_true(all(is.finite(ic$diagnostics$pareto_k)))
     expect_true(all(grepl("Pareto", seen)))
   })
@@ -1109,13 +1130,17 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
         expect_true(spec$epred_ok(pr_e$estimate))
       }
       # The expectation reached through marginaleffects is the one
-      # `posterior_epred()` returns. Both average the whole
-      # posterior, so the tolerance is about the two routes agreeing
-      # rather than about how many draws each took.
-      ep_grid <- colMeans(posterior_epred(fit, newdata = grid,
-                                          ndraws = NULL))
+      # `posterior_epred()` returns, summarised the way
+      # marginaleffects summarises it. Its own brms method reduces
+      # the draws with `collapse::fmedian`, so the point estimate is
+      # a posterior median and comparing it against a mean measures
+      # the skew of the posterior rather than whether the two routes
+      # agree. On the negative binomial fit that gap reaches 0.15
+      # while the median agrees to zero.
+      ep_draws <- posterior_epred(fit, newdata = grid, ndraws = NULL)
+      ep_grid <- apply(ep_draws, 2L, stats::median)
       expect_equal(as.numeric(pr_e$estimate), as.numeric(ep_grid),
-                   tolerance = 0.02)
+                   tolerance = 1e-8)
 
       pr_r <- marginaleffects::predictions(fit, newdata = grid,
                                            type = "response")

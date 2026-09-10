@@ -644,9 +644,13 @@ as.data.frame.mvgam <- function(x, row.names = NULL, optional = TRUE,
 #' @export
 as.matrix.mvgam <- function(x, variable = NULL, regex = FALSE,
                              use_alias = TRUE, ...) {
-  posterior::as_draws_matrix(
+  # Unclassed, as `brms::as.matrix.brmsfit` unclasses: a caller
+  # asking for a matrix is handed one. A `draws_matrix` keeps its
+  # class through subsetting, arithmetic and `as.matrix()` alike, so
+  # anything typed to a bare matrix refuses it downstream.
+  unclass(posterior::as_draws_matrix(
     extract_mvgam_draws(x, variable, regex)
-  )
+  ))
 }
 
 
@@ -654,7 +658,10 @@ as.matrix.mvgam <- function(x, variable = NULL, regex = FALSE,
 #' @export
 as.array.mvgam <- function(x, variable = NULL, regex = FALSE,
                             use_alias = TRUE, ...) {
-  extract_mvgam_draws(x, variable, regex)
+  # Unclassed for the same reason `as.matrix.mvgam()` is, and to
+  # match `brms::as.array.brmsfit()`. `as_draws_array()` remains the
+  # way to ask for the draws object itself.
+  unclass(extract_mvgam_draws(x, variable, regex))
 }
 
 

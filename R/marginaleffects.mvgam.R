@@ -64,21 +64,25 @@ get_predict.mvgam <- function(model,
   checkmate::assert_class(model, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1L)
   checkmate::assert_logical(process_error, len = 1L)
-  # marginaleffects::datagrid() drops every column the model
-  # formula does not reference. Closure-unit families need
-  # `series` / `time` / `visit` / `cap` to pass through the
-  # per-unit prediction pipeline, so fill any that are missing
-  # with sensible defaults (each grid row becomes one synthetic
-  # single-visit closure unit). No-op for non-closure-unit
-  # families and for newdata that already carries the columns.
-  newdata <- complete_closure_unit_newdata(model, newdata)
+  # `marginaleffects::datagrid()` drops every column the model
+  # formula does not reference, so a closure-unit family's grid
+  # arrives without the identifiers its per-unit pipeline needs and
+  # they are filled in below with defaults. A frame the caller
+  # assembled keeps its own.
+  #
+  # Which of the two this is gets settled once, here, on the frame
+  # as it arrived: the completion stamps the very columns the
+  # question is asked of, so asking again afterwards would answer
+  # about mvgam's own stamping rather than about the caller.
+  is_grid <- !closure_units_are_intact(model, newdata)
+  newdata <- complete_closure_unit_newdata(model, newdata, is_grid)
   # A composition is a property of a whole site, so its grid is
   # completed to whole sites, predicted, and the asked-for rows
   # taken back. `asked` stays NULL for every other family, and the
   # grid the caller supplied is what the result is reported against.
   asked <- NULL
   grid <- newdata
-  completed <- complete_simplex_grid(model, newdata)
+  completed <- complete_simplex_grid(model, newdata, is_grid)
   if (!is.null(completed)) {
     newdata <- completed$data
     asked <- completed$take
@@ -198,7 +202,7 @@ get_predict.mvgam <- function(model,
     # draws array dimnames, then integer indices as a last resort.
     med <- apply(draws, c(2L, 3L), stats::median)
     ncat <- dim(draws)[3L]
-    cat_names <- tryCatch(get_group_names(model), error = function(e) NULL)
+    cat_names <- get_group_names(model)
     if (is.null(cat_names) || length(cat_names) != ncat ||
         identical(cat_names, "main_marginaleffect")) {
       cat_names <- dimnames(draws)[[3L]] %||% as.character(seq_len(ncat))
@@ -257,17 +261,20 @@ get_coef.mvgam <- function(model, trend_effects = FALSE, ...) {
 #' @importFrom marginaleffects get_vcov
 #' @export
 get_vcov.mvgam <- function(model, vcov = NULL, ...) {
-  if (!is.null(vcov) && !isFALSE(vcov)) {
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      rlang::warn(
-        paste0(
-          "The `vcov` argument is not supported for mvgam objects; ",
-          "uncertainty propagation uses posterior draws."
-        ),
-        .frequency = "once",
-        .frequency_id = "mvgam_get_vcov_vcov"
+  # `marginaleffects` passes `vcov = TRUE` on every call it makes,
+  # meaning "the model's own uncertainty", which for a Bayesian fit
+  # is the posterior it already uses. Warning on that named an
+  # argument the caller never set, on the ordinary path of every
+  # `predictions()`, `slopes()` and `comparisons()` call. A vcov
+  # *estimator* is the request mvgam cannot honour, and
+  # `get_vcov.brmsfit` draws the line in the same place.
+  if (!is.null(vcov) && !is.logical(vcov)) {
+    rlang::warn(insight::format_warning(
+      paste0(
+        "The `vcov` argument is not supported for mvgam objects; ",
+        "uncertainty propagation uses posterior draws."
       )
-    }
+    ))
   }
   NULL
 }
@@ -292,15 +299,24 @@ set_coef.mvgam <- function(model, coefs, ...) {
 #' @importFrom marginaleffects get_group_names
 #' @export
 get_group_names.mvgam <- function(model, ...) {
-  if (is_ordinal_family(model$family)) {
-    resp <- model$response_names[1L]
-    y <- model$data[[resp]]
-    if (is.factor(y)) {
-      return(levels(y))
-    }
-    return(as.character(sort(unique(y))))
+  if (!is_ordinal_family(model$family)) {
+    return("main_marginaleffect")
   }
-  "main_marginaleffect"
+  # Both facts through the accessors that own them: the response
+  # name off the formula, the frame off the fit. Reading `$data`
+  # alone answers `NULL` for a fit that stores its frame as
+  # `obs_data`, and the categories then come back as integers with
+  # nothing saying the labels were lost.
+  data <- mvgam_training_data(model)
+  resp <- mvgam_response_name(model)
+  if (is.na(resp) || !resp %in% names(data)) {
+    return("main_marginaleffect")
+  }
+  y <- data[[resp]]
+  if (is.factor(y)) {
+    return(levels(y))
+  }
+  as.character(sort(unique(y)))
 }
 
 

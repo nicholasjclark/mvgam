@@ -54,7 +54,10 @@ cell is the response.
 not the (site, species) row grain. The Stan lpdf evaluates the
 joint K-vector Dirichlet density once per closure unit, so the
 per-unit log-density is attributed to the first row of the unit
-and the remaining K - 1 rows return \code{0} for \code{log_lik()}. This is
+and the remaining K - 1 rows return \code{NA} for \code{log_lik()}, which
+is how a row carrying no density of its own is spelled: a \code{0}
+there would assert a density of one, and \code{loo()} would score the
+site once per species. This is
 the only correct grain for joint multi-row outcomes and matches
 the flocker / ubms convention for closure-unit families;
 Vehtari, Gelman and Gabry (2017) recommend the joint-unit grain

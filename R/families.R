@@ -1684,6 +1684,290 @@ closure_unit_default_cap_buffer <- function(family) {
   as.integer(buf)
 }
 
+# Internal: the series axis a closure-unit fit was built on.
+#
+# For a multi-response family these levels are the response
+# components a unit holds one row of, the K species of a composition
+# or the K responses of a multivariate normal. For a detection family
+# they are the series whose `(series, time)` pairs are the units.
+#
+# The axis answers this, not the frame's own column. Which component
+# a row carries decides which entry of `Psi` it is scored against,
+# which is a question about the model: a frame whose series column
+# was superseded by a grouping, or which never saw one of the
+# components, re-factors into a different numbering while the fit's
+# own numbering stays put. `extract_mv_response_components()` pairs
+# rows with `Psi` through the same accessor, so a grid completed here
+# and a density taken there cannot disagree about which species a row
+# belongs to.
+#'@noRd
+closure_unit_axis_levels <- function(object) {
+  levels(axis_row_series(object, mvgam_training_data(object)))
+}
+
+
+# Internal: does this frame already carry intact closure units?
+#
+# `marginaleffects` reaches `get_predict.mvgam()` with either the
+# frame the model was fitted on or a synthetic grid, and the two need
+# opposite treatment: a real frame is predicted as it stands, a grid
+# has to be given the unit structure its family needs. Different
+# evidence settles it at the two grains, because the two kinds of
+# frame carry different columns.
+#
+# A composition or a multivariate response keys its units by time
+# alone and fills each with one row per component, which is checkable
+# on the frame itself: every unit holds each component exactly once.
+# `datagrid()` pins the key at one typical value rather than dropping
+# it, so its rows fall into a single unit holding many rows of one
+# component. That fails the test whether or not the key is present,
+# which a test counting units does not.
+#
+# A detection unit is a `(series, time)` pair with repeat visits, and
+# no structural test separates one visit of each of three units from
+# three visits of one. `visit` settles it instead: no model formula
+# names that column, so `datagrid()` cannot invent it, and a frame
+# carrying it was either assembled by a caller who meant the units it
+# describes or replicated wholesale from the training data.
+#'@noRd
+closure_units_are_intact <- function(object, newdata) {
+  key <- closure_unit_key_vars(object$family)
+  if (is.null(key) || !all(key %in% names(newdata))) {
+    return(FALSE)
+  }
+  if (!is_multi_response_family(object$family)) {
+    return("visit" %in% names(newdata))
+  }
+  levs <- closure_unit_axis_levels(object)
+  component <- as.integer(axis_row_series(object, newdata))
+  if (length(levs) < 2L || length(component) != nrow(newdata) ||
+        anyNA(component)) {
+    return(FALSE)
+  }
+  idx <- closure_unit_index(newdata, key)
+  nrow(newdata) == length(idx$levels) * length(levs) &&
+    !anyDuplicated(paste(idx$unit, component))
+}
+
+
+# Internal: complete a composition's prediction grid to whole sites.
+#
+# A softmax spans the K categories of a site, so a grid row carrying
+# one category is a simplex of width one, whose only probability is
+# 1 whatever the linear predictor holds. Every panel a composition
+# drew was therefore a flat line at one with a zero-width interval.
+# Each distinct covariate setting in the grid is completed to the K
+# category rows of one synthetic site, and the caller takes back the
+# rows the grid asked about.
+#
+# Grouping the grid's own rows into units is not enough, though it
+# looks like it should be. A main-effect grid holds the categories
+# together at its first covariate value and then one category across
+# the remaining values, so grouping leaves every later setting a
+# unit of one.
+#
+# Only a synthetic grid reaches here, which
+# `closure_units_are_intact()` decides, so the K-fold widening is
+# paid on a few hundred rows at most and a real frame is returned
+# untouched. A real frame needs no completion anyway: it already
+# carries the K rows of each site.
+#
+# @return `NULL` when the family needs no completion; otherwise a
+#   list with `data`, the completed grid, and `take`, one index per
+#   row of `newdata` into `data`.
+#'@noRd
+complete_simplex_grid <- function(object, newdata,
+                                  is_grid = !closure_units_are_intact(
+                                    object, newdata
+                                  )) {
+  if (!is_simplex_response_family(object$family) || !is_grid) {
+    return(NULL)
+  }
+  levs <- closure_unit_axis_levels(object)
+  if (length(levs) < 2L) {
+    return(NULL)
+  }
+  resp <- closure_unit_response_var(object$formula)
+  # The covariate setting of a row is everything that is not the
+  # category axis, the unit identifiers, or the response.
+  held <- setdiff(names(newdata),
+                  c("series", "time", "visit", "cap", "rowid", resp))
+  key <- if (length(held)) {
+    do.call(paste, c(lapply(held, function(v) {
+      as.character(newdata[[v]])
+    }), list(sep = "\r")))
+  } else {
+    rep("1", nrow(newdata))
+  }
+  settings <- unique(key)
+  first_row <- match(settings, key)
+  n_set <- length(settings)
+  K <- length(levs)
+  # One block of K rows per setting, carrying that setting's
+  # covariates and sharing a unit identifier.
+  out <- newdata[rep(first_row, each = K), , drop = FALSE]
+  out$series <- factor(rep(levs, times = n_set), levels = levs)
+  out$time <- rep(seq_len(n_set), each = K)
+  out$visit <- 1L
+  out[[resp]] <- 1 / K
+  rownames(out) <- NULL
+  # Which completed row each original row asked about. The component
+  # is read off the axis for the reason `closure_unit_axis_levels()`
+  # gives: the categories are the model's, and `out$series` above is
+  # built from those, so the index back into it has to be resolved
+  # the same way.
+  asked <- as.integer(axis_row_series(object, newdata))
+  take <- (match(key, settings) - 1L) * K + asked
+  if (anyNA(take)) {
+    stop(insight::format_error(c(
+      "A prediction grid names a category the model does not have.",
+      x = paste0(
+        "Unknown: ",
+        paste(unique(setdiff(as.character(newdata$series), levs)),
+              collapse = ", "), "."
+      ),
+      i = paste0("The model's categories are: ",
+                 paste(levs, collapse = ", "), ".")
+    )), call. = FALSE)
+  }
+  list(data = out, take = take)
+}
+
+
+# Fill missing closure-unit identifier columns on an incoming
+# newdata so synthetic prediction grids (e.g. those built by
+# `marginaleffects::datagrid()`, which drops every column the
+# model formula does not reference) round-trip through the per-
+# unit prediction pipeline.
+#
+# The natural interpretation of a per-row marginaleffects grid on
+# a closure-unit fit is "each row is one hypothetical single-
+# visit closure unit". To get that, we stamp:
+#   * `series` to the first training level (held constant so the
+#     state intercept stays interpretable across the grid).
+#   * `time` to `seq_len(nrow(newdata))` so each row has a
+#     distinct unit identifier; `build_closure_unit_arrays()`
+#     then treats the rows as `N_grid` independent units of
+#     1 visit each. Per-row state-level covariate variation
+#     produces per-row state predictions as intended.
+#   * `visit` to `1L`.
+#   * the response column to `0L`, since a synthetic unit has no
+#     observation behind it, which also satisfies
+#     `validate_closure_unit_data()`'s integer / binary checks;
+#     the response is never consumed by `posterior_epred()` /
+#     `posterior_predict()` for these families.
+#
+# `cap` and the response are filled on any frame that omits them,
+# grid or not, because the pipeline reads both whatever the frame
+# is. `cap` takes the family's `mvgam_default_cap` attribute or,
+# failing that, the first training row's value.
+#
+# The unit structure is left alone (`newdata` returned with those
+# fills alone) when:
+#   * the family is not a closure-unit family, or
+#   * `newdata` is NULL, or
+#   * the fit has no `data` slot to source defaults from, or
+#   * the frame already carries intact units, which
+#     `closure_units_are_intact()` decides.
+#
+# Used by `get_predict.mvgam` so every marginaleffects entry
+# point (`predictions`, `slopes`, `comparisons`, `plot_predictions`,
+# `conditional_effects`) works on closure-unit fits out of the
+# box.
+#'@noRd
+complete_closure_unit_newdata <- function(object, newdata,
+                                          is_grid = !closure_units_are_intact(
+                                            object, newdata
+                                          )) {
+  if (is.null(newdata)) return(newdata)
+  if (!is_closure_unit_family(object$family)) return(newdata)
+  data <- mvgam_training_data(object) %||% data.frame()
+  if (nrow(data) == 0L) return(newdata)
+  template <- data[1L, , drop = FALSE]
+  # The response is resolved unguarded, as it is at every other
+  # post-fit closure-unit site: a fit of this family reached here
+  # only by resolving a single response at fit time, so a failure
+  # would be a broken object rather than a case to fall back on.
+  resp <- closure_unit_response_var(object$formula)
+  # A column the frame does not carry is filled whichever kind of
+  # frame this is. `cap` is the upper truncation the unit arrays
+  # need, and the response is read by the binary / non-negative
+  # integer validator rather than by any prediction, so a frame that
+  # omits either is completed rather than refused.
+  if (!"cap" %in% names(newdata)) {
+    cap_val <- closure_unit_default_cap(object$family) %||%
+                 template$cap %||% 1L
+    newdata$cap <- as.integer(rep(cap_val, nrow(newdata)))
+  }
+  if (!resp %in% names(newdata)) {
+    newdata[[resp]] <- rep(0L, nrow(newdata))
+  }
+  # What remains is the unit structure itself, and only a synthetic
+  # grid needs it built. Real long-format newdata keeps the labels it
+  # arrived with, which forecasting and multi-season fits depend on.
+  if (!is_grid) return(newdata)
+  if (!"series" %in% names(newdata)) {
+    # The levels come from the axis rather than from the training
+    # column, which carries none of its own when the user supplied a
+    # character series and orders them differently when a grouping
+    # superseded it.
+    newdata$series <- factor(
+      as.character(template$series),
+      levels = closure_unit_axis_levels(object)
+    )
+  }
+  # On the grid path, every row should be its own closure unit
+  # so each prediction varies the covariate independently.
+  # `datagrid()` pins `time` at a single typical value drawn from
+  # training, which would otherwise collapse the whole grid into
+  # one unit and flatten the predicted curve.
+  newdata$time  <- seq_len(nrow(newdata))
+  newdata$visit <- 1L
+  # A grid's response is whatever value `datagrid()` held it at, and
+  # a synthetic unit has no observation behind it, so the safe
+  # default is stamped over it here rather than filled in.
+  newdata[[resp]] <- rep(0L, nrow(newdata))
+  newdata
+}
+
+
+# Internal: which closure unit each row belongs to.
+#
+# The grouping columns are integer-coded before they are pasted, so
+# columns of any type combine and the separator cannot collide: an
+# integer code never contains an underscore, while the values behind
+# it can.
+#
+# `response_var` is what separates a guard from a description. A
+# missing response is a visit that did not happen, and brms drops
+# those rows from the likelihood, so counts taken over the raw frame
+# describe a model that was never fitted. Naming the response makes
+# `n_rep` the observed visit count and leaves a unit with none at
+# zero.
+#' @noRd
+closure_unit_index <- function(data, unit_grouping_vars,
+                               response_var = NULL) {
+  codes <- lapply(unit_grouping_vars, function(col) {
+    as.integer(as.factor(data[[col]]))
+  })
+  label <- do.call(paste, c(codes, list(sep = "_")))
+  levels <- unique(label)
+  unit <- match(label, levels)
+  observed <- if (is.null(response_var)) {
+    rep(TRUE, NROW(data))
+  } else {
+    !is.na(data[[response_var]])
+  }
+  list(
+    unit = unit,
+    label = label,
+    levels = levels,
+    observed = observed,
+    n_rep = tabulate(unit[observed], nbins = length(levels))
+  )
+}
+
+
 #' Build per-closure-unit indexing arrays from long-format data
 #'
 #' Walks the user's long-format observation data and groups rows
@@ -1751,201 +2035,6 @@ closure_unit_default_cap_buffer <- function(family) {
 #'   of every row, including a visit that never happened: that
 #'   visit has no density but still has an expected value.
 #' @noRd
-# Fill missing closure-unit identifier columns on an incoming
-# newdata so synthetic prediction grids (e.g. those built by
-# `marginaleffects::datagrid()`, which drops every column the
-# model formula does not reference) round-trip through the per-
-# unit prediction pipeline.
-#
-# The natural interpretation of a per-row marginaleffects grid on
-# a closure-unit fit is "each row is one hypothetical single-
-# visit closure unit". To get that, we stamp:
-#   * `series` to the first training level (held constant so the
-#     state intercept stays interpretable across the grid).
-#   * `time` to `seq_len(nrow(newdata))` so each row has a
-#     distinct unit identifier; `build_closure_unit_arrays()`
-#     then treats the rows as `N_grid` independent units of
-#     1 visit each. Per-row state-level covariate variation
-#     produces per-row state predictions as intended.
-#   * `visit` to `1L`.
-#   * `cap` to the family's `mvgam_default_cap` attribute or, if
-#     absent, the first training row's cap value.
-#   * the response column to `0L` to satisfy
-#     `validate_closure_unit_data()`'s integer / binary checks;
-#     the response is never consumed by `posterior_epred()` /
-#     `posterior_predict()` for these families.
-#
-# No-op (returns newdata unchanged) when:
-#   * the family is not a closure-unit family, or
-#   * `newdata` is NULL, or
-#   * the fit has no `data` slot to source defaults from, or
-#   * all four identifier columns are already present.
-#
-# Used by `get_predict.mvgam` so every marginaleffects entry
-# point (`predictions`, `slopes`, `comparisons`, `plot_predictions`,
-# `conditional_effects`) works on closure-unit fits out of the
-# box.
-#'@noRd
-# Internal: complete a composition's prediction grid to whole sites.
-#
-# A softmax spans the K categories of a site, so a grid row carrying
-# one category is a simplex of width one, whose only probability is
-# 1 whatever the linear predictor holds. Every panel a composition
-# drew was therefore a flat line at one with a zero-width interval.
-# Each distinct covariate setting in the grid is completed to the K
-# category rows of one synthetic site, and the caller takes back the
-# rows the grid asked about.
-#
-# Grouping the grid's own rows into units is not enough, though it
-# looks like it should be. A main-effect grid holds the categories
-# together at its first covariate value and then one category across
-# the remaining values, so grouping leaves every later setting a
-# unit of one.
-#
-# Only a synthetic grid reaches here, never a user's own frame, so
-# the K-fold widening is paid on a few hundred rows at most.
-#
-# @return `NULL` when the family needs no completion; otherwise a
-#   list with `data`, the completed grid, and `take`, one index per
-#   row of `newdata` into `data`.
-#'@noRd
-complete_simplex_grid <- function(object, newdata) {
-  if (!is_simplex_response_family(object$family)) {
-    return(NULL)
-  }
-  levs <- levels(factor(mvgam_training_data(object)$series))
-  if (length(levs) < 2L) {
-    return(NULL)
-  }
-  resp <- closure_unit_response_var(object$formula)
-  # The covariate setting of a row is everything that is not the
-  # category axis, the unit identifiers, or the response.
-  held <- setdiff(names(newdata),
-                  c("series", "time", "visit", "cap", "rowid", resp))
-  key <- if (length(held)) {
-    do.call(paste, c(lapply(held, function(v) {
-      as.character(newdata[[v]])
-    }), list(sep = "\r")))
-  } else {
-    rep("1", nrow(newdata))
-  }
-  settings <- unique(key)
-  first_row <- match(settings, key)
-  n_set <- length(settings)
-  K <- length(levs)
-  # One block of K rows per setting, carrying that setting's
-  # covariates and sharing a unit identifier.
-  out <- newdata[rep(first_row, each = K), , drop = FALSE]
-  out$series <- factor(rep(levs, times = n_set), levels = levs)
-  out$time <- rep(seq_len(n_set), each = K)
-  out$visit <- 1L
-  out[[resp]] <- 1 / K
-  rownames(out) <- NULL
-  # Which completed row each original row asked about.
-  asked <- match(as.character(newdata$series), levs)
-  take <- (match(key, settings) - 1L) * K + asked
-  if (anyNA(take)) {
-    stop(insight::format_error(c(
-      "A prediction grid names a category the model does not have.",
-      x = paste0(
-        "Unknown: ",
-        paste(unique(setdiff(as.character(newdata$series), levs)),
-              collapse = ", "), "."
-      ),
-      i = paste0("The model's categories are: ",
-                 paste(levs, collapse = ", "), ".")
-    )), call. = FALSE)
-  }
-  list(data = out, take = take)
-}
-
-
-complete_closure_unit_newdata <- function(object, newdata) {
-  if (is.null(newdata)) return(newdata)
-  if (!is_closure_unit_family(object$family)) return(newdata)
-  data <- object$data %||% data.frame()
-  if (nrow(data) == 0L) return(newdata)
-  # Trigger: only normalise when this looks like a
-  # marginaleffects-style grid. `datagrid()` strips every column
-  # the model formula does not reference, so closure-unit-specific
-  # columns (`visit`, `cap`) go missing. Real long-format newdata
-  # supplied by the user keeps them, in which case we return
-  # unchanged so meaningful (series, time, visit) labels survive,
-  # which forecasting and multi-season fits depend on.
-  is_grid <- !"visit" %in% names(newdata) || !"cap" %in% names(newdata)
-  if (!is_grid) return(newdata)
-  template <- data[1L, , drop = FALSE]
-  if (!"series" %in% names(newdata)) {
-    newdata$series <- factor(
-      as.character(template$series),
-      levels = levels(data$series)
-    )
-  }
-  # On the grid path, every row should be its own closure unit
-  # so each prediction varies the covariate independently.
-  # `datagrid()` pins `time` at a single typical value drawn from
-  # training, which would otherwise collapse the whole grid into
-  # one unit and flatten the predicted curve.
-  newdata$time  <- seq_len(nrow(newdata))
-  newdata$visit <- 1L
-  if (!"cap" %in% names(newdata)) {
-    cap_val <- closure_unit_default_cap(object$family) %||%
-                 template$cap %||% 1L
-    newdata$cap <- as.integer(rep(cap_val, nrow(newdata)))
-  }
-  # Always (re)stamp the response with a safe default so the
-  # binary / non-negative-integer validator passes. Predictions
-  # do not consume the response column for closure-unit families,
-  # so overwriting present values or filling a missing column has
-  # the same downstream effect.
-  #
-  # The response is resolved unguarded, as it is at every other
-  # post-fit closure-unit site: a fit of this family reached here
-  # only by resolving a single response at fit time, so a failure
-  # would be a broken object rather than a case to fall back on.
-  newdata[[closure_unit_response_var(object$formula)]] <-
-    rep(0L, nrow(newdata))
-  newdata
-}
-
-
-# Internal: which closure unit each row belongs to.
-#
-# The grouping columns are integer-coded before they are pasted, so
-# columns of any type combine and the separator cannot collide: an
-# integer code never contains an underscore, while the values behind
-# it can.
-#
-# `response_var` is what separates a guard from a description. A
-# missing response is a visit that did not happen, and brms drops
-# those rows from the likelihood, so counts taken over the raw frame
-# describe a model that was never fitted. Naming the response makes
-# `n_rep` the observed visit count and leaves a unit with none at
-# zero.
-#' @noRd
-closure_unit_index <- function(data, unit_grouping_vars,
-                               response_var = NULL) {
-  codes <- lapply(unit_grouping_vars, function(col) {
-    as.integer(as.factor(data[[col]]))
-  })
-  label <- do.call(paste, c(codes, list(sep = "_")))
-  levels <- unique(label)
-  unit <- match(label, levels)
-  observed <- if (is.null(response_var)) {
-    rep(TRUE, NROW(data))
-  } else {
-    !is.na(data[[response_var]])
-  }
-  list(
-    unit = unit,
-    label = label,
-    levels = levels,
-    observed = observed,
-    n_rep = tabulate(unit[observed], nbins = length(levels))
-  )
-}
-
-
 build_closure_unit_arrays <- function(data,
                                        response_var,
                                        series_var  = "series",
@@ -2078,6 +2167,28 @@ build_closure_unit_arrays <- function(data,
     visit_row[g, seq_len(rep_counts[g])] <-
       as.integer(rows_by_unit[[g]])
   }
+  # Which response component each of a unit's rows carries. Only a
+  # unit whose rows are the components rather than repeat visits has
+  # one, which is what a key omitting the series var means. The
+  # generated lpdf reads it to pair a row with that component's
+  # residual scale; pairing by position instead is right only while
+  # every unit holds every component in order, so a site missing one
+  # species shifted every later species onto another's scale.
+  visit_component <- NULL
+  if (!series_var %in% unit_grouping_vars &&
+        series_var %in% names(data)) {
+    series_col <- data[[series_var]]
+    component <- if (is.factor(series_col)) {
+      as.integer(series_col)
+    } else {
+      as.integer(factor(series_col))
+    }
+    visit_component <- matrix(1L, nrow = n_unit, ncol = max_rep)
+    for (g in seq_len(n_unit)) {
+      visit_component[g, seq_len(rep_counts[g])] <-
+        component[rows_by_unit[[g]]]
+    }
+  }
   # Which unit each row of the frame belongs to, over every row
   # rather than the observed ones alone. A visit that never happened
   # still has a linear predictor and so still has an expected value;
@@ -2100,6 +2211,7 @@ build_closure_unit_arrays <- function(data,
       K_max       = NA_integer_,
       Y_max       = NA_integer_,
       visit_idx   = visit_idx,
+      visit_component = visit_component,
       visit_row   = visit_row,
       row_unit    = row_unit,
       max_rep     = as.integer(max_rep),
@@ -3243,7 +3355,10 @@ make_occ_stanvars <- function(arrays) {
 #' not the (site, species) row grain. The Stan lpdf evaluates the
 #' joint K-vector Dirichlet density once per closure unit, so the
 #' per-unit log-density is attributed to the first row of the unit
-#' and the remaining K - 1 rows return `0` for `log_lik()`. This is
+#' and the remaining K - 1 rows return `NA` for `log_lik()`, which
+#' is how a row carrying no density of its own is spelled: a `0`
+#' there would assert a density of one, and `loo()` would score the
+#' site once per species. This is
 #' the only correct grain for joint multi-row outcomes and matches
 #' the flocker / ubms convention for closure-unit families;
 #' Vehtari, Gelman and Gabry (2017) recommend the joint-unit grain
@@ -3927,7 +4042,7 @@ mvn <- function() {
   # `Z[k, :] * lv[i, :]`, so the lpdf does not need `Z` as a
   # separate argument.
   attr(fam, "mvgam_vars") <- c(
-    "N_unit", "n_rep", "visit_idx", "Psi"
+    "N_unit", "n_rep", "visit_idx", "visit_component", "Psi"
   )
   attr(fam, "mvgam_stanvars") <- NULL
   fam
@@ -3965,6 +4080,7 @@ mvn_stan_funs <- function() {
     "    int N_unit,",
     "    array[] int n_rep,",
     "    array[,] int visit_idx,",
+    "    array[,] int visit_component,",
     "    vector Psi) {",
     "    real lp = 0;",
     "    for (g in 1:N_unit) {",
@@ -3972,7 +4088,7 @@ mvn_stan_funs <- function() {
     "      array[Kg] int idx = visit_idx[g, 1:Kg];",
     "      vector[Kg] y_unit  = y[idx];",
     "      vector[Kg] mu_unit = mu[idx];",
-    "      vector[Kg] psi_unit = Psi[1:Kg];",
+    "      vector[Kg] psi_unit = Psi[visit_component[g, 1:Kg]];",
     "      lp += normal_lpdf(y_unit | mu_unit, psi_unit);",
     "    }",
     "    return lp;",
@@ -4052,7 +4168,8 @@ make_mvn_stanvars <- function(arrays) {
       family_funs_name = "mvn_funs",
       family_funs      = mvn_stan_funs(),
       include_K_max    = FALSE,
-      include_Y_max    = FALSE
+      include_Y_max    = FALSE,
+      include_component = TRUE
     ),
     psi_param,
     psi_prior
@@ -4143,7 +4260,7 @@ mvt <- function() {
   # `make_mvt_stanvars()`. `Z` enters via `mu` through the
   # trend-pipeline contribution `Z[k, :] * lv[i, :]`.
   attr(fam, "mvgam_vars") <- c(
-    "N_unit", "n_rep", "visit_idx", "Psi", "nu"
+    "N_unit", "n_rep", "visit_idx", "visit_component", "Psi", "nu"
   )
   attr(fam, "mvgam_stanvars") <- NULL
   fam
@@ -4174,6 +4291,7 @@ mvt_stan_funs <- function() {
     "    int N_unit,",
     "    array[] int n_rep,",
     "    array[,] int visit_idx,",
+    "    array[,] int visit_component,",
     "    vector Psi,",
     "    real nu) {",
     "    real lp = 0;",
@@ -4182,7 +4300,7 @@ mvt_stan_funs <- function() {
     "      array[Kg] int idx = visit_idx[g, 1:Kg];",
     "      vector[Kg] y_unit  = y[idx];",
     "      vector[Kg] mu_unit = mu[idx];",
-    "      vector[Kg] psi_unit = Psi[1:Kg];",
+    "      vector[Kg] psi_unit = Psi[visit_component[g, 1:Kg]];",
     "      lp += student_t_lpdf(y_unit | nu, mu_unit, psi_unit);",
     "    }",
     "    return lp;",
@@ -4234,7 +4352,8 @@ make_mvt_stanvars <- function(arrays) {
       family_funs_name = "mvt_funs",
       family_funs      = mvt_stan_funs(),
       include_K_max    = FALSE,
-      include_Y_max    = FALSE
+      include_Y_max    = FALSE,
+      include_component = TRUE
     ),
     psi_param,
     psi_prior,
@@ -4726,7 +4845,8 @@ make_closure_unit_arrays_stanvars <- function(arrays,
                                                family_funs,
                                                y_max_upper   = NA_integer_,
                                                include_K_max = TRUE,
-                                               include_Y_max = TRUE) {
+                                               include_Y_max = TRUE,
+                                               include_component = FALSE) {
   checkmate::assert_list(arrays, names = "named")
   checkmate::assert_string(family_funs_name)
   checkmate::assert_string(family_funs)
@@ -4734,7 +4854,9 @@ make_closure_unit_arrays_stanvars <- function(arrays,
                                null.ok = FALSE)
   checkmate::assert_flag(include_K_max)
   checkmate::assert_flag(include_Y_max)
+  checkmate::assert_flag(include_component)
   required <- c("N_unit", "n_rep", "visit_idx", "max_rep")
+  if (include_component) required <- c(required, "visit_component")
   if (include_Y_max) required <- c(required, "Y_max")
   if (include_K_max) required <- c(required, "K_max")
   missing_fields <- setdiff(required, names(arrays))
@@ -4772,6 +4894,22 @@ make_closure_unit_arrays_stanvars <- function(arrays,
       ),
       block = "data"
     )
+  if (include_component) {
+    # Emitted in the family's own bundle rather than read from the
+    # trend block's `obs_trend_series`, which carries the same fact:
+    # the family stanvars are parsed before the trend data lands, so
+    # that identifier is not yet in scope here.
+    stanvars <- stanvars +
+      brms::stanvar(
+        x     = arrays$visit_component,
+        name  = "visit_component",
+        scode = paste0(
+          "array[N_unit, ", arrays$max_rep,
+          "] int<lower=1> visit_component;"
+        ),
+        block = "data"
+      )
+  }
   if (include_Y_max) {
     y_max_scode <- if (is.na(y_max_upper)) {
       "array[N_unit] int<lower=0> Y_max;"
@@ -5860,13 +5998,11 @@ extract_closure_unit_components <- function(object, newdata = NULL,
       i = "Use family = nmix() or family = occ()."
     )))
   }
+  newdata <- newdata %||% mvgam_training_data(object)
   if (is.null(newdata)) {
-    newdata <- object$data
-    if (is.null(newdata)) {
-      stop(insight::format_error(
-        "Training data not stored on object; supply 'newdata'."
-      ))
-    }
+    stop(insight::format_error(
+      "Training data not stored on object; supply 'newdata'."
+    ))
   }
   response_var <- closure_unit_response_var(object$formula)
   binary_y_check <- is_binary_response_family(object$family)
@@ -6131,7 +6267,7 @@ aggregate_closure_unit_visits <- function(object,
                                            yrep_visit) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_matrix(yrep_visit)
-  if (is.null(newdata)) newdata <- object$data
+  newdata <- newdata %||% mvgam_training_data(object)
   response_var <- closure_unit_response_var(object$formula)
   arrays <- closure_unit_arrays_for(object, newdata)
   if (ncol(yrep_visit) != nrow(newdata)) {
@@ -6589,13 +6725,11 @@ extract_mv_response_components <- function(object, newdata = NULL,
       "extract_mv_response_components() requires an mv-response fit."
     ))
   }
+  newdata <- newdata %||% mvgam_training_data(object)
   if (is.null(newdata)) {
-    newdata <- object$obs_data %||% object$data
-    if (is.null(newdata)) {
-      stop(insight::format_error(
-        "Training data not stored on object; supply 'newdata'."
-      ))
-    }
+    stop(insight::format_error(
+      "Training data not stored on object; supply 'newdata'."
+    ))
   }
   # `Psi` is one entry per species in the order the fit numbered
   # them, so which entry a row reads is a question about the model
@@ -6663,11 +6797,21 @@ extract_mv_response_components <- function(object, newdata = NULL,
       )
     )))
   }
-  Psi_full <- draws_mat[draw_ids_local, psi_cols, drop = FALSE]
+  # A plain numeric matrix, not the `draws_matrix` the posterior
+  # arrives as. Its class survives both subsetting and `as.matrix()`,
+  # and arithmetic carries it into whatever a kernel builds from it,
+  # so `posterior_predict()` handed marginaleffects a `draws_matrix`
+  # for `mvt` and was refused: the slot it fills is typed as a
+  # matrix. `mvn` escaped only because its kernel happens to rebuild
+  # the result with `matrix()`. Dropping the class here means no
+  # kernel has to remember to.
+  Psi_full <- matrix(
+    as.numeric(draws_mat[draw_ids_local, psi_cols, drop = FALSE]),
+    nrow = length(draw_ids_local), ncol = length(psi_cols)
+  )
   # Broadcast Psi[, species_idx] to a [ndraws x N_obs] matrix so
   # downstream kernels can use it element-wise alongside mu.
   Psi_row <- Psi_full[, species_idx, drop = FALSE]
-  dim(Psi_row) <- c(ndraws_actual, N_obs)
 
   nu_draws <- NULL
   if (needs_nu) {
@@ -6682,7 +6826,7 @@ extract_mv_response_components <- function(object, newdata = NULL,
   list(
     mu          = mu,
     Psi_row     = Psi_row,
-    Psi         = unname(as.matrix(Psi_full)),
+    Psi         = Psi_full,
     nu          = nu_draws,
     species_idx = species_idx,
     K           = K,
@@ -6929,13 +7073,11 @@ extract_simplex_response_components <- function(object,
       "extract_simplex_response_components() requires a simplex-response fit."
     ))
   }
+  newdata <- newdata %||% mvgam_training_data(object)
   if (is.null(newdata)) {
-    newdata <- object$obs_data %||% object$data
-    if (is.null(newdata)) {
-      stop(insight::format_error(
-        "Training data not stored on object; supply 'newdata'."
-      ))
-    }
+    stop(insight::format_error(
+      "Training data not stored on object; supply 'newdata'."
+    ))
   }
   arrays <- closure_unit_arrays_for(object, newdata)
 

@@ -429,27 +429,6 @@ arm names, the dimensions and `is.finite()`. A link-scale value
 satisfies every one of those. The assertion now compares the arm
 against the scale `posterior_epred()` occupies for that family.
 
-**32. Three fixtures asked a composition a question it cannot
-answer.**
-
-The package is right here and four assertions were wrong, so this
-belongs with the test defects below.
-
-The Dirichlet, multinomial and categorical fits each
-asserted that `posterior_epred()` on a frame holding one species
-matches the corresponding columns of the full-frame answer. It does
-not, and it should not: these families share a softmax normaliser
-across the species at a site, so a frame carrying one of them has a
-different denominator. Measured, the disagreement is total -- up to
-1.0 on a probability for categ and diri, and up to 20.5 on counts
-for multi -- while beta, nb, mvn and mvt agree to zero.
-
-The claim the fixtures were reaching for is real, and survives in a
-form every family can answer: subset whole sites instead. Half the
-sites, all species, agrees to exactly zero on all seven families,
-and still fails on a prediction that places rows by position rather
-than by content. `test-family-jsdgam.R` asks it that way.
-
 **33. `residual_cor(partial = TRUE)` cannot run on a factor model.**
 
 Found by calling it rather than by an assertion, so nothing in the
@@ -476,79 +455,6 @@ Either the factor path takes a pseudo-inverse or a ridge, or the
 method refuses with an explanation. Choosing between those belongs
 to the jsdm work, so `test-family-jsdgam.R` leaves it unasserted
 and this entry carries it.
-
-## The structured loadings prior
-
-**36. Three recovery claims were aimed at a target no fit can hit,
-and their thresholds had been lowered to match.**
-
-The package is right here and the assertions were wrong, so this is
-a test defect. It is recorded because the mistake is the one that
-nearly shipped a wrong answer on the ZMVN fit, in a place where the
-numbers looked reasonable rather than absurd.
-
-`test-factor-loadings-prior.R` checked the recovered species covariance
-against `Phi`, the kernel the loadings were drawn from. Reading the
-generated Stan settles what `Phi` is:
-
-```stan
-target += multi_normal_cholesky_lpdf(Z[ : , i_z] | rep_vector(0.0,
-                    N_series_trend), L_Phi_loadings);
-```
-
-Each column of `Z` gets that prior, so with three latent factors the
-covariance a dataset carries is a Wishart around `Phi` on three
-degrees of freedom, and not `Phi` itself. `residual_cor()` estimates the
-former: it builds `Z * Latent * t(Z)` from the fitted loadings.
-
-Drawing 2000 fresh `Z` from the same `Phi` measures what agreement
-with `Phi` is even available:
-
-| n_lv | mean cor(realised, Phi) |
-|---|---|
-| 3 | 0.399, sd 0.195, 5th pct 0.086, 95th pct 0.724 |
-| 10 | 0.665 |
-| 50 | 0.913 |
-| 200 | 0.976 |
-
-At the rank these fits use, the target moves with the simulation
-seed over most of the unit interval and barely moves with the fit at
-all. That is why the assertion could only be written as
-`agree > 0.1`, and why the phylogeny check came down to a margin of
-0.04 between 0.156 and 0.116.
-
-Against the covariance the realised loadings imply, the same three
-fits read:
-
-| fit | family | pearson | spearman | middle 80% | permutation null |
-|---|---|---|---|---|---|
-| phylo | gaussian, 100 sites | 0.978 | 0.978 | 0.975 | max 0.166 |
-| birds | bernoulli, 25 sites | 0.837 | 0.839 | 0.832 | max 0.169 |
-
-So the loadings were being recovered nearly exactly while the file
-reported it as barely distinguishable from nothing. Neither number
-is carried by a few extreme pairs, and both sit more than five
-standard deviations outside a 500-permutation null of the species
-axis, which is what makes them a claim about which species loads on
-which factor rather than about the spread of the numbers.
-
-Two further pieces of the file were measuring themselves. The
-premise check compared `Phi` against its own two kernels, which
-restates how `Phi` was built and holds whatever data comes out of
-it; it now checks that the realised draw kept the ordering, which at
-rank 3 is not automatic. And the check on the wider prior asked that
-one of two length-scales widen, which over two parameters is a coin
-flip: measured, the phylogenetic scale's spread grows by 89 per cent
-while the trait one's falls by 38, so the honest claim is that both
-move.
-
-A caution found alongside it. Averaging the raw `Z` draws and
-comparing the covariance that implies gives 0.663 where the same
-comparison through `residual_cor()` gives 0.978. Raw `Z` is
-rotation-indeterminate, so its posterior mean is not a loadings
-matrix and nothing should be computed from it. Two routes are invariant to rotation, the
-QR-identified block and the covariance taken within each draw, and
-they agree.
 
 ## The insight surface
 
@@ -1133,6 +1039,31 @@ break a model that samples.
 are refused alongside an explicit `loadings_prior`, as documented.
 
 ## Arguments nothing reads
+
+**88. `standata()` on a fitted model returns the training data
+whatever `newdata` says.**
+
+`standata.mvgam(object, ...)` reads its `...` for nothing and
+returns `object$standata`, the list built at fit time. brms's
+method for the same generic rebuilds from five arguments this one
+does not take, `newdata` among them. Writing
+`standata(fit, newdata = nd)` against the brms API is therefore an
+ordinary thing to do. On an mvgam fit it answers with the training
+data: a well-formed list of the right shape describing another
+frame entirely.
+
+Measured on an `mvn()` fit whose frame was reordered within each
+site. `standata(fit, newdata = reordered)$visit_idx[1, ]` comes back
+as the training layout `1,2,3,4`, while
+`closure_unit_arrays_for(fit, reordered)` reads `4,3,2,1` for that
+same frame. Two accounts of one question. The method a brms reader
+reaches for is the one that ignores the argument.
+
+Its roxygen says `...` is "currently unused; present for S3 generic
+dispatch", so the behaviour is deliberate and documented. What is
+missing is the refusal: an argument the method cannot honour should
+be rejected rather than dropped, which is the rule finding 76
+records for the rest of this surface.
 
 **76. Two methods of fifteen refuse an argument that reaches no
 one.**

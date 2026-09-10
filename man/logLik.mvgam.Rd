@@ -32,8 +32,12 @@ scalar with the \code{df} and \code{nobs} attributes the \code{\link[stats:AIC]{
 \code{\link[stats:AIC]{stats::BIC()}} machinery expects.
 }
 \details{
-The scalar returned is the posterior mean of \code{rowSums(log_lik(object))}
-across draws. For Bayesian state-space models AIC and BIC are coarse
+The scalar returned is the posterior mean, across draws, of the
+summed pointwise log-likelihood over the observations that carry a
+density. Those are every row for most families, and one row per
+closure unit for the detection and composition families, whose
+likelihood is written per unit.
+For Bayesian state-space models AIC and BIC are coarse
 instruments because every latent state inflates the parameter count;
 \code{\link[=loo]{loo()}} / \code{\link[=waic]{waic()}} are usually the better model-selection tools and
 are recommended in preference.

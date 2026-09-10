@@ -26,21 +26,31 @@ spec_groupings <- function(spec) {
   if (is.null(spec)) {
     return(list(gr = NULL, subgr = NULL))
   }
-
-  # `[[` on a name a list does not carry raises rather than
-  # answering `NULL`, so a specification written without a field is
-  # read by name first. A caller that happens to pass one carrying
-  # every field never sees the difference, which is why this held
-  # until a spec spelled by hand reached it.
-  field_of <- function(x, field) {
-    if (is.list(x) && field %in% names(x)) x[[field]] else NULL
-  }
   pick <- function(field) {
-    value <- field_of(spec, field) %||%
-      field_of(field_of(spec, "trend_model"), field)
+    value <- spec_field(spec, field)
     if (named_var(value)) as.character(value) else NULL
   }
   list(gr = pick("gr"), subgr = pick("subgr"))
+}
+
+#' One field of a trend specification, at either depth
+#'
+#' A specification carries its fields at the top level or nested
+#' under `$trend_model`, so both are looked in. `[[` on a name a
+#' list does not carry raises rather than answering `NULL`, so the
+#' name is tested first: a caller that happens to pass a
+#' specification carrying every field never sees the difference,
+#' which is why this held until a spec spelled by hand reached it.
+#'
+#' @param spec A single trend specification
+#' @param field Name of the field to read
+#' @return The field's value, or `NULL` where neither depth has it
+#' @noRd
+spec_field <- function(spec, field) {
+  at <- function(x, name) {
+    if (is.list(x) && name %in% names(x)) x[[name]] else NULL
+  }
+  at(spec, field) %||% at(at(spec, "trend_model"), field)
 }
 
 #' One trend specification, whatever shape it arrives in
@@ -80,14 +90,7 @@ trend_spec_head <- function(spec) {
 #' @return Integer count, or `NULL` where the trend names none
 #' @noRd
 spec_n_lv <- function(spec) {
-  spec <- trend_spec_head(spec)
-  # Read by name for the same reason `spec_groupings()` does: `[[`
-  # raises on a specification written without the field.
-  field_of <- function(x, field) {
-    if (is.list(x) && field %in% names(x)) x[[field]] else NULL
-  }
-  value <- field_of(spec, "n_lv") %||%
-    field_of(field_of(spec, "trend_model"), "n_lv")
+  value <- spec_field(trend_spec_head(spec), "n_lv")
   if (is.null(value)) NULL else as.integer(value)
 }
 

@@ -180,6 +180,10 @@ test_that("prepare_closure_unit_family() groups dirichlet rows by site, not by (
   expect_identical(sd$N_unit, 5L)
   expect_identical(sd$n_rep, rep(4L, 5L))
   expect_identical(dim(sd$visit_idx), c(5L, 4L))
+  # `diri()` does not emit the component index: its lpdf pairs a
+  # row's observation with that row's own softmax probability, so
+  # nothing in it is indexed by component.
+  expect_null(sd$visit_component)
 })
 
 test_that("diri_stan_funs() emits the lpdf body with mu_unit[1] anchor", {
@@ -417,7 +421,7 @@ test_that("mvn() returns a custom family with the right tags", {
   expect_false(is_simplex_response_family(fam))
   expect_identical(
     attr(fam, "mvgam_vars", exact = TRUE),
-    c("N_unit", "n_rep", "visit_idx", "Psi")
+    c("N_unit", "n_rep", "visit_idx", "visit_component", "Psi")
   )
 })
 
@@ -434,7 +438,15 @@ test_that("mvn_stan_funs() emits a per-unit normal_lpdf using Psi as the SD", {
   sc <- mvgam:::mvn_stan_funs()
   expect_match(sc, "real mvn_lpdf(", fixed = TRUE)
   expect_match(sc, "vector Psi)", fixed = TRUE)
-  expect_match(sc, "vector[Kg] psi_unit = Psi[1:Kg];", fixed = TRUE)
+  # Indexed by the component each row carries, not by the row's
+  # position in the unit. Positional pairing is right only while
+  # every unit holds every component in order, so a site missing one
+  # response shifted every later component onto another's scale.
+  expect_match(
+    sc, "vector[Kg] psi_unit = Psi[visit_component[g, 1:Kg]];",
+    fixed = TRUE
+  )
+  expect_match(sc, "array[,] int visit_component,", fixed = TRUE)
   expect_match(
     sc, "normal_lpdf(y_unit | mu_unit, psi_unit)",
     fixed = TRUE
@@ -482,7 +494,7 @@ test_that("prepare_closure_unit_family() groups mvn rows by site", {
   expect_false(is.null(sv))
   expect_identical(
     fam_prep$vars,
-    c("N_unit", "n_rep", "visit_idx", "Psi")
+    c("N_unit", "n_rep", "visit_idx", "visit_component", "Psi")
   )
   # Verify the unit grouping by inspecting the standata round-trip.
   mf <- bf(y ~ env, family = fam_prep)
@@ -490,6 +502,14 @@ test_that("prepare_closure_unit_family() groups mvn rows by site", {
   expect_identical(sd$N_unit, 5L)
   expect_identical(sd$n_rep, rep(4L, 5L))
   expect_identical(dim(sd$visit_idx), c(5L, 4L))
+  # The component index rides in the family's own bundle, because
+  # the trend block's `obs_trend_series` carries the same fact but
+  # is not yet in scope where these stanvars are parsed.
+  expect_identical(dim(sd$visit_component), c(5L, 4L))
+  expect_identical(
+    sd$visit_component,
+    matrix(rep(seq_len(4L), each = 5L), nrow = 5L)
+  )
 })
 
 # ------------------------------------------------------------
@@ -516,7 +536,7 @@ test_that("mvt() returns a custom family with the right tags", {
   expect_false(is_simplex_response_family(fam))
   expect_identical(
     attr(fam, "mvgam_vars", exact = TRUE),
-    c("N_unit", "n_rep", "visit_idx", "Psi", "nu")
+    c("N_unit", "n_rep", "visit_idx", "visit_component", "Psi", "nu")
   )
 })
 
@@ -529,7 +549,15 @@ test_that("mvt_stan_funs() emits per-row student_t_lpdf with Psi and nu", {
   expect_match(sc, "real mvt_lpdf(", fixed = TRUE)
   expect_match(sc, "vector Psi,", fixed = TRUE)
   expect_match(sc, "real nu)", fixed = TRUE)
-  expect_match(sc, "vector[Kg] psi_unit = Psi[1:Kg];", fixed = TRUE)
+  # Indexed by the component each row carries, not by the row's
+  # position in the unit. Positional pairing is right only while
+  # every unit holds every component in order, so a site missing one
+  # response shifted every later component onto another's scale.
+  expect_match(
+    sc, "vector[Kg] psi_unit = Psi[visit_component[g, 1:Kg]];",
+    fixed = TRUE
+  )
+  expect_match(sc, "array[,] int visit_component,", fixed = TRUE)
   expect_match(
     sc, "student_t_lpdf(y_unit | nu, mu_unit, psi_unit)",
     fixed = TRUE
@@ -585,7 +613,7 @@ test_that("prepare_closure_unit_family() wires mvt() vars and stanvars", {
   expect_false(is.null(sv))
   expect_identical(
     fam_prep$vars,
-    c("N_unit", "n_rep", "visit_idx", "Psi", "nu")
+    c("N_unit", "n_rep", "visit_idx", "visit_component", "Psi", "nu")
   )
   mf <- bf(y ~ env, family = fam_prep)
   sd <- brms::make_standata(mf, data = dat, stanvars = sv)

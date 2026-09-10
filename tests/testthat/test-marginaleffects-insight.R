@@ -64,6 +64,25 @@ test_that("get_vcov.mvgam returns NULL", {
   expect_null(marginaleffects::get_vcov(stub))
 })
 
+test_that("get_vcov.mvgam speaks only for a vcov estimator", {
+  stub <- structure(list(), class = "mvgam")
+  # marginaleffects passes `vcov = TRUE` on every call it makes, so
+  # a notice there would reach every user of `predictions()`.
+  expect_silent(marginaleffects::get_vcov(stub, vcov = TRUE))
+  expect_silent(marginaleffects::get_vcov(stub, vcov = FALSE))
+  # A named estimator is a request mvgam cannot honour, and it is
+  # raised per call rather than once per session, so a second call
+  # in the same session still reports it.
+  expect_warning(
+    marginaleffects::get_vcov(stub, vcov = "HC3"),
+    regexp = "posterior draws"
+  )
+  expect_warning(
+    marginaleffects::get_vcov(stub, vcov = "HC3"),
+    regexp = "posterior draws"
+  )
+})
+
 test_that("set_coef.mvgam is a no-op pass-through", {
   stub <- structure(list(marker = 42L), class = "mvgam")
   out <- marginaleffects::set_coef(stub, coefs = c(a = 1))

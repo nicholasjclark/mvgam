@@ -62,8 +62,16 @@ make_mvgam_stub <- function(varnames = c(
 test_that("as.matrix.mvgam(variable = NULL) returns all parameters", {
   stub <- make_mvgam_stub()
   out <- as.matrix(stub)
-  expect_s3_class(out, "draws_matrix")
+  # A caller asking for a matrix is handed one, as
+  # `brms::as.matrix.brmsfit()` hands one: it unclasses the draws
+  # object before returning. The class matters because it survives
+  # subsetting and arithmetic, so anything typed to a bare matrix
+  # downstream refuses a `draws_matrix`.
+  expect_true(is.matrix(out))
+  expect_false(inherits(out, "draws"))
   expect_equal(ncol(out), 18L)
+  # The draws object is still reachable by asking for it.
+  expect_s3_class(posterior::as_draws_matrix(stub), "draws_matrix")
 })
 
 test_that("as.matrix.mvgam(variable = 'betas') extracts b_* only", {
@@ -157,10 +165,15 @@ test_that("as.data.frame.mvgam returns a data.frame", {
   expect_true("b_Intercept" %in% names(out))
 })
 
-test_that("as.array.mvgam returns a draws_array", {
+test_that("as.array.mvgam returns a plain array", {
   stub <- make_mvgam_stub()
   out <- as.array(stub, variable = "betas")
-  expect_s3_class(out, "draws_array")
+  # Unclassed for the same reason `as.matrix.mvgam()` is, and to
+  # match `brms::as.array.brmsfit()`.
+  expect_true(is.array(out))
+  expect_false(inherits(out, "draws"))
+  expect_s3_class(posterior::as_draws_array(stub, variable = "betas"),
+                  "draws_array")
 })
 
 test_that("as_draws_matrix / df / array / list / rvars all dispatch", {

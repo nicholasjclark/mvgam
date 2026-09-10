@@ -50,9 +50,12 @@ test_that("log_lik_diri matches a Beta density when K = 2", {
     trials = NULL
   )
   expected <- stats::dbeta(y[1L], 0.4 * 10, 0.6 * 10, log = TRUE)
-  # The unit's density is attributed to its first row.
+  # The unit's density is attributed to its first row. Its other
+  # rows carry no density of their own, which is missing rather
+  # than zero: `log p = 0` asserts certainty, and a column of it is
+  # scorable, so `loo()` counted a site once per category.
   expect_equal(out[, 1L], rep(expected, ndraws))
-  expect_true(all(out[, 2L] == 0))
+  expect_true(all(is.na(out[, 2L])))
 })
 
 
@@ -193,11 +196,12 @@ test_that("the multi-response kernels return one row per draw", {
                      list(prob_row = prob, phi = phi, arrays = arrays),
                      NULL)
   expect_equal(dim(d), c(ndraws, 4L))
-  expect_true(all(d[, c(2L, 4L)] == 0))
+  # Non-carrying rows are missing, not zero: see the note above.
+  expect_true(all(is.na(d[, c(2L, 4L)])))
   expect_true(all(is.finite(d[, c(1L, 3L)])))
 
   m <- log_lik_multi(lin, "identity", c(2, 3, 1, 4),
                       list(prob_row = prob, arrays = arrays), NULL)
   expect_equal(dim(m), c(ndraws, 4L))
-  expect_true(all(m[, c(2L, 4L)] == 0))
+  expect_true(all(is.na(m[, c(2L, 4L)])))
 })

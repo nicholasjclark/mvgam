@@ -754,17 +754,6 @@ pp_check.mvgam <- function(
 }
 
 
-# Internal: closure-unit pp_check setup.
-#
-# Collapses the per-visit response and per-visit posterior
-# predictive draws to the closure-unit grain via the shared
-# `aggregate_closure_unit_visits()` helper, so bayesplot's ppc_*
-# functions operate on `(y_unit, yrep_unit)`. Per-visit
-# residuals would treat visits within a closure unit as
-# exchangeable, which they are not (visits share the latent
-# state). For `resid_*` types, `yrep` arrives already at the
-# unit grain because `residuals.mvgam` aggregates internally; we
-# only synthesise a length-matched `y_unit` vector (set to zeros
 # Build a factor mapping each long-form prediction column to a
 # category, used to auto-group pp_check on multi-response custom
 # families (diri / multi / categ on the per-unit K-vector axis;
@@ -785,10 +774,10 @@ pp_check_mv_category <- function(object, newdata) {
   fam <- object$family
   if (!is_multi_response_family(fam)) return(NULL)
   if (is_simplex_response_family(fam)) {
-    # Simplex families default to single-axis `time` grouping at
-    # fit time (R/families.R:3534 in prepare_closure_unit_family).
-    # Mirror that fallback here so the category vector matches the
-    # per-unit K-row layout that posterior_predict actually emits.
+    # The unit key comes from `closure_unit_arrays_for()`, which is
+    # the same key `prepare_closure_unit_family()` gave the fit, so
+    # the category vector matches the per-unit K-row layout
+    # `posterior_predict()` emits rather than a second reading of it.
     arrs <- closure_unit_arrays_for(object, newdata)
     cat_int <- integer(nrow(newdata))
     for (g in seq_len(arrs$N_unit)) {
@@ -802,10 +791,18 @@ pp_check_mv_category <- function(object, newdata) {
       levels = paste0("cat_", levels_int)
     ))
   }
-  if ("series" %in% names(newdata)) {
-    return(as.factor(newdata$series))
+  # The species axis, not the frame's own column. `as.factor()` on
+  # the column orders the groups alphabetically over the values that
+  # frame happens to hold, so a fit whose species are declared in
+  # another order, or a frame missing one of them, labels the panels
+  # against a different axis from the one the draws were made on.
+  series <- axis_row_series(object, newdata)
+  if (is.null(series)) {
+    return(NULL)
   }
-  NULL
+  # bayesplot draws one panel per level, so a species the frame does
+  # not hold would be drawn as an empty panel.
+  droplevels(series)
 }
 
 
