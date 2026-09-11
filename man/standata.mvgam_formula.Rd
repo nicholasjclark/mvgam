@@ -29,20 +29,26 @@
 \item{data}{A data frame containing all variables referenced in the formula.}
 
 \item{family}{A description of the response distribution and link
-function, given as a family function or a call to one. Supports
-most brms families, including the ordinal families
+function, given as a family function, a call to one or its name.
+Supports most brms families, including the ordinal families
 (\code{\link[brms:brmsfamily]{brms::cumulative()}}, \code{\link[brms:brmsfamily]{brms::sratio()}}, \code{\link[brms:brmsfamily]{brms::cratio()}},
-\code{\link[brms:brmsfamily]{brms::acat()}}). Multi-category families needing a separate
-linear predictor per response category are not supported here:
-\code{\link[brms:brmsfamily]{brms::categorical()}}, \code{\link[brms:brmsfamily]{brms::multinomial()}},
-\code{\link[brms:brmsfamily]{brms::dirichlet()}}. For those, use brms directly.
+\code{\link[brms:brmsfamily]{brms::acat()}}). The brms families needing a separate linear
+predictor per response category, \code{\link[brms:brmsfamily]{brms::categorical()}},
+\code{\link[brms:brmsfamily]{brms::multinomial()}} and \code{\link[brms:brmsfamily]{brms::dirichlet()}}, are refused: use
+\code{\link[=categ]{categ()}}, \code{\link[=multi]{multi()}} and \code{\link[=diri]{diri()}}, which take the categories in
+long format and share one latent structure across them.
 
-In a multivariate model each response may take its own family, in
-which case name it inside that response's \code{\link[brms:brmsformula]{brms::bf()}}:
-\code{bf(count ~ x, family = poisson()) + bf(seen ~ x, family = bernoulli())}. Passing a list of families to this argument, as
-\code{\link[brms:brm]{brms::brm()}} allows, is not supported; the family belongs to the
-response that names it. A single family given here applies to
-every response that does not name one of its own.}
+A family written inside a univariate \code{\link[brms:brmsformula]{brms::bf()}} is the model's
+family, as in brms. In a multivariate model each response may take
+its own family, in which case name it inside that response's
+\code{\link[brms:brmsformula]{brms::bf()}}: \code{bf(count ~ x, family = poisson()) + bf(seen ~ x, family = bernoulli())}. Passing a list of families to this
+argument, as \code{\link[brms:brm]{brms::brm()}} allows, is not supported; the family
+belongs to the response that names it. A single family given here
+applies to every response that does not name one of its own.
+Closure-unit and multi-response families (\code{\link[=occ]{occ()}}, \code{\link[=nmix]{nmix()}},
+\code{\link[=mvn]{mvn()}}, \code{\link[=mvt]{mvt()}}, \code{\link[=diri]{diri()}}, \code{\link[=multi]{multi()}}, \code{\link[=categ]{categ()}}) lay their data
+out by unit, so each models its response alone and cannot be one
+response of a multivariate model.}
 
 \item{prior}{An optional \code{brmsprior} object containing custom prior
 specifications. Can be created using \code{brms::prior()}.}

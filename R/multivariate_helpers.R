@@ -95,6 +95,25 @@ formula_families <- function(x, family) {
   lapply(response_formulas(x), function(form) form$family %||% family)
 }
 
+#' The family of one response of a model, or of each
+#'
+#' A model written with `brms::mvbf()` gives each response its own
+#' family, and no single family describes it. Asked without `resp`,
+#' a model with several responses answers with one family per
+#' response, named by brms's key for it; otherwise it answers with
+#' one family.
+#'
+#' @param object A fitted `mvgam`, a prefit or its summary.
+#' @param resp One response's key, or `NULL`.
+#' @return A family object, or a list of them named by response.
+#' @noRd
+model_families <- function(object, resp = NULL) {
+  resolve_resp(object, resp)
+  families <- formula_families(object, object$family)
+  if (!is.null(resp)) return(families[[resp]])
+  if (length(families) == 1L) families[[1L]] else families
+}
+
 #' Check the response a caller named against the model's own
 #'
 #' Every method taking `resp` asks the same two questions of it: is it

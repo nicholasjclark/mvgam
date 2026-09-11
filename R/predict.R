@@ -349,7 +349,7 @@ predict_variance <- function(object, newdata, process_error,
   # response at a time and takes that response's family.
   resolve_resp(object, resp, required = TRUE,
                caller = "predict(type = 'variance')")
-  family <- get_family_for_resp(object, resp)
+  family <- model_families(object, resp)
 
   # Closure-unit families have closed-form per-visit marginal
   # variances:

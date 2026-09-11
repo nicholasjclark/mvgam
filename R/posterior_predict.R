@@ -1163,7 +1163,9 @@ predicted_dpar_draws <- function(object, dpar, nobs = NULL,
       i = "Scope the call to a single response with 'resp'."
     )))
   }
-  out <- as.matrix(.linkinv(linpred, dpar_link(object$family, dpar)))
+  # The link is the one this response's family gives the parameter.
+  out <- as.matrix(.linkinv(linpred,
+                            dpar_link(model_families(object, resp), dpar)))
   if (!is.null(ndraws) && nrow(out) != ndraws) {
     stop(insight::format_error(c(
       paste0(
@@ -1697,9 +1699,7 @@ predict_single_response <- function(object, linpred_resp, resp, draw_ids,
   linpred <- linpred_resp[draw_ids, , drop = FALSE]
   nobs <- ncol(linpred)
 
-  # `resp` is NULL on a univariate fit, which resolves to the fit's
-  # own family.
-  family <- get_family_for_resp(object, if (is_multivariate) resp else NULL)
+  family <- model_families(object, resp)
 
   # Closure-unit families need joint-over-unit sampling: draw
   # the latent state (N for nmix, z for occ) per closure unit,

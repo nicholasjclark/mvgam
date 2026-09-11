@@ -609,9 +609,9 @@ glance.mvgam <- function(x, looic = FALSE, resp = NULL, ...) {
     return(dplyr::bind_rows(stacked))
   }
 
-  # Per-response family lookup: on mvbf `x$family` holds the last
-  # arm's, so the family is read for the response in scope.
-  fam <- get_family_for_resp(x, resp)
+  # The family of the response in scope. On an mvbf fit `x$family`
+  # holds the family given beside the formula, not any response's.
+  fam <- model_families(x, resp)
   # `resolve_family_name()` returns the user-visible family
   # name even for customfamily objects (e.g. "tweedie" instead
   # of the brms-internal "custom").

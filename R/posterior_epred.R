@@ -9,67 +9,6 @@
 NULL
 
 
-#' The family of one response, or of each
-#'
-#' A model written with `brms::mvbf()` gives each response its own
-#' family, and no single family describes it. Asked without `resp`,
-#' a model with several responses answers with one family per
-#' response, named by brms's key for it; otherwise it answers with
-#' one family.
-#'
-#' @param object A fitted `mvgam`, a prefit or its summary.
-#' @param resp One response's key, or `NULL`.
-#' @return A family object, or a list of them named by response.
-#' @noRd
-model_families <- function(object, resp = NULL) {
-  resolve_resp(object, resp)
-  keys <- names(response_columns(object))
-  if (is.null(resp) && length(keys) > 1L) {
-    return(lapply(stats::setNames(keys, keys), function(r) {
-      get_family_for_resp(object, r)
-    }))
-  }
-  get_family_for_resp(object, resp)
-}
-
-
-#' Extract Family for Single Response
-#'
-#' Extracts the family object for a specific response from an mvgam model.
-#' Response-specific families embedded in bf() take precedence over the
-#' shared top-level family.
-#'
-#' @param object A fitted mvgam object.
-#' @param resp_name Response variable name (character length 1).
-#'
-#' @return A single family object with `$family` and `$linkinv` components.
-#'
-#' @noRd
-get_family_for_resp <- function(object, resp_name) {
-  checkmate::assert_string(resp_name, null.ok = TRUE)
-  # An unscoped call is asking for the fit's own family, and every
-  # caller that reaches here without a response had written that
-  # branch out for itself. Answering it here keeps one description of
-  # which family applies rather than one per surface.
-  if (is.null(resp_name)) {
-    return(object$family)
-  }
-
-  form <- object$formula$forms[[resp_name]]
-  if (!is.null(form) && !is.null(form$family)) {
-    form$family
-  } else if (!is.null(object$family)) {
-    object$family
-  } else {
-    stop(insight::format_error(
-      cli::format_inline(
-        "No family found for response {.val {resp_name}}. Family must be specified either in {.fn bf} or at top-level."
-      )
-    ))
-  }
-}
-
-
 #' Compute Expected Values from Linear Predictor
 #'
 #' Transforms linear predictor values to expected values (response scale) using

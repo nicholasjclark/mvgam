@@ -448,7 +448,7 @@ residuals_pred_args <- function(pp_args, resp) {
 #'@noRd
 analytic_pit_bounds <- function(object, y, pp_args, d,
                                 draw_ids = NULL, resp = NULL) {
-  family_obj <- get_family_for_resp(object, resp)
+  family_obj <- model_families(object, resp)
   family_name <- resolve_family_name(family_obj)
   # Whether a family has a spec depends on its name alone, so it is
   # settled before the predictor is computed: a family without one

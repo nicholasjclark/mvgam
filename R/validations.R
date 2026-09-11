@@ -137,8 +137,11 @@ filter_required_variables <- function(required_vars, formula = NULL) {
 #' Validate and Standardize Family Argument
 #'
 #' @description
-#' Checks and corrects validity of the model family. Converts functions,
-#' family objects, or character strings to a standardized brmsfamily object.
+#' The one reader of a family argument. Turns every spelling a model
+#' accepts into one family object: a family function, a call to one,
+#' a brms family name, or the name of one of mvgam's own families. A
+#' stats family becomes the `brmsfamily` brms builds from it, which
+#' carries its distributional parameters beside its links.
 #'
 #' @param family Either a function, an object of class 'family' or
 #'   'brmsfamily', or a character string of length one or two
@@ -179,6 +182,18 @@ validate_family <- function(family, link = NULL) {
   if (is.character(family)) {
     if (is.null(link)) {
       link <- family[2]
+    }
+    constructor <- mvgam_family_constructors()[[family[1]]]
+    if (!is.null(constructor)) {
+      if (!is.na(link)) {
+        stop(insight::format_error(c(
+          paste0("A link cannot be given with the family name '",
+                 family[1], "'."),
+          i = paste0("Write the family as a call, as in '", family[1],
+                     "()', and give its arguments there.")
+        )), call. = FALSE)
+      }
+      return(constructor())
     }
     # brms's own refusal names the family it was given and the ones
     # it supports, which says more than a caught error could.
@@ -1940,7 +1955,6 @@ response_support_hint <- function(fam) {
 # for carrying fractional weights.
 #'@noRd
 validate_response_shapes <- function(data, formula, family) {
-  if (is.null(family)) return(invisible(TRUE))
   # A list of frames is the multiple-imputation path; each frame
   # carries the same response and any one of them can be wrong.
   frames <- if (is.data.frame(data)) {
@@ -1952,16 +1966,13 @@ validate_response_shapes <- function(data, formula, family) {
   }
   if (!length(frames)) return(invisible(TRUE))
 
-  model <- list(
-    formula = if (inherits(formula, "bform")) formula else brms::bf(formula),
-    family = family
-  )
-  columns <- response_columns(model$formula)
+  columns <- response_columns(formula)
+  # `validate_family()` normalises a character, family or customfamily
+  # into one object and refuses anything else, which is a fault in the
+  # user's own argument and belongs here.
+  families <- formula_families(formula, validate_family(family))
   for (key in names(columns)) {
-    # `validate_family()` normalises a character, family or
-    # customfamily into one object and refuses anything else, which
-    # is a fault in the user's own argument and belongs here.
-    fam <- validate_family(get_family_for_resp(model, key))
+    fam <- families[[key]]
     if (is_multi_response_family(fam) || is_closure_unit_family(fam)) {
       next
     }

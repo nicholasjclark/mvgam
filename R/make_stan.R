@@ -108,37 +108,28 @@ build_stan_components <- function(formula, data, family = gaussian(),
   obs_formula <- formula$formula
   trend_formula <- formula$trend_formula
 
-  # Validate family parameter when not embedded in formula
-  if (!has_embedded_families(obs_formula)) {
-    if (is.character(family)) {
-      family <- get(family, mode = "function")()
-    }
-    if (!inherits(family, "family")) {
-      stop(insight::format_error(
-        cli::format_inline(
-          "The {.field family} parameter must be a family object or function name."
-        )
-      ))
-    }
-    # Block multi-category families that require 3D linear predictors
-    validate_supported_family(family)
-  }
+  # The family a univariate `bf()` names becomes the model's, and
+  # every response's family is checked, before anything below reads
+  # `family`.
+  resolved <- resolve_observation_family(obs_formula, family)
+  obs_formula <- resolved$formula
+  family <- resolved$family
+
   # Closure-unit families (nmix, future occ / royle_nichols /
   # poisson_poisson) carry per-data Stan stanvars that are built
   # at fit time from the user's observation data: unit indexing
   # arrays, per-unit upper truncation (K_max), per-unit max obs
   # (Y_max), and the family-specific lpdf function block. The
   # arrays change with the data, so the resolution is deferred
-  # to here rather than baked into the family() constructor.
+  # to here rather than baked into the family() constructor. A
+  # closure-unit family models its response alone, which
+  # `resolve_observation_family()` has established.
   if (is_closure_unit_family(family)) {
-    # obs_formula may be either a plain `formula` or a brms
-    # `brmsformula` carrying dpar sub-formulas in `$pforms`.
-    if (inherits(obs_formula, "brmsformula")) {
-      main_formula <- obs_formula$formula
-      dpar_forms   <- obs_formula$pforms %||% list()
+    main_formula <- obs_arm_main_formula(obs_formula)
+    dpar_forms <- if (inherits(obs_formula, "brmsformula")) {
+      obs_formula$pforms %||% list()
     } else {
-      main_formula <- obs_formula
-      dpar_forms   <- list()
+      list()
     }
     response_var <- unname(response_columns(obs_formula)[1L])
     has_obs_covs <- length(
@@ -155,13 +146,17 @@ build_stan_components <- function(formula, data, family = gaussian(),
     )
   }
 
+  # Each response's family, read once the closure-unit family above
+  # carries its data.
+  families <- formula_families(obs_formula, family)
+
   # Custom families (e.g. tweedie()) carry their own Stan function
   # block + data stanvars in attr(family, "mvgam_stanvars"). They
   # belong on the observation submodel only; the trend submodel
   # uses gaussian() and reusing them there would duplicate the
   # function block + the M data int and explode the final
   # c.stanvars merge.
-  obs_stanvars <- attach_family_stanvars(stanvars, family)
+  obs_stanvars <- attach_family_stanvars(stanvars, families)
   trend_stanvars_in <- stanvars
 
   # Parse multivariate trends and validate
@@ -259,15 +254,20 @@ build_stan_components <- function(formula, data, family = gaussian(),
       feature = "'sum_to_zero_vector[K]' for simplex families"
     )
   }
-  if (is_com_binomial_family(family)) {
-    assert_com_binomial_trials(obs_formula)
+  # `com_binomial()` reads its denominator from its own response's
+  # `trials()` term.
+  forms <- response_formulas(obs_formula)
+  for (key in names(families)) {
+    if (is_com_binomial_family(families[[key]])) {
+      assert_com_binomial_trials(forms[[key]])
+    }
   }
   # Families whose brms fallback prior would be unsuitable carry an
-  # mvgam default; `family_default_priors()` is the one definition
+  # mvgam default; `response_default_priors()` is the one definition
   # `get_prior()` also reports. `merge_default_priors()` drops any
   # default the user named, so a user prior still wins.
   prior <- merge_default_priors(
-    family_default_priors(family), prior, obs_formula, family
+    response_default_priors(obs_formula, family), prior
   )
 
   # Filter priors: only pass observation-related priors to observation setup
@@ -473,8 +473,7 @@ zmvn_scale_confounded <- function(mv_spec, family, data) {
   if (!series_var %in% colnames(data)) return(FALSE)
   if (length(unique(data[[series_var]])) > 1L) return(FALSE)
 
-  # `dpars` is absent on a stats family, so normalise before asking.
-  "sigma" %in% validate_family(family)$dpars
+  "sigma" %in% family$dpars
 }
 
 

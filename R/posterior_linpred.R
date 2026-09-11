@@ -490,7 +490,12 @@ apply_mu_linkinv <- function(linpred, family) {
 dpar_posterior_linpred <- function(object, dpar, transform = FALSE,
                                    newdata = NULL, draw_ids = NULL,
                                    resp = NULL) {
-  family_name <- resolve_family_name(get_family_for_resp(object, resp))
+  # A distributional parameter belongs to one response's family, and
+  # its link is that family's.
+  resolve_resp(object, resp, required = TRUE,
+               caller = "posterior_linpred(dpar = )")
+  family <- model_families(object, resp)
+  family_name <- resolve_family_name(family)
   valid <- get_family_dpars(family_name)
   if (!dpar %in% valid) {
     stop(insight::format_error(c(
@@ -525,5 +530,5 @@ dpar_posterior_linpred <- function(object, dpar, transform = FALSE,
   if (!transform) {
     return(linpred)
   }
-  .linkinv(linpred, dpar_link(object$family, dpar))
+  .linkinv(linpred, dpar_link(family, dpar))
 }

@@ -184,46 +184,49 @@ on.
 \item{combine}{Logical, pool multiple imputation results (default TRUE)}
 
 \item{family}{A description of the response distribution and link
-function, given as a family function or a call to one. Supports
-most brms families, including the ordinal families
+function, given as a family function, a call to one or its name.
+Supports most brms families, including the ordinal families
 (\code{\link[brms:brmsfamily]{brms::cumulative()}}, \code{\link[brms:brmsfamily]{brms::sratio()}}, \code{\link[brms:brmsfamily]{brms::cratio()}},
-\code{\link[brms:brmsfamily]{brms::acat()}}). Multi-category families needing a separate
-linear predictor per response category are not supported here:
-\code{\link[brms:brmsfamily]{brms::categorical()}}, \code{\link[brms:brmsfamily]{brms::multinomial()}},
-\code{\link[brms:brmsfamily]{brms::dirichlet()}}. For those, use brms directly.
+\code{\link[brms:brmsfamily]{brms::acat()}}). The brms families needing a separate linear
+predictor per response category, \code{\link[brms:brmsfamily]{brms::categorical()}},
+\code{\link[brms:brmsfamily]{brms::multinomial()}} and \code{\link[brms:brmsfamily]{brms::dirichlet()}}, are refused: use
+\code{\link[=categ]{categ()}}, \code{\link[=multi]{multi()}} and \code{\link[=diri]{diri()}}, which take the categories in
+long format and share one latent structure across them.
 
-In a multivariate model each response may take its own family, in
-which case name it inside that response's \code{\link[brms:brmsformula]{brms::bf()}}:
-\code{bf(count ~ x, family = poisson()) + bf(seen ~ x, family = bernoulli())}. Passing a list of families to this argument, as
-\code{\link[brms:brm]{brms::brm()}} allows, is not supported; the family belongs to the
-response that names it. A single family given here applies to
-every response that does not name one of its own.}
+A family written inside a univariate \code{\link[brms:brmsformula]{brms::bf()}} is the model's
+family, as in brms. In a multivariate model each response may take
+its own family, in which case name it inside that response's
+\code{\link[brms:brmsformula]{brms::bf()}}: \code{bf(count ~ x, family = poisson()) + bf(seen ~ x, family = bernoulli())}. Passing a list of families to this
+argument, as \code{\link[brms:brm]{brms::brm()}} allows, is not supported; the family
+belongs to the response that names it. A single family given here
+applies to every response that does not name one of its own.
+Closure-unit and multi-response families (\code{\link[=occ]{occ()}}, \code{\link[=nmix]{nmix()}},
+\code{\link[=mvn]{mvn()}}, \code{\link[=mvt]{mvt()}}, \code{\link[=diri]{diri()}}, \code{\link[=multi]{multi()}}, \code{\link[=categ]{categ()}}) lay their data
+out by unit, so each models its response alone and cannot be one
+response of a multivariate model.}
 
 \item{threads}{Positive integer or \code{NULL}. When non-NULL the
 model is compiled with \code{cpp_options$stan_threads = TRUE} and
 cmdstanr passes \code{threads_per_chain = N} at sample time.
 Closure-unit families (\code{nmix()}, \code{occ()}) and multi-response
-families (\code{diri()}, \code{mvn()}, \code{mvt()}, \code{multinomial()},
-\code{categorical()}) thread their per-unit lpmf via \code{reduce_sum};
-brms-native families (\code{gaussian()}, \code{poisson()}, etc.) without
-a \code{trend_formula} thread their lpmf loops via brms's
+families (\code{diri()}, \code{mvn()}, \code{mvt()}, \code{multi()}, \code{categ()})
+thread their per-unit lpmf via \code{reduce_sum}; brms-native
+families (\code{gaussian()}, \code{poisson()}, etc.) without a
+\code{trend_formula} thread their lpmf loops via brms's
 \code{partial_log_lik_lpmf}. For closure-unit families, expect
 ~30-40\% sampling throughput improvement at \code{threads = 4} on a
 fixture with N_unit >= 50; smaller fixtures may see
 thread-overhead-dominated regressions. The internal grainsize
 is auto-tuned to ~8 chunks regardless of \code{threads}.
 
-Combining \code{threads > 1} with a \code{trend_formula} on a brms-native
-family is currently a no-op: mvgam's trend injector cannot find
-the \code{mu} assignment once brms moves it inside
-\code{partial_log_lik_lpmf}, so the code is compiled and sampled
-serially. This covers every currently-supported trend model
-under a brms-native family: \code{RW()}, \code{AR()}, \code{VAR()}, \code{VARMA()},
-\code{ZMVN()}, \code{CAR()}, and \code{PW()}. A per-fit warning is emitted so
-the ignored \code{threads_per_chain} value is visible in any batch
-script that fits repeatedly. The full fix (teaching the
-injector to splice into \code{partial_log_lik_lpmf}) is filed as a
-separate enhancement.}
+A brms-native family with a \code{trend_formula} samples serially
+whatever \code{threads} says. brms moves the \code{mu} assignment inside
+\code{partial_log_lik_lpmf} when it threads, where mvgam cannot add
+the trend to it, so the program is built without threading.
+This holds for every trend model under a brms-native family:
+\code{RW()}, \code{AR()}, \code{VAR()}, \code{VARMA()}, \code{ZMVN()}, \code{CAR()} and
+\code{PW()}. Each fit that drops the request warns, so a batch
+script that fits repeatedly shows it every time.}
 
 \item{run_model}{Logical. Setting \code{run_model = FALSE} stops before
 Stan parse, compile and sampling and returns a stub \code{mvgam}

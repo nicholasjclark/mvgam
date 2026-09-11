@@ -249,7 +249,7 @@ mv_response_family_pars <- function(object, newdata, linpred,
 # together.
 log_lik_single_response <- function(object, newdata, linpred, resp,
                                     draw_ids) {
-  family_obj <- get_family_for_resp(object, resp)
+  family_obj <- model_families(object, resp)
   family_name <- resolve_family_name(family_obj)
   family_link <- family_obj$link
 

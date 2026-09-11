@@ -470,7 +470,11 @@ jsdgam <- function(formula,
   # likelihood; the user almost certainly wants per-species fixed
   # effects via `* series` (or the user's species column name) or the
   # brms-native-style `0 + series + env:series`.
-  if (is_simplex_response_family(family)) {
+  # The family a univariate `bf()` names is the model's, as `mvgam()`
+  # reads it.
+  if (is_simplex_response_family(
+    resolve_observation_family(formula, family)$family
+  )) {
     warn_simplex_obs_formula_lacks_species(formula, species_chr)
   }
 

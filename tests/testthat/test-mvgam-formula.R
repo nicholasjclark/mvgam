@@ -362,17 +362,19 @@ test_that("error handling for invalid get_prior calls", {
     "Assertion on 'data' failed"
   )
 
-  # Missing response in formula
+  # Missing response in formula, refused by the one reader of a
+  # model's responses
   expect_error(
     get_prior(mvgam_formula(~ x), data = data.frame(x = 1:5)),
-    "Formula missing response variable"
+    "The observation formula names no response"
   )
 
-  # Invalid family for non-embedded formulas
+  # A name no family answers to is refused by brms, which lists the
+  # names it does accept
   test_data <- data.frame(y = rnorm(20), x = rnorm(20))
   expect_error(
     get_prior(mvgam_formula(y ~ x), family = "not a family", data = test_data),
-    "Assertion on 'family' failed"
+    "not a family is not a supported family"
   )
 })
 

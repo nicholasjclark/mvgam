@@ -254,6 +254,67 @@ resolve_family_name <- function(family) {
   fam
 }
 
+#' The families mvgam builds itself, keyed by constructor name
+#'
+#' brms builds its own families from a name. These are built by
+#' mvgam's constructors, which brms cannot name, so a family given
+#' as one of these names is built by calling its constructor.
+#'
+#' @return A named list of family constructors
+#' @noRd
+mvgam_family_constructors <- function() {
+  list(
+    tweedie = tweedie, beta_nb = beta_nb, com_binomial = com_binomial,
+    occ = occ, nmix = nmix, diri = diri, multi = multi, categ = categ,
+    mvn = mvn, mvt = mvt
+  )
+}
+
+#' The observation formula and family a model is built from
+#'
+#' brms reads a family written inside `bf()` in preference to the one
+#' given beside the formula. A family inside a univariate `bf()` is
+#' taken out of the formula here and becomes the model's family. The
+#' likelihood already followed it, while every step mvgam runs on the
+#' family took the default gaussian: adding a custom family's Stan
+#' functions, injecting its default priors, preparing a closure unit
+#' and recording the family on the fit. A multivariate formula keeps
+#' each response's family in its own `bf()`, where
+#' `formula_families()` reads it.
+#'
+#' Every response's family is checked once, here. Closure-unit and
+#' multi-response families lay the data out by unit and write their
+#' likelihood for that layout, so each models its response alone.
+#'
+#' @param formula The observation formula
+#' @param family The family given beside it, in any spelling
+#'   `validate_family()` accepts
+#' @return A list holding `formula`, with a univariate family taken
+#'   out, and `family`
+#' @noRd
+resolve_observation_family <- function(formula, family) {
+  family <- validate_family(family)
+  if (inherits(formula, "brmsformula") && !is.null(formula$family)) {
+    family <- formula$family
+    formula$family <- NULL
+  }
+  families <- formula_families(formula, family)
+  lapply(families, validate_supported_family)
+  alone <- Filter(function(f) {
+    is_closure_unit_family(f) || is_multi_response_family(f)
+  }, families)
+  if (length(families) > 1L && length(alone) > 0L) {
+    stop(insight::format_error(c(
+      paste0("'", resolve_family_name(alone[[1L]]), "()' cannot be one ",
+             "response of a multivariate model."),
+      x = paste0("Its data are laid out by unit, and its likelihood is ",
+                 "written for that layout."),
+      i = "Fit that response in a model of its own."
+    )), call. = FALSE)
+  }
+  list(formula = formula, family = family)
+}
+
 #' Build the Stan stanvars bundle for the Tweedie family
 #'
 #' Returns a `brms::stanvar()` collection containing the
@@ -971,27 +1032,53 @@ default_com_binomial_population_priors <- function() {
 #' names the same class leaves two rows for it, and brms refuses the
 #' whole set with "Duplicated prior specifications are not allowed",
 #' so a user who tries to override a default gets an error instead of
-#' their prior. Drop any default the user has already spoken for,
-#' after re-aiming those whose dpar is modelled.
+#' their prior. Drop any default the user has already spoken for.
 #'
-#' @param defaults A `brmsprior` of mvgam defaults
+#' @param defaults A `brmsprior` of mvgam defaults, from
+#'   `response_default_priors()`, possibly `NULL`
 #' @param user_prior The user's `brmsprior`, possibly `NULL`
-#' @param formula The observation formula
-#' @param family The family object
 #' @return A `brmsprior` combining both, with no duplicated classes
 #' @noRd
-merge_default_priors <- function(defaults, user_prior, formula,
-                                 family = NULL) {
-  defaults <- adjust_modelled_dpar_priors(defaults, formula, family)
+merge_default_priors <- function(defaults, user_prior) {
   if (is.null(defaults) || nrow(defaults) == 0L) {
     return(user_prior)
   }
   if (!is.null(user_prior) && nrow(user_prior) > 0L) {
-    taken <- paste(user_prior$class, user_prior$coef, user_prior$dpar)
-    keys <- paste(defaults$class, defaults$coef, defaults$dpar)
-    defaults <- defaults[!(keys %in% taken), , drop = FALSE]
+    prior_key <- function(p) paste(p$class, p$coef, p$dpar, p$resp)
+    defaults <- defaults[!(prior_key(defaults) %in% prior_key(user_prior)),
+                         , drop = FALSE]
   }
   c(defaults, user_prior)
+}
+
+#' The default priors mvgam injects, for every response
+#'
+#' Each response gets the defaults its own family carries, re-aimed
+#' where its formula models the dpar they are set on. On a
+#' multivariate formula each default names its response, which brms
+#' needs to place it. Code generation injects these and `get_prior()`
+#' reports them, so the two read one definition.
+#'
+#' @param formula The observation formula
+#' @param family The family given beside it, validated
+#' @return A `brmsprior`, or `NULL` when no response's family carries
+#'   a default
+#' @noRd
+response_default_priors <- function(formula, family) {
+  forms <- response_formulas(formula)
+  families <- formula_families(formula, family)
+  rows <- lapply(names(forms), function(key) {
+    defaults <- adjust_modelled_dpar_priors(
+      family_default_priors(families[[key]]), forms[[key]],
+      families[[key]]
+    )
+    if (is.null(defaults) || nrow(defaults) == 0L) return(NULL)
+    if (inherits(formula, "mvbrmsformula")) defaults$resp <- key
+    defaults
+  })
+  rows <- Filter(Negate(is.null), rows)
+  if (!length(rows)) return(NULL)
+  do.call(c, unname(rows))
 }
 
 #' Re-aim injected dpar priors when the user models that dpar
@@ -1087,14 +1174,14 @@ family_default_priors <- function(family) {
 #' them, so nothing here needs the user's data frame.
 #'
 #' @noRd
-make_com_binomial_stanvars <- function() {
+make_com_binomial_stanvars <- function(trials = "trials") {
   brms::stanvar(
     name = "com_binomial_funs",
     scode = com_binomial_stan_funs(),
     block = "functions"
   ) +
     brms::stanvar(
-      scode = com_binomial_lookup_stan(),
+      scode = com_binomial_lookup_stan(trials),
       block = "tdata",
       position = "end"
     )
@@ -1116,12 +1203,19 @@ make_com_binomial_stanvars <- function() {
 #'
 #' The bound is taken from `trials` inside Stan rather than computed
 #' in R, so it follows whatever rows brms kept and cannot fall out
-#' of step with the response.
+#' of step with the response. brms names the denominator of one
+#' response of a multivariate model `trials_<resp>`, and one table
+#' serves every `com_binomial()` response, so its size is the
+#' largest denominator among them.
 #'
+#' @param trials The Stan names of the denominators the table serves
 #' @noRd
-com_binomial_lookup_stan <- function() {
+com_binomial_lookup_stan <- function(trials = "trials") {
+  checkmate::assert_character(trials, min.len = 1L, any.missing = FALSE)
+  bound <- Reduce(function(a, b) paste0("max(", a, ", ", b, ")"),
+                  paste0("max(", trials, ")"))
   paste(
-    "  int max_com_binomial_T = max(trials);",
+    paste0("  int max_com_binomial_T = ", bound, ";"),
     "  vector[max_com_binomial_T + 1] lfact_com_binomial;",
     "  for (k_lf in 0 : max_com_binomial_T) {",
     "    lfact_com_binomial[k_lf + 1] = lgamma(k_lf + 1);",
@@ -5305,7 +5399,7 @@ prepare_closure_unit_family <- function(family, data, response_var,
   family
 }
 
-#' Merge a custom family's mvgam_stanvars into the user's stanvars
+#' Merge the responses' custom-family stanvars into the user's
 #'
 #' Custom families built via [tweedie()] attach their function-
 #' block helpers + any data inputs in
@@ -5315,18 +5409,53 @@ prepare_closure_unit_family <- function(family, data, response_var,
 #' object. Built-in brms families have no attached stanvars and
 #' pass through unchanged.
 #'
+#' Every response's family contributes, since a custom family named
+#' by one response of a multivariate formula needs its functions as
+#' much as one given beside the formula. Responses sharing a family
+#' share its functions and data, which the program declares once;
+#' given different arguments they would declare one Stan name twice,
+#' which is refused. `com_binomial()` sizes its table from each of
+#' its responses' denominators, which brms suffixes by response.
+#'
 #' @param stanvars Existing stanvars object or NULL.
-#' @param family A `brmsfamily` / `customfamily` object.
+#' @param families A list of `brmsfamily` / `customfamily` objects,
+#'   one per response and named by response key, as
+#'   `formula_families()` returns them.
 #' @return A `brmsstanvars` object (or NULL when neither side
 #'   contributes anything).
 #' @noRd
-attach_family_stanvars <- function(stanvars, family) {
-  fam_stanvars <- attr(family, "mvgam_stanvars", exact = TRUE)
-  if (is.null(fam_stanvars)) return(stanvars)
-  checkmate::assert_class(fam_stanvars, "stanvars")
-  if (is.null(stanvars)) return(fam_stanvars)
-  checkmate::assert_class(stanvars, "stanvars")
-  stanvars + fam_stanvars
+attach_family_stanvars <- function(stanvars, families) {
+  checkmate::assert_list(families, min.len = 1L, names = "named")
+  suffixes <- if (length(families) > 1L) paste0("_", names(families)) else ""
+  served <- split(seq_along(families),
+                  vapply(families, resolve_family_name, character(1L)))
+  sets <- lapply(names(served), function(name) {
+    i <- served[[name]]
+    own <- lapply(families[i], attr, which = "mvgam_stanvars", exact = TRUE)
+    if (any(!vapply(own[-1L], identical, logical(1L), own[[1L]]))) {
+      stop(insight::format_error(c(
+        paste0("Two responses give '", name, "()' different arguments."),
+        x = "Its Stan data are declared once and shared between them.",
+        i = paste0("Give '", name, "()' the same arguments in every ",
+                   "response.")
+      )), call. = FALSE)
+    }
+    if (is_com_binomial_family(families[[i[1L]]])) {
+      return(make_com_binomial_stanvars(paste0("trials", suffixes[i])))
+    }
+    own[[1L]]
+  })
+  sets <- Filter(Negate(is.null), sets)
+  for (fam_stanvars in sets) {
+    checkmate::assert_class(fam_stanvars, "stanvars")
+    stanvars <- if (is.null(stanvars)) {
+      fam_stanvars
+    } else {
+      checkmate::assert_class(stanvars, "stanvars")
+      stanvars + fam_stanvars
+    }
+  }
+  stanvars
 }
 
 #' Pointwise log-likelihood for the beta negative binomial family

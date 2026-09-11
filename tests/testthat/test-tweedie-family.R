@@ -162,12 +162,11 @@ test_that("log_lik_tweedie matches mgcv::ldTweedie row-wise", {
 })
 
 test_that("attach_family_stanvars merges tweedie stanvars with user stanvars", {
-  fam <- tweedie()
   user_sv <- brms::stanvar(scode = "// user", block = "functions")
-  merged <- mvgam:::attach_family_stanvars(user_sv, fam)
+  merged <- mvgam:::attach_family_stanvars(user_sv, list(y = tweedie()))
   expect_s3_class(merged, "stanvars")
-  # User stanvar + tweedie's function block + M data = 3 entries.
-  expect_gte(length(merged), 3L)
+  # The user's stanvar, tweedie's function block and its `M` data.
+  expect_length(merged, 3L)
   scodes <- vapply(merged, function(sv) sv$scode, character(1))
   expect_true(any(grepl("// user", scodes)))
   expect_true(any(grepl("tweedie_lpdf", scodes)))
@@ -175,12 +174,30 @@ test_that("attach_family_stanvars merges tweedie stanvars with user stanvars", {
 })
 
 test_that("attach_family_stanvars passes through unchanged for built-in families", {
-  fam_gauss <- stats::gaussian()
+  fam_gauss <- list(y = stats::gaussian())
   expect_null(mvgam:::attach_family_stanvars(NULL, fam_gauss))
   user_sv <- brms::stanvar(scode = "// user", block = "functions")
   expect_identical(
     mvgam:::attach_family_stanvars(user_sv, fam_gauss),
     user_sv
+  )
+})
+
+test_that("two responses sharing a family declare its Stan code once", {
+  # A custom family named by one response of a multivariate formula
+  # needs its functions as much as one given beside the formula, and
+  # two responses sharing it share one declaration. Given different
+  # arguments they would declare `M` twice.
+  shared <- mvgam:::attach_family_stanvars(
+    NULL, list(a = tweedie(), b = poisson(), c = tweedie())
+  )
+  expect_length(shared, 2L)
+  expect_error(
+    mvgam:::attach_family_stanvars(
+      NULL, list(a = tweedie(M = 30L), b = tweedie(M = 40L))
+    ),
+    "Two responses give 'tweedie()' different arguments",
+    fixed = TRUE
   )
 })
 

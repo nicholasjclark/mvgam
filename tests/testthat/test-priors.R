@@ -846,7 +846,7 @@ test_that("merge_default_priors() drops defaults the user has claimed", {
                 brms::prior("gamma(2, 0.25)", class = "mtail"))
   user <- brms::prior("gamma(3, 1)", class = "shape")
 
-  merged <- mvgam:::merge_default_priors(defaults, user, y ~ 1)
+  merged <- mvgam:::merge_default_priors(defaults, user)
   expect_equal(sum(merged$class == "shape"), 1L)
   expect_true("gamma(3, 1)" %in% merged$prior)
   expect_false("gamma(2, 0.5)" %in% merged$prior)
@@ -857,12 +857,60 @@ test_that("merge_default_priors() drops defaults the user has claimed", {
 test_that("merge_default_priors() passes both sides through untouched", {
   defaults <- brms::prior("gamma(2, 0.5)", class = "shape")
   expect_equal(
-    nrow(mvgam:::merge_default_priors(defaults, NULL, y ~ 1)), 1L
+    nrow(mvgam:::merge_default_priors(defaults, NULL)), 1L
   )
   user <- brms::prior("normal(0, 1)", class = "b")
-  merged <- mvgam:::merge_default_priors(defaults, user, y ~ 1)
-  expect_setequal(merged$class, c("shape", "b"))
+  merged <- mvgam:::merge_default_priors(defaults, user)
+  expect_identical(merged$class, c("shape", "b"))
 })
+
+test_that("each response gets the defaults of its own family", {
+  # The defaults were read off the family given beside the formula,
+  # so a `beta_nb()` or `com_binomial()` response named inside a
+  # multivariate formula sampled under brms's fallbacks. Each default
+  # now names the response whose family carries it, and a user prior
+  # on one response replaces that response's default alone.
+  f <- bf(y ~ 1, family = beta_nb()) +
+    bf(k | trials(n) ~ 1, family = com_binomial()) +
+    bf(z ~ 1, family = poisson())
+  defaults <- mvgam:::response_default_priors(f, gaussian())
+  expect_identical(
+    paste(defaults$class, defaults$resp),
+    c("shape y", "mtail y", "nu k")
+  )
+  user <- brms::prior("normal(0, 2)", class = "nu", resp = "k")
+  merged <- mvgam:::merge_default_priors(defaults, user)
+  expect_identical(merged$prior[merged$class == "nu"], "normal(0, 2)")
+  expect_identical(sum(merged$class == "shape"), 1L)
+})
+
+test_that("get_prior() reports a family written inside bf() as the fit uses it", {
+  # A family inside `bf()` was left to brms, which reported its own
+  # fallbacks while the fit sampled under mvgam's defaults, and on a
+  # multivariate formula every response naming no family was reported
+  # as gaussian whatever `family` said.
+  d <- prior_test_data()
+  d$pos <- rgamma(nrow(d), 2, 1)
+  embedded <- get_prior(mvgam_formula(bf(y ~ 1, family = beta_nb())),
+                        data = d)
+  beside <- get_prior(mvgam_formula(y ~ 1), data = d, family = beta_nb())
+  expect_identical(embedded$prior[embedded$class == "shape"],
+                   beside$prior[beside$class == "shape"])
+  expect_identical(embedded$prior[embedded$class == "shape"],
+                   "gamma(2, 0.5)")
+  mv <- get_prior(
+    mvgam_formula(bf(y ~ 1, family = beta_nb()) + bf(pos ~ 1) +
+                    set_rescor(FALSE)),
+    data = d, family = Gamma(link = "log")
+  )
+  shape <- mv[mv$class == "shape", ]
+  expect_identical(shape$prior[shape$resp == "y"], "gamma(2, 0.5)")
+  # `pos` names no family and takes the gamma given beside the
+  # formula, whose shape brms defaults.
+  expect_identical(shape$prior[shape$resp == "pos"], "gamma(0.01, 0.01)")
+  expect_false(any(mv$class == "sigma"))
+})
+
 
 test_that("beta_nb() default priors can be overridden", {
   mf <- mvgam_formula(y ~ 1)

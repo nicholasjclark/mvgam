@@ -312,46 +312,49 @@ mvgam_imputation_forwarded <- c(
 #' @param backend Stan backend (defaults to "cmdstanr")
 #' @param combine Logical, pool multiple imputation results (default TRUE)
 #' @param family A description of the response distribution and link
-#'   function, given as a family function or a call to one. Supports
-#'   most brms families, including the ordinal families
+#'   function, given as a family function, a call to one or its name.
+#'   Supports most brms families, including the ordinal families
 #'   ([brms::cumulative()], [brms::sratio()], [brms::cratio()],
-#'   [brms::acat()]). Multi-category families needing a separate
-#'   linear predictor per response category are not supported here:
-#'   [brms::categorical()], [brms::multinomial()],
-#'   [brms::dirichlet()]. For those, use brms directly.
+#'   [brms::acat()]). The brms families needing a separate linear
+#'   predictor per response category, [brms::categorical()],
+#'   [brms::multinomial()] and [brms::dirichlet()], are refused: use
+#'   [categ()], [multi()] and [diri()], which take the categories in
+#'   long format and share one latent structure across them.
 #'
-#'   In a multivariate model each response may take its own family, in
-#'   which case name it inside that response's [brms::bf()]:
-#'   `bf(count ~ x, family = poisson()) + bf(seen ~ x, family =
-#'   bernoulli())`. Passing a list of families to this argument, as
-#'   [brms::brm()] allows, is not supported; the family belongs to the
-#'   response that names it. A single family given here applies to
-#'   every response that does not name one of its own.
+#'   A family written inside a univariate [brms::bf()] is the model's
+#'   family, as in brms. In a multivariate model each response may take
+#'   its own family, in which case name it inside that response's
+#'   [brms::bf()]: `bf(count ~ x, family = poisson()) + bf(seen ~ x,
+#'   family = bernoulli())`. Passing a list of families to this
+#'   argument, as [brms::brm()] allows, is not supported; the family
+#'   belongs to the response that names it. A single family given here
+#'   applies to every response that does not name one of its own.
+#'   Closure-unit and multi-response families ([occ()], [nmix()],
+#'   [mvn()], [mvt()], [diri()], [multi()], [categ()]) lay their data
+#'   out by unit, so each models its response alone and cannot be one
+#'   response of a multivariate model.
 #' @param threads Positive integer or `NULL`. When non-NULL the
 #'   model is compiled with `cpp_options$stan_threads = TRUE` and
 #'   cmdstanr passes `threads_per_chain = N` at sample time.
 #'   Closure-unit families (`nmix()`, `occ()`) and multi-response
-#'   families (`diri()`, `mvn()`, `mvt()`, `multinomial()`,
-#'   `categorical()`) thread their per-unit lpmf via `reduce_sum`;
-#'   brms-native families (`gaussian()`, `poisson()`, etc.) without
-#'   a `trend_formula` thread their lpmf loops via brms's
+#'   families (`diri()`, `mvn()`, `mvt()`, `multi()`, `categ()`)
+#'   thread their per-unit lpmf via `reduce_sum`; brms-native
+#'   families (`gaussian()`, `poisson()`, etc.) without a
+#'   `trend_formula` thread their lpmf loops via brms's
 #'   `partial_log_lik_lpmf`. For closure-unit families, expect
 #'   ~30-40% sampling throughput improvement at `threads = 4` on a
 #'   fixture with N_unit >= 50; smaller fixtures may see
 #'   thread-overhead-dominated regressions. The internal grainsize
 #'   is auto-tuned to ~8 chunks regardless of `threads`.
 #'
-#'   Combining `threads > 1` with a `trend_formula` on a brms-native
-#'   family is currently a no-op: mvgam's trend injector cannot find
-#'   the `mu` assignment once brms moves it inside
-#'   `partial_log_lik_lpmf`, so the code is compiled and sampled
-#'   serially. This covers every currently-supported trend model
-#'   under a brms-native family: `RW()`, `AR()`, `VAR()`, `VARMA()`,
-#'   `ZMVN()`, `CAR()`, and `PW()`. A per-fit warning is emitted so
-#'   the ignored `threads_per_chain` value is visible in any batch
-#'   script that fits repeatedly. The full fix (teaching the
-#'   injector to splice into `partial_log_lik_lpmf`) is filed as a
-#'   separate enhancement.
+#'   A brms-native family with a `trend_formula` samples serially
+#'   whatever `threads` says. brms moves the `mu` assignment inside
+#'   `partial_log_lik_lpmf` when it threads, where mvgam cannot add
+#'   the trend to it, so the program is built without threading.
+#'   This holds for every trend model under a brms-native family:
+#'   `RW()`, `AR()`, `VAR()`, `VARMA()`, `ZMVN()`, `CAR()` and
+#'   `PW()`. Each fit that drops the request warns, so a batch
+#'   script that fits repeatedly shows it every time.
 #' @param run_model Logical. Setting `run_model = FALSE` stops before
 #'   Stan parse, compile and sampling and returns a stub `mvgam`
 #'   object whose `$stancode` and `$standata` slots are populated but

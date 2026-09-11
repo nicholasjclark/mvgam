@@ -926,22 +926,16 @@ merge_user_priors <- function(default_priors, user_priors,
 #' `get_prior()` would advertise the brms fallback while the model
 #' sampled under mvgam's, which for `com_binomial()` means showing a
 #' positive-only `gamma(2, 0.1)` on a `nu` declared with `lb = -5`.
-#' Re-aiming runs first so a modelled dpar reports against the
-#' intercept row that actually exists.
+#' The defaults are the ones `response_default_priors()` gives the
+#' fit, one set per response.
 #'
 #' @param obs_priors The `brmsprior` returned by `brms::get_prior()`.
 #' @param formula The observation formula.
-#' @param family The family object, or NULL for embedded families.
+#' @param family The family given beside it, validated.
 #' @return `obs_priors` with mvgam's defaults substituted in place.
 #' @noRd
-overlay_family_default_priors <- function(obs_priors, formula,
-                                          family = NULL) {
-  if (is.null(family) || !inherits(family, "family")) {
-    return(obs_priors)
-  }
-  defaults <- adjust_modelled_dpar_priors(
-    family_default_priors(family), formula, family
-  )
+overlay_family_default_priors <- function(obs_priors, formula, family) {
+  defaults <- response_default_priors(formula, family)
   if (is.null(defaults) || nrow(defaults) == 0L) {
     return(obs_priors)
   }
@@ -1725,29 +1719,6 @@ get_prior.mvgam <- function(object, ...) {
   prior_summary.mvgam(object)
 }
 
-#' Detect Embedded Families in Formula Objects
-#'
-#' Checks if a formula object contains embedded family specifications
-#' (e.g., bf(y1 ~ x, family = poisson()) + bf(y2 ~ x, family = gaussian()))
-#'
-#' @param formula A formula, brmsformula, or mvbrmsformula object
-#' @return Logical indicating whether embedded families are present
-#' @noRd
-has_embedded_families <- function(formula) {
-  checkmate::assert_multi_class(formula, c("formula", "brmsformula", "mvbrmsformula"))
-
-  if (inherits(formula, "mvbrmsformula") && !is.null(formula$forms)) {
-    # Multivariate case: check if any bf() component has embedded family
-    return(any(sapply(formula$forms, function(x) !is.null(x$family))))
-  } else if (inherits(formula, "brmsformula")) {
-    # Single brmsformula with potential embedded family
-    return(!is.null(formula$family))
-  }
-
-  # Regular formula objects cannot have embedded families
-  return(FALSE)
-}
-
 #' Extract Prior Specifications for mvgam Formula Objects
 #'
 #' @description
@@ -1863,18 +1834,11 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
   formula <- object[[1]]  # object$formula triggers S3 dispatch issues
   trend_formula <- object[[2]]  # object$trend_formula
 
-  # Validate family parameter conditionally based on formula type
-  if (!has_embedded_families(formula)) {
-    checkmate::assert_class(family, "family")
-  }
-
-  # Validate formula structure before proceeding
-  if (length(formula) < 3) {
-    stop(insight::format_error(c(
-      "Formula missing response variable.",
-      i = "Ensure formula has form: y ~ predictors"
-    )))
-  }
+  # The family a univariate `bf()` names becomes the model's, and each
+  # response's family is checked, as they are when the model is built.
+  resolved <- resolve_observation_family(formula, family)
+  formula <- resolved$formula
+  family <- resolved$family
 
   # A formula declining every coefficient (`y ~ 0` for a pure-trend
   # state-space model) is built with a pinned placeholder, because
@@ -1882,19 +1846,12 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
   # table is read off the same formula the model is built from, and
   # the pin is hidden here as it is on a fit's stored table.
   injected <- inject_obs_zero_placeholder(formula, data, prior = NULL)
-  if (has_embedded_families(formula)) {
-    # Let brms handle embedded families - don't pass family parameter
-    obs_priors <- brms::get_prior(formula = injected$formula,
-                                  data = injected$data, ...)
-  } else {
-    # Pass family parameter for non-embedded cases
-    obs_priors <- brms::get_prior(formula = injected$formula,
-                                  data = injected$data,
-                                  family = family, ...)
-    obs_priors <- overlay_family_default_priors(
-      obs_priors, formula, family
-    )
-  }
+  # brms applies `family` to every response that names none, as the
+  # fit does.
+  obs_priors <- brms::get_prior(formula = injected$formula,
+                                data = injected$data,
+                                family = family, ...)
+  obs_priors <- overlay_family_default_priors(obs_priors, formula, family)
   obs_priors <- hide_obs_placeholder_prior(obs_priors)
 
   # Handle case where no trend formula is specified

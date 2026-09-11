@@ -338,7 +338,7 @@ new_mvgam_forecast <- function(object, type, resp, reported, training,
   pick <- function(x) if (is.null(x)) NULL else x[reported]
   structure(
     list(
-      family = resolve_family_name(get_family_for_resp(object, resp)),
+      family = resolve_family_name(model_families(object, resp)),
       family_pars = family_pars,
       type = type,
       series_names = factor(reported, levels = reported),
@@ -824,7 +824,7 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
   # sibling row, so they take the per-series cut like any other
   # family.
   if (type %in% c("expected", "response") &&
-        is_simplex_response_family(get_family_for_resp(object, resp))) {
+        is_simplex_response_family(model_families(object, resp))) {
     full <- hindcast_one_series(
       object, training$data, type, draw_idx, obs_uncertainty,
       process_error, resp = resp
@@ -880,7 +880,7 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
                                   obs_uncertainty,
                                   process_error = FALSE,
                                   resp = NULL) {
-  family <- get_family_for_resp(object, resp)
+  family <- model_families(object, resp)
   is_closure <- is_closure_unit_family(family)
 
   if (is_closure) {
@@ -1244,7 +1244,7 @@ build_forecast_arms <- function(object, trend_model, meta,
   if (type == "link") {
     return(arms_of(eta_full))
   }
-  family_for_arm <- get_family_for_resp(object, resp)
+  family_for_arm <- model_families(object, resp)
   if (type == "expected" || isTRUE(!obs_uncertainty)) {
     # `eta_full` is already sliced to `draw_idx`, so the extra
     # parameters a family's mean needs are read at those same
@@ -1806,7 +1806,7 @@ extract_family_pars_for_draws <- function(object, draws_mat,
                                             draw_idx, resp = NULL) {
   # A multivariate fit gives each response its own family, and the
   # dpars looked up are that response's.
-  fam_name <- resolve_family_name(get_family_for_resp(object, resp))
+  fam_name <- resolve_family_name(model_families(object, resp))
   dpar_names <- get_family_dpars(fam_name)
   if (length(dpar_names) == 0L) return(list())
   # For multivariate (mvbind / mvbrmsformula) fits, brms emits

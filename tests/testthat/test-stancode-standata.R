@@ -4273,6 +4273,96 @@ test_that("each response keeps its own rows whatever its column is called", {
 })
 
 
+test_that("a family written inside bf() is the model's family", {
+  # brms reads a family written inside `bf()` over the one given
+  # beside the formula. The likelihood followed it, while the fit
+  # recorded the default gaussian, so every post-fit method read the
+  # wrong family, and a custom family there never had its Stan
+  # functions added.
+  set.seed(4)
+  d <- data.frame(time = 1:30, series = factor("a"),
+                  cnt = rpois(30, 4), pos = rgamma(30, 2, 1))
+  pf <- mvgam(bf(cnt ~ 1, family = poisson()), data = d, run_model = FALSE)
+  expect_identical(family(pf)$family, "poisson")
+  expect_identical(pf$family$family, "poisson")
+  code <- stancode(mvgam_formula(bf(pos ~ 1, family = tweedie())), data = d)
+  expect_match(code, "target += tweedie_lpdf(Y | mu, mphi, mtheta, M);",
+               fixed = TRUE)
+  expect_match(code, "int<lower=1> M;", fixed = TRUE)
+  # The same model spelled with the family beside the formula.
+  expect_identical(
+    code,
+    stancode(mvgam_formula(pos ~ 1), data = d, family = tweedie())
+  )
+})
+
+
+test_that("a family is read in every spelling a model accepts", {
+  set.seed(4)
+  d <- data.frame(time = 1:30, series = factor("a"),
+                  cnt = rpois(30, 4), pos = rgamma(30, 2, 1))
+  by_call <- stancode(mvgam_formula(cnt ~ 1), data = d, family = poisson())
+  expect_identical(
+    stancode(mvgam_formula(cnt ~ 1), data = d, family = poisson),
+    by_call
+  )
+  expect_identical(
+    stancode(mvgam_formula(cnt ~ 1), data = d, family = "poisson"),
+    by_call
+  )
+  # mvgam's own families are built by their constructors, which brms
+  # cannot name.
+  expect_identical(
+    stancode(mvgam_formula(pos ~ 1), data = d, family = "tweedie"),
+    stancode(mvgam_formula(pos ~ 1), data = d, family = tweedie())
+  )
+  expect_error(
+    stancode(mvgam_formula(pos ~ 1), data = d,
+             family = c("tweedie", "log")),
+    "A link cannot be given with the family name 'tweedie'",
+    fixed = TRUE
+  )
+  # A family inside `bf()` meets the same checks as one beside it.
+  expect_error(
+    stancode(mvgam_formula(bf(cnt ~ 1, family = categorical())),
+             data = transform(d, cnt = factor(cnt %% 3))),
+    "Use categ()", fixed = TRUE
+  )
+})
+
+
+test_that("each response of a multivariate model gets its family's code", {
+  # Stan functions, data and default priors were read off the family
+  # given beside the formula, so a custom family named by one response
+  # left its likelihood calling a function the program never declared.
+  set.seed(5)
+  d <- data.frame(time = 1:30, series = factor("a"),
+                  pos = rgamma(30, 2, 1), cnt = rpois(30, 4),
+                  k = rbinom(30, 10, 0.4), n = 10L, y = rbinom(30, 1, 0.5))
+  f <- bf(pos ~ 1, family = tweedie()) +
+    bf(cnt ~ 1, family = beta_nb()) +
+    bf(k | trials(n) ~ 1, family = com_binomial()) + set_rescor(FALSE)
+  code <- stancode(mvgam_formula(f), data = d)
+  expect_match(code, "real tweedie_lpdf(", fixed = TRUE)
+  expect_match(code, "real beta_nb_lpmf(", fixed = TRUE)
+  expect_match(code, "int max_com_binomial_T = max(trials_k);", fixed = TRUE)
+  expect_match(code, "gamma_lpdf(shape_cnt | 2, 0.5)", fixed = TRUE)
+  expect_match(code, "normal_lpdf(nu_k | 1, 1)", fixed = TRUE)
+  # A closure-unit family lays its data out by unit, which one
+  # response among several cannot have.
+  expect_error(
+    stancode(mvgam_formula(bf(y ~ 1, family = occ()) + bf(cnt ~ 1)),
+             data = d),
+    "'occ()' cannot be one response of a multivariate model", fixed = TRUE
+  )
+  expect_error(
+    stancode(mvgam_formula(bf(k ~ 1, family = com_binomial()) + bf(cnt ~ 1)),
+             data = d),
+    "needs its number of trials"
+  )
+})
+
+
 test_that("multi-response fits with no NAs hit the fast no-op path", {
   # When no response has NAs, brms's listwise-deleted standata is
   # already per-response-correct and `expand_per_response_standata`

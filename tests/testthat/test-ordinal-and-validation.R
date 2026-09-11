@@ -319,9 +319,11 @@ test_that("a single-series ZMVN is flagged only when it is confounded", {
       series = factor(rep(paste0("s", seq_len(n)), each = 30))
     )
   }
+  # The build hands the check a validated family, which carries its
+  # distributional parameters.
   flagged <- function(tf, n, fam) {
     zmvn_scale_confounded(
-      parse_multivariate_trends(y ~ 1, tf), fam, mk(n)
+      parse_multivariate_trends(y ~ 1, tf), validate_family(fam), mk(n)
     )
   }
 
