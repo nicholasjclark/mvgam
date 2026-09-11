@@ -266,10 +266,6 @@ dimnames.mock_stanfit <- function(x) {
 #'   random effects are allowed
 #' @param sample_new_levels Character specifying how to sample new levels:
 #'   "uncertainty" or "gaussian"
-#' @param linpred_only Logical. If `TRUE`, return the prep object as soon
-#'   as the design matrices are built, skipping the distributional-
-#'   parameter (`dpars`) extraction. Used by callers that only need the
-#'   linear predictor (e.g. trend submodels). Defaults to `FALSE`.
 #' @param ... Additional arguments passed to brms::make_standata()
 #'
 #' @return A brmsprep object (S3 list) containing design matrices, formula
@@ -302,7 +298,6 @@ prepare_predictions.mock_stanfit <- function(x,
                                               re_formula = NULL,
                                               allow_new_levels = FALSE,
                                               sample_new_levels = "uncertainty",
-                                              linpred_only = FALSE,
                                               ...) {
   object <- x
   # Validate core object types
@@ -376,6 +371,7 @@ prepare_predictions.mock_stanfit <- function(x,
   # The response columns, keyed as brms keys the responses. The frame
   # takes the column; the family is looked up by the key.
   resp_vars <- response_columns(brmsfit$formula)
+  families <- formula_families(brmsfit$formula, brmsfit$family)
 
   # Add dummy values for missing OR NA response entries. Missing
   # column: brms's data_response requires the response to evaluate
@@ -386,11 +382,7 @@ prepare_predictions.mock_stanfit <- function(x,
   # brms's standata validation.
   for (key in names(resp_vars)) {
     rv <- resp_vars[[key]]
-    family_obj <- if (brms::is.mvbrmsformula(brmsfit$formula)) {
-      brmsfit$family[[key]]
-    } else {
-      brmsfit$family
-    }
+    family_obj <- families[[key]]
     # An ordinal response is an ordered factor, so a numeric dummy
     # cannot be written into the column: the assignment lands outside
     # the levels, stays NA, and brms rejects the newdata. Its first
@@ -455,90 +447,16 @@ prepare_predictions.mock_stanfit <- function(x,
     class = c("brmsprep", "mvgam_prep")
   )
 
-  # Linpred-only callers (trend submodel; see
-  # extract_component_linpred() in R/predictions.R) skip the dpar
-  # extraction entirely. Trend submodels carry per-LV process noise
-  # in `sigma_trend[]` (renamed by the `_trend` infix stripper to
-  # `sigma[]`); those are not observation-level residual SDs and
-  # the brms-style dpar lookup would misinterpret them as a
-  # `gaussian()$dpars = c("sigma")` per-row sigma matrix.
-  if (linpred_only) {
-    return(prep)
-  }
-
-  # Populate dpars based on model type. Three cases:
-  # - Nonlinear: mu computed from formula evaluation
-  # - Multivariate: per-response extraction with {dpar}_{resp} naming
-  # - Univariate: direct extraction from posterior
+  # A nonlinear formula's `mu` is its expression evaluated at the
+  # nonlinear parameters, which the linear-predictor composer reads
+  # from `dpars$mu`. Every other distributional parameter is resolved
+  # by `resolve_family_pars()`, which reads a sampled one off the
+  # draws and rebuilds a modelled one from its own formula.
   if (has_nlpars(brmsfit$formula)) {
     prep$dpars <- compute_nonlinear_dpars(prep, brmsfit$formula)
-  } else if (brms::is.mvbrmsformula(brmsfit$formula)) {
-    resp_names <- names(brmsfit$formula$forms)
-
-    if (is.null(resp_names) || length(resp_names) == 0) {
-      stop(insight::format_error(
-        cli::format_inline(
-          "Multivariate formula missing response names in {.field forms}."
-        )
-      ))
-    }
-
-    # Empty list is valid when all families have no dpars (e.g., poisson)
-    prep$dpars <- list()
-
-    for (resp_name in resp_names) {
-      family_obj <- brmsfit$family[[resp_name]]
-      family_name <- resolve_family_name(family_obj)
-      dpar_names <- get_family_dpars(family_name)
-
-      if (length(dpar_names) > 0) {
-        # brms stores per-response nobs as N_{response}
-        nobs_name <- paste0("N_", resp_name)
-        if (!nobs_name %in% names(sdata)) {
-          stop(insight::format_error(
-            cli::format_inline(
-              "Missing {.field {nobs_name}} in standata for response {.val {resp_name}}."
-            )
-          ))
-        }
-        nobs_resp <- sdata[[nobs_name]]
-
-        # brms names multivariate dpars as {dpar}_{response}
-        dpar_names_mv <- paste0(dpar_names, "_", resp_name)
-
-        dpars_resp <- extract_dpars_from_stanfit(
-          stanfit = draws,
-          dpar_names = dpar_names_mv,
-          ndraws = nrow(draws),
-          nobs = nobs_resp
-        )
-
-        # Store with original names for downstream compatibility
-        if (length(dpars_resp) > 0) {
-          names(dpars_resp) <- dpar_names
-          prep$dpars[[resp_name]] <- dpars_resp
-        }
-      }
-    }
-  } else {
-    # Univariate: mu computed via extract_linpred_from_prep()
-    family_name <- resolve_family_name(brmsfit$family)
-    dpar_names <- get_family_dpars(family_name)
-
-    if (length(dpar_names) > 0) {
-      dpars <- extract_dpars_from_stanfit(
-        stanfit = draws,
-        dpar_names = dpar_names,
-        ndraws = nrow(draws),
-        nobs = nrow(prediction_data)
-      )
-      if (length(dpars) > 0) {
-        prep$dpars <- dpars
-      }
-    }
   }
 
-  return(prep)
+  prep
 }
 
 

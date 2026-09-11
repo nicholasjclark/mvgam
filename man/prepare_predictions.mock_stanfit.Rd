@@ -11,7 +11,6 @@
   re_formula = NULL,
   allow_new_levels = FALSE,
   sample_new_levels = "uncertainty",
-  linpred_only = FALSE,
   ...
 )
 }
@@ -33,11 +32,6 @@ random effects are allowed}
 
 \item{sample_new_levels}{Character specifying how to sample new levels:
 "uncertainty" or "gaussian"}
-
-\item{linpred_only}{Logical. If \code{TRUE}, return the prep object as soon
-as the design matrices are built, skipping the distributional-
-parameter (\code{dpars}) extraction. Used by callers that only need the
-linear predictor (e.g. trend submodels). Defaults to \code{FALSE}.}
 
 \item{...}{Additional arguments passed to brms::make_standata()}
 }

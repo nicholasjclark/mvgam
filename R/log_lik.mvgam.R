@@ -151,31 +151,10 @@ log_lik.mvgam <- function(object,
     if (!is.null(resp)) {
       linpred <- linpred[[resp]]
     } else {
-      # Closure-unit families return at the unit grain
-      # (`[S x N_unit]`), which has fewer columns than the
-      # per-visit grain produced by every other family. Stitching
-      # the per-response matrices via `Reduce("+", ...)` would
-      # silently truncate or recycle, so multi-response closure-unit
-      # families are not supported here and the gap is flagged
-      # clearly instead.
+      # Every response here scores at the row grain: a closure-unit
+      # family cannot be one response of several, which
+      # `resolve_observation_family()` refuses at build.
       resp_names <- names(linpred)
-      mv_families <- model_families(object)[resp_names]
-      if (any(vapply(mv_families, is_closure_unit_family, logical(1)))) {
-        stop(insight::format_error(c(
-          paste0(
-            "Multivariate models with a closure-unit family are not ",
-            "supported by log_lik()."
-          ),
-          x = paste0(
-            "Responses with closure-unit families: ",
-            paste(resp_names[vapply(mv_families,
-                                    is_closure_unit_family,
-                                    logical(1))], collapse = ", "),
-            "."
-          ),
-          i = "Call log_lik() per response with `resp = '<name>'`."
-        )))
-      }
       per_resp <- lapply(resp_names, function(r) {
         log_lik_single_response(
           object = object,
@@ -313,46 +292,41 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
     ))
   }
 
-  # Distributional parameters (sigma, shape, hu, zi, ...) as
-  # [ndraws x nobs], whether each was sampled as a scalar or predicted
-  # by a formula of its own.
-  family_pars <- resolve_family_pars(
-    object,
-    dpar_names = get_family_dpars(family_name),
-    ndraws = nrow(linpred),
-    nobs = ncol(linpred),
-    draw_ids = draw_ids,
-    newdata = newdata,
-    resp = resp
-  )
-
-  # Ordinal families need threshold and disc draws from the posterior
-  # in addition to the standard dpars.
-  if (family_name %in% ORDINAL_FAMILIES) {
-    family_pars$thres <- extract_ordinal_thresholds(
-      object,
-      ndraws = nrow(linpred),
-      draw_ids = draw_ids
+  if (is_ordinal_family(family_obj)) {
+    # The observed level's probability, from the same category
+    # probabilities `posterior_epred()` reports.
+    family_pars <- list()
+    trials <- NULL
+    ll <- ordinal_log_lik(
+      ordinal_category_probs(
+        object, linpred, family_obj, draw_ids = draw_ids,
+        newdata = newdata, resp = resp
+      ),
+      y
     )
-    family_pars$disc <- extract_ordinal_disc(
+  } else {
+    # Distributional parameters (sigma, shape, hu, zi, ...) as
+    # [ndraws x nobs], whether each was sampled as a scalar or
+    # predicted by a formula of its own.
+    family_pars <- resolve_family_pars(
       object,
+      dpar_names = get_family_dpars(family_name),
       ndraws = nrow(linpred),
       nobs = ncol(linpred),
-      draw_ids = draw_ids
+      draw_ids = draw_ids,
+      newdata = newdata,
+      resp = resp
+    )
+    trials <- extract_trials_for_family(object, family_obj, newdata)
+    ll <- dispatch_log_lik(
+      family_name = family_name,
+      link = family_link,
+      linpred = linpred,
+      y = y,
+      family_pars = family_pars,
+      trials = trials
     )
   }
-
-  # Trials for binomial-family responses
-  trials <- extract_trials_for_family(object, family_obj, newdata)
-
-  ll <- dispatch_log_lik(
-    family_name = family_name,
-    link = family_link,
-    linpred = linpred,
-    y = y,
-    family_pars = family_pars,
-    trials = trials
-  )
 
   # `weights()`, `cens()` and `trunc()` each change what a row
   # contributes, and every information criterion reads this matrix, so
@@ -391,16 +365,10 @@ extract_response_for_log_lik <- function(object, newdata, resp) {
 }
 
 
-# Family dispatcher. Returns [ndraws x nobs] matrix of log densities.
-#
-# Extension hook: hierarchical detection-error families (nmix and
-# successors) need extra inputs beyond linpred + the standard dpars
-# (latent abundance draws, detection probabilities, capacity per
-# observation). Add them by extending `family_pars` upstream in
-# `log_lik.mvgam` (e.g. pulling `trend` / `detprob` / `cap` via
-# `as_draws_matrix(object, variable = ...)` when family_name == "nmix")
-# and reading them from `family_pars` inside the per-family helper. No
-# dispatcher changes needed.
+# Family dispatcher for the families scored one row at a time. Returns
+# [ndraws x nobs] matrix of log densities. The closure-unit and ordinal
+# families are scored before it is reached, by
+# `dispatch_closure_unit_method()` and `ordinal_log_lik()`.
 dispatch_log_lik <- function(family_name, link, linpred, y,
                              family_pars, trials) {
   fn_name <- paste0("log_lik_", family_name)
@@ -430,23 +398,6 @@ dispatch_log_lik <- function(family_name, link, linpred, y,
 # link string. Returns [ndraws x nobs] of log densities matching brms's
 # *_lpdf / *_lpmf parameterisations.
 
-# Apply the inverse link to a linpred matrix.
-.linkinv <- function(linpred, link) {
-  switch(link,
-    identity = linpred,
-    log = exp(linpred),
-    logit = stats::plogis(linpred),
-    probit = stats::pnorm(linpred),
-    cloglog = 1 - exp(-exp(linpred)),
-    inverse = 1 / linpred,
-    sqrt = linpred^2,
-    log1p = expm1(linpred),
-    stop(insight::format_error(
-      cli::format_inline("Unknown link function: {.val {link}}.")
-    ))
-  )
-}
-
 # Internal: the joint density of several responses measured at the
 # same occasions. Each element is `[ndraws x nobs]` at one grain,
 # with an all-`NA` column wherever that response was not measured.
@@ -471,10 +422,10 @@ sum_measured_arms <- function(per_resp) {
 .apply_log_density <- function(linpred, y, fn) {
   out <- matrix(NA_real_, nrow = nrow(linpred), ncol = ncol(linpred))
   for (j in seq_along(y)) {
-    # A missing response has no density. Families that branch on the
-    # response value (the hurdle, zero-inflated and ordinal kernels)
-    # would otherwise evaluate `if (NA)` and abort the whole call, so
-    # the column is left as NA and dropped downstream by `clean_ll()`.
+    # A missing response has no density. The hurdle and zero-inflated
+    # kernels branch on the response value and would otherwise
+    # evaluate `if (NA)`, aborting the whole call. The column is left
+    # `NA` instead, and `clean_ll()` drops it downstream.
     if (is.na(y[j])) {
       next
     }
@@ -577,7 +528,7 @@ log_lik_geometric <- function(linpred, link, y, family_pars, trials) {
 # Hurdle Poisson: P(Y=0) = hu; P(Y=k>0) = (1 - hu) * dpois(k|mu) /
 # (1 - exp(-mu))
 log_lik_hurdle_poisson <- function(linpred, link, y, family_pars, trials) {
-  mu <- .linkinv(linpred, link)
+  mu <- inv_link(linpred, link)
   hu <- family_pars$hu
   .apply_log_density(linpred, y, function(yj, j) {
     if (yj == 0) {
@@ -593,7 +544,7 @@ log_lik_hurdle_poisson <- function(linpred, link, y, family_pars, trials) {
 # Hurdle NegBin: P(Y=0) = hu; P(Y=k>0) = (1 - hu) * dnbinom(k|mu, shape) /
 # (1 - P(Y_NB = 0))
 log_lik_hurdle_negbinomial <- function(linpred, link, y, family_pars, trials) {
-  mu <- .linkinv(linpred, link)
+  mu <- inv_link(linpred, link)
   hu <- family_pars$hu
   shape <- family_pars$shape
   .apply_log_density(linpred, y, function(yj, j) {
@@ -610,7 +561,7 @@ log_lik_hurdle_negbinomial <- function(linpred, link, y, family_pars, trials) {
 
 # Hurdle Gamma: P(Y=0) = hu; P(Y>0) density = (1 - hu) * dgamma(y|shape, rate)
 log_lik_hurdle_gamma <- function(linpred, link, y, family_pars, trials) {
-  mu <- .linkinv(linpred, link)
+  mu <- inv_link(linpred, link)
   hu <- family_pars$hu
   shape <- family_pars$shape
   .apply_log_density(linpred, y, function(yj, j) {
@@ -643,7 +594,7 @@ log_lik_hurdle_lognormal <- function(linpred, link, y, family_pars, trials) {
 # P(Y=k>0) = (1 - zi) * dpois(k|mu)
 log_lik_zero_inflated_poisson <- function(linpred, link, y,
                                           family_pars, trials) {
-  mu <- .linkinv(linpred, link)
+  mu <- inv_link(linpred, link)
   zi <- family_pars$zi
   .apply_log_density(linpred, y, function(yj, j) {
     if (yj == 0) {
@@ -661,7 +612,7 @@ log_lik_zero_inflated_poisson <- function(linpred, link, y,
 
 log_lik_zero_inflated_negbinomial <- function(linpred, link, y,
                                               family_pars, trials) {
-  mu <- .linkinv(linpred, link)
+  mu <- inv_link(linpred, link)
   zi <- family_pars$zi
   shape <- family_pars$shape
   .apply_log_density(linpred, y, function(yj, j) {
@@ -680,7 +631,7 @@ log_lik_zero_inflated_negbinomial <- function(linpred, link, y,
 
 log_lik_zero_inflated_binomial <- function(linpred, link, y,
                                            family_pars, trials) {
-  prob <- .linkinv(linpred, link)
+  prob <- inv_link(linpred, link)
   zi <- family_pars$zi
   trials <- as.integer(trials)
   .apply_log_density(linpred, y, function(yj, j) {
@@ -699,7 +650,7 @@ log_lik_zero_inflated_binomial <- function(linpred, link, y,
 
 log_lik_zero_inflated_beta <- function(linpred, link, y,
                                        family_pars, trials) {
-  mu <- .linkinv(linpred, link)
+  mu <- inv_link(linpred, link)
   zi <- family_pars$zi
   phi <- family_pars$phi
   .apply_log_density(linpred, y, function(yj, j) {
@@ -710,45 +661,6 @@ log_lik_zero_inflated_beta <- function(linpred, link, y,
       a <- shapes$shape1
       b <- shapes$shape2
       log1p(-zi[, j]) + stats::dbeta(yj, shape1 = a, shape2 = b, log = TRUE)
-    }
-  })
-}
-
-# Ordinal cumulative model on a 1D linpred, using thresholds + disc from
-# posterior draws. brms parameterisation: P(Y <= k) = pnorm(thres[k] - eta * disc)
-# for probit link, or plogis for logit. Returns [ndraws x nobs] log densities.
-log_lik_cumulative <- function(linpred, link, y, family_pars, trials) {
-  if (is.null(family_pars$thres) || is.null(family_pars$disc)) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Ordinal log_lik requires {.field thres} and {.field disc} draws."
-      )
-    ))
-  }
-  thres <- family_pars$thres  # [ndraws x ncat-1]
-  disc <- family_pars$disc    # [ndraws x nobs] (scalar broadcast)
-  link_cdf <- switch(link,
-    logit = stats::plogis,
-    probit = stats::pnorm,
-    cloglog = function(x) 1 - exp(-exp(x)),
-    stop(insight::format_error(
-      cli::format_inline("Unsupported ordinal link: {.val {link}}.")
-    ))
-  )
-  ncat <- ncol(thres) + 1L
-  # Routed through the shared applier so the missing-response guard
-  # lives in one place rather than in each kernel that branches on
-  # the response value.
-  .apply_log_density(linpred, y, function(yj, j) {
-    yj <- as.integer(yj)
-    eta_j <- linpred[, j] * disc[, j]
-    if (yj == 1L) {
-      log(link_cdf(thres[, 1L] - eta_j))
-    } else if (yj == ncat) {
-      log1p(-link_cdf(thres[, ncat - 1L] - eta_j))
-    } else {
-      log(link_cdf(thres[, yj] - eta_j) -
-            link_cdf(thres[, yj - 1L] - eta_j))
     }
   })
 }

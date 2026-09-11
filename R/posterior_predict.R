@@ -319,6 +319,27 @@ apply_truncation <- function(samples, lb, ub, ntrys, ndraws, nobs,
 }
 
 
+#' Draw beta-binomial variates in the mean-precision parameterisation
+#'
+#' `extraDistr::rbbinom()` takes the two Beta shapes, while brms and
+#' mvgam both parameterise the family by a per-trial probability and a
+#' precision. Converting in one place keeps the two samplers that need
+#' it agreeing with `dbeta_binomial()` and with the Stan likelihood.
+#'
+#' @param n Number of variates
+#' @param size Trial counts
+#' @param mu Per-trial probability
+#' @param phi Precision
+#' @return Integer vector of length `n`
+#'
+#' @noRd
+rbeta_binomial_draws <- function(n, size, mu, phi) {
+  shapes <- beta_shapes(mu, phi)
+  probs <- stats::rbeta(n, shapes$shape1, shapes$shape2)
+  stats::rbinom(n, size = size, prob = probs)
+}
+
+
 #' Sample from a Probability Distribution
 #'
 #' Internal helper that samples from a specified distribution using
@@ -369,88 +390,17 @@ apply_truncation <- function(samples, lb, ub, ntrys, ndraws, nobs,
 #'   Required for: wiener
 #' @param bias Optional matrix `\\[ndraws x nobs\\]` of starting point bias (0-1).
 #'   Required for: wiener
-#' @param disc Optional matrix `\\[ndraws x nobs\\]` of discrimination (>0).
-#'   Required for: hurdle_cumulative. Defaults to 1 if NULL.
-#' @param thres Optional matrix \\[ndraws x nthres\\] of ordinal thresholds.
-#'   Required for: hurdle_cumulative
-#' @param link Character; link function for ordinal models.
-#'   Required for: hurdle_cumulative. Default "logit".
 #'
 #' @return Vector of sampled values with length = length(epred). Values are
 #'   integers for count families, doubles for continuous. Used internally
 #'   by posterior_predict.mvgam() which reshapes to `\\[ndraws x nobs\\]` matrix.
 #'
-#' @noRd
-
-
-# Apply the link's inverse CDF to the threshold offset arg = disc *
-# (thres - eta). Vectorised over both draws (rows) and thresholds
-# (columns) of thres.
-ordinal_linkinv <- function(arg, link) {
-  switch(link,
-    logit = stats::plogis(arg),
-    probit = stats::pnorm(arg),
-    probit_approx = stats::pnorm(arg),
-    cloglog = 1 - exp(-exp(arg)),
-    cauchit = stats::pcauchy(arg),
-    identity = arg,
-    stop(insight::format_error(
-      cli::format_inline("Unsupported ordinal link: {.val {link}}.")
-    ))
-  )
-}
-
-# Sample a category for each (draw, obs) under the cumulative family.
-# Returns a length(eta) vector of integers in 1..ncat. eta is a
-# [ndraws x nobs] matrix of link-scale linear predictors; thres is
-# [ndraws x nthres]; disc is a [ndraws x nobs] matrix or scalar.
-ordinal_sample <- function(eta, thres, disc = 1, link = "logit") {
-  ndraws <- nrow(eta)
-  nobs <- ncol(eta)
-  ncat <- ncol(thres) + 1L
-  out <- integer(length(eta))
-  for (j in seq_len(nobs)) {
-    disc_j <- if (is.matrix(disc)) disc[, j] else disc
-    cdf <- matrix(NA_real_, nrow = ndraws, ncol = ncat)
-    for (k in seq_len(ncat - 1L)) {
-      cdf[, k] <- ordinal_linkinv(disc_j * (thres[, k] - eta[, j]), link)
-    }
-    cdf[, ncat] <- 1
-    u <- stats::runif(ndraws)
-    cats <- rep.int(ncat, ndraws)
-    unmatched <- rep.int(TRUE, ndraws)
-    for (k in seq_len(ncat - 1L)) {
-      hit <- unmatched & u <= cdf[, k]
-      cats[hit] <- k
-      unmatched[hit] <- FALSE
-    }
-    out[((j - 1L) * ndraws + 1L):(j * ndraws)] <- cats
-  }
-  out
-}
-
-
-#' Draw beta-binomial variates in the mean-precision parameterisation
-#'
-#' `extraDistr::rbbinom()` takes the two Beta shapes, while brms and
-#' mvgam both parameterise the family by a per-trial probability and a
-#' precision. Converting in one place keeps the two samplers that need
-#' it agreeing with `dbeta_binomial()` and with the Stan likelihood.
-#'
-#' @param n Number of variates
-#' @param size Trial counts
-#' @param mu Per-trial probability
-#' @param phi Precision
-#' @return Integer vector of length `n`
+#' @details
+#' An ordinal family never reaches this sampler. Its predictive
+#' distribution is its category probabilities, and `ordinal_draws()`
+#' draws from those.
 #'
 #' @noRd
-rbeta_binomial_draws <- function(n, size, mu, phi) {
-  shapes <- beta_shapes(mu, phi)
-  probs <- stats::rbeta(n, shapes$shape1, shapes$shape2)
-  stats::rbinom(n, size = size, prob = probs)
-}
-
-
 sample_from_family <- function(family_name, ndraws, epred,
                                sigma = NULL, phi = NULL,
                                shape = NULL, nu = NULL,
@@ -459,10 +409,8 @@ sample_from_family <- function(family_name, ndraws, epred,
                                alpha = NULL, ndt = NULL, xi = NULL,
                                quantile = NULL, kappa = NULL,
                                beta = NULL, bs = NULL, bias = NULL,
-                               disc = NULL, thres = NULL,
                                mphi = NULL, mtheta = NULL,
                                mtail = NULL,
-                               link = "logit",
                                lb = NULL, ub = NULL, ntrys = 5) {
   checkmate::assert_string(family_name)
   checkmate::assert_int(ndraws, lower = 1)
@@ -839,35 +787,6 @@ sample_from_family <- function(family_name, ndraws, epred,
              stats::rlnorm(length(epred), meanlog = epred, sdlog = sigma))
     },
 
-    "hurdle_cumulative" = {
-      checkmate::assert_matrix(hu, nrows = ndraws, ncols = ncol(epred))
-      checkmate::assert_matrix(thres)
-      if (is.null(disc)) disc <- 1
-      ordinal_samples <- ordinal_sample(eta = epred, thres = thres,
-                                        disc = disc, link = link)
-      tmp <- stats::runif(length(epred))
-      ifelse(tmp < hu, 0L, ordinal_samples)
-    },
-
-    "cumulative" = {
-      checkmate::assert_matrix(thres)
-      if (is.null(disc)) disc <- 1
-      ordinal_sample(eta = epred, thres = thres, disc = disc,
-                     link = link)
-    },
-
-    "sratio" = ,
-    "cratio" = ,
-    "acat" = stop(insight::format_error(c(
-      cli::format_inline(
-        paste0("Posterior predictive sampling is unavailable for ",
-               "family {.val {family_name}}.")
-      ),
-      i = cli::format_inline(
-        "The supported ordinal family is {.val cumulative}."
-      )
-    ))),
-
     # ============ Unsupported families ============
 
     stop(insight::format_error(c(
@@ -995,7 +914,6 @@ get_family_dpars <- function(family_name) {
     hurdle_negbinomial = c("hu", "shape"),
     hurdle_gamma = c("hu", "shape"),
     hurdle_lognormal = c("hu", "sigma"),
-    hurdle_cumulative = c("hu", "disc"),
 
     # Custom mvgam families
     tweedie      = c("mphi", "mtheta"),
@@ -1024,10 +942,10 @@ get_family_dpars <- function(family_name) {
 #' and is the single seam the prediction paths go through so the two
 #' cases never have to be told apart at a call site.
 #'
-#' Names are the bare parameter names throughout. A multivariate fit
-#' stores its parameters suffixed with the response, but that suffix is
-#' an artefact of how brms writes the posterior, so it is applied on
-#' the way in and stripped on the way out.
+#' Names are the bare parameter names throughout. A model with several
+#' responses stores each response's parameters under its key,
+#' `response_suffix()` applies that on the way in and the result is
+#' keyed by the bare name again.
 #'
 #' @param object An `mvgam` model object
 #' @param dpar_names Bare names of the parameters the family declares
@@ -1035,7 +953,7 @@ get_family_dpars <- function(family_name) {
 #' @param nobs Number of rows the prediction covers
 #' @param draw_ids Draw indices to keep, or `NULL` for all
 #' @param newdata Data the prediction covers; `object$data` if `NULL`
-#' @param resp Response name for a multivariate fit, or `NULL`
+#' @param resp The response's key, or `NULL`
 #' @return Named list of `[ndraws x nobs]` matrices, keyed by bare
 #'   name. A parameter the posterior does not carry is left out.
 #'
@@ -1068,11 +986,7 @@ resolve_family_pars <- function(object, dpar_names, ndraws, nobs,
   }
 
   if (length(sampled) > 0) {
-    suffixed <- if (!is.null(resp) && nzchar(resp)) {
-      paste0(sampled, "_", resp)
-    } else {
-      sampled
-    }
+    suffixed <- paste0(sampled, response_suffix(object, resp))
     found <- extract_dpars_from_stanfit(
       stanfit = object$fit,
       dpar_names = suffixed,
@@ -1080,8 +994,8 @@ resolve_family_pars <- function(object, dpar_names, ndraws, nobs,
       nobs = nobs,
       draw_ids = draw_ids
     )
-    # `extract_dpars_from_stanfit()` drops a parameter it cannot find,
-    # so match names back rather than assuming the two lists align.
+    # `extract_dpars_from_stanfit()` leaves out a parameter it cannot
+    # find, and each name it returns is matched back to its bare one.
     names(found) <- sampled[match(names(found), suffixed)]
     out[names(found)] <- found
   }
@@ -1095,32 +1009,23 @@ resolve_family_pars <- function(object, dpar_names, ndraws, nobs,
 #' A distributional submodel such as `sigma ~ x` or `nu ~ z` is
 #' recorded by brms in `pforms` on the model formula. Such a parameter
 #' has no scalar counterpart in the posterior: it is a linear predictor
-#' evaluated per observation, so it has to be rebuilt from its
-#' coefficients rather than read off the draws. Non-linear parameters
-#' also live in `pforms`, so the names are intersected with the ones
-#' the family actually recognises.
+#' evaluated per observation, rebuilt from its coefficients. Non-linear
+#' parameters also live in `pforms`, and the names returned are only
+#' those the family declares.
 #'
 #' @param object An `mvgam` model object
 #' @param dpar_names Distributional parameters the family declares
-#' @param resp Response name for a multivariate fit, or `NULL`
+#' @param resp The response's key, or `NULL` for every response
 #' @return Character vector, possibly empty
 #'
 #' @noRd
 predicted_dpar_names <- function(object, dpar_names, resp = NULL) {
-  formula <- object$formula
-  if (is.null(formula)) {
-    return(character())
+  forms <- response_formulas(object)
+  if (!is.null(resp)) {
+    forms <- forms[resp]
   }
-  if (brms::is.mvbrmsformula(formula)) {
-    forms <- formula$forms
-    if (!is.null(resp) && nzchar(resp) && !is.null(forms[[resp]])) {
-      forms <- forms[resp]
-    }
-    named <- unlist(lapply(forms, function(f) names(f$pforms)))
-  } else {
-    named <- names(formula$pforms)
-  }
-  intersect(dpar_names, named %||% character())
+  named <- as.character(unlist(lapply(forms, function(f) names(f$pforms))))
+  intersect(dpar_names, named)
 }
 
 
@@ -1164,7 +1069,7 @@ predicted_dpar_draws <- function(object, dpar, nobs = NULL,
     )))
   }
   # The link is the one this response's family gives the parameter.
-  out <- as.matrix(.linkinv(linpred,
+  out <- as.matrix(inv_link(linpred,
                             dpar_link(model_families(object, resp), dpar)))
   if (!is.null(ndraws) && nrow(out) != ndraws) {
     stop(insight::format_error(c(
@@ -1233,6 +1138,60 @@ dpar_link <- function(family, dpar) {
 }
 
 
+#' Inverse of a brms link
+#'
+#' The one table of link inverses, covering every link brms offers,
+#' written as brms writes them. A `family$linkinv` is not always there
+#' to be asked: a distributional parameter's link lives in
+#' `link_<dpar>` as a name alone.
+#'
+#' @param x Numeric vector, matrix or array on the link scale
+#' @param link Name of the link
+#' @return `x` on the parameter's own scale, with its dimensions
+#' @noRd
+inv_link <- function(x, link) {
+  checkmate::assert_numeric(x)
+  checkmate::assert_string(link)
+  switch(
+    link,
+    identity = x,
+    log = exp(x),
+    logm1 = exp(x) + 1,
+    log1p = expm1(x),
+    inverse = 1 / x,
+    sqrt = x^2,
+    `1/mu^2` = 1 / sqrt(x),
+    tan_half = 2 * atan(x),
+    logit = stats::plogis(x),
+    probit = stats::pnorm(x),
+    probit_approx = stats::pnorm(x),
+    cauchit = stats::pcauchy(x),
+    cloglog = 1 - exp(-exp(x)),
+    softplus = log1p_exp(x),
+    squareplus = (x + sqrt(x^2 + 4)) / 2,
+    softit = {
+      y <- log1p_exp(x)
+      y / (1 + y)
+    },
+    stop(insight::format_error(paste0(
+      "Link '", link, "' has no inverse defined in mvgam."
+    )), call. = FALSE)
+  )
+}
+
+
+#' `log(1 + exp(x))`, kept finite where `exp(x)` overflows
+#'
+#' @param x Numeric vector, matrix or array
+#' @return `x` transformed, with its dimensions
+#' @noRd
+log1p_exp <- function(x) {
+  out <- log1p(exp(x))
+  out[is.infinite(out)] <- x[is.infinite(out)]
+  out
+}
+
+
 #' Extract Distributional Parameters from Stanfit Object
 #'
 #' Extracts posterior draws for distributional parameters (dpars) required by
@@ -1252,25 +1211,10 @@ dpar_link <- function(family, dpar) {
 #'   Parameters not found in the posterior return NULL.
 #'
 #' @details
-#' This function handles both scalar and observation-indexed parameters:
-#' \itemize{
-#'   \item Scalar parameters (e.g., "sigma"): broadcast to `\\[ndraws x nobs\\]`
-#'   \item Indexed parameters (e.g., "sigma\[1\]", "sigma\[2\]", ...): extracted
-#'     as matrix with nobs columns
-#' }
-#'
-#' Example of scalar broadcasting:
-#' If posterior contains "sigma" (scalar), and ndraws=100, nobs=50:
-#'   - Extracts 100 draws of scalar sigma
-#'   - Returns matrix \[100 x 50\] with each row containing the same sigma value
-#'
-#' Parameter naming follows brms conventions. Some families use different
-#' internal names:
-#' \itemize{
-#'   \item Beta precision: "phi" in family specification
-#'   \item Negative binomial shape: "shape" (may be "r" in some
-#'     parameterizations)
-#' }
+#' A scalar parameter such as `sigma`, or one written with a single
+#' index, is broadcast to `\\[ndraws x nobs\\]`. An indexed parameter
+#' with `nobs` columns is read one column per row. Any other width is
+#' refused, since none of its columns is a given row's value.
 #'
 #' @seealso `get_family_dpars()` for family-to-dpar mapping,
 #'   `sample_from_family()` which consumes these matrices.
@@ -1280,8 +1224,7 @@ extract_dpars_from_stanfit <- function(stanfit,
                                        dpar_names,
                                        ndraws,
                                        nobs,
-                                       draw_ids = NULL,
-                                       resp = NULL) {
+                                       draw_ids = NULL) {
   # Validate stanfit can be converted to draws
   checkmate::assert_multi_class(
     stanfit,
@@ -1325,12 +1268,9 @@ extract_dpars_from_stanfit <- function(stanfit,
   dpars_list <- list()
 
   for (dpar in dpar_names) {
-    # Build patterns for scalar and indexed parameters. brms's
-    # mvbf suffixes per-arm dpars with `_<resp>` (e.g.
-    # `shape_biomass`); for univariate fits no suffix is added.
-    suffix <- if (!is.null(resp)) paste0("_", resp) else ""
-    scalar_pattern <- paste0("^", dpar, suffix, "$")
-    indexed_pattern <- paste0("^", dpar, suffix, "\\[")
+    # `dpar_names` arrive already carrying any response suffix.
+    scalar_pattern <- paste0("^", dpar, "$")
+    indexed_pattern <- paste0("^", dpar, "\\[")
 
     # Find matching columns
     scalar_cols <- grep(scalar_pattern, all_cols, value = TRUE)
@@ -1366,11 +1306,12 @@ extract_dpars_from_stanfit <- function(stanfit,
         draws_mat[draw_indices, indexed_cols, drop = FALSE]
       )
 
-      # Handle dimension mismatch when training data has different nobs than
-      # prediction data (e.g., newdata in posterior_predict has fewer/more
-      # observations than the fitted model's observation-level parameters)
+      # One column is a scalar written with an index and is broadcast.
+      # Any other width has to be one value per row. A width that is
+      # neither belongs to some other axis, and no column of it is this
+      # row's value: keeping the first column put a trend's scale where
+      # the residual scale belonged.
       if (ncol(dpar_matrix) == 1) {
-        # Single indexed parameter - broadcast like scalar
         dpars_list[[dpar]] <- matrix(
           dpar_matrix[, 1],
           nrow = ndraws,
@@ -1378,27 +1319,14 @@ extract_dpars_from_stanfit <- function(stanfit,
           byrow = FALSE
         )
       } else if (ncol(dpar_matrix) == nobs) {
-        # Correct number of columns
         dpars_list[[dpar]] <- dpar_matrix
       } else {
-        # Dimension mismatch - use first column with warning
-        if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-          rlang::warn(
-            paste0(
-              "Parameter '", dpar, "' has ", ncol(dpar_matrix),
-              " columns but ", nobs, " observations. ",
-              "Using first column (scalar behavior)."
-            ),
-            .frequency = "once",
-            .frequency_id = paste0("dpar_dim_mismatch_", dpar)
-          )
-        }
-        dpars_list[[dpar]] <- matrix(
-          dpar_matrix[, 1],
-          nrow = ndraws,
-          ncol = nobs,
-          byrow = FALSE
-        )
+        stop(insight::format_error(c(
+          paste0("Parameter '", dpar, "' cannot be read one value per ",
+                 "row."),
+          x = paste0("It has ", ncol(dpar_matrix), " columns and the ",
+                     "prediction covers ", nobs, " rows.")
+        )), call. = FALSE)
       }
     } else {
       # Parameter not found - return NULL (caller handles defaults)
@@ -1565,158 +1493,87 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
     ndraws <- NULL
   }
 
-  # Closure-unit families intercept upstream because the per-visit
-  # sampling step needs joint-over-unit latent state draws (N for
-  # nmix, z for occ) plus the rebuilt closure-unit arrays from the
-  # current newdata; the generic linpred + sample_from_family path
-  # cannot produce that without the unit-level structure.
-  if (is_closure_unit_family(object$family)) {
-    predict_fn <- dispatch_closure_unit_method(object$family, "predict")
-    return(predict_fn(
-      object, newdata = newdata, draw_ids = draw_ids
-    ))
-  }
-
-  # Get ALL draws from linpred (returns list for multivariate without resp).
-  # Using linpred + inverse link (not posterior_epred) because for ZI/hurdle
-  # families, posterior_epred returns E[Y]=(1-zi)*mu, but sampling requires
-  # the raw mu parameter to apply zi/hu during sampling.
-  # `posterior_linpred()` is a sibling method, so it takes the
-  # user-facing `incl_autocor` rather than the `trend_state` that
-  # `get_combined_linpred()` reads.
-  linpred_all <- posterior_linpred(
+  # Sampling starts from the predictor. A hurdle or zero-inflated
+  # family draws its mixture from `mu` itself, which its mean
+  # `E[Y] = (1 - zi) * mu` no longer carries. `posterior_linpred()`
+  # is a sibling method and takes the user-facing `incl_autocor`.
+  # Under `process_error = TRUE` the predictor already carries the
+  # trend's innovations, and adding a second set here doubled the
+  # process variance.
+  linpred <- posterior_linpred(
     object,
     newdata = newdata,
     process_error = process_error,
     incl_autocor = incl_autocor,
-    ndraws = NULL,
+    draw_ids = draw_ids,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels,
     resp = resp
   )
 
-  # The trend's innovations are already carried on the linear
-  # predictor: `posterior_linpred()` composes them through
-  # `get_combined_linpred()` under `process_error = TRUE`. Sampling a
-  # second, independent set here added the process variance twice
-  # before the observation noise was drawn on top.
-
-  # Sample draw_ids ONCE for consistent subsampling across all responses
-  if (is.list(linpred_all) && !is.matrix(linpred_all)) {
-    total_draws <- nrow(linpred_all[[1]])
-  } else {
-    total_draws <- nrow(linpred_all)
+  # A model with several responses answers for each when `resp` names
+  # none, every response drawn at the same iterations.
+  if (is.list(linpred) && !is.matrix(linpred)) {
+    if (is.null(resp)) {
+      return(lapply(stats::setNames(nm = names(linpred)), function(r) {
+        draw_observations(object, linpred[[r]], newdata, draw_ids,
+                          resp = r)
+      }))
+    }
+    linpred <- linpred[[resp]]
   }
-
-  # A requested count became indices above, so either the caller named
-  # the draws it wants or every draw is used.
-  if (is.null(draw_ids)) {
-    draw_ids <- seq_len(total_draws)
-  }
-  if (max(draw_ids) > total_draws) {
-    stop(insight::format_error(c(
-      "Requested 'draw_ids' exceed available draws.",
-      x = paste0(
-        "Max requested: ", max(draw_ids),
-        ", available: ", total_draws, "."
-      )
-    )))
-  }
-  ndraws <- length(draw_ids)
-
-  # Multivariate detection (consistent with posterior_epred.mvgam)
-  is_mv <- inherits(object$formula, "mvbrmsformula") &&
-    !is.null(object$formula$forms) &&
-    length(object$formula$forms) > 1
-
-  if (is_mv && is.null(resp)) {
-    # Multivariate without resp: process each response with SAME draw_ids
-    resp_names <- names(linpred_all)
-    result_list <- lapply(resp_names, function(r) {
-      predict_single_response(
-        object = object,
-        linpred_resp = linpred_all[[r]],
-        resp = r,
-        draw_ids = draw_ids,
-        ndraws = ndraws,
-        newdata = newdata,
-        is_multivariate = TRUE
-      )
-    })
-    names(result_list) <- resp_names
-    return(result_list)
-  }
-
-  # Univariate or multivariate with resp specified
-  linpred_mat <- if (is.list(linpred_all)) linpred_all[[1]] else linpred_all
-  predict_single_response(
-    object = object,
-    linpred_resp = linpred_mat,
-    resp = resp,
-    draw_ids = draw_ids,
-    ndraws = ndraws,
-    newdata = newdata,
-    is_multivariate = is_mv
-  )
+  draw_observations(object, linpred, newdata, draw_ids, resp = resp)
 }
 
 
-#' Predict from a single response (helper for posterior_predict.mvgam)
+#' Draw one response's observations at its predictor
 #'
-#' Applies inverse link to linpred, extracts dpars, and samples from family.
-#' For ZI/hurdle families, uses raw mu (not deflated expected value) so that
-#' zi/hu can be applied during the sampling process itself.
+#' The one sampler `posterior_predict()`, `hindcast()` and `forecast()`
+#' share. A closure-unit family draws each unit's latent state and its
+#' visits together, and its kernel is handed the caller's predictor. A
+#' predictor the kernel rebuilt from the frame would lose the latent
+#' state a forecast carries past the grid, along with the trend and
+#' group-level choices `posterior_predict()` was given. An ordinal family
+#' draws a level from the category probabilities
+#' `ordinal_category_probs()` gives. Every other family draws from its
+#' own distribution at the inverse link of the predictor, with its
+#' distributional parameters, trials and truncation bounds read at the
+#' same draws.
 #'
-#' @param object mvgam model object
-#' @param linpred_resp Matrix \[total_draws x nobs\] of linear predictor
-#' @param resp Response name (NULL for univariate)
-#' @param draw_ids Integer vector of draw indices to use
-#' @param ndraws Number of draws (length of draw_ids)
-#' @param newdata Data frame for predictions
-#' @param is_multivariate Logical; TRUE if multivariate model
-#'
-#' @return Matrix `\\[ndraws x nobs\\]` of posterior predictive samples
-#'
+#' @param object A fitted `mvgam` object
+#' @param linpred `[ndraws x nobs]` link-scale predictor, its rows the
+#'   draws `draw_ids` names
+#' @param newdata Data the predictor was built for
+#' @param draw_ids Draws the predictor was taken at, or `NULL` for every
+#'   draw
+#' @param resp The response's key, or `NULL`
+#' @return `[ndraws x nobs]` matrix of draws
 #' @noRd
-predict_single_response <- function(object, linpred_resp, resp, draw_ids,
-                                    ndraws, newdata, is_multivariate) {
-  # Validate parameters
+draw_observations <- function(object, linpred, newdata, draw_ids,
+                              resp = NULL) {
   checkmate::assert_class(object, "mvgam")
-  checkmate::assert_matrix(linpred_resp)
-  checkmate::assert_integerish(draw_ids, lower = 1, any.missing = FALSE)
-  checkmate::assert_int(ndraws, lower = 1)
+  checkmate::assert_matrix(linpred)
   checkmate::assert_data_frame(newdata)
-  checkmate::assert_logical(is_multivariate, len = 1)
-  checkmate::assert_string(resp, null.ok = TRUE)
-
-  # For multivariate, resp must be specified
-  if (is_multivariate) {
-    checkmate::assert_string(resp, null.ok = FALSE)
-  }
-
-  # Subset linpred by draw_ids and apply inverse link
-  linpred <- linpred_resp[draw_ids, , drop = FALSE]
-  nobs <- ncol(linpred)
-
+  checkmate::assert_integerish(draw_ids, lower = 1, any.missing = FALSE,
+                               len = nrow(linpred), null.ok = TRUE)
   family <- model_families(object, resp)
-
-  # Closure-unit families need joint-over-unit sampling: draw
-  # the latent state (N for nmix, z for occ) per closure unit,
-  # then draw each visit's response conditional on that state.
-  # Intercept upstream so the generic per-row sample_from_family
-  # dispatch never sees a closure-unit family.
   if (is_closure_unit_family(family)) {
     predict_fn <- dispatch_closure_unit_method(family, "predict")
     return(predict_fn(
-      object, newdata = newdata, draw_ids = draw_ids
+      object, newdata = newdata, draw_ids = draw_ids, linpred = linpred
     ))
   }
+  if (is_ordinal_family(family)) {
+    return(ordinal_draws(ordinal_category_probs(
+      object, linpred, family, draw_ids = draw_ids, newdata = newdata,
+      resp = resp
+    )))
+  }
 
-  mu <- family$linkinv(linpred)
   family_name <- resolve_family_name(family)
-
-  # Get dpar names for this family
+  ndraws <- nrow(linpred)
+  nobs <- ncol(linpred)
   dpars <- resolve_family_pars(
     object,
     dpar_names = get_family_dpars(family_name),
@@ -1724,46 +1581,25 @@ predict_single_response <- function(object, linpred_resp, resp, draw_ids,
     nobs = nobs,
     draw_ids = draw_ids,
     newdata = newdata,
-    resp = if (is_multivariate) resp else NULL
+    resp = resp
   )
-
-  # Extract trials for binomial families
-  trials <- extract_trials_for_family(object, family, newdata)
-
-  # Extract constant truncation bounds if model has truncation
   trunc_bounds <- extract_truncation_bounds(object, nobs)
 
-  # Ordinal families need thres + disc draws and operate on the
-  # link-scale linear predictor rather than the response-scale mu.
-  if (family_name %in% ORDINAL_FAMILIES) {
-    dpars$thres <- extract_ordinal_thresholds(object, ndraws = ndraws,
-                                              draw_ids = draw_ids)
-    dpars$disc <- extract_ordinal_disc(object, ndraws = ndraws,
-                                       nobs = nobs, draw_ids = draw_ids)
-    epred_for_family <- linpred
-  } else {
-    epred_for_family <- mu
-  }
-
-  # Sample from family distribution. Forward whichever distributional
-  # parameters the registry produced for this family instead of naming
-  # them one at a time; a hand-written list silently drops the
-  # parameters of any family added afterwards. Names with no matching
-  # argument belong to families that draw through a different path.
+  # Every parameter the registry resolved is forwarded, so a family
+  # added later cannot lose one to a hand-written list. A name with no
+  # matching argument belongs to a family drawn through another path.
   dpar_args <- dpars[intersect(names(dpars),
                                names(formals(sample_from_family)))]
   samples <- do.call(sample_from_family, c(
     list(
       family_name = family_name,
       ndraws = ndraws,
-      epred = epred_for_family,
-      trials = trials,
+      epred = family$linkinv(linpred),
+      trials = extract_trials_for_family(object, family, newdata),
       lb = trunc_bounds$lb,
       ub = trunc_bounds$ub
     ),
     dpar_args
   ))
-
-  # Reshape vector to matrix [ndraws x nobs]
-  matrix(samples, nrow = ndraws, ncol = nobs, byrow = FALSE)
+  matrix(samples, nrow = ndraws, ncol = nobs)
 }

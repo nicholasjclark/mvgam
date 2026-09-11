@@ -15,9 +15,9 @@ epred_kernel_names <- function(ns) {
        value = TRUE)
 }
 
-# Values a mean kernel can be evaluated at for any family: `mu` on
-# the response scale, positive where a scale parameter is wanted, and
-# probabilities strictly inside the unit interval.
+# Values every mean kernel can be evaluated at: `mu` inside the unit
+# interval, which a probability and a discrete Weibull's location both
+# need, scales positive, and every other parameter inside its support.
 mk_prep <- function(ndraws = 5L, nobs = 4L, trials = NULL) {
   set.seed(7L)
   n <- ndraws * nobs
@@ -26,13 +26,19 @@ mk_prep <- function(ndraws = 5L, nobs = 4L, trials = NULL) {
     ndraws = ndraws,
     nobs = nobs,
     dpars = list(
-      mu = m(runif(n, 0.4, 3.0)),
+      mu = m(runif(n, 0.4, 0.9)),
       zi = m(runif(n, 0.1, 0.4)),
       hu = m(runif(n, 0.1, 0.4)),
+      zoi = m(runif(n, 0.1, 0.3)),
+      coi = m(runif(n, 0.2, 0.6)),
       shape = m(runif(n, 1.5, 4.0)),
       nu = m(runif(n, 2.5, 6.0)),
       sigma = m(runif(n, 0.5, 1.5)),
       phi = m(runif(n, 1.5, 4.0)),
+      quantile = m(runif(n, 0.2, 0.8)),
+      ndt = m(runif(n, 0.1, 0.3)),
+      bs = m(runif(n, 1.5, 3.0)),
+      bias = m(runif(n, 0.3, 0.7)),
       xi = m(rep(0, n))
     ),
     data = list()
@@ -41,43 +47,20 @@ mk_prep <- function(ndraws = 5L, nobs = 4L, trials = NULL) {
   prep
 }
 
-# Families whose mean is a closed form in `dpars` (plus trials).
-# Multi-category and ordinal kernels need a category axis and are
-# compared through the fixtures instead.
-kernel_is_pointwise <- function(nm) {
-  !sub("^posterior_epred_", "", nm) %in% c(
-    "categorical", "multinomial", "dirichlet", "dirichlet2",
-    "dirichlet_multinomial", "logistic_normal", "ordinal",
-    "cumulative", "sratio", "cratio", "acat", "custom", "mixture",
-    "gaussian_mv", "student_mv"
-  )
-}
 
-
-test_that("every shared pointwise epred kernel matches brms", {
-  shared <- sort(Filter(kernel_is_pointwise, intersect(
+test_that("every epred kernel mvgam shares with brms matches it", {
+  shared <- sort(intersect(
     epred_kernel_names("mvgam"), epred_kernel_names("brms")
-  )))
+  ))
   # An empty set would satisfy the loop without comparing anything.
-  expect_gt(length(shared), 10L)
+  expect_gt(length(shared), 30L)
 
   prep <- mk_prep(trials = c(10L, 20L, 5L, 8L))
-  checked <- 0L
   for (nm in shared) {
-    mv <- get(nm, envir = asNamespace("mvgam"))
-    br <- get(nm, envir = asNamespace("brms"))
-    a <- tryCatch(mv(prep), error = function(e) e)
-    b <- tryCatch(br(prep), error = function(e) e)
-    # A family this synthetic prep cannot drive errors on both sides
-    # and is left to the fixture comparison.
-    if (inherits(a, "error") || inherits(b, "error")) next
-    checked <- checked + 1L
-    expect_equal(unname(as.matrix(a)), unname(as.matrix(b)))
+    ours <- get(nm, envir = asNamespace("mvgam"))(prep)
+    theirs <- get(nm, envir = asNamespace("brms"))(prep)
+    expect_equal(unname(as.matrix(ours)), unname(as.matrix(theirs)))
   }
-  # The families carrying an extra parameter in their mean are the
-  # ones worth this test, so a run that reached only the trivial
-  # `mu` kernels has not covered it.
-  expect_gt(checked, 10L)
 })
 
 
@@ -220,7 +203,7 @@ test_that("a kernel is given every parameter its own mean formula names", {
   # simplex means take the fit itself and are driven on fixtures.
   kernels <- sort(Filter(function(k) {
     identical(names(formals(get(k, envir = ns))), "prep")
-  }, Filter(kernel_is_pointwise, epred_kernel_names("mvgam"))))
+  }, epred_kernel_names("mvgam")))
   expect_gt(length(kernels), 20L)
 
   set.seed(3L)

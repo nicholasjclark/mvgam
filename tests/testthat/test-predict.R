@@ -419,28 +419,41 @@ test_that("compute_family_epred validates inputs", {
   )
 })
 
-test_that("compute_family_epred handles multivariate input (list)", {
+test_that("a response's mean reads its own family and parameters", {
   set.seed(123)
-  linpred_list <- list(
+  linpred <- list(
     count = matrix(rnorm(20), nrow = 4, ncol = 5),
     biomass = matrix(rnorm(20, mean = 1), nrow = 4, ncol = 5)
   )
+  # The family beside the formula is neither response's.
+  obj <- structure(list(
+    formula = brms::bf(count ~ 1, family = poisson()) +
+      brms::bf(biomass ~ 1, family = brms::lognormal()),
+    family = gaussian(),
+    data = data.frame(count = 1:5, biomass = 1:5)
+  ), class = "mvgam")
 
-  family_list <- list(
-    count = list(family = "poisson", linkinv = exp),
-    biomass = list(family = "gaussian", linkinv = identity)
+  # The lognormal mean needs `sigma_biomass`, the name brms gives the
+  # response's own scale. A plain `sigma` belongs to no response, and
+  # asking for it was how a response named by `resp` lost its scale.
+  testthat::local_mocked_bindings(
+    extract_dpars_from_stanfit = function(stanfit, dpar_names, ndraws,
+                                          nobs, draw_ids = NULL) {
+      expect_identical(dpar_names, "sigma_biomass")
+      list(sigma_biomass = matrix(0.5, nrow = ndraws, ncol = nobs))
+    },
+    get_combined_linpred = function(..., resp = NULL) {
+      if (is.null(resp)) linpred else linpred[[resp]]
+    }
   )
 
-  epred <- compute_family_epred(linpred_list, family_list)
+  one <- posterior_epred(obj, draw_ids = 1:4, resp = "biomass")
+  expect_equal(one, exp(linpred$biomass + 0.5^2 / 2))
 
-  # Returns named list
-
-  expect_true(is.list(epred))
-  expect_named(epred, c("count", "biomass"))
-
-  # Each element correctly transformed
-  expect_equal(epred$count, exp(linpred_list$count))
-  expect_equal(epred$biomass, linpred_list$biomass)
+  both <- posterior_epred(obj, draw_ids = 1:4)
+  expect_named(both, c("count", "biomass"))
+  expect_equal(both$count, exp(linpred$count))
+  expect_equal(both$biomass, one)
 })
 
 # ==============================================================================
@@ -838,74 +851,6 @@ test_that("posterior_epred_asym_laplace uses quantile parameter", {
 })
 
 # ==============================================================================
-# Ordinal and Categorical Family Helper Tests
-# ==============================================================================
-
-test_that("insert_refcat inserts reference category correctly", {
-  # Matrix input: 2 draws x 3 non-reference categories
-  eta <- matrix(c(0.5, 1.0, 1.5, 0.8, 1.2, 1.8), nrow = 2, ncol = 3)
-
-  # Insert reference at position 1 (default)
-  result1 <- insert_refcat(eta, refcat = 1)
-  expect_equal(dim(result1), c(2, 4))
-  # Reference category should be 0
-
-  expect_true(all(result1[, 1] == 0))
-  # Other columns should match original
-  expect_equal(result1[, 2:4], eta)
-
-
-  # Insert reference at position 2 (middle)
-  result2 <- insert_refcat(eta, refcat = 2)
-  expect_equal(dim(result2), c(2, 4))
-  expect_true(all(result2[, 2] == 0))
-  expect_equal(result2[, 1], eta[, 1])
-  expect_equal(result2[, 3:4], eta[, 2:3])
-
-  # Insert reference at last position
-  result4 <- insert_refcat(eta, refcat = 4)
-  expect_equal(dim(result4), c(2, 4))
-  expect_true(all(result4[, 4] == 0))
-  expect_equal(result4[, 1:3], eta)
-})
-
-test_that("log_softmax computes numerically stable softmax", {
-  # Simple test case
-  eta <- matrix(c(1, 2, 3, 4, 5, 6), nrow = 2, ncol = 3)
-  result <- log_softmax(eta)
-
-  expect_equal(dim(result), dim(eta))
-
-  # Log-probabilities should sum to 0 in log space (exp sums to 1)
-  row_logsumexp <- log(rowSums(exp(result)))
-  expect_equal(row_logsumexp, rep(0, 2), tolerance = 1e-10)
-
-  # All values should be <= 0 (log of probability)
-  expect_true(all(result <= 0))
-
-  # Test with extreme values (numerical stability)
-  eta_extreme <- matrix(c(1000, 1001, 1002), nrow = 1, ncol = 3)
-  result_extreme <- log_softmax(eta_extreme)
-  expect_true(all(is.finite(result_extreme)))
-  expect_equal(log(sum(exp(result_extreme))), 0, tolerance = 1e-10)
-})
-
-test_that("dcumulative computes ordinal probabilities correctly", {
-  # 2 draws, 3 categories (2 thresholds)
-  eta <- c(0.5, 0.8)  # Linear predictor values for 2 draws
-  thres <- matrix(c(-1, 1, -0.5, 1.5), nrow = 2, ncol = 2)  # 2 thresholds
-
-  result <- dcumulative(x = 1:3, eta = eta, thres = thres, link = "logit")
-
-  expect_equal(dim(result), c(2, 3))
-  # Probabilities should sum to 1 for each draw
-  row_sums <- rowSums(result)
-  expect_equal(row_sums, rep(1, 2), tolerance = 1e-10)
-  # All probabilities should be in [0, 1]
-  expect_true(all(result >= 0 & result <= 1))
-})
-
-# ==============================================================================
 # extract_dpars_from_stanfit tests
 # ==============================================================================
 
@@ -1007,6 +952,18 @@ test_that("extract_dpars_from_stanfit handles indexed and missing params", {
     nobs = nobs
   )
   expect_equal(result_empty, list())
+})
+
+test_that("an indexed parameter on another axis is not read per row", {
+  # Two columns against three rows: a per-factor scale, say. Taking the
+  # first column put that scale on every row.
+  draws <- posterior::as_draws_matrix(
+    cbind(`sigma[1]` = c(0.2, 0.3), `sigma[2]` = c(0.4, 0.5))
+  )
+  expect_error(
+    extract_dpars_from_stanfit(draws, "sigma", ndraws = 2, nobs = 3),
+    "cannot be read one value per row"
+  )
 })
 
 test_that("extract_dpars_from_stanfit validates inputs correctly", {

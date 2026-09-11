@@ -88,17 +88,17 @@ A family \pkg{mvgam} holds a distribution function for is
 transformed through that function directly. This covers the
 single-parameter and location-scale families, the counts,
 \code{beta} and \code{beta_binomial}, \code{com_binomial()} and \code{tweedie()},
-and the multivariate \code{mvn()}, \code{mvt()} and \code{diri()}. A discrete
-family randomises within the interval its atom occupies,
-\verb{[F(y - 1), F(y)]}; a continuous one has no atom and the
-interval collapses to \code{F(y)}.
+the ordinal families, and the multivariate \code{mvn()}, \code{mvt()} and
+\code{diri()}. A discrete family randomises within the interval its
+atom occupies, \verb{[F(y - 1), F(y)]}; a continuous one has no atom
+and the interval collapses to \code{F(y)}.
 
 The mixtures and the closure-unit families -- zero-inflated,
-hurdle, ordinal, \code{mixture()}, \code{occ()}, \code{nmix()}, \code{multi()} and
-\code{categ()} -- have no single distribution function to name, and
-take an empirical PIT over \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} draws
-instead (the DHARMa / Hartig 2024 approach). The \code{Details}
-below give what that route costs.
+hurdle, \code{mixture()}, \code{occ()}, \code{nmix()}, \code{multi()} and \code{categ()}
+-- have no single distribution function to name, and take an
+empirical PIT over \code{\link[=posterior_predict.mvgam]{posterior_predict.mvgam()}} draws instead
+(the DHARMa / Hartig 2024 approach). The \code{Details} below give
+what that route costs.
 \item \code{"ordinary"} -- the predictive error \code{y - posterior_predict(y)}
 per draw. Matches \code{type = "ordinary"} in
 \code{\link[brms:residuals.brmsfit]{brms::residuals.brmsfit()}}.

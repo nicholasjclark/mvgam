@@ -284,7 +284,9 @@ mvgam_family_constructors <- function() {
 #'
 #' Every response's family is checked once, here. Closure-unit and
 #' multi-response families lay the data out by unit and write their
-#' likelihood for that layout, so each models its response alone.
+#' likelihood for that layout, and each models its response alone. An
+#' ordinal response's predictions read one set of thresholds for every
+#' observation, and thresholds that vary by group are refused.
 #'
 #' @param formula The observation formula
 #' @param family The family given beside it, in any spelling
@@ -300,6 +302,18 @@ resolve_observation_family <- function(formula, family) {
   }
   families <- formula_families(formula, family)
   lapply(families, validate_supported_family)
+  forms <- response_formulas(formula)
+  for (key in names(forms)) {
+    if (has_grouped_thresholds(forms[[key]], families[[key]])) {
+      stop(insight::format_error(c(
+        "mvgam does not support ordinal thresholds that vary by group.",
+        x = paste0("Response '", key, "' is written with ",
+                   "'thres(gr = )'."),
+        i = paste0("Its predictions read one set of thresholds for ",
+                   "every observation. Drop 'gr' from 'thres()'.")
+      )), call. = FALSE)
+    }
+  }
   alone <- Filter(function(f) {
     is_closure_unit_family(f) || is_multi_response_family(f)
   }, families)
@@ -313,6 +327,30 @@ resolve_observation_family <- function(formula, family) {
     )), call. = FALSE)
   }
   list(formula = formula, family = family)
+}
+
+#' Whether an ordinal response gives each group its own thresholds
+#'
+#' brms reads `thres(gr = g)` on the response side as one set of
+#' thresholds per level of `g`, sampled as `Intercept_1`,
+#' `Intercept_2` and so on.
+#'
+#' @param form One response's `brmsformula`
+#' @param family That response's family
+#' @return A single logical
+#' @noRd
+has_grouped_thresholds <- function(form, family) {
+  if (!is_ordinal_family(family)) {
+    return(FALSE)
+  }
+  thres <- brms::brmsterms(
+    brms::bf(form$formula, family = family)
+  )$adforms$thres
+  if (is.null(thres)) {
+    return(FALSE)
+  }
+  spec <- eval(thres[[2L]], list(resp_thres = brms::resp_thres))
+  !identical(spec$vars$gr, "NA")
 }
 
 #' Build the Stan stanvars bundle for the Tweedie family
@@ -5497,7 +5535,7 @@ log_lik_beta_nb <- function(linpred, link, y, family_pars, trials) {
   # beta_nb() restricts the response surface to the log link, which
   # is what keeps `mu` strictly positive.
   checkmate::assert_choice(link, "log")
-  mu <- .linkinv(linpred, link)
+  mu <- inv_link(linpred, link)
   shape <- family_pars$shape
   mtail <- family_pars$mtail
   checkmate::assert_matrix(shape, nrows = nrow(linpred),
@@ -5531,7 +5569,7 @@ log_lik_tweedie <- function(linpred, link, y, family_pars, trials) {
   # have produced positive values. tweedie() restricts the
   # surface to the log link.
   checkmate::assert_choice(link, "log")
-  mu <- .linkinv(linpred, link)
+  mu <- inv_link(linpred, link)
   mphi <- family_pars$mphi
   mtheta <- family_pars$mtheta
   checkmate::assert_matrix(mphi, nrows = nrow(linpred),
@@ -5862,7 +5900,7 @@ log_lik_com_binomial <- function(linpred, link, y,
   # Flatten to column-major (R default): rows fastest, then cols.
   # `outer(nu, lc) + outer(theta, x)` inside `cmb_lpmf_vec`
   # evaluates each unique `T` as a single block.
-  mu_flat <- as.numeric(.linkinv(linpred, link))
+  mu_flat <- as.numeric(inv_link(linpred, link))
   nu_flat <- as.numeric(nu)
   y_flat <- rep(y, each = ndraws)
   T_flat <- rep(trials, each = ndraws)
@@ -5888,7 +5926,7 @@ posterior_predict_com_binomial <- function(linpred, link,
                             ncols = ncol(linpred))
   ndraws <- nrow(linpred)
   nobs <- ncol(linpred)
-  mu_flat <- as.numeric(.linkinv(linpred, link))
+  mu_flat <- as.numeric(inv_link(linpred, link))
   nu_flat <- as.numeric(nu)
   T_flat <- rep(trials, each = ndraws)
   out_flat <- rcmb_vec(mu_flat, nu_flat, T_flat)
@@ -6045,11 +6083,9 @@ dispatch_closure_unit_method <- function(family, method_kind) {
 #' come from the same iterations.
 #'
 #' A count always resolves to indices, even one covering the whole
-#' posterior: the extractions subsample by drawing at random, and
-#' asking for every draw returns them in a random order rather than in
-#' the order they were sampled, so two extractions given the same
-#' count would still disagree. `NULL` comes back only when there is
-#' genuinely nothing to choose, meaning no count was asked for.
+#' posterior. Indices a caller already has come back unchanged, and
+#' each extraction checks them against the draws it reads. `NULL`
+#' comes back only when neither was asked for, meaning every draw.
 #'
 #' @param object An `mvgam` model object
 #' @param ndraws Requested number of draws, or `NULL`
@@ -7014,7 +7050,7 @@ log_lik_nmix <- function(linpred, link, y, family_pars, trials) {
   checkmate::assert_matrix(
     p_mat, nrows = nrow(linpred), ncols = ncol(linpred)
   )
-  lambda_visit <- .linkinv(linpred, link)
+  lambda_visit <- inv_link(linpred, link)
   ndraws <- nrow(linpred)
   N_unit <- arrays$N_unit
   y_int  <- as.integer(y)
@@ -8060,7 +8096,7 @@ log_lik_nmix_royle_nichols <- function(linpred, link, y,
   checkmate::assert_matrix(
     p_mat, nrows = nrow(linpred), ncols = ncol(linpred)
   )
-  lambda_visit <- .linkinv(linpred, link)
+  lambda_visit <- inv_link(linpred, link)
   ndraws <- nrow(linpred)
   N_unit <- arrays$N_unit
   y_int  <- as.integer(y)
@@ -8271,7 +8307,7 @@ log_lik_nmix_poisson_poisson <- function(linpred, link, y,
   checkmate::assert_matrix(
     p_mat, nrows = nrow(linpred), ncols = ncol(linpred)
   )
-  lambda_visit <- .linkinv(linpred, link)
+  lambda_visit <- inv_link(linpred, link)
   ndraws <- nrow(linpred)
   N_unit <- arrays$N_unit
   y_int  <- as.integer(y)
@@ -8481,7 +8517,7 @@ log_lik_occ <- function(linpred, link, y, family_pars, trials) {
   checkmate::assert_matrix(
     p_mat, nrows = nrow(linpred), ncols = ncol(linpred)
   )
-  psi_visit <- .linkinv(linpred, link)
+  psi_visit <- inv_link(linpred, link)
   ndraws <- nrow(linpred)
   N_unit <- arrays$N_unit
   y_int  <- as.integer(y)

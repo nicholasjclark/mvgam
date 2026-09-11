@@ -20,17 +20,17 @@
 #'   transformed through that function directly. This covers the
 #'   single-parameter and location-scale families, the counts,
 #'   `beta` and `beta_binomial`, `com_binomial()` and `tweedie()`,
-#'   and the multivariate `mvn()`, `mvt()` and `diri()`. A discrete
-#'   family randomises within the interval its atom occupies,
-#'   `[F(y - 1), F(y)]`; a continuous one has no atom and the
-#'   interval collapses to `F(y)`.
+#'   the ordinal families, and the multivariate `mvn()`, `mvt()` and
+#'   `diri()`. A discrete family randomises within the interval its
+#'   atom occupies, `[F(y - 1), F(y)]`; a continuous one has no atom
+#'   and the interval collapses to `F(y)`.
 #'
 #'   The mixtures and the closure-unit families -- zero-inflated,
-#'   hurdle, ordinal, `mixture()`, `occ()`, `nmix()`, `multi()` and
-#'   `categ()` -- have no single distribution function to name, and
-#'   take an empirical PIT over [posterior_predict.mvgam()] draws
-#'   instead (the DHARMa / Hartig 2024 approach). The `Details`
-#'   below give what that route costs.
+#'   hurdle, `mixture()`, `occ()`, `nmix()`, `multi()` and `categ()`
+#'   -- have no single distribution function to name, and take an
+#'   empirical PIT over [posterior_predict.mvgam()] draws instead
+#'   (the DHARMa / Hartig 2024 approach). The `Details` below give
+#'   what that route costs.
 #'
 #' * `"ordinary"` -- the predictive error `y - posterior_predict(y)`
 #'   per draw. Matches `type = "ordinary"` in
@@ -442,19 +442,22 @@ residuals_pred_args <- function(pp_args, resp) {
 # A discrete family carries an atom at each observed value, so the
 # Dunn-Smyth construction randomises over `[F(y - 1), F(y)]`. A
 # continuous one has no atom, both bounds are `F(y)`, and the
-# residual is a deterministic function of the draw. Returns NULL for
-# a family the spec does not name, which is what sends that family
-# to the empirical PIT.
+# residual is a deterministic function of the draw. An ordinal
+# family's distribution is its category probabilities, read through
+# `ordinal_category_probs()` as `log_lik()` reads them. Returns NULL
+# for any other family the spec does not name, which is what sends
+# that family to the empirical PIT.
 #'@noRd
 analytic_pit_bounds <- function(object, y, pp_args, d,
                                 draw_ids = NULL, resp = NULL) {
   family_obj <- model_families(object, resp)
   family_name <- resolve_family_name(family_obj)
+  ordinal <- is_ordinal_family(family_obj)
   # Whether a family has a spec depends on its name alone, so it is
   # settled before the predictor is computed: a family without one
   # takes the empirical route and must not pay for a prediction it
   # will not use.
-  if (!family_has_dist_spec(family_name, family_obj$link)) {
+  if (!ordinal && !family_has_dist_spec(family_name, family_obj$link)) {
     return(NULL)
   }
   # The spec applies the family's own inverse link, so it takes the
@@ -469,6 +472,15 @@ analytic_pit_bounds <- function(object, y, pp_args, d,
   # arm's matrix. Stating that is enough; a second code path to
   # narrow a list would be a branch nothing takes.
   checkmate::assert_matrix(linpred)
+  if (ordinal) {
+    return(ordinal_pit_bounds(
+      ordinal_category_probs(
+        object, linpred, family_obj, draw_ids = draw_ids, newdata = d,
+        resp = resp
+      ),
+      y
+    ))
+  }
   # A multi-response family keeps its parameters somewhere else: a
   # per-row scale and degrees of freedom, or a softmax probability
   # and the units its rows are grouped into. `log_lik()` reads them

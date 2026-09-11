@@ -373,8 +373,8 @@ test_that("predicted_dpar_names() names only what carries a formula", {
     class = c("mvgam", "brmsfit")
   )
   expect_equal(predicted_dpar_names(obj, c("sigma", "nu")), "sigma")
-  # Non-linear parameters live in `pforms` too, so the family's own
-  # parameters are the ones asked for.
+  # Non-linear parameters live in `pforms` too, and only the family's
+  # own parameters are asked for.
   expect_equal(predicted_dpar_names(obj, "nu"), character())
 
   scalar_only <- structure(

@@ -236,17 +236,16 @@ test_that("ordinal thresholds follow the draws of their predictor", {
   fit <- fit_ord
   draws <- posterior::as_draws_matrix(fit$fit)
   ids <- c(2L, 9L, 40L)
-  thres <- mvgam:::extract_ordinal_thresholds(
-    fit, ndraws = length(ids), draw_ids = ids
-  )
+  thres <- mvgam:::ordinal_thresholds(fit, draw_ids = ids)
   expect_equal(nrow(thres), length(ids))
   # The thresholds are the ones sampled at those iterations, not the
-  # first few rows of the posterior.
+  # first few rows of the posterior, and they are the ones that cut
+  # the uncentred predictor mvgam builds.
   expect_equal(as.numeric(thres[, 1]),
-               as.numeric(draws[ids, "Intercept[1]"]))
+               as.numeric(draws[ids, "b_Intercept[1]"]))
   expect_false(isTRUE(all.equal(
-    as.numeric(draws[ids, "Intercept[1]"]),
-    as.numeric(draws[seq_along(ids), "Intercept[1]"])
+    as.numeric(draws[ids, "b_Intercept[1]"]),
+    as.numeric(draws[seq_along(ids), "b_Intercept[1]"])
   )))
   # And the surfaces built on them honour a count.
   for (n in c(25L, ndraws(fit))) {

@@ -561,6 +561,23 @@ jsdgam_battery <- function(nm, spec, sim, fit) {
                      match(d$time, sort(unique(d$time))))
   })
 
+  test_that(says("a conditional prediction reads the fitted state"), {
+    # `incl_autocor = TRUE` asks for the latent state the sampler put
+    # at each row, where `FALSE` integrates it out, and the fitted
+    # state sits far closer to the data it was fitted to. A method
+    # that answered both requests from one predictor would give the
+    # two the same error. Measured, the conditional error is at most a
+    # quarter of the marginal one on all four families.
+    ok <- !is.na(d$y)
+    sq_err <- function(m) mean((colMeans(m)[ok] - d$y[ok])^2)
+    for (method in list(posterior_epred, posterior_predict)) {
+      marginal <- method(fit, newdata = d, draw_ids = 1:100)
+      conditional <- method(fit, newdata = d, draw_ids = 1:100,
+                            incl_autocor = TRUE)
+      expect_lt(sq_err(conditional), 0.5 * sq_err(marginal))
+    }
+  })
+
   test_that(says("the axis maps a frame without touching the draws"), {
     # Which species a row belongs to, and which occasions a frame
     # supplies, are settled from the axis record alone. Nothing here

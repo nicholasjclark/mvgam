@@ -530,5 +530,5 @@ dpar_posterior_linpred <- function(object, dpar, transform = FALSE,
   if (!transform) {
     return(linpred)
   }
-  .linkinv(linpred, dpar_link(family, dpar))
+  inv_link(linpred, dpar_link(family, dpar))
 }

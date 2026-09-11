@@ -210,10 +210,13 @@ validate_family <- function(family, link = NULL) {
 #' Validate Family is Supported by mvgam
 #'
 #' @description
-#' Checks that the family is supported by mvgam. Multi-category families
-#' (categorical, multinomial, dirichlet, etc.) are not supported because
-#' they require 3D linear predictors that cannot be combined with
-#' State-Space trend components.
+#' Checks that the family is supported by mvgam. brms's multi-category
+#' families model a matrix response through one linear predictor per
+#' category, while mvgam's trend adds to a single predictor per row,
+#' and the two cannot be composed. brms marks every such family with a
+#' special, `"categorical"`, `"multinomial"` or `"simplex"`, and each is
+#' pointed at the mvgam family that takes the same response in long
+#' format.
 #'
 #' @param family A family or brmsfamily object
 #'
@@ -227,25 +230,22 @@ validate_supported_family <- function(family) {
     checkmate::check_class(family, "customfamily"),
     combine = "or"
   )
-  # mvgam-side multi-response wrappers (diri / multi / categ / mvn /
-  # mvt) carry the `mvgam_multi_response` attribute and route a
-  # long-format K-row response through the closure-unit pipeline.
-  # The naked brms families that wrap K-1 per-category linear
-  # predictors with a reference category cannot compose with the
-  # mvgam factor-model trend; emit a single-line error pointing the
-  # user at the correct mvgam wrapper instead.
+  # mvgam's own multi-response families (diri / multi / categ / mvn /
+  # mvt) take a long-format K-row response through the closure-unit
+  # pipeline.
   if (is_multi_response_family(family)) {
     return(invisible(TRUE))
   }
-  pointer <- switch(
-    resolve_family_name(family) %||% "",
-    dirichlet       = "diri()",
-    multinomial     = "multi()",
-    categorical     = "categ()",
+  # `logistic_normal()` is also marked "simplex", so it is matched
+  # first.
+  wrappers <- c(
     logistic_normal = "mvn()",
-    NULL
+    categorical = "categ()",
+    multinomial = "multi()",
+    simplex = "diri()"
   )
-  if (!is.null(pointer)) {
+  pointer <- wrappers[intersect(names(wrappers), family$specials)][1L]
+  if (!is.na(pointer)) {
     stop(insight::format_error(paste0(
       "Family '", resolve_family_name(family),
       "' is not supported by mvgam directly. ",
@@ -839,9 +839,7 @@ addition_term_na_counts <- function(data, formulas) {
     if (is.null(f) || !length(lhs_columns(f))) {
       return(integer(0L))
     }
-    f <- if (inherits(f, "bform")) f else brms::bf(f)
-    forms <- if (inherits(f, "mvbrmsformula")) f$forms else list(f)
-    unlist(lapply(forms, function(form) {
+    unlist(lapply(unname(response_formulas(f)), function(form) {
       y <- response_columns(form)[[1L]]
       extra <- intersect(setdiff(lhs_columns(form), y), names(data))
       if (!length(extra) || is.null(data[[y]])) {

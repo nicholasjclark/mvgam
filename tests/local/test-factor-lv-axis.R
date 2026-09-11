@@ -1263,4 +1263,23 @@ test_that("pp_check and the plotting methods render", {
   }
 })
 
+
+test_that("a factor model's prediction reads its observation sigma", {
+  # The trend's `sigma_trend[1..n_lv]` sat beside the observation
+  # `sigma`, and an extraction nothing read took the pair for a
+  # per-row sigma and warned that it had kept the first column. That
+  # notice is raised outside testthat only, and this block turns the
+  # switch off to see it.
+  withr::local_envvar(TESTTHAT = "false")
+  ids <- 1:200
+  drawn <- with_warnings(posterior_predict(fit, draw_ids = ids))
+  expect_identical(drawn$warnings, character(0))
+  # A gaussian draw is its expectation plus Normal(0, sigma), so the
+  # spread between the two names the scale that was drawn with.
+  ep <- posterior_epred(fit, draw_ids = ids)
+  spread <- stats::sd(drawn$value - ep, na.rm = TRUE)
+  sigma <- mean(posterior::as_draws_matrix(fit$fit)[ids, "sigma"])
+  expect_equal(spread / sigma, 1, tolerance = 0.1)
+})
+
 cat("\nDone.\n")

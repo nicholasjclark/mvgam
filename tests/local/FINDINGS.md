@@ -796,48 +796,6 @@ A baseline run of `tests/local` is what added the two smooth methods
 to the table. This entry was first written from the methods that came
 to mind. Every fixture file added since has turned up another.
 
-## A notice about a parameter that was not used
-
-**78. A warning is raised on a computation that was right.**
-
-Found while chasing it as a suspected wrong answer. Predicting from a
-gaussian fit with a factor trend raises
-
-    Parameter 'sigma' has 2 columns but 600 observations.
-    Using first column (scalar behavior).
-
-The fit carries an observation `sigma` of one column and a
-`sigma_trend` of two, one per latent factor, so a two-column sigma is
-the trend's. The notice says the first column was taken, which on a
-gaussian would put the trend's innovation scale where the residual
-scale belongs and make every predictive interval too narrow.
-
-It does not. For a gaussian, a draw is the expectation plus
-`Normal(0, sigma)`, so the spread between the two says which parameter
-was used:
-
-| quantity | value | ratio to the observed spread |
-|---|---|---|
-| `sd(posterior_predict - posterior_epred)` | 0.3061 | |
-| observation `sigma` | 0.2859 | 1.07 |
-| `sigma_trend[1]` | 0.1600 | 1.91 |
-| `sigma_trend[2]` | 0.1603 | 1.91 |
-
-The draws were made with the observation sigma. The prediction is
-correct and the warning describes something that did not happen.
-
-Recorded because of what it costs rather than what it breaks. It
-reaches the ordinary prediction path of a gaussian factor model. It
-names a parameter the user never set and asserts a fallback that was
-not taken.
-
-It cannot be asserted where it appears. The notice carries "displayed
-once per session". A block written against it therefore reports what
-ran before it rather than anything the package did, which is the trap
-finding 10 records for the ggplot2 lifecycle notice. A reader who
-checks this one finds nothing wrong. The next warning on the same
-surface is the one they will skip.
-
 ## One model, two observation counts
 
 **87. `nobs()` counts the rows supplied rather than the rows fitted,

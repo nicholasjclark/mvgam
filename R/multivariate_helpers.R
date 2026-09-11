@@ -175,6 +175,24 @@ response_column <- function(object, resp = NULL) {
   unname(columns[[resp %||% 1L]])
 }
 
+#' The suffix brms gives one response's parameters
+#'
+#' A model with several responses names each response's parameters
+#' with its key appended, as in `sigma_count` or
+#' `b_count_Intercept`. A model with one response appends nothing,
+#' whichever `resp` a caller passed.
+#'
+#' @param object A fitted `mvgam` object
+#' @param resp The response's key, or `NULL`
+#' @return `""`, or `"_<resp>"`
+#' @noRd
+response_suffix <- function(object, resp = NULL) {
+  if (is.null(resp) || length(response_formulas(object)) == 1L) {
+    return("")
+  }
+  paste0("_", resp)
+}
+
 
 #' @noRd
 subset_obj_to_response <- function(obj, r) {

@@ -201,7 +201,7 @@ test_that("newdata = NULL returns hindcasts only, no forecasts", {
   # Standard families: hindcast pulls per-draw trend[t, s] from the
   # stanfit via extract_trend_latent_states, composes with the
   # per-draw obs-side linpred, then samples the response via
-  # predict_single_response.
+  # draw_observations.
   testthat::local_mocked_bindings(
     extract_trend_latent_states = function(mvgam_fit, newdata,
                                              full_draws,
@@ -212,10 +212,9 @@ test_that("newdata = NULL returns hindcasts only, no forecasts", {
                                            component, ...) {
       matrix(0, nrow = 3L, ncol = nrow(newdata))
     },
-    predict_single_response = function(object, linpred_resp, resp,
-                                         draw_ids, ndraws, newdata,
-                                         is_multivariate) {
-      matrix(2L, nrow = length(draw_ids), ncol = nrow(newdata))
+    draw_observations = function(object, linpred, newdata, draw_ids,
+                                 resp = NULL) {
+      matrix(2L, nrow = nrow(linpred), ncol = nrow(newdata))
     }
   )
   # Without `newdata` there are no occasions to forecast at, and a
@@ -319,10 +318,9 @@ test_that("All multivariate / PW trend types flow through dispatch", {
                                            component, ...) {
       matrix(0, nrow = 2L, ncol = nrow(newdata))
     },
-    predict_single_response = function(object, linpred_resp, resp,
-                                         draw_ids, ndraws, newdata,
-                                         is_multivariate) {
-      matrix(1L, nrow = length(draw_ids), ncol = nrow(newdata))
+    draw_observations = function(object, linpred, newdata, draw_ids,
+                                 resp = NULL) {
+      matrix(1L, nrow = nrow(linpred), ncol = nrow(newdata))
     }
   )
   # Asked of `hindcast()`, which is the surface this block's stubs

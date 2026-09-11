@@ -867,7 +867,7 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
 # directly from the stanfit (the same per-cell value Stan would
 # emit as `ypred` in generated quantities), compose with the
 # per-draw deterministic obs-side linpred, and dispatch the
-# family RNG via `predict_single_response`. Closure-unit
+# family RNG via `draw_observations`. Closure-unit
 # families keep their joint-over-unit marginalisation entries
 # through `posterior_epred` / `posterior_predict`.
 # `process_error` is carried on the signature for the
@@ -944,18 +944,14 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
       "trend" = fitted_states,
       "link" = linpred,
       "expected" = expected_from_linpred(
-        object, linpred, family, newdata = sub_data
+        object, linpred, newdata = sub_data, resp = resp
       ),
       "response" = if (isTRUE(obs_uncertainty)) {
-        predict_single_response(
-          object = object, linpred_resp = linpred,
-          resp = resp, draw_ids = seq_len(nrow(linpred)),
-          ndraws = nrow(linpred), newdata = sub_data,
-          is_multivariate = !is.null(resp)
-        )
+        draw_observations(object, linpred, sub_data, draw_ids = NULL,
+                          resp = resp)
       } else {
         expected_from_linpred(
-          object, linpred, family, newdata = sub_data
+          object, linpred, newdata = sub_data, resp = resp
         )
       }
     )
@@ -1244,24 +1240,20 @@ build_forecast_arms <- function(object, trend_model, meta,
   if (type == "link") {
     return(arms_of(eta_full))
   }
-  family_for_arm <- model_families(object, resp)
+  # `eta_full` is already sliced to `draw_idx`, and the parameters a
+  # family's mean or draw needs are read at those same iterations.
+  # Resolved independently, they came from a second subsample of the
+  # same size and paired `mu` with a `zi` or `shape` from an unrelated
+  # draw.
   if (type == "expected" || isTRUE(!obs_uncertainty)) {
-    # `eta_full` is already sliced to `draw_idx`, so the extra
-    # parameters a family's mean needs are read at those same
-    # iterations. Leaving them to be resolved independently draws a
-    # second subsample of the same size and pairs `mu` with a `zi`
-    # or `shape` from an unrelated draw.
-    expected <- expected_from_linpred(
-      object, eta_full, family_for_arm, newdata = fc_grid$data,
-      draw_ids = draw_idx
-    )
-    return(arms_of(expected))
+    return(arms_of(expected_from_linpred(
+      object, eta_full, newdata = fc_grid$data, draw_ids = draw_idx,
+      resp = resp
+    )))
   }
-  resp_mat <- sample_family_batched(object, eta_full, fc_grid$data,
-                                      ndraws_use, draw_idx,
-                                      family = family_for_arm,
-                                      resp = resp)
-  arms_of(resp_mat)
+  arms_of(draw_observations(
+    object, eta_full, fc_grid$data, draw_idx, resp = resp
+  ))
 }
 
 
@@ -1745,85 +1737,6 @@ slice_per_series <- function(mat, fc_grid, obs_struct,
 }
 
 
-# Internal: batched observation-family sampling. Calls
-# sample_from_family once on the `[ndraws_use, nobs_fc]` mean
-# matrix; draws dpars / trials / truncation bounds with the
-# matching `draw_ids` so they line up element-wise.
-#'@noRd
-sample_family_batched <- function(object, linpred, fc_data,
-                                    ndraws_use, draw_idx,
-                                    family = NULL, resp = NULL) {
-  family <- family %||% object$family
-  # A closure-unit family's draw reads sibling rows: a visit is a
-  # detection of its unit's one latent state, and a composition is
-  # drawn for the whole site at once. Each has a kernel that says how,
-  # and the family-name switch below has no branch for any of them, so
-  # every such forecast arm was refused as an unsupported family. The
-  # predictor is passed on rather than recomputed because a forecast
-  # propagates the latent state past the grid any frame describes.
-  if (is_closure_unit_family(family)) {
-    predict_fn <- dispatch_closure_unit_method(family, "predict")
-    return(predict_fn(
-      object, newdata = fc_data, draw_ids = draw_idx,
-      linpred = linpred
-    ))
-  }
-  # `resolve_family_name()` gives the name every dispatcher keys on:
-  # "gamma" for `stats::Gamma()`, and the constructor's own name for a
-  # custom family, which brms records as "custom".
-  family_name <- resolve_family_name(family)
-  # The family's own parameter, which is what the draw below is taken
-  # at. Applied here rather than by the caller so a caller reaching
-  # the closure-unit branch above cannot have flattened the predictor
-  # those kernels need.
-  mu <- family$linkinv(linpred)
-  nobs <- ncol(mu)
-  dpar_names <- get_family_dpars(family_name)
-  dpars <- resolve_family_pars(
-    object,
-    dpar_names = dpar_names,
-    ndraws = ndraws_use,
-    nobs = nobs,
-    draw_ids = draw_idx,
-    newdata = fc_data,
-    resp = resp
-  )
-  trials <- extract_trials_for_family(object, family, fc_data)
-  trunc_bounds <- extract_truncation_bounds(object, nobs)
-
-  if (family_name %in% ORDINAL_FAMILIES) {
-    dpars$thres <- extract_ordinal_thresholds(object,
-                                                ndraws = ndraws_use,
-                                                draw_ids = draw_idx)
-    dpars$disc <- extract_ordinal_disc(object,
-                                         ndraws = ndraws_use,
-                                         nobs = nobs,
-                                         draw_ids = draw_idx)
-  }
-
-  # Forward whichever distributional parameters the registry produced
-  # for this family instead of naming them one at a time. Reason: a
-  # hand-written list would silently drop the parameters of any family
-  # added afterwards, such as Tweedie's `mphi` / `mtheta`. Names with
-  # no matching argument belong to families that reach their draws
-  # through a different path.
-  dpar_args <- dpars[intersect(names(dpars),
-                               names(formals(sample_from_family)))]
-  samples <- do.call(sample_from_family, c(
-    list(
-      family_name = family_name,
-      ndraws = ndraws_use,
-      epred = mu,
-      trials = trials,
-      lb = trunc_bounds$lb,
-      ub = trunc_bounds$ub
-    ),
-    dpar_args
-  ))
-  matrix(samples, nrow = ndraws_use, ncol = nobs, byrow = FALSE)
-}
-
-
 # Internal: family-specific dpar draws for `type = "link"`
 # output. Picks the chosen draws from the precomputed
 # `draws_mat` so the returned `family_pars` slot lines up with
@@ -1836,29 +1749,23 @@ extract_family_pars_for_draws <- function(object, draws_mat,
   fam_name <- resolve_family_name(model_families(object, resp))
   dpar_names <- get_family_dpars(fam_name)
   if (length(dpar_names) == 0L) return(list())
-  # For multivariate (mvbind / mvbrmsformula) fits, brms emits
-  # one parameter per response with the response name suffixed
-  # (e.g. `sigma_y1`, `sigma_y2`). Caller passes `resp = "<r>"`
-  # to scope extraction to that response's columns; without the
-  # suffix the base `^<nm>(\\[|$)` pattern never matches and the
-  # extractor returns an empty list.
+  # A response of a model with several carries its parameters under
+  # its own key, as in `sigma_y1`.
+  suffix <- response_suffix(object, resp)
   out <- list()
   for (nm in dpar_names) {
-    pat <- if (!is.null(resp) && nzchar(resp)) {
-      paste0("^", nm, "_", resp, "(\\[|$)")
-    } else {
-      paste0("^", nm, "(\\[|$)")
-    }
+    pat <- paste0("^", nm, suffix, "(\\[|$)")
     cols <- grep(pat, colnames(draws_mat), value = TRUE)
     if (length(cols) == 0L) next
     # An indexed parameter is read back in the order its index
     # counts, not the order the names sort in: `sigma[10]` precedes
     # `sigma[2]` lexically and would put one observation's value on
     # another's row.
-    idx <- suppressWarnings(
-      as.integer(sub("^.*\\[(\\d+)\\]$", "\\1", cols))
-    )
-    if (!anyNA(idx)) cols <- cols[order(idx)]
+    indexed <- grepl("\\[[0-9]+\\]$", cols)
+    if (all(indexed)) {
+      cols <- cols[order(as.integer(sub("^.*\\[([0-9]+)\\]$", "\\1",
+                                        cols)))]
+    }
     out[[nm]] <- draws_mat[draw_idx, cols, drop = FALSE]
   }
   out

@@ -44,7 +44,7 @@ beta_shapes <- function(mu, phi, boundary_na = FALSE) {
 #' @noRd
 family_dist_spec <- function(family_name, link, linpred, family_pars,
                              trials) {
-  mu <- .linkinv(linpred, link)
+  mu <- inv_link(linpred, link)
   sigma <- family_pars$sigma
   shape <- family_pars$shape
   phi <- family_pars$phi

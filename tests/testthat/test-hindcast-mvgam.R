@@ -84,10 +84,9 @@ test_that("hindcast.mvgam returns mvgam_forecast with NULL forecast slots", {
                                            component, ...) {
       matrix(0, nrow = 3L, ncol = nrow(newdata))
     },
-    predict_single_response = function(object, linpred_resp, resp,
-                                         draw_ids, ndraws, newdata,
-                                         is_multivariate) {
-      matrix(2L, nrow = length(draw_ids), ncol = nrow(newdata))
+    draw_observations = function(object, linpred, newdata, draw_ids,
+                                 resp = NULL) {
+      matrix(2L, nrow = nrow(linpred), ncol = nrow(newdata))
     }
   )
   hc <- hindcast(fit, type = "response")
@@ -119,7 +118,7 @@ test_that("hindcast.mvgam type dispatch flows through expected helpers", {
   # Standard families: trend pulled per-draw from stanfit via
   # extract_trend_latent_states; obs linpred via
   # extract_component_linpred(component = 'obs'); response sampled
-  # via predict_single_response. Distinct constants per arm so we
+  # via draw_observations. Distinct constants per arm so we
   # can confirm the right helper was hit.
   testthat::local_mocked_bindings(
     extract_trend_latent_states = function(...) {
@@ -129,10 +128,9 @@ test_that("hindcast.mvgam type dispatch flows through expected helpers", {
                                            component, ...) {
       matrix(3, nrow = 2L, ncol = nrow(newdata))
     },
-    predict_single_response = function(object, linpred_resp, resp,
-                                         draw_ids, ndraws, newdata,
-                                         is_multivariate) {
-      matrix(13L, nrow = length(draw_ids), ncol = nrow(newdata))
+    draw_observations = function(object, linpred, newdata, draw_ids,
+                                 resp = NULL) {
+      matrix(13L, nrow = nrow(linpred), ncol = nrow(newdata))
     }
   )
 
@@ -166,8 +164,8 @@ test_that("obs_uncertainty = FALSE returns family mean for response", {
                                            component, ...) {
       matrix(2, nrow = 2L, ncol = nrow(newdata))
     },
-    predict_single_response = function(...) {
-      stop("predict_single_response should not be called when obs_uncertainty = FALSE")
+    draw_observations = function(...) {
+      stop("draw_observations should not be called when obs_uncertainty = FALSE")
     }
   )
   hc <- hindcast(fit, type = "response", obs_uncertainty = FALSE)
@@ -234,12 +232,9 @@ test_that("ndraws subset yields the requested rows", {
                                            component, ...) {
       matrix(0, nrow = 5L, ncol = nrow(newdata))
     },
-    predict_single_response = function(object, linpred_resp, resp,
-                                         draw_ids, ndraws, newdata,
-                                         is_multivariate) {
-      matrix(seq_len(5L * 8L), nrow = 5L, ncol = 8L)[
-        draw_ids, , drop = FALSE
-      ]
+    draw_observations = function(object, linpred, newdata, draw_ids,
+                                 resp = NULL) {
+      matrix(seq_len(5L * 8L), nrow = nrow(linpred), ncol = 8L)
     }
   )
   hc <- hindcast(fit, type = "response", ndraws = 2L)
@@ -308,10 +303,9 @@ test_that("Multi-series hindcast returns one matrix per series", {
                                            component, ...) {
       matrix(0, nrow = 2L, ncol = nrow(newdata))
     },
-    predict_single_response = function(object, linpred_resp, resp,
-                                         draw_ids, ndraws, newdata,
-                                         is_multivariate) {
-      matrix(0L, nrow = length(draw_ids), ncol = nrow(newdata))
+    draw_observations = function(object, linpred, newdata, draw_ids,
+                                 resp = NULL) {
+      matrix(0L, nrow = nrow(linpred), ncol = nrow(newdata))
     }
   )
   hc <- hindcast(fit, type = "response")
