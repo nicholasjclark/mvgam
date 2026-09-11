@@ -1847,18 +1847,11 @@ parse_trend_formula <- function(trend_formula, data = NULL, .precomputed_dimensi
     # trend and the Stan data cannot disagree about the grid.
     if (!is.null(.precomputed_dimensions)) {
       dimensions <- .precomputed_dimensions
-    } else if (!is.null(data)) {
-      stop(insight::format_error(c(
-        "Trend dimensions were not supplied alongside 'data'.",
-        x = "Series and time dimensions are needed to build the trend.",
-        i = paste0(
-          "This is an internal call; report it at ",
-          "https://github.com/nicholasjclark/mvgam/issues."
-        )
-      )), call. = FALSE)
     } else {
-      # No data provided - dimensions not needed for formula parsing only
-      dimensions <- NULL
+      stop_mvgam_fault(
+        "Trend dimensions were not supplied alongside 'data'.",
+        "Series and time dimensions are needed to build the trend."
+      )
     }
 
     # Add dimensions to trend_model for filtering if available

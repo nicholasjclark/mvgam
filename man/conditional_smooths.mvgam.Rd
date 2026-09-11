@@ -31,7 +31,7 @@ returned by \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}
 
 \item{smooths}{Optional character vector restricting which
 smooth terms to compute. \code{NULL} (default) returns every
-smooth on both the observation and trend formulas.}
+smooth of every predictor, the trend's included.}
 
 \item{int_conditions}{Optional named list. Each name is a
 covariate; each value either a numeric vector of conditioning

@@ -160,119 +160,25 @@ categorize_mvgam_parameters <- function(x) {
 }
 
 
-#' Extract Parameters by Type from mvgam Object
+#' The parameter names of one side of a fit
 #'
-#' Internal helper that extracts parameter names for a specific model
-#' component (observation or trend) from a fitted mvgam object.
+#' The observation side holds the family's parameters, the
+#' population-level coefficients, the smooths and the group-level terms
+#' of the observation model. The trend side holds the same of the trend
+#' model with its dynamics and loadings. The trend's state arrays are
+#' derived quantities and belong to neither.
 #'
-#' @param mvgam_fit A fitted mvgam object
-#' @param type Character string, either "observation" or "trend"
-#'
-#' @return Character vector of parameter names. Returns character(0) if
-#'   no parameters of the specified type are present.
-#'
+#' @param mvgam_fit A fitted `mvgam` object
+#' @param side `"obs"` or `"trend"`
+#' @return Character vector of Stan names, empty when the side has none
 #' @noRd
-extract_parameters_by_type <- function(mvgam_fit,
-  type = c("observation", "trend")) {
-  # Validate inputs
+side_parameters <- function(mvgam_fit, side) {
   checkmate::assert_class(mvgam_fit, "mvgam")
-  type <- match.arg(type)
-
-  # Get categorized parameters
-  categorized <- categorize_mvgam_parameters(mvgam_fit)
-
-  # Define which components to extract based on type
-  if (type == "observation") {
-    components <- c(
-      "observation_pars", "observation_betas",
-      "observation_smoothpars", "observation_re_params"
-    )
-  } else {
-    components <- c(
-      "trend_pars", "trend_betas",
-      "trend_smoothpars", "trend_re_params"
-    )
-  }
-
-  # Extract and combine parameter names from all components
-  param_names <- unlist(lapply(components, function(comp) {
-    if (!is.null(categorized[[comp]])) {
-      categorized[[comp]]$orig_name
-    } else {
-      character(0)
-    }
-  }))
-
-  # Ensure we return character(0) not NULL
-  if (is.null(param_names)) {
-    param_names <- character(0)
-  }
-
-  param_names
-}
-
-
-#' Extract Observation Parameters from mvgam Object
-#'
-#' Helper function that extracts all observation model parameter names from
-#' a fitted mvgam object. This includes family parameters, fixed effects,
-#' smooth parameters, and random effect parameters from the observation
-#' formula.
-#'
-#' @param mvgam_fit A fitted mvgam object
-#'
-#' @return A character vector of observation parameter names. Returns an
-#'   empty character vector (character(0)) if the model has no observation
-#'   parameters (which would be unusual for most fitted models).
-#'
-#' @details
-#' Internally calls `categorize_mvgam_parameters()` and combines the
-#'   following components:
-#' \itemize{
-#'   \item observation_pars: Family parameters (sigma, shape, nu, phi, zi,
-#'     hu)
-#'   \item observation_betas: Fixed effect coefficients
-#'   \item observation_smoothpars: Smooth parameters (s_, sds_)
-#'   \item observation_re_params: Random effect parameters (sd_, r_, cor_)
-#' }
-#'
-#' @noRd
-extract_obs_parameters <- function(mvgam_fit) {
-  extract_parameters_by_type(mvgam_fit, type = "observation")
-}
-
-
-#' Extract Trend Parameters from mvgam Object
-#'
-#' Helper function that extracts all trend model parameter names from a
-#' fitted mvgam object. This includes trend dynamics parameters, fixed
-#' effects, smooth parameters, and random effect parameters from the trend
-#' formula. Excludes computed trend state arrays.
-#'
-#' @param mvgam_fit A fitted mvgam object
-#'
-#' @return A character vector of trend parameter names. Returns an empty
-#'   character vector (character(0)) if the model has no trend parameters
-#'   (e.g., pure brms models with trend_formula = NULL).
-#'
-#' @details
-#' Internally calls `categorize_mvgam_parameters()` and combines the
-#'   following components:
-#' \itemize{
-#'   \item trend_pars: Trend dynamics parameters (AR coefficients,
-#'     innovation SDs, correlations, factor loadings)
-#'   \item trend_betas: Fixed effect coefficients from trend formula
-#'   \item trend_smoothpars: Smooth parameters from trend formula
-#'     (s_, sds_)
-#'   \item trend_re_params: Random effect parameters from trend formula
-#'     (sd_, r_, cor_)
-#' }
-#'
-#' Note: Computed trend state arrays (trend\[i,j\], lv_trend\[i,j\],
-#'   innovations_trend\[i,j\]) are excluded as they are derived
-#'   quantities, not model parameters.
-#'
-#' @noRd
-extract_trend_parameters <- function(mvgam_fit) {
-  extract_parameters_by_type(mvgam_fit, type = "trend")
+  checkmate::assert_choice(side, c("obs", "trend"))
+  prefix <- if (identical(side, "obs")) "observation" else "trend"
+  buckets <- categorize_mvgam_parameters(mvgam_fit)[
+    paste0(prefix, c("_pars", "_betas", "_smoothpars", "_re_params"))
+  ]
+  as.character(unlist(lapply(buckets, `[[`, "orig_name"),
+                      use.names = FALSE))
 }

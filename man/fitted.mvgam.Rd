@@ -31,9 +31,9 @@
 used. This is what makes the call "fitted" rather than a general
 prediction.}
 
-\item{re_formula}{Formula for random effects. If \code{NULL} (the
-default), all random effects are included. Use \code{NA} to exclude
-all random effects.}
+\item{re_formula}{Group-level terms to include: \code{NULL} (the default)
+for every one, \code{NA} for none. A formula choosing some of them is not
+supported.}
 
 \item{scale}{Character; one of \code{"response"} (default) or \code{"linear"}.
 \code{"response"} returns expected values on the response scale via

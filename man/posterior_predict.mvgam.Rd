@@ -68,8 +68,9 @@ use. NULL (default) uses all available draws.}
 draw indices to use. NULL (default) uses all draws (subject to
 \code{ndraws}).}
 
-\item{re_formula}{Formula for random effects. NULL (default) includes
-all random effects, NA excludes all random effects.}
+\item{re_formula}{Group-level terms to include: \code{NULL} (the default)
+for every one, \code{NA} for none. A formula choosing some of them is not
+supported.}
 
 \item{allow_new_levels}{Logical; accepted for brms compatibility.
 A grouping level the model never saw is refused whatever this is

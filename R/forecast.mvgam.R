@@ -887,15 +887,13 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
     full <- switch(
       type,
       "trend" = extract_component_linpred(
-        mvgam_fit = object, newdata = sub_data,
-        component = "trend", incl_latent_state = TRUE
+        mvgam_fit = object, newdata = sub_data, component = "trend"
       ),
       "link" = extract_component_linpred(
         mvgam_fit = object, newdata = sub_data,
         component = "obs", resp = resp
       ) + extract_component_linpred(
-        mvgam_fit = object, newdata = sub_data,
-        component = "trend", incl_latent_state = TRUE
+        mvgam_fit = object, newdata = sub_data, component = "trend"
       ),
       "expected" = posterior_epred(
         object, newdata = sub_data, ndraws = NULL,
@@ -1084,16 +1082,14 @@ build_forecast_arms <- function(object, trend_model, meta,
   has_trend_lp <- !is.null(object$trend_model)
   trend_lp_fc <- if (has_trend_lp) {
     extract_component_linpred(
-      mvgam_fit = object, newdata = fc_grid$data,
-      component = "trend", incl_latent_state = FALSE
+      mvgam_fit = object, newdata = fc_grid$data, component = "trend"
     )
   } else {
     NULL
   }
   trend_lp_tail <- if (has_trend_lp && !is.null(tail_data)) {
     extract_component_linpred(
-      mvgam_fit = object, newdata = tail_data,
-      component = "trend", incl_latent_state = FALSE
+      mvgam_fit = object, newdata = tail_data, component = "trend"
     )
   } else {
     NULL

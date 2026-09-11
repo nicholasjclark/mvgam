@@ -13,14 +13,17 @@ smooths(x)
 \item{x}{A fitted \code{mvgam} object.}
 }
 \value{
-A character vector of canonical smooth labels. Empty
-if the fit has no smooth terms.
+A character vector of canonical smooth labels, one per
+term of each predictor, in the order the panels of
+\code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}} take. Empty if the fit has no
+smooth terms.
 }
 \description{
-Returns the canonical term labels for every \code{s()}, \code{t2()},
-\code{ti()}, or \code{te()} smooth on either the observation formula or
-the trend formula of a fitted \code{mvgam} object. Useful for
-picking a term to pass to \code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}} or
+Returns the canonical term labels for every \code{s()} or \code{t2()}
+smooth of every predictor of a fitted \code{mvgam} object: each
+response's mean, each distributional or non-linear parameter
+given a formula, and the trend. Useful for picking a term to
+pass to \code{\link[=posterior_smooths.mvgam]{posterior_smooths.mvgam()}} or
 \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}.
 }
 \author{

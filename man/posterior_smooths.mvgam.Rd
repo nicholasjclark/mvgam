@@ -26,11 +26,15 @@ appears in the formula (e.g. \code{"s(x)"},
 \code{\link[=smooths.mvgam]{smooths.mvgam()}} to enumerate the available terms.}
 
 \item{newdata}{Optional \code{data.frame} to evaluate the smooth
-at. \code{NULL} (the default) uses the training data.}
+at. \code{NULL} (the default) uses the training data. It needs to
+carry only the smooth's own variables.}
 
-\item{resp, dpar, nlpar}{Retained for brms-parity. mvgam fits
-are currently univariate on a single distributional
-parameter; supplying non-\code{NULL} values raises an error.}
+\item{resp}{The response the smooth belongs to, required on a
+model with several.}
+
+\item{dpar, nlpar}{The distributional or non-linear parameter the
+smooth belongs to. Name at most one; the mean is read when both
+are \code{NULL}.}
 
 \item{ndraws, draw_ids}{Optional posterior-draw subsetting,
 matching the \code{\link[brms:posterior_smooths.brmsfit]{brms::posterior_smooths()}} semantics.}
@@ -46,19 +50,21 @@ of the smooth term's contribution to the linear predictor.
 Returns the posterior draws of a single smooth term evaluated
 at the supplied prediction grid, matching the shape of
 \code{\link[brms:posterior_smooths.brmsfit]{brms::posterior_smooths()}}. Supports any smooth declared by
-\code{s()}, \code{t2()}, \code{ti()}, or \code{te()} on either the observation
-formula or the trend formula, including \code{by = factor}
-expansion.
+\code{s()} or \code{t2()} on the observation formula, a distributional
+parameter's formula, a non-linear parameter's formula or the
+trend formula, including \code{by = factor} expansion.
 }
 \details{
-The smooth's contribution is computed as
-\verb{Xs_focal \%*\% bs_focal + sum_j Zs_j \%*\% s_j} per draw, where
-the basis matrices come from \code{brms::standata()} evaluated on
-\code{newdata}, and the coefficients come from the cached posterior
-draws (already routed through the mvgam aliaser).
+The smooth's contribution is its unpenalised basis times its
+fixed coefficients plus each penalised basis times its random
+coefficients, per draw. The bases come from \code{\link[brms:standata]{brms::standata()}}
+evaluated on \code{newdata}, and the coefficients from the fit's
+draws. An offset is not part of any smooth and is left out,
+where \code{\link[brms:posterior_smooths.brmsfit]{brms::posterior_smooths()}} adds a predictor's offsets to
+each of its smooths.
 
-For trend-side smooths the same logic applies against the
-\verb{_trend} parameter block.
+A term written on both the observation formula and the trend
+formula is read from the observation formula.
 }
 \examples{
 \dontrun{

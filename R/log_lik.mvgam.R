@@ -10,8 +10,9 @@
 #' @param newdata Optional data frame containing the response and all
 #'   covariates referenced by the model. `NULL` (default) uses the original
 #'   training data.
-#' @param re_formula Random-effects formula passed to the prediction
-#'   primitives. `NULL` includes all random effects.
+#' @param re_formula Group-level terms to include: `NULL` (the default)
+#'   for every one, `NA` for none. A formula choosing some of them is not
+#'   supported.
 #' @param resp Character; response name for multivariate models. Ignored for
 #'   univariate fits.
 #' @param ndraws Optional integer; subsample to `ndraws` posterior draws.
@@ -243,20 +244,13 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
   # Closure-unit data prep is re-run from the (possibly new)
   # data here so cap edits at predict time take effect.
   if (is_closure_unit_family(family_obj)) {
-    # mv-response families (mvn / mvt) take a different path:
-    # the per-row residual is independent (normal or Student-t)
-    # conditional on the latent factor contribution in mu, so the
-    # closure-unit log_lik scores at the (site, species) row grain
-    # rather than the marginal-over-N grain. Psi (and nu for mvt)
-    # are pulled from the posterior and broadcast to per-row level
-    # via `extract_mv_response_components()`.
+    # The families with several responses per unit have no latent
+    # count to marginalise. `mvn` and `mvt` score a per-row density,
+    # independent given the factor contribution in mu; `diri`, `multi`
+    # and `categ` score one joint density per unit and carry it on the
+    # unit's first row. All of them read their parameters through
+    # `mv_response_family_pars()`.
     if (is_multi_response_family(family_obj)) {
-      # `mvn` and `mvt` score a per-row density; `diri`, `multi` and
-      # `categ` score one joint density per unit and carry it on the
-      # unit's first row. The two used to be separated here, but
-      # both read their parameters from the same extractor with the
-      # same arguments, so the split bought only a second copy of
-      # the kernel table the registry already holds.
       family_pars_mv <- mv_response_family_pars(
         object, newdata, linpred, family_obj, family_name, draw_ids
       )
@@ -271,10 +265,8 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
     # The unit key and the family's cap declarations are resolved by
     # the accessor, so this call cannot leave one of them out.
     arrays <- closure_unit_arrays_for(object, newdata)
-    # extract_p_for_closure_unit() handles both scalar (no
-    # detection sub-formula) and vector (with `bf(p ~ ...)`) cases
-    # by routing the vector case through brms's dpar linpred via
-    # the mock-stanfit path. Single call covers both shapes.
+    # The detection probability per visit, a scalar or a predictor of
+    # its own under `bf(p ~ ...)`, as `resolve_family_pars()` gives it.
     p_mat <- extract_p_for_closure_unit(
       object   = object,
       newdata  = newdata,

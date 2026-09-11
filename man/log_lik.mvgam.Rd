@@ -23,8 +23,9 @@
 covariates referenced by the model. \code{NULL} (default) uses the original
 training data.}
 
-\item{re_formula}{Random-effects formula passed to the prediction
-primitives. \code{NULL} includes all random effects.}
+\item{re_formula}{Group-level terms to include: \code{NULL} (the default)
+for every one, \code{NA} for none. A formula choosing some of them is not
+supported.}
 
 \item{resp}{Character; response name for multivariate models. Ignored for
 univariate fits.}

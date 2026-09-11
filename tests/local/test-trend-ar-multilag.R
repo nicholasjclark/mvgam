@@ -495,8 +495,7 @@ test_that("the trend smooth is recovered on the trend side", {
   # Reading it at the wrong grain returns one value per observation
   # instead of one per trend cell.
   lp <- extract_component_linpred(
-    mvgam_fit = fit, newdata = dat, component = "trend",
-    draw_ids = 1:20, incl_latent_state = FALSE
+    mvgam_fit = fit, newdata = dat, component = "trend", draw_ids = 1:20
   )
   expect_identical(dim(lp), c(20L, nrow(dat)))
   expect_true(all(is.finite(lp)))

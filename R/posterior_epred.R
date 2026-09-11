@@ -369,8 +369,9 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #' @param draw_ids Optional integer vector selecting a subset of posterior
 #'   draw indices to use. NULL (default) uses all draws (subject to
 #'   `ndraws`).
-#' @param re_formula Formula for random effects. NULL (default) includes
-#'   all random effects, NA excludes all random effects.
+#' @param re_formula Group-level terms to include: `NULL` (the default)
+#'   for every one, `NA` for none. A formula choosing some of them is not
+#'   supported.
 #' @param allow_new_levels Logical; accepted for brms compatibility.
 #'   A grouping level the model never saw is refused whatever this is
 #'   set to, because a new level has no fitted random effect and, for

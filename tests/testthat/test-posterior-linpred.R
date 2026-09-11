@@ -299,69 +299,239 @@ test_that("posterior_linpred(draw_ids = TRUE) rejects non-integer", {
 })
 
 
-# extract_linpred_univariate must only drop X[, 1] when it is the
-# brms-reserved intercept column (i.e., `b_Intercept` is present in
-# draws). Formulas written as `y ~ 0 + <regressor>` (including the
-# `.mvgam_empty_obs` placeholder injected for empty obs sub-formulas)
-# have no `b_Intercept`; their first column IS a real regressor with
-# its own b[k] and must NOT be dropped.
+# ---- The linear-predictor composer --------------------------------
+#
+# A prep as `prepare_linpred_data()` builds it: the draws,
+# the Stan data brms writes, the formula, the group-level table and
+# the `re_formula` the data was built under. The end-to-end check
+# against brms's own predictor lives in tests/local, which needs fits.
 
-mk_linpred_prep <- function(X, draws, formula_str = "y ~ 1") {
-  structure(
-    list(draws = draws, sdata = list(X = X), nobs = nrow(X),
-         formula = brms::brmsformula(stats::as.formula(formula_str))),
-    class = "brmsprep"
-  )
+mk_prep <- function(sdata, draws, formula, ranef = NULL, re_formula = NULL,
+                    nobs = NULL) {
+  structure(list(
+    draws = posterior::as_draws_matrix(draws),
+    sdata = sdata,
+    nobs = nobs %||% nrow(sdata$X %||% sdata[[1L]]),
+    formula = formula,
+    ranef = ranef,
+    re_formula = re_formula
+  ), class = "mvgam_prep")
 }
 
-test_that("extract_linpred_univariate keeps X[,1] when no b_Intercept", {
-  # `y ~ 0 + ones`: X is a column of 1s, b[1] is the lone coef.
-  # Pre-fix bug: code unconditionally dropped X[,1] if all-1s, so
-  # the linpred came back as 0, losing the b[1] contribution.
-  draws <- posterior::as_draws_matrix(matrix(
-    rep(0.788, 4L), nrow = 4L, dimnames = list(NULL, "b[1]")
-  ))
+one_draw <- function(...) {
+  values <- c(...)
+  matrix(values, nrow = 1L, dimnames = list(NULL, names(values)))
+}
+
+
+test_that("predictor_suffix() writes brms's order of parts", {
+  expect_identical(predictor_suffix(), "")
+  expect_identical(predictor_suffix(dpar = "mu"), "")
+  expect_identical(predictor_suffix(resp = "y1"), "_y1")
+  expect_identical(predictor_suffix(dpar = "sigma"), "_sigma")
+  expect_identical(predictor_suffix(resp = "y1", dpar = "sigma"),
+                   "_sigma_y1")
+  expect_identical(predictor_suffix(resp = "y1", nlpar = "a"), "_y1_a")
+})
+
+
+test_that("the intercept column goes only when brms drew an intercept", {
+  # `y ~ 0 + ones`: the column of ones is a regressor with its own b[1].
   X <- cbind(ones = rep(1, 5))
-  lp <- extract_linpred_univariate(
-    mk_linpred_prep(X, draws, "y ~ 0 + ones")
-  )
-  expect_identical(dim(lp), c(4L, 5L))
-  expect_true(all(abs(lp - 0.788) < 1e-9))
+  lp <- extract_linpred_from_prep(mk_prep(
+    list(X = X), one_draw(`b[1]` = 0.788), brms::bf(y ~ 0 + ones)
+  ))
+  expect_equal(unname(lp), matrix(0.788, 1L, 5L))
+
+  # `y ~ 1 + x`: brms samples the slope against the design without its
+  # "Intercept" column and writes the intercept as b_Intercept.
+  X <- cbind(Intercept = 1, x = c(0, 0.5, 1, 1.5, 2))
+  lp <- extract_linpred_from_prep(mk_prep(
+    list(X = X), one_draw(b_Intercept = 0.5, `b[1]` = 2),
+    brms::bf(y ~ 1 + x)
+  ))
+  expect_equal(unname(lp), matrix(0.5 + 2 * X[, "x"], 1L))
 })
 
-test_that("extract_linpred_univariate drops intercept col when b_Intercept present", {
-  # Standard `y ~ 1 + x`: b_Intercept handled separately, X[,1] is the
-  # all-1s intercept column and should be dropped before b[k] %*% t(X).
-  draws <- posterior::as_draws_matrix(matrix(
-    c(rep(0.5, 4L), rep(2.0, 4L)), nrow = 4L,
-    dimnames = list(NULL, c("b_Intercept", "b[1]"))
-  ))
-  X <- cbind(intercept = rep(1, 5), x = c(0, 0.5, 1, 1.5, 2))
-  lp <- extract_linpred_univariate(
-    mk_linpred_prep(X, draws, "y ~ 1 + x")
+
+test_that("each predictor reads only the terms carrying its own suffix", {
+  # `bf(y ~ 1, sigma ~ s(x) + offset(o))` writes the mean's design bare
+  # and sigma's with `_sigma`. Reading every smooth for the mean put
+  # sigma's smooth into it, and keeping the bare `offsets` for sigma put
+  # the mean's offset into sigma.
+  Zs <- matrix(c(1, 0, 2, 1, 1, 0), nrow = 3L)
+  sdata <- list(
+    X = cbind(Intercept = rep(1, 3)), offsets = c(10, 20, 30),
+    X_sigma = cbind(Intercept = rep(1, 3)),
+    nb_sigma_1 = 1L, Zs_sigma_1_1 = Zs, offsets_sigma = c(1, 1, 1)
   )
-  expected <- matrix(rep(0.5 + 2.0 * X[, "x"], each = 4L),
-                       nrow = 4L, ncol = 5L)
-  expect_identical(dim(lp), c(4L, 5L))
-  expect_true(all(abs(lp - expected) < 1e-9))
+  draws <- one_draw(b_Intercept = 2, b_sigma_Intercept = -1,
+                    `s_sigma_1_1[1]` = 0.5, `s_sigma_1_1[2]` = 3)
+  prep <- mk_prep(sdata, draws, brms::bf(y ~ 1, sigma ~ s(x)))
+  expect_equal(unname(extract_linpred_from_prep(prep)),
+               matrix(2 + c(10, 20, 30), 1L))
+  expect_equal(unname(extract_linpred_from_prep(prep, dpar = "sigma")),
+               matrix(-1 + 1 + drop(Zs %*% c(0.5, 3)), 1L))
 })
 
-test_that("extract_linpred_univariate keeps cell-means factor without intercept", {
-  # `y ~ 0 + factor`: per-level indicators; col 1 is NOT all-1s
-  # (only rows with the reference level are 1), so the all-1s check
-  # must return FALSE and fall through to the same branch used for
-  # cell-means formulas.
-  X <- model.matrix(~ 0 + factor(c("a", "b", "c", "a", "b", "c")))
-  draws <- posterior::as_draws_matrix(matrix(
-    c(rep(1, 4L), rep(2, 4L), rep(3, 4L)), nrow = 4L,
-    dimnames = list(NULL, c("b[1]", "b[2]", "b[3]"))
-  ))
-  lp <- extract_linpred_univariate(
-    mk_linpred_prep(X, draws, "y ~ 0 + grp")
+
+# The group-level table brms keeps on a fit, one row per term.
+mk_ranef <- function(rows, levels) {
+  ranef <- data.frame(
+    id = rows$id, group = rows$group, gn = rows$gn %||% 1L, gtype = "",
+    coef = "Intercept", cn = rows$cn %||% 1L, resp = rows$resp %||% "",
+    dpar = rows$dpar %||% "", nlpar = "", type = "",
+    stringsAsFactors = FALSE
   )
-  expected <- matrix(rep(c(1, 2, 3, 1, 2, 3), each = 4L),
-                       nrow = 4L, ncol = 6L)
-  expect_true(all(abs(lp - expected) < 1e-9))
+  attr(ranef, "levels") <- levels
+  ranef
+}
+
+
+test_that("a group-level term is read by its block id and prefix", {
+  # `bf(y ~ (1|g), sigma ~ (1|g))`: one grouping factor, two blocks.
+  # brms numbers the design and coefficients by the block `id`: the
+  # sigma term is `Z_2_sigma_1` against `r_2_sigma_1`, indexed by
+  # `J_2`. Keyed by the grouping factor's number, it would not be
+  # found.
+  J <- c(1L, 3L, 2L, 1L)
+  sdata <- list(
+    X = cbind(Intercept = rep(1, 4)), Z_1_1 = rep(1, 4), J_1 = J,
+    X_sigma = cbind(Intercept = rep(1, 4)), Z_2_sigma_1 = rep(1, 4),
+    J_2 = J
+  )
+  draws <- one_draw(
+    b_Intercept = 0, b_sigma_Intercept = 0,
+    `r_1_1[1]` = 10, `r_1_1[2]` = 20, `r_1_1[3]` = 30,
+    `r_2_sigma_1[1]` = 1, `r_2_sigma_1[2]` = 2, `r_2_sigma_1[3]` = 3
+  )
+  ranef <- mk_ranef(
+    list(id = c(1L, 2L), group = c("g", "g"), dpar = c("", "sigma")),
+    list(g = c("a", "b", "c"))
+  )
+  prep <- mk_prep(sdata, draws, brms::bf(y ~ (1 | g), sigma ~ (1 | g)),
+                  ranef = ranef)
+  expect_equal(unname(extract_linpred_from_prep(prep)),
+               matrix(c(10, 30, 20, 10), 1L))
+  expect_equal(unname(extract_linpred_from_prep(prep, dpar = "sigma")),
+               matrix(c(1, 3, 2, 1), 1L))
+
+  # With every term kept, a design brms did not write is a fault, where
+  # skipping it in silence is what lost the sigma term.
+  sdata$Z_2_sigma_1 <- NULL
+  expect_error(
+    extract_linpred_from_prep(mk_prep(
+      sdata, draws, brms::bf(y ~ (1 | g), sigma ~ (1 | g)), ranef = ranef
+    ), dpar = "sigma"),
+    "fault in mvgam"
+  )
+  # Under `re_formula = NA` brms writes no group-level data, and no
+  # term is read.
+  population_only <- sdata[c("X", "X_sigma")]
+  for (dpar in list(NULL, "sigma")) {
+    expect_equal(
+      unname(extract_linpred_from_prep(mk_prep(
+        population_only, draws, brms::bf(y ~ (1 | g), sigma ~ (1 | g)),
+        ranef = ranef, re_formula = NA
+      ), dpar = dpar)),
+      matrix(0, 1L, 4L)
+    )
+  }
+})
+
+
+test_that("re_formula takes NULL or NA and refuses a formula", {
+  # brms numbers the group-level terms a formula keeps afresh, and the
+  # fitted draws keep the numbers the whole model gave them. On
+  # `(1 | g) + (0 + x || g)`, `re_formula = ~ (0 + x || g)` writes the
+  # slope's design as block 1, and reading it against the fitted block
+  # 1 pairs the slope's design with the intercept's coefficients.
+  expect_null(validate_group_level_args(NULL, FALSE, "uncertainty"))
+  expect_null(validate_group_level_args(NA, FALSE, "uncertainty"))
+  expect_error(
+    validate_group_level_args(~ (0 + x || g), FALSE, "uncertainty"),
+    "takes NULL or NA"
+  )
+  # brms changes how a new level is sampled only when it is allowed one.
+  expect_error(
+    validate_group_level_args(NULL, FALSE, "gaussian"),
+    "'allow_new_levels' is TRUE"
+  )
+  expect_null(validate_group_level_args(NULL, TRUE, "gaussian"))
+})
+
+
+test_that("a response of a model with several reads its own terms", {
+  # brms suffixes a response's names with its key, and indexes its
+  # grouping by `J_<id>_<resp>`. The fixed smooth `Xs_y2` and the
+  # random effect `r_1_y1_1` were both dropped.
+  Xs <- cbind(c(1, 2, 3))
+  sdata <- list(
+    N_y1 = 3L, N_y2 = 3L,
+    X_y1 = cbind(Intercept = rep(1, 3)), Z_1_y1_1 = rep(1, 3),
+    J_1_y1 = c(2L, 1L, 2L),
+    X_y2 = cbind(Intercept = rep(1, 3)), Xs_y2 = Xs,
+    offsets_y2 = c(0.5, 0.5, 0.5)
+  )
+  draws <- one_draw(
+    b_y1_Intercept = 1, `r_1_y1_1[1]` = -1, `r_1_y1_1[2]` = 4,
+    b_y2_Intercept = 2, `bs_y2[1]` = 10
+  )
+  ranef <- mk_ranef(list(id = 1L, group = "g", resp = "y1"),
+                    list(g = c("a", "b")))
+  prep <- mk_prep(sdata, draws,
+                  brms::bf(y1 ~ (1 | g)) + brms::bf(y2 ~ s(x)),
+                  ranef = ranef, nobs = 3L)
+  lp <- extract_linpred_from_prep(prep)
+  expect_identical(names(lp), c("y1", "y2"))
+  expect_equal(unname(lp$y1), matrix(1 + c(4, -1, 4), 1L))
+  expect_equal(unname(lp$y2), matrix(2 + 10 * c(1, 2, 3) + 0.5, 1L))
+  expect_equal(unname(extract_linpred_from_prep(prep, resp = "y2")),
+               unname(lp$y2))
+})
+
+
+test_that("a monotonic term reads each level as brms codes it", {
+  # Three levels coded 0..2. A frame holding only the top level is
+  # coded 2 and reads the whole effect, bsp * D * (simo1 + simo2).
+  sdata <- list(
+    X = cbind(Intercept = rep(1, 2)), Ksp = 1L, Imo = 1L, Jmo = 2L,
+    Xmo_1 = c(2L, 2L)
+  )
+  draws <- one_draw(b_Intercept = 0, `bsp[1]` = 3,
+                    `simo_1[1]` = 0.25, `simo_1[2]` = 0.75)
+  lp <- extract_linpred_from_prep(mk_prep(sdata, draws,
+                                          brms::bf(y ~ mo(z))))
+  expect_equal(unname(lp), matrix(3 * 2 * (0.25 + 0.75), 1L, 2L))
+  # An interaction of monotonic terms numbers them apart, and is refused.
+  sdata$Imo <- 2L
+  expect_error(
+    extract_linpred_from_prep(mk_prep(sdata, draws, brms::bf(y ~ mo(z)))),
+    "stand alone"
+  )
+})
+
+
+test_that("a non-linear mean is its expression at its parameters", {
+  # Each non-linear parameter is a predictor of its own, suffixed by its
+  # name, and the covariate the expression reads is `C_1`.
+  sdata <- list(
+    X_a = cbind(Intercept = rep(1, 3)), X_b = cbind(Intercept = rep(1, 3)),
+    C_1 = c(0, 1, 2)
+  )
+  draws <- one_draw(`b_a[1]` = 2, `b_b[1]` = 0.5)
+  form <- brms::bf(y ~ a * exp(b * x), a ~ 1, b ~ 1, nl = TRUE)
+  lp <- extract_linpred_from_prep(mk_prep(sdata, draws, form, nobs = 3L))
+  expect_equal(unname(lp), matrix(2 * exp(0.5 * c(0, 1, 2)), 1L))
+})
+
+
+test_that("each Gaussian process takes the kernel its own gp() names", {
+  expect_identical(
+    gp_kernels(y ~ gp(x, cov = "matern32", k = 5) + gp(z, k = 4)),
+    c("matern32", "exp_quad")
+  )
+  expect_identical(gp_kernels(sigma ~ x), character(0))
 })
 
 
@@ -707,74 +877,33 @@ test_that("diagnostic_surface_args names the surface as incl_autocor", {
 })
 
 
-# Random-effect contribution: `population_random_pred()` reads one
-# posterior column per level the model was fitted to, indexed by the
-# grouping vector brms puts in the standata. Nothing here samples.
-
-# Build the minimal prep the helper reads: one design matrix, one
-# grouping index, and a mapping from the design matrix to the
-# posterior columns holding that factor's coefficients.
-re_prep_stub <- function(J, n_levels, group = "grp") {
-  z_name <- "Z_1_1"
-  param_names <- paste0("r_1_1[", seq_len(n_levels), "]")
-  structure(list(
-    sdata = stats::setNames(
-      list(rep(1, length(J)), J), c(z_name, "J_1")
-    ),
-    re_mapping = stats::setNames(
-      list(structure(param_names, group = group)), z_name
-    )
-  ), class = "brmsprep")
-}
-
-
-test_that("population_random_pred() adds each level's own coefficient", {
-  draws <- matrix(
-    c(10, 20, 30,
-      11, 21, 31),
-    nrow = 2, byrow = TRUE,
-    dimnames = list(NULL, paste0("r_1_1[", 1:3, "]"))
-  )
-  # Four observations drawn from levels 1, 3, 2, 1.
-  prep <- re_prep_stub(J = c(1L, 3L, 2L, 1L), n_levels = 3L)
-  out <- population_random_pred(prep, draws, n_draws = 2L, n_obs = 4L)
-  expect_equal(unname(out), matrix(c(10, 30, 20, 10,
-                                     11, 31, 21, 11),
-                                   nrow = 2, byrow = TRUE))
-})
-
-
 test_that("a grouping level the model never saw is named, not indexed", {
   # brms extends the grouping index under `allow_new_levels = TRUE`,
   # but no coefficient was ever drawn for the new level. Indexing
   # past the end of the draws would give `subscript out of bounds`,
   # an internal message even though `allow_new_levels` is brms's own
   # documented way to handle this case.
-  draws <- matrix(
-    1, nrow = 2, ncol = 3,
-    dimnames = list(NULL, paste0("r_1_1[", 1:3, "]"))
+  J <- c(1L, 2L, 4L)
+  prep <- mk_prep(
+    list(Z_1_1 = rep(1, 3), J_1 = J),
+    one_draw(`r_1_1[1]` = 1, `r_1_1[2]` = 1, `r_1_1[3]` = 1),
+    brms::bf(y ~ 0 + (1 | grp)),
+    ranef = mk_ranef(list(id = 1L, group = "grp"),
+                     list(grp = c("a", "b", "c"))),
+    nobs = 3L
   )
-  prep <- re_prep_stub(J = c(1L, 2L, 4L), n_levels = 3L)
-  expect_error(
-    population_random_pred(prep, draws, n_draws = 2L, n_obs = 3L),
-    "grouping level the model never saw"
-  )
-  # The message names the factor, both counts, and the way out.
-  err <- tryCatch(
-    population_random_pred(prep, draws, n_draws = 2L, n_obs = 3L),
-    error = function(e) conditionMessage(e)
-  )
-  expect_match(err, "grp")
-  expect_match(err, "re_formula = NA")
+  # The message names the factor and the way out.
+  expect_error(extract_linpred_from_prep(prep),
+               "grouping level the model never saw")
+  expect_error(extract_linpred_from_prep(prep), "'grp'")
+  expect_error(extract_linpred_from_prep(prep), "re_formula = NA",
+               fixed = TRUE)
 })
 
 
 test_that("the prediction entry points share one new-level default", {
   # brms's own `snl_options` is uncertainty / gaussian / old_levels,
-  # and mvgam's entry points offer all three. Two validators
-  # underneath took only the first two, so a documented call was
-  # accepted at the door and refused inside; the end-to-end path is
-  # driven in tests/local/test-new-levels.R, which needs a fit.
+  # and each entry point defaults to the first, as brms does.
   for (fn in list(predict.mvgam, fitted.mvgam, posterior_predict.mvgam,
                   posterior_epred.mvgam, posterior_linpred.mvgam)) {
     expect_identical(eval(formals(fn)$sample_new_levels), "uncertainty")

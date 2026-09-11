@@ -18,9 +18,9 @@
 #'   to use. If `NULL` (the default), all draws are used.
 #' @param draw_ids Integer vector specifying which draws to use. If `NULL`,
 #'   draws are selected based on `ndraws`.
-#' @param re_formula Formula for random effects. If `NULL` (the default),
-#'   all random effects are included. Use `NA` to exclude all random
-#'   effects.
+#' @param re_formula Group-level terms to include: `NULL` (the default)
+#'   for every one, `NA` for none. A formula choosing some of them is not
+#'   supported.
 #' @param allow_new_levels Logical; accepted for brms compatibility.
 #'   A grouping level the model never saw is refused whatever this is
 #'   set to, because a new level has no fitted random effect and, for
@@ -166,16 +166,7 @@ predict.mvgam <- function(object,
   checkmate::assert_logical(incl_autocor, len = 1, any.missing = FALSE)
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
-  checkmate::assert(
-    checkmate::check_class(re_formula, "formula"),
-    checkmate::check_true(is.na(re_formula)),
-    checkmate::check_null(re_formula)
-  )
-  checkmate::assert_logical(allow_new_levels, len = 1, any.missing = FALSE)
-  checkmate::assert_choice(
-    sample_new_levels,
-    choices = c("uncertainty", "gaussian", "old_levels")
-  )
+  validate_group_level_args(re_formula, allow_new_levels, sample_new_levels)
   checkmate::assert_string(resp, null.ok = TRUE)
   checkmate::assert_logical(summary, len = 1, any.missing = FALSE)
   checkmate::assert_logical(robust, len = 1, any.missing = FALSE)

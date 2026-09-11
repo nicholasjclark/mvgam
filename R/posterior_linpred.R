@@ -48,7 +48,8 @@ autocor_to_trend_state <- function(incl_autocor) {
 #' @param draw_ids Integer vector of posterior draws to use (NULL = all).
 #'   Indices rather than a count, so every extraction combined below
 #'   reads the same iterations.
-#' @param re_formula Formula for random effects (NULL = all, NA = none)
+#' @param re_formula Group-level terms to include: `NULL` for every one,
+#'   `NA` for none
 #' @param allow_new_levels Logical; accepted for brms compatibility.
 #'   A grouping level the model never saw is refused whatever this is
 #'   set to, because a new level has no fitted random effect and, for
@@ -282,8 +283,9 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #'   use. `NULL` (default) selects draws via `ndraws` (or all draws when
 #'   both are NULL). Useful for keeping multiple downstream extractions
 #'   aligned to the same posterior subset.
-#' @param re_formula Formula for random effects. NULL (default) includes
-#'   all random effects, NA excludes all random effects.
+#' @param re_formula Group-level terms to include: `NULL` (the default)
+#'   for every one, `NA` for none. A formula choosing some of them is not
+#'   supported.
 #' @param allow_new_levels Logical; accepted for brms compatibility.
 #'   A grouping level the model never saw is refused whatever this is
 #'   set to, because a new level has no fitted random effect and, for

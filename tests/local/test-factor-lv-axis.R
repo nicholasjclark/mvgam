@@ -465,18 +465,16 @@ test_that("the trend design is split by factor, on one shared basis", {
 })
 
 
-test_that("the smooth record names the rows Stan emitted", {
-  # The design above is right, and the block before it proves so.
-  # What broke was the record `posterior_smooths()` and
-  # `conditional_smooths()` walk to find a smooth's coefficients:
-  # it indexed the trend side against the observation frame, where
-  # `.trend` does not exist, so the term was never expanded per
-  # by-level. Only the first level was ever evaluated and the
-  # second came back a flat curve with no posterior width.
+test_that("the smooth record names the objects Stan emitted", {
+  # `posterior_smooths()` and `conditional_smooths()` find a smooth's
+  # coefficients through this record. The trend's `by = .trend` term
+  # is one smooth object per latent factor, and a record holding one
+  # object evaluates the first factor's smooth alone, the second
+  # coming back a flat curve with no posterior width.
   #
-  # Stan emits one `Zs_<row>_<term>_trend` block per by-level, so
-  # the record is checked against those rather than against a
-  # count written here.
+  # Stan emits one `Zs_<object>_1_trend` block per factor, and the
+  # record is checked against those, not against a count written
+  # here.
   hits <- mvgam:::mvgam_smooth_terms(prefit_by_lv)
   expect_length(hits, 1L)
   expect_identical(hits[[1L]]$side, "trend")
@@ -485,15 +483,15 @@ test_that("the smooth record names the rows Stan emitted", {
   zs <- grep("^Zs_[0-9]+_1_trend$", names(prefit_by_lv$standata),
              value = TRUE)
   expect_length(zs, N_lv)
-  expect_identical(as.integer(hits[[1L]]$rows), seq_along(zs))
+  expect_identical(as.integer(hits[[1L]]$objects), seq_along(zs))
 
   # The control: the plain model's smooth carries no `by`, emits one
-  # block, and stays one row. Without it the check above passes on a
-  # record that expanded everything.
+  # block, and stays one object. Without it the check above passes on
+  # a record that expanded everything.
   plain <- mvgam:::mvgam_smooth_terms(prefit_plain)
   expect_length(plain, 1L)
   expect_true(is.na(plain[[1L]]$by_var))
-  expect_identical(as.integer(plain[[1L]]$rows), 1L)
+  expect_identical(as.integer(plain[[1L]]$objects), 1L)
 })
 
 
@@ -653,29 +651,14 @@ test_that("the trend linpred comes back at the series grain", {
   # `mu_factor` is per latent axis and the program folds it through
   # `Z`, so what a caller receives is one value per observation like
   # any other trend formula rather than one per factor.
-  lp_full <- extract_component_linpred(
-    mvgam_fit = fit, newdata = dat, component = "trend",
-    draw_ids = 1:20, incl_latent_state = TRUE
+  lp <- extract_component_linpred(
+    mvgam_fit = fit, newdata = dat, component = "trend", draw_ids = 1:20
   )
-  lp_det <- extract_component_linpred(
-    mvgam_fit = fit, newdata = dat, component = "trend",
-    draw_ids = 1:20, incl_latent_state = FALSE
-  )
-  expect_identical(dim(lp_full), c(20L, nrow(dat)))
-  expect_identical(dim(lp_det), c(20L, nrow(dat)))
-  expect_false(anyNA(lp_full))
-  expect_false(anyNA(lp_det))
+  expect_identical(dim(lp), c(20L, nrow(dat)))
+  expect_false(anyNA(lp))
 
-  # `predict_*` is time-agnostic: it composes the deterministic
-  # submodel and leaves the latent state to arrive as a marginal
-  # envelope. So `incl_latent_state` does not move this result, and
-  # the conditional state is a different quantity reached elsewhere.
-  # Asserting a difference here would be asking a marginal surface to
-  # behave like a conditional one.
-  expect_equal(unname(lp_full), unname(lp_det))
-
-  # And the conditional state really is available, by the route that
-  # owns it, so the agreement above is not the state going missing.
+  # The trend component is the deterministic submodel. The conditional
+  # state is a different quantity, reached by the route that owns it.
   dm <- posterior::as_draws_matrix(fit$fit)
   states <- mvgam:::extract_trend_latent_states(
     fit, newdata = dat_obs, full_draws = dm
@@ -686,7 +669,7 @@ test_that("the trend linpred comes back at the series grain", {
   # Reshaped to the grid it is (time, series), and the species differ
   # because their rows of `Z` do.
   obs <- mvgam:::get_observation_structure(fit, newdata = dat)
-  grid <- mvgam:::reshape_linpred_to_grid(lp_det[1L, ], obs)
+  grid <- mvgam:::reshape_linpred_to_grid(lp[1L, ], obs)
   expect_identical(dim(grid), c(n_time, n_species))
   same <- character(0)
   for (i in seq_len(n_species)) {

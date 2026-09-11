@@ -1354,8 +1354,9 @@ extract_dpars_from_stanfit <- function(stanfit,
 #' @param draw_ids Optional integer vector selecting a subset of posterior
 #'   draw indices to use. NULL (default) uses all draws (subject to
 #'   `ndraws`).
-#' @param re_formula Formula for random effects. NULL (default) includes
-#'   all random effects, NA excludes all random effects.
+#' @param re_formula Group-level terms to include: `NULL` (the default)
+#'   for every one, `NA` for none. A formula choosing some of them is not
+#'   supported.
 #' @param allow_new_levels Logical; accepted for brms compatibility.
 #'   A grouping level the model never saw is refused whatever this is
 #'   set to, because a new level has no fitted random effect and, for
@@ -1460,16 +1461,7 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
       "Specify only one of 'ndraws' or 'draw_ids'."
     ))
   }
-  checkmate::assert(
-    checkmate::check_class(re_formula, "formula"),
-    checkmate::check_true(is.na(re_formula)),
-    checkmate::check_null(re_formula)
-  )
-  checkmate::assert_logical(allow_new_levels, len = 1)
-  checkmate::assert_choice(
-    sample_new_levels,
-    choices = c("uncertainty", "gaussian", "old_levels")
-  )
+  validate_group_level_args(re_formula, allow_new_levels, sample_new_levels)
   checkmate::assert_string(resp, null.ok = TRUE)
 
   # Handle newdata = NULL (use training data)

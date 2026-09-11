@@ -76,9 +76,9 @@ to use. If \code{NULL} (the default), all draws are used.}
 \item{draw_ids}{Integer vector specifying which draws to use. If \code{NULL},
 draws are selected based on \code{ndraws}.}
 
-\item{re_formula}{Formula for random effects. If \code{NULL} (the default),
-all random effects are included. Use \code{NA} to exclude all random
-effects.}
+\item{re_formula}{Group-level terms to include: \code{NULL} (the default)
+for every one, \code{NA} for none. A formula choosing some of them is not
+supported.}
 
 \item{allow_new_levels}{Logical; accepted for brms compatibility.
 A grouping level the model never saw is refused whatever this is

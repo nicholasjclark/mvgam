@@ -1610,32 +1610,38 @@ require_closure_unit_predict_type <- function(family, type) {
 }
 
 
-# Internal: refuse a family the internal dispatch has no kernel for.
+# Internal: refuse a state only a fault in mvgam can reach.
 #
-# Reaching one of these means a family was registered without a
-# kernel some method needs, which is a fault in mvgam rather than
-# anything the caller wrote. Five copies of this refusal each told
-# the reader to add a branch to a named function in a named source
-# file, which is not an action a user of the package can take and
-# reads as an internal note escaping into the console. One message,
-# so a new dispatch table cannot reintroduce that.
+# The caller wrote nothing wrong, and the one useful thing to tell them
+# is where to report it. A refusal naming a function or a source file
+# to change offers an action no user of the package can take. Every
+# refusal of this kind goes through here.
 #'@noRd
-refuse_missing_family_dispatch <- function(family_name, what) {
+stop_mvgam_fault <- function(headline, detail) {
+  checkmate::assert_string(headline)
+  checkmate::assert_string(detail)
   stop(insight::format_error(c(
-    paste0(
-      "mvgam cannot compute ", what, " for family '",
-      family_name, "'."
-    ),
-    x = paste0(
-      "This family is registered without the internal kernel that ",
-      "step requires."
-    ),
+    headline,
+    x = detail,
     i = paste0(
-      "This is a fault in mvgam itself. Please ",
-      "report it at https://github.com/nicholasjclark/mvgam/issues, ",
-      "quoting the family name above."
+      "This is a fault in mvgam itself. Please report it at ",
+      "https://github.com/nicholasjclark/mvgam/issues."
     )
   )), call. = FALSE)
+}
+
+
+# Internal: refuse a family the internal dispatch has no kernel for,
+# which means the family was registered without a kernel some method
+# needs.
+#'@noRd
+refuse_missing_family_dispatch <- function(family_name, what) {
+  stop_mvgam_fault(
+    paste0("mvgam cannot compute ", what, " for family '",
+           family_name, "'."),
+    paste0("This family is registered without the internal kernel ",
+           "that step requires.")
+  )
 }
 
 
@@ -6103,21 +6109,11 @@ resolve_draw_ids <- function(object, ndraws, draw_ids) {
   )
 }
 
-#' Extract detection-probability draws for an nmix() fit
+#' Detection probability of every visit of a closure-unit fit
 #'
-#' Handles both the scalar-`p` case (no detection sub-formula,
-#' brms declares `real<lower=0,upper=1> p;` in the parameters
-#' block and the posterior carries `p` directly) and the
-#' vector-`p` case (sub-formula such as `bf(y ~ x, p ~ s(tod))`,
-#' brms emits `b_p_Intercept` + `b_p_*` and computes `p` as a
-#' transient `vector[N]` in the model block).
-#'
-#' For the vector case the per-row p is rebuilt from the fitted
-#' coefficients + the design matrix on `newdata` via the shared
-#' `extract_component_linpred(component = "p")` path, which
-#' funnels through `prepare_predictions.mock_stanfit()` and so
-#' picks up parametric terms, smooths, random effects, GP
-#' terms etc. transparently.
+#' `p` is one more distributional parameter: sampled as a scalar
+#' without a formula of its own, a linear predictor with one, as in
+#' `bf(y ~ x, p ~ s(tod))`. `resolve_family_pars()` answers both.
 #'
 #' @param object Fitted mvgam object with a closure-unit family.
 #' @param newdata Long-format observation data on which to
@@ -6131,61 +6127,17 @@ resolve_draw_ids <- function(object, ndraws, draw_ids) {
 #' @noRd
 extract_p_for_closure_unit <- function(object, newdata, draw_ids,
                                        n_visit, ndraws) {
-  draws_mat <- posterior::as_draws_matrix(object$fit)
-  all_cols  <- colnames(draws_mat)
-  # Any column emitted by a detection sub-formula triggers the
-  # vector-p path; the rebuild reuses mvgam's existing dpar-
-  # linpred composer via name-stripping so parametric, smooth,
-  # random-effect and GP terms in `p ~ ...` all flow through.
-  has_any_p_subformula <- any(grepl(
-    paste0(
-      "^Intercept_p$|^b_p_|^bs_p($|\\[)|^s_p_|^sds_p_|",
-      "^zs_p_|^r_.+_p_|^gp_p_|^sdgp_p_|^lscale_p_"
-    ),
-    all_cols
-  ))
-  if (has_any_p_subformula) {
-    return(extract_p_via_dpar_linpred(object, newdata, draw_ids))
+  p <- resolve_family_pars(
+    object, "p", ndraws = ndraws, nobs = n_visit, draw_ids = draw_ids,
+    newdata = newdata
+  )$p
+  if (is.null(p)) {
+    stop_mvgam_fault(
+      "A closure-unit fit has no detection probability.",
+      "The posterior carries no 'p' and 'p' has no formula of its own."
+    )
   }
-  # Scalar `p` parameter in the posterior; broadcast to per-visit
-  # length for downstream indexing.
-  if (!"p" %in% all_cols) {
-    stop(insight::format_error(
-      "Detection probability draws 'p' not found in posterior."
-    ))
-  }
-  if (is.null(draw_ids)) {
-    draw_ids <- resolve_draw_indices(nrow(draws_mat), ndraws, NULL)
-  } else if (length(draw_ids) != ndraws) {
-    draw_ids <- draw_ids[seq_len(ndraws)]
-  }
-  p_scalar <- as.numeric(draws_mat[draw_ids, "p"])
-  matrix(p_scalar, nrow = ndraws, ncol = n_visit, byrow = FALSE)
-}
-
-#' Vector-p draws via mvgam's shared dpar-linpred composer
-#'
-#' Delegates to `extract_component_linpred()` with
-#' `component = "p"`, the same machinery used for the obs and
-#' trend components. The dpar branch strip-renames the `_p`
-#' infix on draws and standata, then funnels the result through
-#' `extract_linpred_univariate()` which already composes
-#' parametric + smooth + RE + GP contributions across draws.
-#' Reusing the shared composer means a `bf(y ~ ..., p ~ ...)`
-#' detection sub-formula inherits every predictor type brms
-#' supports without bespoke code.
-#'
-#' @return `[ndraws x n_visit]` matrix of probabilities (link
-#'   inverse already applied).
-#' @noRd
-extract_p_via_dpar_linpred <- function(object, newdata, draw_ids) {
-  # Detection probability is one more parameter carrying a formula of
-  # its own, so it is rebuilt the same way as any other. `nobs` is left
-  # open because closure-unit families work at visit grain, which the
-  # caller reconciles against the unit grain.
-  predicted_dpar_draws(
-    object, "p", newdata = newdata, draw_ids = draw_ids
-  )
+  p
 }
 
 #' The closure-unit arrays for a fit, over a frame
@@ -6248,12 +6200,9 @@ closure_unit_arrays_for <- function(object, newdata = NULL) {
 #' the family's `linkinv`. Downstream methods access
 #' `comp$state` and apply the family-specific likelihood.
 #'
-#' Detection sub-formulas (`bf(y ~ ..., p ~ tod)`) are
-#' supported via `extract_p_via_dpar_linpred()`, which rebuilds
-#' the per-visit probability matrix from the posterior
-#' coefficients + the standata design matrices on `newdata`.
-#' Parametric, smooth, random-effect, and GP terms in
-#' `p ~ ...` all flow through.
+#' A detection sub-formula (`bf(y ~ ..., p ~ tod)`) is rebuilt on
+#' `newdata` by `extract_p_for_closure_unit()`, with every term type
+#' the linear-predictor composer reads.
 #'
 #' Predict-time guard: re-runs `validate_closure_unit_data()` to
 #' catch the case where `newdata` carries `cap < max(y)` per
@@ -7575,77 +7524,37 @@ extract_simplex_response_components <- function(object,
 
 #' Per-row Dirichlet concentration on `newdata`
 #'
-#' Returns the per-row `phi` value for each (draw, observation) in a
-#' `[ndraws x N_obs]` matrix. Two paths:
+#' `phi` is one more distributional parameter: a sampled scalar
+#' without a formula of its own, a linear predictor with one, as
+#' `resolve_family_pars()` gives either on the parameter's own scale.
+#' Each closure unit's K rows then take the value at the unit's first
+#' row, which is the one `diri_lpdf()` reads as `phi[idx[1]]`. A
+#' covariate varying within a unit would otherwise give the rows a
+#' variation the likelihood never sees.
 #'
-#' - **Scalar phi**: brms emits a `phi` column when no `phi ~ ...`
-#'   sub-formula is supplied. We pull the posterior column and
-#'   broadcast it across the `N_obs` axis.
-#' - **Per-row phi**: when the posterior carries `b_phi_*` /
-#'   `Intercept_phi` / `s_phi_*` columns, we call
-#'   `extract_component_linpred()` with `component = "phi"` on
-#'   `newdata` to recompose the per-row linpred (matching whatever
-#'   parametric / smooth / RE / GP structure the user supplied for
-#'   `phi`) and apply the log link inverse `exp()` to get phi on the
-#'   response scale.
-#'
-#' After extraction the per-unit collapse is applied: each closure
-#' unit's K rows are set to the value at the unit's first row,
-#' mirroring Stan's `phi[idx[1]]` semantics in
-#' `diri_lpdf()`. Per-row phi only enters the joint Dirichlet
-#' density once per unit, so any cross-row variation in the unit
-#' would be ignored by the likelihood and is removed here to keep
-#' the R-side and Stan-side scoring identical.
-#'
+#' @param object A fitted `mvgam` object with the `diri()` family
+#' @param newdata The frame the prediction covers
+#' @param draw_ids Draw indices to keep, or `NULL` for all
+#' @param ndraws_actual Number of draws the prediction covers
+#' @param N_obs Number of rows the prediction covers
+#' @param arrays The closure-unit arrays for `newdata`
+#' @return `[ndraws_actual x N_obs]` matrix of concentrations
 #' @noRd
 extract_phi_per_row <- function(object, newdata, draw_ids,
-                                  ndraws_actual, N_obs, arrays) {
-  draws_mat <- posterior::as_draws_matrix(object$fit)
-  has_scalar_phi <- "phi" %in% colnames(draws_mat)
-  has_phi_subformula <- any(grepl(
-    "^b_phi_|^Intercept_phi$|^bs_phi($|\\[)|^s_phi_",
-    colnames(draws_mat)
-  ))
-
-  if (has_phi_subformula) {
-    # Per-row phi via the dpar linpred pipeline. The `phi` component
-    # branch in extract_component_linpred() strips the `_phi` infix
-    # from both the parameter draws and the standata, then composes
-    # the linpred via the same kernel mu uses; we then apply log^-1.
-    phi_linpred <- extract_component_linpred(
-      mvgam_fit = object,
-      newdata   = newdata,
-      component = "phi",
-      draw_ids  = draw_ids
+                                ndraws_actual, N_obs, arrays) {
+  phi_mat <- resolve_family_pars(
+    object, "phi", ndraws = ndraws_actual, nobs = N_obs,
+    draw_ids = draw_ids, newdata = newdata
+  )$phi
+  if (is.null(phi_mat)) {
+    stop_mvgam_fault(
+      "A 'diri()' fit has no concentration.",
+      "The posterior carries no 'phi' and 'phi' has no formula of its own."
     )
-    if (nrow(phi_linpred) != ndraws_actual ||
-        ncol(phi_linpred) != N_obs) {
-      stop(insight::format_error(c(
-        "Per-row 'phi' linpred dimension mismatch.",
-        x = paste0(
-          "Expected [", ndraws_actual, " x ", N_obs,
-          "], got [", nrow(phi_linpred), " x ", ncol(phi_linpred), "]."
-        )
-      )))
-    }
-    phi_mat <- exp(phi_linpred)
-  } else if (has_scalar_phi) {
-    rows <- if (is.null(draw_ids)) seq_len(ndraws_actual) else draw_ids
-    phi_draws <- as.numeric(draws_mat[rows, "phi"])
-    phi_mat <- matrix(phi_draws, nrow = ndraws_actual, ncol = N_obs,
-                       byrow = FALSE)
-  } else {
-    stop(insight::format_error(
-      "Posterior is missing 'phi' column for diri() family."
-    ))
   }
 
-  # Per-unit collapse: each closure unit's rows share `phi[idx[1]]`
-  # (Stan parameterisation). Without this collapse a covariate that
-  # varies WITHIN a unit would introduce per-row variation that the
-  # Stan likelihood never sees. Taken over the unit's whole set of
-  # rows, so a row whose response was not recorded still carries its
-  # site's concentration and can be drawn from.
+  # Taken over the unit's whole set of rows, which leaves a row whose
+  # response was not recorded carrying its site's concentration.
   unit_rows <- closure_unit_row_split(arrays)
   for (g in seq_len(arrays$N_unit)) {
     idx <- unit_rows[[g]]

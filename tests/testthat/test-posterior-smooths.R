@@ -1,49 +1,61 @@
-# CI-safe tests for posterior_smooths.mvgam, conditional_smooths.mvgam,
-# and the supporting smooth-table helpers. Numerical concordance
-# against brms lives in tests/local. Here we lock in S3 dispatch,
-# signature parity with brms, the smooth-index helper (single
-# smooth, by-factor expansion, multi-smooth, trend-side), and the
-# error paths for unknown terms / no-smooth fits.
+# CI-safe tests for posterior_smooths.mvgam, conditional_smooths.mvgam
+# and the smooth record they read. A stub carries brms models built
+# with `brms::brm(empty = TRUE)`, which writes the Stan data without
+# compiling anything, and a hand-made draws matrix standing in for the
+# posterior. Concordance with brms on fitted models lives in
+# tests/local/test-linpred-parity.R.
 
 
-make_smooth_stub <- function(by_factor = FALSE,
-                              trend_smooth = FALSE) {
+smooth_frame <- function(n = 40L) {
   set.seed(5L)
-  n <- 40L
-  df <- data.frame(
-    y = rnorm(n),
-    x = rnorm(n),
-    z = rnorm(n),
+  data.frame(
+    y = rnorm(n), x = rnorm(n), z = rnorm(n), w = rnorm(n),
     grp = factor(sample(letters[1:3], n, replace = TRUE),
-                 levels = letters[1:3])
+                 levels = letters[1:3]),
+    trend_y = rnorm(n),
+    count = rbinom(n, 10L, 0.4), size = 10L
   )
-  obs_form <- if (by_factor) {
-    brms::bf(y ~ 1 + s(z, by = grp))
-  } else {
-    brms::bf(y ~ 1 + s(z))
-  }
-  trend_form <- if (trend_smooth) {
-    brms::bf(trend_y ~ s(z) - 1)
-  } else {
-    NULL
-  }
-  # Build a minimal mvgam-shaped stub. extract_mvgam_draws +
-  # mvgam_smooth_eta both call brms::standata on this formula, so
-  # the standata wiring must be valid.
-  sd_ <- brms::standata(
-    obs_form, data = df, family = brms::brmsfamily("gaussian")
-  )
+}
+
+# A fit-shaped object holding the brms models the smooth record reads,
+# and `fit`, a draws matrix, where a test evaluates a smooth.
+smooth_stub <- function(obs, data = smooth_frame(), family = gaussian(),
+                        trend = NULL, fit = NULL, prior = NULL) {
   structure(
     list(
-      formula = obs_form,
-      trend_formula = trend_form,
-      data = df,
-      family = brms::brmsfamily("gaussian"),
-      standata = as.list(sd_),
-      stancode = "// stub"
+      formula = obs, data = data, family = family, fit = fit,
+      obs_model = brms::brm(obs, data = data, family = family,
+                            prior = prior, empty = TRUE),
+      trend_model = if (!is.null(trend)) {
+        brms::brm(trend, data = data, empty = TRUE)
+      }
     ),
     class = "mvgam"
   )
+}
+
+# Draws with a value for every name, two draws, as a draws matrix.
+stub_draws <- function(names) {
+  set.seed(9L)
+  posterior::as_draws_matrix(matrix(
+    rnorm(2L * length(names)), nrow = 2L,
+    dimnames = list(NULL, names)
+  ))
+}
+
+# The coefficient names of one smooth object of a predictor, as brms
+# writes them, and the basis times the coefficients by hand.
+smooth_by_hand <- function(sdata, draws, sfx, object) {
+  cols <- attr(sdata[[paste0("Xs", sfx)]], "smcols")[[object]]
+  eta <- as.matrix(draws[, paste0("bs", sfx, "[", cols, "]")]) %*%
+    t(sdata[[paste0("Xs", sfx)]][, cols, drop = FALSE])
+  for (j in seq_len(sdata[[paste0("nb", sfx, "_", object)]])) {
+    Zs <- sdata[[paste0("Zs", sfx, "_", object, "_", j)]]
+    eta <- eta + as.matrix(draws[, paste0("s", sfx, "_", object, "_", j,
+                                          "[", seq_len(ncol(Zs)), "]")]) %*%
+      t(Zs)
+  }
+  unname(eta)
 }
 
 
@@ -71,76 +83,152 @@ test_that("conditional_smooths.mvgam matches brms-parity arg set", {
 })
 
 
-# ---- smooths() ------------------------------------------------------
+# ---- The smooth record ----------------------------------------------
 
-test_that("smooths.mvgam returns canonical labels for s() smooths", {
-  stub <- make_smooth_stub()
-  expect_identical(smooths(stub), "s(z)")
-})
-
-
-test_that("smooths.mvgam expands by-factor to one smframe row per level", {
-  stub <- make_smooth_stub(by_factor = TRUE)
-  expect_identical(smooths(stub), "s(z, by = grp)")
-  idx <- mvgam_smooth_index(stub$formula, stub$data)
-  # 3 grp levels = 3 smframe rows for one user-facing term.
-  expect_identical(nrow(idx), 3L)
-  expect_identical(idx$by_level, c("a", "b", "c"))
-})
-
-
-test_that("smooths.mvgam enumerates obs and trend sides", {
-  stub <- make_smooth_stub(trend_smooth = TRUE)
-  out <- smooths(stub)
-  expect_identical(length(out), 2L)
-  expect_true("s(z)" %in% out)
-})
-
-
-# ---- mvgam_smooth_index --------------------------------------------
-
-test_that("mvgam_smooth_index returns NULL on a no-smooth formula", {
-  set.seed(11L)
-  df <- data.frame(y = rnorm(20L), x = rnorm(20L))
-  expect_null(mvgam_smooth_index(brms::bf(y ~ x), df))
-})
-
-
-test_that("mvgam_smooth_index assigns sequential smframe rows", {
-  set.seed(17L); n <- 40L
-  df <- data.frame(
-    y = rnorm(n), x = rnorm(n), z = rnorm(n),
-    grp = factor(sample(letters[1:2], n, replace = TRUE))
+test_that("each predictor's smooths are listed, the trend's last", {
+  # A distributional parameter's smooths are a predictor of their own,
+  # and the trend's follow the observation model's.
+  stub <- smooth_stub(brms::bf(y ~ s(z), sigma ~ s(x)),
+                      trend = brms::bf(trend_y ~ s(z) - 1))
+  expect_identical(smooths(stub), c("s(z)", "s(x)", "s(z)"))
+  expect_identical(
+    vapply(mvgam_smooth_terms(stub), smooth_panel_name, character(1L)),
+    c("mu: s(z)", "sigma: s(x)", "mu: s(z) (trend)")
   )
-  form <- brms::bf(y ~ s(x) + s(z, by = grp))
-  idx <- mvgam_smooth_index(form, df)
-  expect_identical(nrow(idx), 3L)  # 1 (s(x)) + 2 (s(z, by=grp))
-  expect_identical(idx$row, 1:3)
-  expect_identical(idx$term_idx, c(1L, 2L, 2L))
 })
 
 
-# ---- mvgam_side_formula / suffix ----------------------------------
+test_that("a term's smooth objects are numbered as brms numbers them", {
+  # brms gives a `by` factor one smooth object per level and numbers
+  # the objects across the predictor's terms: here 1, 2 to 4 and 5.
+  stub <- smooth_stub(brms::bf(y ~ s(x) + s(z, by = grp) + t2(x, w)))
+  hits <- mvgam_smooth_terms(stub)
+  expect_identical(lapply(hits, `[[`, "objects"), list(1L, 2:4, 5L))
+  sdata <- brms::standata(stub$obs_model, internal = TRUE)
+  expect_length(attr(sdata$Xs, "smcols"), 5L)
+  expect_true(all(paste0("Zs_", 1:5, "_1") %in% names(sdata)))
 
-test_that("mvgam_side_formula returns bf object or NULL", {
-  stub <- make_smooth_stub(trend_smooth = TRUE)
-  expect_s3_class(mvgam_side_formula(stub, "obs"), "brmsformula")
-  expect_s3_class(mvgam_side_formula(stub, "trend"), "brmsformula")
-  stub$trend_formula <- NULL
-  expect_null(mvgam_side_formula(stub, "trend"))
+  expect_true(is.na(hits[[1L]]$by_var))
+  expect_identical(hits[[2L]]$by_var, "grp")
+  expect_identical(hits[[3L]]$covars, c("x", "w"))
 })
 
 
-test_that("mvgam_side_suffix returns the right brms convention", {
-  expect_identical(mvgam_side_suffix("obs"), "")
-  expect_identical(mvgam_side_suffix("trend"), "_trend")
+test_that("a numeric by variable is one smooth object", {
+  hits <- mvgam_smooth_terms(smooth_stub(brms::bf(y ~ s(x, by = w))))
+  expect_length(hits, 1L)
+  expect_identical(hits[[1L]]$objects, 1L)
+  expect_identical(hits[[1L]]$by_var, "w")
+})
+
+
+test_that("each response of a model with several keeps its own smooths", {
+  stub <- smooth_stub(
+    brms::bf(y ~ s(x)) + brms::bf(trend_y ~ s(w)) + brms::set_rescor(FALSE)
+  )
+  hits <- mvgam_smooth_terms(stub)
+  expect_identical(vapply(hits, `[[`, character(1L), "resp"),
+                   c("y", "trendy"))
+  expect_identical(lapply(hits, `[[`, "objects"), list(1L, 1L))
+  expect_identical(vapply(hits, smooth_panel_name, character(1L)),
+                   c("y_mu: s(x)", "trendy_mu: s(w)"))
+})
+
+
+test_that("a non-linear parameter's smooths belong to it", {
+  stub <- smooth_stub(
+    brms::bf(y ~ a * exp(b * x), a ~ s(z), b ~ 1, nl = TRUE),
+    prior = c(brms::prior(normal(0, 1), nlpar = "a"),
+              brms::prior(normal(0, 1), nlpar = "b"))
+  )
+  hits <- mvgam_smooth_terms(stub)
+  expect_length(hits, 1L)
+  expect_identical(hits[[1L]]$nlpar, "a")
+  expect_null(hits[[1L]]$dpar)
+})
+
+
+test_that("a smooth is found under a family carrying an addition term", {
+  # `count | trials(size) ~ s(x)` only parses when brms knows the
+  # family, which the fitted model does.
+  stub <- smooth_stub(brms::bf(count | trials(size) ~ s(x)),
+                      family = binomial())
+  expect_identical(smooths(stub), "s(x)")
+})
+
+
+test_that("a label matches whatever its spacing", {
+  stub <- smooth_stub(brms::bf(y ~ 1 + s(z, by = grp)))
+  hit1 <- resolve_mvgam_smooth(stub, "s(z,by=grp)")
+  hit2 <- resolve_mvgam_smooth(stub, "s(z,  by =  grp)")
+  expect_identical(hit1$term, "s(z, by = grp)")
+  expect_identical(hit2$term, "s(z, by = grp)")
+})
+
+
+# ---- Evaluating one smooth ------------------------------------------
+
+test_that("a smooth reads only its own objects", {
+  # `s(z)` is object 2 of `y ~ s(x) + s(z)`. Its value is its own basis
+  # times its own coefficients, and none of `s(x)`'s.
+  obs <- brms::bf(y ~ s(x) + s(z))
+  stub <- smooth_stub(obs)
+  sdata <- brms::standata(stub$obs_model, internal = TRUE)
+  stub$fit <- stub_draws(c(
+    "b_Intercept", "Intercept", "sigma",
+    paste0("bs[", seq_len(ncol(sdata$Xs)), "]"),
+    paste0("s_1_1[", seq_len(ncol(sdata$Zs_1_1)), "]"),
+    paste0("s_2_1[", seq_len(ncol(sdata$Zs_2_1)), "]")
+  ))
+  expect_equal(
+    unname(posterior_smooths(stub, "s(z)")),
+    smooth_by_hand(sdata, stub$fit, "", 2L)
+  )
+})
+
+
+test_that("a smooth is evaluated on a frame holding its own variables", {
+  # brms fills every other variable from the fitted frame, `trials()`
+  # included, with a value it accepts.
+  stub <- smooth_stub(brms::bf(count | trials(size) ~ s(x)),
+                      family = binomial())
+  grid <- data.frame(x = c(-1, 0, 1))
+  sdata <- brms::standata(stub$obs_model,
+                          newdata = transform(grid, count = 0L, size = 10L),
+                          internal = TRUE)
+  stub$fit <- stub_draws(c(
+    "b_Intercept", "Intercept",
+    paste0("bs[", seq_len(ncol(sdata$Xs)), "]"),
+    paste0("s_1_1[", seq_len(ncol(sdata$Zs_1_1)), "]")
+  ))
+  expect_equal(
+    unname(posterior_smooths(stub, "s(x)", newdata = grid)),
+    smooth_by_hand(sdata, stub$fit, "", 1L)
+  )
+})
+
+
+test_that("a distributional parameter's smooth reads its own names", {
+  stub <- smooth_stub(brms::bf(y ~ 1, sigma ~ s(x)))
+  sdata <- brms::standata(stub$obs_model, internal = TRUE)
+  stub$fit <- stub_draws(c(
+    "b_Intercept", "Intercept", "b_sigma_Intercept", "Intercept_sigma",
+    paste0("bs_sigma[", seq_len(ncol(sdata$Xs_sigma)), "]"),
+    paste0("s_sigma_1_1[", seq_len(ncol(sdata$Zs_sigma_1_1)), "]")
+  ))
+  expect_equal(
+    unname(posterior_smooths(stub, "s(x)", dpar = "sigma")),
+    smooth_by_hand(sdata, stub$fit, "_sigma", 1L)
+  )
+  # The mean has no smooth of that name.
+  expect_error(posterior_smooths(stub, "s(x)"), "Available smooth terms")
 })
 
 
 # ---- Error paths ---------------------------------------------------
 
 test_that("posterior_smooths.mvgam errors on unknown smooth term", {
-  stub <- make_smooth_stub()
+  stub <- smooth_stub(brms::bf(y ~ 1 + s(z)))
   expect_error(
     posterior_smooths(stub, smooth = "s(nope)"),
     "Available smooth terms"
@@ -148,31 +236,16 @@ test_that("posterior_smooths.mvgam errors on unknown smooth term", {
 })
 
 
-test_that("posterior_smooths.mvgam rejects resp/dpar/nlpar", {
-  stub <- make_smooth_stub()
-  expect_error(posterior_smooths(stub, "s(z)", resp = "y"),
-               "brms-parity")
-  expect_error(posterior_smooths(stub, "s(z)", dpar = "mu"),
-               "brms-parity")
-  expect_error(posterior_smooths(stub, "s(z)", nlpar = "a"),
-               "brms-parity")
+test_that("posterior_smooths.mvgam takes one of 'dpar' and 'nlpar'", {
+  stub <- smooth_stub(brms::bf(y ~ 1 + s(z)))
+  expect_error(posterior_smooths(stub, "s(z)", dpar = "mu", nlpar = "a"),
+               "not both")
 })
 
 
 test_that("conditional_smooths.mvgam errors on no-smooth fits", {
-  set.seed(23L)
-  df <- data.frame(y = rnorm(15L), x = rnorm(15L))
-  sd_ <- brms::standata(
-    brms::bf(y ~ x), data = df,
-    family = brms::brmsfamily("gaussian")
-  )
-  stub <- structure(
-    list(formula = brms::bf(y ~ x), data = df,
-         family = brms::brmsfamily("gaussian"),
-         standata = as.list(sd_)),
-    class = "mvgam"
-  )
-  expect_error(conditional_smooths(stub), "no smooth terms")
+  expect_error(conditional_smooths(smooth_stub(brms::bf(y ~ x))),
+               "no smooth terms")
 })
 
 
@@ -191,143 +264,10 @@ test_that("subset_draws_rows validates ndraws and draw_ids", {
 })
 
 
-# ---- Edge cases: different basis families --------------------------
-
-test_that("mvgam_smooth_index handles cyclic cubic basis (bs = 'cc')", {
-  set.seed(31L); n <- 60L
-  df <- data.frame(y = rnorm(n), season = runif(n, 1, 12))
-  form <- brms::bf(y ~ s(season, bs = "cc"))
-  idx <- mvgam_smooth_index(form, df)
-  expect_identical(nrow(idx), 1L)
-  expect_identical(idx$term, "s(season, bs = \"cc\")")
-})
-
-
-test_that("mvgam_smooth_index handles thin-plate basis explicitly (bs = 'tp')", {
-  set.seed(33L); n <- 50L
-  df <- data.frame(y = rnorm(n), x = rnorm(n))
-  form <- brms::bf(y ~ s(x, bs = "tp", k = 8))
-  idx <- mvgam_smooth_index(form, df)
-  expect_identical(nrow(idx), 1L)
-  expect_identical(idx$term_idx, 1L)
-})
-
-
-# ---- Edge cases: multidimensional smooths --------------------------
-
-test_that("mvgam_smooth_index handles 2D smooths (s(x, y))", {
-  set.seed(35L); n <- 60L
-  df <- data.frame(y = rnorm(n), x = rnorm(n), z = rnorm(n))
-  form <- brms::bf(y ~ s(x, z))
-  idx <- mvgam_smooth_index(form, df)
-  expect_identical(nrow(idx), 1L)
-  expect_identical(idx$term, "s(x, z)")
-})
-
-
-test_that("mvgam_smooth_index handles tensor product t2(x, y)", {
-  set.seed(37L); n <- 60L
-  df <- data.frame(y = rnorm(n), x = rnorm(n), z = rnorm(n))
-  form <- brms::bf(y ~ t2(x, z))
-  idx <- mvgam_smooth_index(form, df)
-  expect_identical(nrow(idx), 1L)
-  expect_identical(idx$term, "t2(x, z)")
-})
-
-
-test_that("mvgam_smooth_index handles mixed s() and t2() in one formula", {
-  # brms supports `s()` and `t2()` (not `te()`/`ti()`), so the
-  # mixed-formula coverage tracks that surface.
-  set.seed(39L); n <- 60L
-  df <- data.frame(y = rnorm(n), x = rnorm(n), z = rnorm(n))
-  form <- brms::bf(y ~ s(x) + t2(x, z))
-  idx <- mvgam_smooth_index(form, df)
-  expect_identical(nrow(idx), 2L)
-  expect_identical(idx$term, c("s(x)", "t2(x, z)"))
-  expect_identical(idx$term_idx, c(1L, 2L))
-})
-
-
-# ---- Edge cases: by-factor multi-level expansion -------------------
-
-test_that("by-factor smooths produce one smframe row per level", {
-  set.seed(41L); n <- 60L
-  df <- data.frame(
-    y = rnorm(n), z = rnorm(n),
-    grp = factor(sample(letters[1:4], n, replace = TRUE),
-                 levels = letters[1:4])
-  )
-  form <- brms::bf(y ~ s(z, by = grp))
-  idx <- mvgam_smooth_index(form, df)
-  expect_identical(nrow(idx), 4L)
-  expect_identical(idx$by_level, c("a", "b", "c", "d"))
-  expect_identical(unique(idx$term), "s(z, by = grp)")
-  expect_identical(idx$row, 1:4)
-})
-
-
-test_that("by-factor on a 2D smooth expands per by-level", {
-  set.seed(43L); n <- 60L
-  df <- data.frame(
-    y = rnorm(n), x = rnorm(n), z = rnorm(n),
-    grp = factor(sample(letters[1:3], n, replace = TRUE),
-                 levels = letters[1:3])
-  )
-  form <- brms::bf(y ~ t2(x, z, by = grp))
-  idx <- mvgam_smooth_index(form, df)
-  expect_identical(nrow(idx), 3L)
-  expect_identical(unique(idx$term), "t2(x, z, by = grp)")
-})
-
-
-test_that("numeric by= produces a single smframe row (no expansion)", {
-  set.seed(45L); n <- 50L
-  df <- data.frame(y = rnorm(n), x = rnorm(n), w = rnorm(n))
-  form <- brms::bf(y ~ s(x, by = w))
-  idx <- mvgam_smooth_index(form, df)
-  expect_identical(nrow(idx), 1L)
-  expect_identical(idx$term, "s(x, by = w)")
-  expect_identical(idx$by_var, "w")
-  expect_true(is.na(idx$by_level))
-})
-
-
-# ---- Edge cases: mixed multi-smooth formulas -----------------------
-
-test_that("multiple smooths with mixed types and by-factor get sequential rows", {
-  set.seed(47L); n <- 80L
-  df <- data.frame(
-    y = rnorm(n), x = rnorm(n), z = rnorm(n), w = rnorm(n),
-    grp = factor(sample(letters[1:3], n, replace = TRUE))
-  )
-  form <- brms::bf(y ~ s(x) + s(z, by = grp) + t2(x, w))
-  idx <- mvgam_smooth_index(form, df)
-  # 1 (s(x)) + 3 (s(z,by=grp)) + 1 (t2(x,w)) = 5
-  expect_identical(nrow(idx), 5L)
-  expect_identical(idx$term_idx, c(1L, 2L, 2L, 2L, 3L))
-  expect_identical(idx$row, 1:5)
-  expect_identical(
-    idx$term,
-    c("s(x)", rep("s(z, by = grp)", 3L), "t2(x, w)")
-  )
-})
-
-
 # ---- Conditional_smooths grid builder edge cases -------------------
 
 test_that("build_smooth_grid surface=TRUE uses resolution^2 for 2D", {
-  set.seed(51L); n <- 60L
-  df <- data.frame(y = rnorm(n), x = rnorm(n), z = rnorm(n))
-  sd_ <- brms::standata(
-    brms::bf(y ~ s(x, z)), data = df,
-    family = brms::brmsfamily("gaussian")
-  )
-  stub <- structure(
-    list(formula = brms::bf(y ~ s(x, z)), data = df,
-         family = brms::brmsfamily("gaussian"),
-         standata = as.list(sd_)),
-    class = "mvgam"
-  )
+  stub <- smooth_stub(brms::bf(y ~ s(x, z)))
   hit <- mvgam_smooth_terms(stub)[[1L]]
   g <- build_smooth_grid(stub, hit, surface = TRUE, facets = 3L,
                           resolution = 10L, int_conditions = NULL,
@@ -338,18 +278,7 @@ test_that("build_smooth_grid surface=TRUE uses resolution^2 for 2D", {
 
 
 test_that("build_smooth_grid surface=FALSE for 2D uses focal x facets", {
-  set.seed(53L); n <- 60L
-  df <- data.frame(y = rnorm(n), x = rnorm(n), z = rnorm(n))
-  sd_ <- brms::standata(
-    brms::bf(y ~ s(x, z)), data = df,
-    family = brms::brmsfamily("gaussian")
-  )
-  stub <- structure(
-    list(formula = brms::bf(y ~ s(x, z)), data = df,
-         family = brms::brmsfamily("gaussian"),
-         standata = as.list(sd_)),
-    class = "mvgam"
-  )
+  stub <- smooth_stub(brms::bf(y ~ s(x, z)))
   hit <- mvgam_smooth_terms(stub)[[1L]]
   # facets = 5 should produce 5 levels of the second covariate
   g <- build_smooth_grid(stub, hit, surface = FALSE, facets = 5L,
@@ -361,40 +290,20 @@ test_that("build_smooth_grid surface=FALSE for 2D uses focal x facets", {
 
 
 test_that("int_conditions overrides the focal-covariate grid values", {
-  set.seed(55L); n <- 60L
-  df <- data.frame(y = rnorm(n), x = rnorm(n))
-  sd_ <- brms::standata(
-    brms::bf(y ~ s(x)), data = df,
-    family = brms::brmsfamily("gaussian")
-  )
-  stub <- structure(
-    list(formula = brms::bf(y ~ s(x)), data = df,
-         family = brms::brmsfamily("gaussian"),
-         standata = as.list(sd_)),
-    class = "mvgam"
-  )
+  stub <- smooth_stub(brms::bf(y ~ s(x)))
   hit <- mvgam_smooth_terms(stub)[[1L]]
   g <- build_smooth_grid(stub, hit, surface = TRUE, facets = 3L,
                           resolution = 20L,
                           int_conditions = list(x = c(-1, 0, 1)),
                           too_far = 0)
   expect_identical(g$newdata$x, c(-1, 0, 1))
+  # The grid holds the term's own variable alone.
+  expect_identical(names(g$newdata), "x")
 })
 
 
 test_that("int_conditions accepts a function applied to the data", {
-  set.seed(57L); n <- 60L
-  df <- data.frame(y = rnorm(n), x = rnorm(n))
-  sd_ <- brms::standata(
-    brms::bf(y ~ s(x)), data = df,
-    family = brms::brmsfamily("gaussian")
-  )
-  stub <- structure(
-    list(formula = brms::bf(y ~ s(x)), data = df,
-         family = brms::brmsfamily("gaussian"),
-         standata = as.list(sd_)),
-    class = "mvgam"
-  )
+  stub <- smooth_stub(brms::bf(y ~ s(x)))
   hit <- mvgam_smooth_terms(stub)[[1L]]
   g <- build_smooth_grid(stub, hit, surface = TRUE, facets = 3L,
                           resolution = 20L,
@@ -405,18 +314,7 @@ test_that("int_conditions accepts a function applied to the data", {
 })
 
 
-# ---- resolve_mvgam_smooth tolerates whitespace differences ---------
-
-test_that("resolve_mvgam_smooth normalises whitespace in user-supplied label", {
-  stub <- make_smooth_stub(by_factor = TRUE)
-  # brms canonical is "s(z, by = grp)"; user might pass
-  # "s(z,by=grp)" or "s(z,  by =  grp)".
-  hit1 <- resolve_mvgam_smooth(stub, "s(z,by=grp)")
-  hit2 <- resolve_mvgam_smooth(stub, "s(z,  by =  grp)")
-  expect_identical(hit1$term, "s(z, by = grp)")
-  expect_identical(hit2$term, "s(z, by = grp)")
-})
-
+# ---- Drawing -------------------------------------------------------
 
 test_that("plot.mvgam_conditional_smooths dispatches on the mvgam class", {
   # Mock a 1D smooth's summary data.frame with the columns
@@ -459,58 +357,22 @@ test_that("plot.mvgam_conditional_smooths dispatches on the mvgam class", {
 })
 
 
-test_that("a smooth label parses under a family carrying an aterm", {
-  # `y | trials(n) ~ s(x)` only parses when brms knows the family:
-  # with none to hand it assumes gaussian, for which `trials()` is
-  # not a legal addition term, and rejects the formula. Every side
-  # formula mvgam builds is a `brmsformula`, so the family has to be
-  # attached on the strength of whether one is already there.
-  f <- brms::bf(y | trials(n) ~ s(x))
-  expect_null(f$family)
-
-  spec <- mvgam:::mvgam_smooth_label_spec(f, family = brms::brmsfamily("binomial"))
-  expect_false(is.null(spec))
-  expect_identical(spec$labels, "s(x)")
-
-  # Without a family the same formula is refused, which is what the
-  # caller was silently doing.
-  expect_error(mvgam:::mvgam_smooth_label_spec(f))
-
-  # A formula that names its own family keeps it rather than having
-  # the caller's substituted.
-  own <- brms::bf(y | trials(n) ~ s(x), family = brms::brmsfamily("binomial"))
-  expect_identical(
-    mvgam:::mvgam_smooth_label_spec(own, family = stats::gaussian())$labels,
-    "s(x)"
+test_that("spaghetti draws one line per draw from its own columns", {
+  # The overlay is built by `build_spaghetti_data()` and drawn by
+  # the 1D panel, and the two have to name the same columns.
+  grid <- data.frame(x = seq(-1, 1, length.out = 5L))
+  eta <- matrix(rnorm(3L * 5L), nrow = 3L)
+  df <- data.frame(
+    x = grid$x, effect1__ = grid$x, cond__ = factor(1L),
+    estimate__ = colMeans(eta), lower__ = -1, upper__ = 1
   )
-})
-
-
-test_that("the trend side is read as gaussian and the obs side is not", {
-  fit <- structure(list(family = brms::brmsfamily("binomial")),
-                   class = "mvgam")
-  expect_identical(mvgam:::mvgam_side_family(fit, "obs")$family, "binomial")
-  expect_identical(mvgam:::mvgam_side_family(fit, "trend")$family, "gaussian")
-})
-
-
-test_that("an integer-valued grid column is held at a whole number", {
-  # A median lands between two observations on an even-length column,
-  # and brms refuses a fractional number of trials.
-  expect_true(mvgam:::is_integer_valued(c(1, 2, 3, 4)))
-  expect_true(mvgam:::is_integer_valued(c(10L, 20L, NA)))
-  expect_false(mvgam:::is_integer_valued(c(1.5, 2.5)))
-  expect_false(mvgam:::is_integer_valued(character(0)))
-  expect_false(mvgam:::is_integer_valued(numeric(0)))
-
-  grid <- data.frame(x = c(0, 1))
-  mf <- data.frame(x = c(0, 1), n = c(179L, 180L), y = c(1L, 2L))
-  filled <- mvgam:::backfill_smooth_grid(
-    grid, list(data = mf), y | trials(n) ~ s(x) + n,
-    covars = "x", byvars = character(0)
-  )
-  expect_equal(filled$n, rep(round(stats::median(mf$n)), nrow(grid)))
-  expect_equal(filled$n, filled$n %/% 1)
+  attr(df, "effects") <- "x"
+  attr(df, "surface") <- FALSE
+  attr(df, "spaghetti") <- build_spaghetti_data(eta, df, "x")
+  built <- ggplot2::ggplot_build(build_mvgam_smooth_plot(df, "mu: s(x)"))
+  lines <- built$data[[2L]]
+  expect_identical(length(unique(lines$group)), 3L)
+  expect_equal(sort(lines$y), sort(as.numeric(eta)))
 })
 
 

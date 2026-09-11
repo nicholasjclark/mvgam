@@ -586,22 +586,6 @@ resolve whichever is present rather than fixing one.
 
 ## com_binomial and the trials aterm
 
-**61. The smooth grid omits a distributional parameter's covariate.**
-
-Same fit. `plot(type = "smooths")` stops with
-
-    The following variables can neither be found in 'data' nor in
-    'data2': 'z'
-
-`z` is the predictor of `nu`, not of the mean. The grid the smooth is
-drawn over backfills the columns the mean's formula names and holds
-them at representative values, and a covariate that appears only in a
-dpar sub-formula is not among them, so brms is handed a frame missing
-a variable the model needs.
-
-The denominator reaches the same grid correctly, so the backfill
-handles aterm columns and not dpar ones.
-
 **A difference worth recording, for the family work to settle.** The
 lower bound on `nu` differs between the two spellings: scalar `nu` is
 truncated, reaching Stan as

@@ -324,13 +324,8 @@ test_that("pp_check.mvgam: resp + draw_ids are accepted (brms parity)", {
 
 
 # -------------------------------------------------------------------------
-# extract_component_linpred / extract_trend_latent_states signature gates
+# extract_trend_latent_states
 # -------------------------------------------------------------------------
-
-test_that("extract_component_linpred: incl_latent_state arg exists", {
-  fmls <- names(formals(extract_component_linpred))
-  expect_true("incl_latent_state" %in% fmls)
-})
 
 test_that("extract_trend_latent_states: missing trend[t,s] column errors", {
   # Hand-build a [3 x 4] draws matrix containing only trend[1,1] and

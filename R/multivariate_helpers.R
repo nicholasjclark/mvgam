@@ -180,17 +180,15 @@ response_column <- function(object, resp = NULL) {
 #' A model with several responses names each response's parameters
 #' with its key appended, as in `sigma_count` or
 #' `b_count_Intercept`. A model with one response appends nothing,
-#' whichever `resp` a caller passed.
+#' whichever `resp` a caller passed. The rule is `predictor_suffix()`'s.
 #'
 #' @param object A fitted `mvgam` object
 #' @param resp The response's key, or `NULL`
 #' @return `""`, or `"_<resp>"`
 #' @noRd
 response_suffix <- function(object, resp = NULL) {
-  if (is.null(resp) || length(response_formulas(object)) == 1L) {
-    return("")
-  }
-  paste0("_", resp)
+  several <- length(response_formulas(object)) > 1L
+  predictor_suffix(resp = if (several) resp)
 }
 
 

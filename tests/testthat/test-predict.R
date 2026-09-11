@@ -1,88 +1,39 @@
-test_that("create_mock_stanfit validates input", {
-  # Valid draws_matrix input
-  valid_matrix <- matrix(rnorm(20), nrow = 4, ncol = 5)
-  colnames(valid_matrix) <- paste0("param_", 1:5)
-  valid_draws <- posterior::as_draws_matrix(valid_matrix)
-
-  result <- create_mock_stanfit(valid_draws)
-  expect_s3_class(result, "mock_stanfit")
-  expect_equal(result$draws_cache, valid_draws)
-
-  # Invalid inputs
+test_that("a monotonic variable is read as brms codes it", {
+  # brms codes a variable with D + 1 levels as 0..D in every frame. A
+  # frame holding only the upper levels starts at 1, and its values
+  # are read as they stand: shifting them to start at 0 would put
+  # every row a level low.
+  expect_identical(
+    validate_monotonic_indices(c(0, 1, 2, 1, 0), "Xmo_1", 2L, 5L),
+    c(0L, 1L, 2L, 1L, 0L)
+  )
+  expect_identical(
+    validate_monotonic_indices(c(2, 2, 1), "Xmo_1", 2L, 3L),
+    c(2L, 2L, 1L)
+  )
   expect_error(
-    create_mock_stanfit("not_a_matrix"),
-    "Must inherit from class 'draws_matrix'"
+    validate_monotonic_indices(c(0, 3), "Xmo_1", 2L, 2L),
+    "outside its coding"
   )
-
   expect_error(
-    create_mock_stanfit(matrix(1:4, nrow = 2)),
-    "Must inherit from class 'draws_matrix'"
-  )
-})
-
-test_that("has_nlpars correctly detects nonlinear formulas", {
-  # Test with brmsformula objects
-  linear_formula <- structure(
-    list(
-      formula = structure(y ~ x, nl = FALSE),
-      pforms = NULL
-    ),
-    class = "brmsformula"
-  )
-  expect_false(has_nlpars(linear_formula))
-
-  nonlinear_formula <- structure(
-    list(
-      formula = structure(y ~ x, nl = TRUE),
-      pforms = list(b1 = ~ 1, b2 ~ x)
-    ),
-    class = "brmsformula"
-  )
-  expect_true(has_nlpars(nonlinear_formula))
-
-  # Test with invalid objects
-  expect_error(
-    has_nlpars("not_a_formula"),
-    "Assertion failed.*One of the following must apply"
-  )
-})
-
-test_that("validate_monotonic_indices handles indexing correctly", {
-  # Test 0-based indexing (already correct)
-  indices_0 <- c(0, 1, 2, 1, 0)
-  result_0 <- validate_monotonic_indices(indices_0, "Xmo_1", 3, 5)
-  expect_equal(result_0, c(0, 1, 2, 1, 0))
-
-  # Test 1-based indexing (needs conversion)
-  indices_1 <- c(1, 2, 3, 2, 1)
-  result_1 <- validate_monotonic_indices(indices_1, "Xmo_1", 3, 5)
-  expect_equal(result_1, c(0, 1, 2, 1, 0))
-
-  # Test invalid range
-  expect_error(
-    validate_monotonic_indices(c(0, 5), "Xmo_1", 3, 2),
-    "invalid index range"
-  )
-
-  # Test wrong length
-  expect_error(
-    validate_monotonic_indices(c(0, 1), "Xmo_1", 3, 5),
-    "has.*elements but expected.*observations"
+    validate_monotonic_indices(c(0, 1), "Xmo_1", 2L, 5L),
+    "does not cover"
   )
 })
 
 test_that("spd_gp_exp_quad computes spectral density correctly", {
-  # Simple test case
+  # brms's anisotropic `spd_gp_exp_quad()`: sdgp^2 * sqrt(2 pi)^D *
+  # prod(l) * exp(-0.5 * sum(l^2 * x^2)), one row per draw.
   slambda <- array(c(1, 2, 3, 4), dim = c(2, 2))
   sdgp <- c(0.5, 0.8)
   lscale <- matrix(c(1.0, 1.5, 2.0, 2.5), nrow = 2, ncol = 2)
 
   result <- spd_gp_exp_quad(slambda, sdgp, lscale)
-
-  expect_true(is.matrix(result))
-  expect_equal(dim(result), c(2, 2))  # n_draws x n_basis
-  expect_true(all(result >= 0))  # Spectral density should be non-negative
-  expect_true(all(is.finite(result)))
+  expected <- outer(seq_len(2), seq_len(2), Vectorize(function(d, m) {
+    sdgp[d]^2 * sqrt(2 * pi)^2 * prod(lscale[d, ]) *
+      exp(-0.5 * sum(lscale[d, ]^2 * slambda[m, ]^2))
+  }))
+  expect_equal(result, expected)
 
   # Test input validation
   expect_error(
@@ -96,27 +47,40 @@ test_that("spd_gp_exp_quad computes spectral density correctly", {
   )
 })
 
-test_that("compute_spd_vectorized dispatches correctly", {
-  slambda <- array(c(1, 2), dim = c(1, 2))
-  sdgp <- 0.5
-  lscale <- matrix(c(1.0, 1.5), nrow = 1)
+test_that("each draw's spectral density is its own", {
+  # An isotropic kernel's density at a draw depends on that draw's
+  # length scale alone. The Matern kernels summed the length scale over
+  # every draw, which no single-draw call can show.
+  slambda <- array(c(0.5, 1, 1.5), dim = c(3, 1))
+  sdgp <- c(0.5, 2)
+  lscale <- matrix(c(1, 3), nrow = 2)
+  for (kernel in c("exp_quad", "matern32", "matern52")) {
+    both <- compute_spd_vectorized(slambda, sdgp, lscale, kernel)
+    alone <- rbind(
+      compute_spd_vectorized(slambda, sdgp[1], lscale[1, , drop = FALSE],
+                             kernel),
+      compute_spd_vectorized(slambda, sdgp[2], lscale[2, , drop = FALSE],
+                             kernel)
+    )
+    expect_equal(both, alone)
+  }
+})
 
-  # Test valid kernel dispatch
-  result_exp <- compute_spd_vectorized(slambda, sdgp, lscale, "exp_quad")
-  expect_true(is.matrix(result_exp))
-  expect_true(all(result_exp >= 0))
 
-  result_m32 <- compute_spd_vectorized(slambda, sdgp, lscale, "matern32")
-  expect_true(is.matrix(result_m32))
-  expect_true(all(result_m32 >= 0))
-
-  result_m52 <- compute_spd_vectorized(slambda, sdgp, lscale, "matern52")
-  expect_true(is.matrix(result_m52))
-  expect_true(all(result_m52 >= 0))
-
-  # Test invalid kernel
+test_that("the Matern 3/2 density is the one brms writes in Stan", {
+  # brms's `spd_gp_matern32()` for one dimension:
+  # sdgp^2 * 2 * sqrt(pi) * gamma(2) * 3^1.5 / (0.5 * sqrt(pi)) * l *
+  # (3 + l^2 * x^2)^-2.
+  x <- c(0.5, 1, 1.5)
+  sdgp <- 2
+  l <- 3
+  expected <- sdgp^2 * 4 * 3^1.5 * l * (3 + l^2 * x^2)^-2
+  got <- compute_spd_vectorized(array(x, dim = c(3, 1)), sdgp,
+                                matrix(l), "matern32")
+  expect_equal(as.vector(got), sqrt(expected))
   expect_error(
-    compute_spd_vectorized(slambda, sdgp, lscale, "invalid_kernel"),
+    compute_spd_vectorized(array(x, dim = c(3, 1)), sdgp, matrix(l),
+                           "periodic"),
     "Must be element of set"
   )
 })
@@ -134,30 +98,12 @@ test_that("categorize_mvgam_parameters validates input", {
   )
 })
 
-test_that("extract_parameters_by_type validates input", {
-  # Test with invalid mvgam_fit argument
-  expect_error(
-    extract_parameters_by_type("not_mvgam", type = "observation"),
-    "Must inherit from class 'mvgam'"
-  )
-
-  # Test with invalid type argument - class validation happens first
-  expect_error(
-    extract_parameters_by_type(list(class = "test"), type = "invalid"),
-    "Must inherit from class 'mvgam'"
-  )
-})
-
-test_that("extract_obs_parameters returns character vector", {
-  # Validate return type specification by checking function exists
-  # and documentation promises character(0) on missing parameters
-  expect_true(is.function(extract_obs_parameters))
-})
-
-test_that("extract_trend_parameters returns character vector", {
-  # Validate return type specification by checking function exists
-  # and documentation promises character(0) on missing parameters
-  expect_true(is.function(extract_trend_parameters))
+test_that("side_parameters() takes a fit and one of its two sides", {
+  expect_error(side_parameters("not_mvgam", "obs"),
+               "Must inherit from class 'mvgam'")
+  expect_error(side_parameters(structure(list(), class = "mvgam"),
+                               "observation"),
+               "Must be element of set")
 })
 
 # ==============================================================================
