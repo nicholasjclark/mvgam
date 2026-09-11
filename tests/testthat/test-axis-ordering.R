@@ -1194,7 +1194,7 @@ axis_matrix <- function() {
     # design is refused rather than silently sized by the largest.
     list("hier unbalanced", "hier_unbal",
          ~ AR(p = 1, gr = region, subgr = species), "refuse", "uni",
-         "equal"),
+         "unbalanced groups"),
 
     list("hier / RW", "hier", ~ RW(gr = region, subgr = species),
          "sound", "uni"),

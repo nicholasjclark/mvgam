@@ -258,7 +258,7 @@ lfo_cv.mvgam <- function(object,
         x = paste0("Series with a different time grid: ",
                    paste(bad, collapse = ", "), "."),
         i = paste0("Align series to a common time grid (NA-pad ",
-                   "the response where needed), or evaluate each ",
+                   "the response where needed) or evaluate each ",
                    "series in a separate 'lfo_cv()' call.")
       )))
     }
@@ -279,7 +279,7 @@ lfo_cv.mvgam <- function(object,
              ") exceeds the available time span (",
              n_times, " observed times)."),
       i = paste0("Choose 'fc_horizon' < ", n_times,
-                 " so there is room for at least one ",
+                 " to leave room for at least one ",
                  "training observation.")
     )))
   }
@@ -1177,7 +1177,7 @@ stack_mvgam_lfo <- function(models, model_names) {
         "Pointwise log-likelihood matrices have different widths.",
         x = paste0("Model ", i, " has ", ncol(ll_list[[i]]),
                    " columns; model 1 has ", ref_cols, "."),
-        i = paste0("Re-run lfo_cv() on all models against the ",
+        i = paste0("Run lfo_cv() again on all models against the ",
                    "same newdata and rolling-origin grid.")
       )))
     }

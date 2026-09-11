@@ -26,8 +26,8 @@ mvgam_removed_args <- c(
     "'trend_formula = ~ AR(p = 1)'"
   ),
   trend_knots = paste0(
-    "knot values are named by covariate rather than by formula, so ",
-    "'knots' is the one argument for the model"
+    "knot values are named by covariate, and 'knots' is the one ",
+    "argument for the model"
   ),
   use_lv = paste0(
     "a dynamic factor model is requested with 'n_lv' on the trend ",

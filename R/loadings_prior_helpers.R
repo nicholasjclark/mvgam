@@ -119,7 +119,7 @@ align_feature_rows <- function(df, series_levels) {
     ),
     i = paste0(
       "Add a 'series' column, set rownames(features) to the ",
-      "series levels, or supply rows in factor-level order."
+      "series levels or supply rows in factor-level order."
     )
   )))
 }

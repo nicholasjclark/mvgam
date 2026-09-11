@@ -340,7 +340,7 @@ ordinate_trait_arrows <- function(traits, loadings_2d,
         ", species: ", length(species_names), "."
       ),
       i = paste0(
-        "Set 'rownames(traits)' to the species labels, or supply ",
+        "Set 'rownames(traits)' to the species labels or supply ",
         "one row per species in the same order as the fit's ",
         "series levels."
       )
@@ -441,7 +441,10 @@ ordinate_build_plot <- function(svd_comp, which_lvs, biplot,
   }
   if (length(site_names) != NROW(svd_comp$scores)) {
     stop(insight::format_error(c(
-      "Site-label count does not match factor-score row count.",
+      paste0(
+        "The number of site labels does not match the number of ",
+        "factor-score rows."
+      ),
       x = paste0(
         "labels: ", length(site_names),
         ", lv_trend rows: ", NROW(svd_comp$scores), "."
@@ -770,7 +773,7 @@ resolve_auto_traits <- function(traits, object) {
     stop(insight::format_error(c(
       "Argument 'traits' string value must be 'auto'.",
       x = paste0("Got '", traits[1L], "'."),
-      i = "Use traits = NULL, traits = 'auto', or a data.frame."
+      i = "Use traits = NULL, traits = 'auto' or a data.frame."
     )))
   }
   found <- ordinate_extract_fit_traits(object)

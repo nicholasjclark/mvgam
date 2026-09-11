@@ -94,8 +94,8 @@ ranef.mvgam <- function(object, summary = TRUE, robust = FALSE,
   if (is.null(meta)) {
     stop(insight::format_error(c(
       paste0(
-        "Cannot extract group-level effects: this 'mvgam' object ",
-        "has no observation-side random effects."
+        "Cannot extract group-level effects: the observation model ",
+        "of this 'mvgam' object has no random effects."
       ),
       i = paste0(
         "Add group-level terms via '(1 | g)' / '(x | g)' / ",

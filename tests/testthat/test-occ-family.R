@@ -82,7 +82,7 @@ test_that("validate_closure_unit_data() rejects non-binary y under occ", {
       binary_y_check = TRUE,
       cap_required   = FALSE
     ),
-    "Binary-response closure-unit family requires"
+    "closure-unit family with a binary response requires"
   )
 })
 

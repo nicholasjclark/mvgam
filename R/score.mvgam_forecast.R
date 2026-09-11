@@ -180,13 +180,13 @@ score.mvgam_forecast <- function(object,
     stop(insight::format_error(c(
       paste0("'log = TRUE' does not apply to score '", score, "'."),
       x = paste0(
-        "It is honoured by ",
+        "It is honoured only by ",
         paste0("'", scores_honouring_log, "'", collapse = ", "),
-        ", which score on the scale of the response."
+        ". These score on the scale of the response."
       ),
       i = paste0(
-        "Score on the log scale by transforming the response ",
-        "before fitting, or choose one of the scores above."
+        "To score on the log scale, transform the response ",
+        "before fitting or choose one of the scores above."
       )
     )))
   }
@@ -251,8 +251,9 @@ validate_scoreable_forecast <- function(object, score) {
       x = paste0("Got family = ",
                  paste0("'", unique(families), "'", collapse = ", "),
                  "."),
-      i = paste0("Use 'crps' / 'drps' / 'logs' for other families, or ",
-                 "score a single bernoulli response's forecast.")
+      i = paste0("Use 'crps' / 'drps' / 'logs' for other families. ",
+                 "For 'brier', score a single bernoulli response's ",
+                 "forecast.")
     )))
   }
   invisible(NULL)

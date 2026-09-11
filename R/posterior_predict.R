@@ -127,7 +127,7 @@ extract_truncation_bounds <- function(object, nobs) {
       if (!identical(Sys.getenv("TESTTHAT"), "true")) {
         rlang::warn(
           c(
-            "Variable truncation bounds not yet supported for predictions.",
+            "Variable truncation bounds are not supported for predictions.",
             "i" = "Truncation will be ignored for posterior_predict."
           ),
           .frequency = "once",
@@ -149,7 +149,7 @@ extract_truncation_bounds <- function(object, nobs) {
       if (!identical(Sys.getenv("TESTTHAT"), "true")) {
         rlang::warn(
           c(
-            "Variable truncation bounds not yet supported for predictions.",
+            "Variable truncation bounds are not supported for predictions.",
             "i" = "Truncation will be ignored for posterior_predict."
           ),
           .frequency = "once",

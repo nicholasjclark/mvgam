@@ -976,9 +976,10 @@ add_all_gp_contributions <- function(eta, prep, brmsfit = NULL, resp = NULL) {
         # detect_gp_terms already validated Xgp_g + slambda_g.
         if (is.null(Igp_g) || is.null(Jgp_g)) {
           stop(insight::format_error(c(
-            cli::format_inline(
-              "By-factor GP term {.field {id}} level {g} is missing observation-to-basis mappings."
-            ),
+            cli::format_inline(paste0(
+              "By-factor GP term {.field {id}} level {g} has no ",
+              "mapping from observations to basis functions."
+            )),
             x = cli::format_inline(
               "Required: Igp_{id}_{g} and Jgp_{id}_{g} in standata."
             )
@@ -1309,12 +1310,14 @@ population_random_pred <- function(prep, draws_mat, n_draws, n_obs) {
           "Prediction for a grouping level the model never saw is ",
           "not supported."
         ),
-        x = cli::format_inline(
-          "Grouping factor {.field {group_name %||% J_name}} was fitted with {ncol(r_draws)} level{?s}, and 'newdata' asks for {max(J)}."
-        ),
+        x = cli::format_inline(paste0(
+          "Grouping factor {.field {group_name %||% J_name}} was ",
+          "fitted with {ncol(r_draws)} level{?s}. 'newdata' asks for ",
+          "{max(J)}."
+        )),
         i = paste0(
           "Use 're_formula = NA' to predict from the population ",
-          "effects instead, or supply 'newdata' whose levels the ",
+          "effects or supply 'newdata' whose levels the ",
           "model was fitted to."
         )
       )), call. = FALSE)

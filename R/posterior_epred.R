@@ -196,8 +196,8 @@ compute_family_epred <- function(linpred, family, trials = NULL,
         "' has no mean this dispatch can compute."
       ),
       i = paste0(
-        "A closure-unit family's mean reads the unit's other visits, ",
-        "so it needs the per-fit `p` draws and arrays that the ",
+        "A closure-unit family's mean reads the unit's other visits. ",
+        "It needs the fit's `p` draws and the arrays that the ",
         "kernels in dispatch_closure_unit_method() supply."
       )
     ))),
@@ -220,9 +220,11 @@ compute_family_epred <- function(linpred, family, trials = NULL,
     "sratio" = ,
     "cratio" = ,
     "acat" = stop(insight::format_error(
-      cli::format_inline(
-        "Family {.val {family_name}} is not yet supported for {.fn posterior_epred}. Ordinal models require threshold parameters."
-      )
+      cli::format_inline(paste0(
+        "Family {.val {family_name}} has no mean this dispatch can ",
+        "compute from the linear predictor alone. Ordinal models ",
+        "require threshold parameters."
+      ))
     )),
 
     # Default: try inverse link with warning for unknown families
@@ -911,9 +913,9 @@ family_mean_from_kernel <- function(family_name, mu, family_pars,
       x = paste0("Missing: ", paste(shQuote(missing), collapse = ", "), "."),
       i = paste0(
         "Resolve them with `resolve_family_pars()` and pass them as ",
-        "'family_pars'. What separates E[Y] from the base ",
-        "distribution's parameter is a mixing probability, a shift or ",
-        "a dispersion, depending on the family."
+        "'family_pars'. Depending on the family, a mixing ",
+        "probability, a shift or a dispersion separates E[Y] from ",
+        "the base distribution's parameter."
       )
     )))
   }

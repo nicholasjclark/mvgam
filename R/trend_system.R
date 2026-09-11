@@ -60,7 +60,10 @@ register_trend_type <- function(name, supports_factors = FALSE,
           cli::format_inline(
             "Invalid prior specification for parameter {.field {param_name}}."
           ),
-          i = "Each prior specification must be a named list with 'default', 'bounds', and 'description' elements."
+          i = paste0(
+            "Each prior specification must be a named list with ",
+            "'default', 'bounds' and 'description' elements."
+          )
         )))
       }
       required_fields <- c("default", "bounds", "description")
@@ -1723,9 +1726,10 @@ parse_trend_formula <- function(trend_formula, data = NULL, .precomputed_dimensi
       x = cli::format_inline(
         "The {.field trend_formula} has no terms and no intercept specification."
       ),
-      i = cli::format_inline(
-        "Use {.code ~ 1}, {.code ~ -1}, or include predictors/trend constructors."
-      )
+      i = cli::format_inline(paste0(
+        "Use {.code ~ 1}, {.code ~ -1} or include predictors/trend ",
+        "constructors."
+      ))
     )))
   }
 
@@ -1825,7 +1829,10 @@ parse_trend_formula <- function(trend_formula, data = NULL, .precomputed_dimensi
         ),
         x = "CAR models use irregular time intervals that vary by series in multivariate settings.",
         i = "Remove covariates from the trend formula or use a different trend type.",
-        i = "Note: Univariate CAR models (single series) can include trend covariates."
+        i = paste0(
+          "Univariate CAR models (single series) can include trend ",
+          "covariates."
+        )
       )), call. = FALSE)
     }
   }
@@ -3266,8 +3273,9 @@ assert_trend_df <- function(df) {
       "Argument 'df' must be greater than 2.",
       x = paste0("Got 'df = ", df, "'."),
       i = paste0(
-        "At or below 2 the innovations have no finite variance, so the ",
-        "stationary initialisation of an autoregressive trend is undefined."
+        "At or below 2 the innovations have no finite variance. The ",
+        "stationary initialisation of an autoregressive trend is then ",
+        "undefined."
       )
     )))
   }

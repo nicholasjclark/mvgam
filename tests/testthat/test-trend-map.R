@@ -246,7 +246,7 @@ test_that("data.frame with max(trend) > n_series errors", {
 test_that("integer-vector input is rejected (no implicit ordering)", {
   expect_error(
     mvgam:::normalise_trend_map(c(1L, 1L, 2L), .make_data(3L)),
-    "matrix, data.frame, or character"
+    "matrix, data.frame or character"
   )
 })
 
@@ -254,7 +254,7 @@ test_that("list input is rejected", {
   expect_error(
     mvgam:::normalise_trend_map(list(trend1 = "s1", trend2 = "s2"),
                                 .make_data(3L)),
-    "matrix, data.frame, or character"
+    "matrix, data.frame or character"
   )
 })
 

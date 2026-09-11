@@ -207,7 +207,7 @@ resolve_series <- function(series, series_levels) {
     return(match(series, series_levels))
   }
   stop(insight::format_error(
-    "'series' must be NULL, numeric, character, or 'all'."
+    "'series' must be NULL, numeric, character or 'all'."
   ))
 }
 

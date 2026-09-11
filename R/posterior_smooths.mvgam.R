@@ -100,11 +100,11 @@ posterior_smooths.mvgam <- function(object, smooth, newdata = NULL,
     stop(insight::format_error(c(
       paste0(
         "'resp', 'dpar' and 'nlpar' are accepted for ",
-        "brms-parity but not yet supported on 'mvgam' fits."
+        "brms-parity but are not supported on 'mvgam' fits."
       ),
       i = paste0(
-        "mvgam fits are currently univariate on a single ",
-        "distributional parameter."
+        "'posterior_smooths()' evaluates the smooths of one ",
+        "response on a single distributional parameter."
       )
     )))
   }

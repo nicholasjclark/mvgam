@@ -149,7 +149,7 @@ loo.mvgam <- function(x, ...,
     stop(insight::format_error(c(
       cli::format_inline(paste0(
         "{.field pointwise = TRUE} streaming log-likelihood is not ",
-        "yet supported on mvgam."
+        "supported on mvgam."
       )),
       i = cli::format_inline(
         "Compute LOO in-memory by leaving {.field pointwise = FALSE}."
@@ -159,10 +159,14 @@ loo.mvgam <- function(x, ...,
   if (isTRUE(moment_match) || isTRUE(reloo)) {
     stop(insight::format_error(c(
       cli::format_inline(paste0(
-        "{.field moment_match} and {.field reloo} are not yet ",
+        "{.field moment_match} and {.field reloo} are not ",
         "supported on mvgam."
       )),
-      i = "These require model refits; revisit once the C++ trend extrapolator lands."
+      i = paste0(
+        "These options require model refits. Inspect the Pareto k ",
+        "diagnostics from 'loo()' and refit without problematic ",
+        "observations if needed."
+      )
     )))
   }
 
@@ -400,8 +404,8 @@ per_obs_series_labels <- function(x) {
       "by_series = TRUE is not meaningful for multi-response families.",
       x = paste0(
         "Family '", resolve_family_name(x$family) %||% "?",
-        "' puts species on the per-unit K-vector axis, not as ",
-        "separate rows."
+        "' places species on the K-vector axis within each closure ",
+        "unit. A species has no rows of its own."
       ),
       i = "Use loo()/waic() without by_series to score per closure unit."
     )))
@@ -478,8 +482,8 @@ clean_ll = function(x, logliks) {
       insight::format_message(c(
         paste0(
           n_replaced,
-          " non-finite log-likelihood values were refilled from the ",
-          "finite draws of their own observation."
+          " log-likelihood values were not finite. They were refilled ",
+          "from the finite draws of their own observation."
         ),
         i = paste0(
           "The reported ELPD is optimistic by whatever those draws ",

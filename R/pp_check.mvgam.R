@@ -349,12 +349,13 @@ pp_check.mvgam <- function(
           resolve_family_name(object$family), "'."
         ),
         x = paste0(
-          "Per-row scatter, fitted-vs-residual, and per-row ",
-          "time-axis types do not match the closure-unit grain."
+          "Row scatter plots, residuals against fitted values and ",
+          "residuals over time do not describe data aggregated to ",
+          "closure units."
         ),
         i = paste0(
           "Use type = 'bars', 'rootogram', 'dens_overlay', ",
-          "'ecdf_overlay', 'intervals', 'stat', 'resid_hist', ",
+          "'ecdf_overlay', 'intervals', 'stat', 'resid_hist' ",
           "or 'resid_qq' for closure-unit fits."
         )
       )))

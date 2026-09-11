@@ -487,11 +487,12 @@ warn_zmvn_single_series <- function(mv_spec, family, data) {
     paste0(
       "A 'ZMVN()' trend on one series shares its scale with the ",
       "observation error. The latent state has no temporal ",
-      "structure, so only the sum of the two variances is ",
-      "identified and the split between 'sigma_trend' and 'sigma' ",
-      "follows the priors rather than the data. Add series, choose ",
-      "a trend with temporal structure such as 'AR()' or 'RW()', ",
-      "or set a prior that says which scale you mean to pin."
+      "structure. Only the sum of the two variances is identified: ",
+      "the priors alone set the split between 'sigma_trend' and ",
+      "'sigma'. To separate them, add series or choose a trend ",
+      "with temporal structure such as 'AR()' or 'RW()'. ",
+      "Alternatively, set a prior that says which scale you mean ",
+      "to pin."
     ),
     .frequency = "once",
     .frequency_id = "mvgam_zmvn_single_series"
@@ -527,7 +528,7 @@ warn_pw_obs_intercept <- function(mv_spec, obs_formula) {
       "PW. The PW trend's 'm_trend' parameter and the observation ",
       "intercept compete for the same constant offset. Consider ",
       "fitting with a no-intercept observation formula (e.g. ",
-      "'y ~ -1' or 'y ~ 0 + ...') so the PW intercept is ",
+      "'y ~ -1' or 'y ~ 0 + ...'). The PW intercept is then ",
       "uniquely identified."
     ),
     .frequency = "once",
@@ -592,13 +593,14 @@ warn_threads_trend_brms_native <- function(threads, family, mv_spec) {
   # every time its threads request is dropped.
   rlang::warn(
     paste0(
-      "`threads_per_chain > 1` is currently ignored for brms-native ",
+      "`threads_per_chain > 1` is ignored for brms-native ",
       "families combined with a `trend_formula`. mvgam's trend ",
-      "injector and brms's `partial_log_lik_lpmf` placement are not ",
-      "yet compatible, so the model compiles and samples serially. ",
-      "Closure-unit families (`occ()`, `nmix()`) and multi-response ",
-      "families (`diri()`, `mvn()`, `mvt()`, `multinomial()`, ",
-      "`categorical()`) are unaffected and continue to thread."
+      "injector cannot reach the linear predictor that brms places ",
+      "inside `partial_log_lik_lpmf`. The model compiles and ",
+      "samples serially. Closure-unit families (`occ()`, `nmix()`) ",
+      "are unaffected and continue to thread. Multi-response ",
+      "families (`diri()`, `mvn()`, `mvt()`, `multi()`, `categ()`) ",
+      "also continue to thread."
     )
   )
 }

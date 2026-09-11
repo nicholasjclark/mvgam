@@ -336,7 +336,7 @@ prepare_predictions.mock_stanfit <- function(x,
     if (!inherits(re_formula, "formula")) {
       stop(insight::format_error(c(
         cli::format_inline(
-          "{.field re_formula} must be NULL, NA, or a valid formula object."
+          "{.field re_formula} must be NULL, NA or a valid formula object."
         ),
         x = cli::format_inline(
           "Current value has class: {class(re_formula)}"

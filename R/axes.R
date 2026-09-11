@@ -277,8 +277,8 @@ axis_row_series <- function(object, data, required = FALSE) {
         "Got columns: ", paste(names(data), collapse = ", "), "."
       ),
       i = paste0(
-        "Supply the column the model reads, or the grouping columns ",
-        "that name a series between them."
+        "Supply the column the model reads or the grouping columns ",
+        "that together name a series."
       )
     )), call. = FALSE)
   }

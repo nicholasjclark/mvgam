@@ -345,12 +345,12 @@ require_loo_pairing <- function(object, fn_name) {
              resolve_family_name(family), "'."),
       x = paste0(
         "This family scores one joint density per site across the ",
-        "categories measured there, so a site has no single ",
+        "categories measured there. A site has no single ",
         "observation to predict and reweight."
       ),
       i = paste0(
-        "Use 'loo()' for the per-site scores, or 'posterior_epred()' ",
-        "for the per-category probabilities."
+        "Use 'loo()' to score each site or 'posterior_epred()' ",
+        "for the probability of each category."
       )
     )), call. = FALSE)
   }
@@ -360,8 +360,8 @@ require_loo_pairing <- function(object, fn_name) {
       paste0("'", fn_name, "' is not available for family '",
              resolve_family_name(family), "'."),
       x = paste0(
-        "The likelihood is scored once per closure unit, while a ",
-        "linear predictor is one per visit, and summing log-odds ",
+        "The likelihood is scored once per closure unit while a ",
+        "linear predictor has one value per visit. Summing log-odds ",
         "across the visits of a unit names no quantity."
       ),
       i = paste0(
@@ -715,14 +715,14 @@ loo_predictive_interval.mvgam <- function(object, prob = 0.9,
 loo_subsample.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
                                  model_names = NULL) {
   stop(insight::format_error(c(
-    "'loo_subsample()' is not currently supported for 'mvgam' fits.",
+    "'loo_subsample()' is not supported for 'mvgam' fits.",
     x = paste0(
-      "'loo::loo_subsample()' uses the function-based log-likelihood",
-      " interface (pointwise = TRUE), which requires a per-observation",
-      " log-density callable that mvgam does not yet expose."
+      "'loo::loo_subsample()' calls the log-likelihood as a function",
+      " (pointwise = TRUE). That interface needs a log-density",
+      " function for each observation, and mvgam does not expose one."
     ),
     i = paste0(
-      "Use 'loo(x)' on the full log-likelihood matrix; subsampling",
+      "Use 'loo(x)' on the full log-likelihood matrix. Subsampling",
       " offers no efficiency gain when 'log_lik.mvgam' already",
       " returns the full matrix in one call."
     )
@@ -739,11 +739,11 @@ loo_moment_match.mvgam <- function(x, loo = NULL, k_threshold = 0.7,
                                     check = TRUE, recompile = FALSE,
                                     ...) {
   stop(insight::format_error(c(
-    "'loo_moment_match()' is not currently supported for 'mvgam' fits.",
+    "'loo_moment_match()' is not supported for 'mvgam' fits.",
     x = paste0(
-      "Moment matching requires re-evaluating the joint log-density",
-      " at proposed parameter values via 'unconstrain_pars' /",
-      " 'log_prob', which mvgam does not yet expose."
+      "Moment matching evaluates the joint log-density again at",
+      " proposed parameter values through 'unconstrain_pars' /",
+      " 'log_prob'. mvgam does not expose these methods."
     ),
     i = paste0(
       "Inspect pareto-k diagnostics from 'loo(x)' and refit",

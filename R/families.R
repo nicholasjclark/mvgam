@@ -471,9 +471,9 @@ check_tweedie_truncation <- function(object) {
         ", which is more than 70% of M = ", M, "."
       ),
       i = paste0(
-        "Refit with a larger truncation, e.g. ",
-        "tweedie(M = ", ceiling(lambda_max * 2), "L), and ",
-        "compare 'mphi' / 'mtheta' posteriors."
+        "Refit with a larger truncation such as ",
+        "tweedie(M = ", ceiling(lambda_max * 2), "L) and ",
+        "compare the 'mphi' / 'mtheta' posteriors."
       )
     )))
   }
@@ -1480,7 +1480,7 @@ refuse_missing_family_dispatch <- function(family_name, what) {
       "step requires."
     ),
     i = paste0(
-      "This is a fault in mvgam rather than in your model. Please ",
+      "This is a fault in mvgam itself. Please ",
       "report it at https://github.com/nicholasjclark/mvgam/issues, ",
       "quoting the family name above."
     )
@@ -1505,12 +1505,12 @@ refuse_unsupported_predict_type <- function(family, type) {
     paste0(
       "Family '", resolve_family_name(family), "' groups its ",
       "observations into closure units but models no latent state ",
-      "over them, so it exposes no prediction types of this kind."
+      "over them. It exposes no prediction types of this kind."
     )
   } else {
     paste0(
       "Family '", resolve_family_name(family),
-      "' has no closure units, so it exposes no types of this kind."
+      "' has no closure units. It exposes no types of this kind."
     )
   }
   stop(insight::format_error(c(
@@ -4211,8 +4211,8 @@ warn_unidentified_component_scale <- function(n_lv, n_species,
     i = paste0(
       "'residual_cor()', 'shared_variation()' and the predictions ",
       "read the combined covariance and are unaffected. 'Psi' is ",
-      "not estimable per species here, so poor Rhat on it reports ",
-      "the design rather than the sampler."
+      "not estimable per species here. A poor Rhat on it reflects ",
+      "this design. It does not signal a sampler fault."
     ),
     i = advice
   ))
@@ -6460,7 +6460,7 @@ multinomial_unit_totals <- function(object, newdata, arrays) {
   unseen <- which(arrays$n_rep == 0L)
   if (length(unseen)) {
     stop(insight::format_error(c(
-      "A multinomial site carries no counts, so its total is unknown.",
+      "A multinomial site carries no counts. Its total is unknown.",
       x = paste0(
         "Sites with no observed category: ",
         paste(utils::head(arrays$unit_labels[unseen], 5L),
@@ -6469,7 +6469,7 @@ multinomial_unit_totals <- function(object, newdata, arrays) {
       ),
       i = paste0(
         "'multi()' reads each site's trial total from its own ",
-        "counts, so a site can be predicted at only where they are ",
+        "counts. It can predict a site only where those counts are ",
         "supplied. Use 'diri()' or 'categ()' to predict a ",
         "composition with no total."
       )

@@ -363,7 +363,7 @@ resolve_y_layout <- function(y, species) {
                     paste(dim(y), collapse = " x ")) else ""),
       i = paste0(
         "Accepted: '[J, K]' matrix, '[N, J, K]' array, ",
-        "'[N, J, T, K]' array, or named list of '[J, K]' matrices."
+        "'[N, J, T, K]' array or named list of '[J, K]' matrices."
       )
     )))
   }
@@ -394,7 +394,7 @@ normalise_obs_covs <- function(obs_covs, J, T_, K, multi_season) {
   if (is.data.frame(obs_covs)) {
     if (multi_season) {
       stop(insight::format_error(c(
-        "data.frame 'obs_covs' is single-season-only.",
+        "A data.frame 'obs_covs' holds single-season data only.",
         i = paste0(
           "Multi-season data must pass 'obs_covs' as a named list ",
           "of '[J, T, K]' arrays."

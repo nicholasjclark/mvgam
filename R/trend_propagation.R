@@ -218,7 +218,7 @@ propagate_pw <- function(trend_model, params, h, n_series,
       stop(insight::format_error(c(
         "PW logistic 'cap' must be strictly positive and finite.",
         x = paste0(
-          "Non-positive / non-finite entries detected."
+          "Some entries are zero, negative, missing or infinite."
         )
       )))
     }

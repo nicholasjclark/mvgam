@@ -543,7 +543,7 @@ resolve_series_arg <- function(series, x) {
   series_levels <- levels(x$data$series)
   if (length(series) != 1L) {
     stop(insight::format_error(
-      "'series' must be NULL, 'all', a series name, or a 1-based index."
+      "'series' must be NULL, 'all', a series name or a 1-based index."
     ))
   }
   if (identical(series, "all")) {
@@ -581,7 +581,7 @@ resolve_series_arg <- function(series, x) {
     return(list(kind = "one", level = series))
   }
   stop(insight::format_error(
-    "'series' must be NULL, 'all', a series name, or a 1-based index."
+    "'series' must be NULL, 'all', a series name or a 1-based index."
   ))
 }
 

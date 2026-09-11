@@ -974,9 +974,9 @@ run_pathfinder <- function(model, args, chains, threading_on, threads,
   if (any(out$return_codes() != 0)) {
     stop(insight::format_error(c(
       "Stan's Pathfinder algorithm did not converge.",
-      x = "No path finished, so no draws are available from it.",
+      x = "No path finished: the run returned no draws.",
       i = paste0(
-        "Try a different 'seed', supply 'init' explicitly, or fit with ",
+        "Try a different 'seed', supply 'init' explicitly or fit with ",
         "'init = \"random\"'."
       )
     )))
@@ -1008,7 +1008,7 @@ validate_sampler_iterations <- function(iter, warmup = NULL) {
     "Argument 'warmup' must be smaller than 'iter'.",
     x = paste0("Got 'warmup' = ", warmup, " and 'iter' = ", iter, "."),
     i = paste0(
-      "'iter' counts warmup and sampling together, so raise 'iter' ",
+      "'iter' counts warmup and sampling together. Raise 'iter' ",
       "above ", warmup, " or lower 'warmup'."
     )
   )))

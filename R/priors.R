@@ -1409,13 +1409,13 @@ get_trend_parameter_prior <- function(prior = NULL, param_name,
           paste0("A 'constant()' prior is not supported for '",
                  param_name, "'."),
           x = paste0(
-            "mvgam emits its own priors as sampling statements, and ",
+            "mvgam emits its own priors as sampling statements. ",
             "'constant()' names no distribution Stan can evaluate."
           ),
           i = paste0(
-            "Give '", param_name, "' a narrow proper prior instead, ",
-            "or fix the quantity through the trend constructor where ",
-            "one takes it."
+            "Give '", param_name, "' a narrow proper prior. Where the ",
+            "trend constructor takes the quantity as an argument, fix ",
+            "it there."
           )
         )))
       }
@@ -1596,15 +1596,15 @@ mvgam_formula <- function(formula, trend_formula = NULL) {
       stop(insight::format_error(c(
         paste0(
           "Distributional-parameter formulas (e.g. 'sigma ~ z') ",
-          "inside 'trend_formula' are not currently supported."
+          "are not supported inside 'trend_formula'."
         ),
         x = paste0(
           "Found dpar formula(s): ", dpar_names, "."
         ),
         i = paste0(
           "Use bf(...) in 'formula' (the observation model) for ",
-          "distributional parameters, or open an issue if you need ",
-          "trend-side dpar support."
+          "distributional parameters. Open an issue if you need ",
+          "them on the trend side."
         )
       )))
     }
@@ -1921,7 +1921,7 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
       "'get_prior()' cannot describe a fit that supplies 'trend_map'.",
       x = paste0(
         "Fixed loadings move 'Z' to the data block and partial ",
-        "loadings replace it with 'Z_free_vec', so the classes ",
+        "loadings replace it with 'Z_free_vec'. Their classes ",
         "differ from the free-loadings table this returns."
       ),
       i = paste0(

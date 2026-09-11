@@ -242,7 +242,7 @@ predict.mvgam <- function(object,
       i = paste0(
         "Use posterior_smooths.mvgam() for per-smooth draws, ",
         "fixef.mvgam() / ranef.mvgam() for parametric and random ",
-        "components, and posterior_linpred.mvgam() for the combined ",
+        "components and posterior_linpred.mvgam() for the combined ",
         "linear predictor."
       )
     )))

@@ -676,7 +676,7 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
   metadata <- object$trend_metadata
   if (is.null(metadata)) {
     stop(insight::format_error(c(
-      "This 'mvgam' fit has no latent trend, so it has no trend covariance.",
+      "This 'mvgam' fit has no latent trend and hence no trend covariance.",
       i = paste0(
         "A trend is declared through 'trend_formula', for example ",
         "trend_formula = ~ AR(cor = TRUE)."
@@ -1544,7 +1544,8 @@ resolve_Z_loadings <- function(object, draws_mat, n_series, n_lv,
       x = "Neither posterior Z / Z_tilde columns nor a fixed_Z on mv_spec.",
       i = paste0(
         "Expected the fit to carry `mv_spec$trend_specs$fixed_Z` ",
-        "(fully-fixed trend_map) or free-Z posterior columns."
+        "(a fully-fixed trend_map) or sampled Z columns in the ",
+        "posterior."
       )
     )))
   }

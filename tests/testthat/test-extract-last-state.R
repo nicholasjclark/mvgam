@@ -374,7 +374,7 @@ test_that("Hierarchical fits (n_lv > n_series) still error", {
   fit <- make_mock_fit(draws, n_series = 2L, n_lv = 3L,
                         n_time = 5L, meta)
   expect_error(extract_last_state(fit, 1L),
-                "not yet supported")
+                "are not supported by")
 })
 
 

@@ -524,8 +524,8 @@ stan_prior_statement <- function(lhs, dist, normalize = TRUE) {
       i = paste0(
         "Expected an expression naming a parameter, such as ",
         "'sigma_trend' or 'to_vector(Z)'. A block opener or a ",
-        "string literal here means a statement was matched that ",
-        "is not a prior."
+        "string literal here means the caller matched a statement ",
+        "that holds no prior."
       )
     )))
   }
@@ -1171,8 +1171,14 @@ validate_mapping_arrays <- function(mapping_arrays) {
   # Validate arrays exist
   if (length(mapping_arrays$time_arrays) == 0 || length(mapping_arrays$series_arrays) == 0) {
     stop(insight::format_error(c(
-      "Missing observation-to-trend mapping arrays in trend_stanvars.",
-      x = "Expected obs_trend_time and obs_trend_series arrays from generate_obs_trend_mapping().",
+      paste0(
+        "Missing the arrays that map observations to trends in ",
+        "trend_stanvars."
+      ),
+      x = paste0(
+        "Expected obs_trend_time and obs_trend_series arrays from ",
+        "generate_obs_trend_mapping()."
+      ),
       i = "This indicates a problem in the stanvar generation pipeline."
     )), call. = FALSE)
   }
@@ -1975,9 +1981,12 @@ expand_per_response_standata <- function(combined_sd, formula, data,
     if (sum(keep_i) == 0L) {
       stop(insight::format_error(c(
         cli::format_inline(
-          "Response variable {.field {resp_i}} has no non-missing values."
+          "Response variable {.field {resp_i}} has no observed values."
         ),
-        x = "Cannot fit a multi-response model with an all-NA response."
+        x = paste0(
+          "Cannot fit a multi-response model with a response that is ",
+          "entirely NA."
+        )
       )), call. = FALSE)
     }
     data_i <- data[keep_i, , drop = FALSE]
@@ -2043,7 +2052,10 @@ expand_per_response_standata <- function(combined_sd, formula, data,
         x = cli::format_inline(
           "N_{resp_i} = {n_i} but expected {expected} (non-NA rows)."
         ),
-        i = "This indicates `expand_per_response_standata()` could not map a per-arm key to its combined-standata equivalent."
+        i = paste0(
+          "This indicates `expand_per_response_standata()` could not ",
+          "map one arm's key to its equivalent in the combined standata."
+        )
       )), call. = FALSE)
     }
     # Y_<resp> length check
@@ -2081,7 +2093,10 @@ expand_per_response_standata <- function(combined_sd, formula, data,
           cli::format_inline(
             "Length mismatch for {.field {jk}}: have {length(jv)}, expected {expected}."
           ),
-          i = "Per-arm random-effect group-index array was not substituted correctly."
+          i = paste0(
+            "The group index array for this arm's random effects was ",
+            "not substituted correctly."
+          )
         )), call. = FALSE)
       }
     }
@@ -2178,7 +2193,7 @@ combine_stanvars <- function(...) {
         stop(insight::format_error(c(
           "Invalid component type.",
           x = paste("Class:", paste(class(component), collapse = ", ")),
-          i = "Expected stanvar, stanvars, list, or NULL."
+          i = "Expected stanvar, stanvars, list or NULL."
         )))
       }
     }
@@ -4187,11 +4202,11 @@ generate_trend_specific_stanvars <- function(trend_specs, data_info, response_su
         ),
         x = paste0(
           "With column_shrinkage = 'mgp' the innovation scale is ",
-          "derived as sqrt(Psi_diag), not sampled."
+          "derived as sqrt(Psi_diag). The model does not sample it."
         ),
         i = paste0(
           "Shape the column scale through 'mgp_a1' and 'mgp_a2' on ",
-          "'loadings_prior', or drop the 'sigma_trend' prior."
+          "'loadings_prior' or drop the 'sigma_trend' prior."
         )
       )))
     }
@@ -4922,9 +4937,10 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   # Reason: Simplifies initialization and computation while covering most practical use cases
   if (ma_lags > 1) {
     stop(insight::format_error(
-      cli::format_inline(
-        "mvgam VARMA models support only {.field ma_lags} = 1. Higher order MA components are not currently implemented."
-      )
+      cli::format_inline(paste0(
+        "mvgam VARMA models support only {.field ma_lags} = 1. ",
+        "MA components of order above 1 are not implemented."
+      ))
     ))
   }
   if (n_lv > n_series && ma_lags == 0) {
@@ -4987,14 +5003,14 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
   if (is_varma && ma_lags <= 0) {
     stop(insight::format_error(
       cli::format_inline(
-        "Internal error: VARMA flag set but {.field ma_lags} <= 0"
+        "Internal error: VARMA indicator set but {.field ma_lags} <= 0"
       )
     ))
   }
   if (!is_varma && ma_lags > 0) {
     stop(insight::format_error(
       cli::format_inline(
-        "Internal error: VARMA flag not set but {.field ma_lags} > 0"
+        "Internal error: VARMA indicator not set but {.field ma_lags} > 0"
       )
     ))
   }
@@ -6822,7 +6838,7 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
             "Variable mapping missing required variables: ", missing_str, ". ",
             "These variables were referenced in mu construction but not found ",
             "in any Stan block (data, parameters, transformed data, ",
-            "transformed parameters, or computed variables).",
+            "transformed parameters or computed variables).",
             call. = FALSE
           )
         }
@@ -8403,7 +8419,7 @@ create_times_trend_matrix <- function(n_time,
   checkmate::assert_flag(has_by_lv)
   checkmate::assert_integerish(n_lv, lower = 1L, len = 1L, null.ok = TRUE)
   if (has_by_lv && is.null(n_lv)) {
-    stop(insight::format_error(c(
+    stop(insight::format_error(paste0(
       "'has_by_lv = TRUE' requires 'n_lv' to be set in",
       " create_times_trend_matrix()."
     )))
@@ -8429,9 +8445,9 @@ create_times_trend_matrix <- function(n_time,
         ") cell)."
       ),
       i = paste0(
-        "Pad 'data' so every ",
+        "Pad 'data' to give every ",
         if (has_by_lv) "latent factor" else "series",
-        " has a row at each unique time ",
+        " a row at each unique time ",
         "(set 'y' to NA at unobserved cells). CAR() trends handle ",
         "irregular gaps within a series natively, but each series ",
         "must still align on the shared union of time points."

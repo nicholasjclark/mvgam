@@ -396,10 +396,9 @@ compute_closure_unit_residuals <- function(object, newdata, type,
         any(agg$arrays$n_rep <= 4L)) {
     rlang::warn(
       paste0(
-        "Per-unit quantile residuals on closure-unit fits ",
+        "Quantile residuals at the unit grain of a closure-unit fit ",
         "have coarse PIT support when 'n_rep' is small. ",
-        "Interpret QQ-plots against simulated N(0, 1) ",
-        "envelopes rather than analytic quantile lines ",
+        "Compare QQ-plots with simulated N(0, 1) envelopes ",
         "when any closure unit has <= 4 visits."
       ),
       .frequency = "once",

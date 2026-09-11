@@ -233,7 +233,8 @@ validate_supported_family <- function(family) {
   if (!is.null(pointer)) {
     stop(insight::format_error(paste0(
       "Family '", family$family, "' is not supported by mvgam directly. ",
-      "Use ", pointer, " instead (long-format multi-response wrapper)."
+      "Use ", pointer, ", the mvgam wrapper for a response in long ",
+      "format."
     )))
   }
   invisible(TRUE)
@@ -404,8 +405,8 @@ validate_closure_unit_data <- function(data,
   if (any(!is.finite(y_obs))) {
     stop(insight::format_error(
       paste0(
-        "Non-finite or non-numeric values found in '",
-        response_var, "'."
+        "'", response_var, "' contains values that are not ",
+        "finite numbers."
       )
     ))
   }
@@ -432,14 +433,14 @@ validate_closure_unit_data <- function(data,
     bad <- which(!is.na(y_int) & y_int > 1L)[1L]
     stop(insight::format_error(c(
       paste0(
-        "Binary-response closure-unit family requires '",
+        "A closure-unit family with a binary response requires '",
         response_var, "' in {0, 1}."
       ),
       x = paste0(
         "Row ", bad, ": ", response_var, " = ", y_int[bad], "."
       ),
       i = paste0(
-        "For count detections use family = nmix() instead; ",
+        "For count detections use family = nmix(). ",
         "occ() and nmix(\"royle_nichols\") model detection / ",
         "non-detection only."
       )
@@ -450,8 +451,8 @@ validate_closure_unit_data <- function(data,
         any(!is.finite(suppressWarnings(as.numeric(cap_vals))))) {
     stop(insight::format_error(
       paste0(
-        "Non-finite or non-numeric values found in '",
-        cap_var, "'."
+        "'", cap_var, "' contains values that are not ",
+        "finite numbers."
       )
     ))
   }
@@ -527,7 +528,7 @@ validate_closure_unit_data <- function(data,
           paste(unique(cap_g), collapse = ", "), "."
         ),
         i = paste0(
-          "Each closure unit has one latent abundance, so its ",
+          "Each closure unit has one latent abundance. Its ",
           "upper truncation '", cap_var, "' must be a single value."
         )
       )))
@@ -584,7 +585,7 @@ validate_closure_unit_data <- function(data,
       }
     } else {
       stop(insight::format_error(c(
-        "Closure-unit count family is non-identified.",
+        "The closure-unit count family is not identified.",
         x = paste0(
           "Every unit has a single visit and neither the state ",
           "nor the detection formula carries a covariate."
@@ -791,11 +792,11 @@ validate_no_covariate_nas <- function(data, formulas,
     x = paste(bad_lines, collapse = "; "),
     i = paste0(
       "mvgam preserves NAs in the response to maintain the ",
-      "time grid (the likelihood simply skips those rows), but ",
-      "a covariate, and an addition term on a row whose response ",
-      "was observed, must be complete for the trend pipeline to ",
-      "align across timepoints. Drop the NA rows, impute the ",
-      "column, or remove it from the formula before fitting."
+      "time grid (the likelihood skips those rows). A covariate ",
+      "must be complete for the trend pipeline to align across ",
+      "timepoints, and the same holds for an addition term on a ",
+      "row whose response was observed. Drop the NA rows, impute ",
+      "the column or remove it from the formula before fitting."
     )
   )))
 }
@@ -1003,7 +1004,7 @@ normalise_trend_map <- function(input, data) {
     trend_map_from_matrix(input, n_series)
   } else {
     stop(insight::format_error(c(
-      "'trend_map' must be a matrix, data.frame, or character code.",
+      "'trend_map' must be a matrix, data.frame or character code.",
       x = paste0("Got: ", class(input)[1L], "."),
       i = "See ?mvgam for accepted shapes."
     )))
@@ -1315,17 +1316,16 @@ validate_gr_balanced_groups <- function(trend_spec, data) {
   )
   stop(insight::format_error(c(
     paste0(
-      "Hierarchical trend models currently require equal ",
-      "series-per-group counts."
+      "Hierarchical trend models require the same number of ",
+      "series in every group."
     ),
     x = paste0(
       "Grouping variable '", gr_var,
       "' has unbalanced groups: ", counts_str, "."
     ),
     i = paste0(
-      "Every group must hold the same number of series, because the ",
-      "per-group blocks share one size. Subset the data to a ",
-      "balanced design, or combine small groups."
+      "The trend's blocks for each group share one size. Subset ",
+      "the data to a balanced design or combine small groups."
     )
   )))
 }
@@ -1483,9 +1483,9 @@ validate_n_lv_ceiling <- function(n_lv, n_species,
       ),
       i = paste0(
         "The marginal residual covariance has rank at most n_",
-        noun, ", so additional columns of 'Z' add no expressive ",
+        noun, ". Additional columns of 'Z' add no expressive ",
         "capacity. With `loadings_prior = \"mgp\"`, increase ",
-        "'mgp_a2' (e.g. to 5) for stronger column shrinkage instead."
+        "'mgp_a2' (e.g. to 5) for stronger column shrinkage."
       )
     )))
   }
@@ -1511,13 +1511,13 @@ refuse_top_level_n_lv <- function(requested_n_lv) {
     "Argument 'n_lv' is not read by 'mvgam()'.",
     x = paste0(
       "It reached the arguments forwarded to brms and Stan, where ",
-      "no factor count is read, so the trend would have been given ",
+      "no factor count is read. The trend would have been given ",
       "one latent state per series."
     ),
     i = paste0(
-      "Write it on the trend instead, as ",
+      "Write it on the trend as ",
       "'trend_formula = ~ AR(p = 1, n_lv = ", requested_n_lv,
-      ")', or use 'jsdgam(n_lv = ", requested_n_lv, ")'."
+      ")' or use 'jsdgam(n_lv = ", requested_n_lv, ")'."
     )
   )), call. = FALSE)
 }
@@ -1877,7 +1877,7 @@ validate_response_for_family <- function(y, family, y_name = "y") {
                  " values are not integers, the first at row ",
                  which(frac)[1L], "."),
       i = paste0("Round the column if the fractions are a storage ",
-                 "artefact, or model it with a continuous family.")
+                 "artefact or model it with a continuous family.")
     )))
   }
 
@@ -2396,7 +2396,7 @@ validate_trend_formula_brms <- function(trend_formula) {
     cli::format_inline(
       "Invalid {.field trend_formula} type: {class(trend_formula)}"
     ),
-    i = "Must be formula, bf() object, or named list."
+    i = "Must be formula, bf() object or named list."
   )))
 }
 
@@ -3545,7 +3545,7 @@ assert_grouping_columns <- function(data, gr_var, subgr_var) {
     x = cli::format_inline("Missing: {.field {missing}}."),
     i = cli::format_inline(paste0(
       "This model groups its trend by {.field {gr_var}} and ",
-      "{.field {subgr_var}}, which together name a series, so ",
+      "{.field {subgr_var}}, which together name a series. ",
       "'newdata' must carry both."
     ))
   )), call. = FALSE)
@@ -4099,7 +4099,7 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
         missing_series[1L], "."
       ),
       i = paste0(
-        "Every row must name a series so its latent state can be ",
+        "Every row must name a series for its latent state to be ",
         "found. Check '", series_var, "' and any grouping variables ",
         "for missing values."
       )
@@ -4129,7 +4129,7 @@ mvgam_prepared_index <- function(data, what) {
       paste0("This data frame carries no ", what, " index."),
       i = paste0(
         "The ", what, " index is built when a frame is read for a ",
-        "model, so this frame has not been through that reading."
+        "model. This frame has not been through that reading."
       )
     )), call. = FALSE)
   }
@@ -4329,9 +4329,10 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   if (!all(required_fields %in% names(mv_spec))) {
     stop(insight::format_error(c(
       cli::format_inline("Invalid {.field mv_spec} structure."),
-      i = cli::format_inline(
-        "Must contain {.field base_formula}, {.field trend_specs}, and {.field has_trends} fields."
-      )
+      i = cli::format_inline(paste0(
+        "Must contain {.field base_formula}, {.field trend_specs} ",
+        "and {.field has_trends} fields."
+      ))
     )), call. = FALSE)
   }
   checkmate::assert_character(response_vars, min.len = 1, null.ok = TRUE)
@@ -5198,11 +5199,11 @@ normalise_loadings_prior <- function(input, data2, data,
     stop(insight::format_error(c(
       paste0(
         "'loadings_prior' must supply at least one of ",
-        "'features', 'distances', or 'column_shrinkage = \"mgp\"'."
+        "'features', 'distances' or 'column_shrinkage = \"mgp\"'."
       ),
       i = paste0(
         "An empty spec collapses to the default iid prior; ",
-        "drop the argument instead."
+        "drop the argument."
       )
     )))
   }
@@ -5304,7 +5305,7 @@ resolve_features_input <- function(features, data2) {
     "'loadings_prior$features' has an unsupported type.",
     x = paste0("Got: ", class(features)[1L], "."),
     i = paste0(
-      "Supply a single 'data2' lookup string, a numeric matrix, ",
+      "Supply a single 'data2' lookup string, a numeric matrix ",
       "or a data.frame."
     )
   )))
@@ -5375,7 +5376,7 @@ resolve_distances_input <- function(distances, data2) {
     x = paste0("Got: ", class(distances)[1L], "."),
     i = paste0(
       "Supply a single name string, a character vector of ",
-      "'data2' names, a single matrix, or a named list of ",
+      "'data2' names, a single matrix or a named list of ",
       "matrices."
     )
   )))
@@ -5453,8 +5454,8 @@ assert_loadings_prior_spec_consistent <- function(spec) {
         "\"'."
       ),
       i = paste0(
-        "An empty spec collapses to the default iid prior; drop ",
-        "'loadings_prior' instead of passing one."
+        "An empty spec collapses to the default iid prior. Drop ",
+        "'loadings_prior' from the call."
       )
     )))
   }
@@ -5527,7 +5528,7 @@ assert_column_shrinkage_compatible <- function(loadings_prior_spec, trend) {
       "scale, which '", trend_nm, "()' does not use."
     ),
     i = paste0(
-      "Use column_shrinkage = 'iid', or a trend that carries it: ",
+      "Use column_shrinkage = 'iid' or a trend that carries it: ",
       paste0(mgp_capable_trends, "()", collapse = ", "), "."
     )
   )))
@@ -5825,22 +5826,22 @@ assert_forecast_times_steppable <- function(fc_times, training,
         ),
         x = paste0(
           "The training grid runs to time ", past[length(past)],
-          ", so the next ", length(fut), " times for series '", lv,
+          ". The next ", length(fut), " times for series '", lv,
           "' are ", expected[1L], " to ",
           expected[length(expected)], "; got ", fut[1L], " to ",
           fut[length(fut)], "."
         ),
         i = paste0(
-          "This trend advances one step per time point, so a gap ",
+          "This trend advances one step per time point: a gap ",
           "would be forecast as though it were not there. Supply ",
-          "every intervening time, or use 'CAR()', which carries ",
+          "every intervening time or use 'CAR()', which carries ",
           "the elapsed gap."
         ),
         i = paste0(
-          "The grid is where the latent state runs, which on a frame ",
-          "padded with unobserved rows reaches past the last ",
-          "response. Occasions inside it already carry a state, so ",
-          "'hindcast()' is what reads them."
+          "The grid is where the latent state runs. On a frame ",
+          "padded with unobserved rows it reaches past the last ",
+          "response. Occasions inside it already carry a state, ",
+          "which 'hindcast()' reads."
         )
       )))
     }
@@ -5991,19 +5992,19 @@ warn_confounded_obs_trend_design <- function(standata, prior = NULL) {
       ),
       x = paste0(
         "Stacked they hold ", ncol(design), " columns of rank ",
-        decomp$rank, ", so one direction is flat in the likelihood."
+        decomp$rank, ". One direction is flat in the likelihood."
       ),
       x = paste0(
         "'", paste(dependent, collapse = "', '"),
         "' adds nothing the other columns do not already span."
       ),
       i = paste0(
-        "Sums of the confounded coefficients are identified, so fitted ",
-        "values and forecasts are unaffected; the individual values are ",
-        "not, and report whatever the prior allowed."
+        "Sums of the confounded coefficients are identified. Fitted ",
+        "values and forecasts are unaffected. The individual values ",
+        "are not identified and report whatever the prior allowed."
       ),
       i = paste0(
-        "Drop the observation-side term, or move the shared term to one ",
+        "Drop the observation-side term or move the shared term to one ",
         "side only."
       )
     ))

@@ -125,8 +125,14 @@ update.mvgam <- function(object, formula. = NULL, newdata = NULL,
   dots <- list(...)
   if ("data" %in% names(dots)) {
     stop(insight::format_error(c(
-      "Use 'newdata' rather than 'data' to update the training data on a fitted mvgam.",
-      i = "'data' is reserved for the original 'mvgam()' call; 'newdata' is the supported argument name on 'update()'."
+      paste0(
+        "Use 'newdata' to update the training data on a fitted ",
+        "mvgam."
+      ),
+      i = paste0(
+        "'data' is reserved for the original 'mvgam()' call. ",
+        "'newdata' is the supported argument name on 'update()'."
+      )
     )))
   }
   # A jsdgam is a `c("mvgam", "jsdgam")` object, so it reaches this
@@ -140,8 +146,8 @@ update.mvgam <- function(object, formula. = NULL, newdata = NULL,
     stop(insight::format_error(c(
       "Cannot 'update()' a 'jsdgam' fit.",
       x = paste0(
-        "The factor structure, and any traits or phylogeny, are not ",
-        "recoverable from the fitted object, so a refit would drop ",
+        "The factor structure and any traits or phylogeny are not ",
+        "recoverable from the fitted object. A refit would drop ",
         "them silently."
       ),
       i = paste0(
@@ -170,14 +176,14 @@ update.mvgam <- function(object, formula. = NULL, newdata = NULL,
         "Cannot infer the original 'trend_formula' from this fit."
       ),
       x = paste0(
-        "This 'mvgam' object lacks the 'trend_call' slot (likely ",
-        "built with an older mvgam version) but has trend dynamics, ",
-        "so the trend constructor cannot be reconstructed."
+        "This 'mvgam' object has trend dynamics but lacks the ",
+        "'trend_call' slot (likely built with an older mvgam ",
+        "version). The trend constructor cannot be reconstructed."
       ),
       i = paste0(
-        "Pass 'trend_formula = ...' explicitly to 'update()', or ",
-        "refit the model with the current mvgam version so the ",
-        "original trend_formula is preserved."
+        "Pass 'trend_formula = ...' explicitly to 'update()'. ",
+        "Refitting the model with the current mvgam version also ",
+        "preserves the original trend_formula."
       )
     )))
   }
@@ -383,7 +389,8 @@ update_inheritance_table <- function() {
 # whole structured prior and nothing said so.
 mvgam_update_uninherited <- c(
   data2 = "stored, but empty on every fit examined",
-  stanvars = "stored with mvgam's own mixed in, so re-passing would double-inject",
+  stanvars = paste0("stored with mvgam's own mixed in; passing them ",
+                    "again injects them twice"),
   combine = "multiple-imputation only, and a pooled fit is refused",
   run_model = "a fitted object is by definition the run_model = TRUE case",
   save_model = "writes the Stan file out; the model is unchanged",
@@ -628,13 +635,13 @@ state_resolved_trend_args <- function(trend_call, metadata) {
       x = paste0(
         "The fit resolved ",
         paste0("'", names(stated), "'", collapse = ", "),
-        " from outside 'trend_formula', and that formula holds no ",
+        " from outside 'trend_formula'. That formula holds no ",
         "trend constructor to state it on."
       ),
       i = paste0(
         "Pass 'trend_formula = ...' naming ",
         paste0("'", names(stated), "'", collapse = ", "),
-        " explicitly, so the refit builds the model this fit had."
+        " explicitly. The refit then builds the model this fit had."
       )
     )))
   }

@@ -939,14 +939,13 @@ how_to_cite.mvgam <- function(object, ...) {
     list(
       detect = uses_heavy_tailed_trend(object),
       text = paste0(
-        " Innovations of the latent process were given a multivariate",
-        " Student-t distribution rather than a Gaussian one, so that",
-        " an occasional large shock is absorbed by the tail instead of",
-        " inflating the process variance throughout the series",
-        " (Durbin and Koopman 2012). The innovation scale is shared",
-        " across series at each time point, so large innovations tend",
-        " to occur together while each series keeps its own direction",
-        " and magnitude."
+        " Innovations of the latent process followed a multivariate",
+        " Student-t distribution. Its tails absorb an occasional large",
+        " shock, which leaves the process variance of the rest of the",
+        " series unchanged (Durbin and Koopman 2012). The innovation",
+        " scale is shared across series at each time point: large",
+        " innovations tend to occur together, while each series keeps",
+        " its own direction and magnitude."
       ),
       refs = "durbin_koopman_ssm"
     ),
@@ -955,8 +954,8 @@ how_to_cite.mvgam <- function(object, ...) {
       text = paste0(
         " Counts were modelled with the beta negative binomial",
         " family (Irwin 1968), which mixes the negative binomial",
-        " success probability over a beta distribution to give a",
-        " power-law rather than geometric tail."
+        " success probability over a beta distribution. Its tail",
+        " decays as a power law."
       ),
       refs = "irwin_waring"
     ),

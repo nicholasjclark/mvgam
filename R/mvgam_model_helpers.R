@@ -140,10 +140,13 @@ mvgam_validate_weights <- function(weights, models,
   if (identical(weights, "kfold")) {
     stop(insight::format_error(c(
       "Weight strategy 'kfold' is not supported for 'mvgam' fits.",
-      x = "There is no 'kfold.mvgam' method.",
+      x = paste0(
+        "Model averaging does not compute weights from ",
+        "cross-validation folds."
+      ),
       i = paste0(
         "Use 'stacking', 'pseudobma', 'pseudobma+', 'loo', ",
-        "'waic', or a numeric vector."
+        "'waic' or a numeric vector."
       )
     )))
   }

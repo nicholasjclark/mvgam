@@ -83,13 +83,16 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
   if (n_lv > n_series) {
     stop(insight::format_error(c(
       paste0(
-        "Hierarchical trends (n_lv > n_series) are not yet ",
+        "Hierarchical trends (n_lv > n_series) are not ",
         "supported by 'extract_last_state'."
       ),
       x = paste0(
         "Got n_lv = ", n_lv, ", n_series = ", n_series, "."
       ),
-      i = "Hierarchical trend support is pending."
+      i = paste0(
+        "'extract_last_state' reads one state per series or one ",
+        "per latent factor."
+      )
     )))
   }
   if (is_factor &&
@@ -97,15 +100,12 @@ extract_last_state <- function(fit, draw_id, draws_mat = NULL) {
     stop(insight::format_error(c(
       paste0(
         "Factor trend variants of '", meta$trend_type,
-        "' are not yet supported by 'extract_last_state'."
+        "' are not supported by 'extract_last_state'."
       ),
       x = paste0(
         "Got n_lv = ", n_lv, ", n_series = ", n_series, "."
       ),
-      i = paste0(
-        "Factor forecast support currently covers RW / AR / VAR ",
-        "and ZMVN."
-      )
+      i = "Factor forecasts support RW, AR, VAR and ZMVN trends."
     )))
   }
 
@@ -265,10 +265,7 @@ extract_sigma_and_cov <- function(one_draw, n_series, n_lv,
           "Got n = ", n_series, ", group indices = ",
           length(group_info$group_inds), "."
         ),
-        i = paste0(
-          "Hierarchical scales are per observed series, not per ",
-          "latent factor."
-        )
+        i = "Hierarchical scales are indexed by observed series."
       )))
     }
     return(extract_hierarchical_sigma_and_cov(
@@ -580,8 +577,8 @@ extract_last_observed_times <- function(fit, n_series) {
         x = paste0("Recorded: ", length(recorded), ", series: ",
                    n_series, "."),
         i = paste0(
-          "The axis and the trend matrix are resolved together, so ",
-          "these cannot differ on a fit built by this version."
+          "The axis and the trend matrix are resolved together. ",
+          "The counts cannot differ on a fit built by this version."
         )
       )), call. = FALSE)
     }

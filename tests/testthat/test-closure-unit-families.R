@@ -974,7 +974,7 @@ test_that("validate_closure_unit_data() errors when all units single-visit with 
       has_obs_covariates = FALSE,
       has_det_covariates = FALSE
     ),
-    "Closure-unit count family is non-identified"
+    "closure-unit count family is not identified"
   )
 })
 
@@ -1818,7 +1818,7 @@ test_that("the identifiability guards count the visits that happened", {
   expect_error(
     mvgam(y ~ 1, data = single_visit, family = nmix(),
           run_model = FALSE),
-    "non-identified"
+    "not identified"
   )
 })
 

@@ -193,7 +193,10 @@ fitted.mvgam <- function(object,
       insight::format_warning(c(
         paste0("'unit_level' ignored for components = '",
                components, "'."),
-        i = "Component grain is fixed (latent_state per-unit, detection per-visit)."
+        i = paste0(
+          "Component grain is fixed: 'latent_state' has one value ",
+          "per unit and 'detection' one per visit."
+        )
       ))
     }
     pred <- predict(

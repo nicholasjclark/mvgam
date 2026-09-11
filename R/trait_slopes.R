@@ -112,8 +112,8 @@ validate_trait_slopes <- function(trait_slopes, obs_formula, data,
         paste(shQuote(missing), collapse = ", "), "."
       ),
       i = paste0(
-        "Add them to 'data' (left-join the per-species trait table",
-        " before calling jsdgam)."
+        "Add them to 'data' (join the trait table, one row per ",
+        "species, before calling jsdgam)."
       )
     )))
   }

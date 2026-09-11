@@ -259,7 +259,7 @@ compute_residual_cor <- function(object, by_group, partial, summary,
       i = paste0(
         "Use a trend that supports correlated innovations, e.g. ",
         "VAR(), VARMA(), RW(cor = TRUE) / AR(cor = TRUE) / ",
-        "ZMVN(cor = TRUE), or any trend with n_lv > 0."
+        "ZMVN(cor = TRUE) or any trend with n_lv > 0."
       )
     )))
   }
@@ -268,12 +268,15 @@ compute_residual_cor <- function(object, by_group, partial, summary,
       (cov_struct$pattern == "cholesky_scaled" &&
        !cov_struct$has_correlations)) {
     stop(insight::format_error(c(
-      "Cannot compute residual correlations: trend innovations are independent.",
+      paste0(
+        "Cannot compute residual correlations: trend innovations ",
+        "are independent."
+      ),
       x = "The fitted trend has no cross-series covariance structure.",
       i = paste0(
         "Refit with cor = TRUE on the trend constructor (e.g. ",
-        "RW(cor = TRUE), AR(cor = TRUE), ZMVN(cor = TRUE)), use ",
-        "VAR() / VARMA(), or add n_lv = k for a latent-factor fit."
+        "RW(cor = TRUE), AR(cor = TRUE) or ZMVN(cor = TRUE)), use ",
+        "VAR() / VARMA() or add n_lv = k for a latent-factor fit."
       )
     )))
   }
@@ -376,11 +379,11 @@ refuse_partial_on_rank_deficient <- function(partial, n_lv, n_series) {
     x = paste0(
       "This fit projects ", n_series, " series onto ", n_lv,
       " latent factor", if (n_lv == 1L) "" else "s",
-      ", so the implied covariance has rank ", n_lv, " and no inverse."
+      ". The implied covariance has rank ", n_lv, " and no inverse."
     ),
     i = paste0(
       "Use 'shared_variation()' for what the factors say the series ",
-      "share, or refit with n_lv = ", n_series, " for a covariance ",
+      "share. Refitting with n_lv = ", n_series, " gives a covariance ",
       "a partial correlation can be read off."
     )
   )))

@@ -491,7 +491,7 @@ jsdgam <- function(formula,
         "species does not carry."
       ),
       i = paste0(
-        "Pass a single-response 'formula' with a 'species' column, ",
+        "Pass a single-response 'formula' with a 'species' column ",
         "or fit without 'trait_slopes'."
       )
     )))

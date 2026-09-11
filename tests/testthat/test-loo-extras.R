@@ -166,7 +166,7 @@ test_that("loo_moment_match.mvgam errors informatively", {
   stub <- make_loo_extras_stub()
   expect_error(
     loo_moment_match(stub),
-    "loo_moment_match.*not currently supported"
+    "loo_moment_match.*not supported"
   )
 })
 
@@ -175,7 +175,7 @@ test_that("loo_subsample.mvgam errors informatively", {
   stub <- make_loo_extras_stub()
   expect_error(
     loo_subsample(stub),
-    "loo_subsample.*not currently supported"
+    "loo_subsample.*not supported"
   )
 })
 

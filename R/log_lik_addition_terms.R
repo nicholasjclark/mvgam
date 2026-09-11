@@ -351,8 +351,8 @@ addition_term_data <- function(object, resp, nobs) {
         "{nobs} likelihood contribution{?s}."
       )),
       i = paste0(
-        "A closure-unit family scores once per unit, not per visit, ",
-        "so per-visit weights, censoring or bounds cannot be applied."
+        "A closure-unit family scores once per unit. Weights, ",
+        "censoring or bounds recorded per visit cannot be applied."
       )
     )), call. = FALSE)
   }

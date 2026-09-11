@@ -162,7 +162,10 @@ log_lik.mvgam <- function(object,
       mv_families <- model_families(object)[resp_names]
       if (any(vapply(mv_families, is_closure_unit_family, logical(1)))) {
         stop(insight::format_error(c(
-          "Multivariate models with a closure-unit family are not yet supported by log_lik().",
+          paste0(
+            "Multivariate models with a closure-unit family are not ",
+            "supported by log_lik()."
+          ),
           x = paste0(
             "Responses with closure-unit families: ",
             paste(resp_names[vapply(mv_families,

@@ -177,7 +177,7 @@ forecast.mvgam <- function(object,
   if (is_trendless && identical(type, "trend")) {
     stop(insight::format_error(c(
       "'type = \"trend\"' is not defined for trendless fits.",
-      i = paste0("Use 'type = \"link\"', 'type = \"expected\"', ",
+      i = paste0("Use 'type = \"link\"', 'type = \"expected\"' ",
                  "or 'type = \"response\"' (the default).")
     )))
   }
@@ -205,7 +205,7 @@ forecast.mvgam <- function(object,
     stop(insight::format_error(c(
       "'newdata' is required to forecast.",
       x = paste0(
-        "A forecast extends the training grid, so the occasions to ",
+        "A forecast extends the training grid. The occasions to ",
         "forecast at have to be supplied."
       ),
       i = paste0(
@@ -533,7 +533,7 @@ refuse_empty_horizon <- function(newdata, candidate, last_times,
     ),
     x = observed_line,
     i = paste0(
-      "A forecast extends the grid, so 'newdata' has to reach past ",
+      "A forecast extends the grid: 'newdata' has to reach past ",
       "it. To predict at occasions the model was fitted on, use ",
       "'hindcast()' or 'posterior_predict()'."
     )
@@ -1104,7 +1104,7 @@ build_forecast_arms <- function(object, trend_model, meta,
   }
   if (is.list(trend_lp_fc) && !is.matrix(trend_lp_fc)) {
     stop(insight::format_error(
-      "Multivariate response forecasts are not yet supported."
+      "Multivariate response forecasts are not supported."
     ))
   }
 
@@ -1440,12 +1440,13 @@ compute_car_forecast_time <- function(object, fc_grid,
     if (!isTRUE(all.equal(gap_per_series[[s]], ref))) {
       stop(insight::format_error(c(
         paste0(
-          "CAR forecasts currently require all series to share ",
+          "CAR forecasts require all series to share ",
           "the same forecast time grid."
         ),
         i = paste0(
-          "Heterogeneous per-series time gaps will be supported ",
-          "after the CAR kernel accepts a per-series time matrix."
+          "The CAR kernel reads one vector of time gaps for all ",
+          "series. Give every series in 'newdata' the same forecast ",
+          "times."
         )
       )))
     }
@@ -1481,11 +1482,12 @@ compute_pw_forecast_extras <- function(object, training,
     } else if (!isTRUE(all.equal(sort(unique(ts)), fc_times))) {
       stop(insight::format_error(c(
         paste0(
-          "PW forecasts currently require all series to share ",
+          "PW forecasts require all series to share ",
           "the same forecast time grid."
         ),
         i = paste0(
-          "Heterogeneous per-series PW horizons are pending."
+          "The PW forecast evaluates one horizon for all series. ",
+          "Give every series in 'newdata' the same forecast times."
         )
       )))
     }
@@ -1703,7 +1705,7 @@ slice_per_series <- function(mat, fc_grid, obs_struct,
                      " matched no row."),
           i = paste0(
             "The horizon and the rows it was cut from are built ",
-            "from one column, so these cannot disagree on a grid ",
+            "from one column. They cannot disagree on a grid ",
             "this version produced."
           )
         )), call. = FALSE)

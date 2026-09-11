@@ -820,8 +820,8 @@ resolve_factor_loadings <- function(object = NULL,
     } else {
       stop(insight::format_error(c(
         "Cannot resolve ndraws for fixed-Z broadcast.",
-        i = paste0("Supply 'object' or 'draws_mat' so the ",
-                   "resolver can size the broadcast.")
+        i = paste0("Supply 'object' or 'draws_mat'. The resolver ",
+                   "reads the draw count from either one.")
       )))
     }
     return(array(

@@ -525,7 +525,7 @@ mask_heldout_response <- function(object, data, held_rows) {
                  "; the training frame holds ",
                  paste(names(data), collapse = ", "), "."),
       i = paste0(
-        "A fold is held out by masking its response, so the ",
+        "A fold is held out by masking its response. The response ",
         "column has to be present."
       )
     )))
@@ -696,7 +696,7 @@ print.mvgam_kfold <- function(x, digits = 2L, ...) {
       "Most-influential ", group_word, "s were the groups whose ",
       "predictive score changed most when the model was refit ",
       "without them. The fitted model is noticeably tuned to ",
-      "their data, so dropping them shifts the inference."
+      "their data. Dropping them shifts the inference."
     )
   )
   for (para in footer) {
