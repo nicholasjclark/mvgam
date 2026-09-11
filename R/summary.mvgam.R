@@ -117,11 +117,7 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   all_summaries <- all_summaries[pars_to_keep, , drop = FALSE]
   pars <- rownames(all_summaries)
 
-  # Exclude lprior, lp__, and uncentered b_Intercept_trend
-  # brms shows only centered Intercept_trend in summaries, hiding the
-  # uncentered b_Intercept_trend generated quantity used for back-transformation
-  exclude_pars <- c(object$exclude, "b_Intercept_trend")
-  pars_to_keep <- !(rownames(all_summaries) %in% exclude_pars)
+  pars_to_keep <- !(rownames(all_summaries) %in% object$exclude)
   all_summaries <- all_summaries[pars_to_keep, , drop = FALSE]
   pars <- rownames(all_summaries)
 
@@ -175,29 +171,23 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
     ndraws = posterior::ndraws(draws_obj)
   )
 
-  # Organize summaries by observation vs trend formula
-  # First identify which parameters belong to trend model
-  is_trend_param <- is_trend_parameter(pars)
-
   # Detect distributional parameters (those with formulas like sigma ~ x)
   dpars_with_formulas <- get_dpar_names(object$formula)
 
   # Observation model parameters (no _trend suffix, no dpar prefix)
-  obs_fixed_idx <- match_fixed_pars(pars, dpars_with_formulas) &
-    !is_trend_param
+  obs_fixed_idx <- match_fixed_pars(pars, dpars_with_formulas)
   if (any(obs_fixed_idx)) {
     out$fixed <- all_summaries[obs_fixed_idx, , drop = FALSE]
     # Clean names: b_Intercept → Intercept, b_x → x
     rownames(out$fixed) <- gsub("^b_", "", rownames(out$fixed))
   }
 
-  obs_smooth_idx <- match_smooth_pars(pars, dpars_with_formulas) &
-    !is_trend_param
+  obs_smooth_idx <- match_smooth_pars(pars, dpars_with_formulas)
   if (any(obs_smooth_idx)) {
     out$smooth <- all_summaries[obs_smooth_idx, , drop = FALSE]
   }
 
-  obs_random_idx <- match_random_pars(pars) & !is_trend_param
+  obs_random_idx <- match_random_pars(pars)
   if (any(obs_random_idx)) {
     out$random <- all_summaries[obs_random_idx, , drop = FALSE]
   }
@@ -232,20 +222,20 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   }
 
   # Trend model parameters (subdivided by type)
-  trend_fixed_idx <- match_trend_fixed_pars(pars)
+  trend_fixed_idx <- match_fixed_pars(pars, side = "trend")
   if (any(trend_fixed_idx)) {
     out$trend_fixed <- all_summaries[trend_fixed_idx, , drop = FALSE]
-    # Clean names: Intercept_trend → Intercept
+    # `b_Intercept_trend` reads as `b_Intercept` under its heading.
     rownames(out$trend_fixed) <- gsub("_trend$", "",
                                        rownames(out$trend_fixed))
   }
 
-  trend_smooth_idx <- match_trend_smooth_pars(pars)
+  trend_smooth_idx <- match_smooth_pars(pars, side = "trend")
   if (any(trend_smooth_idx)) {
     out$trend_smooth <- all_summaries[trend_smooth_idx, , drop = FALSE]
   }
 
-  trend_random_idx <- match_trend_random_pars(pars)
+  trend_random_idx <- match_random_pars(pars, side = "trend")
   if (any(trend_random_idx)) {
     out$trend_random <- all_summaries[trend_random_idx, , drop = FALSE]
   }
@@ -418,40 +408,44 @@ rename_summary_cols <- function(col_names, probs, robust) {
 # PARAMETER MATCHING FUNCTIONS (Pattern-Based)
 # ==============================================================================
 
-#' Population coefficients of the observation model
+#' Population coefficients of one side of the model
+#'
+#' The intercept is the one on the data's scale, `b_Intercept` or
+#' `b_Intercept_trend`; brms's centred intercept is left out.
 #'
 #' @param pars Character vector of all parameter names
 #' @param dpars Distributional parameters carrying their own formula;
 #'   their coefficients form their own block
+#' @param side `"observation"` or `"trend"`
 #' @return Logical vector
 #'
 #' @noRd
-match_fixed_pars <- function(pars, dpars = character()) {
-  mvgam_par_kind(pars, dpars) == "beta" &
-    mvgam_par_side(pars) == "observation"
+match_fixed_pars <- function(pars, dpars = character(),
+                             side = "observation") {
+  mvgam_par_kind(pars, dpars) == "beta" & mvgam_par_side(pars) == side
 }
 
-#' Smooth parameters of the observation model
+#' Smooth parameters of one side of the model
 #'
-#' @param pars Character vector of all parameter names
-#' @param dpars Distributional parameters carrying their own formula
+#' @inheritParams match_fixed_pars
 #' @return Logical vector
 #'
 #' @noRd
-match_smooth_pars <- function(pars, dpars = character()) {
+match_smooth_pars <- function(pars, dpars = character(),
+                              side = "observation") {
   mvgam_par_kind(pars, dpars) %in% c("smooth_sd", "smooth_coef") &
-    mvgam_par_side(pars) == "observation"
+    mvgam_par_side(pars) == side
 }
 
-#' Group-level parameters of the observation model
+#' Group-level parameters of one side of the model
 #'
-#' @param pars Character vector of all parameter names
+#' @inheritParams match_fixed_pars
 #' @return Logical vector
 #'
 #' @noRd
-match_random_pars <- function(pars) {
-  mvgam_par_kind(pars) == "ranef" &
-    mvgam_par_side(pars) == "observation"
+match_random_pars <- function(pars, side = "observation") {
+  mvgam_par_kind(pars) %in% c("ranef_sd", "ranef_coef") &
+    mvgam_par_side(pars) == side
 }
 
 #' Observation-family parameters
@@ -477,42 +471,6 @@ match_family_pars <- function(pars, has_dpar_formulas = character()) {
   keep
 }
 
-
-#' Population coefficients of the trend model
-#'
-#' brms reports only the centred intercept, so the uncentred
-#' `b_Intercept_trend` stays out.
-#'
-#' @param pars Character vector of all parameter names
-#' @return Logical vector
-#'
-#' @noRd
-match_trend_fixed_pars <- function(pars) {
-  mvgam_par_kind(pars) %in% c("beta", "intercept") &
-    mvgam_par_side(pars) == "trend" &
-    pars != "b_Intercept_trend"
-}
-
-#' Smooth parameters of the trend model
-#'
-#' @param pars Character vector of all parameter names
-#' @return Logical vector
-#'
-#' @noRd
-match_trend_smooth_pars <- function(pars) {
-  mvgam_par_kind(pars) %in% c("smooth_sd", "smooth_coef") &
-    mvgam_par_side(pars) == "trend"
-}
-
-#' Group-level parameters of the trend model
-#'
-#' @param pars Character vector of all parameter names
-#' @return Logical vector
-#'
-#' @noRd
-match_trend_random_pars <- function(pars) {
-  mvgam_par_kind(pars) == "ranef" & mvgam_par_side(pars) == "trend"
-}
 
 #' Latent-dynamics parameters of the trend model
 #'

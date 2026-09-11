@@ -1,9 +1,7 @@
 # One place decides what a parameter name means. These lock that in.
 #
-# Each predicate replaced a test written out at several call sites. The
-# risk they guard against is not that the sites disagree today but that
-# the next change touches one of them, so the tests state the rule
-# rather than the current behaviour of any one caller.
+# Each predicate answers for several call sites. The tests state the
+# rule itself, which holds whichever of those callers changes next.
 
 
 test_that("a trend parameter is one whose name ends in the suffix", {
@@ -46,11 +44,8 @@ test_that("the trend suffix decides which block a parameter prints in", {
 
 
 test_that("one taxonomy answers for every consumer of a name", {
-  # The kind and the side are decided once. Three places used to
-  # decide them separately and had drifted: the smooth set differed
-  # between the `variable =` keyword resolver and the bucket builder,
-  # and the trend block counted three state names where the other two
-  # counted six.
+  # The kind and the side are decided once, for the `variable =`
+  # keyword resolver, the summary blocks and the bucket builder alike.
   pars <- c(
     "b_Intercept", "b_x", "sigma", "shape",
     "sds_1[1]", "s_1_1[1]", "sd_grp__Intercept", "r_grp[1,1]",
@@ -88,6 +83,11 @@ test_that("one taxonomy answers for every consumer of a name", {
   expect_identical(unname(kind["s_1_1[1]"]), "smooth_coef")
   expect_identical(unname(kind["lscale_1[1]"]), "gp")
   expect_identical(unname(kind["zs_1_1[1]"]), "smooth_coef")
+  # A group-level block's scales and the coefficients they govern are
+  # two kinds, which is how `tidy()` files them apart.
+  expect_identical(unname(kind["sd_grp__Intercept"]), "ranef_sd")
+  expect_identical(unname(kind["r_grp[1,1]"]), "ranef_coef")
+  expect_identical(unname(kind["sd_g__Intercept_trend"]), "ranef_sd")
   # A rotated fit carries both loading bases and both are loadings;
   # which one a reader sees is settled by the hide filter.
   expect_identical(unname(kind["Z_tilde[1,1]"]), "loading")
@@ -97,6 +97,67 @@ test_that("one taxonomy answers for every consumer of a name", {
   expect_identical(unname(side[pars == "Z[1,1]"]), "observation")
   # Nothing falls through unclassified.
   expect_false(any(kind == "other"))
+})
+
+
+test_that("tidy() files each block under broom.mixed's effects class", {
+  # A group-level block's standard deviations and correlations are
+  # `ran_pars` and its coefficients `ran_vals`; a smooth's penalty and
+  # a Gaussian process's scales split from their basis coefficients
+  # the same way. brms writes a centred intercept beside `b_Intercept`,
+  # one coefficient under two names, and the table reports it once.
+  raw <- c(
+    "b_Intercept", "Intercept", "b[1]", "sigma",
+    "sds_1[1]", "s_1_1[1]", "sdgp_1[1]", "zgp_1[1]",
+    "sd_1[1]", "cor_1[1]", "r_1_1[1]", "r_1_1[2]",
+    "b_Intercept_trend", "Intercept_trend", "ar1_trend[1]",
+    "sd_1_trend[1]", "r_1_1_trend[1]"
+  )
+  stub <- structure(
+    list(fit = posterior::as_draws_matrix(matrix(
+      0, nrow = 2L, ncol = length(raw), dimnames = list(NULL, raw)
+    ))),
+    class = "mvgam"
+  )
+  spec <- tidy_spec(categorize_mvgam_parameters(stub),
+                    stats::setNames(raw, raw))
+  filed <- function(type) spec$params[[match(type, spec$type)]]
+  effect <- function(type) spec$effect[[match(type, spec$type)]]
+
+  expect_setequal(filed("observation_beta"), c("b_Intercept", "b[1]"))
+  expect_identical(filed("observation_family_extra_param"), "sigma")
+  expect_setequal(filed("observation_smooth_param"),
+                  c("sds_1[1]", "sdgp_1[1]"))
+  expect_setequal(filed("observation_smooth_coef"),
+                  c("s_1_1[1]", "zgp_1[1]"))
+  expect_setequal(filed("random_effect_group_level"),
+                  c("sd_1[1]", "cor_1[1]"))
+  expect_identical(filed("random_effect_beta"), c("r_1_1[1]", "r_1_1[2]"))
+  expect_identical(filed("trend_beta"), "b_Intercept_trend")
+  expect_identical(filed("trend_model_param"), "ar1_trend[1]")
+  expect_identical(filed("trend_random_effect_group_level"), "sd_1_trend[1]")
+  expect_identical(filed("trend_random_effect_beta"), "r_1_1_trend[1]")
+  expect_identical(effect("random_effect_beta"), "ran_vals")
+  expect_identical(effect("random_effect_group_level"), "ran_pars")
+  expect_identical(effect("trend_random_effect_beta"), "ran_vals")
+
+  # The composer reads the trend's intercept on the data's scale, as it
+  # reads the observation model's.
+  expect_true("b_Intercept_trend" %in% side_parameters(stub, "trend"))
+  expect_true("b_Intercept" %in% side_parameters(stub, "obs"))
+
+  # The table itself: one intercept, and a request no parameter
+  # answers keeps its columns.
+  small <- c("b_Intercept", "Intercept", "sigma")
+  stub$fit <- posterior::as_draws_matrix(matrix(
+    stats::rnorm(6L), nrow = 2L, dimnames = list(NULL, small)
+  ))
+  expect_setequal(tidy(stub)$term, c("b_Intercept", "sigma"))
+  none <- tidy(stub, effects = "ran_vals")
+  expect_identical(nrow(none), 0L)
+  expect_identical(names(none),
+                   c("term", "type", "estimate", "std.error", "conf.low",
+                     "conf.high"))
 })
 
 

@@ -19,12 +19,9 @@
 \item{x}{A fitted \code{mvgam} object.}
 
 \item{effects}{Character. One of \code{"all"} (the default;
-returns every parameter), \code{"fixed"} (only
-\code{observation_beta} + \code{trend_beta}), \code{"ran_pars"} (only the
-group-level random-effect parameters, observation-family
-extras and trend-dynamics parameters) or \code{"ran_vals"}
-(only the individual random-effect coefficients). The
-vocabulary matches \code{broom.mixed::tidy.brmsfit()}.}
+returns every parameter), \code{"fixed"}, \code{"ran_pars"} or
+\code{"ran_vals"}, selecting the categories above. The vocabulary
+matches \code{broom.mixed::tidy.brmsfit()}.}
 
 \item{robust}{Logical. If \code{FALSE} (the default) the posterior
 mean and standard deviation are used as the point estimate
@@ -63,30 +60,38 @@ observation-model and trend-model parameters.
 }
 \details{
 The \code{type} column places every parameter into one of the
-following categories:
+following categories, each with the \code{effects} class it belongs to:
 \itemize{
-\item \code{"observation_family_extra_param"} -- auxiliary
+\item \code{"observation_family_extra_param"} (\code{ran_pars}) -- auxiliary
 observation-family parameters such as \code{sigma}, \code{shape},
 \code{nu}, \code{phi}, \code{zi}, \code{hu}.
-\item \code{"observation_beta"} -- non-smoother coefficients of the
-observation linear predictor (intercepts + non-smooth
-fixed effects).
-\item \code{"random_effect_group_level"} -- group-level random-effect
-parameters (\code{sd_}, \code{cor_}, etc.) attached to the
-observation formula.
-\item \code{"random_effect_beta"} -- the individual random-effect
-coefficients attached to the observation formula.
-\item \code{"trend_model_param"} -- parameters of the trend dynamics
-(\code{ar1_trend}, \code{theta_trend}, \code{Sigma_trend}, \code{k_trend},
-\code{m_trend}, \code{delta_trend}, etc.) including any GP
-hyperparameters used inside \code{trend_model}.
-\item \code{"trend_beta"} -- non-smoother coefficients of the trend
-linear predictor (\code{trend_formula}).
-\item \code{"trend_random_effect_group_level"} -- group-level
-random-effect parameters attached to the trend formula.
-\item \code{"trend_random_effect_beta"} -- the individual
-random-effect coefficients attached to the trend formula.
+\item \code{"observation_beta"} (\code{fixed}) -- population-level
+coefficients of the observation formula, the intercept
+included, and the fixed parts of its smooths and monotonic
+terms.
+\item \code{"observation_smooth_param"} (\code{ran_pars}) -- the penalty of each
+smooth (\code{sds_}) and the marginal deviation and length scale of
+each Gaussian process.
+\item \code{"observation_smooth_coef"} (\code{ran_vals}) -- the penalised basis
+coefficients of the smooths and Gaussian processes.
+\item \code{"random_effect_group_level"} (\code{ran_pars}) -- the standard
+deviations and correlations of the observation formula's
+group-level terms.
+\item \code{"random_effect_beta"} (\code{ran_vals}) -- the group-level
+coefficients themselves, one per level and term.
+\item \code{"trend_model_param"} (\code{ran_pars}) -- parameters of the trend
+dynamics (\code{ar1_trend}, \code{theta_trend}, \code{Sigma_trend},
+\code{k_trend}, \code{m_trend}, \code{delta_trend}, etc.) and the factor
+loadings.
+\item \code{"trend_beta"}, \code{"trend_smooth_param"}, \code{"trend_smooth_coef"},
+\code{"trend_random_effect_group_level"} and
+\code{"trend_random_effect_beta"} -- the same five blocks of the
+trend formula.
 }
+
+brms writes a centred intercept beside the intercept on the data's
+scale, \code{b_Intercept}. The table reports the coefficient once, as
+\code{b_Intercept}.
 }
 \examples{
 \dontrun{

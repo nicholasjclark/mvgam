@@ -38,124 +38,52 @@ variables.mvgam <- function(x, ...) {
 }
 
 
-#' Categorize Parameters from mvgam Object
+#' The parameters of a fit, by side and by kind
 #'
-#' Internal helper that categorizes parameters from a fitted mvgam object into
-#' observation and trend components. Returns structured list for use by
-#' internal functions (tidy, mcmc_plot, pairs, as.data.frame, etc.).
+#' Sorts the Stan names the fit's draws carry into the buckets
+#' `tidy()` and `side_parameters()` read. Each side has the family's
+#' parameters or the trend's dynamics, its population block, its
+#' smooths and its group-level terms, all decided by
+#' `mvgam_par_kind()` and `mvgam_par_side()`. The factor loadings sit
+#' with the trend's dynamics. The trend's states are no parameter and
+#' belong to no bucket.
 #'
-#' @param x A fitted mvgam object
-#'
-#' @return A list with the following components (each a data.frame with
-#'   orig_name and alias columns, or NULL if not present):
-#'   \itemize{
-#'     \item observation_pars: Family parameters (sigma, shape, nu, phi, zi,
-#'       hu)
-#'     \item observation_betas: Fixed effect coefficients
-#'     \item observation_smoothpars: Smooth parameters (s_, sds_)
-#'     \item observation_re_params: Random effect parameters (sd_, r_, cor_)
-#'     \item trend_pars: Trend dynamics parameters (AR, innovation SDs, etc.)
-#'     \item trend_betas: Trend formula fixed effects
-#'     \item trend_smoothpars: Trend formula smooth parameters
-#'     \item trend_re_params: Trend formula random effects
-#'     \item trends: Computed trend state arrays (trend\[i,j\])
-#'   }
-#'
-#' @details
-#' This function distinguishes observation from trend parameters using the
-#' _trend suffix naming convention. All trend model parameters include this
-#' suffix to avoid naming conflicts with observation model parameters.
-#'
-#' The alias column is reserved for mapping Stan parameter names to mgcv-style
-#' coefficient names (e.g., "s_x_1\[3\]" might alias to "s(x).3"). It holds
-#' NA; Stan names are what the draws carry.
-#'
+#' @param x A fitted `mvgam` object
+#' @return A named list of character vectors of Stan names, each
+#'   possibly empty: `observation_pars`, `observation_betas`,
+#'   `observation_smoothpars`, `observation_re_params`, `trend_pars`,
+#'   `trend_betas`, `trend_smoothpars` and `trend_re_params`. A
+#'   population block holds brms's centred intercept and the uncentred
+#'   `b_Intercept` both.
 #' @noRd
 categorize_mvgam_parameters <- function(x) {
-  # Validate input
   checkmate::assert_class(x, "mvgam")
 
-  # Pull raw positional names directly from the stanfit. The
-  # mvgam-side beta-aliasing (`b[k]` -> `b_<term>`) is a user-facing
-  # projection applied inside `extract_mvgam_draws` and
-  # `variables.mvgam`; the internal prediction pipeline subsets the
-  # raw stanfit draws by positional name and must see them
-  # unaliased here.
-  all_pars <- variables(posterior::as_draws(x$fit))
-  if (!is.null(x$exclude) && length(x$exclude) > 0L) {
-    all_pars <- setdiff(all_pars, x$exclude)
-  }
-
-  # Helper to create data.frame component or NULL
-  create_component <- function(pars) {
-    if (length(pars) > 0) {
-      data.frame(
-        orig_name = pars,
-        alias = NA,
-        stringsAsFactors = FALSE
-      )
-    } else {
-      NULL
-    }
-  }
-
-  # Every bucket is a (side, kind) pair from the one taxonomy.
-  # Each used to carry its own regexes, which is how the smooth set
-  # here came to differ from the one the `variable =` keyword
-  # resolver reports for the same fit.
+  # The names Stan wrote, which the prediction pipeline subsets the
+  # draws by. The names a user reads are `mvgam_user_pars()`'s.
+  all_pars <- setdiff(variables(posterior::as_draws(x$fit)), x$exclude)
   kind <- mvgam_par_kind(all_pars)
   side <- mvgam_par_side(all_pars)
-  pick <- function(k, sd = NULL) {
-    keep <- kind %in% k
-    if (!is.null(sd)) keep <- keep & side == sd
-    create_component(all_pars[keep])
+  pick <- function(kinds, on_side) {
+    all_pars[kind %in% kinds & side == on_side]
   }
+  betas <- c("beta", "basis", "intercept")
+  smooths <- c("smooth_sd", "smooth_coef", "gp", "gp_coef")
+  ranef <- c("ranef_sd", "ranef_coef")
 
-  observation_pars <- pick("family", "observation")
-  observation_betas <- pick(
-    c("beta", "basis", "intercept"), "observation"
-  )
-  observation_smoothpars <- pick(
-    c("smooth_sd", "smooth_coef", "gp"), "observation"
-  )
-  observation_re_params <- pick("ranef", "observation")
-
-  # The latent-dynamics block, plus the loadings that bridge the two
-  # sides. The rotation-indeterminate draws are dropped here for the
-  # same reason `variables()` drops them: their identified
-  # counterparts are in the same posterior and these have arbitrary
-  # convergence diagnostics.
-  trend_dynamic_pars <- all_pars[
-    kind %in% c("dynamics", "loading") & !is_hidden_unrotated(all_pars)
-  ]
-  trend_pars <- create_component(trend_dynamic_pars)
-
-  # brms reports only the centred intercept.
-  trend_beta_pars <- all_pars[
-    kind %in% c("beta", "basis", "intercept") & side == "trend" &
-      all_pars != "b_Intercept_trend"
-  ]
-  trend_betas <- create_component(trend_beta_pars)
-  trend_smoothpars <- pick(
-    c("smooth_sd", "smooth_coef", "gp"), "trend"
-  )
-  trend_re_params <- pick("ranef", "trend")
-
-  # Every Stan state array lands in exactly one bucket and is
-  # reachable via `obj_vars$trends`.
-  trends <- pick("state")
-
-  # Return structured list
   list(
-    observation_pars = observation_pars,
-    observation_betas = observation_betas,
-    observation_smoothpars = observation_smoothpars,
-    observation_re_params = observation_re_params,
-    trend_pars = trend_pars,
-    trend_betas = trend_betas,
-    trend_smoothpars = trend_smoothpars,
-    trend_re_params = trend_re_params,
-    trends = trends
+    observation_pars = pick("family", "observation"),
+    observation_betas = pick(betas, "observation"),
+    observation_smoothpars = pick(smooths, "observation"),
+    observation_re_params = pick(ranef, "observation"),
+    # The rotation-indeterminate loadings are left out, as
+    # `variables()` leaves them out: their identified counterparts
+    # are in the same posterior.
+    trend_pars = all_pars[kind %in% c("dynamics", "loading") &
+                            !is_hidden_unrotated(all_pars)],
+    trend_betas = pick(betas, "trend"),
+    trend_smoothpars = pick(smooths, "trend"),
+    trend_re_params = pick(ranef, "trend")
   )
 }
 
@@ -179,6 +107,5 @@ side_parameters <- function(mvgam_fit, side) {
   buckets <- categorize_mvgam_parameters(mvgam_fit)[
     paste0(prefix, c("_pars", "_betas", "_smoothpars", "_re_params"))
   ]
-  as.character(unlist(lapply(buckets, `[[`, "orig_name"),
-                      use.names = FALSE))
+  as.character(unlist(buckets, use.names = FALSE))
 }

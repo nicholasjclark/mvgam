@@ -22,38 +22,43 @@ generics::glance
 #' observation-model and trend-model parameters.
 #'
 #' The `type` column places every parameter into one of the
-#' following categories:
+#' following categories, each with the `effects` class it belongs to:
 #'
-#'   * `"observation_family_extra_param"` -- auxiliary
+#'   * `"observation_family_extra_param"` (`ran_pars`) -- auxiliary
 #'     observation-family parameters such as `sigma`, `shape`,
 #'     `nu`, `phi`, `zi`, `hu`.
-#'   * `"observation_beta"` -- non-smoother coefficients of the
-#'     observation linear predictor (intercepts + non-smooth
-#'     fixed effects).
-#'   * `"random_effect_group_level"` -- group-level random-effect
-#'     parameters (`sd_`, `cor_`, etc.) attached to the
-#'     observation formula.
-#'   * `"random_effect_beta"` -- the individual random-effect
-#'     coefficients attached to the observation formula.
-#'   * `"trend_model_param"` -- parameters of the trend dynamics
-#'     (`ar1_trend`, `theta_trend`, `Sigma_trend`, `k_trend`,
-#'     `m_trend`, `delta_trend`, etc.) including any GP
-#'     hyperparameters used inside `trend_model`.
-#'   * `"trend_beta"` -- non-smoother coefficients of the trend
-#'     linear predictor (`trend_formula`).
-#'   * `"trend_random_effect_group_level"` -- group-level
-#'     random-effect parameters attached to the trend formula.
-#'   * `"trend_random_effect_beta"` -- the individual
-#'     random-effect coefficients attached to the trend formula.
+#'   * `"observation_beta"` (`fixed`) -- population-level
+#'     coefficients of the observation formula, the intercept
+#'     included, and the fixed parts of its smooths and monotonic
+#'     terms.
+#'   * `"observation_smooth_param"` (`ran_pars`) -- the penalty of each
+#'     smooth (`sds_`) and the marginal deviation and length scale of
+#'     each Gaussian process.
+#'   * `"observation_smooth_coef"` (`ran_vals`) -- the penalised basis
+#'     coefficients of the smooths and Gaussian processes.
+#'   * `"random_effect_group_level"` (`ran_pars`) -- the standard
+#'     deviations and correlations of the observation formula's
+#'     group-level terms.
+#'   * `"random_effect_beta"` (`ran_vals`) -- the group-level
+#'     coefficients themselves, one per level and term.
+#'   * `"trend_model_param"` (`ran_pars`) -- parameters of the trend
+#'     dynamics (`ar1_trend`, `theta_trend`, `Sigma_trend`,
+#'     `k_trend`, `m_trend`, `delta_trend`, etc.) and the factor
+#'     loadings.
+#'   * `"trend_beta"`, `"trend_smooth_param"`, `"trend_smooth_coef"`,
+#'     `"trend_random_effect_group_level"` and
+#'     `"trend_random_effect_beta"` -- the same five blocks of the
+#'     trend formula.
+#'
+#' brms writes a centred intercept beside the intercept on the data's
+#' scale, `b_Intercept`. The table reports the coefficient once, as
+#' `b_Intercept`.
 #'
 #' @param x A fitted `mvgam` object.
 #' @param effects Character. One of `"all"` (the default;
-#'   returns every parameter), `"fixed"` (only
-#'   `observation_beta` + `trend_beta`), `"ran_pars"` (only the
-#'   group-level random-effect parameters, observation-family
-#'   extras and trend-dynamics parameters) or `"ran_vals"`
-#'   (only the individual random-effect coefficients). The
-#'   vocabulary matches `broom.mixed::tidy.brmsfit()`.
+#'   returns every parameter), `"fixed"`, `"ran_pars"` or
+#'   `"ran_vals"`, selecting the categories above. The vocabulary
+#'   matches `broom.mixed::tidy.brmsfit()`.
 #' @param robust Logical. If `FALSE` (the default) the posterior
 #'   mean and standard deviation are used as the point estimate
 #'   and dispersion. If `TRUE` the median and the median
@@ -114,12 +119,10 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
   obj_vars <- categorize_mvgam_parameters(x)
   draws <- posterior::as_draws_array(x$fit)
 
-  # `categorize_mvgam_parameters()` works in raw Stan names because
-  # the internal prediction pipeline subsets the stanfit by them.
-  # The table a user reads must carry the names `variables()` lists
-  # and hold the same parameters, so both the labelling and the
-  # visibility come from the one projection rather than from a
-  # second answer built here.
+  # `categorize_mvgam_parameters()` answers in the names Stan wrote.
+  # The table a user reads carries the names `variables()` lists and
+  # holds the same parameters: both the labels and the visibility come
+  # from `mvgam_user_pars()`, the one projection every reader uses.
   user_map <- mvgam_user_pars(x)
   apply_alias <- function(raw) {
     out <- names(user_map)[match(raw, user_map)]
@@ -127,7 +130,7 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
     out
   }
 
-  spec <- tidy_spec(x, obj_vars, user_map)
+  spec <- tidy_spec(obj_vars, user_map)
   spec <- dplyr::filter(spec, .effects_filter(effect, effects))
 
   out <- purrr::map_dfr(
@@ -149,55 +152,52 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
     }
   )
 
+  # A request no parameter answers, `effects = "ran_vals"` on a fit
+  # with no smooths or group-level terms say, keeps the table's columns.
+  if (nrow(out) == 0L) {
+    fns <- broom_summary_fns(robust = robust, conf.int = conf.int,
+                             conf.level = conf.level, rhat = rhat,
+                             ess = ess)
+    out <- tibble::as_tibble(c(
+      list(term = character(0L), type = character(0L)),
+      lapply(fns, function(fn) numeric(0L))
+    ))
+  }
   out
 }
 
 
-# Internal: the per-block plan that tidy.mvgam walks. Each row
-# is one taxonomy bucket the parameter vector falls into,
-# together with the broom effects-class it belongs to. Keeping
-# this as a single tibble removes the 8+ near-identical blocks
-# the original implementation carried around.
+# Internal: the per-block plan that tidy.mvgam walks. Each row is one
+# bucket of the parameter taxonomy, with the broom effects class it
+# belongs to.
 #'@noRd
-tidy_spec <- function(x, obj_vars, user_map) {
-  # `enrich_trend_metadata` records the trend type as a single string
-  # ("AR", "VAR", "PW", ...); `$trend_model` is read only when that
-  # slot is unset.
-  # Every bucket is narrowed to the parameters the fit shows a user.
-  # `tidy()` previously selected its trend block with a hand-written
-  # allow-list of name prefixes per trend type, which had to be
-  # extended whenever a trend gained a parameter and diverged from
-  # the deny-list `variables()` uses: the identified loadings were
-  # dropped and the rotation-indeterminate Cholesky factor was
-  # reported in their place.
-  visible <- function(pars) intersect(pars %||% character(0L), user_map)
+tidy_spec <- function(obj_vars, user_map) {
+  # Every bucket is narrowed to the parameters `variables()` shows a
+  # user. brms writes a centred intercept beside the `b_Intercept` it
+  # is back-transformed into, and the table reports the coefficient
+  # once, under the name on the data's own scale.
+  visible <- function(pars) {
+    pars <- intersect(pars, user_map)
+    pars[mvgam_par_kind(pars) != "intercept"]
+  }
+  # The penalty of a smooth, the scales of a Gaussian process and the
+  # standard deviations and correlations of a group-level block are
+  # `ran_pars`; the coefficients they govern are `ran_vals`, as
+  # broom.mixed reads a brms fit.
+  by_role <- function(pars) {
+    coef <- mvgam_par_kind(pars) %in%
+      c("smooth_coef", "gp_coef", "ranef_coef")
+    list(vals = pars[coef], pars = pars[!coef])
+  }
 
-  obs_family <- visible(obj_vars$observation_pars$orig_name)
-  obs_family <- grep("vec", obs_family, value = TRUE, invert = TRUE)
-
-  trend_dynamic <- visible(obj_vars$trend_pars$orig_name)
-
-  obs_beta <- head_betas(x$mgcv_model, obj_vars$observation_betas)
-  trend_beta <- if (!is.null(x$trend_call)) {
-    head_betas(x$trend_mgcv_model, obj_vars$trend_betas)
-  } else character(0L)
-
-  # Smoothness penalties (`sds_*`) are reported as `ran_pars` (the
-  # per-smooth variance components); the individual basis-coefficient
-  # draws (`s_*` / `zs_*`) are `ran_vals`. Matches brms's
-  # `tidy.brmsfit` convention so users get a familiar view.
-  obs_smooth_all <- visible(obj_vars$observation_smoothpars$orig_name)
-  obs_smooth_sds <- grep("^sds_", obs_smooth_all, value = TRUE)
-  obs_smooth_vals <- setdiff(obs_smooth_all, obs_smooth_sds)
-  trend_smooth_all <- visible(obj_vars$trend_smoothpars$orig_name)
-  trend_smooth_sds <- grep("^sds_", trend_smooth_all, value = TRUE)
-  trend_smooth_vals <- setdiff(trend_smooth_all, trend_smooth_sds)
-
-  re_pars <- visible(obj_vars$observation_re_params$orig_name)
-  re_beta <- random_effect_beta_names(x, obj_vars)
-  trend_re_pars <- visible(obj_vars$trend_re_params$orig_name)
-  trend_re_beta <- random_effect_beta_names(x, obj_vars,
-                                              which = "trend")
+  obs_family <- visible(obj_vars$observation_pars)
+  trend_dynamic <- visible(obj_vars$trend_pars)
+  obs_beta <- visible(obj_vars$observation_betas)
+  trend_beta <- visible(obj_vars$trend_betas)
+  obs_smooth <- by_role(visible(obj_vars$observation_smoothpars))
+  trend_smooth <- by_role(visible(obj_vars$trend_smoothpars))
+  obs_re <- by_role(visible(obj_vars$observation_re_params))
+  trend_re <- by_role(visible(obj_vars$trend_re_params))
 
   tibble::tibble(
     type = c(
@@ -231,61 +231,18 @@ tidy_spec <- function(x, obj_vars, user_map) {
     params = list(
       obs_family,
       obs_beta,
-      obs_smooth_sds,
-      obs_smooth_vals,
-      re_pars,
-      re_beta,
+      obs_smooth$pars,
+      obs_smooth$vals,
+      obs_re$pars,
+      obs_re$vals,
       trend_dynamic,
       trend_beta,
-      trend_smooth_sds,
-      trend_smooth_vals,
-      trend_re_pars,
-      trend_re_beta
+      trend_smooth$pars,
+      trend_smooth$vals,
+      trend_re$pars,
+      trend_re$vals
     )
   )
-}
-
-
-# Internal: parametric (non-smoother) betas from an obj_vars block.
-# When a fitted `mgcv_model` is available, the first `nsdf` rows are
-# the non-smoother coefficients (mgcv convention). The `mgcv_model`
-# slot is not populated on a brms-backed fit, so this falls back to
-# returning every orig_name in `betas_df`. The categorize step
-# already excludes smooth-coefficient rows (`s_*` / `zs_*` /
-# `sds_*` live in `*_smoothpars` instead).
-#'@noRd
-head_betas <- function(mgcv_model, betas_df) {
-  if (is.null(betas_df) || nrow(betas_df) == 0L) {
-    return(character(0L))
-  }
-  if (!is.null(mgcv_model) && !is.null(mgcv_model$nsdf)) {
-    if (mgcv_model$nsdf <= 0L) return(character(0L))
-    return(utils::head(betas_df$orig_name, mgcv_model$nsdf))
-  }
-  betas_df$orig_name
-}
-
-
-# Internal: extract the raw Stan names for individual random-effect
-# coefficients from a fitted mgcv model. `which` chooses between
-# the observation- and trend-side smooth lists.
-#'@noRd
-random_effect_beta_names <- function(x, obj_vars,
-                                       which = c("obs", "trend")) {
-  which <- match.arg(which)
-  mgcv_model <- if (which == "obs") x$mgcv_model else
-    x$trend_mgcv_model
-  betas_all <- if (which == "obs") obj_vars$observation_betas else
-    obj_vars$trend_betas
-  if (is.null(mgcv_model) || is.null(betas_all)) {
-    return(character(0L))
-  }
-  unlist(lapply(mgcv_model$smooth, function(sp) {
-    if (!inherits(sp, "random.effect")) return(character(0L))
-    re_label <- sp$label
-    idx <- grep(re_label, betas_all$alias, fixed = TRUE)
-    betas_all$orig_name[idx]
-  }), use.names = FALSE) %||% character(0L)
 }
 
 

@@ -80,13 +80,12 @@ default_pairs_variables <- function(x) {
     dpars <- setdiff(validate_family(families[[i]])$dpars, "mu")
     if (length(dpars)) paste0("^", dpars, suffixes[i], "$")
   }), use.names = FALSE)
-  # The obs-side patterns carry no `$` end-marker, so prefixes
-  # like `^b_`, `^sd_`, `^sds_`, `^cor_`, `^lscale_`, `^theta`
-  # also catch their `*_trend` siblings on the mvgam side. The
-  # trend block below only adds entries that don't share an
-  # obs-side prefix (`sigma_trend`, capitalised `Sigma_trend`, the
-  # mvgam-specific VAR / PW dynamics, and the centered intercept
-  # `Intercept_trend` which lacks the `b_` brms prefix).
+  # The obs-side patterns carry no `$` end-marker, and prefixes like
+  # `^b_`, `^sd_`, `^sds_`, `^cor_`, `^lscale_`, `^theta` also catch
+  # their `*_trend` siblings, `b_Intercept_trend` among them. The
+  # trend block below adds the entries sharing no obs-side prefix:
+  # `sigma_trend`, capitalised `Sigma_trend`, and the VAR and PW
+  # dynamics. brms's centred intercept is left out on both sides.
   c(
     # Observation-side patterns (brms parity, but the prefixes also
     # match trend-side `*_trend` parameters).
@@ -100,7 +99,6 @@ default_pairs_variables <- function(x) {
     "^sdb_", "^sdbsp_", "^sdbs_",
     "^sds_", "^sdgp_", "^lscale_",
     # mvgam-specific trend additions (no obs-side prefix overlap).
-    "^Intercept_trend$",      # centered trend intercept
     "^sigma_trend",
     "^ar[0-9]+_trend",        # AR coefficients
     "^A_trend",               # VAR coefficient matrices

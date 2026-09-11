@@ -116,9 +116,9 @@ test_that("no summary block claims a trend state", {
     smooth = function(p) match_smooth_pars(p, character()),
     random = match_random_pars,
     family = function(p) match_family_pars(p, character()),
-    trend_fixed = match_trend_fixed_pars,
-    trend_smooth = match_trend_smooth_pars,
-    trend_random = match_trend_random_pars,
+    trend_fixed = function(p) match_fixed_pars(p, side = "trend"),
+    trend_smooth = function(p) match_smooth_pars(p, side = "trend"),
+    trend_random = function(p) match_random_pars(p, side = "trend"),
     trend_specific = match_trend_specific_pars,
     loadings = match_z_loadings,
     loadings_prior = match_loadings_prior_pars

@@ -1,22 +1,18 @@
 # One taxonomy for parameter names
 #
-# Three places used to answer "what kind of parameter is this name":
-# the `variable =` keyword resolver in `as.data.frame.mvgam.R`, the
-# `match_*_pars()` family in `summary.mvgam.R`, and the bucket
-# builder `categorize_mvgam_parameters()` in `index-mvgam.R`. Each
-# carried its own regexes, and nothing held them to each other.
-# `match_trend_pars()` counted three state names where the other two
-# counted six, so `innovations_trend`, `mu_trend` and
-# `scaled_innovations_trend` were trend parameters in one account and
-# latent states in the others.
+# The `variable =` keyword resolver in `as.data.frame.mvgam.R`, the
+# `match_*_pars()` family in `summary.mvgam.R` and the bucket builder
+# `categorize_mvgam_parameters()` in `index-mvgam.R` all ask what kind
+# of parameter a name is, and all ask here. A regex of their own would
+# let one count `innovations_trend` as a parameter while another
+# counts it as a latent state.
 #
-# Some of the differences between them are meant. The `smooth_params`
-# keyword reports the smoothing standard deviations alone, which
-# `?mvgam_draws` documents, while the parameter buckets group those
-# with the basis coefficients and the Gaussian-process
-# hyperparameters. The kinds below are fine enough to state that
-# difference rather than leaving each caller to encode it in a regex
-# of its own.
+# Their answers differ where they mean to. The `smooth_params` keyword
+# reports the smoothing standard deviations alone, which `?mvgam_draws`
+# documents, while the parameter buckets group those with the basis
+# coefficients and the Gaussian-process hyperparameters. The kinds
+# below are fine enough to state that difference, and no caller
+# encodes it in a regex of its own.
 #
 # Every parameter name carries two facts: which side of the model it
 # belongs to, and what kind of thing it is. The two functions below
@@ -61,8 +57,10 @@ mvgam_par_side <- function(pars) {
 #' | `intercept` | brms's centred `Intercept` | the parameter buckets, with `beta` |
 #' | `smooth_sd` | `sds_*` | the `smooth_params` keyword |
 #' | `smooth_coef` | `s_*`, `zs_*` | `summary()`, with `smooth_sd` |
-#' | `gp` | `sdgp_*`, `lscale_*`, `zgp_*` | the parameter buckets |
-#' | `ranef` | `sd_*`, `r_*`, `cor_*` | every caller |
+#' | `gp` | `sdgp_*`, `lscale_*` | the parameter buckets |
+#' | `gp_coef` | `zgp_*` | `tidy()`'s `ran_vals`, with `smooth_coef` |
+#' | `ranef_sd` | `sd_*`, `cor_*` | `tidy()`'s `ran_pars` |
+#' | `ranef_coef` | `r_*` | `tidy()`'s `ran_vals` |
 #' | `family` | `sigma`, `shape`, `nu`, ... | `obs_params` |
 #' | `dynamics` | trend-side leftovers | `trend_params` |
 #' | `internal` | Stan working arrays | nothing; hidden everywhere |
@@ -123,7 +121,9 @@ mvgam_par_kind <- function(pars, dpars = character()) {
   take(grepl(MVGAM_PAR_SMOOTH_SD_PATTERN, pars), "smooth_sd")
   take(grepl(MVGAM_PAR_SMOOTH_COEF_PATTERN, pars), "smooth_coef")
   take(grepl(MVGAM_PAR_GP_PATTERN, pars), "gp")
-  take(grepl(MVGAM_PAR_RANEF_PATTERN, pars), "ranef")
+  take(grepl(MVGAM_PAR_GP_COEF_PATTERN, pars), "gp_coef")
+  take(grepl(MVGAM_PAR_RANEF_SD_PATTERN, pars), "ranef_sd")
+  take(grepl(MVGAM_PAR_RANEF_COEF_PATTERN, pars), "ranef_coef")
 
   # The population block proper, the basis blocks brms writes beside
   # it, and the centred intercept it writes on its own. They are
@@ -160,11 +160,11 @@ mvgam_par_kind <- function(pars, dpars = character()) {
 # deviates `z_<id>`, the correlation Cholesky `L_<id>` and the
 # correlation matrix `Cor_<id>` are what the scaled effects are
 # built from, and brms drops all three unless the user asks for
-# them with `save_pars(all = TRUE)`. mvgam writes its own Stan and
-# so never ran that exclusion, which left `z_1[1,1]` beside the
+# them with `save_pars(all = TRUE)`. mvgam writes its own Stan, and
+# without this pattern `z_1[1,1]` would sit beside the
 # `r_grp[a,Intercept]` it produces. The trend side spells the same
 # names with `_trend` after the id. The lower-case `cor_<id>`
-# vector is a different parameter, aliased rather than dropped.
+# vector is a different parameter, which is aliased and kept.
 #'@noRd
 MVGAM_PAR_INTERNAL_PATTERN <- paste0(
   "^(P_var|result_var|P_ma|result_ma|empty_theta|Q_tilde)\\[",
@@ -203,21 +203,25 @@ MVGAM_PAR_SMOOTH_SD_PATTERN <- "^sds_"
 #'@noRd
 MVGAM_PAR_SMOOTH_COEF_PATTERN <- "^(s_|zs_)"
 
-# Gaussian-process marginal deviations, length-scales and
-# standardised draws. Grouped with the smooths by the parameter
-# buckets and reported apart from them by `summary()`.
+# Gaussian-process marginal deviations and length-scales, and the
+# standardised basis coefficients they scale. Grouped with the
+# smooths by the parameter buckets and reported apart from them by
+# `summary()`.
 #'@noRd
-MVGAM_PAR_GP_PATTERN <- "^(sdgp_|lscale_|zgp_)"
+MVGAM_PAR_GP_PATTERN <- "^(sdgp_|lscale_)"
+#'@noRd
+MVGAM_PAR_GP_COEF_PATTERN <- "^zgp_"
 
 # The group-level block as brms spells it after renaming: the
-# standard deviations, the scaled effects and the correlation
-# vector. The workspace those are built from carries a bare `L_` or
-# `z_` prefix and is claimed by the internal pattern above, so
-# matching either prefix here would have taken the trend's own
-# innovation Cholesky (`L_Omega_trend`) as a group-level effect and
-# reported it under `summary()`'s random-effects heading.
+# standard deviations and the correlation vector, and the scaled
+# effects they govern. The workspace those are built from carries a
+# bare `L_` or `z_` prefix and is claimed by the internal pattern
+# above. Matching either prefix here would take the trend's own
+# innovation Cholesky (`L_Omega_trend`) for a group-level effect.
 #'@noRd
-MVGAM_PAR_RANEF_PATTERN <- "^(sd_|r_|cor_)"
+MVGAM_PAR_RANEF_SD_PATTERN <- "^(sd_|cor_)"
+#'@noRd
+MVGAM_PAR_RANEF_COEF_PATTERN <- "^r_"
 
 # `mphi` / `mtheta` / `mtail` are the Tweedie custom family's
 # dispersion, power and tail parameters, which follow the same

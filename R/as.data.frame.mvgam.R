@@ -281,12 +281,9 @@ apply_mvgam_beta_aliases <- function(vars, alias_map) {
 # and (unless `hidden`) the rotation-indeterminate factor block.
 #
 # `variables.mvgam()`, `extract_mvgam_draws()` and `tidy.mvgam()`
-# all read this, so the three cannot disagree about which
-# parameters exist or what they are called. Before it existed each
-# built its own answer and they diverged: `tidy()` reported `b[1]`
-# where the others reported `b_x`, listed `L_Omega_trend` where the
-# others hid it, and omitted the identified loadings the others
-# expose.
+# all read this, and the three agree about which parameters exist and
+# what they are called: `b_x` and not `b[1]`, the identified loadings
+# and not `L_Omega_trend`.
 #
 # @param x A fitted `mvgam` object.
 # @param pars Optional raw Stan names to project. Defaults to every

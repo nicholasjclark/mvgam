@@ -18,7 +18,7 @@
 # from them. `brms:::rename_pars()` is internal to brms; it serves here
 # as an oracle and nowhere in the package.
 #
-# Six fits hold every term type under every suffix: a univariate
+# Seven fits hold every term type under every suffix: a univariate
 # model with a correlated random effect, an offset, a Matern GP and a
 # modelled `sigma` carrying a smooth, a monotonic term and a random
 # effect; an `mvbf()` model whose two responses carry a GP, a monotonic
@@ -26,8 +26,8 @@
 # them; a non-linear model with a smooth and a random effect in one
 # parameter; a hurdle model whose `hu` has a random effect; a model
 # whose mean has three smooths, one split by a factor, beside a smooth
-# in `sigma`; and a latent trend whose own formula has a smooth, a
-# slope and a random effect.
+# in `sigma`; a latent trend whose own formula has a smooth, a slope
+# and a random effect; and a latent trend with an intercept alone.
 #
 # Run with:
 #   testthat::test_file("tests/local/test-linpred-parity.R")
@@ -120,6 +120,9 @@ fits <- list(
   trend = fit_cached(
     "trend", bf(y ~ s(x, k = 5)),
     trend_formula = ~ s(z, k = 5) + x + (1 | g) + AR()
+  ),
+  trend_intercept = fit_cached(
+    "trend_intercept", bf(y ~ x), trend_formula = ~ 1 + AR()
   )
 )
 
@@ -252,20 +255,28 @@ test_that("each smooth is brms's own, less the offset brms adds", {
 
 test_that("the trend's predictor and its smooth are brms's own", {
   # The trend is a brms model of its own, whose names the combined
-  # program marks with `_trend`. Its predictor carries a smooth, a
-  # slope and a random effect.
+  # program marks with `_trend`. One trend's predictor carries a
+  # smooth, a slope and a random effect; the other's is an intercept
+  # alone, read as `b_Intercept_trend`.
+  for (nm in c("trend", "trend_intercept")) {
+    fit <- fits[[nm]]
+    b <- as_brms(fit, "trend")
+    frame <- fit$trend_model$data
+    full <- subset_draws_rows(posterior::as_draws_matrix(fit$fit),
+                              draw_ids = ids)
+    mine <- extract_linpred_from_prep(prepare_linpred_data(
+      side_draws(fit, full, "trend"), fit$trend_model, newdata = frame
+    ))
+    theirs <- brms::posterior_linpred(b, newdata = frame, draw_ids = ids,
+                                      incl_autocor = FALSE)
+    expect_lt(max(abs(unname(mine) - unname(theirs))), 1e-8)
+    expect_identical(dim(posterior_epred(fit, draw_ids = ids)),
+                     c(length(ids), nrow(fit$data)))
+  }
+
   fit <- fits$trend
   b <- as_brms(fit, "trend")
   frame <- fit$trend_model$data
-  full <- subset_draws_rows(posterior::as_draws_matrix(fit$fit),
-                            draw_ids = ids)
-  mine <- extract_linpred_from_prep(prepare_linpred_data(
-    side_draws(fit, full, "trend"), fit$trend_model, newdata = frame
-  ))
-  theirs <- brms::posterior_linpred(b, newdata = frame, draw_ids = ids,
-                                    incl_autocor = FALSE)
-  expect_lt(max(abs(unname(mine) - unname(theirs))), 1e-8)
-
   hits <- Filter(function(hit) hit$side == "trend", mvgam_smooth_terms(fit))
   expect_length(hits, 1L)
   expect_lt(max(abs(
