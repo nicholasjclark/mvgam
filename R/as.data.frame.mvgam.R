@@ -133,11 +133,6 @@ resolve_mvgam_keyword <- function(keyword, x, all_vars) {
 # `b_trend[k]` -> `b_<term>_trend` over `standata$X_trend`. We
 # rebuild the map at draw-extraction time so every method routed
 # through `extract_mvgam_draws` sees the brms-native names.
-#
-# Univariate only in v1; multivariate fits store per-response
-# standata blocks (`X_<resp>`) and need per-response prefixes:
-# the helper returns an empty map for MV so positional names are
-# preserved unchanged.
 #'@noRd
 mvgam_beta_aliases <- function(x) {
   checkmate::assert_class(x, "mvgam")
@@ -314,8 +309,9 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
   )
   # The empty-observation placeholder is a structural column that
   # stands in for a design brms cannot build, never a parameter the
-  # user asked for.
-  keep <- !startsWith(user, paste0("b_", MVGAM_EMPTY_OBS_PLACEHOLDER))
+  # user asked for. brms names its coefficient `b_<coef>`, or
+  # `b_<resp>_<coef>` in one response of a multivariate formula.
+  keep <- !endsWith(user, paste0("_", MVGAM_EMPTY_OBS_PLACEHOLDER))
   # Stan's own working arrays are never a parameter a reader asked
   # for, whatever they asked for. Dropping them here rather than
   # through the fit's `exclude` list covers a fit saved before the

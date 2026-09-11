@@ -667,15 +667,8 @@ warn_simplex_obs_formula_lacks_species <- function(formula, species_chr) {
   if (!inherits(formula, "formula") && !inherits(formula, "brmsformula")) {
     return(invisible(NULL))
   }
-  rhs_formula <- if (inherits(formula, "brmsformula")) {
-    formula$formula
-  } else {
-    formula
-  }
-  rhs_vars <- tryCatch(
-    all.vars(rhs_formula[[length(rhs_formula)]]),
-    error = function(e) character(0)
-  )
+  rhs_formula <- obs_arm_main_formula(formula)
+  rhs_vars <- all.vars(rhs_formula[[length(rhs_formula)]])
   if (species_chr %in% rhs_vars || "series" %in% rhs_vars) {
     return(invisible(NULL))
   }

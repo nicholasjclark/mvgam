@@ -134,6 +134,36 @@ glm_layout_for <- function(glm_type) {
   layout
 }
 
+#' The GLM family one likelihood line calls
+#'
+#' Refuses a GLM call whose family has no layout. Returning the line
+#' untouched would leave the trend computed but never added to the
+#' linear predictor: a model with no trend that compiles and samples
+#' without complaint. The refusal catches a family added to brms's
+#' GLM set without a transformation at code generation, before any
+#' result exists.
+#'
+#' @param line One line of Stan source holding a `_glm` density call.
+#' @return The family name including the `_glm` suffix.
+#' @noRd
+glm_family_of_line <- function(line) {
+  checkmate::assert_string(line)
+  hit <- vapply(mvgam_glm_families, function(fam) {
+    grepl(stan_density_call_pattern(fam), line)
+  }, logical(1L))
+  if (!any(hit)) {
+    stop(insight::format_error(c(
+      "Found a GLM likelihood whose family could not be identified.",
+      x = paste0("The call was: ", trimws(line)),
+      i = paste0(
+        "Recognised families are: ",
+        paste(mvgam_glm_families, collapse = ", "), "."
+      )
+    )), call. = FALSE)
+  }
+  mvgam_glm_families[hit][1L]
+}
+
 #' Which GLM likelihoods a Stan program calls
 #'
 #' @param stan_code Character vector of Stan source.
@@ -296,58 +326,27 @@ inject_trends_into_glm_calls <- function(code_lines, block_info, trend_injection
   
   # Find GLM calls in model block
   model_range <- seq(block_info$start_idx, block_info$end_idx)
-  glm_line_idx <- NULL
-  glm_type <- NULL
-  
-  for (i in model_range) {
-    line <- code_lines[i]
-    if (grepl(stan_density_call_pattern("_glm"), line)) {
-      glm_line_idx <- i
-      
-      
-      # The family this line calls, under either density spelling.
-      for (fam in mvgam_glm_families) {
-        if (grepl(stan_density_call_pattern(fam), line)) {
-          glm_type <- fam
-          break
-        }
-      }
-      
-      break
-    }
-  }
-  
-  
+  glm_hits <- model_range[grepl(stan_density_call_pattern("_glm"),
+                                code_lines[model_range])]
+
   # No GLM call in the model block is the ordinary case for a family
   # brms does not optimise, and there is nothing to unwind.
-  if (is.null(glm_line_idx)) {
+  if (!length(glm_hits)) {
     return(code_lines)
   }
+  glm_line_idx <- glm_hits[1L]
+  glm_type <- glm_family_of_line(code_lines[glm_line_idx])
 
-  # Returning the line untouched here would leave the trend computed
-  # but never added to the linear predictor: a model with no trend
-  # that compiles and samples without complaint. Refuse instead, so a
-  # family added to `mvgam_glm_families` without a transformation is
-  # caught at code generation rather than in the results.
-  if (is.null(glm_type)) {
-    stop(insight::format_error(c(
-      "Found a GLM likelihood whose family could not be identified.",
-      x = paste0("The call was: ", trimws(code_lines[glm_line_idx])),
-      i = paste0(
-        "Recognised families are: ",
-        paste(mvgam_glm_families, collapse = ", "), "."
-      )
-    )), call. = FALSE)
-  }
-  
   # Parse GLM parameters using existing pattern
   glm_params <- parse_glm_parameters_from_line(code_lines[glm_line_idx], glm_type)
-  
+
   # Generate mu construction with trend effects
   mu_construction <- build_mu_with_trend_effects(glm_params, trend_injection_code)
-  
+
   # Transform GLM call to use to_matrix(mu) format
-  transformed_glm_call <- transform_glm_call_to_mu_format(code_lines[glm_line_idx], glm_type, glm_params)
+  transformed_glm_call <- transform_single_glm_call(
+    code_lines[glm_line_idx], glm_type, glm_params
+  )
   
   # Insert mu construction and replace GLM call
   modified_lines <- c(
@@ -433,10 +432,8 @@ build_mu_with_trend_effects <- function(glm_params, trend_injection_code) {
   checkmate::assert_list(glm_params)
   checkmate::assert_character(trend_injection_code, len = 1)
   
-  resp_name <- glm_params$response_name
-  # Create mu variable name: "mu" for univariate, "mu_response" for multivariate
-  mu_var <- if (resp_name == "") "mu" else paste0("mu_", resp_name)
-  
+  mu_var <- glm_mu_names(glm_params$response_name)[["mu"]]
+
   mu_lines <- c(
     paste0("  vector[N] ", mu_var, ";"),
     paste0("  ", mu_var, " = rep_vector(0.0, N);"),
@@ -514,33 +511,20 @@ build_glm_call_on_mu <- function(glm_line, glm_type, glm_params,
   )
 }
 
-#' Transform GLM Call to Use Mu Format
+#' The linear predictor a GLM call is rewritten to read
 #'
-#' @param glm_line Character string with original GLM call
-#' @param glm_type Family name including the `_glm` suffix
-#' @param glm_params List of parsed GLM parameters
+#' A univariate model names its predictor `mu` and the `vector[1]` of
+#' ones standing in for its coefficients `mu_ones`; a multivariate
+#' model names one of each per response, suffixed by the response's
+#' key.
 #'
-#' @return Character string with transformed GLM call
-#'
+#' @param resp_name The response key, `""` for a univariate model.
+#' @return Named character vector with elements `mu` and `ones`.
 #' @noRd
-transform_glm_call_to_mu_format <- function(glm_line, glm_type, glm_params) {
-  checkmate::assert_list(glm_params)
-
-  resp_name <- glm_params$response_name
-  # Univariate models name the predictor "mu"; a multivariate model
-  # names one predictor per response.
-  mu_var <- if (resp_name == "") "mu" else paste0("mu_", resp_name)
-  mu_ones_var <- if (resp_name == "") {
-    "mu_ones"
-  } else {
-    paste0("mu_ones_", resp_name)
-  }
-
-  paste0(
-    "  target += ",
-    build_glm_call_on_mu(glm_line, glm_type, glm_params, mu_var, mu_ones_var),
-    ";"
-  )
+glm_mu_names <- function(resp_name) {
+  checkmate::assert_string(resp_name)
+  suffix <- if (nzchar(resp_name)) paste0("_", resp_name) else ""
+  c(mu = paste0("mu", suffix), ones = paste0("mu_ones", suffix))
 }
 
 #' Determine Mu Construction Type
@@ -967,11 +951,9 @@ transform_single_glm_call <- function(glm_line, glm_type, params) {
   # The line keeps its surrounding statement, so only the call itself
   # is rebuilt; the arguments come from the same per-family layout the
   # trend-injection path reads.
-  if (is.null(stan_density_suffix(glm_line, glm_type))) {
-    return(glm_line)
-  }
+  names <- glm_mu_names(params$response_name)
   replacement <- build_glm_call_on_mu(
-    glm_line, glm_type, params, "mu", "mu_ones"
+    glm_line, glm_type, params, names[["mu"]], names[["ones"]]
   )
 
   original_pattern <- paste0(stan_density_call_pattern(glm_type),

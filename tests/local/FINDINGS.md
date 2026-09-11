@@ -1003,54 +1003,58 @@ vignette calls it.
 
 ## Debt the code carries in recognisable shapes
 
-**89. Nine shapes account for the defects found so far, and a scan
-can already count five of them.**
+**89. Ten shapes account for the defects found so far, and a scan
+counts six of them.**
 
-No file covers this yet. The defects fixed while consolidating the
-response accessor were all found by reading. Read together, they
-follow nine shapes, and each shape leaves a mark in the source that
-a scan can find. The counts below were taken across
-`R/` on 2026-09-11. Several include false positives. The
-unused-argument scan counts dispatch kernels that share a signature
-(`log_lik_*` taking `trials`) and generics such as `methods_md()`,
-so each hit needs reading before it is removed.
+The defects fixed while consolidating the response accessor were all
+found by reading. Read together, they follow a small number of
+shapes. Each shape leaves a mark in the source that a scan can find. `tests/local/debt_scan.R` reads parse data and counts the marks
+in `R/`. Several shapes include false positives: the unused-argument
+scan counts dispatch kernels that share a signature (`log_lik_*`
+taking `trials`) and generics such as `methods_md()`, and each hit is
+read before anything is removed.
 
 | shape | the mark it leaves | count |
 |---|---|---|
-| one fact, several derivers | raw `[[series_var]]` / `[[time_var]]` reads; `sort(unique(...))` axis rebuilds; `is.mvbrmsformula()` or `inherits(..., "mvbrmsformula")` asked in place of the question actually meant | 51, 40, 43 |
-| an error turned into a default | `try()` and `tryCatch()` returning `NULL`, `FALSE` or an empty vector | 33 |
-| a literal standing in for a missing value | `%||% "y"`, `%||% "series1"`, `%||% "explicit"` | 113 |
-| a missing column skipped rather than refused | `intersect(x, names(data))`, `if (!col %in% names(df)) next` | 16, 9 |
-| an argument nothing reads | accepted, asserted, never used; the scan also flags `df` on `AR()`, `RW()`, `CAR()` and `ZMVN()`, which is finding 6's shape if it holds | 113 non-S3 functions |
-| a stored copy of a derivable fact | object slots and metadata fields written once and read in a few places | not yet counted |
-| one condition, several refusals | the same fault refused with different wording at different layers | not yet counted |
+| an error turned into a default | `try()` and `tryCatch()` | 0, from 32 |
+| one condition raised twice | `warning()` or `rlang::warn()` around `insight::format_warning()`, which raises its own | 0, from 7 |
+| one fact, several derivers | raw `[[series_var]]` / `[[time_var]]` reads; `sort(unique(...))` axis rebuilds; `inherits(..., "mvbrmsformula")` asked in place of the question meant | 53, 40, 58 |
+| a literal standing in for a missing value | `%||% "y"`, `%||% "series"`, `%||% "explicit"` | 118 |
+| a missing column skipped | `intersect(x, names(data))`, `if (!col %in% names(df)) next` | 21 |
+| a warning silenced, not traced | `suppressWarnings()`, `suppressMessages()` | 12 |
+| an argument nothing reads | accepted, asserted, never used; the scan also flags `df` on `AR()`, `RW()`, `CAR()` and `ZMVN()`, finding 6's shape if it holds | 113 non-S3 functions |
+| a stored copy of a derivable fact | object slots and metadata fields written once and read in a few places | not counted |
+| one condition, several refusals | the same fault refused with different wording at different layers | not counted |
 | a proxy for the question meant | "the frame has no series column" standing for "the responses are the series"; `length(x) > 1` standing for "multivariate" | found by reading |
-| an order lost to sorting | a facet over a character column; `factor(x)` given no levels | found by reading |
 
-What each shape cost when it was met:
+The first two passes are done. Clearing the caught errors was not
+mechanical: each one hid a defect of its own, and those were fixed
+with the catch.
 
-- One fact with several derivers meant eight accessors for "which
-  responses does this model have". One of them read the frame by
-  brms's key for a response rather than by its column. brms drops
-  every `.` and `_` from a response name, so every trend model whose
-  response carried either character was refused while it was being
-  built.
-- A missing column skipped rather than refused is how that key went
-  unnoticed. `count_observed_times()` intersected it with the frame's
-  columns and answered as though the response had no observations.
-- A stored copy drifted from its source. `object$response_names`
-  held column names on one model and brms keys on another, and five
-  readers took it for whichever they needed.
-- One condition had seven refusals. An unknown `resp` was met with
-  seven different messages, depending on which method was called
-  first.
-- A proxy test answered a different question. `build_training_tail_data()`
-  took the absence of a series column to mean the responses were the
-  series. That is also true of a hierarchical frame, whose series
-  come from its grouping columns.
-- An order lost to sorting put the trend panels in alphabetical
-  order, since they were faceted over a character column, beside a
-  series plot drawn in the model's own order.
+- `bf(y ~ 0)` under poisson failed the build, as did an `mvbf()`
+  whose every response declined its terms. A caught error hid the
+  same failure from `get_prior()`.
+- A `trend_param()` condition that failed to evaluate went to a
+  handler whose assignment never left it. The parameter was dropped
+  while the comment beside it said it was kept.
+- `get_prior(fit)` rebuilt the prior table from the formula inside a
+  caught error, and could describe a different model from
+  `prior_summary(fit)`.
+- The smooth readers evaluated each `s()` and `gp()` term. `k = kk`
+  failed there: one reader reported `kk` as a covariate and another
+  refused the formula as invalid syntax.
+- `methods_md()` reported the Stan and package versions of the
+  session describing a fit, and under rstan it gave the rstan package
+  version as the version of Stan. The fit now records its own.
+- `validate_multivariate_trend_constraints()` could never run: every
+  formula it was handed carried a response, which the parser refuses,
+  and the caught error returned before any check.
+
+Removing the placeholder catch exposed two older code-generation
+faults in `mvbf()` models. The GLM rewrite matched response keys of
+letters alone. Every response whose key holds a digit, `y1` or `y2`,
+kept its original likelihood call and fitted with its trend computed
+and never used. An arm written without an intercept did not compile.
 
 The tests carry the same debt. Stubs that fake a class, such as
 `structure(y ~ x, class = c("brmsformula", "formula"))`, or that
@@ -1059,13 +1063,10 @@ object no user could build. Assertions that compare counts or use
 `expect_setequal()` pass where the claim being tested is an order or
 a value.
 
-The scans are cheap and their counts can only be driven down by
-deleting code. So the fix is a saved scan per shape in `tests/local`
-and one pass per shape, starting with the two that return wrong
-answers without saying so: swallowed errors and skipped columns.
-Each pass removes the rival, the fallback or the proxy, adds an
-assertion that fails before the change and records the count before
-and after.
+The scans are cheap, and a count falls only when code is deleted.
+Each remaining shape gets one pass. A pass removes the rival, the
+fallback or the proxy, adds an assertion that fails before the change
+and records the count before and after.
 
 ## Which documents have actually been built
 

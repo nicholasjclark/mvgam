@@ -547,11 +547,11 @@ default_prior.mvgam_formula <- function(object, data,
 #' Default priors for a fitted mvgam model
 #'
 #' Alias for [get_prior.mvgam()] under the brms
-#' `default_prior()` generic. Returns the literal prior table
-#' the model was fit with (`object$prior`).
+#' `default_prior()` generic. Returns the prior table the model was
+#' fit with, the one [prior_summary()] reports.
 #'
 #' @param object A fitted `mvgam` model.
-#' @param ... Currently unused; present for S3 generic dispatch.
+#' @param ... Unused; an argument given here is refused.
 #' @return A `brmsprior` data frame.
 #' @method default_prior mvgam
 #' @export

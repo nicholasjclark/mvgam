@@ -9,13 +9,13 @@
 \arguments{
 \item{object}{A fitted \code{mvgam} model.}
 
-\item{...}{Currently unused; present for S3 generic dispatch.}
+\item{...}{Unused; an argument given here is refused.}
 }
 \value{
 A \code{brmsprior} data frame.
 }
 \description{
 Alias for \code{\link[=get_prior.mvgam]{get_prior.mvgam()}} under the brms
-\code{default_prior()} generic. Returns the literal prior table
-the model was fit with (\code{object$prior}).
+\code{default_prior()} generic. Returns the prior table the model was
+fit with, the one \code{\link[=prior_summary]{prior_summary()}} reports.
 }

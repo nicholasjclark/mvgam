@@ -1184,6 +1184,7 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       algorithm = combined_fit@sim$algorithm %||% "sampling",
       brms_version = utils::packageVersion("brms"),
       mvgam_version = utils::packageVersion("mvgam"),
+      stan_version = live_stan_version(backend),
       creation_time = Sys.time()
     ),
     class = c("mvgam", "brmsfit")
@@ -1268,6 +1269,7 @@ create_mvgam_stub_from_stan_components <- function(stan_components,
       algorithm = "none",
       brms_version = utils::packageVersion("brms"),
       mvgam_version = utils::packageVersion("mvgam"),
+      stan_version = live_stan_version(backend),
       creation_time = Sys.time(),
       criteria = list()
     ),
@@ -1525,15 +1527,7 @@ mvgam_multiple <- function(formula,
     })
   }
 
-  # Validate all elements are data frames
-  if (!all(sapply(data_list, is.data.frame))) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "All elements in {.field data_list} must be data.frames."
-      ),
-      x = "Found non-data.frame elements in imputation list."
-    )))
-  }
+  checkmate::assert_list(data_list, types = "data.frame", min.len = 2)
 
   # Validate multiple imputation datasets
   if (check_data) {
@@ -1574,15 +1568,7 @@ mvgam_multiple <- function(formula,
 #' @return Invisible TRUE if valid, stops with error if invalid
 #' @noRd
 validate_multiple_imputation_datasets <- function(data_list) {
-  checkmate::assert_list(data_list, min.len = 2)
-
-  # Check all elements are data frames
-  if (!all(sapply(data_list, is.data.frame))) {
-    stop(insight::format_error(c(
-      "All elements in data_list must be data.frames.",
-      x = "Found non-data.frame elements in imputation list."
-    )))
-  }
+  checkmate::assert_list(data_list, types = "data.frame", min.len = 2)
 
   # Get reference structure from first dataset
   ref_data <- data_list[[1]]
@@ -1609,51 +1595,10 @@ validate_multiple_imputation_datasets <- function(data_list) {
         x = "All imputed datasets must have same number of observations."
       )))
     }
-
-    # Check essential columns (time, series) are identical
-    essential_cols <- intersect(c("time", "series"), ref_names)
-    for (col in essential_cols) {
-      if (!identical(ref_data[[col]], current_data[[col]])) {
-        stop(insight::format_error(c(
-          paste("Column", col, "differs between datasets."),
-          x = "Time and series identifiers must be identical across imputations."
-        )))
-      }
-    }
   }
-
-  # Validate missing data patterns
-  validate_missing_patterns(data_list)
-
-  invisible(TRUE)
-}
-
-#' Validate Missing Data Patterns
-#' @param data_list List of imputed datasets
-#' @return Invisible TRUE if valid, warns about potential issues
-#' @noRd
-validate_missing_patterns <- function(data_list) {
-  n_datasets <- length(data_list)
-  dataset_names <- names(data_list[[1]])
-
-  # Check for variables that should not be imputed
-  non_imputable <- c("time", "series", "weights", "trials")
-  present_non_imputable <- intersect(non_imputable, dataset_names)
-
-  for (col in present_non_imputable) {
-    values_list <- lapply(data_list, function(d) d[[col]])
-
-    # Check if any differences exist
-    reference_values <- values_list[[1]]
-    for (i in 2:n_datasets) {
-      if (!identical(reference_values, values_list[[i]])) {
-        insight::format_warning(c(
-          paste("Column", col, "varies between imputed datasets."),
-          x = "This may indicate improper imputation of structural variables."
-        ))
-      }
-    }
-  }
+  # Whether the imputations share a time and series axis is asked of
+  # the fits, by `pool_mvgam_fits()`: the columns naming the axis are
+  # the model's to resolve, and need not be called `time` or `series`.
 
   invisible(TRUE)
 }
@@ -1717,14 +1662,23 @@ fit_multiple_imputation_models <- function(formula, trend_formula, data_list,
 #' @return mvgam_pooled object with combined posteriors
 #' @noRd
 pool_mvgam_fits <- function(fits) {
-  # Input validation
-  checkmate::assert_list(fits, min.len = 2)
+  checkmate::assert_list(fits, types = "mvgam", min.len = 2)
 
-  if (!all(sapply(fits, function(x) inherits(x, "mvgam")))) {
-    stop(insight::format_error(c(
-      "All fits must be mvgam objects.",
-      x = "Cannot combine fits of different types."
-    )))
+  # Pooled draws of `trend[t, s]` describe one cell only when every
+  # imputation put the same series and the same occasion there. An
+  # imputation that moved a time or a series value is refused.
+  ref_axes <- mvgam_axes(fits[[1L]])
+  for (i in seq_along(fits)[-1L]) {
+    if (!identical(ref_axes, mvgam_axes(fits[[i]]))) {
+      stop(insight::format_error(c(
+        paste0("Imputation ", i, " has a different time or series axis ",
+               "from imputation 1."),
+        x = paste0("Pooled trend draws would mix different occasions or ",
+                   "series under one label."),
+        i = paste0("Impute only the response and covariates; the time ",
+                   "and series columns must be identical across datasets.")
+      )))
+    }
   }
 
   # Validate parameter consistency across fits
@@ -1740,9 +1694,6 @@ pool_mvgam_fits <- function(fits) {
   }
 
   n_imp <- length(fits)
-  insight::format_message(
-    sprintf("Combining posteriors across %d imputations...", n_imp)
-  )
 
   # Extract stanfit objects
   sflist <- lapply(fits, function(fit) fit$fit)
@@ -1762,8 +1713,6 @@ pool_mvgam_fits <- function(fits) {
 
   # Set class
   class(combined_fit) <- c("mvgam_pooled", "mvgam", "brmsfit")
-
-  insight::format_message("Successfully combined posteriors.")
-  return(combined_fit)
+  combined_fit
 }
 

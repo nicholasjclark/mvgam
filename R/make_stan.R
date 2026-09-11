@@ -474,11 +474,7 @@ zmvn_scale_confounded <- function(mv_spec, family, data) {
   if (length(unique(data[[series_var]])) > 1L) return(FALSE)
 
   # `dpars` is absent on a stats family, so normalise before asking.
-  dpars <- tryCatch(
-    brms::brmsfamily(resolve_family_name(family))$dpars,
-    error = function(e) NULL
-  )
-  isTRUE("sigma" %in% dpars)
+  "sigma" %in% validate_family(family)$dpars
 }
 
 

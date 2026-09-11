@@ -136,6 +136,9 @@
 #'   - `brms_version`, `mvgam_version` The package versions the model
 #'     was fitted under
 #'
+#'   - `stan_version` The version of Stan the backend compiled with,
+#'     `NA` under the `"mock"` backend
+#'
 #'   - `creation_time` A `POSIXct` timestamp
 #'
 #'   A fit from [jsdgam()] has class `c("mvgam", "jsdgam")` and carries

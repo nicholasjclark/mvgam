@@ -599,13 +599,19 @@ evaluate_param_conditions <- function(param_spec, envir = parent.frame()) {
     } else if (condition_str == "FALSE") {
       keep_rows[i] <- FALSE
     } else {
-      tryCatch({
-        condition_expr <- parse(text = condition_str)[[1]]
-        keep_rows[i] <- eval(condition_expr, envir = envir)
-      }, error = function(e) {
-        # If condition can't be evaluated, default to TRUE
-        keep_rows[i] <- TRUE
-      })
+      # A condition that cannot be evaluated is an error in the trend
+      # that declared it. It was once caught by a handler whose
+      # assignment never left the handler: the parameter was dropped
+      # while the comment beside it said it was kept.
+      keep <- eval(str2lang(condition_str), envir = envir)
+      if (!checkmate::test_flag(keep)) {
+        stop(insight::format_error(c(
+          paste0("The condition of trend parameter '", param_spec$name[i],
+                 "' must evaluate to TRUE or FALSE."),
+          x = paste0("'", condition_str, "' did not.")
+        )))
+      }
+      keep_rows[i] <- keep
     }
   }
 
@@ -1684,17 +1690,10 @@ parse_trend_formula <- function(trend_formula, data = NULL, .precomputed_dimensi
   # passed to `trend_map`) can be resolved at evaluation time.
   formula_env <- environment(trend_formula) %||% parent.frame()
 
-  # Safe formula parsing with try() like brms
-  tf_safe <- try(terms(trend_formula, keep.order = TRUE), silent = TRUE)
-  if (inherits(tf_safe, "try-error")) {
-    stop(insight::format_error(c(
-      "Invalid formula syntax.",
-      x = cli::format_inline(
-        "The {.field trend_formula} could not be parsed."
-      ),
-      i = "Check for balanced parentheses and valid R syntax."
-    )))
-  }
+  # A formula object has already parsed. `terms()` fails only on what
+  # it cannot expand, such as a `.` with no `data`, and names the
+  # problem itself. `data` expands a `.` into the columns it holds.
+  tf_safe <- stats::terms(trend_formula, data = data, keep.order = TRUE)
 
   # Check for response variable (brms pattern)
   if (attr(tf_safe, "response") > 0) {
@@ -1705,15 +1704,6 @@ parse_trend_formula <- function(trend_formula, data = NULL, .precomputed_dimensi
         "Remove the response variable from {.field trend_formula}."
       )
     )))
-  }
-
-  # Handle dot expansion if data provided (brms pattern)
-  if (!is.null(data)) {
-    # Expand dots in formula using stats::terms with data
-    tf_expanded <- try(terms(trend_formula, data = data, keep.order = TRUE), silent = TRUE)
-    if (!inherits(tf_expanded, "try-error")) {
-      tf_safe <- tf_expanded
-    }
   }
 
   # Extract term labels (mvgam pattern)

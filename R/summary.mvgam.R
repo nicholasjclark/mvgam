@@ -1020,63 +1020,21 @@ summary.mvgam_pooled <- function(object, probs = c(0.025, 0.975),
   # Call parent method to get standard summary
   base_summary <- NextMethod("summary")
 
-  # Extract MI-specific metadata from object attributes
+  # `pool_mvgam_fits()` is the only constructor of this class and
+  # writes all three.
   individual_fits <- attr(object, "individual_fits")
   n_imputations <- attr(object, "n_imputations")
   combination_method <- attr(object, "combination_method")
 
-  if (is.null(individual_fits) || is.null(n_imputations)) {
-    insight::format_warning(c(
-      "Missing multiple imputation metadata in pooled object.",
-      i = "Summary will proceed without MI diagnostics."
-    ))
-
-    # Return standard summary if metadata missing
-    return(base_summary)
-  }
-
-  # Validate consistency between metadata and actual fits
-  if (length(individual_fits) != n_imputations) {
-    insight::format_warning(c(
-      cli::format_inline(
-        sprintf(
-          "Mismatch: {.field n_imputations} = %d but %d fits stored.",
-          n_imputations, length(individual_fits)
-        )
-      ),
-      i = "Using actual number of stored fits."
-    ))
-    n_imputations <- length(individual_fits)
-  }
-
   # Calculate total draws across all imputations
   total_draws <- posterior::ndraws(posterior::as_draws(object$fit))
-  draws_per_imp <- if (length(individual_fits) > 0) {
-    posterior::ndraws(posterior::as_draws(individual_fits[[1]]$fit))
-  } else {
-    NA_integer_
-  }
+  draws_per_imp <- posterior::ndraws(
+    posterior::as_draws(individual_fits[[1L]]$fit)
+  )
 
   # Extract per-imputation convergence diagnostics
   imp_convergence <- lapply(seq_along(individual_fits), function(i) {
-    fit <- individual_fits[[i]]
-
-    # Safely extract draws and compute diagnostics
-    draws <- tryCatch(
-      posterior::as_draws(fit$fit),
-      error = function(e) NULL
-    )
-
-    if (is.null(draws) || posterior::ndraws(draws) == 0) {
-      return(list(
-        imputation = i,
-        max_rhat = NA_real_,
-        min_bulk_ess = NA_real_,
-        min_tail_ess = NA_real_,
-        n_params = NA_integer_,
-        error = "Failed to extract draws"
-      ))
-    }
+    draws <- posterior::as_draws(individual_fits[[i]]$fit)
 
     # Compute convergence diagnostics only
     summ <- posterior::summarise_draws(
@@ -1109,11 +1067,7 @@ summary.mvgam_pooled <- function(object, probs = c(0.025, 0.975),
     n_imputations = n_imputations,
     total_draws = total_draws,
     draws_per_imputation = draws_per_imp,
-    combination_method = if (is.null(combination_method)) {
-      "sflist2stanfit"
-    } else {
-      combination_method
-    },
+    combination_method = combination_method,
     per_imputation_convergence = imp_convergence,
     max_rhat_across_imputations = max_rhat_across_imps,
     min_ess_across_imputations = min_ess_across_imps

@@ -481,43 +481,40 @@ split_term_labels <- function(lab) {
   if (grepl(":", lab, fixed = TRUE)) {
     return(list(strsplit(lab, ":", fixed = TRUE)[[1L]]))
   }
+  # A label `terms()` wrote always parses.
+  expr <- rlang::parse_expr(lab)
   # A `*` reaching here is part of an expression, not a separator
   # between two effects. `terms()` expands a genuine `a * b` into its
-  # main effects and `a:b` before this is called, so the only labels
+  # main effects and `a:b` before this is called. The only labels
   # still carrying one are calls such as `exp(b2 * x)`, which name a
   # single covariate. Splitting those on the text gave `exp(b2 ` and
-  # ` x)`, neither of which is a column, so the term was dropped and
-  # the model offered no effects at all. Anything that parses falls
-  # through to `all.vars()` below, which reads `x` out of the call.
-  expr <- tryCatch(rlang::parse_expr(lab), error = function(e) NULL)
-  if (!is.null(expr) && is.call(expr) &&
-      identical(expr[[1L]], as.name("*"))) {
+  # ` x)`, neither of which is a column: the term was dropped and the
+  # model offered no effects at all. Anything else falls through to
+  # `all.vars()` below, which reads `x` out of the call.
+  if (is.call(expr) && identical(expr[[1L]], as.name("*"))) {
     return(list(vapply(as.list(expr)[-1L], deparse, character(1L))))
   }
-  smooth_starts <- c("s(", "te(", "t2(", "ti(", "gp(", "mo(")
-  if (any(vapply(smooth_starts, grepl, FUN.VALUE = logical(1L),
-                 x = lab, fixed = TRUE))) {
-    parsed <- tryCatch(eval(rlang::parse_expr(lab)),
-                       error = function(e) NULL)
-    if (is.null(parsed) || is.null(parsed$term)) {
-      return(list(all.vars(rlang::parse_expr(lab))))
-    }
-    by_var <- if (!is.null(parsed$by) && !identical(parsed$by, "NA")) {
-      parsed$by
-    } else {
-      NULL
-    }
-    if (length(parsed$term) <= 2L) {
-      return(list(c(all.vars(parse(text = parsed$term)), by_var)))
-    }
-    list(
-      c(all.vars(parse(text = parsed$term[1:2])), by_var),
-      c(all.vars(parse(text = parsed$term[c(1, 3)])), by_var),
-      c(all.vars(parse(text = parsed$term[c(2, 3)])), by_var)
-    )
-  } else {
-    list(all.vars(rlang::parse_expr(lab)))
+  smooth_heads <- c("s", "te", "t2", "ti", "gp", "mo")
+  if (!is.call(expr) || !is.name(expr[[1L]]) ||
+        !as.character(expr[[1L]]) %in% smooth_heads) {
+    return(list(all.vars(expr)))
   }
+  # A smooth names its covariates as unnamed arguments and its
+  # grouping as `by`; every other argument is a setting. All three are
+  # read off the call. Evaluating the call needed every setting to
+  # resolve: `k = kk` failed and fell back to reporting `kk` as a
+  # covariate. It also returned `by` as deparsed text, and
+  # `by = interaction(a, b)` offered a column named after the call.
+  args <- as.list(expr)[-1L]
+  arg_names <- names(args) %||% character(length(args))
+  by_vars <- if ("by" %in% arg_names) all.vars(args[["by"]]) else NULL
+  term_vars <- lapply(args[!nzchar(arg_names)], all.vars)
+  if (length(term_vars) <= 2L) {
+    return(list(c(unlist(term_vars), by_vars)))
+  }
+  lapply(list(1:2, c(1L, 3L), 2:3), function(pair) {
+    c(unlist(term_vars[pair]), by_vars)
+  })
 }
 
 

@@ -784,58 +784,26 @@ test_that("embedded family edge cases work correctly", {
 })
 
 
-# get_prior.mvgam: post-fit prior inspection should surface the full
-# adjustable set (obs + trend + lifted stanvar rows), not just the
-# user-supplied overrides stored on `object$prior`. The merge marks
-# overridden rows with `source = "user"` so callers can tell which
-# rows the user touched. Uses a stub mvgam object to avoid fitting
+# get_prior.mvgam: the table a fit was built with, the same one
+# prior_summary() reports. Uses a stub mvgam object to avoid fitting
 # Stan in CI (per the package's no-fits-in-testthat rule).
 
-test_that("get_prior.mvgam re-derives full table and marks user rows", {
-  test_data <- create_test_data()
-  user_prior <- c(
+test_that("get_prior on a fit is the table prior_summary reports", {
+  # `get_prior()` once rebuilt the table from the formula, inside a
+  # caught error that fell back to the stored table. The two accessors
+  # could then describe different models.
+  stored <- c(
     brms::prior(normal(0, 1), class = b),
     brms::prior(exponential(2), class = sigma_trend)
   )
-  obs_formula <- y ~ x
-  trend_call <- ~ AR(p = 1)
-
-  # Build the stub: replicate the slots get_prior.mvgam needs without
-  # fitting Stan. The user-prior table emulates what mvgam() stores
-  # on `object$prior` at fit time.
   stub <- structure(
-    list(
-      formula = obs_formula,
-      trend_call = trend_call,
-      data = test_data,
-      family = gaussian(),
-      prior = user_prior
-    ),
+    list(formula = y ~ x, trend_call = ~ AR(p = 1),
+         data = create_test_data(), family = gaussian(), prior = stored),
     class = c("mvgam", "brmsfit")
   )
-
-  out <- suppressWarnings(get_prior(stub))
-  expect_s3_class(out, "brmsprior")
-  expect_true(nrow(out) > nrow(user_prior),
-                label = "re-derived table should expand beyond user rows")
-  expect_true("sigma_trend" %in% out$class,
-                label = "trend-side rows should be visible")
-  user_marked <- out[out$source == "user", , drop = FALSE]
-  expect_true(any(user_marked$class == "b"),
-                label = "obs-side override should be marked source=user")
-})
-
-test_that("get_prior.mvgam falls back to object$prior when re-derive fails", {
-  stub <- structure(
-    list(
-      formula = NULL,  # missing slot triggers fallback
-      prior = c(brms::prior(normal(0, 1), class = b))
-    ),
-    class = c("mvgam", "brmsfit")
-  )
-  out <- suppressWarnings(get_prior(stub))
-  expect_s3_class(out, "brmsprior")
-  expect_identical(nrow(out), 1L)
+  expect_identical(get_prior(stub), prior_summary(stub))
+  expect_identical(default_prior(stub), prior_summary(stub))
+  expect_error(get_prior(stub, zzz_unknown = 1), "zzz_unknown")
 })
 
 test_that("get_prior.mvgam errors clearly when fit lacks any prior info", {

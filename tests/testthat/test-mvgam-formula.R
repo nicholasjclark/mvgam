@@ -202,8 +202,9 @@ test_that("mvgam_formula handles edge cases", {
   expect_no_error(mvgam_formula(y ~ x, trend_formula = ~ 0))
   expect_no_error(mvgam_formula(y ~ x, trend_formula = ~ -1))
 
-  # Formula with dots
-  expect_error(mvgam_formula(y ~ .))
+  # A dot would sweep the time and series columns into the model.
+  expect_error(mvgam_formula(y ~ .), "not supported")
+  expect_error(mvgam_formula(brms::bf(y ~ x + .)), "not supported")
 })
 
 test_that("mvgam_formula + get_prior identical to brms when no trends", {

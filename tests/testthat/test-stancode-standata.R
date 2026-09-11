@@ -5311,3 +5311,40 @@ test_that("the wide-frame trend design is indexed at time level", {
     tolerance = 1e-8
   )
 })
+
+test_that("every response's GLM likelihood reads the predictor its trend joins", {
+  # brms folds a response's predictor into its GLM call. The trend
+  # reaches the likelihood only once that call is rewritten to read
+  # `mu_<resp>`. The rewrite once matched response keys of letters
+  # alone: `y1` and `y2` kept their original calls, and the model
+  # compiled and sampled with the trend computed and never used. An
+  # arm written without an intercept was assumed to carry one, and the
+  # program did not compile.
+  set.seed(5)
+  T_ <- 20L
+  dat <- data.frame(
+    time = seq_len(T_), x = rnorm(T_),
+    y1 = rpois(T_, 5), y2 = rpois(T_, 3)
+  )
+  forms <- list(
+    both_intercepts = brms::mvbf(y1 ~ x, y2 ~ x, rescor = FALSE),
+    one_without = brms::mvbf(y1 ~ x, y2 ~ 0 + x, rescor = FALSE)
+  )
+  for (f in forms) {
+    pf <- mvgam(f, trend_formula = ~ AR(p = 1), data = dat,
+                family = poisson(), run_model = FALSE)
+    # Stan's formatter wraps a long statement. Statements are read with
+    # their whitespace collapsed.
+    code <- gsub("\\s+", " ", stancode(pf))
+    for (r in c("y1", "y2")) {
+      call <- regmatches(code, gregexpr(
+        paste0("poisson_log_glm_lpmf\\(Y_", r, " \\|[^;]*;"), code
+      ))[[1L]]
+      expect_length(call, 1L)
+      expect_match(call, paste0("to_matrix(mu_", r, ")"), fixed = TRUE)
+      expect_match(code, paste0(
+        "mu_", r, "\\[n\\] \\+= [^;]*trend\\[obs_trend_time_", r, "\\[n\\]"
+      ))
+    }
+  }
+})

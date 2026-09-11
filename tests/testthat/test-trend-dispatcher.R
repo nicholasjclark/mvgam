@@ -391,10 +391,11 @@ test_that("formula parsing error handling works comprehensively", {
   expect_equal(result_no_constructors$trend_model$trend, "ZMVN")
   expect_equal(result_no_constructors$regular_terms, c("s(time)", "cov1"))
 
-  # Test dot formula (should error before our validation)
+  # A dot with no data to expand it: `terms()` says what is missing,
+  # where a caught error once blamed the parentheses.
   expect_error(
     mvgam:::parse_trend_formula(~ .),
-    "Invalid formula syntax"
+    "no 'data' argument"
   )
 
   # Test invalid trend constructor calls

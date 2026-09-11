@@ -188,15 +188,15 @@ lfo_cv.mvgam <- function(object,
   # Backward-compat: accept the deprecated `data` arg.
   if (!is.null(data)) {
     if (is.null(newdata)) {
-      warning(insight::format_warning(c(
+      insight::format_warning(c(
         "'data' is deprecated; use 'newdata' instead.",
         i = "Forwarding the supplied value to 'newdata'."
-      )), call. = FALSE)
+      ))
       newdata <- data
     } else {
-      warning(insight::format_warning(
+      insight::format_warning(
         "Both 'data' and 'newdata' supplied; using 'newdata'."
-      ), call. = FALSE)
+      )
     }
   }
 

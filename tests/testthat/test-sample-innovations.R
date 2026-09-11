@@ -951,6 +951,26 @@ test_that("correlated series settle at the exact cross-covariance", {
 })
 
 
+test_that("a draw with a singular stationary covariance keeps its innovations", {
+  # Perfectly correlated innovations under equal coefficients leave
+  # the stationary correlation singular, without a Cholesky factor.
+  # That draw is left as it was, and the draw beside it is still
+  # transformed.
+  n <- 2L
+  sigma <- matrix(c(0.8, 1.3, 0.8, 1.3), nrow = 2L, byrow = TRUE)
+  L <- array(0, dim = c(2L, n, n))
+  L[1L, , ] <- matrix(c(1, 1, 0, 0), n, n)
+  L[2L, , ] <- t(chol(matrix(c(1, 0.6, 0.6, 1), n, n)))
+  phi <- matrix(c(0.5, 0.5, 0.8, 0.1), nrow = 2L, byrow = TRUE)
+  out <- stationary_correlated_params(
+    list(sigma_trend = sigma, L_Omega_trend = L), phi
+  )
+  expect_identical(out$sigma_trend[1L, ], sigma[1L, ])
+  expect_identical(out$L_Omega_trend[1L, , ], L[1L, , ])
+  expect_false(identical(out$sigma_trend[2L, ], sigma[2L, ]))
+})
+
+
 test_that("a draws reader returns NULL for a parameter not carried", {
   dm <- matrix(1, nrow = 4L, ncol = 2L,
                 dimnames = list(NULL, c("a[1]", "a[2]")))

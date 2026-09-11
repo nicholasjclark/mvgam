@@ -981,18 +981,33 @@ assemble_stored_prior_table <- function(obs_priors, trend_priors,
   if (!is.null(user_prior) && nrow(user_prior) > 0L) {
     lifted <- merge_user_priors(lifted, user_prior)$priors
   }
-  # The empty-obs placeholder's pin is structural: it holds a column
-  # mvgam had to invent at zero, and names no parameter the user
-  # wrote. It is dropped here, on the table the fit stores and
-  # `prior_summary()` returns, rather than on the one the code
-  # generator reads.
-  if (is.data.frame(lifted) && nrow(lifted) > 0L &&
-        "coef" %in% names(lifted)) {
-    lifted <- lifted[
-      lifted$coef != MVGAM_EMPTY_OBS_PLACEHOLDER, , drop = FALSE
-    ]
+  # Hidden on the table the fit stores and `prior_summary()` returns.
+  # The code generator reads another table, which keeps the pin.
+  hide_obs_placeholder_prior(lifted)
+}
+
+
+#' Hide the empty-obs placeholder's pin from a prior table a user reads
+#'
+#' The pin is structural: it holds a column mvgam had to invent at
+#' zero, and names no parameter the user wrote. It stays in the table
+#' the code generator reads, where dropping it would leave the
+#' placeholder free.
+#'
+#' @param prior A `brmsprior` data frame
+#' @return The table without the pin's row, or the `b` rows of the mean
+#'   the pin sits in
+#' @noRd
+hide_obs_placeholder_prior <- function(prior) {
+  if (!is.data.frame(prior) || !nrow(prior) || !"coef" %in% names(prior)) {
+    return(prior)
   }
-  lifted
+  # The placeholder is the only coefficient of the mean it sits in.
+  # The class-level `b` row brms writes for that mean describes nothing
+  # the user wrote either, and goes with the pin.
+  mean_of <- paste(prior$resp, prior$dpar, prior$nlpar)
+  held <- mean_of[prior$coef == MVGAM_EMPTY_OBS_PLACEHOLDER]
+  prior[!(prior$class == "b" & mean_of %in% held), , drop = FALSE]
 }
 
 
@@ -1690,17 +1705,15 @@ get_prior.brmsformula <- function(object, ...) {
 #'
 #' Convenience shortcut for the post-fit prior table. In brms the
 #' canonical post-fit accessor is `prior_summary()`; mvgam keeps
-#' that path (it forwards to `object$prior` too) but exports
-#' `get_prior.mvgam()` as well because users frequently type
-#' `get_prior(fit)` by analogy with the formula method. The
-#' returned `brmsprior` is the literal prior table mvgam handed
-#' to brms at fit time (with all adaptive constants baked in by
-#' brms), so it can be edited and fed back through
-#' `update(fit, prior = ..., recompile = FALSE)` for refits that
-#' reuse the compiled Stan model.
+#' that path and exports `get_prior.mvgam()` as well because users
+#' frequently type `get_prior(fit)` by analogy with the formula
+#' method. Both return the one table the model was built with. It can
+#' be edited and fed back through
+#' `update(fit, prior = ..., recompile = FALSE)` for refits that reuse
+#' the compiled Stan model.
 #'
 #' @param object A fitted \code{mvgam} model.
-#' @param ... Currently unused; present for S3 generic dispatch.
+#' @param ... Unused; an argument given here is refused.
 #' @return A \code{brmsprior} data frame covering every adjustable
 #'   prior row (observation and trend components). Rows the user
 #'   overrode at fit time carry `source = "user"`; rows left at
@@ -1708,79 +1721,8 @@ get_prior.brmsformula <- function(object, ...) {
 #'   string \pkg{brms} assigned).
 #' @export
 get_prior.mvgam <- function(object, ...) {
-  checkmate::assert_class(object, "mvgam")
-
-  # Re-derive the full obs + trend prior table from the formula
-  # slots on the fit; `object$prior` alone carries only the subset
-  # the user supplied at fit time and therefore hides every
-  # trend-side row that Stan also used.
-  formula_obs <- object$formula
-  trend_call <- object$trend_call
-  data <- mvgam_training_data(object)
-  family <- object$family %||% gaussian()
-
-  rederive_failed <- is.null(formula_obs) || is.null(data)
-  if (!rederive_failed) {
-    full <- tryCatch(
-      get_prior.mvgam_formula(
-        mvgam_formula(formula_obs, trend_call),
-        data = data, family = family
-      ),
-      error = function(e) NULL
-    )
-    rederive_failed <- is.null(full)
-  }
-
-  # If re-derivation is not possible (e.g. the fit pre-dates the
-  # formula-slot enrichments), fall back to whatever is on
-  # `object$prior` so callers still get something usable. The user
-  # also sees only the legacy view in that case, so warn once.
-  if (rederive_failed) {
-    if (is.null(object$prior)) {
-      stop(insight::format_error(c(
-        "Fit was not stored with a prior table.",
-        i = "Refit with the current package version to enable get_prior() on fitted objects."
-      )))
-    }
-    if (!identical(Sys.getenv("TESTTHAT"), "true")) {
-      rlang::warn(
-        paste0(
-          "Returning the user-supplied prior overrides only; ",
-          "the full prior table could not be re-derived from the ",
-          "stored formula slots."
-        ),
-        class = "mvgam_get_prior_fallback",
-        .frequency = "once",
-        .frequency_id = "mvgam_get_prior_fallback"
-      )
-    }
-    return(object$prior)
-  }
-
-  # `object$prior` (combined obs + trend at fit time) carries BOTH
-  # the user-supplied rows AND brms's auto-defaults; only the
-  # `source = "user"` subset is treated as overrides here.
-  user <- object$prior
-  if (!is.null(user) && "source" %in% names(user)) {
-    user <- user[user$source == "user", , drop = FALSE]
-  }
-  merged <- merge_user_priors(full, user)
-  if (length(merged$unmatched) > 0L &&
-      !identical(Sys.getenv("TESTTHAT"), "true")) {
-    rlang::warn(
-      paste0(
-        length(merged$unmatched),
-        " user-supplied prior row(s) did not match any row in the ",
-        "default table: ",
-        paste(unique(merged$unmatched), collapse = ", "),
-        ". Check the `class` / `coef` spelling."
-      ),
-      class = "mvgam_get_prior_unmatched",
-      .frequency = "once",
-      .frequency_id = "mvgam_get_prior_unmatched"
-    )
-  }
-  merged$priors
+  rlang::check_dots_empty()
+  prior_summary.mvgam(object)
 }
 
 #' Detect Embedded Families in Formula Objects
@@ -1934,26 +1876,26 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
     )))
   }
 
-  # Extract observation priors with embedded family support.
-  # `safe_brms_prior_call` falls back to `brms::empty_prior()` on
-  # the known empty-frame crash that occurs when the obs formula
-  # has no coefficient classes (e.g. `y ~ 0` for a pure-trend
-  # state-space model).
+  # A formula declining every coefficient (`y ~ 0` for a pure-trend
+  # state-space model) is built with a pinned placeholder, because
+  # brms has no parameter class to set a default on without one. The
+  # table is read off the same formula the model is built from, and
+  # the pin is hidden here as it is on a fit's stored table.
+  injected <- inject_obs_zero_placeholder(formula, data, prior = NULL)
   if (has_embedded_families(formula)) {
     # Let brms handle embedded families - don't pass family parameter
-    obs_priors <- safe_brms_prior_call(
-      brms::get_prior(formula = formula, data = data, ...)
-    )
+    obs_priors <- brms::get_prior(formula = injected$formula,
+                                  data = injected$data, ...)
   } else {
     # Pass family parameter for non-embedded cases
-    obs_priors <- safe_brms_prior_call(
-      brms::get_prior(formula = formula, data = data,
-                      family = family, ...)
-    )
+    obs_priors <- brms::get_prior(formula = injected$formula,
+                                  data = injected$data,
+                                  family = family, ...)
     obs_priors <- overlay_family_default_priors(
       obs_priors, formula, family
     )
   }
+  obs_priors <- hide_obs_placeholder_prior(obs_priors)
 
   # Handle case where no trend formula is specified
   if (is.null(trend_formula)) {

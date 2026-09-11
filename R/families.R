@@ -439,22 +439,17 @@ check_tweedie_truncation <- function(object) {
       "'check_tweedie_truncation()' only applies to fits with family = tweedie()."
     ))
   }
-  sd <- object$model_data %||% object$standata
-  if (is.null(sd) || is.null(sd$M)) {
+  # `M` is Stan data and is read from the stored Stan data.
+  # `model_data` on a `jsdgam()` fit is the frame, which has no `M`.
+  M <- object$standata$M
+  if (is.null(M)) {
     stop(insight::format_error(
       "Could not locate the truncation 'M' in the fit's standata."
     ))
   }
-  M <- sd$M
   # Posterior mean of mu (per observation) and the two global
   # scalars; mu is on the response scale via family$linkinv.
-  pe <- try(posterior_epred(object), silent = TRUE)
-  if (inherits(pe, "try-error") || !is.matrix(pe)) {
-    stop(insight::format_error(
-      "Failed to extract posterior epred for the Tweedie fit."
-    ))
-  }
-  mu_mean <- colMeans(pe)
+  mu_mean <- colMeans(posterior_epred(object))
   draws <- posterior::as_draws_matrix(object$fit)
   mphi_mean <- mean(draws[, "mphi"])
   mtheta_mean <- mean(draws[, "mtheta"])
@@ -4203,7 +4198,7 @@ warn_unidentified_component_scale <- function(n_lv, n_species,
     paste0("No factor count separates the two at ", n_species,
            " species; add species to estimate the residual scales.")
   }
-  rlang::warn(insight::format_warning(c(
+  insight::format_warning(c(
     paste0(
       "The per-species residual scale is not identified at 'n_lv = ",
       n_lv, "' with ", n_species, " species."
@@ -4220,7 +4215,7 @@ warn_unidentified_component_scale <- function(n_lv, n_species,
       "the design rather than the sampler."
     ),
     i = advice
-  )))
+  ))
   invisible(NULL)
 }
 

@@ -321,6 +321,20 @@ test_that("process_trend_params handles conditional parameters correctly", {
   expect_false("theta_trend" %in% names(result$bounds))
 })
 
+test_that("a trend parameter condition that cannot be evaluated is an error", {
+  # It was caught and the parameter silently dropped.
+  unknown <- trend_param("theta", bounds = c(-1, 1),
+                         condition = zz_not_defined > 1)
+  expect_error(mvgam:::process_trend_params(unknown), "zz_not_defined")
+  not_a_flag <- trend_param("theta", bounds = c(-1, 1),
+                            condition = c(TRUE, FALSE))
+  expect_error(mvgam:::process_trend_params(not_a_flag), "TRUE or FALSE")
+  # A condition that evaluates keeps or drops its parameter.
+  n_lv <- 2
+  kept <- trend_param("theta", bounds = c(-1, 1), condition = n_lv > 1)
+  expect_identical(mvgam:::process_trend_params(kept)$tpars, "theta_trend")
+})
+
 test_that("process_trend_params handles empty input correctly", {
   # Test NULL parameter specs
   result <- mvgam:::process_trend_params(NULL)

@@ -274,12 +274,12 @@ get_vcov.mvgam <- function(model, vcov = NULL, ...) {
   # *estimator* is the request mvgam cannot honour, and
   # `get_vcov.brmsfit` draws the line in the same place.
   if (!is.null(vcov) && !is.logical(vcov)) {
-    rlang::warn(insight::format_warning(
+    insight::format_warning(
       paste0(
         "The `vcov` argument is not supported for mvgam objects; ",
         "uncertainty propagation uses posterior draws."
       )
-    ))
+    )
   }
   NULL
 }

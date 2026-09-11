@@ -17,11 +17,7 @@ NULL
 # which may be either a brmsformula or a bare formula. Used by several
 # of the methods below.
 mvgam_obs_formula <- function(x) {
-  if (inherits(x$formula, "brmsformula")) {
-    x$formula$formula
-  } else {
-    x$formula
-  }
+  obs_arm_main_formula(x$formula)
 }
 
 
@@ -277,22 +273,30 @@ mvgam_model_info_families <- function() {
 #' @importFrom insight model_info
 #' @export
 model_info.mvgam <- function(x, response = NULL, ...) {
-  fam <- x$family
-  fam_name <- tryCatch(resolve_family_name(fam),
-                       error = function(e) fam$family %||% NA_character_)
-  fam_name <- tolower(fam_name %||% NA_character_)
+  # A multivariate fit gives each response its own family, and
+  # insight describes a brms fit once per response. Reading `$family`
+  # alone described every arm as the last.
+  resolve_resp(x, response)
+  keys <- names(response_columns(x))
+  if (is.null(response) && length(keys) > 1L) {
+    return(lapply(stats::setNames(keys, keys), function(r) {
+      model_info.mvgam(x, response = r, ...)
+    }))
+  }
+  fam <- get_family_for_resp(x, response)
+  fam_name <- tolower(resolve_family_name(fam))
   link <- fam$link %||% NA_character_
   cls <- mvgam_model_info_families()
 
-  # Group-level terms show up as `sd_` scales and `r_` deviations.
-  pars <- tryCatch(variables(x), error = function(e) character(0))
+  # Group-level terms show up as `sd_` scales and `r_` deviations. A
+  # prefit has no draws to show them.
+  pars <- if (is.null(x$fit)) character(0) else variables(x)
 
   list(
     is_binomial = fam_name %in% cls$binomial,
     is_count = fam_name %in% cls$count,
     is_continuous = fam_name %in% cls$continuous,
-    is_ordinal = isTRUE(tryCatch(is_ordinal_family(fam),
-                                 error = function(e) FALSE)),
+    is_ordinal = is_ordinal_family(fam),
     is_categorical = fam_name %in% cls$categorical,
     is_multinomial = fam_name %in% cls$multinomial,
     is_dirichlet = fam_name %in% cls$simplex,

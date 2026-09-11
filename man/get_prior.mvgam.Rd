@@ -9,7 +9,7 @@
 \arguments{
 \item{object}{A fitted \code{mvgam} model.}
 
-\item{...}{Currently unused; present for S3 generic dispatch.}
+\item{...}{Unused; an argument given here is refused.}
 }
 \value{
 A \code{brmsprior} data frame covering every adjustable
@@ -21,12 +21,10 @@ string \pkg{brms} assigned).
 \description{
 Convenience shortcut for the post-fit prior table. In brms the
 canonical post-fit accessor is \code{prior_summary()}; mvgam keeps
-that path (it forwards to \code{object$prior} too) but exports
-\code{get_prior.mvgam()} as well because users frequently type
-\code{get_prior(fit)} by analogy with the formula method. The
-returned \code{brmsprior} is the literal prior table mvgam handed
-to brms at fit time (with all adaptive constants baked in by
-brms), so it can be edited and fed back through
-\code{update(fit, prior = ..., recompile = FALSE)} for refits that
-reuse the compiled Stan model.
+that path and exports \code{get_prior.mvgam()} as well because users
+frequently type \code{get_prior(fit)} by analogy with the formula
+method. Both return the one table the model was built with. It can
+be edited and fed back through
+\code{update(fit, prior = ..., recompile = FALSE)} for refits that reuse
+the compiled Stan model.
 }

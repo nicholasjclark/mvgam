@@ -256,13 +256,7 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   # rewritten to `trend_formula` above and is legitimately allowed
   # to contain AR()/VAR()/RW() etc.).
   if (!is_trend_setup) {
-    formula_validation <- validate_brms_formula(formula)
-    if (!formula_validation$valid) {
-      stop(insight::format_error(c(
-        "Invalid brms formula structure.",
-        x = paste(formula_validation$issues, collapse = "\n")
-      )))
-    }
+    validate_obs_formula_brms(formula)
   }
 
   # Parse and validate trend formula if provided
@@ -271,17 +265,11 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     trend_specs <- parse_multivariate_trends(formula, trend_formula)
   }
 
-  # `formula = y ~ 0` (or `~ -1`) is a legitimate state-space
-  # pattern: all systematic variation comes through the trend
-  # formula. brms cannot natively process a zero-predictor obs
-  # formula (its prior pipeline trips on a 0-row brmsprior).
-  # Inject a constant placeholder column with a `constant(0)`
-  # prior so the contribution to the linear predictor stays
-  # exactly zero, no free parameter enters the Stan parameters
-  # block, and the user-visible model is unchanged. Only applied to the
-  # obs side; the trend side goes through mvgam's own stancode
-  # rewriter, which strips brms's parameters declarations and
-  # would leave the placeholder's pin assignment orphaned.
+  # An observation formula with no coefficient (`y ~ 0`) is given a
+  # pinned zero column, as `inject_obs_zero_placeholder()` explains.
+  # Only applied to the obs side; the trend side goes through mvgam's
+  # own stancode rewriter, which strips brms's parameters declarations
+  # and would leave the placeholder's pin assignment orphaned.
   if (!isTRUE(is_trend_setup)) {
     injected <- inject_obs_zero_placeholder(formula, data, prior)
     formula <- injected$formula
@@ -407,7 +395,7 @@ extract_prior_from_setup <- function(setup_object, codegen = NULL) {
   # on an mvgam fit match the brmsfit convention exactly.
   # The user prior may be NULL (no overrides), in which case
   # validate_prior just returns the default table.
-  prior <- safe_brms_prior_call(do.call(brms::validate_prior, c(
+  prior <- do.call(brms::validate_prior, c(
     list(
       prior   = setup_object$prior,
       formula = setup_object$formula,
@@ -416,7 +404,7 @@ extract_prior_from_setup <- function(setup_object, codegen = NULL) {
       data2   = setup_object$data2
     ),
     codegen_args_for(codegen, mvgam_codegen_standata_options)
-  )))
+  ))
   # The placeholder's `constant(0)` row stays in this table. It is
   # read again by `generate_base_stancode_with_stanvars()`, which
   # regenerates the program mvgam actually compiles, so dropping it
@@ -429,32 +417,6 @@ extract_prior_from_setup <- function(setup_object, codegen = NULL) {
 }
 
 
-# Internal: brms's `get_prior()` and `validate_prior()` both
-# crash when the obs formula has no coefficient classes for them
-# to set priors on (typically `y ~ 0` for a pure-trend obs
-# model). The empty-frame branch inside brms's `.default_prior`
-# stamps `source = "default"` onto a 0-row brmsprior, which
-# tickles `$<-.data.frame("source", value = "default") :
-# replacement has 1 row, data has 0`. This wrapper catches that
-# specific error and returns an empty brmsprior so mvgam's
-# downstream prior-merging code can proceed; any other error is
-# rethrown unchanged.
-#'@noRd
-safe_brms_prior_call <- function(expr) {
-  tryCatch(
-    expr,
-    error = function(e) {
-      msg <- conditionMessage(e)
-      if (grepl("replacement has 1 row, data has 0",
-                msg, fixed = TRUE)) {
-        return(brms::empty_prior())
-      }
-      stop(e)
-    }
-  )
-}
-
-
 # Reserved column name for the empty-obs-formula placeholder,
 # referenced by `inject_obs_zero_placeholder()` (the injection
 # site) and by any post-fit code that needs to filter the
@@ -463,27 +425,41 @@ safe_brms_prior_call <- function(expr) {
 MVGAM_EMPTY_OBS_PLACEHOLDER <- ".mvgam_empty_obs"
 
 
+# Internal: the responses whose observation formula names the
+# placeholder, as brms keys them, with `""` standing for the one
+# response of a univariate formula. The rewritten formula decides
+# whether a frame or a prior table needs the column and its pin, and
+# the stored frame need not carry the column.
+#'@noRd
+obs_placeholder_resps <- function(formula) {
+  if (inherits(formula, "mvgam_formula")) formula <- formula$formula
+  mv <- inherits(formula, "mvbrmsformula")
+  forms <- if (mv) formula$forms else list(formula)
+  names_it <- vapply(forms, function(f) {
+    main <- obs_arm_main_formula(f)
+    inherits(main, "formula") &&
+      MVGAM_EMPTY_OBS_PLACEHOLDER %in% all.vars(main)
+  }, logical(1L))
+  if (mv) {
+    return(vapply(forms[names_it], function(f) f$resp, character(1L)))
+  }
+  if (names_it) "" else character(0L)
+}
+
+
 # Internal: does this observation formula name the placeholder?
-# The rewritten formula is what demands the column, so it is what
-# decides whether a frame needs one, and the stored frame does not
-# have to carry it for a reader to trip over.
 #'@noRd
 obs_formula_needs_placeholder <- function(formula) {
-  # `mvgam_obs_formula()` reaches into the observation slot of an
-  # `mvgam_formula` or a `brmsformula`. A rewritten formula is stored
-  # as a plain formula, which has no slot to reach into and is
-  # already the observation side, so the two shapes are told apart
-  # here rather than asked and repaired.
-  obs <- if (inherits(formula, c("mvgam_formula", "brmsformula",
-                                 "mvbrmsformula", "bform"))) {
-    mvgam_obs_formula(formula)
-  } else if (inherits(formula, "formula")) {
-    formula
-  } else {
-    NULL
-  }
-  if (is.null(obs)) return(FALSE)
-  MVGAM_EMPTY_OBS_PLACEHOLDER %in% all.vars(obs)
+  length(obs_placeholder_resps(formula)) > 0L
+}
+
+
+# Internal: the main formula of one response's observation model. A
+# `brmsformula` keeps it in `$formula`, beside its distributional and
+# non-linear sub-formulas; a plain formula is its own main formula.
+#'@noRd
+obs_arm_main_formula <- function(f) {
+  if (inherits(f, "brmsformula")) f$formula else f
 }
 
 
@@ -583,21 +559,20 @@ format_family_links <- function(family) {
 
 # Internal: `formula = y ~ 0` (or `~ -1`) is a legitimate
 # state-space pattern where the entire linear predictor flows
-# through the trend formula. brms cannot natively process such
-# formulas. Its prior pipeline tries to stamp `source = "default"`
-# onto a 0-row brmsprior and raises a cryptic `replacement has 1
-# row, data has 0` error.
+# through the trend formula. brms cannot build it under a family
+# with no distributional parameter of its own, such as poisson or
+# bernoulli: the formula then leaves no parameter class at all, and
+# brms's prior pipeline stamps `source = "default"` onto a 0-row
+# brmsprior and stops with `replacement has 1 row, data has 0`.
 #
-# Workaround: inject a constant placeholder column
-# (`MVGAM_EMPTY_OBS_PLACEHOLDER`, value = 1) into `data` and
-# rewrite the formula to `y ~ 0 + <placeholder>`. Pin the
-# placeholder's coefficient to zero via `prior(constant(0), class
-# = "b", coef = <placeholder>)` so brms's compiled Stan code
-# emits no free parameter for it: `b` is declared in
-# `transformed parameters` and assigned `b[1] = 0`, leaving the
-# `parameters` block with only the family's own scale. The
-# contribution to the linear predictor is `1 * 0 = 0` everywhere,
-# semantically identical to the user's original `y ~ 0`.
+# The injection adds a column of zeros (`MVGAM_EMPTY_OBS_PLACEHOLDER`)
+# to `data`, rewrites the formula to `y ~ 0 + <placeholder>` and holds
+# the coefficient at zero with `prior(constant(0), class = "b",
+# coef = <placeholder>)`. brms then declares `b` in `transformed
+# parameters` as `b[1] = 0`, the `parameters` block keeps only the
+# family's own scale, and the linear predictor is the user's `y ~ 0`.
+# The rewrite runs under every family, and brms meets one formula
+# shape whichever family is chosen.
 #
 # The pin only holds if it survives to the table
 # `generate_base_stancode_with_stanvars()` regenerates the
@@ -607,9 +582,10 @@ format_family_links <- function(family) {
 #
 # Detection is strict: only when the formula's RHS has zero term
 # labels and zero intercept (empty model matrix). Formulas with
-# even one term (e.g. `y ~ 1`, `y ~ x`) pass through unchanged.
-# Multivariate / brmsformula objects are also passed through
-# untouched.
+# even one term (e.g. `y ~ 1`, `y ~ x`) pass through unchanged. A
+# `brmsformula` is rewritten in its main formula, and a multivariate
+# formula in each response's main formula that declines every term,
+# with a pin per rewritten response.
 #'@noRd
 inject_obs_zero_placeholder <- function(formula, data, prior) {
   checkmate::assert(
@@ -627,67 +603,98 @@ inject_obs_zero_placeholder <- function(formula, data, prior) {
     combine = "or",
     .var.name = "prior"
   )
-  pass_through <- list(formula = formula, data = data, prior = prior)
-
-  if (!inherits(formula, "formula") ||
-        inherits(formula, c("brmsformula", "mvbrmsformula", "bform"))) {
-    return(pass_through)
-  }
-  if (length(formula) < 3L) {
-    return(pass_through)
-  }
-  if (formula_has_population_terms(formula)) {
-    return(pass_through)
+  mv <- inherits(formula, "mvbrmsformula")
+  forms <- if (mv) formula$forms else list(formula)
+  empty <- vapply(forms, function(f) {
+    main <- obs_arm_main_formula(f)
+    inherits(main, "formula") && length(main) == 3L &&
+      !formula_has_population_terms(main)
+  }, logical(1L))
+  if (!any(empty)) {
+    return(list(formula = formula, data = data, prior = prior))
   }
 
-  ph <- MVGAM_EMPTY_OBS_PLACEHOLDER
+  forms[empty] <- lapply(forms[empty], rewrite_empty_obs_arm)
+  resps <- if (mv) {
+    vapply(forms[empty], function(f) f$resp, character(1L))
+  } else {
+    ""
+  }
+  if (mv) {
+    formula$forms <- forms
+  } else {
+    formula <- forms[[1L]]
+  }
   # Zero, not one. The pin already holds the coefficient at zero, so
   # the contribution is nil either way, but a column of ones is an
   # intercept a reader of `standata()$X` would take at face value on a
   # formula that declined one.
-  data[[ph]] <- 0
-  new_formula <- stats::reformulate(
-    termlabels = c("0", ph),
-    response   = formula[[2L]]
+  data[[MVGAM_EMPTY_OBS_PLACEHOLDER]] <- 0
+  pin <- obs_placeholder_pin(resps)
+  list(
+    formula = formula,
+    data = data,
+    prior = if (is.null(prior)) pin else rbind(prior, pin)
   )
-  pin <- obs_placeholder_pin()
-  new_prior <- if (is.null(prior)) pin else rbind(prior, pin)
-
-  list(formula = new_formula, data = data, prior = new_prior)
 }
 
 
-# Internal: the prior that holds the injected placeholder's
-# coefficient at zero, so the column contributes `1 * 0 = 0` and the
-# formula means what the user wrote. Written here rather than at the
-# injection because a refit needs the same row and cannot get it from
-# the injection: the stored formula already names the placeholder, so
-# the injection does not fire a second time.
+# Internal: rewrite one response's main formula from `y ~ 0` to
+# `y ~ 0 + <placeholder>`, keeping the response and environment.
 #'@noRd
-obs_placeholder_pin <- function() {
-  brms::set_prior("constant(0)", class = "b",
-                  coef = MVGAM_EMPTY_OBS_PLACEHOLDER)
+rewrite_empty_obs_arm <- function(f) {
+  main <- obs_arm_main_formula(f)
+  new_main <- stats::reformulate(
+    termlabels = c("0", MVGAM_EMPTY_OBS_PLACEHOLDER),
+    response   = main[[2L]],
+    env        = environment(main)
+  )
+  if (!inherits(f, "brmsformula")) return(new_main)
+  # brms stores settings such as `nl = TRUE` as attributes of the
+  # main formula. The rewritten formula carries them over.
+  for (a in setdiff(names(attributes(main)), c("class", ".Environment"))) {
+    attr(new_main, a) <- attr(main, a)
+  }
+  f$formula <- new_main
+  f
 }
 
 
-# Internal: put the placeholder's pin back into a prior table that
-# lost it. `mvgam()` filters the row out of the table it stores, so
-# the user never reads a prior for a column they did not write; a
-# refit inheriting that table would then sample the placeholder free,
+# Internal: the priors that hold the injected placeholder's
+# coefficient at zero, one per response it was written into. The
+# column then contributes `0 * 0 = 0` and the formula means what the
+# user wrote. A refit needs the same rows and cannot get them from
+# the injection: the stored formula already names the placeholder,
+# and the injection does not fire a second time.
+#'@noRd
+obs_placeholder_pin <- function(resps) {
+  checkmate::assert_character(resps, min.len = 1L, any.missing = FALSE)
+  pins <- lapply(resps, function(r) {
+    brms::set_prior("constant(0)", class = "b",
+                    coef = MVGAM_EMPTY_OBS_PLACEHOLDER, resp = r)
+  })
+  do.call(rbind, pins)
+}
+
+
+# Internal: put the placeholder's pins back into a prior table that
+# lost them. `mvgam()` filters the rows out of the table it stores,
+# and the user never reads a prior for a column they did not write.
+# A refit inheriting that table would sample the placeholder free,
 # and against a trend intercept the two lie on an exact ridge. The
-# sibling of `ensure_obs_placeholder()`, which does the same for the
-# column itself.
+# sibling of `ensure_obs_placeholder()`, which restores the column.
 #'@noRd
 ensure_obs_placeholder_pin <- function(prior, object) {
-  if (!obs_formula_needs_placeholder(object$formula)) return(prior)
-  ph <- MVGAM_EMPTY_OBS_PLACEHOLDER
-  if (!is.null(prior) && nrow(prior) > 0L &&
-        any(prior$coef == ph, na.rm = TRUE)) {
-    return(prior)
+  resps <- obs_placeholder_resps(object$formula)
+  if (!is.null(prior) && nrow(prior) > 0L) {
+    held <- prior$resp[prior$coef == MVGAM_EMPTY_OBS_PLACEHOLDER]
+    resps <- setdiff(resps, held)
   }
-  pin <- obs_placeholder_pin()
+  if (!length(resps)) return(prior)
+  pin <- obs_placeholder_pin(resps)
   if (is.null(prior) || nrow(prior) == 0L) pin else rbind(prior, pin)
 }
+
 
 # Parameters mvgam injects that do not carry the `_trend` suffix.
 # Everything else it emits is suffixed, so the two rules together name
@@ -1115,9 +1122,7 @@ parse_multivariate_trends <- function(formula, trend_formula = NULL) {
       inherits(trend_formula, "mvbrmsterms")) {
 
     # Extract response-specific trend specifications
-    trend_specs <- extract_response_trends(
-      trend_formula, response_names, validate_separate = TRUE
-    )
+    trend_specs <- extract_response_trends(trend_formula, response_names)
 
     # Create base formula for brms setup
     base_formula <- create_trend_base_formula(trend_specs)
@@ -1386,25 +1391,16 @@ strip_addition_terms <- function(formula) {
 #' @param response_names Character vector of response names
 #' @return Named list of trend specifications per response
 #' @noRd
-extract_response_trends <- function(trend_formula,
-                                    response_names,
-                                    validate_separate = FALSE) {
+extract_response_trends <- function(trend_formula, response_names) {
   checkmate::assert_character(response_names, null.ok = TRUE)
-  checkmate::assert_logical(validate_separate, len = 1)
 
   # Check if trend_formula is already processed brms terms
   if (inherits(trend_formula, c("brmsterms", "mvbrmsterms"))) {
     trend_terms <- trend_formula
   } else {
-    # Use brms internal functions to parse the formula structure
-    trend_terms <- try(brms::brmsterms(trend_formula), silent = TRUE)
-
-    if (inherits(trend_terms, "try-error")) {
-      stop(insight::format_error(c(
-        "Could not parse trend_formula structure.",
-        i = "Ensure proper bf() syntax for response-specific trends."
-      )))
-    }
+    # brms parses the structure, and a malformed formula is refused
+    # with brms's own account of what is wrong with it.
+    trend_terms <- brms::brmsterms(trend_formula)
   }
 
   # Extract terms for each response
@@ -1419,14 +1415,7 @@ extract_response_trends <- function(trend_formula,
       }
 
       if (!is.null(resp_name)) {
-        resp_formula <- trend_terms$terms[[i]]$formula
-        # Validate that multivariate trends do not lean on
-        # constructor specials only available on the univariate
-        # path. Applies only to separate-response trends.
-        if (validate_separate) {
-          validate_multivariate_trend_constraints(resp_formula, resp_name)
-        }
-        trend_specs[[resp_name]] <- resp_formula
+        trend_specs[[resp_name]] <- trend_terms$terms[[i]]$formula
       }
     }
   } else {

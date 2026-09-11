@@ -80,3 +80,23 @@ test_that("threads travels only when it was set", {
   mvgam(y ~ x, data = list(d, d), threads = 2L)
   expect_equal(captured$threads, 2L)
 })
+
+
+test_that("imputations are pooled only when they share an axis", {
+  # The check once compared columns literally named `time` and
+  # `series`. A model whose axis came from other columns was pooled
+  # whatever the imputations did to them. The pooled draws are indexed
+  # by the fits' own axes, and those are compared.
+  stub <- function(times) {
+    axes <- list(
+      series = list(levels = "s1", source = "explicit", n = 1L,
+                    groups = NULL),
+      time = list(values = times, n = length(times))
+    )
+    structure(list(trend_metadata = list(axes = axes)), class = "mvgam")
+  }
+  expect_error(
+    mvgam:::pool_mvgam_fits(list(stub(1:5), stub(c(1:4, 6L)))),
+    "different time or series axis"
+  )
+})

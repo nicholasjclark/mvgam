@@ -180,23 +180,15 @@ validate_family <- function(family, link = NULL) {
     if (is.null(link)) {
       link <- family[2]
     }
-    family_name <- family[1]
-
-    # Use brms family conversion with error handling
-    family_result <- try(
-      brms::brmsfamily(family_name, link = link),
-      silent = TRUE
-    )
-
-    if (inherits(family_result, "try-error")) {
-      stop("family not recognized", call. = FALSE)
-    }
-
-    return(family_result)
+    # brms's own refusal names the family it was given and the ones
+    # it supports, which says more than a caught error could.
+    return(brms::brmsfamily(family[1], link = link))
   }
 
-  # Fallback for unexpected input
-  stop("family not recognized", call. = FALSE)
+  # A function that returned something other than a family
+  stop(insight::format_error(
+    "'family' must be a family object, a family function or a family name."
+  ), call. = FALSE)
 }
 
 
@@ -2038,41 +2030,6 @@ is_nonlinear_formula <- function(formula) {
   return(has_nl_true || has_nl_params)
 }
 
-#' @noRd
-validate_brms_formula <- function(formula) {
-  issues <- character(0)
-
-  # Check if formula is NULL
-  if (is.null(formula)) {
-    return(list(valid = FALSE, issues = "Formula cannot be NULL"))
-  }
-
-  # Check formula class
-  valid_classes <- c("formula", "brmsformula", "bform")
-  if (!any(sapply(valid_classes, function(cls) inherits(formula, cls)))) {
-    issues <- c(issues, paste(
-      "Formula must be of class:", paste(valid_classes, collapse = ", "),
-      "but got:", class(formula)[1]
-    ))
-  }
-
-  # Try to validate with existing brms validation function
-  validation_result <- try({
-    validate_obs_formula_brms(formula)
-    NULL  # No issues if validation succeeds
-  }, silent = TRUE)
-
-  if (inherits(validation_result, "try-error")) {
-    error_msg <- attr(validation_result, "condition")$message
-    issues <- c(issues, paste("brms validation failed:", error_msg))
-  }
-
-  return(list(
-    valid = length(issues) == 0,
-    issues = issues
-  ))
-}
-
 # Utility function to extract formula string using brms pattern
 formula2str_mvgam <- function(formula, space = "trim") {
   if (is.null(formula)) {
@@ -2299,15 +2256,13 @@ maybe_warn_exact_gp <- function(gp_term) {
 #' Warn (once) on exact GP terms
 #'
 #' Scans a formula for `gp()` terms that omit `k`. Exact GPs fit
-#' through brms cleanly but mvgam's prediction surface cannot yet
-#' reconstruct their basis at newdata, so the warn flags that
-#' specific gap and lets users opt into the approximate form when
-#' they need newdata prediction.
+#' through brms with their full covariance kernel. mvgam's prediction
+#' surface does not reconstruct their basis at newdata, and the warning
+#' names that gap and the approximate form that avoids it.
 #'
-#' @param formula A formula object
+#' @param formula A formula, `brmsformula` or `mvbrmsformula`
 #' @noRd
 validate_exact_gp_usage <- function(formula) {
-  # Input validation (required by CLAUDE.md standards)
   checkmate::assert(
     checkmate::check_formula(formula),
     checkmate::check_class(formula, "brmsformula"),
@@ -2315,69 +2270,29 @@ validate_exact_gp_usage <- function(formula) {
     checkmate::check_null(formula),
     .var.name = "formula"
   )
-  
   if (is.null(formula)) return(invisible(NULL))
-  
-  # Handle different formula types
-  if (inherits(formula, "brmsformula")) {
-    # For brmsformula, extract the main formula component
-    main_formula <- formula$formula
-  } else if (inherits(formula, "mvbrmsformula")) {
-    # For multivariate brmsformula, check all response formulas
-    all_formulas <- formula$forms
-    for (form in all_formulas) {
-      if (!is.null(form$formula)) {
-        validate_exact_gp_usage(form$formula)
+
+  forms <- if (inherits(formula, "mvbrmsformula")) formula$forms else {
+    list(formula)
+  }
+  for (form in forms) {
+    main <- obs_arm_main_formula(form)
+    # `k` is read off each `gp()` call as written. Evaluating the call
+    # needed every object its arguments name to exist here, and a
+    # `k = kk` was refused as invalid syntax.
+    for (gp_call in formula_calls(main[[length(main)]], "gp")) {
+      k <- gp_call_to_spec(gp_call)$k
+      if (is.na(k) || identical(k, "NA")) {
+        # One mvgam() call reaches this from the observation validator,
+        # the trend validator and `setup_brms_lightweight()`. The
+        # warning is kept to once per term per session by a package
+        # environment; rlang's `.frequency` did not hold across the
+        # re-entries.
+        maybe_warn_exact_gp(paste(deparse(gp_call), collapse = ""))
       }
     }
-    return(invisible(NULL))
-  } else {
-    # Regular formula object
-    main_formula <- formula
   }
-  
-  # Get term labels from formula
-  termlabs <- attr(terms.formula(main_formula, keep.order = TRUE), 
-                   "term.labels")
-  which_gp <- grep("gp(", termlabs, fixed = TRUE)
-  
-  if (length(which_gp) == 0) return(invisible(NULL))
-  
-  # Check each gp() term with error handling
-  for (j in seq_along(which_gp)) {
-    gp_term <- termlabs[which_gp[j]]
-    
-    # Safe evaluation with error handling
-    gp_obj <- try({
-      eval(parse(text = gp_term))
-    }, silent = TRUE)
-    
-    if (inherits(gp_obj, "try-error")) {
-      stop(insight::format_error(c(
-        cli::format_inline("Invalid GP term syntax: {.field {gp_term}}"),
-        i = "GP terms must be valid function calls"
-      )))
-    }
-
-    if (is.na(gp_obj$k)) {
-      # Exact GPs fit fine through brms (full covariance kernel),
-      # but mvgam's prediction surface cannot yet reconstruct the
-      # basis at newdata. Warn rather than hard-fail so users
-      # can still fit / interpret in-sample; predict-on-newdata
-      # currently relies on the approximate form.
-      #
-      # Dedupe per (process, term) so a single mvgam() call doesn't
-      # fire the same warn from each validator entry station (the
-      # obs validator, the trend validator, and setup_brms_lightweight
-      # all hit this code path during one fit). rlang's `.frequency`
-      # was not honouring the dedupe across re-entries; an explicit
-      # package env makes the "once per term per session" semantics
-      # bullet-proof.
-      maybe_warn_exact_gp(gp_term)
-    }
-  }
-  
-  return(invisible(NULL))
+  invisible(NULL)
 }
 
 #' Main validation for observation formulas - ensures they're clean for brms
@@ -2422,6 +2337,24 @@ validate_obs_formula_brms <- function(formula) {
       i = cli::format_inline(
         "Use: {.code mvgam(y ~ x, trend_formula = ~ RW())}"
       )
+    )))
+  }
+
+  # A `.` stands for every column of the frame, and an mvgam frame
+  # holds its time and series columns beside the covariates.
+  forms <- if (inherits(formula, "mvbrmsformula")) formula$forms else {
+    list(formula)
+  }
+  has_dot <- vapply(forms, function(f) {
+    main <- obs_arm_main_formula(f)
+    "." %in% all.vars(main[[length(main)]])
+  }, logical(1L))
+  if (any(has_dot)) {
+    stop(insight::format_error(c(
+      "A '.' is not supported in the observation 'formula'.",
+      x = paste0("It would enter every column of 'data' as a predictor, ",
+                 "the time and series columns among them."),
+      i = "Name the covariates the model should use."
     )))
   }
 
@@ -2767,73 +2700,6 @@ validate_trend_formula_restrictions <- function(formula_str,
 
   return(invisible(NULL))
 }
-
-#'
-#' Ensures that multivariate models with separate trends per response only use
-#' basic temporal dynamics without extra features (factors, correlations, groupings).
-#'
-#' @param trend_formula Formula for a single response trend
-#' @param response_name Name of the response variable
-#' @noRd
-validate_multivariate_trend_constraints <- function(trend_formula, response_name) {
-  checkmate::assert_formula(trend_formula)
-  checkmate::assert_string(response_name)
-
-  # Parse the trend formula to extract trend constructors
-  parsed <- try(parse_trend_formula(trend_formula), silent = TRUE)
-  if (inherits(parsed, "try-error")) {
-    return(invisible(NULL))  # Let parse_trend_formula handle the error
-  }
-
-  # Check each trend component for extra features
-  for (trend_component in parsed$trend_components) {
-    # Check for factor models (n_lv parameter)
-    if (!is.null(trend_component$n_lv) && trend_component$n_lv > 0) {
-      stop(insight::format_error(c(
-        "Factor models not allowed in multivariate response trends.",
-        x = cli::format_inline(
-          "Response {.val {response_name}} has n_lv = {trend_component$n_lv}."
-        ),
-        i = "Remove n_lv parameter for basic temporal dynamics only."
-      )))
-    }
-
-    # Check for correlations (cor parameter)
-    if (!is.null(trend_component$cor) && trend_component$cor) {
-      stop(insight::format_error(c(
-        "Correlation structures not allowed in multivariate response trends.",
-        x = cli::format_inline(
-          "Response {.val {response_name}} has cor = TRUE."
-        ),
-        i = "Remove cor parameter for basic temporal dynamics only."
-      )))
-    }
-
-    # Check for hierarchical grouping (gr, subgr parameters)
-    if (!is.null(trend_component$gr)) {
-      stop(insight::format_error(c(
-        "Hierarchical grouping not allowed in multivariate response trends.",
-        x = cli::format_inline(
-          "Response {.val {response_name}} has gr = {.val {trend_component$gr}}."
-        ),
-        i = "Remove gr parameter for basic temporal dynamics only."
-      )))
-    }
-
-    if (!is.null(trend_component$subgr)) {
-      stop(insight::format_error(c(
-        "Hierarchical grouping not allowed in multivariate response trends.",
-        x = cli::format_inline(
-          "Response {.val {response_name}} has subgr = {.val {trend_component$subgr}}."
-        ),
-        i = "Remove subgr parameter for basic temporal dynamics only."
-      )))
-    }
-  }
-
-  invisible(NULL)
-}
-
 
 #' Validate Setup Components
 #' @param components List of setup components
@@ -3278,48 +3144,40 @@ validate_pos_integer <- function(x, name = deparse(substitute(x))) {
 }
 
 #' Evaluate an expression without printing output or messages
-#' @param expr expression to be evaluated
-#' @param type type of output to be suppressed (see ?sink)
-#' @param try wrap evaluation of expr in 'try' and
-#'   not suppress outputs if evaluation fails?
-#' @param silent actually evaluate silently?
+#'
+#' With `type = "message"` the messages are held and replayed only when
+#' the call fails. A compiler reports what went wrong in its messages
+#' and then raises an error that points at them, and those messages are
+#' what a user needs from a failed compile. The call runs once.
+#'
+#' @param expr Expression to evaluate.
+#' @param type Which stream to suppress: `"output"` or `"message"`.
+#' @param silent Suppress at all?
+#' @param ... Passed to `utils::capture.output()` for `type = "output"`.
 #' @noRd
-eval_silent <- function(
-    expr,
-    type = "output",
-    try = FALSE,
-    silent = TRUE,
-    ...
-) {
-  try <- as_one_logical(try)
+eval_silent <- function(expr, type = "output", silent = TRUE, ...) {
   silent <- as_one_logical(silent)
   type <- match.arg(type, c("output", "message"))
   expr <- substitute(expr)
   envir <- parent.frame()
-  if (silent) {
-    if (try && type == "message") {
-      try_out <- try(utils::capture.output(
-        out <- eval(expr, envir),
-        type = type,
-        ...
-      ))
-      if (is_try_error(try_out)) {
-        # try again without suppressing error messages
-        out <- eval(expr, envir)
-      }
-    } else {
-      utils::capture.output(out <- eval(expr, envir), type = type, ...)
-    }
-  } else {
-    out <- eval(expr, envir)
+  if (!silent) {
+    return(eval(expr, envir))
   }
+  if (identical(type, "message")) {
+    held <- character(0L)
+    return(withCallingHandlers(
+      eval(expr, envir),
+      message = function(m) {
+        held <<- c(held, conditionMessage(m))
+        invokeRestart("muffleMessage")
+      },
+      error = function(e) {
+        if (length(held)) message(paste(held, collapse = ""))
+      }
+    ))
+  }
+  utils::capture.output(out <- eval(expr, envir), type = type, ...)
   out
-}
-
-#' Check if x is a try-error resulting from try()
-#' @noRd
-is_try_error <- function(x) {
-  inherits(x, "try-error")
 }
 
 #' Check if trend_specs represents multivariate trends
@@ -3824,88 +3682,23 @@ validate_prediction_factor_levels <- function(data, metadata) {
   invisible(TRUE)
 }
 
+#' Parse a Stan program with the backend's own parser
+#'
+#' The parse is the one `parse_model()` runs before a fit, so a program
+#' that passes here passes there.
+#'
+#' @param stan_code The Stan program as one string.
+#' @param backend `"rstan"` or `"cmdstanr"`.
+#' @param silent Suppress the parser's messages unless it fails.
+#' @param ... Passed to the backend's parser.
+#' @return `invisible(TRUE)`; the parser's error when the code is invalid.
 #' @noRd
-validate_stan_code <- function(stan_code, backend = "rstan", silent = TRUE, ...) {
-  checkmate::assert_string(stan_code)
+validate_stan_code <- function(stan_code, backend = "rstan", silent = TRUE,
+                               ...) {
+  checkmate::assert_string(stan_code, min.chars = 1L)
   checkmate::assert_choice(backend, c("rstan", "cmdstanr"))
-
-  # Handle empty string case - always error for empty code
-  if (nchar(stan_code) == 0) {
-    stop(insight::format_error(c(
-      "Empty Stan code provided.",
-      i = "Stan code must contain at least one character."
-    )))
-  }
-
-  # Primary validation using rstan::stanc() (most thorough and up-to-date)
-  if (backend == "rstan") {
-    if (!requireNamespace("rstan", quietly = TRUE)) {
-      stop(insight::format_error(c(
-        cli::format_inline(
-          "Package {.pkg rstan} is required for Stan code validation."
-        ),
-        i = "Install rstan or use cmdstanr backend."
-      )))
-    }
-
-    # rstan::stanc() doesn't accept silent parameter, so filter it out
-    # Always let rstan::stanc() errors show directly - no masking
-    rstan::stanc(model_code = stan_code, verbose = FALSE, ...)
-    invisible(TRUE)
-  } else {
-    # cmdstanr backend (fallback) - pass silent through
-    return(parse_model_cmdstanr(stan_code, silent = silent, ...))
-  }
-}
-
-#' Parse Stan Model Code with cmdstanr
-#'
-#' @description
-#' Validates Stan model code using cmdstanr::cmdstan_model without compilation.
-#' Based on existing mvgam patterns in backends.R.
-#'
-#' @param model Stan model code
-#' @param silent Numeric indicating verbosity level
-#' @param ... Additional arguments passed to cmdstanr functions
-#' @return Validated Stan model code
-#' @noRd
-parse_model_cmdstanr <- function(model, silent = 1, ...) {
-  checkmate::assert_string(model, min.chars = 1)
-
-  # Check if cmdstanr is available
-  if (!requireNamespace("cmdstanr", quietly = TRUE)) {
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Package {.pkg cmdstanr} is required for Stan code validation."
-      ),
-      i = "Install cmdstanr or use rstan backend."
-    )))
-  }
-
-  # Write Stan model to temporary file - let errors bubble up
-  temp_file <- cmdstanr::write_stan_file(model)
-
-  # Validate using cmdstan_model without compilation, using existing eval_silent
-  out <- eval_silent(
-    cmdstanr::cmdstan_model(temp_file, compile = FALSE, ...),
-    type = "message",
-    try = TRUE,
-    silent = silent > 0L
-  )
-
-  if (inherits(out, "try-error")) {
-    stop(insight::format_error(c(
-      "Stan code validation failed with cmdstanr backend.",
-      x = "Check Stan syntax and model structure.",
-      i = cli::format_inline(
-        "Error details: {attr(out, 'condition')$message}"
-      )
-    )))
-  }
-
-  # Check syntax and return code - let errors bubble up
-  out$check_syntax(quiet = TRUE)
-  return(paste(out$code(), collapse = "\n"))
+  parse_model(stan_code, backend = backend, silent = silent, ...)
+  invisible(TRUE)
 }
 
 
@@ -5817,6 +5610,46 @@ assert_com_binomial_trials <- function(formula) {
 }
 
 
+#' Every call to one function in an expression
+#'
+#' Walks the parse tree. A bare symbol sharing the function's name is
+#' not a match, and a matched call's own arguments are not searched.
+#'
+#' @param expr A language object, such as one side of a formula.
+#' @param fname The function's name, e.g. `"gp"`.
+#' @return A list of the matched calls, in the order they are written.
+#' @noRd
+formula_calls <- function(expr, fname) {
+  checkmate::assert_string(fname, min.chars = 1L)
+  if (!is.call(expr)) return(list())
+  if (is.name(expr[[1L]]) && identical(as.character(expr[[1L]]), fname)) {
+    return(list(expr))
+  }
+  # An empty argument, as in `x[, 1]`, is the missing symbol, which
+  # cannot be passed on as a value.
+  args <- as.list(expr)[-1L]
+  args <- args[!vapply(args, rlang::is_missing, logical(1L))]
+  unlist(lapply(args, formula_calls, fname = fname), recursive = FALSE)
+}
+
+
+#' The text a formula argument was written as
+#'
+#' A string literal gives its value and anything else its deparsed
+#' expression. A description of a model reads the formula as the user
+#' wrote it: evaluating an argument such as `k = kk` there needed every
+#' object it names to exist in the describing session, and a failure
+#' was reported as the default the user had overridden.
+#'
+#' @param arg One argument of a call in a formula.
+#' @return A character string.
+#' @noRd
+formula_arg_text <- function(arg) {
+  if (is.character(arg) && length(arg) == 1L) return(arg)
+  paste(deparse(arg), collapse = "")
+}
+
+
 #' Locate an addition term in a model formula
 #'
 #' Addition terms live on the response side, so only the left-hand
@@ -5839,21 +5672,8 @@ find_aterm_call <- function(formula, aterm) {
   checkmate::assert_string(aterm, min.chars = 1L)
   inner <- if (!is.null(formula$formula)) formula$formula else formula
   lhs <- if (length(inner) >= 3L) inner[[2L]] else inner
-  found <- NULL
-  walk <- function(expr) {
-    if (!is.call(expr)) {
-      return(invisible(NULL))
-    }
-    if (identical(as.character(expr[[1L]])[1L], aterm)) {
-      found <<- expr
-    }
-    for (part in as.list(expr)[-1L]) {
-      walk(part)
-    }
-    invisible(NULL)
-  }
-  walk(lhs)
-  found
+  calls <- formula_calls(lhs, aterm)
+  if (length(calls)) calls[[1L]] else NULL
 }
 
 
@@ -6164,7 +5984,7 @@ warn_confounded_obs_trend_design <- function(standata, prior = NULL) {
     dependent <- colnames(design)[
       decomp$pivot[seq(decomp$rank + 1L, ncol(design))]
     ]
-    rlang::warn(insight::format_warning(c(
+    insight::format_warning(c(
       paste0(
         "The observation and trend designs are not separately ",
         "identified", if (nzchar(resp)) paste0(" for '", resp, "'"), "."
@@ -6186,7 +6006,7 @@ warn_confounded_obs_trend_design <- function(standata, prior = NULL) {
         "Drop the observation-side term, or move the shared term to one ",
         "side only."
       )
-    )))
+    ))
   }
   invisible(TRUE)
 }

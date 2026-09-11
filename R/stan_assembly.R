@@ -1654,41 +1654,29 @@ inject_multivariate_trends_into_linear_predictors <- function(
     code_lines <- strsplit(base_stancode, "\n", fixed = TRUE)[[1]]
 
     for (resp_name in glm_responses) {
-      # Transform GLM function call to use to_matrix(mu_<resp>)
-      glm_pattern <- paste0("target \\+= [a-z_]+",
-                            stan_density_call_pattern("_glm"),
+      # brms folded this response's predictor into its GLM call. The
+      # call is read by the per-family layout, which names the design
+      # matrix, intercept and coefficients brms actually wrote. An arm
+      # with no intercept passes `0` and an uncentred `X`, and neither
+      # can be assumed. The call is then rewritten to read `mu_<resp>`.
+      glm_pattern <- paste0(stan_density_call_pattern("_glm"),
                             "\\(Y_", resp_name, " \\|")
       glm_lines <- which(grepl(glm_pattern, code_lines))
-
-      if (length(glm_lines) > 0) {
-        for (line_idx in glm_lines) {
-          # Replace GLM call pattern
-          old_line <- code_lines[line_idx]
-
-          # Pattern to find and replace GLM call structure
-          # Match: target += normal_id_glm_lpdf(Y_resp | Xc_resp, Intercept_resp, b_resp, sigma_resp);
-          # Replace: target += normal_id_glm_lpdf(Y_resp | to_matrix(mu_resp), 0.0, mu_ones_resp, sigma_resp);
-
-          if (grepl("normal_id_glm_lpdf", old_line)) {
-            # Normal GLM: has sigma parameter
-            new_line <- gsub(
-              "(target \\+= normal_id_glm_lpdf\\(Y_[a-z_]+ \\|) [^,]+, [^,]+, [^,]+, ([^)]+\\);)",
-              paste0("\\1 to_matrix(mu_", resp_name, "), 0.0, mu_ones_", resp_name, ", \\2"),
-              old_line
-            )
-          } else {
-            # Other GLM types: no sigma parameter
-            new_line <- gsub(
-              paste0("(target \\+= [a-z_]+",
-                     stan_density_call_pattern("_glm"),
-                     "\\(Y_[a-z_]+ \\|) [^,]+, [^,]+, [^,;]+;"),
-              paste0("\\1 to_matrix(mu_", resp_name, "), 0.0, mu_ones_", resp_name, ");"),
-              old_line
-            )
-          }
-
-          code_lines[line_idx] <- new_line
-        }
+      if (!length(glm_lines)) {
+        stop(insight::format_error(c(
+          paste0("No GLM likelihood was found for response '", resp_name,
+                 "', which brms was detected to write one for."),
+          i = "The trend cannot be added to a likelihood it cannot find."
+        )), call. = FALSE)
+      }
+      glm_params <- NULL
+      for (line_idx in glm_lines) {
+        old_line <- code_lines[line_idx]
+        glm_type <- glm_family_of_line(old_line)
+        glm_params <- parse_glm_parameters_from_line(old_line, glm_type)
+        code_lines[line_idx] <- transform_single_glm_call(
+          old_line, glm_type, glm_params
+        )
       }
 
       # Add mu_<resp> computation in model block using shared utility
@@ -1800,12 +1788,24 @@ inject_multivariate_trends_into_linear_predictors <- function(
         } else {
           # No existing mu variable found - create from scratch
           
-          # Create full mu computation with declaration
+          # Create full mu computation with declaration, from the
+          # arguments the GLM call carried
+          mu_var <- glm_mu_names(resp_name)[["mu"]]
+          intercept <- glm_params$intercept
+          offset <- if (is.null(intercept) || identical(intercept, "0")) {
+            ""
+          } else {
+            paste0(intercept, " + ")
+          }
           mu_computation <- c(
-            paste0("    vector[N_", resp_name, "] mu_", resp_name, " = Xc_", resp_name, " * b_", resp_name, ";"),
+            paste0("    vector[N_", resp_name, "] ", mu_var, " = ",
+                   glm_params$design_matrix, " * ",
+                   glm_params$coefficients, ";"),
             paste0("    for (n in 1:N_", resp_name, ") {"),
-            paste0("      mu_", resp_name, "[n] += Intercept_", resp_name, " + trend[obs_trend_time_", resp_name, "[n], obs_trend_series_", resp_name, "[n]];"),
-            paste0("    }")
+            paste0("      ", mu_var, "[n] += ", offset,
+                   "trend[obs_trend_time_", resp_name,
+                   "[n], obs_trend_series_", resp_name, "[n]];"),
+            "    }"
           )
         }
 

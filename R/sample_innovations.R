@@ -2401,12 +2401,13 @@ stationary_correlated_params <- function(params, phi) {
     # A draw can leave `omega` a hair outside the positive-definite
     # cone through rounding, and it is one draw of many rather than a
     # fault to report. It keeps its innovations and the rest proceed.
-    chol_omega <- tryCatch(t(chol(omega)), error = function(e) NULL)
-    if (is.null(chol_omega)) {
+    # Its eigenvalues say so before the decomposition is attempted.
+    ev <- eigen(omega, symmetric = TRUE, only.values = TRUE)$values
+    if (min(ev) <= sqrt(.Machine$double.eps) * max(ev)) {
       next
     }
     sigma[d, ] <- sigma[d, ] * root
-    L[d, , ] <- chol_omega
+    L[d, , ] <- t(chol(omega))
   }
   params$sigma_trend <- sigma
   params$L_Omega_trend <- L

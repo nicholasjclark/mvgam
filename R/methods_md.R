@@ -1601,32 +1601,19 @@ obs_me_specs_from_formula <- function(obj) {
   if (is.null(obj$formula)) return(list())
   f <- mvgam_obs_formula(obj)
   if (!inherits(f, "formula") || length(f) < 3L) return(list())
-  rhs <- f[[3L]]
-  specs <- list()
-  walk <- function(e) {
-    if (is.call(e)) {
-      head <- tryCatch(as.character(e[[1L]]),
-                        error = function(err) "")
-      if (identical(head, "me")) {
-        args <- as.list(e)[-1L]
-        if (length(args) >= 1L) {
-          var <- as.character(args[[1L]])
-          sdvar <- if (length(args) >= 2L) {
-            as.character(args[[2L]])
-          } else NA_character_
-          specs[[length(specs) + 1L]] <<- list(
-            var = var, sdvar = sdvar,
-            coef = paste0("me", var,
-                          if (!is.na(sdvar)) sdvar else "")
-          )
-        }
-      } else {
-        for (k in seq_along(e)[-1L]) walk(e[[k]])
-      }
-    }
-  }
-  walk(rhs)
-  specs
+  calls <- formula_calls(f[[3L]], "me")
+  calls <- calls[lengths(calls) >= 2L]
+  lapply(calls, function(e) {
+    args <- as.list(e)[-1L]
+    var <- formula_arg_text(args[[1L]])
+    sdvar <- if (length(args) >= 2L) {
+      formula_arg_text(args[[2L]])
+    } else NA_character_
+    list(
+      var = var, sdvar = sdvar,
+      coef = paste0("me", var, if (!is.na(sdvar)) sdvar else "")
+    )
+  })
 }
 
 #' @noRd
@@ -1667,45 +1654,27 @@ obs_smooth_specs_from_prior <- function(prior) {
 }
 
 #' Parse a brms `sds` smooth coef label (e.g. `"s(x, k = 5, bs = \"cr\")"`)
-#' into a spec list with `var / vars / k / bs / fname` fields. Returns
-#' a default spec with all-NA fields when `coef_str` does not parse
-#' as a call; this keeps the term-definition loop tolerant of stray
-#' prior-table rows without raising during methods_md rendering.
+#' into a spec list with `var / vars / k / bs / fname` fields. brms
+#' writes the label from the term the formula holds, and it parses as
+#' a call. `k` and `bs` are kept as the text the user wrote, or `NA`
+#' and mgcv's own `"tp"` when they were left out.
 #' @noRd
 parse_smooth_coef <- function(coef_str) {
-  default <- list(
-    var = NA_character_, vars = NA_character_, k = NA_integer_,
-    bs = "tp", fname = "s"
-  )
-  expr <- tryCatch(
-    parse(text = coef_str)[[1L]], error = function(e) NULL
-  )
-  if (is.null(expr) || !is.call(expr)) return(default)
+  checkmate::assert_string(coef_str)
+  expr <- str2lang(coef_str)
   fname <- as.character(expr[[1L]])
   call_args <- as.list(expr)[-1L]
   arg_names <- names(call_args) %||% rep("", length(call_args))
   pos_idx <- which(arg_names == "")
   vars <- if (length(pos_idx) >= 1L) {
-    vapply(
-      pos_idx,
-      function(i) as.character(call_args[[i]]),
-      character(1L)
-    )
+    vapply(call_args[pos_idx], formula_arg_text, character(1L))
   } else NA_character_
   k <- if ("k" %in% arg_names) {
-    tryCatch(
-      as.integer(eval(call_args$k)),
-      error = function(e) NA_integer_
-    )
-  } else NA_integer_
-  bs <- if ("bs" %in% arg_names) {
-    tryCatch(
-      as.character(eval(call_args$bs)),
-      error = function(e) "tp"
-    )
-  } else "tp"
+    formula_arg_text(call_args$k)
+  } else NA_character_
+  bs <- if ("bs" %in% arg_names) formula_arg_text(call_args$bs) else "tp"
   list(
-    var = vars[1L], vars = vars, k = k, bs = bs, fname = fname
+    var = vars[[1L]], vars = unname(vars), k = k, bs = bs, fname = fname
   )
 }
 
@@ -1834,21 +1803,7 @@ obs_gp_specs_from_formula <- function(obj) {
   if (is.null(obj$formula)) return(list())
   f <- mvgam_obs_formula(obj)
   if (!inherits(f, "formula") || length(f) < 3L) return(list())
-  rhs <- f[[3L]]
-  specs <- list()
-  walk <- function(e) {
-    if (is.call(e)) {
-      head <- tryCatch(as.character(e[[1L]]),
-                        error = function(err) "")
-      if (identical(head, "gp")) {
-        specs[[length(specs) + 1L]] <<- gp_call_to_spec(e)
-      } else {
-        for (k in seq_along(e)[-1L]) walk(e[[k]])
-      }
-    }
-  }
-  walk(rhs)
-  specs
+  lapply(formula_calls(f[[3L]], "gp"), gp_call_to_spec)
 }
 
 #' @noRd
@@ -1856,36 +1811,22 @@ gp_call_to_spec <- function(call) {
   args <- as.list(call)[-1L]
   arg_names <- names(args) %||% rep("", length(args))
   pos_mask <- arg_names == ""
-  vars <- vapply(
-    args[pos_mask],
-    function(a) as.character(a),
-    character(1L)
-  )
+  vars <- unname(vapply(args[pos_mask], formula_arg_text, character(1L)))
   if (length(vars) == 0L) {
     stop(insight::format_error(
       "gp() call has no positional variable arguments."
     ))
   }
-  k <- if ("k" %in% arg_names) {
-    tryCatch(
-      as.integer(eval(args[["k"]])),
-      error = function(e) NA_integer_
-    )
-  } else NA_integer_
-  by <- if ("by" %in% arg_names) {
-    tryCatch(
-      as.character(args[["by"]]),
-      error = function(e) NA_character_
-    )
-  } else NA_character_
-  cov <- if ("cov" %in% arg_names) {
-    tryCatch(
-      as.character(eval(args[["cov"]])),
-      error = function(e) "exp_quad"
-    )
-  } else "exp_quad"
+  # Each setting is kept as written, and brms's own default where it
+  # was left out.
+  written <- function(name, default) {
+    if (name %in% arg_names) formula_arg_text(args[[name]]) else default
+  }
   list(
-    vars = vars, k = k, by = by, cov = cov,
+    vars = vars,
+    k = written("k", NA_character_),
+    by = written("by", NA_character_),
+    cov = written("cov", "exp_quad"),
     coef = paste0("gp", paste(vars, collapse = ""))
   )
 }
@@ -2986,9 +2927,6 @@ render_implementation_section <- function(ctx) {
 extract_implementation_info <- function(obj) {
   backend <- obj$backend %||% "rstan"
   algorithm <- obj$algorithm %||% "none"
-  mvgam_v <- obj$mvgam_version %||% utils::packageVersion("mvgam")
-  brms_v <- obj$brms_version %||% utils::packageVersion("brms")
-  stan_v <- backend_stan_version(backend)
   # Reuse the shared sampling-args extractor from how_to_cite.R.
   # `extract_sampling_info()` reads `obj$fit@stan_args` and
   # returns (chains, warmup, iter, threads, adapt_delta,
@@ -3009,37 +2947,22 @@ extract_implementation_info <- function(obj) {
   if (!is.null(obj$init)) {
     sampling$init <- printable_init(obj$init)
   }
+  # Each version is the one the fit recorded when it was built. The
+  # session describing it may have other versions installed, and
+  # reporting those would describe software the model never met.
+  recorded <- function(v) {
+    if (is.null(v) || is.na(v)) "(version not recorded)" else format(v)
+  }
   c(
     list(
       backend   = backend,
       algorithm = algorithm,
-      mvgam_v   = format(mvgam_v),
-      brms_v    = format(brms_v),
-      stan_v    = stan_v
+      mvgam_v   = recorded(obj$mvgam_version),
+      brms_v    = recorded(obj$brms_version),
+      stan_v    = recorded(obj$stan_version)
     ),
     sampling
   )
-}
-
-#' @noRd
-backend_stan_version <- function(backend) {
-  if (identical(backend, "cmdstanr")) {
-    v <- tryCatch(
-      cmdstanr::cmdstan_version(),
-      error = function(e) NULL
-    )
-    if (!is.null(v)) return(as.character(v))
-    v <- tryCatch(
-      utils::packageVersion("cmdstanr"),
-      error = function(e) NULL
-    )
-    return(if (is.null(v)) "unknown" else format(v))
-  }
-  v <- tryCatch(
-    utils::packageVersion("rstan"),
-    error = function(e) NULL
-  )
-  if (is.null(v)) "unknown" else format(v)
 }
 
 #' @noRd

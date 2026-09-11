@@ -311,6 +311,13 @@ test_that("assert_stan_version() reports version, backend and remedy", {
   )
 })
 
+test_that("live_stan_version() reports Stan, not the package calling it", {
+  expect_identical(mvgam:::live_stan_version("rstan"),
+                   as.character(rstan::stan_version()))
+  # The mock backend runs no compiler and has no version to report.
+  expect_identical(mvgam:::live_stan_version("mock"), NA_character_)
+})
+
 test_that("assert_stan_version() rejects the mock backend", {
   # The mock backend runs no Stan compiler, so a version claim about it
   # would be meaningless

@@ -35,6 +35,22 @@ test_that("methods_md returns mvgam_methods_md and prints", {
   expect_true(grepl("## Priors", out))
 })
 
+test_that("the software versions reported are the ones the fit recorded", {
+  # The describing session may have other versions installed than the
+  # one that built the model. Reporting the session's described
+  # software the model never met, and under rstan it reported the
+  # rstan package version as the version of Stan.
+  mod <- make_methods_md_prefit(y ~ x)
+  expect_identical(mod$stan_version, mvgam:::live_stan_version(mod$backend))
+  mod$stan_version <- "9.9.9"
+  mod$brms_version <- package_version("8.8.8")
+  out <- methods_md(mod)
+  expect_match(out, "Stan 9.9.9", fixed = TRUE)
+  expect_match(out, "brms 8.8.8", fixed = TRUE)
+  mod$stan_version <- NULL
+  expect_match(methods_md(mod), "Stan (version not recorded)", fixed = TRUE)
+})
+
 test_that("Data section labels family + reports dimensions", {
   mod <- make_methods_md_prefit(y ~ x)
   out <- methods_md(mod)

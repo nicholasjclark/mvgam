@@ -122,6 +122,8 @@ or function)
 \item \code{call} The matched call
 \item \code{brms_version}, \code{mvgam_version} The package versions the model
 was fitted under
+\item \code{stan_version} The version of Stan the backend compiled with,
+\code{NA} under the \code{"mock"} backend
 \item \code{creation_time} A \code{POSIXct} timestamp
 }
 

@@ -293,6 +293,6 @@ test_that("setup_brms_lightweight integrates with existing validation", {
 
   # Should work with other validation functions
   expect_no_error({
-    mvgam:::validate_brms_formula(setup$formula)
+    mvgam:::validate_obs_formula_brms(setup$formula)
   })
 })

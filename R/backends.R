@@ -98,7 +98,7 @@ parse_model <- function(model, backend, ...) {
 .parse_model_rstan <- function(model, silent = 1, ...) {
   out <- eval_silent(
     rstan::stanc(model_code = model, ...),
-    type = "message", try = TRUE, silent = silent
+    type = "message", silent = silent
   )
   out$model_code
 }
@@ -120,7 +120,7 @@ parse_model <- function(model, backend, ...) {
   # }
   out <- eval_silent(
     cmdstanr::cmdstan_model(temp_file, compile = FALSE, ...),
-    type = "message", try = TRUE, silent = silent
+    type = "message", silent = silent
   )
   out$check_syntax(quiet = TRUE)
   paste(out$code(), collapse = "\n")
@@ -213,7 +213,7 @@ compile_model <- function(model, backend, ...) {
   }
   eval_silent(
     brms::do_call(rstan::stan_model, args),
-    type = "message", try = TRUE, silent = silent >= 2
+    type = "message", silent = silent >= 2
   )
 }
 
@@ -243,7 +243,7 @@ compile_model <- function(model, backend, ...) {
   }
   eval_silent(
     brms::do_call(cmdstanr::cmdstan_model, args),
-    type = "message", try = TRUE, silent = silent >= 2
+    type = "message", silent = silent >= 2
   )
 }
 
@@ -684,6 +684,29 @@ backend_choices <- function() {
   c("rstan", "cmdstanr", "mock")
 }
 
+#' The Stan version a backend compiles with in this session
+#'
+#' The version of Stan itself, not of the R package that calls it:
+#' rstan 2.32.7 ships Stan 2.32.2. A fit records this when it is
+#' built, since the session that later describes it may have another.
+#'
+#' @param backend One of `backend_choices()`.
+#' @return A character string, or `NA` for the `"mock"` backend, which
+#'   runs no compiler, and for cmdstanr with no CmdStan installed.
+#' @noRd
+live_stan_version <- function(backend) {
+  checkmate::assert_choice(backend, backend_choices())
+  if (identical(backend, "cmdstanr")) {
+    require_package("cmdstanr")
+    v <- cmdstanr::cmdstan_version(error_on_NA = FALSE)
+    return(if (is.null(v)) NA_character_ else as.character(v))
+  }
+  if (identical(backend, "rstan")) {
+    return(as.character(rstan::stan_version()))
+  }
+  NA_character_
+}
+
 #' Assert the active Stan backend ships at least a given Stan version
 #'
 #' Returns the underlying engine version reported by the live backend
@@ -708,12 +731,14 @@ assert_stan_version <- function(backend, min_version, feature = NULL) {
   checkmate::assert_string(min_version, min.chars = 1L)
   checkmate::assert_string(feature, null.ok = TRUE)
   required <- numeric_version(min_version)
-  if (identical(backend, "cmdstanr")) {
-    require_package("cmdstanr")
-    stan_v <- numeric_version(as.character(cmdstanr::cmdstan_version()))
-  } else {
-    stan_v <- numeric_version(as.character(rstan::stan_version()))
+  live <- live_stan_version(backend)
+  if (is.na(live)) {
+    stop(insight::format_error(c(
+      "The 'cmdstanr' backend needs CmdStan, which is not installed.",
+      i = "Install it with `cmdstanr::install_cmdstan()`."
+    )))
   }
+  stan_v <- numeric_version(live)
   if (stan_v >= required) return(invisible(NULL))
   upgrade <- if (identical(backend, "cmdstanr")) {
     paste0(

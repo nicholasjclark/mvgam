@@ -12,6 +12,27 @@ test_that("insight S3 methods are registered on mvgam", {
   }
 })
 
+test_that("model_info describes each response of a multivariate fit", {
+  # insight answers once per response for a brms fit. Reading
+  # `$family` alone described every arm as the last one, and three
+  # caught errors turned a failed lookup into a blank family.
+  d <- data.frame(time = 1:20, count = rpois(20, 4), seen = rbinom(20, 1, 0.5))
+  pf <- mvgam(
+    brms::bf(count ~ 1, family = poisson()) +
+      brms::bf(seen ~ 1, family = bernoulli()) + brms::set_rescor(FALSE),
+    trend_formula = ~ AR(p = 1), data = d, run_model = FALSE
+  )
+  info <- insight::model_info(pf)
+  expect_named(info, c("count", "seen"))
+  expect_true(info$count$is_count)
+  expect_false(info$count$is_binomial)
+  expect_true(info$seen$is_binomial)
+  expect_false(info$seen$is_count)
+  expect_identical(insight::model_info(pf, response = "seen"), info$seen)
+  expect_error(insight::model_info(pf, response = "mass"),
+               "not a response of this model")
+})
+
 test_that("marginaleffects S3 methods are registered on mvgam", {
   for (g in c("get_predict", "get_coef", "get_vcov", "set_coef")) {
     expect_true(
@@ -191,6 +212,25 @@ test_that("detect_conditional_effects leaves linear formulas alone", {
   )
   cond <- mvgam:::detect_conditional_effects(stub)
   expect_equal(cond, list("env"))
+})
+
+test_that("a smooth's covariates are read off its call", {
+  # The smooth was once evaluated to learn its variables. A setting
+  # naming an object that does not exist here failed the evaluation,
+  # and the fallback reported that object as a covariate. A `by`
+  # expression came back as its own text, not the columns it names.
+  stub <- structure(
+    list(
+      formula = y ~ s(x, k = kk) + t2(x, z, w) +
+        s(x, by = interaction(a, b)),
+      trend_formula = NULL
+    ),
+    class = "mvgam"
+  )
+  expect_equal(
+    mvgam:::detect_conditional_effects(stub),
+    list("x", c("x", "z"), c("x", "w"), c("z", "w"), c("x", "a", "b"))
+  )
 })
 
 test_that("conditional_effects.mvgam is registered and re-exports the generic", {

@@ -190,11 +190,11 @@ fitted.mvgam <- function(object,
   # definition (latent_state is per-unit, detection is per-visit).
   if (components != "response") {
     if (isTRUE(unit_level) || isFALSE(unit_level)) {
-      warning(insight::format_warning(c(
+      insight::format_warning(c(
         paste0("'unit_level' ignored for components = '",
                components, "'."),
         i = "Component grain is fixed (latent_state per-unit, detection per-visit)."
-      )))
+      ))
     }
     pred <- predict(
       object,
@@ -236,10 +236,10 @@ fitted.mvgam <- function(object,
   # families operate at the row grain regardless.
   if (isTRUE(unit_level)) {
     if (!needs_closure_unit_aggregation(object$family)) {
-      warning(insight::format_warning(c(
+      insight::format_warning(c(
         "'unit_level = TRUE' ignored for this family.",
         i = "Per-unit aggregation applies to detection families (occ() / nmix())."
-      )))
+      ))
     } else if (is.list(draws) && !is.matrix(draws)) {
       stop(insight::format_error(c(
         "'unit_level = TRUE' is not supported on multi-response fits.",
