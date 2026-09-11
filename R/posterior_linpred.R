@@ -435,12 +435,7 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
   # so the link to invert is the one belonging to the response asked
   # for. Unscoped, `family()` answers with the named list that matches
   # the list of predictors.
-  fam <- if (is.null(resp)) {
-    family(object)
-  } else {
-    get_family_for_resp(object, resp)
-  }
-  apply_mu_linkinv(linpred, fam)
+  apply_mu_linkinv(linpred, model_families(object, resp))
 }
 
 

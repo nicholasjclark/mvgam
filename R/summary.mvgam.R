@@ -729,17 +729,12 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   # Header formatting (brms style with fixed padding)
 
   # Section 1: Family and Links (aligned with fixed spacing)
-  # Detect multivariate models by checking for mvbrmsformula with multiple forms
-  is_multivariate <- inherits(x$formula, "mvbrmsformula") &&
-    !is.null(x$formula$forms) &&
-    length(x$formula$forms) > 1
-
+  fams <- model_families(x)
+  is_multivariate <- !inherits(fams, "family")
   if (is_multivariate) {
-    # Multivariate model with response-specific families and links.
-    # `resolve_family_name()` returns "tweedie" instead of "custom"
-    # for customfamily objects, matching the user-facing name.
-    resp_names <- names(response_columns(x$formula))
-    fams <- lapply(resp_names, function(r) get_family_for_resp(x, r))
+    # One family and link per response. `resolve_family_name()`
+    # answers "tweedie" where a customfamily stores "custom".
+    resp_names <- names(fams)
     families <- vapply(fams, resolve_family_name, character(1L))
     links <- vapply(fams, format_family_links, character(1L))
 

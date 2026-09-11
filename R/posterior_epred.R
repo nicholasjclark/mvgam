@@ -9,6 +9,30 @@
 NULL
 
 
+#' The family of one response, or of each
+#'
+#' A model written with `brms::mvbf()` gives each response its own
+#' family, and no single family describes it. Asked without `resp`,
+#' a model with several responses answers with one family per
+#' response, named by brms's key for it; otherwise it answers with
+#' one family.
+#'
+#' @param object A fitted `mvgam`, a prefit or its summary.
+#' @param resp One response's key, or `NULL`.
+#' @return A family object, or a list of them named by response.
+#' @noRd
+model_families <- function(object, resp = NULL) {
+  resolve_resp(object, resp)
+  keys <- names(response_columns(object))
+  if (is.null(resp) && length(keys) > 1L) {
+    return(lapply(stats::setNames(keys, keys), function(r) {
+      get_family_for_resp(object, r)
+    }))
+  }
+  get_family_for_resp(object, resp)
+}
+
+
 #' Extract Family for Single Response
 #'
 #' Extracts the family object for a specific response from an mvgam model.
@@ -590,24 +614,8 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
   # samples them once: drawing a second set here as well put twice
   # the process variance into every marginal prediction.
 
-  # Extract family information for transformation
   # `resp` decides which response is being predicted
-  is_mv <- inherits(object$formula, "mvbrmsformula") &&
-    !is.null(object$formula$forms) &&
-    length(object$formula$forms) > 1
-
-  if (!is_mv) {
-    # Univariate model
-    family <- object$family
-  } else if (!is.null(resp)) {
-    # Multivariate with response filter
-    family <- get_family_for_resp(object, resp)
-  } else {
-    # Multivariate returning all responses
-    resp_names <- names(object$formula$forms)
-    family <- lapply(resp_names, function(r) get_family_for_resp(object, r))
-    names(family) <- resp_names
-  }
+  family <- model_families(object, resp)
 
   # Ordinal families require threshold parameters for probability computation
   # These transform 2D linpred [ndraws x nobs] to 3D category probabilities

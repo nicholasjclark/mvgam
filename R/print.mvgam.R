@@ -231,20 +231,12 @@ named_family <- function(fam) {
 family.mvgam <- function(object, resp = NULL, ...) {
   checkmate::assert_class(object, "mvgam")
   rlang::check_dots_empty()
-  resolve_resp(object, resp)
-
-  # A model written with `brms::mvbf()` gives each response its own
-  # family, so no single family describes it. `$family` holds one
-  # anyway, the last arm's, which is why reading it answered every
-  # response with the gaussian. brms answers the question with one
-  # family per response, and so does this.
-  keys <- names(response_columns(object))
-  if (is.null(resp) && length(keys) > 1L) {
-    return(lapply(stats::setNames(keys, keys), function(r) {
-      named_family(get_family_for_resp(object, r))
-    }))
+  # `$family` holds one family even on an `mvbf()` model, the last
+  # arm's, and reading it answered every response with that one.
+  fams <- model_families(object, resp)
+  if (inherits(fams, "family")) named_family(fams) else {
+    lapply(fams, named_family)
   }
-  named_family(get_family_for_resp(object, resp))
 }
 
 #' Extract formula from mvgam object

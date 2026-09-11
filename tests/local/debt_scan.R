@@ -128,11 +128,62 @@ dead_params <- function() {
   )
 }
 
+# The text of every message, warning and error a user can meet, one
+# section per call site, written as markdown for the prose linter.
+# The string constants inside each outermost condition call are joined
+# in order, which is how `paste0()` and `c()` assemble them.
+condition_heads <- c(
+  "stop", "warning", "message", "warn", "abort", "inform",
+  "format_error", "format_warning", "format_message", "format_alert"
+)
+
+message_sites <- function(path) {
+  pd <- utils::getParseData(parse(path, keep.source = TRUE))
+  heads <- pd[pd$token == "SYMBOL_FUNCTION_CALL" &
+                pd$text %in% condition_heads, ]
+  if (!nrow(heads)) return(NULL)
+  # A call's expression is the parent of the expression that holds
+  # its name.
+  call_ids <- pd$parent[match(heads$parent, pd$id)]
+  calls <- pd[match(unique(call_ids), pd$id), ]
+  starts_after <- function(l1, c1, l2, c2) l1 > l2 | l1 == l2 & c1 >= c2
+  inside <- function(i, j) {
+    starts_after(calls$line1[i], calls$col1[i],
+                 calls$line1[j], calls$col1[j]) &&
+      starts_after(calls$line2[j], calls$col2[j],
+                   calls$line2[i], calls$col2[i])
+  }
+  outer <- vapply(seq_len(nrow(calls)), function(i) {
+    !any(vapply(seq_len(nrow(calls))[-i], function(j) inside(i, j),
+                logical(1L)))
+  }, logical(1L))
+  calls <- calls[outer, ]
+  strs <- pd[pd$token == "STR_CONST", ]
+  out <- lapply(seq_len(nrow(calls)), function(i) {
+    within <- starts_after(strs$line1, strs$col1,
+                           calls$line1[i], calls$col1[i]) &
+      starts_after(calls$line2[i], calls$col2[i],
+                   strs$line2, strs$col2)
+    text <- vapply(strs$text[within], function(t) {
+      eval(parse(text = t))
+    }, character(1L), USE.NAMES = FALSE)
+    text <- text[nzchar(trimws(text))]
+    if (!length(text)) return(NULL)
+    data.frame(file = path, line = calls$line1[i],
+               text = paste(text, collapse = " "))
+  })
+  do.call(rbind, out)
+}
+
 args <- commandArgs(trailingOnly = TRUE)
 files <- list.files("R", pattern = "\\.R$", full.names = TRUE)
 
 if (length(args) && identical(args[[1L]], "dead_param")) {
   print(dead_params(), right = FALSE)
+} else if (length(args) && identical(args[[1L]], "messages")) {
+  sites <- do.call(rbind, lapply(files, message_sites))
+  writeLines(paste0("## ", sites$file, ":", sites$line, "\n\n",
+                    sites$text, "\n"))
 } else {
   sites <- scan_files(files)
   if (length(args)) {

@@ -159,9 +159,7 @@ log_lik.mvgam <- function(object,
       # families are not supported here and the gap is flagged
       # clearly instead.
       resp_names <- names(linpred)
-      mv_families <- lapply(resp_names, function(r) {
-        get_family_for_resp(object, r)
-      })
+      mv_families <- model_families(object)[resp_names]
       if (any(vapply(mv_families, is_closure_unit_family, logical(1)))) {
         stop(insight::format_error(c(
           "Multivariate models with a closure-unit family are not yet supported by log_lik().",

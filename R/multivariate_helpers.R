@@ -41,14 +41,14 @@ first_trend_spec <- function(object) {
 #' prefit and a bare observation formula are all answered from the
 #' formula, so no stored copy can drift from the model it describes.
 #'
-#' @param x A fitted `mvgam`, a prefit, or an observation formula in
-#'   any spelling `mvgam()` accepts
+#' @param x A fitted `mvgam`, a prefit, its summary, or an observation
+#'   formula in any spelling `mvgam()` accepts
 #' @return Character vector of response columns named by key, in
 #'   formula order. An addition term such as `trials()` qualifies a
 #'   response rather than being one, so it is left out.
 #' @noRd
 response_columns <- function(x) {
-  f <- if (inherits(x, "mvgam")) x$formula else x
+  f <- if (inherits(x, c("formula", "bform"))) x else x$formula
   if (!inherits(f, "bform")) {
     f <- brms::bf(f)
   }
