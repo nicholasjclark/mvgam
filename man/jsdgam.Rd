@@ -74,7 +74,7 @@ persisted on the returned fit for later prediction.}
 distribution shared by every species. Supported families are
 documented in \code{mvgam_families}. Defaults to \code{binomial()}, the
 standard choice for presence/absence JSDM responses; switch to a
-count family (\code{poisson()}, \code{nb()}) when modelling counts.
+count family (\code{poisson()}, \code{negbinomial()}) when modelling counts.
 
 To give each species its own family, write \code{formula} as a
 multivariate formula naming one response per species and its

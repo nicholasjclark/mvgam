@@ -2,12 +2,9 @@
 % Please edit documentation in R/print.mvgam.R
 \name{stancode.mvgam}
 \alias{stancode.mvgam}
-\alias{stancode.mvgam_prefit}
 \title{Extract Stan Code from mvgam Objects}
 \usage{
 \method{stancode}{mvgam}(object, ...)
-
-\method{stancode}{mvgam_prefit}(object, ...)
 }
 \arguments{
 \item{object}{A fitted \code{mvgam} object or \code{mvgam_prefit} object.}

@@ -505,7 +505,8 @@ mvgam_training_data <- function(object) {
 #' `cmdstanr` directly, or for inspecting which design matrices
 #' brms produced from the formula and data.
 #'
-#' @param object A fitted `mvgam` model.
+#' @param object An `mvgam` model, fitted or built with
+#'   `run_model = FALSE`.
 #' @param ... Currently unused; present for S3 generic dispatch.
 #' @return A named list of Stan data.
 #' @method standata mvgam

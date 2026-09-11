@@ -223,7 +223,7 @@ validate_supported_family <- function(family) {
     return(invisible(TRUE))
   }
   pointer <- switch(
-    family$family %||% "",
+    resolve_family_name(family) %||% "",
     dirichlet       = "diri()",
     multinomial     = "multi()",
     categorical     = "categ()",
@@ -232,7 +232,8 @@ validate_supported_family <- function(family) {
   )
   if (!is.null(pointer)) {
     stop(insight::format_error(paste0(
-      "Family '", family$family, "' is not supported by mvgam directly. ",
+      "Family '", resolve_family_name(family),
+      "' is not supported by mvgam directly. ",
       "Use ", pointer, ", the mvgam wrapper for a response in long ",
       "format."
     )))
@@ -1841,7 +1842,7 @@ validate_response_for_family <- function(y, family, y_name = "y") {
   y_nz <- y[!is.na(y)]
   if (!length(y_nz)) return(invisible(TRUE))
   fam_name <- resolve_family_name(family)
-  spec <- mvgam_response_support[[tolower(fam_name)]]
+  spec <- mvgam_response_support[[fam_name]]
   if (is.null(spec)) return(invisible(TRUE))
 
   observed <- paste0("Observed range: [", format(min(y_nz), digits = 4L),
@@ -1864,7 +1865,7 @@ validate_response_for_family <- function(y, family, y_name = "y") {
       x = paste0(observed, " ", sum(outside), " of ", sum(present),
                  " values fall outside, the first at row ",
                  which(outside)[1L], "."),
-      i = response_support_hint(tolower(fam_name))
+      i = response_support_hint(fam_name)
     )))
   }
 

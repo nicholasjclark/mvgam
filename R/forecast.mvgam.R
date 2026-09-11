@@ -1741,14 +1741,10 @@ sample_family_batched <- function(object, linpred, fc_data,
       linpred = linpred
     ))
   }
-  # `get_family_dpars` only matches lowercase keys; R's `Gamma()`
-  # constructor stores `family$family = "Gamma"` and brms's mvbf
-  # normalises to `"gamma"` -- both must resolve to the `shape`
-  # dpar lookup downstream. `resolve_family_name()` also recovers the
-  # constructor name for custom families, which brms records as the
-  # literal "custom" and which would otherwise resolve to no dpars at
-  # all, dropping `mphi` / `mtheta` and friends from the forecast.
-  family_name <- tolower(resolve_family_name(family))
+  # `resolve_family_name()` gives the name every dispatcher keys on:
+  # "gamma" for `stats::Gamma()`, and the constructor's own name for a
+  # custom family, which brms records as "custom".
+  family_name <- resolve_family_name(family)
   # The family's own parameter, which is what the draw below is taken
   # at. Applied here rather than by the caller so a caller reaching
   # the closure-unit branch above cannot have flattened the predictor
@@ -1808,15 +1804,9 @@ sample_family_batched <- function(object, linpred, fc_data,
 #'@noRd
 extract_family_pars_for_draws <- function(object, draws_mat,
                                             draw_idx, resp = NULL) {
-  # For multi-response (mvbrmsformula) fits, `object$family` is the
-  # gaussian placeholder; the actual per-response family lives on
-  # `object$formula$forms[[resp]]$family`. Honour the per-response
-  # family when `resp` is supplied so we look up the correct dpar
-  # set (e.g. `shape` for Gamma rather than `sigma` for gaussian).
-  # `get_family_dpars` only matches lowercase keys, so case-fold;
-  # R's `Gamma()` constructor stores `family$family = "Gamma"` but
-  # brms's mvbf normalises to `"gamma"`, and both should resolve.
-  fam_name <- tolower(resolve_family_name(get_family_for_resp(object, resp)))
+  # A multivariate fit gives each response its own family, and the
+  # dpars looked up are that response's.
+  fam_name <- resolve_family_name(get_family_for_resp(object, resp))
   dpar_names <- get_family_dpars(fam_name)
   if (length(dpar_names) == 0L) return(list())
   # For multivariate (mvbind / mvbrmsformula) fits, brms emits

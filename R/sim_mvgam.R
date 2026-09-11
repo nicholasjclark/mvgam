@@ -308,7 +308,7 @@ sim_mvgam <- function(type = 1L,
   # Binomial and Conway-Maxwell-Binomial fits need a `trials`
   # column; sim_family_pars stored the trial count under
   # obs_pars$trials.
-  if (tolower(fam_name) %in% c("binomial", "com_binomial")) {
+  if (fam_name %in% c("binomial", "com_binomial")) {
     data_long$trials <- obs_pars$trials %||% 10L
   }
   if (!is.null(built$time_long)) {
@@ -791,7 +791,7 @@ spec_type_7 <- function() {
 #'@noRd
 intercept_for_family <- function(fam_name) {
   switch(
-    tolower(fam_name),
+    fam_name,
     "gaussian" = 0,
     "student" = 0,
     "gamma" = log(2),     # log link: mean ~ 2
@@ -1026,7 +1026,7 @@ fill_multivariate_trend_defaults <- function(trend_model,
 #'@noRd
 link_scale_budget <- function(fam_name) {
   switch(
-    tolower(fam_name),
+    fam_name,
     "gaussian" = 1.0,
     "student" = 1.0,
     "gamma" = 0.8,
@@ -1064,7 +1064,7 @@ sd_rescale_factor <- function(x, target_sd) {
 #'@noRd
 sim_family_pars <- function(family, family_pars, prop_trend,
                               eta_sd) {
-  fam_name <- tolower(resolve_family_name(family))
+  fam_name <- resolve_family_name(family)
   # obs noise SD = (1 - prop_trend) share of link-scale variance,
   # converted to family-specific scale.
   noise_sigma <- max(eta_sd * sqrt(1 - prop_trend), 0.1)

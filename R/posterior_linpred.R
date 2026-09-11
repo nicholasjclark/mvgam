@@ -490,7 +490,7 @@ apply_mu_linkinv <- function(linpred, family) {
 dpar_posterior_linpred <- function(object, dpar, transform = FALSE,
                                    newdata = NULL, draw_ids = NULL,
                                    resp = NULL) {
-  family_name <- tolower(resolve_family_name(get_family_for_resp(object, resp)))
+  family_name <- resolve_family_name(get_family_for_resp(object, resp))
   valid <- get_family_dpars(family_name)
   if (!dpar %in% valid) {
     stop(insight::format_error(c(

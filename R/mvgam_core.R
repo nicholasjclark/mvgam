@@ -1214,13 +1214,10 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
 # the `run_model = FALSE` path: callers get an mvgam-shaped
 # list with `stancode`, `standata`, `obs_data`, `trend_metadata` and
 # friends populated, but `fit` is left NULL because no sampling
-# happened. The stub carries `c("mvgam", "mvgam_prefit")` so the
-# existing `print.mvgam_prefit()` and `stancode.mvgam_prefit()`
-# methods dispatch on it, reusing the unfitted-object convention
-# already exposed elsewhere in the package. Downstream surfaces that
-# need a real fit (`summary`, `predict`, `loo`, etc.) refuse the stub
-# with a pointer back to `stancode()` / `standata()` on an
-# `mvgam_formula()`.
+# happened. The stub is an `mvgam` first, and every method dispatches
+# to the `mvgam` one; `print()`, `stancode()`, `standata()` and
+# `methods_md()` answer on it. The `mvgam_prefit` class records that
+# no sampling happened.
 create_mvgam_stub_from_stan_components <- function(stan_components,
                                                    formula,
                                                    trend_formula,

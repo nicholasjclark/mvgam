@@ -158,10 +158,8 @@ compute_family_epred <- function(linpred, family, trials = NULL,
     "poisson" = ,
     "bernoulli" = ,
     "beta" = ,
-    "Gamma" = ,
     "gamma" = ,
     "negbinomial" = ,
-    "negative binomial" = ,
     "student" = family$linkinv(linpred),
 
 
@@ -368,13 +366,11 @@ compute_family_variance <- function(mu, family, sigma = NULL,
         p * (1 - p) * trials_mat
       }
     },
-    "negbinomial" = ,
-    "negative binomial" = {
+    "negbinomial" = {
       k <- require_dpar(shape, "shape")
       mu + mu^2 / k
     },
-    "gamma" = ,
-    "Gamma" = {
+    "gamma" = {
       k <- require_dpar(shape, "shape")
       mu^2 / k
     },
@@ -1500,10 +1496,10 @@ is_ordinal_family <- function(family) {
     combine = "or"
   )
 
-  if (is.null(family) || is.null(family$family)) {
+  if (is.null(family)) {
     return(FALSE)
   }
-  family$family %in% ORDINAL_FAMILIES
+  resolve_family_name(family) %in% ORDINAL_FAMILIES
 }
 
 

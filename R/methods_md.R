@@ -88,10 +88,6 @@ methods_md.mvgam <- function(object, file = NULL,
   out
 }
 
-#' @rdname methods_md
-#' @export
-methods_md.mvgam_prefit <- methods_md.mvgam
-
 #' @export
 print.mvgam_methods_md <- function(x, ...) {
   cat(x, sep = "")
@@ -346,10 +342,9 @@ family_data_label <- function(fam_name) {
     gaussian = "real-valued observations",
     student = "real-valued observations",
     lognormal = "positive real observations",
-    Gamma = "positive real observations",
+    gamma = "positive real observations",
     beta = "proportions in (0, 1)",
     negbinomial = "non-negative integer counts",
-    nb = "non-negative integer counts",
     tweedie = "non-negative real observations (compound Poisson-gamma)",
     beta_nb = "heavy-tailed counts (beta negative binomial)",
     hurdle_poisson = "non-negative integer counts with point mass at zero",
@@ -1064,10 +1059,9 @@ family_distribution_text <- function(fam_name, mu, obj) {
     student     = paste0("\\text{StudentT}(", nu, ", ", mu,
                           ", ", sigma, ")"),
     lognormal   = paste0("\\text{LogNormal}(", mu, ", ", sigma, ")"),
-    Gamma       = paste0("\\text{Gamma}(", shape, ", ", mu, ")"),
+    gamma       = paste0("\\text{Gamma}(", shape, ", ", mu, ")"),
     beta        = paste0("\\text{Beta}(", mu, ", ", phi, ")"),
     negbinomial = paste0("\\text{NegBin}(", mu, ", ", phi, ")"),
-    nb          = paste0("\\text{NegBin}(", mu, ", ", phi, ")"),
     beta_nb     = paste0(
       "\\text{BetaNegBinomial}(", mu, ", r, \\tau)"
     ),
@@ -3075,8 +3069,8 @@ family_call_text <- function(family) {
     fam,
     poisson = "log", bernoulli = "logit", binomial = "logit",
     gaussian = "identity", student = "identity",
-    Gamma = "inverse", lognormal = "identity",
-    beta = "logit", negbinomial = "log", nb = "log",
+    gamma = "inverse", lognormal = "identity",
+    beta = "logit", negbinomial = "log",
     occ = "logit",
     diri = "identity", multi = "identity", categ = "identity",
     mvn = "identity", mvt = "identity",

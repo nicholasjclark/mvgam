@@ -2672,11 +2672,10 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
 #' combination if necessary. But you must supply a `cap` value for each
 #' observation in the data when using `growth = 'logistic'`.
 #'
-#' For observation families that use a non-identity link function, the `cap`
-#' value will be internally transformed to the link scale (i.e. your specified
-#' `cap` will be log-transformed if you are using a `poisson()` or `nb()`
-#' family). It is therefore important that you specify the `cap` values on the
-#' scale of your outcome. Note also that no missing values are allowed in
+#' For observation families that use a non-identity link function, the
+#' `cap` value is transformed to the link scale internally: it is
+#' log-transformed under a `poisson()` or `negbinomial()` family. Give
+#' `cap` on the scale of the outcome. No missing values are allowed in
 #' `cap`.
 #'
 #' @rdname piecewise_trends

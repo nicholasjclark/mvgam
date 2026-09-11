@@ -1213,7 +1213,7 @@ dpar_link <- function(family, dpar) {
   if (!is.null(link)) {
     return(link)
   }
-  name <- tolower(resolve_family_name(family))
+  name <- resolve_family_name(family)
   link <- brms::brmsfamily(name)[[paste0("link_", dpar)]]
   if (is.null(link)) {
     stop(insight::format_error(c(

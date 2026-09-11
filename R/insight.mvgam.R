@@ -284,7 +284,7 @@ model_info.mvgam <- function(x, response = NULL, ...) {
     }))
   }
   fam <- get_family_for_resp(x, response)
-  fam_name <- tolower(resolve_family_name(fam))
+  fam_name <- resolve_family_name(fam)
   link <- fam$link %||% NA_character_
   cls <- mvgam_model_info_families()
 

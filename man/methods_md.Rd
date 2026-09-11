@@ -3,7 +3,6 @@
 \name{methods_md}
 \alias{methods_md}
 \alias{methods_md.mvgam}
-\alias{methods_md.mvgam_prefit}
 \title{Render a model's mathematical description}
 \usage{
 methods_md(
@@ -15,14 +14,6 @@ methods_md(
 )
 
 \method{methods_md}{mvgam}(
-  object,
-  file = NULL,
-  notation = "default",
-  implementation = TRUE,
-  ...
-)
-
-\method{methods_md}{mvgam_prefit}(
   object,
   file = NULL,
   notation = "default",

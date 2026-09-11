@@ -1,6 +1,7 @@
-#' Print a fitted \pkg{mvgam} object
+#' Print an \pkg{mvgam} object
 #'
-#' @param x \code{mvgam} object returned from \code{mvgam()}
+#' @param x \code{mvgam} object returned from \code{mvgam()}, fitted or
+#'   built with \code{run_model = FALSE}
 #' @param digits Integer for decimal places. Currently unused for
 #'   consistency with brms.
 #' @param ... Additional arguments (unused)
@@ -25,22 +26,9 @@ print.mvgam <- function(x, digits = 2, ...) {
     print_model_formula(formula(x))
   }
 
-  # Section 2: Family and link. A model written with `brms::mvbf()`
-  # declares one family per response, so `family()` answers with a
-  # named list and each response is named beside its own.
-  fam <- family(x)
-  if (is.null(fam$family)) {
-    cat("\n\nFamilies:\n")
-    for (resp in names(fam)) {
-      cat(resp, ": ", fam[[resp]]$family, " (", fam[[resp]]$link, ")\n",
-          sep = "")
-    }
-  } else {
-    cat("\n\nFamily:\n")
-    cat(fam$family, '\n')
-    cat("\nLink function:\n")
-    cat(fam$link, '\n')
-  }
+  # Section 2: Family and links, one pair per response
+  cat("\n")
+  print_family_links(x)
 
   # Section 3: Trend model (if present)
   if (!is.null(x$trend_formula)) {
@@ -61,11 +49,17 @@ print.mvgam <- function(x, digits = 2, ...) {
     cat(counts$n_timepoints, '\n')
   }
 
-  # Section 6: Sampling status
+  # Section 6: Sampling status. A `run_model = FALSE` model has no
+  # draws to count.
   cat('\n\nStatus:\n')
-  sim_info <- extract_mcmc_info(x)
-  cat(sim_info$chains, 'chains, each with iter =', sim_info$iter, '\n')
-  cat('  Total post-warmup draws =', sim_info$total_draws, '\n')
+  if (is.null(x$fit)) {
+    cat("Not fitted", "\n")
+  } else {
+    draws <- posterior::as_draws(x$fit)
+    cat(posterior::nchains(draws), 'chains, each with iter =',
+        posterior::niterations(draws), '\n')
+    cat('  Total post-warmup draws =', posterior::ndraws(draws), '\n')
+  }
 
   invisible(x)
 }
@@ -86,59 +80,6 @@ print.mvgam_formula <- function(x, ...) {
   } else {
     cat("Trend formula: NULL (no trend component)\n")
   }
-  invisible(x)
-}
-
-#' Print an unfitted \pkg{mvgam} object
-#'
-#' @param x \code{mvgam_prefit} object returned from \code{mvgam()} with
-#'   \code{run_model = FALSE}
-#' @param ... Additional arguments (unused)
-#' @return The \code{mvgam_prefit} object is returned invisibly.
-#' @export
-print.mvgam_prefit <- function(x, ...) {
-  # Formulas (distinguish observation vs process)
-  if (!is.null(x$trend_formula)) {
-    cat("GAM observation formula:\n")
-    print_model_formula(x$formula)
-    cat("\nGAM process formula:\n")
-    print_model_formula(x$trend_formula)
-  } else {
-    cat("GAM formula:\n")
-    print_model_formula(x$formula)
-  }
-
-  # Family and link
-  if (!is.null(x$family)) {
-    cat("\n\nFamily:\n")
-    cat(x$family$family, "\n")
-    cat("\nLink function:\n")
-    cat(x$family$link, "\n")
-  }
-
-  # Trend model (if present)
-  if (!is.null(x$trend_formula)) {
-    cat("\n\nTrend model:\n")
-    cat(printed_trend_label(x), "\n")
-  }
-
-  # N series
-  counts <- printed_axis_counts(x)
-  if (!is.null(counts$n_series)) {
-    cat("\n\nN series:\n")
-    cat(counts$n_series, "\n")
-  }
-
-  # N timepoints
-  if (!is.null(counts$n_timepoints)) {
-    cat("\n\nN timepoints:\n")
-    cat(counts$n_timepoints, "\n")
-  }
-
-  # Sampling status
-  cat("\n\nStatus:\n")
-  cat("Not fitted", "\n")
-
   invisible(x)
 }
 
@@ -282,36 +223,6 @@ nobs.mvgam <- function(object, ...) {
   }
 }
 
-#' Extract MCMC sampling information from mvgam object
-#'
-#' Uses posterior package for consistent extraction across backends. Returns
-#' only information that can be reliably extracted (chains, post-warmup
-#' iterations, total draws).
-#'
-#' @param mvgam_obj mvgam object
-#' @return List with chains (integer), iter (post-warmup iterations per
-#'   chain), and total_draws (total across all chains)
-#' @noRd
-extract_mcmc_info <- function(mvgam_obj) {
-  checkmate::assert_class(mvgam_obj, "mvgam")
-
-  if (is.null(mvgam_obj$fit)) {
-    stop(insight::format_error(c(
-      "Stan fit not found in mvgam object.",
-      i = "The object may be corrupted or incomplete."
-    )))
-  }
-
-  # Use posterior package (backend-independent)
-  draws_obj <- posterior::as_draws(mvgam_obj$fit)
-
-  return(list(
-    chains = posterior::nchains(draws_obj),
-    iter = posterior::niterations(draws_obj),
-    total_draws = posterior::ndraws(draws_obj)
-  ))
-}
-
 #' Extract Stan Code from mvgam Objects
 #'
 #' Extract the Stan model code used to fit mvgam objects. This
@@ -347,37 +258,6 @@ stancode.mvgam <- function(object, ...) {
   code <- object$stancode
   class(code) <- c("mvgamstancode", "stancode", "character")
   return(code)
-}
-
-#' @rdname stancode.mvgam
-#' @export
-stancode.mvgam_prefit <- function(object, ...) {
-  checkmate::assert_class(object, "mvgam_prefit")
-
-  if (is.null(object$stancode)) {
-    stop(insight::format_error(c(
-      "Stan code not found in mvgam_prefit object.",
-      i = "The prefit object may not have been properly generated."
-    )))
-  }
-
-  # Add mvgam-specific stancode class with brms compatibility
-  code <- object$stancode
-  class(code) <- c("mvgamstancode", "stancode", "character")
-  return(code)
-}
-
-#' @rdname standata.mvgam
-#' @export
-standata.mvgam_prefit <- function(object, ...) {
-  checkmate::assert_class(object, "mvgam_prefit")
-  if (is.null(object$standata)) {
-    stop(insight::format_error(c(
-      "Stan data not found in mvgam_prefit object.",
-      i = "The prefit object may not have been properly generated."
-    )))
-  }
-  object$standata
 }
 
 #' Print mvgam Stan Code Objects

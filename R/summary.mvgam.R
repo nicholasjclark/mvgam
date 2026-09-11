@@ -713,6 +713,33 @@ print_param_section <- function(table, header, digits = 2) {
 # PRINT METHOD
 # ==============================================================================
 
+#' Print a model's family and links, one line pair per response
+#'
+#' brms's layout: a model with several responses prefixes each family
+#' and link with the response's key, aligned under the first. The
+#' family is named by `resolve_family_name()`, which answers "tweedie"
+#' where a customfamily stores "custom".
+#'
+#' @param x A fitted `mvgam`, a prefit or its summary.
+#' @return The families `model_families()` gives, invisibly.
+#' @noRd
+print_family_links <- function(x) {
+  fams <- model_families(x)
+  if (inherits(fams, "family")) {
+    cat(" Family: ", resolve_family_name(fams), " \n", sep = "")
+    cat("  Links: ", format_family_links(fams), " \n", sep = "")
+    return(invisible(fams))
+  }
+  keys <- names(fams)
+  families <- vapply(fams, resolve_family_name, character(1L))
+  links <- vapply(fams, format_family_links, character(1L))
+  cat(" Family: ", paste0(keys, ": ", families,
+                          collapse = " \n          "), " \n", sep = "")
+  cat("  Links: ", paste0(keys, ": ", links,
+                          collapse = " \n        "), " \n", sep = "")
+  invisible(fams)
+}
+
 #' Print method for mvgam_summary objects
 #'
 #' @param x An object of class \code{mvgam_summary}.
@@ -729,33 +756,8 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
   # Header formatting (brms style with fixed padding)
 
   # Section 1: Family and Links (aligned with fixed spacing)
-  fams <- model_families(x)
+  fams <- print_family_links(x)
   is_multivariate <- !inherits(fams, "family")
-  if (is_multivariate) {
-    # One family and link per response. `resolve_family_name()`
-    # answers "tweedie" where a customfamily stores "custom".
-    resp_names <- names(fams)
-    families <- vapply(fams, resolve_family_name, character(1L))
-    links <- vapply(fams, format_family_links, character(1L))
-
-    # Format families following brms convention
-    # Pattern: "resp1: family1 \n          resp2: family2"
-    # Separator: " \n          " (space + newline + 10 spaces)
-    family_str <- paste0(resp_names, ": ", families)
-    family_str <- paste0(family_str, collapse = " \n          ")
-    cat(" Family: ", family_str, " \n", sep = "")
-
-    # Format links following brms convention
-    # Pattern: "resp1: link1 \n        resp2: link2"
-    # Separator: " \n        " (space + newline + 8 spaces)
-    link_str <- paste0(resp_names, ": ", links)
-    link_str <- paste0(link_str, collapse = " \n        ")
-    cat("  Links: ", link_str, " \n", sep = "")
-  } else {
-    # Univariate model
-    cat(" Family: ", resolve_family_name(x$family), " \n", sep = "")
-    cat("  Links: ", format_family_links(x$family), " \n", sep = "")
-  }
 
   # Section 2: Formula
   formulas <- if (is_multivariate) {

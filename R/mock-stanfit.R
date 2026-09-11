@@ -488,7 +488,7 @@ prepare_predictions.mock_stanfit <- function(x,
 
     for (resp_name in resp_names) {
       family_obj <- brmsfit$family[[resp_name]]
-      family_name <- family_obj$family
+      family_name <- resolve_family_name(family_obj)
       dpar_names <- get_family_dpars(family_name)
 
       if (length(dpar_names) > 0) {
@@ -522,7 +522,7 @@ prepare_predictions.mock_stanfit <- function(x,
     }
   } else {
     # Univariate: mu computed via extract_linpred_from_prep()
-    family_name <- brmsfit$family$family
+    family_name <- resolve_family_name(brmsfit$family)
     dpar_names <- get_family_dpars(family_name)
 
     if (length(dpar_names) > 0) {

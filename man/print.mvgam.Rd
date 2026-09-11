@@ -2,12 +2,13 @@
 % Please edit documentation in R/print.mvgam.R
 \name{print.mvgam}
 \alias{print.mvgam}
-\title{Print a fitted \pkg{mvgam} object}
+\title{Print an \pkg{mvgam} object}
 \usage{
 \method{print}{mvgam}(x, digits = 2, ...)
 }
 \arguments{
-\item{x}{\code{mvgam} object returned from \code{mvgam()}}
+\item{x}{\code{mvgam} object returned from \code{mvgam()}, fitted or
+built with \code{run_model = FALSE}}
 
 \item{digits}{Integer for decimal places. Currently unused for
 consistency with brms.}
@@ -18,7 +19,7 @@ consistency with brms.}
 The \code{mvgam} object is returned invisibly.
 }
 \description{
-Print a fitted \pkg{mvgam} object
+Print an \pkg{mvgam} object
 }
 \seealso{
 \code{\link{summary.mvgam}}, \code{\link{mvgam}}

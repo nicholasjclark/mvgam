@@ -133,7 +133,7 @@ sim_family_rng <- function(eta, family, pars = list()) {
   # `family$family` is the literal string "custom"). Routing
   # through it lets sim_family_rng dispatch on `tweedie` as well
   # as the brms-native families with one code path.
-  fam_name <- tolower(resolve_family_name(family))
+  fam_name <- resolve_family_name(family)
   link <- family$link
   inv_link <- switch(
     link,

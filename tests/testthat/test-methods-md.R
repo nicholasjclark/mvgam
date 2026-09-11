@@ -37,9 +37,9 @@ test_that("methods_md returns mvgam_methods_md and prints", {
 
 test_that("the software versions reported are the ones the fit recorded", {
   # The describing session may have other versions installed than the
-  # one that built the model. Reporting the session's described
-  # software the model never met, and under rstan it reported the
-  # rstan package version as the version of Stan.
+  # one that built the model. Reporting the session's versions
+  # described software the model never met, and under rstan it gave
+  # the rstan package version as the version of Stan.
   mod <- make_methods_md_prefit(y ~ x)
   expect_identical(mod$stan_version, mvgam:::live_stan_version(mod$backend))
   mod$stan_version <- "9.9.9"
@@ -462,7 +462,7 @@ test_that("family_distribution_text covers core brms families", {
                "\\text{StudentT}(\\nu, \\mu, \\sigma)")
   expect_equal(ft("lognormal", mu, NULL),
                "\\text{LogNormal}(\\mu, \\sigma)")
-  expect_equal(ft("Gamma", mu, NULL),
+  expect_equal(ft("gamma", mu, NULL),
                "\\text{Gamma}(\\alpha, \\mu)")
   expect_equal(ft("beta", mu, NULL),
                "\\text{Beta}(\\mu, \\phi)")
@@ -926,4 +926,48 @@ test_that("a moving-average trend is named as one", {
   ))
   expect_true(mvgam:::trend_has_ma(fake("AR", 1L, 1L)))
   expect_false(mvgam:::trend_has_ma(fake("AR", 1L, integer(0))))
+})
+
+
+test_that("a gamma fit is described as one", {
+  # `resolve_family_name()` names `stats::Gamma()` "gamma", and the
+  # description tables keyed on "Gamma", which no family resolves to.
+  # A gamma fit fell through to the default text in all three.
+  d <- data.frame(
+    time = rep(1:30, 2), series = factor(rep(c("a", "b"), each = 30)),
+    x = rnorm(60), y = rgamma(60, 2, 1)
+  )
+  mod <- make_methods_md_prefit(y ~ x, family = Gamma(link = "log"),
+                                data = d)
+  out <- methods_md(mod)
+  expect_match(out, "positive real observations", fixed = TRUE)
+  expect_match(out, "\\text{Gamma}(", fixed = TRUE)
+  expect_identical(mvgam:::family_call_text(mod$family),
+                   "gamma(link = \"log\")")
+})
+
+
+test_that("an unfitted model prints each family by its own name", {
+  # `print()` on a `run_model = FALSE` model reached the fitted printer
+  # and stopped on the missing draws. The unfitted printer it was meant
+  # to reach read `family$family`, which brms writes as "custom" for
+  # every family built with `custom_family()`, and printed one family
+  # for a model with several responses.
+  d <- data.frame(time = 1:30, series = factor("s1"),
+                  y = rgamma(30, 2, 1))
+  pf <- mvgam(y ~ 1, data = d, family = tweedie(), run_model = FALSE)
+  printed <- capture.output(print(pf))
+  expect_true(any(grepl("Family: tweedie", printed, fixed = TRUE)))
+  expect_false(any(grepl("custom", printed, fixed = TRUE)))
+
+  w <- data.frame(time = 1:20, count = rpois(20, 4),
+                  seen = rbinom(20, 1, 0.5))
+  mv <- mvgam(
+    brms::bf(count ~ 1, family = poisson()) +
+      brms::bf(seen ~ 1, family = bernoulli()) + brms::set_rescor(FALSE),
+    trend_formula = ~ AR(p = 1), data = w, run_model = FALSE
+  )
+  printed <- capture.output(print(mv))
+  expect_true(any(grepl("count: poisson", printed, fixed = TRUE)))
+  expect_true(any(grepl("seen: bernoulli", printed, fixed = TRUE)))
 })

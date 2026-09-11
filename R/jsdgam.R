@@ -80,7 +80,7 @@
 #'   distribution shared by every species. Supported families are
 #'   documented in `mvgam_families`. Defaults to `binomial()`, the
 #'   standard choice for presence/absence JSDM responses; switch to a
-#'   count family (`poisson()`, `nb()`) when modelling counts.
+#'   count family (`poisson()`, `negbinomial()`) when modelling counts.
 #'
 #'   To give each species its own family, write `formula` as a
 #'   multivariate formula naming one response per species and its

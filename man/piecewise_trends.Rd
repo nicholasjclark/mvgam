@@ -97,11 +97,10 @@ need to be static over time; it can vary with each series × timepoint
 combination if necessary. But you must supply a \code{cap} value for each
 observation in the data when using \code{growth = 'logistic'}.
 
-For observation families that use a non-identity link function, the \code{cap}
-value will be internally transformed to the link scale (i.e. your specified
-\code{cap} will be log-transformed if you are using a \code{poisson()} or \code{nb()}
-family). It is therefore important that you specify the \code{cap} values on the
-scale of your outcome. Note also that no missing values are allowed in
+For observation families that use a non-identity link function, the
+\code{cap} value is transformed to the link scale internally: it is
+log-transformed under a \code{poisson()} or \code{negbinomial()} family. Give
+\code{cap} on the scale of the outcome. No missing values are allowed in
 \code{cap}.
 }
 \examples{
