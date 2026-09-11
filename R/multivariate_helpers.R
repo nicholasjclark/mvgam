@@ -181,10 +181,11 @@ subset_obj_to_response <- function(obj, r) {
   # Per-response slice of a multi-response fit. Filters the prior
   # table to rows scoped to response `r` (including rows with no
   # `resp` set, which are shared across responses), and narrows the
-  # formula to that response's own. Downstream extractors and
-  # renderers reading either then see the single-response view
-  # without per-helper threading.
+  # formula and the family to that response's own. Downstream
+  # extractors and renderers reading any of them then see the
+  # single-response view without per-helper threading.
   out <- obj
+  out$family <- model_families(obj, r)
   out$formula <- obj$formula$forms[[r]]
   prior <- obj$prior
   if (!is.null(prior) && nrow(prior) > 0L) {

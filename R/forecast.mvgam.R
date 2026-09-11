@@ -1509,7 +1509,9 @@ compute_pw_forecast_extras <- function(object, training,
   cap <- if (identical(growth, "logistic")) {
     extract_pw_cap_matrix(object, fc_grid, spec, fc_times,
                             series_levels,
-                            family = object$family)
+                            family = pw_cap_link_family(
+                              formula_families(object, object$family)
+                            ))
   } else {
     NULL
   }
@@ -1589,35 +1591,60 @@ extract_pw_cap_matrix <- function(object, fc_grid, spec, fc_times,
       i = paste0("Supply 'cap' for every (time, series) cell.")
     )))
   }
-  cap_mat <- transform_pw_cap_to_link(cap_mat, family)
-  cap_mat
+  transform_pw_cap_to_link(cap_mat, family, cap_var)
 }
 
 
 # Internal: apply the observation family's link function to a
-# response-scale cap matrix. Brms / mvgam families with an
-# identity link pass through unchanged; log / logit / probit
-# transform as expected. Errors if the result has any
-# non-finite cells (e.g. user supplied `cap = 0` to a log-link
+# response-scale cap matrix, at fit time and at forecast time
+# alike. An identity link passes the cap through unchanged; log /
+# logit / probit transform as expected. Errors if the result has
+# any non-finite cells (e.g. user supplied `cap = 0` to a log-link
 # family).
 #'@noRd
-transform_pw_cap_to_link <- function(cap_mat, family) {
-  if (is.null(family) || is.null(family$linkfun)) return(cap_mat)
+transform_pw_cap_to_link <- function(cap_mat, family, cap_var = "cap") {
+  checkmate::assert_function(family$linkfun)
   out <- family$linkfun(cap_mat)
   if (any(!is.finite(out))) {
     stop(insight::format_error(c(
       paste0(
         "PW logistic: cap values are not finite after applying ",
-        "the '", family$link %||% "<unknown>",
-        "' link transform."
+        "the '", family$link, "' link transform."
       ),
       x = paste0(
-        "Check that all 'cap' values are valid on the response ",
-        "scale (e.g. strictly positive for a log link)."
+        "Check that all '", cap_var, "' values are valid on the ",
+        "response scale (e.g. strictly positive for a log link)."
       )
     )))
   }
   out
+}
+
+
+# Internal: the family whose link puts a logistic trend's capacity
+# on the trend's scale.
+#
+# The one latent trend enters every response's linear predictor,
+# so the capacity, given on the response scale, reaches it through
+# a link. Responses whose families link differently would put that
+# one trend on different scales, which no single capacity
+# describes.
+#'@noRd
+pw_cap_link_family <- function(families) {
+  checkmate::assert_list(families, min.len = 1L)
+  links <- unique(vapply(families, function(f) f$link, character(1L)))
+  if (length(links) > 1L) {
+    stop(insight::format_error(c(
+      "A logistic 'PW()' trend needs every response on one link.",
+      x = paste0("The responses use the links ",
+                 paste0("'", links, "'", collapse = ", "), "."),
+      i = paste0("The capacity is given on the response scale and ",
+                 "reaches the shared trend through the link. Give the ",
+                 "responses families with one link, or use a linear ",
+                 "'PW()' trend.")
+    )), call. = FALSE)
+  }
+  families[[1L]]
 }
 
 

@@ -1437,27 +1437,6 @@ test_that("how_to_cite reference_db includes the four nmix entries", {
   }
 })
 
-test_that("uses_nmix_family() predicate distinguishes the family", {
-  expect_false(uses_nmix_family(NULL))
-  expect_false(uses_nmix_family(list(family = gaussian())))
-  expect_true(uses_nmix_family(list(family = nmix())))
-  expect_false(uses_nmix_family(list(family = tweedie())))
-  # Royle-Nichols is its own predicate; the PB predicate excludes it
-  # so the citation rule picks the variant-specific reference set.
-  expect_false(
-    uses_nmix_family(list(family = nmix("royle_nichols")))
-  )
-})
-
-test_that("uses_nmix_royle_nichols_family() predicate distinguishes the RN variant", {
-  expect_false(uses_nmix_royle_nichols_family(NULL))
-  expect_false(uses_nmix_royle_nichols_family(list(family = gaussian())))
-  expect_false(uses_nmix_royle_nichols_family(list(family = nmix())))
-  expect_true(
-    uses_nmix_royle_nichols_family(list(family = nmix("royle_nichols")))
-  )
-})
-
 test_that("how_to_cite reference_db carries the Royle-Nichols 2003 entry", {
   db <- mvgam:::reference_db()
   expect_true("royle_nichols_2003" %in% names(db))
@@ -1551,18 +1530,6 @@ test_that("nmix('poisson_poisson') intercept-only spec runs through prepare_clos
   )
   expect_identical(fam_prep$name, "nmix_poisson_poisson")
   expect_false(is.null(attr(fam_prep, "mvgam_stanvars", exact = TRUE)))
-})
-
-test_that("uses_nmix_poisson_poisson_family() predicate distinguishes the PPM variant", {
-  expect_false(uses_nmix_poisson_poisson_family(NULL))
-  expect_false(uses_nmix_poisson_poisson_family(list(family = gaussian())))
-  expect_false(uses_nmix_poisson_poisson_family(list(family = nmix())))
-  expect_false(
-    uses_nmix_poisson_poisson_family(list(family = nmix("royle_nichols")))
-  )
-  expect_true(
-    uses_nmix_poisson_poisson_family(list(family = nmix("poisson_poisson")))
-  )
 })
 
 test_that("how_to_cite reference_db carries the Neyman 1939 entry", {

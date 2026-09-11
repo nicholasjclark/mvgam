@@ -201,13 +201,28 @@ test_that("two responses sharing a family declare its Stan code once", {
   )
 })
 
-test_that("check_tweedie_truncation requires a tweedie fit", {
-  # Stub a non-Tweedie object so we get the expected guardrail.
-  fake <- list(family = stats::gaussian())
-  class(fake) <- "mvgam"
+test_that("check_tweedie_truncation requires a tweedie response", {
+  # A model is read for every response's family, so a tweedie response
+  # of a multivariate model qualifies where the family given beside
+  # its formula does not.
+  set.seed(8)
+  d <- data.frame(time = 1:30, series = factor("a"),
+                  y = rpois(30, 4), pos = rgamma(30, 2, 1))
+  pf <- mvgam(y ~ 1, data = d, family = poisson(), run_model = FALSE)
   expect_error(
-    check_tweedie_truncation(fake),
-    "tweedie\\(\\)"
+    check_tweedie_truncation(pf),
+    "needs a response with family tweedie()",
+    fixed = TRUE
+  )
+  mv <- mvgam(
+    bf(y ~ 1, family = poisson()) + bf(pos ~ 1, family = tweedie()) +
+      set_rescor(FALSE),
+    data = d, run_model = FALSE
+  )
+  expect_error(
+    check_tweedie_truncation(mv, resp = "y"),
+    "needs a response with family tweedie()",
+    fixed = TRUE
   )
 })
 
@@ -222,19 +237,6 @@ test_that("how_to_cite reference_db includes Tweedie entries", {
   expect_true(grepl("10\\.1007/s11222-005-4070-y",
                     db$dunn_smyth_tweedie$text))
 })
-
-test_that("uses_tweedie_family predicate distinguishes the family", {
-  fake_tw <- list(family = tweedie())
-  class(fake_tw) <- "mvgam"
-  fake_po <- list(family = stats::poisson())
-  class(fake_po) <- "mvgam"
-  expect_true(mvgam:::uses_tweedie_family(fake_tw))
-  expect_false(mvgam:::uses_tweedie_family(fake_po))
-  # NULL-family safety: a malformed object should return FALSE,
-  # not error.
-  expect_false(mvgam:::uses_tweedie_family(list()))
-})
-
 
 test_that("tweedie_lpdf has overloaded scalar / vector dpar signatures", {
   # The Stan function block must declare both the all-scalar

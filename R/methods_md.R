@@ -159,14 +159,20 @@ render_data_section <- function(ctx) {
 
   # Multi-response: list response columns explicitly so the
   # reader sees the mvbind structure (`yA`, `yB`) rather than
-  # an opaque bold `Y` vector label.
+  # an opaque bold `Y` vector label, each described by its own
+  # family.
   responses <- unname(response_columns(obj))
   resp_line <- if (length(responses) > 1L) {
+    labels <- vapply(model_families(obj), function(f) {
+      family_data_label(resolve_family_name(f))
+    }, character(1L))
+    responses <- vapply(responses, escape_math_text, character(1L),
+                        USE.NAMES = FALSE)
     paste0(
       "$\\mathbf{Y} = (",
       paste0(responses, collapse = ", "),
-      ")$: ", family_data_label(fam_name),
-      " observed jointly per (i, t)"
+      ")$, observed jointly per (i, t): ",
+      paste0("$", responses, "$ ", labels, collapse = "; ")
     )
   } else {
     paste0("$", response_letter(obj),
@@ -453,7 +459,7 @@ render_model_section <- function(ctx) {
         obj_r <- subset_obj_to_response(obj, r)
         mu_r <- paste0("\\mu^{(", r, ")}_{i,t}")
         rows[[length(rows) + 1L]] <- list(
-          lhs = link_application(link, mu_r),
+          lhs = link_application(obj_r$family$link, mu_r),
           op  = "=",
           rhs = linear_predictor_rhs(obj_r, notation)
         )
@@ -461,19 +467,22 @@ render_model_section <- function(ctx) {
     } else {
       # Slice the obj down to a single-response view per
       # response and reuse the existing helpers wholesale --
-      # the slice filters the prior table so every downstream
-      # extractor / symbol formatter sees the per-response
-      # subset without any new threading.
+      # the slice filters the prior table and carries the
+      # response's own family, so every downstream extractor /
+      # symbol formatter sees the per-response subset without any
+      # new threading.
       for (r in responses) {
         obj_r <- subset_obj_to_response(obj, r)
         mu_r <- paste0("\\mu^{(", r, ")}_{i,t}")
         rows[[length(rows) + 1L]] <- list(
           lhs = paste0(r, "_{i,t}"),
           op  = "\\sim",
-          rhs = family_distribution_text(fam_name, mu_r, obj_r)
+          rhs = family_distribution_text(
+            resolve_family_name(obj_r$family), mu_r, obj_r
+          )
         )
         rows[[length(rows) + 1L]] <- list(
-          lhs = link_application(link, mu_r),
+          lhs = link_application(obj_r$family$link, mu_r),
           op  = "=",
           rhs = linear_predictor_rhs(obj_r, notation)
         )
@@ -534,59 +543,40 @@ render_model_section <- function(ctx) {
 #' @noRd
 dpar_linear_predictor_rows <- function(obj, notation) {
   # Distributional parameter sub-formulas (`bf(y ~ x, sigma ~ x)`)
-  # emit prior rows with non-empty `dpar`. For each unique dpar
-  # present, render one extra row in the model section showing
-  # its own (linked) linear predictor. Default link map mirrors
-  # brms's per-dpar default link (sigma -> log, phi -> log,
-  # shape -> log, nu -> identity, ...). Unknown dpars fall
-  # through to identity.
+  # emit prior rows with non-empty `dpar`. For each dpar present,
+  # per response on a multivariate model, render one extra row in
+  # the model section showing its own linear predictor under the
+  # link that response's family gives it.
   prior <- obj$prior
   if (is.null(prior) || nrow(prior) == 0L) return(list())
   dpars <- prior$dpar %||% rep("", nrow(prior))
-  present <- unique(dpars[nzchar(dpars)])
-  if (length(present) == 0L) return(list())
+  resps <- prior$resp %||% rep("", nrow(prior))
+  present <- unique(data.frame(resp = resps, dpar = dpars)[nzchar(dpars), ,
+                                                          drop = FALSE])
+  if (nrow(present) == 0L) return(list())
   visit_grain <- methods_md_is_closure_unit(obj)
   rows <- list()
-  for (dp in present) {
-    link <- dpar_default_link(dp, family = obj$family)
-    sym <- dpar_symbol(dp, visit_grain = visit_grain)
-    lhs <- link_application(link, sym)
-    rhs <- dpar_predictor_rhs(prior, dp)
+  for (i in seq_len(nrow(present))) {
+    r <- present$resp[i]
+    dp <- present$dpar[i]
+    family <- model_families(obj, if (nzchar(r)) r)
+    sym <- dpar_symbol(dp, visit_grain = visit_grain, resp = r)
     rows[[length(rows) + 1L]] <- list(
-      lhs = lhs, op = "=", rhs = rhs
+      lhs = link_application(dpar_link(family, dp), sym),
+      op = "=",
+      rhs = dpar_predictor_rhs(prior[resps == r, , drop = FALSE], dp)
     )
   }
   rows
 }
 
 #' @noRd
-dpar_default_link <- function(dp, family = NULL) {
-  # brms stashes each custom_family's per-dpar link as
-  # `family$link_<dp>` (e.g. `nmix("poisson_poisson")$link_p
-  # == "log"` while `nmix("poisson_binomial")$link_p == "logit"`).
-  # Read from the family object when present; fall back to the
-  # static map for the standard brms families that don't carry
-  # the slot.
-  if (!is.null(family)) {
-    link_slot <- family[[paste0("link_", dp)]]
-    if (!is.null(link_slot) && nzchar(link_slot)) return(link_slot)
-  }
-  switch(
-    dp,
-    sigma = "log", phi = "log", shape = "log", kappa = "log",
-    nu = "identity", hu = "logit",
-    zi = "logit", mu = "identity",
-    p = "logit", r = "logit",
-    "identity"
-  )
-}
-
-#' @noRd
-dpar_symbol <- function(dp, visit_grain = FALSE) {
+dpar_symbol <- function(dp, visit_grain = FALSE, resp = "") {
   # Map common dpar names to their Greek / mathematical form.
   # `visit_grain = TRUE` swaps the `_{i,t}` subscript for
   # `_{i,j}` (closure-unit detection sub-formulas operate per
-  # visit `j` within unit `i`).
+  # visit `j` within unit `i`). A response of a multivariate model
+  # is named in a superscript, as its mean is.
   base <- switch(
     dp,
     sigma = "\\sigma", phi = "\\phi", shape = "\\alpha",
@@ -597,7 +587,8 @@ dpar_symbol <- function(dp, visit_grain = FALSE) {
     paste0("\\text{", dp, "}")
   )
   subscript <- if (visit_grain) "_{i,j}" else "_{i,t}"
-  paste0(base, subscript)
+  superscript <- if (nzchar(resp)) paste0("^{(", resp, ")}") else ""
+  paste0(base, superscript, subscript)
 }
 
 #' @noRd
@@ -739,8 +730,16 @@ model_glossary <- function(obj) {
   )
   defs <- c(defs, closure_unit_glossary(obj))
   defs <- c(defs, mv_custom_glossary(obj))
-  if (is.null(closure_unit_family_kind(obj)) &&
-        is.null(mv_custom_family_kind(obj))) {
+  keys <- names(response_columns(obj))
+  if (length(keys) > 1L) {
+    # Each response's mean is on its own family's link scale.
+    defs <- c(defs, vapply(keys, function(r) {
+      paste0("- $\\mu^{(", r, ")}_{i,t}$: conditional mean of $", r,
+             "_{i,t}$ on the ", model_families(obj, r)$link,
+             "-link scale")
+    }, character(1L), USE.NAMES = FALSE))
+  } else if (is.null(closure_unit_family_kind(obj)) &&
+               is.null(mv_custom_family_kind(obj))) {
     defs <- c(defs, paste0(
       "- $\\mu_{i,t}$: conditional mean of $",
       response_letter(obj), "_{i,t}$ on the ", link, "-link scale"
@@ -3015,19 +3014,20 @@ formula_text <- function(f) {
     }
     return(out)
   }
+  # The stored formula carries the pinned placeholder an empty
+  # formula is built with, which the user never wrote.
+  deparsed <- function(x) {
+    strip_empty_obs_placeholder(
+      paste(deparse(x, width.cutoff = 60L), collapse = " ")
+    )
+  }
   if (inherits(f, c("brmsformula", "bform"))) {
     main <- if (!is.null(f$formula)) f$formula else f
-    parts <- paste(deparse(main, width.cutoff = 60L),
-                    collapse = " ")
-    pforms <- f$pforms %||% list()
-    if (length(pforms) > 0L) {
-      for (nm in names(pforms)) {
-        parts <- c(parts, paste0(nm, " = ",
-                                  paste(deparse(pforms[[nm]],
-                                                 width.cutoff = 60L),
-                                        collapse = " ")))
-      }
-    }
+    # A distributional formula names its parameter on its own left
+    # side, as `bf()` takes it.
+    parts <- c(deparsed(main),
+               vapply(f$pforms %||% list(), deparsed, character(1L),
+                      USE.NAMES = FALSE))
     # brms records the nl status as an attribute on the inner
     # formula slot (`attr(f$formula, "nl")`), not as `f$nl`.
     # Also accept `f$nl` for forward-compat with any wrapper
@@ -3037,9 +3037,14 @@ formula_text <- function(f) {
     if (is_nl) {
       parts <- c(parts, "nl = TRUE")
     }
+    # A response of a multivariate formula names its own family in
+    # its `bf()`, and a call without it fits another model.
+    if (!is.null(f$family)) {
+      parts <- c(parts, paste0("family = ", family_call_text(f$family)))
+    }
     return(paste0("bf(", paste(parts, collapse = ", "), ")"))
   }
-  paste(deparse(f, width.cutoff = 60L), collapse = " ")
+  deparsed(f)
 }
 
 #' @noRd

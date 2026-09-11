@@ -69,12 +69,17 @@ pairs.mvgam <- function(
 # discovered from the fit's family rather than hard-coded.
 #' @noRd
 default_pairs_variables <- function(x) {
-  family_obj <- x$family %||% gaussian()
-  # Distributional parameter names are carried on the family object
-  # (e.g. c("mu", "sigma") for gaussian()); fall back to "mu" alone.
-  dpars <- family_obj$dpars %||% "mu"
-  dpars <- setdiff(dpars, "mu")  # `mu` is the linear predictor,
-                                  # not a free parameter.
+  # Each response's distributional parameters, named as brms names
+  # them: a response of a multivariate model suffixes its own with
+  # its key. `validate_family()` gives a stats family, which carries
+  # no parameter names, the ones brms reads it with. `mu` is the
+  # linear predictor, not a free parameter.
+  families <- formula_families(x, x$family)
+  suffixes <- if (length(families) > 1L) paste0("_", names(families)) else ""
+  dpar_patterns <- unlist(lapply(seq_along(families), function(i) {
+    dpars <- setdiff(validate_family(families[[i]])$dpars, "mu")
+    if (length(dpars)) paste0("^", dpars, suffixes[i], "$")
+  }), use.names = FALSE)
   # The obs-side patterns carry no `$` end-marker, so prefixes
   # like `^b_`, `^sd_`, `^sds_`, `^cor_`, `^lscale_`, `^theta`
   # also catch their `*_trend` siblings on the mvgam side. The
@@ -90,7 +95,7 @@ default_pairs_variables <- function(x) {
     "^b(()|(s)|(cs)|(sp)|(mo)|(me)|(mi)|(m))_",
     "^sd_", "^cor_",          # RE variance components
     "^sigma$", "^rescor_",
-    if (length(dpars)) paste0("^", dpars, "$"),
+    dpar_patterns,
     "^delta$", "^theta",
     "^sdb_", "^sdbsp_", "^sdbs_",
     "^sds_", "^sdgp_", "^lscale_",

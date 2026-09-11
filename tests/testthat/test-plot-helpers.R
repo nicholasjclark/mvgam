@@ -317,3 +317,24 @@ test_that("legend breaks stay readable when limits come from data", {
   narrow <- mvgam:::pretty_symmetric_breaks(c(-0.004, 0.004))
   expect_length(unique(narrow), 5L)
 })
+
+
+test_that("pairs() selects each response's own distributional parameters", {
+  # The defaults read `family$dpars` off the family given beside the
+  # formula. A stats family carries none, so a gamma fit's `shape`
+  # was never offered, and brms suffixes a multivariate response's
+  # parameters with its key, which `^shape$` does not match.
+  set.seed(6)
+  d <- data.frame(time = 1:30, series = factor("a"),
+                  pos = rgamma(30, 2, 1), cnt = rpois(30, 4))
+  uni <- mvgam(pos ~ 1, family = Gamma(link = "log"), data = d,
+               run_model = FALSE)
+  expect_true("^shape$" %in% mvgam:::default_pairs_variables(uni))
+  mv <- mvgam(
+    bf(pos ~ 1, family = Gamma(link = "log")) +
+      bf(cnt ~ 1, family = brms::negbinomial()) + set_rescor(FALSE),
+    data = d, run_model = FALSE
+  )
+  expect_true(all(c("^shape_pos$", "^shape_cnt$") %in%
+                    mvgam:::default_pairs_variables(mv)))
+})

@@ -487,17 +487,31 @@ tweedie_stan_funs <- function() {
 #' starts to omit appreciable Poisson tail mass and bias the
 #' log-density downward.
 #'
-#' @param object An `mvgam` fit using the `tweedie()` family.
+#' The rate is taken for every response whose family is `tweedie()`,
+#' since a multivariate model can name it for one response among
+#' several, and all of them share the one `M`. `mphi` and `mtheta`
+#' are read per observation, which covers a parameter given a
+#' formula of its own as well as a scalar one.
+#'
+#' @param object An `mvgam` fit with at least one response whose
+#'   family is `tweedie()`.
+#' @param resp Optional name of one response to check. Without it,
+#'   every `tweedie()` response is checked.
 #' @return Invisible `NULL`. Emits a message indicating the
 #'   adequacy of `M`, and a warning if `M` looks tight.
 #' @export
-check_tweedie_truncation <- function(object) {
+check_tweedie_truncation <- function(object, resp = NULL) {
   checkmate::assert_class(object, "mvgam")
-  fam <- object$family
-  if (!inherits(fam, "customfamily") ||
-        !identical(fam$name, "tweedie")) {
+  resolve_resp(object, resp)
+  families <- formula_families(object, object$family)
+  multivariate <- length(families) > 1L
+  if (!is.null(resp)) families <- families[resp]
+  tweedie_resps <- names(families)[
+    vapply(families, resolve_family_name, character(1L)) == "tweedie"
+  ]
+  if (length(tweedie_resps) == 0L) {
     stop(insight::format_error(
-      "'check_tweedie_truncation()' only applies to fits with family = tweedie()."
+      "'check_tweedie_truncation()' needs a response with family tweedie()."
     ))
   }
   # `M` is Stan data and is read from the stored Stan data.
@@ -508,14 +522,19 @@ check_tweedie_truncation <- function(object) {
       "Could not locate the truncation 'M' in the fit's standata."
     ))
   }
-  # Posterior mean of mu (per observation) and the two global
-  # scalars; mu is on the response scale via family$linkinv.
-  mu_mean <- colMeans(posterior_epred(object))
-  draws <- posterior::as_draws_matrix(object$fit)
-  mphi_mean <- mean(draws[, "mphi"])
-  mtheta_mean <- mean(draws[, "mtheta"])
-  lambda <- mu_mean^(2 - mtheta_mean) /
-    ((2 - mtheta_mean) * mphi_mean)
+  # The Poisson rate at the posterior mean of `mu`, `mphi` and
+  # `mtheta`, per observation of each tweedie response.
+  lambda <- unlist(lapply(tweedie_resps, function(r) {
+    key <- if (multivariate) r else NULL
+    mu <- colMeans(posterior_epred(object, resp = key))
+    mphi <- colMeans(dpar_posterior_linpred(
+      object, "mphi", transform = TRUE, resp = key
+    ))
+    mtheta <- colMeans(dpar_posterior_linpred(
+      object, "mtheta", transform = TRUE, resp = key
+    ))
+    mu^(2 - mtheta) / ((2 - mtheta) * mphi)
+  }))
   lambda_max <- max(lambda)
   message(
     "Tweedie truncation diagnostic: M = ", M,

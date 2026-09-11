@@ -4,10 +4,14 @@
 \alias{check_tweedie_truncation}
 \title{Diagnose whether the Tweedie series-truncation \code{M} is adequate}
 \usage{
-check_tweedie_truncation(object)
+check_tweedie_truncation(object, resp = NULL)
 }
 \arguments{
-\item{object}{An \code{mvgam} fit using the \code{tweedie()} family.}
+\item{object}{An \code{mvgam} fit with at least one response whose
+family is \code{tweedie()}.}
+
+\item{resp}{Optional name of one response to check. Without it,
+every \code{tweedie()} response is checked.}
 }
 \value{
 Invisible \code{NULL}. Emits a message indicating the
@@ -22,4 +26,11 @@ standata. Warns if \code{max(lambda)} exceeds \code{0.7 * M}, the
 rough point at which the \code{log_sum_exp} over \verb{m = 1..M}
 starts to omit appreciable Poisson tail mass and bias the
 log-density downward.
+}
+\details{
+The rate is taken for every response whose family is \code{tweedie()},
+since a multivariate model can name it for one response among
+several, and all of them share the one \code{M}. \code{mphi} and \code{mtheta}
+are read per observation, which covers a parameter given a
+formula of its own as well as a scalar one.
 }

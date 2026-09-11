@@ -724,6 +724,79 @@ make_nmix_prefit <- function(type = "poisson_binomial") {
   )
 }
 
+test_that("each response of a multivariate model is described by its family", {
+  # Every response was rendered with the family given beside the
+  # formula, its link and its data label, and the reproduction call
+  # dropped each response's family, so running it fitted another
+  # model. A distributional formula printed as `sigma = sigma ~ x`.
+  set.seed(3L)
+  d <- data.frame(time = 1:30, series = factor("a"), x = rnorm(30),
+                  n_seen = rpois(30, 4), size_g = rlnorm(30, 1, 0.5))
+  mv <- mvgam(
+    bf(n_seen ~ x, family = poisson()) +
+      bf(size_g ~ x, sigma ~ x, family = lognormal()) + set_rescor(FALSE),
+    data = d, run_model = FALSE
+  )
+  out <- methods_md(mv)
+  expect_match(out, "$\\text{n\\_seen}$ non-negative integer counts",
+               fixed = TRUE)
+  expect_match(out, "$\\text{size\\_g}$ positive real observations",
+               fixed = TRUE)
+  expect_match(out, "nseen_{i,t} &\\sim \\text{Poisson}", fixed = TRUE)
+  expect_match(out, "sizeg_{i,t} &\\sim \\text{LogNormal}", fixed = TRUE)
+  expect_match(out, "\\log \\mu^{(nseen)}_{i,t} &=", fixed = TRUE)
+  expect_match(out, "\\log \\sigma^{(sizeg)}_{i,t} &=", fixed = TRUE)
+  expect_match(out, "$\\mu^{(sizeg)}_{i,t}$: conditional mean of $sizeg_{i,t}$ on the identity-link scale",
+               fixed = TRUE)
+  expect_match(
+    out,
+    paste0("bf(n_seen ~ x, family = poisson()) + ",
+           "bf(size_g ~ x, sigma ~ x, family = lognormal())"),
+    fixed = TRUE
+  )
+})
+
+
+test_that("the reproduction call carries the formula the user wrote", {
+  # A formula declining every coefficient is built with a pinned
+  # placeholder column the user never wrote, which leaked into the
+  # call printed for them to run.
+  mod <- make_methods_md_prefit(y ~ 0, trend_formula = ~ AR(p = 1))
+  out <- methods_md(mod)
+  expect_false(grepl(".mvgam_empty_obs", out, fixed = TRUE))
+  expect_match(out, "formula       = y ~ 0", fixed = TRUE)
+})
+
+
+test_that("how_to_cite cites each family a model has", {
+  # Each citation rule asked `object$family`, which on a multivariate
+  # model is the family given beside the formula, so a tweedie
+  # response written inside `mvbf()` went uncited. The three `nmix()`
+  # variants each carry their own references.
+  cited <- function(mod) names(how_to_cite(mod)$bibtex)
+  pb <- cited(make_nmix_prefit())
+  expect_true("royle_nmix_2004" %in% pb)
+  expect_false("royle_nichols_2003" %in% pb)
+  rn <- cited(make_nmix_prefit("royle_nichols"))
+  expect_true("royle_nichols_2003" %in% rn)
+  expect_false("royle_nmix_2004" %in% rn)
+  expect_true("neyman_type_a_1939" %in%
+                cited(make_nmix_prefit("poisson_poisson")))
+  expect_true("mackenzie_occu_2002" %in% cited(make_occ_prefit()))
+  expect_false("jorgensen_tweedie" %in% cited(make_methods_md_prefit(y ~ x)))
+  set.seed(2L)
+  d <- data.frame(time = 1:30, amount = rgamma(30, 2, 1),
+                  count = rpois(30, 4))
+  mv <- mvgam(
+    bf(amount ~ 1, family = tweedie()) +
+      bf(count ~ 1, family = poisson()) + set_rescor(FALSE),
+    data = d, run_model = FALSE
+  )
+  expect_true(all(c("jorgensen_tweedie", "dunn_smyth_tweedie") %in%
+                    cited(mv)))
+})
+
+
 test_that("occ() emits state + obs + logit(p) rows", {
   out <- methods_md(make_occ_prefit())
   expect_true(grepl(

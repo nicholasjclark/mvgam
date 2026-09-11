@@ -659,52 +659,6 @@ reference_db <- function() {
   )
 }
 
-# Shared predicate: does the fit's family resolve to a given
-# user-facing name? Routes through `resolve_family_name()` so the
-# customfamily storage convention (e.g. name = "nmix" / "tweedie"
-# while family = "custom") is recognised correctly. All per-name
-# predicates below are one-line wrappers; new closure-unit /
-# custom families add a wrapper rather than re-coding the
-# null-check + identical() boilerplate.
-#' @noRd
-family_name_is <- function(object, name) {
-  if (is.null(object$family)) return(FALSE)
-  identical(resolve_family_name(object$family), name)
-}
-
-# Per-family predicates. `uses_nmix_family()` matches the original
-# Royle (2004) Poisson-binomial variant only (not the RN or PPM
-# variants, which have their own citation rules).
-#' @noRd
-uses_nmix_family <- function(object) {
-  family_name_is(object, "nmix")
-}
-
-#' @noRd
-uses_nmix_royle_nichols_family <- function(object) {
-  family_name_is(object, "nmix_royle_nichols")
-}
-
-#' @noRd
-uses_nmix_poisson_poisson_family <- function(object) {
-  family_name_is(object, "nmix_poisson_poisson")
-}
-
-#' @noRd
-uses_occ_family <- function(object) {
-  family_name_is(object, "occ")
-}
-
-#' @noRd
-uses_tweedie_family <- function(object) {
-  family_name_is(object, "tweedie")
-}
-
-#' @noRd
-uses_beta_nb_family <- function(object) {
-  family_name_is(object, "beta_nb")
-}
-
 # Heavy-tailed latent innovations are a modelling choice worth
 # describing, so the methods text reports them rather than leaving the
 # process implicitly Gaussian.
@@ -713,28 +667,6 @@ uses_heavy_tailed_trend <- function(object) {
   df <- object$trend_metadata$df %||% Inf
   !is_gaussian_df(df)
 }
-
-#' @noRd
-uses_com_binomial_family <- function(object) {
-  family_name_is(object, "com_binomial")
-}
-
-# Simplex multi-response: diri(), multi(), categ(). Detect via the
-# mvgam_simplex_response attribute set by the constructor.
-#' @noRd
-uses_simplex_response <- function(object) {
-  is_simplex_response_family(object$family)
-}
-
-# Multivariate continuous response: mvn(), mvt(). Detect via the
-# mvgam_multi_response attribute while excluding the simplex trio.
-#' @noRd
-uses_mv_continuous_response <- function(object) {
-  is_multi_response_family(object$family) &&
-    !is_simplex_response_family(object$family)
-}
-
-
 
 # Predicate: was the fit produced by the jsdgam() wrapper? Keys
 # off the class hierarchy set in jsdgam() (c("mvgam", "jsdgam"))
@@ -856,6 +788,14 @@ how_to_cite.mvgam <- function(object, ...) {
 
   trend_model <- object$trend_components$types[1L] %||% ""
 
+  # Every response's family is cited. A multivariate model can take a
+  # tweedie response beside a poisson one, and the family given beside
+  # its formula is neither. `nmix()` names its variants apart, so the
+  # Poisson-binomial rule matches "nmix" alone.
+  families <- formula_families(object, object$family)
+  family_names <- vapply(families, resolve_family_name, character(1L))
+  any_family <- function(test) any(vapply(families, test, logical(1L)))
+
   # Detection table: each rule pairs a TRUE/FALSE predicate
   # with the methods text it appends and the reference keys it
   # adds. Keeping all conditional citations in one structure
@@ -927,7 +867,7 @@ how_to_cite.mvgam <- function(object, ...) {
       refs = "bhattacharya_mgp"
     ),
     list(
-      detect = uses_tweedie_family(object),
+      detect = "tweedie" %in% family_names,
       text = paste0(
         " Observations were modelled with the Tweedie compound",
         " Poisson-gamma family (Jorgensen 1987), with the",
@@ -950,7 +890,7 @@ how_to_cite.mvgam <- function(object, ...) {
       refs = "durbin_koopman_ssm"
     ),
     list(
-      detect = uses_beta_nb_family(object),
+      detect = "beta_nb" %in% family_names,
       text = paste0(
         " Counts were modelled with the beta negative binomial",
         " family (Irwin 1968), which mixes the negative binomial",
@@ -960,7 +900,7 @@ how_to_cite.mvgam <- function(object, ...) {
       refs = "irwin_waring"
     ),
     list(
-      detect = uses_com_binomial_family(object),
+      detect = "com_binomial" %in% family_names,
       text = paste0(
         " Bounded counts were modelled with the",
         " Conway-Maxwell-Binomial family (Shmueli et al. 2005;",
@@ -976,7 +916,7 @@ how_to_cite.mvgam <- function(object, ...) {
       )
     ),
     list(
-      detect = uses_nmix_family(object),
+      detect = "nmix" %in% family_names,
       text = paste0(
         " Counts were modelled with the Poisson-binomial",
         " N-mixture family (Royle 2004), with the latent",
@@ -996,7 +936,7 @@ how_to_cite.mvgam <- function(object, ...) {
       )
     ),
     list(
-      detect = uses_nmix_royle_nichols_family(object),
+      detect = "nmix_royle_nichols" %in% family_names,
       text = paste0(
         " Binary detection / non-detection histories were modelled",
         " with the Royle-Nichols N-mixture family",
@@ -1015,7 +955,7 @@ how_to_cite.mvgam <- function(object, ...) {
       )
     ),
     list(
-      detect = uses_nmix_poisson_poisson_family(object),
+      detect = "nmix_poisson_poisson" %in% family_names,
       text = paste0(
         " Encounter counts were modelled with the Poisson-Poisson",
         " N-mixture family, where per-visit counts `y ~ Poisson(N * p)`",
@@ -1036,7 +976,7 @@ how_to_cite.mvgam <- function(object, ...) {
       )
     ),
     list(
-      detect = uses_occ_family(object),
+      detect = "occ" %in% family_names,
       text = paste0(
         " Detection / non-detection histories were modelled with",
         " the single-season Bernoulli-binomial occupancy family",
@@ -1051,7 +991,7 @@ how_to_cite.mvgam <- function(object, ...) {
       )
     ),
     list(
-      detect = uses_simplex_response(object),
+      detect = any_family(is_simplex_response_family),
       text = paste0(
         " The multi-category response (proportions, counts or",
         " single-category outcomes across K mutually exclusive",
@@ -1075,7 +1015,7 @@ how_to_cite.mvgam <- function(object, ...) {
       )
     ),
     list(
-      detect = uses_mv_continuous_response(object),
+      detect = any_family(family_has_component_scale),
       text = paste0(
         " The multivariate continuous response was modelled with",
         " a conditional generalised linear latent variable",

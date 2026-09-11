@@ -817,10 +817,12 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
       unique_times = dimensions$unique_times,
       unique_series = dimensions$unique_series,
       series_groups = dimensions$series_groups,
-      # Reason: PW logistic needs `data` and `family` to build
-      # cap_trend (cap column read from data, link-transformed).
+      # Reason: PW logistic needs `data` and every response's family
+      # to build cap_trend (cap column read from data,
+      # link-transformed).
       data = obs_setup$data %||% trend_setup$data,
       family = obs_setup$family,
+      families = formula_families(obs_setup$formula, obs_setup$family),
       # by = lv_axis() grain flag: trend computation emits the
       # per-factor mu_factor fold when TRUE; otherwise unchanged.
       has_by_lv = isTRUE(dimensions$has_by_lv)
@@ -6188,22 +6190,7 @@ build_pw_cap_matrix <- function(data, cap_var, time_var, series_var,
     )))
   }
 
-  if (!is.null(family) && !is.null(family$linkfun)) {
-    out <- family$linkfun(out)
-    if (any(!is.finite(out))) {
-      stop(insight::format_error(c(
-        paste0(
-          "PW logistic: cap values are non-finite after applying ",
-          "the '", family$link %||% "<unknown>", "' link."
-        ),
-        x = paste0(
-          "Check that all '", cap_var, "' values are valid on ",
-          "the response scale."
-        )
-      )))
-    }
-  }
-  out
+  transform_pw_cap_to_link(out, family, cap_var)
 }
 
 
@@ -6391,7 +6378,7 @@ generate_pw_trend_stanvars <- function(trend_specs, data_info, growth = NULL,
       series_var = data_info$series_var %||% "series",
       n_time = n_time_trend,
       n_series = n_series,
-      family = data_info$family
+      family = pw_cap_link_family(data_info$families)
     )
     pw_logistic_data_stanvar <- brms::stanvar(
       x = cap_matrix,
