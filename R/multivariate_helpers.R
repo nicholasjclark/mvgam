@@ -48,6 +48,22 @@ first_trend_spec <- function(object) {
 #'   response rather than being one, so it is left out.
 #' @noRd
 response_columns <- function(x) {
+  vapply(response_formulas(x), function(form) {
+    all.vars(strip_addition_terms(form$formula)[[2L]])[1L]
+  }, character(1L))
+}
+
+#' Each response's own formula, keyed as brms keys it
+#'
+#' A multivariate formula holds one `bf()` per response in `$forms`,
+#' and any other formula is its own single response. The key is the
+#' one `response_columns()` describes.
+#'
+#' @inheritParams response_columns
+#' @return A list of `brmsformula` objects named by key, in formula
+#'   order
+#' @noRd
+response_formulas <- function(x) {
   f <- if (inherits(x, c("formula", "bform"))) x else x$formula
   if (!inherits(f, "bform")) {
     f <- brms::bf(f)
@@ -62,10 +78,21 @@ response_columns <- function(x) {
       i = "Write it as 'response ~ predictors'."
     )), call. = FALSE)
   }
-  columns <- vapply(forms, function(form) {
-    all.vars(strip_addition_terms(form$formula)[[2L]])[1L]
-  }, character(1L), USE.NAMES = FALSE)
-  stats::setNames(columns, keys)
+  stats::setNames(forms, keys)
+}
+
+#' The family of each response
+#'
+#' A family written inside a response's `bf()` belongs to that
+#' response. The family given beside the formula applies to every
+#' response that names none, which is how brms reads the pair.
+#'
+#' @inheritParams response_columns
+#' @param family The family given beside the formula
+#' @return A list of family objects named by response key
+#' @noRd
+formula_families <- function(x, family) {
+  lapply(response_formulas(x), function(form) form$family %||% family)
 }
 
 #' Check the response a caller named against the model's own

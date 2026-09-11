@@ -4228,6 +4228,51 @@ test_that("multi-response fits with NA preserve per-response valid rows", {
 })
 
 
+test_that("each response keeps its own rows whatever its column is called", {
+  # brms keys a response by its column with every `_` and `.` taken
+  # out, so `y_1` is `N_y1`. The per-response rebuild looked for
+  # `N_y_1`, found nothing to replace and left every response on the
+  # rows all of them observed. A `trials()` response stopped it
+  # outright, and a response taking the family given beside the
+  # formula was rebuilt as gaussian.
+  set.seed(3)
+  T_ <- 24L
+  dat <- data.frame(
+    time = seq_len(T_), series = factor("a"),
+    y_1 = rpois(T_, 5), y.2 = rgamma(T_, 2, 0.5),
+    k = rbinom(T_, 10, 0.4), n = 10L, z = rpois(T_, 3)
+  )
+  dat$y_1[c(3L, 9L)] <- NA
+  dat$y.2[c(5L, 14L, 20L)] <- NA
+  dat$k[11L] <- NA
+  mf <- mvgam_formula(
+    bf(y_1 ~ 1, family = poisson()) +
+      bf(y.2 ~ 1, family = Gamma(link = "log")) +
+      bf(k | trials(n) ~ 1, family = binomial()) +
+      bf(z ~ 1),
+    trend_formula = ~ AR(p = 1)
+  )
+  sd <- withCallingHandlers(
+    standata(mf, data = dat, family = poisson()),
+    warning = function(w) {
+      if (grepl("Rows containing NAs", conditionMessage(w))) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+  columns <- c(y1 = "y_1", y2 = "y.2", k = "k", z = "z")
+  for (key in names(columns)) {
+    expected <- sum(!is.na(dat[[columns[[key]]]]))
+    expect_identical(as.integer(sd[[paste0("N_", key)]]), expected)
+    expect_identical(length(sd[[paste0("Y_", key)]]), expected)
+  }
+  expect_identical(as.integer(sd$trials_k), rep(10L, T_ - 1L))
+  # `z` names no family and takes the poisson given beside the
+  # formula, whose response brms stores as integers.
+  expect_true(is.integer(sd$Y_z))
+})
+
+
 test_that("multi-response fits with no NAs hit the fast no-op path", {
   # When no response has NAs, brms's listwise-deleted standata is
   # already per-response-correct and `expand_per_response_standata`

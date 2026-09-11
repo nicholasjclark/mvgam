@@ -1904,6 +1904,7 @@ generate_base_brms_standata <- function(formula, data, family = gaussian(),
       combined_sd = standata,
       formula     = formula,
       data        = data,
+      family      = family,
       stanvars    = stanvars,
       data2       = data2,
       codegen     = codegen
@@ -1943,6 +1944,8 @@ generate_base_brms_standata <- function(formula, data, family = gaussian(),
 #'   on the multi-response formula.
 #' @param formula `mvbrmsformula` object (a sum of `bf()` arms).
 #' @param data The original data frame (may contain NAs).
+#' @param family The family given beside the formula, which an arm
+#'   naming no family of its own is rebuilt under.
 #' @param stanvars Optional stanvars passed through to brms.
 #' @param data2 Optional auxiliary data passed through to brms.
 #' @param codegen A list from `mvgam_codegen_options()`, or NULL. The
@@ -1955,33 +1958,31 @@ generate_base_brms_standata <- function(formula, data, family = gaussian(),
 #'   per-response valid row count.
 #' @noRd
 expand_per_response_standata <- function(combined_sd, formula, data,
+                                          family = NULL,
                                           stanvars = NULL, data2 = NULL,
                                           codegen = NULL) {
-  bf_list <- formula$forms
+  bf_list <- response_formulas(formula)
   if (length(bf_list) < 2L) return(combined_sd)
 
-  resp_names <- vapply(bf_list, function(bf_i) {
-    as.character(stats::formula(bf_i)[[2L]])
-  }, character(1L))
+  # The data is read by column and the standata is named by key:
+  # brms writes the response `y_1` as `N_y1` and `Y_y1`. Reading
+  # both off the column found no key for any response with a `_` or
+  # a `.`, and every response kept the rows another had lost.
+  columns <- response_columns(formula)
+  keys <- names(columns)
+  families <- formula_families(formula, family)
 
   # Fast path: every response is fully observed -> brms's
   # listwise-deleted standata already equals the per-response one.
-  any_na <- vapply(resp_names, function(r) {
-    if (!r %in% names(data)) return(FALSE)
-    anyNA(data[[r]])
-  }, logical(1L))
-  if (!any(any_na)) return(combined_sd)
+  observed <- lapply(columns, function(col) !is.na(data[[col]]))
+  if (all(vapply(observed, all, logical(1L)))) return(combined_sd)
 
-  for (i in seq_along(bf_list)) {
-    resp_i <- resp_names[i]
-    if (!any_na[i] && !any(any_na)) next
-    if (!resp_i %in% names(data)) next
-
-    keep_i <- !is.na(data[[resp_i]])
+  for (key in keys) {
+    keep_i <- observed[[key]]
     if (sum(keep_i) == 0L) {
       stop(insight::format_error(c(
         cli::format_inline(
-          "Response variable {.field {resp_i}} has no observed values."
+          "Response variable {.field {columns[[key]]}} has no observed values."
         ),
         x = paste0(
           "Cannot fit a multi-response model with a response that is ",
@@ -1991,8 +1992,6 @@ expand_per_response_standata <- function(combined_sd, formula, data,
     }
     data_i <- data[keep_i, , drop = FALSE]
 
-    bf_i <- bf_list[[i]]
-    fam_i <- bf_i$family
     # `data2` is forwarded unchanged. brms `data2` usually holds
     # group-keyed auxiliary objects (covariance matrices, basis
     # function tables) that index by group rather than by data
@@ -2000,9 +1999,9 @@ expand_per_response_standata <- function(combined_sd, formula, data,
     # mismatch the per-arm row count and brms will error here.
     single_sd <- do.call(brms::make_standata, c(
       list(
-        formula  = bf_i,
+        formula  = bf_list[[key]],
         data     = data_i,
-        family   = fam_i,
+        family   = families[[key]],
         stanvars = stanvars,
         data2    = data2
       ),
@@ -2014,7 +2013,7 @@ expand_per_response_standata <- function(combined_sd, formula, data,
     # single-arm key by stripping the response substring.
     for (combined_key in names(combined_sd)) {
       single_key <- map_combined_key_to_single(
-        combined_key, resp_i, single_keys
+        combined_key, key, single_keys
       )
       if (!is.null(single_key)) {
         combined_sd[[combined_key]] <- single_sd[[single_key]]
@@ -2025,25 +2024,19 @@ expand_per_response_standata <- function(combined_sd, formula, data,
   # Set the global `N` to the maximum per-response row count so the
   # `int<lower=1> N` declaration remains valid. The combined `N`
   # is otherwise unused by mvgam-side trend machinery.
-  resp_Ns <- vapply(resp_names, function(r) {
-    val <- combined_sd[[paste0("N_", r)]]
-    if (is.null(val)) NA_integer_ else as.integer(val)
+  resp_Ns <- vapply(keys, function(key) {
+    as.integer(combined_sd[[paste0("N_", key)]])
   }, integer(1L))
-  if (!any(is.na(resp_Ns))) {
-    combined_sd$N <- max(resp_Ns)
-  }
+  combined_sd$N <- max(resp_Ns)
 
   # Post-hoc verification: every per-response Y_<resp> and X_<resp>
   # row count must equal the corresponding N_<resp>. This catches
   # any brms naming pattern the heuristic strip in
   # `map_combined_key_to_single` missed (e.g. a future brms version
   # introducing a new per-arm key shape we didn't anticipate).
-  for (i in seq_along(resp_names)) {
-    resp_i <- resp_names[i]
-    n_i <- resp_Ns[i]
-    if (is.na(n_i)) next
-    keep_i <- !is.na(data[[resp_i]])
-    expected <- sum(keep_i)
+  for (resp_i in keys) {
+    n_i <- resp_Ns[[resp_i]]
+    expected <- sum(observed[[resp_i]])
     if (!identical(as.integer(n_i), as.integer(expected))) {
       stop(insight::format_error(c(
         cli::format_inline(
