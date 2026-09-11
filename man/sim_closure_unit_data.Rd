@@ -111,12 +111,13 @@ Exercises multi-covariate identifiability on both linear
 predictors.}
 }
 
-The state linear predictor is on the logit scale for \code{occ()}
-and on the log scale for the \code{nmix()} variants (it determines
-the Poisson abundance mean \code{lambda}). The detection linear
-predictor is always on the logit scale for \code{occ()} and
-\code{nmix("poisson_binomial")}, and on the log scale for the
-Royle-Nichols (\code{r}) and Poisson-Poisson (\code{rho}) variants.
+Each linear predictor is on the scale of the family's own link.
+The state predictor takes the logit for \code{occ()} and the log for
+every \code{nmix()} variant, where it sets the Poisson abundance mean
+\code{lambda}. The detection predictor takes the logit for \code{occ()},
+\code{nmix("poisson_binomial")} and \code{nmix("royle_nichols")}, whose
+per-individual detection \code{r} is a probability, and the log for
+\code{nmix("poisson_poisson")}, whose encounter rate \code{rho} is not.
 }
 \section{Latent factors}{
 

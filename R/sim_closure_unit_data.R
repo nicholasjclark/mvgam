@@ -63,12 +63,13 @@
 #'     predictors.}
 #' }
 #'
-#' The state linear predictor is on the logit scale for `occ()`
-#' and on the log scale for the `nmix()` variants (it determines
-#' the Poisson abundance mean `lambda`). The detection linear
-#' predictor is always on the logit scale for `occ()` and
-#' `nmix("poisson_binomial")`, and on the log scale for the
-#' Royle-Nichols (`r`) and Poisson-Poisson (`rho`) variants.
+#' Each linear predictor is on the scale of the family's own link.
+#' The state predictor takes the logit for `occ()` and the log for
+#' every `nmix()` variant, where it sets the Poisson abundance mean
+#' `lambda`. The detection predictor takes the logit for `occ()`,
+#' `nmix("poisson_binomial")` and `nmix("royle_nichols")`, whose
+#' per-individual detection `r` is a probability, and the log for
+#' `nmix("poisson_poisson")`, whose encounter rate `rho` is not.
 #'
 #' @section Latent factors:
 #'   When `n_lv > 0L` and `n_species > 1L`, the state linear
@@ -462,6 +463,10 @@ draw_recipe_coefs <- function(n_species, cov_names,
 # layouts (long vector aligned with the long-format data, and 4D
 # array aligned with pivot_detection_array()) plus the family-
 # specific truth slots (psi / z for occ, lambda / N for nmix).
+#
+# Both predictors pass through the family's own links, the ones its
+# likelihood inverts, so the simulated scale cannot drift from the
+# fitted one.
 #'@noRd
 closure_unit_sample <- function(family,
                                   state_lp, det_lp,
@@ -470,15 +475,18 @@ closure_unit_sample <- function(family,
   fam_name <- resolve_family_name(family) %||% ""
   y_arr <- array(0L, dim = c(n_species, n_sites, n_visits))
   p_arr <- array(0, dim = c(n_species, n_sites, n_visits))
+  state <- state_lp
+  state[] <- stats::make.link(family$link)$linkinv(state_lp)
+  detect <- det_lp
+  detect[] <- stats::make.link(family$link_p)$linkinv(det_lp)
   state_truth <- list()
   switch(
     fam_name,
     "occ" = {
-      psi <- plogis(state_lp)
       z   <- matrix(stats::rbinom(n_species * n_sites, 1L,
-                                   as.numeric(psi)),
+                                   as.numeric(state)),
                     nrow = n_species, ncol = n_sites)
-      p_arr[] <- plogis(det_lp)
+      p_arr[] <- detect
       for (k in seq_len(n_species)) {
         for (i in seq_len(n_sites)) {
           if (z[k, i] == 1L) {
@@ -486,57 +494,39 @@ closure_unit_sample <- function(family,
           }
         }
       }
-      state_truth <- list(psi = psi, z = z)
+      state_truth <- list(psi = state, z = z)
     },
-    "nmix" = , "nmix_poisson_binomial" = {
-      lambda <- exp(state_lp)
-      N      <- matrix(stats::rpois(n_species * n_sites,
-                                     as.numeric(lambda)),
-                       nrow = n_species, ncol = n_sites)
-      N[N > K_max] <- K_max
-      p_arr[] <- plogis(det_lp)
-      for (k in seq_len(n_species)) {
-        for (i in seq_len(n_sites)) {
-          if (N[k, i] > 0L) {
-            y_arr[k, i, ] <- stats::rbinom(n_visits, N[k, i],
-                                            p_arr[k, i, ])
-          }
-        }
-      }
-      state_truth <- list(lambda = lambda, N = N)
-    },
-    "nmix_royle_nichols" = {
-      lambda <- exp(state_lp)
-      N      <- matrix(stats::rpois(n_species * n_sites,
-                                     as.numeric(lambda)),
-                       nrow = n_species, ncol = n_sites)
-      r_arr <- array(plogis(det_lp),
-                     dim = c(n_species, n_sites, n_visits))
-      p_arr[] <- 1 - (1 - r_arr) ^ array(N, dim = dim(r_arr))
-      for (k in seq_len(n_species)) {
-        for (i in seq_len(n_sites)) {
-          y_arr[k, i, ] <- stats::rbinom(n_visits, 1L, p_arr[k, i, ])
-        }
-      }
-      state_truth <- list(lambda = lambda, N = N)
-    },
+    "nmix" = , "nmix_poisson_binomial" = , "nmix_royle_nichols" = ,
     "nmix_poisson_poisson" = {
-      lambda <- exp(state_lp)
-      N      <- matrix(stats::rpois(n_species * n_sites,
-                                     as.numeric(lambda)),
-                       nrow = n_species, ncol = n_sites)
-      rho_arr <- array(exp(det_lp),
-                       dim = c(n_species, n_sites, n_visits))
-      p_arr[] <- rho_arr
+      # Every variant marginalises the abundance up to `K_max`, which
+      # is the support the draw is held to.
+      N <- matrix(pmin(stats::rpois(n_species * n_sites,
+                                    as.numeric(state)), K_max),
+                  nrow = n_species, ncol = n_sites)
+      # Royle-Nichols detects a unit when any of its N individuals is
+      # detected. The other two read the detection scale directly: a
+      # per-individual probability, or an encounter rate.
+      p_arr[] <- if (identical(fam_name, "nmix_royle_nichols")) {
+        1 - (1 - detect)^array(N, dim = dim(p_arr))
+      } else {
+        detect
+      }
       for (k in seq_len(n_species)) {
         for (i in seq_len(n_sites)) {
-          if (N[k, i] > 0L) {
-            mean_y <- N[k, i] * rho_arr[k, i, ]
-            y_arr[k, i, ] <- stats::rpois(n_visits, mean_y)
+          p <- p_arr[k, i, ]
+          if (identical(fam_name, "nmix_royle_nichols")) {
+            y_arr[k, i, ] <- stats::rbinom(n_visits, 1L, p)
+          } else if (N[k, i] > 0L) {
+            y_arr[k, i, ] <- if (identical(fam_name,
+                                           "nmix_poisson_poisson")) {
+              stats::rpois(n_visits, N[k, i] * p)
+            } else {
+              stats::rbinom(n_visits, N[k, i], p)
+            }
           }
         }
       }
-      state_truth <- list(lambda = lambda, N = N)
+      state_truth <- list(lambda = state, N = N)
     },
     stop(insight::format_error(c(
       "Unsupported closure-unit family for sim_closure_unit_data().",

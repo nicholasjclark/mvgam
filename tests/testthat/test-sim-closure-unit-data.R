@@ -60,6 +60,20 @@ test_that("nmix family produces integer counts and cap = K_max", {
 })
 
 
+test_that("every nmix variant holds the abundance to K_max", {
+  # `K_max` is documented as the cap on the latent abundance for
+  # every `nmix()` variant, and each variant's likelihood integrates
+  # the abundance up to it. The Royle-Nichols and Poisson-Poisson
+  # draws ignored it.
+  for (type in c("poisson_binomial", "royle_nichols", "poisson_poisson")) {
+    s <- sim_closure_unit_data(type = 1L, family = nmix(type),
+                               n_sites = 60L, K_max = 2L, seed = 21L)
+    expect_lte(max(s$truth$N), 2L)
+    expect_gt(max(s$truth$N), 0L)
+  }
+})
+
+
 test_that("multi-species emits per-species coef matrices", {
   s <- sim_closure_unit_data(
     type = 2L, family = occ(),
@@ -145,32 +159,60 @@ test_that("y_array round-trips through pivot_detection_array()", {
 })
 
 
-test_that("compiled fit dispatches via family branching", {
-  # No Stan fit: just compile the standata to confirm the long-
-  # format data feeds make_stancode + the closure-unit prep
-  # pipeline without error.
+test_that("the simulated frame builds the family's own likelihood", {
+  # No Stan fit. The long frame goes through the closure-unit
+  # preparation, and the program scores it with the occupancy
+  # likelihood over the unit arrays that preparation builds.
   s <- sim_closure_unit_data(
     type = 1L, family = occ(), n_sites = 30L, seed = 13L
   )
-  code <- tryCatch(
-    make_stancode(
-      brms::bf(y ~ env, p ~ tod_c),
-      family = occ(), data = s$data_train
-    ),
-    error = function(e) conditionMessage(e)
+  code <- stancode(
+    mvgam_formula(brms::bf(y ~ env, p ~ tod_c)),
+    data = s$data_train, family = occ()
   )
-  expect_type(code, "character")
-  expect_true(nchar(code) > 100L)
+  expect_match(
+    code, "target += occ_lpmf(Y | mu, p, N_unit, n_rep, Y_max, visit_idx);",
+    fixed = TRUE
+  )
+})
+
+
+test_that("detection is simulated on the scale of the family's link", {
+  # `?sim_closure_unit_data` put the Royle-Nichols detection predictor
+  # on the log scale. The family declares a logit link and the
+  # simulator applies it, so a reader setting an intercept from the
+  # page got another probability. The recorded detection probability
+  # is rebuilt here from the predictor through each family's own
+  # inverse link.
+  families <- list(occ(), nmix("poisson_binomial"),
+                   nmix("royle_nichols"), nmix("poisson_poisson"))
+  for (fam in families) {
+    s <- sim_closure_unit_data(type = 1L, family = fam, n_sites = 12L,
+                               n_visits = 3L, seed = 11L)
+    d <- s$data_train
+    coefs <- s$truth$detection_coefs
+    eta <- coefs[["intercept"]] + coefs[["tod_c"]] * d$tod_c
+    r <- stats::make.link(fam$link_p)$linkinv(eta)
+    # Royle-Nichols detects a unit when any of its N individuals is
+    # detected; the other three read the probability directly.
+    expected <- if (identical(fam$name, "nmix_royle_nichols")) {
+      1 - (1 - r)^s$truth$N[1L, d$site]
+    } else {
+      r
+    }
+    # `truth$p` is `[species, site, visit]`; the frame runs visits
+    # within sites.
+    expect_equal(as.vector(t(s$truth$p[1L, , ])), expected)
+  }
 })
 
 
 test_that("draw_recipe_coefs produces community-mean structure", {
-  # The simulator draws ONE community mean per covariate, then per-
-  # species slopes around that mean with sd 0.5. With n_species
-  # large, the empirical per-covariate sd across species should
-  # match the per-species sd (~0.5), much tighter than the legacy
-  # iid N(0, 0.75) distribution. The community mean itself can be
-  # large or small; the within-covariate spread is what's pinned.
+  # The simulator draws one community mean per covariate, then
+  # per-species slopes around it with sd 0.5. Across 50 species the
+  # empirical sd of each covariate's slopes sits near 0.5. The
+  # community mean can be large or small; the spread is what is
+  # pinned.
   set.seed(2024)
   s <- sim_closure_unit_data(
     type = 2L, family = occ(),
@@ -181,10 +223,8 @@ test_that("draw_recipe_coefs produces community-mean structure", {
   # Per-covariate spread across species (sd of slopes).
   env_sd  <- stats::sd(state[, "env"])
   elev_sd <- stats::sd(state[, "elev"])
-  # Slopes are drawn from N(community_mean, 0.5); empirical sd
-  # across 50 species should sit tightly around 0.5. Tolerance
-  # 0.25 catches a regression to the legacy N(0, 0.75) draw whose
-  # empirical sd would land around 0.75.
+  # A tolerance of 0.25 separates sd 0.5 from an iid N(0, 0.75)
+  # draw, whose empirical sd lands near 0.75.
   expect_lt(abs(env_sd  - 0.5), 0.25)
   expect_lt(abs(elev_sd - 0.5), 0.25)
 })
