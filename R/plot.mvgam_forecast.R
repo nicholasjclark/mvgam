@@ -73,13 +73,25 @@ plot.mvgam_forecast <- function(
   }
 
   # Multi-response fan-out wrapper: `x` is a named list keyed
-  # by response, each element itself an `mvgam_forecast`. For
-  # trend-scale hindcasts / forecasts every arm carries the same
-  # shared latent trajectory, so we plot the first arm only and
-  # drop the arm label. For response-scale arms differ per
-  # outcome; when `patchwork` is available we return a
-  # side-by-side stack, otherwise we print each per-arm plot in
-  # turn and invisibly return the raw list.
+  # by response, each element itself an `mvgam_forecast`.
+  #
+  # On a wide frame the responses are the series and each holds its
+  # own latent state, so the elements are the panels of one plot and
+  # are drawn as one forecast over the response axis. Taking the
+  # first element as standing for all of them drew one response's
+  # state in every panel.
+  #
+  # On a long frame every response reads the one state its series
+  # has, so a trend-scale wrapper does repeat one trajectory and the
+  # first arm is drawn alone. Response-scale arms differ per outcome;
+  # when `patchwork` is available we return a side-by-side stack,
+  # otherwise we print each per-arm plot in turn and invisibly return
+  # the raw list.
+  if (isTRUE(attr(x, "response_keyed"))) {
+    return(plot(response_axis_forecast(x), series = series,
+                probs = probs, hindcast = hindcast,
+                forecast = forecast, newdata_obs = newdata_obs, ...))
+  }
   if (isTRUE(attr(x, "mv_wrapper"))) {
     plot_arm <- function(arm, title = NULL) {
       p <- plot(arm, series = series, probs = probs,
@@ -211,6 +223,10 @@ build_forecast_layers <- function(
   layers <- list()
 
   for (s in plotted) {
+    # A factor in the order the object holds its series, since a facet
+    # over a character column sorts it: the trend panels came back
+    # alphabetical beside a series plot in the model's own order.
+    panel <- factor(s, levels = plotted)
     hc_mat <- if (hindcast) x$hindcasts[[s]] else NULL
     fc_mat <- if (forecast) x$forecasts[[s]] else NULL
     hc_times <- if (hindcast) x$train_times[[s]] else NULL
@@ -220,12 +236,12 @@ build_forecast_layers <- function(
     if (!is.null(hc_mat)) {
       layers <- c(layers, mvgam_band_layer(
         hc_mat, hc_times, probs = outer_prob,
-        group = s, fill = hindcast_fill
+        group = panel, fill = hindcast_fill
       ))
       layers <- c(
         layers,
         list(mvgam_median_layer(
-          hc_mat, hc_times, colour = "grey25", group = s
+          hc_mat, hc_times, colour = "grey25", group = panel
         ))
       )
     }
@@ -234,8 +250,8 @@ build_forecast_layers <- function(
     if (!is.null(fc_mat)) {
       layers <- c(
         layers,
-        mvgam_band_layer(fc_mat, fc_times, probs = probs, group = s),
-        list(mvgam_median_layer(fc_mat, fc_times, group = s))
+        mvgam_band_layer(fc_mat, fc_times, probs = probs, group = panel),
+        list(mvgam_median_layer(fc_mat, fc_times, group = panel))
       )
     }
 
@@ -263,7 +279,7 @@ build_forecast_layers <- function(
         mvgam_obs_layer(
           times = obs_times,
           y = obs_y,
-          group = rep(s, length(obs_y))
+          group = rep(panel, length(obs_y))
         )
       )
     }

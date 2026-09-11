@@ -351,23 +351,69 @@ test_that("the trials denominator resolves against the prediction data", {
 test_that("an addition term is not counted as a response", {
   # `y | trials(n)` names one response. Reading variable names off the
   # whole left-hand side would also return the addition variables,
-  # which every consumer that treats `response_names` as the response
-  # columns of the data relies on being excluded.
-  expect_equal(extract_response_names(y | trials(n) ~ x), "y")
-  expect_equal(extract_response_names(y | weights(w) + cens(c) ~ x), "y")
-  expect_equal(extract_response_names(y | trunc(lb = 0) ~ x), "y")
-  expect_equal(extract_response_names(y | se(s, sigma = TRUE) ~ x), "y")
+  # which every consumer reading the response column relies on being
+  # excluded.
+  expect_equal(response_columns(y | trials(n) ~ x), c(y = "y"))
+  expect_equal(response_columns(y | weights(w) + cens(c) ~ x), c(y = "y"))
+  expect_equal(response_columns(y | trunc(lb = 0) ~ x), c(y = "y"))
+  expect_equal(response_columns(y | se(s, sigma = TRUE) ~ x), c(y = "y"))
 })
 
-test_that("responses without addition terms are unchanged", {
-  expect_equal(extract_response_names(y ~ x), "y")
-  expect_equal(extract_response_names(log(y) ~ x), "y")
-  expect_equal(extract_response_names(mvbind(y1, y2) ~ x), c("y1", "y2"))
+test_that("a response is keyed as brms keys it and read by its column", {
+  # brms drops every '.' and '_' from a response's name, so the key a
+  # `resp` argument takes and the column the frame holds differ. Taking
+  # one for the other refused every trend model whose response
+  # carried either character.
+  expect_equal(response_columns(my_y ~ x), c(myy = "my_y"))
+  expect_equal(response_columns(brms::bf(my_y ~ x)), c(myy = "my_y"))
+  expect_equal(response_columns(log(y) ~ x), c(logy = "y"))
+  expect_equal(
+    response_columns(brms::bf(my_count ~ x) + brms::bf(mass.kg ~ x)),
+    c(mycount = "my_count", masskg = "mass.kg")
+  )
+  expect_equal(response_columns(mvbind(y1, y2) ~ x),
+               c(y1 = "y1", y2 = "y2"))
+})
+
+test_that("a response named with an underscore or a dot builds a trend model", {
+  # The frame is read by the column and the program is written with the
+  # key. Reading the frame by the key refused both of these outright.
+  set.seed(3L)
+  dat <- data.frame(time = 1:20, x = rnorm(20L), series = factor("a"))
+  dat$my_y <- rpois(20L, 4)
+  uni <- mvgam(brms::bf(my_y ~ x), trend_formula = ~ AR(), data = dat,
+               family = poisson(), run_model = FALSE, silent = 2)
+  expect_identical(as.integer(uni$standata$N), 20L)
+  expect_identical(response_columns(uni), c(myy = "my_y"))
+
+  wide <- data.frame(time = 1:20, x = rnorm(20L))
+  wide$my_count <- rpois(20L, 4)
+  wide$mass.kg <- rnorm(20L)
+  wide$my_count[c(3L, 9L)] <- NA
+  arms <- brms::bf(my_count ~ x, family = poisson()) +
+    brms::bf(mass.kg ~ x, family = gaussian()) + brms::set_rescor(FALSE)
+  # brms notes the gaps once; that notice is the only one expected.
+  seen <- character(0L)
+  fit <- withCallingHandlers(
+    mvgam(arms, trend_formula = ~ AR(), data = wide,
+          run_model = FALSE, silent = 2),
+    warning = function(w) {
+      seen <<- c(seen, conditionMessage(w))
+      invokeRestart("muffleWarning")
+    }
+  )
+  expect_identical(seen, "Rows containing NAs were excluded from the model.")
+  # The series axis holds the keys, and each arm maps the rows its own
+  # column was observed at.
+  expect_identical(mvgam_axes(fit)$series$levels, c("mycount", "masskg"))
+  expect_identical(as.integer(fit$standata$obs_trend_time_mycount),
+                   setdiff(1:20, c(3L, 9L)))
+  expect_identical(as.integer(fit$standata$obs_trend_time_masskg), 1:20)
 })
 
 test_that("a multivariate response keeps every outcome past its addition terms", {
   expect_equal(
-    extract_response_names(mvbind(y1, y2) | weights(w) ~ x),
-    c("y1", "y2")
+    response_columns(mvbind(y1, y2) | weights(w) ~ x),
+    c(y1 = "y1", y2 = "y2")
   )
 })

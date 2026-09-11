@@ -233,12 +233,8 @@ bayes_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   checkmate::assert_logical(summary, len = 1L)
   checkmate::assert_logical(robust, len = 1L)
   checkmate::assert_numeric(probs, lower = 0, upper = 1, len = 2L)
-  # brms binomial fits carry a trailing `trials` entry in
-  # response_names that is structural, not a second response;
-  # is.mvbrmsformula is the authoritative MV indicator.
   is_mv <- brms::is.mvbrmsformula(object$formula)
-  assert_resp_for_mv(object, resp, "bayes_R2")
-  resp_use <- scored_response_name(object, resp)
+  resolve_resp(object, resp, required = TRUE, caller = "bayes_R2()")
   # Bayesian R^2 of Gelman et al. (2019): var(epred) / (var(epred) +
   # var(residual)) per draw, where residuals are y - epred. The
   # expectation is taken conditional on the latent state, because the
@@ -248,17 +244,17 @@ bayes_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   # multivariate fits; passing it to a univariate posterior_epred is
   # a hard error.
   epred <- if (is_mv) {
-    posterior_epred(object, resp = resp_use,
-                    incl_autocor = TRUE, ...)
+    posterior_epred(object, resp = resp, incl_autocor = TRUE, ...)
   } else {
     posterior_epred(object, incl_autocor = TRUE, ...)
   }
-  y <- object$data[[resp_use]]
-  if (is.null(y) || !is.numeric(y)) {
+  y_col <- response_column(object, resp)
+  y <- mvgam_training_data(object)[[y_col]]
+  if (!is.numeric(y)) {
     stop(insight::format_error(c(
       paste0(
         "bayes_R2 requires a numeric response. Response '",
-        resp_use, "' is not numeric."
+        y_col, "' is not numeric."
       ),
       i = "Bayesian R^2 is undefined for ordinal / categorical fits."
     )))

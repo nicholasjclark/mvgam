@@ -295,7 +295,7 @@ mod_hier <- mvgam(
 )
 ```
 
-The Heaps ([2022](https://doi.org/10.1080/10618600.2022.2079648))
+The Heaps ([2023](https://doi.org/10.1080/10618600.2022.2079648))
 stationarity transform runs once per country per gradient
 evaluation, so a hierarchical VAR is roughly $C$ times slower
 per iteration than a single-panel fit of the same dimension.
@@ -578,7 +578,7 @@ Jim Savage's tutorial post
 partial-pooling perspective in Gelman & Hill
 ([2007](https://doi.org/10.1017/CBO9780511790942)). The
 stationary Heaps prior on the VAR coefficients follows Heaps
-([2022](https://doi.org/10.1080/10618600.2022.2079648)); the
+([2023](https://doi.org/10.1080/10618600.2022.2079648)); the
 LKJ-mixture prior on the correlation matrices follows the
 suggestion Ben Goodrich contributed to Savage's original post.
 Formulas rely on mgcv smooths (Wood

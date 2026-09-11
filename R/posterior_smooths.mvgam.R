@@ -740,8 +740,8 @@ mvgam_smooth_eta <- function(object, hit, newdata,
   # Backfill any missing response column so brms::standata's
   # validate_newdata accepts the grid. Family-aware dummy mirrors
   # brms::check_response = FALSE.
-  resp <- all.vars(side_form$formula[[2L]])[1L]
-  if (!is.null(resp) && !(resp %in% names(newdata))) {
+  resp <- unname(response_columns(side_form)[1L])
+  if (!(resp %in% names(newdata))) {
     fam <- object$family
     if (!inherits(fam, "brmsfamily")) {
       fam <- brms::brmsfamily(fam$family, link = fam$link)
@@ -954,11 +954,6 @@ build_smooth_grid <- function(x, hit, surface, facets, resolution,
 }
 
 
-# Backfill the prediction-grid `data.frame` so brms::standata can
-# build basis matrices. Non-focal covariates get their training
-# median (numeric) or first level (factor); the response is set
-# to a dummy value because the basis matrices are response-free.
-#'@noRd
 # Whether every value a numeric column holds is a whole number.
 # `is.integer()` is not the question: a column read from a data
 # frame is usually double, and what matters is the value rather
@@ -970,9 +965,14 @@ is_integer_valued <- function(col) {
 }
 
 
+# Backfill the prediction-grid `data.frame` so brms::standata can
+# build basis matrices. Non-focal covariates get their training
+# median (numeric) or first level (factor); the response is set
+# to a dummy value because the basis matrices are response-free.
+#'@noRd
 backfill_smooth_grid <- function(grid, x, side_form, covars, byvars) {
   mf <- x$data
-  resp <- all.vars(side_form[[2L]])[1L]
+  resp <- unname(response_columns(side_form)[1L])
   # Strip the response from the backfill set: the dummy gets a
   # family-aware value via `mvgam_smooth_eta`. Setting it to the
   # training median here can violate family bounds (e.g.
@@ -997,7 +997,7 @@ backfill_smooth_grid <- function(grid, x, side_form, covars, byvars) {
       }
     }
   }
-  if (!is.null(resp) && resp %in% names(grid)) {
+  if (resp %in% names(grid)) {
     grid[[resp]] <- NULL
   }
   grid

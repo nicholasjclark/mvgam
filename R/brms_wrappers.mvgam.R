@@ -387,9 +387,10 @@ predictive_error.mvgam <- function(object, newdata = NULL,
   if (!is.null(re.form) && is.null(re_formula)) {
     re_formula <- re.form
   }
-  assert_resp_for_mv(object, resp, "predictive_error")
+  resolve_resp(object, resp, required = TRUE,
+               caller = "predictive_error()")
   data <- if (is.null(newdata)) object$data else newdata
-  resp_name <- mvgam_response_name(object, resp)
+  resp_name <- response_column(object, resp)
   if (!resp_name %in% names(data)) {
     stop(insight::format_error(c(
       paste0(
@@ -464,28 +465,6 @@ parnames.mvgam <- function(x, ...) {
 #' @export
 nsamples.mvgam <- function(object, ...) {
   posterior::ndraws(posterior::as_draws(object$fit))
-}
-
-
-# Internal: the response variable's name from the fit's observation
-# formula, read by every predictive method that needs the column.
-#
-# `resp` names one arm of a multivariate fit. Without it a
-# multivariate fit has no single response to read, so the resolver
-# reports NA and leaves the caller to raise the guard message rather
-# than letting NA leak into a column lookup.
-#'@noRd
-mvgam_response_name <- function(object, resp = NULL) {
-  checkmate::assert_class(object, "mvgam")
-  if (!is.null(resp)) {
-    return(resp)
-  }
-  f <- object$formula
-  if (brms::is.mvbrmsformula(f)) {
-    return(NA_character_)
-  }
-  if (inherits(f, "brmsformula")) f <- f$formula
-  all.vars(f[[2L]])[1L]
 }
 
 

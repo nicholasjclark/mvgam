@@ -338,6 +338,25 @@ mvgam_cut_layer <- function(
   )
 }
 
+#' One figure from one plot per response
+#'
+#' A multivariate fit answers a plotting method once per response.
+#' Handed back as a list, the plots print one after another under
+#' `$name` headers, and a reader gets a console listing where a figure
+#' was asked for. Stacked, each keeps its own scales and is titled by
+#' the response it draws.
+#'
+#' @param plots A named list of `ggplot` or `patchwork` objects
+#' @return A single `patchwork`
+#' @noRd
+stack_response_plots <- function(plots) {
+  checkmate::assert_list(plots, min.len = 1L, names = "unique")
+  titled <- lapply(names(plots), function(r) {
+    patchwork::wrap_elements(full = plots[[r]]) + ggplot2::labs(title = r)
+  })
+  patchwork::wrap_plots(titled, ncol = 1L)
+}
+
 #' `facet_wrap(~series)` wrapper with uniform defaults across
 #' every faceted plot in the package.
 #'
@@ -732,7 +751,7 @@ reorder_clusters <- function(x, dis, ...) {
 #'   draws_mat = ..., n_series = ..., n_lv = ...)`. `n_series`
 #'   and `n_lv` are REQUIRED in this mode (no fallback derivation
 #'   without `object`). Used by hot paths (e.g.
-#'   `sample_innovations()`) that already hold pre-extracted
+#'   `draw_innovation_grid()`) that already hold pre-extracted
 #'   draws and bookkeeping scalars.
 #'
 #' When `fixed_Z` is fully populated (no NAs) the matrix is

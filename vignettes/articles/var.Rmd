@@ -36,7 +36,7 @@ its own recent past and on the recent past of every other series
 The version implemented in mvgam adds a state-space layer on
 top. The observed counts sit above a latent vector autoregression
 whose innovations may be correlated across series (Heaps
-[2022](https://doi.org/10.1080/10618600.2022.2079648); Auger-Méthé
+[2023](https://doi.org/10.1080/10618600.2022.2079648); Auger-Méthé
 et al. [2021](https://doi.org/10.1002/ecm.1470)). The payoff for
 that extra machinery is what the posterior over the transition
 matrix $A$ and the innovation covariance $\Sigma$ then supports.
@@ -170,7 +170,7 @@ The three region intercepts sit close to zero on the
 inverse link scale, and the VAR self-coefficients on the diagonal
 of $A$ (rows `A_raw_trend[1,i,i]`) are all positive and bounded
 well below one, so the Heaps
-([2022](https://doi.org/10.1080/10618600.2022.2079648)) prior
+([2023](https://doi.org/10.1080/10618600.2022.2079648)) prior
 that guarantees stationarity is not pushing against the data.
 
 ## Inspecting the transition matrix
@@ -542,7 +542,7 @@ The kestrel dataset was compiled from the North American
 Breeding Bird Survey and is redistributed with MARSS (Holmes et
 al. [2012](https://doi.org/10.32614/RJ-2012-002)). The stationary
 Heaps prior on the VAR coefficients follows Heaps
-([2022](https://doi.org/10.1080/10618600.2022.2079648)). The
+([2023](https://doi.org/10.1080/10618600.2022.2079648)). The
 state-space framing follows the review by Auger-Méthé and
 colleagues ([2021](https://doi.org/10.1002/ecm.1470)) and the
 dynamic generalised additive model perspective in Clark & Wells

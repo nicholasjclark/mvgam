@@ -156,13 +156,8 @@ forecast.mvgam <- function(object,
   checkmate::assert_flag(trend_uncertainty)
   checkmate::assert_flag(obs_uncertainty)
   checkmate::assert_string(resp, null.ok = TRUE)
-  fan <- mv_resp_fan_out(object, resp)
+  fan <- mv_resp_fan_out(object, resp, class = "mvgam_forecast")
   if (!is.null(fan)) {
-    # Tag the outer fan-out wrapper as `mvgam_forecast` so
-    # plot() / print() dispatch matches the single-response
-    # branch below. Same pattern as the hindcast fan-out.
-    class(fan) <- "mvgam_forecast"
-    attr(fan, "mv_wrapper") <- TRUE
     return(fan)
   }
   newdata <- ensure_obs_placeholder(newdata, object)
@@ -221,9 +216,8 @@ forecast.mvgam <- function(object,
     )), call. = FALSE)
   }
 
-  series_info <- resolve_series_info(object)
-  series_levels <- series_info$series_levels
-  n_series <- length(series_levels)
+  series_levels <- resolve_series_info(object)$series_levels
+  reported <- reported_series(object, resp, series_levels)
 
   draws_mat <- posterior::as_draws_matrix(object$fit)
   total_draws <- nrow(draws_mat)
@@ -231,7 +225,7 @@ forecast.mvgam <- function(object,
 
   training <- build_training_arms(object, series_levels, resp = resp)
   fc_grid <- resolve_forecast_grid(object, newdata, training,
-                                     series_levels)
+                                     series_levels, resp = resp)
 
   # A discrete-time trend takes one step per forecast row, so the
   # rows have to be the times it would step to. Checked here
@@ -250,7 +244,7 @@ forecast.mvgam <- function(object,
   # the training grid.
   hindcasts <- build_hindcast_arms(
     object, training, type, draw_idx, obs_uncertainty,
-    process_error = FALSE, resp = resp
+    process_error = FALSE, resp = resp, series_levels = reported
   )
 
   forecasts <- if (is.null(fc_grid)) {
@@ -262,7 +256,8 @@ forecast.mvgam <- function(object,
       type = type,
       draw_idx = draw_idx,
       obs_uncertainty = obs_uncertainty,
-      series_levels = series_levels
+      series_levels = reported,
+      resp = resp
     )
   } else {
     build_forecast_arms(
@@ -278,7 +273,8 @@ forecast.mvgam <- function(object,
       trend_uncertainty = trend_uncertainty,
       obs_uncertainty = obs_uncertainty,
       series_levels = series_levels,
-      resp = resp
+      resp = resp,
+      reported = reported
     )
   }
 
@@ -289,22 +285,10 @@ forecast.mvgam <- function(object,
     NULL
   }
 
-  structure(
-    list(
-      family = object$family$family,
-      family_pars = family_pars,
-      type = type,
-      series_names = factor(series_levels,
-                              levels = series_levels),
-      train_observations = training$observations,
-      train_times = training$times,
-      test_observations = if (is.null(fc_grid)) NULL else
-        fc_grid$observations,
-      test_times = if (is.null(fc_grid)) NULL else fc_grid$times,
-      hindcasts = hindcasts,
-      forecasts = forecasts
-    ),
-    class = "mvgam_forecast"
+  new_mvgam_forecast(
+    object, type, resp, reported, training,
+    hindcasts = hindcasts, forecasts = forecasts, fc_grid = fc_grid,
+    family_pars = family_pars
   )
 }
 
@@ -327,6 +311,92 @@ resolve_series_info <- function(object) {
 }
 
 
+# Internal: the series an answer scoped to `resp` reports.
+#
+# A wide frame's series are its responses, so an answer for one
+# response covers one series. Reporting every series from inside a
+# per-response call ran the response loop twice: each element of the
+# fan-out held every arm, all but its own under another response's
+# name.
+#'@noRd
+reported_series <- function(object, resp, series_levels) {
+  if (!is.null(resp) && is_response_keyed(object)) resp else series_levels
+}
+
+
+# Internal: the `mvgam_forecast` record a hindcast or forecast returns.
+#
+# Both methods return the same record and each built it by hand, so
+# the two could disagree about what a field held, and both stamped it
+# with the fit's top-level family, which on a multivariate fit is a
+# placeholder shared by every arm. Built here once, cut to the series
+# the answer reports and naming the family of the response it is for.
+#'@noRd
+new_mvgam_forecast <- function(object, type, resp, reported, training,
+                               hindcasts, forecasts = NULL,
+                               fc_grid = NULL, family_pars = NULL) {
+  pick <- function(x) if (is.null(x)) NULL else x[reported]
+  structure(
+    list(
+      family = resolve_family_name(get_family_for_resp(object, resp)),
+      family_pars = family_pars,
+      type = type,
+      series_names = factor(reported, levels = reported),
+      train_observations = pick(training$observations),
+      train_times = pick(training$times),
+      test_observations = pick(fc_grid$observations),
+      test_times = pick(fc_grid$times),
+      hindcasts = hindcasts,
+      forecasts = forecasts
+    ),
+    class = "mvgam_forecast"
+  )
+}
+
+
+# Internal: a wide fit's fan-out, read as one forecast over its
+# responses.
+#
+# On a wide frame the responses are the series, so each element of
+# the fan-out holds one series' arm and together they are a forecast
+# over the whole axis. Drawing and scoring want that single object:
+# drawn element by element the wrapper took its first element as
+# standing for all of them, which is right only where every response
+# reads one shared state, and scored as it stands it offered no
+# `$forecasts` to read. The family is kept per series, since each
+# response brought its own.
+#'@noRd
+response_axis_forecast <- function(x) {
+  checkmate::assert_class(x, "mvgam_forecast")
+  levs <- unlist(lapply(x, function(el) as.character(el$series_names)),
+                 use.names = FALSE)
+  # Unnamed before combining: `c()` over a named list prefixes each
+  # element's own names with the list's, so `count` came back as
+  # `count.count` and matched nothing below.
+  arms <- function(field) {
+    out <- do.call(c, unname(lapply(unclass(x), `[[`, field)))
+    if (is.null(out)) NULL else out[levs]
+  }
+  structure(
+    list(
+      family = stats::setNames(
+        vapply(unclass(x), `[[`, character(1L), "family"), levs
+      ),
+      family_pars = NULL,
+      type = x[[1L]]$type,
+      series_names = factor(levs, levels = levs),
+      train_observations = arms("train_observations"),
+      train_times = arms("train_times"),
+      test_observations = arms("test_observations"),
+      test_times = arms("test_times"),
+      hindcasts = arms("hindcasts"),
+      forecasts = arms("forecasts")
+    ),
+    class = "mvgam_forecast"
+  )
+}
+
+
 # Internal: per-series training observations + unique times,
 # plus the cached time / series variable names and the obs data
 # frame the downstream linpred calls subset.
@@ -341,14 +411,6 @@ build_training_arms <- function(object, series_levels, resp = NULL,
     list(time_var = "time", series_var = "series")
   time_var <- meta_vars$time_var
   series_var <- meta_vars$series_var
-  # Pick the response column. Multi-response (mvbrmsformula) fits
-  # set `resp` via the per-outcome fan-out; honour it. Otherwise
-  # `response_names` may be length > 1 (e.g. addition terms like
-  # `y | trials(n)`); take its first element, which is the actual
-  # response column.
-  resp <- resp %||%
-    (object$mv_spec$response_names %||%
-       as.character(object$formula[[2L]]))[1L]
 
   # Which rows belong to a series, answered once. Everything a series
   # needs is a cut of the training frame, so deciding the membership
@@ -364,29 +426,33 @@ build_training_arms <- function(object, series_levels, resp = NULL,
   # row carries every response, so a series is a column rather than a
   # stretch of rows and its membership is the occasions on which that
   # column was measured.
-  axis <- mvgam_response_axis(prepare_mvgam_frame(object, d))
-  response_keyed <- !is.null(axis)
+  response_keyed <- is_response_keyed(object)
   series_labels <- if (response_keyed) {
     NULL
   } else {
     as.character(training_series_labels(object, d))
   }
+  # A response-keyed series reads its own response's column; otherwise
+  # every series reads the one response in scope. The series level is
+  # brms's key for the response, which is not the column once the
+  # column carries a `.` or an `_`.
+  column_of <- function(lv) {
+    response_column(object, if (response_keyed) lv else resp)
+  }
 
   series_rows <- lapply(series_levels, function(lv) {
     if (response_keyed) {
-      which(!is.na(d[[lv]]))
+      which(!is.na(d[[column_of(lv)]]))
     } else {
       which(series_labels == lv)
     }
   })
   names(series_rows) <- series_levels
 
-  # A response-keyed series reads its own column; otherwise every
-  # series reads the one response the frame carries.
   observations <- lapply(series_levels, function(lv) {
     rows <- series_rows[[lv]]
     if (!length(rows)) return(numeric(0L))
-    as.numeric(d[[if (response_keyed) lv else resp]][rows])
+    as.numeric(d[[column_of(lv)]][rows])
   })
   names(observations) <- series_levels
   # The occasions as the user supplied them. Truncating to an
@@ -406,9 +472,9 @@ build_training_arms <- function(object, series_levels, resp = NULL,
     data = d,
     time_var = time_var,
     series_var = series_var,
+    response_keyed = response_keyed,
     series_labels = series_labels,
     series_rows = series_rows,
-    resp = resp,
     observations = observations,
     times = times
   )
@@ -511,11 +577,10 @@ series_last_times <- function(object, series_levels, training) {
 # nothing.
 #'@noRd
 resolve_forecast_grid <- function(object, newdata, training,
-                                    series_levels) {
+                                    series_levels, resp = NULL) {
   if (is.null(newdata)) return(NULL)
   checkmate::assert_data_frame(newdata, min.rows = 1L)
   time_var <- training$time_var
-  series_var <- training$series_var
   # Only the time is demanded here. Which columns name the series is
   # a question `axis_row_series()` answers from the record, and a
   # grouping names them without any `series` column at all: asking
@@ -530,16 +595,6 @@ resolve_forecast_grid <- function(object, newdata, training,
       )
     )), call. = FALSE)
   }
-  resp <- training$resp
-
-  # A frame whose series column was superseded by a grouping carries
-  # the supplanted spelling, so factoring the raw column against the
-  # trend's own levels matches nothing and reads as unknown series.
-  # The rows are identified the way the fit identified them. A
-  # response-keyed fit answers `NULL`, because there a row belongs to
-  # every response at once; the column read below is what that case
-  # has always used.
-  series_ids <- axis_row_series(object, newdata)
 
   # A series the fit never had is refused by the validator that owns
   # that fact, so a user meets one message wherever the frame
@@ -561,8 +616,7 @@ resolve_forecast_grid <- function(object, newdata, training,
   # every `mvbf()` and `jsdgam()` fit unable to forecast at all.
   last_times <- series_last_times(object, series_levels, training)
 
-  if (is.null(series_ids) &&
-        identical(mvgam_axes(object)$series$source, "multivariate")) {
+  if (is_response_keyed(object)) {
     nt <- sort(unique(newdata[[time_var]]))
     fc_times <- stats::setNames(lapply(series_levels, function(lv) {
       horizon_beyond(nt, last_times[[lv]])
@@ -573,10 +627,11 @@ resolve_forecast_grid <- function(object, newdata, training,
     # Each response's truths come from its own column, so a frame
     # supplying some of them and not others scores what it can.
     fc_observations <- stats::setNames(lapply(series_levels, function(lv) {
-      if (!lv %in% names(newdata)) return(NULL)
+      column <- response_column(object, lv)
+      if (!column %in% names(newdata)) return(NULL)
       idx <- newdata[[time_var]] %in% fc_times[[lv]]
       if (!any(idx)) return(NULL)
-      as.numeric(newdata[[lv]][idx])[order(newdata[[time_var]][idx])]
+      as.numeric(newdata[[column]][idx])[order(newdata[[time_var]][idx])]
     }), series_levels)
     keep <- newdata[[time_var]] %in%
       unique(unlist(fc_times, use.names = FALSE))
@@ -589,19 +644,11 @@ resolve_forecast_grid <- function(object, newdata, training,
                 time_var = time_var))
   }
 
-  row_ids <- series_ids %||% newdata[[series_var]]
-  if (is.null(row_ids)) {
-    stop(insight::format_error(c(
-      "'newdata' names no series this model was fitted on.",
-      x = paste0(
-        "Got columns: ", paste(names(newdata), collapse = ", "), "."
-      ),
-      i = paste0(
-        "Supply the column the model reads, or the grouping columns ",
-        "that name a series between them."
-      )
-    )), call. = FALSE)
-  }
+  # A frame whose series column was superseded by a grouping carries
+  # the supplanted spelling, so factoring the raw column against the
+  # trend's own levels matches nothing and reads as unknown series.
+  # The rows are identified the way the fit identified them.
+  row_ids <- axis_row_series(object, newdata, required = TRUE)
   series_fac <- factor(as.character(row_ids), levels = series_levels)
   # Reached when the levels the grid was given and the levels the
   # validator checks against are not the same list: an object
@@ -638,12 +685,13 @@ resolve_forecast_grid <- function(object, newdata, training,
   # `score()` then paired each truth with a horizon it did not
   # belong to, without complaint. `build_training_tail_data()`
   # sorts its own block for the same reason.
+  column <- response_column(object, resp)
   fc_observations <- lapply(series_levels, function(lv) {
     idx <- series_fac == lv &
       newdata[[time_var]] %in% fc_times[[lv]]
-    if (!any(idx) || !(resp %in% names(newdata))) return(NULL)
+    if (!any(idx) || !(column %in% names(newdata))) return(NULL)
     times_lv <- newdata[[time_var]][idx]
-    as.numeric(newdata[[resp]][idx])[order(times_lv)]
+    as.numeric(newdata[[column]][idx])[order(times_lv)]
   })
   names(fc_observations) <- series_levels
 
@@ -685,7 +733,6 @@ build_training_tail_data <- function(training, max_lag) {
   if (max_lag <= 0L) return(NULL)
   series_levels <- names(training$observations)
   time_var <- training$time_var
-  series_var <- training$series_var
 
   # Where the responses are the series, a row belongs to all of
   # them at once, so the tail is the last occasions of the one
@@ -693,8 +740,10 @@ build_training_tail_data <- function(training, max_lag) {
   # `series` column instead compared against a column the frame
   # does not have, which is `logical(0)`: every block came back
   # empty, the frames were bound into nothing, and the caller was
-  # handed a tail with no rows.
-  if (is.null(training$data[[series_var]])) {
+  # handed a tail with no rows. Asking whether the frame has a
+  # series column answered the same for a grouping with none, so
+  # the arms say which kind of axis they were cut from.
+  if (training$response_keyed) {
     shared <- sort(unique(unlist(training$times, use.names = FALSE)))
     tail_ts <- tail(shared, max_lag)
     sub <- training$data[
@@ -740,9 +789,17 @@ build_training_tail_data <- function(training, max_lag) {
 build_hindcast_arms <- function(object, training, type, draw_idx,
                                   obs_uncertainty,
                                   process_error = FALSE,
-                                  resp = NULL) {
-  series_levels <- names(training$observations)
+                                  resp = NULL,
+                                  series_levels =
+                                    names(training$observations)) {
   time_var <- training$time_var
+  # On a wide frame a series is a response, so each arm is predicted
+  # as its own response. Handing every arm the caller's one `resp`
+  # read that response's state and family into all of them; handing
+  # them none, as a caller asking for every arm at once does, left
+  # no arm able to say which trend column it reads.
+  keyed <- is_response_keyed(object)
+  arm_resp <- function(lv) if (keyed) lv else resp
 
   # Which rows an arm covers, and in what order, said once and read
   # by both paths below. Membership is settled where the arms were
@@ -798,7 +855,7 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
     }
     out[[s]] <- hindcast_one_series(
       object, sub, type, draw_idx, obs_uncertainty,
-      process_error, resp = resp
+      process_error, resp = arm_resp(lv)
     )
   }
   out
@@ -932,7 +989,8 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
 build_trendless_forecast_arms <- function(object, fc_grid, type,
                                             draw_idx,
                                             obs_uncertainty,
-                                            series_levels) {
+                                            series_levels,
+                                            resp = NULL) {
   # `type = "trend"` is rejected at the top of `forecast.mvgam()`
   # before any work runs; the switch below is total over the
   # remaining three types.
@@ -947,17 +1005,27 @@ build_trendless_forecast_arms <- function(object, fc_grid, type,
       posterior_epred
     }
   )
-  full <- predictor(object, newdata = fc_data, draw_ids = draw_idx)
+  # Scoped to the response this call is for. A multivariate fit asked
+  # for no response answers with one matrix per response, and a list
+  # indexed as a matrix below is not a forecast of any of them.
+  full <- predictor(object, newdata = fc_data, draw_ids = draw_idx,
+                    resp = resp)
 
   # Placed the way the fit places a row, so a frame whose `series`
   # column was superseded by a grouping is cut into the series the
   # model has. Reading the column matched nothing there and handed
-  # back an arm of zero columns per series.
-  series_fac <- axis_row_series(object, fc_data) %||%
-    factor(
-      fc_data[[object$trend_metadata$variables$series_var %||% "series"]],
-      levels = series_levels
-    )
+  # back an arm of zero columns per series. On a wide frame every row
+  # carries the response this call is for, so every row is its arm.
+  series_fac <- if (is_response_keyed(object)) {
+    factor(rep(resp, nrow(fc_data)), levels = series_levels)
+  } else {
+    axis_row_series(object, fc_data) %||%
+      factor(
+        fc_data[[object$trend_metadata$variables$series_var %||%
+                   "series"]],
+        levels = series_levels
+      )
+  }
   out <- vector("list", length(series_levels))
   names(out) <- series_levels
   for (s in seq_along(series_levels)) {
@@ -988,7 +1056,13 @@ build_forecast_arms <- function(object, trend_model, meta,
                                   trend_uncertainty,
                                   obs_uncertainty,
                                   series_levels,
-                                  resp = NULL) {
+                                  resp = NULL,
+                                  reported = series_levels) {
+  # Two sets, and they differ on a wide frame. The trend is
+  # propagated over every series the fit has, since a correlated or
+  # VAR state advances its columns together; the arms returned are
+  # the ones this answer reports, which for one response of a wide
+  # frame is that response alone.
   n_series <- length(series_levels)
   ndraws_use <- length(draw_idx)
   per_series_h <- vapply(fc_grid$times, length, integer(1L))
@@ -997,10 +1071,15 @@ build_forecast_arms <- function(object, trend_model, meta,
   max_lag <- as.integer(meta$max_lag %||% 0L)
   tail_data <- build_training_tail_data(training, max_lag)
   obs_struct_fc <- get_observation_structure(object,
-                                               newdata = fc_grid$data)
+                                               newdata = fc_grid$data,
+                                               resp = resp)
   obs_struct_tail <- if (is.null(tail_data)) NULL else
-    get_observation_structure(object, newdata = tail_data)
+    get_observation_structure(object, newdata = tail_data,
+                              resp = resp)
   nobs_fc <- length(obs_struct_fc$time)
+  arms_of <- function(mat) {
+    slice_per_series(mat, fc_grid, obs_struct_fc, ndraws_use, reported)
+  }
 
   # Pre-compute trend-formula linpred matrices for the past
   # tail and the forecast grid. extract_component_linpred is the
@@ -1159,13 +1238,11 @@ build_forecast_arms <- function(object, trend_model, meta,
 
   # Batched obs combination + family pass.
   if (type == "trend") {
-    return(slice_per_series(trend_flat, fc_grid, obs_struct_fc,
-                              ndraws_use, series_levels, resp = resp))
+    return(arms_of(trend_flat))
   }
   eta_full <- obs_full[draw_idx, , drop = FALSE] + trend_flat
   if (type == "link") {
-    return(slice_per_series(eta_full, fc_grid, obs_struct_fc,
-                              ndraws_use, series_levels, resp = resp))
+    return(arms_of(eta_full))
   }
   family_for_arm <- get_family_for_resp(object, resp)
   if (type == "expected" || isTRUE(!obs_uncertainty)) {
@@ -1178,15 +1255,13 @@ build_forecast_arms <- function(object, trend_model, meta,
       object, eta_full, family_for_arm, newdata = fc_grid$data,
       draw_ids = draw_idx
     )
-    return(slice_per_series(expected, fc_grid, obs_struct_fc,
-                              ndraws_use, series_levels, resp = resp))
+    return(arms_of(expected))
   }
   resp_mat <- sample_family_batched(object, eta_full, fc_grid$data,
                                       ndraws_use, draw_idx,
                                       family = family_for_arm,
                                       resp = resp)
-  slice_per_series(resp_mat, fc_grid, obs_struct_fc,
-                     ndraws_use, series_levels, resp = resp)
+  arms_of(resp_mat)
 }
 
 
@@ -1590,8 +1665,7 @@ pad_or_trim_rows <- function(grid, target_rows) {
 # right cell when the user passes future times like 41:45.
 #'@noRd
 slice_per_series <- function(mat, fc_grid, obs_struct,
-                               ndraws_use, series_levels,
-                               resp = NULL) {
+                               ndraws_use, series_levels) {
   # The occasions as the frame holds them, not as they print.
   # `names(obs_struct$time)` are labels, so reading them back with
   # `as.numeric()` is a round trip through a decimal rendering: an
@@ -1602,33 +1676,25 @@ slice_per_series <- function(mat, fc_grid, obs_struct,
   # its neighbours returned numbers. Both sides now come from the
   # one column, so they are the same doubles.
   raw_times <- as.numeric(fc_grid$data[[fc_grid$time_var]])
-  # Where the responses are the series, a row of the frame belongs
-  # to every one of them, so its per-row series index is a single
-  # constant. Matching cells on that index handed every column to
-  # series one and left the rest without a cell to read, so each
-  # arm past the first came back entirely `NA`. This call predicts
-  # one response, named by `resp`, so its columns are that
-  # response's arm and the other arms are not its to fill.
-  keyed <- !is.null(resp) && resp %in% series_levels &&
-    length(unique(obs_struct$series_int)) == 1L &&
-    length(series_levels) > 1L
 
   out <- vector("list", length(series_levels))
   names(out) <- series_levels
   for (s in seq_along(series_levels)) {
     lv <- series_levels[s]
     ts <- fc_grid$times[[lv]]
-    if (length(ts) == 0L || (keyed && !identical(lv, resp))) {
+    if (length(ts) == 0L) {
       out[[s]] <- matrix(NA_real_, nrow = ndraws_use, ncol = 0L)
       next
     }
+    # The trend column this series reads, found by name on the fit's
+    # own axis rather than by its position in `series_levels`. The two
+    # agree when every series is asked for and part company when an
+    # answer reports fewer, which an answer scoped to one response of
+    # a wide frame does.
+    col <- match(lv, obs_struct$series_levels)
     sm <- matrix(NA_real_, nrow = ndraws_use, ncol = length(ts))
     for (k in seq_along(ts)) {
-      cell_j <- if (keyed) {
-        which(raw_times == ts[k])
-      } else {
-        which(raw_times == ts[k] & obs_struct$series_int == s)
-      }
+      cell_j <- which(raw_times == ts[k] & obs_struct$series_int == col)
       if (length(cell_j) == 0L) {
         stop(insight::format_error(c(
           "A forecast occasion has no row in the forecast grid.",
@@ -1748,7 +1814,7 @@ extract_family_pars_for_draws <- function(object, draws_mat,
   # `get_family_dpars` only matches lowercase keys, so case-fold;
   # R's `Gamma()` constructor stores `family$family = "Gamma"` but
   # brms's mvbf normalises to `"gamma"`, and both should resolve.
-  fam_name <- tolower(resolve_resp_family(object, resp))
+  fam_name <- tolower(resolve_family_name(get_family_for_resp(object, resp)))
   dpar_names <- get_family_dpars(fam_name)
   if (length(dpar_names) == 0L) return(list())
   # For multivariate (mvbind / mvbrmsformula) fits, brms emits

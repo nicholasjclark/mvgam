@@ -63,7 +63,9 @@ as well as to the PPC function specified in \code{type}}
 }
 \value{
 A ggplot object that can be further
-customized using the \pkg{ggplot2} package.
+customized using the \pkg{ggplot2} package. A multivariate model
+given no \code{resp} answers with one figure holding a panel per
+response, each titled by its response.
 }
 \description{
 Perform unconditional posterior predictive checks with the help

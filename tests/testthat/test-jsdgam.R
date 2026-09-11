@@ -566,7 +566,7 @@ test_that("jsdgam accepts the formulas mvgam accepts", {
     unit = site, species = species, n_lv = 1L, run_model = FALSE
   ))
   expect_s3_class(m, "jsdgam")
-  expect_identical(as.character(m$response_names), c("cnt", "pa"))
+  expect_identical(names(response_columns(m)), c("cnt", "pa"))
 
   # Each response keeps the family it named.
   code <- m$stancode

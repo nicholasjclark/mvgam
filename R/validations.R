@@ -641,24 +641,28 @@ validate_closure_unit_data <- function(data,
 #' Automatically filters out latent parameters from nonlinear formulas
 #' to avoid validation errors for model-defined parameters.
 #'
-#' Extract response (LHS) variable names from a formula-like object
+#' Every column a formula's left-hand side reads
 #'
-#' Handles plain `formula`, `brmsformula` (uses the
-#' `$formula` slot), and `mvbrmsformula` (iterates `$forms`).
-#' Returns an empty character vector for one-sided formulas,
-#' NULL input, or non-formula objects so callers can rely on a
-#' character vector return shape.
+#' The response and its addition terms together, so `y | trials(n)`
+#' answers `y` and `n`. That is the set a model frame carries and the
+#' set a covariate check has to leave alone. Which of them is the
+#' response is `response_columns()`'s question, not this one.
+#'
+#' Handles plain `formula`, `brmsformula` (uses the `$formula` slot)
+#' and `mvbrmsformula` (iterates `$forms`). Returns an empty character
+#' vector for one-sided formulas, NULL input, or non-formula objects
+#' so callers can rely on a character vector return shape.
 #'
 #' `rlang::f_lhs()` cannot be used directly because it errors on
 #' `brmsformula` objects (they are lists internally, not true
 #' `formula`s).
 #'
 #' @noRd
-extract_response_vars <- function(formula) {
+lhs_columns <- function(formula) {
   if (is.null(formula)) return(character(0L))
   if (inherits(formula, "mvbrmsformula") && !is.null(formula$forms)) {
     return(unique(unlist(lapply(formula$forms, function(x) {
-      extract_response_vars(x$formula %||% x)
+      lhs_columns(x$formula %||% x)
     }))))
   }
   if (inherits(formula, "brmsformula")) {
@@ -719,8 +723,7 @@ extract_predictor_vars <- function(formulas) {
     } else if (inherits(f, "formula")) {
       # RHS only when response is on LHS; full formula otherwise.
       rhs <- if (length(f) == 3L) f[[3L]] else f
-      lhs_vars <- if (length(f) == 3L) all.vars(f[[2L]]) else character(0L)
-      setdiff(all.vars(rhs), lhs_vars)
+      setdiff(all.vars(rhs), lhs_columns(f))
     } else {
       character(0L)
     }
@@ -768,9 +771,6 @@ validate_no_covariate_nas <- function(data, formulas,
   # `data` may be a data frame or a list (for matrix predictors).
   available <- names(data)
   predictor_vars <- intersect(predictor_vars, available)
-  if (length(predictor_vars) == 0L) {
-    return(invisible(NULL))
-  }
 
   na_counts <- vapply(predictor_vars, function(v) {
     col <- data[[v]]
@@ -779,6 +779,7 @@ validate_no_covariate_nas <- function(data, formulas,
     # matrix and `sum()` counts every NA cell.
     if (is.null(col)) 0L else as.integer(sum(is.na(col)))
   }, integer(1L))
+  na_counts <- c(na_counts, addition_term_na_counts(data, formulas))
 
   bad <- na_counts[na_counts > 0L]
   if (length(bad) == 0L) {
@@ -792,19 +793,58 @@ validate_no_covariate_nas <- function(data, formulas,
 
   stop(insight::format_error(c(
     paste0(
-      "Covariates referenced by the formula contain ",
+      "Columns referenced by the formula contain ",
       "missing values in '", context, "'."
     ),
     x = paste(bad_lines, collapse = "; "),
     i = paste0(
       "mvgam preserves NAs in the response to maintain the ",
       "time grid (the likelihood simply skips those rows), but ",
-      "covariates that appear in the formula must be complete ",
-      "for the trend pipeline to align across timepoints. Drop ",
-      "the NA rows, impute the covariate, or remove that column ",
-      "from the formula before fitting."
+      "a covariate, and an addition term on a row whose response ",
+      "was observed, must be complete for the trend pipeline to ",
+      "align across timepoints. Drop the NA rows, impute the ",
+      "column, or remove it from the formula before fitting."
     )
   )))
+}
+
+
+#' Missing values in the addition terms of observed rows
+#'
+#' An addition term such as `weights(w)` or `trials(n)` is read on
+#' every row its response was observed at, and brms drops a row whose
+#' addition term is missing just as it drops one whose covariate is.
+#' The trend mapping keeps that row, since its response was seen, so
+#' the two then describe different rows. Where the response is missing
+#' the row leaves the likelihood anyway, so only observed rows count.
+#'
+#' @param data A data frame
+#' @param formulas The formulas `validate_no_covariate_nas()` was given
+#' @return Named integer counts, one per addition-term column
+#' @noRd
+addition_term_na_counts <- function(data, formulas) {
+  if (inherits(formulas, c("formula", "bform")) || !is.list(formulas)) {
+    formulas <- list(formulas)
+  }
+  counts <- lapply(formulas, function(f) {
+    if (is.null(f) || !length(lhs_columns(f))) {
+      return(integer(0L))
+    }
+    f <- if (inherits(f, "bform")) f else brms::bf(f)
+    forms <- if (inherits(f, "mvbrmsformula")) f$forms else list(f)
+    unlist(lapply(forms, function(form) {
+      y <- response_columns(form)[[1L]]
+      extra <- intersect(setdiff(lhs_columns(form), y), names(data))
+      if (!length(extra) || is.null(data[[y]])) {
+        return(integer(0L))
+      }
+      seen <- !is.na(data[[y]])
+      vapply(extra, function(v) {
+        as.integer(sum(is.na(data[[v]][seen])))
+      }, integer(1L))
+    }))
+  })
+  unlist(counts)
 }
 
 
@@ -1890,17 +1930,24 @@ response_support_hint <- function(fam) {
 }
 
 
-# Internal: run `validate_response_for_family()` over each
-# response `mvgam()` has already resolved, so a fit rejects a response
-# its family cannot take with a message naming the column and the
-# values observed, rather than letting brms report the constraint
-# from a function the user did not call. Multi-response families
-# take a matrix response and closure-unit families are checked by
+# Internal: run `validate_response_for_family()` over each response
+# the observation formula names, so a fit rejects a response its
+# family cannot take with a message naming the column and the values
+# observed, rather than letting brms report the constraint from a
+# function the user did not call. Multi-response families take a
+# matrix response and closure-unit families are checked by
 # `validate_closure_unit_data()`, so both are left to their own
 # validators.
+#
+# Each response is held to its own family: the one named inside its
+# `bf()` where it has one, `family` otherwise. Only the response is
+# held to it. An addition term such as `weights(w)` or `trials(n)` is
+# a column the model reads, but its values are not observations of the
+# family, and checking them as though they were refused a poisson fit
+# for carrying fractional weights.
 #'@noRd
-validate_response_shapes <- function(data, resp_vars, family) {
-  if (is.null(family) || !length(resp_vars)) return(invisible(TRUE))
+validate_response_shapes <- function(data, formula, family) {
+  if (is.null(family)) return(invisible(TRUE))
   # A list of frames is the multiple-imputation path; each frame
   # carries the same response and any one of them can be wrong.
   frames <- if (is.data.frame(data)) {
@@ -1912,28 +1959,23 @@ validate_response_shapes <- function(data, resp_vars, family) {
   }
   if (!length(frames)) return(invisible(TRUE))
 
-  # A multivariate call may pair one family per response; anything
-  # else applies the single family to each.
-  fams <- if (is.list(family) && !inherits(family, "family") &&
-                length(family) == length(resp_vars)) {
-    family
-  } else {
-    rep(list(family), length(resp_vars))
-  }
-
-  for (i in seq_along(resp_vars)) {
+  model <- list(
+    formula = if (inherits(formula, "bform")) formula else brms::bf(formula),
+    family = family
+  )
+  columns <- response_columns(model$formula)
+  for (key in names(columns)) {
     # `validate_family()` normalises a character, family or
     # customfamily into one object and refuses anything else, which
     # is a fault in the user's own argument and belongs here.
-    fam <- validate_family(fams[[i]])
+    fam <- validate_family(get_family_for_resp(model, key))
     if (is_multi_response_family(fam) || is_closure_unit_family(fam)) {
       next
     }
+    column <- columns[[key]]
     for (frame in frames) {
-      if (!resp_vars[i] %in% names(frame)) next
-      validate_response_for_family(
-        frame[[resp_vars[i]]], fam, y_name = resp_vars[i]
-      )
+      if (!column %in% names(frame)) next
+      validate_response_for_family(frame[[column]], fam, y_name = column)
     }
   }
   invisible(TRUE)
@@ -2898,6 +2940,8 @@ validate_trend_components <- function(trend_components) {
 #' @param series_var Name of series variable (default: "series")
 #' @param trend_type Type of trend model ("CAR" allows irregular intervals)
 #' @param trend_specs Optional trend specification list for added metadata
+#' @param response_vars Response columns named by response key, from
+#'   `response_columns()`
 #' @return List with time series dimensions and optional added metadata
 #' @noRd
 extract_time_series_dimensions <- function(data, time_var = "time", series_var = "series", trend_type = NULL, trend_specs = NULL, response_vars = NULL, cached_formulas = NULL) {
@@ -3040,8 +3084,7 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
       time_var = time_var,
       series_var = series_var,
       gr_var = groupings$gr,
-      subgr_var = groupings$subgr,
-      response_vars = response_vars
+      subgr_var = groupings$subgr
     )
   )
 
@@ -3050,23 +3093,22 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
   if (!is.null(response_vars)) {
     dimensions$mappings <- list()
 
-    for (resp_var in response_vars) {
-      # Validate response variable exists in data
+    # Keyed by the name brms suffixes each response's data with, and
+    # read from the response's own column.
+    for (key in names(response_vars)) {
+      column <- response_vars[[key]]
       formula_to_use <- if (!is.null(cached_formulas)) cached_formulas$formula else NULL
-      filtered_vars <- filter_required_variables(resp_var, formula_to_use)
+      filtered_vars <- filter_required_variables(column, formula_to_use)
       validate_required_variables(data, filtered_vars, "response mapping data")
 
-      # Generate mapping for this response variable using existing function
-      mapping <- generate_obs_trend_mapping(
+      dimensions$mappings[[key]] <- generate_obs_trend_mapping(
         data = data,
-        response_var = resp_var,
+        response_var = column,
+        response_key = key,
         time_var = time_var,
         series_var = series_var,
         dimensions = dimensions
       )
-
-      # Store mapping with response variable name as key
-      dimensions$mappings[[resp_var]] <- mapping
     }
   }
 
@@ -3087,18 +3129,22 @@ extract_time_series_dimensions <- function(data, time_var = "time", series_var =
 #' where brms excludes NA observations but doesn't provide an obs_ind array.
 #'
 #' @param data Data frame with observations (may include NAs)
-#' @param response_var Name of response variable to check for missing values
+#' @param response_var Name of response column to check for missing values
+#' @param response_key The response's key, as `response_columns()` names
+#'   it, which is what a response-keyed series axis holds
 #' @param time_var Name of time variable
 #' @param series_var Name of series variable
 #' @param dimensions List from extract_time_series_dimensions with time series structure
 #' @return List containing obs_trend_time and obs_trend_series arrays for Stan
 #' @noRd
 generate_obs_trend_mapping <- function(data, response_var,
+                                       response_key = response_var,
                                        time_var = "time",
                                        series_var = "series",
                                        dimensions) {
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_string(response_var)
+  checkmate::assert_string(response_key)
   checkmate::assert_string(time_var)
   checkmate::assert_string(series_var)
   checkmate::assert_list(dimensions)
@@ -3167,7 +3213,7 @@ generate_obs_trend_mapping <- function(data, response_var,
   obs_trend_series <- if (is.null(response_axis)) {
     match(series_values, sorted_unique_series)
   } else {
-    rep(response_series_index(response_axis, response_var),
+    rep(response_series_index(response_axis, response_key),
         length(non_missing_idx))
   }
 
@@ -4023,29 +4069,6 @@ remove_trend_expressions <- function(expr, trend_patterns, depth = 0) {
   }
 }
 
-#' Check if brmsfit is Multivariate
-#' @param brmsfit brms model fit object
-#' @return Logical indicating if model is multivariate
-#' @noRd
-is_multivariate_brmsfit <- function(brmsfit) {
-  checkmate::assert_class(brmsfit, "brmsfit")
-
-  # Check if formula has multivariate structure
-  if (!is.null(brmsfit$formula) && inherits(brmsfit$formula, "mvbrmsformula")) {
-    return(TRUE)
-  }
-
-  # Check brmsterms for multivariate structure
-  if (!is.null(brmsfit$formula)) {
-    terms_obj <- try(brms::brmsterms(brmsfit$formula), silent = TRUE)
-    if (!inherits(terms_obj, "try-error") && inherits(terms_obj, "mvbrmsterms")) {
-      return(TRUE)
-    }
-  }
-
-  return(FALSE)
-}
-
 #' Check if expression matches trend term patterns
 #'
 #' @description
@@ -4082,7 +4105,8 @@ is_trend_term <- function(expr, trend_patterns) {
 #' @param parsed_trend Parsed trend formula object with trend_model component (fitting context)
 #' @param time_var Character name of time variable column
 #' @param series_var Character name of series variable column
-#' @param response_vars Character vector of response variable names (for multivariate series creation)
+#' @param response_vars Response columns named by response key, from
+#'   `response_columns()`, for multivariate series creation
 #' @param metadata Trend metadata object for prediction context series recreation
 #' @return Data frame with mvgam time and series attributes added
 #' @noRd
@@ -4183,7 +4207,8 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
 
   # Strategy 1: Prediction context - use stored metadata to recreate series
   if (!is.null(metadata)) {
-    stored_source <- metadata$series_source %||% "explicit"
+    stored <- axes_from_metadata(metadata)$series
+    stored_source <- stored$source %||% "explicit"
 
     if (stored_source == "hierarchical" && !is.null(metadata$variables)) {
       gr_var <- metadata$variables$gr_var
@@ -4196,11 +4221,10 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
         )
         series_source <- "hierarchical"
       }
-    } else if (stored_source == "multivariate" && !is.null(metadata$response_vars)) {
-      # Use helper function for trend-aware series creation
-      result <- create_multivariate_series(
-        metadata$response_vars, nrow(data)
-      )
+    } else if (stored_source == "multivariate") {
+      # The response axis the fit was built on, keyed as brms keys the
+      # responses, which is what every per-response read is asked by.
+      result <- create_multivariate_series(stored$levels, nrow(data))
       series_values <- result$series_values
       series_levels <- result$series_levels
       series_source <- result$series_source
@@ -4247,15 +4271,17 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
   # Strategy 4: Missing series (create from multivariate structure in fitting context)
   if (is.null(series_values)) {
     if (!is.null(response_vars) && length(response_vars) > 1) {
-      result <- create_multivariate_series(response_vars, nrow(data))
+      result <- create_multivariate_series(names(response_vars), nrow(data))
       series_values <- result$series_values
       series_levels <- result$series_levels
       series_source <- result$series_source
     } else {
       stop(insight::format_error(c(
-        "No series variable found in data.",
-        i = cli::format_inline(
-          "Either provide {.field {series_var}} column, hierarchical grouping variables (gr and subgr), or specify response_vars for multivariate series creation."
+        paste0("No series variable '", series_var, "' found in data."),
+        i = paste0(
+          "Name each row's series with that column, or with the 'gr' ",
+          "and 'subgr' columns of a hierarchical trend. A multivariate ",
+          "formula whose responses are the series needs neither."
         )
       )), call. = FALSE)
     }
@@ -4429,19 +4455,22 @@ mvgam_response_axis <- function(data) {
 
 #' Which series a named response sits on
 #'
-#' @param axis Response axis from `mvgam_response_axis()`
-#' @param response_var Name of the response being asked about
+#' Asked while the model is built, of the axis being built, and after
+#' fitting, of the axis the fit records, so both read one answer.
+#'
+#' @param axis A response-keyed series axis, holding response keys
+#' @param response_key The key of the response being asked about
 #' @return Integer index into the trend matrix's series dimension
 #' @noRd
-response_series_index <- function(axis, response_var) {
+response_series_index <- function(axis, response_key) {
   checkmate::assert_character(axis, min.len = 1, any.missing = FALSE,
                               unique = TRUE)
-  checkmate::assert_string(response_var)
-  idx <- match(response_var, axis)
+  checkmate::assert_string(response_key)
+  idx <- match(response_key, axis)
   if (is.na(idx)) {
     stop(insight::format_error(c(
       cli::format_inline(
-        "Response {.field {response_var}} is not on the series axis."
+        "Response {.field {response_key}} is not on the series axis."
       ),
       i = cli::format_inline("Axis holds {.val {axis}}.")
     )), call. = FALSE)
@@ -4673,7 +4702,7 @@ extract_and_validate_trend_components <- function(data, mv_spec,
   all_formula_vars <- character(0)
   if (!is.null(trend_formula)) {
     # Use existing parse_trend_formula with precomputed dimensions to avoid redundant computation
-    parsed_trend_result <- parse_trend_formula(trend_formula, data, response_vars,
+    parsed_trend_result <- parse_trend_formula(trend_formula, data,
                                              .precomputed_dimensions = dimensions)
     regular_terms <- parsed_trend_result$regular_terms %||% character(0)
 
@@ -5224,7 +5253,6 @@ extract_trend_data <- function(data, trend_formula = NULL, time_var = "time", se
       } else {
         NULL
       },
-      response_vars = if (is.null(mvgam_object)) response_vars else NULL,
       # by = lv_axis() grain switch: persist so prediction rebuilds
       # newdata at the matching (time, .trend) grid via the same
       # extract_trend_data code path under the prediction context.

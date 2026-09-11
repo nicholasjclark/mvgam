@@ -345,8 +345,10 @@ predict_variance <- function(object, newdata, process_error,
                              re_formula, allow_new_levels,
                              sample_new_levels, resp) {
   # A model written with `brms::mvbf()` gives each response its own
-  # family and stores none at the top level, so the family a variance
-  # needs is the one belonging to the response being asked about.
+  # family and its own dispersion, so a variance is defined for one
+  # response at a time and takes that response's family.
+  resolve_resp(object, resp, required = TRUE,
+               caller = "predict(type = 'variance')")
   family <- get_family_for_resp(object, resp)
 
   # Closure-unit families have closed-form per-visit marginal
@@ -439,18 +441,6 @@ predict_variance <- function(object, newdata, process_error,
     sample_new_levels = sample_new_levels,
     resp = resp
   )
-
-  # A multivariate fit carries one dispersion parameter per response,
-  # so a variance is only defined once a response is named.
-  if (is.list(mu_full) && !is.matrix(mu_full)) {
-    stop(insight::format_error(c(
-      "type = 'variance' requires 'resp' for multivariate models.",
-      i = paste0(
-        "Available responses: ",
-        paste(shQuote(object$response_names), collapse = ", "), "."
-      )
-    )), call. = FALSE)
-  }
 
   draws_mat <- posterior::as_draws_matrix(object$fit)
   total_draws <- nrow(draws_mat)

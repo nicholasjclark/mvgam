@@ -3,8 +3,8 @@
 # residuals.mvgam / pp_check.mvgam / plot.mvgam /
 # conditional_effects.mvgam / hindcast.mvgam / methods_md:
 #
-#   1. response-name extraction (with prior-table fallback for
-#      prefits where response_names is NULL)
+#   1. which responses a model has, keyed as brms keys them, and
+#      the column each is read from
 #   2. detection of `set_rescor(TRUE)`
 #   3. per-response fan-out: when a method receives no `resp`
 #      arg on an mv fit, re-enter the method once per response
@@ -27,69 +27,106 @@ first_trend_spec <- function(object) {
   if (inherits(ts, "mvgam_trend")) ts else ts[[1L]]
 }
 
-#' Name the response a univariate scoring method works on
+#' The responses a model reads, keyed as brms keys them
 #'
-#' Scoring methods that reduce a fit to one number, such as
-#' `bayes_R2()` and `loo_R2()`, need the response to read observed
-#' values from. A multivariate fit has to be told which one; a
-#' univariate fit has exactly one, though a binomial fit also carries
-#' its denominator in the same slot, so the first entry is the
-#' response and the rest are addition terms.
+#' brms keys a response by its column with every `.` and `_` taken
+#' out, so the column `my_count` is the response `mycount`. The key is
+#' what `resp` takes, what `forms` is indexed by and what every
+#' per-response parameter and data array is suffixed with. Reading the
+#' frame takes the column. Code that took one spelling for the other
+#' looked for a column that was not there, which refused every trend
+#' model whose response carried an underscore or a dot.
 #'
-#' Reading the slot directly is what broke these methods on fits with
-#' no trend formula, where it was left empty. `get_response_names()`
-#' falls back to the prior table and then to the formula, so it
-#' answers whatever the slot holds.
+#' This is the one reader of which responses a model has. A fit, a
+#' prefit and a bare observation formula are all answered from the
+#' formula, so no stored copy can drift from the model it describes.
 #'
-#' @param object An `mvgam` model object
-#' @param resp Response the caller asked for, or `NULL`
-#' @return A single response name
-#'
+#' @param x A fitted `mvgam`, a prefit, or an observation formula in
+#'   any spelling `mvgam()` accepts
+#' @return Character vector of response columns named by key, in
+#'   formula order. An addition term such as `trials()` qualifies a
+#'   response rather than being one, so it is left out.
 #' @noRd
-scored_response_name <- function(object, resp = NULL) {
-  if (!is.null(resp) && nzchar(resp)) {
-    return(resp)
+response_columns <- function(x) {
+  f <- if (inherits(x, "mvgam")) x$formula else x
+  if (!inherits(f, "bform")) {
+    f <- brms::bf(f)
   }
-  rn <- get_response_names(object)
-  if (length(rn) == 0L) {
+  forms <- if (inherits(f, "mvbrmsformula")) f$forms else list(f)
+  keys <- vapply(forms, function(form) {
+    form$resp %||% NA_character_
+  }, character(1L), USE.NAMES = FALSE)
+  if (anyNA(keys)) {
     stop(insight::format_error(c(
-      "Cannot determine which response to score.",
-      i = paste0(
-        "Name it with 'resp', or refit the model so its response is ",
-        "recorded."
-      )
-    )))
+      "The observation formula names no response.",
+      i = "Write it as 'response ~ predictors'."
+    )), call. = FALSE)
   }
-  rn[1L]
+  columns <- vapply(forms, function(form) {
+    all.vars(strip_addition_terms(form$formula)[[2L]])[1L]
+  }, character(1L), USE.NAMES = FALSE)
+  stats::setNames(columns, keys)
 }
 
-
-
+#' Check the response a caller named against the model's own
+#'
+#' Every method taking `resp` asks the same two questions of it: is it
+#' one of the model's responses, and can the method answer without
+#' one. They are answered here so the refusal reads the same wherever
+#' it is met.
+#'
+#' @param x A fitted `mvgam`, or anything else `response_columns()`
+#'   reads
+#' @param resp The response a caller named, or `NULL`
+#' @param required Whether the caller answers for one response at a
+#'   time, so a model with several needs to be told which
+#' @param caller Name of the method asking, used in the refusal
+#' @return `resp`, unchanged, invisibly
 #' @noRd
-get_response_names <- function(obj) {
-  # Three-tier fallback for multi-response detection:
-  #   * obj$response_names if the fit has populated it (post-fit
-  #     mvgam objects)
-  #   * unique non-empty `resp` values on the prior table (prefits
-  #     can leave response_names NULL but the prior table is
-  #     already populated)
-  #   * canonical formula-LHS triage via brms's
-  #     extract_response_names (handles brmsformula /
-  #     mvbrmsformula / mvbind triage in one place)
-  rn <- obj$response_names
-  if (length(rn) > 0L) return(rn)
-  prior <- obj$prior
-  if (!is.null(prior) && nrow(prior) > 0L) {
-    rsp <- prior$resp %||% rep("", nrow(prior))
-    have <- unique(rsp[nzchar(rsp)])
-    if (length(have) > 0L) return(have)
+resolve_resp <- function(x, resp, required = FALSE, caller = NULL) {
+  columns <- response_columns(x)
+  keys <- names(columns)
+  listed <- paste0("Its responses are ",
+                   paste0("'", keys, "'", collapse = ", "), ".")
+  if (is.null(resp)) {
+    if (required && length(keys) > 1L) {
+      stop(insight::format_error(c(
+        "Name a response with 'resp': this model has several.",
+        x = if (!is.null(caller)) {
+          paste0("'", caller, "' answers for one response at a time.")
+        },
+        i = listed
+      )), call. = FALSE)
+    }
+    return(invisible(NULL))
   }
-  f <- obj$formula
-  if (is.null(f)) return(character(0L))
-  if (inherits(f, "formula") && length(f) < 3L) {
-    return(character(0L))
+  checkmate::assert_string(resp)
+  if (!resp %in% keys) {
+    # A column name is the natural thing to type, and brms answers to
+    # the key alone, so the refusal says which key the column became.
+    as_key <- keys[match(resp, columns)]
+    stop(insight::format_error(c(
+      paste0("'", resp, "' is not a response of this model."),
+      x = if (!is.na(as_key)) {
+        paste0("brms names the column '", resp, "' as '", as_key,
+               "', removing every '.' and '_'.")
+      },
+      i = listed
+    )), call. = FALSE)
   }
-  extract_response_names(f)
+  invisible(resp)
+}
+
+#' The column one response is read from
+#'
+#' @param object A fitted `mvgam` object
+#' @param resp The response's key, or `NULL` on a model with one
+#' @return A single column name
+#' @noRd
+response_column <- function(object, resp = NULL) {
+  resolve_resp(object, resp, required = TRUE)
+  columns <- response_columns(object)
+  unname(columns[[resp %||% 1L]])
 }
 
 
@@ -97,12 +134,12 @@ get_response_names <- function(obj) {
 subset_obj_to_response <- function(obj, r) {
   # Per-response slice of a multi-response fit. Filters the prior
   # table to rows scoped to response `r` (including rows with no
-  # `resp` set, which are shared across responses), and pins
-  # `response_names = r`. Downstream extractors / renderers that
-  # read from `obj$prior` and `obj$response_names` then see the
-  # single-response view without per-helper threading.
+  # `resp` set, which are shared across responses), and narrows the
+  # formula to that response's own. Downstream extractors and
+  # renderers reading either then see the single-response view
+  # without per-helper threading.
   out <- obj
-  out$response_names <- r
+  out$formula <- obj$formula$forms[[r]]
   prior <- obj$prior
   if (!is.null(prior) && nrow(prior) > 0L) {
     rsp <- prior$resp %||% rep("", nrow(prior))
@@ -153,7 +190,7 @@ make_row_prefix <- function(nlpar, dpar, resp) {
 
 
 #' @noRd
-mv_resp_fan_out <- function(object, resp) {
+mv_resp_fan_out <- function(object, resp, class = NULL, combine = NULL) {
   # Per-response fan-out for multivariate user-facing methods.
   # When `resp` is NULL on an mv fit, re-invoke the calling
   # function once per response with `resp = r` and return a named
@@ -161,6 +198,18 @@ mv_resp_fan_out <- function(object, resp) {
   # its univariate body. Centralises the pattern shared by
   # residuals.mvgam, pp_check.mvgam, conditional_effects.mvgam,
   # mvgam_resid_panel, and hindcast.mvgam.
+  #
+  # `class` is the class the caller's single-response answer has.
+  # Given it, the list takes that class too, so a method dispatches
+  # on the wrapper as it would on one answer, and records two facts a
+  # reader would otherwise have to infer from its shape: that it is a
+  # wrapper, and whether its responses are the fit's series. On a
+  # wide frame they are, so the elements together are one answer over
+  # the whole axis; on a long frame each element spans every series.
+  #
+  # `combine`, where given, turns the named list into the one object
+  # the caller returns, which is how a plotting method hands back one
+  # figure rather than a list that prints as a listing.
   #
   # Implementation: capture the caller's matched call via
   # `match.call(sys.function(-1L), sys.call(-1L))`, swap `resp`
@@ -194,7 +243,7 @@ mv_resp_fan_out <- function(object, resp) {
       parent_call[[1L]] <- as.name(bare_name)
     }
   }
-  responses <- object$formula$responses
+  responses <- names(response_columns(object))
   eval_env <- parent.frame(n = 2L)
   out <- lapply(responses, function(r) {
     call_r <- parent_call
@@ -202,25 +251,15 @@ mv_resp_fan_out <- function(object, resp) {
     eval(call_r, envir = eval_env)
   })
   names(out) <- responses
-  out
-}
-
-
-#' Resolve the family for a given response in a multi-response fit.
-#'
-#' brms `mvbf` puts a placeholder family on the top-level `mvgam`
-#' object (the default `gaussian()`); the actual per-arm family
-#' lives on `object$formula$forms[[resp]]$family`. Univariate fits
-#' have one family at the top level. This helper returns the family
-#' name string (`fam$family`).
-#'
-#' @noRd
-resolve_resp_family <- function(object, resp = NULL) {
-  if (!is.null(resp) && inherits(object$formula, "mvbrmsformula")) {
-    bf_i <- object$formula$forms[[resp]]
-    if (!is.null(bf_i$family)) return(resolve_family_name(bf_i$family))
+  if (!is.null(combine)) {
+    return(combine(out))
   }
-  resolve_family_name(object$family)
+  if (!is.null(class)) {
+    class(out) <- class
+    attr(out, "mv_wrapper") <- TRUE
+    attr(out, "response_keyed") <- is_response_keyed(object)
+  }
+  out
 }
 
 

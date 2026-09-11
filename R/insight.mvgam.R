@@ -107,18 +107,10 @@ find_formula.mvgam <- function(x, verbose = TRUE, ...) {
 #' @importFrom insight find_response
 #' @export
 find_response.mvgam <- function(x, combine = TRUE, ...) {
-  if (length(x$response_names) > 0L) {
-    return(x$response_names)
-  }
-  # Multivariate: each per-response form is a brmsformula with
-  # its own LHS. Return every response so marginaleffects and
-  # insight find every available column.
-  if (inherits(x$formula, "mvbrmsformula")) {
-    return(unlist(lapply(x$formula$forms, function(bf) {
-      all.vars(bf$formula[[2L]])[1L]
-    }), use.names = FALSE))
-  }
-  all.vars(mvgam_obs_formula(x)[[2L]])[1L]
+  # The columns, not brms's keys for them: insight's callers read the
+  # answer off the data, and a multivariate fit returns every response
+  # so marginaleffects finds each one.
+  unname(response_columns(x))
 }
 
 
@@ -231,11 +223,13 @@ model.frame.mvgam <- function(formula, trend_effects = FALSE, ...) {
   vars <- if (trend_effects) {
     mvgam_rhs_predictors(formula$trend_formula)
   } else {
-    # Walk the same surface find_predictors() does so nl / dpar
-    # sub-formula vars and jsdgam aliases ride along.
-    response <- all.vars(mvgam_obs_formula(formula)[[2L]])
-    preds <- find_predictors(formula, flatten = TRUE)
-    unique(c(response, preds))
+    # Every response and its addition terms, then the same surface
+    # find_predictors() walks so nl / dpar sub-formula vars and jsdgam
+    # aliases ride along. Reading the left-hand side of one formula
+    # dropped every response of a multivariate fit, whose subscript
+    # there is a character vector rather than an expression.
+    unique(c(lhs_columns(formula$formula),
+             find_predictors(formula, flatten = TRUE)))
   }
   vars <- intersect(vars, colnames(formula$data))
   formula$data[, vars, drop = FALSE]

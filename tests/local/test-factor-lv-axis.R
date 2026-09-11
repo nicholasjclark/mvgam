@@ -549,7 +549,7 @@ test_that("the record and the metadata tell one story about the axis", {
   expect_identical(ax$vars$series_var, "series")
   expect_null(ax$vars$gr_var)
   expect_null(ax$vars$subgr_var)
-  expect_identical(ax$vars$response_vars, "y")
+  expect_identical(mvgam:::response_columns(prefit_by_lv), c(y = "y"))
 })
 
 

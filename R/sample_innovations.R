@@ -121,7 +121,7 @@ prepare_mvgam_frame <- function(object, data) {
     parsed_trend = NULL,
     time_var = meta$variables$time_var %||% "time",
     series_var = meta$variables$series_var %||% "series",
-    response_vars = object$response_names,
+    response_vars = response_columns(object),
     metadata = meta
   )
 }
@@ -175,23 +175,25 @@ fitted_series_index <- function(object) {
   if (is.null(train)) {
     return(NULL)
   }
-  frame <- prepare_mvgam_frame(object, train)
-  # A frame whose responses are its series states the axis outright,
-  # and the per-row values are then a single constant that no sorting
-  # can recover the axis from. The record below is per response on
-  # such a fit (`obs_trend_series_<resp>`), so there is nothing here
-  # for the label route to read either.
-  axis <- mvgam_response_axis(frame)
-  if (!is.null(axis)) {
-    return(stats::setNames(seq_along(axis), axis))
-  }
   # The axis the model was built on, which is the answer whenever the
-  # fit carries it. Sorting labels below is a last resort that gives
-  # an alphabetical order, and a hierarchical or response-keyed fit
-  # numbers its columns in another one.
+  # fit carries it. Everything below is a fallback for a fit that
+  # predates the record, and asking the record first spares every call
+  # on a current fit the frame preparation those fallbacks need.
   recorded_axis <- mvgam_axes(object)$series$levels
   if (!is.null(recorded_axis)) {
     return(stats::setNames(seq_along(recorded_axis), recorded_axis))
+  }
+  frame <- prepare_mvgam_frame(object, train)
+  # A frame whose responses are its series states the axis outright,
+  # and the per-row values are then a single constant that no sorting
+  # can recover the axis from. The record is per response on such a
+  # fit (`obs_trend_series_<resp>`), so there is nothing below for the
+  # label route to read either. Sorting labels is a last resort that
+  # gives an alphabetical order, and a hierarchical or response-keyed
+  # fit numbers its columns in another one.
+  axis <- mvgam_response_axis(frame)
+  if (!is.null(axis)) {
+    return(stats::setNames(seq_along(axis), axis))
   }
 
   labels <- as.character(get_series_for_grouping(frame))
@@ -220,12 +222,16 @@ fitted_series_index <- function(object) {
 #' @param object mvgam object with fitted trend model
 #' @param newdata Data frame with prediction covariates. If NULL, uses
 #'   training data from object.
+#' @param resp The response this structure is for. Required on a fit
+#'   whose series are its responses, where it is what names the trend
+#'   column a row reads; ignored otherwise.
 #'
 #' @return List with components:
 #'   \itemize{
 #'     \item \code{time}: Integer vector of time indices (1-based)
 #'     \item \code{series}: Factor/character vector of series identifiers
-#'     \item \code{series_int}: Integer vector of series indices (1-based)
+#'     \item \code{series_int}: Integer vector, the column of
+#'       `trend[t, s]` each row reads (1-based)
 #'     \item \code{n_obs}: Number of observations
 #'     \item \code{n_times}: Number of unique time points
 #'     \item \code{n_series}: Number of unique series
@@ -233,8 +239,10 @@ fitted_series_index <- function(object) {
 #'   }
 #'
 #' @noRd
-get_observation_structure <- function(object, newdata = NULL) {
+get_observation_structure <- function(object, newdata = NULL,
+                                      resp = NULL) {
   checkmate::assert_class(object, "mvgam")
+  checkmate::assert_string(resp, null.ok = TRUE)
 
   # Use training data if newdata not provided
   if (is.null(newdata)) {
@@ -292,8 +300,8 @@ get_observation_structure <- function(object, newdata = NULL) {
 
   # Otherwise: prepare data with standardized time/series attributes.
   # For multivariate fits the data may not carry an explicit `series`
-  # column (mvbind builds it implicitly); pass response_names so
-  # ensure_mvgam_variables can recreate the multivariate series.
+  # column (mvbind builds it implicitly), and the preparation
+  # rebuilds the multivariate series from the fit's own responses.
   data_prepared <- prepare_mvgam_frame(object, newdata)
 
   # Validate that data preparation succeeded
@@ -345,6 +353,12 @@ get_observation_structure <- function(object, newdata = NULL) {
     )))
   }
 
+  # Every reader of this structure indexes the trend, or the
+  # innovations drawn for it, with `series_int`, so the rule for a
+  # wide frame is applied once here. Left to each reader, three of
+  # four forgot it and read the first response's column for all of
+  # them.
+  series_int <- trend_series_index(object, series_int, resp)
   unique_times <- sort(unique(time_indices))
 
   list(
@@ -512,17 +526,17 @@ has_stochastic_trend <- function(object) {
 #'
 #' @noRd
 sample_process_errors <- function(object, ndraws = NULL, newdata = NULL,
-                                   draw_ids = NULL) {
+                                   draw_ids = NULL, resp = NULL) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
+  checkmate::assert_character(resp, min.len = 1L, any.missing = FALSE,
+                              null.ok = TRUE)
   if (!is.null(ndraws) && !is.null(draw_ids)) {
     stop(insight::format_error(
       "Cannot specify both 'ndraws' and 'draw_ids'."
     ))
   }
-
-  obs_structure <- get_observation_structure(object, newdata)
 
   if (!has_stochastic_trend(object)) {
     n_rows <- if (!is.null(draw_ids)) {
@@ -532,22 +546,32 @@ sample_process_errors <- function(object, ndraws = NULL, newdata = NULL,
     } else {
       1L
     }
-    return(matrix(0, n_rows, obs_structure$n_obs))
+    n_obs <- NROW(newdata %||% mvgam_training_data(object))
+    return(matrix(0, n_rows, n_obs))
   }
 
   cov_structure <- get_trend_covariance_structure(
     object, ndraws = ndraws, draw_ids = draw_ids
   )
-  innov <- sample_innovations(cov_structure, obs_structure)
-  # Strip posterior::draws_matrix class so downstream callers (notably
-  # marginaleffects, which type-checks @draws against matrixOrNULL)
-  # see a plain numeric matrix matching brms's posterior_* return.
-  if (!is.null(innov)) {
-    dn <- dim(innov)
-    innov <- as.numeric(innov)
-    dim(innov) <- dn
-  }
-  innov
+  # One structure per response the noise is read for. Every response
+  # reads the same joint draw, so on a wide frame they keep the
+  # correlation the trend was fitted with; each reads its own column,
+  # so each keeps its own scale.
+  structures <- lapply(resp %||% list(NULL), function(r) {
+    get_observation_structure(object, newdata, resp = r)
+  })
+  grid <- draw_innovation_grid(cov_structure, structures[[1L]]$n_times)
+  innov <- lapply(structures, function(os) {
+    m <- map_innovations_to_obs(grid$innovations, os$n_times,
+                                grid$n_series, os)
+    # A plain numeric matrix, as brms's posterior_* methods return;
+    # marginaleffects type-checks its draws against `matrixOrNULL`.
+    dn <- dim(m)
+    m <- as.numeric(m)
+    dim(m) <- dn
+    m
+  })
+  if (length(resp) > 1L) stats::setNames(innov, resp) else innov[[1L]]
 }
 
 
@@ -760,7 +784,7 @@ get_trend_covariance_structure <- function(object, ndraws = NULL,
     n_obs_series = as.integer(n_obs_series),
     draws_mat = if (is_lv) draws_mat else NULL,
     # Per-draw innovation degrees of freedom, NULL for Gaussian trends.
-    # Carried here so `sample_innovations()` draws from the same
+    # Carried here so `draw_innovation_grid()` draws from the same
     # distribution the model was fitted with.
     nu_trend = extract_nu_trend_draws(draws_mat, object),
     # Threaded to `resolve_factor_loadings()` so fixed-Z fits
@@ -1205,56 +1229,54 @@ get_group_info <- function(standata) {
 # Per-draw loops only when unavoidable (different covariance per draw).
 
 
-#' Sample Innovations from Trend Model
+#' One joint draw of a trend's innovations over its whole grid
 #'
-#' Main entry point for innovation sampling. Dispatches to pattern-specific
-#' transform functions based on covariance structure.
+#' The innovations every series receives at a time are drawn together,
+#' from the covariance the trend was fitted with, so a correlated or
+#' factor trend moves its series jointly. Drawing the grid is kept
+#' apart from reading it row by row because one draw can be read more
+#' than once: the responses of a wide frame are its series, and each
+#' reads its own column of the same draw. Drawing once per response
+#' instead would lose the correlation between them, and reading one
+#' column for all of them gave every response the first one's noise.
 #'
-#' @param cov_structure List from `get_trend_covariance_structure()`
-#'   containing: pattern, n_series, ndraws, params, has_correlations.
-#' @param obs_structure List from `get_observation_structure()` containing:
-#'   time, series_int, n_obs, n_times, n_series, unique_times.
-#'
-#' @return Matrix \[ndraws x n_obs\] of sampled innovations, where each
-#'   observation gets the innovation for its (time, series) combination.
-#'
-#' @details
-#' Algorithm:
-#' 1. Generate standard normals for (time, series) grid
-#' 2. Transform by covariance pattern
-#' 3. Map grid innovations to observations via linear indexing
-#'
+#' @param cov_structure List from `get_trend_covariance_structure()`.
+#' @param n_times Number of occasions the grid spans.
+#' @return List with `innovations`, a `[ndraws x (n_times * n_series)]`
+#'   matrix laid out time-fastest within each series block, and
+#'   `n_series`, the series count that layout uses.
 #' @noRd
-sample_innovations <- function(cov_structure, obs_structure) {
-  # Validate input structures
+draw_innovation_grid <- function(cov_structure, n_times) {
   checkmate::assert_list(cov_structure, min.len = 1)
   checkmate::assert_names(
     names(cov_structure),
     must.include = c("pattern", "ndraws", "n_series", "params")
   )
-  checkmate::assert_list(obs_structure, min.len = 1)
-  checkmate::assert_names(
-    names(obs_structure),
-    must.include = c("n_obs", "n_times", "series_int", "time", "unique_times")
-  )
-
   pattern <- cov_structure$pattern
   ndraws <- cov_structure$ndraws
 
   checkmate::assert_string(pattern)
   checkmate::assert_int(ndraws, lower = 0)
+  checkmate::assert_int(n_times, lower = 1)
 
-  # Return zeros for deterministic trends (pattern="none") or when
-  # no draws requested (ndraws=0, which can occur during validation)
+  # Zeros for deterministic trends (pattern = "none") or when no draws
+  # were requested (ndraws = 0, which can occur during validation).
   if (pattern == "none" || ndraws == 0L) {
     effective_ndraws <- if (ndraws == 0L) 1L else ndraws
-    return(matrix(0, effective_ndraws, obs_structure$n_obs))
+    # The width a drawn grid has once it reaches the series, which on a
+    # factor trend is past the loadings.
+    n_series <- as.integer(if (isTRUE(cov_structure$is_lv)) {
+      cov_structure$n_obs_series
+    } else {
+      cov_structure$n_series
+    })
+    return(list(
+      innovations = matrix(0, effective_ndraws, n_times * n_series),
+      n_series = n_series
+    ))
   }
 
-  n_times <- obs_structure$n_times
   n_series <- cov_structure$n_series
-
-  checkmate::assert_int(n_times, lower = 1)
   checkmate::assert_int(n_series, lower = 1)
 
   # When cor=FALSE, use diagonal path (independent innovations per series)
@@ -1334,8 +1356,7 @@ sample_innovations <- function(cov_structure, obs_structure) {
     n_series <- cov_structure$n_obs_series
   }
 
-  # Map (time, series) grid to observations
-  map_innovations_to_obs(innovations_flat, n_times, n_series, obs_structure)
+  list(innovations = innovations_flat, n_series = n_series)
 }
 
 

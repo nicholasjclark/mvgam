@@ -102,7 +102,7 @@ Savage J (2016). Hierarchical Vector
 Autoregression. RPubs, 27 November 2016.
 \url{https://rpubs.com/jimsavage/hierarchical_var}
 
-Heaps SE (2022). Enforcing stationarity through the prior in
+Heaps SE (2023). Enforcing stationarity through the prior in
 vector autoregressions.
 \emph{Journal of Computational and Graphical Statistics}
 32(1), 74-83.

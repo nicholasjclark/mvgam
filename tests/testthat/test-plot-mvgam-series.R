@@ -32,7 +32,6 @@
   obj <- list(
     data = d,
     test_data = test_d,
-    response_names = "y",
     formula = stats::as.formula("y ~ 1"),
     family = stats::gaussian(),
     series_info = list(
@@ -79,26 +78,27 @@ test_that("series_long_df extracts the right columns and labels rows", {
   df <- data.frame(
     y = 1:5, time = 1:5, series = factor(rep("s1", 5L))
   )
-  meta <- list(time_var = "time", series_var = "series")
-  out <- mvgam:::series_long_df(df, "y", meta, label = "train")
+  out <- mvgam:::series_long_df(df, "y", df$series, "time",
+                                label = "train")
   expect_equal(sort(colnames(out)), c("data", "series", "time", "y"))
   expect_equal(nrow(out), 5L)
   expect_true(all(out$data == "train"))
+  # The series is the one the caller names, not a column of the frame.
+  out_named <- mvgam:::series_long_df(df, "y", "count", "time",
+                                      label = "train")
+  expect_true(all(out_named$series == "count"))
 })
 
 test_that("series_long_df returns NULL on NULL input (rbind passthrough)", {
-  meta <- list(time_var = "time", series_var = "series")
-  out <- mvgam:::series_long_df(
-    NULL, "y", meta, label = "validate"
-  )
+  out <- mvgam:::series_long_df(NULL, "y", NULL, "time",
+                                label = "validate")
   expect_null(out)
 })
 
 test_that("series_long_df errors when response missing", {
   df <- data.frame(time = 1:3, series = factor(rep("s1", 3L)))
-  meta <- list(time_var = "time", series_var = "series")
   expect_error(
-    mvgam:::series_long_df(df, "yy", meta, label = "train"),
+    mvgam:::series_long_df(df, "yy", df$series, "time", label = "train"),
     "Response variable not found"
   )
 })

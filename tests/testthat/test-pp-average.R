@@ -27,7 +27,6 @@ make_pp_average_stub <- function(n_iter = 60L, n_chains = 2L,
       fit = drws,
       formula = brms::bf(y ~ x),
       trend_formula = NULL,
-      response_names = "y",
       data = data.frame(y = rnorm(8L), x = rnorm(8L)),
       standata = list(X = X, K = ncol(X), Kc = ncol(X) - 1L,
                        Y = rnorm(8L), N = 8L),
@@ -132,7 +131,7 @@ test_that("mvgam_match_response returns TRUE for matching responses", {
 test_that("mvgam_match_response returns FALSE for mismatched responses", {
   a <- make_pp_average_stub()
   b <- make_pp_average_stub()
-  b$response_names <- "z"
+  b$formula <- brms::bf(z ~ x)
   expect_false(mvgam_match_response(list(a, b)))
 })
 
@@ -252,10 +251,10 @@ test_that("pp_average rejects 'draw_ids' / 'subset' in dots", {
 
 # ---- pp_average response-mismatch guard ----------------------------
 
-test_that("pp_average errors on mismatched response_names", {
+test_that("pp_average errors on mismatched responses", {
   a <- make_pp_average_stub()
   b <- make_pp_average_stub()
-  b$response_names <- "z"
+  b$formula <- brms::bf(z ~ x)
   expect_error(
     pp_average(a, b, weights = c(0.5, 0.5)),
     "same response"

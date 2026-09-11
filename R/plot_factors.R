@@ -214,11 +214,14 @@ plot_latent_state <- function(object, probs = c(0.5, 0.8, 0.95),
                             max(1L, sum(sp_idx & unit_meta$time ==
                                           time_levels[1L]))))
     # Per-time draw pool. `pooled` is `[ndraws * n_sites_t, n_time]`.
+    # A factor, so the facet keeps the series order rather than
+    # sorting a character column.
+    panel <- factor(sp, levels = series_levels)
     layers <- c(
       layers,
       mvgam_band_layer(pooled, time_levels, probs = probs,
-                        group = sp),
-      list(mvgam_median_layer(pooled, time_levels, group = sp))
+                        group = panel),
+      list(mvgam_median_layer(pooled, time_levels, group = panel))
     )
   }
   ggplot2::ggplot() +

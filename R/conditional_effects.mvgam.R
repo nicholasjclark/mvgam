@@ -111,10 +111,8 @@ conditional_effects.mvgam <- function(x,
   # uni- or multivariate; extraction via
   # `as.data.frame.mvgam_conditional_effects()` also relies on
   # the class marker to recognise the fan-out shape.
-  fan <- mv_resp_fan_out(x, resp)
+  fan <- mv_resp_fan_out(x, resp, class = "mvgam_conditional_effects")
   if (!is.null(fan)) {
-    class(fan) <- "mvgam_conditional_effects"
-    attr(fan, "mv_wrapper") <- TRUE
     return(fan)
   }
   type <- match.arg(

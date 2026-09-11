@@ -32,8 +32,7 @@ make_wrapper_stub <- function(with_re = FALSE) {
       data = data.frame(y = rnorm(8L), x = rnorm(8L),
                          grp = factor("a")),
       family = brms::brmsfamily("gaussian"),
-      standata = std,
-      response_names = "y"
+      standata = std
     ),
     class = "mvgam"
   )
@@ -137,11 +136,11 @@ test_that("predictive_error.mvgam errors when newdata lacks the response", {
 })
 
 
-# ---- mvgam_response_name -------------------------------------------
+# ---- response_column -----------------------------------------------
 
-test_that("mvgam_response_name returns the LHS variable", {
+test_that("response_column returns the LHS variable", {
   stub <- make_wrapper_stub()
-  expect_identical(mvgam_response_name(stub), "y")
+  expect_identical(response_column(stub), "y")
 })
 
 

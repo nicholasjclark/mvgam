@@ -832,7 +832,7 @@ generate_ar_monitor_params <- function(trend_spec) {
 #' @return Character vector of VAR-specific parameters
 #' @noRd
 generate_var_monitor_params <- function(trend_spec) {
-  # VAR uses hierarchical hyperparameters following Heaps 2022 methodology
+  # VAR uses hierarchical hyperparameters following Heaps 2023 methodology
 
   # Base VAR hyperparameters - always present
   var_params <- c("Amu_trend", "Aomega_trend")
@@ -1671,13 +1671,10 @@ extract_regular_terms <- function(formula_terms) {
 #'
 #' @return List containing parsed formula components
 #' @noRd
-parse_trend_formula <- function(trend_formula, data = NULL, response_vars = NULL, .precomputed_dimensions = NULL) {
+parse_trend_formula <- function(trend_formula, data = NULL, .precomputed_dimensions = NULL) {
 
   # Input validation with brms-inspired error handling
   checkmate::assert_class(trend_formula, "formula")
-  if (!is.null(response_vars)) {
-    checkmate::assert_character(response_vars, min.len = 1, any.missing = FALSE)
-  }
   if (!is.null(.precomputed_dimensions)) {
     checkmate::assert_list(.precomputed_dimensions, names = "named")
   }
@@ -2044,7 +2041,7 @@ print.mvgam_trend <- function(x, ...) {
 #'     \code{p = k} is the VAR(k) interpretation with
 #'     consecutive coefficient matrices for lags \code{1:k}.
 #'     Sparse-lag vector \code{p} is not supported and will
-#'     not be added: the Heaps-2022 stationary joint-
+#'     not be added: the Heaps-2023 stationary joint-
 #'     distribution initialisation assumes consecutive
 #'     companion-form structure, so the sparse case has no
 #'     companion-form analogue with the same identified
@@ -2074,7 +2071,7 @@ print.mvgam_trend <- function(x, ...) {
 #'   \item For multivariate dynamics: `VAR(p = 2)` captures cross-series relationships
 #' }
 #'
-#' @note **VAR fits and `init = 0`**: VAR uses the Heaps-2022
+#' @note **VAR fits and `init = 0`**: VAR uses the Heaps-2023
 #'   stationary joint-distribution initialisation. Setting
 #'   `init = 0` in the call to [mvgam()] starts all parameters
 #'   at zero on the unconstrained scale, which collapses the
@@ -2555,7 +2552,7 @@ VAR = function(time = NA, series = NA, p = 1, ma = FALSE, cor = TRUE,
   # Validate VAR order parameter. Scalar p (e.g. p = 2) is the
   # standard interpretation: include AR coefficient matrices
   # for consecutive lags 1..p. Sparse-lag vector p (e.g.
-  # p = c(2, 4)) is not supported. Reason: the Heaps-2022
+  # p = c(2, 4)) is not supported. Reason: the Heaps-2023
   # stationary joint-distribution initialisation that VAR uses
   # assumes consecutive companion-form structure, so the sparse
   # case has no companion-form analogue with the same identified

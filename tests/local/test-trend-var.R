@@ -1328,7 +1328,7 @@ test_that("the plotting methods render for a VAR fit", {
   # panel instead would satisfy the loop above.
   expect_error(plot(fit, type = "smooths"), "no smooth terms")
   expect_error(plot(fit, type = "factors"), "latent dynamic factors")
-  expect_error(plot(fit, type = "latent_state"), "closure-unit family")
+  expect_error(plot(fit, type = "latent_state"), "has no closure units")
 })
 
 test_that("find_predictors reports a series column that varies", {
@@ -1475,20 +1475,21 @@ test_that("hypothesis reaches every parameter the fit reports", {
 
 
 test_that("a forecast over observed occasions is refused, not emptied", {
-  # Finding 51. Handed a frame whose times lie inside the training
-  # grid, `forecast()` returns an `mvgam_forecast` carrying no arms
+  # Handed a frame whose times lie inside the training grid,
+  # `forecast()` used to return an `mvgam_forecast` carrying no arms
   # and no test times, with `series_names` still populated so the
-  # object looks well formed. One occasion past the end of the grid
-  # is refused properly, naming the series and the times it wanted,
-  # so the guard exists and does not cover this direction. An empty
-  # arm list satisfies any claim written as a loop over the arms, so
-  # the count is asserted before anything is read out.
+  # object looked well formed. A frame naming no occasion beyond the
+  # grid has nothing to forecast, so it is refused, naming the times
+  # it was given and the last each series was observed at.
   h <- 3L
   inside <- make_future(h)
   inside$time <- rep(time_vals[seq_len(h)], times = n_series)
-  fc <- forecast(fit, newdata = inside, ndraws = 20L, type = "trend")
-  expect_identical(names(fc$forecasts), series_levels)
-  expect_length(fc$forecasts, n_series)
+  err <- expect_error(
+    forecast(fit, newdata = inside, ndraws = 20L, type = "trend"),
+    "names no occasion beyond the training grid"
+  )
+  expect_match(conditionMessage(err),
+               paste(time_vals[seq_len(h)], collapse = ", "), fixed = TRUE)
 })
 
 

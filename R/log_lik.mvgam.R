@@ -376,22 +376,9 @@ rstantools::log_lik
 
 
 # Pull the response column out of newdata (or the training data) for the
-# requested response. Binomial single-trial responses can arrive as a 2-col
-# matrix from cbind() syntax; reduce to integer success counts.
+# requested response.
 extract_response_for_log_lik <- function(object, newdata, resp) {
-  if (!is.null(resp)) {
-    y_name <- resp
-  } else {
-    y_name <- as.character(object$formula$resp)
-    if (length(y_name) == 0 || y_name == "") {
-      lhs <- if (inherits(object$formula, "brmsformula")) {
-        object$formula$formula[[2L]]
-      } else {
-        object$formula[[2L]]
-      }
-      y_name <- all.vars(lhs)[1L]
-    }
-  }
+  y_name <- response_column(object, resp)
   if (!y_name %in% names(newdata)) {
     stop(insight::format_error(
       cli::format_inline(
@@ -399,12 +386,7 @@ extract_response_for_log_lik <- function(object, newdata, resp) {
       )
     ))
   }
-  y <- newdata[[y_name]]
-  if (is.matrix(y) && ncol(y) == 2L) {
-    # cbind(success, failure) → take success column
-    y <- y[, 1L]
-  }
-  as.numeric(y)
+  as.numeric(newdata[[y_name]])
 }
 
 

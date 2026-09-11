@@ -36,7 +36,6 @@ make_hindcast_mock <- function(series_levels = "s1",
     family = poisson(),
     trend_model = list(),
     mv_spec = list(
-      response_names = "y",
       trend_specs = spec
     ),
     series_info = list(series_levels = series_levels),

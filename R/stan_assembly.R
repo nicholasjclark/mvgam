@@ -306,14 +306,9 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
   } else {
     # Single trend specification - backward compatible
     # Extract actual response name from observation formula
-    response_names <- extract_response_names(obs_setup$formula)
-    if (length(response_names) == 0) {
-      stop(insight::format_error(c(
-        "Could not extract response variable from observation formula.",
-        i = "The formula must have a valid response variable on the left-hand side."
-      )), call. = FALSE)
-    }
-    response_name <- response_names[1]  # Use first response for univariate
+    # The key the response's mapping is filed under, which is the name
+    # `response_columns()` gives it.
+    response_name <- names(response_columns(obs_setup$formula))[1L]
 
     trend_stanvars <- extract_trend_stanvars_from_setup(
       trend_setup = trend_setup,
@@ -815,7 +810,7 @@ extract_trend_stanvars_from_setup <- function(trend_setup, trend_specs,
       n_time_observed = count_observed_times(
         data = obs_setup$data %||% trend_setup$data,
         time_var = dimensions$time_var,
-        response_vars = extract_response_names(obs_setup$formula)
+        response_vars = unname(response_columns(obs_setup$formula))
       ),
       time_var = dimensions$time_var,
       series_var = dimensions$series_var,
@@ -4855,7 +4850,7 @@ generate_ar_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 #' constraints. Uses efficient matrix formulation for multi-lag VAR models
 #' with proper parameter naming and non-centered parameterization.
 #' 
-#' NOTE: VARMA implementation follows Heaps (2022) methodology with constraint
+#' NOTE: VARMA implementation follows Heaps (2023) methodology with constraint
 #' that MA order q=1 (ma_lags must be 0 or 1). Higher order MA components 
 #' are not supported.
 #'
@@ -5282,7 +5277,7 @@ generate_var_trend_stanvars <- function(trend_specs, data_info, prior = NULL) {
 
   # Conditional MA parameters block for VARMA(p,q) when ma_lags > 0
   # This creates a 4th stanvar component only for VARMA models
-  # D_trend naming follows Heaps 2022 convention for MA coefficients
+  # D_trend naming follows Heaps 2023 convention for MA coefficients
   if (is_varma) {
     var_ma_parameters_stanvar <- brms::stanvar(
       name = "var_ma_parameters",
@@ -6539,8 +6534,10 @@ extract_and_rename_trend_parameters <- function(trend_setup, dimensions, suffix 
 
   # Detect if this is a multivariate model
   brmsfit <- trend_setup$brmsfit
-  is_multivariate <- is_multivariate_brmsfit(brmsfit)
-  response_names <- if (is_multivariate) extract_response_names_from_brmsfit(brmsfit) else NULL
+  is_multivariate <- inherits(brmsfit$formula, "mvbrmsformula")
+  response_names <- if (is_multivariate) {
+    names(response_columns(brmsfit$formula))
+  }
 
   # Create parameter mapping for prediction compatibility
   parameter_mapping <- list(
@@ -6610,29 +6607,6 @@ extract_and_rename_trend_parameters <- function(trend_setup, dimensions, suffix 
   }
 
   return(combined_stanvars)
-}
-
-#' Extract Response Names from brmsfit
-#' @param brmsfit brms model fit object
-#' @return Character vector of response names or NULL
-#' @noRd
-extract_response_names_from_brmsfit <- function(brmsfit) {
-  checkmate::assert_class(brmsfit, "brmsfit")
-
-  if (!is.null(brmsfit$formula) && inherits(brmsfit$formula, "mvbrmsformula")) {
-    # Extract from mvbrmsformula
-    return(names(brmsfit$formula$forms))
-  }
-
-  # Try extracting from brmsterms
-  if (!is.null(brmsfit$formula)) {
-    terms_obj <- try(brms::brmsterms(brmsfit$formula), silent = TRUE)
-    if (!inherits(terms_obj, "try-error") && inherits(terms_obj, "mvbrmsterms")) {
-      return(terms_obj$responses)
-    }
-  }
-
-  return(NULL)
 }
 
 #' Extract and Rename Stan Code Blocks

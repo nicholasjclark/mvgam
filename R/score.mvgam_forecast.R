@@ -142,6 +142,23 @@ score.mvgam_forecast <- function(object,
                                    weights = NULL,
                                    ...) {
   checkmate::assert_class(object, "mvgam_forecast")
+  # A fan-out wrapper holds one forecast per response. On a wide frame
+  # those responses are the series, so it is scored as one forecast
+  # over them; on a long frame each element spans every series and is
+  # scored as the answer for its response. Reading the wrapper's own
+  # `$forecasts`, which a wrapper does not have, refused the object
+  # `forecast()` had just returned and told the caller to pass the
+  # `newdata` they had passed.
+  if (isTRUE(attr(object, "response_keyed"))) {
+    object <- response_axis_forecast(object)
+  } else if (isTRUE(attr(object, "mv_wrapper"))) {
+    return(lapply(
+      unclass(object), score.mvgam_forecast,
+      score = score, interval_width = interval_width,
+      quantile_level = quantile_level, lower = lower, upper = upper,
+      log = log, weights = weights, ...
+    ))
+  }
   univariate <- c("crps", "drps", "sis", "brier",
                    "logs", "dss", "qs", "twcrps")
   multivariate <- c("energy", "variogram", "twenergy")
@@ -224,12 +241,18 @@ validate_scoreable_forecast <- function(object, score) {
       )
     )))
   }
+  # One family per series on a forecast whose series are a wide fit's
+  # responses, so the rule is asked of every series being scored.
+  families <- object$family
   if (identical(score, "brier") &&
-      !identical(object$family, "bernoulli")) {
+      (!length(families) || !all(families == "bernoulli"))) {
     stop(insight::format_error(c(
       "'brier' is only defined for 'bernoulli' families.",
-      x = paste0("Got family = '", object$family, "'."),
-      i = "Use 'crps' / 'drps' / 'logs' for other families."
+      x = paste0("Got family = ",
+                 paste0("'", unique(families), "'", collapse = ", "),
+                 "."),
+      i = paste0("Use 'crps' / 'drps' / 'logs' for other families, or ",
+                 "score a single bernoulli response's forecast.")
     )))
   }
   invisible(NULL)

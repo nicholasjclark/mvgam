@@ -738,16 +738,10 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
     # Multivariate model with response-specific families and links.
     # `resolve_family_name()` returns "tweedie" instead of "custom"
     # for customfamily objects, matching the user-facing name.
-    # Per-response `f$family` is typically NULL because users pass
-    # `family =` to `mvgam()` rather than inside each `bf()`; fall
-    # back to the shared `x$family` in that case so the summary
-    # never shows "Family: y1: NULL".
-    resp_names <- x$formula$responses
-    pick_family <- function(f) f$family %||% x$family
-    families <- sapply(x$formula$forms,
-                       function(f) resolve_family_name(pick_family(f)))
-    links <- sapply(x$formula$forms,
-                    function(f) format_family_links(pick_family(f)))
+    resp_names <- names(response_columns(x$formula))
+    fams <- lapply(resp_names, function(r) get_family_for_resp(x, r))
+    families <- vapply(fams, resolve_family_name, character(1L))
+    links <- vapply(fams, format_family_links, character(1L))
 
     # Format families following brms convention
     # Pattern: "resp1: family1 \n          resp2: family2"

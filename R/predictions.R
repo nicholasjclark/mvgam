@@ -743,21 +743,8 @@ extract_linpred_nonlinear <- function(prep, resp = NULL) {
   }
 
   # Multivariate model - split mu by response
-  if (!"responses" %in% names(prep$formula)) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Multivariate formula must contain {.field responses}."
-      )
-    ))
-  }
-
-  response_names <- prep$formula$responses
-
-  if (is.null(response_names) || length(response_names) == 0) {
-    stop(insight::format_error(
-      "Multivariate formula has no response names."
-    ))
-  }
+  resolve_resp(prep$formula, resp)
+  response_names <- names(response_columns(prep$formula))
 
   # Extract nobs per response using brms N_<response> pattern
   nobs_list <- lapply(response_names, function(r) {
@@ -793,14 +780,6 @@ extract_linpred_nonlinear <- function(prep, resp = NULL) {
 
   # Return single response if specified
   if (!is.null(resp)) {
-    if (!resp %in% response_names) {
-      available <- paste(response_names, collapse = ", ")
-      stop(insight::format_error(
-        cli::format_inline(
-          "Response {.field {resp}} not found. Available: {available}."
-        )
-      ))
-    }
     return(mu_list[[resp]])
   }
 
@@ -1757,35 +1736,8 @@ extract_linpred_multivariate <- function(prep, resp = NULL) {
     return(extract_linpred_nonlinear(prep, resp = resp))
   }
 
-  # Extract response names
-  if (!"responses" %in% names(prep$formula)) {
-    stop(insight::format_error(
-      cli::format_inline(
-        "Multivariate formula must contain {.field responses} component."
-      )
-    ))
-  }
-
-  response_names <- prep$formula$responses
-
-  # Validate response_names is populated
-  if (is.null(response_names) || length(response_names) == 0) {
-    stop(insight::format_error(
-      "Multivariate formula detected but no response names found."
-    ))
-  }
-
-  # Validate resp if specified
-  if (!is.null(resp)) {
-    if (!resp %in% response_names) {
-      stop(insight::format_error(
-        cli::format_inline(
-          "Response {.val {resp}} not found in model. Available: {.val {response_names}}."
-        )
-      ))
-    }
-    response_names <- resp
-  }
+  resolve_resp(prep$formula, resp)
+  response_names <- resp %||% names(response_columns(prep$formula))
 
   draws_mat <- posterior::as_draws_matrix(prep$draws)
   n_draws <- nrow(draws_mat)
@@ -2276,7 +2228,8 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
       re_formula = re_formula,
       allow_new_levels = allow_new_levels,
       sample_new_levels = sample_new_levels,
-      incl_latent_state = incl_latent_state
+      incl_latent_state = incl_latent_state,
+      resp = resp
     ))
   }
 
@@ -2417,7 +2370,8 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata,
                                          draw_ids, re_formula,
                                          allow_new_levels,
                                          sample_new_levels,
-                                         incl_latent_state) {
+                                         incl_latent_state,
+                                         resp = NULL) {
   checkmate::assert_class(mvgam_fit, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1L)
   checkmate::assert_logical(incl_latent_state, len = 1L)
@@ -2454,7 +2408,8 @@ compose_by_lv_trend_linpred <- function(mvgam_fit, newdata,
     ))
   }
 
-  obs_struct <- get_observation_structure(mvgam_fit, newdata = newdata)
+  obs_struct <- get_observation_structure(mvgam_fit, newdata = newdata,
+                                          resp = resp)
   s_idx <- as.integer(obs_struct$series_int)
   if (any(s_idx < 1L | s_idx > n_series)) {
     stop(insight::format_error(
@@ -2589,38 +2544,26 @@ diagnostic_surface_args <- function(args, in_sample, weighted = FALSE) {
 #' caller was scoped to picks the column and the row supplies the
 #' time.
 #'
-#' @param mvgam_fit A fitted `mvgam` object
-#' @param obs_struct The observation structure for the prediction rows
+#' Refusing when no response is named is what keeps this safe to
+#' extend: a new reader of the observation structure that forgets to
+#' scope itself stops here, rather than reading the first response's
+#' state for every response as three readers once did.
+#'
+#' @param object A fitted `mvgam` object
+#' @param series_int The per-row series index the frame's own series
+#'   values give
 #' @param resp The response this prediction is scoped to, or `NULL`
 #' @return An integer, one per prediction row, indexing the columns of
 #'   `trend[t, s]`
 #'
 #' @noRd
-trend_series_index <- function(mvgam_fit, obs_struct, resp) {
-  levs <- mvgam_axes(mvgam_fit)$series$levels
-  if (!identical(mvgam_axes(mvgam_fit)$series$source, "multivariate")) {
-    return(obs_struct$series_int)
+trend_series_index <- function(object, series_int, resp) {
+  if (!is_response_keyed(object)) {
+    return(series_int)
   }
-  if (is.null(resp) || !nzchar(resp)) {
-    stop(insight::format_error(c(
-      "A response-keyed fit needs a response to read its trend by.",
-      x = paste0(
-        "Each response carries its own latent state, and a row of a ",
-        "wide frame names no response."
-      ),
-      i = paste0("Pass resp = one of '",
-                 paste(levs, collapse = "', '"), "'.")
-    )))
-  }
-  col <- match(resp, levs)
-  if (is.na(col)) {
-    stop(insight::format_error(c(
-      paste0("Response '", resp, "' is not on the fitted series axis."),
-      i = paste0("The fit records '", paste(levs, collapse = "', '"),
-                 "'.")
-    )))
-  }
-  rep(col, length(obs_struct$series_int))
+  resolve_resp(object, resp, required = TRUE)
+  col <- response_series_index(mvgam_axes(object)$series$levels, resp)
+  rep(col, length(series_int))
 }
 
 
@@ -2662,8 +2605,9 @@ extract_trend_latent_states <- function(mvgam_fit, newdata, full_draws,
   # half, silently and with the right shape. Working from the raw
   # values also makes a time the fit never saw fall out as `NA`, which
   # is what the marginal substitution below keys on.
-  obs_struct <- get_observation_structure(mvgam_fit, newdata = newdata)
-  s_idx <- trend_series_index(mvgam_fit, obs_struct, resp)
+  obs_struct <- get_observation_structure(mvgam_fit, newdata = newdata,
+                                          resp = resp)
+  s_idx <- obs_struct$series_int
   time_var <- mvgam_fit$trend_metadata$variables$time_var %||% "time"
   train_data <- mvgam_training_data(mvgam_fit)
   raw_t_idx <- if (time_var %in% names(newdata) &&

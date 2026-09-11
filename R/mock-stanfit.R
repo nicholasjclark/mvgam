@@ -373,14 +373,9 @@ prepare_predictions.mock_stanfit <- function(x,
   # consistency, but are never used in prediction computations
   newdata_with_resp <- prediction_data
 
-  # Extract response variable(s) - handle both univariate and multivariate
-  if (brms::is.mvbrmsformula(brmsfit$formula)) {
-    # Multivariate: get all response variables from formula components
-    resp_vars <- names(brmsfit$formula$forms)
-  } else {
-    # Univariate: extract single response from formula LHS
-    resp_vars <- as.character(brmsfit$formula$formula[[2]])
-  }
+  # The response columns, keyed as brms keys the responses. The frame
+  # takes the column; the family is looked up by the key.
+  resp_vars <- response_columns(brmsfit$formula)
 
   # Add dummy values for missing OR NA response entries. Missing
   # column: brms's data_response requires the response to evaluate
@@ -389,9 +384,10 @@ prepare_predictions.mock_stanfit <- function(x,
   # linpred machinery. Dummy values are never read by the
   # linpred, epred and predict paths; they exist only to satisfy
   # brms's standata validation.
-  for (rv in resp_vars) {
+  for (key in names(resp_vars)) {
+    rv <- resp_vars[[key]]
     family_obj <- if (brms::is.mvbrmsformula(brmsfit$formula)) {
-      brmsfit$family[[rv]]
+      brmsfit$family[[key]]
     } else {
       brmsfit$family
     }
@@ -660,10 +656,12 @@ compute_nonlinear_dpars <- function(prep, formula) {
   c_vars <- grep("^C_", names(prep$sdata), value = TRUE)
 
   if (length(c_vars) > 0) {
-    # Extract covariate variable names from formula
-    all_vars <- all.vars(formula$formula)
-    response_var <- as.character(formula$formula[[2]])
-    covariate_names <- setdiff(all_vars, c(response_var, nlpar_names))
+    # The covariates are what the non-linear expression reads besides
+    # its parameters. Taking every variable in the formula and removing
+    # the response left an addition term such as `trials(n)` among
+    # them, and the count then disagreed with brms's.
+    covariate_names <- setdiff(all.vars(formula$formula[[3L]]),
+                               nlpar_names)
 
     if (length(covariate_names) != length(c_vars)) {
       stop(insight::format_error(

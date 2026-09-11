@@ -1787,7 +1787,7 @@ complete_simplex_grid <- function(object, newdata,
   if (length(levs) < 2L) {
     return(NULL)
   }
-  resp <- closure_unit_response_var(object$formula)
+  resp <- response_column(object)
   # The covariate setting of a row is everything that is not the
   # category axis, the unit identifiers, or the response.
   held <- setdiff(names(newdata),
@@ -1888,7 +1888,7 @@ complete_closure_unit_newdata <- function(object, newdata,
   # post-fit closure-unit site: a fit of this family reached here
   # only by resolving a single response at fit time, so a failure
   # would be a broken object rather than a case to fall back on.
-  resp <- closure_unit_response_var(object$formula)
+  resp <- response_column(object)
   # A column the frame does not carry is filled whichever kind of
   # frame this is. `cap` is the upper truncation the unit arrays
   # need, and the response is read by the binary / non-negative
@@ -5924,36 +5924,6 @@ resolve_draw_ids <- function(object, ndraws, draw_ids) {
   )
 }
 
-#' Resolve the response variable name from an mvgam formula slot
-#'
-#' Handles both the plain `formula` and the `brmsformula` /
-#' `mvgam_formula` cases. Used by every closure-unit family's
-#' R-side extractor.
-#' @noRd
-closure_unit_response_var <- function(form) {
-  raw <- if (inherits(form, "brmsformula")) {
-    form$formula[[2L]]
-  } else if (inherits(form, "formula")) {
-    form[[2L]]
-  } else {
-    stop(insight::format_error(
-      "Could not resolve response variable from object$formula."
-    ))
-  }
-  vars <- all.vars(raw)
-  if (length(vars) != 1L) {
-    stop(insight::format_error(c(
-      "Closure-unit families require a single response column.",
-      x = paste0(
-        "Found ", length(vars),
-        " variables in the LHS of the observation formula."
-      ),
-      i = "cbind() responses are not supported for closure-unit families."
-    )))
-  }
-  vars[1L]
-}
-
 #' Extract detection-probability draws for an nmix() fit
 #'
 #' Handles both the scalar-`p` case (no detection sub-formula,
@@ -6071,7 +6041,7 @@ closure_unit_arrays_for <- function(object, newdata = NULL) {
   fam <- object$family
   build_closure_unit_arrays(
     newdata,
-    response_var = closure_unit_response_var(object$formula),
+    response_var = response_column(object),
     default_cap = closure_unit_default_cap(fam),
     default_cap_buffer = closure_unit_default_cap_buffer(fam),
     compute_y_max = !is_multi_response_family(fam),
@@ -6134,7 +6104,7 @@ extract_closure_unit_components <- function(object, newdata = NULL,
       "Training data not stored on object; supply 'newdata'."
     ))
   }
-  response_var <- closure_unit_response_var(object$formula)
+  response_var <- response_column(object)
   binary_y_check <- is_binary_response_family(object$family)
   default_cap <- closure_unit_default_cap(object$family)
   default_cap_buffer <- closure_unit_default_cap_buffer(object$family)
@@ -6449,7 +6419,7 @@ aggregate_closure_unit_visits <- function(object,
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_matrix(yrep_visit)
   newdata <- newdata %||% mvgam_training_data(object)
-  response_var <- closure_unit_response_var(object$formula)
+  response_var <- response_column(object)
   arrays <- closure_unit_arrays_for(object, newdata)
   if (ncol(yrep_visit) != nrow(newdata)) {
     stop(insight::format_error(c(
@@ -6486,7 +6456,7 @@ aggregate_closure_unit_visits <- function(object,
 #' @noRd
 multinomial_unit_totals <- function(object, newdata, arrays) {
   newdata <- newdata %||% mvgam_training_data(object)
-  y <- as.numeric(newdata[[closure_unit_response_var(object$formula)]])
+  y <- as.numeric(newdata[[response_column(object)]])
   # `N_site` is the multinomial's sample size, and it is data rather
   # than a parameter: a site's counts sum to it. A site with no counts
   # supplies none, and summing nothing reports a total of zero, which
@@ -6808,7 +6778,7 @@ posterior_latent_N_pb <- function(object, newdata = NULL,
   ndraws <- comp$ndraws
   N_unit <- arrays$N_unit
   if (is.null(newdata)) newdata <- object$data
-  response_var <- closure_unit_response_var(object$formula)
+  response_var <- response_column(object)
   y_vals <- as.integer(newdata[[response_var]])
   out <- matrix(0L, nrow = ndraws, ncol = N_unit)
   for (g in seq_len(N_unit)) {
@@ -7863,7 +7833,7 @@ posterior_latent_N_royle_nichols <- function(object,
   ndraws <- comp$ndraws
   N_unit <- arrays$N_unit
   if (is.null(newdata)) newdata <- object$data
-  response_var <- closure_unit_response_var(object$formula)
+  response_var <- response_column(object)
   y_vals <- as.integer(newdata[[response_var]])
   out <- matrix(0L, nrow = ndraws, ncol = N_unit)
   for (g in seq_len(N_unit)) {
@@ -8070,7 +8040,7 @@ posterior_latent_N_poisson_poisson <- function(object,
   ndraws <- comp$ndraws
   N_unit <- arrays$N_unit
   if (is.null(newdata)) newdata <- object$data
-  response_var <- closure_unit_response_var(object$formula)
+  response_var <- response_column(object)
   y_vals <- as.integer(newdata[[response_var]])
   out <- matrix(0L, nrow = ndraws, ncol = N_unit)
   for (g in seq_len(N_unit)) {

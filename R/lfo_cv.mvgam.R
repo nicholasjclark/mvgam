@@ -1286,13 +1286,12 @@ window_predictive <- function(fit, fc_data) {
     draw_idx = seq_len(nrow(draws_mat)),
     obs_uncertainty = TRUE
   )
-  structure(
-    list(
-      forecasts = arms,
-      test_observations = window$observations,
-      series_names = series_levels,
-      type = "response"
-    ),
-    class = "mvgam_forecast"
+  # The window's own observations are what the arms are scored
+  # against, so they sit where a forecast keeps its held-out truths.
+  new_mvgam_forecast(
+    fit, "response", resp = NULL, reported = series_levels,
+    training = NULL, hindcasts = NULL, forecasts = arms,
+    fc_grid = list(observations = window$observations,
+                   times = window$times)
   )
 }

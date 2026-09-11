@@ -630,7 +630,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   # covariate row breaks dimension alignment downstream in Stan
   # and only shows up as an opaque chain-failure error. Catch it
   # here naming the offending column(s).
-  resp_vars <- extract_response_vars(formula)
+  resp_vars <- lhs_columns(formula)
   validate_no_covariate_nas(
     data           = data,
     formulas       = list(formula, trend_formula),
@@ -650,12 +650,12 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   # `data_response.brmsframe()`, which names neither the column nor
   # the values that broke it, and states only the bound it reached
   # first. Checking here names both and gives the whole constraint.
-  validate_response_shapes(data, resp_vars, family)
+  validate_response_shapes(data, formula, family)
   if (!is.null(newdata)) {
     # A forecast frame carries an all-NA or absent response, which
     # the check passes over; a value it does carry has to satisfy
     # the family the same way the training response does.
-    validate_response_shapes(newdata, resp_vars, family)
+    validate_response_shapes(newdata, formula, family)
   }
   checkmate::assert_character(backend, len = 1)
   checkmate::assert_logical(combine, len = 1)
@@ -1172,7 +1172,6 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       standata = combined_standata %||% obs_setup$standata,
       exclude = c("lprior", "lp__"),
       mv_spec = mv_spec,
-      response_names = mv_spec$response_names %||% NULL,
       trend_components = mvgam_components$trend_components,
       series_info = mvgam_components$series_info,
       time_info = mvgam_components$time_info,
@@ -1262,7 +1261,6 @@ create_mvgam_stub_from_stan_components <- function(stan_components,
       standata = stan_components$combined_components$standata,
       exclude = c("lprior", "lp__"),
       mv_spec = mv_spec,
-      response_names = mv_spec$response_names %||% NULL,
       trend_metadata = enriched_trend_metadata,
       obs_model = obs_setup$brmsfit,
       trend_model = if (!is.null(trend_setup)) trend_setup$brmsfit else NULL,

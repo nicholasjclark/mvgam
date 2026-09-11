@@ -329,8 +329,7 @@ residuals.mvgam <- function(object,
   # `resp` is populated when the mv fan-out scoped this call (or
   # the user supplied it explicitly via `...`); otherwise fall
   # back to the single response on a univariate fit.
-  resp_col <- mvgam_response_name(object, resp)
-  y <- as.numeric(d[[resp_col]])
+  y <- as.numeric(d[[response_column(object, resp)]])
   pp_args <- c(list(object = object, newdata = newdata,
                      ndraws = ndraws, draw_ids = draw_ids,
                      summary = FALSE), dots)

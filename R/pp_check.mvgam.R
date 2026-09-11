@@ -25,7 +25,9 @@
 #'   as well as to the PPC function specified in \code{type}
 #'
 #' @return A ggplot object that can be further
-#'   customized using the \pkg{ggplot2} package.
+#'   customized using the \pkg{ggplot2} package. A multivariate model
+#'   given no `resp` answers with one figure holding a panel per
+#'   response, each titled by its response.
 #'
 #' @details
 #' Replicates are drawn against the latent trend state the model
@@ -216,31 +218,13 @@ pp_check.mvgam <- function(
   }
 
   # Multivariate fits (mvbind / mvbrmsformula). When `resp` is
-  # NULL, fan out per response via the shared helper and return
-  # a named list. When the caller supplied `resp`, validate it
-  # and fall through to the univariate path scoped to that
-  # response.
-  is_mv <- brms::is.mvbrmsformula(object$formula)
-  fan <- mv_resp_fan_out(object, resp)
+  # NULL, fan out per response via the shared helper and return one
+  # figure with a panel per response. When the caller supplied
+  # `resp`, validate it and fall through to the univariate path
+  # scoped to that response.
+  fan <- mv_resp_fan_out(object, resp, combine = stack_response_plots)
   if (!is.null(fan)) return(fan)
-  if (is_mv) {
-    resp_names <- object$formula$responses
-    if (length(resp) != 1L) {
-      stop(insight::format_error(c(
-        cli::format_inline("{.field resp} must be a single response name."),
-        i = cli::format_inline(
-          "Available responses: {.val {resp_names}}."
-        )
-      )))
-    }
-    if (!resp %in% resp_names) {
-      stop(insight::format_error(
-        cli::format_inline(
-          "Invalid {.field resp}: {.val {resp}}. Valid choices: {.val {resp_names}}."
-        )
-      ))
-    }
-  }
+  resolve_resp(object, resp)
 
   if (prefix == "ppc") {
     # No type checking for prefix 'ppd' yet
@@ -507,20 +491,8 @@ pp_check.mvgam <- function(
 
   y <- NULL
   if (prefix == "ppc") {
-    # y is ignored in prefix 'ppd' plots. Pull the response name from
-    # the formula's lhs; for multivariate fits use the per-resp form.
-    # Handles the cbind(success, failure) binomial and the
-    # `y | trials(trials)` aterms convention by taking the leftmost
-    # variable in the lhs expression.
-    lhs <- if (is_mv) {
-      object$formula$forms[[resp]]$formula[[2L]]
-    } else if (inherits(object$formula, "brmsformula")) {
-      object$formula$formula[[2L]]
-    } else {
-      object$formula[[2L]]
-    }
-    out_name <- all.vars(lhs)[1L]
-    y <- newdata[[out_name]]
+    # y is ignored in prefix 'ppd' plots.
+    y <- newdata[[response_column(object, resp)]]
     # Ordinal responses arrive as ordered factors; bayesplot's ppc_*
     # functions assert numeric y, so coerce factors to their integer
     # codes (1..nlevels).
@@ -1196,11 +1168,11 @@ plot.mvgam_ppc_fit_stat <- function(x, ...) {
 mvgam_resid_panel <- function(
   object, newdata = NULL, ndraws = 100L, resp = NULL, ...
 ) {
-  # Multivariate fan-out via the shared helper: returns one
-  # 4-panel grid per response in a named list. Without this each
-  # inner `pp_check` call would itself return a list per response
-  # and `patchwork::wrap_plots` refuses nested lists.
-  fan <- mv_resp_fan_out(object, resp)
+  # Multivariate fan-out via the shared helper: one 4-panel grid per
+  # response, stacked into one figure. Without this each inner
+  # `pp_check` call would itself answer for every response, and
+  # `patchwork::wrap_plots` refuses nested lists.
+  fan <- mv_resp_fan_out(object, resp, combine = stack_response_plots)
   if (!is.null(fan)) return(fan)
   # The four panels each run the same residual extraction over the
   # same rows, so anything it reports about the data holds for the

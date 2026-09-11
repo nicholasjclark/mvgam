@@ -4,15 +4,19 @@
 \alias{family.mvgam}
 \title{Extract family from mvgam object}
 \usage{
-\method{family}{mvgam}(object, ...)
+\method{family}{mvgam}(object, resp = NULL, ...)
 }
 \arguments{
 \item{object}{mvgam object}
 
-\item{...}{Additional arguments (unused)}
+\item{resp}{Optional name of one response of a multivariate model.
+Without it, a model with several responses answers with one
+family per response.}
+
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
-Family object
+A family object, or a list of them named by response
 }
 \description{
 Extract family from mvgam object

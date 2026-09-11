@@ -1,6 +1,6 @@
 #' Tests for Innovation Sampling Infrastructure
 #'
-#' Unit-level tests for sample_innovations() and the per-pattern
+#' Unit-level tests for draw_innovation_grid() and the per-pattern
 #' transforms. Hierarchical Cholesky uses synthetic posterior matrices
 #' rather than fitted models for fast, deterministic coverage.
 

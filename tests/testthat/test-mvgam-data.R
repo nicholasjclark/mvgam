@@ -211,7 +211,7 @@ test_that("validate_no_covariate_nas() catches NAs in obs-formula covariates", {
       mvgam_data(dat, formula = y ~ temp, family = poisson(),
                   plot = FALSE)
     ),
-    regexp = "Covariates referenced.*missing values.*'temp': 1 NA"
+    regexp = "Columns referenced.*missing values.*'temp': 1 NA"
   )
 })
 
@@ -228,7 +228,7 @@ test_that("validate_no_covariate_nas() checks trend-formula covariates", {
       mvgam_data(dat, trend_formula = ~ s(env) + AR(),
                   family = poisson(), plot = FALSE)
     ),
-    regexp = "Covariates referenced.*'env': 2 NAs"
+    regexp = "Columns referenced.*'env': 2 NAs"
   )
 })
 
@@ -250,6 +250,26 @@ test_that("validate_no_covariate_nas() ignores response + unreferenced cols", {
   )
   # NAs in y (the response) are also allowed by the validator.
   expect_true(any(is.na(dat$y)))
+})
+
+
+test_that("an addition term is complete on the rows its response was seen", {
+  # brms drops a row whose addition term is missing, while the trend
+  # mapping keeps any row whose response was observed, so a missing
+  # weight left the likelihood and the trend describing different rows.
+  dat <- data.frame(y = rpois(12L, 3), x = rnorm(12L),
+                    w = runif(12L, 0.2, 1.5))
+  dat$w[4L] <- NA
+  expect_error(
+    validate_no_covariate_nas(dat, formulas = list(y | weights(w) ~ x)),
+    regexp = "'w': 1 NA"
+  )
+  # Where the response is missing too, the row leaves the likelihood
+  # whatever the addition term holds, so nothing is refused.
+  dat$y[4L] <- NA
+  expect_null(
+    validate_no_covariate_nas(dat, formulas = list(y | weights(w) ~ x))
+  )
 })
 
 
@@ -303,16 +323,16 @@ test_that("validate_no_covariate_nas() counts NAs in matrix-column predictors", 
 })
 
 
-test_that("extract_response_vars() handles formula / brmsformula / mvbrmsformula", {
-  expect_identical(extract_response_vars(NULL),    character(0L))
-  expect_identical(extract_response_vars(~ x),     character(0L))
-  expect_identical(extract_response_vars(y ~ x),   "y")
-  expect_setequal(extract_response_vars(cbind(y, trials) ~ x),
+test_that("lhs_columns() handles formula / brmsformula / mvbrmsformula", {
+  expect_identical(lhs_columns(NULL),    character(0L))
+  expect_identical(lhs_columns(~ x),     character(0L))
+  expect_identical(lhs_columns(y ~ x),   "y")
+  expect_setequal(lhs_columns(cbind(y, trials) ~ x),
                   c("y", "trials"))
   # brmsformula: response on $formula slot.
-  expect_identical(extract_response_vars(brms::bf(y ~ x)), "y")
+  expect_identical(lhs_columns(brms::bf(y ~ x)), "y")
   # Two-arm bf(): still only the top response, not the dpar arm.
-  expect_identical(extract_response_vars(brms::bf(y ~ env, p ~ tod)),
+  expect_identical(lhs_columns(brms::bf(y ~ env, p ~ tod)),
                    "y")
 })
 
@@ -478,6 +498,24 @@ test_that("a response inside its support passes every family", {
 })
 
 
+test_that("only a response is held to its family, and to its own", {
+  dat <- data.frame(count = rpois(10L, 3), mass = rnorm(10L),
+                    x = rnorm(10L), w = runif(10L, 0.2, 1.5))
+  # A fractional weight is not an observation of a count family.
+  expect_silent(
+    validate_response_shapes(dat, count | weights(w) ~ x, poisson())
+  )
+  # Each arm answers to the family its own `bf()` names; the family
+  # given to `mvgam()` covers only an arm that names none.
+  arms <- brms::bf(count ~ x, family = poisson()) +
+    brms::bf(mass ~ x, family = gaussian())
+  expect_silent(validate_response_shapes(dat, arms, poisson()))
+  dat$count[2L] <- 2.5
+  expect_error(validate_response_shapes(dat, arms, gaussian()),
+               regexp = "'count'")
+})
+
+
 test_that("newdata is held to the same support as the training data", {
   set.seed(1L)
   sd <- sim_mvgam(family = poisson(), n_series = 2L,
@@ -488,8 +526,8 @@ test_that("newdata is held to the same support as the training data", {
   # call that clears validation runs on into the model build.
   fc <- sd$data_test
   fc$y <- NA_real_
-  expect_silent(validate_response_shapes(fc, "y", poisson()))
-  expect_silent(validate_response_shapes(tr, "y", poisson()))
+  expect_silent(validate_response_shapes(fc, y ~ 1, poisson()))
+  expect_silent(validate_response_shapes(tr, y ~ 1, poisson()))
   # A value it does carry is held to the family.
   bad <- sd$data_test
   bad$y[2L] <- -5

@@ -113,7 +113,12 @@ get_combined_linpred <- function(mvgam_fit, newdata,
   # On a response-keyed fit the state is read once per response, since
   # each response is its own series and holds its own `trend[t, s]`
   # column. Reading it once and sharing it gave every response the
-  # first one's trajectory.
+  # first one's trajectory. A multivariate fit whose series axis is a
+  # column of the frame holds one state that every response reads, so
+  # there it is built once rather than once per response with the same
+  # answer. The process noise below follows the same rule.
+  per_response <- is_response_keyed(mvgam_fit) &&
+    is.list(obs_linpred) && !is.matrix(obs_linpred)
   conditional_state <- if (identical(trend_state, "conditional")) {
     draws_mat <- posterior::as_draws_matrix(mvgam_fit$fit)
     if (!is.null(draw_ids)) {
@@ -125,14 +130,7 @@ get_combined_linpred <- function(mvgam_fit, newdata,
         full_draws = draws_mat, resp = r
       )
     }
-    # Only a response-keyed axis needs one state per response. A
-    # multivariate fit whose series axis is a column of the frame
-    # holds one state that every response reads, so it is built once
-    # rather than once per response with the same answer.
-    resp_keyed <- identical(
-      mvgam_axes(mvgam_fit)$series$source, "multivariate"
-    )
-    if (resp_keyed && is.list(obs_linpred) && !is.matrix(obs_linpred)) {
+    if (per_response) {
       stats::setNames(
         lapply(names(obs_linpred), state_for), names(obs_linpred)
       )
@@ -168,7 +166,8 @@ get_combined_linpred <- function(mvgam_fit, newdata,
     trend_noise <- if (isTRUE(process_error) &&
                          has_stochastic_trend(mvgam_fit)) {
       sample_process_errors(
-        mvgam_fit, newdata = newdata, draw_ids = draw_ids
+        mvgam_fit, newdata = newdata, draw_ids = draw_ids,
+        resp = if (per_response) names(obs_linpred) else resp
       )
     } else {
       NULL
@@ -181,26 +180,21 @@ get_combined_linpred <- function(mvgam_fit, newdata,
   if (is_multivariate) {
     # Multivariate: combine each response separately
     combined <- lapply(names(obs_linpred), function(resp_name) {
-      obs_mat <- obs_linpred[[resp_name]]
-
-      # The trend arrives as one matrix or as one per response. A
-      # matrix is a state every response shares, which is what a
-      # marginal read of a wide fit gives: the trend design of a wide
-      # frame runs at time grain, since a covariate column there holds
-      # one value per time and cannot name a response. A list is the
-      # conditional read, where each response has its own
-      # `trend[t, s]` column and must be paired with it.
-      if (is.list(trend_linpred) && !is.matrix(trend_linpred)) {
-        trend_mat <- trend_linpred[[resp_name]]
-      } else {
-        # Shared trend across responses
-        checkmate::assert_matrix(trend_linpred)
-        trend_mat <- trend_linpred
+      # The trend and its noise each arrive as one matrix or as one per
+      # response. A matrix is shared by every response, which is what a
+      # marginal read of a wide fit gives for the deterministic part:
+      # the trend design of a wide frame runs at time grain, since a
+      # covariate column there holds one value per time and cannot name
+      # a response. A list holds each response's own, which the
+      # conditional state and a wide frame's noise both are.
+      own <- function(x) {
+        if (is.list(x) && !is.matrix(x)) x[[resp_name]] else x
       }
-
+      trend_mat <- own(trend_linpred)
+      checkmate::assert_matrix(trend_mat)
       compose_linpred_with_noise(
-        obs_mat = obs_mat, trend_mat = trend_mat,
-        trend_noise = trend_noise, resp_name = resp_name
+        obs_mat = obs_linpred[[resp_name]], trend_mat = trend_mat,
+        trend_noise = own(trend_noise), resp_name = resp_name
       )
     })
     names(combined) <- names(obs_linpred)
@@ -437,10 +431,10 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
   # distribution's parameter before any mass is moved to zero.
   # `posterior_epred()` is what answers for `E[Y]`.
   #
-  # A model written with `brms::mvbf()` names a family per response
-  # and stores none at the top level, so the link to invert is the one
-  # belonging to the response asked for. Unscoped, `family()` answers
-  # with the named list that matches the list of predictors.
+  # A model written with `brms::mvbf()` names a family per response,
+  # so the link to invert is the one belonging to the response asked
+  # for. Unscoped, `family()` answers with the named list that matches
+  # the list of predictors.
   fam <- if (is.null(resp)) {
     family(object)
   } else {
@@ -501,7 +495,7 @@ apply_mu_linkinv <- function(linpred, family) {
 dpar_posterior_linpred <- function(object, dpar, transform = FALSE,
                                    newdata = NULL, draw_ids = NULL,
                                    resp = NULL) {
-  family_name <- tolower(resolve_resp_family(object, resp))
+  family_name <- tolower(resolve_family_name(get_family_for_resp(object, resp)))
   valid <- get_family_dpars(family_name)
   if (!dpar %in% valid) {
     stop(insight::format_error(c(

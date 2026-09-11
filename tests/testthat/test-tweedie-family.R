@@ -288,21 +288,20 @@ test_that("custom families resolve to their constructor name, not 'custom'", {
   )
 })
 
-test_that("resolve_resp_family() returns a usable dispatch key for custom families", {
+test_that("family() names a custom family by its own name", {
+  # brms writes the placeholder "custom" into a custom family, and
+  # `family()` is the accessor other packages call, so it has to
+  # answer with the name mvgam records instead.
   stub <- structure(
     list(family = tweedie(), formula = y ~ x), class = "mvgam"
   )
-  expect_identical(mvgam:::resolve_resp_family(stub), "tweedie")
+  expect_identical(family(stub)$family, "tweedie")
 
-  # Built-in families are unaffected, and Gamma still case-folds
+  # Built-in families are unaffected
   gauss <- structure(
     list(family = gaussian(), formula = y ~ x), class = "mvgam"
   )
-  expect_identical(mvgam:::resolve_resp_family(gauss), "gaussian")
-  gam <- structure(
-    list(family = Gamma(), formula = y ~ x), class = "mvgam"
-  )
-  expect_identical(mvgam:::resolve_resp_family(gam), "gamma")
+  expect_identical(family(gauss)$family, "gaussian")
 })
 
 test_that("sample_from_family() accepts every dpar the registry can emit for it", {

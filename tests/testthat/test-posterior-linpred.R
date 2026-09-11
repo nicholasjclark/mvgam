@@ -18,7 +18,7 @@
 #' models in fast unit tests.
 
 stub_obj <- function(has_trend = TRUE, n_draws = 0L) {
-  out <- structure(list(), class = "mvgam")
+  out <- structure(list(formula = brms::bf(y ~ 1)), class = "mvgam")
   if (has_trend) {
     out$trend_model <- list(formula = ~ 1)
   }

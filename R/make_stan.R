@@ -140,12 +140,10 @@ build_stan_components <- function(formula, data, family = gaussian(),
       main_formula <- obs_formula
       dpar_forms   <- list()
     }
-    response_var <- as.character(main_formula[[2L]])
-    main_terms <- tryCatch(
-      stats::terms(main_formula), error = function(e) NULL
-    )
-    has_obs_covs <- if (is.null(main_terms)) FALSE else
-      length(attr(main_terms, "term.labels")) > 0L
+    response_var <- unname(response_columns(obs_formula)[1L])
+    has_obs_covs <- length(
+      attr(stats::terms(main_formula), "term.labels")
+    ) > 0L
     has_det_covs <- "p" %in% names(dpar_forms) &&
       length(attr(stats::terms(dpar_forms$p), "term.labels")) > 0L
     family <- prepare_closure_unit_family(
@@ -318,9 +316,6 @@ build_stan_components <- function(formula, data, family = gaussian(),
     # Filter priors: only pass trend-related priors to trend setup
     trend_priors <- filter_priors_by_side(prior, "trend")
     
-    # Extract response variables and time series structure for trend validation
-    response_vars <- extract_response_names(obs_formula)
-    
     # Extract time/series variables from trend specs following existing pattern
     if (is_multivariate_trend_specs(mv_spec$trend_specs)) {
       first_spec <- mv_spec$trend_specs[[1]]
@@ -331,8 +326,10 @@ build_stan_components <- function(formula, data, family = gaussian(),
       series_var <- mv_spec$trend_specs$series_var %||% mv_spec$trend_specs$series %||% "series"
     }
     
-    # Extract response variable names for mapping generation
-    response_vars <- extract_response_names(obs_formula)
+    # Each response's column, named by the key brms suffixes its data
+    # and parameters with: the frame is read by the one and the
+    # program is written with the other.
+    response_vars <- response_columns(obs_formula)
     
     # Consolidated trend processing - replaces dual path architecture
     components <- extract_and_validate_trend_components(

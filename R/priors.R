@@ -171,10 +171,9 @@ common_trend_priors <- list(
 #'
 #' @param trend_formula Trend formula specification
 #' @param data Data frame
-#' @param response_names Character vector of response variable names
 #' @return A brmsprior object with trend model priors
 #' @noRd
-extract_trend_priors <- function(trend_formula, data, response_names = NULL,
+extract_trend_priors <- function(trend_formula, data,
                                  .precomputed_dimensions = NULL,
                                  codegen = NULL,
                                  loadings_prior_spec = NULL) {
@@ -182,9 +181,6 @@ extract_trend_priors <- function(trend_formula, data, response_names = NULL,
     checkmate::assert_formula(trend_formula)
   }
   checkmate::assert_data_frame(data, min.rows = 1)
-  if (!is.null(response_names)) {
-    checkmate::assert_character(response_names, min.len = 1)
-  }
   if (!is.null(.precomputed_dimensions)) {
     checkmate::assert_list(.precomputed_dimensions, names = "named")
   }
@@ -197,12 +193,11 @@ extract_trend_priors <- function(trend_formula, data, response_names = NULL,
 
   # Parse trend formula to determine trend type
   trend_spec <- parse_trend_formula(trend_formula, data,
-                                   response_vars = response_names,
                                    .precomputed_dimensions = .precomputed_dimensions)
 
   # Generate priors based on trend type using convention-based dispatch
   # Pass data through for base formula prior extraction
-  trend_priors <- generate_trend_priors(trend_spec, data, response_names,
+  trend_priors <- generate_trend_priors(trend_spec, data,
                                         loadings_prior_spec = loadings_prior_spec,
                                         codegen = codegen)
 
@@ -217,19 +212,14 @@ extract_trend_priors <- function(trend_formula, data, response_names = NULL,
 #'
 #' @param codegen A list from `mvgam_codegen_options()`, or NULL
 #' @param trend_spec Trend specification from parse_trend_formula
-#' @param response_names Character vector of response names for
-#'   multivariate models
 #' @return A brmsprior object with trend priors
 #' @noRd
-generate_trend_priors <- function(trend_spec, data, response_names = NULL,
+generate_trend_priors <- function(trend_spec, data,
                                   loadings_prior_spec = NULL,
                                   codegen = NULL) {
   # Validate parameters before generating trend priors
   checkmate::assert_list(trend_spec, names = "named")
   checkmate::assert_data_frame(data, min.rows = 1)
-  if (!is.null(response_names)) {
-    checkmate::assert_character(response_names, min.len = 1)
-  }
 
   # Validate trend_spec structure before accessing components
   if (!"trend_model" %in% names(trend_spec)) {
@@ -1971,8 +1961,9 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
     return(obs_priors)
   }
 
-  # Extract response variable names for trend prior generation
-  response_names <- extract_response_names(formula)
+  # Each response's column, named by its key, as the fitting path
+  # builds them
+  response_vars <- response_columns(formula)
 
   # Parse multivariate trends and validate
   mv_spec <- parse_multivariate_trends(formula, trend_formula)
@@ -2019,7 +2010,7 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
   # `lv_axis()` as an unresolved variable inside brms's
   # `validate_data()`.
   components <- extract_and_validate_trend_components(
-    data, mv_spec, response_names, "time", "series", trend_formula
+    data, mv_spec, response_vars, "time", "series", trend_formula
   )
 
   # Extract dimensions from the validated spec
@@ -2053,7 +2044,6 @@ get_prior.mvgam_formula <- function(object, data, family = gaussian(),
   trend_priors <- extract_trend_priors(
     trend_formula = trend_formula_for_priors,
     data = components$trend_data,
-    response_names = response_names,
     .precomputed_dimensions = dimensions,
     codegen = codegen_from_dots(list(...)),
     loadings_prior_spec = loadings_prior_spec

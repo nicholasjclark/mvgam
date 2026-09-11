@@ -51,8 +51,7 @@ The Stan program:
 The model specification, used by prediction and forecasting:
 \itemize{
 \item \code{mv_spec} The parsed model specification, including the trend
-specifications and the response names
-\item \code{response_names} A \code{character} vector of response variables
+specifications
 \item \code{trend_metadata} The resolved trend details a prediction needs,
 including the time and series variables, the trend type and the
 number of latent factors. Its \code{axes} entry is the record of

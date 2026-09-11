@@ -55,9 +55,7 @@
 #'   The model specification, used by prediction and forecasting:
 #'
 #'   - `mv_spec` The parsed model specification, including the trend
-#'     specifications and the response names
-#'
-#'   - `response_names` A `character` vector of response variables
+#'     specifications
 #'
 #'   - `trend_metadata` The resolved trend details a prediction needs,
 #'     including the time and series variables, the trend type and the

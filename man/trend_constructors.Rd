@@ -192,7 +192,7 @@ or \code{ar3}).
 \code{p = k} is the VAR(k) interpretation with
 consecutive coefficient matrices for lags \code{1:k}.
 Sparse-lag vector \code{p} is not supported and will
-not be added: the Heaps-2022 stationary joint-
+not be added: the Heaps-2023 stationary joint-
 distribution initialisation assumes consecutive
 companion-form structure, so the sparse case has no
 companion-form analogue with the same identified
@@ -247,7 +247,7 @@ with fewer latent processes than observed series, see
 \code{vignette("dfm", package = "mvgam")}.
 }
 \note{
-\strong{VAR fits and \code{init = 0}}: VAR uses the Heaps-2022
+\strong{VAR fits and \code{init = 0}}: VAR uses the Heaps-2023
 stationary joint-distribution initialisation. Setting
 \code{init = 0} in the call to \code{\link[=mvgam]{mvgam()}} starts all parameters
 at zero on the unconstrained scale, which collapses the

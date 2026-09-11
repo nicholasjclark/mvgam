@@ -580,7 +580,7 @@ test_that("the tidiers keep this fit's own row order", {
   d <- as.data.frame(fit$data)
   vars <- fit$trend_metadata$variables
 
-  resp <- fit$response_names[1L]
+  resp <- mvgam:::response_column(fit)
   aug <- augment(fit)
   expect_true(is.data.frame(aug))
   expect_identical(nrow(aug), nrow(d))
@@ -609,8 +609,17 @@ test_that("every series gets a panel, and the panels are named", {
   strip_col <- intersect(c("series", "trend"), names(lay))[1L]
   labs <- as.character(lay[[strip_col]])
   expect_identical(nrow(lay), as.integer(n_series))
-  expect_false(any(is.na(labs)))
-  expect_setequal(labs, series_levels)
+  # In the axis's own order, which is the grouping's rather than the
+  # alphabet's, and each panel holds its own series' observations.
+  expect_identical(labs, series_levels)
+  drawn <- b$data[[1L]]
+  d <- as.data.frame(fit$data)
+  row_series <- paste(d$region, d$species, sep = "_")
+  for (k in seq_len(nrow(lay))) {
+    got <- drawn[as.integer(drawn$PANEL) == as.integer(lay$PANEL[k]), ]
+    own <- d[row_series == labs[k], ]
+    expect_equal(got$y[order(got$x)], own$y[order(own$time)])
+  }
 })
 
 
@@ -1013,7 +1022,7 @@ test_that("the axis maps a hierarchical newdata with no draws at all", {
     expect_length(training$observations[[s]], length(user_times))
   }
   # Each arm holds its own series' observations, in time order.
-  resp <- fit$response_names[1L]
+  resp <- mvgam:::response_column(fit)
   for (s in levs) {
     rows <- which(stated == s)
     rows <- rows[order(d[[vars$time_var]][rows])]

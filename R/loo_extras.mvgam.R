@@ -233,42 +233,6 @@ mvgam_loo_R2 <- function(y, epred, ll, r_eff) {
 }
 
 
-# Internal: shared PSIS-weighting skeleton for `loo_predict`,
-# `loo_epred`, and `loo_linpred`. Builds a PSIS object (via
-# `loo(save_psis = TRUE)` if none supplied), computes posterior
-# predictions through `posterior_fn`, and returns the PSIS-
-# weighted expectation/quantile via `loo::E_loo`, with the
-# brms-parity output normalisation (column-labelled matrix; for
-# 3D multivariate prediction arrays, returns a 3D array with the
-# per-response slabs stacked along the last dimension).
-#
-# Weights and predictions are both taken conditional on the latent
-# state, so the two describe the same observation rather than two
-# draws of the trend. What remains stochastic is the observation
-# noise `posterior_predict()` draws, and the calls run under a
-# shared seed so a repeated call answers the same way; the user's
-# RNG state is snapshotted on entry and restored on exit.
-#'@noRd
-# Internal: stop with a consistent message when a method that can only
-# operate on one response at a time is handed a multivariate fit and
-# no `resp`. Reason: a method without this guard fails deep in the
-# prediction stack with an internal message
-# ("is.numeric(x) is not TRUE") instead of naming the fix.
-#'@noRd
-assert_resp_for_mv <- function(object, resp, fn_name) {
-  if (!brms::is.mvbrmsformula(object$formula) || !is.null(resp)) {
-    return(invisible(NULL))
-  }
-  stop(insight::format_error(c(
-    paste0("'", fn_name, "()' requires 'resp' for multivariate models."),
-    i = paste0(
-      "Available responses: ",
-      paste(shQuote(object$response_names), collapse = ", "), "."
-    )
-  )), call. = FALSE)
-}
-
-
 #' Carry a per-row value onto the columns of `log_lik()`
 #'
 #' `log_lik()` answers at one column per row of the frame for most
@@ -465,6 +429,22 @@ narrow_to_scored <- function(x, scored_from) {
 }
 
 
+# Internal: shared PSIS-weighting skeleton for `loo_predict`,
+# `loo_epred`, and `loo_linpred`. Builds a PSIS object (via
+# `loo(save_psis = TRUE)` if none supplied), computes posterior
+# predictions through `posterior_fn`, and returns the PSIS-
+# weighted expectation/quantile via `loo::E_loo`, with the
+# brms-parity output normalisation (column-labelled matrix; for
+# 3D multivariate prediction arrays, returns a 3D array with the
+# per-response slabs stacked along the last dimension).
+#
+# Weights and predictions are both taken conditional on the latent
+# state, so the two describe the same observation rather than two
+# draws of the trend. What remains stochastic is the observation
+# noise `posterior_predict()` draws, and the calls run under a
+# shared seed so a repeated call answers the same way; the user's
+# RNG state is snapshotted on entry and restored on exit.
+#'@noRd
 mvgam_loo_E_loo <- function(object, posterior_fn,
                              type = c("mean", "var", "quantile"),
                              probs = 0.5, psis_object = NULL,
@@ -472,7 +452,8 @@ mvgam_loo_E_loo <- function(object, posterior_fn,
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_function(posterior_fn)
   fn_name <- loo_fn_name(posterior_fn)
-  assert_resp_for_mv(object, resp, fn_name)
+  resolve_resp(object, resp, required = TRUE,
+               caller = paste0(fn_name, "()"))
   # Refused before the weights are computed, not after: running PSIS
   # over the whole posterior to then reject the pairing spends
   # minutes to reach an answer already known from the family.
@@ -609,21 +590,22 @@ loo_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   checkmate::assert_list(args_epred)
   checkmate::assert_list(args_loglik)
   is_mv <- brms::is.mvbrmsformula(object$formula)
-  assert_resp_for_mv(object, resp, "loo_R2")
+  resolve_resp(object, resp, required = TRUE, caller = "loo_R2()")
   require_loo_pairing(object, "loo_R2")
   local_seed(seed)
-  resp_use <- scored_response_name(object, resp)
-  y <- object$data[[resp_use]]
-  if (is.null(y) || !is.numeric(y)) {
+  data_used <- mvgam_training_data(object)
+  y_col <- response_column(object, resp)
+  y <- data_used[[y_col]]
+  if (!is.numeric(y)) {
     stop(insight::format_error(c(
       paste0(
         "'loo_R2' requires a numeric response. Response '",
-        resp_use, "' is not numeric."
+        y_col, "' is not numeric."
       ),
       i = "LOO Bayesian R^2 is undefined for ordinal / categorical fits."
     )))
   }
-  resp_arg <- if (is_mv) list(resp = resp_use) else list()
+  resp_arg <- if (is_mv) list(resp = resp) else list()
   # The expectation and the importance weights have to describe the
   # same observation, so both are taken conditional on the latent
   # state the model inferred at that time. Pairing a marginal
@@ -645,7 +627,6 @@ loo_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   # unit on a detection family. Both reach the likelihood's grain
   # before the scored columns are selected from them, or the
   # selection takes a unit's index out of a visit-indexed vector.
-  data_used <- mvgam_training_data(object)
   y <- at_loglik_grain(object, data_used, y)
   epred <- at_loglik_grain(object, data_used, epred)
   y <- narrow_to_scored(y, ll)

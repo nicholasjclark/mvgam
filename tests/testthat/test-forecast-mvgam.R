@@ -43,7 +43,6 @@ make_mock_mvgam <- function(series_levels = "s1", n_time = 10L,
     family = poisson(),
     trend_model = list(),
     mv_spec = list(
-      response_names = "y",
       trend_specs = spec
     ),
     series_info = list(series_levels = series_levels),
@@ -791,15 +790,15 @@ test_that("the forecast grid does not depend on newdata row order", {
   train_info <- list(
     times = list(a = 1:10, b = 1:10),
     observations = list(a = training$y[1:10], b = training$y[11:20]),
-    data = training, series_var = "series", time_var = "time",
-    resp = "y"
+    data = training, series_var = "series", time_var = "time"
   )
+  model <- structure(list(formula = brms::bf(y ~ 1)), class = "mvgam")
   ordered_grid <- resolve_forecast_grid(
-    object = NULL, newdata = future, training = train_info,
+    object = model, newdata = future, training = train_info,
     series_levels = c("a", "b")
   )
   shuffled_grid <- resolve_forecast_grid(
-    object = NULL, newdata = future[c(5, 2, 6, 1, 4, 3), ],
+    object = model, newdata = future[c(5, 2, 6, 1, 4, 3), ],
     training = train_info, series_levels = c("a", "b")
   )
 

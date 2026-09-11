@@ -102,10 +102,9 @@ plot.mvgam <- function(
   checkmate::assert_class(x, "mvgam")
   type <- match.arg(type)
   # `resp` is the per-response selector for multivariate fits
-  # (mvbind / mvbrmsformula). When NULL on a mv fit the per-type
-  # branches below fan out across responses and return a named
-  # list of plots; when set to a single response name the plot
-  # is scoped to that response. Univariate fits ignore the arg.
+  # (mvbind / mvbrmsformula). When NULL on a mv fit each branch below
+  # draws every response in one figure; when set to a single response
+  # name the plot is scoped to that response.
   checkmate::assert_string(resp, null.ok = TRUE)
 
   switch(
@@ -117,12 +116,13 @@ plot.mvgam <- function(
       conditional_smooths(x, ndraws = ndraws, resp = resp, ...)
     ),
     trend = plot(
-      hindcast(x, type = "trend", ndraws = ndraws),
+      hindcast(x, type = "trend", ndraws = ndraws, resp = resp),
       series = series,
       ...
     ),
     factors = plot_factors(x, ...),
-    series = plot_mvgam_series(object = x, series = series, ...),
+    series = plot_mvgam_series(object = x, series = series, resp = resp,
+                               ...),
     latent_state = plot_latent_state(x, ndraws = ndraws, ...)
   )
 }

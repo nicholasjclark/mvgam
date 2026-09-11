@@ -221,33 +221,30 @@ named_family <- function(fam) {
 #' Extract family from mvgam object
 #'
 #' @param object mvgam object
-#' @param ... Additional arguments (unused)
-#' @return Family object
+#' @param resp Optional name of one response of a multivariate model.
+#'   Without it, a model with several responses answers with one
+#'   family per response.
+#' @param ... Unused. Anything passed here is refused.
+#' @return A family object, or a list of them named by response
 #' @importFrom stats family
 #' @export
-family.mvgam <- function(object, ...) {
+family.mvgam <- function(object, resp = NULL, ...) {
   checkmate::assert_class(object, "mvgam")
-
-  if (!is.null(object$family)) {
-    return(named_family(object$family))
-  }
+  rlang::check_dots_empty()
+  resolve_resp(object, resp)
 
   # A model written with `brms::mvbf()` gives each response its own
-  # family, so no single family describes it and none is stored. The
-  # families are on the formula, one per response, and are returned
-  # as a named list the way brms answers the same question.
-  forms <- object$formula$forms
-  if (!is.null(forms)) {
-    fams <- lapply(forms, function(form) form$family)
-    if (!any(vapply(fams, is.null, logical(1)))) {
-      return(lapply(fams, named_family))
-    }
+  # family, so no single family describes it. `$family` holds one
+  # anyway, the last arm's, which is why reading it answered every
+  # response with the gaussian. brms answers the question with one
+  # family per response, and so does this.
+  keys <- names(response_columns(object))
+  if (is.null(resp) && length(keys) > 1L) {
+    return(lapply(stats::setNames(keys, keys), function(r) {
+      named_family(get_family_for_resp(object, r))
+    }))
   }
-
-  stop(insight::format_error(c(
-    "Family not found in mvgam object.",
-    i = "The object may be corrupted or from an incompatible version."
-  )))
+  named_family(get_family_for_resp(object, resp))
 }
 
 #' Extract formula from mvgam object

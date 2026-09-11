@@ -262,10 +262,11 @@ mvgam_data <- function(data,
 
   if (isTRUE(plot)) {
     p <- series_obs_plot(
-      train         = data,
-      test          = newdata,
-      response      = y,
-      meta          = list(time_var = "time", series_var = "series"),
+      dat           = rbind(
+        series_long_df(data, y, data$series, "time", "train"),
+        series_long_df(newdata, y, newdata$series, "time", "validate")
+      ),
+      labels        = y,
       series_levels = series_levels,
       series        = series,
       lines         = lines,

@@ -308,16 +308,17 @@ get_group_names.mvgam <- function(model, ...) {
     return("main_marginaleffect")
   }
   # Both facts through the accessors that own them: the response
-  # name off the formula, the frame off the fit. Reading `$data`
+  # column off the formula, the frame off the fit. Reading `$data`
   # alone answers `NULL` for a fit that stores its frame as
   # `obs_data`, and the categories then come back as integers with
-  # nothing saying the labels were lost.
-  data <- mvgam_training_data(model)
-  resp <- mvgam_response_name(model)
-  if (is.na(resp) || !resp %in% names(data)) {
+  # nothing saying the labels were lost. A model with several
+  # responses has no one set of categories, and marginaleffects asks
+  # this once per model rather than per response.
+  columns <- response_columns(model)
+  if (length(columns) != 1L) {
     return("main_marginaleffect")
   }
-  y <- data[[resp]]
+  y <- mvgam_training_data(model)[[columns[[1L]]]]
   if (is.factor(y)) {
     return(levels(y))
   }

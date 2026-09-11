@@ -165,6 +165,24 @@ mvgam_axes <- function(object) {
        time = NULL)
 }
 
+#' Whether a fit's series are its responses
+#'
+#' A wide `mvbf()` frame holds one row per occasion and one column per
+#' response, so the series an observation sits on is the response it
+#' was measured for rather than anything the row names. Its series
+#' column, where there is one, is a single constant standing in for
+#' all of them. Every post-fit path that maps a row to a trend column
+#' has to know this, and the axis record states it, so this is the one
+#' test they ask. Rebuilding the answer from a frame instead cost a
+#' preparation pass per call and gave the question four spellings.
+#'
+#' @param object A fitted `mvgam` object
+#' @return A single logical
+#' @noRd
+is_response_keyed <- function(object) {
+  identical(mvgam_axes(object)$series$source, "multivariate")
+}
+
 #' The axes a stored metadata list describes
 #'
 #' The one place that knows a model saved before the record existed
@@ -212,25 +230,25 @@ axes_from_metadata <- function(meta) {
 #'
 #' @param object A fitted `mvgam` object
 #' @param data Frame to identify the rows of
+#' @param required Whether a frame naming no series and carrying no
+#'   grouping is refused rather than answered with `NULL`
 #' @return A factor with one entry per row, or `NULL` when the frame
 #'   names no series and carries no grouping. A frame keyed by
 #'   response answers `NULL`: there the series is a property of the
 #'   `(row, response)` pair, which one value per row cannot state,
 #'   and the caller reads the response axis instead.
 #' @noRd
-axis_row_series <- function(object, data) {
+axis_row_series <- function(object, data, required = FALSE) {
   checkmate::assert_data_frame(data)
-  meta <- object$trend_metadata
-  axes <- mvgam_axes(object)
-  # A response-keyed frame holds one row per time and one column per
-  # response, and its series column is a single constant standing in
-  # for all of them. Answering with that constant would put every row
-  # on the first series, so the question is refused here and the
-  # caller reads the response axis instead.
-  if (identical(axes$series$source, "multivariate")) {
+  checkmate::assert_flag(required)
+  # Answering for a response-keyed frame with its series constant
+  # would put every row on the first series, so the question is
+  # refused and the caller reads the response axis instead.
+  if (is_response_keyed(object)) {
     return(NULL)
   }
-  levs <- axes$series$levels
+  meta <- object$trend_metadata
+  levs <- mvgam_axes(object)$series$levels
   gr_var <- meta$variables$gr_var
   subgr_var <- meta$variables$subgr_var
 
@@ -251,6 +269,18 @@ axis_row_series <- function(object, data) {
   series_var <- meta$variables$series_var %||% "series"
   if (series_var %in% names(data)) {
     return(as_axis(data[[series_var]]))
+  }
+  if (required) {
+    stop(insight::format_error(c(
+      "The frame names no series this model was fitted on.",
+      x = paste0(
+        "Got columns: ", paste(names(data), collapse = ", "), "."
+      ),
+      i = paste0(
+        "Supply the column the model reads, or the grouping columns ",
+        "that name a series between them."
+      )
+    )), call. = FALSE)
   }
   NULL
 }
@@ -293,8 +323,10 @@ complete_axes_grain <- function(axes, has_by_lv, had_by_lv) {
 #' @param times Per-row times, in the units the record carries
 #' @param response_axis The response axis where the responses are the
 #'   series, from `mvgam_response_axis()`, and `NULL` otherwise
-#' @param response_vars The response columns, used to tell an
-#'   observation from a padding row on a stacked frame
+#' @param response_vars The response columns named by response key, from
+#'   `response_columns()`. They say which column a response-keyed series
+#'   is read from, and tell an observation from a padding row on a
+#'   stacked frame.
 #' @return One time per axis entry, `NA` where a series has no rows
 #' @noRd
 axis_last_times <- function(data, series_vals, series_axis, times,
@@ -310,8 +342,8 @@ axis_last_times <- function(data, series_vals, series_axis, times,
   # one series that every response is measured on, and there the
   # levels are not column names at all.
   if (!is.null(response_axis)) {
-    return(vapply(as.character(series_axis), function(resp) {
-      seen <- times[!is.na(data[[resp]])]
+    return(vapply(as.character(series_axis), function(key) {
+      seen <- times[!is.na(data[[response_vars[[key]]]])]
       if (!length(seen)) NA_real_ else max(as.numeric(seen))
     }, numeric(1L), USE.NAMES = FALSE))
   }

@@ -296,26 +296,6 @@ following the documentation reaches working code.
 
 ## Fits still worth adding
 
-### An `mvn()` fit
-
-Nothing in `tests/local` fits one, and the four findings that named
-that family were all settled on a throwaway fit rather than on a
-cached one. Five species on two factors satisfies `(K - m)^2 >= K + m`,
-so the residual scale is separable there and the recovery assertions
-finding 5 records as untestable at four species become testable.
-
-Driven on such a fit, `forecast(type = "expected")` lands on the scale
-`posterior_epred()` occupies and `forecast(type = "response")` draws
-rather than refusing. `plot(type = "residuals")` and `augment()` both
-answer, and `hindcast(type = "latent_state")` refuses by naming the
-family instead of naming a source file to edit. None of that is under
-an assertion until the fixture exists.
-
-The same fit carried 104 divergences in 1000 at a true `Psi` of 0.5,
-which is finding 5's funnel appearing at a `(K, m)` pair the
-identification bound admits. That pair is what separates the two
-mechanisms, so the fixture is also the evidence for that entry.
-
 ### The remaining shapes
 
 The wide `mvbf()` frame, the fixed-loading `trend_map`, `lfo_cv()` on
@@ -619,38 +599,6 @@ the failure is a missing column rather than a message.
 Neither spelling is documented as the contract, so the assertions
 resolve whichever is present rather than fixing one.
 
-## Plotted output
-
-**55. `plot(type = "trend")` orders its panels alphabetically while
-every other per-series surface uses the model's order.**
-
-Found by rendering the plots and looking at them. Two fits whose
-series are declared out of alphabetical order:
-
-| surface | arma, declared `kappa, beta` | var, declared `willow, ash, rowan` |
-|---|---|---|
-| `plot(type = "trend")` | beta, kappa | ash, rowan, willow |
-| `plot(type = "series")` | kappa, beta | willow, ash, rowan |
-| `hindcast()` arms | kappa, beta | willow, ash, rowan |
-| `plot(hindcast(), series = 1)` | kappa | willow |
-
-So the trend plot is the one that sorts. Placed beside the series
-plot, which is the obvious comparison to make, its first panel holds
-a different series, and both are labelled only by name so nothing on
-either picture says the order changed. `series = 1` agrees with the
-series plot and disagrees with the trend plot.
-
-This is the plan's own class reaching the output a reader looks at
-rather than a number they compute: one axis, two orders, every label
-correct in isolation.
-
-The hierarchical fit is the worst case, because its axis is derived
-and cannot be recovered by sorting anything. Declared `south_sp_c,
-south_sp_a, south_sp_b, north_sp_c, north_sp_a, north_sp_b`, the trend
-panels come back `north_sp_a, north_sp_b, north_sp_c, south_sp_a,
-south_sp_b, south_sp_c`. All six positions differ, so no panel in the
-trend plot holds the series the series plot puts in the same place.
-
 ## com_binomial and the trials aterm
 
 **61. The smooth grid omits a distributional parameter's covariate.**
@@ -700,200 +648,6 @@ knowing the class, so a package that answers `model.frame()` and not
 hierarchical fits, which between them cover a univariate trend, a
 multivariate one, a response-keyed axis and a derived one, so it
 belongs to the class rather than to any model.
-
-## A wide fit describing itself
-
-**65. `family()` reports one arm of three, and ignores `resp`.**
-
-`test-grain-mvbf-wide.R`, "the fit reports the family of every arm it
-was given". The fit carries a poisson, a bernoulli and a gaussian
-response. Asked which family it has:
-
-| call | answer |
-|---|---|
-| `family(fit)` | gaussian |
-| `family(fit, resp = "count")` | gaussian |
-| `family(fit, resp = "seen")` | gaussian |
-| `glance(fit)$family` | poisson, bernoulli, gaussian |
-
-`family.mvgam()` already holds the right behaviour and cannot reach
-it. `R/print.mvgam.R:181` returns `object$family` when that is set,
-and falls through to a branch that reads one family per response off
-`object$formula$forms` otherwise. Its comment says a model written
-with `brms::mvbf()` has no single family so none is stored. One is
-stored. `fit$family` holds the gaussian, being the last arm, so the
-branch written for this case is unreachable and the comment above it
-describes something that does not happen.
-
-`resp` is the second half. `family.mvgam(object, ...)` takes no such
-argument. Naming a response lands it in `...` where nothing reads it,
-so the caller is answered about a different response without being
-told. Findings 6, 49 and 58 record the same shape, an argument taken
-and then dropped, on a constructor rather than on an accessor.
-
-`glance()` reads the formula and gets all three, so the information is
-on the object and only this accessor loses it. `family()` is what
-other packages call, which is what makes it the one of the two that
-matters.
-
-**66. `model.frame()` returns a wide fit's predictors and none of its
-responses.**
-
-Same file. The frame comes back 60 by 2, holding `x` and `time`. The
-three responses are absent, while `fit$data` and
-`insight::get_data()` each return all five columns.
-
-`model.frame.mvgam()` at `R/insight.mvgam.R:230` builds its column
-list as the response plus the predictors:
-
-```r
-response <- all.vars(mvgam_obs_formula(formula)[[2L]])
-```
-
-On an `mvbrmsformula` that subscript is not a language object. It is
-the character vector `c(count = "count", seen = "seen", "mass")`, and
-`all.vars()` of a character vector is `character(0)`. So the responses
-are dropped and the intersection keeps the predictors alone.
-
-`names(formula$formula$forms)` holds the three names, so the answer is
-on the object. A univariate fit is unaffected, since there the
-subscript is a symbol and `all.vars()` reads it.
-
-`model.frame()` is the standard route to a fitted model's data, and a
-frame with no response cannot be used for anything it is normally
-reached for. Finding 64 records `terms()` raising on the same object,
-so the two accessors a caller pairs are broken together.
-
-## A wide fit, drawn
-
-**70. `plot(type = "trend")` draws one response's latent state in
-every panel.**
-
-`test-grain-mvbf-wide.R`, "each trend panel draws its own response's
-latent state". The fit holds three responses with three latent
-columns. The sampler separates them: the posterior means of
-`trend[, 1]`, `trend[, 2]` and `trend[, 3]` differ by up to 1.73 and
-carry standard deviations of 0.504, 0.161 and 0.270.
-
-The plot draws three panels whose strips read `count`, `mass` and
-`seen`. Reading the line layers off the built object, on every x the
-three panels share:
-
-| pair | shared x | max abs difference |
-|---|---|---|
-| count vs seen | 55 | 0 |
-| count vs mass | 52 | 0 |
-| seen vs mass | 53 | 0 |
-
-One trajectory, drawn three times. The first five drawn values are
-0.1714, -0.0227, -0.0454 in all three panels, against the sampler's
-own 0.1333, 0.0868, 0.1441 for `seen` and -0.1149, 0.1097, 0.0639 for
-`mass`.
-
-The fault hides because the panels are otherwise right. Each is
-truncated to its own response's observed length, 57, 58 and 55, so the
-three pictures are different widths and no two are pixel identical.
-The strips are correct, the counts are correct and the content is one
-series repeated.
-
-The panel order is wrong in the same picture. The responses are
-declared `count, seen, mass` and the strips read `count, mass, seen`,
-which is finding 55 on a fourth fit.
-
-Driven again after the conditional read was fixed, the panels are
-still identical on every shared x, and the reason is now located. The
-hindcast arms the plot is built from do differ once each response
-reads its own `trend[t, s]` column: across the three elements of the
-fan-out they separate by 1.19, 1.73 and 0.95. Within any one element
-they do not. `build_hindcast_arms()` (`R/forecast.mvgam.R:740`) loops
-the series levels, which on a response-keyed fit are the responses,
-and hands `hindcast_one_series()` the caller's single `resp` for every
-one of them, so all three arms of an element read that response's
-state. The plot then draws one element's three arms.
-
-So the fault is not in the plotting layer, and looking for it there
-will not find it. It is that a response-keyed fit fans out twice: once
-in `hindcast.mvgam()` through `mv_resp_fan_out()` and again in the
-series loop, which is already a loop over the responses. Reconciling
-those two removes a loop rather than adding an argument.
-
-`plot(type = "series")` on the same object is the other half. It draws
-a single panel whose strip reads `NA`. Its one layer holds 60 rows and
-its y axis is labelled `count`. Two of the three responses are not
-drawn at all and the one that is carries no name. Every other
-per-response surface on this fit answers correctly, `glance()` and
-`augment()` included, which places both faults in the plotting layer
-rather than in the fit.
-
-The two halves have different reach, and the hierarchical fit settles
-which is which. `test-trend-hierarchical.R` draws six series on a
-derived axis:
-
-| call | on the hierarchical fit |
-|---|---|
-| `plot(type = "trend")` | six panels, six distinct trajectories, named |
-| `plot(type = "series")` | one panel, strip `NA`, all six overplotted |
-
-So the trend panels are drawn correctly wherever the axis is a series,
-and the repetition in the wide fit belongs to the response-keyed axis
-alone. The series panel collapses on both, which makes it a property
-of any axis the frame has no column for, derived or response-keyed.
-Six series drawn over one another read as noise rather than as a
-series, so nothing about the picture invites a second look.
-
-**73. Some methods class the list they fan out, and some leave it
-bare.**
-
-Same fit. Every method that answers per response returns a list keyed
-by the response name. Three of them class that list and three leave it
-bare:
-
-| call | class of the fan-out |
-|---|---|
-| `hindcast()`, `forecast()` | `mvgam_forecast` |
-| `conditional_effects()` | `mvgam_conditional_effects` |
-| `plot()`, `pp_check()`, `predict()` | `list` |
-
-The consequence is visible at the console. `pp_check(fit)` holds three
-ggplots and prints as a list, so the reader gets `$count`, a plot,
-`$seen`, a plot, `$mass`, a plot, rather than one figure. `plot(fit)`
-does the same. On a univariate fit both return a single object that
-renders, so the wide fit is where the two behaviours part.
-
-Naming a response sidesteps it, since `pp_check(fit, resp = "count")`
-returns a plain ggplot. Recorded because the default call is the one a
-reader makes first.
-
-**Checked and correct.** `pp_check(fit, resp = )` draws the right data
-for each arm: the plotted x range covers 2 to 47 for the poisson arm,
-0 to 1 for the bernoulli and 0.05 to 3.34 for the gaussian, matching
-each response's own observations.
-
-## A wide fit and the evaluation surface
-
-**67. `score()` refuses the object `forecast()` gave it.**
-
-`test-grain-mvbf-wide.R`, "a wide forecast can be scored". A wide fit
-fans out per response, so `forecast()` returns an `mvgam_forecast`
-carrying one element per response rather than the arms directly. Each
-element is complete: for `count` the `count` arm holds a 50 by 5
-matrix of finite draws and `test_times` names the five held-out
-occasions.
-
-`score()` on that object answers
-
-    'object' contains no held-out forecasts to score.
-    Pass 'newdata' covering held-out times to 'forecast()'.
-
-which is what produced the object. Indexing the wrapper first works,
-so `score(fc[["count"]])` returns a scored list and the forecasts were
-there throughout. The method reads `$forecasts` off the outer object.
-A fan-out wrapper keeps nothing there, so the absence is reported as
-the user's mistake.
-
-This is finding 9's shape a third time, a refusal whose stated remedy
-has already been followed. It reaches every multivariate fit, since
-the fan-out is how `mvbf()` and `jsdgam()` both answer.
 
 ## Two documents, two contracts
 
@@ -1139,116 +893,48 @@ its own comment claims the one it does not give.
 
 ## What reading a rendered article shows
 
-**80. `vignettes/articles/var.Rmd` publishes four faults that a
-successful knit cannot see.**
+**80. The VAR article's fit asks for four chains and reports three.**
 
-Found by reading the rendered output rather than by checking that it
-rendered. The article knits in 14.1 minutes with no error and no
-warning, and every one of these is in the page a reader gets.
+Found by reading the rendered `vignettes/articles/var.Rmd` rather than
+by checking that it rendered. The article knits in 14.1 minutes with
+no error and no warning.
 
-**The figure captions name the wrong regions.** The frame declares
-`regions <- c("BC", "Alb", "Sask")` and then builds the series axis
-with `as.factor(region)`, so the levels sort to `Alb, BC, Sask` and
-`region_order <- levels(train$series)` is that order. The inline text
-is computed from `region_order` and is right. The captions were
-written by hand from the declaration order and are not:
-
-| call | caption says | the text below it says |
-|---|---|---|
-| `plot(irfs, series = 1)` | region 1 (British Columbia) | "A shock to Alb" |
-| `plot(irfs, series = 2)` | region 2 (Alberta) | "a shock to BC" |
-| `plot(irfs, series = 3)` | region 3 (Saskatchewan) | Saskatchewan |
-
-Two of the three contradict the sentence directly beneath them, and
-the third agrees only because `Sask` is third in both orders. This is
-finding 55's permutation, alphabetical against declared, reaching a
-published page. Finding 8 is why it happened: `irf()` labels its
-shocks `Process_k`. The article therefore maps them back by hand at
-`var.Rmd:336`. A positional mapping written out twice is one that can
-be inverted once. The entry predicted that a label nobody
-can resolve makes the table unusable without knowing the internal
-ordering. Here the package's own article got it wrong.
-
-**A computed value contradicts the prose around it.**
-`cross_resolved` counts the cross-region impulse responses whose 95%
-interval excludes zero. It renders as 2. The sentence it sits in
-continues "the intervals do not support telling it", and the
-paragraph closes "any spillover is too small for this series to pin
-down". The prose was written for a zero that the fit did not produce,
-so the article states a conclusion its own number refutes.
-
-**The fit asks for four chains and reports three.** The chunk at
-`var.Rmd:133` reads `chains = 4`, and the `summary()` printed
-underneath it says "Draws: 3 chains" with 4500 post-warmup draws,
-which is 3 x 1500 exactly. So three chains are what the numbers rely
-on. `summary()` is not miscounting: fitted at 2, 3 and 4 chains it
-reports 2, 3 and 4 and `ndraws()` agrees each time. A chain was
+The chunk at `var.Rmd:133` reads `chains = 4`, and the `summary()`
+printed underneath it says "Draws: 3 chains" with 4500 post-warmup
+draws, which is 3 x 1500 exactly. So three chains are what the numbers
+rely on. `summary()` is not miscounting: fitted at 2, 3 and 4 chains
+it reports 2, 3 and 4 and `ndraws()` agrees each time. A chain was
 therefore lost during this fit and nothing said so, with `silent = 2`
-covering whatever was raised. A quarter of a posterior leaving
-without a word is worth a message the caller cannot suppress by
-asking for a quiet fit.
+covering whatever was raised. A quarter of a posterior leaving without
+a word is worth a message the caller cannot suppress by asking for a
+quiet fit. Settling it needs the article re-rendered.
 
-**A citation disagrees with its own reference list.** The text cites
-Heaps [2022] twice, at `var.Rmd:38` and `var.Rmd:172`. The reference
-list gives Heaps SE (2023), JCGS 32(1), 74-83, under the same DOI.
-The list is right.
+**82. `posterior_summary()` prints each arm's intercept twice, and
+the mvbf article corrects a sign nothing makes indeterminate.**
 
-**82. `vignettes/articles/mvbf.Rmd` reports one intercept twice and
-promises a call that is refused.**
+Both were found by reading the rendered `vignettes/articles/mvbf.Rmd`.
 
-Found the same way as finding 80, by reading the rendered page.
+`posterior_summary()` on a multivariate fit carries two spellings of
+every arm's intercept, `Intercept_<r>` and `b_<r>_Intercept`, with
+nothing to say they sit on different scales. That is brms's centred
+parameterisation rather than an mvgam fault. `Intercept_<r>` is the
+intercept at the covariate mean and `b_<r>_Intercept` the intercept at
+zero, so the two part company by the slope times the covariate mean.
+On the article's camera arm, whose covariate `deploy_days` is drawn
+`Unif(5, 20)` and not centred, the two read 0.007 and -0.882 against
+a truth of -0.5. The article now reads only the `b_` spelling and
+says why, but a reader of the table the package prints still has two
+rows and no guide.
 
-**The recovery table gives the camera arm two intercepts.** The
-printed table carries both spellings of every arm's intercept:
-
-| name | Estimate | truth |
-|---|---|---|
-| `Intercept_count` | 1.559 | 1.5 |
-| `b_count_Intercept` | 1.559 | 1.5 |
-| `Intercept_biomass` | 0.580 | 0.5 |
-| `b_biomass_Intercept` | 0.580 | 0.5 |
-| `Intercept_camera` | 0.007 | -0.5 |
-| `b_camera_Intercept` | -0.882 | -0.5 |
-
-The prose beneath says "every intercept ... sit close to their
-generating values". Two of the six do not, and a reader has no way
-to tell which of the two camera rows to read against `a_camera`.
-
-The mechanism is brms's centred parameterisation rather than an
-mvgam fault. `Intercept_<r>` is the intercept at the covariate mean
-and `b_<r>_Intercept` the intercept at zero. The two therefore part
-company by the slope times the covariate mean. Only the camera arm
-carries an uncentred covariate: `deploy_days` is drawn
-`Unif(5, 20)`, and 0.077 x 12.5 is 0.96, which is the gap. Checked on the wide fixture,
-where `x` is drawn `rnorm` and centred already, the two spellings
-agree to 0.008 on all three arms, which is what confirms the
-mechanism.
-
-So the package is behaving as brms does and the article is reading
-it wrongly. It is recorded for two reasons. The table is a recovery
-check, which is the one thing a reader of a simulation study acts on.
-And `posterior_summary()` prints both names with nothing to say that
-they sit on different scales.
-
-**A promise the package refuses.** The article closes the forecast
-section with "The same forecast objects feed straight into
-`score()`". Finding 67 records what `score()` answers on the forecast of a wide
-fit: "'object' contains no held-out forecasts to score". The fan-out
-wrapper keeps nothing in `$forecasts` and the method reads that slot.
-The article never runs the call, so the knit cannot catch it. A
-reader who follows the sentence meets a refusal telling them to do
-what they already did.
-
-**A sign flip applied where nothing is indeterminate.**
 `recovery_summary()` multiplies each posterior by
 `sign(cor(med, truth$x))`, explaining that "latent factor models
 identify the trend only up to sign". None of the four fits is a
-factor model. Each is an AR(1) state with an identified intercept,
-so the sign is identified and the correction has nothing to fix.
-What it does instead is guarantee a non-negative correlation with
-the truth for every fit in the table, which can only move RMSE
-downward. The comparison it feeds is the article's headline claim
-that the joint fit recovers the state best.
+factor model. Each is an AR(1) state with an identified intercept, so
+the sign is identified and the correction has nothing to fix. What it
+does instead is guarantee a non-negative correlation with the truth
+for every fit in the table, which can only move RMSE downward. The
+comparison it feeds is the article's headline claim that the joint
+fit recovers the state best.
 
 ## An article that does not build
 
@@ -1315,6 +1001,72 @@ is that `contributing` is not a misspelling a user invented. It is
 documented. It is motivated by a named use case. The package's own
 vignette calls it.
 
+## Debt the code carries in recognisable shapes
+
+**89. Nine shapes account for the defects found so far, and a scan
+can already count five of them.**
+
+No file covers this yet. The defects fixed while consolidating the
+response accessor were all found by reading. Read together, they
+follow nine shapes, and each shape leaves a mark in the source that
+a scan can find. The counts below were taken across
+`R/` on 2026-09-11. Several include false positives. The
+unused-argument scan counts dispatch kernels that share a signature
+(`log_lik_*` taking `trials`) and generics such as `methods_md()`,
+so each hit needs reading before it is removed.
+
+| shape | the mark it leaves | count |
+|---|---|---|
+| one fact, several derivers | raw `[[series_var]]` / `[[time_var]]` reads; `sort(unique(...))` axis rebuilds; `is.mvbrmsformula()` or `inherits(..., "mvbrmsformula")` asked in place of the question actually meant | 51, 40, 43 |
+| an error turned into a default | `try()` and `tryCatch()` returning `NULL`, `FALSE` or an empty vector | 33 |
+| a literal standing in for a missing value | `%||% "y"`, `%||% "series1"`, `%||% "explicit"` | 113 |
+| a missing column skipped rather than refused | `intersect(x, names(data))`, `if (!col %in% names(df)) next` | 16, 9 |
+| an argument nothing reads | accepted, asserted, never used; the scan also flags `df` on `AR()`, `RW()`, `CAR()` and `ZMVN()`, which is finding 6's shape if it holds | 113 non-S3 functions |
+| a stored copy of a derivable fact | object slots and metadata fields written once and read in a few places | not yet counted |
+| one condition, several refusals | the same fault refused with different wording at different layers | not yet counted |
+| a proxy for the question meant | "the frame has no series column" standing for "the responses are the series"; `length(x) > 1` standing for "multivariate" | found by reading |
+| an order lost to sorting | a facet over a character column; `factor(x)` given no levels | found by reading |
+
+What each shape cost when it was met:
+
+- One fact with several derivers meant eight accessors for "which
+  responses does this model have". One of them read the frame by
+  brms's key for a response rather than by its column. brms drops
+  every `.` and `_` from a response name, so every trend model whose
+  response carried either character was refused while it was being
+  built.
+- A missing column skipped rather than refused is how that key went
+  unnoticed. `count_observed_times()` intersected it with the frame's
+  columns and answered as though the response had no observations.
+- A stored copy drifted from its source. `object$response_names`
+  held column names on one model and brms keys on another, and five
+  readers took it for whichever they needed.
+- One condition had seven refusals. An unknown `resp` was met with
+  seven different messages, depending on which method was called
+  first.
+- A proxy test answered a different question. `build_training_tail_data()`
+  took the absence of a series column to mean the responses were the
+  series. That is also true of a hierarchical frame, whose series
+  come from its grouping columns.
+- An order lost to sorting put the trend panels in alphabetical
+  order, since they were faceted over a character column, beside a
+  series plot drawn in the model's own order.
+
+The tests carry the same debt. Stubs that fake a class, such as
+`structure(y ~ x, class = c("brmsformula", "formula"))`, or that
+carry slots a real fit no longer has, let an assertion pass on an
+object no user could build. Assertions that compare counts or use
+`expect_setequal()` pass where the claim being tested is an order or
+a value.
+
+The scans are cheap and their counts can only be driven down by
+deleting code. So the fix is a saved scan per shape in `tests/local`
+and one pass per shape, starting with the two that return wrong
+answers without saying so: swallowed errors and skipped columns.
+Each pass removes the rival, the fallback or the proxy, adds an
+assertion that fails before the change and records the count before
+and after.
+
 ## Which documents have actually been built
 
 Recorded because a knit that skips every chunk reports success. The
@@ -1340,8 +1092,9 @@ of them and returns in seconds. Everything below was built with
 the articles. Nothing here has run it to completion, so its row is
 blank rather than green.
 
-Three of the eight that build carry a defect the build cannot see.
-`var.Rmd` and `mvbf.Rmd` under findings 80 and 82, and `jsdgam.Rmd`
-under a paragraph of stale numbers. All three are repaired. A knit
-reports whether the code ran. The faults reading found sat in what
-the code printed and in the prose beside it.
+Three of the eight that build carried a defect the build cannot see:
+`var.Rmd`, `mvbf.Rmd` and `jsdgam.Rmd`, whose paragraph of stale
+numbers is repaired. What is still open in the first two is under
+findings 80 and 82. A knit reports whether the code ran. The faults
+reading found sat in what the code printed and in the prose beside
+it.

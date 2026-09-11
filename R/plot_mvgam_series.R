@@ -16,11 +16,13 @@
 #' @param newdata Optional data frame / list of future
 #'   observations with the same `time` and `series` columns as
 #'   the training data. When omitted the function uses
-#'   `object$test_data` if persisted (forward-compatible with
-#'   `mvgam()` newdata persistence; currently always NULL).
+#'   `object$test_data`.
 #' @param series `NULL` (default), `"all"`, or a positive
 #'   integer indexing the series levels. `NULL` resolves to
 #'   `"all"` for multi-series fits and `1` for single-series.
+#' @param resp Optional response of a multivariate fit. Where the
+#'   responses are the series it narrows the plot to that response's
+#'   series; otherwise it names the response every series is drawn for.
 #' @param lines Logical. Plot lines (default) or points.
 #' @param n_bins Optional histogram bin count. Defaults to the
 #'   number returned by `hist(..., plot = FALSE)$breaks` (at
@@ -37,22 +39,54 @@ plot_mvgam_series <- function(
   object,
   newdata = NULL,
   series = NULL,
+  resp = NULL,
   lines = TRUE,
   n_bins = NULL,
   log_scale = FALSE
 ) {
   checkmate::assert_class(object, "mvgam")
-
-  meta <- object$trend_metadata$variables %||%
-    list(time_var = "time", series_var = "series")
-  resp <- (object$response_names %||% "y")[1L]
+  resolve_resp(object, resp)
+  time_var <- object$trend_metadata$variables$time_var %||% "time"
   series_levels <- resolve_series_info(object)$series_levels
+  test <- newdata %||% object$test_data
+  if (!is.null(test) && !is.null(object$trend_metadata)) {
+    validate_prediction_factor_levels(test, object$trend_metadata)
+  }
+
+  # Where the responses are the series, a row is one occasion carrying
+  # every response, so each series is its own response's column and
+  # the frame is stacked one response at a time. Everywhere else a row
+  # names its series the way the fit identified it, and every series
+  # is drawn for the one response in scope. Reading the raw series
+  # column instead put a derived axis in a single panel labelled NA,
+  # and reading one response column drew one response of three.
+  keyed <- is_response_keyed(object)
+  if (keyed && !is.null(resp)) {
+    series_levels <- resp
+  }
+  labels <- if (keyed) {
+    vapply(stats::setNames(series_levels, series_levels),
+           function(key) response_column(object, key), character(1L))
+  } else {
+    response_column(object, resp)
+  }
+  long_of <- function(df, label) {
+    if (is.null(df)) {
+      return(NULL)
+    }
+    if (keyed) {
+      return(do.call(rbind, lapply(series_levels, function(key) {
+        series_long_df(df, labels[[key]], key, time_var, label)
+      })))
+    }
+    series_long_df(df, labels, axis_row_series(object, df, required = TRUE),
+                   time_var, label)
+  }
 
   series_obs_plot(
-    train         = mvgam_training_data(object),
-    test          = newdata %||% object$test_data,
-    response      = resp,
-    meta          = meta,
+    dat           = rbind(long_of(mvgam_training_data(object), "train"),
+                          long_of(test, "validate")),
+    labels        = labels,
     series_levels = series_levels,
     series        = series,
     lines         = lines,
@@ -68,11 +102,15 @@ plot_mvgam_series <- function(
 # whether the input comes from a fitted `mvgam` object
 # (`plot_mvgam_series()` / `plot.mvgam(type = "series")`) or a
 # raw long-format data frame (`mvgam_data()` pre-fit). Both
-# callers pass already-resolved metadata so this helper does no
-# class dispatch.
+# callers pass the long frame `series_long_df()` builds, so this
+# helper does no class dispatch.
+#
+# `labels` names what the y axis measures: one response column, or
+# one per series where each series is a different response. A panel
+# of one series takes its own; a facet over several responses takes
+# a label none of them can claim alone.
 #'@noRd
-series_obs_plot <- function(train, test, response, meta,
-                             series_levels, series = NULL,
+series_obs_plot <- function(dat, labels, series_levels, series = NULL,
                              lines = TRUE, n_bins = NULL,
                              log_scale = FALSE) {
   checkmate::assert_flag(lines)
@@ -82,12 +120,17 @@ series_obs_plot <- function(train, test, response, meta,
   set_color_scheme_local("red")
 
   series_idx <- resolve_series_index(series, length(series_levels))
-
-  dat <- rbind(
-    series_long_df(train, response, meta, label = "train"),
-    series_long_df(test,  response, meta, label = "validate")
-  )
   dat$series <- factor(dat$series, levels = series_levels)
+  s_name <- if (identical(series_idx, "all")) NULL else {
+    series_levels[series_idx]
+  }
+  response <- if (!is.null(s_name) && length(labels) > 1L) {
+    labels[[s_name]]
+  } else if (length(unique(labels)) == 1L) {
+    labels[[1L]]
+  } else {
+    "Observed value"
+  }
 
   # An ordinal response arrives as an ordered factor, which none of the
   # four panels can take. Its level index is the representation the rest
@@ -113,10 +156,9 @@ series_obs_plot <- function(train, test, response, meta,
   }
   if (log_scale) dat$y <- log(dat$y + 1)
 
-  if (identical(series_idx, "all")) {
-    return(series_all_plot(dat, ylab, lines))
+  if (is.null(s_name)) {
+    return(series_time_plot(dat, ylab, lines))
   }
-  s_name <- series_levels[series_idx]
   dat_s <- dat[as.character(dat$series) == s_name, , drop = FALSE]
   if (nrow(dat_s) == 0L) {
     stop(insight::format_error(c(
@@ -125,7 +167,7 @@ series_obs_plot <- function(train, test, response, meta,
     )))
   }
   patchwork::wrap_plots(
-    series_ts_panel(dat_s, ylab, lines),
+    series_time_plot(dat_s, ylab, lines, facet = FALSE),
     series_hist_panel(dat_s$y, ylab, n_bins),
     series_acf_panel(dat_s$y),
     series_ecdf_panel(dat_s$y, ylab),
@@ -160,44 +202,46 @@ resolve_series_index <- function(series, n_series) {
 }
 
 
-# Internal: pull (time, y, series, data) from a training or test
-# data frame using the canonical column names recorded on the
-# fit. Returns NULL when `df` is NULL so callers can `rbind` it
-# unconditionally.
+# Internal: one long `(time, y, series, data)` block from a training
+# or test frame. The caller says which column is the response and
+# which series each row is on, because that is a question about the
+# model rather than about the frame. Returns NULL when `df` is NULL so
+# callers can `rbind` it unconditionally.
 #'@noRd
-series_long_df <- function(df, resp, meta, label) {
+series_long_df <- function(df, response, series, time_var, label) {
   if (is.null(df)) {
     return(NULL)
   }
-  if (!resp %in% names(df)) {
+  if (!response %in% names(df)) {
     stop(insight::format_error(c(
       "Response variable not found in data.",
-      x = paste0("Expected: '", resp, "'."),
+      x = paste0("Expected: '", response, "'."),
       i = paste0("Got columns: ",
                  paste0("'", names(df), "'", collapse = ", "), ".")
     )))
   }
-  series_vec <- if (!is.null(meta$series_var) &&
-                     meta$series_var %in% names(df)) {
-    df[[meta$series_var]]
-  } else {
-    factor(rep("series1", length(df[[resp]])))
-  }
   data.frame(
-    time = df[[meta$time_var %||% "time"]],
-    y = df[[resp]],
-    series = series_vec,
+    time = df[[time_var]],
+    y = df[[response]],
+    series = as.character(series),
     data = label,
     stringsAsFactors = FALSE
   )
 }
 
 
-# Internal: faceted multi-series time-series plot. One panel
-# per series; training observations in the active palette,
-# test observations (when present) in black with a dashed cut.
+# Internal: observed series over time. Training observations in the
+# active palette, test observations (when present) in black with a
+# dashed cut at the boundary. `facet` gives one panel per series; the
+# single-series grid calls it without one.
+#
+# An unobserved occasion is a missing `y`, which breaks the line where
+# it falls. One at the end of a series has nothing to break, and
+# ggplot2 then reports removing it on every render, so missing values
+# are dropped without that notice: the gap is the information and it
+# is already drawn.
 #'@noRd
-series_all_plot <- function(dat, ylab, lines) {
+series_time_plot <- function(dat, ylab, lines, facet = TRUE) {
   palette <- mvgam_palette()
   cut_t <- if (any(dat$data == "validate")) {
     min(dat$time[dat$data == "validate"], na.rm = TRUE)
@@ -205,42 +249,11 @@ series_all_plot <- function(dat, ylab, lines) {
     NA_real_
   }
   geom_obs <- if (lines) {
-    ggplot2::geom_line(linewidth = 0.75)
+    ggplot2::geom_line(linewidth = 0.75, na.rm = TRUE)
   } else {
-    ggplot2::geom_point()
+    ggplot2::geom_point(na.rm = TRUE)
   }
-  ggplot2::ggplot(
-    dat, ggplot2::aes(x = time, y = y, colour = data)
-  ) +
-    mvgam_facet_series() +
-    geom_obs +
-    ggplot2::scale_colour_manual(
-      values = c(train = palette[5L], validate = "black"),
-      guide = "none"
-    ) +
-    mvgam_cut_layer(cut_t) +
-    ggplot2::labs(x = "Time", y = ylab) +
-    mvgam_theme()
-}
-
-
-# Internal: per-series time-series panel (used in the 4-panel
-# single-series view). Same colour rules as `series_all_plot`
-# but no facet.
-#'@noRd
-series_ts_panel <- function(dat, ylab, lines) {
-  palette <- mvgam_palette()
-  cut_t <- if (any(dat$data == "validate")) {
-    min(dat$time[dat$data == "validate"], na.rm = TRUE)
-  } else {
-    NA_real_
-  }
-  geom_obs <- if (lines) {
-    ggplot2::geom_line(linewidth = 0.75)
-  } else {
-    ggplot2::geom_point()
-  }
-  ggplot2::ggplot(
+  p <- ggplot2::ggplot(
     dat, ggplot2::aes(x = time, y = y, colour = data)
   ) +
     geom_obs +
@@ -249,8 +262,10 @@ series_ts_panel <- function(dat, ylab, lines) {
       guide = "none"
     ) +
     mvgam_cut_layer(cut_t) +
-    ggplot2::labs(title = "Time series", x = "Time", y = ylab) +
+    ggplot2::labs(title = if (!facet) "Time series",
+                  x = "Time", y = ylab) +
     mvgam_theme()
+  if (facet) p + mvgam_facet_series() else p
 }
 
 

@@ -32,7 +32,6 @@ make_update_stub <- function(n_iter = 50L, n_chains = 2L) {
       stancode = "data { int N; } parameters { real mu; } model { mu ~ normal(0,1); }",
       backend = "cmdstanr",
       algorithm = "sampling",
-      response_names = "y",
       call = call("mvgam", formula = y ~ x)
     ),
     class = "mvgam"

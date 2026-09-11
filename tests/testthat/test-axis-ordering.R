@@ -773,8 +773,25 @@ expect_postfit_sound <- function(prefit, resp_names, lab, frame,
     label = paste(lab, "factor count matches Stan's")
   )
 
-  # The structure every conditional prediction is built on.
-  os <- mvgam:::get_observation_structure(prefit)
+  # The structure every conditional prediction is built on. Where the
+  # responses are the series a row names no response, so the structure
+  # is asked for one response at a time and every row reads that
+  # response's column.
+  keyed_by_response <- identical(
+    frame_axis_source_of(prefit, frame), "multivariate"
+  )
+  if (keyed_by_response) {
+    for (r in expected) {
+      os_r <- mvgam:::get_observation_structure(prefit, resp = r)
+      expect_true(
+        all(os_r$series_int == match(r, expected)),
+        label = paste(lab, "each response reads its own trend column")
+      )
+    }
+    os <- os_r
+  } else {
+    os <- mvgam:::get_observation_structure(prefit)
+  }
   expect_identical(
     as.character(os$series_levels), as.character(expected),
     label = paste(lab, "observation structure names the axis")
@@ -804,9 +821,6 @@ expect_postfit_sound <- function(prefit, resp_names, lab, frame,
     label = paste(lab, "last times are read off the frame")
   )
 
-  keyed_by_response <- identical(
-    frame_axis_source_of(prefit, frame), "multivariate"
-  )
   if (!keyed_by_response) {
     row_series <- frame_row_series(frame, prefit)
     # Which series a row belongs to, on the axis's own levels.

@@ -135,31 +135,27 @@ hindcast.mvgam <- function(object,
                                    resp = resp))
   }
 
-  # Multivariate fan-out via the shared helper: hindcast operates
-  # on the obs-side posterior, which returns a per-response list
-  # on mv fits; scope per response and return a named list of
-  # `mvgam_forecast` objects. Class the outer wrapper as
-  # `mvgam_forecast` too so `plot()` / `print()` dispatch is
-  # uniform whether the fit is uni- or multivariate.
-  fan <- mv_resp_fan_out(object, resp)
+  # Multivariate fan-out: one `mvgam_forecast` per response, in a
+  # wrapper of the same class so `plot()`, `print()` and `score()`
+  # dispatch on it as on a single answer.
+  fan <- mv_resp_fan_out(object, resp, class = "mvgam_forecast")
   if (!is.null(fan)) {
-    class(fan) <- "mvgam_forecast"
-    attr(fan, "mv_wrapper") <- TRUE
     return(fan)
   }
 
-  series_info <- resolve_series_info(object)
-  series_levels <- series_info$series_levels
+  series_levels <- resolve_series_info(object)$series_levels
+  reported <- reported_series(object, resp, series_levels)
 
   draws_mat <- posterior::as_draws_matrix(object$fit)
   total_draws <- nrow(draws_mat)
   draw_idx <- resolve_draw_indices(total_draws, ndraws, NULL)
 
-  training <- build_training_arms(object, series_levels)
+  training <- build_training_arms(object, series_levels, resp = resp)
   hindcasts <- build_hindcast_arms(
     object, training, type, draw_idx, obs_uncertainty,
     process_error = process_error,
-    resp = resp
+    resp = resp,
+    series_levels = reported
   )
 
   family_pars <- if (type == "link") {
@@ -169,22 +165,8 @@ hindcast.mvgam <- function(object,
     NULL
   }
 
-  structure(
-    list(
-      family = object$family$family,
-      family_pars = family_pars,
-      type = type,
-      series_names = factor(series_levels,
-                            levels = series_levels),
-      train_observations = training$observations,
-      train_times = training$times,
-      test_observations = NULL,
-      test_times = NULL,
-      hindcasts = hindcasts,
-      forecasts = NULL
-    ),
-    class = "mvgam_forecast"
-  )
+  new_mvgam_forecast(object, type, resp, reported, training,
+                     hindcasts = hindcasts, family_pars = family_pars)
 }
 
 

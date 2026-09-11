@@ -35,7 +35,7 @@ make_mvgam_stub <- function(varnames = c(
   formula <- if (mv) {
     brms::bf(brms::mvbind(y1, y2) ~ x)
   } else {
-    structure(y ~ x, class = c("brmsformula", "formula"))
+    brms::bf(y ~ x)
   }
   data <- if (mv) {
     data.frame(y1 = rnorm(10), y2 = rnorm(10), x = rnorm(10))
@@ -47,7 +47,6 @@ make_mvgam_stub <- function(varnames = c(
       fit = drws,
       formula = formula,
       trend_formula = NULL,
-      response_names = if (mv) c("y1", "y2") else "y",
       data = data,
       prior = data.frame(prior = "(flat)", class = "b"),
       call = call("mvgam", formula = formula)
@@ -489,7 +488,7 @@ test_that("bayes_R2.mvgam errors for multivariate without resp", {
   stub <- make_mvgam_stub(mv = TRUE)
   expect_error(
     bayes_R2(stub),
-    regexp = "requires 'resp' for multivariate models"
+    regexp = "Name a response with 'resp'"
   )
 })
 

@@ -67,16 +67,7 @@ mvgam_match_response <- function(models) {
   if (length(models) < 2L) {
     return(TRUE)
   }
-  resp_names <- lapply(models, function(m) {
-    if (!is.null(m$response_names)) {
-      m$response_names
-    } else {
-      # Reached only when `response_names` is unset, which a
-      # multivariate fit always populates, so the resolver is being
-      # asked about a univariate fit and needs no `resp`.
-      mvgam_response_name(m, resp = NULL)
-    }
-  })
+  resp_names <- lapply(models, function(m) unname(response_columns(m)))
   ref_names <- resp_names[[1L]]
   if (!all(vapply(resp_names[-1L], identical, logical(1L),
                   ref_names))) {

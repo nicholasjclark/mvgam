@@ -32,7 +32,6 @@ make_loo_extras_stub <- function(n_iter = 80L, n_chains = 2L) {
       fit = drws,
       formula = structure(y ~ x, class = c("brmsformula", "formula")),
       trend_formula = NULL,
-      response_names = "y",
       data = data.frame(y = rnorm(10), x = rnorm(10)),
       standata = list(X = X, K = ncol(X), Kc = ncol(X) - 1L),
       prior = data.frame(prior = "(flat)", class = "b"),

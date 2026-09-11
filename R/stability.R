@@ -126,7 +126,7 @@ stability <- function(object, ...) {
 
 # Discrete Lyapunov solver via doubling (Kitagawa 1977 / Anderson
 # 1979). Solves X = B X B' + Sigma for X, assuming B has spectral
-# radius < 1 (guaranteed under mvgam's Heaps 2022 stationarity
+# radius < 1 (guaranteed under mvgam's Heaps 2023 stationarity
 # prior on VAR fits). Doubling accumulates the Neumann series
 # `sum_{k>=0} B^k Sigma (B')^k` by squaring the partial sum each
 # iteration; after `k` steps the partial sum covers `2^k` terms

@@ -164,7 +164,7 @@ render_data_section <- function(ctx) {
   # Multi-response: list response columns explicitly so the
   # reader sees the mvbind structure (`yA`, `yB`) rather than
   # an opaque bold `Y` vector label.
-  responses <- get_response_names(obj)
+  responses <- unname(response_columns(obj))
   resp_line <- if (length(responses) > 1L) {
     paste0(
       "$\\mathbf{Y} = (",
@@ -196,16 +196,7 @@ render_data_section <- function(ctx) {
 describe_predictors <- function(obj) {
   data <- obj$data %||% data.frame()
   if (nrow(data) == 0L) return(character(0L))
-  # Response column(s). Prefer obj$response_names; fall back to
-  # the formula LHS via mvgam_obs_formula() so prefits (where
-  # response_names is NULL) still skip the response column.
-  resp_cols <- obj$response_names %||% character(0L)
-  if (length(resp_cols) == 0L && !is.null(obj$formula)) {
-    f <- mvgam_obs_formula(obj)
-    if (inherits(f, "formula") && length(f) >= 3L) {
-      resp_cols <- all.vars(f[[2L]])
-    }
-  }
+  resp_cols <- unname(response_columns(obj))
   # Restrict to columns the model formula actually references.
   # Without this guard, every column in the user's data frame
   # surfaces here, including ones the model ignores -- which
@@ -252,9 +243,8 @@ formula_used_vars <- function(obj) {
   # treatment.
   obs <- obj$formula
   obs_vars <- mvgam_formula_predictors(obs)
-  # Response columns from the LHS surface separately via
-  # response_names; include them so Predictors filtering does
-  # not blank out single-response fits.
+  # Every variable on the left-hand side, addition terms included,
+  # since a `trials()` denominator is a column the model reads.
   resp_vars <- if (!is.null(obs)) {
     f <- if (inherits(obs, c("brmsformula", "bform", "mvbrmsformula"))) {
       obs$formula %||% obs
@@ -424,7 +414,7 @@ render_model_section <- function(ctx) {
     rows[[length(rows) + 1L]] <- ir
   }
 
-  responses <- get_response_names(obj)
+  responses <- names(response_columns(obj))
   if (length(responses) > 1L) {
     # mvbind / multivariate brmsformula. Two flavours:
     #
@@ -987,18 +977,10 @@ index_range_rows <- function(obj) {
 
 #' @noRd
 response_letter <- function(obj) {
-  # Prefer the formula LHS so the rendered name preserves any
-  # `_` in the user's column (e.g. `y_occ`). brms's response
-  # normalisation strips `_` from `response_names` / the prior
-  # table to fit Stan parameter naming, so those paths would
-  # give `yocc`. Fall back to the brms-normalised name when the
-  # formula LHS is unavailable.
-  f <- mvgam_obs_formula(obj)
-  nm <- if (inherits(f, "formula") && length(f) >= 3L) {
-    all.vars(f[[2L]])
-  } else NULL
-  if (is.null(nm) || length(nm) == 0L) nm <- get_response_names(obj)
-  if (is.null(nm) || length(nm) == 0L) return("Y")
+  # The column rather than brms's key for it, so the rendered name
+  # keeps any `_` in the user's column (e.g. `y_occ`) where the key
+  # would read `yocc`.
+  nm <- unname(response_columns(obj))
   if (length(nm) > 1L) return("\\mathbf{Y}")
   escape_math_text(nm[[1L]])
 }
@@ -1027,7 +1009,7 @@ response_subscripted <- function(obj) {
 
 #' @noRd
 mu_symbol <- function(obj) {
-  if (length(get_response_names(obj)) > 1L) {
+  if (length(response_columns(obj)) > 1L) {
     return("\\boldsymbol{\\mu}_{i,t}")
   }
   "\\mu_{i,t}"
