@@ -15,14 +15,14 @@ make_methods_md_prefit <- function(formula, trend_formula = NULL,
       y      = rpois(120, lambda = 3)
     )
   }
-  suppressWarnings(mvgam(
+  mvgam(
     formula       = formula,
     trend_formula = trend_formula,
     data          = data,
     family        = family,
     run_model     = FALSE,
     silent        = 2
-  ))
+  )
 }
 
 test_that("methods_md returns mvgam_methods_md and prints", {
@@ -346,10 +346,10 @@ test_that("nl formula renders per-nlpar decompositions", {
   f <- brms::bf(y ~ a + b * env,
                 a + b ~ trait1,
                 nl = TRUE)
-  mod <- suppressWarnings(suppressMessages(mvgam(
+  mod <- mvgam(
     formula = f, data = dat, family = gaussian(),
     run_model = FALSE, silent = 2L
-  )))
+  )
   out <- methods_md(mod)
   # Top-level mu uses nlpar tokens verbatim with (i, t) subscripts.
   expect_true(grepl("a_\\{i,t\\}", out))
@@ -695,11 +695,11 @@ make_occ_prefit <- function() {
     elev = rep(rnorm(8), each = 4),
     tod = stats::runif(32)
   )
-  suppressWarnings(suppressMessages(mvgam(
+  mvgam(
     formula = bf(y ~ elev, p ~ tod),
     data = d, family = occ(),
     run_model = FALSE, silent = 2
-  )))
+  )
 }
 
 make_nmix_prefit <- function(type = "poisson_binomial") {
@@ -717,11 +717,11 @@ make_nmix_prefit <- function(type = "poisson_binomial") {
     elev = rep(rnorm(8), each = 4),
     tod = stats::runif(32)
   )
-  suppressWarnings(suppressMessages(mvgam(
+  mvgam(
     formula = bf(y ~ elev, p ~ tod),
     data = d, family = nmix(type),
     run_model = FALSE, silent = 2
-  )))
+  )
 }
 
 test_that("occ() emits state + obs + logit(p) rows", {
@@ -779,12 +779,12 @@ test_that("diri() emits Dirichlet + alpha = phi * pi + softmax row", {
   d$env <- rep(rnorm(n_sites), times = K)
   d$y <- runif(n_sites * K)
   d$y <- d$y / tapply(d$y, d$time, sum)[match(d$time, names(tapply(d$y, d$time, sum)))]
-  mod <- suppressWarnings(suppressMessages(jsdgam(
+  mod <- jsdgam(
     formula = y ~ env * series, factor_formula = ~ -1,
     data = d, unit = time, species = series,
     family = diri(), n_lv = 2L,
     run_model = FALSE, silent = 2, backend = "cmdstanr"
-  )))
+  )
   out <- methods_md(mod)
   expect_true(grepl(
     "\\\\mathbf\\{Y\\}_i &\\\\sim \\\\text\\{Dirichlet\\}",
@@ -809,7 +809,7 @@ test_that("nl b_<nlpar>_<term> prior carries nlpar superscript on beta", {
   )
   # Explicit nlpar priors so the prior table carries the rows the
   # renderer needs (default flat priors are filtered out).
-  mod <- suppressWarnings(suppressMessages(mvgam(
+  mod <- mvgam(
     formula = bf(yC ~ a + b * x, a + b ~ trait1, nl = TRUE),
     data = d, family = gaussian(),
     prior = c(
@@ -817,7 +817,7 @@ test_that("nl b_<nlpar>_<term> prior carries nlpar superscript on beta", {
       brms::prior(normal(0, 1), nlpar = "b")
     ),
     run_model = FALSE, silent = 2
-  )))
+  )
   out <- methods_md(mod)
   expect_true(grepl("\\\\beta\\^\\{\\(a\\)\\}_\\{trait1\\}", out))
   expect_true(grepl("\\\\beta\\^\\{\\(b\\)\\}_\\{trait1\\}", out))
@@ -830,11 +830,11 @@ test_that("Ordinal Intercept rows render as theta_{k} thresholds", {
     x = rnorm(120),
     yord = factor(sample(1:5, 120, replace = TRUE), ordered = TRUE)
   )
-  mod <- suppressWarnings(suppressMessages(mvgam(
+  mod <- mvgam(
     formula = yord ~ x,
     data = d, family = cumulative(),
     run_model = FALSE, silent = 2
-  )))
+  )
   out <- methods_md(mod)
   expect_true(grepl("\\\\theta_\\{1\\}", out) ||
               grepl("\\\\theta_\\{[0-9]+\\}", out))
@@ -846,12 +846,12 @@ test_that("mvbind rescor priors carry response superscripts", {
     time = rep(1:30, 2), series = factor(rep(1:2, each = 30)),
     x = rnorm(60), yA = rnorm(60), yB = rnorm(60)
   )
-  mod <- suppressWarnings(suppressMessages(mvgam(
+  mod <- mvgam(
     formula = brms::bf(brms::mvbind(yA, yB) ~ x) +
       brms::set_rescor(TRUE),
     data = d, family = gaussian(),
     run_model = FALSE, silent = 2
-  )))
+  )
   out <- methods_md(mod)
   expect_true(grepl("\\\\sigma\\^\\{\\(yA\\)\\}", out))
   expect_true(grepl("\\\\sigma\\^\\{\\(yB\\)\\}", out))
@@ -867,12 +867,12 @@ test_that("mvn() emits MVNormal + Sigma decomposition + LKJCholesky", {
   )
   d$env <- rep(rnorm(n_sites), times = K)
   d$y <- rnorm(n_sites * K)
-  mod <- suppressWarnings(suppressMessages(jsdgam(
+  mod <- jsdgam(
     formula = y ~ env, factor_formula = ~ -1,
     data = d, unit = time, species = series,
     family = mvn(), n_lv = 1L,
     run_model = FALSE, silent = 2, backend = "cmdstanr"
-  )))
+  )
   out <- methods_md(mod)
   expect_true(grepl(
     "\\\\mathbf\\{Y\\}_i &\\\\sim \\\\text\\{MVNormal\\}",
