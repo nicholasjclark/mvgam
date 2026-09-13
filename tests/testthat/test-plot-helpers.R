@@ -319,22 +319,34 @@ test_that("legend breaks stay readable when limits come from data", {
 })
 
 
-test_that("pairs() selects each response's own distributional parameters", {
-  # The defaults read `family$dpars` off the family given beside the
-  # formula. A stats family carries none, so a gamma fit's `shape`
-  # was never offered, and brms suffixes a multivariate response's
-  # parameters with its key, which `^shape$` does not match.
-  set.seed(6)
-  d <- data.frame(time = 1:30, series = factor("a"),
-                  pos = rgamma(30, 2, 1), cnt = rpois(30, 4))
-  uni <- mvgam(pos ~ 1, family = Gamma(link = "log"), data = d,
-               run_model = FALSE)
-  expect_true("^shape$" %in% mvgam:::default_pairs_variables(uni))
-  mv <- mvgam(
-    bf(pos ~ 1, family = Gamma(link = "log")) +
-      bf(cnt ~ 1, family = brms::negbinomial()) + set_rescor(FALSE),
-    data = d, run_model = FALSE
+test_that("the plotting default holds the parameters a reader reads", {
+  # `mcmc_plot()` and `pairs()` ask one question, so they read one
+  # answer, and it is the taxonomy's. Each response's own family
+  # parameters come with it, which a `^shape$` pattern missed on a
+  # multivariate fit, and the names are the ones `as.array()` hands
+  # back, which raw Stan names are not.
+  raw <- c(
+    "b_Intercept", "Intercept", "b_x", "bs_sx_1", "simo_mo1[1]",
+    "shape_pos", "shape_cnt", "sds_1[1]", "sdgp_1[1]", "lscale_1[1]",
+    "zgp_1[1]", "s_1_1[1]", "zs_1_1[1]", "sd_g__Intercept",
+    "cor_g__Intercept__x", "r_g[a,Intercept]", "Z[1,1]",
+    "Z_tilde[1,1]", "ar1_trend[1]", "b_Intercept_trend",
+    "trend[1,1]", "lv_trend[1,1]", "lp__"
   )
-  expect_true(all(c("^shape_pos$", "^shape_cnt$") %in%
-                    mvgam:::default_pairs_variables(mv)))
+  stub <- structure(
+    list(fit = posterior::as_draws_matrix(matrix(
+      0, nrow = 2L, ncol = length(raw), dimnames = list(NULL, raw)
+    ))),
+    class = "mvgam"
+  )
+  # The loadings a free-Z fit is rotated to are drawn and the raw
+  # basis beside them is not, which is the same filter `variables()`
+  # and `summary()` apply.
+  expect_setequal(
+    mvgam:::default_plot_variables(stub),
+    c("b_Intercept", "b_x", "bs_sx_1", "simo_mo1[1]", "shape_pos",
+      "shape_cnt", "sds_1[1]", "sdgp_1[1]", "lscale_1[1]",
+      "sd_g__Intercept", "cor_g__Intercept__x", "Z_tilde[1,1]",
+      "ar1_trend[1]", "b_Intercept_trend")
+  )
 })

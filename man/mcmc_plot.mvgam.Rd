@@ -4,14 +4,7 @@
 \alias{mcmc_plot.mvgam}
 \title{MCMC plots of \pkg{mvgam} parameters, as implemented in \pkg{bayesplot}}
 \usage{
-\method{mcmc_plot}{mvgam}(
-  object,
-  type = "intervals",
-  variable = NULL,
-  regex = FALSE,
-  use_alias = TRUE,
-  ...
-)
+\method{mcmc_plot}{mvgam}(object, type = "intervals", variable = NULL, regex = FALSE, ...)
 }
 \arguments{
 \item{object}{An \R object typically of class \code{brmsfit}}
@@ -34,9 +27,6 @@ default, a hopefully not too large selection of variables is plotted.}
 
 \item{regex}{Logical; Indicates whether \code{variable} should
 be treated as regular expressions. Defaults to \code{FALSE}.}
-
-\item{use_alias}{Retained for backwards-compatibility; parameter
-names are now brms-native so no aliasing is performed.}
 
 \item{...}{Additional arguments passed to the plotting functions.
 See \code{\link[bayesplot:MCMC-overview]{MCMC-overview}} for

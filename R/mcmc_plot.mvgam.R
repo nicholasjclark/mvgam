@@ -41,13 +41,11 @@ mcmc_plot.mvgam = function(
   type = 'intervals',
   variable = NULL,
   regex = FALSE,
-  use_alias = TRUE,
   ...
 ) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_character(variable, null.ok = TRUE)
   checkmate::assert_logical(regex, len = 1L)
-  checkmate::assert_logical(use_alias, len = 1L)
 
   # Check type validity
   valid_types <- as.character(bayesplot::available_mcmc(""))
@@ -63,20 +61,13 @@ mcmc_plot.mvgam = function(
     )))
   }
 
-  # Default variable set: every brms-named parameter except the bulk
-  # per-observation / per-state arrays (latent trend, innovations,
-  # posterior predictive draws) and the Stan housekeeping entries
-  # (`lp__`, `lprior`). Spline-heavy models otherwise render hundreds
-  # of panels.
+  # The parameters a reader interprets, chosen the same way here and
+  # in `pairs()`. Reading the raw Stan names instead offered
+  # `as.array()` names it renames, and every renamed parameter -- the
+  # population coefficients and the whole group-level block among
+  # them -- was dropped from the panel without a word.
   if (is.null(variable)) {
-    all_vars <- posterior::variables(
-      posterior::as_draws_array(object$fit)
-    )
-    drop_pattern <- paste0(
-      "^(trend\\[|innovations_trend\\[|Y_pred\\[|",
-      "lp__$|lprior$)"
-    )
-    variable <- all_vars[!grepl(drop_pattern, all_vars)]
+    variable <- default_plot_variables(object)
     regex <- FALSE
   }
 
@@ -93,12 +84,7 @@ mcmc_plot.mvgam = function(
     if (grepl("^nuts_", type)) {
       mcmc_args$x <- np
     } else {
-      draws <- as.array(
-        object,
-        variable = variable,
-        regex = regex,
-        use_alias = use_alias
-      )
+      draws <- as.array(object, variable = variable, regex = regex)
       sel_variables <- dimnames(draws)$variable
       if (type %in% c("scatter", "hex") && length(sel_variables) != 2L) {
         stop(insight::format_error(c(

@@ -38,6 +38,31 @@ variables.mvgam <- function(x, ...) {
 }
 
 
+#' The parameters a diagnostic plot shows when none is named
+#'
+#' `mcmc_plot()` and `pairs()` both start here. The set holds what a
+#' reader interprets: the population block with the basis
+#' coefficients brms writes beside it, the family's parameters, the
+#' trend's dynamics and its loadings, the smoothing and
+#' Gaussian-process scales, and the group-level scales. Left out are
+#' the per-level and per-basis coefficients (`r_*`, `s_*`, `zs_*`,
+#' `zgp_*`), which run to hundreds on a spline or hierarchical fit,
+#' the trend's states, and brms's centred intercept, which
+#' `b_Intercept` reports on the data's scale. Naming any of those in
+#' `variable` still selects it.
+#'
+#' @param x A fitted `mvgam` object
+#' @return Character vector of the names a user reads
+#' @noRd
+default_plot_variables <- function(x) {
+  checkmate::assert_class(x, "mvgam")
+  pars <- names(mvgam_user_pars(x))
+  shown <- c("beta", "basis", "family", "dynamics", "loading",
+             "smooth_sd", "gp", "ranef_sd")
+  pars[mvgam_par_kind(pars) %in% shown]
+}
+
+
 #' The parameters of a fit, by side and by kind
 #'
 #' Sorts the Stan names the fit's draws carry into the buckets

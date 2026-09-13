@@ -20,58 +20,22 @@
   variable = NULL,
   draw = NULL,
   regex = FALSE,
-  use_alias = TRUE,
   ...
 )
 
-\method{as.matrix}{mvgam}(x, variable = NULL, regex = FALSE, use_alias = TRUE, ...)
+\method{as.matrix}{mvgam}(x, variable = NULL, regex = FALSE, ...)
 
-\method{as.array}{mvgam}(x, variable = NULL, regex = FALSE, use_alias = TRUE, ...)
+\method{as.array}{mvgam}(x, variable = NULL, regex = FALSE, ...)
 
-\method{as_draws}{mvgam}(
-  x,
-  variable = NULL,
-  regex = FALSE,
-  inc_warmup = FALSE,
-  use_alias = TRUE,
-  ...
-)
+\method{as_draws}{mvgam}(x, variable = NULL, regex = FALSE, inc_warmup = FALSE, ...)
 
-\method{as_draws_matrix}{mvgam}(
-  x,
-  variable = NULL,
-  regex = FALSE,
-  inc_warmup = FALSE,
-  use_alias = TRUE,
-  ...
-)
+\method{as_draws_matrix}{mvgam}(x, variable = NULL, regex = FALSE, inc_warmup = FALSE, ...)
 
-\method{as_draws_df}{mvgam}(
-  x,
-  variable = NULL,
-  regex = FALSE,
-  inc_warmup = FALSE,
-  use_alias = TRUE,
-  ...
-)
+\method{as_draws_df}{mvgam}(x, variable = NULL, regex = FALSE, inc_warmup = FALSE, ...)
 
-\method{as_draws_array}{mvgam}(
-  x,
-  variable = NULL,
-  regex = FALSE,
-  inc_warmup = FALSE,
-  use_alias = TRUE,
-  ...
-)
+\method{as_draws_array}{mvgam}(x, variable = NULL, regex = FALSE, inc_warmup = FALSE, ...)
 
-\method{as_draws_list}{mvgam}(
-  x,
-  variable = NULL,
-  regex = FALSE,
-  inc_warmup = FALSE,
-  use_alias = TRUE,
-  ...
-)
+\method{as_draws_list}{mvgam}(x, variable = NULL, regex = FALSE, inc_warmup = FALSE, ...)
 
 \method{as_draws_rvars}{mvgam}(x, variable = NULL, regex = FALSE, inc_warmup = FALSE, ...)
 }
@@ -106,9 +70,6 @@ vector of draw indices (1-based) to subset after extraction.
 treated as a regular expression and any parameter matching at
 least one pattern is selected. Keyword shortcuts are still
 honoured. Defaults to \code{FALSE}.}
-
-\item{use_alias}{Retained for backwards-compatibility; parameter
-names are now brms-native so no aliasing is performed.}
 
 \item{...}{Ignored.}
 

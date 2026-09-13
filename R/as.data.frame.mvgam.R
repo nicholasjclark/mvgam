@@ -33,8 +33,6 @@
 #'   `NULL` (the default) returns all draws.
 #' @param inc_warmup Logical. Include warmup draws? Defaults to
 #'   `FALSE`.
-#' @param use_alias Retained for backwards-compatibility; parameter
-#'   names are now brms-native so no aliasing is performed.
 #' @param row.names,optional Ignored.
 #' @param ... Ignored.
 #'
@@ -621,8 +619,7 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
 #' @export
 as.data.frame.mvgam <- function(x, row.names = NULL, optional = TRUE,
                                  variable = NULL, draw = NULL,
-                                 regex = FALSE, use_alias = TRUE,
-                                 ...) {
+                                 regex = FALSE, ...) {
   drws <- posterior::as_draws_df(
     extract_mvgam_draws(x, variable, regex)
   )
@@ -635,8 +632,7 @@ as.data.frame.mvgam <- function(x, row.names = NULL, optional = TRUE,
 
 #' @rdname mvgam_draws
 #' @export
-as.matrix.mvgam <- function(x, variable = NULL, regex = FALSE,
-                             use_alias = TRUE, ...) {
+as.matrix.mvgam <- function(x, variable = NULL, regex = FALSE, ...) {
   # Unclassed, as `brms::as.matrix.brmsfit` unclasses: a caller
   # asking for a matrix is handed one. A `draws_matrix` keeps its
   # class through subsetting, arithmetic and `as.matrix()` alike, so
@@ -649,8 +645,7 @@ as.matrix.mvgam <- function(x, variable = NULL, regex = FALSE,
 
 #' @rdname mvgam_draws
 #' @export
-as.array.mvgam <- function(x, variable = NULL, regex = FALSE,
-                            use_alias = TRUE, ...) {
+as.array.mvgam <- function(x, variable = NULL, regex = FALSE, ...) {
   # Unclassed for the same reason `as.matrix.mvgam()` is, and to
   # match `brms::as.array.brmsfit()`. `as_draws_array()` remains the
   # way to ask for the draws object itself.
@@ -662,8 +657,7 @@ as.array.mvgam <- function(x, variable = NULL, regex = FALSE,
 #' @method as_draws mvgam
 #' @export
 as_draws.mvgam <- function(x, variable = NULL, regex = FALSE,
-                            inc_warmup = FALSE, use_alias = TRUE,
-                            ...) {
+                            inc_warmup = FALSE, ...) {
   posterior::as_draws(
     extract_mvgam_draws(x, variable, regex, inc_warmup)
   )
@@ -679,8 +673,7 @@ posterior::as_draws
 #' @method as_draws_matrix mvgam
 #' @export
 as_draws_matrix.mvgam <- function(x, variable = NULL, regex = FALSE,
-                                   inc_warmup = FALSE,
-                                   use_alias = TRUE, ...) {
+                                   inc_warmup = FALSE, ...) {
   posterior::as_draws_matrix(
     extract_mvgam_draws(x, variable, regex, inc_warmup)
   )
@@ -696,8 +689,7 @@ posterior::as_draws_matrix
 #' @method as_draws_df mvgam
 #' @export
 as_draws_df.mvgam <- function(x, variable = NULL, regex = FALSE,
-                               inc_warmup = FALSE,
-                               use_alias = TRUE, ...) {
+                               inc_warmup = FALSE, ...) {
   posterior::as_draws_df(
     extract_mvgam_draws(x, variable, regex, inc_warmup)
   )
@@ -713,8 +705,7 @@ posterior::as_draws_df
 #' @method as_draws_array mvgam
 #' @export
 as_draws_array.mvgam <- function(x, variable = NULL, regex = FALSE,
-                                  inc_warmup = FALSE,
-                                  use_alias = TRUE, ...) {
+                                  inc_warmup = FALSE, ...) {
   extract_mvgam_draws(x, variable, regex, inc_warmup)
 }
 
@@ -728,8 +719,7 @@ posterior::as_draws_array
 #' @method as_draws_list mvgam
 #' @export
 as_draws_list.mvgam <- function(x, variable = NULL, regex = FALSE,
-                                 inc_warmup = FALSE,
-                                 use_alias = TRUE, ...) {
+                                 inc_warmup = FALSE, ...) {
   posterior::as_draws_list(
     extract_mvgam_draws(x, variable, regex, inc_warmup)
   )

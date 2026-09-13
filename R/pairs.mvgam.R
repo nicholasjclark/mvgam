@@ -1,15 +1,15 @@
 #' Create a matrix of output plots from a \code{mvgam} object
 #'
 #' A \code{\link[graphics:pairs]{pairs}} method for MCMC output.
-#' Mirrors the brms convention: when `variable` is left at its
-#' default the selection is built from a regex list targeting
-#' canonical inferential parameters (intercept, parametric
-#' coefficients, family extras, variance components, smoothness
-#' penalties, and the mvgam-specific trend dynamics). Per-basis
-#' smooth coefficients (`s_*` / `zs_*`) and per-level random-effect
-#' deviations (`r_*` / `z_*`) are deliberately excluded because
-#' spline / hierarchical fits can carry hundreds of them; supply an
-#' explicit `variable` regex when you need them.
+#' With `variable` left at its default the panel holds the
+#' parameters a reader interprets: the intercept and the parametric
+#' coefficients, the family's parameters, the variance components,
+#' the smoothing penalties, and the trend's dynamics and loadings.
+#' The per-basis smooth coefficients (`s_*` / `zs_*`) and the
+#' per-level group-level deviations (`r_*`) are left out, since a
+#' spline or hierarchical fit carries hundreds of them; name them in
+#' `variable` to draw them. \code{\link{mcmc_plot.mvgam}} takes the
+#' same default.
 #'
 #' @param x An object of class \code{mvgam} or \code{jsdgam}.
 #' @inheritParams mcmc_plot.mvgam
@@ -42,68 +42,12 @@ pairs.mvgam <- function(
   x,
   variable = NULL,
   regex = FALSE,
-  use_alias = TRUE,
   ...
 ) {
   if (is.null(variable)) {
-    variable <- default_pairs_variables(x)
-    regex <- TRUE
+    variable <- default_plot_variables(x)
+    regex <- FALSE
   }
-  draws <- as.array(
-    x,
-    variable = variable,
-    regex = regex,
-    use_alias = use_alias
-  )
+  draws <- as.array(x, variable = variable, regex = regex)
   with_color_scheme("red", bayesplot::mcmc_pairs(draws, ...))
-}
-
-
-# Internal: regex patterns that drive `pairs.mvgam()`'s default
-# variable selection. Mirrors the internal brms default_plot_variables()
-# for the observation-side parameters (so users moving between brms and
-# mvgam see the same defaults) and adds mvgam-specific patterns for
-# trend dynamics and the matching `*_trend` variants of the brms
-# patterns. Family-specific distributional parameters (e.g. `sigma`
-# for `gaussian()`, `shape` for `Gamma()` / negative binomial) are
-# discovered from the fit's family rather than hard-coded.
-#' @noRd
-default_pairs_variables <- function(x) {
-  # Each response's distributional parameters, named as brms names
-  # them: a response of a multivariate model suffixes its own with
-  # its key. `validate_family()` gives a stats family, which carries
-  # no parameter names, the ones brms reads it with. `mu` is the
-  # linear predictor, not a free parameter.
-  families <- formula_families(x, x$family)
-  suffixes <- if (length(families) > 1L) paste0("_", names(families)) else ""
-  dpar_patterns <- unlist(lapply(seq_along(families), function(i) {
-    dpars <- setdiff(validate_family(families[[i]])$dpars, "mu")
-    if (length(dpars)) paste0("^", dpars, suffixes[i], "$")
-  }), use.names = FALSE)
-  # The obs-side patterns carry no `$` end-marker, and prefixes like
-  # `^b_`, `^sd_`, `^sds_`, `^cor_`, `^lscale_`, `^theta` also catch
-  # their `*_trend` siblings, `b_Intercept_trend` among them. The
-  # trend block below adds the entries sharing no obs-side prefix:
-  # `sigma_trend`, capitalised `Sigma_trend`, and the VAR and PW
-  # dynamics. brms's centred intercept is left out on both sides.
-  c(
-    # Observation-side patterns (brms parity, but the prefixes also
-    # match trend-side `*_trend` parameters).
-    # brms fixed-effect parameter prefixes (`b_`, `bs_`, `bcs_`,
-    # `bsp_`, `bmo_`, `bme_`, `bmi_`, `bm_`).
-    "^b(()|(s)|(cs)|(sp)|(mo)|(me)|(mi)|(m))_",
-    "^sd_", "^cor_",          # RE variance components
-    "^sigma$", "^rescor_",
-    dpar_patterns,
-    "^delta$", "^theta",
-    "^sdb_", "^sdbsp_", "^sdbs_",
-    "^sds_", "^sdgp_", "^lscale_",
-    # mvgam-specific trend additions (no obs-side prefix overlap).
-    "^sigma_trend",
-    "^ar[0-9]+_trend",        # AR coefficients
-    "^A_trend",               # VAR coefficient matrices
-    "^alpha_cor_trend",       # hierarchical correlation weight
-    "^Sigma_trend",
-    "^k_trend", "^m_trend", "^delta_trend"     # PW changepoint
-  )
 }

@@ -4,7 +4,7 @@
 \alias{pairs.mvgam}
 \title{Create a matrix of output plots from a \code{mvgam} object}
 \usage{
-\method{pairs}{mvgam}(x, variable = NULL, regex = FALSE, use_alias = TRUE, ...)
+\method{pairs}{mvgam}(x, variable = NULL, regex = FALSE, ...)
 }
 \arguments{
 \item{x}{An object of class \code{mvgam} or \code{jsdgam}.}
@@ -16,9 +16,6 @@ default, a hopefully not too large selection of variables is plotted.}
 \item{regex}{Logical; Indicates whether \code{variable} should
 be treated as regular expressions. Defaults to \code{FALSE}.}
 
-\item{use_alias}{Retained for backwards-compatibility; parameter
-names are now brms-native so no aliasing is performed.}
-
 \item{...}{Further arguments passed to
 \code{\link[bayesplot:MCMC-scatterplots]{mcmc_pairs}}.}
 }
@@ -28,15 +25,15 @@ A \code{bayesplot_grid} object; see
 }
 \description{
 A \code{\link[graphics:pairs]{pairs}} method for MCMC output.
-Mirrors the brms convention: when \code{variable} is left at its
-default the selection is built from a regex list targeting
-canonical inferential parameters (intercept, parametric
-coefficients, family extras, variance components, smoothness
-penalties, and the mvgam-specific trend dynamics). Per-basis
-smooth coefficients (\verb{s_*} / \verb{zs_*}) and per-level random-effect
-deviations (\verb{r_*} / \verb{z_*}) are deliberately excluded because
-spline / hierarchical fits can carry hundreds of them; supply an
-explicit \code{variable} regex when you need them.
+With \code{variable} left at its default the panel holds the
+parameters a reader interprets: the intercept and the parametric
+coefficients, the family's parameters, the variance components,
+the smoothing penalties, and the trend's dynamics and loadings.
+The per-basis smooth coefficients (\verb{s_*} / \verb{zs_*}) and the
+per-level group-level deviations (\verb{r_*}) are left out, since a
+spline or hierarchical fit carries hundreds of them; name them in
+\code{variable} to draw them. \code{\link{mcmc_plot.mvgam}} takes the
+same default.
 }
 \examples{
 \dontrun{

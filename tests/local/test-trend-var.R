@@ -1320,7 +1320,21 @@ test_that("the plotting methods render for a VAR fit", {
   for (ty in c("residuals", "trend", "series", "re")) {
     drawn(plot(fit, type = ty))
   }
-  drawn(mcmc_plot(fit))
+  panel <- as.character(mcmc_plot(fit)$data$parameter)
+  # The default panel holds what a reader interprets, under the names
+  # `variables()` lists. Built from the raw Stan names it offered
+  # `as.array()` names that method renames, so the slopes and the
+  # whole group-level block were dropped without a word.
+  expect_true(all(
+    c("b_elev", "sd_block__Intercept", "sigma_trend[1]") %in% panel
+  ))
+  # The per-level deviations stay out: a hierarchical fit carries
+  # hundreds, and naming one in `variable` is how a reader gets it.
+  expect_false(any(grepl("^r_block", panel)))
+  expect_s3_class(
+    pairs(fit, variable = c("sigma", "sigma_trend[1]")),
+    "bayesplot_grid"
+  )
   drawn(plot(conditional_effects(fit))[[1L]])
 
   # The three types this fit cannot answer refuse it, each naming
