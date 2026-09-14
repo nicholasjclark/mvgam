@@ -100,8 +100,7 @@ for the covariance matrix in latent factor models. \emph{Statistics
 and Computing} 34, 143. \doi{10.1007/s11222-024-10454-0}
 }
 \seealso{
-\code{\link[=ordinate.mvgam]{ordinate.mvgam()}}, \code{\link[=ordinate.jsdgam]{ordinate.jsdgam()}},
-\code{\link[=residual_cor]{residual_cor()}}, \code{\link[=active_factors]{active_factors()}}
+\code{\link[=ordinate]{ordinate()}}, \code{\link[=residual_cor]{residual_cor()}}, \code{\link[=active_factors]{active_factors()}}
 }
 \author{
 Nicholas J Clark

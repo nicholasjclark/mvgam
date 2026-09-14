@@ -53,8 +53,7 @@
 #'   preserved without rotation. Time runs along the training
 #'   grid only; out-of-sample factor draws are not displayed.
 #'
-#' @seealso [as_draws_df.mvgam()], [residual_cor()],
-#'   [ordinate.jsdgam()]
+#' @seealso [as_draws_df.mvgam()], [residual_cor()], [ordinate()]
 #'
 #' @author Nicholas J Clark
 #' @noRd

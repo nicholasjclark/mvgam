@@ -142,16 +142,14 @@
 #'   - `creation_time` A `POSIXct` timestamp
 #'
 #'   A fit from [jsdgam()] has class `c("mvgam", "jsdgam")` and carries
-#'   four further elements, which [ordinate()], [residual_cor()] and
-#'   the `print` method read:
+#'   two further elements, which `insight::find_predictors()` reads to
+#'   address a prediction grid in the user's own column names:
 #'
 #'   - `obs_data` The data frame as `jsdgam()` prepared it, with the
 #'     `time` and `series` columns it derives from `unit` and `species`
 #'
 #'   - `model_data` The same frame, carrying a `prepped_trend_model`
 #'     attribute that records the `unit` and `species` column names
-#'
-#'   - `model_spec` A `list` whose `is_jsdgam` element marks the fit
 #'
 #'
 #' @seealso [mvgam], [jsdgam], [mvgam_forecast-class]

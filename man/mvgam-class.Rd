@@ -128,14 +128,13 @@ was fitted under
 }
 
 A fit from \code{\link[=jsdgam]{jsdgam()}} has class \code{c("mvgam", "jsdgam")} and carries
-four further elements, which \code{\link[=ordinate]{ordinate()}}, \code{\link[=residual_cor]{residual_cor()}} and
-the \code{print} method read:
+two further elements, which \code{insight::find_predictors()} reads to
+address a prediction grid in the user's own column names:
 \itemize{
 \item \code{obs_data} The data frame as \code{jsdgam()} prepared it, with the
 \code{time} and \code{series} columns it derives from \code{unit} and \code{species}
 \item \code{model_data} The same frame, carrying a \code{prepped_trend_model}
 attribute that records the \code{unit} and \code{species} column names
-\item \code{model_spec} A \code{list} whose \code{is_jsdgam} element marks the fit
 }
 }
 \seealso{

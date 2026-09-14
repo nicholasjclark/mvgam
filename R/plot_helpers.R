@@ -740,7 +740,7 @@ reorder_clusters <- function(x, dis, ...) {
 #' fit time (default factor model) or fixed by the user via
 #' `trend_map` (the fixed-Z path). Everything that needs Z
 #' (sample_innovations, residual_cor, plot_factors and
-#' ordinate.jsdgam) calls this resolver so the fixed-vs-sampled
+#' ordinate) calls this resolver so the fixed-vs-sampled
 #' decision lives in exactly one place.
 #'
 #' Two callable styles:

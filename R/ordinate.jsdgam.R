@@ -1,66 +1,133 @@
-#' Latent variable ordination plots from `jsdgam` objects
+#' Latent variable ordination plots from `mvgam` and `jsdgam` fits
 #'
 #' Plot an ordination of latent variables and their factor
-#' loadings from a fitted `jsdgam` model. The two chosen latent
-#' variables are first re-rotated via singular value
-#' decomposition, then posterior medians of the variables and
-#' the species' loadings are scattered in the resulting 2-D
-#' space. Site labels and species loading arrows are drawn via
-#' the package-wide [ggrepel] helpers; when \pkg{ggarrow} and \pkg{ggpp}
-#' are installed the species arrows are rendered as tapered
-#' loadings.
+#' loadings from a fitted factor model. The two chosen latent
+#' variables are first re-rotated, then posterior medians of the
+#' variables and the series' loadings are scattered in the
+#' resulting 2-D space. "Sites" are the training time points and
+#' "species" are the model's series. Site labels and series
+#' loading arrows are drawn via the package-wide [ggrepel]
+#' helpers; when \pkg{ggarrow} and \pkg{ggpp} are installed the
+#' arrows are rendered as tapered loadings.
 #'
 #' @note This method needs a fitted factor model. It reads the
 #'   identified latent variables and their loadings from the
 #'   posterior (`lv_trend_tilde[t, k]` and `Z_tilde[i, k]` for
 #'   free-loading factor models, or `lv_trend` and `Z` when the
-#'   loadings follow a fixed pattern). For an `mvgam()` fit that
-#'   included latent factors, use [ordinate.mvgam()].
+#'   loadings follow a fixed pattern).
 #'
-#' @name ordinate.jsdgam
+#' @name ordinate
 #'
-#' @param object A fitted `jsdgam` object.
+#' @param object A fitted `mvgam` or `jsdgam` object with latent
+#'   dynamic factors (`n_lv` set on an `AR()` / `RW()` / `VAR()` /
+#'   `ZMVN()` trend constructor, or a `trend_map` argument).
 #' @param which_lvs Integer vector of length 2 indicating the
 #'   two re-rotated latent variables to plot. Defaults to
 #'   `c(1, 2)`.
 #' @param biplot Logical. When `TRUE` (the default) both site
-#'   scores and species loading arrows are drawn; when `FALSE`,
+#'   scores and series loading arrows are drawn; when `FALSE`,
 #'   site scores only.
 #' @param alpha Proportional numeric scalar in `[0, 1]`
-#'   controlling the relative scaling of latent variables vs
-#'   loading coefficients.
-#' @param label_sites Logical. When `TRUE`, site scores are
-#'   drawn as labels (from the `unit` argument of the original
-#'   `jsdgam()` call); when `FALSE`, as points only.
-#' @param traits Optional trait overlay. One of:
+#'   controlling how the SVD singular value variance is split
+#'   between site scores and series loadings. `alpha = 0.5`
+#'   (default) splits equally; distances between sites and
+#'   between series are approximately comparably scaled. Use
+#'   `alpha` close to `1` to emphasise separation between time
+#'   points, or close to `0` to emphasise separation between
+#'   series. Matches the BORAL convention. Ignored for
+#'   `rotation` values other than `"svd"`.
+#' @param rotation Character. Post-hoc rotation of the
+#'   posterior-median LV trends and Z loadings before plotting.
+#'   One of:
 #'   \describe{
-#'     \item{`NULL` (default)}{No trait arrows; the previous
-#'       biplot behaviour.}
-#'     \item{`"auto"`}{If the fit was trait-informed via
-#'       `jsdgam(traits = ...)`, pull the trait frame back off
-#'       the fit and use it as the overlay. Emits a one-time
-#'       warning and skips the overlay if no traits are found.}
-#'     \item{a `data.frame` or `matrix`}{Per-species trait values
-#'       (one row per species; columns are traits). Rows are
-#'       aligned via `rownames(traits)` when set; otherwise rows
-#'       must already match the fit's series-level order. Non-
-#'       numeric columns are ignored.}
+#'     \item{`"svd"` (default)}{BORAL convention: SVD of
+#'       `LV %*% t(Z)` re-orders axes by singular-value variance.
+#'       Most informative when `n_lv > 2` and you want the two
+#'       leading gradients. Use `alpha` to split the variance
+#'       between site scores and loadings.}
+#'     \item{`"varimax"`}{Orthogonal rotation maximising loading
+#'       sparsity (each series loads strongly on one factor and
+#'       near-zero on others). Use this when you want
+#'       interpretable factor "names" rather than variance-
+#'       ordered axes. Requires `n_lv >= 2`. `alpha` ignored.}
+#'     \item{`"promax"`}{Oblique extension of varimax that allows
+#'       correlated rotated factors. `alpha` ignored.}
+#'     \item{`"none"`}{Skip rotation entirely; plot raw
+#'       posterior-median LV / Z, centred. The axes correspond
+#'       directly to the Stan parameters
+#'       `lv_trend_tilde[t, k]` and `Z_tilde[i, k]` (free-Z
+#'       factor models) or `lv_trend` / `Z` (partial-Z fits),
+#'       as discussed in Details. `alpha` ignored.}
 #'   }
-#'   When a non-NULL frame is in play, each numeric trait is
-#'   regressed on the rotated species loadings to give its
-#'   direction in the LV space; the resulting arrows are overlaid
-#'   on the biplot in steelblue. The regression-on-loadings recipe
-#'   works whether the fit was trait-informed via
-#'   `jsdgam(traits = ...)` or not, so it can either visualise the
-#'   structural trait gradient (informed) or serve as a post-hoc
-#'   overlay (naive). Only meaningful when `biplot = TRUE`.
+#'   For varimax / promax the axes are NOT variance-ordered, so
+#'   the choice of `which_lvs` matters in a different way than
+#'   under SVD: any pair of rotated factors is a valid pair to
+#'   plot.
+#' @param label_sites Logical. When `TRUE`, site scores are
+#'   drawn as text labels (the training time values); when
+#'   `FALSE`, as points only.
+#' @param traits Optional trait overlay. Accepts `NULL` (default,
+#'   no overlay), the literal string `"auto"` (pull the trait
+#'   frame off the fit if it was fitted with a trait-informed
+#'   `loadings_prior`), or an explicit `data.frame` / `matrix`
+#'   with one row per series. Numeric columns are regressed on
+#'   the rotated series loadings to give each trait's direction
+#'   in the LV space; the resulting arrows are overlaid in
+#'   steelblue. Row alignment follows `rownames(traits)` when
+#'   set; otherwise rows must match the fit's series-level order.
+#'   Non-numeric columns are ignored. A fit carrying no traits
+#'   warns and the overlay is skipped. Only meaningful when
+#'   `biplot = TRUE`.
 #' @param trait_arrow_scale Positive numeric. Visual scaling
-#'   factor for trait-arrow lengths. The default `1` places the
-#'   longest trait arrow at the same radius as the longest species
-#'   arrow; values `> 1` lengthen, values `< 1` shorten.
+#'   factor for trait-arrow lengths. The default `1` matches the
+#'   longest trait arrow to the longest series-loading radius;
+#'   values `> 1` lengthen, values `< 1` shorten.
 #' @param ... Unused. Anything passed here is refused.
 #'
-#' @return A `ggplot` object.
+#' @return A `ggplot` object. The returned object carries a
+#'   `"rotation"` attribute (a list with `method`, `n_lv`,
+#'   `scores`, `loadings`, `rotmat`) so users can extract the
+#'   rotated factor scores and loadings without re-running
+#'   `ordinate()`. Access via `attr(p, "rotation")`.
+#'
+#' @details
+#' For sampled-Z factor models the Stan model samples an
+#' unconstrained loading matrix `Z` under a structured prior and
+#' then applies a thin-QR decomposition in generated quantities
+#' to produce a lower-triangular, positive-diagonal `Z_tilde`
+#' together with the rotated factor paths `lv_trend_tilde`. The
+#' identified `Z_tilde` and `lv_trend_tilde` are what
+#' `ordinate()` reads. Under `rotation = "svd"` (default) the
+#' axes are SVD-rotated ordination gradients, NOT the original
+#' Stan factors. Under `rotation = "varimax"` / `"promax"` the
+#' axes are rotated for sparsity rather than variance; the
+#' identified lower-triangular pattern is preserved in the
+#' underlying fit but not visible in the plot. Use
+#' `rotation = "none"` (or `plot_factors()`) to view the
+#' un-rotated identified factors directly. See Heaps and Jermyn
+#' (2024) for the structured-prior + post-hoc QR framework.
+#'
+#' For partial-Z fits (free entries marked `NA` in `trend_map`)
+#' no QR rotation is applied, since rotating would overwrite
+#' the user-supplied entries on `Z`. Ordination reads `Z` and
+#' `lv_trend` directly in those fits.
+#'
+#' A `trend_map` supplies the loading pattern as data, and any
+#' rotation other than `"none"` replaces it with one read off
+#' the fitted covariance. Each such call warns, naming the
+#' rotation it applied; `plot_factors(fit)` shows the loadings
+#' the map declared.
+#'
+#' @section Known limitations:
+#' \itemize{
+#'   \item Posterior-median plug-in: the rotation operates on
+#'     per-element medians of `lv_trend` and `Z`. Uncertainty in
+#'     site scores and loading positions is not propagated to
+#'     the biplot.
+#'   \item Sign indeterminacy: SVD and varimax columns are sign-
+#'     arbitrary, so comparing ordinations from independently-
+#'     fit models may require a manual sign-flip alignment.
+#' }
 #'
 #' @author Nicholas J Clark
 #'
@@ -512,187 +579,9 @@ ordinate_build_plot <- function(svd_comp, which_lvs, biplot,
 }
 
 
-#' @rdname ordinate.jsdgam
-#' @param rotation Character. Post-hoc rotation of the
-#'   posterior-median LV trends and Z loadings before plotting.
-#'   One of:
-#'   \describe{
-#'     \item{`"svd"` (default)}{BORAL convention: SVD of
-#'       `LV %*% t(Z)` re-orders axes by singular-value variance.
-#'       Use `alpha` to split the variance between site scores and
-#'       loadings.}
-#'     \item{`"varimax"`}{Orthogonal rotation maximising loading
-#'       sparsity. Each series tends to load strongly on one
-#'       factor and near-zero on others. `alpha` is ignored.
-#'       Requires `n_lv >= 2`.}
-#'     \item{`"promax"`}{Oblique extension of varimax (allows
-#'       correlated factors). `alpha` ignored.}
-#'     \item{`"none"`}{No rotation. Plot raw posterior-median LV
-#'       and Z, centred. `alpha` ignored.}
-#'   }
-#'   For varimax / promax the axes are NOT variance-ordered, so
-#'   the choice of `which_lvs` matters in a different way than
-#'   under SVD: any pair of rotated factors is a valid pair to
-#'   plot.
-#' @method ordinate jsdgam
-#' @importFrom grid arrow unit
-#' @export
-ordinate.jsdgam <- function(
-  object,
-  which_lvs = c(1L, 2L),
-  biplot = TRUE,
-  alpha = 0.5,
-  rotation = c("svd", "varimax", "promax", "none"),
-  label_sites = TRUE,
-  traits = NULL,
-  trait_arrow_scale = 1,
-  ...
-) {
-  checkmate::assert_integerish(
-    which_lvs, len = 2L, lower = 1L, any.missing = FALSE
-  )
-  validate_proportional(alpha)
-  checkmate::assert_flag(biplot)
-  checkmate::assert_flag(label_sites)
-  checkmate::assert_number(trait_arrow_scale, lower = 0)
-  rotation <- match.arg(rotation)
-  rlang::check_dots_empty()
-  insight::check_if_installed(
-    "ggrepel",
-    reason = "to adequately plot ordination scores"
-  )
-
-  traits <- resolve_auto_traits(traits, object)
-  comp <- ordinate_factor_components(object, alpha, rotation)
-  sp_names <- resolve_series_info(object)$series_levels
-  unit_name <- attr(object$model_data, "prepped_trend_model")$unit
-  site_names <- unique(object$obs_data[[unit_name]])
-  ordinate_build_plot(
-    comp, which_lvs, biplot, label_sites,
-    site_names = site_names, species_names = sp_names,
-    traits = traits, trait_arrow_scale = trait_arrow_scale
-  )
-}
-
-
-#' Latent variable ordination plot from a fitted `mvgam`
-#'
-#' Generalises `ordinate.jsdgam()` to any LV-factor `mvgam` fit
-#' (default sampled-Z factor models OR fixed Z via `trend_map`).
-#' "Sites" are training time points, "species" are the model's
-#' series. The SVD re-rotation and the biplot layout are
-#' identical to the `jsdgam` method.
-#'
-#' @param object A fitted `mvgam` object with latent dynamic
-#'   factors (`n_lv` set on an `AR()` / `RW()` / `VAR()` /
-#'   `ZMVN()` trend constructor, or a `trend_map` argument).
-#' @param which_lvs Integer vector of length 2 indicating the
-#'   two re-rotated latent variables to plot. Defaults to
-#'   `c(1, 2)`.
-#' @param biplot Logical. When `TRUE` (default) both site scores
-#'   and series loading arrows are drawn; when `FALSE`, site
-#'   scores only.
-#' @param alpha Proportional numeric scalar in `[0, 1]`
-#'   controlling how the SVD singular value variance is split
-#'   between site scores and series loadings. `alpha = 0.5`
-#'   (default) splits equally; distances between sites and
-#'   between series are approximately comparably scaled. Use
-#'   `alpha` close to `1` to emphasise separation between time
-#'   points, or close to `0` to emphasise separation between
-#'   series. Matches the BORAL convention. Ignored for
-#'   `rotation` values other than `"svd"`.
-#' @param rotation Character. Post-hoc rotation of the
-#'   posterior-median LV trends and Z loadings before plotting.
-#'   One of:
-#'   \describe{
-#'     \item{`"svd"` (default)}{BORAL convention: SVD of
-#'       `LV %*% t(Z)` re-orders axes by singular-value variance.
-#'       Most informative when `n_lv > 2` and you want the two
-#'       leading gradients.}
-#'     \item{`"varimax"`}{Orthogonal rotation maximising loading
-#'       sparsity (each series loads strongly on one factor and
-#'       near-zero on others). Use this when you want
-#'       interpretable factor "names" rather than variance-
-#'       ordered axes. Requires `n_lv >= 2`. `alpha` ignored.}
-#'     \item{`"promax"`}{Oblique extension of varimax that allows
-#'       correlated rotated factors. `alpha` ignored.}
-#'     \item{`"none"`}{Skip rotation entirely; plot raw
-#'       posterior-median LV / Z, centred. The axes correspond
-#'       directly to the Stan parameters
-#'       `lv_trend_tilde[t, k]` and `Z_tilde[i, k]` (free-Z
-#'       factor models) or `lv_trend` / `Z` (partial-Z fits),
-#'       as discussed in Details. `alpha` ignored.}
-#'   }
-#' @param label_sites Logical. When `TRUE`, site scores are
-#'   drawn as text labels (the training time values); when
-#'   `FALSE`, as points only.
-#' @param traits Optional trait overlay. Accepts `NULL` (default,
-#'   no overlay), the literal string `"auto"` (pull the trait
-#'   frame off the fit if `mvgam()` was called with a trait-
-#'   informed `loadings_prior`), or an explicit `data.frame` /
-#'   `matrix` with one row per series. Numeric columns are
-#'   regressed on the rotated series loadings to give each trait's
-#'   direction in the LV space; the resulting arrows are overlaid
-#'   in steelblue. Row alignment follows `rownames(traits)` when
-#'   set; otherwise rows must match the fit's series-level order.
-#'   Only meaningful when `biplot = TRUE`.
-#' @param trait_arrow_scale Positive numeric. Visual scaling
-#'   factor for trait-arrow lengths. The default `1` matches the
-#'   longest trait arrow to the longest series-loading radius.
-#' @param ... Unused. Anything passed here is refused.
-#'
-#' @return A `ggplot` object. The returned object carries a
-#'   `"rotation"` attribute (a list with `method`, `n_lv`,
-#'   `scores`, `loadings`, `rotmat`) so users can extract the
-#'   rotated factor scores and loadings without re-running
-#'   `ordinate()`. Access via `attr(p, "rotation")`.
-#'
-#' @details
-#' For sampled-Z factor models the Stan model samples an
-#' unconstrained loading matrix `Z` under a structured prior and
-#' then applies a thin-QR decomposition in generated quantities
-#' to produce a lower-triangular, positive-diagonal `Z_tilde`
-#' together with the rotated factor paths `lv_trend_tilde`. The
-#' identified `Z_tilde` and `lv_trend_tilde` are what
-#' `ordinate()` reads. Under `rotation = "svd"` (default) the
-#' axes are SVD-rotated ordination gradients, NOT the original
-#' Stan factors. Under `rotation = "varimax"` / `"promax"` the
-#' axes are rotated for sparsity rather than variance; the
-#' identified lower-triangular pattern is preserved in the
-#' underlying fit but not visible in the plot. Use
-#' `rotation = "none"` (or `plot_factors()`) to view the
-#' un-rotated identified factors directly. See Heaps and Jermyn
-#' (2024) for the structured-prior + post-hoc QR framework.
-#'
-#' For partial-Z fits (free entries marked `NA` in `trend_map`)
-#' no QR rotation is applied, since rotating would overwrite
-#' the user-supplied entries on `Z`. Ordination reads `Z` and
-#' `lv_trend` directly in those fits.
-#'
-#' For fully fixed-Z fits supplied via `trend_map`, ANY
-#' non-`"none"` rotation discards the structural loadings the
-#' user encoded. A one-time warning is emitted when called on
-#' a fixed-Z fit; `plot_factors(fit)` shows the raw user-
-#' supplied loadings.
-#'
-#' @section Known limitations:
-#' \itemize{
-#'   \item Posterior-median plug-in: the rotation operates on
-#'     per-element medians of `lv_trend` and `Z`. Uncertainty in
-#'     site scores and loading positions is not propagated to
-#'     the biplot.
-#'   \item Sign indeterminacy: SVD and varimax columns are sign-
-#'     arbitrary, so comparing ordinations from independently-
-#'     fit models may require a manual sign-flip alignment.
-#' }
-#'
-#' @author Nicholas J Clark
-#'
-#' @seealso [ordinate.jsdgam()], [residual_cor()],
-#'   [plot.mvgam()] (especially `type = "factors"` and
-#'   `type = "latent_state"`)
-#'
+#' @rdname ordinate
 #' @method ordinate mvgam
+#' @importFrom grid arrow unit
 #' @export
 ordinate.mvgam <- function(
   object,
@@ -718,30 +607,30 @@ ordinate.mvgam <- function(
     reason = "to adequately plot ordination scores"
   )
 
-  # Fixed-Z fits: the SVD re-rotation discards the structural
-  # loading pattern the user encoded via trend_map, so the biplot
-  # cannot be read as a depiction of those constraints. Warn once
-  # per session to keep the message visible without spamming.
-  if (!is.null(object$trend_metadata$fixed_Z) &&
-      !identical(Sys.getenv("TESTTHAT"), "true")) {
+  rotation <- match.arg(rotation)
+
+  # A trend_map supplies the loading pattern as data. Every rotation
+  # but "none" replaces it with one read off the fitted covariance,
+  # so the axes drawn carry none of the structure that pattern
+  # declared. The notice describes the plot being returned, so it is
+  # raised on each call rather than once per session.
+  if (!is.null(object$trend_metadata$fixed_Z) && rotation != "none") {
     rlang::warn(
       message = c(
         paste0(
-          "SVD re-rotation in 'ordinate()' overrides the ",
+          "'rotation = \"", rotation, "\"' re-rotates the ",
           "structural loadings supplied via 'trend_map'."
         ),
         i = paste0(
-          "The biplot shows ordination gradients, not the ",
-          "user-specified factor structure. Use ",
-          "'plot_factors()' to see the raw fixed loadings."
+          "The biplot shows ordination gradients, not the declared ",
+          "factor structure. Pass 'rotation = \"none\"' to keep the ",
+          "declared axes, or read 'plot_factors()' for the fixed ",
+          "loadings."
         )
-      ),
-      .frequency = "once",
-      .frequency_id = "mvgam_ordinate_fixed_Z"
+      )
     )
   }
 
-  rotation <- match.arg(rotation)
   svd_comp <- ordinate_factor_components(object, alpha, rotation)
   series_info <- resolve_series_info(object)
   species_names <- series_info$series_levels
@@ -762,7 +651,7 @@ ordinate.mvgam <- function(
 
 
 #' Internal: resolve `traits = "auto"` to the trait frame stored
-#' on a trait-informed fit, warn once if none is found. Returns
+#' on a trait-informed fit, warning if none is found. Returns
 #' the input unchanged when it is `NULL` or already a frame /
 #' matrix, so the downstream `ordinate_trait_arrows()` validator
 #' handles the structural checks.
@@ -779,8 +668,9 @@ resolve_auto_traits <- function(traits, object) {
     )))
   }
   found <- ordinate_extract_fit_traits(object)
-  if (is.null(found) &&
-      !identical(Sys.getenv("TESTTHAT"), "true")) {
+  # The overlay the caller asked for is absent from the plot being
+  # returned, so the notice belongs to the call and not the session.
+  if (is.null(found)) {
     rlang::warn(
       message = c(
         "traits = 'auto' requested but the fit carries no traits.",
@@ -788,9 +678,7 @@ resolve_auto_traits <- function(traits, object) {
           "Pass an explicit data.frame to 'traits', or refit ",
           "with jsdgam(traits = ...). Skipping the overlay."
         )
-      ),
-      .frequency = "once",
-      .frequency_id = "mvgam_ordinate_auto_traits"
+      )
     )
   }
   found

@@ -185,11 +185,16 @@ test_that("resolve_auto_traits('auto') pulls from a trait-informed fit", {
   expect_equal(out, features)
 })
 
-test_that("resolve_auto_traits('auto') returns NULL on naive fit", {
-  withr::local_envvar(TESTTHAT = "true")
+test_that("resolve_auto_traits('auto') notices a fit with no traits", {
   spec <- structure(list(), class = "mvgam_trend")
   stub_fit <- list(mv_spec = list(trend_specs = spec))
-  expect_null(mvgam:::resolve_auto_traits("auto", stub_fit))
+  # The overlay the caller asked for is absent from the returned
+  # plot, so every call earns the notice and not just the first.
+  expect_warning(
+    out <- mvgam:::resolve_auto_traits("auto", stub_fit),
+    "carries no traits"
+  )
+  expect_null(out)
 })
 
 test_that("resolve_auto_traits() errors on unknown string", {

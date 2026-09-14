@@ -1,7 +1,7 @@
 # Tests for the `jsdgam()` wrapper: skeleton, legacy signature
 # port, class and slot plumbing. Three layers:
 #   1. Argument validation: 'unit' / 'species' / 'n_lv' / 'data'.
-#   2. Class + slot plumbing: c("mvgam", "jsdgam"); is_jsdgam flag;
+#   2. Class + slot plumbing: c("mvgam", "jsdgam") and the
 #      prepped_trend_model attribute populated correctly.
 #   3. Forward-compat smoke test: a minimal jsdgam call composes
 #      cleanly with the brms-integration mvgam() pipeline.
@@ -207,7 +207,6 @@ test_that("jsdgam returns c('mvgam', 'jsdgam') and the metadata slots", {
   expect_s3_class(mod, "jsdgam")
   expect_s3_class(mod, "mvgam")
   expect_identical(class(mod)[1L:2L], c("mvgam", "jsdgam"))
-  expect_true(isTRUE(mod$model_spec$is_jsdgam))
 
   prepped <- attr(mod$model_data, "prepped_trend_model")
   expect_type(prepped, "list")

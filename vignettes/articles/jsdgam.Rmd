@@ -360,7 +360,7 @@ tend to load on one factor more than the others. The `none`
 option plots the raw identified loadings. All four panels show
 the same fit. The choice between them is about which axis
 interpretation suits the question at hand. See
-`?ordinate.jsdgam` for the full set of plotting arguments
+`?ordinate` for the full set of plotting arguments
 (including `alpha` for the BORAL site / loading variance
 split, and `label_sites` for switching between text and point
 markers). `plot(fit, type = "factors")` draws the identified

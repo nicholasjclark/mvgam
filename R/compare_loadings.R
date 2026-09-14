@@ -69,8 +69,7 @@
 #'
 #' @author Nicholas J Clark
 #'
-#' @seealso [ordinate.mvgam()], [ordinate.jsdgam()],
-#'   [residual_cor()], [active_factors()]
+#' @seealso [ordinate()], [residual_cor()], [active_factors()]
 #'
 #' @references
 #' Schoenemann PH (1966). A generalized solution of the orthogonal

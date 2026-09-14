@@ -7,10 +7,11 @@
 # forwards everything to `mvgam()` via:
 #   trend_formula = factor_formula   (`~ -1` resolves to ZMVN())
 #   trend_map     = matrix(NA_real_, n_species, n_lv)   (partial-Z full mask)
-# Class assignment is `c("mvgam", "jsdgam")` so existing mvgam methods
-# inherit and the small jsdgam-specific surfaces (`ordinate.jsdgam`,
-# `residual_cor.jsdgam`, the `is_jsdgam` branch in `print.mvgam`) fire
-# at the right time.
+# Class assignment is `c("mvgam", "jsdgam")`, so every mvgam method
+# serves a jsdgam fit. `mvgam` leads that vector, which means S3
+# dispatch reaches a `.jsdgam` method for no generic the package
+# defines; the methods a jsdgam fit needs are the mvgam ones, and
+# the extra slots set below are what they read.
 #
 # The wrapper does NOT patch Stan code, does NOT rotate species across
 # factors via a modulo trend_map, and does NOT introduce new
@@ -403,8 +404,9 @@ jsdgam <- function(formula,
   }
 
   # Promote (unit, species) to the canonical (time, series) columns
-  # mvgam expects. The original columns stay attached so downstream
-  # surfaces (e.g. ordinate.jsdgam) can read them via unit_chr.
+  # mvgam expects. The original columns stay attached so a prediction
+  # grid can still be addressed in the names the user wrote, which is
+  # what `insight::find_predictors()` reads them for.
   data_train <- data
   if (!identical(unit_chr, "time")) {
     if ("time" %in% names(data_train)) {
@@ -623,16 +625,15 @@ jsdgam <- function(formula,
 
   fit <- do.call(mvgam, forward_args)
 
-  # Slot plumbing for the jsdgam-specific forward-compat surfaces.
-  # `model_data`, `obs_data`, and `model_spec$is_jsdgam` are the slots
-  # `ordinate.jsdgam`, `residual_cor.jsdgam`, and the `is_jsdgam`
-  # branch in `print.mvgam` read.
+  # The frame as jsdgam prepared it, and the record of which columns
+  # the user named. `insight::find_predictors()` reads that record so
+  # a grid can be addressed by `unit` and `species` rather than by the
+  # `time` and `series` aliases mvgam fits on.
   fit$model_data <- structure(
     data_train,
     prepped_trend_model = list(unit = unit_chr, species = species_chr)
   )
   fit$obs_data <- data_train
-  fit$model_spec <- c(fit$model_spec %||% list(), list(is_jsdgam = TRUE))
   # `mvgam()` stamped its own frame's call, which for a forwarded
   # fit is `do.call()`'s resolved arguments. A `jsdgam` fit was
   # built by `jsdgam()`, so that is the call it reports, and it is
