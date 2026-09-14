@@ -24,10 +24,10 @@
 #      covariate and no intercept, so the placeholder is the only
 #      constant in the model and is identified.
 #   2. `trend_formula = ~ series + AR(p = 1)`. The trend carries a
-#      per-series intercept, so its span already contains the
+#      per-series intercept, whose span already contains the
 #      constant the placeholder adds. This is the VAR article's
-#      shape, and whether the two are separately identified is what
-#      the second fit answers.
+#      shape, and it is where a free placeholder would reach the
+#      posterior.
 #
 # Run with:
 #   TESTTHAT_MAX_FAILS=1000 Rscript -e "devtools::load_all(); \
@@ -167,38 +167,16 @@ test_that("the frame handed back is the frame that was given", {
 })
 
 
-# The stacked design, and why it belongs on a prefit
-#
-# The linear predictor is `X %*% b` plus the trend, and the trend's
-# own mean is `X_trend %*% b_trend` read at that row's cell. So the
-# matrix deciding whether the two sides are separately identified is
-# the pair stacked side by side, and it is fully determined before
-# any sampling.
-
-# The mapping is checked against the frame below rather than being
-# taken on trust, and the package's own resolver is what is driven, so
-# a second derivation cannot drift from the one that runs.
-stacked_design <- function(fit) {
-  mvgam:::stacked_obs_trend_design(
-    standata(fit), mvgam:::MVGAM_EMPTY_OBS_PLACEHOLDER
-  )
-}
-
 
 test_that("the mapping onto the trend grid is the one Stan uses", {
   # The block below is only worth anything if this index is right, so
   # it is checked against the frame on a fit where the same covariate
   # sits on both sides: read through the map, the trend column has to
   # come back as the frame's own values. Putting `elev` on both sides
-  # is what makes that comparison possible, and it is also the
-  # pairing the likelihood cannot separate, so the notice is expected
-  # here rather than silenced.
-  expect_warning(
-    pre_both <- mvgam(
-      y ~ elev, trend_formula = ~ elev + AR(p = 1),
-      data = dat, family = gaussian(), run_model = FALSE
-    ),
-    "not separately identified"
+  # is what makes that comparison possible.
+  pre_both <- mvgam(
+    y ~ elev, trend_formula = ~ elev + AR(p = 1),
+    data = dat, family = gaussian(), run_model = FALSE
   )
   sd <- standata(pre_both)
   idx <- mvgam:::obs_rows_to_trend_rows(sd)
@@ -207,54 +185,6 @@ test_that("the mapping onto the trend grid is the one Stan uses", {
 })
 
 
-# Which of the seven pairings is identified, and what each one is
-# told. A column pinned at a constant carries no free parameter, so
-# the placeholder is dropped before the rank is taken: what is asked
-# is whether the free coefficients are separately identified.
-#
-# The three deficient rows are not refused. Fitting `y ~ 1` against
-# `~ series + AR(p = 1)` three ways settles why: under the default
-# priors each part carries a posterior SD of 4.26 while their sums
-# hold at 0.11 to 0.36; under `std_normal()` on the trend
-# coefficients the fit is proper at R-hat 1.02 and the parts are
-# still displaced by the intercept; and `y ~ -1` recovers the levels.
-# The sums, the fitted values and the forecasts are identified
-# throughout, so a refusal would reject a model that samples and
-# predicts. The notice names the columns instead.
-identification_cases <- list(
-  list(obs = y ~ -1, trend = ~ elev + AR(p = 1), deficient = FALSE),
-  list(obs = y ~ -1, trend = ~ series + AR(p = 1), deficient = FALSE),
-  list(obs = y ~ 1, trend = ~ elev + AR(p = 1), deficient = FALSE),
-  list(obs = y ~ 1, trend = ~ series + AR(p = 1), deficient = TRUE),
-  list(obs = y ~ 1, trend = ~ 1 + AR(p = 1), deficient = FALSE),
-  list(obs = y ~ elev, trend = ~ series + AR(p = 1), deficient = TRUE),
-  list(obs = y ~ elev, trend = ~ elev + AR(p = 1), deficient = TRUE)
-)
-
-
-test_that("a confounded pairing is named where it is built", {
-  for (case in identification_cases) {
-    build <- function() {
-      mvgam(
-        case$obs, trend_formula = case$trend, data = dat,
-        family = gaussian(), run_model = FALSE
-      )
-    }
-    if (case$deficient) {
-      expect_warning(pre_i <- build(), "not separately identified")
-    } else {
-      pre_i <- build()
-    }
-    M <- stacked_design(pre_i)
-    # `~ 1 + AR` carries no trend design at all, so there is nothing
-    # to stack and nothing that could be confounded.
-    if (is.null(M)) {
-      expect_false(case$deficient)
-      next
-    }
-    expect_identical(qr(M)$rank < ncol(M), case$deficient)
-  }
-})
 
 
 # -- Fits -------------------------------------------------------------

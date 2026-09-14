@@ -42,15 +42,17 @@ A 0-row \code{saturated} set means the configured \code{K_max} was
 sufficient for all units in the sampled posterior.
 }
 \description{
-For a fit using a closure-unit family with a per-unit upper
-truncation \code{K_max} (\code{nmix()}, \code{nmix("royle_nichols")},
-\code{nmix("poisson_poisson")}), reports the share of conditional
-posterior \code{N} draws that sit at the truncation point. Units
-whose posterior abundance hits \code{K_max} carry truncation-induced
-downward bias and are a signal that the \code{cap} column should be
-raised (or supplied at all, since \code{nmix("royle_nichols")}
-defaults to \code{K_max = 25}).
+For a fit using a closure-unit family, reports the share of
+conditional posterior latent-state draws that sit at the per-unit
+upper truncation \code{K_max}. Under \code{nmix()} and its
+\code{royle_nichols} / \code{poisson_poisson} variants \code{K_max} bounds a
+latent count, so a unit whose posterior abundance reaches it
+carries truncation-induced downward bias and signals that the
+\code{cap} column should be raised (or supplied at all, since
+\code{nmix("royle_nichols")} defaults to \code{K_max = 25}). Under \code{occ()}
+the latent state is binary and \code{K_max} is one, where a saturated
+unit is one the species certainly occupies.
 }
 \seealso{
-\code{\link[=nmix]{nmix()}}.
+\code{\link[=nmix]{nmix()}}, \code{\link[=occ]{occ()}}.
 }

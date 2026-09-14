@@ -1015,7 +1015,7 @@ normalise_trend_map <- function(input, data) {
   } else if (is.data.frame(input)) {
     trend_map_from_dataframe(input, series_levels)
   } else if (is.matrix(input) && is.numeric(input)) {
-    trend_map_from_matrix(input, n_series)
+    trend_map_from_matrix(input, series_levels)
   } else {
     stop(insight::format_error(c(
       "'trend_map' must be a matrix, data.frame or character code.",
@@ -1050,10 +1050,67 @@ trend_map_from_character <- function(input, n_series) {
 }
 
 
-# Numeric-matrix branch. Validates shape + finite + no all-zero
-# rows.
+# Internal: does a table name every training series exactly once?
+#
+# Three shapes ask this. A `trend_map` data frame names its series in
+# a column, a `trend_map` matrix names them in its rownames, and a
+# `loadings_prior` feature frame does either. Every fault is named in
+# one message, so a caller who wrote a stranger in place of a real
+# series is told both halves at once instead of learning the second
+# after fixing the first.
+#
+# @param supplied The series labels the caller wrote.
+# @param series_levels The training series, in their canonical order.
+# @param subject The argument to name in the message.
 #'@noRd
-trend_map_from_matrix <- function(input, n_series) {
+assert_series_coverage <- function(supplied, series_levels, subject) {
+  supplied <- as.character(supplied)
+  absent <- setdiff(series_levels, supplied)
+  unknown <- setdiff(supplied, series_levels)
+  dups <- unique(supplied[duplicated(supplied)])
+  if (!length(absent) && !length(unknown) && !length(dups)) {
+    return(invisible(TRUE))
+  }
+  quoted <- function(v) paste0("'", v, "'", collapse = ", ")
+  stop(insight::format_error(c(
+    paste0("'", subject,
+           "' must list every training series exactly once."),
+    x = if (length(absent)) {
+      paste0("Missing: ", quoted(absent), ".")
+    },
+    x = if (length(unknown)) {
+      paste0("Unknown to the training data: ", quoted(unknown), ".")
+    },
+    x = if (length(dups)) {
+      paste0("These are duplicated: ", quoted(dups), ".")
+    },
+    i = paste0("The training series are: ", quoted(series_levels), ".")
+  )), call. = FALSE)
+}
+
+
+# Internal: the row order that puts a caller's series into the axis
+# order, refusing any labelling that cannot produce one.
+#
+# Reordering rows without first checking the labels is the fault this
+# exists to prevent, so the two steps are one operation and a caller
+# cannot reach the second without the first.
+#
+# @inheritParams assert_series_coverage
+# @return An integer index, one position per training series.
+#'@noRd
+series_row_order <- function(supplied, series_levels, subject) {
+  assert_series_coverage(supplied, series_levels, subject)
+  match(series_levels, as.character(supplied))
+}
+
+
+# Numeric-matrix branch. Validates shape + finite + no all-zero
+# rows. Rownames, where the user supplies them, say which series each
+# row of loadings belongs to, and the rows are read in that order.
+#'@noRd
+trend_map_from_matrix <- function(input, series_levels) {
+  n_series <- length(series_levels)
   if (nrow(input) != n_series) {
     stop(insight::format_error(c(
       "'trend_map' matrix has the wrong number of rows.",
@@ -1063,6 +1120,16 @@ trend_map_from_matrix <- function(input, n_series) {
       ),
       i = "Rows correspond to series; columns to latent factors."
     )))
+  }
+  # A matrix carries rownames, and a user who writes them is saying
+  # which series each row of loadings belongs to. Taking the rows
+  # positionally instead hands each series another's loadings, and
+  # the declared names are then written back over the result.
+  rn <- rownames(input)
+  if (!is.null(rn)) {
+    input <- input[
+      series_row_order(rn, series_levels, "trend_map"), , drop = FALSE
+    ]
   }
   # NA entries mark free (sampled) loadings under the partial-Z
   # surface; only Inf / NaN are now rejected as malformed.
@@ -1089,8 +1156,8 @@ trend_map_from_matrix <- function(input, n_series) {
     stop(insight::format_error(c(
       "'trend_map' has zero-loading rows; those series are unmodelled.",
       x = paste0(
-        "Rows with zero loadings: ",
-        paste(zero_rows, collapse = ", "), "."
+        "Series with no loadings: ",
+        paste0("'", series_levels[zero_rows], "'", collapse = ", "), "."
       ),
       i = paste0(
         "Every series must load on at least one factor (set a ",
@@ -1116,37 +1183,7 @@ trend_map_from_dataframe <- function(input, series_levels) {
     input, c("series", "trend"), "trend_map"
   )
   s <- as.character(input$series)
-  if (!all(series_levels %in% s)) {
-    missing_series <- setdiff(series_levels, s)
-    stop(insight::format_error(c(
-      "'trend_map' must list every training series exactly once.",
-      x = paste0(
-        "Missing from trend_map: ",
-        paste0("'", missing_series, "'", collapse = ", "), "."
-      )
-    )))
-  }
-  if (anyDuplicated(s)) {
-    stop(insight::format_error(c(
-      "'trend_map' contains duplicate series labels.",
-      x = paste0(
-        "Duplicated: ",
-        paste0("'", unique(s[duplicated(s)]), "'", collapse = ", "),
-        "."
-      ),
-      i = "Each series must map to exactly one trend."
-    )))
-  }
-  unknown <- setdiff(s, series_levels)
-  if (length(unknown) > 0L) {
-    stop(insight::format_error(c(
-      "'trend_map' references series not present in the training data.",
-      x = paste0(
-        "Unknown: ",
-        paste0("'", unknown, "'", collapse = ", "), "."
-      )
-    )))
-  }
+  ord <- series_row_order(s, series_levels, "trend_map")
   if (!is.numeric(input$trend) && !is.integer(input$trend)) {
     stop(insight::format_error(c(
       "'trend_map$trend' must be a numeric or integer column.",
@@ -1187,9 +1224,8 @@ trend_map_from_dataframe <- function(input, series_levels) {
       i = "max(trend) must not exceed the number of series."
     )))
   }
-  # Reorder rows to match series_levels so Z[s, ] aligns with
-  # the canonical series order.
-  ord <- match(series_levels, s)
+  # `ord` puts the user's rows into the canonical series order, so
+  # `Z[s, ]` aligns with the axis the sampler indexes.
   Z <- matrix(0, nrow = length(series_levels), ncol = max_t)
   Z[cbind(seq_along(series_levels), t[ord])] <- 1
   Z
@@ -5317,8 +5353,6 @@ normalise_loadings_prior <- function(input, data2, data,
       i = "Set column_shrinkage = 'mgp' to use these hyperparameters."
     )))
   }
-  length_scale_collinearity_warning(features_mat, distance_mats)
-  imbalance_warning(features_mat)
   list(
     features_mat = features_mat,
     distance_mats = distance_mats,
@@ -5906,23 +5940,6 @@ assert_forecast_times_steppable <- function(fc_times, training,
 }
 
 
-#' Which observation designs a fitted model holds
-#'
-#' A univariate model has one, keyed `X`; a model written with
-#' `brms::mvbf()` has one per response, keyed `X_<resp>` and paired
-#' with its own `obs_trend_time_<resp>` and `obs_trend_series_<resp>`.
-#' The index arrays are mvgam's own, so they are what the set is read
-#' from rather than the design names, which a covariate could collide
-#' with.
-#'
-#' @param standata The assembled Stan data list.
-#' @return Character vector of response suffixes, `""` for the
-#'   univariate case.
-#' @noRd
-obs_design_responses <- function(standata) {
-  nm <- grep("^obs_trend_time", names(standata), value = TRUE)
-  sub("^obs_trend_time_?", "", nm)
-}
 
 
 #' Map each observation row onto its row of the trend design
@@ -5961,109 +5978,3 @@ obs_rows_to_trend_rows <- function(standata, resp = "") {
 }
 
 
-#' The design the likelihood actually sees
-#'
-#' `mu[n]` is `X[n, ] * b` plus the trend at that row's cell, whose own
-#' mean is `X_trend * b_trend` read through
-#' `obs_rows_to_trend_rows()`. Whether the two sides are separately
-#' identified is therefore a question about the pair stacked side by
-#' side, and it is settled before any sampling.
-#'
-#' @param standata The assembled Stan data list.
-#' @param pinned_coefs Observation coefficients held at a constant,
-#'   whose columns carry no free parameter and are dropped.
-#' @param resp Response suffix, `""` on a univariate model.
-#' @return A numeric matrix with named columns, or `NULL` where the
-#'   stack cannot be formed.
-#' @noRd
-stacked_obs_trend_design <- function(standata, pinned_coefs = character(),
-                                     resp = "") {
-  x_obs <- standata[[if (nzchar(resp)) paste0("X_", resp) else "X"]]
-  x_trend <- standata$X_trend
-  if (is.null(x_obs) || is.null(x_trend) ||
-        !is.matrix(x_obs) || !is.matrix(x_trend)) {
-    return(NULL)
-  }
-  idx <- obs_rows_to_trend_rows(standata, resp)
-  if (is.null(idx) || length(idx) != nrow(x_obs) ||
-        any(idx < 1L) || any(idx > nrow(x_trend))) {
-    return(NULL)
-  }
-  obs_names <- colnames(x_obs)
-  if (is.null(obs_names)) {
-    obs_names <- paste0("obs_", seq_len(ncol(x_obs)))
-    colnames(x_obs) <- obs_names
-  }
-  x_obs <- x_obs[, !obs_names %in% pinned_coefs, drop = FALSE]
-  mapped <- x_trend[idx, , drop = FALSE]
-  trend_names <- colnames(x_trend)
-  if (is.null(trend_names)) {
-    trend_names <- paste0("trend_", seq_len(ncol(x_trend)))
-  }
-  colnames(mapped) <- paste0(trend_names, "_trend")
-  cbind(x_obs, mapped)
-}
-
-
-#' Warn where the observation and trend designs span a direction twice
-#'
-#' The two sides are fitted together, so a column of one that lies in
-#' the span of the other leaves a flat direction in the likelihood.
-#'
-#' A notice rather than a refusal, settled by fitting the pairing three
-#' ways on one frame. `y ~ 1` against `~ series + AR(p = 1)` under the
-#' default priors returns each part at a posterior SD of 4.26 while
-#' their sums hold at 0.11 to 0.36; under `std_normal()` on the trend
-#' coefficients the same fit is proper at R-hat 1.02 and the parts are
-#' still displaced by the intercept the data cannot separate. The
-#' identified spelling, `y ~ -1`, recovers the levels. So what a
-#' confounded pairing costs is the decomposition, not the fit: the
-#' sums, the fitted values and the forecasts are all identified, which
-#' is why refusing would reject a model that samples and predicts.
-#'
-#' @param standata The assembled Stan data list.
-#' @param prior The observation-side prior table, read for the
-#'   coefficients a constant pins.
-#' @return `invisible(TRUE)`.
-#' @noRd
-warn_confounded_obs_trend_design <- function(standata, prior = NULL) {
-  for (resp in obs_design_responses(standata)) {
-    design <- stacked_obs_trend_design(
-      standata, pinned_prior_coefs(prior, resp), resp
-    )
-    if (is.null(design) || ncol(design) == 0L || nrow(design) == 0L) {
-      next
-    }
-    decomp <- qr(design)
-    if (decomp$rank >= ncol(design)) {
-      next
-    }
-    dependent <- colnames(design)[
-      decomp$pivot[seq(decomp$rank + 1L, ncol(design))]
-    ]
-    insight::format_warning(c(
-      paste0(
-        "The observation and trend designs are not separately ",
-        "identified", if (nzchar(resp)) paste0(" for '", resp, "'"), "."
-      ),
-      x = paste0(
-        "Stacked they hold ", ncol(design), " columns of rank ",
-        decomp$rank, ". One direction is flat in the likelihood."
-      ),
-      x = paste0(
-        "'", paste(dependent, collapse = "', '"),
-        "' adds nothing the other columns do not already span."
-      ),
-      i = paste0(
-        "Sums of the confounded coefficients are identified. Fitted ",
-        "values and forecasts are unaffected. The individual values ",
-        "are not identified and report whatever the prior allowed."
-      ),
-      i = paste0(
-        "Drop the observation-side term or move the shared term to one ",
-        "side only."
-      )
-    ))
-  }
-  invisible(TRUE)
-}

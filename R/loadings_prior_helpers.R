@@ -78,29 +78,10 @@ align_feature_rows <- function(df, series_levels) {
   n_series <- length(series_levels)
   if ("series" %in% names(df)) {
     s <- as.character(df$series)
-    if (!setequal(s, series_levels)) {
-      missing_series <- setdiff(series_levels, s)
-      extra_series <- setdiff(s, series_levels)
-      stop(insight::format_error(c(
-        "'features$series' must list every training series exactly once.",
-        x = if (length(missing_series) > 0L) paste0(
-          "Missing: ", paste0("'", missing_series, "'", collapse = ", "), "."
-        ) else NULL,
-        x = if (length(extra_series) > 0L) paste0(
-          "Unknown: ", paste0("'", extra_series, "'", collapse = ", "), "."
-        ) else NULL
-      )))
-    }
-    if (anyDuplicated(s)) {
-      dups <- unique(s[duplicated(s)])
-      stop(insight::format_error(c(
-        "'features$series' contains duplicate labels.",
-        x = paste0(
-          "Duplicated: ", paste0("'", dups, "'", collapse = ", "), "."
-        )
-      )))
-    }
-    df <- df[match(series_levels, s), , drop = FALSE]
+    df <- df[
+      series_row_order(s, series_levels, "features$series"), ,
+      drop = FALSE
+    ]
     df$series <- NULL
     return(df)
   }
@@ -289,125 +270,4 @@ validate_pairwise_distance <- function(mat, n_series, name,
     }
   }
   mat
-}
-
-
-# Soft-warn when supplied length-scale dimensions are nearly
-# colinear, because the data cannot identify them separately.
-# Compares each pair of (i) feature-derived ARD distances and
-# (ii) supplied pairwise distance matrices via the Pearson
-# correlation of their upper triangles, warning at correlation
-# above `threshold`. Silent under TESTTHAT to avoid noise in
-# unit tests.
-#'@noRd
-length_scale_collinearity_warning <- function(features_mat,
-                                              distance_mats,
-                                              threshold = 0.9) {
-  vecs <- list()
-  if (!is.null(features_mat) && ncol(features_mat) > 0L) {
-    for (k in seq_len(ncol(features_mat))) {
-      dvec <- pairwise_abs_diff(features_mat[, k])
-      vecs[[paste0("feature:", colnames(features_mat)[k])]] <- dvec
-    }
-  }
-  if (length(distance_mats) > 0L) {
-    for (nm in names(distance_mats)) {
-      vecs[[paste0("distance:", nm)]] <- upper_tri_vec(distance_mats[[nm]])
-    }
-  }
-  if (length(vecs) < 2L) return(invisible(NULL))
-  hot <- character(0)
-  nms <- names(vecs)
-  for (i in seq_along(vecs)) {
-    for (j in seq_along(vecs)) {
-      if (j <= i) next
-      r <- suppressWarnings(stats::cor(vecs[[i]], vecs[[j]]))
-      if (!is.na(r) && abs(r) >= threshold) {
-        hot <- c(
-          hot,
-          paste0(
-            nms[i], " ~ ", nms[j],
-            " (|r| = ", format(abs(r), digits = 2), ")"
-          )
-        )
-      }
-    }
-  }
-  if (length(hot) > 0L &&
-      !identical(Sys.getenv("TESTTHAT"), "true")) {
-    rlang::warn(
-      message = c(
-        "Length-scale dimensions are nearly colinear; identifiability is weak.",
-        i = paste0(
-          "Pairs above |r| = ", threshold, ": ",
-          paste(hot, collapse = "; "), "."
-        )
-      ),
-      .frequency = "once",
-      .frequency_id = "mvgam_loadings_prior_collinearity"
-    )
-  }
-  invisible(NULL)
-}
-
-
-# Soft-warn when a one-hot feature column is dominated by a
-# single level (default > 95%). Such columns carry almost no
-# pairwise contrast information, so the corresponding ARD
-# length-scale is hard for the data to identify. Silent under
-# TESTTHAT.
-#'@noRd
-imbalance_warning <- function(features_mat, threshold = 0.95) {
-  if (is.null(features_mat) || ncol(features_mat) == 0L) {
-    return(invisible(NULL))
-  }
-  hot <- character(0)
-  for (k in seq_len(ncol(features_mat))) {
-    col <- features_mat[, k]
-    if (!all(col %in% c(0, 1))) next
-    p <- max(mean(col == 0), mean(col == 1))
-    if (p >= threshold) {
-      hot <- c(
-        hot,
-        paste0(
-          colnames(features_mat)[k], " (",
-          format(100 * p, digits = 3), "% modal)"
-        )
-      )
-    }
-  }
-  if (length(hot) > 0L &&
-      !identical(Sys.getenv("TESTTHAT"), "true")) {
-    rlang::warn(
-      message = c(
-        "One-hot feature column(s) dominated by a single level.",
-        i = paste0(
-          "Columns above ", format(100 * threshold, digits = 3),
-          "% modal: ", paste(hot, collapse = ", "), "."
-        )
-      ),
-      .frequency = "once",
-      .frequency_id = "mvgam_loadings_prior_imbalance"
-    )
-  }
-  invisible(NULL)
-}
-
-
-# Pairwise absolute-difference vector for a numeric feature
-# column. Used as a feature-derived "distance" for the
-# collinearity check. Returns the upper triangle (excluding the
-# diagonal) of |x_i - x_j| in column-major order.
-#'@noRd
-pairwise_abs_diff <- function(x) {
-  d <- abs(outer(x, x, FUN = `-`))
-  upper_tri_vec(d)
-}
-
-
-# Upper-triangle (excluding diagonal) of a square matrix as a
-# vector in column-major order.
-#'@noRd
-upper_tri_vec <- function(mat) {
-  mat[upper.tri(mat, diag = FALSE)]
 }

@@ -6791,14 +6791,16 @@ posterior_latent_N <- function(object, newdata = NULL,
 
 #' Per-unit posterior saturation of the closure-unit K_max truncation
 #'
-#' For a fit using a closure-unit family with a per-unit upper
-#' truncation `K_max` (`nmix()`, `nmix("royle_nichols")`,
-#' `nmix("poisson_poisson")`), reports the share of conditional
-#' posterior `N` draws that sit at the truncation point. Units
-#' whose posterior abundance hits `K_max` carry truncation-induced
-#' downward bias and are a signal that the `cap` column should be
-#' raised (or supplied at all, since `nmix("royle_nichols")`
-#' defaults to `K_max = 25`).
+#' For a fit using a closure-unit family, reports the share of
+#' conditional posterior latent-state draws that sit at the per-unit
+#' upper truncation `K_max`. Under `nmix()` and its
+#' `royle_nichols` / `poisson_poisson` variants `K_max` bounds a
+#' latent count, so a unit whose posterior abundance reaches it
+#' carries truncation-induced downward bias and signals that the
+#' `cap` column should be raised (or supplied at all, since
+#' `nmix("royle_nichols")` defaults to `K_max = 25`). Under `occ()`
+#' the latent state is binary and `K_max` is one, where a saturated
+#' unit is one the species certainly occupies.
 #'
 #' @param object A fitted `mvgam` with a closure-unit family.
 #' @param newdata Optional `data.frame`. When `NULL` uses the fit's
@@ -6824,7 +6826,7 @@ posterior_latent_N <- function(object, newdata = NULL,
 #'   A 0-row `saturated` set means the configured `K_max` was
 #'   sufficient for all units in the sampled posterior.
 #'
-#' @seealso [nmix()].
+#' @seealso [nmix()], [occ()].
 #'
 #' @export
 latent_N_saturation <- function(object, newdata = NULL,
@@ -6833,27 +6835,25 @@ latent_N_saturation <- function(object, newdata = NULL,
                                  draw_ids = NULL) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_number(threshold, lower = 0, upper = 1)
-  if (!is_closure_unit_family(object$family)) {
-    stop(insight::format_error(
-      "latent_N_saturation() requires a closure-unit family."
-    ))
+  if (!needs_closure_unit_aggregation(object$family)) {
+    stop(insight::format_error(c(
+      paste0(
+        "latent_N_saturation() requires a closure-unit family with ",
+        "a latent state."
+      ),
+      x = paste0(
+        "Family '", resolve_family_name(object$family),
+        "' marginalises no latent state over repeat visits."
+      ),
+      i = "It applies to occ() and nmix() fits."
+    )))
   }
   # K_max comes from the per-unit array assembled at fit / predict
-  # time; for multi-response families (mvn, mvt, diri, multi, categ)
-  # K_max is NA and the diagnostic does not apply.
+  # time.
   comp <- extract_closure_unit_components(
     object, newdata = newdata, draw_ids = draw_ids
   )
   K_max <- comp$arrays$K_max
-  if (is.null(K_max) || all(is.na(K_max))) {
-    stop(insight::format_error(c(
-      "K_max is not defined for this family.",
-      i = paste0(
-        "latent_N_saturation() applies only to nmix() and its ",
-        "royle_nichols / poisson_poisson variants."
-      )
-    )))
-  }
   draws <- posterior_latent_N(
     object, newdata = newdata,
     draw_ids = draw_ids, conditional = TRUE

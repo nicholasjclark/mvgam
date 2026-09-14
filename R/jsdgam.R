@@ -113,29 +113,28 @@
 #'   mvgam models.
 #'
 #' @param n_lv `integer`. Number of latent factors to use for
-#'   modelling residual associations. Must be `>= 1`. Defaults to
-#'   `2`. The upper bound depends on the `loadings_prior`:
+#'   modelling residual associations. Must be `>= 1` and at most the
+#'   number of species. Defaults to `2`. One bound covers every
+#'   `loadings_prior`: the marginal residual covariance
+#'   `Z Z' + diag(Psi^2)` has rank at most the number of species,
+#'   and further columns of `Z` add no expressive capacity.
+#'   `n_lv = n_species` is admitted. Whether that boundary samples
+#'   well is a question for the prior.
+#'
+#'   What `n_lv` counts does depend on the prior:
 #'   \itemize{
 #'     \item Default iid Z prior (`student_t(3, 0, 0.5)`) or any
 #'       kernel-driven structured prior built from `traits` /
 #'       `phylo` / `loadings_prior$distances`: `n_lv` is the
-#'       **exact factor count** that enters the likelihood, and
-#'       must be **strictly less than** the number of species. The
-#'       constraint exists because at `n_lv = n_species`, `Z Z'`
-#'       saturates the residual covariance and the per-species
-#'       residual variance loses identifiability under HMC,
-#'       producing a heavy funnel.
+#'       **exact factor count** that enters the likelihood.
 #'     \item Multiplicative gamma process prior
 #'       (`loadings_prior = "mgp"` or
 #'       `loadings_prior = list(column_shrinkage = "mgp", ...)`):
 #'       `n_lv` is a **truncation ceiling**. Set it at or above
 #'       the rank you want to admit; the MGP shrinks later columns
-#'       of `Z` toward zero by construction so unused columns are
-#'       pruned by the prior. Allowed up to `n_lv = n_species`.
-#'       Passing `n_lv > n_species` is rejected because the
-#'       marginal `Z Z' + diag(Psi^2)` has rank at most `n_species`
-#'       and additional columns add no expressive capacity --
-#'       tighten `mgp_a2` for stronger shrinkage instead.
+#'       of `Z` toward zero by construction, and unused columns are
+#'       pruned by the prior. Tighten `mgp_a2` for stronger
+#'       shrinkage.
 #'   }
 #'   See [active_factors()] for a posterior summary of how many
 #'   columns the data actually used under MGP.

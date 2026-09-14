@@ -865,14 +865,6 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     )
   )
 
-  # Whether the two sides are separately identified is settled by the
-  # designs alone, so it is asked here rather than left to a reader of
-  # the R-hat column. Both the prefit and the fitted path pass through
-  # this point.
-  warn_confounded_obs_trend_design(
-    standata = stan_components$combined_components$standata,
-    prior = stan_components$obs_setup$prior
-  )
 
   # `run_model = FALSE`: stop before parse, compile and fit so a
   # caller can read the generated stancode and standata without

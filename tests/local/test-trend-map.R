@@ -214,12 +214,10 @@ test_that("a matrix map keys its rows by the names the user gave", {
   # positionally instead assigns row one to whichever series the
   # frame happens to declare first.
   #
-  # This fails today. Rownames are dropped and the rows are taken in
-  # position order, and the emitted matrix is then relabelled with
-  # the declared levels, so the object asserts the assignment the
-  # user asked for while holding another series' numbers. Every
-  # series loads on another's factors, nothing raises, and the labels
-  # say otherwise. Recorded as finding 16.
+  # Reading the rows positionally instead would hand each series
+  # another's loadings and then relabel the result with the declared
+  # levels, leaving every dimension in agreement and the labels
+  # asserting an assignment the numbers do not hold.
   #
   # The same map with its rows named in a different order is a
   # different model, so it has to emit a different `Z`.

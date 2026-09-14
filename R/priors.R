@@ -1024,35 +1024,6 @@ is_constant_prior <- function(x) {
 }
 
 
-#' Which coefficients a constant prior pins
-#'
-#' A coefficient held at a constant carries no free parameter in the
-#' generated program: brms declares it in `transformed parameters` and
-#' assigns the value. Its design column therefore adds no direction the
-#' likelihood has to identify, so anything asking whether two designs
-#' are separately identified has to leave those columns out.
-#'
-#' @param prior A `brmsprior` table, or `NULL`.
-#' @param resp Response the design belongs to, `""` on a univariate
-#'   model. A row scoped to another response pins nothing here.
-#' @return Character vector of coefficient names, possibly empty.
-#' @noRd
-pinned_prior_coefs <- function(prior, resp = "") {
-  if (is.null(prior) || !is.data.frame(prior) || nrow(prior) == 0L) {
-    return(character())
-  }
-  if (!all(c("prior", "class", "coef") %in% names(prior))) {
-    return(character())
-  }
-  keep <- prior$class == "b" &
-    nzchar(prior$coef) &
-    is_constant_prior(prior$prior)
-  if ("resp" %in% names(prior)) {
-    scoped <- as.character(prior$resp)
-    keep <- keep & (!nzchar(scoped) | scoped == resp)
-  }
-  unique(as.character(prior$coef[keep]))
-}
 
 
 #' Re-attach the `_trend` suffix to a brms-validated trend prior table

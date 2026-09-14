@@ -110,29 +110,28 @@ prior overrides. See \code{\link[=default_prior.mvgam_formula]{default_prior.mvg
 \code{\link[brms:set_prior]{brms::prior()}} for the conventions.}
 
 \item{n_lv}{\code{integer}. Number of latent factors to use for
-modelling residual associations. Must be \verb{>= 1}. Defaults to
-\code{2}. The upper bound depends on the \code{loadings_prior}:
+modelling residual associations. Must be \verb{>= 1} and at most the
+number of species. Defaults to \code{2}. One bound covers every
+\code{loadings_prior}: the marginal residual covariance
+\verb{Z Z' + diag(Psi^2)} has rank at most the number of species,
+and further columns of \code{Z} add no expressive capacity.
+\code{n_lv = n_species} is admitted. Whether that boundary samples
+well is a question for the prior.
+
+What \code{n_lv} counts does depend on the prior:
 \itemize{
 \item Default iid Z prior (\code{student_t(3, 0, 0.5)}) or any
 kernel-driven structured prior built from \code{traits} /
 \code{phylo} / \code{loadings_prior$distances}: \code{n_lv} is the
-\strong{exact factor count} that enters the likelihood, and
-must be \strong{strictly less than} the number of species. The
-constraint exists because at \code{n_lv = n_species}, \verb{Z Z'}
-saturates the residual covariance and the per-species
-residual variance loses identifiability under HMC,
-producing a heavy funnel.
+\strong{exact factor count} that enters the likelihood.
 \item Multiplicative gamma process prior
 (\code{loadings_prior = "mgp"} or
 \code{loadings_prior = list(column_shrinkage = "mgp", ...)}):
 \code{n_lv} is a \strong{truncation ceiling}. Set it at or above
 the rank you want to admit; the MGP shrinks later columns
-of \code{Z} toward zero by construction so unused columns are
-pruned by the prior. Allowed up to \code{n_lv = n_species}.
-Passing \code{n_lv > n_species} is rejected because the
-marginal \verb{Z Z' + diag(Psi^2)} has rank at most \code{n_species}
-and additional columns add no expressive capacity --
-tighten \code{mgp_a2} for stronger shrinkage instead.
+of \code{Z} toward zero by construction, and unused columns are
+pruned by the prior. Tighten \code{mgp_a2} for stronger
+shrinkage.
 }
 See \code{\link[=active_factors]{active_factors()}} for a posterior summary of how many
 columns the data actually used under MGP.}

@@ -12,43 +12,16 @@ description.
 
 ## mvn()
 
-**5. The mvn fixture asks for a split the data cannot identify.**
+**5. `Psi` has no prior class.**
 
-The fixture declares four species and two latent factors. A factor
-model separates a per-species residual scale from the factor
-covariance only when `(K - m)^2 >= K + m`, which at `K = 4, m = 2`
-reads `4 >= 6` and fails. `Psi` and the diagonal of `Z Sigma Z'`
-therefore trade against each other along a ridge, and the file's "Psi
-recovers the simulated residual scale" assertion reads one arbitrary
-point on it. Psi posterior means came back at 0.556, 1.194, 0.448 and
-0.475 against a truth of 0.5 throughout.
-
-Diagnosing this separated three mechanisms, and only the first is what
-the recovery assertion meets.
-
-- The bound above. `jsdgam()` defaults to `n_lv = 2`, so three and
-  four species fail it by default. `mvgam()` now warns at fit time and
-  names the largest `n_lv` the species count admits.
-- The divergences are a funnel at small `Psi` rather than the scale
-  ridge. Locating the divergent draws in the geometry puts them at log
-  min `Psi` -1.44 sd, against +0.44 sd along the ridge direction.
-- `Z` and `sigma_trend` enter the trend only as a product, verified to
-  4e-16 on a posterior draw. That redundancy is exact and is not what
-  either diagnostic above measures.
-
-Three things remain. Respecify the fixture at a `(K, m)` pair the
-bound admits, so its recovery assertions test an identified quantity.
-Give `Psi` a prior class, since it is hard-coded in a stanvar today
-and a user who knows their response scale cannot set the one thing
-that moves the posterior. On a truth of 2.0, `gamma(4, 2)` gives 34
-divergences at Psi rhat 1.009; `exponential(1)` gives 225 at 1.084;
-`gamma(4, 8)` gives 335 at 1.396, with two species pulled to 0.9 by a
-prior centred on 0.5. No fixed
-constant suits every response scale, so a new default needs
-calibrating over a grid of true `Psi` and factor share before it is
-chosen. And give the parameter an interpretable home, the variance
-decomposition `Psi_i^2 / (Psi_i^2 + (Z Sigma Z')_ii)`, so the raw
-scale is not what a reader acts on.
+`mvn()` and `mvt()` estimate one residual scale per component, and
+its prior is written into a stanvar. A user who knows their response
+scale cannot set the one thing that moves the posterior. Measured
+against a truth of 2.0: `gamma(4, 2)` gives 34 divergences at Psi
+rhat 1.009, `exponential(1)` gives 225 at 1.084 and `gamma(4, 8)`
+gives 335 at 1.396, with two species pulled to 0.9 by a prior centred
+on 0.5. No fixed constant suits every response scale. A new default
+needs calibrating over a grid of true `Psi` and factor share.
 
 **7. One post-fit method guards against a prefit. Seventeen do not.**
 
@@ -84,66 +57,6 @@ that all say the same unhelpful thing.
 The test holds every method to the message `summary()` already
 produces, so it fails until they meet it.
 
-## pp_check
-
-**10. `intervals` and `ribbon` raise a deprecation on every call, and
-that costs `x` its coverage.**
-
-`pp_check(fit, type = "intervals")` and `type = "ribbon"` reach
-`bayesplot::ppc_intervals`, which builds its layer with
-`geom_linerange(size = )`. ggplot2 deprecated that in 3.4.0, so every
-call raises
-
-    Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.
-    Please use `linewidth` instead.
-
-mvgam forwards only `y`, `yrep` and `x`, so the call is bayesplot's
-and so is the repair. It is recorded here because it reaches every
-user of those two types, on any fit, with or without an `x`.
-
-The consequence for this suite is that the `x` argument has no test.
-These two are the only types that take one: the third,
-`error_scatter_avg_vs_x`, is deprecated inside bayesplot itself.
-Reaching an assertion means silencing a notice every user receives,
-which is a worse trade than leaving the argument uncovered, so
-`test-trend-var.R` covers `group` and states why it stops there.
-
-A lifecycle notice is also raised once per session, so an
-`expect_warning()` on it passes or fails on what ran before the file
-rather than on anything the package did.
-
-## loo()
-
-**11. Every fit with a latent trend breaks PSIS-loo, and the numbers
-belong on the record rather than under a suppression.**
-
-Unmasking `suppressWarnings(loo(fit))` across the seven fits written
-in this pass gives, per fit, the share of observations whose Pareto-k
-crosses the thresholds:
-
-| fit | n | max k | > 0.7 | >= 1 |
-|---|---|---|---|---|
-| var_trend | 180 | 1.14 | 22.8% | 1.1% |
-| pw_trend | 120 | 1.98 | 10.0% | 5.8% |
-| ar_multilag | 192 | 1.09 | 35.9% | 1.0% |
-| arma_trend | 160 | 1.12 | 62.5% | 1.2% |
-| car_irregular | 78 | 1.52 | 50.0% | 5.1% |
-| by_lv_axis | 276 | 0.93 | 1.4% | 0% |
-| hier_trend | 240 | 0.99 | 9.2% | 0% |
-
-This is the expected behaviour of a state-space model rather than a
-defect: dropping an observation moves the latent state it is being
-scored against, so the importance ratios have no finite variance.
-A fit of the same family with no trend satisfies `all(k < 1)` on the
-same assertion, which is what makes the table above read as a
-property of the trend rather than of the family.
-
-It is recorded because it bears on how `loo()` should be read on
-these models, and because two of the three published comparisons in
-the package rank trend models by `elpd_loo`. `lfo_cv()` is the tool
-that answers the question these fits are being asked, and nothing in
-`loo()`'s output on a trend fit says so.
-
 ## Families
 
 **4a. Three families are classified as closure-unit, not one.**
@@ -171,62 +84,13 @@ The wire format has no name of its own and borrows this one.
 The assertion asks the registry directly, so it covers every family
 at once.
 
-**14. `marginaleffects` does not know mvgam accepts `resp` or
-`process_error`.**
-
-Same block. Naming a response raises
-
-    These arguments are not known to be supported for models of
-    class `mvgam`: resp.
-
-marginaleffects keeps a whitelist per model class and mvgam has not
-registered `resp` on it, so every user of a multivariate fit meets
-this on every call that names an arm. The argument is forwarded and
-honoured; only the notice is wrong.
-
-`process_error` is on the same footing, and reaches further. It is
-mvgam's own argument, it sits in the signature of
-`get_predict.mvgam()` and it decides whether a marginal prediction
-carries the trend's innovations. Every call that sets it
-raises the notice, on a univariate fit as much as a multivariate
-one. Seen in `test-draws-alignment.R`, "process_error moves a
-marginal prediction", where the two calls that establish the
-argument does something both warn that nothing is known about it.
-
-## trend_map
-
-**16. A matrix `trend_map` ignores its rownames, then writes the
-declared ones over them.**
-
-`test-trend-map.R`, "a matrix map keys its rows by the names the
-user gave". A matrix carries rownames, and a user who supplies them
-is saying which series each row of loadings belongs to. They are
-dropped: rows are taken in position order against the frame's
-declared series levels.
-
-Measured on a four-series frame declaring `delta, alpha, charlie,
-bravo`. One map names its rows in that order, another names the same
-contents `alpha, delta, bravo, charlie`. Both emit an identical `Z`,
-and both come back carrying the rownames `delta, alpha, charlie,
-bravo`.
-
-So the emitted matrix asserts the assignment the user asked for while
-holding another series' numbers. Two series load on each other's
-factors. Nothing raises, every dimension agrees and reading `Z` back
-confirms the mistake rather than revealing it. On this one route the
-loadings are the user's own statement of which series loads on what,
-which is what makes the silence costly.
-
-The data-frame form is unaffected: it names its series in a column
-and a stranger there is refused.
-
 ## Prefit modes
 
 **46. `chains = 0` samples anyway, and the diagnostics warn about
 the chain it ran.**
 
-No file covers this. Two Stan-emission blocks reached it, each Both ask for a
-program without a posterior, spelled
+No file covers this. Two Stan-emission blocks reach it, and both ask
+for a program without a posterior, spelled
 
 ```r
 mvgam(y ~ elev, family = nmix("royle_nichols"), data = d,
@@ -300,53 +164,6 @@ truncated, reaching Stan as
 `nu` gets a plain `normal_lpdf(Intercept_nu | 1, 1)`. Whether an
 intercept on the identity scale should carry the scalar's bound is a
 question for the family rather than for the axis work.
-
-## Two documents, two contracts
-
-**75. `?jsdgam` states an `n_lv` constraint the package does not
-have, and does not want.**
-
-`test-family-jsdgam.R`, "n_lv reaches the ceiling the validator sets".
-`?jsdgam` documents the bound on the number of latent factors as
-depending on the loadings prior. Two branches share one rule there:
-the default iid prior, and any structured prior whose kernel comes
-from `traits` or `phylo`. For both, `n_lv` "must be strictly less than
-the number of species". The man page gives the reason. At
-`n_lv = n_species` the matrix `Z Z'` saturates the
-residual covariance, per-species residual variance loses
-identifiability under HMC and the sampler meets a heavy funnel.
-
-Measured on four species, that bound is enforced nowhere:
-
-| prior | `n_lv = 4` on 4 species | `n_lv = 5` |
-|---|---|---|
-| default iid | accepted, `N_lv_trend` 4 | refused |
-| `traits` | accepted, `N_lv_trend` 4 | refused |
-| `phylo` | accepted, `N_lv_trend` 4 | refused |
-| `"mgp"` | accepted, `N_lv_trend` 4 | refused |
-
-Only the MGP rule is implemented, and it is applied to every prior.
-`validate_n_lv_ceiling()` at `R/validations.R:1396` refuses
-`n_lv > n_species` and nothing else.
-
-The code is right and the man page is wrong, which is what makes this
-worth recording rather than fixing with a guard. The validator's own
-roxygen says so deliberately, four lines above the function:
-
-> `n_lv = n_series` is allowed: the loadings prior is what decides
-> whether that boundary samples well, and saying so here would refuse
-> a model the prior makes admissible.
-
-So one package documents two contradictory contracts for one argument,
-and the one a user reads is the one that is not true. Sampling the
-saturated model settles which is right on the evidence: fitted at
-`n_lv = n_species = 4`, it returns max r-hat 1.021 with 0 of 255
-parameters above 1.05. The funnel `?jsdgam` warns of does not appear,
-so refusing the model would have cost a user a fit that works.
-
-`test-family-jsdgam.R` pins the behaviour the validator intends. A
-later reader following `?jsdgam` would otherwise add the guard and
-break a model that samples.
 
 ## Arguments nothing reads
 
