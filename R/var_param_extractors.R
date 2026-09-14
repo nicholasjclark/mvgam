@@ -77,6 +77,7 @@ var_draw_surfaces <- function(var_post, kernel, future) {
     function(draw) {
       kernel(list(
         K = var_post$K,
+        labels = var_post$labels,
         A = var_post$A[draw, , , drop = TRUE],
         Sigma = var_post$Sigma[draw, , , drop = TRUE],
         p = 1L
@@ -157,7 +158,8 @@ extract_var_posterior <- function(object, ndraws = NULL,
     required_for = "Sigma_trend (VAR innovation covariance)"
   )
 
-  list(A = A, Sigma = Sigma, K = K, ndraws = ndraws)
+  list(A = A, Sigma = Sigma, K = K, ndraws = ndraws,
+       labels = var_process_labels(object, K))
 }
 
 #' Optionally parallelise a per-draw VAR post-processing lapply
@@ -227,6 +229,34 @@ validate_var_plot_ids <- function(ids, n_proc, arg) {
     .var.name = arg
   )
   sort(unique(as.integer(ids)))
+}
+
+#' The name each latent VAR process carries
+#'
+#' An impulse response and a variance decomposition are both read to
+#' decide which series drives which, so the label has to name a series
+#' wherever one names the process. A VAR over the observed series
+#' numbers its processes by the series axis, and a factor VAR's
+#' processes are latent factors that no series names, which is what
+#' keeps the index available as the other answer.
+#'
+#' @param object A fitted `mvgam` object whose trend is a VAR.
+#' @param K The VAR dimension.
+#' @return A character vector of length `K`.
+#' @noRd
+var_process_labels <- function(object, K) {
+  checkmate::assert_int(K, lower = 1L)
+  generic <- paste0("Process_", seq_len(K))
+  # `detect_factor_n_lv()` answers NULL when the processes are the
+  # series, a model carrying one factor per series included.
+  if (!is.null(detect_factor_n_lv(object))) {
+    return(generic)
+  }
+  levs <- mvgam_axes(object)$series$levels
+  if (length(levs) != K) {
+    return(generic)
+  }
+  as.character(levs)
 }
 
 #' Posterior transition matrix for a VAR trend
@@ -469,12 +499,7 @@ extract_transition_matrix_draws <- function(object, group) {
   # Non-hierarchical VAR: single A_trend, lag pinned to one
   K <- resolve_var_dim(object, "N_lv_trend",
                        "^A_trend\\[1,", all_cols)
-  # `K` counts latent processes, which are the observed series only
-  # when the fit is not a factor model, so the axes take the
-  # `process_<k>` labels `irf()`, `fevd()` and `stability()` give
-  # the same quantity rather than a series name that would be wrong
-  # for a factor VAR.
-  labs <- paste0("process_", seq_len(K))
+  labs <- var_process_labels(object, K)
   out <- extract_indexed_array_2d(
     draws_mat, "A_trend", K, K,
     prefix_ids   = 1L,
@@ -495,8 +520,7 @@ extract_transition_matrix_draws <- function(object, group) {
 #' @noRd
 finalise_transition_matrix <- function(arr, group_label,
                                         robust, probs) {
-  series_names <- dimnames(arr)[[2L]] %||%
-    paste0("process_", seq_len(dim(arr)[2L]))
+  series_names <- dimnames(arr)[[2L]]
   stats <- summarise_unconstrained_array(
     arr, robust = robust, probs = probs, series_names = series_names
   )

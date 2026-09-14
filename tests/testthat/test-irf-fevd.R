@@ -48,6 +48,14 @@ build_var_mock <- function(K = 3L, ndraws = 50L,
   )
 }
 
+# The math kernels are reached only through `var_draw_surfaces()`,
+# which hands them the process labels beside the matrices. A stub
+# omitting those describes an object no caller builds.
+var_kernel_input <- function(K, A, Sigma = diag(K)) {
+  list(K = K, A = A, Sigma = Sigma, p = 1L,
+       labels = paste0("s", seq_len(K)))
+}
+
 # ---- Gate ----------------------------------------------------------
 
 test_that("assert_var_trend() rejects non-VAR fits with a clear pointer", {
@@ -116,8 +124,7 @@ test_that("extract_var_posterior() errors when the expected column is missing", 
 
 test_that("var_phi() returns identity at lag 0 and zero powers when A = 0", {
   K <- 3L
-  x <- list(K = K, A = matrix(0, K, K),
-            Sigma = diag(K), p = 1L)
+  x <- var_kernel_input(K, matrix(0, K, K))
   Phi <- var_phi(x, h = 5L)
   expect_identical(dim(Phi), c(K, K, 6L))
   expect_equal(Phi[, , 1L], diag(K))
@@ -129,7 +136,7 @@ test_that("var_phi() returns identity at lag 0 and zero powers when A = 0", {
 test_that("var_phi() recovers A^k for diagonal A", {
   K <- 2L
   A <- diag(c(0.5, 0.3))
-  x <- list(K = K, A = A, Sigma = diag(K), p = 1L)
+  x <- var_kernel_input(K, A)
   Phi <- var_phi(x, h = 3L)
   # Phi[, , k+1] = A^k for the i.i.d. case with diagonal A.
   expect_equal(Phi[, , 2L], A)
@@ -145,7 +152,7 @@ test_that("gen_fevd() rows sum to 1 across the columns for each horizon", {
   ev <- max(abs(eigen(A_raw)$values))
   A <- A_raw / (1.2 * ev)
   Sigma <- crossprod(matrix(stats::rnorm(K * K), K, K)) + diag(K)
-  x <- list(K = K, A = A, Sigma = Sigma, p = 1L)
+  x <- var_kernel_input(K, A, Sigma)
   fevd <- gen_fevd(x, h = 5L)
   expect_length(fevd, K)
   for (i in seq_len(K)) {
@@ -161,7 +168,7 @@ test_that("gen_irf() returns finite arrays of the right shape", {
   set.seed(11L)
   A <- matrix(c(0.4, 0.1, 0.05, 0.3), K, K)
   Sigma <- diag(K)
-  x <- list(K = K, A = A, Sigma = Sigma, p = 1L)
+  x <- var_kernel_input(K, A, Sigma)
   irf_gen <- gen_irf(x, h = 6L, cumulative = FALSE, orthogonal = FALSE)
   irf_orth <- gen_irf(x, h = 6L, cumulative = FALSE, orthogonal = TRUE)
   irf_cum <- gen_irf(x, h = 6L, cumulative = TRUE, orthogonal = FALSE)
@@ -189,7 +196,7 @@ test_that("orthogonalised IRF at horizon 1 equals P %*% e_j", {
   K <- 2L
   A <- matrix(0, K, K)
   Sigma <- diag(c(1, 4))
-  x <- list(K = K, A = A, Sigma = Sigma, p = 1L)
+  x <- var_kernel_input(K, A, Sigma)
   irf_orth <- gen_irf(x, h = 1L, cumulative = FALSE, orthogonal = TRUE)
   P <- t(chol(Sigma))
   expect_equal(as.numeric(irf_orth[[1L]][1L, ]), as.numeric(P[, 1L]))
@@ -200,7 +207,7 @@ test_that("var_fecov() builds a forecast-error covariance with positive diagonal
   K <- 2L
   A <- matrix(c(0.3, 0.05, 0.1, 0.2), K, K)
   Sigma <- diag(K) + 0.3
-  x <- list(K = K, A = A, Sigma = Sigma, p = 1L)
+  x <- var_kernel_input(K, A, Sigma)
   msey <- var_fecov(x, h = 4L)
   expect_identical(dim(msey), c(K, K, 4L))
   for (i in seq_len(4L)) {
@@ -291,4 +298,48 @@ test_that("posterior_transition_matrix() gates on the trend type", {
     posterior_transition_matrix(fake),
     "requires a VAR\\(1\\) latent trend"
   )
+})
+
+
+# ---- Process labels -------------------------------------------------
+
+test_that("var_process_labels names the series where they are the processes", {
+  # A VAR over the observed series numbers its processes by the series
+  # axis, so a shock can be read without knowing the internal ordering.
+  # No cached fixture is a factor VAR, so the index branch is only
+  # reachable here.
+  mock <- build_var_mock(K = 3L, ndraws = 5L)
+  expect_identical(var_process_labels(mock, 3L),
+                   c("Process_1", "Process_2", "Process_3"))
+
+  named <- mock
+  named$trend_metadata <- list(
+    levels = list(series = c("willow", "ash", "rowan"))
+  )
+  expect_identical(var_process_labels(named, 3L),
+                   c("willow", "ash", "rowan"))
+
+  # A series count disagreeing with the VAR dimension is no labelling
+  # of it, and the index answers in place of a recycled name.
+  short <- named
+  short$trend_metadata$levels$series <- c("willow", "ash")
+  expect_identical(var_process_labels(short, 3L),
+                   c("Process_1", "Process_2", "Process_3"))
+})
+
+
+test_that("the VAR posterior carries one label per process", {
+  mock <- build_var_mock(K = 3L, ndraws = 5L)
+  vp <- extract_var_posterior(mock)
+  expect_length(vp$labels, 3L)
+  # Both kernels read the labels off the posterior, so a surface
+  # cannot spell them a second way.
+  irf_gen <- gen_irf(list(K = 3L, labels = vp$labels,
+                          A = matrix(0.1, 3L, 3L), Sigma = diag(3L),
+                          p = 1L), h = 2L)
+  expect_identical(names(irf_gen), vp$labels)
+  fevd_gen <- gen_fevd(list(K = 3L, labels = vp$labels,
+                            A = matrix(0.1, 3L, 3L), Sigma = diag(3L),
+                            p = 1L), h = 2L)
+  expect_identical(names(fevd_gen), vp$labels)
 })

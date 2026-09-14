@@ -29,7 +29,10 @@
 #'   - `mvgam_fevd_summary`, the default. A long-format `tibble`
 #'     inheriting from `mvgam_var_surface_summary`, with one row per
 #'     shock-response pair per horizon. `shock` names the pair as
-#'     `"Process_j -> Process_k"`, `horizon` is the step ahead, and
+#'     `"<from> -> <to>"`, taking the model's own series names where
+#'     the latent processes are the series and `"Process_k"` where a
+#'     factor VAR's processes are latent factors instead. `horizon`
+#'     is the step ahead, and
 #'     three further columns carry the posterior median and the
 #'     interval bounds, named for the percentiles asked for:
 #'     `fevdQ50`, and by default `fevdQ2.5` and `fevdQ97.5`.
@@ -103,7 +106,7 @@ summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
     ) %>%
     dplyr::ungroup() %>%
     dplyr::mutate(
-      shock = gsub('process', 'Process', paste0(Series, ' -> ', target))
+      shock = paste0(Series, ' -> ', target)
     ) %>%
     dplyr::select(shock, horizon, fevdQ50, fevd_Qlower, fevd_Qupper) %>%
     dplyr::distinct()
@@ -162,7 +165,7 @@ plot.mvgam_fevd = function(x, series = NULL, contributing = NULL, ...) {
     contributing, n_proc, "contributing"
   )
   target_names <- ynames[target_keep]
-  source_names <- paste0("process_", source_keep)
+  source_names <- ynames[source_keep]
 
   do.call(
     rbind,
@@ -183,11 +186,7 @@ plot.mvgam_fevd = function(x, series = NULL, contributing = NULL, ...) {
     dplyr::mutate(
       mean_evd = mean_evd / sum(mean_evd)
     ) %>%
-    dplyr::ungroup() %>%
-    dplyr::mutate(
-      Series = gsub('process', 'Process', Series),
-      target = gsub('process', 'Process', target)
-    ) -> mean_evds
+    dplyr::ungroup() -> mean_evds
 
   # FEVD bars encode a categorical partition (which series
   # contributed how much of the forecast variance), so use the
@@ -220,13 +219,10 @@ fevd_df = function(x, ynames) {
       data.frame(
         horizon = 1:NROW(x[[process]]),
         evd = as.vector(x[[process]]),
-        Series = paste0(
-          'process_',
-          sort(rep(
-            1:length(ynames),
-            NROW(x[[process]])
-          ))
-        ),
+        Series = ynames[sort(rep(
+          seq_along(ynames),
+          NROW(x[[process]])
+        ))],
         target = ynames[process]
       )
     })

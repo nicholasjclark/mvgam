@@ -158,6 +158,19 @@ structure. Whether a structured prior recovers the structure it was
 given is a statement about a posterior and cannot be read off a
 program.
 
+**test-factor-var.R** fits `VAR(cor = TRUE, n_lv = 2)` over four
+gaussian series on a hundred occasions, under `y ~ x`. Every other VAR
+in this directory gives the transition matrix the series axis, where
+`n_lv` and `n_series` coincide and neither can be told from the other.
+Four series loading two factors separates the axis the dynamics run on
+from the axis the observations sit on. That separation is what makes
+two claims answerable here: `irf()` carries four shock pairs and not
+sixteen while `residual_cor()` and the forecast arms stay keyed by the
+series, and a latent process no series names takes its index as a
+label, which a series-axis VAR never reaches. The loadings are sampled
+here and not supplied, which lets `trend[t, s] = Z[s, ] . lv_trend[t, ]`
+be checked with both sides drawn from one iteration.
+
 ### Observation families
 
 **test-family-tweedie.R** fits `tweedie()` with an AR(1) trend over

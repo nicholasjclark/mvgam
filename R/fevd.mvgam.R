@@ -88,7 +88,8 @@ fevd.mvgam <- function(object, h = 10, ndraws = NULL, draw_ids = NULL,
   # See `irf()`: the draws are one K by K matrix per horizon per draw,
   # so they are summarised unless asked for.
   as_var_surface_summary(
-    summary(all_fevds, probs = probs), "mvgam_fevd_summary"
+    summary(all_fevds, probs = probs), "mvgam_fevd_summary",
+    process_labels = var_post$labels
   )
 }
 
@@ -99,7 +100,7 @@ fevd.mvgam <- function(object, h = 10, ndraws = NULL, draw_ids = NULL,
 #' @noRd
 gen_fevd <- function(x, h = 6, ...) {
   K <- x$K
-  ynames <- paste0("process_", 1:K)
+  ynames <- x$labels
   msey <- var_fecov(x, h = h)
   Psi <- var_psi(x, h = h)
   mse <- matrix(NA, nrow = h, ncol = K)

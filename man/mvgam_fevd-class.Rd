@@ -34,7 +34,10 @@ returns the summary, and the two forms carry different classes:
 \item \code{mvgam_fevd_summary}, the default. A long-format \code{tibble}
 inheriting from \code{mvgam_var_surface_summary}, with one row per
 shock-response pair per horizon. \code{shock} names the pair as
-\code{"Process_j -> Process_k"}, \code{horizon} is the step ahead, and
+\code{"<from> -> <to>"}, taking the model's own series names where
+the latent processes are the series and \code{"Process_k"} where a
+factor VAR's processes are latent factors instead. \code{horizon}
+is the step ahead, and
 three further columns carry the posterior median and the
 interval bounds, named for the percentiles asked for:
 \code{fevdQ50}, and by default \code{fevdQ2.5} and \code{fevdQ97.5}.

@@ -88,14 +88,22 @@ plot.mvgam_var_surface_summary <- function(x, series = NULL,
   cols <- var_surface_columns(x)
   dat <- as.data.frame(x)
 
-  # Both surfaces label a pair `Process_<from> -> Process_<to>`, so the
-  # selection reads off the two ends of the label. Which end each
-  # argument names is the surface's own convention, and it is the one
-  # `plot.mvgam_irf()` and `plot.mvgam_fevd()` use on the draws.
+  # Both surfaces label a pair `<from> -> <to>`, naming each process
+  # the way the fit names it, so the selection reads off the two ends
+  # of the label. Which end each argument names is the surface's own
+  # convention, and it is the one `plot.mvgam_irf()` and
+  # `plot.mvgam_fevd()` use on the draws.
   ends <- strsplit(dat$shock, " -> ", fixed = TRUE)
-  from <- as.integer(sub("^\\D*", "", vapply(ends, `[`, character(1), 1L)))
-  to <- as.integer(sub("^\\D*", "", vapply(ends, `[`, character(1), 2L)))
-  n_proc <- max(c(from, to))
+  left <- vapply(ends, `[`, character(1), 1L)
+  right <- vapply(ends, `[`, character(1), 2L)
+  # The surface carries the labels in the order the VAR numbers its
+  # processes, so a selection by index is a position in that vector.
+  # Reading the index out of the label itself only worked while every
+  # label ended in its own number.
+  labels <- attr(x, "process_labels") %||% unique(left)
+  from <- match(left, labels)
+  to <- match(right, labels)
+  n_proc <- length(labels)
   is_fevd <- inherits(x, "mvgam_fevd_summary")
 
   # A decomposition is read from its target inwards and an impulse

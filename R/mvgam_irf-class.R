@@ -20,7 +20,10 @@
 #'   - `mvgam_irf_summary`, the default. A long-format `tibble`
 #'     inheriting from `mvgam_var_surface_summary`, with one row per
 #'     shock-response pair per horizon. `shock` names the pair as
-#'     `"Process_j -> Process_k"`, `horizon` is the step ahead, and
+#'     `"<from> -> <to>"`, taking the model's own series names where
+#'     the latent processes are the series and `"Process_k"` where a
+#'     factor VAR's processes are latent factors instead. `horizon`
+#'     is the step ahead, and
 #'     three further columns carry the posterior median and the
 #'     interval bounds, named for the percentiles asked for:
 #'     `irfQ50`, and by default `irfQ2.5` and `irfQ97.5`. An
@@ -83,6 +86,9 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
   n_processes <- dim(object[[1]][[1]])[2]
   h <- dim(object[[1]][[1]])[1]
   n_draws <- length(object)
+  # `irf()` names each shocked process when it builds the draws, so
+  # the label is read back here instead of being spelled a second way.
+  labels <- names(object[[1]])
 
   out <- do.call(
     rbind,
@@ -98,17 +104,14 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
           data.frame(
             horizon = 1:h,
             imp_resp = as.vector(impulse_responses[[j]][[1]]),
-            resp_var = paste0(
-              'Process_',
-              sort(rep(
-                1:n_processes,
-                NROW(impulse_responses[[j]][[1]])
-              ))
-            )
+            resp_var = labels[sort(rep(
+              seq_len(n_processes),
+              NROW(impulse_responses[[j]][[1]])
+            ))]
           )
         })
       ) %>%
-        dplyr::mutate(shock = paste0('Process_', series, ' -> ', resp_var)) %>%
+        dplyr::mutate(shock = paste0(labels[series], ' -> ', resp_var)) %>%
 
         # Calculate posterior empirical quantiles of impulse responses
         dplyr::group_by(shock, horizon) %>%
@@ -185,8 +188,15 @@ plot.mvgam_irf = function(x, series = 1, responses = NULL, ...) {
   # side-by-side, tagged with a faceting key. `mvgam_band_layer`
   # and `mvgam_median_layer` then handle quantile-band + median
   # construction per panel via their `group` arg.
+  # These are the model's own series names, and the facet strips parse
+  # as plotmath. `deparse()` writes each one as an R string literal, so
+  # a name carrying a quote, a backslash or a space still parses.
+  labels <- names(x[[1]])
+  as_literal <- function(v) {
+    vapply(v, deparse, character(1L), USE.NAMES = FALSE)
+  }
   resp_keys <- paste0(
-    "Process_~", series, " %->% Process_~", resp_ids
+    as_literal(labels[series]), " %->% ", as_literal(labels[resp_ids])
   )
   draws_mat <- do.call(cbind, lapply(resp_ids, function(resp) {
     t(vapply(x, function(draw) draw[[series]][, resp], numeric(h)))

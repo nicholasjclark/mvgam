@@ -112,7 +112,8 @@ irf.mvgam <- function(
   # hand. `summary = FALSE` keeps them for anyone who does.
   as_var_surface_summary(
     summary(all_irfs, probs = probs), "mvgam_irf_summary",
-    irf_type = attr(all_irfs, "irf_type")
+    irf_type = attr(all_irfs, "irf_type"),
+    process_labels = var_post$labels
   )
 }
 
@@ -136,7 +137,7 @@ irf.mvgam <- function(
 #'
 #' @noRd
 gen_irf <- function(x, h = 6, cumulative = TRUE, orthogonal = FALSE) {
-  impulse <- paste0("process_", 1:x$K)
+  impulse <- x$labels
   irf_array <- array(
     data = 0,
     dim = c(h, x$K, x$K),

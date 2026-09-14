@@ -332,10 +332,9 @@ named when the data were assembled.
 
 ```{r irf-numbers, include = FALSE}
 ir <- as.data.frame(irfs)
-ir$src <- region_order[as.integer(sub(".*Process_(\\d+) ->.*", "\\1",
-                                       ir$shock))]
-ir$tgt <- region_order[as.integer(sub(".*-> Process_(\\d+)", "\\1",
-                                       ir$shock))]
+ir_sides <- strsplit(ir$shock, " -> ", fixed = TRUE)
+ir$src <- vapply(ir_sides, `[`, character(1), 1L)
+ir$tgt <- vapply(ir_sides, `[`, character(1), 2L)
 self_pk <- max(abs(ir$irfQ50[ir$src == ir$tgt]))
 cross_pk <- max(abs(ir$irfQ50[ir$src != ir$tgt]))
 cross <- ir[ir$src != ir$tgt, ]
@@ -397,10 +396,9 @@ plot(fevds)
 
 ```{r fevd-numbers, include = FALSE}
 fv <- as.data.frame(fevds)
-fv$src <- region_order[as.integer(sub(".*Process_(\\d+) ->.*", "\\1",
-                                       fv$shock))]
-fv$tgt <- region_order[as.integer(sub(".*-> Process_(\\d+)", "\\1",
-                                       fv$shock))]
+fv_sides <- strsplit(fv$shock, " -> ", fixed = TRUE)
+fv$src <- vapply(fv_sides, `[`, character(1), 1L)
+fv$tgt <- vapply(fv_sides, `[`, character(1), 2L)
 f12 <- fv[fv$horizon == 12, ]
 sh <- function(a, b) sprintf("%.0f%%", 100 *
   f12$fevdQ50[f12$src == a & f12$tgt == b])

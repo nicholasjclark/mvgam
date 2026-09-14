@@ -439,8 +439,8 @@ irfs <- irf(mod_hier, h = 8)
 plot(irfs, series = 2, responses = 1:3)
 ```
 
-The diagonal panel (`Process_2 -> Process_2`) traces own-lag
-persistence in GDP. The off-diagonal panels trace spillover to
+The diagonal panel, GDP against its own shock, traces own-lag
+persistence. The off-diagonal panels trace spillover to
 consumption and investment. Both spillovers are positive and
 substantial at short horizons, matching the strong global
 correlations we already saw in $\Omega_{\text{global}}$.
