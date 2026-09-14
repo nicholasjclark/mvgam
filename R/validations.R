@@ -3577,6 +3577,52 @@ hierarchical_series_values <- function(data, gr_var, subgr_var) {
 }
 
 
+# Internal: refuse a prediction frame with gaps in what the model reads.
+#
+# A prediction reads the columns the formulas name, the groupings, the
+# aterms, the offset and the axis. A gap in any of them reaches the
+# linear predictor untouched: a numeric column arrives as `NA` cells,
+# and a factor column takes its reference level with nothing to mark
+# it. The response is excluded, because a missing response is how a
+# forecast frame names the occasions it wants predicted.
+#' @noRd
+validate_newdata_complete <- function(newdata, object) {
+  checkmate::assert_data_frame(newdata, min.rows = 1L)
+  checkmate::assert_class(object, "mvgam")
+  terms <- mvgam_term_list(object)
+  read <- setdiff(
+    unique(c(terms$conditional, terms$random, terms$aterms,
+             terms$offset, terms$index)),
+    terms$response
+  )
+  read <- intersect(read, names(newdata))
+  if (!length(read)) {
+    return(invisible(TRUE))
+  }
+  gaps <- read[vapply(read, function(col) anyNA(newdata[[col]]),
+                      logical(1L))]
+  if (!length(gaps)) {
+    return(invisible(TRUE))
+  }
+  first <- vapply(gaps, function(col) which(is.na(newdata[[col]]))[1L],
+                  integer(1L))
+  stop(insight::format_error(c(
+    "'newdata' is missing values the model needs to predict.",
+    x = paste0(
+      "Missing in: ",
+      paste0("'", gaps, "' (first at row ", first, ")",
+             collapse = ", "),
+      "."
+    ),
+    i = paste0(
+      "Supply a value for every row, or drop the rows that have ",
+      "none. A missing response asks for a prediction; a missing ",
+      "predictor leaves the model nothing to predict from."
+    )
+  )), call. = FALSE)
+}
+
+
 validate_prediction_factor_levels <- function(data, metadata) {
   checkmate::assert_data_frame(data, min.rows = 1)
   checkmate::assert_list(metadata, names = "named")

@@ -84,32 +84,6 @@ that all say the same unhelpful thing.
 The test holds every method to the message `summary()` already
 produces, so it fails until they meet it.
 
-## VAR()
-
-**8. `irf()` and `fevd()` label their shocks `Process_k`.**
-
-`test-trend-var.R`, "irf and fevd name the series, not Process_k". Both
-tables come back keyed by strings of the form `Process_1 -> Process_2`
-on a fit whose series are `willow`, `ash` and `rowan`. The mapping from
-`Process_2` to a series is positional and appears nowhere in the
-output.
-
-This is the failure the axis work exists to end, in its mildest form:
-the numbers are right and the reader cannot tell which series they
-belong to. An impulse response is read to decide which series drives
-which, so a label nobody can resolve makes the whole table
-unusable without knowing the internal ordering.
-
-`posterior_transition_matrix()` does the same, in `series_names` and
-in the dimnames of every block it returns. That one matters most of
-the three. `?posterior_transition_matrix` presents it as the direct
-route to `A`, so a reader goes there first, and what they find is
-correct values under labels that resolve to nothing.
-
-`residual_cor()` carries the series names on both margins and the
-hindcast and forecast arms are named. These three VAR summaries are
-the exception.
-
 ## pp_check
 
 **10. `intervals` and `ribbon` raise a deprecation on every call, and
@@ -317,26 +291,6 @@ their prose states the tighter setting was used. `idm.Rmd` uses
 
 `jsdgam()` forwards to `mvgam()`, so it behaves the same way.
 
-## Refusals that name an internal
-
-**52. A missing covariate value is refused nowhere, and the
-prediction hands back `NA`.**
-
-`test-trend-var.R`, "a missing covariate value is refused by name".
-One `NA` in a covariate column of a `newdata` frame does not stop the
-prediction: `posterior_epred(fit, newdata = nd, draw_ids = 1:5)`
-returns a matrix and the gap reaches the caller as `NA` cells.
-
-Nothing on the prediction path looks for it. No `eta` assertion in
-`R/` carries `any.missing`, and the only `NA` guard there is the
-series-index check at `R/predictions.R:603`.
-
-The same fit refuses other malformed frames well: an unknown series
-names the level and lists the ones the model has, and a gapped
-forecast frame names the series, the last observed time and the times
-it expected. The standard is set within the same object, and what is
-wanted is a refusal naming the user's own column.
-
 ## com_binomial and the trials aterm
 
 **A difference worth recording, for the family work to settle.** The
@@ -488,26 +442,6 @@ does instead is guarantee a non-negative correlation with the truth
 for every fit in the table, which can only move RMSE downward. The
 comparison it feeds is the article's headline claim that the joint
 fit recovers the state best.
-
-## A smooth the design cannot identify
-
-**91. The unpenalised part of a smooth is rank deficient, and the band
-drawn around it is a hundred times the effect.**
-
-`val_mvgam_smooth_surfaces`, poisson,
-`y ~ s(z, by = grp, k = 5) + t2(z, w, k = c(4, 4)) + gp(w, by = cat, k = 5)`
-over 60 rows. `standata()$Xs` is 60 by 6 with rank 4. `bs_sz:grpa_1`
-reads mean -0.77, sd 123.8; `bs_t2zw_1` and `bs_t2zw_2` sit at 137.4
-and -137.7 and sum to -0.3. Every `s_*` beside them has sd 1 to 4.
-
-`conditional_smooths()` therefore draws a band 1.03 wide at the centre
-of `z` and 109.7 at its edge, around an estimate spanning -6.9 to 6.5,
-with width tracking `|z|` at R^2 0.99998.
-
-`test-obs-smooth-surfaces.R` passes on it: the assertions are
-ordering, a non-zero width and `sd(estimate__) > 1e-6`, all of which a
-hundredfold band satisfies. A prefit rank check on the stacked
-observation and trend design would name the pairing.
 
 ## Debt the code carries in recognisable shapes
 

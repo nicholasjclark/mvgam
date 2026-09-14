@@ -476,6 +476,9 @@ extract_component_linpred <- function(mvgam_fit, newdata, component = "obs",
   # when the fit needed one. brms's `validate_data()` would
   # otherwise reject the frame for missing the column.
   newdata <- ensure_obs_placeholder(newdata, mvgam_fit)
+  # Ahead of the level check, so a gap in the axis is named as a gap
+  # instead of reaching the level comparison as an unknown series.
+  validate_newdata_complete(newdata, mvgam_fit)
   if (!is.null(mvgam_fit$trend_metadata$levels)) {
     validate_prediction_factor_levels(newdata, mvgam_fit$trend_metadata)
   }

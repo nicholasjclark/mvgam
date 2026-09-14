@@ -599,10 +599,9 @@ test_that("irf and fevd describe this fit's own matrix", {
   sides <- strsplit(h1$shock, " -> ", fixed = TRUE)
   from <- vapply(sides, `[`, "", 1L)
   to <- vapply(sides, `[`, "", 2L)
-  # Keyed by the order the table emits rather than by the series
-  # names, since finding 8 has it labelling these `Process_k`. Both
-  # spellings run the axis in the same order, so the claim below
-  # survives that being fixed.
+  # Keyed by the order the table emits. That order is the series axis
+  # whatever the labels are called, which is what the claim below
+  # rests on.
   keys <- unique(from)
   expect_length(keys, n_series)
   M <- matrix(0, n_series, n_series, dimnames = list(keys, keys))
@@ -670,11 +669,11 @@ test_that("the prediction surface refuses an argument nothing reads", {
 
 
 test_that("irf and fevd name the series, not Process_k", {
-  # Both tables label their shocks `Process_1 -> Process_2` while
-  # this fit's series are named. A correct decomposition under a
-  # generic label is, to a reader, the same as a wrong one: there is
-  # nothing in the output that says which species `Process_2` is,
-  # and the mapping is positional and undocumented.
+  # An impulse response is read to decide which series drives which,
+  # so each end of a shock pair carries the name the fit gives that
+  # series. A generic label leaves the mapping positional and
+  # undocumented, and to a reader a correct table under one looks the
+  # same as a wrong one.
   ir <- irf(fit, h = 3L)
   labels <- unique(unlist(strsplit(unique(ir$shock), " -> ",
                                    fixed = TRUE)))
@@ -995,14 +994,12 @@ test_that("conditional_effects cuts the interaction by region", {
 
 
 test_that("a missing covariate value is refused by name", {
-  # One `NA` in a covariate column stops the prediction with a
-  # checkmate assertion on `eta`, an internal object the caller never
-  # supplied and cannot locate:
-  #
-  #   Assertion on 'eta' failed: Contains missing values (row 1, col 1)
-  #
-  # Nothing in that names the column, the row of the user's frame, or
-  # what to do. The refusals elsewhere on this fit are the standard:
+  # One `NA` in a covariate column does not stop the prediction at
+  # all. The value passes through the design into the linear
+  # predictor and reaches the caller as `NA` cells, with nothing
+  # naming the column or the row it came from. A factor column is
+  # worse: the row silently takes the reference level and no `NA`
+  # marks it. The refusals elsewhere on this fit are the standard:
   # an unknown series names the level and the levels it knew, and a
   # gapped forecast frame names the series and the times it wanted.
   nd <- dat
