@@ -192,10 +192,10 @@ plot_latent_state <- function(object, probs = c(0.5, 0.8, 0.95),
 
   series_levels <- levels(unit_meta$series)
   time_levels <- sort(unique(unit_meta$time))
-  y_label <- if (resolve_family_name(object$family) == "occ") {
-    "Posterior occupancy (psi)"
-  } else {
+  y_label <- if (models_latent_count(object$family)) {
     "Posterior latent N"
+  } else {
+    "Posterior occupancy (psi)"
   }
 
   set_color_scheme_local("red")

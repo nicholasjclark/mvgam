@@ -177,7 +177,7 @@ mvgam_data <- function(data,
     )))
   }
 
-  is_cu <- is_closure_unit_family(family)
+  is_cu <- uses_closure_unit_layout(family)
   if (is_cu) {
     # validate_closure_unit_data() already enforces required
     # columns (response + visit + cap when needed), integer /

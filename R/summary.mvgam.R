@@ -872,12 +872,12 @@ build_next_steps <- function(x) {
   has_covariates <- !is.null(x$fixed) &&
     nrow(x$fixed) > 1L
   forecastable <- !grepl("^ZMVN", trend_model)
+  # Sharing the closure-unit layout is not the same as modelling a
+  # detection process. `mvn()`, `mvt()` and `diri()` share the
+  # layout and model none, and asking the layout question here sent
+  # readers of those summaries to `pp_check(type = "fit_stat")`,
+  # which refuses them.
   is_cu <- !is.null(x$family) && is_closure_unit_family(x$family)
-  # Sharing the closure-unit pipeline is not the same as having a
-  # latent state to report: `mvn()`, `mvt()` and `diri()` share it and
-  # have none, so `is_cu` sent readers of those summaries to a call
-  # that refuses. The registry answers, and both suggestions below
-  # read the one answer.
   has_latent_state <- "latent_state" %in% family_predict_types(x$family)
   # Candidates in priority order; first five matching entries
   # populate the printed list. Closure-unit (occ / nmix) fits get

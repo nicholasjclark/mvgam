@@ -32,7 +32,7 @@ test_that("occ() returns a customfamily with mu/p dpars and logit links", {
 
 test_that("occ() tags closure-unit, binary-response and predict-type attributes", {
   fam <- occ()
-  expect_true(is_closure_unit_family(fam))
+  expect_true(uses_closure_unit_layout(fam))
   expect_true(isTRUE(attr(fam, "mvgam_binary_response", exact = TRUE)))
   expect_identical(
     attr(fam, "mvgam_predict_types", exact = TRUE),

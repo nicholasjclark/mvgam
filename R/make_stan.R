@@ -124,7 +124,7 @@ build_stan_components <- function(formula, data, family = gaussian(),
   # to here rather than baked into the family() constructor. A
   # closure-unit family models its response alone, which
   # `resolve_observation_family()` has established.
-  if (is_closure_unit_family(family)) {
+  if (uses_closure_unit_layout(family)) {
     main_formula <- obs_arm_main_formula(obs_formula)
     dpar_forms <- if (inherits(obs_formula, "brmsformula")) {
       obs_formula$pforms %||% list()
@@ -566,7 +566,7 @@ warn_pw_obs_intercept <- function(mv_spec, obs_formula) {
 #'@noRd
 suppress_brms_threading <- function(threads, family, mv_spec) {
   if (!is.numeric(threads) || !isTRUE(threads > 1)) return(FALSE)
-  if (is_closure_unit_family(family)) return(TRUE)
+  if (uses_closure_unit_layout(family)) return(TRUE)
   if (is_multi_response_family(family)) return(TRUE)
   if (!is.null(mv_spec) && isTRUE(mv_spec$has_trends)) return(TRUE)
   FALSE
@@ -576,7 +576,7 @@ suppress_brms_threading <- function(threads, family, mv_spec) {
 threads_no_op_for_trend_brms_native <- function(threads, family, mv_spec) {
   if (!is.numeric(threads) || !isTRUE(threads > 1)) return(FALSE)
   if (is.null(mv_spec) || !isTRUE(mv_spec$has_trends)) return(FALSE)
-  if (is_closure_unit_family(family)) return(FALSE)
+  if (uses_closure_unit_layout(family)) return(FALSE)
   if (is_multi_response_family(family)) return(FALSE)
   TRUE
 }

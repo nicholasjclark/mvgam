@@ -2007,7 +2007,7 @@ validate_response_shapes <- function(data, formula, family) {
   families <- formula_families(formula, validate_family(family))
   for (key in names(columns)) {
     fam <- families[[key]]
-    if (is_multi_response_family(fam) || is_closure_unit_family(fam)) {
+    if (is_multi_response_family(fam) || uses_closure_unit_layout(fam)) {
       next
     }
     column <- columns[[key]]

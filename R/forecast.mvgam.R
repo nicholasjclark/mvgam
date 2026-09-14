@@ -850,7 +850,7 @@ build_hindcast_arms <- function(object, training, type, draw_idx,
     # `"response"` surfaces keep the per-row sub-data because the
     # latent state varies per closure unit.
     if (type %in% c("trend", "link") &&
-          is_closure_unit_family(object$family)) {
+          uses_closure_unit_layout(object$family)) {
       sub <- sub[!duplicated(sub[[time_var]]), , drop = FALSE]
     }
     out[[s]] <- hindcast_one_series(
@@ -881,7 +881,7 @@ hindcast_one_series <- function(object, sub_data, type, draw_idx,
                                   process_error = FALSE,
                                   resp = NULL) {
   family <- model_families(object, resp)
-  is_closure <- is_closure_unit_family(family)
+  is_closure <- uses_closure_unit_layout(family)
 
   if (is_closure) {
     full <- switch(

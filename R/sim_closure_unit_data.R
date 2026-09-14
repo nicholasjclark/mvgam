@@ -297,7 +297,7 @@ sim_closure_unit_data <- function(type = 1L,
   )
   long$time <- long$site
   long$y    <- sim_components$y_long
-  long$cap  <- if (grepl("^nmix", fam_name)) {
+  long$cap  <- if (models_latent_count(family)) {
     rep(K_max, NROW(long))
   } else {
     rep(1L, NROW(long))
@@ -418,9 +418,8 @@ draw_recipe_coefs <- function(n_species, cov_names,
   # leave the fit nothing to recover. Logit-link state for occ()
   # uses the wider draws since the link saturates anyway and a
   # wider draw gives more visible occupancy variation.
-  fam_name <- if (is.null(family)) "" else resolve_family_name(family) %||% ""
-  is_nmix <- grepl("^nmix", fam_name)
-  is_closure <- is_nmix || identical(fam_name, "occ")
+  is_nmix <- models_latent_count(family)
+  is_closure <- is_closure_unit_family(family)
   if (is_state && is_nmix) {
     # nmix log-link state: tightest draws.
     intercept_sd      <- 0.5

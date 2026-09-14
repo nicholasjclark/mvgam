@@ -313,7 +313,7 @@ residuals.mvgam <- function(object,
   # grain are conditionally independent given lv. Routes through
   # the standard non-closure-unit residual path, which calls
   # posterior_predict and subtracts y row-wise.
-  if (needs_closure_unit_aggregation(object$family)) {
+  if (is_closure_unit_family(object$family)) {
     resids <- compute_closure_unit_residuals(
       object   = object,
       newdata  = newdata,

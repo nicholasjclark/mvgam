@@ -350,7 +350,7 @@ predict_variance <- function(object, newdata, process_error,
   #     so Var[Y] = E[Y] * (1 - E[Y]).
   # Both route through posterior_epred and apply the
   # family-specific variance formula; no dpar broadcasting needed.
-  if (is_closure_unit_family(family)) {
+  if (uses_closure_unit_layout(family)) {
     family_name <- resolve_family_name(family)
     # mv-response families (mvn, mvt) carry per-row residual scale
     # in Psi (and df in nu for mvt). The marginal per-row variance

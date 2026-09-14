@@ -38,7 +38,7 @@ test_that("nmix() returns a customfamily with mu/p dpars and logit/log links", {
 
 test_that("nmix() tags closure-unit and predict-type attributes", {
   fam <- nmix()
-  expect_true(is_closure_unit_family(fam))
+  expect_true(uses_closure_unit_layout(fam))
   expect_identical(
     attr(fam, "mvgam_predict_types", exact = TRUE),
     c("latent_state", "detection")
@@ -49,11 +49,11 @@ test_that("nmix() tags closure-unit and predict-type attributes", {
   expect_null(attr(fam, "mvgam_stanvars", exact = TRUE))
 })
 
-test_that("is_closure_unit_family() returns FALSE for non-closure families", {
-  expect_false(is_closure_unit_family(NULL))
-  expect_false(is_closure_unit_family(gaussian()))
-  expect_false(is_closure_unit_family(brms::brmsfamily("poisson")))
-  expect_false(is_closure_unit_family(tweedie()))
+test_that("uses_closure_unit_layout() returns FALSE for non-closure families", {
+  expect_false(uses_closure_unit_layout(NULL))
+  expect_false(uses_closure_unit_layout(gaussian()))
+  expect_false(uses_closure_unit_layout(brms::brmsfamily("poisson")))
+  expect_false(uses_closure_unit_layout(tweedie()))
 })
 
 # ------------------------------------------------------------
@@ -151,7 +151,7 @@ test_that("diri() returns a custom family with the right tags", {
   expect_identical(fam$dpars, c("mu", "phi"))
   expect_identical(fam$link, "identity")
   expect_identical(fam$link_phi, "log")
-  expect_true(is_closure_unit_family(fam))
+  expect_true(uses_closure_unit_layout(fam))
   expect_true(is_multi_response_family(fam))
   expect_true(is_simplex_response_family(fam))
   expect_identical(
@@ -255,7 +255,7 @@ test_that("multi() returns a custom family with the right tags", {
   expect_identical(fam$link, "identity")
   expect_identical(fam$type, "int")
   expect_false(fam$loop)
-  expect_true(is_closure_unit_family(fam))
+  expect_true(uses_closure_unit_layout(fam))
   expect_true(is_multi_response_family(fam))
   expect_true(is_simplex_response_family(fam))
   expect_identical(
@@ -329,7 +329,7 @@ test_that("categ() returns a custom family with the right tags", {
   expect_identical(fam$name, "categ")
   expect_identical(fam$dpars, "mu")
   expect_identical(fam$type, "int")
-  expect_true(is_closure_unit_family(fam))
+  expect_true(uses_closure_unit_layout(fam))
   expect_true(is_multi_response_family(fam))
   expect_true(is_simplex_response_family(fam))
   expect_true(isTRUE(
@@ -414,7 +414,7 @@ test_that("mvn() returns a custom family with the right tags", {
   expect_identical(fam$link, "identity")
   expect_identical(fam$type, "real")
   expect_false(fam$loop)
-  expect_true(is_closure_unit_family(fam))
+  expect_true(uses_closure_unit_layout(fam))
   expect_true(is_multi_response_family(fam))
   # NOT simplex: multi_normal_cholesky_lpdf is shift-sensitive so
   # the simplex identification machinery must be skipped.
@@ -529,7 +529,7 @@ test_that("mvt() returns a custom family with the right tags", {
   expect_identical(fam$link, "identity")
   expect_identical(fam$type, "real")
   expect_false(fam$loop)
-  expect_true(is_closure_unit_family(fam))
+  expect_true(uses_closure_unit_layout(fam))
   expect_true(is_multi_response_family(fam))
   # NOT simplex: student_t_lpdf is shift-sensitive so the simplex
   # identification machinery must be skipped.

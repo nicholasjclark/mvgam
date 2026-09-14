@@ -242,8 +242,7 @@ hindcast_latent_state <- function(object, ndraws = NULL,
     )))
   }
 
-  fam_nm <- resolve_family_name(object$family) %||% ""
-  is_nmix <- grepl("^nmix", fam_nm)
+  is_nmix <- models_latent_count(object$family)
   state_label <- if (is_nmix) {
     "Latent abundance (N)"
   } else {

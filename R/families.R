@@ -315,7 +315,7 @@ resolve_observation_family <- function(formula, family) {
     }
   }
   alone <- Filter(function(f) {
-    is_closure_unit_family(f) || is_multi_response_family(f)
+    uses_closure_unit_layout(f) || is_multi_response_family(f)
   }, families)
   if (length(families) > 1L && length(alone) > 0L) {
     stop(insight::format_error(c(
@@ -1443,9 +1443,9 @@ com_binomial_stan_funs <- function() {
 # latent state (abundance N for nmix, occupancy Z for occ). All
 # closure-unit families flow through four primitives:
 #
-#   1. `is_closure_unit_family()`: predicate gating downstream
-#      bypasses (duplicate-time validation skip, prediction-type
-#      routing, etc).
+#   1. `uses_closure_unit_layout()`: the predicate downstream
+#      bypasses read (duplicate-time validation skip,
+#      prediction-type routing).
 #   2. `build_closure_unit_arrays()`: long-format data to unit
 #      arrays (N_unit, n_rep, K_max, Y_max, visit_idx,
 #      visit_row, row_unit). Called
@@ -1472,18 +1472,20 @@ com_binomial_stan_funs <- function() {
 # the fit-time data reuse the stored K_max without re-deriving
 # it.
 
-#' Detect whether a family uses the closure-unit wire format
+#' Detect whether a family uses the closure-unit data layout
 #'
-#' Returns TRUE if the family is one of the closure-unit
-#' detection-error families (currently `nmix()`; future
-#' `occ()`, `royle_nichols()`, `poisson_poisson()`). Detected
-#' via the `mvgam_closure_unit` attribute attached by each
-#' family constructor.
+#' TRUE for the seven families whose data arrives one row per visit
+#' with a unit key: `occ()`, `nmix()` and its variants, and the
+#' multi-response families `mvn()`, `mvt()`, `diri()`, `multi()`
+#' and `categ()`. Read from the `mvgam_closure_unit` attribute each
+#' constructor attaches. Sharing the layout says nothing about
+#' modelling a detection process, which `is_closure_unit_family()`
+#' answers.
 #'
 #' @param family A family / brmsfamily / customfamily object.
 #' @return TRUE or FALSE.
 #' @noRd
-is_closure_unit_family <- function(family) {
+uses_closure_unit_layout <- function(family) {
   if (is.null(family)) return(FALSE)
   isTRUE(attr(family, "mvgam_closure_unit", exact = TRUE))
 }
@@ -1510,31 +1512,44 @@ is_multi_response_family <- function(family) {
   isTRUE(attr(family, "mvgam_multi_response", exact = TRUE))
 }
 
-#' Detect whether a closure-unit family routes its post-fit
-#' surface (pp_check, residuals, log_lik, posterior_predict /
-#' epred) through the per-unit aggregation pipeline.
+#' Detect whether a family models a detection process over repeat
+#' visits to a closed unit
 #'
-#' TRUE for `nmix()` and `occ()`: their Stan likelihood
-#' marginalises a latent state (N for nmix, z for occ) and
-#' downstream R-side methods aggregate per-visit responses to the
-#' closure-unit grain via `closure_unit_pp_check_setup()` /
-#' `compute_closure_unit_residuals()`. FALSE for the mv-response
-#' families (`mvn()`, `mvt()`): their per-row residual is
-#' conditionally independent given the latent factor scores
-#' baked into mu by the trend pipeline, so post-fit methods
-#' operate at the (site, species) row grain directly.
+#' TRUE for `occ()` and `nmix()` with its variants. Their Stan
+#' likelihood marginalises a latent state (N for nmix, z for occ)
+#' and their post-fit methods aggregate per-visit responses to the
+#' closure-unit grain. FALSE for `mvn()`, `mvt()`, `diri()`,
+#' `multi()` and `categ()`, which share the data layout and model
+#' no detection: their per-row density is conditionally independent
+#' given the factor scores in mu.
 #'
-#' Used by `pp_check.mvgam()`, `residuals.mvgam()`, and the
-#' predict-time guard in `extract_closure_unit_components()` to
-#' route mv-response fits around the aggregation / cap-validation
-#' machinery that does not apply to them.
+#' Read from the `mvgam_predict_types` registry, which is the
+#' record of what a family exposes. Asking the layout question here
+#' instead admitted five families to code paths written for a
+#' detection process.
 #'
 #' @param family A family / brmsfamily / customfamily object.
 #' @return TRUE or FALSE.
 #' @noRd
-needs_closure_unit_aggregation <- function(family) {
+is_closure_unit_family <- function(family) {
+  "detection" %in% family_predict_types(family)
+}
+
+#' Detect whether a detection family's latent state counts
+#' individuals
+#'
+#' TRUE for `nmix()` and its `royle_nichols` / `poisson_poisson`
+#' variants, whose latent state is an abundance. FALSE for `occ()`,
+#' whose latent state is presence. The Royle-Nichols variant scores
+#' a binary response over an abundance state, which is what stops
+#' `is_binary_response_family()` answering this one.
+#'
+#' @param family A family / brmsfamily / customfamily object.
+#' @return TRUE or FALSE.
+#' @noRd
+models_latent_count <- function(family) {
   is_closure_unit_family(family) &&
-    !is_multi_response_family(family)
+    startsWith(resolve_family_name(family) %||% "", "nmix")
 }
 
 #' Detect whether a multi-response family uses the softmax-based
@@ -1602,7 +1617,7 @@ family_predict_types <- function(family) {
 # replied by naming a source file for the user to edit.
 #'@noRd
 require_closure_unit_predict_type <- function(family, type) {
-  if (!is_closure_unit_family(family) ||
+  if (!uses_closure_unit_layout(family) ||
         !(type %in% family_predict_types(family))) {
     refuse_unsupported_predict_type(family, type)
   }
@@ -1658,7 +1673,7 @@ refuse_unsupported_predict_type <- function(family, type) {
       "Family '", resolve_family_name(family), "' exposes types: ",
       paste(paste0("'", types, "'"), collapse = ", "), "."
     )
-  } else if (is_closure_unit_family(family)) {
+  } else if (uses_closure_unit_layout(family)) {
     paste0(
       "Family '", resolve_family_name(family), "' groups its ",
       "observations into closure units but models no latent state ",
@@ -1804,7 +1819,7 @@ closure_unit_key_vars <- function(family, series_var = "series",
     return(declared)
   }
   if (!is.null(family)) {
-    if (!is_closure_unit_family(family)) {
+    if (!uses_closure_unit_layout(family)) {
       return(NULL)
     }
     if (is_multi_response_family(family)) {
@@ -2032,7 +2047,7 @@ complete_closure_unit_newdata <- function(object, newdata,
                                             object, newdata
                                           )) {
   if (is.null(newdata)) return(newdata)
-  if (!is_closure_unit_family(object$family)) return(newdata)
+  if (!uses_closure_unit_layout(object$family)) return(newdata)
   data <- mvgam_training_data(object) %||% data.frame()
   if (nrow(data) == 0L) return(newdata)
   template <- data[1L, , drop = FALSE]
@@ -5359,8 +5374,7 @@ prepare_closure_unit_family <- function(family, data, response_var,
                                          has_obs_covariates = FALSE,
                                          has_det_covariates = FALSE) {
   family_name <- family$name
-  binary_y_check <- isTRUE(attr(family, "mvgam_binary_response",
-                                 exact = TRUE))
+  binary_y_check <- is_binary_response_family(family)
   default_cap <- closure_unit_default_cap(family)
   default_cap_buffer <- closure_unit_default_cap_buffer(family)
   multi_response <- is_multi_response_family(family)
@@ -5998,7 +6012,7 @@ posterior_epred_com_binomial <- function(prep) {
 #' one branch per `method_kind` arm.
 #'
 #' @param family A fitted mvgam family (must be a closure-unit
-#'   family per `is_closure_unit_family()`).
+#'   family per `uses_closure_unit_layout()`).
 #' @param method_kind One of `"epred"`, `"predict"`, `"log_lik"`,
 #'   `"latent_state"`. The `"latent_state"` arm is family-specific
 #'   (latent_N for nmix, occupancy for occ).
@@ -6011,7 +6025,7 @@ dispatch_closure_unit_method <- function(family, method_kind) {
   checkmate::assert_choice(
     method_kind, c("epred", "predict", "log_lik", "latent_state")
   )
-  if (!is_closure_unit_family(family)) {
+  if (!uses_closure_unit_layout(family)) {
     stop(insight::format_error(
       "dispatch_closure_unit_method() requires a closure-unit family."
     ))
@@ -6225,7 +6239,7 @@ extract_closure_unit_components <- function(object, newdata = NULL,
                                              draw_ids = NULL,
                                              linpred = NULL) {
   checkmate::assert_class(object, "mvgam")
-  if (!is_closure_unit_family(object$family)) {
+  if (!uses_closure_unit_layout(object$family)) {
     stop(insight::format_error(c(
       "extract_closure_unit_components() requires a closure-unit fit.",
       i = "Use family = nmix() or family = occ()."
@@ -6253,7 +6267,7 @@ extract_closure_unit_components <- function(object, newdata = NULL,
   # without a per-unit truncation; they share the closure-unit
   # data layout (long format, K rows per site) but neither
   # require a cap column nor run the binary-y check.
-  aggregates <- needs_closure_unit_aggregation(object$family)
+  aggregates <- is_closure_unit_family(object$family)
   validate_closure_unit_data(
     newdata,
     response_var       = response_var,
@@ -6370,7 +6384,7 @@ posterior_epred_nmix <- function(object, newdata = NULL,
 #' @noRd
 closure_unit_draws_to_rows <- function(object, newdata, draws) {
   if (!is.matrix(draws) || is.null(newdata) ||
-        !is_closure_unit_family(object$family) ||
+        !uses_closure_unit_layout(object$family) ||
         ncol(draws) == nrow(newdata)) {
     return(draws)
   }
@@ -6835,7 +6849,7 @@ latent_N_saturation <- function(object, newdata = NULL,
                                  draw_ids = NULL) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_number(threshold, lower = 0, upper = 1)
-  if (!needs_closure_unit_aggregation(object$family)) {
+  if (!is_closure_unit_family(object$family)) {
     stop(insight::format_error(c(
       paste0(
         "latent_N_saturation() requires a closure-unit family with ",

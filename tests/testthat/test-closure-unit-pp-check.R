@@ -148,7 +148,7 @@ test_that("pp_check(type = 'fit_stat') is refused where no unit aggregates", {
   # sum to one whatever the fit says, so the Bayesian p-value came
   # back near 0.5 for every model.
   for (fam in list(diri(), multi(), categ(), mvn(), mvt())) {
-    expect_false(needs_closure_unit_aggregation(fam))
+    expect_false(is_closure_unit_family(fam))
     expect_error(
       pp_check(stub(fam), type = "fit_stat"),
       "does not aggregate repeat visits"
@@ -156,7 +156,7 @@ test_that("pp_check(type = 'fit_stat') is refused where no unit aggregates", {
   }
   # The two that do aggregate must not be caught by the same gate.
   for (fam in list(occ(), nmix())) {
-    expect_true(needs_closure_unit_aggregation(fam))
+    expect_true(is_closure_unit_family(fam))
   }
 })
 

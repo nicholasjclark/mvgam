@@ -279,7 +279,7 @@ closure_unit_data_dimensions <- function(obj) {
   # / multi / categ) also carry `mvgam_closure_unit = TRUE` but
   # each unit holds one K-vector observation, so the "visits per
   # unit" framing does not apply.
-  if (!methods_md_is_detection_family(obj)) return(character(0L))
+  if (!is_closure_unit_family(obj$family)) return(character(0L))
   data <- obj$data %||% data.frame()
   if (nrow(data) == 0L) return(character(0L))
   # The columns that key a closure unit, default included. The
@@ -541,7 +541,7 @@ dpar_linear_predictor_rows <- function(obj, notation) {
   present <- unique(data.frame(resp = resps, dpar = dpars)[nzchar(dpars), ,
                                                           drop = FALSE])
   if (nrow(present) == 0L) return(list())
-  visit_grain <- methods_md_is_closure_unit(obj)
+  visit_grain <- is_closure_unit_family(obj$family)
   rows <- list()
   for (i in seq_len(nrow(present))) {
     r <- present$resp[i]
@@ -1118,7 +1118,7 @@ family_distribution_text <- function(fam_name, mu, obj) {
 closure_unit_family_kind <- function(obj) {
   # Returns one of: "occ", "nmix_pb", "nmix_rn", "nmix_ppm",
   # or NULL when the family is not a detection family.
-  if (!methods_md_is_detection_family(obj)) return(NULL)
+  if (!is_closure_unit_family(obj$family)) return(NULL)
   fam_name <- resolve_family_name(obj$family) %||% ""
   switch(
     fam_name,
@@ -1251,7 +1251,7 @@ closure_unit_state_link <- function(kind) {
 
 #' @noRd
 mv_custom_family_kind <- function(obj) {
-  if (!methods_md_is_mv_custom_family(obj)) return(NULL)
+  if (!is_multi_response_family(obj$family)) return(NULL)
   fam_name <- resolve_family_name(obj$family) %||% ""
   switch(
     fam_name,
@@ -2091,40 +2091,19 @@ methods_md_has_latent_trend <- function(obj) {
 # ---------------------------------------------------------------
 # Family-kind predicates
 # ---------------------------------------------------------------
-# Three orthogonal predicates read off the family object
-# attributes (set in `R/families.R::occ()` / `::nmix()` /
-# `::mvn()` etc.):
-#   * is_closure_unit:   `attr(family, "mvgam_closure_unit")`.
-#                        Family uses the closure-unit data layout
-#                        (per-visit obs, per-unit latent state).
-#   * is_detection:      `attr(family, "mvgam_predict_types")`
-#                        carries `"detection"`. Only occ / nmix
-#                        variants have a detection sub-formula.
-#   * is_mv_custom:      `attr(family, "mvgam_multi_response")`.
-#                        Multi-response custom families
-#                        (mvn / mvt / diri / multi / categ) whose
-#                        likelihood is a single joint MVNormal /
-#                        Dirichlet / Multinomial / Categorical
-#                        per unit.
+# Three orthogonal questions, each with one shared predicate in
+# `R/families.R`:
+#   * `uses_closure_unit_layout()`: the family takes per-visit rows
+#     keyed by a unit.
+#   * `is_closure_unit_family()`: the family models a detection
+#     process over those visits. Only occ and nmix do.
+#   * `is_multi_response_family()`: the family's likelihood is one
+#     joint density per unit (mvn / mvt / diri / multi / categ).
 #
 # Whether the fit indexes seasons is asked of
 # `is_multi_season_family()`, which reads the closure-unit grouping
 # the likelihood was built on.
 
-#' @noRd
-methods_md_is_closure_unit <- function(obj) {
-  is_closure_unit_family(obj$family)
-}
-
-#' @noRd
-methods_md_is_detection_family <- function(obj) {
-  "detection" %in% family_predict_types(obj$family)
-}
-
-#' @noRd
-methods_md_is_mv_custom_family <- function(obj) {
-  is_multi_response_family(obj$family)
-}
 
 
 

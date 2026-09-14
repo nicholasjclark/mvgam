@@ -57,33 +57,6 @@ that all say the same unhelpful thing.
 The test holds every method to the message `summary()` already
 produces, so it fails until they meet it.
 
-## Families
-
-**4a. Three families are classified as closure-unit, not one.**
-
-`test-grain-mvbf-wide.R`, "only the closure-unit families are classified as
-such". Finding 4 recorded `mvn()` reaching an occupancy-only code
-path. Asked of the family table rather than of one fit,
-`is_closure_unit_family()` answers `TRUE` for `mvn()`, `mvt()` and
-`diri()` as well as for `occ()` and `nmix()`.
-
-None of the three models a detection process over repeat visits to a
-closed unit. `mvn()` and `mvt()` are multivariate observation models
-and `diri()` is a composition, so every path this predicate guards is
-reached by three families it was never written for.
-
-One attribute answers two questions. A caller may mean "does this
-family run through the same data preparation". It may instead mean
-"does this family model detection over a closed unit", which is true
-of `occ()` and `nmix()` alone. Both are spelled the same way, so
-each of the thirty-odd call sites has to be read to learn which it
-asks. `needs_closure_unit_aggregation()` and
-`is_simplex_response_family()` each name a piece of the difference.
-The wire format has no name of its own and borrows this one.
-
-The assertion asks the registry directly, so it covers every family
-at once.
-
 ## Prefit modes
 
 **46. `chains = 0` samples anyway, and the diagnostics warn about

@@ -1547,7 +1547,7 @@ draw_observations <- function(object, linpred, newdata, draw_ids,
   checkmate::assert_integerish(draw_ids, lower = 1, any.missing = FALSE,
                                len = nrow(linpred), null.ok = TRUE)
   family <- model_families(object, resp)
-  if (is_closure_unit_family(family)) {
+  if (uses_closure_unit_layout(family)) {
     predict_fn <- dispatch_closure_unit_method(family, "predict")
     return(predict_fn(
       object, newdata = newdata, draw_ids = draw_ids, linpred = linpred

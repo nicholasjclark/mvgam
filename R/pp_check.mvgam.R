@@ -271,7 +271,7 @@ pp_check.mvgam <- function(
     # wire-format question instead admitted the composition
     # families, whose unit sums to one whatever the fit says, and
     # returned a Bayesian p-value near 0.5 for every model.
-    if (!needs_closure_unit_aggregation(object$family)) {
+    if (!is_closure_unit_family(object$family)) {
       stop(insight::format_error(c(
         paste0(
           "pp_check(type = 'fit_stat') is only available for the ",
@@ -334,7 +334,7 @@ pp_check.mvgam <- function(
   # so their plots are per-row already and these ten types describe
   # them correctly; the wire-format spelling refused all ten for a
   # reason that did not hold.
-  if (needs_closure_unit_aggregation(object$family)) {
+  if (is_closure_unit_family(object$family)) {
     closure_unit_blocked <- c(
       "scatter_avg", "scatter_avg_grouped",
       "error_scatter_avg", "error_scatter_avg_vs_x",
@@ -565,7 +565,7 @@ pp_check.mvgam <- function(
   # aggregation in `closure_unit_pp_check_setup()` is for
   # nmix / occ where multiple visits within a site need a
   # sufficient-statistic collapse before scoring.
-  if (needs_closure_unit_aggregation(object$family)) {
+  if (is_closure_unit_family(object$family)) {
     cu <- closure_unit_pp_check_setup(
       object  = object,
       newdata = newdata,

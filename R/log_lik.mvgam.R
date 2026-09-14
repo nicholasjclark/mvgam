@@ -245,7 +245,7 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
   # that loo/waic must score (Vehtari, Gelman, Gabry 2017).
   # Closure-unit data prep is re-run from the (possibly new)
   # data here so cap edits at predict time take effect.
-  if (is_closure_unit_family(family_obj)) {
+  if (uses_closure_unit_layout(family_obj)) {
     # The families with several responses per unit have no latent
     # count to marginalise. `mvn` and `mvt` score a per-row density,
     # independent given the factor contribution in mu; `diri`, `multi`

@@ -138,7 +138,7 @@ test_that("beta_nb() is registered everywhere the dispatchers look", {
   expect_true(mvgam:::family_uses_integers("beta_nb"))
   expect_true(mvgam:::is_beta_nb_family(beta_nb()))
   expect_false(mvgam:::is_beta_nb_family(poisson()))
-  expect_false(mvgam:::is_closure_unit_family(beta_nb()))
+  expect_false(mvgam:::uses_closure_unit_layout(beta_nb()))
   expect_invisible(mvgam:::validate_supported_family(beta_nb()))
   # Both dpars must be reachable as arguments of the sampler, or
   # posterior_predict() errors only once someone fits the model

@@ -601,7 +601,7 @@ expected_from_linpred <- function(object, linpred, newdata = NULL,
     }))
   }
   family <- model_families(object, resp)
-  if (is_closure_unit_family(family)) {
+  if (uses_closure_unit_layout(family)) {
     epred_fn <- dispatch_closure_unit_method(family, "epred")
     return(epred_fn(
       object, newdata = newdata, draw_ids = draw_ids,

@@ -261,7 +261,7 @@ mvgam_loo_R2 <- function(y, epred, ll, r_eff) {
 #'
 #' @noRd
 loglik_col_values <- function(object, data, x, n_cols = NULL) {
-  if (needs_closure_unit_aggregation(object$family)) {
+  if (is_closure_unit_family(object$family)) {
     arrays <- closure_unit_arrays_for(object, data)
     out <- x[closure_unit_first_rows(arrays)]
     label <- "closure units"
@@ -308,7 +308,7 @@ loglik_col_values <- function(object, data, x, n_cols = NULL) {
 #'
 #' @noRd
 at_loglik_grain <- function(object, data, x) {
-  if (!needs_closure_unit_aggregation(object$family)) {
+  if (!is_closure_unit_family(object$family)) {
     return(x)
   }
   sum_within_closure_units(closure_unit_arrays_for(object, data), x)
@@ -354,7 +354,7 @@ require_loo_pairing <- function(object, fn_name) {
       )
     )), call. = FALSE)
   }
-  if (needs_closure_unit_aggregation(family) &&
+  if (is_closure_unit_family(family) &&
         identical(fn_name, "loo_linpred")) {
     stop(insight::format_error(c(
       paste0("'", fn_name, "' is not available for family '",

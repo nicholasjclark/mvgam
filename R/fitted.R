@@ -232,7 +232,7 @@ fitted.mvgam <- function(object,
   # aggregation to detection families (occ / nmix); mv-custom
   # families operate at the row grain regardless.
   if (isTRUE(unit_level)) {
-    if (!needs_closure_unit_aggregation(object$family)) {
+    if (!is_closure_unit_family(object$family)) {
       insight::format_warning(c(
         "'unit_level = TRUE' ignored for this family.",
         i = "Per-unit aggregation applies to detection families (occ() / nmix())."

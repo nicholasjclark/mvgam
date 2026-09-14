@@ -120,14 +120,15 @@ test_that("fitted.mvgam validates probs and other inputs", {
 # have their own tests.
 # ---------------------------------------------------------------
 
-# Family stub that satisfies is_closure_unit_family() and
-# needs_closure_unit_aggregation() so the dispatch reaches the
-# aggregator branch without needing a real fit.
+# Family stub carrying the attributes `uses_closure_unit_layout()`
+# and `is_closure_unit_family()` read. The dispatch then reaches the
+# aggregator branch without a real fit.
 make_occ_family_stub <- function() {
   structure(
     list(family = "occ", name = "occ"),
     class = "customfamily",
     mvgam_closure_unit  = TRUE,
+    mvgam_predict_types = c("latent_state", "detection"),
     mvgam_unit_grouping = c("series", "time"),
     mvgam_default_cap   = 1L
   )

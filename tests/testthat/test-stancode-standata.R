@@ -4123,7 +4123,7 @@ test_that("com_binomial() routes through the row-wise family kind", {
   # predicates classify it correctly so the threading gate and
   # other dispatch tables route as intended.
   fam <- com_binomial()
-  expect_false(is_closure_unit_family(fam))
+  expect_false(uses_closure_unit_layout(fam))
   expect_false(is_multi_response_family(fam))
   expect_false(is_simplex_response_family(fam))
   expect_true(is_com_binomial_family(fam))
