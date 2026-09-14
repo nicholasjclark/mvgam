@@ -556,6 +556,10 @@ glance.mvgam <- function(x, looic = FALSE, resp = NULL, ...) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_flag(looic)
   checkmate::assert_string(resp, null.ok = TRUE)
+  # The draw count below comes straight off `$fit`. The shared
+  # accessor guards the rest of the draws surface, and this call
+  # bypasses it.
+  require_fitted_model(x, "glance")
   # `...` reaches `loo()`, and only where `looic = TRUE`, so on the
   # default path a name nothing reads was dropped without a word. The
   # receiver is the same whichever branch runs.

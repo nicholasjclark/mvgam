@@ -1120,25 +1120,53 @@ series_row_order <- function(supplied, series_levels, subject) {
 #' user cannot construct and which this refusal would mis-describe.
 #'
 #' @param object An `mvgam` object.
-#' @param fn The method's own name, which the message reports.
+#' @param fn The method's own name, which the message reports. A
+#'   shared accessor several methods reach leaves this `NULL`, since
+#'   naming the accessor would describe code the caller never wrote.
 #' @return Invisibly `TRUE`, or an error.
 #' @noRd
-require_fitted_model <- function(object, fn) {
+require_fitted_model <- function(object, fn = NULL) {
   if (!inherits(object, "mvgam_prefit")) {
     return(invisible(TRUE))
   }
-  stop(insight::format_error(c(
-    "No fitted model found in mvgam object.",
-    x = paste0(
+  detail <- if (is.null(fn)) {
+    paste0(
+      "A posterior is required here, and an unfitted stub was ",
+      "supplied (`run_model = FALSE`)."
+    )
+  } else {
+    paste0(
       fn, "() requires a fitted Stan model and an unfitted ",
       "stub was supplied (`run_model = FALSE`)."
-    ),
+    )
+  }
+  stop(insight::format_error(c(
+    "No fitted model found in mvgam object.",
+    x = detail,
     i = paste0(
       "Use `stancode()` and `standata()` to inspect the generated ",
       "Stan code and data without fitting; refit with ",
       "`run_model = TRUE` (the default) to use this method."
     )
   )), call. = FALSE)
+}
+
+
+#' Refuse a set of models where any one of them lacks a posterior.
+#'
+#' Averaging weighs several fits against each other, so a single
+#' unfitted stub among them stops the whole call. The message is the
+#' one every other method gives a prefit, raised from one place.
+#'
+#' @param models A list of `mvgam` objects.
+#' @param fn The calling method's name, which the message reports.
+#' @return Invisibly `TRUE`, or an error.
+#' @noRd
+require_fitted_models <- function(models, fn) {
+  for (model in models) {
+    require_fitted_model(model, fn)
+  }
+  invisible(TRUE)
 }
 
 

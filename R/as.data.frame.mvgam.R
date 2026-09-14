@@ -546,6 +546,11 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_logical(regex, len = 1L)
   checkmate::assert_logical(inc_warmup, len = 1L)
+  # Every draws method in the package arrives here, so one guard
+  # covers them all. A prefit has an empty `fit` slot, and the line
+  # below met it with "Don't know how to transform an object of class
+  # 'NULL'", naming neither the state nor the argument that made it.
+  require_fitted_model(x)
   drws <- posterior::as_draws_array(x$fit, inc_warmup = inc_warmup)
   # One projection decides which parameters exist and what they are
   # called. When the user did not name a `variable`, the

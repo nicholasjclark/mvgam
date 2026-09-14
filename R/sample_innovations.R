@@ -798,6 +798,11 @@ validate_covariance_inputs <- function(object, ndraws, draw_ids) {
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
   validate_draw_selectors(ndraws, draw_ids)
 
+  # A prefit is the user-facing shape of this condition and carries
+  # the message every other method gives it. The slot test stays for
+  # the classed stubs the tests build, which a user cannot construct
+  # and which that message would describe wrongly.
+  require_fitted_model(object, "residual_cor")
   if (is.null(object$fit)) {
     stop(insight::format_error(
       "mvgam object has no fitted posterior draws."

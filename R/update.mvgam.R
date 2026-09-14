@@ -323,7 +323,16 @@ mvgam_update_inheritance <- list(
     normaliser = function(value) drop_mvgam_sourced_priors(value)
   ),
   backend = list(slot = "backend"),
-  algorithm = list(slot = "algorithm"),
+  # A `run_model = FALSE` stub records `algorithm = "none"`, which no
+  # backend lists, and handing it back refused the refit that turns a
+  # prefit into a fit. Reported as absent, the loop below skips it and
+  # the default applies.
+  algorithm = list(
+    getter = function(object) {
+      value <- object$algorithm
+      if (identical(value, "none")) NULL else value
+    }
+  ),
   init = list(slot = "init"),
   newdata = list(getter = function(object) object$test_data),
   # brms keeps this as a `brmsthreads` object, present whether or not

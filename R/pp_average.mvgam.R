@@ -89,6 +89,9 @@ posterior_average.mvgam <- function(x, ..., variable = NULL,
   ndraws <- mvgam_use_alias(ndraws, nsamples)
   split <- mvgam_split_models(x, ..., model_names = model_names)
   models <- split$models
+  # Draws come straight off each `$fit` below, which met an unfitted
+  # stub with "Don't know how to transform an object of class 'NULL'".
+  require_fitted_models(models, "posterior_average")
   vars_list <- lapply(models, variables)
   all_vars <- unique(unlist(vars_list))
   missing_resolved <- NULL
@@ -263,6 +266,9 @@ pp_average.mvgam <- function(x, ..., weights = "stacking",
   ndraws <- mvgam_use_alias(ndraws, nsamples)
   split <- mvgam_split_models(x, ..., model_names = model_names)
   models <- split$models
+  # Draws come straight off each `$fit` below, which met an unfitted
+  # stub with "Don't know how to transform an object of class 'NULL'".
+  require_fitted_models(models, "pp_average")
   other <- split$other
   reserved <- intersect(c("draw_ids", "subset"), names(other))
   if (length(reserved) > 0L) {

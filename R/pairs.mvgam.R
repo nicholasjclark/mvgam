@@ -44,6 +44,7 @@ pairs.mvgam <- function(
   regex = FALSE,
   ...
 ) {
+  require_fitted_model(x, "pairs")
   refuse_unread_dots(
     list(...), names(formals(bayesplot::mcmc_pairs)), "pairs"
   )

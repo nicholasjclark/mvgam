@@ -468,6 +468,7 @@ parnames.mvgam <- function(x, ...) {
 nsamples.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
   rlang::check_dots_empty()
+  require_fitted_model(object, "nsamples")
   posterior::ndraws(posterior::as_draws(object$fit))
 }
 
