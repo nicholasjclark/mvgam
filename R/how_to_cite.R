@@ -10,7 +10,7 @@
 #' @name how_to_cite.mvgam
 #'
 #' @param object A fitted `mvgam` or `jsdgam` object.
-#' @param ... Currently ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return An object of class `how_to_cite` carrying a
 #'   `methods_text` skeleton, the matched `citations`, a
@@ -771,6 +771,8 @@ extract_sampling_info <- function(object) {
 #' @method how_to_cite mvgam
 #' @export
 how_to_cite.mvgam <- function(object, ...) {
+  checkmate::assert_class(object, "mvgam")
+  rlang::check_dots_empty()
   db <- reference_db()
 
   # Always-cited references: mvgam itself plus its essential

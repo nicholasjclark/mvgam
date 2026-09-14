@@ -1368,7 +1368,7 @@ extract_dpars_from_stanfit <- function(stanfit,
 #' @param resp Character specifying which response variable for
 #'   multivariate models. NULL (default) returns predictions for all
 #'   responses.
-#' @param ... Additional arguments passed to internal methods.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return Matrix with dimensions `\\[ndraws x nobs\\]` containing posterior
 #'   predictive samples. Each row is one posterior draw, each column is
@@ -1456,13 +1456,10 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
                             any.missing = FALSE)
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1L, null.ok = TRUE)
-  if (!is.null(ndraws) && !is.null(draw_ids)) {
-    stop(insight::format_error(
-      "Specify only one of 'ndraws' or 'draw_ids'."
-    ))
-  }
+  validate_draw_selectors(ndraws, draw_ids)
   validate_group_level_args(re_formula, allow_new_levels, sample_new_levels)
   checkmate::assert_string(resp, null.ok = TRUE)
+  rlang::check_dots_empty()
 
   # Handle newdata = NULL (use training data)
   if (is.null(newdata)) {

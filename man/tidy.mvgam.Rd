@@ -41,7 +41,7 @@ posterior::rhat() values.}
 \item{ess}{Logical. If \code{TRUE}, add an \code{ess_bulk} column with
 posterior::ess_bulk() values.}
 
-\item{...}{Unused, included for generic consistency.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A tibble with one row per parameter and columns

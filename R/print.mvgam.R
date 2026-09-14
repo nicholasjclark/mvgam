@@ -2,18 +2,20 @@
 #'
 #' @param x \code{mvgam} object returned from \code{mvgam()}, fitted or
 #'   built with \code{run_model = FALSE}
-#' @param digits Integer for decimal places. Currently unused for
-#'   consistency with brms.
-#' @param ... Additional arguments (unused)
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return The \code{mvgam} object is returned invisibly.
 #'
 #' @seealso \code{\link{summary.mvgam}}, \code{\link{mvgam}}
 #'
 #' @export
-print.mvgam <- function(x, digits = 2, ...) {
+print.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
-  checkmate::assert_int(digits, lower = 0)
+  # This method prints structure: the formulas, the family, the axis
+  # counts and the sampler's state. No estimate is shown, so there is
+  # nothing for a `digits` argument to round; `summary()` prints the
+  # estimates and takes one.
+  rlang::check_dots_empty()
 
   # Section 1: Formulas (distinguish observation vs process)
   if (!is.null(x$trend_formula)) {
@@ -183,11 +185,12 @@ family.mvgam <- function(object, resp = NULL, ...) {
 #' Extract formula from mvgam object
 #'
 #' @param x mvgam object
-#' @param ... Additional arguments (unused)
+#' @param ... Unused. Anything passed here is refused.
 #' @return Formula object
 #' @export
 formula.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
+  rlang::check_dots_empty()
 
   if (is.null(x$formula)) {
     stop(insight::format_error(c(
@@ -202,11 +205,12 @@ formula.mvgam <- function(x, ...) {
 #' Extract number of observations from mvgam object
 #'
 #' @param object mvgam object
-#' @param ... Additional arguments (unused)
+#' @param ... Unused. Anything passed here is refused.
 #' @return Integer number of observations
 #' @export
 nobs.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
+  rlang::check_dots_empty()
 
   if (!is.null(object$data)) {
     return(nrow(object$data))
@@ -230,7 +234,7 @@ nobs.mvgam <- function(object, ...) {
 #' with \code{stancode} class.
 #'
 #' @param object A fitted \code{mvgam} object or \code{mvgam_prefit} object.
-#' @param ... Currently unused.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A character string containing the Stan model code with class
 #'   \code{c("stancode", "character")}.
@@ -243,6 +247,7 @@ nobs.mvgam <- function(object, ...) {
 #' @export
 stancode.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
+  rlang::check_dots_empty()
 
   if (is.null(object$stancode)) {
     stop(insight::format_error(c(

@@ -71,7 +71,7 @@ treated as a regular expression and any parameter matching at
 least one pattern is selected. Keyword shortcuts are still
 honoured. Defaults to \code{FALSE}.}
 
-\item{...}{Ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 
 \item{inc_warmup}{Logical. Include warmup draws? Defaults to
 \code{FALSE}.}

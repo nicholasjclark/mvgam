@@ -12,7 +12,7 @@
 \item{series}{Optional integer / character; restrict to a subset
 of the series. Defaults to all.}
 
-\item{...}{Currently unused.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{ggplot} object.

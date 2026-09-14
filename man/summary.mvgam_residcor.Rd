@@ -10,7 +10,7 @@
 \item{object}{An \code{mvgam_residcor} object returned by
 \code{\link[=residual_cor]{residual_cor()}} with \code{summary = TRUE}.}
 
-\item{...}{Currently ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{tibble::tibble} with columns \code{series_1}, \code{series_2},

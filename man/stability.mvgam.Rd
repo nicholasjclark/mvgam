@@ -22,7 +22,7 @@ stability(object, ...)
 to \code{\link[=mvgam]{mvgam()}} that used a Vector Autoregressive latent process model (either
 as \code{VAR(cor = FALSE)} or \code{VAR(cor = TRUE)})}
 
-\item{...}{Ignored}
+\item{...}{Unused. Anything passed here is refused.}
 
 \item{ndraws}{Optional integer; the number of posterior draws to use.
 Each draw costs a Lyapunov solve, so a wide panel is worth

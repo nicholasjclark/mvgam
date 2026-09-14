@@ -108,8 +108,8 @@
 \arguments{
 \item{x, object}{A fitted \code{mvgam} object.}
 
-\item{...}{Additional arguments forwarded to the underlying
-\verb{loo::*} or mvgam method.}
+\item{...}{Forwarded to the \verb{loo::*} or mvgam method each of these
+wraps. \code{loo_R2()} reads none of them and refuses them.}
 
 \item{compare}{Logical. If \code{TRUE}, compare multiple models.}
 

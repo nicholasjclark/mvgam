@@ -78,8 +78,8 @@
 #' @param loo,newdata,check,recompile Retained for brms-parity on
 #'   `loo_moment_match.mvgam` (the method errors before they are
 #'   read).
-#' @param ... Additional arguments forwarded to the underlying
-#'   `loo::*` or mvgam method.
+#' @param ... Forwarded to the `loo::*` or mvgam method each of these
+#'   wraps. `loo_R2()` reads none of them and refuses them.
 #'
 #' @return Shape depends on the method (see method details and the
 #'   brms / loo equivalents).
@@ -589,6 +589,7 @@ loo_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
   checkmate::assert_numeric(probs, lower = 0, upper = 1, len = 2L)
   checkmate::assert_list(args_epred)
   checkmate::assert_list(args_loglik)
+  rlang::check_dots_empty()
   is_mv <- brms::is.mvbrmsformula(object$formula)
   resolve_resp(object, resp, required = TRUE, caller = "loo_R2()")
   require_loo_pairing(object, "loo_R2")

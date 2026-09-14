@@ -19,7 +19,7 @@ processes to draw. Default draws all of them.}
 \item{shocks}{Optional character vector naming shock-response pairs
 directly, for a selection \code{series} and \code{responses} cannot express.}
 
-\item{...}{ignored}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{ggplot} object

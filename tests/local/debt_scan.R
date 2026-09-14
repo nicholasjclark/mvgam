@@ -11,10 +11,12 @@
 #   Rscript tests/local/debt_scan.R try       # every site of one shape
 #
 # Shapes: try, default, narrow, raw_axis, rebuild, mv_class, suppress,
-# double, dead_param. `dead_param` loads the package and lists
-# parameters no body reads outside an assertion. It also counts
+# double, dead_param, dead_dots. `dead_param` loads the package and
+# lists parameters no body reads outside an assertion. It also counts
 # dispatch kernels that share a signature and S3 generics, and each
-# hit is read before anything is removed.
+# hit is read before anything is removed. `dead_dots` lists the
+# functions whose `...` is neither read, forwarded nor refused, which
+# is where a misspelt argument stops without a word.
 
 tokens_of <- function(path) {
   pd <- utils::getParseData(parse(path, keep.source = TRUE))
@@ -128,6 +130,29 @@ dead_params <- function() {
   )
 }
 
+# Functions whose `...` no body reads, forwards or refuses. A method
+# carries `...` because its generic declares one, so the signature
+# alone says nothing; what matters is whether anything downstream can
+# ever see what was passed. `UseMethod()` and `NextMethod()` pass the
+# dots on through dispatch, and `check_dots_empty()` refuses them, so
+# both count as answered.
+dead_dots <- function() {
+  suppressMessages(devtools::load_all(".", quiet = TRUE))
+  ns <- asNamespace("mvgam")
+  answered <- "UseMethod|NextMethod|check_dots_empty|check_dots_used"
+  out <- character(0L)
+  for (nm in ls(ns, all.names = TRUE)) {
+    f <- get(nm, envir = ns)
+    if (!is.function(f) || is.primitive(f)) next
+    if (!"..." %in% names(formals(f))) next
+    txt <- paste(deparse(body(f)), collapse = " ")
+    if (!grepl("\\.\\.\\.", txt) && !grepl(answered, txt)) {
+      out <- c(out, nm)
+    }
+  }
+  data.frame(shape = "dead_dots", fn = sort(out), row.names = NULL)
+}
+
 # The text of every message, warning and error a user can meet, one
 # section per call site, written as markdown for the prose linter.
 # The string constants inside each outermost condition call are joined
@@ -180,6 +205,10 @@ files <- list.files("R", pattern = "\\.R$", full.names = TRUE)
 
 if (length(args) && identical(args[[1L]], "dead_param")) {
   print(dead_params(), right = FALSE)
+} else if (length(args) && identical(args[[1L]], "dead_dots")) {
+  hits <- dead_dots()
+  cat(nrow(hits), "functions drop their dots\n")
+  print(hits, right = FALSE)
 } else if (length(args) && identical(args[[1L]], "messages")) {
   sites <- do.call(rbind, lapply(files, message_sites))
   writeLines(paste0("## ", sites$file, ":", sites$line, "\n\n",

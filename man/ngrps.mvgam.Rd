@@ -10,7 +10,7 @@
 \arguments{
 \item{object}{A fitted \code{mvgam} object.}
 
-\item{...}{Unused; present for S3 / brms-parity.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A named list of integer scalars, or \code{NULL} if no

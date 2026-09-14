@@ -532,11 +532,7 @@ sample_process_errors <- function(object, ndraws = NULL, newdata = NULL,
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
   checkmate::assert_character(resp, min.len = 1L, any.missing = FALSE,
                               null.ok = TRUE)
-  if (!is.null(ndraws) && !is.null(draw_ids)) {
-    stop(insight::format_error(
-      "Cannot specify both 'ndraws' and 'draw_ids'."
-    ))
-  }
+  validate_draw_selectors(ndraws, draw_ids)
 
   if (!has_stochastic_trend(object)) {
     n_rows <- if (!is.null(draw_ids)) {
@@ -800,12 +796,7 @@ validate_covariance_inputs <- function(object, ndraws, draw_ids) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
-
-  if (!is.null(ndraws) && !is.null(draw_ids)) {
-    stop(insight::format_error(
-      "Cannot specify both 'ndraws' and 'draw_ids'."
-    ))
-  }
+  validate_draw_selectors(ndraws, draw_ids)
 
   if (is.null(object$fit)) {
     stop(insight::format_error(

@@ -43,7 +43,7 @@ labelled. \code{"all"} (default) labels every species; \code{"shift"}
 labels the top 10 species by post-alignment displacement
 between fits; \code{"none"} draws unlabelled points only.}
 
-\item{...}{Ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{ggplot} object.

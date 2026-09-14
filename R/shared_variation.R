@@ -126,6 +126,7 @@ shared_variation.mvgam <- function(object,
     any.missing = FALSE, sorted = TRUE
   )
   checkmate::assert_flag(robust)
+  rlang::check_dots_empty()
 
   n_lv <- detect_factor_n_lv(object)
   if (is.null(n_lv)) {
@@ -216,7 +217,7 @@ print.mvgam_shared_variation <- function(x, digits = 3L, ...) {
 #' @param type One of `"point"` (default) showing the posterior
 #'   point estimate, or `"uncertainty"` showing the per-entry
 #'   posterior spread (`delta_se`).
-#' @param ... Ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object.
 #'
@@ -231,6 +232,7 @@ plot.mvgam_shared_variation <- function(x,
                                         ...) {
   checkmate::assert_class(x, "mvgam_shared_variation")
   type <- match.arg(type)
+  rlang::check_dots_empty()
   mat <- switch(type, point = x$delta, uncertainty = x$delta_se)
   rng <- max(abs(range(mat, na.rm = TRUE, finite = TRUE)))
   if (type == "point") {

@@ -9,7 +9,7 @@
 \arguments{
 \item{x}{An \code{mvgam_kfold} object.}
 
-\item{...}{Ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{ggplot} object.

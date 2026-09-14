@@ -9,7 +9,7 @@
 \arguments{
 \item{x}{An object of class \code{mvgam_lfo}.}
 
-\item{...}{Currently unused.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{ggplot} object.

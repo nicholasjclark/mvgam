@@ -13,6 +13,8 @@
   draw_ids = NULL,
   incl_autocor = TRUE,
   process_error = NULL,
+  allow_new_levels = FALSE,
+  sample_new_levels = "uncertainty",
   ...
 )
 }
@@ -52,13 +54,14 @@ to \code{incl_autocor = TRUE} and \code{FALSE} to \code{incl_autocor = FALSE}.
 When only \code{process_error} is given it decides; when both are
 given \code{incl_autocor} decides and \code{process_error} is ignored.}
 
-\item{...}{Forwarded to \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}}, which in
-turn forwards brms-style prediction args to the underlying
-prediction machinery. Common pass-throughs include
-\code{allow_new_levels = TRUE} and \code{sample_new_levels = "gaussian"}
-for predicting on factor levels that were not in the
-training data (e.g. inside \code{kfold.mvgam()} refits scoring on
-held-out groups).}
+\item{allow_new_levels}{Logical. Score rows whose grouping level
+the training data did not carry, which is what \code{kfold.mvgam()}
+needs when a fold holds out whole groups. Defaults to \code{FALSE}.}
+
+\item{sample_new_levels}{How a new level's coefficients are drawn:
+\code{"uncertainty"} (the default), \code{"gaussian"} or \code{"old_levels"}.}
+
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 Numeric matrix [ndraws x nobs] of pointwise log densities.

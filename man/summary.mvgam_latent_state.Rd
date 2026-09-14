@@ -14,7 +14,7 @@ inner-lower / inner-upper / upper interval probabilities.
 Defaults to \code{c(0.025, 0.25, 0.75, 0.975)} (50\% and 95\%
 intervals).}
 
-\item{...}{Currently unused.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{data.frame} with columns \code{series}, \code{time}, \code{median},

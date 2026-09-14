@@ -23,7 +23,7 @@ fevd(object, ...)
 that used a Vector Autoregressive latent process model (either as \code{VAR(cor = FALSE)} or
 \code{VAR(cor = TRUE)}; see \code{\link[=VAR]{VAR()}} for details)}
 
-\item{...}{ignored}
+\item{...}{Unused. Anything passed here is refused.}
 
 \item{h}{Positive \code{integer} specifying the forecast horizon over which to calculate
 the IRF}

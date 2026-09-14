@@ -34,7 +34,7 @@
 #'   are `NULL`.
 #' @param ndraws,draw_ids Optional posterior-draw subsetting,
 #'   matching the [brms::posterior_smooths()] semantics.
-#' @param ... Unused; present for S3 / brms-parity.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A numeric matrix of dimension
 #'   \[n_draws x n_grid_points\] containing the posterior draws
@@ -83,8 +83,10 @@ posterior_smooths.mvgam <- function(object, smooth, newdata = NULL,
   checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1L, min.len = 1L,
                                null.ok = TRUE)
+  validate_draw_selectors(ndraws, draw_ids)
   checkmate::assert_string(dpar, null.ok = TRUE)
   checkmate::assert_string(nlpar, null.ok = TRUE)
+  rlang::check_dots_empty()
   if (!is.null(dpar) && !is.null(nlpar)) {
     stop(insight::format_error(
       "Name a distributional parameter or a non-linear parameter, not both."
@@ -150,7 +152,11 @@ brms::posterior_smooths
 #'   the unit square) are dropped via
 #'   [mgcv::exclude.too.far()]. `0` (default) keeps all points.
 #' @param ndraws,draw_ids Optional posterior-draw subsetting.
-#' @param ... Unused; present for S3 / brms-parity.
+#' @param resp Optional response name. `NULL` (the default) returns
+#'   every response's smooths; naming one keeps that response's
+#'   smooths alone. A univariate fit names no response on its terms
+#'   and is unaffected.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A named list of class `mvgam_conditional_smooths` with
 #'   one element per smooth term. Each element is a `data.frame`
@@ -175,6 +181,7 @@ conditional_smooths.mvgam <- function(x, smooths = NULL,
                                        surface = TRUE, facets = 3L,
                                        resolution = 100L, too_far = 0,
                                        ndraws = NULL, draw_ids = NULL,
+                                       resp = NULL,
                                        ...) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_character(smooths, null.ok = TRUE)
@@ -185,6 +192,9 @@ conditional_smooths.mvgam <- function(x, smooths = NULL,
   checkmate::assert_int(facets, lower = 2L)
   checkmate::assert_int(resolution, lower = 2L)
   checkmate::assert_number(too_far, lower = 0, upper = 1)
+  validate_draw_selectors(ndraws, draw_ids)
+  resolve_resp(x, resp, caller = "conditional_smooths()")
+  rlang::check_dots_empty()
   terms_list <- mvgam_smooth_terms(x)
   if (length(terms_list) == 0L) {
     stop(insight::format_error(c(
@@ -194,6 +204,22 @@ conditional_smooths.mvgam <- function(x, smooths = NULL,
         "observation or trend formula."
       )
     )), call. = FALSE)
+  }
+  if (!is.null(resp)) {
+    # A univariate fit carries no response on its terms, and
+    # `resolve_resp()` refuses a name the model does not have, so a
+    # term with none belongs to the response that was named.
+    keep <- vapply(
+      terms_list, function(t) identical(t$resp %||% resp, resp),
+      logical(1L)
+    )
+    terms_list <- terms_list[keep]
+    if (length(terms_list) == 0L) {
+      stop(insight::format_error(c(
+        paste0("Response '", resp, "' has no smooth terms."),
+        i = "Use 'smooths(x)' to list the terms this fit has."
+      )), call. = FALSE)
+    }
   }
   if (!is.null(smooths)) {
     keep <- vapply(terms_list, function(t) t$term %in% smooths,
@@ -267,7 +293,7 @@ conditional_smooths.mvgam <- function(x, smooths = NULL,
 #'   ggplot; otherwise returns the list invisibly for post-processing.
 #' @param ask Logical. If `TRUE`, prompts before each new plot when
 #'   multiple smooths are drawn to the same device.
-#' @param ... Ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return Invisibly returns the list of ggplot objects, one per
 #'   smooth term in `x`.
@@ -277,6 +303,7 @@ conditional_smooths.mvgam <- function(x, smooths = NULL,
 #' @export
 plot.mvgam_conditional_smooths <- function(x, plot = TRUE,
                                             ask = FALSE, ...) {
+  rlang::check_dots_empty()
   if (length(x) == 0L) return(invisible(x))
   # Lock the palette to the mvgam red scheme for the duration of
   # this call, matching plot.mvgam_forecast / plot.mvgam_stability

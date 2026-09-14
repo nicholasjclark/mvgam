@@ -330,6 +330,7 @@ as.data.frame.mvgam_conditional_effects <- function(x,
                                                     row.names = NULL,
                                                     optional = FALSE,
                                                     ...) {
+  rlang::check_dots_empty()
   if (length(x) == 0L) return(data.frame())
   # For each entry, build a per-piece DF tagged with a label
   # column, then rbind under a shared column union. mv wrapper and

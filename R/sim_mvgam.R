@@ -348,7 +348,7 @@ sim_mvgam <- function(type = 1L,
 #' fields manually.
 #'
 #' @param object An `mvgam_sim` object returned by [sim_mvgam()].
-#' @param ... Currently ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A list with class `mvgam_sim_summary` containing:
 #'   \describe{
@@ -373,6 +373,7 @@ sim_mvgam <- function(type = 1L,
 #' @export
 summary.mvgam_sim <- function(object, ...) {
   checkmate::assert_class(object, "mvgam_sim")
+  rlang::check_dots_empty()
   trend_label <- if (is.null(object$trend_model)) {
     "None"
   } else {

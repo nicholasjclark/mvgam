@@ -37,13 +37,14 @@
 
 \item{...}{More \code{mvgam} objects}
 
-\item{compare, resp, pointwise, moment_match, reloo, k_threshold, save_psis, moment_match_args, reloo_args}{Accepted for \link[brms:loo.brmsfit]{brms::loo.brmsfit} parity. \code{resp} is passed through to
-\code{\link[=log_lik.mvgam]{log_lik.mvgam()}} for multivariate response selection; \code{pointwise},
-\code{moment_match}, \code{reloo} and their \verb{*_args} companions require
-refit / streaming machinery that mvgam does not support; v1
-raises a clear error when any of them is requested. \code{compare},
-\code{k_threshold}, \code{save_psis} and \code{model_names} pass through to
-\code{\link[loo:loo]{loo::loo()}} or are no-ops for single-model evaluation.}
+\item{compare, resp, pointwise, moment_match, reloo, k_threshold, save_psis, moment_match_args, reloo_args}{Accepted for \link[brms:loo.brmsfit]{brms::loo.brmsfit} parity. Two are honoured: \code{resp}
+scopes a multivariate fit to one response, and \code{save_psis} keeps
+the smoothing object. The rest name machinery mvgam does not
+have. \code{pointwise} streams the density, \code{moment_match} and \code{reloo}
+refit the model and \code{k_threshold} with the \verb{*_args} lists
+configure those refits, while \code{compare} and \code{model_names} rank
+several models, which \code{\link[=loo_compare]{loo_compare()}} does. Supplying any of them
+raises an error naming it.}
 
 \item{model_names}{If \code{NULL} (the default) will use model names derived
 from deparsing the call. Otherwise will use the passed values as model names}

@@ -7,13 +7,14 @@
 #' @param x Object of class `mvgam` or `jsdgam`
 #'
 #' @param compare,resp,pointwise,moment_match,reloo,k_threshold,save_psis,moment_match_args,reloo_args
-#'   Accepted for [brms::loo.brmsfit] parity. `resp` is passed through to
-#'   [log_lik.mvgam()] for multivariate response selection; `pointwise`,
-#'   `moment_match`, `reloo` and their `*_args` companions require
-#'   refit / streaming machinery that mvgam does not support; v1
-#'   raises a clear error when any of them is requested. `compare`,
-#'   `k_threshold`, `save_psis` and `model_names` pass through to
-#'   [loo::loo()] or are no-ops for single-model evaluation.
+#'   Accepted for [brms::loo.brmsfit] parity. Two are honoured: `resp`
+#'   scopes a multivariate fit to one response, and `save_psis` keeps
+#'   the smoothing object. The rest name machinery mvgam does not
+#'   have. `pointwise` streams the density, `moment_match` and `reloo`
+#'   refit the model and `k_threshold` with the `*_args` lists
+#'   configure those refits, while `compare` and `model_names` rank
+#'   several models, which [loo_compare()] does. Supplying any of them
+#'   raises an error naming it.
 #'
 #' @param incl_autocor Logical, default `TRUE`. Passed to
 #'   [log_lik.mvgam()] as its argument of the same name, so each
@@ -166,6 +167,33 @@ loo.mvgam <- function(x, ...,
         "These options require model refits. Inspect the Pareto k ",
         "diagnostics from 'loo()' and refit without problematic ",
         "observations if needed."
+      )
+    )))
+  }
+
+  # The remaining brms-parity arguments describe machinery this
+  # method does not run: `k_threshold` and the `*_args` lists
+  # configure the refits refused above, and `compare` / `model_names`
+  # rank several models, which `loo_compare()` does. Each is refused
+  # where supplied.
+  unhonoured <- c(
+    compare = !missing(compare),
+    k_threshold = !missing(k_threshold),
+    moment_match_args = length(moment_match_args) > 0L,
+    reloo_args = length(reloo_args) > 0L,
+    model_names = !is.null(model_names)
+  )
+  if (any(unhonoured)) {
+    stop(insight::format_error(c(
+      "Arguments this method cannot honour were supplied.",
+      x = paste0(
+        "Supplied: ",
+        paste0("'", names(unhonoured)[unhonoured], "'", collapse = ", "),
+        "."
+      ),
+      i = paste0(
+        "Rank models with 'loo_compare()'; 'k_threshold' and the ",
+        "'*_args' lists configure refits mvgam does not run."
       )
     )))
   }

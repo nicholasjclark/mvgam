@@ -29,7 +29,7 @@
 #'   or thousands of rows. Individual per-country blocks can
 #'   still be pulled via \code{as.matrix()},
 #'   \code{as_draws_df()}, or \code{mcmc_plot()}.
-#' @param ... Additional arguments (currently unused).
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return An object of class \code{summary.mvgam} containing:
 #' \describe{
@@ -77,6 +77,7 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   checkmate::assert_true(probs[1] < probs[2])
   checkmate::assert_logical(robust, len = 1)
   checkmate::assert_logical(include_betas, len = 1)
+  rlang::check_dots_empty()
 
   # Check for fitted model
   if (is.null(object$fit)) {

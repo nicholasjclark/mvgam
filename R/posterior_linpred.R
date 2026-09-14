@@ -302,7 +302,7 @@ compose_linpred_with_noise <- function(obs_mat, trend_mat, trend_noise,
 #'   Naming a parameter that carries a formula of its own returns its
 #'   linear predictor, which has no latent trend term; naming one that
 #'   was sampled as a scalar returns those draws across the rows.
-#' @param ... Additional arguments passed to internal methods.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return Matrix with dimensions `\\[ndraws x nobs\\]` containing linear
 #'   predictor values. Each row is one posterior draw, each column is
@@ -383,6 +383,8 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,
                                 any.missing = FALSE)
   checkmate::assert_string(dpar, null.ok = TRUE)
+  validate_draw_selectors(ndraws, draw_ids)
+  rlang::check_dots_empty()
 
   # A count becomes indices here, so nothing below is left to choose
   # its own draws.

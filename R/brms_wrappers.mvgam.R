@@ -311,7 +311,7 @@ bayes_factor.mvgam <- function(x1, x2, log = FALSE, ...) {
 #' fit has no observation-side random effects.
 #'
 #' @param object A fitted `mvgam` object.
-#' @param ... Unused; present for S3 / brms-parity.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A named list of integer scalars, or `NULL` if no
 #'   group-level effects are present.
@@ -325,6 +325,7 @@ bayes_factor.mvgam <- function(x1, x2, log = FALSE, ...) {
 #' @export
 ngrps.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
+  rlang::check_dots_empty()
   meta <- mvgam_ranef_metadata(object)
   if (is.null(meta)) {
     return(NULL)
@@ -384,6 +385,7 @@ predictive_error.mvgam <- function(object, newdata = NULL,
   checkmate::assert_choice(
     method, c("posterior_predict", "posterior_epred")
   )
+  validate_draw_selectors(ndraws, draw_ids)
   if (!is.null(re.form) && is.null(re_formula)) {
     re_formula <- re.form
   }
@@ -464,6 +466,8 @@ parnames.mvgam <- function(x, ...) {
 #' @method nsamples mvgam
 #' @export
 nsamples.mvgam <- function(object, ...) {
+  checkmate::assert_class(object, "mvgam")
+  rlang::check_dots_empty()
   posterior::ndraws(posterior::as_draws(object$fit))
 }
 
@@ -507,12 +511,15 @@ mvgam_training_data <- function(object) {
 #'
 #' @param object An `mvgam` model, fitted or built with
 #'   `run_model = FALSE`.
-#' @param ... Currently unused; present for S3 generic dispatch.
+#' @param ... Unused. Anything passed here is refused, `newdata`
+#'   included: this method reports the data the model was fitted to
+#'   and cannot rebuild it for another frame.
 #' @return A named list of Stan data.
 #' @method standata mvgam
 #' @export
 standata.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
+  rlang::check_dots_empty()
   if (is.null(object$standata)) {
     stop(insight::format_error(c(
       "Stan data not found in mvgam object.",
@@ -570,7 +577,7 @@ default_prior.mvgam <- function(object, ...) {
 #' this method `control_params(fit)` fails on an mvgam object.
 #'
 #' @param x A fitted `mvgam` model.
-#' @param ... Currently unused.
+#' @param ... Unused. Anything passed here is refused.
 #' @return Named list of NUTS control settings (same shape as
 #'   `brms::control_params()` on a `brmsfit`); empty list when
 #'   no NUTS args are stored (e.g. variational fits).
@@ -578,6 +585,7 @@ default_prior.mvgam <- function(object, ...) {
 #' @export
 control_params.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
+  rlang::check_dots_empty()
   fit_obj <- x$fit
   if (!isS4(fit_obj) ||
         !"stan_args" %in% methods::slotNames(fit_obj)) {
@@ -597,13 +605,14 @@ control_params.mvgam <- function(x, ...) {
 #' so without this method `inits(fit)` fails on an mvgam object.
 #'
 #' @param x A fitted `mvgam` model.
-#' @param ... Currently unused.
+#' @param ... Unused. Anything passed here is refused.
 #' @return List with one element per chain, mirroring the `init`
 #'   argument passed to the sampler.
 #' @method inits mvgam
 #' @export
 inits.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
+  rlang::check_dots_empty()
   fit_obj <- x$fit
   if (!isS4(fit_obj) ||
         !"stan_args" %in% methods::slotNames(fit_obj)) {

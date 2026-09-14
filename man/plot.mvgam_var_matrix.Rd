@@ -14,7 +14,7 @@
 using approximate Robinson clustering on \code{1 - A} (only
 meaningful when \code{A} is roughly symmetric).}
 
-\item{...}{Currently unused.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \link[ggplot2:ggplot]{ggplot2::ggplot} object, which can be further

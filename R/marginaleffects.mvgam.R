@@ -60,6 +60,13 @@ get_predict.mvgam <- function(model,
                               newdata = insight::get_data(model),
                               type = "response",
                               ...,
+                              ndraws = NULL,
+                              draw_ids = NULL,
+                              re_formula = NULL,
+                              allow_new_levels = FALSE,
+                              sample_new_levels = "uncertainty",
+                              incl_autocor = FALSE,
+                              resp = NULL,
                               process_error = FALSE) {
   checkmate::assert_class(model, "mvgam")
   checkmate::assert_data_frame(newdata, min.rows = 1L)
@@ -115,22 +122,36 @@ get_predict.mvgam <- function(model,
   # slope or comparison reads the covariate structure of both
   # submodels alone. Passing `process_error = TRUE` through
   # `predictions()` integrates over the trend's dynamics instead.
+  #
+  # Every argument the prediction methods read is named above and
+  # forwarded by name here. marginaleffects calls this hook with
+  # bookkeeping of its own, `mfx` and `modeldata`, so `...` holds
+  # arguments belonging to the caller rather than to mvgam and is
+  # left to it: splatting it reaches a method whose formals it does
+  # not fit.
+  shared <- list(
+    object = model,
+    newdata = newdata,
+    ndraws = ndraws,
+    draw_ids = draw_ids,
+    re_formula = re_formula,
+    allow_new_levels = allow_new_levels,
+    sample_new_levels = sample_new_levels,
+    incl_autocor = incl_autocor,
+    resp = resp,
+    process_error = process_error
+  )
   draws <- switch(type,
-    link       = posterior_linpred(model, newdata = newdata,
-                                   process_error = process_error, ...),
-    expected   = posterior_epred(model, newdata = newdata,
-                                  process_error = process_error, ...),
-    response   = posterior_predict(model, newdata = newdata,
-                                    process_error = process_error, ...),
-    latent_N     = predict(model, newdata = newdata,
-                           type = "latent_state",
-                           summary = FALSE, ...),
-    latent_state = predict(model, newdata = newdata,
-                           type = "latent_state",
-                           summary = FALSE, ...),
-    detection    = predict(model, newdata = newdata,
-                            type = "detection",
-                            summary = FALSE, ...)
+    link         = do.call(posterior_linpred, shared),
+    expected     = do.call(posterior_epred, shared),
+    response     = do.call(posterior_predict, shared),
+    latent_N     = ,
+    latent_state = do.call(
+      predict, c(shared, list(type = "latent_state", summary = FALSE))
+    ),
+    detection    = do.call(
+      predict, c(shared, list(type = "detection", summary = FALSE))
+    )
   )
 
   # Multivariate fits return a per-response list; marginaleffects

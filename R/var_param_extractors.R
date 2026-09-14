@@ -593,7 +593,7 @@ print.mvgam_var_matrix <- function(x, digits = 2L, ...) {
 #' @param cluster Logical. If `TRUE`, reorder rows and columns
 #'   using approximate Robinson clustering on `1 - A` (only
 #'   meaningful when `A` is roughly symmetric).
-#' @param ... Currently unused.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A [ggplot2::ggplot] object, which can be further
 #'   customised with the \pkg{ggplot2} API.
@@ -606,6 +606,7 @@ print.mvgam_var_matrix <- function(x, digits = 2L, ...) {
 #' @export
 plot.mvgam_var_matrix <- function(x, cluster = FALSE, ...) {
   checkmate::assert_flag(cluster)
+  rlang::check_dots_empty()
   mat <- x$A
   if (cluster) {
     idx <- cluster_cormat(mat)
@@ -685,7 +686,7 @@ print.mvgam_var_matrix_list <- function(x, ...) {
 #' @param ncol Optional integer. Number of facet columns for the
 #'   heatmap grid; defaults to `ceiling(sqrt(length(x)))`. Only
 #'   used when `type = "heatmap"`.
-#' @param ... Currently unused.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A [ggplot2::ggplot] object.
 #'
@@ -699,6 +700,7 @@ plot.mvgam_var_matrix_list <- function(x, type = c("heatmap",
                                                      "diagonal"),
                                         ncol = NULL, ...) {
   type <- match.arg(type)
+  rlang::check_dots_empty()
   if (type == "heatmap") return(plot_var_matrix_list_heatmap(x, ncol))
   plot_var_matrix_list_diagonal(x)
 }

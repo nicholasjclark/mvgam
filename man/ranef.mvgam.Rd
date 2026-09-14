@@ -42,7 +42,7 @@ supplied entries (matched against the brms \code{coef} column).
 returned grouping factors. \code{NULL} (the default) keeps every
 factor.}
 
-\item{...}{Unused; present for S3 / brms-parity.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A named list with one entry per grouping factor. Each

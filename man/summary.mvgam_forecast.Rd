@@ -14,7 +14,7 @@ draws from the posterior distribution of hindcasts and forecasts.}
 \item{probs}{The upper and lower percentiles to be computed by the
 \code{quantile} function, in addition to the median}
 
-\item{...}{ignored}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A long-format \code{tibble} / \code{data.frame} reporting the posterior median,

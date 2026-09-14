@@ -383,7 +383,7 @@ compute_family_variance <- function(mu, family, sigma = NULL,
 #' @param resp Character specifying which response variable for
 #'   multivariate models. NULL (default) returns predictions for all
 #'   responses.
-#' @param ... Additional arguments passed to internal methods.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return Matrix with dimensions `\\[ndraws x nobs\\]` containing expected
 #'   values on response scale. Each row is one posterior draw, each column
@@ -462,6 +462,8 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
   trend_state <- autocor_to_trend_state(incl_autocor)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,
                                 any.missing = FALSE)
+  validate_draw_selectors(ndraws, draw_ids)
+  rlang::check_dots_empty()
 
   # Handle newdata = NULL (use training data)
   if (is.null(newdata)) {

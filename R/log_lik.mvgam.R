@@ -33,13 +33,12 @@
 #'   to `incl_autocor = TRUE` and `FALSE` to `incl_autocor = FALSE`.
 #'   When only `process_error` is given it decides; when both are
 #'   given `incl_autocor` decides and `process_error` is ignored.
-#' @param ... Forwarded to [posterior_linpred.mvgam()], which in
-#'   turn forwards brms-style prediction args to the underlying
-#'   prediction machinery. Common pass-throughs include
-#'   `allow_new_levels = TRUE` and `sample_new_levels = "gaussian"`
-#'   for predicting on factor levels that were not in the
-#'   training data (e.g. inside `kfold.mvgam()` refits scoring on
-#'   held-out groups).
+#' @param allow_new_levels Logical. Score rows whose grouping level
+#'   the training data did not carry, which is what `kfold.mvgam()`
+#'   needs when a fold holds out whole groups. Defaults to `FALSE`.
+#' @param sample_new_levels How a new level's coefficients are drawn:
+#'   `"uncertainty"` (the default), `"gaussian"` or `"old_levels"`.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return Numeric matrix \[ndraws x nobs\] of pointwise log densities.
 #'   For multi-response (mvbf) fits with `resp = NULL`, the returned
@@ -97,12 +96,18 @@ log_lik.mvgam <- function(object,
                           draw_ids = NULL,
                           incl_autocor = TRUE,
                           process_error = NULL,
+                          allow_new_levels = FALSE,
+                          sample_new_levels = "uncertainty",
                           ...) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
+  validate_draw_selectors(ndraws, draw_ids)
   checkmate::assert_string(resp, null.ok = TRUE)
+  validate_group_level_args(re_formula, allow_new_levels,
+                            sample_new_levels)
+  rlang::check_dots_empty()
   incl_autocor <- resolve_incl_autocor(
     incl_autocor = incl_autocor,
     legacy = process_error,
@@ -126,10 +131,7 @@ log_lik.mvgam <- function(object,
   # density for an observation at a given time has to be evaluated
   # under the state the model put there, which is what makes the
   # importance weights `loo()` builds from it describe that
-  # observation. `allow_new_levels` / `sample_new_levels` come through
-  # `...` from callers such as `kfold.mvgam()`, which scores on
-  # held-out factor levels.
-  dots <- list(...)
+  # observation.
   linpred <- get_combined_linpred(
     mvgam_fit = object,
     newdata = newdata,
@@ -137,8 +139,8 @@ log_lik.mvgam <- function(object,
     trend_state = autocor_to_trend_state(incl_autocor),
     draw_ids = draw_ids,
     re_formula = re_formula,
-    allow_new_levels = dots$allow_new_levels %||% FALSE,
-    sample_new_levels = dots$sample_new_levels %||% "uncertainty",
+    allow_new_levels = allow_new_levels,
+    sample_new_levels = sample_new_levels,
     resp = resp
   )
 

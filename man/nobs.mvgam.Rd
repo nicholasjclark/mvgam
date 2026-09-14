@@ -9,7 +9,7 @@
 \arguments{
 \item{object}{mvgam object}
 
-\item{...}{Additional arguments (unused)}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 Integer number of observations

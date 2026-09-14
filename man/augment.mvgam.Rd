@@ -32,7 +32,7 @@ credible intervals. Defaults to \code{0.95}.}
 name of a single response variable to return results for.
 \code{NULL} (the default) returns results for all responses.}
 
-\item{...}{Unused, included for generic consistency.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A tibble (or \code{list}, when \code{class(x$obs_data) == "list"})

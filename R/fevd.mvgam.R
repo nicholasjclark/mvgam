@@ -29,7 +29,7 @@
 #'   see [`irf()`] for details. Requires the \code{future} package
 #'   (mvgam Suggests).
 #'
-#' @param ... ignored
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return See \code{\link{mvgam_fevd-class}} for a full description of the quantities that are
 #' computed and returned by this function, along with key references.
@@ -71,8 +71,10 @@ fevd.mvgam <- function(object, h = 10, ndraws = NULL, draw_ids = NULL,
   validate_pos_integer(h)
   checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1L, null.ok = TRUE)
+  validate_draw_selectors(ndraws, draw_ids)
   checkmate::assert_flag(summary)
   checkmate::assert_flag(future)
+  rlang::check_dots_empty()
   assert_var_trend(object, surface = "fevd()")
   var_post <- extract_var_posterior(object, ndraws, draw_ids)
 

@@ -86,7 +86,7 @@ compatibility and not used, since new levels are refused. See
 multivariate models. NULL (default) returns predictions for all
 responses.}
 
-\item{...}{Additional arguments passed to internal methods.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 Matrix with dimensions \verb{\\\[ndraws x nobs\\\]} containing expected

@@ -40,8 +40,9 @@
 #' @param probs Numeric vector of probabilities for quantile computation.
 #'   Default is `c(0.025, 0.975)` for 95% credible intervals. Can be a
 #'   single value or multiple values.
-#' @param ... Additional arguments forwarded to the underlying
-#'   `posterior_predict` / `posterior_epred` / `posterior_linpred` method.
+#' @param ... Unused. Anything passed here is refused; every argument
+#'   this method passes to `posterior_predict` / `posterior_epred` /
+#'   `posterior_linpred` it names above.
 #'
 #' @return If `summary = FALSE`, returns a numeric matrix of posterior
 #'   draws with dimensions ``\\[ndraws x nobs\\]``. For multivariate fits with
@@ -166,6 +167,7 @@ predict.mvgam <- function(object,
   checkmate::assert_logical(incl_autocor, len = 1, any.missing = FALSE)
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)
+  validate_draw_selectors(ndraws, draw_ids)
   validate_group_level_args(re_formula, allow_new_levels, sample_new_levels)
   checkmate::assert_string(resp, null.ok = TRUE)
   checkmate::assert_logical(summary, len = 1, any.missing = FALSE)
@@ -177,6 +179,7 @@ predict.mvgam <- function(object,
     min.len = 1,
     any.missing = FALSE
   )
+  rlang::check_dots_empty()
 
   # A requested count becomes indices here, at the boundary, so that
   # nothing below is ever handed a bare count and left to choose its
@@ -255,8 +258,7 @@ predict.mvgam <- function(object,
       re_formula = re_formula,
       allow_new_levels = allow_new_levels,
       sample_new_levels = sample_new_levels,
-      resp = resp,
-      ...
+      resp = resp
     ),
     "link" = posterior_linpred(
       object,
@@ -269,8 +271,7 @@ predict.mvgam <- function(object,
       re_formula = re_formula,
       allow_new_levels = allow_new_levels,
       sample_new_levels = sample_new_levels,
-      resp = resp,
-      ...
+      resp = resp
     ),
     "expected" = posterior_epred(
       object,
@@ -282,8 +283,7 @@ predict.mvgam <- function(object,
       re_formula = re_formula,
       allow_new_levels = allow_new_levels,
       sample_new_levels = sample_new_levels,
-      resp = resp,
-      ...
+      resp = resp
     ),
     "variance" = predict_variance(
       object,

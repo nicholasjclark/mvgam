@@ -75,7 +75,7 @@
 #' @param silent Integer in `\{0, 1, 2\}`. `0` prints per-fold
 #'   progress; `1` (default) prints only the refit count; `2`
 #'   silences output.
-#' @param ... Ignored (reserved for future arguments).
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return An object of class `c("mvgam_kfold", "kfold", "loo")`
 #'   carrying `estimates` (elpd_kfold, p_kfold, kfoldic with SE),
@@ -152,6 +152,7 @@ kfold.mvgam <- function(x,
                             null.ok = TRUE)
   checkmate::assert_int(silent, lower = 0L, upper = 2L)
   fold_split <- match.arg(fold_split)
+  rlang::check_dots_empty()
   if (!is.null(seed)) {
     checkmate::assert_int(seed)
     set.seed(seed)
@@ -714,7 +715,7 @@ print.mvgam_kfold <- function(x, digits = 2L, ...) {
 #' flag. Useful for downstream filtering / plotting.
 #'
 #' @param object An `mvgam_kfold` object.
-#' @param ... Ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A tibble with columns `group`, `elpd`, `pareto_k`,
 #'   `refit`.
@@ -722,6 +723,7 @@ print.mvgam_kfold <- function(x, digits = 2L, ...) {
 #' @method summary mvgam_kfold
 #' @export
 summary.mvgam_kfold <- function(object, ...) {
+  rlang::check_dots_empty()
   group <- rownames(object$pointwise) %||%
     names(object$pareto_k)
   elpd <- as.numeric(object$pointwise[, "elpd_kfold"])
@@ -757,7 +759,7 @@ summary.mvgam_kfold <- function(object, ...) {
 #' grey, outliers in the package red.
 #'
 #' @param x An `mvgam_kfold` object.
-#' @param ... Ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object.
 #'
@@ -766,6 +768,7 @@ summary.mvgam_kfold <- function(object, ...) {
 #' @method plot mvgam_kfold
 #' @export
 plot.mvgam_kfold <- function(x, ...) {
+  rlang::check_dots_empty()
   # Pin the scheme the way every other mvgam figure does, so a
   # user's own `bayesplot::color_scheme_set()` does not leave this
   # panel the odd one out.

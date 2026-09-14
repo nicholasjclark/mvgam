@@ -10,7 +10,7 @@
 \item{x}{An \code{mvgam_active_factors} object returned by
 \code{\link[=active_factors]{active_factors()}}.}
 
-\item{...}{Ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{ggplot} object.

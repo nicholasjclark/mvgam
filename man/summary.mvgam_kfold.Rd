@@ -9,7 +9,7 @@
 \arguments{
 \item{object}{An \code{mvgam_kfold} object.}
 
-\item{...}{Ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A tibble with columns \code{group}, \code{elpd}, \code{pareto_k},

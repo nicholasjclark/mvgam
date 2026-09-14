@@ -27,7 +27,7 @@
 #'   see [`irf()`] for details. Requires the \code{future} package
 #'   (mvgam Suggests).
 #'
-#' @param ... Ignored
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @details These measures of stability can be used to assess how important
 #'   inter-series dependencies are to the variability of a multivariate system
@@ -156,10 +156,12 @@ stability.mvgam = function(object, ndraws = NULL, draw_ids = NULL,
                            future = FALSE, ...) {
   checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1L, null.ok = TRUE)
+  validate_draw_selectors(ndraws, draw_ids)
   checkmate::assert_flag(summary)
   checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1,
                             any.missing = FALSE, sorted = TRUE)
   checkmate::assert_flag(future)
+  rlang::check_dots_empty()
   assert_var_trend(object, surface = "stability()")
   # Each draw costs a Lyapunov solve at O(K^3 log(1/tol)), so a wide
   # panel is worth answering from a subset. The coefficients and the
@@ -273,7 +275,7 @@ stability.mvgam = function(object, ndraws = NULL, draw_ids = NULL,
       dat$mean_return_rate <- max(abs(lam_B))
       dat$var_return_rate <- dat$mean_return_rate^2
       dat
-    })
+    }, future = future)
   )
   class(metrics) <- c("mvgam_stability", class(metrics))
   if (summary) {
@@ -298,7 +300,7 @@ stability.mvgam = function(object, ndraws = NULL, draw_ids = NULL,
 #'   deviation rather than the mean and standard deviation
 #' @param bins Number of bins used to record the shape of each metric
 #'   alongside its interval, which is what `plot()` draws
-#' @param ... ignored
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `data.frame` with one row per metric
 #'
@@ -311,6 +313,7 @@ summary.mvgam_stability <- function(object, probs = c(0.025, 0.975),
                             any.missing = FALSE, sorted = TRUE)
   checkmate::assert_flag(robust)
   checkmate::assert_int(bins, lower = 5L)
+  rlang::check_dots_empty()
   # The same summary every other accessor reports, so a stability
   # metric and a prediction describe their spread the same way. It
   # was written out a fifth time here; the shared one also answers
@@ -377,7 +380,7 @@ bin_draws <- function(draws, bins) {
 #' @param variables Metrics to draw
 #' @param intervals Logical; draw each metric as a median and interval
 #'   rather than as its binned posterior
-#' @param ... ignored
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object
 #'
@@ -392,6 +395,7 @@ plot.mvgam_stability_summary <- function(
   checkmate::assert_class(x, "mvgam_stability_summary")
   checkmate::assert_character(variables, min.len = 1L, any.missing = FALSE)
   checkmate::assert_flag(intervals)
+  rlang::check_dots_empty()
   keep <- intersect(variables, x$metric)
   if (!length(keep)) {
     stop(insight::format_error(c(
@@ -471,7 +475,7 @@ plot.mvgam_stability_summary <- function(
 #'   `"var_return_rate"`); pass any subset of `x`'s column names
 #'   to widen or narrow the panel set.
 #' @param bins Number of histogram bins passed to `geom_histogram`.
-#' @param ... Ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object.
 #' @seealso [stability()], [irf()], [fevd()],
@@ -490,6 +494,7 @@ plot.mvgam_stability = function(
   checkmate::assert_class(x, "mvgam_stability")
   checkmate::assert_character(variables, min.len = 1L, any.missing = FALSE)
   checkmate::assert_int(bins, lower = 5L)
+  rlang::check_dots_empty()
   keep <- intersect(variables, colnames(x))
   if (!length(keep)) {
     stop(insight::format_error(c(

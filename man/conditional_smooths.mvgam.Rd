@@ -18,6 +18,7 @@
   too_far = 0,
   ndraws = NULL,
   draw_ids = NULL,
+  resp = NULL,
   ...
 )
 
@@ -68,7 +69,12 @@ the unit square) are dropped via
 
 \item{ndraws, draw_ids}{Optional posterior-draw subsetting.}
 
-\item{...}{Ignored.}
+\item{resp}{Optional response name. \code{NULL} (the default) returns
+every response's smooths; naming one keeps that response's
+smooths alone. A univariate fit names no response on its terms
+and is unaffected.}
+
+\item{...}{Unused. Anything passed here is refused.}
 
 \item{plot}{Logical. If \code{TRUE} (default), draws each smooth's
 ggplot; otherwise returns the list invisibly for post-processing.}

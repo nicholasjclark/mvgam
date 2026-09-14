@@ -1178,6 +1178,12 @@ test_that("stability reports each metric once, over the whole posterior", {
   expect_identical(nrow(draws), as.integer(ndraws(fit)))
   expect_equal(summary(draws)$Estimate, st$Estimate, tolerance = 1e-10)
 
+  # `future = TRUE` was asserted and then never handed to the helper
+  # that takes it, so the request ran serially and reported nothing.
+  # The scheduled path now runs, and it answers with the same numbers
+  # in the same draw order.
+  expect_equal(stability(fit, future = TRUE, summary = FALSE), draws)
+
   metrics <- c(
     "prop_cov_offdiag", "prop_cov_diag", "prop_int", "prop_int_adj",
     "prop_int_offdiag", "prop_int_diag", "reactivity",

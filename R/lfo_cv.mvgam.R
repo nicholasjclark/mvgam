@@ -80,7 +80,7 @@
 #'   matrix can be large.
 #' @param silent Verbosity level between `0` and `2`. See
 #'   [mvgam] for the contract.
-#' @param ... Currently unused.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `list` of class `mvgam_lfo` containing:
 #'   * `elpds`: vector of approximate ELPDs at each evaluation
@@ -184,6 +184,7 @@ lfo_cv.mvgam <- function(object,
                        "energy", "variogram")
   checkmate::assert_subset(score, allowed_scores, empty.ok = FALSE)
   score <- unique(score)
+  rlang::check_dots_empty()
 
   # Backward-compat: accept the deprecated `data` arg.
   if (!is.null(data)) {
@@ -795,11 +796,12 @@ lfo_sum_rows <- function(x) {
 #'
 #' @importFrom graphics layout axis lines abline polygon points
 #' @param x An object of class `mvgam_lfo`.
-#' @param ... Currently unused.
+#' @param ... Unused. Anything passed here is refused.
 #' @return A `ggplot` object.
 #'
 #' @export
 plot.mvgam_lfo <- function(x, ...) {
+  rlang::check_dots_empty()
   obj <- x
   # Pin the scheme the way every other mvgam figure does, so a
   # user's own `bayesplot::color_scheme_set()` does not leave this
@@ -881,13 +883,14 @@ plot.mvgam_lfo <- function(x, ...) {
 #'   `mvgam_irf` and `mvgam_fevd`.
 #'
 #' @param object An object of class `mvgam_lfo`.
-#' @param ... Currently unused.
+#' @param ... Unused. Anything passed here is refused.
 #' @return A `tibble` (`tbl_df`) with one row per evaluation time
 #'   point.
 #'
 #' @method summary mvgam_lfo
 #' @export
 summary.mvgam_lfo <- function(object, ...) {
+  rlang::check_dots_empty()
   out <- data.frame(
     eval_time = object$eval_timepoints,
     # `refit_here` is TRUE when the evaluation at that time used

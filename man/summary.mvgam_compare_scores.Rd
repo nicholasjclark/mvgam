@@ -10,7 +10,7 @@
 \item{object}{A \code{mvgam_compare_scores} object from
 \code{\link[=compare_scores]{compare_scores()}}.}
 
-\item{...}{Ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{tibble} with one row per series x horizon cell

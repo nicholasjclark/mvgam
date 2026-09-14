@@ -34,7 +34,7 @@ not look like one of 1. Set \code{TRUE} to scale colour to the
 entries actually present, which reads better on a fit whose
 correlations are all small. Defaults to \code{FALSE}.}
 
-\item{...}{Ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{ggplot} object.

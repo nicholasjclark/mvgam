@@ -35,7 +35,7 @@ or thousands of rows. Individual per-country blocks can
 still be pulled via \code{as.matrix()},
 \code{as_draws_df()}, or \code{mcmc_plot()}.}
 
-\item{...}{Additional arguments (currently unused).}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 An object of class \code{summary.mvgam} containing:

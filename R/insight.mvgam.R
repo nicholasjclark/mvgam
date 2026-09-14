@@ -200,13 +200,14 @@ get_data.mvgam <- function(x, effects = "all", component = "all",
 #' @param formula A fitted `mvgam` object.
 #' @param trend_effects Logical; if `TRUE` and the model has a trend
 #'   formula, return the trend submodel's covariates only.
-#' @param ... Ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A data frame.
 #' @export
 model.frame.mvgam <- function(formula, trend_effects = FALSE, ...) {
   checkmate::assert_class(formula, "mvgam")
   checkmate::assert_logical(trend_effects, len = 1L)
+  rlang::check_dots_empty()
   if (trend_effects && is.null(formula$trend_formula)) {
     return(NULL)
   }

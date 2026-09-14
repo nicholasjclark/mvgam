@@ -105,8 +105,9 @@ deviation (MAD).}
 Default is \code{c(0.025, 0.975)} for 95\% credible intervals. Can be a
 single value or multiple values.}
 
-\item{...}{Additional arguments forwarded to the underlying
-\code{posterior_predict} / \code{posterior_epred} / \code{posterior_linpred} method.}
+\item{...}{Unused. Anything passed here is refused; every argument
+this method passes to \code{posterior_predict} / \code{posterior_epred} /
+\code{posterior_linpred} it names above.}
 }
 \value{
 If \code{summary = FALSE}, returns a numeric matrix of posterior

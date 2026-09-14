@@ -31,7 +31,7 @@
 #'   negligible overhead; \code{plan(multisession, workers = N)}
 #'   splits draws across \code{N} R processes). Requires the
 #'   \code{future} package (mvgam Suggests).
-#' @param ... ignored
+#' @param ... Unused. Anything passed here is refused.
 #' @details
 #' See \code{\link{mvgam_irf-class}} for a full description of the quantities that are
 #' computed and returned by this function, along with key references.
@@ -82,8 +82,10 @@ irf.mvgam <- function(
   checkmate::assert_logical(orthogonal, len = 1L)
   checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1L, null.ok = TRUE)
+  validate_draw_selectors(ndraws, draw_ids)
   checkmate::assert_flag(summary)
   checkmate::assert_flag(future)
+  rlang::check_dots_empty()
   assert_var_trend(object, surface = "irf()")
   var_post <- extract_var_posterior(object, ndraws, draw_ids)
 

@@ -268,6 +268,7 @@ residuals.mvgam <- function(object,
   checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1L,
                                 null.ok = TRUE)
+  validate_draw_selectors(ndraws, draw_ids)
   checkmate::assert_flag(summary)
   checkmate::assert_flag(robust)
   checkmate::assert_numeric(probs, len = 2L,
@@ -330,9 +331,11 @@ residuals.mvgam <- function(object,
   # the user supplied it explicitly via `...`); otherwise fall
   # back to the single response on a univariate fit.
   y <- as.numeric(d[[response_column(object, resp)]])
+  # The prediction methods answer in draws; none of them takes a
+  # `summary` argument, so asking for one here reached `...` and was
+  # dropped.
   pp_args <- c(list(object = object, newdata = newdata,
-                     ndraws = ndraws, draw_ids = draw_ids,
-                     summary = FALSE), dots)
+                     ndraws = ndraws, draw_ids = draw_ids), dots)
 
   resids <- switch(
     type,

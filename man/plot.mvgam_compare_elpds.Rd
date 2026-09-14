@@ -23,7 +23,7 @@ timepoint, which is the quantity \code{loo_compare()} sums
 across folds. Useful for spotting when one model pulls
 ahead of another over the rolling-origin window.}
 
-\item{...}{Ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{ggplot} object.

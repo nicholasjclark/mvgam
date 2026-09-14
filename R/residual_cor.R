@@ -47,7 +47,7 @@
 #' @param probs Length-2 numeric vector giving the lower and upper
 #'   probabilities for the quantile-based credible interval. Default
 #'   `c(0.025, 0.975)`.
-#' @param ... Currently ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return An \[mvgam_residcor-class\] object when `summary = TRUE` and
 #'   `by_group = FALSE`. When `by_group = TRUE` on a hierarchical trend, an
@@ -183,6 +183,7 @@ residual_cor.mvgam <- function(object,
   checkmate::assert_flag(robust)
   checkmate::assert_numeric(probs, len = 2L, lower = 0, upper = 1,
                             any.missing = FALSE, unique = TRUE)
+  rlang::check_dots_empty()
   probs <- sort(probs)
 
   compute_residual_cor(
@@ -911,7 +912,7 @@ lookup_factor_levels <- function(data, var_name, expected_n, prefix) {
 #'
 #' @param object An `mvgam_residcor` object returned by
 #'   [residual_cor()] with `summary = TRUE`.
-#' @param ... Currently ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `tibble::tibble` with columns `series_1`, `series_2`,
 #'   `Estimate`, `Est.Error`, `Q_lower`, `Q_upper`, `ESS`,
@@ -925,6 +926,7 @@ lookup_factor_levels <- function(data, var_name, expected_n, prefix) {
 #' @export
 summary.mvgam_residcor <- function(object, ...) {
   checkmate::assert_class(object, "mvgam_residcor")
+  rlang::check_dots_empty()
 
   # Use [[ for exact name lookup; $ does partial matching and would
   # silently return cor_draws when cor is absent (summary = FALSE).

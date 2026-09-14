@@ -556,7 +556,7 @@ closure_unit_sample <- function(family,
 #'
 #' @param object A `mvgam_sim_closure_unit` list returned by
 #'   [sim_closure_unit_data()].
-#' @param ... Currently ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return An object of class `mvgam_sim_closure_unit_summary`: a list
 #'   of per-unit detection and abundance summaries with its own
@@ -566,6 +566,7 @@ closure_unit_sample <- function(family,
 #' @export
 summary.mvgam_sim_closure_unit <- function(object, ...) {
   checkmate::assert_class(object, "mvgam_sim_closure_unit")
+  rlang::check_dots_empty()
   truth <- object$truth
   fam_name <- resolve_family_name(object$family) %||% "?"
   state_label <- if (!is.null(truth$psi)) "psi" else "lambda"

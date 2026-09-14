@@ -21,7 +21,7 @@
 #' @param implementation Logical; append an Implementation
 #'   section that reconstructs the `mvgam` / `jsdgam` call used
 #'   to fit the model. Defaults to `TRUE`.
-#' @param ... Currently ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return An object of class `mvgam_methods_md` carrying the
 #'   rendered markdown as a character string. Use `print()` to
@@ -64,6 +64,7 @@ methods_md.mvgam <- function(object, file = NULL,
   checkmate::assert_string(file, null.ok = TRUE)
   checkmate::assert_choice(notation, c("default", "brms"))
   checkmate::assert_flag(implementation)
+  rlang::check_dots_empty()
 
   sections <- methods_md_section_registry(
     implementation = implementation

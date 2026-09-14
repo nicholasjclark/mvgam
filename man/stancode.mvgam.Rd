@@ -9,7 +9,7 @@
 \arguments{
 \item{object}{A fitted \code{mvgam} object or \code{mvgam_prefit} object.}
 
-\item{...}{Currently unused.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A character string containing the Stan model code with class

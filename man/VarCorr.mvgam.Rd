@@ -32,7 +32,7 @@ MAD as the centre / spread. Defaults to \code{FALSE}.}
 \item{probs}{Numeric vector of length 2 with the quantiles to
 report when \code{summary = TRUE}.}
 
-\item{...}{Unused; present for S3 / brms-parity.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A named list with one entry per grouping factor. Each

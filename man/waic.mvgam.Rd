@@ -23,10 +23,11 @@
 \code{newdata}, \code{ndraws}, \code{draw_ids}).}
 
 \item{compare, resp, pointwise, model_names}{Accepted for
-\link[brms:waic.brmsfit]{brms::waic.brmsfit} parity. \code{resp} is passed through to
-\code{\link[=log_lik.mvgam]{log_lik.mvgam()}} for multivariate response selection;
-\code{pointwise} is not yet supported and raises a clear error;
-\code{compare} and \code{model_names} are no-ops for single-model WAIC.}
+\link[brms:waic.brmsfit]{brms::waic.brmsfit} parity. \code{resp} scopes a multivariate fit to
+one response and is honoured. \code{pointwise} streams the density,
+which mvgam does not do, and \code{compare} with \code{model_names} ranks
+several models, which \code{\link[=loo_compare]{loo_compare()}} does. Supplying one of
+those three raises an error naming it.}
 
 \item{incl_autocor}{Logical, default \code{TRUE}. Passed to
 \code{\link[=log_lik.mvgam]{log_lik.mvgam()}} as its argument of the same name, so each

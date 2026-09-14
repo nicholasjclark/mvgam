@@ -81,7 +81,7 @@ Only meaningful when \code{biplot = TRUE}.}
 factor for trait-arrow lengths. The default \code{1} matches the
 longest trait arrow to the longest series-loading radius.}
 
-\item{...}{Ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{ggplot} object. The returned object carries a

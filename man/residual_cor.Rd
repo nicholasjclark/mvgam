@@ -20,7 +20,7 @@ residual_cor(object, ...)
 \arguments{
 \item{object}{A fitted [mvgam][mvgam::mvgam] object.}
 
-\item{...}{Currently ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 
 \item{by_group}{Logical. Only relevant for hierarchical trends
 (\code{gr = ...} supplied to the trend constructor). When \code{FALSE}

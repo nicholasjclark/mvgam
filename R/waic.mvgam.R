@@ -9,10 +9,11 @@
 #' @param ... Additional arguments passed to [log_lik.mvgam()] (e.g.
 #'   `newdata`, `ndraws`, `draw_ids`).
 #' @param compare,resp,pointwise,model_names Accepted for
-#'   [brms::waic.brmsfit] parity. `resp` is passed through to
-#'   [log_lik.mvgam()] for multivariate response selection;
-#'   `pointwise` is not yet supported and raises a clear error;
-#'   `compare` and `model_names` are no-ops for single-model WAIC.
+#'   [brms::waic.brmsfit] parity. `resp` scopes a multivariate fit to
+#'   one response and is honoured. `pointwise` streams the density,
+#'   which mvgam does not do, and `compare` with `model_names` ranks
+#'   several models, which [loo_compare()] does. Supplying one of
+#'   those three raises an error naming it.
 #' @param incl_autocor Logical, default `TRUE`. Passed to
 #'   [log_lik.mvgam()] as its argument of the same name, so each
 #'   observation is scored on the conditional surface, under the latent
@@ -76,6 +77,23 @@ waic.mvgam <- function(x, ..., compare = TRUE, resp = NULL,
       i = cli::format_inline(
         "Compute WAIC in-memory by leaving {.field pointwise = FALSE}."
       )
+    )))
+  }
+  # `compare` and `model_names` rank several models, which
+  # `loo_compare()` does on the results this returns.
+  unhonoured <- c(
+    compare = !missing(compare),
+    model_names = !is.null(model_names)
+  )
+  if (any(unhonoured)) {
+    stop(insight::format_error(c(
+      "Arguments this method cannot honour were supplied.",
+      x = paste0(
+        "Supplied: ",
+        paste0("'", names(unhonoured)[unhonoured], "'", collapse = ", "),
+        "."
+      ),
+      i = "Rank models with 'loo_compare()' on their 'waic()' results."
     )))
   }
   logliks <- log_lik(

@@ -118,7 +118,7 @@ NULL
 #'   not look like one of 1. Set `TRUE` to scale colour to the
 #'   entries actually present, which reads better on a fit whose
 #'   correlations are all small. Defaults to `FALSE`.
-#' @param ... Ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @details Only the lower triangle of off-diagonal entries is
 #'   drawn; a symmetric matrix says everything once and the
@@ -151,6 +151,7 @@ plot.mvgam_residcor <- function(
   type <- match.arg(type)
   checkmate::assert_flag(cluster)
   checkmate::assert_flag(rescale)
+  rlang::check_dots_empty()
   set_color_scheme_local("red")
 
   if (type == "correlation") {
@@ -231,6 +232,7 @@ plot.mvgam_residcor_list <- function(x, include_global = TRUE,
                                       ...) {
   checkmate::assert_flag(include_global)
   checkmate::assert_flag(rescale)
+  rlang::check_dots_empty()
   set_color_scheme_local("red")
   keep <- if (isTRUE(include_global)) names(x) else
     setdiff(names(x), "_global")

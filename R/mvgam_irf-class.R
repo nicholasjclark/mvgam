@@ -59,7 +59,7 @@ NULL
 #' @param probs The upper and lower percentiles to be computed by the
 #'   `quantile` function, in addition to the median
 #'
-#' @param ... ignored
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A long-format `tibble` / `data.frame` reporting the posterior median,
 #'   upper and lower percentiles of the impulse responses of each series to
@@ -78,6 +78,7 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
                             any.missing = FALSE, sorted = TRUE)
   validate_proportional(min(probs))
   validate_proportional(max(probs))
+  rlang::check_dots_empty()
 
   n_processes <- dim(object[[1]][[1]])[2]
   h <- dim(object[[1]][[1]])[1]
@@ -146,7 +147,7 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
 #'   where the raw K-panel grid is unreadable. Defaults to all
 #'   processes.
 #'
-#' @param ... ignored
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object showing the expected response of each latent time
 #'   series to a shock of the focal `series`
@@ -161,6 +162,7 @@ summary.mvgam_irf = function(object, probs = c(0.025, 0.975), ...) {
 plot.mvgam_irf = function(x, series = 1, responses = NULL, ...) {
   checkmate::assert_class(x, "mvgam_irf")
   validate_pos_integer(series)
+  rlang::check_dots_empty()
   # Lock the bayesplot scheme to the house red for the duration
   # of this call so IRFs share the visual identity of forecast(),
   # fevd() and stability() plots.

@@ -13,6 +13,7 @@
   unit_level = NULL,
   resp = NULL,
   ndraws = NULL,
+  draw_ids = NULL,
   summary = TRUE,
   robust = FALSE,
   probs = c(0.025, 0.975),
@@ -75,6 +76,10 @@ all responses (a named list).}
 \item{ndraws}{Positive integer specifying the number of posterior
 draws to use. If \code{NULL} (the default), all draws are used.}
 
+\item{draw_ids}{Optional integer vector naming the posterior draws
+to use, indexed into the full posterior. Give one of \code{ndraws} or
+\code{draw_ids}.}
+
 \item{summary}{Logical. If \code{TRUE} (the default), returns summary
 statistics. If \code{FALSE}, returns the full matrix of posterior
 draws.}
@@ -134,8 +139,8 @@ the fit knows, or refit with the new levels included.}
 compatibility and not used, since new levels are refused. See
 \code{allow_new_levels}.}
 
-\item{...}{Additional arguments passed to the underlying posterior
-methods.}
+\item{...}{Unused. Anything passed here is refused; every argument
+this method gives the posterior methods it names above.}
 }
 \value{
 If \code{summary = FALSE}, returns a matrix of posterior draws
@@ -176,16 +181,12 @@ Neither setting fixes the trend at a posterior mean. For the state
 the model actually inferred at each time, pass \code{incl_autocor = TRUE}
 or read it directly from \code{\link[=hindcast.mvgam]{hindcast.mvgam()}}.
 
-Two brms \code{fitted()} arguments are not yet supported and will be
-ignored if passed via \code{...}:
-\itemize{
-\item \code{dpar} / \code{nlpar}: distributional and non-linear parameter
-selection (waiting on broader distributional regression
-support in mvgam).
-\item \code{draw_ids} / \code{sort}: draw subsetting by index and series
-sorting are not yet plumbed through the underlying mvgam
-posterior methods. Use \code{ndraws} for subsetting.
-}
+Two brms \code{fitted()} arguments have no counterpart here and are
+refused rather than dropped. \code{dpar} and \code{nlpar} name a
+distributional or non-linear parameter to return on its own scale,
+which is what \code{\link[=posterior_linpred.mvgam]{posterior_linpred.mvgam()}} answers through its own
+\code{dpar}. \code{sort} orders the returned rows by series, and this method
+returns them in the order the frame supplied.
 }
 \examples{
 \dontrun{

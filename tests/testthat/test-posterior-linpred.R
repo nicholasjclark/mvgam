@@ -461,6 +461,24 @@ test_that("re_formula takes NULL or NA and refuses a formula", {
 })
 
 
+test_that("a draw count and a set of draw indices are not both read", {
+  # `draw_ids` names the draws to read and `ndraws` takes that many at
+  # random, so the resolver honours the indices and the count goes
+  # unread. Either alone passes.
+  expect_null(validate_draw_selectors(NULL, NULL))
+  expect_null(validate_draw_selectors(10L, NULL))
+  expect_null(validate_draw_selectors(NULL, 1:3))
+  err <- expect_error(
+    validate_draw_selectors(10L, 1:3),
+    "Specify only one"
+  )
+  # The refusal names both quantities, which is what tells a caller
+  # which of the two to drop.
+  expect_match(conditionMessage(err), "10")
+  expect_match(conditionMessage(err), "3")
+})
+
+
 test_that("a response of a model with several reads its own terms", {
   # brms suffixes a response's names with its key, and indexes its
   # grouping by `J_<id>_<resp>`. The fixed smooth `Xs_y2` and the

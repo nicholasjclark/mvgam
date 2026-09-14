@@ -242,7 +242,7 @@ compare_elpds <- function(..., model_names = NULL) {
 #'   are faceted by series; when `FALSE` series are overlaid on
 #'   one panel with linetype distinguishing them. Ignored for
 #'   joint scores.
-#' @param ... Ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object.
 #'
@@ -255,6 +255,7 @@ compare_elpds <- function(..., model_names = NULL) {
 #' @export
 plot.mvgam_compare_scores <- function(x, relative = NULL,
                                        facet = TRUE, ...) {
+  rlang::check_dots_empty()
   score_type <- attr(x, "score") %||% "score"
   joint_set <- c("energy", "variogram", "twenergy")
   is_joint <- score_type %in% joint_set
@@ -344,7 +345,7 @@ plot.mvgam_compare_scores <- function(x, relative = NULL,
 #'   timepoint, which is the quantity `loo_compare()` sums
 #'   across folds. Useful for spotting when one model pulls
 #'   ahead of another over the rolling-origin window.
-#' @param ... Ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object.
 #'
@@ -357,6 +358,7 @@ plot.mvgam_compare_scores <- function(x, relative = NULL,
 #' @export
 plot.mvgam_compare_elpds <- function(x, relative = NULL,
                                       cumulative = FALSE, ...) {
+  rlang::check_dots_empty()
   df <- as.data.frame(x)
   if (!is.null(relative)) {
     checkmate::assert_string(relative)
@@ -434,7 +436,7 @@ plot.mvgam_compare_elpds <- function(x, relative = NULL,
 #'
 #' @param object A `mvgam_compare_scores` object from
 #'   [compare_scores()].
-#' @param ... Ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `tibble` with one row per series x horizon cell
 #'   (univariate scores) or per horizon (joint scores), one
@@ -446,6 +448,7 @@ plot.mvgam_compare_elpds <- function(x, relative = NULL,
 #' @author Nicholas J Clark
 #' @export
 summary.mvgam_compare_scores <- function(object, ...) {
+  rlang::check_dots_empty()
   score_type <- attr(object, "score") %||% "score"
   joint_set <- c("energy", "variogram", "twenergy")
   is_joint <- score_type %in% joint_set

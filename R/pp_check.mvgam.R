@@ -171,6 +171,7 @@ pp_check.mvgam <- function(
   }
 
   prefix <- match.arg(prefix)
+  validate_draw_selectors(ndraws, draw_ids)
   ndraws_given <- "ndraws" %in% names(match.call())
 
   # Whether the fit saw these rows decides which surface every panel
@@ -401,11 +402,20 @@ pp_check.mvgam <- function(
       stop("Variable '", x, "' could not be found in the data.", call. = FALSE)
     }
   }
+  # `...` carries two audiences: the arguments of the prediction
+  # method this type reads, and the arguments of the bayesplot kernel
+  # that draws it. The split is taken once here and read at both
+  # places below, so neither side is handed a name the other owns.
   if (type == "error_binned") {
     method <- "posterior_epred"
   } else {
     method <- "posterior_predict"
   }
+  for_pred <- names(dots) %in% names(formals(switch(
+    method,
+    posterior_epred = posterior_epred.mvgam,
+    posterior_predict = posterior_predict.mvgam
+  )))
   # Type-specific draw count defaults + warnings.
   #
   # Non-grouped resid plots use empirical PIT residuals: ndraws
@@ -423,7 +433,7 @@ pp_check.mvgam <- function(
   resid_diagnostic <- c(
     "resid_acf", "resid_pacf", "resid_qq", "resid_vs_fitted"
   )
-  if (!ndraws_given) {
+  if (!ndraws_given && is.null(draw_ids)) {
     aps_types <- c(
       "error_scatter_avg",
       "error_scatter_avg_vs_x",
@@ -526,13 +536,15 @@ pp_check.mvgam <- function(
       draw_ids = draw_ids, resp = resp
     )
   } else {
-    pred_args <- list(
-      object,
-      newdata = newdata,
-      ndraws = ndraws,
-      draw_ids = draw_ids,
-      resp = resp,
-      ...
+    pred_args <- c(
+      list(
+        object,
+        newdata = newdata,
+        ndraws = ndraws,
+        draw_ids = draw_ids,
+        resp = resp
+      ),
+      dots[for_pred]
     )
     pred_args <- diagnostic_surface_args(
       pred_args, in_sample, weighted = psis_weighted
@@ -700,8 +712,6 @@ pp_check.mvgam <- function(
     }
   }
 
-  # Most ... arguments are meant for the prediction function
-  for_pred <- names(dots) %in% names(formals(posterior_predict.mvgam))
   ppc_args <- c(ppc_args, dots[!for_pred])
 
   # Generate plot
@@ -1136,6 +1146,7 @@ print.mvgam_ppc_fit_stat <- function(x, ...) {
 #' @method plot mvgam_ppc_fit_stat
 #' @export
 plot.mvgam_ppc_fit_stat <- function(x, ...) {
+  rlang::check_dots_empty()
   d <- data.frame(T_obs = x$T_obs, T_rep = x$T_rep)
   rng <- range(c(d$T_obs, d$T_rep))
   stat_lab <- if (identical(x$stat, "chi_squared")) {

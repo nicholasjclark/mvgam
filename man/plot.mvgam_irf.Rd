@@ -17,7 +17,7 @@ display as response panels. Useful for hierarchical VAR fits
 where the raw K-panel grid is unreadable. Defaults to all
 processes.}
 
-\item{...}{ignored}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{ggplot} object showing the expected response of each latent time

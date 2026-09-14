@@ -19,7 +19,7 @@
 \item{intervals}{Logical; draw each metric as a median and interval
 rather than as its binned posterior}
 
-\item{...}{ignored}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{ggplot} object

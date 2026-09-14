@@ -56,7 +56,7 @@ NULL
 #' @param probs The upper and lower percentiles to be computed by the
 #'   `quantile` function, in addition to the median
 #'
-#' @param ... ignored
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A long-format `tibble` / `data.frame` reporting the posterior median,
 #'   upper and lower percentiles of the predictions for each series at each of
@@ -76,6 +76,7 @@ summary.mvgam_forecast = function(object, probs = c(0.025, 0.975), ...) {
   }
   validate_proportional(min(probs))
   validate_proportional(max(probs))
+  rlang::check_dots_empty()
 
   n_series <- length(object$series_names)
   type <- object$type

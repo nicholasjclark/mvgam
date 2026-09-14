@@ -9,7 +9,7 @@
 \arguments{
 \item{x}{A fitted \code{mvgam} model.}
 
-\item{...}{Currently unused.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 List with one element per chain, mirroring the \code{init}

@@ -22,7 +22,7 @@ to widen or narrow the panel set.}
 
 \item{bins}{Number of histogram bins passed to \code{geom_histogram}.}
 
-\item{...}{Ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{ggplot} object.

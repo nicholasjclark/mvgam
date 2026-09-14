@@ -14,7 +14,7 @@
 point estimate, or \code{"uncertainty"} showing the per-entry
 posterior spread (\code{delta_se}).}
 
-\item{...}{Ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{ggplot} object.

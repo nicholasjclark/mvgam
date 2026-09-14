@@ -65,7 +65,7 @@ var_surface_columns <- function(x) {
 #'   processes to draw. Default draws all of them.
 #' @param shocks Optional character vector naming shock-response pairs
 #'   directly, for a selection `series` and `responses` cannot express.
-#' @param ... ignored
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object
 #'
@@ -78,6 +78,7 @@ plot.mvgam_var_surface_summary <- function(x, series = NULL,
   checkmate::assert_int(series, lower = 1L, null.ok = TRUE)
   checkmate::assert_integerish(responses, lower = 1L, null.ok = TRUE)
   checkmate::assert_character(shocks, null.ok = TRUE, min.len = 1L)
+  rlang::check_dots_empty()
   cols <- var_surface_columns(x)
   dat <- as.data.frame(x)
 
@@ -172,6 +173,7 @@ unclass_var_surface <- function(x) {
 #' @method summary mvgam_var_surface_summary
 #' @export
 summary.mvgam_var_surface_summary <- function(object, ...) {
+  rlang::check_dots_empty()
   # Already a summary; asking again returns the same table rather than
   # attempting to summarise quantiles a second time.
   unclass_var_surface(object)

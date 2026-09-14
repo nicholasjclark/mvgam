@@ -48,6 +48,9 @@
 #'   all responses (a named list).
 #' @param ndraws Positive integer specifying the number of posterior
 #'   draws to use. If `NULL` (the default), all draws are used.
+#' @param draw_ids Optional integer vector naming the posterior draws
+#'   to use, indexed into the full posterior. Give one of `ndraws` or
+#'   `draw_ids`.
 #' @param summary Logical. If `TRUE` (the default), returns summary
 #'   statistics. If `FALSE`, returns the full matrix of posterior
 #'   draws.
@@ -66,8 +69,8 @@
 #' @param sample_new_levels Character; accepted for brms
 #'   compatibility and not used, since new levels are refused. See
 #'   `allow_new_levels`.
-#' @param ... Additional arguments passed to the underlying posterior
-#'   methods.
+#' @param ... Unused. Anything passed here is refused; every argument
+#'   this method gives the posterior methods it names above.
 #'
 #' @return If `summary = FALSE`, returns a matrix of posterior draws
 #'   with dimensions `[ndraws x nobs]`.
@@ -101,16 +104,12 @@
 #' the model actually inferred at each time, pass `incl_autocor = TRUE`
 #' or read it directly from [hindcast.mvgam()].
 #'
-#' Two brms `fitted()` arguments are not yet supported and will be
-#' ignored if passed via `...`:
-#' \itemize{
-#'   \item `dpar` / `nlpar`: distributional and non-linear parameter
-#'     selection (waiting on broader distributional regression
-#'     support in mvgam).
-#'   \item `draw_ids` / `sort`: draw subsetting by index and series
-#'     sorting are not yet plumbed through the underlying mvgam
-#'     posterior methods. Use `ndraws` for subsetting.
-#' }
+#' Two brms `fitted()` arguments have no counterpart here and are
+#' refused rather than dropped. `dpar` and `nlpar` name a
+#' distributional or non-linear parameter to return on its own scale,
+#' which is what [posterior_linpred.mvgam()] answers through its own
+#' `dpar`. `sort` orders the returned rows by series, and this method
+#' returns them in the order the frame supplied.
 #'
 #' @seealso [posterior_epred.mvgam()], [posterior_linpred.mvgam()],
 #'   [posterior_predict.mvgam()], [predict.mvgam()],
@@ -148,6 +147,7 @@ fitted.mvgam <- function(object,
                          unit_level = NULL,
                          resp = NULL,
                          ndraws = NULL,
+                         draw_ids = NULL,
                          summary = TRUE,
                          robust = FALSE,
                          probs = c(0.025, 0.975),
@@ -163,6 +163,8 @@ fitted.mvgam <- function(object,
   checkmate::assert_logical(process_error, len = 1, any.missing = FALSE)
   checkmate::assert_logical(incl_autocor, len = 1, any.missing = FALSE)
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
+  checkmate::assert_integerish(draw_ids, lower = 1L, null.ok = TRUE)
+  validate_draw_selectors(ndraws, draw_ids)
   validate_group_level_args(re_formula, allow_new_levels, sample_new_levels)
   checkmate::assert_string(resp, null.ok = TRUE)
   checkmate::assert_logical(summary, len = 1, any.missing = FALSE)
@@ -172,6 +174,7 @@ fitted.mvgam <- function(object,
   checkmate::assert_numeric(
     probs, lower = 0, upper = 1, min.len = 1, any.missing = FALSE
   )
+  rlang::check_dots_empty()
 
   # `latent_state` / `detection` components delegate to predict()
   # which already runs the family-availability gate and dispatches
@@ -195,9 +198,9 @@ fitted.mvgam <- function(object,
       newdata  = newdata,
       type     = components,
       ndraws   = ndraws,
+      draw_ids = draw_ids,
       resp     = resp,
-      summary  = FALSE,
-      ...
+      summary  = FALSE
     )
     return(summarise_or_pass(
       pred, summary = summary, probs = probs, robust = robust
@@ -215,11 +218,11 @@ fitted.mvgam <- function(object,
     process_error = process_error,
     incl_autocor = incl_autocor,
     ndraws = ndraws,
+    draw_ids = draw_ids,
     re_formula = re_formula,
     allow_new_levels = allow_new_levels,
     sample_new_levels = sample_new_levels,
-    resp = resp,
-    ...
+    resp = resp
   )
 
   # Closure-unit per-unit aggregation. `unit_level = NULL` keeps the

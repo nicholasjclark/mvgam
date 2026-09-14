@@ -38,7 +38,7 @@ verbatim). Defaults to \code{"default"}.}
 section that reconstructs the \code{mvgam} / \code{jsdgam} call used
 to fit the model. Defaults to \code{TRUE}.}
 
-\item{...}{Currently ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 An object of class \code{mvgam_methods_md} carrying the

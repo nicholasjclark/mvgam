@@ -59,7 +59,7 @@ the fold split so the partition is reproducible.}
 progress; \code{1} (default) prints only the refit count; \code{2}
 silences output.}
 
-\item{...}{Ignored (reserved for future arguments).}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 An object of class \code{c("mvgam_kfold", "kfold", "loo")}

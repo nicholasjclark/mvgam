@@ -58,7 +58,7 @@
 #'   factor for trait-arrow lengths. The default `1` places the
 #'   longest trait arrow at the same radius as the longest species
 #'   arrow; values `> 1` lengthen, values `< 1` shorten.
-#' @param ... Ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object.
 #'
@@ -556,6 +556,7 @@ ordinate.jsdgam <- function(
   checkmate::assert_flag(label_sites)
   checkmate::assert_number(trait_arrow_scale, lower = 0)
   rotation <- match.arg(rotation)
+  rlang::check_dots_empty()
   insight::check_if_installed(
     "ggrepel",
     reason = "to adequately plot ordination scores"
@@ -638,7 +639,7 @@ ordinate.jsdgam <- function(
 #' @param trait_arrow_scale Positive numeric. Visual scaling
 #'   factor for trait-arrow lengths. The default `1` matches the
 #'   longest trait arrow to the longest series-loading radius.
-#' @param ... Ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object. The returned object carries a
 #'   `"rotation"` attribute (a list with `method`, `n_lv`,
@@ -711,6 +712,7 @@ ordinate.mvgam <- function(
   checkmate::assert_flag(biplot)
   checkmate::assert_flag(label_sites)
   checkmate::assert_number(trait_arrow_scale, lower = 0)
+  rlang::check_dots_empty()
   insight::check_if_installed(
     "ggrepel",
     reason = "to adequately plot ordination scores"

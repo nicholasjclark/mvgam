@@ -6092,6 +6092,11 @@ dispatch_closure_unit_method <- function(family, method_kind) {
 #' posterior. Indices a caller already has come back unchanged, and
 #' each extraction checks them against the draws it reads. `NULL`
 #' comes back only when neither was asked for, meaning every draw.
+#' Given both, the indices win, which is why a user's pair is refused
+#' before it arrives here by `validate_draw_selectors()`. The internal
+#' seams pass both on purpose: `resolve_family_pars()` reads `ndraws`
+#' as the row count its answer has to match, next to the indices that
+#' say which draws those rows are.
 #'
 #' @param object An `mvgam` model object
 #' @param ndraws Requested number of draws, or `NULL`
@@ -7136,11 +7141,13 @@ extract_mv_response_components <- function(object, newdata = NULL,
   # random while Psi is read from the first rows of the posterior, and
   # the two describe different draws.
   draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
+  if (!is.null(draw_ids)) {
+    ndraws <- NULL
+  }
   if (is.null(linpred)) {
     linpred <- posterior_linpred(
       object, newdata = newdata, draw_ids = draw_ids,
-      ndraws = if (is.null(draw_ids)) ndraws else NULL,
-      process_error = FALSE
+      ndraws = ndraws, process_error = FALSE
     )
   }
   mu <- object$family$linkinv(linpred)
@@ -7468,6 +7475,9 @@ extract_simplex_response_components <- function(object,
   # Without this, an ndraws-only call would randomly subsample once
   # for mu and again for phi, mis-aligning the two by draw index.
   draw_ids <- resolve_draw_ids(object, ndraws, draw_ids)
+  if (!is.null(draw_ids)) {
+    ndraws <- NULL
+  }
 
   if (is.null(linpred)) {
     linpred <- posterior_linpred(

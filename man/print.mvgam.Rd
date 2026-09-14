@@ -4,16 +4,13 @@
 \alias{print.mvgam}
 \title{Print an \pkg{mvgam} object}
 \usage{
-\method{print}{mvgam}(x, digits = 2, ...)
+\method{print}{mvgam}(x, ...)
 }
 \arguments{
 \item{x}{\code{mvgam} object returned from \code{mvgam()}, fitted or
 built with \code{run_model = FALSE}}
 
-\item{digits}{Integer for decimal places. Currently unused for
-consistency with brms.}
-
-\item{...}{Additional arguments (unused)}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 The \code{mvgam} object is returned invisibly.

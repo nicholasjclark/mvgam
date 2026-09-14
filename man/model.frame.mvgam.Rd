@@ -12,7 +12,7 @@
 \item{trend_effects}{Logical; if \code{TRUE} and the model has a trend
 formula, return the trend submodel's covariates only.}
 
-\item{...}{Ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A data frame.

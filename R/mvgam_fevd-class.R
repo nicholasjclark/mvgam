@@ -65,7 +65,7 @@ NULL
 #' @param probs The upper and lower percentiles to be computed by the
 #'   `quantile` function, in addition to the median
 #'
-#' @param ... ignored
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A long-format `tibble` / `data.frame` reporting the posterior median,
 #'   upper and lower percentiles of the error variance decompositions of each
@@ -84,6 +84,7 @@ summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
                             any.missing = FALSE, sorted = TRUE)
   validate_proportional(min(probs))
   validate_proportional(max(probs))
+  rlang::check_dots_empty()
 
   # Calculate posterior quantiles of error variance contributions
   ynames <- names(object[[1]])
@@ -138,7 +139,7 @@ summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
 #'  within-country dependencies on hierarchical VARs. Defaults to
 #'  all processes.
 #'
-#'@param ... ignored
+#'@param ... Unused. Anything passed here is refused.
 #'
 #'@return A \code{\link[ggplot2]{ggplot}} object,
 #'  which can be further customized using the \pkg{ggplot2} package
@@ -152,6 +153,7 @@ summary.mvgam_fevd = function(object, probs = c(0.025, 0.975), ...) {
 #'@export
 plot.mvgam_fevd = function(x, series = NULL, contributing = NULL, ...) {
   checkmate::assert_class(x, "mvgam_fevd")
+  rlang::check_dots_empty()
   # Calculate posterior median error variance contributions
   ynames <- names(x[[1]])
   n_proc <- length(ynames)

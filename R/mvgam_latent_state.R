@@ -82,7 +82,7 @@ new_mvgam_latent_state <- function(draws, unit, family,
 #'   inner-lower / inner-upper / upper interval probabilities.
 #'   Defaults to `c(0.025, 0.25, 0.75, 0.975)` (50% and 95%
 #'   intervals).
-#' @param ... Currently unused.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `data.frame` with columns `series`, `time`, `median`,
 #'   `lower_50`, `upper_50`, `lower_95`, `upper_95`.
@@ -96,6 +96,7 @@ summary.mvgam_latent_state <- function(object,
   checkmate::assert_class(object, "mvgam_latent_state")
   checkmate::assert_numeric(probs, len = 4L, lower = 0, upper = 1,
                              sorted = TRUE, unique = TRUE)
+  rlang::check_dots_empty()
   q <- apply(object$draws, 2L,
               stats::quantile, probs = c(0.5, probs),
               na.rm = TRUE)
@@ -163,7 +164,7 @@ print.mvgam_latent_state <- function(x, digits = 2L, ...) {
 #' @param x A `mvgam_latent_state` object.
 #' @param series Optional integer / character; restrict to a subset
 #'   of the series. Defaults to all.
-#' @param ... Currently unused.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object.
 #'
@@ -171,6 +172,7 @@ print.mvgam_latent_state <- function(x, digits = 2L, ...) {
 #' @export
 plot.mvgam_latent_state <- function(x, series = NULL, ...) {
   checkmate::assert_class(x, "mvgam_latent_state")
+  rlang::check_dots_empty()
   # Pin the scheme the way every other mvgam figure does, so a
   # user's own `bayesplot::color_scheme_set()` does not leave this
   # panel the odd one out.

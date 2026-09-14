@@ -12,7 +12,7 @@ how_to_cite(object, ...)
 \arguments{
 \item{object}{A fitted \code{mvgam} or \code{jsdgam} object.}
 
-\item{...}{Currently ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 An object of class \code{how_to_cite} carrying a

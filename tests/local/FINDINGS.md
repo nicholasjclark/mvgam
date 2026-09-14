@@ -252,100 +252,6 @@ which is what makes the silence costly.
 The data-frame form is unaffected: it names its series in a column
 and a stranger there is refused.
 
-## Gaps closed rather than found
-
-Two things the plan names as untested now have coverage, and the
-package passes both. Three families that had none now have it too.
-
-The axis record carries the user's own time values rather than their
-ranks. `test-factor-lv-axis.R` numbers its occasions from 3 and
-a jsdgam fit numbering its sites from 3, so a function returning the
-index where it was asked for the value becomes visible. Substituting
-ranks for values inside `build_training_arms()` fails the assertion, so
-it bites.
-
-A frame is also mapped to trend cells and back to labels with no
-posterior in hand. `axis_row_series()`,
-`validate_prediction_factor_levels()`, `build_training_arms()` and
-`resolve_forecast_grid()` all run on a `run_model = FALSE` prefit. The frames
-they are given include a shuffled copy of the training data and one
-naming a species the model never had. Two more probe the horizon: one
-reaching past the training grid, one wholly inside it.
-
-Tweedie is now fitted. It was the only exported family nothing in
-`tests/local` ever fitted, and the only one carrying its own Stan
-functions through `attr(family, "mvgam_stanvars")`.
-`test-family-tweedie.R` reaches `P(Y = 0) = exp(-mu^(2-p)/(phi(2-p)))`
-three ways -- the closed form, `exp(log_lik())` at the zero rows, and
-the fraction of zeros among the draws -- and all three agree, the
-first two exactly. Checking the density itself would have been
-circular, since mvgam's post-fit `log_lik` calls `mgcv::ldTweedie`.
-The prefit carries `M` as data, so `standata()$M` is 30 or 40 as
-asked while the code is byte-identical.
-
-Hurdle and zero-inflated Poisson are covered the same way, each
-against its own closed form and against the other's, so neither
-mixture can stand in for the other.
-
-Every `\seealso` link in the package resolves. Resolved across all
-195 man pages, against the package's own aliases for a bare
-`\link{}` and against the named package for a `\link[pkg]{}`, none
-is broken. Every function `?jsdgam` lists was separately called and
-each one answers, which finding 75 records. On that route a reader
-following the documentation reaches working code.
-
-## Fits still worth adding
-
-### The remaining shapes
-
-The wide `mvbf()` frame, the fixed-loading `trend_map`, `lfo_cv()` on
-a trend fit and `update()` are all fitted now, so what remains is two
-shapes and one family argument.
-
-### A hierarchical VAR
-
-    trend_formula = ~ VAR(gr = region, subgr = species, cor = TRUE)
-
-Two structures that are only tested apart. `A_trend` comes back as
-`[N_groups, N_subgroups, N_subgroups]`, so the transition matrix is
-per group over subgroups rather than over all series, which is the
-claim `test-trend-hierarchical.R` already makes about the correlation
-block and has never made about `A`.
-
-It is also the worst case for finding 8. `irf()` labels its shocks
-`Process_k`, and on a derived `gr` / `subgr` axis there is no column
-to compare those labels against at all.
-
-Fit it twice, once on a frame carrying a superseded `series` column
-and once on a frame with no series column whatever, since a frame of
-the second kind is refused at four separate layers and no fit starts
-from one.
-
-### The `AR()` arguments nothing exercises
-
-    AR(p = 2, coef_sharing = ..., df = 4)
-
-`coef_sharing` appears in no local file. `df` appears only on
-observation families, never on the trend.
-
-Finding 6 and finding 58 are the reason to care: a factor request is
-accepted and silently saturated on two trend types, so an argument
-read and dropped is a mistake this package makes. The test that
-settles it is the contrast `test-trend-arma.R` uses for `ma`: build
-with and without, and require the programs to differ by the machinery
-the argument names.
-
-Student-t innovations also give the trend a tail, so a fit with a
-small `df` should absorb an outlying occasion into the innovation
-rather than into the level. That is a claim about a value.
-
-### `score()` and `ensemble()` over two fits
-
-Both need two fits on one frame, which also gives `loo_compare()`
-something to rank. Assert the scores are keyed by the series axis,
-since a per-series score under permuted names is finding 8 in a place
-a user acts on.
-
 ## The insight surface
 
 **44. A random-effect grouping factor is reported as a fixed
@@ -673,112 +579,26 @@ are refused alongside an explicit `loadings_prior`, as documented.
 
 ## Arguments nothing reads
 
-**88. `standata()` on a fitted model returns the training data
-whatever `newdata` says.**
+**76. `pp_check()` and `plot()` still take an argument that reaches
+no one.**
 
-`standata.mvgam(object, ...)` reads its `...` for nothing and
-returns `object$standata`, the list built at fit time. brms's
-method for the same generic rebuilds from five arguments this one
-does not take, `newdata` among them. Writing
-`standata(fit, newdata = nd)` against the brms API is therefore an
-ordinary thing to do. On an mvgam fit it answers with the training
-data: a well-formed list of the right shape describing another
-frame entirely.
+Every other closed method on the post-fit surface refuses one, and
+`tests/local/test-dots-refusal.R` derives that set from the S3
+registry at runtime, so a method added later without the guard fails
+there. These two stay open, for different reasons.
 
-Measured on an `mvn()` fit whose frame was reordered within each
-site. `standata(fit, newdata = reordered)$visit_idx[1, ]` comes back
-as the training layout `1,2,3,4`, while
-`closure_unit_arrays_for(fit, reordered)` reads `4,3,2,1` for that
-same frame. Two accounts of one question. The method a brms reader
-reaches for is the one that ignores the argument.
+`plot()` forwards its `...` to whichever of six callees the `type`
+selects, and four of the six refuse. The argument is named under
+`type = "smooths"` and dropped under the default
+`type = "residuals"`, which reaches `mvgam_resid_panel()`: that
+method takes `...` and reads nothing from it.
+`test-trend-car-irregular.R`, "the criticism surface refuses an
+argument it cannot honour", fails on `plot(fit, zzz_unknown = 1)`.
 
-Its roxygen says `...` is "currently unused; present for S3 generic
-dispatch", so the behaviour is deliberate and documented. What is
-missing is the refusal: an argument the method cannot honour should
-be rejected rather than dropped, which is the rule finding 76
-records for the rest of this surface.
-
-**76. Two methods of fifteen refuse an argument that reaches no
-one.**
-
-Found by misspelling one. `ordinate()` selects its ordination axes
-with `which_lvs`, and a call written `ordinate(fit, axes = c(1, 5))`
-returns a plot. The plot is of factors 1 and 2, labelled 1 and 2,
-because `axes` reached `...` where nothing reads it. `which_lvs` is
-faultless. Passing `c(2, 1)` transposes the picture and relabels it,
-and a factor past `n_lv` is refused with the constraint named.
-
-mvgam has already decided this is a defect. `R/forecast.mvgam.R:172`
-carries the reasoning and the cure:
-
-> Both methods take every argument by name after `...`, so a
-> misspelling lands in `...` and the method proceeds on the default it
-> was trying to override. That is how `incl_autocor` went unnoticed on
-> `posterior_predict()`, and it is silent by construction, so refuse
-> what nothing reads.
-
-`rlang::check_dots_empty()` appears twice in the whole of `R/`, in
-`forecast.mvgam.R` and `hindcast.mvgam.R`. Probed with
-`zzz_unknown = 1`:
-
-| behaviour | methods |
-|---|---|
-| refuses | `forecast()`, `hindcast()` |
-| warns, from bayesplot rather than mvgam | `pp_check()` |
-| accepts in silence | `ordinate()`, `residual_cor()`, `shared_variation()`, `active_factors()`, `summary()`, `posterior_epred()`, `posterior_predict()`, `predict()`, `fitted()`, `residuals()`, `log_lik()`, `plot()`, `posterior_smooths()`, `conditional_smooths()` |
-
-The cost is measured rather than imagined. Writing `axes` for
-`which_lvs` produced a picture that looked like an answer to the
-question asked. Reading it as one is how a wrong axis pair reaches a
-paper. The same shape reaches values as readily as pictures:
-`incl_autocor` misspelled on `posterior_predict()` returns a marginal
-prediction where a conditional one was asked for, every number finite
-and plausible.
-
-**What a unified check would have to respect.** The guard cannot be
-applied everywhere, because `...` on this package's surface carries
-two different meanings.
-
-- Arguments that stop at mvgam. Every post-fit method above names
-  each of its arguments and forwards none of them onward, so anything
-  left in `...` is dead by definition and can be refused outright.
-  This is the whole of the table above.
-- Arguments that pass through. `mvgam()` and `jsdgam()` document `...`
-  as the route to `data2`, `algorithm`, `chains`, `silent` and the
-  rest of the brms and Stan surface. `jsdgam()` forwards to `mvgam()`
-  in turn. A blanket refusal here would reject legitimate calls, and
-  the set to allow belongs to brms rather than to mvgam.
-
-So the check belongs where a method's argument list is closed and
-known, which is the whole post-fit surface. The forwarding layer needs
-a different treatment: an allowed set drawn from the callee's own
-formals, or no check at all. Finding 49 is the pass-through half of this and shows
-the cost of leaving it alone, since `adapt_delta` is read by neither
-mvgam nor Stan when spelled bare and the sampler runs at its default
-while the call looks like it addressed the problem.
-
-`pp_check()` is the useful exception, and it is worth being precise
-about what it does and does not settle. It says "The following
-arguments were unrecognized and ignored: zzz_unknown", which names the
-argument and is the behaviour this entry asks for. Two caveats sit on
-it. The notice comes from bayesplot checking its own dots, so mvgam
-contributes nothing and the notice leaves if the route to bayesplot
-changes. And a warning is the weaker half of what `forecast()` does.
-The plot is still returned, built on the default the caller was
-overriding. A warning inside a loop or a knitted document is easily
-missed.
-
-`test-grain-mvbf-wide.R` pins the notice rather than demanding an
-error there, so the one call on this surface that speaks cannot go
-quiet unnoticed.
-
-One method per release is not the way out. The two that guard were
-fixed because a specific bug was traced to them, and thirteen more
-carry the same hole today.
-
-A baseline run of `tests/local` is what added the two smooth methods
-to the table. This entry was first written from the methods that came
-to mind. Every fixture file added since has turned up another.
+`pp_check()` hands `...` to bayesplot, which names the argument in a
+warning and returns the plot built on the default the caller was
+overriding. The notice is bayesplot's and leaves if the route to it
+changes. `test-grain-mvbf-wide.R` pins it.
 
 ## One model, two observation counts
 
@@ -933,10 +753,9 @@ vignette calls it.
 **89. Ten shapes account for the defects found so far, and a scan
 counts six of them.**
 
-The defects fixed while consolidating the response accessor were all
-found by reading. Read together, they follow a small number of
-shapes. Each shape leaves a mark in the source that a scan can find. `tests/local/debt_scan.R` reads parse data and counts the marks
-in `R/`. Several shapes include false positives: the unused-argument
+Each shape leaves a mark in the source that a scan can find.
+`tests/local/debt_scan.R` reads parse data to count the marks in
+`R/`. Several shapes include false positives: the unused-argument
 scan counts dispatch kernels that share a signature (`log_lik_*`
 taking `trials`) and generics such as `methods_md()`, and each hit is
 read before anything is removed.
@@ -954,39 +773,11 @@ read before anything is removed.
 | one condition, several refusals | the same fault refused with different wording at different layers | not counted |
 | a proxy for the question meant | "the frame has no series column" standing for "the responses are the series"; `length(x) > 1` standing for "multivariate" | found by reading |
 
-The first two passes are done. Clearing the caught errors was not
-mechanical: each one hid a defect of its own, and those were fixed
-with the catch.
-
-- `bf(y ~ 0)` under poisson failed the build, as did an `mvbf()`
-  whose every response declined its terms. A caught error hid the
-  same failure from `get_prior()`.
-- A `trend_param()` condition that failed to evaluate went to a
-  handler whose assignment never left it. The parameter was dropped
-  while the comment beside it said it was kept.
-- `get_prior(fit)` rebuilt the prior table from the formula inside a
-  caught error, and could describe a different model from
-  `prior_summary(fit)`.
-- The smooth readers evaluated each `s()` and `gp()` term. `k = kk`
-  failed there: one reader reported `kk` as a covariate and another
-  refused the formula as invalid syntax.
-- `methods_md()` reported the Stan and package versions of the
-  session describing a fit, and under rstan it gave the rstan package
-  version as the version of Stan. The fit now records its own.
-- `validate_multivariate_trend_constraints()` could never run: every
-  formula it was handed carried a response, which the parser refuses,
-  and the caught error returned before any check.
-
-Removing the placeholder catch exposed two older code-generation
-faults in `mvbf()` models. The GLM rewrite matched response keys of
-letters alone. Every response whose key holds a digit, `y1` or `y2`,
-kept its original likelihood call and fitted with its trend computed
-and never used. An arm written without an intercept did not compile.
-
-The tests carry the same debt. Stubs that fake a class, such as
-`structure(y ~ x, class = c("brmsformula", "formula"))`, or that
-carry slots a real fit no longer has, let an assertion pass on an
-object no user could build. Assertions that compare counts or use
+The tests carry the same debt. A stub that fakes a class with
+`structure(y ~ x, class = c("brmsformula", "formula"))` lets an
+assertion pass on an object no user could build. So does a stub
+carrying slots a real fit no longer has. Assertions that compare
+counts or use
 `expect_setequal()` pass where the claim being tested is an order or
 a value.
 
@@ -995,34 +786,14 @@ Each remaining shape gets one pass. A pass removes the rival, the
 fallback or the proxy, adds an assertion that fails before the change
 and records the count before and after.
 
-## Which documents have actually been built
+## A distribution function that does not exist
 
-Recorded because a knit that skips every chunk reports success. The
-three package vignettes gate their chunks on `params$EVAL`, and only
-`rmarkdown::render()` supplies `params`, so `knitr::knit()` runs none
-of them and returns in seconds. Everything below was built with
-`render()` under `NOT_CRAN=true`, one document per R session.
+**90. The beta-binomial quantile function is named but absent.**
 
-| document | result |
-|---|---|
-| `vignettes/data.Rmd` | OK, 1.4 min |
-| `vignettes/dfm.Rmd` | OK, 2.5 min |
-| `vignettes/mvgam_overview.Rmd` | OK, 3.4 min |
-| `articles/nmix.Rmd` | OK, 5.3 min |
-| `articles/jsdgam.Rmd` | OK, 7.4 min |
-| `articles/mvbf.Rmd` | OK, 4.2 min |
-| `articles/var.Rmd` | OK, 14.1 min |
-| `articles/idm.Rmd` | OK, 6.5 min |
-| `articles/hierarchical_var.Rmd` | ERROR at 29.5 min, finding 85 |
-| `articles/forecast_evaluation.Rmd` | not built |
+`R CMD check --as-cran` reports "Missing or unexported object:
+'extraDistr::qbbinom'". `R/log_lik_addition_terms.R:166` names
+`extraDistr::qbbinom` as the beta-binomial quantile function.
+extraDistr 1.10.0.4 exports `dbbinom`, `pbbinom` and `rbbinom` with
+no `qbbinom`. Any call reaching that line fails. Nothing in the local
+sweep reaches it, which is why the check found it and no fixture did.
 
-`forecast_evaluation.Rmd` is the one gap, and it is the longest of
-the articles. Nothing here has run it to completion, so its row is
-blank rather than green.
-
-Three of the eight that build carried a defect the build cannot see:
-`var.Rmd`, `mvbf.Rmd` and `jsdgam.Rmd`, whose paragraph of stale
-numbers is repaired. What is still open in the first two is under
-findings 80 and 82. A knit reports whether the code ran. The faults
-reading found sat in what the code printed and in the prose beside
-it.

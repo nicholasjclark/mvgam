@@ -9,7 +9,7 @@
 \arguments{
 \item{x}{mvgam object}
 
-\item{...}{Additional arguments (unused)}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 Formula object

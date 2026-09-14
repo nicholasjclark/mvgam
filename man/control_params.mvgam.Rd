@@ -9,7 +9,7 @@
 \arguments{
 \item{x}{A fitted \code{mvgam} model.}
 
-\item{...}{Currently unused.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 Named list of NUTS control settings (same shape as

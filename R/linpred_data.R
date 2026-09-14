@@ -105,6 +105,34 @@ validate_group_level_args <- function(re_formula, allow_new_levels,
 }
 
 
+#' Check the two ways a caller names the draws to read
+#'
+#' `ndraws` takes that many draws at random; `draw_ids` names the ones
+#' to read. A call giving both asks for two different subsets, and the
+#' resolver honours the indices while the count goes unread. The pair
+#' is refused here, at the boundary a user's arguments enter.
+#'
+#' The internal seams are not held to this. `resolve_family_pars()`
+#' reads `ndraws` as the number of rows its answer has to have, beside
+#' the indices naming which draws those rows are.
+#'
+#' @param ndraws,draw_ids As the post-fit methods take them
+#' @return `NULL`, invisibly
+#' @noRd
+validate_draw_selectors <- function(ndraws, draw_ids) {
+  if (!is.null(ndraws) && !is.null(draw_ids)) {
+    stop(insight::format_error(c(
+      "Specify only one of 'ndraws' or 'draw_ids'.",
+      x = paste0("'ndraws' asks for ", ndraws, " draws while ",
+                 "'draw_ids' names ", length(draw_ids), "."),
+      i = paste0("'draw_ids' names the draws to read; 'ndraws' takes ",
+                 "that many at random.")
+    )), call. = FALSE)
+  }
+  invisible(NULL)
+}
+
+
 #' The Stan data and draws one prediction's linear predictors read
 #'
 #' brms writes the design of every term into its Stan data. The data it

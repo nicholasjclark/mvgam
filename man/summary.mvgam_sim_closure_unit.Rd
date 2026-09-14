@@ -10,7 +10,7 @@
 \item{object}{A \code{mvgam_sim_closure_unit} list returned by
 \code{\link[=sim_closure_unit_data]{sim_closure_unit_data()}}.}
 
-\item{...}{Currently ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 An object of class \code{mvgam_sim_closure_unit_summary}: a list

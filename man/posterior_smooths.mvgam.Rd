@@ -39,7 +39,7 @@ are \code{NULL}.}
 \item{ndraws, draw_ids}{Optional posterior-draw subsetting,
 matching the \code{\link[brms:posterior_smooths.brmsfit]{brms::posterior_smooths()}} semantics.}
 
-\item{...}{Unused; present for S3 / brms-parity.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A numeric matrix of dimension

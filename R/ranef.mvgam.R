@@ -28,7 +28,7 @@
 #' @param groups Optional character vector. When set, restrict the
 #'   returned grouping factors. `NULL` (the default) keeps every
 #'   factor.
-#' @param ... Unused; present for S3 / brms-parity.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A named list with one entry per grouping factor. Each
 #'   entry is a 3D `array`:
@@ -90,6 +90,7 @@ ranef.mvgam <- function(object, summary = TRUE, robust = FALSE,
   if (!is.null(groups)) {
     checkmate::assert_character(groups, min.len = 1L)
   }
+  rlang::check_dots_empty()
   meta <- mvgam_ranef_metadata(object)
   if (is.null(meta)) {
     stop(insight::format_error(c(
@@ -198,7 +199,7 @@ brms::ranef
 #'   MAD as the centre / spread. Defaults to `FALSE`.
 #' @param probs Numeric vector of length 2 with the quantiles to
 #'   report when `summary = TRUE`.
-#' @param ... Unused; present for S3 / brms-parity.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A named list with one entry per grouping factor. Each
 #'   entry is itself a list with up to three components:
@@ -257,6 +258,7 @@ VarCorr.mvgam <- function(x, sigma = 1, summary = TRUE,
   checkmate::assert_numeric(
     probs, lower = 0, upper = 1, len = 2L, sorted = TRUE
   )
+  rlang::check_dots_empty()
   meta <- mvgam_ranef_metadata(x)
   if (is.null(meta)) {
     stop(insight::format_error(c(

@@ -155,6 +155,7 @@ active_factors.mvgam <- function(object,
     lower = .Machine$double.eps,
     upper = 1 - .Machine$double.eps
   )
+  rlang::check_dots_empty()
   n_lv <- detect_factor_n_lv(object)
   if (is.null(n_lv) || n_lv < 1L) {
     stop(insight::format_error(
@@ -244,7 +245,7 @@ active_factors.mvgam <- function(object,
 #'
 #' @param x An `mvgam_active_factors` object returned by
 #'   [active_factors()].
-#' @param ... Ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object.
 #'
@@ -256,6 +257,7 @@ active_factors.mvgam <- function(object,
 #' @export
 plot.mvgam_active_factors <- function(x, ...) {
   checkmate::assert_class(x, "mvgam_active_factors")
+  rlang::check_dots_empty()
   # Single-category fill: pick the strong tone (`[5L]`) from the
   # active bayesplot scheme via mvgam_palette() to match the
   # convention in plot_mvgam_series() / pp_check.mvgam().

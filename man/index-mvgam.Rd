@@ -17,7 +17,7 @@
 \arguments{
 \item{x}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
-\item{...}{Arguments passed to individual methods (if applicable).}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 a character vector of parameter names

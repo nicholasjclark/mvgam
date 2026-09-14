@@ -23,7 +23,7 @@ are faceted by series; when \code{FALSE} series are overlaid on
 one panel with linetype distinguishing them. Ignored for
 joint scores.}
 
-\item{...}{Ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{ggplot} object.

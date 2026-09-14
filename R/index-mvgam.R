@@ -7,7 +7,7 @@
 #' @param x A \code{mvgam} object or another \R object for which
 #' the methods are defined.
 #'
-#' @param ... Arguments passed to individual methods (if applicable).
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @name index-mvgam
 NULL
@@ -29,6 +29,7 @@ NULL
 variables.mvgam <- function(x, ...) {
   # Validate input
   checkmate::assert_class(x, "mvgam")
+  rlang::check_dots_empty()
 
   # The exclusion list, the brms-style renames, the empty-observation
   # placeholder and the rotation-indeterminate factor block are all

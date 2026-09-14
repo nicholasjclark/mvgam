@@ -24,7 +24,7 @@ lfo_cv(object, ...)
 \arguments{
 \item{object}{A fitted \link[=mvgam]{mvgam} object.}
 
-\item{...}{Currently unused.}
+\item{...}{Unused. Anything passed here is refused.}
 
 \item{newdata}{Optional \code{data.frame} containing the response,
 \code{time}, \code{series} and any covariates required by the model

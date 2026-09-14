@@ -9,7 +9,7 @@
 \arguments{
 \item{object}{An \code{mvgam_sim} object returned by \code{\link[=sim_mvgam]{sim_mvgam()}}.}
 
-\item{...}{Currently ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A list with class \code{mvgam_sim_summary} containing:

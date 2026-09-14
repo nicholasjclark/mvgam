@@ -323,24 +323,26 @@ test_that("only a sampled trend makes a prediction differ across calls", {
 
 test_that("a misspelt argument does not pass for the default", {
   # This file exists because a prediction assembled from mismatched
-  # reads is finite, plausible and wrong. An argument that lands in
-  # `...` is the same failure reached by a typo: every method below
-  # names each of its arguments and forwards none of them onward, so
-  # anything left over is dead and can be refused.
+  # reads is finite, plausible and wrong. A typo reaches that same
+  # failure through `...`: every method below names each of its
+  # arguments and forwards none of them onward, which leaves anything
+  # else dead where it lands.
   #
-  # The cost is measured rather than assumed. On this fit the
-  # conditional expectation spans 0.17 to 70.17 and the marginal one
-  # 1.66 to 103.80, so the two answers differ by up to 102.6 counts.
-  # Writing `incl_autoccor` returns the marginal one exactly.
+  # What the silence cost was measured on this fit before it was
+  # ended. The conditional expectation spans 0.17 to 70.17 and the
+  # marginal one 1.66 to 103.80, and `incl_autoccor` returned the
+  # marginal answer to the last bit where the conditional one was
+  # asked for: wrong by up to 102.6 counts, with nothing raised.
   set.seed(7L)
   asked <- posterior_epred(fit_plain, incl_autocor = TRUE)
   set.seed(7L)
-  typo <- posterior_epred(fit_plain, incl_autoccor = TRUE)
-  set.seed(7L)
   default <- posterior_epred(fit_plain)
   expect_gt(max(abs(asked - default)), 1)
-  # The typo is the default, to the last bit, and nothing said so.
-  expect_equal(unname(as.matrix(typo)), unname(as.matrix(default)))
+  # The misspelling now names itself instead of answering.
+  expect_error(
+    posterior_epred(fit_plain, incl_autoccor = TRUE),
+    "incl_autoccor"
+  )
 
   for (m in c("posterior_epred", "posterior_linpred", "posterior_predict",
               "log_lik", "residuals", "predict", "fitted")) {

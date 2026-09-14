@@ -22,7 +22,7 @@ retained sources; this makes it easy to zoom in on
 within-country dependencies on hierarchical VARs. Defaults to
 all processes.}
 
-\item{...}{ignored}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{\link[ggplot2]{ggplot}} object,

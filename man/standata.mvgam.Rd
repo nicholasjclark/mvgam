@@ -10,7 +10,9 @@
 \item{object}{An \code{mvgam} model, fitted or built with
 \code{run_model = FALSE}.}
 
-\item{...}{Currently unused; present for S3 generic dispatch.}
+\item{...}{Unused. Anything passed here is refused, \code{newdata}
+included: this method reports the data the model was fitted to
+and cannot rebuild it for another frame.}
 }
 \value{
 A named list of Stan data.

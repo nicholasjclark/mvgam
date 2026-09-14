@@ -71,8 +71,9 @@ are returned; if \code{FALSE}, the raw posterior draws are returned.
 \code{coef} summarises to posterior means rather than to the
 Estimate / Est.Error / quantile matrix its siblings return.}
 
-\item{...}{Additional arguments forwarded to the underlying
-\verb{bayesplot::*} / \verb{posterior::*} function.}
+\item{...}{Unused by these methods, and refused, except on
+\code{nuts_params()} and \code{log_posterior()}, which forward what they
+are given to \pkg{bayesplot}.}
 
 \item{pars}{Optional character vector of parameter names. For
 \code{nuts_params} these are sampler-parameter names; otherwise they

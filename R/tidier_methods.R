@@ -72,7 +72,7 @@ generics::glance
 #'   posterior::rhat() values.
 #' @param ess Logical. If `TRUE`, add an `ess_bulk` column with
 #'   posterior::ess_bulk() values.
-#' @param ... Unused, included for generic consistency.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A tibble with one row per parameter and columns
 #'   `term`, `type`, `estimate`, `std.error`, optionally
@@ -115,6 +115,7 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
   checkmate::assert_number(conf.level, lower = 0, upper = 1)
   checkmate::assert_flag(rhat)
   checkmate::assert_flag(ess)
+  rlang::check_dots_empty()
 
   obj_vars <- categorize_mvgam_parameters(x)
   draws <- posterior::as_draws_array(x$fit)
@@ -338,7 +339,7 @@ broom_summary_fns <- function(robust = FALSE,
 #' @param conf.level Numeric. Probability covered by the
 #'   credible intervals. Defaults to `0.95`.
 #' @inheritParams forecast.mvgam
-#' @param ... Unused, included for generic consistency.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A tibble (or `list`, when `class(x$obs_data) == "list"`)
 #'   with the original training data plus:
@@ -403,6 +404,7 @@ augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
   checkmate::assert_flag(conf.int)
   checkmate::assert_number(conf.level, lower = 0, upper = 1)
   checkmate::assert_string(resp, null.ok = TRUE)
+  rlang::check_dots_empty()
 
   # Multi-response (mvbrmsformula) fits with no `resp` argument
   # fan out per outcome and stack the tibbles with a `.resp`

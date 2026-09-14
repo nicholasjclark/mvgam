@@ -49,7 +49,7 @@
 #'   labelled. `"all"` (default) labels every species; `"shift"`
 #'   labels the top 10 species by post-alignment displacement
 #'   between fits; `"none"` draws unlabelled points only.
-#' @param ... Ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object.
 #'
@@ -100,6 +100,7 @@ compare_loadings <- function(
   checkmate::assert_flag(align)
   checkmate::assert_flag(facet)
   label_species <- match.arg(label_species)
+  rlang::check_dots_empty()
   insight::check_if_installed(
     "ggrepel", reason = "to label species without overplotting"
   )

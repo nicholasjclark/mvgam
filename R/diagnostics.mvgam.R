@@ -26,8 +26,9 @@
 #'   `c(0.025, 0.975)` (95% CI).
 #' @param resp Character. Response name for multivariate models.
 #'   Ignored for univariate fits.
-#' @param ... Additional arguments forwarded to the underlying
-#'   `bayesplot::*` / `posterior::*` function.
+#' @param ... Unused by these methods, and refused, except on
+#'   `nuts_params()` and `log_posterior()`, which forward what they
+#'   are given to \pkg{bayesplot}.
 #'
 #' @return Shape depends on the method (see method details).
 #'
@@ -122,6 +123,7 @@ mvgam_post_summary <- function(draws, robust = FALSE,
 coef.mvgam <- function(object, summary = TRUE, ...) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_logical(summary, len = 1L)
+  rlang::check_dots_empty()
   # Reuse the `betas` keyword so the b_trend[*] block is filtered
   # consistently with as.matrix(object, variable = "betas").
   draws_mat <- as_draws_matrix(object, variable = "betas")
@@ -162,6 +164,7 @@ log_posterior.mvgam <- function(object, ...) {
 rhat.mvgam <- function(x, pars = NULL, ...) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_character(pars, null.ok = TRUE)
+  rlang::check_dots_empty()
   drws <- as_draws_array(x, variable = pars)
   summ <- posterior::summarise_draws(drws, rhat = posterior::rhat)
   out <- summ$rhat
@@ -177,6 +180,7 @@ rhat.mvgam <- function(x, pars = NULL, ...) {
 neff_ratio.mvgam <- function(object, pars = NULL, ...) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_character(pars, null.ok = TRUE)
+  rlang::check_dots_empty()
   drws <- as_draws_array(object, variable = pars)
   summ <- posterior::summarise_draws(
     drws,
@@ -202,6 +206,7 @@ fixef.mvgam <- function(object, summary = TRUE, robust = FALSE,
   checkmate::assert_logical(summary, len = 1L)
   checkmate::assert_logical(robust, len = 1L)
   checkmate::assert_numeric(probs, lower = 0, upper = 1, len = 2L)
+  rlang::check_dots_empty()
   # Reuse the `betas` keyword to share the b_trend[*] filter logic
   # with as.matrix.mvgam / coef.mvgam.
   mat <- as_draws_matrix(object, variable = "betas")
@@ -282,6 +287,7 @@ bayes_R2.mvgam <- function(object, resp = NULL, summary = TRUE,
 #' @export
 prior_summary.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
+  rlang::check_dots_empty()
   if (is.null(object$prior)) {
     stop(insight::format_error(
       "Fit was not stored with a prior table (object$prior is NULL)."
@@ -331,6 +337,7 @@ backfill_declared_bounds <- function(prior, stancode) {
 #' @export
 ndraws.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
+  rlang::check_dots_empty()
   posterior::ndraws(as_draws_array(x))
 }
 
@@ -341,6 +348,7 @@ ndraws.mvgam <- function(x, ...) {
 #' @export
 nchains.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
+  rlang::check_dots_empty()
   posterior::nchains(as_draws_array(x))
 }
 
@@ -351,6 +359,7 @@ nchains.mvgam <- function(x, ...) {
 #' @export
 niterations.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
+  rlang::check_dots_empty()
   posterior::niterations(as_draws_array(x))
 }
 
@@ -361,6 +370,7 @@ niterations.mvgam <- function(x, ...) {
 #' @export
 nvariables.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
+  rlang::check_dots_empty()
   posterior::nvariables(as_draws_array(x))
 }
 
@@ -375,6 +385,7 @@ posterior_summary.mvgam <- function(x, pars = NULL,
   object <- x
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_character(pars, null.ok = TRUE)
+  rlang::check_dots_empty()
   drws <- as_draws_array(object, variable = pars)
   mat <- posterior::as_draws_matrix(drws)
   mvgam_post_summary(mat, robust = robust, probs = probs)
@@ -386,6 +397,7 @@ posterior_summary.mvgam <- function(x, pars = NULL,
 #' @export
 getCall.mvgam <- function(x, ...) {
   checkmate::assert_class(x, "mvgam")
+  rlang::check_dots_empty()
   call <- x$call
   # A fit saved before the call was captured at the user-facing
   # entry point carries the `do.call()` frame's version, whose head
@@ -411,6 +423,7 @@ vcov.mvgam <- function(object, correlation = FALSE, pars = NULL, ...) {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_logical(correlation, len = 1L)
   checkmate::assert_character(pars, null.ok = TRUE)
+  rlang::check_dots_empty()
   # Reuse the `betas` keyword so the `b_trend[*]` filter matches
   # `coef.mvgam` / `fixef.mvgam` exactly.
   mat <- as_draws_matrix(object, variable = "betas")

@@ -22,7 +22,7 @@ ordinate(object, ...)
 \arguments{
 \item{object}{A fitted \code{jsdgam} object.}
 
-\item{...}{Ignored.}
+\item{...}{Unused. Anything passed here is refused.}
 
 \item{which_lvs}{Integer vector of length 2 indicating the
 two re-rotated latent variables to plot. Defaults to

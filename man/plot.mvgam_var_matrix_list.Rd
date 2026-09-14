@@ -16,7 +16,7 @@
 heatmap grid; defaults to \code{ceiling(sqrt(length(x)))}. Only
 used when \code{type = "heatmap"}.}
 
-\item{...}{Currently unused.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \link[ggplot2:ggplot]{ggplot2::ggplot} object.

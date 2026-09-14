@@ -106,7 +106,7 @@ Naming a parameter that carries a formula of its own returns its
 linear predictor, which has no latent trend term; naming one that
 was sampled as a scalar returns those draws across the rows.}
 
-\item{...}{Additional arguments passed to internal methods.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 Matrix with dimensions \verb{\\\[ndraws x nobs\\\]} containing linear

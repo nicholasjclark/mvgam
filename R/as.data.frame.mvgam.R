@@ -34,7 +34,7 @@
 #' @param inc_warmup Logical. Include warmup draws? Defaults to
 #'   `FALSE`.
 #' @param row.names,optional Ignored.
-#' @param ... Ignored.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `data.frame`, `matrix`, `array`, or one of the
 #'   `posterior::draws_*` classes (`draws_matrix`, `draws_array`,
@@ -620,6 +620,7 @@ extract_mvgam_draws <- function(x, variable = NULL, regex = FALSE,
 as.data.frame.mvgam <- function(x, row.names = NULL, optional = TRUE,
                                  variable = NULL, draw = NULL,
                                  regex = FALSE, ...) {
+  rlang::check_dots_empty()
   drws <- posterior::as_draws_df(
     extract_mvgam_draws(x, variable, regex)
   )
@@ -633,6 +634,7 @@ as.data.frame.mvgam <- function(x, row.names = NULL, optional = TRUE,
 #' @rdname mvgam_draws
 #' @export
 as.matrix.mvgam <- function(x, variable = NULL, regex = FALSE, ...) {
+  rlang::check_dots_empty()
   # Unclassed, as `brms::as.matrix.brmsfit` unclasses: a caller
   # asking for a matrix is handed one. A `draws_matrix` keeps its
   # class through subsetting, arithmetic and `as.matrix()` alike, so
@@ -646,6 +648,7 @@ as.matrix.mvgam <- function(x, variable = NULL, regex = FALSE, ...) {
 #' @rdname mvgam_draws
 #' @export
 as.array.mvgam <- function(x, variable = NULL, regex = FALSE, ...) {
+  rlang::check_dots_empty()
   # Unclassed for the same reason `as.matrix.mvgam()` is, and to
   # match `brms::as.array.brmsfit()`. `as_draws_array()` remains the
   # way to ask for the draws object itself.
@@ -658,6 +661,7 @@ as.array.mvgam <- function(x, variable = NULL, regex = FALSE, ...) {
 #' @export
 as_draws.mvgam <- function(x, variable = NULL, regex = FALSE,
                             inc_warmup = FALSE, ...) {
+  rlang::check_dots_empty()
   posterior::as_draws(
     extract_mvgam_draws(x, variable, regex, inc_warmup)
   )
@@ -674,6 +678,7 @@ posterior::as_draws
 #' @export
 as_draws_matrix.mvgam <- function(x, variable = NULL, regex = FALSE,
                                    inc_warmup = FALSE, ...) {
+  rlang::check_dots_empty()
   posterior::as_draws_matrix(
     extract_mvgam_draws(x, variable, regex, inc_warmup)
   )
@@ -690,6 +695,7 @@ posterior::as_draws_matrix
 #' @export
 as_draws_df.mvgam <- function(x, variable = NULL, regex = FALSE,
                                inc_warmup = FALSE, ...) {
+  rlang::check_dots_empty()
   posterior::as_draws_df(
     extract_mvgam_draws(x, variable, regex, inc_warmup)
   )
@@ -706,6 +712,7 @@ posterior::as_draws_df
 #' @export
 as_draws_array.mvgam <- function(x, variable = NULL, regex = FALSE,
                                   inc_warmup = FALSE, ...) {
+  rlang::check_dots_empty()
   extract_mvgam_draws(x, variable, regex, inc_warmup)
 }
 
@@ -720,6 +727,7 @@ posterior::as_draws_array
 #' @export
 as_draws_list.mvgam <- function(x, variable = NULL, regex = FALSE,
                                  inc_warmup = FALSE, ...) {
+  rlang::check_dots_empty()
   posterior::as_draws_list(
     extract_mvgam_draws(x, variable, regex, inc_warmup)
   )
@@ -736,6 +744,7 @@ posterior::as_draws_list
 #' @export
 as_draws_rvars.mvgam <- function(x, variable = NULL, regex = FALSE,
                                   inc_warmup = FALSE, ...) {
+  rlang::check_dots_empty()
   posterior::as_draws_rvars(
     extract_mvgam_draws(x, variable, regex, inc_warmup)
   )
