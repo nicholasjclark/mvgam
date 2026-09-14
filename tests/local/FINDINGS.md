@@ -97,37 +97,6 @@ not both exist and disagree about whether sampling happens. The
 blocks are left as they are so the warning keeps arriving, rather
 than being spelled around in the test.
 
-## Sampler settings
-
-**49. A bare `adapt_delta` or `max_treedepth` is accepted and
-discarded.**
-
-Found by reading a vignette that asks for one and checking whether it
-arrived. `mvgam()` takes both through `...` and never reads them.
-`R/mvgam_core.R:889` reads `control <- dots$control %||% NULL`, and
-nothing anywhere in `R/` lifts a top-level `adapt_delta` into it.
-
-Asked for `adapt_delta = 0.99, max_treedepth = 15` on one frame,
-reading back `fit$fit@stan_args[[1]]$control`:
-
-| call | recorded | warning |
-|---|---|---|
-| `mvgam(..., adapt_delta = 0.99, max_treedepth = 15)` | 0.8, 10 | none |
-| `mvgam(..., control = list(adapt_delta = 0.99, max_treedepth = 15))` | 0.99, 15 | none |
-| neither argument | 0.8, 10 | none |
-
-So the bare spelling runs at Stan's defaults and says nothing. This is
-finding 6's shape on an argument every user reaches for: a divergent
-fit is the usual reason to raise `adapt_delta`, and the raise is what
-gets dropped, so the sampler keeps diverging and the call looks like
-it addressed the problem.
-
-Three articles on this branch were written with the bare spelling and
-their prose states the tighter setting was used. `idm.Rmd` uses
-`control = list(...)` and is the only one that got what it asked for.
-
-`jsdgam()` forwards to `mvgam()`, so it behaves the same way.
-
 ## com_binomial and the trials aterm
 
 **A difference worth recording, for the family work to settle.** The

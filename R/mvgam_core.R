@@ -48,6 +48,40 @@ mvgam_removed_args <- c(
   )
 )
 
+# The NUTS settings both backends read under one spelling. rstan
+# takes them inside `control`; the cmdstanr path flattens `control`
+# into `model$sample()`, which declares each of these as a formal.
+mvgam_nuts_control_args <- c(
+  "adapt_delta", "max_treedepth", "adapt_engaged", "metric", "stepsize"
+)
+
+# Reason: `fit_model()` is called with an explicit argument list and
+# no dots. A NUTS setting written beside the formula reaches neither
+# backend, and the fit samples at Stan's defaults while the call
+# looks like it addressed the divergences it was raised for.
+# Measured on a poisson AR(1): a bare `adapt_delta = 0.99` sampled at
+# delta 0.8, while `control = list(adapt_delta = 0.99)` sampled at
+# 0.99. The bare spelling moves into `control`, which both backends
+# read, and which `control_params()` reports.
+lift_sampler_control <- function(dots, control = NULL) {
+  bare <- intersect(names(dots), mvgam_nuts_control_args)
+  if (!length(bare)) {
+    return(control)
+  }
+  clash <- intersect(bare, names(control))
+  if (length(clash)) {
+    stop(insight::format_error(c(
+      "Sampler settings were given twice.",
+      x = paste0(
+        "Named beside the formula and inside 'control': ",
+        paste0("'", clash, "'", collapse = ", "), "."
+      ),
+      i = "Keep one spelling."
+    )), call. = FALSE)
+  }
+  c(control, dots[bare])
+}
+
 # Reason: called on the dots of every entry point that reaches the
 # code generator, so an argument mvgam no longer takes is named
 # wherever it is written rather than disappearing into `...`.
@@ -900,7 +934,7 @@ mvgam_single <- function(formula, trend_formula, data, backend,
   init <- dots$init %||% "random"
   exclude <- dots$exclude %||% NULL
   seed <- dots$seed %||% sample.int(.Machine$integer.max, 1)
-  control <- dots$control %||% NULL
+  control <- lift_sampler_control(dots, dots$control %||% NULL)
   silent <- dots$silent %||% 1
   future <- dots$future %||% FALSE
   # cmdstanr compile-time passthroughs. cpp_options accepts
