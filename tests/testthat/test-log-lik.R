@@ -383,6 +383,31 @@ test_that("a family with no distribution function is refused", {
 })
 
 
+test_that("a family with no quantile function samples by rejection", {
+  # extraDistr supplies a beta-binomial density and distribution
+  # function and no quantile function, and the COM-binomial and
+  # Tweedie kernels supply none either. `truncated_dist_draws()` reads
+  # NULL as its instruction to sample by rejection, so naming a
+  # function that does not exist is what breaks the path.
+  for (dist in c("bbinom", "cmb", "tweedie")) {
+    expect_type(mvgam:::dist_fun(dist, "d"), "closure")
+    expect_type(mvgam:::dist_fun(dist, "p"), "closure")
+    expect_null(mvgam:::dist_fun(dist, "q"))
+  }
+  # A family served by stats carries all three.
+  for (dist in c("pois", "norm", "binom")) {
+    expect_type(mvgam:::dist_fun(dist, "q"), "closure")
+  }
+  spec <- list(
+    dist = "bbinom",
+    args = function(j) list(size = 10, alpha = 2, beta = 2)
+  )
+  expect_null(
+    mvgam:::truncated_dist_draws(spec, matrix(TRUE, 2L, 2L), 0, 10, TRUE)
+  )
+})
+
+
 test_that("addition-term keys are read per response", {
   sdata <- list(weights = rep(2, 4L), weights_y1 = rep(5, 4L))
   obj <- structure(list(standata = sdata), class = "mvgam")

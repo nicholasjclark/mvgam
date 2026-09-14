@@ -99,8 +99,11 @@ and produces one ggplot per term.
 prediction grid as a long-format \code{data.frame} (one row per grid
 point, per effect, per response). Columns are \code{resp} (present only
 when the fit is multivariate), \code{effect} (the primary conditioning
-variable name), \code{estimate}, \code{conf.low}, \code{conf.high}, followed by
-whichever additional grid columns marginaleffects populated.
+variable name), \code{estimate__}, \code{lower__}, \code{upper__}, followed by
+whichever additional grid columns marginaleffects populated. Those
+three are brms's names for them, and \code{\link[=conditional_smooths.mvgam]{conditional_smooths.mvgam()}}
+answers with the same three, so one frame can be read the way the
+other is.
 
 Use this to reach the raw numbers when you want to build a custom
 plot, overlay several fits, or compare against a known truth. It

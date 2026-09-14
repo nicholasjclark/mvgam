@@ -317,8 +317,11 @@ print.mvgam_conditional_effects <- function(x, ...) plot(x, ...)
 #' prediction grid as a long-format `data.frame` (one row per grid
 #' point, per effect, per response). Columns are `resp` (present only
 #' when the fit is multivariate), `effect` (the primary conditioning
-#' variable name), `estimate`, `conf.low`, `conf.high`, followed by
-#' whichever additional grid columns marginaleffects populated.
+#' variable name), `estimate__`, `lower__`, `upper__`, followed by
+#' whichever additional grid columns marginaleffects populated. Those
+#' three are brms's names for them, and [conditional_smooths.mvgam()]
+#' answers with the same three, so one frame can be read the way the
+#' other is.
 #'
 #' Use this to reach the raw numbers when you want to build a custom
 #' plot, overlay several fits, or compare against a known truth. It
@@ -346,6 +349,15 @@ as.data.frame.mvgam_conditional_effects <- function(x,
       d <- entry$data
       if (is.null(d) || nrow(d) == 0L) return(data.frame())
       d$rowid <- NULL
+      # brms names the estimate and its interval with a trailing
+      # underscore in both drawn views, and
+      # `conditional_smooths.mvgam()` already answers that way. The
+      # ggplot itself keeps marginaleffects' own names, which its
+      # layers map to aesthetics.
+      spellings <- c(estimate = "estimate__", conf.low = "lower__",
+                     conf.high = "upper__")
+      hit <- intersect(names(spellings), names(d))
+      names(d)[match(hit, names(d))] <- spellings[hit]
       d
     }
   }
@@ -380,96 +392,7 @@ as.data.frame.mvgam_conditional_effects <- function(x,
 # same set. Its value still enters the prediction, held at the
 # reference the conditioning grid gives it.
 detect_conditional_effects <- function(x) {
-  # Multivariate brmsformula has no single `$formula` slot.
-  # `$forms` is a list of per-response brmsformula objects with
-  # potentially distinct RHSs (`bf(yA ~ a) + bf(yB ~ b)`); for
-  # mvbind both forms share the RHS but the shape is the same.
-  # Union the term labels across responses so every covariate
-  # the user might want to plot ends up in the term list.
-  if (inherits(x$formula, "mvbrmsformula")) {
-    per_resp <- lapply(x$formula$forms, function(bf) {
-      # A response may carry distributional or non-linear
-      # sub-formulas of its own, whose covariates appear in no
-      # RHS above them.
-      c(
-        attr(stats::terms(bf$formula, keep.order = TRUE),
-             "term.labels"),
-        unlist(lapply(bf$pforms %||% list(), function(pf) {
-          attr(stats::terms(pf, keep.order = TRUE), "term.labels")
-        }), use.names = FALSE)
-      )
-    })
-    termlabs <- unique(unlist(per_resp, use.names = FALSE))
-    if (!is.null(x$trend_formula)) {
-      termlabs <- c(
-        termlabs,
-        attr(stats::terms(x$trend_formula, keep.order = TRUE),
-             "term.labels")
-      )
-    }
-    cond <- unlist(lapply(termlabs, split_term_labels),
-                   recursive = FALSE)
-    return(unique(cond))
-  }
-  obs_f <- mvgam_obs_formula(x)
-  # Reason: `$pforms` holds the sub-formula of every parameter the
-  # user gave one, and its covariates never appear in the top-level
-  # RHS. That covers two cases. For `bf(..., nl = TRUE)` the RHS
-  # enumerates nlpar names (`a + b * env`) rather than covariates,
-  # so env and trait1 are only reachable through the sub-formulas.
-  # For a distributional model such as `bf(y ~ x, hu ~ z)` the RHS
-  # is the mean's own covariates, and z is reachable nowhere else.
-  # Both are collected, so the default term list matches the one
-  # brms builds from the whole formula.
-  is_nl <- isTRUE(attr(obs_f, "nl"))
-  pforms <- if (inherits(x$formula, "brmsformula")) {
-    x$formula$pforms %||% list()
-  } else {
-    list()
-  }
-  # Only a non-linear RHS carries parameter names as terms, so only
-  # there do they have to be pruned from the result below.
-  nlpar_names <- if (is_nl) names(pforms) else character(0L)
-  pform_terms <- unlist(lapply(pforms, function(pf) {
-    attr(stats::terms(pf, keep.order = TRUE), "term.labels")
-  }), use.names = FALSE)
-  top <- attr(stats::terms(obs_f, keep.order = TRUE), "term.labels")
-  # brms builds its list the same way round in both cases:
-  # `get_all_effects.brmsterms` walks `dpars` before `nlpars`, so a
-  # non-linear fit leads with the covariates of the top-level RHS and
-  # a distributional fit with the mean's. Measured on
-  # `bf(y ~ a + bb * env, a ~ trait1, bb ~ 1, nl = TRUE)` brms returns
-  # `env` then `trait1`. The parameter names the RHS carries are
-  # pruned below, so leading with it costs nothing.
-  termlabs <- c(top, pform_terms)
-  if (!is.null(x$trend_formula)) {
-    termlabs <- c(
-      termlabs,
-      attr(stats::terms(x$trend_formula, keep.order = TRUE),
-           "term.labels")
-    )
-  }
-  cond <- unlist(lapply(termlabs, split_term_labels),
-                 recursive = FALSE)
-  # Filter out nlpar tokens that survived from the top-level
-  # nl formula. `b * env` splits into c("b", "env"); the nlpar
-  # `b` must be dropped from the grouping so we plot env on its
-  # own. Empty groupings (a bare nlpar like `a`) are pruned.
-  if (length(nlpar_names) > 0L) {
-    cond <- lapply(cond, function(g) setdiff(g, nlpar_names))
-    cond <- cond[lengths(cond) > 0L]
-  }
-  # Drop brms `|id|` correlation-tag tokens and other non-data
-  # names so marginaleffects only sees addressable columns. Shares
-  # the filter with find_predictors.mvgam via mvgam_keep_data_columns().
-  # `mvgam_keep_data_columns()` drops the empty-obs placeholder along
-  # with every other token that names no covariate a reader wrote, so
-  # the workaround cannot reach a figure as though it were one.
-  cond <- lapply(cond, function(g) mvgam_keep_data_columns(g, x))
-  cond <- cond[lengths(cond) > 0L]
-  # Drop duplicates while preserving order
-  keys <- vapply(cond, paste, FUN.VALUE = character(1L), collapse = ":")
-  cond[!duplicated(keys)]
+  mvgam_term_list(x)$groupings
 }
 
 

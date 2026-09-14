@@ -200,11 +200,11 @@ describe_predictors <- function(obj) {
   data <- obj$data %||% data.frame()
   if (nrow(data) == 0L) return(character(0L))
   resp_cols <- unname(response_columns(obj))
-  # Restrict to columns the model formula actually references.
-  # Without this guard, every column in the user's data frame
-  # surfaces here, including ones the model ignores -- which
-  # misleads readers about what enters the linear predictor.
-  used_vars <- formula_used_vars(obj)
+  # Restrict to the terms that enter a linear predictor. Without
+  # this guard every column of the user's frame is described, and a
+  # denominator, an offset and a grouping factor each name a column
+  # no reader would take to be a covariate.
+  used_vars <- mvgam_term_list(obj)$conditional
   # Skip canonical panel keys plus the response column(s); they are
   # already covered by the dimensions line above.
   skip <- unique(c(resp_cols, "time", "series"))
@@ -238,26 +238,12 @@ describe_predictors <- function(obj) {
 
 #' @noRd
 formula_used_vars <- function(obj) {
-  # Every variable referenced anywhere in the model spec:
-  # obs formula (LHS + RHS, plus dpar / nlpar sub-formulas) and
-  # the trend formula. Delegates to `mvgam_formula_predictors()`
-  # in insight.mvgam.R for the obs side -- that function already
-  # walks `$pforms`. Trend side gets the same `mvgam_rhs_predictors`
-  # treatment.
-  obs <- obj$formula
-  obs_vars <- mvgam_formula_predictors(obs)
-  # Every variable on the left-hand side, addition terms included,
-  # since a `trials()` denominator is a column the model reads.
-  resp_vars <- if (!is.null(obs)) {
-    f <- if (inherits(obs, c("brmsformula", "bform", "mvbrmsformula"))) {
-      obs$formula %||% obs
-    } else obs
-    if (inherits(f, "formula") && length(f) >= 3L) all.vars(f[[2L]])
-    else character(0L)
-  } else character(0L)
-  tf <- obj$trend_formula %||% obj$trend_model$formula
-  trend_vars <- mvgam_formula_predictors(tf)
-  unique(c(obs_vars, resp_vars, trend_vars))
+  # Every variable referenced anywhere in the model spec: both
+  # submodels, the distributional and non-linear sub-formulas beneath
+  # them, the responses, and the addition terms beside the response.
+  # That list is what `find_variables()` answers with, and reading it
+  # here keeps one account of what the model names.
+  insight::find_variables(obj, flatten = TRUE)
 }
 
 #' @noRd

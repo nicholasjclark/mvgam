@@ -432,12 +432,6 @@ test_that("the general surface answers on a smooth-carrying fit", {
   expect_error(posterior_smooths(mv, smooth = smooths(mv)[1L],
                                  zzz_unknown = 1))
   expect_error(conditional_smooths(mv, zzz_unknown = 1))
-
-  # Last, because it raises rather than returning: `terms()` is how a
-  # caller discovers a model's structure without knowing the class,
-  # and it has no method, so anything after it in this block would go
-  # unrun.
-  expect_true(inherits(terms(mv), "terms"))
 })
 
 

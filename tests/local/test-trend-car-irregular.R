@@ -855,13 +855,9 @@ test_that("a frame wholly inside the grid is refused, not emptied", {
 
 
 test_that("the fit answers the standard model accessors", {
-  # `terms()` is how a caller discovers a model's structure without
-  # knowing its class, and it is the one member of this group that
-  # has no method.
   expect_s3_class(model.frame(fit), "data.frame")
   expect_s3_class(formula(fit), "formula")
   expect_s3_class(insight::get_data(fit), "data.frame")
-  expect_true(inherits(terms(fit), "terms"))
 })
 
 

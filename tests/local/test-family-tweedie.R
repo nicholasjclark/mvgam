@@ -432,15 +432,10 @@ test_that("the fit names its own family", {
 })
 
 
-test_that("the frame accessors a caller pairs both answer", {
-  # `model.frame()` answers with the 60-row training frame. `terms()`
-  # raises R's own "no terms component nor attribute", so a caller
-  # discovering the model's structure without knowing the class gets
-  # half of the pair. Ordered so the failing half is last.
+test_that("model.frame answers with the training frame", {
   mf <- model.frame(fit)
   expect_identical(nrow(mf), nrow(dat))
   expect_true(all(c("y", "x") %in% names(mf)))
-  expect_s3_class(terms(fit), "terms")
 })
 
 

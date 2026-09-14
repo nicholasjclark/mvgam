@@ -21,53 +21,6 @@ mvgam_obs_formula <- function(x) {
 }
 
 
-# Predictor variables on the rhs of `f`. NULL formulas (e.g. a missing
-# trend submodel) return character(0L) so downstream `unique()` /
-# `c()` calls work without a guard.
-mvgam_rhs_predictors <- function(f) {
-  if (is.null(f)) {
-    return(character(0L))
-  }
-  rhs <- if (length(f) == 3L) f[[3L]] else f[[2L]]
-  all.vars(rhs)
-}
-
-
-# Predictor variables anywhere in a brms (or plain) formula: top-level
-# RHS plus any per-parameter sub-formulas living in `$pforms`. brms
-# stores both nl sub-formulas (`bf(..., nl = TRUE)`'s nlpar formulas)
-# and distributional dpar sub-formulas (`sigma ~ x`, `hu ~ z`, etc.)
-# under the same `$pforms` slot, keyed by the parameter name. The
-# parameter names themselves (a, b, sigma, ...) are not data
-# columns so they are filtered out of the returned vector. The
-# return order is preserved for callers that want a stable list.
-mvgam_formula_predictors <- function(f) {
-  if (is.null(f)) {
-    return(character(0L))
-  }
-  # mvbrmsformula has no top-level `$formula` slot; iterate the
-  # per-response brmsformulas in `$forms` and union their
-  # predictors. Each form may have its own nlpar / dpar pforms.
-  if (inherits(f, "mvbrmsformula")) {
-    return(unique(unlist(lapply(f$forms, mvgam_formula_predictors),
-                           use.names = FALSE)))
-  }
-  if (inherits(f, "brmsformula")) {
-    top <- mvgam_rhs_predictors(f$formula)
-    nlpars <- character(0L)
-    sub <- character(0L)
-    if (length(f$pforms) > 0L) {
-      nlpars <- names(f$pforms)
-      sub <- unlist(lapply(f$pforms, mvgam_rhs_predictors),
-                    use.names = FALSE)
-    }
-    setdiff(unique(c(top, sub)), nlpars)
-  } else {
-    mvgam_rhs_predictors(f)
-  }
-}
-
-
 # Drop tokens that are not actual columns of the fit's data frame.
 # brms RE syntax carries correlation IDs (`(1 | sp | series)`) and
 # nested-group separators as if they were variables; this filter
@@ -110,43 +63,288 @@ find_response.mvgam <- function(x, combine = TRUE, ...) {
 }
 
 
+# The variables one parsed formula contributes, by the part of the
+# model they belong to. brms has already separated them: `fe` holds
+# the parametric terms, `sm` the smooths, `gp` the Gaussian
+# processes, `sp` the special terms such as `mo()`, `offset` the
+# offset and `re` a row per group-level term. Reading each slot is
+# what keeps a covariate that reaches the linear predictor only
+# through a smooth or a Gaussian process from being dropped.
+#'@noRd
+mvgam_brmsterms_parts <- function(bt) {
+  # A non-linear formula keeps its sub-formulas under `nlpars`, and
+  # their covariates appear in no `dpars` entry: the predictor above
+  # them enumerates parameter names instead. Both are walked, and the
+  # parameter names are dropped, since `a` and `b` name no column.
+  nlpars <- bt$nlpars %||% list()
+  dpars <- c(bt$dpars %||% list(), nlpars)
+  from_slot <- function(slot) {
+    unique(unlist(
+      lapply(dpars, function(d) all.vars(d[[slot]])),
+      use.names = FALSE
+    ))
+  }
+  # An offset is a known quantity the prediction carries, not a term
+  # a reader takes a slope over, so it is kept apart from the rest.
+  offset <- from_slot("offset")
+  # A non-linear predictor has no `fe`: its own terms enumerate
+  # parameter names, and the covariates they are built from are
+  # recorded under `covars`.
+  conditional <- setdiff(
+    unique(c(from_slot("fe"), from_slot("sm"), from_slot("gp"),
+             from_slot("sp"), from_slot("cs"), from_slot("covars"))),
+    c(offset, names(nlpars))
+  )
+  # Indexed exactly. A distributional parameter with no group-level
+  # term has no `re` entry, and `$` would partial-match it to `resp`,
+  # handing back a character vector that answers as though the
+  # parameter had one.
+  groups <- unique(unlist(
+    lapply(dpars, function(d) {
+      re <- d[["re"]]
+      if (NROW(re) == 0L) NULL else as.character(re$group)
+    }),
+    use.names = FALSE
+  ))
+  # The terms as written, which is what a drawn effect is keyed by: an
+  # interaction is one effect over two columns, and a smooth of two
+  # covariates is one effect over both. `stats::terms()` files an
+  # offset under its own attribute, so an offset never appears here.
+  labels <- unique(unlist(
+    lapply(dpars, function(d) {
+      unlist(lapply(c("fe", "sm", "gp", "sp", "covars"), function(s) {
+        if (is.null(d[[s]])) {
+          return(NULL)
+        }
+        attr(stats::terms(d[[s]], keep.order = TRUE), "term.labels")
+      }), use.names = FALSE)
+    }),
+    use.names = FALSE
+  ))
+  list(
+    conditional = conditional,
+    random = groups,
+    # A `trials()` denominator or a truncation bound is a column the
+    # likelihood reads. It is no one's predictor, and a grid built
+    # without it is refused by brms.
+    aterms = unique(unlist(lapply(bt$adforms, all.vars),
+                           use.names = FALSE)),
+    offset = offset,
+    labels = setdiff(labels, names(nlpars)),
+    all = all.vars(bt$allvars)
+  )
+}
+
+
+# One side of the model, parsed once.
+#
+# The stored `brmsformula` carries no family. `brmsterms()` then
+# defaults to gaussian and refuses `trials()` as unsupported for it,
+# which is why the fit's own family is attached before parsing. A
+# multivariate formula keeps no top-level `dpars`: each response has
+# its own parse under `$terms`, and the parts are unioned.
+#'@noRd
+mvgam_side_terms <- function(f, family = NULL) {
+  empty <- list(conditional = character(0L), random = character(0L),
+                aterms = character(0L), offset = character(0L),
+                labels = character(0L), all = character(0L))
+  if (is.null(f)) {
+    return(empty)
+  }
+  if (!is.null(family)) {
+    if (inherits(f, "mvbrmsformula")) {
+      # Each arm of a multivariate formula carries its own family,
+      # and mvgam records one on the fit. An arm left without one
+      # reads as neither gaussian nor student, which is what brms
+      # requires of every arm before it will estimate `rescor`.
+      f$forms <- lapply(f$forms, function(arm) {
+        if (is.null(arm$family)) arm$family <- family
+        arm
+      })
+    } else if (inherits(f, "brmsformula")) {
+      f$family <- family
+    }
+  }
+  # A trend submodel is written without a response. brms parses a
+  # two-sided formula, and the name given here reaches no column, so
+  # it is filtered out with every other name the data does not carry.
+  if (inherits(f, "formula") && length(f) == 2L) {
+    f <- stats::reformulate(deparse(f[[2L]]), response = ".mvgam_lhs")
+  }
+  bt <- brms::brmsterms(f)
+  if (is.null(bt$terms)) {
+    return(mvgam_brmsterms_parts(bt))
+  }
+  per_resp <- lapply(bt$terms, mvgam_brmsterms_parts)
+  fold <- function(nm) {
+    unique(unlist(lapply(per_resp, `[[`, nm), use.names = FALSE))
+  }
+  list(
+    conditional = fold("conditional"), random = fold("random"),
+    aterms = fold("aterms"), offset = fold("offset"),
+    labels = fold("labels"),
+    all = unique(c(fold("all"), all.vars(bt$allvars)))
+  )
+}
+
+
+#' Every term the model has, split the way its readers ask for it
+#'
+#' One parse, read by `find_predictors()`, `find_random()`,
+#' `find_variables()`, `terms()`, `model.frame()` and the effect
+#' groupings `conditional_effects()` draws. Asking twice is how a
+#' grouping factor came to be offered as a population slope while
+#' `find_random()` reported nothing at all.
+#'
+#' The axis columns are the distinction the split turns on. Which
+#' occasion a row belongs to is addressable in a prediction grid, so
+#' `time` and `series` stay in the variable list. Neither supports a
+#' slope or a contrast, so neither is a predictor. A column holding
+#' one value supports neither either, which is why the axis entries
+#' are kept only while they vary.
+#'
+#' @param x A fitted `mvgam` object
+#' @return A list of character vectors: `response`, `conditional`,
+#'   `random`, `aterms`, `offset` and `index`, each filtered to
+#'   columns the model's data carries
+#' @noRd
+mvgam_term_list <- function(x) {
+  obs <- mvgam_side_terms(x$formula, x$family)
+  trend <- mvgam_side_terms(x$trend_formula)
+  keep <- function(v) mvgam_keep_data_columns(unique(v), x)
+
+  # The axis and the groupings it is built on. jsdgam aliases the
+  # user's species column to `series`, and the original name is kept
+  # so a grid can still be addressed in the user's own terms.
+  # Both records are read defensively: a fit saved before either was
+  # stored carries something other than a list there, and a term list
+  # is not the place to refuse one.
+  as_list <- function(v) if (is.list(v)) v else list()
+  meta <- as_list(as_list(x$trend_metadata)$variables)
+  jsdgam_meta <- as_list(attr(x$model_data, "prepped_trend_model"))
+  index <- varying_meta_vars(
+    c(meta$time_var, meta$series_var, meta$gr_var, meta$subgr_var,
+      unlist(jsdgam_meta[c("unit", "species")], use.names = FALSE)),
+    x
+  )
+  index <- keep(index)
+
+  # A column a formula names is a term of the model, whatever else it
+  # also is. `series` names the axis, and a model written
+  # `y ~ series` asks for a per-series effect as well: the axis entry
+  # is what a grid addresses, and the formula is what makes it a term.
+  # Only the axis columns no formula mentions are grid-only.
+  conditional <- keep(c(obs$conditional, trend$conditional))
+
+  # The same terms, grouped as they are drawn. `conditional_effects()`
+  # plots one panel per grouping, so an interaction is one entry over
+  # two columns and a three-way smooth is its three pairwise margins.
+  groupings <- unlist(
+    lapply(unique(c(obs$labels, trend$labels)), split_term_labels),
+    recursive = FALSE
+  )
+  groupings <- lapply(groupings, function(g) keep(g))
+  groupings <- groupings[lengths(groupings) > 0L]
+  groupings <- groupings[!duplicated(vapply(
+    groupings, paste, character(1L), collapse = ":"
+  ))]
+
+  list(
+    response = keep(unname(response_columns(x))),
+    conditional = conditional,
+    random = setdiff(keep(c(obs$random, trend$random)), conditional),
+    aterms = setdiff(keep(c(obs$aterms, trend$aterms)), conditional),
+    offset = keep(c(obs$offset, trend$offset)),
+    index = setdiff(index, conditional),
+    groupings = groupings
+  )
+}
+
+
 #' @importFrom insight find_predictors
 #' @export
 find_predictors.mvgam <- function(x, effects = "fixed",
                                   component = "conditional",
                                   flatten = FALSE, verbose = TRUE, ...) {
-  # Reason: walk the full brmsformula (top-level + nl/dpar pforms)
-  # rather than just the obs formula's top-level RHS, so trait1,
-  # sigma covariates, and other sub-formula-only variables surface
-  # for marginaleffects::datagrid and insight downstream.
-  preds <- unique(c(
-    mvgam_formula_predictors(x$formula),
-    mvgam_rhs_predictors(x$trend_formula)
+  effects <- match.arg(effects, c("fixed", "random", "all"))
+  terms_list <- mvgam_term_list(x)
+  out <- list()
+  # An element is left out when it is empty, which is how insight
+  # answers for a model with no predictor: `$conditional` is absent
+  # and reads as NULL.
+  if (effects %in% c("fixed", "all") && length(terms_list$conditional)) {
+    out$conditional <- terms_list$conditional
+  }
+  if (effects %in% c("random", "all") && length(terms_list$random)) {
+    out$random <- terms_list$random
+  }
+  # `insight::find_variables()` is not a generic. It composes
+  # `find_response()` with this list, and `marginaleffects::datagrid()`
+  # builds its grid from that composition, so a column reaching the
+  # grid has no other route. The axis a per-series facet is drawn on
+  # and the denominator of a `trials()` term are both read by the
+  # model without anyone taking a slope over them, and they ride
+  # here under a name of their own:
+  # `marginaleffects::get_predictors()` keeps only the components it
+  # knows, so nothing filed here is offered as a term to contrast.
+  grid_only <- unique(c(terms_list$index, terms_list$aterms,
+                        terms_list$offset))
+  if (length(grid_only)) {
+    out$grid <- grid_only
+  }
+  if (flatten) unique(unlist(out, use.names = FALSE)) else out
+}
+
+
+#' @importFrom insight find_random
+#' @export
+find_random.mvgam <- function(x, split_nested = FALSE, flatten = FALSE,
+                              ...) {
+  groups <- mvgam_term_list(x)$random
+  if (!length(groups)) {
+    return(NULL)
+  }
+  if (isTRUE(split_nested)) {
+    groups <- unique(unlist(strsplit(groups, ":", fixed = TRUE),
+                            use.names = FALSE))
+  }
+  if (flatten) groups else list(random = groups)
+}
+
+
+#' Model terms for a fitted mvgam object
+#'
+#' `terms()` is how a caller discovers a model's structure without
+#' knowing its class, and it is the accessor `model.frame()` is
+#' normally paired with. The object is built from the terms the model
+#' has: its responses on the left, the covariates of both submodels on
+#' the right. Group-level terms are not among them, since the bar
+#' syntax has no meaning to `stats::terms()`; read them with
+#' [insight::find_random()].
+#'
+#' @param x A fitted `mvgam` object.
+#' @param ... Unused. Anything passed here is refused.
+#'
+#' @return An object of class `terms`.
+#' @export
+#' @method terms mvgam
+terms.mvgam <- function(x, ...) {
+  checkmate::assert_class(x, "mvgam")
+  rlang::check_dots_empty()
+  terms_list <- mvgam_term_list(x)
+  labels <- terms_list$conditional
+  response <- terms_list$response
+  lhs <- if (length(response) > 1L) {
+    str2lang(paste0("cbind(", paste(response, collapse = ", "), ")"))
+  } else if (length(response) == 1L) {
+    str2lang(response)
+  } else {
+    NULL
+  }
+  stats::terms(stats::reformulate(
+    if (length(labels)) labels else "1",
+    response = lhs
   ))
-
-  # Time / series / grouping variables are addressable in the data
-  # grid even though they sit outside the formulas. jsdgam aliases
-  # the user's species column to 'series' on data_train; persist the
-  # original column name so downstream tools that look up the user-
-  # facing variable (conditional_effects, predict newdata builders)
-  # find both. mv_spec$species_var is set by jsdgam(); the trend
-  # metadata covers the regular mvgam case.
-  meta <- x$trend_metadata$variables
-  if (!is.null(meta)) {
-    extras <- c(meta$time_var, meta$series_var, meta$gr_var, meta$subgr_var)
-    preds <- unique(c(preds, varying_meta_vars(extras, x)))
-  }
-  jsdgam_meta <- attr(x$model_data, "prepped_trend_model")
-  if (!is.null(jsdgam_meta)) {
-    extras <- unlist(jsdgam_meta[c("unit", "species")], use.names = FALSE)
-    preds <- unique(c(preds, varying_meta_vars(extras, x)))
-  }
-
-  # Drop brms `|id|` correlation-tag tokens and any other
-  # non-data names that slipped through all.vars().
-  preds <- mvgam_keep_data_columns(preds, x)
-
-  if (flatten) preds else list(conditional = preds)
 }
 
 
@@ -218,15 +416,12 @@ model.frame.mvgam <- function(formula, trend_effects = FALSE, ...) {
     )))
   }
   vars <- if (trend_effects) {
-    mvgam_rhs_predictors(formula$trend_formula)
+    mvgam_side_terms(formula$trend_formula)$all
   } else {
-    # Every response and its addition terms, then the same surface
-    # find_predictors() walks so nl / dpar sub-formula vars and jsdgam
-    # aliases ride along. Reading the left-hand side of one formula
-    # dropped every response of a multivariate fit, whose subscript
-    # there is a character vector rather than an expression.
-    unique(c(lhs_columns(formula$formula),
-             find_predictors(formula, flatten = TRUE)))
+    # Every variable the model reads: the responses, the covariates
+    # of both submodels, the groupings, the addition terms beside the
+    # response and the axis the rows are indexed by.
+    unique(unlist(mvgam_term_list(formula), use.names = FALSE))
   }
   vars <- intersect(vars, colnames(formula$data))
   formula$data[, vars, drop = FALSE]

@@ -36,9 +36,6 @@ the recovery assertion meets.
   4e-16 on a posterior draw. That redundancy is exact and is not what
   either diagnostic above measures.
 
-The "13 per cent divergences" this entry first recorded belong to an
-`mvn()` fit no file holds; the cached `mvt` fixture has none.
-
 Three things remain. Respecify the fixture at a `(K, m)` pair the
 bound admits, so its recovery assertions test an identified quantity.
 Give `Psi` a prior class, since it is hard-coded in a stanvar today
@@ -85,10 +82,7 @@ raised where a method starts, would replace seventeen internal errors
 that all say the same unhelpful thing.
 
 The test holds every method to the message `summary()` already
-produces, so it fails until they meet it. It was written after the
-first version of this entry described the defect in a markdown file
-and quietly moved the assertion onto a fitted object, where it passed
-and proved nothing.
+produces, so it fails until they meet it.
 
 ## VAR()
 
@@ -252,73 +246,6 @@ which is what makes the silence costly.
 The data-frame form is unaffected: it names its series in a column
 and a stranger there is refused.
 
-## The insight surface
-
-**44. A random-effect grouping factor is reported as a fixed
-predictor, and `find_random()` finds nothing.**
-
-`test-trend-var.R`, "find_predictors reports a series column that
-varies". insight splits a model's terms so that a consumer knows
-which of them carry a population slope. mvgam does not make the
-split:
-
-| call | brms `y ~ elev * region + (1 \| block)` | mvgam, same terms |
-|---|---|---|
-| `find_predictors()$conditional` | elev, region | elev, region, block, time, series |
-| `find_predictors(effects = "all")$random` | block | absent |
-| `find_random()` | block | `NULL` |
-
-`lme4::lmer` on the same formula answers as brms does, so this is
-insight's contract and not a brms convention. Reproduced on the
-random-effects fits as well, where `grp` appears among the
-conditional terms and `find_random()` is again `NULL`, so it
-belongs to the method rather than to one fit.
-
-What it costs is the term list every downstream package builds from
-it. `marginaleffects` reads `$conditional` to decide what can be
-contrasted, so it offers a grouping factor as a term to take a
-slope or a comparison over. The grouping itself stays invisible:
-nothing reading an mvgam fit through insight can discover that the
-model has a random effect at all.
-
-The `effects` argument is not honoured either. Asked for `"all"`,
-the method returns the same one-element list it returns by default,
-so a caller who asks for the split explicitly is told nothing about
-why it did not happen. `find_variables()` carries no `random`
-element for the same reason.
-
-The hierarchical fit shows the same fault with nothing left to be
-right about. Its observation formula is `y ~ 1`. The model has no
-predictor whatever. `find_predictors()$conditional` answers
-`time, series, region, species`. Two of these name the axis. The other
-two name the grouping the trend is built on. Every term offered to a consumer is
-one no user can take a meaningful slope over, and the model's real
-term list is empty.
-
-The consequence is measurable rather than hypothetical, and it
-reaches the plotting surface too. `conditional_effects()` on the VAR
-fit returns four panels, and one of them is `block`: six shrunk
-group deviations drawn as an effect, spanning -0.349 to 1.117, which
-is a wider range than the `elev` panel beside it. A reader is given
-no sign that those six levels are exchangeable draws rather than
-categories.
-
-`avg_slopes()` on a fit with a random effect returns one contrast row
-per non-reference level of the grouping:
-
-| fit | grp contrasts | range of the estimates |
-|---|---|---|
-| ar1_re | b-a to f-a | -0.17 to -7.80 |
-| ar1_re_smooth | b-a to f-a | -0.03 to 1.03 |
-| ar1_cor_re | b-a to f-a | -0.18 to -7.88 |
-
-Those are group-level deviations, shrunk toward zero by the prior
-on `sd_grp`, presented as population contrasts a reader could act
-on. Nothing in the table says the levels are exchangeable draws
-rather than fixed categories. `test-trend-var.R` and
-`test-family-com-binomial.R` each assert the term list on a fit with
-a grouping, so both fail until the split exists.
-
 ## Prefit modes
 
 **46. `chains = 0` samples anyway, and the diagnostics warn about
@@ -359,59 +286,6 @@ not both exist and disagree about whether sampling happens. The
 blocks are left as they are so the warning keeps arriving, rather
 than being spelled around in the test.
 
-## Aterms and the prediction grid
-
-**47. `conditional_effects()` cannot run on a model with a
-`trials()` aterm.**
-
-Found by driving the model rather than by an assertion. On a plain
-`binomial()` fit of `y | trials(trials) ~ s(x)`:
-
-    Unable to compute predicted values with this model ...
-    The following variables can neither be found in 'data' nor in
-    'data2': 'trials'
-
-The column is not missing from the fit. Asked four ways, it is
-there:
-
-| call | trials present |
-|---|---|
-| `fit$data` | yes |
-| `insight::get_data()` | yes |
-| `model.frame()` | yes |
-| `find_predictors()` | no, correctly |
-| `datagrid(x = 0)` | no |
-
-The last two rows are the whole of it. A trial count is a
-denominator rather than a predictor. `find_predictors()` is right to
-leave it out, and `datagrid()` builds its grid from that list. The
-denominator therefore never reaches the grid, and brms refuses a
-prediction without it. `posterior_epred()` on the same fit answers
-normally, so the fault is in how the grid is built and not in the
-prediction.
-
-There is no way round it from the outside. Naming the column
-explicitly works, as `datagrid(x = 0, trials = c(10, 50, 100))`
-does, but that is a call the user has to construct. `conditional_effects()` builds its own grid, and
-supplying one is refused:
-
-    Cannot pass 'newdata' through `...`. These are set by
-    conditional_effects.mvgam; pass via the named arguments instead.
-
-So every binomial model written with the aterm brms requires loses
-`conditional_effects()` entirely. Reproduced on `com_binomial()` as
-well, so it belongs to the aterm and not to one family.
-
-The grid needs to carry aterm columns at a representative value, the
-way it carries a covariate held at its mean.
-
-**Not a defect, recorded because it was checked.**
-`predict(type = "variance")` refuses `com_binomial()` and names both
-the families it supports and what to do instead. `diri()` is
-accepted, and returns `[ndraws x nobs]`. Both are built through
-`brms::custom_family()`, and the dispatch that separates them reads
-the name mvgam records alongside the family object.
-
 ## Sampler settings
 
 **49. A bare `adapt_delta` or `max_treedepth` is accepted and
@@ -445,50 +319,23 @@ their prose states the tighter setting was used. `idm.Rmd` uses
 
 ## Refusals that name an internal
 
-**52. A missing covariate value stops on a checkmate assertion about
-`eta`.**
+**52. A missing covariate value is refused nowhere, and the
+prediction hands back `NA`.**
 
-`test-trend-var.R`. One `NA` in a covariate column of a `newdata`
-frame ends the prediction with
+`test-trend-var.R`, "a missing covariate value is refused by name".
+One `NA` in a covariate column of a `newdata` frame does not stop the
+prediction: `posterior_epred(fit, newdata = nd, draw_ids = 1:5)`
+returns a matrix and the gap reaches the caller as `NA` cells.
 
-    Assertion on 'eta' failed: Contains missing values (row 1, col 1).
-
-`eta` is the linear predictor mvgam builds internally. The caller
-never supplied it, cannot see it and cannot map "row 1, col 1" back
-to a row of the frame they passed, so nothing in the message says
-which column carried the gap or what to do about it.
+Nothing on the prediction path looks for it. No `eta` assertion in
+`R/` carries `any.missing`, and the only `NA` guard there is the
+series-index check at `R/predictions.R:603`.
 
 The same fit refuses other malformed frames well: an unknown series
 names the level and lists the ones the model has, and a gapped
 forecast frame names the series, the last observed time and the times
-it expected. So the standard is set within the same object.
-
-Reproduced by setting one cell of `elev` to `NA` on an otherwise
-valid frame. Whether a missing covariate should be an error at all is
-a separate question, since a missing response is handled by the
-likelihood; what is recorded here is that if it is an error, it
-should name the user's column.
-
-## Two spellings of one drawn view
-
-**54. `conditional_effects()` and `conditional_smooths()` answer in
-different column spellings.**
-
-`test-trend-ar-multilag.R`. Both are drawn views of a fitted term and
-they name their columns differently:
-
-| method | estimate | interval |
-|---|---|---|
-| `conditional_effects()` | `estimate` | `conf.low`, `conf.high` |
-| `conditional_smooths()` | `estimate__` | `lower__`, `upper__` |
-
-brms uses the trailing-underscore spelling for both. mvgam renames one
-and not the other, so code written against a `conditional_effects()`
-frame fails on a `conditional_smooths()` frame from the same fit, and
-the failure is a missing column rather than a message.
-
-Neither spelling is documented as the contract, so the assertions
-resolve whichever is present rather than fixing one.
+it expected. The standard is set within the same object, and what is
+wanted is a refusal naming the user's own column.
 
 ## com_binomial and the trials aterm
 
@@ -499,30 +346,6 @@ truncated, reaching Stan as
 `nu` gets a plain `normal_lpdf(Intercept_nu | 1, 1)`. Whether an
 intercept on the identity scale should carry the scalar's bound is a
 question for the family rather than for the axis work.
-
-**Also checked and correct.** A user prior reaches the program on
-every class it can be set on: `b`, `Intercept`, `sd`, `sds`,
-`sigma_trend` and `ar1_trend` each arrive carrying the user's own
-constant. `get_prior()` on an `mvgam_formula()` lists the trend
-classes alongside the observation ones and reports the same `nu`
-prior the program uses.
-
-## Introspection
-
-**64. `terms()` has no method, on any fit.**
-
-Every other frame accessor answers. `model.frame()` returns the
-78-row training frame, `formula()` the formula and
-`insight::get_data()` the data. `terms()` raises R's own
-
-    no terms component nor attribute
-
-`terms()` is how a caller discovers a model's structure without
-knowing the class, so a package that answers `model.frame()` and not
-`terms()` breaks the pair. Seen on the CAR, ARMA, wide and
-hierarchical fits, which between them cover a univariate trend, a
-multivariate one, a response-keyed axis and a derived one, so it
-belongs to the class rather than to any model.
 
 ## Two documents, two contracts
 
@@ -571,32 +394,15 @@ so refusing the model would have cost a user a fit that works.
 later reader following `?jsdgam` would otherwise add the guard and
 break a model that samples.
 
-**Checked and correct.** Every surface `?jsdgam` lists under
-`seealso` answers on a fitted jsdgam: `residual_cor()`, `ordinate()`,
-`shared_variation()`, `active_factors()`, `compare_loadings()`,
-`methods_md()` and `how_to_cite()`. The `traits` and `phylo` aliases
-are refused alongside an explicit `loadings_prior`, as documented.
-
 ## Arguments nothing reads
 
-**76. `pp_check()` and `plot()` still take an argument that reaches
-no one.**
+**76. `pp_check()` still takes an argument that reaches no one.**
 
 Every other closed method on the post-fit surface refuses one, and
 `tests/local/test-dots-refusal.R` derives that set from the S3
 registry at runtime, so a method added later without the guard fails
-there. These two stay open, for different reasons.
-
-`plot()` forwards its `...` to whichever of six callees the `type`
-selects, and four of the six refuse. The argument is named under
-`type = "smooths"` and dropped under the default
-`type = "residuals"`, which reaches `mvgam_resid_panel()`: that
-method takes `...` and reads nothing from it.
-`test-trend-car-irregular.R`, "the criticism surface refuses an
-argument it cannot honour", fails on `plot(fit, zzz_unknown = 1)`.
-
-`pp_check()` hands `...` to bayesplot, which names the argument in a
-warning and returns the plot built on the default the caller was
+there. `pp_check()` hands `...` to bayesplot, which names the argument
+in a warning and returns the plot built on the default the caller was
 overriding. The notice is bayesplot's and leaves if the route to it
 changes. `test-grain-mvbf-wide.R` pins it.
 
@@ -683,70 +489,25 @@ for every fit in the table, which can only move RMSE downward. The
 comparison it feeds is the article's headline claim that the joint
 fit recovers the state best.
 
-## An article that does not build
+## A smooth the design cannot identify
 
-**85. `plot()` on an `fevd()` refuses one documented argument and
-ignores the other, and the hierarchical VAR article fails on it.**
+**91. The unpenalised part of a smooth is rank deficient, and the band
+drawn around it is a hundred times the effect.**
 
-`vignettes/articles/hierarchical_var.Rmd` stops after 29.5 minutes at
-its `fevd` chunk:
+`val_mvgam_smooth_surfaces`, poisson,
+`y ~ s(z, by = grp, k = 5) + t2(z, w, k = c(4, 4)) + gp(w, by = cat, k = 5)`
+over 60 rows. `standata()$Xs` is 60 by 6 with rank 4. `bs_sz:grpa_1`
+reads mean -0.77, sd 123.8; `bs_t2zw_1` and `bs_t2zw_2` sit at 137.4
+and -137.7 and sum to -0.3. Every `s_*` beside them has sd 1 to 4.
 
-    Quitting from hierarchical_var.Rmd:459-462 [fevd]
-    Assertion on 'series' failed: Must have length 1.
+`conditional_smooths()` therefore draws a band 1.03 wide at the centre
+of `z` and 109.7 at its edge, around an estimate spanning -6.9 to 6.5,
+with width tracking `|z|` at R^2 0.99998.
 
-The call is `plot(fevds, series = 1:3, contributing = 1:3)`, and the
-prose above it explains why: a 24-dimensional hierarchical VAR would
-otherwise draw 24 target panels over 24 sources, so the article keeps
-the display to Australia. Both arguments are documented and neither
-works.
-
-`fevd()` and `irf()` return objects that both inherit
-`mvgam_var_surface_summary`, so both dispatch to one plot method.
-Three roxygen blocks describe its `series` argument and no two agree:
-
-| source | says |
-|---|---|
-| `R/mvgam_fevd-class.R:129` | "Optional integer vector selecting which target processes should be shown as facets" |
-| `R/mvgam_irf-class.R:142` | "`integer` specifying which process series should be given the shock" |
-| `R/var_surface_summary.R:61` | "Optional integer naming the process the shock originates in" |
-
-The third is the one that runs, and it asserts
-`checkmate::assert_int(series, lower = 1L, null.ok = TRUE)`. So a
-vector is refused, on the argument whose own documentation offers a
-vector and names the hierarchical VAR as the reason to want one.
-
-Measured on the three-series VAR fixture:
-
-| call | result |
-|---|---|
-| `plot(fv, series = 1)` | draws |
-| `plot(fv, series = 1:2)` | refused, "Must have length 1" |
-| `plot(ir, series = 1:2)` | refused, the same |
-| `plot(fv, contributing = 1:2)` | draws, unchanged |
-
-The scalar that is accepted keeps the wrong end of the pair.
-`plot(fv, series = 1)` retains the three pairs whose left end is
-`Process_1`. That is the shock's source. `?plot.mvgam_fevd` says `series` selects the target
-processes shown as facets. The method filters `from == series`
-because that is what the shock-origin reading means, and the fevd
-documentation describes the opposite end.
-
-`contributing` is worse, because it does not fail. It is absent from
-the signature of the method that runs, so it lands in `...`, which
-that method documents as ignored. Passing `contributing = 1` on a
-nine-pair fevd leaves all nine pairs. The article's renormalisation
-claim, that "the retained shares get renormalised per (target,
-horizon)", describes something no code performs.
-
-`responses` is the spelling the running method does read, and it
-takes a vector. So the vector selection exists and is reachable under
-another name at the other end of the pair.
-
-This is finding 76 with a shipped article as the evidence: an
-argument accepted and dropped, silent by construction. The difference
-is that `contributing` is not a misspelling a user invented. It is
-documented. It is motivated by a named use case. The package's own
-vignette calls it.
+`test-obs-smooth-surfaces.R` passes on it: the assertions are
+ordering, a non-zero width and `sd(estimate__) > 1e-6`, all of which a
+hundredfold band satisfies. A prefit rank check on the stacked
+observation and trend design would name the pairing.
 
 ## Debt the code carries in recognisable shapes
 
@@ -762,8 +523,6 @@ read before anything is removed.
 
 | shape | the mark it leaves | count |
 |---|---|---|
-| an error turned into a default | `try()` and `tryCatch()` | 0, from 32 |
-| one condition raised twice | `warning()` or `rlang::warn()` around `insight::format_warning()`, which raises its own | 0, from 7 |
 | one fact, several derivers | raw `[[series_var]]` / `[[time_var]]` reads; `sort(unique(...))` axis rebuilds; `inherits(..., "mvbrmsformula")` asked in place of the question meant | 53, 40, 58 |
 | a literal standing in for a missing value | `%||% "y"`, `%||% "series"`, `%||% "explicit"` | 118 |
 | a missing column skipped | `intersect(x, names(data))`, `if (!col %in% names(df)) next` | 21 |
@@ -786,14 +545,4 @@ Each remaining shape gets one pass. A pass removes the rival, the
 fallback or the proxy, adds an assertion that fails before the change
 and records the count before and after.
 
-## A distribution function that does not exist
-
-**90. The beta-binomial quantile function is named but absent.**
-
-`R CMD check --as-cran` reports "Missing or unexported object:
-'extraDistr::qbbinom'". `R/log_lik_addition_terms.R:166` names
-`extraDistr::qbbinom` as the beta-binomial quantile function.
-extraDistr 1.10.0.4 exports `dbbinom`, `pbbinom` and `rbbinom` with
-no `qbbinom`. Any call reaching that line fails. Nothing in the local
-sweep reaches it, which is why the check found it and no fixture did.
 

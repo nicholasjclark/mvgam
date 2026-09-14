@@ -1180,6 +1180,11 @@ plot.mvgam_ppc_fit_stat <- function(x, ...) {
 mvgam_resid_panel <- function(
   object, newdata = NULL, ndraws = 100L, resp = NULL, ...
 ) {
+  # The four panels are built from this function's own arguments, so
+  # nothing here reads `...`. It is refused instead of being handed
+  # on, since `plot.mvgam(type = "residuals")` reaches this and an
+  # argument accepted here would reach no one.
+  rlang::check_dots_empty()
   # Multivariate fan-out via the shared helper: one 4-panel grid per
   # response, stacked into one figure. Without this each inner
   # `pp_check` call would itself answer for every response, and
@@ -1194,7 +1199,7 @@ mvgam_resid_panel <- function(
     function(type) {
       pp_check(
         object, type = type, newdata = newdata,
-        ndraws = ndraws, resp = resp, ...
+        ndraws = ndraws, resp = resp
       )
     }
   ))

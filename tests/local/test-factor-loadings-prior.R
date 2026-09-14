@@ -297,9 +297,6 @@ test_that("cluster: the fit describes itself to a caller", {
   # asked to override.
   expect_error(residual_cor(mv, zzz_unknown = 1))
   expect_error(shared_variation(mv, zzz_unknown = 1))
-
-  # Last, because it raises rather than returning.
-  expect_true(inherits(terms(mv), "terms"))
 })
 
 

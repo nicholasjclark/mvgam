@@ -58,13 +58,20 @@ var_surface_columns <- function(x) {
 #' these same quantiles.
 #'
 #' @param x A `mvgam_irf_summary` or `mvgam_fevd_summary`
-#' @param series Optional integer naming the process the shock
-#'   originates in, as in `plot.mvgam_irf()`. Default draws every
-#'   originating process.
-#' @param responses Optional integer vector naming the responding
-#'   processes to draw. Default draws all of them.
+#' @param series Integer vector of processes to keep, read at the end
+#'   of the pair the surface is about: the process a shock originates
+#'   in on an impulse response, the target whose forecast error is
+#'   decomposed on a variance decomposition. Default keeps every
+#'   process.
+#' @param responses Impulse responses only. Integer vector of the
+#'   processes whose response to the shock is drawn. Default keeps
+#'   every process.
+#' @param contributing Variance decompositions only. Integer vector of
+#'   the source processes whose contributions are drawn. Each share was
+#'   computed before the surface was summarised, so a selection here
+#'   chooses the pairs drawn and leaves every share at its value.
 #' @param shocks Optional character vector naming shock-response pairs
-#'   directly, for a selection `series` and `responses` cannot express.
+#'   directly, for a selection the index arguments cannot express.
 #' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object
@@ -73,26 +80,52 @@ var_surface_columns <- function(x) {
 #' @export
 plot.mvgam_var_surface_summary <- function(x, series = NULL,
                                            responses = NULL,
+                                           contributing = NULL,
                                            shocks = NULL, ...) {
   checkmate::assert_class(x, "mvgam_var_surface_summary")
-  checkmate::assert_int(series, lower = 1L, null.ok = TRUE)
-  checkmate::assert_integerish(responses, lower = 1L, null.ok = TRUE)
   checkmate::assert_character(shocks, null.ok = TRUE, min.len = 1L)
   rlang::check_dots_empty()
   cols <- var_surface_columns(x)
   dat <- as.data.frame(x)
 
-  # `series` and `responses` select the same way they do on the draws
-  # plot, so code written against that one keeps working when the
-  # summary becomes what `irf()` hands back. Both surfaces label a pair
-  # `Process_<from> -> Process_<to>`, so the selection reads off the
-  # two ends of the label.
+  # Both surfaces label a pair `Process_<from> -> Process_<to>`, so the
+  # selection reads off the two ends of the label. Which end each
+  # argument names is the surface's own convention, and it is the one
+  # `plot.mvgam_irf()` and `plot.mvgam_fevd()` use on the draws.
   ends <- strsplit(dat$shock, " -> ", fixed = TRUE)
   from <- as.integer(sub("^\\D*", "", vapply(ends, `[`, character(1), 1L)))
   to <- as.integer(sub("^\\D*", "", vapply(ends, `[`, character(1), 2L)))
+  n_proc <- max(c(from, to))
+  is_fevd <- inherits(x, "mvgam_fevd_summary")
+
+  # A decomposition is read from its target inwards and an impulse
+  # response from its shock outwards, so each surface takes one of the
+  # two names and refuses the other.
+  unusable <- if (is_fevd) "responses" else "contributing"
+  usable <- if (is_fevd) "contributing" else "responses"
+  if (!is.null(if (is_fevd) responses else contributing)) {
+    stop(insight::format_error(c(
+      paste0("'", unusable, "' does not select on this surface."),
+      x = paste0(
+        "Supplied on a ",
+        if (is_fevd) "variance decomposition" else "impulse response",
+        "."
+      ),
+      i = paste0("Use '", usable, "' to name the other end of the pair.")
+    )))
+  }
   keep <- rep(TRUE, nrow(dat))
-  if (!is.null(series)) keep <- keep & from == series
-  if (!is.null(responses)) keep <- keep & to %in% responses
+  if (is_fevd) {
+    keep <- keep &
+      to %in% validate_var_plot_ids(series, n_proc, "series") &
+      from %in% validate_var_plot_ids(
+        contributing, n_proc, "contributing"
+      )
+  } else {
+    keep <- keep &
+      from %in% validate_var_plot_ids(series, n_proc, "series") &
+      to %in% validate_var_plot_ids(responses, n_proc, "responses")
+  }
   if (!is.null(shocks)) {
     unknown <- setdiff(shocks, unique(dat$shock))
     if (length(unknown)) {

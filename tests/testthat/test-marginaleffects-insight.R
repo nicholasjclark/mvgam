@@ -110,7 +110,12 @@ test_that("set_coef.mvgam is a no-op pass-through", {
   expect_identical(out$marker, 42L)
 })
 
-test_that("find_predictors.mvgam pulls obs + trend + meta vars", {
+test_that("find_predictors reads both submodels and leaves the axis out", {
+  # A covariate of either submodel is a term. The axis columns are
+  # not: nothing takes a slope over an occasion number or a series
+  # index, and offering them is what put a grouping into
+  # `avg_slopes()`. They stay in the variable list, which is what a
+  # prediction grid is built from.
   stub <- structure(
     list(
       formula = y ~ x1,
@@ -123,7 +128,8 @@ test_that("find_predictors.mvgam pulls obs + trend + meta vars", {
     class = "mvgam"
   )
   preds <- insight::find_predictors(stub)$conditional
-  expect_true(all(c("x1", "x2", "time", "series") %in% preds))
+  expect_true(all(c("x1", "x2") %in% preds))
+  expect_false(any(c("time", "series") %in% preds))
 })
 
 test_that("find_predictors.mvgam walks nl sub-formulas and jsdgam aliases", {
@@ -144,9 +150,13 @@ test_that("find_predictors.mvgam walks nl sub-formulas and jsdgam aliases", {
   preds <- insight::find_predictors(stub_nl, flatten = TRUE)
   expect_true("env" %in% preds)
   expect_true("trait1" %in% preds)
-  expect_true("species" %in% preds)
   expect_false("a" %in% preds)
   expect_false("b" %in% preds)
+  # `species` groups the sub-formulas' varying terms. It is the
+  # grouping, not a term a slope can be taken over, so it answers
+  # under `random`.
+  expect_false("species" %in% preds)
+  expect_identical(insight::find_random(stub_nl)$random, "species")
 
   # jsdgam: the user's species / unit column names persist via
   # attr(model_data, "prepped_trend_model"). find_predictors must
@@ -169,6 +179,66 @@ test_that("find_predictors.mvgam walks nl sub-formulas and jsdgam aliases", {
   expect_true("site" %in% preds_j)
 })
 
+test_that("the term list splits one formula the way its readers ask", {
+  # One parse answers `find_predictors()`, `find_random()`,
+  # `find_variables()`, `terms()` and the prediction grid. The split
+  # decides whether a consumer offers a slope over a column: a
+  # grouping, a binomial denominator and an offset each name a column
+  # the model reads without anyone taking a slope over it, and each
+  # has to stay addressable in the grid all the same.
+  set.seed(1)
+  d <- data.frame(
+    time = rep(1:10, 2),
+    series = factor(rep(c("a", "b"), each = 10L)),
+    y = rbinom(20L, 10L, 0.5), n = 10L,
+    x = rnorm(20L), e = runif(20L, 1, 2),
+    g = factor(rep(c("g1", "g2"), 10L))
+  )
+  pf <- mvgam(
+    brms::bf(y | trials(n) ~ x + offset(log(e)) + (1 | g)),
+    trend_formula = ~ AR(p = 1), data = d, family = binomial(),
+    run_model = FALSE
+  )
+  preds <- insight::find_predictors(pf, effects = "all")
+  expect_identical(preds$conditional, "x")
+  expect_identical(preds$random, "g")
+  # The denominator, the offset and the axis are addressable and are
+  # not terms.
+  expect_true(all(c("n", "e", "time", "series") %in% preds$grid))
+  expect_false(any(c("n", "e", "g", "time", "series") %in%
+                     preds$conditional))
+  expect_identical(insight::find_random(pf)$random, "g")
+
+  # `find_variables()` is what a prediction grid is built from, so
+  # every column above has to survive into it.
+  vars <- insight::find_variables(pf, flatten = TRUE)
+  expect_true(all(c("y", "x", "g", "n", "e", "time", "series") %in%
+                    vars))
+
+  # `terms()` carries the terms and none of the rest, and
+  # `model.frame()` carries every column the model reads.
+  expect_identical(attr(terms(pf), "term.labels"), "x")
+  expect_true(all(c("y", "x", "g", "n", "e") %in%
+                    names(model.frame(pf))))
+})
+
+test_that("a distributional sub-formula's covariate is a term", {
+  # A covariate reaching the linear predictor only through a `dpar`
+  # appears in no top-level right-hand side, and a grid built without
+  # it holds the parameter it governs at one value.
+  set.seed(2)
+  d <- data.frame(
+    time = rep(1:10, 2),
+    series = factor(rep(c("a", "b"), each = 10L)),
+    y = rnorm(20L), x = rnorm(20L), w = rnorm(20L)
+  )
+  pf <- mvgam(
+    brms::bf(y ~ x, sigma ~ w), trend_formula = ~ AR(p = 1),
+    data = d, family = gaussian(), run_model = FALSE
+  )
+  expect_setequal(insight::find_predictors(pf)$conditional, c("x", "w"))
+})
+
 test_that("detect_conditional_effects recurses into nl sub-formulas", {
   # Reason: bf(..., nl = TRUE) hides the user-relevant covariates
   # inside per-nlpar pforms; the top-level RHS only enumerates the
@@ -189,14 +259,18 @@ test_that("detect_conditional_effects recurses into nl sub-formulas", {
   )
   cond <- mvgam:::detect_conditional_effects(stub)
   flat <- unlist(cond, use.names = FALSE)
-  # Should surface env (top-level data var), trait1 (sub-formula
-  # term) and species (RE grouping factor), and NOT the nlpar
-  # names a / b.
+  # env comes off the top-level right-hand side and trait1 off a
+  # sub-formula, so both are terms a reader can take a slope over.
   expect_true("env" %in% flat)
   expect_true("trait1" %in% flat)
-  expect_true("species" %in% flat)
   expect_false("a" %in% flat)
   expect_false("b" %in% flat)
+  # `species` groups the sub-formulas' varying terms. Its levels are
+  # exchangeable draws from a distribution whose scale the model
+  # estimates, so a panel over them draws shrunk deviations as though
+  # they were a population contrast. It answers under `find_random()`.
+  expect_false("species" %in% flat)
+  expect_identical(insight::find_random(stub)$random, "species")
   # No grouping should contain a nlpar after filtering.
   for (g in cond) {
     expect_false(any(g %in% c("a", "b")))
@@ -215,13 +289,15 @@ test_that("detect_conditional_effects leaves linear formulas alone", {
 })
 
 test_that("a smooth's covariates are read off its call", {
-  # The smooth was once evaluated to learn its variables. A setting
-  # naming an object that does not exist here failed the evaluation,
-  # and the fallback reported that object as a covariate. A `by`
-  # expression came back as its own text, not the columns it names.
+  # A smooth names its covariates as unnamed arguments and its
+  # grouping as `by`; every other argument is a setting. The
+  # covariates and the `by` are read off the call rather than by
+  # evaluating it, so `by = interaction(a, b)` answers with the two
+  # columns it names instead of a column named after the call, and a
+  # three-covariate smooth answers with its three pairwise margins.
   stub <- structure(
     list(
-      formula = y ~ s(x, k = kk) + t2(x, z, w) +
+      formula = y ~ s(x, k = 5) + t2(x, z, w) +
         s(x, by = interaction(a, b)),
       trend_formula = NULL
     ),
@@ -369,7 +445,7 @@ test_that("as.data.frame.mvgam_conditional_effects handles both shapes", {
   )
   df_u <- as.data.frame(uni)
   expect_true(is.data.frame(df_u))
-  expect_true(all(c("effect", "estimate", "conf.low", "conf.high")
+  expect_true(all(c("effect", "estimate__", "lower__", "upper__")
                     %in% colnames(df_u)))
   expect_false("rowid" %in% colnames(df_u))
   expect_setequal(unique(df_u$effect), c("env", "rain"))

@@ -4,20 +4,35 @@
 \alias{plot.mvgam_var_surface_summary}
 \title{Plot a summarised impulse response or variance decomposition}
 \usage{
-\method{plot}{mvgam_var_surface_summary}(x, series = NULL, responses = NULL, shocks = NULL, ...)
+\method{plot}{mvgam_var_surface_summary}(
+  x,
+  series = NULL,
+  responses = NULL,
+  contributing = NULL,
+  shocks = NULL,
+  ...
+)
 }
 \arguments{
 \item{x}{A \code{mvgam_irf_summary} or \code{mvgam_fevd_summary}}
 
-\item{series}{Optional integer naming the process the shock
-originates in, as in \code{plot.mvgam_irf()}. Default draws every
-originating process.}
+\item{series}{Integer vector of processes to keep, read at the end
+of the pair the surface is about: the process a shock originates
+in on an impulse response, the target whose forecast error is
+decomposed on a variance decomposition. Default keeps every
+process.}
 
-\item{responses}{Optional integer vector naming the responding
-processes to draw. Default draws all of them.}
+\item{responses}{Impulse responses only. Integer vector of the
+processes whose response to the shock is drawn. Default keeps
+every process.}
+
+\item{contributing}{Variance decompositions only. Integer vector of
+the source processes whose contributions are drawn. Each share was
+computed before the surface was summarised, so a selection here
+chooses the pairs drawn and leaves every share at its value.}
 
 \item{shocks}{Optional character vector naming shock-response pairs
-directly, for a selection \code{series} and \code{responses} cannot express.}
+directly, for a selection the index arguments cannot express.}
 
 \item{...}{Unused. Anything passed here is refused.}
 }

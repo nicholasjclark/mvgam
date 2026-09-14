@@ -162,8 +162,10 @@ dist_fun <- function(dist, kind = c("d", "p", "q")) {
           "likelihoods"
         )
       )
+      # extraDistr has no beta-binomial quantile function; `NULL`
+      # sends the truncation sampler to rejection sampling.
       switch(kind, d = extraDistr::dbbinom, p = extraDistr::pbbinom,
-             q = extraDistr::qbbinom)
+             q = NULL)
     },
     # A COM-binomial and a Tweedie have no quantile function here, so
     # a caller asking for one is told rather than handed a base R

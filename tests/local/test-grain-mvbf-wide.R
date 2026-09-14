@@ -675,7 +675,9 @@ test_that("model.frame carries the responses as well as the terms", {
   expect_true(all(responses %in% names(mf)))
   expect_true(all(c("x", "time") %in% names(mf)))
 
-  # The two accessors a caller pairs. `terms()` has no method at all.
+  # The two accessors a caller pairs, on the multivariate shape:
+  # `terms()` builds a `cbind()` left-hand side from the three
+  # responses.
   expect_true(inherits(terms(fit), "terms"))
 })
 

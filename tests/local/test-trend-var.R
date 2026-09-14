@@ -1359,8 +1359,12 @@ test_that("find_predictors reports a series column that varies", {
   library(marginaleffects)
   options("marginaleffects_model_classes" = "mvgam")
   preds <- insight::find_predictors(fit)$conditional
-  expect_true("series" %in% preds)
+  # Three series here, and still no slope over a series index. The
+  # axis is addressable in a grid, which is what `find_variables()`
+  # answers, and it is not a term a consumer may contrast over.
   expect_gt(length(unique(fit$data$series)), 1L)
+  expect_false("series" %in% preds)
+  expect_true("series" %in% insight::find_variables(fit, flatten = TRUE))
   # The observation formula's own terms are there too, so a list
   # built from the axis columns alone fails.
   expect_true(all(c("elev", "region") %in% preds))

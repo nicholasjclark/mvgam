@@ -806,20 +806,15 @@ test_that("the trend-side smooth is drawn as a curve that moves", {
   expect_s3_class(d, "data.frame")
   expect_gt(nrow(d), 0L)
 
-  # brms names these columns with trailing underscores and mvgam's
-  # own `conditional_effects()` renames them to `estimate`,
-  # `conf.low` and `conf.high`, so the two sibling methods answer in
-  # different spellings and code written against one breaks on the
-  # other. The column is resolved rather than assumed so this states
-  # the curve's shape either way.
-  ecol <- intersect(c("estimate__", "estimate"), names(d))
-  lo <- intersect(c("lower__", "conf.low"), names(d))
-  hi <- intersect(c("upper__", "conf.high"), names(d))
-  expect_length(ecol, 1L)
-  expect_gt(stats::sd(d[[ecol]]), 1e-6)
-  expect_true(all(d[[lo]] <= d[[ecol]]))
-  expect_true(all(d[[ecol]] <= d[[hi]]))
-  expect_gt(min(d[[hi]] - d[[lo]]), 0)
+  # brms names the estimate and its interval with trailing
+  # underscores in both of its drawn views, and the sibling method
+  # here answers with the same three, so code written against one
+  # frame reads the other.
+  expect_true(all(c("estimate__", "lower__", "upper__") %in% names(d)))
+  expect_gt(stats::sd(d$estimate__), 1e-6)
+  expect_true(all(d$lower__ <= d$estimate__))
+  expect_true(all(d$estimate__ <= d$upper__))
+  expect_gt(min(d$upper__ - d$lower__), 0)
   # Drawn over the covariate's own range rather than over its rank.
   expect_true(all(d$temp >= min(dat$temp) - 1e-8))
   expect_true(all(d$temp <= max(dat$temp) + 1e-8))
@@ -876,6 +871,15 @@ test_that("conditional_effects finds the model's own smooth term", {
   expect_true(all(d$conf.low <= d$estimate))
   expect_true(all(d$estimate <= d$conf.high))
   expect_gt(mean(d$conf.high - d$conf.low), 0)
+
+  # The ggplot keeps marginaleffects' own names, which its layers map
+  # to aesthetics. The documented extraction route is where mvgam
+  # names these columns, and it answers the way brms does, matching
+  # the `conditional_smooths()` frame above.
+  ce_df <- as.data.frame(ce)
+  expect_true(all(c("estimate__", "lower__", "upper__") %in%
+                    names(ce_df)))
+  expect_false(any(c("conf.low", "conf.high") %in% names(ce_df)))
 })
 
 

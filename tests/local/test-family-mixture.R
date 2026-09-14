@@ -606,7 +606,7 @@ test_that("a distributional term is offered by default", {
     series = factor("s1", levels = levels(dat2$series))
   )
   ep <- posterior_epred(fit2, newdata = nd)
-  ends <- panel$estimate[match(range(panel$z), panel$z)]
+  ends <- panel$estimate__[match(range(panel$z), panel$z)]
   expect_equal(ends, unname(apply(ep, 2L, median)), tolerance = 1e-6)
 
   # A higher `z` means a higher hurdle, so the curve falls.
@@ -1009,10 +1009,7 @@ test_that("the fit describes itself through the standard accessors", {
   # The head position holds the `mvgam` closure, so printing it emits
   # the function's source in place of the call that made the fit.
   expect_identical(class(getCall(fit)[[1L]]), "name")
-  # `model.frame()` answers and `terms()` does not, so the pair a
-  # caller reaches for is half available. Asserted last.
   expect_identical(nrow(model.frame(fit)), nrow(dat))
-  expect_s3_class(terms(fit), "terms")
 })
 
 

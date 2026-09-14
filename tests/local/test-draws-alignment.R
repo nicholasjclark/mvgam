@@ -411,7 +411,13 @@ test_that("find_predictors reaches a covariate on either side", {
   # the second, which is what makes the pair the test.
   expect_true("x" %in% insight::find_predictors(fit_plain)$conditional)
   expect_true("x" %in% insight::find_predictors(fit_trend)$conditional)
-  expect_true("time" %in% insight::find_predictors(fit_trend)$conditional)
+  # `time` is the axis the rows are indexed by. A prediction grid has
+  # to address it, so it is one of the model's variables; no slope
+  # over an occasion number exists, so it is not one of its
+  # predictors.
+  expect_false("time" %in% insight::find_predictors(fit_trend)$conditional)
+  expect_true("time" %in%
+                insight::find_variables(fit_trend, flatten = TRUE))
   # Both fits carry one series, so `series` supports neither a slope
   # nor a contrast and must not be offered.
   expect_identical(length(unique(fit_plain$data$series)), 1L)
