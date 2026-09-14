@@ -34,7 +34,7 @@ arm is drawn. Both default to \code{TRUE}; setting \code{forecast = FALSE} produ
 object carries \code{test_observations}, the test observations
 are overlaid on the forecast region.}
 
-\item{...}{Currently unused; reserved for future arguments.}
+\item{...}{Unused. Anything passed here is refused.}
 }
 \value{
 A \code{ggplot} object.

@@ -23,7 +23,7 @@
 #' @param newdata_obs Logical. When `TRUE` (the default) and the
 #'   object carries `test_observations`, the test observations
 #'   are overlaid on the forecast region.
-#' @param ... Currently unused; reserved for future arguments.
+#' @param ... Unused. Anything passed here is refused.
 #'
 #' @return A `ggplot` object.
 #'
@@ -65,6 +65,7 @@ plot.mvgam_forecast <- function(
   checkmate::assert_flag(hindcast)
   checkmate::assert_flag(forecast)
   checkmate::assert_flag(newdata_obs)
+  rlang::check_dots_empty()
 
   if (!hindcast && !forecast) {
     stop(insight::format_error(

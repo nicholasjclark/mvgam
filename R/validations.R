@@ -1142,6 +1142,44 @@ require_fitted_model <- function(object, fn) {
 }
 
 
+#' Refuse dot arguments absent from the method's and receiver's
+#' formals.
+#'
+#' A method that hands `...` to another package splits the names in
+#' its own formals from the names in the receiver's. A name in neither
+#' set reached the receiver, which discards what it does not
+#' recognise, and the caller got a result computed from the default
+#' they meant to override. bayesplot emits a warning for this and loo
+#' emits nothing, so the signal depended on which package was
+#' downstream.
+#'
+#' `rlang::check_dots_empty()` covers the methods with no use for
+#' dots. This covers the ones that legitimately forward them.
+#'
+#' @param dots The method's `list(...)`.
+#' @param allowed Names in the method's or the receiver's formals.
+#' @param fn The method's own name, which the message reports.
+#' @return Invisibly `TRUE`, or an error.
+#' @noRd
+refuse_unread_dots <- function(dots, allowed, fn) {
+  unread <- setdiff(names(dots), allowed)
+  if (!length(unread)) {
+    return(invisible(TRUE))
+  }
+  stop(insight::format_error(c(
+    "Unrecognised arguments were supplied.",
+    x = paste0(
+      "Unknown to ", fn, "() and to what it hands the work to: ",
+      paste0("'", unread, "'", collapse = ", "), "."
+    ),
+    i = paste0(
+      "Check the spelling against `?", fn, "`. A result computed ",
+      "from the default would differ from what was asked for."
+    )
+  )), call. = FALSE)
+}
+
+
 # Numeric-matrix branch. Validates shape + finite + no all-zero
 # rows. Rownames, where the user supplies them, say which series each
 # row of loadings belongs to, and the rows are read in that order.

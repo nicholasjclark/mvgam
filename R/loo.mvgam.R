@@ -199,6 +199,20 @@ loo.mvgam <- function(x, ...,
     )))
   }
 
+  # The refusals above name the arguments this method declines by
+  # design. What remains of `...` reaches `loo::loo()`, whose matrix
+  # method drops a name it does not read, so a misspelling returned an
+  # ELPD computed on the defaults with nothing said. The receiver's
+  # own formals are the set that survives a change in its signature.
+  refuse_unread_dots(
+    list(...),
+    names(formals(utils::getS3method(
+      "loo", "matrix",
+      envir = asNamespace("loo")
+    ))),
+    "loo"
+  )
+
   # An ELPD is a statement about the observations in hand, so each
   # column is scored under the state the model inferred at that time
   # rather than under a fresh draw from the trend's marginal

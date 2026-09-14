@@ -556,6 +556,10 @@ glance.mvgam <- function(x, looic = FALSE, resp = NULL, ...) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_flag(looic)
   checkmate::assert_string(resp, null.ok = TRUE)
+  # `...` reaches `loo()`, and only where `looic = TRUE`, so on the
+  # default path a name nothing reads was dropped without a word. The
+  # receiver is the same whichever branch runs.
+  refuse_unread_dots(list(...), names(formals(loo.mvgam)), "glance")
 
   # Multi-response (mvbrmsformula) fits with no `resp` argument
   # return one row per outcome carrying that outcome's family

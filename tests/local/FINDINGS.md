@@ -33,56 +33,6 @@ truncated, reaching Stan as
 intercept on the identity scale should carry the scalar's bound is a
 question for the family rather than for the axis work.
 
-## Arguments nothing reads
-
-**76. `pp_check()` still takes an argument that reaches no one.**
-
-Every other closed method on the post-fit surface refuses one, and
-`tests/local/test-dots-refusal.R` derives that set from the S3
-registry at runtime, so a method added later without the guard fails
-there. `pp_check()` hands `...` to bayesplot, which names the argument
-in a warning and returns the plot built on the default the caller was
-overriding. The notice is bayesplot's and leaves if the route to it
-changes. `test-grain-mvbf-wide.R` pins it.
-
-## One model, two observation counts
-
-**87. `nobs()` counts the rows supplied rather than the rows fitted,
-and its two branches disagree.**
-
-Found while checking what `summary()` prints against what the model
-was given. `nobs.mvgam()` returns `nrow(object$data)` and falls back
-to `standata$N` when the frame is absent, so the same function
-answers with either quantity depending on which slot the object
-happens to carry. On a frame with no unobserved cell the two
-coincide, which is why this went unseen.
-
-Measured on the two cached fits whose frames carry unobserved cells:
-
-| fit | rows | fitted (`standata$N`) | `nobs()` | `summary()` prints |
-|---|---|---|---|---|
-| by_lv_axis | 300 | 276 | 300 | 300 |
-| occ_visits_gappy | 300 | 250 | 300 | 300 |
-
-`summary.mvgam()` reads `nobs()` for the line a reader takes to be
-the size of the analysis, and the comment above that call states the
-intent the code does not meet: "How many rows the model was fitted
-to, which is what `nobs()` answers". It answers the other one.
-
-brms is the convention mvgam mirrors elsewhere and it counts the
-fitted rows: `nobs.brmsfit` is `nrow(model.frame(object))`, and brms
-drops the rows whose response is missing. Its signature also takes
-`resp`, which mvgam's does not, so a wide fit cannot be asked for one
-arm's count.
-
-What is not settled, and is why this is recorded rather than changed:
-mvgam requires the frame to be rectangular so the trend grid is
-complete, so an unobserved cell is part of the design in a way it is
-not for brms. Whether "Number of observations" should name the design
-or the likelihood is a decision for whoever owns the printed summary.
-What is wrong either way is that one function gives both answers and
-its own comment claims the one it does not give.
-
 ## What reading a rendered article shows
 
 **80. The VAR article's fit asks for four chains and reports three.**

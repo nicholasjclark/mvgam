@@ -15,6 +15,7 @@
   newdata = NULL,
   resp = NULL,
   draw_ids = NULL,
+  per_obs = TRUE,
   ...
 )
 }
@@ -58,8 +59,17 @@ are performed only for the specified response variables.}
 \item{draw_ids}{An integer vector specifying the posterior draws to be used.
 If \code{NULL} (the default), all draws are used.}
 
+\item{per_obs}{Logical. For \code{type = 'resid_vs_fitted'}, whether each
+observation collapses to its posterior median on both axes, giving
+one point per observation. \code{FALSE} keeps the draw by observation
+scatter, which shows the posterior spread. Read only by that type.}
+
 \item{...}{Further arguments passed to \code{\link{predict.mvgam}}
-as well as to the PPC function specified in \code{type}}
+as well as to the PPC function specified in \code{type}. A name
+belonging to neither is refused, naming the argument. Ten
+bayesplot types read a \code{stat} of their own; \code{type = 'fit_stat'}
+reads one here too, either \code{'chi_squared'} (default) or
+\code{'freeman_tukey'}, naming the discrepancy it computes.}
 }
 \value{
 A ggplot object that can be further

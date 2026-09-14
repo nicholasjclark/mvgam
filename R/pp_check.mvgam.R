@@ -21,8 +21,17 @@
 #'   original observations used for the model fit. Ignored if using one
 #'   of the residual plots (i.e. 'resid_hist')
 #'
+#' @param per_obs Logical. For `type = 'resid_vs_fitted'`, whether each
+#'   observation collapses to its posterior median on both axes, giving
+#'   one point per observation. `FALSE` keeps the draw by observation
+#'   scatter, which shows the posterior spread. Read only by that type.
+#'
 #' @param ... Further arguments passed to \code{\link{predict.mvgam}}
-#'   as well as to the PPC function specified in \code{type}
+#'   as well as to the PPC function specified in \code{type}. A name
+#'   belonging to neither is refused, naming the argument. Ten
+#'   bayesplot types read a `stat` of their own; `type = 'fit_stat'`
+#'   reads one here too, either `'chi_squared'` (default) or
+#'   `'freeman_tukey'`, naming the discrepancy it computes.
 #'
 #' @return A ggplot object that can be further
 #'   customized using the \pkg{ggplot2} package. A multivariate model
@@ -160,6 +169,7 @@ pp_check.mvgam <- function(
   newdata = NULL,
   resp = NULL,
   draw_ids = NULL,
+  per_obs = TRUE,
   ...
 ) {
   require_fitted_model(object, "pp_check")
@@ -261,6 +271,57 @@ pp_check.mvgam <- function(
     }
   }
 
+  # Which bayesplot kernel draws this type, and what it accepts.
+  # `fit_stat` and the four diagnostic resid types draw themselves and
+  # name no kernel, so the lookup is skipped for them. Resolved here
+  # because every early return below this point has already consumed
+  # `...`, and the split needs both audiences known.
+  bptype <- type
+  if (bptype %in% c("resid_hist", "resid_hist_grouped")) {
+    bptype <- sub("resid", "error", bptype)
+  }
+  if (bptype %in% c("resid_ribbon", "resid_ribbon_grouped")) {
+    bptype <- sub("resid_", "", bptype)
+  }
+  ppc_fun <- if (type %in% c(
+    "fit_stat", "resid_acf", "resid_pacf", "resid_qq", "resid_vs_fitted"
+  )) {
+    NULL
+  } else {
+    get(paste0(prefix, "_", bptype), asNamespace("bayesplot"))
+  }
+  ppc_formals <- if (is.null(ppc_fun)) {
+    character(0L)
+  } else {
+    names(formals(ppc_fun))
+  }
+
+  # `...` carries two audiences: the prediction method's arguments for
+  # this type, and the arguments of the kernel that draws it. A name
+  # in neither set reached bayesplot, which named it in a warning and
+  # returned the plot built from the default the caller meant to
+  # override.
+  method <- if (identical(type, "error_binned")) {
+    "posterior_epred"
+  } else {
+    "posterior_predict"
+  }
+  pred_formals <- names(formals(switch(
+    method,
+    posterior_epred = posterior_epred.mvgam,
+    posterior_predict = posterior_predict.mvgam
+  )))
+  # `stat` stays in `...`. Ten bayesplot kernels declare one of their
+  # own, so promoting it to a formal here bound it to mvgam and left
+  # `pp_check(type = 'stat', stat = 'median')` drawing the default.
+  # `type = 'fit_stat'` has no kernel to declare it, so it is named
+  # here for that type alone.
+  allowed <- c(pred_formals, ppc_formals)
+  if (identical(type, "fit_stat")) {
+    allowed <- c(allowed, "stat")
+  }
+  refuse_unread_dots(dots, allowed, "pp_check")
+
   # Short-circuit for the closure-unit fit-statistic GOF: it has a
   # custom computation (per-draw discrepancy on epred + yrep) and
   # returns a dedicated `mvgam_ppc_fit_stat` object, so it bypasses
@@ -285,10 +346,13 @@ pp_check.mvgam <- function(
         i = "Use family = occ() or family = nmix() to enable this discrepancy GOF."
       )))
     }
-    if (!ndraws_given) {
+    # The sibling default below carries `is.null(draw_ids)`. Without
+    # it a caller who named draws was given a count as well, and the
+    # prediction refused the pair.
+    if (!ndraws_given && is.null(draw_ids)) {
       ndraws <- 500L
     }
-    stat <- list(...)$stat %||% "chi_squared"
+    stat <- dots$stat %||% "chi_squared"
     return(closure_unit_fit_stat_ppc(
       object   = object,
       newdata  = newdata,
@@ -297,29 +361,6 @@ pp_check.mvgam <- function(
       ndraws   = ndraws,
       draw_ids = draw_ids
     ))
-  }
-
-  bptype <- type
-
-  # Residual ppc types: residuals() is computed on-the-fly below
-  # (line ~323). Just rename the bptype to the corresponding
-  # `error_*` bayesplot function.
-  if (bptype %in% c("resid_hist", "resid_hist_grouped")) {
-    bptype <- sub("resid", "error", bptype)
-  }
-  if (bptype %in% c("resid_ribbon", "resid_ribbon_grouped")) {
-    bptype <- sub("resid_", "", bptype)
-  }
-
-  # The four diagnostic resid types skip bayesplot entirely (see
-  # the dispatch later in this function); short-circuit so the
-  # bayesplot lookup doesn't fail on `ppc_resid_acf` etc.
-  ppc_fun <- if (type %in% c(
-    "resid_acf", "resid_pacf", "resid_qq", "resid_vs_fitted"
-  )) {
-    NULL
-  } else {
-    get(paste0(prefix, "_", bptype), asNamespace("bayesplot"))
   }
 
   # The detection families plot at the closure-unit grain, because
@@ -368,11 +409,6 @@ pp_check.mvgam <- function(
   # check is all we need here. The diagnostic resid types skip this
   # block; they have no bayesplot formals to query.
   valid_vars <- names(newdata)
-  ppc_formals <- if (is.null(ppc_fun)) {
-    character(0L)
-  } else {
-    names(formals(ppc_fun))
-  }
   # A `loo_*` check reweights its replicates by importance weights
   # built from the likelihood, which scores each observation under the
   # latent state the model inferred at that time. The replicates have
@@ -403,20 +439,7 @@ pp_check.mvgam <- function(
       stop("Variable '", x, "' could not be found in the data.", call. = FALSE)
     }
   }
-  # `...` carries two audiences: the arguments of the prediction
-  # method this type reads, and the arguments of the bayesplot kernel
-  # that draws it. The split is taken once here and read at both
-  # places below, so neither side is handed a name the other owns.
-  if (type == "error_binned") {
-    method <- "posterior_epred"
-  } else {
-    method <- "posterior_predict"
-  }
-  for_pred <- names(dots) %in% names(formals(switch(
-    method,
-    posterior_epred = posterior_epred.mvgam,
-    posterior_predict = posterior_predict.mvgam
-  )))
+  for_pred <- names(dots) %in% pred_formals
   # Type-specific draw count defaults + warnings.
   #
   # Non-grouped resid plots use empirical PIT residuals: ndraws
@@ -641,7 +664,7 @@ pp_check.mvgam <- function(
       # matching the one-dot-per-observation `plot.lm` style.
       # Pass `per_obs = FALSE` to retain the pooled draw x obs
       # scatter that exposes posterior uncertainty.
-      per_obs <- isTRUE(dots$per_obs %||% TRUE)
+      per_obs <- isTRUE(per_obs)
       return(build_resid_vs_fitted_panel(
         resid_draws, fitted_draws, per_obs = per_obs
       ))

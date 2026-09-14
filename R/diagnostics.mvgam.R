@@ -143,6 +143,14 @@ coef.mvgam <- function(object, summary = TRUE, ...) {
 #' @export
 nuts_params.mvgam <- function(object, pars = NULL, ...) {
   checkmate::assert_class(object, "mvgam")
+  refuse_unread_dots(
+    list(...),
+    names(formals(utils::getS3method(
+      "nuts_params", "stanfit",
+      envir = asNamespace("bayesplot")
+    ))),
+    "nuts_params"
+  )
   bayesplot::nuts_params(object$fit, pars = pars, ...)
 }
 
@@ -153,6 +161,16 @@ nuts_params.mvgam <- function(object, pars = NULL, ...) {
 #' @export
 log_posterior.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
+  # bayesplot raised on an unknown name here by its own accident of
+  # argument matching, which is not a signal mvgam controls.
+  refuse_unread_dots(
+    list(...),
+    names(formals(utils::getS3method(
+      "log_posterior", "stanfit",
+      envir = asNamespace("bayesplot")
+    ))),
+    "log_posterior"
+  )
   bayesplot::log_posterior(object$fit, ...)
 }
 

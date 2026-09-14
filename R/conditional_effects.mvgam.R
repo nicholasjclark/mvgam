@@ -207,6 +207,16 @@ conditional_effects.mvgam <- function(x,
     )))
   }
 
+  # The collision check above owns the names mvgam sets itself. What
+  # remains of `...` reaches `marginaleffects::plot_predictions`,
+  # which drops a name it does not read, so a misspelling drew the
+  # panel on the default the caller meant to override.
+  refuse_unread_dots(
+    list(...),
+    names(formals(marginaleffects::plot_predictions)),
+    "conditional_effects"
+  )
+
   # marginaleffects validates `type` against its shipped mvgam
   # `type_dictionary`, which names the latent state `latent_N`.
   # mvgam's user-facing token is `latent_state`; translate it to the

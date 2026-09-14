@@ -575,24 +575,51 @@ test_that("a wide fit refuses an argument nothing reads", {
 })
 
 
-test_that("pp_check says which argument it ignored", {
-  # This one already tells the user, and the notice comes from
-  # bayesplot checking its own dots rather than from mvgam. It is the
-  # weaker half of what `forecast()` does, since a plot is still
-  # returned on the default the caller was overriding, but it names
-  # the argument and so cannot be missed silently. Pinned here
-  # because it is the only call on this surface that says anything,
-  # and it would go if the route to bayesplot changed.
-  seen <- character(0)
-  suppressWarnings(withCallingHandlers(
-    pp_check(fit, resp = "count", ndraws = 10L, zzz_unknown = 1),
-    warning = function(w) {
-      seen <<- c(seen, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    }
-  ))
-  expect_true(any(grepl("zzz_unknown", seen, fixed = TRUE)))
-  expect_true(any(grepl("unrecognized|ignored", seen)))
+test_that("pp_check refuses an argument nothing reads", {
+  # The name belongs to neither the prediction method nor the
+  # bayesplot kernel. It used to reach bayesplot, which named it in a
+  # warning and then used the default the caller meant to override.
+  # That notice depended on the route to bayesplot staying as it is.
+  # mvgam owns the refusal now.
+  err <- expect_error(
+    pp_check(fit, resp = "count", ndraws = 10L, zzz_unknown = 1)
+  )
+  expect_match(conditionMessage(err), "zzz_unknown", fixed = TRUE)
+
+  # Both audiences it does read still reach their own side: `alpha`
+  # is the kernel's and `process_error` is the prediction method's.
+  expect_s3_class(
+    suppressWarnings(
+      pp_check(fit, resp = "count", ndraws = 10L, alpha = 0.5)
+    ),
+    "ggplot"
+  )
+  expect_s3_class(
+    suppressWarnings(
+      pp_check(fit, resp = "count", ndraws = 10L, process_error = FALSE)
+    ),
+    "ggplot"
+  )
+})
+
+
+test_that("nobs counts the design where standata counts one response", {
+  # `standata$N` is a different quantity from the frame's row count,
+  # and on a wide frame it is one response's count rather than the
+  # model's. `nobs()` fell through to it whenever the data slot was
+  # empty, so one function reported either quantity depending on
+  # which slot the object carried. Stated as the identity it is
+  # rather than as fixed numbers, so regenerating the fixture keeps
+  # the claim.
+  per_resp <- vapply(responses, function(r) {
+    as.integer(fit$standata[[paste0("N_", r)]])
+  }, integer(1L))
+  expect_true(as.integer(fit$standata$N) %in% per_resp)
+  expect_false(
+    identical(as.integer(nobs(fit)), as.integer(fit$standata$N))
+  )
+  # One derivation of the design count, reached two ways.
+  expect_identical(as.integer(nobs(fit)), nrow(model.frame(fit)))
 })
 
 
@@ -1191,26 +1218,25 @@ test_that("each arm predicts on the support its own family has", {
   # between arms, so the claim does not depend on which values this
   # particular simulation happened to draw.
   #
-  # Naming an arm raises a marginaleffects notice saying `resp` is
-  # not known to be supported for this class, once per arm. mvgam
-  # forwards and honours it, so the notice is wrong and the class has
-  # not been registered on that whitelist. Captured here rather than
-  # left to leak, and asserted as the absence it should be.
-  resp_warnings <- character(0)
+  # Naming a response raises a marginaleffects notice saying `resp`
+  # is not known to be supported for this class. Its `sanity_dots()`
+  # carries the per-class list of accepted names as a literal in its
+  # own body, keyed on `class(model)[1]`, which leaves the notice
+  # outside mvgam's control. Asserting its absence pinned on
+  # marginaleffects a claim only marginaleffects can satisfy. What
+  # mvgam owns is that the value is honoured, which the support
+  # checks below state.
   est <- lapply(responses, function(r) {
     withCallingHandlers(
       predictions(fit, newdata = dat, type = "expected", resp = r),
       warning = function(w) {
-        resp_warnings <<- c(resp_warnings, conditionMessage(w))
-        invokeRestart("muffleWarning")
+        if (grepl("not known to be supported", conditionMessage(w))) {
+          invokeRestart("muffleWarning")
+        }
       }
     )
   })
   names(est) <- responses
-  expect_identical(
-    grep("not known to be supported", resp_warnings, value = TRUE),
-    character(0)
-  )
 
   # A bernoulli expectation is a probability, bounds included. A
   # prediction that escaped to the link scale keeps every dimension

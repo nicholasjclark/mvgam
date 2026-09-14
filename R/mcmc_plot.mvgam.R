@@ -76,6 +76,10 @@ mcmc_plot.mvgam = function(
   mcmc_fun <- get(paste0("mcmc_", type), asNamespace("bayesplot"))
   mcmc_arg_names <- names(formals(mcmc_fun))
   mcmc_args <- list(...)
+  # The kernel's own formals are the contract, and they are already
+  # read above. A name outside them reached bayesplot, which drew the
+  # panel on the default the caller was overriding.
+  refuse_unread_dots(mcmc_args, mcmc_arg_names, "mcmc_plot")
   # NUTS sampler params are needed for both `x` (nuts_* plot types)
   # and `np` (any plot type that overlays divergences). Compute once.
   need_np <- ("x" %in% mcmc_arg_names && grepl("^nuts_", type)) ||

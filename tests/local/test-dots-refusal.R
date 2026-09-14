@@ -69,17 +69,18 @@ forwards_dots <- c(
   "find_formula", "find_predictors", "find_response", "find_variables",
   "get_data", "model_info", "get_coef", "get_vcov", "set_coef",
   "get_group_names", "get_predict",
-  # These forward `...` to a callee whose formals are the contract.
-  "nuts_params", "log_posterior", "hypothesis", "bridge_sampler",
-  "bayes_factor", "posterior_interval", "predictive_interval",
-  "predictive_error", "loo_predict", "loo_epred", "loo_linpred",
-  "loo_predictive_interval", "LOO", "WAIC", "loo", "waic",
-  "loo_compare", "loo_model_weights", "loo_R2", "add_criterion",
-  "pp_average", "posterior_average", "logLik", "bayes_R2", "parnames",
-  "mcmc_plot", "pairs", "pp_check", "plot", "conditional_effects",
-  "update", "residuals", "ensemble", "score", "smooths", "glance",
-  # Refused already, by their own hand-written checks.
-  "forecast", "hindcast", "family", "get_prior", "default_prior",
+  # `update()` rebuilds the call, so every `mvgam()` argument is one
+  # it legitimately takes.
+  "update",
+  # These compare several models, so a lone fit stops them before any
+  # guard is reached.
+  "loo_compare", "loo_model_weights", "pp_average", "posterior_average",
+  "ensemble", "score",
+  # Need an argument of their own before they can be asked anything.
+  "hypothesis", "bridge_sampler", "bayes_factor",
+  # Refuse the brms-parity arguments first, by name, so the message is
+  # about those rather than the unknown one.
+  "LOO", "WAIC",
   # Needs a refit to answer, so it is driven in its own file.
   "kfold", "lfo_cv", "loo_subsample", "loo_moment_match"
 )
@@ -102,7 +103,18 @@ test_that("every closed method on the mvgam class refuses an unknown argument", 
   expect_gt(length(covered), 30L)
   for (gen in covered) {
     args <- c(list(fit), needs_args[[gen]], list(zzz_unknown = 1))
-    err <- expect_error(do.call(gen, args), label = gen)
+    # brms deprecated `parnames` and warns from the generic before
+    # dispatch, so its refusal arrives carrying a notice this file
+    # makes no claim about. That one notice is muffled; every other
+    # warning still reaches testthat.
+    err <- withCallingHandlers(
+      expect_error(do.call(gen, args), label = gen),
+      warning = function(w) {
+        if (grepl("deprecated", conditionMessage(w), fixed = TRUE)) {
+          invokeRestart("muffleWarning")
+        }
+      }
+    )
     expect_match(conditionMessage(err), "zzz_unknown", label = gen)
   }
 })

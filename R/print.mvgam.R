@@ -206,25 +206,27 @@ formula.mvgam <- function(x, ...) {
 #'
 #' @param object mvgam object
 #' @param ... Unused. Anything passed here is refused.
-#' @return Integer number of observations
+#' @return Integer count of the rows the model was given, matching
+#'   `nrow(model.frame(object))`. A frame mvgam fits is rectangular,
+#'   so an unobserved cell is part of the design and is counted.
 #' @export
 nobs.mvgam <- function(object, ...) {
   checkmate::assert_class(object, "mvgam")
   rlang::check_dots_empty()
 
-  if (!is.null(object$data)) {
-    return(nrow(object$data))
-  } else if (!is.null(object$standata) &&
-             !is.null(object$standata$N)) {
-    return(object$standata$N)
-  } else {
+  # `standata$N` counts the rows contributing a density, a different
+  # quantity: 276 of 300 on a frame with unobserved cells, and on a
+  # wide frame one response's count rather than the model's (58,
+  # where the three responses have 57, 58 and 55). Using it as a
+  # fallback made one function report two quantities, chosen by
+  # which slot the object happened to carry.
+  if (is.null(object$data)) {
     stop(insight::format_error(c(
-      "Cannot determine number of observations.",
-      x = cli::format_inline(
-        "Neither {.field data} nor {.field standata$N} found in mvgam object."
-      )
-    )))
+      "No data found in mvgam object.",
+      i = "Refit the model and ensure the data is stored on the object."
+    )), call. = FALSE)
   }
+  nrow(object$data)
 }
 
 #' Extract Stan Code from mvgam Objects

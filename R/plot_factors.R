@@ -69,6 +69,7 @@ plot_factors <- function(
     lower = 0, upper = 1, min.len = 1L, any.missing = FALSE
   )
   checkmate::assert_flag(label_contribution)
+  rlang::check_dots_empty()
 
   n_lv <- detect_factor_n_lv(object)
   if (is.null(n_lv)) {
@@ -146,6 +147,7 @@ plot_factors <- function(
 # @noRd
 plot_latent_state <- function(object, probs = c(0.5, 0.8, 0.95),
                                 ndraws = NULL, ...) {
+  rlang::check_dots_empty()
   # Sharing the closure-unit pipeline does not mean exposing a
   # latent state, and asking only that admitted `mvn()`, `mvt()`,
   # `diri()`, `multi()` and `categ()` as far as a dispatcher with no

@@ -44,6 +44,9 @@ pairs.mvgam <- function(
   regex = FALSE,
   ...
 ) {
+  refuse_unread_dots(
+    list(...), names(formals(bayesplot::mcmc_pairs)), "pairs"
+  )
   if (is.null(variable)) {
     variable <- default_plot_variables(x)
     regex <- FALSE
