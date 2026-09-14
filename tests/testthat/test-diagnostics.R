@@ -240,6 +240,41 @@ test_that("neff_ratio.mvgam returns ratios <= 1 in [0,1]", {
   expect_true(all(out > 0))
 })
 
+test_that("compute_all_summaries() columns and measures match the draws", {
+  stub <- make_mvgam_stub()
+  draws <- posterior::as_draws_df(stub)
+  v <- as.numeric(draws[["b_x"]])
+
+  robust_out <- compute_all_summaries(
+    stub, probs = c(0.025, 0.975), robust = TRUE
+  )
+  # These are the columns `summary()` prints, and this is the only
+  # place in the suite that drives them.
+  expect_equal(colnames(robust_out),
+               c("Estimate", "Est.Error", "l-95% CI", "u-95% CI",
+                 "Rhat", "Bulk_ESS", "Tail_ESS"))
+  expect_true("b_x" %in% rownames(robust_out))
+
+  # Computed from the draws directly. A measure resolving to a
+  # different function would change these two numbers.
+  expect_equal(robust_out["b_x", "Estimate"], stats::median(v))
+  expect_equal(robust_out["b_x", "Est.Error"], stats::mad(v))
+
+  plain_out <- compute_all_summaries(
+    stub, probs = c(0.025, 0.975), robust = FALSE
+  )
+  expect_equal(colnames(plain_out), colnames(robust_out))
+  expect_equal(plain_out["b_x", "Estimate"], base::mean(v))
+  expect_equal(plain_out["b_x", "Est.Error"], stats::sd(v))
+
+  # The interval columns take their label from `probs`.
+  narrow <- compute_all_summaries(
+    stub, probs = c(0.1, 0.9), robust = FALSE
+  )
+  expect_equal(colnames(narrow)[3:4], c("l-80% CI", "u-80% CI"))
+})
+
+
 test_that("posterior_summary.mvgam returns a brms-shaped matrix", {
   stub <- make_mvgam_stub()
   out <- posterior_summary(stub, pars = c("b_Intercept", "sigma"))

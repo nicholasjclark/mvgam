@@ -5937,6 +5937,31 @@ warn_once_per_call <- function(expr) {
 }
 
 
+#' Compute an effective sample size without the capping notice
+#'
+#' `posterior` caps an ESS estimate at `S * log10(S)` whenever a
+#' parameter's autocorrelation sum falls below `1 / log10(S)`, and
+#' warns each time it caps one. Anticorrelated draws are what put an
+#' estimate above that bound, and the capped figure is both the
+#' conservative one and the figure mvgam reports, which leaves the
+#' reader nothing to act on. Every mvgam surface reporting an ESS
+#' runs its computation through here, which keeps the decision about
+#' showing the notice in one place. The match is on the message,
+#' which keeps every other warning the computation raises visible.
+#'
+#' @param expr Expression computing one or more ESS values
+#' @return The value of `expr`
+#'
+#' @noRd
+without_ess_cap_notice <- function(expr) {
+  withCallingHandlers(expr, warning = function(w) {
+    if (grepl("ESS has been capped", conditionMessage(w), fixed = TRUE)) {
+      invokeRestart("muffleWarning")
+    }
+  })
+}
+
+
 #' Are these forecast times the ones the trend can step to?
 #'
 #' A discrete-time trend advances one step per time point, so its

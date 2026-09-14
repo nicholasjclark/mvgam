@@ -280,9 +280,9 @@ summarise_param_block <- function(draws, param_names, type,
     robust = robust, conf.int = conf.int,
     conf.level = conf.level, rhat = rhat, ess = ess
   )
-  summ <- do.call(
+  summ <- without_ess_cap_notice(do.call(
     posterior::summarise_draws, c(list(sub), summary_fns)
-  )
+  ))
   out <- tibble::tibble(
     term = if (!is.null(alias)) alias else summ$variable,
     type = type

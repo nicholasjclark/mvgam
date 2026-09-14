@@ -98,7 +98,7 @@ fevd.mvgam <- function(object, h = 10, ndraws = NULL, draw_ids = NULL,
 # package https://github.com/cran/vars ####
 #' Forecast error variance decomposition
 #' @noRd
-gen_fevd <- function(x, h = 6, ...) {
+gen_fevd <- function(x, h = 6) {
   K <- x$K
   ynames <- x$labels
   msey <- var_fecov(x, h = h)

@@ -261,3 +261,32 @@ test_that("warn_once_per_call() drops repeats but never a new message", {
   # The value of the expression is passed through untouched.
   expect_equal(warn_once_per_call(41L + 1L), 42L)
 })
+
+
+test_that("without_ess_cap_notice() drops the cap notice and keeps the rest", {
+  # Anticorrelated draws are what push an ESS estimate above the bound
+  # posterior caps it at. The jitter separates the ranks, without which
+  # ties hold the estimate under the bound and nothing is capped.
+  set.seed(1)
+  draws <- rep(c(-1, 1), 500) + stats::rnorm(1000, 0, 1e-3)
+
+  # Matched on posterior's own wording, so a reworded notice fails
+  # here instead of passing through mvgam unnoticed.
+  expect_warning(posterior::ess_bulk(draws), "ESS has been capped")
+  expect_silent(without_ess_cap_notice(posterior::ess_bulk(draws)))
+
+  # The capped figure is the one reported: S * log10(S) at S = 1000.
+  expect_equal(without_ess_cap_notice(posterior::ess_bulk(draws)), 3000)
+
+  # A second, unrelated warning still reaches the caller.
+  expect_warning(
+    without_ess_cap_notice({
+      warning("something else")
+      posterior::ess_bulk(draws)
+    }),
+    "something else"
+  )
+
+  # The value of the expression is passed through untouched.
+  expect_equal(without_ess_cap_notice(41L + 1L), 42L)
+})

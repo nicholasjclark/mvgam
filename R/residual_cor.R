@@ -720,7 +720,7 @@ summarise_correlation_array <- function(arr, robust, probs, series_names) {
     pmin(pmax(r, -1 + eps), 1 - eps)
   }
 
-  for (i in seq_len(p)) {
+  without_ess_cap_notice(for (i in seq_len(p)) {
     for (j in seq_len(p)) {
       r <- arr[, i, j]
       z <- atanh(clip(r))
@@ -737,7 +737,7 @@ summarise_correlation_array <- function(arr, robust, probs, series_names) {
       # the boundary and well-defined when r touches +/- 1.
       ess[i, j] <- if (stats::sd(z) > 0) posterior::ess_basic(z) else NA_real_
     }
-  }
+  })
 
   # Correlation matrix diagonal is definitionally 1; the Fisher-z
   # clip + back-transform introduces a tiny bias on the diagonal that
@@ -788,7 +788,7 @@ summarise_unconstrained_array <- function(arr, robust, probs,
   upper <- matrix(0, p, p)
   ess   <- matrix(NA_real_, p, p)
 
-  for (i in seq_len(p)) {
+  without_ess_cap_notice(for (i in seq_len(p)) {
     for (j in seq_len(p)) {
       x <- arr[, i, j]
       point[i, j] <- if (robust) median(x) else mean(x)
@@ -798,7 +798,7 @@ summarise_unconstrained_array <- function(arr, robust, probs,
       upper[i, j] <- qs[2L]
       ess[i, j] <- if (stats::sd(x) > 0) posterior::ess_basic(x) else NA_real_
     }
-  }
+  })
 
   rownames(point) <- colnames(point) <- series_names
   rownames(se) <- colnames(se) <- series_names

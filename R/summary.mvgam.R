@@ -286,10 +286,9 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
 #' Compute posterior summaries for all parameters
 #'
 #' @description
-#' Internal helper that computes summaries once for all parameters using
-#' posterior package, then returns the full result for filtering by category.
-#' This makes a single call rather than multiple calls to
-#' posterior::summarise_draws().
+#' Internal helper that summarises every parameter in one
+#' `posterior::summarise_draws()` call, returning the full table for
+#' filtering by category.
 #'
 #' @param object An mvgam fitted object
 #' @param probs Quantile probabilities (length 2)
@@ -307,25 +306,25 @@ compute_all_summaries <- function(object, probs, robust) {
   # trend-side parameters mvgam adds pass through unchanged.
   draws <- posterior::as_draws_df(object)
 
-  # Compute summaries using posterior package
-  # Suppress ESS capping warnings (users can call diagnostics functions if needed)
-  if (robust) {
-    out <- suppressWarnings(posterior::summarise_draws(
-      draws,
-      median,
-      mad,
-      ~quantile(.x, probs = probs),
-      posterior::default_convergence_measures()
-    ))
+  # Each element is named, which gives the column its name, and holds
+  # the function itself, which removes the lookup. An unnamed argument
+  # takes its column name from a deparse of what was passed, and for a
+  # function object that is the whole body; a bare string is looked up
+  # in the calling namespace, where a same-named function defined here
+  # later would win.
+  measures <- if (robust) {
+    list(median = stats::median, mad = stats::mad)
   } else {
-    out <- suppressWarnings(posterior::summarise_draws(
-      draws,
-      mean,
-      sd,
+    list(mean = base::mean, sd = stats::sd)
+  }
+  out <- without_ess_cap_notice(do.call(posterior::summarise_draws, c(
+    list(draws),
+    measures,
+    list(
       ~quantile(.x, probs = probs),
       posterior::default_convergence_measures()
-    ))
-  }
+    )
+  )))
 
   # Rename columns for display
   names(out) <- rename_summary_cols(names(out), probs, robust)
@@ -976,10 +975,10 @@ summary.mvgam_pooled <- function(object, probs = c(0.025, 0.975),
     draws <- posterior::as_draws(individual_fits[[i]]$fit)
 
     # Compute convergence diagnostics only
-    summ <- posterior::summarise_draws(
+    summ <- without_ess_cap_notice(posterior::summarise_draws(
       draws,
       posterior::default_convergence_measures()
-    )
+    ))
 
     list(
       imputation = i,

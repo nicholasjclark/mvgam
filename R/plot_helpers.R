@@ -621,7 +621,7 @@ cluster_cormat <- function(cormat, ...) {
 
 
 #'@noRd
-reorder_clusters <- function(x, dis, ...) {
+reorder_clusters <- function(x, dis) {
   if (!is.matrix(dis)) {
     dis <- as.matrix(dis)
   }

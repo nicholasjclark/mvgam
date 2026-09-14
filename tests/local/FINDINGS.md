@@ -80,23 +80,18 @@ fit recovers the state best.
 
 ## Debt the code carries in recognisable shapes
 
-**89. Ten shapes account for the defects found so far, and a scan
-counts six of them.**
+**89. Six shapes remain, and a scan counts three of them.**
 
 Each shape leaves a mark in the source that a scan can find.
 `tests/local/debt_scan.R` reads parse data to count the marks in
-`R/`. Several shapes include false positives: the unused-argument
-scan counts dispatch kernels that share a signature (`log_lik_*`
-taking `trials`) and generics such as `methods_md()`, and each hit is
-read before anything is removed.
+`R/`. Several counts include false positives, and each hit is
+examined before anything is removed.
 
 | shape | the mark it leaves | count |
 |---|---|---|
-| one fact, several derivers | raw `[[series_var]]` / `[[time_var]]` reads; `sort(unique(...))` axis rebuilds; `inherits(..., "mvbrmsformula")` asked in place of the question meant | 53, 40, 58 |
+| one fact, several derivers | raw `[[series_var]]` / `[[time_var]]` reads; `sort(unique(...))` axis rebuilds; `inherits(..., "mvbrmsformula")` asked in place of the question meant | 53, 40, 43 |
 | a literal standing in for a missing value | `%||% "y"`, `%||% "series"`, `%||% "explicit"` | 118 |
-| a missing column skipped | `intersect(x, names(data))`, `if (!col %in% names(df)) next` | 21 |
-| a warning silenced, not traced | `suppressWarnings()`, `suppressMessages()` | 12 |
-| an argument nothing reads | accepted, asserted, never used; the scan also flags `df` on `AR()`, `RW()`, `CAR()` and `ZMVN()`, finding 6's shape if it holds | 113 non-S3 functions |
+| a missing column skipped | `intersect(x, names(data))`, `if (!col %in% names(df)) next` | 25 |
 | a stored copy of a derivable fact | object slots and metadata fields written once and read in a few places | not counted |
 | one condition, several refusals | the same fault refused with different wording at different layers | not counted |
 | a proxy for the question meant | "the frame has no series column" standing for "the responses are the series"; `length(x) > 1` standing for "multivariate" | found by reading |

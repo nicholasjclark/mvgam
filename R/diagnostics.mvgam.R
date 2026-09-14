@@ -200,11 +200,11 @@ neff_ratio.mvgam <- function(object, pars = NULL, ...) {
   checkmate::assert_character(pars, null.ok = TRUE)
   rlang::check_dots_empty()
   drws <- as_draws_array(object, variable = pars)
-  summ <- posterior::summarise_draws(
+  summ <- without_ess_cap_notice(posterior::summarise_draws(
     drws,
     ess_bulk = posterior::ess_bulk,
     ess_tail = posterior::ess_tail
-  )
+  ))
   # min(ess_bulk, ess_tail) mirrors bayesplot's neff_ratio convention.
   ess <- pmin(summ$ess_bulk, summ$ess_tail)
   names(ess) <- summ$variable
