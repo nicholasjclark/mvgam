@@ -161,6 +161,7 @@ predict.mvgam <- function(object,
 
   # Input validation
   checkmate::assert_class(object, "mvgam")
+  require_fitted_model(object, "predict")
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
   type <- match.arg(type)
   checkmate::assert_logical(process_error, len = 1, any.missing = FALSE)

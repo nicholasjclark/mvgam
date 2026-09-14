@@ -23,40 +23,6 @@ gives 335 at 1.396, with two species pulled to 0.9 by a prior centred
 on 0.5. No fixed constant suits every response scale. A new default
 needs calibrating over a grid of true `Psi` and factor share.
 
-**7. One post-fit method guards against a prefit. Seventeen do not.**
-
-No file covers this. `run_model = FALSE` returns an object of class
-`mvgam_prefit` whose `$fit` is `NULL`, so anything needing a posterior
-has to refuse. `summary()` does it properly:
-
-    No fitted model found in mvgam object.
-    summary() requires a fitted Stan model and an unfitted stub was
-    supplied (`run_model = FALSE`).
-    Use `stancode()` ...
-
-It names the state, names the argument that produced it and points at
-what does work. Every other method needing draws instead falls through
-to `posterior::as_draws_matrix()` failing on the empty slot:
-
-    Don't know how to transform an object of class 'NULL' to any
-    supported draws format.
-
-Measured across the post-fit surface, that is what comes back from
-`posterior_epred`, `posterior_predict`, `posterior_linpred`,
-`predict`, `fitted`, `residuals`, `log_lik`, `hindcast`, `forecast`,
-`loo`, `variables`, `tidy`, `augment`, `plot`, `pp_check` and
-`mcmc_plot`. `conditional_effects()` differs only in failing further
-out, inside `insight::get_data()`. `stancode()` and `standata()` both
-answer, as they must: reading them is why the mode exists at all.
-
-The pattern to copy already exists in the package, which is what makes
-this worth fixing rather than tolerating: one guard on the class,
-raised where a method starts, would replace seventeen internal errors
-that all say the same unhelpful thing.
-
-The test holds every method to the message `summary()` already
-produces, so it fails until they meet it.
-
 ## Prefit modes
 
 **46. `chains = 0` samples anyway, and the diagnostics warn about

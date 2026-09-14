@@ -29,6 +29,7 @@ NULL
 variables.mvgam <- function(x, ...) {
   # Validate input
   checkmate::assert_class(x, "mvgam")
+  require_fitted_model(x, "variables")
   rlang::check_dots_empty()
 
   # The exclusion list, the brms-style renames, the empty-observation

@@ -79,24 +79,7 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   checkmate::assert_logical(include_betas, len = 1)
   rlang::check_dots_empty()
 
-  # Check for fitted model
-  if (is.null(object$fit)) {
-    stop(
-      insight::format_error(c(
-        "No fitted model found in mvgam object.",
-        x = paste0(
-          "summary() requires a fitted Stan model and an unfitted ",
-          "stub was supplied (`run_model = FALSE`)."
-        ),
-        i = paste0(
-          "Use `stancode()` and `standata()` on `mvgam_formula()` ",
-          "to inspect the generated Stan code and data without ",
-          "fitting; refit with `run_model = TRUE` (the default) to ",
-          "summarise."
-        )
-      ))
-    )
-  }
+  require_fitted_model(object, "summary")
 
   # Compute summaries once for efficiency (then filter by category)
   all_summaries <- compute_all_summaries(

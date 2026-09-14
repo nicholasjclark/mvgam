@@ -100,6 +100,7 @@ log_lik.mvgam <- function(object,
                           sample_new_levels = "uncertainty",
                           ...) {
   checkmate::assert_class(object, "mvgam")
+  require_fitted_model(object, "log_lik")
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
   checkmate::assert_int(ndraws, lower = 1, null.ok = TRUE)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE)

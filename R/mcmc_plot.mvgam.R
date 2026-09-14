@@ -44,6 +44,7 @@ mcmc_plot.mvgam = function(
   ...
 ) {
   checkmate::assert_class(object, "mvgam")
+  require_fitted_model(object, "mcmc_plot")
   checkmate::assert_character(variable, null.ok = TRUE)
   checkmate::assert_logical(regex, len = 1L)
 

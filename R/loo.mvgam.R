@@ -138,6 +138,7 @@ loo.mvgam <- function(x, ...,
                       incl_autocor = TRUE,
                       incl_dynamics = NULL,
                       by_series = FALSE) {
+  require_fitted_model(x, "loo")
   incl_autocor <- resolve_incl_autocor(
     incl_autocor = incl_autocor,
     legacy = incl_dynamics,

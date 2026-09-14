@@ -377,6 +377,7 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
                                     ...) {
   # Validate mvgam-specific parameters only (other validation delegated)
   checkmate::assert_class(object, "mvgam")
+  require_fitted_model(object, "posterior_linpred")
   checkmate::assert_flag(transform)
   checkmate::assert_logical(process_error, len = 1)
   trend_state <- autocor_to_trend_state(incl_autocor)

@@ -1104,6 +1104,43 @@ series_row_order <- function(supplied, series_levels, subject) {
   match(series_levels, as.character(supplied))
 }
 
+#' Refuse a method that needs draws an unfitted stub does not carry
+#'
+#' `run_model = FALSE` returns an object classed `mvgam_prefit` whose
+#' `fit` slot is `NULL`. Every method needing a posterior otherwise
+#' reached `posterior::as_draws_matrix()` and failed on the empty
+#' slot with "Don't know how to transform an object of class 'NULL'",
+#' which names neither the state nor the argument that produced it.
+#' Reading the program and its data is why the mode exists, and
+#' `stancode()` and `standata()` do not call this.
+#'
+#' The class is what the stub is asked for. An absent `fit` slot is
+#' the broader condition and also describes the classed stubs the
+#' tests build to reach one validator without a posterior, which a
+#' user cannot construct and which this refusal would mis-describe.
+#'
+#' @param object An `mvgam` object.
+#' @param fn The method's own name, which the message reports.
+#' @return Invisibly `TRUE`, or an error.
+#' @noRd
+require_fitted_model <- function(object, fn) {
+  if (!inherits(object, "mvgam_prefit")) {
+    return(invisible(TRUE))
+  }
+  stop(insight::format_error(c(
+    "No fitted model found in mvgam object.",
+    x = paste0(
+      fn, "() requires a fitted Stan model and an unfitted ",
+      "stub was supplied (`run_model = FALSE`)."
+    ),
+    i = paste0(
+      "Use `stancode()` and `standata()` to inspect the generated ",
+      "Stan code and data without fitting; refit with ",
+      "`run_model = TRUE` (the default) to use this method."
+    )
+  )), call. = FALSE)
+}
+
 
 # Numeric-matrix branch. Validates shape + finite + no all-zero
 # rows. Rownames, where the user supplies them, say which series each

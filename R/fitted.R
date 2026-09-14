@@ -157,6 +157,7 @@ fitted.mvgam <- function(object,
                          sample_new_levels = "uncertainty",
                          ...) {
   checkmate::assert_class(object, "mvgam")
+  require_fitted_model(object, "fitted")
   scale <- match.arg(scale)
   components <- match.arg(components)
   checkmate::assert_data_frame(newdata, null.ok = TRUE)

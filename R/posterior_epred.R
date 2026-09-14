@@ -458,6 +458,7 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
                                   ...) {
   # Validate mvgam-specific parameters
   checkmate::assert_class(object, "mvgam")
+  require_fitted_model(object, "posterior_epred")
   checkmate::assert_logical(process_error, len = 1)
   trend_state <- autocor_to_trend_state(incl_autocor)
   checkmate::assert_integerish(draw_ids, lower = 1, null.ok = TRUE,

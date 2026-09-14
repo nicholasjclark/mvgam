@@ -263,6 +263,7 @@ residuals.mvgam <- function(object,
                               probs = c(0.025, 0.975),
                               ...) {
   checkmate::assert_class(object, "mvgam")
+  require_fitted_model(object, "residuals")
   type <- match.arg(type)
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
   checkmate::assert_int(ndraws, lower = 1L, null.ok = TRUE)

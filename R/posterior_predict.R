@@ -1450,6 +1450,7 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
                                     ...) {
   # Validate all parameters
   checkmate::assert_class(object, "mvgam")
+  require_fitted_model(object, "posterior_predict")
   checkmate::assert_data_frame(newdata, null.ok = TRUE)
   checkmate::assert_logical(process_error, len = 1)
   checkmate::assert_logical(incl_autocor, len = 1,

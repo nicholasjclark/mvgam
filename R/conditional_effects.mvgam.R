@@ -95,6 +95,7 @@ conditional_effects.mvgam <- function(x,
                                       resp = NULL,
                                       ...) {
   checkmate::assert_class(x, "mvgam")
+  require_fitted_model(x, "conditional_effects")
   checkmate::assert_character(effects, null.ok = TRUE)
   checkmate::assert_logical(process_error, len = 1L)
   # `resp` is the per-response selector for multivariate fits

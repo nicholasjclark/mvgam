@@ -100,6 +100,7 @@ plot.mvgam <- function(
   ...
 ) {
   checkmate::assert_class(x, "mvgam")
+  require_fitted_model(x, "plot")
   type <- match.arg(type)
   # `resp` is the per-response selector for multivariate fits
   # (mvbind / mvbrmsformula). When NULL on a mv fit each branch below

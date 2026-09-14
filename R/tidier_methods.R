@@ -107,6 +107,7 @@ tidy.mvgam <- function(x, effects = "all", robust = FALSE,
                         conf.int = TRUE, conf.level = 0.95,
                         rhat = FALSE, ess = FALSE, ...) {
   checkmate::assert_class(x, "mvgam")
+  require_fitted_model(x, "tidy")
   effects <- match.arg(
     effects, c("all", "fixed", "ran_pars", "ran_vals")
   )
@@ -400,6 +401,7 @@ broom_summary_fns <- function(robust = FALSE,
 augment.mvgam <- function(x, robust = FALSE, conf.int = TRUE,
                             conf.level = 0.95, resp = NULL, ...) {
   checkmate::assert_class(x, "mvgam")
+  require_fitted_model(x, "augment")
   checkmate::assert_flag(robust)
   checkmate::assert_flag(conf.int)
   checkmate::assert_number(conf.level, lower = 0, upper = 1)

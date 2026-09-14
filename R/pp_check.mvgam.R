@@ -162,6 +162,7 @@ pp_check.mvgam <- function(
   draw_ids = NULL,
   ...
 ) {
+  require_fitted_model(object, "pp_check")
   set_color_scheme_local("red")
 
   dots <- list(...)
