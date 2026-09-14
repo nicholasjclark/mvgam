@@ -808,8 +808,17 @@ plot.mvgam_lfo <- function(x, ...) {
   # panel the odd one out.
   set_color_scheme_local("red")
   ks <- obj$pareto_ks
-  ks[is.infinite(ks)] <-
-    suppressWarnings(max(ks[!is.infinite(ks)], na.rm = TRUE))
+  # An infinite k is loo declining to fit the tail rather than a
+  # diagnosis: `do_psis_i()` starts `khat` at `Inf` and replaces it
+  # only when the tail holds at least five draws. Those points are
+  # drawn at the largest finite k to keep the panel's scale. When no
+  # k is finite there is nothing to stand in for them, and taking a
+  # maximum over the empty set returned `-Inf`, which drew the least
+  # reliable evaluations as the most reliable.
+  finite_ks <- ks[is.finite(ks)]
+  if (length(finite_ks) > 0L) {
+    ks[is.infinite(ks)] <- max(finite_ks)
+  }
 
   threshold_val <- pareto_k_threshold_of(obj)
   panels <- list()
@@ -820,11 +829,14 @@ plot.mvgam_lfo <- function(x, ...) {
     facet = "Pareto K"
   )
   if (!is.null(obj$elpds)) {
+    # `quantile()` names its result, and `data.frame()` reads a name
+    # on a length-one column as row names it then discards, with a
+    # notice on every call.
     panels$elpds <- data.frame(
       eval = obj$eval_timepoints,
       value = obj$elpds,
-      threshold = stats::quantile(obj$elpds, probs = 0.15,
-                                    na.rm = TRUE),
+      threshold = unname(stats::quantile(obj$elpds, probs = 0.15,
+                                           na.rm = TRUE)),
       facet = "ELPD"
     )
   }
@@ -833,9 +845,10 @@ plot.mvgam_lfo <- function(x, ...) {
       panels[[sc]] <- data.frame(
         eval = obj$eval_timepoints,
         value = obj$scores[[sc]],
-        threshold = stats::quantile(obj$scores[[sc]],
-                                       probs = 0.85, na.rm = TRUE),
-        facet = paste0(toupper(sc))
+        threshold = unname(stats::quantile(obj$scores[[sc]],
+                                             probs = 0.85,
+                                             na.rm = TRUE)),
+        facet = toupper(sc)
       )
     }
   }

@@ -501,6 +501,50 @@ mk_mvgam_lfo <- function(elpds, eval_timepoints = NULL,
 }
 
 
+test_that("plot.mvgam_lfo keeps an unfittable Pareto k off the floor", {
+  # `loo:::do_psis_i()` starts `khat` at `Inf` and replaces it only
+  # when the tail holds five draws, so every k is infinite on a
+  # posterior of twenty draws or fewer. Standing the largest finite k
+  # in for the infinities took a maximum over an empty set there and
+  # returned `-Inf`, which sits below the threshold and coloured the
+  # evaluations loo could not fit at all as the most reliable ones.
+  all_inf <- mk_mvgam_lfo(c(-2, -2.5, -3), pareto_ks = rep(Inf, 3L))
+  g <- plot(all_inf)
+  expect_s3_class(g, "ggplot")
+  ks <- g$data$value[g$data$facet == "Pareto K"]
+  expect_false(any(ks == -Inf))
+  expect_true(all(is.infinite(ks) & ks > 0))
+  # An unfittable tail is the opposite of a reliable one, and the
+  # panel colours it that way.
+  expect_identical(
+    unique(g$data$colour[g$data$facet == "Pareto K"]), "outlier"
+  )
+
+  # One finite k is enough to stand in for the rest, which is what
+  # keeps the panel's scale readable.
+  mixed <- mk_mvgam_lfo(c(-2, -2.5, -3), pareto_ks = c(0.2, Inf, 0.6))
+  g2 <- plot(mixed)
+  ks2 <- g2$data$value[g2$data$facet == "Pareto K"]
+  expect_identical(ks2, c(0.2, 0.6, 0.6))
+})
+
+
+test_that("plot.mvgam_lfo draws a panel per score without notices", {
+  # `quantile()` names its result, and a named length-one column sends
+  # `data.frame()` looking for row names it then discards, with a
+  # notice on every call. Nothing reached `plot()` on an `mvgam_lfo`
+  # before these tests, so the notice went unseen. A warning fails
+  # this suite, which is what holds the fix.
+  scored <- mk_mvgam_lfo(c(-2, -2.5, -3))
+  scored$scores <- list(crps = c(1.1, 1.4, 0.9), sis = c(2, 3, 4))
+  g <- plot(scored)
+  expect_s3_class(g, "ggplot")
+  expect_identical(
+    unique(g$data$facet), c("Pareto K", "ELPD", "CRPS", "SIS")
+  )
+})
+
+
 test_that("loo_compare.mvgam_lfo orders by elpd_diff descending", {
   m1 <- mk_mvgam_lfo(c(-2, -2.5, -3, -2.2, -2.7))
   # Non-uniform offset so sd(diff) > 0 and se_diff is meaningful.
