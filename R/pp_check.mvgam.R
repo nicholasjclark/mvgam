@@ -701,9 +701,12 @@ pp_check.mvgam <- function(
     # above, where the NA responses were dropped from `y`.
     ll <- clean_ll(object, ll)
     r_eff <- mvgam_r_eff_log_lik(object, ll, draw_ids = draw_ids)
-    psis_obj <- suppressWarnings(
-      loo::psis(-ll, r_eff = r_eff)
-    )
+    # The panel below is drawn from these weights, and `loo()` on the
+    # same fit already hands this diagnostic to the user. Muting it
+    # here left a LOO-PIT plot with nothing to say its weights were
+    # unusable: the cached AR fit carries k above the threshold in
+    # 100 of its 160 scored columns.
+    psis_obj <- loo::psis(-ll, r_eff = r_eff)
     if ("psis_object" %in% ppc_formals) {
       ppc_args$psis_object <- psis_obj
     }
