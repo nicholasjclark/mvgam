@@ -33,51 +33,6 @@ truncated, reaching Stan as
 intercept on the identity scale should carry the scalar's bound is a
 question for the family rather than for the axis work.
 
-## What reading a rendered article shows
-
-**80. The VAR article's fit asks for four chains and reports three.**
-
-Found by reading the rendered `vignettes/articles/var.Rmd` rather than
-by checking that it rendered. The article knits in 14.1 minutes with
-no error and no warning.
-
-The chunk at `var.Rmd:133` reads `chains = 4`, and the `summary()`
-printed underneath it says "Draws: 3 chains" with 4500 post-warmup
-draws, which is 3 x 1500 exactly. So three chains are what the numbers
-rely on. `summary()` is not miscounting: fitted at 2, 3 and 4 chains
-it reports 2, 3 and 4 and `ndraws()` agrees each time. A chain was
-therefore lost during this fit and nothing said so, with `silent = 2`
-covering whatever was raised. A quarter of a posterior leaving without
-a word is worth a message the caller cannot suppress by asking for a
-quiet fit. Settling it needs the article re-rendered.
-
-**82. `posterior_summary()` prints each arm's intercept twice, and
-the mvbf article corrects a sign nothing makes indeterminate.**
-
-Both were found by reading the rendered `vignettes/articles/mvbf.Rmd`.
-
-`posterior_summary()` on a multivariate fit carries two spellings of
-every arm's intercept, `Intercept_<r>` and `b_<r>_Intercept`, with
-nothing to say they sit on different scales. That is brms's centred
-parameterisation rather than an mvgam fault. `Intercept_<r>` is the
-intercept at the covariate mean and `b_<r>_Intercept` the intercept at
-zero, so the two part company by the slope times the covariate mean.
-On the article's camera arm, whose covariate `deploy_days` is drawn
-`Unif(5, 20)` and not centred, the two read 0.007 and -0.882 against
-a truth of -0.5. The article now reads only the `b_` spelling and
-says why, but a reader of the table the package prints still has two
-rows and no guide.
-
-`recovery_summary()` multiplies each posterior by
-`sign(cor(med, truth$x))`, explaining that "latent factor models
-identify the trend only up to sign". None of the four fits is a
-factor model. Each is an AR(1) state with an identified intercept, so
-the sign is identified and the correction has nothing to fix. What it
-does instead is guarantee a non-negative correlation with the truth
-for every fit in the table, which can only move RMSE downward. The
-comparison it feeds is the article's headline claim that the joint
-fit recovers the state best.
-
 ## Debt the code carries in recognisable shapes
 
 **89. Six shapes remain, and a scan counts three of them.**

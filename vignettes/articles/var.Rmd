@@ -83,7 +83,8 @@ test  <- model_data[model_data$year >= 2004, ]
 ```
 
 ```{r plot-observed, fig.cap = "Annual detection-adjusted kestrel counts across the three regions. The last five years are held out."}
-mvgam_data(train, y = "adj_count", family = Gamma(), newdata = test)
+mvgam_data(train, y = "adj_count", family = Gamma(link = "log"),
+           newdata = test)
 ```
 
 Counts sit in a similar range across regions and tick along
@@ -128,7 +129,7 @@ varmod <- mvgam(
   ),
   data          = train,
   newdata       = test,
-  family        = Gamma(),
+  family        = Gamma(link = "log"),
   control       = list(adapt_delta = 0.99),
   chains        = 4,
   iter          = 3000,

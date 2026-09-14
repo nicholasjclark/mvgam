@@ -376,12 +376,6 @@ recovery_summary <- function(fit) {
   if (isTRUE(attr(hc, "mv_wrapper"))) hc <- hc[[1L]]
   m <- hc$hindcasts[[1L]]
   med <- apply(m, 2L, median)
-  # Latent factor models identify the trend only up to sign; flip
-  # the posterior to the sign that maximises correlation with the
-  # truth before computing the recovery metrics.
-  sgn <- sign(cor(med, truth$x))
-  m <- sgn * m
-  med <- sgn * med
   c(RMSE     = sqrt(mean((med - truth$x)^2)),
     `Mean SD` = mean(apply(m, 2L, sd)))
 }

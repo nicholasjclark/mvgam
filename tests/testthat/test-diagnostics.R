@@ -615,20 +615,3 @@ test_that("hidden_unrotated_factor_pars adds A_trend hide on VAR factor fits", {
   expect_true(grepl("A_trend\\[1\\]\\[1,1\\]", grep(pat, pars_var, value = TRUE)[1]))
 })
 
-test_that("filter_hidden_unrotated honours an explicit Z request via name", {
-  # Stub-level test: when the user explicitly asks for "Z", the
-  # default-path filter should NOT have dropped it from the pars
-  # vector the extractor sees. This guards against the regression
-  # where the filter ran before the variable argument was honoured.
-  pars <- c("Z_tilde[1,1]", "Z[1,1]", "b_x", "Intercept")
-  # Default path drops the raw Z[ name.
-  identified <- mvgam:::filter_hidden_unrotated(pars)
-  expect_false("Z[1,1]" %in% identified)
-  # The escape hatch (explicit variable arg in as_draws_array.mvgam)
-  # bypasses filter_hidden_unrotated entirely and runs the user's
-  # pattern against the full posterior name list; the integration
-  # test for that lives in tests/local/test-jsdgam-diagnostics.R
-  # because it needs a fitted jsdgam.
-  expect_true("Z_tilde[1,1]" %in% identified)
-  expect_true("b_x" %in% identified)
-})

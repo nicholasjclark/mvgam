@@ -232,10 +232,6 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   z_idx <- match_z_loadings(pars)
   if (any(z_idx)) {
     out$loadings <- all_summaries[z_idx, , drop = FALSE]
-    # Flag set when loadings were extracted from QR-identified
-    # `Z_tilde` draws rather than raw `Z`, so print.summary.mvgam
-    # can surface a scope footnote when relevant.
-    out$loadings_identified <- has_identified_loadings(pars)
   }
 
   loadings_prior_idx <- match_loadings_prior_pars(pars)
@@ -807,24 +803,8 @@ print.mvgam_summary <- function(x, digits = 2, ...) {
     print_param_section(x$trend_smooth, "Smooth Terms", digits)
     print_param_section(x$trend_random, "Group-Level Effects", digits)
     print_param_section(x$trend_spec, "Trend Specific Parameters", digits)
-    if (!is.null(x$loadings)) {
-      cat(
-        "Factor Loadings: ", nrow(x$loadings),
-        " entries. Use `shared_variation(fit)` for the",
-        " series-level shared-variation summary.\n\n",
-        sep = ""
-      )
-    }
-    if (!is.null(x$loadings_prior)) {
-      cat(
-        "Loadings Prior (length-scales: smaller ",
-        "=> stronger influence on Delta = Z * Z'; larger ",
-        "=> weaker):\n",
-        sep = ""
-      )
-      print(round_numeric(x$loadings_prior, digits), quote = FALSE)
-      cat("\n")
-    }
+    print_param_section(x$loadings, "Factor Loadings", digits)
+    print_param_section(x$loadings_prior, "Loadings Prior", digits)
   }
   cat("Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS\n")
   cat("and Tail_ESS are effective sample size measures, and Rhat is the potential\n")

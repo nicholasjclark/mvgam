@@ -575,6 +575,34 @@ fit_model <- function(model, backend, ...) {
     ), call. = FALSE)
   }
 
+  # `$metadata()` and `$output_files()` below assume a chain produced
+  # output. A run where none did reaches them and fails inside
+  # cmdstanr with "Unable to retrieve the metadata", which names
+  # neither the model nor the cause. The pathfinder branch checks its
+  # return codes already; the sampler is given the same check here.
+  # A run that kept some chains stays on this path, and
+  # `check_chains_finished()` names the shortfall after the fit.
+  if (algorithm %in% c("sampling", "fixed_param")) {
+    codes <- if (future) {
+      ulapply(out, function(x) x$return_codes())
+    } else {
+      out$return_codes()
+    }
+    if (length(codes) > 0L && all(codes != 0)) {
+      stop(insight::format_error(c(
+        "Every Stan chain exited with an error.",
+        x = paste0(
+          "All ", length(codes), " chains returned a non-zero code."
+        ),
+        i = paste0(
+          "Refit with 'silent = 0' to see Stan's own messages. A ",
+          "different 'seed' or 'init', or a higher 'adapt_delta', ",
+          "may also help."
+        )
+      )), call. = FALSE)
+    }
+  }
+
   if (future) {
     # 'out' is a list of fitted models
     output_files <- ulapply(out, function(x) x$output_files())
