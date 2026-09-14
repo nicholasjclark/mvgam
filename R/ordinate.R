@@ -6,7 +6,7 @@
 #' variables and the series' loadings are scattered in the
 #' resulting 2-D space. "Sites" are the training time points and
 #' "species" are the model's series. Site labels and series
-#' loading arrows are drawn via the package-wide [ggrepel]
+#' loading arrows are drawn via the package-wide \pkg{ggrepel}
 #' helpers; when \pkg{ggarrow} and \pkg{ggpp} are installed the
 #' arrows are rendered as tapered loadings.
 #'
