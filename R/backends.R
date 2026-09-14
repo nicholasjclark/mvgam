@@ -478,17 +478,6 @@ fit_model <- function(model, backend, ...) {
   args[names(control)] <- control
 
   checkmate::assert_number(chains)
-  empty_model <- chains <= 0
-  if (empty_model) {
-    # A model with no parameters to estimate still has to run for
-    # CmdStan to emit its generated quantities, so it is sampled at
-    # the smallest size that produces output.
-    chains <- 1
-    iter <- 2
-    warmup <- 1
-    thin <- 1
-    cores <- 1
-  }
 
   # do the actual sampling
   if (silent < 2) {
@@ -502,9 +491,7 @@ fit_model <- function(model, backend, ...) {
   # scale. Reason: a state-space model declares one innovation per time
   # point and latent variable, so random starts place hundreds of
   # correlated parameters far from the typical set.
-  # Skipped for the empty model, whose two draws exist only to let
-  # `update()` rebuild a fit object and would not repay the approximation.
-  if (pathfinder_init && !empty_model) {
+  if (pathfinder_init) {
     require_package("cmdstanr", version = "0.8.1")
     if (silent < 2) {
       message("Running Pathfinder to obtain initial values")
@@ -603,10 +590,6 @@ fit_model <- function(model, backend, ...) {
     model = model, exclude = exclude, algorithm = algorithm
   )
 
-  if (empty_model) {
-    # allow correct updating of an 'empty' model
-    out@sim <- list()
-  }
   out
 }
 

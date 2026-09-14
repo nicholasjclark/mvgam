@@ -23,46 +23,6 @@ gives 335 at 1.396, with two species pulled to 0.9 by a prior centred
 on 0.5. No fixed constant suits every response scale. A new default
 needs calibrating over a grid of true `Psi` and factor share.
 
-## Prefit modes
-
-**46. `chains = 0` samples anyway, and the diagnostics warn about
-the chain it ran.**
-
-No file covers this. Two Stan-emission blocks reach it, and both ask
-for a program without a posterior, spelled
-
-```r
-mvgam(y ~ elev, family = nmix("royle_nichols"), data = d,
-      algorithm = "sampling", chains = 0)
-```
-
-and both then read `stancode()` off the result. What happens in
-between is a compile and a two-iteration run:
-
-```
-Running MCMC with 1 chain...
-Chain 1 WARNING: No variance estimation is performed for
-                 num_warmup < 20
-Chain 1 Iteration: 1 / 2 [ 50%]  (Warmup)
-Chain 1 Iteration: 2 / 2 [100%]  (Sampling)
-```
-
-testthat then records a warning against each block:
-
-    E-BFMI not computed because it is undefined for posterior
-    chains of length less than 3.
-
-So a request for no chains produces one chain of two draws, and the
-sampler diagnostics run against it and report that they cannot. The
-returned object carries a posterior a user could read and summarise,
-of two iterations with no warmup behind them.
-
-`run_model = FALSE` is the mode that does what these calls were
-asking for, and `stancode()` answers on it. The two spellings should
-not both exist and disagree about whether sampling happens. The
-blocks are left as they are so the warning keeps arriving, rather
-than being spelled around in the test.
-
 ## com_binomial and the trials aterm
 
 **A difference worth recording, for the family work to settle.** The

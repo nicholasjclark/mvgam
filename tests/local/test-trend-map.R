@@ -290,19 +290,20 @@ test_that("every method needing draws refuses a prefit the same way", {
 })
 
 
-test_that("chains = 0 emits a program without sampling", {
-  # A request for no chains is a request for the program alone.
-  # Spelled this way it compiles and runs one chain of two draws, so
-  # the returned object carries a posterior of two iterations with no
-  # warmup behind it, and the sampler diagnostics then report that
-  # they cannot be computed on it.
-  built <- SM(mvgam(
+test_that("chains below one is refused, naming the mode that answers", {
+  # A request for no chains is a request for the program alone, which
+  # `run_model = FALSE` answers. Spelled as `chains = 0` it reached a
+  # branch inherited from brms for parameter-free models, compiled,
+  # ran one chain of two draws and blanked the simulation slot. The
+  # returned object carried a posterior a reader could summarise and
+  # sampler diagnostics that reported they could not be computed.
+  err <- expect_error(mvgam(
     formula = obs_formula,
     trend_formula = ~ -1 + AR(p = 1, trend_map = Z_true),
     data = dat, family = poisson(),
     algorithm = "sampling", chains = 0L, silent = 2
   ))
-  expect_null(built$fit)
+  expect_match(conditionMessage(err), "run_model", fixed = TRUE)
 })
 
 

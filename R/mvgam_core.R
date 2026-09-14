@@ -928,6 +928,23 @@ mvgam_single <- function(formula, trend_formula, data, backend,
   warmup <- dots$warmup %||% (iter %/% 2)
   thin <- dots$thin %||% 1
   chains <- dots$chains %||% 4
+  checkmate::assert_number(chains)
+  # A request for the program without a posterior has its own
+  # spelling, and `chains = 0` reached a branch inherited from brms
+  # for parameter-free models: it compiled, sampled one chain of two
+  # draws and blanked the simulation slot, leaving a posterior a
+  # reader could summarise and diagnostics that could not be computed.
+  if (chains < 1) {
+    stop(insight::format_error(c(
+      "'chains' must be at least 1.",
+      x = paste0("Got 'chains' = ", chains, "."),
+      i = paste0(
+        "Ask for the program without a posterior with ",
+        "`run_model = FALSE`, which `stancode()` and `standata()` ",
+        "read."
+      )
+    )), call. = FALSE)
+  }
   cores <- dots$cores %||% 1
   threads <- dots$threads %||% NULL
   opencl <- dots$opencl %||% NULL
