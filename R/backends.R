@@ -1051,6 +1051,82 @@ repair_stanfit <- function(x) {
 }
 
 
+#' How many chains does a fitted Stan model hold?
+#'
+#' Both backends hand back a `stanfit`: the rstan path through
+#' `repair_stanfit()` and the cmdstanr path through
+#' `brms::read_csv_as_stanfit()`. Its `stan_args` slot holds one entry
+#' per chain that finished, which is the count every later summary is
+#' computed from. The draws are the fallback for a fit carrying no
+#' `stan_args`, such as a stub built from a draws array.
+#'
+#' `stan_args` has precedence because it costs constant time, where
+#' counting chains from draws materialises the whole posterior. Both
+#' count the chains that finished, and they agree on every cached
+#' fixture.
+#'
+#' @param fit A fitted Stan model, or a draws object
+#' @return Integer count of chains, or `NA_integer_` when neither
+#'   route yields one
+#' @noRd
+realised_chain_count <- function(fit) {
+  if (isS4(fit) && "stan_args" %in% methods::slotNames(fit)) {
+    n <- length(methods::slot(fit, "stan_args"))
+    if (n > 0L) {
+      return(as.integer(n))
+    }
+  }
+  if (is.stanfit(fit) || inherits(fit, "draws")) {
+    return(as.integer(posterior::nchains(posterior::as_draws(fit))))
+  }
+  NA_integer_
+}
+
+
+#' Say when fewer chains finished than were requested
+#'
+#' Stan hands back the chains that finished, and the requested count
+#' is recorded nowhere on the fit. A chain lost to a failed start or
+#' an exception produces a smaller posterior with nothing said, and
+#' every later summary is computed from the smaller number without
+#' marking that it differs from the request. The notice is raised
+#' once per call and `silent` does not suppress it: a quiet fit is a
+#' request about progress output, not about part of the posterior
+#' going missing.
+#'
+#' @param fit The fitted Stan model the backend returned
+#' @param requested Chain count the caller asked for
+#' @param algorithm The algorithm that ran
+#' @return `invisible(TRUE)`
+#' @noRd
+check_chains_finished <- function(fit, requested, algorithm) {
+  # `fixed_param` runs chains in the ordinary way and holds only the
+  # parameters still, which is why it counts here. The approximations
+  # carry no chains, and "pathfinder" spends the same argument on its
+  # number of paths.
+  if (!algorithm %in% c("sampling", "fixed_param")) {
+    return(invisible(TRUE))
+  }
+  finished <- realised_chain_count(fit)
+  if (is.na(finished) || finished >= requested) {
+    return(invisible(TRUE))
+  }
+  # `insight::format_warning()` raises the warning while formatting
+  # it. The returned string is discarded here.
+  insight::format_warning(c(
+    "Fewer chains finished than were requested.",
+    x = paste0(
+      "Asked for ", requested, " chains and ", finished, " finished."
+    ),
+    i = paste0(
+      "Every summary of this model is computed from the ", finished,
+      " chains that finished. Refit to recover the full posterior."
+    )
+  ))
+  invisible(TRUE)
+}
+
+
 #' Unlist lapply Output
 #' @description
 #' Convenience function to unlist lapply results.

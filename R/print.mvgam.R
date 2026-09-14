@@ -58,7 +58,7 @@ print.mvgam <- function(x, ...) {
     cat("Not fitted", "\n")
   } else {
     draws <- posterior::as_draws(x$fit)
-    cat(posterior::nchains(draws), 'chains, each with iter =',
+    cat(realised_chain_count(x$fit), 'chains, each with iter =',
         posterior::niterations(draws), '\n')
     cat('  Total post-warmup draws =', posterior::ndraws(draws), '\n')
   }

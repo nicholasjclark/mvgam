@@ -270,6 +270,30 @@ test_that("A is one square matrix over the series", {
 })
 
 
+test_that("the chain count comes from the slot holding finished chains", {
+  # The CI suite drives only the draws fallback, since its stub is
+  # built from a draws array and carries no `stan_args`. A cached fit
+  # is the only place the slot branch runs.
+  expect_true(isS4(fit$fit))
+  expect_true("stan_args" %in% methods::slotNames(fit$fit))
+  expect_identical(realised_chain_count(fit$fit), 2L)
+
+  # The two counts agree on a real cmdstanr fit, which is what makes
+  # the slot safe to take first.
+  expect_identical(
+    realised_chain_count(fit$fit),
+    as.integer(posterior::nchains(posterior::as_draws(fit$fit)))
+  )
+
+  # A request above what finished names both counts.
+  expect_warning(
+    check_chains_finished(fit$fit, requested = 4L, algorithm = "sampling"),
+    "Asked for 4 chains and 2 finished"
+  )
+  expect_silent(check_chains_finished(fit$fit, 2L, "sampling"))
+})
+
+
 test_that("A recovers the simulated dynamics, entry by entry", {
   # Recovery on the whole matrix rather than on a summary of it. A
   # transposed or row-permuted `A` reproduces the same marginal

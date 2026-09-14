@@ -455,7 +455,7 @@ mvgam_sampler_inheritance <- function(object) {
     return(out)
   }
   first <- args[[1L]]
-  out$chains <- length(args)
+  out$chains <- realised_chain_count(fit_obj)
   if (!is.null(first$iter)) out$iter <- first$iter
   if (!is.null(first$warmup)) out$warmup <- first$warmup
   if (!is.null(first$thin)) out$thin <- first$thin

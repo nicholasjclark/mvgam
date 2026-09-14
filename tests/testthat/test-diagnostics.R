@@ -283,6 +283,38 @@ test_that("posterior_summary.mvgam returns a brms-shaped matrix", {
                                     "Q2.5", "Q97.5"))
 })
 
+test_that("a lost chain is named against the count that was asked for", {
+  stub <- make_mvgam_stub(n_chains = 3L)
+  expect_equal(realised_chain_count(stub$fit), 3L)
+
+  # Stan hands back only the chains that finished and the request is
+  # recorded nowhere on the fit, which is what let a lost chain pass
+  # without notice.
+  expect_warning(
+    check_chains_finished(stub$fit, requested = 4L, algorithm = "sampling"),
+    "Fewer chains finished"
+  )
+  # The notice names both counts, which is what a reader needs to tell
+  # a 4-chain request apart from a 3-chain posterior.
+  expect_warning(
+    check_chains_finished(stub$fit, requested = 4L, algorithm = "sampling"),
+    "Asked for 4 chains and 3 finished"
+  )
+  expect_silent(check_chains_finished(stub$fit, 3L, "sampling"))
+  expect_silent(check_chains_finished(stub$fit, 2L, "sampling"))
+
+  # The approximations carry no chains, and "pathfinder" spends the
+  # same argument on its number of paths.
+  expect_silent(check_chains_finished(stub$fit, 4L, "pathfinder"))
+  expect_silent(check_chains_finished(stub$fit, 4L, "meanfield"))
+  expect_silent(check_chains_finished(stub$fit, 4L, "laplace"))
+
+  # Nothing countable gives no verdict, never a false alarm.
+  expect_identical(realised_chain_count(NULL), NA_integer_)
+  expect_silent(check_chains_finished(NULL, 4L, "sampling"))
+})
+
+
 test_that("ndraws / nchains / niterations / nvariables work", {
   stub <- make_mvgam_stub(n_iter = 50L, n_chains = 2L)
   expect_equal(ndraws(stub), 100L)

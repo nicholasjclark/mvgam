@@ -1009,6 +1009,8 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     future = future
   )
   
+  check_chains_finished(combined_fit, chains, algorithm)
+
   # Store backend information for later use. `init` is kept as the user
   # wrote it because Stan records only the resolved value, which for
   # list-valued and Pathfinder starts is a temporary file path that
