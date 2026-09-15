@@ -27,6 +27,28 @@ test_that("setup_brms_lightweight accepts trend_formula parameter", {
   expect_null(setup1$trend_formula)
 })
 
+test_that("setup_brms_lightweight carries only the metadata it set", {
+  # The observation-side call assigns no `trend_metadata`. A bare
+  # `exists()` on that name then reaches the enclosing environments
+  # instead of the call, and an object a user happens to hold under
+  # that name in their session is stamped onto the setup.
+  data <- data.frame(
+    y = rnorm(20),
+    x = rnorm(20),
+    time = 1:20,
+    series = factor(rep(1:2, each = 10))
+  )
+  assign("trend_metadata", "planted", envir = globalenv())
+  withr::defer(rm("trend_metadata", envir = globalenv()))
+
+  setup <- setup_brms_lightweight(
+    formula = y ~ x,
+    data = data,
+    trend_formula = NULL
+  )
+  expect_null(setup$trend_metadata)
+})
+
 test_that("setup_brms_lightweight validates trend_formula parameter types", {
   data <- data.frame(
     y = rnorm(20),

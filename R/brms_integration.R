@@ -192,6 +192,12 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
   }
 
   # Trend context handling - validate and reduce data if this is trend setup
+  #
+  # Named before the branch, because only the trend-side call assigns
+  # it. Testing `exists()` on the observation side reached the
+  # enclosing environments and took whatever object a caller happened
+  # to hold under this name.
+  trend_metadata <- NULL
   if (is_trend_setup && !is.null(trend_formula)) {
     # Use consolidated validation and data extraction with metadata capture
     result <- extract_trend_data(
@@ -368,7 +374,7 @@ setup_brms_lightweight <- function(formula, data, family = gaussian(),
     trend_specs = trend_specs,  # Include parsed trend specifications
     # Pass through any trend metadata captured upstream so
     # downstream stancode generation can reuse it.
-    trend_metadata = if (exists("trend_metadata")) trend_metadata else NULL,
+    trend_metadata = trend_metadata,
     setup_time = system.time({})[["elapsed"]]
   )
 
