@@ -148,6 +148,22 @@ sides, `re_formula = NA` moves `mu` by 2.19 and moves `sigma` by 0.
 which puts `posterior_epred()` and `posterior_predict()` on the same
 footing. Forward the three.
 
+## A name looked up outside the call that should have set it
+
+**102. `exists("trend_metadata")` searches enclosing environments.**
+
+`brms_integration.R:371` takes `trend_metadata` when
+`exists("trend_metadata")` holds. That name is assigned at `:202`,
+inside the branch `:195` opens for
+`is_trend_setup && !is.null(trend_formula)`. The observation-side
+call takes neither. On that path the name is never assigned locally,
+which leaves the bare `exists()` reaching the enclosing environments,
+the global one included. The usual value is `NULL` by
+luck. `exists(..., inherits = FALSE)`, or an explicit `NULL` set
+before the branch runs, states what is meant. This one is reachable
+on the common path, which separates it from the dead guard 96 records
+at `make_stan.R:432`, where both branches assign the name.
+
 ## Debt the code carries in recognisable shapes
 
 **89. Six shapes remain, and a scan counts three of them.**
