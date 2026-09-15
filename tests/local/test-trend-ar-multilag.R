@@ -861,7 +861,7 @@ test_that("conditional_effects finds the model's own smooth term", {
   # Each element is a built panel, and the frame behind it is what
   # carries the effect. A panel that was never evaluated is a
   # constant with a zero-width band and satisfies any class check.
-  ce <- suppressWarnings(conditional_effects(fit))
+  ce <- conditional_effects(fit)
   expect_s3_class(ce, "mvgam_conditional_effects")
   expect_true("x" %in% names(ce))
   d <- ce[["x"]]$data
@@ -884,8 +884,8 @@ test_that("conditional_effects finds the model's own smooth term", {
 
 
 test_that("conditional_effects type = link is the link scale", {
-  ce_resp <- suppressWarnings(conditional_effects(fit))
-  ce_link <- suppressWarnings(conditional_effects(fit, type = "link"))
+  ce_resp <- conditional_effects(fit)
+  ce_link <- conditional_effects(fit, type = "link")
   expect_setequal(names(ce_link), names(ce_resp))
   # This fit is gaussian, so its link is the identity and the two
   # scales are the same numbers. Agreeing is the contract rather than
@@ -907,14 +907,14 @@ test_that("conditional_effects type = link is the link scale", {
 
 
 test_that("conditional_effects honours a user-supplied effects list", {
-  ce <- suppressWarnings(conditional_effects(fit, effects = "x"))
+  ce <- conditional_effects(fit, effects = "x")
   expect_length(ce, 1L)
   expect_identical(names(ce), "x")
 })
 
 
 test_that("plot returns the effects list invisibly and draws it", {
-  ce <- suppressWarnings(conditional_effects(fit))
+  ce <- conditional_effects(fit)
   out <- plot(ce, plot = FALSE)
   expect_identical(out, ce)
   # Returning its input unchanged is half the contract; the panels
@@ -930,7 +930,7 @@ test_that("the series argument selects among this fit's own levels", {
   # alphabetical reverse of what a rebuilt axis would give.
   lev <- levels(fit$data$series)
   expect_identical(lev, series_levels)
-  all_ce <- suppressWarnings(conditional_effects(fit, series = "all"))
+  all_ce <- conditional_effects(fit, series = "all")
   d_all <- all_ce[[1L]]$data
   expect_true("series" %in% colnames(d_all))
   expect_setequal(as.character(unique(d_all$series)), lev)
@@ -938,7 +938,7 @@ test_that("the series argument selects among this fit's own levels", {
   # Naming one series filters to it. On a single-series fit this is
   # satisfied by a filter that does nothing, which is why it is
   # asserted here instead.
-  one <- suppressWarnings(conditional_effects(fit, series = lev[1L]))
+  one <- conditional_effects(fit, series = lev[1L])
   d_one <- one[[1L]]$data
   expect_lt(nrow(d_one), nrow(d_all))
   expect_setequal(as.character(unique(d_one$series)), lev[1L])
@@ -946,7 +946,7 @@ test_that("the series argument selects among this fit's own levels", {
   # An index resolves to the level at that position, so it and the
   # name give the same answer. Position, not alphabetical rank: this
   # fit's first level is `gamma`, which sorts second.
-  by_int <- suppressWarnings(conditional_effects(fit, series = 1L))
+  by_int <- conditional_effects(fit, series = 1L)
   expect_equal(by_int[[1L]]$data$estimate, d_one$estimate)
 })
 

@@ -96,11 +96,11 @@ assert_by_factor_variation <- function(mvgam_fit, grid_A, grid_B,
   prev_mc <- options(marginaleffects_model_classes = "mvgam")
   on.exit(options(prev_mc), add = TRUE)
   me_grid <- rbind(grid_A, grid_B)
-  me_preds <- suppressWarnings(marginaleffects::predictions(
+  me_preds <- marginaleffects::predictions(
     mvgam_fit,
     newdata = me_grid,
     type = "response"
-  ))
+  )
   n_A <- nrow(grid_A)
   me_A <- me_preds$estimate[seq_len(n_A)]
   me_B <- me_preds$estimate[-seq_len(n_A)]
