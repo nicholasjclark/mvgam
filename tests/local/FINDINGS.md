@@ -120,6 +120,11 @@ spellings. The two coincide on every cached fixture, which makes this
 a latent hazard and not a measured defect. Point the three at the
 accessor.
 
+`per_obs_series_labels()` (`loo.mvgam.R:456`) is a fourth site, and
+it carries the axis debt as well: it takes `x$data` and then tests
+for a literal `"series"` column at `:457`, which is the question
+`axis_row_series()` owns. This is the `loo(by_series = TRUE)` path.
+
 ## Copy-paste twins
 
 **100. Two pairs differ in one field.**
@@ -128,6 +133,20 @@ accessor.
 their defaults and their roxygen. They differ in which component they
 extract. `make_stan.R:578-584` and `:587-593` test the same four
 conditions and return opposite verdicts.
+
+## An argument honoured on one path and dropped on another
+
+**101. `re_formula` reaches `mu` and never reaches a dpar.**
+
+`posterior_linpred.R:531-534` and `posterior_predict.R:1055-1061`
+call `extract_component_linpred()` with five arguments. The three it
+leaves out are `re_formula`, `allow_new_levels` and
+`sample_new_levels`, which then take the defaults declared at
+`predictions.R:466-468`, while the mean path forwards them. Measured on a fit carrying `(1 | g)` on both
+sides, `re_formula = NA` moves `mu` by 2.19 and moves `sigma` by 0.
+`predicted_dpar_draws()` is reached from `resolve_family_pars()`,
+which puts `posterior_epred()` and `posterior_predict()` on the same
+footing. Forward the three.
 
 ## Debt the code carries in recognisable shapes
 
