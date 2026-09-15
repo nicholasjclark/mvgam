@@ -69,6 +69,13 @@ When a trend formula is specified, the function:
 The function handles embedded families automatically when using \code{bf()}
 specifications and supports all brms family types for observation models
 while trend components are always modeled as Gaussian State-Space processes.
+
+A shrinkage prior on a trend-side class is written without
+autoscaling. \code{horseshoe()} and \code{R2D2()} scale their global
+parameter by the family's residual standard deviation, and the
+trend's own scale is \code{sigma_trend}, one per latent series, so
+\code{autoscale = FALSE} is set for those rows. Writing
+\code{autoscale = TRUE} on a trend-side class is refused.
 }
 \examples{
 \dontrun{

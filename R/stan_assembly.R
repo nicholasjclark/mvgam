@@ -2640,12 +2640,17 @@ generate_common_trend_data <- function(n_obs, n_series, n_lv = NULL,
 #' @param stanvars A named list of stanvar objects, typically from brms
 #' @return A reordered list of stanvars with same class and structure
 #' @details
-#' Priority levels:
-#' - Level 1: Dimension variables (N_trend, N_series_trend, etc.)
-#' - Level 2: Arrays referencing dimensions (times_trend, obs_trend)
-#' - Level 3: All other stanvars
+#' The order, each level depending on the ones above it:
+#' - the trend's dimensions (`N_trend`, `N_series_trend`, ...)
+#' - whatever the trend's linear predictor is built from, which is
+#'   decided by the names that predictor references
+#' - the linear predictor `mu_trend` itself
+#' - the latent states and the factor loadings
+#' - the arrays indexing those dimensions, then everything else
+#' - the trend matrix, which the states and `mu_trend` produce
+#' - the observation predictor's trend term, which that matrix produces
 #'
-#' Within each priority level, original order is preserved for stability.
+#' Within each level the original order is kept.
 #' @noRd
 sort_stanvars <- function(stanvars) {
   # Validate input per CLAUDE.md standards
@@ -2678,15 +2683,41 @@ sort_stanvars <- function(stanvars) {
     }
   }
 
-  # Evidence-based patterns from actual Stan compilation failures
-  # Level 0: Random effects declarations (must precede mu_trend usage)
-  re_matrix_pattern <- "matrix\\s*\\[\\s*N_[0-9]+_trend\\s*,\\s*M_[0-9]+_trend\\s*\\]\\s+r_[0-9]+_trend"
-  re_vector_pattern <- "vector\\s*\\[\\s*N_[0-9]+_trend\\s*\\]\\s+r_[0-9]+_[0-9]+_trend"
-  re_scale_r_cor_pattern <- "r_[0-9]+_trend\\s*=\\s*scale_r_cor"
-  re_extraction_pattern <- "r_[0-9]+_[0-9]+_trend\\s*=\\s*r_[0-9]+_trend\\s*\\["
+  # The code of each stanvar, as one string. A stanvar that delegates
+  # to a shared system carries none.
+  scodes <- vapply(
+    stanvars,
+    function(sv) {
+      scode <- sv$scode
+      if (is.character(scode) && length(scode) == 1L) scode else ""
+    },
+    character(1L)
+  )
 
-  # Level 1: mu_trend declarations (must come after RE but before other foundation)
+  # Level 1: the trend's linear predictor
   mu_trend_decl_pattern <- "vector\\s*\\[\\s*N_trend\\s*\\]\\s+mu_trend\\s*="
+  is_mu_trend <- grepl(mu_trend_decl_pattern, scodes)
+
+  # Level 0: whatever that predictor is built from. A group-level block
+  # computes `r_1_1_trend` and a shrinkage prior computes `b_trend`,
+  # and the predictor adds both, so each is declared before it. The
+  # names come from the predictor's own code: one pattern per term type
+  # left every other term type out, which is how `horseshoe(1)` on
+  # `class = "b_trend"` produced a program using `b_trend` two lines
+  # above its declaration.
+  mu_references <- unique(unlist(lapply(
+    scodes[is_mu_trend], extract_all_identifiers
+  )))
+  builds_mu_trend <- vapply(
+    scodes,
+    function(scode) {
+      if (!nzchar(scode)) {
+        return(FALSE)
+      }
+      any(extract_computed_variables(scode) %in% mu_references)
+    },
+    logical(1L)
+  )
 
   # Level 2: Foundation variables (no dependencies on trend)
   lv_trend_pattern <- "matrix\\s*\\[\\s*N_time_trend\\s*,\\s*N_lv_trend\\s*\\]\\s+lv_trend\\s*[;=]"
@@ -2705,7 +2736,7 @@ sort_stanvars <- function(stanvars) {
   array_with_dims_pattern <- "^\\s*array\\[.*\\b(N_series_trend|N_lv_trend)\\b.*\\]"
 
   # Initialize level collections
-  level0_re_declarations <- integer(0)
+  level0_mu_inputs <- integer(0)
   level1_mu_trend <- integer(0)
   level2_foundation <- integer(0)
   level3_trend_comp <- integer(0)
@@ -2731,13 +2762,10 @@ sort_stanvars <- function(stanvars) {
       dimensions <- c(dimensions, i)
     } else if (grepl(array_with_dims_pattern, scode)) {
       dimension_arrays <- c(dimension_arrays, i)
-    } else if (grepl(re_matrix_pattern, scode) ||
-               grepl(re_vector_pattern, scode) ||
-               grepl(re_scale_r_cor_pattern, scode) ||
-               grepl(re_extraction_pattern, scode)) {
-      level0_re_declarations <- c(level0_re_declarations, i)
-    } else if (grepl(mu_trend_decl_pattern, scode)) {
+    } else if (is_mu_trend[i]) {
       level1_mu_trend <- c(level1_mu_trend, i)
+    } else if (builds_mu_trend[i]) {
+      level0_mu_inputs <- c(level0_mu_inputs, i)
     } else if (grepl(lv_trend_pattern, scode) ||
                grepl(scaled_innov_pattern, scode) ||
                grepl(z_pattern, scode)) {
@@ -2751,11 +2779,15 @@ sort_stanvars <- function(stanvars) {
   }
 
   # All other stanvars (priors, etc.)
-  categorized <- c(dimensions, dimension_arrays, level0_re_declarations, level1_mu_trend, level2_foundation, level3_trend_comp, level4_mu_inject)
+  categorized <- c(dimensions, dimension_arrays, level0_mu_inputs,
+                   level1_mu_trend, level2_foundation, level3_trend_comp,
+                   level4_mu_inject)
   others <- setdiff(seq_along(stanvars), categorized)
 
   # Dependency-respecting order
-  sort_order <- c(dimensions, level0_re_declarations, level1_mu_trend, level2_foundation, dimension_arrays, others, level3_trend_comp, level4_mu_inject)
+  sort_order <- c(dimensions, level0_mu_inputs, level1_mu_trend,
+                  level2_foundation, dimension_arrays, others,
+                  level3_trend_comp, level4_mu_inject)
 
   # Validate sort_order indices are within bounds
   checkmate::assert_integerish(sort_order, lower = 1, upper = length(stanvars),
@@ -7902,7 +7934,12 @@ extract_computed_variables <- function(stan_code) {
 
   for (line in lines) {
     if (grepl(direct_pattern, line, perl = TRUE)) {
-      var_name <- gsub(direct_pattern, "\\1", line, perl = TRUE)
+      # The whole line is replaced by the name it assigns. Substituting
+      # the matched prefix alone left the expression attached, so a
+      # caller comparing the result against a variable name matched
+      # nothing.
+      var_name <- sub(paste0(direct_pattern, ".*$"), "\\1", line,
+                      perl = TRUE)
       # Filter out Stan reserved keywords and empty strings
       if (!var_name %in% stan_reserved && nchar(var_name) > 0) {
         computed_vars <- c(computed_vars, var_name)

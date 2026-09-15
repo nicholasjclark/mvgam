@@ -1079,6 +1079,50 @@ suffix_trend_prior_classes <- function(priors) {
 }
 
 
+#' Turn off autoscaling for a trend-side shrinkage prior
+#'
+#' `horseshoe()` and `R2D2()` scale their global parameter by the
+#' family's residual standard deviation, which brms writes as
+#' `hs_scale_global * sigma` and `sigma^2 * R2D2_R2 / (1 - R2D2_R2)`.
+#' The trend submodel reaches brms as a gaussian whose residual scale
+#' mvgam takes back out: the process noise is `sigma_trend`, one scale
+#' per latent series. The factor names a parameter the combined program
+#' leaves undeclared, and under a gaussian observation family it
+#' resolves to the observation model's own `sigma`, a different
+#' quantity. brms takes `autoscale = FALSE` for this case.
+#'
+#' @param priors A `brmsprior` table scoped to the trend formula.
+#' @return The same table, with `autoscale = FALSE` on each special
+#'   prior that left it unset.
+#' @noRd
+disable_trend_prior_autoscale <- function(priors) {
+  special <- "^\\s*(horseshoe|R2D2)\\s*\\("
+  texts <- priors$prior %||% character(0)
+  for (i in which(grepl(special, texts))) {
+    call <- str2lang(texts[i])
+    if ("autoscale" %in% names(call)) {
+      if (identical(call$autoscale, FALSE)) {
+        next
+      }
+      stop(insight::format_error(c(
+        "A shrinkage prior on the trend is written unscaled.",
+        x = paste0(
+          "'", texts[i], "' was given for class '", priors$class[i], "'."
+        ),
+        i = paste0(
+          "Autoscaling multiplies the prior by the family's residual ",
+          "scale, and the trend's own scale is 'sigma_trend', one per ",
+          "latent series. Write 'autoscale = FALSE'."
+        )
+      )), call. = FALSE)
+    }
+    call$autoscale <- FALSE
+    priors$prior[i] <- paste(deparse(call), collapse = "")
+  }
+  priors
+}
+
+
 #' Strip the `_trend` suffix from the keys of a `brmsprior` table so
 #' the remaining rows can be merged back into a brms-only prior set.
 #' Used by the trend-side prior pipeline to hand off
@@ -1115,6 +1159,7 @@ remove_trend_suffix_from_priors <- function(trend_priors, trend_specs, base_form
   # Keep only brms-compatible parameters and remove _trend suffix
   result <- trend_priors[is_brms_compatible, , drop = FALSE]
   result$class <- gsub("_trend$", "", result$class)
+  result <- disable_trend_prior_autoscale(result)
   
   structure(result, class = c("brmsprior", "data.frame"))
 }
@@ -1782,6 +1827,13 @@ get_prior.mvgam <- function(object, ...) {
 #' The function handles embedded families automatically when using \code{bf()}
 #' specifications and supports all brms family types for observation models
 #' while trend components are always modeled as Gaussian State-Space processes.
+#'
+#' A shrinkage prior on a trend-side class is written without
+#' autoscaling. \code{horseshoe()} and \code{R2D2()} scale their global
+#' parameter by the family's residual standard deviation, and the
+#' trend's own scale is \code{sigma_trend}, one per latent series, so
+#' \code{autoscale = FALSE} is set for those rows. Writing
+#' \code{autoscale = TRUE} on a trend-side class is refused.
 #'
 #' @examples
 #' \dontrun{

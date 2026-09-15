@@ -5231,6 +5231,43 @@ test_that("a shrinkage prior gets the Stan data it declares", {
   ))
 })
 
+test_that("a shrinkage prior on the trend keeps its own scale", {
+  # `horseshoe()` scales its global parameter by the family's residual
+  # standard deviation. The trend submodel reaches brms as a gaussian
+  # whose residual scale mvgam takes back out, so that factor named a
+  # parameter the program does not declare, and under a gaussian
+  # observation family it resolved to the observation model's `sigma`.
+  dat <- codegen_test_data()
+  dat$x1 <- rnorm(nrow(dat))
+  dat$x2 <- rnorm(nrow(dat))
+  mf <- mvgam_formula(y ~ 1, trend_formula = ~ x1 + x2 + AR(p = 1))
+
+  for (shrinkage in c("horseshoe(1)", "R2D2(0.5, 2)")) {
+    # A poisson model declares no `sigma`, so the parse catches the
+    # reference. `validate = TRUE` is the assertion.
+    stancode(mf, data = dat, family = poisson(), silent = 2L,
+             validate = TRUE,
+             prior = brms::set_prior(shrinkage, class = "b_trend"))
+
+    # A gaussian model declares one, and the program compiled with the
+    # trend's prior scaled by the observation model's residual scale.
+    code <- stancode(mf, data = dat, family = gaussian(), silent = 2L,
+                     validate = TRUE,
+                     prior = brms::set_prior(shrinkage, class = "b_trend"))
+    scaled <- grep("hs_global_trend|R2D2_tau2_trend",
+                   strsplit(code, "\n", fixed = TRUE)[[1]], value = TRUE)
+    expect_false(any(grepl("\\bsigma\\b", scaled)))
+  }
+
+  # Asking for the scaling names what the trend does not have
+  expect_error(
+    stancode(mf, data = dat, family = poisson(), silent = 2L,
+             prior = brms::set_prior("horseshoe(1, autoscale = TRUE)",
+                                     class = "b_trend")),
+    "autoscale"
+  )
+})
+
 test_that("normalize = FALSE still injects the trend into the GLM call", {
   # The GLM path recognised only the normalised `_lpmf` / `_lpdf`
   # spelling when deciding which family a likelihood line called, so
