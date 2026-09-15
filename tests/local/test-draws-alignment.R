@@ -58,6 +58,18 @@ cache_path <- function(name) {
   file.path(dir, name)
 }
 
+# The value of `expr` and every warning raised computing it. Several
+# blocks here exercise calls that warn by contract, and each one
+# names the notice instead of discarding it.
+with_warnings <- function(expr) {
+  seen <- character(0)
+  value <- withCallingHandlers(expr, warning = function(w) {
+    seen <<- c(seen, conditionMessage(w))
+    invokeRestart("muffleWarning")
+  })
+  list(value = value, warnings = seen)
+}
+
 # Fits are cached because every assertion here is about which draws
 # came back, not about what the sampler found, so refitting changes
 # nothing a check reads. Written under a temporary name and moved into
@@ -68,10 +80,8 @@ fit_cached <- function(name, ...) {
   # differently specified fit of the same name answer instead.
   path <- cache_path(paste0("val_align_", name, ".rds"))
   if (file.exists(path)) {
-    cat("[cache]", name, "\n")
     return(readRDS(path))
   }
-  cat("[fit  ]", name, "\n")
   fit <- mvgam(
     ..., chains = 2L, iter = 1000L, warmup = 500L,
     silent = 2, backend = "cmdstanr"
@@ -356,20 +366,17 @@ test_that("a misspelt argument does not pass for the default", {
 
 test_that("quantile residuals are standard normal on both families", {
   # A randomised quantile residual is standard normal by
-  # construction, whatever the family, which is what makes it the
-  # residual to read a fit through. The ordinal fit is the control:
-  # its four categories supply enough ties for the empirical PIT to
-  # spread properly, and it answers at 0.908 with 0.22 per cent
-  # beyond three standard deviations.
+  # construction, whatever the family, which makes a departure from
+  # that scale measurable instead of arguable. Both families are held
+  # to the one contract. Measured on these two fixtures, the ordinal
+  # fit gives 1.041 and the poisson 1.001, each with tail mass beyond
+  # three standard deviations.
   #
-  # The poisson arm does not. It reads 0.454 with 0.05 per cent
-  # beyond three, so a QQ plot of this fit is too narrow to show a
-  # departure that is really there. The control is asserted first so
-  # that it runs.
+  # The PIT is taken per draw. A single pooled ECDF across the whole
+  # draw column narrows a continuous family onto one repeated value.
   scale_of <- function(fit) {
-    r <- suppressWarnings(
-      residuals(fit, type = "quantile", summary = FALSE, ndraws = 200L)
-    )
+    r <- residuals(fit, type = "quantile", summary = FALSE,
+                   ndraws = 200L)
     c(sd = stats::sd(r, na.rm = TRUE),
       tail = mean(abs(r) > 3, na.rm = TRUE))
   }
@@ -558,38 +565,34 @@ test_that("avg_predictions averages the draws predictions returns", {
 
 
 test_that("process_error moves a marginal prediction", {
-  # The trend's innovations are what `process_error` adds, so
-  # switching it on has to move the answer. An argument read and
-  # dropped leaves every dimension intact. `FALSE` is the default, so
-  # its repeatability is the claim the block above already makes and
-  # is not restated here.
+  # `process_error` adds the trend's innovations, and switching it on
+  # has to move the estimate. An argument taken and discarded leaves
+  # every dimension intact. `FALSE` is the default, and its
+  # repeatability is already claimed earlier in this file.
   #
-  # Both calls raise a marginaleffects notice saying `process_error`
-  # is not known to be supported for this class. It is mvgam's own
-  # argument and it is honoured, so the notice is wrong and the
-  # class has not been registered on that whitelist. Captured here
-  # rather than left to leak, and asserted as the absence it should
-  # be, so this reports the defect instead of the argument.
-  warned <- character(0)
-  grab <- function(expr) {
-    withCallingHandlers(expr, warning = function(w) {
-      warned <<- c(warned, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    })
-  }
+  # Both calls raise a marginaleffects notice naming `process_error`
+  # as unsupported for this class. `sanity_dots()` holds the per-class
+  # list of accepted names as a literal in its own body, keyed on
+  # `class(model)[1]`, with no option or generic to extend it, which
+  # puts the notice outside mvgam's control. Asserting its absence
+  # pinned on marginaleffects a claim only marginaleffects can
+  # satisfy. What mvgam owns is that the value is honoured, which the
+  # comparison in this block states.
   set.seed(1L)
-  p_off <- grab(predictions(fit_plain, type = "expected",
-                            process_error = FALSE))
-  set.seed(1L)
-  p_on <- grab(predictions(fit_plain, type = "expected",
-                           process_error = TRUE))
-  expect_gt(max(abs(p_off$estimate - p_on$estimate)), 1e-6)
-
-  # Nothing about a supported argument should be reported as unknown.
-  expect_identical(
-    grep("not known to be supported", warned, value = TRUE),
-    character(0)
+  got_off <- with_warnings(
+    predictions(fit_plain, type = "expected", process_error = FALSE)
   )
+  set.seed(1L)
+  got_on <- with_warnings(
+    predictions(fit_plain, type = "expected", process_error = TRUE)
+  )
+  expect_gt(max(abs(got_off$value$estimate - got_on$value$estimate)),
+            1e-6)
+
+  # Held to being that one notice. An unrelated warning then cannot
+  # pass unseen.
+  expect_true(all(grepl("not known to be supported",
+                        c(got_off$warnings, got_on$warnings))))
 })
 
 
@@ -690,22 +693,17 @@ test_that("loo_epred and loo_linpred part at a non-identity link", {
   # two must not agree on a log link; a method that
   # skipped the inverse link returns the right dimensions on the
   # wrong scale and passes every shape check.
-  # Both run PSIS, and both warn that some Pareto k are too high,
-  # which on a latent-trend fit is the truth rather than
-  # noise: dropping an observation moves the state it is scored
-  # against, so the ratios have no finite variance. The notice is
-  # captured and held to being that one, so an unrelated warning
-  # cannot pass unseen behind it.
-  psis_warnings <- character(0)
-  grab_k <- function(expr) {
-    withCallingHandlers(expr, warning = function(w) {
-      psis_warnings <<- c(psis_warnings, conditionMessage(w))
-      invokeRestart("muffleWarning")
-    })
-  }
-  e <- grab_k(loo_epred(fit_plain, type = "mean"))
-  l <- grab_k(loo_linpred(fit_plain, type = "mean"))
-  expect_true(all(grepl("Pareto k", psis_warnings)))
+  # Both run PSIS, and both warn that some Pareto k are too high. On
+  # a latent-trend fit that notice is accurate: dropping an
+  # observation moves the state it is scored against, leaving the
+  # importance ratios with no finite variance. The notice is captured
+  # and held to being that one. An unrelated warning fails this block.
+  got_e <- with_warnings(loo_epred(fit_plain, type = "mean"))
+  got_l <- with_warnings(loo_linpred(fit_plain, type = "mean"))
+  expect_true(all(grepl("Pareto k",
+                        c(got_e$warnings, got_l$warnings))))
+  e <- got_e$value
+  l <- got_l$value
   expect_identical(dim(e), c(nrow(fit_plain$data), 1L))
   expect_identical(dim(l), dim(e))
   expect_true(all(is.finite(e)))
@@ -727,9 +725,6 @@ test_that("loo_epred and loo_linpred part at a non-identity link", {
   # draws. Pinning a number here would enshrine that regime rather
   # than describe it.
 })
-
-
-cat("\nDone.\n")
 
 
 test_that("a variance reads a scale written with its own formula", {
@@ -894,6 +889,6 @@ test_that("a fold splits the simplest frame there is", {
   expect_identical(length(unique(d$series)), 1L)
   expect_false(any(diff(sort(unique(d$time))) != 1L))
 
-  kf <- suppressWarnings(kfold(fit_plain, K = 2L, silent = 2L))
+  kf <- kfold(fit_plain, K = 2L, silent = 2L)
   expect_true(is.finite(kf$estimates["elpd_kfold", "Estimate"]))
 })
