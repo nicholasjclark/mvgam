@@ -1630,9 +1630,6 @@ parse_trend_formula <- function(trend_formula, data = NULL, .precomputed_dimensi
     }
   }
 
-  # Validate trend components for any remaining conflicts
-  validate_trend_components(trend_components)
-
   # Create base formula without trend constructors using structure-preserving rlang approach
   offset_attr <- attr(tf_safe, 'offset')
 

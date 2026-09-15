@@ -2398,31 +2398,27 @@ formula_rhs_function_names <- function(x) {
   character(0L)
 }
 
-#' Get Dynamic Trend Validation Patterns
+#' Trend constructor calls written in a formula
 #'
 #' @description
-#' Dynamically generates regex patterns for detecting trend constructors
-#' based on the current trend registry. This ensures validation works
-#' with custom trend types without hard-coding patterns.
+#' Returns one element per constructor call, in the order written.
+#' Counting occurrences separates `~ AR(p = 1) + AR(p = 2)` from a
+#' single constructor, which one match per registered type reports
+#' identically. The pattern comes from the registry, so a newly
+#' registered trend type needs no change here.
 #'
-#' @return Named character vector of regex patterns
+#' @param formula_str Deparsed formula
+#' @return Character vector of the constructor calls written
 #' @noRd
-get_trend_validation_patterns <- function() {
+trend_constructor_calls <- function(formula_str) {
+  checkmate::assert_string(formula_str)
 
-  # Access trend registry from mvgam namespace
-  trend_registry <- get("trend_registry", envir = asNamespace("mvgam"))
-  trend_types <- ls(trend_registry)
+  matches <- regmatches(
+    formula_str,
+    gregexpr(mvgam_trend_pattern(), formula_str, perl = TRUE)
+  )[[1]]
 
-  # Generate patterns dynamically
-  patterns <- character(length(trend_types))
-  names(patterns) <- paste0("\\b", trend_types, "\\s*\\(")
-
-  # Create the values (display names)
-  for (i in seq_along(trend_types)) {
-    patterns[i] <- paste0(trend_types[i], "()")
-  }
-
-  return(patterns)
+  matches[nzchar(matches)]
 }
 
 #' Per-session memo of exact-GP terms that have already warned.
@@ -2535,14 +2531,7 @@ validate_obs_formula_brms <- function(formula) {
   formula_str <- formula2str_mvgam(formula)
 
   # Check for mvgam trend constructors using dynamic registry lookup
-  trend_patterns <- get_trend_validation_patterns()
-
-  detected_trends <- character(0)
-  for (pattern in names(trend_patterns)) {
-    if (grepl(pattern, formula_str, perl = TRUE)) {
-      detected_trends <- c(detected_trends, trend_patterns[[pattern]])
-    }
-  }
+  detected_trends <- trend_constructor_calls(formula_str)
 
   if (length(detected_trends) > 0) {
     stop(insight::format_error(c(
@@ -2840,15 +2829,10 @@ validate_trend_formula_restrictions <- function(formula_str,
 
     "multiple_constructors" = list(
       patterns = function(formula_str) {
-        trend_patterns <- get_trend_validation_patterns()
-        detected_trends <- character(0)
-        for (pattern in names(trend_patterns)) {
-          if (grepl(pattern, formula_str, perl = TRUE)) {
-            detected_trends <- c(detected_trends, trend_patterns[[pattern]])
-          }
-        }
+        detected_trends <- trend_constructor_calls(formula_str)
         if (length(detected_trends) > 1) {
-          structure(detected_trends, names = rep("detected", length(detected_trends)))
+          structure(detected_trends,
+                    names = rep("detected", length(detected_trends)))
         } else character(0)
       },
       error_header = "Multiple trend constructors found in single {.field trend_formula}:",
@@ -2966,29 +2950,6 @@ validate_setup_components <- function(components) {
 #' @export
 is.mvgam_trend <- function(x) {
   inherits(x, "mvgam_trend")
-}
-
-#' Validate trend components for conflicts
-#'
-#' Refuses a trend formula carrying more than one trend constructor.
-#'
-#' @param trend_components List of trend components to validate
-#'
-#' @noRd
-validate_trend_components <- function(trend_components) {
-
-  # Check for multiple trend types - only one trend type allowed per formula
-  if (length(trend_components) > 1) {
-    trend_types <- sapply(trend_components, function(x) x$trend_type)
-    stop(insight::format_error(c(
-      "Multiple trend types detected in single formula.",
-      x = paste("Found:", paste(trend_types, collapse = ", ")),
-      x = "Only one trend constructor is allowed per trend_formula.",
-      i = "Use separate models or combine into a single trend type."
-    )))
-  }
-
-  invisible(NULL)
 }
 
 #' Extract Time Series Dimensions from Data
