@@ -502,7 +502,14 @@ analytic_pit_bounds <- function(object, y, pp_args, d,
       nobs = ncol(linpred),
       draw_ids = draw_ids,
       newdata = d,
-      resp = resp
+      resp = resp,
+      # The group-level choices arrive with the prediction arguments,
+      # which is where `residuals.mvgam()` puts the user's `...`. The
+      # predictor above is built under them, and the parameters
+      # standardising it have to be built under them too.
+      re_formula = pp_args$re_formula,
+      allow_new_levels = pp_args$allow_new_levels %||% FALSE,
+      sample_new_levels = pp_args$sample_new_levels %||% "uncertainty"
     )
   }
   spec <- family_dist_spec(

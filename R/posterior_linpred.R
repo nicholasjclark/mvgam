@@ -397,7 +397,9 @@ posterior_linpred.mvgam <- function(object, transform = FALSE,
   if (!is.null(dpar)) {
     return(dpar_posterior_linpred(
       object, dpar = dpar, transform = transform, newdata = newdata,
-      draw_ids = draw_ids, resp = resp
+      draw_ids = draw_ids, resp = resp,
+      re_formula = re_formula, allow_new_levels = allow_new_levels,
+      sample_new_levels = sample_new_levels
     ))
   }
 
@@ -494,7 +496,10 @@ apply_mu_linkinv <- function(linpred, family) {
 #' @noRd
 dpar_posterior_linpred <- function(object, dpar, transform = FALSE,
                                    newdata = NULL, draw_ids = NULL,
-                                   resp = NULL) {
+                                   resp = NULL,
+                                   re_formula = NULL,
+                                   allow_new_levels = FALSE,
+                                   sample_new_levels = "uncertainty") {
   # A distributional parameter belongs to one response's family, and
   # its link is that family's.
   resolve_resp(object, resp, required = TRUE,
@@ -530,7 +535,9 @@ dpar_posterior_linpred <- function(object, dpar, transform = FALSE,
   }
   linpred <- extract_component_linpred(
     mvgam_fit = object, newdata = newdata, component = dpar,
-    draw_ids = draw_ids, resp = resp
+    draw_ids = draw_ids, resp = resp,
+    re_formula = re_formula, allow_new_levels = allow_new_levels,
+    sample_new_levels = sample_new_levels
   )
   if (!transform) {
     return(linpred)

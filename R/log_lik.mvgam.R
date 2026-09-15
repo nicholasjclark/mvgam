@@ -165,7 +165,10 @@ log_lik.mvgam <- function(object,
           newdata = newdata,
           linpred = linpred[[r]],
           resp = r,
-          draw_ids = draw_ids
+          draw_ids = draw_ids,
+          re_formula = re_formula,
+          allow_new_levels = allow_new_levels,
+          sample_new_levels = sample_new_levels
         )
       })
       if (length(per_resp) == 1L) {
@@ -189,7 +192,10 @@ log_lik.mvgam <- function(object,
     newdata = newdata,
     linpred = linpred,
     resp = resp,
-    draw_ids = draw_ids
+    draw_ids = draw_ids,
+    re_formula = re_formula,
+    allow_new_levels = allow_new_levels,
+    sample_new_levels = sample_new_levels
   )
 }
 
@@ -231,7 +237,10 @@ mv_response_family_pars <- function(object, newdata, linpred,
 # loop over responses and stitch the [ndraws x sum(nobs)] matrix back
 # together.
 log_lik_single_response <- function(object, newdata, linpred, resp,
-                                    draw_ids) {
+                                    draw_ids,
+                                    re_formula = NULL,
+                                    allow_new_levels = FALSE,
+                                    sample_new_levels = "uncertainty") {
   family_obj <- model_families(object, resp)
   family_name <- resolve_family_name(family_obj)
   family_link <- family_obj$link
@@ -310,7 +319,10 @@ log_lik_single_response <- function(object, newdata, linpred, resp,
       nobs = ncol(linpred),
       draw_ids = draw_ids,
       newdata = newdata,
-      resp = resp
+      resp = resp,
+      re_formula = re_formula,
+      allow_new_levels = allow_new_levels,
+      sample_new_levels = sample_new_levels
     )
     trials <- extract_trials_for_family(object, family_obj, newdata)
     ll <- dispatch_log_lik(

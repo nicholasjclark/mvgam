@@ -477,7 +477,10 @@ predict_variance <- function(object, newdata, process_error,
     nobs = nobs_mu,
     draw_ids = draw_idx,
     newdata = newdata,
-    resp = resp
+    resp = resp,
+    re_formula = re_formula,
+    allow_new_levels = allow_new_levels,
+    sample_new_levels = sample_new_levels
   )
 
   # broadcast: dpar matrices arrive as [ndraws x n_series] for

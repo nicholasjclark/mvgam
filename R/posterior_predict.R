@@ -960,7 +960,10 @@ get_family_dpars <- function(family_name) {
 #' @noRd
 resolve_family_pars <- function(object, dpar_names, ndraws, nobs,
                                 draw_ids = NULL, newdata = NULL,
-                                resp = NULL) {
+                                resp = NULL,
+                                re_formula = NULL,
+                                allow_new_levels = FALSE,
+                                sample_new_levels = "uncertainty") {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_character(dpar_names, min.len = 0)
   if (length(dpar_names) == 0) {
@@ -981,7 +984,9 @@ resolve_family_pars <- function(object, dpar_names, ndraws, nobs,
   for (dpar in predicted) {
     out[[dpar]] <- predicted_dpar_draws(
       object, dpar, nobs = nobs, ndraws = ndraws, draw_ids = draw_ids,
-      newdata = newdata, resp = resp
+      newdata = newdata, resp = resp,
+      re_formula = re_formula, allow_new_levels = allow_new_levels,
+      sample_new_levels = sample_new_levels
     )
   }
 
@@ -1051,13 +1056,19 @@ predicted_dpar_names <- function(object, dpar_names, resp = NULL) {
 #' @noRd
 predicted_dpar_draws <- function(object, dpar, nobs = NULL,
                                  ndraws = NULL, draw_ids = NULL,
-                                 newdata = NULL, resp = NULL) {
+                                 newdata = NULL, resp = NULL,
+                                 re_formula = NULL,
+                                 allow_new_levels = FALSE,
+                                 sample_new_levels = "uncertainty") {
   linpred <- extract_component_linpred(
     mvgam_fit = object,
     newdata = newdata %||% mvgam_training_data(object),
     component = dpar,
     draw_ids = draw_ids,
-    resp = resp
+    resp = resp,
+    re_formula = re_formula,
+    allow_new_levels = allow_new_levels,
+    sample_new_levels = sample_new_levels
   )
   if (is.list(linpred) && !is.matrix(linpred)) {
     stop(insight::format_error(c(
@@ -1508,12 +1519,17 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
     if (is.null(resp)) {
       return(lapply(stats::setNames(nm = names(linpred)), function(r) {
         draw_observations(object, linpred[[r]], newdata, draw_ids,
-                          resp = r)
+                          resp = r, re_formula = re_formula,
+                          allow_new_levels = allow_new_levels,
+                          sample_new_levels = sample_new_levels)
       }))
     }
     linpred <- linpred[[resp]]
   }
-  draw_observations(object, linpred, newdata, draw_ids, resp = resp)
+  draw_observations(object, linpred, newdata, draw_ids, resp = resp,
+                    re_formula = re_formula,
+                    allow_new_levels = allow_new_levels,
+                    sample_new_levels = sample_new_levels)
 }
 
 
@@ -1541,7 +1557,10 @@ posterior_predict.mvgam <- function(object, newdata = NULL,
 #' @return `[ndraws x nobs]` matrix of draws
 #' @noRd
 draw_observations <- function(object, linpred, newdata, draw_ids,
-                              resp = NULL) {
+                              resp = NULL,
+                              re_formula = NULL,
+                              allow_new_levels = FALSE,
+                              sample_new_levels = "uncertainty") {
   checkmate::assert_class(object, "mvgam")
   checkmate::assert_matrix(linpred)
   checkmate::assert_data_frame(newdata)
@@ -1571,7 +1590,10 @@ draw_observations <- function(object, linpred, newdata, draw_ids,
     nobs = nobs,
     draw_ids = draw_ids,
     newdata = newdata,
-    resp = resp
+    resp = resp,
+    re_formula = re_formula,
+    allow_new_levels = allow_new_levels,
+    sample_new_levels = sample_new_levels
   )
   trunc_bounds <- extract_truncation_bounds(object, nobs)
 

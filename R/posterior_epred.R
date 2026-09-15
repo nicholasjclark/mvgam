@@ -513,10 +513,16 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
   # none, as brms does.
   if (is.list(linpred) && !is.matrix(linpred)) {
     return(lapply(stats::setNames(nm = names(linpred)), function(r) {
-      response_epred(object, linpred[[r]], newdata, draw_ids, resp = r)
+      response_epred(object, linpred[[r]], newdata, draw_ids, resp = r,
+                     re_formula = re_formula,
+                     allow_new_levels = allow_new_levels,
+                     sample_new_levels = sample_new_levels)
     }))
   }
-  response_epred(object, linpred, newdata, draw_ids, resp = resp)
+  response_epred(object, linpred, newdata, draw_ids, resp = resp,
+                 re_formula = re_formula,
+                 allow_new_levels = allow_new_levels,
+                 sample_new_levels = sample_new_levels)
 }
 
 
@@ -534,7 +540,10 @@ posterior_epred.mvgam <- function(object, newdata = NULL,
 #' @return A matrix, or an `[ndraws x nobs x ncat]` array for an
 #'   ordinal response.
 #' @noRd
-response_epred <- function(object, linpred, newdata, draw_ids, resp) {
+response_epred <- function(object, linpred, newdata, draw_ids, resp,
+                           re_formula = NULL,
+                           allow_new_levels = FALSE,
+                           sample_new_levels = "uncertainty") {
   family <- model_families(object, resp)
   if (is_ordinal_family(family)) {
     return(ordinal_category_probs(
@@ -543,7 +552,9 @@ response_epred <- function(object, linpred, newdata, draw_ids, resp) {
     ))
   }
   expected_from_linpred(
-    object, linpred, newdata = newdata, draw_ids = draw_ids, resp = resp
+    object, linpred, newdata = newdata, draw_ids = draw_ids, resp = resp,
+    re_formula = re_formula, allow_new_levels = allow_new_levels,
+    sample_new_levels = sample_new_levels
   )
 }
 
@@ -592,12 +603,17 @@ response_epred <- function(object, linpred, newdata, draw_ids, resp) {
 #' @return Matrix of expected values, or a named list of them.
 #' @noRd
 expected_from_linpred <- function(object, linpred, newdata = NULL,
-                                  draw_ids = NULL, resp = NULL) {
+                                  draw_ids = NULL, resp = NULL,
+                                  re_formula = NULL,
+                                  allow_new_levels = FALSE,
+                                  sample_new_levels = "uncertainty") {
   if (is.list(linpred) && !is.matrix(linpred)) {
     return(lapply(stats::setNames(nm = names(linpred)), function(r) {
       expected_from_linpred(
         object, linpred[[r]], newdata = newdata, draw_ids = draw_ids,
-        resp = r
+        resp = r, re_formula = re_formula,
+        allow_new_levels = allow_new_levels,
+        sample_new_levels = sample_new_levels
       )
     }))
   }
@@ -626,7 +642,10 @@ expected_from_linpred <- function(object, linpred, newdata = NULL,
       nobs = ncol(linpred),
       draw_ids = draw_ids,
       newdata = newdata,
-      resp = resp
+      resp = resp,
+      re_formula = re_formula,
+      allow_new_levels = allow_new_levels,
+      sample_new_levels = sample_new_levels
     )
   )
 }

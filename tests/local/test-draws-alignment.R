@@ -180,6 +180,27 @@ fit_trunc <- fit_cached(
   trend_formula = ~ AR(p = 1), data = dat_trunc, family = gaussian()
 )
 
+# A group-level term on the mean and on the scale. `re_formula = NA`
+# drops group-level terms from a prediction, and a fit carrying one
+# on the mean alone cannot tell an argument that is honoured from one
+# that is discarded: both give the scale nothing to drop.
+fit_sigma_re <- fit_cached(
+  "gaussian_sigma_re",
+  formula = brms::bf(y ~ x + (1 | grp), sigma ~ (1 | grp)),
+  data = dat, family = gaussian()
+)
+
+# The group-level term on the scale alone. Every quantity the scale
+# enters has to move under `re_formula = NA` while the mean stays
+# where it is, which is what separates the routes: on the fit above
+# the mean and the scale move together and each claim would hold
+# whichever of the two had honoured the argument.
+fit_sigma_re_only <- fit_cached(
+  "gaussian_sigma_re_only",
+  formula = brms::bf(y ~ x, sigma ~ (1 | grp)),
+  data = dat, family = gaussian()
+)
+
 
 # The alignment claims need more draws than the indices they name.
 stopifnot(ndraws(fit_plain) >= 300L, ndraws(fit_trend) >= 300L)
@@ -751,6 +772,70 @@ test_that("a variance reads a scale written with its own formula", {
   # A gaussian variance is that draw's own sigma squared, cell for
   # cell, so this is an identity rather than a tolerance.
   expect_equal(v, sigma^2, tolerance = 1e-12)
+})
+
+
+test_that("re_formula reaches a distributional parameter", {
+  # The mean path forwards `re_formula` and the distributional path
+  # left it out, which kept on the scale the group-level terms the
+  # mean had already dropped. The mean is the control here: a zero
+  # difference on the scale, taken alone, says only that the fit had
+  # nothing to drop.
+  ids <- 1:20
+  mu_full <- posterior_linpred(fit_sigma_re, draw_ids = ids)
+  mu_pop <- posterior_linpred(fit_sigma_re, draw_ids = ids,
+                              re_formula = NA)
+  expect_gt(max(abs(mu_full - mu_pop)), 1e-6)
+
+  sigma_full <- posterior_linpred(fit_sigma_re, dpar = "sigma",
+                                  draw_ids = ids)
+  sigma_pop <- posterior_linpred(fit_sigma_re, dpar = "sigma",
+                                 draw_ids = ids, re_formula = NA)
+  expect_gt(max(abs(sigma_full - sigma_pop)), 1e-6)
+
+  # The second route the argument travels. A gaussian variance is
+  # this draw's own sigma squared, which confines the claim to the
+  # scale.
+  v_full <- predict(fit_sigma_re, type = "variance", summary = FALSE,
+                    draw_ids = ids)
+  v_pop <- predict(fit_sigma_re, type = "variance", summary = FALSE,
+                   draw_ids = ids, re_formula = NA)
+  expect_gt(max(abs(v_full - v_pop)), 1e-6)
+})
+
+
+test_that("a scale-only group term moves the scale and holds the mean", {
+  # The three remaining routes the group-level arguments travel:
+  # `log_lik()` through its per-response helper, `predict()` through
+  # the family-parameter resolver and `posterior_predict()` through
+  # the sampler. The mean carries no group-level term on this fit,
+  # and anything moving under `re_formula = NA` moved because the
+  # scale did.
+  ids <- 1:20
+  # A gaussian expectation is its mean, which has no group-level term
+  # here. This is the control, and it holds still.
+  ep_full <- posterior_epred(fit_sigma_re_only, draw_ids = ids)
+  ep_pop <- posterior_epred(fit_sigma_re_only, draw_ids = ids,
+                            re_formula = NA)
+  expect_equal(ep_full, ep_pop, tolerance = 1e-12)
+
+  ll_full <- log_lik(fit_sigma_re_only, draw_ids = ids)
+  ll_pop <- log_lik(fit_sigma_re_only, draw_ids = ids,
+                    re_formula = NA)
+  expect_gt(max(abs(ll_full - ll_pop)), 1e-6)
+
+  v_full <- predict(fit_sigma_re_only, type = "variance",
+                    summary = FALSE, draw_ids = ids)
+  v_pop <- predict(fit_sigma_re_only, type = "variance",
+                   summary = FALSE, draw_ids = ids, re_formula = NA)
+  expect_gt(max(abs(v_full - v_pop)), 1e-6)
+
+  set.seed(7L)
+  pp_full <- posterior_predict(fit_sigma_re_only, draw_ids = ids)
+  set.seed(7L)
+  pp_pop <- posterior_predict(fit_sigma_re_only, draw_ids = ids,
+                              re_formula = NA)
+  expect_gt(max(abs(pp_full - pp_pop)), 1e-6)
 })
 
 
