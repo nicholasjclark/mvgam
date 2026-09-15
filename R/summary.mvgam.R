@@ -101,10 +101,6 @@ summary.mvgam <- function(object, probs = c(0.025, 0.975),
   all_summaries <- all_summaries[pars_to_keep, , drop = FALSE]
   pars <- rownames(all_summaries)
 
-  pars_to_keep <- !(rownames(all_summaries) %in% object$exclude)
-  all_summaries <- all_summaries[pars_to_keep, , drop = FALSE]
-  pars <- rownames(all_summaries)
-
   # `include_betas = FALSE` drops the trend-side per-cell arrays that
   # dominate the printed summary on hierarchical or high-dimensional
   # VAR fits (per-country A_group_trend, Sigma_group_trend, the full

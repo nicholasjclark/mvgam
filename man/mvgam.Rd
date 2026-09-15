@@ -15,6 +15,7 @@ mvgam(
   combine = TRUE,
   family = gaussian(),
   threads = NULL,
+  save_pars = brms::save_pars(),
   run_model = TRUE,
   ...
 )
@@ -241,6 +242,17 @@ This holds for every trend model under a brms-native family:
 \code{RW()}, \code{AR()}, \code{VAR()}, \code{VARMA()}, \code{ZMVN()}, \code{CAR()} and
 \code{PW()}. Each fit that drops the request warns, so a batch
 script that fits repeatedly shows it every time.}
+
+\item{save_pars}{A \code{\link[brms:save_pars]{brms::save_pars()}} object naming which
+parameters the posterior keeps. A model is built from working
+variables it also reports under another name: the standardised
+deviates a group-level block is scaled from, the unscaled
+coefficients a shrinkage prior scales, the ordered intercepts a
+mixture is identified by. Those are left out by default, as brms
+leaves them out. \code{save_pars(all = TRUE)} keeps every one, \code{group}
+and \code{latent} keep the per-level deviations and the latent values
+of a \code{me()} covariate, and \code{manual} names individual parameters
+to keep.}
 
 \item{run_model}{Logical. Setting \code{run_model = FALSE} stops before
 Stan parse, compile and sampling and returns a stub \code{mvgam}

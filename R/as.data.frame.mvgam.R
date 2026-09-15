@@ -296,9 +296,6 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
   checkmate::assert_class(x, "mvgam")
   checkmate::assert_flag(all)
   raw <- pars %||% posterior::variables(posterior::as_draws(x$fit))
-  if (!all && !is.null(x$exclude) && length(x$exclude) > 0L) {
-    raw <- setdiff(raw, x$exclude)
-  }
   user <- apply_mvgam_beta_aliases(
     raw, c(mvgam_beta_aliases(x), mvgam_ranef_aliases(x))
   )
@@ -315,7 +312,12 @@ mvgam_user_pars <- function(x, pars = NULL, all = FALSE) {
   if (!all) {
     keep <- keep & !is_hidden_unrotated(user)
   }
-  stats::setNames(raw[keep], user[keep])
+  raw <- raw[keep]
+  user <- user[keep]
+  # brms orders a fitted object's parameters by class, and every
+  # reader of this projection inherits that order
+  ord <- mvgam_par_order(user, get_dpar_names(x$formula))
+  stats::setNames(raw[ord], user[ord])
 }
 
 
@@ -464,15 +466,13 @@ mvgam_ranef_aliases_side <- function(x,
     group_token_per_coef <- ifelse(
       nzchar(row_pfx), paste0(group, "__", row_pfx), group
     )
-    # Stan parameter form depends on whether brms estimates a
-    # correlation matrix for this group:
-    #   - correlated (M >= 2, cor = TRUE): a single matrix
-    #     `r_<id>[<level_idx>, <coef_idx>]` is emitted.
-    #   - uncorrelated or single-coef: per-coef vectors
-    #     `r_<id>_<coef_idx>[<level_idx>]` are emitted.
-    # Both forms alias to the same user-facing
-    # `r_<group>[<level>, <coef>]` (or
-    # `r_<group>__<nlpar>[<level>, <coef>]`) name.
+    # brms writes the per-level deviations twice: as the matrix
+    # `r_<id>[<level_idx>, <coef_idx>]` a correlated block is scaled
+    # into, and as the per-coefficient vectors
+    # `r_<id>_<coef_idx>[<level_idx>]` its own comment calls faster to
+    # index. The matrix is one of the working variables a fit leaves
+    # out, so the vectors are what a posterior carries and what the
+    # alias is built from, which is the spelling brms renames too.
     grid <- expand.grid(
       level_idx = seq_len(n_lvl),
       coef_idx = seq_len(n_coef),
@@ -491,14 +491,9 @@ mvgam_ranef_aliases_side <- function(x,
     pfx_per_coef <- row_pfx
     coef_infix <- ifelse(nzchar(pfx_per_coef),
                           paste0("_", pfx_per_coef), "")
-    r_old <- if (has_cor) {
-      sprintf("r_%d%s%s[%d,%d]", id, coef_infix[grid$coef_idx],
-              pos_sfx, grid$level_idx, grid$coef_idx)
-    } else {
-      sprintf("r_%d%s_%d%s[%d]", id,
-              coef_infix[grid$coef_idx],
-              grid$coef_idx, pos_sfx, grid$level_idx)
-    }
+    r_old <- sprintf("r_%d%s_%d%s[%d]", id,
+                     coef_infix[grid$coef_idx],
+                     grid$coef_idx, pos_sfx, grid$level_idx)
     # The suffix belongs on the variable name, before the index.
     # `posterior` parses a name as `variable[element]`, so
     # `r_grp[a,Intercept]_trend` would not select as an element of

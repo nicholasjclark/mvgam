@@ -7,7 +7,7 @@
 ### 1. Single-Fit Lazy Categorization Architecture
 - mvgam object stores complete stanfit from combined model in `fit` slot
 - Parameter categorization computed on-demand at extraction time
-- Simple `exclude` field for parameter filtering
+- A model's working variables stay out of the posterior
 - Pattern: Store complete, categorize lazily, filter on demand
 - brms generates linear predictors (`mu`, `mu_trend`) from two formulae
 - Stan models from two brmsfit objects (using `backend = "mock"`) are combined
@@ -259,53 +259,32 @@ transformed parameters {
 
 ## Ecosystem Integration Principles
 
-### 1. Lazy Parameter Categorization System
+### 1. One projection of a fit's parameter names
 
-**Design Decision**: Store complete stanfit, compute parameter categorization on-demand.
+**Design Decision**: A model's working variables stay out of the
+posterior, and one projection names and orders what remains.
 
-**Storage Pattern**:
-```r
-mvgam_object$fit <- stanfit  # Complete stanfit
-mvgam_object$exclude <- c("lprior", "lp__")  # Parameters to hide
-```
+**Exclusion**: `mvgam_excluded_pars()` (`R/par_exclusion.R`) computes
+before sampling the names a brms fit leaves out: the standardised
+deviates a group-level block is scaled from, the unscaled coefficients
+a shrinkage prior scales, the ordered intercepts a mixture is
+identified by. Each is a quantity the model also reports under another
+name. The list travels to both backends through `exclude`, which keeps
+those draws out of the posterior. `save_pars()` states which of them a
+user keeps, with brms's own meaning.
 
-**Categorization Patterns** (computed dynamically):
-1. **observation**: Fixed effects, random effects, smooths, family parameters (`b_`, `sd_`, `r_`, `s_`, `sigma`, `shape`, `nu`, `phi`)
-2. **trend**: Trend states, innovations, AR/VAR coefficients, correlations (`_trend` suffix, `trend[`, `lv_trend`, `mu_trend`)
-3. **factor_loadings**: Loading matrices and vectors (`Z[`, `z_loading`)
-4. **diagnostic**: Log posterior and prior (`lp__`, `lprior`)
+**Naming and order**: `mvgam_user_pars()` (`R/as.data.frame.mvgam.R`)
+maps every Stan name to the name a user sees and orders the result by
+class the way brms orders a fitted object. It leaves out the placeholder
+column an empty observation formula is given. It also leaves out the
+factor block whose rotation is indeterminate. `variables()`,
+`extract_mvgam_draws()` and `tidy()` all obtain their names from it.
 
-**Lazy Evaluation Pattern**:
-```r
-# Variables method delegates to fit
-variables.mvgam <- function(x, ...) {
-  variables(x$fit, ...)
-}
-
-# Categorization computed when needed
-categorize_parameters <- function(x, category = NULL) {
-  all_pars <- variables(x$fit)
-  all_pars <- setdiff(all_pars, x$exclude)
-
-  if (is.null(category)) {
-    return(all_pars)
-  }
-
-  # Apply category patterns dynamically
-  patterns <- get_category_patterns(category)
-  all_pars[grepl(paste(patterns, collapse = "|"), all_pars)]
-}
-
-# Parameter extraction applies filtering
-as_draws.mvgam <- function(x, variable = NULL, ...) {
-  draws <- as_draws(x$fit, ...)
-  if (!is.null(variable)) {
-    draws <- subset_draws(draws, variable = variable)
-  }
-  draws <- rename_pars(draws, x)
-  draws
-}
-```
+**Kinds**: `mvgam_par_kind()` and `mvgam_par_side()`
+(`R/par_taxonomy.R`) decide what kind of thing a name is and which
+side of the model it belongs to. The `variable =` keyword resolver,
+the `summary()` blocks and the parameter buckets are each defined in
+terms of them.
 
 ### 2. brms Method Compatibility
 **Requirement**: All brms ecosystem methods must work with mvgam objects

@@ -334,6 +334,7 @@ mvgam_update_inheritance <- list(
     }
   ),
   init = list(slot = "init"),
+  save_pars = list(slot = "save_pars"),
   newdata = list(getter = function(object) object$test_data),
   # brms keeps this as a `brmsthreads` object, present whether or not
   # the user asked for threading, with a NULL count when they did not.

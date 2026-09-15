@@ -4,6 +4,62 @@
 # rule itself, which holds whichever of those callers changes next.
 
 
+test_that("a fit keeps the parameters brms keeps", {
+  # The working variables a model is built from are named by the
+  # response, distributional and non-linear parameters they belong to,
+  # and each is reported under another name: `zs_1_1` as `s_1_1`, the
+  # standardised deviates `z_1` as `r_g`, the correlation Cholesky
+  # `L_1` as `cor_g`.
+  dat <- data.frame(
+    y = rnorm(20L), x = rnorm(20L), z = rnorm(20L),
+    g = factor(rep(letters[1:4], each = 5L))
+  )
+  form <- brms::bf(y ~ s(x, k = 4) + (1 + x | g), sigma ~ z)
+  bfit <- brms::brm(form, data = dat, empty = TRUE)
+  sdata <- brms::standata(form, data = dat)
+
+  excluded <- mvgam_excluded_pars(bfit, standata = sdata)
+  expect_true(all(
+    c("zb", "zbs", "hs_local", "scales", "zs_1_1", "zb_sigma",
+      "z_1", "L_1", "Cor_1", "r_1") %in% excluded
+  ))
+  # What the fit reports is kept: the scaled smooth coefficients, the
+  # group-level scales and the coefficients themselves
+  expect_false(any(c("s_1_1", "sds_1", "sd_1", "cor_1", "r_1_1", "b",
+                     "Intercept", "lprior") %in% excluded))
+
+  # `all = TRUE` keeps everything that is conditional on it
+  kept_all <- mvgam_excluded_pars(bfit, standata = sdata,
+                                  save_pars = brms::save_pars(all = TRUE))
+  expect_false(any(c("zb", "zs_1_1", "z_1", "L_1") %in% kept_all))
+  # `manual` names individual parameters to keep
+  manual <- mvgam_excluded_pars(
+    bfit, standata = sdata, save_pars = brms::save_pars(manual = "zb")
+  )
+  expect_false("zb" %in% manual)
+
+  # The trend side spells the same names with mvgam's suffix
+  trend <- mvgam_excluded_pars(NULL, trend_model = bfit, standata = sdata)
+  expect_true(all(c("zb_trend", "z_1_trend", "Cor_1_trend") %in% trend))
+})
+
+
+test_that("parameters are ordered by class, bookkeeping last", {
+  pars <- c("lp__", "trend[1,1]", "sigma", "lprior", "b_x", "b_Intercept",
+            "sd_g__Intercept", "Intercept", "sds_1", "r_g[a,Intercept]",
+            "ar1_trend[1]")
+  ordered <- pars[mvgam_par_order(pars)]
+  # An intercept opens its own class, and Stan's accumulators close
+  # the list
+  expect_identical(
+    ordered,
+    c("b_Intercept", "b_x", "sd_g__Intercept", "sds_1", "sigma",
+      "Intercept", "r_g[a,Intercept]", "ar1_trend[1]", "trend[1,1]",
+      "lprior", "lp__")
+  )
+})
+
+
 test_that("a trend parameter is one whose name ends in the suffix", {
   # Every trend parameter the package emits carries `_trend` at the end
   # of the name, or immediately before the index.

@@ -88,7 +88,7 @@ categorize_mvgam_parameters <- function(x) {
 
   # The names Stan wrote, which the prediction pipeline subsets the
   # draws by. The names a user reads are `mvgam_user_pars()`'s.
-  all_pars <- setdiff(variables(posterior::as_draws(x$fit)), x$exclude)
+  all_pars <- variables(posterior::as_draws(x$fit))
   kind <- mvgam_par_kind(all_pars)
   side <- mvgam_par_side(all_pars)
   pick <- function(kinds, on_side) {

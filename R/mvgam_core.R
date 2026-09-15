@@ -36,7 +36,10 @@ mvgam_removed_args <- c(
   noncentred = "the trend parameterisation is chosen by mvgam",
   prior_simulation = "use 'sample_prior = \"only\"'",
   return_model_data = "use 'standata()' on the fitted model",
-  save_all_pars = "every sampled parameter is kept",
+  save_all_pars = paste0(
+    "the parameters a fit keeps are chosen with 'save_pars', as in ",
+    "'save_pars = brms::save_pars(all = TRUE)'"
+  ),
   parallel = "use 'cores', which brms passes to the backend",
   sparse = paste0(
     "a sparse design matrix is requested on the formula, as in ",
@@ -180,7 +183,7 @@ translate_samples_burnin <- function(dots) {
 # the single-dataset path would have used.
 mvgam_imputation_forwarded <- c(
   "formula", "trend_formula", "newdata", "trend_map", "loadings_prior",
-  "backend", "family", "threads", "run_model"
+  "backend", "family", "threads", "save_pars", "run_model"
 )
 
 
@@ -421,6 +424,16 @@ mvgam_imputation_forwarded <- c(
 #'   repeated calls within the same R session do not re-warn (the
 #'   warning is rate-limited via `.frequency = "regularly"`).
 #'   Defaults to `TRUE`.
+#' @param save_pars A [brms::save_pars()] object naming which
+#'   parameters the posterior keeps. A model is built from working
+#'   variables it also reports under another name: the standardised
+#'   deviates a group-level block is scaled from, the unscaled
+#'   coefficients a shrinkage prior scales, the ordered intercepts a
+#'   mixture is identified by. Those are left out by default, as brms
+#'   leaves them out. `save_pars(all = TRUE)` keeps every one, `group`
+#'   and `latent` keep the per-level deviations and the latent values
+#'   of a `me()` covariate, and `manual` names individual parameters
+#'   to keep.
 #' @param ... Additional arguments passed to Stan fitting. Two are worth
 #'   calling out. `algorithm` selects how the posterior is explored and
 #'   accepts `"sampling"` (the default), `"meanfield"`, `"fullrank"` or
@@ -646,6 +659,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
                            backend = getOption("brms.backend", "cmdstanr"),
                            combine = TRUE, family = gaussian(),
                            threads = NULL,
+                           save_pars = brms::save_pars(),
                            run_model = TRUE, ...) {
 
   # Translate the deprecated `samples` / `burnin` argument pair to
@@ -670,6 +684,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
           combine        = combine,
           family         = family,
           threads        = threads,
+          save_pars      = save_pars,
           run_model      = run_model
         ),
         dots
@@ -727,6 +742,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
   }
   checkmate::assert_character(backend, len = 1)
   checkmate::assert_logical(combine, len = 1)
+  checkmate::assert_class(save_pars, "save_pars")
   checkmate::assert_flag(run_model)
   # `threads` is forwarded as-is. The inner pipeline (mvgam_single,
   # stancode.mvgam_formula) does its own validation; eager
@@ -803,6 +819,7 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
     backend = backend,
     family = family,
     data_name = data_name,
+    save_pars = save_pars,
     run_model = run_model
   )
   if (!is.null(threads)) {
@@ -901,6 +918,7 @@ validate_newdata <- function(newdata, data) {
 mvgam_single <- function(formula, trend_formula, data, backend,
                         family, data_name = NULL, newdata = NULL,
                         trend_map = NULL, loadings_prior = NULL,
+                        save_pars = brms::save_pars(),
                         run_model = TRUE, ...) {
 
   # Create mvgam_formula object for shared processing
@@ -950,6 +968,7 @@ mvgam_single <- function(formula, trend_formula, data, backend,
       data_name = data_name,
       newdata = newdata,
       backend = backend,
+      save_pars = save_pars,
       user_prior = forward_dots$prior
     ))
   }
@@ -986,7 +1005,15 @@ mvgam_single <- function(formula, trend_formula, data, backend,
   threads <- dots$threads %||% NULL
   opencl <- dots$opencl %||% NULL
   init <- dots$init %||% "random"
-  exclude <- dots$exclude %||% NULL
+  # The working variables each brms model is built from, which the
+  # sampler is told to leave out of the posterior. `save_pars()` says
+  # which of them a user keeps.
+  exclude <- mvgam_excluded_pars(
+    obs_model = stan_components$obs_setup$brmsfit,
+    trend_model = stan_components$trend_setup$brmsfit,
+    standata = stan_components$combined_components$standata,
+    save_pars = save_pars
+  )
   seed <- dots$seed %||% sample.int(.Machine$integer.max, 1)
   control <- lift_sampler_control(dots, dots$control %||% NULL)
   silent <- dots$silent %||% 1
@@ -1085,6 +1112,7 @@ mvgam_single <- function(formula, trend_formula, data, backend,
     # only marks rows brms itself knows about.
     user_prior = dots$prior,
     newdata = newdata,
+    save_pars = save_pars,
     silent = silent
   )
 
@@ -1168,6 +1196,7 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
                                           user_trend_formula = NULL,
                                           user_prior = NULL,
                                           newdata = NULL,
+                                          save_pars = brms::save_pars(),
                                           silent = 1L) {
   checkmate::assert_class(combined_fit, "stanfit")
   checkmate::assert_list(obs_setup, names = "named")
@@ -1251,7 +1280,7 @@ create_mvgam_from_combined_fit <- function(combined_fit, obs_setup,
       silent = silent,
       stancode = combined_stancode %||% obs_setup$stancode,
       standata = combined_standata %||% obs_setup$standata,
-      exclude = c("lprior", "lp__"),
+      save_pars = save_pars,
       mv_spec = mv_spec,
       trend_components = mvgam_components$trend_components,
       series_info = mvgam_components$series_info,
@@ -1307,6 +1336,7 @@ create_mvgam_stub_from_stan_components <- function(stan_components,
                                                    data_name,
                                                    newdata,
                                                    backend,
+                                                   save_pars = brms::save_pars(),
                                                    user_prior = NULL) {
   obs_setup <- stan_components$obs_setup
   trend_setup <- stan_components$trend_setup
@@ -1338,7 +1368,7 @@ create_mvgam_stub_from_stan_components <- function(stan_components,
       data.name = data_name,
       stancode = stan_components$combined_components$stancode,
       standata = stan_components$combined_components$standata,
-      exclude = c("lprior", "lp__"),
+      save_pars = save_pars,
       mv_spec = mv_spec,
       trend_metadata = enriched_trend_metadata,
       obs_model = obs_setup$brmsfit,

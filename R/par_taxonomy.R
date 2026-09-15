@@ -63,6 +63,7 @@ mvgam_par_side <- function(pars) {
 #' | `ranef_coef` | `r_*` | `tidy()`'s `ran_vals` |
 #' | `family` | `sigma`, `shape`, `nu`, ... | `obs_params` |
 #' | `dynamics` | trend-side leftovers | `trend_params` |
+#' | `bookkeeping` | `lprior`, `lp__` | nothing; no summary claims them |
 #' | `internal` | Stan working arrays | nothing; hidden everywhere |
 #'
 #' Collapsing any of these would force the caller that wants the
@@ -140,10 +141,47 @@ mvgam_par_kind <- function(pars, dpars = character()) {
   # apart by the side.
   take(grepl(MVGAM_PAR_FAMILY_PATTERN, pars) & side == "observation",
        "family")
+  take(grepl(MVGAM_PAR_BOOKKEEPING_PATTERN, pars), "bookkeeping")
   take(side == "trend", "dynamics")
 
   out
 }
+
+
+#' The order a reader meets a fit's parameters in
+#'
+#' brms orders a fitted object's parameters by class, and the classes
+#' run from the population coefficients through the scales to the
+#' quantities Stan keeps for itself. The kinds below are that order,
+#' stated once: the bucket a name belongs to decides where it goes and
+#' names within a bucket keep the order the program declares them in.
+#'
+#' @param pars Character vector of parameter names
+#' @param dpars Character vector of distributional parameters that
+#'   carry their own formula
+#' @return Integer vector ordering `pars`
+#' @noRd
+mvgam_par_order <- function(pars, dpars = character()) {
+  checkmate::assert_character(pars)
+  # An intercept opens its own class, as brms reports it. Stan's two
+  # accumulators have an order of their own, and every other name
+  # keeps the order the program declares it in.
+  intercept_last <- !grepl("_Intercept(_[0-9]+)?$", pars)
+  within_kind <- match(pars, MVGAM_PAR_BOOKKEEPING_ORDER, nomatch = 0L)
+  order(match(mvgam_par_kind(pars, dpars), MVGAM_PAR_KIND_ORDER),
+        intercept_last, within_kind, seq_along(pars))
+}
+
+
+# The classes brms orders a fitted object by, as the kinds this
+# taxonomy names. Stan's own accumulators come last, as they do in
+# brms, and a name of no named kind sorts before them.
+#'@noRd
+MVGAM_PAR_KIND_ORDER <- c(
+  "beta", "basis", "dpar_beta", "ranef_sd", "smooth_sd", "dpar_smooth",
+  "gp", "family", "intercept", "ranef_coef", "smooth_coef", "gp_coef",
+  "loading", "dynamics", "state", "internal", "other", "bookkeeping"
+)
 
 
 # The name patterns, written once. A trend-side name matches the
@@ -223,9 +261,28 @@ MVGAM_PAR_RANEF_SD_PATTERN <- "^(sd_|cor_)"
 #'@noRd
 MVGAM_PAR_RANEF_COEF_PATTERN <- "^r_"
 
+# What Stan accumulates for itself: the prior contribution the
+# program sums into `lprior` and the log posterior density it reports
+# as `lp__`. brms keeps both in the posterior and claims neither in a
+# summary table, which is what this kind states.
+#'@noRd
+MVGAM_PAR_BOOKKEEPING_PATTERN <- "^(lprior|lp__)$"
+
+# brms reports the prior contribution before the log posterior
+#'@noRd
+MVGAM_PAR_BOOKKEEPING_ORDER <- c("lprior", "lp__")
+
 # `mphi` / `mtheta` / `mtail` are the Tweedie custom family's
 # dispersion, power and tail parameters, which follow the same
 # convention as the standard distributional parameters.
 #'@noRd
-MVGAM_PAR_FAMILY_PATTERN <-
-  "^(sigma|shape|nu|phi|zi|hu|mphi|mtheta|mtail)(_|\\[|$)"
+# A mixture gives each component's parameters the component's number,
+# as `sigma1` and `theta2`. The mixing proportions are a family
+# parameter only in that spelling: a bare `theta` is the simplex the
+# program is identified by, and `theta_features` is the trend's own
+# loading-prior length-scale.
+#'@noRd
+MVGAM_PAR_FAMILY_PATTERN <- paste0(
+  "^(sigma|shape|nu|phi|zi|hu|mphi|mtheta|mtail)[0-9]*(_|\\[|$)",
+  "|^theta[0-9]+(\\[|$)"
+)

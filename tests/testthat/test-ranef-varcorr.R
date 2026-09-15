@@ -88,9 +88,12 @@ test_that("mvgam_ranef_aliases produces r_/sd_/cor_ aliases for (x|grp)", {
   expect_true("sd_grp__x" %in% names(map))
   # cor_<group>__<coef1>__<coef2> alias for the single off-diagonal.
   expect_true("cor_grp__Intercept__x" %in% names(map))
-  # Positional values follow the brms internal convention.
-  expect_identical(map[["r_grp[a,Intercept]"]], "r_1[1,1]")
-  expect_identical(map[["r_grp[f,x]"]], "r_1[6,2]")
+  # Positional values follow the brms internal convention. The
+  # per-level deviations come from the per-coefficient vectors, which
+  # is what a posterior carries: the matrix a correlated block is
+  # scaled into is one of the working variables a fit leaves out.
+  expect_identical(map[["r_grp[a,Intercept]"]], "r_1_1[1]")
+  expect_identical(map[["r_grp[f,x]"]], "r_1_2[6]")
   expect_identical(map[["sd_grp__Intercept"]], "sd_1[1]")
   expect_identical(map[["sd_grp__x"]], "sd_1[2]")
   expect_identical(map[["cor_grp__Intercept__x"]], "cor_1[1]")
