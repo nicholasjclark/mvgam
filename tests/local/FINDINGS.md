@@ -55,6 +55,80 @@ refusal at `validations.R:4214` stays out of reach because
 `forecast()` calls `ensure_mvgam_variables()` nowhere. Four fixtures
 give three different messages, none naming the missing value.
 
+## One axis name, several resolvers
+
+**94. The time and series column names carry a literal fallback at
+six sites.**
+
+`make_stan.R:320-327` resolves both names in two branches that differ
+only in whether the spec list is nested, each falling through
+`$time_var %||% $time %||% "time"`. The same idiom appears at
+`make_stan.R:482-483`, `axes.R:269`, `forecast.mvgam.R:411-412`,
+`hindcast.mvgam.R:221-222` and `lfo_cv.mvgam.R:212`. Two field
+spellings and six defaults for one pair of names. Put the pair on the
+axes record with one resolver and point the six at it.
+
+## The trend's covariates, derived twice
+
+**95. Two routes write `metadata$covariates`.**
+
+`validations.R:4938` takes a `brms::brmsterms()` walk, which adds
+random-effect grouping factors and strips `"1"`.
+`validations.R:5171-5180` builds the same field from
+`extract_predictor_vars()`, which does neither. Both are taken back at
+`validations.R:5183`, where they drive the covariate-invariance check,
+the collapse to trend grain and what `newdata` must carry.
+
+## Guards that cannot fire
+
+**96. Three dead branches.**
+
+`validations.R:2993` and `:3006` need more than one trend component,
+which `validations.R:2982` has already refused.
+`stan_assembly.R:1699-1754` needs `resp_name` outside `glm_responses`,
+which the loop at `stan_assembly.R:1664` draws it from.
+`make_stan.R:432` tests `exists("trend_metadata")` where both branches
+above it assign that name. Delete all three.
+
+## One condition, two refusals
+
+**97. More than one trend constructor is refused twice.**
+
+`validations.R:2985` and `validations.R:2854` refuse it with different
+wording, and the detection loop is copy-pasted at
+`validations.R:2540-2545` and `:2844-2849`. One detection, one
+message.
+
+## A response can lose its trend without a word
+
+**98. A discarded warning leaves the program unchanged.**
+
+`stan_assembly.R:1357-1363` calls `insight::format_warning()`, which
+only formats a string, discards the value and returns `code_lines`
+untouched. Its single caller is `stan_assembly.R:1841`. A response
+whose `mu_<resp>` assignment escapes the pattern is fitted with no
+trend in its linear predictor, and the program still compiles.
+
+## Two spellings of the training frame
+
+**99. Three kernels take the raw slot.**
+
+`families.R:6927`, `:7947` and `:8154` take `object$data` while the
+unit arrays they index come from `mvgam_training_data()`
+(`brms_wrappers.mvgam.R:484`), which exists because the frame has two
+spellings. The two coincide on every cached fixture, which makes this
+a latent hazard and not a measured defect. Point the three at the
+accessor.
+
+## Copy-paste twins
+
+**100. Two pairs differ in one field.**
+
+`make_stan.R:688-727` and `:781-833` share a 14-parameter signature,
+their defaults and their roxygen. They differ in which component they
+extract. `make_stan.R:578-584` and `:587-593` test the same four
+conditions and return opposite verdicts.
+
 ## Debt the code carries in recognisable shapes
 
 **89. Six shapes remain, and a scan counts three of them.**
