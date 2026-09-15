@@ -134,20 +134,6 @@ their defaults and their roxygen. They differ in which component they
 extract. `make_stan.R:578-584` and `:587-593` test the same four
 conditions and return opposite verdicts.
 
-## An argument honoured on one path and dropped on another
-
-**101. `re_formula` reaches `mu` and never reaches a dpar.**
-
-`posterior_linpred.R:531-534` and `posterior_predict.R:1055-1061`
-call `extract_component_linpred()` with five arguments. The three it
-leaves out are `re_formula`, `allow_new_levels` and
-`sample_new_levels`, which then take the defaults declared at
-`predictions.R:466-468`, while the mean path forwards them. Measured on a fit carrying `(1 | g)` on both
-sides, `re_formula = NA` moves `mu` by 2.19 and moves `sigma` by 0.
-`predicted_dpar_draws()` is reached from `resolve_family_pars()`,
-which puts `posterior_epred()` and `posterior_predict()` on the same
-footing. Forward the three.
-
 ## A name looked up outside the call that should have set it
 
 **102. `exists("trend_metadata")` searches enclosing environments.**
@@ -163,6 +149,74 @@ luck. `exists(..., inherits = FALSE)`, or an explicit `NULL` set
 before the branch runs, states what is meant. This one is reachable
 on the common path, which separates it from the dead guard 96 records
 at `make_stan.R:432`, where both branches assign the name.
+
+## Nothing checks whether a model is identified
+
+**103. The stacked design's rank is never computed.**
+
+The matrix deciding identification is the observation and trend
+designs stacked, mapped through
+`times_trend[obs_trend_time, obs_trend_series]`. No body computes it.
+Four of seven ordinary pairings measured rank deficient, including
+`y ~ 1` with `~ series + AR(p = 1)`, which is the plain way to ask
+for a per-series latent level. Reproduce at prefit on those seven
+pairings, then decide between a refusal naming the pairing and a
+notice that names the confounding.
+
+## The composition families leave their own scale
+
+**104. `forecast(type = "expected")` departs from the simplex.**
+
+On categ, diri and multi, `posterior_epred()` on the training grid
+gives probabilities while the forecast on the extension of that grid
+gave values outside `[0, 1]`, and `hindcast()` gave 1 for every
+species at every site. Beta and the negative binomial stay correct on
+the same paths, which places the fault at the shared normaliser.
+Reproduce on the jsdgam fixtures before editing.
+
+## One series order, except in one drawn surface
+
+**105. `plot(type = "trend")` sorts its panels.**
+
+Every other per-series surface takes the model's own order, so two
+pictures put different series in the same position, and on the
+hierarchical fit all six positions differ. Reproduce against
+`axes$series$levels`, which is the order the trend matrix numbers its
+columns.
+
+## A prediction returns missing cells instead of refusing
+
+**106. A missing covariate value gives `NA` back.**
+
+`posterior_epred()` returns a matrix carrying `NA` cells for a
+covariate value `newdata` omits. `posterior_epred.R:1470` carries no
+`any.missing = FALSE`. Name the column, as the pre-fit covariate
+guard does.
+
+## No guard that an argument reaches the model
+
+**107. The prediction surface has no exhaustiveness test.**
+
+`tests/testthat/test-update.R:401-424` diffs `formals(mvgam)` against
+`update_inheritance_table()` and `mvgam_update_uninherited`, and
+requires a written reason for every exclusion. That test exists
+because a dropped `loadings_prior` had gone unnoticed. The prediction
+methods have no equivalent, which is how 101 went unnoticed. One test
+over their formals, naming each argument as forwarded or excused.
+
+## Documentation that contradicts the code
+
+**108. Four pages describe something the code does otherwise.**
+
+`?sim_closure_unit_data` puts the Royle-Nichols detection predictor
+on the log scale while the family declares `logit` and the simulator
+uses `plogis()`. `?jsdgam` documents an `n_lv < n_species` bound the
+validator deliberately leaves unenforced. Two published comparisons
+rank trend models by `elpd_loo`, which is unreliable on a
+latent-trend fit, with nothing pointing at `lfo_cv()`. `mvn()`'s
+`forecast(type = "response")` refuses a family `hindcast()` draws,
+and no file fits `mvn()` any more, so that one needs a fixture before
+it can be settled.
 
 ## Debt the code carries in recognisable shapes
 
