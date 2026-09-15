@@ -40,7 +40,7 @@ Removing an exported function needs an API decision.
 **92. `newdata` needs no time column and no known series.**
 
 `posterior_epred()` and `predict()` reach neither the time assertion
-at `validations.R:4202` nor the unknown-series refusal.
+at `validations.R:4235` nor the unknown-series refusal.
 `predictions.R:788` continues when the time column is absent, and a
 hierarchical fit accepts a series level it never had. One layer
 should own what a frame must carry.
@@ -51,7 +51,7 @@ should own what a frame must carry.
 
 `horizon_beyond()` (`R/forecast.mvgam.R:498`) ends in `sort()`, which
 drops `NA`, and the remaining grid then looks discontinuous. The
-refusal at `validations.R:4214` stays out of reach because
+refusal at `validations.R:4247` stays out of reach because
 `forecast()` calls `ensure_mvgam_variables()` nowhere. Four fixtures
 give three different messages, none naming the missing value.
 
@@ -229,12 +229,21 @@ examined before anything is removed.
 
 | shape | the mark it leaves | count |
 |---|---|---|
-| one fact, several derivers | raw `[[series_var]]` / `[[time_var]]` reads; `sort(unique(...))` axis rebuilds; `inherits(..., "mvbrmsformula")` asked in place of the question meant | 53, 40, 43 |
-| a literal standing in for a missing value | `%||% "y"`, `%||% "series"`, `%||% "explicit"` | 118 |
+| one fact, several derivers | raw `[[series_var]]` / `[[time_var]]` reads; `sort(unique(...))` axis rebuilds; `inherits(..., "mvbrmsformula")` asked in place of the question meant | 55, 40, 43 |
+| a literal standing in for a missing value | `%||% "y"`, `%||% "series"`, `%||% "explicit"` | 120 |
 | a missing column skipped | `intersect(x, names(data))`, `if (!col %in% names(df)) next` | 25 |
 | a stored copy of a derivable fact | object slots and metadata fields written once and read in a few places | not counted |
 | one condition, several refusals | the same fault refused with different wording at different layers | not counted |
 | a proxy for the question meant | "the frame has no series column" standing for "the responses are the series"; `length(x) > 1` standing for "multivariate" | found by reading |
+
+The scan's `suppress` count was examined site by site and holds no
+debt: each of the six replaces a coercion warning with a refusal
+naming the column, or takes the Pareto k out of the object it
+suppressed and reports it. `raw_axis` concentrates in
+`forecast.mvgam.R`, which carries 22 of its 55. Several of the rest
+are the layers that build the axis. The `sort(unique(...))`
+sites in `sample_innovations.R` are guarded last resorts, each
+carrying a comment naming the order it falls back to.
 
 The tests carry the same debt. A stub that fakes a class with
 `structure(y ~ x, class = c("brmsformula", "formula"))` lets an
