@@ -1603,16 +1603,6 @@ parse_trend_formula <- function(trend_formula, data = NULL, .precomputed_dimensi
   has_explicit_trends <- length(trend_terms) > 0
   should_default_to_zmvn <- !has_explicit_trends
 
-  # Validate we have exactly one trend type per response - only one allowed per formula
-  if (length(trend_terms) > 1) {
-    stop(insight::format_error(c(
-      "Multiple trend constructors detected in single response formula.",
-      x = paste("Found:", paste(trend_terms, collapse = ", ")),
-      x = "Only one trend constructor is allowed per response variable.",
-      i = "For multivariate models, use separate trend formulas per response."
-    )))
-  }
-
   # Handle formulas without explicit trend constructors (default to ZMVN)
   if (should_default_to_zmvn) {
     # Create proper mvgam_trend object using constructor with default arguments

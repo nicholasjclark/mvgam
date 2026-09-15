@@ -79,22 +79,6 @@ random-effect grouping factors and strips `"1"`.
 `validations.R:5183`, where they drive the covariate-invariance check,
 the collapse to trend grain and what `newdata` must carry.
 
-## One condition, two refusals
-
-**97. More than one trend constructor is refused twice.**
-
-`parse_trend_formula()` (`trend_system.R`) refuses a second
-constructor counted from the parsed term labels, while the
-`multiple_constructors` restriction in
-`validate_trend_formula_restrictions()` (`validations.R`) refuses it
-from the formula string at the user boundary, in different wording.
-That boundary validates first for every `R/` caller of
-`parse_trend_formula()`. The four assertions at
-`test-trend-dispatcher.R:322`, `:330`, `:440` and `:783` call the
-parser directly, which is the one route reaching its copy. Keep the
-boundary, delete the parser's refusal and point those four assertions
-at the boundary.
-
 ## A response can lose its trend without a word
 
 **98. A discarded warning leaves the program unchanged.**
@@ -198,18 +182,33 @@ latent-trend fit, with nothing pointing at `lfo_cv()`. `mvn()`'s
 and no file fits `mvn()` any more, so that one needs a fixture before
 it can be settled.
 
-## A trend formula accepted and discarded
+## One trend family, two initial distributions
 
-**109. `get_prior()` on a bare formula drops `trend_formula`.**
+**110. The stationary initialisation reaches one AR path only.**
 
-`get_prior.formula()` (`priors.R:1655`) delegates to
-`brms::get_prior(object, ...)`. A `trend_formula` lands in brms's dots
-and is discarded. Measured on `y ~ x` with `trend_formula = ~ AR()`: the
-bare call returns 4 rows, none naming a trend, while
-`get_prior(mvgam_formula(y ~ x, trend_formula = ~ AR()), data)` returns
-6 rows, two of which name a trend. `get_prior.brmsformula()` (`:1665`)
-and `get_prior.default()` (`:1645`) carry the same delegation. Refuse a
-`trend_formula` at a method that discards it.
+A plain `AR(p = 1)` starts the latent state at its stationary scale:
+`lv_trend[1, j] = scaled_innovations_trend[1, j] / sqrt(1 - square(ar1_trend[j]))`.
+Every other AR path starts from the raw innovation instead:
+correlated innovations, a lag above one and a moving-average term. At
+`ar1 = 0.9` the first state is 2.3 times under-dispersed against
+stationarity, and the `t = 1` likelihood absorbs that into
+`sigma_trend` and `ar1_trend`. Element-wise scaling is the wrong
+repair for the correlated case: the stationary covariance solves
+`Sigma_x[i, j] = Sigma_eps[i, j] / (1 - phi_i phi_j)`. `VAR()`
+computes this already, through `initial_joint_var()`.
+
+## A box where the stationarity region is a triangle
+
+**111. `AR(p >= 2)` coefficients carry independent bounds.**
+
+`ar1_trend` and `ar2_trend` are each declared `<lower=-1, upper=1>`
+with `normal(0, 0.5)`. The prior table and the program agree on that.
+The AR(2) stationarity region is a triangle bounded by three
+inequalities: `|phi_2| < 1`; `phi_1 + phi_2 < 1`; `phi_2 - phi_1 < 1`.
+The box admits non-stationary draws such as `phi_1 = phi_2 = 0.9`.
+`VAR()` maps an unconstrained matrix through `AtoP()` and
+`rev_mapping()` (Heaps 2023), which is stationary by construction.
+That mapping at dimension 1 covers `AR(p)`.
 
 ## Debt the code carries in recognisable shapes
 

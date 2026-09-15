@@ -319,16 +319,16 @@ test_that("multiple trend components are properly rejected", {
   f1 <- ~ s(season) + RW() + AR(p = 2) + cov1
 
   expect_error(
-    mvgam:::parse_trend_formula(f1),
-    "Multiple trend constructors detected"
+    mvgam:::validate_single_trend_formula(f1),
+    "Multiple trend constructors found"
   )
 
   # Test in different order should also fail
   f2 <- ~ AR(p = 2) + cov1 + RW() + s(season)
 
   expect_error(
-    mvgam:::parse_trend_formula(f2),
-    "Multiple trend constructors detected"
+    mvgam:::validate_single_trend_formula(f2),
+    "Multiple trend constructors found"
   )
 })
 
@@ -437,8 +437,8 @@ test_that("boundary conditions are handled correctly", {
     # Test formula with repeated trend constructors should fail
     f3 <- ~ RW() + s(time) + RW(ma = TRUE)
     expect_error(
-      mvgam:::parse_trend_formula(f3),
-      "Multiple trend constructors detected"
+      mvgam:::validate_single_trend_formula(f3),
+      "Multiple trend constructors found"
     )
   })
 })
@@ -780,8 +780,8 @@ test_that("grouping variables are properly validated and passed to dispatchers",
            s(temperature) +
            RW(time = week, series = transect, gr = site, subgr = quadrat, cor = TRUE)
     expect_error(
-      mvgam:::parse_trend_formula(f2),
-      "Multiple trend constructors detected"
+      mvgam:::validate_single_trend_formula(f2),
+      "Multiple trend constructors found"
     )
   })
 })

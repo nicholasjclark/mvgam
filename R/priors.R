@@ -1636,6 +1636,37 @@ get_prior <- function(object, ...) {
   UseMethod("get_prior")
 }
 
+#' Build the `mvgam_formula` that a `trend_formula` names
+#'
+#' A `trend_formula` in the same call names an mvgam model. The brms
+#' path takes the formula and discards the rest, giving a
+#' complete-looking result that omits the trend entirely. Building the
+#' `mvgam_formula` and dispatching on it covers the trend as well.
+#'
+#' Each caller handles its own no-trend case. `stancode()` and
+#' `standata()` fall through with `NextMethod()`, which works only
+#' when called from the method itself. `brms::make_stancode()` looks
+#' like a shared exit and is not one: it calls the `stancode()`
+#' generic, which dispatches back to the mvgam method and recurses
+#' until the C stack fills. `brms::get_prior()` is a plain function
+#' and returns directly.
+#'
+#' @param object A formula or brmsformula
+#' @param dots The `...` of the calling method, as a list, carrying a
+#'   non-NULL `trend_formula`
+#' @param mvgam_fun The mvgam generic to dispatch on
+#' @return Whatever `mvgam_fun` returns
+#' @noRd
+route_trend_formula <- function(object, dots, mvgam_fun) {
+  trend_formula <- dots$trend_formula
+  dots$trend_formula <- NULL
+
+  do.call(
+    mvgam_fun,
+    c(list(mvgam_formula(object, trend_formula = trend_formula)), dots)
+  )
+}
+
 #' Default method for get_prior - delegates to brms
 #'
 #' @param object Model specification object
@@ -1643,7 +1674,11 @@ get_prior <- function(object, ...) {
 #' @return A \code{brmsprior} data frame
 #' @export
 get_prior.default <- function(object, ...) {
-  brms::get_prior(object, ...)
+  dots <- list(...)
+  if (is.null(dots$trend_formula)) {
+    return(brms::get_prior(object, ...))
+  }
+  route_trend_formula(object, dots, get_prior)
 }
 
 #' Formula method for get_prior - explicit brms delegation
@@ -1653,7 +1688,11 @@ get_prior.default <- function(object, ...) {
 #' @return A \code{brmsprior} data frame
 #' @export
 get_prior.formula <- function(object, ...) {
-  brms::get_prior(object, ...)
+  dots <- list(...)
+  if (is.null(dots$trend_formula)) {
+    return(brms::get_prior(object, ...))
+  }
+  route_trend_formula(object, dots, get_prior)
 }
 
 #' brmsformula method for get_prior - explicit brms delegation
@@ -1663,7 +1702,11 @@ get_prior.formula <- function(object, ...) {
 #' @return A \code{brmsprior} data frame
 #' @export
 get_prior.brmsformula <- function(object, ...) {
-  brms::get_prior(object, ...)
+  dots <- list(...)
+  if (is.null(dots$trend_formula)) {
+    return(brms::get_prior(object, ...))
+  }
+  route_trend_formula(object, dots, get_prior)
 }
 
 #' Method for fitted mvgam objects - returns the stored prior table

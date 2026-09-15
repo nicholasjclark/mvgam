@@ -726,6 +726,65 @@ stancode.mvgam_formula <- function(object, data, family = gaussian(),
   return(stancode)
 }
 
+#' Stan program and data from a formula carrying a `trend_formula`
+#'
+#' @description
+#' `stancode()` and `standata()` delegate a plain formula to
+#' \pkg{brms}. A `trend_formula` in the same call names an mvgam
+#' model, and these methods build the \code{\link{mvgam_formula}} that
+#' call describes before generating the program. A call supplying no
+#' `trend_formula` delegates to \pkg{brms} unchanged.
+#'
+#' @param object A `formula` or `brmsformula`.
+#' @param ... Arguments for \code{\link{stancode.mvgam_formula}} or for
+#'   \pkg{brms}, `data` and `family` among them.
+#'
+#' @return A character string of Stan code, or a list of Stan data.
+#'
+#' @seealso \code{\link{mvgam_formula}},
+#'   \code{\link{stancode.mvgam_formula}},
+#'   \code{\link{standata.mvgam_formula}}
+#'
+#' @rdname trend_formula_generation
+#' @export
+stancode.formula <- function(object, ...) {
+  dots <- list(...)
+  if (is.null(dots$trend_formula)) {
+    return(NextMethod())
+  }
+  route_trend_formula(object, dots, stancode)
+}
+
+#' @rdname trend_formula_generation
+#' @export
+stancode.brmsformula <- function(object, ...) {
+  dots <- list(...)
+  if (is.null(dots$trend_formula)) {
+    return(NextMethod())
+  }
+  route_trend_formula(object, dots, stancode)
+}
+
+#' @rdname trend_formula_generation
+#' @export
+standata.formula <- function(object, ...) {
+  dots <- list(...)
+  if (is.null(dots$trend_formula)) {
+    return(NextMethod())
+  }
+  route_trend_formula(object, dots, standata)
+}
+
+#' @rdname trend_formula_generation
+#' @export
+standata.brmsformula <- function(object, ...) {
+  dots <- list(...)
+  if (is.null(dots$trend_formula)) {
+    return(NextMethod())
+  }
+  route_trend_formula(object, dots, standata)
+}
+
 #' Generate Stan Data for mvgam Formula
 #'
 #' Generate complete Stan data list for an \code{mvgam_formula} object before

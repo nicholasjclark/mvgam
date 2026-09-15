@@ -585,6 +585,40 @@ test_that("validate_trend_formula_brms handles all formula types", {
   expect_error(mvgam:::validate_trend_formula_brms(~ AR() + RW()))
 })
 
+test_that("a trend_formula routes to the mvgam methods", {
+  test_data <- create_test_data()
+  tf <- ~ AR(p = 1)
+
+  # The bare spelling gives what the wrapped one gives
+  bare <- get_prior(y ~ x, trend_formula = tf, data = test_data)
+  wrapped <- get_prior(
+    mvgam_formula(y ~ x, trend_formula = tf), data = test_data
+  )
+  expect_equal(as.data.frame(bare), as.data.frame(wrapped))
+  expect_true(any(grepl("_trend$", bare$class)))
+
+  # Stan code and Stan data carry the trend as well
+  sc <- stancode(y ~ x, trend_formula = tf, data = test_data)
+  expect_true(grepl("trend", paste(sc, collapse = "\n")))
+  sd <- standata(y ~ x, trend_formula = tf, data = test_data)
+  expect_true(any(grepl("trend", names(sd))))
+
+  # A brmsformula takes the same route
+  bf_bare <- get_prior(brms::bf(y ~ x), trend_formula = tf,
+                       data = test_data)
+  expect_true(any(grepl("_trend$", bf_bare$class)))
+
+  # A call supplying no trend_formula still matches brms exactly
+  expect_equal(
+    as.data.frame(get_prior(y ~ x, data = test_data)),
+    as.data.frame(brms::get_prior(y ~ x, data = test_data))
+  )
+  expect_equal(
+    as.character(stancode(y ~ x, data = test_data)),
+    as.character(brms::make_stancode(y ~ x, data = test_data))
+  )
+})
+
 test_that("generate_trend_priors creates correct structures", {
   test_data <- create_test_data()
 
