@@ -2970,8 +2970,7 @@ is.mvgam_trend <- function(x) {
 
 #' Validate trend components for conflicts
 #'
-#' Checks for conflicting trend specifications like multiple dynamic factor models
-#' or incompatible correlation structures using brms-inspired validation patterns.
+#' Refuses a trend formula carrying more than one trend constructor.
 #'
 #' @param trend_components List of trend components to validate
 #'
@@ -2986,27 +2985,6 @@ validate_trend_components <- function(trend_components) {
       x = paste("Found:", paste(trend_types, collapse = ", ")),
       x = "Only one trend constructor is allowed per trend_formula.",
       i = "Use separate models or combine into a single trend type."
-    )))
-  }
-
-  # Check for multiple dynamic factor models
-  n_lv_models <- sum(sapply(trend_components, function(x) !is.null(x$n_lv) && x$n_lv > 0))
-  if (n_lv_models > 1) {
-    stop(insight::format_error(c(
-      "Multiple dynamic factor models specified.",
-      x = cli::format_inline(
-        "Only one trend component can have {.field n_lv > 0}."
-      ),
-      i = "Consider combining factor structures or removing one factor model."
-    )))
-  }
-
-  # Check for conflicting correlation structures
-  cor_settings <- sapply(trend_components, function(x) x$cor %||% FALSE)
-  if (any(cor_settings) && !all(cor_settings)) {
-    stop(insight::format_error(c(
-      "Mixed correlation settings detected.",
-      x = "Some trend components have correlation enabled while others don't."
     )))
   }
 

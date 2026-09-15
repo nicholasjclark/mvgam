@@ -79,17 +79,6 @@ random-effect grouping factors and strips `"1"`.
 `validations.R:5183`, where they drive the covariate-invariance check,
 the collapse to trend grain and what `newdata` must carry.
 
-## Guards that cannot fire
-
-**96. Three dead branches.**
-
-`validations.R:2993` and `:3006` need more than one trend component,
-which `validations.R:2982` has already refused.
-`stan_assembly.R:1699-1754` needs `resp_name` outside `glm_responses`,
-which the loop at `stan_assembly.R:1664` draws it from.
-`make_stan.R:432` tests `exists("trend_metadata")` where both branches
-above it assign that name. Delete all three.
-
 ## One condition, two refusals
 
 **97. More than one trend constructor is refused twice.**

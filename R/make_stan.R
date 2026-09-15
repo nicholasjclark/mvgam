@@ -429,7 +429,7 @@ build_stan_components <- function(formula, data, family = gaussian(),
     obs_setup = obs_setup,
     trend_setup = trend_setup,
     mv_spec = mv_spec,
-    trend_metadata = if (exists("trend_metadata")) trend_metadata else NULL
+    trend_metadata = trend_metadata
   ))
 }
 
