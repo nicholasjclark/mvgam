@@ -25,6 +25,37 @@ truncated, reaching Stan as
 intercept on the identity scale should carry the scalar's bound is a
 question for the family rather than for the axis work.
 
+## Factor arguments a trendless model discards
+
+**90. `trend_map` and `loadings_prior` are taken and dropped.**
+
+Both are applied onto the trend specs in `make_stan.R` at `:176`
+and `:192`. A model written with no `trend_formula` has
+`mv_spec$trend_specs = NULL`, and both helpers open by returning
+that: `apply_trend_map_alias()` at `validations.R:3447` and
+`attach_loadings_prior_spec()` at `:3504`. The argument reaches
+neither the Stan data nor the program, and nothing is raised.
+
+Measured on three series mapped onto two trends,
+`run_model = FALSE`:
+
+| call | `Z` | `N_lv_trend` | warned |
+|---|---|---|---|
+| `trend_map` + `AR(p = 1)` | 3x2 | 2 | no |
+| `trend_map`, no `trend_formula` | absent | absent | no |
+| `loadings_prior` + `AR(n_lv = 2)` | - | 2 | no |
+| `loadings_prior`, no `trend_formula` | - | absent | no |
+
+The last row also puts the structured kernel outside the program,
+so a user asking for feature-based loadings is handed an ordinary
+GAM. `loadings_prior` is normalised and its compatibility asserted
+first, which makes the silence harder to notice.
+
+`refuse_top_level_n_lv()` (`validations.R`) already refuses the
+third factor argument, naming what was asked for, what happened
+instead and where to write it. The same refusal belongs at both
+sites above, owned by the layer that drops them.
+
 ## Debt the code carries in recognisable shapes
 
 **89. Six shapes remain, and a scan counts three of them.**

@@ -371,6 +371,17 @@ build_stan_components <- function(formula, data, family = gaussian(),
     NULL
   }
 
+  # A model with no trend skips the branch above, where the record is
+  # built. Which series a model has, when each was last observed and
+  # whether the responses are the series are facts about the frame,
+  # and post-fit takes its labels, its forecast horizons and the
+  # response axis of a wide frame from them.
+  if (!mv_spec$has_trends) {
+    trend_metadata <- trendless_trend_metadata(
+      data, "time", "series", response_columns(obs_formula)
+    )
+  }
+
   # Generate combined Stan code and data using existing infrastructure
   combined_components <- generate_combined_stancode_and_data(
     obs_setup = obs_setup,

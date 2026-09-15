@@ -1366,6 +1366,62 @@ test_that("every model configuration keeps its axes sound", {
 })
 
 
+test_that("a model with no trend records its axes", {
+  # `has_trends` wraps the whole trend block, and the axis record is
+  # built inside it, so the record reaches post-fit only for a model
+  # carrying a `trend_formula`. Which series a model has, and when
+  # each was last seen, are facts about the frame. A trend decides
+  # neither.
+  #
+  # Every cell in the matrix above carries a trend, which is why this
+  # went unseen. `ragged` is the frame that separates a last row from
+  # a last observation: its series stop at 14, 15 and 12, while all
+  # three have a row at 15.
+  frame <- axis_frames()[["ragged"]]
+  prefit <- withCallingHandlers(
+    axis_prefit(frame, NULL, "uni"),
+    warning = function(w) {
+      if (any(vapply(axis_expected_warnings(), grepl,
+                     logical(1L), conditionMessage(w)))) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+
+  axes <- prefit$trend_metadata$axes
+  expect_false(is.null(axes), label = "trendless records its axes")
+  if (!is.null(axes)) {
+    expect_identical(
+      as.character(axes$series$levels),
+      as.character(frame_axis_labels("ragged")),
+      label = "trendless levels are the user's own"
+    )
+    expect_identical(
+      axes$series$source, frame_axis_source("ragged"),
+      label = "trendless records how the axis was arrived at"
+    )
+    expect_identical(
+      as.numeric(axes$time$values),
+      as.numeric(sort(unique(frame[[time_col(prefit)]]))),
+      label = "trendless times are the user's own"
+    )
+    # A padded series is dated from its last observation, never from
+    # its last row. The last row is 15 for all three series here, and
+    # a horizon cut against that silently drops the occasions
+    # `b_site` and `a_site` were never observed at.
+    expect_identical(
+      as.numeric(axes$series$last_time),
+      frame_last_times(frame, prefit, NULL, axes$series$levels),
+      label = "trendless last times are each series' own"
+    )
+    expect_identical(
+      axes$vars$time_var, time_col(prefit),
+      label = "trendless records the time column"
+    )
+  }
+})
+
+
 # Frames a user might hand a fitted model, well formed and not.
 # Placing a row on the fit's axes is a structural question, so none
 # of this needs draws: a prefit knows its axes and that is the whole

@@ -4373,6 +4373,76 @@ ensure_mvgam_variables <- function(data, parsed_trend = NULL, time_var = "time",
 
   return(data)
 }
+
+#' Whether a frame can name the axes a record needs
+#'
+#' `ensure_mvgam_variables()` accepts a frame carrying its time column
+#' with no missing values, naming its series either with a column or
+#' with several responses. It refuses anything else, and a trendless
+#' model reaches post-fit today with no record at all. This names the
+#' set where building one succeeds, so a frame that works now keeps
+#' working.
+#'
+#' @param data Data frame the model was given
+#' @param time_var Time column name
+#' @param series_var Series column name
+#' @param response_vars Response columns named by key
+#' @return A single logical
+#' @noRd
+frame_names_an_axis <- function(data, time_var, series_var,
+                                response_vars = NULL) {
+  if (!time_var %in% names(data) || anyNA(data[[time_var]])) {
+    return(FALSE)
+  }
+  if (series_var %in% names(data)) {
+    return(!anyNA(data[[series_var]]))
+  }
+  length(response_vars) > 1L
+}
+
+#' The axis record a model without a trend carries
+#'
+#' The trend branch builds this record while resolving the trend's own
+#' dimensions. A model written without a `trend_formula` skips that
+#' branch, and every post-fit surface then derives an axis of its own:
+#' a padded series takes the date of its last row instead of its last
+#' observation, and a wide frame loses the one field naming its
+#' responses as the series. `trend_type` stays absent, which marks a
+#' model stepping no latent state.
+#'
+#' @param data Data frame the model was given
+#' @param time_var Time column name
+#' @param series_var Series column name
+#' @param response_vars Response columns named by key
+#' @return A metadata list, or `NULL` where the frame names no axis
+#' @noRd
+trendless_trend_metadata <- function(data, time_var, series_var,
+                                     response_vars = NULL) {
+  if (!frame_names_an_axis(data, time_var, series_var, response_vars)) {
+    return(NULL)
+  }
+  prepared <- ensure_mvgam_variables(
+    data = data, parsed_trend = NULL, time_var = time_var,
+    series_var = series_var, response_vars = response_vars
+  )
+  dimensions <- extract_time_series_dimensions(
+    prepared, time_var, series_var, response_vars = response_vars
+  )
+  list(
+    covariates = character(0),
+    variables = list(
+      time_var = time_var,
+      series_var = series_var,
+      gr_var = NA_character_,
+      subgr_var = NA_character_
+    ),
+    is_car = FALSE,
+    time_source = attr(prepared, "mvgam_time_source"),
+    series_source = attr(prepared, "mvgam_series_source"),
+    axes = complete_axes_grain(dimensions$axes, FALSE, FALSE)
+  )
+}
+
 #' The prepared time or series index a frame carries
 #'
 #' A frame read for a model carries its trend indices as attributes,
