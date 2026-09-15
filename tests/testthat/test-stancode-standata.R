@@ -1528,6 +1528,117 @@ test_that("stancode generates correct hierarchical VAR(gr = habitat) model with 
 })
 
 
+test_that("a statement polishing moves stays in the scope it needs", {
+  # brms's mixture likelihood declares `ps` in its loop and ends the
+  # loop by adding it to target. The statement carries no index, and
+  # moving it to the end of the block takes `ps` out of scope.
+  code <- c(
+    "model {",
+    "  if (!prior_only) {",
+    "    target += normal_lpdf(Z | 0, 1);",
+    "    for (n in 1:N) {",
+    "      array[2] real ps;",
+    "      ps[1] = log(theta1) + normal_lpdf(Y[n] | mu1[n], sigma1);",
+    "      ps[2] = log(theta2) + normal_lpdf(Y[n] | mu2[n], sigma2);",
+    "      target += log_sum_exp(ps);",
+    "    }",
+    "  }",
+    "  target += lprior;",
+    "}"
+  )
+  out <- mvgam:::reorganize_target_statements(code)
+
+  loop_start <- grep("for (n in 1:N)", out, fixed = TRUE)
+  loop_end <- mvgam:::find_matching_closing_brace(out, loop_start)
+  nested <- grep("log_sum_exp(ps)", out, fixed = TRUE)
+  expect_gt(nested, loop_start)
+  expect_lt(nested, loop_end)
+
+  # A top-level statement still moves to the end of the block
+  top_level <- grep("normal_lpdf(Z | 0, 1)", out, fixed = TRUE)
+  expect_gt(top_level, loop_end)
+})
+
+test_that("polishing moves a statement written over two lines whole", {
+  # brms writes the density of a bounded parameter with its normalising
+  # constant on a second line
+  code <- c(
+    "transformed parameters {",
+    "  vector[Kc] b;",
+    "  real lprior = 0;",
+    "  b = zb .* sdb;",
+    "  lprior += student_t_lpdf(hs_global | hs_df_global, 0, hs_scale_global)",
+    "    - 1 * log(0.5);",
+    "}",
+    "model {",
+    "  target += std_normal_lpdf(zb);",
+    "  target += student_t_lpdf(hs_local | hs_df, 0, 1)",
+    "    - rows(hs_local) * log(0.5);",
+    "  if (!prior_only) {",
+    "    target += poisson_log_glm_lpmf(Y | Xc, Intercept, b);",
+    "  }",
+    "  target += lprior;",
+    "}"
+  )
+  follows <- function(out, head, tail) {
+    grep(tail, out, fixed = TRUE) == grep(head, out, fixed = TRUE) + 1L
+  }
+
+  out <- mvgam:::reorganize_lprior_statements(code)
+  expect_true(follows(out, "lprior += student_t_lpdf(hs_global", "- 1 * log(0.5);"))
+  expect_lt(grep("lprior += ", out, fixed = TRUE),
+            grep("b = zb .* sdb;", out, fixed = TRUE))
+
+  out <- mvgam:::reorganize_model_block_statements(code)
+  expect_true(follows(out, "target += student_t_lpdf(hs_local",
+                      "- rows(hs_local) * log(0.5);"))
+  # The target statements follow the likelihood guard, lprior first
+  guard_end <- mvgam:::find_matching_closing_brace(
+    out, grep("if (!prior_only) {", out, fixed = TRUE)
+  )
+  targets <- grep("^\\s*target \\+=", out)
+  targets <- targets[targets > guard_end]
+  expect_match(out[targets[1]], "target += lprior;", fixed = TRUE)
+  expect_length(targets, 3L)
+})
+
+test_that("statements are split at their delimiters and headers", {
+  code <- c(
+    "model {",
+    "  for (n in 1:N)",
+    "    target += normal_lpdf(Y[n] | mu[n], sigma);",
+    "  target += normal_lpdf(sigma | 0, 1)",
+    "    - 1 * normal_lccdf(0 | 0, 1);",
+    "  if (!prior_only) {",
+    "    vector[N] mu = rep_vector(0.0, N);",
+    "  }",
+    "  print(\"{ in a string\"); // { in a comment",
+    "}"
+  )
+  st <- mvgam:::stan_statements(code, list(start = 1L, end = length(code)))
+  expect_identical(st$start, c(2L, 3L, 4L, 6L, 7L, 8L, 9L))
+  expect_identical(st$end, c(2L, 3L, 5L, 6L, 7L, 8L, 9L))
+  # A statement governed by a header without braces is nested, as is
+  # everything inside a braced block up to its closing brace
+  expect_identical(st$top, c(TRUE, FALSE, TRUE, TRUE, FALSE, FALSE, TRUE))
+})
+
+test_that("a mixture family's program parses once polished", {
+  data <- data.frame(
+    y = c(rnorm(30, -2), rnorm(30, 2)),
+    x = rnorm(60),
+    time = rep(1:30, 2),
+    series = factor(rep(c("a", "b"), each = 30))
+  )
+  mix <- brms::mixture(gaussian, gaussian, order = "mu")
+
+  # `validate = TRUE` parses the polished program, which is the one
+  # compiled
+  code <- stancode(mvgam_formula(y ~ x), data = data, family = mix,
+                   validate = TRUE)
+  expect_match(code, "target += log_sum_exp(ps)", fixed = TRUE)
+})
+
 test_that("trend codegen emits modern Stan array syntax across every branch", {
   # Regression guard: Stan >= 2.32 (cmdstanr default) rejects the
   # legacy `int name[N];` form, but `rstan::stanc()` still accepts

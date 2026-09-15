@@ -1111,7 +1111,8 @@ mvgam_single <- function(formula, trend_formula, data, backend,
 #' @param mv_spec Multivariate specification
 #' @return List with combined stancode and standata
 #' @noRd
-generate_combined_stancode_and_data <- function(obs_setup, trend_setup, mv_spec, validate = TRUE, prior = NULL,
+generate_combined_stancode_and_data <- function(obs_setup, trend_setup,
+                                                mv_spec, prior = NULL,
                                                 backend = "rstan") {
 
   # Extract trend_specs from mv_spec for the Stan code generator.
@@ -1122,16 +1123,11 @@ generate_combined_stancode_and_data <- function(obs_setup, trend_setup, mv_spec,
     NULL
   }
 
-  # Use the two-stage assembly system. `backend` is threaded so the
-  # syntax-validation step picks the same Stan parser the user will
-  # compile with; otherwise simplex families (which need Stan >= 2.36
-  # via cmdstanr) fail validation under the default rstan bundled
-  # parser.
+  # Use the two-stage assembly system
   result <- generate_combined_stancode(
     obs_setup = obs_setup,
     trend_setup = trend_setup,
     trend_specs = trend_specs,
-    validate = validate,
     prior = prior,
     silent = 1,
     backend = backend

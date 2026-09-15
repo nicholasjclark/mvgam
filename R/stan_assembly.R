@@ -148,8 +148,6 @@ apply_suffix_to_stan_code <- function(stan_code, patterns, suffix) {
 #'   both observation and trend parameters. If NULL, uses defaults. Default NULL.
 #' @param backend Character string specifying Stan backend, either "rstan" or
 #'   "cmdstanr". Default "rstan".
-#' @param validate Logical indicating whether to validate generated Stan code
-#'   structure. Default TRUE.
 #' @param silent Numeric controlling message verbosity. 0 = all messages,
 #'   1 = important only, 2 = silent. Default 1.
 #'
@@ -174,28 +172,16 @@ apply_suffix_to_stan_code <- function(stan_code, patterns, suffix) {
 #' @noRd
 generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
                                       trend_specs = NULL, prior = NULL,
-                                      backend = "rstan", validate = TRUE,
-                                      silent = 1) {
+                                      backend = "rstan", silent = 1) {
   checkmate::assert_list(obs_setup, names = "named")
   checkmate::assert_list(trend_setup, null.ok = TRUE)
   checkmate::assert_list(trend_specs, null.ok = TRUE)
   checkmate::assert_class(prior, "brmsprior", null.ok = TRUE)
   checkmate::assert_choice(backend, c("rstan", "cmdstanr"))
-  checkmate::assert_flag(validate)
   checkmate::assert_number(silent)
 
   # If no trend specification, return observation model as-is.
-  # Still parse-validate when `validate = TRUE` so obs-only fits get
-  # the same syntax check trend-formula fits do; the assembly stage
-  # is skipped but the parser is not.
   if (is.null(trend_setup) || is.null(trend_specs)) {
-    if (isTRUE(validate)) {
-      validate_stan_code(
-        obs_setup$stancode,
-        backend = backend,
-        silent = silent
-      )
-    }
     # A trend-free program still carries obs-side statements the
     # families wrote, so it needs the same pass the assembled one
     # gets. `mvn()` and `mvt()` put a prior on `Psi` this way.
@@ -389,18 +375,6 @@ generate_combined_stancode <- function(obs_setup, trend_setup = NULL,
     prior = obs_setup$prior,
     threads = obs_setup$threads
   )
-
-  # Validate final Stan code if requested
-  if (validate) {
-    validate_stan_code(
-      combined_stancode,
-      backend = backend,
-      silent = silent
-    )
-
-    # Validation function returns TRUE/FALSE, not modified code
-    # combined_stancode remains unchanged after validation
-  }
 
   return(list(
     stancode = combined_stancode,

@@ -210,6 +210,17 @@ The box admits non-stationary draws such as `phi_1 = phi_2 = 0.9`.
 `rev_mapping()` (Heaps 2023), which is stationary by construction.
 That mapping at dimension 1 covers `AR(p)`.
 
+## Shrinkage priors on the trend coefficients
+
+**112. `horseshoe()` and `R2D2()` on `b_trend` fail to compile.**
+
+The trend model's gaussian placeholder family makes brms scale both
+priors by `sigma`, which is undeclared under a poisson observation
+model and the observation scale under a gaussian one. The spliced
+block also declares `b_trend` after `mu_trend += X_trend * b_trend;`.
+Write the trend priors without the placeholder's `sigma` and declare
+`b_trend` before its first use.
+
 ## Debt the code carries in recognisable shapes
 
 **89. Six shapes remain, and a scan counts three of them.**

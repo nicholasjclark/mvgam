@@ -387,7 +387,6 @@ build_stan_components <- function(formula, data, family = gaussian(),
     obs_setup = obs_setup,
     trend_setup = trend_setup,
     mv_spec = mv_spec,
-    validate = validate,
     prior = trend_priors,  # Pass unfiltered trend priors to mvgam functions
     backend = backend
   )
@@ -414,7 +413,24 @@ build_stan_components <- function(formula, data, family = gaussian(),
   }
 
   # Polish Stan code for consistent formatting and spacing
-  combined_components$stancode <- paste(polish_generated_stan_code(combined_components$stancode), collapse = "\n")
+  combined_components$stancode <- paste(
+    polish_generated_stan_code(combined_components$stancode),
+    collapse = "\n"
+  )
+
+  # Parse the polished program, which is the one compiled. Polishing
+  # moves statements between blocks, and a parse of the unpolished
+  # program cannot see a statement moved away from the scope it needs.
+  # `backend` picks the parser the user compiles with: simplex families
+  # need Stan >= 2.36 through cmdstanr and fail under rstan's bundled
+  # parser.
+  if (isTRUE(validate)) {
+    validate_stan_code(
+      combined_components$stancode,
+      backend = backend,
+      silent = 1
+    )
+  }
 
   # `save_model` writes the program mvgam assembles, not the brms
   # program it starts from, since the assembled one is what gets
