@@ -134,22 +134,6 @@ their defaults and their roxygen. They differ in which component they
 extract. `make_stan.R:578-584` and `:587-593` test the same four
 conditions and return opposite verdicts.
 
-## A name looked up outside the call that should have set it
-
-**102. `exists("trend_metadata")` searches enclosing environments.**
-
-`brms_integration.R:371` takes `trend_metadata` when
-`exists("trend_metadata")` holds. That name is assigned at `:202`,
-inside the branch `:195` opens for
-`is_trend_setup && !is.null(trend_formula)`. The observation-side
-call takes neither. On that path the name is never assigned locally,
-which leaves the bare `exists()` reaching the enclosing environments,
-the global one included. The usual value is `NULL` by
-luck. `exists(..., inherits = FALSE)`, or an explicit `NULL` set
-before the branch runs, states what is meant. This one is reachable
-on the common path, which separates it from the dead guard 96 records
-at `make_stan.R:432`, where both branches assign the name.
-
 ## Nothing checks whether a model is identified
 
 **103. The stacked design's rank is never computed.**
