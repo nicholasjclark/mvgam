@@ -3440,12 +3440,29 @@ is_multivariate_trend_specs <- function(trend_specs) {
 #'   be NULL).
 #'
 #' @return `trend_specs` with `$trend_map` populated when the
-#'   top-level alias was supplied; unchanged otherwise.
+#'   top-level alias was supplied; unchanged otherwise. A mapping
+#'   supplied with no trend spec to hold it is refused here, which
+#'   is the layer that would otherwise discard it.
 #'
 #' @noRd
 apply_trend_map_alias <- function(trend_specs, mvgam_trend_map) {
-  if (is.null(trend_specs) || is.null(mvgam_trend_map)) {
+  if (is.null(mvgam_trend_map)) {
     return(trend_specs)
+  }
+  if (is.null(trend_specs)) {
+    stop(insight::format_error(c(
+      "Argument 'trend_map' requires a 'trend_formula'.",
+      x = paste0(
+        "The mapping is stored on a trend spec, which ",
+        "'trend_formula' creates. 'Z' would be dropped before the ",
+        "Stan data is built, and the model fitted would be an ",
+        "ordinary GAM."
+      ),
+      i = paste0(
+        "Write the trend the factors belong to, such as ",
+        "'trend_formula = ~ AR(p = 1)', or drop 'trend_map'."
+      )
+    )), call. = FALSE)
   }
   is_multivar <- is_multivariate_trend_specs(trend_specs)
   specs <- if (is_multivar) trend_specs else list(trend_specs)
@@ -3501,7 +3518,23 @@ apply_trend_map_alias <- function(trend_specs, mvgam_trend_map) {
 # the rationale and error messages).
 #'@noRd
 attach_loadings_prior_spec <- function(trend_specs, spec) {
-  if (is.null(trend_specs) || is.null(spec)) return(trend_specs)
+  if (is.null(spec)) return(trend_specs)
+  if (is.null(trend_specs)) {
+    stop(insight::format_error(c(
+      "Argument 'loadings_prior' requires a 'trend_formula'.",
+      x = paste0(
+        "The prior applies to the factor loadings 'Z', which a ",
+        "trend carrying latent factors has. 'trend_formula' ",
+        "creates that trend, and the prior would otherwise be ",
+        "dropped in silence."
+      ),
+      i = paste0(
+        "Write the trend the factors belong to, such as ",
+        "'trend_formula = ~ AR(n_lv = 2)', or drop ",
+        "'loadings_prior'."
+      )
+    )), call. = FALSE)
+  }
   is_multivar <- is_multivariate_trend_specs(trend_specs)
   specs <- if (is_multivar) trend_specs else list(trend_specs)
   for (i in seq_along(specs)) {

@@ -25,17 +25,6 @@ truncated, reaching Stan as
 intercept on the identity scale should carry the scalar's bound is a
 question for the family rather than for the axis work.
 
-## Factor arguments a trendless model discards
-
-**90. `trend_map` and `loadings_prior` are taken and dropped.**
-
-`apply_trend_map_alias()` (`validations.R:3447`) and
-`attach_loadings_prior_spec()` (`:3504`) return early when
-`trend_specs` is `NULL`, which is what a model with no
-`trend_formula` has. Neither argument reaches Stan and nothing is
-raised. Refuse both where they are dropped, as
-`refuse_top_level_n_lv()` does for `n_lv`.
-
 ## An exported constructor with three inert fields
 
 **91. `custom_trend()` stores three function names nothing fetches.**

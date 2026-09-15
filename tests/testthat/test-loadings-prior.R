@@ -374,6 +374,33 @@ test_that("MGP shrinkage is refused on trends that cannot carry it", {
 })
 
 
+test_that("loadings_prior requires a trend to carry it", {
+  # The structured prior replaces the iid prior on `Z`, which exists
+  # only on a trend carrying latent factors. With no `trend_formula`
+  # the spec is normalised and its compatibility asserted, then
+  # discarded in silence. A user asking for feature-based loadings
+  # was handed an ordinary GAM.
+  set.seed(1L)
+  d <- sim_mvgam(family = poisson(), n_series = 6L,
+                 n_timepoints = 20L)$data_train
+  err <- expect_error(
+    mvgam(y ~ 1, data = d, family = poisson(),
+          loadings_prior = list(column_shrinkage = "mgp"),
+          run_model = FALSE),
+    "loadings_prior"
+  )
+  # The refusal names where the prior belongs.
+  expect_match(conditionMessage(err), "trend_formula", fixed = TRUE)
+
+  # With a trend carrying factors the same argument still builds.
+  expect_no_error(suppressWarnings(mvgam(
+    y ~ 1, trend_formula = ~ AR(n_lv = 3), data = d,
+    family = poisson(),
+    loadings_prior = list(column_shrinkage = "mgp"), run_model = FALSE
+  )))
+})
+
+
 test_that("each kernel length-scale can be seen and set", {
   # The length-scales were emitted as literals with no registry
   # entry, so `prior_summary()` reported a row `get_prior()` never

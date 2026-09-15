@@ -333,6 +333,35 @@ test_that("apply_trend_map_alias is a no-op when alias is NULL", {
   expect_null(out$trend_map)
 })
 
+test_that("trend_map requires a trend_formula to map onto", {
+  # `trend_map` fixes which latent factor each series loads on, and
+  # that mapping is stored on a trend spec. A model written with no
+  # `trend_formula` has no spec, and the argument was discarded in
+  # silence: `Z` never reached the Stan data and the model built was
+  # an ordinary GAM.
+  set.seed(1L)
+  d <- data.frame(
+    series = factor(rep(c("a", "b", "c"), each = 10L)),
+    time = rep(1:10, 3L),
+    y = rpois(30L, 5)
+  )
+  tm <- data.frame(series = factor(c("a", "b", "c")),
+                   trend = c(1L, 1L, 2L))
+  err <- expect_error(
+    mvgam(y ~ 1, trend_map = tm, data = d, family = poisson(),
+          run_model = FALSE),
+    "trend_map"
+  )
+  # The refusal names where the mapping belongs.
+  expect_match(conditionMessage(err), "trend_formula", fixed = TRUE)
+
+  # The same argument with a trend to carry it still builds.
+  expect_no_error(suppressWarnings(mvgam(
+    y ~ 1, trend_formula = ~ AR(p = 1), trend_map = tm, data = d,
+    family = poisson(), run_model = FALSE
+  )))
+})
+
 test_that("apply_trend_map_alias grafts onto a single spec", {
   spec <- AR()  # constructor-level NULL
   out <- mvgam:::apply_trend_map_alias(spec, "identity")

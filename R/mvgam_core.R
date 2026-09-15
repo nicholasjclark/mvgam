@@ -246,10 +246,15 @@ mvgam_imputation_forwarded <- c(
 #'   `trend_map` argument on the trend constructor; passing both
 #'   is an error. See `loadings_prior` for the compatibility
 #'   matrix between `trend_map` patterns and structured
-#'   loadings priors.
+#'   loadings priors. The mapping is stored on a trend spec and
+#'   requires a `trend_formula`. Supplying it without one is an
+#'   error.
 #' @param loadings_prior Optional named list specifying a
 #'   structured prior on the unconstrained factor loadings
-#'   matrix following Heaps & Jermyn (2024). When supplied, the
+#'   matrix following Heaps & Jermyn (2024). The loadings belong
+#'   to a trend carrying latent factors, and the argument
+#'   requires a `trend_formula`. Supplying it without one is an
+#'   error. When supplied, the
 #'   default iid `to_vector(Z) ~ student_t(3, 0, 0.5)` prior is
 #'   replaced with a per-column matrix-normal prior of the form
 #'   `Z[, i] ~ multi_normal_cholesky(0, L_Phi)`, where the
