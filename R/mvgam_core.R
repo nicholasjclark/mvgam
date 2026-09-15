@@ -353,7 +353,16 @@ mvgam_imputation_forwarded <- c(
 #'   predictor per response category, [brms::categorical()],
 #'   [brms::multinomial()] and [brms::dirichlet()], are refused: use
 #'   [categ()], [multi()] and [diri()], which take the categories in
-#'   long format and share one latent structure across them.
+#'   long format and share one latent structure across them. A family
+#'   whose mean has to stay positive needs a link that keeps it there
+#'   once a trend enters the linear predictor: pair [stats::Gamma()],
+#'   [brms::weibull()], [brms::exponential()], [brms::frechet()] and
+#'   [stats::inverse.gaussian()] with `link = "log"`. Their default
+#'   links leave the mean positive only where the predictor is, and a
+#'   latent trend is centred near zero and reaches negative values,
+#'   where the likelihood is undefined. `mvgam()` warns before
+#'   fitting. [brms::lognormal()] is the exception, since its `mu` is
+#'   a log-scale location that takes any sign.
 #'
 #'   A family written inside a univariate [brms::bf()] is the model's
 #'   family, as in brms. In a multivariate model each response may take
@@ -462,6 +471,23 @@ mvgam_imputation_forwarded <- c(
 #' summary(mod, include_betas = FALSE)
 #' conditional_effects(mod)
 #' mcmc_plot(mod, variable = "^ar1", regex = TRUE, type = "hist")
+#'
+#' # ---- Positive continuous response with a trend ----
+#' # A mean that must stay positive needs `link = "log"` once a trend
+#' # enters the linear predictor. `stats::Gamma()` supplies the
+#' # `inverse` link instead, and a trend reaching negative values
+#' # leaves the likelihood undefined. mvgam warns on that pairing.
+#' set.seed(3)
+#' gamdat <- sim_mvgam(family = Gamma(link = "log"))
+#' gmod <- mvgam(
+#'   y ~ s(x),
+#'   trend_formula = ~ AR(p = 1),
+#'   data = gamdat$data_train,
+#'   family = Gamma(link = "log"),
+#'   chains = 2,
+#'   silent = 2
+#' )
+#' summary(gmod, include_betas = FALSE)
 #'
 #' # ---- Multivariate VAR(1) with intercept suppression + custom priors ----
 #' # Three correlated series, no observation intercept (`y ~ 0`),
@@ -750,6 +776,12 @@ mvgam <- function(formula, trend_formula = NULL, data = NULL,
       )
     ))
   }
+
+  # A positive mean under a link that admits zero needs the linear
+  # predictor to stay positive, which a latent trend does not
+  # guarantee. The imputation branch returns before this point, and
+  # `mvgam_multiple()` raises the same notice once for a whole list.
+  warn_positive_mean_link_with_trend(family, trend_formula)
 
   # Single dataset processing. `threads` is forwarded only when the
   # user actually set it; sending `threads = NULL` explicitly down
@@ -1504,6 +1536,10 @@ extract_trend_component_info <- function(combined_fit, mv_spec) {
 #'
 #' If `combine=FALSE`: A list of mvgam objects, one per imputation.
 #'
+#' If `run_model=FALSE`: a single unfitted stub built from the first
+#' dataset, whatever `combine` is set to. Pooling needs draws, which a
+#' stub does not have.
+#'
 #' @examples
 #' \dontrun{
 #' # Create pseudo-imputed data (3 imputations)
@@ -1561,6 +1597,12 @@ mvgam_multiple <- function(formula,
   checkmate::assert_logical(combine, len = 1, any.missing = FALSE)
   checkmate::assert_logical(check_data, len = 1, any.missing = FALSE)
 
+  # This function is exported and reaches a fit without passing
+  # through `mvgam()`, which is why the notice is raised here too.
+  # `family` arrives through `...`. Raising it once covers the whole
+  # list, where the per-imputation fit would repeat it per dataset.
+  warn_positive_mean_link_with_trend(list(...)$family, trend_formula)
+
   # Handle mids objects from mice package
   if (inherits(data_list, "mids")) {
     rlang::check_installed("mice",
@@ -1577,6 +1619,21 @@ mvgam_multiple <- function(formula,
   # Validate multiple imputation datasets
   if (check_data) {
     validate_multiple_imputation_datasets(data_list)
+  }
+
+  # A request for the program without a posterior is met from the
+  # first dataset, before any imputation is fitted. Pooling needs
+  # draws, and a stub has none. `brms::brm_multiple()` returns one
+  # unfitted model the same way under its `chains = 0` spelling.
+  if (isFALSE(list(...)$run_model)) {
+    return(mvgam_single(
+      formula = formula,
+      trend_formula = trend_formula,
+      data = data_list[[1L]],
+      backend = backend,
+      newdata = newdata,
+      ...
+    ))
   }
 
   # Fit individual models to each imputed dataset. The same

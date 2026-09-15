@@ -191,7 +191,16 @@ Supports most brms families, including the ordinal families
 predictor per response category, \code{\link[brms:brmsfamily]{brms::categorical()}},
 \code{\link[brms:brmsfamily]{brms::multinomial()}} and \code{\link[brms:brmsfamily]{brms::dirichlet()}}, are refused: use
 \code{\link[=categ]{categ()}}, \code{\link[=multi]{multi()}} and \code{\link[=diri]{diri()}}, which take the categories in
-long format and share one latent structure across them.
+long format and share one latent structure across them. A family
+whose mean has to stay positive needs a link that keeps it there
+once a trend enters the linear predictor: pair \code{\link[stats:family]{stats::Gamma()}},
+\code{\link[brms:brmsfamily]{brms::weibull()}}, \code{\link[brms:brmsfamily]{brms::exponential()}}, \code{\link[brms:brmsfamily]{brms::frechet()}} and
+\code{\link[stats:family]{stats::inverse.gaussian()}} with \code{link = "log"}. Their default
+links leave the mean positive only where the predictor is, and a
+latent trend is centred near zero and reaches negative values,
+where the likelihood is undefined. \code{mvgam()} warns before
+fitting. \code{\link[brms:brmsfamily]{brms::lognormal()}} is the exception, since its \code{mu} is
+a log-scale location that takes any sign.
 
 A family written inside a univariate \code{\link[brms:brmsformula]{brms::bf()}} is the model's
 family, as in brms. In a multivariate model each response may take
@@ -308,6 +317,23 @@ mod <- mvgam(
 summary(mod, include_betas = FALSE)
 conditional_effects(mod)
 mcmc_plot(mod, variable = "^ar1", regex = TRUE, type = "hist")
+
+# ---- Positive continuous response with a trend ----
+# A mean that must stay positive needs `link = "log"` once a trend
+# enters the linear predictor. `stats::Gamma()` supplies the
+# `inverse` link instead, and a trend reaching negative values
+# leaves the likelihood undefined. mvgam warns on that pairing.
+set.seed(3)
+gamdat <- sim_mvgam(family = Gamma(link = "log"))
+gmod <- mvgam(
+  y ~ s(x),
+  trend_formula = ~ AR(p = 1),
+  data = gamdat$data_train,
+  family = Gamma(link = "log"),
+  chains = 2,
+  silent = 2
+)
+summary(gmod, include_betas = FALSE)
 
 # ---- Multivariate VAR(1) with intercept suppression + custom priors ----
 # Three correlated series, no observation intercept (`y ~ 0`),

@@ -88,6 +88,33 @@ test_that("a prefit states what it has and what it lacks", {
 })
 
 
+test_that("mvgam_multiple gives one prefit when run_model is FALSE", {
+  set.seed(9)
+  mk <- function() {
+    data.frame(
+      y = rpois(20, 3),
+      time = seq_len(20L),
+      series = factor(rep("s1", 20L))
+    )
+  }
+  # Pooling compares `variables()` across the fits. A stub refuses
+  # that call, and an unfitted request that reached the pooler failed
+  # inside it. One stub comes back from the first dataset, under
+  # either `combine`.
+  for (comb in c(TRUE, FALSE)) {
+    pf <- suppressWarnings(mvgam_multiple(
+      y ~ 1, data_list = list(mk(), mk()), family = poisson(),
+      combine = comb, run_model = FALSE, silent = 2
+    ))
+    expect_s3_class(pf, "mvgam_prefit")
+    expect_false(inherits(pf, "mvgam_pooled"))
+    expect_null(pf$fit)
+    expect_type(stancode(pf), "character")
+    expect_identical(nobs(pf), 20L)
+  }
+})
+
+
 test_that("update rebuilds a prefit past the algorithm it recorded", {
   pf <- build_prefit()
   # A prefit records `algorithm = "none"`, which no backend lists.

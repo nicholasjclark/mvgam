@@ -43,7 +43,17 @@
 #'     [brms::lognormal()], [brms::exponential()],
 #'     [brms::weibull()], [brms::frechet()],
 #'     [stats::inverse.gaussian()], and [tweedie()] when the data
-#'     are continuous but carry a point mass at zero.}
+#'     are continuous but carry a point mass at zero. Pair these
+#'     with `link = "log"` whenever the model carries a trend:
+#'     their mean has to stay positive, and under `identity`,
+#'     `inverse` or `1/mu^2` that holds only where the linear
+#'     predictor is positive on every row. A latent trend is
+#'     centred near zero and takes negative values, where the
+#'     likelihood is undefined. `stats::Gamma()` supplies the
+#'     `inverse` link, which is why the pairing is easy to reach by
+#'     accident. `lognormal()` is the exception: its `mu` is a
+#'     log-scale location that takes any sign, and `identity` is
+#'     the right link for it.}
 #'   \item{A single proportion on `(0, 1)`}{[Beta()], with
 #'     [brms::zero_inflated_beta()] or
 #'     [brms::zero_one_inflated_beta()] when the bounds are

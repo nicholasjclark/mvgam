@@ -49,7 +49,17 @@ compound Poisson sum \cr
 \code{\link[brms:brmsfamily]{brms::lognormal()}}, \code{\link[brms:brmsfamily]{brms::exponential()}},
 \code{\link[brms:brmsfamily]{brms::weibull()}}, \code{\link[brms:brmsfamily]{brms::frechet()}},
 \code{\link[stats:family]{stats::inverse.gaussian()}}, and \code{\link[=tweedie]{tweedie()}} when the data
-are continuous but carry a point mass at zero.}
+are continuous but carry a point mass at zero. Pair these
+with \code{link = "log"} whenever the model carries a trend:
+their mean has to stay positive, and under \code{identity},
+\code{inverse} or \code{1/mu^2} that holds only where the linear
+predictor is positive on every row. A latent trend is
+centred near zero and takes negative values, where the
+likelihood is undefined. \code{stats::Gamma()} supplies the
+\code{inverse} link, which is why the pairing is easy to reach by
+accident. \code{lognormal()} is the exception: its \code{mu} is a
+log-scale location that takes any sign, and \code{identity} is
+the right link for it.}
 \item{A single proportion on \verb{(0, 1)}}{\code{\link[=Beta]{Beta()}}, with
 \code{\link[brms:brmsfamily]{brms::zero_inflated_beta()}} or
 \code{\link[brms:brmsfamily]{brms::zero_one_inflated_beta()}} when the bounds are

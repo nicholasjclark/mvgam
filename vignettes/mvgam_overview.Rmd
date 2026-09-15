@@ -168,6 +168,16 @@ worked recovery example. The two groups that need extra
 explanation are the closure-unit families and the joint
 multivariate response families, both summarised below.
 
+A family whose mean has to stay positive needs a link that keeps it
+there once a trend enters the linear predictor. `stats::Gamma()`
+supplies the `inverse` link. Under it the mean is positive only where
+the predictor is, and a latent trend is centred near zero and reaches
+negative values, leaving the likelihood undefined. Pair `Gamma()`,
+`weibull()`, `exponential()`, `frechet()` and `inverse.gaussian()`
+with `link = "log"` for a trend model. `mvgam()` warns before
+fitting. `lognormal()` is the exception, since its `mu` is a
+log-scale location that takes any sign.
+
 ### Closure-unit families: `occ()` and `nmix()`
 
 Closure-unit data hold repeated observations of the same sampling

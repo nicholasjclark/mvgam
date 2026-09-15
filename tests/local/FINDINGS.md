@@ -1,14 +1,6 @@
-# Defects the local fixture assertions found
+# Open defects
 
-Every entry here is still open. A finding is deleted once its fix is
-verified by the assertion that caught it, so the file shrinks as the
-work lands rather than accumulating a record of what used to be
-wrong.
-
-Each entry names the failing file and line. It then states what the
-assertion claims, against what the package does instead. Line numbers
-move as the files grow, so each entry also names the test by its
-description.
+Each entry is a task, deleted once its fix is verified.
 
 ## mvn()
 

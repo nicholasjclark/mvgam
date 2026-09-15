@@ -1978,6 +1978,76 @@ describe_response_support <- function(spec, y_name) {
 }
 
 
+# Internal: families whose mean parameter must be positive. brms
+# defaults each of these to a link that keeps it positive, and
+# defaults `lognormal` and `shifted_lognormal` to identity because
+# their `mu` is a log-scale location that takes any sign.
+#'@noRd
+mvgam_positive_mean_families <- c(
+  "gamma", "weibull", "exponential", "frechet", "inverse.gaussian"
+)
+
+# Internal: links leaving the linear predictor free to reach zero or
+# below. Each needs `eta > 0` for the mean to stay positive.
+#'@noRd
+mvgam_links_needing_positive_eta <- c("identity", "inverse", "1/mu^2")
+
+
+#' Warn when a latent trend can drive a positive mean to zero
+#'
+#' A family in `mvgam_positive_mean_families` needs `mu > 0`. Under
+#' `identity`, `inverse` or `1/mu^2` that holds only where the linear
+#' predictor stays positive on every row. A latent trend is unbounded
+#' and centred near zero, and the predictor reaches zero during
+#' sampling, where the likelihood is undefined and Stan rejects the
+#' draw. Without an intercept the initial draws never reach the
+#' region at all and every chain stops before warmup.
+#'
+#' The link the caller asked for is kept. `Gamma()` and
+#' `Gamma(link = "inverse")` build the same object, so substituting a
+#' link here would override a deliberate choice as readily as an
+#' inherited default.
+#'
+#' The notice is raised once per call, with no session-level
+#' frequency. The condition belongs to the model the caller supplied,
+#' and a second model pairing the two earns a second notice.
+#' `mvgam()` and `mvgam_multiple()` each raise it once, which keeps a
+#' list of imputations to one notice for the whole list.
+#'
+#' @param family The observation family
+#' @param trend_formula The trend formula, or `NULL`
+#' @return `invisible(TRUE)`
+#' @noRd
+warn_positive_mean_link_with_trend <- function(family, trend_formula) {
+  if (is.null(trend_formula) || !is.list(family)) {
+    return(invisible(TRUE))
+  }
+  fam <- resolve_family_name(family)
+  link <- family$link %||% "identity"
+  if (!fam %in% mvgam_positive_mean_families ||
+      !link %in% mvgam_links_needing_positive_eta) {
+    return(invisible(TRUE))
+  }
+  insight::format_warning(c(
+    paste0("Family '", fam, "' with 'link = \"", link,
+           "\"' needs a positive linear predictor."),
+    x = paste0(
+      "A latent trend is centred near zero and takes negative ",
+      "values, where the likelihood is undefined and Stan rejects ",
+      "the draw."
+    ),
+    i = paste0(
+      "Set 'link = \"log\"' to keep the mean positive for any ",
+      "predictor. Keeping this link needs an intercept held well ",
+      "above zero and a trend whose scale is small relative to it. ",
+      "An intercept-free observation formula stops every chain ",
+      "before warmup."
+    )
+  ))
+  invisible(TRUE)
+}
+
+
 # Internal: response-vs-family shape check for non-closure-unit
 # families. Closure-unit families (`occ()`, `nmix()` variants)
 # go through `validate_closure_unit_data()` instead, which does

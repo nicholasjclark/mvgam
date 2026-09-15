@@ -58,6 +58,10 @@ mvgam objects}
 }
 
 If \code{combine=FALSE}: A list of mvgam objects, one per imputation.
+
+If \code{run_model=FALSE}: a single unfitted stub built from the first
+dataset, whatever \code{combine} is set to. Pooling needs draws, which a
+stub does not have.
 }
 \description{
 Fits Bayesian state-space models to multiply imputed datasets,

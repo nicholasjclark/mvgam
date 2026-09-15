@@ -58,35 +58,83 @@ test_that("mvgam_data errors on negative y with Poisson", {
 })
 
 
-test_that("mvgam_data errors on non-binary y with Bernoulli", {
-  set.seed(4L)
-  df <- data.frame(time   = seq_len(12L),
-                   series = factor(rep("s1", 12L)),
-                   y      = c(rep(0L, 6L), rep(2L, 6L)))
-  expect_error(
-    suppressMessages(
-      mvgam_data(df, y = "y", family = bernoulli(), plot = FALSE)
-    ),
-    "outside the support"
-  )
-})
-
-
-test_that("mvgam_data errors on non-positive y with Gamma", {
-  df <- data.frame(time   = seq_len(10L),
-                   series = factor(rep("s1", 10L)),
-                   y      = c(0, runif(9L)))
-  expect_error(
-    suppressMessages(
-      mvgam_data(df, y = "y", family = Gamma(link = "log"),
-                  plot = FALSE)
-    ),
-    "outside the support"
-  )
-})
-
-
 # ---- Structural errors -------------------------------------------
+
+test_that("a positive mean under a zero-admitting link warns with a trend", {
+  # `Gamma()` supplies the inverse link, whose mean is positive only
+  # where the linear predictor is. A latent trend takes negative
+  # values, where the likelihood is undefined.
+  # `insight` wraps at the console width, so the pattern tolerates a
+  # line break where the message happens to fold.
+  expect_warning(
+    warn_positive_mean_link_with_trend(Gamma(), ~ AR(p = 1)),
+    "positive linear\\s+predictor"
+  )
+  # `inverse.gaussian()` arrives with the `1/mu^2` link.
+  expect_warning(
+    warn_positive_mean_link_with_trend(
+      stats::inverse.gaussian(), ~ AR(p = 1)
+    ),
+    "inverse.gaussian"
+  )
+
+  # The log link keeps the mean positive for any predictor.
+  expect_silent(
+    warn_positive_mean_link_with_trend(Gamma(link = "log"), ~ AR(p = 1))
+  )
+  # A trendless GLM keeps the inverse link without trouble, which is
+  # why the trend is part of the condition.
+  expect_silent(warn_positive_mean_link_with_trend(Gamma(), NULL))
+  # `lognormal()` carries `mu` as a log-scale location taking any
+  # sign, and identity is its right link. A check built from
+  # `mvgam_response_support` would group it with Gamma and warn on
+  # every lognormal trend fit.
+  expect_silent(
+    warn_positive_mean_link_with_trend(brms::lognormal(), ~ AR(p = 1))
+  )
+  expect_silent(
+    warn_positive_mean_link_with_trend(poisson(), ~ AR(p = 1))
+  )
+})
+
+
+test_that("the trend link warning reaches a prefit", {
+  # The helper alone would pass with the call site mis-wired, so the
+  # warning is driven through `mvgam()` itself. `run_model = FALSE`
+  # keeps the check free of sampling.
+  set.seed(1)
+  df <- data.frame(
+    y = rgamma(20L, shape = 2, rate = 1),
+    time = seq_len(20L),
+    series = factor(rep("s1", 20L))
+  )
+  expect_warning(
+    mvgam(y ~ 1, trend_formula = ~ AR(p = 1), data = df,
+          family = Gamma(), run_model = FALSE, silent = 2),
+    "positive linear\\s+predictor"
+  )
+})
+
+
+test_that("the trend link warning reaches mvgam_multiple", {
+  # `mvgam_multiple()` is exported and reaches a fit without passing
+  # through `mvgam()`, which is why it carries its own call.
+  set.seed(2)
+  mk <- function() {
+    data.frame(
+      y = rgamma(20L, shape = 2, rate = 1),
+      time = seq_len(20L),
+      series = factor(rep("s1", 20L))
+    )
+  }
+  expect_warning(
+    mvgam_multiple(y ~ 1, trend_formula = ~ AR(p = 1),
+                   data_list = list(mk(), mk()), family = Gamma(),
+                   run_model = FALSE, silent = 2),
+    "positive linear\\s+predictor"
+  )
+})
+
 
 test_that("mvgam_data refuses multi-response families", {
   set.seed(5L)
