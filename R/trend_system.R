@@ -903,140 +903,6 @@ get_trend_name <- function(trend_spec) {
 # Forecast Metadata Generation
 # -----------------------------------------------------------------------------
 
-#' Generate Forecast Metadata for Ultra-Fast Dispatch
-#'
-#' Creates minimal forecast metadata for fast runtime dispatch.
-#' Stores only function name and required parameter list for lazy extraction
-#' and zero-overhead forecasting calls.
-#'
-#' @param trend_spec An mvgam_trend object
-#' @return List with function_name and required_params for dispatch
-#' @noRd
-generate_forecast_metadata <- function(trend_spec) {
-  checkmate::assert_list(trend_spec, min.len = 1)
-
-  # Extract and normalize trend type
-  trend_type <- get_trend_name(trend_spec)
-
-  # Convention-based function naming: "AR" → forecast_ar_rcpp
-  function_name <- paste0("forecast_", tolower(trend_type), "_rcpp")
-
-  # Get minimal required parameters for lazy extraction
-  required_params <- generate_forecast_required_params(trend_spec, trend_type)
-
-  return(list(
-    function_name = function_name,
-    required_params = required_params
-  ))
-}
-
-#' Generate Required Parameters for Ultra-Fast Forecasting
-#'
-#' Determines minimal set of parameters needed for forecasting dispatch.
-#' Always a subset of monitor_params, kept minimal for fast extraction.
-#'
-#' @param trend_spec An mvgam_trend object
-#' @param trend_type Normalized trend type
-#' @return Character vector of minimal required parameter names
-#' @noRd
-generate_forecast_required_params <- function(trend_spec, trend_type) {
-  # Every filter below selects from this list rather than naming
-  # parameters itself, so a name the trend does not monitor cannot
-  # be required. Naming them independently is how `PW()` came to
-  # require a `sigma_trend` it never samples, VAR a `Sigma_trend`
-  # that is computed rather than monitored, and CAR an `ar1` that
-  # no trend has ever produced under the suffix convention.
-  all_monitor_params <- generate_monitor_params(trend_spec)
-
-  # Filter to minimal required set for each trend type
-  switch(trend_type,
-    "RW" = filter_rw_forecast_params(all_monitor_params, trend_spec),
-    "AR" = filter_ar_forecast_params(all_monitor_params, trend_spec),
-    "VAR" = filter_var_forecast_params(all_monitor_params, trend_spec),
-    "CAR" = filter_car_forecast_params(all_monitor_params, trend_spec),
-    "ZMVN" = filter_zmvn_forecast_params(all_monitor_params, trend_spec),
-    "PW" = filter_pw_forecast_params(all_monitor_params, trend_spec),
-    stop(insight::format_error(c(
-      cli::format_inline(
-        "Unknown trend type for forecasting: {.field {trend_type}}"
-      ),
-      i = "Supported types: RW, AR, VAR, CAR, ZMVN, PW"
-    )))
-  )
-}
-
-#' Filter RW parameters for minimal forecasting requirements
-#' @param monitor_params All monitor parameters for RW
-#' @param trend_spec RW trend specification
-#' @return Minimal required parameters for fast RW forecasting
-#' @noRd
-filter_rw_forecast_params <- function(monitor_params, trend_spec) {
-  # RW minimally needs: variance + optional MA + correlation
-  intersect(
-    monitor_params,
-    c("sigma_trend", "theta1_trend", "L_Omega_trend")
-  )
-}
-
-#' Filter AR parameters for minimal forecasting requirements
-#' @param monitor_params All monitor parameters for AR
-#' @param trend_spec AR trend specification
-#' @return Minimal required parameters for fast AR forecasting
-#' @noRd
-filter_ar_forecast_params <- function(monitor_params, trend_spec) {
-  # AR minimally needs: coefficients + variance
-  ar_coeffs <- monitor_params[is_ar_coefficient(monitor_params)]
-  c(ar_coeffs, intersect(
-    monitor_params,
-    c("sigma_trend", "L_Omega_trend")
-  ))
-}
-
-#' Filter VAR parameters for minimal forecasting requirements
-#' @param monitor_params All monitor parameters for VAR
-#' @param trend_spec VAR trend specification
-#' @return Minimal required parameters for fast VAR forecasting
-#' @noRd
-filter_var_forecast_params <- function(monitor_params, trend_spec) {
-  # VAR minimally needs: the transition-matrix hyperparameters its
-  # stationary parameterisation is built from, plus the innovation
-  # variance and correlation it draws through.
-  intersect(
-    monitor_params,
-    c("Amu_trend", "Aomega_trend", "sigma_trend", "L_Omega_trend")
-  )
-}
-
-#' Filter CAR parameters for minimal forecasting requirements
-#' @param monitor_params All monitor parameters for CAR
-#' @param trend_spec CAR trend specification
-#' @return Minimal required parameters for fast CAR forecasting
-#' @noRd
-filter_car_forecast_params <- function(monitor_params, trend_spec) {
-  # CAR minimally needs: AR coefficient + variance
-  intersect(monitor_params, c("ar1_trend", "sigma_trend"))
-}
-
-#' Filter ZMVN parameters for minimal forecasting requirements
-#' @param monitor_params All monitor parameters for ZMVN
-#' @param trend_spec ZMVN trend specification
-#' @return Minimal required parameters for fast ZMVN forecasting
-#' @noRd
-filter_zmvn_forecast_params <- function(monitor_params, trend_spec) {
-  # ZMVN minimally needs: variance + optional correlation
-  intersect(monitor_params, c("sigma_trend", "L_Omega_trend"))
-}
-
-#' Filter PW parameters for minimal forecasting requirements
-#' @param monitor_params All monitor parameters for PW
-#' @param trend_spec PW trend specification
-#' @return Minimal required parameters for fast PW forecasting
-#' @noRd
-filter_pw_forecast_params <- function(monitor_params, trend_spec) {
-  # PW minimally needs: all growth parameters
-  intersect(monitor_params, c("k_trend", "m_trend", "delta_trend"))
-}
-
 
 # -----------------------------------------------------------------------------
 # Summary Labels Generation for User-Friendly Parameter Display
@@ -1161,17 +1027,6 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
 #'     Format: list(ar1_trend = c(-1, 1), sigma_trend = c(0, Inf))}
 #' }
 #'
-#' @section Self-Contained Forecasting Metadata Fields:
-#' \describe{
-#'   \item{forecast_metadata}{List. Forecasting function information:
-#'     \describe{
-#'       \item{function_name}{Character. Forecasting function name (e.g., "forecast_ar_rcpp")}
-#'       \item{required_args}{Character vector. Required arguments from fitted model}
-#'       \item{max_horizon}{Integer. Maximum forecasting steps supported}
-#'       \item{dependencies}{Character vector. Requirements like "needs_last_state"}
-#'     }}
-#' }
-#'
 #' @section Configuration Parameters (Trend-Specific):
 #' \describe{
 #'   \item{p}{Integer or vector. Order parameter for AR/VAR models.
@@ -1244,7 +1099,6 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
 #' The trend field enables automatic function lookup:
 #' \itemize{
 #'   \item Stan generation: "AR" → generate_ar_trend_stanvars()
-#'   \item Forecasting: forecast_metadata$function_name → that function
 #'   \item No manual registry entries needed
 #' }
 #'
@@ -1261,7 +1115,6 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
 #' \itemize{
 #'   \item trend_model: Legacy field, use trend instead
 #'   \item trend_type: Legacy field, use trend instead
-#'   \item forecast_fun: Legacy field, use forecast_metadata$function_name
 #'   \item stancode_fun: Legacy field, replaced by convention-based lookup
 #'   \item standata_fun: Legacy field, replaced by convention-based lookup
 #' }
@@ -1295,14 +1148,6 @@ generate_parameter_label <- function(param_name, trend_type, trend_spec) {
 #'   monitor_params = c("ar1_trend", "sigma_trend"),
 #'   tpars = c("ar1_trend"),
 #'   bounds = list(ar1_trend = c(-1, 1)),
-#'
-#'   # Self-contained forecasting
-#'   forecast_metadata = list(
-#'     function_name = "forecast_ar_rcpp",
-#'     required_args = c("ar_coefficients", "last_state"),
-#'     max_horizon = Inf,
-#'     dependencies = c("needs_ar_coeffs")
-#'   ),
 #'
 #'   # Configuration
 #'   p = 1, ma = FALSE, cor = FALSE, n_lv = NULL,
@@ -2963,7 +2808,6 @@ get_mvgam_trend_defaults <- function() {
 
     # Placeholder metadata (to be auto-generated)
     monitor_params = character(0),
-    forecast_metadata = list(),
     summary_labels = character(0)
   )
 }
@@ -3000,10 +2844,6 @@ apply_mvgam_trend_defaults <- function(trend_obj) {
   # Auto-generate metadata if missing
   if (length(trend_obj$monitor_params) == 0) {
     trend_obj$monitor_params <- generate_monitor_params(trend_obj)
-  }
-
-  if (length(trend_obj$forecast_metadata) == 0) {
-    trend_obj$forecast_metadata <- generate_forecast_metadata(trend_obj)
   }
 
   if (length(trend_obj$summary_labels) == 0) {
@@ -3185,13 +3025,12 @@ create_mvgam_trend <- function(trend_type, ...,
 #' @noRd
 get_trend_dispatch_function <- function(trend_type, function_type) {
   checkmate::assert_string(trend_type)
-  checkmate::assert_choice(function_type, c("stanvar", "forecast", "monitor"))
+  checkmate::assert_choice(function_type, c("stanvar", "monitor"))
 
   trend_lower <- tolower(trend_type)
 
   switch(function_type,
     stanvar = paste0("generate_", trend_lower, "_trend_stanvars"),
-    forecast = paste0("forecast_", trend_lower, "_rcpp"),
     monitor = paste0("generate_", trend_lower, "_monitor_params")
   )
 }
@@ -3207,13 +3046,6 @@ get_trend_dispatch_function <- function(trend_type, function_type) {
 #' @noRd
 add_consistent_dispatch_metadata <- function(trend_obj) {
   trend_type <- trend_obj$trend
-
-  # Add forecast metadata with consistent naming
-  if (is.null(trend_obj$forecast_metadata)) {
-    trend_obj$forecast_metadata <- list(
-      function_name = get_trend_dispatch_function(trend_type, "forecast")
-    )
-  }
 
   # Add monitor params generator name
   trend_obj$monitor_generator <- get_trend_dispatch_function(trend_type, "monitor")

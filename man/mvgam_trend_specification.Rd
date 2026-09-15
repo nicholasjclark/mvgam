@@ -47,19 +47,6 @@ Format: list(ar1_trend = c(-1, 1), sigma_trend = c(0, Inf))}
 }
 }
 
-\section{Self-Contained Forecasting Metadata Fields}{
-
-\describe{
-\item{forecast_metadata}{List. Forecasting function information:
-\describe{
-\item{function_name}{Character. Forecasting function name (e.g., "forecast_ar_rcpp")}
-\item{required_args}{Character vector. Required arguments from fitted model}
-\item{max_horizon}{Integer. Maximum forecasting steps supported}
-\item{dependencies}{Character vector. Requirements like "needs_last_state"}
-}}
-}
-}
-
 \section{Configuration Parameters (Trend-Specific)}{
 
 \describe{
@@ -141,7 +128,6 @@ The validation_rules field determines which other fields are valid:
 The trend field enables automatic function lookup:
 \itemize{
 \item Stan generation: "AR" → generate_ar_trend_stanvars()
-\item Forecasting: forecast_metadata$function_name → that function
 \item No manual registry entries needed
 }
 }
@@ -162,7 +148,6 @@ During transition period, old fields may still be present:
 \itemize{
 \item trend_model: Legacy field, use trend instead
 \item trend_type: Legacy field, use trend instead
-\item forecast_fun: Legacy field, use forecast_metadata$function_name
 \item stancode_fun: Legacy field, replaced by convention-based lookup
 \item standata_fun: Legacy field, replaced by convention-based lookup
 }
@@ -200,14 +185,6 @@ ar_trend <- structure(list(
   monitor_params = c("ar1_trend", "sigma_trend"),
   tpars = c("ar1_trend"),
   bounds = list(ar1_trend = c(-1, 1)),
-
-  # Self-contained forecasting
-  forecast_metadata = list(
-    function_name = "forecast_ar_rcpp",
-    required_args = c("ar_coefficients", "last_state"),
-    max_horizon = Inf,
-    dependencies = c("needs_ar_coeffs")
-  ),
 
   # Configuration
   p = 1, ma = FALSE, cor = FALSE, n_lv = NULL,

@@ -589,13 +589,11 @@ test_that("consistent dispatch metadata is added automatically", {
     rw_trend <- RW()
     expect_equal(rw_trend$stanvar_generator, "generate_rw_trend_stanvars")
     expect_equal(rw_trend$monitor_generator, "generate_rw_monitor_params")
-    expect_equal(rw_trend$forecast_metadata$function_name, "forecast_rw_rcpp")
 
     # Test AR gets correct dispatch metadata
     ar_trend <- AR()
     expect_equal(ar_trend$stanvar_generator, "generate_ar_trend_stanvars")
     expect_equal(ar_trend$monitor_generator, "generate_ar_monitor_params")
-    expect_equal(ar_trend$forecast_metadata$function_name, "forecast_ar_rcpp")
   })
 })
 
@@ -605,11 +603,6 @@ test_that("get_trend_dispatch_function generates correct names", {
   expect_equal(get_trend_dispatch_function("AR", "stanvar"), "generate_ar_trend_stanvars")
   expect_equal(get_trend_dispatch_function("RW", "stanvar"), "generate_rw_trend_stanvars")
   expect_equal(get_trend_dispatch_function("VAR", "stanvar"), "generate_var_trend_stanvars")
-
-  # Test forecast function names
-  expect_equal(get_trend_dispatch_function("AR", "forecast"), "forecast_ar_rcpp")
-  expect_equal(get_trend_dispatch_function("RW", "forecast"), "forecast_rw_rcpp")
-  expect_equal(get_trend_dispatch_function("VAR", "forecast"), "forecast_var_rcpp")
 
   # Test monitor generator names
   expect_equal(get_trend_dispatch_function("AR", "monitor"), "generate_ar_monitor_params")
@@ -790,40 +783,6 @@ test_that("a trend that cannot take factors refuses them", {
   expect_error(CAR(n_lv = 2), "unused argument")
   # A factor-compatible trend takes it.
   expect_silent(AR(n_lv = 2))
-})
-
-
-test_that("forecasting cannot require a parameter nothing monitors", {
-  # A filter that names its own parameters independently of the
-  # trends can drift from what they actually monitor: `PW()` could
-  # require a `sigma_trend` it never samples, VAR a `Sigma_trend`
-  # that Stan computes rather than monitors, or CAR an `ar1` that no
-  # trend produces under the suffix convention. Selecting from the
-  # monitor list makes that impossible rather than merely currently
-  # true.
-  specs <- list(
-    RW = RW(), RW_ma = RW(ma = TRUE), AR = AR(p = 2),
-    AR_ma = AR(p = 1, ma = TRUE), AR_cor = AR(p = 1, cor = TRUE),
-    VAR = VAR(), CAR = CAR(), ZMVN = ZMVN(), PW = PW()
-  )
-  for (spec in specs) {
-    monitored <- mvgam:::generate_monitor_params(spec)
-    required <- mvgam:::generate_forecast_required_params(
-      spec, mvgam:::get_trend_name(spec)
-    )
-    expect_true(all(required %in% monitored))
-  }
-
-  # A trend that samples no innovation scale must not require one.
-  expect_false("sigma_trend" %in% mvgam:::generate_forecast_required_params(
-    PW(), "PW"
-  ))
-  rw_mgp <- mvgam:::attach_loadings_spec_to_trend(
-    RW(), list(column_shrinkage = "mgp")
-  )
-  expect_false("sigma_trend" %in% mvgam:::generate_forecast_required_params(
-    rw_mgp, "RW"
-  ))
 })
 
 

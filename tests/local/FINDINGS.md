@@ -29,32 +29,42 @@ question for the family rather than for the axis work.
 
 **90. `trend_map` and `loadings_prior` are taken and dropped.**
 
-Both are applied onto the trend specs in `make_stan.R` at `:176`
-and `:192`. A model written with no `trend_formula` has
-`mv_spec$trend_specs = NULL`, and both helpers open by returning
-that: `apply_trend_map_alias()` at `validations.R:3447` and
-`attach_loadings_prior_spec()` at `:3504`. The argument reaches
-neither the Stan data nor the program, and nothing is raised.
+`apply_trend_map_alias()` (`validations.R:3447`) and
+`attach_loadings_prior_spec()` (`:3504`) return early when
+`trend_specs` is `NULL`, which is what a model with no
+`trend_formula` has. Neither argument reaches Stan and nothing is
+raised. Refuse both where they are dropped, as
+`refuse_top_level_n_lv()` does for `n_lv`.
 
-Measured on three series mapped onto two trends,
-`run_model = FALSE`:
+## An exported constructor with three inert fields
 
-| call | `Z` | `N_lv_trend` | warned |
-|---|---|---|---|
-| `trend_map` + `AR(p = 1)` | 3x2 | 2 | no |
-| `trend_map`, no `trend_formula` | absent | absent | no |
-| `loadings_prior` + `AR(n_lv = 2)` | - | 2 | no |
-| `loadings_prior`, no `trend_formula` | - | absent | no |
+**91. `custom_trend()` stores three function names nothing fetches.**
 
-The last row also puts the structured kernel outside the program,
-so a user asking for feature-based loadings is handed an ordinary
-GAM. `loadings_prior` is normalised and its compatibility asserted
-first, which makes the silence harder to notice.
+`custom_trend()` (`R/trend_system.R:1384`) is exported and asserts
+`forecast_fun`, `stancode_fun` and `standata_fun` as non-empty
+strings. No body in `R/` fetches any of the three, and the function
+has no caller. `register_custom_trend()` covers the same ground.
+Removing an exported function needs an API decision.
 
-`refuse_top_level_n_lv()` (`validations.R`) already refuses the
-third factor argument, naming what was asked for, what happened
-instead and where to write it. The same refusal belongs at both
-sites above, owned by the layer that drops them.
+## Prediction accepts frames the axis layer refuses
+
+**92. `newdata` needs no time column and no known series.**
+
+`posterior_epred()` and `predict()` reach neither the time assertion
+at `validations.R:4202` nor the unknown-series refusal.
+`predictions.R:788` continues when the time column is absent, and a
+hierarchical fit accepts a series level it never had. One layer
+should own what a frame must carry.
+
+## One missing time, three different refusals
+
+**93. An NA time in `newdata` is dropped before a guard names it.**
+
+`horizon_beyond()` (`R/forecast.mvgam.R:498`) ends in `sort()`, which
+drops `NA`, and the remaining grid then looks discontinuous. The
+refusal at `validations.R:4214` stays out of reach because
+`forecast()` calls `ensure_mvgam_variables()` nowhere. Four fixtures
+give three different messages, none naming the missing value.
 
 ## Debt the code carries in recognisable shapes
 
