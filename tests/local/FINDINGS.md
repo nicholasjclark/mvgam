@@ -37,13 +37,16 @@ Removing an exported function needs an API decision.
 
 ## Prediction accepts frames the axis layer refuses
 
-**92. `newdata` needs no time column and no known series.**
+**92. `newdata` needs no time column.**
 
-`posterior_epred()` and `predict()` reach neither the time assertion
-at `validations.R:4235` nor the unknown-series refusal.
-`predictions.R:788` continues when the time column is absent, and a
-hierarchical fit accepts a series level it never had. One layer
-should own what a frame must carry.
+`predictions.R:788-794` continues when the time column is absent.
+`ensure_mvgam_variables()` carries the time assertion
+(`validations.R:4174`), and the prediction path never calls it. An
+unknown series level is now refused through
+`validate_prediction_factor_levels()` (`predictions.R:481-484`). Two
+conditions still bypass it: a fit whose `trend_metadata$levels` is
+NULL and a frame whose series column is absent. One layer should own
+what a frame must carry.
 
 ## One missing time, three different refusals
 
@@ -83,11 +86,13 @@ the collapse to trend grain and what `newdata` must carry.
 
 **98. A discarded warning leaves the program unchanged.**
 
-`stan_assembly.R:1357-1363` calls `insight::format_warning()`, which
-only formats a string, discards the value and returns `code_lines`
-untouched. Its single caller is `stan_assembly.R:1841`. A response
-whose `mu_<resp>` assignment escapes the pattern is fitted with no
-trend in its linear predictor, and the program still compiles.
+`handle_response_trend_injection()` (`stan_assembly.R:1281-1288`)
+calls `insight::format_warning()`, which only formats a string,
+discards the value and returns `code_lines` untouched. No `warning()`
+wraps it. The user is told nothing at all. Its single caller is
+`stan_assembly.R:1705`. A response whose `mu_<resp>` assignment
+escapes the pattern is fitted with no trend in its linear predictor,
+and the program still compiles.
 
 ## Two spellings of the training frame
 
@@ -153,9 +158,11 @@ columns.
 **106. A missing covariate value gives `NA` back.**
 
 `posterior_epred()` returns a matrix carrying `NA` cells for a
-covariate value `newdata` omits. `posterior_epred.R:1470` carries no
-`any.missing = FALSE`. Name the column, as the pre-fit covariate
-guard does.
+covariate value `newdata` omits. `posterior_epred.mvgam()`
+(`posterior_epred.R:449-525`) asserts nothing about the matrix it
+returns, and `ordinal_probs()` (`posterior_epred.R:1490`) asserts
+`eta` numeric with no `any.missing = FALSE`. Name the column, as the
+pre-fit covariate guard does.
 
 ## No guard that an argument reaches the model
 
@@ -210,24 +217,44 @@ The box admits non-stationary draws such as `phi_1 = phi_2 = 0.9`.
 `rev_mapping()` (Heaps 2023), which is stationary by construction.
 That mapping at dimension 1 covers `AR(p)`.
 
-## One group-level assignment, written twice
+## One unwrapping that deletes every closing brace
 
-**113. A trend random effect is computed twice per iteration.**
+**114. `filter_block_content()` returns a block whose braces do not
+balance.**
 
-`r_1_1_trend = (sd_1_trend[1] * (z_1_trend[1]));` is emitted on both
-sides of the `mu_trend` declaration in `trend_re` and `trend_mixed`.
-The second write is identical to the first, so the value is right and
-the work is doubled. Emit the group-level assignment once, before the
-loop that uses it.
+brms guards the likelihood with `if (!prior_only) { ... }`. The filter
+drops that header and then drops every standalone `}` line
+(`stan_assembly.R:7373`). That removes the closing brace of each `for`
+loop in the same block. Two rules compensate for that. The monotonic
+branch deletes an orphaned `for` header. Construction of mu is
+subtracted from the model block before the filter runs. Unwrap the
+conditional by deleting its header and the brace matching it, and
+leave the other structures intact.
+
+## Four spellings of one brace count
+
+**115. Braces are counted by hand at two sites and guessed at a
+third.**
+
+`parse_stan_functions()` (`stan_assembly.R:8463`) and
+`inject_multivariate_trends_into_linear_predictors()`
+(`stan_assembly.R:1615`) count braces themselves. Both count a brace
+inside a string literal or a comment. `stan_line_code()` removes both
+first. The second also takes the next standalone `}` as a loop's
+closing brace, which holds only where the loop has no nested block.
+`clean_stan_comments()` (`stan_polish.R:517`) splits a line on
+`//` with the same blindness to a string literal. Four sites restate
+the `functions` header pattern that `stan_block_header()` composes.
+`stan_source.R` defines one helper for each of these questions.
 
 ## Debt the code carries in recognisable shapes
 
 **89. Six shapes remain, and a scan counts three of them.**
 
 Each shape leaves a mark in the source that a scan can find.
-`tests/local/debt_scan.R` reads parse data to count the marks in
-`R/`. Several counts include false positives, and each hit is
-examined before anything is removed.
+`tests/local/debt_scan.R` counts those marks in `R/` from parse data.
+Several counts include false positives, and each hit is examined
+before anything is removed.
 
 | shape | the mark it leaves | count |
 |---|---|---|

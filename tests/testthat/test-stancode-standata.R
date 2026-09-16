@@ -2441,6 +2441,44 @@ test_that("stancode handles smooth terms in trend_formula with correct declarati
   expect_true(knots_line < zs_line)
 })
 
+test_that("a trend term is computed once per iteration", {
+  # brms declares a group-level effect and a smooth coefficient in the
+  # trend model's transformed parameters and assigns each below its
+  # declaration, and mu_trend's construction needs the pair. Emitting
+  # both blocks wrote the assignment twice: the program parsed, the
+  # value was right, and every iteration computed it a second time.
+  data <- setup_stan_test_data()$univariate
+
+  shapes <- list(
+    list(trend = ~ (1 | site) + AR(p = 1), term = "r_1_1_trend"),
+    list(trend = ~ s(x, k = 5) + AR(p = 1), term = "s_1_1_trend"),
+    list(trend = ~ x + s(temperature, k = 5) + (1 | site) + AR(p = 1),
+         term = "r_1_1_trend")
+  )
+
+  for (shape in shapes) {
+    code <- stancode(
+      mvgam_formula(y ~ 1, trend_formula = shape$trend),
+      data = data, family = poisson(), validate = TRUE
+    )
+    statements <- gsub("\\s+", " ", trimws(
+      strsplit(code, "\n", fixed = TRUE)[[1]]
+    ))
+    assignments <- statements[
+      grepl("^[A-Za-z_][A-Za-z0-9_]*(\\[[^]]*\\])? \\+?=", statements)
+    ]
+
+    # Two blocks emitting one statement is what this catches, and
+    # anyDuplicated names the first repeat rather than a count
+    expect_identical(anyDuplicated(assignments), 0L)
+
+    # A duplicate check passes when the term is dropped altogether, so
+    # the term is also asserted present, exactly once
+    assigned <- grepl(paste0("^", shape$term, " ="), statements)
+    expect_identical(sum(assigned), 1L)
+  }
+})
+
 test_that("stancode handles multivariate specifications with shared RW trend and offset", {
   data <- setup_stan_test_data()$multivariate
 

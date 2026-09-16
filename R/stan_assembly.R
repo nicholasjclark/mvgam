@@ -1137,48 +1137,23 @@ find_stan_block <- function(code_lines, block_name) {
   checkmate::assert_character(code_lines, min.len = 1)
   checkmate::assert_string(block_name)
 
-  # Find block start - properly escape regex
-  block_pattern <- paste0("^\\s*", gsub(" ", "\\\\s+", block_name), "\\s*\\{")
-  start_idx <- which(grepl(block_pattern, code_lines))
-
-  if (length(start_idx) == 0) {
+  bounds <- stan_block_bounds(code_lines, block_name)
+  if (is.null(bounds)) {
     return(NULL)
   }
 
-  start_idx <- start_idx[1]
-
-  # Find matching closing brace
-  brace_count <- 0
-  end_idx <- NULL
-
-  for (i in start_idx:length(code_lines)) {
-    line <- code_lines[i]
-    # Count braces using base R - use literal braces with fixed = TRUE
-    open_matches <- gregexpr("{", line, fixed = TRUE)[[1]]
-    close_matches <- gregexpr("}", line, fixed = TRUE)[[1]]
-
-    # Count actual matches (gregexpr returns -1 when no matches)
-    open_braces <- if (open_matches[1] == -1) 0 else length(open_matches)
-    close_braces <- if (close_matches[1] == -1) 0 else length(close_matches)
-
-    brace_count <- brace_count + open_braces - close_braces
-
-
-    # Only check for closing after we've processed the opening line
-    if (i > start_idx && brace_count == 0) {
-      end_idx <- i
-      break
-    }
-  }
-
-  if (is.null(end_idx)) {
+  # stan_block_bounds() ends the block at the last line when the braces
+  # do not balance. Callers here splice code into the block, and a
+  # caller given the end of the program would write past it.
+  end_idx <- find_matching_closing_brace(code_lines, bounds$start)
+  if (is.na(end_idx)) {
     stop(insight::format_error(c(
       cli::format_inline("Cannot find end of {block_name} block."),
       x = "Stan code structure is invalid or malformed."
     )), call. = FALSE)
   }
 
-  return(list(start_idx = start_idx, end_idx = end_idx))
+  return(list(start_idx = bounds$start, end_idx = end_idx))
 }
 
 #' Find Insertion Point After if (!prior_only) in Model Block
@@ -2705,8 +2680,16 @@ sort_stanvars <- function(stanvars) {
   # left every other term type out, which is how `horseshoe(1)` on
   # `class = "b_trend"` produced a program using `b_trend` two lines
   # above its declaration.
+  # A comment is prose, and its words are not names the predictor
+  # uses, so each stanvar is compared on its code alone.
+  code_only <- function(scode) {
+    paste(stan_line_code(strsplit(scode, "\n", fixed = TRUE)[[1L]]),
+          collapse = "\n")
+  }
   mu_references <- unique(unlist(lapply(
-    scodes[is_mu_trend], extract_all_identifiers
+    scodes[is_mu_trend], function(scode) {
+      extract_all_identifiers(code_only(scode))
+    }
   )))
   builds_mu_trend <- vapply(
     scodes,
@@ -2714,7 +2697,7 @@ sort_stanvars <- function(stanvars) {
       if (!nzchar(scode)) {
         return(FALSE)
       }
-      any(extract_computed_variables(scode) %in% mu_references)
+      any(extract_computed_variables(code_only(scode)) %in% mu_references)
     },
     logical(1L)
   )
@@ -6608,6 +6591,9 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
   }
 
   # 2. Extract transformed parameters block content (without headers) and rename references
+  # Its stanvar is created below, once mu_trend's construction has
+  # settled which of these statements it takes for itself.
+  trend_tparams_code <- NULL
   tparams_block <- extract_stan_block_content(stancode, "transformed parameters")
   if (!is.null(tparams_block) && nchar(tparams_block) > 0) {
     # FILTER OUT DUPLICATE DECLARATIONS BEFORE RENAMING
@@ -6618,19 +6604,7 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
         filtered_tparams, suffix, mapping, "tparameters", is_multivariate, response_names
       )
       mapping <- tparams_result$mapping  # Update mapping
-
-      # Filter smooth coefficients - handled in mu_creation stanvar for correct ordering
-      tparams_lines <- strsplit(tparams_result$code, "\n")[[1]]
-      decl_pattern <- "^\\s*vector\\s*\\[.*\\]\\s+s_[0-9]+_[0-9]+_trend\\s*;"
-      assign_pattern <- "^\\s*s_[0-9]+_[0-9]+_trend\\s*="
-      keep_lines <- !grepl(decl_pattern, tparams_lines) &
-                    !grepl(assign_pattern, tparams_lines)
-      filtered_tparams_code <- paste(tparams_lines[keep_lines], collapse = "\n")
-
-      stanvar_list[["trend_tparameters"]] <- brms::stanvar(
-        scode = filtered_tparams_code,
-        block = "tparameters"
-      )
+      trend_tparams_code <- tparams_result$code
     }
   }
 
@@ -6809,6 +6783,26 @@ extract_and_rename_stan_blocks <- function(stancode, suffix, mapping, is_multiva
 
     mapping$original_to_renamed[["mu"]] <- paste0("mu", suffix)
     mapping$renamed_to_original[[paste0("mu", suffix)]] <- "mu"
+  }
+
+  # The trend's transformed parameters, less what mu_trend's
+  # construction takes. brms declares a group-level effect and a smooth
+  # coefficient here and assigns each below its declaration;
+  # construction needs both, and a statement written in two places is
+  # computed twice per iteration.
+  if (!is.null(trend_tparams_code)) {
+    mu_creation <- stanvar_list[["trend_model_mu_creation"]]
+    if (!is.null(mu_creation)) {
+      trend_tparams_code <- drop_repeated_statements(
+        trend_tparams_code, mu_creation[[1L]]$scode
+      )
+    }
+    if (nzchar(trimws(trend_tparams_code))) {
+      stanvar_list[["trend_tparameters"]] <- brms::stanvar(
+        scode = trend_tparams_code,
+        block = "tparameters"
+      )
+    }
   }
 
   # 4. Extract model block content (without headers) but exclude likelihood statements
@@ -7104,22 +7098,18 @@ reconstruct_mu_trend_with_renamed_vars <- function(mu_construction, supporting_d
     # Use registry-aware checking to prevent duplicates
     include <- should_include_in_transformed_parameters(decl)
 
-    # Include smooth coefficient declarations with split declaration+assignment pattern
-    # brms generates: vector[k] s_1_1; followed by s_1_1 = sds_1[1] * zs_1_1;
-    # These need to be in mu_creation for correct ordering because sort_stanvars
-    # puts them in "others" category which appears AFTER mu_trend.
-    # Random effects (r_*) are NOT included here - sort_stanvars classifies them
-    # to level0_re_declarations which appears BEFORE mu_trend.
+    # brms splits a declaration from its assignment for a smooth
+    # coefficient (`vector[k] s_1_1;` then `s_1_1 = sds_1[1] * zs_1_1;`)
+    # and for a group-level effect. The rule above leaves the
+    # declaration out, having no assignment of its own, so it travels
+    # with its assignment instead: mu_trend uses the pair, and
+    # sort_stanvars places whichever block holds them before mu_trend.
     if (!include && !grepl("=", decl) &&
         grepl("^\\s*(vector|matrix|real|int|array)", decl)) {
       var_match <- regmatches(decl, regexec("([a-zA-Z_][a-zA-Z0-9_]*)\\s*;", decl))[[1]]
       if (length(var_match) > 1) {
-        var_name <- var_match[2]
-        # Only include smooth coefficients (s_N_N pattern from brms)
-        if (grepl("^s_[0-9]+_[0-9]+$", var_name)) {
-          assign_pattern <- paste0("^\\s*", var_name, "\\s*=")
-          include <- any(grepl(assign_pattern, supporting_declarations))
-        }
+        assign_pattern <- paste0("^\\s*", var_match[2], "\\s*=")
+        include <- any(grepl(assign_pattern, supporting_declarations))
       }
     }
 
@@ -7429,48 +7419,21 @@ extract_non_likelihood_from_model_block <- function(model_block, exclude_mu_line
   # No need for brace extraction since the content is already unwrapped
 
   # Use general filtering function for model blocks
-  filtered_content <- filter_block_content(model_block, "model")
-
-  # Additionally filter out mu construction lines if provided
-  if (length(exclude_mu_lines) > 0 && !is.null(filtered_content)) {
-    lines <- strsplit(filtered_content, "\n", fixed = TRUE)[[1]]
-    lines <- trimws(lines)
-
-    # Remove lines that match exclude_mu_lines and their preceding for loops if needed
-    lines_to_remove <- character(0)
-    
-    for (mu_line in exclude_mu_lines) {
-      mu_line_trimmed <- trimws(mu_line)
-      if (nchar(mu_line_trimmed) > 0) {
-        lines_to_remove <- c(lines_to_remove, mu_line_trimmed)
-        
-        # If this mu line contains mu[n] pattern, find and mark preceding for loop for removal
-        if (grepl("mu\\[n\\]", mu_line_trimmed)) {
-          # Find the index of this mu line
-          mu_line_idx <- which(lines == mu_line_trimmed)
-          if (length(mu_line_idx) > 0) {
-            # Check the line immediately before it
-            for (idx in mu_line_idx) {
-              if (idx > 1) {
-                preceding_line <- lines[idx - 1]
-                if (grepl("^\\s*for\\s*\\(\\s*n\\s+in\\s+1:\\s*N\\s*\\)\\s*\\{?\\s*$", preceding_line)) {
-                  lines_to_remove <- c(lines_to_remove, preceding_line)
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    
-    # Remove all identified lines
-    lines <- lines[!lines %in% lines_to_remove]
-
-    filtered_content <- paste(lines, collapse = "\n")
-    if (nchar(trimws(filtered_content)) == 0) {
-      filtered_content <- NULL
-    }
+  # mu construction is extracted into its own stanvar, so the model
+  # block keeps none of it, and a loop left governing nothing goes too.
+  # Subtraction comes first, while the braces still balance:
+  # filter_block_content() unwraps the prior_only conditional by
+  # dropping every standalone closing brace.
+  if (length(exclude_mu_lines) > 0) {
+    model_block <- drop_repeated_statements(
+      model_block, paste(exclude_mu_lines, collapse = "\n")
+    )
   }
+  if (!nzchar(trimws(model_block))) {
+    return(NULL)
+  }
+
+  filtered_content <- filter_block_content(model_block, "model")
 
   return(filtered_content)
 }
@@ -7880,14 +7843,9 @@ extract_stan_identifiers <- function(stan_code) {
     gregexpr("\\b[a-zA-Z_][a-zA-Z0-9_]*\\b", code_without_comments, perl = TRUE)
   )[[1]]
 
-  # Extract computed variables from assignments (NEW: addresses computed variable mapping issue)
-  computed_vars <- extract_computed_variables(code_without_comments)
-
-  # Combine and deduplicate all identifiers
-  all_identifiers <- c(identifiers, computed_vars)
-
-  # Return unique identifiers, removing empty strings
-  unique(all_identifiers[nchar(all_identifiers) > 0])
+  # A variable an assignment computes is named in the code the scan
+  # above covers, so the two lists agree and one of them is enough.
+  unique(identifiers[nchar(identifiers) > 0])
 }
 
 #' Extract computed variables from Stan assignment patterns

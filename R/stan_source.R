@@ -228,3 +228,83 @@ statement_lines <- function(statements) {
   as.integer(unlist(Map(seq.int, statements$start, statements$end),
                     use.names = FALSE))
 }
+
+
+#' Headers left governing nothing
+#'
+#' A `for` or `if` whose every statement goes takes its own header with
+#' it, and the brace closing it where the source kept one. Headers are
+#' examined last one first, so a loop emptied by an inner loop leaving
+#' is itself emptied.
+#'
+#' @param lines The lines a block spans, its braces included.
+#' @param statements Rows of `stan_statements()` over `lines`.
+#' @param removed One logical per statement, TRUE where it goes.
+#' @return `removed`, with emptied headers and their braces added.
+#' @noRd
+emptied_blocks <- function(lines, statements, removed) {
+  opens <- grepl("^(for|if|while|else)\\b.*\\{\\s*$", statements$head)
+  for (i in rev(which(opens))) {
+    closes_at <- find_matching_closing_brace(lines, statements$end[i])
+    last <- if (is.na(closes_at)) length(lines) + 1L else closes_at
+    inner <- which(statements$start > statements$end[i] &
+                     statements$start < last)
+    # A blank line and a comment have an empty head. Neither computes
+    # anything, so neither keeps a block alive, and both leave with the
+    # statements they described.
+    code <- inner[nzchar(statements$head[inner])]
+    if (length(code) == 0L || !all(removed[code])) next
+    removed[inner] <- TRUE
+    removed[i] <- TRUE
+    if (!is.na(closes_at)) removed[statements$start == closes_at] <- TRUE
+  }
+  removed
+}
+
+
+#' A block body without the statements another block already writes
+#'
+#' brms declares a group-level effect or a smooth coefficient in the
+#' transformed parameters block and assigns it there. `mu_trend`'s
+#' construction repeats that pair, so both precede the predictor using
+#' them, and the block written second drops what the first one wrote.
+#' Comparison is by statement, since brms splits a density and its
+#' normalising constant over two lines.
+#'
+#' @param code One block body, without its braces.
+#' @param written Stan code whose statements appear elsewhere.
+#' @return `code` without any statement that `written` also contains.
+#' @noRd
+drop_repeated_statements <- function(code, written) {
+  checkmate::assert_string(code)
+  checkmate::assert_string(written)
+
+  as_block <- function(text) {
+    c("model {", strsplit(text, "\n", fixed = TRUE)[[1L]], "}")
+  }
+  # One statement per element, so indentation and the line a statement
+  # was split across cannot make two spellings of the same code differ.
+  one_line_each <- function(lines, statements) {
+    spans <- Map(seq.int, statements$start, statements$end)
+    vapply(spans, function(span) {
+      gsub("\\s+", " ", paste(trimws(lines[span]), collapse = " "))
+    }, character(1L))
+  }
+
+  body <- as_block(code)
+  statements <- stan_statements(body, list(start = 1L, end = length(body)))
+  elsewhere <- as_block(written)
+  taken <- one_line_each(elsewhere, stan_statements(
+    elsewhere, list(start = 1L, end = length(elsewhere))
+  ))
+
+  text <- one_line_each(body, statements)
+  repeated <- nzchar(text) & text %in% taken[nzchar(taken)]
+  repeated <- emptied_blocks(body, statements, repeated)
+  if (!any(repeated)) return(code)
+
+  dropped <- statement_lines(statements[repeated, , drop = FALSE])
+  wrappers <- c(1L, length(body))
+  paste(body[setdiff(seq_along(body), c(wrappers, dropped))],
+        collapse = "\n")
+}
