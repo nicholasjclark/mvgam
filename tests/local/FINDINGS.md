@@ -209,36 +209,112 @@ The box admits non-stationary draws such as `phi_1 = phi_2 = 0.9`.
 `rev_mapping()` (Heaps 2023), which is stationary by construction.
 That mapping at dimension 1 covers `AR(p)`.
 
-## One unwrapping that deletes every closing brace
+## One block body, two bounds
 
-**114. `filter_block_content()` returns a block whose braces do not
-balance.**
+**120. `extract_stan_block_content()` ends a block at the next
+header.**
 
-brms guards the likelihood with `if (!prior_only) { ... }`. The filter
-drops that header and then drops every standalone `}` line
-(`stan_assembly.R:7373`). That removes the closing brace of each `for`
-loop in the same block. Two rules compensate for that. The monotonic
-branch deletes an orphaned `for` header. Construction of mu is
-subtracted from the model block before the filter runs. Unwrap the
-conditional by deleting its header and the brace matching it, and
-leave the other structures intact.
+`extract_stan_block_content()` (`stan_assembly.R:7460`) takes a
+block's end from the following block's header and then strips one
+trailing `}`. `stan_block_body()` (`stan_source.R:103`) matches the
+brace the header opened. A blank line or a comment between `}` and
+the next header leaves the block's own closing brace in the returned
+body: a `data` block comes back as
+`"  int<lower=1> N;\n  vector[N] Y;\n}\n"`. Seven call sites build six
+`brms::stanvar()` objects from that value, and a stray `}` unbalances
+the assembled program. Point them at `stan_block_body()`.
 
-## Four spellings of one brace count
+## Comment stripping that cannot see a string
 
-**115. Braces are counted by hand at two sites and guessed at a
-third.**
+**121. Three strippers split on `//` inside a string literal.**
 
-`parse_stan_functions()` (`stan_assembly.R:8463`) and
-`inject_multivariate_trends_into_linear_predictors()`
-(`stan_assembly.R:1615`) count braces themselves. Both count a brace
-inside a string literal or a comment. `stan_line_code()` removes both
-first. The second also takes the next standalone `}` as a loop's
-closing brace, which holds only where the loop has no nested block.
-`clean_stan_comments()` (`stan_polish.R:517`) splits a line on `//`
-with the same blindness to a string literal. `stan_line_code()` is the
-wrong helper there. It also removes string literals, which suits
-analysis and corrupts emitted code. That site needs a comment stripper
-keeping strings intact.
+`strip_stan_comments()` (`stan_assembly.R:539`) and the inline
+`gsub("//.*$", "", ...)` at `stan_assembly.R:593`, `:7799` and `:8553`
+cut a line at its first `//`, string literals included.
+`stan_drop_line_comment()` (`stan_source.R:158`) keeps the literal.
+The `:7799` site is `extract_stan_identifiers()`, where
+`print("a // b"); real keepme = 1;` yields `print` and `a` alone.
+`keepme` then never takes its `_trend` suffix and collides with the
+observation-side name of that spelling. `strip_stan_comments()` also
+handles `/* */`, which neither shared helper does; fold that in.
+
+## Two answers for what the functions block declares
+
+**122. Called functions are reported as declared.**
+
+`extract_declared_functions()` (`mu_expression_analysis.R:231`)
+matches `identifier identifier(` with one regex, which `return
+log1p(x);` satisfies. On a body calling `log1p()` and `sqrt()` it
+returns `myfun`, `log1p` and `sqrt`. `parse_stan_functions()`
+(`stan_assembly.R:8382`) returns `myfun` alone. The first fills
+`context$all_functions`, the list against which a token in a `mu`
+expression is classified as a call. The second fills
+`mapping$custom_functions`, which keeps a name from `_trend`
+renaming. One token, two classifications.
+
+## Two rules for whether brms wrote a GLM likelihood
+
+**123. A closed list and an open pattern disagree.**
+
+`glm_calls_present()` (`glm_analysis.R:172`) tests the five names in
+`mvgam_glm_families`. `map_responses_to_glm()` (`:259`) tests
+`stan_density_call_pattern("_glm")`. `detect_glm_usage()`
+(`stan_assembly.R:994`) dispatches to the first when `response_names`
+is NULL and to the second otherwise. On
+`target += categorical_logit_glm_lpmf(Y_cat | Xc, Intercept, b);` the
+first reports no GLM and the second reports one. The quiet path
+returns before `glm_family_of_line()`'s refusal is reached, and the
+trend is computed without reaching the linear predictor.
+
+## Three routes to the factor count
+
+**124. `n_lv` is derived once and stored twice.**
+
+`spec_n_lv()` (`axes.R:92`) takes both spec depths through
+`spec_field()`. `trend_propagation.R:671` writes
+`trend_metadata$n_lv` from a bare `spec$n_lv`, and
+`validations.R:4725` writes `n_lv_for_grain` from `parsed_trend$n_lv`.
+On a nested spec, `list(trend_model = list(trend = "AR", n_lv = 2))`,
+`spec_n_lv()` gives 2. The bare `$` access gives NULL. Readers split
+three ways: `plot_helpers.R:797`, `predictions.R:592` and
+`diagnostics.mvgam.R:488`.
+
+## Three rules for one spec or a list of them
+
+**125. `first_trend_spec()` takes the first element of a bare spec.**
+
+`trend_spec_head()` (`axes.R:69`) requires every entry to be a list.
+`first_trend_spec()` (`multivariate_helpers.R:24`) tests
+`inherits(ts, "mvgam_trend")`. `validations.R:3369` tests
+`is_multivariate_trend_specs()` alone. On an unclassed univariate spec
+`list(trend = "AR", n_lv = 2L, gr = NA)`, `first_trend_spec()` returns
+the string `"AR"`. `detect_factor_n_lv()` composes the two and stops
+on a checkmate assertion.
+
+## Four counts of the series axis
+
+**126. `series_info$n_series` is set only for a literal column.**
+
+`extract_series_information()` (`mvgam_core.R:1445-1457`) sets
+`n_series` when a column named `series` is present. A hierarchical fit
+and an `mvbind()` fit carry none. The field stays NULL while
+`mvgam_axes(object)$series$n` holds the count. `plot_helpers.R:801`,
+`sample_innovations.R:713` and `print.mvgam.R:142` take the bare
+field. `sign_canonical.R:87-93` records this having already returned
+an object untouched with nothing said.
+
+## The suite's assertion count moves between runs
+
+**127. Two runs of one tree report different totals.**
+
+`devtools::test()` reported 10417, then 10427 on a tree whose only
+change was in `R/`, then 10427 again once ten assertions were added to
+`test-stancode-standata.R`. That file's own count moved 1476 to 1486,
+measured on its own. Ten assertions ran and ten others did not. Every
+run reported no failures, no warnings and no skips. What moves is the
+number of assertions a test runs, which makes the total a poor signal
+for a regression. Record per-file counts on two runs of one tree to
+find the test whose count depends on a draw.
 
 ## Debt the code carries in recognisable shapes
 

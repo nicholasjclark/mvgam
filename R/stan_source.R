@@ -144,6 +144,57 @@ stan_line_code <- function(lines) {
 }
 
 
+#' One Stan line with its line comment removed
+#'
+#' The string literals are kept, which is what separates this from
+#' `stan_line_code()`. A `//` inside a literal is part of the string
+#' and starts no comment. Code that will be emitted is stripped here;
+#' `stan_line_code()` suits analysis, where a literal's contents
+#' matter to nothing.
+#'
+#' @param line One Stan source line.
+#' @return `line` up to its first line comment, that comment removed.
+#' @noRd
+stan_drop_line_comment <- function(line) {
+  checkmate::assert_string(line)
+  chars <- strsplit(line, "", fixed = TRUE)[[1L]]
+  in_string <- FALSE
+  for (i in seq_along(chars)) {
+    if (identical(chars[i], '"')) {
+      in_string <- !in_string
+    } else if (!in_string && identical(chars[i], "/") &&
+               i < length(chars) && identical(chars[i + 1L], "/")) {
+      if (i == 1L) return("")
+      return(paste(chars[seq_len(i - 1L)], collapse = ""))
+    }
+  }
+  line
+}
+
+
+#' Lines of the prior_only guard inside a block body
+#'
+#' `prior_only_bounds()` locates the guard in a whole program, taking
+#' the model block's bounds. A block body carries no header of its
+#' own. One is supplied here, and the line numbers are shifted back
+#' onto the body's own numbering.
+#'
+#' @param lines Character vector of a block body's lines.
+#' @return Integer line numbers of the guard's header and of the brace
+#'   matching it, or `integer(0)` when the body holds no guard.
+#' @noRd
+prior_only_guard_indices <- function(lines) {
+  checkmate::assert_character(lines)
+  if (length(lines) == 0L) return(integer(0))
+  wrapped <- c("model {", lines, "}")
+  guard <- prior_only_bounds(
+    wrapped, list(start = 1L, end = length(wrapped))
+  )
+  if (is.null(guard)) return(integer(0))
+  c(guard$start, guard$end) - 1L
+}
+
+
 #' Net brace depth a Stan line opens
 #'
 #' @param line One Stan source line.

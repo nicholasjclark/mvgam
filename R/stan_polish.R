@@ -514,7 +514,7 @@ clean_stan_comments <- function(lines) {
     } else {
       # All other blocks: remove ALL comments and empty lines
       if (grepl("//", line)) {
-        code_part <- strsplit(line, "//", fixed = TRUE)[[1]][1]
+        code_part <- stan_drop_line_comment(line)
         code_trimmed <- trimws(code_part, which = "right")
         # Only keep line if there's actual code
         if (nzchar(code_trimmed)) {

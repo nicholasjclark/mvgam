@@ -1610,14 +1610,11 @@ inject_multivariate_trends_into_linear_predictors <- function(
             # Find the closing brace of the for loop
             for_start <- max(for_loop_lines)
             
-            # Look for the next standalone closing brace after the for loop
-            insert_point <- for_start
-            for (i in (for_start + 1):length(code_lines)) {
-              if (grepl("^\\s*}\\s*$", code_lines[i])) {
-                insert_point <- i
-                break
-              }
-            }
+            # The brace matching the loop's own opening brace. The
+            # next standalone `}` closes a nested block wherever the
+            # body holds one.
+            loop_end <- find_matching_closing_brace(code_lines, for_start)
+            insert_point <- if (is.na(loop_end)) for_start else loop_end
           } else {
             # Fallback: insert after mu declaration
             mu_decl_lines <- which(grepl(existing_mu_pattern, code_lines))
@@ -7338,11 +7335,18 @@ filter_block_content <- function(block_content, block_type = "model") {
   lines <- strsplit(block_content, "\n", fixed = TRUE)[[1]]
   lines <- trimws(lines)
 
+  # brms guards the likelihood with `if (!prior_only) { ... }`. That
+  # header and the brace matching it are dropped by line number. Every
+  # other closing brace ends a structure the block still needs, a
+  # `for` loop among them.
+  guard_idx <- prior_only_guard_indices(lines)
+
   # Keep filtered lines
   filtered_lines <- character(0)
   prev_line_was_sigma_prior <- FALSE
 
-  for (line in lines) {
+  for (idx in seq_along(lines)) {
+    line <- lines[idx]
     # Skip empty lines first (optimization)
     if (nchar(line) == 0) {
       next
@@ -7357,13 +7361,10 @@ filter_block_content <- function(block_content, block_type = "model") {
     is_sigma_lccdf <- grepl("^\\s*-\\s*1\\s*\\*\\s*student_t_lccdf\\s*\\(\\s*0\\s*\\|", line)
 
     # Skip specific lines we don't want (applies to all block types)
-    skip_line <- any(c(
+    skip_line <- idx %in% guard_idx || any(c(
       # Prior-only conditional statements (but keep their contents)
       grepl("if\\s*\\(\\s*!\\s*prior_only\\s*\\)\\s*\\{?\\s*$", line),
       grepl("if\\s*\\(\\s*prior_only\\s*\\)\\s*\\{?\\s*$", line),
-
-      # Standalone closing braces (likely end of prior_only blocks)
-      grepl("^\\s*}\\s*$", line),
 
       # lprior declarations and sigma priors (avoid duplication with observation model)
       grepl("^\\s*real\\s+lprior\\s*=\\s*0\\s*;", line),
@@ -7397,9 +7398,7 @@ filter_block_content <- function(block_content, block_type = "model") {
                      "\\s*\\("), line),
         grepl("target\\s*\\+=.*Y\\s*\\|", line),
         # Filter out lprior accumulation since observation model handles it
-        grepl("^\\s*target\\s*\\+=\\s*lprior\\s*;", line),
-        # Filter orphaned for loops from monotonic effects
-        grepl("^\\s*for\\s*\\(\\s*n_trend\\s+in\\s+\\d+:\\s*[Nn]_?[Tt]rend\\s*\\)\\s*\\{?\\s*$", line)
+        grepl("^\\s*target\\s*\\+=\\s*lprior\\s*;", line)
       ))
     }
 
@@ -7428,12 +7427,9 @@ extract_non_likelihood_from_model_block <- function(model_block, exclude_mu_line
   # extract_stan_block_content() already provides the full inner content
   # No need for brace extraction since the content is already unwrapped
 
-  # Use general filtering function for model blocks
-  # mu construction is extracted into its own stanvar, so the model
-  # block keeps none of it, and a loop left governing nothing goes too.
-  # Subtraction comes first, while the braces still balance:
-  # filter_block_content() unwraps the prior_only conditional by
-  # dropping every standalone closing brace.
+  # mu construction is extracted into its own stanvar, and the model
+  # block keeps none of it. A loop left governing nothing goes with
+  # its statements, through `emptied_blocks()`.
   if (length(exclude_mu_lines) > 0) {
     model_block <- drop_repeated_statements(
       model_block, paste(exclude_mu_lines, collapse = "\n")

@@ -1623,6 +1623,46 @@ test_that("statements are split at their delimiters and headers", {
   expect_identical(st$top, c(TRUE, FALSE, TRUE, TRUE, FALSE, FALSE, TRUE))
 })
 
+test_that("a line comment goes and a string literal stays", {
+  # Two families write `reject("...")` into their programs, and the
+  # stripper that emits code has to leave the literal alone.
+  f <- mvgam:::stan_drop_line_comment
+  expect_identical(f('reject("bad // value"); // drop me'),
+                   'reject("bad // value"); ')
+  expect_identical(f("x = 1; // note"), "x = 1; ")
+  expect_identical(f("y = 2;"), "y = 2;")
+  expect_identical(f("// whole line"), "")
+  # `stan_line_code()` gives a different result on the same line.
+  # Analysis takes that helper, and emitted code takes the other.
+  expect_identical(mvgam:::stan_line_code('reject("bad // value");'),
+                   "reject();")
+})
+
+test_that("unwrapping the likelihood guard leaves other braces alone", {
+  body <- c(
+    "lprior += normal_lpdf(b | 0, 1);",
+    "if (!prior_only) {",
+    "  for (n in 1:N) {",
+    "    target += poisson_log_lpmf(Y[n] | mu[n]);",
+    "  }",
+    "}"
+  )
+  # The guard's header and the brace matching it, and neither brace
+  # belonging to the loop inside it
+  expect_identical(mvgam:::prior_only_guard_indices(body), c(2L, 6L))
+  expect_length(mvgam:::prior_only_guard_indices("x = 1;"), 0L)
+
+  kept <- mvgam:::filter_block_content(paste(body, collapse = "\n"),
+                                       "model")
+  kept_lines <- strsplit(kept, "\n", fixed = TRUE)[[1]]
+  expect_false(any(grepl("prior_only", kept_lines)))
+  # The loop keeps the brace that closes it, and the block balances
+  expect_true(any(grepl("^for \\(n in 1:N\\) \\{$", kept_lines)))
+  expect_identical(
+    sum(vapply(kept_lines, mvgam:::count_stan_braces, integer(1))), 0L
+  )
+})
+
 test_that("a mixture family's program parses once polished", {
   data <- data.frame(
     y = c(rnorm(30, -2), rnorm(30, 2)),
