@@ -43,19 +43,6 @@ conditions still bypass it: a fit whose `trend_metadata$levels` is
 NULL and a frame whose series column is absent. One layer should own
 what a frame must carry.
 
-## Nothing checks whether a model is identified
-
-**103. The stacked design's rank is never computed.**
-
-The matrix deciding identification is the observation and trend
-designs stacked, mapped through
-`times_trend[obs_trend_time, obs_trend_series]`. No body computes it.
-Four of seven ordinary pairings measured rank deficient, including
-`y ~ 1` with `~ series + AR(p = 1)`, which is the plain way to ask
-for a per-series latent level. Reproduce at prefit on those seven
-pairings, then decide between a refusal naming the pairing and a
-notice that names the confounding.
-
 ## The composition families leave their own scale
 
 **104. `forecast(type = "expected")` departs from the simplex.**

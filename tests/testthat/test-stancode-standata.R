@@ -5750,3 +5750,66 @@ test_that("every response's GLM likelihood reads the predictor its trend joins",
     }
   }
 })
+
+
+test_that("the stacked design names the columns the two sides share", {
+  # A term written into both formulas moves the same fitted values
+  # from either side. The observation and trend designs stacked on
+  # one row per observation give the columns one likelihood sees at
+  # once, and the rank of that matrix states whether the two
+  # coefficients are separately identified.
+  set.seed(9)
+  nt <- 24
+  d <- expand.grid(
+    time = seq_len(nt), series = factor(c("a", "b", "c")),
+    stringsAsFactors = TRUE
+  )
+  d$x <- rnorm(nrow(d))
+  d$env <- rnorm(nrow(d))
+  d$y <- rpois(nrow(d), 6)
+
+  shared <- function(obs, tr) {
+    pf <- mvgam(obs, trend_formula = tr, data = d, family = poisson(),
+                run_model = FALSE)
+    m <- stacked_design_matrix(standata(pf))
+    if (is.null(m)) {
+      return(NULL)
+    }
+    norms <- sqrt(colSums(m^2))
+    norms[norms == 0] <- 1
+    q <- qr(sweep(m, 2L, norms, "/"))
+    list(
+      ncol = ncol(m),
+      rank = q$rank,
+      dependent = if (q$rank < ncol(m)) {
+        colnames(m)[q$pivot[seq.int(q$rank + 1L, ncol(m))]]
+      } else {
+        character(0)
+      }
+    )
+  }
+
+  # A per-series latent level against an observation intercept.
+  s1 <- shared(y ~ 1, ~ series + AR(p = 1))
+  expect_lt(s1$rank, s1$ncol)
+  expect_match(s1$dependent, "^X_trend:series")
+
+  # The same covariate on both sides.
+  s2 <- shared(y ~ x, ~ x + AR(p = 1))
+  expect_identical(s2$dependent, "X_trend:x")
+
+  # Different covariates are separately identified.
+  s3 <- shared(y ~ x, ~ env + AR(p = 1))
+  expect_identical(s3$rank, s3$ncol)
+  expect_length(s3$dependent, 0L)
+
+  # A smooth repeated across the two formulas shares its whole basis.
+  # A check over the parametric designs alone reports this pairing at
+  # full rank.
+  s4 <- shared(y ~ s(env, k = 5), ~ s(env, k = 5) + AR(p = 1))
+  expect_lt(s4$rank, s4$ncol)
+  expect_true(any(grepl("^Zs_1_1_trend", s4$dependent)))
+
+  # A trend carrying no design of its own gives nothing to compare.
+  expect_null(shared(y ~ x, ~ AR(p = 1)))
+})

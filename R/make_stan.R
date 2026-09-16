@@ -435,6 +435,10 @@ build_stan_components <- function(formula, data, family = gaussian(),
     write_stan_program(combined_components$stancode, save_model)
   }
   
+  # The two designs one likelihood sees together, checked once the
+  # data is assembled.
+  warn_confounded_design(combined_components$standata)
+
   # Return all components needed for mvgam object creation
   return(list(
     combined_components = combined_components,
@@ -507,9 +511,9 @@ zmvn_scale_confounded <- function(mv_spec, family, data) {
 #' Warn once when a single-series ZMVN cannot split its scales
 #' @noRd
 warn_zmvn_single_series <- function(mv_spec, family, data) {
-  if (isTRUE(identical(Sys.getenv("TESTTHAT"), "true"))) return()
   if (!zmvn_scale_confounded(mv_spec, family, data)) return()
-  rlang::warn(
+  warn_confound(
+    "zmvn_single_series",
     paste0(
       "A 'ZMVN()' trend on one series shares its scale with the ",
       "observation error. The latent state has no temporal ",
@@ -519,9 +523,7 @@ warn_zmvn_single_series <- function(mv_spec, family, data) {
       "with temporal structure such as 'AR()' or 'RW()'. ",
       "Alternatively, set a prior that says which scale you mean ",
       "to pin."
-    ),
-    .frequency = "once",
-    .frequency_id = "mvgam_zmvn_single_series"
+    )
   )
 }
 
@@ -533,7 +535,6 @@ warn_zmvn_single_series <- function(mv_spec, family, data) {
 # fitting with no obs intercept.
 #'@noRd
 warn_pw_obs_intercept <- function(mv_spec, obs_formula) {
-  if (isTRUE(identical(Sys.getenv("TESTTHAT"), "true"))) return()
   trend_specs <- mv_spec$trend_specs
   if (is.null(trend_specs)) return()
   specs_list <- if (is_multivariate_trend_specs(trend_specs)) {
@@ -548,7 +549,8 @@ warn_pw_obs_intercept <- function(mv_spec, obs_formula) {
   ))
   if (!has_pw) return()
   if (!has_obs_intercept(obs_formula)) return()
-  rlang::warn(
+  warn_confound(
+    "pw_obs_intercept",
     paste0(
       "Observation formula has an intercept while the trend is ",
       "PW. The PW trend's 'm_trend' parameter and the observation ",
@@ -556,9 +558,144 @@ warn_pw_obs_intercept <- function(mv_spec, obs_formula) {
       "fitting with a no-intercept observation formula (e.g. ",
       "'y ~ -1' or 'y ~ 0 + ...'). The PW intercept is then ",
       "uniquely identified."
-    ),
+    )
+  )
+}
+
+
+# Internal: one emission path for the confound notices.
+#
+# Each of these names a pairing the model still samples under, where
+# the priors alone divide an effect between two terms. They are held
+# back under `TESTTHAT` for the reason recorded in FINDINGS: a
+# once-per-session notice asserted in a suite reports whatever was
+# raised before it.
+#'@noRd
+warn_confound <- function(id, message) {
+  if (isTRUE(identical(Sys.getenv("TESTTHAT"), "true"))) {
+    return(invisible(NULL))
+  }
+  rlang::warn(
+    message,
     .frequency = "once",
-    .frequency_id = "mvgam_pw_obs_intercept"
+    .frequency_id = paste0("mvgam_", id)
+  )
+}
+
+
+# Internal: the observation and trend designs stacked on one row per
+# observation.
+#
+# An observation's linear predictor takes its own design row together
+# with the trend design row at
+# `times_trend[obs_trend_time, obs_trend_series]`. Stacking the two
+# gives the columns one likelihood sees at once, and the rank of that
+# matrix settles whether their coefficients are separately
+# identified.
+#
+# Covered: the parametric designs, the smooth bases and the Gaussian
+# process bases, on both sides. A grouping random effect is left out.
+# brms passes it as a sparse expansion against its own index, and
+# partial pooling identifies it by shrinkage.
+#
+# `NULL` where no comparison exists: a fit carrying one design alone,
+# a multivariate formula whose responses hold designs of their own,
+# and a `by = lv_axis()` trend whose second dimension counts factors.
+#'@noRd
+stacked_design_matrix <- function(sdata) {
+  n <- sdata$N
+  n_trend <- sdata$N_trend
+  tt <- sdata$times_trend
+  oi <- sdata$obs_trend_time
+  os <- sdata$obs_trend_series
+  if (is.null(n) || is.null(n_trend) || is.null(tt) ||
+        is.null(oi) || is.null(os)) {
+    return(NULL)
+  }
+  if (!identical(ncol(tt), as.integer(sdata$N_series_trend))) {
+    return(NULL)
+  }
+  is_design <- function(nm) {
+    v <- sdata[[nm]]
+    is.numeric(v) && length(dim(v)) == 2L &&
+      !grepl("_prior_", nm, fixed = TRUE) &&
+      !identical(nm, "times_trend")
+  }
+  nms <- Filter(is_design, names(sdata))
+  trend_nms <- Filter(function(nm) {
+    grepl("_trend$", nm) && nrow(sdata[[nm]]) == n_trend
+  }, nms)
+  obs_nms <- Filter(function(nm) {
+    !grepl("_trend$", nm) && nrow(sdata[[nm]]) == n
+  }, nms)
+  # One observation design named `X`. A multivariate formula keys its
+  # designs by response, and those belong to separate likelihoods.
+  if (!("X" %in% obs_nms) || !length(trend_nms)) {
+    return(NULL)
+  }
+  idx <- tt[cbind(as.integer(oi), as.integer(os))]
+  if (anyNA(idx)) {
+    return(NULL)
+  }
+  # A block carries its own column names where brms wrote them, and
+  # a basis column is numbered otherwise, which keeps every column of
+  # the result nameable in the notice.
+  labelled <- function(nm, rows) {
+    block <- as.matrix(sdata[[nm]])
+    if (!is.null(rows)) {
+      block <- block[rows, , drop = FALSE]
+    }
+    cols <- colnames(block)
+    if (is.null(cols) || !all(nzchar(cols))) {
+      cols <- paste0(nm, "[", seq_len(ncol(block)), "]")
+    } else {
+      cols <- paste0(nm, ":", cols)
+    }
+    colnames(block) <- cols
+    block
+  }
+  obs_part <- do.call(cbind, lapply(obs_nms, labelled, rows = NULL))
+  trend_part <- do.call(cbind, lapply(trend_nms, labelled, rows = idx))
+  cbind(obs_part, trend_part)
+}
+
+
+# Internal: warn once when the two designs share a direction.
+#
+# A term written into both formulas moves the same fitted values from
+# either side. The model still samples, and the priors alone set the
+# split between the two coefficients. `y ~ 1` with
+# `~ series + AR(p = 1)` is one such pairing and a reasonable model
+# to write. This names the columns involved and continues.
+#'@noRd
+warn_confounded_design <- function(sdata) {
+  m <- stacked_design_matrix(sdata)
+  if (is.null(m) || ncol(m) < 2L) {
+    return(invisible(NULL))
+  }
+  # A rank taken on raw columns follows their scales: the
+  # observation design is centred and the trend design is not.
+  norms <- sqrt(colSums(m^2))
+  norms[norms == 0] <- 1
+  q <- qr(sweep(m, 2L, norms, "/"))
+  if (q$rank >= ncol(m)) {
+    return(invisible(NULL))
+  }
+  dependent <- colnames(m)[q$pivot[seq.int(q$rank + 1L, ncol(m))]]
+  warn_confound(
+    "confounded_design",
+    paste0(
+      "The observation and trend designs share ",
+      ncol(m) - q$rank, " direction",
+      if (ncol(m) - q$rank > 1L) "s" else "", ". Stacked, they hold ",
+      ncol(m), " columns of rank ", q$rank,
+      ". The remaining columns carry ",
+      paste(dependent, collapse = ", "),
+      ". A coefficient on one side and its partner on the other move ",
+      "the same fitted values, and the priors alone set the split ",
+      "between them. Drop the repeated term from one formula, or set ",
+      "a prior pinning the side that carries it."
+    )
   )
 }
 
